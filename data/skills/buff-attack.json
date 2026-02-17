@@ -1,0 +1,23 @@
+{
+  "id": "buff-attack",
+  "name": "攻击强化",
+  "description": "提升自身攻击力",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 4,
+  "maxCharges": 0,
+  "powerMultiplier": 1.0,
+  "code": "function executeSkill(context) {\n  return {\n    effects: [{
+      type: \"buff\",\n      value: 10,\n      target: \"self\",\n      duration: 3,\n      description: \"攻击力提升10点，持续3回合\"\n    }],\n    message: \"攻击强化生效，攻击力提升\",\n    success: true\n  }\n}",
+  "effects": [
+    {
+      "type": "buff",
+      "value": 10,
+      "target": "self",
+      "duration": 3,
+      "description": "攻击力提升10点，持续3回合"
+    }
+  ],
+  "range": "self",
+  "requiresTarget": false
+}

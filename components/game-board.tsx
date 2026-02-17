@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect } from "react"
 import type { BoardMap, Tile } from "@/lib/game/map"
 import type { PieceInstance, PieceTemplate } from "@/lib/game/piece"
-import { getPieceById } from "@/lib/game/piece-repository"
+import { getPieceById, loadPieces } from "@/lib/game/piece-repository"
+
 
 type GameBoardProps = {
   map: BoardMap
@@ -10,6 +12,7 @@ type GameBoardProps = {
   onTileClick?: (x: number, y: number) => void
   selectedPieceId?: string
   isSelectingMoveTarget?: boolean
+  isSelectingTeleportTarget?: boolean
 }
 
 function tileColor(tile: Tile): string {
@@ -28,8 +31,13 @@ function tileColor(tile: Tile): string {
   }
 }
 
-export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSelectingMoveTarget }: GameBoardProps) {
+export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSelectingMoveTarget, isSelectingTeleportTarget }: GameBoardProps) {
   const size = Math.max(map.width, map.height)
+  
+  // 组件加载时自动加载棋子数据
+  useEffect(() => {
+    void loadPieces()
+  }, [])
   
   // 方块类型图例
   const tileTypes = [
@@ -63,6 +71,37 @@ export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSe
       if (y === startY) continue
       if (isValidMoveTarget(startX, startY, startX, y)) {
         targets.push({ x: startX, y })
+      }
+    }
+    
+    return targets
+  }
+
+  // 计算可传送的格子（5格范围内）
+  const getValidTeleportTargets = (): { x: number, y: number }[] => {
+    if (!selectedPiece || !isSelectingTeleportTarget) return []
+    
+    const targets: { x: number, y: number }[] = []
+    const { x: startX, y: startY } = selectedPiece
+    const teleportRange = 5
+    
+    // 检查5格范围内的所有格子
+    for (let x = 0; x < map.width; x++) {
+      for (let y = 0; y < map.height; y++) {
+        if (x === startX && y === startY) continue
+        
+        // 计算曼哈顿距离
+        const distance = Math.abs(x - startX) + Math.abs(y - startY)
+        if (distance <= teleportRange) {
+          // 检查目标格子是否存在且可走
+          const targetTile = map.tiles.find(t => t.x === x && t.y === y)
+          if (targetTile && targetTile.props.walkable) {
+            // 检查目标格子是否被占用
+            if (!pieces.some(p => p.x === x && p.y === y && p.currentHp > 0)) {
+              targets.push({ x, y })
+            }
+          }
+        }
       }
     }
     
@@ -134,6 +173,14 @@ export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSe
       }
     }
     
+    // 检查是否是可传送目标
+    if (isSelectingTeleportTarget) {
+      const validTargets = getValidTeleportTargets()
+      if (validTargets.some(t => t.x === tile.x && t.y === tile.y)) {
+        return `${baseClass} cursor-pointer hover:bg-purple-500/30`
+      }
+    }
+    
     return baseClass
   }
 
@@ -172,7 +219,7 @@ export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSe
               tile.props.walkable
             }  bullet=${tile.props.bulletPassable}`}
             onClick={() => {
-              if (isSelectingMoveTarget && onTileClick) {
+              if ((isSelectingMoveTarget || isSelectingTeleportTarget) && onTileClick) {
                 onTileClick(tile.x, tile.y)
               }
             }}
@@ -219,7 +266,8 @@ export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSe
 
             {/* 显示类型首字母 */}
             <span className="pointer-events-none select-none uppercase">
-              {tile.props.type[0]}
+              {/* 注释掉类型首字母显示，避免用户混淆 */}
+              {/* {tile.props.type[0]} */}
             </span>
           </div>
         ))}

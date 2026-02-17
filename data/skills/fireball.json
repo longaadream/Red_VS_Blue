@@ -1,0 +1,23 @@
+{
+  "id": "fireball",
+  "name": "火球术",
+  "description": "发射火球对敌人造成范围伤害",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 2,
+  "maxCharges": 3,
+  "chargeCost": 1,
+  "powerMultiplier": 1.5,
+  "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  const targets = getAllEnemiesInRange(context, context.skill.areaSize || 3)\n  return {\n    damage: damage,\n    effects: targets.map(t => ({\n      type: \"damage\",\n      value: damage,\n      target: \"enemy\",\n      description: \"对 \" + t.templateId + \" 造成 \" + damage + \" 点伤害\"\n    })),\n    message: \"火球爆炸，对范围内敌人造成伤害\",\n    success: true\n  }\n}",
+  "effects": [
+    {
+      "type": "damage",
+      "value": 1.5,
+      "target": "all-enemies",
+      "description": "对范围内所有敌人造成150%攻击力的伤害"
+    }
+  ],
+  "range": "area",
+  "areaSize": 3,
+  "requiresTarget": false
+}

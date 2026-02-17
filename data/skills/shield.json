@@ -1,0 +1,24 @@
+{
+  "id": "shield",
+  "name": "护盾术",
+  "description": "为自身提供护盾，吸收伤害",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 4,
+  "maxCharges": 2,
+  "chargeCost": 1,
+  "powerMultiplier": 1.0,
+  "code": "function executeSkill(context) {\n  return {\n    effects: [{
+      type: \"shield\",\n      value: 50,\n      target: \"self\",\n      duration: 3,\n      description: \"获得50点护盾，持续3回合\"\n    }],\n    message: \"护盾术生效，获得护盾\",\n    success: true\n  }\n}",
+  "effects": [
+    {
+      "type": "shield",
+      "value": 50,
+      "target": "self",
+      "duration": 3,
+      "description": "获得50点护盾，持续3回合"
+    }
+  ],
+  "range": "self",
+  "requiresTarget": false
+}

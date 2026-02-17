@@ -1,63 +1,23 @@
-import { AsciiMapConfig, BoardMap, createMapFromAscii } from "@/lib/game/map"
+import { getMapById, getAllMaps, loadMaps, type BoardMap } from "@/lib/game/map-repository"
 
-// 通用图例：你可以在这里统一定义“# . S C H”等字符的含义
-const BASE_LEGEND: AsciiMapConfig["legend"] = [
-  {
-    char: "#",
-    type: "wall",
-    walkable: false,
-    bulletPassable: false,
-  },
-  {
-    char: ".",
-    type: "floor",
-    walkable: true,
-    bulletPassable: true,
-  },
-  {
-    char: "S",
-    type: "spawn",
-    walkable: true,
-    bulletPassable: true,
-  },
-  {
-    char: "C",
-    type: "cover",
-    walkable: true,
-    bulletPassable: false,
-  },
-  {
-    char: "H",
-    type: "hole",
-    walkable: false,
-    bulletPassable: true,
-  },
-]
+// 预加载地图数据
+loadMaps().catch(error => {
+  console.error('Error preloading maps:', error)
+})
 
-// 一个示例地图：8x6 的小竞技场
-const ARENA_ASCII: AsciiMapConfig = {
-  id: "arena-8x6",
-  name: "小型竞技场",
-  layout: [
-    "########",
-    "#..C..S#",
-    "#..##..#",
-    "#S.C..H#",
-    "#......#",
-    "########",
-  ],
-  legend: BASE_LEGEND,
-}
+export const DEFAULT_MAP_ID = "arena-8x6"
 
-export const MAPS: Record<string, BoardMap> = {
-  [ARENA_ASCII.id]: createMapFromAscii(ARENA_ASCII),
-}
-
+// 获取地图
 export function getMap(id: string): BoardMap | undefined {
-  return MAPS[id]
+  return getMapById(id)
 }
 
+// 获取所有地图
 export function listMaps(): BoardMap[] {
-  return Object.values(MAPS)
+  return getAllMaps()
 }
+
+// 加载地图数据（用于需要手动触发加载的场景）
+export { loadMaps }
+
 

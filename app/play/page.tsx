@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, UserPlus, LogIn } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { GameBoard } from "@/components/game-board"
 import type { BattleState, BattleAction } from "@/lib/game/turn"
 
@@ -19,16 +20,37 @@ type Room = {
   currentTurnIndex: number
 }
 
+type User = {
+  id: string
+  username: string
+  password: string
+  createdAt: string
+}
+
 export default function PlayPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [playerName, setPlayerName] = useState("")
+  const [user, setUser] = useState<User | null>(null)
   const [roomId, setRoomId] = useState<string | null>(null)
   const [room, setRoom] = useState<Room | null>(null)
   const [battle, setBattle] = useState<BattleState | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 检查用户登录状态
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser))
+      } catch (error) {
+        console.error('解析用户信息失败:', error)
+        localStorage.removeItem('user')
+        setUser(null)
+      }
+    }
+  }, [])
 
   // 如果 URL 上已经有 roomId（例如分享链接），进入页面时自动加载
   useEffect(() => {
@@ -47,7 +69,7 @@ export default function PlayPage() {
       const res = await fetch(`/api/rooms/${id}`)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        // 不再显示错误信息，而是等待用户输入昵称并加入房间
+        // 不再显示错误信息，而是等待用户登录并加入房间
         setError(null)
         return
       }
@@ -67,8 +89,8 @@ export default function PlayPage() {
   }
 
   async function handleCreateRoom() {
-    if (!playerName.trim()) {
-      setError("请先输入你的昵称")
+    if (!user) {
+      setError("请先登录")
       return
     }
     try {
@@ -79,7 +101,7 @@ export default function PlayPage() {
       const res = await fetch("/api/lobby", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: `${playerName} 的 1v1 房间` }),
+        body: JSON.stringify({ name: `${user.username} 的 1v1 房间` }),
       })
 
       if (!res.ok) {
@@ -95,7 +117,7 @@ export default function PlayPage() {
       router.replace(`/play?roomId=${created.id}`)
 
       // 2. 让自己加入房间
-      await joinRoom(created.id, playerName)
+      await joinRoom(created.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
@@ -103,11 +125,14 @@ export default function PlayPage() {
     }
   }
 
-  async function joinRoom(id: string, name: string) {
+  async function joinRoom(id: string) {
+    if (!user) {
+      throw new Error("请先登录")
+    }
     const res = await fetch(`/api/rooms/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "join", playerName: name }),
+      body: JSON.stringify({ action: "join", playerName: user.username, playerId: user.id }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -118,8 +143,8 @@ export default function PlayPage() {
   }
 
   async function handleJoinExisting() {
-    if (!playerName.trim()) {
-      setError("请先输入你的昵称")
+    if (!user) {
+      setError("请先登录")
       return
     }
     if (!roomId) {
@@ -129,7 +154,7 @@ export default function PlayPage() {
     try {
       setLoading(true)
       setError(null)
-      await joinRoom(roomId, playerName)
+      await joinRoom(roomId)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
@@ -138,12 +163,12 @@ export default function PlayPage() {
   }
 
   async function handleStartGame() {
-    if (!roomId) return
+    if (!roomId || !user) return
     try {
       setLoading(true)
       setError(null)
       // 重定向到棋子选择页面，而不是直接开始游戏
-      router.replace(`/piece-selection?roomId=${roomId}&playerName=${encodeURIComponent(playerName.trim())}`)
+      router.replace(`/piece-selection?roomId=${roomId}&playerName=${encodeURIComponent(user.username)}&playerId=${encodeURIComponent(user.id)}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
@@ -152,9 +177,8 @@ export default function PlayPage() {
   }
 
   async function handleMakeMove() {
-    if (!roomId || !battle || !playerName.trim()) return
-    const me = currentPlayerId
-    if (!me) return
+    if (!roomId || !battle || !user) return
+    const me = user.id
     const myPiece = battle.pieces.find((p) => p.ownerPlayerId === me)
     if (!myPiece || myPiece.x == null || myPiece.y == null) return
 
@@ -276,17 +300,17 @@ export default function PlayPage() {
 
   const isMyTurn =
     !!room &&
-    !!playerName.trim() &&
-    currentPlayerName?.toLowerCase() === playerName.trim().toLowerCase()
+    !!user &&
+    currentPlayerName?.toLowerCase() === user.username.toLowerCase()
 
   const currentPlayerId = useMemo(
-    () => (playerName.trim() ? playerName.trim() : null),
-    [playerName],
+    () => (user ? user.id : null),
+    [user],
   )
 
   // 轮询检查房间状态，确保所有玩家都能及时获取状态变化
   useEffect(() => {
-    if (!roomId) return
+    if (!roomId || !user) return
 
     const interval = setInterval(async () => {
       try {
@@ -294,7 +318,7 @@ export default function PlayPage() {
         if (res.ok) {
           const data = (await res.json()) as Room
           if (data.status === "in-progress") {
-            router.replace(`/battle/${roomId}?playerName=${encodeURIComponent(playerName.trim())}`)
+            router.replace(`/battle/${roomId}?playerName=${encodeURIComponent(user.username)}&playerId=${encodeURIComponent(user.id)}`)
           }
         }
       } catch (error) {
@@ -303,14 +327,14 @@ export default function PlayPage() {
     }, 2000) // 每2秒检查一次
 
     return () => clearInterval(interval)
-  }, [roomId, router])
+  }, [roomId, router, user])
 
   // 监听房间状态变化，当游戏开始时自动跳转
   useEffect(() => {
-    if (room?.status === "in-progress" && roomId) {
-      router.replace(`/battle/${roomId}`)
+    if (room?.status === "in-progress" && roomId && user) {
+      router.replace(`/battle/${roomId}?playerName=${encodeURIComponent(user.username)}&playerId=${encodeURIComponent(user.id)}`)
     }
-  }, [room?.status, roomId, router])
+  }, [room?.status, roomId, router, user])
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center px-4 py-12">
@@ -323,67 +347,101 @@ export default function PlayPage() {
           Back to Menu
         </Link>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold">
-              1v1 对战大厅
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="playerName">你的昵称</Label>
-              <Input
-                id="playerName"
-                placeholder="例如：Player_One"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-              />
-            </div>
+        {/* 未登录状态 */}
+        {!user && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold">
+                1v1 对战大厅
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertTitle>需要登录</AlertTitle>
+                <AlertDescription>
+                  请先登录或注册账号，才能进行 1v1 对战
+                </AlertDescription>
+              </Alert>
+              <div className="flex gap-2">
+                <Button asChild className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+                  <Link href="/auth/login">
+                    <LogIn className="mr-2 h-4 w-4" />
+                    登录
+                  </Link>
+                </Button>
+                <Button asChild className="flex-1 bg-green-600 hover:bg-green-700 text-white">
+                  <Link href="/auth/register">
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    注册
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-            <div className="space-y-2">
-              <Label htmlFor="roomId">房间 ID（可选，用于加入他人房间）</Label>
-              <Input
-                id="roomId"
-                placeholder="创建房间后会自动生成"
-                value={roomId ?? ""}
-                onChange={(e) => setRoomId(e.target.value || null)}
-              />
-            </div>
+        {/* 已登录状态 */}
+        {user && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold">
+                1v1 对战大厅
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>当前用户</Label>
+                <div className="flex items-center gap-2 rounded-md border border-border bg-card/60 p-2">
+                  <span className="font-medium">{user.username}</span>
+                  <span className="text-xs text-muted-foreground">ID: {user.id}</span>
+                </div>
+              </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                className="flex-1"
-                onClick={handleCreateRoom}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    处理中…
-                  </>
-                ) : (
-                  "创建新房间"
-                )}
-              </Button>
-              <Button
-                className="flex-1"
-                variant="outline"
-                onClick={handleJoinExisting}
-                disabled={loading}
-              >
-                加入房间
-              </Button>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="roomId">房间 ID（可选，用于加入他人房间）</Label>
+                <Input
+                  id="roomId"
+                  placeholder="创建房间后会自动生成"
+                  value={roomId ?? ""}
+                  onChange={(e) => setRoomId(e.target.value || null)}
+                />
+              </div>
 
-            {error && (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  className="flex-1"
+                  onClick={handleCreateRoom}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      处理中…
+                    </>
+                  ) : (
+                    "创建新房间"
+                  )}
+                </Button>
+                <Button
+                  className="flex-1"
+                  variant="outline"
+                  onClick={handleJoinExisting}
+                  disabled={loading}
+                >
+                  加入房间
+                </Button>
+              </div>
 
-        {room && (
+              {error && (
+                <p className="text-sm text-destructive" role="alert">
+                  {error}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {user && room && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -415,7 +473,7 @@ export default function PlayPage() {
                 </div>
               </div>
 
-              {!battle && room.status === "waiting" && playerName.trim() && (
+              {!battle && room.status === "waiting" && user && (
                 <div className="flex justify-center">
                   <Button
                     size="sm"
@@ -484,7 +542,7 @@ export default function PlayPage() {
                           loading ||
                           !battle ||
                           battle.turn.phase !== "action" ||
-                          !currentPlayerId
+                          !user
                         }
                         onClick={handleMakeMove}
                       >
@@ -497,15 +555,15 @@ export default function PlayPage() {
                           loading ||
                           !battle ||
                           battle.turn.phase !== "action" ||
-                          !currentPlayerId
+                          !user
                         }
                         onClick={() =>
                           sendBattleAction({
                             type: "useBasicSkill",
-                            playerId: currentPlayerId!,
+                            playerId: user!.id,
                             pieceId:
                               battle.pieces.find(
-                                (p) => p.ownerPlayerId === currentPlayerId,
+                                (p) => p.ownerPlayerId === user!.id,
                               )?.instanceId ?? "",
                             skillId: "basic-attack",
                           })
@@ -520,15 +578,15 @@ export default function PlayPage() {
                           loading ||
                           !battle ||
                           battle.turn.phase !== "action" ||
-                          !currentPlayerId
+                          !user
                         }
                         onClick={() =>
                           sendBattleAction({
                             type: "useChargeSkill",
-                            playerId: currentPlayerId!,
+                            playerId: user!.id,
                             pieceId:
                               battle.pieces.find(
-                                (p) => p.ownerPlayerId === currentPlayerId,
+                                (p) => p.ownerPlayerId === user!.id,
                               )?.instanceId ?? "",
                             skillId: "fireball",
                           })
@@ -543,12 +601,12 @@ export default function PlayPage() {
                           loading ||
                           !battle ||
                           battle.turn.phase !== "action" ||
-                          !currentPlayerId
+                          !user
                         }
                         onClick={() =>
                           sendBattleAction({
                             type: "endTurn",
-                            playerId: currentPlayerId!,
+                            playerId: user!.id,
                           })
                         }
                       >

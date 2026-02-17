@@ -1,120 +1,30 @@
 import type { PieceTemplate } from "./piece"
 
-export const DEFAULT_PIECES: Record<string, PieceTemplate> = {
-  "red-warrior": {
-    id: "red-warrior",
-    name: "红方战士",
-    faction: "red",
-    description: "高生命值，近战攻击",
-    rarity: "common",
-    image: "🛡️",
-    stats: {
-      maxHp: 120,
-      attack: 20,
-      defense: 8,
-      moveRange: 3,
-    },
-    skills: [
-      { skillId: "basic-attack", level: 1 },
-      { skillId: "shield", level: 1 },
-    ],
-    isDefault: true,
-  },
-  "red-mage": {
-    id: "red-mage",
-    name: "红方法师",
-    faction: "red",
-    description: "高攻击力，低防御力",
-    rarity: "rare",
-    image: "🔥",
-    stats: {
-      maxHp: 80,
-      attack: 30,
-      defense: 3,
-      moveRange: 2,
-    },
-    skills: [
-      { skillId: "fireball", level: 1 },
-      { skillId: "teleport", level: 1 },
-    ],
-    isDefault: true,
-  },
-  "red-archer": {
-    id: "red-archer",
-    name: "红方射手",
-    faction: "red",
-    description: "远程攻击，中等属性",
-    rarity: "common",
-    image: "🏹",
-    stats: {
-      maxHp: 100,
-      attack: 25,
-      defense: 5,
-      moveRange: 4,
-    },
-    skills: [
-      { skillId: "basic-attack", level: 1 },
-      { skillId: "buff-attack", level: 1 },
-    ],
-    isDefault: true,
-  },
-  "blue-warrior": {
-    id: "blue-warrior",
-    name: "蓝方战士",
-    faction: "blue",
-    description: "高生命值，近战攻击",
-    rarity: "common",
-    image: "🛡️",
-    stats: {
-      maxHp: 120,
-      attack: 20,
-      defense: 8,
-      moveRange: 3,
-    },
-    skills: [
-      { skillId: "basic-attack", level: 1 },
-      { skillId: "shield", level: 1 },
-    ],
-    isDefault: true,
-  },
-  "blue-mage": {
-    id: "blue-mage",
-    name: "蓝方法师",
-    faction: "blue",
-    description: "高攻击力，低防御力",
-    rarity: "rare",
-    image: "🔥",
-    stats: {
-      maxHp: 80,
-      attack: 28,
-      defense: 4,
-      moveRange: 2,
-    },
-    skills: [
-      { skillId: "fireball", level: 1 },
-      { skillId: "teleport", level: 1 },
-    ],
-    isDefault: true,
-  },
-  "blue-archer": {
-    id: "blue-archer",
-    name: "蓝方射手",
-    faction: "blue",
-    description: "远程攻击，中等属性",
-    rarity: "common",
-    image: "🏹",
-    stats: {
-      maxHp: 100,
-      attack: 22,
-      defense: 6,
-      moveRange: 4,
-    },
-    skills: [
-      { skillId: "basic-attack", level: 1 },
-      { skillId: "buff-attack", level: 1 },
-    ],
-    isDefault: true,
-  },
+// 客户端版本：初始为空对象，通过API获取数据
+export let DEFAULT_PIECES: Record<string, PieceTemplate> = {}
+
+// 从API加载棋子数据
+export async function loadPieces(): Promise<void> {
+  try {
+    const response = await fetch('/api/pieces')
+    if (response.ok) {
+      DEFAULT_PIECES = await response.json()
+    }
+  } catch (error) {
+    console.error('Error loading pieces:', error)
+  }
+}
+
+// 服务器端版本：使用文件系统加载数据
+if (typeof window === 'undefined') {
+  // 只在服务器端执行
+  const { loadJsonFilesServer } = require('./file-loader')
+  DEFAULT_PIECES = loadJsonFilesServer<PieceTemplate>('data/pieces')
+  
+  // 如果没有加载到棋子，使用空对象
+  if (Object.keys(DEFAULT_PIECES).length === 0) {
+    console.warn('No pieces loaded from JSON files, using empty object')
+  }
 }
 
 export function getPieceById(id: string): PieceTemplate | undefined {
@@ -130,3 +40,4 @@ export function getPiecesByFaction(faction: "red" | "blue"): PieceTemplate[] {
 export function getAllPieces(): PieceTemplate[] {
   return Object.values(DEFAULT_PIECES)
 }
+

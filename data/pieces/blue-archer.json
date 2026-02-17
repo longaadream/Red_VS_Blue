@@ -1,0 +1,25 @@
+{
+  "id": "blue-archer",
+  "name": "蓝方射手",
+  "faction": "blue",
+  "description": "远程攻击，中等属性",
+  "rarity": "common",
+  "image": "🏹",
+  "stats": {
+    "maxHp": 100,
+    "attack": 22,
+    "defense": 6,
+    "moveRange": 4
+  },
+  "skills": [
+    {
+      "skillId": "basic-attack",
+      "level": 1
+    },
+    {
+      "skillId": "buff-attack",
+      "level": 1
+    }
+  ],
+  "isDefault": true
+}

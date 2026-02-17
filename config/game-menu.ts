@@ -16,8 +16,8 @@ import {
 
 /** Game branding */
 export const GAME_BRAND = {
-  title: "Red",
-  subtitle: "VS Blue",
+  title: "RED",
+  subtitle: "VS BLUE",
   tagline: "Red vs Blue tactical duel",
   version: "v1.0.2",
 }
@@ -88,15 +88,6 @@ export const MENU_ITEMS: MenuItem[] = [
     description: "Game options",
     icon: Settings,
     href: "/settings",
-    variant: "default",
-    enabled: true,
-  },
-  {
-    id: "quit",
-    label: "Quit",
-    description: "Exit to desktop",
-    icon: LogOut,
-    href: "/quit",
     variant: "default",
     enabled: true,
   },

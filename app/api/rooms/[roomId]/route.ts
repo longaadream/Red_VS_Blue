@@ -17,16 +17,17 @@ export async function GET(
   return NextResponse.json(room)
 }
 
-type JoinBody = {
-  action: "join"
-  playerName: string
-}
-
 type StartBody = {
   action: "start"
 }
 
-type RoomPostBody = JoinBody | StartBody
+type JoinBody = {
+  action: "join"
+  playerId: string
+  playerName?: string
+}
+
+
 
 export async function POST(
   req: NextRequest,
@@ -47,9 +48,10 @@ export async function POST(
   }
 
   if (body.action === "join") {
-    const name = body.playerName?.trim()
-    if (!name) {
-      return NextResponse.json({ error: "playerName is required" }, { status: 400 })
+    const playerId = body.playerId?.trim()
+    const playerName = body.playerName?.trim()
+    if (!playerId) {
+      return NextResponse.json({ error: "playerId is required" }, { status: 400 })
     }
 
     if (room.status !== "waiting") {
@@ -64,13 +66,13 @@ export async function POST(
     }
 
     const existing = room.players.find(
-      (p) => p.name.toLowerCase() === name.toLowerCase(),
+      (p) => p.id === playerId,
     )
 
     if (!existing) {
       const player = {
-        id: crypto.randomUUID(),
-        name,
+        id: playerId,
+        name: playerName || `Player ${playerId.slice(0, 8)}`,
         joinedAt: Date.now(),
       }
       room.players.push(player)
@@ -96,7 +98,7 @@ export async function POST(
       )
     }
 
-    const playerIds = room.players.map((p) => p.name)
+    const playerIds = room.players.map((p) => p.id)
     const defaultPieces = getAllPieces()
     const battle = createInitialBattleForPlayers(playerIds, defaultPieces)
     if (!battle) {

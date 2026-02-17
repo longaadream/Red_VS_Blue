@@ -53,12 +53,16 @@ export type BattleAction =
       playerId: PlayerId
       pieceId: string
       skillId: string
+      targetX?: number
+      targetY?: number
     }
   | {
       type: "useChargeSkill"
       playerId: PlayerId
       pieceId: string
       skillId: string
+      targetX?: number
+      targetY?: number
     }
   | {
       type: "endTurn"
@@ -68,6 +72,10 @@ export type BattleAction =
       type: "grantChargePoints"
       playerId: PlayerId
       amount: number
+    }
+  | {
+      type: "surrender"
+      playerId: PlayerId
     }
 
 export class BattleRuleError extends Error {
@@ -241,8 +249,58 @@ export function applyBattleAction(
         throw new BattleRuleError("Skill definition not found")
       }
 
-      // TODO：在这里检查冷却、范围、目标等，并生成伤害 / 效果。
-      // 当前只标记“已使用一次”，具体结算逻辑以后再实现。
+      // 执行技能
+      const { executeSkillFunction, applySkillEffects } = require('./skills')
+      const context = {
+        piece: {
+          instanceId: piece.instanceId,
+          templateId: piece.templateId,
+          ownerPlayerId: piece.ownerPlayerId,
+          currentHp: piece.currentHp,
+          maxHp: piece.maxHp,
+          attack: piece.attack,
+          defense: piece.defense,
+          x: piece.x || 0,
+          y: piece.y || 0,
+          moveRange: piece.moveRange,
+        },
+        target: null,
+        battle: {
+          turn: next.turn.turnNumber,
+          currentPlayerId: next.turn.currentPlayerId,
+          phase: next.turn.phase,
+        },
+        skill: {
+          id: skillDef.id,
+          name: skillDef.name,
+          type: skillDef.type,
+          powerMultiplier: skillDef.powerMultiplier,
+        },
+      }
+
+      const result = executeSkillFunction(skillDef, context, next)
+      if (result.success && result.effects) {
+        applySkillEffects(next, result.effects, piece)
+      }
+
+      // 处理传送技能的目标位置
+      if (skillDef.id === "teleport" && action.targetX !== undefined && action.targetY !== undefined) {
+        // 检查目标位置是否有效
+        const targetTile = next.map.tiles.find(t => t.x === action.targetX && t.y === action.targetY)
+        if (targetTile && targetTile.props.walkable) {
+          // 检查目标位置是否被占用
+          const isOccupied = next.pieces.some(p => p.x === action.targetX && p.y === action.targetY && p.currentHp > 0)
+          if (!isOccupied) {
+            // 计算曼哈顿距离，确保在5格范围内
+            const distance = Math.abs(action.targetX - (piece.x || 0)) + Math.abs(action.targetY - (piece.y || 0))
+            if (distance <= 5) {
+              piece.x = action.targetX
+              piece.y = action.targetY
+            }
+          }
+        }
+      }
+
       next.turn.actions.hasUsedBasicSkill = true
       return next
     }
@@ -285,7 +343,39 @@ export function applyBattleAction(
         playerMeta.chargePoints -= cost
       }
 
-      // TODO：在这里检查冷却 / 范围 / 目标，并应用实际效果。
+      // 执行技能
+      const { executeSkillFunction, applySkillEffects } = require('./skills')
+      const context = {
+        piece: {
+          instanceId: piece.instanceId,
+          templateId: piece.templateId,
+          ownerPlayerId: piece.ownerPlayerId,
+          currentHp: piece.currentHp,
+          maxHp: piece.maxHp,
+          attack: piece.attack,
+          defense: piece.defense,
+          x: piece.x || 0,
+          y: piece.y || 0,
+          moveRange: piece.moveRange,
+        },
+        target: null,
+        battle: {
+          turn: next.turn.turnNumber,
+          currentPlayerId: next.turn.currentPlayerId,
+          phase: next.turn.phase,
+        },
+        skill: {
+          id: skillDef.id,
+          name: skillDef.name,
+          type: skillDef.type,
+          powerMultiplier: skillDef.powerMultiplier,
+        },
+      }
+
+      const result = executeSkillFunction(skillDef, context, next)
+      if (result.success && result.effects) {
+        applySkillEffects(next, result.effects, piece)
+      }
 
       next.turn.actions.hasUsedChargeSkill = true
       return next
@@ -299,6 +389,20 @@ export function applyBattleAction(
       const next = structuredClone(state) as BattleState
       // TODO：在这里触发“结束阶段效果”，例如 DOT、buff 结算等。
       next.turn.phase = "end"
+      return next
+    }
+
+    case "surrender": {
+      // 投降逻辑：将投降玩家的所有棋子设置为阵亡状态
+      const next = structuredClone(state) as BattleState
+      
+      // 找到投降玩家的所有棋子并设置为阵亡
+      next.pieces.forEach(piece => {
+        if (piece.ownerPlayerId === action.playerId) {
+          piece.currentHp = 0
+        }
+      })
+      
       return next
     }
 

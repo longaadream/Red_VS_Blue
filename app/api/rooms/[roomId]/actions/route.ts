@@ -13,14 +13,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   const { roomId } = await params
-  const { playerName, action, pieces } = (body as { 
+  const { playerId, playerName, action, pieces } = (body as { 
+    playerId?: string
     playerName?: string
     action?: "select-pieces" | "start-game"
     pieces?: Array<{ templateId: string; faction: string }>
   }) ?? {}
 
-  if (!playerName?.trim()) {
-    return NextResponse.json({ error: "playerName is required" }, { status: 400 })
+  if (!playerId?.trim()) {
+    return NextResponse.json({ error: "playerId is required" }, { status: 400 })
   }
 
   const room = roomStore.getRoom(roomId)
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     }
 
     const existingPlayer = room.players.find(
-      (p) => p.name.toLowerCase() === playerName.toLowerCase()
+      (p) => p.id === playerId.trim()
     )
 
     if (existingPlayer) {
@@ -45,8 +46,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     }
 
     const newPlayer = {
-      id: crypto.randomUUID(),
-      name: playerName.trim(),
+      id: playerId.trim(),
+      name: playerName?.trim() || `Player ${playerId.slice(0, 8)}`,
       joinedAt: Date.now(),
       selectedPieces: pieces,
       hasSelectedPieces: true,
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     
     console.log('All piece templates from players:', pieceTemplates.length)
     console.log('Players in room:', room.players.map(p => ({
+      id: p.id,
       name: p.name,
       hasSelectedPieces: !!p.hasSelectedPieces,
       selectedPiecesCount: p.selectedPieces?.length || 0
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     }
 
     // 确保只使用前两个玩家，因为这是1v1游戏
-    const playerIds = room.players.slice(0, 2).map(p => p.name)
+    const playerIds = room.players.slice(0, 2).map(p => p.id)
     console.log('Creating battle for players:', playerIds)
     console.log('With piece templates:', pieceTemplates.length)
     const battle = createInitialBattleForPlayers(playerIds, pieceTemplates)

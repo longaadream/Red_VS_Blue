@@ -1,0 +1,25 @@
+{
+  "id": "blue-mage",
+  "name": "蓝方法师",
+  "faction": "blue",
+  "description": "高攻击力，低防御力",
+  "rarity": "rare",
+  "image": "🔥",
+  "stats": {
+    "maxHp": 80,
+    "attack": 28,
+    "defense": 4,
+    "moveRange": 2
+  },
+  "skills": [
+    {
+      "skillId": "teleport",
+      "level": 1
+    },
+    {
+      "skillId": "fireball",
+      "level": 1
+    }
+  ],
+  "isDefault": true
+}

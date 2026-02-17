@@ -10362,7 +10362,7 @@
           "templateId": "red-warrior",
           "ownerPlayerId": "1",
           "faction": "red",
-          "currentHp": 120,
+          "currentHp": 0,
           "maxHp": 120,
           "attack": 20,
           "defense": 8,
@@ -10389,7 +10389,7 @@
           "templateId": "red-mage",
           "ownerPlayerId": "1",
           "faction": "red",
-          "currentHp": 80,
+          "currentHp": 0,
           "maxHp": 80,
           "attack": 30,
           "defense": 3,
@@ -10448,7 +10448,7 @@
           "attack": 22,
           "defense": 6,
           "moveRange": 4,
-          "x": 5,
+          "x": 2,
           "y": 4,
           "skills": [
             {
@@ -10649,11 +10649,2925 @@
       ],
       "turn": {
         "currentPlayerId": "1",
-        "turnNumber": 1,
+        "turnNumber": 3,
+        "phase": "start",
+        "actions": {
+          "hasMoved": false,
+          "hasUsedBasicSkill": false,
+          "hasUsedChargeSkill": false
+        }
+      }
+    }
+  },
+  {
+    "id": "c1ytv",
+    "name": "admin 的 1v1 房间",
+    "status": "waiting",
+    "createdAt": 1771361377727,
+    "maxPlayers": 2,
+    "players": [
+      {
+        "id": "0da07913-0bff-4910-b013-5f24b883d22e",
+        "name": "admin",
+        "joinedAt": 1771361378040
+      },
+      {
+        "id": "ea5d9763-8b5c-411d-8ea0-adc792813021",
+        "name": "Longaadream",
+        "joinedAt": 1771361398228
+      }
+    ],
+    "currentTurnIndex": 0,
+    "actions": [],
+    "battleState": null
+  },
+  {
+    "id": "ufgnp",
+    "name": "admin 的 1v1 房间",
+    "status": "in-progress",
+    "createdAt": 1771361421435,
+    "maxPlayers": 2,
+    "players": [
+      {
+        "id": "user_1771360858632_9522",
+        "name": "admin",
+        "joinedAt": 1771361421503,
+        "selectedPieces": [
+          {
+            "templateId": "red-archer",
+            "faction": "red"
+          },
+          {
+            "templateId": "red-mage",
+            "faction": "red"
+          }
+        ],
+        "hasSelectedPieces": true
+      },
+      {
+        "id": "user_1771361118594_8536",
+        "name": "Longaadream",
+        "joinedAt": 1771361426917,
+        "selectedPieces": [
+          {
+            "templateId": "blue-mage",
+            "faction": "blue"
+          },
+          {
+            "templateId": "blue-warrior",
+            "faction": "blue"
+          }
+        ],
+        "hasSelectedPieces": true
+      }
+    ],
+    "currentTurnIndex": 0,
+    "actions": [],
+    "battleState": {
+      "map": {
+        "id": "default-8x6",
+        "name": "默认地图",
+        "width": 8,
+        "height": 6,
+        "tiles": [
+          {
+            "id": "default-0-0",
+            "x": 0,
+            "y": 0,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-1-0",
+            "x": 1,
+            "y": 0,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-0",
+            "x": 2,
+            "y": 0,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-0",
+            "x": 3,
+            "y": 0,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-0",
+            "x": 4,
+            "y": 0,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-0",
+            "x": 5,
+            "y": 0,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-0",
+            "x": 6,
+            "y": 0,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-0",
+            "x": 7,
+            "y": 0,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-0-1",
+            "x": 0,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-1-1",
+            "x": 1,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-1",
+            "x": 2,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-1",
+            "x": 3,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-1",
+            "x": 4,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-1",
+            "x": 5,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-1",
+            "x": 6,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-1",
+            "x": 7,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-0-2",
+            "x": 0,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-1-2",
+            "x": 1,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-2",
+            "x": 2,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-2",
+            "x": 3,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-2",
+            "x": 4,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-2",
+            "x": 5,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-2",
+            "x": 6,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-2",
+            "x": 7,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-0-3",
+            "x": 0,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-1-3",
+            "x": 1,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-3",
+            "x": 2,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-3",
+            "x": 3,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-3",
+            "x": 4,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-3",
+            "x": 5,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-3",
+            "x": 6,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-3",
+            "x": 7,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-0-4",
+            "x": 0,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-1-4",
+            "x": 1,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-4",
+            "x": 2,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-4",
+            "x": 3,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-4",
+            "x": 4,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-4",
+            "x": 5,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-4",
+            "x": 6,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-4",
+            "x": 7,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-0-5",
+            "x": 0,
+            "y": 5,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-1-5",
+            "x": 1,
+            "y": 5,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-5",
+            "x": 2,
+            "y": 5,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-5",
+            "x": 3,
+            "y": 5,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-5",
+            "x": 4,
+            "y": 5,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-5",
+            "x": 5,
+            "y": 5,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-5",
+            "x": 6,
+            "y": 5,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-5",
+            "x": 7,
+            "y": 5,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          }
+        ]
+      },
+      "pieces": [
+        {
+          "instanceId": "user_1771361118594_8536-1",
+          "templateId": "red-archer",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "red",
+          "currentHp": 100,
+          "maxHp": 100,
+          "attack": 25,
+          "defense": 5,
+          "moveRange": 4,
+          "x": 5,
+          "y": 4,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "buff-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771361118594_8536-2",
+          "templateId": "red-mage",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "red",
+          "currentHp": 80,
+          "maxHp": 80,
+          "attack": 30,
+          "defense": 3,
+          "moveRange": 2,
+          "x": 5,
+          "y": 1,
+          "skills": [
+            {
+              "skillId": "fireball",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "teleport",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771360858632_9522-1",
+          "templateId": "blue-mage",
+          "ownerPlayerId": "user_1771360858632_9522",
+          "faction": "blue",
+          "currentHp": 80,
+          "maxHp": 80,
+          "attack": 28,
+          "defense": 4,
+          "moveRange": 2,
+          "x": 6,
+          "y": 1,
+          "skills": [
+            {
+              "skillId": "fireball",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "teleport",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771360858632_9522-2",
+          "templateId": "blue-warrior",
+          "ownerPlayerId": "user_1771360858632_9522",
+          "faction": "blue",
+          "currentHp": 120,
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 8,
+          "moveRange": 3,
+          "x": 3,
+          "y": 0,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "shield",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        }
+      ],
+      "pieceStatsByTemplateId": {
+        "red-warrior": {
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 5,
+          "moveRange": 3
+        },
+        "blue-warrior": {
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 5,
+          "moveRange": 3
+        }
+      },
+      "skillsById": {
+        "basic-attack": {
+          "id": "basic-attack",
+          "name": "基础攻击",
+          "description": "对目标造成基础伤害",
+          "kind": "active",
+          "type": "normal",
+          "cooldownTurns": 0,
+          "maxCharges": 0,
+          "powerMultiplier": 1,
+          "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  return {\n    damage: damage,\n    message: \"造成 \" + damage + \" 点伤害\",\n    success: true\n  }\n}",
+          "effects": [
+            {
+              "type": "damage",
+              "value": 1,
+              "target": "enemy",
+              "description": "造成100%攻击力的伤害"
+            }
+          ],
+          "range": "single",
+          "requiresTarget": true
+        },
+        "fireball": {
+          "id": "fireball",
+          "name": "火球术",
+          "description": "发射火球对敌人造成范围伤害",
+          "kind": "active",
+          "type": "super",
+          "cooldownTurns": 2,
+          "maxCharges": 3,
+          "chargeCost": 1,
+          "powerMultiplier": 1.5,
+          "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  const targets = getAllEnemiesInRange(context, context.skill.areaSize || 3)\n  return {\n    damage: damage,\n    effects: targets.map(t => ({\n      type: \"damage\",\n      value: damage,\n      target: \"enemy\",\n      description: \"对 \" + t.templateId + \" 造成 \" + damage + \" 点伤害\"\n    })),\n    message: \"火球爆炸，对范围内敌人造成伤害\",\n    success: true\n  }\n}",
+          "effects": [
+            {
+              "type": "damage",
+              "value": 1.5,
+              "target": "all-enemies",
+              "description": "对范围内所有敌人造成150%攻击力的伤害"
+            }
+          ],
+          "range": "area",
+          "areaSize": 3,
+          "requiresTarget": false
+        }
+      },
+      "players": [
+        {
+          "playerId": "user_1771360858632_9522",
+          "chargePoints": 0
+        },
+        {
+          "playerId": "user_1771361118594_8536",
+          "chargePoints": 0
+        }
+      ],
+      "turn": {
+        "currentPlayerId": "user_1771360858632_9522",
+        "turnNumber": 2,
         "phase": "action",
         "actions": {
           "hasMoved": true,
-          "hasUsedBasicSkill": true,
+          "hasUsedBasicSkill": false,
+          "hasUsedChargeSkill": false
+        }
+      }
+    }
+  },
+  {
+    "id": "sxlo6",
+    "name": "Longaadream 的 1v1 房间",
+    "status": "in-progress",
+    "createdAt": 1771362633381,
+    "maxPlayers": 2,
+    "players": [
+      {
+        "id": "user_1771361118594_8536",
+        "name": "Longaadream",
+        "joinedAt": 1771362633520,
+        "selectedPieces": [
+          {
+            "templateId": "red-archer",
+            "faction": "red"
+          },
+          {
+            "templateId": "red-warrior",
+            "faction": "red"
+          }
+        ],
+        "hasSelectedPieces": true
+      },
+      {
+        "id": "user_1771360858632_9522",
+        "name": "admin",
+        "joinedAt": 1771362642042,
+        "selectedPieces": [
+          {
+            "templateId": "red-mage",
+            "faction": "red"
+          },
+          {
+            "templateId": "red-warrior",
+            "faction": "red"
+          }
+        ],
+        "hasSelectedPieces": true
+      }
+    ],
+    "currentTurnIndex": 0,
+    "actions": [],
+    "battleState": {
+      "map": {
+        "id": "default-8x6",
+        "name": "默认地图",
+        "width": 8,
+        "height": 6,
+        "tiles": [
+          {
+            "id": "default-0-0",
+            "x": 0,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-0",
+            "x": 1,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-2-0",
+            "x": 2,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-3-0",
+            "x": 3,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-4-0",
+            "x": 4,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-5-0",
+            "x": 5,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-6-0",
+            "x": 6,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-7-0",
+            "x": 7,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-1",
+            "x": 0,
+            "y": 1,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-1",
+            "x": 1,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-1",
+            "x": 2,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-1",
+            "x": 3,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-1",
+            "x": 4,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-1",
+            "x": 5,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-1",
+            "x": 6,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-1",
+            "x": 7,
+            "y": 1,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-2",
+            "x": 0,
+            "y": 2,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-2",
+            "x": 1,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-2",
+            "x": 2,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-2",
+            "x": 3,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-2",
+            "x": 4,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-2",
+            "x": 5,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-2",
+            "x": 6,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-2",
+            "x": 7,
+            "y": 2,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-3",
+            "x": 0,
+            "y": 3,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-3",
+            "x": 1,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-3",
+            "x": 2,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-3",
+            "x": 3,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-3",
+            "x": 4,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-3",
+            "x": 5,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-3",
+            "x": 6,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-3",
+            "x": 7,
+            "y": 3,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-4",
+            "x": 0,
+            "y": 4,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-4",
+            "x": 1,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-4",
+            "x": 2,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-4",
+            "x": 3,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-4",
+            "x": 4,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-4",
+            "x": 5,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-4",
+            "x": 6,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-4",
+            "x": 7,
+            "y": 4,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-5",
+            "x": 0,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-5",
+            "x": 1,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-2-5",
+            "x": 2,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-3-5",
+            "x": 3,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-4-5",
+            "x": 4,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-5-5",
+            "x": 5,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-6-5",
+            "x": 6,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-7-5",
+            "x": 7,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          }
+        ]
+      },
+      "pieces": [
+        {
+          "instanceId": "user_1771361118594_8536-1",
+          "templateId": "red-archer",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "red",
+          "currentHp": 100,
+          "maxHp": 100,
+          "attack": 25,
+          "defense": 5,
+          "moveRange": 4,
+          "x": 5,
+          "y": 1,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "buff-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771361118594_8536-2",
+          "templateId": "red-warrior",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "red",
+          "currentHp": 120,
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 8,
+          "moveRange": 3,
+          "x": 6,
+          "y": 2,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "shield",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771361118594_8536-3",
+          "templateId": "red-mage",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "red",
+          "currentHp": 80,
+          "maxHp": 80,
+          "attack": 30,
+          "defense": 3,
+          "moveRange": 2,
+          "x": 5,
+          "y": 3,
+          "skills": [
+            {
+              "skillId": "fireball",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "teleport",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771361118594_8536-4",
+          "templateId": "red-warrior",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "red",
+          "currentHp": 120,
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 8,
+          "moveRange": 3,
+          "x": 5,
+          "y": 2,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "shield",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        }
+      ],
+      "pieceStatsByTemplateId": {
+        "red-warrior": {
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 5,
+          "moveRange": 3
+        },
+        "blue-warrior": {
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 5,
+          "moveRange": 3
+        }
+      },
+      "skillsById": {
+        "basic-attack": {
+          "id": "basic-attack",
+          "name": "基础攻击",
+          "description": "对目标造成基础伤害",
+          "kind": "active",
+          "type": "normal",
+          "cooldownTurns": 0,
+          "maxCharges": 0,
+          "powerMultiplier": 1,
+          "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  return {\n    damage: damage,\n    message: \"造成 \" + damage + \" 点伤害\",\n    success: true\n  }\n}",
+          "effects": [
+            {
+              "type": "damage",
+              "value": 1,
+              "target": "enemy",
+              "description": "造成100%攻击力的伤害"
+            }
+          ],
+          "range": "single",
+          "requiresTarget": true
+        },
+        "fireball": {
+          "id": "fireball",
+          "name": "火球术",
+          "description": "发射火球对敌人造成范围伤害",
+          "kind": "active",
+          "type": "super",
+          "cooldownTurns": 2,
+          "maxCharges": 3,
+          "chargeCost": 1,
+          "powerMultiplier": 1.5,
+          "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  const targets = getAllEnemiesInRange(context, context.skill.areaSize || 3)\n  return {\n    damage: damage,\n    effects: targets.map(t => ({\n      type: \"damage\",\n      value: damage,\n      target: \"enemy\",\n      description: \"对 \" + t.templateId + \" 造成 \" + damage + \" 点伤害\"\n    })),\n    message: \"火球爆炸，对范围内敌人造成伤害\",\n    success: true\n  }\n}",
+          "effects": [
+            {
+              "type": "damage",
+              "value": 1.5,
+              "target": "all-enemies",
+              "description": "对范围内所有敌人造成150%攻击力的伤害"
+            }
+          ],
+          "range": "area",
+          "areaSize": 3,
+          "requiresTarget": false
+        }
+      },
+      "players": [
+        {
+          "playerId": "user_1771361118594_8536",
+          "chargePoints": 0
+        },
+        {
+          "playerId": "user_1771360858632_9522",
+          "chargePoints": 0
+        }
+      ],
+      "turn": {
+        "currentPlayerId": "user_1771361118594_8536",
+        "turnNumber": 1,
+        "phase": "start",
+        "actions": {
+          "hasMoved": false,
+          "hasUsedBasicSkill": false,
+          "hasUsedChargeSkill": false
+        }
+      }
+    }
+  },
+  {
+    "id": "ma8zc",
+    "name": "admin 的 1v1 房间",
+    "status": "in-progress",
+    "createdAt": 1771362761790,
+    "maxPlayers": 2,
+    "players": [
+      {
+        "id": "user_1771360858632_9522",
+        "name": "admin",
+        "joinedAt": 1771362762037,
+        "selectedPieces": [
+          {
+            "templateId": "blue-mage",
+            "faction": "blue"
+          },
+          {
+            "templateId": "blue-warrior",
+            "faction": "blue"
+          }
+        ],
+        "hasSelectedPieces": true
+      },
+      {
+        "id": "user_1771361118594_8536",
+        "name": "Longaadream",
+        "joinedAt": 1771362774696,
+        "selectedPieces": [
+          {
+            "templateId": "blue-archer",
+            "faction": "blue"
+          },
+          {
+            "templateId": "blue-mage",
+            "faction": "blue"
+          }
+        ],
+        "hasSelectedPieces": true
+      }
+    ],
+    "currentTurnIndex": 0,
+    "actions": [],
+    "battleState": {
+      "map": {
+        "id": "default-8x6",
+        "name": "默认地图",
+        "width": 8,
+        "height": 6,
+        "tiles": [
+          {
+            "id": "default-0-0",
+            "x": 0,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-0",
+            "x": 1,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-2-0",
+            "x": 2,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-3-0",
+            "x": 3,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-4-0",
+            "x": 4,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-5-0",
+            "x": 5,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-6-0",
+            "x": 6,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-7-0",
+            "x": 7,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-1",
+            "x": 0,
+            "y": 1,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-1",
+            "x": 1,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-1",
+            "x": 2,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-1",
+            "x": 3,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-1",
+            "x": 4,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-1",
+            "x": 5,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-1",
+            "x": 6,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-1",
+            "x": 7,
+            "y": 1,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-2",
+            "x": 0,
+            "y": 2,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-2",
+            "x": 1,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-2",
+            "x": 2,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-2",
+            "x": 3,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-2",
+            "x": 4,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-2",
+            "x": 5,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-2",
+            "x": 6,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-2",
+            "x": 7,
+            "y": 2,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-3",
+            "x": 0,
+            "y": 3,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-3",
+            "x": 1,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-3",
+            "x": 2,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-3",
+            "x": 3,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-3",
+            "x": 4,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-3",
+            "x": 5,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-3",
+            "x": 6,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-3",
+            "x": 7,
+            "y": 3,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-4",
+            "x": 0,
+            "y": 4,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-4",
+            "x": 1,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-4",
+            "x": 2,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-4",
+            "x": 3,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-4",
+            "x": 4,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-4",
+            "x": 5,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-4",
+            "x": 6,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-4",
+            "x": 7,
+            "y": 4,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-5",
+            "x": 0,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-5",
+            "x": 1,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-2-5",
+            "x": 2,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-3-5",
+            "x": 3,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-4-5",
+            "x": 4,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-5-5",
+            "x": 5,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-6-5",
+            "x": 6,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-7-5",
+            "x": 7,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          }
+        ]
+      },
+      "pieces": [
+        {
+          "instanceId": "user_1771360858632_9522-1",
+          "templateId": "blue-mage",
+          "ownerPlayerId": "user_1771360858632_9522",
+          "faction": "blue",
+          "currentHp": 80,
+          "maxHp": 80,
+          "attack": 28,
+          "defense": 4,
+          "moveRange": 2,
+          "x": 3,
+          "y": 4,
+          "skills": [
+            {
+              "skillId": "fireball",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "teleport",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771360858632_9522-2",
+          "templateId": "blue-warrior",
+          "ownerPlayerId": "user_1771360858632_9522",
+          "faction": "blue",
+          "currentHp": 120,
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 8,
+          "moveRange": 3,
+          "x": 3,
+          "y": 3,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "shield",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771360858632_9522-3",
+          "templateId": "blue-archer",
+          "ownerPlayerId": "user_1771360858632_9522",
+          "faction": "blue",
+          "currentHp": 100,
+          "maxHp": 100,
+          "attack": 22,
+          "defense": 6,
+          "moveRange": 4,
+          "x": 4,
+          "y": 4,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "buff-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771360858632_9522-4",
+          "templateId": "blue-mage",
+          "ownerPlayerId": "user_1771360858632_9522",
+          "faction": "blue",
+          "currentHp": 80,
+          "maxHp": 80,
+          "attack": 28,
+          "defense": 4,
+          "moveRange": 2,
+          "x": 1,
+          "y": 2,
+          "skills": [
+            {
+              "skillId": "fireball",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "teleport",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        }
+      ],
+      "pieceStatsByTemplateId": {
+        "red-warrior": {
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 5,
+          "moveRange": 3
+        },
+        "blue-warrior": {
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 5,
+          "moveRange": 3
+        }
+      },
+      "skillsById": {
+        "basic-attack": {
+          "id": "basic-attack",
+          "name": "基础攻击",
+          "description": "对目标造成基础伤害",
+          "kind": "active",
+          "type": "normal",
+          "cooldownTurns": 0,
+          "maxCharges": 0,
+          "powerMultiplier": 1,
+          "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  return {\n    damage: damage,\n    message: \"造成 \" + damage + \" 点伤害\",\n    success: true\n  }\n}",
+          "effects": [
+            {
+              "type": "damage",
+              "value": 1,
+              "target": "enemy",
+              "description": "造成100%攻击力的伤害"
+            }
+          ],
+          "range": "single",
+          "requiresTarget": true
+        },
+        "fireball": {
+          "id": "fireball",
+          "name": "火球术",
+          "description": "发射火球对敌人造成范围伤害",
+          "kind": "active",
+          "type": "super",
+          "cooldownTurns": 2,
+          "maxCharges": 3,
+          "chargeCost": 1,
+          "powerMultiplier": 1.5,
+          "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  const targets = getAllEnemiesInRange(context, context.skill.areaSize || 3)\n  return {\n    damage: damage,\n    effects: targets.map(t => ({\n      type: \"damage\",\n      value: damage,\n      target: \"enemy\",\n      description: \"对 \" + t.templateId + \" 造成 \" + damage + \" 点伤害\"\n    })),\n    message: \"火球爆炸，对范围内敌人造成伤害\",\n    success: true\n  }\n}",
+          "effects": [
+            {
+              "type": "damage",
+              "value": 1.5,
+              "target": "all-enemies",
+              "description": "对范围内所有敌人造成150%攻击力的伤害"
+            }
+          ],
+          "range": "area",
+          "areaSize": 3,
+          "requiresTarget": false
+        }
+      },
+      "players": [
+        {
+          "playerId": "user_1771360858632_9522",
+          "chargePoints": 0
+        },
+        {
+          "playerId": "user_1771361118594_8536",
+          "chargePoints": 0
+        }
+      ],
+      "turn": {
+        "currentPlayerId": "user_1771360858632_9522",
+        "turnNumber": 1,
+        "phase": "start",
+        "actions": {
+          "hasMoved": false,
+          "hasUsedBasicSkill": false,
+          "hasUsedChargeSkill": false
+        }
+      }
+    }
+  },
+  {
+    "id": "fyaxb",
+    "name": "admin 的 1v1 房间",
+    "status": "in-progress",
+    "createdAt": 1771362951137,
+    "maxPlayers": 2,
+    "players": [
+      {
+        "id": "user_1771360858632_9522",
+        "name": "admin",
+        "joinedAt": 1771362951283,
+        "selectedPieces": [
+          {
+            "templateId": "blue-archer",
+            "faction": "blue"
+          },
+          {
+            "templateId": "blue-mage",
+            "faction": "blue"
+          }
+        ],
+        "hasSelectedPieces": true
+      },
+      {
+        "id": "user_1771361118594_8536",
+        "name": "Longaadream",
+        "joinedAt": 1771362959545,
+        "selectedPieces": [
+          {
+            "templateId": "red-archer",
+            "faction": "red"
+          },
+          {
+            "templateId": "red-mage",
+            "faction": "red"
+          }
+        ],
+        "hasSelectedPieces": true
+      }
+    ],
+    "currentTurnIndex": 0,
+    "actions": [],
+    "battleState": {
+      "map": {
+        "id": "default-8x6",
+        "name": "默认地图",
+        "width": 8,
+        "height": 6,
+        "tiles": [
+          {
+            "id": "default-0-0",
+            "x": 0,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-0",
+            "x": 1,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-2-0",
+            "x": 2,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-3-0",
+            "x": 3,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-4-0",
+            "x": 4,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-5-0",
+            "x": 5,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-6-0",
+            "x": 6,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-7-0",
+            "x": 7,
+            "y": 0,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-1",
+            "x": 0,
+            "y": 1,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-1",
+            "x": 1,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-1",
+            "x": 2,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-1",
+            "x": 3,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-1",
+            "x": 4,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-1",
+            "x": 5,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-1",
+            "x": 6,
+            "y": 1,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-1",
+            "x": 7,
+            "y": 1,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-2",
+            "x": 0,
+            "y": 2,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-2",
+            "x": 1,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-2",
+            "x": 2,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-2",
+            "x": 3,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-2",
+            "x": 4,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-2",
+            "x": 5,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-2",
+            "x": 6,
+            "y": 2,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-2",
+            "x": 7,
+            "y": 2,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-3",
+            "x": 0,
+            "y": 3,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-3",
+            "x": 1,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-3",
+            "x": 2,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-3",
+            "x": 3,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-3",
+            "x": 4,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-3",
+            "x": 5,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-3",
+            "x": 6,
+            "y": 3,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-3",
+            "x": 7,
+            "y": 3,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-4",
+            "x": 0,
+            "y": 4,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-4",
+            "x": 1,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-2-4",
+            "x": 2,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-3-4",
+            "x": 3,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-4-4",
+            "x": 4,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-5-4",
+            "x": 5,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-6-4",
+            "x": 6,
+            "y": 4,
+            "props": {
+              "walkable": true,
+              "bulletPassable": true,
+              "type": "floor"
+            }
+          },
+          {
+            "id": "default-7-4",
+            "x": 7,
+            "y": 4,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-0-5",
+            "x": 0,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-1-5",
+            "x": 1,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-2-5",
+            "x": 2,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-3-5",
+            "x": 3,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-4-5",
+            "x": 4,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-5-5",
+            "x": 5,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-6-5",
+            "x": 6,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          },
+          {
+            "id": "default-7-5",
+            "x": 7,
+            "y": 5,
+            "props": {
+              "walkable": false,
+              "bulletPassable": false,
+              "type": "wall"
+            }
+          }
+        ]
+      },
+      "pieces": [
+        {
+          "instanceId": "user_1771360858632_9522-1",
+          "templateId": "red-archer",
+          "ownerPlayerId": "user_1771360858632_9522",
+          "faction": "red",
+          "currentHp": 100,
+          "maxHp": 100,
+          "attack": 25,
+          "defense": 5,
+          "moveRange": 4,
+          "x": 2,
+          "y": 2,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "buff-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771360858632_9522-2",
+          "templateId": "red-mage",
+          "ownerPlayerId": "user_1771360858632_9522",
+          "faction": "red",
+          "currentHp": 80,
+          "maxHp": 80,
+          "attack": 30,
+          "defense": 3,
+          "moveRange": 2,
+          "x": 1,
+          "y": 3,
+          "skills": [
+            {
+              "skillId": "fireball",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "teleport",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771361118594_8536-1",
+          "templateId": "blue-archer",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "blue",
+          "currentHp": 100,
+          "maxHp": 100,
+          "attack": 22,
+          "defense": 6,
+          "moveRange": 4,
+          "x": 3,
+          "y": 4,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "buff-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771361118594_8536-2",
+          "templateId": "blue-mage",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "blue",
+          "currentHp": 80,
+          "maxHp": 80,
+          "attack": 28,
+          "defense": 4,
+          "moveRange": 2,
+          "x": 4,
+          "y": 3,
+          "skills": [
+            {
+              "skillId": "fireball",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "teleport",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        }
+      ],
+      "pieceStatsByTemplateId": {
+        "red-warrior": {
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 5,
+          "moveRange": 3
+        },
+        "blue-warrior": {
+          "maxHp": 120,
+          "attack": 20,
+          "defense": 5,
+          "moveRange": 3
+        }
+      },
+      "skillsById": {
+        "basic-attack": {
+          "id": "basic-attack",
+          "name": "基础攻击",
+          "description": "对目标造成基础伤害",
+          "kind": "active",
+          "type": "normal",
+          "cooldownTurns": 0,
+          "maxCharges": 0,
+          "powerMultiplier": 1,
+          "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  return {\n    damage: damage,\n    message: \"造成 \" + damage + \" 点伤害\",\n    success: true\n  }\n}",
+          "effects": [
+            {
+              "type": "damage",
+              "value": 1,
+              "target": "enemy",
+              "description": "造成100%攻击力的伤害"
+            }
+          ],
+          "range": "single",
+          "requiresTarget": true
+        },
+        "fireball": {
+          "id": "fireball",
+          "name": "火球术",
+          "description": "发射火球对敌人造成范围伤害",
+          "kind": "active",
+          "type": "super",
+          "cooldownTurns": 2,
+          "maxCharges": 3,
+          "chargeCost": 1,
+          "powerMultiplier": 1.5,
+          "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  const targets = getAllEnemiesInRange(context, context.skill.areaSize || 3)\n  return {\n    damage: damage,\n    effects: targets.map(t => ({\n      type: \"damage\",\n      value: damage,\n      target: \"enemy\",\n      description: \"对 \" + t.templateId + \" 造成 \" + damage + \" 点伤害\"\n    })),\n    message: \"火球爆炸，对范围内敌人造成伤害\",\n    success: true\n  }\n}",
+          "effects": [
+            {
+              "type": "damage",
+              "value": 1.5,
+              "target": "all-enemies",
+              "description": "对范围内所有敌人造成150%攻击力的伤害"
+            }
+          ],
+          "range": "area",
+          "areaSize": 3,
+          "requiresTarget": false
+        }
+      },
+      "players": [
+        {
+          "playerId": "user_1771360858632_9522",
+          "chargePoints": 0
+        },
+        {
+          "playerId": "user_1771361118594_8536",
+          "chargePoints": 0
+        }
+      ],
+      "turn": {
+        "currentPlayerId": "user_1771360858632_9522",
+        "turnNumber": 3,
+        "phase": "action",
+        "actions": {
+          "hasMoved": false,
+          "hasUsedBasicSkill": false,
           "hasUsedChargeSkill": false
         }
       }

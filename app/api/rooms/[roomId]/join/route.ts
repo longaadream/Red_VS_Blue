@@ -10,12 +10,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   const { roomId } = await params
-  const { playerName } = (body as { 
+  const { playerId, playerName } = (body as { 
+    playerId?: string
     playerName?: string
   }) ?? {}
 
-  if (!playerName?.trim()) {
-    return NextResponse.json({ error: "playerName is required" }, { status: 400 })
+  if (!playerId?.trim()) {
+    return NextResponse.json({ error: "playerId is required" }, { status: 400 })
   }
 
   const room = roomStore.getRoom(roomId)
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   const existingPlayer = room.players.find(
-    (p) => p.name.toLowerCase() === playerName.toLowerCase()
+    (p) => p.id === playerId.trim()
   )
 
   if (existingPlayer) {
@@ -32,8 +33,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   const newPlayer = {
-    id: crypto.randomUUID(),
-    name: playerName.trim(),
+    id: playerId.trim(),
+    name: playerName?.trim() || `Player ${playerId.slice(0, 8)}`,
     joinedAt: Date.now(),
     selectedPieces: [],
   }

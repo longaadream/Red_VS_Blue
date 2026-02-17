@@ -1,0 +1,21 @@
+{
+  "id": "basic-attack",
+  "name": "基础攻击",
+  "description": "对目标造成基础伤害",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1.0,
+  "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  return {\n    damage: damage,\n    message: \"造成 \" + damage + \" 点伤害\",\n    success: true\n  }\n}",
+  "effects": [
+    {
+      "type": "damage",
+      "value": 1.0,
+      "target": "enemy",
+      "description": "造成100%攻击力的伤害"
+    }
+  ],
+  "range": "single",
+  "requiresTarget": true
+}

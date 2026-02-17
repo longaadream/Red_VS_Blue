@@ -12,13 +12,14 @@ export async function POST(req: NextRequest) {
     body = {}
   }
 
-  const { playerName, pieces } = (body as { 
+  const { playerId, playerName, pieces } = (body as { 
+    playerId?: string
     playerName?: string
     pieces?: Array<{ templateId: string; faction: string }>
   }) ?? {}
 
-  if (!playerName?.trim()) {
-    return NextResponse.json({ error: "playerName is required" }, { status: 400 })
+  if (!playerId?.trim()) {
+    return NextResponse.json({ error: "playerId is required" }, { status: 400 })
   }
 
   if (!pieces || pieces.length !== 2) {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const roomId = crypto.randomUUID()
-  const playerIds = [playerName.trim() + "-red", playerName.trim() + "-blue"]
+  const playerIds = [playerId.trim() + "-red", playerId.trim() + "-blue"]
 
   const battle = createInitialBattleForPlayers(playerIds, pieces as PieceTemplate[])
 
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     maxPlayers: 2,
     players: playerIds.map((id, index) => ({
       id,
-      name: index === 0 ? playerName.trim() + " (红方)" : playerName.trim() + " (蓝方)",
+      name: index === 0 ? (playerName?.trim() || `Player ${playerId.slice(0, 8)}`) + " (红方)" : (playerName?.trim() || `Player ${playerId.slice(0, 8)}`) + " (蓝方)",
     })),
     currentTurnIndex: 0,
     actions: [],

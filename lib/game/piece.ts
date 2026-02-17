@@ -45,6 +45,7 @@ export interface PieceInstance {
   skills: PieceSkill[]
   buffs: PieceBuff[]
   debuffs: PieceDebuff[]
+  shield?: number
 }
 
 export interface PieceBuff {

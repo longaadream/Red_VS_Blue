@@ -1,0 +1,22 @@
+{
+  "id": "teleport",
+  "name": "传送术",
+  "description": "瞬间移动到指定位置",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { return { effects: [{ type: 'teleport', value: 5, target: 'self', description: '传送到5格范围内' }], message: '传送术生效，瞬间移动', success: true } }",
+  "effects": [
+    {
+      "type": "teleport",
+      "value": 5,
+      "target": "self",
+      "description": "传送到5格范围内"
+    }
+  ],
+  "range": "area",
+  "areaSize": 5,
+  "requiresTarget": true
+}

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getRoomsStore } from "../../../lobby/route"
+import roomStore from "@/lib/game/room-store"
 import {
   type BattleAction,
   applyBattleAction,
   BattleRuleError,
 } from "@/lib/game/turn"
 
-const rooms = getRoomsStore()
+const rooms = roomStore
 
 export async function GET(
   _req: NextRequest,

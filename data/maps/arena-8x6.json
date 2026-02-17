@@ -1,0 +1,32 @@
+{
+  "id": "arena-8x6",
+  "name": "小型竞技场",
+  "layout": [
+    "########",
+    "#..C..S#",
+    "#..##..#",
+    "#S.C..H#",
+    "#......#",
+    "########"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false
+    }
+  ]
+}

@@ -16,9 +16,11 @@ export function GameMenu() {
       <main className="relative flex min-h-svh flex-col items-center justify-center px-4 py-12">
         {/* Logo / brand */}
         <header className="mb-10 flex flex-col items-center gap-2 text-center">
-          <h1 className="text-5xl font-black tracking-tighter text-foreground sm:text-6xl">
-            {GAME_BRAND.title}
-            <span className="ml-2 text-primary">{GAME_BRAND.subtitle}</span>
+          <h1 className="text-5xl font-black tracking-tighter sm:text-6xl">
+            <span className="text-red-500">{GAME_BRAND.title.split(' ')[0]}</span>
+            {GAME_BRAND.title.includes(' ') && <span className="ml-2">{GAME_BRAND.title.split(' ')[1]}</span>}
+            <span className="ml-2 text-primary">{GAME_BRAND.subtitle.split(' ')[0]}</span>
+            <span className="ml-2 text-blue-500">{GAME_BRAND.subtitle.split(' ')[1]}</span>
           </h1>
           <p className="text-sm tracking-widest uppercase text-muted-foreground">
             {GAME_BRAND.tagline}
@@ -36,9 +38,6 @@ export function GameMenu() {
               <MenuButton key={item.id} item={item} index={index} />
             ))}
           </nav>
-
-          {/* Stats bar */}
-          <StatsBar />
         </div>
 
         {/* Version tag */}

@@ -1,0 +1,25 @@
+{
+  "id": "red-mage",
+  "name": "红方法师",
+  "faction": "red",
+  "description": "高攻击力，低防御力",
+  "rarity": "rare",
+  "image": "🔥",
+  "stats": {
+    "maxHp": 80,
+    "attack": 30,
+    "defense": 3,
+    "moveRange": 2
+  },
+  "skills": [
+    {
+      "skillId": "teleport",
+      "level": 1
+    },
+    {
+      "skillId": "fireball",
+      "level": 1
+    }
+  ],
+  "isDefault": true
+}

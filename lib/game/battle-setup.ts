@@ -1,257 +1,25 @@
-import { getMap } from "@/config/maps"
+import { getMap, DEFAULT_MAP_ID } from "@/config/maps"
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceTemplate, PieceStats } from "./piece"
-import type { SkillDefinition } from "./skills"
+import type { SkillDefinition, SkillState } from "./skills"
 import type { BattleState, PlayerId } from "./turn"
-import { DEFAULT_PIECES, type PieceTemplate } from "./piece-repository"
-
-export const DEFAULT_MAP_ID = "arena-8x6"
+import { loadJsonFilesServer } from "./file-loader"
+import { DEFAULT_PIECES } from "./piece-repository"
 
 export function buildDefaultSkills(): Record<string, SkillDefinition> {
-  return {
-    "basic-attack": {
-      id: "basic-attack",
-      name: "基础攻击",
-      description: "对目标造成基础伤害",
-      kind: "active",
-      type: "normal",
-      cooldownTurns: 0,
-      maxCharges: 0,
-      powerMultiplier: 1.0,
-      code: `function executeSkill(context) {
-  const damage = context.piece.attack * context.skill.powerMultiplier
-  return {
-    damage: damage,
-    message: "造成 " + damage + " 点伤害",
-    success: true
+  // 从JSON文件加载技能
+  const skills = loadJsonFilesServer<SkillDefinition>('data/skills')
+  
+  // 打印加载的技能
+  console.log('Loaded skills:', Object.keys(skills))
+  
+  // 如果没有加载到技能，返回空对象
+  if (Object.keys(skills).length === 0) {
+    console.warn('No skills loaded from JSON files, returning empty object')
+    return {}
   }
-}`,
-      effects: [
-        {
-          type: "damage",
-          value: 1.0,
-          target: "enemy",
-          description: "造成100%攻击力的伤害"
-        }
-      ],
-      range: "single",
-      requiresTarget: true
-    },
-    "fireball": {
-      id: "fireball",
-      name: "火球术",
-      description: "发射火球对敌人造成范围伤害",
-      kind: "active",
-      type: "super",
-      cooldownTurns: 2,
-      maxCharges: 3,
-      chargeCost: 1,
-      powerMultiplier: 1.5,
-      code: `function executeSkill(context) {
-  const damage = context.piece.attack * context.skill.powerMultiplier
-  const targets = getAllEnemiesInRange(context, context.skill.areaSize || 3)
-  return {
-    damage: damage,
-    effects: targets.map(t => ({
-      type: "damage",
-      value: damage,
-      target: "enemy",
-      description: "对 " + t.templateId + " 造成 " + damage + " 点伤害"
-    })),
-    message: "火球爆炸，对范围内敌人造成伤害",
-    success: true
-  }
-}`,
-      effects: [
-        {
-          type: "damage",
-          value: 1.5,
-          target: "all-enemies",
-          description: "对范围内所有敌人造成150%攻击力的伤害"
-        }
-      ],
-      range: "area",
-      areaSize: 3,
-      requiresTarget: false
-    },
-    "heal": {
-      id: "heal",
-      name: "治疗术",
-      description: "恢复自身或盟友的生命值",
-      kind: "active",
-      type: "normal",
-      cooldownTurns: 3,
-      maxCharges: 0,
-      powerMultiplier: 1.0,
-      code: `function executeSkill(context) {
-  const allies = getAllAlliesInRange(context, context.skill.areaSize || 2)
-  return {
-    heal: 30,
-    effects: allies.map(a => ({
-      type: "heal",
-      value: 30,
-      target: "allies",
-      description: "恢复30点生命值"
-    })),
-    message: "治疗术生效，恢复生命值",
-    success: true
-  }
-}`,
-      effects: [
-        {
-          type: "heal",
-          value: 30,
-          target: "allies",
-          description: "恢复30点生命值"
-        }
-      ],
-      range: "area",
-      areaSize: 2,
-      requiresTarget: false
-    },
-    "shield": {
-      id: "shield",
-      name: "护盾术",
-      description: "为自身提供护盾，吸收伤害",
-      kind: "active",
-      type: "super",
-      cooldownTurns: 4,
-      maxCharges: 2,
-      chargeCost: 1,
-      powerMultiplier: 1.0,
-      code: `function executeSkill(context) {
-  return {
-    effects: [{
-      type: "shield",
-      value: 50,
-      target: "self",
-      duration: 3,
-      description: "获得50点护盾，持续3回合"
-    }],
-    message: "护盾术生效，获得护盾",
-    success: true
-  }
-}`,
-      effects: [
-        {
-          type: "shield",
-          value: 50,
-          target: "self",
-          duration: 3,
-          description: "获得50点护盾，持续3回合"
-        }
-      ],
-      range: "self",
-      requiresTarget: false
-    },
-    "teleport": {
-      id: "teleport",
-      name: "传送术",
-      description: "瞬间移动到指定位置",
-      kind: "active",
-      type: "normal",
-      cooldownTurns: 2,
-      maxCharges: 0,
-      powerMultiplier: 1.0,
-      code: `function executeSkill(context) {
-  return {
-    effects: [{
-      type: "teleport",
-      value: 5,
-      target: "self",
-      description: "传送到5格范围内"
-    }],
-    message: "传送术生效，瞬间移动",
-    success: true
-  }
-}`,
-      effects: [
-        {
-          type: "teleport",
-          value: 5,
-          target: "self",
-          description: "传送到5格范围内"
-        }
-      ],
-      range: "area",
-      areaSize: 5,
-      requiresTarget: false
-    },
-    "buff-attack": {
-      id: "buff-attack",
-      name: "攻击强化",
-      description: "提升自身攻击力",
-      kind: "active",
-      type: "normal",
-      cooldownTurns: 4,
-      maxCharges: 0,
-      powerMultiplier: 1.0,
-      code: `function executeSkill(context) {
-  return {
-    effects: [{
-      type: "buff",
-      value: 10,
-      target: "self",
-      duration: 3,
-      description: "攻击力提升10点，持续3回合"
-    }],
-    message: "攻击强化生效，攻击力提升",
-    success: true
-  }
-}`,
-      effects: [
-        {
-          type: "buff",
-          value: 10,
-          target: "self",
-          duration: 3,
-          description: "攻击力提升10点，持续3回合"
-        }
-      ],
-      range: "self",
-      requiresTarget: false
-    },
-    "debuff-defense": {
-      id: "debuff-defense",
-      name: "防御削弱",
-      description: "降低目标防御力",
-      kind: "active",
-      type: "normal",
-      cooldownTurns: 3,
-      maxCharges: 0,
-      powerMultiplier: 1.0,
-      code: `function executeSkill(context) {
-  if (!context.target) {
-    return {
-      message: "没有目标",
-      success: false
-    }
-  }
-  return {
-    effects: [{
-      type: "debuff",
-      value: 5,
-      target: "enemy",
-      duration: 2,
-      description: "防御力降低5点，持续2回合"
-    }],
-    message: "防御削弱生效，降低目标防御力",
-    success: true
-  }
-}`,
-      effects: [
-        {
-          type: "debuff",
-          value: 5,
-          target: "enemy",
-          duration: 2,
-          description: "防御力降低5点，持续2回合"
-        }
-      ],
-      range: "single",
-      requiresTarget: true
-    }
-  }
+  
+  return skills
 }
 
 export function buildDefaultPieceStats(): Record<string, PieceStats> {
@@ -280,9 +48,9 @@ export function buildInitialPiecesForPlayers(
   
   const [p1, p2] = players
   
-  // 随机分配玩家到红方和蓝方
-  const redPlayer = Math.random() > 0.5 ? p1 : p2
-  const bluePlayer = redPlayer === p1 ? p2 : p1
+  // 固定分配玩家到红方和蓝方，避免随机导致的问题
+  const redPlayer = p1
+  const bluePlayer = p2
   
   // 为每个玩家创建棋子
   const pieces: PieceInstance[] = []
@@ -305,10 +73,15 @@ export function buildInitialPiecesForPlayers(
     return { x: availableTiles[randomIndex].x, y: availableTiles[randomIndex].y }
   }
   
+  console.log('Selected pieces count:', selectedPieces.length)
+  console.log('Selected pieces:', selectedPieces)
+  
   // 为红方玩家添加棋子
   let redPieceIndex = 0
+  
+  // 添加红方专属棋子
   for (const pieceTemplate of selectedPieces) {
-    if (pieceTemplate.faction === "red" || pieceTemplate.faction === "neutral") {
+    if (pieceTemplate.faction === "red") {
       const position = getRandomPosition()
       pieces.push({
         instanceId: `${redPlayer}-${redPieceIndex + 1}`,
@@ -327,7 +100,7 @@ export function buildInitialPiecesForPlayers(
           currentCooldown: 0,
           currentCharges: 0,
           unlocked: true,
-        })),
+        } as SkillState)),
       })
       redPieceIndex++
     }
@@ -335,8 +108,10 @@ export function buildInitialPiecesForPlayers(
   
   // 为蓝方玩家添加棋子
   let bluePieceIndex = 0
+  
+  // 添加蓝方专属棋子
   for (const pieceTemplate of selectedPieces) {
-    if (pieceTemplate.faction === "blue" || pieceTemplate.faction === "neutral") {
+    if (pieceTemplate.faction === "blue") {
       const position = getRandomPosition()
       pieces.push({
         instanceId: `${bluePlayer}-${bluePieceIndex + 1}`,
@@ -355,14 +130,28 @@ export function buildInitialPiecesForPlayers(
           currentCooldown: 0,
           currentCharges: 0,
           unlocked: true,
-        })),
+        } as SkillState)),
       })
       bluePieceIndex++
     }
   }
   
+  console.log('Red pieces created:', redPieceIndex)
+  console.log('Blue pieces created:', bluePieceIndex)
+  
   // 确保至少有一个棋子
   if (pieces.length === 0) {
+    console.log('No pieces created, adding default pieces')
+    
+    // 获取两个不同的随机位置
+    const redPosition = getRandomPosition()
+    let bluePosition = getRandomPosition()
+    
+    // 确保两个位置不同
+    while (bluePosition.x === redPosition.x && bluePosition.y === redPosition.y && availableTiles.length > 1) {
+      bluePosition = getRandomPosition()
+    }
+    
     // 添加默认红方棋子
     const defaultRedPiece = DEFAULT_PIECES["red-warrior"]
     pieces.push({
@@ -375,8 +164,8 @@ export function buildInitialPiecesForPlayers(
       attack: defaultRedPiece.stats.attack,
       defense: defaultRedPiece.stats.defense,
       moveRange: defaultRedPiece.stats.moveRange,
-      x: getRandomPosition().x,
-      y: getRandomPosition().y,
+      x: redPosition.x,
+      y: redPosition.y,
       skills: defaultRedPiece.skills.map(s => ({
         skillId: s.skillId,
         currentCooldown: 0,
@@ -397,8 +186,8 @@ export function buildInitialPiecesForPlayers(
       attack: defaultBluePiece.stats.attack,
       defense: defaultBluePiece.stats.defense,
       moveRange: defaultBluePiece.stats.moveRange,
-      x: getRandomPosition().x,
-      y: getRandomPosition().y,
+      x: bluePosition.x,
+      y: bluePosition.y,
       skills: defaultBluePiece.skills.map(s => ({
         skillId: s.skillId,
         currentCooldown: 0,
@@ -407,6 +196,9 @@ export function buildInitialPiecesForPlayers(
       })),
     })
   }
+  
+  console.log('Final pieces count:', pieces.length)
+  console.log('Final pieces:', pieces)
   
   return pieces
 }
@@ -417,32 +209,82 @@ export function createInitialBattleForPlayers(
 ): BattleState | null {
   if (playerIds.length !== 2) return null
 
-  const defaultMap: BoardMap = {
-    id: "default-8x6",
-    name: "默认地图",
-    width: 8,
-    height: 6,
-    tiles: Array.from({ length: 8 * 6 }, (_, i) => {
-      const x = i % 8
-      const y = Math.floor(i / 8)
-      return {
-        id: `default-${x}-${y}`,
-        x,
-        y,
-        props: {
-          walkable: true,
-          bulletPassable: true,
-          type: "floor",
-        },
+  const [p1, p2] = playerIds
+  
+  // 尝试获取默认地图
+  const map = getMap(DEFAULT_MAP_ID)
+  
+  // 如果地图没有加载成功，使用默认地图
+  if (!map) {
+    console.warn(`Map ${DEFAULT_MAP_ID} not found, using default map`)
+    
+    // 创建一个更真实的默认地图，包含墙壁和不同类型的格子
+    const defaultMap: BoardMap = {
+      id: "default-8x6",
+      name: "默认地图",
+      width: 8,
+      height: 6,
+      tiles: [],
+    }
+    
+    // 生成地图格子
+    for (let y = 0; y < 6; y++) {
+      for (let x = 0; x < 8; x++) {
+        // 边缘是墙壁
+        if (x === 0 || x === 7 || y === 0 || y === 5) {
+          defaultMap.tiles.push({
+            id: `default-${x}-${y}`,
+            x,
+            y,
+            props: {
+              walkable: false,
+              bulletPassable: false,
+              type: "wall",
+            },
+          })
+        } 
+        // 中间区域是地板
+        else {
+          defaultMap.tiles.push({
+            id: `default-${x}-${y}`,
+            x,
+            y,
+            props: {
+              walkable: true,
+              bulletPassable: true,
+              type: "floor",
+            },
+          })
+        }
       }
-    }),
+    }
+    
+    const pieces = buildInitialPiecesForPlayers(defaultMap, playerIds, selectedPieces)
+    const redPlayer = pieces.find(piece => piece.faction === "red")?.ownerPlayerId || p1
+    
+    return {
+      map: defaultMap,
+      pieces,
+      pieceStatsByTemplateId: buildDefaultPieceStats(),
+      skillsById: buildDefaultSkills(),
+      players: [
+        { playerId: p1, chargePoints: 0 },
+        { playerId: p2, chargePoints: 0 },
+      ],
+      turn: {
+        currentPlayerId: redPlayer,
+        turnNumber: 1,
+        phase: "start",
+        actions: {
+          hasMoved: false,
+          hasUsedBasicSkill: false,
+          hasUsedChargeSkill: false,
+        },
+      },
+    }
   }
 
-  const map = getMap(DEFAULT_MAP_ID) || defaultMap
-
-  const [p1, p2] = playerIds
   const pieces = buildInitialPiecesForPlayers(map, playerIds, selectedPieces)
-  
   const redPlayer = pieces.find(piece => piece.faction === "red")?.ownerPlayerId || p1
 
   return {
