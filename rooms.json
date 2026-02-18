@@ -13419,8 +13419,8 @@
           "attack": 30,
           "defense": 3,
           "moveRange": 2,
-          "x": 1,
-          "y": 3,
+          "x": 4,
+          "y": 2,
           "skills": [
             {
               "skillId": "fireball",
@@ -13446,7 +13446,7 @@
           "attack": 22,
           "defense": 6,
           "moveRange": 4,
-          "x": 3,
+          "x": 1,
           "y": 4,
           "skills": [
             {
@@ -13563,11 +13563,11 @@
       ],
       "turn": {
         "currentPlayerId": "user_1771360858632_9522",
-        "turnNumber": 3,
+        "turnNumber": 5,
         "phase": "action",
         "actions": {
-          "hasMoved": false,
-          "hasUsedBasicSkill": false,
+          "hasMoved": true,
+          "hasUsedBasicSkill": true,
           "hasUsedChargeSkill": false
         }
       }

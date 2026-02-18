@@ -22,7 +22,10 @@ export function loadJsonFilesServer<T>(directory: string): Record<string, T> {
   const dirPath = join(process.cwd(), directory)
   
   try {
+    console.log('Current working directory:', process.cwd())
     console.log('Loading files from directory:', dirPath)
+    console.log('Directory exists:', require('fs').existsSync(dirPath))
+    
     const files = readdirSync(dirPath, { withFileTypes: true })
     
     console.log('Found files:', files.map(f => f.name))

@@ -13,6 +13,7 @@ type GameBoardProps = {
   selectedPieceId?: string
   isSelectingMoveTarget?: boolean
   isSelectingTeleportTarget?: boolean
+  teleportRange?: number
 }
 
 function tileColor(tile: Tile): string {
@@ -31,7 +32,7 @@ function tileColor(tile: Tile): string {
   }
 }
 
-export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSelectingMoveTarget, isSelectingTeleportTarget }: GameBoardProps) {
+export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSelectingMoveTarget, isSelectingTeleportTarget, teleportRange = 5 }: GameBoardProps) {
   const size = Math.max(map.width, map.height)
   
   // 组件加载时自动加载棋子数据
@@ -77,15 +78,14 @@ export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSe
     return targets
   }
 
-  // 计算可传送的格子（5格范围内）
+  // 计算可传送的格子
   const getValidTeleportTargets = (): { x: number, y: number }[] => {
     if (!selectedPiece || !isSelectingTeleportTarget) return []
     
     const targets: { x: number, y: number }[] = []
     const { x: startX, y: startY } = selectedPiece
-    const teleportRange = 5
     
-    // 检查5格范围内的所有格子
+    // 检查范围内的所有格子
     for (let x = 0; x < map.width; x++) {
       for (let y = 0; y < map.height; y++) {
         if (x === startX && y === startY) continue
@@ -235,27 +235,32 @@ export function GameBoard({ map, pieces = [], onTileClick, selectedPieceId, isSe
                   const pieceTemplate = getPieceById(piece.templateId)
                   const image = pieceTemplate?.image
                   
+                  // 检查棋子是否被选中
+                  const isSelected = selectedPieceId === piece.instanceId
+                  
                   if (image && image.startsWith("http")) {
                     return (
-                      <img
-                        src={image}
-                        alt={pieceTemplate?.name || "Piece"}
-                      className="w-8 h-8 object-contain"
-                      />
+                      <div className={`transition-all duration-200 ${isSelected ? "ring-4 ring-green-500 rounded-full p-1" : `hover:ring-4 hover:ring-${piece.faction === "red" ? "red" : "blue"}-500 rounded-full p-1`}`}>
+                        <img
+                          src={image}
+                          alt={pieceTemplate?.name || "Piece"}
+                          className="w-8 h-8 object-contain"
+                        />
+                      </div>
                     )
                   } else if (image) {
                     return (
-                      <div className={`text-2xl font-bold ${
+                      <div className={`text-2xl font-bold transition-all duration-200 ${
                         piece.faction === "red" ? "text-red-500" : "text-blue-500"
-                      }`}>
+                      } ${isSelected ? "ring-4 ring-green-500 rounded-full p-1" : `hover:ring-4 hover:ring-${piece.faction === "red" ? "red" : "blue"}-500 rounded-full p-1`}`}>
                         {image}
                       </div>
                     )
                   } else {
                     return (
-                      <div className={`text-2xl font-bold ${
+                      <div className={`text-2xl font-bold transition-all duration-200 ${
                         piece.faction === "red" ? "text-red-500" : "text-blue-500"
-                      }`}>
+                      } ${isSelected ? "ring-4 ring-green-500 rounded-full p-1" : `hover:ring-4 hover:ring-${piece.faction === "red" ? "red" : "blue"}-500 rounded-full p-1`}`}>
                         {piece.faction === "red" ? "⚔" : "🛡"}
                       </div>
                     )

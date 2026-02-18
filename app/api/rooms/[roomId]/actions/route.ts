@@ -79,7 +79,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     let pieceTemplates = room.players
       .flatMap(p => p.selectedPieces || [])
       .map(piece => getPieceById(piece.templateId))
-      .filter(Boolean)
+      .filter(Boolean) as any[]
+    
+    console.log('Piece templates found:', pieceTemplates.length)
+    console.log('Piece templates details:', pieceTemplates)
     
     console.log('All piece templates from players:', pieceTemplates.length)
     console.log('Players in room:', room.players.map(p => ({

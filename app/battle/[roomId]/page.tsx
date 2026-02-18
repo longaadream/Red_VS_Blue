@@ -437,6 +437,7 @@ export default function BattlePage() {
                     selectedPieceId={selectedPieceId}
                     isSelectingMoveTarget={isSelectingMoveTarget}
                     isSelectingTeleportTarget={isSelectingTeleportTarget}
+                    teleportRange={battle.skillsById.teleport?.areaSize || 5}
                   />
                 </CardContent>
             </Card>
@@ -789,7 +790,7 @@ export default function BattlePage() {
                     ) : isSelectingTeleportTarget ? (
                       <>
                         <p className="text-xs text-muted-foreground text-center">
-                          请点击棋盘上的格子选择传送目标（5格范围内）
+                          请点击棋盘上的格子选择传送目标（{battle.skillsById.teleport?.areaSize || 5}格范围内）
                         </p>
                         <Button
                           className="w-full"
@@ -823,10 +824,28 @@ export default function BattlePage() {
                         {(() => {
                           const pieceTemplate = getPieceById(selectedPiece.templateId)
                           const pieceSkills = pieceTemplate?.skills || []
+                          
+                          console.log('Selected piece:', selectedPiece.templateId)
+                          console.log('Piece skills:', pieceSkills)
+                          console.log('Battle skills:', Object.keys(battle.skillsById))
+                          
                           const availableSkills = pieceSkills.map(skill => {
                             const skillDef = battle.skillsById[skill.skillId]
-                            return { ...skill, ...skillDef }
+                            console.log('Skill', skill.skillId, 'found:', !!skillDef)
+                            
+                            // 确保技能对象总是有完整的属性
+                            const mergedSkill = {
+                              id: skill.skillId,
+                              name: skill.skillId,
+                              type: "normal",
+                              ...skill,
+                              ...skillDef
+                            }
+                            
+                            return mergedSkill
                           }).filter(skill => skill)
+                          
+                          console.log('Available skills:', availableSkills)
                           
                           return availableSkills.map(skill => (
                             <Button

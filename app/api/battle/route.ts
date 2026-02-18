@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
-import type { PieceTemplate } from "@/lib/game/piece-repository"
+import { getPieceById } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
 import roomStore, { type Room } from "@/lib/game/room-store"
 
@@ -36,7 +36,10 @@ export async function POST(req: NextRequest) {
   const roomId = crypto.randomUUID()
   const playerIds = [playerId.trim() + "-red", playerId.trim() + "-blue"]
 
-  const battle = createInitialBattleForPlayers(playerIds, pieces as PieceTemplate[])
+  // 获取完整的PieceTemplate对象
+  const pieceTemplates = pieces.map(piece => getPieceById(piece.templateId)).filter(Boolean)
+  
+  const battle = createInitialBattleForPlayers(playerIds, pieceTemplates)
 
   if (!battle) {
     return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })

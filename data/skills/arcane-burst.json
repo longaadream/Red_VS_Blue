@@ -1,0 +1,16 @@
+{
+  "id": "arcane-burst",
+  "name": "Arcane Burst",
+  "description": "Teleport and unleash a powerful arcane explosion",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 3,
+  "maxCharges": 1,
+  "chargeCost": 1,
+  "powerMultiplier": 2,
+  "code": "function executeSkill(context) {\n  // 使用函数调用创建复合技能\n  const teleportResult = teleport();\n  const buffResult = buff(15, 2);\n  const damageResult = damage(context.piece.attack * 2.5, 'all-enemies');\n  \n  return { \n    message: 'Arcane burst activated', \n    success: true \n  }\n}",
+  "effects": [],
+  "range": "area",
+  "areaSize": 5,
+  "requiresTarget": true
+}

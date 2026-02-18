@@ -1,0 +1,36 @@
+{
+  "id": "arcane-combination",
+  "name": "Arcane Combination",
+  "description": "Teleport and unleash a powerful attack",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 3,
+  "maxCharges": 1,
+  "chargeCost": 1,
+  "powerMultiplier": 2,
+  "code": "function executeSkill(context) { return { message: 'Arcane combination activated', success: true } }",
+  "effects": [
+    {
+      "type": "teleport",
+      "value": 5,
+      "target": "self",
+      "description": "Teleport to target location"
+    },
+    {
+      "type": "buff",
+      "value": 10,
+      "target": "self",
+      "duration": 2,
+      "description": "Attack boost after teleport"
+    },
+    {
+      "type": "damage",
+      "value": 50,
+      "target": "all-enemies",
+      "description": "Damage all enemies after teleport"
+    }
+  ],
+  "range": "area",
+  "areaSize": 5,
+  "requiresTarget": true
+}
