@@ -40,10 +40,67 @@
 - `id`：技能唯一标识符，使用小写字母和连字符
 - `name`：技能显示名称
 - `description`：技能描述，说明触发条件和效果
-- `kind`：技能类型，被动技能使用 `passive`
-- `type`：技能类型，普通技能使用 `normal`
+- `kind`：技能类型，被动技能使用 `passive`，主动技能使用 `active`
+- `type`：技能类型，普通技能使用 `normal`，充能技能使用 `super`
 - `cooldownTurns`：冷却回合数，0表示无冷却
-- `code`：技能执行代码，被动技能可以使用简单的返回语句
+- `code`：技能执行代码，**所有技能效果都必须通过代码实现**，包括主动技能和被动技能
+- `range`：技能范围，`self`（自身）、`single`（单体）、`area`（范围）
+- `areaSize`：范围大小，仅对 `area` 类型有效
+- `requiresTarget`：是否需要目标，`true` 或 `false`
+
+## 技能执行上下文 (Context)
+
+### Context 对象结构
+当技能执行时，系统会传入一个 `context` 对象，包含以下信息：
+
+```javascript
+{
+  piece: {
+    instanceId: "棋子实例ID",
+    templateId: "棋子模板ID",
+    ownerPlayerId: "所有者玩家ID",
+    currentHp: 当前生命值,
+    maxHp: 最大生命值,
+    attack: 攻击力,
+    defense: 防御力,
+    x: X坐标,
+    y: Y坐标,
+    moveRange: 移动范围
+  },
+  targetPiece: {
+    // 目标棋子信息，格式同 piece
+    // 仅在有目标时存在
+  },
+  battle: {
+    turn: 当前回合数,
+    currentPlayerId: 当前玩家ID,
+    phase: 当前回合阶段
+  },
+  skill: {
+    id: "技能ID",
+    name: "技能名称",
+    type: "技能类型",
+    powerMultiplier: 威力系数
+  }
+}
+```
+
+### 触发事件与 Context 信息
+不同的触发事件会在 `context` 对象中传入不同的信息：
+
+| 触发类型 | 传入的 Context 信息 |
+|---------|-------------------|
+| `afterDamageDealt` | `piece`（攻击者）, `targetPiece`（被攻击者）, `damage`（伤害值） |
+| `afterDamageTaken` | `piece`（被攻击者）, `targetPiece`（攻击者）, `damage`（伤害值） |
+| `afterPieceKilled` | `piece`（击杀者）, `targetPiece`（被杀者） |
+| `afterPieceSummoned` | `piece`（召唤者）, `targetPiece`（被召唤者） |
+| `beginTurn` | `piece`（当前回合玩家的棋子） |
+| `endTurn` | `piece`（当前回合玩家的棋子） |
+| `afterMove` | `piece`（移动的棋子） |
+| `afterSkillUsed` | `piece`（使用技能的棋子）, `skillId`（技能ID） |
+
+### 重要说明
+**所有技能效果都必须通过代码实现**，规则文件中的 `effect` 字段仅用于触发技能，不直接定义效果。技能的具体效果完全由 `code` 字段中的代码决定。
 
 ## 触发规则
 
@@ -154,7 +211,48 @@
 ]
 ```
 
-## 示例1：反击技能
+## 示例1：主动技能 - 火球术
+
+实现"对单个目标造成150%攻击力的伤害"的主动技能。
+
+### 步骤1：创建技能文件
+
+创建 `data/skills/fireball.json`：
+
+```json
+{
+  "id": "fireball",
+  "name": "火球术",
+  "description": "对单个目标造成150%攻击力的伤害",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1.5,
+  "code": "function executeSkill(context) { \n  const caster = context.piece;\n  const target = context.targetPiece;\n  if (target) {\n    const damage = Math.round(caster.attack * context.skill.powerMultiplier);\n    target.currentHp = Math.max(0, target.currentHp - damage);\n    return { message: caster.templateId + '释放火球术，对' + target.templateId + '造成' + damage + '点伤害', success: true };\n  }\n  return { message: '没有目标可以攻击', success: false };\n}",
+  "range": "single",
+  "requiresTarget": true
+}
+```
+
+### 步骤2：装备技能
+
+将技能分配给角色，在角色的 `skills` 数组中添加技能：
+
+```json
+"skills": [
+  {
+    "skillId": "basic-attack",
+    "level": 1
+  },
+  {
+    "skillId": "fireball",
+    "level": 1
+  }
+]
+```
+
+## 示例2：被动技能 - 反击
 
 实现"当受到伤害时，选择一个3格内的目标，造成100%攻击力的伤害"的技能。
 
@@ -223,7 +321,7 @@
 ]
 ```
 
-## 示例2：生命汲取
+## 示例3：被动技能 - 生命汲取
 
 实现"当击杀敌人时，获得等同于其最大生命值的生命值"的技能。
 
@@ -271,7 +369,7 @@
 }
 ```
 
-## 示例3：战斗光环
+## 示例4：战斗光环
 
 实现"当回合开始时，所有友方角色攻击力+1"的技能。
 
@@ -320,7 +418,7 @@
 }
 ```
 
-## 示例4：触发技能代码
+## 示例5：触发技能代码
 
 实现"当受到伤害时，触发反击技能"的效果，使用技能的code代码执行逻辑。
 
