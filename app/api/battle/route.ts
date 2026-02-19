@@ -36,10 +36,38 @@ export async function POST(req: NextRequest) {
   const roomId = crypto.randomUUID()
   const playerIds = [playerId.trim() + "-red", playerId.trim() + "-blue"]
 
-  // 获取完整的PieceTemplate对象
-  const pieceTemplates = pieces.map(piece => getPieceById(piece.templateId)).filter(Boolean)
+  // 获取完整的PieceTemplate对象，并根据玩家选择覆盖faction属性
+  const pieceTemplates = pieces.map(piece => {
+    const template = getPieceById(piece.templateId);
+    if (template) {
+      // 覆盖faction属性，确保棋子分配到正确的阵营
+      return { ...template, faction: piece.faction };
+    }
+    return null;
+  }).filter(Boolean)
   
-  const battle = createInitialBattleForPlayers(playerIds, pieceTemplates)
+  // 准备玩家选择的棋子信息，确保第一个玩家（红方）获得红方棋子，第二个玩家（蓝方）获得蓝方棋子
+  // 确保每个玩家至少有一个棋子
+  const redPieces = pieceTemplates.filter(piece => piece.faction === "red")
+  const bluePieces = pieceTemplates.filter(piece => piece.faction === "blue")
+  
+  // 如果没有红方棋子，将第一个棋子设为红方
+  const finalRedPieces = redPieces.length > 0 ? redPieces : pieceTemplates.slice(0, 1).map(piece => ({ ...piece, faction: "red" }))
+  // 如果没有蓝方棋子，将第二个棋子设为蓝方
+  const finalBluePieces = bluePieces.length > 0 ? bluePieces : pieceTemplates.slice(1, 2).map(piece => ({ ...piece, faction: "blue" }))
+  
+  const playerSelectedPieces = [
+    {
+      playerId: playerIds[0], // 红方玩家
+      pieces: finalRedPieces
+    },
+    {
+      playerId: playerIds[1], // 蓝方玩家
+      pieces: finalBluePieces
+    }
+  ];
+  
+  const battle = createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces)
 
   if (!battle) {
     return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })

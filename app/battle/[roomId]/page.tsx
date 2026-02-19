@@ -441,6 +441,30 @@ export default function BattlePage() {
                   />
                 </CardContent>
             </Card>
+            
+            {/* 终端框 - 显示技能执行消息 */}
+            <Card className="bg-zinc-900/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">战斗日志</CardTitle>
+              </CardHeader>
+              <CardContent className="max-h-40 overflow-y-auto space-y-2">
+                {(battle.actions || []).map((action, index) => (
+                  <div key={index} className="text-xs text-zinc-300">
+                    <span className="text-zinc-500">[{action.turn || battle.turn.turnNumber}] </span>
+                    <span className={action.playerId === currentPlayerId ? "text-green-400" : "text-blue-400"}>
+                      {action.playerId === currentPlayerId ? "你" : "对手"}
+                    </span>
+                    <span className="text-zinc-400">: </span>
+                    <span>{action.payload?.message || action.type || "未知操作"}</span>
+                  </div>
+                ))}
+                {(battle.actions || []).length === 0 && (
+                  <div className="text-xs text-zinc-500">
+                    战斗日志为空
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {myPieces.length > 0 && (
               <Card className="bg-zinc-900/50">
@@ -532,21 +556,42 @@ export default function BattlePage() {
                                 <div className="space-y-2">
                                   {pieceTemplate.skills.map((skill) => {
                                     const skillDef = battle.skillsById[skill.skillId]
+                                    if (!skillDef) return null
+                                    
+                                    // 计算技能的预期效果
+                                    const { calculateSkillPreview } = require('@/lib/game/skills')
+                                    // 从棋子的技能状态中获取当前冷却回合数
+                                    const pieceSkillState = piece.skills.find(s => s.skillId === skill.skillId)
+                                    const currentCooldown = pieceSkillState?.currentCooldown || 0
+                                    const skillPreview = calculateSkillPreview(skillDef, piece, currentCooldown)
+                                    
                                     return (
                                       <div key={skill.skillId} className="space-y-1">
                                         <div className="flex items-center justify-between text-xs">
                                           <span className="font-medium text-zinc-200">
-                                            {skillDef?.name || skill.skillId}
+                                            {skillDef.name || skill.skillId}
                                           </span>
                                           <span className={`text-xs ${
-                                            skillDef?.type === "super" ? "text-yellow-400" : "text-green-400"
+                                            skillDef.type === "super" ? "text-yellow-400" : "text-green-400"
                                           }`}>
-                                            {skillDef?.type === "super" ? "充能" : "普通"}
+                                            {skillDef.type === "super" ? "充能" : "普通"}
                                           </span>
                                         </div>
                                         <p className="text-xs text-zinc-400">
-                                          {skillDef?.description || "无描述"}
+                                          {skillPreview.description || "无描述"}
                                         </p>
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="text-zinc-500">冷却:</span>
+                                          <span className={`text-xs ${
+                                            skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
+                                              ? "text-red-400" 
+                                              : "text-green-400"
+                                          }`}>
+                                            {skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
+                                              ? `${skillPreview.currentCooldown} 回合` 
+                                              : `${skillPreview.cooldown || 0} 回合`}
+                                          </span>
+                                        </div>
                                       </div>
                                     )
                                   })}
@@ -656,21 +701,42 @@ export default function BattlePage() {
                                 <div className="space-y-2">
                                   {pieceTemplate.skills.map((skill) => {
                                     const skillDef = battle.skillsById[skill.skillId]
+                                    if (!skillDef) return null
+                                    
+                                    // 计算技能的预期效果
+                                    const { calculateSkillPreview } = require('@/lib/game/skills')
+                                    // 从棋子的技能状态中获取当前冷却回合数
+                                    const pieceSkillState = piece.skills.find(s => s.skillId === skill.skillId)
+                                    const currentCooldown = pieceSkillState?.currentCooldown || 0
+                                    const skillPreview = calculateSkillPreview(skillDef, piece, currentCooldown)
+                                    
                                     return (
                                       <div key={skill.skillId} className="space-y-1">
                                         <div className="flex items-center justify-between text-xs">
                                           <span className="font-medium text-zinc-200">
-                                            {skillDef?.name || skill.skillId}
+                                            {skillDef.name || skill.skillId}
                                           </span>
                                           <span className={`text-xs ${
-                                            skillDef?.type === "super" ? "text-yellow-400" : "text-green-400"
+                                            skillDef.type === "super" ? "text-yellow-400" : "text-green-400"
                                           }`}>
-                                            {skillDef?.type === "super" ? "充能" : "普通"}
+                                            {skillDef.type === "super" ? "充能" : "普通"}
                                           </span>
                                         </div>
                                         <p className="text-xs text-zinc-400">
-                                          {skillDef?.description || "无描述"}
+                                          {skillPreview.description || "无描述"}
                                         </p>
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="text-zinc-500">冷却:</span>
+                                          <span className={`text-xs ${
+                                            skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
+                                              ? "text-red-400" 
+                                              : "text-green-400"
+                                          }`}>
+                                            {skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
+                                              ? `${skillPreview.currentCooldown} 回合` 
+                                              : `${skillPreview.cooldown || 0} 回合`}
+                                          </span>
+                                        </div>
                                       </div>
                                     )
                                   })}

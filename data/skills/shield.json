@@ -1,24 +1,16 @@
 {
   "id": "shield",
   "name": "护盾术",
-  "description": "为自身提供护盾，吸收伤害",
+  "description": "为自身提供50点护盾，吸收伤害",
+  "icon": "🛡️",
   "kind": "active",
   "type": "super",
   "cooldownTurns": 4,
   "maxCharges": 2,
   "chargeCost": 1,
   "powerMultiplier": 1.0,
-  "code": "function executeSkill(context) {\n  return {\n    effects: [{
-      type: \"shield\",\n      value: 50,\n      target: \"self\",\n      duration: 3,\n      description: \"获得50点护盾，持续3回合\"\n    }],\n    message: \"护盾术生效，获得护盾\",\n    success: true\n  }\n}",
-  "effects": [
-    {
-      "type": "shield",
-      "value": 50,
-      "target": "self",
-      "duration": 3,
-      "description": "获得50点护盾，持续3回合"
-    }
-  ],
+  "code": "function executeSkill(context) {\n  // 直接修改自身的护盾值\n  const shieldValue = 50;\n  if (!context.piece.shield) {\n    context.piece.shield = 0;\n  }\n  context.piece.shield += shieldValue;\n  \n  return {\n    message: \"护盾术生效，获得\" + shieldValue + \"点护盾\",\n    success: true\n  };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) {\n  // 固定护盾值\n  const shieldValue = 50;\n  \n  return {\n    description: \"为自身提供\" + shieldValue + \"点护盾，吸收伤害\",\n    expectedValues: {\n      heal: shieldValue // 使用heal字段表示护盾值，因为它们都是正面效果 \n}\n  };\n}",
   "range": "self",
   "requiresTarget": false
 }

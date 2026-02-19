@@ -6,9 +6,9 @@
   "rarity": "common",
   "image": "🏹",
   "stats": {
-    "maxHp": 100,
-    "attack": 22,
-    "defense": 6,
+    "maxHp": 4,
+    "attack": 2,
+    "defense": 0,
     "moveRange": 4
   },
   "skills": [

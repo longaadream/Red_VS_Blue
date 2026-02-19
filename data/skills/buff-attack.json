@@ -1,23 +1,15 @@
 {
   "id": "buff-attack",
   "name": "攻击强化",
-  "description": "提升自身攻击力",
+  "description": "提升自身攻击力1点，增强后续攻击效果",
+  "icon": "💪",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 4,
   "maxCharges": 0,
   "powerMultiplier": 1.0,
-  "code": "function executeSkill(context) {\n  return {\n    effects: [{
-      type: \"buff\",\n      value: 10,\n      target: \"self\",\n      duration: 3,\n      description: \"攻击力提升10点，持续3回合\"\n    }],\n    message: \"攻击强化生效，攻击力提升\",\n    success: true\n  }\n}",
-  "effects": [
-    {
-      "type": "buff",
-      "value": 10,
-      "target": "self",
-      "duration": 3,
-      "description": "攻击力提升10点，持续3回合"
-    }
-  ],
+  "code": "function executeSkill(context) {\n  // 直接修改自身的攻击力\n  const buffValue = 1;\n  context.piece.attack += buffValue;\n  \n  return {\n    message: \"攻击强化生效，攻击力提升\" + buffValue + \"点\",\n    success: true\n  };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) {\n  // 固定增益值\n  const buffValue = 1;\n  \n  return {\n    description: \"提升自身攻击力\" + buffValue + \"点，增强后续攻击效果\",\n    expectedValues: {\n      buff: buffValue\n    }\n  };\n}",
   "range": "self",
   "requiresTarget": false
 }

@@ -9,7 +9,7 @@ async function loadMaps() {
 export async function GET(request: NextRequest) {
   try {
     const maps = await loadMaps()
-    return NextResponse.json(maps, { status: 200 })
+    return NextResponse.json({ maps: Object.values(maps) }, { status: 200 })
   } catch (error) {
     console.error('Error loading maps:', error)
     return NextResponse.json({ error: 'Failed to load maps' }, { status: 500 })

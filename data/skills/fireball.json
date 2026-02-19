@@ -1,22 +1,16 @@
 {
   "id": "fireball",
   "name": "火球术",
-  "description": "发射火球对敌人造成范围伤害",
+  "description": "对3格范围内的所有敌人造成相当于攻击力150%的伤害",
+  "icon": "🔥",
   "kind": "active",
   "type": "super",
   "cooldownTurns": 2,
   "maxCharges": 3,
   "chargeCost": 1,
   "powerMultiplier": 1.5,
-  "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  const targets = getAllEnemiesInRange(context, context.skill.areaSize || 3)\n  return {\n    damage: damage,\n    effects: targets.map(t => ({\n      type: \"damage\",\n      value: damage,\n      target: \"enemy\",\n      description: \"对 \" + t.templateId + \" 造成 \" + damage + \" 点伤害\"\n    })),\n    message: \"火球爆炸，对范围内敌人造成伤害\",\n    success: true\n  }\n}",
-  "effects": [
-    {
-      "type": "damage",
-      "value": 1.5,
-      "target": "all-enemies",
-      "description": "对范围内所有敌人造成150%攻击力的伤害"
-    }
-  ],
+  "code": "function executeSkill(context) {\n  // 计算伤害值\n  const damageValue = context.piece.attack * context.skill.powerMultiplier;\n  \n  // 选择3格内的所有敌人\n  const enemies = select.getEnemiesInRange(3);\n  if (enemies.length === 0) {\n    return { message: '范围内没有可攻击的敌人', success: false };\n  }\n  \n  // 直接修改每个敌人的生命值\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return {\n    message: \"火球爆炸，对范围内\" + enemies.length + \"个敌人造成\" + damageValue + \"点伤害\",\n    success: true\n  }\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) {\n  // 计算预期伤害值\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  const areaSize = skillDef.areaSize || 3;\n  \n  return {\n    description: \"对\" + areaSize + \"格范围内的所有敌人造成\" + damageValue + \"点伤害（相当于攻击力150%）\",\n    expectedValues: {\n      damage: damageValue\n    }\n  };\n}",
   "range": "area",
   "areaSize": 3,
   "requiresTarget": false

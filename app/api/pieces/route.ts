@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       }
     })
     
-    return NextResponse.json(pieces)
+    return NextResponse.json({ pieces: Object.values(pieces) })
   } catch (error) {
     console.error('Error loading pieces:', error)
     return NextResponse.json({ error: 'Failed to load pieces' }, { status: 500 })

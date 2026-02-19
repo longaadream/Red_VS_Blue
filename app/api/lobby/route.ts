@@ -18,6 +18,9 @@ export async function GET() {
     createdAt: room.createdAt,
     maxPlayers: room.maxPlayers,
     playerCount: room.players.length,
+    hostId: room.hostId,
+    mapId: room.mapId,
+    visibility: room.visibility,
   }))
 
   return NextResponse.json({ rooms: allRooms })
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
     body = {}
   }
 
-  const { name } = (body as { name?: string; maxPlayers?: number }) ?? {}
+  const { name, hostId, mapId, visibility } = (body as { name?: string; hostId?: string; mapId?: string; visibility?: "private" | "public" }) ?? {}
 
   // 生成5位的数字和字母组合作为房间ID
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -49,6 +52,9 @@ export async function POST(req: NextRequest) {
     // 1v1 对战房间，固定 2 人
     maxPlayers: 2,
     players: [],
+    hostId: hostId?.trim() || '',
+    mapId: mapId?.trim() || 'arena-8x6', // 默认使用小型竞技场地图
+    visibility: visibility || "private",
     currentTurnIndex: 0,
     actions: [],
     battleState: null,

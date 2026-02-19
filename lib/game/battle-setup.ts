@@ -7,33 +7,52 @@ import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 
 export function buildDefaultSkills(): Record<string, SkillDefinition> {
-  // 直接硬编码技能数据，确保技能能被正确加载
-  const skills: any = {
+  try {
+    // 尝试从文件系统加载技能数据
+    const { loadJsonFilesServer } = require('./file-loader')
+    const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
+    
+    console.log('Loaded skills from files:', Object.keys(loadedSkills))
+    console.log('Number of skills:', Object.keys(loadedSkills).length)
+    console.log('Teleport skill present:', 'teleport' in loadedSkills)
+    
+    // 如果加载到技能，返回加载的技能
+    if (Object.keys(loadedSkills).length > 0) {
+      return loadedSkills
+    }
+  } catch (error) {
+    console.error('Error loading skills from files:', error)
+  }
+  
+  // 加载失败时，使用默认技能数据
+  const defaultSkills: Record<string, SkillDefinition> = {
     "basic-attack": {
       id: "basic-attack",
-      name: "Basic Attack",
-      description: "Basic attack on target",
+      name: "普通攻击",
+      description: "对单个目标造成伤害",
       kind: "active",
       type: "normal",
       cooldownTurns: 0,
       maxCharges: 0,
       powerMultiplier: 1,
-      code: "function executeSkill(context) { return { message: 'Basic attack', success: true } }",
+      code: "function executeSkill(context) { const nearestEnemy = select.getNearestEnemy(); if (nearestEnemy) { const damage = Math.round(sourcePiece.attack * context.skill.powerMultiplier); nearestEnemy.currentHp = Math.max(0, nearestEnemy.currentHp - damage); return { message: '对单个目标造成' + damage + '点伤害', success: true }; } return { message: '范围内没有可攻击的敌人', success: false }; }",
+      previewCode: "function calculatePreview(piece, skillDef) { const damage = Math.round(piece.attack * skillDef.powerMultiplier); return { description: \"对单个目标造成\" + damage + \"点伤害\", expectedValues: { damage } }; }",
       effects: [],
       range: "single",
       requiresTarget: true
     },
     "fireball": {
       id: "fireball",
-      name: "Fireball",
-      description: "Fireball attack",
+      name: "火球术",
+      description: "对范围内多个目标造成伤害",
       kind: "active",
       type: "super",
       cooldownTurns: 2,
       maxCharges: 3,
       chargeCost: 1,
       powerMultiplier: 1.5,
-      code: "function executeSkill(context) { return { message: 'Fireball', success: true } }",
+      code: "function executeSkill(context) { const enemies = select.getEnemiesInRange(3); if (enemies.length > 0) { enemies.forEach(enemy => { const damage = Math.round(sourcePiece.attack * context.skill.powerMultiplier); enemy.currentHp = Math.max(0, enemy.currentHp - damage); }); return { message: '对范围内多个目标造成伤害', success: true }; } return { message: '范围内没有可攻击的敌人', success: false }; }",
+      previewCode: "function calculatePreview(piece, skillDef) { const damage = Math.round(piece.attack * skillDef.powerMultiplier); const areaSize = skillDef.areaSize || 3; return { description: \"对\" + areaSize + \"格范围内的所有敌人造成\" + damage + \"点伤害（相当于攻击力150%）\", expectedValues: { damage } }; }",
       effects: [],
       range: "area",
       areaSize: 3,
@@ -41,14 +60,15 @@ export function buildDefaultSkills(): Record<string, SkillDefinition> {
     },
     "teleport": {
       id: "teleport",
-      name: "Teleport",
-      description: "Instantly move to target location",
+      name: "传送",
+      description: "传送到目标位置",
       kind: "active",
       type: "normal",
       cooldownTurns: 2,
       maxCharges: 0,
       powerMultiplier: 1,
-      code: "function executeSkill(context) { return { message: 'Teleport activated', success: true } }",
+      code: "function executeSkill(context) { if (context.target) { teleport(context.target.x, context.target.y); return { message: '成功传送到目标位置', success: true }; } return { message: '没有指定目标位置', success: false }; }",
+      previewCode: "function calculatePreview(piece, skillDef) { const areaSize = skillDef.areaSize || 5; return { description: \"传送到目标位置，冷却2回合（\" + areaSize + \"格范围内）\", expectedValues: {} }; }",
       effects: [],
       range: "area",
       areaSize: 5,
@@ -56,48 +76,39 @@ export function buildDefaultSkills(): Record<string, SkillDefinition> {
     },
     "shield": {
       id: "shield",
-      name: "Shield",
-      description: "Create a shield",
+      name: "护盾",
+      description: "为自己创建一个护盾",
       kind: "active",
       type: "super",
       cooldownTurns: 4,
       maxCharges: 2,
       chargeCost: 1,
       powerMultiplier: 1,
-      code: "function executeSkill(context) { return { message: 'Shield activated', success: true } }",
+      code: "function executeSkill(context) { sourcePiece.shield = (sourcePiece.shield || 0) + Math.round(sourcePiece.defense * 2); return { message: '为自己创建一个护盾', success: true }; }",
+      previewCode: "function calculatePreview(piece, skillDef) { const shieldValue = Math.round(piece.defense * 2); return { description: \"为自己创建一个吸收\" + shieldValue + \"点伤害的护盾\", expectedValues: {} }; }",
       effects: [],
       range: "self",
       requiresTarget: false
     },
     "buff-attack": {
       id: "buff-attack",
-      name: "Attack Buff",
-      description: "Buff attack power",
+      name: "攻击增益",
+      description: "提升自身攻击力",
       kind: "active",
       type: "normal",
       cooldownTurns: 4,
       maxCharges: 0,
       powerMultiplier: 1,
-      code: "function executeSkill(context) { return { message: 'Attack buff', success: true } }",
+      code: "function executeSkill(context) { sourcePiece.attack += 10; return { message: '提升自身攻击力10点', success: true }; }",
+      previewCode: "function calculatePreview(piece, skillDef) { const buffValue = 10; return { description: \"提升自身攻击力\" + buffValue + \"点，持续3回合\", expectedValues: { buff: buffValue } }; }",
       effects: [],
       range: "self",
       requiresTarget: false
     }
   }
   
-  console.log('Using hardcoded skills:', Object.keys(skills))
-  console.log('Number of skills:', Object.keys(skills).length)
-  console.log('Teleport skill present:', 'teleport' in skills)
-  console.log('Teleport skill details:', skills['teleport'])
-  
-  // 直接返回包含teleport技能的对象
-  return {
-    "teleport": skills["teleport"],
-    "fireball": skills["fireball"],
-    "basic-attack": skills["basic-attack"],
-    "shield": skills["shield"],
-    "buff-attack": skills["buff-attack"]
-  }
+  console.log('Using default skills:', Object.keys(defaultSkills))
+  return defaultSkills
 }
 
 export function buildDefaultPieceStats(): Record<string, PieceStats> {
@@ -117,16 +128,24 @@ export function buildDefaultPieceStats(): Record<string, PieceStats> {
   }
 }
 
+// 玩家选择的棋子信息
+interface PlayerSelectedPieces {
+  playerId: string
+  pieces: PieceTemplate[]
+}
+
 export function buildInitialPiecesForPlayers(
   map: BoardMap,
   players: PlayerId[],
   selectedPieces: PieceTemplate[],
+  playerSelectedPieces?: PlayerSelectedPieces[]
 ): PieceInstance[] {
   if (players.length !== 2) return []
   
   const [p1, p2] = players
   
   // 固定分配玩家到红方和蓝方，避免随机导致的问题
+  // 玩家数组已按红方在前、蓝方在后的顺序排序
   const redPlayer = p1
   const bluePlayer = p2
   
@@ -141,83 +160,205 @@ export function buildInitialPiecesForPlayers(
   // 如果没有地板方格，使用所有可走的方格
   const availableTiles = floorTiles.length > 0 ? floorTiles : map.tiles.filter(tile => tile.props.walkable)
   
-  // 随机选择位置的函数
+  // 随机选择位置的函数，确保位置不重叠
   const getRandomPosition = () => {
     if (availableTiles.length === 0) {
       // 如果没有可走的方格，返回默认位置
       return { x: Math.floor(map.width / 2), y: Math.floor(map.height / 2) }
     }
-    const randomIndex = Math.floor(Math.random() * availableTiles.length)
-    return { x: availableTiles[randomIndex].x, y: availableTiles[randomIndex].y }
+    
+    // 尝试最多100次，找到一个未被占用的位置
+    for (let i = 0; i < 100; i++) {
+      const randomIndex = Math.floor(Math.random() * availableTiles.length)
+      const position = { x: availableTiles[randomIndex].x, y: availableTiles[randomIndex].y }
+      
+      // 检查位置是否已经被占用
+      const isOccupied = pieces.some(piece => piece.x === position.x && piece.y === position.y)
+      if (!isOccupied) {
+        return position
+      }
+    }
+    
+    // 如果所有位置都被占用，返回第一个可用位置
+    return { x: availableTiles[0].x, y: availableTiles[0].y }
   }
   
   console.log('Selected pieces count:', selectedPieces.length)
   console.log('Selected pieces:', selectedPieces)
+  console.log('Player selected pieces:', playerSelectedPieces)
   
-  // 为红方玩家添加棋子
+  // 初始化棋子计数器
   let redPieceIndex = 0
-  
-  // 添加红方专属棋子
-  for (const pieceTemplate of selectedPieces) {
-    if (pieceTemplate.faction === "red") {
-      const position = getRandomPosition()
-      pieces.push({
-        instanceId: `${redPlayer}-${redPieceIndex + 1}`,
-        templateId: pieceTemplate.id,
-        ownerPlayerId: redPlayer,
-        faction: "red",
-        currentHp: pieceTemplate.stats.maxHp,
-        maxHp: pieceTemplate.stats.maxHp,
-        attack: pieceTemplate.stats.attack,
-        defense: pieceTemplate.stats.defense,
-        moveRange: pieceTemplate.stats.moveRange,
-        x: position.x,
-        y: position.y,
-        skills: pieceTemplate.skills.map(s => ({
-          skillId: s.skillId,
-          currentCooldown: 0,
-          currentCharges: 0,
-          unlocked: true,
-        } as SkillState)),
-      })
-      redPieceIndex++
-    }
-  }
-  
-  // 为蓝方玩家添加棋子
   let bluePieceIndex = 0
   
-  // 添加蓝方专属棋子
-  for (const pieceTemplate of selectedPieces) {
-    if (pieceTemplate.faction === "blue") {
-      const position = getRandomPosition()
-      pieces.push({
-        instanceId: `${bluePlayer}-${bluePieceIndex + 1}`,
-        templateId: pieceTemplate.id,
-        ownerPlayerId: bluePlayer,
-        faction: "blue",
-        currentHp: pieceTemplate.stats.maxHp,
-        maxHp: pieceTemplate.stats.maxHp,
-        attack: pieceTemplate.stats.attack,
-        defense: pieceTemplate.stats.defense,
-        moveRange: pieceTemplate.stats.moveRange,
-        x: position.x,
-        y: position.y,
-        skills: pieceTemplate.skills.map(s => ({
-          skillId: s.skillId,
-          currentCooldown: 0,
-          currentCharges: 0,
-          unlocked: true,
-        } as SkillState)),
+  // 分配棋子给玩家
+  // 优先使用玩家选择的棋子信息
+  if (playerSelectedPieces && playerSelectedPieces.length > 0) {
+    console.log('Using player selected pieces info for allocation')
+    console.log('Player selected pieces:', playerSelectedPieces)
+    console.log('Red player:', redPlayer)
+    console.log('Blue player:', bluePlayer)
+    
+    // 为每个玩家分配棋子
+    // 确保红方玩家获得红方棋子，蓝方玩家获得蓝方棋子
+    playerSelectedPieces.forEach((playerInfo, playerIndex) => {
+      const playerId = playerInfo.playerId
+      
+      // 确定玩家的所有者ID和对应阵营
+      const ownerPlayerId = playerIndex === 0 ? redPlayer : bluePlayer
+      const expectedFaction = playerIndex === 0 ? "red" : "blue"
+      
+      console.log(`Allocating pieces for player ${playerId} (owner: ${ownerPlayerId}, expected faction: ${expectedFaction})`)
+      
+      let pieceIndex = 0
+      playerInfo.pieces.forEach(pieceTemplate => {
+        const position = getRandomPosition()
+        // 强制使用对应玩家的阵营，确保红方玩家获得红方棋子，蓝方玩家获得蓝方棋子
+        const actualFaction = expectedFaction
+        pieces.push({
+          instanceId: `${ownerPlayerId}-${pieceIndex + 1}`,
+          templateId: pieceTemplate.id,
+          ownerPlayerId,
+          faction: actualFaction,
+          currentHp: pieceTemplate.stats.maxHp,
+          maxHp: pieceTemplate.stats.maxHp,
+          attack: pieceTemplate.stats.attack,
+          defense: pieceTemplate.stats.defense,
+          moveRange: pieceTemplate.stats.moveRange,
+          x: position.x,
+          y: position.y,
+          skills: pieceTemplate.skills.map(s => ({
+            skillId: s.skillId,
+            currentCooldown: 0,
+            currentCharges: 0,
+            unlocked: true,
+          } as SkillState)),
+        })
+        pieceIndex++
+        
+        // 更新计数器
+        if (actualFaction === "red") {
+          redPieceIndex++
+        } else {
+          bluePieceIndex++
+        }
       })
-      bluePieceIndex++
+    })
+  } else {
+    // 没有玩家选择的棋子信息，根据棋子模板的faction属性分配，
+    // 确保每个玩家至少有一个棋子，并且分配给正确的阵营
+    console.log('Using default allocation based on piece faction')
+    
+    // 收集红方和蓝方的棋子模板
+    const redPieces = selectedPieces.filter(piece => piece.faction === "red")
+    const bluePieces = selectedPieces.filter(piece => piece.faction === "blue")
+    
+    console.log('Red pieces found:', redPieces.length)
+    console.log('Blue pieces found:', bluePieces.length)
+    
+    // 为红方玩家分配棋子
+    if (redPieces.length > 0) {
+      redPieces.forEach((pieceTemplate, index) => {
+        const position = getRandomPosition()
+        pieces.push({
+          instanceId: `${redPlayer}-${index + 1}`,
+          templateId: pieceTemplate.id,
+          ownerPlayerId: redPlayer,
+          faction: "red",
+          currentHp: pieceTemplate.stats.maxHp,
+          maxHp: pieceTemplate.stats.maxHp,
+          attack: pieceTemplate.stats.attack,
+          defense: pieceTemplate.stats.defense,
+          moveRange: pieceTemplate.stats.moveRange,
+          x: position.x,
+          y: position.y,
+          skills: pieceTemplate.skills.map(s => ({
+            skillId: s.skillId,
+            currentCooldown: 0,
+            currentCharges: 0,
+            unlocked: true,
+          } as SkillState)),
+        })
+        redPieceIndex++
+      })
+    }
+    
+    // 为蓝方玩家分配棋子
+    if (bluePieces.length > 0) {
+      bluePieces.forEach((pieceTemplate, index) => {
+        const position = getRandomPosition()
+        pieces.push({
+          instanceId: `${bluePlayer}-${index + 1}`,
+          templateId: pieceTemplate.id,
+          ownerPlayerId: bluePlayer,
+          faction: "blue",
+          currentHp: pieceTemplate.stats.maxHp,
+          maxHp: pieceTemplate.stats.maxHp,
+          attack: pieceTemplate.stats.attack,
+          defense: pieceTemplate.stats.defense,
+          moveRange: pieceTemplate.stats.moveRange,
+          x: position.x,
+          y: position.y,
+          skills: pieceTemplate.skills.map(s => ({
+            skillId: s.skillId,
+            currentCooldown: 0,
+            currentCharges: 0,
+            unlocked: true,
+          } as SkillState)),
+        })
+        bluePieceIndex++
+      })
+    }
+    
+    // 如果没有按阵营分配到足够的棋子，将剩余棋子平均分配给两个玩家
+    const remainingPieces = selectedPieces.filter(piece => 
+      !redPieces.includes(piece) && !bluePieces.includes(piece)
+    )
+    
+    console.log('Remaining pieces to distribute:', remainingPieces.length)
+    
+    if (remainingPieces.length > 0) {
+      remainingPieces.forEach((pieceTemplate, index) => {
+        // 交替分配给两个玩家
+        const isRedPlayer = index % 2 === 0
+        const playerId = isRedPlayer ? redPlayer : bluePlayer
+        const faction = isRedPlayer ? "red" : "blue"
+        const pieceIndex = isRedPlayer ? redPieceIndex : bluePieceIndex
+        
+        const position = getRandomPosition()
+        pieces.push({
+          instanceId: `${playerId}-${pieceIndex + 1}`,
+          templateId: pieceTemplate.id,
+          ownerPlayerId: playerId,
+          faction: faction,
+          currentHp: pieceTemplate.stats.maxHp,
+          maxHp: pieceTemplate.stats.maxHp,
+          attack: pieceTemplate.stats.attack,
+          defense: pieceTemplate.stats.defense,
+          moveRange: pieceTemplate.stats.moveRange,
+          x: position.x,
+          y: position.y,
+          skills: pieceTemplate.skills.map(s => ({
+            skillId: s.skillId,
+            currentCooldown: 0,
+            currentCharges: 0,
+            unlocked: true,
+          } as SkillState)),
+        })
+        
+        if (isRedPlayer) {
+          redPieceIndex++
+        } else {
+          bluePieceIndex++
+        }
+      })
     }
   }
   
   console.log('Red pieces created:', redPieceIndex)
   console.log('Blue pieces created:', bluePieceIndex)
   
-  // 确保至少有一个棋子
+  // 确保每个玩家至少有一个棋子
   if (pieces.length === 0) {
     console.log('No pieces created, adding default pieces')
     
@@ -273,6 +414,65 @@ export function buildInitialPiecesForPlayers(
         unlocked: true,
       })),
     })
+  } else {
+    // 检查是否每个玩家至少有一个棋子
+    const redPlayerPieces = pieces.filter(p => p.ownerPlayerId === redPlayer)
+    const bluePlayerPieces = pieces.filter(p => p.ownerPlayerId === bluePlayer)
+    
+    console.log('Red player pieces count:', redPlayerPieces.length)
+    console.log('Blue player pieces count:', bluePlayerPieces.length)
+    
+    // 如果红方玩家没有棋子，添加默认红方棋子
+    if (redPlayerPieces.length === 0) {
+      console.log('Red player has no pieces, adding default red piece')
+      const position = getRandomPosition()
+      const defaultRedPiece = DEFAULT_PIECES["red-warrior"]
+      pieces.push({
+        instanceId: `${redPlayer}-1`,
+        templateId: defaultRedPiece.id,
+        ownerPlayerId: redPlayer,
+        faction: "red",
+        currentHp: defaultRedPiece.stats.maxHp,
+        maxHp: defaultRedPiece.stats.maxHp,
+        attack: defaultRedPiece.stats.attack,
+        defense: defaultRedPiece.stats.defense,
+        moveRange: defaultRedPiece.stats.moveRange,
+        x: position.x,
+        y: position.y,
+        skills: defaultRedPiece.skills.map(s => ({
+          skillId: s.skillId,
+          currentCooldown: 0,
+          currentCharges: 0,
+          unlocked: true,
+        })),
+      })
+    }
+    
+    // 如果蓝方玩家没有棋子，添加默认蓝方棋子
+    if (bluePlayerPieces.length === 0) {
+      console.log('Blue player has no pieces, adding default blue piece')
+      const position = getRandomPosition()
+      const defaultBluePiece = DEFAULT_PIECES["blue-warrior"]
+      pieces.push({
+        instanceId: `${bluePlayer}-1`,
+        templateId: defaultBluePiece.id,
+        ownerPlayerId: bluePlayer,
+        faction: "blue",
+        currentHp: defaultBluePiece.stats.maxHp,
+        maxHp: defaultBluePiece.stats.maxHp,
+        attack: defaultBluePiece.stats.attack,
+        defense: defaultBluePiece.stats.defense,
+        moveRange: defaultBluePiece.stats.moveRange,
+        x: position.x,
+        y: position.y,
+        skills: defaultBluePiece.skills.map(s => ({
+          skillId: s.skillId,
+          currentCooldown: 0,
+          currentCharges: 0,
+          unlocked: true,
+        })),
+      })
+    }
   }
   
   console.log('Final pieces count:', pieces.length)
@@ -284,13 +484,15 @@ export function buildInitialPiecesForPlayers(
 export function createInitialBattleForPlayers(
   playerIds: PlayerId[],
   selectedPieces: PieceTemplate[],
+  playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[] }>,
+  mapId?: string,
 ): BattleState | null {
   if (playerIds.length !== 2) return null
 
   const [p1, p2] = playerIds
   
-  // 尝试获取默认地图
-  const map = getMap(DEFAULT_MAP_ID)
+  // 尝试获取指定地图或默认地图
+  const map = getMap(mapId || DEFAULT_MAP_ID)
   
   // 如果地图没有加载成功，使用默认地图
   if (!map) {
@@ -337,8 +539,9 @@ export function createInitialBattleForPlayers(
       }
     }
     
-    const pieces = buildInitialPiecesForPlayers(defaultMap, playerIds, selectedPieces)
-    const redPlayer = pieces.find(piece => piece.faction === "red")?.ownerPlayerId || p1
+    const pieces = buildInitialPiecesForPlayers(defaultMap, playerIds, selectedPieces, playerSelectedPieces)
+    // 玩家数组已按红方在前、蓝方在后的顺序排序，所以第一个玩家是红方
+    const redPlayer = playerIds[0]
     
     const skills = buildDefaultSkills()
     console.log('Skills for battle:', Object.keys(skills))
@@ -366,8 +569,9 @@ export function createInitialBattleForPlayers(
     }
   }
 
-  const pieces = buildInitialPiecesForPlayers(map, playerIds, selectedPieces)
-  const redPlayer = pieces.find(piece => piece.faction === "red")?.ownerPlayerId || p1
+  const pieces = buildInitialPiecesForPlayers(map, playerIds, selectedPieces, playerSelectedPieces)
+  // 玩家数组已按红方在前、蓝方在后的顺序排序，所以第一个玩家是红方
+  const redPlayer = playerIds[0]
 
   const skills = buildDefaultSkills()
   console.log('Skills for battle:', Object.keys(skills))

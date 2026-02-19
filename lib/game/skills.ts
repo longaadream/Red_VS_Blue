@@ -7,26 +7,7 @@ export type SkillKind = "active" | "passive"
 
 export type SkillType = "normal" | "super"
 
-export type SkillEffectType = 
-  | "damage"        // 造成伤害
-  | "heal"          // 治疗生命值
-  | "move"          // 移动
-  | "buff"          // 增益效果
-  | "debuff"         // 减益效果
-  | "shield"         // 护盾
-  | "stun"          // 眩晕
-  | "teleport"      // 传送
-  | "summon"        // 召唤
-  | "area"          // 范围效果
-  | "special"        // 特殊效果
 
-export interface SkillEffect {
-  type: SkillEffectType
-  value: number
-  duration?: number  // 持续时间（回合数）
-  target?: "self" | "enemy" | "all" | "allies" | "all-enemies"
-  description?: string
-}
 
 /**
  * 技能执行上下文，提供给技能函数使用
@@ -72,9 +53,6 @@ export interface SkillExecutionContext {
  * 技能执行结果，由技能函数返回
  */
 export interface SkillExecutionResult {
-  damage?: number
-  heal?: number
-  effects?: SkillEffect[]
   message: string
   success: boolean
 }
@@ -100,8 +78,8 @@ export interface SkillDefinition {
   powerMultiplier: number
   /** 技能函数代码（字符串形式存储） */
   code: string
-  /** 技能效果列表，支持多个效果 */
-  effects: SkillEffect[]
+  /** 技能预览函数代码（字符串形式存储），用于计算和显示技能效果预览 */
+  previewCode?: string
   /** 技能范围：single=单体, area=范围, self=自身 */
   range: "single" | "area" | "self"
   /** 范围大小（仅对area类型有效） */
@@ -390,241 +368,6 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
     // 目标选择器
     select: selectors,
     
-    // 伤害效果
-    damage: (params: { value: number, target: "self" | "enemy" | "all-enemies" | PieceInstance } | number, targetTypeOrPiece?: "self" | "enemy" | "all-enemies" | PieceInstance) => {
-      // 支持多种调用方式
-      let value: number;
-      let target: "self" | "enemy" | "all-enemies" | PieceInstance;
-      
-      if (typeof params === "object" && params !== null) {
-        if ('value' in params) {
-          value = params.value;
-          target = params.target;
-        } else {
-          // 如果直接传入棋子对象
-          value = params as any;
-          target = targetTypeOrPiece as PieceInstance;
-        }
-      } else {
-        value = params;
-        target = targetTypeOrPiece || "enemy";
-      }
-      
-      if (target === "self") {
-        sourcePiece.currentHp = Math.max(0, sourcePiece.currentHp - value);
-      } else if (target === "all-enemies") {
-        for (const piece of battle.pieces) {
-          if (piece.ownerPlayerId !== sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-            piece.currentHp = Math.max(0, piece.currentHp - value);
-          }
-        }
-      } else if (target === "enemy") {
-        // 默认攻击最近的敌人
-        const nearestEnemy = selectors.getNearestEnemy();
-        if (nearestEnemy) {
-          nearestEnemy.currentHp = Math.max(0, nearestEnemy.currentHp - value);
-        }
-      } else if (typeof target === "object" && target.currentHp > 0) {
-        // 直接攻击指定的棋子
-        target.currentHp = Math.max(0, target.currentHp - value);
-      }
-      
-      return { type: "damage", value, success: true };
-    },
-
-    // 治疗效果
-    heal: (params: { value: number, target: "self" | "allies" | PieceInstance } | number, targetTypeOrPiece?: "self" | "allies" | PieceInstance) => {
-      let value: number;
-      let target: "self" | "allies" | PieceInstance;
-      
-      if (typeof params === "object" && params !== null) {
-        if ('value' in params) {
-          value = params.value;
-          target = params.target;
-        } else {
-          value = params as any;
-          target = targetTypeOrPiece as PieceInstance;
-        }
-      } else {
-        value = params;
-        target = targetTypeOrPiece || "self";
-      }
-      
-      if (target === "self") {
-        sourcePiece.currentHp = Math.min(sourcePiece.maxHp, sourcePiece.currentHp + value);
-      } else if (target === "allies") {
-        for (const piece of battle.pieces) {
-          if (piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-            piece.currentHp = Math.min(piece.maxHp, piece.currentHp + value);
-          }
-        }
-      } else if (typeof target === "object" && target.currentHp > 0) {
-        // 直接治疗指定的棋子
-        target.currentHp = Math.min(target.maxHp, target.currentHp + value);
-      }
-      
-      return { type: "heal", value, success: true };
-    },
-
-    // 增益效果
-    buff: (params: { value: number, duration?: number, target: "self" | "allies" | PieceInstance, type?: "attack" | "defense" } | number, duration?: number, targetTypeOrPiece?: "self" | "allies" | PieceInstance) => {
-      let value: number;
-      let durationVal: number = 3;
-      let target: "self" | "allies" | PieceInstance;
-      let buffType: "attack" | "defense" = "attack";
-      
-      if (typeof params === "object" && params !== null) {
-        if ('value' in params) {
-          value = params.value;
-          durationVal = params.duration || 3;
-          target = params.target;
-          buffType = params.type || "attack";
-        } else {
-          value = params as any;
-          durationVal = duration || 3;
-          target = targetTypeOrPiece as PieceInstance;
-        }
-      } else {
-        value = params;
-        durationVal = duration || 3;
-        target = targetTypeOrPiece || "self";
-      }
-      
-      const applyBuff = (piece: PieceInstance) => {
-        if (!piece.buffs) {
-          piece.buffs = [];
-        }
-        piece.buffs.push({
-          type: buffType,
-          value,
-          duration: durationVal,
-          source: 'skill'
-        });
-        if (buffType === "attack") {
-          piece.attack += value;
-        } else if (buffType === "defense") {
-          piece.defense += value;
-        }
-      };
-      
-      if (target === "self") {
-        applyBuff(sourcePiece);
-      } else if (target === "allies") {
-        for (const piece of battle.pieces) {
-          if (piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-            applyBuff(piece);
-          }
-        }
-      } else if (typeof target === "object" && target.currentHp > 0) {
-        // 直接增益指定的棋子
-        applyBuff(target);
-      }
-      
-      return { type: "buff", value, duration: durationVal, success: true };
-    },
-
-    // 减益效果
-    debuff: (params: { value: number, duration?: number, target: "enemy" | "all-enemies" | PieceInstance, type?: "attack" | "defense" } | number, duration?: number, targetTypeOrPiece?: "enemy" | "all-enemies" | PieceInstance) => {
-      let value: number;
-      let durationVal: number = 3;
-      let target: "enemy" | "all-enemies" | PieceInstance;
-      let debuffType: "attack" | "defense" = "defense";
-      
-      if (typeof params === "object" && params !== null) {
-        if ('value' in params) {
-          value = params.value;
-          durationVal = params.duration || 3;
-          target = params.target;
-          debuffType = params.type || "defense";
-        } else {
-          value = params as any;
-          durationVal = duration || 3;
-          target = targetTypeOrPiece as PieceInstance;
-        }
-      } else {
-        value = params;
-        durationVal = duration || 3;
-        target = targetTypeOrPiece || "enemy";
-      }
-      
-      const applyDebuff = (piece: PieceInstance) => {
-        if (!piece.debuffs) {
-          piece.debuffs = [];
-        }
-        piece.debuffs.push({
-          type: debuffType,
-          value,
-          duration: durationVal,
-          source: 'skill'
-        });
-        if (debuffType === "attack") {
-          piece.attack = Math.max(0, piece.attack - value);
-        } else if (debuffType === "defense") {
-          piece.defense = Math.max(0, piece.defense - value);
-        }
-      };
-      
-      if (target === "all-enemies") {
-        for (const piece of battle.pieces) {
-          if (piece.ownerPlayerId !== sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-            applyDebuff(piece);
-          }
-        }
-      } else if (target === "enemy") {
-        // 默认减益最近的敌人
-        const nearestEnemy = selectors.getNearestEnemy();
-        if (nearestEnemy) {
-          applyDebuff(nearestEnemy);
-        }
-      } else if (typeof target === "object" && target.currentHp > 0) {
-        // 直接减益指定的棋子
-        applyDebuff(target);
-      }
-      
-      return { type: "debuff", value, duration: durationVal, success: true };
-    },
-
-    // 护盾效果
-    shield: (params: { value: number, target: "self" | "allies" | PieceInstance } | number, targetTypeOrPiece?: "self" | "allies" | PieceInstance) => {
-      let value: number;
-      let target: "self" | "allies" | PieceInstance;
-      
-      if (typeof params === "object" && params !== null) {
-        if ('value' in params) {
-          value = params.value;
-          target = params.target;
-        } else {
-          value = params as any;
-          target = targetTypeOrPiece as PieceInstance;
-        }
-      } else {
-        value = params;
-        target = targetTypeOrPiece || "self";
-      }
-      
-      const applyShield = (piece: PieceInstance) => {
-        if (!piece.shield) {
-          piece.shield = 0;
-        }
-        piece.shield += value;
-      };
-      
-      if (target === "self") {
-        applyShield(sourcePiece);
-      } else if (target === "allies") {
-        for (const piece of battle.pieces) {
-          if (piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-            applyShield(piece);
-          }
-        }
-      } else if (typeof target === "object" && target.currentHp > 0) {
-        // 直接为指定的棋子添加护盾
-        applyShield(target);
-      }
-      
-      return { type: "shield", value, success: true };
-    },
-
     // 传送效果
     teleport: (x: number, y?: number) => {
       let targetPos: { x: number, y: number } | undefined;
@@ -702,34 +445,97 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
 
     // 创建技能执行环境，包含辅助函数和效果函数
     const skillEnvironment = {
+      // 上下文
       context,
       battle,
+      sourcePiece,
+      
+      // 目标选择器
+      select: effects.select,
+      
+      // 效果函数
+      teleport: effects.teleport,
+      
+      // 辅助函数
       getAllEnemiesInRange: (range: number) => getAllEnemiesInRange(context, range, battle),
       getAllAlliesInRange: (range: number) => getAllAlliesInRange(context, range, battle),
       calculateDistance,
       isTargetInRange: (target: any, range: number) => isTargetInRange(context, target, range),
-      // 目标选择器
-      select: effects.select,
-      // 效果函数
-      damage: effects.damage,
-      heal: effects.heal,
-      buff: effects.buff,
-      debuff: effects.debuff,
-      shield: effects.shield,
-      teleport: effects.teleport
+      
+      // 工具函数
+      Math,
+      console
     }
 
-    // 构建技能执行函数
-    const skillCode = `
-      (function() {
-        ${skillDef.code}
-        return executeSkill(context);
-      })()
-    `
+    // 尝试执行技能定义中的代码
+    if (skillDef.code) {
+      try {
+        // 构建完整的技能执行代码
+        const fullSkillCode = `
+          (function(environment) {
+            // 定义全局变量
+            const context = environment.context;
+            const battle = environment.battle;
+            const sourcePiece = environment.sourcePiece;
+            const select = environment.select;
+            const teleport = environment.teleport;
+            const getAllEnemiesInRange = environment.getAllEnemiesInRange;
+            const getAllAlliesInRange = environment.getAllAlliesInRange;
+            const calculateDistance = environment.calculateDistance;
+            const isTargetInRange = environment.isTargetInRange;
+            const Math = environment.Math;
+            const console = environment.console;
+            
+            // 定义技能执行函数
+            ${skillDef.code}
+            
+            // 执行技能
+            return executeSkill(context);
+          })(skillEnvironment)
+        `;
+        
+        // 执行技能代码
+        const result = eval(fullSkillCode);
+        return result;
+      } catch (error) {
+        console.error('Error executing skill code:', error);
+        // 执行失败时，使用默认技能逻辑
+      }
+    }
 
-    // 执行技能函数
-    const result = eval(skillCode)
-    return result
+    // 默认技能逻辑（作为fallback）
+    // 找到最近的敌人
+    const nearestEnemy = effects.select.getNearestEnemy();
+    if (nearestEnemy) {
+      // 计算伤害值
+      const damageValue = sourcePiece.attack * skillDef.powerMultiplier;
+      // 应用伤害
+      const originalHp = nearestEnemy.currentHp;
+      nearestEnemy.currentHp = Math.max(0, nearestEnemy.currentHp - damageValue);
+      
+      // 检查是否击杀了敌人
+      if (originalHp > 0 && nearestEnemy.currentHp === 0) {
+        // 击杀敌人后，为击杀者添加充能点
+        const playerMeta = battle.players.find(p => p.playerId === sourcePiece.ownerPlayerId);
+        if (playerMeta) {
+          playerMeta.chargePoints += 1; // 每次击杀获得1点充能
+        }
+        return {
+          message: `对最近的敌人造成${Math.round(damageValue)}点伤害，击杀敌人获得1点充能`,
+          success: true
+        };
+      }
+      
+      return {
+        message: `对最近的敌人造成${Math.round(damageValue)}点伤害`,
+        success: true
+      };
+    } else {
+      return {
+        message: '范围内没有可攻击的敌人',
+        success: false
+      };
+    }
   } catch (error) {
     console.error('Error executing skill:', error)
     return {
@@ -739,140 +545,96 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
   }
 }
 
-// 应用技能效果
-export function applySkillEffects(battle: BattleState, effects: SkillEffect[], sourcePiece: PieceInstance, target?: { x: number, y: number }): void {
-  for (const effect of effects) {
-    switch (effect.type) {
-      case 'damage':
-        // 处理伤害效果
-        if (effect.target === 'enemy') {
-          // 伤害单个敌人
-          // 这里需要知道具体的目标，暂时跳过
-        } else if (effect.target === 'all-enemies') {
-          // 伤害所有敌人
-          for (const piece of battle.pieces) {
-            if (piece.ownerPlayerId !== sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-              piece.currentHp = Math.max(0, piece.currentHp - effect.value)
-            }
-          }
-        } else if (effect.target === 'self') {
-          // 自残效果
-          sourcePiece.currentHp = Math.max(0, sourcePiece.currentHp - effect.value)
-        }
-        break
-      case 'heal':
-        // 处理治疗效果
-        if (effect.target === 'self') {
-          sourcePiece.currentHp = Math.min(sourcePiece.maxHp, sourcePiece.currentHp + effect.value)
-        } else if (effect.target === 'allies') {
-          for (const piece of battle.pieces) {
-            if (piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-              piece.currentHp = Math.min(piece.maxHp, piece.currentHp + effect.value)
-            }
-          }
-        }
-        break
-      case 'buff':
-        // 处理增益效果
-        if (effect.target === 'self') {
-          if (!sourcePiece.buffs) {
-            sourcePiece.buffs = []
-          }
-          sourcePiece.buffs.push({
-            type: 'attack',
-            value: effect.value,
-            duration: effect.duration || 3,
-            source: 'skill'
-          })
-          // 直接提升攻击力，简化实现
-          sourcePiece.attack += effect.value
-        } else if (effect.target === 'allies') {
-          // 增益所有盟友
-          for (const piece of battle.pieces) {
-            if (piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-              if (!piece.buffs) {
-                piece.buffs = []
-              }
-              piece.buffs.push({
-                type: 'attack',
-                value: effect.value,
-                duration: effect.duration || 3,
-                source: 'skill'
-              })
-              piece.attack += effect.value
-            }
-          }
-        }
-        break
-      case 'debuff':
-        // 处理减益效果
-        if (effect.target === 'enemy') {
-          // 需要实现 debuff 系统
-        } else if (effect.target === 'all-enemies') {
-          // 减益所有敌人
-          for (const piece of battle.pieces) {
-            if (piece.ownerPlayerId !== sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-              if (!piece.debuffs) {
-                piece.debuffs = []
-              }
-              piece.debuffs.push({
-                type: 'defense',
-                value: effect.value,
-                duration: effect.duration || 3,
-                source: 'skill'
-              })
-              // 直接降低防御力，简化实现
-              piece.defense = Math.max(0, piece.defense - effect.value)
-            }
-          }
-        }
-        break
-      case 'shield':
-        // 处理护盾效果
-        if (effect.target === 'self') {
-          if (!sourcePiece.shield) {
-            sourcePiece.shield = 0
-          }
-          sourcePiece.shield += effect.value
-        } else if (effect.target === 'allies') {
-          // 为所有盟友添加护盾
-          for (const piece of battle.pieces) {
-            if (piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0) {
-              if (!piece.shield) {
-                piece.shield = 0
-              }
-              piece.shield += effect.value
-            }
-          }
-        }
-        break
-      case 'teleport':
-        // 处理传送效果
-        if (effect.target === 'self') {
-          if (target) {
-            // 使用指定的目标位置
-            const targetTile = battle.map.tiles.find(t => t.x === target.x && t.y === target.y)
-            if (targetTile && targetTile.props.walkable) {
-              // 检查目标位置是否被占用
-              const isOccupied = battle.pieces.some(p => p.x === target.x && p.y === target.y && p.currentHp > 0)
-              if (!isOccupied) {
-                sourcePiece.x = target.x
-                sourcePiece.y = target.y
-              }
-            }
-          } else {
-            // 随机传送作为 fallback
-            const walkableTiles = battle.map.tiles.filter(tile => tile.props.walkable)
-            if (walkableTiles.length > 0) {
-              const randomTile = walkableTiles[Math.floor(Math.random() * walkableTiles.length)]
-              sourcePiece.x = randomTile.x
-              sourcePiece.y = randomTile.y
-            }
-          }
-        }
-        break
-      default:
-        break
+// 计算技能的预期效果（用于显示）
+export function calculateSkillPreview(skillDef: SkillDefinition, piece: PieceInstance, currentCooldown?: number): {
+  description: string
+  expectedValues: {
+    damage?: number
+    heal?: number
+    buff?: number
+    debuff?: number
+  }
+  cooldown?: number
+  currentCooldown?: number
+  chargeCost?: number
+} {
+  // 如果技能定义中包含预览函数代码，使用它来计算效果
+  if (skillDef.previewCode) {
+    try {
+      // 创建预览函数执行环境
+      const previewEnvironment = {
+        piece,
+        skillDef,
+        currentCooldown,
+        calculateDistance,
+        Math
+      }
+
+      // 构建预览函数执行代码
+      const previewCode = `
+        (function() {
+          ${skillDef.previewCode}
+          return calculatePreview(piece, skillDef, currentCooldown);
+        })()
+      `
+
+      // 执行预览函数
+      const result = eval(previewCode)
+      // 添加冷却信息和充能点数信息
+      return {
+        ...result,
+        cooldown: skillDef.cooldownTurns,
+        currentCooldown,
+        chargeCost: skillDef.chargeCost
+      }
+    } catch (error) {
+      console.error('Error executing skill preview:', error)
+      // 如果预览函数执行失败，使用默认计算
     }
   }
+
+  // 默认计算逻辑（作为fallback）
+  const expectedValues: {
+    damage?: number
+    heal?: number
+    buff?: number
+    debuff?: number
+  } = {}
+
+  // 根据技能ID和powerMultiplier计算预期效果
+  if (skillDef.id === 'basic-attack') {
+    expectedValues.damage = Math.round(piece.attack * skillDef.powerMultiplier)
+  } else if (skillDef.id === 'fireball') {
+    expectedValues.damage = Math.round(piece.attack * skillDef.powerMultiplier)
+  } else if (skillDef.id === 'buff-attack') {
+    expectedValues.buff = 10 // 固定值
+  } else if (skillDef.id === 'arcane-burst') {
+    expectedValues.damage = Math.round(piece.attack * 2.5)
+    expectedValues.buff = 15 // 固定值
+  } else if (skillDef.id === 'arcane-combination') {
+    expectedValues.damage = 50 // 固定值
+    expectedValues.buff = 10 // 固定值
+  }
+
+  // 生成包含计算值的描述
+  let calculatedDescription = skillDef.description
+
+  // 替换描述中的占位符为实际计算值
+  if (expectedValues.damage !== undefined) {
+    calculatedDescription = calculatedDescription.replace(/造成.*?点伤害/, `造成${expectedValues.damage}点伤害`)
+    calculatedDescription = calculatedDescription.replace(/造成相当于攻击力.*?%的伤害/, `造成${expectedValues.damage}点伤害（相当于攻击力${Math.round((expectedValues.damage / piece.attack) * 100)}%）`)
+  }
+  if (expectedValues.buff !== undefined) {
+    calculatedDescription = calculatedDescription.replace(/提升自身攻击力.*?点/, `提升自身攻击力${expectedValues.buff}点`)
+  }
+
+  return {
+    description: calculatedDescription,
+    expectedValues,
+    cooldown: skillDef.cooldownTurns,
+    currentCooldown,
+    chargeCost: skillDef.chargeCost
+  }
 }
+
+

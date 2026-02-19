@@ -76,6 +76,11 @@ export async function POST(
         joinedAt: Date.now(),
       }
       room.players.push(player)
+      
+      // 如果房间还没有房主，将当前加入的玩家设置为房主
+      if (!room.hostId) {
+        room.hostId = playerId
+      }
     }
 
     roomStore.setRoom(room.id, room)
@@ -100,7 +105,7 @@ export async function POST(
 
     const playerIds = room.players.map((p) => p.id)
     const defaultPieces = getAllPieces()
-    const battle = createInitialBattleForPlayers(playerIds, defaultPieces)
+    const battle = createInitialBattleForPlayers(playerIds, defaultPieces, undefined, room.mapId)
     if (!battle) {
       return NextResponse.json(
         { error: "Failed to initialize battle state" },

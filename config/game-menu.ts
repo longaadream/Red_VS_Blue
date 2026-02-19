@@ -6,6 +6,8 @@ import {
   Users,
   LogOut,
   Code,
+  BookOpen,
+  Map,
   type LucideIcon,
 } from "lucide-react"
 
@@ -53,6 +55,24 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: Target,
     href: "/practice",
     variant: "primary",
+    enabled: true,
+  },
+  {
+    id: "encyclopedia",
+    label: "Character Encyclopedia",
+    description: "Browse all available pieces",
+    icon: BookOpen,
+    href: "/encyclopedia/pieces",
+    variant: "default",
+    enabled: true,
+  },
+  {
+    id: "map-encyclopedia",
+    label: "Map Encyclopedia",
+    description: "Explore all game maps",
+    icon: Map,
+    href: "/encyclopedia/maps",
+    variant: "default",
     enabled: true,
   },
   {

@@ -1,21 +1,15 @@
 {
   "id": "basic-attack",
   "name": "基础攻击",
-  "description": "对目标造成基础伤害",
+  "description": "选择最近的敌人，造成相当于攻击力100%的伤害",
+  "icon": "⚔️",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1.0,
-  "code": "function executeSkill(context) {\n  const damage = context.piece.attack * context.skill.powerMultiplier\n  return {\n    damage: damage,\n    message: \"造成 \" + damage + \" 点伤害\",\n    success: true\n  }\n}",
-  "effects": [
-    {
-      "type": "damage",
-      "value": 1.0,
-      "target": "enemy",
-      "description": "造成100%攻击力的伤害"
-    }
-  ],
+  "code": "function executeSkill(context) {\n  // 选择最近的敌人\n  const targetEnemy = select.getNearestEnemy();\n  if (!targetEnemy) {\n    return { message: '没有可攻击的敌人', success: false };\n  }\n  \n  // 计算伤害值\n  const damageValue = context.piece.attack * context.skill.powerMultiplier;\n  \n  // 直接修改敌人的生命值\n  targetEnemy.currentHp = Math.max(0, targetEnemy.currentHp - damageValue);\n  \n  return {\n    message: \"造成 \" + damageValue + \" 点伤害\",\n    success: true\n  };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) {\n  // 计算预期伤害值\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  \n  return {\n    description: \"选择最近的敌人，造成\" + damageValue + \"点伤害（相当于攻击力100%）\",\n    expectedValues: {\n      damage: damageValue\n    }\n  };\n}",
   "range": "single",
   "requiresTarget": true
 }

@@ -196,13 +196,30 @@ export default function PieceSelectionPage() {
               (p: any) => p.id === user.id
             )
             if (isAlreadyInRoom) {
-              // 如果玩家已经在房间中，直接设置状态
-              console.log('Player is already in room, setting state directly')
-              const faction = Math.random() > 0.5 ? "red" : "blue"
-              setPlayerFaction(faction)
-              setRoomStatus(roomData.players.length === 2 ? "ready" : "waiting")
-              setError(null)
-              return
+              // 如果玩家已经在房间中，调用 claim-faction 来获取实际分配的阵营
+              console.log('Player is already in room, claiming faction')
+              const factionRes = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/actions`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json"
+                },
+                body: JSON.stringify({
+                  action: "claim-faction",
+                  playerName: user.username,
+                  playerId: user.id,
+                }),
+              })
+              
+              if (factionRes.ok) {
+                const factionData = await factionRes.json()
+                if (factionData.success) {
+                  setPlayerFaction(factionData.faction)
+                  setRoomStatus(roomData.players.length === 2 ? "ready" : "waiting")
+                  setError(null)
+                  return
+                }
+              }
             }
           }
         }
@@ -214,12 +231,30 @@ export default function PieceSelectionPage() {
         throw new Error('响应数据格式不正确，缺少players字段')
       }
       
-      // 模拟分配阵营
-      const faction = Math.random() > 0.5 ? "red" : "blue"
-      setPlayerFaction(faction)
-      setRoomStatus(data.players.length === 2 ? "ready" : "waiting")
-      setError(null)
-      console.log('Join room successful!')
+      // 调用 claim-faction 来获取实际分配的阵营
+      console.log('Join room successful, claiming faction')
+      const factionRes = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/actions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          action: "claim-faction",
+          playerName: user.username,
+          playerId: user.id,
+        }),
+      })
+      
+      if (factionRes.ok) {
+        const factionData = await factionRes.json()
+        if (factionData.success) {
+          setPlayerFaction(factionData.faction)
+          setRoomStatus(data.players.length === 2 ? "ready" : "waiting")
+          setError(null)
+          console.log('Faction claimed successfully:', factionData.faction)
+        }
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "加入房间失败"
       console.error('Join room error:', err)
@@ -252,11 +287,11 @@ export default function PieceSelectionPage() {
     console.log('Attempting to start game:', {
       roomId,
       userId: user.id,
-      selectedPiecesCount: [...redSelectedPieces, ...blueSelectedPieces].length
+      selectedPiecesCount: playerFaction === "red" ? redSelectedPieces.length : blueSelectedPieces.length
     })
 
-    // 发送所有已选择的棋子，让服务器在游戏开始时分配阵营
-    const selectedPieces = [...redSelectedPieces, ...blueSelectedPieces]
+    // 根据玩家的实际身份发送选择的棋子
+    const selectedPieces = playerFaction === "red" ? redSelectedPieces : blueSelectedPieces
     
     fetch(`/api/rooms/${roomId}/actions`, {
       method: "POST",

@@ -7,9 +7,10 @@
 4. [开始创建](#开始创建)
 5. [核心类型定义](#核心类型定义)
 6. [目标选择器系统](#目标选择器系统)
-7. [效果执行函数](#效果执行函数)
-8. [编程规范](#编程规范)
-9. [底层实现原理](#底层实现原理)
+7. [直接属性修改](#直接属性修改)
+8. [特殊效果函数](#特殊效果函数)
+9. [编程规范](#编程规范)
+10. [底层实现原理](#底层实现原理)
 
 ---
 
@@ -19,88 +20,12 @@
 - **normal**：普通技能，可以无限次使用
 - **super**：充能技能，需要消耗充能点数才能释放
 
-### 技能效果类型
-
-#### 1. damage（伤害）
-```typescript
-{
-  type: "damage",
-  value: 100,
-  target: "enemy",
-  description: "造成100点伤害"
-}
-```
-
-#### 2. heal（治疗）
-```typescript
-{
-  type: "heal",
-  value: 30,
-  target: "allies",
-  description: "恢复30点生命值"
-}
-```
-
-#### 3. buff（增益）
-```typescript
-{
-  type: "buff",
-  value: 10,
-  target: "self",
-  duration: 3,
-  description: "攻击力提升10点，持续3回合"
-}
-```
-
-#### 4. debuff（减益）
-```typescript
-{
-  type: "debuff",
-  value: 5,
-  target: "enemy",
-  duration: 2,
-  description: "防御力降低5点，持续2回合"
-}
-```
-
-#### 5. shield（护盾）
-```typescript
-{
-  type: "shield",
-  value: 50,
-  target: "self",
-  duration: 3,
-  description: "获得50点护盾，持续3回合"
-}
-```
-
-#### 6. teleport（传送）
-```typescript
-{
-  type: "teleport",
-  value: 5,
-  target: "self",
-  description: "传送到5格范围内"
-}
-```
-
-#### 7. special（特殊效果）
-```typescript
-{
-  type: "special",
-  value: 1,
-  target: "self",
-  description: "特殊效果描述"
-}
-```
-
 ### 技能函数编写
 
 #### 基础结构
 ```typescript
 function executeSkill(context) {
-  // 直接调用效果函数
-  damage(50, 'enemy');
+  // 技能逻辑
   
   return {
     message: "技能执行成功",
@@ -109,93 +34,71 @@ function executeSkill(context) {
 }
 ```
 
-#### 示例：基础攻击技能
+#### 示例：直接修改属性的攻击技能
 ```typescript
 function executeSkill(context) {
-  damage(context.piece.attack * context.skill.powerMultiplier, 'enemy');
+  // 选择最近的敌人
+  const targetEnemy = select.getNearestEnemy();
+  if (!targetEnemy) {
+    return { message: '没有可攻击的敌人', success: false };
+  }
+  
+  // 直接修改敌人的生命值
+  const damageValue = context.piece.attack * 1.5;
+  targetEnemy.currentHp = Math.max(0, targetEnemy.currentHp - damageValue);
   
   return {
-    message: "基础攻击",
+    message: `对敌人造成${damageValue}点伤害`,
     success: true
-  }
+  };
 }
 ```
 
-#### 示例：范围伤害技能
+#### 示例：直接修改属性的增益技能
 ```typescript
 function executeSkill(context) {
-  const damageValue = Math.floor(context.piece.attack * context.skill.powerMultiplier * 1.5);
-  damage(damageValue, 'all-enemies');
+  // 选择血量最低的盟友
+  const targetAlly = select.getLowestHpAlly();
+  if (!targetAlly) {
+    return { message: '没有可增益的盟友', success: false };
+  }
+  
+  // 直接修改盟友的攻击力
+  const buffValue = 20;
+  targetAlly.attack += buffValue;
+  
+  // 记录增益效果（可选）
+  if (!targetAlly.buffs) {
+    targetAlly.buffs = [];
+  }
+  targetAlly.buffs.push({
+    type: 'attack',
+    value: buffValue,
+    duration: 2,
+    source: 'skill'
+  });
   
   return {
-    message: "火球爆炸",
+    message: `为盟友提升${buffValue}点攻击力`,
     success: true
-  }
+  };
 }
 ```
 
-#### 示例：复合技能（传送+攻击+增益）
-```typescript
-function executeSkill(context) {
-  // 顺序执行多个效果
-  teleport(); // 传送到目标位置
-  buff(15, 2); // 攻击提升15点，持续2回合
-  damage(context.piece.attack * 2.5, 'all-enemies'); // 对所有敌人造成伤害
-  
-  return {
-    message: "奥术连击",
-    success: true
-  }
-}
-```
-
-#### 示例：治疗+护盾+团队增益
-```typescript
-function executeSkill(context) {
-  heal(30); // 治疗自身
-  shield(25); // 添加护盾
-  buff(8, 3, 'allies'); // 团队增益
-  
-  return {
-    message: "神圣守护",
-    success: true
-  }
-}
-```
-
-#### 示例：复杂战术技能
-```typescript
-function executeSkill(context) {
-  // 先自残获取能量
-  damage(20, 'self');
-  // 然后获得强力增益
-  buff(25, 2);
-  // 最后造成大范围伤害
-  damage(context.piece.attack * 3, 'all-enemies');
-  // 添加护盾保护自己
-  shield(40);
-  
-  return {
-    message: "献祭仪式",
-    success: true
-  }
-}
-```
-
-#### 示例：使用目标选择器的技能
+#### 示例：范围攻击技能
 ```typescript
 function executeSkill(context) {
   // 获取3格内的所有敌人
   const enemies = select.getEnemiesInRange(3);
   if (enemies.length === 0) {
-    return { message: '没有可攻击的敌人', success: false };
+    return { message: '3格内没有可攻击的敌人', success: false };
   }
   
   // 对每个敌人造成伤害
   let totalDamage = 0;
   enemies.forEach(enemy => {
     const damageValue = context.piece.attack * 1.2;
-    damage({ value: damageValue, target: enemy });
+    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);
     totalDamage += damageValue;
   });
   
@@ -203,33 +106,6 @@ function executeSkill(context) {
     message: `攻击了${enemies.length}个敌人，共造成${totalDamage}点伤害`,
     success: true
   };
-}
-```
-
-#### 示例：单体攻击技能
-```typescript
-function executeSkill(context) {
-  // 获取3格内的敌人
-  const enemiesInRange = select.getEnemiesInRange(3);
-  if (enemiesInRange.length === 0) {
-    return { message: '3格内没有可攻击的敌人', success: false };
-  }
-  
-  // 选择最近的敌人
-  const targetEnemy = select.getNearestEnemy();
-  if (!targetEnemy) {
-    return { message: '无法选择目标', success: false };
-  }
-  
-  // 造成伤害
-  const damageValue = context.piece.attack * 1.5;
-  const damageResult = damage({ value: damageValue, target: targetEnemy });
-  
-  if (damageResult.success) {
-    return { message: `对敌人造成${damageValue}点伤害`, success: true };
-  } else {
-    return { message: '攻击失败', success: false };
-  }
 }
 ```
 
@@ -455,7 +331,7 @@ interface PieceSkill {
 
 #### 1. 创建技能
 1. 访问技能DIY页面
-2. 编写技能函数代码
+2. 编写技能函数代码，使用直接属性修改的方式
 3. 配置技能属性（类型、冷却、威力等）
 4. 导出技能JSON文件
 
@@ -490,33 +366,6 @@ export type SkillKind = "active" | "passive"
 #### SkillType
 ```typescript
 export type SkillType = "normal" | "super"
-```
-
-#### SkillEffectType
-```typescript
-export type SkillEffectType = 
-  | "damage"        // 造成伤害
-  | "heal"          // 治疗生命值
-  | "move"          // 移动
-  | "buff"          // 增益效果
-  | "debuff"         // 减益效果
-  | "shield"         // 护盾
-  | "stun"          // 眩晕
-  | "teleport"      // 传送
-  | "summon"        // 召唤
-  | "area"          // 范围效果
-  | "special"        // 特殊效果
-```
-
-#### SkillEffect
-```typescript
-export interface SkillEffect {
-  type: SkillEffectType
-  value: number
-  duration?: number  // 持续时间（回合数）
-  target?: "self" | "enemy" | "all" | "allies" | "all-enemies"
-  description?: string
-}
 ```
 
 #### SkillExecutionContext
@@ -562,9 +411,6 @@ export interface SkillExecutionContext {
 #### SkillExecutionResult
 ```typescript
 export interface SkillExecutionResult {
-  damage?: number
-  heal?: number
-  effects?: SkillEffect[]
   message: string
   success: boolean
 }
@@ -589,8 +435,6 @@ export interface SkillDefinition {
   powerMultiplier: number
   /** 技能函数代码（字符串形式存储） */
   code: string
-  /** 技能效果列表，支持多个效果 */
-  effects: SkillEffect[]
   /** 技能范围：single=单体, area=范围, self=自身 */
   range: "single" | "area" | "self"
   /** 范围大小（仅对area类型有效） */
@@ -746,7 +590,8 @@ export interface TargetSelectors {
 ```typescript
 const enemies = select.getEnemiesInRange(3);
 enemies.forEach(enemy => {
-  damage({ value: 20, target: enemy });
+  // 对每个敌人执行操作
+  enemy.currentHp = Math.max(0, enemy.currentHp - 20);
 });
 ```
 
@@ -754,7 +599,8 @@ enemies.forEach(enemy => {
 ```typescript
 const nearestEnemy = select.getNearestEnemy();
 if (nearestEnemy) {
-  damage({ value: 50, target: nearestEnemy });
+  // 对最近的敌人执行操作
+  nearestEnemy.currentHp = Math.max(0, nearestEnemy.currentHp - 50);
 }
 ```
 
@@ -762,7 +608,8 @@ if (nearestEnemy) {
 ```typescript
 const lowestHpAlly = select.getLowestHpAlly();
 if (lowestHpAlly) {
-  heal({ value: 30, target: lowestHpAlly });
+  // 对血量最低的盟友执行操作
+  lowestHpAlly.currentHp = Math.min(lowestHpAlly.maxHp, lowestHpAlly.currentHp + 30);
 }
 ```
 
@@ -771,122 +618,179 @@ if (lowestHpAlly) {
 const pieceAtPosition = select.getPieceAt(5, 5);
 if (pieceAtPosition) {
   // 对该位置的棋子执行操作
+  pieceAtPosition.attack += 10;
 }
 ```
 
 ---
 
-## 效果执行函数
+## 直接属性修改
 
-### 1. damage（造成伤害）
-
-#### 参数格式
-- **传统参数**：`damage(value: number, targetType?: "self" | "enemy" | "all-enemies" | PieceInstance)`
-- **对象参数**：`damage({ value: number, target: "self" | "enemy" | "all-enemies" | PieceInstance })`
-
-#### 示例
+### 攻击示例
 ```typescript
-// 传统参数
- damage(50, 'enemy'); // 对敌人造成50点伤害
-
-// 对象参数
- damage({ value: 50, target: 'enemy' }); // 对敌人造成50点伤害
-
-// 直接指定目标
-const target = select.getNearestEnemy();
-if (target) {
-  damage({ value: 50, target }); // 对指定目标造成50点伤害
+function executeSkill(context) {
+  // 选择最近的敌人
+  const targetEnemy = select.getNearestEnemy();
+  if (!targetEnemy) {
+    return { message: '没有可攻击的敌人', success: false };
+  }
+  
+  // 计算伤害值
+  const damageValue = context.piece.attack * 1.5;
+  
+  // 直接修改敌人的生命值
+  targetEnemy.currentHp = Math.max(0, targetEnemy.currentHp - damageValue);
+  
+  return {
+    message: `对敌人造成${damageValue}点伤害`,
+    success: true
+  };
 }
 ```
 
-### 2. heal（治疗）
-
-#### 参数格式
-- **传统参数**：`heal(value: number, targetType?: "self" | "allies" | PieceInstance)`
-- **对象参数**：`heal({ value: number, target: "self" | "allies" | PieceInstance })`
-
-#### 示例
+### 治疗示例
 ```typescript
-// 传统参数
- heal(30); // 治疗自身30点生命值
-
-// 对象参数
- heal({ value: 30, target: 'self' }); // 治疗自身30点生命值
-
-// 治疗所有盟友
- heal({ value: 20, target: 'allies' }); // 治疗所有盟友20点生命值
+function executeSkill(context) {
+  // 选择血量最低的盟友
+  const targetAlly = select.getLowestHpAlly();
+  if (!targetAlly) {
+    return { message: '没有可治疗的盟友', success: false };
+  }
+  
+  // 计算治疗值
+  const healValue = 30;
+  
+  // 直接修改盟友的生命值
+  targetAlly.currentHp = Math.min(targetAlly.maxHp, targetAlly.currentHp + healValue);
+  
+  return {
+    message: `为盟友恢复${healValue}点生命值`,
+    success: true
+  };
+}
 ```
 
-### 3. buff（增益）
-
-#### 参数格式
-- **传统参数**：`buff(value: number, duration?: number, targetType?: "self" | "allies" | PieceInstance, type?: "attack" | "defense")`
-- **对象参数**：`buff({ value: number, duration?: number, target: "self" | "allies" | PieceInstance, type?: "attack" | "defense" })`
-
-#### 示例
+### 增益示例
 ```typescript
-// 传统参数
- buff(15, 2); // 自身攻击提升15点，持续2回合
-
-// 对象参数
- buff({ value: 15, duration: 2, target: 'self', type: 'attack' }); // 自身攻击提升15点，持续2回合
-
-// 为所有盟友添加防御增益
- buff({ value: 10, duration: 3, target: 'allies', type: 'defense' }); // 所有盟友防御提升10点，持续3回合
+function executeSkill(context) {
+  // 选择攻击力最高的盟友
+  const targetAlly = select.getHighestAttackAlly();
+  if (!targetAlly) {
+    return { message: '没有可增益的盟友', success: false };
+  }
+  
+  // 计算增益值
+  const buffValue = 20;
+  
+  // 直接修改盟友的攻击力
+  targetAlly.attack += buffValue;
+  
+  // 记录增益效果（可选）
+  if (!targetAlly.buffs) {
+    targetAlly.buffs = [];
+  }
+  targetAlly.buffs.push({
+    type: 'attack',
+    value: buffValue,
+    duration: 2,
+    source: 'skill'
+  });
+  
+  return {
+    message: `为盟友提升${buffValue}点攻击力`,
+    success: true
+  };
+}
 ```
 
-### 4. debuff（减益）
-
-#### 参数格式
-- **传统参数**：`debuff(value: number, duration?: number, targetType?: "enemy" | "all-enemies" | PieceInstance, type?: "attack" | "defense")`
-- **对象参数**：`debuff({ value: number, duration?: number, target: "enemy" | "all-enemies" | PieceInstance, type?: "attack" | "defense" })`
-
-#### 示例
+### 减益示例
 ```typescript
-// 传统参数
- debuff(5, 2, 'enemy'); // 敌人防御降低5点，持续2回合
-
-// 对象参数
- debuff({ value: 5, duration: 2, target: 'enemy', type: 'defense' }); // 敌人防御降低5点，持续2回合
-
-// 对所有敌人添加攻击减益
- debuff({ value: 8, duration: 3, target: 'all-enemies', type: 'attack' }); // 所有敌人攻击降低8点，持续3回合
+function executeSkill(context) {
+  // 选择防御力最低的敌人
+  const targetEnemy = select.getLowestDefenseEnemy();
+  if (!targetEnemy) {
+    return { message: '没有可减益的敌人', success: false };
+  }
+  
+  // 计算减益值
+  const debuffValue = 8;
+  
+  // 直接修改敌人的防御力
+  targetEnemy.defense = Math.max(0, targetEnemy.defense - debuffValue);
+  
+  // 记录减益效果（可选）
+  if (!targetEnemy.debuffs) {
+    targetEnemy.debuffs = [];
+  }
+  targetEnemy.debuffs.push({
+    type: 'defense',
+    value: debuffValue,
+    duration: 3,
+    source: 'skill'
+  });
+  
+  return {
+    message: `为敌人降低${debuffValue}点防御力`,
+    success: true
+  };
+}
 ```
 
-### 5. shield（护盾）
+---
 
-#### 参数格式
-- **传统参数**：`shield(value: number, targetType?: "self" | "allies" | PieceInstance)`
-- **对象参数**：`shield({ value: number, target: "self" | "allies" | PieceInstance })`
+## 特殊效果函数
 
-#### 示例
-```typescript
-// 传统参数
- shield(25); // 为自身添加25点护盾
-
-// 对象参数
- shield({ value: 25, target: 'self' }); // 为自身添加25点护盾
-
-// 为所有盟友添加护盾
- shield({ value: 15, target: 'allies' }); // 为所有盟友添加15点护盾
-```
-
-### 6. teleport（传送）
+### teleport（传送）
 
 #### 参数格式
 - **坐标参数**：`teleport(x: number, y: number)`
 - **对象参数**：`teleport({ x: number, y: number })`
+- **光标选择**：当技能 `requiresTarget: true` 时，系统会自动将光标选择的位置作为目标
 
 #### 示例
 ```typescript
 // 坐标参数
- teleport(5, 5); // 传送到(5, 5)位置
+teleport(5, 5); // 传送到(5, 5)位置
 
 // 对象参数
- teleport({ x: 5, y: 5 }); // 传送到(5, 5)位置
+teleport({ x: 5, y: 5 }); // 传送到(5, 5)位置
 
-// 不指定位置（随机传送）
- teleport(); // 随机传送到可行走位置
+// 利用光标选择位置（自动处理）
+function executeSkill(context) {
+  // 系统会自动将光标选择的位置作为传送目标
+  teleport();
+  return { message: "传送到目标位置", success: true };
+}
+```
+
+#### 光标选择位置的实现原理
+
+当技能设置 `requiresTarget: true` 时，系统会：
+
+1. **进入目标选择模式**：玩家点击技能后，鼠标光标变为选择模式
+2. **捕获点击位置**：玩家点击地图上的位置时，系统记录该位置的坐标
+3. **传递目标信息**：系统将选择的位置信息传递给技能执行函数
+4. **自动处理参数**：`teleport()` 函数会自动使用传递的目标位置
+
+#### 技能配置示例
+
+要实现光标选择位置的传送，需要在技能配置中设置 `requiresTarget: true`：
+
+```json
+{
+  "id": "targeted-teleport",
+  "name": "定向传送",
+  "description": "传送到光标选择的位置",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1.0,
+  "code": "function executeSkill(context) { teleport(); return { message: \"传送到目标位置\", success: true }; }",
+  "range": "self",
+  "requiresTarget": true,
+  "icon": "✨"
+}
 ```
 
 ---
@@ -938,13 +842,12 @@ function executeSkill(context) {
   
   // 执行技能
   const damageValue = context.piece.attack * 1.5;
-  const result = damage({ value: damageValue, target });
+  target.currentHp = Math.max(0, target.currentHp - damageValue);
   
-  if (result.success) {
-    return { message: `对敌人造成${damageValue}点伤害`, success: true };
-  } else {
-    return { message: '攻击失败', success: false };
-  }
+  return {
+    message: `对敌人造成${damageValue}点伤害`,
+    success: true
+  };
 }
 ```
 
@@ -981,7 +884,7 @@ function executeSkill(context) {
   // 对多个目标造成伤害
   const enemies = select.getEnemiesInRange(3);
   enemies.forEach(enemy => {
-    damage({ value: baseDamage, target: enemy });
+    enemy.currentHp = Math.max(0, enemy.currentHp - baseDamage);
   });
   
   return {
@@ -1000,8 +903,8 @@ function executeSkill(context) {
 1. **技能触发**：玩家选择棋子并点击技能
 2. **目标选择**：如果技能需要目标，系统进入目标选择模式
 3. **技能执行**：玩家选择目标后，系统执行技能函数
-4. **环境准备**：系统创建技能执行环境，包含所有辅助函数和效果函数
-5. **效果执行**：技能函数调用效果函数，效果函数直接修改游戏状态
+4. **环境准备**：系统创建技能执行环境，包含所有辅助函数和目标选择器
+5. **属性修改**：技能函数直接修改棋子属性
 6. **状态更新**：系统更新棋子状态和游戏状态
 7. **冷却处理**：技能进入冷却状态
 
@@ -1018,12 +921,7 @@ const skillEnvironment = {
   isTargetInRange: (target: any, range: number) => isTargetInRange(context, target, range),
   // 目标选择器
   select: effects.select,
-  // 效果函数
-  damage: effects.damage,
-  heal: effects.heal,
-  buff: effects.buff,
-  debuff: effects.debuff,
-  shield: effects.shield,
+  // 特殊效果函数
   teleport: effects.teleport
 };
 ```
@@ -1044,48 +942,9 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
 }
 ```
 
-### 4. 效果函数实现
+### 4. 特殊效果函数实现
 
-#### 核心逻辑
-```typescript
-function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, target?: { x: number, y: number }) {
-  const selectors = createTargetSelectors(battle, sourcePiece);
-  
-  return {
-    select: selectors,
-    
-    damage: (params: { value: number, target: "self" | "enemy" | "all-enemies" | PieceInstance } | number, targetTypeOrPiece?: "self" | "enemy" | "all-enemies" | PieceInstance) => {
-      // 处理不同参数格式
-      let value: number;
-      let target: "self" | "enemy" | "all-enemies" | PieceInstance;
-      
-      if (typeof params === "object" && params !== null) {
-        if ('value' in params) {
-          value = params.value;
-          target = params.target;
-        } else {
-          value = params as any;
-          target = targetTypeOrPiece as PieceInstance;
-        }
-      } else {
-        value = params;
-        target = targetTypeOrPiece || "enemy";
-      }
-      
-      // 执行伤害逻辑
-      // ...
-      
-      return { type: "damage", value, success: true };
-    },
-    
-    // 其他效果函数...
-  };
-}
-```
-
-### 5. 传送函数实现
-
-#### 核心逻辑
+#### teleport 函数实现
 ```typescript
 teleport: (x: number, y?: number) => {
   let targetPos: { x: number, y: number } | undefined;
@@ -1138,7 +997,7 @@ teleport: (x: number, y?: number) => {
 }
 ```
 
-### 6. 技能执行函数
+### 5. 技能执行函数
 
 #### 核心逻辑
 ```typescript
@@ -1277,10 +1136,10 @@ A: 在棋子配置的skills数组中添加技能ID，可以设置技能等级。
 A: 在技能函数中使用 `select.` 前缀调用目标选择器函数，如 `select.getNearestEnemy()`。
 
 ### Q8: 如何实现范围攻击？
-A: 使用 `select.getEnemiesInRange(range)` 获取范围内的敌人，然后遍历造成伤害。
+A: 使用 `select.getEnemiesInRange(range)` 获取范围内的敌人，然后遍历修改它们的属性。
 
 ### Q9: 如何实现单体攻击？
-A: 使用 `select.getNearestEnemy()`、`select.getLowestHpEnemy()` 等函数选择目标，然后造成伤害。
+A: 使用 `select.getNearestEnemy()`、`select.getLowestHpEnemy()` 等函数选择目标，然后修改其属性。
 
 ### Q10: 如何实现传送技能？
 A: 使用 `teleport(x, y)` 函数传送到指定位置，或 `teleport()` 随机传送。
@@ -1290,23 +1149,23 @@ A: 使用 `teleport(x, y)` 函数传送到指定位置，或 `teleport()` 随机
 ## 总结
 
 这个指南涵盖了：
-1. ✅ 技能系统设计和编写（支持复合技能）
+1. ✅ 技能系统设计和编写（直接属性修改）
 2. ✅ 棋子系统设计和创建
 3. ✅ 文件位置和结构说明
 4. ✅ 游戏流程和创建步骤
 5. ✅ 核心类型定义
 6. ✅ 目标选择器系统
-7. ✅ 效果执行函数
-8. ✅ 编程规范
-9. ✅ 底层实现原理
-10. ✅ 最佳实践和常见问题
+7. ✅ 直接属性修改方法
+8. ✅ 特殊效果函数
+9. ✅ 编程规范
+10. ✅ 底层实现原理
+11. ✅ 最佳实践和常见问题
 
 **新特性亮点：**
-- ✅ 一个技能可以包含多个子效果
-- ✅ 支持效果的顺序执行
-- ✅ 灵活的参数传递机制
-- ✅ 强大的目标选择器系统
-- ✅ 丰富的效果类型组合
-- ✅ 详细的类型定义
+- ✅ 直接修改目标属性，更加灵活强大
+- ✅ 强大的目标选择器系统，支持多种目标选择策略
+- ✅ 保留teleport等特殊效果函数
+- ✅ 清晰的编程规范和最佳实践
+- ✅ 详细的底层实现原理
 
-现在你可以创建更加复杂和有趣的技能了！通过组合不同的效果类型和目标选择策略，你可以设计出独一无二的技能组合，为游戏增添更多策略性和乐趣。
+现在你可以创建更加复杂和有趣的技能了！通过直接修改目标属性的方式，你可以实现几乎任何你能想象的技能效果，为游戏增添更多策略性和乐趣。

@@ -18,6 +18,10 @@ type Room = {
   status: "waiting" | "in-progress" | "finished"
   players: { id: string; name: string }[]
   currentTurnIndex: number
+  hostId: string
+  mapId: string
+  visibility: "private" | "public"
+  playerCount?: number
 }
 
 type User = {
@@ -37,6 +41,12 @@ export default function PlayPage() {
   const [battle, setBattle] = useState<BattleState | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [maps, setMaps] = useState<Array<{id: string, name: string}>>([])
+  const [selectedMapId, setSelectedMapId] = useState<string>('arena-8x6')
+  const [selectedVisibility, setSelectedVisibility] = useState<"private" | "public">('private')
+  const [myRooms, setMyRooms] = useState<Room[]>([])
+  const [publicRooms, setPublicRooms] = useState<Room[]>([])
+  const [loadingRooms, setLoadingRooms] = useState(false)
 
   // 检查用户登录状态
   useEffect(() => {
@@ -51,6 +61,89 @@ export default function PlayPage() {
       }
     }
   }, [])
+
+  // 加载地图数据
+  useEffect(() => {
+    const fetchMaps = async () => {
+      try {
+        const response = await fetch('/api/maps')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.maps) {
+            setMaps(Object.values(data.maps).map((map: any) => ({
+              id: map.id,
+              name: map.name
+            })))
+          }
+        }
+      } catch (error) {
+        console.error('加载地图数据失败:', error)
+        // 使用默认地图数据
+        setMaps([
+          { id: 'arena-8x6', name: '小型竞技场' },
+          { id: 'large-battlefield', name: '大型战场' }
+        ])
+      }
+    }
+
+    fetchMaps()
+  }, [])
+
+  // 加载用户作为房主的房间和其他玩家的公开房间
+  const fetchMyRooms = async () => {
+    if (!user) return
+    
+    try {
+      setLoadingRooms(true)
+      const response = await fetch('/api/lobby')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.rooms) {
+          // 过滤出用户作为房主的房间
+          const rooms = data.rooms.filter((room: any) => room.hostId === user.id)
+          setMyRooms(rooms)
+          
+          // 过滤出其他玩家的公开房间
+          const publicRoomsData = data.rooms.filter((room: any) => 
+            room.visibility === 'public' && room.hostId !== user.id
+          )
+          setPublicRooms(publicRoomsData)
+        }
+      }
+    } catch (error) {
+      console.error('加载房间数据失败:', error)
+    } finally {
+      setLoadingRooms(false)
+    }
+  }
+
+  // 清空所有过去的房间
+  const clearAllRooms = async () => {
+    if (!user) return
+    
+    try {
+      setLoading(true)
+      // 删除所有用户作为房主的房间
+      for (const room of myRooms) {
+        await fetch(`/api/rooms/${room.id}`, {
+          method: "DELETE",
+        })
+      }
+      // 重新加载房间列表
+      await fetchMyRooms()
+    } catch (error) {
+      console.error('清空房间失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 当用户登录状态变化时，加载用户的房间
+  useEffect(() => {
+    if (user) {
+      fetchMyRooms()
+    }
+  }, [user])
 
   // 如果 URL 上已经有 roomId（例如分享链接），进入页面时自动加载
   useEffect(() => {
@@ -101,7 +194,12 @@ export default function PlayPage() {
       const res = await fetch("/api/lobby", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: `${user.username} 的 1v1 房间` }),
+        body: JSON.stringify({ 
+          name: `${user.username} 的 1v1 房间`,
+          hostId: user.id,
+          mapId: selectedMapId,
+          visibility: selectedVisibility
+        }),
       })
 
       if (!res.ok) {
@@ -407,6 +505,35 @@ export default function PlayPage() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="mapId">选择地图（房主设置）</Label>
+                <select
+                  id="mapId"
+                  className="w-full rounded-md border border-border bg-card/60 p-2 text-sm"
+                  value={selectedMapId}
+                  onChange={(e) => setSelectedMapId(e.target.value)}
+                >
+                  {maps.map((map) => (
+                    <option key={map.id} value={map.id}>
+                      {map.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="visibility">房间可见性（房主设置）</Label>
+                <select
+                  id="visibility"
+                  className="w-full rounded-md border border-border bg-card/60 p-2 text-sm"
+                  value={selectedVisibility}
+                  onChange={(e) => setSelectedVisibility(e.target.value as "private" | "public")}
+                >
+                  <option value="private">仅房间码</option>
+                  <option value="public">公开</option>
+                </select>
+              </div>
+
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   className="flex-1"
@@ -437,6 +564,129 @@ export default function PlayPage() {
                   {error}
                 </p>
               )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>我的房间（作为房主创建的房间）</Label>
+                  {myRooms.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                      onClick={clearAllRooms}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="ml-2">清空ing...</span>
+                        </>
+                      ) : (
+                        "清空所有房间"
+                      )}
+                    </Button>
+                  )}
+                </div>
+                {loadingRooms ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="ml-2">加载中...</span>
+                  </div>
+                ) : myRooms.length > 0 ? (
+                  <div className="space-y-2">
+                    {myRooms.map((room) => (
+                      <div key={room.id} className="flex items-center justify-between rounded-md border border-border bg-card/60 p-2">
+                        <div className="space-y-1">
+                          <div className="font-medium">{room.name}</div>
+                          <div className="text-xs text-muted-foreground">ID: {room.id}</div>
+                          <div className="text-xs text-muted-foreground">地图: {maps.find(m => m.id === room.mapId)?.name || room.mapId}</div>
+                          <div className="text-xs text-muted-foreground">可见性: {room.visibility === 'public' ? '公开' : '仅房间码'}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">状态: {room.status === 'waiting' ? '等待中' : room.status === 'in-progress' ? '对战中' : '已结束'}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setRoomId(room.id)
+                              void fetchRoom(room.id)
+                            }}
+                          >
+                            加入
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive"
+                            onClick={async () => {
+                              try {
+                                setLoading(true)
+                                const res = await fetch(`/api/rooms/${room.id}`, {
+                                  method: "DELETE",
+                                })
+                                if (res.ok) {
+                                  // 删除成功后，重新加载房间列表
+                                  await fetchMyRooms()
+                                }
+                              } catch (error) {
+                                console.error('删除房间失败:', error)
+                              } finally {
+                                setLoading(false)
+                              }
+                            }}
+                          >
+                            删除
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground">
+                    暂无房间，创建新房间开始游戏
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>公开房间（其他玩家创建的房间）</Label>
+                {loadingRooms ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="ml-2">加载中...</span>
+                  </div>
+                ) : publicRooms.length > 0 ? (
+                  <div className="space-y-2">
+                    {publicRooms.map((room) => (
+                      <div key={room.id} className="flex items-center justify-between rounded-md border border-border bg-card/60 p-2">
+                        <div className="space-y-1">
+                          <div className="font-medium">{room.name}</div>
+                          <div className="text-xs text-muted-foreground">ID: {room.id}</div>
+                          <div className="text-xs text-muted-foreground">房主: {room.hostId}</div>
+                          <div className="text-xs text-muted-foreground">地图: {maps.find(m => m.id === room.mapId)?.name || room.mapId}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">状态: {room.status === 'waiting' ? '等待中' : room.status === 'in-progress' ? '对战中' : '已结束'}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setRoomId(room.id)
+                              void fetchRoom(room.id)
+                            }}
+                          >
+                            加入
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground">
+                    暂无公开房间
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}

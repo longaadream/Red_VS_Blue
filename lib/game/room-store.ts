@@ -29,6 +29,9 @@ export type Room = {
   createdAt: number
   maxPlayers: number
   players: Player[]
+  hostId: string
+  mapId: string
+  visibility: "private" | "public"
   currentTurnIndex: number
   actions: GameAction[]
   battleState: BattleState | null
@@ -87,6 +90,39 @@ class RoomStore {
   getRoom(id: string): Room | undefined {
     const normalizedId = this.normalizeId(id)
     return this.rooms.get(normalizedId)
+  }
+
+  // 分配玩家身份
+  assignFaction(room: Room, playerId: string): "red" | "blue" | null {
+    // 检查玩家是否已经有身份
+    const existingPlayer = room.players.find(p => p.id === playerId)
+    if (existingPlayer && existingPlayer.faction) {
+      return existingPlayer.faction
+    }
+
+    // 检查已分配的身份
+    const assignedFactions = room.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
+    
+    // 如果两个身份都已分配，返回null
+    if (assignedFactions.length >= 2) {
+      return null
+    }
+
+    // 如果还没有分配身份，随机分配一个
+    if (assignedFactions.length === 0) {
+      const randomFaction = Math.random() > 0.5 ? "red" : "blue"
+      if (existingPlayer) {
+        existingPlayer.faction = randomFaction
+      }
+      return randomFaction
+    }
+
+    // 如果已经分配了一个身份，分配剩下的那个
+    const remainingFaction = assignedFactions[0] === "red" ? "blue" : "red"
+    if (existingPlayer) {
+      existingPlayer.faction = remainingFaction
+    }
+    return remainingFaction
   }
 
   // 添加房间
