@@ -27,6 +27,16 @@ export interface TurnState {
   actions: PerTurnActionFlags
 }
 
+export interface BattleActionLog {
+  type: string
+  playerId: PlayerId
+  turn: number
+  payload?: {
+    message?: string
+    [key: string]: any
+  }
+}
+
 export interface BattleState {
   map: BoardMap
   pieces: PieceInstance[]
@@ -37,6 +47,8 @@ export interface BattleState {
   /** 两个玩家的资源状态（充能点等） */
   players: PlayerTurnMeta[]
   turn: TurnState
+  /** 战斗日志 */
+  actions?: BattleActionLog[]
 }
 
 export type BattleAction =
@@ -324,6 +336,23 @@ export function applyBattleAction(
         }
       }
 
+      // 初始化actions数组
+      if (!next.actions) {
+        next.actions = []
+      }
+
+      // 存储技能执行消息到战斗日志
+      next.actions.push({
+        type: "useBasicSkill",
+        playerId: action.playerId,
+        turn: next.turn.turnNumber,
+        payload: {
+          message: result.message || "使用了普通技能",
+          skillId: action.skillId,
+          pieceId: action.pieceId
+        }
+      })
+
       next.turn.actions.hasUsedBasicSkill = true
       return next
     }
@@ -421,6 +450,24 @@ export function applyBattleAction(
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         console.log('Skill executed:', result.message)
       }
+
+      // 初始化actions数组
+      if (!next.actions) {
+        next.actions = []
+      }
+
+      // 存储技能执行消息到战斗日志
+      next.actions.push({
+        type: "useChargeSkill",
+        playerId: action.playerId,
+        turn: next.turn.turnNumber,
+        payload: {
+          message: result.message || "使用了充能技能",
+          skillId: action.skillId,
+          pieceId: action.pieceId,
+          chargeCost: cost
+        }
+      })
 
       next.turn.actions.hasUsedChargeSkill = true
       return next

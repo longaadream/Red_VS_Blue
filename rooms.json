@@ -27169,7 +27169,7 @@
           "templateId": "blue-mage",
           "ownerPlayerId": "user_1771360858632_9522",
           "faction": "blue",
-          "currentHp": 3,
+          "currentHp": 1,
           "maxHp": 3,
           "attack": 2,
           "defense": 0,
@@ -27360,15 +27360,47 @@
         }
       ],
       "turn": {
-        "currentPlayerId": "user_1771361118594_8536",
-        "turnNumber": 1,
+        "currentPlayerId": "user_1771360858632_9522",
+        "turnNumber": 4,
         "phase": "action",
         "actions": {
           "hasMoved": false,
-          "hasUsedBasicSkill": false,
+          "hasUsedBasicSkill": true,
           "hasUsedChargeSkill": false
         }
-      }
+      },
+      "actions": [
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771360858632_9522",
+          "turn": 2,
+          "payload": {
+            "message": "攻击强化生效，攻击力提升1点",
+            "skillId": "buff-attack",
+            "pieceId": "user_1771360858632_9522-2"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771361118594_8536",
+          "turn": 3,
+          "payload": {
+            "message": "造成 1 点伤害",
+            "skillId": "basic-attack",
+            "pieceId": "user_1771361118594_8536-1"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771360858632_9522",
+          "turn": 4,
+          "payload": {
+            "message": "攻击强化生效，攻击力提升1点",
+            "skillId": "buff-attack",
+            "pieceId": "user_1771360858632_9522-2"
+          }
+        }
+      ]
     }
   }
 ]

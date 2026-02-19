@@ -448,16 +448,59 @@ export default function BattlePage() {
                 <CardTitle className="text-sm">战斗日志</CardTitle>
               </CardHeader>
               <CardContent className="max-h-40 overflow-y-auto space-y-2">
-                {(battle.actions || []).map((action, index) => (
-                  <div key={index} className="text-xs text-zinc-300">
-                    <span className="text-zinc-500">[{action.turn || battle.turn.turnNumber}] </span>
-                    <span className={action.playerId === currentPlayerId ? "text-green-400" : "text-blue-400"}>
-                      {action.playerId === currentPlayerId ? "你" : "对手"}
-                    </span>
-                    <span className="text-zinc-400">: </span>
-                    <span>{action.payload?.message || action.type || "未知操作"}</span>
-                  </div>
-                ))}
+                {(battle.actions || []).map((action, index) => {
+                  // 找到相关棋子的名称
+                  let pieceName = "未知棋子";
+                  if (action.payload?.pieceId) {
+                    const piece = battle.pieces.find(p => p.instanceId === action.payload.pieceId);
+                    if (piece) {
+                      // 尝试获取棋子模板名称
+                      pieceName = piece.templateId || "未知棋子";
+                      // 这里应该通过templateId获取棋子的名称，但目前battle.pieceStatsByTemplateId可能没有name属性
+                      // 后续需要修改battle-setup.ts，确保pieceStatsByTemplateId包含name属性
+                    }
+                  }
+                  
+                  // 格式化消息
+                  let formattedMessage = action.payload?.message || action.type || "未知操作";
+                  
+                  // 替换消息中的templateId为更友好的名称
+                  if (pieceName !== "未知棋子") {
+                    // 简单的名称映射，后续应该从模板中获取
+                    const pieceNameMap: Record<string, string> = {
+                      "red-warrior": "红方战士",
+                      "blue-warrior": "蓝方战士",
+                      "red-archer": "红方射手",
+                      "blue-archer": "蓝方射手",
+                      "red-mage": "红方法师",
+                      "blue-mage": "蓝方法师"
+                    };
+                    const friendlyName = pieceNameMap[pieceName] || pieceName;
+                    formattedMessage = formattedMessage.replace(pieceName, friendlyName);
+                  }
+                  
+                  return (
+                    <div key={index} className="text-xs text-zinc-300">
+                      <span className="text-zinc-500">[{action.turn || battle.turn.turnNumber}] </span>
+                      <span className={action.playerId === currentPlayerId ? "text-green-400" : "text-blue-400"}>
+                        {/* 使用友好的棋子名称 */}
+                        {(() => {
+                          const pieceNameMap: Record<string, string> = {
+                            "red-warrior": "红方战士",
+                            "blue-warrior": "蓝方战士",
+                            "red-archer": "红方射手",
+                            "blue-archer": "蓝方射手",
+                            "red-mage": "红方法师",
+                            "blue-mage": "蓝方法师"
+                          };
+                          return pieceNameMap[pieceName] || pieceName;
+                        })()}
+                      </span>
+                      <span className="text-zinc-400">: </span>
+                      <span>{formattedMessage}</span>
+                    </div>
+                  );
+                })}
                 {(battle.actions || []).length === 0 && (
                   <div className="text-xs text-zinc-500">
                     战斗日志为空
@@ -589,9 +632,17 @@ export default function BattlePage() {
                                           }`}>
                                             {skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
                                               ? `${skillPreview.currentCooldown} 回合` 
-                                              : `${skillPreview.cooldown || 0} 回合`}
+                                              : "0 回合"}
                                           </span>
                                         </div>
+                                        {skillDef.type === "super" && skillPreview.chargeCost && (
+                                          <div className="flex items-center justify-between text-xs">
+                                            <span className="text-zinc-500">充能点数:</span>
+                                            <span className="text-yellow-400">
+                                              {skillPreview.chargeCost} 点
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
                                     )
                                   })}
@@ -734,9 +785,17 @@ export default function BattlePage() {
                                           }`}>
                                             {skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
                                               ? `${skillPreview.currentCooldown} 回合` 
-                                              : `${skillPreview.cooldown || 0} 回合`}
+                                              : "0 回合"}
                                           </span>
                                         </div>
+                                        {skillDef.type === "super" && skillPreview.chargeCost && (
+                                          <div className="flex items-center justify-between text-xs">
+                                            <span className="text-zinc-500">充能点数:</span>
+                                            <span className="text-yellow-400">
+                                              {skillPreview.chargeCost} 点
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
                                     )
                                   })}
@@ -942,7 +1001,7 @@ export default function BattlePage() {
                               }}
                             >
                               <Zap className="mr-2 h-4 w-4" />
-                              {skill.name} ({skill.type === "super" ? "充能" : "普通"})
+                              {skill.name} ({skill.type === "super" ? `充能 ${skill.chargeCost || 0}点` : "普通"})
                             </Button>
                           ))
                         })()}

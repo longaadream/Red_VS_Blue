@@ -447,8 +447,9 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     const skillEnvironment = {
       // 上下文
       context,
-      battle,
+      // 源棋子（直接引用，可读写）
       sourcePiece,
+      battle,
       
       // 目标选择器
       select: effects.select,
@@ -475,8 +476,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           (function(environment) {
             // 定义全局变量
             const context = environment.context;
-            const battle = environment.battle;
             const sourcePiece = environment.sourcePiece;
+            const battle = environment.battle;
             const select = environment.select;
             const teleport = environment.teleport;
             const getAllEnemiesInRange = environment.getAllEnemiesInRange;
@@ -493,7 +494,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             return executeSkill(context);
           })(skillEnvironment)
         `;
-        
+
         // 执行技能代码
         const result = eval(fullSkillCode);
         return result;

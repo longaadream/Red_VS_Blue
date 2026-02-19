@@ -842,7 +842,7 @@ export default function PlayPage() {
                           })
                         }
                       >
-                        使用一次充能技能（示例）
+                        使用一次充能技能（示例，消耗1点）
                       </Button>
                       <Button
                         size="sm"

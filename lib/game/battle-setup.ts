@@ -7,108 +7,14 @@ import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 
 export function buildDefaultSkills(): Record<string, SkillDefinition> {
-  try {
-    // 尝试从文件系统加载技能数据
-    const { loadJsonFilesServer } = require('./file-loader')
-    const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
-    
-    console.log('Loaded skills from files:', Object.keys(loadedSkills))
-    console.log('Number of skills:', Object.keys(loadedSkills).length)
-    console.log('Teleport skill present:', 'teleport' in loadedSkills)
-    
-    // 如果加载到技能，返回加载的技能
-    if (Object.keys(loadedSkills).length > 0) {
-      return loadedSkills
-    }
-  } catch (error) {
-    console.error('Error loading skills from files:', error)
-  }
+  // 从文件系统加载技能数据
+  const { loadJsonFilesServer } = require('./file-loader')
+  const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
   
-  // 加载失败时，使用默认技能数据
-  const defaultSkills: Record<string, SkillDefinition> = {
-    "basic-attack": {
-      id: "basic-attack",
-      name: "普通攻击",
-      description: "对单个目标造成伤害",
-      kind: "active",
-      type: "normal",
-      cooldownTurns: 0,
-      maxCharges: 0,
-      powerMultiplier: 1,
-      code: "function executeSkill(context) { const nearestEnemy = select.getNearestEnemy(); if (nearestEnemy) { const damage = Math.round(sourcePiece.attack * context.skill.powerMultiplier); nearestEnemy.currentHp = Math.max(0, nearestEnemy.currentHp - damage); return { message: '对单个目标造成' + damage + '点伤害', success: true }; } return { message: '范围内没有可攻击的敌人', success: false }; }",
-      previewCode: "function calculatePreview(piece, skillDef) { const damage = Math.round(piece.attack * skillDef.powerMultiplier); return { description: \"对单个目标造成\" + damage + \"点伤害\", expectedValues: { damage } }; }",
-      effects: [],
-      range: "single",
-      requiresTarget: true
-    },
-    "fireball": {
-      id: "fireball",
-      name: "火球术",
-      description: "对范围内多个目标造成伤害",
-      kind: "active",
-      type: "super",
-      cooldownTurns: 2,
-      maxCharges: 3,
-      chargeCost: 1,
-      powerMultiplier: 1.5,
-      code: "function executeSkill(context) { const enemies = select.getEnemiesInRange(3); if (enemies.length > 0) { enemies.forEach(enemy => { const damage = Math.round(sourcePiece.attack * context.skill.powerMultiplier); enemy.currentHp = Math.max(0, enemy.currentHp - damage); }); return { message: '对范围内多个目标造成伤害', success: true }; } return { message: '范围内没有可攻击的敌人', success: false }; }",
-      previewCode: "function calculatePreview(piece, skillDef) { const damage = Math.round(piece.attack * skillDef.powerMultiplier); const areaSize = skillDef.areaSize || 3; return { description: \"对\" + areaSize + \"格范围内的所有敌人造成\" + damage + \"点伤害（相当于攻击力150%）\", expectedValues: { damage } }; }",
-      effects: [],
-      range: "area",
-      areaSize: 3,
-      requiresTarget: false
-    },
-    "teleport": {
-      id: "teleport",
-      name: "传送",
-      description: "传送到目标位置",
-      kind: "active",
-      type: "normal",
-      cooldownTurns: 2,
-      maxCharges: 0,
-      powerMultiplier: 1,
-      code: "function executeSkill(context) { if (context.target) { teleport(context.target.x, context.target.y); return { message: '成功传送到目标位置', success: true }; } return { message: '没有指定目标位置', success: false }; }",
-      previewCode: "function calculatePreview(piece, skillDef) { const areaSize = skillDef.areaSize || 5; return { description: \"传送到目标位置，冷却2回合（\" + areaSize + \"格范围内）\", expectedValues: {} }; }",
-      effects: [],
-      range: "area",
-      areaSize: 5,
-      requiresTarget: true
-    },
-    "shield": {
-      id: "shield",
-      name: "护盾",
-      description: "为自己创建一个护盾",
-      kind: "active",
-      type: "super",
-      cooldownTurns: 4,
-      maxCharges: 2,
-      chargeCost: 1,
-      powerMultiplier: 1,
-      code: "function executeSkill(context) { sourcePiece.shield = (sourcePiece.shield || 0) + Math.round(sourcePiece.defense * 2); return { message: '为自己创建一个护盾', success: true }; }",
-      previewCode: "function calculatePreview(piece, skillDef) { const shieldValue = Math.round(piece.defense * 2); return { description: \"为自己创建一个吸收\" + shieldValue + \"点伤害的护盾\", expectedValues: {} }; }",
-      effects: [],
-      range: "self",
-      requiresTarget: false
-    },
-    "buff-attack": {
-      id: "buff-attack",
-      name: "攻击增益",
-      description: "提升自身攻击力",
-      kind: "active",
-      type: "normal",
-      cooldownTurns: 4,
-      maxCharges: 0,
-      powerMultiplier: 1,
-      code: "function executeSkill(context) { sourcePiece.attack += 10; return { message: '提升自身攻击力10点', success: true }; }",
-      previewCode: "function calculatePreview(piece, skillDef) { const buffValue = 10; return { description: \"提升自身攻击力\" + buffValue + \"点，持续3回合\", expectedValues: { buff: buffValue } }; }",
-      effects: [],
-      range: "self",
-      requiresTarget: false
-    }
-  }
+  console.log('Loaded skills from files:', Object.keys(loadedSkills))
+  console.log('Number of skills:', Object.keys(loadedSkills).length)
   
-  console.log('Using default skills:', Object.keys(defaultSkills))
-  return defaultSkills
+  return loadedSkills
 }
 
 export function buildDefaultPieceStats(): Record<string, PieceStats> {

@@ -9,7 +9,7 @@
   "maxCharges": 1,
   "chargeCost": 1,
   "powerMultiplier": 2,
-  "code": "function executeSkill(context) {\n  // 使用teleport函数进行传送\n  teleport();\n  \n  // 直接修改自身的攻击力（buff效果）\n  const buffValue = 10;\n  context.piece.attack += buffValue;\n  \n  // 直接修改范围内敌人的生命值（damage效果）\n  const damageValue = 50;\n  const enemies = select.getEnemiesInRange(5);\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return { message: 'Arcane combination activated', success: true };\n}",
+  "code": "function executeSkill(context) {\n  // 使用teleport函数进行传送\n  teleport();\n  \n  // 直接修改自身的攻击力（buff效果）\n  const buffValue = 10;\n  sourcePiece.attack += buffValue;\n  \n  // 直接修改范围内敌人的生命值（damage效果）\n  const damageValue = 50;\n  const enemies = select.getEnemiesInRange(5);\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return { message: sourcePiece.templateId + ' 激活了奥术组合，提升攻击力' + buffValue + '点，对' + enemies.length + '个敌人造成' + damageValue + '点伤害', success: true };\n}",
   "previewCode": "function calculatePreview(piece, skillDef) {\n  // 计算预期伤害值和增益值\n  const buffValue = 10;\n  const damageValue = 50; // 固定伤害值\n  const areaSize = skillDef.areaSize || 5;\n  \n  return {\n    description: \"传送到目标位置，提升自身攻击力\" + buffValue + \"点，对\" + areaSize + \"格范围内的所有敌人造成\" + damageValue + \"点伤害\",\n    expectedValues: {\n      damage: damageValue,\n      buff: buffValue\n    }\n  };\n}",
   "range": "area",
   "areaSize": 5,

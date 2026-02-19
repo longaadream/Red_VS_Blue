@@ -8,7 +8,7 @@
   "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { return { message: 'Teleport activated', success: true } }",
+  "code": "function executeSkill(context) { return { message: sourcePiece.templateId + '使用了传送技能', success: true } }",
   "previewCode": "function calculatePreview(piece, skillDef) { const areaSize = skillDef.areaSize || 5; return { description: \"传送到目标位置，冷却2回合（\" + areaSize + \"格范围内）\", expectedValues: {} }; }",
   "effects": [],
   "range": "area",
