@@ -1,211 +1,475 @@
-# 技能编写教程
+# 条件技能实现教程
 
-## 技能系统概述
+本教程将教会你如何在游戏中实现"当……的时候，执行……效果"的条件技能。
 
-技能是游戏中棋子的核心能力，本教程将指导您如何编写自己的技能。
+## 基础概念
 
-## 技能执行环境
+### 什么是条件技能？
+条件技能是指在满足特定条件时自动触发的技能，例如：
+- 当受到伤害时，发动反击
+- 当击杀敌人时，获得生命值
+- 当回合开始时，增加攻击力
 
-当技能被执行时，会在一个特定的环境中运行，该环境提供了以下变量和函数：
+### 实现原理
+条件技能通过两个部分实现：
+1. **技能定义**：在 `data/skills/` 目录下创建技能JSON文件
+2. **触发规则**：在 `data/rules/` 目录下创建规则JSON文件
 
-### 可用变量
+## 技能定义
 
-1. **context** - 技能执行上下文，包含以下信息：
-   - `context.piece` - 执行技能的棋子信息（只读）
-   - `context.target` - 技能目标信息（如果有）
-   - `context.battle` - 战斗状态信息
-   - `context.skill` - 技能本身的信息
-
-2. **sourcePiece** - 源棋子的直接引用（可读写）
-   - 用于直接修改棋子的属性，如攻击力、生命值等
-   - 这是修改棋子状态的推荐方式
-
-3. **battle** - 战斗状态的直接引用
-
-### 目标选择器
-
-4. **select** - 目标选择器对象，包含以下方法：
-   - `select.getAllEnemies()` - 获取所有敌人
-   - `select.getAllAllies()` - 获取所有盟友
-   - `select.getNearestEnemy()` - 获取最近的敌人
-   - `select.getLowestHpEnemy()` - 获取血量最低的敌人
-   - `select.getHighestAttackEnemy()` - 获取攻击力最高的敌人
-   - `select.getLowestDefenseEnemy()` - 获取防御力最低的敌人
-   - `select.getLowestHpAlly()` - 获取血量最低的盟友
-   - `select.getHighestAttackAlly()` - 获取攻击力最高的盟友
-   - `select.getPieceAt(x, y)` - 根据位置获取棋子
-   - `select.getEnemiesInRange(range)` - 获取指定范围内的敌人
-   - `select.getAlliesInRange(range)` - 获取指定范围内的盟友
-
-### 效果函数
-
-5. **teleport(x, y)** - 传送效果
-   - 将执行技能的棋子传送到指定位置
-   - 可以接受 `{x, y}` 对象或两个单独的参数
-
-### 辅助函数
-
-6. **getAllEnemiesInRange(range)** - 获取范围内的所有敌人
-7. **getAllAlliesInRange(range)** - 获取范围内的所有盟友
-8. **calculateDistance(x1, y1, x2, y2)** - 计算两点之间的距离
-9. **isTargetInRange(target, range)** - 检查目标是否在范围内
-
-### 工具函数
-
-10. **Math** - JavaScript Math 对象
-11. **console** - 控制台对象（用于调试）
-
-## 技能编写规范
-
-### 函数签名
-
-技能函数必须使用以下签名：
-
-```javascript
-function executeSkill(context) {
-  // 技能逻辑
-  return {
-    message: "技能执行消息",
-    success: true // 或 false
-  };
-}
-```
-
-### 最佳实践
-
-1. **使用 executeSkill(context)** - 始终使用此函数签名来定义技能
-2. **避免使用 context.piece 进行修改** - 不要直接修改 context.piece 的属性
-3. **使用 sourcePiece 进行修改** - 当需要修改棋子属性时，使用 sourcePiece
-4. **提供详细的消息** - 在返回的对象中提供清晰、详细的技能执行消息
-5. **处理边界情况** - 检查目标是否存在等边界情况
-
-## 技能示例
-
-### 基础攻击技能
-
-```javascript
-function executeSkill(context) {
-  // 选择最近的敌人
-  const targetEnemy = select.getNearestEnemy();
-  if (!targetEnemy) {
-    return { message: '没有可攻击的敌人', success: false };
-  }
-  
-  // 计算伤害值
-  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;
-  
-  // 直接修改敌人的生命值
-  targetEnemy.currentHp = Math.max(0, targetEnemy.currentHp - damageValue);
-  
-  return {
-    message: sourcePiece.templateId + ' 造成 ' + damageValue + ' 点伤害',
-    success: true
-  };
-}
-```
-
-### 攻击强化技能
-
-```javascript
-function executeSkill(context) {
-  // 直接修改自身的攻击力
-  const buffValue = 1;
-  sourcePiece.attack += buffValue;
-  
-  return {
-    message: sourcePiece.templateId + ' 的攻击力提升 ' + buffValue + ' 点',
-    success: true
-  };
-}
-```
-
-### 火球术技能
-
-```javascript
-function executeSkill(context) {
-  // 计算伤害值
-  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;
-  
-  // 选择3格内的所有敌人
-  const enemies = select.getEnemiesInRange(3);
-  if (enemies.length === 0) {
-    return { message: sourcePiece.templateId + ' 周围没有可攻击的敌人', success: false };
-  }
-  
-  // 直接修改每个敌人的生命值
-  enemies.forEach(enemy => {
-    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);
-  });
-  
-  return {
-    message: sourcePiece.templateId + ' 对 ' + enemies.length + ' 个敌人造成 ' + damageValue + ' 点伤害',
-    success: true
-  };
-}
-```
-
-## 技能预览
-
-技能还可以包含一个预览函数，用于在技能选择界面显示技能效果的预览：
-
-```javascript
-function calculatePreview(piece, skillDef, currentCooldown) {
-  // 计算预期伤害值
-  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);
-  
-  return {
-    description: "选择最近的敌人，造成" + damageValue + "点伤害（相当于攻击力100%）",
-    expectedValues: {
-      damage: damageValue
-    }
-  };
-}
-```
-
-## 技能文件结构
-
-技能文件是 JSON 格式，包含以下字段：
+### 技能文件格式
+在 `data/skills/` 目录下创建 `.json` 文件，格式如下：
 
 ```json
 {
-  "id": "skill-id",
+  "id": "技能ID",
   "name": "技能名称",
   "description": "技能描述",
-  "icon": "技能图标",
-  "kind": "active", // 或 "passive"
-  "type": "normal", // 或 "super"
-  "cooldownTurns": 0, // 冷却回合数
-  "maxCharges": 0, // 最大充能次数
-  "chargeCost": 1, // 充能技能的充能点数消耗
-  "powerMultiplier": 1.0, // 技能威力系数
-  "code": "技能函数代码",
-  "previewCode": "预览函数代码",
-  "range": "single", // 或 "area", "self"
-  "areaSize": 3, // 范围大小（仅对area类型有效）
-  "requiresTarget": true // 是否需要目标
+  "kind": "passive", // 被动技能
+  "type": "normal",
+  "cooldownTurns": 冷却回合数,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { return { message: '技能已激活', success: true } }",
+  "range": "self",
+  "requiresTarget": false
 }
 ```
 
-## 常见问题
+### 字段说明
+- `id`：技能唯一标识符，使用小写字母和连字符
+- `name`：技能显示名称
+- `description`：技能描述，说明触发条件和效果
+- `kind`：技能类型，被动技能使用 `passive`
+- `type`：技能类型，普通技能使用 `normal`
+- `cooldownTurns`：冷却回合数，0表示无冷却
+- `code`：技能执行代码，被动技能可以使用简单的返回语句
 
-### 技能不执行
-- 检查函数签名是否正确（必须是 `function executeSkill(context)`）
-- 检查是否正确返回了包含 `message` 和 `success` 字段的对象
+## 触发规则
 
-### 技能效果不生效
-- 确保使用 `sourcePiece` 而不是 `context.piece` 进行修改
-- 检查目标是否正确选择
+### 规则文件格式
+在 `data/rules/` 目录下创建 `.json` 文件，格式如下：
 
-### 战斗日志信息不足
-- 在返回的对象中提供详细的 `message`
-- 包含棋子名称和具体效果
+```json
+{
+  "id": "规则ID",
+  "name": "规则名称",
+  "description": "规则描述",
+  "trigger": {
+    "type": "触发类型",
+    "conditions": {
+      "条件1": "值1",
+      "条件2": "值2"
+    }
+  },
+  "effect": {
+    "type": "效果类型",
+    "target": "目标类型",
+    "属性1": "值1",
+    "属性2": "值2",
+    "message": "效果消息"
+  },
+  "limits": {
+    "cooldownTurns": 冷却回合数,
+    "maxUses": 最大使用次数
+  }
+}
+```
+
+### 触发类型
+
+| 触发类型 | 描述 |
+|---------|------|
+| `afterSkillUsed` | 技能使用后 |
+| `afterDamageDealt` | 造成伤害后 |
+| `afterDamageTaken` | 受到伤害后 |
+| `afterPieceKilled` | 击杀棋子后 |
+| `afterPieceSummoned` | 召唤棋子后 |
+| `beginTurn` | 回合开始时 |
+| `endTurn` | 回合结束时 |
+| `afterMove` | 移动后 |
+
+### 效果类型
+
+| 效果类型 | 描述 | 必要属性 |
+|---------|------|----------|
+| `modifyStats` | 修改属性 | `target`, `modifications`, `message` |
+| `addChargePoints` | 增加充能点 | `amount`, `message` |
+| `heal` | 治疗 | `amount`, `target`, `message` |
+| `damage` | 伤害 | `amount`, `target`, `message` |
+| `triggerSkill` | 触发技能 | `skillId`, `message` |
+
+### 目标类型
+
+| 目标类型 | 描述 |
+|---------|------|
+| `source` | 源角色（触发规则的角色） |
+| `target` | 目标角色 |
+| `all` | 所有角色 |
+| `area` | 范围内的角色（需要指定 `range` 属性） |
+
+### 动态值
+
+效果值可以使用动态值，例如：
+- `source.attack`：源角色的攻击力
+- `source.maxHp`：源角色的最大生命值
+- `target.attack`：目标角色的攻击力
+- `target.maxHp`：目标角色的最大生命值
+- `damage`：造成的伤害值
+
+### 消息模板
+
+消息可以使用模板字符串，例如：
+- `${source.templateId}`：源角色的模板ID
+- `${target.templateId}`：目标角色的模板ID
+- `${source.attack}`：源角色的攻击力
+- `${target.maxHp}`：目标角色的最大生命值
+
+## 实现步骤
+
+### 步骤1：创建技能文件
+
+1. 在 `data/skills/` 目录下创建技能JSON文件
+2. 填写技能的基本信息
+3. 设置为被动技能（`kind: "passive"`）
+
+### 步骤2：创建规则文件
+
+1. 在 `data/rules/` 目录下创建规则JSON文件
+2. 填写规则的基本信息
+3. 定义触发条件
+4. 定义效果
+5. 设置限制（如冷却）
+
+### 步骤3：装备技能
+
+将技能分配给角色，在角色的 `skills` 数组中添加技能：
+
+```json
+"skills": [
+  {
+    "skillId": "技能ID",
+    "level": 1
+  }
+]
+```
+
+## 示例1：反击技能
+
+实现"当受到伤害时，选择一个3格内的目标，造成100%攻击力的伤害"的技能。
+
+### 步骤1：创建技能文件
+
+创建 `data/skills/retaliation.json`：
+
+```json
+{
+  "id": "retaliation",
+  "name": "反击",
+  "description": "当受到伤害时，选择一个3格内的目标，造成100%攻击力的伤害",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { return { message: '反击被动技能已激活', success: true } }",
+  "range": "area",
+  "areaSize": 3,
+  "requiresTarget": false
+}
+```
+
+### 步骤2：创建规则文件
+
+创建 `data/rules/retaliation.json`：
+
+```json
+{
+  "id": "rule-4",
+  "name": "反击",
+  "description": "当受到伤害时，选择一个3格内的目标，造成100%攻击力的伤害",
+  "trigger": {
+    "type": "afterDamageTaken",
+    "conditions": {
+      "minDamage": 1
+    }
+  },
+  "effect": {
+    "type": "damage",
+    "target": "area",
+    "range": 3,
+    "amount": "source.attack",
+    "message": "${source.templateId}发动反击，对3格内的目标造成${source.attack}点伤害"
+  },
+  "limits": {
+    "cooldownTurns": 1,
+    "maxUses": 0
+  }
+}
+```
+
+### 步骤3：装备技能
+
+在角色的JSON文件中添加技能：
+
+```json
+"skills": [
+  {
+    "skillId": "basic-attack",
+    "level": 1
+  },
+  {
+    "skillId": "retaliation",
+    "level": 1
+  }
+]
+```
+
+## 示例2：生命汲取
+
+实现"当击杀敌人时，获得等同于其最大生命值的生命值"的技能。
+
+### 步骤1：创建技能文件
+
+创建 `data/skills/life-drain.json`：
+
+```json
+{
+  "id": "life-drain",
+  "name": "生命汲取",
+  "description": "当击杀敌人时，获得等同于其最大生命值的生命值",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { return { message: '生命汲取被动技能已激活', success: true } }",
+  "range": "self",
+  "requiresTarget": false
+}
+```
+
+### 步骤2：创建规则文件
+
+创建 `data/rules/life-drain.json`：
+
+```json
+{
+  "id": "rule-5",
+  "name": "生命汲取",
+  "description": "当击杀敌人时，获得等同于其最大生命值的生命值",
+  "trigger": {
+    "type": "afterPieceKilled"
+  },
+  "effect": {
+    "type": "modifyStats",
+    "target": "source",
+    "modifications": [
+      {
+        "stat": "currentHp",
+        "operation": "add",
+        "value": "target.maxHp"
+      }
+    ],
+    "message": "${source.templateId}汲取了${target.templateId}的生命，恢复了${target.maxHp}点生命值"
+  },
+  "limits": {
+    "cooldownTurns": 0,
+    "maxUses": 0
+  }
+}
+```
+
+## 示例3：战斗光环
+
+实现"当回合开始时，所有友方角色攻击力+1"的技能。
+
+### 步骤1：创建技能文件
+
+创建 `data/skills/battle-aura.json`：
+
+```json
+{
+  "id": "battle-aura",
+  "name": "战斗光环",
+  "description": "当回合开始时，所有友方角色攻击力+1",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { return { message: '战斗光环已激活', success: true } }",
+  "range": "area",
+  "areaSize": 10,
+  "requiresTarget": false
+}
+```
+
+### 步骤2：创建规则文件
+
+创建 `data/rules/battle-aura.json`：
+
+```json
+{
+  "id": "rule-6",
+  "name": "战斗光环",
+  "description": "当回合开始时，所有友方角色攻击力+1",
+  "trigger": {
+    "type": "beginTurn"
+  },
+  "effect": {
+    "type": "modifyStats",
+    "target": "all",
+    "modifications": [
+      {
+        "stat": "attack",
+        "operation": "add",
+        "value": 1
+      }
+    ],
+    "message": "${source.templateId}的战斗光环生效，所有友方角色攻击力+1"
+  },
+  "limits": {
+    "cooldownTurns": 1,
+    "maxUses": 0
+  }
+}
+```
+
+## 示例4：触发技能代码
+
+实现"当受到伤害时，触发反击技能"的效果，使用技能的code代码执行逻辑。
+
+### 步骤1：创建技能文件
+
+创建 `data/skills/counter-attack.json`：
+
+```json
+{
+  "id": "counter-attack",
+  "name": "反击",
+  "description": "当受到伤害时，对攻击者造成伤害",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) {\n  const attacker = context.targetPiece;\n  if (attacker) {\n    const damage = context.piece.attack;\n    attacker.currentHp = Math.max(0, attacker.currentHp - damage);\n    return { message: context.piece.templateId + '发动反击，对' + attacker.templateId + '造成' + damage + '点伤害', success: true };\n  }\n  return { message: '没有目标可以反击', success: false };\n}",
+  "range": "self",
+  "requiresTarget": false
+}
+```
+
+### 步骤2：创建规则文件
+
+创建 `data/rules/trigger-counter-attack.json`：
+
+```json
+{
+  "id": "rule-7",
+  "name": "触发反击",
+  "description": "当受到伤害时，触发反击技能",
+  "trigger": {
+    "type": "afterDamageTaken",
+    "conditions": {
+      "minDamage": 1
+    }
+  },
+  "effect": {
+    "type": "triggerSkill",
+    "skillId": "counter-attack",
+    "message": "${source.templateId}触发了反击技能"
+  },
+  "limits": {
+    "cooldownTurns": 1,
+    "maxUses": 0
+  }
+}
+```
+
+## 高级技巧
+
+### 复杂条件
+
+可以使用复合条件，例如：
+
+```json
+"trigger": {
+  "type": "afterDamageDealt",
+  "conditions": {
+    "minDamage": 5,
+    "pieceType": "warrior"
+  }
+}
+```
+
+### 多效果
+
+一个规则可以包含多个效果，例如：
+
+```json
+"effect": {
+  "type": "modifyStats",
+  "target": "source",
+  "modifications": [
+    {
+      "stat": "attack",
+      "operation": "add",
+      "value": 2
+    },
+    {
+      "stat": "defense",
+      "operation": "add",
+      "value": 1
+    }
+  ],
+  "message": "${source.templateId}获得了力量和防御增益"
+}
+```
+
+### 范围效果
+
+可以创建范围效果，例如：
+
+```json
+"effect": {
+  "type": "heal",
+  "target": "area",
+  "range": 2,
+  "amount": 3,
+  "message": "${source.templateId}释放了治疗光环，为2格内的友方角色恢复了3点生命值"
+}
+```
+
+## 故障排除
+
+### 技能不触发的原因
+
+1. **规则文件不存在**：确保在 `data/rules/` 目录下创建了对应的规则文件
+2. **触发条件不匹配**：检查触发类型和条件是否正确
+3. **冷却未就绪**：检查规则的冷却是否已结束
+4. **目标不存在**：确保目标类型和范围设置正确
+5. **技能未装备**：确保角色已装备该技能
+
+### 常见错误
+
+1. **JSON格式错误**：确保JSON文件格式正确，没有语法错误
+2. **值类型错误**：确保动态值的格式正确，例如 `target.maxHp`
+3. **字段缺失**：确保所有必要的字段都已填写
+4. **路径错误**：确保文件保存在正确的目录中
 
 ## 总结
 
-- 使用 `executeSkill(context)` 函数签名
-- 避免修改 `context.piece`
-- 使用 `sourcePiece` 进行属性修改
-- 提供详细的技能执行消息
-- 处理边界情况
+通过本教程，你应该已经学会了如何创建条件技能：
 
-遵循这些指南，您可以创建强大、可靠的技能来增强游戏体验！
+1. **创建技能文件**：定义技能的基本属性
+2. **创建规则文件**：定义触发条件和效果
+3. **装备技能**：将技能分配给角色
+
+现在你可以尝试创建自己的条件技能了！例如：
+
+- 当移动时，在脚下留下火焰
+- 当受到致命伤害时，触发无敌效果
+- 当使用技能时，召唤一个小兵
+
+祝你游戏开发愉快！

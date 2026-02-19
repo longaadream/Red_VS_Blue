@@ -1,5 +1,6 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
+import { globalTriggerSystem } from "./triggers"
 
 export type SkillId = string
 
@@ -432,7 +433,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
 }
 
 // 执行技能函数
-export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState): SkillExecutionResult {
+  export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState): SkillExecutionResult {
   try {
     console.log('=== executeSkillFunction called ===');
     console.log('Skill ID:', skillDef.id);
@@ -486,6 +487,11 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       console
     }
 
+    // 记录技能执行前的状态
+    const beforeState = {
+      enemies: battle.pieces.filter(p => p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0).map(p => ({ instanceId: p.instanceId, currentHp: p.currentHp }))
+    };
+
     // 尝试执行技能定义中的代码
     if (skillDef.code) {
       try {
@@ -513,6 +519,18 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             maxHp: sourcePiece.maxHp,
             currentHp: sourcePiece.currentHp
           });
+
+          // 触发技能使用后的规则
+          const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
+            type: "afterSkillUsed",
+            sourcePiece,
+            skillId: skillDef.id
+          });
+
+          // 处理触发效果的消息
+          if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
+            result.message += "。" + skillUsedResult.messages.join("。");
+          }
           
           return result;
         } else {
@@ -553,6 +571,21 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           // 显式更新battle.pieces中的对应元素，确保修改能够正确反映到battle状态中
           battle.pieces[pieceIndex] = sourcePiece;
           console.log('Updated battle.pieces[' + pieceIndex + ']:', battle.pieces[pieceIndex]);
+
+          // 检查是否有伤害和击杀
+          checkForDamageAndKill(battle, beforeState, sourcePiece, skillDef.id);
+
+          // 触发技能使用后的规则
+          const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
+            type: "afterSkillUsed",
+            sourcePiece,
+            skillId: skillDef.id
+          });
+
+          // 处理触发效果的消息
+          if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
+            result.message += "。" + skillUsedResult.messages.join("。");
+          }
           
           return result;
         }
@@ -579,19 +612,99 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         if (playerMeta) {
           playerMeta.chargePoints += 1; // 每次击杀获得1点充能
         }
+
+        // 触发伤害和击杀的规则
+        globalTriggerSystem.checkTriggers(battle, {
+          type: "afterDamageDealt",
+          sourcePiece,
+          targetPiece: nearestEnemy,
+          damage: damageValue,
+          skillId: skillDef.id
+        });
+
+        globalTriggerSystem.checkTriggers(battle, {
+          type: "afterPieceKilled",
+          sourcePiece,
+          targetPiece: nearestEnemy,
+          skillId: skillDef.id
+        });
+
+        // 触发技能使用后的规则
+        const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
+          type: "afterSkillUsed",
+          sourcePiece,
+          skillId: skillDef.id
+        });
+
+        let message = `对最近的敌人造成${Math.round(damageValue)}点伤害，击杀敌人获得1点充能`;
+        if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
+          message += "。" + skillUsedResult.messages.join("。");
+        }
+
         return {
-          message: `对最近的敌人造成${Math.round(damageValue)}点伤害，击杀敌人获得1点充能`,
+          message,
+          success: true
+        };
+      } else if (originalHp > nearestEnemy.currentHp) {
+        // 只造成伤害，未击杀
+        // 触发伤害的规则
+        globalTriggerSystem.checkTriggers(battle, {
+          type: "afterDamageDealt",
+          sourcePiece,
+          targetPiece: nearestEnemy,
+          damage: damageValue,
+          skillId: skillDef.id
+        });
+
+        // 触发技能使用后的规则
+        const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
+          type: "afterSkillUsed",
+          sourcePiece,
+          skillId: skillDef.id
+        });
+
+        let message = `对最近的敌人造成${Math.round(damageValue)}点伤害`;
+        if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
+          message += "。" + skillUsedResult.messages.join("。");
+        }
+
+        return {
+          message,
           success: true
         };
       }
       
+      // 触发技能使用后的规则
+      const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
+        type: "afterSkillUsed",
+        sourcePiece,
+        skillId: skillDef.id
+      });
+
+      let message = `对最近的敌人造成${Math.round(damageValue)}点伤害`;
+      if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
+        message += "。" + skillUsedResult.messages.join("。");
+      }
+
       return {
-        message: `对最近的敌人造成${Math.round(damageValue)}点伤害`,
+        message,
         success: true
       };
     } else {
+      // 触发技能使用后的规则
+      const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
+        type: "afterSkillUsed",
+        sourcePiece,
+        skillId: skillDef.id
+      });
+
+      let message = '范围内没有可攻击的敌人';
+      if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
+        message += "。" + skillUsedResult.messages.join("。");
+      }
+
       return {
-        message: '范围内没有可攻击的敌人',
+        message,
         success: false
       };
     }
@@ -600,6 +713,38 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     return {
       message: '技能执行失败: ' + (error instanceof Error ? error.message : 'Unknown error'),
       success: false
+    }
+  }
+}
+
+// 检查技能执行后是否造成伤害或击杀
+function checkForDamageAndKill(battle: BattleState, beforeState: any, sourcePiece: PieceInstance, skillId: string) {
+  // 检查每个敌人的状态变化
+  for (const beforeEnemy of beforeState.enemies) {
+    const afterEnemy = battle.pieces.find(p => p.instanceId === beforeEnemy.instanceId);
+    if (afterEnemy && afterEnemy.currentHp < beforeEnemy.currentHp) {
+      // 造成了伤害
+      const damage = beforeEnemy.currentHp - afterEnemy.currentHp;
+      
+      // 触发伤害规则
+      globalTriggerSystem.checkTriggers(battle, {
+        type: "afterDamageDealt",
+        sourcePiece,
+        targetPiece: afterEnemy,
+        damage,
+        skillId
+      });
+
+      // 检查是否击杀
+      if (afterEnemy.currentHp === 0 && beforeEnemy.currentHp > 0) {
+        // 触发击杀规则
+        globalTriggerSystem.checkTriggers(battle, {
+          type: "afterPieceKilled",
+          sourcePiece,
+          targetPiece: afterEnemy,
+          skillId
+        });
+      }
     }
   }
 }

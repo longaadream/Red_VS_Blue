@@ -16,6 +16,7 @@ export interface PieceStats {
 export interface PieceSkill {
   skillId: string
   level?: number
+  currentCooldown?: number
 }
 
 export interface PieceTemplate {

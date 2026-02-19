@@ -1,0 +1,20 @@
+{
+  "id": "rule-3",
+  "name": "灵魂收割",
+  "description": "当一个敌方角色死亡时，触发灵魂收割技能",
+  "trigger": {
+    "type": "afterPieceKilled",
+    "conditions": {
+      "pieceType": "blue-reaper"
+    }
+  },
+  "effect": {
+    "type": "triggerSkill",
+    "skillId": "soul-harvest",
+    "message": "${source.templateId}触发了灵魂收割技能"
+  },
+  "limits": {
+    "cooldownTurns": 0,
+    "maxUses": 0
+  }
+}

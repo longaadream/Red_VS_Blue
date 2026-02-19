@@ -178,18 +178,28 @@ export default function MapEncyclopediaPage() {
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
       {/* Header */}
       <header className="py-8 px-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Map Encyclopedia</h1>
-            <p className="text-gray-400">Explore all game maps</p>
+        <div className="container mx-auto">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Map Encyclopedia</h1>
+              <p className="text-gray-400">Explore all game maps</p>
+            </div>
+            <div className="flex gap-3">
+              <a 
+                href="/encyclopedia" 
+                className="flex items-center text-gray-400 hover:text-white transition-colors duration-300 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md"
+              >
+                <ChevronLeft className="mr-1" size={20} />
+                Back to Encyclopedia
+              </a>
+              <a 
+                href="/" 
+                className="flex items-center text-gray-400 hover:text-white transition-colors duration-300 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md"
+              >
+                ← 返回主菜单
+              </a>
+            </div>
           </div>
-          <a 
-            href="/encyclopedia" 
-            className="flex items-center text-gray-400 hover:text-white transition-colors duration-300"
-          >
-            <ChevronLeft className="mr-1" size={20} />
-            Back to Encyclopedia
-          </a>
         </div>
       </header>
 

@@ -1,0 +1,14 @@
+{
+  "id": "retaliation",
+  "name": "反击",
+  "description": "当受到伤害时，选择一个3格内的目标，造成100%攻击力的伤害",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { return { message: '反击被动技能已激活', success: true } }",
+  "range": "area",
+  "areaSize": 3,
+  "requiresTarget": false
+}

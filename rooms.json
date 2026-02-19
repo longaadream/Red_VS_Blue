@@ -26574,16 +26574,16 @@
     }
   },
   {
-    "id": "k0xay",
-    "name": "Longaadream 的 1v1 房间",
+    "id": "5hyvc",
+    "name": "admin 的 1v1 房间",
     "status": "in-progress",
-    "createdAt": 1771469450640,
+    "createdAt": 1771484264076,
     "maxPlayers": 2,
     "players": [
       {
-        "id": "user_1771361118594_8536",
-        "name": "Longaadream",
-        "joinedAt": 1771469450679,
+        "id": "user_1771360858632_9522",
+        "name": "admin",
+        "joinedAt": 1771484264115,
         "faction": "red",
         "selectedPieces": [
           {
@@ -26591,16 +26591,16 @@
             "faction": "red"
           },
           {
-            "templateId": "red-mage",
+            "templateId": "red-archer",
             "faction": "red"
           }
         ],
         "hasSelectedPieces": true
       },
       {
-        "id": "user_1771360858632_9522",
-        "name": "admin",
-        "joinedAt": 1771469459115,
+        "id": "user_1771361118594_8536",
+        "name": "Longaadream",
+        "joinedAt": 1771484270963,
         "faction": "blue",
         "selectedPieces": [
           {
@@ -26615,7 +26615,7 @@
         "hasSelectedPieces": true
       }
     ],
-    "hostId": "user_1771361118594_8536",
+    "hostId": "user_1771360858632_9522",
     "mapId": "arena-8x6",
     "visibility": "public",
     "currentTurnIndex": 0,
@@ -27107,13 +27107,14 @@
               "type": "wall"
             }
           }
-        ]
+        ],
+        "rules": []
       },
       "pieces": [
         {
-          "instanceId": "user_1771361118594_8536-1",
+          "instanceId": "user_1771360858632_9522-1",
           "templateId": "red-warrior",
-          "ownerPlayerId": "user_1771361118594_8536",
+          "ownerPlayerId": "user_1771360858632_9522",
           "faction": "red",
           "currentHp": 6,
           "maxHp": 6,
@@ -27121,7 +27122,7 @@
           "defense": 0,
           "moveRange": 3,
           "x": 4,
-          "y": 1,
+          "y": 2,
           "skills": [
             {
               "skillId": "basic-attack",
@@ -27138,48 +27139,48 @@
           ]
         },
         {
-          "instanceId": "user_1771361118594_8536-2",
-          "templateId": "red-mage",
-          "ownerPlayerId": "user_1771361118594_8536",
+          "instanceId": "user_1771360858632_9522-2",
+          "templateId": "red-archer",
+          "ownerPlayerId": "user_1771360858632_9522",
           "faction": "red",
+          "currentHp": 4,
+          "maxHp": 4,
+          "attack": 2,
+          "defense": 0,
+          "moveRange": 4,
+          "x": 1,
+          "y": 4,
+          "skills": [
+            {
+              "skillId": "basic-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            },
+            {
+              "skillId": "buff-attack",
+              "currentCooldown": 0,
+              "currentCharges": 0,
+              "unlocked": true
+            }
+          ]
+        },
+        {
+          "instanceId": "user_1771361118594_8536-1",
+          "templateId": "blue-mage",
+          "ownerPlayerId": "user_1771361118594_8536",
+          "faction": "blue",
           "currentHp": 3,
           "maxHp": 3,
           "attack": 2,
           "defense": 0,
           "moveRange": 2,
           "x": 6,
-          "y": 4,
-          "skills": [
-            {
-              "skillId": "teleport",
-              "currentCooldown": 0,
-              "currentCharges": 0,
-              "unlocked": true
-            },
-            {
-              "skillId": "fireball",
-              "currentCooldown": 0,
-              "currentCharges": 0,
-              "unlocked": true
-            }
-          ]
-        },
-        {
-          "instanceId": "user_1771360858632_9522-1",
-          "templateId": "blue-mage",
-          "ownerPlayerId": "user_1771360858632_9522",
-          "faction": "blue",
-          "currentHp": 1,
-          "maxHp": 3,
-          "attack": 2,
-          "defense": 0,
-          "moveRange": 2,
-          "x": 3,
           "y": 1,
           "skills": [
             {
               "skillId": "teleport",
-              "currentCooldown": 0,
+              "currentCooldown": 1,
               "currentCharges": 0,
               "unlocked": true
             },
@@ -27192,13 +27193,13 @@
           ]
         },
         {
-          "instanceId": "user_1771360858632_9522-2",
+          "instanceId": "user_1771361118594_8536-2",
           "templateId": "blue-archer",
-          "ownerPlayerId": "user_1771360858632_9522",
+          "ownerPlayerId": "user_1771361118594_8536",
           "faction": "blue",
-          "currentHp": 4,
+          "currentHp": 3,
           "maxHp": 4,
-          "attack": 3,
+          "attack": 2,
           "defense": 0,
           "moveRange": 4,
           "x": 2,
@@ -27245,7 +27246,7 @@
           "maxCharges": 1,
           "chargeCost": 1,
           "powerMultiplier": 2,
-          "code": "function executeSkill(context) {\n  // 使用teleport函数进行传送\n  teleport();\n  \n  // 直接修改自身的攻击力（buff效果）\n  const buffValue = 15;\n  context.piece.attack += buffValue;\n  \n  // 直接修改范围内敌人的生命值（damage效果）\n  const damageValue = context.piece.attack * 2.5;\n  const enemies = select.getEnemiesInRange(5);\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return { \n    message: 'Arcane burst activated', \n    success: true \n  };\n}",
+          "code": "function executeSkill(context) {\n  // 使用teleport函数进行传送\n  teleport();\n  \n  // 直接修改自身的攻击力（buff效果）\n  const buffValue = 15;\n  sourcePiece.attack += buffValue;\n  \n  // 直接修改范围内敌人的生命值（damage效果）\n  const damageValue = sourcePiece.attack * 2.5;\n  const enemies = select.getEnemiesInRange(5);\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return { \n    message: sourcePiece.templateId + ' 激活了奥术爆发，提升攻击力' + buffValue + '点，对' + enemies.length + '个敌人造成' + damageValue + '点伤害', \n    success: true \n  };\n}",
           "previewCode": "function calculatePreview(piece, skillDef) {\n  // 计算预期伤害值和增益值\n  const buffValue = 15;\n  const damageValue = Math.round((piece.attack + buffValue) * 2.5); // 考虑增益后的攻击力\n  const areaSize = skillDef.areaSize || 5;\n  \n  return {\n    description: \"传送到目标位置，提升自身攻击力\" + buffValue + \"点，对\" + areaSize + \"格范围内的所有敌人造成\" + damageValue + \"点伤害\",\n    expectedValues: {\n      damage: damageValue,\n      buff: buffValue\n    }\n  };\n}",
           "range": "area",
           "areaSize": 5,
@@ -27262,7 +27263,7 @@
           "maxCharges": 1,
           "chargeCost": 1,
           "powerMultiplier": 2,
-          "code": "function executeSkill(context) {\n  // 使用teleport函数进行传送\n  teleport();\n  \n  // 直接修改自身的攻击力（buff效果）\n  const buffValue = 10;\n  context.piece.attack += buffValue;\n  \n  // 直接修改范围内敌人的生命值（damage效果）\n  const damageValue = 50;\n  const enemies = select.getEnemiesInRange(5);\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return { message: 'Arcane combination activated', success: true };\n}",
+          "code": "function executeSkill(context) {\n  // 使用teleport函数进行传送\n  teleport();\n  \n  // 直接修改自身的攻击力（buff效果）\n  const buffValue = 10;\n  sourcePiece.attack += buffValue;\n  \n  // 直接修改范围内敌人的生命值（damage效果）\n  const damageValue = 50;\n  const enemies = select.getEnemiesInRange(5);\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return { message: sourcePiece.templateId + ' 激活了奥术组合，提升攻击力' + buffValue + '点，对' + enemies.length + '个敌人造成' + damageValue + '点伤害', success: true };\n}",
           "previewCode": "function calculatePreview(piece, skillDef) {\n  // 计算预期伤害值和增益值\n  const buffValue = 10;\n  const damageValue = 50; // 固定伤害值\n  const areaSize = skillDef.areaSize || 5;\n  \n  return {\n    description: \"传送到目标位置，提升自身攻击力\" + buffValue + \"点，对\" + areaSize + \"格范围内的所有敌人造成\" + damageValue + \"点伤害\",\n    expectedValues: {\n      damage: damageValue,\n      buff: buffValue\n    }\n  };\n}",
           "range": "area",
           "areaSize": 5,
@@ -27278,25 +27279,10 @@
           "cooldownTurns": 0,
           "maxCharges": 0,
           "powerMultiplier": 1,
-          "code": "function executeSkill(context) {\n  // 选择最近的敌人\n  const targetEnemy = select.getNearestEnemy();\n  if (!targetEnemy) {\n    return { message: '没有可攻击的敌人', success: false };\n  }\n  \n  // 计算伤害值\n  const damageValue = context.piece.attack * context.skill.powerMultiplier;\n  \n  // 直接修改敌人的生命值\n  targetEnemy.currentHp = Math.max(0, targetEnemy.currentHp - damageValue);\n  \n  return {\n    message: \"造成 \" + damageValue + \" 点伤害\",\n    success: true\n  };\n}",
+          "code": "function executeSkill(context) {\n  // 选择最近的敌人\n  const targetEnemy = select.getNearestEnemy();\n  if (!targetEnemy) {\n    return { message: '没有可攻击的敌人', success: false };\n  }\n  \n  // 计算伤害值\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  \n  // 直接修改敌人的生命值\n  targetEnemy.currentHp = Math.max(0, targetEnemy.currentHp - damageValue);\n  \n  return {\n    message: sourcePiece.templateId + ' 造成 ' + damageValue + ' 点伤害',\n    success: true\n  };\n}",
           "previewCode": "function calculatePreview(piece, skillDef) {\n  // 计算预期伤害值\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  \n  return {\n    description: \"选择最近的敌人，造成\" + damageValue + \"点伤害（相当于攻击力100%）\",\n    expectedValues: {\n      damage: damageValue\n    }\n  };\n}",
           "range": "single",
           "requiresTarget": true
-        },
-        "buff-attack": {
-          "id": "buff-attack",
-          "name": "攻击强化",
-          "description": "提升自身攻击力1点，增强后续攻击效果",
-          "icon": "💪",
-          "kind": "active",
-          "type": "normal",
-          "cooldownTurns": 4,
-          "maxCharges": 0,
-          "powerMultiplier": 1,
-          "code": "function executeSkill(context) {\n  // 直接修改自身的攻击力\n  const buffValue = 1;\n  context.piece.attack += buffValue;\n  \n  return {\n    message: \"攻击强化生效，攻击力提升\" + buffValue + \"点\",\n    success: true\n  };\n}",
-          "previewCode": "function calculatePreview(piece, skillDef) {\n  // 固定增益值\n  const buffValue = 1;\n  \n  return {\n    description: \"提升自身攻击力\" + buffValue + \"点，增强后续攻击效果\",\n    expectedValues: {\n      buff: buffValue\n    }\n  };\n}",
-          "range": "self",
-          "requiresTarget": false
         },
         "fireball": {
           "id": "fireball",
@@ -27309,8 +27295,22 @@
           "maxCharges": 3,
           "chargeCost": 1,
           "powerMultiplier": 1.5,
-          "code": "function executeSkill(context) {\n  // 计算伤害值\n  const damageValue = context.piece.attack * context.skill.powerMultiplier;\n  \n  // 选择3格内的所有敌人\n  const enemies = select.getEnemiesInRange(3);\n  if (enemies.length === 0) {\n    return { message: '范围内没有可攻击的敌人', success: false };\n  }\n  \n  // 直接修改每个敌人的生命值\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return {\n    message: \"火球爆炸，对范围内\" + enemies.length + \"个敌人造成\" + damageValue + \"点伤害\",\n    success: true\n  }\n}",
+          "code": "function executeSkill(context) {\n  // 计算伤害值\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  \n  // 选择3格内的所有敌人\n  const enemies = select.getEnemiesInRange(3);\n  if (enemies.length === 0) {\n    return { message: sourcePiece.templateId + '周围没有可攻击的敌人', success: false };\n  }\n  \n  // 直接修改每个敌人的生命值\n  enemies.forEach(enemy => {\n    enemy.currentHp = Math.max(0, enemy.currentHp - damageValue);\n  });\n  \n  return {\n    message: sourcePiece.templateId + \"对\" + enemies.length + \"个敌人造成\" + damageValue + \"点伤害\",\n    success: true\n  }\n}",
           "previewCode": "function calculatePreview(piece, skillDef) {\n  // 计算预期伤害值\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  const areaSize = skillDef.areaSize || 3;\n  \n  return {\n    description: \"对\" + areaSize + \"格范围内的所有敌人造成\" + damageValue + \"点伤害（相当于攻击力150%）\",\n    expectedValues: {\n      damage: damageValue\n    }\n  };\n}",
+          "range": "area",
+          "areaSize": 3,
+          "requiresTarget": false
+        },
+        "retaliation": {
+          "id": "retaliation",
+          "name": "反击",
+          "description": "当受到伤害时，选择一个3格内的目标，造成100%攻击力的伤害",
+          "kind": "passive",
+          "type": "normal",
+          "cooldownTurns": 1,
+          "maxCharges": 0,
+          "powerMultiplier": 1,
+          "code": "function executeSkill(context) { return { message: '反击被动技能已激活', success: true } }",
           "range": "area",
           "areaSize": 3,
           "requiresTarget": false
@@ -27331,6 +27331,19 @@
           "range": "self",
           "requiresTarget": false
         },
+        "soul-harvest": {
+          "id": "soul-harvest",
+          "name": "灵魂收割",
+          "description": "当一个敌方角色死亡时，获得等同于其最大生命值的最大生命值，并且增加其最大生命值的血量",
+          "kind": "passive",
+          "type": "normal",
+          "cooldownTurns": 0,
+          "maxCharges": 0,
+          "powerMultiplier": 1,
+          "code": "function executeSkill(context) {\n  const reaper = context.piece;\n  const victim = context.targetPiece;\n  if (victim) {\n    const soulPower = victim.maxHp;\n    // 增加最大生命值\n    reaper.maxHp += soulPower;\n    // 增加当前生命值\n    reaper.currentHp += soulPower;\n    return { message: reaper.templateId + '从' + victim.templateId + '的死亡中汲取力量，生命值增加' + soulPower, success: true };\n  }\n  return { message: '没有灵魂可以收割', success: false };\n}",
+          "range": "self",
+          "requiresTarget": false
+        },
         "teleport": {
           "id": "teleport",
           "name": "Teleport",
@@ -27341,7 +27354,7 @@
           "cooldownTurns": 2,
           "maxCharges": 0,
           "powerMultiplier": 1,
-          "code": "function executeSkill(context) { return { message: 'Teleport activated', success: true } }",
+          "code": "function executeSkill(context) { return { message: sourcePiece.templateId + '使用了传送技能', success: true } }",
           "previewCode": "function calculatePreview(piece, skillDef) { const areaSize = skillDef.areaSize || 5; return { description: \"传送到目标位置，冷却2回合（\" + areaSize + \"格范围内）\", expectedValues: {} }; }",
           "effects": [],
           "range": "area",
@@ -27351,21 +27364,21 @@
       },
       "players": [
         {
-          "playerId": "user_1771361118594_8536",
+          "playerId": "user_1771360858632_9522",
           "chargePoints": 0
         },
         {
-          "playerId": "user_1771360858632_9522",
+          "playerId": "user_1771361118594_8536",
           "chargePoints": 0
         }
       ],
       "turn": {
-        "currentPlayerId": "user_1771360858632_9522",
-        "turnNumber": 14,
-        "phase": "action",
+        "currentPlayerId": "user_1771361118594_8536",
+        "turnNumber": 6,
+        "phase": "start",
         "actions": {
           "hasMoved": false,
-          "hasUsedBasicSkill": true,
+          "hasUsedBasicSkill": false,
           "hasUsedChargeSkill": false
         }
       },
@@ -27373,91 +27386,31 @@
         {
           "type": "useBasicSkill",
           "playerId": "user_1771360858632_9522",
-          "turn": 2,
+          "turn": 1,
           "payload": {
-            "message": "攻击强化生效，攻击力提升1点",
-            "skillId": "buff-attack",
-            "pieceId": "user_1771360858632_9522-2"
+            "message": "red-warrior 造成 1 点伤害",
+            "skillId": "basic-attack",
+            "pieceId": "user_1771360858632_9522-1"
           }
         },
         {
           "type": "useBasicSkill",
           "playerId": "user_1771361118594_8536",
-          "turn": 3,
+          "turn": 2,
           "payload": {
-            "message": "造成 1 点伤害",
-            "skillId": "basic-attack",
+            "message": "blue-mage使用了传送技能",
+            "skillId": "teleport",
             "pieceId": "user_1771361118594_8536-1"
           }
         },
         {
           "type": "useBasicSkill",
-          "playerId": "user_1771360858632_9522",
+          "playerId": "user_1771361118594_8536",
           "turn": 4,
           "payload": {
-            "message": "攻击强化生效，攻击力提升1点",
-            "skillId": "buff-attack",
-            "pieceId": "user_1771360858632_9522-2"
-          }
-        },
-        {
-          "type": "useBasicSkill",
-          "playerId": "user_1771361118594_8536",
-          "turn": 5,
-          "payload": {
-            "message": "Teleport activated",
+            "message": "blue-mage使用了传送技能",
             "skillId": "teleport",
-            "pieceId": "user_1771361118594_8536-2"
-          }
-        },
-        {
-          "type": "useBasicSkill",
-          "playerId": "user_1771360858632_9522",
-          "turn": 6,
-          "payload": {
-            "message": "攻击强化生效，攻击力提升1点",
-            "skillId": "buff-attack",
-            "pieceId": "user_1771360858632_9522-2"
-          }
-        },
-        {
-          "type": "useBasicSkill",
-          "playerId": "user_1771360858632_9522",
-          "turn": 8,
-          "payload": {
-            "message": "攻击强化生效，攻击力提升1点",
-            "skillId": "buff-attack",
-            "pieceId": "user_1771360858632_9522-2"
-          }
-        },
-        {
-          "type": "useBasicSkill",
-          "playerId": "user_1771360858632_9522",
-          "turn": 10,
-          "payload": {
-            "message": "攻击强化生效，攻击力提升1点",
-            "skillId": "buff-attack",
-            "pieceId": "user_1771360858632_9522-2"
-          }
-        },
-        {
-          "type": "useBasicSkill",
-          "playerId": "user_1771360858632_9522",
-          "turn": 12,
-          "payload": {
-            "message": "攻击强化生效，攻击力提升1点",
-            "skillId": "buff-attack",
-            "pieceId": "user_1771360858632_9522-2"
-          }
-        },
-        {
-          "type": "useBasicSkill",
-          "playerId": "user_1771360858632_9522",
-          "turn": 14,
-          "payload": {
-            "message": "blue-archer的攻击力提升至3点",
-            "skillId": "buff-attack",
-            "pieceId": "user_1771360858632_9522-2"
+            "pieceId": "user_1771361118594_8536-1"
           }
         }
       ]

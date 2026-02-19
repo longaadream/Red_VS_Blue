@@ -5,6 +5,7 @@ import type { SkillDefinition, SkillState } from "./skills"
 import type { BattleState, PlayerId } from "./turn"
 import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
+import { globalTriggerSystem } from "./triggers"
 
 export function buildDefaultSkills(): Record<string, SkillDefinition> {
   // 从文件系统加载技能数据
@@ -410,6 +411,7 @@ export function createInitialBattleForPlayers(
       width: 8,
       height: 6,
       tiles: [],
+      rules: []
     }
     
     // 生成地图格子
@@ -452,6 +454,11 @@ export function createInitialBattleForPlayers(
     console.log('Skills for battle:', Object.keys(skills))
     console.log('Teleport in skills:', 'teleport' in skills)
     
+    // 收集所有规则ID
+    const ruleIds = collectRuleIds(selectedPieces, defaultMap as any)
+    // 加载指定的规则
+    globalTriggerSystem.loadSpecificRules(ruleIds)
+    
     return {
       map: defaultMap,
       pieces,
@@ -482,6 +489,11 @@ export function createInitialBattleForPlayers(
   console.log('Skills for battle:', Object.keys(skills))
   console.log('Teleport in skills:', 'teleport' in skills)
   
+  // 收集所有规则ID
+  const ruleIds = collectRuleIds(selectedPieces, map as any)
+  // 加载指定的规则
+  globalTriggerSystem.loadSpecificRules(ruleIds)
+  
   return {
     map,
     pieces,
@@ -502,4 +514,23 @@ export function createInitialBattleForPlayers(
       },
     },
   }
+}
+
+// 收集所有规则ID
+function collectRuleIds(selectedPieces: PieceTemplate[], map: any): string[] {
+  const ruleIds = new Set<string>()
+  
+  // 收集棋子的规则
+  selectedPieces.forEach(piece => {
+    if (piece.rules && Array.isArray(piece.rules)) {
+      piece.rules.forEach(ruleId => ruleIds.add(ruleId))
+    }
+  })
+  
+  // 收集地图的规则
+  if (map.rules && Array.isArray(map.rules)) {
+    map.rules.forEach(ruleId => ruleIds.add(ruleId))
+  }
+  
+  return Array.from(ruleIds)
 }

@@ -4,9 +4,21 @@ export default function EncyclopediaPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
       {/* Header */}
-      <header className="py-8 px-4 text-center">
-        <h1 className="text-4xl font-bold mb-2">Game Encyclopedia</h1>
-        <p className="text-gray-400">Explore the world of Red vs Blue</p>
+      <header className="py-8 px-4">
+        <div className="container mx-auto max-w-4xl">
+          <div className="flex items-center justify-between mb-8">
+            <a 
+              href="/" 
+              className="inline-flex items-center px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors duration-300"
+            >
+              ← 返回主菜单
+            </a>
+          </div>
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-2">Game Encyclopedia</h1>
+            <p className="text-gray-400">Explore the world of Red vs Blue</p>
+          </div>
+        </div>
       </header>
 
       {/* Content */}

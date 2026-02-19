@@ -1,0 +1,22 @@
+{
+  "id": "rule-4",
+  "name": "反击",
+  "description": "当受到伤害时，选择一个3格内的目标，造成100%攻击力的伤害",
+  "trigger": {
+    "type": "afterDamageTaken",
+    "conditions": {
+      "minDamage": 1
+    }
+  },
+  "effect": {
+    "type": "damage",
+    "target": "area",
+    "range": 3,
+    "amount": "source.attack",
+    "message": "${source.templateId}发动反击，对3格内的目标造成${source.attack}点伤害"
+  },
+  "limits": {
+    "cooldownTurns": 1,
+    "maxUses": 0
+  }
+}

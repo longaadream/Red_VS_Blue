@@ -1,0 +1,28 @@
+{
+  "id": "blue-reaper",
+  "name": "死神",
+  "faction": "blue",
+  "description": "收割生命的使者，从死亡中汲取力量",
+  "rarity": "rare",
+  "image": "",
+  "stats": {
+    "maxHp": 4,
+    "attack": 2,
+    "defense": 1,
+    "moveRange": 2
+  },
+  "skills": [
+    {
+      "skillId": "basic-attack",
+      "level": 1
+    },
+    {
+      "skillId": "soul-harvest",
+      "level": 1
+    }
+  ],
+  "rules": [
+    "rule-3"
+  ],
+  "isDefault": false
+}

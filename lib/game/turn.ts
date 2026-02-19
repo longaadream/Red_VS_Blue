@@ -1,6 +1,7 @@
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
+import { globalTriggerSystem } from "./triggers"
 
 export type TurnPhase = "start" | "action" | "end"
 
@@ -171,7 +172,45 @@ export function applyBattleAction(
     case "beginPhase": {
       const next = structuredClone(state) as BattleState
       if (next.turn.phase === "start") {
-        // TODO：在这里触发“开始阶段效果”
+        // 触发回合开始效果
+        const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
+          type: "beginTurn",
+          turnNumber: next.turn.turnNumber,
+          playerId: next.turn.currentPlayerId
+        });
+
+        // 处理触发效果的消息
+        if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
+          if (!next.actions) {
+            next.actions = [];
+          }
+          beginTurnResult.messages.forEach(message => {
+            next.actions!.push({
+              type: "triggerEffect",
+              playerId: next.turn.currentPlayerId,
+              turn: next.turn.turnNumber,
+              payload: {
+                message
+              }
+            });
+          });
+        }
+
+        // 更新冷却
+        globalTriggerSystem.updateCooldowns();
+        
+        // 更新所有棋子技能的冷却时间
+        next.pieces.forEach(piece => {
+          if (piece.skills) {
+            piece.skills.forEach(skill => {
+              if (skill.currentCooldown && skill.currentCooldown > 0) {
+                skill.currentCooldown--
+                console.log(`Reduced cooldown for skill ${skill.skillId} on piece ${piece.instanceId}: ${skill.currentCooldown} turns remaining`)
+              }
+            })
+          }
+        })
+
         next.turn.phase = "action"
         return next
       }
@@ -231,6 +270,31 @@ export function applyBattleAction(
       piece.x = action.toX
       piece.y = action.toY
       next.turn.actions.hasMoved = true
+
+      // 触发移动后的规则
+      const moveResult = globalTriggerSystem.checkTriggers(next, {
+        type: "afterMove",
+        sourcePiece: piece,
+        playerId: action.playerId
+      });
+
+      // 处理触发效果的消息
+      if (moveResult.success && moveResult.messages.length > 0) {
+        if (!next.actions) {
+          next.actions = [];
+        }
+        moveResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: {
+              message
+            }
+          });
+        });
+      }
+
       return next
     }
 
@@ -254,6 +318,16 @@ export function applyBattleAction(
         throw new BattleRuleError(
           "Piece not found or does not belong to current player",
         )
+      }
+
+      // 检查技能是否在冷却中
+      if (piece.skills) {
+        const skillState = piece.skills.find(s => s.skillId === action.skillId)
+        if (skillState && skillState.currentCooldown && skillState.currentCooldown > 0) {
+          throw new BattleRuleError(
+            `Skill ${action.skillId} is on cooldown for ${skillState.currentCooldown} more turns`,
+          )
+        }
       }
 
       console.log('Executing skill with ID:', action.skillId)
@@ -319,6 +393,34 @@ export function applyBattleAction(
         // 检查技能执行后棋子的属性是否被正确修改
         const updatedPiece = next.pieces.find(p => p.instanceId === piece.instanceId)
         console.log('Updated piece after skill:', updatedPiece);
+        
+        // 设置技能冷却
+        if (skillDef.cooldownTurns > 0) {
+          // 找到棋子的技能状态并设置冷却
+          if (piece.skills) {
+            const skillIndex = piece.skills.findIndex(s => s.skillId === action.skillId)
+            if (skillIndex !== -1) {
+              piece.skills[skillIndex].currentCooldown = skillDef.cooldownTurns
+              console.log(`Set cooldown for skill ${action.skillId}: ${skillDef.cooldownTurns} turns`)
+            } else {
+              // 如果技能不在棋子的技能列表中，添加它
+              piece.skills.push({ 
+                skillId: action.skillId, 
+                level: 1, 
+                currentCooldown: skillDef.cooldownTurns 
+              })
+              console.log(`Added skill ${action.skillId} to piece with cooldown: ${skillDef.cooldownTurns} turns`)
+            }
+          } else {
+            // 如果棋子没有skills属性，初始化它
+            piece.skills = [{ 
+              skillId: action.skillId, 
+              level: 1, 
+              currentCooldown: skillDef.cooldownTurns 
+            }]
+            console.log(`Initialized skills for piece and added cooldown for ${action.skillId}: ${skillDef.cooldownTurns} turns`)
+          }
+        }
       }
 
       // 处理传送技能的目标位置（作为备用机制）
@@ -381,6 +483,16 @@ export function applyBattleAction(
         throw new BattleRuleError(
           "Piece not found or does not belong to current player",
         )
+      }
+
+      // 检查技能是否在冷却中
+      if (piece.skills) {
+        const skillState = piece.skills.find(s => s.skillId === action.skillId)
+        if (skillState && skillState.currentCooldown && skillState.currentCooldown > 0) {
+          throw new BattleRuleError(
+            `Skill ${action.skillId} is on cooldown for ${skillState.currentCooldown} more turns`,
+          )
+        }
       }
 
       console.log('Executing skill with ID:', action.skillId)
@@ -453,6 +565,34 @@ export function applyBattleAction(
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         console.log('Skill executed:', result.message)
+        
+        // 设置技能冷却
+        if (skillDef.cooldownTurns > 0) {
+          // 找到棋子的技能状态并设置冷却
+          if (piece.skills) {
+            const skillIndex = piece.skills.findIndex(s => s.skillId === action.skillId)
+            if (skillIndex !== -1) {
+              piece.skills[skillIndex].currentCooldown = skillDef.cooldownTurns
+              console.log(`Set cooldown for skill ${action.skillId}: ${skillDef.cooldownTurns} turns`)
+            } else {
+              // 如果技能不在棋子的技能列表中，添加它
+              piece.skills.push({ 
+                skillId: action.skillId, 
+                level: 1, 
+                currentCooldown: skillDef.cooldownTurns 
+              })
+              console.log(`Added skill ${action.skillId} to piece with cooldown: ${skillDef.cooldownTurns} turns`)
+            }
+          } else {
+            // 如果棋子没有skills属性，初始化它
+            piece.skills = [{ 
+              skillId: action.skillId, 
+              level: 1, 
+              currentCooldown: skillDef.cooldownTurns 
+            }]
+            console.log(`Initialized skills for piece and added cooldown for ${action.skillId}: ${skillDef.cooldownTurns} turns`)
+          }
+        }
       }
 
       // 初始化actions数组
@@ -483,7 +623,30 @@ export function applyBattleAction(
       }
 
       const next = structuredClone(state) as BattleState
-      // TODO：在这里触发“结束阶段效果”，例如 DOT、buff 结算等。
+      // 触发回合结束效果
+      const endTurnResult = globalTriggerSystem.checkTriggers(next, {
+        type: "endTurn",
+        turnNumber: next.turn.turnNumber,
+        playerId: action.playerId
+      });
+
+      // 处理触发效果的消息
+      if (endTurnResult.success && endTurnResult.messages.length > 0) {
+        if (!next.actions) {
+          next.actions = [];
+        }
+        endTurnResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: {
+              message
+            }
+          });
+        });
+      }
+
       next.turn.phase = "end"
       return next
     }

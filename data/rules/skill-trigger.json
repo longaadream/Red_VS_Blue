@@ -1,0 +1,20 @@
+{
+  "id": "rule-7",
+  "name": "技能触发",
+  "description": "当受到伤害时，触发反击技能",
+  "trigger": {
+    "type": "afterDamageTaken",
+    "conditions": {
+      "minDamage": 1
+    }
+  },
+  "effect": {
+    "type": "triggerSkill",
+    "skillId": "retaliation",
+    "message": "${source.templateId}触发了反击技能"
+  },
+  "limits": {
+    "cooldownTurns": 1,
+    "maxUses": 0
+  }
+}

@@ -28,5 +28,6 @@
       "walkable": true,
       "bulletPassable": false
     }
-  ]
+  ],
+  "rules": []
 }
