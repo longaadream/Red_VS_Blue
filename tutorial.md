@@ -30,7 +30,7 @@
   "cooldownTurns": 冷却回合数,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { return { message: '技能已激活', success: true } }",
+  "code": "function executeSkill(context) { \n  // 技能执行逻辑\n  const piece = context.piece;\n  // 在这里实现具体的技能效果\n  return { message: '技能已激活', success: true };\n}",
   "range": "self",
   "requiresTarget": false
 }
@@ -172,7 +172,7 @@
   "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { return { message: '反击被动技能已激活', success: true } }",
+  "code": "function executeSkill(context) { \n  const piece = context.piece;\n  // 寻找3格内的敌人\n  const enemies = context.battle.pieces.filter(enemy => {\n    if (enemy.ownerPlayerId === piece.ownerPlayerId || enemy.currentHp <= 0) return false;\n    const distance = Math.abs(enemy.x - piece.x) + Math.abs(enemy.y - piece.y);\n    return distance <= 3;\n  });\n  \n  if (enemies.length > 0) {\n    // 选择第一个敌人并造成伤害\n    const target = enemies[0];\n    const damage = piece.attack;\n    target.currentHp = Math.max(0, target.currentHp - damage);\n    return { message: piece.templateId + '发动反击，对' + target.templateId + '造成' + damage + '点伤害', success: true };\n  }\n  return { message: '没有敌人可以反击', success: false };\n}",
   "range": "area",
   "areaSize": 3,
   "requiresTarget": false
@@ -195,11 +195,9 @@
     }
   },
   "effect": {
-    "type": "damage",
-    "target": "area",
-    "range": 3,
-    "amount": "source.attack",
-    "message": "${source.templateId}发动反击，对3格内的目标造成${source.attack}点伤害"
+    "type": "triggerSkill",
+    "skillId": "retaliation",
+    "message": "${source.templateId}触发了反击技能"
   },
   "limits": {
     "cooldownTurns": 1,
@@ -243,7 +241,7 @@
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { return { message: '生命汲取被动技能已激活', success: true } }",
+  "code": "function executeSkill(context) { \n  const piece = context.piece;\n  const target = context.targetPiece;\n  if (target) {\n    // 获得等同于目标最大生命值的生命值\n    const healAmount = target.maxHp;\n    piece.currentHp = Math.min(piece.currentHp + healAmount, piece.maxHp);\n    return { message: piece.templateId + '汲取了' + target.templateId + '的生命，恢复了' + healAmount + '点生命值', success: true };\n  }\n  return { message: '没有目标可以汲取生命', success: false };\n}",
   "range": "self",
   "requiresTarget": false
 }
@@ -262,16 +260,9 @@
     "type": "afterPieceKilled"
   },
   "effect": {
-    "type": "modifyStats",
-    "target": "source",
-    "modifications": [
-      {
-        "stat": "currentHp",
-        "operation": "add",
-        "value": "target.maxHp"
-      }
-    ],
-    "message": "${source.templateId}汲取了${target.templateId}的生命，恢复了${target.maxHp}点生命值"
+    "type": "triggerSkill",
+    "skillId": "life-drain",
+    "message": "${source.templateId}触发了生命汲取技能"
   },
   "limits": {
     "cooldownTurns": 0,
@@ -298,7 +289,7 @@
   "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { return { message: '战斗光环已激活', success: true } }",
+  "code": "function executeSkill(context) { \n  const piece = context.piece;\n  // 为所有友方角色增加攻击力\n  context.battle.pieces.forEach(friendly => {\n    if (friendly.ownerPlayerId === piece.ownerPlayerId && friendly.currentHp > 0) {\n      friendly.attack += 1;\n    }\n  });\n  return { message: piece.templateId + '的战斗光环生效，所有友方角色攻击力+1', success: true };\n}",
   "range": "area",
   "areaSize": 10,
   "requiresTarget": false
@@ -318,16 +309,9 @@
     "type": "beginTurn"
   },
   "effect": {
-    "type": "modifyStats",
-    "target": "all",
-    "modifications": [
-      {
-        "stat": "attack",
-        "operation": "add",
-        "value": 1
-      }
-    ],
-    "message": "${source.templateId}的战斗光环生效，所有友方角色攻击力+1"
+    "type": "triggerSkill",
+    "skillId": "battle-aura",
+    "message": "${source.templateId}触发了战斗光环技能"
   },
   "limits": {
     "cooldownTurns": 1,

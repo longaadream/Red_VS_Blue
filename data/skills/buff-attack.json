@@ -8,8 +8,7 @@
   "cooldownTurns": 4,
   "maxCharges": 0,
   "powerMultiplier": 1.0,
-  "code": "function executeSkill(context) {\n  // 直接修改自身的攻击力
-  sourcePiece.attack = sourcePiece.attack + 1;\n  \n  return {\n    message: sourcePiece.templateId + '的攻击力提升至' + sourcePiece.attack + '点',\n    success: true\n  };\n}",
+  "code": "function executeSkill(context) {\n  // 直接修改自身的攻击力\nsourcePiece.attack = sourcePiece.attack + 1;\n  \n  return {\n    message: sourcePiece.templateId + '的攻击力提升至' + sourcePiece.attack + '点',\n    success: true\n  };\n}",
   "previewCode": "function calculatePreview(piece, skillDef) {\n  // 固定增益值\n  const buffValue = 1;\n  \n  return {\n    description: \"提升自身攻击力\" + buffValue + \"点，增强后续攻击效果\",\n    expectedValues: {\n      buff: buffValue\n    }\n  };\n}",
   "range": "self",
   "requiresTarget": false
