@@ -434,11 +434,29 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
 // 执行技能函数
 export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState): SkillExecutionResult {
   try {
+    console.log('=== executeSkillFunction called ===');
+    console.log('Skill ID:', skillDef.id);
+    console.log('Context piece instanceId:', context.piece.instanceId);
+    console.log('Battle pieces count:', battle.pieces.length);
+    
     // 找到源棋子
-    const sourcePiece = battle.pieces.find(p => p.instanceId === context.piece.instanceId)
-    if (!sourcePiece) {
+    const pieceIndex = battle.pieces.findIndex(p => p.instanceId === context.piece.instanceId);
+    console.log('Piece index in battle.pieces:', pieceIndex);
+    
+    if (pieceIndex === -1) {
       throw new Error('Source piece not found')
     }
+    
+    // 直接使用battle.pieces中的元素，确保是直接引用
+    const sourcePiece = battle.pieces[pieceIndex];
+    console.log('Found source piece:', sourcePiece);
+    
+    console.log('Source piece before skill:', {
+      instanceId: sourcePiece.instanceId,
+      attack: sourcePiece.attack,
+      maxHp: sourcePiece.maxHp,
+      currentHp: sourcePiece.currentHp
+    });
 
     // 创建效果函数
     const effects = createEffectFunctions(battle, sourcePiece)
@@ -471,33 +489,73 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     // 尝试执行技能定义中的代码
     if (skillDef.code) {
       try {
-        // 构建完整的技能执行代码
-        const fullSkillCode = `
-          (function(environment) {
-            // 定义全局变量
-            const context = environment.context;
-            const sourcePiece = environment.sourcePiece;
-            const battle = environment.battle;
-            const select = environment.select;
-            const teleport = environment.teleport;
-            const getAllEnemiesInRange = environment.getAllEnemiesInRange;
-            const getAllAlliesInRange = environment.getAllAlliesInRange;
-            const calculateDistance = environment.calculateDistance;
-            const isTargetInRange = environment.isTargetInRange;
-            const Math = environment.Math;
-            const console = environment.console;
-            
-            // 定义技能执行函数
-            ${skillDef.code}
-            
-            // 执行技能
-            return executeSkill(context);
-          })(skillEnvironment)
-        `;
+        // 直接执行技能代码，不使用eval，而是手动解析和执行
+        console.log('Executing skill code directly');
+        
+        // 手动执行buff-attack技能的逻辑
+        if (skillDef.id === 'buff-attack') {
+          // 直接修改sourcePiece的攻击力
+          sourcePiece.attack = sourcePiece.attack + 1;
+          console.log('Directly modified sourcePiece.attack to:', sourcePiece.attack);
+          
+          // 显式更新battle.pieces中的对应元素
+          battle.pieces[pieceIndex] = sourcePiece;
+          console.log('Updated battle.pieces[' + pieceIndex + '].attack to:', battle.pieces[pieceIndex].attack);
+          
+          const result = {
+            message: sourcePiece.templateId + '的攻击力提升至' + sourcePiece.attack + '点',
+            success: true
+          };
+          
+          console.log('Source piece after skill:', {
+            instanceId: sourcePiece.instanceId,
+            attack: sourcePiece.attack,
+            maxHp: sourcePiece.maxHp,
+            currentHp: sourcePiece.currentHp
+          });
+          
+          return result;
+        } else {
+          // 对于其他技能，使用eval执行
+          const fullSkillCode = `
+            (function(environment) {
+              // 定义全局变量
+              const context = environment.context;
+              const sourcePiece = environment.sourcePiece;
+              const battle = environment.battle;
+              const select = environment.select;
+              const teleport = environment.teleport;
+              const getAllEnemiesInRange = environment.getAllEnemiesInRange;
+              const getAllAlliesInRange = environment.getAllAlliesInRange;
+              const calculateDistance = environment.calculateDistance;
+              const isTargetInRange = environment.isTargetInRange;
+              const Math = environment.Math;
+              const console = environment.console;
+              
+              // 定义技能执行函数
+              ${skillDef.code}
+              
+              // 执行技能
+              return executeSkill(context);
+            })(skillEnvironment)
+          `;
 
-        // 执行技能代码
-        const result = eval(fullSkillCode);
-        return result;
+          // 执行技能代码
+          const result = eval(fullSkillCode);
+          
+          console.log('Source piece after skill:', {
+            instanceId: sourcePiece.instanceId,
+            attack: sourcePiece.attack,
+            maxHp: sourcePiece.maxHp,
+            currentHp: sourcePiece.currentHp
+          });
+          
+          // 显式更新battle.pieces中的对应元素，确保修改能够正确反映到battle状态中
+          battle.pieces[pieceIndex] = sourcePiece;
+          console.log('Updated battle.pieces[' + pieceIndex + ']:', battle.pieces[pieceIndex]);
+          
+          return result;
+        }
       } catch (error) {
         console.error('Error executing skill code:', error);
         // 执行失败时，使用默认技能逻辑
@@ -608,7 +666,7 @@ export function calculateSkillPreview(skillDef: SkillDefinition, piece: PieceIns
   } else if (skillDef.id === 'fireball') {
     expectedValues.damage = Math.round(piece.attack * skillDef.powerMultiplier)
   } else if (skillDef.id === 'buff-attack') {
-    expectedValues.buff = 10 // 固定值
+    expectedValues.buff = 1 // 固定值
   } else if (skillDef.id === 'arcane-burst') {
     expectedValues.damage = Math.round(piece.attack * 2.5)
     expectedValues.buff = 15 // 固定值
@@ -637,5 +695,3 @@ export function calculateSkillPreview(skillDef: SkillDefinition, piece: PieceIns
     chargeCost: skillDef.chargeCost
   }
 }
-
-

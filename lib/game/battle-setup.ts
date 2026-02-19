@@ -8,7 +8,6 @@ import { DEFAULT_PIECES } from "./piece-repository"
 
 export function buildDefaultSkills(): Record<string, SkillDefinition> {
   // 从文件系统加载技能数据
-  const { loadJsonFilesServer } = require('./file-loader')
   const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
   
   console.log('Loaded skills from files:', Object.keys(loadedSkills))

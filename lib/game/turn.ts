@@ -315,6 +315,10 @@ export function applyBattleAction(
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         console.log('Skill executed:', result.message)
+        
+        // 检查技能执行后棋子的属性是否被正确修改
+        const updatedPiece = next.pieces.find(p => p.instanceId === piece.instanceId)
+        console.log('Updated piece after skill:', updatedPiece);
       }
 
       // 处理传送技能的目标位置（作为备用机制）

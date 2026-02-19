@@ -27147,8 +27147,8 @@
           "attack": 2,
           "defense": 0,
           "moveRange": 2,
-          "x": 2,
-          "y": 3,
+          "x": 6,
+          "y": 4,
           "skills": [
             {
               "skillId": "teleport",
@@ -27198,10 +27198,10 @@
           "faction": "blue",
           "currentHp": 4,
           "maxHp": 4,
-          "attack": 2,
+          "attack": 3,
           "defense": 0,
           "moveRange": 4,
-          "x": 6,
+          "x": 2,
           "y": 2,
           "skills": [
             {
@@ -27361,7 +27361,7 @@
       ],
       "turn": {
         "currentPlayerId": "user_1771360858632_9522",
-        "turnNumber": 4,
+        "turnNumber": 14,
         "phase": "action",
         "actions": {
           "hasMoved": false,
@@ -27396,6 +27396,66 @@
           "turn": 4,
           "payload": {
             "message": "攻击强化生效，攻击力提升1点",
+            "skillId": "buff-attack",
+            "pieceId": "user_1771360858632_9522-2"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771361118594_8536",
+          "turn": 5,
+          "payload": {
+            "message": "Teleport activated",
+            "skillId": "teleport",
+            "pieceId": "user_1771361118594_8536-2"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771360858632_9522",
+          "turn": 6,
+          "payload": {
+            "message": "攻击强化生效，攻击力提升1点",
+            "skillId": "buff-attack",
+            "pieceId": "user_1771360858632_9522-2"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771360858632_9522",
+          "turn": 8,
+          "payload": {
+            "message": "攻击强化生效，攻击力提升1点",
+            "skillId": "buff-attack",
+            "pieceId": "user_1771360858632_9522-2"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771360858632_9522",
+          "turn": 10,
+          "payload": {
+            "message": "攻击强化生效，攻击力提升1点",
+            "skillId": "buff-attack",
+            "pieceId": "user_1771360858632_9522-2"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771360858632_9522",
+          "turn": 12,
+          "payload": {
+            "message": "攻击强化生效，攻击力提升1点",
+            "skillId": "buff-attack",
+            "pieceId": "user_1771360858632_9522-2"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "user_1771360858632_9522",
+          "turn": 14,
+          "payload": {
+            "message": "blue-archer的攻击力提升至3点",
             "skillId": "buff-attack",
             "pieceId": "user_1771360858632_9522-2"
           }

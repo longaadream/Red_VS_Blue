@@ -563,7 +563,7 @@ export default function BattlePage() {
                           <div className="flex items-center gap-4 text-xs text-zinc-400">
                             <span className="flex items-center gap-1">
                               <Shield className="h-3 w-3" />
-                              HP: {piece.currentHp}
+                              HP: {piece.currentHp}/{piece.maxHp}
                             </span>
                             <span className="flex items-center gap-1">
                               <Swords className="h-3 w-3" />
@@ -716,7 +716,7 @@ export default function BattlePage() {
                           <div className="flex items-center gap-4 text-xs text-zinc-400">
                             <span className="flex items-center gap-1">
                               <Shield className="h-3 w-3" />
-                              HP: {piece.currentHp}
+                              HP: {piece.currentHp}/{piece.maxHp}
                             </span>
                             <span className="flex items-center gap-1">
                               <Swords className="h-3 w-3" />
