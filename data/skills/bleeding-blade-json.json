@@ -1,0 +1,14 @@
+{
+  "id": "bleeding-blade-json",
+  "name": "出血之刃(JSON)",
+  "description": "对单个目标造成120%攻击力的伤害，并施加JSON定义的流血状态",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1.2,
+  "code": "function executeSkill(context) { \n  const caster = sourcePiece;\n  const nearestEnemy = select.getNearestEnemy();\n  \n  if (nearestEnemy) {\n    // 计算伤害\n    const damage = Math.round(caster.attack * context.skill.powerMultiplier);\n    nearestEnemy.currentHp = Math.max(0, nearestEnemy.currentHp - damage);\n    \n    // 施加JSON定义的流血状态\n    addStatusEffectById(nearestEnemy, 'bleeding');\n    \n    return { message: caster.templateId + '使用出血之刃，对' + nearestEnemy.templateId + '造成' + damage + '点伤害，并施加了流血状态', success: true };\n  }\n  return { message: '范围内没有可攻击的敌人', success: false };\n}",
+  "range": "single",
+  "requiresTarget": false,
+  "actionPointCost": 2
+}

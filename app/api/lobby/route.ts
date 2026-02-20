@@ -11,7 +11,14 @@ export function getRoomsStore() {
 }
 
 export async function GET() {
-  const allRooms = Array.from(roomStore.getRooms().values()).map((room) => ({
+  const allRooms = Array.from(roomStore.getRooms().values())
+  console.log('All rooms in store:', allRooms.map(r => ({ id: r.id, name: r.name, hostId: r.hostId })))
+  
+  // 去重处理，确保每个房间ID只出现一次
+  const uniqueRooms = Array.from(new Map(allRooms.map(room => [room.id, room])).values())
+  console.log('Unique rooms to return:', uniqueRooms.map(r => ({ id: r.id, name: r.name, hostId: r.hostId })))
+  
+  const formattedRooms = uniqueRooms.map((room) => ({
     id: room.id,
     name: room.name,
     status: room.status,
@@ -23,7 +30,7 @@ export async function GET() {
     visibility: room.visibility,
   }))
 
-  return NextResponse.json({ rooms: allRooms })
+  return NextResponse.json({ rooms: formattedRooms })
 }
 
 export async function POST(req: NextRequest) {
@@ -43,6 +50,7 @@ export async function POST(req: NextRequest) {
     roomId += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   const now = Date.now()
+  const trimmedHostId = hostId?.trim() || ''
 
   const room: Room = {
     id: roomId,
@@ -52,13 +60,15 @@ export async function POST(req: NextRequest) {
     // 1v1 对战房间，固定 2 人
     maxPlayers: 2,
     players: [],
-    hostId: hostId?.trim() || '',
+    hostId: trimmedHostId,
     mapId: mapId?.trim() || 'arena-8x6', // 默认使用小型竞技场地图
     visibility: visibility || "private",
     currentTurnIndex: 0,
     actions: [],
     battleState: null,
   }
+
+  console.log('Creating room with:', { roomId, hostId: trimmedHostId, name: room.name })
 
   // 确保房间被正确保存
   console.log('Creating room with ID:', roomId)

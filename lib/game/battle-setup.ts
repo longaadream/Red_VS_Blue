@@ -520,8 +520,8 @@ export async function createInitialBattleForPlayers(
     pieceStatsByTemplateId: buildDefaultPieceStats(),
     skillsById: skills,
     players: [
-      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 10 },
-      { playerId: p2, chargePoints: 0, actionPoints: 1, maxActionPoints: 10 },
+      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1 },
+      { playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0 },
     ],
     turn: {
       currentPlayerId: redPlayer,

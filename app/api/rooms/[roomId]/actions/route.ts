@@ -94,14 +94,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     console.log('Claim faction request received:', { roomId, playerId, playerName })
 
+    const trimmedPlayerId = playerId.trim()
     let existingPlayer = latestRoom.players.find(
-      (p) => p.id === playerId.trim()
+      (p) => p.id.trim() === trimmedPlayerId
     )
 
     if (!existingPlayer) {
       const newPlayer = {
-        id: playerId.trim(),
-        name: playerName?.trim() || `Player ${playerId.slice(0, 8)}`,
+        id: trimmedPlayerId,
+        name: playerName?.trim() || `Player ${trimmedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
       }
       latestRoom.players.push(newPlayer)
@@ -163,22 +164,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       return NextResponse.json({ error: "Room not found" }, { status: 404 })
     }
 
+    const trimmedPlayerId = playerId.trim()
     const existingPlayer = latestRoom.players.find(
-      (p) => p.id === playerId.trim()
+      (p) => p.id.trim() === trimmedPlayerId
     )
 
     if (existingPlayer) {
       existingPlayer.selectedPieces = pieces
       existingPlayer.hasSelectedPieces = true
+      console.log('Before setRoom - Player data:', { id: existingPlayer.id, hasSelectedPieces: existingPlayer.hasSelectedPieces, selectedPiecesCount: existingPlayer.selectedPieces?.length || 0 })
+      console.log('Before setRoom - Room data:', { id: latestRoom.id, playersCount: latestRoom.players.length, players: latestRoom.players.map(p => ({ id: p.id, hasSelectedPieces: p.hasSelectedPieces, selectedPiecesCount: p.selectedPieces?.length || 0 })) })
       roomStore.setRoom(roomId, latestRoom)
+      // 重新获取房间，验证更新是否成功
+      const updatedRoom = roomStore.getRoom(roomId)
+      console.log('After setRoom - Updated room data:', { id: updatedRoom?.id, playersCount: updatedRoom?.players.length, players: updatedRoom?.players.map(p => ({ id: p.id, hasSelectedPieces: p.hasSelectedPieces, selectedPiecesCount: p.selectedPieces?.length || 0 })) })
       console.log('Updated existing player pieces:', { roomId, playerId: existingPlayer.id, piecesCount: pieces.length })
-      console.log('Room after update:', { roomId, totalPlayers: latestRoom.players.length, players: latestRoom.players })
       return NextResponse.json({ success: true, message: "Pieces selected successfully" })
     }
 
     const newPlayer = {
-      id: playerId.trim(),
-      name: playerName?.trim() || `Player ${playerId.slice(0, 8)}`,
+      id: trimmedPlayerId,
+      name: playerName?.trim() || `Player ${trimmedPlayerId.slice(0, 8)}`,
       joinedAt: Date.now(),
       selectedPieces: pieces,
       hasSelectedPieces: true,

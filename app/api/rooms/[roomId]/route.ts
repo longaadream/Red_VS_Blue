@@ -67,7 +67,7 @@ export async function POST(
     }
 
     const existing = room.players.find(
-      (p) => p.id === playerId,
+      (p) => p.id.trim() === playerId,
     )
 
     if (!existing) {
@@ -129,14 +129,23 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
-  const { roomId } = await params
-  const existed = roomStore.deleteRoom(roomId)
+  try {
+    const { roomId: originalRoomId } = await params
+    const roomId = originalRoomId.trim()
+    console.log('DELETE request received:', { originalRoomId, trimmedRoomId: roomId })
+    
+    // 调用 deleteRoom 方法删除房间
+    roomStore.deleteRoom(roomId)
+    console.log('DELETE request processed:', { roomId })
 
-  if (!existed) {
-    return NextResponse.json({ error: "Room not found" }, { status: 404 })
+    // 无论房间是否存在，都返回成功响应
+    // 因为 deleteRoom 方法会尝试删除房间，即使房间不存在
+    console.log('Room deletion attempted:', roomId)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error in DELETE handler:', error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }
 
 

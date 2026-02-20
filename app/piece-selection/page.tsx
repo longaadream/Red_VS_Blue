@@ -33,8 +33,10 @@ export default function PieceSelectionPage() {
   const [playerFaction, setPlayerFaction] = useState<"red" | "blue" | null>(null)
   const [roomStatus, setRoomStatus] = useState<"waiting" | "ready">("waiting")
   const [isPiecesSelected, setIsPiecesSelected] = useState(false)
+  const [currentPlayerSelected, setCurrentPlayerSelected] = useState(false)
   const [allPlayersSelected, setAllPlayersSelected] = useState(false)
   const [roomPlayers, setRoomPlayers] = useState<Array<{ name: string; hasSelectedPieces: boolean }>>([])
+  const [gameStarting, setGameStarting] = useState(false)
 
   // 检查用户登录状态
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function PieceSelectionPage() {
   // 从URL参数中获取roomId
   useEffect(() => {
     const urlRoomId = searchParams.get('roomId')
-    setRoomId(urlRoomId || "")
+    setRoomId(urlRoomId ? urlRoomId.trim() : "")
   }, [searchParams])
 
   // 加载棋子数据
@@ -69,14 +71,15 @@ export default function PieceSelectionPage() {
 
   // 轮询检查房间状态，确保所有玩家都能及时获取状态更新
   useEffect(() => {
-    if (!roomId.trim() || !playerFaction || !user) {
+    const trimmedRoomId = roomId.trim()
+    if (!trimmedRoomId || !playerFaction || !user) {
       return
     }
 
     const interval = setInterval(async () => {
       try {
-        console.log('Polling room status:', { roomId, timestamp: Date.now() })
-        const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}`)
+        console.log('Polling room status:', { roomId: trimmedRoomId, timestamp: Date.now() })
+        const res = await fetch(`/api/rooms/${encodeURIComponent(trimmedRoomId)}`)
         console.log('Fetch response status:', { status: res.status, statusText: res.statusText })
         if (res.ok) {
           const data = await res.json()
@@ -84,7 +87,7 @@ export default function PieceSelectionPage() {
           // 检查房间状态是否已经是"in-progress"，如果是，直接跳转到战斗页面
           if (data.status === "in-progress") {
             console.log('Room is already in progress, redirecting to battle')
-            window.location.href = `/battle/${roomId}?playerName=${encodeURIComponent(user.username)}&playerId=${encodeURIComponent(user.id)}`
+            window.location.href = `/battle/${trimmedRoomId}?playerName=${encodeURIComponent(user.username)}&playerId=${encodeURIComponent(user.id.trim())}`
             return
           }
           
@@ -96,27 +99,49 @@ export default function PieceSelectionPage() {
             // 更新玩家列表和棋子选择状态
             const players = data.players.map((p: any) => ({
               name: p.name,
-              hasSelectedPieces: p.hasSelectedPieces || false
+              hasSelectedPieces: p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0)
             }))
             setRoomPlayers(players)
             
+            // 输出详细的玩家状态以便调试
+            console.log('Player status details:', data.players.map((p: any) => ({
+              id: p.id,
+              idTrimmed: p.id.trim(),
+              name: p.name,
+              hasSelectedPieces: p.hasSelectedPieces,
+              selectedPiecesCount: p.selectedPieces?.length || 0
+            })))
+            
             // 检查是否所有玩家都选择了棋子，并且至少有2个玩家
-            const allSelected = data.players.length >= 2 && data.players.every((p: any) => p.hasSelectedPieces)
+            const allSelected = data.players.length >= 2 && data.players.every((p: any) => {
+              const hasSelected = p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0)
+              console.log('Player selection check:', { player: p.name, hasSelectedPieces: p.hasSelectedPieces, selectedPiecesCount: p.selectedPieces?.length || 0, hasSelected })
+              return hasSelected
+            })
             setAllPlayersSelected(allSelected)
+            console.log('All players selected check:', { allSelected, playerCount: data.players.length })
+            
+            // 检查当前玩家是否已经选择了棋子
+            const currentPlayer = data.players.find((p: any) => p.id.trim() === user.id.trim())
+            const currentPlayerSelected = currentPlayer && (currentPlayer.hasSelectedPieces === true || (currentPlayer.selectedPieces && currentPlayer.selectedPieces.length > 0))
+            setCurrentPlayerSelected(currentPlayerSelected)
             
             // 输出详细的房间状态以便调试
             console.log('Room status update:', {
-              roomId,
+              roomId: trimmedRoomId,
               playersCount: data.players.length,
-              players: data.players.map((p: any) => ({ id: p.id, name: p.name, hasSelectedPieces: p.hasSelectedPieces, faction: p.faction })),
+              players: data.players.map((p: any) => ({ id: p.id, name: p.name, hasSelectedPieces: p.hasSelectedPieces, selectedPiecesCount: p.selectedPieces?.length || 0, faction: p.faction })),
               allSelected,
+              currentPlayerSelected,
               isPiecesSelected,
-              roomStatus: data.status
+              roomStatus: data.status,
+              currentUserId: user.id.trim()
             })
             
             // 如果所有玩家都选择了棋子，并且当前玩家也选择了棋子，自动开始游戏
-            if (allSelected && isPiecesSelected) {
+            if (allSelected && currentPlayerSelected && !gameStarting) {
               console.log('All players have selected pieces, auto-starting game')
+              setGameStarting(true)
               // 延迟一小段时间，让用户看到"游戏即将开始"的消息
               setTimeout(() => {
                 void handleStartGame()
@@ -131,10 +156,10 @@ export default function PieceSelectionPage() {
       } catch (error) {
         console.error('Error polling room status:', error)
       }
-    }, 2000) // 每2秒检查一次，增加轮询频率
+    }, 1000) // 每1秒检查一次，增加轮询频率
 
     return () => clearInterval(interval)
-  }, [roomId, playerFaction, isPiecesSelected, user])
+  }, [roomId, playerFaction, user])
 
   function handleRedPieceToggle(piece: PieceTemplate) {
     const isSelected = redSelectedPieces.some(p => p.id === piece.id)
@@ -159,7 +184,8 @@ export default function PieceSelectionPage() {
       toast.error("请先登录")
       return
     }
-    if (!roomId.trim()) {
+    const trimmedRoomId = roomId.trim()
+    if (!trimmedRoomId) {
       toast.error("请输入房间ID")
       return
     }
@@ -170,11 +196,11 @@ export default function PieceSelectionPage() {
     setLoading(true)
 
     try {
-      console.log('Attempting to join room:', roomId)
+      console.log('Attempting to join room:', trimmedRoomId)
       console.log('User:', user.username, 'ID:', user.id)
       
       // 构建完整的URL，确保路径正确
-      const url = `/api/rooms/${encodeURIComponent(roomId)}`
+      const url = `/api/rooms/${encodeURIComponent(trimmedRoomId)}`
       console.log('API URL:', url)
       
       const res = await fetch(url, {
@@ -186,7 +212,7 @@ export default function PieceSelectionPage() {
         body: JSON.stringify({
           action: "join",
           playerName: user.username,
-          playerId: user.id,
+          playerId: user.id.trim(),
         }),
       })
       
@@ -207,16 +233,16 @@ export default function PieceSelectionPage() {
         if (data.error === "Room is full") {
           // 房间已满，检查是否已经是房间中的玩家
           // 尝试获取房间信息，看看当前玩家是否已经在房间中
-          const roomRes = await fetch(`/api/rooms/${encodeURIComponent(roomId)}`)
+          const roomRes = await fetch(`/api/rooms/${encodeURIComponent(trimmedRoomId)}`)
           if (roomRes.ok) {
             const roomData = await roomRes.json()
             const isAlreadyInRoom = roomData.players.some(
-              (p: any) => p.id === user.id
+              (p: any) => p.id.trim() === user.id.trim()
             )
             if (isAlreadyInRoom) {
               // 如果玩家已经在房间中，调用 claim-faction 来获取实际分配的阵营
               console.log('Player is already in room, claiming faction')
-              const factionRes = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/actions`, {
+              const factionRes = await fetch(`/api/rooms/${encodeURIComponent(trimmedRoomId)}/actions`, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
@@ -225,7 +251,7 @@ export default function PieceSelectionPage() {
                 body: JSON.stringify({
                   action: "claim-faction",
                   playerName: user.username,
-                  playerId: user.id,
+                  playerId: user.id.trim(),
                 }),
               })
               
@@ -250,7 +276,7 @@ export default function PieceSelectionPage() {
       
       // 调用 claim-faction 来获取实际分配的阵营
       console.log('Join room successful, claiming faction')
-      const factionRes = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/actions`, {
+      const factionRes = await fetch(`/api/rooms/${encodeURIComponent(trimmedRoomId)}/actions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -259,7 +285,7 @@ export default function PieceSelectionPage() {
         body: JSON.stringify({
           action: "claim-faction",
           playerName: user.username,
-          playerId: user.id,
+          playerId: user.id.trim(),
         }),
       })
       
@@ -285,18 +311,20 @@ export default function PieceSelectionPage() {
       toast.error("请先登录")
       return
     }
-    if (!roomId.trim()) {
+    const trimmedRoomId = roomId.trim()
+    if (!trimmedRoomId) {
       toast.error("请先加入房间")
       return
     }
-    if (loading) {
+    if (loading || gameStarting) {
       // 防止重复调用
+      console.log('Game start already in progress, skipping')
       return
     }
     setLoading(true)
 
     console.log('Attempting to start game:', {
-      roomId,
+      roomId: trimmedRoomId,
       userId: user.id,
       selectedPiecesCount: playerFaction === "red" ? redSelectedPieces.length : blueSelectedPieces.length,
       clientSidePlayersCount: roomPlayers.length
@@ -305,7 +333,7 @@ export default function PieceSelectionPage() {
     // 根据玩家的实际身份发送选择的棋子
     const selectedPieces = playerFaction === "red" ? redSelectedPieces : blueSelectedPieces
     
-    fetch(`/api/rooms/${roomId}/actions`, {
+    fetch(`/api/rooms/${encodeURIComponent(trimmedRoomId)}/actions`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -314,7 +342,7 @@ export default function PieceSelectionPage() {
       body: JSON.stringify({
         action: "start-game",
         playerName: user.username,
-        playerId: user.id,
+        playerId: user.id.trim(),
         pieces: selectedPieces.map(p => ({
           templateId: p.id,
           faction: p.faction,
@@ -329,15 +357,17 @@ export default function PieceSelectionPage() {
         console.log('Start game response data:', data)
         if (data.success) {
           console.log('Game started successfully, redirecting to battle')
-          window.location.href = `/battle/${roomId}?playerName=${encodeURIComponent(user.username)}&playerId=${encodeURIComponent(user.id)}`
+          window.location.href = `/battle/${trimmedRoomId}?playerName=${encodeURIComponent(user.username)}&playerId=${encodeURIComponent(user.id.trim())}`
         } else {
           console.log('Game start failed:', data.error || data.message)
           toast.error(data.error || data.message || "开始游戏失败")
+          setGameStarting(false)
         }
       })
       .catch((err) => {
         console.error('Error starting game:', err)
         toast.error(err instanceof Error ? err.message : "开始游戏失败")
+        setGameStarting(false)
       })
       .finally(() => {
         setLoading(false)
@@ -349,7 +379,8 @@ export default function PieceSelectionPage() {
       toast.error("请先登录")
       return
     }
-    if (!roomId.trim()) {
+    const trimmedRoomId = roomId.trim()
+    if (!trimmedRoomId) {
       toast.error("请先加入房间")
       return
     }
@@ -365,13 +396,13 @@ export default function PieceSelectionPage() {
 
     const selectedPieces = playerFaction === "red" ? redSelectedPieces : blueSelectedPieces
     
-    fetch(`/api/rooms/${roomId}/actions`, {
+    fetch(`/api/rooms/${encodeURIComponent(trimmedRoomId)}/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "select-pieces",
         playerName: user.username,
-        playerId: user.id,
+        playerId: user.id.trim(),
         pieces: selectedPieces.map(p => ({
           templateId: p.id,
           faction: p.faction,
@@ -722,7 +753,7 @@ export default function PieceSelectionPage() {
             </Button>
           </div>
         )}
-        {user && allPlayersSelected && isPiecesSelected && (
+        {user && allPlayersSelected && currentPlayerSelected && (
           <div className="mt-4 p-4 rounded-lg bg-blue-900/30 border border-blue-700 text-center">
             <div className="flex justify-center mb-2">
               <div className="h-6 w-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />

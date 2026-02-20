@@ -2,6 +2,7 @@ import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import { globalTriggerSystem } from "./triggers"
+import { statusEffectSystem, StatusEffectType } from "./status-effects"
 
 export type TurnPhase = "start" | "action" | "end"
 
@@ -204,13 +205,11 @@ export function applyBattleAction(
         // 更新冷却
         globalTriggerSystem.updateCooldowns();
         
-        // 刷新当前玩家的行动点：比上回合+1，上限10点
+        // 行动点已经在回合切换时设置，这里不再重复增加
+        // 确保当前玩家有行动点属性
         const currentPlayerMeta = next.players.find(p => p.playerId === next.turn.currentPlayerId)
         if (currentPlayerMeta) {
-          // 计算新的行动点：比上回合+1，上限10点
-          const newActionPoints = Math.min(currentPlayerMeta.actionPoints + 1, 10)
-          currentPlayerMeta.actionPoints = newActionPoints
-          console.log(`Player ${currentPlayerMeta.playerId} now has ${newActionPoints} action points (max 10)`)
+          console.log(`Player ${currentPlayerMeta.playerId} has ${currentPlayerMeta.actionPoints}/${currentPlayerMeta.maxActionPoints} action points for this turn`)
         }
 
         // 更新所有棋子技能的冷却时间
@@ -224,6 +223,34 @@ export function applyBattleAction(
             })
           }
         })
+
+        // 更新所有状态效果
+        statusEffectSystem.setBattleState(next);
+        statusEffectSystem.updateStatusEffects()
+
+        // 触发whenever规则（每一步行动后检测）
+        const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+          type: "whenever",
+          playerId: next.turn.currentPlayerId,
+          turnNumber: next.turn.turnNumber
+        });
+
+        // 处理whenever触发效果的消息
+        if (wheneverResult.success && wheneverResult.messages.length > 0) {
+          if (!next.actions) {
+            next.actions = [];
+          }
+          wheneverResult.messages.forEach(message => {
+            next.actions!.push({
+              type: "triggerEffect",
+              playerId: next.turn.currentPlayerId,
+              turn: next.turn.turnNumber,
+              payload: {
+                message
+              }
+            });
+          });
+        }
 
         next.turn.phase = "action"
         return next
@@ -246,13 +273,43 @@ export function applyBattleAction(
           hasUsedChargeSkill: false,
         }
         
-        // 确保新回合的玩家有初始行动点
+        // 确保新回合的玩家有初始行动点和最大行动点
         const nextPlayerMeta = next.players[nextIndex]
         if (nextPlayerMeta) {
-          // 如果玩家没有行动点属性，初始化它们为1点
-          if (nextPlayerMeta.actionPoints === undefined) {
-            nextPlayerMeta.actionPoints = 1 // 初始1点行动点
+          // 实现类似炉石传说的法力水晶机制
+          // 每回合开始时，最大行动点+1（最多10点），当前行动点充满
+          if (nextPlayerMeta.maxActionPoints === undefined) {
+            nextPlayerMeta.maxActionPoints = 1 // 初始最大行动点
+          } else if (nextPlayerMeta.maxActionPoints < 10) {
+            nextPlayerMeta.maxActionPoints += 1 // 每回合增长1点
           }
+          // 充满行动点
+          nextPlayerMeta.actionPoints = nextPlayerMeta.maxActionPoints
+          console.log(`Player ${nextPlayerMeta.playerId} now has ${nextPlayerMeta.actionPoints}/${nextPlayerMeta.maxActionPoints} action points (turn ${next.turn.turnNumber})`)
+        }
+        
+        // 触发whenever规则（每一步行动后检测）
+        const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+          type: "whenever",
+          playerId: next.turn.currentPlayerId,
+          turnNumber: next.turn.turnNumber
+        });
+
+        // 处理whenever触发效果的消息
+        if (wheneverResult.success && wheneverResult.messages.length > 0) {
+          if (!next.actions) {
+            next.actions = [];
+          }
+          wheneverResult.messages.forEach(message => {
+            next.actions!.push({
+              type: "triggerEffect",
+              playerId: next.turn.currentPlayerId,
+              turn: next.turn.turnNumber,
+              payload: {
+                message
+              }
+            });
+          });
         }
         
         return next
@@ -264,6 +321,30 @@ export function applyBattleAction(
       const next = structuredClone(state) as BattleState
       const meta = getPlayerMeta(next, action.playerId)
       meta.chargePoints += action.amount
+
+      // 触发whenever规则（每一步行动后检测）
+      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+        type: "whenever",
+        playerId: action.playerId
+      });
+
+      // 处理whenever触发效果的消息
+      if (wheneverResult.success && wheneverResult.messages.length > 0) {
+        if (!next.actions) {
+          next.actions = [];
+        }
+        wheneverResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: {
+              message
+            }
+          });
+        });
+      }
+
       return next
     }
 
@@ -271,9 +352,6 @@ export function applyBattleAction(
       requireActionPhase(state)
       if (!isCurrentPlayer(state, action.playerId)) {
         throw new BattleRuleError("It is not this player's turn")
-      }
-      if (state.turn.actions.hasMoved) {
-        throw new BattleRuleError("Move action already used this turn")
       }
 
       // 检查行动点是否足够
@@ -303,8 +381,6 @@ export function applyBattleAction(
       // 消耗行动点
       const playerMeta = getPlayerMeta(next, action.playerId)
       playerMeta.actionPoints -= 1
-      
-      next.turn.actions.hasMoved = true
 
       // 触发移动后的规则
       const moveResult = globalTriggerSystem.checkTriggers(next, {
@@ -330,6 +406,30 @@ export function applyBattleAction(
         });
       }
 
+      // 触发whenever规则（每一步行动后检测）
+      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+        type: "whenever",
+        sourcePiece: piece,
+        playerId: action.playerId
+      });
+
+      // 处理whenever触发效果的消息
+      if (wheneverResult.success && wheneverResult.messages.length > 0) {
+        if (!next.actions) {
+          next.actions = [];
+        }
+        wheneverResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: {
+              message
+            }
+          });
+        });
+      }
+
       return next
     }
 
@@ -338,9 +438,10 @@ export function applyBattleAction(
       if (!isCurrentPlayer(state, action.playerId)) {
         throw new BattleRuleError("It is not this player's turn")
       }
-      if (state.turn.actions.hasUsedBasicSkill) {
-        throw new BattleRuleError("Basic skill already used this turn")
-      }
+      // 取消一回合只能用一个技能的限制
+      // if (state.turn.actions.hasUsedBasicSkill) {
+      //   throw new BattleRuleError("Basic skill already used this turn")
+      // }
 
       const next = structuredClone(state) as BattleState
       const piece = next.pieces.find(
@@ -522,7 +623,33 @@ export function applyBattleAction(
         }
       })
 
-      next.turn.actions.hasUsedBasicSkill = true
+      // 不再设置 hasUsedBasicSkill，允许一回合使用多个技能
+
+      // 触发whenever规则（每一步行动后检测）
+      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+        type: "whenever",
+        sourcePiece: piece,
+        playerId: action.playerId,
+        skillId: action.skillId
+      });
+
+      // 处理whenever触发效果的消息
+      if (wheneverResult.success && wheneverResult.messages.length > 0) {
+        if (!next.actions) {
+          next.actions = [];
+        }
+        wheneverResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: {
+              message
+            }
+          });
+        });
+      }
+
       return next
     }
 
@@ -531,9 +658,10 @@ export function applyBattleAction(
       if (!isCurrentPlayer(state, action.playerId)) {
         throw new BattleRuleError("It is not this player's turn")
       }
-      if (state.turn.actions.hasUsedChargeSkill) {
-        throw new BattleRuleError("Charge skill already used this turn")
-      }
+      // 取消一回合只能用一个技能的限制
+      // if (state.turn.actions.hasUsedChargeSkill) {
+      //   throw new BattleRuleError("Charge skill already used this turn")
+      // }
 
       const next = structuredClone(state) as BattleState
       const piece = next.pieces.find(
@@ -704,7 +832,33 @@ export function applyBattleAction(
         }
       })
 
-      next.turn.actions.hasUsedChargeSkill = true
+      // 不再设置 hasUsedChargeSkill，允许一回合使用多个技能
+
+      // 触发whenever规则（每一步行动后检测）
+      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+        type: "whenever",
+        sourcePiece: piece,
+        playerId: action.playerId,
+        skillId: action.skillId
+      });
+
+      // 处理whenever触发效果的消息
+      if (wheneverResult.success && wheneverResult.messages.length > 0) {
+        if (!next.actions) {
+          next.actions = [];
+        }
+        wheneverResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: {
+              message
+            }
+          });
+        });
+      }
+
       return next
     }
 
@@ -738,6 +892,30 @@ export function applyBattleAction(
         });
       }
 
+      // 触发whenever规则（每一步行动后检测）
+      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+        type: "whenever",
+        playerId: action.playerId,
+        turnNumber: next.turn.turnNumber
+      });
+
+      // 处理whenever触发效果的消息
+      if (wheneverResult.success && wheneverResult.messages.length > 0) {
+        if (!next.actions) {
+          next.actions = [];
+        }
+        wheneverResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: {
+              message
+            }
+          });
+        });
+      }
+
       next.turn.phase = "end"
       return next
     }
@@ -752,6 +930,29 @@ export function applyBattleAction(
           piece.currentHp = 0
         }
       })
+      
+      // 触发whenever规则（每一步行动后检测）
+      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+        type: "whenever",
+        playerId: action.playerId
+      });
+
+      // 处理whenever触发效果的消息
+      if (wheneverResult.success && wheneverResult.messages.length > 0) {
+        if (!next.actions) {
+          next.actions = [];
+        }
+        wheneverResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: {
+              message
+            }
+          });
+        });
+      }
       
       return next
     }

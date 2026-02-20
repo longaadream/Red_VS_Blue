@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
-import { ArrowLeft, Loader2, Swords, Shield, Zap, Footprints, Flag } from "lucide-react"
+import { ArrowLeft, Loader2, Swords, Shield, Zap, Footprints } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -199,7 +199,7 @@ export default function BattlePage() {
     
     console.log('Player alive pieces:', playerAlivePieces)
     
-    // 检查是否有玩家的所有棋子都已阵亡
+    // 检查是否有玩家的所有棋子都已阵亡（包括投降的情况）
     const eliminatedPlayers = Object.entries(playerAlivePieces)
       .filter(([_, count]) => count === 0)
       .map(([playerId]) => playerId)
@@ -221,6 +221,20 @@ export default function BattlePage() {
         // 使用toast通知显示胜利/失败消息
         toast(isCurrentPlayerWinner ? "恭喜你获胜了！" : `你输了，${winner.playerId} 获胜！`)
         
+        // 自动删除房间
+        if (roomId) {
+          console.log('Auto-deleting room:', roomId)
+          fetch(`/api/rooms/${encodeURIComponent(roomId)}`, {
+            method: "DELETE",
+          })
+            .then(response => {
+              console.log('Room deletion response:', { status: response.status, statusText: response.statusText })
+            })
+            .catch(error => {
+              console.error('Error deleting room:', error)
+            })
+        }
+        
         // 重定向回大厅
         setTimeout(() => {
           router.push('/play')
@@ -228,6 +242,8 @@ export default function BattlePage() {
       }
     }
   }
+
+
 
   const isMyTurn = useMemo(() => {
     if (!room || !battle || !currentPlayerId) return false
@@ -356,33 +372,6 @@ export default function BattlePage() {
               <span className="text-sm text-zinc-400">回合</span>
               <span className="text-lg font-bold text-zinc-100">{battle.turn.turnNumber}</span>
             </div>
-            <Button 
-              variant="destructive" 
-              size="sm"
-              onClick={async () => {
-                if (currentPlayerId) {
-                  try {
-                    await sendBattleAction({
-                      type: "surrender",
-                      playerId: currentPlayerId
-                    })
-                    
-                    // 投降后显示通知
-                    toast("你已投降，游戏结束！")
-                    
-                    // 重定向回大厅
-                    setTimeout(() => {
-                      router.push('/play')
-                    }, 2000)
-                  } catch (error) {
-                    console.error("投降失败：", error)
-                  }
-                }
-              }}
-            >
-              <Flag className="mr-2 h-4 w-4" />
-              投降
-            </Button>
           </div>
         </div>
 
@@ -986,10 +975,7 @@ export default function BattlePage() {
                               className="w-full"
                               variant="outline"
                               size="sm"
-                              disabled={loading || 
-                                (skill.type === "normal" && battle.turn.actions.hasUsedBasicSkill) || 
-                                (skill.type === "super" && battle.turn.actions.hasUsedChargeSkill) || 
-                                isSelectingMoveTarget}
+                              disabled={loading || isSelectingMoveTarget}
                               onClick={() => {
                                 if (selectedPiece) {
                                   if (skill.id === "teleport") {
@@ -1096,6 +1082,40 @@ export default function BattlePage() {
                     </div>
                   )
                 })}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900/50">
+              <CardContent className="p-4">
+                <Button
+                  className="w-full bg-red-900/50 hover:bg-red-800 text-red-300 border-red-800"
+                  size="sm"
+                  onClick={() => {
+                    if (currentPlayerId) {
+                      try {
+                        sendBattleAction({
+                          type: "surrender",
+                          playerId: currentPlayerId
+                        })
+                        
+                        // 投降后显示通知
+                        toast("你已投降，游戏结束！")
+                        
+                        // 重定向回大厅
+                        setTimeout(() => {
+                          router.push('/play')
+                        }, 2000)
+                      } catch (error) {
+                        console.error("投降失败：", error)
+                      }
+                    }
+                  }}
+                >
+                  投降
+                </Button>
+                <p className="mt-2 text-xs text-zinc-500 text-center">
+                  投降将导致你输掉当前游戏，并且游戏会自动结束
+                </p>
               </CardContent>
             </Card>
           </div>

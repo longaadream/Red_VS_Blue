@@ -1,0 +1,17 @@
+{
+  "id": "rule-status-bleeding",
+  "name": "流血状态规则",
+  "description": "处理流血状态的触发时机",
+  "trigger": {
+    "type": "beginTurn"
+  },
+  "effect": {
+    "type": "triggerStatusEffect",
+    "statusId": "bleeding",
+    "message": "流血状态触发"
+  },
+  "limits": {
+    "cooldownTurns": 0,
+    "maxUses": 0
+  }
+}

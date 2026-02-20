@@ -94,26 +94,40 @@ export default function PlayPage() {
     if (!user) return
     
     try {
+      console.log('=== Fetching Rooms ===')
       setLoadingRooms(true)
       const response = await fetch('/api/lobby')
+      console.log('Lobby API response:', { status: response.status, statusText: response.statusText })
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('Lobby API data:', data)
+        
         if (data.rooms) {
+          console.log('Raw rooms data:', data.rooms)
+          
           // 过滤出用户作为房主的房间
-          const rooms = data.rooms.filter((room: any) => room.hostId === user.id)
+          const rooms = data.rooms.filter((room: any) => room.hostId === user.id.trim())
+          console.log('Filtered my rooms:', rooms)
           setMyRooms(rooms)
           
           // 过滤出其他玩家的公开房间
           const publicRoomsData = data.rooms.filter((room: any) => 
-            room.visibility === 'public' && room.hostId !== user.id
+            room.visibility === 'public' && room.hostId !== user.id.trim()
           )
+          console.log('Filtered public rooms:', publicRoomsData)
           setPublicRooms(publicRoomsData)
+        } else {
+          console.log('No rooms data in response:', data)
         }
+      } else {
+        console.error('Failed to fetch lobby data:', { status: response.status, statusText: response.statusText })
       }
     } catch (error) {
       console.error('加载房间数据失败:', error)
     } finally {
       setLoadingRooms(false)
+      console.log('=== Fetching Rooms Complete ===')
     }
   }
 
@@ -196,7 +210,7 @@ export default function PlayPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           name: `${user.username} 的 1v1 房间`,
-          hostId: user.id,
+          hostId: user.id.trim(),
           mapId: selectedMapId,
           visibility: selectedVisibility
         }),
@@ -230,7 +244,7 @@ export default function PlayPage() {
     const res = await fetch(`/api/rooms/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "join", playerName: user.username, playerId: user.id }),
+      body: JSON.stringify({ action: "join", playerName: user.username, playerId: user.id.trim() }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -378,6 +392,9 @@ export default function PlayPage() {
         throw new Error(data.error || "Failed to delete room")
       }
 
+      // 重新加载房间列表，确保所有玩家都能看到最新的房间状态
+      await fetchMyRooms()
+
       // 清空状态
       setRoom(null)
       setRoomId(null)
@@ -386,6 +403,8 @@ export default function PlayPage() {
       router.replace("/play")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error")
+      // 即使出错，也要重新加载房间列表
+      await fetchMyRooms()
     } finally {
       setLoading(false)
     }
@@ -607,9 +626,17 @@ export default function PlayPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              setRoomId(room.id)
-                              void fetchRoom(room.id)
+                            onClick={async () => {
+                              try {
+                                setLoading(true)
+                                setRoomId(room.id)
+                                await joinRoom(room.id)
+                              } catch (error) {
+                                console.error('加入房间失败:', error)
+                                setError(error instanceof Error ? error.message : "加入房间失败")
+                              } finally {
+                                setLoading(false)
+                              }
                             }}
                           >
                             加入
@@ -621,15 +648,45 @@ export default function PlayPage() {
                             onClick={async () => {
                               try {
                                 setLoading(true)
-                                const res = await fetch(`/api/rooms/${room.id}`, {
+                                const roomId = room.id.trim()
+                                console.log('=== Delete Room Operation ===')
+                                console.log('Room to delete:', { id: roomId, name: room.name })
+                                
+                                // 发送 DELETE 请求到服务器
+                                console.log('Sending DELETE request to server')
+                                const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}`, {
                                   method: "DELETE",
                                 })
-                                if (res.ok) {
-                                  // 删除成功后，重新加载房间列表
-                                  await fetchMyRooms()
+                                
+                                // 无论服务器返回什么状态，都从前端状态中删除房间
+                                // 因为即使服务器找不到房间，我们也希望在前端界面上移除它
+                                console.log('Server response:', { status: res.status, statusText: res.statusText })
+                                
+                                // 重新加载房间列表，确保所有玩家都能看到最新的房间状态
+                                console.log('Reloading room list')
+                                await fetchMyRooms()
+                                
+                                // 如果当前显示的房间就是被删除的房间，将其设置为 null
+                                if (room && room.id === roomId) {
+                                  console.log('Clearing current room state:', roomId)
+                                  setRoom(null)
+                                  setRoomId(null)
+                                  setBattle(null)
                                 }
+                                
+                                console.log('=== Delete Room Operation Complete ===')
                               } catch (error) {
                                 console.error('删除房间失败:', error)
+                                // 即使出错，也要重新加载房间列表
+                                await fetchMyRooms()
+                                if (room) {
+                                  const roomId = room.id.trim()
+                                  if (room.id === roomId) {
+                                    setRoom(null)
+                                    setRoomId(null)
+                                    setBattle(null)
+                                  }
+                                }
                               } finally {
                                 setLoading(false)
                               }
@@ -670,9 +727,17 @@ export default function PlayPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              setRoomId(room.id)
-                              void fetchRoom(room.id)
+                            onClick={async () => {
+                              try {
+                                setLoading(true)
+                                setRoomId(room.id)
+                                await joinRoom(room.id)
+                              } catch (error) {
+                                console.error('加入房间失败:', error)
+                                setError(error instanceof Error ? error.message : "加入房间失败")
+                              } finally {
+                                setLoading(false)
+                              }
                             }}
                           >
                             加入

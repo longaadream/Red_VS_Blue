@@ -1,0 +1,11 @@
+{
+  "id": "bleeding",
+  "type": "bleeding",
+  "name": "流血",
+  "description": "每回合受到持续伤害",
+  "intensity": 5,
+  "isDebuff": true,
+  "canStack": true,
+  "maxStacks": 5,
+  "code": "// 流血状态效果函数\nfunction EffectTrigger(context) {\n  const damage = context.statusEffect.intensity * context.statusEffect.currentStacks;\n  context.piece.currentHp = Math.max(0, context.piece.currentHp - damage);\n  console.log(context.piece.templateId + '受到流血伤害，失去' + damage + '点生命值');\n  return { success: true, message: context.piece.templateId + '受到流血伤害' };\n}"
+}

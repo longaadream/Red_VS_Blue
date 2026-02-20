@@ -11,6 +11,7 @@ export type TriggerType =
   | "beginTurn"             // 回合开始时
   | "endTurn"               // 回合结束时
   | "afterMove"             // 移动后
+  | "whenever"              // 每一步行动后检测
 
 // 条件类型
 export type ConditionType =

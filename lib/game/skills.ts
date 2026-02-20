@@ -1,12 +1,18 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import { globalTriggerSystem } from "./triggers"
+import { statusEffectSystem, predefinedStatusEffects, StatusEffect } from "./status-effects"
 
 export type SkillId = string
 
 export type SkillKind = "active" | "passive"
 
 export type SkillType = "normal" | "super" | "ultimate"
+
+/**
+ * 伤害类型
+ */
+export type DamageType = "physical" | "magical" | "true"
 
 
 
@@ -59,6 +65,11 @@ export interface SkillExecutionResult {
 }
 
 /**
+ * 技能形态类型
+ */
+export type SkillForm = "melee" | "ranged" | "magic" | "projectile" | "area" | "self"
+
+/**
  * 技能的静态定义（模板）
  * 包含技能的元数据和函数代码
  */
@@ -69,6 +80,8 @@ export interface SkillDefinition {
   kind: SkillKind
   /** 技能类型：normal=普通技能, super=充能技能 */
   type: SkillType
+  /** 技能形态：melee=近战, ranged=远程, magic=魔法, projectile=飞行物, area=范围, self=自身 */
+  form?: SkillForm
   /** 冷却回合数（0 表示无冷却） */
   cooldownTurns: number
   /** 最大充能次数（例如 3 次用完就没了），0 表示不限次数，仅对super技能有效 */
@@ -432,7 +445,98 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         }
       }
       return { type: "teleport", success: false };
+    },
+    
+    // 造成伤害
+    dealDamage: (targetPiece: PieceInstance, baseDamage: number, damageType: DamageType = "physical", skillId?: string) => {
+      return dealDamage(sourcePiece, targetPiece, baseDamage, damageType, battle, skillId);
     }
+  };
+}
+
+/**
+ * 处理伤害计算和应用的函数
+ * @param attacker 攻击者棋子
+ * @param target 目标棋子
+ * @param baseDamage 基础伤害值
+ * @param damageType 伤害类型
+ * @param battle 战斗状态
+ * @param skillId 技能ID（可选）
+ * @returns 伤害结果
+ */
+export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseDamage: number, damageType: DamageType, battle: BattleState, skillId?: string) {
+  // 计算最终伤害（考虑防御力）
+  let finalDamage: number;
+  
+  switch (damageType) {
+    case "physical":
+      // 物理伤害：受到防御力影响
+      finalDamage = Math.max(1, Math.round(baseDamage - target.defense)); // 至少造成1点伤害
+      break;
+    case "magical":
+      // 法术伤害：受到魔法抗性影响（暂时使用防御力代替）
+      finalDamage = Math.max(1, Math.round(baseDamage - target.defense)); // 至少造成1点伤害
+      break;
+    case "true":
+      // 真实伤害：不受防御力影响
+      finalDamage = Math.max(1, Math.round(baseDamage)); // 至少造成1点伤害
+      break;
+    default:
+      // 默认使用物理伤害
+      finalDamage = Math.max(1, Math.round(baseDamage - target.defense)); // 至少造成1点伤害
+  }
+  
+  // 记录原始生命值
+  const originalHp = target.currentHp;
+  
+  // 应用伤害
+  target.currentHp = Math.max(0, target.currentHp - finalDamage);
+  
+  // 触发伤害相关的触发器
+  // 1. 攻击者的伤害触发
+  globalTriggerSystem.checkTriggers(battle, {
+    type: "afterDamageDealt",
+    sourcePiece: attacker,
+    targetPiece: target,
+    damage: finalDamage,
+    skillId
+  });
+  
+  // 2. 目标的伤害触发
+  globalTriggerSystem.checkTriggers(battle, {
+    type: "afterDamageTaken",
+    sourcePiece: target,
+    targetPiece: attacker,
+    damage: finalDamage,
+    skillId
+  });
+  
+  // 检查是否击杀了目标
+  let isKilled = false;
+  if (originalHp > 0 && target.currentHp === 0) {
+    isKilled = true;
+    
+    // 触发击杀相关的触发器
+    globalTriggerSystem.checkTriggers(battle, {
+      type: "afterPieceKilled",
+      sourcePiece: attacker,
+      targetPiece: target,
+      skillId
+    });
+    
+    // 击杀敌人后，为击杀者添加充能点
+    const playerMeta = battle.players.find(p => p.playerId === attacker.ownerPlayerId);
+    if (playerMeta) {
+      playerMeta.chargePoints += 1; // 每次击杀获得1点充能
+    }
+  }
+  
+  return {
+    success: true,
+    damage: finalDamage,
+    isKilled,
+    targetHp: target.currentHp,
+    message: `${attacker.templateId}对${target.templateId}造成${finalDamage}点伤害${isKilled ? '，击杀敌人获得1点充能' : ''}`
   };
 }
 
@@ -478,17 +582,55 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
       select: effects.select,
       
       // 效果函数
-      teleport: effects.teleport,
-      
-      // 辅助函数
-      getAllEnemiesInRange: (range: number) => getAllEnemiesInRange(context, range, battle),
-      getAllAlliesInRange: (range: number) => getAllAlliesInRange(context, range, battle),
-      calculateDistance,
-      isTargetInRange: (target: any, range: number) => isTargetInRange(context, target, range),
-      
-      // 工具函数
-      Math,
-      console
+    teleport: effects.teleport,
+    dealDamage: effects.dealDamage,
+    
+    // 状态效果函数
+    statusEffectSystem: statusEffectSystem,
+    addStatusEffect: (targetPiece: PieceInstance, statusEffect: StatusEffect) => {
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, statusEffect);
+    },
+    addStatusEffectById: (targetPiece: PieceInstance, statusId: string) => {
+      return statusEffectSystem.addStatusEffectById(targetPiece.instanceId, statusId);
+    },
+    addBleeding: (targetPiece: PieceInstance, intensity: number = 5) => {
+      const bleedingEffect = predefinedStatusEffects.bleeding(intensity);
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, bleedingEffect);
+    },
+    addPoison: (targetPiece: PieceInstance, intensity: number = 3) => {
+      const poisonEffect = predefinedStatusEffects.poison(intensity);
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, poisonEffect);
+    },
+    addBurn: (targetPiece: PieceInstance, intensity: number = 8) => {
+      const burnEffect = predefinedStatusEffects.burn(intensity);
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, burnEffect);
+    },
+    addBuffAttack: (targetPiece: PieceInstance, intensity: number = 2) => {
+      const buffEffect = predefinedStatusEffects.buffAttack(intensity);
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, buffEffect);
+    },
+    addBuffDefense: (targetPiece: PieceInstance, intensity: number = 2) => {
+      const buffEffect = predefinedStatusEffects.buffDefense(intensity);
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, buffEffect);
+    },
+    addRegeneration: (targetPiece: PieceInstance, intensity: number = 4) => {
+      const regenEffect = predefinedStatusEffects.regeneration(intensity);
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, regenEffect);
+    },
+    addStun: (targetPiece: PieceInstance) => {
+      const stunEffect = predefinedStatusEffects.stun();
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, stunEffect);
+    },
+    
+    // 辅助函数
+    getAllEnemiesInRange: (range: number) => getAllEnemiesInRange(context, range, battle),
+    getAllAlliesInRange: (range: number) => getAllAlliesInRange(context, range, battle),
+    calculateDistance,
+    isTargetInRange: (target: any, range: number) => isTargetInRange(context, target, range),
+    
+    // 工具函数
+    Math,
+    console
     }
 
     // 记录技能执行前的状态
@@ -547,10 +689,21 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
               const battle = environment.battle;
               const select = environment.select;
               const teleport = environment.teleport;
+              const statusEffectSystem = environment.statusEffectSystem;
+              const addStatusEffect = environment.addStatusEffect;
+              const addStatusEffectById = environment.addStatusEffectById;
+              const addBleeding = environment.addBleeding;
+              const addPoison = environment.addPoison;
+              const addBurn = environment.addBurn;
+              const addBuffAttack = environment.addBuffAttack;
+              const addBuffDefense = environment.addBuffDefense;
+              const addRegeneration = environment.addRegeneration;
+              const addStun = environment.addStun;
               const getAllEnemiesInRange = environment.getAllEnemiesInRange;
               const getAllAlliesInRange = environment.getAllAlliesInRange;
               const calculateDistance = environment.calculateDistance;
               const isTargetInRange = environment.isTargetInRange;
+              const dealDamage = environment.dealDamage;
               const Math = environment.Math;
               const console = environment.console;
               

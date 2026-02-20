@@ -1,0 +1,17 @@
+{
+  "id": "rule-status-poison",
+  "name": "中毒状态规则",
+  "description": "处理中毒状态的触发时机",
+  "trigger": {
+    "type": "beginTurn"
+  },
+  "effect": {
+    "type": "triggerStatusEffect",
+    "statusId": "poison",
+    "message": "中毒状态触发"
+  },
+  "limits": {
+    "cooldownTurns": 0,
+    "maxUses": 0
+  }
+}

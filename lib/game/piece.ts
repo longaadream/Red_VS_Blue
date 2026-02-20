@@ -47,6 +47,8 @@ export interface PieceInstance {
   buffs: PieceBuff[]
   debuffs: PieceDebuff[]
   shield?: number
+  ruleTags: string[] // 存储相关的规则ID数组
+  statusTags: string[] // 存储状态变量的标签数组，如"bleeding-duration"
 }
 
 export interface PieceBuff {
