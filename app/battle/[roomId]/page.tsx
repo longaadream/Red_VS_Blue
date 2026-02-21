@@ -105,6 +105,16 @@ export default function BattlePage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
+        // 检查是否是需要目标选择的情况
+        if (data.needsTargetSelection) {
+          // 进入目标选择模式
+          setIsSelectingSkillTarget(true)
+          setSelectedSkillId(action.skillId!)
+          setTargetSelectionType(data.targetType || 'piece')
+          setTargetSelectionRange(data.range || 5)
+          setTargetSelectionFilter(data.filter || 'enemy')
+          return
+        }
         // 使用toast通知显示错误信息，而不是设置错误状态
         toast.error(data.error || "操作失败")
         return
@@ -266,7 +276,11 @@ export default function BattlePage() {
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null)
   const [isSelectingMoveTarget, setIsSelectingMoveTarget] = useState(false)
   const [isSelectingTeleportTarget, setIsSelectingTeleportTarget] = useState(false)
+  const [isSelectingSkillTarget, setIsSelectingSkillTarget] = useState(false)
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
+  const [targetSelectionType, setTargetSelectionType] = useState<'piece' | 'grid'>('piece')
+  const [targetSelectionRange, setTargetSelectionRange] = useState(5)
+  const [targetSelectionFilter, setTargetSelectionFilter] = useState<'enemy' | 'ally' | 'all'>('enemy')
 
   const selectedPiece = useMemo(() => {
     if (!selectedPieceId || !battle || !currentPlayerId) return null
@@ -426,22 +440,50 @@ export default function BattlePage() {
                         })
                         setIsSelectingTeleportTarget(false)
                         setSelectedSkillId(null)
+                      } else if (isSelectingSkillTarget && selectedPiece && selectedSkillId) {
+                        // 处理技能目标位置选择（如暴风雪的区域选择）
+                        sendBattleAction({
+                          type: "useBasicSkill",
+                          playerId: currentPlayerId!,
+                          pieceId: selectedPiece.instanceId,
+                          skillId: selectedSkillId,
+                          targetX: x,
+                          targetY: y,
+                        })
+                        setIsSelectingSkillTarget(false)
+                        setSelectedSkillId(null)
                       }
                     }}
                     onPieceClick={(pieceId) => {
-                      // 检查点击的是否是己方棋子
-                      const clickedPiece = battle.pieces.find(p => p.instanceId === pieceId);
-                      if (clickedPiece && clickedPiece.ownerPlayerId.toLowerCase() === currentPlayerId?.toLowerCase()) {
-                        setSelectedPieceId(pieceId);
-                        // 重置选择状态
-                        setIsSelectingMoveTarget(false);
-                        setIsSelectingTeleportTarget(false);
-                        setSelectedSkillId(null);
+                      if (isSelectingSkillTarget && selectedPiece && selectedSkillId) {
+                        // 处理技能目标棋子选择
+                        sendBattleAction({
+                          type: "useBasicSkill",
+                          playerId: currentPlayerId!,
+                          pieceId: selectedPiece.instanceId,
+                          skillId: selectedSkillId,
+                          targetPieceId: pieceId,
+                        })
+                        setIsSelectingSkillTarget(false)
+                        setSelectedSkillId(null)
+                      } else {
+                        // 检查点击的是否是己方棋子
+                        const clickedPiece = battle.pieces.find(p => p.instanceId === pieceId);
+                        if (clickedPiece && clickedPiece.ownerPlayerId.toLowerCase() === currentPlayerId?.toLowerCase()) {
+                          setSelectedPieceId(pieceId);
+                          // 重置选择状态
+                          setIsSelectingMoveTarget(false);
+                          setIsSelectingTeleportTarget(false);
+                          setIsSelectingSkillTarget(false);
+                          setSelectedSkillId(null);
+                        }
                       }
                     }}
                     selectedPieceId={selectedPieceId}
                     isSelectingMoveTarget={isSelectingMoveTarget}
                     isSelectingTeleportTarget={isSelectingTeleportTarget}
+                    isSelectingSkillTarget={isSelectingSkillTarget}
+                    selectedSkillId={selectedSkillId}
                     teleportRange={battle.skillsById.teleport?.areaSize || 5}
                   />
                 </CardContent>
@@ -947,6 +989,24 @@ export default function BattlePage() {
                           取消传送
                         </Button>
                       </>
+                    ) : isSelectingSkillTarget ? (
+                      <>
+                        <p className="text-xs text-muted-foreground text-center">
+                          请点击棋盘上的敌人棋子选择技能目标
+                        </p>
+                        <Button
+                          className="w-full"
+                          size="sm"
+                          variant="outline"
+                          disabled={loading}
+                          onClick={() => {
+                            setIsSelectingSkillTarget(false)
+                            setSelectedSkillId(null)
+                          }}
+                        >
+                          取消技能
+                        </Button>
+                      </>
                     ) : (
                       <Button
                         className="w-full"
@@ -1002,8 +1062,12 @@ export default function BattlePage() {
                                     // 进入传送目标选择模式
                                     setSelectedSkillId(skill.id)
                                     setIsSelectingTeleportTarget(true)
+                                  } else if (skill.requiresTarget) {
+                                    // 进入技能目标选择模式
+                                    setSelectedSkillId(skill.id)
+                                    setIsSelectingSkillTarget(true)
                                   } else {
-                                    // 直接使用其他技能
+                                    // 直接使用不需要目标的技能
                                     sendBattleAction({
                                       type: skill.type === "normal" ? "useBasicSkill" : "useChargeSkill",
                                       playerId: currentPlayerId!,

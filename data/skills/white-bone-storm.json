@@ -1,0 +1,16 @@
+{
+  "id": "white-bone-storm",
+  "name": "白骨风暴",
+  "description": "在自身周围5*5格范围内生成一个会跟随自身移动的白骨风暴，当敌人经过时对其造成当前攻击力的伤害",
+  "icon": "🌪️",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 4,
+  "maxCharges": 0,
+  "chargeCost": 3,
+  "powerMultiplier": 1,
+  "actionPointCost": 5,
+  "code": "function executeSkill(context) { if (typeof addStatusEffectById === 'function') { addStatusEffectById(sourcePiece.instanceId, 'bone-storm', 999); } return { message: sourcePiece.templateId + '召唤了白骨风暴，在自身周围5*5格范围内对经过的敌人造成伤害', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '在自身周围5*5格范围内生成一个会跟随自身移动的白骨风暴，当敌人经过时对其造成当前攻击力的伤害', expectedValues: { damage: piece.attack } }; }",
+  "range": "self"
+}

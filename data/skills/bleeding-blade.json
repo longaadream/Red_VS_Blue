@@ -1,14 +1,13 @@
 {
   "id": "bleeding-blade",
   "name": "出血之刃",
-  "description": "对单个目标造成120%攻击力的伤害，并施加3回合的流血状态，每回合造成5点伤害",
+  "description": "对单个目标造成120%攻击力的伤害，并施加流血状态",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1.2,
-  "code": "function executeSkill(context) { \n  const caster = sourcePiece;\n  const nearestEnemy = select.getNearestEnemy();\n  \n  if (nearestEnemy) {\n    // 计算伤害\n    const damage = Math.round(caster.attack * context.skill.powerMultiplier);\n    nearestEnemy.currentHp = Math.max(0, nearestEnemy.currentHp - damage);\n    \n    // 施加流血状态\n    addBleeding(nearestEnemy, 3, 5);\n    \n    return { message: caster.templateId + '使用出血之刃，对' + nearestEnemy.templateId + '造成' + damage + '点伤害，并施加了流血状态', success: true };\n  }\n  return { message: '范围内没有可攻击的敌人', success: false };\n}",
+  "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const damage = Math.round(sourcePiece.attack * context.skill.powerMultiplier); const damageResult = dealDamage(sourcePiece, targetEnemy, damage, 'physical', context.battle, context.skill.id); if (damageResult.success) { addStatusEffectById(targetEnemy.instanceId, 'bleeding'); } return { message: sourcePiece.templateId + '使用出血之刃，对' + targetEnemy.templateId + '造成' + damage + '点伤害，并施加了流血状态', success: true }; }",
   "range": "single",
-  "requiresTarget": false,
   "actionPointCost": 2
 }

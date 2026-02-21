@@ -1,16 +1,1 @@
-{
-  "id": "hand-cannon",
-  "name": "手炮",
-  "description": "对一个两格内敌人造成1点物理伤害",
-  "icon": "🔫",
-  "kind": "active",
-  "type": "normal",
-  "cooldownTurns": 0,
-  "maxCharges": 0,
-  "powerMultiplier": 1.0,
-  "actionPointCost": 1,
-  "code": "function executeSkill(context) {\n  const targetEnemy = context.targetPiece;\n  if (!targetEnemy) {\n    return { message: '请选择目标敌人', success: false };\n  }\n  const distance = calculate.distance(sourcePiece.position, targetEnemy.position);\n  if (distance > 2) {\n    return { message: '目标距离太远', success: false };\n  }\n  const damageValue = 1;\n  const damageResult = dealDamage(targetEnemy, damageValue, 'physical', context.skill.id);\n  return { message: sourcePiece.templateId + ' 使用手炮对 ' + targetEnemy.templateId + ' 造成 ' + damageResult.damage + ' 点伤害', success: damageResult.success };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) {\n  return { description: '对两格内的敌人造成1点物理伤害', expectedValues: { damage: 1, range: 2 } };\n}",
-  "range": "single",
-  "requiresTarget": true
-}
+{"id":"hand-cannon","name":"手炮","description":"对一个两格内敌人造成1点物理伤害","icon":"🔫","kind":"active","type":"normal","cooldownTurns":0,"maxCharges":0,"powerMultiplier":1.0,"actionPointCost":1,"code":"function executeSkill(context) { const sourcePiece = context.piece; const targetEnemy = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const distance = Math.abs(sourcePiece.x - targetEnemy.x) + Math.abs(sourcePiece.y - targetEnemy.y); if (distance > 2) { return { message: '目标距离太远', success: false }; } const damageValue = 1; const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'physical', context.battle, context.skill.id); return { message: sourcePiece.templateId + ' 使用手炮对 ' + targetEnemy.templateId + ' 造成 ' + damageResult.damage + ' 点伤害', success: damageResult.success }; }","previewCode":"function calculatePreview(piece, skillDef) { return { description: '对两格内的敌人造成1点物理伤害', expectedValues: { damage: 1, range: 2 } }; }","range":"single"}

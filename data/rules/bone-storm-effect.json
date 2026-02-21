@@ -1,0 +1,17 @@
+{
+  "id": "rule-bone-storm-effect",
+  "name": "白骨风暴效果规则",
+  "description": "白骨风暴对周围敌人造成伤害",
+  "trigger": {
+    "type": "beginTurn"
+  },
+  "effect": {
+    "type": "triggerStatusEffect",
+    "statusId": "bone-storm",
+    "message": "白骨风暴对周围敌人造成伤害"
+  },
+  "limits": {
+    "cooldownTurns": 0,
+    "maxUses": 0
+  }
+}

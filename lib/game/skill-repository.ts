@@ -13,7 +13,6 @@ const defaultSkillsData: Record<string, SkillDefinition> = {
     powerMultiplier: 1,
     code: "function executeSkill(context) { const targetEnemy = context.targetPiece; if (!targetEnemy) { return { message: sourcePiece.templateId + '需要选择一个目标', success: false }; } const damageValue = sourcePiece.attack * context.skill.powerMultiplier; const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'physical', context.battle, context.skill.id); return { message: sourcePiece.templateId + '对' + targetEnemy.templateId + '造成' + damageResult.damage + '点伤害', success: true }; }",
     range: "single",
-    requiresTarget: true,
     actionPointCost: 1
   }
 }

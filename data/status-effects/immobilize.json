@@ -1,0 +1,11 @@
+{
+  "id": "immobilize",
+  "type": "immobilize",
+  "name": "无法移动",
+  "description": "无法移动",
+  "intensity": 1,
+  "isDebuff": true,
+  "canStack": false,
+  "maxStacks": 1,
+  "code": "function EffectTrigger(context) { return { success: true, message: context.piece.templateId + '被限制移动' }; }"
+}

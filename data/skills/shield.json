@@ -12,6 +12,5 @@
   "actionPointCost": 2,
   "code": "function executeSkill(context) {\n  // 直接修改自身的护盾值\n  const shieldValue = 50;\n  if (!context.piece.shield) {\n    context.piece.shield = 0;\n  }\n  context.piece.shield += shieldValue;\n  \n  return {\n    message: \"护盾术生效，获得\" + shieldValue + \"点护盾\",\n    success: true\n  };\n}",
   "previewCode": "function calculatePreview(piece, skillDef) {\n  // 固定护盾值\n  const shieldValue = 50;\n  \n  return {\n    description: \"为自身提供\" + shieldValue + \"点护盾，吸收伤害\",\n    expectedValues: {\n      heal: shieldValue // 使用heal字段表示护盾值，因为它们都是正面效果 \n}\n  };\n}",
-  "range": "self",
-  "requiresTarget": false
+  "range": "self"
 }

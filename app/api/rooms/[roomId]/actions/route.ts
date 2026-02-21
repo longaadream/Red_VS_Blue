@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
-import { getPieceById } from "@/lib/game/piece-repository"
+import { getPieceById, getAllPieces } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
 import type { PieceTemplate } from "@/lib/game/piece"
 import { getRoomStore, type Room } from "@/lib/game/room-store"
@@ -184,10 +184,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     // 如果玩家不存在，创建新玩家
     if (!targetPlayer) {
       console.log('Player not found, creating new player:', trimmedPlayerId)
+      // 为新玩家分配阵营
+      const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
+      let faction: "red" | "blue" = "red"
+      if (assignedFactions.length > 0) {
+        faction = assignedFactions[0] === "red" ? "blue" : "red"
+      }
       targetPlayer = {
         id: trimmedPlayerId,
         name: playerName?.trim() || `Player ${trimmedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
+        faction: faction,
         hasSelectedPieces: true,
         selectedPieces: pieces
       }
@@ -198,9 +205,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       console.log('Updating existing player:', targetPlayer.id)
       targetPlayer.hasSelectedPieces = true
       targetPlayer.selectedPieces = pieces
+      // 确保玩家有阵营信息
+      if (!targetPlayer.faction) {
+        const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
+        let faction: "red" | "blue" = "red"
+        if (assignedFactions.length > 0) {
+          faction = assignedFactions[0] === "red" ? "blue" : "red"
+        }
+        targetPlayer.faction = faction
+        console.log('Assigned faction to existing player:', faction)
+      }
       console.log('Player updated:', {
         hasSelectedPieces: targetPlayer.hasSelectedPieces,
-        selectedPiecesCount: targetPlayer.selectedPieces?.length || 0
+        selectedPiecesCount: targetPlayer.selectedPieces?.length || 0,
+        faction: targetPlayer.faction
       })
     }
 

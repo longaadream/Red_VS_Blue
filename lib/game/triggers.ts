@@ -7,10 +7,15 @@ export type TriggerType =
   | "afterDamageDealt"      // 造成伤害后
   | "afterDamageTaken"      // 受到伤害后
   | "afterPieceKilled"      // 击杀棋子后
+  | "beforePieceKilled"     // 即将击杀棋子前
   | "afterPieceSummoned"    // 召唤棋子后
+  | "beforePieceSummoned"   // 即将召唤棋子前
   | "beginTurn"             // 回合开始时
   | "endTurn"               // 回合结束时
   | "afterMove"             // 移动后
+  | "beforeMove"            // 即将移动前
+  | "beforeSkillUse"        // 即将使用技能前
+  | "beforeAttack"          // 即将攻击前
   | "whenever"              // 每一步行动后检测
 
 // 条件类型

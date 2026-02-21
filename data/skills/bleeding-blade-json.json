@@ -7,8 +7,7 @@
   "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1.2,
-  "code": "function executeSkill(context) { \n  const caster = sourcePiece;\n  const nearestEnemy = select.getNearestEnemy();\n  \n  if (nearestEnemy) {\n    // 计算伤害\n    const damage = Math.round(caster.attack * context.skill.powerMultiplier);\n    nearestEnemy.currentHp = Math.max(0, nearestEnemy.currentHp - damage);\n    \n    // 施加JSON定义的流血状态\n    addStatusEffectById(nearestEnemy, 'bleeding');\n    \n    return { message: caster.templateId + '使用出血之刃，对' + nearestEnemy.templateId + '造成' + damage + '点伤害，并施加了流血状态', success: true };\n  }\n  return { message: '范围内没有可攻击的敌人', success: false };\n}",
+  "code": "function executeSkill(context) { \n  const caster = context.piece;\n  const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' });\n  if (!targetEnemy || targetEnemy.needsTargetSelection) {\n    return targetEnemy;\n  }\n  // 计算伤害\n  const damage = Math.round(caster.attack * context.skill.powerMultiplier);\n  const damageResult = dealDamage(caster, targetEnemy, damage, 'physical', context.battle, context.skill.id);\n  if (damageResult.success) {\n    addStatusEffectById(targetEnemy.instanceId, 'bleeding');\n  }\n  return { message: caster.templateId + '使用出血之刃，对' + targetEnemy.templateId + '造成' + damage + '点伤害，并施加了流血状态', success: true };\n}",
   "range": "single",
-  "requiresTarget": false,
   "actionPointCost": 2
 }

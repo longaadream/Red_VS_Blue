@@ -1,7 +1,7 @@
 {
   "id": "basic-attack",
   "name": "基础攻击",
-  "description": "选择最近的敌人，造成相当于攻击力100%的伤害",
+  "description": "选择一个敌人，造成相当于攻击力100%的伤害",
   "icon": "⚔️",
   "kind": "active",
   "type": "normal",
@@ -9,8 +9,7 @@
   "maxCharges": 0,
   "powerMultiplier": 1.0,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) {\n  // 选择最近的敌人\n  const targetEnemy = select.getNearestEnemy();\n  if (!targetEnemy) {\n    return { message: '没有可攻击的敌人', success: false };\n  }\n  \n  // 计算伤害值\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  \n  // 直接修改敌人的生命值\n  targetEnemy.currentHp = Math.max(0, targetEnemy.currentHp - damageValue);\n  \n  return {\n    message: sourcePiece.templateId + ' 造成 ' + damageValue + ' 点伤害',\n    success: true\n  };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) {\n  // 计算预期伤害值\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  \n  return {\n    description: \"选择最近的敌人，造成\" + damageValue + \"点伤害（相当于攻击力100%）\",\n    expectedValues: {\n      damage: damageValue\n    }\n  };\n}",
-  "range": "single",
-  "requiresTarget": true
+  "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetEnemy = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const damageValue = sourcePiece.attack * context.skill.powerMultiplier; const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'physical', context.battle, context.skill.id); return { message: sourcePiece.templateId + ' 造成 ' + damageResult.damage + ' 点伤害', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.round(piece.attack * skillDef.powerMultiplier); return { description: \"选择一个敌人，造成\" + damageValue + \"点伤害（相当于攻击力100%）\", expectedValues: { damage: damageValue } }; }",
+  "range": "single"
 }

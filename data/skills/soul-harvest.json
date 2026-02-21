@@ -1,13 +1,1 @@
-{
-  "id": "soul-harvest",
-  "name": "灵魂收割",
-  "description": "当一个敌方角色死亡时，获得等同于其最大生命值的最大生命值，并且增加其最大生命值的血量",
-  "kind": "passive",
-  "type": "normal",
-  "cooldownTurns": 0,
-  "maxCharges": 0,
-  "powerMultiplier": 1,
-  "code": "function executeSkill(context) {\n  const reaper = context.piece;\n  const victim = context.targetPiece;\n  if (victim) {\n    const soulPower = victim.maxHp;\n    // 增加最大生命值\n    reaper.maxHp += soulPower;\n    // 增加当前生命值\n    reaper.currentHp += soulPower;\n    return { message: reaper.templateId + '从' + victim.templateId + '的死亡中汲取力量，生命值增加' + soulPower, success: true };\n  }\n  return { message: '没有灵魂可以收割', success: false };\n}",
-  "range": "self",
-  "requiresTarget": false
-}
+{"id":"soul-harvest","name":"灵魂收割","description":"当一个敌方角色死亡时，获得等同于其最大生命值的最大生命值，并且增加其最大生命值的血量","kind":"passive","type":"normal","cooldownTurns":0,"maxCharges":0,"powerMultiplier":1,"code":"function executeSkill(context) { const victim = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!victim || victim.needsTargetSelection) { return victim; } const soulPower = victim.maxHp; sourcePiece.maxHp += soulPower; sourcePiece.currentHp += soulPower; return { message: sourcePiece.templateId + '从' + victim.templateId + '的死亡中汲取力量，生命值增加' + soulPower, success: true }; }","range":"self"}

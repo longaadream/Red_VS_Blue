@@ -1,0 +1,17 @@
+{
+  "id": "rule-immobilize-prevent-move",
+  "name": "无法移动状态规则",
+  "description": "阻止被无法移动状态影响的角色移动",
+  "trigger": {
+    "type": "beforeMove"
+  },
+  "effect": {
+    "type": "triggerStatusEffect",
+    "statusId": "immobilize",
+    "message": "无法移动状态阻止移动"
+  },
+  "limits": {
+    "cooldownTurns": 0,
+    "maxUses": 0
+  }
+}

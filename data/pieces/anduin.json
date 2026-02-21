@@ -1,0 +1,1 @@
+{"id":"anduin","name":"安度因","faction":"blue","description":"神圣的治疗者，拥有强大的回复和保护能力","rarity":"epic","image":"anduin.jpg","stats":{"maxHp":10,"attack":3,"defense":1,"moveRange":3},"skills":[{"skillId":"light-of-the-light","level":1},{"skillId":"shield-of-light","level":1},{"skillId":"holy-light-descend","level":1}],"isDefault":false}

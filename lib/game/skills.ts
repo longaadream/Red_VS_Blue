@@ -43,6 +43,10 @@ export interface SkillExecutionContext {
     x: number
     y: number
   } | null
+  targetPosition: {
+    x: number
+    y: number
+  } | null
   battle: {
     turn: number
     currentPlayerId: string
@@ -62,6 +66,10 @@ export interface SkillExecutionContext {
 export interface SkillExecutionResult {
   message: string
   success: boolean
+  needsTargetSelection?: boolean
+  targetType?: 'piece' | 'grid'
+  range?: number
+  filter?: 'enemy' | 'ally' | 'all'
 }
 
 /**
@@ -379,12 +387,54 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
 }
 
 // 效果函数
-function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, target?: { x: number, y: number }) {
+function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, target?: { x: number, y: number }, context?: SkillExecutionContext) {
   const selectors = createTargetSelectors(battle, sourcePiece);
   
   return {
     // 目标选择器
     select: selectors,
+    
+    // 目标选择函数 - 用于在技能代码中唤起目标选择
+      selectTarget: (options?: {
+        type: 'piece' | 'grid';
+        range?: number;
+        filter?: 'enemy' | 'ally' | 'all';
+      }) => {
+        const defaultOptions = {
+          type: 'piece' as const,
+          range: 5,
+          filter: 'enemy' as const,
+          ...options
+        };
+        
+        // 检查是否已经有目标信息（用户已经选择了目标）
+        // 使用context参数来获取目标信息
+        if (defaultOptions.type === 'piece' && context && context.target) {
+          // 如果需要选择棋子且context.target存在，直接返回目标棋子
+          return context.target;
+        } else if (defaultOptions.type === 'grid' && context) {
+          // 如果需要选择格子，检查context中的目标信息
+          if (context.targetPosition) {
+            // 如果有targetPosition，使用它
+            return context.targetPosition;
+          } else if (context.target && context.target.x !== undefined && context.target.y !== undefined) {
+            // 如果只有target，使用其位置
+            return {
+              x: context.target.x,
+              y: context.target.y
+            };
+          }
+        }
+        
+        // 没有目标信息，返回需要目标选择的结果
+        // 这会触发前端显示目标选择界面
+        return {
+          needsTargetSelection: true,
+          targetType: defaultOptions.type,
+          range: defaultOptions.range,
+          filter: defaultOptions.filter
+        };
+      },
     
     // 传送效果
     teleport: (x: number, y?: number) => {
@@ -516,6 +566,14 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
   if (originalHp > 0 && target.currentHp === 0) {
     isKilled = true;
     
+    // 触发即将击杀的触发器
+    globalTriggerSystem.checkTriggers(battle, {
+      type: "beforePieceKilled",
+      sourcePiece: target,
+      targetPiece: attacker,
+      skillId
+    });
+    
     // 触发击杀相关的触发器
     globalTriggerSystem.checkTriggers(battle, {
       type: "afterPieceKilled",
@@ -554,6 +612,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
     console.log('Skill ID:', skillDef.id);
     console.log('Context piece instanceId:', context.piece.instanceId);
     console.log('Battle pieces count:', battle.pieces.length);
+    console.log('Context target:', context.target);
     
     // 找到源棋子
     const pieceIndex = battle.pieces.findIndex(p => p.instanceId === context.piece.instanceId);
@@ -575,7 +634,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
     });
 
     // 创建效果函数
-    const effects = createEffectFunctions(battle, sourcePiece)
+    const effects = createEffectFunctions(battle, sourcePiece, undefined, context)
 
     // 创建技能执行环境，包含辅助函数和效果函数
     const skillEnvironment = {
@@ -587,6 +646,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
       
       // 目标选择器
       select: effects.select,
+      selectTarget: effects.selectTarget,
       
       // 效果函数
     teleport: effects.teleport,
@@ -597,8 +657,8 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
     addStatusEffect: (targetPiece: PieceInstance, statusEffect: StatusEffect) => {
       return statusEffectSystem.addStatusEffect(targetPiece.instanceId, statusEffect);
     },
-    addStatusEffectById: (targetPiece: PieceInstance, statusId: string) => {
-      return statusEffectSystem.addStatusEffectById(targetPiece.instanceId, statusId);
+    addStatusEffectById: (targetPieceId: string, statusId: string, duration?: number) => {
+      return statusEffectSystem.addStatusEffectById(targetPieceId, statusId, duration);
     },
     addBleeding: (targetPiece: PieceInstance, intensity: number = 5) => {
       const bleedingEffect = predefinedStatusEffects.bleeding(intensity);
@@ -624,9 +684,13 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
       const regenEffect = predefinedStatusEffects.regeneration(intensity);
       return statusEffectSystem.addStatusEffect(targetPiece.instanceId, regenEffect);
     },
-    addStun: (targetPiece: PieceInstance) => {
-      const stunEffect = predefinedStatusEffects.stun();
+    addStun: (targetPiece: PieceInstance, intensity: number = 1) => {
+      const stunEffect = predefinedStatusEffects.stun(intensity);
       return statusEffectSystem.addStatusEffect(targetPiece.instanceId, stunEffect);
+    },
+    addFreeze: (targetPiece: PieceInstance, intensity: number = 1) => {
+      const freezeEffect = predefinedStatusEffects.freeze(intensity);
+      return statusEffectSystem.addStatusEffect(targetPiece.instanceId, freezeEffect);
     },
     
     // 辅助函数
@@ -695,6 +759,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
               const sourcePiece = environment.sourcePiece;
               const battle = environment.battle;
               const select = environment.select;
+              const selectTarget = environment.selectTarget;
               const teleport = environment.teleport;
               const statusEffectSystem = environment.statusEffectSystem;
               const addStatusEffect = environment.addStatusEffect;
@@ -706,6 +771,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
               const addBuffDefense = environment.addBuffDefense;
               const addRegeneration = environment.addRegeneration;
               const addStun = environment.addStun;
+              const addFreeze = environment.addFreeze;
               const getAllEnemiesInRange = environment.getAllEnemiesInRange;
               const getAllAlliesInRange = environment.getAllAlliesInRange;
               const calculateDistance = environment.calculateDistance;
@@ -723,7 +789,22 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
           `;
 
           // 执行技能代码
-          const result = eval(fullSkillCode);
+          let result = eval(fullSkillCode);
+          
+          // 检查是否需要目标选择
+          if (result && result.needsTargetSelection) {
+            // 直接返回需要目标选择的结果
+            // 目标选择完全由selectTarget函数控制
+            // 当用户选择目标后，前端会重新发送请求，selectTarget函数会处理目标信息
+            return {
+              message: '需要选择目标',
+              success: false,
+              needsTargetSelection: true,
+              targetType: result.targetType || 'piece',
+              range: result.range || 5,
+              filter: result.filter || 'enemy'
+            };
+          }
           
           console.log('Source piece after skill:', {
             instanceId: sourcePiece.instanceId,

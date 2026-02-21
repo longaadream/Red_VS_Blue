@@ -1,0 +1,20 @@
+{
+  "id": "bone-storm",
+  "type": "bone-storm",
+  "name": "白骨风暴",
+  "description": "在自身周围5*5格范围内对敌人造成伤害",
+  "intensity": 1,
+  "isDebuff": false,
+  "canStack": false,
+  "maxStacks": 1,
+  "code": "function EffectTrigger(context) { const piece = context.piece; const nearbyEnemies = context.battleState.pieces.filter(enemy => {
+    if (enemy.playerId === piece.playerId || enemy.currentHp <= 0) return false;
+    const distance = Math.abs(enemy.x - piece.x) + Math.abs(enemy.y - piece.y);
+    return distance <= 5;
+  });
+  nearbyEnemies.forEach(enemy => {
+    const damage = piece.attack;
+    enemy.currentHp = Math.max(0, enemy.currentHp - damage);
+  });
+  return { success: true, message: piece.templateId + '的白骨风暴对周围敌人造成伤害' }; }"
+}

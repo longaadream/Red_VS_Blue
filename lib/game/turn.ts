@@ -75,6 +75,7 @@ export type BattleAction =
       skillId: string
       targetX?: number
       targetY?: number
+      targetPieceId?: string
     }
   | {
       type: "useChargeSkill"
@@ -83,6 +84,7 @@ export type BattleAction =
       skillId: string
       targetX?: number
       targetY?: number
+      targetPieceId?: string
     }
   | {
       type: "endTurn"
@@ -505,6 +507,38 @@ export function applyBattleAction(
 
       // 执行技能
       const { executeSkillFunction, applySkillEffects } = require('./skills')
+      
+      // 构建目标信息
+      let targetInfo = null;
+      let targetPositionInfo = null;
+      if (action.targetPieceId) {
+        const targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId);
+        if (targetPiece) {
+          targetInfo = {
+            instanceId: targetPiece.instanceId,
+            templateId: targetPiece.templateId,
+            ownerPlayerId: targetPiece.ownerPlayerId,
+            currentHp: targetPiece.currentHp,
+            maxHp: targetPiece.maxHp,
+            attack: targetPiece.attack,
+            defense: targetPiece.defense,
+            x: targetPiece.x || 0,
+            y: targetPiece.y || 0,
+          };
+          // 如果选择了棋子，也将其位置作为目标位置
+          targetPositionInfo = {
+            x: targetPiece.x || 0,
+            y: targetPiece.y || 0,
+          };
+        }
+      } else if (action.targetX !== undefined && action.targetY !== undefined) {
+        // 如果选择了格子，设置目标位置
+        targetPositionInfo = {
+          x: action.targetX,
+          y: action.targetY,
+        };
+      }
+      
       const context = {
         piece: {
           instanceId: piece.instanceId,
@@ -518,7 +552,8 @@ export function applyBattleAction(
           y: piece.y || 0,
           moveRange: piece.moveRange,
         },
-        target: null,
+        target: targetInfo,
+        targetPosition: targetPositionInfo,
         battle: {
           turn: next.turn.turnNumber,
           currentPlayerId: next.turn.currentPlayerId,
@@ -736,6 +771,38 @@ export function applyBattleAction(
 
       // 执行技能
       const { executeSkillFunction, applySkillEffects } = require('./skills')
+      
+      // 构建目标信息
+      let targetInfo = null;
+      let targetPositionInfo = null;
+      if (action.targetPieceId) {
+        const targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId);
+        if (targetPiece) {
+          targetInfo = {
+            instanceId: targetPiece.instanceId,
+            templateId: targetPiece.templateId,
+            ownerPlayerId: targetPiece.ownerPlayerId,
+            currentHp: targetPiece.currentHp,
+            maxHp: targetPiece.maxHp,
+            attack: targetPiece.attack,
+            defense: targetPiece.defense,
+            x: targetPiece.x || 0,
+            y: targetPiece.y || 0,
+          };
+          // 如果选择了棋子，也将其位置作为目标位置
+          targetPositionInfo = {
+            x: targetPiece.x || 0,
+            y: targetPiece.y || 0,
+          };
+        }
+      } else if (action.targetX !== undefined && action.targetY !== undefined) {
+        // 如果选择了格子，设置目标位置
+        targetPositionInfo = {
+          x: action.targetX,
+          y: action.targetY,
+        };
+      }
+      
       const context = {
         piece: {
           instanceId: piece.instanceId,
@@ -749,7 +816,8 @@ export function applyBattleAction(
           y: piece.y || 0,
           moveRange: piece.moveRange,
         },
-        target: null,
+        target: targetInfo,
+        targetPosition: targetPositionInfo,
         battle: {
           turn: next.turn.turnNumber,
           currentPlayerId: next.turn.currentPlayerId,
@@ -764,6 +832,18 @@ export function applyBattleAction(
       }
 
       const result = executeSkillFunction(skillDef, context, next)
+      
+      // 检查是否需要目标选择
+      if (result.needsTargetSelection) {
+        // 抛出一个特殊的错误，指示需要目标选择
+        const error = new Error(result.message) as any
+        error.needsTargetSelection = true
+        error.targetType = result.targetType
+        error.range = result.range
+        error.filter = result.filter
+        throw error
+      }
+      
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         console.log('Skill executed:', result.message)

@@ -1,0 +1,1 @@
+{"id":"holy-shield","name":"圣盾","description":"抵挡一次伤害","icon":"🛡️","duration":1,"stacks":1,"isDebuff":false,"effects":[{"type":"block_damage","value":1}]}

@@ -14,6 +14,8 @@ type GameBoardProps = {
   selectedPieceId?: string
   isSelectingMoveTarget?: boolean
   isSelectingTeleportTarget?: boolean
+  isSelectingSkillTarget?: boolean
+  selectedSkillId?: string
   teleportRange?: number
 }
 
@@ -33,7 +35,7 @@ function tileColor(tile: Tile): string {
   }
 }
 
-export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selectedPieceId, isSelectingMoveTarget, isSelectingTeleportTarget, teleportRange = 5 }: GameBoardProps) {
+export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selectedPieceId, isSelectingMoveTarget, isSelectingTeleportTarget, isSelectingSkillTarget, selectedSkillId, teleportRange = 5 }: GameBoardProps) {
   const size = Math.max(map.width, map.height)
   
   // 组件加载时自动加载棋子数据
@@ -182,6 +184,12 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
       }
     }
     
+    // 检查是否是技能目标选择模式
+    if (isSelectingSkillTarget) {
+      // 对于技能目标选择，我们只需要让格子可点击，具体的目标验证由游戏逻辑处理
+      return `${baseClass} cursor-pointer hover:bg-blue-500/30`
+    }
+    
     return baseClass
   }
 
@@ -220,7 +228,7 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
               tile.props.walkable
             }  bullet=${tile.props.bulletPassable}`}
             onClick={() => {
-              if ((isSelectingMoveTarget || isSelectingTeleportTarget) && onTileClick) {
+              if ((isSelectingMoveTarget || isSelectingTeleportTarget || isSelectingSkillTarget) && onTileClick) {
                 onTileClick(tile.x, tile.y)
               }
             }}

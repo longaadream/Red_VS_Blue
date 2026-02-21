@@ -346,7 +346,25 @@ export default function CharacterEncyclopediaPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="text-4xl">{piece.image}</div>
+                  <div className="h-24 w-24 flex items-center justify-center">
+                    {piece.image && piece.image.startsWith("http") ? (
+                      <img 
+                        src={piece.image} 
+                        alt={piece.name} 
+                        className="h-20 w-20 object-contain"
+                      />
+                    ) : piece.image && (piece.image.length <= 3 || piece.image.includes("️")) ? (
+                      <span className="text-6xl">{piece.image}</span>
+                    ) : piece.image ? (
+                      <img 
+                        src={`/${piece.image}`} 
+                        alt={piece.name} 
+                        className="h-20 w-20 object-contain"
+                      />
+                    ) : (
+                      <span className="text-6xl">❓</span>
+                    )}
+                  </div>
                 </div>
                 
                 <p className="text-gray-400 mb-6">{piece.description}</p>
