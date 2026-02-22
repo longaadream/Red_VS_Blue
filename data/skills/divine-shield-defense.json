@@ -1,1 +1,11 @@
-{"id":"divine-shield-defense","name":"圣盾防御","description":"当拥有圣盾状态时，抵挡一次伤害并移除圣盾效果","kind":"passive","type":"normal","cooldownTurns":0,"maxCharges":0,"powerMultiplier":1,"code":"function executeSkill(context) { const piece = context.piece; const damage = context.damage; let hasDivineShield = false; if (piece.statusTags) { hasDivineShield = piece.statusTags.some(tag => tag.type === 'divine-shield'); } if (!hasDivineShield) { return { success: true, blocked: false, message: '' }; } if (!damage || damage <= 0) { return { success: true, blocked: false, message: '没有伤害需要抵挡' }; } if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'divine-shield'); } if (typeof removeRuleById === 'function') { removeRuleById(piece.instanceId, 'rule-divine-shield'); } if (typeof piece.skills !== 'undefined') { piece.skills = piece.skills.filter(skill => skill.skillId !== 'divine-shield-defense'); } const attacker = context.target ? context.target.name : '未知敌人'; return { success: true, blocked: true, message: piece.name + '的圣盾破裂，抵挡了来自于' + attacker + '的伤害' }; }"}
+{
+  "id": "divine-shield-defense",
+  "name": "圣盾防御",
+  "description": "当拥有圣盾状态时，抵挡一次伤害并移除圣盾效果",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; let hasDivineShield = false; if (piece.statusTags) { hasDivineShield = piece.statusTags.some(tag => tag.type === 'divine-shield'); } if (!hasDivineShield) { return { success: true, blocked: false, message: '' }; } if (!damage || damage <= 0) { return { success: true, blocked: false, message: '没有伤害需要抵挡' }; } if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'divine-shield'); } if (typeof removeRuleById === 'function') { removeRuleById(piece.instanceId, 'rule-divine-shield'); } if (typeof removeSkillById === 'function') { removeSkillById(piece.instanceId, 'divine-shield-defense'); } const attacker = context.target ? context.target.name : '未知敌人'; return { success: true, blocked: true, message: piece.name + '的圣盾破裂，抵挡了来自于' + attacker + '的伤害' }; }"
+}

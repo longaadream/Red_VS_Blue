@@ -2,11 +2,39 @@ import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
 import {
   type BattleAction,
+  type BattleState,
   applyBattleAction,
   BattleRuleError,
 } from "@/lib/game/turn"
+import { loadRuleById } from "@/lib/game/skills"
 
 const rooms = roomStore
+
+/**
+ * 重新为战斗状态中所有棋子的规则注入 effect 函数。
+ * 规则对象保存到 JSON 文件时，函数会丢失，每次加载后需重新注入。
+ */
+function rehydrateBattleRules(battleState: BattleState): void {
+  for (const piece of battleState.pieces) {
+    if (!piece.rules || piece.rules.length === 0) continue
+    piece.rules = piece.rules.map((rule: any) => {
+      if (typeof rule.effect !== 'function' && rule.id) {
+        const rehydrated = loadRuleById(rule.id)
+        // 只有当重新加载成功且有 effect 函数时才替换
+        if (rehydrated && typeof rehydrated.effect === 'function') {
+          return rehydrated
+        }
+        // 如果加载失败，保留原规则但添加一个空的 effect 函数防止报错
+        console.warn(`Failed to rehydrate rule ${rule.id}, adding default effect`)
+        return {
+          ...rule,
+          effect: () => ({ success: false, message: '' })
+        }
+      }
+      return rule
+    })
+  }
+}
 
 export async function GET(
   _req: NextRequest,
@@ -55,6 +83,8 @@ export async function POST(
   }
 
   try {
+    // 从磁盘加载后规则的 effect 函数会丢失，需要在执行动作前重新注入
+    rehydrateBattleRules(room.battleState)
     const nextState = applyBattleAction(room.battleState, body)
     room.battleState = nextState
     rooms.updateBattleState(room.id, nextState)

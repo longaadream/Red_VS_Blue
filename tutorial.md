@@ -120,12 +120,17 @@
 | `afterMove` | `piece`（移动的棋子）, `playerId`（玩家ID） | `context.piece`（移动的棋子）, `context.playerId`（玩家ID） |
 | `beforeMove` | `piece`（即将移动的棋子） | `context.piece`（即将移动的棋子） |
 | `beforeSkillUse` | `piece`（即将释放技能的棋子）, `skillId`（技能ID） | `context.piece`（即将释放技能的棋子）, `context.skillId`（技能ID） |
-| `beforeAttack` | `piece`（即将攻击的棋子） | `context.piece`（即将攻击的棋子） |
 | `afterSkillUsed` | `piece`（使用技能的棋子）, `skillId`（技能ID）, `playerId`（玩家ID） | `context.piece`（使用技能的棋子）, `context.skillId`（技能ID）, `context.playerId`（玩家ID） |
 | `afterHealDealt` | `piece`（治疗者）, `target`（被治疗者）, `heal`（治疗值） | `context.piece`（治疗者）, `context.target`（被治疗者）, `context.heal`（治疗值） |
 | `afterHealTaken` | `piece`（被治疗者）, `target`（治疗者）, `heal`（治疗值） | `context.piece`（被治疗者）, `context.target`（治疗者）, `context.heal`（治疗值） |
 | `beforeHealDealt` | `piece`（治疗者）, `target`（被治疗者）, `heal`（治疗值） | `context.piece`（治疗者）, `context.target`（被治疗者）, `context.heal`（治疗值） |
 | `beforeHealTaken` | `piece`（被治疗者）, `target`（治疗者）, `heal`（治疗值） | `context.piece`（被治疗者）, `context.target`（治疗者）, `context.heal`（治疗值） |
+| `onPieceDied` | `piece`（死亡棋子本身）, `target`（造成致命一击的攻击者）, `damage`（致命伤害值） | `context.piece`（死亡棋子）, `context.target`（攻击者）, `context.damage`（伤害值）— 用于"我死亡时做X"效果 |
+| `afterDamageBlocked` | `piece`（被格挡伤害的防御方）, `target`（攻击者）, `damage`（被格挡的伤害值） | `context.piece`（防御方）, `context.target`（攻击者）, `context.damage`（格挡的伤害值）— 圣盾等规则触发格挡后调用 |
+| `afterHealBlocked` | `piece`（被阻止治疗的棋子）, `target`（治疗者）, `heal`（被阻止的治疗值） | `context.piece`（受治疗棋子）, `context.target`（治疗者）, `context.heal`（治疗值） |
+| `afterStatusApplied` | `piece`（被施加状态的棋子）, `statusId`（状态ID）, `amount`（叠加层数） | `context.piece`（目标棋子）, `context.statusId`（状态ID）, `context.amount`（层数） |
+| `afterStatusRemoved` | `piece`（被移除状态的棋子）, `statusId`（状态ID） | `context.piece`（目标棋子）, `context.statusId`（状态ID） |
+| `afterChargeGained` | `piece`（获得充能的棋子）, `playerId`（玩家ID）, `amount`（充能获得量） | `context.piece`（棋子）, `context.playerId`（玩家ID）, `context.amount`（充能量） |
 | `whenever` | 根据触发时机不同，可能包含上述所有信息 | 根据具体情况获取相应信息 |
 
 ### 详细示例：如何在技能中获取死亡玩家信息
@@ -278,10 +283,13 @@ dealDamage(context.piece, targetEnemy, baseDamage, 'true', context.battle, 'true
 
 2. **伤害应用**：更新目标的生命值，确保至少剩余0点
 3. **触发器触发**：
-   - 触发攻击者的 `afterDamageDealt` 触发器
-   - 触发目标的 `afterDamageTaken` 触发器
-   - 如果目标被击杀，触发 `afterPieceKilled` 触发器
-4. **击杀奖励**：击杀敌人后，为攻击者的玩家增加1点充能点
+   - 触发攻击者的 `beforeDamageDealt` 触发器（可阻止）
+   - 触发目标的 `beforeDamageTaken` 触发器（可阻止）
+   - 若伤害被规则格挡（如圣盾），触发 `afterDamageBlocked` 触发器并返回
+   - 若伤害未被格挡，触发攻击者的 `afterDamageDealt` 触发器
+   - 若伤害未被格挡，触发目标的 `afterDamageTaken` 触发器
+   - 如果目标被击杀，触发 `afterPieceKilled` 触发器（攻击者视角）和 `onPieceDied` 触发器（死亡棋子自身视角）
+4. **击杀奖励**：击杀敌人后，为攻击者的玩家增加1点充能点，并触发 `afterChargeGained` 触发器
 5. **返回结果**：包含伤害值、是否击杀、目标剩余生命值等信息
 
 ## 触发规则
@@ -610,16 +618,69 @@ function executeSkill(context) {
 
 ### 触发类型
 
+#### 伤害类
+
+| 触发类型 | 描述 | 可阻止 |
+|---------|------|--------|
+| `beforeDamageDealt` | 即将造成伤害前（攻击者视角） | 是 |
+| `afterDamageDealt` | 造成伤害后（攻击者视角） | 否 |
+| `beforeDamageTaken` | 即将受到伤害前（防御者视角） | 是 |
+| `afterDamageTaken` | 受到伤害后（防御者视角） | 否 |
+| `afterDamageBlocked` | 伤害被规则/护盾格挡后（如圣盾触发时） | 否 |
+
+#### 治疗类
+
+| 触发类型 | 描述 | 可阻止 |
+|---------|------|--------|
+| `beforeHealDealt` | 即将造成治疗前 | 是 |
+| `afterHealDealt` | 造成治疗后 | 否 |
+| `beforeHealTaken` | 即将受到治疗前 | 是 |
+| `afterHealTaken` | 受到治疗后 | 否 |
+| `afterHealBlocked` | 治疗被规则格挡后 | 否 |
+
+#### 棋子类
+
+| 触发类型 | 描述 | 可阻止 |
+|---------|------|--------|
+| `afterPieceKilled` | 击杀棋子后（击杀者视角） | 否 |
+| `beforePieceKilled` | 即将击杀棋子前 | 否 |
+| `onPieceDied` | 棋子死亡时（**死亡棋子自身**视角，用于"我死亡时做X"效果） | 否 |
+| `afterPieceSummoned` | 召唤棋子后 | 否 |
+| `beforePieceSummoned` | 即将召唤棋子前 | 否 |
+
+#### 技能类
+
+| 触发类型 | 描述 | 可阻止 |
+|---------|------|--------|
+| `beforeSkillUse` | 即将使用技能前 | 是 |
+| `afterSkillUsed` | 技能使用后 | 否 |
+
+#### 移动类
+
+| 触发类型 | 描述 | 可阻止 |
+|---------|------|--------|
+| `beforeMove` | 即将移动前 | 是 |
+| `afterMove` | 移动后 | 否 |
+
+#### 回合类
+
+| 触发类型 | 描述 | 可阻止 |
+|---------|------|--------|
+| `beginTurn` | 回合开始时 | 否 |
+| `endTurn` | 回合结束时 | 否 |
+
+#### 状态与充能类
+
+| 触发类型 | 描述 | Context 附加字段 |
+|---------|------|-----------------|
+| `afterStatusApplied` | 状态效果被施加到棋子后 | `statusId`（状态ID）, `amount`（层数） |
+| `afterStatusRemoved` | 状态效果从棋子移除后 | `statusId`（状态ID） |
+| `afterChargeGained` | 充能点获得后 | `amount`（获得量）, `playerId`（玩家ID） |
+
+#### 通用
+
 | 触发类型 | 描述 |
 |---------|------|
-| `afterSkillUsed` | 技能使用后 |
-| `afterDamageDealt` | 造成伤害后 |
-| `afterDamageTaken` | 受到伤害后 |
-| `afterPieceKilled` | 击杀棋子后 |
-| `afterPieceSummoned` | 召唤棋子后 |
-| `beginTurn` | 回合开始时 |
-| `endTurn` | 回合结束时 |
-| `afterMove` | 移动后 |
 | `whenever` | 每一步行动后检测，用于实现"每当……，……"的效果 |
 
 ### 目标类型
@@ -1297,7 +1358,7 @@ function executeSkill(context) {
 ### 代码编写规范
 
 1. **Context使用规范**：
-   - **仅在特定触发事件中**可以使用 `context.target`，如 `afterDamageDealt`、`afterDamageTaken`
+   - **仅在特定触发事件中**可以使用 `context.target`，如 `afterDamageDealt`、`afterDamageTaken`、`onPieceDied`（此时 target 是攻击者）
    - **禁止**使用 `context.targetPosition`
    - 除特定触发事件外，所有目标相关的信息必须通过函数调用获取
 
@@ -1490,6 +1551,103 @@ function executeSkill(context) {
 
 通过遵循以上战斗日志标准，可以为玩家提供更清晰、更详细的战斗记录，增强游戏的可玩性和透明度。同时，统一的日志格式也便于开发人员调试和排查问题。
 
+## 游戏系统常量（BATTLE_DEFAULTS）
+
+为了便于后续调整游戏平衡，所有"回合/行动点"相关的魔法数字都集中定义在 `lib/game/turn.ts` 顶部的 `BATTLE_DEFAULTS` 常量对象中。**编写技能/规则时无需修改这些常量**，但了解它们的含义有助于理解行动点机制。
+
+```typescript
+const BATTLE_DEFAULTS = {
+  initialMaxActionPoints: 1,       // 每局开始时玩家的初始最大行动点
+  actionPointsGrowthPerTurn: 1,    // 每回合最大行动点增长量（炉石传说风格）
+  maxActionPointsLimit: 10,        // 最大行动点上限
+  moveActionCost: 1,               // 移动操作消耗的行动点
+} as const
+```
+
+**各常量说明：**
+- `initialMaxActionPoints`：第1回合时玩家拥有的最大行动点数（默认1点）
+- `actionPointsGrowthPerTurn`：每过一个自己的回合，最大行动点增加多少（默认1点）
+- `maxActionPointsLimit`：最大行动点的天花板，永远不会超过此值（默认10点）
+- `moveActionCost`：棋子移动一次消耗的行动点（默认1点）
+
+如需调整游戏节奏（如起始行动点、每回合成长速度），只需修改此对象中的对应数值，无需在代码各处搜索魔法数字。
+
+## 状态克隆机制（safeCloneBattleState）
+
+### 概述
+
+在 `lib/game/turn.ts` 中，我们使用 `safeCloneBattleState` 函数来安全地克隆战斗状态。这是因为 JavaScript 的 `structuredClone` 无法克隆函数类型的数据，而战斗状态中的棋子规则（rules）包含 `effect` 函数。
+
+### 实现原理
+
+`safeCloneBattleState` 函数的工作流程：
+
+1. **提取函数**：遍历所有棋子的规则，将 `effect` 函数提取并存储到 `Map` 中
+2. **删除函数**：从原始状态中删除 `effect` 属性，使 `structuredClone` 可以正常工作
+3. **克隆状态**：使用 `structuredClone` 克隆状态
+4. **恢复函数**：将存储的函数恢复到原始状态和克隆后的状态中
+
+```typescript
+function safeCloneBattleState(state: BattleState): BattleState {
+  // 临时存储所有棋子的规则函数
+  const pieceRulesFunctions: Map<number, any[]> = new Map()
+
+  // 提取函数
+  state.pieces.forEach((piece, index) => {
+    if (piece.rules && piece.rules.length > 0) {
+      pieceRulesFunctions.set(index, piece.rules.map(rule => rule.effect))
+      // 移除函数以便克隆
+      piece.rules.forEach((rule: any) => {
+        delete rule.effect
+      })
+    }
+  })
+
+  // 克隆状态
+  const cloned = structuredClone(state) as BattleState
+
+  // 恢复函数
+  state.pieces.forEach((piece, index) => {
+    if (piece.rules && piece.rules.length > 0) {
+      const functions = pieceRulesFunctions.get(index)
+      if (functions) {
+        piece.rules.forEach((rule: any, ruleIndex: number) => {
+          rule.effect = functions[ruleIndex]
+        })
+        // 同时恢复克隆对象中的函数
+        if (cloned.pieces[index].rules) {
+          cloned.pieces[index].rules.forEach((rule: any, ruleIndex: number) => {
+            rule.effect = functions[ruleIndex]
+          })
+        }
+      }
+    }
+  })
+
+  return cloned
+}
+```
+
+### 使用场景
+
+在 `turn.ts` 中，所有的战斗动作处理都使用 `safeCloneBattleState` 替代 `structuredClone`：
+
+- `beginPhase` 动作
+- `grantChargePoints` 动作  
+- `move` 动作
+- `basicSkill` 动作
+- `chargeSkill` 动作
+- `endTurn` 动作
+- `surrender` 动作
+
+### 注意事项
+
+1. **不要直接使用 `structuredClone`**：当战斗状态包含函数时，直接使用 `structuredClone` 会抛出错误：`could not be cloned`
+2. **确保函数恢复**：在克隆完成后，必须将函数恢复到原始状态和克隆后的状态，否则后续代码无法访问规则效果
+3. **处理空规则**：函数会正确处理没有规则的棋子，不会报错
+
+---
+
 ## 总结
 
 通过本教程，你应该已经学会了如何创建条件技能、使用状态系统以及实现目标选择：
@@ -1518,7 +1676,7 @@ function executeSkill(context) {
    - 使用正确的字段和值类型
    - 遵循代码编写规范
    - 确保JSON格式有效
-   - **仅在特定触发事件中**可以使用 `context.target`，如 `afterDamageDealt`、`afterDamageTaken`
+   - **仅在特定触发事件中**可以使用 `context.target`，如 `afterDamageDealt`、`afterDamageTaken`、`onPieceDied`（此时 target 是攻击者）
    - **禁止**使用 `context.targetPosition`
    - **所有效果都必须通过code标签执行**，禁止使用JSON硬编码
    - **所有条件判断都必须在code标签中使用if语句实现**，禁止在规则文件中使用conditions字段

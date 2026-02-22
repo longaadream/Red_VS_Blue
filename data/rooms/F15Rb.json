@@ -1,43 +1,14 @@
 {
-  "id": "gFt8I",
+  "id": "F15Rb",
   "name": "admin 的 1v1 房间",
   "status": "in-progress",
-  "createdAt": 1771765769369,
+  "createdAt": 1771787211291,
   "maxPlayers": 2,
   "players": [
     {
       "id": "user_1771360858632_9522",
       "name": "admin",
-      "joinedAt": 1771765769408,
-      "faction": "red",
-      "hasSelectedPieces": true,
-      "selectedPieces": [
-        {
-          "templateId": "red-archer",
-          "faction": "red"
-        },
-        {
-          "templateId": "red-doomsday-fist",
-          "faction": "red"
-        },
-        {
-          "templateId": "red-mage",
-          "faction": "red"
-        },
-        {
-          "templateId": "red-nilasec",
-          "faction": "red"
-        },
-        {
-          "templateId": "red-warrior",
-          "faction": "red"
-        }
-      ]
-    },
-    {
-      "id": "user_1771361118594_8536",
-      "name": "Longaadream",
-      "joinedAt": 1771765773552,
+      "joinedAt": 1771787211383,
       "faction": "blue",
       "hasSelectedPieces": true,
       "selectedPieces": [
@@ -60,6 +31,35 @@
         {
           "templateId": "jaina",
           "faction": "blue"
+        }
+      ]
+    },
+    {
+      "id": "user_1771361118594_8536",
+      "name": "Longaadream",
+      "joinedAt": 1771787217790,
+      "faction": "red",
+      "hasSelectedPieces": true,
+      "selectedPieces": [
+        {
+          "templateId": "red-archer",
+          "faction": "red"
+        },
+        {
+          "templateId": "red-doomsday-fist",
+          "faction": "red"
+        },
+        {
+          "templateId": "red-mage",
+          "faction": "red"
+        },
+        {
+          "templateId": "red-nilasec",
+          "faction": "red"
+        },
+        {
+          "templateId": "red-warrior",
+          "faction": "red"
         }
       ]
     }
@@ -3280,18 +3280,18 @@
     },
     "pieces": [
       {
-        "instanceId": "user_1771360858632_9522-1",
+        "instanceId": "user_1771361118594_8536-1",
         "templateId": "red-archer",
         "name": "红方射手",
-        "ownerPlayerId": "user_1771360858632_9522",
+        "ownerPlayerId": "user_1771361118594_8536",
         "faction": "red",
         "currentHp": 9,
         "maxHp": 9,
         "attack": 3,
         "defense": 0,
         "moveRange": 4,
-        "x": 3,
-        "y": 9,
+        "x": 10,
+        "y": 6,
         "skills": [
           {
             "skillId": "basic-attack",
@@ -3310,18 +3310,18 @@
         ]
       },
       {
-        "instanceId": "user_1771360858632_9522-2",
+        "instanceId": "user_1771361118594_8536-2",
         "templateId": "red-doomsday-fist",
         "name": "末日铁拳",
-        "ownerPlayerId": "user_1771360858632_9522",
+        "ownerPlayerId": "user_1771361118594_8536",
         "faction": "red",
-        "currentHp": 8,
+        "currentHp": 13,
         "maxHp": 13,
         "attack": 2,
         "defense": 1,
         "moveRange": 3,
-        "x": 13,
-        "y": 6,
+        "x": 14,
+        "y": 4,
         "skills": [
           {
             "skillId": "rocket-punch",
@@ -3354,18 +3354,18 @@
         ]
       },
       {
-        "instanceId": "user_1771360858632_9522-3",
+        "instanceId": "user_1771361118594_8536-3",
         "templateId": "red-mage",
         "name": "红方法师",
-        "ownerPlayerId": "user_1771360858632_9522",
+        "ownerPlayerId": "user_1771361118594_8536",
         "faction": "red",
         "currentHp": 8,
         "maxHp": 8,
         "attack": 6,
         "defense": 0,
         "moveRange": 2,
-        "x": 10,
-        "y": 1,
+        "x": 15,
+        "y": 6,
         "skills": [
           {
             "skillId": "teleport",
@@ -3384,18 +3384,18 @@
         ]
       },
       {
-        "instanceId": "user_1771360858632_9522-4",
+        "instanceId": "user_1771361118594_8536-4",
         "templateId": "red-nilasec",
         "name": "尼拉塞克",
-        "ownerPlayerId": "user_1771360858632_9522",
+        "ownerPlayerId": "user_1771361118594_8536",
         "faction": "red",
         "currentHp": 10,
         "maxHp": 10,
         "attack": 3,
         "defense": 0,
         "moveRange": 2,
-        "x": 3,
-        "y": 6,
+        "x": 9,
+        "y": 4,
         "skills": [
           {
             "skillId": "basic-attack",
@@ -3428,18 +3428,18 @@
         ]
       },
       {
-        "instanceId": "user_1771360858632_9522-5",
+        "instanceId": "user_1771361118594_8536-5",
         "templateId": "red-warrior",
         "name": "红方战士",
-        "ownerPlayerId": "user_1771360858632_9522",
+        "ownerPlayerId": "user_1771361118594_8536",
         "faction": "red",
         "currentHp": 15,
         "maxHp": 15,
         "attack": 2,
         "defense": 0,
         "moveRange": 3,
-        "x": 15,
-        "y": 5,
+        "x": 10,
+        "y": 12,
         "skills": [
           {
             "skillId": "basic-attack",
@@ -3458,17 +3458,17 @@
         ]
       },
       {
-        "instanceId": "user_1771361118594_8536-1",
+        "instanceId": "user_1771360858632_9522-1",
         "templateId": "anduin",
         "name": "安度因",
-        "ownerPlayerId": "user_1771361118594_8536",
+        "ownerPlayerId": "user_1771360858632_9522",
         "faction": "blue",
         "currentHp": 10,
         "maxHp": 10,
         "attack": 3,
         "defense": 1,
         "moveRange": 3,
-        "x": 7,
+        "x": 9,
         "y": 6,
         "skills": [
           {
@@ -3480,7 +3480,7 @@
           },
           {
             "skillId": "shield-of-light",
-            "currentCooldown": 0,
+            "currentCooldown": 2,
             "currentCharges": 0,
             "unlocked": true,
             "usesRemaining": -1
@@ -3495,18 +3495,18 @@
         ]
       },
       {
-        "instanceId": "user_1771361118594_8536-2",
+        "instanceId": "user_1771360858632_9522-2",
         "templateId": "blue-archer",
         "name": "蓝方射手",
-        "ownerPlayerId": "user_1771361118594_8536",
+        "ownerPlayerId": "user_1771360858632_9522",
         "faction": "blue",
         "currentHp": 9,
         "maxHp": 9,
         "attack": 3,
         "defense": 0,
         "moveRange": 4,
-        "x": 4,
-        "y": 11,
+        "x": 1,
+        "y": 6,
         "skills": [
           {
             "skillId": "basic-attack",
@@ -3525,18 +3525,18 @@
         ]
       },
       {
-        "instanceId": "user_1771361118594_8536-3",
+        "instanceId": "user_1771360858632_9522-3",
         "templateId": "blue-mage",
         "name": "蓝方法师",
-        "ownerPlayerId": "user_1771361118594_8536",
+        "ownerPlayerId": "user_1771360858632_9522",
         "faction": "blue",
         "currentHp": 8,
         "maxHp": 8,
         "attack": 6,
         "defense": 0,
         "moveRange": 2,
-        "x": 17,
-        "y": 11,
+        "x": 12,
+        "y": 4,
         "skills": [
           {
             "skillId": "teleport",
@@ -3551,22 +3551,28 @@
             "currentCharges": 0,
             "unlocked": true,
             "usesRemaining": -1
+          },
+          {
+            "skillId": "divine-shield-defense",
+            "currentCooldown": 0
           }
-        ]
+        ],
+        "statusTags": [],
+        "rules": []
       },
       {
-        "instanceId": "user_1771361118594_8536-4",
+        "instanceId": "user_1771360858632_9522-4",
         "templateId": "blue-warrior",
         "name": "蓝方战士",
-        "ownerPlayerId": "user_1771361118594_8536",
+        "ownerPlayerId": "user_1771360858632_9522",
         "faction": "blue",
         "currentHp": 15,
         "maxHp": 15,
         "attack": 2,
         "defense": 0,
         "moveRange": 3,
-        "x": 3,
-        "y": 11,
+        "x": 15,
+        "y": 9,
         "skills": [
           {
             "skillId": "basic-attack",
@@ -3585,17 +3591,17 @@
         ]
       },
       {
-        "instanceId": "user_1771361118594_8536-5",
+        "instanceId": "user_1771360858632_9522-5",
         "templateId": "jaina",
         "name": "吉安娜",
-        "ownerPlayerId": "user_1771361118594_8536",
+        "ownerPlayerId": "user_1771360858632_9522",
         "faction": "blue",
         "currentHp": 10,
         "maxHp": 10,
         "attack": 4,
         "defense": 0,
         "moveRange": 4,
-        "x": 10,
+        "x": 5,
         "y": 4,
         "skills": [
           {
@@ -3618,36 +3624,6 @@
             "currentCharges": 0,
             "unlocked": true,
             "usesRemaining": -1
-          },
-          {
-            "skillId": "divine-shield-defense",
-            "currentCooldown": 0
-          }
-        ],
-        "statusTags": [
-          {
-            "id": "divine-shield",
-            "type": "divine-shield",
-            "currentDuration": -1,
-            "currentUses": -1,
-            "intensity": 1,
-            "stacks": 1,
-            "relatedRules": [
-              "rule-divine-shield"
-            ]
-          }
-        ],
-        "rules": [
-          {
-            "id": "rule-divine-shield",
-            "name": "圣盾效果",
-            "description": "当拥有圣盾状态时，受到伤害会抵挡一次伤害并移除圣盾效果",
-            "trigger": {
-              "type": "beforeDamageTaken"
-            },
-            "relatedStatusTags": [
-              "divine-shield"
-            ]
           }
         ]
       }
@@ -3806,7 +3782,7 @@
         "cooldownTurns": 0,
         "maxCharges": 0,
         "powerMultiplier": 1,
-        "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; let hasDivineShield = false; if (piece.statusTags) { hasDivineShield = piece.statusTags.some(tag => tag.type === 'divine-shield'); } if (!hasDivineShield) { return { success: true, blocked: false, message: '' }; } if (!damage || damage <= 0) { return { success: true, blocked: false, message: '没有伤害需要抵挡' }; } if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'divine-shield'); } if (typeof removeRuleById === 'function') { removeRuleById(piece.instanceId, 'rule-divine-shield'); } if (typeof piece.skills !== 'undefined') { piece.skills = piece.skills.filter(skill => skill.skillId !== 'divine-shield-defense'); } const attacker = context.target ? context.target.name : '未知敌人'; return { success: true, blocked: true, message: piece.name + '的圣盾破裂，抵挡了来自于' + attacker + '的伤害' }; }"
+        "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; let hasDivineShield = false; if (piece.statusTags) { hasDivineShield = piece.statusTags.some(tag => tag.type === 'divine-shield'); } if (!hasDivineShield) { return { success: true, blocked: false, message: '' }; } if (!damage || damage <= 0) { return { success: true, blocked: false, message: '没有伤害需要抵挡' }; } if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'divine-shield'); } if (typeof removeRuleById === 'function') { removeRuleById(piece.instanceId, 'rule-divine-shield'); } if (typeof removeSkillById === 'function') { removeSkillById(piece.instanceId, 'divine-shield-defense'); } const attacker = context.target ? context.target.name : '未知敌人'; return { success: true, blocked: true, message: piece.name + '的圣盾破裂，抵挡了来自于' + attacker + '的伤害' }; }"
       },
       "earthshatter": {
         "id": "earthshatter",
@@ -4060,22 +4036,22 @@
     },
     "players": [
       {
-        "playerId": "user_1771360858632_9522",
-        "chargePoints": 0,
-        "actionPoints": 5,
-        "maxActionPoints": 5
-      },
-      {
         "playerId": "user_1771361118594_8536",
         "chargePoints": 0,
-        "actionPoints": 3,
-        "maxActionPoints": 5
+        "actionPoints": 4,
+        "maxActionPoints": 4
+      },
+      {
+        "playerId": "user_1771360858632_9522",
+        "chargePoints": 0,
+        "actionPoints": 0,
+        "maxActionPoints": 3
       }
     ],
     "turn": {
       "currentPlayerId": "user_1771361118594_8536",
-      "turnNumber": 10,
-      "phase": "action",
+      "turnNumber": 7,
+      "phase": "end",
       "actions": {
         "hasMoved": false,
         "hasUsedBasicSkill": false,
@@ -4086,112 +4062,68 @@
       {
         "type": "move",
         "playerId": "user_1771360858632_9522",
-        "turn": 1,
-        "payload": {
-          "message": "末日铁拳从(7, 6)移动到(10, 6)",
-          "pieceId": "user_1771360858632_9522-2",
-          "fromX": 7,
-          "fromY": 6,
-          "toX": 10,
-          "toY": 6
-        }
-      },
-      {
-        "type": "move",
-        "playerId": "user_1771361118594_8536",
         "turn": 2,
         "payload": {
-          "message": "安度因从(1, 5)移动到(1, 4)",
-          "pieceId": "user_1771361118594_8536-1",
-          "fromX": 1,
-          "fromY": 5,
-          "toX": 1,
-          "toY": 4
+          "message": "安度因从(4, 7)移动到(4, 6)",
+          "pieceId": "user_1771360858632_9522-1",
+          "fromX": 4,
+          "fromY": 7,
+          "toX": 4,
+          "toY": 6
         }
       },
       {
         "type": "move",
         "playerId": "user_1771360858632_9522",
-        "turn": 3,
+        "turn": 4,
         "payload": {
-          "message": "末日铁拳从(10, 6)移动到(13, 6)",
-          "pieceId": "user_1771360858632_9522-2",
-          "fromX": 10,
+          "message": "安度因从(4, 6)移动到(7, 6)",
+          "pieceId": "user_1771360858632_9522-1",
+          "fromX": 4,
           "fromY": 6,
-          "toX": 13,
+          "toX": 7,
           "toY": 6
         }
       },
       {
         "type": "move",
-        "playerId": "user_1771361118594_8536",
+        "playerId": "user_1771360858632_9522",
         "turn": 4,
         "payload": {
-          "message": "安度因从(1, 4)移动到(4, 4)",
-          "pieceId": "user_1771361118594_8536-1",
-          "fromX": 1,
-          "fromY": 4,
-          "toX": 4,
-          "toY": 4
-        }
-      },
-      {
-        "type": "move",
-        "playerId": "user_1771361118594_8536",
-        "turn": 4,
-        "payload": {
-          "message": "安度因从(4, 4)移动到(7, 4)",
-          "pieceId": "user_1771361118594_8536-1",
-          "fromX": 4,
-          "fromY": 4,
-          "toX": 7,
-          "toY": 4
+          "message": "安度因从(7, 6)移动到(9, 6)",
+          "pieceId": "user_1771360858632_9522-1",
+          "fromX": 7,
+          "fromY": 6,
+          "toX": 9,
+          "toY": 6
         }
       },
       {
         "type": "useBasicSkill",
-        "playerId": "user_1771361118594_8536",
+        "playerId": "user_1771360858632_9522",
         "turn": 6,
         "payload": {
-          "message": "安度因使用了圣光术，目标是吉安娜，undefined 为 吉安娜 施加了圣盾",
+          "message": "安度因使用了圣光术，目标是蓝方法师，undefined 为 蓝方法师 施加了圣盾",
           "skillId": "shield-of-light",
-          "pieceId": "user_1771361118594_8536-1"
+          "pieceId": "user_1771360858632_9522-1"
+        }
+      },
+      {
+        "type": "triggerEffect",
+        "playerId": "user_1771361118594_8536",
+        "turn": 7,
+        "payload": {
+          "message": "蓝方法师受到的伤害被规则阻止"
         }
       },
       {
         "type": "useBasicSkill",
         "playerId": "user_1771361118594_8536",
-        "turn": 8,
+        "turn": 7,
         "payload": {
-          "message": "吉安娜使用了火球术，目标是末日铁拳，jaina对red-doomsday-fist造成5点伤害",
-          "skillId": "fireball",
-          "pieceId": "user_1771361118594_8536-5"
-        }
-      },
-      {
-        "type": "move",
-        "playerId": "user_1771361118594_8536",
-        "turn": 10,
-        "payload": {
-          "message": "吉安娜从(13, 4)移动到(10, 4)",
-          "pieceId": "user_1771361118594_8536-5",
-          "fromX": 13,
-          "fromY": 4,
-          "toX": 10,
-          "toY": 4
-        }
-      },
-      {
-        "type": "move",
-        "playerId": "user_1771361118594_8536",
-        "turn": 10,
-        "payload": {
-          "message": "安度因从(7, 4)移动到(7, 6)",
-          "pieceId": "user_1771361118594_8536-1",
-          "fromX": 7,
-          "fromY": 4,
-          "toX": 7,
-          "toY": 6
+          "message": "末日铁拳使用了手炮，目标是蓝方法师，undefined 使用手炮对 蓝方法师 造成 0 点伤害",
+          "skillId": "hand-cannon",
+          "pieceId": "user_1771361118594_8536-2"
         }
       }
     ]

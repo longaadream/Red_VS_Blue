@@ -22,6 +22,12 @@ export type TriggerType =
   | "beforeHealDealt"       // 即将造成治疗前
   | "beforeHealTaken"       // 即将受到治疗前
   | "whenever"              // 每一步行动后检测
+  | "onPieceDied"           // 棋子死亡时（死亡者自身视角，可用于"我死亡时做X"效果）
+  | "afterStatusApplied"    // 状态效果被施加到棋子后
+  | "afterStatusRemoved"    // 状态效果从棋子移除后
+  | "afterChargeGained"     // 充能点获得后
+  | "afterDamageBlocked"    // 伤害被规则/护盾格挡后（如圣盾）
+  | "afterHealBlocked"      // 治疗被规则格挡后
 
 // 条件类型定义已移除，所有条件判断都在技能代码中通过if语句实现
 
@@ -65,6 +71,10 @@ export interface TriggerContext {
   heal?: number
   turnNumber?: number
   playerId?: string
+  /** 数量（用于充能获得量、状态层数等数值事件） */
+  amount?: number
+  /** 状态 ID（用于 afterStatusApplied / afterStatusRemoved 事件） */
+  statusId?: string
 }
 
 // 触发系统类
@@ -146,61 +156,13 @@ export class TriggerSystem {
 
     // 执行全局匹配的规则
     for (const rule of globalMatchingRules) {
-      const result = rule.effect(battle, context)
-      if (result.success) {
-        success = true
-        if (result.message) {
-          triggeredEffects.push(result.message)
-        }
-        // 检查是否阻止行动
-        if (result.blocked) {
-          blocked = true
-        }
-
-        // 更新规则的限制状态
-        if (rule.limits) {
-          // 增加使用次数
-          if (rule.limits.uses !== undefined) {
-            rule.limits.uses++
-          } else {
-            rule.limits.uses = 1
-          }
-
-          // 设置冷却
-          if (rule.limits.cooldownTurns) {
-            rule.limits.currentCooldown = rule.limits.cooldownTurns
-          }
-        }
+      // 检查规则对象是否有效
+      if (!rule || typeof rule.effect !== 'function') {
+        console.warn(`Skipping invalid global rule: rule or rule.effect is not a function`, rule?.id)
+        continue
       }
-    }
-
-    // 2. 检查棋子实例的规则
-    if (context.sourcePiece && context.sourcePiece.rules) {
-      const pieceMatchingRules = context.sourcePiece.rules.filter((rule: any) => {
-        // 只检查触发类型是否匹配
-        if (rule.trigger.type !== context.type) {
-          return false
-        }
-
-        // 检查限制条件
-        const limits = rule.limits
-        if (limits) {
-          // 检查冷却
-          if (limits.currentCooldown && limits.currentCooldown > 0) {
-            return false
-          }
-
-          // 检查使用次数
-          if (limits.maxUses && (limits.uses || 0) >= limits.maxUses) {
-            return false
-          }
-        }
-
-        return true
-      })
-
-      // 执行棋子匹配的规则
-      for (const rule of pieceMatchingRules) {
+      
+      try {
         const result = rule.effect(battle, context)
         if (result.success) {
           success = true
@@ -226,6 +188,79 @@ export class TriggerSystem {
               rule.limits.currentCooldown = rule.limits.cooldownTurns
             }
           }
+        }
+      } catch (error) {
+        console.error(`Error executing global rule ${rule.id}:`, error)
+      }
+    }
+
+    // 2. 检查棋子实例的规则
+    if (context.sourcePiece && context.sourcePiece.rules) {
+      const pieceMatchingRules = context.sourcePiece.rules.filter((rule: any) => {
+        // 检查规则对象是否有效
+        if (!rule || !rule.trigger) {
+          console.warn(`Skipping invalid rule on piece ${context.sourcePiece?.instanceId}: rule or rule.trigger is undefined`)
+          return false
+        }
+        
+        // 只检查触发类型是否匹配
+        if (rule.trigger.type !== context.type) {
+          return false
+        }
+
+        // 检查限制条件
+        const limits = rule.limits
+        if (limits) {
+          // 检查冷却
+          if (limits.currentCooldown && limits.currentCooldown > 0) {
+            return false
+          }
+
+          // 检查使用次数
+          if (limits.maxUses && (limits.uses || 0) >= limits.maxUses) {
+            return false
+          }
+        }
+
+        return true
+      })
+
+      // 执行棋子匹配的规则
+      for (const rule of pieceMatchingRules) {
+        if (typeof rule.effect !== 'function') {
+          console.warn(`Skipping rule ${rule.id}: effect is not a function (may have been lost during JSON serialization)`)
+          continue
+        }
+        
+        try {
+          const result = rule.effect(battle, context)
+          if (result.success) {
+            success = true
+            if (result.message) {
+              triggeredEffects.push(result.message)
+            }
+            // 检查是否阻止行动
+            if (result.blocked) {
+              blocked = true
+            }
+
+            // 更新规则的限制状态
+            if (rule.limits) {
+              // 增加使用次数
+              if (rule.limits.uses !== undefined) {
+                rule.limits.uses++
+              } else {
+                rule.limits.uses = 1
+              }
+
+              // 设置冷却
+              if (rule.limits.cooldownTurns) {
+                rule.limits.currentCooldown = rule.limits.cooldownTurns
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error executing piece rule ${rule.id}:`, error)
         }
       }
     }

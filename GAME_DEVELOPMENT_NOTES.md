@@ -304,16 +304,33 @@
 
 #### 触发类型
 
-| 触发类型 | 描述 | 传入的 Context 信息 |
-|---------|------|-------------------|
-| `afterSkillUsed` | 技能使用后 | `piece`（使用技能的棋子）, `skillId`（技能ID） |
-| `afterDamageDealt` | 造成伤害后 | `piece`（攻击者）, `targetPiece`（被攻击者）, `damage`（伤害值） |
-| `afterDamageTaken` | 受到伤害后 | `piece`（被攻击者）, `targetPiece`（攻击者）, `damage`（伤害值） |
-| `afterPieceKilled` | 击杀棋子后 | `piece`（击杀者）, `targetPiece`（被杀者） |
-| `afterPieceSummoned` | 召唤棋子后 | `piece`（召唤者）, `targetPiece`（被召唤者） |
-| `beginTurn` | 回合开始时 | `piece`（当前回合玩家的棋子） |
-| `endTurn` | 回合结束时 | `piece`（当前回合玩家的棋子） |
-| `afterMove` | 移动后 | `piece`（移动的棋子） |
+| 触发类型 | 描述 | 附加 Context 字段 |
+|---------|------|-----------------|
+| `afterSkillUsed` | 技能使用后 | `skillId`, `playerId` |
+| `beforeSkillUse` | 即将使用技能前（可阻止） | `skillId` |
+| `afterDamageDealt` | 造成伤害后（攻击者视角） | `damage`, `targetPiece`, `skillId` |
+| `beforeDamageDealt` | 即将造成伤害前（可阻止） | `damage`, `targetPiece` |
+| `afterDamageTaken` | 受到伤害后（防御者视角） | `damage`, `targetPiece`, `skillId` |
+| `beforeDamageTaken` | 即将受到伤害前（可阻止） | `damage`, `targetPiece` |
+| `afterDamageBlocked` | 伤害被规则/护盾格挡后 | `damage`, `targetPiece` |
+| `afterHealDealt` | 造成治疗后 | `heal`, `targetPiece` |
+| `beforeHealDealt` | 即将造成治疗前（可阻止） | `heal`, `targetPiece` |
+| `afterHealTaken` | 受到治疗后 | `heal`, `targetPiece` |
+| `beforeHealTaken` | 即将受到治疗前（可阻止） | `heal`, `targetPiece` |
+| `afterHealBlocked` | 治疗被规则格挡后 | `heal`, `targetPiece` |
+| `afterPieceKilled` | 击杀棋子后（击杀者视角） | `targetPiece`, `damage` |
+| `beforePieceKilled` | 即将击杀棋子前 | `targetPiece` |
+| `onPieceDied` | 棋子死亡时（**死亡棋子自身**视角） | `targetPiece`（攻击者）, `damage` |
+| `afterPieceSummoned` | 召唤棋子后 | `targetPiece` |
+| `beforePieceSummoned` | 即将召唤棋子前 | — |
+| `beginTurn` | 回合开始时 | `turnNumber`, `playerId` |
+| `endTurn` | 回合结束时 | `turnNumber`, `playerId` |
+| `afterMove` | 移动后 | `playerId` |
+| `beforeMove` | 即将移动前（可阻止） | — |
+| `afterStatusApplied` | 状态效果被施加后 | `statusId`, `amount` |
+| `afterStatusRemoved` | 状态效果被移除后 | `statusId` |
+| `afterChargeGained` | 充能点获得后 | `amount`, `playerId` |
+| `whenever` | 每一步行动后检测 | 视当前上下文而定 |
 
 #### 触发上下文 (TriggerContext)
 
@@ -322,12 +339,15 @@
 ```typescript
 interface TriggerContext {
   type: TriggerType;
-  sourcePiece?: PieceInstance;     // 事件源棋子
-  targetPiece?: PieceInstance;     // 事件目标棋子
-  skillId?: string;               // 技能ID（仅在技能相关事件中存在）
-  damage?: number;                // 伤害值（仅在伤害相关事件中存在）
+  sourcePiece?: PieceInstance;     // 事件源棋子（规则绑定棋子 / 攻击者 / 治疗者 / 死亡棋子本身）
+  targetPiece?: PieceInstance;     // 事件目标棋子（被攻击者 / 被治疗者 / 攻击者）
+  skillId?: string;                // 技能ID（仅在技能相关事件中存在）
+  damage?: number;                 // 伤害值（仅在伤害相关事件中存在）
+  heal?: number;                   // 治疗值（仅在治疗相关事件中存在）
   turnNumber?: number;             // 回合数
   playerId?: string;               // 玩家ID
+  amount?: number;                 // 数量（充能获得量、状态叠加层数等）
+  statusId?: string;               // 状态ID（用于 afterStatusApplied / afterStatusRemoved）
 }
 ```
 
@@ -1321,3 +1341,77 @@ function calculatePreview(piece, skillDef) {
 
 8. **游戏已在进行或已结束错误**：
    - **问题**：进入游戏界面时提示"game is already in progress or finished"
+   - **原因**：房间状态管理问题，房间状态没有正确重置
+   - **解决方案**：修复房间状态管理逻辑，确保房间状态正确重置
+
+34. **圣盾（divine-shield）崩溃修复**：
+    - **问题**：其他棋子选中带有圣盾的棋子时，游戏报错 `TypeError: rule.effect is not a function`
+    - **原因**：`room-store.ts` 的 `syncWithStorage()` 在每次 `getRoom()` 调用时都会重新从 JSON 文件加载房间数据，而 JSON 序列化无法保留 JavaScript 函数，导致 `piece.rules[i].effect` 反序列化后变为 `undefined`
+    - **三层修复方案**：
+      1. `lib/game/triggers.ts`：在 `checkTriggers` 中，执行规则 effect 前添加 `typeof rule.effect !== 'function'` 安全守卫，跳过已丢失函数的规则并打印警告，避免崩溃
+      2. `lib/game/skills.ts`：将 `loadRuleById` 从内部函数改为 `export function`，供外部调用
+      3. `app/api/rooms/[roomId]/battle/route.ts`：在每次 `POST`（即每次执行战斗动作前）调用新增的 `rehydrateBattleRules()` 函数，遍历所有棋子的 `rules` 数组，对 `effect` 为非函数的规则通过 `loadRuleById` 从磁盘重新注入函数引用，确保圣盾等规则在每次请求中都能正确执行
+
+35. **触发系统（TriggerType）完整性补全**：
+    - **背景**：原有 TriggerType 联合类型缺少多类游戏场景的时机，导致部分"当X时做Y"效果无法通过规则系统表达
+    - **新增 6 个触发类型**（`lib/game/triggers.ts`）：
+      - `onPieceDied`：棋子死亡时从**死亡棋子自身视角**触发，专门用于"我死亡时做X"效果，sourcePiece 为死亡棋子
+      - `afterStatusApplied`：状态效果被施加到棋子后触发，context 含 `statusId` 和 `amount`
+      - `afterStatusRemoved`：状态效果从棋子移除后触发，context 含 `statusId`
+      - `afterChargeGained`：充能点获得后触发，context 含 `amount` 和 `playerId`
+      - `afterDamageBlocked`：伤害被规则或护盾格挡后触发（如圣盾消耗时）
+      - `afterHealBlocked`：治疗被规则格挡后触发
+    - **新增 TriggerContext 字段**：
+      - `amount?: number`：用于充能获得量、状态叠加层数等数值事件
+      - `statusId?: string`：用于 `afterStatusApplied` / `afterStatusRemoved` 事件中标识状态
+    - **触发点植入**（`lib/game/skills.ts`）：
+      - `dealDamage`：格挡路径触发 `afterDamageBlocked`；击杀路径分别触发 `onPieceDied`（死亡棋子）和 `afterChargeGained`（攻击者玩家）
+      - `healDamage`：格挡路径触发 `afterHealBlocked`
+      - `addStatusEffectById` 闭包：施加状态后触发 `afterStatusApplied`
+      - `removeStatusEffectById` 闭包：移除状态后触发 `afterStatusRemoved`
+
+36. **规则加载性能优化（ruleCache）**：
+    - **问题**：每次 `loadRuleById` 都通过 `fs.readFileSync` 读取磁盘文件，在频繁触发规则的战斗中（圣盾重注、大量规则重注入）产生大量 I/O
+    - **解决方案**：在 `lib/game/skills.ts` 顶层添加模块级 `ruleCache = new Map<string, TriggerRule>()`，`loadRuleById` 首先检查缓存，命中则直接返回浅拷贝；未命中则读取文件、解析、写入缓存后返回
+    - **效果**：每条规则在服务进程生命周期内只读取一次磁盘，后续所有调用均从内存 Map 返回，消除重复 I/O
+
+37. **turn.ts 架构重构**：
+    - **BATTLE_DEFAULTS 常量化**：将原先散落在代码各处的魔法数字（初始行动点、每回合增长量、上限、移动消耗）集中到顶部 `BATTLE_DEFAULTS` 常量对象，后续调整游戏数值只需修改一处：
+      ```typescript
+      const BATTLE_DEFAULTS = {
+        initialMaxActionPoints: 1,
+        actionPointsGrowthPerTurn: 1,
+        maxActionPointsLimit: 10,
+        moveActionCost: 1,
+      } as const
+      ```
+    - **提取 `executeAndApplySkill` 共享函数**：`useBasicSkill` 和 `useChargeSkill` 两个 case 原各自包含约 276 行高度重复的技能执行逻辑（棋子查找、skillDef 查找、行动点检查、冷却检查、ultimate 检查、充能检查、`beforeSkillUse` 触发、目标构建、context 构建、`executeSkillFunction` 调用、`needsTargetSelection` 错误处理、行动点扣除、冷却设置、日志构建、`whenever` 触发）。现在提取为独立的 `executeAndApplySkill(state, next, action, chargeCost)` 函数（约 120 行），两个 case 各精简至 6–10 行
+    - **修复充能点扣除 Bug**：原 `useChargeSkill` 通过 `getPlayerMeta(state, ...)` 在**原始状态**上扣除充能点，而 `room.battleState = nextState` 替换的是 `structuredClone` 后的 `next`，导致扣除操作被丢弃。修复后统一在 `next`（克隆状态）上执行所有修改
+    - **移除 fallback 默认技能**：`useChargeSkill` 中存在一段硬编码的"默认普通攻击"逻辑作为 fallback，与"严格从文件加载技能"原则冲突。现已移除，技能定义找不到时直接抛出 `BattleRuleError`
+
+38. **安度因圣盾术修复与 safeCloneBattleState 实现**：
+    - **问题1：addSkillById 函数缺失**：圣光术技能代码调用 `addSkillById` 为目标添加圣盾防御技能，但该函数未在技能执行环境中定义
+    - **修复1**：在 `lib/game/skills.ts` 的 `skillEnvironment` 中添加 `addSkillById` 函数，用于为目标棋子添加技能
+    - **问题2：removeSkillById 函数缺失**：圣盾防御技能代码需要移除自身技能，但 `removeSkillById` 函数不存在
+    - **修复2**：在 `lib/game/skills.ts` 中添加 `removeSkillById` 函数，并在 `executeSkillFunction` 的 eval 代码中注入该函数
+    - **问题3：structuredClone 无法克隆函数**：当棋子拥有规则（rules）时，规则中的 `effect` 是函数，直接使用 `structuredClone(state)` 会报错 `could not be cloned`
+    - **修复3**：创建 `safeCloneBattleState` 辅助函数，工作流程：
+      1. 提取所有棋子规则中的 `effect` 函数并存储到 Map
+      2. 从原始状态中删除 `effect` 属性
+      3. 使用 `structuredClone` 克隆状态
+      4. 将函数恢复到原始状态和克隆后的状态
+    - **应用**：将所有 8 处 `structuredClone(state) as BattleState` 替换为 `safeCloneBattleState(state)`，包括：
+      - `beginPhase` 动作
+      - `grantChargePoints` 动作
+      - `move` 动作
+      - `basicSkill` 动作
+      - `chargeSkill` 动作
+      - `endTurn` 动作
+      - `surrender` 动作
+    - **文件修改**：
+      - `lib/game/turn.ts`：添加 `safeCloneBattleState` 函数，替换所有 `structuredClone`
+      - `lib/game/skills.ts`：添加 `addSkillById` 和 `removeSkillById` 函数
+      - `data/skills/shield-of-light.json`：恢复使用 `addSkillById` 添加圣盾防御技能
+      - `data/skills/divine-shield-defense.json`：使用 `removeSkillById` 移除自身技能
+      - `app/api/rooms/[roomId]/battle/route.ts`：改进 `rehydrateBattleRules` 函数，处理加载失败的情况
+      - `lib/game/triggers.ts`：添加规则有效性检查和错误处理

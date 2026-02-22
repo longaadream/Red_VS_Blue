@@ -38,8 +38,17 @@ interface TriggerRule {
   }
 }
 
-// 从文件中加载规则的函数
-function loadRuleById(ruleId: string): TriggerRule | null {
+// 规则加载缓存：同一个规则文件在服务器生命周期内只读一次磁盘
+// 每次复用时返回浅拷贝，保持 effect 函数引用一致
+const ruleCache = new Map<string, TriggerRule>()
+
+// 从文件中加载规则的函数（导出以便在需要时重新注入 effect 函数）
+export function loadRuleById(ruleId: string): TriggerRule | null {
+  // 命中缓存时直接返回浅拷贝（保留 effect 函数引用，避免重复读文件）
+  const cached = ruleCache.get(ruleId)
+  if (cached) {
+    return { ...cached }
+  }
   try {
     const fs = require('fs');
     const path = require('path');
@@ -254,6 +263,8 @@ function loadRuleById(ruleId: string): TriggerRule | null {
       };
       
       console.log(`Loaded rule successfully: ${ruleId}`);
+      // 写入缓存，后续复用时无需再读文件
+      ruleCache.set(ruleId, rule)
       return rule;
     } else {
       console.error(`Rule file not found: ${rulePath}`);
@@ -923,23 +934,25 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
   
   // 检查是否有规则阻止了伤害
   if (beforeDamageTakenResult.blocked) {
-    // 记录阻止信息到战斗日志
-    const attackerName = attacker.name || attacker.templateId;
     const targetName = target.name || target.templateId;
-    
-    if (!battle.actions) {
-      battle.actions = [];
-    }
-    
+
+    if (!battle.actions) battle.actions = [];
     battle.actions.push({
       type: "triggerEffect",
       playerId: attacker.ownerPlayerId,
       turn: battle.turn.turnNumber,
-      payload: {
-        message: `${targetName}受到的伤害被规则阻止`
-      }
+      payload: { message: `${targetName}受到的伤害被规则阻止` }
     });
-    
+
+    // 触发格挡后事件（死亡者视角：target 是被保护的棋子）
+    globalTriggerSystem.checkTriggers(battle, {
+      type: "afterDamageBlocked",
+      sourcePiece: target,
+      targetPiece: attacker,
+      damage: baseDamage,
+      skillId
+    });
+
     return {
       success: false,
       damage: 0,
@@ -1009,20 +1022,37 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
       skillId
     });
     
-    // 触发击杀相关的触发器
+    // 触发击杀相关的触发器（击杀者视角）
     globalTriggerSystem.checkTriggers(battle, {
       type: "afterPieceKilled",
       sourcePiece: attacker,
       targetPiece: target,
       skillId
     });
-    
+
+    // 触发死亡事件（死亡棋子自身视角，用于"我死亡时做X"效果）
+    // 在移出棋盘前触发，此时棋子仍在 battle.pieces 中
+    globalTriggerSystem.checkTriggers(battle, {
+      type: "onPieceDied",
+      sourcePiece: target,
+      targetPiece: attacker,
+      damage: finalDamage,
+      skillId
+    });
+
     // 击杀敌人后，为击杀者添加充能点
     const playerMeta = battle.players.find(p => p.playerId === attacker.ownerPlayerId);
     if (playerMeta) {
       playerMeta.chargePoints += 1; // 每次击杀获得1点充能
+      // 触发充能获得事件（可用于"获得充能时做X"效果）
+      globalTriggerSystem.checkTriggers(battle, {
+        type: "afterChargeGained",
+        sourcePiece: attacker,
+        amount: 1,
+        playerId: attacker.ownerPlayerId
+      });
     }
-    
+
     // 从棋盘上移除死亡的棋子，并将其移到墓地中
     const targetIndex = battle.pieces.findIndex(p => p.instanceId === target.instanceId);
     if (targetIndex !== -1) {
@@ -1108,23 +1138,25 @@ export function healDamage(healer: PieceInstance, target: PieceInstance, baseHea
   
   // 检查是否有规则阻止了治疗
   if (beforeHealTakenResult.blocked) {
-    // 记录阻止信息到战斗日志
-    const healerName = healer.name || healer.templateId;
     const targetName = target.name || target.templateId;
-    
-    if (!battle.actions) {
-      battle.actions = [];
-    }
-    
+
+    if (!battle.actions) battle.actions = [];
     battle.actions.push({
       type: "triggerEffect",
       playerId: healer.ownerPlayerId,
       turn: battle.turn.turnNumber,
-      payload: {
-        message: `${targetName}受到的治疗被规则阻止`
-      }
+      payload: { message: `${targetName}受到的治疗被规则阻止` }
     });
-    
+
+    // 触发治疗格挡后事件
+    globalTriggerSystem.checkTriggers(battle, {
+      type: "afterHealBlocked",
+      sourcePiece: target,
+      targetPiece: healer,
+      heal: baseHeal,
+      skillId
+    });
+
     return {
       success: false,
       heal: 0,
@@ -1250,6 +1282,13 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         
         // 添加到状态标签数组
         targetPiece.statusTags.push(newStatus);
+        // 触发状态施加后事件
+        globalTriggerSystem.checkTriggers(battle, {
+          type: "afterStatusApplied",
+          sourcePiece: targetPiece,
+          statusId: statusObject.id,
+          playerId: targetPiece.ownerPlayerId
+        });
         return true;
       }
       return false;
@@ -1293,6 +1332,13 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         
         // 从状态标签数组中移除指定状态
         targetPiece.statusTags.splice(statusTagIndex, 1);
+        // 触发状态移除后事件
+        globalTriggerSystem.checkTriggers(battle, {
+          type: "afterStatusRemoved",
+          sourcePiece: targetPiece,
+          statusId: statusId,
+          playerId: targetPiece.ownerPlayerId
+        });
         return true;
       }
       return false;
@@ -1351,6 +1397,10 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       // 找到目标棋子
       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
       if (targetPiece) {
+        // 确保skills数组存在
+        if (!targetPiece.skills) {
+          targetPiece.skills = [];
+        }
         // 检查技能是否已经存在
         const existingSkill = targetPiece.skills.find(skill => skill.skillId === skillId);
         if (!existingSkill) {
@@ -1363,6 +1413,17 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           targetPiece.skills.push(newSkill);
           return true;
         }
+      }
+      return false;
+    },
+    removeSkillById: (targetPieceId: string, skillId: string) => {
+      // 找到目标棋子
+      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
+      if (targetPiece && targetPiece.skills) {
+        // 从棋子的技能列表中移除
+        const originalLength = targetPiece.skills.length;
+        targetPiece.skills = targetPiece.skills.filter(skill => skill.skillId !== skillId);
+        return targetPiece.skills.length < originalLength;
       }
       return false;
     },
@@ -1451,6 +1512,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const removeRuleById = environment.removeRuleById;
               const removeStatusEffectById = environment.removeStatusEffectById;
               const addSkillById = environment.addSkillById;
+              const removeSkillById = environment.removeSkillById;
               const Math = environment.Math;
               const console = environment.console;
               

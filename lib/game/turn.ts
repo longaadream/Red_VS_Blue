@@ -4,6 +4,46 @@ import type { SkillDefinition } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { statusEffectSystem, StatusEffectType } from "./status-effects"
 
+// ─── 辅助函数：安全地克隆 BattleState（处理函数无法克隆的问题）────────────────
+function safeCloneBattleState(state: BattleState): BattleState {
+  // 临时存储所有棋子的规则函数
+  const pieceRulesFunctions: Map<number, any[]> = new Map()
+
+  // 提取函数
+  state.pieces.forEach((piece, index) => {
+    if (piece.rules && piece.rules.length > 0) {
+      pieceRulesFunctions.set(index, piece.rules.map(rule => rule.effect))
+      // 移除函数以便克隆
+      piece.rules.forEach((rule: any) => {
+        delete rule.effect
+      })
+    }
+  })
+
+  // 克隆状态
+  const cloned = structuredClone(state) as BattleState
+
+  // 恢复函数到原始状态
+  state.pieces.forEach((piece, index) => {
+    if (piece.rules && piece.rules.length > 0) {
+      const functions = pieceRulesFunctions.get(index)
+      if (functions) {
+        piece.rules.forEach((rule: any, ruleIndex: number) => {
+          rule.effect = functions[ruleIndex]
+        })
+        // 同时恢复克隆对象中的函数
+        if (cloned.pieces[index].rules) {
+          cloned.pieces[index].rules.forEach((rule: any, ruleIndex: number) => {
+            rule.effect = functions[ruleIndex]
+          })
+        }
+      }
+    }
+  })
+
+  return cloned
+}
+
 export type TurnPhase = "start" | "action" | "end"
 
 export type PlayerId = string
@@ -180,7 +220,7 @@ export function applyBattleAction(
 ): BattleState {
   switch (action.type) {
     case "beginPhase": {
-      const next = structuredClone(state) as BattleState
+      const next = safeCloneBattleState(state)
       if (next.turn.phase === "start") {
         // 获取当前玩家的所有棋子
         const currentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0);
@@ -381,7 +421,7 @@ export function applyBattleAction(
     }
 
     case "grantChargePoints": {
-      const next = structuredClone(state) as BattleState
+      const next = safeCloneBattleState(state)
       const meta = getPlayerMeta(next, action.playerId)
       meta.chargePoints += action.amount
 
@@ -423,7 +463,7 @@ export function applyBattleAction(
         throw new BattleRuleError("Not enough action points to move")
       }
 
-      const next = structuredClone(state) as BattleState
+      const next = safeCloneBattleState(state)
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
@@ -563,7 +603,7 @@ export function applyBattleAction(
       //   throw new BattleRuleError("Basic skill already used this turn")
       // }
 
-      const next = structuredClone(state) as BattleState
+      const next = safeCloneBattleState(state)
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
@@ -840,7 +880,7 @@ export function applyBattleAction(
       //   throw new BattleRuleError("Charge skill already used this turn")
       // }
 
-      const next = structuredClone(state) as BattleState
+      const next = safeCloneBattleState(state)
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
@@ -1139,7 +1179,7 @@ export function applyBattleAction(
         throw new BattleRuleError("Only the current player can end the turn")
       }
 
-      const next = structuredClone(state) as BattleState
+      const next = safeCloneBattleState(state)
       // 获取当前玩家的所有棋子
       const currentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId === action.playerId && p.currentHp > 0);
       
@@ -1200,8 +1240,8 @@ export function applyBattleAction(
 
     case "surrender": {
       // 投降逻辑：将投降玩家的所有棋子设置为阵亡状态
-      const next = structuredClone(state) as BattleState
-      
+      const next = safeCloneBattleState(state)
+
       // 找到投降玩家的所有棋子并设置为阵亡
       next.pieces.forEach(piece => {
         if (piece.ownerPlayerId === action.playerId) {
