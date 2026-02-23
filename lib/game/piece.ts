@@ -17,6 +17,8 @@ export interface PieceSkill {
   skillId: string
   level?: number
   currentCooldown?: number
+  /** 剩余使用次数，限定技为1，其他技能为-1（无限制） */
+  usesRemaining?: number
 }
 
 export interface PieceTemplate {

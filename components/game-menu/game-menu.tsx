@@ -3,7 +3,6 @@
 import { GAME_BRAND, MENU_ITEMS } from "@/config/game-menu"
 import { MenuButton } from "./menu-button"
 import { PlayerCard } from "./player-card"
-import { StatsBar } from "./stats-bar"
 import { AnimatedBackground } from "./animated-background"
 
 export function GameMenu() {

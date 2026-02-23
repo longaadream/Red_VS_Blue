@@ -14,6 +14,7 @@
 10. [技能JSON文件标准格式](#技能json文件标准格式)
 11. [故障排除](#故障排除)
 12. [总结](#总结)
+13. [训练营使用教程](#训练营使用教程)
 
 ## 基础概念
 
@@ -44,7 +45,7 @@
   "cooldownTurns": 冷却回合数,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { \n  // 技能执行逻辑\n  const piece = context.piece;\n  // 在这里实现具体的技能效果\n  return { message: '技能已激活', success: true };\n}",
+  "code": "function executeSkill(context) { \n  // 技能执行逻辑\n  const piece = context.piece;\n  // 在这里实现具体的技能效果\n  return { message: '技能已激活', success: true };}",
   "actionPointCost": 1 // 行动点消耗
 }
 ```
@@ -957,7 +958,7 @@ if (typeof removeRuleById === 'function') {
   "isDebuff": 是否为减益效果,
   "canStack": 是否可以叠加,
   "maxStacks": 最大叠加层数,
-  "code": "// 状态效果代码\nfunction EffectTrigger(context) {\n  // 主要效果逻辑\n  return { success: true, message: '效果触发' };\n}\n"
+  "code": "// 状态效果代码\nfunction EffectTrigger(context) {\n  // 主要效果逻辑\n  return { success: true, message: '效果触发' };\n}"
 }
 ```
 
@@ -1053,18 +1054,17 @@ function EffectTrigger(context) {
   
   // 查找当前状态的对象（通过状态ID）
   // 注意：在实际使用中，你需要知道状态的唯一ID
-  const statusTag = piece.statusTags.find(tag => tag.id === 'bleeding-123');
-  let remainingDuration = 0;
-  let remainingUses = 0;
+  // 这里为了示例，我们遍历所有状态对象，查找流血状态
+  let intensity = 5;
   let currentStacks = 1;
-  let intensity = 1;
   
-  if (statusTag) {
-    // 直接访问状态参数
-    remainingDuration = statusTag.remainingDuration || 0;
-    remainingUses = statusTag.remainingUses || 0;
-    currentStacks = statusTag.stacks || 1;
-    intensity = statusTag.intensity || 1;
+  for (const tag of piece.statusTags) {
+    // 检查标签是否是流血状态标签
+    if (tag.type === 'bleeding') {
+      intensity = tag.intensity || 5;
+      currentStacks = tag.stacks || 1;
+      break;
+    }
   }
   
   // 执行状态效果
@@ -1133,7 +1133,7 @@ function EffectTrigger(context) {
   "isDebuff": true,
   "canStack": true,
   "maxStacks": 5,
-  "code": "// 流血状态效果代码\nfunction EffectTrigger(context) {\n  const piece = context.piece;\n  \n  // 查找流血状态的对象\n  // 注意：在实际使用中，你需要知道状态的唯一ID\n  // 这里为了示例，我们遍历所有状态对象，查找流血状态\n  let intensity = 5;\n  let currentStacks = 1;\n  \n  for (const tag of piece.statusTags) {\n    // 检查标签是否是流血状态标签\n    if (tag.type === 'bleeding') {\n      intensity = tag.intensity || 5;\n      currentStacks = tag.stacks || 1;\n      break;\n    }\n  }\n  \n  // 计算伤害\n  const damage = intensity * currentStacks;\n  piece.currentHp = Math.max(0, piece.currentHp - damage);\n  \n  console.log(piece.name + '受到流血伤害，失去' + damage + '点生命值');\n  return { success: true, message: piece.name + '受到流血伤害' };\n}\n"
+  "code": "// 流血状态效果代码\nfunction EffectTrigger(context) {\n  const piece = context.piece;\n  \n  // 查找流血状态的对象\n  // 注意：在实际使用中，你需要知道状态的唯一ID\n  // 这里为了示例，我们遍历所有状态对象，查找流血状态\n  let intensity = 5;\n  let currentStacks = 1;\n  \n  for (const tag of piece.statusTags) {\n    // 检查标签是否是流血状态标签\n    if (tag.type === 'bleeding') {\n      intensity = tag.intensity || 5;\n      currentStacks = tag.stacks || 1;\n      break;\n    }\n  }\n  \n  // 计算伤害\n  const damage = intensity * currentStacks;\n  piece.currentHp = Math.max(0, piece.currentHp - damage);\n  \n  console.log(piece.name + '受到流血伤害，失去' + damage + '点生命值');\n  return { success: true, message: piece.name + '受到流血伤害' };\n}"
 }
 ```
 
@@ -1334,7 +1334,7 @@ function executeSkill(context) {
   "cooldownTurns": 冷却回合数,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { \n  // 技能执行逻辑\n  return { message: '技能已激活', success: true };\n}",
+  "code": "function executeSkill(context) { \n  // 技能执行逻辑\n  return { message: '技能已激活', success: true };}",
   "actionPointCost": 1 // 行动点消耗
 }
 ```
@@ -1696,3 +1696,187 @@ function safeCloneBattleState(state: BattleState): BattleState {
 - 创建具有复杂触发条件的状态效果
 
 祝你游戏开发愉快！
+
+---
+
+# 训练营使用教程
+
+## 概述
+
+训练营是一个用于测试棋子、技能和战斗系统的独立环境。你可以自由控制双方棋子，无需等待对手，非常适合学习和调试游戏机制。
+
+## 功能特性
+
+### 1. 双方控制
+- 点击"红方"或"蓝方"按钮切换当前控制方
+- 可以随时切换控制任意一方的棋子
+- 双方共享同一个视角，但只能操作当前控制方的棋子
+
+### 2. 添加棋子
+- 点击"添加棋子"按钮打开添加对话框
+- 选择阵营（红方/蓝方）
+- 选择棋子模板（战士、法师、射手等）
+- 设置初始位置（X、Y坐标）
+- 点击"添加"将棋子放入战场
+
+### 3. 修改资源
+- 点击"修改资源"按钮打开资源修改对话框
+- 选择要修改的玩家（红方/蓝方）
+- 调整行动点（0-20）
+- 调整充能点（0-20）
+- 点击"更新"应用修改
+
+### 4. 重置冷却
+- 点击"重置冷却"按钮
+- 所有棋子的所有技能冷却时间立即归零
+- 可以立即再次使用任何技能
+
+### 5. 切换地图
+- 点击"切换地图"按钮
+- 选择不同的地图配置
+- 战场会立即切换到新地图
+
+## 操作流程
+
+### 基本操作
+
+1. **选择棋子**
+   - 点击棋子图标或战场上的棋子
+   - 选中的棋子会高亮显示
+   - 下方会显示该棋子的详细信息
+
+2. **移动棋子**
+   - 选中己方棋子后，点击蓝色高亮的可移动格子
+   - 棋子会立即移动到目标位置
+   - 移动消耗1点行动点
+
+3. **使用技能**
+   - 选中棋子后，查看下方的技能列表
+   - 点击技能按钮查看技能详情
+   - 如果满足条件（足够行动点/充能点，技能不在冷却中），点击"使用"按钮
+   - 根据技能类型选择目标：
+     - 普通攻击：点击范围内的敌方棋子
+     - 范围技能：点击目标位置
+     - 自身技能：直接生效
+
+4. **结束回合**
+   - 完成所有操作后，点击"结束回合"按钮
+   - 回合会切换到另一方
+   - 新回合开始时会恢复行动点和充能点
+
+### 高级操作
+
+1. **切换控制方**
+   - 任何时候都可以点击"红方"或"蓝方"按钮
+   - 切换后可以操作另一方的棋子
+   - 无需等待对方结束回合
+
+2. **连续添加多个棋子**
+   - 可以多次打开"添加棋子"对话框
+   - 每次添加的棋子都有唯一的ID
+   - 同一方可以有多个相同类型的棋子
+
+3. **测试不同技能组合**
+   - 添加不同类型的棋子
+   - 使用"重置冷却"快速测试技能连招
+   - 使用"修改资源"模拟不同资源情况
+
+## 界面说明
+
+### 顶部信息栏
+- 显示当前回合数
+- 显示当前控制方（红方/蓝方）
+- 切换控制方按钮
+
+### 左侧信息面板
+- 显示当前选中棋子的详细信息：
+  - 名称和阵营
+  - 生命值（当前/最大）
+  - 攻击力、防御力、移动范围
+  - 当前位置
+  - 技能列表（包含冷却状态）
+
+### 中央战场
+- 显示地图格子
+- 不同颜色代表不同地形：
+  - 灰色：地板（可行走）
+  - 深灰色：墙壁（不可通行）
+  - 绿色：出生点
+  - 橙色：掩体
+  - 深蓝色：洞口
+- 显示所有棋子位置
+- 选中棋子时显示可移动范围（蓝色）
+
+### 右侧操作面板
+- 显示当前控制方的资源：
+  - 行动点（⚡）
+  - 充能点（🔋）
+- 操作按钮：
+  - 添加棋子
+  - 修改资源
+  - 重置冷却
+  - 切换地图
+  - 结束回合
+
+### 底部日志
+- 显示战斗操作记录
+- 记录移动、攻击、技能使用等操作
+- 显示伤害数值和效果
+
+## 快捷键
+
+- 点击棋子：选择/查看详情
+- 点击蓝色格子：移动棋子
+- 点击技能按钮：查看技能详情/使用技能
+- 点击"结束回合"：切换回合
+
+## 注意事项
+
+1. **资源管理**
+   - 每个回合开始时行动点会恢复
+   - 充能点不会自动恢复，需要使用特定技能或手动修改
+   - 使用技能需要消耗行动点或充能点
+
+2. **技能冷却**
+   - 技能使用后进入冷却
+   - 冷却回合数显示在技能按钮上
+   - 使用"重置冷却"可以立即清除所有冷却
+
+3. **棋子位置**
+   - 棋子不能移动到墙壁或已有其他棋子的位置
+   - 棋子可以移动到地板、出生点、掩体位置
+   - 移动范围受棋子属性限制
+
+4. **战斗逻辑**
+   - 训练营使用与正式战斗相同的逻辑
+   - 伤害计算、技能效果、状态效果都保持一致
+   - 适合测试和验证战斗机制
+
+## 故障排除
+
+### 无法添加棋子
+- 检查目标位置是否为空（没有其他棋子）
+- 检查目标位置是否可行走（不是墙壁）
+- 检查坐标是否在地图范围内
+
+### 无法使用技能
+- 检查是否有足够的行动点或充能点
+- 检查技能是否在冷却中
+- 检查是否有有效的目标（对于需要目标的技能）
+
+### 无法移动棋子
+- 确保当前控制方是该棋子的所有者
+- 检查目标位置是否在移动范围内（蓝色格子）
+- 检查目标位置是否被占用
+
+## 开发调试
+
+训练营模式也适合用于：
+- 测试新棋子的平衡性
+- 验证技能效果是否正确
+- 测试不同地图配置
+- 调试战斗逻辑问题
+
+---
+
+如有问题或建议，请联系开发团队。

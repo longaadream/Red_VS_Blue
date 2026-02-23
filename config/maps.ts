@@ -31,6 +31,12 @@ export function listMaps(): BoardMap[] {
   return getAllMaps()
 }
 
+// 导出GameMap类型
+export type GameMap = BoardMap
+
+// 导出getAllMaps函数
+export { getAllMaps }
+
 // 加载地图数据（用于需要手动触发加载的场景）
 export { loadMaps }
 

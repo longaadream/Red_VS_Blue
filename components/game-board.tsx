@@ -36,7 +36,10 @@ function tileColor(tile: Tile): string {
 }
 
 export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selectedPieceId, isSelectingMoveTarget, isSelectingTeleportTarget, isSelectingSkillTarget, selectedSkillId, teleportRange = 5 }: GameBoardProps) {
-  const size = Math.max(map.width, map.height)
+  const maxSize = Math.max(map.width, map.height)
+  // 根据地图大小动态计算格子大小，确保棋盘在容器中合理显示
+  // 最小格子大小为 24px，最大为 48px
+  const tileSize = Math.max(24, Math.min(48, Math.floor(600 / maxSize)))
   
   // 组件加载时自动加载棋子数据
   useEffect(() => {
@@ -214,8 +217,8 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
       <div
         className="grid gap-0.5"
         style={{
-          gridTemplateColumns: `repeat(${map.width}, minmax(0, 1fr))`,
-          width: `${size * 36}px`,
+          gridTemplateColumns: `repeat(${map.width}, ${tileSize}px)`,
+          width: `${map.width * tileSize + (map.width - 1) * 2}px`,
         }}
       >
         {map.tiles.map((tile) => (
@@ -300,7 +303,10 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
                         className="w-full h-full object-contain"
                       />
                     ) : image && (image.length <= 3 || image.includes("️")) ? (
-                      <span className={`text-4xl font-bold ${faction === "red" ? "text-red-500" : "text-blue-500"} ${isDead ? "opacity-50" : ""}`}>
+                      <span 
+                        className={`font-bold ${faction === "red" ? "text-red-500" : "text-blue-500"} ${isDead ? "opacity-50" : ""}`}
+                        style={{ fontSize: `${Math.max(16, tileSize * 0.7)}px` }}
+                      >
                         {image}
                       </span>
                     ) : image ? (
@@ -310,7 +316,10 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
                         className="w-full h-full object-contain"
                       />
                     ) : (
-                      <span className={`text-3xl font-bold ${faction === "red" ? "text-red-500" : "text-blue-500"} ${isDead ? "opacity-50" : ""}`}>
+                      <span 
+                        className={`font-bold ${faction === "red" ? "text-red-500" : "text-blue-500"} ${isDead ? "opacity-50" : ""}`}
+                        style={{ fontSize: `${Math.max(14, tileSize * 0.6)}px` }}
+                      >
                         {faction === "red" ? "⚔" : "🛡"}
                       </span>
                     )}
@@ -318,7 +327,12 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
                     {/* 为死亡的棋子添加阵亡标记 */}
                     {isDead && (
                       <div className="absolute inset-0 flex items-center justify-center bg-red-900/30">
-                        <span className="text-2xl font-bold text-red-500">✖️</span>
+                        <span 
+                          className="font-bold text-red-500"
+                          style={{ fontSize: `${Math.max(12, tileSize * 0.5)}px` }}
+                        >
+                          ✖️
+                        </span>
                       </div>
                     )}
                   </div>

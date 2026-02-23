@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find C:\\\\Users\\\\lngsc\\\\Documents\\\\GitHub\\\\v0-game-menu-design\\\\v0-game-menu-design:*)"
+      "Bash(find C:\\\\Users\\\\lngsc\\\\Documents\\\\GitHub\\\\v0-game-menu-design\\\\v0-game-menu-design:*)",
+      "Bash(grep:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)"
     ]
   }
 }
