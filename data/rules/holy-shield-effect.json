@@ -1,1 +1,0 @@
-{"id":"rule-holy-shield","name":"圣盾效果","description":"当拥有圣盾状态时，受到伤害会抵挡一次伤害并移除圣盾效果","trigger":{"type":"beforeDamageTaken"},"effect":{"type":"triggerSkill","skillId":"holy-shield-defense","message":"${source.templateId}的圣盾抵挡了伤害"}}

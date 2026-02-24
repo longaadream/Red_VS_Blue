@@ -102,6 +102,14 @@ export async function POST(
           filter: (e as any).filter || 'enemy'
         }, { status: 400 })
       }
+      // 检查是否是需要选项选择的错误
+      if ((e as any).needsOptionSelection) {
+        return NextResponse.json({
+          needsOptionSelection: true,
+          options: (e as any).options || [],
+          title: (e as any).title || '请选择'
+        }, { status: 400 })
+      }
       return NextResponse.json({ error: e.message }, { status: 400 })
     }
 

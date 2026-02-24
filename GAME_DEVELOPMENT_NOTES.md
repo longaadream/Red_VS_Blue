@@ -1458,4 +1458,58 @@ function calculatePreview(piece, skillDef) {
     - **熔岩**：`dealDamage(piece, piece, tile.props.damagePerTurn, "true", next, "lava-terrain")` — attacker 和 target 同为该棋子（环境伤害语义），`damageType: "true"` 无视防御，`skillId: "lava-terrain"` 用于日志区分
     - **治愈泉**：`healDamage(piece, piece, tile.props.healPerTurn, next, "spring-terrain")` — 函数内部自动做 `Math.min(heal, maxHp - currentHp)` 溢出保护，无需外部处理
     - **联动效果**：神圣护盾可格挡熔岩伤害；反治疗规则可阻止治愈泉回血；熔岩致死时正常触发 `onPieceDied` 和 `afterPieceKilled`，并从 `pieces` 中 `splice` 移入墓地
+
+42. **选项选择器（selectOption）功能实现**：
+    - **需求**：支持技能代码调用 `selectOption()` 弹出多个选项供玩家选择，根据选择结果走不同的技能分支；支持"取消释放"选项（不消耗行动点/冷却）
+    - **设计模式**：复用 `selectTarget` 的双阶段错误机制——技能首次执行时抛出 `BattleRuleError`（带 `needsOptionSelection` 标记）→ API 返回 400 + 选项元数据 → 前端显示选项 UI → 玩家选择后重新发送原 action + `selectedOption` 字段 → 技能二次执行时从 context 读取 `selectedOption`，正常完成
+    - **`lib/game/skills.ts`**：
+      - `SkillExecutionContext` 新增 `selectedOption?: any` 字段
+      - `SkillExecutionResult` 新增 `needsOptionSelection?`、`options?`、`title?` 字段
+      - `createEffectFunctions` 返回值新增 `selectOption(config)` 函数：若 `context.selectedOption !== undefined` 则直接返回已选值，否则返回 `{ needsOptionSelection: true, options, title }` 信号对象
+      - `skillEnvironment` 和 eval 注入代码均添加 `selectOption`
+      - 结果处理新增 `needsOptionSelection` 分支，返回带标记的 `SkillExecutionResult`
+    - **`lib/game/turn.ts`**：
+      - `useBasicSkill` 和 `useChargeSkill` action 类型各新增 `selectedOption?: any`
+      - 两个 case 的 context 构建均添加 `selectedOption: (action as any).selectedOption`
+      - 两个 case 均新增 `needsOptionSelection` 错误抛出（与 `needsTargetSelection` 并列）
+    - **`app/api/rooms/[roomId]/battle/route.ts`**：新增 `needsOptionSelection` 的 400 响应处理，返回 `{ needsOptionSelection, options, title }`
+    - **`app/battle/[roomId]/page.tsx`**：
+      - 新增 4 个 state：`isSelectingOption`、`optionSelectionTitle`、`optionSelectionOptions`、`pendingOptionAction`
+      - `sendBattleAction` 检测到 `needsOptionSelection` 时进入选项选择模式，保存 pending action
+      - 新增 `handleOptionSelect(value)` 函数：`value === null` 时取消释放（清空状态），否则将 `selectedOption` 附加到 pending action 后重新发送
+      - 战斗操作区新增选项选择器覆盖层（`isSelectingOption` 时优先显示），每个选项一个 Button，底部有"取消释放"按钮
+
+43. **技能系统去硬编码化 + tutorial.md 全面重写**：
+    - **去硬编码化（`lib/game/skills.ts`）**：
+      - 移除 `buff-attack` 技能的硬编码执行分支（原 `if (skillDef.id === 'buff-attack') { ... } else { ... }` 结构），所有技能统一走 `eval()` 路径
+      - 移除 5 个技能（basic-attack、fireball、buff-attack、arcane-burst、arcane-combination）的硬编码预览计算分支，替换为通用 fallback（仅返回 `description` 和静态字段，不包含任何技能特定逻辑）
+      - 原则：所有技能效果必须在 JSON 的 `code` 字段中实现，不得在引擎代码中为特定技能 ID 添加特殊分支
+    - **tutorial.md 全面重写**：
+      - 旧版：约 2469 行，内容分散、风格不一致，AI 实现新角色时容易出错
+      - 新版：重新组织为 18 个章节，以"黄金法则（必读）"开篇，强调 5 条绝对规则（含 ✅/❌ 代码示例）
+      - 新增完整函数参考手册（所有可注入函数的完整签名和用法）
+      - 新增"禁止做法（反模式）"章节，列举 7 种常见错误并提供对比示例
+      - 新增"暗影刺客"完整角色创建示例（7 个文件的完整实现）
+      - 保留并整合原有训练营使用教程和地图设计教程
+
+44. **数据文件清理：删除无效 JSON + 蓝方三角色**：
+    - **删除蓝方棋子**（3 个）：`blue-warrior.json`、`blue-archer.json`、`blue-mage.json`
+    - **删除孤立/测试技能**（6 个）：
+      - `test.json` — 测试文件
+      - `bleeding-blade-json.json` — 文件名含"json"，明显错误命名
+      - `arcane-burst.json`、`arcane-combination.json` — 无任何角色引用的孤立技能
+      - `bleeding-blade.json` — 无任何角色引用
+      - `retaliation.json`（技能）— 无任何角色引用
+    - **删除无效规则**（10 个）：
+      - `retaliation.json`（规则）— 内部 ID 为 `"rule-4"`，占位符
+      - `skill-trigger.json` — 内部 ID 为 `"rule-7"`，占位符
+      - `blizzard-effect.json` — 引用了不存在的技能 `"blizzard-effect"`，功能已由 `rule-blizzard-active.json` 替代
+      - `bone-storm-effect.json`、`hardy-block.json`（规则）、`holy-shield-effect.json`、`immobilize-prevent-move.json` — 孤立规则，无技能通过 `addRuleById` 添加
+      - `status-bleeding.json`、`status-freeze.json`、`status-poison.json` — 孤立规则，无任何引用
+    - **删除过期存档**（1 个）：`data/rooms/F15Rb.json`
+    - **重命名修复**（3 个，文件名与内部 ID 不符，导致 `loadRuleById` 无法按 ID 找到文件）：
+      - `freeze-prevent-move.json` → `rule-freeze-prevent-move.json`
+      - `freeze-prevent-skill.json` → `rule-freeze-prevent-skill.json`
+      - `freeze-prevent-attack.json` → `rule-freeze-prevent-attack.json`
+    - **更新 `data/pieces/jaina.json`**：从 `rules` 数组中移除 `"rule-blizzard-effect"`（对应文件已删除；暴风雪规则现由 `blizzard` 技能自行调用 `addRuleById('rule-blizzard-active')` 动态添加）
     - **`turn.ts` 导入**：顶部新增 `import { dealDamage, healDamage } from "./skills"`

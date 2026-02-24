@@ -363,6 +363,8 @@ export interface SkillExecutionContext {
     x: number
     y: number
   } | null
+  /** 用户通过选项选择器选择的值，未选择时为 undefined */
+  selectedOption?: any
   battle: {
     turn: number
     currentPlayerId: string
@@ -386,6 +388,9 @@ export interface SkillExecutionResult {
   targetType?: 'piece' | 'grid'
   range?: number
   filter?: 'enemy' | 'ally' | 'all'
+  needsOptionSelection?: boolean
+  options?: { label: string; value: any; description?: string }[]
+  title?: string
 }
 
 /**
@@ -710,6 +715,23 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
     // 目标选择器
     select: selectors,
     
+    // 选项选择函数 - 用于在技能代码中唤起选项选择器
+    selectOption: (config: {
+      title?: string;
+      options: { label: string; value: any; description?: string }[];
+    }) => {
+      // 如果已有选项值（用户已选择），直接返回该值
+      if (context && context.selectedOption !== undefined) {
+        return context.selectedOption;
+      }
+      // 否则触发前端选项选择器
+      return {
+        needsOptionSelection: true,
+        options: config.options,
+        title: config.title || '请选择'
+      };
+    },
+
     // 目标选择函数 - 用于在技能代码中唤起目标选择
     selectTarget: (options?: {
       type: 'piece' | 'grid';
@@ -1014,15 +1036,15 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
   switch (damageType) {
     case "physical":
       // 物理伤害：受到防御力影响
-      finalDamage = Math.max(1, Math.round(validBaseDamage - validDefense)); // 至少造成1点伤害
+      finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense)); // 至少造成1点伤害
       break;
     case "magical":
       // 法术伤害：受到魔法抗性影响（暂时使用防御力代替）
-      finalDamage = Math.max(1, Math.round(validBaseDamage - validDefense)); // 至少造成1点伤害
+      finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense)); // 至少造成1点伤害
       break;
     case "true":
       // 真实伤害：不受防御力影响
-      finalDamage = Math.max(1, Math.round(validBaseDamage)); // 至少造成1点伤害
+      finalDamage = Math.max(1, Math.floor(validBaseDamage)); // 至少造成1点伤害
       break;
    }
   
@@ -1208,7 +1230,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance, baseHea
   }
   
   // 计算最终治疗值
-  const finalHeal = Math.max(0, Math.round(baseHeal));
+  const finalHeal = Math.max(0, Math.floor(baseHeal));
   
   // 记录原始生命值
   const originalHp = target.currentHp;
@@ -1290,6 +1312,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       // 目标选择器
       select: effects.select,
       selectTarget: effects.selectTarget,
+      selectOption: effects.selectOption,
       
       // 效果函数
     teleport: effects.teleport,
@@ -1503,49 +1526,12 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       enemies: battle.pieces.filter(p => p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0).map(p => ({ instanceId: p.instanceId, currentHp: p.currentHp }))
     };
 
-    // 尝试执行技能定义中的代码
+    // 执行技能定义中的代码（所有技能统一走 eval 路径，不存在硬编码分支）
     if (skillDef.code) {
       try {
-        // 直接执行技能代码，不使用eval，而是手动解析和执行
-        console.log('Executing skill code directly');
-        
-        // 手动执行buff-attack技能的逻辑
-        if (skillDef.id === 'buff-attack') {
-          // 直接修改sourcePiece的攻击力
-          sourcePiece.attack = sourcePiece.attack + 1;
-          console.log('Directly modified sourcePiece.attack to:', sourcePiece.attack);
-          
-          // 显式更新battle.pieces中的对应元素
-          battle.pieces[pieceIndex] = sourcePiece;
-          console.log('Updated battle.pieces[' + pieceIndex + '].attack to:', battle.pieces[pieceIndex].attack);
-          
-          const result = {
-            message: sourcePiece.templateId + '的攻击力提升至' + sourcePiece.attack + '点',
-            success: true
-          };
-          
-          console.log('Source piece after skill:', {
-            instanceId: sourcePiece.instanceId,
-            attack: sourcePiece.attack,
-            maxHp: sourcePiece.maxHp,
-            currentHp: sourcePiece.currentHp
-          });
-
-          // 触发技能使用后的规则
-          const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
-            type: "afterSkillUsed",
-            sourcePiece,
-            skillId: skillDef.id
-          });
-
-          // 处理触发效果的消息
-          if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
-            result.message += "。" + skillUsedResult.messages.join("。");
-          }
-          
-          return result;
-        } else {
-          // 对于其他技能，使用eval执行
+        console.log('Executing skill code via eval');
+        {
+          // 所有技能通过 eval 执行，确保效果完全由 code 字段控制
           const fullSkillCode = `
             (function(environment) {
               // 定义全局变量
@@ -1554,6 +1540,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const battle = environment.battle;
               const select = environment.select;
               const selectTarget = environment.selectTarget;
+              const selectOption = environment.selectOption;
               const teleport = environment.teleport;
               const statusEffectSystem = environment.statusEffectSystem;
               const addStatusEffect = environment.addStatusEffect;
@@ -1598,6 +1585,18 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               targetType: result.targetType || 'piece',
               range: result.range || 5,
               filter: result.filter || 'enemy'
+            };
+          }
+
+          // 检查是否需要选项选择
+          if (result && result.needsOptionSelection) {
+            console.log('Need option selection:', result);
+            return {
+              message: '需要选择选项',
+              success: false,
+              needsOptionSelection: true,
+              options: result.options || [],
+              title: result.title || '请选择'
             };
           }
           
@@ -1725,44 +1724,10 @@ export function calculateSkillPreview(skillDef: SkillDefinition, piece: PieceIns
     }
   }
 
-  // 默认计算逻辑（作为fallback）
-  const expectedValues: {
-    damage?: number
-    heal?: number
-    buff?: number
-    debuff?: number
-  } = {}
-
-  // 根据技能ID和powerMultiplier计算预期效果
-  if (skillDef.id === 'basic-attack') {
-    expectedValues.damage = Math.round(piece.attack * skillDef.powerMultiplier)
-  } else if (skillDef.id === 'fireball') {
-    expectedValues.damage = Math.round(piece.attack * skillDef.powerMultiplier)
-  } else if (skillDef.id === 'buff-attack') {
-    expectedValues.buff = 1 // 固定值
-  } else if (skillDef.id === 'arcane-burst') {
-    expectedValues.damage = Math.round(piece.attack * 2.5)
-    expectedValues.buff = 15 // 固定值
-  } else if (skillDef.id === 'arcane-combination') {
-    expectedValues.damage = 50 // 固定值
-    expectedValues.buff = 10 // 固定值
-  }
-
-  // 生成包含计算值的描述
-  let calculatedDescription = skillDef.description
-
-  // 替换描述中的占位符为实际计算值
-  if (expectedValues.damage !== undefined) {
-    calculatedDescription = calculatedDescription.replace(/造成.*?点伤害/, `造成${expectedValues.damage}点伤害`)
-    calculatedDescription = calculatedDescription.replace(/造成相当于攻击力.*?%的伤害/, `造成${expectedValues.damage}点伤害（相当于攻击力${Math.round((expectedValues.damage / piece.attack) * 100)}%）`)
-  }
-  if (expectedValues.buff !== undefined) {
-    calculatedDescription = calculatedDescription.replace(/提升自身攻击力.*?点/, `提升自身攻击力${expectedValues.buff}点`)
-  }
-
+  // 无 previewCode 时的通用 fallback：仅展示静态描述，不硬编码任何技能逻辑
   return {
-    description: calculatedDescription,
-    expectedValues,
+    description: skillDef.description,
+    expectedValues: {},
     cooldown: skillDef.cooldownTurns,
     currentCooldown,
     chargeCost: skillDef.chargeCost

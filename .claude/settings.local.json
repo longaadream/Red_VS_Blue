@@ -4,7 +4,11 @@
       "Bash(find C:\\\\Users\\\\lngsc\\\\Documents\\\\GitHub\\\\v0-game-menu-design\\\\v0-game-menu-design:*)",
       "Bash(grep:*)",
       "Bash(node:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(head:*)",
+      "Bash(wc:*)",
+      "Bash(done)",
+      "Bash(echo === Rules referenced by pieces ===:*)"
     ]
   }
 }

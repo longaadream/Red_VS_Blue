@@ -119,6 +119,8 @@ export type BattleAction =
       targetX?: number
       targetY?: number
       targetPieceId?: string
+      /** 用户通过选项选择器选择的值 */
+      selectedOption?: any
     }
   | {
       type: "useChargeSkill"
@@ -128,6 +130,8 @@ export type BattleAction =
       targetX?: number
       targetY?: number
       targetPieceId?: string
+      /** 用户通过选项选择器选择的值 */
+      selectedOption?: any
     }
   | {
       type: "endTurn"
@@ -225,15 +229,23 @@ export function applyBattleAction(
       if (next.turn.phase === "start") {
         // 获取当前玩家的所有棋子
         const currentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0);
+        console.log(`[ShadowStep] currentPlayerPieces: ${currentPlayerPieces.length}, pieces with rules: ${currentPlayerPieces.filter(p => p.rules && p.rules.length > 0).length}`);
         
         // 触发回合开始效果，为每个存活的棋子都触发一次
         currentPlayerPieces.forEach(piece => {
+          console.log(`[ShadowStep] Checking piece ${piece.instanceId}, rules: ${piece.rules ? piece.rules.length : 0}`);
+          if (piece.rules) {
+            piece.rules.forEach((rule: any) => {
+              console.log(`[ShadowStep] Rule: ${rule.id}, trigger: ${rule.trigger?.type}, effect is function: ${typeof rule.effect === 'function'}`);
+            });
+          }
           const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
             type: "beginTurn",
             sourcePiece: piece,
             turnNumber: next.turn.turnNumber,
             playerId: next.turn.currentPlayerId
           });
+          console.log(`[ShadowStep] beginTurnResult: success=${beginTurnResult.success}, messages=${beginTurnResult.messages.length}`);
 
           // 处理触发效果的消息
           if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
@@ -380,6 +392,64 @@ export function applyBattleAction(
           console.log(`Player ${nextPlayerMeta.playerId} now has ${nextPlayerMeta.actionPoints}/${nextPlayerMeta.maxActionPoints} action points (turn ${next.turn.turnNumber})`)
         }
         
+        // 获取当前玩家的所有棋子
+        const currentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0);
+        console.log(`[ShadowStep] END phase - currentPlayerPieces: ${currentPlayerPieces.length}, pieces with rules: ${currentPlayerPieces.filter(p => p.rules && p.rules.length > 0).length}`);
+        
+        // 触发回合开始效果，为每个存活的棋子都触发一次
+        currentPlayerPieces.forEach(piece => {
+          console.log(`[ShadowStep] END phase - Checking piece ${piece.instanceId}, rules: ${piece.rules ? piece.rules.length : 0}`);
+          if (piece.rules) {
+            piece.rules.forEach((rule: any) => {
+              console.log(`[ShadowStep] END phase - Rule: ${rule.id}, trigger: ${rule.trigger?.type}, effect is function: ${typeof rule.effect === 'function'}`);
+            });
+          }
+          const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
+            type: "beginTurn",
+            sourcePiece: piece,
+            turnNumber: next.turn.turnNumber,
+            playerId: next.turn.currentPlayerId
+          });
+          console.log(`[ShadowStep] END phase - beginTurnResult: success=${beginTurnResult.success}, messages=${beginTurnResult.messages.length}`);
+
+          // 处理触发效果的消息
+          if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
+            if (!next.actions) {
+              next.actions = [];
+            }
+            beginTurnResult.messages.forEach(message => {
+              next.actions!.push({
+                type: "triggerEffect",
+                playerId: next.turn.currentPlayerId,
+                turn: next.turn.turnNumber,
+                payload: {
+                  message
+                }
+              });
+            });
+          }
+        });
+
+        // 更新冷却
+        globalTriggerSystem.updateCooldowns();
+        
+        // 更新当前玩家棋子技能的冷却时间
+        next.pieces.forEach(piece => {
+          // 只减少当前玩家棋子的技能冷却
+          if (piece.ownerPlayerId === next.turn.currentPlayerId && piece.skills) {
+            piece.skills.forEach(skill => {
+              if (skill.currentCooldown && skill.currentCooldown > 0) {
+                skill.currentCooldown--
+                console.log(`Reduced cooldown for skill ${skill.skillId} on piece ${piece.instanceId}: ${skill.currentCooldown} turns remaining`)
+              }
+            })
+          }
+        })
+
+        // 更新所有状态效果
+        statusEffectSystem.setBattleState(next);
+        statusEffectSystem.updateStatusEffects()
+        
         // 触发whenever规则（每一步行动后检测）
         const wheneverResult = globalTriggerSystem.checkTriggers(next, {
           type: "whenever",
@@ -403,6 +473,47 @@ export function applyBattleAction(
             });
           });
         }
+        
+        // 特殊地形效果（每回合开始时，对当前玩家的棋子生效）
+        const tileEffectPieces = next.pieces.filter(
+          (p) => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0,
+        )
+        for (const piece of tileEffectPieces) {
+          if (piece.x == null || piece.y == null) continue
+          const tile = next.map.tiles.find((t) => t.x === piece.x && t.y === piece.y)
+          if (!tile) continue
+
+          // 熔岩伤害
+          if (tile.props.damagePerTurn && tile.props.damagePerTurn > 0) {
+            dealDamage(piece, piece, tile.props.damagePerTurn, "true", next, "lava-terrain")
+          }
+
+          // 治愈泉回复
+          if (tile.props.healPerTurn && tile.props.healPerTurn > 0 && piece.currentHp > 0) {
+            healDamage(piece, piece, tile.props.healPerTurn, next, "spring-terrain")
+          }
+
+          // 充能台
+          if (tile.props.chargePerTurn && tile.props.chargePerTurn > 0 && piece.currentHp > 0) {
+            const playerMeta = next.players.find((p) => p.playerId === piece.ownerPlayerId)
+            if (playerMeta) {
+              playerMeta.chargePoints += tile.props.chargePerTurn
+              if (!next.actions) next.actions = []
+              next.actions.push({
+                type: "tileEffect",
+                playerId: piece.ownerPlayerId,
+                turn: next.turn.turnNumber,
+                payload: {
+                  message: `${piece.name || piece.templateId} 在充能台上获得了 ${tile.props.chargePerTurn} 充能点`,
+                  pieceId: piece.instanceId,
+                },
+              })
+            }
+          }
+        }
+        
+        // 直接进入action阶段，不需要前端再次发送beginPhase
+        next.turn.phase = "action"
         
         return next
       }
@@ -715,6 +826,7 @@ export function applyBattleAction(
         },
         target: targetInfo,
         targetPosition: targetPositionInfo,
+        selectedOption: (action as any).selectedOption,
         battle: {
           turn: next.turn.turnNumber,
           currentPlayerId: next.turn.currentPlayerId,
@@ -729,7 +841,7 @@ export function applyBattleAction(
       }
 
       const result = executeSkillFunction(skillDef, context, next)
-      
+
       // 检查是否需要目标选择
       if (result.needsTargetSelection) {
         // 创建一个包含目标选择信息的错误对象
@@ -739,6 +851,15 @@ export function applyBattleAction(
         targetSelectionError.range = result.range || 5
         targetSelectionError.filter = result.filter || 'enemy'
         throw targetSelectionError
+      }
+
+      // 检查是否需要选项选择
+      if (result.needsOptionSelection) {
+        const optionSelectionError = new BattleRuleError('需要选择选项') as any
+        optionSelectionError.needsOptionSelection = true
+        optionSelectionError.options = result.options || []
+        optionSelectionError.title = result.title || '请选择'
+        throw optionSelectionError
       }
       
       if (result.success) {
@@ -1024,6 +1145,7 @@ export function applyBattleAction(
         },
         target: targetInfo,
         targetPosition: targetPositionInfo,
+        selectedOption: (action as any).selectedOption,
         battle: {
           turn: next.turn.turnNumber,
           currentPlayerId: next.turn.currentPlayerId,
@@ -1038,7 +1160,7 @@ export function applyBattleAction(
       }
 
       const result = executeSkillFunction(skillDef, context, next)
-      
+
       // 检查是否需要目标选择
       if (result.needsTargetSelection) {
         // 创建一个包含目标选择信息的错误对象
@@ -1048,6 +1170,15 @@ export function applyBattleAction(
         targetSelectionError.range = result.range || 5
         targetSelectionError.filter = result.filter || 'enemy'
         throw targetSelectionError
+      }
+
+      // 检查是否需要选项选择
+      if (result.needsOptionSelection) {
+        const optionSelectionError = new BattleRuleError('需要选择选项') as any
+        optionSelectionError.needsOptionSelection = true
+        optionSelectionError.options = result.options || []
+        optionSelectionError.title = result.title || '请选择'
+        throw optionSelectionError
       }
       
       if (result.success) {

@@ -1,1 +1,0 @@
-{"id":"test","name":"测试技能","description":"测试技能描述","code":"function test() {\n  return \"test\";\n}","previewCode":"function preview() {\n  return \"preview\";\n}"}

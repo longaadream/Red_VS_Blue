@@ -123,6 +123,15 @@ export default function BattlePage() {
           });
           return;
         }
+        // 检查是否是需要选项选择的情况
+        if (data.needsOptionSelection) {
+          console.log('Need option selection:', data);
+          setIsSelectingOption(true);
+          setOptionSelectionTitle(data.title || '请选择');
+          setOptionSelectionOptions(data.options || []);
+          setPendingOptionAction(action);
+          return;
+        }
         // 使用toast通知显示错误信息，而不是设置错误状态
         toast.error(data.error || "操作失败");
         return;
@@ -133,6 +142,26 @@ export default function BattlePage() {
       toast.error(err instanceof Error ? err.message : "未知错误")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 处理选项选择器的选择结果
+  async function handleOptionSelect(value: any | null) {
+    if (value === null) {
+      // 用户取消了技能释放
+      setIsSelectingOption(false)
+      setOptionSelectionOptions([])
+      setOptionSelectionTitle('请选择')
+      setPendingOptionAction(null)
+      return
+    }
+    if (pendingOptionAction) {
+      const actionWithOption = { ...pendingOptionAction, selectedOption: value } as BattleAction
+      setIsSelectingOption(false)
+      setOptionSelectionOptions([])
+      setOptionSelectionTitle('请选择')
+      setPendingOptionAction(null)
+      await sendBattleAction(actionWithOption)
     }
   }
 
@@ -289,6 +318,12 @@ export default function BattlePage() {
   const [targetSelectionType, setTargetSelectionType] = useState<'piece' | 'grid'>('piece')
   const [targetSelectionRange, setTargetSelectionRange] = useState(5)
   const [targetSelectionFilter, setTargetSelectionFilter] = useState<'enemy' | 'ally' | 'all'>('enemy')
+
+  // 选项选择器状态
+  const [isSelectingOption, setIsSelectingOption] = useState(false)
+  const [optionSelectionTitle, setOptionSelectionTitle] = useState<string>('请选择')
+  const [optionSelectionOptions, setOptionSelectionOptions] = useState<{ label: string; value: any; description?: string }[]>([])
+  const [pendingOptionAction, setPendingOptionAction] = useState<BattleAction | null>(null)
 
   const selectedPiece = useMemo(() => {
     if (!selectedPieceId || !battle || !currentPlayerId) return null
@@ -1207,14 +1242,45 @@ export default function BattlePage() {
                   })()}
                 </div>
 
-                {battle.turn.phase === "action" && isMyTurn && (
+                {/* 选项选择器覆盖层 - 优先级最高，独立显示 */}
+                {isSelectingOption && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-zinc-200 text-center">{optionSelectionTitle}</p>
+                    {optionSelectionOptions.map((opt, index) => (
+                      <Button
+                        key={index}
+                        className="w-full justify-start"
+                        variant="outline"
+                        size="sm"
+                        disabled={loading}
+                        onClick={() => void handleOptionSelect(opt.value)}
+                      >
+                        <span className="font-medium">{opt.label}</span>
+                        {opt.description && (
+                          <span className="ml-2 text-xs text-zinc-400">{opt.description}</span>
+                        )}
+                      </Button>
+                    ))}
+                    <Button
+                      className="w-full"
+                      variant="ghost"
+                      size="sm"
+                      disabled={loading}
+                      onClick={() => void handleOptionSelect(null)}
+                    >
+                      取消释放
+                    </Button>
+                  </div>
+                )}
+
+                {battle.turn.phase === "action" && isMyTurn && !isSelectingOption && (
                   <div className="space-y-2">
                     {!selectedPiece && (
                       <p className="text-xs text-muted-foreground text-center">
                         请从左侧选择一个棋子进行操作
                       </p>
                     )}
-                    
+
                     {isSelectingMoveTarget ? (
                       <>
                         <p className="text-xs text-muted-foreground text-center">
