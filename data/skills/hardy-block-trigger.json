@@ -1,0 +1,12 @@
+{
+  "id": "hardy-block-trigger",
+  "name": "悍猛格挡效果",
+  "description": "受到伤害时将50%伤害转化为攻击力",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { const battle = context.battle; const piece = context.piece; const damage = context.damage; const hardyBlockTag = piece.statusTags && piece.statusTags.find(function(tag) { return tag.type === 'hardy-block'; }); if (!hardyBlockTag) { removeRuleById(piece.instanceId, 'rule-hardy-block'); return { success: false, message: '' }; } if (!damage || damage <= 0) { return { success: false, message: '' }; } const attackGain = Math.floor(damage * 0.5); if (attackGain > 0) { piece.attack += attackGain; } return { success: true, message: piece.name + ' 的悍猛格挡生效，将 ' + damage + ' 点伤害的50%转化为 ' + attackGain + ' 点攻击力，当前攻击力为 ' + piece.attack }; }"
+}

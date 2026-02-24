@@ -7,6 +7,7 @@ import type { PieceInstance, PieceTemplate } from "@/lib/game/piece"
 import { getAllPieces, getPieceById } from "@/lib/game/piece-repository"
 import { buildDefaultSkills } from "@/lib/game/battle-setup"
 import { globalTriggerSystem } from "@/lib/game/triggers"
+import { reloadSkills } from "@/lib/game/skill-repository"
 
 // 确保地图数据在模块加载时就被加载
 loadMaps().catch(error => {
@@ -24,6 +25,9 @@ function generateUniquePieceId(ownerPlayerId: string): string {
 
 // 创建初始训练营战斗状态
 function createTrainingBattleState(mapId?: string): BattleState {
+  // 重新加载技能文件（开发模式热重载）
+  reloadSkills()
+
   // 获取地图
   let map = getMap(mapId || DEFAULT_MAP_ID)
 
@@ -210,6 +214,9 @@ export async function PUT(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    // 重新加载技能文件（开发模式热重载）
+    reloadSkills()
 
     // 使用原版的 applyBattleAction 处理战斗逻辑
     const newState = applyBattleAction(battleState, action)

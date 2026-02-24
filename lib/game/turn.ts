@@ -1,9 +1,92 @@
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, healDamage } from "./skills"
+import { dealDamage, healDamage, loadRuleById } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { statusEffectSystem, StatusEffectType } from "./status-effects"
+import { getSkillById } from "./skill-repository"
+
+// ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
+function restorePieceRules(state: BattleState): void {
+  console.log(`[RestoreRules] Called with ${state.pieces.length} pieces`)
+  state.pieces.forEach(piece => {
+    console.log(`[RestoreRules] Checking piece: ${piece.name}, statusTags: ${piece.statusTags?.length || 0}, rules: ${piece.rules?.length || 0}`)
+    // 确保 rules 数组存在
+    if (!piece.rules) {
+      piece.rules = []
+    }
+
+    // 1. 恢复现有规则的 effect 函数
+    if (piece.rules.length > 0) {
+      piece.rules.forEach((rule: any) => {
+        // 如果 effect 不是函数，尝试重新加载
+        if (typeof rule.effect !== 'function' && rule.id) {
+          try {
+            const reloadedRule = loadRuleById(rule.id)
+            if (reloadedRule && typeof reloadedRule.effect === 'function') {
+              rule.effect = reloadedRule.effect
+              console.log(`[RestoreRules] Restored effect for rule: ${rule.id}`)
+            } else {
+              console.warn(`[RestoreRules] Failed to restore effect for rule: ${rule.id}`)
+            }
+          } catch (error) {
+            console.error(`[RestoreRules] Error reloading rule ${rule.id}:`, error)
+          }
+        }
+      })
+    }
+
+    // 2. 根据状态标签重新添加丢失的规则
+    if (piece.statusTags && piece.statusTags.length > 0) {
+      piece.statusTags.forEach((statusTag: any) => {
+        // 检查状态标签是否有关联的规则
+        if (statusTag.relatedRules && statusTag.relatedRules.length > 0) {
+          statusTag.relatedRules.forEach((ruleId: string) => {
+            // 检查规则是否已存在
+            const existingRule = piece.rules!.find((r: any) => r.id === ruleId)
+            if (!existingRule) {
+              // 规则不存在，重新添加
+              try {
+                const reloadedRule = loadRuleById(ruleId)
+                if (reloadedRule && typeof reloadedRule.effect === 'function') {
+                  piece.rules!.push(reloadedRule)
+                  console.log(`[RestoreRules] Re-added missing rule: ${ruleId} for status: ${statusTag.type}`)
+                }
+              } catch (error) {
+                console.error(`[RestoreRules] Error re-adding rule ${ruleId}:`, error)
+              }
+            }
+          })
+        }
+
+        // 3. 根据状态类型自动添加对应的规则（如果没有 relatedRules）
+        const statusToRuleMap: Record<string, string> = {
+          'hardy-block': 'rule-hardy-block',
+          'divine-shield': 'rule-divine-shield',
+          'freeze': 'rule-freeze-prevent-move',
+          'sleep': 'rule-sleep-prevent-skill',
+          'bleeding': 'rule-bleeding-tick',
+        }
+
+        const expectedRuleId = statusToRuleMap[statusTag.type]
+        if (expectedRuleId) {
+          const existingRule = piece.rules!.find((r: any) => r.id === expectedRuleId)
+          if (!existingRule) {
+            try {
+              const reloadedRule = loadRuleById(expectedRuleId)
+              if (reloadedRule && typeof reloadedRule.effect === 'function') {
+                piece.rules!.push(reloadedRule)
+                console.log(`[RestoreRules] Added rule ${expectedRuleId} for status: ${statusTag.type}`)
+              }
+            } catch (error) {
+              console.error(`[RestoreRules] Error adding rule ${expectedRuleId}:`, error)
+            }
+          }
+        }
+      })
+    }
+  })
+}
 
 // ─── 辅助函数：安全地克隆 BattleState（处理函数无法克隆的问题）────────────────
 function safeCloneBattleState(state: BattleState): BattleState {
@@ -223,6 +306,10 @@ export function applyBattleAction(
   state: BattleState,
   action: BattleAction,
 ): BattleState {
+  console.log(`[applyBattleAction] Called with action type: ${action.type}, pieces count: ${state.pieces.length}`)
+  // 恢复棋子规则的 effect 函数（API 传输后函数会丢失）
+  restorePieceRules(state)
+
   switch (action.type) {
     case "beginPhase": {
       const next = safeCloneBattleState(state)
@@ -720,7 +807,8 @@ export function applyBattleAction(
       console.log('Executing skill with ID:', action.skillId)
       console.log('Available skills:', Object.keys(next.skillsById))
       
-      let skillDef = next.skillsById[action.skillId]
+      // 优先从服务器获取最新的技能定义（开发模式热重载）
+      let skillDef = getSkillById(action.skillId) || next.skillsById[action.skillId]
       
       // 检查行动点是否足够
       const playerMeta = getPlayerMeta(state, action.playerId)
@@ -811,27 +899,11 @@ export function applyBattleAction(
       }
       
       const context = {
-        piece: {
-          instanceId: piece.instanceId,
-          templateId: piece.templateId,
-          name: piece.name,
-          ownerPlayerId: piece.ownerPlayerId,
-          currentHp: piece.currentHp,
-          maxHp: piece.maxHp,
-          attack: piece.attack,
-          defense: piece.defense,
-          x: piece.x || 0,
-          y: piece.y || 0,
-          moveRange: piece.moveRange,
-        },
+        piece: piece,
         target: targetInfo,
         targetPosition: targetPositionInfo,
         selectedOption: (action as any).selectedOption,
-        battle: {
-          turn: next.turn.turnNumber,
-          currentPlayerId: next.turn.currentPlayerId,
-          phase: next.turn.phase,
-        },
+        battle: next,
         skill: {
           id: skillDef.id,
           name: skillDef.name,
@@ -1130,27 +1202,11 @@ export function applyBattleAction(
       }
       
       const context = {
-        piece: {
-          instanceId: piece.instanceId,
-          templateId: piece.templateId,
-          name: piece.name,
-          ownerPlayerId: piece.ownerPlayerId,
-          currentHp: piece.currentHp,
-          maxHp: piece.maxHp,
-          attack: piece.attack,
-          defense: piece.defense,
-          x: piece.x || 0,
-          y: piece.y || 0,
-          moveRange: piece.moveRange,
-        },
+        piece: piece,
         target: targetInfo,
         targetPosition: targetPositionInfo,
         selectedOption: (action as any).selectedOption,
-        battle: {
-          turn: next.turn.turnNumber,
-          currentPlayerId: next.turn.currentPlayerId,
-          phase: next.turn.phase,
-        },
+        battle: next,
         skill: {
           id: skillDef.id,
           name: skillDef.name,
@@ -1366,14 +1422,20 @@ export function applyBattleAction(
           // 遍历所有状态标签
           for (let i = piece.statusTags.length - 1; i >= 0; i--) {
             const statusTag = piece.statusTags[i];
-            // 检查状态标签是否有currentDuration属性且大于0
-            if (statusTag.currentDuration !== undefined && statusTag.currentDuration > 0) {
+            // 检查状态标签是否有持续时间属性（支持 currentDuration 和 remainingDuration）
+            const currentDuration = statusTag.remainingDuration ?? statusTag.currentDuration;
+            if (currentDuration !== undefined && currentDuration > 0) {
               // 减少持续时间
-              statusTag.currentDuration--;
-              console.log(`Reduced duration for status ${statusTag.type} on piece ${piece.instanceId}: ${statusTag.currentDuration} turns remaining`);
-              
+              const newDuration = currentDuration - 1;
+              if (statusTag.remainingDuration !== undefined) {
+                statusTag.remainingDuration = newDuration;
+              } else {
+                statusTag.currentDuration = newDuration;
+              }
+              console.log(`Reduced duration for status ${statusTag.type} on piece ${piece.instanceId}: ${newDuration} turns remaining`);
+
               // 如果持续时间为0，清除状态标签
-              if (statusTag.currentDuration === 0) {
+              if (newDuration === 0) {
                 console.log(`Status ${statusTag.type} expired on piece ${piece.instanceId}, removing status tag`);
                 
                 // 检查并清理相关规则

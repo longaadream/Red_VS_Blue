@@ -44,9 +44,11 @@ const ruleCache = new Map<string, TriggerRule>()
 
 // 从文件中加载规则的函数（导出以便在需要时重新注入 effect 函数）
 export function loadRuleById(ruleId: string): TriggerRule | null {
+  console.log(`[loadRuleById] Called with ruleId: ${ruleId}`);
   // 命中缓存时直接返回浅拷贝（保留 effect 函数引用，避免重复读文件）
   const cached = ruleCache.get(ruleId)
   if (cached) {
+    console.log(`[loadRuleById] Cache hit for rule: ${ruleId}`);
     return { ...cached }
   }
   try {
@@ -55,9 +57,10 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
     
     // 尝试使用process.cwd()来获取当前工作目录，确保路径正确
     const rulePath = path.join(process.cwd(), 'data', 'rules', `${ruleId}.json`);
+    console.log(`[loadRuleById] Looking for rule at: ${rulePath}`);
     
     if (fs.existsSync(rulePath)) {
-      console.log(`Loading rule from: ${rulePath}`);
+      console.log(`[loadRuleById] Found rule file: ${rulePath}`);
       const ruleContent = fs.readFileSync(rulePath, 'utf8');
       const ruleData = JSON.parse(ruleContent);
       
@@ -87,11 +90,7 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                     piece: context.sourcePiece,
                     target: context.targetPiece,
                     targetPosition: null,
-                    battle: {
-                      turn: battle.turn.turnNumber,
-                      currentPlayerId: battle.turn.currentPlayerId,
-                      phase: battle.turn.phase
-                    },
+                    battle: battle,
                     skill: {
                       id: skillId,
                       name: skillDef.name,
@@ -1056,21 +1055,34 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
   
   // 触发伤害相关的触发器
   // 1. 攻击者的伤害触发
-  globalTriggerSystem.checkTriggers(battle, {
+  const damageDealtResult = globalTriggerSystem.checkTriggers(battle, {
     type: "afterDamageDealt",
     sourcePiece: attacker,
     targetPiece: target,
     damage: finalDamage,
     skillId
   });
-  
+
   // 2. 目标的伤害触发
-  globalTriggerSystem.checkTriggers(battle, {
+  const damageTakenResult = globalTriggerSystem.checkTriggers(battle, {
     type: "afterDamageTaken",
     sourcePiece: target,
     targetPiece: attacker,
     damage: finalDamage,
     skillId
+  });
+
+  // 将触发器的消息添加到战斗日志
+  if (!battle.actions) {
+    battle.actions = [];
+  }
+  [...damageDealtResult.messages, ...damageTakenResult.messages].forEach(message => {
+    battle.actions!.push({
+      type: "triggerEffect",
+      playerId: target.ownerPlayerId,
+      turn: battle.turn?.turnNumber || 0,
+      payload: { message }
+    });
   });
   
   // 检查是否击杀了目标
@@ -1424,12 +1436,15 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     },
     // 规则管理函数
     addRuleById: (targetPieceId: string, ruleId: string) => {
+      console.log(`[addRuleById] Called with targetPieceId: ${targetPieceId}, ruleId: ${ruleId}`);
       // 找到目标棋子
       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
       if (targetPiece) {
+        console.log(`[addRuleById] Found target piece: ${targetPiece.name}`);
         // 从文件中加载规则
         const rule = loadRuleById(ruleId);
         if (rule) {
+          console.log(`[addRuleById] Loaded rule: ${rule.id}, effect is function: ${typeof rule.effect === 'function'}`);
           // 创建规则对象的副本并添加关联状态标签数组
           const newRule = {
             ...rule,
@@ -1456,8 +1471,13 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             targetPiece.rules = [];
           }
           targetPiece.rules.push(newRule);
+          console.log(`[addRuleById] Rule added successfully. Piece now has ${targetPiece.rules.length} rules`);
           return true;
+        } else {
+          console.error(`[addRuleById] Failed to load rule: ${ruleId}`);
         }
+      } else {
+        console.error(`[addRuleById] Target piece not found: ${targetPieceId}`);
       }
       return false;
     },

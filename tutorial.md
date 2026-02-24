@@ -196,11 +196,12 @@ context = {
   heal: number,         // 治疗值（afterHealDealt/afterHealTaken 中）
   statusId: string,     // 状态ID（afterStatusApplied/afterStatusRemoved 中）
 
-  // 当前战斗基础信息
+  // 当前战斗状态（完整引用，包含 pieces 数组等所有信息）
   battle: {
-    turn: 3,                           // 当前回合数
-    currentPlayerId: "player1",        // 当前行动玩家ID
-    phase: "action"                    // 当前回合阶段：start / action / end
+    turn: { turnNumber: 3, currentPlayerId: "player1", phase: "action" },
+    pieces: [...],                     // 所有棋子数组，可直接访问和修改
+    actions: [...],                    // 战斗日志
+    // ... 其他战斗状态字段
   },
 
   // 正在使用的技能信息
@@ -215,10 +216,12 @@ context = {
 
 ### 重要说明
 
-- `context.piece` 是**可写的直接引用**。修改 `context.piece.attack` 会立即反映到战斗状态中。
+- **`context.piece` 是 `battle.pieces` 中的实际引用**。修改 `context.piece.x`、`context.piece.attack` 等属性会立即反映到战斗状态中。
+- **`sourcePiece` 变量与 `context.piece` 指向同一个棋子实例**，两者可互换使用。
 - `context.target` 在主动技能中始终为 `null`。需要目标时，使用 `selectTarget()` 函数获取。
 - `context.targetPosition` 在主动技能中始终为 `null`。需要格子位置时，使用 `selectTarget({type: 'grid', ...})` 获取。
 - **禁止**在主动技能中直接使用 `context.target` 或 `context.targetPosition`。
+- **`context.battle` 是完整的战斗状态引用**，包含 `pieces` 数组、`turn` 对象等所有信息。可以通过 `context.battle.pieces` 访问所有棋子。
 
 ---
 
@@ -238,7 +241,7 @@ const result = dealDamage(
   target,               // 目标棋子实例（同上）
   20,                   // 基础伤害值（数字）
   'physical',           // 伤害类型：'physical'（受防御减免）/ 'magical'（受防御减免）/ 'true'（无视防御）
-  context.battle,       // 当前战斗状态（固定传 context.battle）
+  context.battle,       // 当前战斗状态（完整引用，固定传 context.battle）
   context.skill.id      // 技能ID（用于日志，传 context.skill.id 即可）
 )
 
@@ -373,13 +376,18 @@ removeRuleById(target.instanceId, 'rule-bleeding-tick')
 
 ### `sourcePiece` 变量
 
-在技能代码中，除了 `context.piece`，还有一个 `sourcePiece` 变量，两者指向**同一个棋子实例**，可互换使用。
+在技能代码中，除了 `context.piece`，还有一个 `sourcePiece` 变量可用。**两者都指向 `battle.pieces` 中的同一个实际棋子实例**，修改任意一个都会立即反映到战斗状态中。
 
 ```javascript
-// 这两种写法等价
-sourcePiece.attack += 2
-context.piece.attack += 2
+// 这三种写法等价，都会立即修改棋子的位置
+sourcePiece.x = 5
+context.piece.x = 5
+// 或者通过 battle.pieces 查找后修改
+const piece = context.battle.pieces.find(p => p.instanceId === context.piece.instanceId);
+piece.x = 5
 ```
+
+**推荐使用 `sourcePiece`**，因为它更简洁，且明确表示这是技能的施法者。
 
 ---
 
@@ -712,13 +720,21 @@ function executeSkill(context) {
 
 ```javascript
 function executeSkill(context) {
-  const caster = context.piece
   const pos = selectTarget({ type: 'grid', range: 6, filter: 'all' })
   if (!pos || pos.needsTargetSelection) return pos
 
-  caster.x = pos.x
-  caster.y = pos.y
-  return { success: true, message: caster.name + '传送到了(' + pos.x + ',' + pos.y + ')' }
+  // 检查目标格子是否已有棋子
+  const pieceAtPos = context.battle.pieces.find(p => 
+    p.x === pos.x && p.y === pos.y && p.currentHp > 0
+  )
+  if (pieceAtPos) {
+    return { success: false, message: '该位置已有棋子' }
+  }
+
+  // 使用 sourcePiece 修改位置（与 context.piece 等价）
+  sourcePiece.x = pos.x
+  sourcePiece.y = pos.y
+  return { success: true, message: sourcePiece.name + '传送到了(' + pos.x + ',' + pos.y + ')' }
 }
 ```
 
@@ -799,6 +815,65 @@ function executeSkill(context) {
   }
 
   return { success: false, message: '未知选项' }
+}
+```
+
+### 示例：范围伤害+传送（毁天灭地）
+
+```javascript
+function executeSkill(context) {
+  // 选择降落位置
+  const targetPos = selectTarget({ type: 'grid', range: 10, filter: 'all' })
+  if (!targetPos || targetPos.needsTargetSelection) return targetPos
+
+  // 检查目标位置是否已有棋子
+  const pieceAtPos = context.battle.pieces.find(p => 
+    p.x === targetPos.x && p.y === targetPos.y && p.currentHp > 0
+  )
+  if (pieceAtPos) {
+    return { message: '该位置已有棋子', success: false }
+  }
+
+  // 传送到目标位置
+  sourcePiece.x = targetPos.x
+  sourcePiece.y = targetPos.y
+
+  // 对3x3范围内的敌人造成伤害
+  const damageValue = sourcePiece.attack * context.skill.powerMultiplier
+  const affectedEnemies = []
+  let totalDamage = 0
+
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const checkPos = { x: targetPos.x + dx, y: targetPos.y + dy }
+      const enemyAtPos = context.battle.pieces.find(p => 
+        p.x === checkPos.x && 
+        p.y === checkPos.y && 
+        p.currentHp > 0 && 
+        p.ownerPlayerId !== sourcePiece.ownerPlayerId
+      )
+      if (enemyAtPos) {
+        affectedEnemies.push(enemyAtPos.name)
+        const damageResult = dealDamage(
+          sourcePiece, 
+          enemyAtPos, 
+          damageValue, 
+          'physical', 
+          context.battle, 
+          context.skill.id
+        )
+        totalDamage += damageResult.damage
+      }
+    }
+  }
+
+  if (affectedEnemies.length > 0) {
+    return { 
+      message: sourcePiece.name + ' 从天而降，对 ' + affectedEnemies.join(', ') + ' 造成 ' + totalDamage + ' 点伤害', 
+      success: true 
+    }
+  }
+  return { message: sourcePiece.name + ' 从天而降', success: true }
 }
 ```
 

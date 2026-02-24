@@ -1,1 +1,15 @@
-{"id":"hardy-block","name":"悍猛格挡","description":"在接下来的敌方回合如果受到伤害将伤害的50%转化为攻击力（向下取整）","icon":"🛡️","kind":"active","type":"buff","cooldownTurns":2,"maxCharges":0,"powerMultiplier":0.5,"actionPointCost":2,"code":"function executeSkill(context) { const sourcePiece = context.piece; if (typeof addStatusEffectById === 'function') { const result = addStatusEffectById(sourcePiece.instanceId, 'hardy-block', 1); if (result.success) { return { message: sourcePiece.templateId + ' 激活了悍猛格挡，持续1回合', success: true }; } else { return { message: '无法激活悍猛格挡', success: false }; } } else { return { message: '系统函数不可用', success: false }; } }","previewCode":"function calculatePreview(piece, skillDef) { return { description: '在接下来的敌方回合，受到伤害时将50%伤害转化为攻击力（向下取整）', expectedValues: { duration: 1 } }; }","range":"self"}
+{
+  "id": "hardy-block",
+  "name": "悍猛格挡",
+  "description": "如果受到伤害，将伤害的50%转化为攻击力（向下取整），持续2回合",
+  "icon": "🛡️",
+  "kind": "active",
+  "type": "buff",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 0.5,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { console.log('[HardyBlock] Skill executing'); const sourcePiece = context.piece; console.log('[HardyBlock] sourcePiece:', sourcePiece.instanceId, sourcePiece.name); console.log('[HardyBlock] Calling addStatusEffectById'); addStatusEffectById(sourcePiece.instanceId, { id: 'hardy-block', type: 'hardy-block', currentDuration: 2, currentUses: -1, intensity: 50, stacks: 1 }); console.log('[HardyBlock] Calling addRuleById'); addRuleById(sourcePiece.instanceId, 'rule-hardy-block'); console.log('[HardyBlock] Skill execution complete'); return { message: sourcePiece.name + ' 激活了悍猛格挡，持续2回合，受到伤害时将50%伤害转化为攻击力', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '在接下来的敌方回合，受到伤害时将50%伤害转化为攻击力（向下取整）', expectedValues: { duration: 2 } }; }",
+  "range": "self"
+}

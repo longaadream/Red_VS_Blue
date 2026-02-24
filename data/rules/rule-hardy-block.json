@@ -1,0 +1,13 @@
+{
+  "id": "rule-hardy-block",
+  "name": "悍猛格挡触发",
+  "description": "受到伤害时触发悍猛格挡效果，将伤害转化为攻击力",
+  "trigger": {
+    "type": "afterDamageTaken"
+  },
+  "effect": {
+    "type": "triggerSkill",
+    "skillId": "hardy-block-trigger",
+    "message": ""
+  }
+}

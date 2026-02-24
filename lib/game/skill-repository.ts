@@ -79,3 +79,17 @@ export function getAllSkills(): SkillDefinition[] {
 export function getSkillsByIds(ids: string[]): SkillDefinition[] {
   return ids.map(id => DEFAULT_SKILLS[id]).filter((skill): skill is SkillDefinition => skill !== undefined)
 }
+
+// 强制重新加载技能文件（用于开发模式热重载）
+export function reloadSkills(): void {
+  if (typeof window === 'undefined') {
+    try {
+      const { loadJsonFilesServer } = require('./file-loader')
+      const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
+      DEFAULT_SKILLS = { ...defaultSkillsData, ...loadedSkills }
+      console.log('[reloadSkills] Reloaded skills:', Object.keys(DEFAULT_SKILLS))
+    } catch (error) {
+      console.error('[reloadSkills] Error reloading skills:', error)
+    }
+  }
+}
