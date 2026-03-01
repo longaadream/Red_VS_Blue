@@ -68,7 +68,7 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
       
       if (ruleData.effect) {
         if (ruleData.effect.type === 'triggerSkill') {
-          // 触发技能的效果
+          // 触发技能的效果（原有逻辑）
           effectFunction = (battle: BattleState, context: any) => {
             const skillId = ruleData.effect.skillId;
             if (skillId) {
@@ -274,6 +274,31 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
               }
             }
             return { success: true, message: `${ruleData.name}触发` };
+          };
+        } else if (ruleData.skillCode) {
+          // 直接执行自定义代码
+          effectFunction = (battle: BattleState, context: any) => {
+            try {
+              console.log(`[Rule] Executing skillCode for rule: ${ruleId}`);
+              // 保存全局的dealDamage和healDamage函数
+              const globalDealDamage = dealDamage;
+              const globalHealDamage = healDamage;
+              
+              // 构建执行环境
+              const codeEnvironment = `
+                (function(battle, context, dealDamage, healDamage) {
+                  ${ruleData.skillCode}
+                  return checkToxin(battle, context);
+                })(arguments[0], arguments[1], arguments[2], arguments[3])
+              `;
+              
+              const result = eval(codeEnvironment);
+              console.log(`[Rule] skillCode result:`, result);
+              return result || { success: false, message: '' };
+            } catch (error) {
+              console.error('[Rule] Error executing skillCode:', error);
+              return { success: false, message: '规则执行失败' };
+            }
           };
         } else {
           // 默认效果函数
@@ -1029,16 +1054,14 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
   
   switch (damageType) {
     case "physical":
-      // 物理伤害：受到防御力影响
-      finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense)); // 至少造成1点伤害
+      finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense));
       break;
     case "magical":
-      // 法术伤害：受到魔法抗性影响（暂时使用防御力代替）
-      finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense)); // 至少造成1点伤害
+      finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense));
       break;
     case "true":
-      // 真实伤害：不受防御力影响
-      finalDamage = Math.max(1, Math.floor(validBaseDamage)); // 至少造成1点伤害
+    case "toxin":
+      finalDamage = Math.max(1, Math.floor(validBaseDamage));
       break;
    }
   

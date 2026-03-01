@@ -27,8 +27,31 @@ import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import { dealDamage, healDamage, loadRuleById } from "./skills"
+import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
+
+// ─── 辅助函数：检测毒素触发（敌人移动到毒素格子）────────────────
+function checkToxinTrigger(battle: BattleState, mover: PieceInstance): string | null {
+  if (!battle.toxins || battle.toxins.length === 0) {
+    return null
+  }
+  
+  for (const toxin of battle.toxins) {
+    console.log('[checkToxinTrigger] Checking toxin at:', toxin.x, toxin.y, 'mover at:', mover.x, mover.y, 'toxin caster:', toxin.casterOwnerId, 'mover owner:', mover.ownerPlayerId)
+    if (mover.x === toxin.x && mover.y === toxin.y && mover.ownerPlayerId !== toxin.casterOwnerId) {
+      console.log('[checkToxinTrigger] Enemy stepped on toxin!')
+      const damage = toxin.damage || 4
+      console.log('[checkToxinTrigger] mover defense:', mover.defense, 'damage:', damage)
+      const caster = battle.pieces.find(p => p.ownerPlayerId === toxin.casterOwnerId) || mover
+      const result = dealDamage(caster, mover, damage, 'toxin' as DamageType, battle)
+      console.log('[checkToxinTrigger] dealDamage result:', result)
+      console.log('[checkToxinTrigger] mover currentHp after damage:', mover.currentHp)
+      return `${mover.name}触发了致命毒素，受到${result.damage}点伤害！${result.isKilled ? '（被击杀）' : ''}`
+    }
+  }
+  return null
+}
 
 // ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
 function restorePieceRules(state: BattleState): void {
@@ -720,6 +743,24 @@ export function applyBattleAction(
             }
           });
         });
+      }
+
+      // 检测毒素触发（敌人移动到毒素格子）
+      if (next.toxins && next.toxins.length > 0) {
+        console.log('[Turn] Checking toxins after move, total toxins:', next.toxins.length)
+        const toxinMessage = checkToxinTrigger(next, piece)
+        if (toxinMessage) {
+          console.log('[Turn] Toxin triggered:', toxinMessage)
+          if (!next.actions) {
+            next.actions = []
+          }
+          next.actions.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: { message: toxinMessage }
+          })
+        }
       }
 
       // 触发whenever规则（每一步行动后检测）

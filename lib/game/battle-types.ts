@@ -61,6 +61,8 @@ export interface BattleState {
   turn: TurnState
   /** 战斗日志 */
   actions?: BattleActionLog[]
+  /** 毒素列表 - 存放黑百合等技能放置的毒素 */
+  toxins?: Array<{ x: number; y: number; damage: number; casterOwnerId: string }>
 }
 
 export type BattleAction =

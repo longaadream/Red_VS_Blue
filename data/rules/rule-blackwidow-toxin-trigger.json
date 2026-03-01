@@ -1,13 +1,9 @@
 {
   "id": "rule-blackwidow-toxin-trigger",
   "name": "毒素触发",
-  "description": "回合开始时检测敌人是否踩到毒素",
+  "description": "敌人进入毒素所在格子时触发",
   "trigger": {
-    "type": "beginTurn"
+    "type": "afterMove"
   },
-  "effect": {
-    "type": "triggerSkill",
-    "skillId": "blackwidow-toxin-damage",
-    "message": ""
-  }
+  "skillCode": "function checkToxin(battle, context) { var mover = context.sourcePiece; console.log('[ToxinTrigger] Checking for:', mover.name, 'at', mover.x, mover.y); if (!mover) { return { success: false, message: '' }; } if (!battle.toxins) { battle.toxins = []; } console.log('[ToxinTrigger] Total toxins:', battle.toxins.length); for (var i = 0; i < battle.toxins.length; i++) { var toxin = battle.toxins[i]; console.log('[ToxinTrigger] Checking toxin at:', toxin.x, toxin.y, 'mover at:', mover.x, mover.y, 'toxin owner:', toxin.casterOwnerId, 'mover owner:', mover.ownerPlayerId); if (mover.x === toxin.x && mover.y === toxin.y && mover.ownerPlayerId !== toxin.casterOwnerId) { console.log('[ToxinTrigger] Enemy stepped on toxin!'); var damage = toxin.damage || 4; dealDamage(mover.instanceId, damage); return { success: true, message: mover.name + '触发了致命毒素，受到' + damage + '点伤害！' }; } } return { success: false, message: '' }; }"
 }
