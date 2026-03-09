@@ -255,21 +255,16 @@ export function executeCardFunction(
   selectedOption?: any
 ): SkillExecutionResult {
   try {
-    const context = {
-      card: { id: cardDef.id, name: cardDef.name, type: cardDef.type },
-      playerId,
-      battle,
-      piece: null,
-      target: targetPiece || null,
-      targetPosition: targetPosition || null,
-      selectedOption,
-      // 触发事件上下文（reactive 卡牌使用）
-      sourcePiece: triggerContext?.sourcePiece || null,
-      targetPiece: triggerContext?.targetPiece || null,
-      damage: triggerContext?.damage,
-      heal: triggerContext?.heal,
-      skillId: triggerContext?.skillId,
-    }
+    // 卡牌执行上下文：优先使用 triggerContext 作为基础（保持引用），然后添加卡牌相关字段
+    // 这样 reactive 卡牌可以修改原始事件的参数（如 damage、heal 等）
+    const context = triggerContext || {}
+    context.card = { id: cardDef.id, name: cardDef.name, type: cardDef.type }
+    context.playerId = playerId
+    context.battle = battle
+    context.piece = context.piece || null
+    context.target = targetPiece || context.target || null
+    context.targetPosition = targetPosition || context.targetPosition || null
+    context.selectedOption = selectedOption
 
     const env = createCardEffectFunctions(battle, playerId, context)
 
@@ -373,22 +368,19 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                   const globalDealDamage = dealDamage;
                   const globalHealDamage = healDamage;
                   
-                  // 构建技能执行上下文
-                  const skillContext = {
-                    piece: context.sourcePiece,
-                    target: context.targetPiece,
-                    targetPosition: null,
-                    battle: battle,
-                    skill: {
-                      id: skillId,
-                      name: skillDef.name,
-                      type: skillDef.type,
-                      powerMultiplier: skillDef.powerMultiplier
-                    },
-                    damage: context.damage,
-                    playerId: context.playerId,
-                    type: context.type
+                  // 直接使用传入的 context，确保修改能反映到原始对象上
+                  // 添加技能相关的字段到 context
+                  context.piece = context.piece || context.sourcePiece;
+                  context.target = context.target || context.targetPiece;
+                  context.targetPosition = context.targetPosition || null;
+                  context.skill = {
+                    id: skillId,
+                    name: skillDef.name,
+                    type: skillDef.type,
+                    powerMultiplier: skillDef.powerMultiplier
                   };
+                  // 使用 context 作为 skillContext，确保引用传递
+                  const skillContext = context;
                   
                   // 构建技能执行环境
                   const skillEnvironment = {
@@ -1284,25 +1276,31 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
  * @returns 伤害结果
  */
 export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseDamage: number, damageType: DamageType, battle: BattleState, skillId?: string) {
-  // 触发即将造成伤害前的触发器
-  const beforeDamageDealtResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "beforeDamageDealt",
+  // 创建一个可修改的上下文对象，触发器可以直接修改其中的值
+  // piece = 攻击者（事件源），target = 被攻击者（事件目标）
+  const damageContext = {
+    type: "beforeDamageDealt" as const,
+    piece: attacker,
     sourcePiece: attacker,
     targetPiece: target,
+    target: target,
     damage: baseDamage,
     skillId
-  });
-  
+  };
+
+  // 触发即将造成伤害前的触发器
+  const beforeDamageDealtResult = globalTriggerSystem.checkTriggers(battle, damageContext);
+
   // 检查是否有规则阻止了伤害
   if (beforeDamageDealtResult.blocked) {
     // 记录阻止信息到战斗日志
     const attackerName = attacker.name || attacker.templateId;
     const targetName = target.name || target.templateId;
-    
+
     if (!battle.actions) {
       battle.actions = [];
     }
-    
+
     battle.actions.push({
       type: "triggerEffect",
       playerId: attacker.ownerPlayerId,
@@ -1311,7 +1309,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
         message: `${attackerName}的攻击被规则阻止`
       }
     });
-    
+
     return {
       success: false,
       damage: 0,
@@ -1320,16 +1318,22 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
       message: "攻击被规则阻止"
     };
   }
-  
+
+  // 触发器可能已经修改了 damageContext.damage，使用修改后的值
+  const modifiedBaseDamage = damageContext.damage;
+
   // 触发即将受到伤害前的触发器
+  // piece = 被攻击者（事件源），target = 攻击者（事件目标）
   const beforeDamageTakenResult = globalTriggerSystem.checkTriggers(battle, {
     type: "beforeDamageTaken",
+    piece: target,
     sourcePiece: target,
     targetPiece: attacker,
-    damage: baseDamage,
+    target: attacker,
+    damage: modifiedBaseDamage,
     skillId
   });
-  
+
   // 检查是否有规则阻止了伤害
   if (beforeDamageTakenResult.blocked) {
     const targetName = target.name || target.templateId;
@@ -1347,7 +1351,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
       type: "afterDamageBlocked",
       sourcePiece: target,
       targetPiece: attacker,
-      damage: baseDamage,
+      damage: modifiedBaseDamage,
       skillId
     });
 
@@ -1359,14 +1363,14 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
       message: "伤害被规则阻止"
     };
   }
-  
+
   // 计算最终伤害（考虑防御力）
   let finalDamage: number;
-  
-  // 确保baseDamage和target.defense都是有效的数字
-  const validBaseDamage = Number(baseDamage) || 0;
+
+  // 使用触发器可能修改后的伤害值
+  const validBaseDamage = Number(modifiedBaseDamage) || 0;
   const validDefense = Number(target.defense) || 0;
-  
+
   switch (damageType) {
     case "physical":
       finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense));
@@ -1500,25 +1504,31 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance, baseD
  * @returns 治疗结果
  */
 export function healDamage(healer: PieceInstance, target: PieceInstance, baseHeal: number, battle: BattleState, skillId?: string) {
-  // 触发即将造成治疗前的触发器
-  const beforeHealDealtResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "beforeHealDealt",
+  // 创建一个可修改的上下文对象，触发器可以直接修改其中的值
+  // piece = 治疗者（事件源），target = 被治疗者（事件目标）
+  const healContext = {
+    type: "beforeHealDealt" as const,
+    piece: healer,
     sourcePiece: healer,
     targetPiece: target,
+    target: target,
     heal: baseHeal,
     skillId
-  });
-  
+  };
+
+  // 触发即将造成治疗前的触发器
+  const beforeHealDealtResult = globalTriggerSystem.checkTriggers(battle, healContext);
+
   // 检查是否有规则阻止了治疗
   if (beforeHealDealtResult.blocked) {
     // 记录阻止信息到战斗日志
     const healerName = healer.name || healer.templateId;
     const targetName = target.name || target.templateId;
-    
+
     if (!battle.actions) {
       battle.actions = [];
     }
-    
+
     battle.actions.push({
       type: "triggerEffect",
       playerId: healer.ownerPlayerId,
@@ -1527,7 +1537,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance, baseHea
         message: `${healerName}的治疗被规则阻止`
       }
     });
-    
+
     return {
       success: false,
       heal: 0,
@@ -1535,16 +1545,22 @@ export function healDamage(healer: PieceInstance, target: PieceInstance, baseHea
       message: "治疗被规则阻止"
     };
   }
-  
+
+  // 触发器可能已经修改了 healContext.heal，使用修改后的值
+  const modifiedBaseHeal = healContext.heal;
+
   // 触发即将受到治疗前的触发器
+  // piece = 被治疗者（事件源），target = 治疗者（事件目标）
   const beforeHealTakenResult = globalTriggerSystem.checkTriggers(battle, {
     type: "beforeHealTaken",
+    piece: target,
     sourcePiece: target,
     targetPiece: healer,
-    heal: baseHeal,
+    target: healer,
+    heal: modifiedBaseHeal,
     skillId
   });
-  
+
   // 检查是否有规则阻止了治疗
   if (beforeHealTakenResult.blocked) {
     const targetName = target.name || target.templateId;
@@ -1562,7 +1578,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance, baseHea
       type: "afterHealBlocked",
       sourcePiece: target,
       targetPiece: healer,
-      heal: baseHeal,
+      heal: modifiedBaseHeal,
       skillId
     });
 
@@ -1573,9 +1589,9 @@ export function healDamage(healer: PieceInstance, target: PieceInstance, baseHea
       message: "治疗被规则阻止"
     };
   }
-  
-  // 计算最终治疗值
-  const finalHeal = Math.max(0, Math.floor(baseHeal));
+
+  // 计算最终治疗值（使用触发器可能修改后的值）
+  const finalHeal = Math.max(0, Math.floor(modifiedBaseHeal));
   
   // 记录原始生命值
   const originalHp = target.currentHp;

@@ -1,0 +1,25 @@
+{
+  "id": "blue-tirion-fordring",
+  "name": "提里奥弗丁",
+  "faction": "blue",
+  "description": "圣骑士的领袖，手持灰烬使者，能够给予敌人致命的真实伤害",
+  "rarity": "legendary",
+  "image": "tirion-fordring.jpg",
+  "stats": {
+    "maxHp": 15,
+    "attack": 5,
+    "defense": 1,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "ashbringer",
+      "level": 1
+    },
+    {
+      "skillId": "holy-blast",
+      "level": 1
+    }
+  ],
+  "isDefault": false
+}

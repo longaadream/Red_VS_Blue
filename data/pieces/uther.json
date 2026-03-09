@@ -1,0 +1,29 @@
+{
+  "id": "uther",
+  "name": "乌瑟尔",
+  "faction": "blue",
+  "description": "白银之手骑士团的领袖，精通圣光之力，能为队友提供强大的增益和保护",
+  "rarity": "epic",
+  "image": "uther.jpg",
+  "stats": {
+    "maxHp": 15,
+    "attack": 4,
+    "defense": 1,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "blessed-hammer",
+      "level": 1
+    },
+    {
+      "skillId": "shield-of-light",
+      "level": 1
+    },
+    {
+      "skillId": "divine-blessing",
+      "level": 1
+    }
+  ],
+  "isDefault": false
+}

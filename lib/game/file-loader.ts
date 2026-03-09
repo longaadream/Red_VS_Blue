@@ -13,62 +13,51 @@ export async function loadJsonFiles<T>(endpoint: string): Promise<Record<string,
   }
 }
 
-// 导出loadJsonFilesServer函数，在客户端返回空对象
-let loadJsonFilesServer: <T>(directory: string) => Record<string, T> = () => ({});
-
 // 服务器端版本的文件加载器，使用fs模块
-if (typeof window === 'undefined') {
-  // 只在服务器端导入fs模块
+function loadJsonFilesServerImpl<T>(directory: string): Record<string, T> {
+  const result: Record<string, T> = {};
+  
+  // 只在服务器端执行
+  if (typeof window !== 'undefined') {
+    return result;
+  }
+  
   const { readdirSync, readFileSync, existsSync } = require('fs');
   const { join } = require('path');
+  const dirPath = join(process.cwd(), directory);
 
-  loadJsonFilesServer = function<T>(directory: string): Record<string, T> {
-    const result: Record<string, T> = {};
-    const dirPath = join(process.cwd(), directory);
+  try {
+    const files = readdirSync(dirPath, { withFileTypes: true });
 
-    try {
-      // console.log('Current working directory:', process.cwd());
-      // console.log('Loading files from directory:', dirPath);
-      // console.log('Directory exists:', existsSync(dirPath));
+    files.forEach((file: any) => {
+      if (file.isFile() && file.name.endsWith('.json')) {
+        const filePath = join(dirPath, file.name);
 
-      const files = readdirSync(dirPath, { withFileTypes: true });
-
-      // console.log('Found files:', files.map(f => f.name));
-
-      files.forEach((file: any) => {
-        if (file.isFile() && file.name.endsWith('.json')) {
-          const filePath = join(dirPath, file.name);
-          // console.log('Loading file:', filePath);
+        try {
+          const content = readFileSync(filePath, 'utf-8');
 
           try {
-            const content = readFileSync(filePath, 'utf-8');
-            // console.log('File content length:', content.length);
+            const data = JSON.parse(content) as T;
 
-            try {
-              const data = JSON.parse(content) as T;
-              // console.log('Parsed data for', file.name, ':', data);
-
-              if (data && typeof data === 'object' && 'id' in data) {
-                result[data.id as string] = data;
-                // console.log('Added skill:', data.id);
-              } else {
-                // console.warn('File', file.name, 'does not have an id field');
-              }
-            } catch (parseError) {
-              // console.error(`Error parsing JSON file ${file.name}:`, parseError);
+            if (data && typeof data === 'object' && 'id' in data) {
+              result[data.id as string] = data;
             }
-          } catch (readError) {
-            // console.error(`Error reading file ${file.name}:`, readError);
+          } catch (parseError) {
+            console.error(`Error parsing JSON file ${file.name}:`, parseError);
           }
+        } catch (readError) {
+          console.error(`Error reading file ${file.name}:`, readError);
         }
-      });
-    } catch (error) {
-      // console.error(`Error loading files from directory ${directory}:`, error);
-    }
+      }
+    });
+  } catch (error) {
+    console.error(`Error loading files from directory ${directory}:`, error);
+  }
 
-    // console.log('Final loaded skills:', Object.keys(result));
-    return result;
-  };
+  return result;
 }
 
-export { loadJsonFilesServer };
+// 导出函数
+export function loadJsonFilesServer<T>(directory: string): Record<string, T> {
+  return loadJsonFilesServerImpl<T>(directory);
+}

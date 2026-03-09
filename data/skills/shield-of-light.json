@@ -1,7 +1,7 @@
 {
   "id": "shield-of-light",
   "name": "圣光术",
-  "description": "为范围内一个友军获得圣盾，抵挡一次伤害",
+  "description": "使7格内一个友军获得圣盾，抵挡一次伤害",
   "icon": "shield",
   "kind": "active",
   "type": "normal",

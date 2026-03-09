@@ -668,11 +668,15 @@ export function applyBattleAction(
       }
 
       // 触发即将移动前的规则（检查冰冻等状态）
-      const beforeMoveResult = globalTriggerSystem.checkTriggers(next, {
-        type: "beforeMove",
+      // 使用可修改的上下文对象，触发器可以修改 targetX/targetY 来改变移动目标
+      const moveContext = {
+        type: "beforeMove" as const,
         sourcePiece: piece,
-        playerId: action.playerId
-      });
+        playerId: action.playerId,
+        targetX: action.toX,
+        targetY: action.toY
+      };
+      const beforeMoveResult = globalTriggerSystem.checkTriggers(next, moveContext);
 
       // 检查是否有规则触发了效果
       if (beforeMoveResult.success) {
@@ -691,21 +695,25 @@ export function applyBattleAction(
           });
         });
       }
-      
+
       // 检查是否有规则明确阻止了行动（在添加消息之后检查）
       if (beforeMoveResult.blocked) {
         return next; // 返回包含消息的状态，不执行移动
       }
 
-      validateMove(next, piece, action.toX, action.toY)
+      // 触发器可能修改了目标位置，使用修改后的值
+      const finalToX = moveContext.targetX;
+      const finalToY = moveContext.targetY;
+
+      validateMove(next, piece, finalToX, finalToY)
 
       // 记录移动前的位置
       const fromX = piece.x
       const fromY = piece.y
-      
-      // 执行移动
-      piece.x = action.toX
-      piece.y = action.toY
+
+      // 执行移动（使用触发器可能修改后的目标位置）
+      piece.x = finalToX
+      piece.y = finalToY
       
       // 消耗行动点
       const playerMeta = getPlayerMeta(next, action.playerId)
@@ -718,8 +726,8 @@ export function applyBattleAction(
       
       // 记录移动信息到战斗日志
       const pieceName = piece.name || piece.templateId;
-      const moveMessage = `${pieceName}从(${fromX}, ${fromY})移动到(${action.toX}, ${action.toY})`;
-      
+      const moveMessage = `${pieceName}从(${fromX}, ${fromY})移动到(${finalToX}, ${finalToY})`;
+
       next.actions.push({
         type: "move",
         playerId: action.playerId,
@@ -729,8 +737,8 @@ export function applyBattleAction(
           pieceId: action.pieceId,
           fromX,
           fromY,
-          toX: action.toX,
-          toY: action.toY
+          toX: finalToX,
+          toY: finalToY
         }
       })
 
@@ -808,37 +816,15 @@ export function applyBattleAction(
         )
       }
 
-      // 优先从服务器获取最新的技能定义（开发模式热重载）
-      let skillDef = getSkillById(action.skillId) || next.skillsById[action.skillId]
-      
-      // 检查行动点是否足够
-      const playerMeta = getPlayerMeta(state, action.playerId)
-      if (playerMeta.actionPoints < skillDef.actionPointCost) {
-        throw new BattleRuleError(`Not enough action points to use ${skillDef.name}`)
-      }
-
-      // 检查技能是否在冷却中
-      if (piece.skills) {
-        const skillState = piece.skills.find(s => s.skillId === action.skillId)
-        if (skillState && skillState.currentCooldown && skillState.currentCooldown > 0) {
-          throw new BattleRuleError(
-            `Skill ${action.skillId} is on cooldown for ${skillState.currentCooldown} more turns`,
-          )
-        }
-        
-        // 检查限定技的使用次数
-        if (skillState && skillDef.type === "ultimate" && skillState.usesRemaining <= 0) {
-          throw new BattleRuleError(`Ultimate skill ${action.skillId} has already been used`)
-        }
-      }
-
       // 触发即将使用技能前的规则（检查冰冻等状态）
-      const beforeSkillUseResult = globalTriggerSystem.checkTriggers(next, {
-        type: "beforeSkillUse",
+      // 使用可修改的上下文对象，触发器可以修改 skillId 来改变使用的技能
+      const skillUseContext = {
+        type: "beforeSkillUse" as const,
         sourcePiece: piece,
         playerId: action.playerId,
         skillId: action.skillId
-      });
+      };
+      const beforeSkillUseResult = globalTriggerSystem.checkTriggers(next, skillUseContext);
 
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
@@ -857,13 +843,41 @@ export function applyBattleAction(
           });
         });
       }
-      
+
       // 检查是否有规则明确阻止了行动（在添加消息之后检查）
       if (beforeSkillUseResult.blocked) {
         return next; // 返回包含消息的状态，不执行技能
       }
 
-      // 执行技能
+      // 触发器可能修改了技能ID，使用修改后的值
+      const finalSkillId = skillUseContext.skillId;
+
+      // 优先从服务器获取最新的技能定义（开发模式热重载）
+      // 使用触发器可能修改后的技能ID
+      let skillDef = getSkillById(finalSkillId) || next.skillsById[finalSkillId]
+
+      // 检查行动点是否足够
+      const playerMeta = getPlayerMeta(state, action.playerId)
+      if (playerMeta.actionPoints < skillDef.actionPointCost) {
+        throw new BattleRuleError(`Not enough action points to use ${skillDef.name}`)
+      }
+
+      // 检查技能是否在冷却中
+      if (piece.skills) {
+        const skillState = piece.skills.find(s => s.skillId === finalSkillId)
+        if (skillState && skillState.currentCooldown && skillState.currentCooldown > 0) {
+          throw new BattleRuleError(
+            `Skill ${finalSkillId} is on cooldown for ${skillState.currentCooldown} more turns`,
+          )
+        }
+
+        // 检查限定技的使用次数
+        if (skillState && skillDef.type === "ultimate" && skillState.usesRemaining <= 0) {
+          throw new BattleRuleError(`Ultimate skill ${finalSkillId} has already been used`)
+        }
+      }
+
+      // 执行技能（使用触发器可能修改后的技能ID）
       const { executeSkillFunction } = require('./skills')
       
       // 构建目标信息
@@ -944,7 +958,7 @@ export function applyBattleAction(
         if (skillDef.cooldownTurns > 0 || skillDef.type === "ultimate") {
           // 找到棋子的技能状态并设置冷却
           if (piece.skills) {
-            const skillIndex = piece.skills.findIndex(s => s.skillId === action.skillId)
+            const skillIndex = piece.skills.findIndex(s => s.skillId === finalSkillId)
             if (skillIndex !== -1) {
               // 设置冷却
               if (skillDef.cooldownTurns > 0) {
@@ -959,7 +973,7 @@ export function applyBattleAction(
               // 如果技能不在棋子的技能列表中，添加它
               const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
               piece.skills.push({
-                skillId: action.skillId,
+                skillId: finalSkillId,
                 level: 1,
                 currentCooldown: skillDef.cooldownTurns,
                 usesRemaining: usesRemaining
@@ -969,7 +983,7 @@ export function applyBattleAction(
             // 如果棋子没有skills属性，初始化它
             const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
             piece.skills = [{
-              skillId: action.skillId,
+              skillId: finalSkillId,
               level: 1,
               currentCooldown: skillDef.cooldownTurns,
               usesRemaining: usesRemaining
@@ -986,7 +1000,7 @@ export function applyBattleAction(
       // 存储技能执行消息到战斗日志
       // 构建更详细的技能释放消息
       const pieceName = piece.name || piece.templateId;
-      let skillMessage = `${pieceName}使用了${skillDef.name || action.skillId}`;
+      let skillMessage = `${pieceName}使用了${skillDef.name || finalSkillId}`;
       
       // 如果有目标，添加目标信息
       if (action.targetPieceId) {
@@ -1068,13 +1082,26 @@ export function applyBattleAction(
         )
       }
 
-      let skillDef = next.skillsById[action.skillId]
-      
+      // 触发即将使用技能前的规则（检查冰冻等状态）
+      // 使用可修改的上下文对象，触发器可以修改 skillId 来改变使用的技能
+      const skillUseContext = {
+        type: "beforeSkillUse" as const,
+        sourcePiece: piece,
+        playerId: action.playerId,
+        skillId: action.skillId
+      };
+      const beforeSkillUseResult = globalTriggerSystem.checkTriggers(next, skillUseContext);
+
+      // 触发器可能修改了技能ID，使用修改后的值
+      const finalSkillId = skillUseContext.skillId;
+
+      let skillDef = next.skillsById[finalSkillId]
+
       // 如果技能定义找不到，使用默认技能定义
       if (!skillDef) {
         skillDef = {
-          id: action.skillId,
-          name: action.skillId,
+          id: finalSkillId,
+          name: finalSkillId,
           description: "Default skill",
           kind: "active",
           type: "super",
@@ -1088,7 +1115,7 @@ export function applyBattleAction(
           actionPointCost: 2
         }
       }
-      
+
       // 检查行动点是否足够
       const playerMeta = getPlayerMeta(state, action.playerId)
       if (playerMeta.actionPoints < skillDef.actionPointCost) {
@@ -1097,26 +1124,18 @@ export function applyBattleAction(
 
       // 检查技能是否在冷却中
       if (piece.skills) {
-        const skillState = piece.skills.find(s => s.skillId === action.skillId)
+        const skillState = piece.skills.find(s => s.skillId === finalSkillId)
         if (skillState && skillState.currentCooldown && skillState.currentCooldown > 0) {
           throw new BattleRuleError(
-            `Skill ${action.skillId} is on cooldown for ${skillState.currentCooldown} more turns`,
+            `Skill ${finalSkillId} is on cooldown for ${skillState.currentCooldown} more turns`,
           )
         }
-        
+
         // 检查限定技的使用次数
         if (skillState && skillDef.type === "ultimate" && skillState.usesRemaining <= 0) {
-          throw new BattleRuleError(`Ultimate skill ${action.skillId} has already been used`)
+          throw new BattleRuleError(`Ultimate skill ${finalSkillId} has already been used`)
         }
       }
-
-      // 触发即将使用技能前的规则（检查冰冻等状态）
-      const beforeSkillUseResult = globalTriggerSystem.checkTriggers(next, {
-        type: "beforeSkillUse",
-        sourcePiece: piece,
-        playerId: action.playerId,
-        skillId: action.skillId
-      });
 
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
@@ -1234,7 +1253,7 @@ export function applyBattleAction(
         if (skillDef.cooldownTurns > 0 || skillDef.type === "ultimate") {
           // 找到棋子的技能状态并设置冷却
           if (piece.skills) {
-            const skillIndex = piece.skills.findIndex(s => s.skillId === action.skillId)
+            const skillIndex = piece.skills.findIndex(s => s.skillId === finalSkillId)
             if (skillIndex !== -1) {
               // 设置冷却
               if (skillDef.cooldownTurns > 0) {
@@ -1249,7 +1268,7 @@ export function applyBattleAction(
               // 如果技能不在棋子的技能列表中，添加它
               const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
               piece.skills.push({
-                skillId: action.skillId,
+                skillId: finalSkillId,
                 level: 1,
                 currentCooldown: skillDef.cooldownTurns,
                 usesRemaining: usesRemaining
@@ -1259,7 +1278,7 @@ export function applyBattleAction(
             // 如果棋子没有skills属性，初始化它
             const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
             piece.skills = [{
-              skillId: action.skillId,
+              skillId: finalSkillId,
               level: 1,
               currentCooldown: skillDef.cooldownTurns,
               usesRemaining: usesRemaining
@@ -1276,7 +1295,7 @@ export function applyBattleAction(
       // 存储技能执行消息到战斗日志
       // 构建更详细的技能释放消息
       const pieceName = piece.name || piece.templateId;
-      let skillMessage = `${pieceName}使用了${skillDef.name || action.skillId}（充能技能，消耗${cost}点充能）`;
+      let skillMessage = `${pieceName}使用了${skillDef.name || finalSkillId}（充能技能，消耗${cost}点充能）`;
       
       // 如果有目标，添加目标信息
       if (action.targetPieceId) {

@@ -113,6 +113,143 @@ dealDamage(sourcePiece, target, 10, 'physical', context.battle, context.skill.id
 ❌ 错误：在 lib/game/turn.ts 等主进程文件中硬编码角色技能逻辑
 ```
 
+### 法则七：Context 必须是真实引用（引擎开发者必读）
+
+**所有传递给触发器的 Context 对象必须是真实引用，禁止创建新对象拷贝。**
+
+这是整个触发器系统的核心机制。触发器通过修改 Context 对象的字段来影响原始事件（如修改伤害值、治疗量、移动目标等）。如果创建了新对象，触发器的修改将无法反映到原始事件上。
+
+```javascript
+// ✅ 正确：直接传递对象字面量（引用）
+const damageContext = {
+  type: "beforeDamageDealt",
+  damage: baseDamage,
+  piece: attacker,
+  target: target
+};
+globalTriggerSystem.checkTriggers(battle, damageContext);
+// 触发器修改 damageContext.damage 后，这里读取到的是修改后的值
+const finalDamage = damageContext.damage;
+
+// ❌ 错误：创建新对象拷贝
+const skillContext = {
+  damage: context.damage,  // 值复制，不是引用
+  piece: context.sourcePiece
+};
+// 触发器修改 skillContext.damage，但原始的 context.damage 不变
+```
+
+**关键检查点：**
+- `dealDamage` / `healDamage` 函数中创建的 `damageContext` / `healContext`
+- `loadRuleById` 中构建的技能执行上下文
+- `executeCardFunction` 中构建的卡牌执行上下文
+- `turn.ts` 中 `beforeMove` / `beforeSkillUse` 等创建的上下文
+
+**所有触发器调用必须遵循：**
+1. 使用对象字面量直接创建 context
+2. 如需基于现有 context 扩展，直接修改原对象（`context.newField = value`）
+3. 禁止解构赋值后创建新对象（`{ ...context }`）
+4. 禁止通过函数参数重新赋值创建新引用
+
+---
+
+## Context 引用传递机制（重要）
+
+### 核心概念
+
+在触发器系统中，**Context 对象通过引用传递**，这意味着触发器（规则）可以直接修改 Context 中的字段，从而影响原始事件的执行。
+
+### 可修改的 Context 字段
+
+| 字段 | 适用触发类型 | 说明 |
+|------|-------------|------|
+| `context.damage` | `beforeDamageDealt`, `beforeDamageTaken` | 修改即将造成的伤害值 |
+| `context.heal` | `beforeHealDealt`, `beforeHealTaken` | 修改即将造成的治疗量 |
+| `context.targetX` / `context.targetY` | `beforeMove`, `beforePieceSummoned` | 修改移动/召唤的目标位置 |
+| `context.skillId` | `beforeSkillUse` | 修改即将使用的技能 |
+| `context.targetPiece` | 多种触发类型 | 修改或替换目标棋子 |
+| `context.damageType` | `beforeDamageDealt` | 修改伤害类型（physical/magical/true/toxin） |
+| `context.amount` | `afterChargeGained` 等 | 修改数值类事件的数值 |
+
+### 只读 Context 字段
+
+| 字段 | 说明 |
+|------|------|
+| `context.piece` | 触发事件的棋子（攻击者/被攻击者/治疗者等，取决于触发类型） |
+| `context.target` | 事件目标的棋子（被攻击者/攻击者/被治疗者等） |
+| `context.rulePiece` | **当前执行规则的棋子**（规则绑定者），用于区分事件源和规则拥有者 |
+| `context.type` | 触发类型 |
+| `context.battle` | 当前战斗状态 |
+| `context.skill` | 当前技能信息（技能相关触发） |
+
+### 使用示例：伤害加成
+
+```javascript
+// 在 beforeDamageDealt 触发器中增加伤害
+function executeSkill(context) {
+  // 直接修改 context.damage，不需要返回
+  context.damage = context.damage + 5
+  return { success: true, message: '伤害增加5点' }
+}
+```
+
+### 使用示例：改变移动目标
+
+```javascript
+// 在 beforeMove 触发器中改变移动目的地
+function executeSkill(context) {
+  // 将目标位置改为 (5, 5)
+  context.targetX = 5
+  context.targetY = 5
+  return { success: true, message: '移动目标被改变' }
+}
+```
+
+### 使用示例：技能替换
+
+```javascript
+// 在 beforeSkillUse 触发器中替换技能
+function executeSkill(context) {
+  // 将原本要使用的技能替换为另一个技能
+  if (context.skillId === 'fireball') {
+    context.skillId = 'frostbolt'
+    return { success: true, message: '火球术被替换为寒冰箭' }
+  }
+  return { success: false }
+}
+```
+
+### 工作原理
+
+1. **创建 Context 对象**：在 `dealDamage`、`healDamage`、移动、使用技能等操作前，系统创建一个 Context 对象
+2. **传递引用**：Context 对象作为引用传递给 `checkTriggers` 函数
+3. **触发器修改**：各个触发器（规则）可以直接修改 Context 对象的字段
+4. **使用修改后的值**：系统使用 Context 对象中可能被修改过的字段执行原始操作
+
+```typescript
+// 以 dealDamage 为例的工作流程：
+const damageContext = {
+  type: "beforeDamageDealt",
+  sourcePiece: attacker,
+  targetPiece: target,
+  damage: baseDamage,  // 原始伤害值
+  skillId
+}
+
+// 触发器可以修改 damageContext.damage
+checkTriggers(battle, damageContext)
+
+// 使用可能被修改过的伤害值
+const finalDamage = damageContext.damage  // 可能是触发器修改后的值
+```
+
+### 注意事项
+
+1. **不是所有字段都可以修改**：只有上面表格中列出的字段支持被触发器修改
+2. **修改是立即生效的**：触发器对 Context 的修改会立即影响后续逻辑
+3. **多个触发器的叠加**：如果有多个触发器修改同一个字段，后面的修改会覆盖前面的
+4. **类型安全**：修改字段时请保持类型一致（如 `damage` 必须是 number）
+
 ---
 
 ## 文件结构一览
@@ -1248,13 +1385,13 @@ return { success: true, blocked: false, message: '' }
 
 ### 伤害类
 
-| 触发类型 | 触发时机 | context.piece | context.target | context.damage | 可 blocked |
-|---------|---------|--------------|---------------|---------------|-----------|
-| `beforeDamageDealt` | 即将造成伤害前 | 攻击者 | 被攻击者 | 伤害值 | ✅ |
-| `afterDamageDealt` | 造成伤害后 | 攻击者 | 被攻击者 | 实际伤害值 | ❌ |
-| `beforeDamageTaken` | 即将受到伤害前 | 被攻击者 | 攻击者 | 伤害值 | ✅ |
-| `afterDamageTaken` | 受到伤害后 | 被攻击者 | 攻击者 | 实际伤害值 | ❌ |
-| `afterDamageBlocked` | 伤害被护盾抵挡后 | 被攻击者 | 攻击者 | 被抵挡的伤害值 | ❌ |
+| 触发类型                 | 触发时机     | context.piece | context.target | context.damage | 可 blocked |
+| -------------------- | -------- | ------------- | -------------- | -------------- | --------- |
+| `beforeDamageDealt`  | 即将造成伤害前  | 攻击者           | 被攻击者           | 伤害值            | ✅         |
+| `afterDamageDealt`   | 造成伤害后    | 攻击者           | 被攻击者           | 实际伤害值          | ❌         |
+| `beforeDamageTaken`  | 即将受到伤害前  | 被攻击者          | 攻击者            | 伤害值            | ✅         |
+| `afterDamageTaken`   | 受到伤害后    | 被攻击者          | 攻击者            | 实际伤害值          | ❌         |
+| `afterDamageBlocked` | 伤害被护盾抵挡后 | 被攻击者          | 攻击者            | 被抵挡的伤害值        | ❌         |
 
 ### 治疗类
 

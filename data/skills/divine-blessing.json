@@ -1,0 +1,16 @@
+{
+  "id": "divine-blessing",
+  "name": "赐福",
+  "description": "所有友方棋子下一次造成伤害时，伤害增加4点",
+  "icon": "🙏",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 1,
+  "maxCharges": 4,
+  "chargeCost": 4,
+  "powerMultiplier": 1,
+  "actionPointCost": 3,
+  "code": "function executeSkill(context) { const sourcePiece = context.piece; const battle = context.battle; const allies = battle.pieces.filter(function(p) { return p.faction === sourcePiece.faction && p.currentHp > 0; }); allies.forEach(function(ally) { if (typeof addStatusEffectById === 'function') { addStatusEffectById(ally.instanceId, { id: 'divine-blessing-buff', type: 'divine-blessing-buff', currentDuration: -1, currentUses: 1, intensity: 4, stacks: 1, relatedRules: ['rule-divine-blessing'] }); } if (typeof addRuleById === 'function') { addRuleById(ally.instanceId, 'rule-divine-blessing'); } }); return { message: sourcePiece.name + '为所有友方棋子赐福，下一次伤害增加4点', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '所有友方棋子下一次造成伤害时，伤害增加4点', expectedValues: { damageBonus: 4 } }; }",
+  "range": "all-allies"
+}

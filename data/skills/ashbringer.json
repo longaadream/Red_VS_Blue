@@ -1,0 +1,15 @@
+{
+  "id": "ashbringer",
+  "name": "灰烬使者",
+  "description": "对一格以内的一个敌人造成自身攻击力100%的真实伤害",
+  "icon": "⚔️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { const caster = context.piece; const target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) { return target; } const damage = caster.attack; const damageResult = dealDamage(caster, target, damage, 'true', context.battle, context.skill.id); return { message: caster.name + '使用灰烬使者对' + target.name + '造成' + damageResult.damage + '点真实伤害', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: '对1格内一个敌人造成' + damage + '点真实伤害', expectedValues: { damage: damage } }; }",
+  "range": "single"
+}

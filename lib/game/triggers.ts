@@ -62,20 +62,39 @@ export interface TriggerRule {
   }
 }
 
-// 触发上下文
+// 触发上下文 - 所有字段都可以通过引用被触发器修改
 export interface TriggerContext {
   type: TriggerType
+  /** 源棋子，可以被修改（如改变位置、属性等） */
   sourcePiece?: PieceInstance
+  /** 目标棋子，可以被修改或替换 */
   targetPiece?: PieceInstance
+  /** 技能ID，可以被修改以改变即将使用的技能 */
   skillId?: string
+  /** 伤害值，可以在 beforeDamageDealt/beforeDamageTaken 中被修改 */
   damage?: number
+  /** 治疗值，可以在 beforeHealDealt/beforeHealTaken 中被修改 */
   heal?: number
+  /** 回合数 */
   turnNumber?: number
+  /** 玩家ID */
   playerId?: string
-  /** 数量（用于充能获得量、状态层数等数值事件） */
+  /** 数量（用于充能获得量、状态层数等数值事件），可以被修改 */
   amount?: number
   /** 状态 ID（用于 afterStatusApplied / afterStatusRemoved 事件） */
   statusId?: string
+  /** 目标位置X坐标，可以在 beforeMove/beforePieceSummoned 中被修改 */
+  targetX?: number
+  /** 目标位置Y坐标，可以在 beforeMove/beforePieceSummoned 中被修改 */
+  targetY?: number
+  /** 伤害类型，可以在 beforeDamageDealt 中被修改 */
+  damageType?: 'physical' | 'magical' | 'true' | 'toxin'
+  /** 
+   * 当前执行规则的棋子（规则绑定者）
+   * 在全场扫描规则时，这个字段表示当前正在执行哪个棋子的规则
+   * 用于区分事件源(sourcePiece)和规则拥有者
+   */
+  rulePiece?: PieceInstance
 }
 
 // 触发系统类
@@ -234,6 +253,8 @@ export class TriggerSystem {
           }
 
           try {
+            // 设置当前执行规则的棋子，让技能代码知道是哪个棋子的规则正在执行
+            context.rulePiece = piece
             const result = rule.effect(battle, context)
             if (result.success) {
               success = true
@@ -306,6 +327,7 @@ export class TriggerSystem {
               success = true
               if (result.message) triggeredEffects.push(result.message)
               if (result.blocked) blocked = true
+              // 检查是否修改了伤害值
               if (rule.limits) {
                 rule.limits.uses = (rule.limits.uses || 0) + 1
                 if (rule.limits.cooldownTurns) rule.limits.currentCooldown = rule.limits.cooldownTurns

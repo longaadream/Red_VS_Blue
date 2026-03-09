@@ -339,7 +339,7 @@
 ```typescript
 interface TriggerContext {
   type: TriggerType;
-  sourcePiece?: PieceInstance;     // 事件源棋子（规则绑定棋子 / 攻击者 / 治疗者 / 死亡棋子本身）
+  sourcePiece?: PieceInstance;     // 事件源棋子（攻击者 / 治疗者 / 死亡棋子本身）
   targetPiece?: PieceInstance;     // 事件目标棋子（被攻击者 / 被治疗者 / 攻击者）
   skillId?: string;                // 技能ID（仅在技能相关事件中存在）
   damage?: number;                 // 伤害值（仅在伤害相关事件中存在）
@@ -348,8 +348,98 @@ interface TriggerContext {
   playerId?: string;               // 玩家ID
   amount?: number;                 // 数量（充能获得量、状态叠加层数等）
   statusId?: string;               // 状态ID（用于 afterStatusApplied / afterStatusRemoved）
+  targetX?: number;                // 目标X坐标（用于 beforeMove）
+  targetY?: number;                // 目标Y坐标（用于 beforeMove）
+  damageType?: 'physical' | 'magical' | 'true' | 'toxin';  // 伤害类型
+  rulePiece?: PieceInstance;       // 当前执行规则的棋子（规则绑定者），用于区分事件源和规则拥有者
 }
 ```
+
+#### Context 引用传递机制（重要）
+
+从2025年3月起，触发系统采用了**Context 引用传递机制**。这意味着传递给技能代码的 `context` 对象是一个**真实引用**，对 `context` 字段的修改会直接反映到触发事件的原值上。
+
+**核心原理**：
+
+1. **引用传递**：`checkTriggers` 接收的 `context` 是一个可变对象，技能代码中修改 `context.xxx` 会直接修改原始值
+2. **无需返回值**：不需要通过返回值来传递修改后的值，直接修改 `context` 即可
+3. **自动生效**：修改后的值会在触发检查完成后被主流程读取并使用
+
+**引擎开发规范（必读）**：
+
+所有传递给 `checkTriggers` 的 Context 对象**必须是真实引用，禁止创建新对象拷贝**。这是触发器系统正常工作的基础。
+
+```typescript
+// ✅ 正确：传递对象字面量（引用）
+const damageContext = {
+  type: "beforeDamageDealt" as const,
+  damage: baseDamage,
+  piece: attacker,
+  target: target
+};
+globalTriggerSystem.checkTriggers(battle, damageContext);
+const finalDamage = damageContext.damage; // 读取触发器修改后的值
+
+// ❌ 错误：创建新对象拷贝（触发器修改不会影响原始值）
+const skillContext = {
+  damage: context.damage,  // 值复制！
+  piece: context.sourcePiece
+};
+// 触发器修改 skillContext.damage，但原始 context 不变
+```
+
+**关键实现位置**：
+- `dealDamage` / `healDamage` 中的 `damageContext` / `healContext`
+- `loadRuleById` 中的技能执行上下文（必须使用 `const skillContext = context`）
+- `executeCardFunction` 中的卡牌执行上下文（优先使用 `triggerContext` 作为基础）
+- `turn.ts` 中的 `beforeMove` / `beforeSkillUse` / `beginTurn` / `endTurn` 等上下文
+
+**可修改的 Context 字段**：
+
+| Context 字段 | 适用触发类型 | 说明 |
+|-------------|-------------|------|
+| `context.damage` | `beforeDamageDealt`, `beforeDamageTaken` | 修改即将造成的伤害值 |
+| `context.heal` | `beforeHealDealt`, `beforeHealTaken` | 修改即将造成的治疗值 |
+| `context.targetX`, `context.targetY` | `beforeMove` | 修改移动的目标位置 |
+| `context.skillId` | `beforeSkillUse` | 修改即将使用的技能（高级用法） |
+
+**只读 Context 字段（重要）**：
+
+| Context 字段 | 说明 |
+|-------------|------|
+| `context.sourcePiece` | 事件源棋子（攻击者/治疗者等） |
+| `context.targetPiece` | 事件目标棋子（被攻击者/被治疗者等） |
+| `context.rulePiece` | **当前执行规则的棋子**（规则绑定者）。在全场扫描规则时，这个字段表示当前正在执行哪个棋子的规则。用于区分事件源(sourcePiece)和规则拥有者。例如：棋子A的规则在棋子B造成伤害时触发，此时 `sourcePiece`=B, `rulePiece`=A |
+
+**使用示例**：
+
+```javascript
+// 在 beforeDamageDealt 中增加伤害
+function executeSkill(context) {
+  if (context.type === 'beforeDamageDealt' && context.damage) {
+    const bonus = 5;
+    context.damage = context.damage + bonus;  // 直接修改 context.damage
+    return { message: context.sourcePiece.name + '的赐福使伤害+' + bonus, success: true };
+  }
+  return { message: '未触发', success: false };
+}
+
+// 在 beforeMove 中修改目标位置
+function executeSkill(context) {
+  if (context.type === 'beforeMove') {
+    context.targetX = context.targetX + 1;  // 修改目标X坐标
+    return { message: '被推动1格', success: true };
+  }
+  return { message: '未触发', success: false };
+}
+```
+
+**注意事项**：
+
+1. 只有标记为"可修改"的字段才能通过 `context.xxx = value` 修改
+2. `sourcePiece` 和 `targetPiece` 等对象引用也可以修改其属性（如 `context.sourcePiece.currentHp += 10`）
+3. 修改只对当前触发事件有效，不会影响其他事件或后续回合
+4. 多个规则的修改会叠加，按规则加载顺序依次执行
 
 #### 技能代码中的上下文使用
 
