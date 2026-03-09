@@ -1,0 +1,14 @@
+{
+  "id": "grant-lucky-coin",
+  "name": "发放幸运币",
+  "description": "战斗开始时，该阵营玩家获得一张幸运币手牌",
+  "kind": "passive",
+  "type": "normal",
+  "form": "self",
+  "range": 0,
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { var player = context.battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player) return { success: false, message: '' }; addCardToHand('lucky-coin', player.playerId); return { success: true, message: (player.name || player.playerId) + ' 获得了幸运币' }; }"
+}

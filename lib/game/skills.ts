@@ -215,6 +215,26 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       return false
     },
 
+    /** 为玩家绑定一个玩家级别规则（不挂在棋子上） */
+    addPlayerRuleById: (targetPlayerId: string, ruleId: string) => {
+      const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+      if (!player) return false
+      const rule = loadRuleById(ruleId)
+      if (!rule) return false
+      if (!player.rules) player.rules = []
+      if (player.rules.some((r: any) => r.id === ruleId)) return false // 已存在则跳过
+      player.rules.push(rule)
+      return true
+    },
+
+    /** 从玩家移除一个玩家级别规则 */
+    removePlayerRuleById: (targetPlayerId: string, ruleId: string) => {
+      const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+      if (!player?.rules) return false
+      player.rules = player.rules.filter((r: any) => r.id !== ruleId)
+      return true
+    },
+
     Math,
     console
   }
@@ -268,6 +288,8 @@ export function executeCardFunction(
         const removeStatusEffectById = env.removeStatusEffectById;
         const addRuleById = env.addRuleById;
         const removeRuleById = env.removeRuleById;
+        const addPlayerRuleById = env.addPlayerRuleById;
+        const removePlayerRuleById = env.removePlayerRuleById;
         const Math = env.Math;
         const console = env.console;
 
@@ -462,6 +484,22 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                       }
                       return false;
                     },
+                    addPlayerRuleById: (targetPlayerId: string, ruleId: string) => {
+                      const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+                      if (!player) return false;
+                      const rule = loadRuleById(ruleId);
+                      if (!rule) return false;
+                      if (!player.rules) player.rules = [];
+                      if (player.rules.some((r: any) => r.id === ruleId)) return false;
+                      player.rules.push(rule);
+                      return true;
+                    },
+                    removePlayerRuleById: (targetPlayerId: string, ruleId: string) => {
+                      const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+                      if (!player?.rules) return false;
+                      player.rules = player.rules.filter((r: any) => r.id !== ruleId);
+                      return true;
+                    },
                     addSkillById: (targetPieceId, skillId) => {
                       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
                       if (targetPiece) {
@@ -490,7 +528,7 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                       return false;
                     },
                     addCardToHand: (cardId: string, targetPlayerId?: string) => {
-                      const pid = targetPlayerId || context.sourcePiece?.ownerPlayerId
+                      const pid = targetPlayerId || context.sourcePiece?.ownerPlayerId || context.playerId
                       if (!pid) return false
                       const player = battle.players?.find(p => p.playerId === pid)
                       if (!player) return false

@@ -607,8 +607,11 @@ export async function createInitialBattleForPlayers(
     pieceStatsByTemplateId: buildDefaultPieceStats(),
     skillsById: skills,
     players: [
-      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1, hand: [], discardPile: [] },
-      { playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0, hand: [], discardPile: [] },
+      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1, hand: [], discardPile: [], rules: [] },
+      {
+        playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0, hand: [], discardPile: [],
+        rules: [loadRuleById('rule-lucky-coin-start')].filter(Boolean),
+      },
     ],
     turn: {
       currentPlayerId: redPlayer,

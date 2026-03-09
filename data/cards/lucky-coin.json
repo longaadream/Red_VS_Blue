@@ -1,0 +1,8 @@
+{
+  "id": "lucky-coin",
+  "name": "幸运币",
+  "description": "抛出一枚幸运币，获得1点额外行动力。",
+  "type": "active",
+  "icon": "Coins",
+  "code": "function executeCard(context) {\n  const player = battle.players.find(p => p.playerId === playerId);\n  if (!player) {\n    return { success: false, message: '找不到玩家' };\n  }\n  player.actionPoints += 1;\n  return { success: true, message: `幸运币：获得1点行动力（当前：${player.actionPoints}）` };\n}"
+}

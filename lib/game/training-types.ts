@@ -85,6 +85,8 @@ export interface PlayerTurnMeta {
   maxActionPoints: number
   hand: CardInstance[]
   discardPile: string[]
+  /** 玩家级别规则（挂在玩家身上而非棋子上的被动触发器） */
+  rules?: any[]
 }
 
 export interface PerTurnActionFlags {

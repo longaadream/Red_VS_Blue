@@ -34,6 +34,8 @@ export interface PlayerTurnMeta {
   hand: CardInstance[]
   /** 弃牌堆（只记 cardId，用于日志/统计） */
   discardPile: string[]
+  /** 玩家级别规则（挂在玩家身上而非棋子上的被动触发器） */
+  rules?: any[]
 }
 
 export interface PerTurnActionFlags {

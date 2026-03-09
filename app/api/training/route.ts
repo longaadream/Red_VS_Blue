@@ -91,8 +91,11 @@ function createTrainingBattleState(mapId?: string): BattleState {
     pieceStatsByTemplateId: {},
     skillsById: skills,
     players: [
-      { playerId: player1, name: "红方", chargePoints: 0, actionPoints: 10, maxActionPoints: 10, hand: [], discardPile: [] },
-      { playerId: player2, name: "蓝方", chargePoints: 0, actionPoints: 0, maxActionPoints: 10, hand: [], discardPile: [] },
+      { playerId: player1, name: "红方", chargePoints: 0, actionPoints: 10, maxActionPoints: 10, hand: [], discardPile: [], rules: [] },
+      {
+        playerId: player2, name: "蓝方", chargePoints: 0, actionPoints: 0, maxActionPoints: 10, hand: [], discardPile: [],
+        rules: [loadRuleById('rule-lucky-coin-start')].filter(Boolean),
+      },
     ],
     turn: {
       currentPlayerId: player1,

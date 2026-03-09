@@ -261,7 +261,64 @@ export class TriggerSystem {
       }
     }
 
-    // 3. 检查所有玩家手牌中的 reactive 卡牌（全场两个玩家都扫描）
+    // 3. 检查所有玩家的玩家级别规则（player.rules[]）
+    if (battle.players) {
+      for (const player of battle.players) {
+        if (!(player as any).rules || (player as any).rules.length === 0) continue
+
+        const playerMatchingRules = ((player as any).rules as any[]).filter((rule: any) => {
+          if (!rule || !rule.trigger) return false
+          if (rule.trigger.type !== context.type) return false
+          const limits = rule.limits
+          if (limits) {
+            if (limits.currentCooldown && limits.currentCooldown > 0) return false
+            if (limits.maxUses && (limits.uses || 0) >= limits.maxUses) return false
+          }
+          return true
+        })
+
+        for (const rule of playerMatchingRules) {
+          // 如果 effect 是存根函数，重新加载
+          const isDefaultEffect = typeof rule.effect === 'function' &&
+            rule.effect.toString().includes('ruleData.name') &&
+            rule.effect.toString().includes('触发') &&
+            !rule.effect.toString().includes('checkToxin')
+
+          if (typeof rule.effect !== 'function' || isDefaultEffect) {
+            try {
+              const { loadRuleById } = require('./skills')
+              const reloadedRule = loadRuleById(rule.id, true)
+              if (reloadedRule && typeof reloadedRule.effect === 'function') {
+                rule.effect = reloadedRule.effect
+              } else {
+                continue
+              }
+            } catch {
+              continue
+            }
+          }
+
+          try {
+            // 把玩家的 playerId 注入到 context，供 triggerSkill 技能读取
+            const playerContext = { ...context, playerId: player.playerId }
+            const result = rule.effect(battle, playerContext)
+            if (result.success) {
+              success = true
+              if (result.message) triggeredEffects.push(result.message)
+              if (result.blocked) blocked = true
+              if (rule.limits) {
+                rule.limits.uses = (rule.limits.uses || 0) + 1
+                if (rule.limits.cooldownTurns) rule.limits.currentCooldown = rule.limits.cooldownTurns
+              }
+            }
+          } catch (error) {
+            console.error(`Error executing player rule ${rule.id} for player ${player.playerId}:`, error)
+          }
+        }
+      }
+    }
+
+    // 4. 检查所有玩家手牌中的 reactive 卡牌（全场两个玩家都扫描）
     if (battle.players) {
       for (const player of battle.players) {
         if (!player.hand || player.hand.length === 0) continue

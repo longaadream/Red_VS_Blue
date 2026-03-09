@@ -20,6 +20,7 @@
 16. [游戏系统常量](#游戏系统常量)
 17. [训练营使用教程](#训练营使用教程)
 18. [地图设计教程](#地图设计教程)
+19. [玩家级别规则（Player-Level Rules）](#玩家级别规则player-level-rules)
 
 ---
 
@@ -1835,18 +1836,72 @@ function executeCard(context) {
 
 ### 卡牌可用函数
 
+卡牌代码里可以直接使用以下所有函数（无需 `import`，系统自动注入）：
+
+#### 伤害 / 治疗
+
 | 函数 | 说明 |
 |------|------|
-| `dealDamage(attacker, target, amount, type, battle, cardId)` | 造成伤害 |
-| `healDamage(healer, target, amount, battle, cardId)` | 治疗 |
-| `addStatusEffectById(pieceId, statusObj)` | 施加状态 |
-| `removeStatusEffectById(pieceId, statusId)` | 移除状态 |
-| `addRuleById(pieceId, ruleId)` | 为棋子附加规则 |
-| `removeRuleById(pieceId, ruleId)` | 移除棋子规则 |
-| `addCardToHand(cardId, targetPlayerId?)` | 将卡牌加入手牌（默认己方） |
-| `discardCard(instanceId)` | 弃置指定手牌 |
-| `getHand(targetPlayerId?)` | 获取手牌列表 |
-| `selectTarget(opts)` | 选择目标棋子 |
+| `dealDamage(attacker, target, amount, type, battle, cardId)` | 造成伤害（同技能中的 dealDamage） |
+| `healDamage(healer, target, amount, battle, cardId)` | 治疗（同技能中的 healDamage） |
+
+#### 目标 / 选项
+
+| 函数 | 说明 |
+|------|------|
+| `selectTarget(opts)` | 弹出目标选择，同技能中用法相同；必须检查 `needsTargetSelection` |
+| `selectOption(config)` | 弹出选项列表，同技能中用法相同；必须检查 `needsOptionSelection` |
+
+#### 状态管理
+
+| 函数 | 说明 |
+|------|------|
+| `addStatusEffectById(pieceId, statusObj)` | 为棋子施加状态标签 |
+| `removeStatusEffectById(pieceId, statusId)` | 移除棋子状态标签 |
+
+#### 棋子规则管理
+
+| 函数 | 说明 |
+|------|------|
+| `addRuleById(pieceId, ruleId)` | 为**棋子**附加一个被动规则 |
+| `removeRuleById(pieceId, ruleId)` | 从**棋子**移除一个被动规则 |
+
+#### 玩家规则管理（新）
+
+| 函数 | 说明 |
+|------|------|
+| `addPlayerRuleById(playerId, ruleId)` | 为**玩家**附加一个玩家级别规则（不挂在棋子上） |
+| `removePlayerRuleById(playerId, ruleId)` | 从**玩家**移除一个玩家级别规则 |
+
+#### 手牌操作
+
+| 函数 | 签名 | 说明 |
+|------|------|------|
+| `addCardToHand` | `(cardId, targetPlayerId?)` | 将卡牌加入手牌；`targetPlayerId` 省略则为当前持牌玩家；手牌超过10张时自动弃置并记录日志 |
+| `discardCard` | `(instanceId)` | 按 `instanceId` 弃置指定手牌到弃牌堆 |
+| `getHand` | `(targetPlayerId?)` | 获取指定玩家的手牌列表（`CardInstance[]`） |
+
+```javascript
+// 示例：向对方手牌加入一张卡
+addCardToHand('lucky-coin', context.battle.players.find(
+  p => p.ownerPlayerId !== playerId
+)?.playerId)
+
+// 示例：检查己方手牌数量
+const hand = getHand(playerId)  // CardInstance[]
+console.log('当前手牌数：', hand.length)
+
+// 示例：弃置手牌中的第一张
+const hand = getHand(playerId)
+if (hand.length > 0) discardCard(hand[0].instanceId)
+```
+
+#### 工具
+
+| 函数 | 说明 |
+|------|------|
+| `Math` | 标准 JavaScript Math |
+| `console` | `console.log` / `console.error` 用于调试 |
 
 ### AP 消耗
 
@@ -1865,15 +1920,39 @@ function executeCard(context) {
 
 ### gameStart 触发器
 
-`gameStart` 在战斗开始时触发一次（`turnNumber === 1`，`beginPhase` 时）。
-用于初始发牌等效果，写在规则的 `skillCode` 里：
+`gameStart` 在战斗开始时触发一次（`turnNumber === 1`，`beginPhase` 时），**只触发一次**（由 `gameStartFired` 标志保护）。
+
+常见用途：开局发手牌、初始化玩家级别规则等。写法与普通规则完全一致，使用 `triggerSkill`：
 
 ```json
+// data/rules/rule-deal-opening-card.json
 {
+  "id": "rule-deal-opening-card",
+  "name": "开局发牌",
+  "description": "战斗开始时向指定玩家发一张手牌",
   "trigger": { "type": "gameStart" },
-  "skillCode": "function checkToxin(battle, context) { addCardToHand('sample-active-card', context.playerId); return { success: true, message: '发了一张手牌' } }"
+  "effect": { "type": "triggerSkill", "skillId": "deal-opening-card", "message": "" },
+  "limits": { "maxUses": 1 }
 }
 ```
+
+```json
+// data/skills/deal-opening-card.json
+{
+  "id": "deal-opening-card",
+  "kind": "passive",
+  "type": "normal",
+  "form": "self",
+  "range": 0,
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { addCardToHand('lucky-coin', context.playerId); return { success: true, message: '开局获得幸运币' }; }"
+}
+```
+
+> **注意**：`gameStart` 规则写在**玩家的 `rules` 数组**里（玩家级别规则，详见下一章），而不是棋子身上。
 
 ### 示例：主动牌
 
@@ -1928,4 +2007,183 @@ function executeCard(context) {
   ],
   "rules": []
 }
+```
+
+---
+
+# 玩家级别规则（Player-Level Rules）
+
+## 概念
+
+**玩家级别规则**（player rule）是挂在玩家本身上的被动触发器，而不是某个具体棋子上。适合用于：
+
+- 开局发手牌（`gameStart`）
+- 每回合开始时给整个阵营加行动力
+- "己方任意棋子死亡时"触发全局效果
+- 棋子技能将某个规则"授权"给阵营而非绑在自己身上
+
+与棋子规则的区别：
+
+| 维度 | 棋子规则 `piece.rules[]` | 玩家规则 `player.rules[]` |
+|------|--------------------------|--------------------------|
+| 挂载位置 | 单个棋子实例 | 玩家（PlayerTurnMeta） |
+| 棋子死亡后 | 规则随棋子消失 | 规则保持不变 |
+| 代码中的 context | `context.piece` = 棋子 | `context.piece` = null，用 `context.playerId` 识别阵营 |
+| 典型用途 | 反击、流血、圣盾等棋子本身的被动 | 开局发牌、阵营级增益、全局监听 |
+
+---
+
+## 文件结构
+
+与棋子规则完全一样，都在 `data/rules/*.json`，格式不变。唯一区别是这个规则会被加到 `PlayerTurnMeta.rules[]` 而不是 `PieceInstance.rules[]`。
+
+---
+
+## 创建玩家级别规则
+
+### 步骤一：创建规则文件
+
+```json
+// data/rules/rule-lucky-coin-start.json
+{
+  "id": "rule-lucky-coin-start",
+  "name": "幸运币规则",
+  "description": "战斗开始时，该玩家获得一张幸运币手牌",
+  "trigger": { "type": "gameStart" },
+  "effect": { "type": "triggerSkill", "skillId": "grant-lucky-coin", "message": "" },
+  "limits": { "maxUses": 1 }
+}
+```
+
+> `limits.maxUses: 1` 确保 `gameStart` 规则只触发一次。
+
+### 步骤二：创建技能文件
+
+技能里通过 `context.playerId` 获取阵营，而不是 `context.piece`：
+
+```json
+// data/skills/grant-lucky-coin.json
+{
+  "id": "grant-lucky-coin",
+  "name": "发放幸运币",
+  "description": "战斗开始时，该阵营玩家获得一张幸运币手牌",
+  "kind": "passive",
+  "type": "normal",
+  "form": "self",
+  "range": 0,
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { var player = context.battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player) return { success: false, message: '' }; addCardToHand('lucky-coin', player.playerId); return { success: true, message: (player.name || player.playerId) + ' 获得了幸运币' }; }"
+}
+```
+
+### 步骤三：在战斗初始化时为玩家挂载规则
+
+在 `battle-setup.ts` 的 `players` 数组里，为目标玩家加上规则：
+
+```typescript
+// lib/game/battle-setup.ts（节选）
+import { loadRuleById } from "./skills"
+
+players: [
+  { playerId: p1, ..., hand: [], discardPile: [], rules: [] },
+  {
+    playerId: p2, ..., hand: [], discardPile: [],
+    rules: [loadRuleById('rule-lucky-coin-start')].filter(Boolean),
+  },
+]
+```
+
+---
+
+## 在技能代码中动态绑定玩家规则
+
+棋子技能也可以在运行时给整个阵营玩家授予规则，使用 `addPlayerRuleById`：
+
+```javascript
+// 某主动技能的 code：给己方玩家授予一个被动规则
+function executeSkill(context) {
+  const caster = context.piece
+  addPlayerRuleById(caster.ownerPlayerId, 'rule-faction-buff')
+  return { success: true, message: caster.name + '为己方阵营施加了增益' }
+}
+```
+
+反向操作——移除玩家规则：
+
+```javascript
+removePlayerRuleById(caster.ownerPlayerId, 'rule-faction-buff')
+```
+
+---
+
+## 玩家规则的技能代码写法要点
+
+玩家规则触发的技能（`kind: "passive"`）里，**`context.piece` 为 null**。必须用 `context.playerId` 来识别阵营：
+
+```javascript
+function executeSkill(context) {
+  // ✅ 正确：用 context.playerId 获取玩家
+  var player = context.battle.players.find(function(p) {
+    return p.playerId === context.playerId
+  })
+  if (!player) return { success: false, message: '' }
+
+  // ✅ 可以访问该阵营的所有棋子
+  var myPieces = context.battle.pieces.filter(function(p) {
+    return p.ownerPlayerId === context.playerId && p.currentHp > 0
+  })
+
+  // ✅ 可以修改玩家资源
+  player.actionPoints += 1
+
+  // ✅ 可以向玩家手牌加卡
+  addCardToHand('lucky-coin', context.playerId)
+
+  // ❌ 禁止：context.piece 为 null，不能用
+  // dealDamage(context.piece, ...)  // 会崩溃！
+}
+```
+
+---
+
+## 可用触发类型
+
+玩家规则支持所有触发类型，但以下几种最适合玩家级别：
+
+| 触发类型 | 说明 | 典型用途 |
+|---------|------|---------|
+| `gameStart` | 战斗开始时触发一次 | 开局发手牌、初始化状态 |
+| `beginTurn` | 每个回合开始时 | 每回合给阵营加资源 |
+| `endTurn` | 每个回合结束时 | 结算阵营级持续效果 |
+| `afterPieceKilled` | 任意棋子被击杀后 | "我方击杀时" 阵营奖励 |
+| `onPieceDied` | 任意棋子死亡后 | "我方棋子死亡时" 触发 |
+| `afterDamageDealt` | 任意伤害造成后 | 阵营级吸血、计数器等 |
+| `whenever` | 每一步行动后 | 实时条件检测 |
+
+---
+
+## 完整示例：蓝方开局幸运币
+
+本示例已集成到项目中，可作为参考模板：
+
+```
+data/cards/lucky-coin.json            ← 卡牌定义（无消耗，+1行动力）
+data/rules/rule-lucky-coin-start.json ← 规则文件（gameStart 触发，maxUses: 1）
+data/skills/grant-lucky-coin.json     ← 技能文件（addCardToHand 给蓝方）
+lib/game/battle-setup.ts              ← 蓝方玩家 rules: [loadRuleById('rule-lucky-coin-start')]
+app/api/training/route.ts             ← 训练营同上
+```
+
+触发流程：
+```
+战斗开始（beginPhase turn 1）
+  → checkTriggers("gameStart")
+  → 遍历 state.players[].rules
+  → 蓝方有 rule-lucky-coin-start
+  → 调用 grant-lucky-coin 技能
+  → addCardToHand('lucky-coin', 'training-blue')
+  → 蓝方手牌里出现幸运币
 ```
