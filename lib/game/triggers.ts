@@ -28,6 +28,7 @@ export type TriggerType =
   | "afterChargeGained"     // 充能点获得后
   | "afterDamageBlocked"    // 伤害被规则/护盾格挡后（如圣盾）
   | "afterHealBlocked"      // 治疗被规则格挡后
+  | "gameStart"             // 战斗开始时（只触发一次，用于初始发牌等效果）
 
 // 条件类型定义已移除，所有条件判断都在技能代码中通过if语句实现
 
@@ -194,87 +195,98 @@ export class TriggerSystem {
       }
     }
 
-    // 2. 检查棋子实例的规则
-    if (context.sourcePiece && context.sourcePiece.rules) {
-      const pieceMatchingRules = context.sourcePiece.rules.filter((rule: any) => {
-        // 检查规则对象是否有效
-        if (!rule || !rule.trigger) {
-          console.warn(`Skipping invalid rule on piece ${context.sourcePiece?.instanceId}: rule or rule.trigger is undefined`)
-          return false
-        }
-        
-        // 只检查触发类型是否匹配
-        if (rule.trigger.type !== context.type) {
-          return false
-        }
+    // 2. 检查所有棋子实例的规则（对所有触发类型都扫描全部棋子）
+    // 这样"移动后"、"技能使用后"等事件可以触发任意棋子上绑定的规则，而不仅限于事件发起者
+    if (battle.pieces) {
+      for (const piece of battle.pieces) {
+        if (!piece.rules || piece.rules.length === 0) continue
 
-        // 检查限制条件
-        const limits = rule.limits
-        if (limits) {
-          // 检查冷却
-          if (limits.currentCooldown && limits.currentCooldown > 0) {
-            return false
+        const pieceMatchingRules = piece.rules.filter((rule: any) => {
+          if (!rule || !rule.trigger) return false
+          if (rule.trigger.type !== context.type) return false
+          const limits = rule.limits
+          if (limits) {
+            if (limits.currentCooldown && limits.currentCooldown > 0) return false
+            if (limits.maxUses && (limits.uses || 0) >= limits.maxUses) return false
           }
+          return true
+        })
 
-          // 检查使用次数
-          if (limits.maxUses && (limits.uses || 0) >= limits.maxUses) {
-            return false
-          }
-        }
+        for (const rule of pieceMatchingRules) {
+          // 检查是否是默认函数（只返回 "xxx触发" 消息，尚未加载真实逻辑）
+          const isDefaultEffect = typeof rule.effect === 'function' &&
+            rule.effect.toString().includes('ruleData.name') &&
+            rule.effect.toString().includes('触发') &&
+            !rule.effect.toString().includes('checkToxin')
 
-        return true
-      })
-
-      // 执行棋子匹配的规则
-      for (const rule of pieceMatchingRules) {
-        if (typeof rule.effect !== 'function') {
-          console.warn(`Rule ${rule.id}: effect is not a function, attempting to reload...`)
-          // 尝试重新加载规则以恢复 effect 函数
-          try {
-            const { loadRuleById } = require('./skills')
-            const reloadedRule = loadRuleById(rule.id)
-            if (reloadedRule && typeof reloadedRule.effect === 'function') {
-              console.log(`Successfully reloaded rule ${rule.id}, restoring effect function`)
-              rule.effect = reloadedRule.effect
-            } else {
-              console.warn(`Failed to reload rule ${rule.id}: effect still not a function`)
+          if (typeof rule.effect !== 'function' || isDefaultEffect) {
+            try {
+              const { loadRuleById } = require('./skills')
+              const reloadedRule = loadRuleById(rule.id, true)
+              if (reloadedRule && typeof reloadedRule.effect === 'function') {
+                rule.effect = reloadedRule.effect
+              } else {
+                continue
+              }
+            } catch {
               continue
             }
-          } catch (reloadError) {
-            console.error(`Error reloading rule ${rule.id}:`, reloadError)
-            continue
+          }
+
+          try {
+            const result = rule.effect(battle, context)
+            if (result.success) {
+              success = true
+              if (result.message) {
+                triggeredEffects.push(result.message)
+              }
+              if (result.blocked) {
+                blocked = true
+              }
+              if (rule.limits) {
+                if (rule.limits.uses !== undefined) {
+                  rule.limits.uses++
+                } else {
+                  rule.limits.uses = 1
+                }
+                if (rule.limits.cooldownTurns) {
+                  rule.limits.currentCooldown = rule.limits.cooldownTurns
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Error executing rule ${rule.id} on piece ${piece.instanceId}:`, error)
           }
         }
-        
-        try {
-          const result = rule.effect(battle, context)
-          if (result.success) {
-            success = true
-            if (result.message) {
-              triggeredEffects.push(result.message)
-            }
-            // 检查是否阻止行动
-            if (result.blocked) {
-              blocked = true
-            }
+      }
+    }
 
-            // 更新规则的限制状态
-            if (rule.limits) {
-              // 增加使用次数
-              if (rule.limits.uses !== undefined) {
-                rule.limits.uses++
-              } else {
-                rule.limits.uses = 1
-              }
+    // 3. 检查所有玩家手牌中的 reactive 卡牌（全场两个玩家都扫描）
+    if (battle.players) {
+      for (const player of battle.players) {
+        if (!player.hand || player.hand.length === 0) continue
+        // 从后往前遍历，因为触发后可能弃牌（会 splice）
+        for (let i = player.hand.length - 1; i >= 0; i--) {
+          const cardInstance = player.hand[i]
+          try {
+            const { loadCardById, executeCardFunction } = require('./skills')
+            const cardDef = loadCardById(cardInstance.cardId)
+            if (!cardDef || cardDef.type !== 'reactive') continue
+            if (!cardDef.trigger || cardDef.trigger.type !== context.type) continue
 
-              // 设置冷却
-              if (rule.limits.cooldownTurns) {
-                rule.limits.currentCooldown = rule.limits.cooldownTurns
-              }
+            const result = executeCardFunction(cardDef, player.playerId, battle, context)
+            if (result && result.success) {
+              success = true
+              if (result.message) triggeredEffects.push(result.message)
+              if (result.blocked) blocked = true
+              // 弃牌
+              if (!player.discardPile) player.discardPile = []
+              player.hand.splice(i, 1)
+              player.discardPile.push(cardInstance.cardId)
             }
+          } catch (error) {
+            console.error(`Error executing reactive card ${cardInstance.cardId}:`, error)
           }
-        } catch (error) {
-          console.error(`Error executing piece rule ${rule.id}:`, error)
         }
       }
     }

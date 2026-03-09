@@ -71,12 +71,20 @@ export interface SkillState {
 export type TurnPhase = "start" | "action" | "end"
 export type PlayerId = string
 
+export interface CardInstance {
+  cardId: string
+  instanceId: string
+  ownerPlayerId: string
+}
+
 export interface PlayerTurnMeta {
   playerId: PlayerId
   name?: string
   chargePoints: number
   actionPoints: number
   maxActionPoints: number
+  hand: CardInstance[]
+  discardPile: string[]
 }
 
 export interface PerTurnActionFlags {
@@ -144,4 +152,13 @@ export type BattleAction =
   | {
       type: "endTurn"
       playerId: PlayerId
+    }
+  | {
+      type: "playCard"
+      playerId: PlayerId
+      cardInstanceId: string
+      targetPieceId?: string
+      targetX?: number
+      targetY?: number
+      selectedOption?: any
     }

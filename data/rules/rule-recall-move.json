@@ -1,0 +1,7 @@
+{
+  "id": "rule-recall-move",
+  "name": "回溯计数（移动）",
+  "description": "记录对手移动的次数，达到目标操作数时执行回溯。",
+  "trigger": { "type": "afterMove" },
+  "effect": { "type": "triggerSkill", "skillId": "recall-move-trigger", "message": "" }
+}

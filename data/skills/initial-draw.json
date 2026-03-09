@@ -1,0 +1,12 @@
+{
+  "id": "initial-draw",
+  "name": "初始抽牌",
+  "description": "游戏开始时每个玩家抽3张牌",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) {\n  const battle = context.battle;\n  const cardPool = ['sample-active-card', 'sample-reactive-card'];\n  battle.players.forEach(function(player) {\n    for (let i = 0; i < 3; i++) {\n      const randomCard = cardPool[Math.floor(Math.random() * cardPool.length)];\n      addCardToHand(randomCard, player.playerId);\n    }\n  });\n  return { success: true, message: '所有玩家抽了3张初始手牌' };\n}"
+}

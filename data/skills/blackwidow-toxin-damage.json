@@ -1,13 +1,10 @@
 {
   "id": "blackwidow-toxin-damage",
   "name": "毒素伤害",
-  "description": "检测并处理毒素伤害",
+  "description": "敌人踩到毒素时受到4点真实伤害",
+  "icon": "☠️",
   "kind": "passive",
-  "type": "normal",
-  "cooldownTurns": 0,
-  "maxCharges": 0,
-  "powerMultiplier": 1,
-  "actionPointCost": 0,
-  "code": "function executeSkill(context) { var piece = context.piece; console.log('[Toxin] Checking toxin, piece:', piece.name, 'x:', piece.x, 'y:', piece.y); if (!piece.statusTags || piece.statusTags.length === 0) { console.log('[Toxin] No status tags'); if (piece.rules) { var hasRule = piece.rules.some(function(r) { return r.id === 'rule-blackwidow-toxin-trigger'; }); if (hasRule) { console.log('[Toxin] Removing orphan rule'); removeRuleById(piece.instanceId, 'rule-blackwidow-toxin-trigger'); } } return { success: false, message: '' }; } var toxinTag = piece.statusTags.find(function(tag) { return tag.type === 'lethal-toxin'; }); console.log('[Toxin] toxinTag:', toxinTag); if (!toxinTag) { if (piece.rules) { var hasRule = piece.rules.some(function(r) { return r.id === 'rule-blackwidow-toxin-trigger'; }); if (hasRule) { console.log('[Toxin] Removing orphan rule (no toxin tag)'); removeRuleById(piece.instanceId, 'rule-blackwidow-toxin-trigger'); } } return { success: false, message: '' }; } var toxinX = toxinTag.value; var toxinY = toxinTag.extraValue; var damage = toxinTag.intensity || 4; console.log('[Toxin] Toxin at:', toxinX, toxinY, 'damage:', damage); var enemies = context.battle.pieces.filter(function(p) { return p.ownerPlayerId !== piece.ownerPlayerId && p.currentHp > 0; }); console.log('[Toxin] Enemies:', enemies.map(function(e) { return e.name + '(' + e.x + ',' + e.y + ')'; })); var hitEnemy = null; for (var i = 0; i < enemies.length; i++) { console.log('[Toxin] Checking enemy:', enemies[i].name, 'at', enemies[i].x, enemies[i].y); if (enemies[i].x === toxinX && enemies[i].y === toxinY) { hitEnemy = enemies[i]; console.log('[Toxin] Hit enemy:', hitEnemy.name); break; } } if (hitEnemy) { var result = dealDamage(piece, hitEnemy, damage, 'true', context.battle, context.skill.id); console.log('[Toxin] Dealt damage:', result.damage); removeStatusEffectById(piece.instanceId, toxinTag.id); removeRuleById(piece.instanceId, 'rule-blackwidow-toxin-trigger'); return { success: true, message: hitEnemy.name + '触发了毒素，受到' + result.damage + '点真实伤害' }; } console.log('[Toxin] No enemy on toxin tile'); toxinTag.currentDuration = (toxinTag.currentDuration || 0) - 1; console.log('[Toxin] Duration:', toxinTag.currentDuration); if (toxinTag.currentDuration <= 0) { console.log('[Toxin] Expired, removing'); removeStatusEffectById(piece.instanceId, toxinTag.id); removeRuleById(piece.instanceId, 'rule-blackwidow-toxin-trigger'); } return { success: true, message: '' }; }",
-  "showInUI": false
+  "type": "passive",
+  "code": "function executeSkill(context) { return { success: true, message: '' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '毒素伤害4点', expectedValues: { damage: 4 } }; }"
 }

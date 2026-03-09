@@ -1,0 +1,13 @@
+{
+  "id": "recall",
+  "name": "回溯",
+  "description": "选择一个数字，在对手下回合达到该操作次数时，将自身状态还原为标记时的状态",
+  "icon": "⏪",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var result = selectOption({ title: '选择回溯触发操作数', options: [{ label: '1', value: 1 }, { label: '2', value: 2 }, { label: '3', value: 3 }, { label: '4', value: 4 }, { label: '5', value: 5 }, { label: '6', value: 6 }, { label: '7', value: 7 }, { label: '8', value: 8 }, { label: '9', value: 9 }, { label: '10', value: 10 }] }); if (result === null || result === undefined || result.needsOptionSelection) { return result; } var data = context.battle.recallData || []; data = data.filter(function(r) { return r.pieceId !== caster.instanceId; }); data.push({ pieceId: caster.instanceId, ownerPlayerId: caster.ownerPlayerId, targetCount: result, actionCount: 0, snapshot: { x: caster.x, y: caster.y, hp: caster.currentHp, shield: caster.shield, statusTags: caster.statusTags ? JSON.parse(JSON.stringify(caster.statusTags)) : [], buffs: caster.buffs ? JSON.parse(JSON.stringify(caster.buffs)) : [], debuffs: caster.debuffs ? JSON.parse(JSON.stringify(caster.debuffs)) : [] } }); context.battle.recallData = data; return { success: true, message: caster.name + '标记了回溯点，目标操作数：' + result }; }"
+}

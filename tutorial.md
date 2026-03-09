@@ -74,8 +74,43 @@ dealDamage(sourcePiece, target, 10, 'physical', context.battle, context.skill.id
 
 被动技能（`kind: "passive"`）不能单独工作。需要：
 1. 一个**技能文件**（`data/skills/xxx.json`）：实现效果逻辑
-2. 一个**规则文件**（`data/rules/xxx.json`）：定义触发时机，并调用技能
+2. 一个**规则文件**（`data/rules/rule-xxx.json`）：定义触发时机，并调用技能
 3. 在角色的**初始化技能**或**施加状态时**，通过 `addRuleById` 将规则绑定到棋子
+
+#### 规则文件的正确写法
+
+```json
+{
+  "id": "rule-my-passive",
+  "name": "我的被动规则",
+  "description": "触发时机的描述",
+  "trigger": { "type": "afterSkillUsed" },
+  "effect": { "type": "triggerSkill", "skillId": "my-passive-effect", "message": "" }
+}
+```
+
+#### 规则文件的错误写法（禁止）
+
+```json
+// ❌ 错误！禁止在规则文件中直接写 skillCode
+{
+  "id": "rule-my-passive",
+  "trigger": { "type": "afterSkillUsed" },
+  "skillCode": "function executeSkill(context) { ... }"
+}
+```
+
+所有效果逻辑必须写在技能文件中，规则文件只定义触发时机。
+
+### 法则六：角色技能必须独立于游戏主进程
+
+所有角色的技能效果都必须通过 `data/skills/` 和 `data/rules/` 目录下的 JSON 文件定义。**禁止**在 `lib/game/` 下的主进程代码中硬编码任何特定角色的技能逻辑。角色应当是独立的模块，可以随时添加或删除，与游戏核心逻辑解耦。
+
+```
+✅ 正确：在 data/skills/ 和 data/rules/ 中定义技能效果
+✅ 正确：通过 addRuleById 动态绑定规则到棋子
+❌ 错误：在 lib/game/turn.ts 等主进程文件中硬编码角色技能逻辑
+```
 
 ---
 
@@ -673,6 +708,47 @@ return {
 }
 ```
 
+### 示例：敌人释放技能前触发（脉冲手枪）
+
+创建"敌人释放技能前触发反击"效果。注意：`beforeSkillUse` 是**全场扫描**的，需要在技能代码里判断是否是正确的敌人。
+
+**文件1：`data/rules/rule-pulse-pistol.json`**
+
+```json
+{
+  "id": "rule-pulse-pistol",
+  "name": "脉冲手枪规则",
+  "description": "敌人释放技能前，对范围内随机敌人造成伤害",
+  "trigger": { "type": "beforeSkillUse" },
+  "effect": { "type": "triggerSkill", "skillId": "pulse-pistol", "message": "" }
+}
+```
+
+**文件2：`data/skills/pulse-pistol.json`**
+
+```json
+{
+  "id": "pulse-pistol",
+  "name": "脉冲手枪",
+  "description": "敌人释放技能时，对5×5范围内随机一个敌人造成等同于自身攻击力的伤害",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { const caster = context.piece; const enemy = context.sourcePiece; if (!enemy) { return { success: false, message: '' }; } if (enemy.ownerPlayerId === caster.ownerPlayerId) { return { success: false, message: '' }; } const dx = Math.abs(enemy.x - caster.x); const dy = Math.abs(enemy.y - caster.y); if (Math.max(dx, dy) > 2) { return { success: false, message: '' }; } const enemies = context.battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && Math.abs(p.x - caster.x) <= 2 && Math.abs(p.y - caster.y) <= 2; }); if (enemies.length === 0) { return { success: false, message: '' }; } const target = enemies[Math.floor(Math.random() * enemies.length)]; const result = dealDamage(caster, target, caster.attack, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '的脉冲手枪触发，对' + target.name + '造成' + result.damage + '点伤害' }; }"
+}
+```
+
+**要点说明**：
+- 使用 `beforeSkillUse` 触发器，在敌人释放技能**前**触发
+- 通过 `context.sourcePiece` 获取释放技能的敌人
+- 需要在代码里判断敌人是否是敌方（`enemy.ownerPlayerId !== caster.ownerPlayerId`）
+- 需要判断敌人在5×5范围内（Chebyshev距离 ≤ 2）
+- 返回 `blocked: true` 可以阻止敌人释放技能
+```
+
 ---
 
 ## 目标选择器（selectTarget）
@@ -1152,6 +1228,23 @@ return { success: true, blocked: false, message: '' }
 
 ## 触发类型完整参考
 
+> **重要：全场扫描机制**
+>
+> 每次触发事件发生时，系统会遍历场上**所有棋子**的规则，而不只检查事件发起者的规则。
+>
+> 这意味着：
+> - 棋子 A 移动后，棋子 B 身上的 `afterMove` 规则也会被检查
+> - 棋子 A 释放技能后，棋子 C 身上的 `afterSkillUsed` 规则也会被检查
+>
+> 在规则代码中，通过 `context.sourcePiece`（或 `context.piece`）可以判断是谁触发了本次事件，从而决定是否生效：
+> ```javascript
+> // 示例：只在队友释放技能后才给自己回血
+> if (context.sourcePiece.ownerPlayerId !== sourcePiece.ownerPlayerId) return { success: false }
+> if (context.sourcePiece.instanceId === sourcePiece.instanceId) return { success: false } // 自己不触发
+> healDamage(sourcePiece, sourcePiece, 3, context.battle, context.skillId)
+> return { success: true, message: sourcePiece.name + '因队友施法获得回血' }
+> ```
+
 ### 伤害类
 
 | 触发类型 | 触发时机 | context.piece | context.target | context.damage | 可 blocked |
@@ -1182,17 +1275,17 @@ return { success: true, blocked: false, message: '' }
 
 ### 技能类
 
-| 触发类型 | context.piece | context.skillId | 可 blocked |
-|---------|--------------|----------------|-----------|
-| `beforeSkillUse` | 即将使用技能的棋子 | 技能ID | ✅ |
-| `afterSkillUsed` | 使用技能后的棋子 | 技能ID | ❌ |
+| 触发类型 | context.piece | context.skillId | 可 blocked | 备注 |
+|---------|--------------|----------------|-----------|------|
+| `beforeSkillUse` | 即将使用技能的棋子 | 技能ID | ✅ | 全场扫描 |
+| `afterSkillUsed` | 使用技能后的棋子 | 技能ID | ❌ | 全场扫描 |
 
 ### 移动类
 
-| 触发类型 | context.piece | 可 blocked |
-|---------|--------------|-----------|
-| `beforeMove` | 即将移动的棋子 | ✅ |
-| `afterMove` | 已移动的棋子 | ❌ |
+| 触发类型 | context.piece | 可 blocked | 备注 |
+|---------|--------------|-----------|------|
+| `beforeMove` | 即将移动的棋子 | ✅ | 全场扫描 |
+| `afterMove` | 已移动的棋子 | ❌ | 全场扫描 |
 
 ### 回合类
 
@@ -1689,6 +1782,121 @@ if (tile.props.healPerTurn > 0 && piece.currentHp > 0) {
 }
 if (tile.props.chargePerTurn > 0 && piece.currentHp > 0) {
   playerMeta.chargePoints += tile.props.chargePerTurn
+}
+```
+
+---
+
+## 手牌卡牌系统
+
+### 概述
+
+卡牌定义存储在 `data/cards/*.json`，玩家在对局中持有手牌（最多10张）。
+卡牌只能通过 `addCardToHand()` 函数加入手牌，不会自动获得。
+
+### CardDefinition JSON 格式
+
+```json
+{
+  "id": "card-id",
+  "name": "卡牌名称",
+  "description": "卡牌说明文字",
+  "type": "active",
+  "icon": "Heart",
+  "code": "function executeCard(context) { ... }"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 与文件名一致 |
+| `name` | string | 显示名称 |
+| `description` | string | 说明文字 |
+| `type` | `"active"` \| `"reactive"` | 主动/被动 |
+| `trigger` | `{ type: TriggerType }` | 仅 reactive 需要，触发时机 |
+| `code` | string | JS代码，入口为 `executeCard(context)` |
+| `icon` | string | lucide-react 图标名（可选） |
+
+### 卡牌类型
+
+- **active（主动牌）**：玩家在行动阶段点击使用，使用后弃置。没有 `sourcePiece`，通过 `playerId` 识别阵营。
+- **reactive（被动牌）**：监听指定触发时机，条件满足时自动触发并弃置。双方手牌都会被扫描。
+
+### 代码入口
+
+```javascript
+function executeCard(context) {
+  // context 为触发上下文（reactive）或空对象（active）
+  // playerId 变量可直接使用（当前持牌玩家ID）
+  // battle 变量可直接使用
+  return { success: true, message: "效果描述" }
+}
+```
+
+### 卡牌可用函数
+
+| 函数 | 说明 |
+|------|------|
+| `dealDamage(attacker, target, amount, type, battle, cardId)` | 造成伤害 |
+| `healDamage(healer, target, amount, battle, cardId)` | 治疗 |
+| `addStatusEffectById(pieceId, statusObj)` | 施加状态 |
+| `removeStatusEffectById(pieceId, statusId)` | 移除状态 |
+| `addRuleById(pieceId, ruleId)` | 为棋子附加规则 |
+| `removeRuleById(pieceId, ruleId)` | 移除棋子规则 |
+| `addCardToHand(cardId, targetPlayerId?)` | 将卡牌加入手牌（默认己方） |
+| `discardCard(instanceId)` | 弃置指定手牌 |
+| `getHand(targetPlayerId?)` | 获取手牌列表 |
+| `selectTarget(opts)` | 选择目标棋子 |
+
+### AP 消耗
+
+无专用字段，在代码中用 `if` 语句判断：
+
+```javascript
+function executeCard(context) {
+  const player = battle.players.find(p => p.playerId === playerId)
+  if (!player || player.actionPoints < 1) {
+    return { success: false, message: "行动点不足" }
+  }
+  player.actionPoints -= 1
+  // ... 执行效果
+}
+```
+
+### gameStart 触发器
+
+`gameStart` 在战斗开始时触发一次（`turnNumber === 1`，`beginPhase` 时）。
+用于初始发牌等效果，写在规则的 `skillCode` 里：
+
+```json
+{
+  "trigger": { "type": "gameStart" },
+  "skillCode": "function checkToxin(battle, context) { addCardToHand('sample-active-card', context.playerId); return { success: true, message: '发了一张手牌' } }"
+}
+```
+
+### 示例：主动牌
+
+```json
+{
+  "id": "first-aid-kit",
+  "name": "急救包",
+  "description": "消耗1AP，为友方棋子回复15生命",
+  "type": "active",
+  "code": "function executeCard(context) {\n  const player = battle.players.find(p => p.playerId === playerId);\n  if (!player || player.actionPoints < 1) return { success: false, message: 'AP不足' };\n  const target = selectTarget({ filter: 'ally', range: 99 });\n  if (!target) return { success: false, message: '请选择目标' };\n  player.actionPoints -= 1;\n  const r = healDamage(target, target, 15, battle, 'first-aid-kit');\n  return { success: true, message: '急救包：回复' + r.heal + '点生命' };\n}"
+}
+```
+
+### 示例：被动牌
+
+```json
+{
+  "id": "counter-will",
+  "name": "反击意志",
+  "description": "友方受伤时自动触发：对攻击者造成5点真实伤害",
+  "type": "reactive",
+  "trigger": { "type": "afterDamageTaken" },
+  "code": "function executeCard(context) {\n  if (!context.targetPiece || context.targetPiece.ownerPlayerId !== playerId) return { success: false };\n  const r = dealDamage(context.targetPiece, context.sourcePiece, 5, 'true', battle, 'counter-will');\n  return { success: true, message: '反击意志：造成5点真实伤害' };\n}"
 }
 ```
 

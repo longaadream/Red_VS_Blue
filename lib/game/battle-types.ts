@@ -10,6 +10,16 @@ export type TurnPhase = "start" | "action" | "end"
 
 export type PlayerId = string
 
+/** 手牌实例（一张在玩家手中的卡牌） */
+export interface CardInstance {
+  /** 卡牌定义 ID，对应 data/cards/*.json */
+  cardId: string
+  /** 本次实例的唯一 ID，用于指定打出哪张牌 */
+  instanceId: string
+  /** 拥有者玩家 ID */
+  ownerPlayerId: string
+}
+
 export interface PlayerTurnMeta {
   playerId: PlayerId
   /** 玩家昵称 */
@@ -20,6 +30,10 @@ export interface PlayerTurnMeta {
   actionPoints: number
   /** 最大行动点 */
   maxActionPoints: number
+  /** 当前手牌（最多 10 张） */
+  hand: CardInstance[]
+  /** 弃牌堆（只记 cardId，用于日志/统计） */
+  discardPile: string[]
 }
 
 export interface PerTurnActionFlags {
@@ -63,6 +77,12 @@ export interface BattleState {
   actions?: BattleActionLog[]
   /** 毒素列表 - 存放黑百合等技能放置的毒素 */
   toxins?: Array<{ x: number; y: number; damage: number; casterOwnerId: string }>
+  /** 回溯数据列表 - 存放猎空等技能的标记快照 */
+  recallData?: Array<{ pieceId: string; ownerPlayerId: string; targetCount: number; actionCount: number; snapshot: { x: number; y: number; hp: number } }>
+  /** 粘性炸弹列表 - 存放猎空粘性炸弹数据 */
+  stickyBombs?: Array<{ x: number; y: number; damage: number; ownerPlayerId: string; attachedPieceId: string | null; opponentEndTurnsSeen: number }>
+  /** gameStart 触发器是否已触发过（防止重复触发） */
+  gameStartFired?: boolean
 }
 
 export type BattleAction =
@@ -108,6 +128,16 @@ export type BattleAction =
   | {
       type: "surrender"
       playerId: PlayerId
+    }
+  | {
+      type: "playCard"
+      playerId: PlayerId
+      /** 要打出的手牌实例 ID */
+      cardInstanceId: string
+      targetPieceId?: string
+      targetX?: number
+      targetY?: number
+      selectedOption?: any
     }
 
 export class BattleRuleError extends Error {

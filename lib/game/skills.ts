@@ -41,6 +41,251 @@ interface TriggerRule {
 // 每次复用时返回浅拷贝，保持 effect 函数引用一致
 const ruleCache = new Map<string, TriggerRule>()
 
+// ─── 卡牌系统类型 ─────────────────────────────────────────────────────────────
+
+export interface CardDefinition {
+  id: string
+  name: string
+  description: string
+  /** active = 主动打出；reactive = 被动触发后自动弃牌 */
+  type: "active" | "reactive"
+  /** reactive 卡牌的触发时机，类型与 TriggerType 对应 */
+  trigger?: { type: string }
+  /** 卡牌效果代码，入口函数名为 executeCard(context) */
+  code: string
+  icon?: string
+}
+
+// 卡牌定义缓存
+const cardCache = new Map<string, CardDefinition>()
+
+/** 从 data/cards/{cardId}.json 加载卡牌定义（带缓存） */
+export function loadCardById(cardId: string): CardDefinition | null {
+  const cached = cardCache.get(cardId)
+  if (cached) return { ...cached }
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const cardPath = path.join(process.cwd(), 'data', 'cards', `${cardId}.json`)
+    if (fs.existsSync(cardPath)) {
+      const cardData: CardDefinition = JSON.parse(fs.readFileSync(cardPath, 'utf8'))
+      cardCache.set(cardId, cardData)
+      return { ...cardData }
+    }
+    console.error(`[loadCardById] Card file not found: ${cardPath}`)
+    return null
+  } catch (error) {
+    console.error(`[loadCardById] Error loading card ${cardId}:`, error)
+    return null
+  }
+}
+
+/** 为卡牌效果构建执行环境（没有 sourcePiece，用 playerId 判断阵营） */
+function createCardEffectFunctions(battle: BattleState, playerId: string, context: any) {
+  return {
+    context,
+    battle,
+    playerId,
+
+    // 目标选择：无 sourcePiece，无距离限制过滤
+    selectTarget: (options?: { type?: 'piece' | 'grid'; range?: number; filter?: 'enemy' | 'ally' | 'all' }) => {
+      const opts = { type: 'piece' as const, filter: 'all' as const, ...options }
+      if (opts.type === 'piece' && context.target) {
+        const isAlly = context.target.ownerPlayerId === playerId
+        if (opts.filter === 'ally' && !isAlly)
+          return { needsTargetSelection: true, targetType: opts.type, range: opts.range, filter: opts.filter }
+        if (opts.filter === 'enemy' && isAlly)
+          return { needsTargetSelection: true, targetType: opts.type, range: opts.range, filter: opts.filter }
+        if (context.target.instanceId) {
+          const found = battle.pieces.find((p: PieceInstance) => p.instanceId === context.target.instanceId)
+          if (found) return found
+        }
+        return context.target
+      }
+      if (opts.type === 'grid' && context.targetPosition) return context.targetPosition
+      if (opts.type === 'grid' && context.target?.x !== undefined)
+        return { x: context.target.x, y: context.target.y }
+      return { needsTargetSelection: true, targetType: opts.type, range: opts.range, filter: opts.filter }
+    },
+
+    selectOption: (config: any) => {
+      if (context.selectedOption !== undefined) return context.selectedOption
+      return { needsOptionSelection: true, options: config.options, title: config.title || '请选择' }
+    },
+
+    dealDamage: (attacker: PieceInstance, target: PieceInstance, baseDamage: number, damageType: DamageType = 'true', _battleState?: BattleState, skillId?: string) => {
+      return dealDamage(attacker, target, baseDamage, damageType, battle, skillId)
+    },
+
+    healDamage: (healer: PieceInstance, target: PieceInstance, baseHeal: number, _battleState?: BattleState, skillId?: string) => {
+      return healDamage(healer, target, baseHeal, battle, skillId)
+    },
+
+    /** 向某玩家手牌加一张卡（超上限时弃置并写日志） */
+    addCardToHand: (cardId: string, targetPlayerId?: string) => {
+      const pid = targetPlayerId || playerId
+      const player = battle.players.find((p: any) => p.playerId === pid)
+      if (!player) return false
+      if (!player.hand) player.hand = []
+      if (player.hand.length >= 10) {
+        const def = loadCardById(cardId)
+        if (!battle.actions) battle.actions = []
+        battle.actions.push({
+          type: "cardOverflow",
+          playerId: pid,
+          turn: battle.turn.turnNumber,
+          payload: { message: `手牌已满（10张），${def?.name || cardId}被弃置` }
+        })
+        if (!player.discardPile) player.discardPile = []
+        player.discardPile.push(cardId)
+        return false
+      }
+      const instanceId = `ci-${cardId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+      player.hand.push({ cardId, instanceId, ownerPlayerId: pid })
+      return true
+    },
+
+    /** 按 instanceId 从手牌移除并加入弃牌堆 */
+    discardCard: (instanceId: string) => {
+      for (const player of battle.players as any[]) {
+        if (!player.hand) continue
+        const idx = player.hand.findIndex((c: any) => c.instanceId === instanceId)
+        if (idx !== -1) {
+          const [removed] = player.hand.splice(idx, 1)
+          if (!player.discardPile) player.discardPile = []
+          player.discardPile.push(removed.cardId)
+          return true
+        }
+      }
+      return false
+    },
+
+    /** 获取某玩家当前手牌 */
+    getHand: (targetPlayerId?: string) => {
+      const pid = targetPlayerId || playerId
+      const player = battle.players.find((p: any) => p.playerId === pid) as any
+      return player?.hand || []
+    },
+
+    addStatusEffectById: (targetPieceId: string, statusObject: any) => {
+      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
+      if (targetPiece) {
+        if (!targetPiece.statusTags) targetPiece.statusTags = []
+        targetPiece.statusTags.push({
+          id: statusObject.id, type: statusObject.type,
+          name: statusObject.name || statusObject.type,
+          remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
+          remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
+          intensity: statusObject.intensity, stacks: statusObject.stacks,
+          value: statusObject.value, relatedRules: []
+        })
+        return true
+      }
+      return false
+    },
+
+    removeStatusEffectById: (targetPieceId: string, statusId: string) => {
+      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
+      if (targetPiece?.statusTags) {
+        const idx = targetPiece.statusTags.findIndex((t: any) => t.id === statusId)
+        if (idx !== -1) { targetPiece.statusTags.splice(idx, 1); return true }
+      }
+      return false
+    },
+
+    addRuleById: (targetPieceId: string, ruleId: string) => {
+      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
+      if (targetPiece) {
+        const rule = loadRuleById(ruleId)
+        if (rule) {
+          if (!targetPiece.rules) targetPiece.rules = []
+          targetPiece.rules.push(rule)
+          return true
+        }
+      }
+      return false
+    },
+
+    removeRuleById: (targetPieceId: string, ruleId: string) => {
+      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
+      if (targetPiece?.rules) {
+        targetPiece.rules = targetPiece.rules.filter((r: any) => r.id !== ruleId)
+        return true
+      }
+      return false
+    },
+
+    Math,
+    console
+  }
+}
+
+/**
+ * 执行卡牌效果代码
+ * 卡牌没有 sourcePiece，通过 playerId 确定归属；入口函数名为 executeCard(context)
+ */
+export function executeCardFunction(
+  cardDef: CardDefinition,
+  playerId: string,
+  battle: BattleState,
+  triggerContext?: any,
+  targetPiece?: PieceInstance,
+  targetPosition?: { x: number; y: number },
+  selectedOption?: any
+): SkillExecutionResult {
+  try {
+    const context = {
+      card: { id: cardDef.id, name: cardDef.name, type: cardDef.type },
+      playerId,
+      battle,
+      piece: null,
+      target: targetPiece || null,
+      targetPosition: targetPosition || null,
+      selectedOption,
+      // 触发事件上下文（reactive 卡牌使用）
+      sourcePiece: triggerContext?.sourcePiece || null,
+      targetPiece: triggerContext?.targetPiece || null,
+      damage: triggerContext?.damage,
+      heal: triggerContext?.heal,
+      skillId: triggerContext?.skillId,
+    }
+
+    const env = createCardEffectFunctions(battle, playerId, context)
+
+    const fullCode = `
+      (function(env) {
+        const context = env.context;
+        const battle = env.battle;
+        const playerId = env.playerId;
+        const selectTarget = env.selectTarget;
+        const selectOption = env.selectOption;
+        const dealDamage = env.dealDamage;
+        const healDamage = env.healDamage;
+        const addCardToHand = env.addCardToHand;
+        const discardCard = env.discardCard;
+        const getHand = env.getHand;
+        const addStatusEffectById = env.addStatusEffectById;
+        const removeStatusEffectById = env.removeStatusEffectById;
+        const addRuleById = env.addRuleById;
+        const removeRuleById = env.removeRuleById;
+        const Math = env.Math;
+        const console = env.console;
+
+        ${cardDef.code}
+
+        return executeCard(context);
+      })(env)
+    `
+    const result = eval(fullCode)
+    return result || { success: false, message: '卡牌效果无返回值' }
+  } catch (error: any) {
+    if (error?.needsTargetSelection) return error as SkillExecutionResult
+    if (error?.needsOptionSelection) return error as SkillExecutionResult
+    console.error(`[executeCardFunction] Error executing card ${cardDef.id}:`, error)
+    return { success: false, message: `卡牌执行失败: ${error?.message || error}` }
+  }
+}
+
 // 从文件中加载规则的函数（导出以便在需要时重新注入 effect 函数）
 export function loadRuleById(ruleId: string): TriggerRule | null {
   console.log(`[loadRuleById] Called with ruleId: ${ruleId}`);
@@ -63,10 +308,31 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
       const ruleContent = fs.readFileSync(rulePath, 'utf8');
       const ruleData = JSON.parse(ruleContent);
       
-      // 转换effect为函数
+      // 转换effect为函数 - 优先处理 skillCode
       let effectFunction: EffectFunction;
       
-      if (ruleData.effect) {
+      // 优先处理 skillCode（新的简化方式）
+      if (ruleData.skillCode) {
+        effectFunction = (battle: BattleState, context: any) => {
+          try {
+            const globalDealDamage = dealDamage;
+            const globalHealDamage = healDamage;
+            
+            const codeEnvironment = `
+              (function(battle, context, dealDamage, healDamage) {
+                ${ruleData.skillCode}
+                return checkToxin(battle, context);
+              })(battle, context, dealDamage, healDamage)
+            `;
+            
+            const result = eval(codeEnvironment);
+            return result || { success: false, message: '' };
+          } catch (error) {
+            console.error('[Rule] Error executing skillCode:', error);
+            return { success: false, message: '规则执行失败' };
+          }
+        };
+      } else if (ruleData.effect) {
         if (ruleData.effect.type === 'triggerSkill') {
           // 触发技能的效果（原有逻辑）
           effectFunction = (battle: BattleState, context: any) => {
@@ -223,6 +489,41 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                       }
                       return false;
                     },
+                    addCardToHand: (cardId: string, targetPlayerId?: string) => {
+                      const pid = targetPlayerId || context.sourcePiece?.ownerPlayerId
+                      if (!pid) return false
+                      const player = battle.players?.find(p => p.playerId === pid)
+                      if (!player) return false
+                      if (!player.hand) player.hand = []
+                      if (!player.discardPile) player.discardPile = []
+                      if (player.hand.length >= 10) {
+                        if (battle.actions) battle.actions.push({ type: 'info', playerId: pid, turn: battle.turn?.turnNumber ?? 0, payload: { message: `${pid}手牌已满，${cardId}被弃置` } })
+                        player.discardPile.push(cardId)
+                        return false
+                      }
+                      const instanceId = `ci-${cardId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+                      player.hand.push({ cardId, instanceId, ownerPlayerId: pid })
+                      return true
+                    },
+                    discardCard: (instanceId: string) => {
+                      if (!battle.players) return false
+                      for (const player of battle.players) {
+                        if (!player.hand) continue
+                        const idx = player.hand.findIndex(c => c.instanceId === instanceId)
+                        if (idx !== -1) {
+                          const [card] = player.hand.splice(idx, 1)
+                          if (!player.discardPile) player.discardPile = []
+                          player.discardPile.push(card.cardId)
+                          return true
+                        }
+                      }
+                      return false
+                    },
+                    getHand: (targetPlayerId?: string) => {
+                      const pid = targetPlayerId || context.sourcePiece?.ownerPlayerId
+                      const player = battle.players?.find(p => p.playerId === pid)
+                      return player?.hand ?? []
+                    },
                     getAllEnemiesInRange: (range) => [],
                     getAllAlliesInRange: (range) => [],
                     calculateDistance: (x1, y1, x2, y2) => Math.abs(x1 - x2) + Math.abs(y1 - y2),
@@ -252,11 +553,14 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                       const removeStatusEffectById = environment.removeStatusEffectById;
                       const addSkillById = environment.addSkillById;
                       const removeSkillById = environment.removeSkillById;
+                      const addCardToHand = environment.addCardToHand;
+                      const discardCard = environment.discardCard;
+                      const getHand = environment.getHand;
                       const Math = environment.Math;
                       const console = environment.console;
-                      
+
                       ${skillDef.code}
-                      
+
                       return executeSkill(context);
                     })(skillEnvironment)
                   `;
@@ -275,42 +579,12 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
             }
             return { success: true, message: `${ruleData.name}触发` };
           };
-        } else if (ruleData.skillCode) {
-          // 直接执行自定义代码
-          effectFunction = (battle: BattleState, context: any) => {
-            try {
-              console.log(`[Rule] Executing skillCode for rule: ${ruleId}`);
-              // 保存全局的dealDamage和healDamage函数
-              const globalDealDamage = dealDamage;
-              const globalHealDamage = healDamage;
-              
-              // 构建执行环境
-              const codeEnvironment = `
-                (function(battle, context, dealDamage, healDamage) {
-                  ${ruleData.skillCode}
-                  return checkToxin(battle, context);
-                })(arguments[0], arguments[1], arguments[2], arguments[3])
-              `;
-              
-              const result = eval(codeEnvironment);
-              console.log(`[Rule] skillCode result:`, result);
-              return result || { success: false, message: '' };
-            } catch (error) {
-              console.error('[Rule] Error executing skillCode:', error);
-              return { success: false, message: '规则执行失败' };
-            }
-          };
         } else {
           // 默认效果函数
           effectFunction = (battle: BattleState, context: any) => {
             return { success: true, message: `${ruleData.name}触发` };
           };
         }
-      } else {
-        // 默认效果函数
-        effectFunction = (battle: BattleState, context: any) => {
-          return { success: true, message: `${ruleData.name}触发` };
-        };
       }
       
       // 创建规则对象
@@ -739,6 +1013,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
       title?: string;
       options: { label: string; value: any; description?: string }[];
     }) => {
+      console.log('selectOption called, config:', config, 'context.selectedOption:', context && context.selectedOption);
       // 如果已有选项值（用户已选择），直接返回该值
       if (context && context.selectedOption !== undefined) {
         return context.selectedOption;
@@ -1542,6 +1817,41 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       }
       return false;
     },
+    // 手牌管理函数
+    addCardToHand: (cardId: string, targetPlayerId?: string) => {
+      const pid = targetPlayerId || sourcePiece.ownerPlayerId
+      const player = battle.players?.find(p => p.playerId === pid)
+      if (!player) return false
+      if (!player.hand) player.hand = []
+      if (!player.discardPile) player.discardPile = []
+      if (player.hand.length >= 10) {
+        if (battle.actions) battle.actions.push({ type: 'info', playerId: pid, turn: battle.turn?.turnNumber ?? 0, payload: { message: `${pid}手牌已满，${cardId}被弃置` } })
+        player.discardPile.push(cardId)
+        return false
+      }
+      const instanceId = `ci-${cardId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+      player.hand.push({ cardId, instanceId, ownerPlayerId: pid })
+      return true
+    },
+    discardCard: (instanceId: string) => {
+      if (!battle.players) return false
+      for (const player of battle.players) {
+        if (!player.hand) continue
+        const idx = player.hand.findIndex(c => c.instanceId === instanceId)
+        if (idx !== -1) {
+          const [card] = player.hand.splice(idx, 1)
+          if (!player.discardPile) player.discardPile = []
+          player.discardPile.push(card.cardId)
+          return true
+        }
+      }
+      return false
+    },
+    getHand: (targetPlayerId?: string) => {
+      const pid = targetPlayerId || sourcePiece.ownerPlayerId
+      const player = battle.players?.find(p => p.playerId === pid)
+      return player?.hand ?? []
+    },
     // 辅助函数
     getAllEnemiesInRange: (range: number) => getAllEnemiesInRange(context, range, battle),
     getAllAlliesInRange: (range: number) => getAllAlliesInRange(context, range, battle),
@@ -1561,7 +1871,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     // 执行技能定义中的代码（所有技能统一走 eval 路径，不存在硬编码分支）
     if (skillDef.code) {
       try {
-        console.log('Executing skill code via eval');
+        console.log('Executing skill code via eval, skillId:', skillDef.id);
+        console.log('Skill code:', skillDef.code.substring(0, 100) + '...');
         {
           // 所有技能通过 eval 执行，确保效果完全由 code 字段控制
           const fullSkillCode = `
@@ -1586,6 +1897,9 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const removeStatusEffectById = environment.removeStatusEffectById;
               const addSkillById = environment.addSkillById;
               const removeSkillById = environment.removeSkillById;
+              const addCardToHand = environment.addCardToHand;
+              const discardCard = environment.discardCard;
+              const getHand = environment.getHand;
               const Math = environment.Math;
               const console = environment.console;
               
@@ -1601,6 +1915,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           let result = eval(fullSkillCode);
           
           console.log('Skill execution result:', result);
+          console.log('result.needsOptionSelection:', result && result.needsOptionSelection);
           
           // 检查是否需要目标选择
           if (result && result.needsTargetSelection) {
@@ -1619,6 +1934,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           }
 
           // 检查是否需要选项选择
+          console.log('Checking for option selection, result:', result);
           if (result && result.needsOptionSelection) {
             console.log('Need option selection:', result);
             return {

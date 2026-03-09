@@ -91,8 +91,8 @@ function createTrainingBattleState(mapId?: string): BattleState {
     pieceStatsByTemplateId: {},
     skillsById: skills,
     players: [
-      { playerId: player1, name: "红方", chargePoints: 0, actionPoints: 10, maxActionPoints: 10 },
-      { playerId: player2, name: "蓝方", chargePoints: 0, actionPoints: 0, maxActionPoints: 10 },
+      { playerId: player1, name: "红方", chargePoints: 0, actionPoints: 10, maxActionPoints: 10, hand: [], discardPile: [] },
+      { playerId: player2, name: "蓝方", chargePoints: 0, actionPoints: 0, maxActionPoints: 10, hand: [], discardPile: [] },
     ],
     turn: {
       currentPlayerId: player1,
@@ -260,6 +260,18 @@ export async function PUT(req: NextRequest) {
           targetType: err.targetType,
           range: err.range,
           filter: err.filter,
+        },
+        { status: 400 }
+      )
+    }
+    // 检查是否是需要选项选择的错误
+    if (err.needsOptionSelection) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          needsOptionSelection: true,
+          options: err.options,
+          title: err.title,
         },
         { status: 400 }
       )

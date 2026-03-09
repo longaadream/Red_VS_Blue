@@ -84,8 +84,6 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
     { type: "lava", name: "熔岩(-HP)", color: "bg-orange-700" },
     { type: "spring", name: "治愈泉(+HP)", color: "bg-teal-700" },
     { type: "chargepad", name: "充能台(+CP)", color: "bg-violet-700" },
-    { type: "shadow-step", name: "暗影步", color: "bg-purple-600" },
-    { type: "blizzard", name: "暴风雪", color: "bg-blue-400/50" },
   ]
 
   // 获取选中的棋子

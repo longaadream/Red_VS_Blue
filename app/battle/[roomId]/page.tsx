@@ -725,13 +725,13 @@ export default function BattlePage() {
                                         <div className="flex items-center justify-between text-xs">
                                           <span className="text-zinc-500">冷却:</span>
                                           <span className={`text-xs ${
-                                            skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
+                                            currentCooldown > 0 
                                               ? "text-red-400" 
                                               : "text-green-400"
                                           }`}>
-                                            {skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
-                                              ? `${skillPreview.currentCooldown} 回合` 
-                                              : "0 回合"}
+                                            {skillDef.cooldownTurns > 0 
+                                              ? `${skillDef.cooldownTurns}/${currentCooldown} 回合` 
+                                              : `${currentCooldown} 回合`}
                                           </span>
                                         </div>
                                         {skillDef.type === "super" && skillPreview.chargeCost && (
@@ -1020,13 +1020,13 @@ export default function BattlePage() {
                                         <div className="flex items-center justify-between text-xs">
                                           <span className="text-zinc-500">冷却:</span>
                                           <span className={`text-xs ${
-                                            skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
+                                            currentCooldown > 0 
                                               ? "text-red-400" 
                                               : "text-green-400"
                                           }`}>
-                                            {skillPreview.currentCooldown && skillPreview.currentCooldown > 0 
-                                              ? `${skillPreview.currentCooldown} 回合` 
-                                              : "0 回合"}
+                                            {skillDef.cooldownTurns > 0 
+                                              ? `${skillDef.cooldownTurns}/${currentCooldown} 回合` 
+                                              : `${currentCooldown} 回合`}
                                           </span>
                                         </div>
                                         {skillDef.type === "super" && skillPreview.chargeCost && (

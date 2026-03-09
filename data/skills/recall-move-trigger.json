@@ -1,0 +1,12 @@
+{
+  "id": "recall-move-trigger",
+  "name": "回溯触发（移动）",
+  "description": "对手移动时计数，达到目标时执行回溯",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { if (!context.battle.recallData || context.battle.recallData.length === 0) return { success: false }; var actor = context.sourcePiece; if (!actor) return { success: false }; var triggered = false; var messages = []; for (var i = context.battle.recallData.length - 1; i >= 0; i--) { var recall = context.battle.recallData[i]; if (actor.ownerPlayerId === recall.ownerPlayerId) continue; recall.actionCount = (recall.actionCount || 0) + 1; if (recall.actionCount >= recall.targetCount) { var piece = context.battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (piece && recall.snapshot) { piece.x = recall.snapshot.x; piece.y = recall.snapshot.y; piece.currentHp = Math.min(recall.snapshot.hp, piece.maxHp); if (recall.snapshot.shield !== undefined) piece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) piece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) piece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) piece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); messages.push(piece.name + '回溯！（对手操作数达到' + recall.targetCount + '）'); triggered = true; } context.battle.recallData.splice(i, 1); } } return triggered ? { success: true, message: messages.join('，') } : { success: false }; }"
+}

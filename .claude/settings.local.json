@@ -8,7 +8,9 @@
       "Bash(head:*)",
       "Bash(wc:*)",
       "Bash(done)",
-      "Bash(echo === Rules referenced by pieces ===:*)"
+      "Bash(echo === Rules referenced by pieces ===:*)",
+      "Bash(\"C:\\\\Users\\\\lngsc\\\\Documents\\\\GitHub\\\\v0-game-menu-design\\\\v0-game-menu-design\\\\GAME_DEVELOPMENT_NOTES.md\":*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

@@ -1,0 +1,9 @@
+{
+  "id": "sample-reactive-card",
+  "name": "反击意志",
+  "description": "当任意友方棋子受到伤害时自动触发：对攻击者造成5点真实伤害。",
+  "type": "reactive",
+  "trigger": { "type": "afterDamageTaken" },
+  "icon": "Zap",
+  "code": "function executeCard(context) {\n  if (!context.sourcePiece) return { success: false };\n  if (context.targetPiece && context.targetPiece.ownerPlayerId !== playerId) return { success: false };\n  const attacker = context.sourcePiece;\n  const defender = context.targetPiece;\n  if (!defender || defender.ownerPlayerId !== playerId) return { success: false };\n  const result = dealDamage(defender, attacker, 5, 'true', battle, 'sample-reactive-card');\n  return { success: true, message: `反击意志：对${attacker.name || attacker.templateId}造成5点真实伤害` };\n}"
+}

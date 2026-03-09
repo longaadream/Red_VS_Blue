@@ -46,11 +46,19 @@ interface PieceInstance {
   rules: any[]
 }
 
+interface CardInstance {
+  cardId: string
+  instanceId: string
+  ownerPlayerId: string
+}
+
 interface PlayerMeta {
   playerId: string
   chargePoints: number
   actionPoints: number
   maxActionPoints: number
+  hand: CardInstance[]
+  discardPile: string[]
 }
 
 interface TurnState {
@@ -360,6 +368,11 @@ export default function TurnDebugPage() {
     act({ ...targetReq.pendingAction, targetPieceId: target.instanceId })
   }
 
+  const handlePlayCard = (cardInstanceId: string) => {
+    if (!battle) return
+    act({ type: "playCard", playerId: battle.turn.currentPlayerId, cardInstanceId })
+  }
+
   const cancelTarget = () => setTargetReq(null)
 
   // ── 派生状态 ──────────────────────────────────────────────────────────────
@@ -615,6 +628,32 @@ export default function TurnDebugPage() {
           )}
 
           {/* 战场：棋子卡片 */}
+          {/* 手牌区 */}
+          {battle && (() => {
+            const currentMeta = battle.players.find(p => p.playerId === battle.turn.currentPlayerId)
+            const hand = currentMeta?.hand ?? []
+            if (hand.length === 0) return null
+            return (
+              <div className="border-b border-zinc-800 bg-zinc-900/40 px-4 py-2">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  当前玩家手牌（{hand.length}/10）
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {hand.map((card) => (
+                    <button
+                      key={card.instanceId}
+                      disabled={!isActionPhase}
+                      onClick={() => handlePlayCard(card.instanceId)}
+                      className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {card.cardId}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
           {battle ? (
             <div className="flex flex-col gap-4 p-4 lg:flex-row">
               {/* 红方棋子 */}

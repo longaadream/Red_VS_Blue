@@ -1,0 +1,7 @@
+{
+  "id": "rule-sticky-bomb-move",
+  "name": "粘性炸弹（跟随移动）",
+  "description": "当棋子移动时，更新附着在该棋子上的粘性炸弹位置。",
+  "trigger": { "type": "afterMove" },
+  "effect": { "type": "triggerSkill", "skillId": "sticky-bomb-move", "message": "" }
+}

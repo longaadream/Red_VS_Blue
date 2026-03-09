@@ -7,10 +7,9 @@ import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 import { globalTriggerSystem } from "./triggers"
 import { loadRuleById } from "./skills"
-import fs from 'fs'
 import path from 'path'
+import fs from 'fs'
 
-// 简单的日志写入函数
 function writeLog(message: string) {
   const logDir = path.join(process.cwd(), 'logs')
   if (!fs.existsSync(logDir)) {
@@ -608,8 +607,8 @@ export async function createInitialBattleForPlayers(
     pieceStatsByTemplateId: buildDefaultPieceStats(),
     skillsById: skills,
     players: [
-      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1 },
-      { playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0 },
+      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1, hand: [], discardPile: [] },
+      { playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0, hand: [], discardPile: [] },
     ],
     turn: {
       currentPlayerId: redPlayer,

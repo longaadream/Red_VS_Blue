@@ -322,6 +322,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       try {
         const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId)
         
+        if (!battle) {
+          console.error('Failed to create battle - battle is null')
+          return NextResponse.json(
+            { error: "Failed to create battle: invalid player count or battle setup" },
+            { status: 500 }
+          )
+        }
+        
         if (battle) {
           console.log('Battle created successfully:', battle)
           
@@ -336,9 +344,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
           console.log('Game started successfully on server')
         } else {
           console.error('Failed to create battle')
+          return NextResponse.json(
+            { error: "Failed to create battle" },
+            { status: 500 }
+          )
         }
       } catch (error) {
         console.error('Error starting game:', error)
+        return NextResponse.json(
+          { error: `Failed to start game: ${error instanceof Error ? error.message : 'Unknown error'}` },
+          { status: 500 }
+        )
       }
     }
 

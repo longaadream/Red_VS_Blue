@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     }
   ];
   
-  const battle = createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces)
+  const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces)
 
   if (!battle) {
     return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })

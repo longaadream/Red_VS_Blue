@@ -1,0 +1,28 @@
+{
+  "id": "tracer",
+  "name": "猎空",
+  "faction": "blue",
+  "rarity": "epic",
+  "stats": {
+    "maxHp": 7,
+    "attack": 3,
+    "defense": 0,
+    "moveRange": 5
+  },
+  "image": "tracer.jpg",
+  "skills": [
+    { "skillId": "blink" },
+    { "skillId": "recall" },
+    { "skillId": "sticky-bomb" },
+    { "skillId": "pulse-pistol" }
+  ],
+  "rules": [
+    "rule-pulse-pistol",
+    "rule-pulse-pistol-move",
+    "rule-recall-skill",
+    "rule-recall-move",
+    "rule-recall-endturn",
+    "rule-sticky-bomb-move",
+    "rule-sticky-bomb-endturn"
+  ]
+}

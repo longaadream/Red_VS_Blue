@@ -31,28 +31,6 @@ import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
 
-// ─── 辅助函数：检测毒素触发（敌人移动到毒素格子）────────────────
-function checkToxinTrigger(battle: BattleState, mover: PieceInstance): string | null {
-  if (!battle.toxins || battle.toxins.length === 0) {
-    return null
-  }
-  
-  for (const toxin of battle.toxins) {
-    console.log('[checkToxinTrigger] Checking toxin at:', toxin.x, toxin.y, 'mover at:', mover.x, mover.y, 'toxin caster:', toxin.casterOwnerId, 'mover owner:', mover.ownerPlayerId)
-    if (mover.x === toxin.x && mover.y === toxin.y && mover.ownerPlayerId !== toxin.casterOwnerId) {
-      console.log('[checkToxinTrigger] Enemy stepped on toxin!')
-      const damage = toxin.damage || 4
-      console.log('[checkToxinTrigger] mover defense:', mover.defense, 'damage:', damage)
-      const caster = battle.pieces.find(p => p.ownerPlayerId === toxin.casterOwnerId) || mover
-      const result = dealDamage(caster, mover, damage, 'toxin' as DamageType, battle)
-      console.log('[checkToxinTrigger] dealDamage result:', result)
-      console.log('[checkToxinTrigger] mover currentHp after damage:', mover.currentHp)
-      return `${mover.name}触发了致命毒素，受到${result.damage}点伤害！${result.isKilled ? '（被击杀）' : ''}`
-    }
-  }
-  return null
-}
-
 // ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
 function restorePieceRules(state: BattleState): void {
   state.pieces.forEach(piece => {
@@ -162,6 +140,10 @@ export interface PlayerTurnMeta {
   actionPoints: number
   /** 最大行动点 */
   maxActionPoints: number
+  /** 当前手牌（最多 10 张） */
+  hand: { cardId: string; instanceId: string; ownerPlayerId: string }[]
+  /** 弃牌堆（只记 cardId） */
+  discardPile: string[]
 }
 
 export interface PerTurnActionFlags {
@@ -203,6 +185,12 @@ export interface BattleState {
   turn: TurnState
   /** 战斗日志 */
   actions?: BattleActionLog[]
+  /** 回溯数据列表 */
+  recallData?: Array<{ pieceId: string; ownerPlayerId: string; targetCount: number; actionCount: number; snapshot: { x: number; y: number; hp: number } }>
+  /** 粘性炸弹列表 */
+  stickyBombs?: Array<{ x: number; y: number; damage: number; ownerPlayerId: string; attachedPieceId: string | null; opponentEndTurnsSeen: number }>
+  /** gameStart 触发器是否已触发过 */
+  gameStartFired?: boolean
 }
 
 export type BattleAction =
@@ -248,6 +236,15 @@ export type BattleAction =
   | {
       type: "surrender"
       playerId: PlayerId
+    }
+  | {
+      type: "playCard"
+      playerId: PlayerId
+      cardInstanceId: string
+      targetPieceId?: string
+      targetX?: number
+      targetY?: number
+      selectedOption?: any
     }
 
 export class BattleRuleError extends Error {
@@ -333,6 +330,22 @@ export function applyBattleAction(
     case "beginPhase": {
       const next = safeCloneBattleState(state)
       if (next.turn.phase === "start") {
+        // ── 游戏开始时触发一次 gameStart 规则（第一回合第一个 beginPhase）────
+        if (!next.gameStartFired && next.turn.turnNumber === 1) {
+          next.gameStartFired = true
+          const gameStartResult = globalTriggerSystem.checkTriggers(next, {
+            type: "gameStart",
+            playerId: next.turn.currentPlayerId,
+            turnNumber: 1
+          })
+          if (gameStartResult.success && gameStartResult.messages.length > 0) {
+            if (!next.actions) next.actions = []
+            gameStartResult.messages.forEach(message => {
+              next.actions!.push({ type: "triggerEffect", playerId: next.turn.currentPlayerId, turn: 1, payload: { message } })
+            })
+          }
+        }
+
         // 获取当前玩家的所有棋子
         const currentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0);
         // 触发回合开始效果，为每个存活的棋子都触发一次
@@ -743,24 +756,6 @@ export function applyBattleAction(
             }
           });
         });
-      }
-
-      // 检测毒素触发（敌人移动到毒素格子）
-      if (next.toxins && next.toxins.length > 0) {
-        console.log('[Turn] Checking toxins after move, total toxins:', next.toxins.length)
-        const toxinMessage = checkToxinTrigger(next, piece)
-        if (toxinMessage) {
-          console.log('[Turn] Toxin triggered:', toxinMessage)
-          if (!next.actions) {
-            next.actions = []
-          }
-          next.actions.push({
-            type: "triggerEffect",
-            playerId: action.playerId,
-            turn: next.turn.turnNumber,
-            payload: { message: toxinMessage }
-          })
-        }
       }
 
       // 触发whenever规则（每一步行动后检测）
@@ -1525,6 +1520,83 @@ export function applyBattleAction(
         });
       }
       
+      return next
+    }
+
+    case "playCard": {
+      requireActionPhase(state)
+      if (!isCurrentPlayer(state, action.playerId)) {
+        throw new BattleRuleError("It is not this player's turn")
+      }
+
+      const next = safeCloneBattleState(state)
+      const playerMeta = getPlayerMeta(next, action.playerId)
+
+      // 找到手牌
+      if (!playerMeta.hand) playerMeta.hand = []
+      const cardIdx = playerMeta.hand.findIndex(c => c.instanceId === action.cardInstanceId)
+      if (cardIdx === -1) throw new BattleRuleError("手牌中找不到该卡牌")
+      const cardInstance = playerMeta.hand[cardIdx]
+
+      // 加载卡牌定义
+      const { loadCardById, executeCardFunction } = require('./skills')
+      const cardDef = loadCardById(cardInstance.cardId)
+      if (!cardDef) throw new BattleRuleError(`卡牌定义找不到: ${cardInstance.cardId}`)
+      if (cardDef.type !== 'active') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
+
+      // 构建目标信息
+      let targetPiece = undefined
+      let targetPosition = undefined
+      if (action.targetPieceId) {
+        targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId)
+      }
+      if (action.targetX !== undefined && action.targetY !== undefined) {
+        targetPosition = { x: action.targetX, y: action.targetY }
+      }
+
+      // 执行卡牌
+      const result = executeCardFunction(cardDef, action.playerId, next, undefined, targetPiece, targetPosition, action.selectedOption)
+
+      // 处理目标选择
+      if (result.needsTargetSelection) {
+        const err = new BattleRuleError('需要选择目标') as any
+        err.needsTargetSelection = true
+        err.targetType = result.targetType || 'piece'
+        err.range = result.range || 999
+        err.filter = result.filter || 'all'
+        throw err
+      }
+
+      // 处理选项选择
+      if (result.needsOptionSelection) {
+        const err = new BattleRuleError('需要选择选项') as any
+        err.needsOptionSelection = true
+        err.options = result.options || []
+        err.title = result.title || '请选择'
+        throw err
+      }
+
+      if (!result.success) {
+        throw new BattleRuleError(result.message || "卡牌效果执行失败")
+      }
+
+      // 弃牌
+      if (!playerMeta.discardPile) playerMeta.discardPile = []
+      playerMeta.hand.splice(cardIdx, 1)
+      playerMeta.discardPile.push(cardInstance.cardId)
+
+      // 写入战斗日志
+      if (!next.actions) next.actions = []
+      next.actions.push({
+        type: "playCard",
+        playerId: action.playerId,
+        turn: next.turn.turnNumber,
+        payload: { message: result.message || `使用了卡牌：${cardDef.name}`, cardId: cardInstance.cardId }
+      })
+
+      // 触发 whenever
+      globalTriggerSystem.checkTriggers(next, { type: "whenever", playerId: action.playerId })
+
       return next
     }
 

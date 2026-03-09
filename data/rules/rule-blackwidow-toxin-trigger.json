@@ -1,9 +1,9 @@
 {
   "id": "rule-blackwidow-toxin-trigger",
   "name": "毒素触发",
-  "description": "敌人进入毒素所在格子时触发",
+  "description": "敌人移动到毒素格子时触发毒素伤害",
   "trigger": {
     "type": "afterMove"
   },
-  "skillCode": "function checkToxin(battle, context) { var mover = context.sourcePiece; console.log('[ToxinTrigger] Checking for:', mover.name, 'at', mover.x, mover.y); if (!mover) { return { success: false, message: '' }; } if (!battle.toxins) { battle.toxins = []; } console.log('[ToxinTrigger] Total toxins:', battle.toxins.length); for (var i = 0; i < battle.toxins.length; i++) { var toxin = battle.toxins[i]; console.log('[ToxinTrigger] Checking toxin at:', toxin.x, toxin.y, 'mover at:', mover.x, mover.y, 'toxin owner:', toxin.casterOwnerId, 'mover owner:', mover.ownerPlayerId); if (mover.x === toxin.x && mover.y === toxin.y && mover.ownerPlayerId !== toxin.casterOwnerId) { console.log('[ToxinTrigger] Enemy stepped on toxin!'); var damage = toxin.damage || 4; dealDamage(mover.instanceId, damage); return { success: true, message: mover.name + '触发了致命毒素，受到' + damage + '点伤害！' }; } } return { success: false, message: '' }; }"
+  "skillCode": "function checkToxin(battle, context) { var mover = context.sourcePiece; console.log('[ToxinTrigger] Checking for mover:', mover.name, 'at', mover.x, mover.y); var allPieces = battle.pieces; var toxinOwners = []; for (var i = 0; i < allPieces.length; i++) { var piece = allPieces[i]; if (piece.statusTags) { for (var j = 0; j < piece.statusTags.length; j++) { var tag = piece.statusTags[j]; if (tag.type === 'lethal-toxin') { toxinOwners.push({ piece: piece, toxin: tag }); } } } } console.log('[ToxinTrigger] Found', toxinOwners.length, 'toxins'); for (var k = 0; k < toxinOwners.length; k++) { var toxinOwner = toxinOwners[k]; if (mover.ownerPlayerId === toxinOwner.piece.ownerPlayerId) { continue; } var toxinX = toxinOwner.toxin.value; var toxinY = toxinOwner.toxin.extraValue; console.log('[ToxinTrigger] Checking toxin at:', toxinX, toxinY, 'mover at:', mover.x, mover.y); if (mover.x === toxinX && mover.y === toxinY) { console.log('[ToxinTrigger] Enemy stepped on toxin!'); var damage = toxinOwner.toxin.intensity || 4; dealDamage(toxinOwner.piece, mover, damage, 'toxin', battle); return { success: true, message: mover.name + '触发了致命毒素，受到' + damage + '点伤害！' }; } } return { success: false, message: '' }; }"
 }

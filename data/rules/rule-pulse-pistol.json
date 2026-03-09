@@ -1,0 +1,7 @@
+{
+  "id": "rule-pulse-pistol",
+  "name": "脉冲手枪规则",
+  "description": "敌人释放技能前，对范围内随机敌人造成伤害",
+  "trigger": { "type": "beforeSkillUse" },
+  "effect": { "type": "triggerSkill", "skillId": "pulse-pistol", "message": "" }
+}

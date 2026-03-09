@@ -51,6 +51,10 @@ export default function TrainingPage() {
   const [selectedPieceId, setSelectedPieceId] = useState<string | undefined>(undefined)
   const [isSelectingMoveTarget, setIsSelectingMoveTarget] = useState(false)
   const [isSelectingSkillTarget, setIsSelectingSkillTarget] = useState(false)
+  const [isSelectingOption, setIsSelectingOption] = useState(false)
+  const [optionSelectionTitle, setOptionSelectionTitle] = useState<string>('请选择')
+  const [optionSelectionOptions, setOptionSelectionOptions] = useState<{ label: string; value: any; description?: string }[]>([])
+  const [pendingOptionAction, setPendingOptionAction] = useState<BattleAction | null>(null)
   const [selectedSkillId, setSelectedSkillId] = useState<string | undefined>(undefined)
   const [selectedSkillType, setSelectedSkillType] = useState<"normal" | "super" | undefined>(undefined)
   const [targetSelectionType, setTargetSelectionType] = useState<'piece' | 'grid'>('piece')
@@ -146,6 +150,14 @@ export default function TrainingPage() {
           setTargetSelectionFilter(data.filter || 'enemy')
           return
         }
+        // 检查是否是需要选项选择的情况
+        if (data.needsOptionSelection) {
+          setIsSelectingOption(true)
+          setOptionSelectionTitle(data.title || '请选择')
+          setOptionSelectionOptions(data.options || [])
+          setPendingOptionAction(action)
+          return
+        }
         toast.error(data.error || "操作失败")
         return
       }
@@ -154,6 +166,36 @@ export default function TrainingPage() {
       toast.error(err instanceof Error ? err.message : "未知错误")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 处理选项选择器的选择结果
+  async function handleOptionSelect(value: any | null) {
+    if (value === null) {
+      setIsSelectingOption(false)
+      setPendingOptionAction(null)
+      return
+    }
+    if (!pendingOptionAction) return
+    try {
+      setLoading(true)
+      const res = await fetch("/api/training", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: { ...pendingOptionAction, selectedOption: value }, battleState: battle }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || "操作失败")
+        return
+      }
+      setBattle(data as BattleState)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "未知错误")
+    } finally {
+      setLoading(false)
+      setIsSelectingOption(false)
+      setPendingOptionAction(null)
     }
   }
 
@@ -522,6 +564,32 @@ export default function TrainingPage() {
                           取消技能
                         </Button>
                       </>
+                    ) : isSelectingOption ? (
+                      <>
+                        <p className="text-xs text-muted-foreground text-center">
+                          {optionSelectionTitle}
+                        </p>
+                        <div className="grid grid-cols-5 gap-1">
+                          {optionSelectionOptions.map((opt, idx) => (
+                            <Button
+                              key={idx}
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOptionSelect(opt.value)}
+                            >
+                              {opt.label}
+                            </Button>
+                          ))}
+                        </div>
+                        <Button
+                          className="w-full"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleOptionSelect(null)}
+                        >
+                          取消释放
+                        </Button>
+                      </>
                     ) : (
                       <Button
                         className="w-full"
@@ -560,13 +628,19 @@ export default function TrainingPage() {
                             const isSuper = skillType === "super"
                             const actionType = isSuper ? "useChargeSkill" : "useBasicSkill"
                             
+                            const pieceSkillState = selectedPiece.skills?.find(s => s.skillId === skillId)
+                            const currentCooldown = pieceSkillState?.currentCooldown || 0
+                            const skillCooldown = skill.cooldownTurns || 0
+                            const cooldownText = currentCooldown > 0 ? `冷却${currentCooldown}` : ''
+                            const cooldownDisplay = skillCooldown > 0 ? `${skillCooldown}/${currentCooldown}` : ''
+                            
                             return (
                               <Button
                                 key={skillId}
                                 className="w-full"
                                 variant="outline"
                                 size="sm"
-                                disabled={isSelectingMoveTarget}
+                                disabled={isSelectingMoveTarget || currentCooldown > 0}
                                 onClick={() => {
                                   if (!selectedPiece) return
                                   sendBattleAction({
@@ -578,7 +652,7 @@ export default function TrainingPage() {
                                 }}
                               >
                                 <Zap className="mr-2 h-4 w-4" />
-                                {skillName} ({isSuper ? `充能 ${chargeCost || 0}点` : "普通"}) - {actionPointCost || 0}AP
+                                {skillName} ({isSuper ? `充能 ${chargeCost || 0}点` : "普通"}) - {actionPointCost || 0}AP {cooldownDisplay ? ` (${cooldownDisplay})` : ''}
                               </Button>
                             )
                           })
@@ -774,6 +848,40 @@ export default function TrainingPage() {
               </CardContent>
             </Card>
 
+            {/* 手牌区 */}
+            {(() => {
+              const myMeta = battle.players.find(p => p.playerId === currentPlayerId)
+              const hand = myMeta?.hand ?? []
+              const canPlay = isMyTurn && battle.turn.phase === "action"
+              return (
+                <Card className="bg-zinc-900/50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">手牌 ({hand.length}/10)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {hand.length === 0 ? (
+                      <div className="text-xs text-zinc-500 italic">
+                        {canPlay ? "暂无手牌" : "等待回合开始..."}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {hand.map((card) => (
+                          <button
+                            key={card.instanceId}
+                            disabled={!canPlay}
+                            onClick={() => sendBattleAction({ type: "playCard", playerId: currentPlayerId, cardInstanceId: card.instanceId })}
+                            className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {card.cardId}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })()}
+
             {/* 战斗日志 */}
             <Card className="bg-zinc-900/50">
               <CardHeader className="pb-2">
@@ -958,13 +1066,13 @@ export default function TrainingPage() {
                                     <div className="flex items-center justify-between text-xs">
                                       <span className="text-zinc-500">冷却:</span>
                                       <span className={`text-xs ${
-                                        skillPreview.currentCooldown && skillPreview.currentCooldown > 0
+                                        currentCooldown > 0
                                           ? "text-red-400"
                                           : "text-green-400"
                                       }`}>
-                                        {skillPreview.currentCooldown && skillPreview.currentCooldown > 0
-                                          ? `${skillPreview.currentCooldown} 回合`
-                                          : "0 回合"}
+                                        {skillDef.cooldownTurns > 0
+                                          ? `${skillDef.cooldownTurns}/${currentCooldown} 回合`
+                                          : `${currentCooldown} 回合`}
                                       </span>
                                     </div>
                                     {skillDef.type === "super" && skillPreview.chargeCost && (

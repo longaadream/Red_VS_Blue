@@ -65,9 +65,9 @@ export class RoomStore {
   // 保存单个房间到存储
   private saveRoom(room: Room): void {
     if (!this.storagePath) return
-    
+
     const filePath = path.join(this.storagePath, `${room.id}.json`)
-    
+
     try {
       const roomWithValidPlayers = {
         ...room,
@@ -76,11 +76,15 @@ export class RoomStore {
           hasSelectedPieces: player.hasSelectedPieces === true || (player.selectedPieces && player.selectedPieces.length > 0)
         }))
       }
-      
-      const roomData = JSON.stringify(roomWithValidPlayers, null, 2)
+
+      // Use a replacer to strip functions (rule.effect etc.) so JSON.stringify never throws
+      const roomData = JSON.stringify(roomWithValidPlayers, (_key, value) => {
+        if (typeof value === 'function') return undefined
+        return value
+      }, 2)
       fs.writeFileSync(filePath, roomData)
     } catch (error) {
-      // console.error(`Error saving room ${room.id}:`, error)
+      console.error(`Error saving room ${room.id}:`, error)
     }
   }
 
@@ -187,9 +191,14 @@ export class RoomStore {
   // 获取房间
   getRoom(roomId: string, loadFromStorage: boolean = true): Room | undefined {
     const trimmedRoomId = roomId.trim()
-    
-    this.syncWithStorage()
-    
+
+    // Only sync from disk if the room isn't already in memory.
+    // Syncing on every call clears in-memory state with (potentially stale)
+    // disk data, which can lose battle state when saveRoom fails silently.
+    if (!this.rooms.has(trimmedRoomId)) {
+      this.syncWithStorage()
+    }
+
     let room = this.rooms.get(trimmedRoomId)
     
     if (room) {
@@ -284,15 +293,18 @@ export class RoomStore {
   // 设置房间
   setRoom(roomId: string, room: Room): void {
     const trimmedRoomId = roomId.trim()
-    
+
     const roomWithCorrectId = {
       ...room,
       id: trimmedRoomId
     }
-    
+
     this.saveRoom(roomWithCorrectId)
-    
     this.syncWithStorage()
+    // Always ensure in-memory reflects the intended state, even if saveRoom
+    // silently failed (e.g. serialization error) and syncWithStorage loaded
+    // stale data from disk.
+    this.rooms.set(trimmedRoomId, roomWithCorrectId)
   }
 
   // 删除房间 - 强制立即删除，优先级最高

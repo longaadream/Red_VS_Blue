@@ -245,7 +245,7 @@
   - **TriggerContext**：触发上下文，传递事件相关信息
 - **关键功能**：
   - **规则加载**：从JSON文件加载规则定义
-  - **触发检查**：检查事件是否满足规则条件
+  - **触发检查**：检查事件是否满足规则条件（**全场扫描**：每次触发事件都会遍历场上所有棋子的规则，而不仅限于事件发起者，详见条目 #45）
   - **效果执行**：执行规则关联的技能代码
   - **冷却管理**：管理规则的冷却时间
 
@@ -325,7 +325,7 @@
 | `beforePieceSummoned` | 即将召唤棋子前 | — |
 | `beginTurn` | 回合开始时 | `turnNumber`, `playerId` |
 | `endTurn` | 回合结束时 | `turnNumber`, `playerId` |
-| `afterMove` | 移动后 | `playerId` |
+| `afterMove` | 移动后（**全场所有棋子的规则都会被检查**） | `playerId` |
 | `beforeMove` | 即将移动前（可阻止） | — |
 | `afterStatusApplied` | 状态效果被施加后 | `statusId`, `amount` |
 | `afterStatusRemoved` | 状态效果被移除后 | `statusId` |
@@ -1492,6 +1492,23 @@ function calculatePreview(piece, skillDef) {
       - 新增"暗影刺客"完整角色创建示例（7 个文件的完整实现）
       - 保留并整合原有训练营使用教程和地图设计教程
 
+45. **触发系统广义化：全场扫描所有棋子规则**：
+    - **背景**：原 `checkTriggers` 方法对 `afterMove` 事件已实现"全场扫描所有棋子规则"，但其他所有事件类型（含 `afterSkillUsed`、`afterDamageTaken`、`beginTurn` 等）仍只检查 `context.sourcePiece` 自身的规则，导致"甲移动时乙的规则触发"等跨棋子被动效果无法实现
+    - **修改文件**：`lib/game/triggers.ts`
+    - **修改位置**：`checkTriggers` 方法的棋子规则检查段（原约 72 行的 if/else 分支）
+    - **变更内容**：
+      - 移除 `if (context.type === 'afterMove') { ... } else if (context.sourcePiece ...) { ... }` 分支结构
+      - 统一替换为：只要 `battle.pieces` 存在，就遍历**所有棋子**，对每个棋子的规则进行触发类型匹配检查
+      - effect 重载（默认函数检测 + `loadRuleById` 重注入）逻辑保留，现对所有事件类型生效
+    - **效果**：
+      - `afterSkillUsed`：任意角色释放技能后，全场所有棋子的 `afterSkillUsed` 规则都会被检查
+      - `afterMove`：同上（行为与之前一致，现由统一逻辑处理）
+      - `afterDamageTaken`、`beginTurn`、`endTurn` 等所有触发类型同理
+      - 规则代码内仍可通过 `context.sourcePiece` 判断"是谁触发了此事件"，从而只在特定条件下生效
+    - **典型用例**：
+      - 棋子A释放技能后，棋子B身上的"队友使用技能后给我回血"规则自动触发
+      - 棋子A移动后，棋子B身上的毒素/印记效果规则自动检查是否需要结算
+
 44. **数据文件清理：删除无效 JSON + 蓝方三角色**：
     - **删除蓝方棋子**（3 个）：`blue-warrior.json`、`blue-archer.json`、`blue-mage.json`
     - **删除孤立/测试技能**（6 个）：
@@ -1513,3 +1530,31 @@ function calculatePreview(piece, skillDef) {
       - `freeze-prevent-attack.json` → `rule-freeze-prevent-attack.json`
     - **更新 `data/pieces/jaina.json`**：从 `rules` 数组中移除 `"rule-blizzard-effect"`（对应文件已删除；暴风雪规则现由 `blizzard` 技能自行调用 `addRuleById('rule-blizzard-active')` 动态添加）
     - **`turn.ts` 导入**：顶部新增 `import { dealDamage, healDamage } from "./skills"`
+
+46. **手牌卡牌系统（Hand Card System）**：
+    - **背景**：为游戏引入可配置手牌机制，使角色可以通过技能给玩家发牌，玩家主动打出或被动触发卡牌效果
+    - **数据文件**：`data/cards/*.json`，每张卡定义 `id`、`name`、`description`、`type`、`trigger?`、`code`、`icon?`
+    - **卡牌类型**：
+      - `active`：玩家行动阶段手动打出，使用后弃置
+      - `reactive`：监听指定 `trigger.type` 事件，条件满足时自动触发并弃置
+    - **核心修改文件**：
+      - **`lib/game/battle-types.ts`**：新增 `CardInstance` 接口；`PlayerTurnMeta` 增加 `hand: CardInstance[]`、`discardPile: string[]`；`BattleState` 增加 `gameStartFired?: boolean`；`BattleAction` 联合类型增加 `playCard` 动作
+      - **`lib/game/turn.ts`**：同步以上类型变更（本地重复定义）；`beginPhase`（start→action）时触发 `gameStart` 事件（只触发一次，由 `gameStartFired` 标志保护）；新增 `case "playCard"` 处理分支（验证手牌 → 执行 → 弃置 → 触发 `whenever`）
+      - **`lib/game/skills.ts`**：
+        - 新增 `CardDefinition` 接口（exported）
+        - 新增 `cardCache: Map<string, CardDefinition>`
+        - 新增 `loadCardById(cardId)` — 文件缓存，同 `loadRuleById` 模式
+        - 新增 `createCardEffectFunctions(battle, playerId, context)` — 构建卡牌执行环境（不含 `sourcePiece`，以 `playerId` 识别阵营）
+        - 新增 `executeCardFunction(cardDef, playerId, battle, ...)` — 以 `executeCard(context)` 为入口通过 eval 执行
+        - `skillEnvironment` 对象及 `fullSkillCode` eval字符串新增 `addCardToHand`、`discardCard`、`getHand` 三个函数（triggerSkill路径同步增加）
+      - **`lib/game/triggers.ts`**：新增 `"gameStart"` 到 `TriggerType`；`checkTriggers` 新增第3段：遍历所有玩家手牌，找到匹配 `type` 的 reactive 卡自动执行并弃置
+      - **`lib/game/battle-setup.ts`**：两个 `PlayerTurnMeta` 条目增加 `hand: [], discardPile: []`
+    - **手牌获取方式**：所有手牌必须通过 `addCardToHand(cardId, targetPlayerId?)` 加入，不会自动发牌
+    - **手牌上限**：10张；超出时自动弃置并记录日志
+    - **对手手牌**：不在UI显示
+    - **AP消耗**：在 `code` 里用 `if` 语句手动判断，无专用字段
+    - **UI修改**：
+      - `app/turn-debug/page.tsx`：手牌区显示于棋子区上方，行动阶段可点击主动牌
+      - `app/battle/[roomId]/page.tsx`：手牌区显示于侧边栏（投降按钮上方），行动阶段可点击
+    - **示例文件**：`data/cards/sample-active-card.json`（急救包）、`data/cards/sample-reactive-card.json`（反击意志）
+
