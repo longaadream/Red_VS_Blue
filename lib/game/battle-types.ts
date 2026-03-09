@@ -18,6 +18,8 @@ export interface CardInstance {
   instanceId: string
   /** 拥有者玩家 ID */
   ownerPlayerId: string
+  /** 卡牌显示名称（从 CardDefinition.name 复制，避免前端重新加载定义文件） */
+  name?: string
 }
 
 export interface PlayerTurnMeta {

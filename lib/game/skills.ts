@@ -141,7 +141,8 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
         return false
       }
       const instanceId = `ci-${cardId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-      player.hand.push({ cardId, instanceId, ownerPlayerId: pid })
+      const cardName = loadCardById(cardId)?.name
+      player.hand.push({ cardId, instanceId, ownerPlayerId: pid, ...(cardName ? { name: cardName } : {}) })
       return true
     },
 
@@ -540,7 +541,8 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                         return false
                       }
                       const instanceId = `ci-${cardId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
-                      player.hand.push({ cardId, instanceId, ownerPlayerId: pid })
+                      const cardName = loadCardById(cardId)?.name
+                      player.hand.push({ cardId, instanceId, ownerPlayerId: pid, ...(cardName ? { name: cardName } : {}) })
                       return true
                     },
                     discardCard: (instanceId: string) => {

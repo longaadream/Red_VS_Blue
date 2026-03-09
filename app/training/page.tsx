@@ -872,7 +872,7 @@ export default function TrainingPage() {
                             onClick={() => sendBattleAction({ type: "playCard", playerId: currentPlayerId, cardInstanceId: card.instanceId })}
                             className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            {card.cardId}
+                            {card.name || card.cardId}
                           </button>
                         ))}
                       </div>

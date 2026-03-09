@@ -75,6 +75,7 @@ export interface CardInstance {
   cardId: string
   instanceId: string
   ownerPlayerId: string
+  name?: string
 }
 
 export interface PlayerTurnMeta {
