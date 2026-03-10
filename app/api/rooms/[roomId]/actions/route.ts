@@ -15,6 +15,7 @@ function writeLog(message: string) {
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getPieceById, getAllPieces } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
+import { applyBattleAction } from "@/lib/game/turn"
 import type { PieceTemplate } from "@/lib/game/piece"
 import { getRoomStore, type Room } from "@/lib/game/room-store"
 
@@ -29,7 +30,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     body = {}
   }
 
-  const { roomId } = await params
+  const { roomId: rawRoomId } = await params
+  const roomId = rawRoomId.trim().toLowerCase()  // 强制小写
   const { playerId, playerName, action, pieces } = (body as { 
     playerId?: string
     playerName?: string
@@ -47,9 +49,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   if (action === "join") {
-    const trimmedPlayerId = playerId?.trim()
+    const normalizedPlayerId = playerId?.trim().toLowerCase()
     const trimmedPlayerName = playerName?.trim()
-    if (!trimmedPlayerId) {
+    if (!normalizedPlayerId) {
       console.log('Missing playerId:', { playerId })
       return NextResponse.json({ error: "playerId is required" }, { status: 400 })
     }
@@ -75,24 +77,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     }
 
     const existing = latestRoom.players.find(
-      (p) => p.id === trimmedPlayerId,
+      (p) => p.id.toLowerCase() === normalizedPlayerId,
     )
 
     if (!existing) {
       const player = {
-        id: trimmedPlayerId,
-        name: trimmedPlayerName || `Player ${trimmedPlayerId.slice(0, 8)}`,
+        id: normalizedPlayerId,
+        name: trimmedPlayerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
       }
       latestRoom.players.push(player)
       
       // 如果房间还没有房主，将当前加入的玩家设置为房主
       if (!latestRoom.hostId) {
-        latestRoom.hostId = trimmedPlayerId
+        latestRoom.hostId = normalizedPlayerId
       }
-      console.log('Player joined room:', { roomId, playerId: trimmedPlayerId, playerName: trimmedPlayerName, totalPlayers: latestRoom.players.length })
+      console.log('Player joined room:', { roomId, playerId: normalizedPlayerId, playerName: trimmedPlayerName, totalPlayers: latestRoom.players.length })
     } else {
-      console.log('Player already in room:', { roomId, playerId: trimmedPlayerId })
+      console.log('Player already in room:', { roomId, playerId: normalizedPlayerId })
     }
 
     roomStore.setRoom(roomId, latestRoom)
@@ -110,15 +112,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     console.log('Claim faction request received:', { roomId, playerId, playerName })
 
-    const trimmedPlayerId = playerId.trim()
+    const normalizedPlayerId = playerId.trim().toLowerCase()
     let existingPlayer = latestRoom.players.find(
-      (p) => p.id.trim() === trimmedPlayerId
+      (p) => p.id.toLowerCase() === normalizedPlayerId
     )
 
     if (!existingPlayer) {
       const newPlayer = {
-        id: trimmedPlayerId,
-        name: playerName?.trim() || `Player ${trimmedPlayerId.slice(0, 8)}`,
+        id: normalizedPlayerId,
+        name: playerName?.trim() || `Player ${normalizedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
       }
       latestRoom.players.push(newPlayer)
@@ -187,16 +189,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       playersCount: latestRoom.players.length
     })
 
-    const trimmedPlayerId = playerId.trim()
-    console.log('Processing player:', { originalPlayerId: playerId, trimmedPlayerId })
+    const normalizedPlayerId = playerId.trim().toLowerCase()
+    console.log('Processing player:', { originalPlayerId: playerId, normalizedPlayerId })
     
     let targetPlayer = latestRoom.players.find(
-      (p) => p.id.trim() === trimmedPlayerId
+      (p) => p.id.toLowerCase() === normalizedPlayerId
     )
 
     // 如果玩家不存在，创建新玩家
     if (!targetPlayer) {
-      console.log('Player not found, creating new player:', trimmedPlayerId)
+      console.log('Player not found, creating new player:', normalizedPlayerId)
       // 为新玩家分配阵营
       const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
       let faction: "red" | "blue" = "red"
@@ -204,8 +206,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         faction = assignedFactions[0] === "red" ? "blue" : "red"
       }
       targetPlayer = {
-        id: trimmedPlayerId,
-        name: playerName?.trim() || `Player ${trimmedPlayerId.slice(0, 8)}`,
+        id: normalizedPlayerId,
+        name: playerName?.trim() || `Player ${normalizedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
         faction: faction,
         hasSelectedPieces: true,
@@ -237,11 +239,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     // 强制保存房间状态
     console.log('=== FORCE SAVING ROOM STATE ===')
-    const trimmedRoomId = roomId.trim()
-    roomStore.setRoom(trimmedRoomId, latestRoom)
-    
+    roomStore.setRoom(roomId, latestRoom)
+
     // 立即验证保存结果
-    const savedRoom = roomStore.getRoom(trimmedRoomId)
+    const savedRoom = roomStore.getRoom(roomId)
     if (savedRoom) {
       console.log('Room saved successfully:', {
         id: savedRoom.id,
@@ -332,15 +333,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         
         if (battle) {
           console.log('Battle created successfully:', battle)
+          writeLog('[select-pieces] Battle created, calling beginPhase to trigger gameStart rules')
           
-          // 更新房间状态为in-progress
-          latestRoom.status = "in-progress"
-          latestRoom.currentTurnIndex = 0
-          latestRoom.battleState = battle
+          try {
+            // 调用 beginPhase 触发 gameStart 规则（给蓝方发放幸运币）
+            writeLog('[select-pieces] Calling applyBattleAction with beginPhase...')
+            const battleWithRules = applyBattleAction(battle, { type: "beginPhase" })
+            writeLog('[select-pieces] beginPhase completed, players chargePoints: ' + JSON.stringify(battleWithRules.players.map(p => ({ playerId: p.playerId, chargePoints: p.chargePoints }))))
+            
+            // 更新房间状态为in-progress
+            latestRoom.status = "in-progress"
+            latestRoom.currentTurnIndex = 0
+            latestRoom.battleState = battleWithRules
+          } catch (beginPhaseError) {
+            writeLog('[select-pieces] ERROR in beginPhase: ' + (beginPhaseError instanceof Error ? beginPhaseError.message : 'Unknown error'))
+            console.error('Error in beginPhase:', beginPhaseError)
+            // 即使 beginPhase 失败，也继续保存战斗状态
+            latestRoom.status = "in-progress"
+            latestRoom.currentTurnIndex = 0
+            latestRoom.battleState = battle
+          }
           
           // 保存更新后的房间状态
-          roomStore.setRoom(trimmedRoomId, latestRoom)
-          
+          roomStore.setRoom(roomId, latestRoom)
+
           console.log('Game started successfully on server')
         } else {
           console.error('Failed to create battle')
@@ -360,9 +376,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     // 强制返回成功响应，确保前端立即更新
     console.log('=== RETURNING SUCCESS RESPONSE ===')
-    
+
     // 如果游戏已经自动启动，返回更新后的房间状态
-    const finalRoom = roomStore.getRoom(trimmedRoomId)
+    const finalRoom = roomStore.getRoom(roomId)
     
     return NextResponse.json({ 
       success: true, 
@@ -526,10 +542,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     latestRoom.status = "in-progress"
     latestRoom.currentTurnIndex = 0
     latestRoom.battleState = battle
-    const trimmedRoomId = roomId.trim()
-    roomStore.setRoom(trimmedRoomId, latestRoom)
+    roomStore.setRoom(roomId, latestRoom)
 
-    console.log('Game started successfully for room:', trimmedRoomId)
+    console.log('Game started successfully for room:', roomId)
     return NextResponse.json({ success: true, message: "Game started" })
   }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getPieceById } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
-import roomStore, { type Room } from "@/lib/game/room-store"
+import { roomStore, type Room } from "@/lib/game/room-store"
 
 export async function POST(req: NextRequest) {
   let body: unknown
@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Must select 1 red and 1 blue piece" }, { status: 400 })
   }
 
-  const roomId = crypto.randomUUID()
-  const playerIds = [playerId.trim() + "-red", playerId.trim() + "-blue"]
+  const roomId = crypto.randomUUID().toLowerCase()
+  const playerIds = [playerId.trim().toLowerCase() + "-red", playerId.trim().toLowerCase() + "-blue"]
 
   // 获取完整的PieceTemplate对象，并根据玩家选择覆盖faction属性
   const pieceTemplates = pieces.map(piece => {

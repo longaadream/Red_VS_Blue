@@ -1,0 +1,8 @@
+{
+  "id": "holy-smite",
+  "name": "圣光惩击",
+  "description": "消耗1AP，对敌方生命值最低的棋子造成5点真实伤害",
+  "type": "active",
+  "icon": "⚡",
+  "code": "function executeCard(context) { const battle = context.battle; const playerId = context.playerId; const player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player || player.actionPoints < 1) { return { success: false, message: 'AP不足' }; } const enemies = battle.pieces.filter(function(p) { return p.faction !== player.faction && p.currentHp > 0; }); if (enemies.length === 0) { return { success: false, message: '没有敌人' }; } const target = enemies.sort(function(a, b) { return a.currentHp - b.currentHp; })[0]; const source = battle.pieces.find(function(p) { return p.ownerPlayerId === playerId && p.currentHp > 0; }) || target; player.actionPoints -= 1; const result = dealDamage(source, target, 5, 'true', battle, 'holy-smite'); return { success: true, message: '圣光惩击对' + target.name + '造成' + result.damage + '点真实伤害' }; }"
+}

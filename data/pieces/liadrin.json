@@ -1,0 +1,29 @@
+{
+  "id": "liadrin",
+  "name": "莉亚德琳",
+  "faction": "blue",
+  "description": "血骑士的领袖，能够萃取圣盾转化为圣光手牌，驾驭纳鲁的力量为团队带来毁灭性的爆发",
+  "rarity": "epic",
+  "image": "liadrin.jpg",
+  "stats": {
+    "maxHp": 14,
+    "attack": 4,
+    "defense": 1,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "light-extraction",
+      "level": 1
+    },
+    {
+      "skillId": "blood-echo",
+      "level": 1
+    },
+    {
+      "skillId": "muru-lament",
+      "level": 1
+    }
+  ],
+  "isDefault": false
+}

@@ -1,0 +1,9 @@
+{
+  "id": "rule-starfall-turn-start",
+  "name": "群星陨落回合开始",
+  "description": "星辰领域持续期间，每回合对2个随机敌人造成伤害",
+  "trigger": { "type": "turnStart" },
+  "condition": { "statusId": "starfall-aura" },
+  "effect": { "type": "triggerSkill", "skillId": "starfall-damage", "message": "群星陨落造成伤害" },
+  "limits": { "maxUsesPerTurn": 1 }
+}

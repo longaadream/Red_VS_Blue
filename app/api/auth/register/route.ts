@@ -21,7 +21,7 @@ interface RegisterResponse {
 }
 
 function generateUserId(): string {
-  return 'user_' + Date.now() + '_' + Math.floor(Math.random() * 10000)
+  return ('user_' + Date.now() + '_' + Math.floor(Math.random() * 10000)).toLowerCase()
 }
 
 export async function POST(request: NextRequest) {

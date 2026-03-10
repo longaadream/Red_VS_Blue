@@ -1,0 +1,15 @@
+{
+  "id": "light-extraction",
+  "name": "圣光萃取",
+  "description": "选择一个拥有圣盾的友方单位，移除其圣盾，为己方阵营添加2张圣光手牌（圣光惩击和圣光治疗）",
+  "icon": "💧",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const target = selectTarget({ type: 'piece', range: 99, filter: 'ally' }); if (!target || target.needsTargetSelection) { return target; } const hasDivineShield = target.statusTags && target.statusTags.some(tag => tag.id === 'divine-shield'); if (!hasDivineShield) { return { success: false, message: '目标没有圣盾' }; } removeStatusEffectById(target.instanceId, 'divine-shield'); const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); if (player) { addCardToHand('holy-smite', player.playerId); addCardToHand('holy-heal', player.playerId); } return { message: caster.name + '萃取了' + target.name + '的圣盾，获得2张圣光手牌', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '选择一个有圣盾的友方，移除圣盾，获得圣光惩击和圣光治疗各1张', expectedValues: {} }; }",
+  "range": "single"
+}

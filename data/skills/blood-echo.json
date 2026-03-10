@@ -1,0 +1,13 @@
+{
+  "id": "blood-echo",
+  "name": "血之回响",
+  "description": "被动：每当友方单位失去圣盾时，为己方阵营添加1张圣光充能手牌",
+  "icon": "🔁",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { return { success: true }; }"
+}

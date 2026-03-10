@@ -1,0 +1,9 @@
+{
+  "id": "rule-starfall-card-used",
+  "name": "群星陨落手牌协同",
+  "description": "星辰领域期间使用圣光手牌时，额外造成伤害",
+  "trigger": { "type": "cardUsed", "cardType": "holy" },
+  "condition": { "statusId": "starfall-aura" },
+  "effect": { "type": "triggerSkill", "skillId": "starfall-synergy", "message": "群星陨落协同攻击" },
+  "limits": { "maxUsesPerTurn": 999 }
+}

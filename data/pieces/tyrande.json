@@ -1,0 +1,29 @@
+{
+  "id": "tyrande",
+  "name": "泰兰德",
+  "faction": "blue",
+  "description": "月之女祭司，艾露恩的高阶祭司，能够召唤星辰之力并强化圣光手牌的效果",
+  "rarity": "epic",
+  "image": "tyrande.jpg",
+  "stats": {
+    "maxHp": 13,
+    "attack": 4,
+    "defense": 1,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "elune-blessing",
+      "level": 1
+    },
+    {
+      "skillId": "starfall",
+      "level": 1
+    },
+    {
+      "skillId": "elune-guidance",
+      "level": 1
+    }
+  ],
+  "isDefault": false
+}

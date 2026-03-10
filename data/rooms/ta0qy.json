@@ -1,0 +1,1601 @@
+{
+  "id": "ta0qy",
+  "name": "Longaadream 的 1v1 房间",
+  "status": "in-progress",
+  "createdAt": 1773123823596,
+  "maxPlayers": 2,
+  "players": [
+    {
+      "id": "user_1771361118594_8536",
+      "name": "Longaadream",
+      "joinedAt": 1773123823706,
+      "hasSelectedPieces": true,
+      "selectedPieces": [
+        {
+          "templateId": "ana",
+          "faction": "blue"
+        }
+      ],
+      "faction": "blue"
+    },
+    {
+      "id": "user_1771360858632_9522",
+      "name": "admin",
+      "joinedAt": 1773123831322,
+      "hasSelectedPieces": true,
+      "selectedPieces": [
+        {
+          "templateId": "reaper",
+          "faction": "red"
+        }
+      ],
+      "faction": "red"
+    }
+  ],
+  "hostId": "user_1771361118594_8536",
+  "mapId": "arena-8x6",
+  "visibility": "public",
+  "currentTurnIndex": 0,
+  "actions": [],
+  "battleState": {
+    "map": {
+      "id": "arena-8x6",
+      "name": "小型竞技场",
+      "width": 8,
+      "height": 6,
+      "tiles": [
+        {
+          "id": "arena-8x6-0-0",
+          "x": 0,
+          "y": 0,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-1-0",
+          "x": 1,
+          "y": 0,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-2-0",
+          "x": 2,
+          "y": 0,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-3-0",
+          "x": 3,
+          "y": 0,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-4-0",
+          "x": 4,
+          "y": 0,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-5-0",
+          "x": 5,
+          "y": 0,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-6-0",
+          "x": 6,
+          "y": 0,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-7-0",
+          "x": 7,
+          "y": 0,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-0-1",
+          "x": 0,
+          "y": 1,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-1-1",
+          "x": 1,
+          "y": 1,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-2-1",
+          "x": 2,
+          "y": 1,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-3-1",
+          "x": 3,
+          "y": 1,
+          "props": {
+            "walkable": true,
+            "bulletPassable": false,
+            "type": "cover"
+          }
+        },
+        {
+          "id": "arena-8x6-4-1",
+          "x": 4,
+          "y": 1,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-5-1",
+          "x": 5,
+          "y": 1,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-6-1",
+          "x": 6,
+          "y": 1,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "spawn"
+          }
+        },
+        {
+          "id": "arena-8x6-7-1",
+          "x": 7,
+          "y": 1,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-0-2",
+          "x": 0,
+          "y": 2,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-1-2",
+          "x": 1,
+          "y": 2,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-2-2",
+          "x": 2,
+          "y": 2,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-3-2",
+          "x": 3,
+          "y": 2,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-4-2",
+          "x": 4,
+          "y": 2,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-5-2",
+          "x": 5,
+          "y": 2,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-6-2",
+          "x": 6,
+          "y": 2,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-7-2",
+          "x": 7,
+          "y": 2,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-0-3",
+          "x": 0,
+          "y": 3,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-1-3",
+          "x": 1,
+          "y": 3,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "spawn"
+          }
+        },
+        {
+          "id": "arena-8x6-2-3",
+          "x": 2,
+          "y": 3,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-3-3",
+          "x": 3,
+          "y": 3,
+          "props": {
+            "walkable": true,
+            "bulletPassable": false,
+            "type": "cover"
+          }
+        },
+        {
+          "id": "arena-8x6-4-3",
+          "x": 4,
+          "y": 3,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-5-3",
+          "x": 5,
+          "y": 3,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-6-3",
+          "x": 6,
+          "y": 3,
+          "props": {
+            "walkable": false,
+            "bulletPassable": true,
+            "type": "hole"
+          }
+        },
+        {
+          "id": "arena-8x6-7-3",
+          "x": 7,
+          "y": 3,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-0-4",
+          "x": 0,
+          "y": 4,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-1-4",
+          "x": 1,
+          "y": 4,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-2-4",
+          "x": 2,
+          "y": 4,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-3-4",
+          "x": 3,
+          "y": 4,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-4-4",
+          "x": 4,
+          "y": 4,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-5-4",
+          "x": 5,
+          "y": 4,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-6-4",
+          "x": 6,
+          "y": 4,
+          "props": {
+            "walkable": true,
+            "bulletPassable": true,
+            "type": "floor"
+          }
+        },
+        {
+          "id": "arena-8x6-7-4",
+          "x": 7,
+          "y": 4,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-0-5",
+          "x": 0,
+          "y": 5,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-1-5",
+          "x": 1,
+          "y": 5,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-2-5",
+          "x": 2,
+          "y": 5,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-3-5",
+          "x": 3,
+          "y": 5,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-4-5",
+          "x": 4,
+          "y": 5,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-5-5",
+          "x": 5,
+          "y": 5,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-6-5",
+          "x": 6,
+          "y": 5,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        },
+        {
+          "id": "arena-8x6-7-5",
+          "x": 7,
+          "y": 5,
+          "props": {
+            "walkable": false,
+            "bulletPassable": false,
+            "type": "wall"
+          }
+        }
+      ]
+    },
+    "pieces": [
+      {
+        "instanceId": "user_1771360858632_9522-1",
+        "templateId": "reaper",
+        "name": "死神",
+        "ownerPlayerId": "user_1771360858632_9522",
+        "faction": "red",
+        "currentHp": 11,
+        "maxHp": 11,
+        "attack": 4,
+        "defense": 0,
+        "moveRange": 4,
+        "x": 5,
+        "y": 2,
+        "skills": [
+          {
+            "skillId": "hellfire-shotgun",
+            "currentCooldown": 0,
+            "currentCharges": 0,
+            "unlocked": true,
+            "usesRemaining": -1
+          },
+          {
+            "skillId": "shadow-step",
+            "currentCooldown": 0,
+            "currentCharges": 0,
+            "unlocked": true,
+            "usesRemaining": -1
+          },
+          {
+            "skillId": "death-blossom",
+            "currentCooldown": 0,
+            "currentCharges": 0,
+            "unlocked": true,
+            "usesRemaining": -1
+          },
+          {
+            "skillId": "reap",
+            "currentCooldown": 0,
+            "currentCharges": 0,
+            "unlocked": true,
+            "usesRemaining": -1
+          }
+        ],
+        "rules": [
+          {
+            "id": "rule-reap",
+            "name": "收割",
+            "description": "（被动）造成伤害时，对自己造成伤害量50%的治疗",
+            "trigger": {
+              "type": "afterDamageDealt"
+            }
+          }
+        ],
+        "buffs": [],
+        "debuffs": [],
+        "ruleTags": [],
+        "statusTags": []
+      },
+      {
+        "instanceId": "user_1771361118594_8536-1",
+        "templateId": "ana",
+        "name": "安娜",
+        "ownerPlayerId": "user_1771361118594_8536",
+        "faction": "blue",
+        "currentHp": 9,
+        "maxHp": 9,
+        "attack": 2,
+        "defense": 1,
+        "moveRange": 3,
+        "x": 6,
+        "y": 2,
+        "skills": [
+          {
+            "skillId": "biotic-grenade",
+            "currentCooldown": 0,
+            "currentCharges": 0,
+            "unlocked": true,
+            "usesRemaining": -1
+          },
+          {
+            "skillId": "sleep-dart",
+            "currentCooldown": 0,
+            "currentCharges": 0,
+            "unlocked": true,
+            "usesRemaining": -1
+          },
+          {
+            "skillId": "nano-boost",
+            "currentCooldown": 0,
+            "currentCharges": 0,
+            "unlocked": true,
+            "usesRemaining": -1
+          }
+        ],
+        "rules": [],
+        "buffs": [],
+        "debuffs": [],
+        "ruleTags": [],
+        "statusTags": []
+      }
+    ],
+    "graveyard": [],
+    "pieceStatsByTemplateId": {
+      "red-warrior": {
+        "maxHp": 120,
+        "attack": 20,
+        "defense": 5,
+        "moveRange": 3
+      },
+      "blue-warrior": {
+        "maxHp": 120,
+        "attack": 20,
+        "defense": 5,
+        "moveRange": 3
+      }
+    },
+    "skillsById": {
+      "anti-heal-block": {
+        "id": "anti-heal-block",
+        "name": "禁疗阻止",
+        "description": "阻止被禁疗目标受到治疗",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { if (!context.piece) { return { message: '没有目标', success: false }; } let isAntiHeal = false; if (context.piece.statusTags) { for (let i = 0; i < context.piece.statusTags.length; i++) { const tag = context.piece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'anti-heal') { isAntiHeal = true; break; } if (typeof tag === 'string' && tag.includes('anti-heal')) { isAntiHeal = true; break; } } } if (isAntiHeal) { return { message: context.piece.name + '处于禁疗状态，无法受到治疗', success: false, blocked: true, showUIEffect: true }; } return { message: '目标未处于禁疗状态', success: true }; }",
+        "showInUI": false
+      },
+      "ashbringer": {
+        "id": "ashbringer",
+        "name": "灰烬使者",
+        "description": "对一格以内的一个敌人造成自身攻击力100%的真实伤害",
+        "icon": "⚔️",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { const caster = context.piece; const target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) { return target; } const damage = caster.attack; const damageResult = dealDamage(caster, target, damage, 'true', context.battle, context.skill.id); return { message: caster.name + '使用灰烬使者对' + target.name + '造成' + damageResult.damage + '点真实伤害', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: '对1格内一个敌人造成' + damage + '点真实伤害', expectedValues: { damage: damage } }; }",
+        "range": "single"
+      },
+      "basic-attack": {
+        "id": "basic-attack",
+        "name": "基础攻击",
+        "description": "选择1格内一个目标，对其造成等同于自身攻击力的伤害",
+        "icon": "⚔️",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 1,
+        "code": "function executeSkill(context) { const targetEnemy = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } // 确保攻击力和威力系数都是有效的数字 const attack = Number(sourcePiece.attack) || 0; const powerMultiplier = Number(context.skill.powerMultiplier) || 1; const damageValue = attack * powerMultiplier; const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'physical', context.battle, context.skill.id); return { message: sourcePiece.name + ' 造成 ' + damageResult.damage + ' 点伤害', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.round(piece.attack * skillDef.powerMultiplier); return { description: \"选择1格内一个目标，造成\" + damageValue + \"点伤害（相当于自身攻击力）\", expectedValues: { damage: damageValue } }; }"
+      },
+      "biotic-grenade": {
+        "id": "biotic-grenade",
+        "name": "生物手雷",
+        "description": "选择一个2*2区域的左上角格子（4格距离内），对其中友军回复4点生命值，对敌军造成1点伤害并附加禁疗效果一回合",
+        "icon": "💣",
+        "kind": "active",
+        "type": "normal",
+        "form": "throw",
+        "cooldownTurns": 3,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 3,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetPosition = selectTarget({ type: 'grid', range: 4, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) { return targetPosition; } const targetX = targetPosition.x; const targetY = targetPosition.y; let healCount = 0; let damageCount = 0; let messages = []; for (let dx = 0; dx < 2; dx++) { for (let dy = 0; dy < 2; dy++) { const checkX = targetX + dx; const checkY = targetY + dy; const targetPiece = select.getPieceAt(checkX, checkY); if (targetPiece && targetPiece.currentHp > 0) { const isAlly = targetPiece.ownerPlayerId === sourcePiece.ownerPlayerId; if (isAlly) { const healResult = healDamage(sourcePiece, targetPiece, 4, context.battle, context.skill.id); if (healResult.success) { healCount++; messages.push(targetPiece.name + '回复' + healResult.heal + '点生命值'); } } else { const damageResult = dealDamage(sourcePiece, targetPiece, 1, 'physical', context.battle, context.skill.id); if (damageResult.success) { damageCount++; const statusId = 'anti-heal-' + Date.now(); addStatusEffectById(targetPiece.instanceId, { id: statusId, type: 'anti-heal', currentDuration: 1, intensity: 1, relatedRules: ['rule-anti-heal-block'] }); addRuleById(targetPiece.instanceId, 'rule-anti-heal-block'); addSkillById(targetPiece.instanceId, 'anti-heal-block'); messages.push(targetPiece.name + '受到' + damageResult.damage + '点伤害并被禁疗'); } } } } } return { message: '生物手雷生效：' + messages.join('，'), success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对2*2区域内友军回复4点生命值，对敌军造成1点伤害并附加禁疗效果1回合', expectedValues: { heal: 4, damage: 1 } }; }",
+        "range": "area",
+        "areaSize": 2,
+        "requiresTarget": true
+      },
+      "blackwidow-deadly-gaze": {
+        "id": "blackwidow-deadly-gaze",
+        "name": "致命视线",
+        "description": "对距离自己6格之外的敌方单位造成200%攻击力的伤害。",
+        "icon": "👁️",
+        "kind": "active",
+        "type": "super",
+        "cooldownTurns": 2,
+        "maxCharges": 3,
+        "chargeCost": 1,
+        "powerMultiplier": 2,
+        "actionPointCost": 3,
+        "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var distance = Math.abs(target.x - caster.x) + Math.abs(target.y - caster.y); if (distance <= 6) { return { success: false, message: '目标距离太近，必须选择6格之外的敌人' }; }; var damage = Math.round(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '发动致命视线，对' + target.name + '造成' + result.damage + '点伤害（距离' + distance + '格）' }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对6格之外的敌人造成200%攻击力的伤害', expectedValues: { damage: Math.round(piece.attack * 2) } }; }"
+      },
+      "blackwidow-lethal-strike": {
+        "id": "blackwidow-lethal-strike",
+        "name": "致命打击",
+        "description": "选择一个同行或同列的格子作为方向，向该方向射出一发子弹，对路径上第一个敌人造成(1+间隔格数*0.1)倍攻击力的伤害。被子弹:false的格子拦截。",
+        "icon": "🎯",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 2,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { var caster = context.piece; var targetPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos; var dx = targetPos.x - caster.x; var dy = targetPos.y - caster.y; if (dx !== 0 && dy !== 0) { return { success: false, message: '必须选择与自己在同一行或同一列的格子' }; } var dirX = dx === 0 ? 0 : (dx > 0 ? 1 : -1); var dirY = dy === 0 ? 0 : (dy > 0 ? 1 : -1); var firstEnemy = null; var hitDistance = 0; for (var i = 1; i <= 99; i++) { var checkX = caster.x + dirX * i; var checkY = caster.y + dirY * i; var tile = context.battle.map.tiles.find(function(t) { return t.x === checkX && t.y === checkY; }); if (!tile) { break; } if (tile.props && tile.props.bulletPassable === false) { break; } var enemy = context.battle.pieces.find(function(p) { return p.x === checkX && p.y === checkY && p.currentHp > 0 && p.ownerPlayerId !== caster.ownerPlayerId; }); if (enemy) { firstEnemy = enemy; hitDistance = i; break; } } if (!firstEnemy) { return { success: false, message: '路径上没有敌人' }; } var damageMultiplier = 1 + (hitDistance * 0.1); var damage = Math.round(caster.attack * damageMultiplier); var result = dealDamage(caster, firstEnemy, damage, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '对' + firstEnemy.name + '造成' + result.damage + '点伤害（距离' + hitDistance + '格）' }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '向选择方向发射子弹，对第一个敌人造成(1+距离*0.1)倍伤害', expectedValues: { damage: Math.round(piece.attack * 1.1) } }; }"
+      },
+      "blackwidow-lethal-toxin": {
+        "id": "blackwidow-lethal-toxin",
+        "name": "致命毒素",
+        "description": "在自己当前的格子放置一个毒素，选择距离3以内未被占用的格子并移动到该格子，敌人碰到毒素时受到4点伤害。",
+        "icon": "☠️",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 2,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; console.log('[LethalToxin] Starting, caster:', caster.name, 'at', caster.x, caster.y); var targetPos = selectTarget({ type: 'grid', range: 3, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) { return targetPos; } var newX = targetPos.x; var newY = targetPos.y; var tile = battle.map.tiles.find(function(t) { return t.x === newX && t.y === newY; }); if (!tile || !tile.props.walkable) { return { success: false, message: '目标位置不可行走' }; } var occupied = battle.pieces.some(function(p) { return p.x === newX && p.y === newY && p.currentHp > 0; }); if (occupied) { return { success: false, message: '目标位置已被占用' }; } var toxinX = caster.x; var toxinY = caster.y; console.log('[LethalToxin] Placing toxin at:', toxinX, toxinY); console.log('[LethalToxin] Moving to:', newX, newY); if (!caster.statusTags) { caster.statusTags = []; } var toxinId = 'lethal-toxin-' + Date.now(); caster.statusTags.push({ id: toxinId, type: 'lethal-toxin', name: '致命毒素', remainingDuration: -1, intensity: 4, value: toxinX, extraValue: toxinY }); console.log('[LethalToxin] Added toxin status to caster, total toxins:', caster.statusTags.filter(function(t) { return t.type === 'lethal-toxin'; }).length); addRuleById(caster.instanceId, 'rule-blackwidow-toxin-trigger'); caster.x = newX; caster.y = newY; console.log('[LethalToxin] Moved, new position:', caster.x, caster.y); return { success: true, message: caster.name + '在原位置(' + toxinX + ',' + toxinY + ')放置了毒素，并移动到了(' + newX + ',' + newY + ')' }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '在当前格子放置毒素，选择距离3以内未被占用的格子移动，敌人触碰毒素受到4点伤害', expectedValues: { damage: 4 } }; }"
+      },
+      "blackwidow-toxin-damage": {
+        "id": "blackwidow-toxin-damage",
+        "name": "毒素伤害",
+        "description": "敌人踩到毒素时受到4点真实伤害",
+        "icon": "☠️",
+        "kind": "passive",
+        "type": "passive",
+        "code": "function executeSkill(context) { return { success: true, message: '' }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '毒素伤害4点', expectedValues: { damage: 4 } }; }"
+      },
+      "blessed-hammer": {
+        "id": "blessed-hammer",
+        "name": "祝福之锤",
+        "description": "对一个两格内敌人造成自身攻击力100%的物理伤害",
+        "icon": "🔨",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetEnemy = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const damage = sourcePiece.attack; const damageResult = dealDamage(sourcePiece, targetEnemy, damage, 'physical', context.battle, context.skill.id); return { message: sourcePiece.name + '的祝福之锤对' + targetEnemy.name + '造成' + damageResult.damage + '点物理伤害', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: '对两格内一个敌人造成' + damage + '点物理伤害（攻击力100%）', expectedValues: { damage: damage } }; }",
+        "range": "single"
+      },
+      "blink": {
+        "id": "blink",
+        "name": "闪烁",
+        "description": "选择5×5格范围内一个空地格，传送至该位置",
+        "icon": "⚡",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 1,
+        "range": "single",
+        "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = Math.abs(pos.x - caster.x); var dy = Math.abs(pos.y - caster.y); if (Math.max(dx, dy) > 2) return { success: false, message: '目标超出闪烁范围（5×5格内）' }; var tile = battle.map.tiles.find(function(t) { return t.x === pos.x && t.y === pos.y; }); if (!tile || !tile.props.walkable) return { success: false, message: '目标位置不可行走' }; var pieceAtPos = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (pieceAtPos) return { success: false, message: '目标位置已被占用' }; caster.x = pos.x; caster.y = pos.y; return { success: true, message: caster.name + '闪烁至(' + pos.x + ',' + pos.y + ')' }; }"
+      },
+      "blizzard-damage": {
+        "id": "blizzard-damage",
+        "name": "暴风雪伤害",
+        "description": "对暴风雪区域内的所有敌人造成伤害和冰冻",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) {\n    const sourcePiece = context.piece;\n    // 检查statusTags数组（addStatusEffectById添加的状态在这里）\n    if (!sourcePiece.statusTags || sourcePiece.statusTags.length === 0) {\n      return { message: '没有状态标签', success: false };\n    }\n    // 找到暴风雪状态\n    const blizzardStatus = sourcePiece.statusTags.find(effect => effect.type === 'blizzard');\n    if (!blizzardStatus) {\n      return { message: '没有暴风雪状态', success: false };\n    }\n    // 获取暴风雪中心位置和伤害\n    const centerX = blizzardStatus.value;\n    const centerY = blizzardStatus.extraValue;\n    const damageValue = blizzardStatus.damage;\n    if (centerX === undefined || centerY === undefined || damageValue === undefined) {\n      return { message: '暴风雪状态数据不完整', success: false };\n    }\n    // 只在对方回合结束时触发\n    if (context.playerId === sourcePiece.ownerPlayerId) {\n      return { message: '暴风雪只在对方回合结束时触发', success: false };\n    }\n    const radius = 1;\n    let totalDamage = 0;\n    let totalEnemies = 0;\n    let enemyNames = [];\n    // 找到区域内所有敌人\n    const enemiesInArea = context.battle.pieces.filter(piece => {\n      if (piece.ownerPlayerId === sourcePiece.ownerPlayerId) return false;\n      if (piece.currentHp <= 0) return false;\n      const distanceX = Math.abs(piece.x - centerX);\n      const distanceY = Math.abs(piece.y - centerY);\n      return distanceX <= radius && distanceY <= radius;\n    });\n    // 对每个敌人造成伤害和冰冻\n    enemiesInArea.forEach(enemy => {\n      const damageResult = dealDamage(sourcePiece, enemy, damageValue, 'magical', context.battle, 'blizzard');\n      if (damageResult.success) {\n        // 添加冰冻状态\n        if (typeof addStatusEffectById === 'function') {\n          const statusId = 'freeze-' + Date.now() + '-' + enemy.instanceId;\n          addStatusEffectById(enemy.instanceId, { id: statusId, type: 'freeze', currentDuration: 1, intensity: 1 });\n        }\n        // 添加冰冻规则\n        if (typeof addRuleById === 'function') {\n          addRuleById(enemy.instanceId, 'rule-freeze-prevent-move');\n          addRuleById(enemy.instanceId, 'rule-freeze-prevent-skill');\n        }\n        // 添加冰冻技能\n        if (typeof addSkillById === 'function') {\n          addSkillById(enemy.instanceId, 'freeze-prevent');\n        }\n        enemy.showFreezeEffect = true;\n        totalDamage += damageResult.damage;\n        totalEnemies++;\n        enemyNames.push(enemy.name);\n      }\n    });\n    // 添加视觉效果\n    if (!context.battle.effects) {\n      context.battle.effects = [];\n    }\n    for (let x = centerX - radius; x <= centerX + radius; x++) {\n      for (let y = centerY - radius; y <= centerY + radius; y++) {\n        context.battle.effects.push({ type: 'blizzard', position: { x, y }, duration: 1, zIndex: 999, showOnUI: true });\n      }\n    }\n    // 移除自身的暴风雪状态、规则和技能\n    if (typeof removeStatusEffectById === 'function') {\n      removeStatusEffectById(sourcePiece.instanceId, blizzardStatus.id);\n    }\n    if (typeof removeRuleById === 'function') {\n      removeRuleById(sourcePiece.instanceId, 'rule-blizzard-active');\n    }\n    if (typeof removeSkillById === 'function') {\n      removeSkillById(sourcePiece.instanceId, 'blizzard-damage');\n    }\n    // 构建消息\n    let message = sourcePiece.name + '的暴风雪效果';\n    message += '（中心坐标：(' + centerX + ',' + centerY + ')）';\n    if (totalEnemies > 0) {\n      message += '对' + enemyNames.join('、') + '造成了' + totalDamage + '点伤害并使其冰冻';\n    } else {\n      message += '没有对任何敌人造成伤害';\n    }\n    return { message: message, success: true, showUIEffects: true };\n  }",
+        "showInUI": false
+      },
+      "blizzard": {
+        "id": "blizzard",
+        "name": "暴风雪",
+        "description": "选择全局任意一个格子，以该格子为中心创造3*3格的暴风雪区域，对方的回合结束时对其中所有敌人造成当前攻击力1.5倍的伤害和1回合冰冻",
+        "icon": "🌪️",
+        "kind": "active",
+        "type": "super",
+        "cooldownTurns": 3,
+        "maxCharges": 3,
+        "chargeCost": 2,
+        "powerMultiplier": 1.5,
+        "actionPointCost": 2,
+        "range": "area",
+        "areaSize": 3,
+        "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const targetPosition = selectTarget({ type: 'grid', range: 10, filter: 'all' });\n  if (!targetPosition || targetPosition.needsTargetSelection) {\n    return targetPosition;\n  }\n  // 给自身添加statusTag存储暴风雪中心位置和伤害\n  // 同时传入relatedRules，让restorePieceRules能在API传输后恢复规则\n  if (typeof addStatusEffectById === 'function') {\n    const statusId = 'blizzard-' + Date.now();\n    addStatusEffectById(sourcePiece.instanceId, {\n      id: statusId,\n      type: 'blizzard',\n      currentDuration: 2,\n      intensity: 1,\n      value: targetPosition.x,\n      extraValue: targetPosition.y,\n      damage: damageValue,\n      relatedRules: ['rule-blizzard-active']\n    });\n  }\n  // 给自身添加规则，在对方回合结束时触发\n  if (typeof addRuleById === 'function') {\n    addRuleById(sourcePiece.instanceId, 'rule-blizzard-active');\n  }\n  // 给自身添加暴风雪效果技能\n  if (typeof addSkillById === 'function') {\n    addSkillById(sourcePiece.instanceId, 'blizzard-damage');\n  }\n  return {\n    message: sourcePiece.name + '使用了暴风雪，在(' + targetPosition.x + ',' + targetPosition.y + ')创造了暴风雪区域，将在对方回合结束时对3x3格范围内的敌人造成' + damageValue + '点伤害并使其冰冻',\n    success: true\n  };\n}",
+        "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '选择全局任意位置，创造3*3格的暴风雪区域，对方回合结束时对其中所有敌人造成' + damageValue + '点伤害（相当于攻击力150%）和1回合冰冻',\n    expectedValues: { damage: damageValue }\n  };\n}"
+      },
+      "blood-echo-trigger": {
+        "id": "blood-echo-trigger",
+        "name": "血之回响触发",
+        "description": "失去圣盾时触发，添加圣光充能手牌",
+        "icon": "🔁",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { const battle = context.battle; const sourcePiece = context.sourcePiece; if (!sourcePiece) return { success: false }; const liadrin = battle.pieces.find(function(p) { return p.templateId === 'liadrin' && p.faction === sourcePiece.faction && p.currentHp > 0; }); if (!liadrin) return { success: false }; const player = battle.players.find(function(p) { return p.playerId === sourcePiece.ownerPlayerId; }); if (player) { addCardToHand('holy-charge', player.playerId); return { success: true, message: '血之回响：获得1张圣光充能' }; } return { success: false }; }"
+      },
+      "blood-echo": {
+        "id": "blood-echo",
+        "name": "血之回响",
+        "description": "被动：每当友方单位失去圣盾时，为己方阵营添加1张圣光充能手牌",
+        "icon": "🔁",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { return { success: true }; }"
+      },
+      "bone-prison": {
+        "id": "bone-prison",
+        "name": "骨牢",
+        "description": "对距离6以内的一名角色使用，使其无法移动2回合",
+        "icon": "🔒",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 2,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 3,
+        "code": "function executeSkill(context) { const targetPiece = selectTarget({ type: 'piece', range: 6, filter: 'all' }); if (!targetPiece || targetPiece.needsTargetSelection) { return targetPiece; } if (typeof addStatusEffectById === 'function') { addStatusEffectById(targetPiece.instanceId, 'immobilize', 2); } return { message: sourcePiece.templateId + '对' + targetPiece.templateId + '使用骨牢，使其无法移动2回合', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对距离6以内的一名角色使用，使其无法移动2回合', expectedValues: {} }; }",
+        "range": "single"
+      },
+      "death-blossom": {
+        "id": "death-blossom",
+        "name": "死亡绽放",
+        "description": "对三格内所有的敌人造成200%攻击力的伤害",
+        "icon": "🌸",
+        "kind": "active",
+        "type": "normal",
+        "form": "projectile",
+        "cooldownTurns": 3,
+        "maxCharges": 0,
+        "powerMultiplier": 2,
+        "actionPointCost": 3,
+        "range": "area",
+        "areaSize": 3,
+        "requiresTarget": false,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const damageValue = Math.round(sourcePiece.attack * context.skill.powerMultiplier); const enemiesInRange = getAllEnemiesInRange(3); if (enemiesInRange.length === 0) { return { message: '范围内没有敌人', success: false }; } let totalDamage = 0; let killedCount = 0; let hitMessages = []; for (const enemy of enemiesInRange) { const dx = enemy.x - sourcePiece.x; const dy = enemy.y - sourcePiece.y; const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1; const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1; let currentX = sourcePiece.x + stepX; let currentY = sourcePiece.y + stepY; let blocked = false; while (currentX !== enemy.x || currentY !== enemy.y) { const tile = battle.map.tiles.find(t => t.x === currentX && t.y === currentY); if (!tile || tile.props.bullet === false) { blocked = true; break; } const pieceInPath = battle.pieces.find(p => p.x === currentX && p.y === currentY && p.currentHp > 0 && p.instanceId !== enemy.instanceId); if (pieceInPath) { blocked = true; break; } currentX += stepX; currentY += stepY; } if (blocked) { continue; } const enemyPiece = battle.pieces.find(p => p.instanceId === enemy.instanceId); if (enemyPiece) { const damageResult = dealDamage(sourcePiece, enemyPiece, damageValue, 'physical', battle, context.skill.id); totalDamage += damageResult.damage; if (damageResult.isKilled) { killedCount++; } hitMessages.push(enemyPiece.name + '受到' + damageResult.damage + '点伤害'); } } if (hitMessages.length === 0) { return { message: '所有敌人都被障碍物或棋子遮挡', success: false }; } let message = sourcePiece.name + '释放死亡绽放，'; message += hitMessages.join('，'); if (killedCount > 0) { message += '，击杀了' + killedCount + '个敌人'; } return { message: message, success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '对3格内所有未被遮挡的敌人造成' + damageValue + '点伤害（相当于攻击力200%）', expectedValues: { damage: damageValue } }; }"
+      },
+      "divine-blessing-damage": {
+        "id": "divine-blessing-damage",
+        "name": "赐福增伤",
+        "description": "赐福状态下下一次造成的伤害+4",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { const attacker = context.piece; if (!attacker) { return { message: '没有攻击者', success: false }; } let hasDivineBlessing = false; let blessingIntensity = 4; if (attacker.statusTags) { for (let i = 0; i < attacker.statusTags.length; i++) { const tag = attacker.statusTags[i]; if (typeof tag === 'object' && tag.type === 'divine-blessing-buff') { hasDivineBlessing = true; if (tag.intensity) { blessingIntensity = tag.intensity; } break; } } } if (hasDivineBlessing && context.damage) { context.damage = context.damage + blessingIntensity; if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(attacker.instanceId, 'divine-blessing-buff'); } if (typeof removeRuleById === 'function') { removeRuleById(attacker.instanceId, 'rule-divine-blessing'); } if (typeof removeSkillById === 'function') { removeSkillById(attacker.instanceId, 'divine-blessing-damage'); } return { message: attacker.name + '的赐福使伤害+' + blessingIntensity + '，赐福效果消失', success: true }; } return { message: '未处于赐福状态', success: false }; }",
+        "showInUI": false
+      },
+      "divine-blessing": {
+        "id": "divine-blessing",
+        "name": "赐福",
+        "description": "所有友方棋子下一次造成伤害时，伤害增加4点",
+        "icon": "🙏",
+        "kind": "active",
+        "type": "super",
+        "cooldownTurns": 1,
+        "maxCharges": 4,
+        "chargeCost": 4,
+        "powerMultiplier": 1,
+        "actionPointCost": 3,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const battle = context.battle; const allies = battle.pieces.filter(function(p) { return p.faction === sourcePiece.faction && p.currentHp > 0; }); allies.forEach(function(ally) { if (typeof addStatusEffectById === 'function') { addStatusEffectById(ally.instanceId, { id: 'divine-blessing-buff', type: 'divine-blessing-buff', currentDuration: -1, currentUses: 1, intensity: 4, stacks: 1, relatedRules: ['rule-divine-blessing'] }); } if (typeof addRuleById === 'function') { addRuleById(ally.instanceId, 'rule-divine-blessing'); } }); return { message: sourcePiece.name + '为所有友方棋子赐福，下一次伤害增加4点', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '所有友方棋子下一次造成伤害时，伤害增加4点', expectedValues: { damageBonus: 4 } }; }",
+        "range": "all-allies"
+      },
+      "divine-shield-defense": {
+        "id": "divine-shield-defense",
+        "name": "圣盾防御",
+        "description": "当拥有圣盾状态时，抵挡一次伤害并移除圣盾效果",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; let hasDivineShield = false; if (piece.statusTags) { hasDivineShield = piece.statusTags.some(tag => tag.type === 'divine-shield'); } if (!hasDivineShield) { return { success: true, blocked: false, message: '' }; } if (!damage || damage <= 0) { return { success: true, blocked: false, message: '没有伤害需要抵挡' }; } if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'divine-shield'); } if (typeof removeRuleById === 'function') { removeRuleById(piece.instanceId, 'rule-divine-shield'); } if (typeof removeSkillById === 'function') { removeSkillById(piece.instanceId, 'divine-shield-defense'); } const attacker = context.target ? context.target.name : '未知敌人'; return { success: true, blocked: true, message: piece.name + '的圣盾破裂，抵挡了来自于' + attacker + '的伤害' }; }"
+      },
+      "earthshatter": {
+        "id": "earthshatter",
+        "name": "毁天灭地",
+        "description": "选择一个无遮挡和棋子的格子，从天而降降落到该格子并对以该格子为中心的3*3区域的敌人造成100%攻击力的物理伤害",
+        "icon": "🌋",
+        "kind": "active",
+        "type": "super",
+        "cooldownTurns": 1,
+        "maxCharges": 3,
+        "chargeCost": 2,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { console.log('[Earthshatter] Skill executing'); console.log('[Earthshatter] sourcePiece:', sourcePiece.name, 'at', sourcePiece.x, sourcePiece.y); const targetPos = selectTarget({ type: 'grid', range: 10, filter: 'all' }); console.log('[Earthshatter] targetPos:', targetPos); if (!targetPos || targetPos.needsTargetSelection) { console.log('[Earthshatter] Needs target selection or no target'); return targetPos; } console.log('[Earthshatter] Checking piece at target position'); const pieceAtPos = battle.pieces.find(p => p.x === targetPos.x && p.y === targetPos.y && p.currentHp > 0); if (pieceAtPos) { console.log('[Earthshatter] Position occupied by:', pieceAtPos.name); return { message: '该位置已有棋子', success: false }; } console.log('[Earthshatter] Moving sourcePiece to', targetPos.x, targetPos.y); sourcePiece.x = targetPos.x; sourcePiece.y = targetPos.y; console.log('[Earthshatter] sourcePiece new position:', sourcePiece.x, sourcePiece.y); const damageValue = sourcePiece.attack * context.skill.powerMultiplier; console.log('[Earthshatter] Damage value:', damageValue); const affectedEnemies = []; let totalDamage = 0; for (let dx = -1; dx <= 1; dx++) { for (let dy = -1; dy <= 1; dy++) { const checkPos = { x: targetPos.x + dx, y: targetPos.y + dy }; const enemyAtPos = battle.pieces.find(p => p.x === checkPos.x && p.y === checkPos.y && p.currentHp > 0 && p.ownerPlayerId !== sourcePiece.ownerPlayerId); if (enemyAtPos) { console.log('[Earthshatter] Found enemy at', checkPos.x, checkPos.y, ':', enemyAtPos.name); affectedEnemies.push(enemyAtPos.name); const damageResult = dealDamage(sourcePiece, enemyAtPos, damageValue, 'physical', battle, context.skill.id); console.log('[Earthshatter] Damage result:', damageResult); totalDamage += damageResult.damage; } } } console.log('[Earthshatter] Total enemies:', affectedEnemies.length, 'Total damage:', totalDamage); if (affectedEnemies.length > 0) { return { message: sourcePiece.name + ' 从天而降，对 ' + affectedEnemies.join(', ') + ' 造成 ' + totalDamage + ' 点伤害', success: true }; } return { message: sourcePiece.name + ' 从天而降', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '选择一个安全位置降落，对3*3区域内的敌人造成' + damageValue + '点伤害（相当于攻击力100%）', expectedValues: { damage: damageValue, area: '3*3' } }; }"
+      },
+      "elune-blessing": {
+        "id": "elune-blessing",
+        "name": "月神赐福",
+        "description": "为己方添加1张圣光手牌（随机：惩击/治疗/充能），并使下1张使用的圣光手牌效果+50%",
+        "icon": "🌙",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); if (!player) { return { success: false, message: '找不到玩家' }; } const cardPool = ['holy-smite', 'holy-heal', 'holy-charge']; const randomCard = cardPool[Math.floor(Math.random() * cardPool.length)]; addCardToHand(randomCard, player.playerId); addStatusEffectById(caster.instanceId, { id: 'elune-blessing-buff', type: 'card-buff', currentDuration: 1, currentUses: 1, intensity: 1.5, stacks: 1 }); return { message: caster.name + '获得月神赐福，添加1张圣光手牌，下张手牌效果+50%', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '获得1张随机圣光手牌，下张手牌效果+50%', expectedValues: {} }; }",
+        "range": "self"
+      },
+      "elune-guidance-trigger": {
+        "id": "elune-guidance-trigger",
+        "name": "艾露恩的指引触发",
+        "description": "使用圣光手牌时触发，累积月华层数",
+        "icon": "✨",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { const battle = context.battle; const sourcePiece = context.sourcePiece; if (!sourcePiece) return { success: false }; const tyrande = battle.pieces.find(function(p) { return p.templateId === 'tyrande' && p.faction === sourcePiece.faction && p.currentHp > 0; }); if (!tyrande) return { success: false }; const moonGlow = tyrande.statusTags ? tyrande.statusTags.find(function(t) { return t.id === 'moon-glow'; }) : null; let currentStacks = moonGlow ? moonGlow.stacks : 0; currentStacks++; if (currentStacks >= 2) { const allies = battle.pieces.filter(function(p) { return p.faction === tyrande.faction && p.currentHp > 0; }); if (allies.length > 0) { const target = allies.sort(function(a, b) { return a.currentHp - b.currentHp; })[0]; healDamage(tyrande, target, 5, battle, 'elune-guidance'); if (moonGlow) { removeStatusEffectById(tyrande.instanceId, 'moon-glow'); } return { success: true, message: '艾露恩的指引：为' + target.name + '恢复5点生命' }; } } else { addStatusEffectById(tyrande.instanceId, { id: 'moon-glow', type: 'buff', currentDuration: -1, currentUses: -1, intensity: 1, stacks: currentStacks }); return { success: true, message: '艾露恩的指引：获得' + currentStacks + '层月华' }; } return { success: false }; }"
+      },
+      "elune-guidance": {
+        "id": "elune-guidance",
+        "name": "艾露恩的指引",
+        "description": "被动：每当己方使用圣光手牌时，获得1层月华（最多2层）。月华达到2层时，为生命值最低的友方恢复5点生命",
+        "icon": "✨",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { return { success: true }; }"
+      },
+      "evil-explosion": {
+        "id": "evil-explosion",
+        "name": "邪爆",
+        "description": "消灭距离5以内一个生命值小于等于2的角色，对目标距离2格内的角色造成目标生命值上限1/3的伤害（向下取整且至少为攻击力）",
+        "icon": "💥",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } if (targetEnemy.currentHp > 2) { return { message: '目标生命值大于2，无法使用邪爆', success: false }; } const baseDamage = Math.max(sourcePiece.attack, Math.floor(targetEnemy.maxHp / 3)); const nearbyPieces = context.battle.pieces.filter(piece => { if (piece.instanceId === targetEnemy.instanceId) return false; const distance = Math.abs(piece.x - targetEnemy.x) + Math.abs(piece.y - targetEnemy.y); return distance <= 2; }); nearbyPieces.forEach(piece => { const damageResult = dealDamage(sourcePiece, piece, baseDamage, 'magical', context.battle, context.skill.id); }); targetEnemy.currentHp = 0; return { message: sourcePiece.templateId + '使用邪爆消灭了' + targetEnemy.templateId + '，并对周围造成伤害', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '消灭距离5以内一个生命值小于等于2的角色，对目标周围2格内的角色造成伤害', expectedValues: {} }; }",
+        "range": "single"
+      },
+      "fireball": {
+        "id": "fireball",
+        "name": "火球术",
+        "description": "对5格内一个敌人造成当前攻击力1.5倍的伤害",
+        "icon": "🔥",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1.5,
+        "actionPointCost": 2,
+        "range": "single",
+        "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' });\n  if (!targetEnemy || targetEnemy.needsTargetSelection) {\n    return targetEnemy;\n  }\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'magical', context.battle, context.skill.id);\n  return {\n    message: sourcePiece.name + '使用了火球术，对' + targetEnemy.name + '造成' + damageResult.damage + '点伤害',\n    success: true\n  };\n}",
+        "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '对5格内一个敌人造成' + damageValue + '点伤害（相当于攻击力150%）',\n    expectedValues: { damage: damageValue }\n  };\n}"
+      },
+      "freeze-prevent": {
+        "id": "freeze-prevent",
+        "name": "冰冻阻止",
+        "description": "阻止被冰冻目标的移动和使用技能",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) {\n  if (!context.piece) {\n    return { message: '没有目标', success: false };\n  }\n  // 检查statusTags中的冰冻状态\n  if (context.piece.statusTags) {\n    const hasFreezeTag = context.piece.statusTags.some(tag => {\n      if (typeof tag === 'string') {\n        return tag === 'freeze';\n      }\n      if (typeof tag === 'object' && tag !== null) {\n        return tag.type === 'freeze';\n      }\n      return false;\n    });\n    if (hasFreezeTag) {\n      // 根据触发类型确定行动类型\n      let actionType = '执行该操作';\n      if (context.type === 'beforeMove') {\n        actionType = '移动';\n    } else if (context.type === 'beforeSkillUse') {\n        actionType = '使用技能';\n      }\n      return { message: context.piece.name + '被冰冻，无法' + actionType, success: true, blocked: true };\n    }\n  }\n  return { message: '目标未被冰冻或行动未被阻止', success: true };\n}",
+        "showInUI": false
+      },
+      "frostbolt": {
+        "id": "frostbolt",
+        "name": "冰霜箭",
+        "description": "对5格内一个敌人造成当前攻击力的伤害和1回合冰冻",
+        "icon": "❄️",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "range": "single",
+        "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' });\n  if (!targetEnemy || targetEnemy.needsTargetSelection) {\n    return targetEnemy;\n  }\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'magical', context.battle, context.skill.id);\n  if (typeof addStatusEffectById === 'function' && damageResult.success) {\n    const statusId = 'freeze-' + Date.now();\n    addStatusEffectById(targetEnemy.instanceId, { id: statusId, type: 'freeze', currentDuration: 1, intensity: 1, relatedRules: ['rule-freeze-prevent-move', 'rule-freeze-prevent-skill'] });\n  }\n  if (typeof addRuleById === 'function' && damageResult.success) {\n    addRuleById(targetEnemy.instanceId, 'rule-freeze-prevent-move');\n    addRuleById(targetEnemy.instanceId, 'rule-freeze-prevent-skill');\n  }\n  if (typeof addSkillById === 'function' && damageResult.success) {\n    addSkillById(targetEnemy.instanceId, 'freeze-prevent');\n  }\n  return {\n    message: sourcePiece.name + '使用了冰霜箭，对' + targetEnemy.name + '造成' + damageResult.damage + '点伤害并使其冰冻',\n    success: true\n  };\n}",
+        "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '对5格内一个敌人造成' + damageValue + '点伤害（相当于攻击力100%）和1回合冰冻',\n    expectedValues: { damage: damageValue }\n  };\n}"
+      },
+      "grant-lucky-coin": {
+        "id": "grant-lucky-coin",
+        "name": "发放幸运币",
+        "description": "战斗开始时，该阵营玩家获得一张幸运币手牌",
+        "kind": "passive",
+        "type": "normal",
+        "form": "self",
+        "range": 0,
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { try { console.log('[grant-lucky-coin] context.playerId:', context.playerId); var player = battle.players.find(function(p) { return p.playerId.toLowerCase() === context.playerId.toLowerCase(); }); if (!player) { console.log('[grant-lucky-coin] Player not found'); return { success: false, message: 'Player not found' }; } console.log('[grant-lucky-coin] Found player:', player.playerId); var result = addCardToHand('lucky-coin', player.playerId); console.log('[grant-lucky-coin] addCardToHand result:', result); return { success: result, message: (player.name || player.playerId) + ' 获得了幸运币' }; } catch (e) { console.error('[grant-lucky-coin] Error:', e); return { success: false, message: 'Error: ' + e.message }; } }"
+      },
+      "hand-cannon": {
+        "id": "hand-cannon",
+        "name": "手炮",
+        "description": "对一个两格内敌人造成1点物理伤害",
+        "icon": "🔫",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 1,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetEnemy = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const distance = Math.abs(sourcePiece.x - targetEnemy.x) + Math.abs(sourcePiece.y - targetEnemy.y); if (distance > 2) { return { message: '目标距离太远', success: false }; } const damageValue = 1; const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'physical', context.battle, context.skill.id); return { message: sourcePiece.name + ' 使用手炮对 ' + targetEnemy.name + ' 造成 ' + damageResult.damage + ' 点伤害', success: damageResult.success }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对两格内的敌人造成1点物理伤害', expectedValues: { damage: 1, range: 2 } }; }"
+      },
+      "hardy-block-trigger": {
+        "id": "hardy-block-trigger",
+        "name": "悍猛格挡效果",
+        "description": "受到伤害时将50%伤害转化为攻击力",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { const battle = context.battle; const piece = context.piece; const damage = context.damage; const hardyBlockTag = piece.statusTags && piece.statusTags.find(function(tag) { return tag.type === 'hardy-block'; }); if (!hardyBlockTag) { removeRuleById(piece.instanceId, 'rule-hardy-block'); return { success: false, message: '' }; } if (!damage || damage <= 0) { return { success: false, message: '' }; } const attackGain = Math.floor(damage * 0.5); if (attackGain > 0) { piece.attack += attackGain; } return { success: true, message: piece.name + ' 的悍猛格挡生效，将 ' + damage + ' 点伤害的50%转化为 ' + attackGain + ' 点攻击力，当前攻击力为 ' + piece.attack }; }"
+      },
+      "hardy-block": {
+        "id": "hardy-block",
+        "name": "悍猛格挡",
+        "description": "如果受到伤害，将伤害的50%转化为攻击力（向下取整），持续2回合",
+        "icon": "🛡️",
+        "kind": "active",
+        "type": "buff",
+        "cooldownTurns": 2,
+        "maxCharges": 0,
+        "powerMultiplier": 0.5,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { console.log('[HardyBlock] Skill executing'); const sourcePiece = context.piece; console.log('[HardyBlock] sourcePiece:', sourcePiece.instanceId, sourcePiece.name); console.log('[HardyBlock] Calling addStatusEffectById'); addStatusEffectById(sourcePiece.instanceId, { id: 'hardy-block', type: 'hardy-block', currentDuration: 2, currentUses: -1, intensity: 50, stacks: 1, relatedRules: ['rule-hardy-block'] }); console.log('[HardyBlock] Calling addRuleById'); addRuleById(sourcePiece.instanceId, 'rule-hardy-block'); console.log('[HardyBlock] Skill execution complete'); return { message: sourcePiece.name + ' 激活了悍猛格挡，持续2回合，受到伤害时将50%伤害转化为攻击力', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '在接下来的敌方回合，受到伤害时将50%伤害转化为攻击力（向下取整）', expectedValues: { duration: 2 } }; }",
+        "range": "self"
+      },
+      "hellfire-shotgun": {
+        "id": "hellfire-shotgun",
+        "name": "地狱火霰弹枪",
+        "description": "选择一个格子，对相对方向发出一次攻击，对路径上第一个目标造成攻击力+(5-x)点伤害（x为距离）",
+        "icon": "🔫",
+        "kind": "active",
+        "type": "normal",
+        "form": "projectile",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 1,
+        "range": "single",
+        "requiresTarget": true,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetPosition = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) { return targetPosition; } const dx = targetPosition.x - sourcePiece.x; const dy = targetPosition.y - sourcePiece.y; if (dx !== 0 && dy !== 0) { return { message: '必须选择同行或同列的格子', success: false }; } let dirX = 0, dirY = 0; if (Math.abs(dx) > Math.abs(dy)) { dirX = dx > 0 ? 1 : -1; } else { dirY = dy > 0 ? 1 : -1; } let currentX = sourcePiece.x + dirX; let currentY = sourcePiece.y + dirY; let distance = 1; let hitPiece = null; while (currentX >= 0 && currentX < battle.map.width && currentY >= 0 && currentY < battle.map.height) { const tile = battle.map.tiles.find(t => t.x === currentX && t.y === currentY); if (!tile || tile.props.bullet === false) { return { message: '攻击被障碍物阻挡', success: false }; } const pieceAtPos = battle.pieces.find(p => p.x === currentX && p.y === currentY && p.currentHp > 0); if (pieceAtPos) { hitPiece = pieceAtPos; break; } currentX += dirX; currentY += dirY; distance++; if (distance > 5) break; } if (!hitPiece) { return { message: '路径上没有目标', success: false }; } const damageValue = sourcePiece.attack + (5 - distance); const damageResult = dealDamage(sourcePiece, hitPiece, damageValue, 'physical', battle, context.skill.id); return { message: sourcePiece.name + '使用地狱火霰弹枪对' + hitPiece.name + '造成' + damageResult.damage + '点伤害（距离' + distance + '格）', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '选择方向发射攻击，对路径上第一个目标造成攻击力+(5-距离)点伤害，距离越近伤害越高', expectedValues: { damage: piece.attack + 4 } }; }"
+      },
+      "holy-blast": {
+        "id": "holy-blast",
+        "name": "圣光爆破",
+        "description": "在自己有圣盾时，对一个一格以内的一个敌人造成自身攻击力100%的真实伤害并击退两格",
+        "icon": "💥",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const hasDivineShield = caster.statusTags && caster.statusTags.some(tag => tag.id === 'divine-shield'); if (!hasDivineShield) { return { success: false, message: '需要拥有圣盾才能使用此技能' }; } const target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) { return target; } const damage = caster.attack; const damageResult = dealDamage(caster, target, damage, 'true', battle, context.skill.id); removeStatusEffectById(caster.instanceId, 'divine-shield'); let pushMessage = ''; const dx = target.x - caster.x; const dy = target.y - caster.y; let pushX = 0, pushY = 0; if (Math.abs(dx) > Math.abs(dy)) { pushX = dx > 0 ? 1 : -1; } else { pushY = dy > 0 ? 1 : -1; } let finalX = target.x; let finalY = target.y; for (let i = 0; i < 2; i++) { const nextX = finalX + pushX; const nextY = finalY + pushY; const mapWidth = battle.mapWidth || 10; const mapHeight = battle.mapHeight || 10; if (nextX < 0 || nextX >= mapWidth || nextY < 0 || nextY >= mapHeight) { break; } const cell = battle.map && battle.map[nextY] && battle.map[nextY][nextX]; if (!cell || cell.walkable === false) { break; } const occupied = battle.pieces && battle.pieces.some(p => p.x === nextX && p.y === nextY && p.currentHp > 0 && p.instanceId !== target.instanceId); if (occupied) { break; } finalX = nextX; finalY = nextY; } if (finalX !== target.x || finalY !== target.y) { target.x = finalX; target.y = finalY; pushMessage = '并将其击退到(' + finalX + ',' + finalY + ')'; } return { message: caster.name + '使用圣光爆破对' + target.name + '造成' + damageResult.damage + '点真实伤害' + pushMessage, success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { const hasDivineShield = piece.statusTags && piece.statusTags.some(tag => tag.id === 'divine-shield'); if (!hasDivineShield) { return { description: '需要拥有圣盾才能使用', expectedValues: {} }; } const damage = piece.attack; return { description: '对1格内一个敌人造成' + damage + '点真实伤害并击退2格', expectedValues: { damage: damage } }; }",
+        "range": "single"
+      },
+      "holy-light-descend": {
+        "id": "holy-light-descend",
+        "name": "圣光降临",
+        "description": "选择一个距离6或以内的地格，对该格内的友军回复7点生命值，对该格内敌人造成7点伤害；对该格距离1的地格，伤害和治疗量为4；对该格距离2的地格，伤害和治疗量为2",
+        "icon": "☀️",
+        "kind": "active",
+        "type": "super",
+        "cooldownTurns": 3,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 5,
+        "chargeCost": 3,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetCell = selectTarget({ type: 'grid', range: 6 }); if (!targetCell || targetCell.needsTargetSelection) { return targetCell; } const battle = context.battle; const centerX = targetCell.x; const centerY = targetCell.y; const applyEffect = (x, y, value) => { const piece = select.getPieceAt(x, y); if (piece) { if (piece.faction === sourcePiece.faction) { healDamage(sourcePiece, piece, value, battle, context.skill.id); } else { dealDamage(sourcePiece, piece, value, 'magical', battle, context.skill.id); } } }; applyEffect(centerX, centerY, 7); for (let dx = -1; dx <= 1; dx++) { for (let dy = -1; dy <= 1; dy++) { if (Math.abs(dx) + Math.abs(dy) === 1) { applyEffect(centerX + dx, centerY + dy, 4); } } } for (let dx = -2; dx <= 2; dx++) { for (let dy = -2; dy <= 2; dy++) { if (Math.abs(dx) + Math.abs(dy) === 2) { applyEffect(centerX + dx, centerY + dy, 2); } } } return { message: sourcePiece.name + '释放了圣光降临', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '选择一个距离6或以内的地格，对该格内的友军回复7点生命值，对该格内敌人造成7点伤害；对该格距离1的地格，伤害和治疗量为4；对该格距离2的地格，伤害和治疗量为2', expectedValues: { centerHeal: 7, centerDamage: 7, adjacentHeal: 4, adjacentDamage: 4, distantHeal: 2, distantDamage: 2 } }; }",
+        "range": "area"
+      },
+      "holy-shield-defense": {
+        "id": "holy-shield-defense",
+        "name": "圣盾防御",
+        "description": "当拥有圣盾状态时，抵挡一次伤害并移除圣盾效果",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'holy-shield'); } return { message: piece.name + '的圣盾抵挡了' + damage + '点伤害', success: true }; }"
+      },
+      "initial-draw": {
+        "id": "initial-draw",
+        "name": "初始抽牌",
+        "description": "游戏开始时每个玩家抽3张牌",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) {\n  const battle = context.battle;\n  const cardPool = ['sample-active-card', 'sample-reactive-card'];\n  battle.players.forEach(function(player) {\n    for (let i = 0; i < 3; i++) {\n      const randomCard = cardPool[Math.floor(Math.random() * cardPool.length)];\n      addCardToHand(randomCard, player.playerId);\n    }\n  });\n  return { success: true, message: '所有玩家抽了3张初始手牌' };\n}"
+      },
+      "light-extraction": {
+        "id": "light-extraction",
+        "name": "圣光萃取",
+        "description": "选择一个拥有圣盾的友方单位，移除其圣盾，为己方阵营添加2张圣光手牌（圣光惩击和圣光治疗）",
+        "icon": "💧",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const target = selectTarget({ type: 'piece', range: 99, filter: 'ally' }); if (!target || target.needsTargetSelection) { return target; } const hasDivineShield = target.statusTags && target.statusTags.some(tag => tag.id === 'divine-shield'); if (!hasDivineShield) { return { success: false, message: '目标没有圣盾' }; } removeStatusEffectById(target.instanceId, 'divine-shield'); const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); if (player) { addCardToHand('holy-smite', player.playerId); addCardToHand('holy-heal', player.playerId); } return { message: caster.name + '萃取了' + target.name + '的圣盾，获得2张圣光手牌', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '选择一个有圣盾的友方，移除圣盾，获得圣光惩击和圣光治疗各1张', expectedValues: {} }; }",
+        "range": "single"
+      },
+      "light-of-the-light": {
+        "id": "light-of-the-light",
+        "name": "圣光闪耀",
+        "description": "为7格内一个友军回复5点生命值",
+        "icon": "✨",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetAlly = selectTarget({ type: 'piece', range: 7, filter: 'ally' }); if (!targetAlly || targetAlly.needsTargetSelection) { return targetAlly; } const healValue = 5; const healResult = healDamage(sourcePiece, targetAlly, healValue, context.battle, context.skill.id); return { message: sourcePiece.name + '为' + targetAlly.name + '回复' + healResult.heal + '点生命值', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { const healValue = 5; return { description: '为7格内一个友军回复' + healValue + '点生命值', expectedValues: { heal: healValue } }; }",
+        "range": "single"
+      },
+      "muru-lament": {
+        "id": "muru-lament",
+        "name": "穆鲁的哀鸣",
+        "description": "自动释放所有圣光手牌（不耗AP），每释放1张对所有敌人造成3点真实伤害、为友方恢复2点生命。若释放3张以上，所有友方获得圣盾",
+        "icon": "💫",
+        "kind": "active",
+        "type": "super",
+        "cooldownTurns": 2,
+        "maxCharges": 3,
+        "chargeCost": 3,
+        "powerMultiplier": 1,
+        "actionPointCost": 3,
+        "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); const holyCards = player.hand.filter(function(c) { return c.id.startsWith('holy-'); }); const cardCount = holyCards.length; if (cardCount === 0) { return { success: false, message: '没有圣光手牌' }; } let cardEffectsMsg = []; holyCards.forEach(function(card) { const result = executeCard({ battle: battle, playerId: player.playerId, card: card, autoCast: true }); if (result && result.success) { cardEffectsMsg.push(result.message); } removeCardFromHand(card.id, player.playerId); }); const enemies = battle.pieces.filter(function(p) { return p.faction !== caster.faction && p.currentHp > 0; }); const allies = battle.pieces.filter(function(p) { return p.faction === caster.faction && p.currentHp > 0; }); let totalDamage = 0; let totalHeal = 0; enemies.forEach(function(enemy) { const dmg = dealDamage(caster, enemy, 3 * cardCount, 'true', battle, 'muru-lament'); totalDamage += dmg.damage; }); allies.forEach(function(ally) { const hl = healDamage(caster, ally, 2 * cardCount, battle, 'muru-lament'); totalHeal += hl.heal; }); if (cardCount >= 3) { allies.forEach(function(ally) { addStatusEffectById(ally.instanceId, { id: 'divine-shield', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); addRuleById(ally.instanceId, 'rule-divine-shield'); }); } return { message: caster.name + '释放穆鲁的哀鸣！' + (cardEffectsMsg.length > 0 ? '[' + cardEffectsMsg.join('][') + ']' : '') + '对所有敌人造成' + (3 * cardCount) + '点伤害，友方恢复' + totalHeal + '生命' + (cardCount >= 3 ? '，全体获得圣盾！' : ''), success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '释放所有圣光手牌，每张对敌造成3伤害、友方回2血，3张以上全体圣盾', expectedValues: {} }; }",
+        "range": "all-enemies"
+      },
+      "nano-boost-damage": {
+        "id": "nano-boost-damage",
+        "name": "纳米激素增伤",
+        "description": "纳米激素状态下造成的所有伤害+1",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { if (!context.sourcePiece) { return { message: '没有来源棋子', success: false }; } let hasNanoBoost = false; if (context.sourcePiece.statusTags) { for (let i = 0; i < context.sourcePiece.statusTags.length; i++) { const tag = context.sourcePiece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'nano-boost') { hasNanoBoost = true; break; } if (typeof tag === 'string' && tag.includes('nano-boost')) { hasNanoBoost = true; break; } } } if (hasNanoBoost && context.damage) { const boostedDamage = context.damage + 1; return { message: context.sourcePiece.name + '的纳米激素使伤害+1', success: true, damage: boostedDamage }; } return { message: '目标未处于纳米激素状态', success: false }; }",
+        "showInUI": false
+      },
+      "nano-boost": {
+        "id": "nano-boost",
+        "name": "纳米激素",
+        "description": "选择一个除自己外的友方，使其+3防御力，且其造成的所有伤害（无论任何形式）+1",
+        "icon": "⚗️",
+        "kind": "active",
+        "type": "super",
+        "form": "projectile",
+        "cooldownTurns": 2,
+        "maxCharges": 0,
+        "chargeCost": 1,
+        "powerMultiplier": 1,
+        "actionPointCost": 4,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetAlly = selectTarget({ type: 'piece', range: 10, filter: 'ally' }); if (!targetAlly || targetAlly.needsTargetSelection) { return targetAlly; } if (targetAlly.instanceId === sourcePiece.instanceId) { return { message: '不能对自己使用纳米激素', success: false }; } targetAlly.defense = targetAlly.defense + 3; const statusId = 'nano-boost-' + Date.now(); addStatusEffectById(targetAlly.instanceId, { id: statusId, type: 'nano-boost', currentDuration: -1, intensity: 1, value: 3, relatedRules: ['rule-nano-boost-damage'] }); addRuleById(targetAlly.instanceId, 'rule-nano-boost-damage'); addSkillById(targetAlly.instanceId, 'nano-boost-damage'); return { message: sourcePiece.name + '对' + targetAlly.name + '使用纳米激素，防御力+3，伤害+1', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '使目标友方防御力+3，造成的所有伤害+1', expectedValues: { buff: 3 } }; }",
+        "range": "single",
+        "requiresTarget": true
+      },
+      "pulse-pistol": {
+        "id": "pulse-pistol",
+        "name": "脉冲手枪",
+        "description": "敌人释放技能时，对5×5范围内随机一个敌人造成等同于自身攻击力的伤害",
+        "icon": "🔫",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { var caster = context.piece; var enemy = context.sourcePiece; if (!enemy) { return { success: false, message: '' }; } if (enemy.ownerPlayerId === caster.ownerPlayerId) { return { success: false, message: '' }; } var dx = Math.abs(enemy.x - caster.x); var dy = Math.abs(enemy.y - caster.y); if (Math.max(dx, dy) > 2) { return { success: false, message: '' }; } var enemies = context.battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && Math.max(Math.abs(p.x - caster.x), Math.abs(p.y - caster.y)) <= 2; }); if (enemies.length === 0) { return { success: false, message: '' }; } var target = enemies[Math.floor(Math.random() * enemies.length)]; var result = dealDamage(caster, target, caster.attack, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '的脉冲手枪触发，对' + target.name + '造成' + result.damage + '点伤害' }; }"
+      },
+      "reap-heal": {
+        "id": "reap-heal",
+        "name": "收割治疗",
+        "description": "恢复造成伤害量50%的生命值",
+        "icon": "💀",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 0.5,
+        "actionPointCost": 0,
+        "range": "self",
+        "requiresTarget": false,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const damage = context.damage || 0; const healAmount = Math.floor(damage * 0.5); if (healAmount > 0 && sourcePiece.currentHp < sourcePiece.maxHp) { const healResult = healDamage(sourcePiece, sourcePiece, healAmount, context.battle, context.skill.id); return { message: sourcePiece.name + '通过收割恢复了' + healResult.heal + '点生命值', success: true }; } return { message: '', success: true }; }"
+      },
+      "reap": {
+        "id": "reap",
+        "name": "收割",
+        "description": "（被动）造成伤害时，对自己造成伤害量50%的治疗",
+        "icon": "💀",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 0.5,
+        "actionPointCost": 0,
+        "range": "self",
+        "requiresTarget": false,
+        "code": "function executeSkill(context) { return { message: '收割被动技能已激活', success: true } }"
+      },
+      "recall-endturn-trigger": {
+        "id": "recall-endturn-trigger",
+        "name": "回溯触发（回合结束）",
+        "description": "对手回合结束时强制执行回溯",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { if (!context.battle.recallData || context.battle.recallData.length === 0) return { success: false }; var triggered = false; var messages = []; for (var i = context.battle.recallData.length - 1; i >= 0; i--) { var recall = context.battle.recallData[i]; if (context.playerId === recall.ownerPlayerId) continue; var piece = context.battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (piece && recall.snapshot) { piece.x = recall.snapshot.x; piece.y = recall.snapshot.y; piece.currentHp = Math.min(recall.snapshot.hp, piece.maxHp); if (recall.snapshot.shield !== undefined) piece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) piece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) piece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) piece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); messages.push(piece.name + '回溯！（对手回合结束）'); triggered = true; } context.battle.recallData.splice(i, 1); } return triggered ? { success: true, message: messages.join('，') } : { success: false }; }"
+      },
+      "recall-move-trigger": {
+        "id": "recall-move-trigger",
+        "name": "回溯触发（移动）",
+        "description": "对手移动时计数，达到目标时执行回溯",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { if (!context.battle.recallData || context.battle.recallData.length === 0) return { success: false }; var actor = context.sourcePiece; if (!actor) return { success: false }; var triggered = false; var messages = []; for (var i = context.battle.recallData.length - 1; i >= 0; i--) { var recall = context.battle.recallData[i]; if (actor.ownerPlayerId === recall.ownerPlayerId) continue; recall.actionCount = (recall.actionCount || 0) + 1; if (recall.actionCount >= recall.targetCount) { var piece = context.battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (piece && recall.snapshot) { piece.x = recall.snapshot.x; piece.y = recall.snapshot.y; piece.currentHp = Math.min(recall.snapshot.hp, piece.maxHp); if (recall.snapshot.shield !== undefined) piece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) piece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) piece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) piece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); messages.push(piece.name + '回溯！（对手操作数达到' + recall.targetCount + '）'); triggered = true; } context.battle.recallData.splice(i, 1); } } return triggered ? { success: true, message: messages.join('，') } : { success: false }; }"
+      },
+      "recall-skill-trigger": {
+        "id": "recall-skill-trigger",
+        "name": "回溯触发（技能）",
+        "description": "对手释放技能时计数，达到目标时执行回溯",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { if (!context.battle.recallData || context.battle.recallData.length === 0) return { success: false }; var actor = context.sourcePiece; if (!actor) return { success: false }; var triggered = false; var messages = []; for (var i = context.battle.recallData.length - 1; i >= 0; i--) { var recall = context.battle.recallData[i]; if (actor.ownerPlayerId === recall.ownerPlayerId) continue; recall.actionCount = (recall.actionCount || 0) + 1; if (recall.actionCount >= recall.targetCount) { var piece = context.battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (piece && recall.snapshot) { piece.x = recall.snapshot.x; piece.y = recall.snapshot.y; piece.currentHp = Math.min(recall.snapshot.hp, piece.maxHp); if (recall.snapshot.shield !== undefined) piece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) piece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) piece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) piece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); messages.push(piece.name + '回溯！（对手操作数达到' + recall.targetCount + '）'); triggered = true; } context.battle.recallData.splice(i, 1); } } return triggered ? { success: true, message: messages.join('，') } : { success: false }; }"
+      },
+      "recall": {
+        "id": "recall",
+        "name": "回溯",
+        "description": "选择一个数字，在对手下回合达到该操作次数时，将自身状态还原为标记时的状态",
+        "icon": "⏪",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 1,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { var caster = context.piece; var result = selectOption({ title: '选择回溯触发操作数', options: [{ label: '1', value: 1 }, { label: '2', value: 2 }, { label: '3', value: 3 }, { label: '4', value: 4 }, { label: '5', value: 5 }, { label: '6', value: 6 }, { label: '7', value: 7 }, { label: '8', value: 8 }, { label: '9', value: 9 }, { label: '10', value: 10 }] }); if (result === null || result === undefined || result.needsOptionSelection) { return result; } var data = context.battle.recallData || []; data = data.filter(function(r) { return r.pieceId !== caster.instanceId; }); data.push({ pieceId: caster.instanceId, ownerPlayerId: caster.ownerPlayerId, targetCount: result, actionCount: 0, snapshot: { x: caster.x, y: caster.y, hp: caster.currentHp, shield: caster.shield, statusTags: caster.statusTags ? JSON.parse(JSON.stringify(caster.statusTags)) : [], buffs: caster.buffs ? JSON.parse(JSON.stringify(caster.buffs)) : [], debuffs: caster.debuffs ? JSON.parse(JSON.stringify(caster.debuffs)) : [] } }); context.battle.recallData = data; return { success: true, message: caster.name + '标记了回溯点，目标操作数：' + result }; }"
+      },
+      "rocket-punch": {
+        "id": "rocket-punch",
+        "name": "火箭重拳",
+        "description": "选择一个同行或同列的格子，向该方向冲刺3并对路径上的敌人造成伤害，停在第一个敌人或障碍物面前",
+        "icon": "👊",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 2,
+        "maxCharges": 0,
+        "powerMultiplier": 2,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { const targetPosition = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) { return targetPosition; } if (sourcePiece.x !== targetPosition.x && sourcePiece.y !== targetPosition.y) { return { message: '目标格子必须与当前位置在同一行或同一列', success: false }; } let direction = ''; if (sourcePiece.x === targetPosition.x) { direction = targetPosition.y < sourcePiece.y ? 'up' : 'down'; } else { direction = targetPosition.x < sourcePiece.x ? 'left' : 'right'; } let hitEnemies = []; const damageValue = Math.round(sourcePiece.attack * context.skill.powerMultiplier); for (let i = 1; i <= 3; i++) { let checkX = sourcePiece.x; let checkY = sourcePiece.y; switch (direction) { case 'up': checkY -= i; break; case 'down': checkY += i; break; case 'left': checkX -= i; break; case 'right': checkX += i; break; } const enemyAtCheck = battle.pieces.find(p => p.x === checkX && p.y === checkY && p.currentHp > 0 && p.ownerPlayerId !== sourcePiece.ownerPlayerId); if (enemyAtCheck) { hitEnemies.push(enemyAtCheck); } } let finalX = sourcePiece.x; let finalY = sourcePiece.y; for (let step = 1; step <= 3; step++) { let nextX = finalX; let nextY = finalY; switch (direction) { case 'up': nextY--; break; case 'down': nextY++; break; case 'left': nextX--; break; case 'right': nextX++; break; } const hasEnemy = battle.pieces.some(p => p.x === nextX && p.y === nextY && p.currentHp > 0); const isOutOfBounds = nextX < 0 || nextX >= battle.map.width || nextY < 0 || nextY >= battle.map.height; if (hasEnemy || isOutOfBounds) { break; } const tile = battle.map.tiles.find(t => t.x === nextX && t.y === nextY); if (!tile || !tile.props.walkable) { break; } finalX = nextX; finalY = nextY; } sourcePiece.x = finalX; sourcePiece.y = finalY; hitEnemies.forEach(enemy => { dealDamage(sourcePiece, enemy, damageValue, 'physical', battle, context.skill.id); }); return { message: sourcePiece.name + ' 使用了火箭重拳，对路径上的敌人造成了伤害', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '选择同行或同列的格子冲刺，对路径上的敌人造成' + damageValue + '点伤害(相当于攻击力200%)', expectedValues: { damage: damageValue, range: 5 } }; }",
+        "range": "single"
+      },
+      "shadow-step-teleport": {
+        "id": "shadow-step-teleport",
+        "name": "暗影步传送",
+        "description": "回合开始时传送到预设位置",
+        "icon": "👤",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "range": "self",
+        "requiresTarget": false,
+        "code": "function executeSkill(context) { console.log('[ShadowStep] Executing shadow-step-teleport skill'); const sourcePiece = context.piece; console.log('[ShadowStep] sourcePiece:', sourcePiece ? sourcePiece.instanceId : 'null'); if (!sourcePiece.statusTags) { console.log('[ShadowStep] No statusTags, returning'); return { message: '', success: true }; } console.log('[ShadowStep] statusTags:', sourcePiece.statusTags.map(t => ({ type: t.type, remainingDuration: t.remainingDuration }))); const shadowStepStatus = sourcePiece.statusTags.find(tag => tag.type === 'shadow-step'); console.log('[ShadowStep] shadowStepStatus:', shadowStepStatus); if (!shadowStepStatus) { console.log('[ShadowStep] No shadow-step status found, returning'); return { message: '', success: true }; } if (shadowStepStatus.remainingDuration <= 0) { console.log('[ShadowStep] remainingDuration <= 0, returning'); return { message: '', success: true }; } const targetX = shadowStepStatus.value; const targetY = shadowStepStatus.intensity; console.log('[ShadowStep] Target position:', targetX, targetY); const targetTile = battle.map.tiles.find(t => t.x === targetX && t.y === targetY); const pieceAtPos = battle.pieces.find(p => p.x === targetX && p.y === targetY && p.currentHp > 0); if (pieceAtPos) { console.log('[ShadowStep] Target position occupied by', pieceAtPos.instanceId); targetTile.props.walkable = true; targetTile.props.shadowStepTarget = false; const index = sourcePiece.statusTags.findIndex(tag => tag.type === 'shadow-step'); if (index !== -1) { sourcePiece.statusTags.splice(index, 1); } return { message: sourcePiece.name + '的暗影步目标位置已被占用', success: true }; } if (!targetTile) { console.log('[ShadowStep] Target tile not found'); const index = sourcePiece.statusTags.findIndex(tag => tag.type === 'shadow-step'); if (index !== -1) { sourcePiece.statusTags.splice(index, 1); } return { message: sourcePiece.name + '的暗影步目标位置已不存在', success: true }; } console.log('[ShadowStep] Teleporting to', targetX, targetY); targetTile.props.walkable = true; targetTile.props.shadowStepTarget = false; sourcePiece.x = targetX; sourcePiece.y = targetY; shadowStepStatus.remainingDuration = 0; const index = sourcePiece.statusTags.findIndex(tag => tag.type === 'shadow-step'); if (index !== -1) { sourcePiece.statusTags.splice(index, 1); } console.log('[ShadowStep] Teleport successful'); return { message: sourcePiece.name + '通过暗影步传送到了(' + targetX + ',' + targetY + ')', success: true }; }"
+      },
+      "shadow-step": {
+        "id": "shadow-step",
+        "name": "暗影步",
+        "description": "选择地图上一个未被遮挡的格子，在下个回合开始的时候传送",
+        "icon": "👤",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 2,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 3,
+        "range": "single",
+        "requiresTarget": true,
+        "code": "function executeSkill(context) { console.log('[ShadowStep] Executing shadow-step skill'); const sourcePiece = context.piece; console.log('[ShadowStep] sourcePiece:', sourcePiece ? sourcePiece.instanceId : 'null'); const targetPosition = selectTarget({ type: 'grid', range: 10, filter: 'all' }); console.log('[ShadowStep] targetPosition:', targetPosition); if (!targetPosition || targetPosition.needsTargetSelection) { return targetPosition; } const tile = battle.map.tiles.find(t => t.x === targetPosition.x && t.y === targetPosition.y); console.log('[ShadowStep] tile:', tile ? 'found' : 'not found'); if (!tile || !tile.props.walkable) { return { message: '目标位置不可行走', success: false }; } const pieceAtPos = battle.pieces.find(p => p.x === targetPosition.x && p.y === targetPosition.y && p.currentHp > 0); if (pieceAtPos) { return { message: '目标位置已被占用', success: false }; } if (!sourcePiece.statusTags) { sourcePiece.statusTags = []; } const existingShadowStep = sourcePiece.statusTags.find(tag => tag.type === 'shadow-step'); if (existingShadowStep) { console.log('[ShadowStep] Updating existing shadow-step status'); const oldX = existingShadowStep.value; const oldY = existingShadowStep.intensity; const oldTile = battle.map.tiles.find(t => t.x === oldX && t.y === oldY); if (oldTile) { oldTile.props.walkable = true; oldTile.props.shadowStepTarget = false; } existingShadowStep.value = targetPosition.x; existingShadowStep.intensity = targetPosition.y; existingShadowStep.remainingDuration = 2; } else { console.log('[ShadowStep] Creating new shadow-step status'); sourcePiece.statusTags.push({ id: 'shadow-step-' + Date.now(), type: 'shadow-step', name: '暗影步', remainingDuration: 2, value: targetPosition.x, intensity: targetPosition.y, relatedRules: ['rule-shadow-step'] }); } tile.props.walkable = false; tile.props.shadowStepTarget = true; if (!sourcePiece.rules) { sourcePiece.rules = []; } const hasRule = sourcePiece.rules.some(r => r.id === 'rule-shadow-step'); console.log('[ShadowStep] hasRule:', hasRule); if (!hasRule) { console.log('[ShadowStep] Adding rule-shadow-step'); const result = addRuleById(sourcePiece.instanceId, 'rule-shadow-step'); console.log('[ShadowStep] addRuleById result:', result); } return { message: sourcePiece.name + '标记了暗影步位置，将在下回合开始时传送到(' + targetPosition.x + ',' + targetPosition.y + ')', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '选择地图上一个未被遮挡的格子，在下个回合开始时自动传送', expectedValues: {} }; }"
+      },
+      "shield-of-light": {
+        "id": "shield-of-light",
+        "name": "圣光术",
+        "description": "使7格内一个友军获得圣盾，抵挡一次伤害",
+        "icon": "shield",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 2,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 3,
+        "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetAlly = selectTarget({ type: 'piece', range: 7, filter: 'ally' }); if (!targetAlly || targetAlly.needsTargetSelection) { return targetAlly; } if (typeof addStatusEffectById === 'function') { addStatusEffectById(targetAlly.instanceId, { id: 'divine-shield', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); } if (typeof addRuleById === 'function') { addRuleById(targetAlly.instanceId, 'rule-divine-shield'); } if (typeof addSkillById === 'function') { addSkillById(targetAlly.instanceId, 'divine-shield-defense'); } return { message: sourcePiece.name + ' 为 ' + targetAlly.name + ' 施加了圣盾', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '为范围内一个友军获得圣盾，抵挡一次伤害', expectedValues: {} }; }",
+        "range": "single"
+      },
+      "sleep-dart": {
+        "id": "sleep-dart",
+        "name": "麻醉镖",
+        "description": "选择一个格子，向该格子相对方向发射一个麻醉镖5格，如果有敌人则施加麻醉2回合",
+        "icon": "💤",
+        "kind": "active",
+        "type": "normal",
+        "form": "projectile",
+        "cooldownTurns": 4,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { var sourcePiece = context.piece; var targetPosition = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) { return targetPosition; } var targetX = targetPosition.x; var targetY = targetPosition.y; var sourceX = sourcePiece.x; var sourceY = sourcePiece.y; var dirX = targetX - sourceX; var dirY = targetY - sourceY; var maxSteps = 5; var stepX = 0; var stepY = 0; if (dirX !== 0) stepX = dirX > 0 ? 1 : -1; if (dirY !== 0) stepY = dirY > 0 ? 1 : -1; if (stepX === 0 && stepY === 0) { return { message: '无法向自身方向发射', success: false }; } for (var step = 1; step <= maxSteps; step++) { var checkX = sourceX + stepX * step; var checkY = sourceY + stepY * step; var targetPiece = select.getPieceAt(checkX, checkY); if (targetPiece && targetPiece.currentHp > 0) { var isEnemy = targetPiece.ownerPlayerId !== sourcePiece.ownerPlayerId; if (isEnemy) { var statusId = 'sleep-' + Date.now(); addStatusEffectById(targetPiece.instanceId, { id: statusId, type: 'sleep', currentDuration: 2, intensity: 1, relatedRules: ['rule-sleep-prevent-move', 'rule-sleep-prevent-skill', 'rule-sleep-remove-on-damage'] }); addRuleById(targetPiece.instanceId, 'rule-sleep-prevent-move'); addRuleById(targetPiece.instanceId, 'rule-sleep-prevent-skill'); addRuleById(targetPiece.instanceId, 'rule-sleep-remove-on-damage'); addSkillById(targetPiece.instanceId, 'sleep-prevent'); addSkillById(targetPiece.instanceId, 'sleep-remove'); return { message: sourcePiece.name + '的麻醉镖命中' + targetPiece.name + '，使其进入麻醉状态2回合', success: true }; } } } return { message: '麻醉镖飞行5格但未命中敌人', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '向选择方向发射麻醉镖，飞行5格，命中敌人则使其麻醉2回合（无法移动、无法使用技能直到受到伤害）', expectedValues: {} }; }",
+        "range": "single",
+        "requiresTarget": true
+      },
+      "sleep-prevent": {
+        "id": "sleep-prevent",
+        "name": "麻醉阻止",
+        "description": "阻止被麻醉目标的移动和使用技能",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { console.log('=== sleep-prevent skill called ==='); console.log('context.piece:', context.piece ? context.piece.name : 'null'); if (!context.piece) { console.log('No piece in context'); return { message: '没有目标', success: false }; } console.log('context.piece.statusTags:', context.piece.statusTags); var isSleeping = false; if (context.piece.statusTags) { for (var i = 0; i < context.piece.statusTags.length; i++) { var tag = context.piece.statusTags[i]; console.log('Checking tag:', tag); if (typeof tag === 'object' && tag.type === 'sleep') { isSleeping = true; console.log('Found sleep tag!'); break; } } } console.log('isSleeping:', isSleeping); if (isSleeping) { var actionType = '执行该操作'; if (context.type === 'beforeMove') { actionType = '移动'; } else if (context.type === 'beforeSkillUse') { actionType = '使用技能'; } console.log('Blocking action:', actionType); return { message: context.piece.name + '处于麻醉状态，无法' + actionType, success: true, blocked: true, showUIEffect: true }; } console.log('Not sleeping, action allowed'); return { message: '目标未处于麻醉状态或行动未被阻止', success: false }; }",
+        "showInUI": false
+      },
+      "sleep-remove": {
+        "id": "sleep-remove",
+        "name": "麻醉解除",
+        "description": "受到伤害时解除麻醉状态",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { if (!context.piece) { return { message: '没有目标', success: false }; } let sleepStatusIndex = -1; if (context.piece.statusTags) { for (let i = 0; i < context.piece.statusTags.length; i++) { const tag = context.piece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'sleep') { sleepStatusIndex = i; break; } } } if (sleepStatusIndex !== -1) { context.piece.statusTags.splice(sleepStatusIndex, 1); removeRuleById(context.piece.instanceId, 'rule-sleep-prevent-move'); removeRuleById(context.piece.instanceId, 'rule-sleep-prevent-skill'); removeRuleById(context.piece.instanceId, 'rule-sleep-remove-on-damage'); removeSkillById(context.piece.instanceId, 'sleep-prevent'); removeSkillById(context.piece.instanceId, 'sleep-remove'); return { message: context.piece.name + '受到伤害，麻醉状态解除', success: true }; } return { message: '目标未处于麻醉状态', success: false }; }",
+        "showInUI": false
+      },
+      "starfall-damage": {
+        "id": "starfall-damage",
+        "name": "群星陨落伤害",
+        "description": "星辰领域对2个随机敌人造成伤害",
+        "icon": "⭐",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { const battle = context.battle; const sourcePiece = context.sourcePiece; if (!sourcePiece) return { success: false }; const enemies = battle.pieces.filter(function(p) { return p.faction !== sourcePiece.faction && p.currentHp > 0; }); if (enemies.length === 0) return { success: false }; const targets = enemies.sort(function() { return Math.random() - 0.5; }).slice(0, 2); let totalDamage = 0; targets.forEach(function(target) { const result = dealDamage(sourcePiece, target, 5, 'magic', battle, 'starfall'); totalDamage += result.damage; }); return { success: true, message: '群星陨落对' + targets.length + '个敌人造成' + totalDamage + '点伤害' }; }"
+      },
+      "starfall-heal": {
+        "id": "starfall-heal",
+        "name": "群星陨落治疗",
+        "description": "星辰领域结束时为友方恢复生命",
+        "icon": "⭐",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { const battle = context.battle; const sourcePiece = context.sourcePiece; if (!sourcePiece) return { success: false }; const tracker = sourcePiece.statusTags ? sourcePiece.statusTags.find(function(t) { return t.id === 'starfall-heal-tracker'; }) : null; const cardsUsed = tracker ? tracker.currentUses : 0; if (cardsUsed === 0) return { success: false }; const allies = battle.pieces.filter(function(p) { return p.faction === sourcePiece.faction && p.currentHp > 0; }); let totalHeal = 0; allies.forEach(function(ally) { const result = healDamage(sourcePiece, ally, cardsUsed * 3, battle, 'starfall-heal'); totalHeal += result.heal; }); removeStatusEffectById(sourcePiece.instanceId, 'starfall-heal-tracker'); return { success: true, message: '群星陨落结束：根据使用的' + cardsUsed + '张手牌，友方共恢复' + totalHeal + '点生命' }; }"
+      },
+      "starfall-synergy": {
+        "id": "starfall-synergy",
+        "name": "群星陨落协同",
+        "description": "使用圣光手牌时，群星陨落额外攻击",
+        "icon": "⭐",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { const battle = context.battle; const sourcePiece = context.sourcePiece; if (!sourcePiece) return { success: false }; const tyrande = battle.pieces.find(function(p) { return p.templateId === 'tyrande' && p.faction === sourcePiece.faction && p.currentHp > 0; }); if (!tyrande) return { success: false }; const enemies = battle.pieces.filter(function(p) { return p.faction !== tyrande.faction && p.currentHp > 0; }); if (enemies.length === 0) return { success: false }; const target = enemies[Math.floor(Math.random() * enemies.length)]; const result = dealDamage(tyrande, target, 3, 'magic', battle, 'starfall-synergy'); const tracker = tyrande.statusTags ? tyrande.statusTags.find(function(t) { return t.id === 'starfall-heal-tracker'; }) : null; if (tracker) { tracker.currentUses++; } return { success: true, message: '群星陨落协同：对' + target.name + '造成' + result.damage + '点伤害' }; }"
+      },
+      "starfall": {
+        "id": "starfall",
+        "name": "群星陨落",
+        "description": "召唤星辰领域，持续X回合（X=当前圣光手牌数）。领域持续期间：每回合对2个随机敌人造成5点伤害；使用圣光手牌时额外对1个敌人造成3点伤害；领域结束时根据使用的圣光手牌数为友方恢复生命（每张3点）",
+        "icon": "⭐",
+        "kind": "active",
+        "type": "super",
+        "cooldownTurns": 2,
+        "maxCharges": 3,
+        "chargeCost": 3,
+        "powerMultiplier": 1,
+        "actionPointCost": 3,
+        "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); const holyCards = player.hand.filter(function(c) { return c.id.startsWith('holy-'); }); const duration = Math.max(1, holyCards.length); addStatusEffectById(caster.instanceId, { id: 'starfall-aura', type: 'aura', currentDuration: duration, currentUses: -1, intensity: 5, stacks: 1, relatedRules: ['rule-starfall-turn-start', 'rule-starfall-card-used'] }); addRuleById(caster.instanceId, 'rule-starfall-turn-start'); addRuleById(caster.instanceId, 'rule-starfall-card-used'); addStatusEffectById(caster.instanceId, { id: 'starfall-heal-tracker', type: 'tracker', currentDuration: duration, currentUses: 0, intensity: 3, stacks: 1, relatedRules: ['rule-starfall-end'] }); addRuleById(caster.instanceId, 'rule-starfall-end'); return { message: caster.name + '召唤群星陨落！星辰领域持续' + duration + '回合', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '根据手牌数召唤持续回合的星辰领域，期间持续伤害+手牌协同', expectedValues: {} }; }",
+        "range": "all-enemies"
+      },
+      "sticky-bomb-explode": {
+        "id": "sticky-bomb-explode",
+        "name": "粘性炸弹爆炸",
+        "description": "粘性炸弹爆炸，对周围敌人造成伤害",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { if (!context.battle.stickyBombs || context.battle.stickyBombs.length === 0) return { success: false }; var triggered = false; var messages = []; for (var i = context.battle.stickyBombs.length - 1; i >= 0; i--) { var bomb = context.battle.stickyBombs[i]; if (context.playerId === bomb.ownerPlayerId) continue; bomb.opponentEndTurnsSeen = (bomb.opponentEndTurnsSeen || 0) + 1; if (bomb.opponentEndTurnsSeen < 1) continue; var targetX = bomb.x; var targetY = bomb.y; if (bomb.attachedPieceId) { var attachedPiece = context.battle.pieces.find(function(p) { return p.instanceId === bomb.attachedPieceId && p.currentHp > 0; }); if (attachedPiece) { targetX = attachedPiece.x; targetY = attachedPiece.y; } } var affected = context.battle.pieces.filter(function(p) { return p.currentHp > 0 && Math.abs(p.x - targetX) + Math.abs(p.y - targetY) <= 1; }); var hitNames = []; for (var j = 0; j < affected.length; j++) { var target = affected[j]; var dmg = Math.max(0, bomb.damage - (target.defense || 0)); target.currentHp = Math.max(0, target.currentHp - dmg); hitNames.push(target.name + '(-' + dmg + ')'); } messages.push('粘性炸弹爆炸！' + (hitNames.length > 0 ? hitNames.join('、') : '未命中任何棋子')); context.battle.stickyBombs.splice(i, 1); triggered = true; } return triggered ? { success: true, message: messages.join('，') } : { success: false }; }"
+      },
+      "sticky-bomb-move": {
+        "id": "sticky-bomb-move",
+        "name": "粘性炸弹跟随",
+        "description": "当棋子移动时更新炸弹位置",
+        "kind": "passive",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 0,
+        "code": "function executeSkill(context) { if (!context.battle.stickyBombs || context.battle.stickyBombs.length === 0) return { success: false }; var mover = context.sourcePiece; if (!mover) return { success: false }; var updated = false; for (var i = 0; i < context.battle.stickyBombs.length; i++) { var bomb = context.battle.stickyBombs[i]; if (bomb.attachedPieceId === mover.instanceId) { bomb.x = mover.x; bomb.y = mover.y; updated = true; } } return { success: false }; }"
+      },
+      "sticky-bomb": {
+        "id": "sticky-bomb",
+        "name": "粘性炸弹",
+        "description": "选择1格内一个格子放置炸弹，炸弹附着在格子上的棋子身上（如果有），对方回合结束时对周围造成7点伤害",
+        "icon": "💣",
+        "kind": "active",
+        "type": "super",
+        "cooldownTurns": 1,
+        "maxCharges": 3,
+        "chargeCost": 2,
+        "powerMultiplier": 1,
+        "actionPointCost": 3,
+        "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 1, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dist = Math.abs(pos.x - caster.x) + Math.abs(pos.y - caster.y); if (dist > 1) return { success: false, message: '目标超出范围（仅限相邻格）' }; var attachedPiece = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (!context.battle.stickyBombs) context.battle.stickyBombs = []; context.battle.stickyBombs.push({ x: pos.x, y: pos.y, damage: 7, ownerPlayerId: caster.ownerPlayerId, attachedPieceId: attachedPiece ? attachedPiece.instanceId : null, opponentEndTurnsSeen: 0 }); var msg = attachedPiece ? caster.name + '将粘性炸弹附着在' + attachedPiece.name + '身上！' : caster.name + '在(' + pos.x + ',' + pos.y + ')放置了粘性炸弹！'; return { success: true, message: msg }; }"
+      },
+      "white-bone-storm": {
+        "id": "white-bone-storm",
+        "name": "白骨风暴",
+        "description": "召唤白骨风暴，在自身周围5*5格范围内对经过的敌人造成伤害",
+        "icon": "💀",
+        "kind": "active",
+        "type": "normal",
+        "cooldownTurns": 0,
+        "maxCharges": 0,
+        "powerMultiplier": 1,
+        "actionPointCost": 2,
+        "code": "function executeSkill(context) { if (typeof addStatusEffectById === 'function') { addStatusEffectById(sourcePiece.instanceId, 'bone-storm', 999); } return { message: sourcePiece.name + '召唤了白骨风暴，在自身周围5*5格范围内对经过的敌人造成伤害', success: true }; }",
+        "previewCode": "function calculatePreview(piece, skillDef) { return { description: '召唤白骨风暴，在自身周围5*5格范围内对经过的敌人造成伤害', expectedValues: {} }; }"
+      }
+    },
+    "players": [
+      {
+        "playerId": "user_1771360858632_9522",
+        "chargePoints": 0,
+        "actionPoints": 1,
+        "maxActionPoints": 1,
+        "hand": [],
+        "discardPile": [],
+        "rules": []
+      },
+      {
+        "playerId": "user_1771361118594_8536",
+        "chargePoints": 0,
+        "actionPoints": 0,
+        "maxActionPoints": 0,
+        "hand": [
+          {
+            "cardId": "lucky-coin",
+            "instanceId": "ci-lucky-coin-1773123836691-4522",
+            "ownerPlayerId": "user_1771361118594_8536",
+            "name": "幸运币"
+          }
+        ],
+        "discardPile": [],
+        "rules": [
+          {
+            "id": "rule-lucky-coin-start",
+            "name": "幸运币规则",
+            "description": "战斗开始时，该玩家获得一张幸运币手牌",
+            "trigger": {
+              "type": "gameStart"
+            },
+            "limits": {
+              "maxUses": 1,
+              "uses": 1
+            }
+          }
+        ]
+      }
+    ],
+    "turn": {
+      "currentPlayerId": "user_1771360858632_9522",
+      "turnNumber": 1,
+      "phase": "action",
+      "actions": {
+        "hasMoved": false,
+        "hasUsedBasicSkill": false,
+        "hasUsedChargeSkill": false
+      }
+    },
+    "gameStartFired": true,
+    "actions": [
+      {
+        "type": "triggerEffect",
+        "playerId": "user_1771360858632_9522",
+        "turn": 1,
+        "payload": {
+          "message": "user_1771361118594_8536 获得了幸运币"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "rule-elune-guidance",
+  "name": "艾露恩的指引规则",
+  "description": "当己方使用圣光手牌时，泰兰德获得月华层数",
+  "trigger": { "type": "cardUsed", "cardType": "holy" },
+  "effect": { "type": "triggerSkill", "skillId": "elune-guidance-trigger", "message": "艾露恩的指引触发" },
+  "limits": { "maxUsesPerTurn": 999 }
+}

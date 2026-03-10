@@ -11,6 +11,23 @@ import type {
   BattleRuleError as BattleRuleErrorType
 } from "./battle-types"
 
+// 简单的日志写入函数
+function writeLog(message: string) {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const logDir = path.join(process.cwd(), 'logs')
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true })
+    }
+    const logFile = path.join(logDir, 'game.log')
+    const timestamp = new Date().toISOString()
+    fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`)
+  } catch {
+    // 忽略日志写入错误
+  }
+}
+
 // 重新导出类型，保持向后兼容
 export type {
   TurnPhase,
@@ -86,12 +103,41 @@ function restorePieceRules(state: BattleState): void {
   })
 }
 
+// ─── 辅助函数：恢复玩家规则的 effect 函数（用于 API 传输后重新加载）────────────────
+function restorePlayerRules(state: BattleState): void {
+  state.players.forEach(player => {
+    // 确保 rules 数组存在
+    if (!player.rules) {
+      player.rules = []
+    }
+
+    // 恢复现有规则的 effect 函数
+    if (player.rules.length > 0) {
+      player.rules.forEach((rule: any) => {
+        // 如果 effect 不是函数，尝试重新加载
+        if (typeof rule.effect !== 'function' && rule.id) {
+          try {
+            const reloadedRule = loadRuleById(rule.id)
+            if (reloadedRule && typeof reloadedRule.effect === 'function') {
+              rule.effect = reloadedRule.effect
+            }
+          } catch {
+            // 忽略规则重载错误
+          }
+        }
+      })
+    }
+  })
+}
+
 // ─── 辅助函数：安全地克隆 BattleState（处理函数无法克隆的问题）────────────────
 function safeCloneBattleState(state: BattleState): BattleState {
   // 临时存储所有棋子的规则函数
   const pieceRulesFunctions: Map<number, any[]> = new Map()
+  // 临时存储所有玩家的规则函数
+  const playerRulesFunctions: Map<number, any[]> = new Map()
 
-  // 提取函数
+  // 提取棋子规则函数
   state.pieces.forEach((piece, index) => {
     if (piece.rules && piece.rules.length > 0) {
       pieceRulesFunctions.set(index, piece.rules.map(rule => rule.effect))
@@ -102,10 +148,23 @@ function safeCloneBattleState(state: BattleState): BattleState {
     }
   })
 
+  // 提取玩家规则函数
+  state.players.forEach((player, index) => {
+    const playerRules = (player as any).rules
+    if (playerRules && Array.isArray(playerRules) && playerRules.length > 0) {
+      const effects = playerRules.map((rule: any) => rule.effect)
+      playerRulesFunctions.set(index, effects)
+      // 移除函数以便克隆
+      playerRules.forEach((rule: any) => {
+        delete rule.effect
+      })
+    }
+  })
+
   // 克隆状态
   const cloned = structuredClone(state) as BattleState
    
-  // 恢复函数到原始状态
+  // 恢复棋子规则函数到原始状态
   state.pieces.forEach((piece, index) => {
     if (piece.rules && piece.rules.length > 0) {
       const functions = pieceRulesFunctions.get(index)
@@ -116,6 +175,24 @@ function safeCloneBattleState(state: BattleState): BattleState {
         // 同时恢复克隆对象中的函数
         if (cloned.pieces[index].rules) {
           cloned.pieces[index].rules.forEach((rule: any, ruleIndex: number) => {
+            rule.effect = functions[ruleIndex]
+          })
+        }
+      }
+    }
+  })
+
+  // 恢复玩家规则函数到原始状态
+  state.players.forEach((player, index) => {
+    if ((player as any).rules && (player as any).rules.length > 0) {
+      const functions = playerRulesFunctions.get(index)
+      if (functions) {
+        (player as any).rules.forEach((rule: any, ruleIndex: number) => {
+          rule.effect = functions[ruleIndex]
+        })
+        // 同时恢复克隆对象中的函数
+        if ((cloned.players[index] as any).rules) {
+          (cloned.players[index] as any).rules.forEach((rule: any, ruleIndex: number) => {
             rule.effect = functions[ruleIndex]
           })
         }
@@ -263,7 +340,13 @@ function getPlayerMeta(state: BattleState, playerId: PlayerId): PlayerTurnMeta {
 }
 
 function isCurrentPlayer(state: BattleState, playerId: PlayerId): boolean {
-  return state.turn.currentPlayerId === playerId
+  // 使用大小写不敏感的比较
+  return state.turn.currentPlayerId.toLowerCase() === playerId.toLowerCase()
+}
+
+// 辅助函数：大小写不敏感地比较两个玩家ID
+function isSamePlayer(playerId1: PlayerId, playerId2: PlayerId): boolean {
+  return playerId1.toLowerCase() === playerId2.toLowerCase()
 }
 
 function isCellOccupied(state: BattleState, x: number, y: number): boolean {
@@ -323,21 +406,25 @@ export function applyBattleAction(
   state: BattleState,
   action: BattleAction,
 ): BattleState {
-  // 恢复棋子规则的 effect 函数（API 传输后函数会丢失）
+  // 恢复棋子和玩家规则的 effect 函数（API 传输后函数会丢失）
   restorePieceRules(state)
+  restorePlayerRules(state)
 
   switch (action.type) {
     case "beginPhase": {
       const next = safeCloneBattleState(state)
+      writeLog('[beginPhase] Current phase: ' + next.turn.phase + ', gameStartFired: ' + next.gameStartFired + ', turnNumber: ' + next.turn.turnNumber)
       if (next.turn.phase === "start") {
         // ── 游戏开始时触发一次 gameStart 规则（第一回合第一个 beginPhase）────
         if (!next.gameStartFired && next.turn.turnNumber === 1) {
+          writeLog('[beginPhase] Triggering gameStart rules...')
           next.gameStartFired = true
           const gameStartResult = globalTriggerSystem.checkTriggers(next, {
             type: "gameStart",
             playerId: next.turn.currentPlayerId,
             turnNumber: 1
           })
+          writeLog('[beginPhase] gameStart result: ' + JSON.stringify(gameStartResult))
           if (gameStartResult.success && gameStartResult.messages.length > 0) {
             if (!next.actions) next.actions = []
             gameStartResult.messages.forEach(message => {
@@ -347,7 +434,7 @@ export function applyBattleAction(
         }
 
         // 获取当前玩家的所有棋子
-        const currentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0);
+        const currentPlayerPieces = next.pieces.filter(p => isSamePlayer(p.ownerPlayerId, next.turn.currentPlayerId) && p.currentHp > 0);
         // 触发回合开始效果，为每个存活的棋子都触发一次
         currentPlayerPieces.forEach(piece => {
           const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
@@ -388,7 +475,7 @@ export function applyBattleAction(
         // 更新当前玩家棋子技能的冷却时间
         next.pieces.forEach(piece => {
           // 只减少当前玩家棋子的技能冷却
-          if (piece.ownerPlayerId === next.turn.currentPlayerId && piece.skills) {
+          if (isSamePlayer(piece.ownerPlayerId, next.turn.currentPlayerId) && piece.skills) {
             piece.skills.forEach(skill => {
               if (skill.currentCooldown && skill.currentCooldown > 0) {
                 skill.currentCooldown--
@@ -424,7 +511,7 @@ export function applyBattleAction(
         // ── 特殊地形效果（每回合开始时，对当前玩家的棋子生效）────────────────
         // 快照避免熔岩致死后影响当前遍历
         const tileEffectPieces = next.pieces.filter(
-          (p) => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0,
+          (p) => isSamePlayer(p.ownerPlayerId, next.turn.currentPlayerId) && p.currentHp > 0,
         )
         for (const piece of tileEffectPieces) {
           if (piece.x == null || piece.y == null) continue
@@ -444,7 +531,7 @@ export function applyBattleAction(
 
           // 充能台：直接给玩家加充能点（无护盾/触发器概念，简单累加）
           if (tile.props.chargePerTurn && tile.props.chargePerTurn > 0 && piece.currentHp > 0) {
-            const playerMeta = next.players.find((p) => p.playerId === piece.ownerPlayerId)
+            const playerMeta = next.players.find((p) => isSamePlayer(p.playerId, piece.ownerPlayerId))
             if (playerMeta) {
               playerMeta.chargePoints += tile.props.chargePerTurn
               if (!next.actions) next.actions = []
@@ -467,7 +554,7 @@ export function applyBattleAction(
       if (next.turn.phase === "end") {
         // 下一个玩家的回合开始
         const currentIndex = next.players.findIndex(
-          (p) => p.playerId === next.turn.currentPlayerId,
+          (p) => isSamePlayer(p.playerId, next.turn.currentPlayerId),
         )
         const nextIndex =
           currentIndex === -1
@@ -497,7 +584,7 @@ export function applyBattleAction(
         }
         
         // 获取当前玩家的所有棋子
-        const currentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0);
+        const currentPlayerPieces = next.pieces.filter(p => isSamePlayer(p.ownerPlayerId, next.turn.currentPlayerId) && p.currentHp > 0);
         
         // 触发回合开始效果，为每个存活的棋子都触发一次
         currentPlayerPieces.forEach(piece => {
@@ -532,7 +619,7 @@ export function applyBattleAction(
         // 更新当前玩家棋子技能的冷却时间
         next.pieces.forEach(piece => {
           // 只减少当前玩家棋子的技能冷却
-          if (piece.ownerPlayerId === next.turn.currentPlayerId && piece.skills) {
+          if (isSamePlayer(piece.ownerPlayerId, next.turn.currentPlayerId) && piece.skills) {
             piece.skills.forEach(skill => {
               if (skill.currentCooldown && skill.currentCooldown > 0) {
                 skill.currentCooldown--
@@ -567,7 +654,7 @@ export function applyBattleAction(
         
         // 特殊地形效果（每回合开始时，对当前玩家的棋子生效）
         const tileEffectPieces = next.pieces.filter(
-          (p) => p.ownerPlayerId === next.turn.currentPlayerId && p.currentHp > 0,
+          (p) => isSamePlayer(p.ownerPlayerId, next.turn.currentPlayerId) && p.currentHp > 0,
         )
         for (const piece of tileEffectPieces) {
           if (piece.x == null || piece.y == null) continue
@@ -586,7 +673,7 @@ export function applyBattleAction(
 
           // 充能台
           if (tile.props.chargePerTurn && tile.props.chargePerTurn > 0 && piece.currentHp > 0) {
-            const playerMeta = next.players.find((p) => p.playerId === piece.ownerPlayerId)
+            const playerMeta = next.players.find((p) => isSamePlayer(p.playerId, piece.ownerPlayerId))
             if (playerMeta) {
               playerMeta.chargePoints += tile.props.chargePerTurn
               if (!next.actions) next.actions = []
@@ -658,7 +745,7 @@ export function applyBattleAction(
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
-          p.ownerPlayerId === action.playerId &&
+          isSamePlayer(p.ownerPlayerId, action.playerId) &&
           p.currentHp > 0,
       )
       if (!piece) {
@@ -807,7 +894,7 @@ export function applyBattleAction(
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
-          p.ownerPlayerId === action.playerId &&
+          isSamePlayer(p.ownerPlayerId, action.playerId) &&
           p.currentHp > 0,
       )
       if (!piece) {
@@ -1073,7 +1160,7 @@ export function applyBattleAction(
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
-          p.ownerPlayerId === action.playerId &&
+          isSamePlayer(p.ownerPlayerId, action.playerId) &&
           p.currentHp > 0,
       )
       if (!piece) {
@@ -1362,9 +1449,9 @@ export function applyBattleAction(
 
       const next = safeCloneBattleState(state)
       // 获取当前玩家的所有棋子
-      const currentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId === action.playerId && p.currentHp > 0);
+      const currentPlayerPieces = next.pieces.filter(p => isSamePlayer(p.ownerPlayerId, action.playerId) && p.currentHp > 0);
       // 获取对方玩家的所有棋子（用于触发如暴风雪等对方回合结束时触发的规则）
-      const opponentPlayerPieces = next.pieces.filter(p => p.ownerPlayerId !== action.playerId && p.currentHp > 0);
+      const opponentPlayerPieces = next.pieces.filter(p => !isSamePlayer(p.ownerPlayerId, action.playerId) && p.currentHp > 0);
       
       // 触发回合结束效果，为每个存活的棋子都触发一次
       currentPlayerPieces.forEach(piece => {
@@ -1452,7 +1539,7 @@ export function applyBattleAction(
       // 在回合结束阶段的最后时刻，处理当前玩家棋子的状态效果持续时间扣除和规则移除
       next.pieces.forEach(piece => {
         // 只处理当前玩家棋子的状态效果
-        if (piece.ownerPlayerId === action.playerId && piece.statusTags) {
+        if (isSamePlayer(piece.ownerPlayerId, action.playerId) && piece.statusTags) {
           // 遍历所有状态标签
           for (let i = piece.statusTags.length - 1; i >= 0; i--) {
             const statusTag = piece.statusTags[i];
@@ -1511,7 +1598,7 @@ export function applyBattleAction(
 
       // 找到投降玩家的所有棋子并设置为阵亡
       next.pieces.forEach(piece => {
-        if (piece.ownerPlayerId === action.playerId) {
+        if (isSamePlayer(piece.ownerPlayerId, action.playerId)) {
           piece.currentHp = 0
         }
       })

@@ -2,6 +2,23 @@ import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import { globalTriggerSystem } from "./triggers"
 
+// 简单的日志写入函数
+function writeLog(message: string) {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const logDir = path.join(process.cwd(), 'logs')
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true })
+    }
+    const logFile = path.join(logDir, 'game.log')
+    const timestamp = new Date().toISOString()
+    fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`)
+  } catch {
+    // 忽略日志写入错误
+  }
+}
+
 // 效果函数类型
 type EffectFunction = (battle: BattleState, context: any) => { success: boolean; message?: string; blocked?: boolean }
 
@@ -355,6 +372,7 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
           // 触发技能的效果（原有逻辑）
           effectFunction = (battle: BattleState, context: any) => {
             const skillId = ruleData.effect.skillId;
+            writeLog(`[triggerSkill] Triggering skill: ${skillId} for rule: ${ruleId}, context.playerId: ${context.playerId}`);
             if (skillId) {
               console.log(`Triggering skill: ${skillId} for rule: ${ruleId}`);
               // 直接从文件加载技能定义，使用process.cwd()确保路径正确
@@ -598,7 +616,9 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                   `;
                   
                   // 执行技能代码
+                  writeLog(`[triggerSkill] Executing skill code for ${skillId}...`);
                   const result = eval(fullSkillCode);
+                  writeLog(`[triggerSkill] Skill execution result for ${skillId}: ${JSON.stringify(result)}`);
                   console.log(`Skill execution result:`, result);
                   return result;
                 } catch (error) {

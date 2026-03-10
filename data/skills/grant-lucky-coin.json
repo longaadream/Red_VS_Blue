@@ -10,5 +10,5 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { var player = context.battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player) return { success: false, message: '' }; addCardToHand('lucky-coin', player.playerId); return { success: true, message: (player.name || player.playerId) + ' 获得了幸运币' }; }"
+  "code": "function executeSkill(context) { try { console.log('[grant-lucky-coin] context.playerId:', context.playerId); var player = battle.players.find(function(p) { return p.playerId.toLowerCase() === context.playerId.toLowerCase(); }); if (!player) { console.log('[grant-lucky-coin] Player not found'); return { success: false, message: 'Player not found' }; } console.log('[grant-lucky-coin] Found player:', player.playerId); var result = addCardToHand('lucky-coin', player.playerId); console.log('[grant-lucky-coin] addCardToHand result:', result); return { success: result, message: (player.name || player.playerId) + ' 获得了幸运币' }; } catch (e) { console.error('[grant-lucky-coin] Error:', e); return { success: false, message: 'Error: ' + e.message }; } }"
 }

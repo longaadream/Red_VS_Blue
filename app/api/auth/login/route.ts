@@ -58,8 +58,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 确保返回的 user.id 是小写
+    const userWithLowerCaseId = {
+      ...user,
+      id: user.id.toLowerCase()
+    }
+
     return NextResponse.json<LoginResponse>(
-      { success: true, user },
+      { success: true, user: userWithLowerCaseId },
       { status: 200 }
     )
   } catch (error) {

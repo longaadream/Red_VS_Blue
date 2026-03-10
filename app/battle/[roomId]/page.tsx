@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Swords, Shield, Zap, Footprints } from "lucide-reac
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { GameBoard } from "@/components/game-board"
 import type { BattleState, BattleAction } from "@/lib/game/turn"
@@ -44,14 +45,15 @@ export default function BattlePage() {
     }
   }, [params])
 
-  // 从URL参数获取玩家ID
+  // 从URL参数获取玩家ID（强制小写）
   useEffect(() => {
     const playerId = searchParams.get("playerId")
     if (playerId && battle?.players) {
-      // 查找对应的玩家
-      const player = battle.players.find(p => p.playerId === playerId)
+      // 查找对应的玩家（使用小写比较）
+      const normalizedPlayerId = playerId.toLowerCase()
+      const player = battle.players.find(p => p.playerId === normalizedPlayerId)
       if (player) {
-        setCurrentPlayerId(player.playerId)
+        setCurrentPlayerId(player.playerId) // 使用服务器返回的小写ID
       }
     }
   }, [searchParams, battle])
@@ -164,10 +166,11 @@ export default function BattlePage() {
     if (battle?.players?.length > 0 && !currentPlayerId) {
       const storedPlayerId = localStorage.getItem(`battle-player-${roomId}`)
       if (storedPlayerId) {
-        // 检查存储的玩家 ID 是否存在于当前战斗中
-        const playerExists = battle.players.some(p => p.playerId.toLowerCase() === storedPlayerId.toLowerCase())
-        if (playerExists) {
-          setCurrentPlayerId(storedPlayerId)
+        // 检查存储的玩家 ID 是否存在于当前战斗中（使用小写比较）
+        const normalizedStoredId = storedPlayerId.toLowerCase()
+        const player = battle.players.find(p => p.playerId === normalizedStoredId)
+        if (player) {
+          setCurrentPlayerId(player.playerId) // 使用服务器返回的小写ID
         }
       }
       // 不再默认选择第一个玩家，强制显示选择界面
@@ -253,7 +256,7 @@ export default function BattlePage() {
       if (remainingPlayers.length === 1) {
         // 显示游戏结束消息
         const winner = remainingPlayers[0]
-        const isCurrentPlayerWinner = winner.playerId.toLowerCase() === currentPlayerId?.toLowerCase()
+        const isCurrentPlayerWinner = winner.playerId === currentPlayerId
         
         // 使用toast通知显示胜利/失败消息
         toast(isCurrentPlayerWinner ? "恭喜你获胜了！" : `你输了，${winner.playerId} 获胜！`)
@@ -289,12 +292,12 @@ export default function BattlePage() {
 
   const isMyTurn = useMemo(() => {
     if (!room || !battle || !currentPlayerId) return false
-    return battle.turn.currentPlayerId.toLowerCase() === currentPlayerId.toLowerCase()
+    return battle.turn.currentPlayerId === currentPlayerId
   }, [room, battle, currentPlayerId])
 
   const myPieces = useMemo(() => {
     if (!battle || !currentPlayerId) return []
-    return battle.pieces.filter((p) => p.ownerPlayerId.toLowerCase() === currentPlayerId.toLowerCase() && p.currentHp > 0)
+    return battle.pieces.filter((p) => p.ownerPlayerId === currentPlayerId && p.currentHp > 0)
   }, [battle, currentPlayerId])
 
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null)
@@ -317,7 +320,7 @@ export default function BattlePage() {
     if (!selectedPieceId || !battle || !currentPlayerId) return null
     const piece = battle.pieces.find(p => p.instanceId === selectedPieceId)
     // 只有己方棋子才能被选中为当前操作棋子
-    if (piece && piece.ownerPlayerId.toLowerCase() === currentPlayerId.toLowerCase()) {
+    if (piece && piece.ownerPlayerId === currentPlayerId) {
       return piece
     }
     return null
@@ -502,7 +505,7 @@ export default function BattlePage() {
                       } else {
                         // 检查点击的是否是己方棋子
                         const clickedPiece = battle.pieces.find(p => p.instanceId === pieceId);
-                        if (clickedPiece && clickedPiece.ownerPlayerId.toLowerCase() === currentPlayerId?.toLowerCase()) {
+                        if (clickedPiece && clickedPiece.ownerPlayerId === currentPlayerId) {
                           setSelectedPieceId(pieceId);
                           // 重置选择状态
                           setIsSelectingMoveTarget(false);
@@ -574,14 +577,14 @@ export default function BattlePage() {
             </Card>
 
             {/* 显示所有棋子，包括存活的和死亡的（从墓地中获取） */}
-            {battle && (battle.pieces.filter(p => p.ownerPlayerId.toLowerCase() === currentPlayerId?.toLowerCase()).length + (battle.graveyard?.filter(p => p.ownerPlayerId.toLowerCase() === currentPlayerId?.toLowerCase()).length || 0)) > 0 && (
+            {battle && (battle.pieces.filter(p => p.ownerPlayerId === currentPlayerId).length + (battle.graveyard?.filter(p => p.ownerPlayerId === currentPlayerId).length || 0)) > 0 && (
               <Card className="bg-zinc-900/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm">我的棋子</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* 筛选出当前玩家的所有存活棋子 */}
-                  {battle.pieces.filter(p => p.ownerPlayerId.toLowerCase() === currentPlayerId?.toLowerCase() && p.currentHp > 0).map((piece) => (
+                  {battle.pieces.filter(p => p.ownerPlayerId === currentPlayerId && p.currentHp > 0).map((piece) => (
                       <div 
                         key={piece.instanceId} 
                         className={`group relative flex items-center gap-4 cursor-pointer rounded-md p-2 transition-colors ${
@@ -761,7 +764,7 @@ export default function BattlePage() {
                       </div>
                     ))}
                   {/* 筛选出当前玩家的所有死亡棋子（从墓地中获取） */}
-                  {battle.graveyard?.filter(p => p.ownerPlayerId.toLowerCase() === currentPlayerId?.toLowerCase()).map((piece) => (
+                  {battle.graveyard?.filter(p => p.ownerPlayerId === currentPlayerId).map((piece) => (
                       <div 
                         key={piece.instanceId} 
                         className={`group relative flex items-center gap-4 cursor-pointer rounded-md p-2 transition-colors ${'bg-zinc-900/50 opacity-70'}`}
@@ -867,10 +870,10 @@ export default function BattlePage() {
             {(() => {
               // 显示所有对方棋子，包括存活的和死亡的（从墓地中获取）
               const opponentAlivePieces = battle.pieces.filter(p => 
-                p.ownerPlayerId.toLowerCase() !== currentPlayerId?.toLowerCase() && p.currentHp > 0
+                p.ownerPlayerId !== currentPlayerId && p.currentHp > 0
               )
               const opponentDeadPieces = battle.graveyard?.filter(p => 
-                p.ownerPlayerId.toLowerCase() !== currentPlayerId?.toLowerCase()
+                p.ownerPlayerId !== currentPlayerId
               ) || []
               const totalOpponentPieces = opponentAlivePieces.length + opponentDeadPieces.length
               return totalOpponentPieces > 0 ? (
@@ -1260,7 +1263,7 @@ export default function BattlePage() {
                   <div className="mb-2 text-xs text-zinc-400">当前回合</div>
                   {(() => {
                     const currentPlayer = battle.players.find(p => p.playerId === battle.turn.currentPlayerId)
-                    const isCurrentPlayer = currentPlayer?.playerId.toLowerCase() === currentPlayerId?.toLowerCase()
+                    const isCurrentPlayer = currentPlayer?.playerId === currentPlayerId
                     const playerName = room?.players.find(p => p.id === currentPlayer?.playerId)?.name || currentPlayer?.playerId || "未知"
                     const playerPiece = battle.pieces.find(p => p.ownerPlayerId === currentPlayer?.playerId)
                     const isRed = playerPiece?.faction === "red"
@@ -1493,8 +1496,8 @@ export default function BattlePage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {battle.players.map((player) => {
-                  const isCurrentPlayer = player.playerId.toLowerCase() === currentPlayerId?.toLowerCase()
-                  const playerPiece = battle.pieces.find(p => p.ownerPlayerId.toLowerCase() === player.playerId.toLowerCase())
+                  const isCurrentPlayer = player.playerId === currentPlayerId
+                  const playerPiece = battle.pieces.find(p => p.ownerPlayerId === player.playerId)
                   // 从 room.players 中获取玩家的昵称
                   const playerName = room?.players.find(p => p.id === player.playerId)?.name || player.playerId
                   return (
@@ -1519,7 +1522,7 @@ export default function BattlePage() {
                       <div className="flex items-center gap-2 text-xs">
                         <span className="flex items-center gap-1 text-zinc-300">
                           <Swords className="h-3 w-3" />
-                          {battle.pieces.filter(p => p.ownerPlayerId.toLowerCase() === player.playerId.toLowerCase() && p.currentHp > 0).length}
+                          {battle.pieces.filter(p => p.ownerPlayerId === player.playerId && p.currentHp > 0).length}
                         </span>
                         <span className="flex items-center gap-1 text-yellow-400">
                           <Zap className="h-3 w-3" />
@@ -1535,6 +1538,14 @@ export default function BattlePage() {
                 })}
               </CardContent>
             </Card>
+
+            {/* 手牌区 */}
+            <HandArea 
+              battle={battle} 
+              currentPlayerId={currentPlayerId} 
+              isMyTurn={isMyTurn}
+              sendBattleAction={sendBattleAction}
+            />
 
             <Card className="bg-zinc-900/50">
               <CardContent className="p-4">
@@ -1573,5 +1584,112 @@ export default function BattlePage() {
         </div>
       </div>
     </main>
+  )
+}
+
+// 卡牌定义类型
+interface CardDefinition {
+  id: string
+  name: string
+  description: string
+  type: "active" | "reactive"
+  icon?: string
+}
+
+// 手牌区组件
+function HandArea({ 
+  battle, 
+  currentPlayerId, 
+  isMyTurn,
+  sendBattleAction 
+}: { 
+  battle: BattleState
+  currentPlayerId: string | null
+  isMyTurn: boolean
+  sendBattleAction: (action: BattleAction) => void
+}) {
+  const [cardCache, setCardCache] = useState<Map<string, CardDefinition>>(new Map())
+  
+  const myMeta = battle.players.find(p => p.playerId === currentPlayerId)
+  const hand = myMeta?.hand ?? []
+  const canPlay = isMyTurn && battle.turn.phase === "action"
+  
+  // 加载卡牌定义
+  useEffect(() => {
+    async function loadCardDefinitions() {
+      const newCache = new Map(cardCache)
+      const cardIds = hand.map(card => card.cardId)
+      const uniqueCardIds = [...new Set(cardIds)].filter(id => !newCache.has(id))
+      
+      if (uniqueCardIds.length === 0) return
+      
+      for (const cardId of uniqueCardIds) {
+        try {
+          const response = await fetch(`/api/cards/${cardId}`)
+          if (response.ok) {
+            const cardDef: CardDefinition = await response.json()
+            newCache.set(cardId, cardDef)
+          }
+        } catch {
+          // 忽略加载错误
+        }
+      }
+      
+      setCardCache(newCache)
+    }
+    
+    loadCardDefinitions()
+  }, [hand])
+  
+  return (
+    <Card className="bg-zinc-900/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">手牌 ({hand.length}/10)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {hand.length === 0 ? (
+          <div className="text-xs text-zinc-500 italic">
+            {canPlay ? "暂无手牌" : "等待回合开始..."}
+          </div>
+        ) : (
+          <TooltipProvider>
+            <div className="flex flex-wrap gap-2">
+              {hand.map((card) => {
+                const cardDef = cardCache.get(card.cardId)
+                return (
+                  <Tooltip key={card.instanceId}>
+                    <TooltipTrigger asChild>
+                      <button
+                        disabled={!canPlay}
+                        onClick={() => currentPlayerId && sendBattleAction({ type: "playCard", playerId: currentPlayerId, cardInstanceId: card.instanceId })}
+                        className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {card.name || card.cardId}
+                      </button>
+                    </TooltipTrigger>
+                    {cardDef && (
+                      <TooltipContent 
+                        side="top" 
+                        className="max-w-xs bg-zinc-800 border-zinc-700 text-zinc-100"
+                      >
+                        <div className="space-y-1">
+                          <div className="font-semibold text-yellow-400">{cardDef.name}</div>
+                          <div className="text-xs text-zinc-400">
+                            类型: {cardDef.type === "active" ? "主动" : "被动"}
+                          </div>
+                          <div className="text-xs text-zinc-300 leading-relaxed">
+                            {cardDef.description}
+                          </div>
+                        </div>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                )
+              })}
+            </div>
+          </TooltipProvider>
+        )}
+      </CardContent>
+    </Card>
   )
 }

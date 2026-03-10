@@ -1,0 +1,16 @@
+{
+  "id": "starfall",
+  "name": "群星陨落",
+  "description": "召唤星辰领域，持续X回合（X=当前圣光手牌数）。领域持续期间：每回合对2个随机敌人造成5点伤害；使用圣光手牌时额外对1个敌人造成3点伤害；领域结束时根据使用的圣光手牌数为友方恢复生命（每张3点）",
+  "icon": "⭐",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 2,
+  "maxCharges": 3,
+  "chargeCost": 3,
+  "powerMultiplier": 1,
+  "actionPointCost": 3,
+  "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); const holyCards = player.hand.filter(function(c) { return c.id.startsWith('holy-'); }); const duration = Math.max(1, holyCards.length); addStatusEffectById(caster.instanceId, { id: 'starfall-aura', type: 'aura', currentDuration: duration, currentUses: -1, intensity: 5, stacks: 1, relatedRules: ['rule-starfall-turn-start', 'rule-starfall-card-used'] }); addRuleById(caster.instanceId, 'rule-starfall-turn-start'); addRuleById(caster.instanceId, 'rule-starfall-card-used'); addStatusEffectById(caster.instanceId, { id: 'starfall-heal-tracker', type: 'tracker', currentDuration: duration, currentUses: 0, intensity: 3, stacks: 1, relatedRules: ['rule-starfall-end'] }); addRuleById(caster.instanceId, 'rule-starfall-end'); return { message: caster.name + '召唤群星陨落！星辰领域持续' + duration + '回合', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '根据手牌数召唤持续回合的星辰领域，期间持续伤害+手牌协同', expectedValues: {} }; }",
+  "range": "all-enemies"
+}

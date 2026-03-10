@@ -41,6 +41,8 @@ export default function PieceSelectionPage() {
   const [showDetails, setShowDetails] = useState(false)
   const [selectedPiece, setSelectedPiece] = useState<PieceTemplate | null>(null)
   const [expandedSkills, setExpandedSkills] = useState<Record<string, boolean>>({})
+  const fetchRequestIdRef = useRef(0)
+  const lastSelectTimeRef = useRef(0)
 
   // 检查用户登录状态
   useEffect(() => {
@@ -81,10 +83,19 @@ export default function PieceSelectionPage() {
       return
     }
 
-    console.log('Fetching room status:', { roomId: trimmedRoomId })
+    // 如果在选择棋子后的2秒内，跳过这次轮询
+    const timeSinceLastSelect = Date.now() - lastSelectTimeRef.current
+    if (timeSinceLastSelect < 2000) {
+      console.log('Skipping fetch, recently selected pieces:', timeSinceLastSelect, 'ms ago')
+      return
+    }
+
+    // 生成新的请求ID
+    const requestId = ++fetchRequestIdRef.current
+    console.log('Fetching room status:', { roomId: trimmedRoomId, requestId })
     const apiUrl = `/api/rooms/${encodeURIComponent(trimmedRoomId)}`
     console.log('API request URL:', apiUrl)
-    
+
     fetch(apiUrl)
       .then(res => {
         console.log('Fetch response details:', {
@@ -131,13 +142,16 @@ export default function PieceSelectionPage() {
           setRoomStatus(data.players.length === 2 ? "ready" : "waiting")
           
           // 更新玩家列表和棋子选择状态
+          const trimmedUserId = user.id.trim()
           const players = data.players.map((p: any) => {
             // 确保正确计算玩家的选择状态，处理undefined情况
-            const isCurrentPlayer = p.id.trim() === user.id.trim()
+            const isCurrentPlayer = p.id.trim() === trimmedUserId
             // 计算玩家的实际选择状态，不强制将当前玩家标记为已选择
             const hasSelected = Boolean(p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
             console.log('Processing player:', {
               name: p.name,
+              playerId: p.id,
+              trimmedUserId,
               isCurrentPlayer,
               hasSelectedPiecesFromAPI: p.hasSelectedPieces,
               selectedPiecesFromAPI: p.selectedPieces,
@@ -154,7 +168,7 @@ export default function PieceSelectionPage() {
           setRoomPlayers(players)
           
           // 更新当前玩家的选择状态
-          const currentPlayer = data.players.find((p: any) => p.id.trim() === user.id.trim())
+          const currentPlayer = data.players.find((p: any) => p.id.trim() === trimmedUserId)
           const currentPlayerHasSelected = currentPlayer ? Boolean(currentPlayer.hasSelectedPieces === true || (currentPlayer.selectedPieces && currentPlayer.selectedPieces.length > 0)) : false
           setCurrentPlayerSelected(currentPlayerHasSelected)
           setIsPiecesSelected(currentPlayerHasSelected)
@@ -272,8 +286,9 @@ export default function PieceSelectionPage() {
           const roomRes = await fetch(`/api/rooms/${encodeURIComponent(trimmedRoomId)}`)
           if (roomRes.ok) {
             const roomData = await roomRes.json()
+            const trimmedUserId = user.id.trim()
             const isAlreadyInRoom = roomData.players.some(
-              (p: any) => p.id.trim() === user.id.trim()
+              (p: any) => p.id.trim() === trimmedUserId
             )
             if (isAlreadyInRoom) {
               // 如果玩家已经在房间中，调用 claim-faction 来获取实际分配的阵营
@@ -454,8 +469,11 @@ export default function PieceSelectionPage() {
     }
     setLoading(true)
 
+    // 记录选择棋子的时间，用于跳过轮询
+    lastSelectTimeRef.current = Date.now()
+
     const selectedPieces = playerFaction === "red" ? redSelectedPieces : blueSelectedPieces
-    
+
     console.log('=== Select Pieces Operation ===')
     console.log('Input parameters:', {
       roomId: {
@@ -515,42 +533,41 @@ export default function PieceSelectionPage() {
             console.log('Using backend returned room data to update local state:', data.room.players)
             
             // 计算所有玩家的选择状态
-            const playersWithStatus = data.room.players.map((p: any) => ({
-              id: p.id,
+            const trimmedUserId = user.id.trim()
+            const currentPlayerFromServer = data.room.players.find((p: any) => p.id.trim() === trimmedUserId)
+            const hasActuallySelected = currentPlayerFromServer ? 
+              Boolean(currentPlayerFromServer.hasSelectedPieces === true || (currentPlayerFromServer.selectedPieces && currentPlayerFromServer.selectedPieces.length > 0)) : 
+              false
+
+            console.log('Current player from server:', {
+              player: currentPlayerFromServer,
+              hasActuallySelected
+            })
+
+            // 更新玩家列表状态（使用后端返回的数据）
+            const players = data.room.players.map((p: any) => ({
               name: p.name,
-              hasSelected: Boolean(p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0)),
-              isCurrentPlayer: p.id.trim() === user.id.trim()
+              hasSelectedPieces: Boolean(p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
             }))
-            
-            console.log('Players with selection status:', playersWithStatus)
-            
-            // 检查是否所有玩家都已选择完成（至少2个玩家）
-            const allSelected = data.room.players.length >= 2 && playersWithStatus.every(p => p.hasSelected)
-            console.log('All players selected check:', allSelected)
-            
-            // 无论是否所有玩家都已选择，都更新本地状态
-            console.log('Updating local state after piece selection')
-            
-            // 只在玩家真正选择了棋子后才更新状态
-            const hasActuallySelected = selectedPieces.length > 0
+            console.log('Updated room players:', players)
+            setRoomPlayers(players)
+
+            // 更新当前玩家的选择状态（使用后端返回的数据）
             setIsPiecesSelected(hasActuallySelected)
             setCurrentPlayerSelected(hasActuallySelected)
-            
-            // 更新玩家列表状态
-            const players = data.room.players.map((p: any) => {
-              const isCurrentPlayer = p.id.trim() === user.id.trim()
-              return {
-                name: p.name,
-                hasSelectedPieces: isCurrentPlayer ? hasActuallySelected : Boolean(p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
-              }
-            })
-            console.log('Updated room players with current player status:', players)
-            setRoomPlayers(players)
-            
-            // 选择棋子后立即获取最新的房间状态，检查游戏是否已经启动
-            // 游戏启动的逻辑现在由后端处理，前端只需要检查状态并跳转
-            console.log('Checking if game has started on server')
-            fetchRoomStatus()
+
+            // 检查是否所有玩家都已选择完成（至少2个玩家）
+            const allSelected = data.room.players.length >= 2 && data.room.players.every((p: any) => 
+              Boolean(p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
+            )
+            console.log('All players selected check:', allSelected)
+            setAllPlayersSelected(allSelected)
+
+            // 如果所有玩家都已选择，自动开始游戏
+            if (allSelected) {
+              console.log('All players have selected pieces, auto-starting game')
+              handleStartGame()
+            }
           } else {
             // 如果后端返回的数据中没有房间信息，根据实际选择情况更新状态
             console.log('No room data in response, updating local state based on actual selection')
@@ -558,7 +575,7 @@ export default function PieceSelectionPage() {
             setIsPiecesSelected(hasActuallySelected)
             setCurrentPlayerSelected(hasActuallySelected)
             
-            // 即使没有房间数据，也获取最新的房间状态
+            // 只有在没有房间数据时才需要重新获取
             fetchRoomStatus()
           }
         } else {

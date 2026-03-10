@@ -55,8 +55,8 @@ export async function POST(req: NextRequest) {
 
   const { name, hostId, mapId, visibility } = (body as { name?: string; hostId?: string; mapId?: string; visibility?: "private" | "public" }) ?? {}
 
-  // 生成5位的数字和字母组合作为房间ID
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  // 生成5位的数字和字母组合作为房间ID（强制小写）
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
   let roomId = ''
   for (let i = 0; i < 5; i++) {
     roomId += chars.charAt(Math.floor(Math.random() * chars.length))

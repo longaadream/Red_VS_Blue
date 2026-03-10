@@ -1,0 +1,13 @@
+{
+  "id": "elune-guidance",
+  "name": "艾露恩的指引",
+  "description": "被动：每当己方使用圣光手牌时，获得1层月华（最多2层）。月华达到2层时，为生命值最低的友方恢复5点生命",
+  "icon": "✨",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { return { success: true }; }"
+}

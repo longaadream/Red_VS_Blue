@@ -1,0 +1,13 @@
+{
+  "id": "elune-guidance-trigger",
+  "name": "艾露恩的指引触发",
+  "description": "使用圣光手牌时触发，累积月华层数",
+  "icon": "✨",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { const battle = context.battle; const sourcePiece = context.sourcePiece; if (!sourcePiece) return { success: false }; const tyrande = battle.pieces.find(function(p) { return p.templateId === 'tyrande' && p.faction === sourcePiece.faction && p.currentHp > 0; }); if (!tyrande) return { success: false }; const moonGlow = tyrande.statusTags ? tyrande.statusTags.find(function(t) { return t.id === 'moon-glow'; }) : null; let currentStacks = moonGlow ? moonGlow.stacks : 0; currentStacks++; if (currentStacks >= 2) { const allies = battle.pieces.filter(function(p) { return p.faction === tyrande.faction && p.currentHp > 0; }); if (allies.length > 0) { const target = allies.sort(function(a, b) { return a.currentHp - b.currentHp; })[0]; healDamage(tyrande, target, 5, battle, 'elune-guidance'); if (moonGlow) { removeStatusEffectById(tyrande.instanceId, 'moon-glow'); } return { success: true, message: '艾露恩的指引：为' + target.name + '恢复5点生命' }; } } else { addStatusEffectById(tyrande.instanceId, { id: 'moon-glow', type: 'buff', currentDuration: -1, currentUses: -1, intensity: 1, stacks: currentStacks }); return { success: true, message: '艾露恩的指引：获得' + currentStacks + '层月华' }; } return { success: false }; }"
+}

@@ -40,7 +40,8 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
-  const { roomId } = await params
+  const { roomId: rawRoomId } = await params
+  const roomId = rawRoomId.trim().toLowerCase()
   const room = rooms.getRoom(roomId)
 
   if (!room) {
@@ -61,7 +62,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
-  const { roomId } = await params
+  const { roomId: rawRoomId } = await params
+  const roomId = rawRoomId.trim().toLowerCase()
   const room = rooms.getRoom(roomId)
 
   if (!room) {

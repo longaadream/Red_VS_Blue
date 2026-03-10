@@ -1,0 +1,13 @@
+{
+  "id": "blood-echo-trigger",
+  "name": "血之回响触发",
+  "description": "失去圣盾时触发，添加圣光充能手牌",
+  "icon": "🔁",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { const battle = context.battle; const sourcePiece = context.sourcePiece; if (!sourcePiece) return { success: false }; const liadrin = battle.pieces.find(function(p) { return p.templateId === 'liadrin' && p.faction === sourcePiece.faction && p.currentHp > 0; }); if (!liadrin) return { success: false }; const player = battle.players.find(function(p) { return p.playerId === sourcePiece.ownerPlayerId; }); if (player) { addCardToHand('holy-charge', player.playerId); return { success: true, message: '血之回响：获得1张圣光充能' }; } return { success: false }; }"
+}

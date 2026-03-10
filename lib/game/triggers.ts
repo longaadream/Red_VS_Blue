@@ -1,6 +1,23 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 
+// 简单的日志写入函数
+function writeLog(message: string) {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const logDir = path.join(process.cwd(), 'logs')
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true })
+    }
+    const logFile = path.join(logDir, 'game.log')
+    const timestamp = new Date().toISOString()
+    fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`)
+  } catch {
+    // 忽略日志写入错误
+  }
+}
+
 // 触发类型
 export type TriggerType =
   | "afterSkillUsed"       // 技能使用后
@@ -150,6 +167,8 @@ export class TriggerSystem {
     let success = false
     let blocked = false
 
+    writeLog('[checkTriggers] Checking triggers for: ' + context.type + ', players: ' + JSON.stringify(battle.players?.map(p => ({ playerId: p.playerId, rulesCount: (p as any).rules?.length || 0 }))))
+
     // 1. 检查全局规则
     const globalMatchingRules = this.rules.filter(rule => {
       // 只检查触发类型是否匹配
@@ -239,15 +258,20 @@ export class TriggerSystem {
             !rule.effect.toString().includes('checkToxin')
 
           if (typeof rule.effect !== 'function' || isDefaultEffect) {
+            writeLog('[checkTriggers] Reloading rule effect for: ' + rule.id + ', isDefaultEffect: ' + isDefaultEffect)
             try {
               const { loadRuleById } = require('./skills')
-              const reloadedRule = loadRuleById(rule.id, true)
+              const reloadedRule = loadRuleById(rule.id)
+              writeLog('[checkTriggers] Reloaded rule: ' + rule.id + ', effect type: ' + typeof reloadedRule?.effect)
               if (reloadedRule && typeof reloadedRule.effect === 'function') {
                 rule.effect = reloadedRule.effect
+                writeLog('[checkTriggers] Rule effect reloaded successfully: ' + rule.id)
               } else {
+                writeLog('[checkTriggers] Failed to reload rule effect for: ' + rule.id)
                 continue
               }
-            } catch {
+            } catch (e) {
+              writeLog('[checkTriggers] Error reloading rule: ' + rule.id + ', error: ' + e)
               continue
             }
           }
@@ -284,8 +308,13 @@ export class TriggerSystem {
 
     // 3. 检查所有玩家的玩家级别规则（player.rules[]）
     if (battle.players) {
+      writeLog('[checkTriggers] Checking player rules, players count: ' + battle.players.length)
       for (const player of battle.players) {
-        if (!(player as any).rules || (player as any).rules.length === 0) continue
+        writeLog('[checkTriggers] Checking player: ' + player.playerId + ', rules: ' + ((player as any).rules?.length || 0))
+        if (!(player as any).rules || (player as any).rules.length === 0) {
+          writeLog('[checkTriggers] Player has no rules, skipping')
+          continue
+        }
 
         const playerMatchingRules = ((player as any).rules as any[]).filter((rule: any) => {
           if (!rule || !rule.trigger) return false
@@ -297,8 +326,11 @@ export class TriggerSystem {
           }
           return true
         })
+        
+        writeLog('[checkTriggers] Found matching rules for player: ' + player.playerId + ', count: ' + playerMatchingRules.length)
 
         for (const rule of playerMatchingRules) {
+          writeLog('[checkTriggers] Executing rule: ' + rule.id + ' for player: ' + player.playerId)
           // 如果 effect 是存根函数，重新加载
           const isDefaultEffect = typeof rule.effect === 'function' &&
             rule.effect.toString().includes('ruleData.name') &&
@@ -322,7 +354,9 @@ export class TriggerSystem {
           try {
             // 把玩家的 playerId 注入到 context，供 triggerSkill 技能读取
             const playerContext = { ...context, playerId: player.playerId }
+            writeLog('[checkTriggers] Calling rule.effect for: ' + rule.id + ', effect type: ' + typeof rule.effect)
             const result = rule.effect(battle, playerContext)
+            writeLog('[checkTriggers] Rule effect result for ' + rule.id + ': ' + JSON.stringify(result))
             if (result.success) {
               success = true
               if (result.message) triggeredEffects.push(result.message)
@@ -334,6 +368,7 @@ export class TriggerSystem {
               }
             }
           } catch (error) {
+            writeLog('[checkTriggers] Error executing player rule ' + rule.id + ' for player ' + player.playerId + ': ' + error)
             console.error(`Error executing player rule ${rule.id} for player ${player.playerId}:`, error)
           }
         }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import roomStore, { type Room } from "@/lib/game/room-store"
+import { roomStore, type Room } from "@/lib/game/room-store"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -9,8 +9,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     body = {}
   }
 
-  const { roomId } = await params
-  const { playerId, playerName } = (body as { 
+  const { roomId: rawRoomId } = await params
+  const roomId = rawRoomId.trim().toLowerCase()
+  const { playerId, playerName } = (body as {
     playerId?: string
     playerName?: string
   }) ?? {}
@@ -24,8 +25,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: "Room not found" }, { status: 404 })
   }
 
+  const normalizedPlayerId = playerId.trim().toLowerCase()
+
   const existingPlayer = room.players.find(
-    (p) => p.id === playerId.trim()
+    (p) => p.id.toLowerCase() === normalizedPlayerId
   )
 
   if (existingPlayer) {
@@ -33,8 +36,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   const newPlayer = {
-    id: playerId.trim(),
-    name: playerName?.trim() || `Player ${playerId.slice(0, 8)}`,
+    id: normalizedPlayerId,
+    name: playerName?.trim() || `Player ${normalizedPlayerId.slice(0, 8)}`,
     joinedAt: Date.now(),
     selectedPieces: [],
   }

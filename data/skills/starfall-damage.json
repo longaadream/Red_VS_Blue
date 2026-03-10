@@ -1,0 +1,13 @@
+{
+  "id": "starfall-damage",
+  "name": "群星陨落伤害",
+  "description": "星辰领域对2个随机敌人造成伤害",
+  "icon": "⭐",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { const battle = context.battle; const sourcePiece = context.sourcePiece; if (!sourcePiece) return { success: false }; const enemies = battle.pieces.filter(function(p) { return p.faction !== sourcePiece.faction && p.currentHp > 0; }); if (enemies.length === 0) return { success: false }; const targets = enemies.sort(function() { return Math.random() - 0.5; }).slice(0, 2); let totalDamage = 0; targets.forEach(function(target) { const result = dealDamage(sourcePiece, target, 5, 'magic', battle, 'starfall'); totalDamage += result.damage; }); return { success: true, message: '群星陨落对' + targets.length + '个敌人造成' + totalDamage + '点伤害' }; }"
+}

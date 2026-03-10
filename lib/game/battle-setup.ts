@@ -144,15 +144,26 @@ export function buildInitialPiecesForPlayers(
     console.log('Blue player:', bluePlayer)
     
     // 为每个玩家分配棋子
-    // 确保红方玩家获得红方棋子，蓝方玩家获得蓝方棋子
-    playerSelectedPieces.forEach((playerInfo, playerIndex) => {
+    // 根据 playerInfo.playerId 匹配 players 数组中的玩家，确保 ownerPlayerId 正确
+    playerSelectedPieces.forEach((playerInfo) => {
       const playerId = playerInfo.playerId
       
-      // 确定玩家的所有者ID和对应阵营
-      const ownerPlayerId = playerIndex === 0 ? redPlayer : bluePlayer
-      const expectedFaction = playerIndex === 0 ? "red" : "blue"
+      // 根据 playerId 在 players 数组中的位置确定阵营
+      // players 数组已按红方在前、蓝方在后的顺序排序
+      // 使用大小写不敏感的匹配
+      const playerIndexInArray = players.findIndex(p => p.toLowerCase() === playerId.toLowerCase())
       
-      console.log(`Allocating pieces for player ${playerId} (owner: ${ownerPlayerId}, expected faction: ${expectedFaction})`)
+      // 如果找不到玩家，跳过
+      if (playerIndexInArray === -1) {
+        console.error(`Player ${playerId} not found in players array:`, players)
+        return
+      }
+      
+      // 使用 players 数组中的实际 ID 作为 ownerPlayerId，确保大小写一致
+      const ownerPlayerId = players[playerIndexInArray]
+      const expectedFaction = playerIndexInArray === 0 ? "red" : "blue"
+      
+      console.log(`Allocating pieces for player ${playerId} (owner: ${ownerPlayerId}, expected faction: ${expectedFaction}, index: ${playerIndexInArray})`)
       
       let pieceIndex = 0
       playerInfo.pieces.forEach(pieceTemplate => {
@@ -606,13 +617,21 @@ export async function createInitialBattleForPlayers(
     graveyard: [],
     pieceStatsByTemplateId: buildDefaultPieceStats(),
     skillsById: skills,
-    players: [
-      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1, hand: [], discardPile: [], rules: [] },
-      {
-        playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0, hand: [], discardPile: [],
-        rules: [loadRuleById('rule-lucky-coin-start')].filter(Boolean),
-      },
-    ],
+    players: (() => {
+      writeLog('[createInitialBattle] Loading lucky coin rule for p2...')
+      const luckyCoinRule = loadRuleById('rule-lucky-coin-start')
+      writeLog('[createInitialBattle] Loaded lucky coin rule: ' + (luckyCoinRule ? luckyCoinRule.name : 'NULL'))
+      
+      const players = [
+        { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1, hand: [], discardPile: [], rules: [] },
+        {
+          playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0, hand: [], discardPile: [],
+          rules: luckyCoinRule ? [luckyCoinRule] : [],
+        },
+      ]
+      writeLog('[createInitialBattle] Players created: ' + JSON.stringify(players.map(p => ({ playerId: p.playerId, rulesCount: p.rules.length }))))
+      return players
+    })(),
     turn: {
       currentPlayerId: redPlayer,
       turnNumber: 1,
