@@ -636,6 +636,127 @@ piece.x = 5
 
 ---
 
+## 召唤棋子函数（summonPiece）
+
+`summonPiece` 函数用于将棋子召唤到棋盘上，同时触发相关的召唤事件。这是添加棋子到战场的标准方式。
+
+### 函数签名
+
+```typescript
+function summonPiece(
+  battle: BattleState,
+  options: SummonPieceOptions,
+  getPieceById: (id: string) => PieceTemplate,
+  createPieceInstance: (template, ownerPlayerId, faction, x, y, index) => PieceInstance
+): SummonPieceResult
+```
+
+### 参数说明
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `battle` | `BattleState` | 当前战斗状态 |
+| `options` | `SummonPieceOptions` | 召唤配置选项 |
+| `getPieceById` | `Function` | 获取棋子模板的函数 |
+| `createPieceInstance` | `Function` | 创建棋子实例的函数 |
+
+### SummonPieceOptions 配置
+
+```typescript
+interface SummonPieceOptions {
+  templateId: string        // 棋子模板ID，如 "tyrande"
+  faction: "red" | "blue"   // 阵营
+  ownerPlayerId: string     // 所属玩家ID
+  x: number                 // 召唤位置X坐标
+  y: number                 // 召唤位置Y坐标
+  index?: number            // 棋子索引（可选，默认1）
+}
+```
+
+### 返回值
+
+```typescript
+interface SummonPieceResult {
+  success: boolean          // 是否成功
+  piece?: PieceInstance     // 召唤的棋子实例（成功时）
+  message?: string          // 提示信息
+  blocked?: boolean         // 是否被阻止
+}
+```
+
+### 触发器
+
+`summonPiece` 会自动触发以下两个触发器：
+
+#### beforePieceSummon（棋子召唤前）
+
+**触发时机**：棋子实例创建前
+
+**上下文参数**：
+- `playerId`: 召唤者玩家ID
+- `targetPosition`: `{ x, y }` 召唤位置
+- `pieceTemplateId`: 棋子模板ID
+- `faction`: 阵营
+
+**可 blocked**: ✅ 可以阻止召唤
+
+#### afterPieceSummon（棋子召唤后）
+
+**触发时机**：棋子已添加到棋盘后
+
+**上下文参数**：
+- `playerId`: 召唤者玩家ID
+- `piece`: 被召唤的棋子实例
+- `pieceTemplateId`: 棋子模板ID
+- `faction`: 阵营
+
+**可 blocked**: ❌ 不能阻止（已发生）
+
+### 使用示例
+
+```typescript
+// 在训练模式中添加棋子
+const result = summonPiece(
+  battleState,
+  {
+    templateId: 'tyrande',
+    faction: 'blue',
+    ownerPlayerId: 'training-blue',
+    x: 5,
+    y: 3
+  },
+  getPieceById,
+  createPieceInstance
+)
+
+if (result.success) {
+  console.log(result.message)  // "泰兰德 被召唤到 (5, 3)"
+} else {
+  console.log(result.message)  // 错误信息
+}
+```
+
+### 规则加载
+
+`summonPiece` 会自动将棋子的规则加载到全局触发器系统：
+
+1. 查找棋子模板的 `rules` 数组
+2. 使用 `loadRuleById` 加载每个规则
+3. 通过 `globalTriggerSystem.addRule` 添加到全局触发器
+
+这意味着召唤的棋子会立即拥有其被动技能效果。
+
+### 与 addPiece 的区别
+
+| 方式 | 触发器 | 规则加载 | 使用场景 |
+|------|--------|----------|----------|
+| `summonPiece` | ✅ 触发 before/after | ✅ 自动加载 | 标准召唤流程 |
+| 直接 `createPieceInstance` | ❌ 不触发 | ❌ 手动加载 | 特殊逻辑 |
+
+**推荐**：始终使用 `summonPiece` 来添加棋子到战场。
+
+---
+
 ## 主动技能编写指南
 
 主动技能（`kind: "active"`）由玩家点击按钮释放。
@@ -1474,11 +1595,65 @@ return { success: true, blocked: false, message: '' }
 
 ### 棋子类
 
-| 触发类型 | context.piece | context.target | 说明 |
-|---------|--------------|---------------|------|
-| `afterPieceKilled` | **击杀者** | 被击杀者 | 用于"我击杀时..."效果 |
-| `onPieceDied` | **死亡棋子自身** | 击杀者（攻击者） | 用于"我死亡时..."效果 |
-| `afterPieceSummoned` | 召唤者 | 被召唤者 | — |
+| 触发类型 | context.piece | context.target | 说明 | 可 blocked |
+|---------|--------------|---------------|------|-----------|
+| `beforePieceSummon` | null | null | 棋子召唤前触发 | ✅ |
+| `afterPieceSummon` | 被召唤的棋子 | 召唤者 | 棋子召唤后触发 | ❌ |
+| `afterPieceKilled` | **击杀者** | 被击杀者 | 用于"我击杀时..."效果 | ❌ |
+| `onPieceDied` | **死亡棋子自身** | 击杀者（攻击者） | 用于"我死亡时..."效果 | ❌ |
+| `afterPieceSummoned` | 召唤者 | 被召唤者 | — | ❌ |
+
+#### beforePieceSummon 详细说明
+
+**触发时机**：棋子即将被召唤到棋盘前
+
+**上下文参数**：
+- `playerId`: 召唤者玩家ID
+- `targetPosition`: `{ x, y }` 召唤位置
+- `pieceTemplateId`: 棋子模板ID
+- `faction`: 阵营
+
+**用途**：
+- 阻止召唤（如召唤位被封锁）
+- 修改召唤位置
+- 添加召唤前效果
+
+**示例规则**：
+```json
+{
+  "id": "rule-block-summon",
+  "name": "召唤封锁",
+  "description": "阻止敌方在特定区域召唤棋子",
+  "trigger": { "type": "beforePieceSummon" },
+  "skillCode": "if (context.faction !== context.rulePiece.faction && context.targetPosition.x < 5) { return { success: true, blocked: true, message: '该区域已被封锁，无法召唤' }; } return { success: false };"
+}
+```
+
+#### afterPieceSummon 详细说明
+
+**触发时机**：棋子已成功召唤到棋盘后
+
+**上下文参数**：
+- `playerId`: 召唤者玩家ID
+- `piece`: 被召唤的棋子实例（完整棋子对象）
+- `pieceTemplateId`: 棋子模板ID
+- `faction`: 阵营
+
+**用途**：
+- 召唤后增益效果
+- 召唤连携触发
+- 记录召唤日志
+
+**示例规则**：
+```json
+{
+  "id": "rule-summon-buff",
+  "name": "召唤增益",
+  "description": "友方召唤棋子时，为其增加攻击力",
+  "trigger": { "type": "afterPieceSummon" },
+  "skillCode": "if (context.faction === context.rulePiece.faction && context.piece) { context.piece.attack += 2; return { success: true, message: context.piece.name + '获得召唤增益，攻击力+2' }; } return { success: false };"
+}
+```
 
 ### 技能类
 
