@@ -20,7 +20,8 @@
 16. [游戏系统常量](#游戏系统常量)
 17. [训练营使用教程](#训练营使用教程)
 18. [地图设计教程](#地图设计教程)
-19. [玩家级别规则（Player-Level Rules）](#玩家级别规则player-level-rules)
+19. [手牌卡牌系统](#手牌卡牌系统)
+20. [玩家级别规则（Player-Level Rules）](#玩家级别规则player-level-rules)
 
 ---
 
@@ -103,14 +104,82 @@ dealDamage(sourcePiece, target, 10, 'physical', context.battle, context.skill.id
 
 所有效果逻辑必须写在技能文件中，规则文件只定义触发时机。
 
-### 法则六：角色技能必须独立于游戏主进程
+### 法则六：游戏核心逻辑必须完全独立于所有棋子（禁止硬编码）
 
-所有角色的技能效果都必须通过 `data/skills/` 和 `data/rules/` 目录下的 JSON 文件定义。**禁止**在 `lib/game/` 下的主进程代码中硬编码任何特定角色的技能逻辑。角色应当是独立的模块，可以随时添加或删除，与游戏核心逻辑解耦。
+**这是最重要的法则。游戏核心逻辑（`lib/game/` 下的代码）必须完全独立于任何特定棋子，禁止任何形式的硬编码。**
+
+#### 禁止的行为
+
+```
+❌ 错误：在 lib/game/turn.ts 等主进程文件中硬编码角色技能逻辑
+❌ 错误：在 lib/game/battle-setup.ts 中根据 piece.id === 'liadrin' 特殊处理
+❌ 错误：在 lib/game/skills.ts 中针对特定角色写死逻辑
+❌ 错误：在任何游戏核心代码中通过 if (piece.id === 'xxx') 来判断角色
+❌ 错误：在 BattleState 类型中硬编码角色特定的字段（如 recallData、stickyBombs）
+```
+
+#### 正确的做法
 
 ```
 ✅ 正确：在 data/skills/ 和 data/rules/ 中定义技能效果
+✅ 正确：在 data/pieces/xxx.json 中通过 "rules" 字段绑定规则到棋子
 ✅ 正确：通过 addRuleById 动态绑定规则到棋子
-❌ 错误：在 lib/game/turn.ts 等主进程文件中硬编码角色技能逻辑
+✅ 正确：游戏核心只负责加载和执行规则，不关心规则属于哪个角色
+✅ 正确：角色特定的数据存储在 battle.extensions 中，而不是硬编码在 BattleState 类型中
+```
+
+#### 角色特定数据的正确存储方式
+
+**❌ 错误：在 BattleState 中硬编码字段**
+```typescript
+// lib/game/battle-types.ts
+export interface BattleState {
+  // ...其他字段
+  recallData?: Array<...>  // ❌ 硬编码猎空的数据
+  stickyBombs?: Array<...> // ❌ 硬编码猎空的数据
+}
+```
+
+**✅ 正确：使用 extensions 字段存储角色特定数据**
+```typescript
+// lib/game/battle-types.ts
+export interface BattleState {
+  // ...其他字段
+  extensions?: Record<string, any>  // ✅ 通用扩展字段
+}
+
+// 在角色技能代码中
+function executeSkill(context) {
+  // 初始化扩展数据
+  if (!battle.extensions) battle.extensions = {};
+  if (!battle.extensions.recallData) battle.extensions.recallData = [];
+  
+  // 使用扩展数据
+  battle.extensions.recallData.push({...});
+}
+```
+
+#### 为什么这很重要
+
+1. **模块化**：角色应当是独立的模块，可以随时添加或删除，不影响游戏核心
+2. **可维护性**：修改角色技能只需要改 JSON 文件，不需要改游戏代码
+3. **扩展性**：添加新角色只需要添加新的 JSON 文件，不需要修改游戏逻辑
+4. **避免 Bug**：硬编码会导致代码耦合，一个角色的修改可能影响其他角色
+5. **类型安全**：使用 `extensions` 字段避免频繁修改核心类型定义
+
+#### 违规示例
+
+```typescript
+// ❌ 错误！在 battle-setup.ts 中硬编码
+if (piece.id === 'liadrin') {
+  ruleIds.add('rule-blood-echo')
+}
+
+// ✅ 正确！在 liadrin.json 中定义 rules 字段
+{
+  "id": "liadrin",
+  "rules": ["rule-blood-echo"]
+}
 ```
 
 ### 法则七：Context 必须是真实引用（引擎开发者必读）
@@ -1440,6 +1509,15 @@ return { success: true, blocked: false, message: '' }
 | `afterStatusRemoved` | 被移除状态的棋子 | `context.statusId`（状态ID） |
 | `afterChargeGained` | 获得充能的棋子 | `context.amount`（获得量）, `context.playerId` |
 
+### 卡牌类
+
+| 触发类型 | context.piece | 额外字段 | 可 blocked | 说明 |
+|---------|--------------|---------|-----------|------|
+| `beforeCardPlay` | null | `playerId`, `cardId`, `cardInstanceId` | ✅ | 手牌使用前，可阻止 |
+| `afterCardPlay` | null | `playerId`, `cardId`, `cardInstanceId` | ❌ | 手牌使用后 |
+| `beforeCardAdded` | null | `playerId`, `cardId`, `sourcePiece` | ✅ | 手牌加入前，可阻止 |
+| `afterCardAdded` | null | `playerId`, `cardId`, `cardInstanceId`, `sourcePiece` | ❌ | 手牌加入后 |
+
 ### 通用
 
 | 触发类型 | 说明 |
@@ -2014,7 +2092,7 @@ function executeCard(context) {
 
 | 函数 | 签名 | 说明 |
 |------|------|------|
-| `addCardToHand` | `(cardId, targetPlayerId?)` | 将卡牌加入手牌；`targetPlayerId` 省略则为当前持牌玩家；手牌超过10张时自动弃置并记录日志 |
+| `addCardToHand` | `(cardId, targetPlayerId?)` | 将卡牌加入手牌；`targetPlayerId` 省略则为当前持牌玩家；手牌超过10张时自动弃置并记录日志；会自动触发 `beforeCardAdded` 和 `afterCardAdded` 规则 |
 | `discardCard` | `(instanceId)` | 按 `instanceId` 弃置指定手牌到弃牌堆 |
 | `getHand` | `(targetPlayerId?)` | 获取指定玩家的手牌列表（`CardInstance[]`） |
 
@@ -2052,6 +2130,118 @@ function executeCard(context) {
   }
   player.actionPoints -= 1
   // ... 执行效果
+}
+```
+
+### 卡牌相关触发器
+
+卡牌系统支持以下触发器类型：
+
+| 触发类型 | 触发时机 | 上下文参数 | 可 blocked | 说明 |
+|---------|---------|-----------|-----------|------|
+| `beforeCardPlay` | 手牌使用前 | `playerId`, `cardId`, `cardInstanceId` | ✅ | 可以阻止卡牌使用 |
+| `afterCardPlay` | 手牌使用后 | `playerId`, `cardId`, `cardInstanceId` | ❌ | 触发连携效果 |
+| `beforeCardAdded` | 手牌加入手里前 | `playerId`, `cardId`, `sourcePiece` | ✅ | 可以阻止添加手牌 |
+| `afterCardAdded` | 手牌加入手里后 | `playerId`, `cardId`, `cardInstanceId`, `sourcePiece` | ❌ | 触发抽牌效果 |
+
+#### beforeCardPlay（手牌使用前）
+
+**触发时机**：玩家点击使用手牌后，卡牌效果执行前
+
+**上下文参数**：
+- `playerId`: 使用手牌的玩家ID
+- `cardId`: 卡牌ID
+- `cardInstanceId`: 卡牌实例ID
+
+**用途**：
+- 阻止卡牌使用（如沉默、封印效果）
+- 修改卡牌效果（如强化、削弱）
+- 记录日志
+
+**示例规则**：
+```json
+{
+  "id": "rule-silence-card",
+  "name": "沉默封印",
+  "description": "阻止敌方使用手牌",
+  "trigger": { "type": "beforeCardPlay" },
+  "skillCode": "if (context.playerId !== context.rulePiece.ownerPlayerId) { return { success: true, blocked: true, message: '敌方被沉默，无法使用手牌' }; } return { success: false };"
+}
+```
+
+#### afterCardPlay（手牌使用后）
+
+**触发时机**：手牌效果执行后，卡牌进入弃牌堆前
+
+**上下文参数**：
+- `playerId`: 使用手牌的玩家ID
+- `cardId`: 卡牌ID
+- `cardInstanceId`: 卡牌实例ID
+
+**用途**：
+- 触发连携效果（如"使用攻击牌后抽一张牌"）
+- 记录使用次数
+- 触发其他技能
+
+**示例规则**：
+```json
+{
+  "id": "rule-card-chain",
+  "name": "卡牌连携",
+  "description": "使用攻击牌后抽一张牌",
+  "trigger": { "type": "afterCardPlay" },
+  "skillCode": "if (context.cardId && context.cardId.startsWith('attack-')) { addCardToHand('basic-attack', context.playerId); return { success: true, message: '卡牌连携：抽一张攻击牌' }; } return { success: false };"
+}
+```
+
+#### beforeCardAdded（手牌加入手里前）
+
+**触发时机**：`addCardToHand()` 函数执行前
+
+**上下文参数**：
+- `playerId`: 目标玩家ID
+- `cardId`: 要添加的卡牌ID
+- `sourcePiece`: 来源棋子（可选，可能为 null）
+
+**用途**：
+- 阻止添加手牌（如"敌方不能抽牌"效果）
+- 修改添加的卡牌（如"抽到的牌变成另一种牌"）
+- 触发抽牌前的效果
+
+**示例规则**：
+```json
+{
+  "id": "rule-block-draw",
+  "name": "封锁抽牌",
+  "description": "阻止敌方抽牌",
+  "trigger": { "type": "beforeCardAdded" },
+  "skillCode": "if (context.playerId !== context.rulePiece.ownerPlayerId) { return { success: true, blocked: true, message: '敌方抽牌被封锁' }; } return { success: false };"
+}
+```
+
+#### afterCardAdded（手牌加入手里后）
+
+**触发时机**：`addCardToHand()` 函数执行后，卡牌已进入手牌
+
+**上下文参数**：
+- `playerId`: 目标玩家ID
+- `cardId`: 卡牌ID
+- `cardInstanceId`: 卡牌实例ID
+- `sourcePiece`: 来源棋子（可选，可能为 null）
+
+**用途**：
+- 触发抽牌后的效果（如"抽牌时获得1点能量"）
+- 记录手牌数量变化
+- 触发连携效果
+
+**示例规则**：
+```json
+{
+  "id": "rule-draw-bonus",
+  "name": "抽牌加成",
+  "description": "每次抽牌后获得1点能量",
+  "trigger": { "type": "afterCardAdded" },
+  "skillCode": "const player = battle.players.find(p => p.playerId === context.playerId); if (player) { player.energy = (player.energy || 0) + 1; return { success: true, message: '抽牌加成：获得1点能量' }; } return { success: false };"
 }
 ```
 

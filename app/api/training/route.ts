@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { BattleState, BattleAction } from "@/lib/game/turn"
-import { applyBattleAction } from "@/lib/game/turn"
+import { applyBattleAction, summonPiece } from "@/lib/game/turn"
 import { getMap, DEFAULT_MAP_ID, loadMaps } from "@/config/maps"
 import type { BoardMap } from "@/lib/game/map"
 import type { PieceInstance, PieceTemplate } from "@/lib/game/piece"
@@ -316,15 +316,6 @@ export async function PATCH(req: NextRequest) {
 
         console.log('[addPiece] faction:', faction, 'templateId:', templateId, 'x:', x, 'y:', y)
 
-        const template = getPieceById(templateId)
-        console.log('[addPiece] template:', template)
-        if (!template) {
-          return NextResponse.json(
-            { error: `Piece template not found: ${templateId}` },
-            { status: 400 }
-          )
-        }
-
         // 检查位置是否有效
         const targetTile = battleState.map.tiles.find((t: { x: number; y: number; props: { walkable: boolean } }) => t.x === x && t.y === y)
         if (!targetTile || !targetTile.props.walkable) {
@@ -347,8 +338,29 @@ export async function PATCH(req: NextRequest) {
         const existingPieces = battleState.pieces.filter(p => p.ownerPlayerId === ownerPlayerId)
         const newIndex = existingPieces.length + 1
 
-        const newPiece = createPieceInstance(template, ownerPlayerId, faction, x, y, newIndex)
-        newState.pieces = [...battleState.pieces, newPiece]
+        // 使用 summonPiece 函数召唤棋子
+        const summonResult = summonPiece(
+          newState,
+          {
+            templateId,
+            faction,
+            ownerPlayerId,
+            x,
+            y,
+            index: newIndex
+          },
+          getPieceById,
+          createPieceInstance
+        )
+
+        if (!summonResult.success) {
+          return NextResponse.json(
+            { error: summonResult.message || "召唤棋子失败" },
+            { status: 400 }
+          )
+        }
+
+        console.log('[addPiece] Summon result:', summonResult.message)
         break
       }
 

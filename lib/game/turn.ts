@@ -262,10 +262,8 @@ export interface BattleState {
   turn: TurnState
   /** 战斗日志 */
   actions?: BattleActionLog[]
-  /** 回溯数据列表 */
-  recallData?: Array<{ pieceId: string; ownerPlayerId: string; targetCount: number; actionCount: number; snapshot: { x: number; y: number; hp: number } }>
-  /** 粘性炸弹列表 */
-  stickyBombs?: Array<{ x: number; y: number; damage: number; ownerPlayerId: string; attachedPieceId: string | null; opponentEndTurnsSeen: number }>
+  /** 扩展数据 - 角色特定的数据存储在这里 */
+  extensions?: Record<string, any>
   /** gameStart 触发器是否已触发过 */
   gameStartFired?: boolean
 }
@@ -934,6 +932,13 @@ export function applyBattleAction(
       // 检查是否有规则明确阻止了行动（在添加消息之后检查）
       if (beforeSkillUseResult.blocked) {
         return next; // 返回包含消息的状态，不执行技能
+      }
+
+      // 检查施法者是否还活着（可能被 beforeSkillUse 触发器杀死）
+      const currentPiece = next.pieces.find(p => p.instanceId === piece.instanceId)
+      if (!currentPiece || currentPiece.currentHp <= 0) {
+        writeLog(`[applyBattleAction] Caster ${piece.name} was killed by beforeSkillUse trigger, aborting skill execution`)
+        return next; // 施法者已死亡，不执行技能
       }
 
       // 触发器可能修改了技能ID，使用修改后的值
@@ -1650,6 +1655,28 @@ export function applyBattleAction(
       if (!cardDef) throw new BattleRuleError(`卡牌定义找不到: ${cardInstance.cardId}`)
       if (cardDef.type !== 'active') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
 
+      // 触发手牌使用前规则
+      const beforeCardPlayResult = globalTriggerSystem.checkTriggers(next, {
+        type: "beforeCardPlay",
+        playerId: action.playerId,
+        cardId: cardInstance.cardId,
+        cardInstanceId: cardInstance.instanceId
+      });
+
+      // 检查是否有规则阻止了卡牌使用
+      if (beforeCardPlayResult.blocked) {
+        if (!next.actions) next.actions = []
+        beforeCardPlayResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: { message }
+          });
+        });
+        return next;
+      }
+
       // 构建目标信息
       let targetPiece = undefined
       let targetPosition = undefined
@@ -1700,6 +1727,26 @@ export function applyBattleAction(
         payload: { message: result.message || `使用了卡牌：${cardDef.name}`, cardId: cardInstance.cardId }
       })
 
+      // 触发手牌使用后规则
+      const afterCardPlayResult = globalTriggerSystem.checkTriggers(next, {
+        type: "afterCardPlay",
+        playerId: action.playerId,
+        cardId: cardInstance.cardId,
+        cardInstanceId: cardInstance.instanceId
+      });
+
+      // 处理触发效果的消息
+      if (afterCardPlayResult.success && afterCardPlayResult.messages.length > 0) {
+        afterCardPlayResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: { message }
+          });
+        });
+      }
+
       // 触发 whenever
       globalTriggerSystem.checkTriggers(next, { type: "whenever", playerId: action.playerId })
 
@@ -1708,6 +1755,100 @@ export function applyBattleAction(
 
     default:
       return state
+  }
+}
+
+// 召唤棋子接口
+export interface SummonPieceOptions {
+  templateId: string
+  faction: "red" | "blue"
+  ownerPlayerId: string
+  x: number
+  y: number
+  index?: number
+}
+
+// 召唤棋子结果
+export interface SummonPieceResult {
+  success: boolean
+  piece?: PieceInstance
+  message?: string
+  blocked?: boolean
+}
+
+/**
+ * 召唤棋子到棋盘
+ * 触发 beforePieceSummon 和 afterPieceSummon 触发器
+ */
+export function summonPiece(
+  battle: BattleState,
+  options: SummonPieceOptions,
+  getPieceById: (id: string) => any,
+  createPieceInstance: (template: any, ownerPlayerId: string, faction: "red" | "blue", x: number, y: number, index: number) => PieceInstance
+): SummonPieceResult {
+  const { templateId, faction, ownerPlayerId, x, y, index = 1 } = options
+
+  // 获取棋子模板
+  const template = getPieceById(templateId)
+  if (!template) {
+    return { success: false, message: `棋子模板未找到: ${templateId}` }
+  }
+
+  // 触发召唤前触发器
+  const beforeSummonResult = globalTriggerSystem.checkTriggers(battle, {
+    type: "beforePieceSummon",
+    playerId: ownerPlayerId,
+    targetPosition: { x, y },
+    pieceTemplateId: templateId,
+    faction
+  })
+
+  if (beforeSummonResult.blocked) {
+    return { success: false, message: "召唤被阻止", blocked: true }
+  }
+
+  // 创建棋子实例
+  const newPiece = createPieceInstance(template, ownerPlayerId, faction, x, y, index)
+
+  // 将棋子添加到棋盘
+  battle.pieces.push(newPiece)
+
+  // 将棋子的规则加载到全局触发器系统
+  if (template.rules && Array.isArray(template.rules)) {
+    template.rules.forEach((ruleId: string) => {
+      const rule = loadRuleById(ruleId)
+      if (rule) {
+        globalTriggerSystem.addRule(rule)
+      }
+    })
+  }
+
+  // 触发召唤后触发器
+  const afterSummonResult = globalTriggerSystem.checkTriggers(battle, {
+    type: "afterPieceSummon",
+    playerId: ownerPlayerId,
+    piece: newPiece,
+    pieceTemplateId: templateId,
+    faction
+  })
+
+  // 处理触发效果的消息
+  if (afterSummonResult.success && afterSummonResult.messages.length > 0) {
+    afterSummonResult.messages.forEach(message => {
+      if (!battle.actions) battle.actions = []
+      battle.actions.push({
+        type: "triggerEffect",
+        playerId: ownerPlayerId,
+        turn: battle.turn.turnNumber,
+        payload: { message }
+      })
+    })
+  }
+
+  return {
+    success: true,
+    piece: newPiece,
+    message: `${newPiece.name} 被召唤到 (${x}, ${y})`
   }
 }
 

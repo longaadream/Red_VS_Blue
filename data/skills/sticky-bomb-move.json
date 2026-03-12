@@ -8,5 +8,5 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { if (!context.battle.stickyBombs || context.battle.stickyBombs.length === 0) return { success: false }; var mover = context.sourcePiece; if (!mover) return { success: false }; var updated = false; for (var i = 0; i < context.battle.stickyBombs.length; i++) { var bomb = context.battle.stickyBombs[i]; if (bomb.attachedPieceId === mover.instanceId) { bomb.x = mover.x; bomb.y = mover.y; updated = true; } } return { success: false }; }"
+  "code": "function executeSkill(context) { if (!battle.extensions || !battle.extensions.stickyBombs || battle.extensions.stickyBombs.length === 0) return { success: false }; var mover = context.sourcePiece; if (!mover) return { success: false }; var updated = false; for (var i = 0; i < battle.extensions.stickyBombs.length; i++) { var bomb = battle.extensions.stickyBombs[i]; if (bomb.attachedPieceId === mover.instanceId) { bomb.x = mover.x; bomb.y = mover.y; updated = true; } } return { success: false }; }"
 }

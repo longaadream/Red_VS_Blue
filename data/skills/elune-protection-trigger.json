@@ -1,0 +1,13 @@
+{
+  "id": "elune-protection-trigger",
+  "name": "艾露恩的守护触发",
+  "description": "受到致命伤害时免疫并恢复生命",
+  "icon": "🛡️",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { const battle = context.battle; const targetPiece = context.piece; const damage = context.damage; if (!targetPiece) return { success: false, message: '没有目标' }; if (!damage || damage <= 0) return { success: false, message: '没有伤害' }; if (targetPiece.currentHp > damage) return { success: false, message: '不是致命伤害' }; const tyrande = battle.pieces.find(function(p) { return p.templateId === 'tyrande' && p.faction === targetPiece.faction && p.currentHp > 0; }); if (!tyrande) return { success: false, message: '泰兰德不在场' }; const protectedFlag = targetPiece.statusTags ? targetPiece.statusTags.find(function(t) { return t.id === 'elune-protection-used'; }) : null; if (protectedFlag) return { success: false, message: '已经触发过守护' }; addStatusEffectById(targetPiece.instanceId, { id: 'elune-protection-used', name: '艾露恩已守护', type: 'buff', currentDuration: -1, currentUses: -1 }); healDamage(tyrande, targetPiece, 5, battle, 'elune-protection'); return { success: true, blocked: true, message: '艾露恩的守护：' + targetPiece.name + '免疫致命伤害并恢复5点生命' }; }"
+}

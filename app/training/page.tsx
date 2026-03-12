@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Loader2, Swords, Shield, Zap, Footprints, Plus, Settings, Map as MapIcon, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { GameBoard } from "@/components/game-board"
 import type { BattleState, BattleAction } from "@/lib/game/training-types"
@@ -849,38 +850,12 @@ export default function TrainingPage() {
             </Card>
 
             {/* 手牌区 */}
-            {(() => {
-              const myMeta = battle.players.find(p => p.playerId === currentPlayerId)
-              const hand = myMeta?.hand ?? []
-              const canPlay = isMyTurn && battle.turn.phase === "action"
-              return (
-                <Card className="bg-zinc-900/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">手牌 ({hand.length}/10)</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {hand.length === 0 ? (
-                      <div className="text-xs text-zinc-500 italic">
-                        {canPlay ? "暂无手牌" : "等待回合开始..."}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {hand.map((card) => (
-                          <button
-                            key={card.instanceId}
-                            disabled={!canPlay}
-                            onClick={() => sendBattleAction({ type: "playCard", playerId: currentPlayerId, cardInstanceId: card.instanceId })}
-                            className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            {card.name || card.cardId}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })()}
+            <TrainingHandArea 
+              battle={battle} 
+              currentPlayerId={currentPlayerId} 
+              isMyTurn={isMyTurn}
+              sendBattleAction={sendBattleAction}
+            />
 
             {/* 战斗日志 */}
             <Card className="bg-zinc-900/50">
@@ -1362,5 +1337,114 @@ export default function TrainingPage() {
         </DialogContent>
       </Dialog>
     </main>
+  )
+}
+
+// 卡牌定义类型
+interface CardDefinition {
+  id: string
+  name: string
+  description: string
+  type: "active" | "reactive"
+  icon?: string
+}
+
+// 训练营手牌区组件
+function TrainingHandArea({ 
+  battle, 
+  currentPlayerId, 
+  isMyTurn,
+  sendBattleAction 
+}: { 
+  battle: BattleState
+  currentPlayerId: string
+  isMyTurn: boolean
+  sendBattleAction: (action: BattleAction) => void
+}) {
+  const [cardCache, setCardCache] = useState<Map<string, CardDefinition>>(new Map())
+  
+  const myMeta = battle.players.find(p => p.playerId === currentPlayerId)
+  const hand = myMeta?.hand ?? []
+  const canPlay = isMyTurn && battle.turn.phase === "action"
+  
+  // 加载卡牌定义
+  useEffect(() => {
+    async function loadCardDefinitions() {
+      const newCache = new Map(cardCache)
+      const cardIds = hand.map(card => card.cardId)
+      const uniqueCardIds = [...new Set(cardIds)].filter(id => !newCache.has(id))
+      
+      if (uniqueCardIds.length === 0) return
+      
+      for (const cardId of uniqueCardIds) {
+        try {
+          const response = await fetch(`/api/cards/${cardId}`)
+          if (response.ok) {
+            const cardDef: CardDefinition = await response.json()
+            newCache.set(cardId, cardDef)
+          }
+        } catch {
+          // 忽略加载错误
+        }
+      }
+      
+      setCardCache(newCache)
+    }
+    
+    loadCardDefinitions()
+  }, [hand])
+  
+  return (
+    <Card className="bg-zinc-900/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">手牌 ({hand.length}/10)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {hand.length === 0 ? (
+          <div className="text-xs text-zinc-500 italic">
+            {canPlay ? "暂无手牌" : "等待回合开始..."}
+          </div>
+        ) : (
+          <TooltipProvider>
+            <div className="flex flex-wrap gap-2">
+              {hand.map((card) => {
+                const cardDef = cardCache.get(card.cardId)
+                // 优先使用缓存中的中文名称，其次是card.name，最后是cardId
+                const displayName = cardDef?.name || card.name || card.cardId
+                return (
+                  <Tooltip key={card.instanceId}>
+                    <TooltipTrigger asChild>
+                      <button
+                        disabled={!canPlay}
+                        onClick={() => sendBattleAction({ type: "playCard", playerId: currentPlayerId, cardInstanceId: card.instanceId })}
+                        className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {displayName}
+                      </button>
+                    </TooltipTrigger>
+                    {cardDef && (
+                      <TooltipContent 
+                        side="top" 
+                        className="max-w-xs bg-zinc-800 border-zinc-700 text-zinc-100"
+                      >
+                        <div className="space-y-1">
+                          <div className="font-semibold text-yellow-400">{cardDef.name}</div>
+                          <div className="text-xs text-zinc-400">
+                            类型: {cardDef.type === "active" ? "主动" : "被动"}
+                          </div>
+                          <div className="text-xs text-zinc-300 leading-relaxed">
+                            {cardDef.description}
+                          </div>
+                        </div>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                )
+              })}
+            </div>
+          </TooltipProvider>
+        )}
+      </CardContent>
+    </Card>
   )
 }

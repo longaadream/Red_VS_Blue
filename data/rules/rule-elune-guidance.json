@@ -1,8 +1,7 @@
 {
   "id": "rule-elune-guidance",
   "name": "艾露恩的指引规则",
-  "description": "当己方使用圣光手牌时，泰兰德获得月华层数",
-  "trigger": { "type": "cardUsed", "cardType": "holy" },
-  "effect": { "type": "triggerSkill", "skillId": "elune-guidance-trigger", "message": "艾露恩的指引触发" },
-  "limits": { "maxUsesPerTurn": 999 }
+  "description": "当己方使用圣光手牌且泰兰德在场时，泰兰德获得月华层数",
+  "trigger": { "type": "afterCardPlay" },
+  "skillCode": "const cardId = context.cardId; if (!cardId || !cardId.startsWith('holy-')) return { success: false }; const playerId = context.playerId; const player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player) return { success: false }; const tyrande = battle.pieces.find(function(p) { return p.templateId === 'tyrande' && p.ownerPlayerId === playerId && p.currentHp > 0; }); if (!tyrande) return { success: false }; const moonGlow = tyrande.statusTags ? tyrande.statusTags.find(function(t) { return t.id === 'moon-glow'; }) : null; let currentStacks = moonGlow ? moonGlow.stacks : 0; currentStacks++; if (currentStacks >= 2) { const allies = battle.pieces.filter(function(p) { return p.ownerPlayerId === playerId && p.currentHp > 0; }); if (allies.length > 0) { const target = allies.sort(function(a, b) { return a.currentHp - b.currentHp; })[0]; healDamage(tyrande, target, 5, battle, 'elune-guidance'); if (moonGlow) { removeStatusEffectById(tyrande.instanceId, 'moon-glow'); } return { success: true, message: '艾露恩的指引：月华满层，为' + target.name + '恢复5点生命' }; } } else { addStatusEffectById(tyrande.instanceId, { id: 'moon-glow', name: '月华', type: 'buff', currentDuration: -1, currentUses: -1, intensity: 1, stacks: currentStacks, maxStacks: 2 }); return { success: true, message: '艾露恩的指引：获得' + currentStacks + '层月华' }; } return { success: false };"
 }

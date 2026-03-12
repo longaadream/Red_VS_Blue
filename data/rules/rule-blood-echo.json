@@ -2,7 +2,6 @@
   "id": "rule-blood-echo",
   "name": "血之回响规则",
   "description": "当友方单位失去圣盾时，为己方添加圣光充能手牌",
-  "trigger": { "type": "statusRemoved", "statusId": "divine-shield" },
-  "effect": { "type": "triggerSkill", "skillId": "blood-echo-trigger", "message": "血之回响触发" },
-  "limits": { "maxUsesPerTurn": 999 }
+  "trigger": { "type": "afterStatusRemoved" },
+  "effect": { "type": "triggerSkill", "skillId": "blood-echo-trigger", "message": "" }
 }

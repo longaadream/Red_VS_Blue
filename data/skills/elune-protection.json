@@ -1,0 +1,13 @@
+{
+  "id": "elune-protection",
+  "name": "艾露恩的守护",
+  "description": "被动：每当友方单位受到致命伤害时，使其免疫该伤害并恢复5点生命。每名友方每场战斗只能触发1次",
+  "icon": "🛡️",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { const caster = context.piece; addRuleById(caster.instanceId, 'rule-elune-protection'); return { success: true }; }"
+}

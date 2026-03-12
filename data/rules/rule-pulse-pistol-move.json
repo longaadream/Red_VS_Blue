@@ -3,5 +3,5 @@
   "name": "脉冲手枪（移动触发）",
   "description": "当敌人移动时，对自身Chebyshev距离≤2范围内随机1名敌人造成等同于攻击力的伤害。",
   "trigger": { "type": "afterMove" },
-  "skillCode": "function checkToxin(battle, context) {\n  const actor = context.sourcePiece;\n  if (!actor) return { success: false };\n  const tracers = battle.pieces.filter(p => p.templateId === 'tracer' && p.currentHp > 0);\n  if (tracers.length === 0) return { success: false };\n  let triggered = false;\n  const messages = [];\n  for (const tracer of tracers) {\n    if (actor.ownerPlayerId === tracer.ownerPlayerId) continue;\n    const enemies = battle.pieces.filter(p =>\n      p.ownerPlayerId !== tracer.ownerPlayerId &&\n      p.currentHp > 0 &&\n      Math.max(Math.abs(p.x - tracer.x), Math.abs(p.y - tracer.y)) <= 2\n    );\n    if (enemies.length === 0) continue;\n    const target = enemies[Math.floor(Math.random() * enemies.length)];\n    const dmg = Math.max(0, tracer.attack - (target.defense || 0));\n    target.currentHp = Math.max(0, target.currentHp - dmg);\n    messages.push(`${tracer.name}脉冲手枪：对${target.name}造成${dmg}点伤害`);\n    triggered = true;\n  }\n  return triggered ? { success: true, message: messages.join('，') } : { success: false };\n}"
+  "effect": { "type": "triggerSkill", "skillId": "pulse-pistol-move", "message": "" }
 }

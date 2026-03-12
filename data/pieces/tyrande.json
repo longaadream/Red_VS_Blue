@@ -17,13 +17,14 @@
       "level": 1
     },
     {
-      "skillId": "starfall",
+      "skillId": "elune-guidance",
       "level": 1
     },
     {
-      "skillId": "elune-guidance",
+      "skillId": "elune-protection",
       "level": 1
     }
   ],
+  "rules": ["rule-elune-guidance", "rule-elune-protection"],
   "isDefault": false
 }

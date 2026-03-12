@@ -58,6 +58,84 @@ interface TriggerRule {
 // 每次复用时返回浅拷贝，保持 effect 函数引用一致
 const ruleCache = new Map<string, TriggerRule>()
 
+/**
+ * 辅助函数：向玩家手牌添加卡牌，并触发相关事件
+ * @param battle 战斗状态
+ * @param cardId 卡牌ID
+ * @param targetPlayerId 目标玩家ID
+ * @param sourcePiece 来源棋子（可选）
+ * @returns 是否成功添加
+ */
+function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPlayerId: string, sourcePiece?: PieceInstance): boolean {
+  const player = battle.players?.find((p: any) => p.playerId === targetPlayerId)
+  if (!player) return false
+  if (!player.hand) player.hand = []
+  
+  // 触发手牌加入手里前规则
+  const beforeCardAddedResult = globalTriggerSystem.checkTriggers(battle, {
+    type: "beforeCardAdded",
+    playerId: targetPlayerId,
+    cardId: cardId,
+    sourcePiece: sourcePiece
+  });
+  
+  // 检查是否有规则阻止了添加手牌
+  if (beforeCardAddedResult.blocked) {
+    if (!battle.actions) battle.actions = []
+    beforeCardAddedResult.messages.forEach(message => {
+      battle.actions!.push({
+        type: "triggerEffect",
+        playerId: targetPlayerId,
+        turn: battle.turn?.turnNumber ?? 0,
+        payload: { message }
+      });
+    });
+    return false;
+  }
+  
+  if (player.hand.length >= 10) {
+    const def = loadCardById(cardId)
+    if (!battle.actions) battle.actions = []
+    battle.actions.push({
+      type: "cardOverflow",
+      playerId: targetPlayerId,
+      turn: battle.turn?.turnNumber ?? 0,
+      payload: { message: `手牌已满（10张），${def?.name || cardId}被弃置` }
+    })
+    if (!player.discardPile) player.discardPile = []
+    player.discardPile.push(cardId)
+    return false
+  }
+  
+  const instanceId = `ci-${cardId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+  const cardName = loadCardById(cardId)?.name
+  player.hand.push({ cardId, instanceId, ownerPlayerId: targetPlayerId, ...(cardName ? { name: cardName } : {}) })
+  
+  // 触发手牌加入手里后规则
+  const afterCardAddedResult = globalTriggerSystem.checkTriggers(battle, {
+    type: "afterCardAdded",
+    playerId: targetPlayerId,
+    cardId: cardId,
+    cardInstanceId: instanceId,
+    sourcePiece: sourcePiece
+  });
+  
+  // 处理触发效果的消息
+  if (afterCardAddedResult.success && afterCardAddedResult.messages.length > 0) {
+    if (!battle.actions) battle.actions = []
+    afterCardAddedResult.messages.forEach(message => {
+      battle.actions!.push({
+        type: "triggerEffect",
+        playerId: targetPlayerId,
+        turn: battle.turn?.turnNumber ?? 0,
+        payload: { message }
+      });
+    });
+  }
+  
+  return true
+}
+
 // ─── 卡牌系统类型 ─────────────────────────────────────────────────────────────
 
 export interface CardDefinition {
@@ -141,26 +219,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     /** 向某玩家手牌加一张卡（超上限时弃置并写日志） */
     addCardToHand: (cardId: string, targetPlayerId?: string) => {
       const pid = targetPlayerId || playerId
-      const player = battle.players.find((p: any) => p.playerId === pid)
-      if (!player) return false
-      if (!player.hand) player.hand = []
-      if (player.hand.length >= 10) {
-        const def = loadCardById(cardId)
-        if (!battle.actions) battle.actions = []
-        battle.actions.push({
-          type: "cardOverflow",
-          playerId: pid,
-          turn: battle.turn.turnNumber,
-          payload: { message: `手牌已满（10张），${def?.name || cardId}被弃置` }
-        })
-        if (!player.discardPile) player.discardPile = []
-        player.discardPile.push(cardId)
-        return false
-      }
-      const instanceId = `ci-${cardId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-      const cardName = loadCardById(cardId)?.name
-      player.hand.push({ cardId, instanceId, ownerPlayerId: pid, ...(cardName ? { name: cardName } : {}) })
-      return true
+      return addCardToHandWithTriggers(battle, cardId, pid)
     },
 
     /** 按 instanceId 从手牌移除并加入弃牌堆 */
@@ -352,12 +411,54 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
           try {
             const globalDealDamage = dealDamage;
             const globalHealDamage = healDamage;
-            
+
+            // 构建辅助函数
+            const addCardToHand = (cardId: string, targetPlayerId?: string) => {
+              const pid = targetPlayerId || context.sourcePiece?.ownerPlayerId || context.playerId;
+              if (!pid) return false;
+              return addCardToHandWithTriggers(battle, cardId, pid, context.sourcePiece);
+            };
+
+            // 构建 checkToxin 辅助函数
+            const checkToxin = (battleState: BattleState, ctx: any) => {
+              // 简单的毒素检查逻辑，如果需要可以扩展
+              return { success: true };
+            };
+
+            // 构建 addStatusEffectById 辅助函数
+            const addStatusEffectById = (targetPieceId: string, status: any) => {
+              const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
+              if (targetPiece) {
+                if (!targetPiece.statusTags) targetPiece.statusTags = [];
+                // 检查是否已存在相同ID的状态
+                const existingIndex = targetPiece.statusTags.findIndex((t: any) => t.id === status.id);
+                if (existingIndex >= 0) {
+                  targetPiece.statusTags[existingIndex] = { ...status, currentDuration: status.currentDuration || -1, currentUses: status.currentUses || -1 };
+                } else {
+                  targetPiece.statusTags.push({ ...status, currentDuration: status.currentDuration || -1, currentUses: status.currentUses || -1 });
+                }
+                return true;
+              }
+              return false;
+            };
+
+            // 构建 removeStatusEffectById 辅助函数
+            const removeStatusEffectById = (targetPieceId: string, statusId: string) => {
+              const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
+              if (targetPiece?.statusTags) {
+                const idx = targetPiece.statusTags.findIndex((t: any) => t.id === statusId);
+                if (idx !== -1) {
+                  targetPiece.statusTags.splice(idx, 1);
+                  return true;
+                }
+              }
+              return false;
+            };
+
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById) {
                 ${ruleData.skillCode}
-                return checkToxin(battle, context);
-              })(battle, context, dealDamage, healDamage)
+              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById)
             `;
             
             const result = eval(codeEnvironment);
@@ -468,6 +569,13 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                         const statusTagIndex = targetPiece.statusTags.findIndex(tag => tag.id === statusId);
                         if (statusTagIndex !== -1) {
                           targetPiece.statusTags.splice(statusTagIndex, 1);
+                          // 触发状态移除后事件
+                          globalTriggerSystem.checkTriggers(battle, {
+                            type: "afterStatusRemoved",
+                            sourcePiece: targetPiece,
+                            statusId: statusId,
+                            playerId: targetPiece.ownerPlayerId
+                          });
                           return true;
                         }
                       }
@@ -541,19 +649,7 @@ export function loadRuleById(ruleId: string): TriggerRule | null {
                     addCardToHand: (cardId: string, targetPlayerId?: string) => {
                       const pid = targetPlayerId || context.sourcePiece?.ownerPlayerId || context.playerId
                       if (!pid) return false
-                      const player = battle.players?.find(p => p.playerId === pid)
-                      if (!player) return false
-                      if (!player.hand) player.hand = []
-                      if (!player.discardPile) player.discardPile = []
-                      if (player.hand.length >= 10) {
-                        if (battle.actions) battle.actions.push({ type: 'info', playerId: pid, turn: battle.turn?.turnNumber ?? 0, payload: { message: `${pid}手牌已满，${cardId}被弃置` } })
-                        player.discardPile.push(cardId)
-                        return false
-                      }
-                      const instanceId = `ci-${cardId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
-                      const cardName = loadCardById(cardId)?.name
-                      player.hand.push({ cardId, instanceId, ownerPlayerId: pid, ...(cardName ? { name: cardName } : {}) })
-                      return true
+                      return addCardToHandWithTriggers(battle, cardId, pid, context.sourcePiece)
                     },
                     discardCard: (instanceId: string) => {
                       if (!battle.players) return false
@@ -1115,6 +1211,20 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
             range: defaultOptions.range,
             filter: defaultOptions.filter
           };
+        }
+        
+        // 检查目标是否在范围内
+        if (defaultOptions.range !== undefined && context.target.x !== undefined && context.target.y !== undefined) {
+          const distance = Math.abs(sourcePiece.x - context.target.x) + Math.abs(sourcePiece.y - context.target.y);
+          if (distance > defaultOptions.range) {
+            console.log(`Target out of range: distance=${distance}, range=${defaultOptions.range}`);
+            return {
+              needsTargetSelection: true,
+              targetType: defaultOptions.type,
+              range: defaultOptions.range,
+              filter: defaultOptions.filter
+            };
+          }
         }
         
         // 尝试从battle.pieces中查找原始目标实例
@@ -1752,6 +1862,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       return false;
     },
     removeStatusEffectById: (targetPieceId: string, statusId: string) => {
+      writeLog('[removeStatusEffectById] Called with targetPieceId: ' + targetPieceId + ', statusId: ' + statusId);
       // 找到目标棋子
       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
       if (targetPiece && targetPiece.statusTags) {
@@ -1790,13 +1901,15 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         
         // 从状态标签数组中移除指定状态
         targetPiece.statusTags.splice(statusTagIndex, 1);
+        writeLog('[removeStatusEffectById] Status ' + statusId + ' removed from ' + targetPiece.name + ', triggering afterStatusRemoved');
         // 触发状态移除后事件
-        globalTriggerSystem.checkTriggers(battle, {
+        const triggerResult = globalTriggerSystem.checkTriggers(battle, {
           type: "afterStatusRemoved",
           sourcePiece: targetPiece,
           statusId: statusId,
           playerId: targetPiece.ownerPlayerId
         });
+        writeLog('[removeStatusEffectById] afterStatusRemoved trigger result: ' + JSON.stringify(triggerResult));
         return true;
       }
       return false;
@@ -1896,18 +2009,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     // 手牌管理函数
     addCardToHand: (cardId: string, targetPlayerId?: string) => {
       const pid = targetPlayerId || sourcePiece.ownerPlayerId
-      const player = battle.players?.find(p => p.playerId === pid)
-      if (!player) return false
-      if (!player.hand) player.hand = []
-      if (!player.discardPile) player.discardPile = []
-      if (player.hand.length >= 10) {
-        if (battle.actions) battle.actions.push({ type: 'info', playerId: pid, turn: battle.turn?.turnNumber ?? 0, payload: { message: `${pid}手牌已满，${cardId}被弃置` } })
-        player.discardPile.push(cardId)
-        return false
-      }
-      const instanceId = `ci-${cardId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
-      player.hand.push({ cardId, instanceId, ownerPlayerId: pid })
-      return true
+      return addCardToHandWithTriggers(battle, cardId, pid, sourcePiece)
     },
     discardCard: (instanceId: string) => {
       if (!battle.players) return false

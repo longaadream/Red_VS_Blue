@@ -46,6 +46,10 @@ export type TriggerType =
   | "afterDamageBlocked"    // 伤害被规则/护盾格挡后（如圣盾）
   | "afterHealBlocked"      // 治疗被规则格挡后
   | "gameStart"             // 战斗开始时（只触发一次，用于初始发牌等效果）
+  | "beforeCardPlay"        // 手牌使用前
+  | "afterCardPlay"         // 手牌使用后
+  | "beforeCardAdded"       // 手牌加入手里前
+  | "afterCardAdded"        // 手牌加入手里后
 
 // 条件类型定义已移除，所有条件判断都在技能代码中通过if语句实现
 
@@ -128,15 +132,34 @@ export class TriggerSystem {
     try {
       // 清空现有规则
       this.clearRules()
-      console.log(`Loaded 0 specific rules:`, ruleIds)
+      
+      writeLog('[loadSpecificRules] Loading rules: ' + JSON.stringify(ruleIds))
+      
+      // 加载指定的规则
+      const { loadRuleById } = require('./skills')
+      for (const ruleId of ruleIds) {
+        const rule = loadRuleById(ruleId)
+        if (rule) {
+          this.addRule(rule)
+          writeLog('[loadSpecificRules] Loaded rule: ' + ruleId)
+        } else {
+          writeLog('[loadSpecificRules] Failed to load rule: ' + ruleId)
+        }
+      }
+      
+      writeLog('[loadSpecificRules] Loaded ' + this.rules.length + ' specific rules: ' + JSON.stringify(ruleIds))
     } catch (error) {
-      console.error('Error loading specific rules:', error)
+      writeLog('Error loading specific rules: ' + error)
     }
   }
 
   // 添加规则
   addRule(rule: TriggerRule): void {
-    this.rules.push(rule)
+    // 检查规则是否已经存在，避免重复添加
+    const exists = this.rules.some(r => r.id === rule.id)
+    if (!exists) {
+      this.rules.push(rule)
+    }
   }
 
   // 添加多条规则
@@ -167,9 +190,12 @@ export class TriggerSystem {
     let success = false
     let blocked = false
 
-    writeLog('[checkTriggers] Checking triggers for: ' + context.type + ', players: ' + JSON.stringify(battle.players?.map(p => ({ playerId: p.playerId, rulesCount: (p as any).rules?.length || 0 }))))
+    writeLog('[checkTriggers] Checking triggers for: ' + context.type + ', global rules count: ' + this.rules.length + ', players: ' + JSON.stringify(battle.players?.map(p => ({ playerId: p.playerId, rulesCount: (p as any).rules?.length || 0 }))))
+    writeLog('[checkTriggers] Context: ' + JSON.stringify({ type: context.type, statusId: (context as any).statusId, playerId: context.playerId }));
 
     // 1. 检查全局规则
+    writeLog('[checkTriggers] Global rules count: ' + this.rules.length);
+    writeLog('[checkTriggers] Global rules: ' + JSON.stringify(this.rules.map(r => r.id)));
     const globalMatchingRules = this.rules.filter(rule => {
       // 只检查触发类型是否匹配
       if (rule.trigger.type !== context.type) {
@@ -192,52 +218,80 @@ export class TriggerSystem {
 
       return true
     })
+    
+    writeLog('[checkTriggers] Global matching rules for ' + context.type + ': ' + JSON.stringify(globalMatchingRules.map(r => r.id)));
+
+    // 跟踪已执行的规则ID，避免重复执行
+    const executedRuleIds = new Set<string>();
 
     // 执行全局匹配的规则
     for (const rule of globalMatchingRules) {
+      // 记录已执行的规则
+      executedRuleIds.add(rule.id);
       // 检查规则对象是否有效
       if (!rule || typeof rule.effect !== 'function') {
-        console.warn(`Skipping invalid global rule: rule or rule.effect is not a function`, rule?.id)
+        writeLog('Skipping invalid global rule: rule or rule.effect is not a function, ruleId: ' + rule?.id)
         continue
       }
       
       try {
-        const result = rule.effect(battle, context)
-        if (result.success) {
-          success = true
-          if (result.message) {
-            triggeredEffects.push(result.message)
-          }
-          // 检查是否阻止行动
-          if (result.blocked) {
-            blocked = true
-          }
-
-          // 更新规则的限制状态
-          if (rule.limits) {
-            // 增加使用次数
-            if (rule.limits.uses !== undefined) {
-              rule.limits.uses++
-            } else {
-              rule.limits.uses = 1
+        // 找到拥有该规则的所有棋子，为每个棋子执行规则
+        const owningPieces = battle.pieces?.filter((p: any) => 
+          p.rules?.some((r: any) => r.id === rule.id)
+        ) || [];
+        
+        if (owningPieces.length === 0) {
+          // 如果没有棋子拥有该规则，直接执行（兼容旧逻辑）
+          const result = rule.effect(battle, context)
+          if (result.success) {
+            success = true
+            if (result.message) {
+              triggeredEffects.push(result.message)
             }
+            if (result.blocked) {
+              blocked = true
+            }
+          }
+        } else {
+          // 为每个拥有该规则的棋子执行
+          for (const owningPiece of owningPieces) {
+            const pieceContext = { ...context, rulePiece: owningPiece }
+            const result = rule.effect(battle, pieceContext)
+            if (result.success) {
+              success = true
+              if (result.message) {
+                triggeredEffects.push(result.message)
+              }
+              if (result.blocked) {
+                blocked = true
+              }
 
-            // 设置冷却
-            if (rule.limits.cooldownTurns) {
-              rule.limits.currentCooldown = rule.limits.cooldownTurns
+              // 更新规则的限制状态
+              if (rule.limits) {
+                if (rule.limits.uses !== undefined) {
+                  rule.limits.uses++
+                } else {
+                  rule.limits.uses = 1
+                }
+                if (rule.limits.cooldownTurns) {
+                  rule.limits.currentCooldown = rule.limits.cooldownTurns
+                }
+              }
             }
           }
         }
       } catch (error) {
-        console.error(`Error executing global rule ${rule.id}:`, error)
+        writeLog('Error executing global rule ' + rule.id + ': ' + error)
       }
     }
 
     // 2. 检查所有棋子实例的规则（对所有触发类型都扫描全部棋子）
     // 这样"移动后"、"技能使用后"等事件可以触发任意棋子上绑定的规则，而不仅限于事件发起者
+    writeLog('[checkTriggers] Checking piece rules, pieces count: ' + (battle.pieces?.length || 0));
     if (battle.pieces) {
       for (const piece of battle.pieces) {
         if (!piece.rules || piece.rules.length === 0) continue
+        writeLog('[checkTriggers] Piece ' + piece.name + ' has ' + piece.rules.length + ' rules: ' + JSON.stringify(piece.rules.map((r: any) => r.id)));
 
         const pieceMatchingRules = piece.rules.filter((rule: any) => {
           if (!rule || !rule.trigger) return false
@@ -251,6 +305,12 @@ export class TriggerSystem {
         })
 
         for (const rule of pieceMatchingRules) {
+          // 跳过已在全局规则中执行过的规则
+          if (executedRuleIds.has(rule.id)) {
+            writeLog('[checkTriggers] Skipping already executed rule: ' + rule.id);
+            continue;
+          }
+
           // 检查是否是默认函数（只返回 "xxx触发" 消息，尚未加载真实逻辑）
           const isDefaultEffect = typeof rule.effect === 'function' &&
             rule.effect.toString().includes('ruleData.name') &&
@@ -300,7 +360,7 @@ export class TriggerSystem {
               }
             }
           } catch (error) {
-            console.error(`Error executing rule ${rule.id} on piece ${piece.instanceId}:`, error)
+            writeLog('Error executing rule ' + rule.id + ' on piece ' + piece.instanceId + ': ' + error)
           }
         }
       }
@@ -369,7 +429,7 @@ export class TriggerSystem {
             }
           } catch (error) {
             writeLog('[checkTriggers] Error executing player rule ' + rule.id + ' for player ' + player.playerId + ': ' + error)
-            console.error(`Error executing player rule ${rule.id} for player ${player.playerId}:`, error)
+            writeLog('Error executing player rule ' + rule.id + ' for player ' + player.playerId + ': ' + error)
           }
         }
       }
@@ -399,7 +459,7 @@ export class TriggerSystem {
               player.discardPile.push(cardInstance.cardId)
             }
           } catch (error) {
-            console.error(`Error executing reactive card ${cardInstance.cardId}:`, error)
+            writeLog('Error executing reactive card ' + cardInstance.cardId + ': ' + error)
           }
         }
       }
@@ -433,7 +493,7 @@ export class TriggerSystem {
           // 如果持续时间结束，移除规则
           if (rule.limits.remainingDuration <= 0) {
             this.rules.splice(i, 1);
-            console.log(`Rule ${rule.id} (${rule.name}) expired and was removed`);
+            writeLog('Rule ' + rule.id + ' (' + rule.name + ') expired and was removed');
           }
         }
       }

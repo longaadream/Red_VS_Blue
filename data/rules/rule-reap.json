@@ -5,9 +5,5 @@
   "trigger": {
     "type": "afterDamageDealt"
   },
-  "effect": {
-    "type": "triggerSkill",
-    "skillId": "reap-heal",
-    "message": "${source.name}触发收割，恢复${Math.floor(damage * 0.5)}点生命值"
-  }
+  "skillCode": "if (!context.sourcePiece || !context.rulePiece) return { success: false }; if (context.sourcePiece.instanceId !== context.rulePiece.instanceId) return { success: false }; if (!context.damage || context.damage <= 0) return { success: false }; const healAmount = Math.floor(context.damage * 0.5); if (healAmount <= 0) return { success: false }; const healResult = healDamage(context.rulePiece, context.rulePiece, healAmount, battle, 'reap'); return { success: true, message: context.rulePiece.name + '通过收割恢复了' + healResult.heal + '点生命值' };"
 }

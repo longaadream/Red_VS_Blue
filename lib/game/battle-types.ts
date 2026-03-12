@@ -81,10 +81,8 @@ export interface BattleState {
   actions?: BattleActionLog[]
   /** 毒素列表 - 存放黑百合等技能放置的毒素 */
   toxins?: Array<{ x: number; y: number; damage: number; casterOwnerId: string }>
-  /** 回溯数据列表 - 存放猎空等技能的标记快照 */
-  recallData?: Array<{ pieceId: string; ownerPlayerId: string; targetCount: number; actionCount: number; snapshot: { x: number; y: number; hp: number } }>
-  /** 粘性炸弹列表 - 存放猎空粘性炸弹数据 */
-  stickyBombs?: Array<{ x: number; y: number; damage: number; ownerPlayerId: string; attachedPieceId: string | null; opponentEndTurnsSeen: number }>
+  /** 扩展数据 - 角色特定的数据存储在这里，避免修改 BattleState 类型 */
+  extensions?: Record<string, any>
   /** gameStart 触发器是否已触发过（防止重复触发） */
   gameStartFired?: boolean
 }

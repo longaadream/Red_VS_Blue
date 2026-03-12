@@ -608,8 +608,10 @@ export async function createInitialBattleForPlayers(
   
   // 收集所有规则ID
   const ruleIds = collectRuleIds(selectedPieces, map as any)
+  writeLog('[createInitialBattle] Collected rule IDs: ' + JSON.stringify(ruleIds))
   // 加载指定的规则
   globalTriggerSystem.loadSpecificRules(ruleIds)
+  writeLog('[createInitialBattle] Loaded global rules count: ' + globalTriggerSystem.getRules().length + ', rules: ' + JSON.stringify(globalTriggerSystem.getRules().map(r => r.id)))
   
   return {
     map,
@@ -649,10 +651,16 @@ export async function createInitialBattleForPlayers(
 function collectRuleIds(selectedPieces: PieceTemplate[], map: any): string[] {
   const ruleIds = new Set<string>()
   
+  console.log('[collectRuleIds] Selected pieces count: ' + selectedPieces.length);
+  
   // 收集棋子的规则
   selectedPieces.forEach(piece => {
+    console.log(`[collectRuleIds] Checking piece ${piece.name}, rules:`, piece.rules);
     if (piece.rules && Array.isArray(piece.rules)) {
+      console.log(`[collectRuleIds] Piece ${piece.name} has rules: ${JSON.stringify(piece.rules)}`);
       piece.rules.forEach(ruleId => ruleIds.add(ruleId))
+    } else {
+      console.log(`[collectRuleIds] Piece ${piece.name} has no rules or rules is not an array`);
     }
   })
   
@@ -661,5 +669,7 @@ function collectRuleIds(selectedPieces: PieceTemplate[], map: any): string[] {
     map.rules.forEach(ruleId => ruleIds.add(ruleId))
   }
   
-  return Array.from(ruleIds)
+  const result = Array.from(ruleIds)
+  writeLog('[collectRuleIds] Final rule IDs: ' + JSON.stringify(result))
+  return result
 }

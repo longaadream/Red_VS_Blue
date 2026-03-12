@@ -25,5 +25,6 @@
       "level": 1
     }
   ],
+  "rules": ["rule-blood-echo"],
   "isDefault": false
 }
