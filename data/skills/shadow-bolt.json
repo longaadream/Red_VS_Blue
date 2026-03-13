@@ -1,0 +1,15 @@
+{
+  "id": "shadow-bolt",
+  "name": "暗影箭",
+  "description": "选择一个同行或同列的格子作为方向，消耗所有灵魂残片，向该方向射出暗影箭，对路径上所有敌方棋子造成攻击力100%+灵魂残片数量的伤害",
+  "icon": "🌑",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 1,
+  "maxCharges": 3,
+  "chargeCost": 3,
+  "powerMultiplier": 1,
+  "actionPointCost": 4,
+  "code": "function executeSkill(context) { var targetPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (targetPos && targetPos.needsTargetSelection) { return targetPos; } if (!targetPos || !targetPos.x) { return { success: false, message: '无效目标' }; } var caster = context.piece; var dx = targetPos.x - caster.x; var dy = targetPos.y - caster.y; if (dx !== 0 && dy !== 0) { return { success: false, message: '必须选择同行或同列的格子' }; } var battle = context.battle; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); var soulFragments = []; if (player.hand) { for (var i = 0; i < player.hand.length; i++) { var card = player.hand[i]; if (card && card.cardId === 'soul-fragment') { soulFragments.push(card); } } } var fragmentCount = soulFragments.length; for (var j = 0; j < soulFragments.length; j++) { var fragment = soulFragments[j]; if (fragment && fragment.instanceId) { discardCard(fragment.instanceId); } } var dirX = dx === 0 ? 0 : (dx > 0 ? 1 : -1); var dirY = dy === 0 ? 0 : (dy > 0 ? 1 : -1); var damageValue = caster.attack + fragmentCount; var hitPieces = []; for (var k = 1; k <= 99; k++) { var checkX = caster.x + dirX * k; var checkY = caster.y + dirY * k; var target = battle.pieces.find(function(p) { return p.x === checkX && p.y === checkY && p.currentHp > 0 && p.faction !== caster.faction; }); if (target) { dealDamage(caster, target, damageValue, 'magical', battle, context.skill.id); hitPieces.push(target.name); } } return { success: true, message: caster.name + '释放暗影箭！消耗' + fragmentCount + '个灵魂残片，对' + hitPieces.join('、') + '造成' + damageValue + '点伤害（攻击力+' + fragmentCount + '）' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '选择同行同列格子，消耗所有灵魂残片，对该方向所有敌人造成伤害', expectedValues: {} }; }"
+}

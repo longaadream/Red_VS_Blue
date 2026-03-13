@@ -58,6 +58,12 @@ interface TriggerRule {
 // 每次复用时返回浅拷贝，保持 effect 函数引用一致
 const ruleCache = new Map<string, TriggerRule>()
 
+// 清除规则缓存的函数
+export function clearRuleCache(): void {
+  ruleCache.clear();
+  console.log('[clearRuleCache] Rule cache cleared');
+}
+
 /**
  * 辅助函数：向玩家手牌添加卡牌，并触发相关事件
  * @param battle 战斗状态
@@ -381,13 +387,16 @@ export function executeCardFunction(
 }
 
 // 从文件中加载规则的函数（导出以便在需要时重新注入 effect 函数）
-export function loadRuleById(ruleId: string): TriggerRule | null {
-  console.log(`[loadRuleById] Called with ruleId: ${ruleId}`);
+export function loadRuleById(ruleId: string, forceReload: boolean = false): TriggerRule | null {
+  console.log(`[loadRuleById] Called with ruleId: ${ruleId}, forceReload: ${forceReload}`);
   // 命中缓存时直接返回浅拷贝（保留 effect 函数引用，避免重复读文件）
   const cached = ruleCache.get(ruleId)
-  if (cached) {
+  if (cached && !forceReload) {
     console.log(`[loadRuleById] Cache hit for rule: ${ruleId}`);
     return { ...cached }
+  }
+  if (forceReload && cached) {
+    console.log(`[loadRuleById] Force reloading rule: ${ruleId}`);
   }
   try {
     const fs = require('fs');

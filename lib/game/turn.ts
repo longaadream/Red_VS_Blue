@@ -1017,7 +1017,15 @@ export function applyBattleAction(
         },
       }
 
-      const result = executeSkillFunction(skillDef, context, next)
+      writeLog('[useChargeSkill] Calling executeSkillFunction...')
+      let result;
+      try {
+        result = executeSkillFunction(skillDef, context, next)
+        writeLog('[useChargeSkill] executeSkillFunction result: ' + JSON.stringify({success: result.success, needsTargetSelection: result.needsTargetSelection, targetType: result.targetType}))
+      } catch (err) {
+        writeLog('[useChargeSkill] executeSkillFunction ERROR: ' + (err instanceof Error ? err.message : String(err)))
+        throw err
+      }
 
       // 检查是否需要目标选择
       if (result.needsTargetSelection) {
@@ -1266,6 +1274,10 @@ export function applyBattleAction(
 
       // 执行技能
       const { executeSkillFunction } = require('./skills')
+      console.log('[useChargeSkill] executeSkillFunction imported: ' + typeof executeSkillFunction)
+      console.log('[useChargeSkill] skillDef id: ' + skillDef.id)
+      console.log('[useChargeSkill] skillDef has code: ' + !!skillDef.code)
+      console.log('[useChargeSkill] About to build target info...')
       
       // 构建目标信息
       let targetInfo = null;
@@ -1312,7 +1324,15 @@ export function applyBattleAction(
         },
       }
 
-      const result = executeSkillFunction(skillDef, context, next)
+      writeLog('[useChargeSkill] Calling executeSkillFunction...')
+      let result;
+      try {
+        result = executeSkillFunction(skillDef, context, next)
+        writeLog('[useChargeSkill] executeSkillFunction result: ' + JSON.stringify({success: result.success, needsTargetSelection: result.needsTargetSelection, targetType: result.targetType}))
+      } catch (err) {
+        writeLog('[useChargeSkill] executeSkillFunction ERROR: ' + (err instanceof Error ? err.message : String(err)))
+        throw err
+      }
 
       // 检查是否需要目标选择
       if (result.needsTargetSelection) {

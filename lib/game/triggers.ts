@@ -128,17 +128,17 @@ export class TriggerSystem {
   }
 
   // 加载指定的规则
-  loadSpecificRules(ruleIds: string[]): void {
+  loadSpecificRules(ruleIds: string[], forceReload: boolean = false): void {
     try {
       // 清空现有规则
       this.clearRules()
       
-      writeLog('[loadSpecificRules] Loading rules: ' + JSON.stringify(ruleIds))
+      writeLog('[loadSpecificRules] Loading rules: ' + JSON.stringify(ruleIds) + ', forceReload: ' + forceReload)
       
       // 加载指定的规则
       const { loadRuleById } = require('./skills')
       for (const ruleId of ruleIds) {
-        const rule = loadRuleById(ruleId)
+        const rule = loadRuleById(ruleId, forceReload)
         if (rule) {
           this.addRule(rule)
           writeLog('[loadSpecificRules] Loaded rule: ' + ruleId)
@@ -229,6 +229,7 @@ export class TriggerSystem {
       // 记录已执行的规则
       executedRuleIds.add(rule.id);
       // 检查规则对象是否有效
+      writeLog('[checkTriggers] Checking global rule: ' + rule?.id + ', effect type: ' + typeof rule?.effect);
       if (!rule || typeof rule.effect !== 'function') {
         writeLog('Skipping invalid global rule: rule or rule.effect is not a function, ruleId: ' + rule?.id)
         continue

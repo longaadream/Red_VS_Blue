@@ -1,0 +1,30 @@
+{
+  "id": "guldan",
+  "name": "古尔丹",
+  "faction": "red",
+  "description": "强大的术士，擅长使用邪能魔法和操控灵魂残片",
+  "rarity": "legendary",
+  "image": "guldan.jpg",
+  "stats": {
+    "maxHp": 10,
+    "attack": 4,
+    "defense": 0,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "fel-blessing",
+      "level": 1
+    },
+    {
+      "skillId": "shadow-bolt",
+      "level": 1
+    },
+    {
+      "skillId": "soul-fracture",
+      "level": 1
+    }
+  ],
+  "rules": ["rule-soul-fracture"],
+  "isDefault": false
+}

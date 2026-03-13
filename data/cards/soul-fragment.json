@@ -1,0 +1,9 @@
+{
+  "id": "soul-fragment",
+  "name": "灵魂残片",
+  "description": "消耗1AP，选择一个友方棋子回复4点体力值",
+  "type": "active",
+  "cardType": "fel",
+  "icon": "💀",
+  "code": "function executeCard(context) { const battle = context.battle; const playerId = context.playerId; const player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player || player.actionPoints < 1) { return { success: false, message: 'AP不足' }; } const target = selectTarget({ filter: 'ally', range: 99 }); if (!target || target.needsTargetSelection) { return target || { success: false, message: '请选择一个友方棋子' }; } player.actionPoints -= 1; const result = healDamage(target, target, 4, battle, 'soul-fragment'); return { success: true, message: '灵魂残片为' + target.name + '恢复' + result.heal + '点生命' }; }"
+}

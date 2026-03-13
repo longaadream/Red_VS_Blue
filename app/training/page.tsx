@@ -52,10 +52,12 @@ export default function TrainingPage() {
   const [selectedPieceId, setSelectedPieceId] = useState<string | undefined>(undefined)
   const [isSelectingMoveTarget, setIsSelectingMoveTarget] = useState(false)
   const [isSelectingSkillTarget, setIsSelectingSkillTarget] = useState(false)
+  const [isSelectingCardTarget, setIsSelectingCardTarget] = useState(false)
   const [isSelectingOption, setIsSelectingOption] = useState(false)
   const [optionSelectionTitle, setOptionSelectionTitle] = useState<string>('请选择')
   const [optionSelectionOptions, setOptionSelectionOptions] = useState<{ label: string; value: any; description?: string }[]>([])
   const [pendingOptionAction, setPendingOptionAction] = useState<BattleAction | null>(null)
+  const [pendingCardAction, setPendingCardAction] = useState<BattleAction | null>(null)
   const [selectedSkillId, setSelectedSkillId] = useState<string | undefined>(undefined)
   const [selectedSkillType, setSelectedSkillType] = useState<"normal" | "super" | undefined>(undefined)
   const [targetSelectionType, setTargetSelectionType] = useState<'piece' | 'grid'>('piece')
@@ -137,14 +139,18 @@ export default function TrainingPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         if (data.needsTargetSelection) {
-          setIsSelectingSkillTarget(true)
           setIsPlacingPiece(false)
           // skillId only exists on useBasicSkill or useChargeSkill actions
           if ('skillId' in action) {
+            setIsSelectingSkillTarget(true)
             setSelectedSkillId(action.skillId!)
             // 保存技能类型，以便在目标选择后使用正确的动作类型
             const skillDef = battle?.skillsById[action.skillId!]
             setSelectedSkillType(skillDef?.type as "normal" | "super" | undefined)
+          } else if ('cardInstanceId' in action) {
+            // 手牌需要目标选择
+            setIsSelectingCardTarget(true)
+            setPendingCardAction(action)
           }
           setTargetSelectionType(data.targetType || 'piece')
           setTargetSelectionRange(data.range || 5)
@@ -565,6 +571,23 @@ export default function TrainingPage() {
                           取消技能
                         </Button>
                       </>
+                    ) : isSelectingCardTarget ? (
+                      <>
+                        <p className="text-xs text-muted-foreground text-center">
+                          请点击棋盘上的友方棋子选择手牌目标
+                        </p>
+                        <Button
+                          className="w-full"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setIsSelectingCardTarget(false)
+                            setPendingCardAction(null)
+                          }}
+                        >
+                          取消手牌
+                        </Button>
+                      </>
                     ) : isSelectingOption ? (
                       <>
                         <p className="text-xs text-muted-foreground text-center">
@@ -832,6 +855,14 @@ export default function TrainingPage() {
                       setIsSelectingSkillTarget(false)
                       setSelectedSkillId(undefined)
                       setSelectedSkillType(undefined)
+                    } else if (isSelectingCardTarget && pendingCardAction) {
+                      // 手牌目标选择
+                      sendBattleAction({
+                        ...pendingCardAction,
+                        targetPieceId: pieceId,
+                      })
+                      setIsSelectingCardTarget(false)
+                      setPendingCardAction(null)
                     } else {
                       setSelectedPieceId(pieceId)
                       setIsSelectingMoveTarget(false)
@@ -841,7 +872,7 @@ export default function TrainingPage() {
                   }}
                   selectedPieceId={selectedPieceId}
                   isSelectingMoveTarget={isSelectingMoveTarget}
-                  isSelectingSkillTarget={isSelectingSkillTarget}
+                  isSelectingSkillTarget={isSelectingSkillTarget || isSelectingCardTarget}
                   isPlacingPiece={isPlacingPiece}
                   selectedSkillId={selectedSkillId}
                   teleportRange={battle.skillsById.teleport?.areaSize || 5}

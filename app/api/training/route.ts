@@ -28,6 +28,7 @@ function generateUniquePieceId(ownerPlayerId: string): string {
 function createTrainingBattleState(mapId?: string): BattleState {
   // 重新加载技能文件（开发模式热重载）
   reloadSkills()
+  console.log('[createTrainingBattleState] Reloaded skills')
 
   // 获取地图
   let map = getMap(mapId || DEFAULT_MAP_ID)
@@ -39,6 +40,8 @@ function createTrainingBattleState(mapId?: string): BattleState {
   }
 
   const skills = buildDefaultSkills()
+  console.log('[createTrainingBattleState] Skills loaded:', Object.keys(skills))
+  console.log('[createTrainingBattleState] shadow-bolt in skills:', 'shadow-bolt' in skills)
 
   // 创建两个训练玩家
   const player1 = "training-red"
@@ -82,7 +85,7 @@ function createTrainingBattleState(mapId?: string): BattleState {
   if ((map as any).rules && Array.isArray((map as any).rules)) {
     (map as any).rules.forEach((ruleId: string) => ruleIds.push(ruleId))
   }
-  globalTriggerSystem.loadSpecificRules(ruleIds)
+  globalTriggerSystem.loadSpecificRules(ruleIds, true)
 
   return {
     map,
