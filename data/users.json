@@ -35,6 +35,18 @@
       "username": "hehehehe",
       "password": "2786549zz",
       "createdAt": "2026-03-09T00:47:09.875Z"
+    },
+    {
+      "id": "user_1773661647774_6091",
+      "username": "testplayer999",
+      "password": "123456",
+      "createdAt": "2026-03-16T11:47:27.774Z"
+    },
+    {
+      "id": "user_1773661889429_5170",
+      "username": "debuguser777",
+      "password": "pass123456",
+      "createdAt": "2026-03-16T11:51:29.429Z"
     }
   ]
 }

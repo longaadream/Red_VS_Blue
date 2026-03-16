@@ -1,0 +1,22 @@
+{
+  "id": "b74tw",
+  "name": "testplayer999 �� 1v1 ����",
+  "status": "waiting",
+  "createdAt": 1773661664995,
+  "maxPlayers": 2,
+  "players": [
+    {
+      "id": "user_1773661647774_6091",
+      "name": "testplayer999",
+      "joinedAt": 1773661668654,
+      "hasSelectedPieces": false,
+      "selectedPieces": []
+    }
+  ],
+  "hostId": "user_1773661647774_6091",
+  "mapId": "arena-8x6",
+  "visibility": "private",
+  "currentTurnIndex": 0,
+  "actions": [],
+  "battleState": null
+}

@@ -52,6 +52,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
+  try {
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
   let room = roomStore.getRoom(roomId)
@@ -149,6 +150,10 @@ export async function POST(
   }
 
   return NextResponse.json({ error: "Unsupported action" }, { status: 400 })
+  } catch (error) {
+    console.error('[POST /api/rooms/:roomId] Unhandled error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
 }
 
 export async function DELETE(

@@ -46,47 +46,48 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  let body: unknown
   try {
-    body = await req.json()
-  } catch {
-    body = {}
+    let body: unknown
+    try {
+      body = await req.json()
+    } catch {
+      body = {}
+    }
+
+    const { name, hostId, mapId, visibility } = (body as { name?: string; hostId?: string; mapId?: string; visibility?: "private" | "public" }) ?? {}
+
+    // 生成5位的数字和字母组合作为房间ID（强制小写）
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    let roomId = ''
+    for (let i = 0; i < 5; i++) {
+      roomId += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    const now = Date.now()
+    const trimmedHostId = hostId?.trim() || ''
+
+    const room: Room = {
+      id: roomId,
+      name: name?.trim() || `Room ${roomId}`,
+      status: "waiting",
+      createdAt: now,
+      maxPlayers: 2,
+      players: [],
+      hostId: trimmedHostId,
+      mapId: mapId?.trim() || 'arena-8x6',
+      visibility: visibility || "private",
+      currentTurnIndex: 0,
+      actions: [],
+      battleState: null,
+    }
+
+    console.log('Creating room with:', { roomId, hostId: trimmedHostId, name: room.name })
+    roomStore.setRoom(roomId, room)
+    console.log('Room created successfully')
+
+    return NextResponse.json(room, { status: 201 })
+  } catch (error) {
+    console.error('[POST /api/lobby] Error creating room:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
   }
-
-  const { name, hostId, mapId, visibility } = (body as { name?: string; hostId?: string; mapId?: string; visibility?: "private" | "public" }) ?? {}
-
-  // 生成5位的数字和字母组合作为房间ID（强制小写）
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let roomId = ''
-  for (let i = 0; i < 5; i++) {
-    roomId += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  const now = Date.now()
-  const trimmedHostId = hostId?.trim() || ''
-
-  const room: Room = {
-    id: roomId,
-    name: name?.trim() || `Room ${roomId}`,
-    status: "waiting",
-    createdAt: now,
-    // 1v1 对战房间，固定 2 人
-    maxPlayers: 2,
-    players: [],
-    hostId: trimmedHostId,
-    mapId: mapId?.trim() || 'arena-8x6', // 默认使用小型竞技场地图
-    visibility: visibility || "private",
-    currentTurnIndex: 0,
-    actions: [],
-    battleState: null,
-  }
-
-  console.log('Creating room with:', { roomId, hostId: trimmedHostId, name: room.name })
-
-  // 确保房间被正确保存
-  console.log('Creating room with ID:', roomId)
-  roomStore.setRoom(roomId, room)
-  console.log('Room created successfully')
-
-  return NextResponse.json(room, { status: 201 })
 }
 

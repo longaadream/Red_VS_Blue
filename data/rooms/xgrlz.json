@@ -1,0 +1,22 @@
+{
+  "id": "xgrlz",
+  "name": "prod test",
+  "status": "waiting",
+  "createdAt": 1773661519221,
+  "maxPlayers": 2,
+  "players": [
+    {
+      "id": "user_test_001",
+      "name": "testuser",
+      "joinedAt": 1773661524906,
+      "hasSelectedPieces": false,
+      "selectedPieces": []
+    }
+  ],
+  "hostId": "user_test_001",
+  "mapId": "arena-8x6",
+  "visibility": "private",
+  "currentTurnIndex": 0,
+  "actions": [],
+  "battleState": null
+}
