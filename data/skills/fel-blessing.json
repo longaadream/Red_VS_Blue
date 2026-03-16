@@ -1,7 +1,7 @@
 {
   "id": "fel-blessing",
   "name": "邪能赐福",
-  "description": "使一个友方棋子获得2点攻击力并受到4点伤害",
+  "description": "使一个10格内友方棋子获得2点攻击力并受到4点伤害",
   "icon": "💀",
   "kind": "active",
   "type": "normal",

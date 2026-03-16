@@ -304,12 +304,6 @@ export default function TurnDebugPage() {
     })
   }, [])
 
-  // 日志自动滚底
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight
-    }
-  }, [battle?.actions])
 
   // ── 工具 ──────────────────────────────────────────────────────────────────
 
@@ -742,7 +736,7 @@ export default function TurnDebugPage() {
             {!battle?.actions || battle.actions.length === 0 ? (
               <div className="text-xs text-zinc-700">日志为空</div>
             ) : (
-              battle.actions.map((log, i) => <LogEntry key={i} log={log} />)
+              [...battle.actions].reverse().map((log, i) => <LogEntry key={i} log={log} />)
             )}
           </div>
 

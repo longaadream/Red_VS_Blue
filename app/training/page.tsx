@@ -909,7 +909,7 @@ export default function TrainingPage() {
                 <CardTitle className="text-sm">战斗日志</CardTitle>
               </CardHeader>
               <CardContent className="max-h-40 overflow-y-auto space-y-2">
-                {(battle.actions || []).map((action, index) => {
+                {[...(battle.actions || [])].reverse().map((action, index) => {
                   let pieceName = "未知棋子"
                   const payload = action.payload
                   if (payload?.pieceId) {

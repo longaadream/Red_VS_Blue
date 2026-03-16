@@ -10,5 +10,5 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var caster = context.piece; var result = dealDamage(caster, caster, 10, 'true', context.battle, context.skill.id); return { success: true, message: caster.name + '发动狂信者献祭，对自身造成' + result.damage + '点真实伤害' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对自身造成10点真实伤害；若血誓激活则诅咒目标同时受到10点真实伤害', expectedValues: { selfDamage: 10 } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对自身造成10点真实伤害', expectedValues: { selfDamage: 10 } }; }"
 }

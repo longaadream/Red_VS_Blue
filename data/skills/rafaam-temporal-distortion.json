@@ -8,7 +8,7 @@
   "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 1,
+  "actionPointCost": 4,
   "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var damageResult = dealDamage(caster, caster, 4, 'magical', battle, context.skill.id); var casterOwnerId = caster.ownerPlayerId; var enemyPlayerId = battle.players.find(function(p) { return p.playerId !== casterOwnerId; })?.playerId; if (!enemyPlayerId) return { success: true, message: caster.name + '使用时空扭曲，对自身造成' + damageResult.damage + '点伤害' }; var selfPlayer = battle.players.find(function(p) { return p.playerId === casterOwnerId; }); var enemyPlayer = battle.players.find(function(p) { return p.playerId === enemyPlayerId; }); if (selfPlayer) { if (!selfPlayer.statusTags) selfPlayer.statusTags = []; selfPlayer.statusTags.push({ id: 'temporal-distortion-self-' + Date.now(), type: 'temporal-distortion-self', name: '时空扭曲-自身加AP', remainingDuration: 2 }); addPlayerRuleById(casterOwnerId, 'rule-rafaam-temporal-distortion'); } if (enemyPlayer) { if (!enemyPlayer.statusTags) enemyPlayer.statusTags = []; enemyPlayer.statusTags.push({ id: 'temporal-distortion-enemy-' + Date.now(), type: 'temporal-distortion-enemy', name: '时空扭曲-敌方减AP', remainingDuration: 2 }); addPlayerRuleById(enemyPlayerId, 'rule-rafaam-temporal-distortion'); } return { success: true, message: caster.name + '使用时空扭曲，对自身造成' + damageResult.damage + '点伤害，下回合敌方行动点-1，自己下回合行动点+1' }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对自身造成4点伤害，下回合敌方行动点-1，自己下回合行动点+1', expectedValues: { selfDamage: 4 } }; }"
 }

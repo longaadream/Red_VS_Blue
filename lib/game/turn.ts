@@ -1611,7 +1611,7 @@ export function applyBattleAction(
       const { loadCardById, executeCardFunction } = require('./skills')
       const cardDef = loadCardById(cardInstance.cardId) ?? next.customCards?.[cardInstance.cardId] ?? null
       if (!cardDef) throw new BattleRuleError(`卡牌定义找不到: ${cardInstance.cardId}`)
-      if (cardDef.type !== 'active') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
+      if (cardDef.type !== 'active' && cardDef.type !== 'reactive') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
 
       // AP 消耗：优先取手牌实例上的 actionPointCost（可被运行时效果修改），fallback 到卡牌定义
       const cardApCost = (cardInstance as any).actionPointCost ?? cardDef.actionPointCost ?? 0

@@ -1,7 +1,7 @@
 {
   "id": "pulse-pistol",
   "name": "脉冲手枪",
-  "description": "敌人释放技能时，对5×5范围内随机一个敌人造成等同于自身攻击力的伤害",
+  "description": "敌人释放技能时，对Chebyshev距离≤2范围内随机一个敌人造成等同于自身攻击力的伤害",
   "icon": "🔫",
   "kind": "passive",
   "type": "normal",
@@ -9,5 +9,5 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { var caster = context.rulePiece; var enemy = context.sourcePiece; if (!caster) { return { success: false, message: '' }; } if (!enemy) { return { success: false, message: '' }; } if (enemy.ownerPlayerId === caster.ownerPlayerId) { return { success: false, message: '' }; } var dx = Math.abs(enemy.x - caster.x); var dy = Math.abs(enemy.y - caster.y); if (Math.max(dx, dy) > 2) { return { success: false, message: '' }; } var enemies = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && Math.max(Math.abs(p.x - caster.x), Math.abs(p.y - caster.y)) <= 2; }); if (enemies.length === 0) { return { success: false, message: '' }; } var target = enemies[Math.floor(Math.random() * enemies.length)]; var result = dealDamage(caster, target, caster.attack, 'physical', battle, 'pulse-pistol'); return { success: true, message: caster.name + '的脉冲手枪触发，对' + target.name + '造成' + result.damage + '点伤害' }; }"
+  "code": "function executeSkill(context) { var caster = context.rulePiece; var trigger = context.sourcePiece; if (!caster) return { success: false, message: '' }; if (!trigger) return { success: false, message: '' }; if (trigger.ownerPlayerId === caster.ownerPlayerId) return { success: false, message: '' }; var enemies = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && Math.max(Math.abs(p.x - caster.x), Math.abs(p.y - caster.y)) <= 2; }); if (enemies.length === 0) return { success: false, message: '' }; var target = enemies[Math.floor(Math.random() * enemies.length)]; var result = dealDamage(caster, target, caster.attack, 'physical', battle, 'pulse-pistol'); return { success: true, message: caster.name + '的脉冲手枪触发，对' + target.name + '造成' + result.damage + '点伤害' }; }"
 }

@@ -1,7 +1,7 @@
 {
   "id": "blizzard",
   "name": "暴风雪",
-  "description": "选择全局任意一个格子，以该格子为中心创造3*3格的暴风雪区域，对方的回合结束时对其中所有敌人造成当前攻击力1.5倍的伤害和1回合冰冻",
+  "description": "选择全局任意一个格子，以该格子为中心创造7*7格的暴风雪区域，对方的回合结束时对其中所有敌人造成当前攻击力1.5倍的伤害和1回合冰冻",
   "icon": "🌪️",
   "kind": "active",
   "type": "super",
@@ -11,7 +11,7 @@
   "powerMultiplier": 1.5,
   "actionPointCost": 2,
   "range": "area",
-  "areaSize": 3,
-  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const targetPosition = selectTarget({ type: 'grid', range: 10, filter: 'all' });\n  if (!targetPosition || targetPosition.needsTargetSelection) {\n    return targetPosition;\n  }\n  // 给自身添加statusTag存储暴风雪中心位置和伤害\n  // 同时传入relatedRules，让restorePieceRules能在API传输后恢复规则\n  if (typeof addStatusEffectById === 'function') {\n    const statusId = 'blizzard-' + Date.now();\n    addStatusEffectById(sourcePiece.instanceId, {\n      id: statusId,\n      type: 'blizzard',\n      currentDuration: 2,\n      intensity: 1,\n      value: targetPosition.x,\n      extraValue: targetPosition.y,\n      damage: damageValue,\n      relatedRules: ['rule-blizzard-active']\n    });\n  }\n  // 给自身添加规则，在对方回合结束时触发\n  if (typeof addRuleById === 'function') {\n    addRuleById(sourcePiece.instanceId, 'rule-blizzard-active');\n  }\n  // 给自身添加暴风雪效果技能\n  if (typeof addSkillById === 'function') {\n    addSkillById(sourcePiece.instanceId, 'blizzard-damage');\n  }\n  return {\n    message: sourcePiece.name + '使用了暴风雪，在(' + targetPosition.x + ',' + targetPosition.y + ')创造了暴风雪区域，将在对方回合结束时对3x3格范围内的敌人造成' + damageValue + '点伤害并使其冰冻',\n    success: true\n  };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '选择全局任意位置，创造3*3格的暴风雪区域，对方回合结束时对其中所有敌人造成' + damageValue + '点伤害（相当于攻击力150%）和1回合冰冻',\n    expectedValues: { damage: damageValue }\n  };\n}"
+  "areaSize": 7,
+  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const targetPosition = selectTarget({ type: 'grid', range: 10, filter: 'all' });\n  if (!targetPosition || targetPosition.needsTargetSelection) {\n    return targetPosition;\n  }\n  // 给自身添加statusTag存储暴风雪中心位置和伤害\n  // 同时传入relatedRules，让restorePieceRules能在API传输后恢复规则\n  if (typeof addStatusEffectById === 'function') {\n    const statusId = 'blizzard-' + Date.now();\n    addStatusEffectById(sourcePiece.instanceId, {\n      id: statusId,\n      type: 'blizzard',\n      currentDuration: 2,\n      intensity: 1,\n      value: targetPosition.x,\n      extraValue: targetPosition.y,\n      damage: damageValue,\n      relatedRules: ['rule-blizzard-active']\n    });\n  }\n  // 给自身添加规则，在对方回合结束时触发\n  if (typeof addRuleById === 'function') {\n    addRuleById(sourcePiece.instanceId, 'rule-blizzard-active');\n  }\n  // 给自身添加暴风雪效果技能\n  if (typeof addSkillById === 'function') {\n    addSkillById(sourcePiece.instanceId, 'blizzard-damage');\n  }\n  return {\n    message: sourcePiece.name + '使用了暴风雪，在(' + targetPosition.x + ',' + targetPosition.y + ')创造了暴风雪区域，将在对方回合结束时对7x7格范围内的敌人造成' + damageValue + '点伤害并使其冰冻',\n    success: true\n  };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '选择全局任意位置，创造7*7格的暴风雪区域，对方回合结束时对其中所有敌人造成' + damageValue + '点伤害（相当于攻击力150%）和1回合冰冻',\n    expectedValues: { damage: damageValue }\n  };\n}"
 }

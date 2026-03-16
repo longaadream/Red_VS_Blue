@@ -28,7 +28,9 @@
       "Bash(powershell -Command \"Stop-Process -Id 27336 -Force\")",
       "Bash(for f:*)",
       "Bash(cd:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(python3:*)",
+      "Bash(find:*)"
     ]
   }
 }

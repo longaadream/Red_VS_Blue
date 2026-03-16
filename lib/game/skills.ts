@@ -1345,35 +1345,14 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
           }
         }
         
-        // 如果仍然找不到，尝试创建一个新的目标实例并添加到battle.pieces中
-        // 这是一个极端的备用方案，确保我们总是能修改一个会被保存的实例
-        console.warn('Creating new target piece instance as last resort');
-        const newTargetPiece = {
-          instanceId: targetInstanceId || `temp_${Date.now()}`,
-          templateId: context.target.templateId,
-          name: context.target.name || context.target.templateId,
-          ownerPlayerId: context.target.ownerPlayerId,
-          faction: context.target.faction || 'neutral',
-          currentHp: context.target.currentHp,
-          maxHp: context.target.maxHp,
-          attack: context.target.attack,
-          defense: context.target.defense,
-          x: context.target.x || 0,
-          y: context.target.y || 0,
-          moveRange: context.target.moveRange || 1,
-          skills: context.target.skills || [],
-          buffs: context.target.buffs || [],
-          debuffs: context.target.debuffs || [],
-          ruleTags: context.target.ruleTags || [],
-          statusTags: context.target.statusTags || [],
-          rules: context.target.rules || []
+        // 目标找不到，请求重新选择目标
+        console.warn('Target piece not found in battle.pieces, requesting target selection');
+        return {
+          needsTargetSelection: true,
+          targetType: defaultOptions.type,
+          range: defaultOptions.range,
+          filter: defaultOptions.filter
         };
-        
-        // 将新创建的目标实例添加到battle.pieces中
-        battle.pieces.push(newTargetPiece);
-        console.log('Added new target piece to battle.pieces:', newTargetPiece);
-        
-        return newTargetPiece;
       } else if (defaultOptions.type === 'grid' && context) {
         // 如果需要选择格子，检查context中的目标信息
         if (context.targetPosition) {

@@ -1,0 +1,84 @@
+{
+  "id": "large-elemental-temple",
+  "name": "大型元素神殿",
+  "layout": [
+    "####################",
+    "#RR..C........C..RR#",
+    "#.LLLL.......WWWW..#",
+    "#.LLLL...#...WWWW..#",
+    "#....##.......##...#",
+    "#...E#.........#E..#",
+    "#....#.........#...#",
+    "#.C..#....C....#..C#",
+    "#....#.........#...#",
+    "#....#..C...C..#...#",
+    "#.C..#.........#..C#",
+    "#....#.........#...#",
+    "#...E#.........#E..#",
+    "#....##.......##...#",
+    "#.WWWW...#...LLLL..#",
+    "#.WWWW.......LLLL..#",
+    "#BB..C........C..BB#",
+    "####################"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "R",
+      "type": "spawn",
+      "walkable": true,
+      "bulletPassable": true,
+      "description": "红方出生点"
+    },
+    {
+      "char": "B",
+      "type": "spawn",
+      "walkable": true,
+      "bulletPassable": true,
+      "description": "蓝方出生点"
+    },
+    {
+      "char": "L",
+      "type": "lava",
+      "walkable": true,
+      "bulletPassable": true,
+      "damagePerTurn": 2,
+      "description": "火元素祭坛，每回合造成2点伤害"
+    },
+    {
+      "char": "W",
+      "type": "spring",
+      "walkable": true,
+      "bulletPassable": true,
+      "healPerTurn": 2,
+      "description": "水元素圣泉，每回合回复2点生命"
+    },
+    {
+      "char": "E",
+      "type": "chargepad",
+      "walkable": true,
+      "bulletPassable": true,
+      "chargePerTurn": 1,
+      "description": "能量节点，每回合获得1点充能"
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false,
+      "description": "掩体，可阻挡子弹"
+    }
+  ],
+  "rules": []
+}

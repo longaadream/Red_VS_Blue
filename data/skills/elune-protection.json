@@ -9,5 +9,5 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { const caster = context.piece; addRuleById(caster.instanceId, 'rule-elune-protection'); return { success: true }; }"
+  "code": "function executeSkill(context) { const caster = context.piece; addPlayerRuleById(caster.ownerPlayerId, 'rule-elune-protection-player'); return { success: true }; }"
 }

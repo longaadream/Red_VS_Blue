@@ -531,7 +531,7 @@ export default function BattlePage() {
                 <CardTitle className="text-sm">战斗日志</CardTitle>
               </CardHeader>
               <CardContent className="max-h-40 overflow-y-auto space-y-2">
-                {(battle.actions || []).map((action, index) => {
+                {[...(battle.actions || [])].reverse().map((action, index) => {
                   // 找到相关棋子的名称
                   let pieceName = "未知棋子";
                   if (action.payload?.pieceId) {

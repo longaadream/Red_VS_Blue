@@ -1,7 +1,7 @@
 {
   "id": "hidan-blood-oath",
   "name": "血誓仪式",
-  "description": "对4格内目标施加「血誓诅咒」持续3回合：飞段受到的任何伤害（含自伤）同时作为真实伤害施加给目标",
+  "description": "对4格内一个目标施加「血誓诅咒」持续3回合：飞段受到的任何伤害（含自伤）同时作为真实伤害施加给目标",
   "icon": "🩸",
   "kind": "active",
   "type": "normal",
@@ -10,5 +10,5 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var alreadyOathed = target.statusTags && target.statusTags.some(function(t) { return t.type === 'blood-oath'; }); if (alreadyOathed) return { success: false, message: target.name + '已处于血誓诅咒中' }; addStatusEffectById(target.instanceId, { id: 'blood-oath-' + target.instanceId, name: '血誓诅咒', type: 'blood-oath', currentDuration: 3, currentUses: -1, intensity: 1, stacks: 1 }); addRuleById(caster.instanceId, 'rule-hidan-blood-oath-reflect'); addRuleById(target.instanceId, 'rule-blood-oath-tick'); return { success: true, message: caster.name + '对' + target.name + '施加了血誓诅咒（持续3回合），飞段受到的所有伤害将同时施加给目标' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内目标施加血誓诅咒（3回合），飞段受到的伤害同时作为真实伤害施加给目标', expectedValues: {} }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内一个目标施加血誓诅咒（3回合），飞段受到的伤害同时作为真实伤害施加给目标', expectedValues: {} }; }"
 }
