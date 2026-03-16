@@ -219,6 +219,7 @@ export class TriggerSystem {
       return true
     })
     
+    globalMatchingRules.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
     writeLog('[checkTriggers] Global matching rules for ' + context.type + ': ' + JSON.stringify(globalMatchingRules.map(r => r.id)));
 
     // 跟踪已执行的规则ID，避免重复执行
@@ -226,6 +227,7 @@ export class TriggerSystem {
 
     // 执行全局匹配的规则
     for (const rule of globalMatchingRules) {
+      if (blocked) break
       // 记录已执行的规则
       executedRuleIds.add(rule.id);
       // 检查规则对象是否有效
@@ -256,6 +258,7 @@ export class TriggerSystem {
         } else {
           // 为每个拥有该规则的棋子执行
           for (const owningPiece of owningPieces) {
+            if (blocked) break
             const pieceContext = { ...context, rulePiece: owningPiece }
             const result = rule.effect(battle, pieceContext)
             if (result.success) {
@@ -291,6 +294,7 @@ export class TriggerSystem {
     writeLog('[checkTriggers] Checking piece rules, pieces count: ' + (battle.pieces?.length || 0));
     if (battle.pieces) {
       for (const piece of battle.pieces) {
+        if (blocked) break
         if (!piece.rules || piece.rules.length === 0) continue
         writeLog('[checkTriggers] Piece ' + piece.name + ' has ' + piece.rules.length + ' rules: ' + JSON.stringify(piece.rules.map((r: any) => r.id)));
 
@@ -305,7 +309,9 @@ export class TriggerSystem {
           return true
         })
 
+        pieceMatchingRules.sort((a: any, b: any) => (b.priority ?? 0) - (a.priority ?? 0))
         for (const rule of pieceMatchingRules) {
+          if (blocked) break
           // 跳过已在全局规则中执行过的规则
           if (executedRuleIds.has(rule.id)) {
             writeLog('[checkTriggers] Skipping already executed rule: ' + rule.id);
@@ -445,7 +451,7 @@ export class TriggerSystem {
           const cardInstance = player.hand[i]
           try {
             const { loadCardById, executeCardFunction } = require('./skills')
-            const cardDef = loadCardById(cardInstance.cardId)
+            const cardDef = loadCardById(cardInstance.cardId) || (battle as any).customCards?.[cardInstance.cardId]
             if (!cardDef || cardDef.type !== 'reactive') continue
             if (!cardDef.trigger || cardDef.trigger.type !== context.type) continue
 
@@ -454,10 +460,12 @@ export class TriggerSystem {
               success = true
               if (result.message) triggeredEffects.push(result.message)
               if (result.blocked) blocked = true
-              // 弃牌
-              if (!player.discardPile) player.discardPile = []
-              player.hand.splice(i, 1)
-              player.discardPile.push(cardInstance.cardId)
+              // 弃牌（keepInHand=true 时保留在手牌中）
+              if (!result.keepInHand) {
+                if (!player.discardPile) player.discardPile = []
+                player.hand.splice(i, 1)
+                player.discardPile.push(cardInstance.cardId)
+              }
             }
           } catch (error) {
             writeLog('Error executing reactive card ' + cardInstance.cardId + ': ' + error)

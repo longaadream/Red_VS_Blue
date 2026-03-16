@@ -1,0 +1,7 @@
+{
+  "id": "rule-hidan-undying-tick",
+  "name": "濒死倒计时",
+  "description": "飞段濒死状态在己方回合结束时结算，时间到后真正死亡",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var hidan = context.rulePiece; if (context.battle.turn.currentPlayerId !== hidan.ownerPlayerId) return { success: false, message: '' }; var tag = hidan.statusTags && hidan.statusTags.find(function(t) { return t.type === 'hidan-dying'; }); if (!tag) { hidan.rules = (hidan.rules || []).filter(function(r) { return r.id !== 'rule-hidan-undying-tick'; }); return { success: false, message: '' }; } removeStatusEffectById(hidan.instanceId, 'hidan-dying'); hidan.rules = (hidan.rules || []).filter(function(r) { return r.id !== 'rule-hidan-undying-tick'; }); dealDamage(hidan, hidan, 999, 'true', context.battle, 'undying-expire'); return { success: true, message: hidan.name + '的濒死状态结束，最终陨落' };"
+}

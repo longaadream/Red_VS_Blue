@@ -1,0 +1,7 @@
+{
+  "id": "rule-obito-grudge-reset",
+  "name": "怨念消散",
+  "description": "带土己方回合结束时，清除所有怨念层数并重置攻击力加成",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var obito = context.rulePiece; var battle = context.battle; if (battle.turn.currentPlayerId !== obito.ownerPlayerId) return { success: false, message: '' }; if (!obito.statusTags) return { success: false, message: '' }; var tagIdx = obito.statusTags.findIndex(function(t) { return t.type === 'obito-grudge'; }); if (tagIdx === -1) return { success: false, message: '' }; var tag = obito.statusTags[tagIdx]; var removed = tag.intensity || 0; if (removed > 0) { obito.attack = Math.max(0, obito.attack - removed); } obito.statusTags.splice(tagIdx, 1); return { success: true, message: obito.name + '的怨念消散，攻击力-' + removed + '，现为' + obito.attack };"
+}

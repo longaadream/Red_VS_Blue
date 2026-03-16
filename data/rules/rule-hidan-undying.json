@@ -1,0 +1,8 @@
+{
+  "id": "rule-hidan-undying",
+  "priority": -101,
+  "name": "不死神体",
+  "description": "受到致命伤害时，HP强制保留1点并进入「濒死」状态；濒死状态持续1回合，结束后才真正死亡（一战仅触发一次）",
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "var hidan = context.rulePiece; if (context.piece.instanceId !== hidan.instanceId) return { success: false, message: '' }; var inDying = hidan.statusTags && hidan.statusTags.some(function(t) { return t.type === 'hidan-dying'; }); if (inDying) return { success: false, message: '' }; var alreadyTriggered = hidan.statusTags && hidan.statusTags.some(function(t) { return t.type === 'hidan-undying-used'; }); if (alreadyTriggered) return { success: false, message: '' }; var isTrue = (context.damageType === 'true' || context.damageType === 'toxin'); var effectiveDamage = isTrue ? Math.max(1, context.damage) : Math.max(1, context.damage - (hidan.defense || 0)); if (effectiveDamage < hidan.currentHp) return { success: false, message: '' }; hidan.currentHp = 1; addStatusEffectById(hidan.instanceId, { id: 'hidan-dying', name: '濒死', type: 'hidan-dying', currentDuration: 1, currentUses: -1, intensity: 1, stacks: 1 }); addStatusEffectById(hidan.instanceId, { id: 'hidan-undying-used', name: '不死已触发', type: 'hidan-undying-used', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); addRuleById(hidan.instanceId, 'rule-hidan-undying-tick'); return { success: true, blocked: true, message: hidan.name + '的不死神体触发！HP强制保留1点，进入濒死状态（下回合结束后死亡）' };"
+}

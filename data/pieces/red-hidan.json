@@ -1,0 +1,24 @@
+{
+  "id": "red-hidan",
+  "name": "飞段",
+  "faction": "red",
+  "description": "晓组织的不死狂信者，通过血誓诅咒将自身所受的伤害反射给绑定目标，受到致命伤害时会进入濒死状态而非直接死亡",
+  "rarity": "legendary",
+  "image": "hidan.jpg",
+  "stats": {
+    "maxHp": 13,
+    "attack": 3,
+    "defense": 1,
+    "moveRange": 3
+  },
+  "skills": [
+    { "skillId": "hidan-blood-oath", "level": 1 },
+    { "skillId": "hidan-sacrifice", "level": 1 },
+    { "skillId": "hidan-undying", "level": 1 }
+  ],
+  "rules": [
+    "rule-hidan-dying-immune",
+    "rule-hidan-undying"
+  ],
+  "isDefault": false
+}

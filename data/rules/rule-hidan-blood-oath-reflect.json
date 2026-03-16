@@ -1,0 +1,7 @@
+{
+  "id": "rule-hidan-blood-oath-reflect",
+  "name": "血誓反射",
+  "description": "飞段受到任何伤害时，将等量真实伤害反射给血誓诅咒目标",
+  "trigger": { "type": "afterDamageTaken" },
+  "skillCode": "var hidan = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== hidan.instanceId) return { success: false, message: '' }; var damage = context.damage; if (!damage || damage <= 0) return { success: false, message: '' }; var battle = context.battle; var oathed = battle.pieces.find(function(p) { return p.ownerPlayerId !== hidan.ownerPlayerId && p.currentHp > 0 && p.statusTags && p.statusTags.some(function(t) { return t.type === 'blood-oath'; }); }); if (!oathed) { hidan.rules = (hidan.rules || []).filter(function(r) { return r.id !== 'rule-hidan-blood-oath-reflect'; }); return { success: false, message: '' }; } var result = dealDamage(hidan, oathed, damage, 'true', battle, 'blood-oath-reflect'); return { success: true, message: '血誓触发：' + oathed.name + '受到' + result.damage + '点诅咒真实伤害' };"
+}

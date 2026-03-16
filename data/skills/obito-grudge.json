@@ -1,0 +1,13 @@
+{
+  "id": "obito-grudge",
+  "name": "怨念积蓄",
+  "description": "任意回合内，任意友方棋子（含带土自身）受到伤害时，带土获得一层「怨念」（最多3层，每层攻击力+2），带土己方回合结束时清除",
+  "icon": "👁",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { return { success: true, message: '' }; }"
+}

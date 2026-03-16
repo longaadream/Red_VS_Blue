@@ -1,0 +1,14 @@
+{
+  "id": "obito-kamui",
+  "name": "神威·吸收",
+  "description": "带土将自身转移至异次元空间，完全免疫并将下一次受到的伤害作为真实伤害反弹给攻击者",
+  "icon": "🌀",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var alreadyShielded = caster.statusTags && caster.statusTags.some(function(t) { return t.type === 'kamui-shield'; }); if (alreadyShielded) return { success: false, message: caster.name + '已处于神威护盾中' }; addStatusEffectById(caster.instanceId, { id: 'kamui-shield', name: '神威护盾', type: 'kamui-shield', currentDuration: -1, currentUses: 1, intensity: 1, stacks: 1 }); addRuleById(caster.instanceId, 'rule-obito-kamui-block'); return { success: true, message: caster.name + '激活神威，转移至异次元空间！下一次受到的伤害将被完全吸收并反弹' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '免疫并反弹下一次受到的伤害（真实伤害反弹给攻击者）', expectedValues: {} }; }"
+}

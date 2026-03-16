@@ -1,0 +1,15 @@
+{
+  "id": "obito-space-time",
+  "name": "神威·时空跳跃",
+  "description": "消耗3点充能，传送至地图任意空地，对落点周围2格内所有敌方棋子造成攻击力120%的真实伤害",
+  "icon": "⚫",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "chargeCost": 3,
+  "powerMultiplier": 1.2,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var pos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var tile = battle.map.tiles.find(function(t) { return t.x === pos.x && t.y === pos.y; }); if (!tile || !tile.props.walkable) return { success: false, message: '目标位置不可行走' }; var pieceAtPos = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (pieceAtPos) return { success: false, message: '目标位置已被占用' }; var oldX = caster.x; var oldY = caster.y; caster.x = pos.x; caster.y = pos.y; var baseDamage = Math.round(caster.attack * 1.2); var hit = []; battle.pieces.forEach(function(p) { if (p.ownerPlayerId === caster.ownerPlayerId || p.currentHp <= 0) return; var dx = Math.abs(p.x - pos.x); var dy = Math.abs(p.y - pos.y); if (Math.max(dx, dy) <= 2) { var result = dealDamage(caster, p, baseDamage, 'true', battle, context.skill.id); hit.push(p.name + '(-' + result.damage + ')'); } }); var hitMsg = hit.length > 0 ? '，击中：' + hit.join('、') : '，周围无敌人'; return { success: true, message: caster.name + '时空跳跃至(' + pos.x + ',' + pos.y + ')' + hitMsg }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var dmg = Math.round((piece.attack || 0) * 1.2); return { description: '传送至地图任意位置，对落点2格内敌人造成' + dmg + '点真实伤害（攻击力120%）', expectedValues: { damage: dmg } }; }"
+}

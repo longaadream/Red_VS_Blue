@@ -27,7 +27,7 @@
 
 ## 黄金法则（必读）
 
-**在编写任何技能前，必须牢记以下五条规则。违反任何一条将导致技能无法正常工作。**
+**在编写任何技能前，必须牢记以下规则。违反任何一条将导致技能无法正常工作。**
 
 ### 法则一：所有效果必须在 `code` 字段中实现
 
@@ -97,7 +97,9 @@ dealDamage(sourcePiece, target, 10, 'physical', context.battle, context.skill.id
 2. 一个**规则文件**（`data/rules/rule-xxx.json`）：定义触发时机，并调用技能
 3. 在角色的**初始化技能**或**施加状态时**，通过 `addRuleById` 将规则绑定到棋子
 
-#### 规则文件的正确写法
+#### 规则文件有两种合法格式
+
+**格式A：`effect.triggerSkill` + 独立技能文件（推荐用于复杂逻辑）**
 
 ```json
 {
@@ -109,18 +111,29 @@ dealDamage(sourcePiece, target, 10, 'physical', context.battle, context.skill.id
 }
 ```
 
-#### 规则文件的错误写法（禁止）
+对应技能文件 `data/skills/my-passive-effect.json`，使用 `executeSkill(context)` 函数包裹。
+
+**格式B：`skillCode` 内联代码（适用于短小、自包含的规则逻辑）**
 
 ```json
-// ❌ 错误！禁止在规则文件中直接写 skillCode
 {
   "id": "rule-my-passive",
+  "name": "我的被动规则",
   "trigger": { "type": "afterSkillUsed" },
-  "skillCode": "function executeSkill(context) { ... }"
+  "skillCode": "if (context.skillId !== 'target-skill') return { success: false, message: '' }; var piece = context.rulePiece; piece.attack += 1; return { success: true, message: piece.name + '攻击力+1' };"
 }
 ```
 
-所有效果逻辑必须写在技能文件中，规则文件只定义触发时机。
+`skillCode` 是原始代码字符串（无函数包裹），可直接访问 `context`。当逻辑短小且不需要复用时选择此格式。
+
+**两种格式的对比：**
+
+| 对比项 | `effect.triggerSkill` | `skillCode` 内联 |
+|--------|----------------------|-----------------|
+| 代码复用 | ✅ 技能文件可被多个规则调用 | ❌ 逻辑嵌入规则中 |
+| 适用长度 | 任意长度 | 建议 ≤ 5 行逻辑 |
+| 可调用函数 | `executeSkill(context)` 内所有函数 | 同左，完全相同 |
+| `context.rulePiece` | `context.rulePiece` = 绑定规则的棋子 | 同左 |
 
 ### 法则六：游戏核心逻辑必须完全独立于所有棋子（禁止硬编码）
 
@@ -265,9 +278,12 @@ const skillContext = {
 | `context.piece` | 触发事件的棋子（攻击者/被攻击者/治疗者等，取决于触发类型） |
 | `context.target` | 事件目标的棋子（被攻击者/攻击者/被治疗者等） |
 | `context.rulePiece` | **当前执行规则的棋子**（规则绑定者），用于区分事件源和规则拥有者 |
+| `context.skillId` | 触发技能的ID（仅 `afterSkillUsed`/`beforeSkillUse` 中可靠存在） |
 | `context.type` | 触发类型 |
 | `context.battle` | 当前战斗状态 |
 | `context.skill` | 当前技能信息（技能相关触发） |
+
+> **`context.piece` vs `context.rulePiece`**：在规则 `skillCode` 中，这两个字段含义不同。`context.piece` 是**触发本次事件的棋子**（如谁受伤了、谁使用了技能），`context.rulePiece` 是**规则绑定的棋子**（即规则挂在哪个棋子上）。大多数情况下规则检查的是 `context.rulePiece`（"我自己"），而事件的来源通过 `context.piece` 或 `context.target` 获取。
 
 ### 使用示例：伤害加成
 
@@ -396,6 +412,31 @@ data/
 | `actionPointCost` | number | ✅ | 消耗的行动点，被动技能填 0 |
 | `code` | string | ✅ | **技能效果代码**，必须定义 `executeSkill(context)` 函数 |
 | `previewCode` | string | 否 | 技能预览代码，定义 `calculatePreview(piece, skillDef)` 函数 |
+
+### previewCode 编写规范
+
+`previewCode` 用于在技能悬浮框中显示动态说明（如当前伤害预期值）。**当技能伤害与攻击力挂钩时，必须明确说明比例，不能只写固定数值**，否则玩家会误以为是固定伤害。
+
+```javascript
+// ✅ 正确：说明与攻击力的关系
+function calculatePreview(piece, skillDef) {
+  const dmg = Math.round(piece.attack * skillDef.powerMultiplier)
+  return {
+    description: '对1格内敌人造成' + dmg + '点物理伤害（攻击力' + Math.round(skillDef.powerMultiplier * 100) + '%）',
+    expectedValues: { damage: dmg }
+  }
+}
+
+// ❌ 错误：只写数值，玩家不知道是否随攻击力变化
+function calculatePreview(piece, skillDef) {
+  return {
+    description: '对敌人造成15点伤害',  // 15是固定还是当前值？
+    expectedValues: { damage: 15 }
+  }
+}
+```
+
+**格式规范**：`'造成X点伤害（攻击力100%）'`，括号内注明倍率。
 
 ### 关于 `kind` 字段
 
@@ -605,6 +646,7 @@ if (!isTargetInRange(target, 5)) {
 ```javascript
 addStatusEffectById(target.instanceId, {
   id: 'bleeding',            // 状态的显示ID（用于 removeStatusEffectById）
+  name: '流血',              // ⚠️ 必填！UI 中显示的名称；不填则 UI 显示 id 字段（难看）
   type: 'bleeding',          // 状态类型（用于代码中检查）
   currentDuration: 3,        // 持续回合数，-1 = 永久
   currentUses: -1,           // 最大触发次数，-1 = 无限
@@ -614,6 +656,8 @@ addStatusEffectById(target.instanceId, {
 })
 ```
 
+> **重要**：`name` 字段是 UI 显示的名称，**必须填写**。缺少 `name` 时，UI 会退回显示 `id`，玩家看到的是不可读的内部标识符（如 `demon-strike-charges`）。
+>
 > **重要**：如果状态需要配合规则（被动技能）工作，必须在 `relatedRules` 字段中声明关联的规则ID。这样在API传输后，`restorePieceRules` 函数可以根据状态标签自动重新加载规则。
 
 #### `removeStatusEffectById(targetPieceId, statusId)`
@@ -662,11 +706,35 @@ removePlayerRuleById(sourcePiece.ownerPlayerId, 'rule-faction-buff')
 
 #### `addSkillById(targetPieceId, skillId)`
 
-在运行时为棋子添加一个技能。
+在运行时为棋子添加一个技能。**同时**将技能定义注入 `battle.skillsById`，确保 UI 能立即显示该技能按钮。
+
+```javascript
+// 添加动态技能（如变形后获得新技能）
+addSkillById(caster.instanceId, 'illidan-demon-strike')
+// → piece.skills 里出现新条目
+// → battle.skillsById['illidan-demon-strike'] 被填充，UI 按钮立即出现
+```
 
 #### `removeSkillById(targetPieceId, skillId)`
 
 从棋子移除一个技能。
+
+```javascript
+removeSkillById(piece.instanceId, 'illidan-demon-strike')
+```
+
+#### ⚠️ 关键：规则移除技能后 turn.ts 不会重新添加
+
+在 `afterSkillUsed` 等触发器的 `skillCode` 里，可以直接操作 `piece.skills` 数组来移除技能：
+
+```javascript
+// 在 skillCode 中手动移除
+piece.skills = (piece.skills || []).filter(function(s) {
+  return s.skillId !== 'illidan-demon-strike'
+})
+```
+
+**turn.ts 冷却处理已修复**：技能执行后，turn.ts 只为 `piece.skills` 中**仍然存在**的技能设置冷却，不会重新添加已被规则移除的技能。因此规则在 `afterSkillUsed` 中移除技能后，移除效果会被正确保留。
 
 ### 手牌管理
 
@@ -901,7 +969,7 @@ return {
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { const caster = context.piece; const target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; const dmg = Math.round(caster.attack * context.skill.powerMultiplier); const result = dealDamage(caster, target, dmg, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '攻击了' + target.name + '，造成' + result.damage + '点物理伤害' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对1格内的敌人造成' + Math.round(piece.attack * skillDef.powerMultiplier) + '点物理伤害', expectedValues: { damage: Math.round(piece.attack * skillDef.powerMultiplier) } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { var dmg = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '对1格内的敌人造成' + dmg + '点物理伤害（攻击力100%）', expectedValues: { damage: dmg } }; }"
 }
 ```
 
@@ -979,25 +1047,33 @@ return {
     - 在 code 里检查条件并执行效果
 ```
 
-### 被动技能的规则文件格式
+### 被动技能的规则文件格式（两种写法）
+
+**写法A：调用独立技能文件（推荐）**
 
 ```json
 {
   "id": "rule-counter-attack",
   "name": "反击规则",
   "description": "受到伤害时触发反击",
-  "trigger": {
-    "type": "afterDamageTaken"
-  },
-  "effect": {
-    "type": "triggerSkill",
-    "skillId": "counter-attack",
-    "message": ""
-  }
+  "trigger": { "type": "afterDamageTaken" },
+  "effect": { "type": "triggerSkill", "skillId": "counter-attack", "message": "" }
 }
 ```
 
-> **规则文件只定义触发时机（trigger.type）**，不写任何条件逻辑。所有条件在技能代码里判断。
+**写法B：skillCode 内联（适合短逻辑）**
+
+```json
+{
+  "id": "rule-counter-attack",
+  "name": "反击规则",
+  "description": "受到伤害时触发反击",
+  "trigger": { "type": "afterDamageTaken" },
+  "skillCode": "var piece = context.rulePiece; var attacker = context.piece; if (!attacker || attacker.currentHp <= 0) return { success: false, message: '' }; var result = dealDamage(piece, attacker, piece.attack, 'physical', context.battle, 'counter-attack'); return { success: true, message: piece.name + '反击造成' + result.damage + '点伤害' };"
+}
+```
+
+> **规则文件只定义触发时机（trigger.type）**，所有条件判断在代码里（`skillCode` 或技能 `code`）。在 `skillCode` 中，`context.rulePiece` 是绑定该规则的棋子，`context.piece` 是触发事件的棋子（两者不一定相同）。
 
 ### 被动技能的技能文件格式
 
@@ -1083,52 +1159,71 @@ return {
 
 #### 实现优先级的方法
 
-目前系统**不支持**在规则 JSON 中直接声明 `priority` 数值。优先级通过以下方式控制：
-
-1. **全局规则 vs 棋子规则**：全局规则总是先于棋子规则执行
-2. **规则绑定时机**：先绑定的规则先执行
-3. **在技能代码中提前返回**：如果前置规则已经 `blocked`，后续规则不会执行
-
-#### 示例：艾露恩的守护的优先级设计
-
-**艾露恩的守护**（`rule-elune-protection.json`）是一个典型的低优先级规则：
+系统支持在规则 JSON 中直接声明 `priority` 数值。规则按优先级**降序**执行（数值越大越先执行，默认为 0）：
 
 ```json
 {
   "id": "rule-elune-protection",
-  "name": "艾露恩的守护规则",
-  "description": "当友方单位受到致命伤害且泰兰德在场时，触发艾露恩的守护。此规则应在所有beforeDamageTaken规则最后触发",
-  "trigger": { "type": "beforeDamageTaken" },
-  "skillCode": "const targetPiece = context.piece; const damage = context.damage; ..."
+  "priority": -100,
+  ...
 }
 ```
 
-**实现逻辑**：
+| priority 值 | 执行顺序 | 典型用途 |
+|-------------|----------|----------|
+| > 0         | 最先执行 | 护盾、伤害减免 |
+| 0（默认）   | 正常顺序 | 普通被动规则 |
+| -100        | 较后执行 | 艾露恩守护 |
+| -101        | 更后执行 | 飞段不死神体 |
+
+除了 priority 字段，还可以通过以下方式控制顺序：
+
+1. **全局规则 vs 棋子规则**：全局规则总是先于棋子规则执行
+2. **在技能代码中提前返回**：如果前置规则已经 `blocked`，后续规则不会执行
+
+#### 示例：艾露恩的守护 + 飞段不死神体的优先级设计
+
+这两个规则都在 `beforeDamageTaken` 时机触发，通过 `priority` 控制执行顺序：
+
+```json
+{
+  "id": "rule-elune-protection",
+  "priority": -100,
+  "trigger": { "type": "beforeDamageTaken" },
+  ...
+}
+```
+
+```json
+{
+  "id": "rule-hidan-undying",
+  "priority": -101,
+  "trigger": { "type": "beforeDamageTaken" },
+  ...
+}
+```
+
+**艾露恩的守护**（priority=-100）实现逻辑：
 
 1. 检查是否为致命伤害（`targetPiece.currentHp <= damage`）
 2. 检查泰兰德是否在场
 3. 检查该友方单位本场战斗是否已触发过守护
 4. 如果满足条件，添加已守护标记并恢复生命
-5. 返回 `blocked: true` 阻止原始伤害
+5. 返回 `blocked: true` 阻止原始伤害 → 飞段不死神体不再执行
 
-**为什么它应该是低优先级**：
+**飞段不死神体**（priority=-101）在艾露恩守护之后执行，作为最后的救命保险。
 
-- 如果先执行了艾露恩的守护，后续的伤害减免规则（如护盾）将没有机会生效
-- 理想情况下，应该先执行护盾、防御姿态等伤害减免规则
-- 如果伤害被减免到非致命，艾露恩的守护就不应该触发
+**为什么艾露恩应该先于不死神体执行**：
 
-**当前限制**：
-
-目前系统没有内置的优先级排序机制。要实现严格的优先级控制，需要：
-1. 将高优先级规则设计为全局规则或先绑定
-2. 或者在技能代码中检查 `context.damage` 是否已被修改
+- 如果艾露恩先守护成功（`blocked: true`），不死神体的触发条件（`effectiveDamage >= currentHp`）就不会成立
+- 如果不死神体先执行并触发，艾露恩守护就会白白消耗一次
 
 #### 最佳实践
 
 1. **伤害减免类规则**应该尽早执行，减少后续规则需要处理的伤害值
 2. **伤害免疫/救援类规则**应该最后执行，作为最后的保险
 3. **在技能代码中检查条件**：即使规则被触发，也要在 `skillCode` 中检查所有条件，确保逻辑正确
-4. **使用 `blocked` 谨慎**：一旦一个规则返回 `blocked: true`，后续同类型规则仍然会被执行，但原始行动已被阻止
+4. **使用 `blocked` 谨慎**：一旦一个规则返回 `blocked: true`，**同一时机的后续规则全部停止执行**，原始行动也被阻止。要让某规则在 blocked 后仍能执行，必须给它设置更高的 priority（更大的数值）
 
 ### 示例：反击被动技能
 
@@ -1449,6 +1544,7 @@ function executeSkill(context) {
 ```javascript
 addStatusEffectById(targetPieceId, {
   id: 'bleeding',         // 显示用ID，也是 removeStatusEffectById 的参数
+  name: '流血',           // ⚠️ 必填！UI 棋子状态栏显示的名称（缺少则显示 id）
   type: 'bleeding',       // 状态类型（用于在 statusTags 中查找：tag.type === 'bleeding'）
   currentDuration: 3,     // 持续回合数（-1 = 永久）
   currentUses: -1,        // 最大触发次数（-1 = 无限次）
@@ -1458,7 +1554,9 @@ addStatusEffectById(targetPieceId, {
 })
 ```
 
-> **重要规范**：如果状态需要配合规则（被动技能）工作，必须在 `relatedRules` 字段中声明关联的规则ID。这样在API传输后，`restorePieceRules` 函数可以根据状态标签自动重新加载规则，无需硬编码映射。
+> **重要规范（name 字段）**：`name` 必须填写。UI 状态栏优先显示 `tag.name`，找不到时降级显示 `tag.id`。如果不填 `name`，玩家会看到类似 `demon-strike-charges` 这样的内部 ID。
+>
+> **重要规范（relatedRules）**：如果状态需要配合规则（被动技能）工作，必须在 `relatedRules` 字段中声明关联的规则ID。这样在API传输后，`restorePieceRules` 函数可以根据状态标签自动重新加载规则，无需硬编码映射。
 
 ### 读取棋子的状态
 
@@ -1649,6 +1747,55 @@ if (bleedTag) {
 
 ---
 
+### 完整示例：动态技能授予与自我清除
+
+"变形获得临时技能，使用 N 次后自动移除"是一类常见模式，以下是完整实现方案：
+
+**主动技能（变形）`data/skills/metamorphosis.json`**
+
+```javascript
+function executeSkill(context) {
+  var caster = context.piece;
+  // 1. 修改属性
+  caster.attack += 2;
+  // 2. 添加状态标签记录使用次数（必须有 name 字段）
+  addStatusEffectById(caster.instanceId, {
+    id: 'strike-charges',
+    name: '冲击次数',           // ⚠️ 必填，UI 显示此文字
+    type: 'strike-charges',
+    currentDuration: -1,
+    currentUses: 2,
+    intensity: 2,
+    stacks: 1
+  });
+  // 3. 添加技能（UI 立即出现按钮）
+  addSkillById(caster.instanceId, 'demon-strike');
+  // 4. 添加追踪规则
+  addRuleById(caster.instanceId, 'rule-demon-strike-count');
+  return { success: true, message: caster.name + '变形！获得冲击技能（2次）' };
+}
+```
+
+**追踪规则 `data/rules/rule-demon-strike-count.json`（skillCode 格式）**
+
+```json
+{
+  "id": "rule-demon-strike-count",
+  "name": "冲击计数",
+  "trigger": { "type": "afterSkillUsed" },
+  "skillCode": "if (context.skillId !== 'demon-strike') return { success: false, message: '' }; var piece = context.rulePiece; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.id === 'strike-charges'; }); if (!tag) return { success: false, message: '' }; if (tag.remainingUses === undefined) { tag.remainingUses = tag.currentUses || 2; } tag.remainingUses -= 1; if (tag.remainingUses <= 0) { removeStatusEffectById(piece.instanceId, 'strike-charges'); piece.skills = (piece.skills || []).filter(function(s) { return s.skillId !== 'demon-strike'; }); piece.rules = (piece.rules || []).filter(function(r) { return r.id !== 'rule-demon-strike-count'; }); return { success: true, message: piece.name + '的冲击次数耗尽，技能已移除' }; } return { success: true, message: piece.name + '冲击剩余' + tag.remainingUses + '次' };"
+}
+```
+
+**关键注意事项：**
+
+1. **`context.skillId` 过滤**：规则是全场触发的，必须用 `if (context.skillId !== 'xxx') return` 过滤掉其他技能
+2. **`context.rulePiece`**：规则 `skillCode` 中用此获取规则绑定的棋子（不是触发事件的棋子）
+3. **`remainingUses` 初始化**：`addStatusEffectById` 中的 `currentUses` 字段名在某些上下文中不会自动转为 `remainingUses`，需要在第一次访问时手动初始化：`if (tag.remainingUses === undefined) { tag.remainingUses = tag.currentUses || 2; }`
+4. **直接操作 `piece.skills/rules` 数组**：移除时可直接 `piece.skills = piece.skills.filter(...)`，turn.ts 不会重新添加已被规则移除的技能
+
+---
+
 ## 阻止行动（blocked）
 
 通过在技能返回值中加入 `blocked: true`，可以阻止当前触发的行动（如移动、受伤）。
@@ -1808,8 +1955,26 @@ return { success: true, blocked: false, message: '' }
 
 | 触发类型 | context.piece | context.skillId | 可 blocked | 备注 |
 |---------|--------------|----------------|-----------|------|
-| `beforeSkillUse` | 即将使用技能的棋子 | 技能ID | ✅ | 全场扫描 |
-| `afterSkillUsed` | 使用技能后的棋子 | 技能ID | ❌ | 全场扫描 |
+| `beforeSkillUse` | 即将使用技能的棋子 | 技能ID ✅ | ✅ | 全场扫描 |
+| `afterSkillUsed` | 使用技能后的棋子 | 技能ID ✅ | ❌ | 全场扫描 |
+
+#### afterSkillUsed vs afterDamageDealt 的选择
+
+**判断技能是否被使用**：用 `afterSkillUsed`，不要用 `afterDamageDealt`。
+
+原因：
+- `afterSkillUsed`：技能被使用时**必然**触发，`context.skillId` 可靠地等于 `skillDef.id`
+- `afterDamageDealt`：只有在造成伤害时才触发，技能有可能一滴血都没打到（如目标有圣盾、全程闪避等），`context.skillId` 在此触发类型中不可靠（不总是携带）
+
+```javascript
+// ✅ 正确：追踪技能使用次数
+// rule: trigger: { "type": "afterSkillUsed" }
+if (context.skillId !== 'illidan-demon-strike') return { success: false, message: '' }
+// context.skillId 在此处始终有效
+
+// ❌ 错误：用 afterDamageDealt 来计次
+// 如果技能打在圣盾上没造成伤害，afterDamageDealt 不会触发，计次逻辑跳过
+```
 
 ### 移动类
 
@@ -2016,7 +2181,7 @@ removeRuleById(piece.instanceId, 'rule-bleeding-tick')
   "powerMultiplier": 1.2,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var dmg = Math.round(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, dmg, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '刺击了' + target.name + '，造成' + result.damage + '点物理伤害' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对1格内敌人造成' + Math.round(piece.attack * skillDef.powerMultiplier) + '点物理伤害', expectedValues: { damage: Math.round(piece.attack * skillDef.powerMultiplier) } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { var dmg = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '对1格内敌人造成' + dmg + '点物理伤害（攻击力120%）', expectedValues: { damage: dmg } }; }"
 }
 ```
 

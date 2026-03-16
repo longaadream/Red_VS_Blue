@@ -1454,69 +1454,26 @@ export function applyBattleAction(
       }
 
       const next = safeCloneBattleState(state)
-      // 获取当前玩家的所有棋子
-      const currentPlayerPieces = next.pieces.filter(p => isSamePlayer(p.ownerPlayerId, action.playerId) && p.currentHp > 0);
-      // 获取对方玩家的所有棋子（用于触发如暴风雪等对方回合结束时触发的规则）
-      const opponentPlayerPieces = next.pieces.filter(p => !isSamePlayer(p.ownerPlayerId, action.playerId) && p.currentHp > 0);
-      
-      // 触发回合结束效果，为每个存活的棋子都触发一次
-      currentPlayerPieces.forEach(piece => {
-        const endTurnResult = globalTriggerSystem.checkTriggers(next, {
-          type: "endTurn",
-          sourcePiece: piece,
-          turnNumber: next.turn.turnNumber,
-          playerId: action.playerId
+
+      // 触发所有回合结束效果：一次调用，checkTriggers 内部自行迭代棋子规则、玩家规则、手牌 reactive 卡牌
+      // context.playerId = 当前结束回合的玩家，供暴风雪等规则判断"是否是对方回合"
+      const endTurnResult = globalTriggerSystem.checkTriggers(next, {
+        type: "endTurn",
+        turnNumber: next.turn.turnNumber,
+        playerId: action.playerId
+      });
+
+      if (endTurnResult.success && endTurnResult.messages.length > 0) {
+        if (!next.actions) next.actions = [];
+        endTurnResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: action.playerId,
+            turn: next.turn.turnNumber,
+            payload: { message }
+          });
         });
-
-        // 处理触发效果的消息
-        if (endTurnResult.success && endTurnResult.messages.length > 0) {
-          if (!next.actions) {
-            next.actions = [];
-          }
-          endTurnResult.messages.forEach(message => {
-            next.actions!.push({
-              type: "triggerEffect",
-              playerId: action.playerId,
-              turn: next.turn.turnNumber,
-              payload: {
-                message
-              }
-            });
-          });
-        }
-      });
-
-      // 触发对方玩家棋子的回合结束规则（如暴风雪等）
-      // 暴风雪技能检查 context.playerId !== sourcePiece.ownerPlayerId
-      // 所以这里传递当前结束回合的玩家ID（对方玩家的ID）
-      opponentPlayerPieces.forEach(piece => {
-        // 检查棋子是否有 endTurn 类型的规则
-        if (piece.rules && piece.rules.some((rule: any) => rule.trigger && rule.trigger.type === "endTurn")) {
-          const endTurnResult = globalTriggerSystem.checkTriggers(next, {
-            type: "endTurn",
-            sourcePiece: piece,
-            turnNumber: next.turn.turnNumber,
-            playerId: action.playerId  // 使用当前结束回合的玩家ID
-          });
-
-          // 处理触发效果的消息
-          if (endTurnResult.success && endTurnResult.messages.length > 0) {
-            if (!next.actions) {
-              next.actions = [];
-            }
-            endTurnResult.messages.forEach(message => {
-              next.actions!.push({
-                type: "triggerEffect",
-                playerId: piece.ownerPlayerId,
-                turn: next.turn.turnNumber,
-                payload: {
-                  message
-                }
-              });
-            });
-          }
-        }
-      });
+      }
 
       // 触发whenever规则（每一步行动后检测）
       const wheneverResult = globalTriggerSystem.checkTriggers(next, {

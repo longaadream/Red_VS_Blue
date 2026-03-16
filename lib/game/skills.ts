@@ -505,10 +505,32 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               return true
             };
 
+            const addRuleById = (targetPieceId: string, ruleId: string) => {
+              const targetPiece = battle.pieces.find((p: any) => p.instanceId === targetPieceId)
+              if (targetPiece) {
+                const rule = loadRuleById(ruleId)
+                if (rule) {
+                  if (!targetPiece.rules) targetPiece.rules = []
+                  targetPiece.rules.push(rule)
+                  return true
+                }
+              }
+              return false
+            };
+
+            const removeRuleById = (targetPieceId: string, ruleId: string) => {
+              const targetPiece = battle.pieces.find((p: any) => p.instanceId === targetPieceId)
+              if (targetPiece?.rules) {
+                targetPiece.rules = targetPiece.rules.filter((r: any) => r.id !== ruleId)
+                return true
+              }
+              return false
+            };
+
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, addRuleById, removeRuleById) {
                 ${ruleData.skillCode}
-              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById)
+              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, addRuleById, removeRuleById)
             `;
             
             const result = eval(codeEnvironment);
@@ -1551,6 +1573,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
     targetPiece: attacker,
     target: attacker,
     damage: modifiedBaseDamage,
+    damageType,
     skillId
   });
 

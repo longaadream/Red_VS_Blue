@@ -1,0 +1,7 @@
+{
+  "id": "rule-obito-kamui-block",
+  "name": "神威·反弹",
+  "description": "带土拥有神威护盾时，完全免疫下一次受到的伤害，并将该伤害作为真实伤害反弹给攻击者",
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "var obito = context.rulePiece; if (context.piece.instanceId !== obito.instanceId) return { success: false, message: '' }; var shield = obito.statusTags && obito.statusTags.find(function(t) { return t.type === 'kamui-shield'; }); if (!shield) { obito.rules = (obito.rules || []).filter(function(r) { return r.id !== 'rule-obito-kamui-block'; }); return { success: false, message: '' }; } var damage = context.damage; if (!damage || damage <= 0) return { success: false, message: '' }; var attacker = context.target; removeStatusEffectById(obito.instanceId, 'kamui-shield'); obito.rules = (obito.rules || []).filter(function(r) { return r.id !== 'rule-obito-kamui-block'; }); if (attacker && attacker.currentHp > 0) { dealDamage(obito, attacker, damage, 'true', context.battle, 'kamui-reflect'); return { success: true, blocked: true, message: obito.name + '的神威吸收了' + damage + '点伤害，并将其反弹给' + attacker.name + '！' }; } return { success: true, blocked: true, message: obito.name + '的神威吸收了' + damage + '点伤害！' };"
+}

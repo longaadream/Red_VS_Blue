@@ -1,0 +1,24 @@
+{
+  "id": "red-obito",
+  "name": "宇智波带土",
+  "faction": "red",
+  "description": "晓组织的幕后黑手，以友方的苦难为力量积蓄怨念，神威使其能完全免疫一次伤害并将其反弹",
+  "rarity": "legendary",
+  "image": "obito.jpg",
+  "stats": {
+    "maxHp": 11,
+    "attack": 3,
+    "defense": 1,
+    "moveRange": 4
+  },
+  "skills": [
+    { "skillId": "obito-kamui", "level": 1 },
+    { "skillId": "obito-space-time", "level": 1 },
+    { "skillId": "obito-grudge", "level": 1 }
+  ],
+  "rules": [
+    "rule-obito-grudge",
+    "rule-obito-grudge-reset"
+  ],
+  "isDefault": false
+}
