@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Loader2, UserPlus, LogIn } from "lucide-react"
@@ -32,6 +32,14 @@ type User = {
 }
 
 export default function PlayPage() {
+  return (
+    <Suspense>
+      <PlayContent />
+    </Suspense>
+  )
+}
+
+function PlayContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 

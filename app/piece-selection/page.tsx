@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Swords, Star, UserPlus, LogIn, X } from "lucide-react"
@@ -20,6 +20,14 @@ type User = {
 }
 
 export default function PieceSelectionPage() {
+  return (
+    <Suspense>
+      <PieceSelectionContent />
+    </Suspense>
+  )
+}
+
+function PieceSelectionContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [user, setUser] = useState<User | null>(null)

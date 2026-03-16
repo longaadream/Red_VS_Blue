@@ -1,101 +1,52 @@
 import { createMapFromAscii, type AsciiMapConfig, type BoardMap } from './map'
-import { readdirSync, readFileSync, existsSync } from 'fs'
-import { join } from 'path'
-import fs from 'fs'
-import path from 'path'
+import arenaJson from '../../data/maps/arena-8x6.json'
+import mediumLavaTempleJson from '../../data/maps/medium-lava-temple.json'
+import largeElementalArenaJson from '../../data/maps/large-elemental-arena.json'
+import largeBattlefieldJson from '../../data/maps/large-battlefield.json'
 
-function writeLog(message: string) {
-  const logDir = path.join(process.cwd(), 'logs')
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true })
-  }
-  const logFile = path.join(logDir, 'game.log')
-  const timestamp = new Date().toISOString()
-  fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`)
-}
+const allMapConfigs: AsciiMapConfig[] = [
+  arenaJson as AsciiMapConfig,
+  mediumLavaTempleJson as AsciiMapConfig,
+  largeElementalArenaJson as AsciiMapConfig,
+  largeBattlefieldJson as AsciiMapConfig,
+]
 
 let mapsCache: Record<string, BoardMap> = {}
-let isLoading = false
+let loaded = false
 
-// 加载地图数据
-export async function loadMaps() {
-  if (isLoading) return
-
-  isLoading = true
-  try {
-    // 使用process.cwd()来获取项目根目录
-    const dirPath = join(process.cwd(), 'data/maps')
-    writeLog('[loadMaps] dirPath: ' + dirPath)
-    writeLog('[loadMaps] cwd: ' + process.cwd())
-    writeLog('[loadMaps] Directory exists: ' + existsSync(dirPath))
-
-    const maps: Record<string, BoardMap> = {}
-
-    if (existsSync(dirPath)) {
-      const files = readdirSync(dirPath, { withFileTypes: true })
-      writeLog('[loadMaps] Found files: ' + files.map(f => f.name).join(', '))
-
-      files.forEach((file) => {
-        if (file.isFile() && file.name.endsWith('.json')) {
-          const filePath = join(dirPath, file.name)
-          // console.log('Loading map file:', filePath)
-
-          try {
-            const content = readFileSync(filePath, 'utf-8')
-            // console.log('File content length:', content.length)
-
-            try {
-              const config = JSON.parse(content) as AsciiMapConfig
-              // console.log('Parsed map config for', file.name, ':', config)
-
-              if (config && typeof config === 'object' && 'id' in config) {
-                try {
-                  const map = createMapFromAscii(config)
-                  maps[map.id] = map
-                  writeLog('[loadMaps] Created map: ' + map.id + ', name: ' + map.name)
-                } catch (mapError) {
-                  writeLog('[loadMaps] Error creating map from config ' + config.id + ': ' + mapError)
-                }
-              } else {
-                // console.warn('File', file.name, 'does not have an id field')
-              }
-            } catch (parseError) {
-              // console.error(`Error parsing JSON file ${file.name}:`, parseError)
-            }
-          } catch (readError) {
-            // console.error(`Error reading file ${file.name}:`, readError)
-          }
-        }
-      })
-    } else {
-      // console.error('Directory', dirPath, 'does not exist')
+function ensureLoaded() {
+  if (loaded) return
+  loaded = true
+  for (const config of allMapConfigs) {
+    try {
+      const map = createMapFromAscii(config)
+      mapsCache[map.id] = map
+    } catch (e) {
+      console.error('[map-repository] Failed to create map:', config.id, e)
     }
-
-    // console.log('Final maps:', maps)
-    mapsCache = maps
-  } catch (error) {
-    // console.error('Error loading maps:', error)
-  } finally {
-    isLoading = false
   }
 }
 
-// 获取所有地图
+export async function loadMaps() {
+  ensureLoaded()
+}
+
 export function getAllMaps(): BoardMap[] {
+  ensureLoaded()
   return Object.values(mapsCache)
 }
 
-// 根据ID获取地图
 export function getMapById(id: string): BoardMap | undefined {
+  ensureLoaded()
   return mapsCache[id]
 }
 
-// 检查地图是否存在
 export function mapExists(id: string): boolean {
+  ensureLoaded()
   return id in mapsCache
 }
 
-// 清空地图缓存（用于测试或重新加载）
 export function clearMapsCache() {
   mapsCache = {}
+  loaded = false
 }
