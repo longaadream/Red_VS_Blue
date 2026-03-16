@@ -1,0 +1,13 @@
+{
+  "id": "rafaam-temporal-distortion-enemy",
+  "name": "时空扭曲-敌方减AP",
+  "description": "在敌方回合开始时减少1点行动点",
+  "icon": "⏳",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { var battle = context.battle; var currentPlayerId = battle.turn.currentPlayerId; var contextPlayerId = context.playerId; if (!contextPlayerId) return { success: false }; if (currentPlayerId !== contextPlayerId) return { success: false }; var player = battle.players.find(function(p) { return p.playerId === contextPlayerId; }); if (!player) return { success: false }; if (!player.statusTags) player.statusTags = []; var enemyEffect = player.statusTags.find(function(t) { return t.type === 'temporal-distortion-enemy'; }); if (!enemyEffect) return { success: false }; if (player.actionPoints > 0) { player.actionPoints -= 1; } player.statusTags = player.statusTags.filter(function(t) { return t.type !== 'temporal-distortion-enemy'; }); return { success: true, message: '时空扭曲使敌方行动点-1' }; }"
+}

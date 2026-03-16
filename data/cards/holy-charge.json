@@ -1,9 +1,10 @@
 {
   "id": "holy-charge",
   "name": "圣光充能",
-  "description": "消耗1AP，为己方所有棋子下次伤害+2",
+  "description": "消耗2AP，为己方所有棋子下次伤害+2",
   "type": "active",
+  "actionPointCost": 2,
   "cardType": "holy",
   "icon": "🔋",
-  "code": "function executeCard(context) { const battle = context.battle; const playerId = context.playerId; const player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player || player.actionPoints < 1) { return { success: false, message: 'AP不足' }; } player.actionPoints -= 1; let buffAmount = 2; let buffMsg = ''; if (player.buffs && player.buffs['elune-blessing-buff'] && player.buffs['elune-blessing-buff'].uses > 0) { buffAmount = Math.floor(buffAmount * player.buffs['elune-blessing-buff'].multiplier); player.buffs['elune-blessing-buff'].uses--; buffMsg = '（月神赐福强化）'; } const allies = battle.pieces.filter(function(p) { return p.ownerPlayerId === playerId && p.currentHp > 0; }); allies.forEach(function(ally) { addStatusEffectById(ally.instanceId, { id: 'holy-charge-buff', type: 'damage-buff', currentDuration: 1, currentUses: 1, intensity: buffAmount, stacks: 1 }); }); return { success: true, message: '圣光充能' + buffMsg + '：己方所有棋子下次伤害+' + buffAmount }; }"
+  "code": "function executeCard(context) { const battle = context.battle; const playerId = context.playerId; const player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player) { return { success: false, message: '找不到玩家' }; } let buffAmount = 2; let buffMsg = ''; if (player.buffs && player.buffs['elune-blessing-buff'] && player.buffs['elune-blessing-buff'].uses > 0) { buffAmount = Math.floor(buffAmount * player.buffs['elune-blessing-buff'].multiplier); player.buffs['elune-blessing-buff'].uses--; buffMsg = '（月神赐福强化）'; } const allies = battle.pieces.filter(function(p) { return p.ownerPlayerId === playerId && p.currentHp > 0; }); allies.forEach(function(ally) { addStatusEffectById(ally.instanceId, { id: 'holy-charge-buff', type: 'damage-buff', currentDuration: -1, currentUses: 1, intensity: buffAmount, stacks: 1 }); addRuleById(ally.instanceId, 'rule-holy-charge'); }); return { success: true, message: '圣光充能' + buffMsg + '：己方所有棋子下次伤害+' + buffAmount }; }"
 }

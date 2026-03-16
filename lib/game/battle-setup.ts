@@ -65,7 +65,7 @@ function loadPieceRules(pieceTemplate: PieceTemplate): any[] {
   if (pieceTemplate.rules && Array.isArray(pieceTemplate.rules)) {
     pieceTemplate.rules.forEach(ruleId => {
       console.log(`[loadPieceRules] Loading rule: ${ruleId}`)
-      const rule = loadRuleById(ruleId)
+      const rule = loadRuleById(ruleId, true)
       if (rule) {
         console.log(`[loadPieceRules] Rule loaded successfully: ${rule.id}`)
         rules.push(rule)
@@ -610,7 +610,7 @@ export async function createInitialBattleForPlayers(
   const ruleIds = collectRuleIds(selectedPieces, map as any)
   writeLog('[createInitialBattle] Collected rule IDs: ' + JSON.stringify(ruleIds))
   // 加载指定的规则
-  globalTriggerSystem.loadSpecificRules(ruleIds)
+  globalTriggerSystem.loadSpecificRules(ruleIds, true)
   writeLog('[createInitialBattle] Loaded global rules count: ' + globalTriggerSystem.getRules().length + ', rules: ' + JSON.stringify(globalTriggerSystem.getRules().map(r => r.id)))
   
   return {

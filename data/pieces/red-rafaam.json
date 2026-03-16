@@ -1,0 +1,32 @@
+{
+  "id": "red-rafaam",
+  "name": "拉法姆",
+  "faction": "red",
+  "description": "神秘的术士，擅长操控时间与诅咒之力",
+  "rarity": "legendary",
+  "image": "rafaam.jpg",
+  "stats": {
+    "maxHp": 15,
+    "attack": 2,
+    "defense": 0,
+    "moveRange": 2
+  },
+  "skills": [
+    {
+      "skillId": "rafaam-temporal-distortion",
+      "level": 1
+    },
+    {
+      "skillId": "rafaam-curse-ward",
+      "level": 1
+    },
+    {
+      "skillId": "rafaam-curse-amplify",
+      "level": 1
+    }
+  ],
+  "rules": [
+    "rule-rafaam-curse-ward"
+  ],
+  "isDefault": false
+}

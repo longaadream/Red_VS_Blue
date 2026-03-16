@@ -1,0 +1,15 @@
+{
+  "id": "illidan-metamorphosis",
+  "name": "恶魔变形",
+  "description": "消耗3点充能，获得2点攻击力，失去1点防御力，并获得技能「恶魔冲击」（可对任意敌人造成等同于攻击力的伤害，共2次）",
+  "icon": "🔮",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "chargeCost": 3,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; caster.attack = (caster.attack || 0) + 2; caster.defense = Math.max(0, (caster.defense || 0) - 1); addStatusEffectById(caster.instanceId, { id: 'demon-strike-charges', name: '恶魔冲击次数', type: 'demon-strike-charges', currentDuration: -1, currentUses: 2, intensity: 2, stacks: 1 }); addSkillById(caster.instanceId, 'illidan-demon-strike'); addRuleById(caster.instanceId, 'rule-illidan-demon-strike'); return { success: true, message: caster.name + '进入恶魔变形！攻击力+2（现为' + caster.attack + '），防御力-1（现为' + caster.defense + '），获得恶魔冲击技能（2次）' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '消耗3充能：攻击力+2，防御力-1，获得恶魔冲击（2次）', expectedValues: { attackGain: 2, defenseChange: -1 } }; }"
+}

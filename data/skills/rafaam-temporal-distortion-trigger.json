@@ -1,0 +1,13 @@
+{
+  "id": "rafaam-temporal-distortion-trigger",
+  "name": "时空扭曲触发",
+  "description": "处理时空扭曲的效果：在玩家回合开始时检查statusTags并应用效果",
+  "icon": "⏳",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { try { var battle = context.battle; var currentPlayerId = battle.turn.currentPlayerId; var contextPlayerId = context.playerId; console.log('[rafaam-trigger] currentPlayerId:', currentPlayerId, 'contextPlayerId:', contextPlayerId); if (!contextPlayerId) return { success: false, message: 'No contextPlayerId' }; var player = battle.players.find(function(p) { return p.playerId === contextPlayerId; }); if (!player) return { success: false, message: 'Player not found' }; console.log('[rafaam-trigger] Player found, statusTags:', JSON.stringify(player.statusTags)); if (!player.statusTags) player.statusTags = []; var enemyEffect = player.statusTags.find(function(t) { return t.type === 'temporal-distortion-enemy'; }); var selfEffect = player.statusTags.find(function(t) { return t.type === 'temporal-distortion-self'; }); console.log('[rafaam-trigger] enemyEffect:', !!enemyEffect, 'selfEffect:', !!selfEffect); var message = ''; var effectTriggered = false; /* 如果是当前玩家的回合，且有selfEffect，加AP */ if (selfEffect && currentPlayerId === contextPlayerId) { player.actionPoints += 1; message += '时空扭曲使自身行动点+1'; effectTriggered = true; player.statusTags = player.statusTags.filter(function(t) { return t.type !== 'temporal-distortion-self'; }); console.log('[rafaam-trigger] Self effect applied, AP+1'); } /* 如果是当前玩家的回合，且有enemyEffect，减AP */ if (enemyEffect && currentPlayerId === contextPlayerId) { if (player.actionPoints > 0) { player.actionPoints -= 1; message += '时空扭曲使行动点-1'; effectTriggered = true; } player.statusTags = player.statusTags.filter(function(t) { return t.type !== 'temporal-distortion-enemy'; }); console.log('[rafaam-trigger] Enemy effect applied, AP-1'); } console.log('[rafaam-trigger] effectTriggered:', effectTriggered, 'message:', message); if (effectTriggered) { return { success: true, message: message }; } return { success: false, message: 'No effect triggered' }; } catch (e) { console.error('[rafaam-trigger] Error:', e.message); return { success: false, message: 'Error: ' + e.message }; } }"
+}

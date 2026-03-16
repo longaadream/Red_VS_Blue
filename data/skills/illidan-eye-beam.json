@@ -1,0 +1,15 @@
+{
+  "id": "illidan-eye-beam",
+  "name": "眼棱",
+  "description": "选择一个距离4以内的敌方棋子，对其造成自身攻击力100%的魔法伤害，并回复等量的生命值",
+  "icon": "👁️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 3,
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var dmgResult = dealDamage(caster, target, caster.attack, 'magical', battle, context.skill.id); var actualDamage = dmgResult.damage || 0; var healResult = healDamage(caster, caster, actualDamage, battle, context.skill.id); return { success: true, message: caster.name + '释放眼棱，对' + target.name + '造成' + actualDamage + '点伤害并回复' + healResult.heal + '点生命值' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内敌人造成' + piece.attack + '点魔法伤害并回复等量生命值（攻击力100%）', expectedValues: { damage: piece.attack, heal: piece.attack } }; }",
+  "range": "single"
+}

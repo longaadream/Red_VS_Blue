@@ -1,0 +1,15 @@
+{
+  "id": "rafaam-curse-amplify",
+  "name": "诅咒增幅",
+  "description": "将对手手牌中诅咒的行动点消耗改为10",
+  "icon": "🔮",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "chargeCost": 2,
+  "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const casterOwnerId = caster.ownerPlayerId; const opponentPlayer = battle.players.find(p => p.playerId !== casterOwnerId); if (!opponentPlayer || !opponentPlayer.hand) { return { success: false, message: '对手没有手牌' }; } let modifiedCount = 0; for (let card of opponentPlayer.hand) { if (card.name && card.name.includes('诅咒')) { card.actionPointCost = 10; modifiedCount++; } } if (modifiedCount === 0) { return { success: false, message: '对手手牌中没有诅咒' }; } return { success: true, message: caster.name + '使用诅咒增幅，将对手手牌中' + modifiedCount + '张诅咒的行动点消耗改为10' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '将对手手牌中所有诅咒的行动点消耗改为10' }; }"
+}

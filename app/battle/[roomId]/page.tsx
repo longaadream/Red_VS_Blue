@@ -1533,6 +1533,21 @@ export default function BattlePage() {
                           {player.actionPoints}/{player.maxActionPoints}
                         </span>
                       </div>
+                      {/* 玩家状态标签 */}
+                      {player.statusTags && player.statusTags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {player.statusTags.map((tag, index) => (
+                            <span
+                              key={tag.id || index}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-purple-600/60 text-white"
+                              title={tag.name}
+                            >
+                              {tag.name}
+                              {tag.remainingDuration > 0 && `(${tag.remainingDuration})`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -1656,29 +1671,35 @@ function HandArea({
             <div className="flex flex-wrap gap-2">
               {hand.map((card) => {
                 const cardDef = cardCache.get(card.cardId)
+                const displayDef = cardDef ?? (card.description ? (card as any) : null)
+                const apCost = (card as any).actionPointCost ?? displayDef?.actionPointCost
+                const apHigh = apCost !== undefined && apCost >= 10
                 return (
                   <Tooltip key={card.instanceId}>
                     <TooltipTrigger asChild>
                       <button
                         disabled={!canPlay}
                         onClick={() => currentPlayerId && sendBattleAction({ type: "playCard", playerId: currentPlayerId, cardInstanceId: card.instanceId })}
-                        className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {card.name || card.cardId}
+                        {apCost !== undefined && (
+                          <span className={`font-bold ${apHigh ? "text-red-400" : "text-yellow-400"}`}>{apCost}</span>
+                        )}
+                        <span>{card.name || card.cardId}</span>
                       </button>
                     </TooltipTrigger>
-                    {cardDef && (
-                      <TooltipContent 
-                        side="top" 
+                    {displayDef && (
+                      <TooltipContent
+                        side="top"
                         className="max-w-xs bg-zinc-800 border-zinc-700 text-zinc-100"
                       >
                         <div className="space-y-1">
-                          <div className="font-semibold text-yellow-400">{cardDef.name}</div>
+                          <div className="font-semibold text-yellow-400">{displayDef.name}</div>
                           <div className="text-xs text-zinc-400">
-                            类型: {cardDef.type === "active" ? "主动" : "被动"}
+                            消耗: {apCost ?? displayDef.actionPointCost ?? "?"}AP &nbsp;|&nbsp; {displayDef.type === "active" ? "主动" : "被动"}
                           </div>
                           <div className="text-xs text-zinc-300 leading-relaxed">
-                            {cardDef.description}
+                            {displayDef.description}
                           </div>
                         </div>
                       </TooltipContent>

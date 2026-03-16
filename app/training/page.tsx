@@ -527,6 +527,21 @@ export default function TrainingPage() {
                             CP: {player.chargePoints}
                           </span>
                         </div>
+                        {/* 玩家状态标签 */}
+                        {player.statusTags && player.statusTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {player.statusTags.map((tag, index) => (
+                              <span
+                                key={tag.id || index}
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-purple-600/60 text-white"
+                                title={tag.name}
+                              >
+                                {tag.name}
+                                {tag.remainingDuration > 0 && `(${tag.remainingDuration})`}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -630,7 +645,7 @@ export default function TrainingPage() {
                       <div className="space-y-2">
                         {(() => {
                           const pieceTemplate = getPieceById(selectedPiece.templateId)
-                          const pieceSkills = pieceTemplate?.skills || []
+                          const pieceSkills = selectedPiece.skills || pieceTemplate?.skills || []
 
                           const availableSkills = pieceSkills.map(skill => {
                             const skillDef = battle.skillsById[skill.skillId]
@@ -1032,23 +1047,21 @@ export default function TrainingPage() {
                     {/* 技能信息悬停显示 - 改为向下显示 */}
                     <div className="absolute left-0 top-full mt-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                       {(() => {
-                        const pieceTemplate = getPieceById(piece.templateId)
-                        if (!pieceTemplate || !pieceTemplate.skills || pieceTemplate.skills.length === 0) {
+                        const instanceSkills = piece.skills || []
+                        if (instanceSkills.length === 0) {
                           return null
                         }
                         return (
                           <div className="rounded-lg border border-border bg-zinc-800 p-3 shadow-lg">
                             <div className="mb-2 text-xs font-medium text-zinc-200">技能</div>
                             <div className="space-y-2">
-                              {pieceTemplate.skills.map((skill) => {
+                              {instanceSkills.map((skill) => {
                                 const skillDef = battle.skillsById[skill.skillId]
                                 if (!skillDef) return null
 
                                 // 计算技能的预期效果
                                 const { calculateSkillPreview } = require('@/lib/game/skills')
-                                // 从棋子的技能状态中获取当前冷却回合数
-                                const pieceSkillState = piece.skills.find(s => s.skillId === skill.skillId)
-                                const currentCooldown = pieceSkillState?.currentCooldown || 0
+                                const currentCooldown = skill.currentCooldown || 0
                                 const skillPreview = calculateSkillPreview(skillDef, piece, currentCooldown)
 
                                 return (
@@ -1063,7 +1076,7 @@ export default function TrainingPage() {
                                       }`}>
                                         {skillDef.type === "super" ? "充能" :
                                          skillDef.type === "ultimate" ? "终极" : "普通"}
-                                        {pieceSkillState?.usesRemaining === 1 && ' (限定技)'}
+                                        {skill.usesRemaining === 1 && ' (限定技)'}
                                       </span>
                                     </div>
                                     <p className="text-xs text-zinc-400">
@@ -1440,31 +1453,36 @@ function TrainingHandArea({
             <div className="flex flex-wrap gap-2">
               {hand.map((card) => {
                 const cardDef = cardCache.get(card.cardId)
-                // 优先使用缓存中的中文名称，其次是card.name，最后是cardId
-                const displayName = cardDef?.name || card.name || card.cardId
+                const displayDef = cardDef ?? ((card as any).description ? (card as any) : null)
+                const displayName = displayDef?.name || card.name || card.cardId
+                const apCost = (card as any).actionPointCost ?? displayDef?.actionPointCost
+                const apHigh = apCost !== undefined && apCost >= 10
                 return (
                   <Tooltip key={card.instanceId}>
                     <TooltipTrigger asChild>
                       <button
                         disabled={!canPlay}
                         onClick={() => sendBattleAction({ type: "playCard", playerId: currentPlayerId, cardInstanceId: card.instanceId })}
-                        className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {displayName}
+                        {apCost !== undefined && (
+                          <span className={`font-bold ${apHigh ? "text-red-400" : "text-yellow-400"}`}>{apCost}</span>
+                        )}
+                        <span>{displayName}</span>
                       </button>
                     </TooltipTrigger>
-                    {cardDef && (
-                      <TooltipContent 
-                        side="top" 
+                    {displayDef && (
+                      <TooltipContent
+                        side="top"
                         className="max-w-xs bg-zinc-800 border-zinc-700 text-zinc-100"
                       >
                         <div className="space-y-1">
-                          <div className="font-semibold text-yellow-400">{cardDef.name}</div>
+                          <div className="font-semibold text-yellow-400">{displayDef.name}</div>
                           <div className="text-xs text-zinc-400">
-                            类型: {cardDef.type === "active" ? "主动" : "被动"}
+                            消耗: {apCost ?? displayDef.actionPointCost ?? "?"}AP &nbsp;|&nbsp; {displayDef.type === "active" ? "主动" : "被动"}
                           </div>
                           <div className="text-xs text-zinc-300 leading-relaxed">
-                            {cardDef.description}
+                            {displayDef.description}
                           </div>
                         </div>
                       </TooltipContent>

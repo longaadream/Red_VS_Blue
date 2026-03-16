@@ -50,6 +50,24 @@ dealDamage(sourcePiece, target, 10, 'physical', context.battle, context.skill.id
 target.currentHp -= 10
 ```
 
+### 法则二点五：AoE 伤害必须传入数组，禁止用 forEach 循环调用 dealDamage
+
+对多个目标造成伤害时，必须将目标数组整体传给 `dealDamage` / `healDamage`。**禁止**在 forEach/for 循环里逐个调用，否则 `beforeDamageDealt` 触发器（含伤害加成 buff）会被消耗多次。
+
+```javascript
+// ✅ 正确：buff 只消耗一次，所有目标共享修改后的伤害值
+const enemies = getAllEnemiesInRange(3)
+const result = dealDamage(sourcePiece, enemies, 10, 'magical', context.battle, context.skill.id)
+// result.totalDamage / result.results[i].damage / result.results[i].isKilled
+
+// ❌ 错误 — 每次循环都会触发一次 beforeDamageDealt，buff 会被多次消耗
+enemies.forEach(enemy => {
+  dealDamage(sourcePiece, enemy, 10, 'magical', context.battle, context.skill.id)
+})
+```
+
+> **注意**：单独调用仍然完全兼容旧逻辑，无需改写已有的单体技能。
+
 ### 法则三：所有条件判断必须用 `if` 在 `code` 里实现
 
 规则文件（rules）只定义**触发时机**，不定义任何条件。所有"当HP低于50%时"、"当距离小于3格时"等条件，全部用 `if` 语句在技能代码中实现。
@@ -477,38 +495,52 @@ context = {
 
 对目标造成伤害。自动处理防御力减免、触发器、护盾、击杀奖励。
 
-```javascript
-const result = dealDamage(
-  sourcePiece,          // 攻击者棋子实例（来自 battle.pieces，或 selectTarget 返回值）
-  target,               // 目标棋子实例（同上）
-  20,                   // 基础伤害值（数字）
-  'physical',           // 伤害类型：'physical'（受防御减免）/ 'magical'（受防御减免）/ 'true'（无视防御）
-  context.battle,       // 当前战斗状态（完整引用，固定传 context.battle）
-  context.skill.id      // 技能ID（用于日志，传 context.skill.id 即可）
-)
+**`target` 支持单个棋子或棋子数组。** 传入数组时，`beforeDamageDealt` 触发器（含 buff 消耗）**只触发一次**，所有目标共享同一次 buff 修改后的伤害值——这是 AoE 技能的正确写法。
 
-// result 的结构：
-// result.success  - 是否成功
-// result.damage   - 实际造成的伤害值（扣除防御后）
-// result.isKilled - 是否击杀了目标
-// result.targetHp - 目标剩余HP
-// result.message  - 日志消息
+```javascript
+// 单体伤害
+const result = dealDamage(
+  sourcePiece,          // 攻击者棋子实例
+  target,               // 单个目标棋子实例
+  20,                   // 基础伤害值
+  'physical',           // 伤害类型：'physical' / 'magical'（受防御减免）/ 'true'（无视防御）
+  context.battle,
+  context.skill.id
+)
+// result.success / result.damage / result.isKilled / result.targetHp / result.message
+
+// 多体伤害（推荐：buff 只消耗一次）
+const result = dealDamage(
+  sourcePiece,
+  enemies,              // PieceInstance[] 数组
+  10,
+  'magical',
+  context.battle,
+  context.skill.id
+)
+// result.success     - 是否成功
+// result.totalDamage - 所有目标的伤害总和
+// result.damages[]   - 每个目标实际受到的伤害
+// result.results[]   - 每个目标的完整结果（.damage / .isKilled / .targetHp）
 ```
 
 #### `healDamage(healer, target, baseHeal, battle, skillId)`
 
 对目标进行治疗。自动处理禁疗状态、触发器。
 
-```javascript
-const result = healDamage(
-  sourcePiece,          // 治疗者棋子
-  target,               // 被治疗棋子
-  10,                   // 基础治疗量
-  context.battle,
-  context.skill.id
-)
+**`target` 同样支持单个棋子或棋子数组。** 传入数组时，`beforeHealDealt` 触发器只触发一次。
 
+```javascript
+// 单体治疗
+const result = healDamage(sourcePiece, target, 10, context.battle, context.skill.id)
 // result.success / result.heal / result.targetHp / result.message
+
+// 多体治疗（推荐：buff 只消耗一次）
+const result = healDamage(sourcePiece, allies, 10, context.battle, context.skill.id)
+// result.success    - 是否成功
+// result.totalHeal  - 总治疗量
+// result.heals[]    - 每个目标实际恢复的生命值
+// result.results[]  - 每个目标的完整结果
 ```
 
 ### 目标获取
@@ -527,9 +559,15 @@ const result = healDamage(
 
 ```javascript
 const enemies = getAllEnemiesInRange(3) // 3格内所有敌人
-enemies.forEach(enemy => {
-  dealDamage(sourcePiece, enemy, 10, 'magical', context.battle, context.skill.id)
-})
+
+// ✅ 推荐：传入数组，buff（如伤害加成）只消耗一次
+const result = dealDamage(sourcePiece, enemies, 10, 'magical', context.battle, context.skill.id)
+// result.totalDamage / result.results[]
+
+// ❌ 旧写法（不推荐）：每次调用都会消耗一次 buff
+// enemies.forEach(enemy => {
+//   dealDamage(sourcePiece, enemy, 10, 'magical', context.battle, context.skill.id)
+// })
 ```
 
 #### `getAllAlliesInRange(range)`
@@ -604,6 +642,22 @@ addRuleById(target.instanceId, 'rule-bleeding-tick')
 removeRuleById(target.instanceId, 'rule-bleeding-tick')
 ```
 
+#### `addPlayerRuleById(targetPlayerId, ruleId)`
+
+为**玩家**（阵营级别）绑定一个规则，不挂在棋子上。即使施法棋子死亡，规则仍然生效。
+
+```javascript
+addPlayerRuleById(sourcePiece.ownerPlayerId, 'rule-faction-buff')
+```
+
+#### `removePlayerRuleById(targetPlayerId, ruleId)`
+
+从玩家移除一个玩家级别规则。
+
+```javascript
+removePlayerRuleById(sourcePiece.ownerPlayerId, 'rule-faction-buff')
+```
+
 ### 技能管理
 
 #### `addSkillById(targetPieceId, skillId)`
@@ -613,6 +667,37 @@ removeRuleById(target.instanceId, 'rule-bleeding-tick')
 #### `removeSkillById(targetPieceId, skillId)`
 
 从棋子移除一个技能。
+
+### 手牌管理
+
+#### `addCardToHand(cardId, targetPlayerId?)`
+
+将卡牌加入指定玩家手牌。`targetPlayerId` 省略则默认为施法者的玩家ID。手牌上限10张，超出自动弃置并记录日志。会触发 `beforeCardAdded`/`afterCardAdded` 触发器。
+
+```javascript
+// 向对手加一张牌
+addCardToHand('curse-ward', battle.players.find(p => p.playerId !== sourcePiece.ownerPlayerId)?.playerId)
+// 向自己加一张牌
+addCardToHand('lucky-coin')
+```
+
+#### `discardCard(instanceId)`
+
+按实例ID弃置手牌到弃牌堆。
+
+```javascript
+const hand = getHand(sourcePiece.ownerPlayerId)
+if (hand.length > 0) discardCard(hand[0].instanceId)
+```
+
+#### `getHand(targetPlayerId?)`
+
+获取指定玩家手牌列表（`CardInstance[]`）。省略参数返回施法者手牌。
+
+```javascript
+const hand = getHand(sourcePiece.ownerPlayerId)
+console.log('手牌数：', hand.length)
+```
 
 ### 工具
 
@@ -834,7 +919,7 @@ return {
   "maxCharges": 0,
   "powerMultiplier": 1.5,
   "actionPointCost": 2,
-  "code": "function executeSkill(context) { const caster = context.piece; const enemies = getAllEnemiesInRange(3); if (enemies.length === 0) { return { success: false, message: '范围内没有敌人' }; } const dmg = Math.round(caster.attack * context.skill.powerMultiplier); let totalDmg = 0; enemies.forEach(function(enemy) { const r = dealDamage(caster, enemy, dmg, 'magical', context.battle, context.skill.id); totalDmg += r.damage; }); return { success: true, message: caster.name + '释放烈焰爆发，对' + enemies.length + '个敌人共造成' + totalDmg + '点伤害' }; }"
+  "code": "function executeSkill(context) { const caster = context.piece; const enemies = getAllEnemiesInRange(3); if (enemies.length === 0) { return { success: false, message: '范围内没有敌人' }; } const dmg = Math.round(caster.attack * context.skill.powerMultiplier); const result = dealDamage(caster, enemies, dmg, 'magical', context.battle, context.skill.id); return { success: true, message: caster.name + '释放烈焰爆发，对' + enemies.length + '个敌人共造成' + result.totalDamage + '点伤害' }; }"
 }
 ```
 
@@ -971,6 +1056,79 @@ return {
   "rules": ["rule-init-counter"]
 }
 ```
+
+### 规则执行优先级
+
+当多个规则在同一个触发时机（如 `beforeDamageTaken`）被触发时，它们的**执行顺序非常重要**。系统按照以下顺序执行规则：
+
+#### 执行顺序
+
+1. **全局规则**（`globalTriggerSystem` 中的规则）
+2. **棋子级别规则**（`piece.rules[]`）
+3. **玩家级别规则**（`player.rules[]`）
+4. **手牌中的 reactive 卡牌**
+
+#### 同一级别内的执行顺序
+
+在同一级别内，规则按照它们在数组中的**原始顺序**执行。后执行的规则可以覆盖先执行规则对 `context` 的修改。
+
+#### 优先级设计模式
+
+对于 `beforeDamageTaken` 等可以 `blocked` 的触发类型，通常需要设计优先级：
+
+| 优先级 | 规则类型 | 示例 |
+|--------|----------|------|
+| 高优先级（先执行） | 伤害减免、护盾类 | 圣盾、防御姿态 |
+| 低优先级（后执行） | 伤害免疫、特殊救援 | 艾露恩的守护 |
+
+#### 实现优先级的方法
+
+目前系统**不支持**在规则 JSON 中直接声明 `priority` 数值。优先级通过以下方式控制：
+
+1. **全局规则 vs 棋子规则**：全局规则总是先于棋子规则执行
+2. **规则绑定时机**：先绑定的规则先执行
+3. **在技能代码中提前返回**：如果前置规则已经 `blocked`，后续规则不会执行
+
+#### 示例：艾露恩的守护的优先级设计
+
+**艾露恩的守护**（`rule-elune-protection.json`）是一个典型的低优先级规则：
+
+```json
+{
+  "id": "rule-elune-protection",
+  "name": "艾露恩的守护规则",
+  "description": "当友方单位受到致命伤害且泰兰德在场时，触发艾露恩的守护。此规则应在所有beforeDamageTaken规则最后触发",
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "const targetPiece = context.piece; const damage = context.damage; ..."
+}
+```
+
+**实现逻辑**：
+
+1. 检查是否为致命伤害（`targetPiece.currentHp <= damage`）
+2. 检查泰兰德是否在场
+3. 检查该友方单位本场战斗是否已触发过守护
+4. 如果满足条件，添加已守护标记并恢复生命
+5. 返回 `blocked: true` 阻止原始伤害
+
+**为什么它应该是低优先级**：
+
+- 如果先执行了艾露恩的守护，后续的伤害减免规则（如护盾）将没有机会生效
+- 理想情况下，应该先执行护盾、防御姿态等伤害减免规则
+- 如果伤害被减免到非致命，艾露恩的守护就不应该触发
+
+**当前限制**：
+
+目前系统没有内置的优先级排序机制。要实现严格的优先级控制，需要：
+1. 将高优先级规则设计为全局规则或先绑定
+2. 或者在技能代码中检查 `context.damage` 是否已被修改
+
+#### 最佳实践
+
+1. **伤害减免类规则**应该尽早执行，减少后续规则需要处理的伤害值
+2. **伤害免疫/救援类规则**应该最后执行，作为最后的保险
+3. **在技能代码中检查条件**：即使规则被触发，也要在 `skillCode` 中检查所有条件，确保逻辑正确
+4. **使用 `blocked` 谨慎**：一旦一个规则返回 `blocked: true`，后续同类型规则仍然会被执行，但原始行动已被阻止
 
 ### 示例：反击被动技能
 
@@ -1217,8 +1375,9 @@ function executeSkill(context) {
   if (mode === 'aoe') {
     const enemies = getAllEnemiesInRange(3)
     const dmg = Math.round(caster.attack * 0.8)
-    enemies.forEach(function(e) { dealDamage(caster, e, dmg, 'physical', context.battle, context.skill.id) })
-    return { success: true, message: caster.name + '使用群体打击，攻击了' + enemies.length + '个目标' }
+    // 传入数组：beforeDamageDealt 只触发一次，buff 只消耗一次
+    const result = dealDamage(caster, enemies, dmg, 'physical', context.battle, context.skill.id)
+    return { success: true, message: caster.name + '使用群体打击，攻击了' + enemies.length + '个目标，共造成' + result.totalDamage + '点伤害' }
   }
 
   return { success: false, message: '未知选项' }
@@ -1248,36 +1407,26 @@ function executeSkill(context) {
   // 对3x3范围内的敌人造成伤害
   const damageValue = sourcePiece.attack * context.skill.powerMultiplier
   const affectedEnemies = []
-  let totalDamage = 0
 
   for (let dx = -1; dx <= 1; dx++) {
     for (let dy = -1; dy <= 1; dy++) {
       const checkPos = { x: targetPos.x + dx, y: targetPos.y + dy }
-      const enemyAtPos = context.battle.pieces.find(p => 
-        p.x === checkPos.x && 
-        p.y === checkPos.y && 
-        p.currentHp > 0 && 
+      const enemyAtPos = context.battle.pieces.find(p =>
+        p.x === checkPos.x &&
+        p.y === checkPos.y &&
+        p.currentHp > 0 &&
         p.ownerPlayerId !== sourcePiece.ownerPlayerId
       )
-      if (enemyAtPos) {
-        affectedEnemies.push(enemyAtPos.name)
-        const damageResult = dealDamage(
-          sourcePiece, 
-          enemyAtPos, 
-          damageValue, 
-          'physical', 
-          context.battle, 
-          context.skill.id
-        )
-        totalDamage += damageResult.damage
-      }
+      if (enemyAtPos) affectedEnemies.push(enemyAtPos)
     }
   }
 
+  // 传入数组：beforeDamageDealt 只触发一次，buff（如伤害加成）只消耗一次
   if (affectedEnemies.length > 0) {
-    return { 
-      message: sourcePiece.name + ' 从天而降，对 ' + affectedEnemies.join(', ') + ' 造成 ' + totalDamage + ' 点伤害', 
-      success: true 
+    const result = dealDamage(sourcePiece, affectedEnemies, damageValue, 'physical', context.battle, context.skill.id)
+    return {
+      message: sourcePiece.name + ' 从天而降，对 ' + affectedEnemies.map(e => e.name).join(', ') + ' 造成 ' + result.totalDamage + ' 点伤害',
+      success: true
     }
   }
   return { message: sourcePiece.name + ' 从天而降', success: true }
@@ -1437,7 +1586,7 @@ if (bleedTag) {
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { const sourcePiece = context.piece; if (!sourcePiece.statusTags || sourcePiece.statusTags.length === 0) { return { message: '没有状态标签', success: false }; } const blizzardStatus = sourcePiece.statusTags.find(effect => effect.type === 'blizzard'); if (!blizzardStatus) { return { message: '没有暴风雪状态', success: false }; } const centerX = blizzardStatus.value; const centerY = blizzardStatus.extraValue; const damageValue = blizzardStatus.damage; if (centerX === undefined || centerY === undefined || damageValue === undefined) { return { message: '暴风雪状态数据不完整', success: false }; } if (context.playerId === sourcePiece.ownerPlayerId) { return { message: '暴风雪只在对方回合结束时触发', success: false }; } const radius = 1; let totalDamage = 0; let totalEnemies = 0; let enemyNames = []; const enemiesInArea = context.battle.pieces.filter(piece => { if (piece.ownerPlayerId === sourcePiece.ownerPlayerId) return false; if (piece.currentHp <= 0) return false; const distanceX = Math.abs(piece.x - centerX); const distanceY = Math.abs(piece.y - centerY); return distanceX <= radius && distanceY <= radius; }); enemiesInArea.forEach(enemy => { const damageResult = dealDamage(sourcePiece, enemy, damageValue, 'magical', context.battle, 'blizzard'); if (damageResult.success) { if (typeof addStatusEffectById === 'function') { const statusId = 'freeze-' + Date.now() + '-' + enemy.instanceId; addStatusEffectById(enemy.instanceId, { id: statusId, type: 'freeze', currentDuration: 1, intensity: 1, relatedRules: ['rule-freeze-prevent-move', 'rule-freeze-prevent-skill'] }); } if (typeof addRuleById === 'function') { addRuleById(enemy.instanceId, 'rule-freeze-prevent-move'); addRuleById(enemy.instanceId, 'rule-freeze-prevent-skill'); } if (typeof addSkillById === 'function') { addSkillById(enemy.instanceId, 'freeze-prevent'); } enemy.showFreezeEffect = true; totalDamage += damageResult.damage; totalEnemies++; enemyNames.push(enemy.name); } }); if (!context.battle.effects) { context.battle.effects = []; } for (let x = centerX - radius; x <= centerX + radius; x++) { for (let y = centerY - radius; y <= centerY + radius; y++) { context.battle.effects.push({ type: 'blizzard', position: { x, y }, duration: 1, zIndex: 999, showOnUI: true }); } } if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(sourcePiece.instanceId, blizzardStatus.id); } if (typeof removeRuleById === 'function') { removeRuleById(sourcePiece.instanceId, 'rule-blizzard-active'); } if (typeof removeSkillById === 'function') { removeSkillById(sourcePiece.instanceId, 'blizzard-damage'); } let message = sourcePiece.name + '的暴风雪效果'; message += '（中心坐标：(' + centerX + ',' + centerY + ')）'; if (totalEnemies > 0) { message += '对' + enemyNames.join('、') + '造成了' + totalDamage + '点伤害并使其冰冻'; } else { message += '没有对任何敌人造成伤害'; } return { message: message, success: true, showUIEffects: true }; }",
+  "code": "function executeSkill(context) { const sourcePiece = context.piece; if (!sourcePiece.statusTags || sourcePiece.statusTags.length === 0) { return { message: '没有状态标签', success: false }; } const blizzardStatus = sourcePiece.statusTags.find(effect => effect.type === 'blizzard'); if (!blizzardStatus) { return { message: '没有暴风雪状态', success: false }; } const centerX = blizzardStatus.value; const centerY = blizzardStatus.extraValue; const damageValue = blizzardStatus.damage; if (centerX === undefined || centerY === undefined || damageValue === undefined) { return { message: '暴风雪状态数据不完整', success: false }; } if (context.playerId === sourcePiece.ownerPlayerId) { return { message: '暴风雪只在对方回合结束时触发', success: false }; } const radius = 1; const enemiesInArea = context.battle.pieces.filter(piece => { if (piece.ownerPlayerId === sourcePiece.ownerPlayerId) return false; if (piece.currentHp <= 0) return false; return Math.abs(piece.x - centerX) <= radius && Math.abs(piece.y - centerY) <= radius; }); const dmgResult = dealDamage(sourcePiece, enemiesInArea, damageValue, 'magical', context.battle, 'blizzard'); enemiesInArea.forEach(function(enemy, i) { const r = dmgResult.results && dmgResult.results[i]; if (r && r.success) { const statusId = 'freeze-' + Date.now() + '-' + enemy.instanceId; addStatusEffectById(enemy.instanceId, { id: statusId, type: 'freeze', currentDuration: 1, intensity: 1 }); addRuleById(enemy.instanceId, 'rule-freeze-prevent-move'); addRuleById(enemy.instanceId, 'rule-freeze-prevent-skill'); addSkillById(enemy.instanceId, 'freeze-prevent'); enemy.showFreezeEffect = true; } }); const hitEnemies = enemiesInArea.filter(function(e, i) { return dmgResult.results && dmgResult.results[i] && dmgResult.results[i].success; }); if (!context.battle.effects) { context.battle.effects = []; } for (let x = centerX - radius; x <= centerX + radius; x++) { for (let y = centerY - radius; y <= centerY + radius; y++) { context.battle.effects.push({ type: 'blizzard', position: { x, y }, duration: 1, zIndex: 999, showOnUI: true }); } } removeStatusEffectById(sourcePiece.instanceId, blizzardStatus.id); removeRuleById(sourcePiece.instanceId, 'rule-blizzard-active'); removeSkillById(sourcePiece.instanceId, 'blizzard-damage'); let message = sourcePiece.name + '的暴风雪效果（中心坐标：(' + centerX + ',' + centerY + ')）'; if (hitEnemies.length > 0) { message += '对' + hitEnemies.map(function(e) { return e.name; }).join('、') + '造成了' + dmgResult.totalDamage + '点伤害并使其冰冻'; } else { message += '没有对任何敌人造成伤害'; } return { message: message, success: true, showUIEffects: true }; }",
   "showInUI": false
 }
 ```
@@ -1741,6 +1890,19 @@ dealDamage(sourcePiece, target, 20, 'true', context.battle, context.skill.id)
 }
 
 // 必须改为：在 code 字段里调用 dealDamage / addStatusEffectById 等函数
+```
+
+### ❌ 用 forEach 循环对多个目标调用 dealDamage
+
+```javascript
+// 禁止！每次调用都会触发一次 beforeDamageDealt，buff（如伤害加成）会被多次消耗
+const enemies = getAllEnemiesInRange(3)
+enemies.forEach(enemy => {
+  dealDamage(sourcePiece, enemy, 10, 'physical', context.battle, context.skill.id)
+})
+
+// 必须改为：传入数组，buff 只消耗一次
+const result = dealDamage(sourcePiece, enemies, 10, 'physical', context.battle, context.skill.id)
 ```
 
 ### ❌ 不检查 selectTarget / selectOption 的返回值
@@ -2193,6 +2355,7 @@ if (tile.props.chargePerTurn > 0 && piece.currentHp > 0) {
   "name": "卡牌名称",
   "description": "卡牌说明文字",
   "type": "active",
+  "actionPointCost": 2,
   "icon": "Heart",
   "code": "function executeCard(context) { ... }"
 }
@@ -2204,6 +2367,7 @@ if (tile.props.chargePerTurn > 0 && piece.currentHp > 0) {
 | `name` | string | 显示名称 |
 | `description` | string | 说明文字 |
 | `type` | `"active"` \| `"reactive"` | 主动/被动 |
+| `actionPointCost` | number | 打出此卡消耗的行动点（默认 0）；系统自动检查并扣除，无需在代码里手动判断 |
 | `trigger` | `{ type: TriggerType }` | 仅 reactive 需要，触发时机 |
 | `code` | string | JS代码，入口为 `executeCard(context)` |
 | `icon` | string | lucide-react 图标名（可选） |
@@ -2232,8 +2396,8 @@ function executeCard(context) {
 
 | 函数 | 说明 |
 |------|------|
-| `dealDamage(attacker, target, amount, type, battle, cardId)` | 造成伤害（同技能中的 dealDamage） |
-| `healDamage(healer, target, amount, battle, cardId)` | 治疗（同技能中的 healDamage） |
+| `dealDamage(attacker, target, amount, type, battle, cardId)` | 造成伤害（同技能中的 dealDamage，`target` 支持单棋子或数组） |
+| `healDamage(healer, target, amount, battle, cardId)` | 治疗（同技能中的 healDamage，`target` 支持单棋子或数组） |
 
 #### 目标 / 选项
 
@@ -2273,8 +2437,8 @@ function executeCard(context) {
 
 ```javascript
 // 示例：向对方手牌加入一张卡
-addCardToHand('lucky-coin', context.battle.players.find(
-  p => p.ownerPlayerId !== playerId
+addCardToHand('lucky-coin', battle.players.find(
+  p => p.playerId !== playerId
 )?.playerId)
 
 // 示例：检查己方手牌数量
@@ -2295,18 +2459,31 @@ if (hand.length > 0) discardCard(hand[0].instanceId)
 
 ### AP 消耗
 
-无专用字段，在代码中用 `if` 语句判断：
+在卡牌定义中设置 `actionPointCost` 字段，系统会在 `playCard` 执行前自动检查并扣除，**无需在卡牌代码里手动判断或扣除**：
 
-```javascript
-function executeCard(context) {
-  const player = battle.players.find(p => p.playerId === playerId)
-  if (!player || player.actionPoints < 1) {
-    return { success: false, message: "行动点不足" }
-  }
-  player.actionPoints -= 1
-  // ... 执行效果
+```json
+{
+  "id": "curse-ward",
+  "name": "诅咒",
+  "type": "active",
+  "actionPointCost": 2,
+  "code": "function executeCard(context) { ... }"
 }
 ```
+
+手牌实例上存储着 `actionPointCost` 的独立副本，可在运行时被效果修改（例如"诅咒增幅"将对手手牌中的诅咒消耗改为10）：
+
+```javascript
+// 在技能/规则的 skillCode 中修改对手手牌 AP 消耗
+var opponentPlayer = battle.players.find(function(p) { return p.playerId !== caster.ownerPlayerId; });
+for (var card of opponentPlayer.hand) {
+  if (card.name && card.name.includes('诅咒')) {
+    card.actionPointCost = 10;  // 直接修改手牌实例，下次打出时生效
+  }
+}
+```
+
+UI 中手牌按钮会自动显示 AP 消耗标签（黄色正常，红色表示 ≥10）。
 
 ### 卡牌相关触发器
 
@@ -2651,6 +2828,289 @@ function executeSkill(context) {
 
 ---
 
+## 玩家状态标签（Player StatusTags）
+
+### 概念
+
+**玩家状态标签**（Player StatusTags）是挂在 `PlayerTurnMeta` 上的状态数组，与棋子状态标签（`piece.statusTags`）类似，但绑定在玩家身上。即使所有棋子死亡，玩家状态标签仍然存在。
+
+### 适用场景
+
+- **跨回合持续效果**：技能效果需要持续到玩家下一回合，即使施法棋子已死亡
+- **玩家级别增益/减益**：影响玩家整体资源（行动点、手牌等）的效果
+- **阵营级状态**：标记整个阵营的特殊状态
+
+### 数据结构
+
+```typescript
+interface PlayerTurnMeta {
+  playerId: string
+  actionPoints: number
+  maxActionPoints: number
+  chargePoints: number
+  hand: CardInstance[]
+  discardPile: CardInstance[]
+  rules: Rule[]           // 玩家级别规则
+  statusTags?: StatusTag[] // 玩家状态标签数组（新增）
+}
+
+interface StatusTag {
+  id: string              // 唯一标识
+  type: string            // 状态类型（用于查找和识别）
+  name: string            // 显示名称
+  remainingDuration?: number // 剩余持续回合数
+  intensity?: number      // 强度值
+  stacks?: number         // 叠加层数
+  // 其他自定义字段...
+}
+```
+
+### 在技能代码中使用玩家状态标签
+
+#### 添加状态标签
+
+```javascript
+function executeSkill(context) {
+  var caster = context.piece
+  var battle = context.battle
+  
+  // 获取施法者所属玩家
+  var player = battle.players.find(function(p) {
+    return p.playerId === caster.ownerPlayerId
+  })
+  
+  // 初始化 statusTags 数组（如果不存在）
+  if (!player.statusTags) player.statusTags = []
+  
+  // 添加状态标签
+  player.statusTags.push({
+    id: 'my-effect-' + Date.now(),  // 唯一ID
+    type: 'my-effect',              // 状态类型
+    name: '我的效果',                // 显示名称
+    remainingDuration: 2            // 持续2回合
+  })
+  
+  return { success: true, message: '效果已施加' }
+}
+```
+
+#### 读取和检查状态标签
+
+```javascript
+function executeSkill(context) {
+  var battle = context.battle
+  var playerId = context.playerId  // 玩家规则中使用 context.playerId
+  
+  var player = battle.players.find(function(p) {
+    return p.playerId === playerId
+  })
+  
+  if (!player || !player.statusTags) {
+    return { success: false, message: '没有状态标签' }
+  }
+  
+  // 检查是否有特定类型的状态
+  var hasEffect = player.statusTags.some(function(tag) {
+    return tag.type === 'my-effect'
+  })
+  
+  // 查找特定类型的状态
+  var effectTag = player.statusTags.find(function(tag) {
+    return tag.type === 'my-effect'
+  })
+  
+  if (effectTag) {
+    console.log('效果剩余回合：', effectTag.remainingDuration)
+  }
+  
+  return { success: true, message: '' }
+}
+```
+
+#### 移除状态标签
+
+```javascript
+function executeSkill(context) {
+  var player = context.battle.players.find(function(p) {
+    return p.playerId === context.playerId
+  })
+  
+  if (!player || !player.statusTags) return { success: false }
+  
+  // 移除特定类型的状态标签
+  player.statusTags = player.statusTags.filter(function(tag) {
+    return tag.type !== 'my-effect'
+  })
+  
+  return { success: true, message: '效果已移除' }
+}
+```
+
+#### 减少持续时间并自动清理
+
+```javascript
+function executeSkill(context) {
+  var player = context.battle.players.find(function(p) {
+    return p.playerId === context.playerId
+  })
+  
+  if (!player || !player.statusTags) return { success: false }
+  
+  // 遍历所有状态标签，减少持续时间
+  player.statusTags = player.statusTags.filter(function(tag) {
+    if (tag.remainingDuration !== undefined) {
+      tag.remainingDuration--
+      // 持续时间归零时移除
+      return tag.remainingDuration > 0
+    }
+    return true  // 无持续时间限制的状态保留
+  })
+  
+  return { success: true, message: '' }
+}
+```
+
+---
+
+## 完整示例：时空扭曲技能
+
+以下是一个完整的玩家级别效果示例——"时空扭曲"技能。该技能：
+1. 对自身造成4点伤害
+2. 在敌方下一回合减少其1点行动点
+3. 在自己的下一回合获得1点额外行动点
+4. 效果绑定在玩家身上，即使施法棋子死亡仍然生效
+
+### 文件1：主动技能（data/skills/rafaam-temporal-distortion.json）
+
+```json
+{
+  "id": "rafaam-temporal-distortion",
+  "name": "时空扭曲",
+  "description": "对自身造成4点伤害，下一回合对方减少1点行动点，在自己的下一回合获得1个额外的行动点",
+  "icon": "⏳",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 4,
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var damageResult = dealDamage(caster, caster, 4, 'magical', battle, context.skill.id); var casterOwnerId = caster.ownerPlayerId; var enemyPlayerId = battle.players.find(function(p) { return p.playerId !== casterOwnerId; })?.playerId; if (!enemyPlayerId) return { success: true, message: caster.name + '使用时空扭曲，对自身造成' + damageResult.damage + '点伤害' }; var selfPlayer = battle.players.find(function(p) { return p.playerId === casterOwnerId; }); var enemyPlayer = battle.players.find(function(p) { return p.playerId === enemyPlayerId; }); if (selfPlayer) { if (!selfPlayer.statusTags) selfPlayer.statusTags = []; selfPlayer.statusTags.push({ id: 'temporal-distortion-self-' + Date.now(), type: 'temporal-distortion-self', name: '时空扭曲-自身加AP', remainingDuration: 2 }); addPlayerRuleById(casterOwnerId, 'rule-rafaam-temporal-distortion'); } if (enemyPlayer) { if (!enemyPlayer.statusTags) enemyPlayer.statusTags = []; enemyPlayer.statusTags.push({ id: 'temporal-distortion-enemy-' + Date.now(), type: 'temporal-distortion-enemy', name: '时空扭曲-敌方减AP', remainingDuration: 2 }); addPlayerRuleById(enemyPlayerId, 'rule-rafaam-temporal-distortion'); } return { success: true, message: caster.name + '使用时空扭曲，对自身造成' + damageResult.damage + '点伤害，下回合敌方行动点-1，自己下回合行动点+1' }; }"
+}
+```
+
+### 文件2：触发规则（data/rules/rule-rafaam-temporal-distortion.json）
+
+```json
+{
+  "id": "rule-rafaam-temporal-distortion",
+  "name": "时空扭曲规则",
+  "description": "处理时空扭曲的效果：在玩家回合开始时检查并应用效果",
+  "trigger": { "type": "beginTurn" },
+  "effect": { "type": "triggerSkill", "skillId": "rafaam-temporal-distortion-trigger", "message": "" },
+  "limits": { "maxUses": 2 }
+}
+```
+
+### 文件3：被动触发技能（data/skills/rafaam-temporal-distortion-trigger.json）
+
+```json
+{
+  "id": "rafaam-temporal-distortion-trigger",
+  "name": "时空扭曲触发",
+  "description": "处理时空扭曲的效果：在玩家回合开始时检查statusTags并应用效果",
+  "icon": "⏳",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { try { var battle = context.battle; var currentPlayerId = battle.turn.currentPlayerId; var contextPlayerId = context.playerId; console.log('[rafaam-trigger] currentPlayerId:', currentPlayerId, 'contextPlayerId:', contextPlayerId); if (!contextPlayerId) return { success: false, message: 'No contextPlayerId' }; var player = battle.players.find(function(p) { return p.playerId === contextPlayerId; }); if (!player) return { success: false, message: 'Player not found' }; console.log('[rafaam-trigger] Player found, statusTags:', JSON.stringify(player.statusTags)); if (!player.statusTags) player.statusTags = []; var enemyEffect = player.statusTags.find(function(t) { return t.type === 'temporal-distortion-enemy'; }); var selfEffect = player.statusTags.find(function(t) { return t.type === 'temporal-distortion-self'; }); console.log('[rafaam-trigger] enemyEffect:', !!enemyEffect, 'selfEffect:', !!selfEffect); var message = ''; var effectTriggered = false; if (selfEffect && currentPlayerId === contextPlayerId) { player.actionPoints += 1; message += '时空扭曲使自身行动点+1'; effectTriggered = true; player.statusTags = player.statusTags.filter(function(t) { return t.type !== 'temporal-distortion-self'; }); console.log('[rafaam-trigger] Self effect applied, AP+1'); } if (enemyEffect && currentPlayerId === contextPlayerId) { if (player.actionPoints > 0) { player.actionPoints -= 1; message += '时空扭曲使行动点-1'; effectTriggered = true; } player.statusTags = player.statusTags.filter(function(t) { return t.type !== 'temporal-distortion-enemy'; }); console.log('[rafaam-trigger] Enemy effect applied, AP-1'); } console.log('[rafaam-trigger] effectTriggered:', effectTriggered, 'message:', message); if (effectTriggered) { return { success: true, message: message }; } return { success: false, message: 'No effect triggered' }; } catch (e) { console.error('[rafaam-trigger] Error:', e.message); return { success: false, message: 'Error: ' + e.message }; } }"
+}
+```
+
+### 关键要点说明
+
+1. **双方玩家都获得规则**：主动技能给双方都添加了 `rule-rafaam-temporal-distortion` 规则
+2. **通过 statusTags 区分效果类型**：
+   - `temporal-distortion-self`：表示"在自己的回合获得额外行动点"
+   - `temporal-distortion-enemy`：表示"在自己的回合减少行动点"
+3. **在被动技能中检查 currentPlayerId**：确保只在玩家自己的回合触发效果
+4. **效果触发后立即移除 statusTag**：避免重复触发
+5. **使用 context.playerId**：在玩家级别规则触发的技能中，这是获取当前玩家ID的唯一方式
+
+---
+
+## 技能上下文中的 playerId 字段
+
+### 概念
+
+在 `triggerSkill` 效果触发的被动技能中，`context` 对象包含 `playerId` 字段，用于标识触发该规则的玩家。
+
+### 适用场景
+
+- 玩家级别规则触发的技能（`player.rules[]` 中的规则）
+- 需要知道"哪个玩家的回合"或"哪个玩家触发了规则"
+
+### 数据结构
+
+```javascript
+// 在 triggerSkill 触发的被动技能中，context 包含：
+context = {
+  // ... 其他字段 ...
+  
+  playerId: "player1",  // 触发规则的玩家ID
+  
+  battle: { ... },
+  skill: { ... }
+}
+```
+
+### 使用示例
+
+```javascript
+function executeSkill(context) {
+  // 获取触发规则的玩家ID
+  var playerId = context.playerId
+  
+  if (!playerId) {
+    return { success: false, message: 'No playerId in context' }
+  }
+  
+  // 获取玩家对象
+  var player = context.battle.players.find(function(p) {
+    return p.playerId === playerId
+  })
+  
+  // 检查是否是当前回合玩家
+  var isCurrentPlayer = context.battle.turn.currentPlayerId === playerId
+  
+  if (isCurrentPlayer) {
+    // 在当前玩家回合执行的逻辑
+    player.actionPoints += 1
+    return { success: true, message: '获得额外行动点' }
+  }
+  
+  return { success: false, message: '不是当前玩家回合' }
+}
+```
+
+### 与 piece.ownerPlayerId 的区别
+
+| 字段 | 含义 | 使用场景 |
+|------|------|---------|
+| `context.playerId` | 触发规则的玩家ID | 玩家级别规则触发的技能 |
+| `context.piece.ownerPlayerId` | 施法棋子所属玩家ID | 棋子级别规则触发的技能 |
+| `context.battle.turn.currentPlayerId` | 当前回合玩家ID | 判断是否是某玩家的回合 |
+
+### 注意事项
+
+1. **玩家级别规则中 `context.piece` 为 null**：必须使用 `context.playerId`
+2. **棋子级别规则中也有 `context.playerId`**：表示该棋子所属的玩家
+3. **始终检查 `playerId` 是否存在**：某些旧代码可能未传递此字段
+
+---
+
 ## 可用触发类型
 
 玩家规则支持所有触发类型，但以下几种最适合玩家级别：
@@ -2688,4 +3148,136 @@ app/api/training/route.ts             ← 训练营同上
   → 调用 grant-lucky-coin 技能
   → addCardToHand('lucky-coin', 'training-blue')
   → 蓝方手牌里出现幸运币
+```
+
+---
+
+## 动态自定义手牌（battle.customCards）
+
+当你需要创建一张运行时才能确定参数的卡牌（例如数值由技能触发时的伤害量决定），不能使用 `data/cards/*.json` 文件，因为文件内容是静态的。解决方案是写入 `battle.customCards`：
+
+### 原理
+
+`battle.customCards` 是一个普通对象 `{ [cardId: string]: CardDefinition }`，存储在战斗状态里。`addCardToHand` 会先查 `data/cards/`，找不到时再查 `battle.customCards`。`playCard` 同理。
+
+### 用法示例（在 skillCode / skill code 中）
+
+```javascript
+// 创建一张伤害数值是动态的诅咒牌
+var dynamicCardId = 'curse-ward-' + Date.now();
+if (!battle.customCards) battle.customCards = {};
+battle.customCards[dynamicCardId] = {
+  id: dynamicCardId,
+  name: '诅咒',
+  description: '消耗2AP来打出。当此牌在手牌中时，每回合结束时对随机友方棋子造成' + blockedDamage + '点伤害',
+  type: 'active',
+  actionPointCost: 2,
+  icon: '💀',
+  damageAmount: blockedDamage,   // 可在卡牌代码中通过 battle.customCards[cardId].damageAmount 读取
+  code: '...'
+};
+addCardToHand(dynamicCardId, opponentPlayerId);
+```
+
+### 注意事项
+
+- `customCards` 里的 `code` 字段同样是 `function executeCard(context) { ... }` 格式
+- 卡牌代码中可通过 `battle.customCards[context.cardId]` 读取自定义字段（如 `damageAmount`）
+- `actionPointCost` 会自动复制到手牌实例，并由 `playCard` 系统检查/扣除
+
+---
+
+## 玩家级 endTurn 规则注意事项
+
+玩家级规则（`player.rules[]`）的 `endTurn` 触发器会在**每一个玩家回合结束时**对所有玩家的规则全部扫描。如果效果只应在某位玩家自己的回合结束时触发，必须在 `skillCode` 或技能 `code` 中加守卫：
+
+```javascript
+// 在 skillCode / skill code 中
+var playerId = context.playerId;
+
+// 关键守卫：只有当前回合玩家才执行
+if (battle.turn.currentPlayerId !== playerId) {
+  return { success: false };
+}
+
+// ... 实际效果
+```
+
+**原因**：`checkTriggers` 会同时遍历红方和蓝方的 `player.rules`，双方各自的 `endTurn` 规则在任意回合结束时都会被尝试触发。没有守卫的话，持有诅咒的玩家在对方回合结束时也会触发诅咒伤害。
+
+---
+
+## 完整示例：拉法姆诅咒系统
+
+本示例展示了以下功能的综合运用：
+- `beforeDamageTaken` 伤害免疫 + 阻止时的自定义消息
+- 动态自定义手牌（`battle.customCards`）
+- 玩家级规则 + endTurn 守卫
+- 运行时修改手牌 AP 消耗（诅咒增幅）
+
+### 技能1：诅咒结界（data/skills/rafaam-curse-ward.json）
+
+被动技能，挂在拉法姆棋子上。拦截对自身的伤害，并向伤害来源的对手塞入一张带有等值伤害的诅咒手牌，同时为对手注册 `rule-rafaam-curse-end-turn` 玩家规则。
+
+```json
+{
+  "id": "rafaam-curse-ward",
+  "name": "诅咒结界",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { ... }"
+}
+```
+
+- 触发规则：`rule-rafaam-curse-ward.json`，`trigger: { type: 'beforeDamageTaken' }`
+- `skillCode` 返回 `{ success: true, blocked: true, message: '诅咒结界触发...' }` 阻止伤害
+- 同时调用 `addCardToHand(dynamicCardId, opponentPlayerId)` 并写入 `battle.customCards`
+- 调用 `addPlayerRuleById(opponentPlayerId, 'rule-rafaam-curse-end-turn')` 注册回合结束伤害
+
+### 技能2：诅咒增幅（data/skills/rafaam-curse-amplify.json）
+
+充能主动技能（`type: "super"`），消耗2AP、2充能点。遍历对手手牌，将所有名称包含"诅咒"的手牌实例的 `actionPointCost` 改为 10。
+
+```json
+{
+  "id": "rafaam-curse-amplify",
+  "type": "super",
+  "actionPointCost": 2,
+  "chargeCost": 2,
+  "cooldownTurns": 1
+}
+```
+
+手牌实例上的 `actionPointCost` 是可修改的独立字段，修改后 `playCard` 系统会读取并强制执行新的 AP 消耗。
+
+### 规则：诅咒回合伤害（data/rules/rule-rafaam-curse-end-turn.json）
+
+玩家级规则，`trigger: { type: 'endTurn' }`，带 `currentPlayerId` 守卫。每回合结束时检查持有者手牌，对每张诅咒牌向随机友方棋子造成伤害。手牌中没有诅咒时自我移除。
+
+```javascript
+// skillCode 中的关键结构
+var playerId = context.playerId;
+if (battle.turn.currentPlayerId !== playerId) return { success: false };
+
+var curseCards = player.hand.filter(function(c) { return c.name && c.name.indexOf('诅咒') >= 0; });
+if (curseCards.length === 0) {
+  player.rules = player.rules.filter(function(r) { return r.id !== 'rule-rafaam-curse-end-turn'; });
+  return { success: false };
+}
+// 对每张诅咒牌造成伤害...
+```
+
+### 手牌系统 AP 消耗流程
+
+```
+playCard 被调用
+  → 从手牌实例读取 cardInstance.actionPointCost（可能已被诅咒增幅改为10）
+  → 检查 playerMeta.actionPoints >= cardApCost
+  → 执行 executeCard()
+  → playerMeta.actionPoints -= cardApCost
+  → 弃置手牌
 ```

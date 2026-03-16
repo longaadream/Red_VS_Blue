@@ -38,6 +38,8 @@ export interface PlayerTurnMeta {
   discardPile: string[]
   /** 玩家级别规则（挂在玩家身上而非棋子上的被动触发器） */
   rules?: any[]
+  /** 玩家级别状态标签（如时空扭曲等阵营buff） */
+  statusTags?: any[]
 }
 
 export interface PerTurnActionFlags {

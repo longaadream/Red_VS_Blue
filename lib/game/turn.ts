@@ -221,6 +221,10 @@ export interface PlayerTurnMeta {
   hand: { cardId: string; instanceId: string; ownerPlayerId: string }[]
   /** 弃牌堆（只记 cardId） */
   discardPile: string[]
+  /** 玩家级别规则（挂在玩家身上而非棋子上的被动触发器） */
+  rules?: any[]
+  /** 玩家级别状态标签（如时空扭曲等阵营buff） */
+  statusTags?: any[]
 }
 
 export interface PerTurnActionFlags {
@@ -431,34 +435,29 @@ export function applyBattleAction(
           }
         }
 
-        // 获取当前玩家的所有棋子
-        const currentPlayerPieces = next.pieces.filter(p => isSamePlayer(p.ownerPlayerId, next.turn.currentPlayerId) && p.currentHp > 0);
-        // 触发回合开始效果，为每个存活的棋子都触发一次
-        currentPlayerPieces.forEach(piece => {
-          const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
-            type: "beginTurn",
-            sourcePiece: piece,
-            turnNumber: next.turn.turnNumber,
-            playerId: next.turn.currentPlayerId
-          });
-
-          // 处理触发效果的消息
-          if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
-            if (!next.actions) {
-              next.actions = [];
-            }
-            beginTurnResult.messages.forEach(message => {
-              next.actions!.push({
-                type: "triggerEffect",
-                playerId: next.turn.currentPlayerId,
-                turn: next.turn.turnNumber,
-                payload: {
-                  message
-                }
-              });
-            });
-          }
+        // 触发回合开始效果（只调用一次，checkTriggers会扫描所有棋子和玩家的规则）
+        const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
+          type: "beginTurn",
+          turnNumber: next.turn.turnNumber,
+          playerId: next.turn.currentPlayerId
         });
+
+        // 处理触发效果的消息
+        if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
+          if (!next.actions) {
+            next.actions = [];
+          }
+          beginTurnResult.messages.forEach(message => {
+            next.actions!.push({
+              type: "triggerEffect",
+              playerId: next.turn.currentPlayerId,
+              turn: next.turn.turnNumber,
+              payload: {
+                message
+              }
+            });
+          });
+        }
 
         // 更新冷却
         globalTriggerSystem.updateCooldowns();
@@ -582,34 +581,29 @@ export function applyBattleAction(
         }
         
         // 获取当前玩家的所有棋子
-        const currentPlayerPieces = next.pieces.filter(p => isSamePlayer(p.ownerPlayerId, next.turn.currentPlayerId) && p.currentHp > 0);
-        
-        // 触发回合开始效果，为每个存活的棋子都触发一次
-        currentPlayerPieces.forEach(piece => {
-          const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
-            type: "beginTurn",
-            sourcePiece: piece,
-            turnNumber: next.turn.turnNumber,
-            playerId: next.turn.currentPlayerId
-          });
-
-          // 处理触发效果的消息
-          if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
-            if (!next.actions) {
-              next.actions = [];
-            }
-            beginTurnResult.messages.forEach(message => {
-              next.actions!.push({
-                type: "triggerEffect",
-                playerId: next.turn.currentPlayerId,
-                turn: next.turn.turnNumber,
-                payload: {
-                  message
-                }
-              });
-            });
-          }
+        // 触发回合开始效果（只调用一次，checkTriggers会扫描所有棋子和玩家的规则）
+        const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
+          type: "beginTurn",
+          turnNumber: next.turn.turnNumber,
+          playerId: next.turn.currentPlayerId
         });
+
+        // 处理触发效果的消息
+        if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
+          if (!next.actions) {
+            next.actions = [];
+          }
+          beginTurnResult.messages.forEach(message => {
+            next.actions!.push({
+              type: "triggerEffect",
+              playerId: next.turn.currentPlayerId,
+              turn: next.turn.turnNumber,
+              payload: {
+                message
+              }
+            });
+          });
+        }
 
         // 更新冷却
         globalTriggerSystem.updateCooldowns();
@@ -944,9 +938,9 @@ export function applyBattleAction(
       // 触发器可能修改了技能ID，使用修改后的值
       const finalSkillId = skillUseContext.skillId;
 
-      // 优先从服务器获取最新的技能定义（开发模式热重载）
+      // 优先使用战局中已加载的技能定义，回退到模块缓存
       // 使用触发器可能修改后的技能ID
-      let skillDef = getSkillById(finalSkillId) || next.skillsById[finalSkillId]
+      let skillDef = next.skillsById[finalSkillId] || getSkillById(finalSkillId)
 
       // 检查行动点是否足够
       const playerMeta = getPlayerMeta(state, action.playerId)
@@ -1069,16 +1063,8 @@ export function applyBattleAction(
               if (skillDef.type === "ultimate") {
                 piece.skills[skillIndex].usesRemaining -= 1
               }
-            } else {
-              // 如果技能不在棋子的技能列表中，添加它
-              const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
-              piece.skills.push({
-                skillId: finalSkillId,
-                level: 1,
-                currentCooldown: skillDef.cooldownTurns,
-                usesRemaining: usesRemaining
-              })
             }
+            // 注意：不在此处重新添加技能，规则系统可能已在技能执行期间移除了该技能
           } else {
             // 如果棋子没有skills属性，初始化它
             const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
@@ -1273,8 +1259,11 @@ export function applyBattleAction(
       }
 
       // 执行技能
-      const { executeSkillFunction } = require('./skills')
+      const skillsModule = require('./skills')
+      const { executeSkillFunction } = skillsModule
       console.log('[useChargeSkill] executeSkillFunction imported: ' + typeof executeSkillFunction)
+      console.log('[useChargeSkill] skillsModule keys:', Object.keys(skillsModule).join(', '))
+      console.log('[useChargeSkill] executeSkillFunction toString:', executeSkillFunction.toString().substring(0, 500))
       console.log('[useChargeSkill] skillDef id: ' + skillDef.id)
       console.log('[useChargeSkill] skillDef has code: ' + !!skillDef.code)
       console.log('[useChargeSkill] About to build target info...')
@@ -1376,16 +1365,8 @@ export function applyBattleAction(
               if (skillDef.type === "ultimate") {
                 piece.skills[skillIndex].usesRemaining -= 1
               }
-            } else {
-              // 如果技能不在棋子的技能列表中，添加它
-              const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
-              piece.skills.push({
-                skillId: finalSkillId,
-                level: 1,
-                currentCooldown: skillDef.cooldownTurns,
-                usesRemaining: usesRemaining
-              })
             }
+            // 注意：不在此处重新添加技能，规则系统可能已在技能执行期间移除了该技能
           } else {
             // 如果棋子没有skills属性，初始化它
             const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
@@ -1669,11 +1650,17 @@ export function applyBattleAction(
       if (cardIdx === -1) throw new BattleRuleError("手牌中找不到该卡牌")
       const cardInstance = playerMeta.hand[cardIdx]
 
-      // 加载卡牌定义
+      // 加载卡牌定义（先查文件，再查战局自定义卡）
       const { loadCardById, executeCardFunction } = require('./skills')
-      const cardDef = loadCardById(cardInstance.cardId)
+      const cardDef = loadCardById(cardInstance.cardId) ?? next.customCards?.[cardInstance.cardId] ?? null
       if (!cardDef) throw new BattleRuleError(`卡牌定义找不到: ${cardInstance.cardId}`)
       if (cardDef.type !== 'active') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
+
+      // AP 消耗：优先取手牌实例上的 actionPointCost（可被运行时效果修改），fallback 到卡牌定义
+      const cardApCost = (cardInstance as any).actionPointCost ?? cardDef.actionPointCost ?? 0
+      if (playerMeta.actionPoints < cardApCost) {
+        throw new BattleRuleError(`行动点不足，打出 ${cardDef.name} 需要 ${cardApCost} 点，当前 ${playerMeta.actionPoints} 点`)
+      }
 
       // 触发手牌使用前规则
       const beforeCardPlayResult = globalTriggerSystem.checkTriggers(next, {
@@ -1732,6 +1719,9 @@ export function applyBattleAction(
       if (!result.success) {
         throw new BattleRuleError(result.message || "卡牌效果执行失败")
       }
+
+      // 扣除行动点
+      playerMeta.actionPoints -= cardApCost
 
       // 弃牌
       if (!playerMeta.discardPile) playerMeta.discardPile = []

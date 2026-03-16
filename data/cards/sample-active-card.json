@@ -1,8 +1,0 @@
-{
-  "id": "sample-active-card",
-  "name": "急救包",
-  "description": "消耗1AP，为己方一名棋子回复15点生命值。",
-  "type": "active",
-  "icon": "Heart",
-  "code": "function executeCard(context) {\n  const player = battle.players.find(p => p.playerId === playerId);\n  if (!player || player.actionPoints < 1) {\n    return { success: false, message: '行动点不足，无法使用急救包' };\n  }\n  const target = selectTarget({ filter: 'ally', range: 99 });\n  if (!target) return { success: false, message: '请选择一名友方棋子' };\n  player.actionPoints -= 1;\n  const result = healDamage(target, target, 15, battle, 'sample-active-card');\n  return { success: true, message: `急救包：为${target.name || target.templateId}回复${result.heal}点生命值` };\n}"
-}

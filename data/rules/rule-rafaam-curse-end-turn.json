@@ -1,0 +1,7 @@
+{
+  "id": "rule-rafaam-curse-end-turn",
+  "name": "诅咒-回合结束伤害",
+  "description": "持有诅咒牌时，每回合结束对一个随机友方棋子造成伤害，直到打出该牌",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var playerId = context.playerId; if (battle.turn.currentPlayerId !== playerId) return { success: false }; var player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player || !player.hand) return { success: false }; var curseCards = player.hand.filter(function(c) { return c.name && c.name.indexOf('诅咒') >= 0; }); if (curseCards.length === 0) { if (player.rules) player.rules = player.rules.filter(function(r) { return r.id !== 'rule-rafaam-curse-end-turn'; }); return { success: false }; } var messages = []; curseCards.forEach(function(card) { var cardDef = battle.customCards && battle.customCards[card.cardId]; var dmg = (cardDef && cardDef.damageAmount) ? cardDef.damageAmount : 4; var friendlyPieces = battle.pieces.filter(function(p) { return p.ownerPlayerId === playerId && p.currentHp > 0; }); if (friendlyPieces.length === 0) return; var target = friendlyPieces[Math.floor(Math.random() * friendlyPieces.length)]; var dmgResult = dealDamage(target, target, dmg, 'magical', battle, 'curse-end-turn'); messages.push('诅咒对' + target.name + '造成了' + dmgResult.damage + '点伤害'); }); return { success: true, message: messages.join('，') };"
+}

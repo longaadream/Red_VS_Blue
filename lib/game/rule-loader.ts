@@ -321,23 +321,25 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
 
           case 'triggerSkill': {
             const effect = ruleDef.effect as TriggerSkillEffect
-            if (context.sourcePiece) {
+            // 使用 context.rulePiece（规则绑定的棋子）或 context.sourcePiece（事件源棋子）
+            const rulePiece = context.rulePiece || context.sourcePiece
+            if (rulePiece) {
               // 查找技能定义
               const skillDef = battle.skillsById[effect.skillId]
               if (skillDef) {
                 // 创建技能执行上下文
                 const skillContext = {
                   piece: {
-                    instanceId: context.sourcePiece.instanceId,
-                    templateId: context.sourcePiece.templateId,
-                    ownerPlayerId: context.sourcePiece.ownerPlayerId,
-                    currentHp: context.sourcePiece.currentHp,
-                    maxHp: context.sourcePiece.maxHp,
-                    attack: context.sourcePiece.attack,
-                    defense: context.sourcePiece.defense,
-                    x: context.sourcePiece.x,
-                    y: context.sourcePiece.y,
-                    moveRange: context.sourcePiece.moveRange
+                    instanceId: rulePiece.instanceId,
+                    templateId: rulePiece.templateId,
+                    ownerPlayerId: rulePiece.ownerPlayerId,
+                    currentHp: rulePiece.currentHp,
+                    maxHp: rulePiece.maxHp,
+                    attack: rulePiece.attack,
+                    defense: rulePiece.defense,
+                    x: rulePiece.x,
+                    y: rulePiece.y,
+                    moveRange: rulePiece.moveRange
                   },
                   target: context.targetPiece ? {
                     instanceId: context.targetPiece.instanceId,
@@ -351,16 +353,21 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                     y: context.targetPiece.y
                   } : null,
                   battle: {
-                    turn: battle.turn.turnNumber,
-                    currentPlayerId: battle.turn.currentPlayerId,
-                    phase: battle.turn.phase
+                    turn: {
+                      turnNumber: battle.turn.turnNumber,
+                      currentPlayerId: battle.turn.currentPlayerId,
+                      phase: battle.turn.phase
+                    },
+                    players: battle.players
                   },
                   skill: {
                     id: skillDef.id,
                     name: skillDef.name,
                     type: skillDef.type,
                     powerMultiplier: skillDef.powerMultiplier
-                  }
+                  },
+                  // 添加 playerId，用于玩家规则触发的技能
+                  playerId: context.playerId
                 }
 
                 // 执行技能代码
@@ -373,6 +380,42 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                 console.warn(`Skill not found: ${effect.skillId}`)
                 success = false
                 message = `技能 ${effect.skillId} 未找到`
+              }
+            } else if (context.playerId) {
+              // 玩家级规则触发技能（无棋子上下文），直接 eval 执行技能代码
+              const skillDef = battle.skillsById[effect.skillId]
+              if (skillDef?.code) {
+                try {
+                  const playerSkillContext = {
+                    piece: null,
+                    target: null,
+                    battle: {
+                      turn: {
+                        turnNumber: battle.turn.turnNumber,
+                        currentPlayerId: battle.turn.currentPlayerId,
+                        phase: battle.turn.phase
+                      },
+                      players: battle.players
+                    },
+                    skill: {
+                      id: skillDef.id,
+                      name: skillDef.name,
+                      type: skillDef.type,
+                      powerMultiplier: skillDef.powerMultiplier
+                    },
+                    playerId: context.playerId
+                  }
+                  const skillCode = skillDef.code
+                  const skillResult = eval(`(function(context) { ${skillCode}; return executeSkill(context); })(playerSkillContext)`)
+                  if (skillResult?.success) {
+                    message = skillResult.message || resolveMessage(effect.message, context)
+                    success = true
+                  }
+                } catch (e) {
+                  console.warn(`Error executing player-level trigger skill ${effect.skillId}:`, e)
+                }
+              } else {
+                console.warn(`Skill not found or has no code: ${effect.skillId}`)
               }
             }
             break

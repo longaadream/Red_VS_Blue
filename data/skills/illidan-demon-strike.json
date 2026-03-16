@@ -1,0 +1,14 @@
+{
+  "id": "illidan-demon-strike",
+  "name": "恶魔冲击",
+  "description": "对任意敌方棋子造成自身攻击力100%的物理伤害（恶魔变形期间共2次）",
+  "icon": "💢",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var result = dealDamage(caster, target, caster.attack, 'physical', battle, context.skill.id); return { success: true, message: caster.name + '使用恶魔冲击，对' + target.name + '造成' + result.damage + '点伤害' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对任意敌人造成' + piece.attack + '点物理伤害（攻击力100%，恶魔变形期间可用）', expectedValues: { damage: piece.attack } }; }"
+}

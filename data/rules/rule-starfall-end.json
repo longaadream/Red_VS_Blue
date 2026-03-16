@@ -1,8 +1,0 @@
-{
-  "id": "rule-starfall-end",
-  "name": "群星陨落结束",
-  "description": "星辰领域结束时，根据使用的圣光手牌数量为友方恢复生命",
-  "trigger": { "type": "statusRemoved", "statusId": "starfall-aura" },
-  "effect": { "type": "triggerSkill", "skillId": "starfall-heal", "message": "群星陨落结束治疗" },
-  "limits": { "maxUses": 1 }
-}

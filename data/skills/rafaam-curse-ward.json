@@ -1,0 +1,13 @@
+{
+  "id": "rafaam-curse-ward",
+  "name": "诅咒结界",
+  "description": "(被动)每回合限一次，该棋子在己方回合受到伤害时，免疫此伤害并将1张此次伤害量的诅咒（消耗2点AP来弃置，己方回合结束时使一个随机友方棋子受到记录的伤害）交给对手",
+  "icon": "🛡️",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { return { success: true }; }"
+}

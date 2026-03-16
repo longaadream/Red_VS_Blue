@@ -10,7 +10,24 @@
       "Bash(done)",
       "Bash(echo === Rules referenced by pieces ===:*)",
       "Bash(\"C:\\\\Users\\\\lngsc\\\\Documents\\\\GitHub\\\\v0-game-menu-design\\\\v0-game-menu-design\\\\GAME_DEVELOPMENT_NOTES.md\":*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(sleep:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(python:*)",
+      "Bash(powershell -Command \"Get-Process -Name 'node' | Stop-Process -Force\" 2>&1; sleep 2; echo \"killed\")",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3000 -State Listen | Select-Object -ExpandProperty OwningProcess\" 2>/dev/null)",
+      "Bash(powershell -Command \"\\(Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue\\).OwningProcess\" 2>/dev/null && echo \"found\")",
+      "Bash(powershell -Command \"\n\\\\$pid = \\(Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue\\).OwningProcess | Select-Object -First 1\nif \\(\\\\$pid\\) { Stop-Process -Id \\\\$pid -Force -ErrorAction SilentlyContinue; Write-Host 'Killed' \\\\$pid }\n\" 2>/dev/null)",
+      "Bash(cmd //c \"for /f \\\\\"tokens=5\\\\\" %a in \\('netstat -ano ^| findstr :3000 ^| findstr LISTENING'\\) do taskkill /PID %a /F\" 2>/dev/null && echo \"killed\")",
+      "Bash(powershell -Command \"\\(Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -First 1\\).OwningProcess\" && echo \"port 3000 in use\")",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /PID 27336 /F\")",
+      "Bash(cmd /c \"taskkill /PID 27336 /F 2>&1\")",
+      "Bash(cmd /c taskkill /PID 27336 /F)",
+      "Bash(powershell -Command \"Stop-Process -Id 27336 -Force\")",
+      "Bash(for f:*)",
+      "Bash(cd:*)"
     ]
   }
 }
