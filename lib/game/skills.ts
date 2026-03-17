@@ -1439,8 +1439,8 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
     },
     
     // 造成伤害（支持单目标或目标数组；传入数组时 beforeDamageDealt 只触发一次）
-    dealDamage: (attacker: PieceInstance, targetPiece: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = "physical", battleState?: BattleState, skillId?: string) => {
-      return dealDamage(attacker, targetPiece, baseDamage, damageType, battle, skillId);
+    dealDamage: (attacker: PieceInstance, targetPiece: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = "physical", battleState?: BattleState, skillId?: string, skipBefore = false, killerPlayerId?: string) => {
+      return dealDamage(attacker, targetPiece, baseDamage, damageType, battle, skillId, skipBefore, killerPlayerId);
     },
 
     // 治疗（支持单目标或目标数组；传入数组时 beforeHealDealt 只触发一次）
@@ -1461,7 +1461,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
  * @param skillId 技能ID（可选）
  * @returns 伤害结果
  */
-export function dealDamage(attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType, battle: BattleState, skillId?: string, skipBeforeTrigger = false): any {
+export function dealDamage(attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType, battle: BattleState, skillId?: string, skipBeforeTrigger = false, killerPlayerId?: string): any {
   // 支持传入目标数组：beforeDamageDealt 只触发一次，buff 只消耗一次，对所有目标生效
   if (Array.isArray(target)) {
     if (target.length === 0) {
@@ -1687,7 +1687,8 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
     });
 
     // 击杀敌人后，为击杀者添加充能点
-    const playerMeta = battle.players.find(p => p.playerId === attacker.ownerPlayerId);
+    const killCreditId = killerPlayerId || attacker.ownerPlayerId;
+    const playerMeta = battle.players.find(p => p.playerId === killCreditId);
     if (playerMeta) {
       playerMeta.chargePoints += 1; // 每次击杀获得1点充能
       // 触发充能获得事件（可用于"获得充能时做X"效果）
@@ -1695,7 +1696,7 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
         type: "afterChargeGained",
         sourcePiece: attacker,
         amount: 1,
-        playerId: attacker.ownerPlayerId
+        playerId: killCreditId
       });
     }
 
