@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { getRoomStore, type Room } from "@/lib/game/room-store"
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getAllPieces } from "@/lib/game/piece-repository"
-import fs from 'fs'
-import path from 'path'
-
-// 获取 RoomStore 实例
-console.log('Getting RoomStore instance in rooms route')
-const roomStore = getRoomStore()
 
 export async function GET(
   _req: NextRequest,
@@ -16,7 +10,8 @@ export async function GET(
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
   console.log('[GET /api/rooms/:roomId] Fetching room:', roomId)
-  const room = roomStore.getRoom(roomId)
+  const roomStore = getRoomStore()
+  const room = await roomStore.getRoom(roomId)
 
   if (!room) {
     console.log('[GET /api/rooms/:roomId] Room not found:', roomId)
@@ -55,12 +50,13 @@ export async function POST(
   try {
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
-  let room = roomStore.getRoom(roomId)
+  const roomStore = getRoomStore()
+  let room = await roomStore.getRoom(roomId)
 
   // 如果房间不存在，创建一个新的房间
   if (!room) {
     console.log('Room not found, creating new room:', roomId)
-    room = roomStore.createRoom(roomId, `Room ${roomId}`)
+    room = await roomStore.createRoom(roomId, `Room ${roomId}`)
     console.log('New room created:', room.id)
   }
 
@@ -100,16 +96,13 @@ export async function POST(
         joinedAt: Date.now(),
       }
       room.players.push(player)
-      
-      // 如果房间还没有房主，将当前加入的玩家设置为房主
+
       if (!room.hostId) {
         room.hostId = normalizedPlayerId
       }
     }
 
-    // 确保使用修剪后的房间 ID 作为键，与 setRoom 方法的行为一致
-    const trimmedRoomId = room.id.trim()
-    roomStore.setRoom(trimmedRoomId, room)
+    await roomStore.setRoom(room.id.trim(), room)
     return NextResponse.json(room)
   }
 
@@ -121,7 +114,6 @@ export async function POST(
       )
     }
 
-    // 1v1：必须刚好 2 人才能开始
     if (room.players.length !== 2) {
       return NextResponse.json(
         { error: "Exactly two players are required to start a 1v1 game" },
@@ -142,9 +134,7 @@ export async function POST(
     room.status = "in-progress"
     room.currentTurnIndex = 0
     room.battleState = battle
-    // 确保使用修剪后的房间 ID 作为键，与 setRoom 方法的行为一致
-    const trimmedRoomId = room.id.trim()
-    roomStore.setRoom(trimmedRoomId, room)
+    await roomStore.setRoom(room.id.trim(), room)
 
     return NextResponse.json(room)
   }
@@ -163,26 +153,20 @@ export async function DELETE(
   console.log('=== DELETE Request Started ===')
 
   try {
-    // 获取房间 ID
     const { roomId: originalRoomId } = await params
     const roomId = originalRoomId.trim().toLowerCase()
     console.log('Processing room deletion:', { original: originalRoomId, normalized: roomId })
 
-    // 直接使用 roomStore.removeRoom 删除房间（它会处理内存和磁盘）
-    console.log('=== Deleting room via roomStore ===')
-    const removed = roomStore.removeRoom(roomId)
+    const roomStore = getRoomStore()
+    const removed = await roomStore.removeRoom(roomId)
     console.log('Room removal result:', removed)
 
-    // 返回结果
     console.log('Room deletion completed:', roomId)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Unexpected error in DELETE handler:', error)
-    // 即使出错，也返回成功，因为我们已经尝试了删除操作
     return NextResponse.json({ success: true })
   } finally {
     console.log('=== DELETE Request Completed ===')
   }
 }
-
-

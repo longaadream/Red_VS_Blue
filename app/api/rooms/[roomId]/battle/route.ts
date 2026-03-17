@@ -8,8 +8,6 @@ import {
 } from "@/lib/game/turn"
 import { loadRuleById } from "@/lib/game/skills"
 
-const rooms = roomStore
-
 /**
  * 重新为战斗状态中所有棋子的规则注入 effect 函数。
  * 规则对象保存到 JSON 文件时，函数会丢失，每次加载后需重新注入。
@@ -20,11 +18,9 @@ function rehydrateBattleRules(battleState: BattleState): void {
     piece.rules = piece.rules.map((rule: any) => {
       if (typeof rule.effect !== 'function' && rule.id) {
         const rehydrated = loadRuleById(rule.id)
-        // 只有当重新加载成功且有 effect 函数时才替换
         if (rehydrated && typeof rehydrated.effect === 'function') {
           return rehydrated
         }
-        // 如果加载失败，保留原规则但添加一个空的 effect 函数防止报错
         console.warn(`Failed to rehydrate rule ${rule.id}, adding default effect`)
         return {
           ...rule,
@@ -42,7 +38,7 @@ export async function GET(
 ) {
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
-  const room = rooms.getRoom(roomId)
+  const room = await roomStore.getRoom(roomId)
 
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 })
@@ -64,7 +60,7 @@ export async function POST(
 ) {
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
-  const room = rooms.getRoom(roomId)
+  const room = await roomStore.getRoom(roomId)
 
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 })
@@ -85,11 +81,9 @@ export async function POST(
   }
 
   try {
-    // 从磁盘加载后规则的 effect 函数会丢失，需要在执行动作前重新注入
     rehydrateBattleRules(room.battleState)
     const nextState = applyBattleAction(room.battleState, body)
     console.log('[Battle API] Players chargePoints after action:', nextState.players.map(p => ({ playerId: p.playerId, chargePoints: p.chargePoints })))
-    // 安全网：防止棋子重复 bug 污染持久化状态
     const uniquePieces = nextState.pieces.filter((piece: any, index: number, self: any[]) =>
       index === self.findIndex((p: any) => p.instanceId === piece.instanceId)
     )
@@ -98,14 +92,12 @@ export async function POST(
       nextState.pieces = uniquePieces
     }
     room.battleState = nextState
-    rooms.updateBattleState(room.id, nextState)
+    await roomStore.updateBattleState(room.id, nextState)
 
     return NextResponse.json(nextState)
   } catch (e) {
     if (e instanceof BattleRuleError) {
-      // 检查是否是需要目标选择的错误
       if ((e as any).needsTargetSelection) {
-        // 返回包含目标选择信息的响应
         return NextResponse.json({
           needsTargetSelection: true,
           targetType: (e as any).targetType || 'piece',
@@ -113,7 +105,6 @@ export async function POST(
           filter: (e as any).filter || 'enemy'
         }, { status: 400 })
       }
-      // 检查是否是需要选项选择的错误
       if ((e as any).needsOptionSelection) {
         return NextResponse.json({
           needsOptionSelection: true,
@@ -131,4 +122,3 @@ export async function POST(
     )
   }
 }
-

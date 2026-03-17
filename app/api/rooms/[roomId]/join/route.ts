@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { roomStore, type Room } from "@/lib/game/room-store"
+import { roomStore } from "@/lib/game/room-store"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: "playerId is required" }, { status: 400 })
   }
 
-  const room = roomStore.getRoom(roomId)
+  const room = await roomStore.getRoom(roomId)
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 })
   }
@@ -43,10 +43,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   room.players.push(newPlayer)
-  roomStore.setRoom(roomId, room)
+  await roomStore.setRoom(roomId, room)
 
-  return NextResponse.json({ 
-    success: true, 
+  return NextResponse.json({
+    success: true,
     message: "Player joined room successfully",
     player: {
       id: newPlayer.id,

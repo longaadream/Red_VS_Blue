@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import type { BattleState } from "@/lib/game/turn"
 import { getRoomStore, type Room } from "@/lib/game/room-store"
 
-// 获取 RoomStore 实例
-console.log('Getting RoomStore instance in lobby route')
-const roomStore = getRoomStore()
-
 // 导出 Room 类型供其他文件使用
 export type { Room }
 
@@ -16,19 +12,15 @@ export function getRoomsStore() {
 
 export async function GET() {
   console.log('=== Lobby API GET Request ===')
-  
-  // 先确保房间存储已初始化
-  const allRooms = Array.from(roomStore.getRooms().values())
+  const roomStore = getRoomStore()
+
+  const allRooms = await roomStore.getAllRooms()
   console.log('All rooms in store:', allRooms.map(r => ({ id: r.id, name: r.name, hostId: r.hostId })))
-  
-  // 过滤出有效的房间（排除可能的空数据）
+
   const validRooms = allRooms.filter(room => room.id && room.name)
-  console.log('Valid rooms:', validRooms.length)
-  
-  // 去重处理，确保每个房间ID只出现一次
   const uniqueRooms = Array.from(new Map(validRooms.map(room => [room.id, room])).values())
   console.log('Unique rooms to return:', uniqueRooms.map(r => ({ id: r.id, name: r.name, hostId: r.hostId })))
-  
+
   const formattedRooms = uniqueRooms.map((room) => ({
     id: room.id,
     name: room.name,
@@ -56,7 +48,6 @@ export async function POST(req: NextRequest) {
 
     const { name, hostId, mapId, visibility } = (body as { name?: string; hostId?: string; mapId?: string; visibility?: "private" | "public" }) ?? {}
 
-    // 生成5位的数字和字母组合作为房间ID（强制小写）
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
     let roomId = ''
     for (let i = 0; i < 5; i++) {
@@ -64,6 +55,7 @@ export async function POST(req: NextRequest) {
     }
     const now = Date.now()
     const trimmedHostId = hostId?.trim() || ''
+    const roomStore = getRoomStore()
 
     const room: Room = {
       id: roomId,
@@ -77,11 +69,11 @@ export async function POST(req: NextRequest) {
       visibility: visibility || "private",
       currentTurnIndex: 0,
       actions: [],
-      battleState: null,
+      battleState: undefined,
     }
 
     console.log('Creating room with:', { roomId, hostId: trimmedHostId, name: room.name })
-    roomStore.setRoom(roomId, room)
+    await roomStore.setRoom(roomId, room)
     console.log('Room created successfully')
 
     return NextResponse.json(room, { status: 201 })
@@ -90,4 +82,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
-

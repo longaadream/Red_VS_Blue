@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
-
-interface User {
-  id: string
-  username: string
-  password: string
-  createdAt: string
-}
+import bcrypt from 'bcryptjs'
+import { prisma } from '@/lib/db'
 
 interface RegisterRequest {
   username: string
@@ -16,12 +9,8 @@ interface RegisterRequest {
 
 interface RegisterResponse {
   success: boolean
-  user?: User
+  user?: { id: string; username: string; createdAt: string }
   error?: string
-}
-
-function generateUserId(): string {
-  return ('user_' + Date.now() + '_' + Math.floor(Math.random() * 10000)).toLowerCase()
 }
 
 export async function POST(request: NextRequest) {
@@ -50,42 +39,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 读取用户数据文件
-    const usersFilePath = join(process.cwd(), 'data', 'users.json')
-    let usersData: { users: User[] }
-
-    try {
-      const usersFileContent = readFileSync(usersFilePath, 'utf-8')
-      usersData = JSON.parse(usersFileContent)
-    } catch (error) {
-      usersData = { users: [] }
-    }
-
-    // 检查用户名是否已存在
-    const existingUser = usersData.users.find(user => user.username.toLowerCase() === username.toLowerCase())
-    if (existingUser) {
+    const lowerUsername = username.toLowerCase()
+    const existing = await prisma.user.findUnique({
+      where: { username: lowerUsername }
+    })
+    if (existing) {
       return NextResponse.json<RegisterResponse>(
         { success: false, error: '用户名已存在' },
         { status: 400 }
       )
     }
 
-    // 创建新用户
-    const newUser: User = {
-      id: generateUserId(),
-      username,
-      password, // 注意：在实际应用中，应该对密码进行加密
-      createdAt: new Date().toISOString()
-    }
-
-    // 添加新用户到数据中
-    usersData.users.push(newUser)
-
-    // 写回文件
-    writeFileSync(usersFilePath, JSON.stringify(usersData, null, 2), 'utf-8')
+    const passwordHash = await bcrypt.hash(password, 10)
+    const newUser = await prisma.user.create({
+      data: { username: lowerUsername, passwordHash }
+    })
 
     return NextResponse.json<RegisterResponse>(
-      { success: true, user: newUser },
+      { success: true, user: { id: newUser.id, username: newUser.username, createdAt: newUser.createdAt.toISOString() } },
       { status: 201 }
     )
   } catch (error) {

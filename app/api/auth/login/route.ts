@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFileSync } from 'fs'
-import { join } from 'path'
-
-interface User {
-  id: string
-  username: string
-  password: string
-  createdAt: string
-}
+import bcrypt from 'bcryptjs'
+import { prisma } from '@/lib/db'
 
 interface LoginRequest {
   username: string
@@ -16,7 +9,7 @@ interface LoginRequest {
 
 interface LoginResponse {
   success: boolean
-  user?: User
+  user?: { id: string; username: string; createdAt: string }
   error?: string
 }
 
@@ -32,40 +25,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 读取用户数据文件
-    const usersFilePath = join(process.cwd(), 'data', 'users.json')
-    let usersData: { users: User[] }
+    const user = await prisma.user.findUnique({
+      where: { username: username.toLowerCase() }
+    })
 
-    try {
-      const usersFileContent = readFileSync(usersFilePath, 'utf-8')
-      usersData = JSON.parse(usersFileContent)
-    } catch (error) {
-      return NextResponse.json<LoginResponse>(
-        { success: false, error: '用户数据加载失败' },
-        { status: 500 }
-      )
-    }
-
-    // 查找用户
-    const user = usersData.users.find(
-      user => user.username.toLowerCase() === username.toLowerCase() && user.password === password
-    )
-
-    if (!user) {
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return NextResponse.json<LoginResponse>(
         { success: false, error: '用户名或密码错误' },
         { status: 401 }
       )
     }
 
-    // 确保返回的 user.id 是小写
-    const userWithLowerCaseId = {
-      ...user,
-      id: user.id.toLowerCase()
-    }
-
     return NextResponse.json<LoginResponse>(
-      { success: true, user: userWithLowerCaseId },
+      { success: true, user: { id: user.id.toLowerCase(), username: user.username, createdAt: user.createdAt.toISOString() } },
       { status: 200 }
     )
   } catch (error) {
