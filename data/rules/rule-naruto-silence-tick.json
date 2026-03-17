@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-silence-tick",
+  "name": "沉默结算",
+  "description": "每回合结束时检查沉默效果，1回合后解除",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'naruto-silence'; }); if (!tag) { removeRuleById(piece.instanceId, 'rule-naruto-silence-tick'); return { success: false, message: '' }; } removeStatusEffectById(piece.instanceId, tag.id); return { success: true, message: piece.name + '的沉默效果解除' };"
+}

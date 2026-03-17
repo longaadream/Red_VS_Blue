@@ -1,0 +1,14 @@
+{
+  "id": "naruto-sage-mode",
+  "name": "仙人模式",
+  "description": "进入打坐状态，免疫下一次伤害，但无法移动或使用技能。4回合后若鸣人存活，获得额外3行动点和1充能点",
+  "icon": "🧘",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 10,
+  "maxCharges": 0,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 1,
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var existingSageMode = caster.statusTags && caster.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (existingSageMode) return { success: false, message: caster.name + '已处于仙人模式中' }; addStatusEffectById(caster.instanceId, { id: 'sage-mode-' + caster.instanceId, name: '仙人模式', type: 'sage-mode', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 4, relatedRules: ['rule-naruto-sage-immobile', 'rule-naruto-sage-block-skill', 'rule-naruto-sage-tick'] }); addStatusEffectById(caster.instanceId, { id: 'sage-mode-shield-' + caster.instanceId, name: '仙人之盾', type: 'sage-mode-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-naruto-sage-immunity'] }); addRuleById(caster.instanceId, 'rule-naruto-sage-immobile'); addRuleById(caster.instanceId, 'rule-naruto-sage-block-skill'); addRuleById(caster.instanceId, 'rule-naruto-sage-tick'); addRuleById(caster.instanceId, 'rule-naruto-sage-immunity'); return { success: true, message: caster.name + '进入仙人模式！免疫一次伤害，4回合后获得3行动点和1充能点' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '进入仙人模式：免疫1次伤害，不可移动/施法，4回合后获得+3AP +1充能，若有影分身存在，回合结束时提前一回合进入仙人模式', expectedValues: {} }; }"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "naruto-rasengan",
+  "name": "螺旋手里剑",
+  "description": "对2格内一名敌人造成攻击力200%的物理伤害，并沉默目标1回合",
+  "icon": "🌀",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 2.0,
+  "actionPointCost": 3,
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var target = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; if (target.currentHp <= 0) return { success: false, message: '目标已死亡' }; var dmg = caster.attack * 2; dealDamage(caster, target, dmg, 'physical', battle); var existingSilence = target.statusTags && target.statusTags.find(function(t) { return t.type === 'naruto-silence'; }); if (!existingSilence) { addStatusEffectById(target.instanceId, { id: 'naruto-silence-' + target.instanceId, name: '沉默', type: 'naruto-silence', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-naruto-silence', 'rule-naruto-silence-tick'] }); addRuleById(target.instanceId, 'rule-naruto-silence'); addRuleById(target.instanceId, 'rule-naruto-silence-tick'); } return { success: true, message: caster.name + '对' + target.name + '释放螺旋手里剑，造成' + dmg + '点伤害并沉默1回合' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对2格内敌人造成攻击力×2物理伤害并沉默1回合', expectedValues: { '伤害': piece.attack * 2 } }; }"
+}

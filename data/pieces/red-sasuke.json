@@ -1,0 +1,21 @@
+{
+  "id": "red-sasuke",
+  "name": "宇智波佐助",
+  "faction": "red",
+  "description": "宇智波一族的遗孤，以千鸟贯穿敌阵，以天照焚灼大地，激活须佐能乎后攻击力飞跃，掌控加具土命与因陀罗之矢将战场变为黑炎炼狱",
+  "rarity": "legendary",
+  "image": "sasuke.jpg",
+  "stats": {
+    "maxHp": 11,
+    "attack": 4,
+    "defense": 1,
+    "moveRange": 4
+  },
+  "skills": [
+    { "skillId": "sasuke-chidori", "level": 1 },
+    { "skillId": "sasuke-amaterasu", "level": 1 },
+    { "skillId": "sasuke-susanoo", "level": 1 }
+  ],
+  "rules": [],
+  "isDefault": false
+}

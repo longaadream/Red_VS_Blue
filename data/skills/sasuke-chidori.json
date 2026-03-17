@@ -1,0 +1,14 @@
+{
+  "id": "sasuke-chidori",
+  "name": "千鸟",
+  "description": "选择同行或同列4格内的一个空格子，冲刺至该格子，对路径上所有敌人造成攻击力100%的物理伤害并附加一回合无法移动",
+  "icon": "⚡",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var pos = selectTarget({ type: 'grid', range: 4, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; if (pos.x !== caster.x && pos.y !== caster.y) return { success: false, message: '千鸟只能冲刺至同行或同列的格子' }; var dist = Math.abs(pos.x - caster.x) + Math.abs(pos.y - caster.y); if (dist === 0 || dist > 4) return { success: false, message: '目标距离必须在1-4格内' }; var occupied = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (occupied) return { success: false, message: '目标位置已有棋子' }; var pathEnemies = []; if (pos.x === caster.x) { var minY = Math.min(caster.y, pos.y); var maxY = Math.max(caster.y, pos.y); battle.pieces.forEach(function(p) { if (p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && p.x === caster.x && p.y > minY && p.y < maxY) pathEnemies.push(p); }); } else { var minX = Math.min(caster.x, pos.x); var maxX = Math.max(caster.x, pos.x); battle.pieces.forEach(function(p) { if (p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && p.y === caster.y && p.x > minX && p.x < maxX) pathEnemies.push(p); }); } caster.x = pos.x; caster.y = pos.y; var hitMsgs = []; if (pathEnemies.length > 0) { var dmg = Math.round(caster.attack * context.skill.powerMultiplier); var res = dealDamage(caster, pathEnemies, dmg, 'physical', battle, context.skill.id); pathEnemies.forEach(function(p, i) { var r = res.results && res.results[i]; if (r) hitMsgs.push(p.name + '(-' + r.damage + ')'); if (p.currentHp > 0) { var hasTag = p.statusTags && p.statusTags.some(function(t) { return t.type === 'chidori-immobile'; }); if (!hasTag) { addStatusEffectById(p.instanceId, { id: 'chidori-immobile-' + p.instanceId, name: '被千鸟贯穿', type: 'chidori-immobile', currentDuration: 1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-chidori-immobile'] }); addRuleById(p.instanceId, 'rule-chidori-immobile'); } } }); } var msg = caster.name + '发动千鸟，冲刺至(' + pos.x + ',' + pos.y + ')'; if (hitMsgs.length > 0) msg += '，贯穿' + hitMsgs.join('、') + '并使其无法移动'; return { success: true, message: msg }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var dmg = Math.round((piece.attack || 0) * skillDef.powerMultiplier); return { description: '冲刺至同行/同列4格内空格，对路径敌人造成' + dmg + '点物理伤害（攻击力100%）并使其1回合无法移动', expectedValues: { damage: dmg } }; }"
+}

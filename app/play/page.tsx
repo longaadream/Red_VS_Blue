@@ -887,7 +887,7 @@ function PlayContent() {
                       棋盘（服务器同步）
                     </div>
                     <div className="flex justify-center">
-                      <GameBoard map={battle.map} pieces={battle.pieces} />
+                      <GameBoard map={battle.map} pieces={battle.pieces} extensions={battle.extensions} />
                     </div>
                   </div>
 

@@ -1,0 +1,9 @@
+{
+  "id": "amaterasu",
+  "name": "天照",
+  "description": "佐助的永久天照灼烧区域，经过或停留的棋子每层每回合失去2点生命值",
+  "icon": "🔥",
+  "bgColor": "linear-gradient(to top, rgba(140, 15, 0, 0.88), rgba(10, 0, 0, 0.65))",
+  "boxShadow": "inset 0 0 6px rgba(255, 60, 0, 0.5)",
+  "iconPosition": "bottom-right"
+}

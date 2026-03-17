@@ -18,30 +18,22 @@ type GameBoardProps = {
   isPlacingPiece?: boolean
   selectedSkillId?: string
   teleportRange?: number
+  extensions?: Record<string, any>
 }
 
-// 暴风雪状态类型
-interface BlizzardStatus {
-  type: 'blizzard'
-  value: number  // 中心X坐标
-  extraValue: number  // 中心Y坐标
-}
-
-// 检查棋子是否有暴风雪状态
-function getBlizzardCenter(piece: PieceInstance): { x: number, y: number } | null {
-  if (!piece.statusTags) return null
-  const blizzardStatus = piece.statusTags.find((tag: any) => tag.type === 'blizzard') as BlizzardStatus | undefined
-  if (blizzardStatus && blizzardStatus.value !== undefined && blizzardStatus.extraValue !== undefined) {
-    return { x: blizzardStatus.value, y: blizzardStatus.extraValue }
-  }
-  return null
+// 格子特效条目（来自 battle.extensions.tileEffects）
+interface TileEffect {
+  x: number
+  y: number
+  sourceId: string
+  tileType: string
+  icon?: string
+  bgColor?: string
+  boxShadow?: string
+  iconPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 }
 
 function tileColor(tile: Tile): string {
-  // 检查是否是暗影步目标格子
-  if (tile.props.shadowStepTarget) {
-    return "bg-purple-600"
-  }
   switch (tile.props.type) {
     case "wall":
       return "bg-zinc-800"
@@ -63,7 +55,7 @@ function tileColor(tile: Tile): string {
   }
 }
 
-export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selectedPieceId, isSelectingMoveTarget, isSelectingTeleportTarget, isSelectingSkillTarget, isPlacingPiece, selectedSkillId, teleportRange = 5 }: GameBoardProps) {
+export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selectedPieceId, isSelectingMoveTarget, isSelectingTeleportTarget, isSelectingSkillTarget, isPlacingPiece, selectedSkillId, teleportRange = 5, extensions }: GameBoardProps) {
   const maxSize = Math.max(map.width, map.height)
   // 根据地图大小动态计算格子大小，确保棋盘在容器中合理显示
   // 最小格子大小为 24px，最大为 48px
@@ -198,34 +190,15 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
     return false
   }
 
-  // 获取所有暴风雪区域
-  const getBlizzardAreas = (): { x: number, y: number }[] => {
-    const areas: { x: number, y: number }[] = []
-    pieces.forEach(piece => {
-      const center = getBlizzardCenter(piece)
-      if (center) {
-        // 3x3 区域
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dy = -1; dy <= 1; dy++) {
-            const x = center.x + dx
-            const y = center.y + dy
-            if (x >= 0 && x < map.width && y >= 0 && y < map.height) {
-              areas.push({ x, y })
-            }
-          }
-        }
-      }
-    })
-    return areas
+  // 获取当前格子的所有特效条目
+  const getTileEffects = (x: number, y: number): TileEffect[] => {
+    if (!extensions?.tileEffects) return []
+    return (extensions.tileEffects as TileEffect[]).filter(te => te.x === x && te.y === y)
   }
 
   // 获取格子的额外类名
   const getTileClassName = (tile: typeof map.tiles[0]) => {
     const baseClass = tileColor(tile)
-
-    // 检查是否是暴风雪区域
-    const blizzardAreas = getBlizzardAreas()
-    const isBlizzardTile = blizzardAreas.some(t => t.x === tile.x && t.y === tile.y)
 
     // 检查是否是可移动目标
     if (isSelectingMoveTarget) {
@@ -251,11 +224,6 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
     // 放置棋子模式
     if (isPlacingPiece) {
       return `${baseClass} cursor-crosshair hover:bg-yellow-500/30`
-    }
-
-    // 如果是暴风雪区域，添加半透明蓝色背景
-    if (isBlizzardTile) {
-      return `${baseClass} bg-blue-400/50 border border-blue-300/50`
     }
 
     return baseClass
@@ -301,6 +269,31 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
               }
             }}
           >
+            {/* 格子特效覆盖层（通用 tileEffects 系统） */}
+            {getTileEffects(tile.x, tile.y).map((te, idx) => (
+              <div
+                key={`te-${te.sourceId}-${idx}`}
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: te.bgColor || 'transparent',
+                  boxShadow: te.boxShadow,
+                  zIndex: 1,
+                }}
+              >
+                {te.icon && (
+                  <span
+                    className={`absolute leading-none select-none ${
+                      te.iconPosition === 'top-left' ? 'top-0 left-0' :
+                      te.iconPosition === 'top-right' ? 'top-0 right-0' :
+                      te.iconPosition === 'bottom-left' ? 'bottom-0 left-0' :
+                      'bottom-0 right-0'
+                    }`}
+                    style={{ fontSize: `${Math.max(7, tileSize * 0.22)}px`, lineHeight: 1 }}
+                  >{te.icon}</span>
+                )}
+              </div>
+            ))}
+
             {/* 棋子显示 - 只显示存活的棋子 */}
             {pieces && pieces.some(p => p.x === tile.x && p.y === tile.y && p.currentHp > 0) && (
               (() => {

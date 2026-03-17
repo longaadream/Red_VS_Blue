@@ -1,0 +1,15 @@
+{
+  "id": "sasuke-susanoo",
+  "name": "须佐能乎",
+  "description": "消耗1点充能，激活完全体须佐能乎：攻击力+3，失去千鸟，获得加具土命与因陀罗之矢",
+  "icon": "🔮",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 10,
+  "maxCharges": 0,
+  "chargeCost": 1,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { var caster = context.piece; caster.attack += 3; removeSkillById(caster.instanceId, 'sasuke-chidori'); addSkillById(caster.instanceId, 'sasuke-kagutsuchi'); addSkillById(caster.instanceId, 'sasuke-indra-arrow'); addStatusEffectById(caster.instanceId, { id: 'susanoo-active', name: '须佐能乎', type: 'susanoo-active', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); return { success: true, message: caster.name + '激活须佐能乎！攻击力提升至' + caster.attack + '，千鸟消逝，获得加具土命与因陀罗之矢！' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '攻击力+3（提升至' + ((piece.attack || 0) + 3) + '），失去千鸟，获得加具土命与因陀罗之矢', expectedValues: { attackBonus: 3 } }; }"
+}

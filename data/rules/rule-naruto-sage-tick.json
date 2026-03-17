@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-sage-tick",
+  "name": "仙人模式倒计时",
+  "description": "每回合开始时倒计时，4回合后解除仙人模式并授予3行动点和1充能点",
+  "trigger": { "type": "beginTurn" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; var sageTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (!sageTag) { removeRuleById(piece.instanceId, 'rule-naruto-sage-tick'); return { success: false, message: '' }; } sageTag.stacks = (sageTag.stacks || 4) - 1; if (sageTag.stacks > 0) { return { success: true, message: piece.name + '仙人模式还剩' + sageTag.stacks + '回合' }; } var shieldTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode-shield'; }); if (shieldTag) { removeStatusEffectById(piece.instanceId, shieldTag.id); } removeStatusEffectById(piece.instanceId, sageTag.id); var playerMeta = battle.players.find(function(p) { return p.playerId === piece.ownerPlayerId; }); if (playerMeta) { playerMeta.actionPoints += 3; playerMeta.chargePoints += 1; } return { success: true, message: piece.name + '仙人模式完成！获得3行动点和1充能点' };"
+}

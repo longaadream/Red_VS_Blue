@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-silence",
+  "name": "沉默",
+  "description": "被螺旋手里剑沉默后，无法使用技能",
+  "trigger": { "type": "beforeSkillUse" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (!context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'naruto-silence'; }); if (!tag) { removeRuleById(piece.instanceId, 'rule-naruto-silence'); return { success: false, message: '' }; } return { success: true, blocked: true, message: piece.name + '被沉默，无法使用技能' };"
+}

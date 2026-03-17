@@ -1,0 +1,9 @@
+{
+  "id": "shadow-step",
+  "name": "暗影步目标",
+  "description": "死神的暗影步标记位置，下回合开始时自动传送至此",
+  "icon": "👤",
+  "bgColor": "rgba(147, 51, 234, 0.5)",
+  "boxShadow": "inset 0 0 4px rgba(168, 85, 247, 0.5)",
+  "iconPosition": "top-left"
+}

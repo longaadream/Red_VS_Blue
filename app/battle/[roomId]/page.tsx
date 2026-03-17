@@ -118,6 +118,9 @@ export default function BattlePage() {
           setTargetSelectionType(data.targetType || 'piece');
           setTargetSelectionRange(data.range || 5);
           setTargetSelectionFilter(data.filter || 'enemy');
+          if ('selectedOption' in action) {
+            setPendingSelectedOption((action as any).selectedOption);
+          }
           return;
         }
         // 检查是否是需要选项选择的情况
@@ -315,6 +318,7 @@ export default function BattlePage() {
   const [optionSelectionTitle, setOptionSelectionTitle] = useState<string>('请选择')
   const [optionSelectionOptions, setOptionSelectionOptions] = useState<{ label: string; value: any; description?: string }[]>([])
   const [pendingOptionAction, setPendingOptionAction] = useState<BattleAction | null>(null)
+  const [pendingSelectedOption, setPendingSelectedOption] = useState<any>(undefined)
 
   const selectedPiece = useMemo(() => {
     if (!selectedPieceId || !battle || !currentPlayerId) return null
@@ -483,10 +487,12 @@ export default function BattlePage() {
                           skillId: selectedSkillId,
                           targetX: x,
                           targetY: y,
+                          ...(pendingSelectedOption !== undefined ? { selectedOption: pendingSelectedOption } : {}),
                         })
                         setIsSelectingSkillTarget(false)
                         setSelectedSkillId(null)
                         setSelectedSkillType(null)
+                        setPendingSelectedOption(undefined)
                       }
                     }}
                     onPieceClick={(pieceId) => {
@@ -498,10 +504,12 @@ export default function BattlePage() {
                           pieceId: selectedPiece.instanceId,
                           skillId: selectedSkillId,
                           targetPieceId: pieceId,
+                          ...(pendingSelectedOption !== undefined ? { selectedOption: pendingSelectedOption } : {}),
                         })
                         setIsSelectingSkillTarget(false)
                         setSelectedSkillId(null)
                         setSelectedSkillType(null)
+                        setPendingSelectedOption(undefined)
                       } else {
                         // 检查点击的是否是己方棋子
                         const clickedPiece = battle.pieces.find(p => p.instanceId === pieceId);
@@ -521,6 +529,7 @@ export default function BattlePage() {
                     isSelectingSkillTarget={isSelectingSkillTarget}
                     selectedSkillId={selectedSkillId}
                     teleportRange={battle.skillsById.teleport?.areaSize || 5}
+                    extensions={battle.extensions}
                   />
                 </CardContent>
             </Card>
@@ -646,15 +655,15 @@ export default function BattlePage() {
                           <div className="flex items-center gap-4 text-xs text-zinc-400">
                             <span className="flex items-center gap-1">
                               <Shield className="h-3 w-3" />
-                              HP: {piece.currentHp}/{piece.maxHp}
+                              HP: {(piece as any).displayCurrentHp ?? piece.currentHp}/{(piece as any).displayMaxHp ?? piece.maxHp}
                             </span>
                             <span className="flex items-center gap-1">
                               <Swords className="h-3 w-3" />
-                              攻击: {piece.attack}
+                              攻击: {(piece as any).displayAttack ?? piece.attack}
                             </span>
                             <span className="flex items-center gap-1">
                               <Footprints className="h-3 w-3" />
-                              移动: {piece.moveRange}
+                              移动: {(piece as any).displayMoveRange ?? piece.moveRange}
                             </span>
                           </div>
                           <div className="flex items-center gap-4 text-xs text-zinc-400">
@@ -664,7 +673,7 @@ export default function BattlePage() {
                             </span>
                             <span className="flex items-center gap-1">
                               <Shield className="h-3 w-3" />
-                              防御: {piece.defense || 0}
+                              防御: {(piece as any).displayDefense ?? piece.defense ?? 0}
                             </span>
                           </div>
                           {/* 状态标签显示 */}
@@ -684,7 +693,7 @@ export default function BattlePage() {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* 技能信息悬停显示 */}
                         <div className="absolute right-0 top-0 -translate-y-full mr-2 mb-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                           {(() => {
@@ -941,15 +950,15 @@ export default function BattlePage() {
                           <div className="flex items-center gap-4 text-xs text-zinc-400">
                             <span className="flex items-center gap-1">
                               <Shield className="h-3 w-3" />
-                              HP: {piece.currentHp}/{piece.maxHp}
+                              HP: {(piece as any).displayCurrentHp ?? piece.currentHp}/{(piece as any).displayMaxHp ?? piece.maxHp}
                             </span>
                             <span className="flex items-center gap-1">
                               <Swords className="h-3 w-3" />
-                              攻击: {piece.attack}
+                              攻击: {(piece as any).displayAttack ?? piece.attack}
                             </span>
                             <span className="flex items-center gap-1">
                               <Footprints className="h-3 w-3" />
-                              移动: {piece.moveRange}
+                              移动: {(piece as any).displayMoveRange ?? piece.moveRange}
                             </span>
                           </div>
                           <div className="flex items-center gap-4 text-xs text-zinc-400">
@@ -959,7 +968,7 @@ export default function BattlePage() {
                             </span>
                             <span className="flex items-center gap-1">
                               <Shield className="h-3 w-3" />
-                              防御: {piece.defense || 0}
+                              防御: {(piece as any).displayDefense ?? piece.defense ?? 0}
                             </span>
                           </div>
                           {/* 状态标签显示 */}
@@ -979,7 +988,7 @@ export default function BattlePage() {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* 技能信息悬停显示 */}
                         <div className="absolute right-0 top-0 -translate-y-full mr-2 mb-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                           {(() => {
@@ -1300,15 +1309,15 @@ export default function BattlePage() {
                     {optionSelectionOptions.map((opt, index) => (
                       <Button
                         key={index}
-                        className="w-full justify-start"
+                        className="w-full justify-start h-auto whitespace-normal py-2 text-left"
                         variant="outline"
                         size="sm"
                         disabled={loading}
                         onClick={() => void handleOptionSelect(opt.value)}
                       >
-                        <span className="font-medium">{opt.label}</span>
+                        <span className="font-medium break-words">{opt.label}</span>
                         {opt.description && (
-                          <span className="ml-2 text-xs text-zinc-400">{opt.description}</span>
+                          <span className="ml-2 text-xs text-zinc-400 break-words">{opt.description}</span>
                         )}
                       </Button>
                     ))}

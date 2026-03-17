@@ -1,0 +1,14 @@
+{
+  "id": "sasuke-kagutsuchi",
+  "name": "加具土命",
+  "description": "选择任意棋子，消耗离该棋子最近的天照格子，并为该棋子附加2层天照效果",
+  "icon": "🌑",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var amaterasuCells = (battle.extensions && battle.extensions.amaterasuCells) || []; if (amaterasuCells.length === 0) return { success: false, message: '场上尚无天照格子' }; var target = selectTarget({ type: 'piece', range: 99, filter: 'all' }); if (!target || target.needsTargetSelection) return target; var nearestIdx = 0; var nearestDist = Math.abs(amaterasuCells[0].x - target.x) + Math.abs(amaterasuCells[0].y - target.y); for (var i = 1; i < amaterasuCells.length; i++) { var dist = Math.abs(amaterasuCells[i].x - target.x) + Math.abs(amaterasuCells[i].y - target.y); if (dist < nearestDist) { nearestDist = dist; nearestIdx = i; } } var removedCell = amaterasuCells[nearestIdx]; battle.extensions.amaterasuCells.splice(nearestIdx, 1); var teIdx = (battle.extensions.tileEffects || []).findIndex(function(t) { return t.tileType === 'amaterasu' && t.x === removedCell.x && t.y === removedCell.y; }); if (teIdx !== -1) battle.extensions.tileEffects.splice(teIdx, 1); var existingTag = target.statusTags && target.statusTags.find(function(t) { return t.type === 'amaterasu-burn'; }); if (existingTag) { existingTag.stacks = (existingTag.stacks || 1) + 2; } else { addStatusEffectById(target.instanceId, { id: 'amaterasu-burn-' + target.instanceId, name: '天照灼烧', type: 'amaterasu-burn', currentDuration: -1, currentUses: -1, intensity: 2, stacks: 2 }); existingTag = { stacks: 2 }; } return { success: true, message: caster.name + '使用加具土命，消耗离' + target.name + '最近的天照格(' + removedCell.x + ',' + removedCell.y + ')，为' + target.name + '附加2层天照效果（当前' + existingTag.stacks + '层）' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '取消一个天照格子，并为任意棋子附加2层天照效果（每层每回合失去2点生命值）', expectedValues: {} }; }"
+}

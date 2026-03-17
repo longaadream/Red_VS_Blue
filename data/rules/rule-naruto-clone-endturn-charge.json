@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-clone-endturn-charge",
+  "name": "影分身蓄力",
+  "description": "鸣人回合结束时，若场上有存活的影分身且正处于仙人模式，倒计时提前1回合",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; var aliveClones = battle.pieces.filter(function(p) { return p.currentHp > 0 && p.ownerPlayerId === piece.ownerPlayerId && p.statusTags && p.statusTags.some(function(t) { return t.type === 'naruto-clone'; }); }); if (aliveClones.length === 0) return { success: false, message: '' }; var sageTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (!sageTag) return { success: false, message: '' }; sageTag.stacks = (sageTag.stacks || 1) - 1; if (sageTag.stacks > 0) { return { success: true, message: piece.name + '的影分身加速了仙人蓄力，剩余' + sageTag.stacks + '回合' }; } var shieldTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode-shield'; }); if (shieldTag) { removeStatusEffectById(piece.instanceId, shieldTag.id); } removeStatusEffectById(piece.instanceId, sageTag.id); var playerMeta = battle.players.find(function(p) { return p.playerId === piece.ownerPlayerId; }); if (playerMeta) { playerMeta.actionPoints += 3; playerMeta.chargePoints += 1; } return { success: true, message: piece.name + '的影分身使仙人模式提前完成！获得3行动点和1充能点' };"
+}

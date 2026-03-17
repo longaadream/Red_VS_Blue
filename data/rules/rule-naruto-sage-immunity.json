@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-sage-immunity",
+  "name": "仙人之盾",
+  "description": "仙人模式期间免疫下一次伤害",
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (!context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var shieldTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode-shield'; }); if (!shieldTag) { removeRuleById(piece.instanceId, 'rule-naruto-sage-immunity'); return { success: false, message: '' }; } removeStatusEffectById(piece.instanceId, shieldTag.id); return { success: true, blocked: true, message: piece.name + '仙人之盾抵挡了一次伤害！' };"
+}

@@ -60,6 +60,7 @@ export default function TrainingPage() {
   const [pendingCardAction, setPendingCardAction] = useState<BattleAction | null>(null)
   const [selectedSkillId, setSelectedSkillId] = useState<string | undefined>(undefined)
   const [selectedSkillType, setSelectedSkillType] = useState<"normal" | "super" | undefined>(undefined)
+  const [pendingSelectedOption, setPendingSelectedOption] = useState<any>(undefined)
   const [targetSelectionType, setTargetSelectionType] = useState<'piece' | 'grid'>('piece')
   const [targetSelectionRange, setTargetSelectionRange] = useState(5)
   const [targetSelectionFilter, setTargetSelectionFilter] = useState<'enemy' | 'ally' | 'all'>('enemy')
@@ -155,6 +156,9 @@ export default function TrainingPage() {
           setTargetSelectionType(data.targetType || 'piece')
           setTargetSelectionRange(data.range || 5)
           setTargetSelectionFilter(data.filter || 'enemy')
+          if ('selectedOption' in action) {
+            setPendingSelectedOption((action as any).selectedOption)
+          }
           return
         }
         // 检查是否是需要选项选择的情况
@@ -184,26 +188,9 @@ export default function TrainingPage() {
       return
     }
     if (!pendingOptionAction) return
-    try {
-      setLoading(true)
-      const res = await fetch("/api/training", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: { ...pendingOptionAction, selectedOption: value }, battleState: battle }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(data.error || "操作失败")
-        return
-      }
-      setBattle(data as BattleState)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "未知错误")
-    } finally {
-      setLoading(false)
-      setIsSelectingOption(false)
-      setPendingOptionAction(null)
-    }
+    setIsSelectingOption(false)
+    setPendingOptionAction(null)
+    await sendBattleAction({ ...pendingOptionAction, selectedOption: value } as BattleAction)
   }
 
   async function addPiece(faction: "red" | "blue", templateId: string, x: number, y: number) {
@@ -608,12 +595,13 @@ export default function TrainingPage() {
                         <p className="text-xs text-muted-foreground text-center">
                           {optionSelectionTitle}
                         </p>
-                        <div className="grid grid-cols-5 gap-1">
+                        <div className="flex flex-col gap-1">
                           {optionSelectionOptions.map((opt, idx) => (
                             <Button
                               key={idx}
                               size="sm"
                               variant="outline"
+                              className="w-full h-auto whitespace-normal py-2 text-left justify-start"
                               onClick={() => handleOptionSelect(opt.value)}
                             >
                               {opt.label}
@@ -850,10 +838,12 @@ export default function TrainingPage() {
                         skillId: selectedSkillId,
                         targetX: x,
                         targetY: y,
+                        ...(pendingSelectedOption !== undefined ? { selectedOption: pendingSelectedOption } : {}),
                       })
                       setIsSelectingSkillTarget(false)
                       setSelectedSkillId(undefined)
                       setSelectedSkillType(undefined)
+                      setPendingSelectedOption(undefined)
                     } else if (isPlacingPiece && newPieceTemplateId) {
                       void addPiece(newPieceFaction, newPieceTemplateId, x, y)
                     }
@@ -866,10 +856,12 @@ export default function TrainingPage() {
                         pieceId: selectedPiece.instanceId,
                         skillId: selectedSkillId,
                         targetPieceId: pieceId,
+                        ...(pendingSelectedOption !== undefined ? { selectedOption: pendingSelectedOption } : {}),
                       })
                       setIsSelectingSkillTarget(false)
                       setSelectedSkillId(undefined)
                       setSelectedSkillType(undefined)
+                      setPendingSelectedOption(undefined)
                     } else if (isSelectingCardTarget && pendingCardAction) {
                       // 手牌目标选择
                       sendBattleAction({
@@ -891,6 +883,7 @@ export default function TrainingPage() {
                   isPlacingPiece={isPlacingPiece}
                   selectedSkillId={selectedSkillId}
                   teleportRange={battle.skillsById.teleport?.areaSize || 5}
+                  extensions={battle.extensions}
                 />
               </CardContent>
             </Card>
@@ -993,15 +986,15 @@ export default function TrainingPage() {
                       <div className="flex items-center gap-4 text-xs text-zinc-400">
                         <span className="flex items-center gap-1">
                           <Shield className="h-3 w-3" />
-                          HP: {piece.currentHp}/{piece.maxHp}
+                          HP: {(piece as any).displayCurrentHp ?? piece.currentHp}/{(piece as any).displayMaxHp ?? piece.maxHp}
                         </span>
                         <span className="flex items-center gap-1">
                           <Swords className="h-3 w-3" />
-                          攻击: {piece.attack}
+                          攻击: {(piece as any).displayAttack ?? piece.attack}
                         </span>
                         <span className="flex items-center gap-1">
                           <Footprints className="h-3 w-3" />
-                          移动: {piece.moveRange}
+                          移动: {(piece as any).displayMoveRange ?? piece.moveRange}
                         </span>
                       </div>
                       <div className="flex items-center gap-4 text-xs text-zinc-400">
@@ -1011,7 +1004,7 @@ export default function TrainingPage() {
                         </span>
                         <span className="flex items-center gap-1">
                           <Shield className="h-3 w-3" />
-                          防御: {piece.defense || 0}
+                          防御: {(piece as any).displayDefense ?? piece.defense ?? 0}
                         </span>
                       </div>
                       {/* 状态标签显示 */}

@@ -1,0 +1,9 @@
+{
+  "id": "blizzard",
+  "name": "暴风雪",
+  "description": "暴风雪覆盖区域，对方回合结束时对范围内敌人造成伤害并冰冻",
+  "icon": "❄️",
+  "bgColor": "rgba(96, 165, 250, 0.4)",
+  "boxShadow": "inset 0 0 4px rgba(147, 197, 253, 0.6)",
+  "iconPosition": "top-right"
+}
