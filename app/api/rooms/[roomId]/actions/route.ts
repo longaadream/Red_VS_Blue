@@ -194,12 +194,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       console.error('ERROR: Failed to save room')
     }
 
-    const allPlayersSelected = latestRoom.players.length >= 2 && latestRoom.players.every(p => p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
+    // Use DB-fresh savedRoom so we can see ALL players' piece selections, not just the current player's
+    const checkRoom = savedRoom || latestRoom
+    const allPlayersSelected = checkRoom.players.length >= 2 && checkRoom.players.every(p => p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
 
     if (allPlayersSelected) {
       console.log('=== ALL PLAYERS HAVE SELECTED PIECES, AUTO-STARTING GAME ===')
 
-      const sortedPlayers = [...latestRoom.players.slice(0, 2)].sort((a, b) => {
+      const sortedPlayers = [...checkRoom.players.slice(0, 2)].sort((a, b) => {
         if (a.faction === "red" && b.faction === "blue") return -1
         if (a.faction === "blue" && b.faction === "red") return 1
         return 0
@@ -213,7 +215,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         return { playerId: player.id, pieces: playerPieceTemplates }
       })
 
-      let pieceTemplates = latestRoom.players
+      let pieceTemplates = checkRoom.players
         .flatMap(p => p.selectedPieces || [])
         .map(piece => getPieceById(piece.templateId))
         .filter(Boolean) as any[]
@@ -226,7 +228,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         }
       }
 
-      const mapId = latestRoom.mapId || "arena-8x6"
+      const mapId = checkRoom.mapId || "arena-8x6"
       writeLog('[select-pieces] mapId from room: ' + mapId)
 
       try {
@@ -239,17 +241,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         writeLog('[select-pieces] Battle created, calling beginPhase')
         try {
           const battleWithRules = applyBattleAction(battle, { type: "beginPhase" })
-          latestRoom.status = "in-progress"
-          latestRoom.currentTurnIndex = 0
-          latestRoom.battleState = battleWithRules
+          checkRoom.status = "in-progress"
+          checkRoom.currentTurnIndex = 0
+          checkRoom.battleState = battleWithRules
         } catch (beginPhaseError) {
           writeLog('[select-pieces] ERROR in beginPhase: ' + (beginPhaseError instanceof Error ? beginPhaseError.message : 'Unknown error'))
-          latestRoom.status = "in-progress"
-          latestRoom.currentTurnIndex = 0
-          latestRoom.battleState = battle
+          checkRoom.status = "in-progress"
+          checkRoom.currentTurnIndex = 0
+          checkRoom.battleState = battle
         }
 
-        await roomStore.setRoom(roomId, latestRoom)
+        await roomStore.setRoom(roomId, checkRoom)
       } catch (error) {
         console.error('Error starting game:', error)
         return NextResponse.json(
