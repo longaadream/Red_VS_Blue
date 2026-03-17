@@ -643,7 +643,7 @@ export default function TrainingPage() {
                           const pieceTemplate = getPieceById(selectedPiece.templateId)
                           const pieceSkills = selectedPiece.skills || pieceTemplate?.skills || []
 
-                          const availableSkills = pieceSkills.map(skill => {
+                          const allMappedSkills = pieceSkills.map(skill => {
                             const skillDef = battle.skillsById[skill.skillId]
                             return {
                               ...skillDef,
@@ -652,9 +652,24 @@ export default function TrainingPage() {
                               name: skillDef?.name || skill.skillId,
                               type: skillDef?.type || "normal",
                             }
-                          }).filter(skill => skill && skill.kind !== "passive")
+                          })
 
-                          return availableSkills.map((skill) => {
+                          const passiveSkills = allMappedSkills.filter(skill => skill && skill.kind === "passive")
+                          const availableSkills = allMappedSkills.filter(skill => skill && skill.kind !== "passive")
+
+                          return (<>
+                          {passiveSkills.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-1">
+                              {passiveSkills.map(skill => (
+                                <span key={skill.id} title={skill.description || ''} className="inline-flex items-center gap-1 rounded bg-zinc-700/60 border border-zinc-600 px-2 py-0.5 text-[11px] text-zinc-300">
+                                  {skill.icon && <span>{skill.icon}</span>}
+                                  {skill.name}
+                                  <span className="text-zinc-500">被动</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {availableSkills.map((skill) => {
                             const skillType = skill.type
                             const skillId = skill.id
                             const skillName = skill.name
@@ -690,7 +705,8 @@ export default function TrainingPage() {
                                 {skillName} ({isSuper ? `充能 ${chargeCost || 0}点` : "普通"}) - {actionPointCost || 0}AP {cooldownDisplay ? ` (${cooldownDisplay})` : ''}
                               </Button>
                             )
-                          })
+                          })}
+                          </>)
                         })()}
                       </div>
                     )}

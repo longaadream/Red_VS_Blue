@@ -13,6 +13,10 @@
   },
   "skills": [
     {
+      "skillId": "tirion-divine-glory",
+      "level": 1
+    },
+    {
       "skillId": "ashbringer",
       "level": 1
     },

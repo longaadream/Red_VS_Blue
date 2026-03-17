@@ -3,5 +3,5 @@
   "name": "血誓倒计时",
   "description": "血誓目标每回合开始时减少诅咒持续时间，归零时解除",
   "trigger": { "type": "beginTurn" },
-  "skillCode": "var piece = context.rulePiece; if (context.battle.turn.currentPlayerId !== piece.ownerPlayerId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'blood-oath'; }); if (!tag) { piece.rules = (piece.rules || []).filter(function(r) { return r.id !== 'rule-blood-oath-tick'; }); return { success: false, message: '' }; } return { success: true, message: piece.name + '的血誓诅咒还剩' + tag.currentDuration + '回合' };"
+  "skillCode": "var piece = context.rulePiece; if (context.battle.turn.currentPlayerId !== piece.ownerPlayerId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'blood-oath'; }); if (!tag) { piece.rules = (piece.rules || []).filter(function(r) { return r.id !== 'rule-blood-oath-tick'; }); return { success: false, message: '' }; } var remaining = tag.remainingDuration !== undefined ? tag.remainingDuration : tag.currentDuration; return { success: true, message: piece.name + '的血誓诅咒还剩' + remaining + '回合' };"
 }

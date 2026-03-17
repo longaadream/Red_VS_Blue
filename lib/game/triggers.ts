@@ -259,7 +259,7 @@ export class TriggerSystem {
           // 为每个拥有该规则的棋子执行
           for (const owningPiece of owningPieces) {
             if (blocked) break
-            const pieceContext = { ...context, rulePiece: owningPiece }
+            const pieceContext = { ...context, piece: context.sourcePiece, rulePiece: owningPiece }
             const result = rule.effect(battle, pieceContext)
             if (result.success) {
               success = true
@@ -345,6 +345,8 @@ export class TriggerSystem {
 
           try {
             // 设置当前执行规则的棋子，让技能代码知道是哪个棋子的规则正在执行
+            // 同时设置 piece 字段，用于检查事件发起者是否为当前规则绑定者
+            context.piece = context.sourcePiece
             context.rulePiece = piece
             const result = rule.effect(battle, context)
             if (result.success) {

@@ -3,5 +3,5 @@
   "name": "圣骑士的荣耀",
   "description": "游戏开始时，提里奥获得圣盾保护",
   "trigger": { "type": "gameStart" },
-  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; addStatusEffectById(piece.instanceId, { id: 'divine-shield-' + piece.instanceId, type: 'divine-shield', name: '圣盾', currentDuration: -1, intensity: 1 }); addRuleById(piece.instanceId, 'rule-divine-shield'); return { success: true, message: piece.name + '散发出神圣光辉，获得圣盾保护！' };"
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; addStatusEffectById(piece.instanceId, { id: 'divine-shield', type: 'divine-shield', name: '圣盾', currentDuration: -1, intensity: 1 }); addRuleById(piece.instanceId, 'rule-divine-shield'); return { success: true, message: piece.name + '散发出神圣光辉，获得圣盾保护！' };"
 }

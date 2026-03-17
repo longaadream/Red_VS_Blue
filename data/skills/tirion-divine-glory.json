@@ -1,0 +1,13 @@
+{
+  "id": "tirion-divine-glory",
+  "name": "圣骑士的荣耀",
+  "description": "游戏开始时获得圣盾，抵挡一次任意伤害",
+  "icon": "🛡️",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "showInUI": true
+}
