@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner"
 import { GameBoard } from "@/components/game-board"
 import type { BattleState, BattleAction } from "@/lib/game/training-types"
-import { getPieceById, loadPieces, getAllPieces } from "@/lib/game/piece-repository"
+import { getPieceById } from "@/lib/game/piece-repository"
 import type { PieceTemplate } from "@/lib/game/piece"
 import type { BoardMap as GameMap } from "@/lib/game/map"
 import {
@@ -86,9 +86,17 @@ export default function TrainingPage() {
   }, [])
 
   async function loadAvailableData() {
-    await loadPieces()
-    const pieces = getAllPieces()
-    setAvailablePieces(pieces)
+    try {
+      const res = await fetch("/api/pieces")
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.pieces && Array.isArray(data.pieces)) {
+          setAvailablePieces(data.pieces)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load pieces:", error)
+    }
     // 通过API获取地图数据
     try {
       const res = await fetch("/api/maps")

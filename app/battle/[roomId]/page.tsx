@@ -109,17 +109,20 @@ export default function BattlePage() {
       if (!res.ok) {
         // 检查是否是需要目标选择的情况
         if (data.needsTargetSelection) {
-          // 进入目标选择模式
           setIsSelectingSkillTarget(true);
-          setSelectedSkillId(action.skillId!);
-          // 保存技能类型，以便在目标选择后使用正确的动作类型
-          const skillDef = battle?.skillsById[action.skillId!];
-          setSelectedSkillType(skillDef?.type as "normal" | "super" | null);
           setTargetSelectionType(data.targetType || 'piece');
           setTargetSelectionRange(data.range || 5);
           setTargetSelectionFilter(data.filter || 'enemy');
-          if ('selectedOption' in action) {
-            setPendingSelectedOption((action as any).selectedOption);
+          if (action.type === 'playCard') {
+            // 卡牌目标选择：保存卡牌 action，onPieceClick/onCellClick 里直接带上 targetPieceId 重发
+            setPendingCardAction(action);
+          } else {
+            setSelectedSkillId(action.skillId!);
+            const skillDef = battle?.skillsById[action.skillId!];
+            setSelectedSkillType(skillDef?.type as "normal" | "super" | null);
+            if ('selectedOption' in action) {
+              setPendingSelectedOption((action as any).selectedOption);
+            }
           }
           return;
         }
@@ -230,64 +233,38 @@ export default function BattlePage() {
   // 检查游戏是否结束
   function checkGameEnd(battleState: BattleState) {
     if (!battleState || !battleState.players || battleState.players.length === 0) return
+    if (gameResult) return
 
-    // 统计每个玩家的存活棋子数量
     const playerAlivePieces: Record<string, number> = {}
-    
     battleState.players.forEach(player => {
       playerAlivePieces[player.playerId] = 0
     })
-    
     battleState.pieces.forEach(piece => {
       if (piece.currentHp > 0 && piece.ownerPlayerId in playerAlivePieces) {
         playerAlivePieces[piece.ownerPlayerId]++
       }
     })
-    
-    console.log('Player alive pieces:', playerAlivePieces)
-    
-    // 检查是否有玩家的所有棋子都已阵亡（包括投降的情况）
+
     const eliminatedPlayers = Object.entries(playerAlivePieces)
       .filter(([_, count]) => count === 0)
       .map(([playerId]) => playerId)
-    
+
     if (eliminatedPlayers.length > 0) {
-      // 确定获胜者
       const remainingPlayers = battleState.players
         .filter(player => !eliminatedPlayers.includes(player.playerId))
-      
       if (remainingPlayers.length === 1) {
-        // 显示游戏结束消息
         const winner = remainingPlayers[0]
-        const isCurrentPlayerWinner = winner.playerId === currentPlayerId
-        
-        // 使用toast通知显示胜利/失败消息
-        toast(isCurrentPlayerWinner ? "恭喜你获胜了！" : `你输了，${winner.playerId} 获胜！`)
-        
-        // 自动删除房间
-        if (roomId) {
-          fetch(`/api/rooms/${encodeURIComponent(roomId)}`, {
-            method: "DELETE",
-          })
-            .then(() => {
-              // 确保删除请求完成后再重定向
-              setTimeout(() => {
-                router.push('/play')
-              }, 500)
-            })
-            .catch(() => {
-              // 即使出错也要重定向
-              setTimeout(() => {
-                router.push('/play')
-              }, 500)
-            })
-        } else {
-          // 如果没有roomId，直接重定向
-          setTimeout(() => {
-            router.push('/play')
-          }, 500)
-        }
+        setGameResult({ winnerId: winner.playerId, isWinner: winner.playerId === currentPlayerId })
       }
+    }
+  }
+
+  function handleReturnToMenu() {
+    if (roomId) {
+      fetch(`/api/rooms/${encodeURIComponent(roomId)}`, { method: "DELETE" })
+        .finally(() => router.push('/'))
+    } else {
+      router.push('/')
     }
   }
 
@@ -303,6 +280,7 @@ export default function BattlePage() {
     return battle.pieces.filter((p) => p.ownerPlayerId === currentPlayerId && p.currentHp > 0)
   }, [battle, currentPlayerId])
 
+  const [gameResult, setGameResult] = useState<{ winnerId: string; isWinner: boolean } | null>(null)
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null)
   const [isSelectingMoveTarget, setIsSelectingMoveTarget] = useState(false)
   const [isSelectingTeleportTarget, setIsSelectingTeleportTarget] = useState(false)
@@ -319,6 +297,7 @@ export default function BattlePage() {
   const [optionSelectionOptions, setOptionSelectionOptions] = useState<{ label: string; value: any; description?: string }[]>([])
   const [pendingOptionAction, setPendingOptionAction] = useState<BattleAction | null>(null)
   const [pendingSelectedOption, setPendingSelectedOption] = useState<any>(undefined)
+  const [pendingCardAction, setPendingCardAction] = useState<BattleAction | null>(null)
 
   const selectedPiece = useMemo(() => {
     if (!selectedPieceId || !battle || !currentPlayerId) return null
@@ -416,6 +395,33 @@ export default function BattlePage() {
     end: "结束阶段",
   }[battle.turn.phase]
 
+  if (gameResult) {
+    return (
+      <main className="flex min-h-svh flex-col items-center justify-center bg-zinc-950">
+        <div className="flex flex-col items-center gap-8">
+          {gameResult.isWinner ? (
+            <>
+              <div className="text-8xl font-black tracking-widest text-yellow-400 drop-shadow-[0_0_40px_rgba(250,204,21,0.6)]">
+                胜利
+              </div>
+              <p className="text-xl text-zinc-300">恭喜你赢得了这场对战！</p>
+            </>
+          ) : (
+            <>
+              <div className="text-8xl font-black tracking-widest text-zinc-500 drop-shadow-[0_0_40px_rgba(100,100,100,0.4)]">
+                失败
+              </div>
+              <p className="text-xl text-zinc-400">{gameResult.winnerId} 获胜</p>
+            </>
+          )}
+          <Button size="lg" onClick={handleReturnToMenu} className="mt-4 px-10 py-6 text-lg">
+            返回主菜单
+          </Button>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="flex min-h-svh flex-col bg-zinc-950 px-4 py-6">
       <div className="mx-auto w-full max-w-6xl space-y-6">
@@ -478,6 +484,11 @@ export default function BattlePage() {
                         })
                         setIsSelectingTeleportTarget(false)
                         setSelectedSkillId(null)
+                      } else if (isSelectingSkillTarget && pendingCardAction) {
+                        // 卡牌目标位置选择
+                        sendBattleAction({ ...pendingCardAction, targetX: x, targetY: y } as any)
+                        setIsSelectingSkillTarget(false)
+                        setPendingCardAction(null)
                       } else if (isSelectingSkillTarget && selectedPiece && selectedSkillId) {
                         // 处理技能目标位置选择（如暴风雪的区域选择）
                         sendBattleAction({
@@ -496,7 +507,12 @@ export default function BattlePage() {
                       }
                     }}
                     onPieceClick={(pieceId) => {
-                      if (isSelectingSkillTarget && selectedPiece && selectedSkillId) {
+                      if (isSelectingSkillTarget && pendingCardAction) {
+                        // 卡牌目标棋子选择
+                        sendBattleAction({ ...pendingCardAction, targetPieceId: pieceId } as any)
+                        setIsSelectingSkillTarget(false)
+                        setPendingCardAction(null)
+                      } else if (isSelectingSkillTarget && selectedPiece && selectedSkillId) {
                         // 处理技能目标棋子选择
                         sendBattleAction({
                           type: selectedSkillType === "super" ? "useChargeSkill" : "useBasicSkill",
@@ -592,8 +608,27 @@ export default function BattlePage() {
                   <CardTitle className="text-sm">我的棋子</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* 筛选出当前玩家的所有存活棋子 */}
-                  {battle.pieces.filter(p => p.ownerPlayerId === currentPlayerId && p.currentHp > 0).map((piece) => (
+                  {/* 筛选出当前玩家的所有存活棋子，克隆紧挨本体，顺序稳定随机 */}
+                  {(() => {
+                    const myPieces = battle.pieces.filter(p => p.ownerPlayerId === currentPlayerId && p.currentHp > 0)
+                    const clones = myPieces.filter(p => (p as any).masterPieceId)
+                    const nonClones = myPieces.filter(p => !(p as any).masterPieceId)
+                    const ordered: typeof myPieces = []
+                    for (const master of nonClones) {
+                      const myClones = clones.filter(c => (c as any).masterPieceId === master.instanceId)
+                      if (myClones.length === 0) {
+                        ordered.push(master)
+                      } else {
+                        // 用第一个克隆的 instanceId 末位数字决定克隆组在本体前还是后
+                        const cloneFirst = parseInt(myClones[0].instanceId.slice(-1)) % 2 === 0
+                        if (cloneFirst) { ordered.push(...myClones); ordered.push(master) }
+                        else { ordered.push(master); ordered.push(...myClones) }
+                      }
+                    }
+                    // 找不到本体的孤儿克隆（理论上不会出现）追加到末尾
+                    clones.filter(c => !nonClones.some(p => p.instanceId === (c as any).masterPieceId)).forEach(c => ordered.push(c))
+                    return ordered
+                  })().map((piece) => (
                       <div 
                         key={piece.instanceId} 
                         className={`group relative flex items-center gap-4 cursor-pointer rounded-md p-2 transition-colors ${
@@ -677,95 +712,103 @@ export default function BattlePage() {
                             </span>
                           </div>
                           {/* 状态标签显示 */}
-                          {piece.statusTags && piece.statusTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {piece.statusTags.filter(tag => tag.visible !== false).map((tag, index) => (
-                                <span key={index} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300">
-                                  {tag.name || tag.type || tag.id}
-                                  {(tag.remainingDuration !== undefined || tag.remainingUses !== undefined) && (
-                                    <span className="text-zinc-400">
-                                      （持续时间：{tag.remainingDuration ?? '-'}，剩余次数：{tag.remainingUses ?? '-'}）
-                                    </span>
-                                  )}
-                                  {tag.stacks && tag.stacks > 1 && ` x${tag.stacks}`}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            const masterPiece = (piece as any).masterPieceId
+                              ? [...battle.pieces, ...(battle.graveyard || [])].find((p: any) => p.instanceId === (piece as any).masterPieceId)
+                              : null
+                            const displayTags = masterPiece?.statusTags ?? piece.statusTags
+                            return displayTags && displayTags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {displayTags.filter((tag: any) => tag.visible !== false).map((tag: any, index: number) => (
+                                  <span key={index} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300">
+                                    {tag.name || tag.type || tag.id}
+                                    {(tag.remainingDuration !== undefined || tag.remainingUses !== undefined) && (
+                                      <span className="text-zinc-400">
+                                        （持续时间：{tag.remainingDuration ?? '-'}，剩余次数：{tag.remainingUses ?? '-'}）
+                                      </span>
+                                    )}
+                                    {tag.stacks && tag.stacks > 1 && ` x${tag.stacks}`}
+                                  </span>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </div>
 
                         {/* 技能信息悬停显示 */}
                         <div className="absolute right-0 top-0 -translate-y-full mr-2 mb-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                           {(() => {
                             const pieceTemplate = getPieceById(piece.templateId)
-                            if (!pieceTemplate || !pieceTemplate.skills || pieceTemplate.skills.length === 0) {
-                              return null
+                            if (!pieceTemplate) return null
+
+                            const masterPiece = (piece as any).masterPieceId
+                              ? [...battle.pieces, ...(battle.graveyard || [])].find((p: any) => p.instanceId === (piece as any).masterPieceId)
+                              : null
+                            const displaySkills: any[] = masterPiece?.skills ?? piece.skills
+
+                            const { calculateSkillPreview } = require('@/lib/game/skills')
+                            const currentSkillIds = new Set(displaySkills.map((s: any) => s.skillId))
+                            const templateTransformedSkills: any[] = (pieceTemplate as any).transformedSkills || []
+                            const pendingTransformSkills = templateTransformedSkills.filter((ts: any) => !currentSkillIds.has(ts.skillId))
+
+                            if (displaySkills.length === 0 && pendingTransformSkills.length === 0) return null
+
+                            const renderSkillRow = (skillId: string) => {
+                              const skillDef = battle.skillsById[skillId]
+                              if (!skillDef) return null
+                              const pieceSkillState = displaySkills.find((s: any) => s.skillId === skillId)
+                              const currentCooldown = pieceSkillState?.currentCooldown || 0
+                              const skillPreview = calculateSkillPreview(skillDef, masterPiece ?? piece, currentCooldown)
+                              return (
+                                <div key={skillId} className="space-y-1">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-medium text-zinc-200">{skillDef.name || skillId}</span>
+                                    <span className={`text-xs ${
+                                      skillDef.type === "super" ? "text-yellow-400" :
+                                      skillDef.type === "ultimate" ? "text-purple-400" : "text-green-400"
+                                    }`}>
+                                      {skillDef.type === "super" ? "充能" :
+                                       skillDef.type === "ultimate" ? "终极" : "普通"}
+                                      {pieceSkillState?.usesRemaining === 1 && ' (限定技)'}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-zinc-400">{skillPreview.description || "无描述"}</p>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-zinc-500">冷却:</span>
+                                    <span className={`text-xs ${currentCooldown > 0 ? "text-red-400" : "text-green-400"}`}>
+                                      {skillDef.cooldownTurns > 0 ? `${skillDef.cooldownTurns}/${currentCooldown} 回合` : `${currentCooldown} 回合`}
+                                    </span>
+                                  </div>
+                                  {skillDef.type === "super" && skillPreview.chargeCost && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-zinc-500">充能点数:</span>
+                                      <span className="text-yellow-400">{skillPreview.chargeCost} 点</span>
+                                    </div>
+                                  )}
+                                  {skillDef.actionPointCost && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-zinc-500">行动点数:</span>
+                                      <span className="text-blue-400">{skillDef.actionPointCost} 点</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )
                             }
+
                             return (
                               <div className="rounded-lg border border-border bg-zinc-800 p-3 shadow-lg">
                                 <div className="mb-2 text-xs font-medium text-zinc-200">技能</div>
                                 <div className="space-y-2">
-                                  {pieceTemplate.skills.map((skill) => {
-                                    const skillDef = battle.skillsById[skill.skillId]
-                                    if (!skillDef) return null
-                                    
-                                    // 计算技能的预期效果
-                                    const { calculateSkillPreview } = require('@/lib/game/skills')
-                                    // 从棋子的技能状态中获取当前冷却回合数
-                                    const pieceSkillState = piece.skills.find(s => s.skillId === skill.skillId)
-                                    const currentCooldown = pieceSkillState?.currentCooldown || 0
-                                    const skillPreview = calculateSkillPreview(skillDef, piece, currentCooldown)
-                                    
-                                    return (
-                                      <div key={skill.skillId} className="space-y-1">
-                                        <div className="flex items-center justify-between text-xs">
-                                          <span className="font-medium text-zinc-200">
-                                            {skillDef.name || skill.skillId}
-                                          </span>
-                                          <span className={`text-xs ${
-                                            skillDef.type === "super" ? "text-yellow-400" : 
-                                            skillDef.type === "ultimate" ? "text-purple-400" : "text-green-400"
-                                          }`}>
-                                            {skillDef.type === "super" ? "充能" : 
-                                             skillDef.type === "ultimate" ? "终极" : "普通"}
-                                            {pieceSkillState?.usesRemaining === 1 && ' (限定技)'}
-                                          </span>
-                                        </div>
-                                        <p className="text-xs text-zinc-400">
-                                          {skillPreview.description || "无描述"}
-                                        </p>
-                                        <div className="flex items-center justify-between text-xs">
-                                          <span className="text-zinc-500">冷却:</span>
-                                          <span className={`text-xs ${
-                                            currentCooldown > 0 
-                                              ? "text-red-400" 
-                                              : "text-green-400"
-                                          }`}>
-                                            {skillDef.cooldownTurns > 0 
-                                              ? `${skillDef.cooldownTurns}/${currentCooldown} 回合` 
-                                              : `${currentCooldown} 回合`}
-                                          </span>
-                                        </div>
-                                        {skillDef.type === "super" && skillPreview.chargeCost && (
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-zinc-500">充能点数:</span>
-                                            <span className="text-yellow-400">
-                                              {skillPreview.chargeCost} 点
-                                            </span>
-                                          </div>
-                                        )}
-                                        {skillDef.actionPointCost && (
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-zinc-500">行动点数:</span>
-                                            <span className="text-blue-400">
-                                              {skillDef.actionPointCost} 点
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )
-                                  })}
+                                  {displaySkills.map((s: any) => renderSkillRow(s.skillId))}
                                 </div>
+                                {pendingTransformSkills.length > 0 && (
+                                  <>
+                                    <div className="mt-2 mb-1 text-xs font-medium text-purple-400">🔮 变身后获得</div>
+                                    <div className="space-y-2">
+                                      {pendingTransformSkills.map((ts: any) => renderSkillRow(ts.skillId))}
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             )
                           })()}
@@ -848,21 +891,27 @@ export default function BattlePage() {
                             </span>
                           </div>
                           {/* 状态标签显示 */}
-                          {piece.statusTags && piece.statusTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {piece.statusTags.filter(tag => tag.visible !== false).map((tag, index) => (
-                                <span key={index} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300">
-                                  {tag.name || tag.type || tag.id}
-                                  {(tag.remainingDuration !== undefined || tag.remainingUses !== undefined) && (
-                                    <span className="text-zinc-400">
-                                      （持续时间：{tag.remainingDuration ?? '-'}，剩余次数：{tag.remainingUses ?? '-'}）
-                                    </span>
-                                  )}
-                                  {tag.stacks && tag.stacks > 1 && ` x${tag.stacks}`}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            const masterPiece = (piece as any).masterPieceId
+                              ? [...battle.pieces, ...(battle.graveyard || [])].find((p: any) => p.instanceId === (piece as any).masterPieceId)
+                              : null
+                            const displayTags = masterPiece?.statusTags ?? piece.statusTags
+                            return displayTags && displayTags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {displayTags.filter((tag: any) => tag.visible !== false).map((tag: any, index: number) => (
+                                  <span key={index} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300">
+                                    {tag.name || tag.type || tag.id}
+                                    {(tag.remainingDuration !== undefined || tag.remainingUses !== undefined) && (
+                                      <span className="text-zinc-400">
+                                        （持续时间：{tag.remainingDuration ?? '-'}，剩余次数：{tag.remainingUses ?? '-'}）
+                                      </span>
+                                    )}
+                                    {tag.stacks && tag.stacks > 1 && ` x${tag.stacks}`}
+                                  </span>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -972,95 +1021,103 @@ export default function BattlePage() {
                             </span>
                           </div>
                           {/* 状态标签显示 */}
-                          {piece.statusTags && piece.statusTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {piece.statusTags.filter(tag => tag.visible !== false).map((tag, index) => (
-                                <span key={index} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300">
-                                  {tag.name || tag.type || tag.id}
-                                  {(tag.remainingDuration !== undefined || tag.remainingUses !== undefined) && (
-                                    <span className="text-zinc-400">
-                                      （持续时间：{tag.remainingDuration ?? '-'}，剩余次数：{tag.remainingUses ?? '-'}）
-                                    </span>
-                                  )}
-                                  {tag.stacks && tag.stacks > 1 && ` x${tag.stacks}`}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            const masterPiece = (piece as any).masterPieceId
+                              ? [...battle.pieces, ...(battle.graveyard || [])].find((p: any) => p.instanceId === (piece as any).masterPieceId)
+                              : null
+                            const displayTags = masterPiece?.statusTags ?? piece.statusTags
+                            return displayTags && displayTags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {displayTags.filter((tag: any) => tag.visible !== false).map((tag: any, index: number) => (
+                                  <span key={index} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300">
+                                    {tag.name || tag.type || tag.id}
+                                    {(tag.remainingDuration !== undefined || tag.remainingUses !== undefined) && (
+                                      <span className="text-zinc-400">
+                                        （持续时间：{tag.remainingDuration ?? '-'}，剩余次数：{tag.remainingUses ?? '-'}）
+                                      </span>
+                                    )}
+                                    {tag.stacks && tag.stacks > 1 && ` x${tag.stacks}`}
+                                  </span>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </div>
 
                         {/* 技能信息悬停显示 */}
                         <div className="absolute right-0 top-0 -translate-y-full mr-2 mb-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                           {(() => {
                             const pieceTemplate = getPieceById(piece.templateId)
-                            if (!pieceTemplate || !pieceTemplate.skills || pieceTemplate.skills.length === 0) {
-                              return null
+                            if (!pieceTemplate) return null
+
+                            const masterPiece = (piece as any).masterPieceId
+                              ? [...battle.pieces, ...(battle.graveyard || [])].find((p: any) => p.instanceId === (piece as any).masterPieceId)
+                              : null
+                            const displaySkills: any[] = masterPiece?.skills ?? piece.skills
+
+                            const { calculateSkillPreview } = require('@/lib/game/skills')
+                            const currentSkillIds = new Set(displaySkills.map((s: any) => s.skillId))
+                            const templateTransformedSkills: any[] = (pieceTemplate as any).transformedSkills || []
+                            const pendingTransformSkills = templateTransformedSkills.filter((ts: any) => !currentSkillIds.has(ts.skillId))
+
+                            if (displaySkills.length === 0 && pendingTransformSkills.length === 0) return null
+
+                            const renderSkillRow = (skillId: string) => {
+                              const skillDef = battle.skillsById[skillId]
+                              if (!skillDef) return null
+                              const pieceSkillState = displaySkills.find((s: any) => s.skillId === skillId)
+                              const currentCooldown = pieceSkillState?.currentCooldown || 0
+                              const skillPreview = calculateSkillPreview(skillDef, masterPiece ?? piece, currentCooldown)
+                              return (
+                                <div key={skillId} className="space-y-1">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-medium text-zinc-200">{skillDef.name || skillId}</span>
+                                    <span className={`text-xs ${
+                                      skillDef.type === "super" ? "text-yellow-400" :
+                                      skillDef.type === "ultimate" ? "text-purple-400" : "text-green-400"
+                                    }`}>
+                                      {skillDef.type === "super" ? "充能" :
+                                       skillDef.type === "ultimate" ? "终极" : "普通"}
+                                      {pieceSkillState?.usesRemaining === 1 && ' (限定技)'}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-zinc-400">{skillPreview.description || "无描述"}</p>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-zinc-500">冷却:</span>
+                                    <span className={`text-xs ${currentCooldown > 0 ? "text-red-400" : "text-green-400"}`}>
+                                      {skillDef.cooldownTurns > 0 ? `${skillDef.cooldownTurns}/${currentCooldown} 回合` : `${currentCooldown} 回合`}
+                                    </span>
+                                  </div>
+                                  {skillDef.type === "super" && skillPreview.chargeCost && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-zinc-500">充能点数:</span>
+                                      <span className="text-yellow-400">{skillPreview.chargeCost} 点</span>
+                                    </div>
+                                  )}
+                                  {skillDef.actionPointCost && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-zinc-500">行动点数:</span>
+                                      <span className="text-blue-400">{skillDef.actionPointCost} 点</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )
                             }
+
                             return (
                               <div className="rounded-lg border border-border bg-zinc-800 p-3 shadow-lg">
                                 <div className="mb-2 text-xs font-medium text-zinc-200">技能</div>
                                 <div className="space-y-2">
-                                  {pieceTemplate.skills.map((skill) => {
-                                    const skillDef = battle.skillsById[skill.skillId]
-                                    if (!skillDef) return null
-                                    
-                                    // 计算技能的预期效果
-                                    const { calculateSkillPreview } = require('@/lib/game/skills')
-                                    // 从棋子的技能状态中获取当前冷却回合数
-                                    const pieceSkillState = piece.skills.find(s => s.skillId === skill.skillId)
-                                    const currentCooldown = pieceSkillState?.currentCooldown || 0
-                                    const skillPreview = calculateSkillPreview(skillDef, piece, currentCooldown)
-                                    
-                                    return (
-                                      <div key={skill.skillId} className="space-y-1">
-                                        <div className="flex items-center justify-between text-xs">
-                                          <span className="font-medium text-zinc-200">
-                                            {skillDef.name || skill.skillId}
-                                          </span>
-                                          <span className={`text-xs ${
-                                            skillDef.type === "super" ? "text-yellow-400" : 
-                                            skillDef.type === "ultimate" ? "text-purple-400" : "text-green-400"
-                                          }`}>
-                                            {skillDef.type === "super" ? "充能" : 
-                                             skillDef.type === "ultimate" ? "终极" : "普通"}
-                                            {pieceSkillState?.usesRemaining === 1 && ' (限定技)'}
-                                          </span>
-                                        </div>
-                                        <p className="text-xs text-zinc-400">
-                                          {skillPreview.description || "无描述"}
-                                        </p>
-                                        <div className="flex items-center justify-between text-xs">
-                                          <span className="text-zinc-500">冷却:</span>
-                                          <span className={`text-xs ${
-                                            currentCooldown > 0 
-                                              ? "text-red-400" 
-                                              : "text-green-400"
-                                          }`}>
-                                            {skillDef.cooldownTurns > 0 
-                                              ? `${skillDef.cooldownTurns}/${currentCooldown} 回合` 
-                                              : `${currentCooldown} 回合`}
-                                          </span>
-                                        </div>
-                                        {skillDef.type === "super" && skillPreview.chargeCost && (
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-zinc-500">充能点数:</span>
-                                            <span className="text-yellow-400">
-                                              {skillPreview.chargeCost} 点
-                                            </span>
-                                          </div>
-                                        )}
-                                        {skillDef.actionPointCost && (
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-zinc-500">行动点数:</span>
-                                            <span className="text-blue-400">
-                                              {skillDef.actionPointCost} 点
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )
-                                  })}
+                                  {displaySkills.map((s: any) => renderSkillRow(s.skillId))}
                                 </div>
+                                {pendingTransformSkills.length > 0 && (
+                                  <>
+                                    <div className="mt-2 mb-1 text-xs font-medium text-purple-400">🔮 变身后获得</div>
+                                    <div className="space-y-2">
+                                      {pendingTransformSkills.map((ts: any) => renderSkillRow(ts.skillId))}
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             )
                           })()}
@@ -1143,21 +1200,27 @@ export default function BattlePage() {
                             </span>
                           </div>
                           {/* 状态标签显示 */}
-                          {piece.statusTags && piece.statusTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {piece.statusTags.filter(tag => tag.visible !== false).map((tag, index) => (
-                                <span key={index} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300">
-                                  {tag.name || tag.type || tag.id}
-                                  {(tag.remainingDuration !== undefined || tag.remainingUses !== undefined) && (
-                                    <span className="text-zinc-400">
-                                      （持续时间：{tag.remainingDuration ?? '-'}，剩余次数：{tag.remainingUses ?? '-'}）
-                                    </span>
-                                  )}
-                                  {tag.stacks && tag.stacks > 1 && ` x${tag.stacks}`}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            const masterPiece = (piece as any).masterPieceId
+                              ? [...battle.pieces, ...(battle.graveyard || [])].find((p: any) => p.instanceId === (piece as any).masterPieceId)
+                              : null
+                            const displayTags = masterPiece?.statusTags ?? piece.statusTags
+                            return displayTags && displayTags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {displayTags.filter((tag: any) => tag.visible !== false).map((tag: any, index: number) => (
+                                  <span key={index} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300">
+                                    {tag.name || tag.type || tag.id}
+                                    {(tag.remainingDuration !== undefined || tag.remainingUses !== undefined) && (
+                                      <span className="text-zinc-400">
+                                        （持续时间：{tag.remainingDuration ?? '-'}，剩余次数：{tag.remainingUses ?? '-'}）
+                                      </span>
+                                    )}
+                                    {tag.stacks && tag.stacks > 1 && ` x${tag.stacks}`}
+                                  </span>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -1587,14 +1650,6 @@ export default function BattlePage() {
                           type: "surrender",
                           playerId: currentPlayerId
                         })
-                        
-                        // 投降后显示通知
-                        toast("你已投降，游戏结束！")
-                        
-                        // 重定向回大厅
-                        setTimeout(() => {
-                          router.push('/play')
-                        }, 2000)
                       } catch (error) {
                         console.error("投降失败：", error)
                       }

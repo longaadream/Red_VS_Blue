@@ -1,0 +1,7 @@
+{
+  "id": "rule-kenshin-tenken",
+  "name": "飞天御剑流·蓄势",
+  "description": "剑心移动后，为下次攻击积蓄剑速，附加「飞天御剑流」状态（1次）",
+  "trigger": { "type": "afterMove" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tagId = 'tenken-charge-' + piece.instanceId; var existing = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'tenken-charge'; }); if (existing) { existing.remainingUses = 1; } else { addStatusEffectById(piece.instanceId, { id: tagId, name: '飞天御剑流', type: 'tenken-charge', currentDuration: -1, currentUses: 1, intensity: 1, stacks: 1 }); } return { success: false, message: '' };"
+}

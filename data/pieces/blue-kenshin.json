@@ -1,0 +1,21 @@
+{
+  "id": "blue-kenshin",
+  "name": "绯村剑心",
+  "faction": "blue",
+  "description": "幕末最强剑客，飞天御剑流传人。移动后攻击力暴增，以龍槌閃急速突进，以天翔龍閃终结猎物",
+  "rarity": "legendary",
+  "image": "kenshin.jpg",
+  "stats": {
+    "maxHp": 6,
+    "attack": 6,
+    "defense": 1,
+    "moveRange": 5
+  },
+  "skills": [
+    { "skillId": "kenshin-ryutsuisen", "level": 1 },
+    { "skillId": "kenshin-ryusosen", "level": 1 },
+    { "skillId": "kenshin-amakakeru", "level": 1 }
+  ],
+  "rules": ["rule-kenshin-tenken", "rule-kenshin-tenken-boost"],
+  "isDefault": false
+}

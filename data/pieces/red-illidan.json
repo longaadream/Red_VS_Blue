@@ -17,5 +17,8 @@
     { "skillId": "illidan-metamorphosis", "level": 1 }
   ],
   "rules": [],
+  "transformedSkills": [
+    { "skillId": "illidan-demon-strike", "triggeredBy": "illidan-metamorphosis" }
+  ],
   "isDefault": false
 }

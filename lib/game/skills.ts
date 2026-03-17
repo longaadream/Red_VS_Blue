@@ -266,12 +266,11 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       if (targetPiece) {
         if (!targetPiece.statusTags) targetPiece.statusTags = []
         targetPiece.statusTags.push({
-          id: statusObject.id, type: statusObject.type,
+          ...statusObject,
           name: statusObject.name || statusObject.type,
           remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
           remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-          intensity: statusObject.intensity, stacks: statusObject.stacks,
-          value: statusObject.value, relatedRules: []
+          relatedRules: statusObject.relatedRules || []
         })
         return true
       }
@@ -561,7 +560,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                   
                   // 直接使用传入的 context，确保修改能反映到原始对象上
                   // 添加技能相关的字段到 context
-                  context.piece = context.piece || context.sourcePiece;
+                  context.piece = context.piece || context.sourcePiece || context.rulePiece;
                   context.target = context.target || context.targetPiece;
                   context.targetPosition = context.targetPosition || null;
                   context.skill = {
@@ -570,9 +569,9 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     type: skillDef.type,
                     powerMultiplier: skillDef.powerMultiplier
                   };
-                  // 为玩家级规则触发的技能补充 context.battle（battle.turn + battle.players）
+                  // 为玩家级规则触发的技能补充 context.battle
                   if (!context.battle) {
-                    context.battle = { turn: battle.turn, players: battle.players };
+                    context.battle = battle;
                   }
                   // 使用 context 作为 skillContext，确保引用传递
                   const skillContext = context;
@@ -622,15 +621,11 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                           'bone-storm': '白骨风暴',
                         };
                         const newStatus = {
-                          id: statusObject.id,
-                          type: statusObject.type,
+                          ...statusObject,
                           name: statusObject.name || statusNameMap[statusObject.type] || statusObject.type,
                           remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
                           remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-                          intensity: statusObject.intensity,
-                          stacks: statusObject.stacks,
-                          value: statusObject.value,
-                          relatedRules: []
+                          relatedRules: statusObject.relatedRules || []
                         };
                         targetPiece.statusTags.push(newStatus);
                         return true;
@@ -780,6 +775,8 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                       const addCardToHand = environment.addCardToHand;
                       const discardCard = environment.discardCard;
                       const getHand = environment.getHand;
+                      const addPlayerRuleById = environment.addPlayerRuleById;
+                      const removePlayerRuleById = environment.removePlayerRuleById;
                       const Math = environment.Math;
                       const console = environment.console;
 

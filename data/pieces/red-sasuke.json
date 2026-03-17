@@ -8,7 +8,7 @@
   "stats": {
     "maxHp": 11,
     "attack": 4,
-    "defense": 1,
+    "defense": 0,
     "moveRange": 4
   },
   "skills": [
@@ -17,5 +17,9 @@
     { "skillId": "sasuke-susanoo", "level": 1 }
   ],
   "rules": [],
+  "transformedSkills": [
+    { "skillId": "sasuke-kagutsuchi", "triggeredBy": "sasuke-susanoo" },
+    { "skillId": "sasuke-indra-arrow", "triggeredBy": "sasuke-susanoo" }
+  ],
   "isDefault": false
 }

@@ -136,6 +136,7 @@ function StatusBadge({ tag }: { tag: { id: string; type: string; currentDuration
 
 function PieceCard({
   piece,
+  allPieces,
   isCurrentPlayer,
   isActionPhase,
   skillsById,
@@ -146,6 +147,7 @@ function PieceCard({
   currentPlayerId,
 }: {
   piece: PieceInstance
+  allPieces: PieceInstance[]
   isCurrentPlayer: boolean
   isActionPhase: boolean
   skillsById: BattleState["skillsById"]
@@ -213,13 +215,19 @@ function PieceCard({
       </div>
 
       {/* 状态效果 */}
-      {piece.statusTags?.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {piece.statusTags.map((t, i) => (
-            <StatusBadge key={i} tag={t} />
-          ))}
-        </div>
-      )}
+      {(() => {
+        const masterPiece = (piece as any).masterPieceId
+          ? allPieces.find((p: any) => p.instanceId === (piece as any).masterPieceId)
+          : null
+        const displayTags = masterPiece?.statusTags ?? piece.statusTags
+        return displayTags?.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {displayTags.map((t: any, i: number) => (
+              <StatusBadge key={i} tag={t} />
+            ))}
+          </div>
+        )
+      })()}
 
       {/* 规则 */}
       {piece.rules?.length > 0 && (
@@ -663,6 +671,7 @@ export default function TurnDebugPage() {
                     <PieceCard
                       key={p.instanceId}
                       piece={p}
+                      allPieces={battle.pieces}
                       isCurrentPlayer={battle.turn.currentPlayerId === RED_ID}
                       isActionPhase={isActionPhase ?? false}
                       skillsById={battle.skillsById}
@@ -696,6 +705,7 @@ export default function TurnDebugPage() {
                     <PieceCard
                       key={p.instanceId}
                       piece={p}
+                      allPieces={battle.pieces}
                       isCurrentPlayer={battle.turn.currentPlayerId === BLUE_ID}
                       isActionPhase={isActionPhase ?? false}
                       skillsById={battle.skillsById}

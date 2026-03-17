@@ -1,7 +1,7 @@
 {
   "id": "soul-fracture",
   "name": "裂魂",
-  "description": "被动：当一个棋子死亡时，获得一个为一个友方棋子回复4点体力值的灵魂残片加入手牌",
+  "description": "被动：当一个棋子死亡时，获得一个为一个友方棋子回复2点体力值的灵魂残片加入手牌",
   "icon": "👻",
   "kind": "passive",
   "type": "normal",

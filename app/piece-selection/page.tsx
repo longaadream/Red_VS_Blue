@@ -1156,7 +1156,71 @@ function PieceSelectionContent() {
                   </div>
                 </div>
               )}
-              
+
+              {(selectedPiece as any).transformedSkills && (selectedPiece as any).transformedSkills.length > 0 && (
+                <div className="mt-4">
+                  <div className="font-medium text-purple-400 mb-2 text-xs flex items-center gap-1">
+                    <span>🔮</span>
+                    <span>变身后获得:</span>
+                  </div>
+                  <div className="space-y-2">
+                    {(selectedPiece as any).transformedSkills.map((tSkill: any) => {
+                      const skillDefinition = getSkillById(tSkill.skillId)
+                      const triggerSkill = getSkillById(tSkill.triggeredBy)
+                      return (
+                        <div key={tSkill.skillId} className="bg-zinc-800/60 rounded overflow-hidden border-l-2 border-purple-500/50">
+                          <div
+                            className="p-2 cursor-pointer hover:bg-zinc-700 transition-colors flex items-center justify-between"
+                            onClick={() => setExpandedSkills(prev => ({
+                              ...prev,
+                              [`transform_${tSkill.skillId}`]: !prev[`transform_${tSkill.skillId}`]
+                            }))}
+                          >
+                            <div>
+                              <div className="font-medium text-zinc-300">{skillDefinition?.name || tSkill.skillId}</div>
+                              <div className="text-xs text-zinc-500">使用「{triggerSkill?.name || tSkill.triggeredBy}」后获得</div>
+                            </div>
+                            <div className="text-zinc-400">
+                              {expandedSkills[`transform_${tSkill.skillId}`] ? '▼' : '►'}
+                            </div>
+                          </div>
+                          {expandedSkills[`transform_${tSkill.skillId}`] && skillDefinition && (
+                            <div className="p-2 border-t border-zinc-700 bg-zinc-900/50">
+                              <div className="text-xs space-y-1">
+                                {skillDefinition.kind && (
+                                  <div>
+                                    <span className="text-zinc-400">类型:</span>
+                                    <span className="text-white">{skillDefinition.kind === 'active' ? '主动' : '被动'}</span>
+                                  </div>
+                                )}
+                                {skillDefinition.description && (
+                                  <div>
+                                    <span className="text-zinc-400">描述:</span>
+                                    <span className="text-white">{skillDefinition.description}</span>
+                                  </div>
+                                )}
+                                {skillDefinition.actionPointCost !== undefined && (
+                                  <div>
+                                    <span className="text-zinc-400">行动点消耗:</span>
+                                    <span className="text-white">{skillDefinition.actionPointCost}</span>
+                                  </div>
+                                )}
+                                {skillDefinition.cooldownTurns > 0 && (
+                                  <div>
+                                    <span className="text-zinc-400">冷却回合:</span>
+                                    <span className="text-white">{skillDefinition.cooldownTurns}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-6 flex justify-end">
                 <Button onClick={() => setShowDetails(false)}>
                   关闭

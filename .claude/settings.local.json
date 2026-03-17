@@ -31,7 +31,9 @@
       "Bash(pkill:*)",
       "Bash(python3:*)",
       "Bash(find:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(git:*)",
+      "Bash(echo:*)"
     ]
   }
 }

@@ -22,6 +22,12 @@
 18. [地图设计教程](#地图设计教程)
 19. [手牌卡牌系统](#手牌卡牌系统)
 20. [玩家级别规则（Player-Level Rules）](#玩家级别规则player-level-rules)
+21. [tileEffects 视觉效果系统](#tileeffects-视觉效果系统)
+22. [持续时间管理规范](#持续时间管理规范)
+23. [triggerSkill 上下文填充规则](#triggerSkill-上下文填充规则)
+24. [变身/形态转换技能](#变身形态转换技能)
+25. [分身与幻象（masterPieceId）](#分身与幻象masterpieceid)
+26. [卡牌目标选择（selectTarget in Card）](#卡牌目标选择selecttarget-in-card)
 
 ---
 
@@ -3445,4 +3451,370 @@ playCard 被调用
   → 执行 executeCard()
   → playerMeta.actionPoints -= cardApCost
   → 弃置手牌
+```
+
+---
+
+## tileEffects 视觉效果系统
+
+### 核心原则：tileEffects 只影响 UI
+
+`battle.extensions.tileEffects` 是一个**纯视觉**数组，仅用于在棋盘格子上叠加视觉效果（颜色、图标等）。**技能逻辑不能依赖 tileEffects，也不能依赖 `tile.props.walkable` 来阻止行动**。
+
+```
+✅ tileEffects 负责：渲染高亮、颜色覆盖、图标标记
+❌ tileEffects 不负责：阻止移动、判定占位、影响技能逻辑
+```
+
+棋子是否占用某格，始终用 `battle.pieces` 查询：
+
+```javascript
+// ✅ 正确：通过 pieces 数组判断目标格是否被占用
+var pieceAtPos = battle.pieces.find(function(p) {
+  return p.x === targetX && p.y === targetY && p.currentHp > 0;
+});
+if (pieceAtPos) return { success: false, message: '目标位置已被占用' };
+
+// ❌ 错误：依赖 walkable 来阻止行动
+tile.props.walkable = false;  // 不要这样做
+```
+
+### tileEffect 数据格式
+
+```javascript
+battle.extensions.tileEffects.push({
+  x: targetX,
+  y: targetY,
+  sourceId: 'my-effect-' + sourcePiece.instanceId,  // 唯一标识，用于后续清理
+  tileType: 'my-effect',                              // 效果类型标识
+  icon: '👤',                                         // 显示在格子上的图标（可选）
+  bgColor: 'rgba(147, 51, 234, 0.5)',                 // 背景叠加颜色
+  boxShadow: 'inset 0 0 4px rgba(168, 85, 247, 0.5)', // 内阴影（可选）
+  iconPosition: 'top-left'                            // 图标位置：'top-left' / 'center' 等
+});
+```
+
+### 清理 tileEffect
+
+```javascript
+// 清理特定 sourceId 的所有 tileEffect
+if (battle.extensions && battle.extensions.tileEffects) {
+  battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) {
+    return !(te.tileType === 'my-effect' && te.sourceId === mySourceId);
+  });
+}
+```
+
+### 初始化保护
+
+在添加 tileEffect 前必须确保数组存在：
+
+```javascript
+if (!battle.extensions) battle.extensions = {};
+if (!battle.extensions.tileEffects) battle.extensions.tileEffects = [];
+```
+
+---
+
+## 持续时间管理规范
+
+### turn.ts 统一管理持续时间
+
+`turn.ts` 的 `endTurn` 阶段会**自动**递减当前玩家所有棋子的 `statusTags` 持续时间（`currentDuration` 或 `remainingDuration`），并在归零时移除状态标签。
+
+**规则（rule）的 `skillCode` 里禁止手动递减持续时间。**
+
+```javascript
+// ❌ 错误：规则里手动递减 → 与 turn.ts 双重递减，持续时间减半
+tag.currentDuration = (tag.currentDuration || 1) - 1;
+if (tag.currentDuration <= 0) {
+  removeStatusEffectById(piece.instanceId, tag.id);
+}
+
+// ✅ 正确：规则只负责读取和响应，持续时间交给 turn.ts 管理
+var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'my-effect'; });
+if (!tag) {
+  // 状态已被 turn.ts 移除，做清理
+  piece.rules = (piece.rules || []).filter(function(r) { return r.id !== 'rule-my-tick'; });
+  return { success: false, message: '' };
+}
+// 正常响应逻辑...
+return { success: true, message: piece.name + '的效果还剩' + tag.currentDuration + '回合' };
+```
+
+### 两个持续时间字段的区别
+
+| 字段 | 递减方向 | 适用场景 |
+|------|---------|---------|
+| `currentDuration` | turn.ts 在 `endTurn` 递减 | 标准持续时间，推荐用于状态效果 |
+| `remainingDuration` | turn.ts 在 `endTurn` 递减 | 同上，两者 turn.ts 都支持 |
+
+两者都由 turn.ts 统一处理，语义相同，选一个保持一致即可。
+
+### 规则自我清理时机
+
+规则不需要主动移除状态标签（turn.ts 会做）。规则只需要在发现标签已消失时清理自身：
+
+```javascript
+var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'my-effect'; });
+if (!tag) {
+  // 状态被 turn.ts 移除了，规则自我清理
+  piece.rules = (piece.rules || []).filter(function(r) { return r.id !== 'rule-my-tick'; });
+  return { success: false, message: '' };
+}
+```
+
+> **提示**：如果在 `addStatusEffectById` 时设置了 `relatedRules: ['rule-my-tick']`，turn.ts 移除状态时也会尝试自动移除关联规则。但规则自我清理作为双重保险仍然推荐保留。
+
+---
+
+## triggerSkill 上下文填充规则
+
+### `context.piece` 的填充链
+
+当规则通过 `triggerSkill` 调用被动技能时，`context.piece` 按以下顺序填充：
+
+```
+context.piece = context.piece           // 触发事件中的棋子（如 beforeDamageTaken 的受害者）
+             || context.sourcePiece     // 技能发起者
+             || context.rulePiece       // 规则绑定的棋子（兜底）
+```
+
+**重要**：通过 `beginTurn`、`endTurn` 触发的规则，`context.piece` 和 `context.sourcePiece` 通常为 `undefined`。此时 `context.rulePiece` 是唯一可靠的棋子引用。在这类规则的 `skillCode` 中，应始终通过 `context.rulePiece` 获取绑定棋子：
+
+```javascript
+// ✅ 正确：beginTurn / endTurn 规则中获取棋子
+var piece = context.rulePiece;
+
+// ❌ 错误：beginTurn 中 context.piece 可能为 undefined（依赖触发事件类型）
+var piece = context.piece;  // 可能是 undefined
+```
+
+### `context.battle` 始终是完整对象
+
+`triggerSkill` 调用的技能代码中，`context.battle` 总是完整的 `BattleState`（包含 `battle.pieces`、`battle.players`、`battle.map` 等所有字段）。
+
+```javascript
+// ✅ 正确：被动技能中可以访问 battle.pieces
+var enemies = context.battle.pieces.filter(function(p) {
+  return p.ownerPlayerId !== context.rulePiece.ownerPlayerId && p.currentHp > 0;
+});
+
+// ❌ 不再需要担心 context.battle 是部分对象
+```
+
+### 玩家级规则中的 context.piece 与 context.playerId
+
+玩家级规则（挂在 `player.rules[]` 上）触发时：
+- `context.piece` 为 `null`（没有棋子触发者）
+- `context.rulePiece` 为 `null`
+- `context.playerId` 是触发规则的玩家 ID
+
+```javascript
+// 玩家级规则的 skillCode / 技能 code 中
+var currentPlayerId = context.playerId;
+var myPieces = context.battle.pieces.filter(function(p) {
+  return p.ownerPlayerId === currentPlayerId && p.currentHp > 0;
+});
+```
+
+---
+
+## 变身/形态转换技能
+
+### piece JSON 中声明变身后技能
+
+当一个技能会给棋子添加新技能（如 `addSkillById`），在棋子 JSON 的 `transformedSkills` 字段中声明这些"变身后获得"的技能。这样 UI 在技能列表中会显示"🔮 变身后获得"区块。
+
+```json
+// data/pieces/my-hero.json
+{
+  "id": "my-hero",
+  "name": "英雄",
+  "skills": [
+    { "skillId": "base-skill-a", "level": 1 },
+    { "skillId": "transform-skill", "level": 1 }
+  ],
+  "transformedSkills": [
+    { "skillId": "post-transform-skill-a", "triggeredBy": "transform-skill" },
+    { "skillId": "post-transform-skill-b", "triggeredBy": "transform-skill" }
+  ],
+  "rules": []
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `skillId` | 变身后获得的技能 ID |
+| `triggeredBy` | 触发变身的技能 ID（用于 UI 显示"使用「XXX」后获得"） |
+
+### 注意事项
+
+- `transformedSkills` 仅用于 UI 展示，不影响游戏逻辑
+- 技能实际添加仍在变身技能的 `code` 中通过 `addSkillById` 实现
+- 变身后 `piece.skills` 已包含新增技能，UI 自动从 `piece.skills` 读取（显示真实当前状态）
+- 未变身时，`transformedSkills` 中的技能以"变身后获得"标签显示；变身后消失（因为已出现在正式列表）
+
+### 示例：伊利丹恶魔变形
+
+```json
+// data/pieces/red-illidan.json（节选）
+{
+  "transformedSkills": [
+    { "skillId": "illidan-demon-strike", "triggeredBy": "illidan-metamorphosis" }
+  ]
+}
+```
+
+```javascript
+// data/skills/illidan-metamorphosis.json 的 code 中
+addSkillById(caster.instanceId, 'illidan-demon-strike');  // 游戏逻辑：实际添加
+```
+
+### 示例：佐助须佐能乎
+
+佐助变身时同时移除旧技能并添加新技能：
+
+```javascript
+// data/skills/sasuke-susanoo.json 的 code 中
+removeSkillById(caster.instanceId, 'sasuke-chidori');     // 移除千鸟
+addSkillById(caster.instanceId, 'sasuke-kagutsuchi');     // 获得加具土命
+addSkillById(caster.instanceId, 'sasuke-indra-arrow');    // 获得因陀罗之矢
+```
+
+```json
+// data/pieces/red-sasuke.json（节选）
+{
+  "transformedSkills": [
+    { "skillId": "sasuke-kagutsuchi",  "triggeredBy": "sasuke-susanoo" },
+    { "skillId": "sasuke-indra-arrow", "triggeredBy": "sasuke-susanoo" }
+  ]
+}
+```
+
+---
+
+## 分身与幻象（masterPieceId）
+
+### 概念
+
+当一个技能在战场上召唤一个"假棋子"（分身、幻象、替身），该假棋子在视觉上应与真身无法区分。通过在假棋子上设置 `masterPieceId` 字段，UI 会自动从真身同步所有展示信息。
+
+### 在技能代码中创建分身
+
+```javascript
+var clone = {
+  instanceId: 'my-clone-' + Date.now(),
+  templateId: caster.templateId,          // ← 使用相同模板 ID，外观一致
+  name: caster.name,                      // ← 相同名字
+  ownerPlayerId: caster.ownerPlayerId,
+  faction: caster.faction,
+  x: cloneX,
+  y: cloneY,
+
+  // 真实属性（分身的实际游戏属性）
+  maxHp: 1,
+  currentHp: 1,
+  attack: 0,
+  defense: 0,
+  moveRange: 0,
+  skills: [],
+  rules: [],
+  statusTags: [],
+
+  // ★ 关键：UI 展示属性从真身读取
+  masterPieceId: caster.instanceId,       // ← 指向真身
+  displayMaxHp: caster.maxHp,             // ← 真身血量（UI 显示）
+  displayCurrentHp: caster.currentHp,
+  displayAttack: caster.attack,
+  displayDefense: caster.defense || 0,
+  displayMoveRange: caster.moveRange,
+};
+battle.pieces.push(clone);
+```
+
+### masterPieceId 的 UI 效果
+
+设置 `masterPieceId` 后，UI 在以下所有位置自动使用真身数据：
+
+| UI 位置 | 同步内容 |
+|---------|---------|
+| 我的棋子列表 悬停技能框 | 技能列表（含冷却状态）|
+| 我的棋子列表 状态标签 | statusTags（真身的所有 visible 标签）|
+| 棋子信息面板 | 技能悬浮说明 |
+
+### 列表顺序
+
+有 `masterPieceId` 的棋子在"我的棋子"列表中**紧挨真身显示**，顺序基于克隆 `instanceId` 末位数字的奇偶性稳定随机（创建后不再变化）。
+
+### display* 字段说明
+
+| 字段 | 说明 |
+|------|------|
+| `displayMaxHp` | UI 显示的最大血量（替代真实 maxHp）|
+| `displayCurrentHp` | UI 显示的当前血量（替代真实 currentHp）|
+| `displayAttack` | UI 显示的攻击力 |
+| `displayDefense` | UI 显示的防御力 |
+| `displayMoveRange` | UI 显示的移动范围 |
+
+> `display*` 字段纯 UI，不影响游戏逻辑。分身真实 HP 仍是 `currentHp: 1`，受伤时按真实属性计算。
+
+---
+
+## 卡牌目标选择（selectTarget in Card）
+
+### 卡牌中使用 selectTarget
+
+`active` 类型卡牌的 `executeCard` 函数中可以调用 `selectTarget`，用法与技能中完全相同：
+
+```javascript
+function executeCard(context) {
+  // ✅ 必须检查 needsTargetSelection
+  var target = selectTarget({ filter: 'ally', range: 99 });
+  if (!target || target.needsTargetSelection) {
+    return target || { success: false, message: '请选择一个目标' };
+  }
+
+  var result = healDamage(target, target, 4, battle, 'my-card');
+  return { success: true, message: '为' + target.name + '恢复' + result.heal + '点生命' };
+}
+```
+
+### 重要：必须返回 selectTarget 的返回值
+
+当 `target.needsTargetSelection === true` 时，**必须直接 `return target`**（不要 `return { success: false }`）。系统靠这个对象中的 `targetType`、`range`、`filter` 字段来展示正确的目标选择 UI。
+
+```javascript
+// ✅ 正确
+if (!target || target.needsTargetSelection) return target;
+
+// ❌ 错误：丢失了 targetType/range/filter，UI 无法进入目标选择模式
+if (!target || target.needsTargetSelection) return { success: false };
+```
+
+### 与技能 selectTarget 的区别
+
+| 项目 | 技能 selectTarget | 卡牌 selectTarget |
+|------|-----------------|-----------------|
+| `filter: 'ally'` 判断基准 | 施法棋子 ownerPlayerId | 出牌玩家 playerId |
+| 距离限制 | 基于施法棋子位置 | 无距离限制（range 参数被忽略） |
+| 第二次调用 | 带 targetPieceId 重发请求 | 同左，UI 已统一处理 |
+
+### selectOption 在卡牌中同样有效
+
+```javascript
+function executeCard(context) {
+  var option = selectOption({
+    title: '选择效果',
+    options: [
+      { label: '治疗', value: 'heal' },
+      { label: '攻击', value: 'attack' }
+    ]
+  });
+  if (!option || option.needsOptionSelection) return option;
+
+  if (option === 'heal') {
+    // ...
+  }
+}
 ```

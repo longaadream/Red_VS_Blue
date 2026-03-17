@@ -4,8 +4,9 @@ import { applyBattleAction, summonPiece } from "@/lib/game/turn"
 import { getMap, DEFAULT_MAP_ID, loadMaps } from "@/config/maps"
 import type { BoardMap } from "@/lib/game/map"
 import type { PieceInstance, PieceTemplate } from "@/lib/game/piece"
-import { getAllPieces, getPieceById } from "@/lib/game/piece-repository"
+import { getAllPieces } from "@/lib/game/piece-repository"
 import { buildDefaultSkills } from "@/lib/game/battle-setup"
+import { loadJsonFilesServer } from "@/lib/game/file-loader"
 import { globalTriggerSystem } from "@/lib/game/triggers"
 import { reloadSkills } from "@/lib/game/skill-repository"
 import { loadRuleById } from "@/lib/game/skills"
@@ -341,6 +342,10 @@ export async function PATCH(req: NextRequest) {
         const existingPieces = battleState.pieces.filter(p => p.ownerPlayerId === ownerPlayerId)
         const newIndex = existingPieces.length + 1
 
+        // 从文件系统实时加载棋子模板（避免模块缓存导致新棋子找不到）
+        const freshPieces = loadJsonFilesServer<PieceTemplate>('data/pieces')
+        const getPieceFresh = (id: string) => freshPieces[id]
+
         // 使用 summonPiece 函数召唤棋子
         const summonResult = summonPiece(
           newState,
@@ -352,7 +357,7 @@ export async function PATCH(req: NextRequest) {
             y,
             index: newIndex
           },
-          getPieceById,
+          getPieceFresh,
           createPieceInstance
         )
 

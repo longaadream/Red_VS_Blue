@@ -1,0 +1,14 @@
+{
+  "id": "kenshin-ryusosen",
+  "name": "龍巢閃",
+  "description": "对相邻一名敌人连续劈砍3次，每次造成50%攻击力的物理伤害，目标死亡后剩余次数不会浪费",
+  "icon": "🗡️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 0.5,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var targetPiece = battle.pieces.find(function(p) { return p.instanceId === target.instanceId && p.currentHp > 0; }); if (!targetPiece) return { success: false, message: '目标不存在或不相邻' }; var totalDmg = 0; var hits = 0; for (var i = 0; i < 3; i++) { if (targetPiece.currentHp <= 0) break; var r = dealDamage(caster, targetPiece, Math.floor(caster.attack * 0.5), 'physical', battle, 'kenshin-ryusosen'); totalDmg += r.totalDamage !== undefined ? r.totalDamage : (r.damage || 0); hits++; } return { success: true, message: caster.name + '龍巢閃！对' + targetPiece.name + '发动' + hits + '连击，共造成' + totalDmg + '点伤害' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var perHit = Math.max(1, Math.floor(piece.attack * skillDef.powerMultiplier) - 1); return { description: '对相邻一格敌人3连击，每次造成' + perHit + '（50%攻击力）点物理伤害，共' + perHit * 3 + '点', expectedValues: { damage: perHit * 3 } }; }"
+}

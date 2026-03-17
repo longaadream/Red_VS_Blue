@@ -8,7 +8,7 @@
   "stats": {
     "maxHp": 15,
     "attack": 4,
-    "defense": 1,
+    "defense": 2,
     "moveRange": 3
   },
   "skills": [

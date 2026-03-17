@@ -1,13 +1,7 @@
 {
   "id": "rule-divine-shield",
-  "name": "圣盾效果",
-  "description": "当拥有圣盾状态时，受到伤害会抵挡一次伤害并移除圣盾效果",
-  "trigger": {
-    "type": "beforeDamageTaken"
-  },
-  "effect": {
-    "type": "triggerSkill",
-    "skillId": "divine-shield-defense",
-    "message": ""
-  }
+  "name": "圣盾",
+  "description": "下次受到伤害时，完全抵挡并消耗圣盾",
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'divine-shield'; }); if (!tag) return { success: false, message: '' }; var idx = piece.statusTags.indexOf(tag); if (idx !== -1) piece.statusTags.splice(idx, 1); removeRuleById(piece.instanceId, 'rule-divine-shield'); return { success: true, blocked: true, message: piece.name + '的圣盾抵挡了这次伤害！' };"
 }

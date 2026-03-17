@@ -1,7 +1,7 @@
 {
   "id": "muru-lament",
   "name": "穆鲁的哀鸣",
-  "description": "自动释放所有圣光手牌（不耗AP），每释放1张对所有敌人造成3点真实伤害、为友方恢复2点生命。若释放3张以上，所有友方获得圣盾",
+  "description": "自动释放所有圣光手牌（不耗AP），每释放1张对所有敌人造成3点真实伤害（最多6点）、为友方恢复2点生命。若释放3张以上，所有友方获得圣盾",
   "icon": "💫",
   "kind": "active",
   "type": "super",
@@ -10,7 +10,7 @@
   "chargeCost": 3,
   "powerMultiplier": 1,
   "actionPointCost": 3,
-  "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); const holyCards = player.hand.filter(function(c) { return c.cardId && c.cardId.startsWith('holy-'); }); const cardCount = holyCards.length; if (cardCount === 0) { return { success: false, message: '没有圣光手牌' }; } holyCards.forEach(function(card) { discardCard(card.instanceId); }); const enemies = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0; }); const allies = battle.pieces.filter(function(p) { return p.ownerPlayerId === caster.ownerPlayerId && p.currentHp > 0; }); const dmgResult = dealDamage(caster, enemies, 3 * cardCount, 'true', battle, 'muru-lament'); const totalDamage = dmgResult.totalDamage || 0; const hlResult = healDamage(caster, allies, 2 * cardCount, battle, 'muru-lament'); const totalHeal = hlResult.totalHeal || 0; if (cardCount >= 3) { allies.forEach(function(ally) { addStatusEffectById(ally.instanceId, { id: 'divine-shield', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); addRuleById(ally.instanceId, 'rule-divine-shield'); }); } return { message: caster.name + '释放穆鲁的哀鸣！弃置' + cardCount + '张圣光手牌，对所有敌人造成' + totalDamage + '点伤害，友方恢复' + totalHeal + '生命' + (cardCount >= 3 ? '，全体获得圣盾！' : ''), success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '释放所有圣光手牌，每张对敌造成3伤害、友方回2血，3张以上全体圣盾', expectedValues: {} }; }",
+  "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); const holyCards = player.hand.filter(function(c) { return c.cardId && c.cardId.startsWith('holy-'); }); const cardCount = holyCards.length; if (cardCount === 0) { return { success: false, message: '没有圣光手牌' }; } holyCards.forEach(function(card) { discardCard(card.instanceId); }); const enemies = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0; }); const allies = battle.pieces.filter(function(p) { return p.ownerPlayerId === caster.ownerPlayerId && p.currentHp > 0; }); const dmgPerTarget = Math.min(3 * cardCount, 6); const dmgResult = dealDamage(caster, enemies, dmgPerTarget, 'true', battle, 'muru-lament'); const totalDamage = dmgResult.totalDamage || 0; const hlResult = healDamage(caster, allies, 2 * cardCount, battle, 'muru-lament'); const totalHeal = hlResult.totalHeal || 0; if (cardCount >= 3) { allies.forEach(function(ally) { addStatusEffectById(ally.instanceId, { id: 'divine-shield', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); addRuleById(ally.instanceId, 'rule-divine-shield'); }); } return { message: caster.name + '释放穆鲁的哀鸣！弃置' + cardCount + '张圣光手牌，对所有敌人造成' + totalDamage + '点伤害，友方恢复' + totalHeal + '生命' + (cardCount >= 3 ? '，全体获得圣盾！' : ''), success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '释放所有圣光手牌，每张对敌造成3真实伤害（最多6点）、友方回2血，3张以上全体圣盾', expectedValues: {} }; }",
   "range": "all-enemies"
 }
