@@ -421,6 +421,16 @@ export function applyBattleAction(
         if (!next.gameStartFired && next.turn.turnNumber === 1) {
           writeLog('[beginPhase] Triggering gameStart rules...')
           next.gameStartFired = true
+          // 为初始棋子补发 afterPieceSummon，确保"进入战场"类规则对初始棋子也能生效
+          for (const piece of next.pieces) {
+            globalTriggerSystem.checkTriggers(next, {
+              type: "afterPieceSummon",
+              playerId: piece.ownerPlayerId,
+              piece: piece,
+              pieceTemplateId: piece.templateId,
+              faction: piece.faction
+            })
+          }
           const gameStartResult = globalTriggerSystem.checkTriggers(next, {
             type: "gameStart",
             playerId: next.turn.currentPlayerId,

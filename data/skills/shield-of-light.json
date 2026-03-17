@@ -10,6 +10,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 3,
   "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetAlly = selectTarget({ type: 'piece', range: 7, filter: 'ally' }); if (!targetAlly || targetAlly.needsTargetSelection) { return targetAlly; } if (typeof addStatusEffectById === 'function') { addStatusEffectById(targetAlly.instanceId, { id: 'divine-shield', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); } if (typeof addRuleById === 'function') { addRuleById(targetAlly.instanceId, 'rule-divine-shield'); } if (typeof addSkillById === 'function') { addSkillById(targetAlly.instanceId, 'divine-shield-defense'); } return { message: sourcePiece.name + ' 为 ' + targetAlly.name + ' 施加了圣盾', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '为范围内一个友军获得圣盾，抵挡一次伤害', expectedValues: {} }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '为7格范围内一个友军获得圣盾，抵挡一次伤害', expectedValues: {} }; }",
   "range": "single"
 }

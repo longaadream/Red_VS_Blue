@@ -1,8 +1,8 @@
 {
   "id": "rule-elune-protection-player",
-  "name": "艾露恩的守护规则",
-  "description": "当友方单位受到致命伤害且泰兰德在场时，每场战斗触发一次：使其免疫该致命伤害并恢复5点生命。触发标记存于玩家statusTags",
+  "name": "艾露恩的守护",
+  "description": "当友方棋子受到致命伤害时，消耗玩家的艾露恩守护statusTag，免疫伤害并恢复5点生命（全队共用一次，与泰兰德是否存活无关）",
   "trigger": { "type": "beforeDamageTaken" },
   "priority": -100,
-  "skillCode": "var player = battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player) return { success: false }; var targetPiece = context.piece; if (!targetPiece || targetPiece.ownerPlayerId !== player.playerId) return { success: false }; var damage = context.damage; if (!damage || damage <= 0) return { success: false }; if (targetPiece.currentHp > damage) return { success: false }; var tyrande = battle.pieces.find(function(p) { return p.templateId === 'tyrande' && p.ownerPlayerId === player.playerId && p.currentHp > 0; }); if (!tyrande) return { success: false, message: '泰兰德不在场' }; if (!player.statusTags) player.statusTags = []; var usedFlag = player.statusTags.find(function(t) { return t.type === 'elune-protection-used'; }); if (usedFlag) return { success: false, message: '艾露恩守护本局已使用' }; player.statusTags.push({ id: 'elune-protection-used', type: 'elune-protection-used', name: '艾露恩守护已使用' }); healDamage(tyrande, targetPiece, 5, battle, 'elune-protection'); return { success: true, blocked: true, message: '艾露恩的守护：' + targetPiece.name + '免疫致命伤害并恢复5点生命（本局仅此一次）' };"
+  "skillCode": "var player = battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player) return { success: false }; var targetPiece = context.piece; if (!targetPiece || targetPiece.ownerPlayerId !== player.playerId) return { success: false }; var damage = context.damage; if (!damage || damage <= 0) return { success: false }; if (targetPiece.currentHp > damage) return { success: false }; if (!player.statusTags) return { success: false }; var shieldTag = player.statusTags.find(function(t) { return t.type === 'elune-protection'; }); if (!shieldTag) return { success: false }; player.statusTags = player.statusTags.filter(function(t) { return t.type !== 'elune-protection'; }); targetPiece.currentHp = Math.min(targetPiece.currentHp + 5, targetPiece.maxHp); return { success: true, blocked: true, message: '艾露恩的守护：' + (targetPiece.name || targetPiece.templateId) + '免疫致命伤害并恢复5点生命（守护已消耗）' };"
 }

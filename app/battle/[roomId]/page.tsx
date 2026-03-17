@@ -1403,11 +1403,11 @@ export default function BattlePage() {
                       <div className="space-y-2">
                         {(() => {
                           const pieceTemplate = getPieceById(selectedPiece.templateId)
-                          const pieceSkills = pieceTemplate?.skills || []
-                          
+                          const pieceSkills = selectedPiece.skills || pieceTemplate?.skills || []
+
                           const availableSkills = pieceSkills.map(skill => {
                             const skillDef = battle.skillsById[skill.skillId]
-                            
+
                             // 确保技能对象总是有完整的属性
                             const mergedSkill = {
                               id: skill.skillId,
@@ -1416,7 +1416,7 @@ export default function BattlePage() {
                               ...skill,
                               ...skillDef
                             }
-                            
+
                             return mergedSkill
                           }).filter(skill => skill && skill.kind !== "passive")
                           
@@ -1428,14 +1428,18 @@ export default function BattlePage() {
                             const actionPointCost = skill.actionPointCost
                             const isSuper = skillType === "super"
                             const actionType = isSuper ? "useChargeSkill" : "useBasicSkill"
-                            
+                            const pieceSkillState = selectedPiece.skills?.find((s: any) => s.skillId === skillId)
+                            const currentCooldown = pieceSkillState?.currentCooldown || 0
+                            const skillCooldown = skill.cooldownTurns || 0
+                            const cooldownDisplay = skillCooldown > 0 ? `${skillCooldown}/${currentCooldown}` : ''
+
                             return (
                               <Button
                                 key={skillId}
                                 className="w-full"
                                 variant="outline"
                                 size="sm"
-                                disabled={loading || isSelectingMoveTarget}
+                                disabled={loading || isSelectingMoveTarget || currentCooldown > 0}
                                 onClick={() => {
                                   if (selectedPiece) {
                                     sendBattleAction({
@@ -1448,7 +1452,7 @@ export default function BattlePage() {
                                 }}
                               >
                                 <Zap className="mr-2 h-4 w-4" />
-                                {skillName} ({isSuper ? `充能 ${chargeCost || 0}点` : "普通"}) - {actionPointCost || 0}AP
+                                {skillName} ({isSuper ? `充能 ${chargeCost || 0}点` : "普通"}) - {actionPointCost || 0}AP{cooldownDisplay ? ` (${cooldownDisplay})` : ''}
                               </Button>
                             )
                           })

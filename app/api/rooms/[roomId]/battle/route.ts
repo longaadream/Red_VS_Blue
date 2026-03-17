@@ -89,6 +89,14 @@ export async function POST(
     rehydrateBattleRules(room.battleState)
     const nextState = applyBattleAction(room.battleState, body)
     console.log('[Battle API] Players chargePoints after action:', nextState.players.map(p => ({ playerId: p.playerId, chargePoints: p.chargePoints })))
+    // 安全网：防止棋子重复 bug 污染持久化状态
+    const uniquePieces = nextState.pieces.filter((piece: any, index: number, self: any[]) =>
+      index === self.findIndex((p: any) => p.instanceId === piece.instanceId)
+    )
+    if (uniquePieces.length !== nextState.pieces.length) {
+      console.warn('[Battle API] Found duplicate pieces, deduplicating...')
+      nextState.pieces = uniquePieces
+    }
     room.battleState = nextState
     rooms.updateBattleState(room.id, nextState)
 

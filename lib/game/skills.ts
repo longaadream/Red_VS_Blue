@@ -2307,9 +2307,10 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             currentHp: sourcePiece.currentHp
           });
           
-          // 显式更新battle.pieces中的对应元素，确保修改能够正确反映到battle状态中
-          battle.pieces[pieceIndex] = sourcePiece;
-          console.log('Updated battle.pieces[' + pieceIndex + ']:', battle.pieces[pieceIndex]);
+          // sourcePiece 是 battle.pieces[pieceIndex] 的直接引用，技能执行期间对它的所有修改
+          // 已经直接反映到 battle.pieces 中，无需重新赋值。
+          // 注意：如果技能执行期间有棋子被击杀（从 battle.pieces splice 移除），pieceIndex 会失效，
+          // 重新赋值会覆盖错误的位置并导致棋子重复。因此移除该赋值。
 
           // 检查是否有伤害和击杀
           checkForDamageAndKill(battle, beforeState, sourcePiece, skillDef.id);
