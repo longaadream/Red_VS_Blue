@@ -30,7 +30,8 @@
       "Bash(cd:*)",
       "Bash(pkill:*)",
       "Bash(python3:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(tasklist:*)"
     ]
   }
 }
