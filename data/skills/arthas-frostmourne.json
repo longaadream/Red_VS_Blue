@@ -1,0 +1,14 @@
+{
+  "id": "arthas-frostmourne",
+  "name": "霜之哀伤",
+  "description": "对1格内的敌人造成攻击力×1.2的物理伤害。若此次攻击将目标击杀，额外获得2点充能（霜之哀伤吞噬灵魂）",
+  "icon": "⚔️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1.2,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damageValue = Math.floor(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damageValue, 'physical', battle, context.skill.id); var msg = caster.name + '用霜之哀伤斩击' + target.name + '，造成' + result.damage + '点物理伤害'; if (result.isKilled) { var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); if (player) { player.chargePoints = (player.chargePoints || 0) + 2; msg += '！霜之哀伤吞噬了' + target.name + '的灵魂，额外获得2点充能！'; } } return { success: true, message: msg }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var dmg = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '对1格内敌人造成' + dmg + '点物理伤害（攻击力×120%）。击杀时额外获得2点充能', expectedValues: { damage: dmg } }; }"
+}

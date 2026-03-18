@@ -2,6 +2,6 @@
   "id": "rule-pulse-pistol-move",
   "name": "脉冲手枪（移动触发）",
   "description": "当敌人移动时，对自身Chebyshev距离≤2范围内随机1名敌人造成等同于攻击力的伤害。",
-  "trigger": { "type": "afterMove" },
+  "trigger": { "type": "beforeMove" },
   "effect": { "type": "triggerSkill", "skillId": "pulse-pistol-move", "message": "" }
 }

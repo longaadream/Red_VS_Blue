@@ -1,0 +1,15 @@
+{
+  "id": "arthas-icebound-fortitude",
+  "name": "寒冰坚忍",
+  "description": "为自身施加「寒冰坚忍」buff，持续2回合：受到的所有伤害降低50%，任何攻击阿尔萨斯的棋子被冰冻1回合",
+  "icon": "🛡️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "range": "self",
+  "code": "function executeSkill(context) { var caster = context.piece; var alreadyIcebound = caster.statusTags && caster.statusTags.some(function(t) { return t.type === 'icebound-fortitude'; }); if (alreadyIcebound) return { success: false, message: '寒冰坚忍已激活中' }; addStatusEffectById(caster.instanceId, { id: 'icebound-fortitude-' + caster.instanceId, name: '寒冰坚忍', type: 'icebound-fortitude', currentDuration: 2, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-arthas-icebound'] }); addRuleById(caster.instanceId, 'rule-arthas-icebound'); return { success: true, message: caster.name + '激活了寒冰坚忍！持续2回合：受到伤害降低50%，攻击者将被冰冻1回合！' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '为自身施加寒冰坚忍（2回合）：受伤害降低50%，攻击者被冰冻1回合', expectedValues: { duration: 2 } }; }"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "arthas-howling-blast",
+  "name": "凛冬哀嚎",
+  "description": "以阿尔萨斯为中心，对以自身为中心3×3格范围内所有敌人造成攻击力×0.8的魔法伤害，并施加「减速」（移动范围-1）持续1回合",
+  "icon": "❄️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 0.8,
+  "actionPointCost": 1,
+  "code": "function executeSkill(context) { var caster = context.piece; var damageValue = Math.round(caster.attack * context.skill.powerMultiplier); var cx = caster.x; var cy = caster.y; var affectedEnemies = battle.pieces.filter(function(p) { return p.currentHp > 0 && p.ownerPlayerId !== caster.ownerPlayerId && Math.abs(p.x - cx) <= 1 && Math.abs(p.y - cy) <= 1; }); if (affectedEnemies.length === 0) { return { success: true, message: caster.name + '释放凛冬哀嚎，但周围没有敌人' }; } var msgs = []; affectedEnemies.forEach(function(enemy) { var result = dealDamage(caster, enemy, damageValue, 'magical', battle, context.skill.id); if (enemy.currentHp > 0) { var alreadySlowed = enemy.statusTags && enemy.statusTags.some(function(t) { return t.type === 'arthas-slow'; }); if (!alreadySlowed) { enemy.moveRange = Math.max(1, (enemy.moveRange || 3) - 1); addStatusEffectById(enemy.instanceId, { id: 'arthas-slow-' + enemy.instanceId, name: '减速', type: 'arthas-slow', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-arthas-slow-restore'] }); addRuleById(enemy.instanceId, 'rule-arthas-slow-restore'); msgs.push(enemy.name + '受到' + result.damage + '点魔法伤害并被减速'); } else { msgs.push(enemy.name + '受到' + result.damage + '点魔法伤害'); } } else { msgs.push(enemy.name + '受到' + result.damage + '点魔法伤害被击杀'); } }); return { success: true, message: caster.name + '凛冬哀嚎！' + msgs.join('，') }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var dmg = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '对以自身为中心3×3范围内所有敌人造成' + dmg + '点魔法伤害（攻击力×80%），并减速1回合（移动-1）', expectedValues: { damage: dmg, area: '3×3' } }; }"
+}

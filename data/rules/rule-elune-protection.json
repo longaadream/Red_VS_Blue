@@ -1,7 +1,7 @@
 {
   "id": "rule-elune-protection",
   "name": "艾露恩的守护初始化",
-  "description": "泰兰德进入战场时，给己方玩家添加一个艾露恩守护statusTag和守护规则（已存在则跳过）",
-  "trigger": { "type": "afterPieceSummon" },
-  "skillCode": "var summonedPiece = context.piece; if (!summonedPiece || summonedPiece.templateId !== 'tyrande') return { success: false }; var playerId = summonedPiece.ownerPlayerId; var player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player) return { success: false }; if (!player.statusTags) player.statusTags = []; var existing = player.statusTags.find(function(t) { return t.type === 'elune-protection'; }); if (existing) return { success: false }; player.statusTags.push({ id: 'elune-protection', type: 'elune-protection', name: '艾露恩的守护', description: '当友方任意棋子受到致命伤害时，免疫该伤害并恢复5点生命（全队共用一次）' }); addPlayerRuleById(playerId, 'rule-elune-protection-player'); return { success: true, message: '艾露恩的守护已就绪' };"
+  "description": "游戏开始时，若泰兰德在场则为其玩家添加艾露恩守护效果",
+  "trigger": { "type": "gameStart" },
+  "skillCode": "var tyrande = context.rulePiece; if (!tyrande) return { success: false }; var playerId = tyrande.ownerPlayerId; var player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player) return { success: false }; if (!player.statusTags) player.statusTags = []; var existing = player.statusTags.find(function(t) { return t.type === 'elune-protection'; }); if (existing) return { success: false }; player.statusTags.push({ id: 'elune-protection', type: 'elune-protection', name: '艾露恩的守护', description: '当友方任意棋子受到致命伤害时，免疫该伤害并恢复5点生命（全队共用一次）' }); addPlayerRuleById(playerId, 'rule-elune-protection-player'); return { success: true, message: '艾露恩的守护已就绪' };"
 }

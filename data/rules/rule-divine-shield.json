@@ -3,5 +3,5 @@
   "name": "圣盾",
   "description": "下次受到伤害时，完全抵挡并消耗圣盾",
   "trigger": { "type": "beforeDamageTaken" },
-  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'divine-shield'; }); if (!tag) return { success: false, message: '' }; var idx = piece.statusTags.indexOf(tag); if (idx !== -1) piece.statusTags.splice(idx, 1); removeRuleById(piece.instanceId, 'rule-divine-shield'); return { success: true, blocked: true, message: piece.name + '的圣盾抵挡了这次伤害！' };"
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'divine-shield'; }); if (!tag) return { success: false, message: '' }; removeStatusEffectById(piece.instanceId, tag.id); removeRuleById(piece.instanceId, 'rule-divine-shield'); return { success: true, blocked: true, message: piece.name + '的圣盾抵挡了这次伤害！' };"
 }

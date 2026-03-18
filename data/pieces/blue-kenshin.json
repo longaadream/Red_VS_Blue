@@ -6,12 +6,13 @@
   "rarity": "legendary",
   "image": "kenshin.jpg",
   "stats": {
-    "maxHp": 6,
-    "attack": 6,
+    "maxHp": 7,
+    "attack": 4,
     "defense": 1,
     "moveRange": 5
   },
   "skills": [
+    { "skillId": "kenshin-tenken-passive", "level": 1 },
     { "skillId": "kenshin-ryutsuisen", "level": 1 },
     { "skillId": "kenshin-ryusosen", "level": 1 },
     { "skillId": "kenshin-amakakeru", "level": 1 }

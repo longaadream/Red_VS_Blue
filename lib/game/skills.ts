@@ -328,6 +328,48 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       return true
     },
 
+    /** 为玩家添加技能 */
+    addPlayerSkillById: (targetPlayerId: string, skillId: string) => {
+      const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+      if (!player) return false
+      if (!player.skills) player.skills = []
+      if (player.skills.some((s: any) => s.skillId === skillId)) return false
+      player.skills.push({ skillId, currentCooldown: 0 })
+      return true
+    },
+
+    /** 从玩家移除技能 */
+    removePlayerSkillById: (targetPlayerId: string, skillId: string) => {
+      const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+      if (!player?.skills) return false
+      player.skills = player.skills.filter((s: any) => s.skillId !== skillId)
+      return true
+    },
+
+    /** 为玩家添加状态标签 */
+    addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => {
+      const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+      if (!player) return false
+      if (!player.statusTags) player.statusTags = []
+      player.statusTags.push({
+        ...statusObject,
+        name: statusObject.name || statusObject.type,
+        remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
+        remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
+        relatedRules: statusObject.relatedRules || []
+      })
+      return true
+    },
+
+    /** 从玩家移除一个状态标签 */
+    removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => {
+      const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+      if (!player?.statusTags) return false
+      const idx = player.statusTags.findIndex((t: any) => t.id === statusId)
+      if (idx !== -1) { player.statusTags.splice(idx, 1); return true }
+      return false
+    },
+
     Math,
     console
   }
@@ -482,6 +524,12 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                 const idx = targetPiece.statusTags.findIndex((t: any) => t.id === statusId);
                 if (idx !== -1) {
                   targetPiece.statusTags.splice(idx, 1);
+                  globalTriggerSystem.checkTriggers(battle, {
+                    type: "afterStatusRemoved",
+                    sourcePiece: targetPiece,
+                    statusId: statusId,
+                    playerId: targetPiece.ownerPlayerId
+                  });
                   return true;
                 }
               }
@@ -526,10 +574,55 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               return false
             };
 
+            const removePlayerRuleById = (targetPlayerId: string, ruleId: string) => {
+              const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+              if (!player?.rules) return false
+              player.rules = player.rules.filter((r: any) => r.id !== ruleId)
+              return true
+            };
+
+            const addPlayerSkillById = (targetPlayerId: string, skillId: string) => {
+              const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+              if (!player) return false
+              if (!player.skills) player.skills = []
+              if (player.skills.some((s: any) => s.skillId === skillId)) return false
+              player.skills.push({ skillId, currentCooldown: 0 })
+              return true
+            };
+
+            const removePlayerSkillById = (targetPlayerId: string, skillId: string) => {
+              const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+              if (!player?.skills) return false
+              player.skills = player.skills.filter((s: any) => s.skillId !== skillId)
+              return true
+            };
+
+            const addPlayerStatusEffectById = (targetPlayerId: string, statusObject: any) => {
+              const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+              if (!player) return false
+              if (!player.statusTags) player.statusTags = []
+              player.statusTags.push({
+                ...statusObject,
+                name: statusObject.name || statusObject.type,
+                remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
+                remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
+                relatedRules: statusObject.relatedRules || []
+              })
+              return true
+            };
+
+            const removePlayerStatusEffectById = (targetPlayerId: string, statusId: string) => {
+              const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
+              if (!player?.statusTags) return false
+              const idx = player.statusTags.findIndex((t: any) => t.id === statusId)
+              if (idx !== -1) { player.statusTags.splice(idx, 1); return true }
+              return false
+            };
+
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, addRuleById, removeRuleById) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById) {
                 ${ruleData.skillCode}
-              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, addRuleById, removeRuleById)
+              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById)
             `;
             
             const result = eval(codeEnvironment);
@@ -688,6 +781,40 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                       player.rules = player.rules.filter((r: any) => r.id !== ruleId);
                       return true;
                     },
+                    addPlayerSkillById: (targetPlayerId: string, skillId: string) => {
+                      const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+                      if (!player) return false;
+                      if (!player.skills) player.skills = [];
+                      if (player.skills.some((s: any) => s.skillId === skillId)) return false;
+                      player.skills.push({ skillId, currentCooldown: 0 });
+                      return true;
+                    },
+                    removePlayerSkillById: (targetPlayerId: string, skillId: string) => {
+                      const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+                      if (!player?.skills) return false;
+                      player.skills = player.skills.filter((s: any) => s.skillId !== skillId);
+                      return true;
+                    },
+                    addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => {
+                      const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+                      if (!player) return false;
+                      if (!player.statusTags) player.statusTags = [];
+                      player.statusTags.push({
+                        ...statusObject,
+                        name: statusObject.name || statusObject.type,
+                        remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
+                        remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
+                        relatedRules: statusObject.relatedRules || []
+                      });
+                      return true;
+                    },
+                    removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => {
+                      const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+                      if (!player?.statusTags) return false;
+                      const idx = player.statusTags.findIndex((t: any) => t.id === statusId);
+                      if (idx !== -1) { player.statusTags.splice(idx, 1); return true; }
+                      return false;
+                    },
                     addSkillById: (targetPieceId, skillId) => {
                       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
                       if (targetPiece) {
@@ -777,6 +904,10 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                       const getHand = environment.getHand;
                       const addPlayerRuleById = environment.addPlayerRuleById;
                       const removePlayerRuleById = environment.removePlayerRuleById;
+                      const addPlayerSkillById = environment.addPlayerSkillById;
+                      const removePlayerSkillById = environment.removePlayerSkillById;
+                      const addPlayerStatusEffectById = environment.addPlayerStatusEffectById;
+                      const removePlayerStatusEffectById = environment.removePlayerStatusEffectById;
                       const Math = environment.Math;
                       const console = environment.console;
 
@@ -1352,15 +1483,24 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         };
       } else if (defaultOptions.type === 'grid' && context) {
         // 如果需要选择格子，检查context中的目标信息
-        if (context.targetPosition) {
-          // 如果有targetPosition，使用它
-          return context.targetPosition;
-        } else if (context.target && context.target.x !== undefined && context.target.y !== undefined) {
-          // 如果只有target，使用其位置
-          return {
-            x: context.target.x,
-            y: context.target.y
-          };
+        const gridPos = context.targetPosition ??
+          (context.target && context.target.x !== undefined && context.target.y !== undefined
+            ? { x: context.target.x, y: context.target.y }
+            : null);
+        if (gridPos) {
+          // 距离校验
+          if (defaultOptions.range !== undefined) {
+            const dist = Math.abs(sourcePiece.x - gridPos.x) + Math.abs(sourcePiece.y - gridPos.y);
+            if (dist > defaultOptions.range) {
+              return {
+                needsTargetSelection: true,
+                targetType: defaultOptions.type,
+                range: defaultOptions.range,
+                filter: defaultOptions.filter
+              };
+            }
+          }
+          return gridPos;
         }
       }
       
@@ -1542,8 +1682,8 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
 
   // 触发即将受到伤害前的触发器
   // piece = 被攻击者（事件源），target = 攻击者（事件目标）
-  const beforeDamageTakenResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "beforeDamageTaken",
+  const beforeDamageTakenCtx = {
+    type: "beforeDamageTaken" as const,
     piece: target,
     sourcePiece: target,
     targetPiece: attacker,
@@ -1551,7 +1691,13 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
     damage: modifiedBaseDamage,
     damageType,
     skillId
-  });
+  };
+  const beforeDamageTakenResult = globalTriggerSystem.checkTriggers(battle, beforeDamageTakenCtx);
+
+  // 捕回触发器管道中被修改的 damage 值
+  if (!beforeDamageTakenResult.blocked) {
+    modifiedBaseDamage = beforeDamageTakenCtx.damage;
+  }
 
   // 检查是否有规则阻止了伤害
   if (beforeDamageTakenResult.blocked) {
@@ -2204,7 +2350,41 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         player.rules = player.rules.filter((r: any) => r.id !== ruleId);
         return true;
       },
-      
+      addPlayerSkillById: (targetPlayerId: string, skillId: string) => {
+        const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+        if (!player) return false;
+        if (!player.skills) player.skills = [];
+        if (player.skills.some((s: any) => s.skillId === skillId)) return false;
+        player.skills.push({ skillId, currentCooldown: 0 });
+        return true;
+      },
+      removePlayerSkillById: (targetPlayerId: string, skillId: string) => {
+        const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+        if (!player?.skills) return false;
+        player.skills = player.skills.filter((s: any) => s.skillId !== skillId);
+        return true;
+      },
+      addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => {
+        const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+        if (!player) return false;
+        if (!player.statusTags) player.statusTags = [];
+        player.statusTags.push({
+          ...statusObject,
+          name: statusObject.name || statusObject.type,
+          remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
+          remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
+          relatedRules: statusObject.relatedRules || []
+        });
+        return true;
+      },
+      removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => {
+        const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
+        if (!player?.statusTags) return false;
+        const idx = player.statusTags.findIndex((t: any) => t.id === statusId);
+        if (idx !== -1) { player.statusTags.splice(idx, 1); return true; }
+        return false;
+      },
+
       // 工具函数
       Math,
       console
@@ -2243,6 +2423,10 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const removeRuleById = environment.removeRuleById;
               const addPlayerRuleById = environment.addPlayerRuleById;
               const removePlayerRuleById = environment.removePlayerRuleById;
+              const addPlayerSkillById = environment.addPlayerSkillById;
+              const removePlayerSkillById = environment.removePlayerSkillById;
+              const addPlayerStatusEffectById = environment.addPlayerStatusEffectById;
+              const removePlayerStatusEffectById = environment.removePlayerStatusEffectById;
               const removeStatusEffectById = environment.removeStatusEffectById;
               const addSkillById = environment.addSkillById;
               const removeSkillById = environment.removeSkillById;
@@ -2251,7 +2435,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const getHand = environment.getHand;
               const Math = environment.Math;
               const console = environment.console;
-              
+
               // 定义技能执行函数
               ${skillDef.code}
               

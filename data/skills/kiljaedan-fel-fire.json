@@ -1,0 +1,14 @@
+{
+  "id": "kiljaedan-fel-fire",
+  "name": "恒星之火",
+  "description": "对4格内一名敌方棋子造成攻击力×2的魔法伤害。若此次攻击将目标击杀，对目标周围3×3范围内所有其他敌人造成等量魔法伤害（连环爆炸）",
+  "icon": "🔥",
+  "kind": "active",
+  "type": "normal",
+  "actionPointCost": 2,
+  "cooldownTurns": 1,
+  "range": "single",
+  "powerMultiplier": 2.0,
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.round(caster.attack * 2.0); var result = dealDamage(caster, target, damage, 'magical', battle, 'kiljaedan-fel-fire'); var actualDamage = result && result.damage !== undefined ? result.damage : damage; var msg = caster.name + '的恒星之火命中' + target.name + '，造成' + actualDamage + '点魔法伤害'; if (result && result.isKilled) { var tx = target.x; var ty = target.y; var chainTargets = battle.pieces.filter(function(p) { return p.instanceId !== caster.instanceId && p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && Math.abs(p.x - tx) <= 1 && Math.abs(p.y - ty) <= 1; }); if (chainTargets.length > 0) { dealDamage(caster, chainTargets, damage, 'magical', battle, 'kiljaedan-fel-fire'); msg += '！击杀触发连环爆炸，对周围' + chainTargets.length + '个敌人各造成' + damage + '点魔法伤害！'; } else { msg += '！目标被击杀，但周围无其他敌人！'; } } return { success: true, message: msg }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内一个敌方造成攻击力×2（' + (piece.attack * 2) + '）魔法伤害，击杀时3×3连环爆炸', expectedValues: { damage: piece.attack * 2 } }; }"
+}

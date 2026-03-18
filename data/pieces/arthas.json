@@ -1,0 +1,22 @@
+{
+  "id": "arthas",
+  "name": "阿尔萨斯·梅涅希尔",
+  "faction": "red",
+  "description": "巫妖王，死亡骑士的主宰。以霜之哀伤吞噬灵魂，以冰霜之力掌控战场，以巫妖誓约为盟友赐予第二条生命",
+  "rarity": "legendary",
+  "image": "arthas.jpg",
+  "stats": {
+    "maxHp": 12,
+    "attack": 3,
+    "defense": 1,
+    "moveRange": 3
+  },
+  "skills": [
+    { "skillId": "arthas-frostmourne", "level": 1 },
+    { "skillId": "arthas-icebound-fortitude", "level": 1 },
+    { "skillId": "arthas-howling-blast", "level": 1 },
+    { "skillId": "arthas-lich-covenant", "level": 1 }
+  ],
+  "rules": [],
+  "isDefault": false
+}

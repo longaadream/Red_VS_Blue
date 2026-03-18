@@ -6,7 +6,7 @@
   "rarity": "legendary",
   "image": "guldan.jpg",
   "stats": {
-    "maxHp": 10,
+    "maxHp": 11,
     "attack": 4,
     "defense": 0,
     "moveRange": 3

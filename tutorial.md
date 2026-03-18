@@ -22,6 +22,7 @@
 18. [地图设计教程](#地图设计教程)
 19. [手牌卡牌系统](#手牌卡牌系统)
 20. [玩家级别规则（Player-Level Rules）](#玩家级别规则player-level-rules)
+20a. [玩家规则自消耗模式（位置绑定效果）](#玩家级别规则的自消耗模式位置绑定效果)
 21. [tileEffects 视觉效果系统](#tileeffects-视觉效果系统)
 22. [持续时间管理规范](#持续时间管理规范)
 23. [triggerSkill 上下文填充规则](#triggerSkill-上下文填充规则)
@@ -257,6 +258,8 @@ const skillContext = {
 3. 禁止解构赋值后创建新对象（`{ ...context }`）
 4. 禁止通过函数参数重新赋值创建新引用
 
+> **引擎内部例外说明**（技能编写者无需关注）：`checkTriggers` 内部在 Section 1（全局规则）和 Section 3（玩家规则）中，由于需要注入额外字段（`rulePiece`、`playerId`），会用 `{ ...context }` 创建浅拷贝再执行规则。但执行后引擎会将 `pieceContext.damage` / `playerContext.damage` **写回原始 context**，保证伤害管道连续。技能编写者只需正常读写 `context.damage` 即可，引擎保证值的正确性。
+
 ---
 
 ## Context 引用传递机制（重要）
@@ -413,7 +416,8 @@ data/
 | `kind` | `"active"` \| `"passive"` | ✅ | `active`=玩家手动释放；`passive`=由规则触发 |
 | `type` | `"normal"` \| `"super"` \| `"ultimate"` | ✅ | `normal`=普通技能；`super`=充能技能；`ultimate`=限定技（只能用一次） |
 | `cooldownTurns` | number | ✅ | 冷却回合数，0=无冷却 |
-| `maxCharges` | number | ✅ | 最大充能层数，普通技能填 0 |
+| `maxCharges` | number | ✅ | **实际未被游戏逻辑读取**，填 0 即可。充能技能的限制只由 `chargeCost`（消耗点数）控制 |
+| `chargeCost` | number | 否 | 仅 `type: "super"` 需要填写，表示使用该技能消耗的充能点数（如 `2`）。未填则为普通技能 |
 | `powerMultiplier` | number | ✅ | 威力系数，用于伤害计算，如 `1.5` 代表 150% |
 | `actionPointCost` | number | ✅ | 消耗的行动点，被动技能填 0 |
 | `code` | string | ✅ | **技能效果代码**，必须定义 `executeSkill(context)` 函数 |
@@ -447,7 +451,7 @@ function calculatePreview(piece, skillDef) {
 ### 关于 `kind` 字段
 
 - **`"active"`**（主动技能）：玩家在战斗界面点击按钮释放。技能代码在释放时执行。
-- **`"passive"`**（被动技能）：不显示在操作按钮中。由规则系统在特定时机调用。被动技能的效果完全通过规则触发。
+- **`"passive"`**（被动技能）：**显示在技能面板中**（作为展示条目），但不显示操作按钮。效果完全通过规则系统触发，与规则配合使用。也可以创建一个纯展示用的被动技能条目（只有 `kind: "passive"`，没有配套规则），用于在技能列表中展示"该角色有某被动属性"，无需实际触发逻辑（逻辑由其他规则实现）。
 
 ### 关于 JSON 中的换行
 
@@ -540,7 +544,7 @@ context = {
 
 #### `dealDamage(attacker, target, baseDamage, damageType, battle, skillId)`
 
-对目标造成伤害。自动处理防御力减免、触发器、护盾、击杀奖励。
+对目标造成伤害。自动处理防御力减免、触发器、护盾、击杀奖励。**击杀目标时，自动为 `attacker.ownerPlayerId` 玩家增加 1 点充能点**（无需额外代码）。
 
 **`target` 支持单个棋子或棋子数组。** 传入数组时，`beforeDamageDealt` 触发器（含 buff 消耗）**只触发一次**，所有目标共享同一次 buff 修改后的伤害值——这是 AoE 技能的正确写法。
 
@@ -668,11 +672,14 @@ addStatusEffectById(target.instanceId, {
 
 #### `removeStatusEffectById(targetPieceId, statusId)`
 
-移除棋子的指定状态标签。
+移除棋子的指定状态标签。**同时会触发 `afterStatusRemoved` 触发器**，传入 `{ statusId, sourcePiece: 该棋子, playerId }` 上下文。任何监听 `afterStatusRemoved` 的规则（如莉亚德琳的"圣光回响"）都会在此时执行。
 
 ```javascript
 removeStatusEffectById(target.instanceId, 'bleeding')
+// → 移除标签，并触发 afterStatusRemoved（如果有监听规则）
 ```
+
+> **在规则 `skillCode` 中**，务必调用此函数而非直接 `piece.statusTags.splice(idx, 1)`。直接 splice 绕过触发器，后续监听 `afterStatusRemoved` 的规则不会触发。
 
 ### 规则管理
 
@@ -702,7 +709,7 @@ addPlayerRuleById(sourcePiece.ownerPlayerId, 'rule-faction-buff')
 
 #### `removePlayerRuleById(targetPlayerId, ruleId)`
 
-从玩家移除一个玩家级别规则。
+从玩家移除一个玩家级别规则。**在规则 `skillCode` 和技能 `code` 中均可调用**（不仅限于技能）。
 
 ```javascript
 removePlayerRuleById(sourcePiece.ownerPlayerId, 'rule-faction-buff')
@@ -1152,7 +1159,12 @@ return {
 
 #### 同一级别内的执行顺序
 
-在同一级别内，规则按照它们在数组中的**原始顺序**执行。后执行的规则可以覆盖先执行规则对 `context` 的修改。
+在同一级别内，规则先按 `priority` **降序**排列（数值越大越先执行），相同优先级则按数组原始顺序执行。
+
+**伤害管道（Damage Pipeline）**：在 `beforeDamageTaken` 触发类型中，每条规则执行后，它对 `context.damage` 的修改会**立即写回主 context**，供后续规则看到。这意味着：
+- 规则A（priority=100）将伤害从 10 改为 4
+- 规则B（priority=-100）看到的是 4，而不是原始的 10
+- 最终伤害计算也使用管道最末端的值（4）
 
 #### 优先级设计模式
 
@@ -1184,8 +1196,8 @@ return {
 
 除了 priority 字段，还可以通过以下方式控制顺序：
 
-1. **全局规则 vs 棋子规则**：全局规则总是先于棋子规则执行
-2. **在技能代码中提前返回**：如果前置规则已经 `blocked`，后续规则不会执行
+1. **全局规则 vs 棋子规则 vs 玩家规则**：Section 1（全局）→ Section 2（棋子）→ Section 3（玩家）→ Section 4（手牌）
+2. **blocked 跨 Section 传播**：任意 Section 中的规则返回 `blocked: true`，或 `context.damage` 降至 ≤ 0，后续所有 Section 的规则**全部停止执行**（不仅仅是当前 Section）
 
 #### 示例：艾露恩的守护 + 飞段不死神体的优先级设计
 
@@ -1209,13 +1221,14 @@ return {
 }
 ```
 
-**艾露恩的守护**（priority=-100）实现逻辑：
+**艾露恩的守护** — 两层规则架构：
 
-1. 检查是否为致命伤害（`targetPiece.currentHp <= damage`）
-2. 检查泰兰德是否在场
-3. 检查该友方单位本场战斗是否已触发过守护
-4. 如果满足条件，添加已守护标记并恢复生命
-5. 返回 `blocked: true` 阻止原始伤害 → 飞段不死神体不再执行
+艾露恩守护是"棋子初始化 + 玩家级别规则"的典型模式：
+
+- **层1（棋子规则）**：`rule-elune-protection`，trigger = `gameStart`，挂在泰兰德身上。游戏开始时为该玩家添加 `elune-protection` statusTag，并通过 `addPlayerRuleById` 把 `rule-elune-protection-player` 挂到玩家身上。这样即使泰兰德死亡，守护效果依然存在。
+- **层2（玩家规则）**：`rule-elune-protection-player`，trigger = `beforeDamageTaken`，priority = -100，挂在 `player.rules[]`。受到伤害时检查友方棋子是否为致命伤，消耗 statusTag，免疫并回血。
+
+为什么守护能正确判断"不致命"：因为有了**伤害管道**，`context.damage` 在到达 priority=-100 的艾露恩守护之前，已经被所有更高优先级的规则（如圣盾，Section 2）修改过了。圣盾若触发则 blocked=true，Section 3 整体跳过，艾露恩守护根本不会执行。
 
 **飞段不死神体**（priority=-101）在艾露恩守护之后执行，作为最后的救命保险。
 
@@ -1226,10 +1239,11 @@ return {
 
 #### 最佳实践
 
-1. **伤害减免类规则**应该尽早执行，减少后续规则需要处理的伤害值
-2. **伤害免疫/救援类规则**应该最后执行，作为最后的保险
+1. **伤害减免类规则**应该尽早执行（高 priority），减少后续规则需要处理的伤害值
+2. **伤害免疫/救援类规则**应该最后执行（低 priority），作为最后的保险
 3. **在技能代码中检查条件**：即使规则被触发，也要在 `skillCode` 中检查所有条件，确保逻辑正确
-4. **使用 `blocked` 谨慎**：一旦一个规则返回 `blocked: true`，**同一时机的后续规则全部停止执行**，原始行动也被阻止。要让某规则在 blocked 后仍能执行，必须给它设置更高的 priority（更大的数值）
+4. **使用 `blocked` 谨慎**：一旦某规则返回 `blocked: true`，或 `context.damage` 降至 ≤ 0，**全部 4 个 Section 的后续规则均停止执行**，原始行动也被阻止。要让某规则在 blocked 后仍能执行，必须给它设置更高的 priority（更大数值）并位于更早的 Section。
+5. **在 `beforeDamageTaken` 中读取 `context.damage` 前无需担心伤害管道问题**：引擎保证此时的值已经是之前所有规则修改后的值。只需直接读取即可。
 
 ### 示例：反击被动技能
 
@@ -1705,51 +1719,52 @@ if (bleedTag) {
 
 ### 圣盾完整示例
 
-**步骤1：施加圣盾的技能**
+圣盾是"施加 statusTag + 添加 piece 规则"的标准模式。规则使用 `skillCode` 内联逻辑，无需单独的技能文件。
 
-```json
-{
-  "id": "divine-shield-cast",
-  "name": "圣盾",
-  "description": "为友军施加圣盾，抵挡一次伤害",
-  "icon": "🛡️",
-  "kind": "active",
-  "type": "normal",
-  "cooldownTurns": 3,
-  "maxCharges": 0,
-  "powerMultiplier": 1,
-  "actionPointCost": 2,
-  "code": "function executeSkill(context) { const caster = context.piece; const target = selectTarget({ type: 'piece', range: 7, filter: 'ally' }); if (!target || target.needsTargetSelection) return target; addStatusEffectById(target.instanceId, { id: 'divine-shield', type: 'divine-shield', currentDuration: -1, currentUses: 1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); addRuleById(target.instanceId, 'rule-divine-shield'); return { success: true, message: caster.name + '为' + target.name + '施加了圣盾' }; }"
+**步骤1：施加圣盾的主动技能**
+
+```javascript
+// data/skills/divine-shield-cast.json（code 字段）
+function executeSkill(context) {
+  var caster = context.piece;
+  var target = selectTarget({ type: 'piece', range: 7, filter: 'ally' });
+  if (!target || target.needsTargetSelection) return target;
+  // 添加 statusTag（UI 显示盾图标）
+  addStatusEffectById(target.instanceId, {
+    id: 'divine-shield',
+    name: '圣盾',
+    type: 'divine-shield',
+    currentDuration: -1,   // 永久（靠消耗次数控制）
+    currentUses: 1,
+    intensity: 1,
+    stacks: 1
+  });
+  // 添加触发规则（棋子级别）
+  addRuleById(target.instanceId, 'rule-divine-shield');
+  return { success: true, message: caster.name + '为' + target.name + '施加了圣盾' };
 }
 ```
 
-**步骤2：圣盾触发规则**
+**步骤2：圣盾触发规则（`data/rules/rule-divine-shield.json`）**
+
+使用 `skillCode` 内联逻辑，无需单独技能文件：
 
 ```json
 {
   "id": "rule-divine-shield",
-  "name": "圣盾效果",
-  "description": "受到伤害时触发圣盾",
+  "name": "圣盾",
+  "description": "下次受到伤害时，完全抵挡并消耗圣盾",
   "trigger": { "type": "beforeDamageTaken" },
-  "effect": { "type": "triggerSkill", "skillId": "divine-shield-block", "message": "" }
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'divine-shield'; }); if (!tag) return { success: false, message: '' }; removeStatusEffectById(piece.instanceId, tag.id); removeRuleById(piece.instanceId, 'rule-divine-shield'); return { success: true, blocked: true, message: piece.name + '的圣盾抵挡了这次伤害！' };"
 }
 ```
 
-**步骤3：圣盾防御技能**
+**关键说明：**
 
-```json
-{
-  "id": "divine-shield-block",
-  "name": "圣盾抵挡",
-  "kind": "passive",
-  "type": "normal",
-  "cooldownTurns": 0,
-  "maxCharges": 0,
-  "powerMultiplier": 1,
-  "actionPointCost": 0,
-  "code": "function executeSkill(context) { const piece = context.piece; const hasShield = piece.statusTags && piece.statusTags.some(function(tag) { return tag.type === 'divine-shield'; }); if (!hasShield) { removeRuleById(piece.instanceId, 'rule-divine-shield'); return { success: true, blocked: false, message: '' }; } if (!context.damage || context.damage <= 0) { return { success: true, blocked: false, message: '' }; } removeStatusEffectById(piece.instanceId, 'divine-shield'); removeRuleById(piece.instanceId, 'rule-divine-shield'); const attackerName = context.target ? context.target.name : '未知'; return { success: true, blocked: true, message: piece.name + '的圣盾破裂，抵挡了来自' + attackerName + '的伤害' }; }"
-}
-```
+- `context.rulePiece`：规则绑定的棋子（拥有圣盾的那个棋子）
+- `context.sourcePiece.instanceId === piece.instanceId`：确认是该棋子受到攻击，而非别的棋子
+- `blocked: true`：圣盾触发后，由于 **blocked 跨 Section 传播**，玩家级别的艾露恩守护（Section 3）不再执行
+- **必须用 `removeStatusEffectById` 而非直接 splice**：`removeStatusEffectById` 会触发 `afterStatusRemoved`，使监听该事件的规则（如圣光回响）能够在圣盾**被伤害消耗时**也能触发
 
 ---
 
@@ -2628,6 +2643,32 @@ if (hand.length > 0) discardCard(hand[0].instanceId)
 | `Math` | 标准 JavaScript Math |
 | `console` | `console.log` / `console.error` 用于调试 |
 
+### 无来源伤害（仪式/环境伤害）
+
+某些卡牌效果造成的伤害不应来自任何棋子（如"仪式消耗""环境惩罚"），此时不能用施法棋子作为攻击者。可以构造一个**匿名仪式对象**作为 `dealDamage` 的第一个参数：
+
+```javascript
+function executeCard(context) {
+  var target = selectTarget({ type: 'piece', filter: 'ally', range: 99 });
+  if (!target || target.needsTargetSelection) return target || { needsTargetSelection: true, targetType: 'piece', range: 99, filter: 'ally' };
+
+  // 构造匿名来源：ownerPlayerId 设为施法玩家，这样击杀时充能点归己方
+  var ritual = {
+    instanceId: 'ritual-source',
+    name: null,                        // 不显示来源名字
+    ownerPlayerId: playerId,           // 充能点归属
+    attack: 0,
+    defense: 0
+  };
+  dealDamage(ritual, target, 5, 'true', battle, 'ritual-card');
+  return { success: true, message: target.name + '承受了仪式的5点真实伤害' };
+}
+```
+
+> **充能点说明**：`dealDamage` 击杀时自动给 `attacker.ownerPlayerId` 的玩家 +1 充能点。若匿名来源的 `ownerPlayerId` 设为 `playerId`，击杀己方棋子仍会为己方计入充能，行为与玩家自己的棋子击杀一致。
+
+---
+
 ### AP 消耗
 
 在卡牌定义中设置 `actionPointCost` 字段，系统会在 `playCard` 执行前自动检查并扣除，**无需在卡牌代码里手动判断或扣除**：
@@ -2996,6 +3037,119 @@ function executeSkill(context) {
   // dealDamage(context.piece, ...)  // 会崩溃！
 }
 ```
+
+---
+
+## 玩家级别 beforeDamageTaken 规则（跨棋子守护模式）
+
+### 概念
+
+某些 buff 效果需要"当**任意**友方棋子受到致命伤害时触发"，而不是某个特定棋子触发。这类效果应实现为**玩家级别规则** + `beforeDamageTaken`，而非棋子级别规则。
+
+### 艾露恩的守护 — 完整实现
+
+这是最典型的跨棋子守护模式：
+
+**层1：棋子初始化规则（`data/rules/rule-elune-protection.json`）**
+
+挂在泰兰德棋子身上，trigger = `gameStart`，负责向玩家注入 statusTag 和玩家级别规则：
+
+> **`gameStart` 规则给棋子添加 statusTag 的最佳写法**：直接 `piece.statusTags.push({...})`，而非 `addStatusEffectById(piece.instanceId, {...})`。原因：在 `gameStart` 阶段，`addStatusEffectById` 内部需要通过 `instanceId` 在 `battle.pieces` 中查找棋子，而此时对象引用关系可能尚未完全建立。直接在 `context.rulePiece` 上 push 则始终有效，因为 `context.rulePiece` 就是该棋子实例的直接引用。
+
+```json
+{
+  "id": "rule-elune-protection",
+  "name": "艾露恩的守护初始化",
+  "trigger": { "type": "gameStart" },
+  "skillCode": "var tyrande = context.rulePiece; if (!tyrande) return { success: false }; var playerId = tyrande.ownerPlayerId; var player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player) return { success: false }; if (!player.statusTags) player.statusTags = []; var existing = player.statusTags.find(function(t) { return t.type === 'elune-protection'; }); if (existing) return { success: false }; player.statusTags.push({ id: 'elune-protection', type: 'elune-protection', name: '艾露恩的守护', description: '当友方任意棋子受到致命伤害时，免疫该伤害并恢复5点生命（全队共用一次）' }); addPlayerRuleById(playerId, 'rule-elune-protection-player'); return { success: true, message: '艾露恩的守护已就绪' };"
+}
+```
+
+**层2：玩家级别守护规则（`data/rules/rule-elune-protection-player.json`）**
+
+挂在 `player.rules[]`，trigger = `beforeDamageTaken`，priority = -100：
+
+```json
+{
+  "id": "rule-elune-protection-player",
+  "name": "艾露恩的守护",
+  "trigger": { "type": "beforeDamageTaken" },
+  "priority": -100,
+  "skillCode": "var player = battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player) return { success: false }; var targetPiece = context.piece; if (!targetPiece || targetPiece.ownerPlayerId !== player.playerId) return { success: false }; var rawDamage = context.damage; if (!rawDamage || rawDamage <= 0) return { success: false }; var defense = targetPiece.defense || 0; var damageType = context.damageType; var effectiveDamage; if (damageType === 'true' || damageType === 'toxin') { effectiveDamage = Math.max(1, Math.floor(rawDamage)); } else { effectiveDamage = Math.max(1, Math.floor(rawDamage - defense)); } if (targetPiece.currentHp > effectiveDamage) return { success: false }; if (!player.statusTags) return { success: false }; var shieldTag = player.statusTags.find(function(t) { return t.type === 'elune-protection'; }); if (!shieldTag) return { success: false }; player.statusTags = player.statusTags.filter(function(t) { return t.type !== 'elune-protection'; }); targetPiece.currentHp = Math.min(targetPiece.currentHp + 5, targetPiece.maxHp); return { success: true, blocked: true, message: '艾露恩的守护：' + (targetPiece.name || targetPiece.templateId) + '免疫致命伤害并恢复5点生命（守护已消耗）' };"
+}
+```
+
+### 关键要点
+
+| 要点 | 说明 |
+|------|------|
+| `context.playerId` | 玩家规则中识别阵营的唯一方式，`context.piece` 在此为 null |
+| `context.piece` | 在 `beforeDamageTaken` 中，此字段是**受攻击的棋子**（非规则绑定棋子） |
+| `context.damage` | 已经过伤害管道处理，反映所有更高优先级规则的修改结果 |
+| 致命判断需手动计算防御 | `context.damage` 是原始伤害值，需减去 `targetPiece.defense` 再比较 HP |
+| 泰兰德死亡后守护仍有效 | 因为规则挂在 `player.rules[]`，而非棋子身上 |
+| 圣盾优先于守护 | 圣盾是 Section 2（棋子规则），守护是 Section 3（玩家规则）。圣盾 blocked=true 后 Section 3 整体跳过 |
+
+---
+
+## 玩家级别规则的"自消耗"模式（位置绑定效果）
+
+### 概念
+
+某些技能需要"标记一个位置，当敌人进入该位置时触发一次性效果"，可以用**玩家 statusTag 存储位置 + 玩家规则监听 `afterMove`** 实现。触发后规则和 statusTag 同时自我销毁，无需每回合全场扫描。
+
+这是比"给目标格子附加规则"或"全场 whenever 扫描"更干净的模式。
+
+### 示例：致命毒素（地格陷阱）
+
+技能效果：在目标格放置毒素陷阱，当敌人进入该格时造成伤害并消耗毒素。
+
+**步骤1：主动技能设置陷阱**（`data/skills/lethal-toxin.json` 节选）
+
+```javascript
+function executeSkill(context) {
+  var caster = context.piece;
+  var pos = selectTarget({ type: 'grid', range: 5, filter: 'all' });
+  if (!pos || pos.needsTargetSelection) return pos;
+
+  var player = context.battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; });
+  if (!player.statusTags) player.statusTags = [];
+
+  // 将陷阱位置存入玩家 statusTag
+  player.statusTags.push({
+    id: 'lethal-toxin-' + Date.now(),
+    type: 'lethal-toxin',
+    name: '致命毒素',
+    value: pos.x,          // 陷阱 X 坐标
+    extraValue: pos.y,     // 陷阱 Y 坐标
+    intensity: 4           // 伤害值
+  });
+
+  // 绑定玩家级别规则监听敌人移动
+  addPlayerRuleById(caster.ownerPlayerId, 'rule-blackwidow-toxin-player');
+  return { success: true, message: caster.name + '在(' + pos.x + ',' + pos.y + ')放置了致命毒素陷阱' };
+}
+```
+
+**步骤2：玩家级别监听规则**（`data/rules/rule-blackwidow-toxin-player.json`）
+
+```json
+{
+  "id": "rule-blackwidow-toxin-player",
+  "trigger": { "type": "afterMove" },
+  "skillCode": "var mover = context.sourcePiece; if (!mover || mover.currentHp <= 0) return { success: false, message: '' }; if (mover.ownerPlayerId === context.playerId) return { success: false, message: '' }; var player = battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player || !player.statusTags) return { success: false, message: '' }; var toxinTag = null; for (var i = 0; i < player.statusTags.length; i++) { if (player.statusTags[i].type === 'lethal-toxin') { toxinTag = player.statusTags[i]; break; } } if (!toxinTag) { removePlayerRuleById(context.playerId, 'rule-blackwidow-toxin-player'); return { success: false, message: '' }; } if (mover.x === toxinTag.value && mover.y === toxinTag.extraValue) { var damage = toxinTag.intensity || 4; var casterPiece = battle.pieces.find(function(p) { return p.ownerPlayerId === context.playerId && p.currentHp > 0; }); dealDamage(casterPiece || mover, mover, damage, 'true', battle, 'lethal-toxin'); removePlayerStatusEffectById(context.playerId, toxinTag.id); removePlayerRuleById(context.playerId, 'rule-blackwidow-toxin-player'); return { success: true, message: mover.name + '触发了致命毒素，受到' + damage + '点真实伤害！' }; } return { success: false, message: '' };"
+}
+```
+
+**关键说明：**
+
+| 要点 | 说明 |
+|------|------|
+| `context.sourcePiece` | `afterMove` 中，移动的棋子（而非规则绑定棋子）|
+| 陷阱位置存 `value`/`extraValue` | StatusTag 的自定义字段，规则从中读取坐标 |
+| `removePlayerStatusEffectById` | 规则环境中可用，移除玩家 statusTag（不是棋子 statusTag）|
+| `removePlayerRuleById` | 规则环境中可用，规则触发后自我销毁 |
+| 未找到 statusTag 时也自销毁 | 防止孤立规则持续监听 |
 
 ---
 
@@ -3730,7 +3884,18 @@ var clone = {
   displayDefense: caster.defense || 0,
   displayMoveRange: caster.moveRange,
 };
-battle.pieces.push(clone);
+
+// ✅ 推荐：插入到真身旁边（随机选前或后），避免分身总在列表末尾
+var casterIdx = -1;
+for (var ci = 0; ci < battle.pieces.length; ci++) {
+  if (battle.pieces[ci].instanceId === caster.instanceId) { casterIdx = ci; break; }
+}
+if (casterIdx >= 0) {
+  var insertBefore = Math.random() < 0.5;
+  battle.pieces.splice(insertBefore ? casterIdx : casterIdx + 1, 0, clone);
+} else {
+  battle.pieces.push(clone);
+}
 ```
 
 ### masterPieceId 的 UI 效果

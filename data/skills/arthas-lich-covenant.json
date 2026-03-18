@@ -1,0 +1,16 @@
+{
+  "id": "arthas-lich-covenant",
+  "name": "巫妖誓约",
+  "description": "为3格内一名友军棋子施加「巫妖誓约」buff（永久）：当该棋子受到致命伤害时，拦截死亡，HP恢复至满血，攻击力永久+50%，所有技能冷却清零，进入永久「亡灵之躯」状态",
+  "icon": "💀",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 3,
+  "maxCharges": 3,
+  "chargeCost": 2,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "range": "single",
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 3, filter: 'ally' }); if (!target || target.needsTargetSelection) return target; var hasCovenantBuff = target.statusTags && target.statusTags.some(function(t) { return t.type === 'lich-covenant'; }); if (hasCovenantBuff) return { success: false, message: target.name + '已拥有巫妖誓约' }; addStatusEffectById(target.instanceId, { id: 'lich-covenant-' + target.instanceId, name: '巫妖誓约', type: 'lich-covenant', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-arthas-lich-covenant'] }); addRuleById(target.instanceId, 'rule-arthas-lich-covenant'); return { success: true, message: caster.name + '对' + target.name + '施加了巫妖誓约——当受到致命伤害时将从死亡中复活，HP恢复至满血并进入亡灵之躯强化状态（2回合）！' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '为3格内友军施加巫妖誓约（永久）：受到致命伤害时复活，满血复活+攻击永久×1.5+冷却清零+永久亡灵之躯', expectedValues: {} }; }"
+}

@@ -6,7 +6,7 @@
   "rarity": "legendary",
   "image": "obito.jpg",
   "stats": {
-    "maxHp": 11,
+    "maxHp": 13,
     "attack": 3,
     "defense": 1,
     "moveRange": 4

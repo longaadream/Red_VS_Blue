@@ -584,7 +584,13 @@ export default function TrainingPage() {
                     ) : isSelectingCardTarget ? (
                       <>
                         <p className="text-xs text-muted-foreground text-center">
-                          请点击棋盘上的友方棋子选择手牌目标
+                          {targetSelectionType === 'grid'
+                            ? '请点击棋盘上的格子'
+                            : targetSelectionFilter === 'ally'
+                              ? '请点击棋盘上的友方棋子'
+                              : targetSelectionFilter === 'enemy'
+                                ? '请点击棋盘上的敌方棋子'
+                                : '请点击棋盘上的棋子或格子'}
                         </p>
                         <Button
                           className="w-full"
@@ -854,6 +860,14 @@ export default function TrainingPage() {
                         toY: y,
                       })
                       setIsSelectingMoveTarget(false)
+                    } else if (isSelectingCardTarget && pendingCardAction && targetSelectionType === 'grid') {
+                      sendBattleAction({
+                        ...pendingCardAction,
+                        targetX: x,
+                        targetY: y,
+                      } as BattleAction)
+                      setIsSelectingCardTarget(false)
+                      setPendingCardAction(null)
                     } else if (isSelectingSkillTarget && selectedPiece && selectedSkillId) {
                       sendBattleAction({
                         type: selectedSkillType === "super" ? "useChargeSkill" : "useBasicSkill",

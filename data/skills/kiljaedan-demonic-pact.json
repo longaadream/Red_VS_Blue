@@ -1,0 +1,10 @@
+{
+  "id": "kiljaedan-demonic-pact",
+  "name": "恶魔仪式",
+  "description": "战斗开始时，基尔加丹隐匿于虚空，在红方手牌中留下「恶魔召唤（1）」。依次打出5张召唤牌（承受2，3，4，5，6点真实自伤），第5张将基尔加丹召唤至指定格子",
+  "icon": "🔮",
+  "kind": "passive",
+  "type": "passive",
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { var kj = context.piece; if (!kj) return { success: false, message: '' }; var idx = battle.pieces.findIndex(function(p) { return p.instanceId === kj.instanceId; }); if (idx === -1) return { success: false, message: '' }; battle.pieces.splice(idx, 1); if (!battle.extensions) battle.extensions = {}; var strippedRules = (kj.rules || []).map(function(r) { var rc = {}; for (var k in r) { if (k !== 'effect') rc[k] = r[k]; } return rc; }); battle.extensions.kiljaedanPiece = JSON.parse(JSON.stringify(Object.assign({}, kj, { rules: strippedRules }))); addCardToHand('demon-summon-1', kj.ownerPlayerId); return { success: true, message: '基尔加丹隐匿于虚空之中，等待召唤...' }; }"
+}

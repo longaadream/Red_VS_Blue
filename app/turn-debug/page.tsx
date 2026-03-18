@@ -50,6 +50,7 @@ interface CardInstance {
   cardId: string
   instanceId: string
   ownerPlayerId: string
+  name?: string
 }
 
 interface PlayerMeta {
@@ -76,12 +77,14 @@ interface ActionLog {
 }
 
 interface BattleState {
+  map: { width: number; height: number; tiles: Array<{ x: number; y: number; props: { walkable?: boolean; [k: string]: any } }> }
   pieces: PieceInstance[]
   graveyard: PieceInstance[]
   players: PlayerMeta[]
   turn: TurnState
   skillsById: Record<string, { id: string; name: string; actionPointCost: number; cooldownTurns: number; chargeCost?: number; type: string }>
   actions?: ActionLog[]
+  extensions?: Record<string, any>
 }
 
 interface TargetRequest {
@@ -366,7 +369,7 @@ export default function TurnDebugPage() {
   }
 
   const handleSelectTarget = (target: PieceInstance) => {
-    if (!targetReq || !battle) return
+    if (!targetReq || !battle || targetReq.targetType === "grid") return
     act({ ...targetReq.pendingAction, targetPieceId: target.instanceId })
   }
 
@@ -602,12 +605,50 @@ export default function TurnDebugPage() {
             <div className="flex items-center gap-3 border-b border-yellow-700 bg-yellow-950 px-4 py-2">
               <Target className="h-4 w-4 shrink-0 text-yellow-400" />
               <span className="flex-1 text-sm text-yellow-300">
-                请选择目标（
-                {targetReq.filter === "enemy" ? "敌方棋子" : targetReq.filter === "ally" ? "友方棋子" : "任意棋子"}，范围 {targetReq.range} 格）
+                {targetReq.targetType === "grid"
+                  ? `请在棋盘上选择一个格子（范围 ${targetReq.range} 格）`
+                  : `请选择${targetReq.filter === "enemy" ? "敌方" : targetReq.filter === "ally" ? "友方" : "任意"}棋子（范围 ${targetReq.range} 格）`}
               </span>
               <button onClick={cancelTarget} className="text-yellow-500 hover:text-yellow-300">
                 <X className="h-4 w-4" />
               </button>
+            </div>
+          )}
+          {targetReq && targetReq.targetType === "grid" && battle && (
+            <div className="border-b border-yellow-800 bg-zinc-900 px-4 py-3">
+              <div className="mb-1 text-xs text-zinc-500">点击格子选择召唤位置</div>
+              <div
+                className="inline-grid gap-0.5"
+                style={{ gridTemplateColumns: `repeat(${battle.map.width}, minmax(0, 1fr))` }}
+              >
+                {Array.from({ length: battle.map.height }, (_, y) =>
+                  Array.from({ length: battle.map.width }, (_, x) => {
+                    const tile = battle.map.tiles.find(t => t.x === x && t.y === y)
+                    const piece = battle.pieces.find(p => p.x === x && p.y === y)
+                    const walkable = tile?.props?.walkable !== false
+                    return (
+                      <button
+                        key={`${x}-${y}`}
+                        disabled={!walkable}
+                        onClick={() => act({ ...targetReq.pendingAction, targetX: x, targetY: y })}
+                        title={piece ? piece.name : `(${x},${y})`}
+                        className={[
+                          "h-8 w-8 rounded text-[10px] font-medium transition-colors",
+                          !walkable
+                            ? "cursor-not-allowed bg-zinc-800 text-zinc-700"
+                            : piece
+                              ? (piece.ownerPlayerId === "debug-red"
+                                  ? "bg-red-900/60 text-red-300 hover:bg-red-700/60 cursor-pointer ring-1 ring-red-700"
+                                  : "bg-blue-900/60 text-blue-300 hover:bg-blue-700/60 cursor-pointer ring-1 ring-blue-700")
+                              : "bg-zinc-700 text-zinc-400 hover:bg-yellow-700/60 hover:text-yellow-200 cursor-pointer",
+                        ].join(" ")}
+                      >
+                        {piece ? piece.name.slice(0, 1) : `${x},${y}`}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
             </div>
           )}
 
@@ -644,7 +685,7 @@ export default function TurnDebugPage() {
                   {hand.map((card) => (
                     <button
                       key={card.instanceId}
-                      disabled={!isActionPhase}
+                      disabled={!isActionPhase || !!targetReq}
                       onClick={() => handlePlayCard(card.instanceId)}
                       className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition-colors hover:border-yellow-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
                     >

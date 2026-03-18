@@ -9,6 +9,7 @@ import {
   Map,
   Dumbbell,
   Wrench,
+  Compass,
   type LucideIcon,
 } from "lucide-react"
 
@@ -40,6 +41,15 @@ export interface MenuItem {
 
 /** All menu items – reorder, add or remove entries freely */
 export const MENU_ITEMS: MenuItem[] = [
+  {
+    id: "tutorial",
+    label: "新手教程",
+    description: "手把手带你入门游戏",
+    icon: Compass,
+    href: "/tutorial",
+    variant: "default",
+    enabled: true,
+  },
   {
     id: "play",
     label: "1v1 Duel",

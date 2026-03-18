@@ -1,0 +1,10 @@
+{
+  "id": "demon-summon-2",
+  "name": "恶魔召唤（2）",
+  "description": "消耗1AP，对一名友方棋子造成3点真实伤害并使其攻击力+2，将「恶魔召唤（3）」加入手牌（2/5）",
+  "type": "active",
+  "actionPointCost": 1,
+  "cardType": "fel",
+  "icon": "🔮",
+  "code": "function executeCard(context) { var battle = context.battle; var playerId = context.playerId; var target = selectTarget({ type: 'piece', filter: 'ally', range: 99 }); if (!target || target.needsTargetSelection) return target || { needsTargetSelection: true, targetType: 'piece', range: 99, filter: 'ally' }; var ritual2 = { instanceId: 'demon-ritual', name: null, ownerPlayerId: playerId, attack: 0, defense: 0 }; dealDamage(ritual2, target, 3, 'true', battle, 'demon-summon-2'); target.attack += 2; addCardToHand('demon-summon-3', playerId); return { success: true, message: '恶魔仪式第二印记：' + target.name + '承受3点真实伤害，攻击力+2，「恶魔召唤（3）」已加入手牌' }; }"
+}

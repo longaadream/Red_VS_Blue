@@ -6,7 +6,7 @@
   "rarity": "legendary",
   "image": "illidan.jpg",
   "stats": {
-    "maxHp": 13,
+    "maxHp": 12,
     "attack": 4,
     "defense": 1,
     "moveRange": 4

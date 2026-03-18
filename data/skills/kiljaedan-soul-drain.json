@@ -1,0 +1,14 @@
+{
+  "id": "kiljaedan-soul-drain",
+  "name": "灵魂汲取",
+  "description": "自动选择血量最低的存活敌方棋子，对其造成999点真实伤害，然后以其最大HP×30%对所有其他存活敌方棋子造成魔法伤害",
+  "icon": "💜",
+  "kind": "active",
+  "type": "normal",
+  "actionPointCost": 6,
+  "cooldownTurns": 2,
+  "range": "global",
+  "powerMultiplier": 1.0,
+  "code": "function executeSkill(context) { var caster = context.piece; var enemies = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0; }); if (enemies.length === 0) return { success: false, message: '没有存活的敌方棋子' }; var weakest = enemies.reduce(function(min, p) { return p.currentHp < min.currentHp ? p : min; }); var savedMaxHp = weakest.maxHp; var splashDamage = Math.max(1, Math.floor(savedMaxHp * 0.3)); dealDamage(caster, weakest, 999, 'true', battle, 'kiljaedan-soul-drain'); var msg = caster.name + '的灵魂汲取消灭了' + weakest.name + '（以其maxHp=' + savedMaxHp + '×30%=' + splashDamage + '）'; var remaining = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0; }); if (remaining.length > 0) { dealDamage(caster, remaining, splashDamage, 'magical', battle, 'kiljaedan-soul-drain'); msg += '，溅射到其余' + remaining.length + '名敌人，各造成' + splashDamage + '点魔法伤害！'; } else { msg += '（无其他存活敌人可溅射）'; } return { success: true, message: msg }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对血量最低的敌方棋子造成999点伤害，以其maxHp×30%溅射其他所有敌人', expectedValues: {} }; }"
+}

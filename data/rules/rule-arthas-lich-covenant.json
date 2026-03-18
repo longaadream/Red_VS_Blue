@@ -1,0 +1,8 @@
+{
+  "id": "rule-arthas-lich-covenant",
+  "priority": -100,
+  "name": "巫妖誓约拦截",
+  "description": "当拥有巫妖誓约buff的棋子即将受到致命伤害时，拦截死亡：HP恢复至满血，攻击力+50%，所有技能冷却清零，进入永久亡灵之躯状态",
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "var piece = context.rulePiece; if (!context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var hasCovenantBuff = piece.statusTags && piece.statusTags.some(function(t) { return t.type === 'lich-covenant'; }); if (!hasCovenantBuff) return { success: false, message: '' }; var rawDmg = context.damage || 0; var isTrue = context.damageType === 'true' || context.damageType === 'toxin'; var effectiveDmg = isTrue ? Math.max(1, rawDmg) : Math.max(1, rawDmg - (piece.defense || 0)); if (effectiveDmg < piece.currentHp) return { success: false, message: '' }; var covenantTag = piece.statusTags.find(function(t) { return t.type === 'lich-covenant'; }); if (covenantTag) { var ci = piece.statusTags.indexOf(covenantTag); piece.statusTags.splice(ci, 1); } removeRuleById(piece.instanceId, 'rule-arthas-lich-covenant'); piece.currentHp = piece.maxHp; var attackBoost = Math.round(piece.attack * 0.5); piece.attack = piece.attack + attackBoost; addStatusEffectById(piece.instanceId, { id: 'undead-body-' + piece.instanceId, name: '亡灵之躯', type: 'undead-body', currentDuration: -1, currentUses: -1, intensity: attackBoost, stacks: -1 }); if (piece.skills) { piece.skills.forEach(function(s) { s.currentCooldown = 0; }); } return { success: true, blocked: true, message: piece.name + '的巫妖誓约触发！从致命伤害中复活！HP恢复至满血（' + piece.maxHp + '），攻击力永久+' + attackBoost + '，进入亡灵之躯状态（永久），所有技能冷却重置！' };"
+}

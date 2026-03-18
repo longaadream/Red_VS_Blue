@@ -6,7 +6,7 @@
   "rarity": "rare",
   "image": "doomsday-fist.jpg",
   "stats": {
-    "maxHp": 13,
+    "maxHp": 16,
     "attack": 2,
     "defense": 1,
     "moveRange": 3

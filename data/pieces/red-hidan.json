@@ -6,7 +6,7 @@
   "rarity": "legendary",
   "image": "hidan.jpg",
   "stats": {
-    "maxHp": 13,
+    "maxHp": 18,
     "attack": 3,
     "defense": 1,
     "moveRange": 3

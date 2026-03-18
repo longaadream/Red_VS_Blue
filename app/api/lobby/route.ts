@@ -12,29 +12,34 @@ export function getRoomsStore() {
 
 export async function GET() {
   console.log('=== Lobby API GET Request ===')
-  const roomStore = getRoomStore()
+  try {
+    const roomStore = getRoomStore()
 
-  const allRooms = await roomStore.getAllRooms()
-  console.log('All rooms in store:', allRooms.map(r => ({ id: r.id, name: r.name, hostId: r.hostId })))
+    const allRooms = await roomStore.getAllRooms()
+    console.log('All rooms in store:', allRooms.map(r => ({ id: r.id, name: r.name, hostId: r.hostId })))
 
-  const validRooms = allRooms.filter(room => room.id && room.name)
-  const uniqueRooms = Array.from(new Map(validRooms.map(room => [room.id, room])).values())
-  console.log('Unique rooms to return:', uniqueRooms.map(r => ({ id: r.id, name: r.name, hostId: r.hostId })))
+    const validRooms = allRooms.filter(room => room.id && room.name)
+    const uniqueRooms = Array.from(new Map(validRooms.map(room => [room.id, room])).values())
+    console.log('Unique rooms to return:', uniqueRooms.map(r => ({ id: r.id, name: r.name, hostId: r.hostId })))
 
-  const formattedRooms = uniqueRooms.map((room) => ({
-    id: room.id,
-    name: room.name,
-    status: room.status,
-    createdAt: room.createdAt,
-    maxPlayers: room.maxPlayers,
-    playerCount: room.players?.length || 0,
-    hostId: room.hostId,
-    mapId: room.mapId,
-    visibility: room.visibility,
-  }))
+    const formattedRooms = uniqueRooms.map((room) => ({
+      id: room.id,
+      name: room.name,
+      status: room.status,
+      createdAt: room.createdAt,
+      maxPlayers: room.maxPlayers,
+      playerCount: room.players?.length || 0,
+      hostId: room.hostId,
+      mapId: room.mapId,
+      visibility: room.visibility,
+    }))
 
-  console.log('Lobby API returning', formattedRooms.length, 'rooms')
-  return NextResponse.json({ rooms: formattedRooms })
+    console.log('Lobby API returning', formattedRooms.length, 'rooms')
+    return NextResponse.json({ rooms: formattedRooms })
+  } catch (error) {
+    console.error('[GET /api/lobby] Error fetching rooms:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {

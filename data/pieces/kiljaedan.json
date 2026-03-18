@@ -1,0 +1,21 @@
+{
+  "id": "kiljaedan",
+  "name": "基尔加丹",
+  "faction": "red",
+  "description": "燃烧军团的主宰，通过恶魔仪式从虚空降临，以恒星之火焚尽一切，以灵魂汲取消灭最弱之敌并将其化为爆炸",
+  "rarity": "legendary",
+  "image": "kiljaedan.jpg",
+  "stats": {
+    "maxHp": 17,
+    "attack": 4,
+    "defense": 3,
+    "moveRange": 4
+  },
+  "skills": [
+    { "skillId": "kiljaedan-demonic-pact", "level": 1 },
+    { "skillId": "kiljaedan-fel-fire", "level": 1 },
+    { "skillId": "kiljaedan-soul-drain", "level": 1 }
+  ],
+  "rules": ["rule-kiljaedan-gamestart"],
+  "isDefault": false
+}

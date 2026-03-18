@@ -33,7 +33,20 @@
       "Bash(find:*)",
       "Bash(tasklist:*)",
       "Bash(git:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(docker:*)",
+      "Bash(npx prisma:*)",
+      "Bash(awk 'NR>=276920 && NR<=276940' logs/game.log)",
+      "Bash(awk 'NR>=540925 && NR<=540960' logs/game.log)",
+      "Bash(awk 'NR>=401493 && NR<=401510' logs/game.log)",
+      "Bash(awk 'NR>=522140 && NR<=522200' logs/game.log)",
+      "Bash(awk 'NR>=522218 && NR<=522260' logs/game.log)",
+      "Bash(awk 'NR>=522200 && NR<=522240' logs/game.log)",
+      "Bash(awk 'NR>=522203 && NR<=522215' logs/game.log)",
+      "Bash(awk 'NR>=522308 && NR<=522340' logs/game.log)",
+      "Bash(for i:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/data/cards/**)"
     ]
   }
 }

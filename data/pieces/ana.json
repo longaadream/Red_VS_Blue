@@ -6,7 +6,7 @@
   "rarity": "epic",
   "image": "ana.jpg",
   "stats": {
-    "maxHp": 9,
+    "maxHp": 10,
     "attack": 2,
     "defense": 1,
     "moveRange": 3

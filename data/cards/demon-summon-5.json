@@ -1,0 +1,10 @@
+{
+  "id": "demon-summon-5",
+  "name": "恶魔召唤（5）",
+  "description": "消耗3AP，先选择一名友方棋子承受6点真实伤害并使其攻击力+2，再选择一个格子将基尔加丹满血召唤至该位置（5/5）",
+  "type": "active",
+  "actionPointCost": 3,
+  "cardType": "fel",
+  "icon": "🔮",
+  "code": "function executeCard(context) { var battle = context.battle; var playerId = context.playerId; var anchor = selectTarget({ type: 'piece', filter: 'ally', range: 99 }); if (!anchor || anchor.needsTargetSelection) return anchor || { needsTargetSelection: true, targetType: 'piece', range: 99, filter: 'ally' }; if (!context.targetPosition) return { needsTargetSelection: true, targetType: 'grid', range: 99, filter: 'all' }; var targetPos = context.targetPosition; var kj = battle.extensions && battle.extensions.kiljaedanPiece; if (!kj) return { success: false, message: '基尔加丹已在场上或数据丢失' }; var ritual5 = { instanceId: 'demon-ritual', name: null, ownerPlayerId: playerId, attack: 0, defense: 0 }; dealDamage(ritual5, anchor, 6, 'true', battle, 'demon-summon-5'); anchor.attack += 2; kj.x = targetPos.x; kj.y = targetPos.y; kj.currentHp = kj.maxHp; battle.pieces.push(kj); delete battle.extensions.kiljaedanPiece; return { success: true, message: anchor.name + '以血肉完成最终仪式（承受6点真实伤害，攻击力+2）——基尔加丹从虚空降临！出现在（' + targetPos.x + ',' + targetPos.y + '），满血（' + kj.maxHp + 'HP）！' }; }"
+}

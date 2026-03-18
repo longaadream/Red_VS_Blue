@@ -56,20 +56,20 @@ function restorePieceRules(state: BattleState): void {
       piece.rules = []
     }
 
-    // 1. 恢复现有规则的 effect 函数
+    // 1. 恢复现有规则（全量替换，确保 trigger/effect 都是最新版本）
     if (piece.rules.length > 0) {
-      piece.rules.forEach((rule: any) => {
-        // 如果 effect 不是函数，尝试重新加载
-        if (typeof rule.effect !== 'function' && rule.id) {
+      piece.rules = piece.rules.map((rule: any) => {
+        if (rule.id) {
           try {
             const reloadedRule = loadRuleById(rule.id)
             if (reloadedRule && typeof reloadedRule.effect === 'function') {
-              rule.effect = reloadedRule.effect
+              return reloadedRule
             }
           } catch {
             // 忽略规则重载错误
           }
         }
+        return rule
       })
     }
 
@@ -111,20 +111,20 @@ function restorePlayerRules(state: BattleState): void {
       player.rules = []
     }
 
-    // 恢复现有规则的 effect 函数
+    // 恢复现有规则（全量替换，确保 trigger/effect 都是最新版本）
     if (player.rules.length > 0) {
-      player.rules.forEach((rule: any) => {
-        // 如果 effect 不是函数，尝试重新加载
-        if (typeof rule.effect !== 'function' && rule.id) {
+      player.rules = player.rules.map((rule: any) => {
+        if (rule.id) {
           try {
             const reloadedRule = loadRuleById(rule.id)
             if (reloadedRule && typeof reloadedRule.effect === 'function') {
-              rule.effect = reloadedRule.effect
+              return reloadedRule
             }
           } catch {
             // 忽略规则重载错误
           }
         }
+        return rule
       })
     }
   })
@@ -225,6 +225,8 @@ export interface PlayerTurnMeta {
   rules?: any[]
   /** 玩家级别状态标签（如时空扭曲等阵营buff） */
   statusTags?: any[]
+  /** 玩家级别技能（如暴风雪等持续效果技能） */
+  skills?: { skillId: string; currentCooldown?: number }[]
 }
 
 export interface PerTurnActionFlags {
@@ -426,7 +428,7 @@ export function applyBattleAction(
             globalTriggerSystem.checkTriggers(next, {
               type: "afterPieceSummon",
               playerId: piece.ownerPlayerId,
-              piece: piece,
+              sourcePiece: piece,
               pieceTemplateId: piece.templateId,
               faction: piece.faction
             })
@@ -1619,7 +1621,7 @@ export function applyBattleAction(
 
       // 加载卡牌定义（先查文件，再查战局自定义卡）
       const { loadCardById, executeCardFunction } = require('./skills')
-      const cardDef = loadCardById(cardInstance.cardId) ?? next.customCards?.[cardInstance.cardId] ?? null
+      const cardDef = loadCardById(cardInstance.cardId, true) ?? next.customCards?.[cardInstance.cardId] ?? null
       if (!cardDef) throw new BattleRuleError(`卡牌定义找不到: ${cardInstance.cardId}`)
       if (cardDef.type !== 'active' && cardDef.type !== 'reactive') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
 
@@ -1804,7 +1806,7 @@ export function summonPiece(
   const afterSummonResult = globalTriggerSystem.checkTriggers(battle, {
     type: "afterPieceSummon",
     playerId: ownerPlayerId,
-    piece: newPiece,
+    sourcePiece: newPiece,
     pieceTemplateId: templateId,
     faction
   })

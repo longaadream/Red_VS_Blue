@@ -110,17 +110,17 @@ function PlayContent() {
       if (response.ok) {
         const data = await response.json()
         console.log('Lobby API data:', data)
-        
+
         if (data.rooms) {
           console.log('Raw rooms data:', data.rooms)
-          
+
           // 过滤出用户作为房主的房间
           const rooms = data.rooms.filter((room: any) => room.hostId === user.id.trim())
           console.log('Filtered my rooms:', rooms)
           setMyRooms(rooms)
-          
+
           // 过滤出其他玩家的公开房间
-          const publicRoomsData = data.rooms.filter((room: any) => 
+          const publicRoomsData = data.rooms.filter((room: any) =>
             room.visibility === 'public' && room.hostId !== user.id.trim()
           )
           console.log('Filtered public rooms:', publicRoomsData)
@@ -129,7 +129,8 @@ function PlayContent() {
           console.log('No rooms data in response:', data)
         }
       } else {
-        console.error('Failed to fetch lobby data:', { status: response.status, statusText: response.statusText })
+        const errData = await response.json().catch(() => ({}))
+        console.error('Failed to fetch lobby data:', { status: response.status, statusText: response.statusText, error: errData.error })
       }
     } catch (error) {
       console.error('加载房间数据失败:', error)

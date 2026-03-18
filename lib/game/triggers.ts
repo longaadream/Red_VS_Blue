@@ -261,6 +261,13 @@ export class TriggerSystem {
             if (blocked) break
             const pieceContext = { ...context, piece: context.sourcePiece, rulePiece: owningPiece }
             const result = rule.effect(battle, pieceContext)
+            // 回写 damage，使后续规则看到修改后的值
+            if (pieceContext.damage !== context.damage) {
+              context.damage = pieceContext.damage;
+            }
+            if (context.damage !== undefined && context.damage <= 0) {
+              blocked = true;
+            }
             if (result.success) {
               success = true
               if (result.message) {
@@ -349,6 +356,10 @@ export class TriggerSystem {
             context.piece = context.sourcePiece
             context.rulePiece = piece
             const result = rule.effect(battle, context)
+            // damage 直接通过引用传递，检查是否归零
+            if (context.damage !== undefined && context.damage <= 0) {
+              blocked = true;
+            }
             if (result.success) {
               success = true
               if (result.message) {
@@ -379,6 +390,7 @@ export class TriggerSystem {
     if (battle.players) {
       writeLog('[checkTriggers] Checking player rules, players count: ' + battle.players.length)
       for (const player of battle.players) {
+        if (blocked) break
         writeLog('[checkTriggers] Checking player: ' + player.playerId + ', rules: ' + ((player as any).rules?.length || 0))
         if (!(player as any).rules || (player as any).rules.length === 0) {
           writeLog('[checkTriggers] Player has no rules, skipping')
@@ -399,6 +411,7 @@ export class TriggerSystem {
         writeLog('[checkTriggers] Found matching rules for player: ' + player.playerId + ', count: ' + playerMatchingRules.length)
 
         for (const rule of playerMatchingRules) {
+          if (blocked) break
           writeLog('[checkTriggers] Executing rule: ' + rule.id + ' for player: ' + player.playerId)
           // 如果 effect 是存根函数，重新加载
           const isDefaultEffect = typeof rule.effect === 'function' &&
@@ -421,11 +434,18 @@ export class TriggerSystem {
           }
 
           try {
-            // 把玩家的 playerId 注入到 context，供 triggerSkill 技能读取
-            const playerContext = { ...context, playerId: player.playerId }
+            // 把玩家的 playerId 和 player 对象注入到 context，供 triggerSkill 技能读取
+            const playerContext = { ...context, playerId: player.playerId, player: player }
             writeLog('[checkTriggers] Calling rule.effect for: ' + rule.id + ', effect type: ' + typeof rule.effect)
             const result = rule.effect(battle, playerContext)
             writeLog('[checkTriggers] Rule effect result for ' + rule.id + ': ' + JSON.stringify(result))
+            // 回写 damage，使后续规则看到修改后的值
+            if (playerContext.damage !== context.damage) {
+              context.damage = playerContext.damage;
+            }
+            if (context.damage !== undefined && context.damage <= 0) {
+              blocked = true;
+            }
             if (result.success) {
               success = true
               if (result.message) triggeredEffects.push(result.message)
@@ -447,6 +467,7 @@ export class TriggerSystem {
     // 4. 检查所有玩家手牌中的 reactive 卡牌（全场两个玩家都扫描）
     if (battle.players) {
       for (const player of battle.players) {
+        if (blocked) break
         if (!player.hand || player.hand.length === 0) continue
         // 从后往前遍历，因为触发后可能弃牌（会 splice）
         for (let i = player.hand.length - 1; i >= 0; i--) {

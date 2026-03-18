@@ -1,7 +1,7 @@
 {
   "id": "illidan-blade-dash",
   "name": "战刃挥刺",
-  "description": "选择一个正方向（同行或同列）6格以内的地格，冲刺至目标位置并对路径上所有敌人造成自身攻击力100%的物理伤害",
+  "description": "选择一个正方向（同行或同列）6格以内的地格，冲刺至目标位置并对路径上所有敌人造成自身攻击力100%的物理伤害（若前面一格被阻挡则无法冲刺）",
   "icon": "⚔️",
   "kind": "active",
   "type": "normal",
@@ -10,6 +10,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var caster = context.piece; var targetPos = selectTarget({ type: 'grid', range: 6, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos; if (caster.x !== targetPos.x && caster.y !== targetPos.y) { return { message: '目标格子必须在同一行或同一列（正方向）', success: false }; } var dx = targetPos.x !== caster.x ? (targetPos.x > caster.x ? 1 : -1) : 0; var dy = targetPos.y !== caster.y ? (targetPos.y > caster.y ? 1 : -1) : 0; var dist = Math.abs(targetPos.x - caster.x) + Math.abs(targetPos.y - caster.y); var enemies = []; var finalX = caster.x; var finalY = caster.y; for (var i = 1; i <= dist; i++) { var cx = caster.x + dx * i; var cy = caster.y + dy * i; var tile = battle.map.tiles.find(function(t) { return t.x === cx && t.y === cy; }); if (!tile || !tile.props.walkable) { break; } var occupant = battle.pieces.find(function(p) { return p.x === cx && p.y === cy && p.currentHp > 0; }); if (occupant) { if (occupant.ownerPlayerId !== caster.ownerPlayerId) { enemies.push(occupant); } break; } finalX = cx; finalY = cy; } if (finalX === caster.x && finalY === caster.y) { return { success: false, message: '路径被阻挡，无法冲刺' }; } caster.x = finalX; caster.y = finalY; if (enemies.length > 0) { var result = dealDamage(caster, enemies, caster.attack, 'physical', battle, context.skill.id); return { success: true, message: caster.name + '战刃挥刺，冲向目标位置并对' + enemies.map(function(e) { return e.name; }).join('、') + '造成' + result.totalDamage + '点伤害' }; } return { success: true, message: caster.name + '战刃挥刺冲向目标位置' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '冲刺至正方向6格内的目标位置，对路径上所有敌人造成' + piece.attack + '点物理伤害（攻击力100%）', expectedValues: { damage: piece.attack } }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '冲刺至正方向6格内的目标位置，对路径上所有敌人造成' + piece.attack + '点物理伤害（攻击力100%）（若前面一格被阻挡则无法冲刺）', expectedValues: { damage: piece.attack } }; }",
   "range": "area"
 }

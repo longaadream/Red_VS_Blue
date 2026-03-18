@@ -1,11 +1,11 @@
 {
   "id": "kenshin-ryusosen",
   "name": "龍巢閃",
-  "description": "对相邻一名敌人连续劈砍3次，每次造成50%攻击力的物理伤害，目标死亡后剩余次数不会浪费",
+  "description": "对相邻一名敌人连续劈砍3次，每次造成50%攻击力的物理伤害",
   "icon": "🗡️",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 2,
+  "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 0.5,
   "actionPointCost": 2,
