@@ -390,9 +390,18 @@ function validateMove(
     throw new BattleRuleError("Move distance exceeds piece moveRange")
   }
 
-  const targetTile = tiles.find((t) => t.x === toX && t.y === toY)
-  if (!targetTile || !targetTile.props.walkable) {
-    throw new BattleRuleError("Target tile is not walkable")
+  // 检查路径上每个格子（含终点）是否可通行
+  const stepX = toX === piece.x ? 0 : toX > piece.x ? 1 : -1
+  const stepY = toY === piece.y ? 0 : toY > piece.y ? 1 : -1
+  let cx = piece.x + stepX
+  let cy = piece.y + stepY
+  while (cx !== toX + stepX || cy !== toY + stepY) {
+    const tile = tiles.find((t) => t.x === cx && t.y === cy)
+    if (!tile || !tile.props.walkable) {
+      throw new BattleRuleError("Path is blocked by a wall")
+    }
+    cx += stepX
+    cy += stepY
   }
 
   if (isCellOccupied(state, toX, toY)) {
