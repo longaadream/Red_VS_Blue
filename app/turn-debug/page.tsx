@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -115,7 +115,7 @@ async function apiPost(body: any): Promise<{ battleState?: BattleState; error?: 
 
 // ─── 子组件 ──────────────────────────────────────────────────────────────────
 
-function HpBar({ current, max }: { current: number; max: number }) {
+const HpBar = memo(function HpBar({ current, max }: { current: number; max: number }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (current / max) * 100)) : 0
   const color = pct > 50 ? "bg-green-500" : pct > 25 ? "bg-yellow-500" : "bg-red-500"
   return (
@@ -123,9 +123,9 @@ function HpBar({ current, max }: { current: number; max: number }) {
       <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
     </div>
   )
-}
+})
 
-function StatusBadge({ tag }: { tag: { id: string; type: string; currentDuration?: number; stacks?: number } }) {
+const StatusBadge = memo(function StatusBadge({ tag }: { tag: { id: string; type: string; currentDuration?: number; stacks?: number } }) {
   return (
     <span className="inline-flex items-center gap-0.5 rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300">
       {tag.type}
@@ -135,9 +135,9 @@ function StatusBadge({ tag }: { tag: { id: string; type: string; currentDuration
       )}
     </span>
   )
-}
+})
 
-function PieceCard({
+const PieceCard = memo(function PieceCard({
   piece,
   allPieces,
   isCurrentPlayer,
@@ -154,7 +154,7 @@ function PieceCard({
   isCurrentPlayer: boolean
   isActionPhase: boolean
   skillsById: BattleState["skillsById"]
-  onSkill: (pieceId: string, skillId: string) => void
+  onSkill: (pieceId: string, skillId: string, skillType: "useBasicSkill" | "useChargeSkill") => void
   isSelectingTarget: boolean
   onSelectAsTarget: (piece: PieceInstance) => void
   targetFilter: "enemy" | "ally" | "all"
@@ -232,36 +232,37 @@ function PieceCard({
         )
       })()}
 
-      {/* 规则 */}
-      {piece.rules?.length > 0 && (
-        <div className="mt-1 text-[10px] text-zinc-600">
-          规则: {piece.rules.map((r: any) => r.id || r.name).join(", ")}
-        </div>
-      )}
 
       {/* 技能按钮（仅当前玩家且行动阶段） */}
       {isCurrentPlayer && isActionPhase && !isSelectingTarget && (
         <div className="mt-2 flex flex-wrap gap-1">
           {piece.skills?.map((s) => {
             const def = skillsById[s.skillId]
+            const isPassive = def?.type === "passive"
             const onCooldown = (s.currentCooldown ?? 0) > 0
             const noUses = s.usesRemaining !== undefined && s.usesRemaining !== -1 && s.usesRemaining <= 0
-            const disabled = onCooldown || noUses
+            const disabled = isPassive || onCooldown || noUses
             return (
               <button
                 key={s.skillId}
                 disabled={disabled}
-                onClick={() => onSkill(piece.instanceId, s.skillId)}
-                title={def ? `${def.name} | AP:${def.actionPointCost} | CD:${def.cooldownTurns}` : s.skillId}
+                onClick={() => {
+                  const skillType = def?.type === "super" ? "useChargeSkill" : "useBasicSkill"
+                  !disabled && onSkill(piece.instanceId, s.skillId, skillType)
+                }}
+                title={def ? `${def.name}${def.description ? " | " + def.description : ""}` : s.skillId}
                 className={[
                   "rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
-                  disabled
+                  isPassive
+                    ? "cursor-default bg-zinc-900 text-zinc-500 border border-zinc-800"
+                    : disabled
                     ? "cursor-not-allowed bg-zinc-800 text-zinc-600"
                     : "bg-zinc-700 text-zinc-200 hover:bg-zinc-600",
                 ]
                   .filter(Boolean)
                   .join(" ")}
               >
+                {isPassive && <span className="mr-1 text-zinc-600">◆</span>}
                 {def?.name ?? s.skillId}
                 {onCooldown && <span className="ml-1 text-zinc-500">(CD:{s.currentCooldown})</span>}
                 {noUses && <span className="ml-1 text-red-500">(已用)</span>}
@@ -272,9 +273,21 @@ function PieceCard({
       )}
     </div>
   )
-}
+}, (prev, next) => {
+  return (
+    prev.piece === next.piece &&
+    prev.isCurrentPlayer === next.isCurrentPlayer &&
+    prev.isActionPhase === next.isActionPhase &&
+    prev.skillsById === next.skillsById &&
+    prev.onSkill === next.onSkill &&
+    prev.isSelectingTarget === next.isSelectingTarget &&
+    prev.onSelectAsTarget === next.onSelectAsTarget &&
+    prev.targetFilter === next.targetFilter &&
+    prev.currentPlayerId === next.currentPlayerId
+  )
+})
 
-function LogEntry({ log }: { log: ActionLog }) {
+const LogEntry = memo(function LogEntry({ log }: { log: ActionLog }) {
   const colorMap: Record<string, string> = {
     move: "text-cyan-400",
     useBasicSkill: "text-yellow-400",
@@ -291,7 +304,7 @@ function LogEntry({ log }: { log: ActionLog }) {
       <span className={`${color} break-words`}>{log.payload?.message ?? log.type}</span>
     </div>
   )
-}
+})
 
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 
@@ -343,6 +356,8 @@ export default function TurnDebugPage() {
       })
     } else if (res.error) {
       setError(res.error)
+      // 技能失败时清除目标选择状态（避免格子选择器残留）
+      setTargetReq(null)
     }
   }, [])
 
@@ -363,24 +378,41 @@ export default function TurnDebugPage() {
     }
   }
 
-  const handleSkill = (pieceId: string, skillId: string, skillType: "useBasicSkill" | "useChargeSkill" = "useBasicSkill") => {
-    if (!battle) return
-    act({ type: skillType, playerId: battle.turn.currentPlayerId, pieceId, skillId })
-  }
+  // ── refs ─────────────────────────────────────────────────────────────────
+  const battleRef = useRef<BattleState | null>(null)
+  useEffect(() => { battleRef.current = battle }, [battle])
 
-  const handleSelectTarget = (target: PieceInstance) => {
-    if (!targetReq || !battle || targetReq.targetType === "grid") return
-    act({ ...targetReq.pendingAction, targetPieceId: target.instanceId })
-  }
+  const targetReqRef = useRef<TargetRequest | null>(null)
+  useEffect(() => { targetReqRef.current = targetReq }, [targetReq])
 
-  const handlePlayCard = (cardInstanceId: string) => {
-    if (!battle) return
-    act({ type: "playCard", playerId: battle.turn.currentPlayerId, cardInstanceId })
-  }
+  const skillsByIdRef = useRef<BattleState["skillsById"]>({})
+  useEffect(() => {
+    if (battle?.skillsById) skillsByIdRef.current = battle.skillsById
+  }, [battle?.skillsById])
 
-  const cancelTarget = () => setTargetReq(null)
+  // ── stable handlers ───────────────────────────────────────────────────────
+  const handleSkill = useCallback((pieceId: string, skillId: string, skillType: "useBasicSkill" | "useChargeSkill" = "useBasicSkill") => {
+    if (!battleRef.current) return
+    act({ type: skillType, playerId: battleRef.current.turn.currentPlayerId, pieceId, skillId })
+  }, [act])
+
+  const handleSelectTarget = useCallback((target: PieceInstance) => {
+    const req = targetReqRef.current
+    if (!req || req.targetType === "grid") return
+    act({ ...req.pendingAction, targetPieceId: target.instanceId })
+  }, [act])
+
+  const handlePlayCard = useCallback((cardInstanceId: string) => {
+    if (!battleRef.current) return
+    act({ type: "playCard", playerId: battleRef.current.turn.currentPlayerId, cardInstanceId })
+  }, [act])
+
+  const cancelTarget = useCallback(() => setTargetReq(null), [])
 
   // ── 派生状态 ──────────────────────────────────────────────────────────────
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const reversedLogs = useMemo(() => battle?.actions ? [...battle.actions].reverse() : [], [battle?.actions?.length])
 
   const currentPlayer = battle?.players.find((p) => p.playerId === battle.turn.currentPlayerId)
   const isActionPhase = battle?.turn.phase === "action"
@@ -652,14 +684,16 @@ export default function TurnDebugPage() {
             </div>
           )}
 
-          {/* 错误提示 */}
+          {/* 错误提示（固定在顶部，醒目显示） */}
           {error && (
-            <div className="flex items-center gap-2 border-b border-red-900 bg-red-950/50 px-4 py-2 text-sm text-red-400">
-              <Info className="h-4 w-4 shrink-0" />
-              {error}
-              <button onClick={() => setError(null)} className="ml-auto text-red-600 hover:text-red-400">
-                <X className="h-4 w-4" />
-              </button>
+            <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 max-w-lg w-[calc(100%-2rem)]">
+              <div className="flex items-start gap-3 rounded-lg border border-red-600 bg-red-950 px-4 py-3 text-sm text-red-300 shadow-xl shadow-red-950/50">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                <span className="flex-1 font-medium">{error}</span>
+                <button onClick={() => setError(null)} className="shrink-0 text-red-500 hover:text-red-300">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           )}
 
@@ -715,12 +749,8 @@ export default function TurnDebugPage() {
                       allPieces={battle.pieces}
                       isCurrentPlayer={battle.turn.currentPlayerId === RED_ID}
                       isActionPhase={isActionPhase ?? false}
-                      skillsById={battle.skillsById}
-                      onSkill={(pieceId, skillId) => {
-                        const skillDef = battle.skillsById[skillId]
-                        const skillType = skillDef?.type === "super" ? "useChargeSkill" : "useBasicSkill"
-                        handleSkill(pieceId, skillId, skillType)
-                      }}
+                      skillsById={skillsByIdRef.current}
+                      onSkill={handleSkill}
                       isSelectingTarget={!!targetReq}
                       onSelectAsTarget={handleSelectTarget}
                       targetFilter={targetReq?.filter ?? "all"}
@@ -749,12 +779,8 @@ export default function TurnDebugPage() {
                       allPieces={battle.pieces}
                       isCurrentPlayer={battle.turn.currentPlayerId === BLUE_ID}
                       isActionPhase={isActionPhase ?? false}
-                      skillsById={battle.skillsById}
-                      onSkill={(pieceId, skillId) => {
-                        const skillDef = battle.skillsById[skillId]
-                        const skillType = skillDef?.type === "super" ? "useChargeSkill" : "useBasicSkill"
-                        handleSkill(pieceId, skillId, skillType)
-                      }}
+                      skillsById={skillsByIdRef.current}
+                      onSkill={handleSkill}
                       isSelectingTarget={!!targetReq}
                       onSelectAsTarget={handleSelectTarget}
                       targetFilter={targetReq?.filter ?? "all"}
@@ -784,10 +810,10 @@ export default function TurnDebugPage() {
             ref={logRef}
             className="h-64 overflow-y-auto px-3 py-2 lg:h-[calc(100vh-12rem)]"
           >
-            {!battle?.actions || battle.actions.length === 0 ? (
+            {reversedLogs.length === 0 ? (
               <div className="text-xs text-zinc-700">日志为空</div>
             ) : (
-              [...battle.actions].reverse().map((log, i) => <LogEntry key={i} log={log} />)
+              reversedLogs.map((log, i) => <LogEntry key={i} log={log} />)
             )}
           </div>
 

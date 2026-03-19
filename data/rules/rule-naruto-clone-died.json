@@ -1,7 +1,7 @@
 {
   "id": "rule-naruto-clone-died",
   "name": "影分身消散",
-  "description": "影分身死亡时，击杀者失去1充能点",
+  "description": "影分身死亡时不给予击杀充能（已由系统层保障，此规则仅输出消息）",
   "trigger": { "type": "onPieceDied" },
-  "skillCode": "var clone = context.rulePiece; if (!clone) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== clone.instanceId) return { success: false, message: '' }; var attacker = context.targetPiece; if (!attacker) return { success: true, message: clone.name + '消散（非战斗）' }; var attackerPlayer = battle.players.find(function(p) { return p.playerId === attacker.ownerPlayerId; }); if (attackerPlayer && attackerPlayer.chargePoints > 0) { attackerPlayer.chargePoints -= 1; } return { success: true, message: attacker.name + '击杀了影分身，失去1充能点' };"
+  "skillCode": "var clone = context.rulePiece; if (!clone) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== clone.instanceId) return { success: false, message: '' }; var attacker = context.targetPiece; if (!attacker) return { success: true, message: clone.name + '消散' }; return { success: true, message: attacker.name + '击杀了影分身（无充能）' };"
 }

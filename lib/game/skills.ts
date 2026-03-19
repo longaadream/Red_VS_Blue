@@ -452,6 +452,26 @@ function loadSkillById(skillId: string): SkillDefinition | null {
   }
 }
 
+// 加载所有技能定义（服务端用，用于重新填充 battle.skillsById）
+export function loadAllSkillsById(): Record<string, SkillDefinition> {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const skillsDir = path.join(process.cwd(), 'data', 'skills');
+    const files: string[] = fs.readdirSync(skillsDir).filter((f: string) => f.endsWith('.json'));
+    const result: Record<string, SkillDefinition> = {};
+    for (const file of files) {
+      const skillId = file.replace('.json', '');
+      const skill = loadSkillById(skillId);
+      if (skill) result[skillId] = skill;
+    }
+    return result;
+  } catch (e) {
+    console.warn('[loadAllSkillsById] Failed to load skills', e);
+    return {};
+  }
+}
+
 // 从文件中加载规则的函数（导出以便在需要时重新注入 effect 函数）
 export function loadRuleById(ruleId: string, forceReload: boolean = false): TriggerRule | null {
   console.log(`[loadRuleById] Called with ruleId: ${ruleId}, forceReload: ${forceReload}`);
@@ -1488,9 +1508,9 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
             ? { x: context.target.x, y: context.target.y }
             : null);
         if (gridPos) {
-          // 距离校验
+          // 距离校验：使用切比雪夫距离（max(|dx|,|dy|)），对应 "N×N 格" 的描述
           if (defaultOptions.range !== undefined) {
-            const dist = Math.abs(sourcePiece.x - gridPos.x) + Math.abs(sourcePiece.y - gridPos.y);
+            const dist = Math.max(Math.abs(sourcePiece.x - gridPos.x), Math.abs(sourcePiece.y - gridPos.y));
             if (dist > defaultOptions.range) {
               return {
                 needsTargetSelection: true,
@@ -1829,18 +1849,20 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
       skillId
     });
 
-    // 击杀敌人后，为击杀者添加充能点
-    const killCreditId = killerPlayerId || attacker.ownerPlayerId;
-    const playerMeta = battle.players.find(p => p.playerId === killCreditId);
-    if (playerMeta) {
-      playerMeta.chargePoints += 1; // 每次击杀获得1点充能
-      // 触发充能获得事件（可用于"获得充能时做X"效果）
-      globalTriggerSystem.checkTriggers(battle, {
-        type: "afterChargeGained",
-        sourcePiece: attacker,
-        amount: 1,
-        playerId: killCreditId
-      });
+    // 击杀敌人后，为击杀者添加充能点（noKillCharge=true 的棋子不计入）
+    if (!(target as any).noKillCharge) {
+      const killCreditId = killerPlayerId || attacker.ownerPlayerId;
+      const playerMeta = battle.players.find(p => p.playerId === killCreditId);
+      if (playerMeta) {
+        playerMeta.chargePoints += 1; // 每次击杀获得1点充能
+        // 触发充能获得事件（可用于"获得充能时做X"效果）
+        globalTriggerSystem.checkTriggers(battle, {
+          type: "afterChargeGained",
+          sourcePiece: attacker,
+          amount: 1,
+          playerId: killCreditId
+        });
+      }
     }
 
     // 从棋盘上移除死亡的棋子，并将其移到墓地中
@@ -2497,18 +2519,20 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           // 检查是否有伤害和击杀
           checkForDamageAndKill(battle, beforeState, sourcePiece, skillDef.id);
 
-          // 触发技能使用后的规则
-          const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
-            type: "afterSkillUsed",
-            sourcePiece,
-            skillId: skillDef.id
-          });
+          // 仅在技能成功时触发 afterSkillUsed（失败技能不计入"释放技能"次数）
+          if (result && result.success) {
+            const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
+              type: "afterSkillUsed",
+              sourcePiece,
+              skillId: skillDef.id
+            });
 
-          // 处理触发效果的消息
-          if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
-            result.message += "。" + skillUsedResult.messages.join("。");
+            // 处理触发效果的消息
+            if (skillUsedResult.success && skillUsedResult.messages.length > 0) {
+              result.message = (result.message || '') + "。" + skillUsedResult.messages.join("。");
+            }
           }
-          
+
           return result;
         }
       } catch (error) {

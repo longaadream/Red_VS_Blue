@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Loader2, UserPlus, LogIn } from "lucide-react"
+import { ArrowLeft, Loader2, UserPlus, LogIn, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -779,24 +779,39 @@ function PlayContent() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">状态: {room.status === 'waiting' ? '等待中' : room.status === 'in-progress' ? '对战中' : '已结束'}</span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={async () => {
-                              try {
-                                setLoading(true)
-                                setRoomId(room.id)
-                                await joinRoom(room.id)
-                              } catch (error) {
-                                console.error('加入房间失败:', error)
-                                setError(error instanceof Error ? error.message : "加入房间失败")
-                              } finally {
-                                setLoading(false)
-                              }
-                            }}
-                          >
-                            加入
-                          </Button>
+                          {room.status === 'in-progress' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-purple-400 border-purple-700 hover:text-purple-300 hover:border-purple-500"
+                              onClick={() => {
+                                if (!user) return
+                                router.push(`/battle/${room.id}?spectate=true&playerId=${encodeURIComponent(user.id)}&playerName=${encodeURIComponent(user.username)}`)
+                              }}
+                            >
+                              <Eye className="mr-1 h-3 w-3" />
+                              观战
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  setLoading(true)
+                                  setRoomId(room.id)
+                                  await joinRoom(room.id)
+                                } catch (error) {
+                                  console.error('加入房间失败:', error)
+                                  setError(error instanceof Error ? error.message : "加入房间失败")
+                                } finally {
+                                  setLoading(false)
+                                }
+                              }}
+                            >
+                              加入
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}

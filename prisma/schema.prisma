@@ -23,8 +23,24 @@ model Room {
   visibility  String?
   maxPlayers  Int?
   players     String   @default("[]")
+  spectators  String   @default("[]")
   battleState String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   version     Int      @default(0)
+}
+
+model GameRecord {
+  id             String   @id @default(cuid())
+  playerId       String
+  playerName     String
+  opponentId     String?
+  opponentName   String?
+  result         String   // "win" | "loss"
+  turns          Int
+  myPieces       String   // JSON: [{templateId, name}]
+  opponentPieces String   // JSON: [{templateId, name}]
+  roomId         String?
+  mapId          String?
+  createdAt      DateTime @default(now())
 }

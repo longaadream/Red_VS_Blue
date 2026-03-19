@@ -1,0 +1,15 @@
+{
+  "id": "hashirama-edo-sage-buddha",
+  "name": "仙术·顶上化佛",
+  "description": "选中自身5×5格内一点，瞬移至此，所有其他技能冷却归零，并向手牌加入「木遁·真数千手」和「仙术·大自然愈合」各1张",
+  "icon": "🙏",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "chargeCost": 3,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 4,
+  "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var targetTile = battle.map && battle.map.tiles && battle.map.tiles.find(function(t) { return t.x === pos.x && t.y === pos.y; }); if (!targetTile || !targetTile.props || !targetTile.props.walkable) return { success: false, message: '目标格不可移动' }; var blocked = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0 && p.instanceId !== caster.instanceId; }); if (blocked) return { success: false, message: '目标格已被占用' }; caster.x = pos.x; caster.y = pos.y; var msgs = [caster.name + ' 仙术·顶上化佛，神佛降临于（' + pos.x + ',' + pos.y + '）！']; if (caster.skills) { for (var j = 0; j < caster.skills.length; j++) { var s = caster.skills[j]; if (s.skillId !== 'hashirama-edo-sage-buddha' && s.currentCooldown > 0) { s.currentCooldown = 0; } } msgs.push('所有其他技能冷却归零'); } addCardToHand('hashirama-edo-thousand-hands', caster.ownerPlayerId); var hand1 = getHand(caster.ownerPlayerId); for (var k1 = hand1.length - 1; k1 >= 0; k1--) { if (hand1[k1].cardId === 'hashirama-edo-thousand-hands' && !hand1[k1].boundPieceInstanceId) { hand1[k1].boundPieceInstanceId = caster.instanceId; break; } } addCardToHand('hashirama-edo-nature-heal', caster.ownerPlayerId); var hand2 = getHand(caster.ownerPlayerId); for (var k2 = hand2.length - 1; k2 >= 0; k2--) { if (hand2[k2].cardId === 'hashirama-edo-nature-heal' && !hand2[k2].boundPieceInstanceId) { hand2[k2].boundPieceInstanceId = caster.instanceId; break; } } msgs.push('获得 木遁·真数千手 × 1'); msgs.push('获得 仙术·大自然愈合 × 1'); return { success: true, message: msgs.join('，') }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '瞬移至5×5格内一点，所有其他技能冷却归零，获得「木遁·真数千手」（2AP，100%攻击力物理伤害）和「仙术·大自然愈合」（0AP，恢复80%已损生命）各1张', expectedValues: {}, chargeCost: 3 }; }"
+}

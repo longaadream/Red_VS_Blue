@@ -1,0 +1,10 @@
+{
+  "id": "hashirama-edo-nature-heal",
+  "name": "仙术·大自然愈合",
+  "description": "消耗0AP，柱间恢复已损生命值的80%",
+  "type": "active",
+  "actionPointCost": 0,
+  "cardType": "wood",
+  "icon": "🌿",
+  "code": "function executeCard(context) { var battle = context.battle; var playerId = context.playerId; var player = battle.players.find(function(p) { return p.playerId === playerId; }); var cardInHand = player && player.hand && player.hand.find(function(c) { return c.cardId === 'hashirama-edo-nature-heal' && c.boundPieceInstanceId; }); var boundId = cardInHand && cardInHand.boundPieceInstanceId; var hashirama = boundId ? battle.pieces.find(function(p) { return p.instanceId === boundId && p.currentHp > 0; }) : battle.pieces.find(function(p) { return p.ownerPlayerId === playerId && p.templateId === 'hashirama-edo' && p.currentHp > 0; }); if (!hashirama) return { success: false, message: '场上没有存活的柱间' }; var missing = hashirama.maxHp - hashirama.currentHp; if (missing <= 0) return { success: true, message: hashirama.name + ' 生命值已满，无需治疗' }; var heal = Math.ceil(missing * 0.8); var result = healDamage(hashirama, hashirama, heal, battle, 'hashirama-edo-nature-heal'); return { success: true, message: '仙术·大自然愈合！' + hashirama.name + ' 恢复 ' + result.heal + ' 点生命值' }; }"
+}

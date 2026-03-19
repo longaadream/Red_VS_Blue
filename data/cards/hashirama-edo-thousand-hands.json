@@ -1,0 +1,10 @@
+{
+  "id": "hashirama-edo-thousand-hands",
+  "name": "木遁·真数千手",
+  "description": "消耗2AP，选择任意一名敌人，造成等同于柱间当前攻击力100%的物理伤害",
+  "type": "active",
+  "actionPointCost": 2,
+  "cardType": "wood",
+  "icon": "🌳",
+  "code": "function executeCard(context) { var battle = context.battle; var playerId = context.playerId; var player = battle.players.find(function(p) { return p.playerId === playerId; }); var cardInHand = player && player.hand && player.hand.find(function(c) { return c.cardId === 'hashirama-edo-thousand-hands' && c.boundPieceInstanceId; }); var boundId = cardInHand && cardInHand.boundPieceInstanceId; var hashirama = boundId ? battle.pieces.find(function(p) { return p.instanceId === boundId && p.currentHp > 0; }) : battle.pieces.find(function(p) { return p.ownerPlayerId === playerId && p.templateId === 'hashirama-edo' && p.currentHp > 0; }); if (!hashirama) return { success: false, message: '场上没有存活的柱间' }; var target = context.target; if (!target) { target = selectTarget({ filter: 'enemy', range: 99 }); if (!target || target.needsTargetSelection) return target || { success: false, message: '请选择一名敌人' }; } var result = dealDamage(hashirama, target, hashirama.attack, 'physical', battle, 'hashirama-edo-thousand-hands'); return { success: true, message: '木遁·真数千手！' + hashirama.name + ' 对 ' + target.name + ' 造成 ' + result.damage + ' 点物理伤害' }; }"
+}

@@ -46,7 +46,17 @@
       "Bash(awk 'NR>=522308 && NR<=522340' logs/game.log)",
       "Bash(for i:*)",
       "Bash(do echo:*)",
-      "Read(//c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/data/cards/**)"
+      "Read(//c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/data/cards/**)",
+      "Bash(find C:UserslngscDocumentsGitHubv0-game-menu-designv0-game-menu-design -type f \\\\\\(-name *socket* -o -name *stream* -o -name *sse* -o -name *webhook* \\\\\\))",
+      "Bash(mv data/pieces/hashirama.json data/pieces/hashirama-edo.json)",
+      "Bash(mv data/skills/hashirama-wood-spike.json data/skills/hashirama-edo-wood-spike.json)",
+      "Bash(mv data/skills/hashirama-wood-dragon.json data/skills/hashirama-edo-wood-dragon.json)",
+      "Bash(mv data/skills/hashirama-sage-buddha.json data/skills/hashirama-edo-sage-buddha.json)",
+      "Bash(mv data/skills/hashirama-edo-regen.json data/skills/hashirama-edo-regen.json)",
+      "Bash(mv data/cards/hashirama-thousand-hands.json data/cards/hashirama-edo-thousand-hands.json)",
+      "Bash(mv data/cards/hashirama-nature-heal.json data/cards/hashirama-edo-nature-heal.json)",
+      "Bash(2)",
+      "Bash(sort -k2 -h)"
     ]
   }
 }

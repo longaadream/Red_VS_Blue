@@ -1,0 +1,14 @@
+{
+  "id": "hashirama-edo-wood-spike",
+  "name": "木遁·扦插之术",
+  "description": "对4格内的一个敌人造成100%攻击力的伤害，并沉默其一回合（无法使用技能）",
+  "icon": "🌿",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; dealDamage(caster, target, Math.floor(caster.attack * 1.0), 'physical', battle, 'hashirama-edo-wood-spike'); if (target.currentHp <= 0) return { success: true, message: caster.name + ' 使用木遁·扦插之术，' + target.name + ' 被击败' }; if (!target.statusTags) target.statusTags = []; var already = target.statusTags.find(function(t) { return t.type === 'silenced'; }); if (!already) { target.statusTags.push({ id: 'silenced-' + target.instanceId, type: 'silenced', name: '沉默', visible: true, remainingDuration: 1, remainingUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-silenced-block'] }); addRuleById(target.instanceId, 'rule-silenced-block'); } return { success: true, message: caster.name + ' 使用木遁·扦插之术，' + target.name + ' 被沉默 1 回合' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内的敌人造成' + piece.attack + '（100%攻击力）点伤害并沉默1回合', expectedValues: { damage: piece.attack } }; }"
+}

@@ -6,7 +6,16 @@ import {
   applyBattleAction,
   BattleRuleError,
 } from "@/lib/game/turn"
-import { loadRuleById } from "@/lib/game/skills"
+import { loadRuleById, loadAllSkillsById } from "@/lib/game/skills"
+
+/**
+ * 重新填充 battleState.skillsById（DB 写入时已剔除，读取后需从文件恢复）。
+ */
+function reloadSkillsIfMissing(battleState: BattleState): void {
+  if (!battleState.skillsById || Object.keys(battleState.skillsById).length === 0) {
+    battleState.skillsById = loadAllSkillsById()
+  }
+}
 
 /**
  * 重新为战斗状态中所有棋子的规则注入 effect 函数。
@@ -33,7 +42,7 @@ function rehydrateBattleRules(battleState: BattleState): void {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
   const { roomId: rawRoomId } = await params
@@ -49,6 +58,16 @@ export async function GET(
       { error: "Battle has not started in this room" },
       { status: 400 },
     )
+  }
+
+  // 恢复 skillsById（DB 写入时已剔除）
+  reloadSkillsIfMissing(room.battleState)
+
+  // 轮询请求不需要 skillsById（前端已本地缓存），仅首次请求（?includeSkills=1）时携带
+  const includeSkills = req.nextUrl.searchParams.get('includeSkills') === '1'
+  if (!includeSkills) {
+    const { skillsById: _skills, ...stateWithoutSkills } = room.battleState
+    return NextResponse.json(stateWithoutSkills)
   }
 
   return NextResponse.json(room.battleState)
@@ -81,6 +100,7 @@ export async function POST(
   }
 
   try {
+    reloadSkillsIfMissing(room.battleState)
     rehydrateBattleRules(room.battleState)
     const nextState = applyBattleAction(room.battleState, body)
     console.log('[Battle API] Players chargePoints after action:', nextState.players.map(p => ({ playerId: p.playerId, chargePoints: p.chargePoints })))

@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       id,
       name: index === 0 ? (playerName?.trim() || `Player ${playerId.slice(0, 8)}`) + " (红方)" : (playerName?.trim() || `Player ${playerId.slice(0, 8)}`) + " (蓝方)",
     })),
+    spectators: [],
     currentTurnIndex: 0,
     actions: [],
     battleState: battle,

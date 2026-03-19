@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
-import { ArrowLeft, Loader2, Swords, Shield, Zap, Footprints } from "lucide-react"
+import { ArrowLeft, Loader2, Swords, Shield, Zap, Footprints, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -29,9 +29,23 @@ export default function BattlePage() {
   const [roomId, setRoomId] = useState<string | null>(null)
   const [room, setRoom] = useState<Room | null>(null)
   const [battle, setBattle] = useState<BattleState | null>(null)
-  const [loading, setLoading] = useState(true)
+  const battleRef = useRef<BattleState | null>(null)
+  useEffect(() => { battleRef.current = battle }, [battle])
+  const battleVersionRef = useRef('')
+  // 本地缓存 skillsById：首次加载时从服务器获取，之后轮询响应中不携带以节省流量
+  const skillsByIdCacheRef = useRef<Record<string, any> | null>(null)
+  // 防止重复写入战绩
+  const recordSavedRef = useRef(false)
+  const [loading, setLoading] = useState(true)       // 初始页面加载（显示全屏 spinner）
+  const [actionLoading, setActionLoading] = useState(false) // 行动执行中（不触发全屏重载）
   const [error, setError] = useState<string | null>(null)
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
+  // 观战模式
+  const [isSpectating, setIsSpectating] = useState(false)
+  const [spectatorId, setSpectatorId] = useState<string | null>(null)
+  const [spectatorName, setSpectatorName] = useState<string | null>(null)
+  // 观战视角：观战者当前从哪个玩家的角度看（控制"我的棋子"/"对方棋子"面板）
+  const [spectatorPerspective, setSpectatorPerspective] = useState<string | null>(null)
 
   useEffect(() => {
     const id = params.roomId as string
@@ -44,6 +58,37 @@ export default function BattlePage() {
       setLoading(false)
     }
   }, [params])
+
+  // 检测观战模式并注册观战者
+  useEffect(() => {
+    const spectate = searchParams.get("spectate")
+    const pid = searchParams.get("playerId")
+    const pname = searchParams.get("playerName")
+    if (spectate === "true" && pid) {
+      setIsSpectating(true)
+      setSpectatorId(pid.toLowerCase())
+      setSpectatorName(pname || pid)
+    }
+  }, [searchParams])
+
+  // 当确认是观战模式且有 roomId 时，向服务器注册
+  useEffect(() => {
+    if (!isSpectating || !spectatorId || !roomId) return
+    fetch(`/api/rooms/${roomId}/spectate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ spectatorId, spectatorName: spectatorName || spectatorId }),
+    }).catch(() => {/* 忽略注册失败，不影响观战 */})
+
+    // 离开时注销
+    return () => {
+      fetch(`/api/rooms/${roomId}/spectate`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spectatorId }),
+      }).catch(() => {/* 忽略 */})
+    }
+  }, [isSpectating, spectatorId, roomId])
 
   // 从URL参数获取玩家ID（强制小写）
   useEffect(() => {
@@ -84,22 +129,26 @@ export default function BattlePage() {
 
   async function fetchBattle(id: string) {
     try {
-      const res = await fetch(`/api/rooms/${id}/battle`)
+      // 首次加载时附带 ?includeSkills=1，让服务器返回完整 skillsById 供本地缓存
+      const res = await fetch(`/api/rooms/${id}/battle?includeSkills=1`)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || "Failed to load battle state")
       }
       const data = (await res.json()) as BattleState
+      if (data.skillsById && Object.keys(data.skillsById).length > 0) {
+        skillsByIdCacheRef.current = data.skillsById
+      }
       setBattle(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load battle state")
     }
   }
 
-  async function sendBattleAction(action: BattleAction) {
+  const sendBattleAction = useCallback(async (action: BattleAction) => {
     if (!roomId) return
     try {
-      setLoading(true)
+      setActionLoading(true)
       const res = await fetch(`/api/rooms/${roomId}/battle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,7 +167,7 @@ export default function BattlePage() {
             setPendingCardAction(action);
           } else {
             setSelectedSkillId(action.skillId!);
-            const skillDef = battle?.skillsById[action.skillId!];
+            const skillDef = battleRef.current?.skillsById[action.skillId!];
             setSelectedSkillType(skillDef?.type as "normal" | "super" | null);
             if ('selectedOption' in action) {
               setPendingSelectedOption((action as any).selectedOption);
@@ -138,14 +187,18 @@ export default function BattlePage() {
         toast.error(data.error || "操作失败");
         return;
       }
-      setBattle(data as BattleState)
+      const battleData = data as BattleState
+      if (battleData.skillsById && Object.keys(battleData.skillsById).length > 0) {
+        skillsByIdCacheRef.current = battleData.skillsById
+      }
+      setBattle(battleData)
     } catch (err) {
       // 使用toast通知显示错误信息，而不是设置错误状态
       toast.error(err instanceof Error ? err.message : "未知错误")
     } finally {
-      setLoading(false)
+      setActionLoading(false)
     }
-  }
+  }, [roomId])
 
   // 处理选项选择器的选择结果
   async function handleOptionSelect(value: any | null) {
@@ -190,9 +243,25 @@ export default function BattlePage() {
     }
   }, [currentPlayerId, roomId])
 
-  // 轮询检查战斗状态，确保所有玩家能及时获取状态更新
+  // 轮询检查战斗状态，确保所有玩家能及时获取状态更新（观战者也参与轮询）
   useEffect(() => {
-    if (!roomId || !currentPlayerId) return
+    if (!roomId || (!currentPlayerId && !isSpectating)) return
+
+    // 更新战斗状态（去重：版本键相同则跳过）
+    const applyBattleData = (data: BattleState) => {
+      // 如果响应包含 skillsById，更新缓存；否则从缓存补充
+      if (data.skillsById && Object.keys(data.skillsById).length > 0) {
+        skillsByIdCacheRef.current = data.skillsById
+      } else if (skillsByIdCacheRef.current) {
+        data = { ...data, skillsById: skillsByIdCacheRef.current }
+      }
+      const newKey = `${data.turn.turnNumber}-${data.turn.phase}-${data.actions?.length ?? 0}`
+      if (newKey !== battleVersionRef.current) {
+        battleVersionRef.current = newKey
+        setBattle(data)
+        checkGameEnd(data)
+      }
+    }
 
     // 立即检查一次状态
     const checkStatusImmediately = async () => {
@@ -200,8 +269,7 @@ export default function BattlePage() {
         const res = await fetch(`/api/rooms/${roomId}/battle`)
         if (res.ok) {
           const data = (await res.json()) as BattleState
-          setBattle(data)
-          checkGameEnd(data)
+          applyBattleData(data)
         }
       } catch (error) {
         // 忽略错误
@@ -217,10 +285,7 @@ export default function BattlePage() {
         const res = await fetch(`/api/rooms/${roomId}/battle`)
         if (res.ok) {
           const data = (await res.json()) as BattleState
-          setBattle(data)
-          
-          // 检查游戏是否结束
-          checkGameEnd(data)
+          applyBattleData(data)
         }
       } catch (error) {
         // 忽略错误
@@ -228,7 +293,7 @@ export default function BattlePage() {
     }, 1000) // 缩短轮询间隔到1秒
 
     return () => clearInterval(interval)
-  }, [roomId, currentPlayerId])
+  }, [roomId, currentPlayerId, isSpectating])
 
   // 检查游戏是否结束
   function checkGameEnd(battleState: BattleState) {
@@ -255,11 +320,46 @@ export default function BattlePage() {
       if (remainingPlayers.length === 1) {
         const winner = remainingPlayers[0]
         setGameResult({ winnerId: winner.playerId, isWinner: winner.playerId === currentPlayerId })
+        // 保存战绩（仅玩家本人、仅一次）
+        if (currentPlayerId && !isSpectating && !recordSavedRef.current) {
+          recordSavedRef.current = true
+          const me = battleState.players.find(p => p.playerId === currentPlayerId)
+          const opponent = battleState.players.find(p => p.playerId !== currentPlayerId)
+          const myPieces = battleState.pieces
+            .filter(p => p.ownerPlayerId === currentPlayerId)
+            .map(p => ({ templateId: p.templateId, name: p.name }))
+          const opponentPieces = battleState.pieces
+            .filter(p => p.ownerPlayerId === opponent?.playerId)
+            .map(p => ({ templateId: p.templateId, name: p.name }))
+          const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
+          const userName = storedUser ? (() => { try { return JSON.parse(storedUser).username } catch { return currentPlayerId } })() : currentPlayerId
+          fetch('/api/records', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              playerId: currentPlayerId,
+              playerName: me?.name || userName,
+              opponentId: opponent?.playerId,
+              opponentName: opponent?.name,
+              result: winner.playerId === currentPlayerId ? 'win' : 'loss',
+              turns: battleState.turn.turnNumber,
+              myPieces,
+              opponentPieces,
+              roomId,
+              mapId: (battleState as any).mapId,
+            }),
+          }).catch(() => {})
+        }
       }
     }
   }
 
   function handleReturnToMenu() {
+    if (isSpectating) {
+      // 观战者离开不删除房间，直接返回大厅
+      router.push('/play')
+      return
+    }
     if (roomId) {
       fetch(`/api/rooms/${encodeURIComponent(roomId)}`, { method: "DELETE" })
         .finally(() => router.push('/'))
@@ -270,15 +370,25 @@ export default function BattlePage() {
 
 
 
+  // 观战模式下的"视角玩家ID"（控制面板中谁是"我方"）
+  const viewPlayerId = isSpectating ? spectatorPerspective : currentPlayerId
+
+  // 当 battle 加载后，给观战者设置默认视角（第一个玩家）
+  useEffect(() => {
+    if (isSpectating && battle?.players?.length > 0 && !spectatorPerspective) {
+      setSpectatorPerspective(battle.players[0].playerId)
+    }
+  }, [isSpectating, battle, spectatorPerspective])
+
   const isMyTurn = useMemo(() => {
     if (!room || !battle || !currentPlayerId) return false
     return battle.turn.currentPlayerId === currentPlayerId
   }, [room, battle, currentPlayerId])
 
   const myPieces = useMemo(() => {
-    if (!battle || !currentPlayerId) return []
-    return battle.pieces.filter((p) => p.ownerPlayerId === currentPlayerId && p.currentHp > 0)
-  }, [battle, currentPlayerId])
+    if (!battle || !viewPlayerId) return []
+    return battle.pieces.filter((p) => p.ownerPlayerId === viewPlayerId && p.currentHp > 0)
+  }, [battle, viewPlayerId])
 
   const [gameResult, setGameResult] = useState<{ winnerId: string; isWinner: boolean } | null>(null)
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null)
@@ -299,6 +409,24 @@ export default function BattlePage() {
   const [pendingSelectedOption, setPendingSelectedOption] = useState<any>(undefined)
   const [pendingCardAction, setPendingCardAction] = useState<BattleAction | null>(null)
 
+  // refs for stable handler callbacks
+  const isSelectingMoveTargetRef = useRef(false)
+  useEffect(() => { isSelectingMoveTargetRef.current = isSelectingMoveTarget }, [isSelectingMoveTarget])
+  const isSelectingTeleportTargetRef = useRef(false)
+  useEffect(() => { isSelectingTeleportTargetRef.current = isSelectingTeleportTarget }, [isSelectingTeleportTarget])
+  const isSelectingSkillTargetRef = useRef(false)
+  useEffect(() => { isSelectingSkillTargetRef.current = isSelectingSkillTarget }, [isSelectingSkillTarget])
+  const selectedSkillIdRef = useRef<string | null>(null)
+  useEffect(() => { selectedSkillIdRef.current = selectedSkillId }, [selectedSkillId])
+  const selectedSkillTypeRef = useRef<"normal" | "super" | null>(null)
+  useEffect(() => { selectedSkillTypeRef.current = selectedSkillType }, [selectedSkillType])
+  const pendingCardActionRef = useRef<BattleAction | null>(null)
+  useEffect(() => { pendingCardActionRef.current = pendingCardAction }, [pendingCardAction])
+  const pendingSelectedOptionRef = useRef<any>(undefined)
+  useEffect(() => { pendingSelectedOptionRef.current = pendingSelectedOption }, [pendingSelectedOption])
+  const currentPlayerIdRef = useRef<string | null>(null)
+  useEffect(() => { currentPlayerIdRef.current = currentPlayerId }, [currentPlayerId])
+
   const selectedPiece = useMemo(() => {
     if (!selectedPieceId || !battle || !currentPlayerId) return null
     const piece = battle.pieces.find(p => p.instanceId === selectedPieceId)
@@ -308,6 +436,81 @@ export default function BattlePage() {
     }
     return null
   }, [selectedPieceId, battle, currentPlayerId])
+
+  const selectedPieceRef = useRef<typeof selectedPiece>(null)
+  useEffect(() => { selectedPieceRef.current = selectedPiece }, [selectedPiece])
+
+  const handleTileClick = useCallback((x: number, y: number) => {
+    if (isSelectingMoveTargetRef.current && selectedPieceRef.current) {
+      sendBattleAction({
+        type: "move",
+        playerId: currentPlayerIdRef.current!,
+        pieceId: selectedPieceRef.current.instanceId,
+        toX: x,
+        toY: y,
+      })
+      setIsSelectingMoveTarget(false)
+    } else if (isSelectingTeleportTargetRef.current && selectedPieceRef.current && selectedSkillIdRef.current === "teleport") {
+      sendBattleAction({
+        type: "useBasicSkill",
+        playerId: currentPlayerIdRef.current!,
+        pieceId: selectedPieceRef.current.instanceId,
+        skillId: "teleport",
+        targetX: x,
+        targetY: y,
+      })
+      setIsSelectingTeleportTarget(false)
+      setSelectedSkillId(null)
+    } else if (isSelectingSkillTargetRef.current && pendingCardActionRef.current) {
+      sendBattleAction({ ...pendingCardActionRef.current, targetX: x, targetY: y } as any)
+      setIsSelectingSkillTarget(false)
+      setPendingCardAction(null)
+    } else if (isSelectingSkillTargetRef.current && selectedPieceRef.current && selectedSkillIdRef.current) {
+      sendBattleAction({
+        type: selectedSkillTypeRef.current === "super" ? "useChargeSkill" : "useBasicSkill",
+        playerId: currentPlayerIdRef.current!,
+        pieceId: selectedPieceRef.current.instanceId,
+        skillId: selectedSkillIdRef.current,
+        targetX: x,
+        targetY: y,
+        ...(pendingSelectedOptionRef.current !== undefined ? { selectedOption: pendingSelectedOptionRef.current } : {}),
+      })
+      setIsSelectingSkillTarget(false)
+      setSelectedSkillId(null)
+      setSelectedSkillType(null)
+      setPendingSelectedOption(undefined)
+    }
+  }, [sendBattleAction])
+
+  const handlePieceClick = useCallback((pieceId: string) => {
+    if (isSelectingSkillTargetRef.current && pendingCardActionRef.current) {
+      sendBattleAction({ ...pendingCardActionRef.current, targetPieceId: pieceId } as any)
+      setIsSelectingSkillTarget(false)
+      setPendingCardAction(null)
+    } else if (isSelectingSkillTargetRef.current && selectedPieceRef.current && selectedSkillIdRef.current) {
+      sendBattleAction({
+        type: selectedSkillTypeRef.current === "super" ? "useChargeSkill" : "useBasicSkill",
+        playerId: currentPlayerIdRef.current!,
+        pieceId: selectedPieceRef.current.instanceId,
+        skillId: selectedSkillIdRef.current,
+        targetPieceId: pieceId,
+        ...(pendingSelectedOptionRef.current !== undefined ? { selectedOption: pendingSelectedOptionRef.current } : {}),
+      })
+      setIsSelectingSkillTarget(false)
+      setSelectedSkillId(null)
+      setSelectedSkillType(null)
+      setPendingSelectedOption(undefined)
+    } else {
+      const clickedPiece = battleRef.current?.pieces.find(p => p.instanceId === pieceId)
+      if (clickedPiece && clickedPiece.ownerPlayerId === currentPlayerIdRef.current) {
+        setSelectedPieceId(pieceId)
+        setIsSelectingMoveTarget(false)
+        setIsSelectingTeleportTarget(false)
+        setIsSelectingSkillTarget(false)
+        setSelectedSkillId(null)
+      }
+    }
+  }, [sendBattleAction])
 
   if (loading) {
     return (
@@ -361,8 +564,8 @@ export default function BattlePage() {
     )
   }
 
-  // 玩家选择界面
-  if (!currentPlayerId && battle.players.length > 1) {
+  // 玩家选择界面（非观战者才需要选择身份）
+  if (!isSpectating && !currentPlayerId && battle.players.length > 1) {
     return (
       <main className="flex min-h-svh flex-col items-center justify-center bg-zinc-950 px-4">
         <Card className="w-full max-w-md">
@@ -399,7 +602,14 @@ export default function BattlePage() {
     return (
       <main className="flex min-h-svh flex-col items-center justify-center bg-zinc-950">
         <div className="flex flex-col items-center gap-8">
-          {gameResult.isWinner ? (
+          {isSpectating ? (
+            <>
+              <div className="text-8xl font-black tracking-widest text-purple-400 drop-shadow-[0_0_40px_rgba(168,85,247,0.6)]">
+                游戏结束
+              </div>
+              <p className="text-xl text-zinc-300">{gameResult.winnerId} 获胜</p>
+            </>
+          ) : gameResult.isWinner ? (
             <>
               <div className="text-8xl font-black tracking-widest text-yellow-400 drop-shadow-[0_0_40px_rgba(250,204,21,0.6)]">
                 胜利
@@ -415,7 +625,7 @@ export default function BattlePage() {
             </>
           )}
           <Button size="lg" onClick={handleReturnToMenu} className="mt-4 px-10 py-6 text-lg">
-            返回主菜单
+            {isSpectating ? "返回大厅" : "返回主菜单"}
           </Button>
         </div>
       </main>
@@ -439,6 +649,12 @@ export default function BattlePage() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
+            {isSpectating && (
+              <div className="flex items-center gap-2 rounded-lg bg-purple-900/50 border border-purple-700 px-3 py-1.5">
+                <Eye className="h-4 w-4 text-purple-400" />
+                <span className="text-sm text-purple-300">观战中</span>
+              </div>
+            )}
             <div className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2">
               <span className="text-sm text-zinc-400">回合</span>
               <span className="text-lg font-bold text-zinc-100">{battle.turn.turnNumber}</span>
@@ -458,87 +674,11 @@ export default function BattlePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex justify-center">
-                  <GameBoard 
-                    map={battle.map} 
+                  <GameBoard
+                    map={battle.map}
                     pieces={battle.pieces}
-                    onTileClick={(x, y) => {
-                      if (isSelectingMoveTarget && selectedPiece) {
-                        // 检查移动是否有效（这里也可以在客户端做一次验证）
-                        sendBattleAction({
-                          type: "move",
-                          playerId: currentPlayerId!,
-                          pieceId: selectedPiece.instanceId,
-                          toX: x,
-                          toY: y,
-                        })
-                        setIsSelectingMoveTarget(false)
-                      } else if (isSelectingTeleportTarget && selectedPiece && selectedSkillId === "teleport") {
-                        // 处理传送目标选择
-                        sendBattleAction({
-                          type: "useBasicSkill",
-                          playerId: currentPlayerId!,
-                          pieceId: selectedPiece.instanceId,
-                          skillId: "teleport",
-                          targetX: x,
-                          targetY: y,
-                        })
-                        setIsSelectingTeleportTarget(false)
-                        setSelectedSkillId(null)
-                      } else if (isSelectingSkillTarget && pendingCardAction) {
-                        // 卡牌目标位置选择
-                        sendBattleAction({ ...pendingCardAction, targetX: x, targetY: y } as any)
-                        setIsSelectingSkillTarget(false)
-                        setPendingCardAction(null)
-                      } else if (isSelectingSkillTarget && selectedPiece && selectedSkillId) {
-                        // 处理技能目标位置选择（如暴风雪的区域选择）
-                        sendBattleAction({
-                          type: selectedSkillType === "super" ? "useChargeSkill" : "useBasicSkill",
-                          playerId: currentPlayerId!,
-                          pieceId: selectedPiece.instanceId,
-                          skillId: selectedSkillId,
-                          targetX: x,
-                          targetY: y,
-                          ...(pendingSelectedOption !== undefined ? { selectedOption: pendingSelectedOption } : {}),
-                        })
-                        setIsSelectingSkillTarget(false)
-                        setSelectedSkillId(null)
-                        setSelectedSkillType(null)
-                        setPendingSelectedOption(undefined)
-                      }
-                    }}
-                    onPieceClick={(pieceId) => {
-                      if (isSelectingSkillTarget && pendingCardAction) {
-                        // 卡牌目标棋子选择
-                        sendBattleAction({ ...pendingCardAction, targetPieceId: pieceId } as any)
-                        setIsSelectingSkillTarget(false)
-                        setPendingCardAction(null)
-                      } else if (isSelectingSkillTarget && selectedPiece && selectedSkillId) {
-                        // 处理技能目标棋子选择
-                        sendBattleAction({
-                          type: selectedSkillType === "super" ? "useChargeSkill" : "useBasicSkill",
-                          playerId: currentPlayerId!,
-                          pieceId: selectedPiece.instanceId,
-                          skillId: selectedSkillId,
-                          targetPieceId: pieceId,
-                          ...(pendingSelectedOption !== undefined ? { selectedOption: pendingSelectedOption } : {}),
-                        })
-                        setIsSelectingSkillTarget(false)
-                        setSelectedSkillId(null)
-                        setSelectedSkillType(null)
-                        setPendingSelectedOption(undefined)
-                      } else {
-                        // 检查点击的是否是己方棋子
-                        const clickedPiece = battle.pieces.find(p => p.instanceId === pieceId);
-                        if (clickedPiece && clickedPiece.ownerPlayerId === currentPlayerId) {
-                          setSelectedPieceId(pieceId);
-                          // 重置选择状态
-                          setIsSelectingMoveTarget(false);
-                          setIsSelectingTeleportTarget(false);
-                          setIsSelectingSkillTarget(false);
-                          setSelectedSkillId(null);
-                        }
-                      }
-                    }}
+                    onTileClick={handleTileClick}
+                    onPieceClick={handlePieceClick}
                     selectedPieceId={selectedPieceId}
                     isSelectingMoveTarget={isSelectingMoveTarget}
                     isSelectingTeleportTarget={isSelectingTeleportTarget}
@@ -551,66 +691,61 @@ export default function BattlePage() {
             </Card>
             
             {/* 终端框 - 显示技能执行消息 */}
-            <Card className="bg-zinc-900/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">战斗日志</CardTitle>
-              </CardHeader>
-              <CardContent className="max-h-40 overflow-y-auto space-y-2">
-                {[...(battle.actions || [])].reverse().map((action, index) => {
-                  // 找到相关棋子的名称
-                  let pieceName = "未知棋子";
-                  if (action.payload?.pieceId) {
-                    const piece = battle.pieces.find(p => p.instanceId === action.payload.pieceId);
-                    if (piece) {
-                      // 尝试获取棋子模板名称
-                      const pieceTemplate = getPieceById(piece.templateId);
-                      pieceName = pieceTemplate?.name || piece.templateId || "未知棋子";
-                    }
-                  }
-                  
-                  // 格式化消息
-                  let formattedMessage = action.payload?.message || action.type || "未知操作";
-                  
-                  // 替换消息中的templateId为更友好的名称
-                  if (action.payload?.pieceId) {
-                    const piece = battle.pieces.find(p => p.instanceId === action.payload.pieceId);
-                    if (piece) {
-                      const pieceTemplate = getPieceById(piece.templateId);
-                      const friendlyName = pieceTemplate?.name || piece.templateId;
-                      formattedMessage = formattedMessage.replace(piece.templateId, friendlyName);
-                    }
-                  }
-                  
-                  return (
-                    <div key={index} className="text-xs text-zinc-300">
-                      <span className="text-zinc-500">[{action.turn || battle.turn.turnNumber}] </span>
-                      <span className={action.playerId === currentPlayerId ? "text-green-400" : "text-blue-400"}>
-                        {/* 使用友好的棋子名称 */}
-                        {pieceName}
-                      </span>
-                      <span className="text-zinc-400">: </span>
-                      <span>{formattedMessage}</span>
-                    </div>
-                  );
-                })}
-                {(battle.actions || []).length === 0 && (
-                  <div className="text-xs text-zinc-500">
-                    战斗日志为空
+            <BattleLogArea
+              actions={battle.actions ?? []}
+              pieces={battle.pieces}
+              viewPlayerId={viewPlayerId ?? ""}
+              currentTurnNumber={battle.turn.turnNumber}
+            />
+
+            {/* 观战者视角切换 */}
+            {isSpectating && battle.players.length >= 2 && (
+              <Card className="bg-zinc-900/50 border-purple-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm text-purple-300">
+                    <Eye className="h-4 w-4" />
+                    观战视角
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2">
+                    {battle.players.map((player) => {
+                      const playerPiece = battle.pieces.find(p => p.ownerPlayerId === player.playerId)
+                      const isRed = playerPiece?.faction === "red"
+                      const playerName = room?.players.find(p => p.id === player.playerId)?.name || player.playerId
+                      const isActive = spectatorPerspective === player.playerId
+                      return (
+                        <button
+                          key={player.playerId}
+                          onClick={() => setSpectatorPerspective(player.playerId)}
+                          className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? isRed
+                                ? "border-red-500 bg-red-950/60 text-red-300"
+                                : "border-blue-500 bg-blue-950/60 text-blue-300"
+                              : "border-zinc-700 bg-zinc-800/40 text-zinc-400 hover:border-zinc-500"
+                          }`}
+                        >
+                          <span className={isRed ? "text-red-400" : "text-blue-400"}>{isRed ? "红方" : "蓝方"} </span>
+                          {playerName}
+                        </button>
+                      )
+                    })}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* 显示所有棋子，包括存活的和死亡的（从墓地中获取） */}
-            {battle && (battle.pieces.filter(p => p.ownerPlayerId === currentPlayerId).length + (battle.graveyard?.filter(p => p.ownerPlayerId === currentPlayerId).length || 0)) > 0 && (
+            {battle && viewPlayerId && (battle.pieces.filter(p => p.ownerPlayerId === viewPlayerId).length + (battle.graveyard?.filter(p => p.ownerPlayerId === viewPlayerId).length || 0)) > 0 && (
               <Card className="bg-zinc-900/50">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">我的棋子</CardTitle>
+                  <CardTitle className="text-sm">{isSpectating ? "当前视角棋子" : "我的棋子"}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* 筛选出当前玩家的所有存活棋子，克隆紧挨本体，顺序稳定随机 */}
                   {(() => {
-                    const myPieces = battle.pieces.filter(p => p.ownerPlayerId === currentPlayerId && p.currentHp > 0)
+                    const myPieces = battle.pieces.filter(p => p.ownerPlayerId === viewPlayerId && p.currentHp > 0)
                     const clones = myPieces.filter(p => (p as any).masterPieceId)
                     const nonClones = myPieces.filter(p => !(p as any).masterPieceId)
                     const ordered: typeof myPieces = []
@@ -638,7 +773,7 @@ export default function BattlePage() {
                               ? 'bg-zinc-900/50 opacity-70' 
                               : 'hover:bg-zinc-800/50'
                         }`}
-                        onClick={() => setSelectedPieceId(piece.instanceId)}
+                        onClick={() => !isSpectating && setSelectedPieceId(piece.instanceId)}
                       >
                         {(() => {
                           const pieceTemplate = getPieceById(piece.templateId)
@@ -816,7 +951,7 @@ export default function BattlePage() {
                       </div>
                     ))}
                   {/* 筛选出当前玩家的所有死亡棋子（从墓地中获取） */}
-                  {battle.graveyard?.filter(p => p.ownerPlayerId === currentPlayerId).map((piece) => (
+                  {battle.graveyard?.filter(p => p.ownerPlayerId === viewPlayerId).map((piece) => (
                       <div 
                         key={piece.instanceId} 
                         className={`group relative flex items-center gap-4 cursor-pointer rounded-md p-2 transition-colors ${'bg-zinc-900/50 opacity-70'}`}
@@ -927,17 +1062,17 @@ export default function BattlePage() {
 
             {(() => {
               // 显示所有对方棋子，包括存活的和死亡的（从墓地中获取）
-              const opponentAlivePieces = battle.pieces.filter(p => 
-                p.ownerPlayerId !== currentPlayerId && p.currentHp > 0
+              const opponentAlivePieces = battle.pieces.filter(p =>
+                p.ownerPlayerId !== viewPlayerId && p.currentHp > 0
               )
-              const opponentDeadPieces = battle.graveyard?.filter(p => 
-                p.ownerPlayerId !== currentPlayerId
+              const opponentDeadPieces = battle.graveyard?.filter(p =>
+                p.ownerPlayerId !== viewPlayerId
               ) || []
               const totalOpponentPieces = opponentAlivePieces.length + opponentDeadPieces.length
               return totalOpponentPieces > 0 ? (
                 <Card className="bg-zinc-900/50">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">对方棋子</CardTitle>
+                    <CardTitle className="text-sm">{isSpectating ? "对方棋子" : "对方棋子"}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {opponentAlivePieces.map((piece) => (
@@ -1299,11 +1434,15 @@ export default function BattlePage() {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center justify-between text-sm">
                   <span>当前行动</span>
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                    isMyTurn ? "bg-green-600 text-white" : "bg-zinc-700 text-zinc-300"
-                  }`}>
-                    {isMyTurn ? "你的回合" : "对手回合"}
-                  </span>
+                  {isSpectating ? (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded bg-purple-700 text-white">观战模式</span>
+                  ) : (
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                      isMyTurn ? "bg-green-600 text-white" : "bg-zinc-700 text-zinc-300"
+                    }`}>
+                      {isMyTurn ? "你的回合" : "对手回合"}
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1335,7 +1474,7 @@ export default function BattlePage() {
                   <div className="mb-2 text-xs text-zinc-400">当前回合</div>
                   {(() => {
                     const currentPlayer = battle.players.find(p => p.playerId === battle.turn.currentPlayerId)
-                    const isCurrentPlayer = currentPlayer?.playerId === currentPlayerId
+                    const isCurrentPlayer = currentPlayer?.playerId === viewPlayerId
                     const playerName = room?.players.find(p => p.id === currentPlayer?.playerId)?.name || currentPlayer?.playerId || "未知"
                     const playerPiece = battle.pieces.find(p => p.ownerPlayerId === currentPlayer?.playerId)
                     const isRed = playerPiece?.faction === "red"
@@ -1354,7 +1493,7 @@ export default function BattlePage() {
                           </span>
                           <span className="text-sm text-zinc-200">
                             {playerName}
-                            {isCurrentPlayer && " (你)"}
+                            {isCurrentPlayer && (isSpectating ? " (当前视角)" : " (你)")}
                           </span>
                         </div>
                         <span className="text-xs px-2 py-0.5 rounded bg-green-600/80 text-white">
@@ -1365,8 +1504,16 @@ export default function BattlePage() {
                   })()}
                 </div>
 
+                {/* 观战者提示 */}
+                {isSpectating && (
+                  <div className="rounded-md bg-purple-950/30 border border-purple-800 p-3 text-center text-sm text-purple-300">
+                    <Eye className="inline h-4 w-4 mr-1 mb-0.5" />
+                    观战模式 · 切换左侧视角可查看双方棋子信息
+                  </div>
+                )}
+
                 {/* 选项选择器覆盖层 - 优先级最高，独立显示 */}
-                {isSelectingOption && (
+                {!isSpectating && isSelectingOption && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-zinc-200 text-center">{optionSelectionTitle}</p>
                     {optionSelectionOptions.map((opt, index) => (
@@ -1375,7 +1522,7 @@ export default function BattlePage() {
                         className="w-full justify-start h-auto whitespace-normal py-2 text-left"
                         variant="outline"
                         size="sm"
-                        disabled={loading}
+                        disabled={actionLoading}
                         onClick={() => void handleOptionSelect(opt.value)}
                       >
                         <span className="font-medium break-words">{opt.label}</span>
@@ -1388,7 +1535,7 @@ export default function BattlePage() {
                       className="w-full"
                       variant="ghost"
                       size="sm"
-                      disabled={loading}
+                      disabled={actionLoading}
                       onClick={() => void handleOptionSelect(null)}
                     >
                       取消释放
@@ -1396,7 +1543,7 @@ export default function BattlePage() {
                   </div>
                 )}
 
-                {battle.turn.phase === "action" && isMyTurn && !isSelectingOption && (
+                {!isSpectating && battle.turn.phase === "action" && isMyTurn && !isSelectingOption && (
                   <div className="space-y-2">
                     {!selectedPiece && (
                       <p className="text-xs text-muted-foreground text-center">
@@ -1413,7 +1560,7 @@ export default function BattlePage() {
                           className="w-full"
                           size="sm"
                           variant="outline"
-                          disabled={loading}
+                          disabled={actionLoading}
                           onClick={() => {
                             setIsSelectingMoveTarget(false)
                           }}
@@ -1430,7 +1577,7 @@ export default function BattlePage() {
                           className="w-full"
                           size="sm"
                           variant="outline"
-                          disabled={loading}
+                          disabled={actionLoading}
                           onClick={() => {
                             setIsSelectingTeleportTarget(false)
                             setSelectedSkillId(null)
@@ -1448,7 +1595,7 @@ export default function BattlePage() {
                           className="w-full"
                           size="sm"
                           variant="outline"
-                          disabled={loading}
+                          disabled={actionLoading}
                           onClick={() => {
                             setIsSelectingSkillTarget(false)
                             setSelectedSkillId(null)
@@ -1461,7 +1608,7 @@ export default function BattlePage() {
                       <Button
                         className="w-full"
                         size="sm"
-                        disabled={loading || battle.turn.actions.hasMoved || !selectedPiece}
+                        disabled={actionLoading || battle.turn.actions.hasMoved || !selectedPiece}
                         onClick={() => {
                           setIsSelectingMoveTarget(true)
                         }}
@@ -1522,7 +1669,7 @@ export default function BattlePage() {
                                 className="w-full"
                                 variant="outline"
                                 size="sm"
-                                disabled={loading || isSelectingMoveTarget || currentCooldown > 0}
+                                disabled={actionLoading || isSelectingMoveTarget || currentCooldown > 0}
                                 onClick={() => {
                                   if (selectedPiece) {
                                     sendBattleAction({
@@ -1547,7 +1694,7 @@ export default function BattlePage() {
                       className="w-full"
                       variant="secondary"
                       size="sm"
-                      disabled={loading || isSelectingMoveTarget}
+                      disabled={actionLoading || isSelectingMoveTarget}
                       onClick={() => {
                         sendBattleAction({
                           type: "endTurn",
@@ -1560,11 +1707,11 @@ export default function BattlePage() {
                   </div>
                 )}
 
-                {battle.turn.phase !== "action" && isMyTurn && (
+                {!isSpectating && battle.turn.phase !== "action" && isMyTurn && (
                   <Button
                     className="w-full"
                     size="sm"
-                    disabled={loading}
+                    disabled={actionLoading}
                     onClick={() => {
                       sendBattleAction({
                         type: "beginPhase",
@@ -1584,7 +1731,9 @@ export default function BattlePage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {battle.players.map((player) => {
-                  const isCurrentPlayer = player.playerId === currentPlayerId
+                  const isCurrentPlayer = isSpectating
+                    ? player.playerId === spectatorPerspective
+                    : player.playerId === currentPlayerId
                   const playerPiece = battle.pieces.find(p => p.ownerPlayerId === player.playerId)
                   // 从 room.players 中获取玩家的昵称
                   const playerName = room?.players.find(p => p.id === player.playerId)?.name || player.playerId
@@ -1604,7 +1753,7 @@ export default function BattlePage() {
                             : "bg-zinc-500"
                         }`} />
                         <span className={`text-sm ${isCurrentPlayer ? "font-medium text-zinc-200" : "text-zinc-400"}`}>
-                          {playerName} {isCurrentPlayer && "(你)"}
+                          {playerName} {isCurrentPlayer && (isSpectating ? "(当前视角)" : "(你)")}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
@@ -1642,45 +1791,107 @@ export default function BattlePage() {
               </CardContent>
             </Card>
 
-            {/* 手牌区 */}
-            <HandArea 
-              battle={battle} 
-              currentPlayerId={currentPlayerId} 
-              isMyTurn={isMyTurn}
-              sendBattleAction={sendBattleAction}
-            />
+            {/* 手牌区（观战者不显示） */}
+            {!isSpectating && (
+              <HandArea
+                battle={battle}
+                currentPlayerId={currentPlayerId}
+                isMyTurn={isMyTurn}
+                sendBattleAction={sendBattleAction}
+              />
+            )}
 
-            <Card className="bg-zinc-900/50">
-              <CardContent className="p-4">
-                <Button
-                  className="w-full bg-red-900/50 hover:bg-red-800 text-red-300 border-red-800"
-                  size="sm"
-                  onClick={() => {
-                    if (currentPlayerId) {
-                      try {
-                        sendBattleAction({
-                          type: "surrender",
-                          playerId: currentPlayerId
-                        })
-                      } catch (error) {
-                        console.error("投降失败：", error)
+            {/* 投降按钮（观战者不显示） */}
+            {!isSpectating && (
+              <Card className="bg-zinc-900/50">
+                <CardContent className="p-4">
+                  <Button
+                    className="w-full bg-red-900/50 hover:bg-red-800 text-red-300 border-red-800"
+                    size="sm"
+                    onClick={() => {
+                      if (currentPlayerId) {
+                        try {
+                          sendBattleAction({
+                            type: "surrender",
+                            playerId: currentPlayerId
+                          })
+                        } catch (error) {
+                          console.error("投降失败：", error)
+                        }
                       }
-                    }
-                  }}
-                >
-                  投降
-                </Button>
-                <p className="mt-2 text-xs text-zinc-500 text-center">
-                  投降将导致你输掉当前游戏，并且游戏会自动结束
-                </p>
-              </CardContent>
-            </Card>
+                    }}
+                  >
+                    投降
+                  </Button>
+                  <p className="mt-2 text-xs text-zinc-500 text-center">
+                    投降将导致你输掉当前游戏，并且游戏会自动结束
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
     </main>
   )
 }
+
+// 战斗日志区组件（memo 避免空闲轮询时重渲染）
+const BattleLogArea = memo(function BattleLogArea({
+  actions,
+  pieces,
+  viewPlayerId,
+  currentTurnNumber,
+}: {
+  actions: NonNullable<BattleState["actions"]>
+  pieces: BattleState["pieces"]
+  viewPlayerId: string
+  currentTurnNumber: number
+}) {
+  const reversedLogs = useMemo(() => [...actions].reverse(), [actions.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Card className="bg-zinc-900/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">战斗日志</CardTitle>
+      </CardHeader>
+      <CardContent className="max-h-40 overflow-y-auto space-y-2">
+        {reversedLogs.map((action, index) => {
+          const payload = action.payload
+          let pieceName = "未知棋子"
+          if (payload?.pieceId) {
+            const piece = pieces.find(p => p.instanceId === payload.pieceId)
+            if (piece) {
+              const pieceTemplate = getPieceById(piece.templateId)
+              pieceName = pieceTemplate?.name || piece.templateId || "未知棋子"
+            }
+          }
+          let formattedMessage = payload?.message || action.type || "未知操作"
+          if (payload?.pieceId) {
+            const piece = pieces.find(p => p.instanceId === payload.pieceId)
+            if (piece) {
+              const pieceTemplate = getPieceById(piece.templateId)
+              const friendlyName = pieceTemplate?.name || piece.templateId
+              formattedMessage = formattedMessage.replace(piece.templateId, friendlyName)
+            }
+          }
+          return (
+            <div key={index} className="text-xs text-zinc-300">
+              <span className="text-zinc-500">[{action.turn || currentTurnNumber}] </span>
+              <span className={action.playerId === viewPlayerId ? "text-green-400" : "text-blue-400"}>
+                {pieceName}
+              </span>
+              <span className="text-zinc-400">: </span>
+              <span>{formattedMessage}</span>
+            </div>
+          )
+        })}
+        {actions.length === 0 && (
+          <div className="text-xs text-zinc-500">战斗日志为空</div>
+        )}
+      </CardContent>
+    </Card>
+  )
+})
 
 // 卡牌定义类型
 interface CardDefinition {
@@ -1734,7 +1945,8 @@ function HandArea({
     }
     
     loadCardDefinitions()
-  }, [hand])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hand.map(c => c.cardId).join(',')])
   
   return (
     <Card className="bg-zinc-900/50">

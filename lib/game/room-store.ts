@@ -11,6 +11,13 @@ export interface Player {
   hasSelectedPieces?: boolean
 }
 
+// 观战者类型
+export interface Spectator {
+  id: string
+  name: string
+  joinedAt: number
+}
+
 // 房间状态类型
 export type RoomStatus = 'waiting' | 'ready' | 'in-progress' | 'finished'
 
@@ -27,6 +34,7 @@ export interface Room {
   name: string
   status: RoomStatus
   players: Player[]
+  spectators: Spectator[]
   currentTurnIndex: number
   battleState?: BattleState
   actions: GameAction[]
@@ -47,6 +55,7 @@ function deserializeRoom(row: {
   visibility: string | null
   maxPlayers: number | null
   players: string
+  spectators?: string | null
   battleState: string | null
   createdAt: Date
   version: number
@@ -57,6 +66,8 @@ function deserializeRoom(row: {
     selectedPieces: p.selectedPieces || []
   }))
 
+  const spectators: Spectator[] = row.spectators ? JSON.parse(row.spectators) : []
+
   return {
     id: row.id,
     name: row.name,
@@ -66,6 +77,7 @@ function deserializeRoom(row: {
     visibility: (row.visibility as "private" | "public") ?? undefined,
     maxPlayers: row.maxPlayers ?? undefined,
     players,
+    spectators,
     currentTurnIndex: 0,
     actions: [],
     battleState: row.battleState ? JSON.parse(row.battleState) : undefined,
@@ -83,12 +95,18 @@ function serializeRoom(room: Room) {
     }))
   )
 
-  const battleState = room.battleState
-    ? JSON.stringify(room.battleState, (_key, value) => {
+  // 序列化时排除 skillsById（静态数据，可从文件重新加载，避免占用过多 Neon 存储）
+  const battleStateToStore = room.battleState
+    ? (() => { const { skillsById: _skills, ...rest } = room.battleState; return rest })()
+    : null
+  const battleState = battleStateToStore
+    ? JSON.stringify(battleStateToStore, (_key, value) => {
         if (typeof value === 'function') return undefined
         return value
       })
     : null
+
+  const spectators = JSON.stringify(room.spectators || [])
 
   return {
     id: room.id,
@@ -99,6 +117,7 @@ function serializeRoom(room: Room) {
     visibility: room.visibility ?? null,
     maxPlayers: room.maxPlayers ?? null,
     players,
+    spectators,
     battleState,
   }
 }
@@ -114,6 +133,7 @@ export class RoomStore {
         name: roomName,
         status: 'waiting',
         players: '[]',
+        spectators: '[]',
       }
     })
     return deserializeRoom(row)
@@ -194,6 +214,32 @@ export class RoomStore {
     const room = await this.getRoom(roomId)
     if (!room) return false
     room.actions.push(action)
+    await this.setRoom(roomId, room)
+    return true
+  }
+
+  // 添加观战者
+  async addSpectator(roomId: string, spectator: Spectator): Promise<boolean> {
+    const room = await this.getRoom(roomId)
+    if (!room) return false
+    if (!room.spectators) room.spectators = []
+    // 已存在则更新 joinedAt
+    const existing = room.spectators.findIndex(s => s.id === spectator.id)
+    if (existing >= 0) {
+      room.spectators[existing] = spectator
+    } else {
+      room.spectators.push(spectator)
+    }
+    await this.setRoom(roomId, room)
+    return true
+  }
+
+  // 移除观战者
+  async removeSpectator(roomId: string, spectatorId: string): Promise<boolean> {
+    const room = await this.getRoom(roomId)
+    if (!room) return false
+    if (!room.spectators) return true
+    room.spectators = room.spectators.filter(s => s.id !== spectatorId)
     await this.setRoom(roomId, room)
     return true
   }

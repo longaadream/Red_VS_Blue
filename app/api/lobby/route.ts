@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { BattleState } from "@/lib/game/turn"
 import { getRoomStore, type Room } from "@/lib/game/room-store"
+import { prisma } from "@/lib/db"
 
 // 导出 Room 类型供其他文件使用
 export type { Room }
@@ -12,6 +13,14 @@ export function getRoomsStore() {
 
 export async function GET() {
   console.log('=== Lobby API GET Request ===')
+  // 顺带清理 24 小时前已结束的房间，避免 Neon 无限累积（异步，不阻塞响应）
+  prisma.room.deleteMany({
+    where: {
+      status: 'finished',
+      updatedAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    }
+  }).catch(() => {})
+
   try {
     const roomStore = getRoomStore()
 
@@ -72,6 +81,7 @@ export async function POST(req: NextRequest) {
       hostId: trimmedHostId,
       mapId: mapId?.trim() || 'arena-8x6',
       visibility: visibility || "private",
+      spectators: [],
       currentTurnIndex: 0,
       actions: [],
       battleState: undefined,

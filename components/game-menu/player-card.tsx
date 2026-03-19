@@ -13,26 +13,35 @@ interface User {
   createdAt: string
 }
 
+interface Stats {
+  total: number
+  wins: number
+  losses: number
+  winRate: number
+}
+
 export function PlayerCard() {
   const [user, setUser] = useState<User | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
 
   useEffect(() => {
-    // 从本地存储获取用户信息
     const storedUser = localStorage.getItem('user')
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser))
-      } catch (error) {
-        console.error('解析用户信息失败:', error)
+        const parsed = JSON.parse(storedUser) as User
+        setUser(parsed)
+        // 拉取战绩统计
+        fetch(`/api/records?playerId=${encodeURIComponent(parsed.id)}`)
+          .then(r => r.json())
+          .then(data => setStats(data.stats))
+          .catch(() => {})
+      } catch {
         localStorage.removeItem('user')
       }
     }
   }, [])
 
-  // 生成用户头像的首字母
-  const getAvatarFallback = (username: string) => {
-    return username.substring(0, 2).toUpperCase()
-  }
+  const getAvatarFallback = (username: string) => username.substring(0, 2).toUpperCase()
 
   // 未登录状态
   if (!user) {
@@ -58,35 +67,55 @@ export function PlayerCard() {
 
   // 登录状态
   return (
-    <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-4">
-      <Avatar className="h-12 w-12 border-2 border-primary/40">
-        <AvatarFallback className="bg-primary/20 text-primary text-sm font-bold">
-          {getAvatarFallback(user.username)}
-        </AvatarFallback>
-      </Avatar>
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+      <div className="flex items-center gap-4">
+        <Avatar className="h-12 w-12 border-2 border-primary/40">
+          <AvatarFallback className="bg-primary/20 text-primary text-sm font-bold">
+            {getAvatarFallback(user.username)}
+          </AvatarFallback>
+        </Avatar>
 
-      <div className="flex flex-1 flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-bold text-foreground">{user.username}</span>
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            className="h-6 px-2 text-xs" 
-            onClick={() => {
-              localStorage.removeItem('user')
-              setUser(null)
-            }}
-          >
-            退出
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-muted-foreground">
-            ID: {user.id}
-          </span>
+        <div className="flex flex-1 flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-foreground">{user.username}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs"
+              onClick={() => {
+                localStorage.removeItem('user')
+                setUser(null)
+                setStats(null)
+              }}
+            >
+              退出
+            </Button>
+          </div>
+          <span className="text-[10px] text-muted-foreground">ID: {user.id}</span>
         </div>
       </div>
+
+      {/* 战绩统计 */}
+      {stats && (
+        <div className="grid grid-cols-4 divide-x divide-border border-t border-border pt-3 text-center">
+          <div>
+            <p className="text-base font-black text-yellow-400">{stats.winRate}%</p>
+            <p className="text-[10px] text-muted-foreground">胜率</p>
+          </div>
+          <div>
+            <p className="text-base font-black">{stats.total}</p>
+            <p className="text-[10px] text-muted-foreground">总局</p>
+          </div>
+          <div>
+            <p className="text-base font-black text-green-400">{stats.wins}</p>
+            <p className="text-[10px] text-muted-foreground">胜</p>
+          </div>
+          <div>
+            <p className="text-base font-black text-red-400">{stats.losses}</p>
+            <p className="text-[10px] text-muted-foreground">负</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

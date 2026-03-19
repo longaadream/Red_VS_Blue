@@ -13,6 +13,7 @@ import type {
 
 // 简单的日志写入函数
 function writeLog(message: string) {
+  if (process.env.NODE_ENV === 'production') return
   try {
     const fs = require('fs')
     const path = require('path')
@@ -1062,13 +1063,18 @@ export function applyBattleAction(
         throw optionSelectionError
       }
       
+      // 技能失败：当 success === false 时，视作无效操作，抛出错误不写日志
+      if (!result.success) {
+        throw new BattleRuleError(result.message || '技能施放失败')
+      }
+
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
-        
+
         // 消耗行动点
         const playerMeta = getPlayerMeta(next, action.playerId)
         playerMeta.actionPoints -= skillDef.actionPointCost
-        
+
         // 设置技能冷却
         if (skillDef.cooldownTurns > 0 || skillDef.type === "ultimate") {
           // 找到棋子的技能状态并设置冷却
@@ -1363,7 +1369,12 @@ export function applyBattleAction(
         optionSelectionError.title = result.title || '请选择'
         throw optionSelectionError
       }
-      
+
+      // 技能失败：视作无效操作，抛出错误不写日志（充能已在 next 中扣减，throw 后 next 被丢弃，自动回滚）
+      if (!result.success) {
+        throw new BattleRuleError(result.message || '技能施放失败')
+      }
+
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
 
