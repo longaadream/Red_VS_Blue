@@ -2753,7 +2753,20 @@
       body.scrollTop = body.scrollHeight
     }
     function clearLog() { const b = document.getElementById('logBody'); if (b) b.innerHTML = '' }
-    function goBack() { window.location.href = TRAINING_MODE ? 'index.html' : 'lobby.html' }
+    function goBack() {
+      if (TRAINING_MODE) { window.location.href = 'index.html'; return }
+      // 携带当前服务器 mode/url 跳回大厅，避免 lobby 切回远程服务器
+      try {
+        const mode = localStorage.getItem('rvb_lobby_server_mode') || 'remote'
+        const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
+        const p = new URLSearchParams({ server: mode })
+        if (serverUrl && mode !== 'local') p.set('url', serverUrl)
+        p.set('v', Date.now().toString())
+        window.location.href = 'lobby.html?' + p.toString()
+      } catch {
+        window.location.href = 'lobby.html'
+      }
+    }
     function confirmLeave() {
       if (TRAINING_MODE || !G || G.gameOver || G.winner) { goBack(); return }
       goBack()

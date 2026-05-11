@@ -227,7 +227,7 @@
 
   <!-- Topbar -->
   <div class="topbar">
-    <a class="back-btn" href="lobby.html">← 返回</a>
+    <a class="back-btn" onclick="goBackToLobby()" style="cursor:pointer">← 返回</a>
     <div class="topbar-title">选择出战棋子</div>
     <div id="factionBadge" style="font-size:13px;padding:4px 10px;border-radius:6px;background:#1e293b;border:1px solid #334155;color:#64748b;flex-shrink:0">加载中…</div>
   </div>
@@ -272,6 +272,28 @@
   </div>
 
   <script>
+    // ── Back navigation — 回到房间等待页（保留同房间上下文）──
+    function goBackToLobby() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+      const sp = new URLSearchParams(location.search)
+      const rid = sp.get('roomId') || ''
+      const pid = sp.get('playerId') || ''
+      const pname = sp.get('playerName') || ''
+      if (rid && pid) {
+        window.location.href = 'room.html?roomId=' + encodeURIComponent(rid)
+          + '&playerId=' + encodeURIComponent(pid)
+          + '&playerName=' + encodeURIComponent(pname)
+        return
+      }
+      // 兜底：没有房间上下文时再回大厅，并保留 server mode
+      const mode = localStorage.getItem('rvb_lobby_server_mode') || 'remote'
+      const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
+      const p = new URLSearchParams({ server: mode })
+      if (serverUrl && mode !== 'local') p.set('url', serverUrl)
+      p.set('v', Date.now().toString())
+      window.location.href = 'lobby.html?' + p.toString()
+    }
+
     // ── URL params ──
     const params = new URLSearchParams(location.search)
     const roomId = params.get('roomId') || ''

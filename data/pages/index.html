@@ -642,7 +642,8 @@
       if (empty) empty.remove()
       const div = document.createElement('div')
       div.className = 'lan-server-item'
-      div.innerHTML = `<div><div class="lan-server-name">${escHtml(info.name || 'RED vs BLUE')}</div><div class="lan-server-url">${escHtml(info.url)}</div></div><button class="lan-join-btn" onclick="connectLanServer('${escHtml(info.url)}')">连接</button>`
+      div.onclick = () => connectLanServer(info.url)
+      div.innerHTML = `<div><div class="lan-server-name">${escHtml(info.name || 'RED vs BLUE')}</div><div class="lan-server-url">${escHtml(info.url)}</div></div><span style="color:#3b82f6;font-size:13px;font-weight:700;flex-shrink:0">连接 ›</span>`
       list.appendChild(div)
     }
 
@@ -967,7 +968,17 @@
     }
 
     // ── Service Worker ────────────────────────────────────────────────────────
-    if ('serviceWorker' in navigator) {
+    // 版本标识，方便确认运行的是最新构建
+    console.log('[RVB] build=v4-room-ready proto=' + location.protocol)
+    if (location.protocol === 'file:') {
+      // Electron file:// 下 SW 的 Cache API 不支持，注销所有旧 SW 避免它们干扰页面加载
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister().catch(() => {}))
+          if (regs.length) console.log('[RVB] Unregistered ' + regs.length + ' service worker(s) on file://')
+        }).catch(() => {})
+      }
+    } else if ('serviceWorker' in navigator) {
       let swRefreshing = false
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (swRefreshing) return

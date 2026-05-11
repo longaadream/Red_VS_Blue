@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>房间 · RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <script src="js/server-utils.js"></script>
+  <script src="js/identity.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; background: #0a0e1a; color: #e5e7eb;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      min-height: 100vh; padding-bottom: 96px;
+    }
+    .topbar {
+      background: #111827; padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid #1e293b;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .back-btn {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      color: #94a3b8; padding: 6px 12px; font-size: 13px; cursor: pointer;
+      text-decoration: none; flex-shrink: 0;
+      font-family: inherit; line-height: 1.2;
+    }
+    .back-btn:hover { background: #263348; }
+    .back-btn:active { opacity: .7; }
+    .back-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .topbar-title { flex: 1; font-size: 16px; font-weight: 700; color: #f1f5f9; }
+    .room-id-badge {
+      font-size: 11px; color: #64748b;
+      background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+      padding: 3px 8px;
+    }
+
+    .section { padding: 12px 16px; }
+    .section-label {
+      font-size: 11px; font-weight: 700; color: #64748b;
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px;
+    }
+
+    .room-info-card {
+      background: #111827; border: 1px solid #1e293b; border-radius: 12px;
+      padding: 14px;
+    }
+    .room-info-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0; font-size: 13px;
+    }
+    .room-info-row + .room-info-row { border-top: 1px solid #1e293b; }
+    .room-info-label { color: #64748b; }
+    .room-info-value { color: #e2e8f0; font-weight: 600; }
+    .invite-code {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      color: #fbbf24; letter-spacing: 2px;
+      cursor: pointer; user-select: all;
+    }
+
+    .player-list { display: flex; flex-direction: column; gap: 10px; }
+    .player-slot {
+      background: #111827; border: 1px solid #1e293b; border-radius: 12px;
+      padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+      transition: border-color .2s, background .2s;
+    }
+    .slot-label {
+      font-size: 10px; font-weight: 800; color: #94a3b8;
+      letter-spacing: 2px; text-transform: uppercase;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .slot-body { display: flex; align-items: center; gap: 12px; }
+    .slot-empty-body {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 12px 0; color: #475569; font-size: 13px;
+    }
+    .slot-spinner {
+      display: inline-block; animation: spin 1.4s linear infinite;
+      font-size: 18px; color: #475569;
+    }
+    @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+    .player-slot.empty {
+      border-style: dashed; border-color: #1f2937;
+    }
+    .player-slot.empty .slot-label { color: #475569; }
+    .player-slot.filled.self { border-color: #3b82f6; background: #0f1d35; }
+    .player-slot.filled.self .slot-label { color: #93c5fd; }
+    .player-slot.filled.opponent { border-color: #f59e0b; background: #1f1407; }
+    .player-slot.filled.opponent .slot-label { color: #fbbf24; }
+    .player-slot.filled.ready { border-color: #22c55e; background: #0f1d12; }
+    .player-slot.filled.ready .slot-label { color: #4ade80; }
+    .player-faction-badge {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .player-faction-badge.red { background: #2a0a0a; color: #f87171; border: 1px solid #ef4444; }
+    .player-faction-badge.blue { background: #0a1a2a; color: #60a5fa; border: 1px solid #3b82f6; }
+    .player-faction-badge.unknown { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .player-name { flex: 1; min-width: 0; }
+    .player-name-text {
+      font-size: 14px; font-weight: 700; color: #f1f5f9;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .name-tag {
+      font-size: 11px; font-weight: 600; color: #64748b;
+      letter-spacing: .5px; margin-left: 4px;
+    }
+    .player-name-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .player-ready-badge {
+      flex-shrink: 0; padding: 4px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    }
+    .player-ready-badge.yes { background: #14532d; color: #4ade80; border: 1px solid #16a34a; }
+    .player-ready-badge.no  { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .host-tag {
+      font-size: 9px; font-weight: 700; color: #fbbf24;
+      background: #422006; border: 1px solid #d97706; border-radius: 4px;
+      padding: 1px 5px; margin-left: 4px; vertical-align: 2px;
+    }
+
+    .bottom-bar {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      background: #0a0e1a; border-top: 1px solid #1e293b;
+      padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;
+      z-index: 20;
+    }
+    .status-line { font-size: 12px; color: #64748b; text-align: center; }
+    .status-line.warn { color: #fbbf24; }
+    .status-line.ok { color: #4ade80; }
+    .btn-ready {
+      width: 100%; padding: 14px; font-size: 16px; font-weight: 800;
+      border-radius: 12px; border: none; cursor: pointer;
+      transition: filter .15s, transform .05s;
+    }
+    .btn-ready:active { transform: scale(.98); }
+    .btn-ready.ready-up { background: #16a34a; color: #fff; }
+    .btn-ready.cancel-ready { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .btn-ready:disabled { opacity: .5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <button type="button" class="back-btn" onclick="leaveAndGoLobby()">← 离开</button>
+    <div class="topbar-title">房间等待中</div>
+    <div class="room-id-badge" id="roomIdBadge">—</div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">房间信息</div>
+    <div class="room-info-card">
+      <div class="room-info-row">
+        <span class="room-info-label">房间名</span>
+        <span class="room-info-value" id="roomNameLabel">—</span>
+      </div>
+      <div class="room-info-row">
+        <span class="room-info-label">地图</span>
+        <span class="room-info-value" id="roomMapLabel">—</span>
+      </div>
+      <div class="room-info-row" id="inviteRow" style="display:none">
+        <span class="room-info-label">邀请码</span>
+        <span class="room-info-value invite-code" id="inviteCodeLabel" onclick="copyInviteCode()">—</span>
+      </div>
+      <div class="room-info-row">
+        <span class="room-info-label">人数</span>
+        <span class="room-info-value" id="playerCountLabel">0 / 2</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">玩家</div>
+    <div class="player-list" id="playerList">
+      <div class="player-slot empty">加载中…</div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="status-line" id="statusLine">等待对手加入…</div>
+    <button class="btn-ready ready-up" id="readyBtn" onclick="toggleReady()" disabled>准备</button>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search)
+    const roomId = params.get('roomId') || ''
+    const playerId = (params.get('playerId') || '').trim().toLowerCase()
+    const playerName = params.get('playerName') || '玩家'
+
+    let pollTimer = null
+    let _lastRoom = null
+    let _navigating = false
+    let _busy = false
+    const MAPS_CACHE = {}
+
+    if (!roomId || !playerId) {
+      document.getElementById('statusLine').textContent = '参数缺失，请重新进入'
+      document.getElementById('statusLine').className = 'status-line warn'
+    }
+
+    async function fetchJson(p) {
+      if (window.fetchPackJson && /^\.?\/?data\//.test(p)) return window.fetchPackJson(p)
+      const res = await fetch(p)
+      if (!res.ok) throw new Error(res.status)
+      return res.json()
+    }
+
+    async function getMapName(mapId) {
+      if (!mapId) return '默认'
+      if (MAPS_CACHE[mapId]) return MAPS_CACHE[mapId]
+      try {
+        const m = await fetchJson('./data/maps/' + mapId + '.json')
+        MAPS_CACHE[mapId] = m.name || mapId
+        return MAPS_CACHE[mapId]
+      } catch {
+        return mapId
+      }
+    }
+
+    function factionIcon(f) { return f === 'red' ? '🔴' : f === 'blue' ? '🔵' : '⚪' }
+    function factionLabel(f) { return f === 'red' ? '红方' : f === 'blue' ? '蓝方' : '未分配' }
+
+    function renderSlot(slotLabel, p, myId, hostId, isMySlot) {
+      if (!p) {
+        // 空位 — 等待
+        return '<div class="player-slot empty">'
+          + '<div class="slot-label">' + slotLabel + '</div>'
+          + '<div class="slot-empty-body">'
+            + '<div class="slot-spinner">⟳</div>'
+            + '<div>' + (isMySlot ? '加载中…' : '等待对手加入…') + '</div>'
+          + '</div>'
+        + '</div>'
+      }
+      const isMe = isMySlot
+      const isHost = p.id && p.id.toLowerCase() === hostId
+      const ready = p.ready === true
+      const factionCls = p.faction === 'red' ? 'red' : (p.faction === 'blue' ? 'blue' : 'unknown')
+      const cls = 'player-slot filled' + (isMe ? ' self' : ' opponent') + (ready ? ' ready' : '')
+      return '<div class="' + cls + '">'
+        + '<div class="slot-label">' + slotLabel + (isHost ? '<span class="host-tag">主机</span>' : '') + '</div>'
+        + '<div class="slot-body">'
+          + '<div class="player-faction-badge ' + factionCls + '">' + factionIcon(p.faction) + '</div>'
+          + '<div class="player-name">'
+            + '<div class="player-name-text">' + escHtml(p.name || p.id) + '<span class="name-tag">#' + escHtml((p.id || '').slice(0, 6).toUpperCase()) + '</span></div>'
+            + '<div class="player-name-sub">' + factionLabel(p.faction) + ' · ID: ' + escHtml((p.id || '').slice(0, 8)) + '</div>'
+          + '</div>'
+          + '<div class="player-ready-badge ' + (ready ? 'yes' : 'no') + '">' + (ready ? '✓ 已准备' : '准备中…') + '</div>'
+        + '</div>'
+      + '</div>'
+    }
+
+    async function refreshRoom() {
+      if (_navigating) return
+      try {
+        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId)
+        if (!res.ok) {
+          if (res.status === 404) {
+            stopPolling()
+            document.getElementById('statusLine').textContent = '房间已不存在，返回大厅…'
+            document.getElementById('statusLine').className = 'status-line warn'
+            setTimeout(() => goBackToLobby(), 1200)
+          }
+          return
+        }
+        const room = await res.json()
+        _lastRoom = room
+        await renderRoom(room)
+
+        // 战斗已开始（status=in-progress / playing / battle）→ 跳转 battle
+        if (room.status === 'in-progress' || room.status === 'playing' || room.status === 'battle') {
+          _navigating = true
+          stopPolling()
+          window.location.href = 'battle.html'
+            + '?roomId=' + encodeURIComponent(roomId)
+            + '&playerId=' + encodeURIComponent(playerId)
+            + '&playerName=' + encodeURIComponent(playerName)
+          return
+        }
+        // 双方都已选完棋子但还没开战，也跳 battle（兼容旧流程）
+        const allSelected = (room.players || []).length >= 2 &&
+          room.players.every(p => p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
+        if (allSelected) {
+          _navigating = true
+          stopPolling()
+          window.location.href = 'battle.html'
+            + '?roomId=' + encodeURIComponent(roomId)
+            + '&playerId=' + encodeURIComponent(playerId)
+            + '&playerName=' + encodeURIComponent(playerName)
+          return
+        }
+      } catch (e) {
+        // 网络错误：暂不跳，等下一次轮询
+      }
+    }
+
+    async function renderRoom(room) {
+      document.getElementById('roomIdBadge').textContent = '#' + (room.id || roomId).slice(0, 8)
+      document.getElementById('roomNameLabel').textContent = room.name || roomId
+      document.getElementById('roomMapLabel').textContent = await getMapName(room.mapId)
+
+      const players = room.players || []
+      document.getElementById('playerCountLabel').textContent = players.length + ' / ' + (room.maxPlayers || 2)
+
+      if (room.inviteCode) {
+        document.getElementById('inviteRow').style.display = 'flex'
+        document.getElementById('inviteCodeLabel').textContent = room.inviteCode
+      }
+
+      // 明确分两个槽：自己 / 对手
+      const cap = room.maxPlayers || 2
+      const hostId = (room.hostId || '').toLowerCase()
+      const me = players.find(p => p.id && p.id.toLowerCase() === playerId) || null
+      const opp = players.find(p => p.id && p.id.toLowerCase() !== playerId) || null
+      const list = document.getElementById('playerList')
+      list.innerHTML =
+        renderSlot('自己', me, playerId, hostId, true) +
+        renderSlot('对手', opp, playerId, hostId, false)
+
+      // 按钮 + 状态文字
+      const btn = document.getElementById('readyBtn')
+      const status = document.getElementById('statusLine')
+      if (!me) {
+        btn.disabled = true
+        btn.textContent = '未加入房间'
+        btn.className = 'btn-ready cancel-ready'
+        status.textContent = '未在房间中，请返回大厅重试'
+        status.className = 'status-line warn'
+        return
+      }
+      btn.disabled = false
+      if (me.ready) {
+        btn.textContent = '取消准备'
+        btn.className = 'btn-ready cancel-ready'
+      } else {
+        btn.textContent = '准备'
+        btn.className = 'btn-ready ready-up'
+      }
+
+      if (players.length < cap) {
+        status.textContent = '等待对手加入…（' + players.length + '/' + cap + '）'
+        status.className = 'status-line'
+      } else {
+        const readyCount = players.filter(p => p.ready === true).length
+        if (readyCount === cap) {
+          status.textContent = '双方已准备，即将进入选人…'
+          status.className = 'status-line ok'
+          // 双方都准备 → 跳选人页（仅本玩家自己已准备时才跳，否则让 polling 等待）
+          if (me.ready && !_navigating) {
+            _navigating = true
+            stopPolling()
+            setTimeout(() => {
+              window.location.href = 'piece-selection.html'
+                + '?roomId=' + encodeURIComponent(roomId)
+                + '&playerId=' + encodeURIComponent(playerId)
+                + '&playerName=' + encodeURIComponent(playerName)
+            }, 400)
+          }
+        } else {
+          status.textContent = '已准备 ' + readyCount + ' / ' + cap + '，等待全部准备就绪'
+          status.className = 'status-line'
+        }
+      }
+    }
+
+    async function toggleReady() {
+      if (_busy) return
+      _busy = true
+      const btn = document.getElementById('readyBtn')
+      btn.disabled = true
+      try {
+        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'toggle-ready', playerId, playerName })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const room = await res.json()
+        await renderRoom(room)
+      } catch (e) {
+        alert('准备失败：' + e.message)
+      } finally {
+        _busy = false
+        document.getElementById('readyBtn').disabled = false
+      }
+    }
+
+    function leaveAndGoLobby() {
+      console.log('[room] leave clicked')
+      _navigating = true  // 防止 beforeunload 再次发 leave
+      stopPolling()
+      // 先发离开通知（不等响应，sendBeacon 或 fire-and-forget fetch）
+      const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
+      if (roomId && playerId) {
+        const payload = JSON.stringify({ action: 'leave', playerId, playerName })
+        try {
+          if (serverUrl && navigator.sendBeacon) {
+            const blob = new Blob([payload], { type: 'application/json' })
+            navigator.sendBeacon(serverUrl + '/api/rooms/' + roomId + '/actions', blob)
+          } else if (window.RvBUtils && RvBUtils.serverFetch) {
+            // fire-and-forget，不 await，不阻塞跳转
+            RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: payload,
+            }).catch(() => {})
+          }
+        } catch (e) { console.warn('[room] leave beacon failed', e) }
+      }
+      // 立即跳转，不等服务器
+      goBackToLobby()
+    }
+
+    function goBackToLobby() {
+      const mode = localStorage.getItem('rvb_lobby_server_mode') || 'remote'
+      const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
+      const p = new URLSearchParams({ server: mode })
+      if (serverUrl && mode !== 'local') p.set('url', serverUrl)
+      p.set('v', Date.now().toString())
+      window.location.href = 'lobby.html?' + p.toString()
+    }
+
+    function copyInviteCode() {
+      const code = document.getElementById('inviteCodeLabel').textContent
+      if (!code || code === '—') return
+      try {
+        navigator.clipboard.writeText(code)
+        const lbl = document.getElementById('inviteCodeLabel')
+        const orig = lbl.textContent
+        lbl.textContent = '已复制 ✓'
+        setTimeout(() => { lbl.textContent = orig }, 800)
+      } catch {}
+    }
+
+    function escHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
+
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer)
+      pollTimer = setInterval(refreshRoom, 1500)
+    }
+    function stopPolling() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+    }
+
+    // 关闭窗口/刷新前向服务器报 leave（best-effort）
+    window.addEventListener('beforeunload', () => {
+      if (_navigating) return  // 正常跳转 battle / piece-selection 不当作离开
+      try {
+        // 同步信标，浏览器在 unload 时仍能发送
+        const blob = new Blob([JSON.stringify({ action: 'leave', playerId, playerName })], { type: 'application/json' })
+        const url = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
+        if (url) navigator.sendBeacon(url + '/api/rooms/' + roomId + '/actions', blob)
+      } catch {}
+    })
+
+    window.addEventListener('load', () => {
+      if (!roomId || !playerId) return
+      refreshRoom()
+      startPolling()
+    })
+  </script>
+</body>
+</html>

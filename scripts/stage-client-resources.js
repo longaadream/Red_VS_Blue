@@ -15,13 +15,29 @@ const packageJsonPath = path.join(srcRoot, 'package.json')
 const serverJsPath = path.join(srcRoot, 'server.js')
 
 if (!fs.existsSync(packageJsonPath) || !fs.existsSync(serverJsPath)) {
-  const entries = fs.readdirSync(srcRoot, { withFileTypes: true })
-  const nested = entries.find(e => e.isDirectory() &&
-    fs.existsSync(path.join(srcRoot, e.name, 'package.json')) &&
-    fs.existsSync(path.join(srcRoot, e.name, 'server.js')))
-  if (nested) {
-    standaloneDir = path.join(srcRoot, nested.name)
-    console.log('[stage-client] Using nested standalone directory:', nested.name)
+  // Recursively find the directory containing both package.json and server.js
+  // (needed for worktree builds where Next.js nests the output more deeply)
+  function findStandaloneDir(dir, depth) {
+    if (depth > 8) return null
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      for (const e of entries) {
+        if (!e.isDirectory() || e.name === 'node_modules') continue
+        const candidate = path.join(dir, e.name)
+        if (fs.existsSync(path.join(candidate, 'package.json')) &&
+            fs.existsSync(path.join(candidate, 'server.js'))) {
+          return candidate
+        }
+        const deeper = findStandaloneDir(candidate, depth + 1)
+        if (deeper) return deeper
+      }
+    } catch {}
+    return null
+  }
+  const found = findStandaloneDir(srcRoot, 0)
+  if (found) {
+    standaloneDir = found
+    console.log('[stage-client] Using nested standalone directory:', path.relative(srcRoot, found))
   }
 }
 

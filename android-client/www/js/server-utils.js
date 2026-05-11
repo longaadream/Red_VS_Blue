@@ -10,9 +10,39 @@
   'use strict'
 
   var SERVER_KEY = 'rvb_server_url'
+  var MODE_KEY = 'rvb_lobby_server_mode'
+  var LOCAL_SERVER_KEY = 'rvb_local_server_url'
+  var LAN_SERVER_KEY = 'rvb_lan_server_url'
+  var REMOTE_SERVER_KEY = 'rvb_remote_server_url'
 
   function getServerUrl() {
+    var mode = localStorage.getItem(MODE_KEY) || ''
+    var expectedUrl = getServerUrlForMode(mode)
+    if (expectedUrl) {
+      var currentUrl = localStorage.getItem(SERVER_KEY) || ''
+      if (currentUrl !== expectedUrl) activateServerUrl(expectedUrl, mode)
+      return expectedUrl
+    }
     return localStorage.getItem(SERVER_KEY) || ''
+  }
+
+  function getServerUrlForMode(mode) {
+    if (mode === 'local') return localStorage.getItem(LOCAL_SERVER_KEY) || ''
+    if (mode === 'lan') return localStorage.getItem(LAN_SERVER_KEY) || ''
+    if (mode === 'remote') return localStorage.getItem(REMOTE_SERVER_KEY) || ''
+    return ''
+  }
+
+  function getActiveServerMode() {
+    var savedMode = localStorage.getItem(MODE_KEY) || ''
+    if (savedMode && getServerUrlForMode(savedMode)) return savedMode
+    var currentUrl = localStorage.getItem(SERVER_KEY) || ''
+    return currentUrl ? getServerModeForUrl(currentUrl) : savedMode
+  }
+
+  function activateServerUrl(url, mode) {
+    localStorage.setItem(SERVER_KEY, url)
+    localStorage.setItem(MODE_KEY, mode)
   }
 
   function isLocalOrLanUrl(url) {
@@ -20,22 +50,158 @@
       /^http:\/\/(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(url)
   }
 
+  function getServerModeForUrl(url) {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\b/.test(url)) return 'local'
+    if (/^http:\/\/(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(url)) return 'lan'
+    return 'remote'
+  }
+
   function saveServerUrl(url) {
-    localStorage.setItem(SERVER_KEY, url)
-    if (!isLocalOrLanUrl(url)) {
-      localStorage.setItem('rvb_remote_server_url', url)
+    var mode = getServerModeForUrl(url)
+    activateServerUrl(url, mode)
+    if (mode === 'remote') {
+      localStorage.setItem(REMOTE_SERVER_KEY, url)
+    } else if (mode === 'local') {
+      localStorage.setItem(LOCAL_SERVER_KEY, url)
+      localStorage.setItem(REMOTE_SERVER_KEY, url)
+    } else if (mode === 'lan') {
+      localStorage.setItem(LAN_SERVER_KEY, url)
+      localStorage.setItem(REMOTE_SERVER_KEY, url)
     }
-    if (!isLocalOrLanUrl(url) && window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
+    if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
       window.RvBBridge.saveUrl(url)
     }
   }
 
+  function saveLocalServerUrl(url) {
+    localStorage.setItem(LOCAL_SERVER_KEY, url)
+    localStorage.setItem(REMOTE_SERVER_KEY, url)
+    activateServerUrl(url, 'local')
+    if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
+      window.RvBBridge.saveUrl(url)
+    }
+  }
+
+  function saveLanServerUrl(url) {
+    localStorage.setItem(LAN_SERVER_KEY, url)
+    localStorage.setItem(REMOTE_SERVER_KEY, url)
+    activateServerUrl(url, 'lan')
+    if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
+      window.RvBBridge.saveUrl(url)
+    }
+  }
+
+  function saveRemoteServerUrl(url) {
+    localStorage.setItem(REMOTE_SERVER_KEY, url)
+    activateServerUrl(url, 'remote')
+    if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
+      window.RvBBridge.saveUrl(url)
+    }
+  }
+
+  function switchServerMode(mode) {
+    var url = getServerUrlForMode(mode)
+    if (!url) return false
+    activateServerUrl(url, mode)
+    return true
+  }
+
+  function parseBridgeJson(raw) {
+    try { return JSON.parse(raw || '{}') } catch { return {} }
+  }
+
+  async function detectLocalServerUrl() {
+    if (window.RvBBridge) {
+      if (typeof window.RvBBridge.getMobileServerStatus === 'function') {
+        var status = parseBridgeJson(window.RvBBridge.getMobileServerStatus())
+        if (status && status.running) return 'http://localhost:7878'
+      }
+      return 'http://localhost:7878'
+    }
+    if (window.electronAPI) {
+      if (typeof window.electronAPI.getMode === 'function') {
+        try {
+          var mode = await window.electronAPI.getMode()
+          if (mode && mode.localUrl) return mode.localUrl
+        } catch {}
+      }
+      if (typeof window.electronAPI.getHostInfo === 'function') {
+        try {
+          var host = await window.electronAPI.getHostInfo()
+          if (host && host.localUrl) return host.localUrl
+        } catch {}
+      }
+    }
+    return ''
+  }
+
+  async function ensureServerMode(mode, fallbackUrl) {
+    if (mode === 'local') {
+      var localUrl = await detectLocalServerUrl()
+      if (localUrl) {
+        saveLocalServerUrl(localUrl)
+        return true
+      }
+      if (switchServerMode('local')) return true
+      if (fallbackUrl && getServerModeForUrl(fallbackUrl) === 'local') {
+        saveLocalServerUrl(fallbackUrl)
+        return true
+      }
+      return false
+    }
+    if (mode === 'lan') {
+      if (fallbackUrl && getServerModeForUrl(fallbackUrl) === 'lan') {
+        saveLanServerUrl(fallbackUrl)
+        return true
+      }
+      return switchServerMode('lan')
+    }
+    if (mode === 'remote') {
+      if (fallbackUrl && getServerModeForUrl(fallbackUrl) === 'remote') {
+        saveRemoteServerUrl(fallbackUrl)
+        return true
+      }
+      return switchServerMode('remote')
+    }
+    return false
+  }
+
+  async function restoreServerFromParams(search) {
+    var params = search instanceof URLSearchParams
+      ? search
+      : new URLSearchParams(search || (window.location && window.location.search) || '')
+    var mode = params.get('server') || ''
+    var url = params.get('serverUrl') || params.get('url') || ''
+    if (mode) return ensureServerMode(mode, url)
+    mode = getActiveServerMode()
+    if (mode) return ensureServerMode(mode, getServerUrl())
+    return false
+  }
+
+  function appendServerParams(params) {
+    params = params || new URLSearchParams()
+    var mode = getActiveServerMode()
+    var url = getServerUrl()
+    if (mode) params.set('server', mode)
+    if (url) params.set('serverUrl', url)
+    return params
+  }
+
   function clearServerUrl() {
     localStorage.removeItem(SERVER_KEY)
-    localStorage.removeItem('rvb_remote_server_url')
+    localStorage.removeItem(MODE_KEY)
+    localStorage.removeItem(LOCAL_SERVER_KEY)
+    localStorage.removeItem(LAN_SERVER_KEY)
+    localStorage.removeItem(REMOTE_SERVER_KEY)
     if (window.RvBBridge && typeof window.RvBBridge.clearUrl === 'function') {
       window.RvBBridge.clearUrl()
     }
+  }
+
+  async function leaveCurrentRoom() {
+    var mode = localStorage.getItem(MODE_KEY) || getServerModeForUrl(getServerUrl())
+    if (mode) return ensureServerMode(mode, getServerUrl())
+    return false
   }
 
   function fetchWithTimeout(url, options, timeoutMs) {
@@ -241,8 +407,20 @@
   window.RvBUtils = {
     SERVER_KEY: SERVER_KEY,
     getServerUrl: getServerUrl,
+    getServerUrlForMode: getServerUrlForMode,
+    getActiveServerMode: getActiveServerMode,
+    getServerModeForUrl: getServerModeForUrl,
+    detectLocalServerUrl: detectLocalServerUrl,
+    ensureServerMode: ensureServerMode,
+    restoreServerFromParams: restoreServerFromParams,
+    appendServerParams: appendServerParams,
     saveServerUrl: saveServerUrl,
+    saveLocalServerUrl: saveLocalServerUrl,
+    saveLanServerUrl: saveLanServerUrl,
+    saveRemoteServerUrl: saveRemoteServerUrl,
+    switchServerMode: switchServerMode,
     clearServerUrl: clearServerUrl,
+    leaveCurrentRoom: leaveCurrentRoom,
     serverFetch: serverFetch,
     validateAndSaveServer: validateAndSaveServer,
   }

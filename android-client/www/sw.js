@@ -1,8 +1,9 @@
-const CACHE_NAME = 'rvb-v3-pve-entry'
+const CACHE_NAME = 'rvb-v4-room-ready'
 const STATIC_ASSETS = [
   './',
   './index.html',
   './lobby.html',
+  './room.html',
   './login.html',
   './battle.html',
   './training.html',
@@ -17,9 +18,20 @@ const STATIC_ASSETS = [
   './js/pve-api.js',
 ]
 
+// 检测当前作用域是否是 file://（Electron 桌面版）—— Cache API 不支持 file://，整体跳过
+const IS_FILE_SCHEME = (self.location && self.location.protocol === 'file:')
+
 self.addEventListener('install', event => {
+  if (IS_FILE_SCHEME) {
+    // file:// 下 cache.addAll 会报错，直接 skipWaiting 让 SW 处于「无缓存透传」状态
+    event.waitUntil(self.skipWaiting())
+    return
+  }
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
+      .catch(() => self.skipWaiting()) // 任何 addAll 失败也不阻塞 SW 启动
   )
 })
 
@@ -42,6 +54,9 @@ self.addEventListener('activate', event => {
 })
 
 self.addEventListener('fetch', event => {
+  // file:// 下 SW 无法操作缓存，全部透传（不调用 respondWith，让浏览器走默认 file 加载）
+  if (IS_FILE_SCHEME) return
+
   const url = new URL(event.request.url)
 
   // API 请求永远走网络，不缓存

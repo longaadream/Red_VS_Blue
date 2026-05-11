@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   const { playerId, playerName, action, pieces } = (body as {
     playerId?: string
     playerName?: string
-    action?: "select-pieces" | "start-game" | "claim-faction" | "join"
+    action?: "select-pieces" | "start-game" | "claim-faction" | "join" | "toggle-ready" | "leave"
     pieces?: Array<{ templateId: string; faction: string }>
   }) ?? {}
 
@@ -162,6 +162,46 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     await roomStore.setRoom(roomId, latestRoom)
     return NextResponse.json({ success: true, faction, message: `Faction ${faction} claimed successfully` })
+  }
+
+  if (action === "toggle-ready") {
+    const latestRoom = await roomStore.getRoom(roomId)
+    if (!latestRoom) return NextResponse.json({ error: "Room not found" }, { status: 404 })
+
+    const normalizedPlayerId = playerId.trim().toLowerCase()
+    const me = latestRoom.players.find(p => p.id.toLowerCase() === normalizedPlayerId)
+    if (!me) return NextResponse.json({ error: "Player not in room" }, { status: 400 })
+
+    me.ready = !me.ready
+    // 当两人都准备就绪时切换为 'ready' 状态，让客户端轮询时检测到并跳转选人
+    const allReady = latestRoom.players.length >= 2 && latestRoom.players.every(p => p.ready === true)
+    if (allReady && latestRoom.status === "waiting") {
+      latestRoom.status = "ready"
+    } else if (!allReady && latestRoom.status === "ready") {
+      latestRoom.status = "waiting"
+    }
+    await roomStore.setRoom(roomId, latestRoom)
+    return NextResponse.json(latestRoom)
+  }
+
+  if (action === "leave") {
+    const latestRoom = await roomStore.getRoom(roomId)
+    if (!latestRoom) return NextResponse.json({ error: "Room not found" }, { status: 404 })
+
+    const normalizedPlayerId = playerId.trim().toLowerCase()
+    const before = latestRoom.players.length
+    latestRoom.players = latestRoom.players.filter(p => p.id.toLowerCase() !== normalizedPlayerId)
+    // 离开后房间剩 <2 人，回到 waiting，并清空其他人的 ready 状态
+    if (latestRoom.players.length < 2 && latestRoom.status === "ready") {
+      latestRoom.status = "waiting"
+    }
+    latestRoom.players.forEach(p => { p.ready = false })
+    // 若离开的是主机，转移主机
+    if (latestRoom.hostId && latestRoom.hostId.toLowerCase() === normalizedPlayerId && latestRoom.players.length > 0) {
+      latestRoom.hostId = latestRoom.players[0].id
+    }
+    await roomStore.setRoom(roomId, latestRoom)
+    return NextResponse.json({ success: true, left: before !== latestRoom.players.length, room: latestRoom })
   }
 
   if (action === "select-pieces") {

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, session } from 'electron'
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
@@ -419,8 +419,8 @@ function loadLocalGame(): void {
   const indexPath = path.join(getHtmlRoot(), 'index.html').replace(/\\/g, '/')
   win.loadURL(`file:///${indexPath}?v=${Date.now()}`)
 
-  // 仅当本地服务器实际启动后，才注入默认服务器 URL
-  win.webContents.on('did-finish-load', () => {
+  // 仅当本地服务器实际启动后，才注入默认服务器 URL（once：只注入一次，不影响后续页面导航）
+  win.webContents.once('did-finish-load', () => {
     if (!serverProcess || !localServerReady) return
     win.webContents.executeJavaScript(`
       (function() {
@@ -439,7 +439,8 @@ function loadOnlineGame(serverUrl: string): void {
   const indexPath = path.join(getHtmlRoot(), 'index.html').replace(/\\/g, '/')
   win.loadURL(`file:///${indexPath}?v=${Date.now()}`)
 
-  win.webContents.on('did-finish-load', () => {
+  // once：只在首次加载 index.html 时注入，不覆盖用户后续切换 LAN/本机模式时的地址
+  win.webContents.once('did-finish-load', () => {
     win.webContents.executeJavaScript(`
       (function() {
         localStorage.setItem('rvb_server_url', ${JSON.stringify(serverUrl)});
@@ -768,6 +769,16 @@ app.on('certificate-error', (event, _webContents, _url, _error, _certificate, ca
 setupPackProtocol()
 
 app.whenReady().then(async () => {
+  // 启动时清除上一版本残留的 Service Worker / Cache Storage，避免旧缓存遮蔽新页面
+  try {
+    await session.defaultSession.clearStorageData({
+      storages: ['serviceworkers', 'cachestorage'],
+    })
+    console.log('[client] Cleared service worker + cache storage on startup')
+  } catch (e) {
+    console.warn('[client] Failed to clear SW/cache storage:', e)
+  }
+
   await startLocalServer()
   // 检查是否有保存的远程服务器地址
   const savedUrl = getOnlineServerUrl()

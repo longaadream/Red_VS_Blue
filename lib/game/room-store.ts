@@ -9,6 +9,7 @@ export interface Player {
   faction?: "red" | "blue"
   selectedPieces?: Array<{ templateId: string; faction: string }>
   hasSelectedPieces?: boolean
+  ready?: boolean
 }
 
 // 观战者类型

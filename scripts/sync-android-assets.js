@@ -166,8 +166,15 @@ function copyImagesFromDir(srcDir, dstDir) {
   return imgCount
 }
 
+function countImagesInDir(srcDir) {
+  if (!fs.existsSync(srcDir)) return 0
+  return fs.readdirSync(srcDir)
+    .filter(name => IMAGE_EXTS.has(path.extname(name).toLowerCase())).length
+}
+
 let imgCount = 0
-if (fs.existsSync(electronBuildImages)) {
+const electronImageCount = countImagesInDir(electronBuildImages)
+if (!fs.existsSync(publicSrc) && electronImageCount > 0) {
   imgCount = copyImagesFromDir(electronBuildImages, imagesDst)
   console.log(`[sync-android] Copied images from electron-build → game_assets/images/ (${imgCount} files)`)
   copyImagesFromDir(electronBuildImages, androidWwwImagesDst)
@@ -175,6 +182,11 @@ if (fs.existsSync(electronBuildImages)) {
   imgCount = copyImagesFromDir(publicSrc, imagesDst)
   console.log(`[sync-android] Copied images from public/ → game_assets/images/ (${imgCount} files)`)
   copyImagesFromDir(publicSrc, androidWwwImagesDst)
+  const electronWww = path.dirname(electronBuildImages)
+  if (fs.existsSync(electronWww)) {
+    const electronSyncedCount = copyImagesFromDir(publicSrc, electronBuildImages)
+    console.log(`[sync-android] Synced images to dist Electron www/images/ (${electronSyncedCount} files)`)
+  }
 } else {
   console.warn('[sync-android] SKIP images (no source found)')
 }

@@ -17,7 +17,7 @@ function ensureLoaded() {
     return
   }
 
-  const files = fs.readdirSync(MAPS_DIR).filter(f => f.endsWith('.json'))
+  const files = fs.readdirSync(MAPS_DIR).filter(f => f.endsWith('.json') && f !== 'manifest.json')
   for (const file of files) {
     try {
       const filePath = path.join(MAPS_DIR, file)
