@@ -1,0 +1,15 @@
+{
+  "id": "effect-hardy-block",
+  "name": "悍猛格挡",
+  "icon": "🛡️",
+  "color": "#f59e0b",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "afterDamageTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.find(function(tag) { return tag.type === 'hardy-block'; })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var hardyBlockTag = piece.statusTags && piece.statusTags.find(function(tag) { return tag.type === 'hardy-block'; }); if (!hardyBlockTag) { self.expire(); return { success: false, message: '' }; } var damage = ctx.damage; if (!damage || damage <= 0) return { success: false, message: '' }; var attackGain = Math.floor(damage * 0.5); if (attackGain > 0) { piece.attack += attackGain; } return { success: true, message: piece.name + ' 的悍猛格挡生效，将' + damage + ' 点伤害的50%转化为' + attackGain + ' 点攻击力，当前攻击力为' + piece.attack }; }"
+    }
+  ]
+}

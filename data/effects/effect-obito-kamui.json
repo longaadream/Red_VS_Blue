@@ -1,0 +1,16 @@
+{
+  "id": "effect-obito-kamui",
+  "name": "神威护盾",
+  "icon": "🌀",
+  "color": "#7c3aed",
+  "visible": true,
+  "statusType": "kamui-shield",
+  "triggers": [
+    {
+      "on": "beforeDamageTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var obito = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!obito) return false; if (!ctx.piece || ctx.piece.instanceId !== obito.instanceId) return false; return !!(obito.statusTags && obito.statusTags.find(function(t) { return t.type === 'kamui-shield'; })); }",
+      "effectCode": "function(ctx, battle, self) { var obito = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!obito) return { success: false }; var shield = obito.statusTags && obito.statusTags.find(function(t) { return t.type === 'kamui-shield'; }); if (!shield) { self.expire(); return { success: false }; } var damage = ctx.damage; if (!damage || damage <= 0) return { success: false }; var attacker = ctx.target; removeStatusEffectById(obito.instanceId, 'kamui-shield'); self.expire(); if (attacker && attacker.currentHp > 0) { dealDamage(obito, attacker, damage, 'true', battle, 'kamui-reflect'); return { success: true, blocked: true, message: obito.name + '的神威吸收了' + damage + '点伤害，并将其反弹给' + attacker.name + '！' }; } return { success: true, blocked: true, message: obito.name + '的神威吸收了' + damage + '点伤害！' }; }"
+    }
+  ]
+}

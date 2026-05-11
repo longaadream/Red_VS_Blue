@@ -1,7 +1,10 @@
 {
   "id": "blessed-hammer",
   "name": "祝福之锤",
-  "description": "对一个两格内敌人造成自身攻击力100%的物理伤害",
+  "description": "对2格内1个敌人造成等同攻击力的物理伤害。",
+  "keywords": [],
+  "targetText": "2格内1个敌人",
+  "effectTags": ["物理伤害"],
   "icon": "🔨",
   "kind": "active",
   "type": "normal",
@@ -10,6 +13,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetEnemy = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const damage = sourcePiece.attack; const damageResult = dealDamage(sourcePiece, targetEnemy, damage, 'physical', context.battle, context.skill.id); return { message: sourcePiece.name + '的祝福之锤对' + targetEnemy.name + '造成' + damageResult.damage + '点物理伤害', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: '对两格内一个敌人造成' + damage + '点物理伤害（攻击力100%）', expectedValues: { damage: damage } }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: '对2格内1个敌人造成' + damage + '点物理伤害。', expectedValues: { damage: damage } }; }",
   "range": "single"
 }

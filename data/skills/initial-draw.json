@@ -1,7 +1,10 @@
 {
   "id": "initial-draw",
   "name": "初始抽牌",
-  "description": "游戏开始时每个玩家抽3张牌",
+  "description": "游戏开始时，每个玩家抽3张牌。",
+  "keywords": [],
+  "targetText": "所有玩家",
+  "effectTags": ["手牌"],
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

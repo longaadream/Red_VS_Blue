@@ -1464,6 +1464,20 @@ if (!chosen || chosen.needsOptionSelection) return chosen
 // ✅ 以下代码才能安全使用 chosen
 ```
 
+### selectOption + selectTarget 连续使用（多步骤链）
+
+当技能需要先选择方式（`selectOption`）再选择目标（`selectTarget`），服务端会经历三次请求：
+
+| 请求 | 客户端发送 | 服务端执行到 | 返回 |
+|------|-----------|-----------|------|
+| 第1次 | 基本动作（无额外字段） | `selectOption` | `{needsOptionSelection: true, ...}` |
+| 第2次 | `+ selectedOption: 'summon'` | `selectOption` 返回值，继续到 `selectTarget` | `{needsTargetSelection: true, ...}` |
+| 第3次 | `+ selectedOption: 'summon' + targetX/targetY` | 两步均跳过，执行完整逻辑 | `{success: true}` |
+
+客户端在进入目标选择模式时，必须将 `selectedOption` 一并保存到待发动作中，否则第3次请求会丢失选项值导致 `selectOption` 重新弹出。
+
+> 这一机制由战斗客户端（`battle.html`）自动处理，技能编写者只需按正常顺序写代码，无需特殊处理。
+
 ### 示例：双模式攻击
 
 ```javascript
@@ -3877,12 +3891,15 @@ var clone = {
   statusTags: [],
 
   // ★ 关键：UI 展示属性从真身读取
-  masterPieceId: caster.instanceId,       // ← 指向真身
+  masterPieceId: caster.instanceId,       // ← 指向真身（用于列表排序等）
   displayMaxHp: caster.maxHp,             // ← 真身血量（UI 显示）
   displayCurrentHp: caster.currentHp,
   displayAttack: caster.attack,
   displayDefense: caster.defense || 0,
   displayMoveRange: caster.moveRange,
+  // ★ 让分身技能栏和状态标签与真身完全相同
+  displaySkills: (caster.skills || []).slice(),
+  displayStatusTags: (caster.statusTags || []).filter(function(t) { return t.visible !== false; }),
 };
 
 // ✅ 推荐：插入到真身旁边（随机选前或后），避免分身总在列表末尾
@@ -3900,13 +3917,15 @@ if (casterIdx >= 0) {
 
 ### masterPieceId 的 UI 效果
 
-设置 `masterPieceId` 后，UI 在以下所有位置自动使用真身数据：
+设置 `masterPieceId` 后，该棋子会被视为分身，在列表中紧挨真身排列。
+技能栏和状态标签的显示内容由 `displaySkills` / `displayStatusTags` 控制（见下方 display* 字段说明）。
 
-| UI 位置 | 同步内容 |
-|---------|---------|
-| 我的棋子列表 悬停技能框 | 技能列表（含冷却状态）|
-| 我的棋子列表 状态标签 | statusTags（真身的所有 visible 标签）|
-| 棋子信息面板 | 技能悬浮说明 |
+| UI 位置 | 显示内容来源 |
+|---------|------------|
+| 棋盘 token 血条 | `displayCurrentHp` / `displayMaxHp`（如设置），否则用真实 hp |
+| 棋子信息面板 攻/防/移 | `displayAttack` / `displayDefense` / `displayMoveRange`（如设置）|
+| 棋子信息面板 技能列表 | `displaySkills`（如设置），否则用真实 `skills` |
+| 棋子身上的状态标签 | `displayStatusTags`（如设置），否则用真实 `statusTags` |
 
 ### 列表顺序
 
@@ -3921,8 +3940,126 @@ if (casterIdx >= 0) {
 | `displayAttack` | UI 显示的攻击力 |
 | `displayDefense` | UI 显示的防御力 |
 | `displayMoveRange` | UI 显示的移动范围 |
+| `displaySkills` | UI 显示的技能列表（替代真实 skills，决定技能栏内容）|
+| `displayStatusTags` | UI 显示的状态标签列表（替代真实 statusTags，决定棋子身上显示的标签）|
 
 > `display*` 字段纯 UI，不影响游戏逻辑。分身真实 HP 仍是 `currentHp: 1`，受伤时按真实属性计算。
+>
+> `displaySkills` / `displayStatusTags` 一旦设置，UI 会完全忽略真实的 `skills` / `statusTags`，直接使用 display 值。适合让假棋子的面板看起来和真身完全一致。
+
+### 完整示例：漩涡鸣人影分身之术
+
+下面是一个完整的分身技能示例，综合了 `selectOption` + `selectTarget` 双步骤、`display*` 全字段、以及 `masterPieceId` 的正确用法：
+
+```javascript
+// data/skills/naruto-shadow-clone.json — code 字段内容
+function executeSkill(context) {
+  var caster = context.piece;
+  var battle = context.battle;
+
+  // ── 步骤1：选项选择器（先选方式）──────────────────────────────
+  var option = selectOption({
+    title: '选择影分身方式',
+    options: [
+      { label: '在目标格召唤分身', value: 'summon' },
+      { label: '传送至目标格，原地留下分身', value: 'teleport' }
+    ]
+  });
+  // ★ 必须立即检查，未选时中断
+  if (option === null || option === undefined || option.needsOptionSelection) return option;
+
+  // ── 步骤2：目标选择器（选格子）────────────────────────────────
+  var pos = selectTarget({ type: 'grid', range: 5, filter: 'all' });
+  // ★ 必须立即检查，未选时中断；selectedOption 会由客户端在重发时保留
+  if (!pos || pos.needsTargetSelection) return pos;
+
+  // ── 逻辑判断 ──────────────────────────────────────────────────
+  var cloneX, cloneY;
+  if (option === 'summon') {
+    var occupied = battle.pieces.find(function(p) {
+      return p.x === pos.x && p.y === pos.y && p.currentHp > 0;
+    });
+    if (occupied) return { success: false, message: '目标格已被占用' };
+    cloneX = pos.x; cloneY = pos.y;
+  } else {
+    var occupied2 = battle.pieces.find(function(p) {
+      return p.x === pos.x && p.y === pos.y && p.currentHp > 0
+          && p.instanceId !== caster.instanceId;
+    });
+    if (occupied2) return { success: false, message: '目标格已被占用' };
+    cloneX = caster.x; cloneY = caster.y;
+    caster.x = pos.x; caster.y = pos.y;  // 真身传送
+  }
+
+  // ── 构建分身对象 ───────────────────────────────────────────────
+  var cloneId = 'naruto-clone-' + Date.now();
+  var clone = {
+    instanceId: cloneId,
+    templateId: caster.templateId,
+    name: caster.name,
+    ownerPlayerId: caster.ownerPlayerId,
+    faction: caster.faction,
+    x: cloneX, y: cloneY,
+
+    // 真实游戏属性（分身一击即溃）
+    maxHp: 99, currentHp: 99,   // 用高血量模拟"单次命中消散"（由 rule-naruto-clone-one-hit 处理）
+    attack: 0, defense: 0, moveRange: 0,
+    skills: [], buffs: [], debuffs: [], ruleTags: [], rules: [],
+
+    // UI 展示属性 — 与真身完全一致
+    masterPieceId: caster.instanceId,
+    displayMaxHp: caster.maxHp,
+    displayCurrentHp: caster.currentHp,
+    displayAttack: caster.attack,
+    displayDefense: caster.defense || 0,
+    displayMoveRange: caster.moveRange,
+    // ★ 新增：让分身的技能栏和状态标签与真身相同
+    displaySkills: (caster.skills || []).slice(),
+    displayStatusTags: (caster.statusTags || []).filter(function(t) {
+      return t.visible !== false;
+    }),
+
+    // 分身专属标签（visible:false，玩家不可见但规则可检测）
+    statusTags: [{
+      id: 'naruto-clone-tag-' + cloneId,
+      name: '影分身', type: 'naruto-clone',
+      visible: false, remainingDuration: -1, remainingUses: -1,
+      intensity: 1, stacks: 1,
+      relatedRules: ['rule-naruto-clone-died', 'rule-naruto-clone-immobile', 'rule-naruto-clone-one-hit']
+    }],
+
+    noKillCharge: true  // 击杀分身不给对手充能
+  };
+
+  // ── 插入分身（紧挨真身）────────────────────────────────────────
+  var casterIdx = -1;
+  for (var ci = 0; ci < battle.pieces.length; ci++) {
+    if (battle.pieces[ci].instanceId === caster.instanceId) { casterIdx = ci; break; }
+  }
+  if (casterIdx >= 0) {
+    var insertBefore = Math.random() < 0.5;
+    battle.pieces.splice(insertBefore ? casterIdx : casterIdx + 1, 0, clone);
+  } else {
+    battle.pieces.push(clone);
+  }
+
+  addRuleById(cloneId, 'rule-naruto-clone-died');
+  addRuleById(cloneId, 'rule-naruto-clone-immobile');
+  addRuleById(cloneId, 'rule-naruto-clone-one-hit');
+
+  return { success: true, message: caster.name + '使用了影分身之术' };
+}
+```
+
+**关键要点：**
+
+1. **`selectOption` 先于 `selectTarget`**：服务端先返回 `needsOptionSelection`，客户端选完后重发时带 `selectedOption` 字段；第二次服务端跳过选项步骤，执行到 `selectTarget` 返回 `needsTargetSelection`；客户端再次重发时同时带 `selectedOption` + `targetX/targetY`（或 `targetPieceId`）。
+
+2. **`displaySkills` 使用 `.slice()`**：浅拷贝，避免分身和真身共享同一数组引用；之后真身技能 CD 变化不会污染分身展示。
+
+3. **`displayStatusTags` 过滤 `visible !== false`**：分身自己的 `statusTags` 里有 `visible: false` 的内部标签（如 `naruto-clone`），过滤后展示层只看到真身的可见标签。
+
+4. **`noKillCharge: true`**：分身不给对手充能，防止对手通过"秒分身"刷充能。
 
 ---
 

@@ -1,0 +1,18 @@
+{
+  "id": "shishio-flame-spirit",
+  "name": "我流·炎灵",
+  "description": "永久点燃周围4格。角色踏入燃烧格或在回合结束时站在燃烧格上时，失去当前生命值50%。同时，对6格内随机1个敌人造成真实伤害。燃烧格可累积扩展，随机伤害倍率为100%/150%/200%攻击力，每击杀1名角色提升1级。",
+  "keywords": ["真实伤害"],
+  "targetText": "无需目标",
+  "effectTags": ["field", "damage", "growth"],
+  "icon": "🔥",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "actionPointCost": 1,
+  "requiresTarget": false,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { var source = context.piece; var battle = context.battle; if (!source) return { success: false, message: '施法者丢失' }; var killTag = source.statusTags && source.statusTags.find(function(t) { return t.type === 'shishio-kills'; }); var kills = killTag ? (killTag.intensity || 0) : 0; var mult = kills >= 2 ? 2.0 : kills >= 1 ? 1.5 : 1.0; if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.shishioBurnTiles) battle.extensions.shishioBurnTiles = []; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; var sx = source.x; var sy = source.y; var newTiles = [ { x: sx, y: sy - 1 }, { x: sx, y: sy + 1 }, { x: sx - 1, y: sy }, { x: sx + 1, y: sy } ]; var added = 0; newTiles.forEach(function(nt) { var already = battle.extensions.shishioBurnTiles.some(function(t) { return t.x === nt.x && t.y === nt.y; }); if (!already) { battle.extensions.shishioBurnTiles.push(nt); battle.extensions.tileEffects.push({ x: nt.x, y: nt.y, sourceId: 'shishio-burn', tileType: 'shishio-burn', icon: '🔥', bgColor: 'linear-gradient(to top, rgba(200, 60, 0, 0.75), rgba(255, 150, 20, 0.35))', boxShadow: 'inset 0 0 8px rgba(255, 100, 0, 0.65)', iconPosition: 'bottom-right' }); added++; } }); var totalBurn = battle.extensions.shishioBurnTiles.length; var msgs = [source.name + ' 发动我流·炎灵！新增' + added + ' 格永久燃烧（当前共 ' + totalBurn + ' 格）']; var enemies = []; for (var i = 0; i < battle.pieces.length; i++) { var p = battle.pieces[i]; if (p.currentHp > 0 && p.ownerPlayerId !== source.ownerPlayerId) { var dist = Math.abs(p.x - source.x) + Math.abs(p.y - source.y); if (dist <= 6) enemies.push(p); } } if (enemies.length > 0) { var rnd = enemies[Math.floor(Math.random() * enemies.length)]; var dmg = Math.floor(source.attack * mult); dealDamage(source, rnd, dmg, 'true'); msgs.push('精神之火锁定 ' + rnd.name + '，造成 ' + dmg + ' 点真实伤害（' + Math.floor(mult * 100) + '%）'); } else { msgs.push('6格内无敌人，精神之火未命中'); } return { success: true, message: msgs.join('；') }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var killTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'shishio-kills'; }); var kills = killTag ? (killTag.intensity || 0) : 0; var mult = kills >= 2 ? 2.0 : kills >= 1 ? 1.5 : 1.0; var dmg = Math.floor((piece.attack || 0) * mult); return { description: '永久点燃周围4格。角色踏入燃烧格或在回合结束时站在燃烧格上时，失去当前生命值50%。同时，对6格内随机1个敌人造成' + dmg + '点真实伤害。', expectedValues: { damage: dmg } }; }"
+}

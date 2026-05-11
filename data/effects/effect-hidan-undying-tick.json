@@ -1,0 +1,15 @@
+{
+  "id": "effect-hidan-undying-tick",
+  "name": "濒死倒计时",
+  "icon": "⏳",
+  "color": "#dc2626",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "endTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var hidan = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!hidan) return false; return ctx.battle ? ctx.battle.turn.currentPlayerId === hidan.ownerPlayerId : battle.turn.currentPlayerId === hidan.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { var hidan = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!hidan) return { success: false }; if (battle.turn.currentPlayerId !== hidan.ownerPlayerId) return { success: false }; var tag = hidan.statusTags && hidan.statusTags.find(function(t) { return t.type === 'hidan-dying'; }); if (!tag) { self.expire(); return { success: false }; } removeStatusEffectById(hidan.instanceId, 'hidan-dying'); removeEffect(hidan.instanceId, 'effect-hidan-dying-immune'); self.expire(); var opponentPlayerId = battle.players.find(function(p) { return p.playerId !== hidan.ownerPlayerId; }) ? battle.players.find(function(p) { return p.playerId !== hidan.ownerPlayerId; }).playerId : null; dealDamage(hidan, hidan, 999, 'true', battle, 'undying-expire', false, opponentPlayerId); return { success: true, message: hidan.name + '的濒死状态结束，最终陨落' }; }"
+    }
+  ]
+}

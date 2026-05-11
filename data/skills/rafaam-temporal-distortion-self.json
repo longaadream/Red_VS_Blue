@@ -1,8 +1,11 @@
 {
   "id": "rafaam-temporal-distortion-self",
   "name": "时空扭曲-自身加AP",
-  "description": "在己方回合开始时增加1点行动点",
-  "icon": "⏳",
+  "description": "己方回合开始时，行动点+1。",
+  "keywords": [],
+  "targetText": "己方玩家",
+  "effectTags": ["行动点"],
+  "icon": "⏪",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

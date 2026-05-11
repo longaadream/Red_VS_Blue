@@ -1,8 +1,11 @@
 {
   "id": "reap-heal",
   "name": "收割治疗",
-  "description": "恢复造成伤害量50%的生命值",
-  "icon": "💀",
+  "description": "治疗等同于造成伤害50%的生命。",
+  "keywords": [],
+  "targetText": "自身",
+  "effectTags": ["治疗"],
+  "icon": "🃏",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,
@@ -11,5 +14,5 @@
   "actionPointCost": 0,
   "range": "self",
   "requiresTarget": false,
-  "code": "function executeSkill(context) { const sourcePiece = context.piece; const damage = context.damage || 0; const healAmount = Math.floor(damage * 0.5); if (healAmount > 0 && sourcePiece.currentHp < sourcePiece.maxHp) { const healResult = healDamage(sourcePiece, sourcePiece, healAmount, context.battle, context.skill.id); return { message: sourcePiece.name + '通过收割恢复了' + healResult.heal + '点生命值', success: true }; } return { message: '', success: true }; }"
+  "code": "function executeSkill(context) { const sourcePiece = context.piece; const damage = context.damage || 0; const healAmount = Math.floor(damage * 0.5); if (healAmount > 0 && sourcePiece.currentHp < sourcePiece.maxHp) { const healResult = healDamage(sourcePiece, sourcePiece, healAmount, context.battle, context.skill.id); return { message: sourcePiece.name + '通过收割治疗了' + healResult.heal + '点生命', success: true }; } return { message: '', success: true }; }"
 }

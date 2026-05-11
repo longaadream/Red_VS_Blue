@@ -1,0 +1,15 @@
+{
+  "id": "effect-illidan-demon-strike",
+  "name": "恶魔冲击计数",
+  "icon": "🔪",
+  "color": "#7c3aed",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "afterSkillUsed",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { if (ctx.skillId !== 'illidan-demon-strike') return false; var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); return !!(piece && piece.currentHp > 0); }",
+      "effectCode": "function(ctx, battle, self) { var illidan = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!illidan) return { success: false }; var tag = illidan.statusTags && illidan.statusTags.find(function(t) { return t.id === 'demon-strike-charges'; }); if (!tag) return { success: false }; if (tag.remainingUses === undefined) { tag.remainingUses = tag.currentUses || 2; } tag.remainingUses -= 1; var remaining = tag.remainingUses; if (remaining <= 0) { removeStatusEffectById(illidan.instanceId, 'demon-strike-charges'); illidan.skills = (illidan.skills || []).filter(function(s) { return s.skillId !== 'illidan-demon-strike'; }); self.expire(); return { success: true, message: illidan.name + '的恶魔冲击次数耗尽，技能已移除' }; } return { success: true, message: illidan.name + '恶魔冲击剩余' + remaining + '次' }; }"
+    }
+  ]
+}

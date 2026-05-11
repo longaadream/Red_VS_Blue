@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RED vs BLUE</string>
+    <string name="title_activity_main">RED vs BLUE</string>
+    <string name="package_name">com.redvsblue.client</string>
+    <string name="custom_url_scheme">com.redvsblue.client</string>
+</resources>

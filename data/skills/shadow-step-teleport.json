@@ -1,8 +1,11 @@
 {
   "id": "shadow-step-teleport",
   "name": "暗影步传送",
-  "description": "回合开始时传送到预设位置",
-  "icon": "👤",
+  "description": "回合开始时，传送到预设位置。",
+  "keywords": [],
+  "targetText": "自身",
+  "effectTags": ["位移"],
+  "icon": "👁",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

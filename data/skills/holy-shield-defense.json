@@ -1,1 +1,14 @@
-{"id":"holy-shield-defense","name":"圣盾防御","description":"当拥有圣盾状态时，抵挡一次伤害并移除圣盾效果","kind":"passive","type":"normal","cooldownTurns":0,"maxCharges":0,"powerMultiplier":1,"code":"function executeSkill(context) { const piece = context.piece; const damage = context.damage; if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'holy-shield'); } return { message: piece.name + '的圣盾抵挡了' + damage + '点伤害', success: true }; }"}
+{
+  "id": "holy-shield-defense",
+  "name": "圣盾防御",
+  "description": "拥有圣盾时，抵挡一次伤害并移除圣盾。",
+  "keywords": ["圣盾"],
+  "targetText": "自身",
+  "effectTags": ["圣盾"],
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'holy-shield'); } return { message: piece.name + '的圣盾抵挡了' + damage + '点伤害', success: true }; }"
+}

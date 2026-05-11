@@ -1,8 +1,11 @@
 {
   "id": "blood-echo-trigger",
   "name": "血之回响触发",
-  "description": "失去圣盾时触发，添加圣光充能手牌",
-  "icon": "🔁",
+  "description": "友军失去圣盾时，添加1张圣光充能手牌。",
+  "keywords": ["圣盾", "充能"],
+  "targetText": "失去圣盾的友军",
+  "effectTags": ["圣盾", "充能", "手牌"],
+  "icon": "🩣",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

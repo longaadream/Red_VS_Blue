@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const logDir = path.join(process.cwd(), 'logs');
+const logDir = path.join(process.env.USER_DATA_DIR ?? process.cwd(), 'logs');
 const logFile = path.join(logDir, 'game.log');
 
 if (!fs.existsSync(logDir)) {

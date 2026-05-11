@@ -1,14 +1,17 @@
 {
   "id": "basic-attack",
   "name": "基础攻击",
-  "description": "选择1格内一个目标，对其造成等同于自身攻击力的伤害",
-  "icon": "⚔️",
+  "description": "对单体目标造成等同攻击力的物理伤害。",
+  "keywords": [],
+  "targetText": "1格内1个敌人",
+  "effectTags": ["物理伤害"],
+  "icon": "⬇️",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1.0,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) { const targetEnemy = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } // 确保攻击力和威力系数都是有效的数字 const attack = Number(sourcePiece.attack) || 0; const powerMultiplier = Number(context.skill.powerMultiplier) || 1; const damageValue = attack * powerMultiplier; const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'physical', context.battle, context.skill.id); return { message: sourcePiece.name + ' 造成 ' + damageResult.damage + ' 点伤害', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.round(piece.attack * skillDef.powerMultiplier); return { description: \"选择1格内一个目标，造成\" + damageValue + \"点伤害（相当于自身攻击力）\", expectedValues: { damage: damageValue } }; }"
+  "code": "function executeSkill(context) { const targetEnemy = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const attack = Number(sourcePiece.attack) || 0; const powerMultiplier = Number(context.skill.powerMultiplier) || 1; const damageValue = attack * powerMultiplier; const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'physical', context.battle, context.skill.id); return { message: sourcePiece.name + ' 造成 ' + damageResult.damage + ' 点伤害', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '对1格内1个敌人造成' + damageValue + '点物理伤害。', expectedValues: { damage: damageValue } }; }"
 }

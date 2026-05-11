@@ -1,0 +1,2848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>对战 - RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <script src="js/server-utils.js"></script>
+  <script src="js/crypto-lib.js"></script>
+  <script src="js/identity.js"></script>
+  <script src="js/game-engine.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a; --bg2: #1e293b; --border: #334155;
+      --text: #e2e8f0; --muted: #64748b; --red: #ef4444; --blue: #3b82f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg); color: var(--text); display: flex; flex-direction: column;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .back-btn {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+      color: #94a3b8; padding: 5px 10px; font-size: 13px; cursor: pointer;
+      text-decoration: none; flex-shrink: 0;
+    }
+    .back-btn:active { opacity: .7; }
+    .btn-surrender {
+      background: #450a0a; border: 1px solid #991b1b; border-radius: 8px;
+      color: #fca5a5; padding: 5px 10px; font-size: 12px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .btn-surrender:active { opacity: .7; }
+    .room-name { font-size: 14px; font-weight: 700; flex: 1; }
+    .turn-badge {
+      font-size: 12px; padding: 4px 14px; border-radius: 20px; font-weight: 800;
+      background: var(--bg2); border: 1px solid var(--border); color: var(--muted);
+      letter-spacing: .5px;
+    }
+    .turn-badge.my-turn {
+      background: linear-gradient(135deg, #14532d, #052e16);
+      border-color: #22c55e; color: #4ade80;
+      box-shadow: 0 0 10px rgba(34,197,94,.35);
+    }
+    .turn-badge.opp-turn {
+      background: linear-gradient(135deg, #172554, #0f1629);
+      border-color: #3b82f6; color: #93c5fd;
+    }
+
+    /* ── Main layout ── */
+    .battle-layout {
+      display: flex; flex: 1; overflow: hidden; min-height: 0;
+    }
+
+    /* ── Side panels ── */
+    .side-panel {
+      width: 110px; flex-shrink: 0; overflow-y: auto;
+      border-right: 1px solid var(--border); padding: 6px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .side-panel.right { border-right: none; border-left: 1px solid var(--border); }
+    .panel-label {
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px;
+    }
+    .piece-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 7px;
+      padding: 5px 6px; cursor: pointer; transition: border-color .15s;
+    }
+    .piece-card:active { opacity: .8; }
+    .piece-card.selected { border-color: #60a5fa; background: #172554; }
+    .piece-card.dead { opacity: .4; cursor: default; }
+    .piece-card-name { font-size: 11px; font-weight: 600; margin-bottom: 2px; }
+    .piece-card-hp { font-size: 10px; color: var(--muted); }
+    .hp-bar { height: 3px; background: #1e3a5f; border-radius: 2px; margin-top: 2px; overflow: hidden; }
+    .hp-fill { height: 100%; background: #22c55e; transition: width .3s; }
+    .hp-fill.low { background: #f59e0b; }
+    .hp-fill.crit { background: #ef4444; }
+    .res-row { font-size: 10px; color: #94a3b8; margin-top: 1px; }
+
+    /* ── Main board area ── */
+    .main-panel {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+    }
+    .phase-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 5px 10px; background: var(--bg2); border-bottom: 1px solid var(--border);
+      font-size: 12px; flex-shrink: 0;
+    }
+    .board-wrap {
+      flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center;
+      padding: 6px; min-height: 0;
+    }
+    #gameGrid {
+      display: grid; gap: 1px; background: #0a0a0f;
+    }
+
+    /* ── Tiles ── */
+    .cell {
+      width: var(--cell-size, 44px); height: var(--cell-size, 44px);
+      position: relative; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .t-floor     { background: #3f3f46; }
+    .t-wall      { background: #18181b; cursor: default; }
+    .t-spawn     { background: #064e3b; }
+    .t-cover     { background: #78350f; }
+    .t-hole      { background: #082f49; cursor: default; }
+    .t-lava      { background: #7c2d12; }
+    .t-spring    { background: #134e4a; }
+    .t-chargepad { background: #3b0764; }
+    .hl-move     { outline: 2px solid #22c55e; z-index: 1; }
+    .hl-skill    { outline: 2px solid #f59e0b; z-index: 1; }
+    .hl-place    { outline: 2px solid #8b5cf6; z-index: 1; }
+    .hl-selected { outline: 3px solid #60a5fa; z-index: 2; }
+
+    /* ── Piece token ── */
+    .piece-tok {
+      width: calc(var(--cell-size, 44px) - 8px); height: calc(var(--cell-size, 44px) - 8px);
+      border-radius: 6px; overflow: visible;
+      position: relative; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; border: 2px solid transparent;
+    }
+    .piece-tok.red  { border-color: #ef4444; }
+    .piece-tok.blue { border-color: #3b82f6; }
+    .piece-tok.selected-tok { box-shadow: 0 0 0 2px #60a5fa; }
+    .piece-tok img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+    .piece-tok-ph { font-size: 20px; line-height: 1; }
+    .tok-hp-bar { position: absolute; bottom: -4px; left: 0; right: 0; height: 3px; background: #0f172a; border-radius: 2px; }
+    .tok-hp-fill { height: 100%; background: #22c55e; border-radius: 2px; transition: width .3s; }
+    .tok-hp-fill.low  { background: #f59e0b; }
+    .tok-hp-fill.crit { background: #ef4444; }
+
+    /* ── StatusTags ── */
+    .piece-tags {
+      position: absolute; top: -14px; left: 0; right: 0;
+      display: flex; flex-wrap: wrap; gap: 1px; justify-content: center;
+    }
+    .status-tag {
+      background: #7c3aed; color: #fff; font-size: 8px; font-weight: 700;
+      border-radius: 3px; padding: 1px 3px; white-space: nowrap; line-height: 1.3;
+    }
+
+    /* ── Action bar ── */
+    .action-bar {
+      border-top: 1px solid var(--border); padding: 8px 10px;
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap;
+      background: var(--bg);
+    }
+    .action-bar select {
+      background: var(--bg2); border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; font-size: 13px; padding: 7px 10px; outline: none; flex: 1; min-width: 0;
+    }
+    .btn-action {
+      background: var(--bg2); border: 1px solid var(--border); color: #94a3b8;
+      border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+      flex-shrink: 0; white-space: nowrap;
+    }
+    .btn-action:active { background: #263348; }
+    .btn-action:disabled { opacity: .4; cursor: default; }
+    .btn-action.active-move { border-color: #22c55e; color: #4ade80; background: #052e16; }
+    .btn-action.active-skill { border-color: #f59e0b; color: #fbbf24; background: #451a03; }
+    .btn-end {
+      background: linear-gradient(180deg, #15803d 0%, #14532d 100%);
+      border: 2px solid #4ade80; border-radius: 50px;
+      color: #fff; font-size: 13px; font-weight: 900; letter-spacing: .5px;
+      padding: 8px 18px; cursor: pointer; flex-shrink: 0;
+      text-shadow: 0 1px 3px rgba(0,0,0,.6);
+      box-shadow: 0 0 18px rgba(74,222,128,.45), 0 3px 8px rgba(0,0,0,.5);
+      animation: endTurnPulse 2.4s ease-in-out infinite;
+      position: relative; overflow: hidden;
+    }
+    .btn-end::before {
+      content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+      animation: btnShimmer 2.4s ease-in-out infinite;
+    }
+    @keyframes endTurnPulse {
+      0%,100% { box-shadow: 0 0 18px rgba(74,222,128,.45), 0 3px 8px rgba(0,0,0,.5); }
+      50%      { box-shadow: 0 0 32px rgba(74,222,128,.75), 0 3px 8px rgba(0,0,0,.5); }
+    }
+    @keyframes btnShimmer {
+      0%      { left: -60%; }
+      50%,100% { left: 120%; }
+    }
+    .btn-end:disabled {
+      background: linear-gradient(180deg, #374151, #1f2937);
+      border-color: #4b5563; color: #6b7280;
+      animation: none; box-shadow: 0 2px 4px rgba(0,0,0,.4); cursor: default;
+    }
+    .btn-end:disabled::before { display: none; }
+    .btn-end:active:not(:disabled) { transform: scale(.97); }
+    .status-msg { font-size: 12px; color: var(--muted); flex: 1; min-width: 120px; }
+
+    /* ── Hand panel ── */
+    .hand-panel {
+      border-top: 1px solid var(--border); flex-shrink: 0;
+      background: #080f1e;
+    }
+    .hand-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 10px; font-size: 11px; color: var(--muted);
+      border-bottom: 1px solid #1a2540;
+    }
+    .hand-scroll {
+      display: flex; gap: 6px; padding: 6px 10px;
+      overflow-x: auto; overflow-y: hidden;
+      scrollbar-width: thin; scrollbar-color: #334155 transparent;
+    }
+    .hand-scroll::-webkit-scrollbar { height: 3px; }
+    .hand-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    /* ── Hearthstone-style cards ── */
+    .card-item {
+      flex-shrink: 0; width: 88px; height: 138px;
+      background: linear-gradient(180deg, #1a2744 0%, #0f1929 55%, #131c30 100%);
+      border: 2px solid #4a6a9a; border-radius: 10px;
+      cursor: pointer; position: relative;
+      display: flex; flex-direction: column; overflow: visible;
+      transition: transform .15s, box-shadow .15s;
+      box-shadow: 0 4px 12px rgba(0,0,0,.6), inset 0 1px 0 rgba(100,150,255,.12);
+    }
+    .card-item:hover { transform: translateY(-10px) scale(1.06); box-shadow: 0 14px 28px rgba(0,0,0,.85); z-index: 10; }
+    .card-item.card-pending { border-color: #f59e0b; box-shadow: 0 0 18px rgba(245,158,11,.45); }
+    .card-item.card-disabled { opacity: .45; cursor: default; }
+    .card-item.card-disabled:hover { transform: none; box-shadow: 0 4px 12px rgba(0,0,0,.6); }
+    .card-item.card-reactive { border-color: #818cf8; box-shadow: 0 0 12px rgba(99,102,241,.35); }
+
+    /* Mana gem */
+    .card-mana-gem {
+      position: absolute; top: -9px; left: -9px;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #93c5fd, #1d4ed8 60%, #1e3a8a);
+      border: 2px solid #bfdbfe;
+      box-shadow: 0 0 12px rgba(59,130,246,.75), 0 2px 4px rgba(0,0,0,.5);
+      color: #fff; font-size: 14px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2; text-shadow: 0 1px 3px rgba(0,0,0,.8);
+    }
+    .card-mana-gem.free {
+      background: radial-gradient(circle at 35% 30%, #86efac, #15803d 60%, #14532d);
+      border-color: #bbf7d0; box-shadow: 0 0 12px rgba(34,197,94,.75), 0 2px 4px rgba(0,0,0,.5);
+    }
+
+    /* Art area */
+    .card-art {
+      width: 100%; height: 66px; flex-shrink: 0;
+      border-radius: 8px 8px 0 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; background: rgba(0,0,0,.25); position: relative;
+    }
+    .card-art::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 40%, rgba(10,15,30,.75));
+      pointer-events: none;
+    }
+
+    /* Name banner */
+    .card-name-banner {
+      background: linear-gradient(90deg, transparent, rgba(18,38,80,.96) 18%, rgba(18,38,80,.96) 82%, transparent);
+      text-align: center; padding: 4px 10px;
+      font-size: 10px; font-weight: 800; color: #e2e8f0;
+      border-top: 1px solid rgba(100,150,220,.3);
+      border-bottom: 1px solid rgba(100,150,220,.3);
+      flex-shrink: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Card body */
+    .card-body { flex: 1; padding: 4px 7px; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+    .card-desc { font-size: 9px; color: #94a3b8; line-height: 1.35; flex: 1; overflow: hidden;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+    .card-type-badge { font-size: 8px; color: #475569; font-weight: 600; text-align: center; }
+    .hand-empty { font-size: 12px; color: #334155; padding: 10px; }
+
+    /* ── Turn announcement overlay ── */
+    #turnAnnounce {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      font-size: 30px; font-weight: 900; letter-spacing: 3px;
+      pointer-events: none; z-index: 500; display: none; white-space: nowrap;
+      text-shadow: 0 2px 12px rgba(0,0,0,.9);
+    }
+    #turnAnnounce.show { display: block; animation: turnAnnounceAnim 1.8s ease-out forwards; }
+    @keyframes turnAnnounceAnim {
+      0%   { opacity: 0; transform: translate(-50%,-50%) scale(.55); }
+      22%  { opacity: 1; transform: translate(-50%,-50%) scale(1.06); }
+      60%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%,-50%) scale(1.12); }
+    }
+
+    /* ── Log ── */
+    .log-panel {
+      flex-shrink: 0; border-top: 1px solid var(--border);
+      display: flex; flex-direction: column;
+    }
+    .log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; cursor: pointer; user-select: none;
+    }
+    .log-header:active { background: var(--bg2); }
+    .log-body { overflow-y: auto; padding: 4px 10px; font-size: 12px; max-height: 90px; }
+    .log-body.collapsed { display: none; }
+    .log-body p { margin: 2px 0; line-height: 1.4; }
+    .log-turn { color: #fbbf24; }
+    .log-move { color: #4ade80; }
+    .log-skill { color: #c084fc; }
+    .log-err  { color: #f87171; }
+    .log-info { color: #94a3b8; }
+    .btn-clear { background: transparent; border: none; color: var(--muted); font-size: 11px; cursor: pointer; }
+    .collapse-arrow { font-size: 10px; color: var(--muted); transition: transform .2s; }
+    .collapse-arrow.open { transform: rotate(90deg); }
+
+    /* ── Hand panel collapsible ── */
+    .hand-body { }
+    .hand-body.collapsed { display: none; }
+    .hand-header { cursor: pointer; user-select: none; }
+    .hand-header:active { background: #0d1929; }
+
+    /* ── Fullscreen map mode ── */
+    .btn-fullmap {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+      color: #94a3b8; padding: 5px 9px; font-size: 14px; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-fullmap:active { opacity: .7; }
+    body.full-map .side-panel,
+    body.full-map .action-bar,
+    body.full-map .hand-panel,
+    body.full-map .log-panel,
+    body.full-map .phase-bar,
+    body.full-map .tile-legend {
+      display: none !important;
+    }
+    body.full-map .topbar { padding: 4px 8px; }
+    body.full-map .board-wrap {
+      align-items: center; justify-content: center;
+    }
+
+    /* ── Damage floaters ── */
+    .dmg-float {
+      position: absolute; pointer-events: none; white-space: nowrap;
+      font-size: 16px; font-weight: 900; z-index: 50;
+      transform: translateX(-50%);
+      text-shadow: 0 1px 4px rgba(0,0,0,.9);
+      animation: floatUp 1.1s ease-out forwards;
+    }
+    .dmg-float.big { font-size: 22px; }
+    @keyframes floatUp {
+      0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+      15%  { opacity: 1; transform: translateX(-50%) translateY(-8px); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-54px); }
+    }
+
+    /* ── Loading / result overlays ── */
+    #loadingOverlay {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 12px; z-index: 200;
+    }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid var(--bg2); border-top-color: var(--blue);
+      border-radius: 50%; animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #resultOverlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.85);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px; z-index: 200; display: none;
+    }
+    .result-icon { font-size: 64px; }
+    .result-title { font-size: 28px; font-weight: 800; }
+    .result-sub { font-size: 15px; color: #94a3b8; }
+
+    /* ── Option picker overlay ── */
+    #optionPickerOverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 300;
+      align-items: center; justify-content: center;
+    }
+    #optionPickerOverlay.show { display: flex; }
+    .option-sheet {
+      background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+      padding: 20px 16px; width: min(340px, 92vw);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .option-title {
+      font-size: 15px; font-weight: 700; color: #e2e8f0;
+      text-align: center; margin-bottom: 4px;
+    }
+    .option-btn {
+      background: #0f172a; border: 1px solid #334155; border-radius: 10px;
+      color: #e2e8f0; padding: 13px 16px; font-size: 14px;
+      cursor: pointer; text-align: left; transition: border-color .15s, background .15s;
+    }
+    .option-btn:active { border-color: #3b82f6; background: #172554; }
+    .option-btn-label { font-weight: 600; }
+    .option-btn-desc { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+    .option-cancel {
+      background: none; border: 1px solid #475569; border-radius: 10px;
+      color: #94a3b8; padding: 10px; font-size: 13px;
+      cursor: pointer; text-align: center; margin-top: 4px;
+    }
+    .option-cancel:active { background: #1e293b; }
+
+    /* Tile legend */
+    .tile-legend {
+      display: flex; flex-wrap: wrap; gap: 5px; padding: 5px 8px;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .legend-item { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #64748b; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+    /* ── Piece info button ── */
+    .piece-info-btn {
+      float: right; background: none; border: none; color: #475569;
+      font-size: 13px; cursor: pointer; padding: 0 0 0 4px; line-height: 1;
+    }
+
+    /* ── Piece info modal ── */
+    #pieceInfoModal {
+      position: fixed; inset: 0; background: rgba(0,0,0,.85);
+      z-index: 150; display: none; align-items: flex-start; justify-content: center;
+      padding: 16px; overflow-y: auto;
+    }
+    .pi-layout {
+      width: 100%; max-width: 760px; display: flex; gap: 14px; align-items: flex-start;
+      margin: auto;
+    }
+    .pi-sheet {
+      flex: 1; width: 100%; max-width: 420px; background: #1e293b;
+      border: 1px solid #334155; border-radius: 14px; padding: 16px;
+    }
+    .pi-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .pi-name { font-size: 17px; font-weight: 800; }
+    .pi-close {
+      background: none; border: none; color: #64748b;
+      font-size: 20px; cursor: pointer; padding: 0 4px;
+    }
+    .pi-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
+      margin-bottom: 12px;
+    }
+    .pi-stat {
+      background: #0f172a; border-radius: 8px; padding: 7px 4px; text-align: center;
+    }
+    .pi-stat-val { font-size: 14px; font-weight: 800; }
+    .pi-stat-lbl { font-size: 9px; color: #475569; margin-top: 1px; text-transform: uppercase; }
+    .pi-section-label {
+      font-size: 10px; font-weight: 700; color: #475569;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+    }
+    .pi-skill {
+      background: #0f172a; border: 1px solid #1e293b; border-radius: 8px;
+      padding: 10px; margin-bottom: 7px;
+    }
+    .pi-skill-header {
+      display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+    }
+    .pi-skill-icon { font-size: 18px; flex-shrink: 0; }
+    .pi-skill-name { font-size: 13px; font-weight: 700; }
+    .pi-skill-badge {
+      margin-left: auto; font-size: 9px; color: #64748b;
+      background: #1e293b; border-radius: 4px; padding: 1px 5px;
+    }
+    .pi-skill-desc { font-size: 11px; color: #94a3b8; line-height: 1.45; }
+    .pi-skill-meta { font-size: 10px; color: #475569; margin-top: 3px; }
+    .pi-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+    .pi-keywords { margin-top: 8px; }
+
+    /* ── Card detail modal ── */
+    #cardDetailModal {
+      position: fixed; inset: 0; background: rgba(0,0,0,.85);
+      z-index: 160; display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .cd-layout {
+      width: 100%; max-width: 640px; display: flex; gap: 14px; align-items: flex-start;
+    }
+    .cd-sheet {
+      width: 220px; background: #1e293b; border: 2px solid #334155;
+      border-radius: 16px; padding: 16px; position: relative;
+    }
+    .cd-close {
+      position: absolute; top: 8px; right: 10px;
+      background: none; border: none; color: #64748b; font-size: 18px; cursor: pointer;
+    }
+    .cd-cost {
+      display: inline-block; background: #1e3a5f; color: #93c5fd;
+      font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 8px; margin-bottom: 8px;
+    }
+    .cd-cost.free { background: #052e16; color: #4ade80; }
+    .cd-icon { font-size: 40px; text-align: center; margin-bottom: 6px; }
+    .cd-name { font-size: 16px; font-weight: 800; text-align: center; margin-bottom: 8px; }
+    .cd-type { font-size: 11px; color: #64748b; text-align: center; margin-bottom: 10px; }
+    .cd-desc {
+      font-size: 12px; color: #94a3b8; line-height: 1.5;
+      background: #0f172a; border-radius: 8px; padding: 10px; margin-bottom: 8px;
+    }
+    .cd-meta { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .cd-meta-tag {
+      font-size: 10px; background: #1e293b; border: 1px solid #334155;
+      border-radius: 6px; padding: 3px 8px; color: #64748b;
+    }
+    .keyword-badges {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
+    }
+    .keyword-badge {
+      border: 1px solid #475569; background: #0f172a; color: #cbd5e1;
+      border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700;
+      cursor: pointer;
+    }
+    .keyword-badge.active {
+      background: #1d4ed8; border-color: #60a5fa; color: #eff6ff;
+      box-shadow: 0 0 0 1px rgba(147,197,253,.2) inset;
+    }
+    .keyword-panel {
+      width: 240px; background: #0f172a; border: 1px solid #334155;
+      border-radius: 14px; padding: 14px; color: #cbd5e1;
+    }
+    .keyword-panel-title {
+      font-size: 11px; color: #64748b; letter-spacing: .08em;
+      text-transform: uppercase; margin-bottom: 10px;
+    }
+    .keyword-empty {
+      color: #64748b; font-size: 12px; line-height: 1.5;
+    }
+    .keyword-name {
+      font-size: 16px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;
+    }
+    .keyword-short {
+      font-size: 12px; color: #cbd5e1; line-height: 1.5; margin-bottom: 8px;
+    }
+    .keyword-long {
+      font-size: 11px; color: #94a3b8; line-height: 1.6;
+    }
+    .keyword-panel-list {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+    }
+    .keyword-mini {
+      font-size: 10px; color: #64748b; border: 1px solid #1e293b;
+      border-radius: 999px; padding: 2px 8px;
+    }
+    @media (max-width: 760px) {
+      #cardDetailModal, #pieceInfoModal { align-items: flex-start; overflow-y: auto; }
+      .cd-layout, .pi-layout { max-width: 420px; flex-direction: column; }
+      .cd-sheet { width: 100%; }
+      .keyword-panel { width: 100%; }
+    }
+
+    /* ── Windows hover ── */
+    @media (hover: hover) {
+      .back-btn:hover { background: #263348; }
+      .piece-card:hover:not(.dead) { border-color: #475569; }
+      .btn-action:hover:not(:disabled) { background: #263348; }
+      .btn-end:hover:not(:disabled) { filter: brightness(1.15); }
+      .piece-info-btn:hover { color: #94a3b8; }
+      .cell:hover { filter: brightness(1.3); }
+      .keyword-badge:hover { border-color: #60a5fa; color: #eff6ff; }
+    }
+
+    /* ── Resource gem display (Hearthstone-style AP/CP) ── */
+    .res-gem { display:flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; font-weight:800; flex-shrink:0; }
+    .res-gem.ap { background:#071429; border:1.5px solid #3b82f6; color:#93c5fd; box-shadow:0 0 8px rgba(59,130,246,.35); }
+    .res-gem.cp { background:#120922; border:1.5px solid #7c3aed; color:#d8b4fe; box-shadow:0 0 8px rgba(124,58,237,.35); }
+    .res-gem-icon { font-size:15px; line-height:1; }
+    .res-gem-val { font-size:17px; line-height:1; letter-spacing:-.5px; }
+    .res-gem-frac { font-size:10px; opacity:.65; }
+
+    /* ── Side panels: fullscreen map by default ── */
+    .side-panel { display:none !important; }
+
+    /* ── Training bar ── */
+    .training-bar { align-items:center; gap:5px; flex-wrap:wrap; padding:4px 8px; background:#04080f; border-top:1px solid #1a2540; flex-shrink:0; }
+    .training-bar select { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:6px; font-size:11px; padding:3px 6px; }
+    .tb-btn { border-radius:6px; font-size:11px; padding:3px 9px; cursor:pointer; border:1px solid; white-space:nowrap; background:transparent; }
+
+    /* ── Hand always visible ── */
+    .hand-body { display:block !important; }
+
+    /* ── Skill card bar ── */
+    #skillBar {
+      display:none; flex-direction:row; gap:6px; flex-shrink:0;
+      padding:5px 10px; overflow-x:auto; overflow-y:hidden;
+      background:rgba(2,6,23,.95); border-top:1px solid #1a2540;
+      -webkit-overflow-scrolling:touch; scrollbar-width:none;
+    }
+    #skillBar::-webkit-scrollbar { display:none; }
+    .skill-card {
+      position:relative; flex-shrink:0; width:68px; border-radius:8px;
+      background:#141f33; border:1.5px solid #2a3a54;
+      cursor:pointer; display:flex; flex-direction:column;
+      align-items:center; padding:6px 4px 5px; gap:3px;
+      user-select:none; -webkit-tap-highlight-color:transparent;
+      transition:border-color .12s, background .12s, box-shadow .12s;
+    }
+    .skill-card:active { opacity:.75; }
+    .skill-card.sk-charge { border-color:#4c1d95; }
+    .skill-card.sk-active {
+      border-color:#f59e0b !important; background:#2d1802 !important;
+      box-shadow:0 0 14px rgba(245,158,11,.55);
+    }
+    .skill-card.sk-disabled { opacity:.35; pointer-events:none; }
+    .sk-icon { font-size:24px; line-height:1.1; }
+    .sk-name {
+      font-size:9.5px; color:#94a3b8; text-align:center;
+      width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .sk-type-tag {
+      font-size:8px; padding:1px 5px; border-radius:8px; letter-spacing:.3px;
+    }
+    .sk-type-tag.ap { background:#071429; color:#93c5fd; border:1px solid #1e3a6e; }
+    .sk-type-tag.cp { background:#130929; color:#d8b4fe; border:1px solid #4c1d95; }
+    .sk-cd-cover {
+      position:absolute; inset:0; border-radius:7px;
+      background:rgba(0,0,0,.72); display:flex;
+      align-items:center; justify-content:center; flex-direction:column; gap:1px;
+      pointer-events:none;
+    }
+    .sk-cd-num { font-size:20px; font-weight:900; color:#64748b; }
+    .sk-cd-lbl { font-size:8px; color:#475569; }
+
+    /* ── Fullscreen log overlay ── */
+    #logOverlay { position:fixed; inset:0; background:rgba(2,8,22,.96); z-index:400; flex-direction:column; display:none; }
+    #logOverlay.show { display:flex; }
+    #logBody { flex:1; overflow-y:auto; padding:10px 16px; }
+    #logBody p { margin:3px 0; line-height:1.45; }
+
+    /* ── Target selection overlay ── */
+    #targetOverlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.58);
+      pointer-events:none; z-index:60;
+      display:none; flex-direction:column; align-items:center; padding-top:72px; gap:10px;
+    }
+    #targetOverlay.show { display:flex; }
+    .target-prompt {
+      font-size:22px; font-weight:900; color:#fbbf24;
+      letter-spacing:1.5px;
+      text-shadow:0 0 20px rgba(245,158,11,.9), 0 2px 6px rgba(0,0,0,.9);
+      animation:targetPulse 1.6s ease-in-out infinite;
+    }
+    .target-cancel-btn {
+      pointer-events:auto; background:rgba(15,23,42,.85);
+      border:1px solid #475569; border-radius:8px;
+      color:#94a3b8; padding:6px 18px; font-size:13px; cursor:pointer;
+    }
+    .target-cancel-btn:active { background:#1e293b; }
+    @keyframes targetPulse {
+      0%,100% { opacity:.85; }
+      50%      { opacity:1; text-shadow:0 0 32px rgba(245,158,11,1), 0 2px 6px rgba(0,0,0,.9); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Turn announcement -->
+  <div id="turnAnnounce"></div>
+
+  <!-- Loading -->
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div style="font-size:14px;color:#64748b" id="loadingMsg">连接战场…</div>
+  </div>
+
+  <!-- Card Detail Modal -->
+  <div id="cardDetailModal" onclick="if(event.target===this)closeCardDetail()">
+    <div class="cd-layout">
+      <div class="cd-sheet">
+      <button class="cd-close" onclick="closeCardDetail()">✕</button>
+      <div class="cd-icon" id="cdIcon">🃏</div>
+      <div class="cd-name" id="cdName"></div>
+      <div id="cdCost"></div>
+      <div class="cd-type" id="cdType"></div>
+        <div class="cd-desc" id="cdDesc"></div>
+        <div class="keyword-badges" id="cdKeywords"></div>
+        <div class="cd-meta" id="cdMeta"></div>
+      </div>
+      <div class="keyword-panel" id="cardKeywordPanel"></div>
+    </div>
+  </div>
+
+  <!-- Piece Info Modal -->
+  <div id="pieceInfoModal" onclick="if(event.target===this)closePieceInfo()">
+    <div class="pi-layout">
+      <div class="pi-sheet">
+      <div class="pi-header">
+        <div class="pi-name" id="pieceInfoName"></div>
+        <button class="pi-close" onclick="closePieceInfo()">✕</button>
+      </div>
+        <div id="pieceInfoContent"></div>
+      </div>
+      <div class="keyword-panel" id="pieceKeywordPanel"></div>
+    </div>
+  </div>
+
+  <!-- Option picker -->
+  <div id="optionPickerOverlay">
+    <div class="option-sheet">
+      <div class="option-title" id="optionPickerTitle">请选择</div>
+      <div id="optionPickerList"></div>
+      <button class="option-cancel" onclick="cancelOptionPicker()">取消</button>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div id="resultOverlay">
+    <div class="result-icon" id="resultIcon">🏆</div>
+    <div class="result-title" id="resultTitle">胜利！</div>
+    <div class="result-sub" id="resultSub"></div>
+    <div id="recordStatus" style="font-size:13px;color:#64748b;margin-top:12px;min-height:18px"></div>
+    <button id="recordDownloadBtn" onclick="downloadGameRecord()" style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;margin-top:8px">下载战报</button>
+    <button style="background:#3b82f6;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px" onclick="goBack()">← 返回大厅</button>
+  </div>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <button class="back-btn" onclick="confirmLeave()">← 离开</button>
+    <div class="room-name" id="roomNameLabel">对战</div>
+    <div class="turn-badge" id="turnBadge">等待中</div>
+    <div style="font-size:12px;color:#64748b" id="roundLabel"></div>
+    <button id="btnSurrender" class="btn-surrender" onclick="confirmSurrender()">🏳 投降</button>
+    <button id="btnSwitchPov" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
+    <button id="btnResetCD" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
+    <button class="btn-fullmap" id="btnFullMap" onclick="toggleFullMap()" title="全屏地图">⛶</button>
+    <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点 AP"><span class="res-gem-icon">⚡</span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
+    <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点 CP"><span class="res-gem-icon">💠</span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
+    <button class="btn-fullmap" onclick="openLog()" title="战斗日志">📜</button>
+  </div>
+
+  <!-- Main layout -->
+  <div class="battle-layout">
+
+    <!-- My pieces panel (left) -->
+    <div class="side-panel" id="myPanel">
+      <div class="panel-label" id="myLabel">我方</div>
+      <div id="myPieces"></div>
+    </div>
+
+    <!-- Board + actions + log -->
+    <div class="main-panel">
+      <div class="phase-bar">
+        <div id="phaseLabel" style="font-weight:600">—</div>
+        <div id="playerResCards" style="display:flex;gap:6px"></div>
+      </div>
+
+      <div class="tile-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#3f3f46"></div>地板</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#18181b"></div>墙壁</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#064e3b"></div>出生点</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#78350f"></div>掩体</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#082f49"></div>陷阱</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7c2d12"></div>熔岩</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#134e4a"></div>治愈泉</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3b0764"></div>充能台</div>
+      </div>
+
+      <div class="board-wrap" id="boardWrap">
+        <div style="position:relative;display:inline-block">
+          <div id="gameGrid"></div>
+          <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible"></div>
+        </div>
+      </div>
+
+      <!-- Action bar -->
+      <div class="action-bar">
+        <select id="pieceSelect" onchange="selectPieceFromDropdown()">
+          <option value="">— 选择棋子 —</option>
+        </select>
+        <button class="btn-action" id="btnMove" onclick="toggleMove()" disabled>移动</button>
+        <button class="btn-end" id="btnEnd" onclick="doEndTurn()" disabled>结束回合</button>
+        <button class="btn-end" id="btnConfirmEnd" onclick="doBeginPhase()" disabled style="display:none;background:#7c3aed;border-color:#a855f7;color:#e9d5ff">确认结束</button>
+        <div class="status-msg" id="statusMsg"></div>
+      </div>
+
+      <!-- Skill card bar (appears when piece selected) -->
+      <div id="skillBar"></div>
+
+      <!-- Training bar (training mode only) -->
+      <div class="training-bar" id="trainingBar" style="display:none">
+        <select id="placeFaction" onchange="refreshPlaceTemplates()">
+          <option value="red">🔴 红方</option>
+          <option value="blue">🔵 蓝方</option>
+        </select>
+        <select id="placeTemplate" style="flex:1;min-width:90px">
+          <option value="">选择棋子…</option>
+        </select>
+        <button id="btnPlace" class="tb-btn" onclick="togglePlaceMode()" style="background:#2d1a4e;border-color:#6d28d9;color:#c4b5fd">📌 放置</button>
+        <button class="tb-btn" onclick="openResourceEditor()" style="background:#1a2a1a;border-color:#15803d;color:#86efac" title="修改 AP / CP">⚡💠 资源</button>
+        <button class="tb-btn" onclick="initTraining()" style="background:#0c1a0c;border-color:#166534;color:#86efac">🔄 重启</button>
+      </div>
+
+      <!-- Resource editor sheet (training mode) -->
+      <div id="resEditorSheet" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeResourceEditor()">
+        <div style="background:#0f1623;border:1px solid #334155;border-radius:14px;padding:20px 22px;min-width:260px;color:#e2e8f0;font-size:14px">
+          <div style="font-weight:700;font-size:15px;margin-bottom:14px">⚡💠 修改资源</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <label style="display:flex;align-items:center;gap:8px;color:#a5b4fc">
+              玩家
+              <select id="resEditorPlayer" onchange="_syncResourceEditorInputs(this.value)" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;padding:4px 6px">
+                <option value="training-red">🔴 红方</option>
+                <option value="training-blue">🔵 蓝方</option>
+              </select>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px">
+              <span style="width:60px;color:#fbbf24">⚡ AP</span>
+              <input id="resEditorAP" type="number" min="0" max="20" value="10"
+                style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#fbbf24;padding:4px 8px;font-size:14px">
+            </label>
+            <label style="display:flex;align-items:center;gap:8px">
+              <span style="width:60px;color:#67e8f9">💠 CP</span>
+              <input id="resEditorCP" type="number" min="0" max="20" value="0"
+                style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#67e8f9;padding:4px 8px;font-size:14px">
+            </label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <button onclick="applyResourceEdit()" style="flex:1;background:#166534;border:1px solid #15803d;border-radius:8px;color:#86efac;padding:8px;font-size:13px;cursor:pointer">✔ 确认</button>
+            <button onclick="closeResourceEditor()" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#94a3b8;padding:8px;font-size:13px;cursor:pointer">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hand (always visible) -->
+      <div class="hand-panel" id="handPanel">
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 10px;font-size:11px;color:#64748b;border-bottom:1px solid #1a2540;flex-shrink:0">
+          <span>🃏 手牌</span>
+          <span id="handCount" style="font-weight:700;color:#93c5fd">0</span>
+          <span id="handTarget" style="color:#f59e0b;display:none"> · 点击目标施放</span>
+        </div>
+        <div id="handBody">
+          <div class="hand-scroll" id="handCards">
+            <div class="hand-empty">暂无手牌</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Opponent pieces panel (right) — hidden, kept for renderPanels() -->
+    <div class="side-panel right" id="oppPanel">
+      <div class="panel-label" id="oppLabel">对方</div>
+      <div id="oppPieces"></div>
+    </div>
+
+  </div><!-- /battle-layout -->
+
+  <script>
+    // ── URL params ──
+    const params = new URLSearchParams(location.search)
+    const roomId = (params.get('roomId') || '').trim().toLowerCase()
+    let myPlayerId = (params.get('playerId') || '').trim().toLowerCase()
+    const myPlayerName = params.get('playerName') || '玩家'
+    const TRAINING_MODE = params.get('mode') === 'training'
+
+    // ── Server URL ──
+    const getServerUrl = () => RvBUtils.getServerUrl()
+
+    // ── Training mode: server URL helpers ──
+    let _trainingBaseUrl = null
+    async function _getTrainingUrl() {
+      if (_trainingBaseUrl) return _trainingBaseUrl
+      if (window.RvBBridge) { _trainingBaseUrl = 'http://localhost:7878'; return _trainingBaseUrl }
+      if (window.electronAPI) {
+        // 等待本地服务器就绪（最多 12 秒，每 500ms 轮询一次）
+        for (let i = 0; i < 24; i++) {
+          try {
+            const info = await window.electronAPI.getHostInfo()
+            if (info && info.port && info.running) {
+              _trainingBaseUrl = 'http://localhost:' + info.port
+              return _trainingBaseUrl
+            }
+            if (i === 0) showMsg('等待本地服务器启动…')
+          } catch (e) { console.warn('[training] getHostInfo failed:', e) }
+          await new Promise(r => setTimeout(r, 500))
+        }
+        // 超时后尝试直连默认端口
+        try {
+          const info = await window.electronAPI.getHostInfo()
+          if (info && info.port) { _trainingBaseUrl = 'http://localhost:' + info.port; return _trainingBaseUrl }
+        } catch {}
+      }
+      _trainingBaseUrl = 'http://localhost:54321'
+      return _trainingBaseUrl
+    }
+    async function trainingApiFetch(method, body) {
+      const baseUrl = await _getTrainingUrl()
+      const res = await fetch(baseUrl + '/api/training', {
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw Object.assign(new Error(data.error || 'API错误'), data)
+      return data
+    }
+
+    // ── Training-only state ──
+    let placingMode = false
+
+    // ── Constants ──
+    const TILE_CLASS = {
+      wall:'t-wall', floor:'t-floor', spawn:'t-spawn',
+      cover:'t-cover', hole:'t-hole', lava:'t-lava',
+      spring:'t-spring', chargepad:'t-chargepad'
+    }
+    const PHASE_LABELS = { start:'开始阶段', action:'行动阶段', end:'结束阶段' }
+
+    // ── State ──
+    let G = null               // BattleState
+    let skillsById = {}        // loaded locally from ./data/skills/
+    let PIECES_BY_ID = {}      // loaded locally from ./data/pieces/
+    let cardsById = {}         // loaded locally from ./data/cards/
+    let keywordGlossaryByName = {}
+    let selectedPieceId = null
+    let pendingMove = false
+    let pendingSkill = null    // { skillId, skillType, range }
+    let pendingCardAction = null  // { type:'playCard', playerId, cardInstanceId } awaiting target
+    let validMoves = new Set()   // reachable cells for current move (wall-aware)
+    let pollTimer = null
+    let myFaction = null       // 'red' | 'blue' (derived from ownerPlayerId)
+    let recordSaved = false
+    let actionLog = []
+    let lastActionCount = 0    // how many G.actions entries already displayed
+    let lastActionSeq = -1     // last processed action log seq
+    let isHost = false         // am I the room host?
+    let gameSeed = null        // shared PRNG seed (from server action log)
+    let pressTimer = null      // long-press timer
+    let playerNames = {}       // playerId → display name, loaded from room
+    let pendingOptionAction = null  // original action awaiting selectedOption
+    let currentCardDetail = null
+    let currentCardKeywords = []
+    let activeCardKeyword = ''
+    let currentPieceInfoId = null
+    let currentPieceKeywords = []
+    let activePieceKeyword = ''
+
+    // ── Piece helpers ──
+    function pieceName(p) {
+      const tmpl = PIECES_BY_ID[p.templateId]
+      return p.name || (tmpl && tmpl.name) || p.templateId || p.instanceId || '?'
+    }
+    function pieceMaxHp(p) {
+      return (p.displayMaxHp !== undefined ? p.displayMaxHp : null) || p.maxHp || (p.stats && p.stats.maxHp) || 1
+    }
+    function pieceDispHp(p) {
+      return p.displayCurrentHp !== undefined ? p.displayCurrentHp : p.currentHp
+    }
+    function pieceDispStats(p) {
+      const base = p.stats || p
+      return {
+        attack:    p.displayAttack    !== undefined ? p.displayAttack    : base.attack,
+        defense:   p.displayDefense   !== undefined ? p.displayDefense   : base.defense,
+        moveRange: p.displayMoveRange !== undefined ? p.displayMoveRange : base.moveRange,
+      }
+    }
+    function pieceDispSkills(p) {
+      return p.displaySkills !== undefined ? p.displaySkills : (p.skills || [])
+    }
+    function pieceDispTags(p) {
+      // For shadow clones, always mirror the master's visible tags to prevent revealing the real one
+      if (p.masterPieceId && G && G.pieces) {
+        const master = G.pieces.find(m => m.instanceId === p.masterPieceId && m.currentHp > 0)
+        if (master) return (master.statusTags || []).filter(t => t.visible !== false)
+      }
+      return p.displayStatusTags !== undefined ? p.displayStatusTags : (p.statusTags || [])
+    }
+    function normalizeKeywordList(items) {
+      return [...new Set((items || []).filter(Boolean).map(v => String(v).trim()).filter(Boolean))]
+    }
+    function getKeywordMeta(name) {
+      const meta = keywordGlossaryByName[name] || {}
+      return {
+        name,
+        shortDescription: meta.shortDescription || '',
+        longDescription: meta.longDescription || ''
+      }
+    }
+    function keywordBadgeHtml(name, scope, activeName) {
+      return `<button type="button" class="keyword-badge${name === activeName ? ' active' : ''}" data-scope="${scope}" data-keyword="${escHtml(name)}">${escHtml(name)}</button>`
+    }
+    function renderKeywordPanel(keywordNames, activeName, emptyText) {
+      if (!keywordNames.length) {
+        return `<div class="keyword-panel-title">关键词</div><div class="keyword-empty">${escHtml(emptyText)}</div>`
+      }
+      const selected = keywordNames.includes(activeName) ? activeName : keywordNames[0]
+      const meta = getKeywordMeta(selected)
+      const extra = keywordNames.filter(name => name !== selected)
+      return `<div class="keyword-panel-title">关键词</div>
+        <div class="keyword-name">${escHtml(meta.name)}</div>
+        <div class="keyword-short">${escHtml(meta.shortDescription || '该关键词暂时还没有补充说明。')}</div>
+        ${meta.longDescription ? `<div class="keyword-long">${escHtml(meta.longDescription)}</div>` : ''}
+        ${extra.length ? `<div class="keyword-panel-list">${extra.map(name => `<span class="keyword-mini">${escHtml(name)}</span>`).join('')}</div>` : ''}`
+    }
+    function bindKeywordBadges(scope) {
+      document.querySelectorAll(`.keyword-badge[data-scope="${scope}"]`).forEach(btn => {
+        btn.onclick = (event) => {
+          event.stopPropagation()
+          const keyword = btn.getAttribute('data-keyword') || ''
+          if (scope === 'card') selectCardKeyword(keyword)
+          if (scope === 'piece') selectPieceKeyword(keyword)
+        }
+      })
+    }
+    function selectCardKeyword(keyword) {
+      activeCardKeyword = keyword
+      if (currentCardDetail) showCardDetail(currentCardDetail.cardInstanceId, currentCardDetail.cardId, true)
+    }
+    function selectPieceKeyword(keyword) {
+      activePieceKeyword = keyword
+      if (currentPieceInfoId) showPieceInfo(currentPieceInfoId, true)
+    }
+
+    // ── State diff → detailed log entries ──
+    function diffStates(oldG, newG) {
+      if (!oldG || !newG) return []
+      const logs = []
+      // Turn change
+      const oid = oldG.turn && oldG.turn.currentPlayerId
+      const nid = newG.turn && newG.turn.currentPlayerId
+      if (oid !== nid && nid) {
+        const isMe = nid.toLowerCase() === myPlayerId
+        logs.push({ msg: `⏭ 第${newG.turn ? newG.turn.turnNumber : '?'}回合 — ${isMe ? '你' : '对方'}的回合`, cls: 'turn' })
+      }
+      // Piece changes
+      const allIds = new Set([
+        ...oldG.pieces.map(p => p.instanceId),
+        ...newG.pieces.map(p => p.instanceId)
+      ])
+      for (const id of allIds) {
+        const op = oldG.pieces.find(p => p.instanceId === id)
+        const np = newG.pieces.find(p => p.instanceId === id)
+        if (!op && np) {
+          logs.push({ msg: `✨ ${pieceName(np)} 登场 (${np.x},${np.y})`, cls: 'info' }); continue
+        }
+        if (op && !np) {
+          logs.push({ msg: `💀 ${pieceName(op)} 已倒下`, cls: 'err' }); continue
+        }
+        if (!op || !np) continue
+        // HP
+        const hpDiff = np.currentHp - op.currentHp
+        const mhp = pieceMaxHp(np)
+        if (hpDiff < 0) {
+          if (np.currentHp <= 0) {
+            logs.push({ msg: `💀 ${pieceName(np)} 阵亡！(受到 ${-hpDiff} 点伤害)`, cls: 'err' })
+          } else {
+            logs.push({ msg: `🩸 ${pieceName(np)} 受到 ${-hpDiff} 伤害 → ${np.currentHp}/${mhp} HP`, cls: 'skill' })
+          }
+        } else if (hpDiff > 0) {
+          logs.push({ msg: `💚 ${pieceName(np)} 恢复 ${hpDiff} 生命 → ${np.currentHp}/${mhp} HP`, cls: 'move' })
+        }
+        // Move
+        if (op.currentHp > 0 && np.currentHp > 0 && (op.x !== np.x || op.y !== np.y)) {
+          logs.push({ msg: `👣 ${pieceName(np)} (${op.x},${op.y})→(${np.x},${np.y})`, cls: 'move' })
+        }
+        // Status effects
+        const ot = (op.statusTags || []).map(t => t.id || t.type).filter(Boolean)
+        const nt = (np.statusTags || []).map(t => t.id || t.type).filter(Boolean)
+        for (const tag of nt.filter(t => !ot.includes(t)))
+          logs.push({ msg: `✨ ${pieceName(np)} 获得[${tag}]`, cls: 'info' })
+        for (const tag of ot.filter(t => !nt.includes(t)))
+          logs.push({ msg: `💨 ${pieceName(np)} 失去[${tag}]`, cls: 'info' })
+        // Skill cooldowns (skill used)
+        const oss = op.skills || []
+        const nss = np.skills || []
+        for (const ns of nss) {
+          const sid = ns.skillId || ns.id
+          const os = oss.find(s => (s.skillId || s.id) === sid)
+          if (os !== undefined && (ns.currentCooldown || 0) > (os.currentCooldown || 0)) {
+            const skn = (skillsById[sid] && skillsById[sid].name) || sid
+            logs.push({ msg: `⚡ ${pieceName(np)} 使用技能[${skn}]`, cls: 'skill' })
+          }
+        }
+      }
+      // Player AP/CP changes
+      if (oldG.players && newG.players) {
+        for (const np of newG.players) {
+          const op = oldG.players.find(p => p.playerId === np.playerId)
+          if (!op) continue
+          const label = (np.playerId && np.playerId.toLowerCase() === myPlayerId) ? '你' : '对方'
+          if (op.chargePoints !== np.chargePoints) {
+            const diff = np.chargePoints - op.chargePoints
+            if (diff > 0) logs.push({ msg: `⚡ ${label}获得 ${diff} 充能点 (共${np.chargePoints}CP)`, cls: 'info' })
+          }
+          if (op.actionPoints !== np.actionPoints && op.actionPoints > 0 && np.actionPoints > op.actionPoints) {
+            logs.push({ msg: `🔋 ${label}行动点恢复至 ${np.actionPoints}AP`, cls: 'info' })
+          }
+        }
+      }
+      return logs
+    }
+
+    // ── Server action log flush ──
+    // ── Turn announcement ──
+    let _lastAnnouncedTurnPlayer = null
+    function showTurnAnnounce(text, color) {
+      const el = document.getElementById('turnAnnounce')
+      if (!el) return
+      el.className = ''
+      el.textContent = text
+      el.style.color = color
+      void el.offsetWidth  // reflow to restart animation
+      el.className = 'show'
+    }
+
+    // ── Damage / heal floaters ──
+    function spawnFloater(x, y, text, color, big) {
+      const layer = document.getElementById('floatLayer')
+      if (!layer) return
+      const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 44
+      const el = document.createElement('div')
+      el.className = 'dmg-float' + (big ? ' big' : '')
+      el.style.color = color
+      el.style.left = (x * cellSize + cellSize / 2) + 'px'
+      el.style.top  = (y * cellSize + 4) + 'px'
+      el.textContent = text
+      layer.appendChild(el)
+      setTimeout(() => el.remove(), 1200)
+    }
+
+    function spawnStateFloaters(oldG, newG) {
+      if (!oldG || !newG || !oldG.pieces || !newG.pieces) return
+      for (const np of newG.pieces) {
+        const op = oldG.pieces.find(p => p.instanceId === np.instanceId)
+        if (!op) continue
+        const newHp = np.currentHp ?? np.hp ?? 0
+        const oldHp = op.currentHp ?? op.hp ?? 0
+        const diff = newHp - oldHp
+        if (diff < 0) {
+          const dead = newHp <= 0
+          const big = dead || -diff >= 50
+          spawnFloater(np.x, np.y, dead ? '💀' : String(-diff), dead ? '#c4b5fd' : '#f87171', big)
+        } else if (diff > 0) {
+          spawnFloater(np.x, np.y, '+' + diff, '#4ade80', false)
+        }
+      }
+    }
+
+    function logClassFromType(type) {
+      if (type === 'move') return 'move'
+      if (type === 'useBasicSkill' || type === 'useChargeSkill') return 'skill'
+      if (type === 'endTurn' || type === 'beginPhase') return 'turn'
+      if (type === 'triggerEffect') return 'skill'
+      if (type === 'tileEffect') return 'info'
+      if (type === 'playCard') return 'skill'
+      if (type === 'surrender') return 'err'
+      return 'info'
+    }
+    function flushActionLog(oldG, newG) {
+      if (!newG || !newG.actions) return
+      const start = (oldG && oldG.actions) ? oldG.actions.length : lastActionCount
+      const newEntries = newG.actions.slice(start)
+      for (const entry of newEntries) {
+        const msg = (entry.payload && entry.payload.message) ? entry.payload.message : entry.type
+        addLog('[T' + entry.turn + '] ' + msg, logClassFromType(entry.type))
+      }
+      lastActionCount = newG.actions.length
+    }
+
+    // ── Long-press / right-click helpers ──
+    function startPressTimer(e, instanceId) {
+      if (pressTimer) clearTimeout(pressTimer)
+      pressTimer = setTimeout(() => { pressTimer = null; showPieceInfo(instanceId) }, 600)
+    }
+    function startCardPressTimer(e, cardInstanceId, cardId) {
+      if (pressTimer) clearTimeout(pressTimer)
+      pressTimer = setTimeout(() => { pressTimer = null; showCardDetail(cardInstanceId, cardId) }, 600)
+    }
+    function clearPressTimer() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
+    }
+
+    // ── Card detail modal ──
+    function showCardDetail(cardInstanceId, cardId, preserveKeyword) {
+      const def = cardsById[cardId] || (G && G.customCards && G.customCards[cardId]) || {}
+      const cost = def.actionPointCost || 0
+      currentCardDetail = { cardInstanceId, cardId }
+      currentCardKeywords = normalizeKeywordList(def.keywords)
+      if (!preserveKeyword || !currentCardKeywords.includes(activeCardKeyword)) {
+        activeCardKeyword = currentCardKeywords[0] || ''
+      }
+      const typeLabel = def.type === 'reactive' ? '被动触发' : def.type === 'passive' ? '持续' : def.type === 'active' ? '主动' : '手牌'
+
+      document.getElementById('cdIcon').textContent = def.icon || '🃏'
+      document.getElementById('cdName').textContent = def.name || cardId
+      document.getElementById('cdType').textContent = typeLabel
+      document.getElementById('cdCost').innerHTML =
+        `<div style="text-align:center;margin-bottom:8px"><span class="cd-cost ${cost===0?'free':''}">${cost===0?'费用: 免费':'费用: '+cost+' AP'}</span></div>`
+      document.getElementById('cdDesc').textContent = def.description || '（无描述）'
+
+      const isPassiveCard = def.type === 'passive'
+      const meta = []
+      if (!isPassiveCard) {
+        meta.push('AP ' + (def.actionPointCost ?? 0))
+        if (def.chargeCost != null) meta.push('充能 ' + def.chargeCost)
+        const cdTurns = def.cooldownTurns ?? def.cooldown ?? 0
+        meta.push('冷却 ' + cdTurns + ' 回合')
+      }
+      document.getElementById('cdMeta').innerHTML = meta.map(m =>
+        `<span class="cd-meta-tag">${escHtml(m)}</span>`
+      ).join('')
+      document.getElementById('cdKeywords').innerHTML = currentCardKeywords.map(name =>
+        keywordBadgeHtml(name, 'card', activeCardKeyword)
+      ).join('')
+      document.getElementById('cardKeywordPanel').innerHTML = renderKeywordPanel(
+        currentCardKeywords,
+        activeCardKeyword,
+        '这张卡牌没有需要额外解释的关键词。'
+      )
+      bindKeywordBadges('card')
+
+      document.getElementById('cardDetailModal').style.display = 'flex'
+    }
+    function closeCardDetail() {
+      currentCardDetail = null
+      currentCardKeywords = []
+      activeCardKeyword = ''
+      document.getElementById('cardDetailModal').style.display = 'none'
+    }
+
+    // ── Surrender ──
+    function confirmSurrender() {
+      if (!G || G.gameOver || G.winner) { goBack(); return }
+      const overlay = document.getElementById('surrenderConfirmOverlay')
+      if (overlay) { overlay.style.display = 'flex'; return }
+      // Fallback if overlay not present
+      doAction({ type: 'surrender', playerId: myPlayerId })
+    }
+    function doSurrender() {
+      document.getElementById('surrenderConfirmOverlay').style.display = 'none'
+      doAction({ type: 'surrender', playerId: myPlayerId })
+    }
+    function cancelSurrender() {
+      document.getElementById('surrenderConfirmOverlay').style.display = 'none'
+    }
+
+    // ── Option picker ──
+    // Stored option values — avoids inline JSON breaking HTML attributes
+    let _pickerOptions = []
+
+    function showOptionPicker(title, options, originalAction) {
+      pendingOptionAction = originalAction
+      _pickerOptions = options
+      document.getElementById('optionPickerTitle').textContent = title || '请选择'
+      const list = document.getElementById('optionPickerList')
+      list.innerHTML = options.map((opt, i) =>
+        `<button class="option-btn" onclick="selectOptionChoice(${i})">
+          <div class="option-btn-label">${escHtml(opt.label)}</div>
+          ${opt.description ? `<div class="option-btn-desc">${escHtml(opt.description)}</div>` : ''}
+        </button>`
+      ).join('')
+      document.getElementById('optionPickerOverlay').classList.add('show')
+    }
+    function selectOptionChoice(index) {
+      document.getElementById('optionPickerOverlay').classList.remove('show')
+      if (!pendingOptionAction) return
+      const opt = _pickerOptions[index]
+      if (!opt) return
+      const action = Object.assign({}, pendingOptionAction, { selectedOption: opt.value !== undefined ? opt.value : opt })
+      pendingOptionAction = null
+      _pickerOptions = []
+      doAction(action)
+    }
+    function cancelOptionPicker() {
+      document.getElementById('optionPickerOverlay').classList.remove('show')
+      pendingOptionAction = null
+      pendingSkill = null
+      const _sp = G && selectedPieceId && G.pieces.find(p => p.instanceId === selectedPieceId)
+      renderSkillBar(_sp || null)
+      renderActionBar()
+    }
+
+    // ── Piece info modal ──
+    function showPieceInfo(instanceId, preserveKeyword) {
+      if (!G) return
+      const piece = G.pieces.find(p => p.instanceId === instanceId)
+      if (!piece) return
+      currentPieceInfoId = instanceId
+      const tmpl = PIECES_BY_ID[piece.templateId] || {}
+      const stats = piece.stats || {}
+      const mhp = pieceMaxHp(piece)
+      const name = piece.name || tmpl.name || piece.templateId
+
+      document.getElementById('pieceInfoName').textContent = name
+
+      // Tags (display* aware)
+      const tags = pieceDispTags(piece).filter(t => t.visible !== false)
+      const tagsHtml = tags.length
+        ? `<div class="pi-tags">${tags.map(t =>
+            `<span class="status-tag" style="font-size:10px;padding:2px 6px">${escHtml(t.name || t.type || t.id || '?')}</span>`
+          ).join('')}</div>` : ''
+
+      // Stats (display* aware)
+      const pstats = pieceDispStats(piece)
+      const dispHp = pieceDispHp(piece)
+      const pct = Math.max(0, Math.round(dispHp / mhp * 100))
+      const hpColor = pct < 30 ? '#ef4444' : pct < 60 ? '#f59e0b' : '#4ade80'
+      const statsHtml = `<div class="pi-stats">
+        <div class="pi-stat"><div class="pi-stat-val" style="color:${hpColor}">${dispHp}/${mhp}</div><div class="pi-stat-lbl">生命</div></div>
+        <div class="pi-stat"><div class="pi-stat-val" style="color:#f87171">${pstats.attack ?? '—'}</div><div class="pi-stat-lbl">攻击</div></div>
+        <div class="pi-stat"><div class="pi-stat-val" style="color:#60a5fa">${pstats.defense ?? '—'}</div><div class="pi-stat-lbl">防御</div></div>
+        <div class="pi-stat"><div class="pi-stat-val" style="color:#fbbf24">${pstats.moveRange ?? '—'}</div><div class="pi-stat-lbl">移动</div></div>
+      </div>`
+
+      // Skills (display* aware)
+      const skills = pieceDispSkills(piece)
+      currentPieceKeywords = normalizeKeywordList(skills.flatMap(sk => {
+        const sid = sk.skillId || sk.id
+        const skd = skillsById[sid] || {}
+        return skd.keywords || []
+      }))
+      if (!preserveKeyword || !currentPieceKeywords.includes(activePieceKeyword)) {
+        activePieceKeyword = currentPieceKeywords[0] || ''
+      }
+      const skillsHtml = skills.length ? skills.map(sk => {
+        const sid = sk.skillId || sk.id
+        const skd = skillsById[sid] || {}
+        const icon = skd.icon || '⚡'
+        const skName = skd.name || sid
+        const desc = skd.description || '（无描述）'
+        const isPassive = skd.type === 'passive' || skd.kind === 'passive'
+        const typeLabel = skd.type === 'super' ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
+        const cooldownTurns = skd.cooldownTurns ?? 0
+        const currentCooldown = sk.currentCooldown ?? 0
+        const keywords = normalizeKeywordList(skd.keywords)
+        const metaParts = []
+        if (!isPassive) {
+          const apCost = skd.actionPointCost ?? 0
+          metaParts.push(`AP ${apCost}`)
+          if (skd.type === 'super') {
+            const cc = skd.chargeCost ?? 0
+            metaParts.push(`充能 ${cc}`)
+          }
+          if (cooldownTurns > 0 || currentCooldown > 0) {
+            const cdColor = currentCooldown > 0 ? 'color:#f87171' : 'color:#4ade80'
+            metaParts.push(`<span style="${cdColor}">冷却 ${currentCooldown}/${cooldownTurns} 回合</span>`)
+          } else {
+            metaParts.push('冷却 无')
+          }
+        }
+        return `<div class="pi-skill">
+          <div class="pi-skill-header">
+            <span class="pi-skill-icon">${icon}</span>
+            <span class="pi-skill-name">${escHtml(skName)}</span>
+            <span class="pi-skill-badge">${typeLabel}</span>
+          </div>
+          <div class="pi-skill-desc">${escHtml(desc)}</div>
+          ${keywords.length ? `<div class="keyword-badges pi-keywords">${keywords.map(name => keywordBadgeHtml(name, 'piece', activePieceKeyword)).join('')}</div>` : ''}
+          ${metaParts.length ? `<div class="pi-skill-meta">${metaParts.join(' · ')}</div>` : ''}
+        </div>`
+      }).join('')
+      : '<div style="color:#475569;font-size:12px;padding:8px 0">该棋子没有技能</div>'
+
+      // Related cards from piece template
+      const tmplForCards = PIECES_BY_ID[piece.templateId] || {}
+      const relatedCardIds = tmplForCards.relatedCards || []
+      let relatedCardsHtml = ''
+      if (relatedCardIds.length > 0) {
+        relatedCardsHtml = `<div class="pi-section-label" style="margin-top:10px">相关卡牌</div>` +
+          relatedCardIds.map(cid => {
+            const cd = cardsById[cid] || (G.customCards && G.customCards[cid]) || {}
+            return `<div class="pi-skill" style="border-color:#334155">
+              <div class="pi-skill-header">
+                <span class="pi-skill-icon">${cd.icon || '🃏'}</span>
+                <span class="pi-skill-name">${escHtml(cd.name || cid)}</span>
+                <span class="pi-skill-badge">${cd.type === 'reactive' ? '触发' : '手牌'}</span>
+              </div>
+              <div class="pi-skill-desc">${escHtml(cd.description || '（无描述）')}</div>
+            </div>`
+          }).join('')
+      }
+
+      document.getElementById('pieceInfoContent').innerHTML =
+        statsHtml + tagsHtml +
+        `<div class="pi-section-label">技能</div>` + skillsHtml + relatedCardsHtml
+
+      document.getElementById('pieceKeywordPanel').innerHTML = renderKeywordPanel(
+        currentPieceKeywords,
+        activePieceKeyword,
+        '这枚棋子的技能没有需要额外解释的关键词。'
+      )
+      bindKeywordBadges('piece')
+      document.getElementById('pieceInfoModal').style.display = 'flex'
+    }
+    function closePieceInfo() {
+      currentPieceInfoId = null
+      currentPieceKeywords = []
+      activePieceKeyword = ''
+      document.getElementById('pieceInfoModal').style.display = 'none'
+    }
+
+    // ── Load local static data ──
+    async function fetchLocalJson(path) {
+      if (window.fetchPackJson && /^\.?\/?data\//.test(path)) {
+        return window.fetchPackJson(path)
+      }
+      const res = await fetch(path)
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      return res.json()
+    }
+
+    async function loadLocalData() {
+      try {
+        try {
+          const glossary = await fetchLocalJson('./data/skill-keywords.json')
+          keywordGlossaryByName = Object.fromEntries((glossary || []).map(item => [item.name, item]))
+        } catch {}
+        // Load piece templates
+        const ids = await fetchLocalJson('./data/pieces/manifest.json')
+          const skillIds = new Set()
+          await Promise.all(ids.map(async id => {
+            try {
+              const p = await fetchLocalJson('./data/pieces/' + id + '.json')
+              PIECES_BY_ID[id] = p
+              // Collect all skill IDs referenced by this piece
+              ;(p.skills || []).forEach(s => {
+                const sid = s.skillId || s.id
+                if (sid) skillIds.add(sid)
+              })
+            } catch {}
+          }))
+          // Load all referenced skills
+          await Promise.all(Array.from(skillIds).map(async sid => {
+            try {
+              const sk = await fetchLocalJson('./data/skills/' + sid + '.json')
+              skillsById[sid] = sk
+            } catch {}
+          }))
+        // Load card definitions
+        try {
+          const cardIds = await fetchLocalJson('./data/cards/manifest.json')
+          await Promise.all(cardIds.map(async cid => {
+            try {
+              const cd = await fetchLocalJson('./data/cards/' + cid + '.json')
+              cardsById[cid] = cd
+            } catch {}
+          }))
+        } catch {}
+      } catch (e) {
+        console.warn('[battle] loadLocalData error:', e.message)
+      }
+    }
+
+    // ── Init ──
+    async function init() {
+      if (TRAINING_MODE) {
+        document.getElementById('btnSurrender').style.display = 'none'
+        document.getElementById('btnSwitchPov').style.display = ''
+        document.getElementById('btnResetCD').style.display = ''
+        document.getElementById('trainingBar').style.display = 'flex'
+        document.getElementById('roomNameLabel').textContent = '训练营'
+        showMsg('加载本地资源…')
+        await loadLocalData()
+        refreshPlaceTemplates()
+        await initTraining()
+        return
+      }
+      if (!roomId || !myPlayerId) { showMsg('缺少 roomId 或 playerId 参数', 'err'); return }
+      if (!getServerUrl()) { showMsg('未连接服务器', 'err'); return }
+      document.getElementById('roomNameLabel').textContent = '房间 ' + roomId
+      showMsg('加载本地资源…')
+      await loadLocalData()
+      try {
+        localStorage.setItem('rvb_active_battle', JSON.stringify({ roomId, playerId: myPlayerId, playerName: myPlayerName }))
+      } catch {}
+      pollTimer = setInterval(pollActions, 2000)
+      await pollActions()
+    }
+
+    async function initTraining(mapId) {
+      showMsg('初始化训练营…')
+      placingMode = false
+      const btnPlace = document.getElementById('btnPlace')
+      if (btnPlace) btnPlace.style.background = '#2d1a4e'
+      try {
+        G = await trainingApiFetch('POST', { mapId: mapId || undefined })
+        // Auto-advance past start phase so training enters action phase immediately
+        if (G.turn && G.turn.phase === 'start') {
+          try { G = await trainingApiFetch('PUT', { action: { type: 'beginPhase' }, battleState: G }) } catch(e) {}
+        }
+        myPlayerId = G.turn.currentPlayerId
+        selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
+        lastActionCount = 0
+        document.getElementById('loadingOverlay').style.display = 'none'
+        render()
+        addLog('⚔️ 训练营开始 — ' + (myPlayerId === 'training-red' ? '🔴 红方先手' : '🔵 蓝方先手'), 'turn')
+        const btn = document.getElementById('btnSwitchPov')
+        if (btn) btn.textContent = myPlayerId === 'training-red' ? '🔄 切换视角 🔴' : '🔄 切换视角 🔵'
+      } catch (e) {
+        showMsg('初始化失败：' + e.message, 'err')
+        document.getElementById('loadingMsg').style.color = '#f87171'
+      }
+    }
+
+    // ── Training: send admin patch ──
+    async function sendPatch(body) {
+      try {
+        G = await trainingApiFetch('PATCH', Object.assign({}, body, { battleState: G }))
+        render(); return true
+      } catch (e) { addLog('❌ ' + e.message, 'err'); return false }
+    }
+
+    // ── Training: switch perspective ──
+    function switchPerspective() {
+      const next = myPlayerId === 'training-red' ? 'training-blue' : 'training-red'
+      myPlayerId = next
+      selectedPieceId = null; pendingMove = false; pendingSkill = null
+      addLog('↔️ 操控方 → ' + (next === 'training-red' ? '🔴 红方' : '🔵 蓝方'), 'turn')
+      const btn = document.getElementById('btnSwitchPov')
+      if (btn) btn.textContent = next === 'training-red' ? '🔄 切换视角 🔴' : '🔄 切换视角 🔵'
+      render()
+    }
+
+    async function resetCooldowns() {
+      if (await sendPatch({ type: 'resetCooldowns' })) addLog('↺ 冷却已重置', 'info')
+    }
+
+    // ── Training: resource editor ──
+    function openResourceEditor() {
+      const sheet = document.getElementById('resEditorSheet')
+      if (!sheet || !G) return
+      // Pre-fill with current values of the active player
+      const playerSel = document.getElementById('resEditorPlayer')
+      const pid = playerSel ? playerSel.value : 'training-red'
+      _syncResourceEditorInputs(pid)
+      sheet.style.display = 'flex'
+    }
+
+    function closeResourceEditor() {
+      const sheet = document.getElementById('resEditorSheet')
+      if (sheet) sheet.style.display = 'none'
+    }
+
+    function _syncResourceEditorInputs(pid) {
+      if (!G) return
+      const p = G.players.find(pl => pl.playerId === pid)
+      if (!p) return
+      const apEl = document.getElementById('resEditorAP')
+      const cpEl = document.getElementById('resEditorCP')
+      if (apEl) apEl.value = p.actionPoints ?? 0
+      if (cpEl) cpEl.value = p.chargePoints ?? 0
+    }
+
+    async function applyResourceEdit() {
+      const pid = document.getElementById('resEditorPlayer')?.value || 'training-red'
+      const ap = parseInt(document.getElementById('resEditorAP')?.value ?? '0', 10)
+      const cp = parseInt(document.getElementById('resEditorCP')?.value ?? '0', 10)
+      if (isNaN(ap) || isNaN(cp)) return
+      const ok = await sendPatch({ type: 'updateResources', playerId: pid, actionPoints: ap, chargePoints: cp })
+      if (ok) {
+        const label = pid === 'training-red' ? '🔴 红方' : '🔵 蓝方'
+        addLog(`⚡💠 ${label} AP→${ap} CP→${cp}`, 'info')
+        closeResourceEditor()
+      }
+    }
+
+    // ── Training: piece placement ──
+    function refreshPlaceTemplates() {
+      const factionEl = document.getElementById('placeFaction')
+      const sel = document.getElementById('placeTemplate')
+      if (!factionEl || !sel) return
+      const faction = factionEl.value || 'red'
+      const pieces = Object.values(PIECES_BY_ID).filter(p => !p.faction || p.faction === faction || p.faction === 'neutral')
+      sel.innerHTML = '<option value="">选择棋子…</option>' + pieces.map(p =>
+        `<option value="${p.id}">${p.name || p.id}</option>`
+      ).join('')
+    }
+
+    function togglePlaceMode() {
+      placingMode = !placingMode
+      const btn = document.getElementById('btnPlace')
+      if (btn) { btn.style.background = placingMode ? '#4c1d95' : '#2d1a4e'; btn.textContent = placingMode ? '✕ 取消放置' : '📌 点击棋盘放置' }
+      setStatusMsg(placingMode ? '🟣 点击棋盘上可行走的格子放置棋子' : '✅ 已取消放置')
+      renderBoard()
+    }
+
+    // ── Action log polling — core battle loop ──
+    async function pollActions() {
+      const url = getServerUrl()
+      if (!url) return
+      try {
+        const res = await fetch(url + '/api/rooms/' + roomId + '/battle?since=' + lastActionSeq)
+        if (res.status === 400) { showMsg('等待对战开始…'); return }
+        if (!res.ok) return
+        const { actions, seed } = await res.json()
+
+        // Init seeded RNG once we know the seed
+        if (seed && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
+          gameSeed = seed
+          GameEngine.setRng(GameEngine.mulberry32(seed))
+        }
+
+        for (const entry of (actions || [])) {
+          lastActionSeq = entry.seq
+
+          if (entry.type === 'init') {
+            // Initial state generated by server — hydrate locally
+            G = entry.payload
+            if (!G.skillsById) G.skillsById = skillsById  // re-attach local skills cache
+            // Derive my faction
+            if (!myFaction && G.pieces) {
+              const myPiece = G.pieces.find(p => p.ownerPlayerId && p.ownerPlayerId.toLowerCase() === myPlayerId)
+              if (myPiece) myFaction = myPiece.faction
+            }
+            // Cache player names
+            try {
+              const rr = await fetch(url + '/api/rooms/' + roomId)
+              if (rr.ok) {
+                const room = await rr.json()
+                isHost = room.hostId && room.hostId.toLowerCase() === myPlayerId
+                for (const p of (room.players || [])) {
+                  const pid = (p.id || '').toLowerCase()
+                  if (pid && p.name) playerNames[pid] = p.name
+                }
+              }
+            } catch {}
+            playerNames[myPlayerId] = myPlayerName
+            document.getElementById('loadingOverlay').style.display = 'none'
+            render()
+            continue
+          }
+
+          if (entry.type === 'action') {
+            if (!G) continue
+            try {
+              const newG = GameEngine.applyBattleAction(G, entry.action)
+              const oldG = G
+              G = newG
+              if (!G.skillsById) G.skillsById = skillsById
+              flushActionLog(oldG, G)
+              spawnStateFloaters(oldG, G)
+              render()
+              if (G.gameOver || G.winner) { handleGameOver(); return }
+              // Auto-advance start phase (only if it's my turn)
+              if (G.turn && G.turn.phase === 'start') {
+                const isMyTurn = G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
+                if (isMyTurn) { addLog('🌅 自动初始化回合…', 'info'); await doBeginPhase() }
+              }
+            } catch (e) { console.warn('[pollActions] apply error:', e) }
+            continue
+          }
+
+          if (entry.type === 'gameOver') {
+            if (G && !G.gameOver) { G.gameOver = true; G.winner = entry.winner; handleGameOver() }
+          }
+        }
+      } catch (e) { console.warn('[pollActions]', e) }
+    }
+
+    // ── Valid skill targets — heuristic using targetType + range from server ──
+    // (Dry-run approach fails because G.skillsById from JSON has no effect functions)
+    // 干运行逐格测试：对射程内每个格子跑一次本地 applyBattleAction
+    // 瘦身状态（skillsById 只含当前技能）+ 射程预过滤，平均 10-60ms，一次性可接受
+    function computeValidSkillTargets(sp) {
+      if (!G || !sp || !pendingSkill) return new Set()
+      const skillId = pendingSkill.skillId
+      const valid = new Set()
+
+      // 若 GameEngine 不可用则降级启发式
+      if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) {
+        return _computeValidSkillTargetsHeuristic(sp)
+      }
+
+      const skDef = (G.skillsById && G.skillsById[skillId]) || skillsById[skillId] || {}
+      const isCharge = pendingSkill.skillType === 'super' || skDef.type === 'super'
+      const baseAction = pendingSkill.baseAction
+        ? { ...pendingSkill.baseAction }
+        : { type: isCharge ? 'useChargeSkill' : 'useBasicSkill',
+            playerId: myPlayerId, pieceId: sp.instanceId, skillId }
+
+      // 射程预过滤（探针拿到的 range，未知时用 99 不过滤）
+      const maxRange = pendingSkill.range != null ? pendingSkill.range : 99
+
+      // 构造瘦身状态：skillsById 只放当前技能，大幅缩减 JSON 体积
+      // G 在浏览器里是纯 JSON 对象（无 function 属性），直接 stringify 即可
+      const savedSkillsById = G.skillsById
+      G.skillsById = { [skillId]: skDef }
+      const baseCloneStr = JSON.stringify(G)
+      G.skillsById = savedSkillsById
+
+      for (const t of G.map.tiles) {
+        const dist = Math.abs(t.x - sp.x) + Math.abs(t.y - sp.y)
+        if (dist > maxRange) continue
+
+        const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
+        const testAction = { ...baseAction }
+        delete testAction.target
+        if (occ) {
+          testAction.targetPieceId = occ.instanceId
+          delete testAction.targetX; delete testAction.targetY
+        } else {
+          delete testAction.targetPieceId
+          testAction.targetX = t.x; testAction.targetY = t.y
+        }
+
+        try {
+          GameEngine.applyBattleAction(JSON.parse(baseCloneStr), testAction)
+          valid.add(t.x + ',' + t.y)
+        } catch (e) {
+          // needsTargetSelection 说明第一步目标合法，还需选第二目标
+          if (e && e.needsTargetSelection) valid.add(t.x + ',' + t.y)
+        }
+      }
+
+      return valid.size > 0 ? valid : _computeValidSkillTargetsHeuristic(sp)
+    }
+
+    // 启发式降级：targetType + filter 粗略判断（GameEngine 不可用时兜底）
+    function _computeValidSkillTargetsHeuristic(sp) {
+      if (!G || !sp || !pendingSkill) return new Set()
+      const maxRange = pendingSkill.range ?? 10
+      const targetType = (pendingSkill.targetType || '').toLowerCase()
+      const filter = (pendingSkill.filter || '').toLowerCase()
+      const valid = new Set()
+      G.map.tiles.forEach(t => {
+        const dist = Math.abs(t.x - sp.x) + Math.abs(t.y - sp.y)
+        if (dist > maxRange) return
+        const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
+        let ok = false
+        if (targetType === 'piece') {
+          if (!occ) ok = false
+          else if (filter === 'enemy') ok = occ.ownerPlayerId !== sp.ownerPlayerId
+          else if (filter === 'ally')  ok = occ.ownerPlayerId === sp.ownerPlayerId
+          else ok = true
+        } else if (targetType === 'grid') {
+          ok = true
+        } else if (targetType === 'self') {
+          ok = t.x === sp.x && t.y === sp.y
+        } else {
+          switch (targetType) {
+            case 'enemy': case 'enemies': ok = !!occ && occ.ownerPlayerId !== sp.ownerPlayerId; break
+            case 'ally': case 'allies':   ok = !!occ && occ.ownerPlayerId === sp.ownerPlayerId; break
+            case 'empty': case 'tile':    ok = !occ; break
+            default: ok = true
+          }
+        }
+        if (ok) valid.add(t.x + ',' + t.y)
+      })
+      return valid
+    }
+
+    // Cache valid targets on pendingSkill once (not per frame)
+    function _updatePendingSkillTargets() {
+      if (!pendingSkill || !G) return
+      const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
+      pendingSkill.validTargets = sp ? computeValidSkillTargets(sp) : new Set()
+    }
+
+    // ── Target overlay ──
+    function _targetPromptText() {
+      if (pendingCardAction) return '🃏 选择手牌目标'
+      if (!pendingSkill) return ''
+      if (pendingSkill.hint) return pendingSkill.hint
+      const tt = (pendingSkill.targetType || '').toLowerCase()
+      if (tt === 'enemy' || tt === 'enemies') return '⚔️ 选择敌方棋子'
+      if (tt === 'ally'  || tt === 'allies' || tt === 'friendly') return '🤝 选择友方棋子'
+      if (tt === 'empty' || tt === 'tile')   return '🎯 选择一个格子'
+      if (tt === 'self')                     return '👤 选择自身'
+      if (tt === 'piece')                    return '🎯 选择一枚棋子'
+      return '🎯 点击选择目标'
+    }
+    function renderTargetOverlay() {
+      const el = document.getElementById('targetOverlay')
+      if (!el) return
+      if (pendingSkill || pendingCardAction) {
+        document.getElementById('targetPromptText').textContent = _targetPromptText()
+        el.classList.add('show')
+      } else {
+        el.classList.remove('show')
+      }
+    }
+    function cancelTargetSelection() {
+      pendingSkill = null; pendingCardAction = null; pendingMove = false
+      document.getElementById('btnMove').className = 'btn-action'
+      const sp = G && selectedPieceId && G.pieces.find(p => p.instanceId === selectedPieceId)
+      renderBoard(); renderSkillBar(sp || null); renderActionBar(); renderTargetOverlay()
+    }
+
+    // ── Render ──
+    let _pendingChoiceShown = null  // track which pendingBeginTurnChoice we've shown
+    function render() {
+      if (!G) return
+      checkClientGameOver()
+      renderBoard()
+      renderPanels()
+      renderHUD()
+      renderActionBar()
+      renderHand()
+      renderTargetOverlay()
+      // Check for pending begin-turn option selection (e.g. Watcher form choice)
+      const pbc = G.pendingBeginTurnChoice
+      if (pbc && pbc.playerId && pbc.playerId.toLowerCase() === myPlayerId) {
+        const key = pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0)
+        if (_pendingChoiceShown !== key) {
+          _pendingChoiceShown = key
+          showOptionPicker(pbc.title || '请选择', pbc.options || [], {
+            type: 'beginTurnChoice',
+            playerId: myPlayerId
+          })
+        }
+      } else {
+        _pendingChoiceShown = null
+      }
+    }
+
+    function renderHUD() {
+      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      const badge = document.getElementById('turnBadge')
+      badge.textContent = isMyTurn ? '我的回合' : '对方回合'
+      badge.className = 'turn-badge ' + (isMyTurn ? 'my-turn' : 'opp-turn')
+
+      // Turn announcement on change
+      const curTurnPlayer = G.turn && G.turn.currentPlayerId
+      if (curTurnPlayer && curTurnPlayer !== _lastAnnouncedTurnPlayer) {
+        _lastAnnouncedTurnPlayer = curTurnPlayer
+        if (isMyTurn) showTurnAnnounce('⚔ 你的回合', '#4ade80')
+        else showTurnAnnounce('🛡 对方回合', '#f87171')
+      }
+      document.getElementById('roundLabel').textContent = '第 ' + (G.turn ? G.turn.turnNumber : 1) + ' 回合'
+      document.getElementById('phaseLabel').textContent = PHASE_LABELS[G.turn ? G.turn.phase : ''] || ''
+
+      // Update AP/CP gem display in topbar
+      const myResMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
+      if (myResMeta) {
+        const apD = document.getElementById('resApDisplay')
+        const cpD = document.getElementById('resCpDisplay')
+        if (apD) { apD.style.display = 'flex'; document.getElementById('resApVal').textContent = myResMeta.actionPoints; document.getElementById('resApMax').textContent = myResMeta.maxActionPoints ?? 10 }
+        if (cpD) { cpD.style.display = 'flex'; document.getElementById('resCpVal').textContent = myResMeta.chargePoints; document.getElementById('resCpMax').textContent = myResMeta.maxChargePoints ?? 0 }
+      }
+
+      const cardsEl = document.getElementById('playerResCards')
+      if (G.players) {
+        cardsEl.innerHTML = G.players.map(p => {
+          const isCur = p.playerId && p.playerId.toLowerCase() === (G.turn ? G.turn.currentPlayerId : '')
+          const isMe = p.playerId && p.playerId.toLowerCase() === myPlayerId
+          const col = isMe ? (myFaction === 'blue' ? '#3b82f6' : '#ef4444') : '#94a3b8'
+          const tags = (p.statusTags || []).filter(t => t.visible !== false)
+          const tagsHtml = tags.map(t => {
+            const label = t.name || t.type || t.id || '?'
+            const extra = t.stacks ? `×${t.stacks}` : (t.duration ? `${t.duration}T` : '')
+            return `<span class="status-tag" title="${escHtml(t.id||t.description||'')}" style="font-size:9px;padding:1px 4px">${escHtml(label)}${extra ? ' '+extra : ''}</span>`
+          }).join('')
+          const pid = (p.playerId || '').toLowerCase()
+          const pDisplayName = isMe ? (myPlayerName || playerNames[pid] || pid) : (playerNames[pid] || p.name || pid)
+          return `<div style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid ${isCur?'#16a34a':'#334155'};background:${isCur?'#052e16':'#1e293b'};color:${col};display:flex;flex-direction:column;gap:3px;min-width:80px">
+            <div>${isMe ? '👤' : '🤖'} ${escHtml(pDisplayName)} AP:${p.actionPoints} CP:${p.chargePoints}${isCur?' ◀':''}</div>
+            ${tagsHtml ? `<div style="display:flex;flex-wrap:wrap;gap:2px">${tagsHtml}</div>` : ''}
+          </div>`
+        }).join('')
+      }
+    }
+
+    function renderBoard() {
+      if (!G || !G.map) return
+      const grid = document.getElementById('gameGrid')
+      const { width, height, tiles } = G.map
+      recalcCellSize()
+      grid.style.gridTemplateColumns = 'repeat(' + width + ', var(--cell-size, 44px))'
+
+      // Build cell map for quick lookup
+      const cellMap = {}
+      G.pieces.forEach(p => { if (p.currentHp > 0) cellMap[p.x + ',' + p.y] = p })
+
+      // Compute highlights
+      const hlMove = new Set(), hlSkill = new Set(), hlPlace = new Set()
+      if (TRAINING_MODE && placingMode) {
+        tiles.forEach(t => { if (t.props && t.props.walkable && !cellMap[t.x + ',' + t.y]) hlPlace.add(t.x + ',' + t.y) })
+      }
+      const sp = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+      validMoves = new Set()
+      if (sp && pendingMove) {
+        const range = (sp.moveRange !== undefined ? sp.moveRange : ((sp.stats && sp.stats.moveRange) || 3))
+        const tileMap = {}
+        tiles.forEach(t => { tileMap[t.x + ',' + t.y] = t })
+        // 四方向射线扫描，遇墙停止（服务器规则：车式直线移动，可穿越棋子但不可落点）
+        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          for (let step = 1; step <= range; step++) {
+            const x = sp.x + dx * step, y = sp.y + dy * step
+            const key = x + ',' + y
+            const t = tileMap[key]
+            if (!t || !t.props || !t.props.walkable) break  // 墙，停止扫描
+            if (!cellMap[key]) validMoves.add(key)          // 落点：未被占用才高亮
+            // 有棋子占据时仍继续扫描（可穿越），但该格不可落点
+          }
+        }
+        validMoves.forEach(k => hlMove.add(k))
+      }
+      if (sp && pendingSkill) {
+        (pendingSkill.validTargets || new Set()).forEach(k => hlSkill.add(k))
+      }
+
+      const cells = []
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const tile = tiles.find(t => t.x === x && t.y === y)
+          const ttype = tile ? (tile.props && tile.props.type ? tile.props.type : (tile.type || 'floor')) : 'floor'
+          const tclass = TILE_CLASS[ttype] || 't-floor'
+          const key = x + ',' + y
+          const piece = cellMap[key]
+          const isSel = piece && piece.instanceId === selectedPieceId
+
+          let cls = 'cell ' + tclass
+          if (isSel) cls += ' hl-selected'
+          else if (hlMove.has(key)) cls += ' hl-move'
+          else if (hlSkill.has(key)) cls += ' hl-skill'
+          else if (hlPlace.has(key)) cls += ' hl-place'
+
+          // Tile overlay effects (e.g. Shishio burn tiles)
+          const tileEfx = G && G.extensions && G.extensions.tileEffects &&
+            G.extensions.tileEffects.find(te => te.x === x && te.y === y)
+          let cellStyle = ''
+          let tileEfxHtml = ''
+          if (tileEfx) {
+            if (tileEfx.bgColor) cellStyle += `background:${tileEfx.bgColor};`
+            if (tileEfx.boxShadow) cellStyle += `box-shadow:${tileEfx.boxShadow};`
+            if (tileEfx.icon) {
+              const ip = tileEfx.iconPosition || 'bottom-right'
+              const ipStyle = ip === 'bottom-right' ? 'bottom:1px;right:1px' : 'top:1px;right:1px'
+              tileEfxHtml = `<span style="position:absolute;${ipStyle};font-size:10px;line-height:1;pointer-events:none">${tileEfx.icon}</span>`
+            }
+          }
+
+          let inner = ''
+          if (piece) {
+            const maxHp = pieceMaxHp(piece)
+            const pct = Math.max(0, Math.round(pieceDispHp(piece) / maxHp * 100))
+            const fillCls = pct < 30 ? 'crit' : pct < 60 ? 'low' : ''
+            const faction = piece.faction || 'red'
+            const tokCls = 'piece-tok ' + faction + (isSel ? ' selected-tok' : '')
+
+            // StatusTags (use displayStatusTags for clones)
+            const tags = pieceDispTags(piece).filter(t => t.visible !== false)
+            const tagsHtml = tags.map(t => `<span class="status-tag" title="${escHtml(t.id || '')}">${escHtml(t.name || t.type || t.id || '?')}</span>`).join('')
+
+            const tmpl = PIECES_BY_ID[piece.templateId]
+            const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
+            const imgHtml = imgSrc
+              ? `<img src="${imgSrc}" onerror="this.style.display='none';this.nextSibling.style.display='flex'" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`
+              : ''
+            inner = `<div class="${tokCls}">
+              <div class="piece-tags">${tagsHtml}</div>
+              ${imgHtml}
+              <span class="piece-tok-ph" style="${imgSrc?'display:none':'display:flex'}">${faction==='red'?'🔴':'🔵'}</span>
+              <div class="tok-hp-bar"><div class="tok-hp-fill ${fillCls}" style="width:${pct}%"></div></div>
+            </div>`
+          }
+          const _ctxAttr = piece ? ` oncontextmenu="event.preventDefault();showPieceInfo('${escHtml(piece.instanceId)}')"` : ''
+          cells.push(`<div class="${cls}"${cellStyle ? ` style="${cellStyle}"` : ''} onclick="onCellClick(${x},${y})"${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
+        }
+      }
+      grid.innerHTML = cells.join('')
+    }
+
+    // Sort pieces so summons appear adjacent to their summoner
+    function sortWithSummons(pieces) {
+      const mains = pieces.filter(p => !p.summonedByInstanceId && !p.summonerInstanceId)
+      const summons = pieces.filter(p => p.summonedByInstanceId || p.summonerInstanceId)
+      const result = []
+      for (const main of mains) {
+        const mine = summons.filter(s =>
+          s.summonedByInstanceId === main.instanceId ||
+          s.summonerInstanceId === main.instanceId
+        )
+        // Stable "random" above/below: use last char code of instanceId
+        const code = main.instanceId ? main.instanceId.charCodeAt(main.instanceId.length - 1) : 0
+        if (code % 2 === 0) {
+          result.push(...mine, main)   // summons above
+        } else {
+          result.push(main, ...mine)   // summons below
+        }
+      }
+      // Any unmatched summons at end
+      for (const s of summons) { if (!result.includes(s)) result.push(s) }
+      return result
+    }
+
+    function renderPanels() {
+      if (!G) return
+      // Determine which player is me
+      const myPieces = sortWithSummons(
+        G.pieces.filter(p => p.ownerPlayerId && p.ownerPlayerId.toLowerCase() === myPlayerId)
+      )
+      const oppPieces = sortWithSummons(
+        G.pieces.filter(p => !(p.ownerPlayerId && p.ownerPlayerId.toLowerCase() === myPlayerId))
+      )
+
+      // Update labels — use player name if available
+      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
+      const oppMeta = G.players && G.players.find(p => !(p.playerId && p.playerId.toLowerCase() === myPlayerId))
+      const factionIcon = myFaction === 'red' ? '🔴' : '🔵'
+      const oppIcon = myFaction === 'red' ? '🔵' : '🔴'
+      const myName = myPlayerName || playerNames[myPlayerId] || (myFaction === 'red' ? '我方' : '我方')
+      const oppPid = oppMeta && (oppMeta.playerId || '').toLowerCase()
+      const oppName = (oppPid && playerNames[oppPid]) || (oppMeta && oppMeta.name) || (myFaction === 'red' ? '对方' : '对方')
+      document.getElementById('myLabel').textContent = factionIcon + ' ' + myName
+      document.getElementById('oppLabel').textContent = oppIcon + ' ' + oppName
+
+      document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, true)).join('')
+      document.getElementById('oppPieces').innerHTML = oppPieces.map(p => renderPieceCard(p, false)).join('')
+
+      // Update piece select dropdown
+      const sel = document.getElementById('pieceSelect')
+      const prev = sel.value
+      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      if (isMyTurn) {
+        sel.innerHTML = '<option value="">— 选棋子 —</option>' +
+          myPieces.filter(p => p.currentHp > 0).map(p => {
+            const tmpl = PIECES_BY_ID[p.templateId]
+            const name = p.name || (tmpl && tmpl.name) || p.templateId
+            return `<option value="${p.instanceId}">${escHtml(name)} HP:${p.currentHp}</option>`
+          }).join('')
+        if (prev && myPieces.find(p => p.instanceId === prev && p.currentHp > 0)) sel.value = prev
+      } else {
+        sel.innerHTML = '<option value="">— 对方回合 —</option>'
+      }
+
+      // Update skill bar
+      const _skillBarPiece = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+      renderSkillBar(_skillBarPiece)
+    }
+
+    function renderPieceCard(piece, isMe) {
+      const mhp = pieceMaxHp(piece)
+      const dispHp = pieceDispHp(piece)
+      const pct = Math.max(0, Math.round(dispHp / mhp * 100))
+      const fillCls = pct < 30 ? 'crit' : pct < 60 ? 'low' : ''
+      const dead = piece.currentHp <= 0
+      const sel = piece.instanceId === selectedPieceId && isMe
+      const stats = pieceDispStats(piece)
+
+      const tags = pieceDispTags(piece).filter(t => t.visible !== false)
+      const tagsHtml = tags.map(t => {
+        const label = t.name || t.type || t.id || '?'
+        const stacks = t.stacks ? `×${t.stacks}` : (t.duration ? `${t.duration}T` : '')
+        return `<span class="status-tag" title="${escHtml(t.id||'')}">${escHtml(label)}${stacks ? ' ' + stacks : ''}</span>`
+      }).join('')
+
+      const tmpl = PIECES_BY_ID[piece.templateId]
+      const displayName = piece.name || (tmpl && tmpl.name) || piece.templateId
+      const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
+      const onclick = isMe && !dead ? `onclick="selectPiece('${piece.instanceId}')"` : `onclick="showPieceInfo('${escHtml(piece.instanceId)}')" `
+      const iid = escHtml(piece.instanceId)
+      return `<div class="piece-card ${dead?'dead':''} ${sel?'selected':''}" ${onclick}
+        ontouchstart="startPressTimer(event,'${iid}')"
+        ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
+        oncontextmenu="event.preventDefault();showPieceInfo('${iid}')">
+        <button class="piece-info-btn" onclick="event.stopPropagation();showPieceInfo('${iid}')">ⓘ</button>
+        ${imgSrc ? `<img src="${imgSrc}" onerror="this.style.display='none'" style="width:100%;height:40px;object-fit:cover;border-radius:5px;margin-bottom:3px">` : ''}
+        <div class="piece-card-name">${escHtml(displayName)}</div>
+        <div class="piece-card-hp">${dispHp}/${mhp} HP</div>
+        <div class="hp-bar"><div class="hp-fill ${fillCls}" style="width:${pct}%"></div></div>
+        <div class="res-row">⚔${stats.attack??'?'} 🛡${stats.defense??'?'} 👟${stats.moveRange??'?'}</div>
+        ${tagsHtml ? '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px">' + tagsHtml + '</div>' : ''}
+      </div>`
+    }
+
+    function renderSkillBar(piece) {
+      const bar = document.getElementById('skillBar')
+      if (!bar) return
+      if (!piece || piece.currentHp <= 0) { bar.style.display = 'none'; return }
+
+      const isMyTurn = G && G.turn && G.turn.currentPlayerId &&
+        G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      const inAction = G && G.turn && G.turn.phase === 'action'
+      const myMeta = G && G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
+      const ap = myMeta ? (myMeta.actionPoints || 0) : 0
+      const cp = myMeta ? (myMeta.chargePoints || 0) : 0
+      const _hasSageMode = (piece.statusTags || []).some(t => t.type === 'sage-mode')
+
+      const skills = pieceDispSkills(piece).filter(sk => {
+        const skData = skillsById[sk.skillId || sk.id] || {}
+        return skData.kind !== 'passive'
+      })
+      if (!skills.length) { bar.style.display = 'none'; return }
+
+      bar.style.display = 'flex'
+      bar.innerHTML = skills.map(sk => {
+        const sid = sk.skillId || sk.id
+        const skData = skillsById[sid] || {}
+        const isCharge = skData.type === 'super'
+        const onCD = (sk.currentCooldown || 0) > 0
+        const noUses = sk.usesRemaining === 0
+        const isActive = pendingSkill && pendingSkill.skillId === sid
+        const icon = skData.icon || (isCharge ? '💠' : '⚡')
+        const rawName = skData.name || sid
+        const displayName = rawName.length > 7 ? rawName.slice(0, 6) + '…' : rawName
+        const typeLabel = isCharge ? '充能' : '基础'
+        const typeCls = isCharge ? 'cp' : 'ap'
+        const canAct = isMyTurn && inAction && !_hasSageMode && piece.ownerPlayerId.toLowerCase() === myPlayerId
+        const disabled = !canAct || onCD || noUses
+
+        let cls = 'skill-card'
+        if (isCharge) cls += ' sk-charge'
+        if (isActive) cls += ' sk-active'
+        if (disabled) cls += ' sk-disabled'
+
+        const cdCover = (onCD || noUses) ? `
+          <div class="sk-cd-cover">
+            <div class="sk-cd-num">${onCD ? sk.currentCooldown : '✕'}</div>
+            <div class="sk-cd-lbl">${onCD ? 'CD' : '已用'}</div>
+          </div>` : ''
+
+        return `<div class="${cls}" onclick="selectSkillCard('${escHtml(sid)}')" title="${escHtml(rawName)}">
+          ${cdCover}
+          <div class="sk-icon">${icon}</div>
+          <div class="sk-name">${escHtml(displayName)}</div>
+          <div class="sk-type-tag ${typeCls}">${typeLabel}</div>
+        </div>`
+      }).join('')
+    }
+
+    function renderHand() {
+      if (!G) return
+      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
+      const hand = (myMeta && myMeta.hand) || []
+      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      const ap = myMeta ? myMeta.actionPoints : 0
+
+      document.getElementById('handCount').textContent = hand.length
+      const targetHint = document.getElementById('handTarget')
+      targetHint.style.display = pendingCardAction ? 'inline' : 'none'
+
+      const container = document.getElementById('handCards')
+      if (!hand.length) {
+        container.innerHTML = '<div class="hand-empty">暂无手牌</div>'
+        return
+      }
+
+      container.innerHTML = hand.map(card => {
+        const def = cardsById[card.cardId] || (G.customCards && G.customCards[card.cardId]) || {}
+        const cost = def.actionPointCost || 0
+        const canPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
+        const isPending = pendingCardAction && pendingCardAction.cardInstanceId === card.instanceId
+        const isReactive = def.type === 'reactive'
+        let cls = 'card-item'
+        if (isPending) cls += ' card-pending'
+        else if (!canPlay) cls += ' card-disabled'
+        if (isReactive) cls += ' card-reactive'
+
+        const gemCls = cost === 0 ? 'free' : ''
+        const icon = def.icon || '🃏'
+        const typeLabel = def.type === 'reactive' ? '⚡被动触发' : def.type === 'passive' ? '🔁持续' : '▶主动'
+
+        const cdTurnsCard = def.cooldownTurns ?? def.cooldown ?? 0
+        const cdHtml = cdTurnsCard > 0
+          ? `<span style="font-size:8px;color:#475569"> CD${cdTurnsCard}</span>` : ''
+
+        const cid = escHtml(card.instanceId)
+        const cdid = escHtml(card.cardId)
+        return `<div class="${cls}"
+          onclick="onCardClick('${cid}','${cdid}')"
+          ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
+          ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
+          oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
+          <div class="card-mana-gem ${gemCls}">${cost}</div>
+          <div class="card-art">${icon}</div>
+          <div class="card-name-banner">${escHtml(def.name || card.cardId)}</div>
+          <div class="card-body">
+            <div class="card-desc">${escHtml(def.description || '（无描述）')}</div>
+            <div class="card-type-badge">${typeLabel}${cdHtml}</div>
+          </div>
+        </div>`
+      }).join('')
+    }
+
+    function onCardClick(cardInstanceId, cardId) {
+      if (!G) return
+      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      if (!isMyTurn) return
+
+      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
+      const def = cardsById[cardId] || (G.customCards && G.customCards[cardId]) || {}
+      const cost = def.actionPointCost || 0
+      const ap = myMeta ? myMeta.actionPoints : 0
+      if (ap < cost) { setStatusMsg('❌ 行动点不足（需要 ' + cost + '，剩余 ' + ap + '）'); return }
+
+      // Toggle pending off
+      if (pendingCardAction && pendingCardAction.cardInstanceId === cardInstanceId) {
+        pendingCardAction = null
+        renderHand()
+        setStatusMsg('✅ 取消手牌')
+        return
+      }
+
+      // Cancel any pending skill/move
+      pendingMove = false
+      pendingSkill = null
+      document.getElementById('btnMove').className = 'btn-action'
+      renderSkillBar(G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null)
+
+      // Try to play immediately (server will respond with needsTargetSelection if target required)
+      doAction({ type: 'playCard', playerId: myPlayerId, cardInstanceId })
+    }
+
+    function renderActionBar() {
+      if (!G) return
+      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      const phase = G.turn ? G.turn.phase : ''
+      const inAction = phase === 'action'
+      const inEnd   = phase === 'end'
+      const inStart = phase === 'start'
+
+      // Show/hide phase-specific buttons
+      const btnEnd = document.getElementById('btnEnd')
+      const btnConfirmEnd = document.getElementById('btnConfirmEnd')
+      if (inEnd && isMyTurn) {
+        btnEnd.style.display = 'none'
+        btnConfirmEnd.style.display = ''
+        btnConfirmEnd.disabled = false
+      } else {
+        btnEnd.style.display = ''
+        btnConfirmEnd.style.display = 'none'
+        btnEnd.disabled = !isMyTurn || !inAction
+      }
+
+      const _selPiece = G && G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
+      const _hasSageMode = _selPiece && (_selPiece.statusTags || []).some(t => t.type === 'sage-mode')
+      document.getElementById('btnMove').disabled = !isMyTurn || !selectedPieceId || !inAction || _hasSageMode
+
+      if (!isMyTurn) {
+        setStatusMsg('⏳ 等待对方操作… [' + (PHASE_LABELS[phase] || phase) + ']')
+        pendingMove = false
+        pendingSkill = null
+        document.getElementById('btnMove').className = 'btn-action'
+        renderSkillBar(_selPiece || null)
+      } else if (inEnd) {
+        setStatusMsg('🔚 结束阶段 — 点击"确认结束"推进回合')
+      } else if (inStart) {
+        setStatusMsg('🌅 开始阶段处理中…')
+      } else if (pendingCardAction) {
+        setStatusMsg('🟡 点击棋子或格子使用手牌')
+      } else if (pendingMove) {
+        setStatusMsg('🟢 点击绿色格子移动棋子')
+      } else if (pendingSkill) {
+        setStatusMsg('🟡 点击目标格子释放技能')
+      } else if (selectedPieceId) {
+        setStatusMsg('✅ 已选中棋子，选择行动')
+      } else {
+        setStatusMsg('👆 选择棋子开始行动')
+      }
+    }
+
+    // ── Cell click ──
+    function onCellClick(x, y) {
+      if (!G) return
+      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
+
+      // Training: place piece mode
+      if (TRAINING_MODE && placingMode) {
+        const templateId = document.getElementById('placeTemplate')?.value
+        const faction = document.getElementById('placeFaction')?.value || 'red'
+        if (!templateId) { addLog('❌ 请先选择棋子类型', 'err'); return }
+        const tile = G.map.tiles.find(t => t.x === x && t.y === y)
+        if (!tile || !tile.props || !tile.props.walkable) { addLog('❌ 不可放置此处', 'err'); return }
+        if (piece) { addLog('❌ 该位置已有棋子', 'err'); return }
+        sendPatch({ type: 'addPiece', faction, templateId, x, y }).then(ok => {
+          if (ok) addLog('➕ 放置 ' + (PIECES_BY_ID[templateId]?.name || templateId), 'info')
+        })
+        return
+      }
+
+      // Pending card target selection
+      if (pendingCardAction) {
+        const extra = piece ? { targetPieceId: piece.instanceId } : { targetX: x, targetY: y }
+        const action = Object.assign({}, pendingCardAction, extra)
+        pendingCardAction = null
+        document.getElementById('handTarget').style.display = 'none'
+        doAction(action)
+        return
+      }
+
+      if (pendingMove && selectedPieceId) {
+        // 合法性拦截：只允许点击高亮格
+        if (!validMoves.has(x + ',' + y)) {
+          setStatusMsg('❌ 无法移动到该位置')
+          return
+        }
+        doAction({ type: 'move', playerId: myPlayerId, pieceId: selectedPieceId, toX: x, toY: y })
+        pendingMove = false
+        document.getElementById('btnMove').className = 'btn-action'
+        return
+      }
+
+      if (pendingSkill && selectedPieceId) {
+        // 合法性拦截：只允许点击技能高亮格
+        const key = x + ',' + y
+        const vt = pendingSkill.validTargets
+        if (vt && vt.size > 0 && !vt.has(key)) {
+          setStatusMsg('❌ 目标不在技能范围内')
+          return
+        }
+        // Build action — start from baseAction (preserves selectedOption etc.) or create fresh
+        const skData = skillsById[pendingSkill.skillId] || {}
+        const isCharge = skData.type === 'super' || pendingSkill.skillType === 'super'
+        const action = pendingSkill.baseAction
+          ? Object.assign({}, pendingSkill.baseAction)
+          : {
+              type: isCharge ? 'useChargeSkill' : 'useBasicSkill',
+              playerId: myPlayerId,
+              pieceId: selectedPieceId,
+              skillId: pendingSkill.skillId
+            }
+        // Set target using server-expected flat fields (not nested target object)
+        if (piece) {
+          action.targetPieceId = piece.instanceId
+        } else {
+          action.targetX = x
+          action.targetY = y
+        }
+        // Remove old 'target' field if any
+        delete action.target
+        pendingSkill = null
+        doAction(action)
+        return
+      }
+
+      // Select own piece or show info
+      if (piece) {
+        const isMyPiece = isMyTurn && piece.ownerPlayerId && piece.ownerPlayerId.toLowerCase() === myPlayerId
+        if (isMyPiece) {
+          selectPiece(piece.instanceId)
+        } else {
+          // 点击对方棋子或非本回合时查看棋子信息
+          showPieceInfo(piece.instanceId)
+        }
+      }
+    }
+
+    function selectPiece(instanceId) {
+      selectedPieceId = instanceId
+      pendingMove = false
+      pendingSkill = null
+      document.getElementById('btnMove').className = 'btn-action'
+      // Sync dropdown
+      document.getElementById('pieceSelect').value = instanceId
+      // Render skill bar
+      const sp = G && G.pieces.find(p => p.instanceId === instanceId)
+      renderSkillBar(sp)
+      render()
+    }
+
+    function selectPieceFromDropdown() {
+      const val = document.getElementById('pieceSelect').value
+      if (val) selectPiece(val)
+    }
+
+    function toggleMove() {
+      if (!selectedPieceId) return
+      pendingMove = !pendingMove
+      pendingSkill = null
+      document.getElementById('btnMove').className = 'btn-action' + (pendingMove ? ' active-move' : '')
+      const sp = G && G.pieces.find(p => p.instanceId === selectedPieceId)
+      renderBoard(); renderSkillBar(sp); renderActionBar()
+    }
+
+    // 探针干运行：用本地 GameEngine 判断技能是否需要选目标，并拿到真实的 range/targetType/filter
+    // 返回 { needsTarget, range, targetType, filter } 或 null（引擎不可用时）
+    function _probeSkillTargetInfo(sp, skId) {
+      if (!G || typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) return null
+      const skDef = (G.skillsById && G.skillsById[skId]) || skillsById[skId] || {}
+      if (!skDef.code) return null  // 没有可执行代码，无法探针
+      const isCharge = skDef.type === 'super'
+      const probeAction = {
+        type: isCharge ? 'useChargeSkill' : 'useBasicSkill',
+        playerId: myPlayerId, pieceId: sp.instanceId, skillId: skId
+      }
+      const savedSkillsById = G.skillsById
+      G.skillsById = { [skId]: skDef }
+      const stateStr = JSON.stringify(G)
+      G.skillsById = savedSkillsById
+      try {
+        GameEngine.applyBattleAction(JSON.parse(stateStr), probeAction)
+        return { needsTarget: false }
+      } catch (e) {
+        if (e && e.needsTargetSelection) {
+          return { needsTarget: true, range: e.range != null ? e.range : 99,
+            targetType: e.targetType || '', filter: e.filter || '' }
+        }
+        if (e && e.needsOptionSelection) return { needsTarget: false }
+        return null
+      }
+    }
+
+    // selectSkillCard: called when a skill card in the skill bar is clicked
+    async function selectSkillCard(skId) {
+      if (!selectedPieceId || !skId || !G) return
+      const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
+      if (!sp) return
+      const skData = skillsById[skId] || {}
+      const isCharge = skData.type === 'super'
+      const actionType = isCharge ? 'useChargeSkill' : 'useBasicSkill'
+
+      // Toggle off: clicking the active skill again cancels selection
+      if (pendingSkill && pendingSkill.skillId === skId) {
+        pendingSkill = null
+        renderBoard(); renderSkillBar(sp); renderActionBar(); renderTargetOverlay()
+        return
+      }
+
+      // 资源预检：充能点 / 行动点不足时直接拦截，不发送 action（防止 beforeSkillUse 被动误触发）
+      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
+      if (myMeta) {
+        const apCost = skData.actionPointCost || 0
+        if (apCost > 0 && (myMeta.actionPoints || 0) < apCost) {
+          setStatusMsg('❌ 行动点不足（需要 ' + apCost + '，剩余 ' + (myMeta.actionPoints || 0) + '）')
+          return
+        }
+        if (isCharge) {
+          const cpCost = skData.chargeCost ?? 1
+          if ((myMeta.chargePoints || 0) < cpCost) {
+            setStatusMsg('❌ 充能点不足（需要 ' + cpCost + '，剩余 ' + (myMeta.chargePoints || 0) + '）')
+            return
+          }
+        }
+      }
+
+      // 探针：用游戏引擎本地干运行判断是否需要选目标
+      const probe = _probeSkillTargetInfo(sp, skId)
+
+      if (probe === null && typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
+        // GameEngine 可用但探针失败 → 技能因游戏规则无法释放（冷却、条件不满足等）
+        setStatusMsg('❌ 技能无法释放')
+        return
+      }
+      if (!probe || !probe.needsTarget) {
+        // 立即释放（无 GameEngine 时 probe 为 null，交由 doAction 处理）
+        await doAction({ type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId })
+        return
+      }
+
+      // 需要选目标：进入目标选择模式，range/targetType/filter 来自探针（准确）
+      pendingMove = false
+      pendingSkill = { skillId: skId, skillType: isCharge ? 'super' : 'normal',
+        range: probe.range, targetType: probe.targetType, filter: probe.filter, baseAction: null }
+      _updatePendingSkillTargets()
+      document.getElementById('btnMove').className = 'btn-action'
+      renderBoard(); renderSkillBar(sp); renderActionBar(); renderTargetOverlay()
+    }
+
+    async function doEndTurn() {
+      await doAction({ type: 'endTurn', playerId: myPlayerId })
+      // If phase is now 'end', auto-advance to next player's turn
+      if (G && G.turn && G.turn.phase === 'end') {
+        await doBeginPhase()
+      }
+    }
+
+    async function doBeginPhase() {
+      await doAction({ type: 'beginPhase' })
+    }
+
+    async function trainingDoAction(action) {
+      if (!G) return
+      try {
+        document.getElementById('btnEnd').disabled = true
+        document.getElementById('btnMove').disabled = true
+        // Dry-run locally
+        if (typeof GameEngine !== 'undefined' && GameEngine.safeCloneBattleState) {
+          try {
+            GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), action)
+          } catch (e) {
+            if (e && e.needsTargetSelection) {
+              if (action.type === 'playCard') {
+                pendingCardAction = action; renderHand(); setStatusMsg('🟡 点击棋子或格子使用手牌')
+              } else {
+                const skData = skillsById[action.skillId] || {}
+                pendingMove = false
+                pendingSkill = { skillId: action.skillId, skillType: skData.type || 'normal',
+                  range: e.range || (typeof skData.range === 'number' ? skData.range : 10),
+                  targetType: e.targetType || '', filter: e.filter || '', hint: e.hint || '', baseAction: action }
+                _updatePendingSkillTargets()
+              }
+              const _sp0 = G.pieces.find(p => p.instanceId === selectedPieceId)
+              renderBoard(); renderSkillBar(_sp0||null); renderActionBar(); renderTargetOverlay(); return
+            }
+            if (e && e.needsOptionSelection) { showOptionPicker(e.title||'请选择', e.options||[], action); renderActionBar(); return }
+            setStatusMsg('❌ ' + (e.message || '操作失败')); renderActionBar(); return
+          }
+        }
+        const oldG = G
+        const newG = await trainingApiFetch('PUT', { action, battleState: G })
+        G = newG
+        spawnStateFloaters(oldG, G)
+        flushActionLog(oldG, G)
+        if (action.type === 'endTurn') {
+          if (G.turn && G.turn.phase === 'end') {
+            try { G = await trainingApiFetch('PUT', { action: { type: 'beginPhase' }, battleState: G }) } catch {}
+          }
+          myPlayerId = G.turn.currentPlayerId
+          const btn = document.getElementById('btnSwitchPov')
+          if (btn) btn.textContent = myPlayerId === 'training-red' ? '🔄 切换视角 🔴' : '🔄 切换视角 🔵'
+        }
+        selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
+        render(); checkClientGameOver()
+      } catch (e) {
+        if (e.needsTargetSelection) {
+          const skData = skillsById[action.skillId] || {}
+          pendingSkill = { skillId: action.skillId, skillType: skData.type||'normal', range: e.range||10,
+            targetType: e.targetType||'', filter: e.filter||'', hint: e.hint||'', baseAction: action }
+          _updatePendingSkillTargets()
+          const _sp1 = G.pieces.find(p => p.instanceId === selectedPieceId)
+          renderBoard(); renderSkillBar(_sp1||null); renderTargetOverlay()
+        } else if (e.needsOptionSelection) {
+          showOptionPicker(e.title||'请选择', e.options||[], action)
+        } else { setStatusMsg('❌ ' + (e.message || '操作失败')); pendingSkill = null; pendingMove = false }
+        renderActionBar()
+      }
+    }
+
+    async function doAction(action) {
+      if (TRAINING_MODE) { await trainingDoAction(action); return }
+      const url = getServerUrl()
+      if (!url) { addLog('❌ 未连接服务器', 'err'); return }
+      if (!G) { addLog('❌ 游戏状态未就绪', 'err'); return }
+      try {
+        document.getElementById('btnEnd').disabled = true
+        document.getElementById('btnMove').disabled = true
+        if (action.type === 'endTurn') addLog('⏭ 正在结束回合…', 'info')
+
+        // Dry-run on a clone to detect target/option selection needs BEFORE posting
+        if (typeof GameEngine !== 'undefined' && GameEngine.safeCloneBattleState) {
+          try {
+            const clone = GameEngine.safeCloneBattleState(G)
+            GameEngine.applyBattleAction(clone, action)
+          } catch (e) {
+            if (e && e.needsTargetSelection) {
+              if (action.type === 'playCard') {
+                pendingCardAction = action; renderHand(); setStatusMsg('🟡 点击棋子或格子使用手牌')
+              } else if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
+                const skData = skillsById[action.skillId] || {}
+                pendingMove = false
+                pendingSkill = { skillId: action.skillId, skillType: skData.type || 'normal',
+                  range: e.range || (typeof skData.range === 'number' ? skData.range : 10),
+                  targetType: e.targetType || '', filter: e.filter || '', hint: e.hint || '', baseAction: action }
+                _updatePendingSkillTargets()
+              }
+              const _sp2 = G.pieces.find(p => p.instanceId === selectedPieceId)
+              renderBoard(); renderSkillBar(_sp2||null); renderActionBar(); renderTargetOverlay(); return
+            }
+            if (e && e.needsOptionSelection) {
+              showOptionPicker(e.title || '请选择', e.options || [], action); renderActionBar(); return
+            }
+            setStatusMsg('❌ ' + (e.message || '操作失败')); renderActionBar(); return
+          }
+        }
+
+        // Build signed request body
+        let bodyToPost = { type: 'action', action, playerId: myPlayerId }
+        const identity = (typeof RvBIdentity !== 'undefined') ? RvBIdentity.getIdentity() : null
+        if (identity && myPlayerId) {
+          try {
+            const payload = { roomId, playerId: myPlayerId, action, timestamp: Date.now() }
+            const signature = await RvBIdentity.sign(payload)
+            bodyToPost = { ...bodyToPost, _auth: { playerId: myPlayerId, publicKey: identity.publicKey, payload, signature } }
+          } catch (e) { console.warn('[battle] sign failed:', e) }
+        }
+
+        // Post to action log relay
+        const res = await fetch(url + '/api/rooms/' + roomId + '/battle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyToPost)
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          setStatusMsg('❌ ' + (data.error || '操作失败'))
+          renderActionBar()
+          return
+        }
+
+        // Immediately poll so our action comes back and gets applied locally
+        await pollActions()
+
+        selectedPieceId = null
+        pendingMove = false
+        pendingSkill = null
+        pendingCardAction = null
+      } catch (e) {
+        addLog('❌ 网络错误：' + e.message, 'err')
+        renderActionBar()
+      }
+    }
+
+    function actionLabel(a) {
+      if (a.type === 'endTurn') return '⏭ 结束回合'
+      if (a.type === 'move') return '👣 移动至 (' + a.to.x + ',' + a.to.y + ')'
+      if (a.type === 'useBasicSkill' || a.type === 'useChargeSkill') {
+        const sk = skillsById[a.skillId]
+        return '⚡ 使用技能：' + (sk ? sk.name : a.skillId)
+      }
+      if (a.type === 'playCard') {
+        const def = cardsById[a.cardId] || {}
+        return '🃏 打出手牌：' + (def.name || a.cardInstanceId)
+      }
+      return a.type
+    }
+    function actionClass(a) {
+      if (a.type === 'move') return 'move'
+      if (a.type.includes('kill')) return 'skill'
+      if (a.type === 'endTurn') return 'turn'
+      return 'info'
+    }
+
+    function checkClientGameOver() {
+      if (!G || G.gameOver || G.winner) return
+      const living = G.pieces.filter(p => p.currentHp > 0)
+      const redAlive = living.filter(p => p.faction === 'red').length
+      const blueAlive = living.filter(p => p.faction === 'blue').length
+      if (redAlive === 0 && blueAlive > 0) { G.winner = 'blue'; G.gameOver = true; handleGameOver() }
+      else if (blueAlive === 0 && redAlive > 0) { G.winner = 'red'; G.gameOver = true; handleGameOver() }
+    }
+
+    function handleGameOver() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+      try { localStorage.removeItem('rvb_active_battle') } catch {}
+      if (recordSaved) return
+      recordSaved = true
+      // Save battle record locally
+      try {
+        const identity = (typeof RvBIdentity !== 'undefined') ? RvBIdentity.getIdentity() : null
+        if (identity && G) {
+          const winner = G.winner
+          const myResult = winner
+            ? (winner === myFaction || winner === myPlayerId ? 'win' : 'loss')
+            : 'draw'
+          const oppPlayer = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() !== myPlayerId)
+          const record = {
+            gameId: roomId + '-' + Date.now(),
+            timestamp: Date.now(),
+            result: myResult,
+            myFaction,
+            myPlayerId,
+            opponentName: (oppPlayer && (playerNames[oppPlayer.playerId] || oppPlayer.name)) || '对手',
+            opponentId: oppPlayer ? oppPlayer.playerId : null,
+          }
+          const records = JSON.parse(localStorage.getItem('rvb_battle_records') || '[]')
+          records.push(record)
+          // Keep last 200 records
+          if (records.length > 200) records.splice(0, records.length - 200)
+          localStorage.setItem('rvb_battle_records', JSON.stringify(records))
+        }
+      } catch {}
+      // Notify server so it can create the game record (only post once)
+      const url = getServerUrl()
+      if (url && G && (G.winner || G.gameOver)) {
+        fetch(url + '/api/rooms/' + roomId + '/battle', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'gameOver', playerId: myPlayerId, winner: G.winner || 'draw' })
+        }).catch(() => {})
+      }
+      const winner = G.winner
+      const iWon = winner && (
+        winner.toLowerCase() === myFaction ||
+        winner.toLowerCase() === myPlayerId
+      )
+      const isDraw = !winner
+      const winnerLabel = winner
+        ? (winner === 'red' ? '🔴 红方' : winner === 'blue' ? '🔵 蓝方' : (playerNames[winner.toLowerCase()] || winner))
+        : ''
+      document.getElementById('resultIcon').textContent = isDraw ? '🤝' : (iWon ? '🏆' : '💀')
+      document.getElementById('resultTitle').textContent = isDraw ? '平局' : (iWon ? '胜利！' : '失败')
+      document.getElementById('resultSub').textContent = (winnerLabel ? winnerLabel + ' 获胜 · ' : '') + '第 ' + (G.turn ? G.turn.turnNumber : '?') + ' 回合结束'
+      if (TRAINING_MODE) {
+        // Replace the "返回大厅" button with "重新开始"
+        const overlay = document.getElementById('resultOverlay')
+        overlay.querySelector('button[onclick="goBack()"]')?.remove()
+        const restartBtn = document.createElement('button')
+        restartBtn.style.cssText = 'background:#1d4ed8;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px'
+        restartBtn.textContent = '🔄 重新开始'
+        restartBtn.onclick = () => { overlay.style.display = 'none'; initTraining() }
+        overlay.appendChild(restartBtn)
+      }
+      document.getElementById('resultOverlay').style.display = 'flex'
+      // Sign game record asynchronously
+      _signGameRecord()
+    }
+
+    var _signedRecord = null
+
+    async function _signGameRecord() {
+      if (!window.RvBIdentity) return
+      const identity = RvBIdentity.getIdentity()
+      if (!identity) return
+      const statusEl = document.getElementById('recordStatus')
+      try {
+        statusEl.textContent = '正在获取战报…'
+        // Wait a moment for server to finalize the game record
+        await new Promise(r => setTimeout(r, 800))
+        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/game-record')
+        if (!res.ok) { statusEl.textContent = ''; return }
+        const record = await res.json()
+        if (record.error) { statusEl.textContent = ''; return }
+
+        // Sign the record (without signatures field)
+        const { signatures: _s, ...recordToSign } = record
+        statusEl.textContent = '正在签名战报…'
+        const publicKey = RvBIdentity.getPublicKey()
+        const signature = await RvBIdentity.sign(recordToSign)
+
+        // Submit signature
+        const submitRes = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/game-record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: identity.id, publicKey, signature })
+        })
+        const submitData = submitRes.ok ? await submitRes.json() : null
+        const count = submitData?.signaturesCount || 1
+        statusEl.textContent = '已签名 (' + count + '/2)'
+
+        // Store full record for download
+        _signedRecord = { ...record, signatures: { ...(record.signatures || {}), [identity.id]: signature } }
+        document.getElementById('recordDownloadBtn').style.display = 'inline-block'
+      } catch { statusEl.textContent = '' }
+    }
+
+    function downloadGameRecord() {
+      if (!_signedRecord) return
+      const blob = new Blob([JSON.stringify(_signedRecord, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'rvb-record-' + (_signedRecord.gameId || Date.now()) + '.json'
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+
+    // ── Helpers ──
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
+    function setStatusMsg(msg) {
+      document.getElementById('statusMsg').textContent = msg
+    }
+    function showMsg(msg, type) {
+      document.getElementById('loadingMsg').textContent = msg
+      if (type === 'err') document.getElementById('loadingMsg').style.color = '#f87171'
+    }
+    function openLog() { document.getElementById('logOverlay').classList.add('show') }
+    function closeLog() { document.getElementById('logOverlay').classList.remove('show') }
+    function addLog(msg, cls) {
+      const body = document.getElementById('logBody')
+      if (!body) return
+      const p = document.createElement('p')
+      p.className = 'log-' + (cls || 'info')
+      p.textContent = msg
+      body.appendChild(p)
+      body.scrollTop = body.scrollHeight
+    }
+    function clearLog() { const b = document.getElementById('logBody'); if (b) b.innerHTML = '' }
+    function goBack() { window.location.href = TRAINING_MODE ? 'index.html' : 'lobby.html' }
+    function confirmLeave() {
+      if (TRAINING_MODE || !G || G.gameOver || G.winner) { goBack(); return }
+      goBack()
+    }
+
+    // ── Start ──
+    // ── Dynamic cell sizing ───────────────────────────────────────────────────
+    function recalcCellSize() {
+      if (!G || !G.map) return
+      const cols = G.map.width
+      const rows = G.map.height
+      const wrap = document.getElementById('boardWrap')
+      if (!wrap) return
+      const availW = wrap.clientWidth - 8
+      const topbarH = document.querySelector('.topbar')?.offsetHeight || 44
+      const phaseH  = document.querySelector('.phase-bar')?.offsetHeight || 0
+      const actionH = document.querySelector('.action-bar')?.offsetHeight || 0
+      const handH   = document.getElementById('handPanel')?.offsetHeight || 0
+      const trainingBarH = document.getElementById('trainingBar')?.offsetHeight || 0
+      const availH  = window.innerHeight - topbarH - phaseH - actionH - handH - trainingBarH - 20
+      const byW = Math.floor(availW / cols)
+      const byH = Math.floor(availH / rows)
+      const sz = Math.max(28, Math.min(72, byW, byH))
+      document.documentElement.style.setProperty('--cell-size', sz + 'px')
+      const grid = document.getElementById('gameGrid')
+      if (grid) grid.style.gridTemplateColumns = 'repeat(' + cols + ', var(--cell-size, 44px))'
+    }
+    window.addEventListener('resize', recalcCellSize)
+
+    // ── Fullscreen map mode ───────────────────────────────────────────────────
+    let fullMapMode = false
+    function toggleFullMap() {
+      fullMapMode = !fullMapMode
+      document.body.classList.toggle('full-map', fullMapMode)
+      document.getElementById('btnFullMap').textContent = fullMapMode ? '✕' : '⛶'
+      setTimeout(recalcCellSize, 50)
+    }
+
+    // ── Collapsible sections (log / hand) ─────────────────────────────────────
+    function toggleSection(section) {
+      if (section === 'log') {
+        const body = document.getElementById('logBody')
+        const arrow = document.getElementById('logArrow')
+        const open = !body.classList.contains('collapsed')
+        body.classList.toggle('collapsed', open)
+        if (arrow) { arrow.textContent = open ? '▶' : '▼'; arrow.classList.toggle('open', !open) }
+      } else if (section === 'hand') {
+        const body = document.getElementById('handBody')
+        const arrow = document.getElementById('handArrow')
+        const open = !body.classList.contains('collapsed')
+        body.classList.toggle('collapsed', open)
+        if (arrow) { arrow.textContent = open ? '▶' : '▼'; arrow.classList.toggle('open', !open) }
+      }
+      setTimeout(recalcCellSize, 50)
+    }
+
+    window.addEventListener('load', init)
+    window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
+  </script>
+
+  <!-- Target selection overlay (pointer-events:none so board stays clickable) -->
+  <div id="targetOverlay">
+    <div class="target-prompt" id="targetPromptText">🎯 选择目标</div>
+    <button class="target-cancel-btn" onclick="cancelTargetSelection()">✕ 取消</button>
+  </div>
+
+  <!-- Fullscreen log overlay -->
+  <div id="logOverlay">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #334155;flex-shrink:0;background:#070f1e">
+      <div style="font-size:15px;font-weight:700;color:#e2e8f0">📜 战斗日志</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="clearLog()" style="background:none;border:1px solid #334155;border-radius:6px;color:#64748b;padding:4px 10px;font-size:12px;cursor:pointer">清空</button>
+        <button onclick="closeLog()" style="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">✕</button>
+      </div>
+    </div>
+    <div id="logBody" style="flex:1;overflow-y:auto;padding:10px 16px;font-size:13px;"></div>
+  </div>
+
+  <!-- Surrender confirm overlay -->
+  <div id="surrenderConfirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px 24px;max-width:300px;width:90%;text-align:center">
+      <div style="font-size:32px;margin-bottom:12px">🏳️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0">确认投降？</div>
+      <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">这将立即结束对战。</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button onclick="cancelSurrender()" style="flex:1;padding:10px;background:#334155;border:none;border-radius:8px;color:#e2e8f0;font-size:14px;cursor:pointer">取消</button>
+        <button onclick="doSurrender()" style="flex:1;padding:10px;background:#dc2626;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">投降</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

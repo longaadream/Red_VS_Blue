@@ -1,7 +1,15 @@
 {
   "id": "frostbolt",
   "name": "冰霜箭",
-  "description": "对5格内一个敌人造成当前攻击力的伤害和1回合冰冻",
+  "description": "对5格内1个敌人造成等同攻击力的法术伤害，并冰冻1回合。冰冻期间，目标不能移动或使用技能。",
+  "keywords": [
+    "冰冻"
+  ],
+  "targetText": "5格内1个敌人",
+  "effectTags": [
+    "法术伤害",
+    "冰冻"
+  ],
   "icon": "❄️",
   "kind": "active",
   "type": "normal",
@@ -10,6 +18,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "range": "single",
-  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' });\n  if (!targetEnemy || targetEnemy.needsTargetSelection) {\n    return targetEnemy;\n  }\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'magical', context.battle, context.skill.id);\n  if (typeof addStatusEffectById === 'function' && damageResult.success) {\n    const statusId = 'freeze-' + Date.now();\n    addStatusEffectById(targetEnemy.instanceId, { id: statusId, type: 'freeze', currentDuration: 1, intensity: 1, relatedRules: ['rule-freeze-prevent-move', 'rule-freeze-prevent-skill'] });\n  }\n  if (typeof addRuleById === 'function' && damageResult.success) {\n    addRuleById(targetEnemy.instanceId, 'rule-freeze-prevent-move');\n    addRuleById(targetEnemy.instanceId, 'rule-freeze-prevent-skill');\n  }\n  if (typeof addSkillById === 'function' && damageResult.success) {\n    addSkillById(targetEnemy.instanceId, 'freeze-prevent');\n  }\n  return {\n    message: sourcePiece.name + '使用了冰霜箭，对' + targetEnemy.name + '造成' + damageResult.damage + '点伤害并使其冰冻',\n    success: true\n  };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '对5格内一个敌人造成' + damageValue + '点伤害（相当于攻击力100%）和1回合冰冻',\n    expectedValues: { damage: damageValue }\n  };\n}"
+  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' });\n  if (!targetEnemy || targetEnemy.needsTargetSelection) {\n    return targetEnemy;\n  }\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'magical', context.battle, context.skill.id);\n  if (damageResult.success) {\n    applyEffect(targetEnemy.instanceId, 'effect-freeze', { currentDuration: 1 });\n  }\n  return {\n    message: sourcePiece.name + '使用了冰霜箭，对' + targetEnemy.name + '造成' + damageResult.damage + '点伤害并使其冰冻',\n    success: true\n  };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '对5格内1个敌人造成' + damageValue + '点法术伤害，并冰冻1回合。',\n    expectedValues: { damage: damageValue }\n  };\n}"
 }

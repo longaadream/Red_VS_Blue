@@ -1,3 +1,6 @@
+// 当序列化格式出现不兼容变化时递增此值（旧状态会被 applyBattleAction 拒绝）
+export const BATTLE_STATE_VERSION = 1
+
 // 从 battle-types 导入类型（避免客户端导入时加载服务器端代码）
 import type {
   TurnPhase,
@@ -17,7 +20,7 @@ function writeLog(message: string) {
   try {
     const fs = require('fs')
     const path = require('path')
-    const logDir = path.join(process.cwd(), 'logs')
+    const logDir = path.join(process.env.USER_DATA_DIR ?? process.cwd(), 'logs')
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true })
     }
@@ -132,7 +135,7 @@ function restorePlayerRules(state: BattleState): void {
 }
 
 // ─── 辅助函数：安全地克隆 BattleState（处理函数无法克隆的问题）────────────────
-function safeCloneBattleState(state: BattleState): BattleState {
+export function safeCloneBattleState(state: BattleState): BattleState {
   // 临时存储所有棋子的规则函数
   const pieceRulesFunctions: Map<number, any[]> = new Map()
   // 临时存储所有玩家的规则函数
@@ -201,6 +204,7 @@ function safeCloneBattleState(state: BattleState): BattleState {
     }
   })
 
+  cloned._v = BATTLE_STATE_VERSION
   return cloned
 }
 
@@ -273,6 +277,36 @@ export interface BattleState {
   extensions?: Record<string, any>
   /** gameStart 触发器是否已触发过 */
   gameStartFired?: boolean
+  /** 回合开始时待处理的选项选择（被动技能需要玩家选择时使用） */
+  pendingBeginTurnChoice?: {
+    ruleId: string
+    playerId: string
+    options: any[]
+    title: string
+  }
+  /** 回合开始时待处理的目标选择 */
+  pendingBeginTurnTarget?: {
+    playerId: string
+    targetType: 'piece' | 'cell'
+    range?: number
+    filter?: string
+  }
+  /** 回合结束时待处理的选项选择 */
+  pendingEndTurnChoice?: {
+    ruleId: string
+    playerId: string
+    options: any[]
+    title: string
+  }
+  /** 回合结束时待处理的目标选择 */
+  pendingEndTurnTarget?: {
+    playerId: string
+    targetType: 'piece' | 'cell'
+    range?: number
+    filter?: string
+  }
+  /** 状态序列化版本号，升级时不兼容的旧状态会被拒绝 */
+  _v?: number
 }
 
 export type BattleAction =
@@ -327,6 +361,30 @@ export type BattleAction =
       targetX?: number
       targetY?: number
       selectedOption?: any
+    }
+  | {
+      type: "beginTurnChoice"
+      playerId: PlayerId
+      selectedOption: any
+    }
+  | {
+      type: "beginTurnTargetSelect"
+      playerId: PlayerId
+      targetPieceId?: string
+      targetX?: number
+      targetY?: number
+    }
+  | {
+      type: "endTurnChoice"
+      playerId: PlayerId
+      selectedOption: any
+    }
+  | {
+      type: "endTurnTargetSelect"
+      playerId: PlayerId
+      targetPieceId?: string
+      targetX?: number
+      targetY?: number
     }
 
 export class BattleRuleError extends Error {
@@ -420,6 +478,14 @@ export function applyBattleAction(
   state: BattleState,
   action: BattleAction,
 ): BattleState {
+  // 版本检查：若状态已有版本号且与当前不兼容，拒绝处理
+  if (state._v !== undefined && state._v !== BATTLE_STATE_VERSION) {
+    throw new Error(
+      `BattleState version mismatch: state has _v=${state._v}, expected _v=${BATTLE_STATE_VERSION}. ` +
+      `The room may be running an outdated game state.`
+    )
+  }
+
   // 恢复棋子和玩家规则的 effect 函数（API 传输后函数会丢失）
   restorePieceRules(state)
   restorePlayerRules(state)
@@ -481,9 +547,28 @@ export function applyBattleAction(
           });
         }
 
+        // 检查是否有需要选项选择的回合开始规则
+        if (beginTurnResult.needsOptionSelection) {
+          next.pendingBeginTurnChoice = {
+            ruleId: 'pending',
+            playerId: next.turn.currentPlayerId,
+            options: beginTurnResult.options || [],
+            title: beginTurnResult.title || '请选择'
+          }
+        }
+        // 检查是否有需要目标选择的回合开始规则
+        if (beginTurnResult.needsTargetSelection) {
+          next.pendingBeginTurnTarget = {
+            playerId: next.turn.currentPlayerId,
+            targetType: (beginTurnResult.targetType || 'piece') as 'piece' | 'cell',
+            range: beginTurnResult.range,
+            filter: beginTurnResult.filter,
+          }
+        }
+
         // 更新冷却
         globalTriggerSystem.updateCooldowns();
-        
+
         // 行动点已经在回合切换时设置，这里不再重复增加
         // 确保当前玩家有行动点属性
         const currentPlayerMeta = next.players.find(p => p.playerId === next.turn.currentPlayerId)
@@ -627,9 +712,28 @@ export function applyBattleAction(
           });
         }
 
+        // 检查是否有需要选项选择的回合开始规则
+        if (beginTurnResult.needsOptionSelection) {
+          next.pendingBeginTurnChoice = {
+            ruleId: 'pending',
+            playerId: next.turn.currentPlayerId,
+            options: beginTurnResult.options || [],
+            title: beginTurnResult.title || '请选择'
+          }
+        }
+        // 检查是否有需要目标选择的回合开始规则
+        if (beginTurnResult.needsTargetSelection) {
+          next.pendingBeginTurnTarget = {
+            playerId: next.turn.currentPlayerId,
+            targetType: (beginTurnResult.targetType || 'piece') as 'piece' | 'cell',
+            range: beginTurnResult.range,
+            filter: beginTurnResult.filter,
+          }
+        }
+
         // 更新冷却
         globalTriggerSystem.updateCooldowns();
-        
+
         // 更新当前玩家棋子技能的冷却时间
         next.pieces.forEach(piece => {
           // 只减少当前玩家棋子的技能冷却
@@ -988,42 +1092,30 @@ export function applyBattleAction(
       // 执行技能（使用触发器可能修改后的技能ID）
       const { executeSkillFunction } = require('./skills')
       
-      // 构建目标信息
-      let targetInfo = null;
-      let targetPositionInfo = null;
-      if (action.targetPieceId) {
-        const targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId);
-        if (targetPiece) {
-          targetInfo = {
-            instanceId: targetPiece.instanceId,
-            templateId: targetPiece.templateId,
-            ownerPlayerId: targetPiece.ownerPlayerId,
-            currentHp: targetPiece.currentHp,
-            maxHp: targetPiece.maxHp,
-            attack: targetPiece.attack,
-            defense: targetPiece.defense,
-            x: targetPiece.x || 0,
-            y: targetPiece.y || 0,
-          };
-          // 如果选择了棋子，也将其位置作为目标位置
-          targetPositionInfo = {
-            x: targetPiece.x || 0,
-            y: targetPiece.y || 0,
-          };
+      // 构建目标信息（支持 N 次 selectTarget 调用）
+      const buildTargetSlot = (pieceId: string | undefined, tx: number | undefined, ty: number | undefined) => {
+        if (pieceId) {
+          const tp = next.pieces.find(p => p.instanceId === pieceId);
+          if (tp) return { info: { instanceId: tp.instanceId, templateId: tp.templateId, ownerPlayerId: tp.ownerPlayerId, currentHp: tp.currentHp, maxHp: tp.maxHp, attack: tp.attack, defense: tp.defense, x: tp.x || 0, y: tp.y || 0 }, pos: { x: tp.x || 0, y: tp.y || 0 } };
+        } else if (tx !== undefined && ty !== undefined) {
+          return { info: null, pos: { x: tx, y: ty } };
         }
-      } else if (action.targetX !== undefined && action.targetY !== undefined) {
-        // 如果选择了格子，设置目标位置
-        targetPositionInfo = {
-          x: action.targetX,
-          y: action.targetY,
-        };
-      }
-      
+        return { info: null, pos: null };
+      };
+      const _t1 = buildTargetSlot(action.targetPieceId, action.targetX, action.targetY);
+      const _actAny = action as any;
+      const _extraTargets: Array<{pieceId?: string; x?: number; y?: number}> = _actAny.extraTargets || [];
+      const targets = [
+        _t1,
+        ..._extraTargets.map((et: {pieceId?: string; x?: number; y?: number}) => buildTargetSlot(et.pieceId, et.x, et.y))
+      ];
+
       const context = {
         piece: piece,
-        target: targetInfo,
-        targetPosition: targetPositionInfo,
-        selectedOption: (action as any).selectedOption,
+        target: _t1.info,
+        targetPosition: _t1.pos,
+        targets,
+        selectedOption: _actAny.selectedOption,
         battle: next,
         skill: {
           id: skillDef.id,
@@ -1295,42 +1387,30 @@ export function applyBattleAction(
       console.log('[useChargeSkill] skillDef has code: ' + !!skillDef.code)
       console.log('[useChargeSkill] About to build target info...')
       
-      // 构建目标信息
-      let targetInfo = null;
-      let targetPositionInfo = null;
-      if (action.targetPieceId) {
-        const targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId);
-        if (targetPiece) {
-          targetInfo = {
-            instanceId: targetPiece.instanceId,
-            templateId: targetPiece.templateId,
-            ownerPlayerId: targetPiece.ownerPlayerId,
-            currentHp: targetPiece.currentHp,
-            maxHp: targetPiece.maxHp,
-            attack: targetPiece.attack,
-            defense: targetPiece.defense,
-            x: targetPiece.x || 0,
-            y: targetPiece.y || 0,
-          };
-          // 如果选择了棋子，也将其位置作为目标位置
-          targetPositionInfo = {
-            x: targetPiece.x || 0,
-            y: targetPiece.y || 0,
-          };
+      // 构建目标信息（支持 N 次 selectTarget 调用）
+      const buildTargetSlot = (pieceId: string | undefined, tx: number | undefined, ty: number | undefined) => {
+        if (pieceId) {
+          const tp = next.pieces.find(p => p.instanceId === pieceId);
+          if (tp) return { info: { instanceId: tp.instanceId, templateId: tp.templateId, ownerPlayerId: tp.ownerPlayerId, currentHp: tp.currentHp, maxHp: tp.maxHp, attack: tp.attack, defense: tp.defense, x: tp.x || 0, y: tp.y || 0 }, pos: { x: tp.x || 0, y: tp.y || 0 } };
+        } else if (tx !== undefined && ty !== undefined) {
+          return { info: null, pos: { x: tx, y: ty } };
         }
-      } else if (action.targetX !== undefined && action.targetY !== undefined) {
-        // 如果选择了格子，设置目标位置
-        targetPositionInfo = {
-          x: action.targetX,
-          y: action.targetY,
-        };
-      }
-      
+        return { info: null, pos: null };
+      };
+      const _t1 = buildTargetSlot(action.targetPieceId, action.targetX, action.targetY);
+      const _actAny = action as any;
+      const _extraTargets: Array<{pieceId?: string; x?: number; y?: number}> = _actAny.extraTargets || [];
+      const targets = [
+        _t1,
+        ..._extraTargets.map((et: {pieceId?: string; x?: number; y?: number}) => buildTargetSlot(et.pieceId, et.x, et.y))
+      ];
+
       const context = {
         piece: piece,
-        target: targetInfo,
-        targetPosition: targetPositionInfo,
-        selectedOption: (action as any).selectedOption,
+        target: _t1.info,
+        targetPosition: _t1.pos,
+        targets,
+        selectedOption: _actAny.selectedOption,
         battle: next,
         skill: {
           id: skillDef.id,
@@ -1507,6 +1587,24 @@ export function applyBattleAction(
         });
       }
 
+      // 检查 endTurn 触发器是否需要选项选择或目标选择
+      if (endTurnResult.needsOptionSelection) {
+        next.pendingEndTurnChoice = {
+          ruleId: 'pending',
+          playerId: action.playerId,
+          options: endTurnResult.options || [],
+          title: endTurnResult.title || '请选择'
+        }
+      }
+      if (endTurnResult.needsTargetSelection) {
+        next.pendingEndTurnTarget = {
+          playerId: action.playerId,
+          targetType: (endTurnResult.targetType || 'piece') as 'piece' | 'cell',
+          range: endTurnResult.range,
+          filter: endTurnResult.filter,
+        }
+      }
+
       // 触发whenever规则（每一步行动后检测）
       const wheneverResult = globalTriggerSystem.checkTriggers(next, {
         type: "whenever",
@@ -1621,6 +1719,97 @@ export function applyBattleAction(
         });
       }
       
+      return next
+    }
+
+    case "beginTurnChoice": {
+      const next = safeCloneBattleState(state)
+      // 清除待处理选项
+      const pending = next.pendingBeginTurnChoice
+      next.pendingBeginTurnChoice = undefined
+      if (!pending) return next
+      // 以 selectedOption 重新触发 beginTurn 规则
+      const choiceCtx: any = {
+        type: "beginTurn",
+        turnNumber: next.turn.turnNumber,
+        playerId: next.turn.currentPlayerId,
+        selectedOption: action.selectedOption
+      }
+      const choiceResult = globalTriggerSystem.checkTriggers(next, choiceCtx)
+      if (choiceResult.messages.length > 0) {
+        if (!next.actions) next.actions = []
+        choiceResult.messages.forEach(message => {
+          next.actions!.push({
+            type: "triggerEffect",
+            playerId: next.turn.currentPlayerId,
+            turn: next.turn.turnNumber,
+            payload: { message }
+          })
+        })
+      }
+      return next
+    }
+
+    case "beginTurnTargetSelect": {
+      const next = safeCloneBattleState(state)
+      next.pendingBeginTurnTarget = undefined
+      const ctx: any = {
+        type: "beginTurn",
+        turnNumber: next.turn.turnNumber,
+        playerId: next.turn.currentPlayerId,
+        targetPieceId: action.targetPieceId,
+        targetX: action.targetX,
+        targetY: action.targetY,
+      }
+      const result = globalTriggerSystem.checkTriggers(next, ctx)
+      if (result.messages.length > 0) {
+        if (!next.actions) next.actions = []
+        result.messages.forEach(message => {
+          next.actions!.push({ type: "triggerEffect", playerId: next.turn.currentPlayerId, turn: next.turn.turnNumber, payload: { message } })
+        })
+      }
+      return next
+    }
+
+    case "endTurnChoice": {
+      const next = safeCloneBattleState(state)
+      const pending = next.pendingEndTurnChoice
+      next.pendingEndTurnChoice = undefined
+      if (!pending) return next
+      const choiceCtx: any = {
+        type: "endTurn",
+        turnNumber: next.turn.turnNumber,
+        playerId: action.playerId,
+        selectedOption: action.selectedOption
+      }
+      const choiceResult = globalTriggerSystem.checkTriggers(next, choiceCtx)
+      if (choiceResult.messages.length > 0) {
+        if (!next.actions) next.actions = []
+        choiceResult.messages.forEach(message => {
+          next.actions!.push({ type: "triggerEffect", playerId: action.playerId, turn: next.turn.turnNumber, payload: { message } })
+        })
+      }
+      return next
+    }
+
+    case "endTurnTargetSelect": {
+      const next = safeCloneBattleState(state)
+      next.pendingEndTurnTarget = undefined
+      const ctx: any = {
+        type: "endTurn",
+        turnNumber: next.turn.turnNumber,
+        playerId: action.playerId,
+        targetPieceId: action.targetPieceId,
+        targetX: action.targetX,
+        targetY: action.targetY,
+      }
+      const result = globalTriggerSystem.checkTriggers(next, ctx)
+      if (result.messages.length > 0) {
+        if (!next.actions) next.actions = []
+        result.messages.forEach(message => {
+          next.actions!.push({ type: "triggerEffect", playerId: action.playerId, turn: next.turn.turnNumber, payload: { message } })
+        })
+      }
       return next
     }
 

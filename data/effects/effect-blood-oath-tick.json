@@ -1,0 +1,15 @@
+{
+  "id": "effect-blood-oath-tick",
+  "name": "血誓诅咒倒计时",
+  "icon": "⏳",
+  "color": "#dc2626",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "beginTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return battle.turn.currentPlayerId === piece.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; if (battle.turn.currentPlayerId !== piece.ownerPlayerId) return { success: false }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'blood-oath'; }); if (!tag) { self.expire(); return { success: false }; } tag.remainingDuration = (tag.remainingDuration !== undefined ? tag.remainingDuration : (tag.currentDuration || 0)) - 1; if (tag.remainingDuration <= 0) { piece.statusTags = (piece.statusTags || []).filter(function(t) { return t.type !== 'blood-oath'; }); self.expire(); return { success: true, message: piece.name + '的血誓诅咒已解除' }; } return { success: true, message: piece.name + '的血誓诅咒还剩' + tag.remainingDuration + '回合' }; }"
+    }
+  ]
+}

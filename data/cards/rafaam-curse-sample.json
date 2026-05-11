@@ -1,0 +1,13 @@
+{
+  "id": "rafaam-curse-sample",
+  "name": "诅咒(?)",
+  "description": "持有时每回合结束对一个随机友方棋子造成?点魔法伤害。消耗1AP打出以弃置此牌。",
+  "keywords": [],
+  "targetText": "无",
+  "effectTags": ["诅咒", "伤害"],
+  "type": "reactive",
+  "actionPointCost": 1,
+  "icon": "💀",
+  "code": "function executeCard(context) { return { success: true, message: '诅咒卡（?）' }; }",
+  "isSample": true
+}

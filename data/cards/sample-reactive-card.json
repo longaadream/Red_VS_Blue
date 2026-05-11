@@ -1,7 +1,10 @@
 {
   "id": "sample-reactive-card",
   "name": "反击意志",
-  "description": "当任意友方棋子受到伤害时自动触发：对攻击者造成5点真实伤害。",
+  "description": "当任意友方棋子受到伤害后自动触发：对攻击者造成5点真实伤害。",
+  "keywords": ["真实伤害"],
+  "targetText": "攻击者",
+  "effectTags": ["真实伤害"],
   "type": "reactive",
   "trigger": { "type": "afterDamageTaken" },
   "icon": "Zap",

@@ -1,0 +1,15 @@
+{
+  "id": "effect-blackwidow-toxin",
+  "name": "致命毒素",
+  "icon": "☠️",
+  "color": "#16a34a",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "afterMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var mover = ctx.sourcePiece; if (!mover || mover.currentHp <= 0) return false; var player = battle.players.find(function(p) { return p.playerId === self.ownerId; }); if (!player) return false; if (mover.ownerPlayerId === player.playerId) return false; if (!player.statusTags) return false; var toxinTag = player.statusTags.find(function(t) { return t.type === 'lethal-toxin'; }); if (!toxinTag) return false; return mover.x === toxinTag.value && mover.y === toxinTag.extraValue; }",
+      "effectCode": "function(ctx, battle, self) { var mover = ctx.sourcePiece; if (!mover || mover.currentHp <= 0) return { success: false }; var player = battle.players.find(function(p) { return p.playerId === self.ownerId; }); if (!player || !player.statusTags) return { success: false }; var toxinTag = player.statusTags.find(function(t) { return t.type === 'lethal-toxin'; }); if (!toxinTag) { self.expire(); return { success: false }; } if (mover.x === toxinTag.value && mover.y === toxinTag.extraValue) { var damage = toxinTag.intensity || 4; var casterPiece = battle.pieces.find(function(p) { return p.ownerPlayerId === self.ownerId && p.currentHp > 0; }); dealDamage(casterPiece || mover, mover, damage, 'true', battle, 'lethal-toxin'); removePlayerStatusEffectById(self.ownerId, toxinTag.id); self.expire(); return { success: true, message: mover.name + '触发了致命毒素，受到' + damage + '点真实伤害！' }; } return { success: false }; }"
+    }
+  ]
+}

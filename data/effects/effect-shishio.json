@@ -1,0 +1,63 @@
+{
+  "id": "effect-shishio",
+  "name": "自燃·志志雄真実",
+  "icon": "🔥",
+  "color": "#dc2626",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "afterDamageDealt",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return false; if (!ctx.targetPiece || ctx.targetPiece.instanceId === piece.instanceId) return false; if (ctx.damage < 8) return false; var target = battle.pieces.find(function(p) { return p.instanceId === ctx.targetPiece.instanceId; }); return !!(target && target.currentHp > 0); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var damage = ctx.damage || 0; if (damage < 8) return { success: false }; var target = battle.pieces.find(function(p) { return p.instanceId === ctx.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return { success: false }; if (!target.statusTags) target.statusTags = []; var already = target.statusTags.find(function(t) { return t.type === 'silenced'; }); if (!already) { target.statusTags.push({ id: 'silenced-' + target.instanceId, type: 'silenced', name: '沉默', visible: true, remainingDuration: 1, remainingUses: -1, intensity: 1, stacks: 1 }); applyEffect(target.instanceId, 'effect-silenced'); } return { success: true, message: piece.name + ' 自燃·灼魂：对 ' + target.name + ' 造成 ' + damage + ' 点伤害，灼烧其灵魂！' + target.name + ' 被沉默 1 回合' }; }"
+    },
+    {
+      "on": "beforeHealTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return !!(ctx.piece && ctx.piece.instanceId === piece.instanceId); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; ctx.heal = 0; return { success: true, blocked: true, message: piece.name + ' 自燃之躯：无法被治疗！' }; }"
+    },
+    {
+      "on": "afterPieceKilled",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return !!(ctx.sourcePiece && ctx.sourcePiece.instanceId === piece.instanceId && ctx.targetPiece); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; if (!ctx.targetPiece) return { success: false }; if (!piece.statusTags) piece.statusTags = []; var tag = piece.statusTags.find(function(t) { return t.type === 'shishio-kills'; }); if (!tag) { tag = { id: 'shishio-kills-' + piece.instanceId, type: 'shishio-kills', name: '击杀数', intensity: 0, currentDuration: -1 }; piece.statusTags.push(tag); } tag.intensity += 1; var mult = tag.intensity >= 2 ? '200%' : '150%'; return { success: true, message: piece.name + ' 击杀 ' + ctx.targetPiece.name + '！击杀数：' + tag.intensity + '，无限刃/炎灵升至 ' + mult }; }"
+    },
+    {
+      "on": "beforeDamageDealt",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return false; if (!ctx.targetPiece || ctx.targetPiece.instanceId === piece.instanceId) return false; var target = battle.pieces.find(function(p) { return p.instanceId === ctx.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return false; return (ctx.damage || 0) > target.currentHp; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var target = battle.pieces.find(function(p) { return p.instanceId === ctx.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return { success: false }; var damage = ctx.damage || 0; if (damage <= target.currentHp) return { success: false }; var choice = selectOption({ title: '自燃·灭杀', options: [{ label: '立即出局', value: 'execute', description: '目标立即出局，不增加充能点' }, { label: '正常造成伤害', value: 'normal', description: '正常造成 ' + damage + ' 点伤害' }] }); if (choice && choice.needsOptionSelection) return choice; if (choice === 'execute') { target.currentHp = 0; return { success: true, blocked: true, message: piece.name + ' 自燃·灭杀：' + target.name + ' 立即出局！（不增加充能）' }; } return { success: false }; }"
+    },
+    {
+      "on": "beforeDamageTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return (ctx.damage || 0) > 1; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; if (ctx.damage <= 1) return { success: false }; ctx.damage = 1; return { success: true, message: piece.name + ' 炼狱之躯：伤害被压制为1点' }; }"
+    },
+    {
+      "on": "beforeDamageDealt",
+      "priority": 49,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return false; if (!ctx.targetPiece || ctx.targetPiece.instanceId === piece.instanceId) return false; var currentTurn = (battle.turn && battle.turn.turnNumber) || 0; var firedTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'shishio-cooldown-fired'; }); return !(firedTag && firedTag.intensity === currentTurn); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var currentTurn = (battle.turn && battle.turn.turnNumber) || 0; if (!piece.statusTags) piece.statusTags = []; var firedTag = piece.statusTags.find(function(t) { return t.type === 'shishio-cooldown-fired'; }); if (firedTag && firedTag.intensity === currentTurn) return { success: false }; if (!firedTag) { firedTag = { id: 'shishio-cooldown-fired-' + piece.instanceId, type: 'shishio-cooldown-fired', name: '压制已触发', intensity: currentTurn, currentDuration: -1, visible: false }; piece.statusTags.push(firedTag); } else { firedTag.intensity = currentTurn; } var target = battle.pieces.find(function(p) { return p.instanceId === ctx.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return { success: false }; if (target.skills && target.skills.length > 0) { target.skills.forEach(function(s) { s.currentCooldown = Math.max(s.currentCooldown || 0, 2); }); return { success: true, message: piece.name + ' 自燃·压制：' + target.name + ' 所有技能陷入冷却！' }; } return { success: false }; }"
+    },
+    {
+      "on": "afterDamageDealt",
+      "priority": 49,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return false; if (!ctx.targetPiece || ctx.targetPiece.instanceId === piece.instanceId) return false; var excludeIds = ['shishio-burn-endturn', 'shishio-burn-move', 'combustion-self']; if (ctx.skillId && excludeIds.indexOf(ctx.skillId) >= 0) return false; return (ctx.damage || 0) > 0; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var damage = ctx.damage || 0; if (damage <= 0) return { success: false }; if (!piece.statusTags) piece.statusTags = []; var counter = piece.statusTags.find(function(t) { return t.type === 'shishio-dmg-counter'; }); if (!counter) { counter = { id: 'shishio-dmg-counter-' + piece.instanceId, type: 'shishio-dmg-counter', name: '灵力消耗', intensity: 0, currentDuration: -1, visible: false }; piece.statusTags.push(counter); } var prevIntensity = counter.intensity; counter.intensity += damage; var newIntensity = counter.intensity; var selfDmgTimes = Math.floor(newIntensity / 5); counter.intensity = newIntensity % 5; if (selfDmgTimes <= 0) return { success: false }; dealDamage(piece, piece, selfDmgTimes, 'true', battle, 'combustion-self'); return { success: true, message: piece.name + ' 自燃·灵力消耗：计数 ' + prevIntensity + '+' + damage + '=' + newIntensity + '，触发' + selfDmgTimes + '次，' + piece.name + ' 失去 ' + selfDmgTimes + ' 点生命值（剩余计数：' + counter.intensity + '）' }; }"
+    },
+    {
+      "on": "afterMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return false; if (!battle.extensions || !battle.extensions.shishioBurnTiles || battle.extensions.shishioBurnTiles.length === 0) return false; var mover = ctx.sourcePiece; if (!mover || mover.currentHp <= 0) return false; return battle.extensions.shishioBurnTiles.some(function(t) { return t.x === mover.x && t.y === mover.y; }); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return { success: false }; var exts = battle.extensions; var burnTiles = exts && exts.shishioBurnTiles; if (!burnTiles || burnTiles.length === 0) return { success: false }; var mover = ctx.sourcePiece; if (!mover || mover.currentHp <= 0) return { success: false }; var onTile = burnTiles.some(function(t) { return t.x === mover.x && t.y === mover.y; }); if (!onTile) return { success: false }; var dmg = Math.ceil(mover.currentHp * 0.5); dealDamage(piece, mover, dmg, 'true', battle, 'shishio-burn-move'); return { success: true, message: mover.name + ' 踏入燃地！承受 ' + dmg + ' 点真实伤害（当前生命值50%）' }; }"
+    },
+    {
+      "on": "endTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return false; return !!(battle.extensions && battle.extensions.shishioBurnTiles && battle.extensions.shishioBurnTiles.length > 0); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return { success: false }; var exts = battle.extensions; var burnTiles = exts && exts.shishioBurnTiles; if (!burnTiles || burnTiles.length === 0) return { success: false }; var msgs = []; var alivePieces = battle.pieces.filter(function(p) { return p.currentHp > 0; }); alivePieces.forEach(function(p) { var onTile = burnTiles.some(function(t) { return t.x === p.x && t.y === p.y; }); if (!onTile) return; var dmg = Math.ceil(p.currentHp * 0.5); dealDamage(piece, p, dmg, 'true', battle, 'shishio-burn-endturn'); msgs.push(p.name + ' 被燃地炙烤，失去 ' + dmg + ' 点真实伤害（当前生命值50%）'); }); if (msgs.length === 0) return { success: false }; return { success: true, message: msgs.join('；') }; }"
+    }
+  ]
+}

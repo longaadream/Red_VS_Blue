@@ -1,0 +1,16 @@
+{
+  "id": "effect-silenced",
+  "name": "沉默",
+  "icon": "🔇",
+  "color": "#6b7280",
+  "visible": true,
+  "statusType": "silenced",
+  "triggers": [
+    {
+      "on": "beforeSkillUse",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'silenced'; })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'silenced'; }); if (!tag) { self.expire(); return { success: false }; } return { success: true, blocked: true, message: piece.name + ' 已被沉默，无法使用技能' }; }"
+    }
+  ]
+}

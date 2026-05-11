@@ -1,0 +1,15 @@
+{
+  "id": "effect-soul-fracture",
+  "name": "裂魂",
+  "icon": "💀",
+  "color": "#7c3aed",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "onPieceDied",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); return !!(piece && piece.currentHp > 0); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var deadPiece = ctx.sourcePiece; if (!deadPiece) return { success: false }; var playerId = piece.ownerPlayerId; addCardToHand('soul-fragment', playerId); if (!battle.actions) battle.actions = []; var message = piece.name + '的裂魂触发：' + deadPiece.name + '死亡，获得一张灵魂残片'; battle.actions.push({ type: 'triggerEffect', playerId: playerId, turn: battle.turn ? battle.turn.turnNumber : 0, payload: { message: message } }); return { success: true, message: message }; }"
+    }
+  ]
+}

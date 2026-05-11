@@ -81,7 +81,7 @@ export async function POST(
       )
     }
 
-    if (room.players.length >= room.maxPlayers) {
+    if (room.players.length >= (room.maxPlayers ?? 2)) {
       return NextResponse.json({ error: "Room is full" }, { status: 400 })
     }
 
@@ -90,16 +90,28 @@ export async function POST(
     )
 
     if (!existing) {
+      const assignedFactions = room.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
+      let faction: "red" | "blue"
+      if (assignedFactions.length === 0) {
+        faction = Math.random() > 0.5 ? "red" : "blue"
+      } else {
+        faction = assignedFactions[0] === "red" ? "blue" : "red"
+      }
+
       const player = {
         id: normalizedPlayerId,
         name: playerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
+        faction,
       }
       room.players.push(player)
 
       if (!room.hostId) {
         room.hostId = normalizedPlayerId
       }
+    } else if (!existing.faction) {
+      const assignedFactions = room.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
+      existing.faction = assignedFactions.length === 0 || assignedFactions[0] === "blue" ? "red" : "blue"
     }
 
     await roomStore.setRoom(room.id.trim(), room)
@@ -147,26 +159,41 @@ export async function POST(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
-  console.log('=== DELETE Request Started ===')
-
   try {
     const { roomId: originalRoomId } = await params
     const roomId = originalRoomId.trim().toLowerCase()
-    console.log('Processing room deletion:', { original: originalRoomId, normalized: roomId })
+
+    const adminKey = req.headers.get('x-admin-key')
+    const playerId = req.headers.get('x-player-id')
+
+    const expectedAdminKey = process.env.ROOM_ADMIN_KEY || 'admin-secret-key'
 
     const roomStore = getRoomStore()
-    const removed = await roomStore.removeRoom(roomId)
-    console.log('Room removal result:', removed)
+    const room = await roomStore.getRoom(roomId)
 
-    console.log('Room deletion completed:', roomId)
-    return NextResponse.json({ success: true })
+    if (!room) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 })
+    }
+
+    if (adminKey === expectedAdminKey) {
+      await roomStore.removeRoom(roomId)
+      return NextResponse.json({ success: true, deletedBy: 'admin' })
+    }
+
+    if (playerId && room.hostId?.toLowerCase() === playerId.toLowerCase()) {
+      if (room.status === 'in-progress') {
+        return NextResponse.json({ error: 'Cannot delete room while game is in progress' }, { status: 400 })
+      }
+      await roomStore.removeRoom(roomId)
+      return NextResponse.json({ success: true, deletedBy: 'host' })
+    }
+
+    return NextResponse.json({ error: 'Unauthorized - only host can delete room' }, { status: 403 })
   } catch (error) {
     console.error('Unexpected error in DELETE handler:', error)
     return NextResponse.json({ success: true })
-  } finally {
-    console.log('=== DELETE Request Completed ===')
   }
 }

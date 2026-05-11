@@ -1,0 +1,15 @@
+{
+  "id": "effect-initial-draw",
+  "name": "初始抽牌",
+  "icon": "🃏",
+  "color": "#6366f1",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "gameStart",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { return true; }",
+      "effectCode": "function(ctx, battle, self) { var cardPool = ['sample-active-card', 'sample-reactive-card']; battle.players.forEach(function(player) { for (var i = 0; i < 3; i++) { var randomCard = cardPool[Math.floor(Math.random() * cardPool.length)]; addCardToHand(randomCard, player.playerId); } }); return { success: true, message: '所有玩家抽了3张初始手牌' }; }"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "effect-nano-boost",
+  "name": "纳米激素",
+  "icon": "⚙️",
+  "color": "#34d399",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeDamageDealt",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.some(function(tag) { return (typeof tag === 'object' && tag && tag.type === 'nano-boost') || (typeof tag === 'string' && tag.includes('nano-boost')); })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; if (!ctx.damage) return { success: false }; var boostedDamage = ctx.damage + 1; ctx.damage = boostedDamage; return { success: true, message: piece.name + '的纳米激素使伤害+1' }; }"
+    }
+  ]
+}

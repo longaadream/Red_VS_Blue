@@ -1,0 +1,34 @@
+{
+  "id": "effect-naruto-clone",
+  "name": "影分身",
+  "icon": "👥",
+  "color": "#f59e0b",
+  "visible": false,
+  "statusType": "naruto-clone",
+  "triggers": [
+    {
+      "on": "beforeMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var clone = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!clone || clone.currentHp <= 0) return false; if (!ctx.piece || ctx.piece.instanceId !== clone.instanceId) return false; return !!(clone.statusTags && clone.statusTags.find(function(t) { return t.type === 'naruto-clone'; })); }",
+      "effectCode": "function(ctx, battle, self) { var clone = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!clone) return { success: false }; var tag = clone.statusTags && clone.statusTags.find(function(t) { return t.type === 'naruto-clone'; }); if (!tag) { self.expire(); return { success: false }; } return { success: true, blocked: true, message: '影分身无法移动' }; }"
+    },
+    {
+      "on": "afterDamageTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var clone = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!clone) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== clone.instanceId) return false; return !!(ctx.damage && ctx.damage > 0); }",
+      "effectCode": "function(ctx, battle, self) { var clone = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!clone) return { success: false }; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== clone.instanceId) return { success: false }; if (!ctx.damage || ctx.damage <= 0) return { success: false }; clone.currentHp = 0; return { success: true, message: clone.name + '（影分身）受到伤害，立即消散' }; }"
+    },
+    {
+      "on": "endTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return false; return ctx.playerId === piece.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return { success: false }; if (ctx.playerId !== piece.ownerPlayerId) return { success: false }; var aliveClones = battle.pieces.filter(function(p) { return p.currentHp > 0 && p.ownerPlayerId === piece.ownerPlayerId && p.statusTags && p.statusTags.some(function(t) { return t.type === 'naruto-clone'; }); }); if (aliveClones.length === 0) return { success: false }; var sageTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (!sageTag) return { success: false }; sageTag.stacks = (sageTag.stacks || 1) - 1; if (sageTag.stacks > 0) { return { success: true, message: piece.name + '的影分身加速了仙人蓄力，剩余' + sageTag.stacks + '回合' }; } var shieldTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode-shield'; }); if (shieldTag) { removeStatusEffectById(piece.instanceId, shieldTag.id); } removeStatusEffectById(piece.instanceId, sageTag.id); var playerMeta = battle.players.find(function(p) { return p.playerId === piece.ownerPlayerId; }); if (playerMeta) { playerMeta.actionPoints += 3; playerMeta.chargePoints += 1; } return { success: true, message: piece.name + '的影分身使仙人模式提前完成！获得3行动点和1充能点' }; }"
+    },
+    {
+      "on": "onPieceDied",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var clone = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); return !!(clone && ctx.sourcePiece && ctx.sourcePiece.instanceId === clone.instanceId); }",
+      "effectCode": "function(ctx, battle, self) { var clone = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!clone) return { success: false }; var attacker = ctx.targetPiece; if (!attacker) return { success: true, message: clone.name + '消散' }; return { success: true, message: attacker.name + '击杀了影分身（无充能）' }; }"
+    }
+  ]
+}

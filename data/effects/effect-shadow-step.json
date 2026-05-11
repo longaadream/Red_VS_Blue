@@ -1,0 +1,15 @@
+{
+  "id": "effect-shadow-step",
+  "name": "暗影步",
+  "icon": "👁",
+  "color": "#9333ea",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beginTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return ctx.playerId === piece.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { var sourcePiece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!sourcePiece) return { success: false }; if (!sourcePiece.statusTags) return { success: false }; var shadowStepStatus = sourcePiece.statusTags.find(function(tag) { return tag.type === 'shadow-step'; }); if (!shadowStepStatus) { self.expire(); return { success: false }; } if (shadowStepStatus.remainingDuration <= 0) { self.expire(); return { success: false }; } if (ctx.playerId !== sourcePiece.ownerPlayerId) return { success: false }; var targetX = shadowStepStatus.value; var targetY = shadowStepStatus.intensity; var shadowStepSourceId = 'shadow-step-' + sourcePiece.instanceId; var cleanupAndCancel = function(reason) { if (battle.extensions && battle.extensions.tileEffects) { battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) { return !(te.tileType === 'shadow-step' && te.sourceId === shadowStepSourceId); }); } var index = sourcePiece.statusTags.findIndex(function(tag) { return tag.type === 'shadow-step'; }); if (index !== -1) { sourcePiece.statusTags.splice(index, 1); } self.expire(); return { success: true, message: sourcePiece.name + '的暗影步' + reason + '，传送取消' }; }; var targetTile = battle.map.tiles.find(function(t) { return t.x === targetX && t.y === targetY; }); if (!targetTile || !targetTile.props.walkable) { return cleanupAndCancel('目标位置不可行走'); } var pieceAtPos = battle.pieces.find(function(p) { return p.x === targetX && p.y === targetY && p.currentHp > 0; }); if (pieceAtPos) { return cleanupAndCancel('目标位置已被占用'); } if (battle.extensions && battle.extensions.tileEffects) { battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) { return !(te.tileType === 'shadow-step' && te.sourceId === shadowStepSourceId); }); } sourcePiece.x = targetX; sourcePiece.y = targetY; var index = sourcePiece.statusTags.findIndex(function(tag) { return tag.type === 'shadow-step'; }); if (index !== -1) { sourcePiece.statusTags.splice(index, 1); } self.expire(); return { success: true, message: sourcePiece.name + '通过暗影步传送到了(' + targetX + ',' + targetY + ')' }; }"
+    }
+  ]
+}

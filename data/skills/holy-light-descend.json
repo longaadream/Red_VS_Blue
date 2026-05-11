@@ -1,1 +1,19 @@
-{"id":"holy-light-descend","name":"圣光降临","description":"选择一个距离6或以内的地格，对该格内的友军回复7点生命值，对该格内敌人造成7点伤害；对该格距离1的地格，伤害和治疗量为4；对该格距离2的地格，伤害和治疗量为2","icon":"☀️","kind":"active","type":"super","cooldownTurns":3,"maxCharges":0,"powerMultiplier":1,"actionPointCost":5,"chargeCost":3,"code":"function executeSkill(context) { const sourcePiece = context.piece; const targetCell = selectTarget({ type: 'grid', range: 6 }); if (!targetCell || targetCell.needsTargetSelection) { return targetCell; } const battle = context.battle; const centerX = targetCell.x; const centerY = targetCell.y; const getPiecesAtDist = function(dist) { return battle.pieces.filter(function(p) { return p.currentHp > 0 && Math.abs(p.x - centerX) + Math.abs(p.y - centerY) === dist; }); }; const applyRing = function(pieces, value) { const allies = pieces.filter(function(p) { return p.ownerPlayerId === sourcePiece.ownerPlayerId; }); const enemies = pieces.filter(function(p) { return p.ownerPlayerId !== sourcePiece.ownerPlayerId; }); if (allies.length > 0) healDamage(sourcePiece, allies, value, battle, context.skill.id); if (enemies.length > 0) dealDamage(sourcePiece, enemies, value, 'magical', battle, context.skill.id); }; applyRing(getPiecesAtDist(0), 7); applyRing(getPiecesAtDist(1), 4); applyRing(getPiecesAtDist(2), 2); return { message: sourcePiece.name + '释放了圣光降临', success: true }; }","previewCode":"function calculatePreview(piece, skillDef) { return { description: '选择一个距离6或以内的地格，对该格内的友军回复7点生命值，对该格内敌人造成7点伤害；对该格距离1的地格，伤害和治疗量为4；对该格距离2的地格，伤害和治疗量为2', expectedValues: { centerHeal: 7, centerDamage: 7, adjacentHeal: 4, adjacentDamage: 4, distantHeal: 2, distantDamage: 2 } }; }","range":"area"}
+{
+  "id": "holy-light-descend",
+  "name": "圣光降临",
+  "description": "选择6格内1个地格。该格中的友军治疗7点，敌军受到7点法术伤害；距离1格的单位治疗或受到4点法术伤害；距离2格的单位治疗或受到2点法术伤害。",
+  "keywords": [],
+  "targetText": "6格内1个地格",
+  "effectTags": ["治疗", "范围伤害"],
+  "icon": "☀️",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 5,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "chargeCost": 3,
+  "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetCell = selectTarget({ type: 'grid', range: 6 }); if (!targetCell || targetCell.needsTargetSelection) { return targetCell; } const battle = context.battle; const centerX = targetCell.x; const centerY = targetCell.y; const getPiecesAtDist = function(dist) { return battle.pieces.filter(function(p) { return p.currentHp > 0 && Math.abs(p.x - centerX) + Math.abs(p.y - centerY) === dist; }); }; const applyRing = function(pieces, value) { const allies = pieces.filter(function(p) { return p.ownerPlayerId === sourcePiece.ownerPlayerId; }); const enemies = pieces.filter(function(p) { return p.ownerPlayerId !== sourcePiece.ownerPlayerId; }); if (allies.length > 0) healDamage(sourcePiece, allies, value, battle, context.skill.id); if (enemies.length > 0) dealDamage(sourcePiece, enemies, value, 'magical', battle, context.skill.id); }; applyRing(getPiecesAtDist(0), 7); applyRing(getPiecesAtDist(1), 4); applyRing(getPiecesAtDist(2), 2); return { message: sourcePiece.name + '释放了圣光降临', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '选择6格内1个地格。该格中的友军治疗7点，敌军受到7点伤害；距离1格的单位治疗或受到4点；距离2格的单位治疗或受到2点。', expectedValues: { centerHeal: 7, centerDamage: 7, adjacentHeal: 4, adjacentDamage: 4, distantHeal: 2, distantDamage: 2 } }; }",
+  "range": "area"
+}

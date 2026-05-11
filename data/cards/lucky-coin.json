@@ -1,7 +1,10 @@
 {
   "id": "lucky-coin",
   "name": "幸运币",
-  "description": "获得1点额外行动力。",
+  "description": "获得1点行动点。",
+  "keywords": [],
+  "targetText": "自身",
+  "effectTags": ["行动点"],
   "type": "active",
   "actionPointCost": 0,
   "icon": "Coins",

@@ -1,8 +1,11 @@
 {
   "id": "kenshin-tenken-passive",
   "name": "飞天御剑流·剑速",
-  "description": "被动：移动后，下一次攻击造成150%伤害",
-  "icon": "⚡",
+  "description": "移动后，下一次攻击造成150%伤害。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": ["强化"],
+  "icon": "⚿",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

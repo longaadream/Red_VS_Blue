@@ -16,13 +16,6 @@
     { "skillId": "sticky-bomb" },
     { "skillId": "pulse-pistol" }
   ],
-  "rules": [
-    "rule-pulse-pistol",
-    "rule-pulse-pistol-move",
-    "rule-recall-skill",
-    "rule-recall-move",
-    "rule-recall-endturn",
-    "rule-sticky-bomb-move",
-    "rule-sticky-bomb-endturn"
-  ]
+  "rules": [],
+  "initialEffects": ["effect-pulse-pistol", "effect-recall", "effect-sticky-bomb"]
 }

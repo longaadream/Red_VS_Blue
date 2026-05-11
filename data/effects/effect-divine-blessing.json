@@ -1,0 +1,15 @@
+{
+  "id": "effect-divine-blessing",
+  "name": "赐福",
+  "icon": "🙏",
+  "color": "#fde68a",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeDamageDealt",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var attacker = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!attacker) return false; if (!ctx.piece || ctx.piece.instanceId !== attacker.instanceId) return false; return !!(attacker.statusTags && attacker.statusTags.some(function(tag) { return typeof tag === 'object' && tag.type === 'divine-blessing-buff'; })); }",
+      "effectCode": "function(ctx, battle, self) { var attacker = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!attacker) return { success: false }; var hasDivineBlessing = false; var blessingIntensity = 4; if (attacker.statusTags) { for (var i = 0; i < attacker.statusTags.length; i++) { var tag = attacker.statusTags[i]; if (typeof tag === 'object' && tag.type === 'divine-blessing-buff') { hasDivineBlessing = true; if (tag.intensity) blessingIntensity = tag.intensity; break; } } } if (hasDivineBlessing && ctx.damage) { ctx.damage = ctx.damage + blessingIntensity; removeStatusEffectById(attacker.instanceId, 'divine-blessing-buff'); self.expire(); return { success: true, message: attacker.name + '的赐福使伤害+' + blessingIntensity + '，赐福效果消失' }; } return { success: false, message: '未处于赐福状态' }; }"
+    }
+  ]
+}

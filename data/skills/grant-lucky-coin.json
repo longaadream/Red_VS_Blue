@@ -1,7 +1,10 @@
 {
   "id": "grant-lucky-coin",
   "name": "发放幸运币",
-  "description": "战斗开始时，该阵营玩家获得一张幸运币手牌",
+  "description": "战斗开始时，该阵营玩家获得1张幸运币手牌。",
+  "keywords": [],
+  "targetText": "己方玩家",
+  "effectTags": ["手牌"],
   "kind": "passive",
   "type": "normal",
   "form": "self",

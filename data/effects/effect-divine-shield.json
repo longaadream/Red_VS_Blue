@@ -1,0 +1,16 @@
+{
+  "id": "effect-divine-shield",
+  "name": "圣盾",
+  "icon": "🛡️",
+  "color": "#fbbf24",
+  "visible": true,
+  "statusType": "divine-shield",
+  "triggers": [
+    {
+      "on": "beforeDamageTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'divine-shield'; })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'divine-shield'; }); if (!tag) { self.expire(); return { success: false }; } removeStatusEffectById(piece.instanceId, tag.id); self.expire(); return { success: true, blocked: true, message: piece.name + '的圣盾抵挡了这次伤害！' }; }"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "effect-obito-grudge",
+  "name": "怨念",
+  "icon": "👁",
+  "color": "#7c3aed",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "afterDamageTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var obito = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!obito || obito.currentHp <= 0) return false; if (!ctx.sourcePiece || ctx.sourcePiece.ownerPlayerId !== obito.ownerPlayerId) return false; return !!(ctx.damage && ctx.damage > 0); }",
+      "effectCode": "function(ctx, battle, self) { var obito = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!obito) return { success: false }; if (!ctx.sourcePiece || ctx.sourcePiece.ownerPlayerId !== obito.ownerPlayerId) return { success: false }; if (!ctx.damage || ctx.damage <= 0) return { success: false }; if (!obito.statusTags) obito.statusTags = []; var tag = obito.statusTags.find(function(t) { return t.type === 'obito-grudge'; }); if (tag && tag.stacks >= 3) return { success: false, message: '怨念已达上限（3层）' }; if (!tag) { tag = { id: 'obito-grudge-' + obito.instanceId, type: 'obito-grudge', name: '怨念', stacks: 0, intensity: 0 }; obito.statusTags.push(tag); } tag.stacks += 1; tag.intensity = (tag.intensity || 0) + 2; obito.attack += 2; var source = ctx.sourcePiece.instanceId === obito.instanceId ? '自身' : ctx.sourcePiece.name; return { success: true, message: obito.name + '的怨念因' + source + '受伤而积蓄（第' + tag.stacks + '层），攻击力+2，现为' + obito.attack }; }"
+    },
+    {
+      "on": "endTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var obito = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!obito) return false; return battle.turn.currentPlayerId === obito.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { var obito = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!obito) return { success: false }; if (battle.turn.currentPlayerId !== obito.ownerPlayerId) return { success: false }; if (!obito.statusTags) return { success: false }; var tagIdx = obito.statusTags.findIndex(function(t) { return t.type === 'obito-grudge'; }); if (tagIdx === -1) return { success: false }; var tag = obito.statusTags[tagIdx]; var removed = tag.intensity || 0; if (removed > 0) { obito.attack = Math.max(0, obito.attack - removed); } obito.statusTags.splice(tagIdx, 1); return { success: true, message: obito.name + '的怨念消散，攻击力-' + removed + '，现为' + obito.attack }; }"
+    }
+  ]
+}

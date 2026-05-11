@@ -1,0 +1,21 @@
+{
+  "id": "effect-pulse-pistol",
+  "name": "脉冲手枪",
+  "icon": "🔫",
+  "color": "#f97316",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeSkillUse",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var caster = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!caster) return false; var trigger = ctx.sourcePiece; if (!trigger) return false; return trigger.ownerPlayerId !== caster.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { var caster = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!caster) return { success: false, message: '' }; var trigger = ctx.sourcePiece; if (!trigger) return { success: false, message: '' }; if (trigger.ownerPlayerId === caster.ownerPlayerId) return { success: false, message: '' }; var enemies = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && Math.max(Math.abs(p.x - caster.x), Math.abs(p.y - caster.y)) <= 2; }); if (enemies.length === 0) return { success: false, message: '' }; var target = enemies[Math.floor(Math.random() * enemies.length)]; var result = dealDamage(caster, target, caster.attack, 'physical', battle, 'pulse-pistol'); return { success: true, message: caster.name + '的脉冲手枪触发，对' + target.name + '造成' + result.damage + '点伤害' }; }"
+    },
+    {
+      "on": "beforeMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var caster = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!caster) return false; var trigger = ctx.sourcePiece; if (!trigger) return false; return trigger.ownerPlayerId !== caster.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { var caster = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!caster) return { success: false, message: '' }; var trigger = ctx.sourcePiece; if (!trigger) return { success: false, message: '' }; if (trigger.ownerPlayerId === caster.ownerPlayerId) return { success: false, message: '' }; var enemies = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && Math.max(Math.abs(p.x - caster.x), Math.abs(p.y - caster.y)) <= 2; }); if (enemies.length === 0) return { success: false, message: '' }; var target = enemies[Math.floor(Math.random() * enemies.length)]; var result = dealDamage(caster, target, caster.attack, 'physical', battle, 'pulse-pistol-move'); return { success: true, message: caster.name + '的脉冲手枪触发，对' + target.name + '造成' + result.damage + '点伤害' }; }"
+    }
+  ]
+}

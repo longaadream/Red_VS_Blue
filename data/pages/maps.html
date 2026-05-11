@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>地图图鉴 - RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+      background: #0f172a; border-bottom: 1px solid #1e293b;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .back-btn {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      color: #94a3b8; padding: 7px 12px; font-size: 14px; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .topbar h1 { font-size: 17px; font-weight: 700; }
+    .topbar .count { font-size: 13px; color: #64748b; margin-left: auto; }
+
+    .map-list { padding: 16px; }
+
+    .map-card {
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 12px; margin-bottom: 12px; overflow: hidden;
+      cursor: pointer;
+    }
+    .map-card:active { border-color: #475569; }
+    .expanded .map-preview { display: block !important; }
+    .map-header {
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .map-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(59,130,246,.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .map-info { flex: 1; }
+    .map-name { font-size: 15px; font-weight: 700; }
+    .map-meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .expand-icon { color: #475569; font-size: 16px; transition: transform .2s; }
+    .expanded .expand-icon { transform: rotate(90deg); }
+
+    .map-desc { font-size: 12px; color: #64748b; padding: 0 16px 12px; }
+
+    .map-preview {
+      display: none;
+      border-top: 1px solid #1e293b;
+      padding: 14px 16px;
+    }
+    .preview-label {
+      font-size: 11px; font-weight: 700; color: #475569;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
+    }
+    .mini-grid {
+      display: inline-grid;
+      gap: 1px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .mini-cell {
+      width: 16px; height: 16px;
+    }
+    .cell-walk     { background: #1e293b; }
+    .cell-obstacle { background: #0c1122; }
+    .cell-water    { background: #0c2a4a; }
+    .cell-special  { background: #1a1535; }
+
+    /* Tile legend */
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #64748b; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+    /* Map stats */
+    .map-stats {
+      display: flex; gap: 0;
+      border-top: 1px solid #1e293b;
+    }
+    .ms-cell {
+      flex: 1; padding: 8px 4px; text-align: center;
+      border-right: 1px solid #1e293b;
+    }
+    .ms-cell:last-child { border-right: none; }
+    .ms-val { font-size: 15px; font-weight: 700; }
+    .ms-lbl { font-size: 10px; color: #475569; margin-top: 1px; text-transform: uppercase; }
+
+    .status-msg {
+      text-align: center; padding: 60px 20px;
+      color: #475569; font-size: 14px;
+    }
+    .status-msg .big { font-size: 32px; margin-bottom: 12px; }
+    .no-data-hint { font-size: 12px; color: #334155; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a class="back-btn" href="index.html">← 返回</a>
+    <h1>地图图鉴</h1>
+    <span class="count" id="countLabel"></span>
+  </div>
+
+  <div class="map-list" id="mapList">
+    <div class="status-msg">
+      <div class="big">⏳</div>
+      <div>正在加载地图数据…</div>
+    </div>
+  </div>
+
+  <script>
+    let allMaps = []
+
+    async function fetchJson(path) {
+      if (window.fetchPackJson && /^\.?\/?data\//.test(path)) {
+        return window.fetchPackJson(path)
+      }
+      const res = await fetch(path)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    }
+
+    async function loadMaps() {
+      try {
+        // Load from local data/ (offline-first, no server fallback)
+        const ids = await fetchJson('./data/maps/manifest.json')
+        const maps = []
+        for (const id of ids) {
+          try {
+            const m = await fetchJson(`./data/maps/${id}.json`)
+            maps.push(m)
+          } catch {}
+        }
+        allMaps = maps
+      } catch {
+        allMaps = []
+        document.getElementById('mapList').innerHTML = `
+          <div class="status-msg">
+            <div class="big">📭</div>
+            <div>未找到地图数据</div>
+            <div class="no-data-hint">请先运行 npm run build:android 生成本地数据</div>
+          </div>`
+        return
+      }
+    }
+
+    function renderList() {
+      document.getElementById('countLabel').textContent = `${allMaps.length} 张地图`
+      if (!allMaps.length) {
+        document.getElementById('mapList').innerHTML =
+          `<div class="status-msg"><div class="big">🗺️</div><div>暂无地图数据</div></div>`
+        return
+      }
+      document.getElementById('mapList').innerHTML = allMaps.map(m => renderCard(m)).join('')
+    }
+
+    // Parse ASCII layout map into a flat tile array
+    function parseMapTiles(map) {
+      // Already has tiles array (legacy format)
+      if (map.tiles && map.tiles.length) return map.tiles
+
+      // ASCII layout format
+      const layout = map.layout || []
+      const legend = {}
+      for (const entry of (map.legend || [])) legend[entry.char] = entry
+
+      const tiles = []
+      for (let y = 0; y < layout.length; y++) {
+        const row = layout[y]
+        for (let x = 0; x < row.length; x++) {
+          const ch = row[x]
+          const def = legend[ch] || { type: 'floor', walkable: true }
+          tiles.push({ x, y, props: { walkable: def.walkable !== false, type: def.type || 'floor' } })
+        }
+      }
+      return tiles
+    }
+
+    function mapDims(map) {
+      if (map.width && map.height) return { w: map.width, h: map.height }
+      const layout = map.layout || []
+      return { w: layout[0] ? layout[0].length : 8, h: layout.length || 6 }
+    }
+
+    const TILE_LABELS = {
+      wall:'墙壁', floor:'地板', spawn:'出生点', cover:'掩体',
+      hole:'陷阱', lava:'熔岩', spring:'治愈泉', chargepad:'充能台'
+    }
+
+    function buildLegend(tiles) {
+      const present = new Set(tiles.map(t => (t.props||t).type || t.type || 'floor'))
+      return Array.from(present).filter(type => TILE_COLORS[type]).map(type =>
+        `<div class="legend-item"><div class="legend-dot" style="background:${TILE_COLORS[type]}"></div>${TILE_LABELS[type]||type}</div>`
+      ).join('')
+    }
+
+    const TILE_COLORS = {
+      wall:      '#18181b',
+      floor:     '#3f3f46',
+      spawn:     '#064e3b',
+      cover:     '#78350f',
+      hole:      '#082f49',
+      lava:      '#7c2d12',
+      spring:    '#134e4a',
+      chargepad: '#3b0764',
+    }
+    function tileColor(tile) {
+      if (!tile) return '#3f3f46'
+      const props = tile.props || tile
+      const type = props.type || tile.type
+      if (type && TILE_COLORS[type]) return TILE_COLORS[type]
+      if (props.walkable === false || props.walkable === 0) return TILE_COLORS.wall
+      return TILE_COLORS.floor
+    }
+
+    function buildMiniGrid(map) {
+      const { w, h } = mapDims(map)
+      const tiles = parseMapTiles(map)
+      const lookup = {}
+      for (const t of tiles) lookup[`${t.x},${t.y}`] = t
+
+      let cells = ''
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          cells += `<div class="mini-cell" style="background:${tileColor(lookup[`${x},${y}`])}"></div>`
+        }
+      }
+      return `<div class="mini-grid" style="grid-template-columns:repeat(${w},16px)">${cells}</div>`
+    }
+
+    function countWalkable(map) {
+      const tiles = parseMapTiles(map)
+      if (!tiles.length) return 0
+      return tiles.filter(t => {
+        const p = t.props || t
+        return p.walkable !== false && p.walkable !== 0
+      }).length
+    }
+
+    function renderCard(m) {
+      const { w, h } = mapDims(m)
+      const walkable = countWalkable(m)
+      const miniGrid = buildMiniGrid(m)
+
+      return `<div class="map-card" id="mc-${m.id}" onclick="toggleCard('${m.id}')">
+        <div class="map-header">
+          <div class="map-icon">🗺️</div>
+          <div class="map-info">
+            <div class="map-name">${m.name || m.id}</div>
+            <div class="map-meta">${w} × ${h} 格 · ${walkable} 可行走</div>
+          </div>
+          <span class="expand-icon">›</span>
+        </div>
+        ${m.description ? `<div class="map-desc">${m.description}</div>` : ''}
+        <div class="map-stats">
+          <div class="ms-cell"><div class="ms-val">${w}</div><div class="ms-lbl">宽度</div></div>
+          <div class="ms-cell"><div class="ms-val">${h}</div><div class="ms-lbl">高度</div></div>
+          <div class="ms-cell"><div class="ms-val">${walkable}</div><div class="ms-lbl">可走</div></div>
+          <div class="ms-cell"><div class="ms-val">${w * h - walkable}</div><div class="ms-lbl">障碍</div></div>
+        </div>
+        <div class="map-preview">
+          <div class="preview-label">地图预览</div>
+          ${miniGrid}
+          <div class="legend">
+            ${buildLegend(parseMapTiles(m))}
+          </div>
+        </div>
+      </div>`
+    }
+
+    function toggleCard(id) {
+      const card = document.getElementById('mc-' + id)
+      if (card) card.classList.toggle('expanded')
+    }
+
+    loadMaps().then(() => renderList())
+  </script>
+</body>
+</html>

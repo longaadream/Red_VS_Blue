@@ -1,17 +1,9 @@
 import { createMapFromAscii, type AsciiMapConfig, type BoardMap } from './map'
-import arenaJson from '../../data/maps/arena-8x6.json'
-import mediumLavaTempleJson from '../../data/maps/medium-lava-temple.json'
-import largeElementalArenaJson from '../../data/maps/large-elemental-arena.json'
-import largeBattlefieldJson from '../../data/maps/large-battlefield.json'
-import largeElementalTempleJson from '../../data/maps/large-elemental-temple.json'
+import fs from 'fs'
+import path from 'path'
+import { getDataRoot } from '../app-paths'
 
-const allMapConfigs: AsciiMapConfig[] = [
-  arenaJson as AsciiMapConfig,
-  mediumLavaTempleJson as AsciiMapConfig,
-  largeElementalArenaJson as AsciiMapConfig,
-  largeBattlefieldJson as AsciiMapConfig,
-  largeElementalTempleJson as AsciiMapConfig,
-]
+const MAPS_DIR = path.join(getDataRoot(), 'maps')
 
 let mapsCache: Record<string, BoardMap> = {}
 let loaded = false
@@ -19,12 +11,22 @@ let loaded = false
 function ensureLoaded() {
   if (loaded) return
   loaded = true
-  for (const config of allMapConfigs) {
+
+  if (!fs.existsSync(MAPS_DIR)) {
+    console.warn('[map-repository] Maps directory not found:', MAPS_DIR)
+    return
+  }
+
+  const files = fs.readdirSync(MAPS_DIR).filter(f => f.endsWith('.json'))
+  for (const file of files) {
     try {
+      const filePath = path.join(MAPS_DIR, file)
+      const content = fs.readFileSync(filePath, 'utf-8')
+      const config = JSON.parse(content) as AsciiMapConfig
       const map = createMapFromAscii(config)
       mapsCache[map.id] = map
     } catch (e) {
-      console.error('[map-repository] Failed to create map:', config.id, e)
+      console.error('[map-repository] Failed to load map:', file, e)
     }
   }
 }

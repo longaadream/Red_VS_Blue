@@ -1,0 +1,28 @@
+{
+  "id": "effect-recall",
+  "name": "回溯",
+  "icon": "⏪",
+  "color": "#8b5cf6",
+  "visible": true,
+  "initialData": { "actionCount": 0, "targetCount": 3 },
+  "triggers": [
+    {
+      "on": "afterSkillUsed",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return false; var actor = ctx.sourcePiece; if (!actor) return false; var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return actor.ownerPlayerId !== piece.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return { success: false }; var actor = ctx.sourcePiece; if (!actor) return { success: false }; for (var i = battle.extensions.recallData.length - 1; i >= 0; i--) { var recall = battle.extensions.recallData[i]; if (actor.ownerPlayerId === recall.ownerPlayerId) continue; recall.actionCount = (recall.actionCount || 0) + 1; var recallPiece = battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (recall.actionCount >= recall.targetCount) { if (recallPiece && recall.snapshot) { recallPiece.x = recall.snapshot.x; recallPiece.y = recall.snapshot.y; recallPiece.currentHp = Math.min(recall.snapshot.hp, recallPiece.maxHp); if (recall.snapshot.shield !== undefined) recallPiece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) recallPiece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) recallPiece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) recallPiece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); } battle.extensions.recallData.splice(i, 1); } } return { success: false }; }"
+    },
+    {
+      "on": "afterMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return false; var actor = ctx.sourcePiece; if (!actor) return false; var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return actor.ownerPlayerId !== piece.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return { success: false }; var actor = ctx.sourcePiece; if (!actor) return { success: false }; for (var i = battle.extensions.recallData.length - 1; i >= 0; i--) { var recall = battle.extensions.recallData[i]; if (actor.ownerPlayerId === recall.ownerPlayerId) continue; recall.actionCount = (recall.actionCount || 0) + 1; var recallPiece = battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (recall.actionCount >= recall.targetCount) { if (recallPiece && recall.snapshot) { recallPiece.x = recall.snapshot.x; recallPiece.y = recall.snapshot.y; recallPiece.currentHp = Math.min(recall.snapshot.hp, recallPiece.maxHp); if (recall.snapshot.shield !== undefined) recallPiece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) recallPiece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) recallPiece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) recallPiece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); } battle.extensions.recallData.splice(i, 1); } } return { success: false }; }"
+    },
+    {
+      "on": "endTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return false; var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return ctx.playerId !== piece.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return { success: false }; for (var i = battle.extensions.recallData.length - 1; i >= 0; i--) { var recall = battle.extensions.recallData[i]; if (ctx.playerId === recall.ownerPlayerId) continue; var recallPiece = battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (recallPiece && recall.snapshot) { recallPiece.x = recall.snapshot.x; recallPiece.y = recall.snapshot.y; recallPiece.currentHp = Math.min(recall.snapshot.hp, recallPiece.maxHp); if (recall.snapshot.shield !== undefined) recallPiece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) recallPiece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) recallPiece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) recallPiece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); } battle.extensions.recallData.splice(i, 1); } return { success: false }; }"
+    }
+  ]
+}

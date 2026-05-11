@@ -1,0 +1,21 @@
+{
+  "id": "effect-sticky-bomb",
+  "name": "粘性炸弹",
+  "icon": "💣",
+  "color": "#ef4444",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "endTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.stickyBombs || battle.extensions.stickyBombs.length === 0) return false; var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return ctx.playerId !== piece.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.stickyBombs || battle.extensions.stickyBombs.length === 0) return { success: false }; var sourcePiece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); var triggered = false; var messages = []; for (var i = battle.extensions.stickyBombs.length - 1; i >= 0; i--) { var bomb = battle.extensions.stickyBombs[i]; if (ctx.playerId === bomb.ownerPlayerId) continue; bomb.opponentEndTurnsSeen = (bomb.opponentEndTurnsSeen || 0) + 1; if (bomb.opponentEndTurnsSeen < 1) continue; var targetX = bomb.x; var targetY = bomb.y; if (bomb.attachedPieceId) { var attachedPiece = battle.pieces.find(function(p) { return p.instanceId === bomb.attachedPieceId && p.currentHp > 0; }); if (attachedPiece) { targetX = attachedPiece.x; targetY = attachedPiece.y; } } var affected = battle.pieces.filter(function(p) { return p.currentHp > 0 && Math.abs(p.x - targetX) + Math.abs(p.y - targetY) <= 1; }); if (affected.length > 0) { var result = dealDamage(sourcePiece, affected, bomb.damage, 'physical', battle, 'sticky-bomb'); var hitNames = affected.map(function(t, idx) { var dmg = result.results && result.results[idx] ? result.results[idx].damage : 0; return t.name + '(-' + dmg + ')'; }); messages.push('粘性炸弹爆炸！' + hitNames.join('、')); } else { messages.push('粘性炸弹爆炸，但没有命中任何棋子'); } battle.extensions.stickyBombs.splice(i, 1); triggered = true; } return triggered ? { success: true, message: messages.join('；') } : { success: false }; }"
+    },
+    {
+      "on": "afterMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.stickyBombs || battle.extensions.stickyBombs.length === 0) return false; var mover = ctx.sourcePiece; if (!mover) return false; return battle.extensions.stickyBombs.some(function(bomb) { return bomb.attachedPieceId === mover.instanceId; }); }",
+      "effectCode": "function(ctx, battle, self) { if (!battle.extensions || !battle.extensions.stickyBombs || battle.extensions.stickyBombs.length === 0) return { success: false }; var mover = ctx.sourcePiece; if (!mover) return { success: false }; for (var i = 0; i < battle.extensions.stickyBombs.length; i++) { var bomb = battle.extensions.stickyBombs[i]; if (bomb.attachedPieceId === mover.instanceId) { bomb.x = mover.x; bomb.y = mover.y; } } return { success: false }; }"
+    }
+  ]
+}

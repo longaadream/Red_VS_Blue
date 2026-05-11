@@ -1,3 +1,5 @@
+import { getDataRoot } from '@/lib/app-paths'
+
 // 客户端版本的文件加载器，通过API获取数据
 export async function loadJsonFiles<T>(endpoint: string): Promise<Record<string, T>> {
   try {
@@ -24,7 +26,10 @@ function loadJsonFilesServerImpl<T>(directory: string): Record<string, T> {
   
   const { readdirSync, readFileSync, existsSync } = require('fs');
   const { join } = require('path');
-  const dirPath = join(process.cwd(), directory);
+  // directory is passed as e.g. 'data/pieces' — strip the leading 'data/' prefix
+  // so the sub-path is resolved relative to getDataRoot() which already points at data/
+  const subDir = directory.replace(/^data[\\/]/, '')
+  const dirPath = join(getDataRoot(), subDir);
 
   try {
     const files = readdirSync(dirPath, { withFileTypes: true });

@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <script src="js/server-utils.js"></script>
+  <script src="js/lan-discover.js"></script>
+  <script src="js/crypto-lib.js"></script>
+  <script src="js/identity.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 0 0 calc(56px + env(safe-area-inset-bottom));
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1e1b2e 0%, #0f172a 100%);
+      border-bottom: 1px solid #1e293b;
+      padding: 20px 20px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand { display: flex; align-items: baseline; gap: 6px; }
+    .brand-red { font-size: 22px; font-weight: 900; color: #ef4444; letter-spacing: 1px; }
+    .brand-vs  { font-size: 14px; font-weight: 700; color: #64748b; }
+    .brand-blue{ font-size: 22px; font-weight: 900; color: #3b82f6; letter-spacing: 1px; }
+    .version   { font-size: 11px; color: #475569; }
+
+    /* ── User pill ── */
+    .user-pill {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .user-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+
+    /* ── Sections ── */
+    .section { padding: 20px 16px 4px; }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    /* ── Menu items ── */
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+      text-decoration: none;
+      color: inherit;
+      -webkit-user-select: none;
+    }
+    .menu-item:active { background: #263348; border-color: #475569; }
+    .menu-item.primary { border-color: #ef4444; background: #1e1521; }
+    .menu-item.primary:active { background: #2d1a2a; }
+    .menu-item.online { border-color: #3b82f6; background: #111827; }
+    .menu-item.online:active { background: #1a2540; }
+
+    .item-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .icon-red  { background: rgba(239,68,68,.15); }
+    .icon-blue { background: rgba(59,130,246,.15); }
+    .icon-gray { background: rgba(100,116,139,.15); }
+
+    .item-text { flex: 1; }
+    .item-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+    .item-desc  { font-size: 12px; color: #64748b; }
+
+    .item-arrow { color: #475569; font-size: 16px; }
+
+    /* ── Connect overlay ── */
+    .overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .overlay.show { display: flex; }
+    .sheet {
+      background: #1e293b;
+      border-radius: 16px 16px 0 0;
+      padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+      width: 100%;
+      max-width: 480px;
+    }
+    .sheet h3 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+    .sheet p  { font-size: 13px; color: #64748b; margin-bottom: 16px; }
+    input[type="text"], input[type="url"] {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #e2e8f0;
+      font-size: 15px;
+      padding: 12px 14px;
+      outline: none;
+      margin-bottom: 12px;
+    }
+    input:focus { border-color: #3b82f6; }
+    .btn-primary {
+      width: 100%;
+      padding: 13px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary:active { opacity: .85; }
+    .btn-cancel {
+      width: 100%;
+      padding: 11px;
+      background: transparent;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #94a3b8;
+      font-size: 15px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .err { color: #f87171; font-size: 13px; margin-bottom: 10px; display: none; }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      border-radius: 8px;
+      padding: 9px 20px;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+    }
+    .btn-ghost:active { opacity: .7; }
+
+    /* ── LAN scan sheet ── */
+    .lan-progress-bar { height: 3px; background: #1e293b; border-radius: 2px; margin-bottom: 14px; overflow: hidden; }
+    .lan-progress-fill { height: 100%; background: #3b82f6; border-radius: 2px; transition: width .3s; width: 0; }
+    .lan-server-list { max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
+    .lan-server-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #0f172a; border: 1px solid #334155; border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 7px; cursor: pointer;
+    }
+    .lan-server-item:active { background: #1e293b; }
+    .lan-server-ip { font-size: 14px; font-weight: 600; }
+    .lan-server-port { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .lan-empty { text-align: center; color: #475569; font-size: 13px; padding: 16px 0; }
+    .lan-scanning { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8; margin-bottom: 10px; }
+    .spin { display: inline-block; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg) } }
+
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <span class="brand-red">RED</span>
+      <span class="brand-vs">vs</span>
+      <span class="brand-blue">BLUE</span>
+    </div>
+    <div id="userPill" class="user-pill" onclick="openIdentitySheet()" style="cursor:pointer">
+      <div class="user-dot" id="userDot" style="background:#f59e0b"></div>
+      <span id="userName">玩家</span>
+      <span id="userElo" style="font-size:11px;color:#64748b;margin-left:6px"></span>
+    </div>
+  </div>
+
+  <!-- 本地联机 -->
+  <div class="section">
+    <div class="section-label">本地联机</div>
+    <div class="menu-item" style="border-color:#10b981;background:#0a1a14;cursor:pointer" onclick="showHostSheet()">
+      <div class="item-icon" style="background:rgba(16,185,129,.15)">🏠</div>
+      <div class="item-text">
+        <div class="item-title">我当主机</div>
+        <div class="item-desc">本机启动内置服务器，好友扫描加入</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+    <div class="menu-item" style="border-color:#6366f1;background:#0d0d1a;cursor:pointer" onclick="showJoinSheet()">
+      <div class="item-icon" style="background:rgba(99,102,241,.15)">📡</div>
+      <div class="item-text">
+        <div class="item-title">连接主机</div>
+        <div class="item-desc">扫描局域网，连接好友的主机</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+  </div>
+
+  <!-- 服务器联机 -->
+  <div class="section">
+    <div class="section-label">服务器联机</div>
+    <div class="menu-item online" style="cursor:pointer" onclick="showConnectSheet()">
+      <div class="item-icon icon-blue">🌐</div>
+      <div class="item-text">
+        <div class="item-title">连接游戏服务器</div>
+        <div class="item-desc" id="serverStatusDesc">输入服务器地址，与更多玩家联机</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+  </div>
+
+  <!-- 账号 -->
+  <div class="section">
+    <div class="section-label">账号</div>
+    <div class="menu-item" style="cursor:pointer" onclick="openIdentitySheet()">
+      <div class="item-icon icon-gray">👤</div>
+      <div class="item-text">
+        <div class="item-title">账号管理</div>
+        <div class="item-desc">查看 ID、助记词备份、导入账号</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+    <div class="menu-item" style="cursor:pointer" onclick="openRecordsSheet()">
+      <div class="item-icon icon-gray">📊</div>
+      <div class="item-text">
+        <div class="item-title">战绩查询</div>
+        <div class="item-desc" id="recordsSummary">本地对战记录</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+  </div>
+
+  <!-- 单机 -->
+  <div class="section">
+    <div class="section-label">单机</div>
+    <div class="menu-item primary" style="cursor:pointer" onclick="goToTraining()">
+      <div class="item-icon icon-red">🏋️</div>
+      <div class="item-text">
+        <div class="item-title">训练营</div>
+        <div class="item-desc">离线对战练习，无需联网</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+    <div class="menu-item" style="cursor:pointer" onclick="loadPage('pieces.html')">
+      <div class="item-icon icon-gray">📖</div>
+      <div class="item-text">
+        <div class="item-title">棋子图鉴</div>
+        <div class="item-desc">查看所有棋子属性与技能</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+    <div class="menu-item" style="cursor:pointer" onclick="loadPage('maps.html')">
+      <div class="item-icon icon-gray">🗺️</div>
+      <div class="item-text">
+        <div class="item-title">地图图鉴</div>
+        <div class="item-desc">浏览所有游戏地图</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+    <div class="menu-item" style="cursor:pointer" onclick="loadPage('pack.html')">
+      <div class="item-icon icon-gray">📦</div>
+      <div class="item-text">
+        <div class="item-title">资源包管理</div>
+        <div class="item-desc" id="packDesc">导入更新包，无需重装应用</div>
+      </div>
+      <span class="item-arrow">›</span>
+    </div>
+  </div>
+
+  <!-- Pack mismatch warning -->
+  <div id="packMismatchWarn" style="display:none;margin:0 16px 8px;background:#1a1106;border:1px solid #b45309;border-radius:10px;padding:10px 14px;font-size:13px;color:#fbbf24">
+    ⚠️ 资源包与服务器不匹配，请前往 <a href="pack.html" style="color:#60a5fa;text-decoration:underline">资源包管理</a> 重新导入
+  </div>
+
+  <div style="height:calc(24px + env(safe-area-inset-bottom))"></div>
+
+  <!-- ── Connect Sheet ── -->
+  <div class="overlay" id="connectOverlay" onclick="closeOverlay('connectOverlay')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3 style="margin:0">连接游戏服务器</h3>
+        <button onclick="closeOverlay('connectOverlay')" style="background:transparent;border:none;color:#64748b;font-size:22px;cursor:pointer">×</button>
+      </div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:14px">输入服务器地址，开始线上联机对战</p>
+      <div id="currentUrlRow" style="display:none;font-size:12px;color:#64748b;background:#0f172a;border-radius:8px;padding:7px 10px;margin-bottom:10px;word-break:break-all">当前：<span id="currentUrlText"></span></div>
+      <label style="font-size:13px;color:#94a3b8;display:block;margin-bottom:6px">服务器地址</label>
+      <input type="url" id="urlInput" placeholder="http://xxx.example.com:3000" inputmode="url" autocomplete="url" />
+      <div class="err" id="connectErr"></div>
+      <button class="btn-primary" onclick="doConnect()">连接并进入大厅</button>
+      <div id="forceConnectArea" style="display:none;margin-top:8px">
+        <input type="hidden" id="forceConnectUrl">
+        <p style="font-size:12px;color:#94a3b8;text-align:center;margin-bottom:8px">确认服务器可访问，可跳过验证直接连接</p>
+        <button class="btn-ghost" onclick="forceConnect()">强制连接（跳过验证）</button>
+      </div>
+      <button class="btn-cancel" onclick="closeOverlay('connectOverlay')">取消</button>
+    </div>
+  </div>
+
+  <!-- ── 我当主机 Sheet ── -->
+  <div class="overlay" id="hostOverlay" onclick="closeHostSheet()">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3 style="margin:0">我当主机</h3>
+        <button onclick="closeHostSheet()" style="background:transparent;border:none;color:#64748b;font-size:22px;cursor:pointer">×</button>
+      </div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:14px">本机作为服务器，好友通过 IP 地址连接</p>
+      <div id="hostStatus" style="margin-bottom:14px">
+        <div class="lan-scanning"><span class="spin">⟳</span><span>正在启动服务器…</span></div>
+      </div>
+      <div id="hostIpBox" style="display:none;background:#0f172a;border:1px solid #10b981;border-radius:10px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:11px;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">好友连接地址</div>
+        <div id="hostIpList" style="font-size:17px;font-weight:700;color:#34d399;letter-spacing:.5px;line-height:1.8"></div>
+        <div id="hostPortHint" style="font-size:12px;color:#6b7280;margin-top:6px">好友点「连接主机」扫描，或手动输入上方地址</div>
+      </div>
+      <div id="hostErrBox" style="display:none;background:#1a0a0a;border:1px solid #7f1d1d;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#fca5a5"></div>
+      <button id="hostEnterBtn" class="btn-primary" onclick="enterAsHost()" style="display:none;margin-bottom:8px">进入大厅（以主机身份）</button>
+      <button id="hostStopBtn" class="btn-cancel" onclick="stopMobileServer()" style="display:none;margin-bottom:8px;border-color:#ef4444;color:#f87171">停止服务器</button>
+      <button class="btn-cancel" onclick="closeHostSheet()">关闭</button>
+    </div>
+  </div>
+
+  <!-- ── 连接主机 Sheet ── -->
+  <div class="overlay" id="lanOverlay" onclick="closeLanSheet()">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <h3 style="margin:0">连接主机</h3>
+        <button onclick="closeLanSheet()" style="background:transparent;border:none;color:#64748b;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">×</button>
+      </div>
+      <p id="lanSubtitle">正在扫描局域网内的游戏服务器…</p>
+      <div class="lan-progress-bar"><div class="lan-progress-fill" id="lanProgressFill"></div></div>
+      <div class="lan-scanning" id="lanScanningRow"><span class="spin">⟳</span><span id="lanScanningText">快速扫描中（约10秒）…</span></div>
+      <div class="lan-server-list" id="lanServerList">
+        <div class="lan-empty">尚未发现服务器</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn-ghost" id="lanFullBtn" onclick="startFullScan()" style="flex:1">全量扫描（更慢更全）</button>
+        <button class="btn-ghost" id="lanRescanBtn" onclick="startQuickScan()" style="flex:1;display:none">重新快速扫描</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 身份 Sheet ── -->
+  <div class="overlay" id="identityOverlay" onclick="closeIdentitySheet()">
+    <div class="sheet" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <h3 style="margin:0" id="identitySheetTitle">我的账号</h3>
+        <button onclick="closeIdentitySheet()" style="background:transparent;border:none;color:#64748b;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">×</button>
+      </div>
+      <!-- View: main -->
+      <div id="identityViewMain">
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;margin-bottom:16px">
+          <div style="font-size:11px;color:#475569;margin-bottom:4px">玩家 ID</div>
+          <div id="identityIdDisplay" style="font-size:13px;color:#94a3b8;font-family:monospace"></div>
+        </div>
+        <label style="font-size:13px;color:#94a3b8;display:block;margin-bottom:6px">显示名称</label>
+        <input id="identityNameInput" type="text" maxlength="20" placeholder="输入你的显示名称"
+          style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;color:#e2e8f0;font-size:15px;padding:12px 14px;outline:none;box-sizing:border-box;margin-bottom:12px" />
+        <button onclick="saveIdentityName()"
+          style="width:100%;padding:13px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px">保存名称</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="identityShowMnemonic()"
+            style="flex:1;padding:11px;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:10px;font-size:14px;cursor:pointer">查看助记词</button>
+          <button onclick="identityShowImport()"
+            style="flex:1;padding:11px;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:10px;font-size:14px;cursor:pointer">导入账号</button>
+        </div>
+      </div>
+      <!-- View: mnemonic -->
+      <div id="identityViewMnemonic" style="display:none">
+        <div style="background:#1a1106;border:1px solid #b45309;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#fbbf24">
+          ⚠ 请抄写下来保管好，丢失后账号无法找回
+        </div>
+        <div id="mnemonicGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px"></div>
+        <button onclick="copyMnemonic()"
+          style="width:100%;padding:12px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:10px;font-size:14px;cursor:pointer;margin-bottom:8px" id="copyMnemonicBtn">复制全部</button>
+        <button onclick="identityShowMain()"
+          style="width:100%;padding:12px;background:transparent;border:1px solid #334155;color:#64748b;border-radius:10px;font-size:14px;cursor:pointer">返回</button>
+      </div>
+      <!-- View: import -->
+      <div id="identityViewImport" style="display:none">
+        <p style="font-size:13px;color:#64748b;margin-bottom:12px">输入12个英文助记词（空格分隔）来恢复账号。当前账号数据将被覆盖。</p>
+        <textarea id="importMnemonicInput" rows="4" placeholder="word1 word2 word3 ... word12"
+          style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;color:#e2e8f0;font-size:14px;padding:12px 14px;outline:none;box-sizing:border-box;resize:none;margin-bottom:8px;font-family:monospace"></textarea>
+        <div id="importErr" style="color:#f87171;font-size:13px;margin-bottom:8px;display:none"></div>
+        <button onclick="doImportMnemonic()" id="importBtn"
+          style="width:100%;padding:12px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px">导入</button>
+        <button onclick="identityShowMain()"
+          style="width:100%;padding:12px;background:transparent;border:1px solid #334155;color:#64748b;border-radius:10px;font-size:14px;cursor:pointer">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 战绩 Sheet ── -->
+  <div class="overlay" id="recordsOverlay" onclick="closeRecordsSheet()">
+    <div class="sheet" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3 style="margin:0">战绩查询</h3>
+        <button onclick="closeRecordsSheet()" style="background:transparent;border:none;color:#64748b;font-size:22px;cursor:pointer">×</button>
+      </div>
+      <!-- ELO summary -->
+      <div id="recordsEloBox" style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-around;text-align:center">
+        <div><div style="font-size:24px;font-weight:700;color:#e2e8f0" id="recordsElo">1200</div><div style="font-size:11px;color:#64748b;margin-top:2px">ELO</div></div>
+        <div><div style="font-size:24px;font-weight:700;color:#22c55e" id="recordsWins">0</div><div style="font-size:11px;color:#64748b;margin-top:2px">胜</div></div>
+        <div><div style="font-size:24px;font-weight:700;color:#ef4444" id="recordsLosses">0</div><div style="font-size:11px;color:#64748b;margin-top:2px">负</div></div>
+        <div><div style="font-size:24px;font-weight:700;color:#64748b" id="recordsTotal">0</div><div style="font-size:11px;color:#64748b;margin-top:2px">总场</div></div>
+      </div>
+      <!-- Record list -->
+      <div id="recordsList" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div id="recordsEmpty" style="text-align:center;color:#475569;font-size:14px;padding:32px 0;display:none">暂无本地战绩记录<br><span style="font-size:12px;color:#334155;margin-top:6px;display:block">完成对局后战绩将自动保存</span></div>
+      <button onclick="closeRecordsSheet()" style="width:100%;padding:12px;background:transparent;border:1px solid #334155;color:#64748b;border-radius:10px;font-size:14px;cursor:pointer;margin-top:12px">关闭</button>
+    </div>
+  </div>
+
+  <script>
+    // ── 我当主机 ──────────────────────────────────────────────────────────────
+    var _hostServerUrl = ''
+
+    async function showHostSheet() {
+      document.getElementById('hostOverlay').classList.add('show')
+      document.getElementById('hostStatus').innerHTML = '<div class="lan-scanning"><span class="spin">⟳</span><span>正在启动服务器…</span></div>'
+      document.getElementById('hostIpBox').style.display = 'none'
+      document.getElementById('hostErrBox').style.display = 'none'
+      document.getElementById('hostEnterBtn').style.display = 'none'
+      document.getElementById('hostStopBtn').style.display = 'none'
+
+      // Electron: query local server info
+      if (window.electronAPI && window.electronAPI.getHostInfo) {
+        try {
+          const info = await window.electronAPI.getHostInfo()
+          if (info && info.running) {
+            const port = info.port || 3001
+            _hostServerUrl = 'http://localhost:' + port
+            const ips = (info.ips || []).map(ip => `http://${ip}:${port}`)
+            // 启动 UDP 广播，让同局域网的安卓/Windows 设备可以自动发现
+            if (window.electronAPI.startHostBroadcast) window.electronAPI.startHostBroadcast()
+            document.getElementById('hostStatus').innerHTML = '<span style="color:#22c55e">✓ 服务器已运行</span>'
+            document.getElementById('hostIpBox').style.display = 'block'
+            document.getElementById('hostIpList').innerHTML = ips.map(ip => `<div style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText('${ip}')">${ip}</div>`).join('')
+            document.getElementById('hostPortHint').textContent = '好友点「连接主机」→ 自动搜索，或手动输入上方地址'
+            document.getElementById('hostEnterBtn').style.display = 'block'
+          } else {
+            document.getElementById('hostStatus').innerHTML = '<span style="color:#f87171">本地服务器未运行</span>'
+            document.getElementById('hostErrBox').textContent = '请重启应用以启动本地服务器'
+            document.getElementById('hostErrBox').style.display = 'block'
+          }
+        } catch (e) {
+          document.getElementById('hostStatus').innerHTML = '<span style="color:#f87171">获取主机信息失败</span>'
+        }
+        return
+      }
+
+      // Android: start mobile server（非阻塞，回调通知）
+      if (window.RvBBridge && typeof window.RvBBridge.startMobileServer === 'function') {
+        // 服务器就绪回调（由 Java evaluateJavascript 触发）
+        window._onMobileServerReady = function(status) {
+          if (status && (status.running || status.ok)) {
+            let ip = '127.0.0.1'
+            try { if (window.RvBBridge.getLocalIp) ip = window.RvBBridge.getLocalIp() || ip } catch {}
+            _hostServerUrl = 'http://localhost:7878'
+            if (typeof window.RvBBridge.startHostBroadcast === 'function') window.RvBBridge.startHostBroadcast()
+            document.getElementById('hostStatus').innerHTML = '<span style="color:#22c55e">✓ 服务器已启动</span>'
+            document.getElementById('hostIpBox').style.display = 'block'
+            document.getElementById('hostIpList').innerHTML =
+              `<div style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText('http://${ip}:7878')">http://${ip}:7878</div>`
+            document.getElementById('hostPortHint').textContent = '好友点「连接主机」→ 自动搜索，或手动输入上方地址'
+            document.getElementById('hostEnterBtn').style.display = 'block'
+            document.getElementById('hostStopBtn').style.display = 'block'
+          } else {
+            document.getElementById('hostStatus').innerHTML = ''
+            document.getElementById('hostErrBox').textContent = '启动失败：' + ((status && status.error) || '引擎初始化超时')
+            document.getElementById('hostErrBox').style.display = 'block'
+          }
+        }
+        try {
+          const res = JSON.parse(window.RvBBridge.startMobileServer() || '{}')
+          if (res.running) {
+            window._onMobileServerReady(res) // 已在运行
+          } else if (res.starting) {
+            document.getElementById('hostStatus').innerHTML =
+              '<div class="lan-scanning"><span class="spin">⟳</span><span>正在启动游戏引擎…（首次约 30-60 秒）</span></div>'
+            // 等待 Java 回调 window._onMobileServerReady
+          } else {
+            window._onMobileServerReady(res) // 立即失败
+          }
+        } catch (e) {
+          document.getElementById('hostErrBox').textContent = '启动失败：' + e.message
+          document.getElementById('hostErrBox').style.display = 'block'
+          document.getElementById('hostStatus').innerHTML = ''
+        }
+        return
+      }
+
+      // Web browser fallback
+      document.getElementById('hostStatus').innerHTML = '<span style="color:#94a3b8">当前环境不支持主机模式</span>'
+      document.getElementById('hostErrBox').textContent = '请使用 Android 客户端或 Electron 桌面版作为主机'
+      document.getElementById('hostErrBox').style.display = 'block'
+    }
+
+    function closeHostSheet() {
+      document.getElementById('hostOverlay').classList.remove('show')
+    }
+
+    function stopMobileServer() {
+      if (window.RvBBridge && typeof window.RvBBridge.stopMobileServer === 'function') {
+        window.RvBBridge.stopMobileServer()  // 内部会自动调用 stopHostBroadcast
+      }
+      document.getElementById('hostEnterBtn').style.display = 'none'
+      document.getElementById('hostStopBtn').style.display = 'none'
+      document.getElementById('hostIpBox').style.display = 'none'
+      document.getElementById('hostStatus').innerHTML = '<span style="color:#64748b">服务器已停止</span>'
+      _hostServerUrl = ''
+    }
+
+    async function enterAsHost() {
+      if (!_hostServerUrl) return
+      RvBUtils.saveServerUrl(_hostServerUrl)
+      closeHostSheet()
+      await checkPackAndGo(_hostServerUrl, 'local')
+    }
+
+    // ── 加入游戏 (LAN scan) ───────────────────────────────────────────────────
+    var _lanScanner = null
+    var _lanFound = []
+
+    function showJoinSheet() {
+      _lanFound = []
+      document.getElementById('lanOverlay').classList.add('show')
+      document.getElementById('lanSubtitle').textContent = '正在搜索局域网主机…'
+      document.getElementById('lanServerList').innerHTML = '<div class="lan-empty">尚未发现主机</div>'
+      document.getElementById('lanFullBtn').style.display = 'block'
+      document.getElementById('lanRescanBtn').style.display = 'none'
+      document.getElementById('lanScanningRow').style.display = 'flex'
+      document.getElementById('lanProgressFill').style.width = '0%'
+
+      // UDP 广播发现（Android / Electron 双端，约 3 秒出结果）
+      if (window.RvBBridge && typeof window.RvBBridge.discoverHosts === 'function') {
+        // Android 路径：Java 后台监听，结果通过全局回调传回
+        window._onUdpHostFound = function(info) {
+          if (!info || !info.ip || !info.port) return
+          addLanServer({ url: 'http://' + info.ip + ':' + info.port,
+            ip: info.ip, port: info.port, name: (info.name || '局域网主机') + ' 📡' })
+        }
+        window.RvBBridge.discoverHosts(3000)
+      } else if (window.electronAPI && typeof window.electronAPI.startDiscoverHosts === 'function') {
+        // Electron 路径：Node dgram 后台监听，结果通过 IPC 事件推送
+        if (window.electronAPI.offUdpDiscovery) window.electronAPI.offUdpDiscovery()
+        window.electronAPI.onUdpHostFound(function(info) {
+          if (!info || !info.ip || !info.port) return
+          addLanServer({ url: 'http://' + info.ip + ':' + info.port,
+            ip: info.ip, port: info.port, name: (info.name || '局域网主机') + ' 📡' })
+        })
+        window.electronAPI.startDiscoverHosts(3000)
+      }
+
+      startQuickScan()
+    }
+
+    function closeLanSheet() {
+      try { if (_lanScanner) _lanScanner.cancel() } catch {}
+      _lanScanner = null
+      document.getElementById('lanOverlay').classList.remove('show')
+    }
+
+    function startQuickScan() {
+      try { if (_lanScanner) _lanScanner.cancel() } catch {}
+      document.getElementById('lanScanningText').textContent = '快速扫描中（约10秒）…'
+      document.getElementById('lanFullBtn').style.display = 'block'
+      document.getElementById('lanRescanBtn').style.display = 'none'
+      document.getElementById('lanScanningRow').style.display = 'flex'
+      document.getElementById('lanProgressFill').style.width = '0%'
+      _lanScanner = RvBLanDiscover.startLanScan({
+        quick: true,
+        onFound: addLanServer,
+        onProgress: p => { document.getElementById('lanProgressFill').style.width = (p * 100) + '%' },
+        onDone: () => {
+          document.getElementById('lanScanningRow').style.display = 'none'
+          document.getElementById('lanRescanBtn').style.display = 'block'
+          document.getElementById('lanFullBtn').style.display = 'block'
+          document.getElementById('lanSubtitle').textContent = '扫描完成'
+        }
+      })
+    }
+
+    function startFullScan() {
+      try { if (_lanScanner) _lanScanner.cancel() } catch {}
+      document.getElementById('lanScanningText').textContent = '全量扫描中（可能需要1-2分钟）…'
+      document.getElementById('lanFullBtn').style.display = 'none'
+      document.getElementById('lanRescanBtn').style.display = 'none'
+      document.getElementById('lanScanningRow').style.display = 'flex'
+      document.getElementById('lanProgressFill').style.width = '0%'
+      _lanScanner = RvBLanDiscover.startLanScan({
+        quick: false,
+        onFound: addLanServer,
+        onProgress: p => { document.getElementById('lanProgressFill').style.width = (p * 100) + '%' },
+        onDone: () => {
+          document.getElementById('lanScanningRow').style.display = 'none'
+          document.getElementById('lanRescanBtn').style.display = 'block'
+          document.getElementById('lanSubtitle').textContent = '全量扫描完成'
+        }
+      })
+    }
+
+    function addLanServer(info) {
+      const existing = _lanFound.find(s => s.url === info.url)
+      if (existing) return
+      _lanFound.push(info)
+      const list = document.getElementById('lanServerList')
+      const empty = list.querySelector('.lan-empty')
+      if (empty) empty.remove()
+      const div = document.createElement('div')
+      div.className = 'lan-server-item'
+      div.innerHTML = `<div><div class="lan-server-name">${escHtml(info.name || 'RED vs BLUE')}</div><div class="lan-server-url">${escHtml(info.url)}</div></div><button class="lan-join-btn" onclick="connectLanServer('${escHtml(info.url)}')">连接</button>`
+      list.appendChild(div)
+    }
+
+    async function connectLanServer(url) {
+      RvBUtils.saveServerUrl(url)
+      closeLanSheet()
+      await checkPackAndGo(url, 'lan')
+    }
+
+    // ── Page loading ──────────────────────────────────────────────────────────
+    function loadPage(pageName) { window.location.href = pageName }
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+    // ── Training ──────────────────────────────────────────────────────────────
+    async function goToTraining() {
+      // For training, use local embedded server if available
+      const localUrl = await _detectLocalServerUrl()
+      if (localUrl) RvBUtils.saveServerUrl(localUrl)
+      window.location.href = 'battle.html?mode=training'
+    }
+
+    async function _detectLocalServerUrl() {
+      // Android embedded server
+      if (window.RvBBridge) return 'http://localhost:7878'
+      // Electron local server
+      if (window.electronAPI && window.electronAPI.getMode) {
+        try {
+          const mode = await window.electronAPI.getMode()
+          if (mode && mode.localUrl) return mode.localUrl
+        } catch {}
+      }
+      return null
+    }
+
+    // ── Server connect sheet ──────────────────────────────────────────────────
+    function getSavedUrl() { return RvBUtils.getServerUrl() || '' }
+
+    function showConnectSheet() {
+      const saved = getSavedUrl()
+      const currentUrlRow = document.getElementById('currentUrlRow')
+      if (saved) {
+        currentUrlRow.style.display = 'block'
+        document.getElementById('currentUrlText').textContent = saved
+        document.getElementById('serverStatusDesc').textContent = '已连接：' + saved.replace(/^https?:\/\//, '').slice(0, 30)
+      } else {
+        currentUrlRow.style.display = 'none'
+      }
+      document.getElementById('connectErr').style.display = 'none'
+      document.getElementById('forceConnectArea').style.display = 'none'
+      document.getElementById('connectOverlay').classList.add('show')
+    }
+
+    async function doConnect() {
+      const raw = document.getElementById('urlInput').value.trim()
+      const err = document.getElementById('connectErr')
+      err.style.display = 'none'
+      document.getElementById('forceConnectArea').style.display = 'none'
+      if (!raw) { err.textContent = '请输入服务器地址'; err.style.display = 'block'; return }
+      const btn = document.querySelector('#connectOverlay .btn-primary')
+      if (btn) { btn.textContent = '连接中…'; btn.disabled = true }
+      const result = await RvBUtils.validateAndSaveServer(raw, 10000)
+      if (result.success) {
+        closeOverlay('connectOverlay')
+        document.getElementById('serverStatusDesc').textContent = '已连接：' + result.url.replace(/^https?:\/\//, '').slice(0, 30)
+        if (btn) { btn.textContent = '校验资源包…'; btn.disabled = true }
+        await checkPackAndGo(result.url, 'remote')
+      } else {
+        err.textContent = result.isTimeout ? '连接超时（10s），请确认地址可访问' : '无法连接，http 和 https 均失败'
+        err.style.display = 'block'
+        let cleanUrl = raw.trim().replace(/\/$/, '')
+        if (!cleanUrl.startsWith('http')) cleanUrl = 'http://' + cleanUrl
+        document.getElementById('forceConnectUrl').value = cleanUrl
+        document.getElementById('forceConnectArea').style.display = 'block'
+      }
+      if (btn) { btn.textContent = '连接并进入大厅'; btn.disabled = false }
+    }
+
+    async function forceConnect() {
+      const url = document.getElementById('forceConnectUrl').value || document.getElementById('urlInput').value.trim()
+      let cleanUrl = url.trim().replace(/\/$/, '')
+      if (!cleanUrl.startsWith('http')) cleanUrl = 'http://' + cleanUrl
+      RvBUtils.saveServerUrl(cleanUrl)
+      closeOverlay('connectOverlay')
+      document.getElementById('serverStatusDesc').textContent = '已连接：' + cleanUrl.replace(/^https?:\/\//, '').slice(0, 30)
+      await checkPackAndGo(cleanUrl, 'remote')
+    }
+
+    function closeOverlay(id) { document.getElementById(id).classList.remove('show') }
+
+    // ── Identity UI ───────────────────────────────────────────────────────────
+    function refreshUserUI() {
+      try {
+        const identity = RvBIdentity.getIdentity()
+        document.getElementById('userName').textContent = identity ? (identity.displayName || '玩家') : '设置账号'
+        document.getElementById('userDot').style.background = identity ? '#22c55e' : '#f59e0b'
+        // Show ELO
+        const elo = _calcLocalElo()
+        document.getElementById('userElo').textContent = elo !== null ? ('ELO ' + elo) : ''
+      } catch {
+        document.getElementById('userName').textContent = '玩家'
+      }
+      _updateRecordsSummary()
+    }
+
+    function identityShowMain() {
+      document.getElementById('identityViewMain').style.display = 'block'
+      document.getElementById('identityViewMnemonic').style.display = 'none'
+      document.getElementById('identityViewImport').style.display = 'none'
+      document.getElementById('identitySheetTitle').textContent = '我的账号'
+    }
+
+    function identityShowMnemonic() {
+      const words = RvBIdentity.getMnemonic()
+      if (!words) return
+      const grid = document.getElementById('mnemonicGrid')
+      grid.innerHTML = words.map((w, i) =>
+        `<div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:8px;text-align:center"><span style="font-size:10px;color:#475569;display:block">${i+1}</span><span style="font-size:14px;font-family:monospace;color:#e2e8f0">${w}</span></div>`
+      ).join('')
+      document.getElementById('copyMnemonicBtn').textContent = '复制全部'
+      document.getElementById('identityViewMain').style.display = 'none'
+      document.getElementById('identityViewMnemonic').style.display = 'block'
+      document.getElementById('identitySheetTitle').textContent = '助记词备份'
+    }
+
+    function identityShowImport() {
+      document.getElementById('importMnemonicInput').value = ''
+      document.getElementById('importErr').style.display = 'none'
+      document.getElementById('importBtn').textContent = '导入'
+      document.getElementById('importBtn').disabled = false
+      document.getElementById('identityViewMain').style.display = 'none'
+      document.getElementById('identityViewImport').style.display = 'block'
+      document.getElementById('identitySheetTitle').textContent = '导入账号'
+    }
+
+    async function openIdentitySheet() {
+      let identity = RvBIdentity.getIdentity()
+      if (!identity) {
+        document.getElementById('userName').textContent = '创建中…'
+        try { identity = await RvBIdentity.ensureIdentity() } catch {}
+      }
+      if (identity) {
+        document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' · ' + identity.id
+        document.getElementById('identityNameInput').value = identity.displayName || ''
+      }
+      identityShowMain()
+      document.getElementById('identityOverlay').classList.add('show')
+    }
+
+    function closeIdentitySheet() {
+      document.getElementById('identityOverlay').classList.remove('show')
+      refreshUserUI()
+    }
+
+    async function saveIdentityName() {
+      const name = document.getElementById('identityNameInput').value.trim()
+      if (!name) return
+      if (typeof RvBIdentity.setDisplayName === 'function') {
+        RvBIdentity.setDisplayName(name)
+      }
+      const identity = RvBIdentity.getIdentity()
+      if (identity) document.getElementById('identityIdDisplay').textContent = name + ' · ' + identity.id
+      closeIdentitySheet()
+    }
+
+    function copyMnemonic() {
+      const words = RvBIdentity.getMnemonic()
+      if (!words) return
+      const text = words.join(' ')
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          document.getElementById('copyMnemonicBtn').textContent = '已复制！'
+          setTimeout(() => { document.getElementById('copyMnemonicBtn').textContent = '复制全部' }, 1500)
+        })
+      }
+    }
+
+    async function doImportMnemonic() {
+      const input = document.getElementById('importMnemonicInput').value.trim()
+      const errEl = document.getElementById('importErr')
+      const btn = document.getElementById('importBtn')
+      errEl.style.display = 'none'
+      btn.textContent = '导入中…'; btn.disabled = true
+      try {
+        await RvBIdentity.importFromMnemonic(input)
+        btn.textContent = '导入成功！'
+        setTimeout(() => { closeIdentitySheet() }, 800)
+      } catch (e) {
+        errEl.textContent = e.message || '导入失败'
+        errEl.style.display = 'block'
+        btn.textContent = '导入'; btn.disabled = false
+      }
+    }
+
+    // ── Battle Records (localStorage) ─────────────────────────────────────────
+    const RECORDS_KEY = 'rvb_battle_records'
+
+    function _loadRecords() {
+      try { return JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]') } catch { return [] }
+    }
+
+    function _calcLocalElo() {
+      const records = _loadRecords()
+      if (!records.length) return null
+      let elo = 1200
+      const K = 32
+      for (const r of records.slice().sort((a, b) => a.timestamp - b.timestamp)) {
+        const oppElo = 1200 // assume opponent is average
+        const expected = 1 / (1 + Math.pow(10, (oppElo - elo) / 400))
+        const actual = r.result === 'win' ? 1 : r.result === 'draw' ? 0.5 : 0
+        elo = Math.round(elo + K * (actual - expected))
+      }
+      return Math.max(100, elo)
+    }
+
+    function _updateRecordsSummary() {
+      const records = _loadRecords()
+      const wins = records.filter(r => r.result === 'win').length
+      const losses = records.filter(r => r.result === 'loss').length
+      const el = document.getElementById('recordsSummary')
+      if (el) {
+        if (records.length === 0) {
+          el.textContent = '暂无本地战绩记录'
+        } else {
+          el.textContent = `共 ${records.length} 场 · ${wins} 胜 ${losses} 负`
+        }
+      }
+    }
+
+    function openRecordsSheet() {
+      const records = _loadRecords().slice().sort((a, b) => b.timestamp - a.timestamp)
+      const elo = _calcLocalElo()
+      const wins = records.filter(r => r.result === 'win').length
+      const losses = records.filter(r => r.result === 'loss').length
+
+      document.getElementById('recordsElo').textContent = elo !== null ? elo : '1200'
+      document.getElementById('recordsWins').textContent = wins
+      document.getElementById('recordsLosses').textContent = losses
+      document.getElementById('recordsTotal').textContent = records.length
+
+      const list = document.getElementById('recordsList')
+      const empty = document.getElementById('recordsEmpty')
+      if (records.length === 0) {
+        list.innerHTML = ''
+        empty.style.display = 'block'
+      } else {
+        empty.style.display = 'none'
+        list.innerHTML = records.map(r => {
+          const date = new Date(r.timestamp).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          const resultColor = r.result === 'win' ? '#22c55e' : r.result === 'loss' ? '#ef4444' : '#64748b'
+          const resultLabel = r.result === 'win' ? '胜' : r.result === 'loss' ? '负' : '平'
+          const factionIcon = r.myFaction === 'red' ? '🔴' : '🔵'
+          return `<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:13px;color:#e2e8f0;margin-bottom:3px">${factionIcon} vs ${escHtml(r.opponentName || '对手')}</div>
+              <div style="font-size:11px;color:#475569">${date}</div>
+            </div>
+            <div style="font-size:18px;font-weight:700;color:${resultColor}">${resultLabel}</div>
+          </div>`
+        }).join('')
+      }
+      document.getElementById('recordsOverlay').classList.add('show')
+    }
+
+    function closeRecordsSheet() {
+      document.getElementById('recordsOverlay').classList.remove('show')
+    }
+
+    // ── Pack hash check ───────────────────────────────────────────────────────
+    async function checkPackMd5(serverUrl) {
+      try {
+        const res = await fetch(serverUrl + '/api/admin/resource-pack')
+        if (!res.ok) return
+        const data = await res.json()
+        const serverMd5 = data.meta?.md5
+        const clientMd5 = localStorage.getItem('rvb_pack_md5')
+        const warn = document.getElementById('packMismatchWarn')
+        if (warn && serverMd5 && clientMd5 && serverMd5 !== clientMd5) {
+          warn.style.display = 'block'
+        } else if (warn) {
+          warn.style.display = 'none'
+        }
+      } catch {}
+    }
+
+    function goLobby(mode, serverUrl) {
+      if (!mode) {
+        window.location.href = 'lobby.html?v=' + Date.now()
+        return
+      }
+      const params = new URLSearchParams({ server: mode })
+      if (serverUrl) params.set('url', serverUrl)
+      params.set('v', Date.now().toString())
+      window.location.href = 'lobby.html?' + params.toString()
+    }
+
+    async function checkPackAndGo(serverUrl, mode) {
+      try {
+        const res = await fetch(serverUrl + '/api/admin/resource-pack')
+        if (!res.ok) { goLobby(mode, serverUrl); return }
+        const data = await res.json()
+        const serverMd5 = data.meta?.md5
+        const clientMd5 = localStorage.getItem('rvb_pack_md5')
+        if (serverMd5 && clientMd5 && serverMd5 !== clientMd5) {
+          window.location.href = 'pack.html'
+        } else {
+          goLobby(mode, serverUrl)
+        }
+      } catch {
+        goLobby(mode, serverUrl)
+      }
+    }
+
+    function updatePackBadge() {
+      const meta = localStorage.getItem('rvb_pack_meta')
+      if (meta) {
+        try {
+          const { version } = JSON.parse(meta)
+          const el = document.getElementById('packDesc')
+          if (el) el.textContent = '当前版本：' + (version || '已安装')
+        } catch {}
+      }
+    }
+
+    // ── Service Worker ────────────────────────────────────────────────────────
+    if ('serviceWorker' in navigator) {
+      let swRefreshing = false
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (swRefreshing) return
+        swRefreshing = true
+        window.location.reload()
+      })
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        reg.addEventListener('updatefound', () => {
+          reg.installing && reg.installing.addEventListener('statechange', e => {
+            if (e.target.state === 'activated') updatePackBadge()
+          })
+        })
+      }).catch(() => {})
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    window.addEventListener('load', async () => {
+      if (!RvBIdentity.getIdentity()) {
+        try { await RvBIdentity.ensureIdentity() } catch {}
+      }
+      refreshUserUI()
+      updatePackBadge()
+      // Show connected server in server section if saved
+      const saved = getSavedUrl()
+      if (saved) {
+        document.getElementById('serverStatusDesc').textContent = '已连接：' + saved.replace(/^https?:\/\//, '').slice(0, 30)
+      }
+    })
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && document.activeElement === document.getElementById('urlInput')) doConnect()
+    })
+  </script>
+</body>
+</html>

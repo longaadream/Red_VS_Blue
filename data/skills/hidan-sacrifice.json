@@ -1,8 +1,11 @@
 {
   "id": "hidan-sacrifice",
   "name": "狂信者献祭",
-  "description": "飞段对自身造成10点真实伤害；若血誓诅咒激活，诅咒目标同时受到10点真实伤害",
-  "icon": "💀",
+  "description": "对自身造成10点真实伤害。若血誓诅咒已生效，被诅咒目标也会受到10点真实伤害。",
+  "keywords": ["真实伤害"],
+  "targetText": "自身",
+  "effectTags": ["真实伤害"],
+  "icon": "🃏",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 2,
@@ -10,5 +13,5 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var caster = context.piece; var result = dealDamage(caster, caster, 10, 'true', context.battle, context.skill.id); return { success: true, message: caster.name + '发动狂信者献祭，对自身造成' + result.damage + '点真实伤害' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对自身造成10点真实伤害', expectedValues: { selfDamage: 10 } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对自身造成10点真实伤害。若血誓诅咒已生效，被诅咒目标也会受到10点真实伤害。', expectedValues: { selfDamage: 10 } }; }"
 }

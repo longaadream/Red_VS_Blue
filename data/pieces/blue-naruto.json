@@ -16,6 +16,7 @@
     { "skillId": "naruto-shadow-clone", "level": 1 },
     { "skillId": "naruto-sage-mode", "level": 1 }
   ],
-  "rules": ["rule-naruto-clone-endturn-charge"],
+  "rules": [],
+  "initialEffects": [],
   "isDefault": false
 }

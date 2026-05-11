@@ -87,6 +87,13 @@ export interface BattleState {
   extensions?: Record<string, any>
   /** gameStart 触发器是否已触发过（防止重复触发） */
   gameStartFired?: boolean
+  /** 回合开始时待处理的选项选择（被动规则需要玩家选择时使用） */
+  pendingBeginTurnChoice?: {
+    ruleId: string
+    playerId: string
+    options: any[]
+    title: string
+  }
 }
 
 export type BattleAction =
@@ -142,6 +149,30 @@ export type BattleAction =
       targetX?: number
       targetY?: number
       selectedOption?: any
+    }
+  | {
+      type: "beginTurnChoice"
+      playerId: PlayerId
+      selectedOption: any
+    }
+  | {
+      type: "beginTurnTargetSelect"
+      playerId: PlayerId
+      targetPieceId?: string
+      targetX?: number
+      targetY?: number
+    }
+  | {
+      type: "endTurnChoice"
+      playerId: PlayerId
+      selectedOption: any
+    }
+  | {
+      type: "endTurnTargetSelect"
+      playerId: PlayerId
+      targetPieceId?: string
+      targetX?: number
+      targetY?: number
     }
 
 export class BattleRuleError extends Error {

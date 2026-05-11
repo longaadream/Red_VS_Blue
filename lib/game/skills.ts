@@ -1,13 +1,15 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import { globalTriggerSystem } from "./triggers"
+import { rng } from "./rng"
+import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 
 // 简单的日志写入函数
 function writeLog(message: string) {
   try {
     const fs = require('fs')
     const path = require('path')
-    const logDir = path.join(process.cwd(), 'logs')
+    const logDir = path.join(getUserDataDir(), 'logs')
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true })
     }
@@ -113,7 +115,7 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
     return false
   }
   
-  const instanceId = `ci-${cardId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+  const instanceId = `ci-${cardId}-${Math.floor(rng() * 1e9)}`
   const staticCard = loadCardById(cardId)
   const customCard = (battle as any).customCards?.[cardId]
   const cardDef = staticCard || customCard
@@ -178,7 +180,7 @@ export function loadCardById(cardId: string, forceReload = false): CardDefinitio
   try {
     const fs = require('fs')
     const path = require('path')
-    const cardPath = path.join(process.cwd(), 'data', 'cards', `${cardId}.json`)
+    const cardPath = path.join(getDataRoot(), 'cards', `${cardId}.json`)
     if (fs.existsSync(cardPath)) {
       const cardData: CardDefinition = JSON.parse(fs.readFileSync(cardPath, 'utf8'))
       cardCache.set(cardId, cardData)
@@ -226,7 +228,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     },
 
     dealDamage: (attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = 'true', _battleState?: BattleState, skillId?: string) => {
-      return dealDamage(attacker, target, baseDamage, damageType, battle, skillId)
+      return dealDamage(attacker, target, baseDamage, damageType, battle, skillId, false, undefined, context.selectedOption)
     },
 
     healDamage: (healer: PieceInstance, target: PieceInstance | PieceInstance[], baseHeal: number, _battleState?: BattleState, skillId?: string) => {
@@ -443,7 +445,7 @@ function loadSkillById(skillId: string): SkillDefinition | null {
   try {
     const fs = require('fs');
     const path = require('path');
-    const skillPath = path.join(process.cwd(), 'data', 'skills', `${skillId}.json`);
+    const skillPath = path.join(getDataRoot(), 'skills', `${skillId}.json`);
     const content = fs.readFileSync(skillPath, 'utf-8');
     return JSON.parse(content) as SkillDefinition;
   } catch (e) {
@@ -457,7 +459,7 @@ export function loadAllSkillsById(): Record<string, SkillDefinition> {
   try {
     const fs = require('fs');
     const path = require('path');
-    const skillsDir = path.join(process.cwd(), 'data', 'skills');
+    const skillsDir = path.join(getDataRoot(), 'skills');
     const files: string[] = fs.readdirSync(skillsDir).filter((f: string) => f.endsWith('.json'));
     const result: Record<string, SkillDefinition> = {};
     for (const file of files) {
@@ -488,8 +490,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
     const fs = require('fs');
     const path = require('path');
     
-    // 尝试使用process.cwd()来获取当前工作目录，确保路径正确
-    const rulePath = path.join(process.cwd(), 'data', 'rules', `${ruleId}.json`);
+    const rulePath = path.join(getDataRoot(), 'rules', `${ruleId}.json`);
     console.log(`[loadRuleById] Looking for rule at: ${rulePath}`);
     
     if (fs.existsSync(rulePath)) {
@@ -639,13 +640,40 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               return false
             };
 
+            const selectOption = (config: any) => {
+              if (context.selectedOption !== undefined) return context.selectedOption;
+              return { needsOptionSelection: true, options: config.options, title: config.title || '请选择' };
+            };
+
+            // ── 新统一效果 API（供 rule skillCode 使用）──────────────
+            const applyEffect = (pieceId: string, effectId: string, dataOverrides?: any) => {
+              const { applyEffectToPiece } = require('./attached-effect');
+              return applyEffectToPiece(battle, pieceId, effectId, dataOverrides);
+            };
+            const removeEffect = (pieceId: string, effectId: string) => {
+              const { removeEffectFromPiece } = require('./attached-effect');
+              return removeEffectFromPiece(battle, pieceId, effectId);
+            };
+            const getPieceEffect = (pieceId: string, effectId: string) => {
+              const { getEffectOnPiece } = require('./attached-effect');
+              return getEffectOnPiece(battle, pieceId, effectId);
+            };
+            const fireEvent = (eventName: string, ctx: any) => {
+              return globalTriggerSystem.checkTriggers(battle, { ...ctx, type: eventName });
+            };
+
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent) {
                 ${ruleData.skillCode}
-              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById)
+              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent)
             `;
-            
+
+            if (ruleId === 'rule-shishio-combustion') {
+              const ctr = (context.rulePiece?.statusTags ?? []).find((t: any) => t.type === 'shishio-dmg-counter');
+              console.log(`[combustion-debug] skillId="${context.skillId ?? 'undefined'}" damage=${context.damage} src=${context.sourcePiece?.name} tgt=${context.targetPiece?.name} counter_before=${ctr?.intensity ?? 0}`);
+            }
             const result = eval(codeEnvironment);
+            if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
             console.error('[Rule] Error executing skillCode:', error);
@@ -660,8 +688,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             writeLog(`[triggerSkill] Triggering skill: ${skillId} for rule: ${ruleId}, context.playerId: ${context.playerId}`);
             if (skillId) {
               console.log(`Triggering skill: ${skillId} for rule: ${ruleId}`);
-              // 直接从文件加载技能定义，使用process.cwd()确保路径正确
-              const skillPath = path.join(process.cwd(), 'data', 'skills', `${skillId}.json`);
+              const skillPath = path.join(getDataRoot(), 'skills', `${skillId}.json`);
               if (fs.existsSync(skillPath)) {
                 try {
                   const skillContent = fs.readFileSync(skillPath, 'utf8');
@@ -1032,6 +1059,28 @@ export interface SkillExecutionContext {
   } | null
   /** 用户通过选项选择器选择的值，未选择时为 undefined */
   selectedOption?: any
+  /**
+   * 多步目标选择结果数组（通用 N 目标支持）。
+   * targets[0] 与 target/targetPosition 相同（向后兼容）。
+   * targets[1] 为第二次 selectTarget，targets[2] 为第三次，以此类推。
+   * 每项：{ info: PieceInfo|null, pos: {x,y}|null }
+   */
+  targets?: Array<{
+    info: {
+      instanceId: string
+      templateId: string
+      ownerPlayerId: string
+      currentHp: number
+      maxHp: number
+      attack: number
+      defense: number
+      x: number
+      y: number
+    } | null
+    pos: { x: number; y: number } | null
+  }>
+  /** selectTarget 调用计数（内部使用，追踪多次目标选择） */
+  _selectTargetCallCount?: number
   battle: {
     turn: number
     currentPlayerId: string
@@ -1377,7 +1426,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
 // 效果函数
 function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, target?: { x: number, y: number }, context?: SkillExecutionContext) {
   const selectors = createTargetSelectors(battle, sourcePiece);
-  
+
   return {
     // 目标选择器
     select: selectors,
@@ -1400,7 +1449,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
       };
     },
 
-    // 目标选择函数 - 用于在技能代码中唤起目标选择
+    // 目标选择函数 - 用于在技能代码中唤起目标选择（支持顺序 N 次调用）
     selectTarget: (options?: {
       type: 'piece' | 'grid';
       range?: number;
@@ -1412,17 +1461,27 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         filter: 'enemy' as const,
         ...options
       };
-      
+
+      // 追踪本次技能执行中 selectTarget 的调用次数
+      if (!context._selectTargetCallCount) context._selectTargetCallCount = 0;
+      const callIdx = context._selectTargetCallCount;
+      context._selectTargetCallCount = callIdx + 1;
+
+      // 从 targets[] 数组中取出本次调用对应的目标槽（支持任意次数）
+      const targetsArr = context.targets || [];
+      const activeSlot = callIdx < targetsArr.length ? targetsArr[callIdx] : null;
+      const activeTarget = activeSlot?.info || null;
+      const activePos = activeSlot?.pos ||
+        (callIdx === 0 ? context.targetPosition : null);
+
       // 检查是否已经有目标信息（用户已经选择了目标）
-      // 使用context参数来获取目标信息
-      if (defaultOptions.type === 'piece' && context && context.target) {
+      if (defaultOptions.type === 'piece' && context && activeTarget) {
         // 检查目标是否符合filter要求
-        const isAlly = context.target.ownerPlayerId === sourcePiece.ownerPlayerId;
+        const isAlly = activeTarget.ownerPlayerId === sourcePiece.ownerPlayerId;
         const isEnemy = !isAlly;
-        
+
         // 根据filter参数检查目标是否符合要求
         if (defaultOptions.filter === 'ally' && !isAlly) {
-          // 目标是敌方，但filter要求是友方，返回需要重新选择目标
           return {
             needsTargetSelection: true,
             targetType: defaultOptions.type,
@@ -1430,7 +1489,6 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
             filter: defaultOptions.filter
           };
         } else if (defaultOptions.filter === 'enemy' && !isEnemy) {
-          // 目标是友方，但filter要求是敌方，返回需要重新选择目标
           return {
             needsTargetSelection: true,
             targetType: defaultOptions.type,
@@ -1438,12 +1496,11 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
             filter: defaultOptions.filter
           };
         }
-        
+
         // 检查目标是否在范围内
-        if (defaultOptions.range !== undefined && context.target.x !== undefined && context.target.y !== undefined) {
-          const distance = Math.abs(sourcePiece.x - context.target.x) + Math.abs(sourcePiece.y - context.target.y);
+        if (defaultOptions.range !== undefined && activeTarget.x !== undefined && activeTarget.y !== undefined) {
+          const distance = Math.abs(sourcePiece.x - activeTarget.x) + Math.abs(sourcePiece.y - activeTarget.y);
           if (distance > defaultOptions.range) {
-            console.log(`Target out of range: distance=${distance}, range=${defaultOptions.range}`);
             return {
               needsTargetSelection: true,
               targetType: defaultOptions.type,
@@ -1452,49 +1509,25 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
             };
           }
         }
-        
+
         // 尝试从battle.pieces中查找原始目标实例
-        const targetInstanceId = context.target.instanceId;
-        console.log('=== selectTarget debug ===');
-        console.log('Target instance ID from context:', targetInstanceId);
-        console.log('Number of pieces in battle.pieces:', battle.pieces.length);
-        console.log('Pieces in battle.pieces:', battle.pieces.map(p => ({ instanceId: p.instanceId, templateId: p.templateId })));
-        console.log('Context target:', context.target);
-        
+        const targetInstanceId = activeTarget.instanceId;
         if (targetInstanceId) {
-          // 遍历battle.pieces，确保找到正确的实例
           for (let i = 0; i < battle.pieces.length; i++) {
             const piece = battle.pieces[i];
-            console.log(`Checking piece ${i}:`, piece.instanceId, 'vs target:', targetInstanceId);
-            console.log(`Type comparison: ${typeof piece.instanceId} vs ${typeof targetInstanceId}`);
-            console.log(`Strict equality: ${piece.instanceId === targetInstanceId}`);
-            console.log(`Loose equality: ${piece.instanceId == targetInstanceId}`);
-            
             if (piece.instanceId === targetInstanceId) {
-              console.log('Found original target piece by direct comparison:', piece);
-              // 返回原始实例，这样修改会影响到battle.pieces中的对象
-              console.log('Returning original target piece');
               return piece;
             }
           }
         }
-        
+
         // 如果通过instanceId找不到，尝试通过位置查找
-        if (context.target.x !== undefined && context.target.y !== undefined) {
-          console.log('Attempting to find target by position:', context.target.x, context.target.y);
-          const targetByPosition = battle.pieces.find(p => {
-            const match = p.x === context.target.x && p.y === context.target.y;
-            console.log(`Checking piece at ${p.x},${p.y}: ${match}`);
-            return match;
-          });
-          if (targetByPosition) {
-            console.log('Found target piece by position:', targetByPosition);
-            return targetByPosition;
-          }
+        if (activeTarget.x !== undefined && activeTarget.y !== undefined) {
+          const targetByPosition = battle.pieces.find(p => p.x === activeTarget.x && p.y === activeTarget.y);
+          if (targetByPosition) return targetByPosition;
         }
-        
+
         // 目标找不到，请求重新选择目标
-        console.warn('Target piece not found in battle.pieces, requesting target selection');
         return {
           needsTargetSelection: true,
           targetType: defaultOptions.type,
@@ -1502,11 +1535,8 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
           filter: defaultOptions.filter
         };
       } else if (defaultOptions.type === 'grid' && context) {
-        // 如果需要选择格子，检查context中的目标信息
-        const gridPos = context.targetPosition ??
-          (context.target && context.target.x !== undefined && context.target.y !== undefined
-            ? { x: context.target.x, y: context.target.y }
-            : null);
+        // 如果需要选择格子，从 targets[] 或 targetPosition 中取坐标
+        const gridPos = activePos;
         if (gridPos) {
           // 距离校验：使用切比雪夫距离（max(|dx|,|dy|)），对应 "N×N 格" 的描述
           if (defaultOptions.range !== undefined) {
@@ -1581,7 +1611,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
           });
           
           if (availableTiles.length > 0) {
-            const randomTile = availableTiles[Math.floor(Math.random() * availableTiles.length)];
+            const randomTile = availableTiles[Math.floor(rng() * availableTiles.length)];
             sourcePiece.x = randomTile.x;
             sourcePiece.y = randomTile.y;
             return { type: "teleport", target: randomTile, success: true };
@@ -1618,7 +1648,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
  * @param skillId 技能ID（可选）
  * @returns 伤害结果
  */
-export function dealDamage(attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType, battle: BattleState, skillId?: string, skipBeforeTrigger = false, killerPlayerId?: string): any {
+export function dealDamage(attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType, battle: BattleState, skillId?: string, skipBeforeTrigger = false, killerPlayerId?: string, selectedOption?: any): any {
   // 支持传入目标数组：beforeDamageDealt 只触发一次，buff 只消耗一次，对所有目标生效
   if (Array.isArray(target)) {
     if (target.length === 0) {
@@ -1631,9 +1661,13 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
       targetPiece: target[0],
       target: target[0],
       damage: baseDamage,
-      skillId
+      skillId,
+      selectedOption
     };
     const beforeRes = globalTriggerSystem.checkTriggers(battle, damageCtx);
+    if (beforeRes.needsOptionSelection) {
+      throw { needsOptionSelection: true, options: beforeRes.options, title: beforeRes.title };
+    }
     if (beforeRes.blocked) {
       if (!battle.actions) battle.actions = [];
       battle.actions.push({
@@ -1663,11 +1697,17 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
       targetPiece: target,
       target: target,
       damage: baseDamage,
-      skillId
+      skillId,
+      selectedOption
     };
 
     // 触发即将造成伤害前的触发器
     const beforeDamageDealtResult = globalTriggerSystem.checkTriggers(battle, damageContext);
+
+    // 检查是否需要玩家选择选项（如处决/正常造成伤害）
+    if (beforeDamageDealtResult.needsOptionSelection) {
+      throw { needsOptionSelection: true, options: beforeDamageDealtResult.options, title: beforeDamageDealtResult.title };
+    }
 
     // 检查是否有规则阻止了伤害
     if (beforeDamageDealtResult.blocked) {
@@ -1698,6 +1738,19 @@ export function dealDamage(attacker: PieceInstance, target: PieceInstance | Piec
 
     // 触发器可能已经修改了 damageContext.damage，使用修改后的值
     modifiedBaseDamage = damageContext.damage;
+
+    // 将 beforeDamageDealt 触发器的消息添加到战斗日志
+    if (beforeDamageDealtResult.messages.length > 0) {
+      if (!battle.actions) battle.actions = [];
+      beforeDamageDealtResult.messages.forEach(message => {
+        battle.actions!.push({
+          type: "triggerEffect",
+          playerId: attacker.ownerPlayerId,
+          turn: battle.turn?.turnNumber || 0,
+          payload: { message }
+        });
+      });
+    }
   }
 
   // 触发即将受到伤害前的触发器
@@ -2272,6 +2325,26 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         }
         return false;
       },
+      // ── 新统一效果系统 API ──────────────────────────────────────────
+      /** 将 data/effects/{effectId}.json 效果挂载到棋子（替代 addStatusEffectById + addRuleById 组合） */
+      applyEffect: (pieceId: string, effectId: string, dataOverrides?: Record<string, any>) => {
+        const { applyEffectToPiece } = require('./attached-effect')
+        return applyEffectToPiece(battle, pieceId, effectId, dataOverrides)
+      },
+      /** 从棋子移除效果（自动清理 statusTag，替代 removeStatusEffectById + removeRuleById） */
+      removeEffect: (pieceId: string, effectId: string) => {
+        const { removeEffectFromPiece } = require('./attached-effect')
+        return removeEffectFromPiece(battle, pieceId, effectId)
+      },
+      /** 获取棋子上的效果实例（不存在时返回 null） */
+      getPieceEffect: (pieceId: string, effectId: string) => {
+        const { getEffectOnPiece } = require('./attached-effect')
+        return getEffectOnPiece(battle, pieceId, effectId)
+      },
+      /** 触发任意字符串名称的事件（包括自定义事件，其他效果可通过 "on" 字段监听） */
+      fireEvent: (eventName: string, ctx: any) => {
+        return globalTriggerSystem.checkTriggers(battle, { ...ctx, type: eventName })
+      },
       // 技能管理函数
       addSkillById: (targetPieceId: string, skillId: string) => {
         // 找到目标棋子
@@ -2552,35 +2625,10 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
 }
 
 // 检查技能执行后是否造成伤害或击杀
-function checkForDamageAndKill(battle: BattleState, beforeState: any, sourcePiece: PieceInstance, skillId: string) {
-  // 检查每个敌人的状态变化
-  for (const beforeEnemy of beforeState.enemies) {
-    const afterEnemy = battle.pieces.find(p => p.instanceId === beforeEnemy.instanceId);
-    if (afterEnemy && afterEnemy.currentHp < beforeEnemy.currentHp) {
-      // 造成了伤害
-      const damage = beforeEnemy.currentHp - afterEnemy.currentHp;
-      
-      // 触发伤害规则
-      globalTriggerSystem.checkTriggers(battle, {
-        type: "afterDamageDealt",
-        sourcePiece,
-        targetPiece: afterEnemy,
-        damage,
-        skillId
-      });
-
-      // 检查是否击杀
-      if (afterEnemy.currentHp === 0 && beforeEnemy.currentHp > 0) {
-        // 触发击杀规则
-        globalTriggerSystem.checkTriggers(battle, {
-          type: "afterPieceKilled",
-          sourcePiece,
-          targetPiece: afterEnemy,
-          skillId
-        });
-      }
-    }
-  }
+function checkForDamageAndKill(_battle: BattleState, _beforeState: any, _sourcePiece: PieceInstance, _skillId: string) {
+  // afterDamageDealt and afterPieceKilled are already fired inside dealDamage() for each hit.
+  // Firing them again here would cause double-counting in rules like rule-shishio-combustion.
+  // This function is intentionally left as a no-op.
 }
 
 // 计算技能的预期效果（用于显示）

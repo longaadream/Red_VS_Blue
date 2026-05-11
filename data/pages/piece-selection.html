@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>选择棋子 - RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <script src="js/server-utils.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh;
+      padding: 0 0 calc(80px + env(safe-area-inset-bottom));
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px;
+      background: #0f172a; border-bottom: 1px solid #1e293b;
+      position: sticky; top: 0; z-index: 20;
+    }
+    .back-btn {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      color: #94a3b8; padding: 6px 11px; font-size: 14px; cursor: pointer;
+      text-decoration: none; flex-shrink: 0;
+    }
+    .back-btn:active { opacity: .7; }
+    .topbar-title { font-size: 16px; font-weight: 700; flex: 1; }
+
+    /* ── Section ── */
+    .section { padding: 16px 14px 8px; }
+    .section-label {
+      font-size: 11px; font-weight: 700; color: #475569;
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;
+    }
+
+    /* ── Piece cards ── */
+    .piece-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .piece-card {
+      background: #1e293b; border: 2px solid #334155;
+      border-radius: 12px; padding: 12px;
+      cursor: pointer; transition: border-color .15s, background .15s;
+      -webkit-user-select: none;
+    }
+    .piece-card:active { background: #263348; }
+    .piece-card.selected { border-color: #3b82f6; background: rgba(59,130,246,.1); }
+    .piece-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .piece-avatar {
+      width: 36px; height: 36px; border-radius: 8px;
+      object-fit: cover; flex-shrink: 0;
+    }
+    .piece-avatar-ph {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: #0f172a; display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .piece-name { font-size: 14px; font-weight: 600; flex: 1; }
+    .piece-stats { font-size: 11px; color: #64748b; line-height: 1.6; }
+    .check-mark {
+      font-size: 16px; color: #3b82f6; font-weight: 700;
+      position: absolute; top: 8px; right: 10px;
+    }
+    .piece-card { position: relative; }
+
+    /* ── Confirm bar ── */
+    .confirm-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #0f172a; border-top: 1px solid #1e293b;
+      padding: 6px 14px calc(6px + env(safe-area-inset-bottom));
+      z-index: 50;
+    }
+    .confirm-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 4px;
+    }
+    .selected-count { font-size: 13px; color: #64748b; flex: 1; }
+    .btn-confirm {
+      background: #3b82f6; color: #fff; border: none;
+      border-radius: 10px; padding: 12px 24px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .btn-confirm:disabled { opacity: .4; cursor: default; }
+    .btn-confirm:not(:disabled):active { opacity: .85; }
+    .server-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .server-label { font-size: 11px; color: #475569; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn-disconnect-sm {
+      background: transparent; border: 1px solid #ef4444; color: #f87171;
+      border-radius: 6px; padding: 3px 10px; font-size: 11px; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-disconnect-sm:active { opacity: .7; }
+
+    /* ── Waiting overlay ── */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.8); z-index: 200;
+      flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 20px;
+    }
+    .overlay.show { display: flex; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 5px solid #1e293b; border-top-color: #3b82f6;
+      border-radius: 50%; margin-bottom: 20px;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .wait-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .wait-sub { font-size: 14px; color: #64748b; }
+
+    /* ── Loading ── */
+    .loading { text-align: center; padding: 60px 20px; color: #475569; font-size: 14px; }
+    .loading-spinner {
+      width: 36px; height: 36px;
+      border: 4px solid #1e293b; border-top-color: #3b82f6;
+      border-radius: 50%; margin: 0 auto 16px;
+      animation: spin .7s linear infinite;
+    }
+
+    /* ── Windows hover ── */
+    @media (hover: hover) {
+      .piece-card:hover { background: #263348; }
+      .piece-card.selected:hover { background: rgba(59,130,246,.15); }
+      .back-btn:hover { background: #263348; }
+    }
+
+    /* ── Piece detail popup ── */
+    .detail-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 300;
+      align-items: flex-end; justify-content: center;
+    }
+    .detail-overlay.show { display: flex; }
+    .detail-sheet {
+      background: #1e293b; border-radius: 16px 16px 0 0;
+      padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+      width: 100%; max-width: 480px;
+      max-height: 80vh; overflow-y: auto;
+    }
+    .detail-head {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    }
+    .detail-avatar {
+      width: 56px; height: 56px; border-radius: 12px; object-fit: cover; flex-shrink: 0;
+    }
+    .detail-avatar-ph {
+      width: 56px; height: 56px; border-radius: 12px;
+      background: #0f172a; display: flex; align-items: center; justify-content: center;
+      font-size: 28px; flex-shrink: 0;
+    }
+    .detail-name { font-size: 18px; font-weight: 700; }
+    .detail-faction { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .detail-stats-row {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 6px; margin-bottom: 14px;
+    }
+    .detail-stat {
+      background: #0f172a; border-radius: 8px;
+      padding: 8px 6px; text-align: center;
+    }
+    .detail-stat-val { font-size: 16px; font-weight: 700; }
+    .detail-stat-label { font-size: 10px; color: #64748b; margin-top: 2px; }
+    .detail-desc {
+      font-size: 13px; color: #94a3b8; margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .detail-skills-label {
+      font-size: 11px; font-weight: 700; color: #475569;
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px;
+    }
+    .skill-entry {
+      background: #0f172a; border-radius: 10px;
+      padding: 10px 12px; margin-bottom: 8px;
+    }
+    .skill-entry-head {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+    }
+    .skill-icon { font-size: 18px; }
+    .skill-name { font-size: 14px; font-weight: 600; flex: 1; }
+    .skill-type-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 6px;
+      border-radius: 4px; background: #1e293b; color: #64748b;
+    }
+    .skill-type-super { background: rgba(168,85,247,.2); color: #a855f7; }
+    .skill-type-buff  { background: rgba(34,197,94,.15); color: #22c55e; }
+    .skill-meta { font-size: 11px; color: #475569; margin-bottom: 4px; }
+    .skill-desc { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+    .btn-close-detail {
+      width: 100%; margin-top: 12px;
+      background: transparent; border: 1px solid #334155;
+      border-radius: 10px; color: #94a3b8;
+      padding: 11px; font-size: 15px; cursor: pointer;
+    }
+    .btn-close-detail:active { opacity: .7; }
+    .detail-related-label {
+      font-size: 11px; font-weight: 700; color: #a855f7;
+      letter-spacing: 1.5px; text-transform: uppercase; margin: 12px 0 6px;
+    }
+    .detail-related-card {
+      background: #0f172a; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+    }
+    .detail-related-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .detail-related-type { font-size: 10px; color: #475569; }
+    .detail-related-desc { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .detail-keyword-label {
+      font-size: 11px; font-weight: 700; color: #22c55e;
+      letter-spacing: 1.5px; text-transform: uppercase; margin: 12px 0 6px;
+    }
+    .detail-keyword-row { display: flex; gap: 8px; padding: 4px 0; }
+    .detail-keyword-name { font-size: 12px; font-weight: 600; color: #a855f7; }
+    .detail-keyword-desc { font-size: 11px; color: #64748b; }
+    .hint-bar {
+      text-align: center; font-size: 11px; color: #334155;
+      padding: 6px 0 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <a class="back-btn" href="lobby.html">← 返回</a>
+    <div class="topbar-title">选择出战棋子</div>
+    <div id="factionBadge" style="font-size:13px;padding:4px 10px;border-radius:6px;background:#1e293b;border:1px solid #334155;color:#64748b;flex-shrink:0">加载中…</div>
+  </div>
+
+  <!-- Piece list -->
+  <div class="section">
+    <div class="section-label" id="sectionLabel">可用棋子（可多选）</div>
+    <div class="hint-bar">右键 / 长按 棋子可查看技能详情</div>
+    <div id="pieceGrid" class="piece-grid" style="margin-top:8px">
+      <div class="loading" style="grid-column:1/-1">
+        <div class="loading-spinner"></div>
+        <div>加载棋子数据…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm bar + server row -->
+  <div class="confirm-bar">
+    <div class="confirm-row">
+      <div class="selected-count" id="selectedCount">已选 0 个棋子</div>
+      <button class="btn-confirm" id="confirmBtn" disabled onclick="confirmSelection()">确认出战 →</button>
+    </div>
+    <div class="server-row">
+      <span class="server-label" id="serverLabel">⚫ 未连接</span>
+      <button class="btn-disconnect-sm" id="disconnectBtn" onclick="doDisconnect()" style="display:none">断开服务器</button>
+    </div>
+  </div>
+
+  <!-- Piece detail popup -->
+  <div class="detail-overlay" id="detailOverlay" onclick="closePieceDetail()">
+    <div class="detail-sheet" onclick="event.stopPropagation()">
+      <div id="detailContent"></div>
+      <button class="btn-close-detail" onclick="closePieceDetail()">关闭</button>
+    </div>
+  </div>
+
+  <!-- Waiting overlay -->
+  <div class="overlay" id="waitOverlay">
+    <div class="spinner"></div>
+    <div class="wait-title">等待对方选择棋子…</div>
+    <div class="wait-sub" id="waitSub">房间 ID: —</div>
+  </div>
+
+  <script>
+    // ── URL params ──
+    const params = new URLSearchParams(location.search)
+    const roomId = params.get('roomId') || ''
+    const playerId = params.get('playerId') || ('anon-' + Date.now())
+    const playerName = params.get('playerName') || '玩家'
+
+    // RvBUtils loaded from js/server-utils.js
+    const getServerUrl = () => RvBUtils.getServerUrl()
+
+    // ── Piece data ──
+    let PIECE_TEMPLATES = []
+    let selectedIds = new Set()
+    let pollTimer = null
+    let playerFaction = null   // 'red' | 'blue' | null
+
+    // ── Skill cache ──
+    const SKILL_CACHE = {}
+
+    async function fetchJson(path) {
+      if (window.fetchPackJson && /^\.?\/?data\//.test(path)) {
+        return window.fetchPackJson(path)
+      }
+      const res = await fetch(path)
+      if (!res.ok) throw new Error(res.status)
+      return res.json()
+    }
+
+    // Fetch player's faction from room data, then load matching pieces
+    async function init() {
+      updateServerRow()
+
+      // Try to get faction from room
+      if (roomId && RvBUtils.getServerUrl()) {
+        try {
+          const res = await RvBUtils.serverFetch('/api/rooms/' + roomId)
+          if (res.ok) {
+            const room = await res.json()
+            const me = (room.players || []).find(p =>
+              p.id && p.id.toLowerCase() === playerId.toLowerCase()
+            )
+            if (me && me.faction) playerFaction = me.faction
+          }
+        } catch {}
+
+        // If still no faction, claim one automatically
+        if (!playerFaction) {
+          try {
+            const claimRes = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ playerId, playerName, action: 'claim-faction' })
+            })
+            if (claimRes.ok) {
+              const claimData = await claimRes.json()
+              if (claimData.faction) playerFaction = claimData.faction
+            }
+          } catch {}
+        }
+      }
+
+      updateFactionBadge()
+      await loadPieces()
+    }
+
+    function updateFactionBadge() {
+      const badge = document.getElementById('factionBadge')
+      const label = document.getElementById('sectionLabel')
+      if (!badge) return
+      if (playerFaction === 'red') {
+        badge.textContent = '🔴 红方'
+        badge.style.color = '#f87171'
+        badge.style.borderColor = '#ef4444'
+        if (label) label.textContent = '红方棋子（可多选）'
+      } else if (playerFaction === 'blue') {
+        badge.textContent = '🔵 蓝方'
+        badge.style.color = '#60a5fa'
+        badge.style.borderColor = '#3b82f6'
+        if (label) label.textContent = '蓝方棋子（可多选）'
+      } else {
+        badge.textContent = '阵营未知'
+        badge.style.color = '#64748b'
+        if (label) label.textContent = '可用棋子（可多选）'
+      }
+    }
+
+    async function loadPieces() {
+      try {
+        const ids = await fetchJson('./data/pieces/manifest.json')
+        const loaded = []
+        for (const id of ids) {
+          try { loaded.push(await fetchJson('./data/pieces/' + id + '.json')) } catch {}
+        }
+        // Filter by faction: show only pieces matching the player's faction
+        // (neutral pieces shown to both sides)
+        if (playerFaction) {
+          PIECE_TEMPLATES = loaded.filter(p =>
+            p.faction === playerFaction || p.faction === 'neutral' || !p.faction
+          )
+        } else {
+          PIECE_TEMPLATES = loaded
+        }
+      } catch {
+        PIECE_TEMPLATES = []
+      }
+      renderPieces()
+    }
+
+    function factionIcon(f) {
+      return f === 'red' ? '🔴' : f === 'blue' ? '🔵' : '⚪'
+    }
+
+    function renderPieces() {
+      const grid = document.getElementById('pieceGrid')
+      if (!PIECE_TEMPLATES.length) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#475569">无可用棋子</div>'
+        return
+      }
+      grid.innerHTML = PIECE_TEMPLATES.map(p => {
+        const s = p.stats || {}
+        const sel = selectedIds.has(p.id)
+        const imgHtml = (p.image && p.image.includes('.'))
+          ? `<img class="piece-avatar" src="images/${p.image}" onerror="this.outerHTML='<div class=\\'piece-avatar-ph\\'>${factionIcon(p.faction)}</div>'">`
+          : `<div class="piece-avatar-ph">${factionIcon(p.faction)}</div>`
+        return `<div class="piece-card${sel ? ' selected' : ''}"
+            data-pid="${p.id}"
+            onclick="togglePiece('${p.id}')"
+            oncontextmenu="showPieceDetail('${p.id}');return false;">
+          ${sel ? '<span class="check-mark">✓</span>' : ''}
+          <div class="piece-card-header">
+            ${imgHtml}
+            <div class="piece-name">${p.name || p.id}</div>
+          </div>
+          <div class="piece-stats">
+            HP: ${s.maxHp || '?'} · ATK: ${s.attack || '?'}<br>
+            DEF: ${s.defense || 0} · MOV: ${s.moveRange || 3}
+          </div>
+        </div>`
+      }).join('')
+
+      // Long-press for touch devices
+      setupLongPress()
+    }
+
+    // ── Long-press ──
+    let lpTimer = null
+    let lpMoved = false
+
+    function setupLongPress() {
+      document.getElementById('pieceGrid').addEventListener('touchstart', function(e) {
+        const card = e.target.closest('[data-pid]')
+        if (!card) return
+        lpMoved = false
+        lpTimer = setTimeout(() => {
+          if (!lpMoved) showPieceDetail(card.dataset.pid)
+        }, 600)
+      }, { passive: true })
+
+      document.getElementById('pieceGrid').addEventListener('touchmove', function() {
+        lpMoved = true
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null }
+      }, { passive: true })
+
+      document.getElementById('pieceGrid').addEventListener('touchend', function() {
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null }
+      }, { passive: true })
+    }
+
+    // ── Piece detail popup ──
+    async function getSkill(skillId) {
+      if (SKILL_CACHE[skillId]) return SKILL_CACHE[skillId]
+      try {
+        const d = await fetchJson('./data/skills/' + skillId + '.json')
+        SKILL_CACHE[skillId] = d
+        return d
+      } catch {
+        return { id: skillId, name: skillId, description: '—', icon: '⚡', type: 'normal', actionPointCost: 0, cooldownTurns: 0 }
+      }
+    }
+
+    const CARD_CACHE = {}
+    async function getCard(cardId) {
+      if (CARD_CACHE[cardId]) return CARD_CACHE[cardId]
+      try {
+        const d = await fetchJson('./data/cards/' + cardId + '.json')
+        CARD_CACHE[cardId] = d
+        return d
+      } catch {
+        return null
+      }
+    }
+
+    let keywordsCache = null
+    async function getKeywords() {
+      if (keywordsCache) return keywordsCache
+      try {
+        keywordsCache = await fetchJson('./data/skill-keywords.json')
+        return keywordsCache
+      } catch {
+        return []
+      }
+    }
+
+    async function showPieceDetail(pieceId) {
+      const p = PIECE_TEMPLATES.find(t => t.id === pieceId)
+      if (!p) return
+      const overlay = document.getElementById('detailOverlay')
+      const content = document.getElementById('detailContent')
+      const s = p.stats || {}
+      const imgHtml = (p.image && p.image.includes('.'))
+        ? `<img class="detail-avatar" src="images/${p.image}" onerror="this.outerHTML='<div class=\\'detail-avatar-ph\\'>${factionIcon(p.faction)}</div>'">`
+        : `<div class="detail-avatar-ph">${factionIcon(p.faction)}</div>`
+
+      content.innerHTML = `
+        <div class="detail-head">
+          ${imgHtml}
+          <div>
+            <div class="detail-name">${p.name || p.id}</div>
+            <div class="detail-faction">${p.faction === 'red' ? '🔴 红方' : p.faction === 'blue' ? '🔵 蓝方' : '⚪ 中立'}</div>
+          </div>
+        </div>
+        <div class="detail-stats-row">
+          <div class="detail-stat"><div class="detail-stat-val" style="color:#f87171">${s.maxHp || '?'}</div><div class="detail-stat-label">生命值</div></div>
+          <div class="detail-stat"><div class="detail-stat-val" style="color:#fb923c">${s.attack || '?'}</div><div class="detail-stat-label">攻击力</div></div>
+          <div class="detail-stat"><div class="detail-stat-val" style="color:#60a5fa">${s.defense || 0}</div><div class="detail-stat-label">防御力</div></div>
+          <div class="detail-stat"><div class="detail-stat-val" style="color:#4ade80">${s.moveRange || 3}</div><div class="detail-stat-label">移动力</div></div>
+        </div>
+        ${p.description ? `<div class="detail-desc">${p.description}</div>` : ''}
+        <div class="detail-skills-label">技能</div>
+        <div id="detailSkillList"><div style="color:#475569;font-size:13px">加载中…</div></div>
+        <div id="detailRelatedCards"></div>
+        <div id="detailKeywords"></div>
+      `
+      overlay.classList.add('show')
+
+      // Load skills async
+      const skillEntries = (p.skills || []).map(sk => typeof sk === 'string' ? sk : (sk.skillId || sk.id)).filter(Boolean)
+      const skills = await Promise.all(skillEntries.map(id => getSkill(id)))
+      const typeLabel = { normal: '普通', super: '超级', buff: '增益' }
+      const typeCls = { super: 'skill-type-super', buff: 'skill-type-buff' }
+      document.getElementById('detailSkillList').innerHTML = skills.length
+        ? skills.map(sk => `
+          <div class="skill-entry">
+            <div class="skill-entry-head">
+              <span class="skill-icon">${sk.icon || '⚡'}</span>
+              <span class="skill-name">${sk.name || sk.id}</span>
+              <span class="skill-type-badge ${typeCls[sk.type] || ''}">${typeLabel[sk.type] || sk.type || '主动'}</span>
+            </div>
+            <div class="skill-meta">行动点：${sk.actionPointCost || 0} · 冷却：${sk.cooldownTurns || 0} 回合${sk.range ? ' · 范围：' + sk.range : ''}</div>
+            <div class="skill-desc">${sk.description || '—'}</div>
+          </div>`)
+          .join('')
+        : '<div style="color:#475569;font-size:13px">暂无技能</div>'
+
+      // Load related cards
+      const relatedContainer = document.getElementById('detailRelatedCards')
+      if (p.relatedCards && p.relatedCards.length > 0) {
+        let relatedHtml = '<div class="detail-related-label">相关手牌</div>'
+        for (const cardId of p.relatedCards) {
+          const card = await getCard(cardId)
+          if (card) {
+            relatedHtml += `<div class="detail-related-card">
+              <div class="detail-related-name">${card.icon || '🎴'} ${card.name || cardId} <span style="color:#a855f7;font-size:11px">AP:${card.actionPointCost ?? 0}</span></div>
+              <div class="detail-related-type">${card.type === 'active' ? '主动' : '反应'}</div>
+              <div class="detail-related-desc">${card.description || ''}</div>
+            </div>`
+          }
+        }
+        relatedContainer.innerHTML = relatedHtml
+      } else {
+        relatedContainer.innerHTML = ''
+      }
+
+      // Load keywords
+      const keywordsContainer = document.getElementById('detailKeywords')
+      const allKeywords = []
+      for (const sk of skills) {
+        if (sk && sk.keywords && sk.keywords.length > 0) {
+          allKeywords.push(...sk.keywords)
+        }
+      }
+      if (allKeywords.length > 0) {
+        const keywordsData = await getKeywords()
+        const keywordMap = {}
+        if (Array.isArray(keywordsData)) {
+          keywordsData.forEach(kw => { keywordMap[kw.name] = kw })
+        }
+        let keywordsHtml = '<div class="detail-keyword-label">关键词</div>'
+        const seen = new Set()
+        for (const kwName of allKeywords) {
+          if (seen.has(kwName)) continue
+          seen.add(kwName)
+          const kw = keywordMap[kwName]
+          keywordsHtml += `<div class="detail-keyword-row">
+            <div class="detail-keyword-name">${kwName}</div>
+            <div class="detail-keyword-desc">${kw ? (kw.shortDescription || kw.longDescription || '') : ''}</div>
+          </div>`
+        }
+        keywordsContainer.innerHTML = keywordsHtml
+      } else {
+        keywordsContainer.innerHTML = ''
+      }
+    }
+
+    function closePieceDetail() {
+      document.getElementById('detailOverlay').classList.remove('show')
+    }
+
+    function togglePiece(id) {
+      if (selectedIds.has(id)) selectedIds.delete(id)
+      else selectedIds.add(id)
+      updateConfirmBar()
+      renderPieces()
+    }
+
+    function updateConfirmBar() {
+      const n = selectedIds.size
+      document.getElementById('selectedCount').textContent = '已选 ' + n + ' 个棋子'
+      document.getElementById('confirmBtn').disabled = n === 0
+    }
+
+    async function confirmSelection() {
+      const url = getServerUrl()
+      if (!url) { alert('服务器未连接'); return }
+      const selected = PIECE_TEMPLATES.filter(p => selectedIds.has(p.id))
+      const btn = document.getElementById('confirmBtn')
+      btn.disabled = true
+      btn.textContent = '提交中…'
+      try {
+        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'select-pieces',
+            playerId,
+            playerName,
+            pieces: selected.map(p => ({ templateId: p.id, faction: p.faction || 'neutral' }))
+          })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        document.getElementById('waitSub').textContent = '房间 ID: ' + roomId
+        document.getElementById('waitOverlay').classList.add('show')
+        pollTimer = setInterval(pollRoomStatus, 2000)
+      } catch (e) {
+        alert('提交失败：' + e.message)
+        btn.disabled = false
+        btn.textContent = '确认出战 →'
+      }
+    }
+
+    async function pollRoomStatus() {
+      const url = getServerUrl()
+      if (!url) return
+      try {
+        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId)
+        if (!res.ok) return
+        const room = await res.json()
+        if (room.status === 'in-progress' || room.status === 'playing' || room.status === 'battle') {
+          clearInterval(pollTimer)
+          // Navigate to local battle client (server is API-only, no page serving)
+          window.location.href = 'battle.html'
+            + '?roomId=' + encodeURIComponent(roomId)
+            + '&playerId=' + encodeURIComponent(playerId)
+            + '&playerName=' + encodeURIComponent(playerName)
+        }
+      } catch {}
+    }
+
+    // ── Disconnect ──
+    function doDisconnect() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+      RvBUtils.clearServerUrl()
+      window.location.href = 'index.html'
+    }
+
+    function updateServerRow() {
+      const url = RvBUtils.getServerUrl()
+      const label = document.getElementById('serverLabel')
+      const btn = document.getElementById('disconnectBtn')
+      if (!label) return
+      if (url) {
+        label.textContent = '🟢 ' + url.replace(/^https?:\/\//, '').slice(0, 30)
+        label.style.color = '#22c55e'
+        if (btn) btn.style.display = 'block'
+      } else {
+        label.textContent = '⚫ 未连接服务器'
+        label.style.color = '#475569'
+        if (btn) btn.style.display = 'none'
+      }
+    }
+
+    // ── Init ──
+    window.addEventListener('load', () => { init() })
+    window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
+  </script>
+</body>
+</html>

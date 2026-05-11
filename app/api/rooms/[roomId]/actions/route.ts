@@ -18,6 +18,7 @@ import type { BattleState } from "@/lib/game/turn"
 import { applyBattleAction } from "@/lib/game/turn"
 import type { PieceTemplate } from "@/lib/game/piece"
 import { getRoomStore } from "@/lib/game/room-store"
+import { verifyJoinAuth } from "@/lib/game/identity-verify"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -54,6 +55,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       return NextResponse.json({ error: "playerId is required" }, { status: 400 })
     }
 
+    const authErr = await verifyJoinAuth(body as Record<string, unknown>)
+    if (authErr) return NextResponse.json({ error: authErr }, { status: 401 })
+
     const latestRoom = await roomStore.getRoom(roomId)
     if (!latestRoom) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 })
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       )
     }
 
-    if (latestRoom.players.length >= latestRoom.maxPlayers) {
+    if (latestRoom.players.length >= (latestRoom.maxPlayers ?? 2)) {
       return NextResponse.json({ error: "Room is full" }, { status: 400 })
     }
 
@@ -75,19 +79,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     )
 
     if (!existing) {
+      // Auto-assign faction on join
+      const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
+      let faction: "red" | "blue"
+      if (assignedFactions.length === 0) {
+        faction = Math.random() > 0.5 ? "red" : "blue"
+      } else {
+        faction = assignedFactions[0] === "red" ? "blue" : "red"
+      }
+
       const player = {
         id: normalizedPlayerId,
         name: trimmedPlayerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
+        faction,
       }
       latestRoom.players.push(player)
 
       if (!latestRoom.hostId) {
         latestRoom.hostId = normalizedPlayerId
       }
-      console.log('Player joined room:', { roomId, playerId: normalizedPlayerId, totalPlayers: latestRoom.players.length })
+      console.log('Player joined room:', { roomId, playerId: normalizedPlayerId, faction, totalPlayers: latestRoom.players.length })
     } else {
-      console.log('Player already in room:', { roomId, playerId: normalizedPlayerId })
+      // If existing player has no faction yet (legacy), assign one now
+      if (!existing.faction) {
+        const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
+        existing.faction = assignedFactions.length === 0 || assignedFactions[0] === "blue" ? "red" : "blue"
+      }
+      console.log('Player already in room:', { roomId, playerId: normalizedPlayerId, faction: existing.faction })
     }
 
     await roomStore.setRoom(roomId, latestRoom)
@@ -228,7 +247,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         }
       }
 
-      const mapId = checkRoom.mapId || "arena-8x6"
+      const mapId = checkRoom.mapId || "large-battlefield"
       writeLog('[select-pieces] mapId from room: ' + mapId)
 
       try {
@@ -238,18 +257,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
           return NextResponse.json({ error: "Failed to create battle: invalid player count or battle setup" }, { status: 500 })
         }
 
-        writeLog('[select-pieces] Battle created, calling beginPhase')
+        writeLog('[select-pieces] Battle created, building action log')
+
+        // Apply beginPhase on server to get clean initial state
+        let initState = battle
         try {
-          const battleWithRules = applyBattleAction(battle, { type: "beginPhase" })
-          checkRoom.status = "in-progress"
-          checkRoom.currentTurnIndex = 0
-          checkRoom.battleState = battleWithRules
-        } catch (beginPhaseError) {
-          writeLog('[select-pieces] ERROR in beginPhase: ' + (beginPhaseError instanceof Error ? beginPhaseError.message : 'Unknown error'))
-          checkRoom.status = "in-progress"
-          checkRoom.currentTurnIndex = 0
-          checkRoom.battleState = battle
+          initState = applyBattleAction(battle, { type: "beginPhase" })
+        } catch (e) {
+          writeLog('[select-pieces] beginPhase failed, using raw state: ' + (e instanceof Error ? e.message : ''))
         }
+
+        // Strip skillsById (large static data, clients reload locally)
+        const { skillsById: _sk, ...initPayload } = initState as any
+
+        // Generate shared random seed for deterministic gameplay
+        const seed = Math.floor(Math.random() * 4294967296)
+
+        checkRoom.status = "in-progress"
+        checkRoom.currentTurnIndex = 0
+        checkRoom.battleState = {
+          type: 'action-log',
+          seed,
+          actions: [{ seq: 0, type: 'init', payload: initPayload, timestamp: Date.now() }],
+        } as any
 
         await roomStore.setRoom(roomId, checkRoom)
       } catch (error) {
@@ -336,7 +366,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       }
     }
 
-    const mapId = latestRoom.mapId || "arena-8x6"
+    const mapId = latestRoom.mapId || "large-battlefield"
     writeLog('[start-game] mapId from room: ' + mapId)
 
     const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId)
@@ -345,9 +375,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })
     }
 
+    let initState = battle
+    try { initState = applyBattleAction(battle, { type: "beginPhase" }) } catch {}
+    const { skillsById: _sk2, ...initPayload2 } = initState as any
+    const seed2 = Math.floor(Math.random() * 4294967296)
+
     latestRoom.status = "in-progress"
     latestRoom.currentTurnIndex = 0
-    latestRoom.battleState = battle
+    latestRoom.battleState = {
+      type: 'action-log',
+      seed: seed2,
+      actions: [{ seq: 0, type: 'init', payload: initPayload2, timestamp: Date.now() }],
+    } as any
     await roomStore.setRoom(roomId, latestRoom)
 
     console.log('Game started successfully for room:', roomId)

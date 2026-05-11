@@ -25,6 +25,8 @@
       "level": 1
     }
   ],
-  "rules": ["rule-blood-echo"],
+  "rules": [],
+  "initialEffects": ["effect-blood-echo"],
+  "relatedCards": ["holy-smite", "holy-heal", "holy-charge"],
   "isDefault": false
 }

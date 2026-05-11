@@ -1,0 +1,15 @@
+{
+  "id": "effect-blood-echo",
+  "name": "血之回响",
+  "icon": "🩣",
+  "color": "#dc2626",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "afterStatusRemoved",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { if (ctx.statusId !== 'divine-shield') return false; var sourcePiece = ctx.sourcePiece || ctx.piece; if (!sourcePiece) return false; var liadrin = battle.pieces.find(function(p) { return p.templateId === 'liadrin' && p.ownerPlayerId === sourcePiece.ownerPlayerId && p.currentHp > 0; }); return !!(liadrin && liadrin.instanceId === self.ownerId); }",
+      "effectCode": "function(ctx, battle, self) { var sourcePiece = ctx.sourcePiece || ctx.piece; if (!sourcePiece) return { success: false }; var liadrin = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!liadrin) return { success: false }; var player = battle.players.find(function(p) { return p.playerId === sourcePiece.ownerPlayerId; }); if (player) { addCardToHand('holy-charge', player.playerId); return { success: true, message: '血之回响：获得1张圣光充能' }; } return { success: false }; }"
+    }
+  ]
+}

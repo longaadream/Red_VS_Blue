@@ -1,8 +1,11 @@
 {
   "id": "hidan-undying",
   "name": "不死神体",
-  "description": "受到致命伤害时，HP强制保留1点并进入「濒死」状态；濒死状态持续1回合，结束后才真正死亡（一战仅触发一次）",
-  "icon": "💀",
+  "description": "受到致命伤害时，生命值强制保留为1点并进入濒死状态。濒死状态下不会死亡；濒死持续2回合，结束后才会真正死亡。每局仅触发一次。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": ["保命"],
+  "icon": "🃏",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

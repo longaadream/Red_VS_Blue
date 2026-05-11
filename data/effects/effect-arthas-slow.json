@@ -1,0 +1,15 @@
+{
+  "id": "effect-arthas-slow",
+  "name": "减速",
+  "icon": "❄️",
+  "color": "#93c5fd",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "endTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (piece.currentHp <= 0) return false; return ctx.playerId === piece.ownerPlayerId; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; if (piece.currentHp <= 0) { self.expire(); return { success: false }; } if (ctx.playerId !== piece.ownerPlayerId) return { success: false }; var slowTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'arthas-slow'; }); if (!slowTag) { self.expire(); return { success: false }; } slowTag.stacks = (slowTag.stacks || 1) - 1; if (slowTag.stacks > 0) { return { success: true, message: piece.name + '的减速还剩' + slowTag.stacks + '回合' }; } var moveRestored = slowTag.intensity || 1; piece.moveRange = (piece.moveRange || 1) + moveRestored; var si = piece.statusTags.indexOf(slowTag); piece.statusTags.splice(si, 1); self.expire(); return { success: true, message: piece.name + '的减速解除，移动范围恢复至' + piece.moveRange }; }"
+    }
+  ]
+}

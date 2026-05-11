@@ -29,6 +29,15 @@ export interface GameAction {
 }
 
 // 房间类型
+export interface GameRecord {
+  gameId: string
+  timestamp: number
+  roomId: string
+  players: Array<{ id: string; name: string; publicKey?: string }>
+  winner: string | null
+  signatures: Record<string, string>
+}
+
 export interface Room {
   id: string
   name: string
@@ -43,6 +52,9 @@ export interface Room {
   mapId?: string
   createdAt?: number
   visibility?: "private" | "public"
+  inviteCode?: string
+  version?: number
+  gameRecord?: GameRecord
 }
 
 // DB 行 → Room 对象
@@ -53,6 +65,7 @@ function deserializeRoom(row: {
   mapId: string | null
   hostId: string | null
   visibility: string | null
+  inviteCode?: string | null
   maxPlayers: number | null
   players: string
   spectators?: string | null
@@ -75,6 +88,7 @@ function deserializeRoom(row: {
     mapId: row.mapId ?? undefined,
     hostId: row.hostId ?? undefined,
     visibility: (row.visibility as "private" | "public") ?? undefined,
+    inviteCode: row.inviteCode ?? undefined,
     maxPlayers: row.maxPlayers ?? undefined,
     players,
     spectators,
@@ -82,6 +96,7 @@ function deserializeRoom(row: {
     actions: [],
     battleState: row.battleState ? JSON.parse(row.battleState) : undefined,
     createdAt: row.createdAt.getTime(),
+    version: row.version,
   }
 }
 
@@ -115,6 +130,7 @@ function serializeRoom(room: Room) {
     mapId: room.mapId ?? null,
     hostId: room.hostId ?? null,
     visibility: room.visibility ?? null,
+    inviteCode: room.inviteCode ?? null,
     maxPlayers: room.maxPlayers ?? null,
     players,
     spectators,
@@ -163,6 +179,19 @@ export class RoomStore {
       update: { ...updateData, version: { increment: 1 } },
       create: data,
     })
+  }
+
+  // 带乐观锁的更新：仅当 DB 版本 === expectedVersion 时才写入
+  // 返回 true = 成功；false = 版本冲突（另一个请求已更新）
+  async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
+    const id = roomId.trim().toLowerCase()
+    const data = serializeRoom({ ...room, id })
+    const { id: _id, ...updateData } = data
+    const result = await prisma.room.updateMany({
+      where: { id, version: expectedVersion },
+      data: { ...updateData, version: { increment: 1 } },
+    })
+    return result.count > 0
   }
 
   // 移除房间

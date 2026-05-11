@@ -1,0 +1,8 @@
+{
+  "appId": "com.redvsblue.game",
+  "appName": "RED vs BLUE",
+  "webDir": "android-client/www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

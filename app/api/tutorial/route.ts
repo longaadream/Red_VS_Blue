@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { BattleState } from "@/lib/game/turn"
 import { getMap, DEFAULT_MAP_ID, loadMaps } from "@/config/maps"
 import type { BoardMap } from "@/lib/game/map"
-import type { PieceTemplate } from "@/lib/game/piece"
+import type { PieceTemplate, PieceInstance } from "@/lib/game/piece"
 import { getAllPieces, getPieceById } from "@/lib/game/piece-repository"
 import { buildDefaultSkills } from "@/lib/game/battle-setup"
 import { globalTriggerSystem } from "@/lib/game/triggers"
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
   try {
     reloadSkills()
 
-    const map = getMap("large-battlefield") || getMap("arena-8x6") || getMap(DEFAULT_MAP_ID)
+    const map = getMap("large-battlefield") || getMap(DEFAULT_MAP_ID)
     if (!map) {
       return NextResponse.json({ error: "Map not found" }, { status: 404 })
     }

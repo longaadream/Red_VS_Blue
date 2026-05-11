@@ -3,6 +3,7 @@ import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getPieceById } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
 import { roomStore, type Room } from "@/lib/game/room-store"
+import type { Faction } from "@/lib/game/piece"
 
 export async function POST(req: NextRequest) {
   let body: unknown
@@ -39,20 +40,20 @@ export async function POST(req: NextRequest) {
   const pieceTemplates = pieces.map(piece => {
     const template = getPieceById(piece.templateId);
     if (template) {
-      return { ...template, faction: piece.faction };
+      return { ...template, faction: piece.faction as Faction };
     }
     return null;
-  }).filter(Boolean)
+  }).filter((p): p is NonNullable<typeof p> => p !== null)
 
   const redPieces = pieceTemplates.filter(piece => piece.faction === "red")
   const bluePieces = pieceTemplates.filter(piece => piece.faction === "blue")
 
-  const finalRedPieces = redPieces.length > 0 ? redPieces : pieceTemplates.slice(0, 1).map(piece => ({ ...piece, faction: "red" }))
-  const finalBluePieces = bluePieces.length > 0 ? bluePieces : pieceTemplates.slice(1, 2).map(piece => ({ ...piece, faction: "blue" }))
+  const finalRedPieces = redPieces.length > 0 ? redPieces : pieceTemplates.slice(0, 1).map(piece => ({ ...piece, faction: piece.faction }))
+  const finalBluePieces = bluePieces.length > 0 ? bluePieces : pieceTemplates.slice(1, 2).map(piece => ({ ...piece, faction: piece.faction }))
 
   const playerSelectedPieces = [
-    { playerId: playerIds[0], pieces: finalRedPieces },
-    { playerId: playerIds[1], pieces: finalBluePieces }
+    { playerId: playerIds[0], pieces: finalRedPieces as import("@/lib/game/piece").PieceTemplate[] },
+    { playerId: playerIds[1], pieces: finalBluePieces as import("@/lib/game/piece").PieceTemplate[] }
   ];
 
   const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces)

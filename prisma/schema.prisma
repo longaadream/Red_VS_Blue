@@ -25,6 +25,7 @@ model Room {
   players     String   @default("[]")
   spectators  String   @default("[]")
   battleState String?
+  inviteCode  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   version     Int      @default(0)

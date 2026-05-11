@@ -1,10 +1,13 @@
 {
   "id": "blackwidow-toxin-damage",
   "name": "毒素伤害",
-  "description": "敌人踩到毒素时受到4点真实伤害",
-  "icon": "☠️",
+  "description": "敌人踩到毒素时，受到4点真实伤害。",
+  "keywords": ["真实伤害"],
+  "targetText": "触发毒素的敌人",
+  "effectTags": ["真实伤害"],
+  "icon": "☽️",
   "kind": "passive",
   "type": "passive",
   "code": "function executeSkill(context) { return { success: true, message: '' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '毒素伤害4点', expectedValues: { damage: 4 } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '敌人踩到毒素时，受到4点真实伤害。', expectedValues: { damage: 4 } }; }"
 }

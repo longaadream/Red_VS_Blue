@@ -1,0 +1,21 @@
+{
+  "id": "effect-kenshin-tenken",
+  "name": "飞天御剑流",
+  "icon": "⚔️",
+  "color": "#ef4444",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "afterMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return false; return !!(ctx.sourcePiece && ctx.sourcePiece.instanceId === piece.instanceId); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return { success: false }; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return { success: false }; var tagId = 'tenken-charge-' + piece.instanceId; var existing = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'tenken-charge'; }); if (existing) { existing.remainingUses = 1; } else { addStatusEffectById(piece.instanceId, { id: tagId, name: '飞天御剑流', type: 'tenken-charge', currentDuration: -1, currentUses: 1, intensity: 1, stacks: 1 }); } return { success: true, message: piece.name + '蓄积飞天御剑流，下次攻击伤害提升50%！' }; }"
+    },
+    {
+      "on": "beforeDamageDealt",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return false; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'tenken-charge'; }); if (!tag) return false; var uses = tag.remainingUses !== undefined ? tag.remainingUses : (tag.currentUses !== undefined ? tag.currentUses : 0); return uses > 0; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'tenken-charge'; }); if (!tag) return { success: false }; var uses = tag.remainingUses !== undefined ? tag.remainingUses : (tag.currentUses !== undefined ? tag.currentUses : 0); if (uses <= 0) return { success: false }; removeStatusEffectById(piece.instanceId, tag.id); ctx.damage = Math.floor((ctx.damage || 0) * 1.5); return { success: true, message: piece.name + '飞天御剑流发动！本次攻击伤害提升50%' }; }"
+    }
+  ]
+}

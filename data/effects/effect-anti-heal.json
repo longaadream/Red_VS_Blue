@@ -1,0 +1,15 @@
+{
+  "id": "effect-anti-heal",
+  "name": "禁疗",
+  "icon": "🚫",
+  "color": "#f87171",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeHealTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.some(function(tag) { return (typeof tag === 'object' && tag && tag.type === 'anti-heal') || (typeof tag === 'string' && tag.includes('anti-heal')); })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; return { success: false, blocked: true, message: piece.name + '处于禁疗状态，无法受到治疗', showUIEffect: true }; }"
+    }
+  ]
+}

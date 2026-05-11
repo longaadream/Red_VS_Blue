@@ -1,0 +1,15 @@
+{
+  "id": "effect-hidan-dying-immune",
+  "name": "濒死免疫",
+  "icon": "🛡️",
+  "color": "#dc2626",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeDamageTaken",
+      "priority": 100,
+      "filterCode": "function(ctx, battle, self) { var hidan = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!hidan) return false; if (!ctx.piece || ctx.piece.instanceId !== hidan.instanceId) return false; return !!(hidan.statusTags && hidan.statusTags.some(function(t) { return t.type === 'hidan-dying'; })); }",
+      "effectCode": "function(ctx, battle, self) { var hidan = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!hidan) return { success: false }; return { success: true, blocked: true, message: hidan.name + '处于濒死状态，免疫伤害' }; }"
+    }
+  ]
+}

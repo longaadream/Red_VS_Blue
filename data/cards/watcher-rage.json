@@ -1,0 +1,12 @@
+{
+  "id": "watcher-rage",
+  "name": "暴怒",
+  "description": "对3格内1名敌人造成等同攻击力的物理伤害，并进入暴怒姿态。暴怒状态下，造成伤害翻倍，受到伤害也翻倍。",
+  "keywords": [],
+  "targetText": "3格内1名敌人",
+  "effectTags": ["物理伤害", "强化", "行动点"],
+  "type": "active",
+  "actionPointCost": 1,
+  "icon": "Flame",
+  "code": "function executeCard(context) { var watcher = battle.pieces.find(function(p) { return p.ownerPlayerId === playerId && p.templateId === 'blue-watcher' && p.currentHp > 0; }); if (!watcher) return { success: false, message: '找不到观察者棋子' }; var target = selectTarget({ type: 'piece', filter: 'enemy', range: 3 }); if (!target || target.needsTargetSelection) return target; var targetPiece = battle.pieces.find(function(p) { return p.instanceId === target.instanceId && p.currentHp > 0; }); if (!targetPiece) return { success: false, message: '目标不存在或已阵亡' }; var dist = Math.abs(targetPiece.x - watcher.x) + Math.abs(targetPiece.y - watcher.y); if (dist > 3) return { success: false, message: '目标超出暴怒攻击范围（3格内）' }; var damage = Math.round(watcher.attack * 1.0); var result = dealDamage(watcher, targetPiece, damage, 'physical', battle, 'watcher-rage'); var msg = watcher.name + '暴怒攻击' + targetPiece.name + '，造成' + (result.damage || 0) + '点伤害'; var calmStance = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'calm-stance'; }); if (calmStance) { removeStatusEffectById(watcher.instanceId, calmStance.id); var player = battle.players.find(function(p) { return p.playerId === playerId; }); if (player) { player.actionPoints = (player.actionPoints || 0) + 1; } msg += '（退出平静姿态，恢复1点行动力）'; } var rageStance = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (!rageStance) { addStatusEffectById(watcher.instanceId, { id: 'rage-stance-' + watcher.instanceId, type: 'rage-stance', name: '暴怒姿态', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); addRuleById(watcher.instanceId, 'rule-watcher-rage-taken'); addRuleById(watcher.instanceId, 'rule-watcher-rage-dealt'); msg += '，进入暴怒姿态'; } if (result.isKilled) msg += '，' + targetPiece.name + '被击败'; return { success: true, message: msg }; }"
+}

@@ -1,7 +1,10 @@
 {
   "id": "fireball",
   "name": "火球术",
-  "description": "对5格内一个敌人造成当前攻击力1.5倍的伤害",
+  "description": "对5格内1个敌人造成等同攻击力150%的法术伤害。",
+  "keywords": [],
+  "targetText": "5格内1个敌人",
+  "effectTags": ["法术伤害"],
   "icon": "🔥",
   "kind": "active",
   "type": "normal",
@@ -11,5 +14,5 @@
   "actionPointCost": 2,
   "range": "single",
   "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' });\n  if (!targetEnemy || targetEnemy.needsTargetSelection) {\n    return targetEnemy;\n  }\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'magical', context.battle, context.skill.id);\n  return {\n    message: sourcePiece.name + '使用了火球术，对' + targetEnemy.name + '造成' + damageResult.damage + '点伤害',\n    success: true\n  };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '对5格内一个敌人造成' + damageValue + '点伤害（相当于攻击力150%）',\n    expectedValues: { damage: damageValue }\n  };\n}"
+  "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '对5格内1个敌人造成' + damageValue + '点法术伤害。',\n    expectedValues: { damage: damageValue }\n  };\n}"
 }

@@ -6,7 +6,7 @@ function writeLog(message: string) {
   try {
     const fs = require('fs')
     const path = require('path')
-    const logDir = path.join(process.cwd(), 'logs')
+    const logDir = path.join(process.env.USER_DATA_DIR ?? process.cwd(), 'logs')
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true })
     }
@@ -85,7 +85,8 @@ export interface TriggerRule {
 
 // 触发上下文 - 所有字段都可以通过引用被触发器修改
 export interface TriggerContext {
-  type: TriggerType
+  /** 事件名。内置事件使用 TriggerType 字符串；技能代码可用 fireEvent 触发任意自定义字符串事件。 */
+  type: string
   /** 源棋子，可以被修改（如改变位置、属性等） */
   sourcePiece?: PieceInstance
   /** 目标棋子，可以被修改或替换 */
@@ -185,10 +186,17 @@ export class TriggerSystem {
 
 
   // 检查并触发规则
-  checkTriggers(battle: BattleState, context: TriggerContext): { success: boolean; messages: string[]; blocked: boolean } {
+  checkTriggers(battle: BattleState, context: TriggerContext): { success: boolean; messages: string[]; blocked: boolean; needsOptionSelection?: boolean; options?: any[]; title?: string; needsTargetSelection?: boolean; targetType?: string; range?: number; filter?: string } {
     const triggeredEffects: string[] = []
     let success = false
     let blocked = false
+    let needsOptionSelection = false
+    let pendingOptions: any[] | undefined
+    let pendingTitle: string | undefined
+    let needsTargetSelection = false
+    let pendingTargetType: string | undefined
+    let pendingRange: number | undefined
+    let pendingFilter: string | undefined
 
     writeLog('[checkTriggers] Checking triggers for: ' + context.type + ', global rules count: ' + this.rules.length + ', players: ' + JSON.stringify(battle.players?.map(p => ({ playerId: p.playerId, rulesCount: (p as any).rules?.length || 0 }))))
     writeLog('[checkTriggers] Context: ' + JSON.stringify({ type: context.type, statusId: (context as any).statusId, playerId: context.playerId }));
@@ -246,6 +254,17 @@ export class TriggerSystem {
         if (owningPieces.length === 0) {
           // 如果没有棋子拥有该规则，直接执行（兼容旧逻辑）
           const result = rule.effect(battle, context)
+          if (result && (result as any).needsOptionSelection) {
+            needsOptionSelection = true
+            pendingOptions = (result as any).options
+            pendingTitle = (result as any).title
+          }
+          if (result && (result as any).needsTargetSelection && !needsTargetSelection) {
+            needsTargetSelection = true
+            pendingTargetType = (result as any).targetType
+            pendingRange = (result as any).range
+            pendingFilter = (result as any).filter
+          }
           if (result.success) {
             success = true
             if (result.message) {
@@ -268,7 +287,18 @@ export class TriggerSystem {
             if (context.damage !== undefined && context.damage <= 0) {
               blocked = true;
             }
-            if (result.success) {
+            if (result && (result as any).needsOptionSelection) {
+              needsOptionSelection = true
+              pendingOptions = (result as any).options
+              pendingTitle = (result as any).title
+            }
+            if (result && (result as any).needsTargetSelection && !needsTargetSelection) {
+              needsTargetSelection = true
+              pendingTargetType = (result as any).targetType
+              pendingRange = (result as any).range
+              pendingFilter = (result as any).filter
+            }
+            if (result && result.success) {
               success = true
               if (result.message) {
                 triggeredEffects.push(result.message)
@@ -360,6 +390,17 @@ export class TriggerSystem {
             if (context.damage !== undefined && context.damage <= 0) {
               blocked = true;
             }
+            if (result && (result as any).needsOptionSelection) {
+              needsOptionSelection = true
+              pendingOptions = (result as any).options
+              pendingTitle = (result as any).title
+            }
+            if (result && (result as any).needsTargetSelection && !needsTargetSelection) {
+              needsTargetSelection = true
+              pendingTargetType = (result as any).targetType
+              pendingRange = (result as any).range
+              pendingFilter = (result as any).filter
+            }
             if (result.success) {
               success = true
               if (result.message) {
@@ -446,6 +487,17 @@ export class TriggerSystem {
             if (context.damage !== undefined && context.damage <= 0) {
               blocked = true;
             }
+            if (result && (result as any).needsOptionSelection) {
+              needsOptionSelection = true
+              pendingOptions = (result as any).options
+              pendingTitle = (result as any).title
+            }
+            if (result && (result as any).needsTargetSelection && !needsTargetSelection) {
+              needsTargetSelection = true
+              pendingTargetType = (result as any).targetType
+              pendingRange = (result as any).range
+              pendingFilter = (result as any).filter
+            }
             if (result.success) {
               success = true
               if (result.message) triggeredEffects.push(result.message)
@@ -497,7 +549,113 @@ export class TriggerSystem {
       }
     }
 
-    return { success, messages: triggeredEffects, blocked }
+    // 5. 处理 AttachedEffect 触发器（新统一系统，替代分散的 rule + statusTag）
+    if (battle.pieces) {
+      const { buildSelfObject, removeEffectFromPiece, applyEffectToPiece, getEffectOnPiece } = require('./attached-effect')
+      const _skills = require('./skills')
+
+      // 构建注入到 effectCode / filterCode 的辅助函数（与 rule skillCode 环境对齐）
+      const _dealDamage = (src: any, tgt: any, dmg: number, type: string, sid?: string) =>
+        _skills.dealDamage(src, tgt, dmg, type, battle, sid)
+      const _healDamage = (healer: any, tgt: any, heal: number, sid?: string) =>
+        _skills.healDamage(healer, tgt, heal, battle, sid)
+      const _removeStatusEffectById = (pieceId: string, statusId: string) => {
+        const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
+        if (p?.statusTags) {
+          const idx = p.statusTags.findIndex((t: any) => t.id === statusId)
+          if (idx !== -1) p.statusTags.splice(idx, 1)
+        }
+      }
+      const _addStatusEffectById = (pieceId: string, status: any) => {
+        const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
+        if (p) {
+          if (!p.statusTags) p.statusTags = []
+          if (!p.statusTags.some((t: any) => t.id === status.id)) p.statusTags.push({ ...status })
+        }
+      }
+      const _addRuleById = (pieceId: string, ruleId: string) => {
+        const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
+        if (p) {
+          const rule = _skills.loadRuleById(ruleId)
+          if (rule) {
+            if (!p.rules) p.rules = []
+            if (!p.rules.some((r: any) => r.id === ruleId)) p.rules.push(rule)
+          }
+        }
+      }
+      const _removeRuleById = (pieceId: string, ruleId: string) => {
+        const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
+        if (p?.rules) p.rules = p.rules.filter((r: any) => r.id !== ruleId)
+      }
+      const _applyEffect = (pieceId: string, effectId: string, data?: any) =>
+        applyEffectToPiece(battle, pieceId, effectId, data)
+      const _removeEffect = (pieceId: string, effectId: string) =>
+        removeEffectFromPiece(battle, pieceId, effectId)
+      const _getPieceEffect = (pieceId: string, effectId: string) =>
+        getEffectOnPiece(battle, pieceId, effectId)
+      const _fireEvent = (eventName: string, ctx: any) =>
+        globalTriggerSystem.checkTriggers(battle, { ...ctx, type: eventName })
+      const _addCardToHand = (cardId: string, targetPlayerId: string) => {
+        const player = battle.players?.find((p: any) => p.playerId === targetPlayerId)
+        if (!player) return false
+        if (!player.hand) player.hand = []
+        player.hand.push({ cardId, instanceId: cardId + '-' + Date.now(), ownerPlayerId: targetPlayerId })
+        return true
+      }
+
+      /** 将辅助函数注入到 effectCode/filterCode 的 eval 作用域中 */
+      const wrapCode = (code: string) => {
+        // eslint-disable-next-line no-eval
+        return eval(
+          `(function(dealDamage,healDamage,removeStatusEffectById,addStatusEffectById,addRuleById,removeRuleById,applyEffect,removeEffect,getPieceEffect,fireEvent,addCardToHand){ return (${code}); })`
+        )(_dealDamage, _healDamage, _removeStatusEffectById, _addStatusEffectById, _addRuleById, _removeRuleById, _applyEffect, _removeEffect, _getPieceEffect, _fireEvent, _addCardToHand)
+      }
+
+      const piecesSnap = [...battle.pieces]
+      for (const piece of piecesSnap) {
+        if (blocked) break
+        if (!piece.attachedEffects || piece.attachedEffects.length === 0) continue
+        const effectsSnap = [...piece.attachedEffects]
+        for (const effect of effectsSnap) {
+          if (blocked) break
+          if (!effect.triggers || effect.triggers.length === 0) continue
+          const matching = effect.triggers
+            .filter((t: any) => t.on === context.type)
+            .sort((a: any, b: any) => (a.priority ?? 50) - (b.priority ?? 50))
+          if (matching.length === 0) continue
+          const selfObj = buildSelfObject(effect, piece, battle)
+          for (const trigger of matching) {
+            if (blocked) break
+            try {
+              const filterFn = wrapCode(trigger.filterCode)
+              if (!filterFn(context, battle, selfObj)) continue
+              const effectFn = wrapCode(trigger.effectCode)
+              const result = effectFn(context, battle, selfObj)
+              if (result) {
+                if (result.success) success = true
+                if (result.message) triggeredEffects.push(result.message)
+                if (result.blocked) blocked = true
+                if (result.needsOptionSelection) {
+                  needsOptionSelection = true
+                  pendingOptions = result.options
+                  pendingTitle = result.title
+                }
+                if (result.needsTargetSelection && !needsTargetSelection) {
+                  needsTargetSelection = true
+                  pendingTargetType = result.targetType
+                  pendingRange = result.range
+                  pendingFilter = result.filter
+                }
+              }
+            } catch (e) {
+              writeLog('[checkTriggers] AttachedEffect error in ' + effect.instanceId + ': ' + e)
+            }
+          }
+        }
+      }
+    }
+
+    return { success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter }
   }
 
   // 条件评估方法已移除，所有条件判断都在技能代码中通过if语句实现

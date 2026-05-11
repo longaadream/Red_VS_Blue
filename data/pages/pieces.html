@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>棋子图鉴 - RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* Header */
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .back-btn {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      color: #94a3b8; padding: 7px 12px; font-size: 14px; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .topbar h1 { font-size: 17px; font-weight: 700; }
+    .topbar .count { font-size: 13px; color: #64748b; margin-left: auto; }
+
+    /* Filters */
+    .filters {
+      display: flex; gap: 8px; padding: 12px 16px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .filter-btn {
+      flex-shrink: 0; padding: 6px 14px;
+      border-radius: 20px; border: 1px solid #334155;
+      background: #1e293b; color: #94a3b8;
+      font-size: 13px; cursor: pointer;
+    }
+    .filter-btn.active-all  { background: #334155; color: #e2e8f0; border-color: #475569; }
+    .filter-btn.active-red  { background: rgba(239,68,68,.2); color: #ef4444; border-color: #ef4444; }
+    .filter-btn.active-blue { background: rgba(59,130,246,.2); color: #60a5fa; border-color: #3b82f6; }
+
+    /* Piece list */
+    .piece-list { padding: 0 16px 24px; }
+
+    .piece-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .piece-card:active { border-color: #475569; }
+    .piece-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px;
+    }
+    .piece-avatar {
+      width: 48px; height: 48px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; flex-shrink: 0;
+      overflow: hidden;
+    }
+    .piece-avatar img {
+      width: 100%; height: 100%;
+      object-fit: cover; border-radius: 10px;
+    }
+    .faction-red  { background: rgba(239,68,68,.15); }
+    .faction-blue { background: rgba(59,130,246,.15); }
+    .faction-neutral { background: rgba(100,116,139,.15); }
+
+    .piece-info { flex: 1; }
+    .piece-name { font-size: 15px; font-weight: 700; }
+    .piece-meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .faction-label-red  { color: #f87171; }
+    .faction-label-blue { color: #60a5fa; }
+
+    .expand-icon { color: #475569; font-size: 16px; transition: transform .2s; }
+    .expanded .expand-icon { transform: rotate(90deg); }
+
+    /* Stats row */
+    .stats-row {
+      display: flex; gap: 0;
+      border-top: 1px solid #1e293b;
+    }
+    .stat-cell {
+      flex: 1; padding: 8px 4px; text-align: center;
+      border-right: 1px solid #1e293b;
+    }
+    .stat-cell:last-child { border-right: none; }
+    .stat-val { font-size: 16px; font-weight: 700; }
+    .stat-lbl { font-size: 10px; color: #475569; margin-top: 1px; text-transform: uppercase; }
+
+    /* Skills detail (expandable) */
+    .skills-panel { display: none; border-top: 1px solid #1e293b; padding: 12px 14px; }
+    .piece-card.expanded .skills-panel { display: block; }
+    .skill-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #1e293b;
+    }
+    .skill-row:last-child { border-bottom: none; }
+    .skill-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+    .skill-name { font-size: 13px; font-weight: 600; }
+    .skill-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .skill-badge {
+      display: inline-block; font-size: 10px; border-radius: 4px;
+      padding: 1px 5px; margin-left: 4px;
+    }
+    .badge-super  { background: rgba(168,85,247,.2); color: #c084fc; }
+    .badge-buff   { background: rgba(34,197,94,.2); color: #4ade80; }
+    .badge-normal { background: rgba(100,116,139,.2); color: #94a3b8; }
+
+    /* Description */
+    .piece-desc { font-size: 12px; color: #64748b; padding: 0 14px 12px; }
+
+    /* Keywords panel */
+    .keywords-panel { display: none; border-top: 1px solid #1e293b; padding: 12px 14px; }
+    .piece-card.expanded .keywords-panel { display: block; }
+    .keyword-row {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 6px 0; border-bottom: 1px solid #1e293b;
+    }
+    .keyword-row:last-child { border-bottom: none; }
+    .keyword-name { font-size: 13px; font-weight: 600; color: #a855f7; }
+    .keyword-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+    /* Related cards */
+    .related-cards-panel { display: none; border-top: 1px solid #1e293b; padding: 12px 14px; }
+    .piece-card.expanded .related-cards-panel { display: block; }
+    .related-card-row {
+      background: #0f172a; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+    }
+    .related-card-row:last-child { margin-bottom: 0; }
+    .related-card-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .related-card-type { font-size: 10px; color: #475569; }
+    .related-card-desc { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+    /* Loading / error */
+    .status-msg {
+      text-align: center; padding: 60px 20px;
+      color: #475569; font-size: 14px;
+    }
+    .status-msg .big { font-size: 32px; margin-bottom: 12px; }
+    .no-data-hint { font-size: 12px; color: #334155; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <a class="back-btn" href="index.html">← 返回</a>
+    <h1>棋子图鉴</h1>
+    <span class="count" id="countLabel"></span>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <button class="filter-btn active-all" id="btnAll"  onclick="setFilter('all')">全部</button>
+    <button class="filter-btn"           id="btnRed"  onclick="setFilter('red')">红方</button>
+    <button class="filter-btn"           id="btnBlue" onclick="setFilter('blue')">蓝方</button>
+  </div>
+
+  <!-- Piece list -->
+  <div class="piece-list" id="pieceList">
+    <div class="status-msg">
+      <div class="big">⏳</div>
+      <div>正在加载棋子数据…</div>
+    </div>
+  </div>
+
+  <script>
+    let allPieces = []
+    let skillsCache = {}
+    let currentFilter = 'all'
+
+    // ── Fetch helpers ──────────────────────────────────────────
+    async function fetchJson(path) {
+      if (window.fetchPackJson && /^\.?\/?data\//.test(path)) {
+        return window.fetchPackJson(path)
+      }
+      const res = await fetch(path)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    }
+
+    async function loadPieces() {
+      try {
+        // Load from local data/ (offline-first, no server fallback)
+        const ids = await fetchJson('./data/pieces/manifest.json')
+
+        // Load each piece JSON
+        const pieces = []
+        for (const id of ids) {
+          try {
+            const p = await fetchJson(`./data/pieces/${id}.json`)
+            pieces.push(p)
+          } catch { /* skip broken files */ }
+        }
+        allPieces = pieces
+      } catch (e) {
+        allPieces = []
+        document.getElementById('pieceList').innerHTML = `
+          <div class="status-msg">
+            <div class="big">📭</div>
+            <div>未找到棋子数据</div>
+            <div class="no-data-hint">请先运行 npm run build:android 生成本地数据</div>
+          </div>`
+        return
+      }
+    }
+
+    async function loadSkill(skillId) {
+      if (skillsCache[skillId]) return skillsCache[skillId]
+      try {
+        const s = await fetchJson(`./data/skills/${skillId}.json`)
+        skillsCache[skillId] = s
+        return s
+      } catch { return null }
+    }
+
+    // ── Keywords ───────────────────────────────────────────────
+    let keywordsCache = null
+
+    async function loadKeywords() {
+      if (keywordsCache) return keywordsCache
+      try {
+        keywordsCache = await fetchJson('./data/skill-keywords.json')
+        return keywordsCache
+      } catch { return [] }
+    }
+
+    // ── Related cards ─────────────────────────────────────────
+    let cardsCache = {}
+
+    async function loadCard(cardId) {
+      if (cardsCache[cardId]) return cardsCache[cardId]
+      try {
+        const c = await fetchJson(`./data/cards/${cardId}.json`)
+        cardsCache[cardId] = c
+        return c
+      } catch { return null }
+    }
+
+    // ── Render ────────────────────────────────────────────────
+    function setFilter(f) {
+      currentFilter = f
+      document.getElementById('btnAll').className  = 'filter-btn' + (f === 'all'  ? ' active-all'  : '')
+      document.getElementById('btnRed').className  = 'filter-btn' + (f === 'red'  ? ' active-red'  : '')
+      document.getElementById('btnBlue').className = 'filter-btn' + (f === 'blue' ? ' active-blue' : '')
+      renderList()
+    }
+
+    function renderList() {
+      const filtered = currentFilter === 'all'
+        ? allPieces
+        : allPieces.filter(p => p.faction === currentFilter)
+
+      document.getElementById('countLabel').textContent = `${filtered.length} 个棋子`
+
+      if (!filtered.length) {
+        document.getElementById('pieceList').innerHTML =
+          `<div class="status-msg"><div class="big">🔍</div><div>没有符合条件的棋子</div></div>`
+        return
+      }
+
+      document.getElementById('pieceList').innerHTML = filtered.map(p => renderCard(p)).join('')
+    }
+
+    function factionClass(f) {
+      if (f === 'red')  return 'faction-red'
+      if (f === 'blue') return 'faction-blue'
+      return 'faction-neutral'
+    }
+    function factionLabel(f) {
+      if (f === 'red')  return '<span class="faction-label-red">红方</span>'
+      if (f === 'blue') return '<span class="faction-label-blue">蓝方</span>'
+      return '<span style="color:#94a3b8">中立</span>'
+    }
+    function pieceAvatarHtml(p) {
+      // 有图片文件（.jpg/.png/.svg）时显示真实头像
+      if (p.image && p.image.includes('.')) {
+        const fallback = p.faction === 'red' ? '🔴' : p.faction === 'blue' ? '🔵' : '⚪'
+        return `<img src="images/${p.image}" alt="${p.name || p.id}" onerror="this.parentElement.textContent='${fallback}'">`
+      }
+      // emoji 直接显示
+      if (p.image) return p.image
+      if (p.faction === 'red')  return '🔴'
+      if (p.faction === 'blue') return '🔵'
+      return '⚪'
+    }
+
+    function renderCard(p) {
+      const stats = p.stats || {}
+      const skills = (p.skills || []).map(s => {
+        const sid = typeof s === 'string' ? s : (s.skillId || s.id || '')
+        return `<div class="skill-row">
+          <div class="skill-icon">⚡</div>
+          <div>
+            <div class="skill-name">${sid}</div>
+            <div class="skill-desc" id="sdesc-${p.id}-${sid}">加载中…</div>
+          </div>
+        </div>`
+      }).join('')
+
+      const transformedSkillsHtml = (p.transformedSkills || []).map(ts => {
+        const sid = ts.skillId || ts.id || ''
+        return `<div class="skill-row">
+          <div class="skill-icon">🔓</div>
+          <div>
+            <div class="skill-name">${sid} <span class="skill-badge badge-super">可解锁</span></div>
+            <div class="skill-desc" id="tsdesc-${p.id}-${sid}">加载中…</div>
+            <div style="font-size:10px;color:#475569;margin-top:2px" id="tstrigg-${p.id}-${sid}"></div>
+          </div>
+        </div>`
+      }).join('')
+
+      return `<div class="piece-card" id="card-${p.id}" onclick="toggleCard('${p.id}', ${JSON.stringify(p.skills || []).replace(/"/g, '&quot;')}, ${JSON.stringify(p.transformedSkills || []).replace(/"/g, '&quot;')}, ${JSON.stringify(p.relatedCards || []).replace(/"/g, '&quot;')})">
+        <div class="piece-header">
+          <div class="piece-avatar ${factionClass(p.faction)}">${pieceAvatarHtml(p)}</div>
+          <div class="piece-info">
+            <div class="piece-name">${p.name || p.id}</div>
+            <div class="piece-meta">${factionLabel(p.faction)} · ${rarityLabel(p.rarity)}</div>
+          </div>
+          <span class="expand-icon">›</span>
+        </div>
+        ${p.description ? `<div class="piece-desc">${p.description}</div>` : ''}
+        <div class="stats-row">
+          <div class="stat-cell"><div class="stat-val" style="color:#ef4444">${stats.maxHp ?? '—'}</div><div class="stat-lbl">HP</div></div>
+          <div class="stat-cell"><div class="stat-val" style="color:#f97316">${stats.attack ?? '—'}</div><div class="stat-lbl">攻击</div></div>
+          <div class="stat-cell"><div class="stat-val" style="color:#22c55e">${stats.defense ?? '—'}</div><div class="stat-lbl">防御</div></div>
+          <div class="stat-cell"><div class="stat-val" style="color:#3b82f6">${stats.moveRange ?? '—'}</div><div class="stat-lbl">移动</div></div>
+          ${stats.attackRange ? `<div class="stat-cell"><div class="stat-val" style="color:#a855f7">${stats.attackRange}</div><div class="stat-lbl">射程</div></div>` : ''}
+        </div>
+        <div class="skills-panel">
+          <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">技能</div>
+          ${skills || '<div style="font-size:13px;color:#475569">无技能</div>'}
+          ${transformedSkillsHtml ? `
+          <div style="font-size:12px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:1px;margin:12px 0 8px">可解锁技能</div>
+          ${transformedSkillsHtml}` : ''}
+        </div>
+        ${p.relatedCards && p.relatedCards.length > 0 ? `
+        <div class="related-cards-panel" id="rcpanel-${p.id}">
+          <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">相关手牌</div>
+          <div id="rccontent-${p.id}">加载中…</div>
+        </div>` : ''}
+        <div class="keywords-panel" id="kwpanel-${p.id}">
+          <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">关键词</div>
+          <div id="kwcontent-${p.id}">加载中…</div>
+        </div>
+      </div>`
+    }
+
+    function rarityLabel(r) {
+      const map = { common: '普通', uncommon: '精良', rare: '稀有', epic: '史诗', legendary: '传说' }
+      return map[r] || r || ''
+    }
+
+    async function fillSkillDesc(pieceId, sid, descIdPrefix, skillData, triggerBy) {
+      const descEl = document.getElementById(`${descIdPrefix}-${pieceId}-${sid}`)
+      if (!descEl || descEl.textContent !== '加载中…') return
+      if (skillData) {
+        const badgeClass = skillData.type === 'super' ? 'badge-super' : skillData.type === 'buff' ? 'badge-buff' : 'badge-normal'
+        const badgeText  = skillData.type === 'super' ? '充能' : skillData.type === 'buff' ? '增益' : '普通'
+        const nameEl = descEl.previousElementSibling
+        if (nameEl) {
+          const lockedBadge = descIdPrefix === 'tsdesc' ? ' <span class="skill-badge badge-super">可解锁</span>' : ''
+          nameEl.innerHTML = `${skillData.name || sid} <span class="skill-badge ${badgeClass}">${badgeText}</span>${lockedBadge}`
+        }
+        descEl.textContent = skillData.description || ''
+        const chips = []
+        if (skillData.actionPointCost) chips.push(`⚡${skillData.actionPointCost} 行动点`)
+        if (skillData.cooldownTurns)   chips.push(`⏱${skillData.cooldownTurns} 回合冷却`)
+        if (skillData.chargeCost)      chips.push(`🔋${skillData.chargeCost}/${skillData.maxCharges || skillData.chargeCost} 充能`)
+        if (chips.length) {
+          const chipEl = document.createElement('div')
+          chipEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px'
+          chipEl.innerHTML = chips.map(c => `<span style="font-size:10px;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:1px 6px;color:#94a3b8">${c}</span>`).join('')
+          descEl.after(chipEl)
+        }
+        if (triggerBy) {
+          const triggEl = document.getElementById(`tstrigg-${pieceId}-${sid}`)
+          if (triggEl) {
+            // Look up the trigger skill name
+            const trigSkill = await loadSkill(triggerBy)
+            triggEl.textContent = `激活「${trigSkill ? trigSkill.name : triggerBy}」后解锁`
+          }
+        }
+      } else {
+        descEl.textContent = ''
+      }
+    }
+
+    async function toggleCard(pieceId, skillsRaw, transformedRaw, relatedCards) {
+      const card = document.getElementById('card-' + pieceId)
+      if (!card) return
+      card.classList.toggle('expanded')
+      if (card.classList.contains('expanded')) {
+        const skills = typeof skillsRaw === 'string' ? JSON.parse(skillsRaw.replace(/&quot;/g, '"')) : skillsRaw
+        for (const s of skills) {
+          const sid = typeof s === 'string' ? s : (s.skillId || s.id || '')
+          const skillData = await loadSkill(sid)
+          await fillSkillDesc(pieceId, sid, 'sdesc', skillData, null)
+        }
+        const transformed = typeof transformedRaw === 'string' ? JSON.parse(transformedRaw.replace(/&quot;/g, '"')) : (transformedRaw || [])
+        for (const ts of transformed) {
+          const sid = ts.skillId || ts.id || ''
+          const skillData = await loadSkill(sid)
+          await fillSkillDesc(pieceId, sid, 'tsdesc', skillData, ts.triggeredBy || null)
+        }
+
+        // Load related cards
+        const rcContent = document.getElementById('rccontent-' + pieceId)
+        if (rcContent && relatedCards && relatedCards.length > 0) {
+          const cardHtmls = []
+          for (const cardId of relatedCards) {
+            const cardData = await loadCard(cardId)
+            if (cardData) {
+              cardHtmls.push(`<div class="related-card-row">
+                <div class="related-card-name">${cardData.icon || '🎴'} ${cardData.name || cardId} <span style="color:#a855f7;font-size:11px">AP:${cardData.actionPointCost ?? 0}</span></div>
+                <div class="related-card-type">${cardData.type === 'active' ? '主动' : '反应'}</div>
+                <div class="related-card-desc">${cardData.description || ''}</div>
+              </div>`)
+            }
+          }
+          rcContent.innerHTML = cardHtmls.join('')
+        } else if (rcContent) {
+          rcContent.innerHTML = '<div style="font-size:12px;color:#475569">无相关手牌</div>'
+        }
+
+        // Load keywords from skills
+        const kwContent = document.getElementById('kwcontent-' + pieceId)
+        if (kwContent) {
+          const allKeywords = []
+          const allSkills = [...(skills || []), ...(transformed || [])]
+          for (const s of allSkills) {
+            const sid = typeof s === 'string' ? s : (s.skillId || s.id || '')
+            const skillData = await loadSkill(sid)
+            if (skillData && skillData.keywords && skillData.keywords.length > 0) {
+              allKeywords.push(...skillData.keywords)
+            }
+          }
+          if (allKeywords.length > 0) {
+            const keywordsData = await loadKeywords()
+            const keywordMap = {}
+            if (Array.isArray(keywordsData)) {
+              keywordsData.forEach(kw => { keywordMap[kw.name] = kw })
+            }
+            const kwHtmls = []
+            const seen = new Set()
+            for (const kwName of allKeywords) {
+              if (seen.has(kwName)) continue
+              seen.add(kwName)
+              const kw = keywordMap[kwName]
+              kwHtmls.push(`<div class="keyword-row">
+                <div class="keyword-name">${kwName}</div>
+                <div class="keyword-desc">${kw ? (kw.shortDescription || kw.longDescription || '') : ''}</div>
+              </div>`)
+            }
+            kwContent.innerHTML = kwHtmls.join('')
+          } else {
+            kwContent.innerHTML = '<div style="font-size:12px;color:#475569">无关键词</div>'
+          }
+        }
+      }
+    }
+
+    // ── Boot ─────────────────────────────────────────────────
+    loadPieces().then(() => {
+      renderList()
+    })
+  </script>
+</body>
+</html>

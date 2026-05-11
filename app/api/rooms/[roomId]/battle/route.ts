@@ -1,45 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
-import {
-  type BattleAction,
-  type BattleState,
-  applyBattleAction,
-  BattleRuleError,
-} from "@/lib/game/turn"
-import { loadRuleById, loadAllSkillsById } from "@/lib/game/skills"
+import { broadcastToRoom } from "@/lib/ws-server"
 
-/**
- * 重新填充 battleState.skillsById（DB 写入时已剔除，读取后需从文件恢复）。
- */
-function reloadSkillsIfMissing(battleState: BattleState): void {
-  if (!battleState.skillsById || Object.keys(battleState.skillsById).length === 0) {
-    battleState.skillsById = loadAllSkillsById()
-  }
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface ActionLogEntry {
+  seq: number
+  type: 'init' | 'action' | 'gameOver'
+  playerId?: string
+  payload?: unknown   // initial BattleState (type=init)
+  action?: unknown    // BattleAction     (type=action)
+  winner?: string     // winning faction  (type=gameOver)
+  timestamp: number
 }
 
-/**
- * 重新为战斗状态中所有棋子的规则注入 effect 函数。
- * 规则对象保存到 JSON 文件时，函数会丢失，每次加载后需重新注入。
- */
-function rehydrateBattleRules(battleState: BattleState): void {
-  for (const piece of battleState.pieces) {
-    if (!piece.rules || piece.rules.length === 0) continue
-    piece.rules = piece.rules.map((rule: any) => {
-      if (typeof rule.effect !== 'function' && rule.id) {
-        const rehydrated = loadRuleById(rule.id)
-        if (rehydrated && typeof rehydrated.effect === 'function') {
-          return rehydrated
-        }
-        console.warn(`Failed to rehydrate rule ${rule.id}, adding default effect`)
-        return {
-          ...rule,
-          effect: () => ({ success: false, message: '' })
-        }
-      }
-      return rule
-    })
-  }
+interface ActionLog {
+  type: 'action-log'
+  seed: number
+  actions: ActionLogEntry[]
 }
+
+// ── GET — return action log entries since N ──────────────────────────────────
 
 export async function GET(
   req: NextRequest,
@@ -49,29 +30,19 @@ export async function GET(
   const roomId = rawRoomId.trim().toLowerCase()
   const room = await roomStore.getRoom(roomId)
 
-  if (!room) {
-    return NextResponse.json({ error: "Room not found" }, { status: 404 })
+  if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
+
+  const log = room.battleState as unknown as ActionLog | undefined
+  if (!log || log.type !== 'action-log') {
+    return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
   }
 
-  if (!room.battleState) {
-    return NextResponse.json(
-      { error: "Battle has not started in this room" },
-      { status: 400 },
-    )
-  }
-
-  // 恢复 skillsById（DB 写入时已剔除）
-  reloadSkillsIfMissing(room.battleState)
-
-  // 轮询请求不需要 skillsById（前端已本地缓存），仅首次请求（?includeSkills=1）时携带
-  const includeSkills = req.nextUrl.searchParams.get('includeSkills') === '1'
-  if (!includeSkills) {
-    const { skillsById: _skills, ...stateWithoutSkills } = room.battleState
-    return NextResponse.json(stateWithoutSkills)
-  }
-
-  return NextResponse.json(room.battleState)
+  const since = parseInt(req.nextUrl.searchParams.get('since') ?? '-1')
+  const actions = log.actions.slice(since + 1)
+  return NextResponse.json({ actions, total: log.actions.length, seed: log.seed })
 }
+
+// ── POST — append action to log (pure relay, no game logic) ──────────────────
 
 export async function POST(
   req: NextRequest,
@@ -79,66 +50,43 @@ export async function POST(
 ) {
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
+
+  let body: { type?: string; playerId?: string; action?: unknown; winner?: string } = {}
+  try { body = await req.json() } catch {}
+
   const room = await roomStore.getRoom(roomId)
+  if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
 
-  if (!room) {
-    return NextResponse.json({ error: "Room not found" }, { status: 404 })
+  const log = room.battleState as unknown as ActionLog | undefined
+  if (!log || log.type !== 'action-log') {
+    return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
   }
 
-  if (!room.battleState) {
-    return NextResponse.json(
-      { error: "Battle has not started in this room" },
-      { status: 400 },
-    )
-  }
+  const { type = 'action', playerId, action, winner } = body
+  const seq = log.actions.length
+  const entry: ActionLogEntry = { seq, type: type as ActionLogEntry['type'], playerId, timestamp: Date.now() }
+  if (action !== undefined) entry.action = action
+  if (winner !== undefined) entry.winner = winner
 
-  let body: BattleAction
-  try {
-    body = (await req.json()) as BattleAction
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
-  }
+  log.actions.push(entry)
 
-  try {
-    reloadSkillsIfMissing(room.battleState)
-    rehydrateBattleRules(room.battleState)
-    const nextState = applyBattleAction(room.battleState, body)
-    console.log('[Battle API] Players chargePoints after action:', nextState.players.map(p => ({ playerId: p.playerId, chargePoints: p.chargePoints })))
-    const uniquePieces = nextState.pieces.filter((piece: any, index: number, self: any[]) =>
-      index === self.findIndex((p: any) => p.instanceId === piece.instanceId)
-    )
-    if (uniquePieces.length !== nextState.pieces.length) {
-      console.warn('[Battle API] Found duplicate pieces, deduplicating...')
-      nextState.pieces = uniquePieces
+  // Game over: create game record, mark room finished
+  if (type === 'gameOver' && !room.gameRecord) {
+    room.status = 'finished'
+    room.gameRecord = {
+      gameId: roomId + '-' + Date.now(),
+      timestamp: Date.now(),
+      roomId,
+      players: room.players.map(p => ({ id: p.id, name: p.name, publicKey: (p as any).publicKey })),
+      winner: winner ?? null,
+      signatures: {},
     }
-    room.battleState = nextState
-    await roomStore.updateBattleState(room.id, nextState)
-
-    return NextResponse.json(nextState)
-  } catch (e) {
-    if (e instanceof BattleRuleError) {
-      if ((e as any).needsTargetSelection) {
-        return NextResponse.json({
-          needsTargetSelection: true,
-          targetType: (e as any).targetType || 'piece',
-          range: (e as any).range || 5,
-          filter: (e as any).filter || 'enemy'
-        }, { status: 400 })
-      }
-      if ((e as any).needsOptionSelection) {
-        return NextResponse.json({
-          needsOptionSelection: true,
-          options: (e as any).options || [],
-          title: (e as any).title || '请选择'
-        }, { status: 400 })
-      }
-      return NextResponse.json({ error: e.message }, { status: 400 })
-    }
-
-    console.error("Unexpected battle error", e)
-    return NextResponse.json(
-      { error: "Unexpected error while applying battle action" },
-      { status: 500 }
-    )
   }
+
+  await roomStore.setRoom(roomId, room)
+
+  // Notify WebSocket subscribers
+  broadcastToRoom(roomId, { type: 'actionLog', entry })
+
+  return NextResponse.json({ seq })
 }

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* https://*" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>服务器管理</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 14px; color: #94a3b8; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #334155; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #64748b; font-size: 13px; }
+    .info-value { color: #e2e8f0; font-size: 13px; font-family: monospace; }
+    .info-value.success { color: #4ade80; }
+    .info-value.warning { color: #fbbf24; }
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-right: 8px;
+      margin-top: 8px;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-success { background: #22c55e; color: #fff; }
+    input[type="file"] {
+      display: block;
+      background: #0f172a;
+      border: 1px dashed #334155;
+      border-radius: 8px;
+      padding: 16px;
+      width: 100%;
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+    input[type="file"]:hover { border-color: #3b82f6; }
+    .log {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #64748b;
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+    .log .entry { margin-bottom: 4px; }
+    .log .entry.success { color: #4ade80; }
+    .log .entry.error { color: #f87171; }
+    .log .entry.info { color: #60a5fa; }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-badge.running { background: #22c55e20; color: #4ade80; }
+    .status-badge.stopped { background: #ef444420; color: #f87171; }
+    .actions { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>🔧 服务器管理</h1>
+
+  <div class="card">
+    <h2>服务器状态</h2>
+    <div class="info-row">
+      <span class="info-label">状态</span>
+      <span class="info-value"><span id="serverStatus" class="status-badge stopped">停止</span></span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">本地地址</span>
+      <span class="info-value" id="serverUrl">-</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">资源包状态</span>
+      <span class="info-value" id="packStatus">-</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">资源包版本</span>
+      <span class="info-value" id="packVersion">-</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">导入时间</span>
+      <span class="info-value" id="packImported">-</span>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="syncResourcePack()">同步资源包</button>
+      <button class="btn btn-danger" onclick="restartServer()">重启服务器</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>上传资源包文件</h2>
+    <p style="color: #64748b; font-size: 12px; margin-bottom: 8px;">
+      选择 resource-pack.zip 文件，系统将自动解压并更新游戏数据。<br/>
+      更新完成后服务器将自动重启。
+    </p>
+    <input type="file" id="packFile" accept=".zip" onchange="handleFileSelect(this.files)" />
+    <div id="uploadProgress" style="display:none; margin-top: 12px;">
+      <div style="background: #334155; border-radius: 4px; height: 8px; overflow: hidden;">
+        <div id="progressBar" style="background: #3b82f6; height: 100%; width: 0%; transition: width 0.3s;"></div>
+      </div>
+      <p id="progressText" style="color: #94a3b8; font-size: 12px; margin-top: 8px;">-</p>
+    </div>
+    <div class="log" id="uploadLog"></div>
+  </div>
+
+  <div class="card">
+    <h2>操作日志</h2>
+    <div class="log" id="opLog">
+      <div class="entry info">等待操作...</div>
+    </div>
+  </div>
+
+  <script>
+    const api = window.electronAPI
+    const SERVER_PORT = 3000
+
+    function log(type, msg) {
+      const el = document.getElementById('opLog')
+      const entry = document.createElement('div')
+      entry.className = 'entry ' + type
+      entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg
+      el.appendChild(entry)
+      el.scrollTop = el.scrollHeight
+    }
+
+    function uploadLog(type, msg) {
+      const el = document.getElementById('uploadLog')
+      const entry = document.createElement('div')
+      entry.className = 'entry ' + type
+      entry.textContent = msg
+      el.appendChild(entry)
+      el.scrollTop = el.scrollHeight
+    }
+
+    async function refreshStatus() {
+      try {
+        const res = await fetch(`http://localhost:${SERVER_PORT}/api/admin/resource-pack`)
+        if (res.ok) {
+          const data = await res.json()
+          document.getElementById('serverStatus').innerHTML = '<span class="status-badge running">运行中</span>'
+          document.getElementById('serverUrl').textContent = `http://localhost:${SERVER_PORT}`
+          document.getElementById('serverUrl').className = 'info-value success'
+
+          if (data.loaded) {
+            document.getElementById('packStatus').textContent = '已加载'
+            document.getElementById('packStatus').className = 'info-value success'
+            document.getElementById('packVersion').textContent = data.meta?.version || '未知'
+            document.getElementById('packImported').textContent = data.meta?.importedAt || '未知'
+          } else {
+            document.getElementById('packStatus').textContent = '使用内置数据'
+            document.getElementById('packStatus').className = 'info-value warning'
+            document.getElementById('packVersion').textContent = '-'
+            document.getElementById('packImported').textContent = '-'
+          }
+        } else {
+          showServerStopped()
+        }
+      } catch {
+        showServerStopped()
+      }
+    }
+
+    function showServerStopped() {
+      document.getElementById('serverStatus').innerHTML = '<span class="status-badge stopped">停止</span>'
+      document.getElementById('serverUrl').textContent = '-'
+      document.getElementById('serverUrl').className = 'info-value'
+      document.getElementById('packStatus').textContent = '-'
+      document.getElementById('packVersion').textContent = '-'
+      document.getElementById('packImported').textContent = '-'
+    }
+
+    async function syncResourcePack() {
+      log('info', '正在同步资源包...')
+      try {
+        const res = await fetch(`http://localhost:${SERVER_PORT}/api/admin/resource-pack`, {
+          method: 'POST',
+          headers: { 'x-admin-key': 'admin-secret-key' }
+        })
+        const data = await res.json()
+        if (data.success) {
+          log('success', '资源包同步成功！版本: ' + (data.meta?.version || '未知'))
+          await restartServer()
+        } else {
+          log('error', '同步失败: ' + data.message)
+        }
+      } catch (e) {
+        log('error', '请求失败: ' + e.message)
+      }
+    }
+
+    async function restartServer() {
+      log('info', '正在重启服务器...')
+      try {
+        await api.restartServer()
+        log('success', '服务器重启指令已发送')
+        setTimeout(refreshStatus, 3000)
+      } catch (e) {
+        log('error', '重启失败: ' + e.message)
+      }
+    }
+
+    async function handleFileSelect(files) {
+      if (!files || !files[0]) return
+      const file = files[0]
+
+      if (!file.name.endsWith('.zip')) {
+        uploadLog('error', '请选择 .zip 文件')
+        return
+      }
+
+      uploadLog('info', '开始上传: ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB)')
+
+      const progressEl = document.getElementById('uploadProgress')
+      const barEl = document.getElementById('progressBar')
+      const textEl = document.getElementById('progressText')
+      progressEl.style.display = 'block'
+      barEl.style.width = '0%'
+      textEl.textContent = '上传中...'
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      try {
+        const xhr = new XMLHttpRequest()
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100)
+            barEl.style.width = pct + '%'
+            textEl.textContent = '上传中... ' + pct + '%'
+          }
+        }
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            barEl.style.width = '100%'
+            textEl.textContent = '上传完成！正在处理...'
+            uploadLog('success', '文件上传成功，系统正在解压...')
+            setTimeout(async () => {
+              await restartServer()
+              uploadLog('success', '资源包更新完成！')
+              await refreshStatus()
+            }, 3000)
+          } else {
+            uploadLog('error', '上传失败: ' + xhr.statusText)
+            progressEl.style.display = 'none'
+          }
+        }
+        xhr.onerror = () => {
+          uploadLog('error', '网络错误，请确保服务器正在运行')
+          progressEl.style.display = 'none'
+        }
+        xhr.open('POST', `http://localhost:${SERVER_PORT}/api/admin/resource-pack/upload`)
+        xhr.setRequestHeader('x-admin-key', 'admin-secret-key')
+        xhr.send(formData)
+      } catch (e) {
+        uploadLog('error', '上传失败: ' + e.message)
+        progressEl.style.display = 'none'
+      }
+    }
+
+    refreshStatus()
+    setInterval(refreshStatus, 10000)
+  </script>
+</body>
+</html>

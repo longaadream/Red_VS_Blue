@@ -1,0 +1,15 @@
+{
+  "id": "effect-arthas-lich-covenant",
+  "name": "巫妖誓约",
+  "icon": "🃏",
+  "color": "#a855f7",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeDamageTaken",
+      "priority": -100,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; var hasCovenantBuff = piece.statusTags && piece.statusTags.some(function(t) { return t.type === 'lich-covenant'; }); if (!hasCovenantBuff) return false; var rawDmg = ctx.damage || 0; var isTrue = ctx.damageType === 'true' || ctx.damageType === 'toxin'; var effectiveDmg = isTrue ? Math.max(1, rawDmg) : Math.max(1, rawDmg - (piece.defense || 0)); return effectiveDmg >= piece.currentHp; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var covenantTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'lich-covenant'; }); if (covenantTag) { var ci = piece.statusTags.indexOf(covenantTag); piece.statusTags.splice(ci, 1); } self.expire(); piece.currentHp = piece.maxHp; var attackBoost = Math.round(piece.attack * 0.5); piece.attack = piece.attack + attackBoost; addStatusEffectById(piece.instanceId, { id: 'undead-body-' + piece.instanceId, name: '亡灵之躯', type: 'undead-body', currentDuration: -1, currentUses: -1, intensity: attackBoost, stacks: -1 }); if (piece.skills) { piece.skills.forEach(function(s) { s.currentCooldown = 0; }); } return { success: true, blocked: true, message: piece.name + '的巫妖誓约触发！从致命伤害中复活！HP恢复至满血（' + piece.maxHp + '），攻击力永久+' + attackBoost + '，进入亡灵之躯状态（永久），所有技能冷却重置！' }; }"
+    }
+  ]
+}

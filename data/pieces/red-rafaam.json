@@ -25,8 +25,8 @@
       "level": 1
     }
   ],
-  "rules": [
-    "rule-rafaam-curse-ward"
-  ],
+  "rules": [],
+  "initialEffects": ["effect-rafaam-curse-ward"],
+  "relatedCards": ["rafaam-curse-sample"],
   "isDefault": false
 }

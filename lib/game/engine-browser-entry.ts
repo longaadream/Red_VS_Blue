@@ -1,0 +1,49 @@
+/**
+ * engine-browser-entry.ts
+ *
+ * esbuild 打包入口 —— 供 Android 训练营 (training.html) 使用。
+ * 编译命令见 package.json build:game-engine 脚本。
+ *
+ * 依赖说明：
+ * - fs / path 标记为 external，由 training.html 的 VirtualFS shim 提供
+ * - process.cwd() 由 training.html 注入的 process shim 提供（返回 ''）
+ */
+
+export { applyBattleAction, safeCloneBattleState } from './turn'
+export { setRng, mulberry32 } from './rng'
+export type { BattleState, BattleAction, BattleActionLog } from './turn'
+
+import { createInitialBattleForPlayers as _createInitialBattleForPlayers } from './battle-setup'
+import { loadAllSkillsById } from './skills'
+import type { BattleState, PlayerId } from './turn'
+import type { PieceTemplate } from './piece'
+
+/**
+ * Browser-safe wrapper for createInitialBattleForPlayers.
+ *
+ * The original function calls buildDefaultSkills() → loadJsonFilesServer()
+ * which has an early-return guard for browser environments (typeof window !== 'undefined').
+ * This wrapper patches skillsById after init using loadAllSkillsById() which
+ * reads directly via require('fs') → VirtualFS shim, bypassing that guard.
+ */
+export async function createInitialBattleForPlayers(
+  playerIds: PlayerId[],
+  selectedPieces: PieceTemplate[],
+  playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[] }>,
+  mapId?: string,
+): Promise<BattleState | null> {
+  const state = await _createInitialBattleForPlayers(playerIds, selectedPieces, playerSelectedPieces, mapId)
+  if (!state) return null
+
+  // buildDefaultSkills() returns {} in browser — patch with VFS-loaded skills
+  const skills = loadAllSkillsById()
+  if (Object.keys(skills).length > 0) {
+    state.skillsById = skills
+  }
+
+  return state
+}
+
+export { DEFAULT_PIECES, getPieceById, getAllPieces, getPiecesByFaction } from './piece-repository'
+
+export { globalTriggerSystem } from './triggers'

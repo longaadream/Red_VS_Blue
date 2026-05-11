@@ -1,0 +1,27 @@
+{
+  "id": "effect-sleep",
+  "name": "麻醉",
+  "icon": "💤",
+  "color": "#a78bfa",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.some(function(tag) { return typeof tag === 'object' && tag && tag.type === 'sleep'; })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; return { success: true, blocked: true, message: piece.name + '处于麻醉状态，无法移动', showUIEffect: true }; }"
+    },
+    {
+      "on": "beforeSkillUse",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.some(function(tag) { return typeof tag === 'object' && tag && tag.type === 'sleep'; })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; return { success: true, blocked: true, message: piece.name + '处于麻醉状态，无法使用技能', showUIEffect: true }; }"
+    },
+    {
+      "on": "afterDamageTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.some(function(tag) { return typeof tag === 'object' && tag && tag.type === 'sleep'; })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var sleepStatusIndex = -1; if (piece.statusTags) { for (var i = 0; i < piece.statusTags.length; i++) { var tag = piece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'sleep') { sleepStatusIndex = i; break; } } } if (sleepStatusIndex !== -1) { piece.statusTags.splice(sleepStatusIndex, 1); self.expire(); return { success: true, message: piece.name + '受到伤害，麻醉状态解除' }; } return { success: false }; }"
+    }
+  ]
+}

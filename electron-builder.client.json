@@ -1,0 +1,38 @@
+{
+  "appId": "com.redvsblue.client",
+  "productName": "RED vs BLUE",
+  "directories": { "output": "dist/client-build" },
+  "extraMetadata": {
+    "main": "electron-client/dist/main.js"
+  },
+  "files": [
+    "electron-client/dist/**",
+    "electron-client/admin/**",
+    "electron-client/connect/**",
+    "package.json",
+    "!node_modules/**"
+  ],
+  "extraResources": [
+    { "from": "_client-stage",       "to": "app/standalone" },
+    { "from": "public",              "to": "app/public" },
+    { "from": "data",                "to": "app/data" },
+    { "from": "prisma",              "to": "app/prisma" },
+    { "from": "android-client/www",  "to": "app/www" },
+    { "from": "electron-client/admin","to": "app/electron-client/admin" },
+    { "from": "scripts/init-db.js",  "to": "app/init-db.js" },
+    { "from": "node_modules/adm-zip","to": "app/node_modules/adm-zip" }
+  ],
+  "asar": false,
+  "win": {
+    "target": "dir"
+  },
+  "mac": {
+    "target": "dmg"
+  },
+  "linux": {
+    "target": [
+      { "target": "AppImage", "arch": ["x64"] },
+      { "target": "tar.gz", "arch": ["x64"] }
+    ]
+  }
+}

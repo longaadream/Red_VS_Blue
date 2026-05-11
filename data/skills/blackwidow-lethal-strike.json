@@ -1,8 +1,11 @@
 {
   "id": "blackwidow-lethal-strike",
   "name": "致命打击",
-  "description": "选择一个同行或同列的格子作为方向，向该方向射出一发子弹，对路径上第一个敌人造成(1+间隔格数*0.1)倍攻击力的伤害。被子弹:false的格子拦截。",
-  "icon": "🎯",
+  "description": "弹射物：向同一行或同一列射击，对路径上的第1个敌人造成物理伤害（无法穿过掩体和角色）。伤害=(1+距离×0.1)×攻击力，无上限。",
+  "keywords": ["弹射物"],
+  "targetText": "同一行或同一列的1个方向",
+  "effectTags": ["物理伤害"],
+  "icon": "🎆",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 2,
@@ -10,5 +13,5 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var caster = context.piece; var targetPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos; var dx = targetPos.x - caster.x; var dy = targetPos.y - caster.y; if (dx !== 0 && dy !== 0) { return { success: false, message: '必须选择与自己在同一行或同一列的格子' }; } var dirX = dx === 0 ? 0 : (dx > 0 ? 1 : -1); var dirY = dy === 0 ? 0 : (dy > 0 ? 1 : -1); var firstEnemy = null; var hitDistance = 0; for (var i = 1; i <= 99; i++) { var checkX = caster.x + dirX * i; var checkY = caster.y + dirY * i; var tile = context.battle.map.tiles.find(function(t) { return t.x === checkX && t.y === checkY; }); if (!tile) { break; } if (tile.props && tile.props.bulletPassable === false) { break; } var enemy = context.battle.pieces.find(function(p) { return p.x === checkX && p.y === checkY && p.currentHp > 0 && p.ownerPlayerId !== caster.ownerPlayerId; }); if (enemy) { firstEnemy = enemy; hitDistance = i; break; } } if (!firstEnemy) { return { success: false, message: '路径上没有敌人' }; } var damageMultiplier = 1 + (hitDistance * 0.1); var damage = Math.round(caster.attack * damageMultiplier); var result = dealDamage(caster, firstEnemy, damage, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '对' + firstEnemy.name + '造成' + result.damage + '点伤害（距离' + hitDistance + '格）' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '向选择方向发射子弹，对第一个敌人造成(1+距离*0.1)倍伤害', expectedValues: { damage: Math.round(piece.attack * 1.1) } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '向同一行或同一列射击，对路径上的第1个敌人造成伤害。伤害=(1+距离×0.1)×攻击力，无上限。', expectedValues: { damage: Math.round(piece.attack * 1.1) } }; }"
 }

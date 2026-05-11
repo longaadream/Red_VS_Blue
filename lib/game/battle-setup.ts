@@ -1,4 +1,5 @@
 import { getMapAsync, getMap, DEFAULT_MAP_ID, loadMaps } from "@/config/maps"
+import { rng } from "./rng"
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceTemplate, PieceStats } from "./piece"
 import type { SkillDefinition, SkillState } from "./skills"
@@ -6,12 +7,13 @@ import type { BattleState, PlayerId } from "./turn"
 import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 import { globalTriggerSystem } from "./triggers"
-import { loadRuleById } from "./skills"
+import { applyEffectToPiece } from './attached-effect'
 import path from 'path'
 import fs from 'fs'
+import { getUserDataDir } from '@/lib/app-paths'
 
 function writeLog(message: string) {
-  const logDir = path.join(process.cwd(), 'logs')
+  const logDir = path.join(getUserDataDir(), 'logs')
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true })
   }
@@ -58,24 +60,13 @@ interface PlayerSelectedPieces {
   pieces: PieceTemplate[]
 }
 
-// 辅助函数：加载棋子的规则
-function loadPieceRules(pieceTemplate: PieceTemplate): any[] {
-  const rules: any[] = []
-  console.log(`[loadPieceRules] Loading rules for ${pieceTemplate.name}, rules:`, pieceTemplate.rules)
-  if (pieceTemplate.rules && Array.isArray(pieceTemplate.rules)) {
-    pieceTemplate.rules.forEach(ruleId => {
-      console.log(`[loadPieceRules] Loading rule: ${ruleId}`)
-      const rule = loadRuleById(ruleId, true)
-      if (rule) {
-        console.log(`[loadPieceRules] Rule loaded successfully: ${rule.id}`)
-        rules.push(rule)
-      } else {
-        console.error(`[loadPieceRules] Failed to load rule: ${ruleId}`)
-      }
-    })
+/** 将棋子模板中的 initialEffects 应用到棋子实例上 */
+function applyInitialEffects(piece: PieceInstance, pieceTemplate: PieceTemplate, battle: any): void {
+  const initialEffects = (pieceTemplate as any).initialEffects
+  if (!initialEffects || !Array.isArray(initialEffects)) return
+  for (const effectId of initialEffects) {
+    applyEffectToPiece(battle, piece.instanceId, effectId)
   }
-  console.log(`[loadPieceRules] Loaded ${rules.length} rules for ${pieceTemplate.name}`)
-  return rules
 }
 
 export function buildInitialPiecesForPlayers(
@@ -113,7 +104,7 @@ export function buildInitialPiecesForPlayers(
     
     // 尝试最多100次，找到一个未被占用的位置
     for (let i = 0; i < 100; i++) {
-      const randomIndex = Math.floor(Math.random() * availableTiles.length)
+      const randomIndex = Math.floor(rng() * availableTiles.length)
       const position = { x: availableTiles[randomIndex].x, y: availableTiles[randomIndex].y }
       
       // 检查位置是否已经被占用
@@ -194,7 +185,7 @@ export function buildInitialPiecesForPlayers(
               usesRemaining: isUltimate ? 1 : -1, // 限定技1次，普通技能无限制
             } as SkillState;
           }),
-          rules: loadPieceRules(pieceTemplate),
+          rules: [],
           buffs: [],
           debuffs: [],
           ruleTags: [],
@@ -250,7 +241,7 @@ export function buildInitialPiecesForPlayers(
               usesRemaining: isUltimate ? 1 : -1, // 限定技1次，普通技能无限制
             } as SkillState;
           }),
-          rules: loadPieceRules(pieceTemplate),
+          rules: [],
           buffs: [],
           debuffs: [],
           ruleTags: [],
@@ -288,7 +279,7 @@ export function buildInitialPiecesForPlayers(
               usesRemaining: isUltimate ? 1 : -1, // 限定技1次，普通技能无限制
             } as SkillState;
           }),
-          rules: loadPieceRules(pieceTemplate),
+          rules: [],
           buffs: [],
           debuffs: [],
           ruleTags: [],
@@ -338,7 +329,7 @@ export function buildInitialPiecesForPlayers(
               usesRemaining: isUltimate ? 1 : -1, // 限定技1次，普通技能无限制
             } as SkillState;
           }),
-          rules: loadPieceRules(pieceTemplate),
+          rules: [],
           buffs: [],
           debuffs: [],
           ruleTags: [],
@@ -605,35 +596,20 @@ export async function createInitialBattleForPlayers(
   const skills = buildDefaultSkills()
   console.log('Skills for battle:', Object.keys(skills))
   console.log('Teleport in skills:', 'teleport' in skills)
-  
-  // 收集所有规则ID
-  const ruleIds = collectRuleIds(selectedPieces, map as any)
-  writeLog('[createInitialBattle] Collected rule IDs: ' + JSON.stringify(ruleIds))
-  // 加载指定的规则
-  globalTriggerSystem.loadSpecificRules(ruleIds, true)
-  writeLog('[createInitialBattle] Loaded global rules count: ' + globalTriggerSystem.getRules().length + ', rules: ' + JSON.stringify(globalTriggerSystem.getRules().map(r => r.id)))
-  
-  return {
+
+  // 清除旧规则系统（rules 已迁移为 initialEffects）
+  globalTriggerSystem.clearRules()
+
+  const state: BattleState = {
     map,
     pieces,
     graveyard: [],
     pieceStatsByTemplateId: buildDefaultPieceStats(),
     skillsById: skills,
-    players: (() => {
-      writeLog('[createInitialBattle] Loading lucky coin rule for p2...')
-      const luckyCoinRule = loadRuleById('rule-lucky-coin-start')
-      writeLog('[createInitialBattle] Loaded lucky coin rule: ' + (luckyCoinRule ? luckyCoinRule.name : 'NULL'))
-      
-      const players = [
-        { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1, hand: [], discardPile: [], rules: [] },
-        {
-          playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0, hand: [], discardPile: [],
-          rules: luckyCoinRule ? [luckyCoinRule] : [],
-        },
-      ]
-      writeLog('[createInitialBattle] Players created: ' + JSON.stringify(players.map(p => ({ playerId: p.playerId, rulesCount: p.rules.length }))))
-      return players
-    })(),
+    players: [
+      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1, hand: [], discardPile: [], rules: [] },
+      { playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0, hand: [], discardPile: [], rules: [] },
+    ],
     turn: {
       currentPlayerId: redPlayer,
       turnNumber: 1,
@@ -645,31 +621,29 @@ export async function createInitialBattleForPlayers(
       },
     },
   }
-}
 
-// 收集所有规则ID
-function collectRuleIds(selectedPieces: PieceTemplate[], map: any): string[] {
-  const ruleIds = new Set<string>()
-  
-  console.log('[collectRuleIds] Selected pieces count: ' + selectedPieces.length);
-  
-  // 收集棋子的规则
-  selectedPieces.forEach(piece => {
-    console.log(`[collectRuleIds] Checking piece ${piece.name}, rules:`, piece.rules);
-    if (piece.rules && Array.isArray(piece.rules)) {
-      console.log(`[collectRuleIds] Piece ${piece.name} has rules: ${JSON.stringify(piece.rules)}`);
-      piece.rules.forEach(ruleId => ruleIds.add(ruleId))
-    } else {
-      console.log(`[collectRuleIds] Piece ${piece.name} has no rules or rules is not an array`);
+  // 为每个棋子应用 initialEffects
+  const allSelectedPieces: PieceTemplate[] = []
+  if (playerSelectedPieces && playerSelectedPieces.length > 0) {
+    playerSelectedPieces.forEach(pi => pi.pieces.forEach(pt => allSelectedPieces.push(pt)))
+  } else {
+    selectedPieces.forEach(pt => allSelectedPieces.push(pt))
+  }
+
+  state.pieces.forEach(piece => {
+    const template = allSelectedPieces.find(t => t.id === piece.templateId)
+    if (template) {
+      applyInitialEffects(piece, template, state)
     }
   })
-  
-  // 收集地图的规则
-  if (map.rules && Array.isArray(map.rules)) {
-    map.rules.forEach(ruleId => ruleIds.add(ruleId))
+
+  // 为玩家2应用 effect-lucky-coin（幸运币）
+  const p2Piece = state.pieces.find(p => p.ownerPlayerId === p2)
+  if (p2Piece) {
+    applyEffectToPiece(state, p2Piece.instanceId, 'effect-lucky-coin')
+    writeLog('[createInitialBattle] Applied effect-lucky-coin to p2 piece: ' + p2Piece.instanceId)
   }
-  
-  const result = Array.from(ruleIds)
-  writeLog('[collectRuleIds] Final rule IDs: ' + JSON.stringify(result))
-  return result
+
+  writeLog('[createInitialBattle] Battle state created, pieces count: ' + state.pieces.length)
+  return state
 }

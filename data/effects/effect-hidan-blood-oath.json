@@ -1,0 +1,15 @@
+{
+  "id": "effect-hidan-blood-oath",
+  "name": "血誓",
+  "icon": "🩸",
+  "color": "#dc2626",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeDamageTaken",
+      "priority": 200,
+      "filterCode": "function(ctx, battle, self) { var hidan = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!hidan) return false; if (!ctx.piece || ctx.piece.instanceId !== hidan.instanceId) return false; if (!ctx.damage || ctx.damage <= 0) return false; return !!(battle.pieces.find(function(p) { return p.ownerPlayerId !== hidan.ownerPlayerId && p.currentHp > 0 && p.statusTags && p.statusTags.some(function(t) { return t.type === 'blood-oath'; }); })); }",
+      "effectCode": "function(ctx, battle, self) { var hidan = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!hidan) return { success: false }; var damage = ctx.damage; if (!damage || damage <= 0) return { success: false }; var oathed = battle.pieces.find(function(p) { return p.ownerPlayerId !== hidan.ownerPlayerId && p.currentHp > 0 && p.statusTags && p.statusTags.some(function(t) { return t.type === 'blood-oath'; }); }); if (!oathed) { self.expire(); return { success: false }; } var result = dealDamage(hidan, oathed, damage, 'true', battle, 'blood-oath-reflect'); return { success: true, message: '血誓触发：' + oathed.name + '受到' + result.damage + '点诅咒真实伤害' }; }"
+    }
+  ]
+}

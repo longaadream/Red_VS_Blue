@@ -1,8 +1,11 @@
 {
   "id": "kiljaedan-demonic-pact",
   "name": "恶魔仪式",
-  "description": "战斗开始时，基尔加丹隐匿于虚空，在红方手牌中留下「恶魔召唤（1）」。依次打出5张召唤牌（承受2，3，4，5，6点真实自伤），第5张将基尔加丹召唤至指定格子",
-  "icon": "🔮",
+  "description": "战斗开始时，基尔加丹隐匿于虚空，并留下【恶魔召唤(1)】。依次打出5张召唤牌后，基尔加丹会被召唤至指定格子。",
+  "keywords": ["召唤"],
+  "targetText": "被动",
+  "effectTags": ["passive", "summon", "card"],
+  "icon": "🔭",
   "kind": "passive",
   "type": "passive",
   "actionPointCost": 0,

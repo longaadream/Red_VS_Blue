@@ -16,9 +16,7 @@
     { "skillId": "obito-space-time", "level": 1 },
     { "skillId": "obito-grudge", "level": 1 }
   ],
-  "rules": [
-    "rule-obito-grudge",
-    "rule-obito-grudge-reset"
-  ],
+  "rules": [],
+  "initialEffects": ["effect-obito-grudge"],
   "isDefault": false
 }

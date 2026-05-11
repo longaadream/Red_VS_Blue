@@ -25,6 +25,7 @@
       "level": 1
     }
   ],
-  "rules": ["rule-tirion-divine-shield-start"],
+  "rules": [],
+  "initialEffects": ["effect-tirion-divine-shield-start"],
   "isDefault": false
 }

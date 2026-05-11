@@ -25,6 +25,8 @@
       "level": 1
     }
   ],
-  "rules": ["rule-elune-guidance", "rule-elune-protection"],
+  "rules": [],
+  "initialEffects": ["effect-elune-guidance", "effect-elune-protection"],
+  "relatedCards": ["holy-smite", "holy-heal", "holy-charge"],
   "isDefault": false
 }

@@ -1,0 +1,90 @@
+[
+  {
+    "id": "true-damage",
+    "name": "真实伤害",
+    "category": "damage",
+    "shortDescription": "无视防御和常规减伤。",
+    "longDescription": "真实伤害不会被防御抵消，也不按普通伤害结算。",
+    "highlight": true
+  },
+  {
+    "id": "anti-heal",
+    "name": "禁疗",
+    "category": "control",
+    "shortDescription": "不能被治疗。",
+    "longDescription": "禁疗期间，目标不能通过治疗效果恢复生命值。",
+    "highlight": true
+  },
+  {
+    "id": "freeze",
+    "name": "冰冻",
+    "category": "control",
+    "shortDescription": "不能移动或使用技能。",
+    "longDescription": "冰冻期间，目标不能移动，也不能主动使用技能。",
+    "highlight": true
+  },
+  {
+    "id": "sleep",
+    "name": "睡眠",
+    "category": "control",
+    "shortDescription": "不能移动或使用技能，受到伤害后解除。",
+    "longDescription": "睡眠期间，目标不能移动或使用技能；受到伤害后会提前解除。",
+    "highlight": true
+  },
+  {
+    "id": "root",
+    "name": "定身",
+    "category": "control",
+    "shortDescription": "不能移动。",
+    "longDescription": "定身期间，目标不能移动，但仍可在规则允许时进行其他行动。",
+    "highlight": true
+  },
+  {
+    "id": "silence",
+    "name": "沉默",
+    "category": "control",
+    "shortDescription": "不能使用技能。",
+    "longDescription": "沉默期间，目标不能主动使用技能，但仍可进行其他允许的行动。",
+    "highlight": true
+  },
+  {
+    "id": "summon",
+    "name": "召唤",
+    "category": "board",
+    "shortDescription": "生成新的单位或效果。",
+    "longDescription": "召唤会在战场上生成新单位、区域效果或衍生物。",
+    "highlight": true
+  },
+  {
+    "id": "divine-shield",
+    "name": "圣盾",
+    "category": "defense",
+    "shortDescription": "抵挡一次伤害。",
+    "longDescription": "圣盾通常会抵挡一次伤害，然后被移除。",
+    "highlight": true
+  },
+  {
+    "id": "shield",
+    "name": "护盾",
+    "category": "defense",
+    "shortDescription": "吸收伤害。",
+    "longDescription": "护盾会优先吸收伤害，数值耗尽后再扣除生命值。",
+    "highlight": true
+  },
+  {
+    "id": "projectile",
+    "name": "弹射物",
+    "category": "mechanic",
+    "shortDescription": "弹射物无法穿过掩体和墙壁。",
+    "longDescription": "弹射物在飞行路径上遇到掩体或墙壁时会停止，无法穿透。",
+    "highlight": false
+  },
+  {
+    "id": "charge",
+    "name": "充能",
+    "category": "resource",
+    "shortDescription": "用于释放特定技能的资源。",
+    "longDescription": "充能是部分技能释放或强化时需要消耗的专属资源。",
+    "highlight": true
+  }
+]

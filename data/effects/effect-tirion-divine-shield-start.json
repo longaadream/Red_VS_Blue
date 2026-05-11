@@ -1,0 +1,15 @@
+{
+  "id": "effect-tirion-divine-shield-start",
+  "name": "圣骑士的荣耀",
+  "icon": "✨",
+  "color": "#fbbf24",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "gameStart",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); return !!(piece && piece.currentHp > 0); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; if (!piece.statusTags) piece.statusTags = []; if (!piece.statusTags.find(function(t) { return t.type === 'divine-shield'; })) { piece.statusTags.push({ id: 'divine-shield', type: 'divine-shield', name: '圣盾', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); } applyEffect(piece.instanceId, 'effect-divine-shield'); return { success: true, message: piece.name + '散发出神圣光辉，获得圣盾保护！' }; }"
+    }
+  ]
+}

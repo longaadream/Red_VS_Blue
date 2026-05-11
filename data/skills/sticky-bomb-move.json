@@ -1,7 +1,10 @@
 {
   "id": "sticky-bomb-move",
   "name": "粘性炸弹跟随",
-  "description": "当棋子移动时更新炸弹位置",
+  "description": "附着目标移动时，更新粘性炸弹的位置。",
+  "keywords": [],
+  "targetText": "附着炸弹的单位",
+  "effectTags": ["位移"],
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

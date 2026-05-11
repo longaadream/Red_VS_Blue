@@ -1,0 +1,48 @@
+{
+  "id": "large-hole-arena",
+  "name": "大型洞穴",
+  "layout": [
+    "####################",
+    "#T..C...T.....C...T#",
+    "#..####...####...#.#",
+    "#.T#....C....#C...##",
+    "#..#..T...T...#....#",
+    "#..####.....####...#",
+    "#....C..T.....C....#",
+    "#C.................#",
+    "#...C.....T....C..C#",
+    "#....T...C.........#",
+    "#..####.....####...#",
+    "#...#..T...T..#T...#",
+    "##..#C....C...#...##",
+    "#.#..####...####..T#",
+    "#T..C...T.....C...T#",
+    "####################"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false
+    },
+    {
+      "char": "T",
+      "type": "hole",
+      "walkable": false,
+      "bulletPassable": true
+    }
+  ]
+}

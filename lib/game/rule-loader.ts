@@ -85,7 +85,8 @@ export interface RuleDefinition {
 
 // 加载所有规则
 export function loadRules(): RuleDefinition[] {
-  const rulesDir = path.join(process.cwd(), 'data', 'rules')
+  const { getDataRoot } = require('@/lib/app-paths')
+  const rulesDir = path.join(getDataRoot(), 'rules')
   const rules: RuleDefinition[] = []
 
   try {

@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>资源包管理 - RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <script src="js/server-utils.js"></script>
+  <script src="js/jszip.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      background: linear-gradient(135deg, #1e1b2e 0%, #0f172a 100%);
+      border-bottom: 1px solid #1e293b;
+      padding: 16px 16px 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .back-btn {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      color: #94a3b8; padding: 6px 12px; font-size: 13px; cursor: pointer;
+      text-decoration: none; flex-shrink: 0;
+    }
+    .back-btn:active { opacity: .7; }
+    .page-title { font-size: 16px; font-weight: 700; }
+
+    /* ── Sections ── */
+    .section { padding: 16px; border-bottom: 1px solid #1e293b; }
+    .section-label {
+      font-size: 11px; font-weight: 700; color: #475569;
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 12px; padding: 14px;
+    }
+    .card + .card { margin-top: 8px; }
+
+    .meta-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .meta-key { font-size: 12px; color: #64748b; }
+    .meta-val { font-size: 13px; font-weight: 600; }
+    .meta-val.good { color: #4ade80; }
+    .meta-val.warn { color: #fb923c; }
+
+    .no-pack {
+      font-size: 13px; color: #475569; text-align: center; padding: 10px 0;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      width: 100%; padding: 13px; background: #3b82f6; color: #fff;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 10px;
+    }
+    .btn-primary:active { opacity: .85; }
+    .btn-primary:disabled { opacity: .4; cursor: default; }
+    .btn-danger {
+      width: 100%; padding: 11px; background: transparent;
+      border: 1px solid #991b1b; border-radius: 10px; color: #f87171;
+      font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px;
+    }
+    .btn-danger:active { background: #1a0606; }
+    .btn-secondary {
+      width: 100%; padding: 11px; background: transparent;
+      border: 1px solid #334155; border-radius: 10px; color: #94a3b8;
+      font-size: 14px; cursor: pointer; margin-top: 8px;
+    }
+    .btn-secondary:active { background: #1e293b; }
+
+    /* ── File input ── */
+    .file-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 13px; background: #1e293b; border: 2px dashed #334155;
+      border-radius: 10px; color: #94a3b8; font-size: 14px; cursor: pointer;
+      margin-top: 4px; transition: border-color .15s;
+    }
+    .file-btn:active { border-color: #3b82f6; color: #93c5fd; }
+    #fileInput { display: none; }
+
+    /* ── URL section ── */
+    .url-section { display: none; margin-top: 10px; }
+    .url-section.show { display: block; }
+    input[type="url"], input[type="text"] {
+      width: 100%; background: #0f172a; border: 1px solid #334155;
+      border-radius: 10px; color: #e2e8f0; font-size: 14px;
+      padding: 11px 14px; outline: none; margin-bottom: 0;
+    }
+    input:focus { border-color: #3b82f6; }
+
+    /* ── Progress ── */
+    .progress-wrap {
+      display: none; margin-top: 10px;
+      background: #0f172a; border: 1px solid #1e293b;
+      border-radius: 8px; overflow: hidden;
+    }
+    .progress-wrap.show { display: block; }
+    .progress-bar-bg { height: 6px; background: #1e293b; }
+    .progress-bar-fill { height: 6px; background: #3b82f6; transition: width .2s; }
+    .progress-msg { font-size: 12px; color: #64748b; padding: 6px 10px; }
+
+    /* ── File list ── */
+    .file-count { font-size: 12px; color: #64748b; margin-top: 6px; }
+    .file-list-toggle {
+      font-size: 12px; color: #3b82f6; cursor: pointer;
+      text-decoration: underline; display: inline-block; margin-top: 4px;
+    }
+    .file-list {
+      display: none; margin-top: 6px; font-size: 11px; color: #475569;
+      max-height: 150px; overflow-y: auto;
+      background: #0f172a; border-radius: 6px; padding: 6px 8px;
+    }
+    .file-list.show { display: block; }
+    .file-list div { margin: 1px 0; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: calc(20px + env(safe-area-inset-bottom));
+      left: 50%; transform: translateX(-50%);
+      background: #334155; color: #e2e8f0; font-size: 13px;
+      padding: 10px 18px; border-radius: 20px; z-index: 200;
+      opacity: 0; transition: opacity .25s; pointer-events: none;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <a class="back-btn" href="index.html">← 返回</a>
+    <div class="page-title">📦 资源包管理</div>
+  </div>
+
+  <!-- Current pack status -->
+  <div class="section">
+    <div class="section-label">当前资源包</div>
+    <div id="packStatusCard" class="card">
+      <div class="no-pack" id="noPackMsg">未安装资源包，使用内置资源</div>
+      <div id="packMeta" style="display:none">
+        <div class="meta-row">
+          <span class="meta-key">名称</span>
+          <span class="meta-val" id="metaName">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">版本</span>
+          <span class="meta-val" id="metaVersion">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">文件数</span>
+          <span class="meta-val" id="metaCount">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">说明</span>
+          <span class="meta-val" id="metaDesc" style="font-size:11px;color:#64748b;font-weight:400">—</span>
+        </div>
+        <span class="file-list-toggle" onclick="toggleFileList()">查看文件列表</span>
+        <div class="file-list" id="fileList"></div>
+      </div>
+    </div>
+    <button class="btn-danger" id="btnClear" onclick="clearPack()" style="display:none">🗑 清除资源包（恢复内置资源）</button>
+  </div>
+
+  <!-- Import -->
+  <div class="section">
+    <div class="section-label">导入资源包</div>
+
+    <input type="file" id="fileInput" accept=".zip" onchange="onFileSelected(this)">
+    <label for="fileInput" class="file-btn">
+      📂 从本地文件选择 .zip
+    </label>
+
+    <button class="btn-secondary" onclick="toggleUrlSection()">🔗 从 URL 下载</button>
+    <div class="url-section" id="urlSection">
+      <input type="url" id="urlInput" placeholder="https://example.com/resource-pack.zip" style="margin-top:8px" />
+      <button class="btn-primary" onclick="downloadFromUrl()">下载并导入</button>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar" style="width:0%"></div></div>
+      <div class="progress-msg" id="progressMsg">准备中…</div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function showToast(msg, duration) {
+      const t = document.getElementById('toast')
+      t.textContent = msg
+      t.classList.add('show')
+      setTimeout(() => t.classList.remove('show'), duration || 2500)
+    }
+
+    function setProgress(pct, msg) {
+      document.getElementById('progressWrap').classList.add('show')
+      document.getElementById('progressBar').style.width = pct + '%'
+      document.getElementById('progressMsg').textContent = msg || ''
+    }
+    function hideProgress() {
+      document.getElementById('progressWrap').classList.remove('show')
+    }
+
+    function guessMime(path) {
+      const ext = path.split('.').pop().toLowerCase()
+      const map = {
+        js: 'application/javascript', json: 'application/json',
+        html: 'text/html', css: 'text/css',
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        svg: 'image/svg+xml', webp: 'image/webp', gif: 'image/gif',
+        woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf',
+      }
+      return map[ext] || 'application/octet-stream'
+    }
+
+    // ── 环境检测 ─────────────────────────────────────────────────────────────
+    // Electron 通过 preload 注入 window.electronAPI；Android/浏览器走 Service Worker
+    const isElectron = !!(window.electronAPI && window.electronAPI.packWriteFiles)
+    // file:// 协议说明在 Electron 内，但 preload 可能是旧版本（无 packWriteFiles）
+    // 此时走本地服务器 API 写入资源包文件
+    const isFileProtocol = window.location.protocol === 'file:'
+
+    // ── IndexedDB helpers（Android/浏览器路径，替代 postMessage）────────────────
+    const IDB_NAME = 'rvb-pack'
+    const IDB_STORE = 'files'
+
+    function openPackIDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1)
+        req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE)
+        req.onsuccess = e => resolve(e.target.result)
+        req.onerror = e => reject(e.target.error)
+      })
+    }
+
+    function idbPut(db, path, arrayBuffer, mime) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite')
+        tx.objectStore(IDB_STORE).put({ data: arrayBuffer, mime }, path)
+        tx.oncomplete = () => resolve()
+        tx.onerror = e => reject(e.target.error)
+      })
+    }
+
+    function idbClear(db) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite')
+        tx.objectStore(IDB_STORE).clear()
+        tx.oncomplete = () => resolve()
+        tx.onerror = e => reject(e.target.error)
+      })
+    }
+
+    function idbKeys(db) {
+      return new Promise((resolve, reject) => {
+        const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).getAllKeys()
+        req.onsuccess = e => resolve(e.target.result)
+        req.onerror = e => reject(e.target.error)
+      })
+    }
+
+    async function swMessage(msg) {
+      if (msg && msg.type === 'LIST_FILES') {
+        try {
+          const db = await openPackIDB()
+          const keys = await new Promise((resolve, reject) => {
+            const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).getAllKeys()
+            req.onsuccess = e => resolve(e.target.result)
+            req.onerror = e => reject(e.target.error)
+          })
+          db.close()
+          return { files: keys || [] }
+        } catch {
+          return { files: [] }
+        }
+      }
+      return { files: [] }
+    }
+
+    // ── Import flow ───────────────────────────────────────────────────────────
+
+    async function importZip(zipData, sourceName) {
+      // ── 诊断日志（可按 F12 在控制台查看）──────────────────────────────────
+      console.log('[pack] importZip called', {
+        isElectron,
+        isFileProtocol,
+        isFile: zipData instanceof File,
+        hasPackGetFilePath: !!(window.electronAPI && window.electronAPI.packGetFilePath),
+        hasPackImportFromPath: !!(window.electronAPI && window.electronAPI.packImportFromPath),
+        hasPackWriteFiles: !!(window.electronAPI && window.electronAPI.packWriteFiles),
+      })
+
+      // Electron 快速路径：获取本地文件路径，直接传给主进程解压
+      // Electron 23+ 移除了 File.path，改用 webUtils.getPathForFile（在 preload 中调用）
+      let electronFilePath = null
+      if (isElectron && zipData instanceof File && window.electronAPI.packGetFilePath) {
+        try {
+          electronFilePath = window.electronAPI.packGetFilePath(zipData)
+          console.log('[pack] packGetFilePath =>', electronFilePath)
+        } catch (e) {
+          console.error('[pack] packGetFilePath threw:', e)
+        }
+      }
+
+      if (isElectron && electronFilePath) {
+        setProgress(10, '解压中，请稍候…')
+        try {
+          console.log('[pack] calling packImportFromPath...')
+          const result = await window.electronAPI.packImportFromPath(electronFilePath)
+          console.log('[pack] packImportFromPath result:', result)
+          if (!result.ok) {
+            hideProgress()
+            showToast('❌ 导入失败：' + (result.error || '未知错误'))
+            return
+          }
+          const m = result.meta || {}
+          const packMeta = {
+            name: m.name || sourceName || '未命名包',
+            version: m.version || '—',
+            description: m.description || '',
+            fileCount: result.count,
+            importedAt: new Date().toISOString(),
+          }
+          localStorage.setItem('rvb_pack_meta', JSON.stringify(packMeta))
+          setProgress(100, '完成！')
+          setTimeout(() => {
+            hideProgress()
+            refreshPackStatus()
+            showToast('✅ 资源包已导入，共 ' + result.count + ' 个文件')
+          }, 500)
+        } catch (e) {
+          console.error('[pack] packImportFromPath error:', e)
+          hideProgress()
+          showToast('❌ 写入失败[IPC]：' + e.message)
+        }
+        return
+      }
+
+      console.log('[pack] falling through to JSZip path, isElectron=', isElectron, 'electronFilePath=', electronFilePath)
+      setProgress(5, '解析 ZIP…')
+      let zip
+      try {
+        zip = await JSZip.loadAsync(zipData, {
+          onUpdate: meta => setProgress(5 + meta.percent * 0.3, '解析 ZIP… ' + Math.round(meta.percent) + '%')
+        })
+      } catch (e) {
+        hideProgress()
+        showToast('❌ ZIP 解析失败：' + e.message)
+        return
+      }
+
+      // Read pack metadata
+      let meta = {}
+      const metaFile = zip.file('pack.json')
+      if (metaFile) {
+        try { meta = JSON.parse(await metaFile.async('text')) } catch {}
+      }
+
+      setProgress(40, '提取文件…')
+      const entries = Object.entries(zip.files).filter(([, e]) => !e.dir)
+
+      setProgress(75, '写入文件…')
+      let result
+      try {
+        if (isElectron) {
+          // Electron: 分批写入，每批 20 个文件，避免单次 IPC 消息过大
+          const BATCH = 20
+          let totalCount = 0
+          const validEntries = entries.filter(([p]) => p !== 'pack.json')
+          for (let b = 0; b < validEntries.length; b += BATCH) {
+            const batch = validEntries.slice(b, b + BATCH)
+            const files = []
+            for (let i = 0; i < batch.length; i++) {
+              const [filePath, entry] = batch[i]
+              const content = await entry.async('base64')
+              files.push({ path: '/' + filePath, content })
+              setProgress(40 + ((b + i) / validEntries.length) * 35, '写入 ' + (b + i + 1) + '/' + validEntries.length + ' 文件…')
+            }
+            const batchResult = await window.electronAPI.packWriteFiles(files)
+            totalCount += batchResult.count
+          }
+          result = { ok: true, count: totalCount }
+        } else if (isFileProtocol) {
+          // Electron 旧版 preload（无 packWriteFiles）→ 通过本地服务器 API 写入
+          const serverUrl = (localStorage.getItem('rvb_server_url') || 'http://localhost:3001').replace(/\/$/, '')
+          const BATCH = 20
+          let totalCount = 0
+          const validEntries = entries.filter(([p]) => p !== 'pack.json')
+          for (let b = 0; b < validEntries.length; b += BATCH) {
+            const batch = validEntries.slice(b, b + BATCH)
+            const files = []
+            for (let i = 0; i < batch.length; i++) {
+              const [filePath, entry] = batch[i]
+              const b64 = await entry.async('base64')
+              files.push({ path: '/' + filePath, content: b64 })
+              setProgress(40 + ((b + i) / validEntries.length) * 35, '写入 ' + (b + i + 1) + '/' + validEntries.length + ' 文件…')
+            }
+            const res = await fetch(serverUrl + '/api/resource-pack/import', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ files })
+            })
+            if (!res.ok) throw new Error('服务器写入失败 ' + res.status)
+            const batchResult = await res.json()
+            totalCount += batchResult.count
+          }
+          result = { ok: true, count: totalCount }
+        } else {
+          // Android / 浏览器: 直接写入 IndexedDB，SW fetch 拦截时从 IDB 读取
+          // 完全不使用 postMessage，规避 Android WebView 的 postMessage 限制
+          const db = await openPackIDB()
+          const validEntries = entries.filter(([p]) => p !== 'pack.json')
+          for (let i = 0; i < validEntries.length; i++) {
+            const [filePath, entry] = validEntries[i]
+            const arrayBuffer = await entry.async('arraybuffer')
+            const normPath = ('/' + filePath.replace(/\\/g, '/')).replace('//', '/')
+            await idbPut(db, normPath, arrayBuffer, guessMime(filePath))
+            setProgress(40 + (i / validEntries.length) * 55, '写入 ' + (i + 1) + '/' + validEntries.length + ' 文件…')
+          }
+          db.close()
+          result = { ok: true, count: validEntries.length }
+        }
+
+        // Calculate MD5 of the zip data
+        let md5Value = ''
+        try {
+          const zipBuffer = zipData instanceof File ? await zipData.arrayBuffer() : zipData
+          const hashBuffer = await crypto.subtle.digest('SHA-256', zipBuffer instanceof ArrayBuffer ? zipBuffer : await new Blob([zipBuffer]).arrayBuffer()).catch(() => null)
+          if (hashBuffer) {
+            const hashArray = Array.from(new Uint8Array(hashBuffer))
+            md5Value = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+          }
+        } catch (e) {
+          console.warn('[pack] MD5 calculation failed:', e)
+        }
+
+        // Save meta to localStorage
+        const packMeta = {
+          name: meta.name || sourceName || '未命名包',
+          version: meta.version || '—',
+          description: meta.description || '',
+          fileCount: result.count,
+          importedAt: new Date().toISOString(),
+          md5: md5Value,
+        }
+        localStorage.setItem('rvb_pack_meta', JSON.stringify(packMeta))
+        if (md5Value) localStorage.setItem('rvb_pack_md5', md5Value)
+        setProgress(100, '完成！')
+        setTimeout(() => {
+          hideProgress()
+          refreshPackStatus()
+          showToast('✅ 资源包已导入，共 ' + result.count + ' 个文件')
+        }, 500)
+      } catch (e) {
+        console.error('[pack] JSZip path error:', e)
+        hideProgress()
+        showToast('❌ 写入失败[JSZip]：' + e.message)
+      }
+    }
+
+    async function onFileSelected(input) {
+      const file = input.files[0]
+      if (!file) return
+      input.value = ''
+      await importZip(file, file.name.replace('.zip', ''))
+    }
+
+    async function downloadFromUrl() {
+      const url = document.getElementById('urlInput').value.trim()
+      if (!url) { showToast('请输入下载地址'); return }
+      setProgress(0, '下载中…')
+      try {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const total = parseInt(res.headers.get('content-length') || '0')
+        const reader = res.body.getReader()
+        const chunks = []
+        let loaded = 0
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          chunks.push(value)
+          loaded += value.length
+          if (total) setProgress(Math.round(loaded / total * 35), '下载中 ' + Math.round(loaded / total * 100) + '%…')
+        }
+        const blob = new Blob(chunks)
+        const name = url.split('/').pop().replace('.zip', '') || 'pack'
+        await importZip(blob, name)
+      } catch (e) {
+        hideProgress()
+        showToast('❌ 下载失败：' + e.message)
+      }
+    }
+
+    // ── Clear ─────────────────────────────────────────────────────────────────
+
+    async function clearPack() {
+      if (!confirm('确定清除资源包？将恢复内置资源，下次打开各页面生效。')) return
+      try {
+        if (isElectron) {
+          await window.electronAPI.packClear()
+        } else {
+          const db = await openPackIDB()
+          await idbClear(db)
+          db.close()
+        }
+        localStorage.removeItem('rvb_pack_meta')
+        refreshPackStatus()
+        showToast('✅ 资源包已清除')
+      } catch (e) {
+        showToast('❌ ' + e.message)
+      }
+    }
+
+    // ── Status display ────────────────────────────────────────────────────────
+
+    async function refreshPackStatus() {
+      const rawMeta = localStorage.getItem('rvb_pack_meta')
+      const meta = rawMeta ? JSON.parse(rawMeta) : null
+
+      if (meta) {
+        document.getElementById('noPackMsg').style.display = 'none'
+        document.getElementById('packMeta').style.display = 'block'
+        document.getElementById('metaName').textContent = meta.name || '—'
+        document.getElementById('metaVersion').textContent = meta.version || '—'
+        document.getElementById('metaCount').textContent = (meta.fileCount || '?') + ' 个文件'
+        document.getElementById('metaDesc').textContent = meta.description || '—'
+        document.getElementById('btnClear').style.display = 'block'
+
+        // Fetch actual file list from SW / IPC
+        try {
+          let res
+          if (isElectron) {
+            res = await window.electronAPI.packList()
+          } else if (isFileProtocol) {
+            res = { files: [] }
+          } else {
+            const db = await openPackIDB()
+            const keys = await idbKeys(db)
+            db.close()
+            res = { files: keys }
+          }
+          const list = document.getElementById('fileList')
+          list.innerHTML = res.files
+            .map(f => '<div>' + decodeURIComponent(typeof f === 'string' ? f : f.replace(location.origin, '')) + '</div>')
+            .join('')
+        } catch {}
+      } else {
+        document.getElementById('noPackMsg').style.display = 'block'
+        document.getElementById('packMeta').style.display = 'none'
+        document.getElementById('btnClear').style.display = 'none'
+      }
+    }
+
+    function toggleFileList() {
+      document.getElementById('fileList').classList.toggle('show')
+    }
+
+    function toggleUrlSection() {
+      document.getElementById('urlSection').classList.toggle('show')
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+
+    window.addEventListener('load', async () => {
+      if (isElectron || isFileProtocol) {
+        refreshPackStatus()
+        return
+      }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {})
+      }
+      refreshPackStatus()
+
+      // Check if app was launched via ZIP file intent (Android)
+      if (window.RvBBridge) {
+        const zipUri = window.RvBBridge.getAndClearImportUri()
+        if (zipUri) {
+          const fileData = window.RvBBridge.readFileAsBase64(zipUri)
+          if (fileData) {
+            const bytes = atob(fileData)
+            const buf = new Uint8Array(bytes.length)
+            for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i)
+            const blob = new Blob([buf], { type: 'application/zip' })
+            showToast('正在导入资源包…', 2000)
+            await importZip(blob, 'intent-import.zip')
+          }
+        }
+      }
+    })
+  </script>
+</body>
+</html>

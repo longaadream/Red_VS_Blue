@@ -1,0 +1,12 @@
+{
+  "id": "watcher-calm",
+  "name": "平静",
+  "description": "获得2点护盾，并进入平静姿态。退出平静姿态时，恢复1点行动点。",
+  "keywords": ["护盾"],
+  "targetText": "自身",
+  "effectTags": ["护盾", "强化"],
+  "type": "active",
+  "actionPointCost": 1,
+  "icon": "Shield",
+  "code": "function executeCard(context) { var watcher = battle.pieces.find(function(p) { return p.ownerPlayerId === playerId && p.templateId === 'blue-watcher' && p.currentHp > 0; }); if (!watcher) return { success: false, message: '找不到观察者棋子' }; var existingShield = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'calm-shield'; }); if (existingShield) { existingShield.intensity = (existingShield.intensity || 0) + 2; } else { addStatusEffectById(watcher.instanceId, { id: 'calm-shield-' + watcher.instanceId, type: 'calm-shield', name: '平静护盾', currentDuration: -1, currentUses: -1, intensity: 2, stacks: 1, relatedRules: ['rule-watcher-shield'] }); addRuleById(watcher.instanceId, 'rule-watcher-shield'); } var rageStance = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (rageStance) { removeStatusEffectById(watcher.instanceId, rageStance.id); removeRuleById(watcher.instanceId, 'rule-watcher-rage-taken'); removeRuleById(watcher.instanceId, 'rule-watcher-rage-dealt'); } var calmStance = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'calm-stance'; }); if (!calmStance) { addStatusEffectById(watcher.instanceId, { id: 'calm-stance-' + watcher.instanceId, type: 'calm-stance', name: '平静姿态', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); } var shieldTag = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'calm-shield'; }); var totalShield = shieldTag ? shieldTag.intensity : 2; return { success: true, message: watcher.name + '进入平静姿态，护盾可格挡' + totalShield + '点伤害' }; }"
+}

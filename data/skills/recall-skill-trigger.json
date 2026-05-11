@@ -1,12 +1,15 @@
 {
   "id": "recall-skill-trigger",
   "name": "回溯触发（技能）",
-  "description": "对手释放技能时计数，达到目标时执行回溯",
+  "description": "对手使用技能时计数；达到目标次数时，触发回溯。",
+  "keywords": [],
+  "targetText": "自身",
+  "effectTags": ["回溯"],
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return { success: false }; var actor = context.sourcePiece; if (!actor) return { success: false }; var messages = []; for (var i = battle.extensions.recallData.length - 1; i >= 0; i--) { var recall = battle.extensions.recallData[i]; if (actor.ownerPlayerId === recall.ownerPlayerId) continue; recall.actionCount = (recall.actionCount || 0) + 1; var piece = battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); var pieceName = piece ? piece.name : '猎空'; if (recall.actionCount >= recall.targetCount) { if (piece && recall.snapshot) { piece.x = recall.snapshot.x; piece.y = recall.snapshot.y; piece.currentHp = Math.min(recall.snapshot.hp, piece.maxHp); if (recall.snapshot.shield !== undefined) piece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) piece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) piece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) piece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); messages.push(pieceName + '回溯触发！（对手技能数达到' + recall.targetCount + '）'); } battle.extensions.recallData.splice(i, 1); } else { messages.push(pieceName + '回溯计数：技能 ' + recall.actionCount + '/' + recall.targetCount); } } return messages.length > 0 ? { success: true, message: messages.join('，') } : { success: false }; }"
+  "code": "function executeSkill(context) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return { success: false }; var actor = context.sourcePiece; if (!actor) return { success: false }; for (var i = battle.extensions.recallData.length - 1; i >= 0; i--) { var recall = battle.extensions.recallData[i]; if (actor.ownerPlayerId === recall.ownerPlayerId) continue; recall.actionCount = (recall.actionCount || 0) + 1; var piece = battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (recall.actionCount >= recall.targetCount) { if (piece && recall.snapshot) { piece.x = recall.snapshot.x; piece.y = recall.snapshot.y; piece.currentHp = Math.min(recall.snapshot.hp, piece.maxHp); if (recall.snapshot.shield !== undefined) piece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) piece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) piece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) piece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); } battle.extensions.recallData.splice(i, 1); } } return { success: false }; }"
 }

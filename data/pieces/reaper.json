@@ -8,7 +8,7 @@
   "stats": {
     "maxHp": 13,
     "attack": 4,
-    "defense": 0,
+    "defense": 1,
     "moveRange": 4
   },
   "skills": [
@@ -29,6 +29,7 @@
       "level": 1
     }
   ],
-  "rules": ["rule-reap"],
+  "rules": [],
+  "initialEffects": ["effect-reap"],
   "isDefault": false
 }

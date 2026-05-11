@@ -1,0 +1,16 @@
+{
+  "id": "effect-chidori-immobile",
+  "name": "千鸟贯穿",
+  "icon": "⚡",
+  "color": "#3b82f6",
+  "visible": true,
+  "statusType": "chidori-immobile",
+  "triggers": [
+    {
+      "on": "beforeMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'chidori-immobile'; })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'chidori-immobile'; }); if (!tag) { self.expire(); return { success: false }; } return { success: true, blocked: true, message: piece.name + '被千鸟贯穿，本回合无法移动' }; }"
+    }
+  ]
+}

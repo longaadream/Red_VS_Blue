@@ -1,0 +1,15 @@
+{
+  "id": "effect-hashirama-edo-regen",
+  "name": "秽土转生自愈",
+  "icon": "🌿",
+  "color": "#16a34a",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "endTurn",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return false; if (battle.turn.currentPlayerId !== piece.ownerPlayerId) return false; var halfHp = Math.floor(piece.maxHp / 2); return piece.currentHp < halfHp; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return { success: false }; if (battle.turn.currentPlayerId !== piece.ownerPlayerId) return { success: false }; var halfHp = Math.floor(piece.maxHp / 2); if (piece.currentHp >= halfHp) return { success: false }; var healAmt = 2; piece.currentHp = Math.min(piece.currentHp + healAmt, halfHp); return { success: true, message: piece.name + ' 秽土转生自愈 ' + healAmt + ' 点（' + piece.currentHp + '/' + piece.maxHp + '）' }; }"
+    }
+  ]
+}

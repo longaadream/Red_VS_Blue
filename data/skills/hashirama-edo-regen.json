@@ -1,8 +1,11 @@
 {
   "id": "hashirama-edo-regen",
   "name": "秽土转生·自愈",
-  "description": "被动：血量低于50%时，每回合结束自愈2点生命，回到50%即停止",
-  "icon": "♻️",
+  "description": "生命值低于50%时，每回合结束治疗1点生命，直到回到50%为止。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": ["治疗"],
+  "icon": "❤️",
   "kind": "passive",
   "type": "passive",
   "cooldownTurns": 0,

@@ -1,0 +1,15 @@
+{
+  "id": "effect-rafaam-curse-ward",
+  "name": "诅咒结界",
+  "icon": "🔮",
+  "color": "#7c3aed",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeDamageTaken",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; var currentPlayerId = battle.turn.currentPlayerId; if (currentPlayerId !== piece.ownerPlayerId) return false; var usedThisTurn = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'curse-ward-used'; }); return !usedThisTurn; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var damageAmount = ctx.damage; var pieceOwnerId = piece.ownerPlayerId; if (!piece.statusTags) piece.statusTags = []; piece.statusTags.push({ id: 'curse-ward-used-' + Date.now(), type: 'curse-ward-used', name: '诅咒结界已使用', remainingDuration: 1 }); var opponentPlayer = battle.players.find(function(p) { return p.playerId !== pieceOwnerId; }); if (opponentPlayer) { var curseCardId = 'rafaam-curse-' + Date.now(); if (!battle.customCards) battle.customCards = {}; battle.customCards[curseCardId] = { id: curseCardId, name: '诅咒(' + damageAmount + ')', description: '持有时每回合结束对一个随机友方棋子造成' + damageAmount + '点伤害。消耗1AP打出以弃置此牌。', type: 'reactive', trigger: { type: 'endTurn' }, icon: '💀', actionPointCost: 1, damageAmount: damageAmount, code: 'function executeCard(context) { if (context.type !== \"endTurn\") return { success: true, message: \"弃置了诅咒\" };if (battle.turn.currentPlayerId !== playerId) return { success: false }; var friendlyPieces = battle.pieces.filter(function(p) { return p.ownerPlayerId === playerId && p.currentHp > 0; }); if (friendlyPieces.length === 0) return { success: false }; var target = friendlyPieces[Math.floor(Math.random() * friendlyPieces.length)]; var cardData = battle.customCards && battle.customCards[context.card.id]; var dmg = (cardData && cardData.damageAmount) ? cardData.damageAmount : 4; var opponentPlayerId = battle.players.find(function(p) { return p.playerId !== playerId; }).playerId; var dmgResult = dealDamage(target, target, dmg, \"magical\", battle, \"curse-end-turn\", false, opponentPlayerId); return { success: true, keepInHand: true, message: \"诅咒对\" + target.name + \"造成了\" + dmgResult.damage + \"点伤害\" }; }' }; addCardToHand(curseCardId, opponentPlayer.playerId); } return { success: true, blocked: true, message: piece.name + '的诅咒结界触发，免疫了' + damageAmount + '点伤害并将诅咒交给了对手' }; }"
+    }
+  ]
+}

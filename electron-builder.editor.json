@@ -1,0 +1,27 @@
+{
+  "appId": "com.redvsblue.editor",
+  "productName": "RED vs BLUE Editor",
+  "directories": { "output": "dist/editor" },
+  "extraMetadata": {
+    "main": "electron-editor/dist/main.js"
+  },
+  "files": [
+    "electron-editor/dist/**",
+    "electron-editor/ui/**",
+    "package.json"
+  ],
+  "extraResources": [
+    { "from": "data",    "to": "app/data" },
+    { "from": "scripts", "to": "app/scripts" }
+  ],
+  "asar": false,
+  "win": {
+    "target": "portable"
+  },
+  "mac": {
+    "target": "dmg"
+  },
+  "linux": {
+    "target": "AppImage"
+  }
+}

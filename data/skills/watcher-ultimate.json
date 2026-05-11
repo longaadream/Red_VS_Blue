@@ -1,0 +1,20 @@
+{
+  "id": "watcher-ultimate",
+  "name": "潦草急救",
+  "description": "用【平静】和【暴怒】填满自己的手牌。",
+  "keywords": [],
+  "targetText": "自身手牌",
+  "effectTags": ["手牌"],
+  "icon": "╹",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 4,
+  "maxCharges": 0,
+  "chargeCost": 2,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 2,
+  "range": "self",
+  "requiresTarget": false,
+  "code": "function executeSkill(context) { var sourcePiece = context.piece; var player = battle.players.find(function(p) { return p.playerId === sourcePiece.ownerPlayerId; }); if (!player) return { message: '找不到玩家', success: false }; if (!player.hand) player.hand = []; var maxHand = 10; var added = 0; var calm = 0; var rage = 0; var cards = ['watcher-calm', 'watcher-rage']; var i = 0; while (player.hand.length < maxHand) { addCardToHand(cards[i % 2], sourcePiece.ownerPlayerId); added++; if (i % 2 === 0) calm++; else rage++; i++; } if (added === 0) return { message: sourcePiece.name + '手牌已满，无法使用潦草急救', success: false }; return { message: sourcePiece.name + '释放潦草急救，手牌被平静(' + calm + ')和暴怒(' + rage + ')填满', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '用【平静】和【暴怒】填满自己的手牌。', expectedValues: {} }; }"
+}

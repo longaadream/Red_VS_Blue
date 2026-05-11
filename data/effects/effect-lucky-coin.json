@@ -1,0 +1,15 @@
+{
+  "id": "effect-lucky-coin",
+  "name": "幸运币",
+  "icon": "🪙",
+  "color": "#fbbf24",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "gameStart",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { return true; }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var player = battle.players.find(function(p) { return p.playerId === piece.ownerPlayerId; }); if (!player) return { success: false, message: 'Player not found' }; var result = addCardToHand('lucky-coin', player.playerId); self.expire(); return { success: result, message: (player.name || player.playerId) + ' 获得了幸运币' }; }"
+    }
+  ]
+}

@@ -13,13 +13,23 @@ export function getRoomsStore() {
 
 export async function GET() {
   console.log('=== Lobby API GET Request ===')
-  // 顺带清理 24 小时前已结束的房间，避免 Neon 无限累积（异步，不阻塞响应）
-  prisma.room.deleteMany({
-    where: {
-      status: 'finished',
-      updatedAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-    }
-  }).catch(() => {})
+  // 懒清理（异步，不阻塞响应）
+  const now = Date.now()
+  Promise.all([
+    // 已结束的房间 24h 后删除
+    prisma.room.deleteMany({
+      where: { status: 'finished', updatedAt: { lt: new Date(now - 24 * 60 * 60 * 1000) } }
+    }),
+    // 等待中但 48h 无人操作的房间直接删除
+    prisma.room.deleteMany({
+      where: { status: 'waiting', updatedAt: { lt: new Date(now - 48 * 60 * 60 * 1000) } }
+    }),
+    // in-progress 超过 6h 未更新：视为已放弃，清空 battleState 节省存储
+    prisma.room.updateMany({
+      where: { status: 'in-progress', updatedAt: { lt: new Date(now - 6 * 60 * 60 * 1000) } },
+      data: { status: 'finished', battleState: null }
+    }),
+  ]).catch(() => {})
 
   try {
     const roomStore = getRoomStore()
@@ -41,6 +51,7 @@ export async function GET() {
       hostId: room.hostId,
       mapId: room.mapId,
       visibility: room.visibility,
+      inviteCode: room.inviteCode,
     }))
 
     console.log('Lobby API returning', formattedRooms.length, 'rooms')
@@ -67,6 +78,11 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < 5; i++) {
       roomId += chars.charAt(Math.floor(Math.random() * chars.length))
     }
+    const inviteChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let inviteCode = ''
+    for (let i = 0; i < 6; i++) {
+      inviteCode += inviteChars.charAt(Math.floor(Math.random() * inviteChars.length))
+    }
     const now = Date.now()
     const trimmedHostId = hostId?.trim() || ''
     const roomStore = getRoomStore()
@@ -79,8 +95,9 @@ export async function POST(req: NextRequest) {
       maxPlayers: 2,
       players: [],
       hostId: trimmedHostId,
-      mapId: mapId?.trim() || 'arena-8x6',
-      visibility: visibility || "private",
+      mapId: mapId?.trim() || 'large-battlefield',
+      visibility: visibility || "public",
+      inviteCode,
       spectators: [],
       currentTurnIndex: 0,
       actions: [],

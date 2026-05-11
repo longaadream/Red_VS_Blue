@@ -1,0 +1,15 @@
+{
+  "id": "effect-reap",
+  "name": "收割",
+  "icon": "🩸",
+  "color": "#dc2626",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "afterDamageDealt",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== self.ownerId) return false; return !!(ctx.damage && ctx.damage > 0); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return { success: false }; var healAmount = Math.ceil(ctx.damage * 0.5); if (healAmount <= 0) return { success: false }; var result = healDamage(piece, piece, healAmount, 'reap'); return { success: true, message: piece.name + '收割治疗了' + (result && result.heal || healAmount) + '点生命' }; }"
+    }
+  ]
+}

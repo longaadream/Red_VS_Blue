@@ -1,0 +1,15 @@
+{
+  "id": "effect-elune-guidance",
+  "name": "艾露恩的指引",
+  "icon": "✨",
+  "color": "#60a5fa",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "afterCardPlay",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var cardId = ctx.cardId; if (!cardId || !cardId.startsWith('holy-')) return false; var tyrande = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); return !!(tyrande && tyrande.currentHp > 0 && tyrande.ownerPlayerId === ctx.playerId); }",
+      "effectCode": "function(ctx, battle, self) { var cardId = ctx.cardId; if (!cardId || !cardId.startsWith('holy-')) return { success: false }; var playerId = ctx.playerId; var tyrande = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!tyrande || tyrande.currentHp <= 0) return { success: false }; var moonGlow = tyrande.statusTags ? tyrande.statusTags.find(function(t) { return t.id === 'moon-glow'; }) : null; var currentStacks = moonGlow ? moonGlow.stacks : 0; currentStacks++; if (currentStacks >= 2) { var allies = battle.pieces.filter(function(p) { return p.ownerPlayerId === playerId && p.currentHp > 0; }); if (allies.length > 0) { var target = allies.sort(function(a, b) { return a.currentHp - b.currentHp; })[0]; healDamage(tyrande, target, 5, battle, 'elune-guidance'); if (moonGlow) { removeStatusEffectById(tyrande.instanceId, 'moon-glow'); } return { success: true, message: '艾露恩的指引：月华满层，为' + target.name + '恢复5点生命' }; } } else { addStatusEffectById(tyrande.instanceId, { id: 'moon-glow', name: '月华', type: 'buff', currentDuration: -1, currentUses: -1, intensity: 1, stacks: currentStacks, maxStacks: 2 }); return { success: true, message: '艾露恩的指引：获得' + currentStacks + '层月华' }; } return { success: false }; }"
+    }
+  ]
+}

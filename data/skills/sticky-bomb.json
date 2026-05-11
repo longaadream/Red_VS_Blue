@@ -1,7 +1,10 @@
 {
   "id": "sticky-bomb",
-  "name": "粘性炸弹",
-  "description": "选择1格内一个格子放置炸弹，炸弹附着在格子上的棋子身上（如果有），对方回合结束时对周围造成7点伤害",
+  "name": "黏性炸弹",
+  "description": "在1格内1个地格放置黏性炸弹。若该格有棋子，炸弹会附着在其身上；对手回合结束时，对周围单位造成7点物理伤害。",
+  "keywords": [],
+  "targetText": "1格内1个地格",
+  "effectTags": ["范围伤害"],
   "icon": "💣",
   "kind": "active",
   "type": "super",
@@ -10,5 +13,5 @@
   "chargeCost": 2,
   "powerMultiplier": 1,
   "actionPointCost": 3,
-  "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 1, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dist = Math.abs(pos.x - caster.x) + Math.abs(pos.y - caster.y); if (dist > 1) return { success: false, message: '目标超出范围（仅限相邻格）' }; var attachedPiece = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (!battle.extensions) { battle.extensions = {}; } if (!battle.extensions.stickyBombs) { battle.extensions.stickyBombs = []; } battle.extensions.stickyBombs.push({ x: pos.x, y: pos.y, damage: 7, ownerPlayerId: caster.ownerPlayerId, attachedPieceId: attachedPiece ? attachedPiece.instanceId : null, opponentEndTurnsSeen: 0 }); var msg = attachedPiece ? caster.name + '将粘性炸弹附着在' + attachedPiece.name + '身上！' : caster.name + '在(' + pos.x + ',' + pos.y + ')放置了粘性炸弹！'; return { success: true, message: msg }; }"
+  "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 1, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dist = Math.abs(pos.x - caster.x) + Math.abs(pos.y - caster.y); if (dist > 1) return { success: false, message: '目标超出范围（仅限相邻格）' }; var attachedPiece = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (!battle.extensions) { battle.extensions = {}; } if (!battle.extensions.stickyBombs) { battle.extensions.stickyBombs = []; } battle.extensions.stickyBombs.push({ x: pos.x, y: pos.y, damage: 7, ownerPlayerId: caster.ownerPlayerId, attachedPieceId: attachedPiece ? attachedPiece.instanceId : null, opponentEndTurnsSeen: 0 }); var msg = attachedPiece ? caster.name + '将黏性炸弹附着在' + attachedPiece.name + '身上' : caster.name + '在(' + pos.x + ',' + pos.y + ')放置了黏性炸弹'; return { success: true, message: msg }; }"
 }

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>1v1 大厅 - RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <script src="js/server-utils.js"></script>
+  <script src="js/crypto-lib.js"></script>
+  <script src="js/identity.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh;
+      padding: 0 0 calc(60px + env(safe-area-inset-bottom));
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px;
+      background: #0f172a; border-bottom: 1px solid #1e293b;
+      position: sticky; top: 0; z-index: 20;
+    }
+    .back-btn {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      color: #94a3b8; padding: 6px 11px; font-size: 14px; cursor: pointer;
+      text-decoration: none; flex-shrink: 0;
+    }
+    .back-btn:active { opacity: .7; }
+    .topbar-title { font-size: 16px; font-weight: 700; flex: 1; }
+    .user-pill {
+      background: #1e293b; border: 1px solid #334155; border-radius: 20px;
+      padding: 4px 10px; font-size: 12px; display: flex; align-items: center; gap: 5px;
+      flex-shrink: 0;
+    }
+    .user-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+
+    /* ── Section ── */
+    .section { padding: 16px 14px 8px; }
+    .section-label {
+      font-size: 11px; font-weight: 700; color: #475569;
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;
+    }
+
+    /* ── Server badge ── */
+    .server-badge {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 12px;
+    }
+    .server-badge-url { font-size: 12px; color: #64748b; word-break: break-all; flex: 1; }
+    .server-badge-url span { color: #94a3b8; }
+    .btn-disconnect {
+      background: transparent; border: 1px solid #475569; color: #94a3b8;
+      border-radius: 7px; padding: 4px 10px; font-size: 12px; cursor: pointer; flex-shrink: 0; margin-left: 8px;
+    }
+    .btn-disconnect:active { opacity: .7; }
+
+    /* ── Actions row ── */
+    .actions-row {
+      display: flex; gap: 8px; margin-bottom: 10px;
+    }
+    .btn-refresh {
+      background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      color: #94a3b8; padding: 10px 14px; font-size: 13px; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-refresh:active { background: #263348; }
+    .btn-create {
+      flex: 1; padding: 10px 14px;
+      background: #3b82f6; color: #fff; border: none;
+      border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .btn-create:active { opacity: .85; }
+
+    /* ── Invite code row ── */
+    .invite-row {
+      display: flex; gap: 8px; margin-bottom: 16px;
+    }
+    .invite-input {
+      flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      color: #e2e8f0; font-size: 13px; padding: 10px 14px; outline: none;
+    }
+    .invite-input::placeholder { color: #475569; }
+    .invite-input:focus { border-color: #3b82f6; }
+    .btn-invite-join {
+      background: #0f766e; color: #fff; border: none;
+      border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-invite-join:active { opacity: .85; }
+
+    /* ── Create room overlay ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.6);
+      display: flex; align-items: flex-end; z-index: 100;
+    }
+    .sheet {
+      background: #0f172a; border-top: 1px solid #334155;
+      border-radius: 16px 16px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+      width: 100%; max-height: 80vh; overflow-y: auto;
+    }
+    .sheet-title {
+      font-size: 16px; font-weight: 700; text-align: center; margin-bottom: 18px;
+    }
+    .field-label {
+      font-size: 12px; color: #64748b; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; margin-bottom: 6px; margin-top: 14px;
+    }
+    .field-label:first-of-type { margin-top: 0; }
+    .sheet select {
+      width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      color: #e2e8f0; font-size: 14px; padding: 10px 12px; outline: none;
+    }
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .toggle-row span { font-size: 14px; color: #94a3b8; }
+    .toggle-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #3b82f6; }
+    .btn-primary {
+      width: 100%; padding: 14px; background: #3b82f6; color: #fff;
+      border: none; border-radius: 12px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 20px;
+    }
+    .btn-primary:active { opacity: .85; }
+    .btn-cancel {
+      width: 100%; padding: 12px; background: transparent; color: #64748b;
+      border: 1px solid #334155; border-radius: 12px; font-size: 14px;
+      cursor: pointer; margin-top: 8px;
+    }
+    .btn-cancel:active { opacity: .7; }
+    .err-msg {
+      background: #450a0a; border: 1px solid #7f1d1d; border-radius: 8px;
+      color: #fca5a5; font-size: 13px; padding: 10px 14px; margin-top: 10px;
+      display: none;
+    }
+
+    /* ── Room cards ── */
+    .room-card {
+      background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .room-info { flex: 1; }
+    .room-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+    .room-meta { font-size: 12px; color: #64748b; }
+    .btn-join {
+      background: #3b82f6; color: #fff; border: none;
+      border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .btn-join:active { opacity: .85; }
+    .btn-spectate {
+      background: #7c3aed; color: #fff; border: none;
+      border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0; margin-right: 6px;
+    }
+    .btn-spectate:active { opacity: .85; }
+    .btn-delete {
+      background: #dc2626; color: #fff; border: none;
+      border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0; margin-right: 6px;
+    }
+    .btn-delete:active { opacity: .85; }
+
+    .empty-state {
+      text-align: center; padding: 40px 20px;
+      color: #475569; font-size: 14px;
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+    .spinner-sm {
+      width: 20px; height: 20px;
+      border: 3px solid #1e293b; border-top-color: #3b82f6;
+      border-radius: 50%; display: inline-block;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-bar {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: #64748b; padding: 0 14px 10px;
+    }
+
+    /* ── Float bar ── */
+    #floatBar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #0f172a; border-top: 1px solid #1e293b;
+      padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+      display: flex; align-items: center; justify-content: space-between; z-index: 50;
+    }
+
+    /* ── Windows hover enhancements ── */
+    @media (hover: hover) {
+      .room-card:hover { background: #263348; border-color: #475569; }
+      .btn-join:hover { opacity: .9; }
+      .btn-create:hover { opacity: .9; }
+      .btn-refresh:hover { background: #263348; }
+      .back-btn:hover { background: #263348; }
+      .btn-invite-join:hover { opacity: .9; }
+      .btn-cancel:hover { background: #1e293b; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <a class="back-btn" href="index.html">← 返回</a>
+    <div class="topbar-title">1v1 大厅</div>
+    <div class="user-pill">
+      <div class="user-dot" id="userDot" style="background:#475569"></div>
+      <span id="userName">未登录</span>
+    </div>
+  </div>
+
+  <!-- Server info -->
+  <div class="section">
+    <div class="server-badge">
+      <div class="server-badge-url">
+        服务器：<span id="serverUrlDisplay">未连接</span>
+      </div>
+      <button class="btn-disconnect" onclick="goBack()">断开</button>
+    </div>
+
+    <div class="actions-row">
+      <button class="btn-refresh" onclick="loadRooms()" id="refreshBtn">🔄 刷新</button>
+      <button class="btn-create" onclick="openCreateSheet()">＋ 创建房间</button>
+    </div>
+
+    <div class="invite-row">
+      <input class="invite-input" id="inviteInput" placeholder="输入邀请码加入…" maxlength="10" />
+      <button class="btn-invite-join" onclick="joinByCode()">加入</button>
+    </div>
+
+    <div class="status-bar" id="statusBar"></div>
+    <!-- 断线重连提示 -->
+    <div id="rejoinBar" style="display:none;background:#1e3a5f;border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="flex:1;font-size:13px;color:#93c5fd">⚔️ 您有一场进行中的对局</span>
+      <button id="rejoinBtn" onclick="rejoinBattle()" style="background:#1d4ed8;border:none;border-radius:8px;color:#fff;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">重新加入</button>
+      <button onclick="dismissRejoin()" style="background:none;border:1px solid #334155;border-radius:8px;color:#64748b;padding:6px 10px;font-size:12px;cursor:pointer">忽略</button>
+    </div>
+  </div>
+
+  <!-- Room list -->
+  <div class="section" style="padding-top:0">
+    <div class="section-label">公开房间</div>
+    <div id="roomList">
+      <div class="empty-state">
+        <div class="spinner-sm"></div>
+        <div style="margin-top:8px">加载中…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create room overlay -->
+  <div id="createSheet" class="overlay" style="display:none" onclick="if(event.target===this)closeCreateSheet()">
+    <div class="sheet">
+      <div class="sheet-title">创建房间</div>
+      <div class="field-label">地图</div>
+      <select id="mapSelect"><option value="arena-8x6">默认地图 (8×6)</option></select>
+      <div class="field-label">可见性</div>
+      <div class="toggle-row">
+        <span>公开房间（所有人可见）</span>
+        <input type="checkbox" id="visibilityToggle" checked>
+      </div>
+      <div id="createErr" class="err-msg"></div>
+      <button class="btn-primary" onclick="doCreateRoom()">创建并加入</button>
+      <button class="btn-cancel" onclick="closeCreateSheet()">取消</button>
+    </div>
+  </div>
+
+  <!-- Float bar -->
+  <div id="floatBar">
+    <span id="floatStatus" style="font-size:13px;color:#64748b">⚫ 离线模式</span>
+    <button onclick="goBack()" style="background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer">← 返回主页</button>
+  </div>
+
+  <script>
+    // RvBUtils loaded from js/server-utils.js
+    // RvBIdentity loaded from js/identity.js
+
+    let pollTimer = null
+
+    function goBack() { window.location.href = 'index.html' }
+
+    async function detectLocalServerUrl() {
+      if (window.RvBBridge) return 'http://localhost:7878'
+      if (window.electronAPI && window.electronAPI.getMode) {
+        try {
+          const mode = await window.electronAPI.getMode()
+          if (mode && mode.localUrl) return mode.localUrl
+        } catch {}
+      }
+      return ''
+    }
+
+    function parseBridgeJson(raw) {
+      try { return JSON.parse(raw || '{}') } catch { return {} }
+    }
+
+    async function detectRunningLocalServerUrl() {
+      if (window.RvBBridge && typeof window.RvBBridge.getMobileServerStatus === 'function') {
+        const status = parseBridgeJson(window.RvBBridge.getMobileServerStatus())
+        if (status && status.running) return 'http://localhost:7878'
+      }
+      if (window.electronAPI && window.electronAPI.getMode) {
+        try {
+          const mode = await window.electronAPI.getMode()
+          if (mode && mode.ready && mode.localUrl) return mode.localUrl
+        } catch {}
+      }
+      return ''
+    }
+
+    async function applyLobbyServerMode() {
+      const params = new URLSearchParams(window.location.search)
+      const mode = params.get('server')
+      const url = params.get('url')
+      if (mode === 'local') {
+        const localUrl = await detectLocalServerUrl()
+        if (localUrl) RvBUtils.saveServerUrl(localUrl)
+        localStorage.setItem('rvb_lobby_server_mode', 'local')
+      } else if (mode === 'lan' || mode === 'remote') {
+        if (url) RvBUtils.saveServerUrl(url)
+        localStorage.setItem('rvb_lobby_server_mode', mode)
+      }
+    }
+
+    async function reconcileLobbyServerMode() {
+      await applyLobbyServerMode()
+      const savedMode = localStorage.getItem('rvb_lobby_server_mode') || ''
+      const runningLocalUrl = await detectRunningLocalServerUrl()
+      if (runningLocalUrl && savedMode !== 'lan') {
+        RvBUtils.saveServerUrl(runningLocalUrl)
+        localStorage.setItem('rvb_lobby_server_mode', 'local')
+      }
+      const el = document.getElementById('serverUrlDisplay')
+      if (el) el.textContent = RvBUtils.getServerUrl() || '未连接'
+      updateFloatBar()
+    }
+
+    function getLobbyServerMode() {
+      const saved = RvBUtils.getServerUrl()
+      if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\b/.test(saved)) return 'local'
+      return localStorage.getItem('rvb_lobby_server_mode') || 'remote'
+    }
+
+    function refreshUserUI() {
+      const identity = RvBIdentity.getIdentity()
+      document.getElementById('userName').textContent = identity.displayName || '玩家'
+      document.getElementById('userDot').style.background = '#22c55e'
+    }
+
+    function updateFloatBar() {
+      const saved = RvBUtils.getServerUrl()
+      const status = document.getElementById('floatStatus')
+      if (!status) return
+      if (saved) {
+        const mode = getLobbyServerMode()
+        const label = mode === 'local' ? '本机主机' : (mode === 'lan' ? '局域网主机' : '远程服务器')
+        status.textContent = '🟢 ' + label + '：' + saved.replace(/^https?:\/\//, '').slice(0, 30)
+        status.style.color = '#22c55e'
+      } else {
+        status.textContent = '⚫ 离线模式'
+        status.style.color = '#64748b'
+      }
+    }
+
+    async function loadRooms() {
+      if (!RvBUtils.getServerUrl()) {
+        document.getElementById('roomList').innerHTML =
+          '<div class="empty-state"><div class="empty-icon">⚠️</div>未连接服务器</div>'
+        return
+      }
+      const btn = document.getElementById('refreshBtn')
+      const statusBar = document.getElementById('statusBar')
+      btn.disabled = true
+      statusBar.innerHTML = '<span class="spinner-sm"></span><span>加载中…</span>'
+      try {
+        const res = await RvBUtils.serverFetch('/api/rooms')
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const data = await res.json()
+        renderRooms(Array.isArray(data) ? data : (data.rooms || []))
+        statusBar.textContent = '上次更新：' + new Date().toLocaleTimeString()
+      } catch (e) {
+        document.getElementById('roomList').innerHTML =
+          '<div class="empty-state"><div class="empty-icon">❌</div>加载失败：' + e.message + '</div>'
+        statusBar.textContent = ''
+      } finally {
+        btn.disabled = false
+      }
+    }
+
+    function renderRooms(rooms) {
+      const list = document.getElementById('roomList')
+      const { id: playerId } = RvBIdentity.getIdentity()
+
+      const waiting = rooms.filter(r =>
+        (r.status === 'waiting' || r.status === 'open' || !r.status) &&
+        (r.visibility === 'public' || r.visibility == null)
+      )
+      const inProgress = rooms.filter(r => r.status === 'in-progress')
+
+      let html = ''
+
+      if (waiting.length) {
+        html += '<div class="section-label">等待中的房间</div>'
+        html += waiting.map(r => {
+          const players = r.players ? r.players.length : (r.playerCount || 0)
+          const inviteInfo = r.inviteCode ? ` · 邀请码: <b style="color:#94a3b8">${r.inviteCode}</b>` : ''
+          const isHost = playerId && r.hostId && r.hostId.toLowerCase() === playerId.toLowerCase()
+          const deleteBtn = isHost && r.status !== 'in-progress'
+            ? `<button class="btn-delete" onclick="deleteRoom('${escHtml(r.id)}', event)">删除</button>` : ''
+          return `<div class="room-card">
+            <div class="room-info">
+              <div class="room-name">${escHtml(r.name || r.id)}</div>
+              <div class="room-meta">玩家 ${players}/2 · 地图：${escHtml(r.mapId || '默认')}${inviteInfo}</div>
+            </div>
+            ${deleteBtn}
+            <button class="btn-join" onclick="joinRoom('${escHtml(r.id)}')">加入</button>
+          </div>`
+        }).join('')
+      }
+
+      if (inProgress.length) {
+        html += '<div class="section-label" style="margin-top:16px">进行中的比赛</div>'
+        html += inProgress.map(r => {
+          const players = r.players ? r.players.length : (r.playerCount || 0)
+          return `<div class="room-card">
+            <div class="room-info">
+              <div class="room-name">${escHtml(r.name || r.id)}</div>
+              <div class="room-meta">玩家 ${players}/2 · 🔴 进行中</div>
+            </div>
+            <button class="btn-spectate" onclick="spectateRoom('${escHtml(r.id)}')">观战</button>
+          </div>`
+        }).join('')
+      }
+
+      if (!waiting.length && !inProgress.length) {
+        list.innerHTML = '<div class="empty-state"><div class="empty-icon">🏠</div>暂无房间<br><span style="font-size:12px">点击"创建房间"开始，或输入邀请码加入私密房间</span></div>'
+        return
+      }
+
+      list.innerHTML = html
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
+
+    async function joinRoom(roomId) {
+      try {
+        const identity = RvBIdentity.getIdentity()
+        if (!identity) { alert('请先设置账号'); return }
+        const { id: playerId, displayName: playerName } = identity
+        const publicKey = typeof RvBIdentity.getPublicKey === 'function'
+          ? RvBIdentity.getPublicKey()
+          : (identity.publicKey || '')
+        const payload = { action: 'join', roomId, playerId, timestamp: Date.now() }
+        const signature = await RvBIdentity.sign(payload)
+        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'join', playerId, playerName, publicKey, payload, signature })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        window.location.href = 'piece-selection.html?roomId=' + encodeURIComponent(roomId)
+          + '&playerId=' + encodeURIComponent(playerId)
+          + '&playerName=' + encodeURIComponent(playerName)
+      } catch (e) { alert('加入房间失败：' + e.message) }
+    }
+
+    async function spectateRoom(roomId) {
+      const { id: spectatorId, displayName: spectatorName } = RvBIdentity.getIdentity()
+      try {
+        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/spectate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ spectatorId, spectatorName })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId)
+          + '&playerId=' + encodeURIComponent(spectatorId)
+          + '&mode=spectate'
+      } catch (e) { alert('观战失败：' + e.message) }
+    }
+
+    async function deleteRoom(roomId, event) {
+      event.stopPropagation()
+      if (!confirm('确定要删除这个房间吗？')) return
+      const { id: playerId } = RvBIdentity.getIdentity()
+      try {
+        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId, {
+          method: 'DELETE',
+          headers: { 'x-player-id': playerId }
+        })
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'HTTP ' + res.status)
+        }
+        loadRooms()
+      } catch (e) { alert('删除房间失败：' + e.message) }
+    }
+
+    function openCreateSheet() {
+      if (!RvBUtils.getServerUrl()) { alert('请先连接服务器'); return }
+      document.getElementById('createSheet').style.display = 'flex'
+      document.getElementById('createErr').style.display = 'none'
+      loadMaps()
+    }
+
+    function closeCreateSheet() {
+      document.getElementById('createSheet').style.display = 'none'
+    }
+
+    async function fetchLocalJson(path) {
+      if (window.fetchPackJson && /^\.?\/?data\//.test(path)) {
+        return window.fetchPackJson(path)
+      }
+      const res = await fetch(path)
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      return res.json()
+    }
+
+    async function loadMaps() {
+      const sel = document.getElementById('mapSelect')
+      if (sel.dataset.loaded) return
+      try {
+        const ids = await fetchLocalJson('./data/maps/manifest.json')
+        sel.innerHTML = ''
+        for (const id of ids) {
+          try {
+            const m = await fetchLocalJson('./data/maps/' + id + '.json')
+            const opt = document.createElement('option')
+            // Use the map's actual JSON id (not the filename) so server lookup succeeds
+            opt.value = m.id || id
+            opt.textContent = (m.name || id)
+            sel.appendChild(opt)
+          } catch { /* skip bad map */ }
+        }
+        sel.dataset.loaded = '1'
+      } catch {
+        sel.innerHTML = '<option value="arena-8x6">默认地图 (8×6)</option>'
+      }
+    }
+
+    async function doCreateRoom() {
+      const { id: hostId, displayName: playerName } = RvBIdentity.getIdentity()
+      const mapId = document.getElementById('mapSelect').value || 'arena-8x6'
+      const visibility = document.getElementById('visibilityToggle').checked ? 'public' : 'private'
+      const errEl = document.getElementById('createErr')
+      errEl.style.display = 'none'
+      try {
+        await reconcileLobbyServerMode()
+        const res = await RvBUtils.serverFetch('/api/lobby', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: playerName + ' 的 1v1 房间', hostId, mapId, visibility })
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const room = await res.json()
+        if (room.id) { closeCreateSheet(); await joinRoom(room.id) }
+        else throw new Error('未返回房间 ID')
+      } catch (e) {
+        const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || '未设置'
+        errEl.textContent = '创建失败：' + e.message + '（服务器：' + serverUrl + '）'
+        errEl.style.display = 'block'
+      }
+    }
+
+    async function joinByCode() {
+      const raw = document.getElementById('inviteInput').value.trim()
+      if (!raw) return
+      const code = raw.toUpperCase()
+      try {
+        const res = await RvBUtils.serverFetch('/api/lobby')
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const data = await res.json()
+        const rooms = Array.isArray(data) ? data : (data.rooms || [])
+        const match = rooms.find(r => r.inviteCode && r.inviteCode.toUpperCase() === code && r.status === 'waiting')
+        if (match) { await joinRoom(match.id) }
+        else { alert('邀请码无效或房间已关闭') }
+      } catch (e) { alert('查找房间失败：' + e.message) }
+    }
+
+    function checkRejoin() {
+      try {
+        const saved = localStorage.getItem('rvb_active_battle')
+        if (!saved) return
+        const info = JSON.parse(saved)
+        if (!info || !info.roomId || !info.playerId) return
+        const bar = document.getElementById('rejoinBar')
+        if (bar) bar.style.display = 'flex'
+        window._rejoinInfo = info
+      } catch {}
+    }
+    function rejoinBattle() {
+      if (!window._rejoinInfo) return
+      const { roomId, playerId, playerName } = window._rejoinInfo
+      const url = RvBUtils.getServerUrl()
+      if (!url) { alert('未连接服务器，无法重新加入'); return }
+      window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId) + '&playerId=' + encodeURIComponent(playerId) + (playerName ? '&playerName=' + encodeURIComponent(playerName) : '')
+    }
+    function dismissRejoin() {
+      try { localStorage.removeItem('rvb_active_battle') } catch {}
+      const bar = document.getElementById('rejoinBar')
+      if (bar) bar.style.display = 'none'
+    }
+
+    window.addEventListener('load', async () => {
+      await reconcileLobbyServerMode()
+      document.getElementById('serverUrlDisplay').textContent = RvBUtils.getServerUrl() || '未连接'
+      refreshUserUI()
+      updateFloatBar()
+      checkRejoin()
+      loadRooms()
+      pollTimer = setInterval(loadRooms, 3000)
+    })
+    window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
+  </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "id": "effect-kiljaedan-gamestart",
+  "name": "恶魔仪式",
+  "icon": "🔭",
+  "color": "#7c3aed",
+  "visible": false,
+  "triggers": [
+    {
+      "on": "gameStart",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); return !!(piece && piece.currentHp > 0); }",
+      "effectCode": "function(ctx, battle, self) { var kj = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!kj) return { success: false }; var idx = battle.pieces.findIndex(function(p) { return p.instanceId === kj.instanceId; }); if (idx === -1) return { success: false }; battle.pieces.splice(idx, 1); if (!battle.extensions) battle.extensions = {}; var strippedRules = (kj.rules || []).map(function(r) { var rc = {}; for (var k in r) { if (k !== 'effect') rc[k] = r[k]; } return rc; }); battle.extensions.kiljaedanPiece = JSON.parse(JSON.stringify(Object.assign({}, kj, { rules: strippedRules }))); addCardToHand('demon-summon-1', kj.ownerPlayerId); self.expire(); return { success: true, message: '基尔加丹隐匿于虚空之中，等待召唤...' }; }"
+    }
+  ]
+}

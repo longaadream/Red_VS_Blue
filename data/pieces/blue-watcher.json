@@ -1,0 +1,28 @@
+{
+  "id": "blue-watcher",
+  "name": "观者",
+  "faction": "blue",
+  "description": "掌握平静与暴怒双重形态的战士。每回合可获得平静或暴怒手牌，选择不同姿态应对战局。",
+  "rarity": "epic",
+  "image": "watcher.jpg",
+  "stats": {
+    "maxHp": 10,
+    "attack": 3,
+    "defense": 1,
+    "moveRange": 4
+  },
+  "skills": [
+    {
+      "skillId": "watcher-form",
+      "level": 1
+    },
+    {
+      "skillId": "watcher-ultimate",
+      "level": 1
+    }
+  ],
+  "rules": [],
+  "initialEffects": ["effect-watcher-form"],
+  "relatedCards": ["watcher-calm", "watcher-rage"],
+  "isDefault": false
+}

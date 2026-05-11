@@ -1,8 +1,11 @@
 {
   "id": "fel-blessing",
   "name": "邪能赐福",
-  "description": "使一个10格内友方棋子获得2点攻击力并受到4点真实伤害",
-  "icon": "💀",
+  "description": "使10格内1个友军攻击力+2，并使其受到4点真实伤害。",
+  "keywords": ["真实伤害"],
+  "targetText": "10格内1个友军",
+  "effectTags": ["强化", "真实伤害"],
+  "icon": "🃏",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 1,
@@ -10,6 +13,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "range": "single",
-  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetAlly = selectTarget({ type: 'piece', range: 10, filter: 'ally' });\n  if (!targetAlly || targetAlly.needsTargetSelection) {\n    return targetAlly;\n  }\n  targetAlly.attack += 2;\n  const damageResult = dealDamage(sourcePiece, targetAlly, 4, 'true', context.battle, context.skill.id);\n  return {\n    message: sourcePiece.name + '使用邪能赐福，' + targetAlly.name + '获得2点攻击力并受到' + damageResult.damage + '点伤害',\n    success: true\n  };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) {\n  return {\n    description: '使一个10格内友方棋子获得2点攻击力并受到4点真实伤害',\n    expectedValues: { attackBonus: 2, selfDamage: 4 }\n  };\n}"
+  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetAlly = selectTarget({ type: 'piece', range: 10, filter: 'ally' });\n  if (!targetAlly || targetAlly.needsTargetSelection) {\n    return targetAlly;\n  }\n  targetAlly.attack += 2;\n  const damageResult = dealDamage(sourcePiece, targetAlly, 4, 'true', context.battle, context.skill.id);\n  return {\n    message: sourcePiece.name + '使用邪能赐福，使' + targetAlly.name + '攻击力+2并受到' + damageResult.damage + '点真实伤害',\n    success: true\n  };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) {\n  return {\n    description: '使10格内1个友军攻击力+2，并使其受到4点真实伤害。',\n    expectedValues: { attackBonus: 2, selfDamage: 4 }\n  };\n}"
 }

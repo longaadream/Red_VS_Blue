@@ -1,0 +1,15 @@
+{
+  "id": "watcher-form",
+  "name": "红蓝形态",
+  "description": "每回合开始时，选择将【平静】或【暴怒】加入手牌。【平静】提供护盾，【暴怒】提高伤害。",
+  "keywords": ["护盾"],
+  "targetText": "被动",
+  "effectTags": ["护盾", "强化", "手牌"],
+  "icon": "🔘",
+  "kind": "passive",
+  "type": "buff",
+  "cooldownTurns": 0,
+  "actionPointCost": 0,
+  "range": "self",
+  "requiresTarget": false
+}

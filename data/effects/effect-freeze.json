@@ -1,0 +1,27 @@
+{
+  "id": "effect-freeze",
+  "name": "冰冻",
+  "icon": "❄️",
+  "color": "#60a5fa",
+  "visible": true,
+  "triggers": [
+    {
+      "on": "beforeAttack",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; return !!(piece.statusTags && piece.statusTags.some(function(tag) { return (typeof tag === 'string' && tag === 'freeze') || (typeof tag === 'object' && tag !== null && tag.type === 'freeze'); })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; return { success: true, blocked: true, message: piece.name + '被冰冻，无法攻击' }; }"
+    },
+    {
+      "on": "beforeMove",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.some(function(tag) { return (typeof tag === 'string' && tag === 'freeze') || (typeof tag === 'object' && tag !== null && tag.type === 'freeze'); })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; return { success: true, blocked: true, message: piece.name + '被冰冻，无法移动' }; }"
+    },
+    {
+      "on": "beforeSkillUse",
+      "priority": 50,
+      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.some(function(tag) { return (typeof tag === 'string' && tag === 'freeze') || (typeof tag === 'object' && tag !== null && tag.type === 'freeze'); })); }",
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; return { success: true, blocked: true, message: piece.name + '被冰冻，无法使用技能' }; }"
+    }
+  ]
+}

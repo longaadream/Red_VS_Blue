@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>数据编辑器</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:       #09090b;
+  --surface:  #18181b;
+  --border:   #27272a;
+  --muted:    #71717a;
+  --text:     #e4e4e7;
+  --text-dim: #a1a1aa;
+  --accent:   #3b82f6;
+  --accent-h: #60a5fa;
+  --green:    #10b981;
+  --red:      #ef4444;
+  --yellow:   #f59e0b;
+}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;font-size:14px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── header ── */
+#header{display:flex;align-items:center;gap:16px;padding:0 16px;height:48px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+#header h1{font-size:15px;font-weight:600;color:var(--text)}
+#header span{color:var(--muted);font-size:12px}
+
+/* ── tabs ── */
+#tab-bar{display:flex;gap:2px;padding:8px 12px 0;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab-btn{padding:6px 16px;border-radius:6px 6px 0 0;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:500;border-bottom:2px solid transparent;transition:color .15s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--accent)}
+
+/* ── tab content ── */
+#content{flex:1;overflow:hidden;display:flex}
+.tab-panel{display:none;width:100%;height:100%}
+.tab-panel.active{display:flex}
+
+/* ── two-column layout ── */
+.split{display:grid;grid-template-columns:260px 1fr;height:100%;overflow:hidden}
+
+/* ── entity list ── */
+.list-col{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.search-wrap{padding:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.search-wrap input{width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none}
+.search-wrap input:focus{border-color:var(--accent)}
+.entity-list{flex:1;overflow-y:auto;padding:4px}
+.entity-item{padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;transition:background .1s}
+.entity-item:hover{background:var(--surface)}
+.entity-item.selected{background:#1e3a5f}
+.entity-item .name{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entity-item .id{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+
+/* ── detail panel ── */
+.detail-col{flex:1;overflow-y:auto;padding:20px}
+.placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:14px}
+
+/* ── form ── */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.form-title{font-size:16px;font-weight:600;margin-bottom:4px}
+.form-subtitle{font-size:12px;color:var(--muted);margin-bottom:20px;font-family:monospace}
+.field-group{margin-bottom:16px}
+.field-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.field-group input,.field-group textarea,.field-group select{width:100%;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.field-group input:focus,.field-group textarea:focus,.field-group select:focus{border-color:var(--accent)}
+.field-group textarea{resize:vertical;min-height:60px;font-family:inherit}
+.field-group select{appearance:none;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+
+/* ── stats section ── */
+.section-label{font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-item label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px}
+.stat-item input{width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-weight:500;text-align:right;outline:none}
+.stat-item input:focus{border-color:var(--accent)}
+
+/* ── action row ── */
+.action-row{display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.btn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:opacity .15s,background .15s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--accent-h)}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover:not(:disabled){background:#34d399}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover:not(:disabled){color:var(--text);border-color:var(--muted)}
+.btn-big{padding:12px 24px;font-size:14px;border-radius:8px;flex:1}
+.btn-open{background:#7c3aed;color:#fff}
+.btn-open:hover:not(:disabled){background:#8b5cf6}
+
+/* ── open-in-editor panel ── */
+.file-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px}
+.file-panel h2{font-size:16px;font-weight:600;margin-bottom:4px}
+.file-panel .file-id{font-family:monospace;font-size:12px;color:var(--muted);margin-bottom:20px}
+.info-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin-bottom:20px}
+.info-grid dt{color:var(--muted);font-size:12px;white-space:nowrap}
+.info-grid dd{color:var(--text);font-size:13px}
+.open-hint{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+.open-actions{display:flex;gap:10px;flex-wrap:wrap}
+.code-preview{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:16px;max-height:200px;overflow-y:auto}
+.code-preview pre{font-family:monospace;font-size:11px;color:#a1a1aa;white-space:pre-wrap;word-break:break-all}
+
+/* ── build tab ── */
+.build-panel{width:100%;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;max-width:800px;margin:0 auto}
+.build-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.build-card h3{font-size:14px;font-weight:600;margin-bottom:16px;color:var(--text-dim)}
+.console{background:#000;border-radius:8px;padding:12px;height:260px;overflow-y:auto;font-family:'Consolas','Courier New',monospace;font-size:12px;line-height:1.6}
+.console-line{color:#71717a;white-space:pre-wrap;word-break:break-all}
+.console-line.stderr{color:#f87171}
+.console-cursor{animation:blink 1s step-end infinite;color:#a1a1aa}
+@keyframes blink{50%{opacity:0}}
+.badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:500}
+.badge-success{background:#052e16;color:#34d399;border:1px solid #065f46}
+.badge-error{background:#450a0a;color:#f87171;border:1px solid #7f1d1d}
+.status-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+
+/* ── toast ── */
+#toast{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast-item{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:auto}
+.toast-item.show{opacity:1;transform:translateY(0)}
+.toast-success{background:#052e16;color:#34d399;border:1px solid #065f46}
+.toast-error{background:#450a0a;color:#f87171;border:1px solid #7f1d1d}
+
+/* ── scrollbar ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#52525b}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>数据编辑器</h1>
+  <span id="data-root-label"></span>
+</div>
+
+<div id="tab-bar">
+  <button class="tab-btn active" data-tab="pieces">棋子</button>
+  <button class="tab-btn" data-tab="skills">技能</button>
+  <button class="tab-btn" data-tab="cards">卡牌</button>
+  <button class="tab-btn" data-tab="rules">规则</button>
+  <button class="tab-btn" data-tab="build">构建资源包</button>
+</div>
+
+<div id="content">
+
+  <!-- ══ PIECES ══ -->
+  <div class="tab-panel active" id="tab-pieces">
+    <div class="split">
+      <div class="list-col">
+        <div class="search-wrap"><input id="pieces-search" placeholder="搜索棋子…" type="text"/></div>
+        <div class="entity-list" id="pieces-list"></div>
+      </div>
+      <div class="detail-col" id="pieces-detail">
+        <div class="placeholder">← 选择一个棋子开始编辑</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SKILLS ══ -->
+  <div class="tab-panel" id="tab-skills">
+    <div class="split">
+      <div class="list-col">
+        <div class="search-wrap"><input id="skills-search" placeholder="搜索技能…" type="text"/></div>
+        <div class="entity-list" id="skills-list"></div>
+      </div>
+      <div class="detail-col" id="skills-detail">
+        <div class="placeholder">← 选择一个技能</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CARDS ══ -->
+  <div class="tab-panel" id="tab-cards">
+    <div class="split">
+      <div class="list-col">
+        <div class="search-wrap"><input id="cards-search" placeholder="搜索卡牌…" type="text"/></div>
+        <div class="entity-list" id="cards-list"></div>
+      </div>
+      <div class="detail-col" id="cards-detail">
+        <div class="placeholder">← 选择一张卡牌</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RULES ══ -->
+  <div class="tab-panel" id="tab-rules">
+    <div class="split">
+      <div class="list-col">
+        <div class="search-wrap"><input id="rules-search" placeholder="搜索规则…" type="text"/></div>
+        <div class="entity-list" id="rules-list"></div>
+      </div>
+      <div class="detail-col" id="rules-detail">
+        <div class="placeholder">← 选择一条规则</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BUILD ══ -->
+  <div class="tab-panel" id="tab-build">
+    <div class="build-panel">
+      <div class="build-card">
+        <h3>构建参数</h3>
+        <div class="grid2" style="margin-bottom:12px">
+          <div class="field-group">
+            <label>包名 (--name)</label>
+            <input id="build-name" type="text" value="editor-build"/>
+          </div>
+          <div class="field-group">
+            <label>版本号 (--version)</label>
+            <input id="build-version" type="text" id="build-version"/>
+          </div>
+        </div>
+        <div class="field-group">
+          <label>描述 (--desc)</label>
+          <input id="build-desc" type="text" value="balance update"/>
+        </div>
+        <div class="action-row" style="border:none;padding:0;margin-top:0">
+          <button class="btn btn-primary btn-big" id="build-btn">▶ 构建资源包</button>
+        </div>
+      </div>
+      <div class="build-card">
+        <div class="status-bar">
+          <h3 style="margin:0">输出</h3>
+          <span id="build-badge"></span>
+        </div>
+        <div class="console" id="build-console"><span class="console-line" style="color:#3f3f46">等待构建…</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── helpers ─────────────────────────────────────────────────────────────────
+const api = window.editorAPI
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div')
+  el.className = `toast-item toast-${type}`
+  el.textContent = msg
+  document.getElementById('toast').appendChild(el)
+  requestAnimationFrame(() => { el.classList.add('show') })
+  setTimeout(() => {
+    el.classList.remove('show')
+    setTimeout(() => el.remove(), 300)
+  }, 2500)
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+// ─── tab switching ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'))
+    btn.classList.add('active')
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active')
+  })
+})
+
+// ─── generic entity list ──────────────────────────────────────────────────────
+function buildList(listEl, searchEl, items, onSelect) {
+  let selected = null
+  const render = (filter) => {
+    const f = filter.toLowerCase()
+    listEl.innerHTML = ''
+    items.filter(it => it.id.includes(f) || (it.name||'').toLowerCase().includes(f))
+      .forEach(it => {
+        const el = document.createElement('div')
+        el.className = 'entity-item' + (it.id === selected ? ' selected' : '')
+        el.innerHTML = `<span class="name">${esc(it.name || it.id)}</span><span class="id">${esc(it.id)}</span>`
+        el.addEventListener('click', () => {
+          selected = it.id
+          render(searchEl.value)
+          onSelect(it)
+        })
+        listEl.appendChild(el)
+      })
+  }
+  searchEl.addEventListener('input', e => render(e.target.value))
+  render('')
+  return { refresh: () => render(searchEl.value), select: id => { selected = id; render(searchEl.value) } }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PIECES
+// ══════════════════════════════════════════════════════════════════════════════
+;(async () => {
+  const files = await api.listFiles('pieces')
+  const piecesData = {}
+  const listEl   = document.getElementById('pieces-list')
+  const searchEl = document.getElementById('pieces-search')
+  const detailEl = document.getElementById('pieces-detail')
+
+  // pre-load all pieces for display
+  await Promise.all(files.map(async f => {
+    try { piecesData[f.id] = await api.readFile('pieces', f.filename) } catch {}
+  }))
+
+  const items = files.map(f => {
+    const d = piecesData[f.id] || {}
+    return { id: f.id, filename: f.filename, name: d.name || f.id, faction: d.faction }
+  })
+
+  buildList(listEl, searchEl, items, async item => {
+    const data = piecesData[item.id]
+    if (!data) return
+    renderPieceDetail(item, data)
+  })
+
+  function renderPieceDetail(item, data) {
+    const stats = data.stats || {}
+    detailEl.innerHTML = `
+      <div class="form-card" id="piece-form">
+        <div class="form-title">${esc(data.name || item.id)}</div>
+        <div class="form-subtitle">${esc(item.filename)}</div>
+
+        <div class="grid2">
+          <div class="field-group">
+            <label>名称</label>
+            <input type="text" id="pf-name" value="${esc(data.name||'')}"/>
+          </div>
+          <div class="field-group">
+            <label>阵营</label>
+            <select id="pf-faction">
+              <option value="red"   ${data.faction==='red'   ?'selected':''}>红方 (red)</option>
+              <option value="blue"  ${data.faction==='blue'  ?'selected':''}>蓝方 (blue)</option>
+              <option value="neutral" ${data.faction==='neutral'?'selected':''}>中立 (neutral)</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label>稀有度</label>
+            <select id="pf-rarity">
+              ${['common','rare','epic','legendary'].map(r=>`<option value="${r}" ${data.rarity===r?'selected':''}>${r}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>描述</label>
+          <textarea id="pf-desc" rows="2">${esc(data.description||'')}</textarea>
+        </div>
+
+        <div class="section-label">属性</div>
+        <div class="stat-grid">
+          <div class="stat-item"><label>生命值 maxHp</label><input type="number" id="pf-maxHp"    min="0" value="${stats.maxHp??0}"/></div>
+          <div class="stat-item"><label>攻击力 attack</label><input type="number" id="pf-attack"  min="0" value="${stats.attack??0}"/></div>
+          <div class="stat-item"><label>防御力 defense</label><input type="number" id="pf-defense" min="0" value="${stats.defense??0}"/></div>
+          <div class="stat-item"><label>移动速度 moveRange</label><input type="number" id="pf-move" min="0" value="${stats.moveRange??0}"/></div>
+        </div>
+
+        <div class="section-label">技能 (只读 — 修改请打开文件)</div>
+        <div style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:6px">
+          ${(data.skills||[]).map(s=>`<span style="background:#1e293b;padding:3px 10px;border-radius:4px;font-size:12px;color:#94a3b8">${esc(s.skillId)} Lv${s.level||1}</span>`).join('') || '<span style="color:var(--muted);font-size:13px">暂无</span>'}
+        </div>
+
+        <div class="section-label">规则 (只读 — 修改请打开文件)</div>
+        <div style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:6px">
+          ${(data.rules||[]).map(r=>`<span style="background:#1e293b;padding:3px 10px;border-radius:4px;font-size:12px;color:#94a3b8">${esc(r)}</span>`).join('') || '<span style="color:var(--muted);font-size:13px">暂无</span>'}
+        </div>
+
+        <div class="action-row">
+          <button class="btn btn-ghost" id="pf-open">在系统编辑器中打开 JSON</button>
+          <button class="btn btn-ghost" id="pf-reset">重置</button>
+          <button class="btn btn-success" id="pf-save">保存</button>
+        </div>
+        <div id="pf-msg" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+      </div>
+    `
+
+    document.getElementById('pf-open').onclick = () => api.openInEditor('pieces', item.filename)
+
+    document.getElementById('pf-reset').onclick = () => renderPieceDetail(item, data)
+
+    document.getElementById('pf-save').onclick = async () => {
+      const btn = document.getElementById('pf-save')
+      btn.disabled = true
+      btn.textContent = '保存中…'
+      const updated = {
+        ...data,
+        name:        document.getElementById('pf-name').value,
+        faction:     document.getElementById('pf-faction').value,
+        rarity:      document.getElementById('pf-rarity').value,
+        description: document.getElementById('pf-desc').value,
+        stats: {
+          ...stats,
+          maxHp:     Number(document.getElementById('pf-maxHp').value),
+          attack:    Number(document.getElementById('pf-attack').value),
+          defense:   Number(document.getElementById('pf-defense').value),
+          moveRange: Number(document.getElementById('pf-move').value),
+        }
+      }
+      try {
+        await api.writeFile('pieces', item.filename, updated)
+        piecesData[item.id] = updated
+        toast('保存成功')
+      } catch(e) {
+        toast('保存失败: ' + e.message, 'error')
+      }
+      btn.disabled = false
+      btn.textContent = '保存'
+    }
+  }
+})()
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SKILLS  — open-in-editor focused
+// ══════════════════════════════════════════════════════════════════════════════
+;(async () => {
+  const files = await api.listFiles('skills')
+  const dataMap = {}
+  await Promise.all(files.map(async f => {
+    try { dataMap[f.id] = await api.readFile('skills', f.filename) } catch {}
+  }))
+
+  const items = files.map(f => {
+    const d = dataMap[f.id] || {}
+    return { id: f.id, filename: f.filename, name: d.name || f.id }
+  })
+
+  buildList(
+    document.getElementById('skills-list'),
+    document.getElementById('skills-search'),
+    items,
+    item => renderSkillDetail(item, dataMap[item.id] || {})
+  )
+
+  function renderSkillDetail(item, data) {
+    const detailEl = document.getElementById('skills-detail')
+    const TYPE_LABEL = { normal:'普通', buff:'Buff', super:'大招' }
+    const codeLen = (data.code||data.skillCode||'').length
+
+    const fields = [
+      ['类型 type',         TYPE_LABEL[data.type] || data.type || '—'],
+      ['冷却回合 cooldownTurns', data.cooldownTurns ?? '—'],
+      ['行动点消耗 actionPointCost', data.actionPointCost ?? '—'],
+      ['最大充能 maxCharges', data.maxCharges ?? '—'],
+      ['充能消耗 chargeCost', data.chargeCost ?? '—'],
+      ['伤害倍率 powerMultiplier', data.powerMultiplier ?? '—'],
+      ['范围 range',        data.range || '—'],
+      ['范围大小 areaSize', data.areaSize ?? '—'],
+      ['需要目标 requiresTarget', data.requiresTarget === true ? '是' : data.requiresTarget === false ? '否' : '—'],
+    ].map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')
+
+    detailEl.innerHTML = `
+      <div class="file-panel">
+        <h2>${esc(data.name || item.id)}</h2>
+        <div class="file-id">${esc(item.filename)}</div>
+
+        ${data.description ? `<div style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.5">${esc(data.description)}</div>` : ''}
+
+        <dl class="info-grid">${fields}</dl>
+
+        <div class="open-hint">
+          技能的核心逻辑在 <code style="font-family:monospace;background:#1c1c1e;padding:1px 5px;border-radius:3px">skillCode</code> 字段中，建议直接打开 JSON 文件进行编辑。
+          ${codeLen > 0 ? `当前代码长度：<strong>${codeLen}</strong> 字符。` : ''}
+        </div>
+
+        <div class="open-actions">
+          <button class="btn btn-open btn-big" id="sk-open">在系统编辑器中打开 JSON 文件</button>
+        </div>
+
+        ${codeLen > 0 ? `
+        <div style="margin-top:16px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">代码预览（只读）</div>
+          <div class="code-preview"><pre>${esc((data.skillCode||data.code||'').slice(0,400))}${codeLen>400?'\n…(truncated)':''}</pre></div>
+        </div>` : ''}
+      </div>
+    `
+
+    document.getElementById('sk-open').onclick = () => {
+      api.openInEditor('skills', item.filename)
+        .then(err => { if (err) toast('无法打开文件: ' + err, 'error') })
+    }
+  }
+})()
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CARDS — open-in-editor focused
+// ══════════════════════════════════════════════════════════════════════════════
+;(async () => {
+  const files = await api.listFiles('cards')
+  const dataMap = {}
+  await Promise.all(files.map(async f => {
+    try { dataMap[f.id] = await api.readFile('cards', f.filename) } catch {}
+  }))
+
+  const items = files.map(f => {
+    const d = dataMap[f.id] || {}
+    return { id: f.id, filename: f.filename, name: d.name || f.id }
+  })
+
+  buildList(
+    document.getElementById('cards-list'),
+    document.getElementById('cards-search'),
+    items,
+    item => renderCardDetail(item, dataMap[item.id] || {})
+  )
+
+  function renderCardDetail(item, data) {
+    const detailEl = document.getElementById('cards-detail')
+    const codeLen = (data.code||data.skillCode||'').length
+
+    const fields = [
+      ['行动点消耗 actionPointCost', data.actionPointCost ?? '—'],
+      ['类型 type',   data.type || '—'],
+      ['图标 icon',   data.icon || '—'],
+    ].map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')
+
+    detailEl.innerHTML = `
+      <div class="file-panel">
+        <h2>${esc(data.icon ? data.icon + ' ' : '')}${esc(data.name || item.id)}</h2>
+        <div class="file-id">${esc(item.filename)}</div>
+
+        ${data.description ? `<div style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.5">${esc(data.description)}</div>` : ''}
+
+        <dl class="info-grid">${fields}</dl>
+
+        <div class="open-hint">
+          卡牌效果在 <code style="font-family:monospace;background:#1c1c1e;padding:1px 5px;border-radius:3px">code</code> 字段中，建议直接打开 JSON 文件进行编辑。
+          ${codeLen > 0 ? `当前代码长度：<strong>${codeLen}</strong> 字符。` : ''}
+        </div>
+
+        <div class="open-actions">
+          <button class="btn btn-open btn-big" id="cd-open">在系统编辑器中打开 JSON 文件</button>
+        </div>
+
+        ${codeLen > 0 ? `
+        <div style="margin-top:16px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">代码预览（只读）</div>
+          <div class="code-preview"><pre>${esc((data.code||data.skillCode||'').slice(0,400))}${codeLen>400?'\n…(truncated)':''}</pre></div>
+        </div>` : ''}
+      </div>
+    `
+
+    document.getElementById('cd-open').onclick = () => {
+      api.openInEditor('cards', item.filename)
+        .then(err => { if (err) toast('无法打开文件: ' + err, 'error') })
+    }
+  }
+})()
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RULES — open-in-editor focused
+// ══════════════════════════════════════════════════════════════════════════════
+;(async () => {
+  const files = await api.listFiles('rules')
+  const dataMap = {}
+  await Promise.all(files.map(async f => {
+    try { dataMap[f.id] = await api.readFile('rules', f.filename) } catch {}
+  }))
+
+  const items = files.map(f => {
+    const d = dataMap[f.id] || {}
+    return { id: f.id, filename: f.filename, name: d.name || f.id }
+  })
+
+  buildList(
+    document.getElementById('rules-list'),
+    document.getElementById('rules-search'),
+    items,
+    item => renderRuleDetail(item, dataMap[item.id] || {})
+  )
+
+  function renderRuleDetail(item, data) {
+    const detailEl = document.getElementById('rules-detail')
+    const trigger = data.trigger || {}
+    const codeLen = (data.skillCode||data.code||'').length
+
+    detailEl.innerHTML = `
+      <div class="file-panel">
+        <h2>${esc(data.name || item.id)}</h2>
+        <div class="file-id">${esc(item.filename)}</div>
+
+        ${data.description ? `<div style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.5">${esc(data.description)}</div>` : ''}
+
+        <dl class="info-grid">
+          <dt>触发类型 trigger.type</dt><dd>${esc(trigger.type || '—')}</dd>
+          ${trigger.targetType ? `<dt>目标 targetType</dt><dd>${esc(trigger.targetType)}</dd>` : ''}
+        </dl>
+
+        <div class="open-hint">
+          规则效果在 <code style="font-family:monospace;background:#1c1c1e;padding:1px 5px;border-radius:3px">skillCode</code> 字段中，建议直接打开 JSON 文件进行编辑。
+          ${codeLen > 0 ? `当前代码长度：<strong>${codeLen}</strong> 字符。` : ''}
+        </div>
+
+        <div class="open-actions">
+          <button class="btn btn-open btn-big" id="ru-open">在系统编辑器中打开 JSON 文件</button>
+        </div>
+
+        ${codeLen > 0 ? `
+        <div style="margin-top:16px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">代码预览（只读）</div>
+          <div class="code-preview"><pre>${esc((data.skillCode||data.code||'').slice(0,400))}${codeLen>400?'\n…(truncated)':''}</pre></div>
+        </div>` : ''}
+      </div>
+    `
+
+    document.getElementById('ru-open').onclick = () => {
+      api.openInEditor('rules', item.filename)
+        .then(err => { if (err) toast('无法打开文件: ' + err, 'error') })
+    }
+  }
+})()
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BUILD
+// ══════════════════════════════════════════════════════════════════════════════
+;(() => {
+  const versionInput = document.getElementById('build-version')
+  versionInput.value = new Date().toISOString().slice(0,10).replace(/-/g,'')
+
+  const consoleEl = document.getElementById('build-console')
+  const buildBtn  = document.getElementById('build-btn')
+  const badgeEl   = document.getElementById('build-badge')
+  let building = false
+  let removeListener = null
+
+  function appendLine(text, cls = '') {
+    const line = document.createElement('div')
+    line.className = 'console-line' + (cls ? ' ' + cls : '')
+    line.textContent = text
+    consoleEl.appendChild(line)
+    consoleEl.scrollTop = consoleEl.scrollHeight
+  }
+
+  buildBtn.addEventListener('click', async () => {
+    if (building) return
+    building = true
+    buildBtn.disabled = true
+    buildBtn.textContent = '⏳ 构建中…'
+    badgeEl.innerHTML = ''
+    consoleEl.innerHTML = ''
+
+    const args = {
+      name:    document.getElementById('build-name').value || 'editor-build',
+      version: document.getElementById('build-version').value,
+      desc:    document.getElementById('build-desc').value,
+    }
+
+    if (removeListener) removeListener()
+    removeListener = api.onBuildOutput(payload => {
+      if (payload.line !== undefined) {
+        appendLine(payload.line, payload.line.startsWith('[stderr]') ? 'stderr' : '')
+      }
+      if (payload.done) {
+        building = false
+        buildBtn.disabled = false
+        buildBtn.textContent = '▶ 构建资源包'
+        if (payload.exitCode === 0) {
+          badgeEl.innerHTML = '<span class="badge badge-success">构建成功</span>'
+          toast('资源包构建成功')
+        } else {
+          badgeEl.innerHTML = `<span class="badge badge-error">构建失败 (exit ${payload.exitCode})</span>`
+          toast('构建失败', 'error')
+        }
+      }
+    })
+
+    try {
+      await api.runBuild(args)
+    } catch(e) {
+      appendLine('[错误] ' + e.message, 'stderr')
+      building = false
+      buildBtn.disabled = false
+      buildBtn.textContent = '▶ 构建资源包'
+    }
+  })
+})()
+</script>
+</body>
+</html>
