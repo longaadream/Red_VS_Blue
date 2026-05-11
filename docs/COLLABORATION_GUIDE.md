@@ -174,6 +174,17 @@ lib/pve/pve-engine-adapter.ts
 
 ## PVE 数据草案
 
+当前已提供 PVE 开发入口：
+
+```text
+data/pages/pve.html
+android-client/www/js/pve-api.js
+data/pve/
+app/api/pve/route.ts
+```
+
+协作者可以先通过 `pve.html` 开发单人流程，通过 `window.RvBPve` 读取 `data/pve/` 中的章节、遭遇、事件、奖励、遗物与敌人配置。服务端调试时也可以请求 `GET /api/pve` 查看聚合后的 PVE 数据。
+
 ### Encounter
 
 ```json

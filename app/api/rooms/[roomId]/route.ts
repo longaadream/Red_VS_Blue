@@ -74,6 +74,23 @@ export async function POST(
       return NextResponse.json({ error: "playerId is required" }, { status: 400 })
     }
 
+    const existing = room.players.find(
+      (p) => p.id.toLowerCase() === normalizedPlayerId,
+    )
+
+    if (existing) {
+      if (!existing.faction) {
+        const assignedFactions = room.players
+          .filter(p => p.id.toLowerCase() !== normalizedPlayerId)
+          .map(p => p.faction)
+          .filter(Boolean) as Array<"red" | "blue">
+        existing.faction = assignedFactions.length === 0 || assignedFactions[0] === "blue" ? "red" : "blue"
+      }
+      if (playerName) existing.name = playerName
+      await roomStore.setRoom(room.id.trim(), room)
+      return NextResponse.json(room)
+    }
+
     if (room.status !== "waiting") {
       return NextResponse.json(
         { error: "Cannot join a game that has already started or finished" },
@@ -85,33 +102,24 @@ export async function POST(
       return NextResponse.json({ error: "Room is full" }, { status: 400 })
     }
 
-    const existing = room.players.find(
-      (p) => p.id.toLowerCase() === normalizedPlayerId,
-    )
+    const assignedFactions = room.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
+    let faction: "red" | "blue"
+    if (assignedFactions.length === 0) {
+      faction = Math.random() > 0.5 ? "red" : "blue"
+    } else {
+      faction = assignedFactions[0] === "red" ? "blue" : "red"
+    }
 
-    if (!existing) {
-      const assignedFactions = room.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
-      let faction: "red" | "blue"
-      if (assignedFactions.length === 0) {
-        faction = Math.random() > 0.5 ? "red" : "blue"
-      } else {
-        faction = assignedFactions[0] === "red" ? "blue" : "red"
-      }
+    const player = {
+      id: normalizedPlayerId,
+      name: playerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
+      joinedAt: Date.now(),
+      faction,
+    }
+    room.players.push(player)
 
-      const player = {
-        id: normalizedPlayerId,
-        name: playerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
-        joinedAt: Date.now(),
-        faction,
-      }
-      room.players.push(player)
-
-      if (!room.hostId) {
-        room.hostId = normalizedPlayerId
-      }
-    } else if (!existing.faction) {
-      const assignedFactions = room.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
-      existing.faction = assignedFactions.length === 0 || assignedFactions[0] === "blue" ? "red" : "blue"
+    if (!room.hostId) {
+      room.hostId = normalizedPlayerId
     }
 
     await roomStore.setRoom(room.id.trim(), room)

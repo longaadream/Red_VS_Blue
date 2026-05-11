@@ -1,0 +1,7 @@
+{
+  "id": "quick-preparation",
+  "name": "快速整备",
+  "rarity": "common",
+  "description": "每场 PVE 战斗开始时，抽 1 张牌。",
+  "hooks": ["battle-start"]
+}

@@ -2,22 +2,35 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRoomStore } from '@/lib/game/room-store'
 
 export async function GET(req: NextRequest) {
-  const roomStore = getRoomStore()
-  const rooms = await roomStore.getAllRooms()
+  try {
+    const roomStore = getRoomStore()
+    const rooms = await roomStore.getAllRooms()
 
-  const roomList = rooms.map(room => ({
-    id: room.id,
-    name: room.name,
-    status: room.status,
-    playersCount: room.players.length,
-    maxPlayers: room.maxPlayers || 2,
-    mapId: room.mapId,
-    hostId: room.hostId,
-    createdAt: room.createdAt,
-    visibility: room.visibility || 'public',
-  }))
+    const roomList = rooms.map(room => ({
+      id: room.id,
+      name: room.name,
+      status: room.status,
+      players: room.players.map(player => ({
+        id: player.id,
+        name: player.name,
+        faction: player.faction,
+        hasSelectedPieces: player.hasSelectedPieces || false,
+      })),
+      playerCount: room.players.length,
+      playersCount: room.players.length,
+      maxPlayers: room.maxPlayers || 2,
+      mapId: room.mapId,
+      hostId: room.hostId,
+      createdAt: room.createdAt,
+      visibility: room.visibility || 'public',
+      inviteCode: room.inviteCode,
+    }))
 
-  return NextResponse.json({ rooms: roomList })
+    return NextResponse.json({ rooms: roomList })
+  } catch (error) {
+    console.error('[GET /api/rooms] Error fetching rooms:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
 }
 
 export async function DELETE(req: NextRequest) {

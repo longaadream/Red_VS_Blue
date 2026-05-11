@@ -38,6 +38,29 @@
     }
   }
 
+  function fetchWithTimeout(url, options, timeoutMs) {
+    options = options || {}
+    timeoutMs = timeoutMs || options.timeoutMs || 10000
+    var ctrl = new AbortController()
+    var timer = setTimeout(function () { ctrl.abort() }, timeoutMs)
+    var fetchOptions = {}
+    Object.keys(options).forEach(function (key) {
+      if (key !== 'timeoutMs') fetchOptions[key] = options[key]
+    })
+    fetchOptions.signal = options.signal || ctrl.signal
+    return fetch(url, fetchOptions).finally(function () { clearTimeout(timer) })
+  }
+
+  function asConnectionError(baseUrl, err) {
+    var message = err && err.name === 'AbortError'
+      ? '服务器响应超时'
+      : ((err && err.message) || 'Failed to fetch')
+    var out = new Error('无法连接服务器：' + message + '（服务器：' + baseUrl + '）')
+    out.code = err && err.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR'
+    out.cause = err
+    return out
+  }
+
   function isAndroidLocalMobileServer(baseUrl) {
     return !!(
       window.RvBBridge &&
@@ -125,7 +148,7 @@
     }
 
     try {
-      res = await fetch(baseUrl + path, options)
+      res = await fetchWithTimeout(baseUrl + path, options)
     } catch (err) {
       if (err instanceof TypeError && isAndroidLocalMobileServer(baseUrl)) {
         return nativeAndroidLocalFetch(path, options)
@@ -134,11 +157,15 @@
       // (Capacitor androidScheme=https) mixed-content blocks http:// fetches.
       if (err instanceof TypeError && baseUrl.startsWith('https://') && !inSecureCtx) {
         var httpUrl = baseUrl.replace('https://', 'http://')
-        res = await fetch(httpUrl + path, options)  // let this throw if also broken
+        try {
+          res = await fetchWithTimeout(httpUrl + path, options)
+        } catch (httpErr) {
+          throw asConnectionError(httpUrl, httpErr)
+        }
         // HTTP worked — persist the corrected URL so future calls don't retry
         saveServerUrl(httpUrl)
       } else {
-        throw err
+        throw asConnectionError(baseUrl, err)
       }
     }
 

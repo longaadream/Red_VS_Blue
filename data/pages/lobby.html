@@ -381,7 +381,10 @@
       btn.disabled = true
       statusBar.innerHTML = '<span class="spinner-sm"></span><span>加载中…</span>'
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms')
+        let res = await RvBUtils.serverFetch('/api/rooms')
+        if (!res.ok && res.status >= 500) {
+          res = await RvBUtils.serverFetch('/api/lobby')
+        }
         if (!res.ok) throw new Error('HTTP ' + res.status)
         const data = await res.json()
         renderRooms(Array.isArray(data) ? data : (data.rooms || []))

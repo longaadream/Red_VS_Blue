@@ -1,0 +1,7 @@
+{
+  "id": "prototype-card-choice",
+  "name": "选择一张手牌",
+  "type": "card-choice",
+  "count": 3,
+  "pools": ["shared-starter"]
+}

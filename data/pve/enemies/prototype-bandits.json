@@ -1,0 +1,9 @@
+{
+  "id": "prototype-bandits",
+  "name": "试炼敌队",
+  "aiProfile": "basic-aggressive",
+  "pieces": [
+    { "templateId": "red-sasuke", "faction": "red" },
+    { "templateId": "red-hidan", "faction": "red" }
+  ]
+}

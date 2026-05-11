@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PVE 冒险模式 - RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <script src="js/pve-api.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 18% 10%, rgba(245, 158, 11, .18), transparent 34%),
+        radial-gradient(circle at 82% 4%, rgba(239, 68, 68, .12), transparent 28%),
+        linear-gradient(180deg, #110d08 0%, #0f172a 48%, #09090b 100%);
+      color: #e2e8f0;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .topbar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(148, 163, 184, .16); background: rgba(15, 23, 42, .82); backdrop-filter: blur(14px); position: sticky; top: 0; z-index: 10; }
+    .back-btn { background: rgba(30, 41, 59, .9); border: 1px solid #334155; border-radius: 8px; color: #cbd5e1; padding: 7px 12px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+    .topbar h1 { font-size: 17px; font-weight: 800; }
+    .hero { padding: 22px 16px 12px; }
+    .eyebrow { color: #fbbf24; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; font-weight: 800; }
+    .title { margin-top: 8px; font-size: 30px; line-height: 1.05; font-weight: 900; }
+    .desc { margin-top: 10px; color: #94a3b8; font-size: 14px; line-height: 1.6; max-width: 560px; }
+    .actions { display: flex; gap: 10px; padding: 12px 16px 6px; }
+    .btn { flex: 1; border: none; border-radius: 12px; padding: 13px 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
+    .btn-primary { background: linear-gradient(135deg, #f59e0b, #ef4444); color: white; }
+    .btn-ghost { background: rgba(15, 23, 42, .74); color: #cbd5e1; border: 1px solid #334155; }
+    .section { padding: 14px 16px; }
+    .section-title { font-size: 13px; color: #64748b; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
+    .grid { display: grid; gap: 12px; }
+    .card { background: rgba(15, 23, 42, .82); border: 1px solid rgba(148, 163, 184, .18); border-radius: 16px; padding: 15px; box-shadow: 0 12px 28px rgba(0, 0, 0, .24); }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .card-name { font-size: 17px; font-weight: 900; }
+    .badge { color: #fbbf24; background: rgba(245, 158, 11, .12); border: 1px solid rgba(245, 158, 11, .26); border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 800; }
+    .card-desc { color: #94a3b8; font-size: 13px; line-height: 1.55; margin-top: 8px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .pill { color: #cbd5e1; background: #111827; border: 1px solid #334155; border-radius: 999px; padding: 5px 8px; font-size: 12px; }
+    .empty { color: #64748b; text-align: center; padding: 32px 18px; border: 1px dashed #334155; border-radius: 16px; }
+    .devbox { margin-top: 12px; background: rgba(2, 6, 23, .7); border: 1px solid #334155; border-radius: 12px; padding: 12px; color: #94a3b8; font-size: 12px; line-height: 1.6; }
+    code { color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="back-btn" href="index.html">← 返回</a>
+    <h1>PVE 冒险模式</h1>
+  </div>
+
+  <section class="hero">
+    <div class="eyebrow">Roguelike Prototype</div>
+    <div class="title">单人冒险的开发入口</div>
+    <p class="desc">
+      这里是 PVE 协作者的独立工作区。PVE 可以复用棋子、技能、卡牌和地图，但新增关卡、事件、遗物、奖励和成长系统应优先放在 <code>data/pve/</code>。
+    </p>
+  </section>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="startPrototypeRun()">开始原型冒险</button>
+    <button class="btn btn-ghost" onclick="reloadPve()">刷新数据</button>
+  </div>
+
+  <section class="section">
+    <div class="section-title">章节</div>
+    <div id="chapterList" class="grid"><div class="empty">正在加载 PVE 数据...</div></div>
+  </section>
+
+  <section class="section">
+    <div class="section-title">接口说明</div>
+    <div class="devbox">
+      页面接口：<code>window.RvBPve</code><br>
+      数据入口：<code>data/pve/manifest.json</code><br>
+      推荐开发目录：<code>data/pve/</code>、<code>components/pve/</code>、<code>lib/pve/</code><br>
+      当前阶段不要接入账号、联机、房间、WebSocket。
+    </div>
+  </section>
+
+  <script>
+    let chapters = []
+
+    function escHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    }
+
+    async function reloadPve() {
+      const list = document.getElementById('chapterList')
+      list.innerHTML = '<div class="empty">正在加载 PVE 数据...</div>'
+      try {
+        chapters = await RvBPve.loadChapters()
+        renderChapters()
+      } catch (e) {
+        list.innerHTML = '<div class="empty">PVE 数据加载失败：' + escHtml(e.message) + '</div>'
+      }
+    }
+
+    function renderChapters() {
+      const list = document.getElementById('chapterList')
+      if (!chapters.length) {
+        list.innerHTML = '<div class="empty">还没有章节。请在 data/pve/chapters/ 添加 JSON，并登记到 data/pve/manifest.json。</div>'
+        return
+      }
+      list.innerHTML = chapters.map(ch => {
+        const encounters = Array.isArray(ch.encounters) ? ch.encounters.length : 0
+        const events = Array.isArray(ch.events) ? ch.events.length : 0
+        return `<div class="card">
+          <div class="card-head">
+            <div class="card-name">${escHtml(ch.name || ch.id)}</div>
+            <div class="badge">${escHtml(ch.status || 'prototype')}</div>
+          </div>
+          <div class="card-desc">${escHtml(ch.description || '暂无描述')}</div>
+          <div class="meta">
+            <span class="pill">遭遇：${encounters}</span>
+            <span class="pill">事件：${events}</span>
+            <span class="pill">推荐队伍：${escHtml(ch.recommendedPartySize || 3)}</span>
+          </div>
+        </div>`
+      }).join('')
+    }
+
+    function startPrototypeRun() {
+      const first = chapters[0]
+      const run = RvBPve.createRunState({ chapterId: first && first.id })
+      localStorage.setItem('rvb_pve_run', JSON.stringify(run))
+      alert('已创建 PVE 原型 run：' + run.id + '\n下一步可由 PVE 开发者接入路线、事件、奖励和战斗 adapter。')
+    }
+
+    window.addEventListener('load', reloadPve)
+  </script>
+</body>
+</html>

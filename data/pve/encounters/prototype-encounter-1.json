@@ -1,0 +1,11 @@
+{
+  "id": "prototype-encounter-1",
+  "name": "路边伏击",
+  "type": "battle",
+  "mapId": "large-battlefield",
+  "enemyTeamId": "prototype-bandits",
+  "winCondition": {
+    "type": "defeat-all-enemies"
+  },
+  "rewards": ["prototype-card-choice", "prototype-relic-choice"]
+}

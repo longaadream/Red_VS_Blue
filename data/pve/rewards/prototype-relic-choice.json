@@ -1,0 +1,7 @@
+{
+  "id": "prototype-relic-choice",
+  "name": "选择一个遗物",
+  "type": "relic-choice",
+  "count": 3,
+  "pools": ["prototype-relics"]
+}

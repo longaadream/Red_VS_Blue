@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rvb-v2-lobby-routing'
+const CACHE_NAME = 'rvb-v3-pve-entry'
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -9,10 +9,12 @@ const STATIC_ASSETS = [
   './piece-selection.html',
   './pieces.html',
   './maps.html',
+  './pve.html',
   './pack.html',
   './history.html',
   './js/server-utils.js',
   './js/pack-fetch.js',
+  './js/pve-api.js',
 ]
 
 self.addEventListener('install', event => {

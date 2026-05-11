@@ -1,0 +1,11 @@
+{
+  "id": "prototype-chapter",
+  "name": "试炼之路",
+  "status": "prototype",
+  "description": "PVE 模式的第一条样例路线，用于验证章节、遭遇、事件和奖励接口。",
+  "recommendedPartySize": 3,
+  "startEncounter": "prototype-encounter-1",
+  "encounters": ["prototype-encounter-1"],
+  "events": ["prototype-campfire"],
+  "rewardPools": ["prototype-card-choice", "prototype-relic-choice"]
+}

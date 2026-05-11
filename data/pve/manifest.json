@@ -1,0 +1,8 @@
+{
+  "chapters": ["prototype-chapter"],
+  "encounters": ["prototype-encounter-1"],
+  "events": ["prototype-campfire"],
+  "rewards": ["prototype-card-choice", "prototype-relic-choice"],
+  "relics": ["quick-preparation"],
+  "enemies": ["prototype-bandits"]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "prototype-campfire",
+  "name": "临时营火",
+  "type": "event",
+  "description": "在下一场战斗前选择一种整备效果。",
+  "choices": [
+    { "id": "heal", "label": "治疗队伍", "effect": { "type": "heal-party", "amount": 2 } },
+    { "id": "draw", "label": "整理手牌", "effect": { "type": "add-card-choice", "count": 1 } }
+  ]
+}

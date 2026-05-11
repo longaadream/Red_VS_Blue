@@ -86,6 +86,7 @@ interface Room {
   createdAt: number
   version: number
   visibility: 'public' | 'private'
+  inviteCode?: string
   gameRecord?: GameRecord
 }
 
@@ -173,12 +174,20 @@ function handleGetRooms(): string {
     id: r.id,
     name: r.name,
     status: r.status,
+    players: r.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      faction: p.faction,
+      hasSelectedPieces: p.hasSelectedPieces || false,
+    })),
+    playerCount: r.players.length,
     playersCount: r.players.length,
     maxPlayers: r.maxPlayers,
     mapId: r.mapId,
     hostId: r.hostId,
     createdAt: r.createdAt,
     visibility: r.visibility,
+    inviteCode: r.inviteCode,
   }))
   return ok({ rooms: roomList })
 }
@@ -219,14 +228,21 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
   const playerName = (body.playerName as string) || '玩家'
 
   if (body.action === 'join') {
-    if (room.players.find(p => p.id === playerId)) return ok(room as unknown as Record<string, unknown>)
-    if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
+    const normalizedPlayerId = playerId.trim().toLowerCase()
     const authErr = await verifyJoinAuth(body)
     if (authErr) return err(authErr, 401)
+    const existing = room.players.find(p => p.id.toLowerCase() === normalizedPlayerId)
+    if (existing) {
+      if (playerName) existing.name = playerName
+      if (!existing.faction) existing.faction = nextFaction(room)
+      room.version++
+      return ok(room as unknown as Record<string, unknown>)
+    }
+    if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
     const publicKey = (body.publicKey as string) || undefined
     const isHost = room.players.length === 0
     const faction = isHost ? 'red' : 'blue'
-    room.players.push({ id: playerId, name: playerName, publicKey, faction, joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] })
+    room.players.push({ id: normalizedPlayerId, name: playerName, publicKey, faction, joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] })
     room.version++
     return ok(room as unknown as Record<string, unknown>)
   }
