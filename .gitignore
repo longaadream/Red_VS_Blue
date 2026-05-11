@@ -3,14 +3,66 @@ __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts
 
-# Common ignores
+# Dependencies
 node_modules/
+
+# Next.js / TypeScript generated output
 .next/
+out/
+app/tailwind-compiled.css
+*.tsbuildinfo
+/lib/generated/prisma/
+
+# Electron / packaged app output
+dist/
+_client-stage/
+_server-stage/
+*.exe
+*.msi
+*.dmg
+*.AppImage
+
+# Environment and local machine state
+.env
 .env*.local
 .DS_Store
-/lib/generated/prisma
+.vscode/
+.idea/
+.claude/settings.local.json
 
-# Database
-.env
+# Database and runtime state
 *.db
 *.db-journal
+*.sqlite
+*.sqlite-journal
+rooms.json
+logs/
+data/rooms/
+
+# Generated/imported resource packs
+resource-pack/
+resource-pack.zip
+dist/resource-pack.zip
+public/resource-pack-manifest.json
+
+# Android / Gradle generated output
+android/.gradle/
+android/.idea/
+android/local.properties
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/game_assets/
+android/app/src/main/assets/public/
+android/app/src/main/assets/mobile-server.js
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+
+# Android client generated web assets.
+# Source pages live in data/pages/; shared hand-written JS stays in android-client/www/js/.
+android-client/www/data/
+android-client/www/images/
+android-client/www/*.html
+android-client/www/game-engine.js
+android-client/www/js/crypto-lib.js
+android-client/www/js/game-engine.js
