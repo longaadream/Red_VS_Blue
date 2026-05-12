@@ -284,6 +284,8 @@
     // RvBIdentity loaded from js/identity.js
 
     let pollTimer = null
+    const _lp = new URLSearchParams(window.location.search)
+    const RELAY_MODE = _lp.get('relay') === '1' || _lp.get('server') === 'remote'
 
     function goBack() { window.location.href = 'index.html' }
 
@@ -475,6 +477,7 @@
         window.location.href = 'room.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(playerId)
           + '&playerName=' + encodeURIComponent(playerName)
+          + (RELAY_MODE ? '&relay=1' : '')
       } catch (e) { alert('加入房间失败：' + e.message) }
     }
 
@@ -490,6 +493,7 @@
         window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(spectatorId)
           + '&mode=spectate'
+          + (RELAY_MODE ? '&relay=1' : '')
       } catch (e) { alert('观战失败：' + e.message) }
     }
 
@@ -607,7 +611,7 @@
       const { roomId, playerId, playerName } = window._rejoinInfo
       const url = RvBUtils.getServerUrl()
       if (!url) { alert('未连接服务器，无法重新加入'); return }
-      window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId) + '&playerId=' + encodeURIComponent(playerId) + (playerName ? '&playerName=' + encodeURIComponent(playerName) : '')
+      window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId) + '&playerId=' + encodeURIComponent(playerId) + (playerName ? '&playerName=' + encodeURIComponent(playerName) : '') + (RELAY_MODE ? '&relay=1' : '')
     }
     function dismissRejoin() {
       try { localStorage.removeItem('rvb_active_battle') } catch {}

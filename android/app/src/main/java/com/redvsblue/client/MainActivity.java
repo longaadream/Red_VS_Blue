@@ -139,6 +139,7 @@ public class MainActivity extends BridgeActivity {
                         return;
                     }
                     MobileHttpServer server = new MobileHttpServer(MOBILE_SERVER_PORT, engine);
+                    engine.setWsServer(server);
                     gameEngineWebView = engine;
                     mobileHttpServer  = server;
                     getSharedPreferences(PREFS, MODE_PRIVATE).edit()

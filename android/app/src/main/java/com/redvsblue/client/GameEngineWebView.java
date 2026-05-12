@@ -33,6 +33,11 @@ public class GameEngineWebView {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Map<String, CompletableFuture<String>> pending = new ConcurrentHashMap<>();
     private final CountDownLatch readyLatch = new CountDownLatch(1);
+    private volatile MobileHttpServer wsServer;
+
+    public void setWsServer(MobileHttpServer server) {
+        this.wsServer = server;
+    }
 
     // Called from NanoHTTPD thread — waits for the WebView to become ready.
     public boolean waitForReady(int timeoutSec) {
@@ -97,6 +102,13 @@ public class GameEngineWebView {
         public void onReady() {
             Log.i(TAG, "Mobile game server is ready");
             readyLatch.countDown();
+        }
+
+        /** Called by JS after appending an action log entry — broadcasts to WS room clients. */
+        @JavascriptInterface
+        public void broadcastToRoom(String roomId, String message) {
+            MobileHttpServer srv = wsServer;
+            if (srv != null) srv.broadcastToRoom(roomId, message);
         }
     }
 

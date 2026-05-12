@@ -432,6 +432,13 @@ async function handleBattleAction(roomId: string, body: Record<string, unknown>)
   log.actions.push(entry)
   room.version++
 
+  // Notify Android WS clients (no-op on non-Android platforms)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const _bridge = (typeof window !== 'undefined' && (window as any).AndroidServerBridge) || null
+  if (_bridge?.broadcastToRoom) {
+    try { _bridge.broadcastToRoom(room.id, JSON.stringify({ type: 'actionLog', entry })) } catch {}
+  }
+
   if (type === 'gameOver' && !room.gameRecord) {
     room.status = 'finished'
     room.gameRecord = {
@@ -547,6 +554,48 @@ async function handleTraining(method: string, body: Record<string, unknown>): Pr
   return err('Method not allowed', 405)
 }
 
+// POST /api/relay-battle-init — create initial state for relay mode host
+async function handleRelayBattleInit(body: Record<string, unknown>): Promise<string> {
+  const players = body.players as Array<{
+    id: string
+    faction: 'red' | 'blue'
+    pieces: Array<{ templateId: string }>
+  }> | undefined
+
+  if (!Array.isArray(players) || players.length < 2) {
+    return err('players array with at least 2 entries required', 400)
+  }
+
+  const playerIds = players.map(p => p.id)
+
+  const playerSelectedPieces = players.map(player => {
+    const pieces = (player.pieces ?? [])
+      .map(p => {
+        const templates = getAllPieces()
+        const tpl = templates.find(t => t.id === p.templateId)
+        if (!tpl) return null
+        return { ...tpl, faction: player.faction } as PieceTemplate
+      })
+      .filter((p): p is PieceTemplate => p !== null)
+    return { playerId: player.id, pieces }
+  })
+
+  const allPieces = playerSelectedPieces.flatMap(p => p.pieces)
+
+  try {
+    const state = await createInitialBattleForPlayers(
+      playerIds,
+      allPieces,
+      playerSelectedPieces,
+      (body.mapId as string | undefined)
+    )
+    if (!state) return err('Failed to create battle state', 500)
+    return ok({ state } as unknown as Record<string, unknown>)
+  } catch (e) {
+    return err('createInitialBattleForPlayers failed: ' + String(e), 500)
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 async function route(method: string, rawPath: string, body: Record<string, unknown>): Promise<string> {
@@ -599,6 +648,10 @@ async function route(method: string, rawPath: string, body: Record<string, unkno
 
   if (p === '/api/training' && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
     return handleTraining(method, body)
+  }
+
+  if (p === '/api/relay-battle-init' && method === 'POST') {
+    return handleRelayBattleInit(body)
   }
 
   return err('Not found', 404)

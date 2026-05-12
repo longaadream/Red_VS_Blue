@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Room {
+  id               String   @id
+  hostId           String
+  name             String
+  status           String   @default("waiting")
+  // waiting | selecting | battle | waiting_host | finished
+  players          Json     @default("[]")
+  inviteCode       String?
+  lastStateBlob    String?  @db.Text
+  actionLog        Json     @default("[]")
+  hostDisconnectedAt DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model LeaderboardPlayer {
+  id          String   @id
+  displayName String
+  publicKey   String   @db.Text
+  rating      Float    @default(1000)
+  wins        Int      @default(0)
+  losses      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BattleRecord {
+  id            String   @id
+  roomId        String
+  winnerId      String
+  loserId       String
+  actionLog     Json
+  hostSignature String   @db.Text
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}

@@ -283,6 +283,7 @@
         window.location.href = 'room.html?roomId=' + encodeURIComponent(rid)
           + '&playerId=' + encodeURIComponent(pid)
           + '&playerName=' + encodeURIComponent(pname)
+          + (RELAY_MODE ? '&relay=1' : '')
         return
       }
       // 兜底：没有房间上下文时再回大厅，并保留 server mode
@@ -299,6 +300,7 @@
     const roomId = params.get('roomId') || ''
     const playerId = params.get('playerId') || ('anon-' + Date.now())
     const playerName = params.get('playerName') || '玩家'
+    const RELAY_MODE = params.get('relay') === '1'
 
     // RvBUtils loaded from js/server-utils.js
     const getServerUrl = () => RvBUtils.getServerUrl()
@@ -657,6 +659,7 @@
             + '?roomId=' + encodeURIComponent(roomId)
             + '&playerId=' + encodeURIComponent(playerId)
             + '&playerName=' + encodeURIComponent(playerName)
+            + (RELAY_MODE ? '&relay=1' : '')
         }
       } catch {}
     }

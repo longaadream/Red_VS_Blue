@@ -9,6 +9,7 @@
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
   <script src="js/game-engine.js"></script>
+  <script src="js/ws-client.js"></script>
   <style>
     :root {
       --bg: #0f172a; --bg2: #1e293b; --border: #334155;
@@ -861,6 +862,7 @@
     <button class="back-btn" onclick="confirmLeave()">← 离开</button>
     <div class="room-name" id="roomNameLabel">对战</div>
     <div class="turn-badge" id="turnBadge">等待中</div>
+    <div id="wsStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● WS</div>
     <div style="font-size:12px;color:#64748b" id="roundLabel"></div>
     <button id="btnSurrender" class="btn-surrender" onclick="confirmSurrender()">🏳 投降</button>
     <button id="btnSwitchPov" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
@@ -990,6 +992,7 @@
     let myPlayerId = (params.get('playerId') || '').trim().toLowerCase()
     const myPlayerName = params.get('playerName') || '玩家'
     const TRAINING_MODE = params.get('mode') === 'training'
+    const RELAY_MODE = params.get('relay') === '1'
 
     // ── Server URL ──
     const getServerUrl = () => RvBUtils.getServerUrl()
@@ -1070,6 +1073,10 @@
     let currentPieceInfoId = null
     let currentPieceKeywords = []
     let activePieceKeyword = ''
+    let wsConnected = false     // WebSocket live
+    let wsRole = 'guest'        // 'host' | 'guest' — from subscribed message
+    let wsMode = 'lan'          // 'lan' | 'relay'
+    let relaySeq = 0            // outbound action/stateUpdate sequence
 
     // ── Piece helpers ──
     function pieceName(p) {
@@ -1607,6 +1614,7 @@
       try {
         localStorage.setItem('rvb_active_battle', JSON.stringify({ roomId, playerId: myPlayerId, playerName: myPlayerName }))
       } catch {}
+      wsMode = RELAY_MODE ? 'relay' : 'lan'
       await initBattle()
     }
 
@@ -1767,31 +1775,99 @@
       }
     }
 
-    // Connect WebSocket and subscribe to this room
-    function connectBattleWs() {
+    // Connect WebSocket for the given mode ('lan' | 'relay')
+    function connectBattleWs(mode) {
       if (typeof RvBWs === 'undefined') return
+      wsMode = mode || 'lan'
+
+      RvBWs.on('connect', function() {
+        wsConnected = true
+        var el = document.getElementById('wsStatus')
+        if (el) { el.style.display = ''; el.textContent = '● WS' }
+        addLog('🔗 WebSocket 已连接', 'info')
+      })
+
+      RvBWs.on('disconnect', function() {
+        wsConnected = false
+        var el = document.getElementById('wsStatus')
+        if (el) el.style.display = 'none'
+        addLog('⚠️ WebSocket 断开，等待重连…', 'info')
+      })
+
       RvBWs.on('message', function(msg) {
-        if (msg.type === 'stateUpdate') {
+        if (msg.type === 'subscribed') {
+          wsRole = msg.role || 'guest'
+          addLog('[WS] 角色：' + wsRole, 'info')
+          if (wsMode === 'relay' && wsRole === 'host') initRelayHostBattle()
+        } else if (msg.type === 'stateUpdate') {
           applyServerState(msg.state, null)
+        } else if (msg.type === 'pendingAction') {
+          // Relay host: process guest action locally → push stateUpdate
+          if (wsMode === 'relay' && wsRole === 'host' && G &&
+              typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
+            try {
+              var newG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), msg.action)
+              applyServerState(newG, null)
+              relaySeq++
+              RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
+            } catch (e) { addLog('❌ 处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err') }
+          }
+        } else if (msg.type === 'hostResume') {
+          if (wsMode === 'relay' && wsRole === 'host' && msg.state) applyServerState(msg.state, null)
         } else if (msg.type === 'gameOver') {
           if (G && !G.gameOver) { G.gameOver = true; G.winner = msg.winner; handleGameOver() }
         }
       })
-      RvBWs.on('connect', function() { console.log('[WS] Connected to battle room') })
-      RvBWs.on('disconnect', function() { console.log('[WS] Disconnected — fallback poll active') })
-      RvBWs.connect(roomId)
+
+      RvBWs.connect(roomId, myPlayerId, wsMode)
     }
 
-    // Initialize a real battle: fetch initial state, connect WS, start fallback poll
+    // Relay host: create initial battle state via local engine, push to relay
+    async function initRelayHostBattle() {
+      var localUrl = null
+      if (window.RvBBridge) {
+        localUrl = 'http://localhost:7878'
+      } else if (window.electronAPI) {
+        try { var info = await window.electronAPI.getHostInfo(); if (info && info.port) localUrl = 'http://localhost:' + info.port } catch {}
+      }
+      if (!localUrl) localUrl = getServerUrl()
+      try {
+        addLog('⚙️ 正在获取房间信息…', 'info')
+        var roomRes = await fetch(getServerUrl() + '/api/rooms/' + roomId)
+        if (!roomRes.ok) { addLog('❌ 无法获取房间信息', 'err'); return }
+        var room = await roomRes.json()
+        if (!room.players || room.players.length < 2) { addLog('❌ 房间玩家不足', 'err'); return }
+        var players = room.players.map(function(p) {
+          return { id: p.id, faction: p.faction || 'red',
+            pieces: (p.pieces || []).map(function(tid) { return { templateId: tid } }) }
+        })
+        addLog('⚙️ 初始化对战…', 'info')
+        var initRes = await fetch(localUrl + '/api/relay-battle-init', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ players: players, mapId: room.mapId || undefined })
+        })
+        if (!initRes.ok) { addLog('❌ 初始化失败：' + initRes.status, 'err'); return }
+        var initData = await initRes.json()
+        if (!initData.state) { addLog('❌ 初始化返回空状态', 'err'); return }
+        applyServerState(initData.state, null)
+        relaySeq = 0
+        RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: initData.state })
+        addLog('✅ 对战已初始化，等待对手…', 'info')
+      } catch (e) { addLog('❌ 初始化出错：' + e.message, 'err') }
+    }
+
+    // Initialize a real battle: connect WS, fetch initial state (LAN only), start fallback poll
     async function initBattle() {
-      connectBattleWs()
-      await pollActions()  // initial state fetch
-      // Slow fallback poll (in case WS drops or misses a message)
-      pollTimer = setInterval(pollActions, 5000)
+      connectBattleWs(wsMode)
+      if (wsMode !== 'relay') {
+        await pollActions()  // initial state fetch for LAN
+        pollTimer = setInterval(pollActions, 10000)  // 10s fallback
+      }
     }
 
     // Fetch current authoritative state from server (fallback / initial load)
     async function pollActions() {
+      if (wsMode === 'relay') return  // relay: state arrives via WS only
       var url = getServerUrl()
       if (!url) return
       try {
@@ -2798,6 +2874,44 @@
           }
         }
 
+        // ── Relay guest: submit action via WS, wait for stateUpdate ──
+        if (wsMode === 'relay' && wsRole === 'guest') {
+          relaySeq++
+          RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: '' })
+          if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
+            selectedPieceId = action.pieceId
+          } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
+          pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
+          return
+        }
+
+        // ── Relay host: apply locally + push stateUpdate ──
+        if (wsMode === 'relay' && wsRole === 'host' && G &&
+            typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
+          try {
+            const newG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), action)
+            if (action.pieceId && newG.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
+              selectedPieceId = action.pieceId
+            } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
+            pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
+            applyServerState(newG, null)
+            relaySeq++
+            RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
+          } catch (e) { addLog('❌ 本地处理失败：' + e.message, 'err'); renderActionBar() }
+          return
+        }
+
+        // ── LAN WS: submit action via WS if connected ──
+        if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
+          RvBWs.send({ type: 'action', action, playerId: myPlayerId })
+          if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
+            selectedPieceId = action.pieceId
+          } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
+          pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
+          return
+        }
+
+        // ── HTTP fallback (LAN WS unavailable) ──
         // Build signed request body
         let bodyToPost = { type: 'action', action, playerId: myPlayerId }
         const identity = (typeof RvBIdentity !== 'undefined') ? RvBIdentity.getIdentity() : null

@@ -18,14 +18,27 @@ const packageJsonPath = path.join(src, 'package.json')
 const serverJsPath = path.join(src, 'server.js')
 
 if (!fs.existsSync(packageJsonPath) || !fs.existsSync(serverJsPath)) {
-  const entries = fs.readdirSync(src, { withFileTypes: true })
-  const nested = entries.find(e => e.isDirectory() &&
-    e.name !== '_standalone' && // Prevent nesting
-    fs.existsSync(path.join(src, e.name, 'package.json')) &&
-    fs.existsSync(path.join(src, e.name, 'server.js')))
-  if (nested) {
-    src = path.join(src, nested.name)
-    console.log('[stage] Using nested standalone directory:', nested.name)
+  function findStandaloneDir(dir, depth) {
+    if (depth > 8) return null
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      for (const e of entries) {
+        if (!e.isDirectory() || e.name === 'node_modules' || e.name === '_standalone') continue
+        const candidate = path.join(dir, e.name)
+        if (fs.existsSync(path.join(candidate, 'package.json')) &&
+            fs.existsSync(path.join(candidate, 'server.js'))) {
+          return candidate
+        }
+        const deeper = findStandaloneDir(candidate, depth + 1)
+        if (deeper) return deeper
+      }
+    } catch {}
+    return null
+  }
+  const found = findStandaloneDir(src, 0)
+  if (found) {
+    src = found
+    console.log('[stage] Using nested standalone directory:', path.relative(srcRoot, found))
   }
 }
 
