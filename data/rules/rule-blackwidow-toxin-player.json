@@ -1,0 +1,7 @@
+{
+  "id": "rule-blackwidow-toxin-player",
+  "name": "毒素陷阱",
+  "description": "当敌方棋子移动到毒素格子时，受到4点真实伤害并消耗毒素",
+  "trigger": { "type": "afterMove" },
+  "skillCode": "var mover = context.sourcePiece; if (!mover || mover.currentHp <= 0) return { success: false, message: '' }; if (mover.ownerPlayerId === context.playerId) return { success: false, message: '' }; var player = battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player || !player.statusTags) return { success: false, message: '' }; var toxinTag = null; for (var i = 0; i < player.statusTags.length; i++) { if (player.statusTags[i].type === 'lethal-toxin') { toxinTag = player.statusTags[i]; break; } } if (!toxinTag) { removePlayerRuleById(context.playerId, 'rule-blackwidow-toxin-player'); return { success: false, message: '' }; } if (mover.x === toxinTag.value && mover.y === toxinTag.extraValue) { var damage = toxinTag.intensity || 4; var casterPiece = battle.pieces.find(function(p) { return p.ownerPlayerId === context.playerId && p.currentHp > 0; }); dealDamage(casterPiece || mover, mover, damage, 'true', battle, 'lethal-toxin'); removePlayerStatusEffectById(context.playerId, toxinTag.id); removePlayerRuleById(context.playerId, 'rule-blackwidow-toxin-player'); return { success: true, message: mover.name + '触发了致命毒素，受到' + damage + '点真实伤害！' }; } return { success: false, message: '' };"
+}

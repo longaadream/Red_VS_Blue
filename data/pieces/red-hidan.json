@@ -16,7 +16,9 @@
     { "skillId": "hidan-sacrifice", "level": 1 },
     { "skillId": "hidan-undying", "level": 1 }
   ],
-  "rules": [],
-  "initialEffects": ["effect-hidan-dying-immune", "effect-hidan-undying"],
+  "rules": [
+    "rule-hidan-dying-immune",
+    "rule-hidan-undying"
+  ],
   "isDefault": false
 }

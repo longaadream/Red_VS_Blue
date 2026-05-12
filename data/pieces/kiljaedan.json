@@ -16,8 +16,7 @@
     { "skillId": "kiljaedan-fel-fire", "level": 1 },
     { "skillId": "kiljaedan-soul-drain", "level": 1 }
   ],
-  "rules": [],
-  "initialEffects": ["effect-kiljaedan-gamestart"],
+  "rules": ["rule-kiljaedan-gamestart"],
   "relatedCards": ["demon-summon-1", "demon-summon-2", "demon-summon-3", "demon-summon-4", "demon-summon-5"],
   "isDefault": false
 }

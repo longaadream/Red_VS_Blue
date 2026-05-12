@@ -1,0 +1,8 @@
+{
+  "id": "rule-hidan-dying-immune",
+  "name": "濒死免疫",
+  "description": "飞段处于「濒死」状态时，免疫所有伤害",
+  "priority": 100,
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "var hidan = context.rulePiece; if (context.piece.instanceId !== hidan.instanceId) return { success: false, message: '' }; var inDying = hidan.statusTags && hidan.statusTags.some(function(t) { return t.type === 'hidan-dying'; }); if (!inDying) return { success: false, message: '' }; return { success: true, blocked: true, message: hidan.name + '处于濒死状态，免疫伤害' };"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "rule-chidori-immobile",
+  "name": "千鸟贯穿",
+  "description": "被千鸟贯穿后，本回合无法移动",
+  "trigger": { "type": "beforeMove" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (!context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'chidori-immobile'; }); if (!tag) { removeRuleById(piece.instanceId, 'rule-chidori-immobile'); return { success: false, message: '' }; } return { success: true, blocked: true, message: piece.name + '被千鸟贯穿，本回合无法移动' };"
+}

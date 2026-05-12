@@ -391,9 +391,16 @@
           style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;color:#e2e8f0;font-size:15px;padding:12px 14px;outline:none;box-sizing:border-box;margin-bottom:12px" />
         <button onclick="saveIdentityName()"
           style="width:100%;padding:13px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px">保存名称</button>
+        <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:12px">账号、战绩和资源包都保存在当前设备，不会自动同步到别的电脑。</div>
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;margin-bottom:12px">
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">本机账号</div>
+          <div id="identityAccountList" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
         <div style="display:flex;gap:8px">
           <button onclick="identityShowMnemonic()"
             style="flex:1;padding:11px;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:10px;font-size:14px;cursor:pointer">查看助记词</button>
+          <button onclick="createAnotherIdentity()"
+            style="flex:1;padding:11px;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:10px;font-size:14px;cursor:pointer">新建账号</button>
           <button onclick="identityShowImport()"
             style="flex:1;padding:11px;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:10px;font-size:14px;cursor:pointer">导入账号</button>
         </div>
@@ -752,7 +759,31 @@
       document.getElementById('identityViewMain').style.display = 'block'
       document.getElementById('identityViewMnemonic').style.display = 'none'
       document.getElementById('identityViewImport').style.display = 'none'
+      renderIdentityAccountList()
       document.getElementById('identitySheetTitle').textContent = '我的账号'
+    }
+
+    function renderIdentityAccountList() {
+      const listEl = document.getElementById('identityAccountList')
+      if (!listEl || !window.RvBIdentity || typeof RvBIdentity.listIdentities !== 'function') return
+      const accounts = RvBIdentity.listIdentities()
+      if (!accounts.length) {
+        listEl.innerHTML = '<div style="font-size:12px;color:#64748b">暂无本机账号</div>'
+        return
+      }
+      listEl.innerHTML = accounts.map(account => {
+        const isActive = !!account.isActive
+        const action = isActive
+          ? '<span style="font-size:12px;color:#22c55e;font-weight:700">当前使用</span>'
+          : `<button onclick="switchIdentityAccount('${escHtml(account.id)}')" style="padding:6px 10px;background:transparent;border:1px solid #334155;color:#cbd5e1;border-radius:999px;font-size:12px;cursor:pointer">切换</button>`
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid ${isActive ? '#2563eb' : '#1e293b'};border-radius:10px;background:${isActive ? 'rgba(30,64,175,.16)' : 'rgba(15,23,42,.55)'}">
+          <div style="min-width:0">
+            <div style="font-size:13px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(account.displayName || '玩家')}</div>
+            <div style="font-size:11px;color:#64748b;font-family:monospace">${escHtml(account.id)}</div>
+          </div>
+          ${action}
+        </div>`
+      }).join('')
     }
 
     function identityShowMnemonic() {
@@ -808,6 +839,39 @@
       closeIdentitySheet()
     }
 
+    function switchIdentityAccount(id) {
+      try {
+        if (typeof RvBIdentity.switchIdentity === 'function') {
+          const identity = RvBIdentity.switchIdentity(id)
+          if (identity) {
+            document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' 路 ' + identity.id
+            document.getElementById('identityNameInput').value = identity.displayName || ''
+          }
+          renderIdentityAccountList()
+          refreshUserUI()
+        }
+      } catch (e) {
+        alert(e.message || '切换账号失败')
+      }
+    }
+
+    async function createAnotherIdentity() {
+      const ok = window.confirm('将创建一个新的本机账号，并自动切换到它。建议创建后立刻备份助记词。')
+      if (!ok) return
+      try {
+        const identity = await RvBIdentity.createIdentity('玩家')
+        if (identity) {
+          document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' 路 ' + identity.id
+          document.getElementById('identityNameInput').value = identity.displayName || ''
+        }
+        renderIdentityAccountList()
+        refreshUserUI()
+        identityShowMnemonic()
+      } catch (e) {
+        alert(e.message || '创建账号失败')
+      }
+    }
+
     function copyMnemonic() {
       const words = RvBIdentity.getMnemonic()
       if (!words) return
@@ -828,6 +892,8 @@
       btn.textContent = '导入中…'; btn.disabled = true
       try {
         await RvBIdentity.importFromMnemonic(input)
+        renderIdentityAccountList()
+        refreshUserUI()
         btn.textContent = '导入成功！'
         setTimeout(() => { closeIdentitySheet() }, 800)
       } catch (e) {
@@ -841,7 +907,12 @@
     const RECORDS_KEY = 'rvb_battle_records'
 
     function _loadRecords() {
-      try { return JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]') } catch { return [] }
+      try {
+        const records = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]')
+        const identity = window.RvBIdentity && RvBIdentity.getIdentity ? RvBIdentity.getIdentity() : null
+        if (!identity || !identity.id) return records
+        return records.filter(r => !r.myPlayerId || r.myPlayerId === identity.id)
+      } catch { return [] }
     }
 
     function _calcLocalElo() {

@@ -1,0 +1,13 @@
+{
+  "id": "rule-initial-draw",
+  "name": "初始抽牌",
+  "description": "游戏开始时每个玩家抽3张牌",
+  "trigger": {
+    "type": "gameStart"
+  },
+  "effect": {
+    "type": "triggerSkill",
+    "skillId": "initial-draw",
+    "message": "初始抽牌"
+  }
+}

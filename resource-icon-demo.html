@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>资源图标预览</title>
+  <style>
+    :root {
+      --bg: #070b12;
+      --panel: #111827;
+      --line: #263244;
+      --text: #e5e7eb;
+      --muted: #8b98aa;
+      --ap-a: #1f6feb;
+      --ap-b: #0f2f68;
+      --cp-a: #8b5cf6;
+      --cp-b: #32185d;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        linear-gradient(180deg, rgba(14, 22, 36, .96), rgba(5, 8, 13, 1)),
+        var(--bg);
+    }
+
+    main {
+      width: min(980px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 38px 0 52px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 26px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: rgba(17, 24, 39, .78);
+      border-radius: 8px;
+      padding: 18px;
+    }
+
+    .panel.light {
+      background: #d7dde8;
+      color: #111827;
+      border-color: #b6bfce;
+    }
+
+    .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .light .label { color: #566174; }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .row:last-child { margin-bottom: 0; }
+
+    .resource {
+      --size: 34px;
+      position: relative;
+      width: var(--size);
+      height: var(--size);
+      flex: 0 0 auto;
+      display: inline-grid;
+      place-items: center;
+      filter: none;
+    }
+
+    .resource.sm { --size: 24px; }
+    .resource.md { --size: 34px; }
+    .resource.lg { --size: 48px; }
+
+    .resource.ap {
+      clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%);
+      background: var(--ap-a);
+      box-shadow: inset 0 0 0 2px rgba(191, 219, 254, .9);
+    }
+
+    .resource.ap::before {
+      content: "";
+      width: 36%;
+      height: 66%;
+      background: #eaf4ff;
+      clip-path: polygon(56% 0, 96% 0, 66% 42%, 100% 42%, 28% 100%, 42% 55%, 0 55%);
+      transform: rotate(8deg);
+    }
+
+    .resource.ap::after {
+      content: "";
+      position: absolute;
+      inset: 14%;
+      clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%);
+      border: 1px solid rgba(234, 244, 255, .38);
+      pointer-events: none;
+    }
+
+    .resource.cp {
+      transform: rotate(45deg);
+      border-radius: 7px;
+      background: var(--cp-a);
+      box-shadow: inset 0 0 0 2px rgba(245, 208, 254, .88);
+    }
+
+    .resource.cp::before {
+      content: "";
+      width: 48%;
+      height: 48%;
+      border-radius: 5px;
+      border: 2px solid #f6eaff;
+    }
+
+    .resource.cp::after {
+      content: "";
+      position: absolute;
+      width: 14%;
+      height: 14%;
+      border-radius: 50%;
+      background: #f6eaff;
+    }
+
+    .cost {
+      height: 25px;
+      min-width: 46px;
+      padding: 0 8px 0 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      border-radius: 999px;
+      background: rgba(7, 12, 22, .76);
+      border: 1px solid #334155;
+      font-weight: 900;
+      font-size: 13px;
+      color: #f8fafc;
+    }
+
+    .cost .resource {
+      --size: 18px;
+      filter: none;
+    }
+
+    .skill {
+      width: 112px;
+      min-height: 130px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #141f33;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 8px;
+    }
+
+    .skill-costs {
+      display: flex;
+      gap: 5px;
+    }
+
+    .skill-icon {
+      font-size: 30px;
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .skill-name {
+      font-size: 12px;
+      font-weight: 800;
+      color: #cbd5e1;
+    }
+
+    .skill-desc {
+      font-size: 10px;
+      line-height: 1.35;
+      color: #8391a5;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>行动点 / 充能点图标预览</h1>
+    <p>保留蓝色闪电表示行动点、紫色菱形表示充能点，但去掉写实高光和宝石质感，改成扁平、干净的卡牌 UI 徽标。</p>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="label">单独图标，不同尺寸</div>
+        <div class="row">
+          <span class="resource ap sm"></span>
+          <span class="resource ap md"></span>
+          <span class="resource ap lg"></span>
+        </div>
+        <div class="row">
+          <span class="resource cp sm"></span>
+          <span class="resource cp md"></span>
+          <span class="resource cp lg"></span>
+        </div>
+      </section>
+
+      <section class="panel light">
+        <div class="label">亮背景识别度</div>
+        <div class="row">
+          <span class="resource ap sm"></span>
+          <span class="resource ap md"></span>
+          <span class="resource ap lg"></span>
+        </div>
+        <div class="row">
+          <span class="resource cp sm"></span>
+          <span class="resource cp md"></span>
+          <span class="resource cp lg"></span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="label">技能栏费用徽标</div>
+        <div class="row">
+          <span class="cost"><span class="resource ap"></span>1</span>
+          <span class="cost"><span class="resource cp"></span>2</span>
+          <span class="cost"><span class="resource ap"></span>0</span>
+          <span class="cost"><span class="resource cp"></span>3</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="label">放进技能卡后的效果</div>
+        <div class="row">
+          <div class="skill">
+            <div class="skill-costs">
+              <span class="cost"><span class="resource ap"></span>1</span>
+              <span class="cost"><span class="resource cp"></span>0</span>
+            </div>
+            <div class="skill-icon">✦</div>
+            <div class="skill-name">恶魔冲击</div>
+            <div class="skill-desc">对直线目标造成伤害，并消耗一次恶魔力量。</div>
+          </div>
+          <div class="skill">
+            <div class="skill-costs">
+              <span class="cost"><span class="resource ap"></span>2</span>
+              <span class="cost"><span class="resource cp"></span>3</span>
+            </div>
+            <div class="skill-icon">◇</div>
+            <div class="skill-name">因陀罗之矢</div>
+            <div class="skill-desc">选择目标区域，造成高额范围伤害。</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"id":"rule-divine-blessing","name":"赐福增伤","description":"赐福状态下下一次造成的伤害+4","trigger":{"type":"beforeDamageDealt"},"effect":{"type":"triggerSkill","skillId":"divine-blessing-damage","message":"赐福增伤生效"}}

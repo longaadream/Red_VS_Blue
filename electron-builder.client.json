@@ -20,7 +20,8 @@
     { "from": "android-client/www",  "to": "app/www" },
     { "from": "electron-client/admin","to": "app/electron-client/admin" },
     { "from": "scripts/init-db.js",  "to": "app/init-db.js" },
-    { "from": "node_modules/adm-zip","to": "app/node_modules/adm-zip" }
+    { "from": "node_modules/adm-zip","to": "app/node_modules/adm-zip" },
+    { "from": "_client-node/node.exe", "to": "node.exe" }
   ],
   "asar": false,
   "win": {

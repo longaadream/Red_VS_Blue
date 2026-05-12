@@ -1,0 +1,9 @@
+{
+  "id": "rule-shishio-kill-track",
+  "name": "击杀计数",
+  "description": "每当志志雄真实击杀一名敌人，记录击杀数并提升无限刃与炎灵的伤害倍率（1杀→150%，2杀+→200%）。",
+  "trigger": {
+    "type": "afterPieceKilled"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (!context.targetPiece) return { success: false, message: '' }; if (!piece.statusTags) piece.statusTags = []; var tag = piece.statusTags.find(function(t) { return t.type === 'shishio-kills'; }); if (!tag) { tag = { id: 'shishio-kills-' + piece.instanceId, type: 'shishio-kills', name: '击杀数', intensity: 0, currentDuration: -1 }; piece.statusTags.push(tag); } tag.intensity += 1; var mult = tag.intensity >= 2 ? '200%' : '150%'; return { success: true, message: piece.name + ' 击杀 ' + context.targetPiece.name + '！击杀数：' + tag.intensity + '，无限刃/炎灵升至 ' + mult };"
+}

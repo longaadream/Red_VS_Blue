@@ -1,0 +1,33 @@
+{
+  "id": "red-nilasec",
+  "name": "尼拉塞克",
+  "faction": "red",
+  "description": "掌握死亡魔法的死灵法师，能够召唤白骨风暴和使用邪爆术",
+  "rarity": "epic",
+  "image": "",
+  "stats": {
+    "maxHp": 10,
+    "attack": 3,
+    "defense": 0,
+    "moveRange": 2
+  },
+  "skills": [
+    {
+      "skillId": "basic-attack",
+      "level": 1
+    },
+    {
+      "skillId": "evil-explosion",
+      "level": 1
+    },
+    {
+      "skillId": "bone-prison",
+      "level": 1
+    },
+    {
+      "skillId": "white-bone-storm",
+      "level": 1
+    }
+  ],
+  "isDefault": false
+}

@@ -1,0 +1,7 @@
+{
+  "id": "rule-arthas-icebound",
+  "name": "寒冰坚忍触发",
+  "description": "当有寒冰坚忍buff的棋子被任何攻击命中时，将伤害降低50%，并冰冻攻击者1回合",
+  "trigger": { "type": "beforeDamageDealt" },
+  "skillCode": "var defender = context.rulePiece; if (!context.targetPiece || context.targetPiece.instanceId !== defender.instanceId) return { success: false, message: '' }; var hasIcebound = defender.statusTags && defender.statusTags.some(function(t) { return t.type === 'icebound-fortitude'; }); if (!hasIcebound) return { success: false, message: '' }; context.damage = Math.max(1, Math.floor(context.damage * 0.5)); var attacker = context.sourcePiece; var msg = defender.name + '的寒冰坚忍生效！伤害降低50%'; if (attacker && attacker.currentHp > 0) { var alreadyFrozen = attacker.statusTags && attacker.statusTags.some(function(t) { return t.type === 'freeze'; }); if (!alreadyFrozen) { addStatusEffectById(attacker.instanceId, { id: 'icebound-freeze-' + attacker.instanceId, name: '冰冻', type: 'freeze', currentDuration: 1, currentUses: -1, intensity: 1, stacks: 1 }); addRuleById(attacker.instanceId, 'rule-freeze-prevent-move'); addRuleById(attacker.instanceId, 'rule-freeze-prevent-skill'); addRuleById(attacker.instanceId, 'rule-freeze-prevent-attack'); msg += '，' + attacker.name + '被冰冻1回合'; if (!battle.actions) battle.actions = []; battle.actions.push({ type: 'triggerEffect', playerId: defender.ownerPlayerId, turn: battle.turn.turnNumber, payload: { message: '❄️ ' + attacker.name + '攻击了' + defender.name + '，被寒冰坚忍反冻！（冰冻1回合，无法行动）' } }); } } return { success: true, message: msg };"
+}

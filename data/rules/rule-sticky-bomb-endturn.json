@@ -1,0 +1,7 @@
+{
+  "id": "rule-sticky-bomb-endturn",
+  "name": "粘性炸弹（回合结束爆炸）",
+  "description": "对手回合结束时，粘性炸弹爆炸，对曼哈顿距离≤1内所有棋子造成伤害。",
+  "trigger": { "type": "endTurn" },
+  "effect": { "type": "triggerSkill", "skillId": "sticky-bomb-explode", "message": "" }
+}

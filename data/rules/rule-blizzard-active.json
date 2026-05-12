@@ -1,0 +1,13 @@
+{
+  "id": "rule-blizzard-active",
+  "name": "暴风雪激活",
+  "description": "在对方回合结束时，触发暴风雪效果对区域内敌人造成伤害和冰冻",
+  "trigger": {
+    "type": "endTurn"
+  },
+  "effect": {
+    "type": "triggerSkill",
+    "skillId": "blizzard-damage",
+    "message": "暴风雪效果触发"
+  }
+}

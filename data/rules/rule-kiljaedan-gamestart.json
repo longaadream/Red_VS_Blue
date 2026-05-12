@@ -1,0 +1,8 @@
+{
+  "id": "rule-kiljaedan-gamestart",
+  "name": "恶魔仪式启动",
+  "description": "游戏开始时，基尔加丹从棋盘消失，向红方手牌中加入「恶魔召唤（1）」",
+  "trigger": { "type": "gameStart" },
+  "effect": { "type": "triggerSkill", "skillId": "kiljaedan-demonic-pact" },
+  "limits": { "maxUses": 1 }
+}

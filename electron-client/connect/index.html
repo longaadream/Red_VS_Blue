@@ -54,7 +54,7 @@
       color: #94a3b8;
       margin-top: 8px;
     }
-    .err { color: #f87171; font-size: 12px; margin-top: 10px; display: none; }
+    .err { color: #f87171; font-size: 12px; margin-top: 10px; display: none; white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto; }
     .hint { font-size: 11px; color: #475569; margin-top: 14px; text-align: center; }
   </style>
 </head>
@@ -92,7 +92,7 @@
       errEl.style.display = 'none'
       const result = await api.openLocalGame()
       if (!result || !result.ok) {
-        errEl.textContent = '本机服务器仍在启动中，请稍后再试'
+        errEl.textContent = '本机服务器启动失败：' + (result?.error || '未知错误')
         errEl.style.display = 'block'
       }
     }

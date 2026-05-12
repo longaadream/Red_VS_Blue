@@ -9,6 +9,7 @@ const path = require('path')
 
 const srcRoot = path.join(__dirname, '..', '.next', 'standalone')
 const dstRoot = path.join(__dirname, '..', '_client-stage')
+const nodeDstRoot = path.join(__dirname, '..', '_client-node')
 
 let standaloneDir = srcRoot
 const packageJsonPath = path.join(srcRoot, 'package.json')
@@ -49,6 +50,10 @@ if (!fs.existsSync(path.join(standaloneDir, 'package.json'))) {
 if (fs.existsSync(dstRoot)) {
   console.log('[stage-client] Removing previous _client-stage...')
   fs.rmSync(dstRoot, { recursive: true, force: true })
+}
+if (fs.existsSync(nodeDstRoot)) {
+  console.log('[stage-client] Removing previous _client-node...')
+  fs.rmSync(nodeDstRoot, { recursive: true, force: true })
 }
 
 console.log('[stage-client] Creating staging directory...')
@@ -101,11 +106,11 @@ if (fs.existsSync(nextSrc)) {
   copyDir(nextSrc, nextDst)
 }
 
-console.log('[stage-client] Copying Prisma client (excluding tmp files)...')
-const prismaClient = path.join(standaloneDir, 'node_modules', '.prisma', 'client')
-const prismaClientDst = path.join(v0Dir, 'node_modules', '.prisma', 'client')
-if (fs.existsSync(prismaClient)) {
-  copyDir(prismaClient, prismaClientDst, [/\.tmp/])
+console.log('[stage-client] Copying node_modules (standalone trimmed set)...')
+const nmSrc = path.join(standaloneDir, 'node_modules')
+const nmDst = path.join(v0Dir, 'node_modules')
+if (fs.existsSync(nmSrc)) {
+  copyDir(nmSrc, nmDst, [/\.tmp/])
 }
 
 console.log('[stage-client] Copying public/static assets...')
@@ -120,5 +125,9 @@ const staticDst = path.join(v0Dir, '.next', 'static')
 if (fs.existsSync(staticSrc) && !fs.existsSync(staticDst)) {
   copyDir(staticSrc, staticDst)
 }
+
+console.log('[stage-client] Copying Node runtime...')
+const nodeName = process.platform === 'win32' ? 'node.exe' : 'node'
+copyFile(process.execPath, path.join(nodeDstRoot, nodeName))
 
 console.log('[stage-client] Done.')

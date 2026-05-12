@@ -1,0 +1,7 @@
+{
+  "id": "rule-watcher-form",
+  "name": "红蓝形态",
+  "description": "（被动）每回合开始时，选择将平静或暴怒加入手牌",
+  "trigger": { "type": "beginTurn" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; var chosen = selectOption({ title: piece.name + ' 红蓝形态：选择加入手牌的卡', options: [ { id: 'calm', label: '平静（护盾2点，进入平静姿态）' }, { id: 'rage', label: '暴怒（攻击100%伤害，进入暴怒姿态）' } ] }); if (!chosen || chosen.needsOptionSelection) return chosen; var cardId = (chosen === 'calm' || chosen.id === 'calm') ? 'watcher-calm' : 'watcher-rage'; addCardToHand(cardId, piece.ownerPlayerId); return { success: true, message: piece.name + '的红蓝形态发动：' + (cardId === 'watcher-calm' ? '获得平静' : '获得暴怒') };"
+}

@@ -1,0 +1,1 @@
+{"id":"rule-freeze-prevent-move","name":"冰冻阻止移动","description":"在即将移动前检查冰冻状态并阻止移动","trigger":{"type":"beforeMove"},"effect":{"type":"triggerSkill","skillId":"freeze-prevent","message":"冰冻状态阻止移动"}}

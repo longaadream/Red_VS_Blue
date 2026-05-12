@@ -2,14 +2,9 @@
   "id": "arthas-icebound-fortitude",
   "name": "寒冰坚忍",
   "description": "持续2回合：受到的伤害减少50%，攻击你的棋子会被冰冻1回合。",
-  "keywords": [
-    "冰冻"
-  ],
+  "keywords": ["冰冻"],
   "targetText": "自身",
-  "effectTags": [
-    "减伤",
-    "冰冻"
-  ],
+  "effectTags": ["减伤", "冰冻"],
   "icon": "🛕",
   "kind": "active",
   "type": "normal",
@@ -18,6 +13,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "range": "self",
-  "code": "function executeSkill(context) { var caster = context.piece; var alreadyIcebound = caster.statusTags && caster.statusTags.some(function(t) { return t.type === 'icebound-fortitude'; }); if (alreadyIcebound) return { success: false, message: '寒冰坚忍已激活中' }; applyEffect(caster.instanceId, 'effect-arthas-icebound', { currentDuration: 2 }); return { success: true, message: caster.name + '激活了寒冰坚忍：持续2回合，受到伤害降低50%，攻击者会被冰冻1回合' }; }",
+  "code": "function executeSkill(context) { var caster = context.piece; var alreadyIcebound = caster.statusTags && caster.statusTags.some(function(t) { return t.type === 'icebound-fortitude'; }); if (alreadyIcebound) return { success: false, message: '寒冰坚忍已激活中' }; addStatusEffectById(caster.instanceId, { id: 'icebound-fortitude-' + caster.instanceId, name: '寒冰坚忍', type: 'icebound-fortitude', currentDuration: 2, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-arthas-icebound'] }); addRuleById(caster.instanceId, 'rule-arthas-icebound'); return { success: true, message: caster.name + '激活了寒冰坚忍：持续2回合，受到伤害降低50%，攻击者会被冰冻1回合' }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: '持续2回合：受到的伤害减少50%，攻击你的棋子会被冰冻1回合。', expectedValues: { duration: 2 } }; }"
 }

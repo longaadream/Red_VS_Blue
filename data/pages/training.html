@@ -107,6 +107,21 @@
     .prc-name.blue { color: var(--blue); }
     .prc-turn-badge { font-size: 9px; background: #16a34a; color: #fff; border-radius: 4px; padding: 1px 5px; }
     .prc-stats { font-size: 11px; color: #a1a1aa; display: flex; gap: 10px; }
+    .status-chip-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+    .status-chip {
+      display: inline-flex; align-items: center; min-height: 18px;
+      max-width: 100%; padding: 2px 6px; border-radius: 5px;
+      border: 1px solid #3f3f46; background: #111827;
+      color: #cbd5e1; font-size: 10px; line-height: 1.2; font-weight: 600;
+      white-space: nowrap;
+    }
+    .status-chip.empty { color: #52525b; background: transparent; border-style: dashed; font-weight: 500; }
+    .selected-status-card {
+      background: #111827; border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 10px; min-height: 92px;
+    }
+    .selected-status-name { font-size: 13px; font-weight: 800; color: #e5e7eb; margin-bottom: 4px; }
+    .selected-status-meta { font-size: 11px; color: #94a3b8; margin-bottom: 6px; }
 
     /* Action buttons */
     .action-btns { display: flex; flex-direction: column; gap: 5px; }
@@ -184,6 +199,34 @@
 
     /* Board */
     .board-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .board-stage { display: inline-flex; align-items: center; gap: 12px; min-width: max-content; }
+    .board-core { position: relative; display: inline-block; }
+    .turn-rail {
+      width: 142px; flex: 0 0 142px; display: flex; align-items: center; justify-content: center;
+      min-height: min(520px, calc(var(--cell-size, 44px) * 8));
+    }
+    .turn-orb {
+      width: 128px; min-height: 46px; padding: 8px 14px; border-radius: 999px;
+      border: 2px solid #475569; background: linear-gradient(180deg, #1f2937, #0f172a);
+      color: #94a3b8; font-size: 14px; font-weight: 900; letter-spacing: .3px;
+      text-align: center; cursor: pointer; box-shadow: 0 8px 20px rgba(0,0,0,.34);
+    }
+    .turn-orb:disabled { opacity: .36; cursor: default; box-shadow: none; }
+    .turn-orb:not(:disabled) {
+      color: #fff; border-color: #facc15;
+      background: linear-gradient(180deg, #b45309 0%, #78350f 100%);
+      box-shadow: 0 0 18px rgba(250,204,21,.34), 0 8px 20px rgba(0,0,0,.48);
+    }
+    .turn-orb.end:not(:disabled) {
+      border-color: #4ade80; background: linear-gradient(180deg, #15803d 0%, #14532d 100%);
+      box-shadow: 0 0 20px rgba(74,222,128,.42), 0 8px 20px rgba(0,0,0,.48);
+    }
+    .hidden-action-wires { display: none !important; }
+    @media (max-width: 899px) {
+      .board-stage { align-items: flex-start; }
+      .turn-rail { width: 118px; flex-basis: 118px; min-height: 220px; }
+      .turn-orb { width: 108px; min-height: 42px; font-size: 12px; padding: 7px 10px; }
+    }
     #gameGrid { display: inline-grid; gap: 2px; user-select: none; }
     .cell {
       width: var(--cell-size, 44px); height: var(--cell-size, 44px);
@@ -515,14 +558,21 @@
           <div id="playerResCards"></div>
         </div>
 
+        <!-- Selected piece status -->
+        <div class="panel-block">
+          <div class="panel-label">&#36873;&#20013;&#26827;&#23376;&#29366;&#24577;</div>
+          <div class="selected-status-card" id="selectedStatusCard">
+            <div class="selected-status-meta">&#26410;&#36873;&#20013;&#26827;&#23376;</div>
+            <div class="status-chip-row"><span class="status-chip empty">&#26080;&#29366;&#24577;</span></div>
+          </div>
+        </div>
+
         <!-- Action buttons (shown in action phase) -->
-        <div class="panel-block" id="actionPanel">
+        <div class="panel-block hidden-action-wires" id="actionPanel">
           <div class="panel-label">操作</div>
           <div class="action-btns">
             <div id="phaseHint" style="font-size:11px;color:#71717a;text-align:center;padding:4px 0"></div>
-            <button class="btn-action primary" id="btnBeginPhase" onclick="doBeginPhase()" style="display:none">▶ 继续</button>
             <button class="btn-action" id="btnMove" onclick="toggleMove()" style="display:none">👣 移动</button>
-            <button class="btn-action danger" id="btnEndTurn" onclick="doEndTurn()" style="display:none" disabled>⏭ 结束回合</button>
           </div>
           <!-- Skills for selected piece -->
           <div id="skillSection" style="margin-top:8px;display:none">
@@ -593,9 +643,15 @@
         </div>
 
         <div class="board-wrap" id="boardWrap">
-          <div style="position:relative;display:inline-block">
-            <div id="gameGrid"></div>
-            <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible"></div>
+          <div class="board-stage">
+            <div class="board-core">
+              <div id="gameGrid"></div>
+              <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible"></div>
+            </div>
+            <div class="turn-rail">
+              <button class="turn-orb" id="btnBeginPhase" onclick="doBeginPhase()" style="display:none">&#32487;&#32493; &rarr;</button>
+              <button class="turn-orb end" id="btnEndTurn" onclick="doEndTurn()" style="display:none" disabled>&#32467;&#26463;&#22238;&#21512; &rarr;</button>
+            </div>
           </div>
         </div>
 
@@ -710,13 +766,13 @@
     let _trainingBaseUrl = null
     async function _getTrainingUrl() {
       if (_trainingBaseUrl) return _trainingBaseUrl
-      if (window.RvBBridge) { _trainingBaseUrl = 'http://localhost:7878'; return _trainingBaseUrl }
       if (window.electronAPI) {
         try {
           const info = await window.electronAPI.getHostInfo()
           if (info && info.port) { _trainingBaseUrl = 'http://localhost:' + info.port; return _trainingBaseUrl }
         } catch (e) { console.warn('[training] getHostInfo failed:', e) }
       }
+      if (window.RvBBridge) { _trainingBaseUrl = 'http://localhost:7878'; return _trainingBaseUrl }
       _trainingBaseUrl = 'http://localhost:54321'
       return _trainingBaseUrl
     }
@@ -838,6 +894,7 @@
         placingMode = false
         actionLog = []
         lastActionCount = 0
+        flushActionLog(0, G)
         addLog('⚔️ 训练营开始', 'turn')
         addLog('点击 [继续▶] 开始回合', 'info')
         showScreen('battle')
@@ -1178,6 +1235,7 @@
     function renderAll() {
       renderBoard()
       renderActionPanel()
+      renderSelectedStatusPanel()
       renderPieceList()
       renderTurnInfo()
       renderHand()
@@ -1284,6 +1342,63 @@
       grid.innerHTML = cells.join('')
     }
 
+    function statusName(item) {
+      if (!item) return ''
+      return item.name || item.label || item.type || item.id || item.definitionId || ''
+    }
+
+    function statusLayerText(item) {
+      if (!item) return ''
+      const data = item.data || {}
+      const raw = item.stacks ?? item.stack ?? item.layers ?? item.count ?? data.stacks ?? data.layers
+      const n = Number(raw)
+      return Number.isFinite(n) && n > 0 ? ' ×' + n : ''
+    }
+
+    function collectStatusItems(entity, includeRules) {
+      const result = []
+      const seen = new Set()
+      const add = (item) => {
+        if (!item || item.visible === false) return
+        const name = statusName(item)
+        if (!name || /lucky-coin|幸运币已获得|幸运币/.test(String(name))) return
+        const key = (item.id || item.type || item.definitionId || name) + ':' + statusLayerText(item)
+        if (seen.has(key)) return
+        seen.add(key)
+        result.push(item)
+      }
+      ;(entity?.statusTags || []).forEach(add)
+      ;(entity?.attachedEffects || []).forEach(add)
+      ;(entity?.buffs || []).forEach(add)
+      ;(entity?.debuffs || []).forEach(add)
+      if (includeRules) (entity?.rules || []).forEach(rule => add({ id: rule.id, name: rule.name || rule.id, stacks: rule.stacks }))
+      return result
+    }
+
+    function statusChipsHtml(entity, includeRules, emptyText) {
+      const items = collectStatusItems(entity, includeRules)
+      if (!items.length) return `<div class="status-chip-row"><span class="status-chip empty">${emptyText || '无状态'}</span></div>`
+      return `<div class="status-chip-row">${items.map(item => {
+        const label = escHtml(statusName(item))
+        return `<span class="status-chip">${label}${statusLayerText(item)}</span>`
+      }).join('')}</div>`
+    }
+
+    function renderSelectedStatusPanel() {
+      const card = document.getElementById('selectedStatusCard')
+      if (!card) return
+      const p = G && selectedPieceId ? G.pieces.find(piece => piece.instanceId === selectedPieceId) : null
+      if (!p) {
+        card.innerHTML = '<div class="selected-status-meta">未选中棋子</div><div class="status-chip-row"><span class="status-chip empty">无状态</span></div>'
+        return
+      }
+      const maxHp = p.maxHp || p.stats?.maxHp || 1
+      const faction = p.faction === 'red' ? '红方' : '蓝方'
+      card.innerHTML = `<div class="selected-status-name">${escHtml(p.name || p.templateId)}</div>
+        <div class="selected-status-meta">${faction} · HP ${p.currentHp}/${maxHp}</div>
+        ${statusChipsHtml(p, true, '无状态')}`
+    }
+
     function renderTurnInfo() {
       if (!G) return
       const curTurnPlayer = G.turn && G.turn.currentPlayerId
@@ -1332,6 +1447,7 @@
       const phase = G.turn.phase
       const isMyTurn = G.turn.currentPlayerId === localPlayerId
       const sp = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+      renderSelectedStatusPanel()
 
       const btnBegin = document.getElementById('btnBeginPhase')
       const btnMove  = document.getElementById('btnMove')

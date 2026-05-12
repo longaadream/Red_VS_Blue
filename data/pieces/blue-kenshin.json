@@ -17,7 +17,6 @@
     { "skillId": "kenshin-ryusosen", "level": 1 },
     { "skillId": "kenshin-amakakeru", "level": 1 }
   ],
-  "rules": [],
-  "initialEffects": ["effect-kenshin-tenken"],
+  "rules": ["rule-kenshin-tenken", "rule-kenshin-tenken-boost"],
   "isDefault": false
 }

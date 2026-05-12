@@ -1,0 +1,12 @@
+{
+  "id": "rule-shadow-step",
+  "name": "暗影步传送",
+  "description": "回合开始时传送到预设位置",
+  "trigger": {
+    "type": "beginTurn"
+  },
+  "effect": {
+    "type": "triggerSkill",
+    "skillId": "shadow-step-teleport"
+  }
+}

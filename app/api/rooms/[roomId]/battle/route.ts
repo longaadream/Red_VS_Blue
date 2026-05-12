@@ -1,26 +1,43 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
+import { applyBattleAction } from "@/lib/game/turn"
+import { loadAllSkillsById } from "@/lib/game/skills"
 import { broadcastToRoom } from "@/lib/ws-server"
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-interface ActionLogEntry {
-  seq: number
-  type: 'init' | 'action' | 'gameOver'
-  playerId?: string
-  payload?: unknown   // initial BattleState (type=init)
-  action?: unknown    // BattleAction     (type=action)
-  winner?: string     // winning faction  (type=gameOver)
-  timestamp: number
-}
-
-interface ActionLog {
-  type: 'action-log'
+interface ServerBattleState {
+  type: 'server-state'
   seed: number
-  actions: ActionLogEntry[]
+  state: unknown  // BattleState JSON-safe (functions stripped by DB serialization)
 }
 
-// ── GET — return action log entries since N ──────────────────────────────────
+function getBattleStorage(room: any): ServerBattleState | null {
+  const bs = room.battleState as any
+  if (!bs) return null
+  // support both new 'server-state' and legacy 'action-log' formats
+  if (bs.type === 'server-state') return bs as ServerBattleState
+  // legacy: extract initial state from first init entry
+  if (bs.type === 'action-log' && Array.isArray(bs.actions)) {
+    const init = bs.actions.find((a: any) => a.type === 'init')
+    if (init?.payload) return { type: 'server-state', seed: bs.seed ?? 0, state: init.payload }
+  }
+  return null
+}
+
+function withServerSkills(state: unknown): unknown {
+  if (!state || typeof state !== 'object') return state
+  return {
+    ...(state as Record<string, unknown>),
+    skillsById: loadAllSkillsById(),
+  }
+}
+
+function withoutServerSkills(state: unknown): unknown {
+  if (!state || typeof state !== 'object') return state
+  const { skillsById: _skillsById, ...rest } = state as Record<string, unknown>
+  return rest
+}
+
+// ── GET — return current authoritative battle state ──────────────────────────
 
 export async function GET(
   req: NextRequest,
@@ -29,20 +46,15 @@ export async function GET(
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
   const room = await roomStore.getRoom(roomId)
-
   if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
 
-  const log = room.battleState as unknown as ActionLog | undefined
-  if (!log || log.type !== 'action-log') {
-    return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
-  }
+  const storage = getBattleStorage(room)
+  if (!storage) return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
 
-  const since = parseInt(req.nextUrl.searchParams.get('since') ?? '-1')
-  const actions = log.actions.slice(since + 1)
-  return NextResponse.json({ actions, total: log.actions.length, seed: log.seed })
+  return NextResponse.json({ state: storage.state, seed: storage.seed })
 }
 
-// ── POST — append action to log (pure relay, no game logic) ──────────────────
+// ── POST — apply action authoritatively, broadcast new state via WS ──────────
 
 export async function POST(
   req: NextRequest,
@@ -57,36 +69,64 @@ export async function POST(
   const room = await roomStore.getRoom(roomId)
   if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
 
-  const log = room.battleState as unknown as ActionLog | undefined
-  if (!log || log.type !== 'action-log') {
-    return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
-  }
-
-  const { type = 'action', playerId, action, winner } = body
-  const seq = log.actions.length
-  const entry: ActionLogEntry = { seq, type: type as ActionLogEntry['type'], playerId, timestamp: Date.now() }
-  if (action !== undefined) entry.action = action
-  if (winner !== undefined) entry.winner = winner
-
-  log.actions.push(entry)
-
-  // Game over: create game record, mark room finished
-  if (type === 'gameOver' && !room.gameRecord) {
-    room.status = 'finished'
-    room.gameRecord = {
-      gameId: roomId + '-' + Date.now(),
-      timestamp: Date.now(),
-      roomId,
-      players: room.players.map(p => ({ id: p.id, name: p.name, publicKey: (p as any).publicKey })),
-      winner: winner ?? null,
-      signatures: {},
+  // ── gameOver: mark room finished, broadcast ──
+  if (body.type === 'gameOver') {
+    if (!room.gameRecord) {
+      room.status = 'finished'
+      room.gameRecord = {
+        gameId: roomId + '-' + Date.now(),
+        timestamp: Date.now(),
+        roomId,
+        players: room.players.map((p: any) => ({ id: p.id, name: p.name, publicKey: p.publicKey })),
+        winner: body.winner ?? null,
+        signatures: {},
+      }
+      await roomStore.setRoom(roomId, room)
     }
+    broadcastToRoom(roomId, { type: 'gameOver', winner: body.winner })
+    return NextResponse.json({ ok: true })
   }
 
+  // ── regular battle action: apply on server ──
+  const storage = getBattleStorage(room)
+  if (!storage) return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
+
+  const action = body.action
+  if (!action) return NextResponse.json({ error: 'action is required' }, { status: 400 })
+
+  let newState: unknown
+  try {
+    // applyBattleAction internally calls restorePieceRules/restorePlayerRules
+    const hydratedState = withServerSkills(storage.state)
+    newState = applyBattleAction(hydratedState as any, action as any)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const errAny = err as any
+    if (errAny?.needsTargetSelection) {
+      return NextResponse.json({
+        error: msg,
+        needsTargetSelection: true,
+        targetType: errAny.targetType ?? '',
+        range: errAny.range ?? 10,
+        filter: errAny.filter ?? '',
+      }, { status: 400 })
+    }
+    if (errAny?.needsOptionSelection) {
+      return NextResponse.json({
+        error: msg,
+        needsOptionSelection: true,
+        title: errAny.title ?? '请选择',
+        options: errAny.options ?? [],
+      }, { status: 400 })
+    }
+    return NextResponse.json({ error: msg }, { status: 400 })
+  }
+
+  storage.state = withoutServerSkills(newState)
+  room.battleState = storage as any
   await roomStore.setRoom(roomId, room)
 
-  // Notify WebSocket subscribers
-  broadcastToRoom(roomId, { type: 'actionLog', entry })
+  broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state })
 
-  return NextResponse.json({ seq })
+  return NextResponse.json({ ok: true })
 }

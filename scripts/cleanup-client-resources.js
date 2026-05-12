@@ -10,3 +10,9 @@ if (fs.existsSync(dst)) {
   fs.rmSync(dst, { recursive: true, force: true })
   console.log('[cleanup] Removed _client-stage.')
 }
+
+const nodeDst = path.join(__dirname, '..', '_client-node')
+if (fs.existsSync(nodeDst)) {
+  fs.rmSync(nodeDst, { recursive: true, force: true })
+  console.log('[cleanup] Removed _client-node.')
+}

@@ -101,6 +101,27 @@ export async function POST(req: NextRequest) {
       maxActionPoints: 10,
     }))
 
+    const bluePlayer = battleState.players.find(player => player.playerId === 'training-blue')
+    if (bluePlayer) {
+      if (!bluePlayer.hand) bluePlayer.hand = []
+      const hasLuckyCoin = bluePlayer.hand.some(card => card.cardId === 'lucky-coin')
+      if (!hasLuckyCoin) {
+        bluePlayer.hand.push({
+          cardId: 'lucky-coin',
+          instanceId: `training-lucky-coin-${Date.now()}`,
+          ownerPlayerId: bluePlayer.playerId,
+          actionPointCost: 0,
+        } as any)
+        if (!battleState.actions) battleState.actions = []
+        battleState.actions.push({
+          type: 'triggerEffect',
+          playerId: bluePlayer.playerId,
+          turn: battleState.turn.turnNumber,
+          payload: { message: 'training-blue 获得了幸运币' },
+        } as any)
+      }
+    }
+
     return NextResponse.json(battleState)
   } catch (error) {
     console.error("Error initializing training:", error)

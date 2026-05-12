@@ -1,0 +1,7 @@
+{
+  "id": "rule-sasuke-amaterasu-stack",
+  "name": "天照叠层",
+  "description": "每回合结束时（双方），对所有站在天照格子上的存活棋子附加一层天照灼烧效果",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "if (!battle.extensions || !battle.extensions.amaterasuCells || battle.extensions.amaterasuCells.length === 0) return { success: false, message: '' }; var msgs = []; battle.pieces.forEach(function(p) { if (p.currentHp <= 0) return; var isOn = battle.extensions.amaterasuCells.some(function(c) { return c.x === p.x && c.y === p.y; }); if (!isOn) return; var tag = p.statusTags && p.statusTags.find(function(t) { return t.type === 'amaterasu-burn'; }); if (tag) { tag.stacks = (tag.stacks || 1) + 1; msgs.push(p.name + '站在天照上，层数加深至' + tag.stacks + '层'); } else { addStatusEffectById(p.instanceId, { id: 'amaterasu-burn-' + p.instanceId, name: '天照灼烧', type: 'amaterasu-burn', currentDuration: -1, currentUses: -1, intensity: 2, stacks: 1 }); msgs.push(p.name + '站在天照上，获得1层天照效果'); } }); if (msgs.length === 0) return { success: false, message: '' }; return { success: true, message: msgs.join('；') };"
+}

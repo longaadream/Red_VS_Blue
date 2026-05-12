@@ -1,0 +1,7 @@
+{
+  "id": "rule-hashirama-edo-regen",
+  "name": "秽土转生自愈",
+  "description": "血量低于50%时，每回合结束自愈2点生命，回到50%即停止",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (battle.turn.currentPlayerId !== piece.ownerPlayerId) return { success: false, message: '' }; if (piece.currentHp <= 0) return { success: false, message: '' }; var halfHp = Math.floor(piece.maxHp / 2); if (piece.currentHp >= halfHp) return { success: false, message: '' }; var healAmt = 2; piece.currentHp += healAmt; return { success: true, message: piece.name + ' 秽土转生自愈 ' + healAmt + ' 点（' + piece.currentHp + '/' + piece.maxHp + '）' };"
+}

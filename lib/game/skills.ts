@@ -865,16 +865,16 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     addSkillById: (targetPieceId, skillId) => {
                       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
                       if (targetPiece) {
-                        if (!targetPiece.skills) {
-                          targetPiece.skills = [];
-                        }
+                        if (!targetPiece.skills) targetPiece.skills = [];
                         const existingSkill = targetPiece.skills.find(skill => skill.skillId === skillId);
                         if (!existingSkill) {
-                          const newSkill = {
-                            skillId: skillId,
-                            currentCooldown: 0
-                          };
+                          const newSkill = { skillId: skillId, currentCooldown: 0 };
                           targetPiece.skills.push(newSkill);
+                          if (targetPiece.displaySkills !== undefined) {
+                            const alreadyInDisplay = targetPiece.displaySkills.some((s: any) =>
+                              (typeof s === 'string' ? s : s.skillId) === skillId);
+                            if (!alreadyInDisplay) targetPiece.displaySkills.push(newSkill);
+                          }
                           if (!battle.skillsById[skillId]) {
                             const loaded = loadSkillById(skillId);
                             if (loaded) battle.skillsById[skillId] = loaded;
@@ -889,6 +889,10 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                       if (targetPiece && targetPiece.skills) {
                         const originalLength = targetPiece.skills.length;
                         targetPiece.skills = targetPiece.skills.filter(skill => skill.skillId !== skillId);
+                        if (targetPiece.displaySkills !== undefined) {
+                          targetPiece.displaySkills = targetPiece.displaySkills.filter((s: any) =>
+                            (typeof s === 'string' ? s : s.skillId) !== skillId);
+                        }
                         return targetPiece.skills.length < originalLength;
                       }
                       return false;
@@ -2347,24 +2351,18 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       },
       // 技能管理函数
       addSkillById: (targetPieceId: string, skillId: string) => {
-        // 找到目标棋子
         const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
         if (targetPiece) {
-          // 确保skills数组存在
-          if (!targetPiece.skills) {
-            targetPiece.skills = [];
-          }
-          // 检查技能是否已经存在
+          if (!targetPiece.skills) targetPiece.skills = [];
           const existingSkill = targetPiece.skills.find(skill => skill.skillId === skillId);
           if (!existingSkill) {
-            // 创建新技能对象
-            const newSkill = {
-              skillId: skillId,
-              currentCooldown: 0
-            };
-            // 添加到棋子的技能列表
+            const newSkill = { skillId: skillId, currentCooldown: 0 };
             targetPiece.skills.push(newSkill);
-            // 同步技能定义到 battle.skillsById，确保 UI 可以找到并渲染该技能
+            if ((targetPiece as any).displaySkills !== undefined) {
+              const alreadyInDisplay = (targetPiece as any).displaySkills.some((s: any) =>
+                (typeof s === 'string' ? s : s.skillId) === skillId);
+              if (!alreadyInDisplay) (targetPiece as any).displaySkills.push(newSkill);
+            }
             if (!battle.skillsById[skillId]) {
               const loaded = loadSkillById(skillId);
               if (loaded) battle.skillsById[skillId] = loaded;
@@ -2375,12 +2373,14 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         return false;
       },
       removeSkillById: (targetPieceId: string, skillId: string) => {
-        // 找到目标棋子
         const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
         if (targetPiece && targetPiece.skills) {
-          // 从棋子的技能列表中移除
           const originalLength = targetPiece.skills.length;
           targetPiece.skills = targetPiece.skills.filter(skill => skill.skillId !== skillId);
+          if ((targetPiece as any).displaySkills !== undefined) {
+            (targetPiece as any).displaySkills = (targetPiece as any).displaySkills.filter((s: any) =>
+              (typeof s === 'string' ? s : s.skillId) !== skillId);
+          }
           return targetPiece.skills.length < originalLength;
         }
         return false;
@@ -2528,6 +2528,10 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const addCardToHand = environment.addCardToHand;
               const discardCard = environment.discardCard;
               const getHand = environment.getHand;
+              const applyEffect = environment.applyEffect;
+              const removeEffect = environment.removeEffect;
+              const getPieceEffect = environment.getPieceEffect;
+              const fireEvent = environment.fireEvent;
               const Math = environment.Math;
               const console = environment.console;
 

@@ -1,0 +1,9 @@
+{
+  "id": "rule-shishio-execute-option",
+  "name": "自燃·灭杀",
+  "description": "志志雄真实造成伤害前，若此次伤害大于目标当前生命值，可选择使目标立即出局（不增加充能点）或正常造成伤害。",
+  "trigger": {
+    "type": "beforeDamageDealt"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (!context.targetPiece || context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; var target = battle.pieces.find(function(p) { return p.instanceId === context.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return { success: false, message: '' }; var damage = context.damage || 0; if (damage <= target.currentHp) return { success: false, message: '' }; var choice = selectOption({ title: '自燃·灭杀', options: [{ label: '立即出局', value: 'execute', description: '目标立即出局，不增加充能点' }, { label: '正常造成伤害', value: 'normal', description: '正常造成 ' + damage + ' 点伤害' }] }); if (choice && choice.needsOptionSelection) return choice; if (choice === 'execute') { target.currentHp = 0; return { success: true, blocked: true, message: piece.name + ' 自燃·灭杀：' + target.name + ' 立即出局！（不增加充能）' }; } return { success: false, message: '' };"
+}

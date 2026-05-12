@@ -1,0 +1,1 @@
+{"id":"rule-freeze-prevent-skill","name":"冰冻阻止技能","description":"在即将释放技能前检查冰冻状态并阻止技能释放","trigger":{"type":"beforeSkillUse"},"effect":{"type":"triggerSkill","skillId":"freeze-prevent","message":"冰冻状态阻止技能释放"}}

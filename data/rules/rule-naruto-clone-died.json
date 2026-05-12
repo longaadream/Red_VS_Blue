@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-clone-died",
+  "name": "影分身消散",
+  "description": "影分身死亡时不给予击杀充能（已由系统层保障，此规则仅输出消息）",
+  "trigger": { "type": "onPieceDied" },
+  "skillCode": "var clone = context.rulePiece; if (!clone) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== clone.instanceId) return { success: false, message: '' }; var attacker = context.targetPiece; if (!attacker) return { success: true, message: clone.name + '消散' }; return { success: true, message: attacker.name + '击杀了影分身（无充能）' };"
+}

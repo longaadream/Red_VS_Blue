@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-clone-endturn-charge",
+  "name": "影分身蓄力",
+  "description": "鸣人回合结束时，若场上有存活的影分身且正处于仙人模式，倒计时提前1回合；倒计时完成后在下一个回合开始时结算奖励",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; var aliveClones = battle.pieces.filter(function(p) { return p.currentHp > 0 && p.ownerPlayerId === piece.ownerPlayerId && p.statusTags && p.statusTags.some(function(t) { return t.type === 'naruto-clone'; }); }); if (aliveClones.length === 0) return { success: false, message: '' }; var sageTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (!sageTag) return { success: false, message: '' }; sageTag.stacks = (sageTag.stacks || 1) - 1; if (sageTag.stacks > 0) { return { success: true, message: piece.name + '的影分身加速了仙人蓄力，剩余' + sageTag.stacks + '回合' }; } return { success: true, message: piece.name + '的影分身使仙人蓄力完成，将在下一回合开始时获得奖励' };"
+}

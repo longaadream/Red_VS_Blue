@@ -1,0 +1,9 @@
+{
+  "id": "rule-shishio-silence-burst",
+  "name": "自燃·灼魂",
+  "description": "志志雄真実对单个目标造成≥8点伤害时，使目标沉默1回合（无法使用技能）。",
+  "trigger": {
+    "type": "afterDamageDealt"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (!context.targetPiece || context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; var damage = context.damage || 0; if (damage < 8) return { success: false, message: '' }; var target = battle.pieces.find(function(p) { return p.instanceId === context.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return { success: false, message: '' }; if (!target.statusTags) target.statusTags = []; var already = target.statusTags.find(function(t) { return t.type === 'silenced'; }); if (!already) { target.statusTags.push({ id: 'silenced-' + target.instanceId, type: 'silenced', name: '沉默', visible: true, remainingDuration: 1, remainingUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-silenced-block'] }); addRuleById(target.instanceId, 'rule-silenced-block'); } return { success: true, message: piece.name + ' 自燃·灼魂：对 ' + target.name + ' 造成 ' + damage + ' 点伤害，灼烧其灵魂！' + target.name + ' 被沉默 1 回合' };"
+}

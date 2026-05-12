@@ -1,0 +1,8 @@
+{
+  "id": "rule-rafaam-temporal-distortion-self",
+  "name": "时空扭曲-自身加AP规则",
+  "description": "在己方回合开始时增加1点行动点",
+  "trigger": { "type": "beginTurn" },
+  "effect": { "type": "triggerSkill", "skillId": "rafaam-temporal-distortion-self", "message": "时空扭曲使自身行动点+1" },
+  "limits": { "maxUses": 1 }
+}

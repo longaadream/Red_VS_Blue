@@ -5,8 +5,6 @@
 
   const STORAGE_KEY = 'rvb_identity_v2'
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-
   function _toHex(bytes) {
     return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
   }
@@ -17,26 +15,77 @@
     return bytes
   }
 
-  function _save(data) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch {}
+  function _normalizeIdentity(data) {
+    if (!data || !data.id || !data.publicKey || !data.privateKey || !data.mnemonic) return null
+    return {
+      id: data.id,
+      displayName: data.displayName || '玩家',
+      publicKey: data.publicKey,
+      privateKey: data.privateKey,
+      mnemonic: Array.isArray(data.mnemonic) ? data.mnemonic : String(data.mnemonic).trim().split(/\s+/),
+    }
   }
 
-  function _load() {
+  function _saveStore(store) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)) } catch {}
+  }
+
+  function _loadStore() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      return raw ? JSON.parse(raw) : null
-    } catch { return null }
+      const data = raw ? JSON.parse(raw) : null
+      if (!data) return null
+      if (Array.isArray(data.identities)) {
+        const identities = data.identities.map(_normalizeIdentity).filter(Boolean)
+        if (!identities.length) return null
+        const activeId = data.activeId && identities.some(item => item.id === data.activeId)
+          ? data.activeId
+          : identities[0].id
+        return { version: 3, activeId, identities }
+      }
+      const legacy = _normalizeIdentity(data)
+      if (!legacy) return null
+      const migrated = { version: 3, activeId: legacy.id, identities: [legacy] }
+      _saveStore(migrated)
+      return migrated
+    } catch {
+      return null
+    }
   }
 
-  // ── Core crypto ───────────────────────────────────────────────────────────────
+  function _getActiveEntry() {
+    const store = _loadStore()
+    if (!store) return null
+    return store.identities.find(item => item.id === store.activeId) || store.identities[0] || null
+  }
+
+  function _saveIdentityEntry(entry, makeActive) {
+    const normalized = _normalizeIdentity(entry)
+    if (!normalized) throw new Error('Invalid identity data')
+    const store = _loadStore() || { version: 3, activeId: normalized.id, identities: [] }
+    const existingIndex = store.identities.findIndex(item => item.id === normalized.id)
+    if (existingIndex >= 0) {
+      const prev = store.identities[existingIndex]
+      store.identities[existingIndex] = {
+        ...prev,
+        ...normalized,
+        displayName: normalized.displayName || prev.displayName || '玩家',
+      }
+    } else {
+      store.identities.push(normalized)
+    }
+    if (makeActive !== false || !store.activeId) {
+      store.activeId = normalized.id
+    }
+    _saveStore(store)
+    return normalized
+  }
 
   async function _deriveKeypair(mnemonicStr) {
     const { getPublicKeyAsync, mnemonicToSeed } = window.CryptoLib
-    // BIP39: mnemonic → 64-byte seed
     const seed = await mnemonicToSeed(mnemonicStr)
-    // Ed25519: first 32 bytes as private key
     const privateKey = seed.slice(0, 32)
-    const publicKey  = await getPublicKeyAsync(privateKey)
+    const publicKey = await getPublicKeyAsync(privateKey)
     return { privateKey, publicKey }
   }
 
@@ -45,28 +94,22 @@
     return _toHex(new Uint8Array(hashBuf)).slice(0, 8)
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────────
-
-  // Synchronous — reads cached data from localStorage.
-  // Returns null if no identity has been created yet.
   function getIdentity() {
-    const data = _load()
+    const data = _getActiveEntry()
     if (!data || !data.id) return null
     return { id: data.id, displayName: data.displayName || '玩家', publicKey: data.publicKey }
   }
 
-  // Create a brand-new identity from a freshly generated mnemonic.
   async function createIdentity(displayName) {
     const { generateMnemonic, englishWordlist } = window.CryptoLib
-    const mnemonicStr = generateMnemonic(englishWordlist)          // 12 words, space-separated
+    const mnemonicStr = generateMnemonic(englishWordlist)
     const words = mnemonicStr.split(' ')
     return _importFromWords(words, displayName)
   }
 
-  // Restore an identity from 12 mnemonic words (array or space-separated string).
   async function importFromMnemonic(input, displayName) {
     const words = Array.isArray(input) ? input : input.trim().split(/\s+/)
-    if (words.length !== 12) throw new Error('助记词必须是12个单词')
+    if (words.length !== 12) throw new Error('助记词必须是 12 个英文单词')
     const { validateMnemonic, englishWordlist } = window.CryptoLib
     if (!validateMnemonic(words.join(' '), englishWordlist)) throw new Error('助记词无效，请检查拼写')
     return _importFromWords(words, displayName)
@@ -76,42 +119,63 @@
     const mnemonicStr = words.join(' ')
     const { privateKey, publicKey } = await _deriveKeypair(mnemonicStr)
     const id = await _publicKeyToId(publicKey)
-
-    // Preserve existing displayName if not provided
-    const existing = _load()
+    const existing = _getActiveEntry()
     const name = (displayName || '').trim() || (existing && existing.displayName) || '玩家'
 
-    _save({
+    _saveIdentityEntry({
       id,
       displayName: name,
-      publicKey:  _toHex(publicKey),
+      publicKey: _toHex(publicKey),
       privateKey: _toHex(privateKey),
-      mnemonic:   words,
-    })
+      mnemonic: words,
+    }, true)
+
     return { id, displayName: name }
   }
 
+  function listIdentities() {
+    const store = _loadStore()
+    if (!store) return []
+    return store.identities.map(item => ({
+      id: item.id,
+      displayName: item.displayName || '玩家',
+      publicKey: item.publicKey,
+      isActive: item.id === store.activeId,
+    }))
+  }
+
+  function switchIdentity(id) {
+    const store = _loadStore()
+    if (!store) return null
+    const target = store.identities.find(item => item.id === id)
+    if (!target) throw new Error('Identity not found')
+    store.activeId = target.id
+    _saveStore(store)
+    return { id: target.id, displayName: target.displayName || '玩家', publicKey: target.publicKey }
+  }
+
   function setDisplayName(name) {
-    const data = _load()
-    if (!data) return null
+    const store = _loadStore()
+    const data = _getActiveEntry()
+    if (!store || !data) return null
     data.displayName = (name || '').trim() || '玩家'
-    _save(data)
+    store.identities = store.identities.map(item => item.id === data.id ? data : item)
+    _saveStore(store)
     return { id: data.id, displayName: data.displayName }
   }
 
   function getMnemonic() {
-    const data = _load()
+    const data = _getActiveEntry()
     return data ? (data.mnemonic || null) : null
   }
 
   function getPublicKey() {
-    const data = _load()
+    const data = _getActiveEntry()
     return data ? (data.publicKey || '') : ''
   }
 
-  // Sign an object. Returns hex-encoded Ed25519 signature.
   async function sign(payload) {
-    const data = _load()
+    const data = _getActiveEntry()
     if (!data || !data.privateKey) throw new Error('No identity to sign with')
     const { signAsync } = window.CryptoLib
     const message = new TextEncoder().encode(JSON.stringify(payload))
@@ -119,14 +183,12 @@
     return _toHex(sig)
   }
 
-  // Verify a hex-encoded signature against a public key (hex).
   async function verify(payload, signatureHex, publicKeyHex) {
     const { verifyAsync } = window.CryptoLib
     const message = new TextEncoder().encode(JSON.stringify(payload))
     return verifyAsync(_fromHex(signatureHex), message, _fromHex(publicKeyHex))
   }
 
-  // Ensure an identity exists, auto-creating one if needed. Returns identity object.
   async function ensureIdentity() {
     const existing = getIdentity()
     if (existing) return existing
@@ -138,6 +200,8 @@
     ensureIdentity,
     createIdentity,
     importFromMnemonic,
+    listIdentities,
+    switchIdentity,
     setDisplayName,
     getMnemonic,
     getPublicKey,

@@ -1,0 +1,1 @@
+{"id":"rule-sleep-remove-on-damage","name":"麻醉受伤解除","description":"受到伤害时解除麻醉状态","trigger":{"type":"afterDamageTaken"},"effect":{"type":"triggerSkill","skillId":"sleep-remove","message":"受到伤害，麻醉状态解除"}}

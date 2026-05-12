@@ -302,28 +302,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
           return NextResponse.json({ error: "Failed to create battle: invalid player count or battle setup" }, { status: 500 })
         }
 
-        writeLog('[select-pieces] Battle created, building action log')
-
-        // Apply beginPhase on server to get clean initial state
+        // Apply beginPhase on server (triggers BATTLE_START, initialEffects 等)
         let initState = battle
         try {
           initState = applyBattleAction(battle, { type: "beginPhase" })
+          console.log('[select-pieces] beginPhase applied successfully')
         } catch (e) {
-          writeLog('[select-pieces] beginPhase failed, using raw state: ' + (e instanceof Error ? e.message : ''))
+          const msg = e instanceof Error ? e.message : String(e)
+          console.error('[select-pieces] beginPhase failed:', msg)
+          return NextResponse.json({ error: 'Failed to init battle phase: ' + msg }, { status: 500 })
         }
 
         // Strip skillsById (large static data, clients reload locally)
         const { skillsById: _sk, ...initPayload } = initState as any
 
-        // Generate shared random seed for deterministic gameplay
         const seed = Math.floor(Math.random() * 4294967296)
 
         checkRoom.status = "in-progress"
         checkRoom.currentTurnIndex = 0
         checkRoom.battleState = {
-          type: 'action-log',
+          type: 'server-state',
           seed,
-          actions: [{ seq: 0, type: 'init', payload: initPayload, timestamp: Date.now() }],
+          state: initPayload,
         } as any
 
         await roomStore.setRoom(roomId, checkRoom)
@@ -421,16 +421,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     }
 
     let initState = battle
-    try { initState = applyBattleAction(battle, { type: "beginPhase" }) } catch {}
+    try {
+      initState = applyBattleAction(battle, { type: "beginPhase" })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('[start-game] beginPhase failed:', msg)
+      return NextResponse.json({ error: 'Failed to init battle phase: ' + msg }, { status: 500 })
+    }
     const { skillsById: _sk2, ...initPayload2 } = initState as any
     const seed2 = Math.floor(Math.random() * 4294967296)
 
     latestRoom.status = "in-progress"
     latestRoom.currentTurnIndex = 0
     latestRoom.battleState = {
-      type: 'action-log',
+      type: 'server-state',
       seed: seed2,
-      actions: [{ seq: 0, type: 'init', payload: initPayload2, timestamp: Date.now() }],
+      state: initPayload2,
     } as any
     await roomStore.setRoom(roomId, latestRoom)
 

@@ -45,7 +45,12 @@ function getUserData(): string {
 }
 
 function getPackRoot(): string {
-  return path.join(getUserData(), 'resource-pack')
+  if (app.isPackaged) {
+    // 打包模式：资源包放在 resources/app/resource-pack，与 data 同级
+    return path.join(process.resourcesPath, 'app', 'resource-pack')
+  }
+  // 开发模式：放在项目根目录下
+  return path.join(getAppRoot(), 'resource-pack')
 }
 
 function getConfigPath(): string {
@@ -72,10 +77,31 @@ function clearOnlineServerUrl(): void {
   } catch {}
 }
 
+// ─── 进程树清理 ───────────────────────────────────────────────────────────────
+
+function killProcessTree(proc: ChildProcess): void {
+  if (!proc.pid) return
+  if (process.platform === 'win32') {
+    try { execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore' }) } catch {}
+  } else {
+    try { process.kill(-proc.pid, 'SIGKILL') } catch { try { proc.kill('SIGKILL') } catch {} }
+  }
+}
+
+function killServer(): void {
+  if (!serverProcess) return
+  const proc = serverProcess
+  serverProcess = null
+  localServerReady = false
+  killProcessTree(proc)
+}
+
 // ─── 本地服务器管理 ───────────────────────────────────────────────────────────
 
 let serverProcess: ChildProcess | null = null
 let localServerReady = false
+let lastServerExitCode: number | null = null
+let lastServerStderr = ''
 
 function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
@@ -90,6 +116,8 @@ function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boole
 
     const retry = () => {
       if (settled) return
+      // Server process died — no point polling further
+      if (!serverProcess) { finish(false); return }
       if (Date.now() >= deadline) {
         finish(false)
         return
@@ -98,6 +126,7 @@ function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boole
     }
 
     const probe = () => {
+      if (!serverProcess) { finish(false); return }
       let retried = false
       const retryOnce = () => {
         if (retried) return
@@ -219,32 +248,40 @@ async function startLocalServer(): Promise<void> {
     return
   }
 
-  // 如果用户已导入资源包且包内含有 data/ 目录，优先从资源包加载游戏数据
-  const packDataDir = path.join(getPackRoot(), 'data')
-  const usePackData = fs.existsSync(packDataDir)
+  // 为 WebSocket 服务器找一个独立的空闲端口（避开主端口和 QMUpload 占用区间）
+  const wsPort = await findFreePort(actualLocalPort + 1)
+  console.log(`[client] WebSocket port: ${wsPort}`)
 
   serverProcess = spawn(getNodeBin(), [serverEntry], {
+    cwd: path.dirname(serverEntry),
     env: {
       ...process.env,
       PORT: String(actualLocalPort),
-      DISABLE_WS: '1',
+      WS_PORT: String(wsPort),
       NODE_ENV: 'production',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
       DATABASE_URL: databaseUrl,
-      ...(usePackData ? { RESOURCE_PACK_DATA_DIR: packDataDir } : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
+  lastServerExitCode = null
+  lastServerStderr = ''
+
   serverProcess.stdout?.on('data', (d) => process.stdout.write(d))
-  serverProcess.stderr?.on('data', (d) => process.stderr.write(d))
+  serverProcess.stderr?.on('data', (d) => {
+    process.stderr.write(d)
+    lastServerStderr = (lastServerStderr + d.toString()).slice(-3000)
+  })
 
   serverProcess.on('error', (err) => console.error('[client] server error:', err))
   serverProcess.on('exit', (code) => {
+    lastServerExitCode = code
     serverProcess = null
     localServerReady = false
     console.log(`[client] local server exited: ${code}`)
+    if (lastServerStderr) console.error('[client] last stderr:', lastServerStderr.slice(-500))
   })
 
   // 等待服务器启动
@@ -514,7 +551,13 @@ ipcMain.handle('go-offline', () => {
 ipcMain.handle('open-local-game', async () => {
   clearOnlineServerUrl()
   await startLocalServer()
-  if (!localServerReady) return { ok: false, error: 'Local server is not ready' }
+  if (!localServerReady) {
+    const exitMsg = lastServerExitCode !== null
+      ? `Local server exited with code ${lastServerExitCode}`
+      : 'Local server did not become ready'
+    const detail = lastServerStderr ? '\n' + lastServerStderr.slice(-500) : ''
+    return { ok: false, error: exitMsg + detail }
+  }
   if (connectWin && !connectWin.isDestroyed()) {
     connectWin.close()
     connectWin = null
@@ -532,11 +575,7 @@ ipcMain.handle('get-mode', () => ({
 
 // 重启本地服务器
 ipcMain.handle('restart-server', async () => {
-  if (serverProcess) {
-    serverProcess.kill()
-    serverProcess = null
-    localServerReady = false
-  }
+  killServer()
   await new Promise(resolve => setTimeout(resolve, 1000))
   await startLocalServer()
   return { ok: true }
@@ -780,23 +819,22 @@ app.whenReady().then(async () => {
   }
 
   await startLocalServer()
-  // 检查是否有保存的远程服务器地址
-  const savedUrl = getOnlineServerUrl()
-  if (savedUrl) {
-    // 有保存的地址，直接连接
-    loadOnlineGame(savedUrl)
-  } else {
-    // 没有保存的地址，显示连接页面
-    openConnectWindow()
-  }
+  // 暂时强制使用本地服务器，跳过在线服务器
+  openConnectWindow()
+  // const savedUrl = getOnlineServerUrl()
+  // if (savedUrl) {
+  //   loadOnlineGame(savedUrl)
+  // } else {
+  //   openConnectWindow()
+  // }
 })
 
 app.on('window-all-closed', () => {
-  serverProcess?.kill()
+  killServer()
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => serverProcess?.kill())
+app.on('before-quit', () => killServer())
 
 app.on('activate', () => {
   if (!mainWin || mainWin.isDestroyed()) loadLocalGame()

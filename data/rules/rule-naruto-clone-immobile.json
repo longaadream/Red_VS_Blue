@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-clone-immobile",
+  "name": "影分身定身",
+  "description": "影分身无法移动",
+  "trigger": { "type": "beforeMove" },
+  "skillCode": "var clone = context.rulePiece; if (!clone || clone.currentHp <= 0) return { success: false, message: '' }; if (!context.piece || context.piece.instanceId !== clone.instanceId) return { success: false, message: '' }; var tag = clone.statusTags && clone.statusTags.find(function(t) { return t.type === 'naruto-clone'; }); if (!tag) { removeRuleById(clone.instanceId, 'rule-naruto-clone-immobile'); return { success: false, message: '' }; } return { success: true, blocked: true, message: '影分身无法移动' };"
+}

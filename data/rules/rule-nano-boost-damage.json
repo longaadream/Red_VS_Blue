@@ -1,0 +1,1 @@
+{"id":"rule-nano-boost-damage","name":"纳米激素增伤","description":"纳米激素状态下造成的所有伤害+1","trigger":{"type":"beforeDamageDealt"},"effect":{"type":"triggerSkill","skillId":"nano-boost-damage","message":"纳米激素增伤生效"}}

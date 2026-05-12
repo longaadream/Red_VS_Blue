@@ -1,0 +1,7 @@
+{
+  "id": "rule-watcher-shield",
+  "name": "平静护盾",
+  "description": "受到伤害时，平静护盾格挡相应伤害值（可叠加，持续1回合）",
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var shield = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'calm-shield'; }); if (!shield || !shield.intensity || shield.intensity <= 0) return { success: false, message: '' }; var absorbed = Math.min(shield.intensity, context.damage || 0); if (absorbed <= 0) return { success: false, message: '' }; shield.intensity -= absorbed; context.damage = (context.damage || 0) - absorbed; var msg = piece.name + '的平静护盾格挡了' + absorbed + '点伤害'; if (shield.intensity <= 0) { removeStatusEffectById(piece.instanceId, shield.id); removeRuleById(piece.instanceId, 'rule-watcher-shield'); msg += '，护盾破碎'; } else { msg += '，剩余护盾' + shield.intensity + '点'; } return { success: true, message: msg };"
+}

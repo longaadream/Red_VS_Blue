@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-clone-one-hit",
+  "name": "影分身脆弱",
+  "description": "影分身受到任何伤害时立即消散（无视血量）",
+  "trigger": { "type": "afterDamageTaken" },
+  "skillCode": "var clone = context.rulePiece; if (!clone) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== clone.instanceId) return { success: false, message: '' }; if (!context.damage || context.damage <= 0) return { success: false, message: '' }; clone.currentHp = 0; return { success: true, message: clone.name + '（影分身）受到伤害，立即消散' };"
+}

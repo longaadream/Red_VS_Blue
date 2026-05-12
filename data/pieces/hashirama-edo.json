@@ -17,8 +17,7 @@
     { "skillId": "hashirama-edo-sage-buddha", "level": 1, "initialCharges": 0 },
     { "skillId": "hashirama-edo-regen", "level": 1 }
   ],
-  "rules": [],
-  "initialEffects": ["effect-hashirama-edo-regen"],
+  "rules": ["rule-hashirama-edo-regen"],
   "relatedCards": ["hashirama-edo-thousand-hands", "hashirama-edo-nature-heal"],
   "isDefault": false
 }

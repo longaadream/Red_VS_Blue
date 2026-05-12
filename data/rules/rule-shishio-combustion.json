@@ -1,0 +1,9 @@
+{
+  "id": "rule-shishio-combustion",
+  "name": "自燃·灵力消耗",
+  "description": "志志雄真实每造成5点直接伤害（累计），对自身造成1点真实伤害。不计入燃地伤害。",
+  "trigger": {
+    "type": "afterDamageDealt"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (!context.targetPiece || context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; var excludeIds = ['shishio-burn-endturn', 'shishio-burn-move', 'combustion-self']; if (context.skillId && excludeIds.indexOf(context.skillId) >= 0) return { success: false, message: '' }; var damage = context.damage || 0; if (damage <= 0) return { success: false, message: '' }; if (!piece.statusTags) piece.statusTags = []; var counter = piece.statusTags.find(function(t) { return t.type === 'shishio-dmg-counter'; }); if (!counter) { counter = { id: 'shishio-dmg-counter-' + piece.instanceId, type: 'shishio-dmg-counter', name: '灵力消耗', intensity: 0, currentDuration: -1, visible: false }; piece.statusTags.push(counter); } var prevIntensity = counter.intensity; counter.intensity += damage; var newIntensity = counter.intensity; var selfDmgTimes = Math.floor(newIntensity / 5); counter.intensity = newIntensity % 5; if (selfDmgTimes <= 0) return { success: false, message: '' }; dealDamage(piece, piece, selfDmgTimes, 'true', battle, 'combustion-self'); return { success: true, message: piece.name + ' 自燃·灵力消耗：计数 ' + prevIntensity + '+' + damage + '=' + newIntensity + '，触发' + selfDmgTimes + '次，' + piece.name + ' 失去 ' + selfDmgTimes + ' 点生命值（剩余计数：' + counter.intensity + '）' };"
+}

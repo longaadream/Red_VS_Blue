@@ -1,0 +1,1 @@
+{"id":"rule-sleep-prevent-move","name":"麻醉阻止移动","description":"在即将移动前检查麻醉状态并阻止移动","trigger":{"type":"beforeMove"},"effect":{"type":"triggerSkill","skillId":"sleep-prevent","message":"麻醉状态阻止移动"}}

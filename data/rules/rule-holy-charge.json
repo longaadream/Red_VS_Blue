@@ -1,0 +1,7 @@
+{
+  "id": "rule-holy-charge",
+  "name": "圣光充能伤害加成",
+  "description": "拥有圣光充能buff的棋子造成伤害时，伤害+2",
+  "trigger": { "type": "beforeDamageDealt" },
+  "effect": { "type": "triggerSkill", "skillId": "holy-charge-damage", "message": "" }
+}

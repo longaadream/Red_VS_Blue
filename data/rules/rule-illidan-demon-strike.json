@@ -1,0 +1,7 @@
+{
+  "id": "rule-illidan-demon-strike",
+  "name": "恶魔冲击计数",
+  "description": "每次恶魔冲击命中后消耗一次使用次数；次数耗尽时自动移除技能和规则",
+  "trigger": { "type": "afterSkillUsed" },
+  "skillCode": "if (context.skillId !== 'illidan-demon-strike') return { success: false, message: '' }; var illidan = context.rulePiece; if (!illidan) return { success: false, message: '' }; var tag = illidan.statusTags && illidan.statusTags.find(function(t) { return t.id === 'demon-strike-charges'; }); if (!tag) return { success: false, message: '' }; if (tag.remainingUses === undefined) { tag.remainingUses = tag.currentUses || 2; } tag.remainingUses -= 1; var remaining = tag.remainingUses; if (remaining <= 0) { removeStatusEffectById(illidan.instanceId, 'demon-strike-charges'); illidan.skills = (illidan.skills || []).filter(function(s) { return s.skillId !== 'illidan-demon-strike'; }); illidan.rules = (illidan.rules || []).filter(function(r) { return r.id !== 'rule-illidan-demon-strike'; }); return { success: true, message: illidan.name + '的恶魔冲击次数耗尽，技能已移除' }; } return { success: true, message: illidan.name + '恶魔冲击剩余' + remaining + '次' };"
+}

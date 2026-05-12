@@ -1,0 +1,7 @@
+{
+  "id": "rule-naruto-sage-block-skill",
+  "name": "仙人专注",
+  "description": "仙人模式期间无法使用技能",
+  "trigger": { "type": "beforeSkillUse" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (!context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (!tag) { removeRuleById(piece.instanceId, 'rule-naruto-sage-block-skill'); return { success: false, message: '' }; } return { success: true, blocked: true, message: piece.name + '正在打坐，无法使用技能' };"
+}

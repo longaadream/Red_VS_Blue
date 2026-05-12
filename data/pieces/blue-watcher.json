@@ -21,8 +21,7 @@
       "level": 1
     }
   ],
-  "rules": [],
-  "initialEffects": ["effect-watcher-form"],
+  "rules": ["rule-watcher-form"],
   "relatedCards": ["watcher-calm", "watcher-rage"],
   "isDefault": false
 }

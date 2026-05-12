@@ -1,0 +1,7 @@
+{
+  "id": "rule-recall-skill",
+  "name": "回溯计数（技能）",
+  "description": "记录对手释放技能的次数，达到目标操作数时执行回溯。",
+  "trigger": { "type": "afterSkillUsed" },
+  "effect": { "type": "triggerSkill", "skillId": "recall-skill-trigger", "message": "" }
+}

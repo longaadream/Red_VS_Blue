@@ -1,0 +1,1 @@
+{"id":"rule-sleep-prevent-skill","name":"麻醉阻止技能","description":"在即将释放技能前检查麻醉状态并阻止技能释放","trigger":{"type":"beforeSkillUse"},"effect":{"type":"triggerSkill","skillId":"sleep-prevent","message":"麻醉状态阻止技能释放"}}

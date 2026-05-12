@@ -8,9 +8,45 @@ import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 import { globalTriggerSystem } from "./triggers"
 import { applyEffectToPiece } from './attached-effect'
+import { loadRuleById } from './skills'
 import path from 'path'
 import fs from 'fs'
 import { getUserDataDir } from '@/lib/app-paths'
+
+function fireInitialGameStart(state: BattleState): void {
+  if (state.gameStartFired || state.turn.turnNumber !== 1) return
+
+  state.gameStartFired = true
+
+  for (const piece of [...state.pieces]) {
+    globalTriggerSystem.checkTriggers(state, {
+      type: "afterPieceSummon",
+      playerId: piece.ownerPlayerId,
+      sourcePiece: piece,
+      pieceTemplateId: piece.templateId,
+      faction: piece.faction,
+    } as any)
+  }
+
+  const result = globalTriggerSystem.checkTriggers(state, {
+    type: "gameStart",
+    playerId: state.turn.currentPlayerId,
+    turnNumber: state.turn.turnNumber,
+  })
+
+  writeLog('[createInitialBattle] gameStart result: ' + JSON.stringify(result))
+  if (result.success && result.messages.length > 0) {
+    if (!state.actions) state.actions = []
+    result.messages.forEach(message => {
+      state.actions!.push({
+        type: "triggerEffect",
+        playerId: state.turn.currentPlayerId,
+        turn: state.turn.turnNumber,
+        payload: { message },
+      })
+    })
+  }
+}
 
 function writeLog(message: string) {
   const logDir = path.join(getUserDataDir(), 'logs')
@@ -60,12 +96,25 @@ interface PlayerSelectedPieces {
   pieces: PieceTemplate[]
 }
 
-/** 将棋子模板中的 initialEffects 应用到棋子实例上 */
+/** 将棋子模板中的 initialEffects 和 rules 应用到棋子实例上 */
 function applyInitialEffects(piece: PieceInstance, pieceTemplate: PieceTemplate, battle: any): void {
   const initialEffects = (pieceTemplate as any).initialEffects
-  if (!initialEffects || !Array.isArray(initialEffects)) return
-  for (const effectId of initialEffects) {
-    applyEffectToPiece(battle, piece.instanceId, effectId)
+  if (initialEffects && Array.isArray(initialEffects)) {
+    for (const effectId of initialEffects) {
+      applyEffectToPiece(battle, piece.instanceId, effectId)
+    }
+  }
+
+  // 加载模板中声明的 rules（旧规则系统，如 rule-kiljaedan-gamestart、rule-reap 等）
+  const templateRules = (pieceTemplate as any).rules
+  if (templateRules && Array.isArray(templateRules)) {
+    if (!piece.rules) piece.rules = []
+    for (const ruleId of templateRules) {
+      const rule = loadRuleById(ruleId)
+      if (rule && !piece.rules.some((r: any) => r.id === ruleId)) {
+        piece.rules.push(rule)
+      }
+    }
   }
 }
 
@@ -622,7 +671,7 @@ export async function createInitialBattleForPlayers(
     },
   }
 
-  // 为每个棋子应用 initialEffects
+  // 为每个棋子应用 initialEffects 和 rules
   const allSelectedPieces: PieceTemplate[] = []
   if (playerSelectedPieces && playerSelectedPieces.length > 0) {
     playerSelectedPieces.forEach(pi => pi.pieces.forEach(pt => allSelectedPieces.push(pt)))
@@ -643,6 +692,8 @@ export async function createInitialBattleForPlayers(
     applyEffectToPiece(state, p2Piece.instanceId, 'effect-lucky-coin')
     writeLog('[createInitialBattle] Applied effect-lucky-coin to p2 piece: ' + p2Piece.instanceId)
   }
+
+  fireInitialGameStart(state)
 
   writeLog('[createInitialBattle] Battle state created, pieces count: ' + state.pieces.length)
   return state

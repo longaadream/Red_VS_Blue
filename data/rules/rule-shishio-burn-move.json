@@ -1,0 +1,9 @@
+{
+  "id": "rule-shishio-burn-move",
+  "name": "燃地灼烧·踏入",
+  "description": "任何角色移动到志志雄真実释放我流·炎灵所点燃的格子时，失去自身当前生命值50%的真实伤害。",
+  "trigger": {
+    "type": "afterMove"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; var exts = battle.extensions; var burnTiles = exts && exts.shishioBurnTiles; if (!burnTiles || burnTiles.length === 0) return { success: false, message: '' }; var mover = context.sourcePiece; if (!mover || mover.currentHp <= 0) return { success: false, message: '' }; var onTile = burnTiles.some(function(t) { return t.x === mover.x && t.y === mover.y; }); if (!onTile) return { success: false, message: '' }; var dmg = Math.ceil(mover.currentHp * 0.5); dealDamage(piece, mover, dmg, 'true', battle, 'shishio-burn-move'); return { success: true, message: mover.name + ' 踏入燃地！承受 ' + dmg + ' 点真实伤害（当前生命值50%）' };"
+}

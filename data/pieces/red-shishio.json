@@ -25,7 +25,14 @@
       "level": 1
     }
   ],
-  "rules": [],
-  "initialEffects": ["effect-shishio"],
+  "rules": [
+    "rule-shishio-damage-cap",
+    "rule-shishio-cooldown-once",
+    "rule-shishio-combustion",
+    "rule-shishio-kill-track",
+    "rule-shishio-burn-move",
+    "rule-shishio-burn-endturn",
+    "rule-shishio-no-heal"
+  ],
   "isDefault": false
 }

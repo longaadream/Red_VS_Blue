@@ -1,0 +1,7 @@
+{
+  "id": "rule-kenshin-tenken-boost",
+  "name": "飞天御剑流·剑速",
+  "description": "剑心有「飞天御剑流」状态时，下次造成伤害前消耗该状态，伤害提升50%",
+  "trigger": { "type": "beforeDamageDealt" },
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'tenken-charge'; }); if (!tag) return { success: false, message: '' }; var uses = tag.remainingUses !== undefined ? tag.remainingUses : (tag.currentUses !== undefined ? tag.currentUses : 0); if (uses <= 0) return { success: false, message: '' }; removeStatusEffectById(piece.instanceId, tag.id); context.damage = Math.floor((context.damage || 0) * 1.5); return { success: true, message: piece.name + '飞天御剑流发动！本次攻击伤害提升50%' };"
+}

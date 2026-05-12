@@ -1,0 +1,7 @@
+{
+  "id": "rule-watcher-rage-dealt",
+  "name": "暴怒·伤害加倍",
+  "description": "（暴怒姿态）造成的伤害翻倍",
+  "trigger": { "type": "beforeDamageDealt" },
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var rageStance = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (!rageStance) return { success: false, message: '' }; var baseDamage = context.damage || 0; context.damage = baseDamage * 2; return { success: true, message: piece.name + '暴怒姿态：伤害翻倍！' + baseDamage + '→' + context.damage + '点' };"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "rule-rafaam-temporal-distortion-enemy",
+  "name": "时空扭曲-敌方减AP规则",
+  "description": "在敌方回合开始时减少1点行动点",
+  "trigger": { "type": "beginTurn" },
+  "effect": { "type": "triggerSkill", "skillId": "rafaam-temporal-distortion-enemy", "message": "时空扭曲使敌方行动点-1" },
+  "limits": { "maxUses": 1 }
+}

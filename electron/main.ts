@@ -126,6 +126,17 @@ function ensureStandaloneAssets(appRoot: string, serverEntry: string): void {
   }
 }
 
+// ─── 进程树清理 ───────────────────────────────────────────────────────────────
+
+function killProcessTree(proc: ChildProcess): void {
+  if (!proc.pid) return
+  if (process.platform === 'win32') {
+    try { execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore' }) } catch {}
+  } else {
+    try { process.kill(-proc.pid, 'SIGKILL') } catch { try { proc.kill('SIGKILL') } catch {} }
+  }
+}
+
 // ─── 游戏服务器进程 ───────────────────────────────────────────────────────────
 
 function findServerEntry(appRoot: string): string | null {
@@ -171,6 +182,7 @@ function startGameServer(): void {
 
   try {
     serverProcess = spawn(getNodeBin(), [serverEntry], {
+      cwd: path.dirname(serverEntry),
       env: {
         ...process.env,
         PORT: '3000',
@@ -252,13 +264,14 @@ function startRoomCleanup(): void {
 
 function stopGameServer(): void {
   if (serverProcess) {
-    serverProcess.kill()
+    const proc = serverProcess
     serverProcess = null
     serverRunning = false
     if (cleanupInterval) {
       clearInterval(cleanupInterval)
       cleanupInterval = null
     }
+    killProcessTree(proc)
     updateTrayMenu()
   }
 }

@@ -29,7 +29,6 @@
       "level": 1
     }
   ],
-  "rules": [],
-  "initialEffects": ["effect-reap"],
+  "rules": ["rule-reap"],
   "isDefault": false
 }

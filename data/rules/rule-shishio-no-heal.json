@@ -1,0 +1,9 @@
+{
+  "id": "rule-shishio-no-heal",
+  "name": "自燃·拒愈",
+  "description": "志志雄真実无法被任何方式治疗。",
+  "trigger": {
+    "type": "beforeHealTaken"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!piece || !context.piece || context.piece.instanceId !== piece.instanceId) return { success: false }; context.heal = 0; return { success: true, blocked: true, message: piece.name + ' 自燃之躯：无法被治疗！' };"
+}

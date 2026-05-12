@@ -1,0 +1,7 @@
+{
+  "id": "rule-soul-fracture",
+  "name": "裂魂规则",
+  "description": "当任意棋子死亡时，拥有裂魂技能的棋子所属玩家获得一张灵魂残片手牌",
+  "trigger": { "type": "onPieceDied" },
+  "skillCode": "if (!context.rulePiece) return { success: false }; const deadPiece = context.sourcePiece; if (!deadPiece) return { success: false }; const playerId = context.rulePiece.ownerPlayerId; addCardToHand('soul-fragment', playerId); if (!battle.actions) battle.actions = []; const message = context.rulePiece.name + '的裂魂触发：' + deadPiece.name + '死亡，获得一张灵魂残片'; battle.actions.push({ type: 'triggerEffect', playerId: playerId, turn: battle.turn ? battle.turn.turnNumber : 0, payload: { message: message } }); return { success: true, message: message };"
+}

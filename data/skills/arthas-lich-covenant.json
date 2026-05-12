@@ -4,10 +4,7 @@
   "description": "使3格内1个友军获得巫妖誓约。该友军受到致命伤害时改为满血复活、攻击力永久提高50%，并重置所有技能冷却。",
   "keywords": [],
   "targetText": "3格内1个友军",
-  "effectTags": [
-    "强化",
-    "复活"
-  ],
+  "effectTags": ["强化", "复活"],
   "icon": "🃏",
   "kind": "active",
   "type": "super",
@@ -17,6 +14,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "range": "single",
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 3, filter: 'ally' }); if (!target || target.needsTargetSelection) return target; var hasCovenantBuff = target.statusTags && target.statusTags.some(function(t) { return t.type === 'lich-covenant'; }); if (hasCovenantBuff) return { success: false, message: target.name + '已拥有巫妖誓约' }; applyEffect(target.instanceId, 'effect-arthas-lich-covenant'); return { success: true, message: caster.name + '对' + target.name + '施加了巫妖誓约' }; }",
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 3, filter: 'ally' }); if (!target || target.needsTargetSelection) return target; var hasCovenantBuff = target.statusTags && target.statusTags.some(function(t) { return t.type === 'lich-covenant'; }); if (hasCovenantBuff) return { success: false, message: target.name + '已拥有巫妖誓约' }; addStatusEffectById(target.instanceId, { id: 'lich-covenant-' + target.instanceId, name: '巫妖誓约', type: 'lich-covenant', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-arthas-lich-covenant'] }); addRuleById(target.instanceId, 'rule-arthas-lich-covenant'); return { success: true, message: caster.name + '对' + target.name + '施加了巫妖誓约' }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: '使3格内1个友军获得巫妖誓约。该友军受到致命伤害时改为满血复活、攻击力永久提高50%，并重置所有技能冷却。', expectedValues: {} }; }"
 }

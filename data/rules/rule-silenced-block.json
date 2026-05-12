@@ -1,0 +1,7 @@
+{
+  "id": "rule-silenced-block",
+  "name": "沉默拦截",
+  "description": "棋子被沉默时，使用技能前被拦截，无法使用技能",
+  "trigger": { "type": "beforeSkillUse" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'silenced'; }); if (!tag) { piece.rules = (piece.rules || []).filter(function(r) { return r.id !== 'rule-silenced-block'; }); return { success: false, message: '' }; } return { success: true, blocked: true, message: piece.name + ' 已被沉默，无法使用技能' };"
+}

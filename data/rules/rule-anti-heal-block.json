@@ -1,0 +1,1 @@
+{"id":"rule-anti-heal-block","name":"禁疗阻止治疗","description":"在即将受到治疗前检查禁疗状态并阻止治疗","trigger":{"type":"beforeHealTaken"},"effect":{"type":"triggerSkill","skillId":"anti-heal-block","message":"禁疗状态阻止治疗"}}

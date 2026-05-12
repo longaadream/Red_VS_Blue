@@ -1,0 +1,7 @@
+{
+  "id": "rule-recall-endturn",
+  "name": "回溯（回合结束强制）",
+  "description": "对手回合结束时，强制执行回溯。",
+  "trigger": { "type": "endTurn" },
+  "effect": { "type": "triggerSkill", "skillId": "recall-endturn-trigger", "message": "" }
+}

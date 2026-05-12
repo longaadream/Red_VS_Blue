@@ -1,0 +1,9 @@
+{
+  "id": "rule-shishio-cooldown-once",
+  "name": "自燃·压制",
+  "description": "志志雄真实每回合第一次造成伤害前，使目标所有技能陷入冷却。",
+  "trigger": {
+    "type": "beforeDamageDealt"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (!context.targetPiece || context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; var currentTurn = (battle.turn && battle.turn.turnNumber) || 0; if (!piece.statusTags) piece.statusTags = []; var firedTag = piece.statusTags.find(function(t) { return t.type === 'shishio-cooldown-fired'; }); if (firedTag && firedTag.intensity === currentTurn) return { success: false, message: '' }; if (!firedTag) { firedTag = { id: 'shishio-cooldown-fired-' + piece.instanceId, type: 'shishio-cooldown-fired', name: '压制已触发', intensity: currentTurn, currentDuration: -1, visible: false }; piece.statusTags.push(firedTag); } else { firedTag.intensity = currentTurn; } var target = battle.pieces.find(function(p) { return p.instanceId === context.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return { success: false, message: '' }; if (target.skills && target.skills.length > 0) { target.skills.forEach(function(s) { s.currentCooldown = Math.max(s.currentCooldown || 0, 2); }); return { success: true, message: piece.name + ' 自燃·压制：' + target.name + ' 所有技能陷入冷却！' }; } return { success: false, message: '' };"
+}
