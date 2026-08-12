@@ -1,0 +1,180 @@
+# 调试与故障复现
+
+状态：RED-9 基线草稿
+
+基线提交：`594977b`
+目标链路：LAN Windows/Electron + Android；两端均可开服或加入
+
+本文供下一项“恢复运行基线”任务直接执行。RED-9 不要求现在运行这些命令或一次解决全部缺口。
+
+## 1. 当前基线声明
+
+项目负责人确认：当前提交作为正式基线，但最后一版出现重大问题且尚未定位。`BUILD_AND_RUN.md` 为空，因此当前没有经过验证的安装、启动、测试和打包步骤。
+
+这意味着：
+
+- 本文不能声明项目可以成功启动或打包。
+- RED-9 的静态代码结论不等于运行验证通过。
+- 第一项后续任务必须重建运行基线并保存证据。
+- 在故障定位前，不升级依赖、不改规则、不删除历史生成物。
+
+## 2. 当前可用入口
+
+根 `package.json` 声明：
+
+- `npm run dev`：Next 开发服务。
+- `npm run dev:electron:server`：Electron 服务端管理器。
+- `npm run dev:electron:client`：Electron 玩家客户端。
+- `npm test`：Vitest 单次运行。
+- `npm run lint`：ESLint。
+- `npm run build`：Prisma、Tailwind、Next standalone 和静态资源。
+- Android 构建：根脚本中的 `build:game-engine`、`build:mobile-server`、`build:android` 等。
+
+这些是“清单中存在的命令”，不是“已验证可用命令”。RED-9 检查时本地没有 `node_modules`，未安装依赖，也未运行测试或构建。
+
+## 3. 稳定运行基线的建议验证顺序
+
+后续独立 Linear 任务应按以下顺序执行并逐步停止在第一个失败点：
+
+1. 记录 Windows、Node、npm、Java、Android SDK 和 Electron 版本。
+2. 从锁文件安装根依赖，保存完整安装日志。
+3. 运行 Vitest。
+4. 运行 ESLint。
+5. 增加并运行显式 TypeScript 检查；当前 Next 构建会忽略 TS build errors。
+6. 启动 Next/WS，调用只读状态端点。
+7. 启动 Electron 服务端，记录端口、子进程和窗口状态。
+8. 启动 Electron 客户端并完成加入房间冒烟流程。
+9. Android 加入 Windows 房间。
+10. Android 开服，Windows 客户端加入同一房间。
+11. 同一设备同时运行服务端与客户端，确认本机玩家仍走公共命令协议。
+12. 从全新临时输出目录构建 Android，记录生成物 hash 和安装结果。
+
+不得为了越过某一步而同时修改多套配置。每个失败点都应保存命令、退出码、日志和 commit。
+
+## 4. 最小问题报告
+
+每次 Bug 至少记录：
+
+```text
+commit/build:
+运行模式: Electron server / Electron client / Android
+设备与系统:
+roomId:
+playerId/seat/faction:
+回合与阶段:
+seed:
+最后一个 clientActionId:
+复现前状态 hash:
+命令或点击序列:
+预期结果:
+实际结果:
+复现后状态 hash:
+服务端日志:
+客户端日志:
+截图/录屏:
+复现次数:
+```
+
+如果 seed、状态或 action ID 取不到，应写“当前系统未提供”，不能省略或猜测。
+
+## 5. 按层定位流程
+
+### 玩家点击无响应
+
+1. 在 `battle.html::doAction()` 确认动作是否生成。
+2. 确认当前 transport 是 LAN WS、HTTP、Relay 还是 local engine。
+3. 检查消息是否包含 room/player/action ID。
+4. 在 `ws-server.ts` 或房间 API 确认接收。
+5. 在 `runBattleAction()` 比较输入/输出 hash。
+6. 确认 `RoomStore.setRoom()` 成功。
+7. 确认 `stateUpdate` 广播并进入 `applyServerState()`。
+
+### 状态在 Electron 与 Android 不一致
+
+1. 确认两端连接同一个 roomId 和服务端。
+2. 比较最后收到的服务端 state hash。
+3. 如果 hash 相同但画面不同，问题位于客户端渲染/资源版本。
+4. 如果 hash 不同，检查消息丢失、动作重复、客户端是否进入 Relay/local 分支。
+5. 记录两端 `game-engine.js` hash，检查 Android 是否使用旧生成物。
+
+### 相同操作结果不同
+
+1. 保存初始状态 JSON、`_v`、seed 和动作序列。
+2. 搜索该路径上的 `Math.random()`、`Date.now()` 和模块级缓存。
+3. 用 `replayBattle()` 执行两次并比较每一步 hash。
+4. 若核心回放一致而 UI 不一致，检查客户端胜负、目标过滤和本地 dry-run。
+5. 若核心回放不一致，检查 RNG 注入、动态效果代码和全局触发器。
+
+### 新格式存档读取后行为改变
+
+1. 保留原始存档副本，不在原文件上测试。
+2. 记录存档 `protocolVersion`、格式版本、规则/数据 hash、server ID 和 match ID。
+3. 记录 `BattleState._v` 和数据库修订号，两者含义不同。
+4. 比较保存前后关键字段，特别是回合、棋子、资源、pending selection、`currentTurnIndex` 和 `actions`。
+5. 验证动作序号、hash 链、玩家签名和服务端任期签名。
+
+公开测试前旧存档不要求兼容，不应为它们编写静默迁移；新存档一旦发布才进入兼容承诺。
+
+## 6. 当前日志现状
+
+- `turn.ts`、`skills.ts`、`triggers.ts`、`battle-setup.ts` 分别维护日志代码。
+- 日志可能写 `game.log`，Electron/Next/浏览器还各用自己的 console。
+- 当前日志经常缺少 roomId、seed、action ID、前后 hash 和错误栈。
+- 代码中存在空 `catch {}` 和阶段性 `[STAGE*]` 日志。
+- mobile 生产构建会禁用一部分 console 输出。
+
+因此“没有日志”不能证明流程没有发生，“看到 stateUpdate”也不能证明各端使用了相同资源和相同状态。
+
+## 7. 统一日志愿景
+
+后续建议所有关键操作使用同一结构：
+
+```ts
+interface GameLogContext {
+  build: string;
+  runtime: 'next' | 'electron-server' | 'electron-client' | 'android';
+  roomId?: string;
+  playerId?: string;
+  turn?: number;
+  phase?: string;
+  seed?: string;
+  actionId?: string;
+  actionType?: string;
+  beforeHash?: string;
+  afterHash?: string;
+}
+```
+
+错误还必须包含稳定错误代码、message、stack 和 cause。该结构是愿景，不在 RED-9 实现。
+
+## 8. 现有调试接口
+
+`app/api/debug-battle/route.ts` 支持创建 duel、执行动作、回放、identity/selection/loopback 场景。它是最接近无 UI 调试 harness 的现有入口。
+
+注意：部分模式会创建或修改数据库房间，不能视为只读端点；调用前必须使用隔离数据库或明确测试房间。
+
+`lib/game/debug-battle.ts` 可以用固定 seed 创建调试对局并生成状态 hash，测试入口为 `tests/game/debug-battle.test.ts`。
+
+## 9. 当前测试缺口
+
+- Electron 启动和退出。
+- Next/WS/Prisma 集成。
+- Android 与 Electron 同房状态一致性。
+- Android 资源来自当前源码的校验。
+- 新格式存档、签名动作链和加密 envelope round-trip。
+- 权威胜负结果。
+- 多房间全局触发器隔离。
+- 完整固定 seed 对局。
+- Relay 与 LAN 行为差异。
+
+## 10. 最高优先级调试任务
+
+1. **运行基线**：确定工具版本并找到当前重大故障的第一个失败点。
+2. **统一上下文**：为启动、连接、动作、持久化和广播添加关联 ID 和错误栈。
+3. **状态导出**：服务端导出脱敏状态、seed、action trace 和 hash。
+4. **Android 来源校验**：构建产物写入 commit/hash，启动时可查看。
+5. **固定种子回归**：同一初始状态和动作序列在 Node/Android 引擎得到相同结果。
+
+长期的端到端加密、密钥恢复、服务端迁移/撤销、规则沙箱和公开回放安全测试应拆分为 High Risk 任务，不作为恢复当前运行基线的前置条件。
+
+每项都应单独建 Linear 任务、独立分支、测试证据和人工批准。
