@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getRoomStore, type Room } from "@/lib/game/room-store"
+import { getRoomStore, type Room, type Player } from "@/lib/game/room-store"
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getAllPieces } from "@/lib/game/piece-repository"
+
+function checkPackMismatch(players: Player[]): boolean {
+  const hashes = players.map(p => p.packMd5).filter(Boolean)
+  return hashes.length === 2 && hashes[0] !== hashes[1]
+}
 
 export async function GET(
   _req: NextRequest,
@@ -38,6 +43,7 @@ type JoinBody = {
   action: "join"
   playerId: string
   playerName?: string
+  packMd5?: string
 }
 
 type RoomPostBody = StartBody | JoinBody
@@ -70,25 +76,30 @@ export async function POST(
   if (body.action === "join") {
     const normalizedPlayerId = body.playerId?.trim().toLowerCase()
     const playerName = body.playerName?.trim()
+    const packMd5 = body.packMd5?.trim() || undefined
     if (!normalizedPlayerId) {
       return NextResponse.json({ error: "playerId is required" }, { status: 400 })
     }
+
+    const requestedFaction = (body as any).faction === "red" || (body as any).faction === "blue"
+      ? (body as any).faction as "red" | "blue"
+      : null
 
     const existing = room.players.find(
       (p) => p.id.toLowerCase() === normalizedPlayerId,
     )
 
     if (existing) {
-      if (!existing.faction) {
-        const assignedFactions = room.players
-          .filter(p => p.id.toLowerCase() !== normalizedPlayerId)
-          .map(p => p.faction)
-          .filter(Boolean) as Array<"red" | "blue">
-        existing.faction = assignedFactions.length === 0 || assignedFactions[0] === "blue" ? "red" : "blue"
+      if (requestedFaction) {
+        existing.faction = requestedFaction
+      } else if (!existing.faction) {
+        existing.faction = Math.random() < 0.5 ? "red" : "blue"
       }
       if (playerName) existing.name = playerName
+      if (packMd5) existing.packMd5 = packMd5
       await roomStore.setRoom(room.id.trim(), room)
-      return NextResponse.json(room)
+      const packMismatch = checkPackMismatch(room.players)
+      return NextResponse.json({ ...room, packMismatch })
     }
 
     if (room.status !== "waiting") {
@@ -102,12 +113,11 @@ export async function POST(
       return NextResponse.json({ error: "Room is full" }, { status: 400 })
     }
 
-    const assignedFactions = room.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
     let faction: "red" | "blue"
-    if (assignedFactions.length === 0) {
-      faction = Math.random() > 0.5 ? "red" : "blue"
+    if (requestedFaction) {
+      faction = requestedFaction
     } else {
-      faction = assignedFactions[0] === "red" ? "blue" : "red"
+      faction = Math.random() < 0.5 ? "red" : "blue"
     }
 
     const player = {
@@ -115,6 +125,7 @@ export async function POST(
       name: playerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
       joinedAt: Date.now(),
       faction,
+      packMd5,
     }
     room.players.push(player)
 
@@ -123,7 +134,8 @@ export async function POST(
     }
 
     await roomStore.setRoom(room.id.trim(), room)
-    return NextResponse.json(room)
+    const packMismatch = checkPackMismatch(room.players)
+    return NextResponse.json({ ...room, packMismatch })
   }
 
   if (body.action === "start") {
@@ -141,19 +153,23 @@ export async function POST(
       )
     }
 
-    const playerIds = room.players.map((p) => p.id)
+    const playerIds = room.players.map((p: any) => p.id)
     const defaultPieces = getAllPieces()
-    const battle = await createInitialBattleForPlayers(playerIds, defaultPieces, undefined, room.mapId)
+    const playerFactions = room.players.map((p: any) => ({ playerId: p.id, faction: p.faction as 'red' | 'blue', pieces: [] as any[] }))
+    const battle = await createInitialBattleForPlayers(playerIds, defaultPieces, playerFactions, room.mapId)
     if (!battle) {
       return NextResponse.json(
         { error: "Failed to initialize battle state" },
         { status: 500 }
       )
     }
-
     room.status = "in-progress"
     room.currentTurnIndex = 0
-    room.battleState = battle
+    room.battleState = {
+      type: 'server-state',
+      seed: Math.floor(Math.random() * 4294967296),
+      state: battle,
+    } as any
     await roomStore.setRoom(room.id.trim(), room)
 
     return NextResponse.json(room)

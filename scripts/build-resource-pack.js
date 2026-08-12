@@ -42,9 +42,14 @@ const packDesc    = getArg('--desc')    || ''
 const EXCLUDE = new Set([
   'cordova.js',
   'cordova_plugins.js',
+  'pack.html',
 ])
 // Exclude subdirectory: cordova-related plugin dirs
 const EXCLUDE_DIRS = new Set(['plugins'])
+const EXCLUDE_PATHS = new Set([
+  'data/pages/pack.html',
+  'js/pack-fetch.js',
+])
 
 // ── Walk directory ────────────────────────────────────────────────────────────
 function walk(dir, base) {
@@ -52,6 +57,7 @@ function walk(dir, base) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (EXCLUDE.has(entry.name)) continue
     const relPath = base ? base + '/' + entry.name : entry.name
+    if (EXCLUDE_PATHS.has(relPath.replace(/\\/g, '/'))) continue
     const fullPath = path.join(dir, entry.name)
     if (entry.isDirectory()) {
       if (EXCLUDE_DIRS.has(entry.name)) continue

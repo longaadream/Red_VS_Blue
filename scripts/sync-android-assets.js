@@ -116,6 +116,16 @@ if (fs.existsSync(pagesSrc)) {
     }
     console.log(`[sync-android] Copied ${pageCount} HTML pages → dist Electron data/pages/`)
   }
+  const electronWwwPages = path.join(ROOT, 'dist', 'client-build', 'win-unpacked', 'resources', 'app', 'www')
+  if (fs.existsSync(electronWwwPages)) {
+    for (const entry of fs.readdirSync(pagesSrc)) {
+      if (!entry.endsWith('.html')) continue
+      const srcFile = path.join(pagesSrc, entry)
+      const dstFile = path.join(electronWwwPages, entry)
+      fs.copyFileSync(srcFile, dstFile)
+    }
+    console.log(`[sync-android] Copied ${pageCount} HTML pages to dist Electron www/`)
+  }
 } else {
   console.warn('[sync-android] SKIP HTML pages (data/pages not found)')
 }
@@ -133,6 +143,12 @@ if (fs.existsSync(jsSrc)) {
   if (fs.existsSync(electronJs)) {
     const n4e = copyDir(jsSrc, electronJs)
     console.log(`[sync-android] Synced js/ → dist Electron www/js/ (${n4e} files)`)
+  }
+  const electronPageJs = path.join(ROOT, 'dist', 'client-build', 'win-unpacked', 'resources', 'app', 'data', 'pages', 'js')
+  const electronPageDir = path.dirname(electronPageJs)
+  if (fs.existsSync(electronPageDir)) {
+    const n4p = copyDir(jsSrc, electronPageJs)
+    console.log(`[sync-android] Synced js/ to dist Electron data/pages/js/ (${n4p} files)`)
   }
 } else {
   console.warn('[sync-android] SKIP js/ (not found)')
@@ -191,6 +207,41 @@ if (!fs.existsSync(publicSrc) && electronImageCount > 0) {
   console.warn('[sync-android] SKIP images (no source found)')
 }
 
+// ── 复制 public/card-art/ → android-client/www/images/card-art/ ─────────
+const terrainSrc = path.join(ROOT, 'public', 'terrain')
+if (fs.existsSync(terrainSrc)) {
+  const terrainTargets = [
+    path.join(imagesDst, 'terrain'),
+    path.join(androidWwwImagesDst, 'terrain'),
+    path.join(ROOT, 'dist', 'client-build', 'win-unpacked', 'resources', 'app', 'www', 'images', 'terrain'),
+    path.join(ROOT, 'dist', 'client-build', 'win-unpacked', 'resources', 'app', 'data', 'pages', 'images', 'terrain'),
+  ]
+  let terrainCount = 0
+  for (const target of terrainTargets) {
+    terrainCount = copyDir(terrainSrc, target)
+  }
+  console.log(`[sync-android] Copied public/terrain/ to images/terrain/ (${terrainCount} files, ${terrainTargets.length} targets)`)
+}
+
+const cardArtSrc = path.join(ROOT, 'public', 'card-art')
+const cardArtDst = path.join(ROOT, 'android-client', 'www', 'images', 'card-art')
+if (fs.existsSync(cardArtSrc)) {
+  const cardArtTargets = [
+    cardArtDst,
+    path.join(ROOT, 'dist', 'client-build', 'win-unpacked', 'resources', 'app', 'www', 'images', 'card-art'),
+  ]
+  let cardArtCount = 0
+  const cardArtFiles = fs.readdirSync(cardArtSrc).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
+  cardArtCount = cardArtFiles.length
+  for (const dst of cardArtTargets) {
+    if (dst === cardArtDst || fs.existsSync(path.dirname(path.dirname(dst)))) {
+      fs.mkdirSync(dst, { recursive: true })
+      for (const f of cardArtFiles) fs.copyFileSync(path.join(cardArtSrc, f), path.join(dst, f))
+    }
+  }
+  console.log(`[sync-android] Copied public/card-art/ → images/card-art/ (${cardArtCount} files, ${cardArtTargets.length} targets)`)
+}
+
 // ── 复制 data/ 到 android-client/www/data/ ──────────────────────────────
 const androidWwwData = path.join(ROOT, 'android-client', 'www', 'data')
 
@@ -210,6 +261,11 @@ if (fs.existsSync(dataSrc)) {
   if (fs.existsSync(electronData)) {
     const n6 = copyDir(dataSrc, electronData)
     console.log(`[sync-android] Synced data/ → dist Electron data/ (${n6} files)`)
+  }
+  const electronWwwData = path.join(ROOT, 'dist', 'client-build', 'win-unpacked', 'resources', 'app', 'www', 'data')
+  if (fs.existsSync(path.dirname(electronWwwData))) {
+    const n7 = copyDir(dataSrc, electronWwwData)
+    console.log(`[sync-android] Synced data/ to dist Electron www/data/ (${n7} files)`)
   }
 }
 

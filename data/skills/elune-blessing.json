@@ -1,7 +1,7 @@
 {
   "id": "elune-blessing",
   "name": "月神赐福",
-  "description": "获得1张随机圣光手牌，且你打出的下一张圣光手牌效果提高50%。",
+  "description": "获得1张随机圣光手牌，且你打出的下一张圣光手牌效果提高100%。",
   "keywords": [],
   "targetText": "自身",
   "effectTags": ["手牌", "强化"],
@@ -10,9 +10,9 @@
   "type": "normal",
   "cooldownTurns": 1,
   "maxCharges": 0,
-  "powerMultiplier": 1,
-  "actionPointCost": 2,
-  "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); if (!player) { return { success: false, message: '找不到玩家' }; } const cardPool = ['holy-smite', 'holy-heal', 'holy-charge']; const randomCard = cardPool[Math.floor(Math.random() * cardPool.length)]; addCardToHand(randomCard, player.playerId); if (!player.buffs) player.buffs = {}; player.buffs['elune-blessing-buff'] = { multiplier: 1.5, uses: 1 }; return { message: caster.name + '获得月神赐福，得到1张圣光手牌，下一张圣光手牌效果提高50%', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '获得1张随机圣光手牌，且你打出的下一张圣光手牌效果提高50%。', expectedValues: {} }; }",
+  "powerMultiplier": 2,
+  "actionPointCost": 1,
+  "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); if (!player) { return { success: false, message: '找不到玩家' }; } const cardPool = ['holy-smite', 'holy-heal', 'holy-charge']; const randomCard = cardPool[Math.floor(Math.random() * cardPool.length)]; addCardToHand(randomCard, player.playerId); if (!player.buffs) player.buffs = {}; player.buffs['elune-blessing-buff'] = { multiplier: 2.0, uses: 1 }; return { message: caster.name + '获得月神赐福，得到1张圣光手牌，下一张圣光手牌效果提高100%', success: true }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '获得1张随机圣光手牌，且你打出的下一张圣光手牌效果提高100%。', expectedValues: {} }; }",
   "range": "self"
 }

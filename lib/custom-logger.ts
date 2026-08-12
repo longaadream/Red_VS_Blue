@@ -8,7 +8,7 @@ if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
-function writeLog(message) {
+function writeLog(message: string) {
   if (process.env.NODE_ENV === 'production') return;
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] ${message}\n`;

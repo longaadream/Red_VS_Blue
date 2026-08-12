@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { roomStore } from "@/lib/game/room-store"
+import { assignNextSeat, normalizePlayerAlignment, roomStore } from "@/lib/game/room-store"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -15,6 +15,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     playerId?: string
     playerName?: string
   }) ?? {}
+  const accountId = String((body as { accountId?: unknown; identityId?: unknown })?.accountId || (body as { accountId?: unknown; identityId?: unknown })?.identityId || '').trim().toLowerCase() || undefined
+  const requestedAlignment = normalizePlayerAlignment((body as { alignment?: unknown })?.alignment)
 
   if (!playerId?.trim()) {
     return NextResponse.json({ error: "playerId is required" }, { status: 400 })
@@ -37,10 +39,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
   const newPlayer = {
     id: normalizedPlayerId,
+    accountId,
     name: playerName?.trim() || `Player ${normalizedPlayerId.slice(0, 8)}`,
     joinedAt: Date.now(),
+    seat: assignNextSeat(room.players, normalizedPlayerId),
     selectedPieces: [],
   }
+  ;(newPlayer as any).faction = newPlayer.seat
+  if (requestedAlignment) (newPlayer as any).alignment = requestedAlignment
 
   room.players.push(newPlayer)
   await roomStore.setRoom(roomId, room)
@@ -51,7 +57,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     player: {
       id: newPlayer.id,
       name: newPlayer.name,
-      faction: null
+      seat: newPlayer.seat,
+      faction: newPlayer.seat,
+      alignment: requestedAlignment,
     },
     roomStatus: room.players.length === 2 ? "ready" : "waiting"
   }, { status: 201 })

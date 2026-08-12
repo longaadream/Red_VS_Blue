@@ -8,7 +8,7 @@
   "icon": "❄️",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 1,
+  "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 2,

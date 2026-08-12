@@ -6,6 +6,8 @@
   <title>训练营 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/game-engine-runtime.js"></script>
+  <script src="js/game-engine.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     :root {
@@ -19,7 +21,7 @@
       min-height: 100vh; overflow-x: hidden;
     }
 
-    /* ── Topbar ── */
+    /* 鈹€鈹€ Topbar 鈹€鈹€ */
     .topbar {
       display: flex; align-items: center; gap: 10px;
       padding: 10px 14px;
@@ -38,8 +40,27 @@
       color: #a1a1aa; padding: 5px 10px; font-size: 12px; cursor: pointer;
     }
     .btn-top:active { background: var(--card2); }
+    body.training-battle .topbar {
+      position: fixed; top: 8px; right: 8px; z-index: 86;
+      display: flex; justify-content: flex-end; padding: 0;
+      background: transparent; border: none; pointer-events: none;
+    }
+    body.training-battle .back-btn,
+    body.training-battle .topbar-title { display: none !important; }
+    body.training-battle #battleTopBtns {
+      pointer-events: auto; display: flex !important; gap: 5px; flex-wrap: wrap; justify-content: flex-end;
+      max-width: min(330px, calc(100vw - 16px)); padding: 6px;
+      background: rgba(5,10,20,.62); border: 1px solid rgba(148,163,184,.22);
+      border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter: blur(10px);
+    }
+    body.training-battle .btn-top {
+      min-width: 34px; height: 32px; padding: 0 9px; border-radius: 8px;
+      background: rgba(15,23,42,.78); color: #dbeafe; font-weight: 900;
+      border-color: rgba(148,163,184,.26);
+    }
 
-    /* ── Setup ── */
+    /* 鈹€鈹€ Setup 鈹€鈹€ */
     #setupScreen { padding: 16px; max-width: 400px; margin: 0 auto; }
     .setup-title { font-size: 13px; font-weight: 700; color: #71717a; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
     select {
@@ -56,7 +77,7 @@
     .btn-start:active { opacity: .85; }
     .setup-err { color: #f87171; font-size: 13px; text-align: center; margin-top: 10px; display: none; }
 
-    /* ── Battle layout ── */
+    /* 鈹€鈹€ Battle layout 鈹€鈹€ */
     #battleScreen { display: none; }
     .battle-layout {
       display: flex; flex-direction: column; gap: 0;
@@ -67,7 +88,7 @@
       .main-panel { flex: 1; overflow-x: auto; }
     }
 
-    /* ── Side panel ── */
+    /* 鈹€鈹€ Side panel 鈹€鈹€ */
     .side-panel { background: var(--bg); }
     .panel-block {
       padding: 12px 14px;
@@ -96,9 +117,17 @@
     .phase-seg.active-end { background: #ef4444; }
 
     .player-res-card {
-      border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+      border-radius: 8px; padding: 5px 7px; margin-bottom: 5px;
       border: 1px solid var(--border);
     }
+    body.training-battle .side-panel {
+      position: fixed; top: 8px; left: 8px; z-index: 85;
+      width: min(340px, calc(100vw - 82px)); max-height: 42vh; overflow: auto;
+      background: rgba(5,10,20,.62); border: 1px solid rgba(148,163,184,.22);
+      border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter: blur(10px);
+    }
+    body.training-battle .side-panel .panel-block { padding: 8px; border-bottom-color: rgba(148,163,184,.14); }
     .player-res-card.red { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.3); }
     .player-res-card.blue { background: rgba(59,130,246,.08); border-color: rgba(59,130,246,.3); }
     .prc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
@@ -106,7 +135,7 @@
     .prc-name.red { color: var(--red); }
     .prc-name.blue { color: var(--blue); }
     .prc-turn-badge { font-size: 9px; background: #16a34a; color: #fff; border-radius: 4px; padding: 1px 5px; }
-    .prc-stats { font-size: 11px; color: #a1a1aa; display: flex; gap: 10px; }
+    .prc-stats { font-size: 11px; color: #a1a1aa; display: flex; gap: 8px; flex-wrap: wrap; }
     .status-chip-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
     .status-chip {
       display: inline-flex; align-items: center; min-height: 18px;
@@ -187,20 +216,23 @@
     }
     .piece-remove:active { color: #ef4444; }
 
-    /* ── Main panel ── */
+    /* 鈹€鈹€ Main panel 鈹€鈹€ */
     .main-panel { padding: 12px 14px; }
     .map-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .map-name { font-size: 12px; color: #71717a; }
 
     /* Legend */
     .tile-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    body.training-battle .map-header,
+    body.training-battle .tile-legend { display: none !important; }
     .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #a1a1aa; }
     .legend-dot { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
 
     /* Board */
-    .board-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .board-wrap { overflow: hidden; -webkit-overflow-scrolling: touch; touch-action: none; cursor: grab; }
+    .board-wrap.dragging { cursor: grabbing; }
     .board-stage { display: inline-flex; align-items: center; gap: 12px; min-width: max-content; }
-    .board-core { position: relative; display: inline-block; }
+    .board-core { position: relative; display: inline-block; transform-origin: 0 0; will-change: transform; }
     .turn-rail {
       width: 142px; flex: 0 0 142px; display: flex; align-items: center; justify-content: center;
       min-height: min(520px, calc(var(--cell-size, 44px) * 8));
@@ -238,11 +270,20 @@
     .cell:active { filter: brightness(.8); }
 
     /* Tile colors */
+    .cell::before {
+      content: ""; position: absolute; inset: 0; border-radius: inherit;
+      background-size: cover; background-position: center; opacity: .96; z-index: 0;
+    }
+    .cell > * { position: relative; z-index: 2; }
     .t-floor    { background: #3f3f46; }
+    .t-floor::before { background-image: url("images/terrain/floor.webp"); }
     .t-wall     { background: #18181b; cursor: default; }
+    .t-wall::before { background-image: url("images/terrain/wall.webp"); }
     .t-spawn    { background: #064e3b; }
     .t-cover    { background: #78350f; }
+    .t-cover::before { background-image: url("images/terrain/cover.webp"); }
     .t-hole     { background: #082f49; cursor: default; }
+    .t-hole::before { background-image: url("images/terrain/trap.webp"); }
     .t-lava     { background: #7c2d12; }
     .t-spring   { background: #134e4a; }
     .t-chargepad{ background: #3b0764; }
@@ -275,7 +316,7 @@
     .tok-hp-fill.low  { background: #eab308; }
     .tok-hp-fill.crit { background: #ef4444; }
 
-    /* ── Hand panel ── */
+    /* 鈹€鈹€ Hand panel 鈹€鈹€ */
     .hand-panel {
       border-top: 1px solid var(--border);
       background: #080f1e; flex-shrink: 0;
@@ -294,7 +335,7 @@
     }
     .hand-scroll::-webkit-scrollbar { height: 3px; }
     .hand-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-    /* ── Hearthstone-style cards ── */
+    /* 鈹€鈹€ Hearthstone-style cards 鈹€鈹€ */
     .card-item {
       flex-shrink: 0; width: 88px; height: 138px;
       background: linear-gradient(180deg, #1a2744 0%, #0f1929 55%, #131c30 100%);
@@ -350,7 +391,7 @@
     .card-type-badge { font-size: 8px; color: #475569; font-weight: 600; text-align: center; }
     .hand-empty { font-size: 12px; color: #334155; padding: 10px; }
 
-    /* ── End-turn button (Hearthstone style) ── */
+    /* 鈹€鈹€ End-turn button (Hearthstone style) 鈹€鈹€ */
     #btnEndTurn:not(:disabled) {
       background: linear-gradient(180deg, #15803d 0%, #14532d 100%) !important;
       border: 2px solid #4ade80 !important; border-radius: 50px !important;
@@ -365,7 +406,7 @@
       50%      { box-shadow: 0 0 32px rgba(74,222,128,.75), 0 3px 8px rgba(0,0,0,.5); }
     }
 
-    /* ── Turn announcement ── */
+    /* 鈹€鈹€ Turn announcement 鈹€鈹€ */
     #turnAnnounce {
       position: fixed; top: 50%; left: 50%;
       transform: translate(-50%,-50%);
@@ -383,7 +424,7 @@
     .collapse-arrow { font-size: 10px; color: #71717a; transition: transform .2s; }
     .collapse-arrow.open { transform: rotate(90deg); }
 
-    /* ── Log ── */
+    /* 鈹€鈹€ Log 鈹€鈹€ */
     .log-panel {
       margin: 10px 0 0; background: var(--card); border: 1px solid var(--border);
       border-radius: 8px; overflow: hidden;
@@ -401,7 +442,7 @@
     .log-entry.err   { color: #fb923c; }
     .btn-clear { background: transparent; border: none; color: #52525b; font-size: 10px; cursor: pointer; }
 
-    /* ── Result ── */
+    /* 鈹€鈹€ Result 鈹€鈹€ */
     #resultScreen {
       display: none; min-height: 60vh; flex-direction: column;
       align-items: center; justify-content: center; padding: 40px 20px; text-align: center;
@@ -412,7 +453,7 @@
     .btn-again { padding: 12px 32px; background: var(--blue); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 10px; width: 100%; max-width: 260px; }
     .btn-back-menu { padding: 10px 32px; background: var(--card); border: 1px solid var(--border); color: #a1a1aa; border-radius: 10px; font-size: 14px; cursor: pointer; width: 100%; max-width: 260px; }
 
-    /* ── Damage floaters ── */
+    /* 鈹€鈹€ Damage floaters 鈹€鈹€ */
     .dmg-float {
       position: absolute; pointer-events: none; white-space: nowrap;
       font-size: 16px; font-weight: 900; z-index: 50;
@@ -427,7 +468,7 @@
       100% { opacity: 0; transform: translateX(-50%) translateY(-54px); }
     }
 
-    /* ── Loading overlay ── */
+    /* 鈹€鈹€ Loading overlay 鈹€鈹€ */
     #loadingOverlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.45); z-index: 100;
@@ -437,7 +478,7 @@
     .spinner { width: 40px; height: 40px; border: 4px solid var(--card2); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Resource dialog ── */
+    /* 鈹€鈹€ Resource dialog 鈹€鈹€ */
     .dlg-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
     .dlg-overlay.show { display: flex; }
     .dlg { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; width: 100%; max-width: 320px; }
@@ -459,7 +500,7 @@
       .btn-top:hover { background: var(--card2); }
     }
 
-    /* ── Piece detail modal ── */
+    /* 鈹€鈹€ Piece detail modal 鈹€鈹€ */
     .pd-overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.75); z-index: 300;
@@ -496,6 +537,110 @@
     .pd-skill-tag.buff { background: rgba(34,197,94,.15); color: #4ade80; }
     .pd-tag-row { display: flex; flex-wrap: wrap; gap: 4px; }
     .pd-tag { font-size: 10px; background: var(--card2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 7px; color: #a1a1aa; }
+
+    /* ── Arc hand (all screens) ── */
+    .hand-panel { display: none !important; }
+    #arcHandContainer {
+      display: block;
+      position: fixed;
+      bottom: -80px;
+      left: 0; right: 0;
+      height: 130px;
+      z-index: 55;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .arc-card {
+      position: absolute;
+      bottom: 0;
+      width: 80px; height: 124px;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #1a2744 0%, #0f1929 100%);
+      border: 2px solid #4a6a9a;
+      display: flex; flex-direction: column; align-items: center;
+      pointer-events: all; cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s;
+      transform-origin: bottom center;
+      overflow: hidden;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .arc-card.arc-hover {
+      transform: translateY(-70px) scale(1.12) !important;
+      z-index: 10;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.9);
+      border-color: #f59e0b;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .arc-card:hover {
+        transform: translateY(-70px) scale(1.12) !important;
+        z-index: 10;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.9);
+        border-color: #f59e0b;
+      }
+    }
+    .arc-card.arc-pending { border-color: #f59e0b; background: linear-gradient(180deg, #2d1802 0%, #1a1205 100%); }
+    .arc-card.arc-disabled { opacity: 0.45; }
+    .arc-card-art {
+      width: 100%; height: 58px; flex-shrink: 0; overflow: hidden;
+      background: rgba(0,0,0,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+    }
+    .arc-card-art img { width: 100%; height: 100%; object-fit: cover; }
+    .arc-card-cost {
+      position: absolute; top: 3px; left: 4px;
+      font-size: 12px; font-weight: bold; color: #93c5fd;
+      background: #1e3a5f; border-radius: 50%;
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2; flex-shrink: 0;
+    }
+    .arc-card-name {
+      font-size: 9px; color: #cbd5e1; text-align: center;
+      padding: 3px 4px; flex: 1; align-self: stretch;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .arc-card-type { font-size: 8px; color: #64748b; padding-bottom: 4px; }
+
+    /* Final Android/Windows parity override. Keep this at the end of CSS. */
+    body.training-battle::after {
+      content: "UI 20260517";
+      position: fixed; right: 6px; bottom: 6px; z-index: 9999;
+      padding: 2px 5px; border-radius: 5px;
+      background: rgba(2,6,23,.55); border: 1px solid rgba(148,163,184,.18);
+      color: rgba(203,213,225,.58); font-size: 9px; pointer-events: none;
+    }
+    body.training-battle .topbar {
+      position: fixed !important; top: 8px !important; right: 8px !important; left: auto !important;
+      width: auto !important; max-width: min(48vw, 360px) !important; min-height: 0 !important;
+      padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
+    }
+    body.training-battle #battleTopBtns {
+      display: flex !important; gap: 4px !important; padding: 5px !important;
+      background: rgba(2,6,23,.42) !important; border: 1px solid rgba(148,163,184,.16) !important;
+      border-radius: 8px !important; box-shadow: none !important; backdrop-filter: blur(8px) !important;
+    }
+    body.training-battle .btn-top {
+      min-width: 30px !important; height: 28px !important; padding: 0 6px !important;
+      border-radius: 7px !important; font-size: 11px !important; line-height: 1 !important;
+    }
+    body.training-battle .side-panel {
+      position: fixed !important; top: 8px !important; left: 8px !important; z-index: 88 !important;
+      width: min(54vw, 520px) !important; max-height: 38vh !important;
+      padding: 0 !important; overflow: auto !important;
+      background: rgba(2,6,23,.46) !important; border: 1px solid rgba(148,163,184,.18) !important;
+      border-radius: 8px !important; box-shadow: none !important; backdrop-filter: blur(8px) !important;
+    }
+    body.training-battle .side-panel .panel-block { padding: 6px !important; }
+    body.training-battle .map-header,
+    body.training-battle .tile-legend { display: none !important; }
+    body.training-battle .board-wrap {
+      overflow: hidden !important; padding: 2px !important; touch-action: none !important; cursor: grab !important;
+    }
+    body.training-battle .board-core { transform-origin: 0 0 !important; will-change: transform !important; }
+    body.training-battle .cell::before { opacity: .68 !important; filter: saturate(.72) contrast(.78) brightness(.86) !important; }
   </style>
 </head>
 <body>
@@ -505,25 +650,42 @@
 
   <!-- Topbar -->
   <div class="topbar">
-    <a class="back-btn" href="index.html">← 返回</a>
-    <div class="topbar-title">⚔️ 训练营</div>
+    <a class="back-btn" href="index.html">? ??</a>
+    <div class="topbar-title">???</div>
     <div class="topbar-btns" id="battleTopBtns" style="display:none">
-      <button class="btn-top" id="btnSwitchPov" onclick="switchPerspective()" style="font-weight:700">🔄 切换视角</button>
-      <button class="btn-top" onclick="showMapDialog()">🗺 地图</button>
-      <button class="btn-top" onclick="initTraining(currentMapId)">↺ 重置</button>
+      <button class="btn-top" id="btnSwitchPov" onclick="switchPerspective()" style="font-weight:700">????</button>
+      <button class="btn-top" onclick="showMapDialog()">??</button>
+      <button class="btn-top" onclick="showResDialog()" title="????">??</button>
+      <button class="btn-top" onclick="resetCooldowns()" title="????">CD</button>
+      <button class="btn-top" onclick="resetMapView()" title="??????">??</button>
+      <button class="btn-top" onclick="initTraining(currentMapId, getInitialPieceConfig())">??</button>
     </div>
   </div>
 
-  <!-- ── SETUP SCREEN ── -->
+  <!-- 鈹€鈹€ SETUP SCREEN 鈹€鈹€ -->
   <div id="setupScreen">
     <div class="setup-title" style="margin-top:16px">选择地图</div>
     <select id="mapSelect"><option value="">默认地图</option></select>
-    <button class="btn-start" onclick="startSetup()">⚔️ 开始训练</button>
-    <a href="index.html" style="display:block;width:100%;padding:12px;margin-top:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:#a1a1aa;font-size:14px;font-weight:600;text-align:center;text-decoration:none;">← 返回主页</a>
+    <div class="setup-title" style="margin-top:16px">先手阵营</div>
+    <select id="firstFaction" onchange="refreshInitialPieceSelects()">
+      <option value="red">🌑 暗</option>
+      <option value="blue">☀️ 光</option>
+    </select>
+    <div class="setup-title" style="margin-top:16px">先手初始棋子</div>
+    <select id="initialFirstPiece"><option value="">加载棋子中...</option></select>
+    <div class="setup-title" style="margin-top:16px">后手阵营</div>
+    <select id="secondFaction" onchange="refreshInitialPieceSelects()">
+      <option value="blue">☀️ 光</option>
+      <option value="red">🌑 暗</option>
+    </select>
+    <div class="setup-title" style="margin-top:16px">后手初始棋子</div>
+    <select id="initialSecondPiece"><option value="">加载棋子中...</option></select>
+    <button class="btn-start" onclick="startSetup()">鈿旓笍 寮€濮嬭缁?/button>
+    <a href="index.html" style="display:block;width:100%;padding:12px;margin-top:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:#a1a1aa;font-size:14px;font-weight:600;text-align:center;text-decoration:none;">鈫?杩斿洖涓婚〉</a>
     <div class="setup-err" id="setupErr"></div>
   </div>
 
-  <!-- ── BATTLE SCREEN ── -->
+  <!-- 鈹€鈹€ BATTLE SCREEN 鈹€鈹€ -->
   <div id="battleScreen">
     <div class="battle-layout">
 
@@ -532,16 +694,16 @@
 
         <!-- Player control toggle -->
         <div class="panel-block">
-          <div class="panel-label">当前操控方</div>
+          <div class="panel-label">褰撳墠鎿嶆帶鏂?/div>
           <div class="player-toggle">
-            <button class="toggle-btn" id="btnRed" onclick="setLocalPlayer('training-red')">🔴 红方</button>
+            <button class="toggle-btn" id="btnRed" onclick="setLocalPlayer('training-red')">🔴 绾㈡柟</button>
             <button class="toggle-btn" id="btnBlue" onclick="setLocalPlayer('training-blue')">🔵 蓝方</button>
           </div>
         </div>
 
         <!-- Turn info -->
         <div class="panel-block">
-          <div class="panel-label">回合信息</div>
+          <div class="panel-label">鍥炲悎淇℃伅</div>
           <div style="background:var(--card2);border-radius:8px;padding:8px 10px;margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;font-size:12px">
               <span style="color:#a1a1aa">阶段</span>
@@ -552,7 +714,7 @@
               <div class="phase-seg" id="seg-action"></div>
               <div class="phase-seg" id="seg-end"></div>
             </div>
-            <div style="font-size:11px;color:#71717a" id="turnNum">回合 1</div>
+            <div style="font-size:11px;color:#71717a" id="turnNum">鍥炲悎 1</div>
           </div>
           <!-- Player resources -->
           <div id="playerResCards"></div>
@@ -569,46 +731,46 @@
 
         <!-- Action buttons (shown in action phase) -->
         <div class="panel-block hidden-action-wires" id="actionPanel">
-          <div class="panel-label">操作</div>
+          <div class="panel-label">鎿嶄綔</div>
           <div class="action-btns">
             <div id="phaseHint" style="font-size:11px;color:#71717a;text-align:center;padding:4px 0"></div>
-            <button class="btn-action" id="btnMove" onclick="toggleMove()" style="display:none">👣 移动</button>
+            <button class="btn-action" id="btnMove" onclick="toggleMove()" style="display:none">👣 绉诲姩</button>
           </div>
           <!-- Skills for selected piece -->
           <div id="skillSection" style="margin-top:8px;display:none">
-            <div class="panel-label" style="margin-bottom:6px">技能</div>
+            <div class="panel-label" style="margin-bottom:6px">鎶€鑳?/div>
             <div class="skill-list" id="skillList"></div>
           </div>
         </div>
 
         <!-- Place piece -->
         <div class="panel-block">
-          <div class="panel-label">快速放置棋子</div>
+          <div class="panel-label">蹇€熸斁缃瀛?/div>
           <div class="place-row">
             <select id="placeFaction" onchange="onPlaceFactionChange()">
-              <option value="red">🔴 红方</option>
-              <option value="blue">🔵 蓝方</option>
+              <option value="red">🌑 暗（先手）</option>
+              <option value="blue">☀️ 光（后手）</option>
             </select>
           </div>
           <div class="place-row">
-            <select id="placeTemplate"><option value="">选择棋子…</option></select>
+            <select id="placeTemplate"><option value="">?????</option></select>
           </div>
-          <button class="btn-action warn" id="btnPlace" onclick="togglePlaceMode()">＋ 点击格子放置</button>
+          <button class="btn-action warn" id="btnPlace" onclick="togglePlaceMode()">??????</button>
         </div>
 
         <!-- Management tools -->
         <div class="panel-block">
-          <div class="panel-label">管理工具</div>
+          <div class="panel-label">绠＄悊宸ュ叿</div>
           <div class="action-btns">
-            <button class="btn-action" onclick="showResDialog()">⚙ 修改资源</button>
-            <button class="btn-action" onclick="resetCooldowns()">↺ 重置冷却</button>
+            <button class="btn-action" onclick="showResDialog()">鈿?淇敼璧勬簮</button>
+            <button class="btn-action" onclick="resetCooldowns()">鈫?閲嶇疆鍐峰嵈</button>
           </div>
         </div>
 
         <!-- Piece list: Red -->
         <div class="panel-block">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div class="panel-label" style="margin-bottom:0;color:var(--red)">🔴 红方棋子</div>
+            <div class="panel-label" style="margin-bottom:0;color:var(--red)">????</div>
           </div>
           <div id="redPieces"></div>
         </div>
@@ -616,7 +778,7 @@
         <!-- Piece list: Blue -->
         <div class="panel-block">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div class="panel-label" style="margin-bottom:0;color:var(--blue)">🔵 蓝方棋子</div>
+            <div class="panel-label" style="margin-bottom:0;color:var(--blue)">????</div>
           </div>
           <div id="bluePieces"></div>
         </div>
@@ -632,14 +794,14 @@
 
         <!-- Tile legend -->
         <div class="tile-legend">
-          <div class="legend-item"><div class="legend-dot" style="background:#3f3f46"></div>地板</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#18181b"></div>墙壁</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#064e3b"></div>出生点</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#78350f"></div>掩体</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#082f49"></div>陷阱</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#7c2d12"></div>熔岩</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#134e4a"></div>治愈泉</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#3b0764"></div>充能台</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#3f3f46"></div>??</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#18181b"></div>?</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#064e3b"></div>???</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#78350f"></div>??</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#082f49"></div>??</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#7c2d12"></div>??</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#134e4a"></div>??</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#3b0764"></div>???</div>
         </div>
 
         <div class="board-wrap" id="boardWrap">
@@ -658,14 +820,14 @@
         <!-- Hand -->
         <div class="hand-panel" id="handPanel">
           <div class="hand-header" onclick="toggleHandPanel()">
-            <span>🃏 手牌 <span id="handCount">0</span>
-              <span id="handTargetHint" style="color:#f59e0b;display:none"> · 点击目标施放</span>
+            <span>?? <span id="handCount">0</span>
+              <span id="handTargetHint" style="color:#f59e0b;display:none"> ? ??????</span>
             </span>
             <span class="collapse-arrow" id="handArrow">▶</span>
           </div>
           <div class="hand-body collapsed" id="handBody">
             <div class="hand-scroll" id="handCards">
-              <div class="hand-empty">暂无手牌</div>
+              <div class="hand-empty">鏆傛棤鎵嬬墝</div>
             </div>
           </div>
         </div>
@@ -673,62 +835,62 @@
         <!-- Battle log -->
         <div class="log-panel">
           <div class="log-header">
-            战斗日志
-            <button class="btn-clear" onclick="clearLog()">清空</button>
+            鎴樻枟鏃ュ織
+            <button class="btn-clear" onclick="clearLog()">娓呯┖</button>
           </div>
           <div class="log-body" id="logBody"></div>
         </div>
 
         <div style="padding:14px 0">
-          <button class="btn-back-menu" style="width:100%" onclick="goSetup()">← 新对战</button>
+          <button class="btn-back-menu" style="width:100%" onclick="goSetup()">鈫?鏂板鎴?/button>
         </div>
       </div><!-- /main-panel -->
 
     </div><!-- /battle-layout -->
   </div><!-- /battleScreen -->
 
-  <!-- ── RESULT SCREEN ── -->
+  <!-- 鈹€鈹€ RESULT SCREEN 鈹€鈹€ -->
   <div id="resultScreen">
     <div class="result-icon" id="resultIcon">🏆</div>
     <div class="result-title" id="resultTitle">胜利！</div>
     <div class="result-sub" id="resultSub"></div>
-    <button class="btn-again" onclick="initTraining(currentMapId)">再来一局</button>
-    <button class="btn-back-menu" onclick="goSetup()">← 返回设置</button>
+      <button class="btn-top" onclick="initTraining(currentMapId, getInitialPieceConfig())">??</button>
+    <button class="btn-back-menu" onclick="goSetup()">鈫?杩斿洖璁剧疆</button>
   </div>
 
-  <!-- ── Resource dialog ── -->
+  <!-- 鈹€鈹€ Resource dialog 鈹€鈹€ -->
   <div class="dlg-overlay" id="resDlg">
     <div class="dlg">
-      <h3>修改资源</h3>
+      <h3>淇敼璧勬簮</h3>
       <div class="dlg-row">
-        <label>操控方</label>
+        <label>鎿嶆帶鏂?/label>
         <select id="resPlayer" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:#e4e4e7;font-size:12px;padding:7px">
-          <option value="training-red">🔴 红方</option>
+          <option value="training-red">🔴 绾㈡柟</option>
           <option value="training-blue">🔵 蓝方</option>
         </select>
       </div>
       <div class="dlg-row"><label>行动点 AP</label><input id="resAP" type="number" min="0" max="20" value="10" /></div>
       <div class="dlg-row"><label>充能点 CP</label><input id="resCP" type="number" min="0" max="20" value="0" /></div>
       <div class="dlg-btns">
-        <button class="btn-cancel-dlg" onclick="closeResDlg()">取消</button>
-        <button class="btn-ok" onclick="applyRes()">确认</button>
+        <button class="btn-cancel-dlg" onclick="closeResDlg()">鍙栨秷</button>
+        <button class="btn-ok" onclick="applyRes()">纭</button>
       </div>
     </div>
   </div>
 
-  <!-- ── Map select dialog ── -->
+  <!-- 鈹€鈹€ Map select dialog 鈹€鈹€ -->
   <div class="dlg-overlay" id="mapDlg">
     <div class="dlg">
       <h3>切换地图</h3>
       <select id="mapDlgSelect" style="width:100%;margin-bottom:12px"><option value="">默认地图</option></select>
       <div class="dlg-btns">
-        <button class="btn-cancel-dlg" onclick="closeMapDlg()">取消</button>
-        <button class="btn-ok" onclick="applyMapChange()">切换并重置</button>
+        <button class="btn-cancel-dlg" onclick="closeMapDlg()">鍙栨秷</button>
+        <button class="btn-ok" onclick="applyMapChange()">鍒囨崲骞堕噸缃?/button>
       </div>
     </div>
   </div>
 
-  <!-- ── Piece detail modal ── -->
+  <!-- 鈹€鈹€ Piece detail modal 鈹€鈹€ -->
   <div class="pd-overlay" id="pdOverlay" onclick="closePieceDetail()">
     <div class="pd-sheet" id="pdSheet" onclick="event.stopPropagation()">
       <div id="pdContent"></div>
@@ -736,9 +898,9 @@
   </div>
 
   <script>
-    // ── Constants ──
+    // 鈹€鈹€ Constants 鈹€鈹€
     const SERVER_KEY = 'rvb_server_url'
-    const getServerUrl = () => localStorage.getItem(SERVER_KEY) || ''
+    const getServerUrl = () => (window.RvBUtils && RvBUtils.getServerUrl ? RvBUtils.getServerUrl() : localStorage.getItem(SERVER_KEY)) || ''
     const TILE_TYPE_CLASS = {
       wall: 't-wall', floor: 't-floor', spawn: 't-spawn',
       cover: 't-cover', hole: 't-hole', lava: 't-lava',
@@ -746,14 +908,14 @@
     }
     const PHASE_LABELS = { start: '开始阶段', action: '行动阶段', end: '结束阶段' }
 
-    // ── State ──
+    // 鈹€鈹€ State 鈹€鈹€
     let G = null                          // BattleState from server
     let localPlayerId = 'training-red'    // which side user controls
     let selectedPieceId = null
     let pendingMove = false
     let pendingSkill = null               // {skillId, skillType, baseAction, extraTargets[]}
     let placingMode = false               // board click will place piece
-    let PIECES_BY_ID = {}                 // templateId → piece template (for images)
+    let PIECES_BY_ID = {}                 // templateId 鈫?piece template (for images)
     let MAPS = []                         // available maps from /api/maps
     let currentMapId = ''                 // current map id
     let actionLog = []
@@ -762,43 +924,156 @@
     let pendingCardAction = null   // { type:'playCard', playerId, cardInstanceId } awaiting target
     let lastActionCount = 0       // for G.actions-based log flushing
 
-    // ── API helpers ──
-    let _trainingBaseUrl = null
-    async function _getTrainingUrl() {
-      if (_trainingBaseUrl) return _trainingBaseUrl
-      if (window.electronAPI) {
-        try {
-          const info = await window.electronAPI.getHostInfo()
-          if (info && info.port) { _trainingBaseUrl = 'http://localhost:' + info.port; return _trainingBaseUrl }
-        } catch (e) { console.warn('[training] getHostInfo failed:', e) }
-      }
-      if (window.RvBBridge) { _trainingBaseUrl = 'http://localhost:7878'; return _trainingBaseUrl }
-      _trainingBaseUrl = 'http://localhost:54321'
-      return _trainingBaseUrl
+    function clearCardPrimaryTarget(action) {
+      const next = Object.assign({}, action || {})
+      delete next.targetPieceId
+      delete next.targetX
+      delete next.targetY
+      delete next.extraTargets
+      return next
     }
 
+    function prepareCardTargetRetry(action, targetIndex) {
+      const idx = Number(targetIndex)
+      return idx === 0 ? clearCardPrimaryTarget(action) : action
+    }
+
+    function getInitialPieceConfig() {
+      const firstFaction = document.getElementById('firstFaction')
+      const secondFaction = document.getElementById('secondFaction')
+      const firstSel = document.getElementById('initialFirstPiece')
+      const secondSel = document.getElementById('initialSecondPiece')
+      return {
+        firstFaction: firstFaction ? firstFaction.value || 'red' : 'red',
+        secondFaction: secondFaction ? secondFaction.value || 'blue' : 'blue',
+        firstTemplateId: firstSel ? firstSel.value || undefined : undefined,
+        secondTemplateId: secondSel ? secondSel.value || undefined : undefined,
+        firstPlayerId: 'training-red',
+      }
+    }
+
+    function resolveInitialPiece(faction, explicitId) {
+      const allPieces = Object.values(PIECES_BY_ID)
+      const alignment = faction === 'red' ? 'evil' : 'good'
+      const fallbackId = faction === 'red' ? 'red-sasuke' : 'blue-naruto'
+      return (explicitId && PIECES_BY_ID[explicitId])
+        || PIECES_BY_ID[fallbackId]
+        || allPieces.find(p => p.faction === alignment)
+        || allPieces.find(p => !p.faction || p.faction === 'neutral')
+        || allPieces[0]
+    }
+
+    // 鈹€鈹€ API helpers 鈹€鈹€
     async function apiFetch(method, body) {
-      const baseUrl = await _getTrainingUrl()
-      const res = await fetch(baseUrl + '/api/training', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw Object.assign(new Error(data.error || 'API错误'), data)
-      return data
+      const Engine = await window.RvBGameEngine.ensure()
+      if (method === 'POST') {
+        const firstFaction = (body && body.firstFaction) === 'blue' ? 'blue' : 'red'
+        const secondFaction = (body && body.secondFaction) === 'red' ? 'red' : 'blue'
+        const firstPlayerId = (body && body.firstPlayerId) || 'training-red'
+        const secondPlayerId = firstPlayerId === 'training-red' ? 'training-blue' : 'training-red'
+        const firstPiece = resolveInitialPiece(firstFaction, body && body.firstTemplateId)
+        const secondPiece = resolveInitialPiece(secondFaction, body && body.secondTemplateId)
+        const state = await Engine.createInitialBattleForPlayers(
+          ['training-red', 'training-blue'],
+          [],
+          [
+            { playerId: firstPlayerId, pieces: firstPiece ? [firstPiece] : [], faction: firstFaction },
+            { playerId: secondPlayerId, pieces: secondPiece ? [secondPiece] : [], faction: secondFaction },
+          ],
+          body && body.mapId,
+          { firstPlayerId }
+        )
+        if (!state) throw new Error('Failed to create training battle state')
+        state.skillsById = Object.assign({}, skillsById || {}, state.skillsById || {})
+        state.players = state.players.map(player => Object.assign({}, player, {
+          actionPoints: player.playerId === firstPlayerId ? 10 : 0,
+          maxActionPoints: 10,
+        }))
+        state.turn.currentPlayerId = firstPlayerId
+        return state
+      }
+      if (method === 'PUT') {
+        if (!body || !body.action || !body.battleState) throw new Error('Missing action or battleState')
+        return Engine.applyBattleAction(Engine.safeCloneBattleState(body.battleState), body.action)
+      }
+      if (method === 'PATCH') {
+        if (!body || !body.type || !body.battleState) throw new Error('Missing type or battleState')
+        const next = Engine.safeCloneBattleState(body.battleState)
+        if (body.type === 'updateResources') {
+          next.players = next.players.map(player => player.playerId === body.playerId
+            ? Object.assign({}, player, { actionPoints: Math.max(0, Math.min(20, body.actionPoints)), chargePoints: Math.max(0, Math.min(20, body.chargePoints)) })
+            : player)
+          return next
+        }
+        if (body.type === 'removePiece') {
+          next.pieces = next.pieces.filter(p => p.instanceId !== body.instanceId)
+          return next
+        }
+        if (body.type === 'resetCooldowns') {
+          next.pieces = next.pieces.map(piece => Object.assign({}, piece, {
+            skills: (piece.skills || []).map(skill => Object.assign({}, skill, { currentCooldown: 0, usesRemaining: skill.usesRemaining === 0 ? 1 : skill.usesRemaining }))
+          }))
+          return next
+        }
+        if (body.type === 'addPiece') {
+          const tpl = PIECES_BY_ID[body.templateId]
+          if (!tpl) throw new Error('???????: ' + body.templateId)
+          if (next.pieces.some(p => p.x === body.x && p.y === body.y && p.currentHp > 0)) throw new Error('Position is already occupied')
+          const stats = tpl.stats || {}
+          const ownerPlayerId = body.faction === 'blue' ? 'training-blue' : 'training-red'
+          const rules = (tpl.rules || [])
+            .map(ruleId => Engine.loadRuleById ? Engine.loadRuleById(ruleId, true) : null)
+            .filter(Boolean)
+          next.pieces.push({
+            instanceId: ownerPlayerId + '-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+            templateId: tpl.id,
+            name: tpl.name,
+            ownerPlayerId,
+            faction: body.faction === 'blue' ? 'blue' : 'red',
+            currentHp: stats.maxHp || 1,
+            maxHp: stats.maxHp || 1,
+            attack: stats.attack || 0,
+            defense: stats.defense || 0,
+            moveRange: stats.moveRange || 3,
+            x: body.x,
+            y: body.y,
+            skills: (tpl.skills || []).map(s => ({ skillId: s.skillId || s.id || s, level: s.level || 1, currentCooldown: 0, usesRemaining: -1 })),
+            buffs: [],
+            debuffs: [],
+            statusTags: [],
+            ruleTags: [],
+            rules,
+          })
+          return next
+        }
+        throw new Error('Unknown operation type: ' + body.type)
+      }
+      throw new Error('Unsupported training method: ' + method)
     }
 
     async function fetchLocalJson(path) {
+      const normalized = String(path).replace(/^\.\//, '')
+      const candidates = [path, normalized, '/' + normalized]
       if (window.fetchPackJson && /^\.?\/?data\//.test(path)) {
-        return window.fetchPackJson(path)
+        for (const candidate of candidates) {
+          const data = await window.fetchPackJson(candidate)
+          if (data) return data
+        }
       }
-      const res = await fetch(path)
-      if (!res.ok) throw new Error('HTTP ' + res.status)
-      return res.json()
+      let lastError = null
+      for (const candidate of candidates) {
+        try {
+          const res = await fetch(candidate)
+          if (res.ok) return res.json()
+          lastError = new Error('HTTP ' + res.status + ' for ' + candidate)
+        } catch (e) {
+          lastError = e
+        }
+      }
+      throw lastError || new Error('Failed to load ' + path)
     }
 
-    // ── Init ──
+    // 鈹€鈹€ Init 鈹€鈹€
     async function loadAvailableData() {
       // Load pieces from local data/ (offline-first)
       try {
@@ -810,6 +1085,7 @@
           } catch {}
         }
         refreshPlaceTemplates()
+        refreshInitialPieceSelects()
       } catch {}
 
       // Load maps from local data/
@@ -850,16 +1126,49 @@
 
     function populateMapSelects() {
       const opts = '<option value="">默认地图</option>' + MAPS.map(m =>
-        `<option value="${m.id}">${m.name || m.id}${m.width ? ' ('+m.width+'×'+m.height+')' : ''}</option>`
+        `<option value="${m.id}">${m.name || m.id}${m.width ? ' ('+m.width+'脳'+m.height+')' : ''}</option>`
       ).join('')
       document.getElementById('mapSelect').innerHTML = opts
       document.getElementById('mapDlgSelect').innerHTML = opts
     }
 
+    function refreshInitialPieceSelects() {
+      const firstSel = document.getElementById('initialFirstPiece')
+      const secondSel = document.getElementById('initialSecondPiece')
+      if (!firstSel || !secondSel) return
+      // map turn-order value (red/blue) to piece alignment (evil/good)
+      const toAlignment = f => f === 'red' ? 'evil' : 'good'
+      const defaultPieceId = f => f === 'red' ? 'red-sasuke' : 'blue-naruto'
+      const makeOptions = (faction, label) => {
+        const alignment = toAlignment(faction)
+        const pieces = Object.values(PIECES_BY_ID)
+          .filter(p => p && p.id && (p.faction === alignment || p.faction === 'neutral' || !p.faction))
+          .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id, 'zh-Hans-CN'))
+        return '<option value="">' + label + '</option>' + pieces.map(p =>
+          `<option value="${p.id}">${p.name || p.id}</option>`
+        ).join('')
+      }
+      const firstFaction = document.getElementById('firstFaction')?.value || 'red'
+      const secondFaction = document.getElementById('secondFaction')?.value || 'blue'
+      const oldFirst = firstSel.value
+      const oldSecond = secondSel.value
+      firstSel.innerHTML = makeOptions(firstFaction, '默认先手棋子')
+      secondSel.innerHTML = makeOptions(secondFaction, '默认后手棋子')
+      const matchesFaction = (pieceId, faction) => {
+        const p = PIECES_BY_ID[pieceId]; if (!p) return false
+        return !p.faction || p.faction === toAlignment(faction) || p.faction === 'neutral'
+      }
+      if (oldFirst && matchesFaction(oldFirst, firstFaction)) firstSel.value = oldFirst
+      else if (PIECES_BY_ID[defaultPieceId(firstFaction)]) firstSel.value = defaultPieceId(firstFaction)
+      if (oldSecond && matchesFaction(oldSecond, secondFaction)) secondSel.value = oldSecond
+      else if (PIECES_BY_ID[defaultPieceId(secondFaction)]) secondSel.value = defaultPieceId(secondFaction)
+    }
+
     function refreshPlaceTemplates() {
       const faction = document.getElementById('placeFaction').value
+      const alignment = faction === 'red' ? 'evil' : 'good'
       const sel = document.getElementById('placeTemplate')
-      const pieces = Object.values(PIECES_BY_ID).filter(p => !p.faction || p.faction === faction || p.faction === 'neutral')
+      const pieces = Object.values(PIECES_BY_ID).filter(p => p.faction === alignment || p.faction === 'neutral' || !p.faction)
       sel.innerHTML = '<option value="">选择棋子…</option>' + pieces.map(p =>
         `<option value="${p.id}">${p.name || p.id}</option>`
       ).join('')
@@ -872,20 +1181,16 @@
     }
 
     async function startSetup() {
-      const url = getServerUrl()
-      if (!url) {
-        showSetupErr('请先在主页连接服务器')
-        return
-      }
       const mapId = document.getElementById('mapSelect').value || undefined
-      await initTraining(mapId)
+      await initTraining(mapId, getInitialPieceConfig())
     }
 
-    async function initTraining(mapId) {
+    async function initTraining(mapId, initialPieces) {
       showLoading(true)
       hideSetupErr()
       try {
-        G = await apiFetch('POST', { mapId: mapId || undefined })
+        const selectedInitialPieces = initialPieces || getInitialPieceConfig()
+        G = await apiFetch('POST', Object.assign({ mapId: mapId || undefined }, selectedInitialPieces))
         currentMapId = mapId || ''
         localPlayerId = G.turn.currentPlayerId
         selectedPieceId = null
@@ -895,19 +1200,19 @@
         actionLog = []
         lastActionCount = 0
         flushActionLog(0, G)
-        addLog('⚔️ 训练营开始', 'turn')
-        addLog('点击 [继续▶] 开始回合', 'info')
+        addLog('训练营开始', 'turn')
+        addLog('点击继续开始回合', 'info')
         showScreen('battle')
         renderAll()
       } catch (e) {
-        showSetupErr('初始化失败：' + e.message)
+        showSetupErr('鍒濆鍖栧け璐ワ細' + e.message)
         showScreen('setup')
       } finally {
         showLoading(false)
       }
     }
 
-    // ── Log helpers ──
+    // 鈹€鈹€ Log helpers 鈹€鈹€
     function logClassFromType(type) {
       if (type === 'move') return 'mov'
       if (type === 'useBasicSkill' || type === 'useChargeSkill') return 'skill'
@@ -928,7 +1233,7 @@
       lastActionCount = newG.actions.length
     }
 
-    // ── Turn announcement ──
+    // 鈹€鈹€ Turn announcement 鈹€鈹€
     let _lastAnnouncedTurnPlayer = null
     function showTurnAnnounce(text, color) {
       const el = document.getElementById('turnAnnounce')
@@ -940,7 +1245,7 @@
       el.className = 'show'
     }
 
-    // ── Damage / heal floaters ──
+    // 鈹€鈹€ Damage / heal floaters 鈹€鈹€
     function spawnFloater(x, y, text, color, big) {
       const layer = document.getElementById('floatLayer')
       if (!layer) return
@@ -971,7 +1276,28 @@
       }
     }
 
-    // ── Send action ──
+    // 鈹€鈹€ Send action 鈹€鈹€
+    async function handleTurnPhasePendingSelections() {
+      if (G.pendingOptionSelection) {
+        const p = G.pendingOptionSelection
+        const chosen = await showOptionDialog(p.title || '请选择', p.options || [])
+        const selectedOption = chosen !== null ? chosen : (p.cancelValue !== undefined ? p.cancelValue : 'no')
+        await sendAction({ type: 'pendingOptionSelect', playerId: p.playerId || G.turn.currentPlayerId, selectedOption })
+        return true
+      }
+      if (G.pendingTargetSelection) {
+        const pt = G.pendingTargetSelection
+        pendingSkill = { targetType: pt.targetType, range: pt.range || 99, filter: pt.filter || 'all', turnTargetActionType: 'pendingTargetSelect', turnTargetPlayerId: pt.playerId || G.turn.currentPlayerId }
+        addLog(pt.title || '🎯 请在棋盘上点击目标', 'info')
+        renderAll()
+        return true
+      } else if (pendingSkill && pendingSkill.turnTargetActionType === 'pendingTargetSelect') {
+        pendingSkill = null
+        renderAll()
+      }
+      return false
+    }
+
     async function sendAction(action) {
       if (!G) return
       showLoading(true)
@@ -989,23 +1315,7 @@
           pendingSkill = null
           pendingCardAction = null
         }
-        // 检测回合阶段待处理的选择
-        if (G.pendingBeginTurnChoice || G.pendingEndTurnChoice) {
-          const p = G.pendingBeginTurnChoice || G.pendingEndTurnChoice
-          const actionType = G.pendingBeginTurnChoice ? 'beginTurnChoice' : 'endTurnChoice'
-          const chosen = await showOptionDialog(p.title, p.options)
-          if (chosen !== null) {
-            await sendAction({ type: actionType, playerId: G.turn.currentPlayerId, selectedOption: chosen })
-            return
-          }
-        }
-        if (G.pendingBeginTurnTarget || G.pendingEndTurnTarget) {
-          const pt = G.pendingBeginTurnTarget || G.pendingEndTurnTarget
-          const actionType = G.pendingBeginTurnTarget ? 'beginTurnTargetSelect' : 'endTurnTargetSelect'
-          pendingSkill = { targetType: pt.targetType, range: pt.range || 10, filter: pt.filter || 'all', turnTargetActionType: actionType, turnTargetPlayerId: G.turn.currentPlayerId }
-          addLog('🎯 请在棋盘上点击目标（回合阶段）', 'info')
-          renderBoard()
-        }
+        if (await handleTurnPhasePendingSelections()) return
         if (wasEndTurn) {
           // auto-chain beginPhase if server left us in 'end' phase
           if (G.turn.phase === 'end') {
@@ -1015,27 +1325,32 @@
               flushActionLog(oldCount2, nextState)
               G = nextState
             } catch {}
+            if (await handleTurnPhasePendingSelections()) return
           }
           localPlayerId = G.turn.currentPlayerId
-          addLog('🔄 回合结束 → ' + playerLabel(localPlayerId), 'turn')
+          addLog('🔄 鍥炲悎缁撴潫 鈫?' + playerLabel(localPlayerId), 'turn')
         }
         renderAll()
         checkGameOver()
       } catch (e) {
         if (e.needsTargetSelection) {
-          // pendingSkill 保留 baseAction + extraTargets，只更新范围/过滤参数
-          if (pendingSkill) {
+          if (action.type === 'playCard') {
+            pendingCardAction = prepareCardTargetRetry(action, e.targetIndex)
+            addLog('请继续在棋盘上点击手牌目标', 'info')
+            renderHand()
+            renderBoard()
+          } else if (pendingSkill) {
             pendingSkill.range = e.range
             pendingSkill.filter = e.filter
           } else {
             pendingSkill = { range: e.range, filter: e.filter, baseAction: null, extraTargets: [] }
+            addLog('请在棋盘上点击目标', 'info')
+            renderBoard()
           }
-          addLog('🎯 请在棋盘上点击目标', 'info')
-          renderBoard()
         } else if (e.needsOptionSelection) {
           const chosen = await showOptionDialog(e.title || '请选择', e.options || [])
           if (chosen !== null) {
-            // 把 selectedOption 合并进当前 action，更新 baseAction（保留已有目标信息）
+            // 鎶?selectedOption 鍚堝苟杩涘綋鍓?action锛屾洿鏂?baseAction（保留已有目标信息）
             const retryAction = Object.assign({}, action, { selectedOption: chosen })
             if (pendingSkill) pendingSkill.baseAction = retryAction
             showLoading(false)
@@ -1044,7 +1359,7 @@
           }
           pendingSkill = null; pendingMove = false
         } else {
-          addLog('❌ ' + e.message, 'err')
+          addLog('鉂?' + e.message, 'err')
           pendingSkill = null; pendingMove = false
         }
         renderActionPanel()
@@ -1060,18 +1375,18 @@
         renderAll()
         return true
       } catch (e) {
-        addLog('❌ ' + e.message, 'err')
+        addLog('鉂?' + e.message, 'err')
         return false
       } finally {
         showLoading(false)
       }
     }
 
-    // ── Actions ──
+    // 鈹€鈹€ Actions 鈹€鈹€
     async function doBeginPhase() { await sendAction({ type: 'beginPhase' }) }
     async function doEndTurn()    { await sendAction({ type: 'endTurn', playerId: localPlayerId }) }
 
-    // 弹出简易选项选择框（回合阶段规则需要时调用）
+    // Simple option picker for turn phase rules.
     function showOptionDialog(title, options) {
       return new Promise(resolve => {
         const overlay = document.createElement('div')
@@ -1083,11 +1398,11 @@
           const btn = document.createElement('button')
           btn.textContent = opt.label || opt.id
           btn.style.cssText = 'display:block;width:100%;margin-bottom:8px;padding:8px;background:#1d4ed8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px'
-          btn.onclick = () => { document.body.removeChild(overlay); resolve(opt) }
+          btn.onclick = () => { document.body.removeChild(overlay); resolve(opt.value !== undefined ? opt.value : opt) }
           box.appendChild(btn)
         })
         const cancel = document.createElement('button')
-        cancel.textContent = '取消'
+        cancel.textContent = '鍙栨秷'
         cancel.style.cssText = 'display:block;width:100%;padding:6px;background:transparent;color:#94a3b8;border:1px solid #475569;border-radius:4px;cursor:pointer;font-size:12px'
         cancel.onclick = () => { document.body.removeChild(overlay); resolve(null) }
         box.appendChild(cancel)
@@ -1096,13 +1411,13 @@
       })
     }
     async function resetCooldowns() {
-      if (await sendPatch({ type: 'resetCooldowns' })) addLog('↺ 冷却已重置', 'info')
+      if (await sendPatch({ type: 'resetCooldowns' })) addLog('冷却已重置', 'info')
     }
 
     function setLocalPlayer(id) {
       localPlayerId = id
       selectedPieceId = null; pendingMove = false; pendingSkill = null
-      addLog('↔️ 操控方 → ' + playerLabel(id), 'turn')
+      addLog('鈫旓笍 鎿嶆帶鏂?鈫?' + playerLabel(id), 'turn')
       renderAll()
     }
 
@@ -1110,7 +1425,7 @@
       const next = localPlayerId === 'training-red' ? 'training-blue' : 'training-red'
       setLocalPlayer(next)
       const btn = document.getElementById('btnSwitchPov')
-      if (btn) btn.textContent = next === 'training-red' ? '🔄 切换视角 🔴' : '🔄 切换视角 🔵'
+      if (btn) btn.textContent = next === 'training-red' ? '🔄 鍒囨崲瑙嗚 🔴' : '🔄 鍒囨崲瑙嗚 🔵'
     }
 
     function toggleMove() {
@@ -1125,9 +1440,8 @@
         renderBoard(); renderActionPanel(); return
       }
       pendingMove = false
-      // baseAction = null（未选目标）；extraTargets = 已累积的额外目标列表
+      // Start without a target; the server will request one if needed.
       pendingSkill = { skillId, skillType, baseAction: null, extraTargets: [] }
-      // Try without target — server will request if needed
       sendAction({
         type: skillType === 'super' ? 'useChargeSkill' : 'useBasicSkill',
         playerId: localPlayerId,
@@ -1136,7 +1450,7 @@
       })
     }
 
-    // ── Board click ──
+    // Board click
     function onCellClick(x, y) {
       if (!G) return
       const alivePieces = G.pieces.filter(p => p.currentHp > 0)
@@ -1144,8 +1458,19 @@
 
       // Pending card target selection
       if (pendingCardAction) {
-        const extra = pieceAt ? { targetPieceId: pieceAt.instanceId } : { targetX: x, targetY: y }
-        const action = Object.assign({}, pendingCardAction, extra)
+        let action
+        const hasPrimaryTarget = pendingCardAction.targetPieceId || pendingCardAction.targetX !== undefined || pendingCardAction.targetY !== undefined
+        if (hasPrimaryTarget) {
+          const newExtra = { x, y }
+          if (pieceAt) newExtra.pieceId = pieceAt.instanceId
+          action = Object.assign({}, pendingCardAction, {
+            extraTargets: (pendingCardAction.extraTargets || []).concat([newExtra])
+          })
+        } else {
+          const firstTarget = { targetX: x, targetY: y }
+          if (pieceAt) firstTarget.targetPieceId = pieceAt.instanceId
+          action = Object.assign({}, pendingCardAction, firstTarget)
+        }
         pendingCardAction = null
         document.getElementById('handTargetHint').style.display = 'none'
         sendAction(action)
@@ -1156,12 +1481,12 @@
       if (placingMode) {
         const templateId = document.getElementById('placeTemplate').value
         const faction = document.getElementById('placeFaction').value
-        if (!templateId) { addLog('❌ 请先选择棋子类型', 'err'); return }
+        if (!templateId) { addLog('请先选择棋子类型', 'err'); return }
         const tile = G.map.tiles.find(t => t.x === x && t.y === y)
-        if (!tile || !tile.props.walkable) { addLog('❌ 不可放置此处', 'err'); return }
-        if (pieceAt) { addLog('❌ 该位置已有棋子', 'err'); return }
+        if (!tile || !tile.props.walkable) { addLog('不可放置此处', 'err'); return }
+        if (pieceAt) { addLog('该位置已有棋子', 'err'); return }
         sendPatch({ type: 'addPiece', faction, templateId, x, y }).then(ok => {
-          if (ok) addLog('➕ 放置 ' + (PIECES_BY_ID[templateId]?.name || templateId), 'info')
+          if (ok) addLog('放置 ' + (PIECES_BY_ID[templateId]?.name || templateId), 'info')
         })
         return
       }
@@ -1176,11 +1501,13 @@
         return
       }
 
-      // Turn phase target select (beginTurnTargetSelect / endTurnTargetSelect)
+      // Generic pending target selection
       if (pendingSkill && pendingSkill.turnTargetActionType) {
         const action = { type: pendingSkill.turnTargetActionType, playerId: pendingSkill.turnTargetPlayerId || localPlayerId, targetX: x, targetY: y }
         if (pieceAt) action.targetPieceId = pieceAt.instanceId
         pendingSkill = null
+        addLog('已提交目标选择', 'info')
+        renderAll()
         sendAction(action)
         return
       }
@@ -1189,15 +1516,15 @@
       if (pendingSkill && selectedPieceId) {
         let action
         if (pendingSkill.baseAction) {
-          // 第 N 次目标选择：在已有 baseAction 基础上追加到 extraTargets[]
+          // 绗?N 娆＄洰鏍囬€夋嫨锛氬湪宸叉湁 baseAction 基础上追加到 extraTargets[]
           const newExtra = { x, y }
           if (pieceAt) newExtra.pieceId = pieceAt.instanceId
           const newExtraTargets = (pendingSkill.extraTargets || []).concat([newExtra])
           action = Object.assign({}, pendingSkill.baseAction, { extraTargets: newExtraTargets })
-          // 更新 pendingSkill 状态（异步 sendAction 返回前不清除，让 catch 能复用）
+          // 鏇存柊 pendingSkill 状态（异步 sendAction 杩斿洖鍓嶄笉娓呴櫎锛岃 catch 鑳藉鐢級
           pendingSkill = Object.assign({}, pendingSkill, { extraTargets: newExtraTargets })
         } else {
-          // 第 1 次目标选择：构建基础 action
+          // 绗?1 娆＄洰鏍囬€夋嫨锛氭瀯寤哄熀纭€ action
           action = {
             type: pendingSkill.skillType === 'super' ? 'useChargeSkill' : 'useBasicSkill',
             playerId: localPlayerId,
@@ -1207,7 +1534,7 @@
             extraTargets: []
           }
           if (pieceAt) action.targetPieceId = pieceAt.instanceId
-          // 存入 baseAction，以便后续调用 selectTarget 时能追加额外目标
+          // Preserve the base action so later target selections can append extra targets.
           pendingSkill = Object.assign({}, pendingSkill, { baseAction: action, extraTargets: [] })
         }
         sendAction(action)
@@ -1227,11 +1554,11 @@
       selectedPieceId = id
       pendingMove = false; pendingSkill = null
       const p = G.pieces.find(p => p.instanceId === id)
-      if (p) addLog('选中：' + p.name + (p.faction === 'red' ? ' 🔴' : ' 🔵'), 'info')
+      if (p) addLog('选中: ' + p.name + (p.faction === 'red' ? ' 🌑暗' : ' ☀️光'), 'info')
       renderBoard(); renderActionPanel(); renderPieceList()
     }
 
-    // ── Render ──
+    // 鈹€鈹€ Render 鈹€鈹€
     function renderAll() {
       renderBoard()
       renderActionPanel()
@@ -1250,7 +1577,7 @@
       grid.style.gridTemplateColumns = `repeat(${map.width}, var(--cell-size, 44px))`
 
       document.getElementById('mapNameLabel').textContent = map.name || '训练场'
-      document.getElementById('mapSizeLabel').textContent = map.width + ' × ' + map.height
+      document.getElementById('mapSizeLabel').textContent = map.width + ' 脳 ' + map.height
 
       const cellMap = {}
       G.pieces.filter(p => p.currentHp > 0).forEach(p => { cellMap[p.x + ',' + p.y] = p })
@@ -1275,7 +1602,11 @@
             if (t && t.props.walkable && !cellMap[sp.x + ',' + y]) hlMove.add(sp.x + ',' + y)
           }
         }
-        if (sp && pendingSkill) {
+        if (pendingSkill && pendingSkill.turnTargetActionType) {
+          map.tiles.forEach(t => {
+            if (t.props && t.props.walkable) hlSkill.add(t.x + ',' + t.y)
+          })
+        } else if (sp && pendingSkill) {
           const range = (pendingSkill.range || 5)
           map.tiles.forEach(t => {
             if (Math.abs(t.x - sp.x) + Math.abs(t.y - sp.y) <= range) hlSkill.add(t.x + ',' + t.y)
@@ -1316,11 +1647,12 @@
           // Tile effect overlay(s)
           let tileEffectHtml = ''
           if (tileEffectsMap[key]) {
-            for (const ef of tileEffectsMap[key]) {
-              const bg = ef.bgColor || 'rgba(255,100,0,0.4)'
-              const shadow = ef.boxShadow ? `box-shadow:${ef.boxShadow};` : ''
-              const iconPos = ef.iconPosition === 'center' ? 'align-items:center;justify-content:center;' : 'align-items:flex-end;justify-content:flex-end;padding:1px;'
-              tileEffectHtml += `<div style="position:absolute;inset:0;background:${bg};${shadow}border-radius:3px;display:flex;${iconPos}pointer-events:none;z-index:1">${ef.icon ? `<span style="font-size:10px;line-height:1">${ef.icon}</span>` : ''}</div>`
+            const icons = tileEffectsMap[key]
+              .filter(ef => ef.icon)
+              .map(ef => `<span title="${escHtml(ef.tileType || '')}" style="font-size:10px;line-height:1">${escHtml(ef.icon)}</span>`)
+              .join('')
+            if (icons) {
+              tileEffectHtml = `<div style="position:absolute;right:1px;bottom:1px;display:flex;gap:1px;align-items:center;justify-content:flex-end;max-width:calc(100% - 2px);pointer-events:none;z-index:4">${icons}</div>`
             }
           }
 
@@ -1352,7 +1684,7 @@
       const data = item.data || {}
       const raw = item.stacks ?? item.stack ?? item.layers ?? item.count ?? data.stacks ?? data.layers
       const n = Number(raw)
-      return Number.isFinite(n) && n > 0 ? ' ×' + n : ''
+      return Number.isFinite(n) && n > 0 ? ' 脳' + n : ''
     }
 
     function collectStatusItems(entity, includeRules) {
@@ -1361,7 +1693,7 @@
       const add = (item) => {
         if (!item || item.visible === false) return
         const name = statusName(item)
-        if (!name || /lucky-coin|幸运币已获得|幸运币/.test(String(name))) return
+        if (!name || /lucky-coin|幸运币/.test(String(name))) return
         const key = (item.id || item.type || item.definitionId || name) + ':' + statusLayerText(item)
         if (seen.has(key)) return
         seen.add(key)
@@ -1393,9 +1725,9 @@
         return
       }
       const maxHp = p.maxHp || p.stats?.maxHp || 1
-      const faction = p.faction === 'red' ? '红方' : '蓝方'
+      const faction = p.faction === 'red' ? '🌑暗' : '☀️光'
       card.innerHTML = `<div class="selected-status-name">${escHtml(p.name || p.templateId)}</div>
-        <div class="selected-status-meta">${faction} · HP ${p.currentHp}/${maxHp}</div>
+        <div class="selected-status-meta">${faction} 路 HP ${p.currentHp}/${maxHp}</div>
         ${statusChipsHtml(p, true, '无状态')}`
     }
 
@@ -1405,11 +1737,11 @@
       if (curTurnPlayer && curTurnPlayer !== _lastAnnouncedTurnPlayer) {
         _lastAnnouncedTurnPlayer = curTurnPlayer
         const isRed = curTurnPlayer === 'training-red'
-        showTurnAnnounce(isRed ? '🔴 红方回合' : '🔵 蓝方回合', isRed ? '#f87171' : '#60a5fa')
+        showTurnAnnounce(isRed ? '🔴 绾㈡柟鍥炲悎' : '🔵 蓝方回合', isRed ? '#f87171' : '#60a5fa')
       }
       const phase = G.turn.phase
       document.getElementById('phaseLabel').textContent = PHASE_LABELS[phase] || phase
-      document.getElementById('turnNum').textContent = '回合 ' + G.turn.turnNumber
+      document.getElementById('turnNum').textContent = '鍥炲悎 ' + G.turn.turnNumber
       ;['start', 'action', 'end'].forEach(p => {
         document.getElementById('seg-' + p).className = 'phase-seg' + (p === phase ? ' active-' + p : '')
       })
@@ -1421,16 +1753,16 @@
         const tags = (player.statusTags || []).filter(t => t.visible !== false)
         const tagsHtml = tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${
           tags.map(t => `<span style="font-size:9px;background:#1c1c1e;border:1px solid #3f3f46;border-radius:4px;padding:1px 5px;color:#a1a1aa"
-            title="${t.id||''}">${t.name||t.id||t.type}${t.stacks>1?' ×'+t.stacks:''}</span>`).join('')
+            title="${t.id||''}">${t.name||t.id||t.type}${t.stacks>1?' 脳'+t.stacks:''}</span>`).join('')
         }</div>` : ''
         return `<div class="player-res-card ${isRed ? 'red' : 'blue'}">
           <div class="prc-top">
-            <span class="prc-name ${isRed ? 'red' : 'blue'}">${isRed ? '🔴 红方' : '🔵 蓝方'}</span>
-            ${isCurrent ? '<span class="prc-turn-badge">当前回合</span>' : ''}
+            <span class="prc-name ${isRed ? 'red' : 'blue'}">${isRed ? '🔴 绾㈡柟' : '🔵 蓝方'}</span>
+            ${isCurrent ? '<span class="prc-turn-badge">褰撳墠鍥炲悎</span>' : ''}
           </div>
           <div class="prc-stats">
             <span>👟 AP: ${player.actionPoints}/${player.maxActionPoints}</span>
-            <span>⚡ CP: ${player.chargePoints}</span>
+            <span>鈿?CP: ${player.chargePoints}</span>
             ${player.hand && player.hand.length ? `<span>🃏 ${player.hand.length}</span>` : ''}
           </div>
           ${tagsHtml}
@@ -1462,13 +1794,13 @@
 
       // Move button state
       btnMove.className = 'btn-action' + (pendingMove ? ' success' : '')
-      btnMove.textContent = pendingMove ? '👣 点击格子移动…' : '👣 移动'
+      btnMove.textContent = pendingMove ? '移动: 点击格子' : '移动'
 
       // Hint text
       if (placingMode) hintEl.textContent = '点击棋盘空格放置棋子'
       else if (pendingMove) hintEl.textContent = '点击高亮格子移动'
       else if (pendingSkill) hintEl.textContent = '点击目标使用技能'
-      else if (sp) hintEl.textContent = '已选中：' + sp.name
+      else if (sp) hintEl.textContent = '已选中: ' + sp.name
       else if (!isMyTurn) hintEl.textContent = '非当前操控方回合'
       else hintEl.textContent = ''
 
@@ -1517,7 +1849,7 @@
     function renderTeam(faction, elId) {
       const el = document.getElementById(elId)
       const pieces = G ? G.pieces.filter(p => p.faction === faction) : []
-      if (!pieces.length) { el.innerHTML = '<div style="font-size:11px;color:#52525b;padding:4px">无棋子</div>'; return }
+      if (!pieces.length) { el.innerHTML = '<div style="font-size:11px;color:#52525b;padding:4px">鏃犳瀛?/div>'; return }
       el.innerHTML = pieces.map(p => {
         const dead = p.currentHp <= 0
         const sel = p.instanceId === selectedPieceId
@@ -1536,7 +1868,7 @@
         const spd = p.stats?.moveRange ?? p.moveRange ?? '?'
         const tags = (p.statusTags || []).filter(t => t.visible !== false)
         const tagsHtml = tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:2px">${
-          tags.map(t => `<span style="font-size:9px;background:#1c1c1e;border:1px solid #3f3f46;border-radius:3px;padding:0 4px;color:#a1a1aa">${t.name||t.id||t.type}${t.stacks>1?' ×'+t.stacks:''}</span>`).join('')
+          tags.map(t => `<span style="font-size:9px;background:#1c1c1e;border:1px solid #3f3f46;border-radius:3px;padding:0 4px;color:#a1a1aa">${t.name||t.id||t.type}${t.stacks>1?' 脳'+t.stacks:''}</span>`).join('')
         }</div>` : ''
         const iid = p.instanceId.replace(/'/g, "\\'")
         return `<div class="${cls}"
@@ -1549,12 +1881,12 @@
           <div class="piece-info">
             <div class="piece-info-name">${p.name || p.templateId}</div>
             <div style="font-size:10px;color:#71717a;margin-top:1px">
-              ❤${p.currentHp}/${maxHp} ⚔${atk} 🛡${def} 👟${spd}
+              鉂?{p.currentHp}/${maxHp} 鈿?{atk} 🛡${def} 👟${spd}
             </div>
             <div class="piece-hp-bar"><div class="piece-hp-fill ${fillCls}" style="width:${pct}%"></div></div>
             ${tagsHtml}
           </div>
-          <button class="piece-remove" onclick="event.stopPropagation();removePiece('${iid}')">✕</button>
+          <button class="piece-remove" onclick="event.stopPropagation();removePiece('${iid}')">?</button>
         </div>`
       }).join('')
     }
@@ -1563,14 +1895,14 @@
       const p = G && G.pieces.find(p => p.instanceId === instanceId)
       if (await sendPatch({ type: 'removePiece', instanceId })) {
         if (selectedPieceId === instanceId) selectedPieceId = null
-        addLog('🗑 移除 ' + (p ? p.name : instanceId), 'info')
+        addLog('??? ' + (p ? p.name : instanceId), 'info')
       }
     }
 
-    // ── Place piece ──
+    // 鈹€鈹€ Place piece 鈹€鈹€
     function togglePlaceMode() {
       const templateId = document.getElementById('placeTemplate').value
-      if (!templateId && !placingMode) { addLog('❌ 请先选择棋子类型', 'err'); return }
+      if (!templateId && !placingMode) { addLog('????????', 'err'); return }
       placingMode = !placingMode
       pendingMove = false; pendingSkill = null
       updatePlaceBtn()
@@ -1580,10 +1912,10 @@
     function updatePlaceBtn() {
       const btn = document.getElementById('btnPlace')
       btn.className = 'btn-action ' + (placingMode ? 'warn' : '')
-      btn.textContent = placingMode ? '✅ 放置中… 点击取消' : '＋ 点击格子放置'
+      btn.textContent = placingMode ? '????????' : '??????'
     }
 
-    // ── Log ──
+    // 鈹€鈹€ Log 鈹€鈹€
     function addLog(msg, type) {
       actionLog.push({ msg, type: type || '' })
       if (actionLog.length > 120) actionLog.shift()
@@ -1596,7 +1928,7 @@
     }
     function clearLog() { actionLog = []; renderLog() }
 
-    // ── Hand panel ──
+    // 鈹€鈹€ Hand panel 鈹€鈹€
     function toggleHandPanel() {
       const body = document.getElementById('handBody')
       const arrow = document.getElementById('handArrow')
@@ -1617,7 +1949,8 @@
 
       const container = document.getElementById('handCards')
       if (!hand.length) {
-        container.innerHTML = '<div class="hand-empty">暂无手牌</div>'
+        renderArcHand()
+        container.innerHTML = '<div class="hand-empty">鏆傛棤鎵嬬墝</div>'
         return
       }
 
@@ -1633,12 +1966,16 @@
 
         const gemCls = cost === 0 ? 'free' : ''
         const icon = def.icon || '🃏'
-        const typeLabel = def.type === 'reactive' ? '⚡被动触发' : def.type === 'passive' ? '🔁持续' : '▶主动'
+        const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
+        const artSrc = def.image ? `images/card-art/${def.image}` : null
+        const artContent = artSrc
+          ? `<img src="${artSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:8px 8px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:28px;width:100%;height:100%;align-items:center;justify-content:center">${def.icon || '🃏'}</span>`
+          : `<span style="font-size:28px">${def.icon || '🃏'}</span>`
         const cid = card.instanceId.replace(/'/g, "\\'")
         const cdid = (card.cardId || '').replace(/'/g, "\\'")
-        return `<div class="${cls}" onclick="onCardClick('${cid}','${cdid}')">
+        return `<div class="${cls}" onclick="onCardClick('${cid}','${cdid}')" oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
           <div class="card-mana-gem ${gemCls}">${cost}</div>
-          <div class="card-art">${icon}</div>
+          <div class="card-art">${artContent}</div>
           <div class="card-name-banner">${escHtml(def.name || card.cardId)}</div>
           <div class="card-body">
             <div class="card-desc">${escHtml(def.description || '')}</div>
@@ -1646,6 +1983,7 @@
           </div>
         </div>`
       }).join('')
+      renderArcHand()
     }
 
     function onCardClick(cardInstanceId, cardId) {
@@ -1658,7 +1996,7 @@
       const def = cardsById[cardId] || {}
       const cost = def.actionPointCost || 0
       const ap = myMeta ? myMeta.actionPoints : 0
-      if (ap < cost) { addLog('❌ 行动点不足（需要 ' + cost + '，剩余 ' + ap + '）', 'err'); return }
+      if (ap < cost) { addLog('行动点不足，需要 ' + cost + '，剩余 ' + ap, 'err'); return }
 
       if (pendingCardAction && pendingCardAction.cardInstanceId === cardInstanceId) {
         pendingCardAction = null
@@ -1669,27 +2007,27 @@
       pendingMove = false
       pendingSkill = null
       pendingCardAction = { type: 'playCard', playerId: localPlayerId, cardInstanceId }
-      addLog('🃏 选择目标施放：' + (def.name || cardId), 'info')
+      addLog('选择目标施放: ' + (def.name || cardId), 'info')
       renderHand()
       renderBoard()
       renderActionPanel()
     }
 
-    // ── Game over ──
+    // 鈹€鈹€ Game over 鈹€鈹€
     function checkGameOver() {
       if (!G) return
       const ra = G.pieces.filter(p => p.faction === 'red' && p.currentHp > 0).length
       const ba = G.pieces.filter(p => p.faction === 'blue' && p.currentHp > 0).length
       if (ra === 0 || ba === 0) {
         const winner = ra > 0 ? 'red' : 'blue'
-        document.getElementById('resultIcon').textContent = winner === 'red' ? '🔴' : '🔵'
-        document.getElementById('resultTitle').textContent = (winner === 'red' ? '红方' : '蓝方') + ' 胜利！'
+        document.getElementById('resultIcon').textContent = winner === 'red' ? '🌑' : '☀️'
+        document.getElementById('resultTitle').textContent = (winner === 'red' ? '暗' : '光') + ' 胜利'
         document.getElementById('resultSub').textContent = '第 ' + G.turn.turnNumber + ' 回合结束'
         showScreen('result')
       }
     }
 
-    // ── Resource dialog ──
+    // 鈹€鈹€ Resource dialog 鈹€鈹€
     function showResDialog() {
       if (!G) return
       const p = G.players.find(p => p.playerId === localPlayerId)
@@ -1705,11 +2043,11 @@
       const cp = +document.getElementById('resCP').value || 0
       closeResDlg()
       if (await sendPatch({ type: 'updateResources', playerId, actionPoints: ap, chargePoints: cp }))
-        addLog('⚙ 资源已更新 AP=' + ap + ' CP=' + cp, 'info')
+        addLog('鈿?璧勬簮宸叉洿鏂?AP=' + ap + ' CP=' + cp, 'info')
     }
 
-    // ── Map dialog ──
-    function showMapDialog() {
+    // 鈹€鈹€ Map dialog 鈹€鈹€
+      <button class="btn-top" onclick="showMapDialog()">??</button>
       document.getElementById('mapDlgSelect').value = currentMapId
       document.getElementById('mapDlg').classList.add('show')
     }
@@ -1717,14 +2055,15 @@
     function applyMapChange() {
       const mapId = document.getElementById('mapDlgSelect').value
       closeMapDlg()
-      initTraining(mapId || undefined)
+      initTraining(mapId || undefined, getInitialPieceConfig())
     }
 
-    // ── Screen ──
+    // 鈹€鈹€ Screen 鈹€鈹€
     function showScreen(name) {
       document.getElementById('setupScreen').style.display = name === 'setup' ? 'block' : 'none'
       document.getElementById('battleScreen').style.display = name === 'battle' ? 'block' : 'none'
       document.getElementById('resultScreen').style.display = name === 'result' ? 'flex' : 'none'
+      document.body.classList.toggle('training-battle', name === 'battle')
       document.getElementById('battleTopBtns').style.display = name === 'battle' ? 'flex' : 'none'
     }
     function goSetup() { G = null; showScreen('setup') }
@@ -1732,11 +2071,11 @@
     function showSetupErr(msg) { const e = document.getElementById('setupErr'); e.textContent = msg; e.style.display = 'block' }
     function hideSetupErr() { document.getElementById('setupErr').style.display = 'none' }
 
-    // ── Helpers ──
-    function playerLabel(id) { return id === 'training-red' ? '🔴 红方' : '🔵 蓝方' }
+    // 鈹€鈹€ Helpers 鈹€鈹€
+    function playerLabel(id) { return id === 'training-red' ? '🔴 绾㈡柟' : '🔵 蓝方' }
     function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
 
-    // ── Piece detail modal ──
+    // 鈹€鈹€ Piece detail modal 鈹€鈹€
     let pressTimer = null
 
     function startPiecePress(e, instanceId) {
@@ -1765,9 +2104,9 @@
 
       const tags = (p.statusTags || []).filter(t => t.visible !== false)
       const tagsHtml = tags.length
-        ? `<div class="pd-section-label">状态效果</div>
+        ? `<div class="pd-section-label">状态</div>
            <div class="pd-tag-row">${tags.map(t =>
-             `<span class="pd-tag">${escHtml(t.name||t.id||t.type)}${t.stacks>1?' ×'+t.stacks:''}${t.duration?' (${t.duration}回合)':''}</span>`
+             `<span class="pd-tag">${escHtml(t.name||t.id||t.type)}${t.stacks>1?' x'+t.stacks:''}${t.duration?' ('+t.duration+'回合)':''}</span>`
            ).join('')}</div>`
         : ''
 
@@ -1775,12 +2114,12 @@
         const def2 = skillsById[s.skillId] || {}
         const type = def2.type || 'normal'
         const cd = s.currentCooldown || 0
-        const uses = s.usesRemaining
+        const cdText = cd > 0 ? `冷却中 ${cd}` : uses === 0 ? '已用尽' : ''
         const cdText = cd > 0 ? `冷却中 ${cd}` : uses === 0 ? '已用尽' : ''
         const cost = type === 'super'
           ? `充能 ${def2.chargeCost||0}CP`
           : type === 'buff' ? '强化' : '普通'
-        const ap = def2.actionPointCost ? ` · ${def2.actionPointCost}AP` : ''
+        const ap = def2.actionPointCost ? ` 路 ${def2.actionPointCost}AP` : ''
         const rangeTxt = def2.range != null ? `射程 ${def2.range}` : ''
         const dmgTxt   = def2.damage != null ? `伤害 ${def2.damage}` : ''
         const cdTxt    = def2.cooldown ? `CD ${def2.cooldown}` : ''
@@ -1797,9 +2136,9 @@
           ${avatarHtml}
           <div>
             <div class="pd-name">${escHtml(p.name||p.templateId)}</div>
-            <div class="pd-faction">${p.faction==='red'?'🔴 红方':'🔵 蓝方'}</div>
+            <div class="pd-faction">${p.faction==='red'?'红方':'蓝方'}</div>
           </div>
-          <button class="pd-close" onclick="closePieceDetail()">✕ 关闭</button>
+          <button class="pd-close" onclick="closePieceDetail()">关闭</button>
         </div>
         <div class="pd-stats-row">
           <div class="pd-stat"><div class="pd-stat-val" style="color:#22c55e">${p.currentHp}/${maxHp}</div><div class="pd-stat-lbl">生命</div></div>
@@ -1811,8 +2150,8 @@
           <div class="piece-hp-fill ${fillCls}" style="width:${pct}%"></div>
         </div>
         ${tagsHtml}
-        <div class="pd-section-label">技能列表</div>
-        ${skillsHtml || '<div style="font-size:11px;color:#52525b">无技能</div>'}
+        <div class="pd-section-label">鎶€鑳藉垪琛?/div>
+        ${skillsHtml || '<div style="font-size:11px;color:#52525b">鏃犳妧鑳?/div>'}
       `
       document.getElementById('pdOverlay').classList.add('show')
     }
@@ -1821,7 +2160,215 @@
       document.getElementById('pdOverlay').classList.remove('show')
     }
 
-    // ── Dynamic cell sizing ───────────────────────────────────────────────────
+    function showCardDetail(cardInstanceId, cardId) {
+      const def = cardsById[cardId] || {}
+      const cost = def.actionPointCost || 0
+      const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
+      const artHtml = def.image
+        ? `<img class="pd-avatar" src="images/card-art/${escHtml(def.image)}" onerror="this.style.display='none'">`
+        : `<div class="pd-avatar-ph">${def.icon || '🃏'}</div>`
+      document.getElementById('pdContent').innerHTML = `
+        <div class="pd-header">
+          ${artHtml}
+          <div>
+            <div class="pd-name">${escHtml(def.name || cardId)}</div>
+            <div class="pd-faction">手牌 · ${typeLabel} · ${cost} AP</div>
+          </div>
+          <button class="pd-close" onclick="closePieceDetail()">关闭</button>
+        </div>
+        <div class="pd-section-label">说明</div>
+        <div class="pd-skill-desc" style="font-size:12px;line-height:1.55">${escHtml(def.description || '无描述')}</div>
+        <div class="pd-section-label">实例</div>
+        <div class="pd-tag-row"><span class="pd-tag">${escHtml(cardInstanceId || '')}</span></div>
+      `
+      document.getElementById('pdOverlay').classList.add('show')
+    }
+
+    // 鈹€鈹€ Dynamic cell sizing 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    function renderArcHand() {
+      const container = document.getElementById('arcHandContainer')
+      if (!container) return
+      if (!G) { container.innerHTML = ''; return }
+
+      container.innerHTML = ''
+      const myMeta = G.players && G.players.find(p => p.playerId === localPlayerId)
+      const hand = (myMeta && myMeta.hand) || []
+      if (!hand.length) return
+
+      const isMyTurn = G.turn && G.turn.currentPlayerId === localPlayerId
+      const phase = G.turn ? G.turn.phase : ''
+      const ap = myMeta ? myMeta.actionPoints : 0
+      const n = hand.length
+      const W = window.innerWidth
+      const cardW = 80
+      const maxSpread = Math.min(W * 0.85, n * 84)
+      const maxAngle = Math.min(28, n * 5)
+
+      hand.forEach((card, i) => {
+        const def = cardsById[card.cardId] || {}
+        const cost = def.actionPointCost || 0
+        const canPlay = isMyTurn && phase === 'action' && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
+        const isPending = pendingCardAction && pendingCardAction.cardInstanceId === card.instanceId
+
+        const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1
+        const angle = t * maxAngle
+        const xPos = W / 2 + t * (maxSpread / 2) - cardW / 2
+        const yLift = -(t * t) * 16
+
+        const el = document.createElement('div')
+        let cls = 'arc-card'
+        if (isPending) cls += ' arc-pending'
+        else if (!canPlay) cls += ' arc-disabled'
+        el.className = cls
+        el.style.left = xPos + 'px'
+        el.style.transform = `rotate(${angle}deg) translateY(${yLift}px)`
+
+        const artSrc = def.image ? `images/card-art/${def.image}` : null
+        const artHtml = artSrc
+          ? `<img src="${artSrc}" onerror="this.style.display='none'">`
+          : (def.icon || '🃏')
+        const typeLabel = def.type === 'reactive' ? '⚡触发' : def.type === 'passive' ? '🔁持续' : '▶主动'
+
+        el.innerHTML = `
+          <div class="arc-card-cost">${cost}</div>
+          <div class="arc-card-art">${artHtml}</div>
+          <div class="arc-card-name">${escHtml(def.name || card.cardId || '')}</div>
+          <div class="arc-card-type">${typeLabel}</div>
+        `
+
+        el.addEventListener('click', () => onCardClick(card.instanceId, card.cardId))
+        el.addEventListener('contextmenu', (event) => {
+          event.preventDefault()
+          showCardDetail(card.instanceId, card.cardId)
+        })
+        let pressTimer = null
+        el.addEventListener('touchstart', () => {
+          el.classList.add('arc-hover')
+          pressTimer = setTimeout(() => showCardDetail(card.instanceId, card.cardId), 600)
+        }, { passive: true })
+        el.addEventListener('touchend', () => {
+          clearTimeout(pressTimer)
+          setTimeout(() => el.classList.remove('arc-hover'), 300)
+        })
+        el.addEventListener('touchmove', () => {
+          clearTimeout(pressTimer)
+          el.classList.remove('arc-hover')
+        }, { passive: true })
+
+        container.appendChild(el)
+      })
+    }
+
+    // ── Map pan / zoom ───────────────────────────────────────────────────────
+    let mapViewScale = 1
+    let mapViewX = 0
+    let mapViewY = 0
+    let isPanning = false
+    const activePointers = new Map()
+    let lastPanPoint = null
+    let lastPinchDistance = 0
+    let mapClickSuppressed = false
+
+    function getMapTarget() {
+      return document.querySelector('.board-core')
+    }
+    function applyMapView() {
+      const target = getMapTarget()
+      if (!target) return
+      target.style.transform = `translate(${mapViewX}px, ${mapViewY}px) scale(${mapViewScale})`
+    }
+      <button class="btn-top" onclick="resetMapView()" title="??????">??</button>
+      mapViewScale = 1
+      mapViewX = 0
+      mapViewY = 0
+      applyMapView()
+    }
+    function clampMapScale(v) {
+      return Math.max(1, Math.min(2.5, v))
+    }
+    function pointerDistance() {
+      const pts = Array.from(activePointers.values())
+      if (pts.length < 2) return 0
+      return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+    }
+    function initMapControls() {
+      const wrap = document.getElementById('boardWrap')
+      if (!wrap || wrap.dataset.mapControlsReady === '1') return
+      wrap.dataset.mapControlsReady = '1'
+      wrap.addEventListener('pointerdown', e => {
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (activePointers.size >= 2) {
+          lastPinchDistance = pointerDistance()
+          mapClickSuppressed = true
+          try { wrap.setPointerCapture(e.pointerId) } catch {}
+          e.preventDefault()
+          return
+        }
+        if (mapViewScale > 1 || e.target === wrap || e.target.id === 'gameGrid') {
+          isPanning = mapViewScale > 1
+          lastPanPoint = { x: e.clientX, y: e.clientY }
+          try { wrap.setPointerCapture(e.pointerId) } catch {}
+        }
+      })
+      wrap.addEventListener('pointermove', e => {
+        if (!activePointers.has(e.pointerId)) return
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (activePointers.size >= 2) {
+          const dist = pointerDistance()
+          if (lastPinchDistance > 0 && dist > 0) {
+            mapViewScale = clampMapScale(mapViewScale * (dist / lastPinchDistance))
+            applyMapView()
+          }
+          lastPinchDistance = dist
+          mapClickSuppressed = true
+          e.preventDefault()
+          return
+        }
+        if (isPanning && lastPanPoint && mapViewScale > 1) {
+          const dx = e.clientX - lastPanPoint.x
+          const dy = e.clientY - lastPanPoint.y
+          if (Math.abs(dx) + Math.abs(dy) > 2) {
+            mapViewX += dx
+            mapViewY += dy
+            lastPanPoint = { x: e.clientX, y: e.clientY }
+            mapClickSuppressed = true
+            wrap.classList.add('dragging')
+            applyMapView()
+          }
+          e.preventDefault()
+        }
+      }, { passive: false })
+      function endPointer(e) {
+        activePointers.delete(e.pointerId)
+        if (activePointers.size < 2) lastPinchDistance = 0
+        if (!activePointers.size) {
+          isPanning = false
+          lastPanPoint = null
+          wrap.classList.remove('dragging')
+          if (mapClickSuppressed) setTimeout(() => { mapClickSuppressed = false }, 60)
+        }
+      }
+      wrap.addEventListener('pointerup', endPointer)
+      wrap.addEventListener('pointercancel', endPointer)
+      wrap.addEventListener('click', e => {
+        if (!mapClickSuppressed) return
+        e.preventDefault()
+        e.stopPropagation()
+      }, true)
+      wrap.addEventListener('dblclick', e => {
+      <button class="btn-top" onclick="resetMapView()" title="??????">??</button>
+        e.preventDefault()
+      })
+      wrap.addEventListener('wheel', e => {
+        const prev = mapViewScale
+        const next = clampMapScale(prev * (e.deltaY < 0 ? 1.1 : 0.9))
+        if (next === prev) return
+        mapViewScale = next
+        applyMapView()
+        e.preventDefault()
+      }, { passive: false })
+    }
+
     function recalcCellSize() {
       if (!G || !G.map) return
       const cols = G.map.width
@@ -1831,6 +2378,7 @@
       const availW = wrap.clientWidth - 8
       const topbarH = document.querySelector('.topbar')?.offsetHeight || 44
       const logH    = document.querySelector('.log-panel')?.offsetHeight || 0
+      const handH   = document.getElementById('handPanel')?.offsetHeight || 0
       const availH  = window.innerHeight - topbarH - logH - 80
       const byW = Math.floor(availW / cols)
       const byH = Math.floor(availH / rows)
@@ -1841,11 +2389,14 @@
     }
     window.addEventListener('resize', recalcCellSize)
 
-    // ── Boot ──
+    // 鈹€鈹€ Boot 鈹€鈹€
     window.addEventListener('load', () => {
+      initMapControls()
       loadAvailableData()
       showScreen('setup')
     })
   </script>
+  <!-- Arc hand container (all screens) -->
+  <div id="arcHandContainer"></div>
 </body>
 </html>

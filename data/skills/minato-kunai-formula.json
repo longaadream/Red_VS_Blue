@@ -1,0 +1,19 @@
+{
+  "id": "minato-kunai-formula",
+  "name": "苦无术式",
+  "description": "选择一名友方角色（包括自己）并传送至一个飞雷神锚点处，清除该锚点并给该角色附加1层飞雷神标记。",
+  "keywords": ["飞雷神", "传送"],
+  "targetText": "1名友方角色，然后1个飞雷神锚点",
+  "effectTags": ["位移", "标记"],
+  "icon": "🗡",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": 99,
+  "targetType": "piece",
+  "filter": "ally",
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var ally = selectTarget({ type: 'piece', range: 99, filter: 'ally' }); if (!ally || ally.needsTargetSelection) return ally; var pos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var anchors = battle.extensions && battle.extensions.minatoAnchors ? battle.extensions.minatoAnchors : []; var idx = anchors.findIndex(function(a) { return a.sourceId === caster.instanceId && a.x === pos.x && a.y === pos.y; }); if (idx === -1) return { success: false, message: '目标位置不是水门的飞雷神锚点' }; var tile = battle.map.tiles.find(function(t) { return t.x === pos.x && t.y === pos.y; }); if (!tile || !tile.props.walkable) return { success: false, message: '锚点位置不可行走' }; var occupied = battle.pieces.find(function(p) { return p.instanceId !== ally.instanceId && p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (occupied) return { success: false, message: '锚点位置已被占用' }; anchors.splice(idx, 1); if (battle.extensions && battle.extensions.tileEffects) battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) { return !(te.tileType === 'flying-raijin-anchor' && te.sourceId === caster.instanceId && te.x === pos.x && te.y === pos.y); }); ally.x = pos.x; ally.y = pos.y; if (!ally.statusTags) ally.statusTags = []; var tag = ally.statusTags.find(function(t) { return t.type === 'flying-raijin-mark' && t.sourceId === caster.instanceId; }); if (tag) tag.stacks = (tag.stacks || 1) + 1; else ally.statusTags.push({ id: 'flying-raijin-mark-' + caster.instanceId + '-' + ally.instanceId + '-' + Date.now(), type: 'flying-raijin-mark', name: '飞雷神', visible: true, currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, sourceId: caster.instanceId }); return { success: true, message: caster.name + '发动苦无术式，将' + ally.name + '传送至飞雷神锚点(' + pos.x + ',' + pos.y + ')并附加飞雷神标记' }; }"
+}

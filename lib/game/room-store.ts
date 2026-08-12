@@ -1,15 +1,56 @@
 import type { BattleState } from './turn'
 import { prisma } from '../db'
 
+export type PlayerSeat = "red" | "blue"
+export type PlayerAlignment = "light" | "dark"
+
+export function normalizePlayerAlignment(value: unknown): PlayerAlignment | undefined {
+  if (value === "light" || value === "good") return "light"
+  if (value === "dark" || value === "evil") return "dark"
+  return undefined
+}
+
+export function alignmentToPieceFaction(alignment: PlayerAlignment | undefined): "good" | "evil" | undefined {
+  if (alignment === "light") return "good"
+  if (alignment === "dark") return "evil"
+  return undefined
+}
+
+export function getPlayerSeat(player: { seat?: PlayerSeat; faction?: PlayerSeat }): PlayerSeat | undefined {
+  return player.seat || player.faction
+}
+
+export function assignNextSeat(players: Array<{ id?: string; seat?: PlayerSeat; faction?: PlayerSeat }>, playerId?: string): PlayerSeat {
+  const normalizedPlayerId = playerId ? playerId.trim().toLowerCase() : undefined
+  const taken = players
+    .filter(p => !normalizedPlayerId || !p.id || p.id.toLowerCase() !== normalizedPlayerId)
+    .map(getPlayerSeat)
+    .filter(Boolean) as PlayerSeat[]
+  if (taken.includes("red") && !taken.includes("blue")) return "blue"
+  if (taken.includes("blue") && !taken.includes("red")) return "red"
+  return "red"
+}
+
 // 玩家类型
 export interface Player {
   id: string
+  /** Stable account identity. A local debug account may control two match players. */
+  accountId?: string
   name: string
   joinedAt?: number
-  faction?: "red" | "blue"
+  /** red/blue are relative battle seats only. They do not mean light/dark. */
+  seat?: PlayerSeat
+  /** Legacy alias for seat kept for existing battle/setup code. */
+  faction?: PlayerSeat
+  /** Player-chosen content alignment. Same-alignment mirrors are allowed. */
+  alignment?: PlayerAlignment
+  /** Public key used by the decentralized identity/signature flow. */
+  publicKey?: string
+  packMd5?: string
   selectedPieces?: Array<{ templateId: string; faction: string }>
   hasSelectedPieces?: boolean
   ready?: boolean
+  isBot?: boolean
 }
 
 // 观战者类型
@@ -76,6 +117,8 @@ function deserializeRoom(row: {
 }): Room {
   const players: Player[] = JSON.parse(row.players).map((p: Player) => ({
     ...p,
+    seat: p.seat || p.faction,
+    faction: p.faction || p.seat,
     hasSelectedPieces: p.hasSelectedPieces === true || (p.selectedPieces != null && p.selectedPieces.length > 0),
     selectedPieces: p.selectedPieces || []
   }))
@@ -106,6 +149,8 @@ function serializeRoom(room: Room) {
   const players = JSON.stringify(
     room.players.map(p => ({
       ...p,
+      seat: p.seat || p.faction,
+      faction: p.faction || p.seat,
       hasSelectedPieces: p.hasSelectedPieces === true || (p.selectedPieces != null && p.selectedPieces.length > 0),
       selectedPieces: p.selectedPieces || []
     }))

@@ -38,6 +38,7 @@ export interface BoardMap {
   height: number
   /** 所有格子，一般按 x+y 排序 */
   tiles: Tile[]
+  rules?: unknown[]
 }
 
 /** 用于“字符画地图”的图例 */

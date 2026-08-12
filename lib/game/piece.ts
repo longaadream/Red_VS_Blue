@@ -2,7 +2,7 @@ import type { AttachedEffectInstance } from './attached-effect'
 
 export type PieceId = string
 
-export type Faction = "red" | "blue" | "neutral"
+export type Faction = "red" | "blue" | "neutral" | "good" | "evil" | "light" | "dark"
 
 export type PieceRarity = "common" | "rare" | "epic" | "legendary"
 
@@ -53,6 +53,7 @@ export interface PieceInstance {
   y: number | null
   moveRange: number
   skills: PieceSkill[]
+  displaySkills?: PieceSkill[]
   buffs: PieceBuff[]
   debuffs: PieceDebuff[]
   shield?: number
@@ -61,6 +62,7 @@ export interface PieceInstance {
     id: string
     type: string
     currentDuration?: number
+    remainingDuration?: number
     currentUses?: number
     intensity?: number
     stacks?: number

@@ -9,12 +9,12 @@
  * - process.cwd() 由 training.html 注入的 process shim 提供（返回 ''）
  */
 
-export { applyBattleAction, safeCloneBattleState } from './turn'
+export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } from './turn'
 export { setRng, mulberry32 } from './rng'
 export type { BattleState, BattleAction, BattleActionLog } from './turn'
 
 import { createInitialBattleForPlayers as _createInitialBattleForPlayers } from './battle-setup'
-import { loadAllSkillsById } from './skills'
+import { loadAllSkillsById, loadRuleById } from './skills'
 import type { BattleState, PlayerId } from './turn'
 import type { PieceTemplate } from './piece'
 
@@ -29,10 +29,11 @@ import type { PieceTemplate } from './piece'
 export async function createInitialBattleForPlayers(
   playerIds: PlayerId[],
   selectedPieces: PieceTemplate[],
-  playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[] }>,
+  playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[]; faction?: 'red' | 'blue' }>,
   mapId?: string,
+  options?: { firstPlayerId?: PlayerId },
 ): Promise<BattleState | null> {
-  const state = await _createInitialBattleForPlayers(playerIds, selectedPieces, playerSelectedPieces, mapId)
+  const state = await _createInitialBattleForPlayers(playerIds, selectedPieces, playerSelectedPieces, mapId, options)
   if (!state) return null
 
   // buildDefaultSkills() returns {} in browser — patch with VFS-loaded skills
@@ -47,3 +48,4 @@ export async function createInitialBattleForPlayers(
 export { DEFAULT_PIECES, getPieceById, getAllPieces, getPiecesByFaction } from './piece-repository'
 
 export { globalTriggerSystem } from './triggers'
+export { loadRuleById }

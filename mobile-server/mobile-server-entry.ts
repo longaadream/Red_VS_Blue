@@ -42,8 +42,10 @@ interface Player {
   name: string
   publicKey?: string
   faction?: 'red' | 'blue'
+  packMd5?: string
   selectedPieces?: Array<{ templateId: string; faction: string }>
   hasSelectedPieces?: boolean
+  ready?: boolean
   joinedAt?: number
 }
 
@@ -200,7 +202,7 @@ function handleCreateRoom(body: Record<string, unknown>): string {
     id: roomId,
     name: (body.name as string) || `${playerName}的房间`,
     status: 'waiting',
-    players: [{ id: playerId, name: playerName, faction: 'red', joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] }],
+    players: [{ id: playerId, name: playerName, faction: Math.random() < 0.5 ? 'red' : 'blue', joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] }],
     hostId: playerId,
     maxPlayers: 2,
     mapId: (body.mapId as string) || 'large-battlefield',
@@ -221,6 +223,15 @@ function handleGetRoom(roomId: string): string {
   return ok(room as unknown as Record<string, unknown>)
 }
 
+function handleDeleteRoom(roomId: string, body: Record<string, unknown>): string {
+  const room = rooms.get(roomId.toLowerCase())
+  if (!room) return err('Room not found', 404)
+  const playerId = ((body.playerId as string) || '').toLowerCase()
+  if ((room.hostId || '').toLowerCase() !== playerId) return err('Only host can delete', 403)
+  rooms.delete(roomId.toLowerCase())
+  return ok({ success: true })
+}
+
 async function handleRoomPost(roomId: string, body: Record<string, unknown>): Promise<string> {
   const room = rooms.get(roomId.toLowerCase())
   if (!room) return err('Room not found', 404)
@@ -231,20 +242,44 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
     const normalizedPlayerId = playerId.trim().toLowerCase()
     const authErr = await verifyJoinAuth(body)
     if (authErr) return err(authErr, 401)
+    const packMd5 = (body.packMd5 as string) || undefined
+    const requestedFaction = (body.faction === 'red' || body.faction === 'blue') ? body.faction as 'red' | 'blue' : null
     const existing = room.players.find(p => p.id.toLowerCase() === normalizedPlayerId)
     if (existing) {
+      if (requestedFaction) {
+        existing.faction = requestedFaction
+      } else if (!existing.faction) {
+        existing.faction = nextFaction(room)
+      }
       if (playerName) existing.name = playerName
-      if (!existing.faction) existing.faction = nextFaction(room)
+      if (packMd5) existing.packMd5 = packMd5
       room.version++
-      return ok(room as unknown as Record<string, unknown>)
+      _broadcastRoomUpdate(room)
+      return ok({ ...room, packMismatch: mobileCheckPackMismatch(room.players) } as unknown as Record<string, unknown>)
     }
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
     const publicKey = (body.publicKey as string) || undefined
-    const isHost = room.players.length === 0
-    const faction = isHost ? 'red' : 'blue'
-    room.players.push({ id: normalizedPlayerId, name: playerName, publicKey, faction, joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] })
+    let faction: 'red' | 'blue'
+    if (requestedFaction) {
+      faction = requestedFaction
+    } else {
+      faction = nextFaction(room)
+    }
+    room.players.push({ id: normalizedPlayerId, name: playerName, publicKey, faction, packMd5, joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] })
     room.version++
-    return ok(room as unknown as Record<string, unknown>)
+    _broadcastRoomUpdate(room)
+    return ok({ ...room, packMismatch: mobileCheckPackMismatch(room.players) } as unknown as Record<string, unknown>)
+  }
+
+  if (body.action === 'toggle-ready') {
+    const player = room.players.find(p => p.id.toLowerCase() === playerId.toLowerCase())
+    if (!player) return err('Player not in room', 404)
+    player.ready = !player.ready
+    const allReady = room.players.length >= 2 && room.players.every(p => p.ready)
+    room.status = allReady ? 'ready' : 'waiting'
+    room.version++
+    _broadcastRoomUpdate(room)
+    return ok({ ...room } as unknown as Record<string, unknown>)
   }
 
   if (body.action === 'start') {
@@ -264,9 +299,11 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
 async function _startGame(room: Room): Promise<string> {
   try {
     const allPieces = getAllPieces()
-    const playerIds = room.players.slice(0, 2).map(p => p.id) as [string, string]
-    const playerSelectedPieces = room.players.slice(0, 2).map(p => ({
+    const roomPlayers = room.players.slice(0, 2)
+    const playerIds = roomPlayers.map(p => p.id) as [string, string]
+    const playerSelectedPieces = roomPlayers.map(p => ({
       playerId: p.id,
+      faction: p.faction as 'red' | 'blue' | undefined,
       pieces: (p.selectedPieces || [])
         .map(sp => allPieces.find(t => t.id === sp.templateId))
         .filter((t): t is PieceTemplate => !!t),
@@ -294,6 +331,7 @@ async function _startGame(room: Room): Promise<string> {
     }
     room.status = 'in-progress'
     room.version++
+    _broadcastBattleSnapshot(room)
     return ok({ success: true })
   } catch (e: unknown) {
     return err('Battle setup failed: ' + (e as Error).message, 500)
@@ -304,10 +342,59 @@ function getAssignedFactions(room: Room): Array<'red' | 'blue'> {
   return room.players.map(p => p.faction).filter(Boolean) as Array<'red' | 'blue'>
 }
 
-function nextFaction(room: Room): 'red' | 'blue' {
-  const assigned = getAssignedFactions(room)
-  if (!assigned.length) return 'red'
-  return assigned[0] === 'red' ? 'blue' : 'red'
+function nextFaction(_room: Room): 'red' | 'blue' {
+  return Math.random() < 0.5 ? 'red' : 'blue'
+}
+
+function mobileCheckPackMismatch(players: Player[]): boolean {
+  const hashes = players.map(p => p.packMd5).filter(Boolean)
+  return hashes.length === 2 && hashes[0] !== hashes[1]
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function _getBridge(): any {
+  return (typeof window !== 'undefined' && (window as any).AndroidServerBridge) || null
+}
+
+function _broadcastRoomUpdate(room: Room): void {
+  const bridge = _getBridge()
+  if (!bridge?.broadcastToRoom) return
+  try { bridge.broadcastToRoom(room.id, JSON.stringify({ type: 'roomUpdate', room })) } catch {}
+}
+
+function _broadcastBattleSnapshot(room: Room): void {
+  if (!room.battleState) return
+  const bridge = _getBridge()
+  if (!bridge?.broadcastToRoom) return
+  try {
+    bridge.broadcastToRoom(room.id, JSON.stringify({
+      type: 'battleSnapshot',
+      actions: room.battleState.actions,
+      total: room.battleState.actions.length,
+      seed: room.battleState.seed,
+    }))
+  } catch {}
+}
+
+function handleLeaveRoom(roomId: string, body: Record<string, unknown>): string {
+  const room = rooms.get(roomId.toLowerCase())
+  if (!room) return ok({ success: true })
+  const playerId = ((body.playerId as string) || '').trim().toLowerCase()
+  if (!playerId) return ok({ success: true })
+  const idx = room.players.findIndex(p => p.id.toLowerCase() === playerId)
+  if (idx >= 0) {
+    room.players.splice(idx, 1)
+    // 重置房间到等待状态，不销毁，保留在 0/max 状态供再次加入
+    room.status = 'waiting'
+    room.battleState = undefined
+    room.gameRecord = undefined
+    if (room.hostId?.toLowerCase() === playerId) {
+      room.hostId = room.players.length > 0 ? room.players[0].id : undefined
+    }
+    room.version++
+    _broadcastRoomUpdate(room)
+  }
+  return ok({ success: true })
 }
 
 function handleClaimFaction(roomId: string, body: Record<string, unknown>): string {
@@ -317,26 +404,38 @@ function handleClaimFaction(roomId: string, body: Record<string, unknown>): stri
   const playerName = ((body.playerName as string) || '').trim()
   if (!playerId) return err('playerId is required', 400)
 
+  const requestedFaction = (body.faction === 'red' || body.faction === 'blue')
+    ? body.faction as 'red' | 'blue'
+    : null
+
   let player = room.players.find(p => p.id.toLowerCase() === playerId)
   if (!player) {
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
+    let faction: 'red' | 'blue'
+    if (requestedFaction) {
+      faction = requestedFaction
+    } else {
+      faction = nextFaction(room)
+    }
     player = {
       id: playerId,
       name: playerName || `Player ${playerId.slice(0, 8)}`,
-      faction: nextFaction(room),
+      faction,
       joinedAt: Date.now(),
       hasSelectedPieces: false,
       selectedPieces: [],
     }
     room.players.push(player)
     room.version++
-  }
-
-  if (!player.faction) {
+  } else if (requestedFaction && player.faction !== requestedFaction) {
+    player.faction = requestedFaction
+    room.version++
+  } else if (!player.faction) {
     player.faction = nextFaction(room)
     room.version++
   }
 
+  _broadcastRoomUpdate(room)
   return ok({ success: true, faction: player.faction })
 }
 
@@ -532,7 +631,7 @@ async function handleTraining(method: string, body: Record<string, unknown>): Pr
     } catch (e: unknown) {
       const err2 = e as Record<string, unknown>
       if (err2.needsTargetSelection) {
-        return JSON.stringify({ needsTargetSelection: true, range: err2.range, targetType: err2.targetType, filter: err2.filter, _status: 400 })
+        return JSON.stringify({ needsTargetSelection: true, range: err2.range, targetType: err2.targetType, filter: err2.filter, targetIndex: err2.targetIndex, _status: 400 })
       }
       if (err2.needsOptionSelection) {
         return JSON.stringify({ needsOptionSelection: true, options: err2.options, title: err2.title, _status: 400 })
@@ -611,8 +710,9 @@ async function route(method: string, rawPath: string, body: Record<string, unkno
   m = p.match(/^\/api\/rooms\/([^/]+)$/)
   if (m) {
     const id = m[1]
-    if (method === 'GET')  return handleGetRoom(id)
-    if (method === 'POST') return handleRoomPost(id, body)
+    if (method === 'GET')    return handleGetRoom(id)
+    if (method === 'POST')   return handleRoomPost(id, body)
+    if (method === 'DELETE') return handleDeleteRoom(id, body)
   }
 
   m = p.match(/^\/api\/rooms\/([^/]+)\/pieces$/)
@@ -622,6 +722,8 @@ async function route(method: string, rawPath: string, body: Record<string, unkno
   if (m && method === 'POST') {
     const action = body.action as string | undefined
     if (action === 'join') return handleRoomPost(m[1], body)
+    if (action === 'toggle-ready') return handleRoomPost(m[1], body)
+    if (action === 'leave') return handleLeaveRoom(m[1], body)
     if (action === 'claim-faction') return handleClaimFaction(m[1], body)
     if (action === 'select-pieces') return handleSelectPieces(m[1], body)
     if (action === 'start-game') return handleRoomPost(m[1], { ...body, action: 'start' })
@@ -645,6 +747,7 @@ async function route(method: string, rawPath: string, body: Record<string, unkno
 
   if (p === '/api/pieces' && method === 'GET') return handleGetPieces()
   if (p === '/api/maps'   && method === 'GET') return handleGetMaps()
+  if (p === '/api/admin/resource-pack' && method === 'GET') return ok({ meta: null })
 
   if (p === '/api/training' && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
     return handleTraining(method, body)
@@ -661,6 +764,10 @@ async function route(method: string, rawPath: string, body: Record<string, unkno
 
 interface AndroidBridge {
   sendResponse(reqId: string, responseJson: string): void
+  sendResponseChunk?(reqId: string, chunk: string): void
+  sendResponseComplete?(reqId: string): void
+  getRequestChunkCount?(reqId: string): number
+  getRequestChunk?(reqId: string, index: number): string
   onReady(): void
 }
 
@@ -672,6 +779,39 @@ declare global {
   // eslint-disable-next-line no-var
   var RvBMobileServer: {
     processRequest(reqId: string, method: string, path: string, bodyJson: string, headersJson?: string): void
+    processRequestFromBridge(reqId: string): void
+    beginBridgeRequest(reqId: string): void
+    appendBridgeRequestChunk(reqId: string, chunk: string): void
+    finishBridgeRequest(reqId: string): void
+  }
+}
+
+const pendingBridgeRequestChunks: Record<string, string[]> = {}
+
+function sendBridgeResponse(reqId: string, responseJson: string): void {
+  const bridge = globalThis.AndroidServerBridge
+  if (!bridge) return
+  if (bridge.sendResponseChunk && bridge.sendResponseComplete && responseJson.length > 32000) {
+    const chunkSize = 48 * 1024
+    for (let i = 0; i < responseJson.length; i += chunkSize) {
+      bridge.sendResponseChunk(reqId, responseJson.slice(i, i + chunkSize))
+    }
+    bridge.sendResponseComplete(reqId)
+    return
+  }
+  bridge.sendResponse(reqId, responseJson)
+}
+
+function readBridgeRequest(reqId: string): { method: string; path: string; bodyJson: string; headersJson?: string } | null {
+  const bridge = globalThis.AndroidServerBridge
+  if (!bridge?.getRequestChunkCount || !bridge.getRequestChunk) return null
+  const count = bridge.getRequestChunkCount(reqId)
+  let payload = ''
+  for (let i = 0; i < count; i++) payload += bridge.getRequestChunk(reqId, i)
+  try {
+    return JSON.parse(payload) as { method: string; path: string; bodyJson: string; headersJson?: string }
+  } catch {
+    return null
   }
 }
 
@@ -681,17 +821,36 @@ globalThis.RvBMobileServer = {
     try { body = JSON.parse(bodyJson || '{}') as Record<string, unknown> } catch {}
 
     Promise.resolve(route(method, path, body))
-      .then(responseJson => {
-        if (globalThis.AndroidServerBridge) {
-          globalThis.AndroidServerBridge.sendResponse(reqId, responseJson)
-        }
-      })
+      .then(responseJson => sendBridgeResponse(reqId, responseJson))
       .catch((e: unknown) => {
         const errJson = JSON.stringify({ error: String(e), _status: 500 })
-        if (globalThis.AndroidServerBridge) {
-          globalThis.AndroidServerBridge.sendResponse(reqId, errJson)
-        }
+        sendBridgeResponse(reqId, errJson)
       })
+  },
+  processRequestFromBridge(reqId) {
+    const request = readBridgeRequest(reqId)
+    if (!request) {
+      sendBridgeResponse(reqId, JSON.stringify({ error: 'Invalid bridge request', _status: 400 }))
+      return
+    }
+    this.processRequest(reqId, request.method, request.path, request.bodyJson, request.headersJson)
+  },
+  beginBridgeRequest(reqId) {
+    pendingBridgeRequestChunks[reqId] = []
+  },
+  appendBridgeRequestChunk(reqId, chunk) {
+    if (!pendingBridgeRequestChunks[reqId]) pendingBridgeRequestChunks[reqId] = []
+    pendingBridgeRequestChunks[reqId].push(chunk || '')
+  },
+  finishBridgeRequest(reqId) {
+    const chunks = pendingBridgeRequestChunks[reqId] || []
+    delete pendingBridgeRequestChunks[reqId]
+    try {
+      const request = JSON.parse(chunks.join('')) as { method: string; path: string; bodyJson: string; headersJson?: string }
+      this.processRequest(reqId, request.method, request.path, request.bodyJson, request.headersJson)
+    } catch {
+      sendBridgeResponse(reqId, JSON.stringify({ error: 'Invalid pushed bridge request', _status: 400 }))
+    }
   },
 }
 

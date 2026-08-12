@@ -6,20 +6,26 @@
   <title>选择棋子 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/ws-client.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f172a; color: #e2e8f0;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(96,165,250,.16), transparent 28%),
+        radial-gradient(circle at 80% 8%, rgba(248,113,113,.13), transparent 30%),
+        #0f172a;
+      color: #e2e8f0;
       min-height: 100vh;
-      padding: 0 0 calc(80px + env(safe-area-inset-bottom));
+      padding: 0 0 calc(92px + env(safe-area-inset-bottom));
     }
 
-    /* ── Topbar ── */
     .topbar {
       display: flex; align-items: center; gap: 10px;
       padding: 12px 14px;
-      background: #0f172a; border-bottom: 1px solid #1e293b;
+      background: rgba(15,23,42,.78); border-bottom: 1px solid rgba(148,163,184,.18);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
       position: sticky; top: 0; z-index: 20;
     }
     .back-btn {
@@ -30,24 +36,24 @@
     .back-btn:active { opacity: .7; }
     .topbar-title { font-size: 16px; font-weight: 700; flex: 1; }
 
-    /* ── Section ── */
-    .section { padding: 16px 14px 8px; }
+    .section { width: min(1120px, 100%); margin: 0 auto; padding: 16px 14px 8px; }
     .section-label {
       font-size: 11px; font-weight: 700; color: #475569;
       letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;
     }
 
-    /* ── Piece cards ── */
     .piece-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+      gap: 10px;
     }
     .piece-card {
-      background: #1e293b; border: 2px solid #334155;
+      background: rgba(30,41,59,.82); border: 1px solid rgba(148,163,184,.2);
       border-radius: 12px; padding: 12px;
       cursor: pointer; transition: border-color .15s, background .15s;
       -webkit-user-select: none;
+      min-height: 94px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
     }
     .piece-card:active { background: #263348; }
     .piece-card.selected { border-color: #3b82f6; background: rgba(59,130,246,.1); }
@@ -69,16 +75,17 @@
     }
     .piece-card { position: relative; }
 
-    /* ── Confirm bar ── */
     .confirm-bar {
       position: fixed; bottom: 0; left: 0; right: 0;
-      background: #0f172a; border-top: 1px solid #1e293b;
+      background: rgba(15,23,42,.88); border-top: 1px solid rgba(148,163,184,.18);
       padding: 6px 14px calc(6px + env(safe-area-inset-bottom));
       z-index: 50;
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
     }
     .confirm-row {
+      width: min(1120px, 100%); margin: 0 auto 4px;
       display: flex; align-items: center; gap: 10px;
-      margin-bottom: 4px;
     }
     .selected-count { font-size: 13px; color: #64748b; flex: 1; }
     .btn-confirm {
@@ -89,6 +96,7 @@
     .btn-confirm:disabled { opacity: .4; cursor: default; }
     .btn-confirm:not(:disabled):active { opacity: .85; }
     .server-row {
+      width: min(1120px, 100%); margin: 0 auto;
       display: flex; align-items: center; justify-content: space-between;
     }
     .server-label { font-size: 11px; color: #475569; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -98,7 +106,6 @@
     }
     .btn-disconnect-sm:active { opacity: .7; }
 
-    /* ── Waiting overlay ── */
     .overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.8); z-index: 200;
@@ -116,7 +123,6 @@
     .wait-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
     .wait-sub { font-size: 14px; color: #64748b; }
 
-    /* ── Loading ── */
     .loading { text-align: center; padding: 60px 20px; color: #475569; font-size: 14px; }
     .loading-spinner {
       width: 36px; height: 36px;
@@ -125,14 +131,12 @@
       animation: spin .7s linear infinite;
     }
 
-    /* ── Windows hover ── */
     @media (hover: hover) {
       .piece-card:hover { background: #263348; }
       .piece-card.selected:hover { background: rgba(59,130,246,.15); }
       .back-btn:hover { background: #263348; }
     }
 
-    /* ── Piece detail popup ── */
     .detail-overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.7); z-index: 300;
@@ -221,25 +225,54 @@
       text-align: center; font-size: 11px; color: #334155;
       padding: 6px 0 0;
     }
+    .alignment-panel {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      width: min(1120px, 100%); margin: 0 auto; padding: 12px 14px 2px;
+    }
+    .alignment-btn {
+      border: 1px solid #334155; border-radius: 10px;
+      background: #162033; color: #94a3b8;
+      min-height: 46px; padding: 8px 10px;
+      font-size: 13px; font-weight: 800; cursor: pointer;
+    }
+    .alignment-btn.active.light {
+      color: #dbeafe; border-color: #60a5fa; background: rgba(37,99,235,.22);
+    }
+    .alignment-btn.active.dark {
+      color: #fecaca; border-color: #f87171; background: rgba(185,28,28,.22);
+    }
+    @media (max-width: 560px) {
+      body { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+      .piece-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .piece-card { padding: 10px; min-height: 90px; }
+      .piece-name { font-size: 13px; }
+      .piece-stats { font-size: 10px; }
+      .btn-confirm { padding: 11px 14px; white-space: nowrap; }
+    }
   </style>
 </head>
 <body>
 
   <!-- Topbar -->
   <div class="topbar">
-    <a class="back-btn" onclick="goBackToLobby()" style="cursor:pointer">← 返回</a>
+    <a class="back-btn" onclick="goBackToLobby()" style="cursor:pointer">返回</a>
     <div class="topbar-title">选择出战棋子</div>
-    <div id="factionBadge" style="font-size:13px;padding:4px 10px;border-radius:6px;background:#1e293b;border:1px solid #334155;color:#64748b;flex-shrink:0">加载中…</div>
+    <div id="factionBadge" style="font-size:13px;padding:4px 10px;border-radius:6px;background:#1e293b;border:1px solid #334155;color:#64748b;flex-shrink:0">加载中...</div>
+  </div>
+
+  <div class="alignment-panel">
+    <button class="alignment-btn light" id="alignmentLightBtn" onclick="setAlignment('light')">光方</button>
+    <button class="alignment-btn dark" id="alignmentDarkBtn" onclick="setAlignment('dark')">暗方</button>
   </div>
 
   <!-- Piece list -->
   <div class="section">
-    <div class="section-label" id="sectionLabel">可用棋子（可多选）</div>
-    <div class="hint-bar">右键 / 长按 棋子可查看技能详情</div>
+    <div class="section-label" id="sectionLabel">可用棋子</div>
+    <div class="hint-bar">右键或长按棋子可查看技能详情</div>
     <div id="pieceGrid" class="piece-grid" style="margin-top:8px">
       <div class="loading" style="grid-column:1/-1">
         <div class="loading-spinner"></div>
-        <div>加载棋子数据…</div>
+        <div>加载棋子数据...</div>
       </div>
     </div>
   </div>
@@ -247,11 +280,11 @@
   <!-- Confirm bar + server row -->
   <div class="confirm-bar">
     <div class="confirm-row">
-      <div class="selected-count" id="selectedCount">已选 0 个棋子</div>
-      <button class="btn-confirm" id="confirmBtn" disabled onclick="confirmSelection()">确认出战 →</button>
+      <div class="selected-count" id="selectedCount">已选 0 / 8 个棋子</div>
+      <button class="btn-confirm" id="confirmBtn" disabled onclick="confirmSelection()">确认出战</button>
     </div>
     <div class="server-row">
-      <span class="server-label" id="serverLabel">⚫ 未连接</span>
+      <span class="server-label" id="serverLabel">未连接</span>
       <button class="btn-disconnect-sm" id="disconnectBtn" onclick="doDisconnect()" style="display:none">断开服务器</button>
     </div>
   </div>
@@ -267,12 +300,12 @@
   <!-- Waiting overlay -->
   <div class="overlay" id="waitOverlay">
     <div class="spinner"></div>
-    <div class="wait-title">等待对方选择棋子…</div>
-    <div class="wait-sub" id="waitSub">房间 ID: —</div>
+    <div class="wait-title">等待对方选择棋子...</div>
+    <div class="wait-sub" id="waitSub">房间 ID: -</div>
   </div>
 
   <script>
-    // ── Back navigation — 回到房间等待页（保留同房间上下文）──
+    // Back navigation: return to the room while preserving server params.
     function goBackToLobby() {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       const sp = new URLSearchParams(location.search)
@@ -283,36 +316,158 @@
         window.location.href = 'room.html?roomId=' + encodeURIComponent(rid)
           + '&playerId=' + encodeURIComponent(pid)
           + '&playerName=' + encodeURIComponent(pname)
-          + (RELAY_MODE ? '&relay=1' : '')
+          + (shouldUseRelayMode() ? '&relay=1' : '')
         return
       }
-      // 兜底：没有房间上下文时再回大厅，并保留 server mode
-      const mode = localStorage.getItem('rvb_lobby_server_mode') || 'remote'
-      const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
-      const p = new URLSearchParams({ server: mode })
-      if (serverUrl && mode !== 'local') p.set('url', serverUrl)
+      // Fallback: no room context, return to lobby while preserving server mode.
+      const p = window.RvBUtils && RvBUtils.appendServerParams
+        ? RvBUtils.appendServerParams(new URLSearchParams())
+        : new URLSearchParams()
       p.set('v', Date.now().toString())
       window.location.href = 'lobby.html?' + p.toString()
     }
 
-    // ── URL params ──
+    // URL params
     const params = new URLSearchParams(location.search)
     const roomId = params.get('roomId') || ''
     const playerId = params.get('playerId') || ('anon-' + Date.now())
+    const accountId = params.get('accountId') || params.get('account') || ''
     const playerName = params.get('playerName') || '玩家'
-    const RELAY_MODE = params.get('relay') === '1'
+    function shouldUseRelayMode() {
+      if (params.get('relay') === '1' || params.get('server') === 'remote') return true
+      return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
+    }
 
     // RvBUtils loaded from js/server-utils.js
     const getServerUrl = () => RvBUtils.getServerUrl()
 
-    // ── Piece data ──
+    // Piece data
     let PIECE_TEMPLATES = []
     let selectedIds = new Set()
     let pollTimer = null
-    let playerFaction = null   // 'red' | 'blue' | null
+    let playerFaction = null    // 'red' | 'blue' turn order seat
+    let playerAlignment = null  // 'good' | 'evil' piece pool
+    playerAlignment = params.get('alignment') || playerAlignment
+    let wsReady = false
+    let latestRoom = null
 
-    // ── Skill cache ──
+    // Skill cache
     const SKILL_CACHE = {}
+
+    function connectSelectionWs() {
+      if (typeof RvBWs === 'undefined' || !roomId || !playerId) return
+      RvBWs.on('connect', function() {
+        wsReady = true
+        RvBWs.send({ type: 'roomState' })
+      })
+      RvBWs.on('disconnect', function() { wsReady = false })
+      RvBWs.on('message', function(msg) {
+        if (msg.type === 'roomUpdate' && msg.room) {
+          latestRoom = msg.room
+          const me = (msg.room.players || []).find(p => p.id && p.id.toLowerCase() === playerId.toLowerCase())
+          if (me) {
+            let changed = false
+            if (me.faction && me.faction !== playerFaction) { playerFaction = me.faction; changed = true }
+            if (me.alignment && me.alignment !== playerAlignment) { playerAlignment = me.alignment; changed = true }
+            if (changed) { updateFactionBadge(); loadPieces() }
+          }
+          if (roomLooksBattleReady(msg.room)) {
+            navigateBattle()
+          }
+        } else if (msg.type === 'roomActionResult') {
+          if (!msg.success) {
+            alert('Submit failed: ' + (msg.error || 'unknown error'))
+            const btn = document.getElementById('confirmBtn')
+            if (btn) { btn.disabled = false; btn.textContent = 'Confirm lineup ->' }
+            return
+          }
+          {
+            let changed = false
+            if (msg.faction && msg.faction !== playerFaction) { playerFaction = msg.faction; changed = true }
+            if (msg.alignment && msg.alignment !== playerAlignment) { playerAlignment = msg.alignment; changed = true }
+            if (changed) { updateFactionBadge(); loadPieces() }
+          }
+          if (msg.room) {
+            latestRoom = msg.room
+            if (roomLooksBattleReady(msg.room)) navigateBattle()
+          }
+        } else if (msg.type === 'stateUpdate' || msg.type === 'battleSnapshot') {
+          navigateBattle()
+        }
+      })
+      RvBWs.connect(roomId, playerId, shouldUseRelayMode() ? 'relay' : 'lan')
+    }
+
+    function waitForSelectionWs(timeoutMs) {
+      timeoutMs = timeoutMs || 5000
+      return new Promise((resolve, reject) => {
+        if (typeof RvBWs === 'undefined') {
+          reject(new Error('WebSocket client not loaded'))
+          return
+        }
+        if (RvBWs.isConnected && RvBWs.isConnected()) {
+          wsReady = true
+          resolve()
+          return
+        }
+        const started = Date.now()
+        const timer = setInterval(() => {
+          if (RvBWs.isConnected && RvBWs.isConnected()) {
+            clearInterval(timer)
+            wsReady = true
+            resolve()
+            return
+          }
+          if (Date.now() - started >= timeoutMs) {
+            clearInterval(timer)
+            reject(new Error('WebSocket connect timeout'))
+          }
+        }, 100)
+      })
+    }
+
+    async function claimFactionViaWs() {
+      const result = await sendRoomAction({
+        action: 'claim-faction',
+        playerId,
+        accountId,
+        playerName,
+        alignment: playerAlignment
+      })
+      if (result && result.faction) playerFaction = result.faction
+      if (result && result.alignment) playerAlignment = result.alignment
+      if (result && result.room) latestRoom = result.room
+      return result
+    }
+
+    async function setAlignment(alignment) {
+      if (alignment !== 'light' && alignment !== 'dark') return
+      if (alignment === playerAlignment) return
+      playerAlignment = alignment
+      selectedIds.clear()
+      updateFactionBadge()
+      await loadPieces()
+      updateConfirmBar()
+      if (wsReady && roomId) {
+        try { await claimFactionViaWs() } catch {}
+      }
+    }
+
+    function navigateBattle() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+      const p = new URLSearchParams({ roomId, playerId, playerName })
+      if (accountId) p.set('accountId', accountId)
+      if (params.get('debug')) p.set('debug', params.get('debug'))
+      if (window.RvBUtils && RvBUtils.appendServerParams) RvBUtils.appendServerParams(p)
+      if (shouldUseRelayMode()) p.set('relay', '1')
+      window.location.href = 'battle.html?' + p.toString()
+    }
+
+    function roomLooksBattleReady(room) {
+      if (!room) return false
+      if (room.battleState && (room.battleState.state || room.battleState.type)) return true
+      return room.status === 'in-progress' || room.status === 'playing' || room.status === 'battle'
+    }
 
     async function fetchJson(path) {
       if (window.fetchPackJson && /^\.?\/?data\//.test(path)) {
@@ -323,36 +478,47 @@
       return res.json()
     }
 
+    async function sendRoomAction(payload) {
+      const body = Object.assign({ roomId }, payload)
+      if (typeof RvBWs !== 'undefined' && RvBWs.request) {
+        try {
+          await waitForSelectionWs(2500)
+          return await RvBWs.request('rooms.action', body, 7000)
+        } catch (e) {
+          console.warn('[piece-selection] WS room action failed; falling back to HTTP:', e)
+        }
+      }
+      if (!window.RvBUtils || !RvBUtils.serverFetch) {
+        throw new Error('No room action transport available')
+      }
+      const res = await RvBUtils.serverFetch('/api/rooms/' + encodeURIComponent(roomId) + '/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      let data = null
+      try { data = await res.json() } catch {}
+      if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status))
+      return data
+    }
+
     // Fetch player's faction from room data, then load matching pieces
     async function init() {
+      if (window.RvBUtils && RvBUtils.restoreServerFromParams) {
+        await RvBUtils.restoreServerFromParams(params)
+      }
       updateServerRow()
+      connectSelectionWs()
 
-      // Try to get faction from room
-      if (roomId && RvBUtils.getServerUrl()) {
+      if (roomId) {
         try {
-          const res = await RvBUtils.serverFetch('/api/rooms/' + roomId)
-          if (res.ok) {
-            const room = await res.json()
-            const me = (room.players || []).find(p =>
-              p.id && p.id.toLowerCase() === playerId.toLowerCase()
-            )
-            if (me && me.faction) playerFaction = me.faction
+          const result = await claimFactionViaWs()
+          if (result && result.room && roomLooksBattleReady(result.room)) {
+            navigateBattle()
+            return
           }
-        } catch {}
-
-        // If still no faction, claim one automatically
-        if (!playerFaction) {
-          try {
-            const claimRes = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ playerId, playerName, action: 'claim-faction' })
-            })
-            if (claimRes.ok) {
-              const claimData = await claimRes.json()
-              if (claimData.faction) playerFaction = claimData.faction
-            }
-          } catch {}
+        } catch (e) {
+          alert('WebSocket connect failed; cannot claim faction via WS: ' + (e && e.message ? e.message : e))
         }
       }
 
@@ -363,21 +529,26 @@
     function updateFactionBadge() {
       const badge = document.getElementById('factionBadge')
       const label = document.getElementById('sectionLabel')
+      const lightBtn = document.getElementById('alignmentLightBtn')
+      const darkBtn = document.getElementById('alignmentDarkBtn')
+      if (lightBtn) lightBtn.classList.toggle('active', playerAlignment === 'light' || playerAlignment === 'good')
+      if (darkBtn) darkBtn.classList.toggle('active', playerAlignment === 'dark' || playerAlignment === 'evil')
       if (!badge) return
-      if (playerFaction === 'red') {
-        badge.textContent = '🔴 红方'
+      const orderLabel = playerFaction === 'red' ? '座位 red' : playerFaction === 'blue' ? '座位 blue' : null
+      if (playerAlignment === 'dark' || playerAlignment === 'evil') {
+        badge.textContent = '暗方' + (orderLabel ? ' (' + orderLabel + ')' : '')
         badge.style.color = '#f87171'
         badge.style.borderColor = '#ef4444'
-        if (label) label.textContent = '红方棋子（可多选）'
-      } else if (playerFaction === 'blue') {
-        badge.textContent = '🔵 蓝方'
+        if (label) label.textContent = '选择暗方棋子'
+      } else if (playerAlignment === 'light' || playerAlignment === 'good') {
+        badge.textContent = '光方' + (orderLabel ? ' (' + orderLabel + ')' : '')
         badge.style.color = '#60a5fa'
         badge.style.borderColor = '#3b82f6'
-        if (label) label.textContent = '蓝方棋子（可多选）'
+        if (label) label.textContent = '选择光方棋子'
       } else {
-        badge.textContent = '阵营未知'
+        badge.textContent = orderLabel || '加载中...'
         badge.style.color = '#64748b'
-        if (label) label.textContent = '可用棋子（可多选）'
+        if (label) label.textContent = '可用棋子'
       }
     }
 
@@ -388,12 +559,12 @@
         for (const id of ids) {
           try { loaded.push(await fetchJson('./data/pieces/' + id + '.json')) } catch {}
         }
-        // Filter by faction: show only pieces matching the player's faction
-        // (neutral pieces shown to both sides)
-        if (playerFaction) {
-          PIECE_TEMPLATES = loaded.filter(p =>
-            p.faction === playerFaction || p.faction === 'neutral' || !p.faction
-          )
+        // Alignment is the player's identity preference. Prefer matching pieces,
+        // but keep enough pieces visible while the art/content pool is incomplete.
+        if (playerAlignment === 'dark' || playerAlignment === 'evil') {
+          PIECE_TEMPLATES = loaded.slice().sort((a, b) => (a.faction === 'evil' ? 0 : 1) - (b.faction === 'evil' ? 0 : 1))
+        } else if (playerAlignment === 'light' || playerAlignment === 'good') {
+          PIECE_TEMPLATES = loaded.slice().sort((a, b) => (a.faction === 'good' ? 0 : 1) - (b.faction === 'good' ? 0 : 1))
         } else {
           PIECE_TEMPLATES = loaded
         }
@@ -404,13 +575,16 @@
     }
 
     function factionIcon(f) {
-      return f === 'red' ? '🔴' : f === 'blue' ? '🔵' : '⚪'
+      return f === 'evil' ? '暗' : f === 'good' ? '光' : '中'
+    }
+    function factionLabel(f) {
+      return f === 'evil' ? '暗方' : f === 'good' ? '光方' : '中立'
     }
 
     function renderPieces() {
       const grid = document.getElementById('pieceGrid')
       if (!PIECE_TEMPLATES.length) {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#475569">无可用棋子</div>'
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#475569">暂无可用棋子</div>'
         return
       }
       grid.innerHTML = PIECE_TEMPLATES.map(p => {
@@ -439,7 +613,7 @@
       setupLongPress()
     }
 
-    // ── Long-press ──
+    // Long-press
     let lpTimer = null
     let lpMoved = false
 
@@ -463,7 +637,7 @@
       }, { passive: true })
     }
 
-    // ── Piece detail popup ──
+    // Piece detail popup
     async function getSkill(skillId) {
       if (SKILL_CACHE[skillId]) return SKILL_CACHE[skillId]
       try {
@@ -471,7 +645,7 @@
         SKILL_CACHE[skillId] = d
         return d
       } catch {
-        return { id: skillId, name: skillId, description: '—', icon: '⚡', type: 'normal', actionPointCost: 0, cooldownTurns: 0 }
+        return { id: skillId, name: skillId, description: '', icon: '*', type: 'normal', actionPointCost: 0, cooldownTurns: 0 }
       }
     }
 
@@ -513,38 +687,51 @@
           ${imgHtml}
           <div>
             <div class="detail-name">${p.name || p.id}</div>
-            <div class="detail-faction">${p.faction === 'red' ? '🔴 红方' : p.faction === 'blue' ? '🔵 蓝方' : '⚪ 中立'}</div>
+            <div class="detail-faction">${factionLabel(p.faction)}</div>
           </div>
         </div>
         <div class="detail-stats-row">
-          <div class="detail-stat"><div class="detail-stat-val" style="color:#f87171">${s.maxHp || '?'}</div><div class="detail-stat-label">生命值</div></div>
-          <div class="detail-stat"><div class="detail-stat-val" style="color:#fb923c">${s.attack || '?'}</div><div class="detail-stat-label">攻击力</div></div>
-          <div class="detail-stat"><div class="detail-stat-val" style="color:#60a5fa">${s.defense || 0}</div><div class="detail-stat-label">防御力</div></div>
-          <div class="detail-stat"><div class="detail-stat-val" style="color:#4ade80">${s.moveRange || 3}</div><div class="detail-stat-label">移动力</div></div>
+          <div class="detail-stat"><div class="detail-stat-val" style="color:#f87171">${s.maxHp || '?'}</div><div class="detail-stat-label">生命</div></div>
+          <div class="detail-stat"><div class="detail-stat-val" style="color:#fb923c">${s.attack || '?'}</div><div class="detail-stat-label">攻击</div></div>
+          <div class="detail-stat"><div class="detail-stat-val" style="color:#60a5fa">${s.defense || 0}</div><div class="detail-stat-label">防御</div></div>
+          <div class="detail-stat"><div class="detail-stat-val" style="color:#4ade80">${s.moveRange || 3}</div><div class="detail-stat-label">移动</div></div>
         </div>
         ${p.description ? `<div class="detail-desc">${p.description}</div>` : ''}
         <div class="detail-skills-label">技能</div>
-        <div id="detailSkillList"><div style="color:#475569;font-size:13px">加载中…</div></div>
+        <div id="detailSkillList"><div style="color:#475569;font-size:13px">加载中...</div></div>
         <div id="detailRelatedCards"></div>
         <div id="detailKeywords"></div>
       `
       overlay.classList.add('show')
 
-      // Load skills async
-      const skillEntries = (p.skills || []).map(sk => typeof sk === 'string' ? sk : (sk.skillId || sk.id)).filter(Boolean)
-      const skills = await Promise.all(skillEntries.map(id => getSkill(id)))
-      const typeLabel = { normal: '普通', super: '超级', buff: '增益' }
+      // Load skills async, including transformed/derived skills that can be gained in battle.
+      const baseSkillEntries = (p.skills || [])
+        .map(sk => ({ id: typeof sk === 'string' ? sk : (sk.skillId || sk.id), derived: false, trigger: '' }))
+        .filter(sk => sk.id)
+      const derivedSkillEntries = (p.transformedSkills || [])
+        .map(sk => ({
+          id: typeof sk === 'string' ? sk : (sk.skillId || sk.id),
+          derived: true,
+          trigger: typeof sk === 'string' ? '' : (sk.triggeredBy || sk.trigger || '')
+        }))
+        .filter(sk => sk.id)
+      const skillEntries = baseSkillEntries.concat(derivedSkillEntries)
+      const skills = await Promise.all(skillEntries.map(async entry => {
+        const def = await getSkill(entry.id)
+        return Object.assign({}, def, { _derived: entry.derived, _trigger: entry.trigger })
+      }))
+      const typeLabel = { normal: '普通', super: '充能', buff: '增益' }
       const typeCls = { super: 'skill-type-super', buff: 'skill-type-buff' }
       document.getElementById('detailSkillList').innerHTML = skills.length
         ? skills.map(sk => `
           <div class="skill-entry">
             <div class="skill-entry-head">
-              <span class="skill-icon">${sk.icon || '⚡'}</span>
-              <span class="skill-name">${sk.name || sk.id}</span>
+              <span class="skill-icon">${sk.icon || '*'}</span>
+              <span class="skill-name">${sk.name || sk.id}${sk._derived ? ' <span style="color:#a855f7;font-size:11px">衍生</span>' : ''}</span>
               <span class="skill-type-badge ${typeCls[sk.type] || ''}">${typeLabel[sk.type] || sk.type || '主动'}</span>
             </div>
-            <div class="skill-meta">行动点：${sk.actionPointCost || 0} · 冷却：${sk.cooldownTurns || 0} 回合${sk.range ? ' · 范围：' + sk.range : ''}</div>
-            <div class="skill-desc">${sk.description || '—'}</div>
+            <div class="skill-meta">行动点：${sk.actionPointCost || 0} | 冷却：${sk.cooldownTurns || 0} 回合${sk.range ? ' | 范围：' + sk.range : ''}${sk._derived && sk._trigger ? ' | 由 ' + sk._trigger + ' 获得' : ''}</div>
+            <div class="skill-desc">${sk.description || '暂无描述'}</div>
           </div>`)
           .join('')
         : '<div style="color:#475569;font-size:13px">暂无技能</div>'
@@ -557,7 +744,7 @@
           const card = await getCard(cardId)
           if (card) {
             relatedHtml += `<div class="detail-related-card">
-              <div class="detail-related-name">${card.icon || '🎴'} ${card.name || cardId} <span style="color:#a855f7;font-size:11px">AP:${card.actionPointCost ?? 0}</span></div>
+              <div class="detail-related-name">${card.icon || '*'} ${card.name || cardId} <span style="color:#a855f7;font-size:11px">AP:${card.actionPointCost ?? 0}</span></div>
               <div class="detail-related-type">${card.type === 'active' ? '主动' : '反应'}</div>
               <div class="detail-related-desc">${card.description || ''}</div>
             </div>`
@@ -612,59 +799,64 @@
 
     function updateConfirmBar() {
       const n = selectedIds.size
-      document.getElementById('selectedCount').textContent = '已选 ' + n + ' 个棋子'
-      document.getElementById('confirmBtn').disabled = n === 0
+      document.getElementById('selectedCount').textContent = '已选 ' + n + ' / 8 个棋子'
+      document.getElementById('confirmBtn').disabled = !playerAlignment || n !== 8
     }
 
     async function confirmSelection() {
       const url = getServerUrl()
       if (!url) { alert('服务器未连接'); return }
+      if (!playerAlignment) { alert('请先选择光方或暗方'); return }
       const selected = PIECE_TEMPLATES.filter(p => selectedIds.has(p.id))
+      if (selected.length !== 8) { alert('请选择正好 8 个棋子'); return }
       const btn = document.getElementById('confirmBtn')
       btn.disabled = true
-      btn.textContent = '提交中…'
+      btn.textContent = '提交中...'
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'select-pieces',
-            playerId,
-            playerName,
-            pieces: selected.map(p => ({ templateId: p.id, faction: p.faction || 'neutral' }))
-          })
+        const result = await sendRoomAction({
+          action: 'select-pieces',
+          playerId,
+          accountId,
+          playerName,
+          alignment: playerAlignment,
+          pieces: selected.map(p => ({ templateId: p.id, faction: p.faction || 'neutral' }))
         })
-        if (!res.ok) throw new Error('HTTP ' + res.status)
-        document.getElementById('waitSub').textContent = '房间 ID: ' + roomId
-        document.getElementById('waitOverlay').classList.add('show')
-        pollTimer = setInterval(pollRoomStatus, 2000)
+        if (result && result.room) {
+          latestRoom = result.room
+          if (roomLooksBattleReady(result.room)) {
+            navigateBattle()
+            return
+          }
+        }
+        startWaitForBattle()
       } catch (e) {
         alert('提交失败：' + e.message)
         btn.disabled = false
-        btn.textContent = '确认出战 →'
+        btn.textContent = '确认出战'
       }
     }
 
+    function startWaitForBattle() {
+      try { if (window.RvBWs && RvBWs.send) RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
+      document.getElementById('waitSub').textContent = '房间 ID: ' + roomId
+      document.getElementById('waitOverlay').classList.add('show')
+      if (pollTimer) clearInterval(pollTimer)
+      pollTimer = setInterval(pollRoomStatus, 1500)
+      pollRoomStatus()
+    }
+
     async function pollRoomStatus() {
-      const url = getServerUrl()
-      if (!url) return
+      if (!roomId || !window.RvBUtils || !RvBUtils.serverFetch) return
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId)
+        const res = await RvBUtils.serverFetch('/api/rooms/' + encodeURIComponent(roomId))
         if (!res.ok) return
         const room = await res.json()
-        if (room.status === 'in-progress' || room.status === 'playing' || room.status === 'battle') {
-          clearInterval(pollTimer)
-          // Navigate to local battle client (server is API-only, no page serving)
-          window.location.href = 'battle.html'
-            + '?roomId=' + encodeURIComponent(roomId)
-            + '&playerId=' + encodeURIComponent(playerId)
-            + '&playerName=' + encodeURIComponent(playerName)
-            + (RELAY_MODE ? '&relay=1' : '')
-        }
+        latestRoom = room
+        if (roomLooksBattleReady(room)) navigateBattle()
       } catch {}
     }
 
-    // ── Disconnect ──
+    // Disconnect
     function doDisconnect() {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       RvBUtils.clearServerUrl()
@@ -677,17 +869,17 @@
       const btn = document.getElementById('disconnectBtn')
       if (!label) return
       if (url) {
-        label.textContent = '🟢 ' + url.replace(/^https?:\/\//, '').slice(0, 30)
+        label.textContent = '已连接 ' + url.replace(/^https?:\/\//, '').slice(0, 30)
         label.style.color = '#22c55e'
         if (btn) btn.style.display = 'block'
       } else {
-        label.textContent = '⚫ 未连接服务器'
+        label.textContent = '未连接服务器'
         label.style.color = '#475569'
         if (btn) btn.style.display = 'none'
       }
     }
 
-    // ── Init ──
+    // Init
     window.addEventListener('load', () => { init() })
     window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
   </script>

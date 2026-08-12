@@ -5,7 +5,16 @@
 // Example: readFileSync('data/skills/fireball.json', 'utf-8') → skill JSON string.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const __GAME_DATA__: { skills: Record<string, any>; pieces: Record<string, any>; maps: Record<string, any>; cards: Record<string, any>; tiles: Record<string, any>; statusEffects: Record<string, any> }
+declare const __GAME_DATA__: {
+  skills: Record<string, any>
+  pieces: Record<string, any>
+  maps: Record<string, any>
+  cards: Record<string, any>
+  rules: Record<string, any>
+  effects: Record<string, any>
+  tiles: Record<string, any>
+  statusEffects: Record<string, any>
+}
 
 const vfs = new Map<string, string>()
 
@@ -15,6 +24,8 @@ function populateVfs() {
     ['pieces', __GAME_DATA__.pieces],
     ['maps',   __GAME_DATA__.maps],
     ['cards',  __GAME_DATA__.cards],
+    ['rules',  __GAME_DATA__.rules],
+    ['effects', __GAME_DATA__.effects],
     ['tiles',  __GAME_DATA__.tiles],
     ['status-effects', __GAME_DATA__.statusEffects],
   ]

@@ -1,41 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
-import { applyBattleAction } from "@/lib/game/turn"
-import { loadAllSkillsById } from "@/lib/game/skills"
+import { getBattleStorage } from "@/lib/game/battle-storage"
+import { runBattleAction } from "@/lib/game/battle-runner"
 import { broadcastToRoom } from "@/lib/ws-server"
-
-interface ServerBattleState {
-  type: 'server-state'
-  seed: number
-  state: unknown  // BattleState JSON-safe (functions stripped by DB serialization)
-}
-
-function getBattleStorage(room: any): ServerBattleState | null {
-  const bs = room.battleState as any
-  if (!bs) return null
-  // support both new 'server-state' and legacy 'action-log' formats
-  if (bs.type === 'server-state') return bs as ServerBattleState
-  // legacy: extract initial state from first init entry
-  if (bs.type === 'action-log' && Array.isArray(bs.actions)) {
-    const init = bs.actions.find((a: any) => a.type === 'init')
-    if (init?.payload) return { type: 'server-state', seed: bs.seed ?? 0, state: init.payload }
-  }
-  return null
-}
-
-function withServerSkills(state: unknown): unknown {
-  if (!state || typeof state !== 'object') return state
-  return {
-    ...(state as Record<string, unknown>),
-    skillsById: loadAllSkillsById(),
-  }
-}
-
-function withoutServerSkills(state: unknown): unknown {
-  if (!state || typeof state !== 'object') return state
-  const { skillsById: _skillsById, ...rest } = state as Record<string, unknown>
-  return rest
-}
 
 // ── GET — return current authoritative battle state ──────────────────────────
 
@@ -94,11 +61,9 @@ export async function POST(
   const action = body.action
   if (!action) return NextResponse.json({ error: 'action is required' }, { status: 400 })
 
-  let newState: unknown
+  let result: ReturnType<typeof runBattleAction>
   try {
-    // applyBattleAction internally calls restorePieceRules/restorePlayerRules
-    const hydratedState = withServerSkills(storage.state)
-    newState = applyBattleAction(hydratedState as any, action as any)
+    result = runBattleAction(storage.state as any, action as any)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     const errAny = err as any
@@ -109,6 +74,7 @@ export async function POST(
         targetType: errAny.targetType ?? '',
         range: errAny.range ?? 10,
         filter: errAny.filter ?? '',
+        targetIndex: errAny.targetIndex ?? undefined,
       }, { status: 400 })
     }
     if (errAny?.needsOptionSelection) {
@@ -122,11 +88,18 @@ export async function POST(
     return NextResponse.json({ error: msg }, { status: 400 })
   }
 
-  storage.state = withoutServerSkills(newState)
+  storage.state = result.state
   room.battleState = storage as any
   await roomStore.setRoom(roomId, room)
 
-  broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state })
+  broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: result.stateHash, duplicate: result.duplicate })
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({
+    ok: true,
+    state: storage.state,
+    seed: storage.seed,
+    stateHash: result.stateHash,
+    actionHash: result.actionHash,
+    duplicate: result.duplicate === true,
+  })
 }

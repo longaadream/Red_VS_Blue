@@ -1,5 +1,13 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
+import {
+  applyEffectToPiece,
+  buildSelfObject,
+  getEffectOnPiece,
+  removeEffectFromPiece,
+} from './attached-effect'
+
+const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
 // 简单的日志写入函数
 function writeLog(message: string) {
@@ -55,7 +63,7 @@ export type TriggerType =
 
 // 触发条件
 export interface TriggerCondition {
-  type: TriggerType
+  type: string
   // 移除额外条件，所有条件判断都在技能代码中通过if语句实现
 }
 
@@ -72,6 +80,7 @@ export interface TriggerRule {
   description: string
   trigger: TriggerCondition
   effect: EffectFunction
+  priority?: number
   // 可选的限制条件
   limits?: {
     maxUses?: number        // 最大使用次数
@@ -93,6 +102,9 @@ export interface TriggerContext {
   targetPiece?: PieceInstance
   /** 技能ID，可以被修改以改变即将使用的技能 */
   skillId?: string
+  cardId?: string
+  cardInstanceId?: string
+  pieceTemplateId?: string
   /** 伤害值，可以在 beforeDamageDealt/beforeDamageTaken 中被修改 */
   damage?: number
   /** 治疗值，可以在 beforeHealDealt/beforeHealTaken 中被修改 */
@@ -109,6 +121,8 @@ export interface TriggerContext {
   targetX?: number
   /** 目标位置Y坐标，可以在 beforeMove/beforePieceSummoned 中被修改 */
   targetY?: number
+  targetPosition?: { x: number; y: number } | null
+  targetPieceId?: string
   /** 伤害类型，可以在 beforeDamageDealt 中被修改 */
   damageType?: 'physical' | 'magical' | 'true' | 'toxin'
   /** 
@@ -117,6 +131,9 @@ export interface TriggerContext {
    * 用于区分事件源(sourcePiece)和规则拥有者
    */
   rulePiece?: PieceInstance
+  piece?: PieceInstance
+  selectedOption?: any
+  [key: string]: any
 }
 
 // 触发系统类
@@ -186,158 +203,110 @@ export class TriggerSystem {
 
 
   // 检查并触发规则
-  checkTriggers(battle: BattleState, context: TriggerContext): { success: boolean; messages: string[]; blocked: boolean; needsOptionSelection?: boolean; options?: any[]; title?: string; needsTargetSelection?: boolean; targetType?: string; range?: number; filter?: string } {
+  checkTriggers(battle: BattleState, context: TriggerContext): { success: boolean; messages: string[]; blocked: boolean; needsOptionSelection?: boolean; options?: any[]; title?: string; needsTargetSelection?: boolean; targetType?: string; range?: number; filter?: string; pendingQueue?: Array<{ruleId: string, sourceId?: string}> } {
     const triggeredEffects: string[] = []
     let success = false
     let blocked = false
     let needsOptionSelection = false
     let pendingOptions: any[] | undefined
     let pendingTitle: string | undefined
+    let pendingPlayerId: string | undefined
     let needsTargetSelection = false
     let pendingTargetType: string | undefined
     let pendingRange: number | undefined
     let pendingFilter: string | undefined
+    let pendingRuleId: string | undefined
+    let pendingRuleSourceId: string | undefined
+    let pendingQueue: Array<{ruleId: string, sourceId?: string}> = []
+
+    if ((battle as any).extensions?.__dryRunSkillPreflight) {
+      return { success: false, messages: [], blocked: false } as any
+    }
+
+    // 从 context 中读取恢复状态（用于从 pendingTargetSelect/pendingOptionSelect 恢复执行）
+    const ctxPendingRuleId = (context as any).pendingRuleId as string | undefined
+    const ctxPendingSourceId = (context as any).pendingRuleSourceId as string | undefined
 
     writeLog('[checkTriggers] Checking triggers for: ' + context.type + ', global rules count: ' + this.rules.length + ', players: ' + JSON.stringify(battle.players?.map(p => ({ playerId: p.playerId, rulesCount: (p as any).rules?.length || 0 }))))
     writeLog('[checkTriggers] Context: ' + JSON.stringify({ type: context.type, statusId: (context as any).statusId, playerId: context.playerId }));
 
-    // 1. 检查全局规则
-    writeLog('[checkTriggers] Global rules count: ' + this.rules.length);
-    writeLog('[checkTriggers] Global rules: ' + JSON.stringify(this.rules.map(r => r.id)));
-    const globalMatchingRules = this.rules.filter(rule => {
-      // 只检查触发类型是否匹配
-      if (rule.trigger.type !== context.type) {
+    // 辅助函数：确保规则的 effect 已加载（不是存根函数）
+    function ensureRuleEffect(rule: any): boolean {
+      const isDefaultEffect = typeof rule.effect === 'function' &&
+        rule.effect.toString().length < 120 &&
+        rule.effect.toString().includes('ruleData.name') &&
+        rule.effect.toString().includes('触发') &&
+        !rule.effect.toString().includes('checkToxin')
+      if (typeof rule.effect !== 'function' || isDefaultEffect) {
+        try {
+          const { loadRuleById } = require('./skills')
+          const reloaded = loadRuleById(rule.id, FORCE_RULE_RELOAD)
+          if (reloaded && typeof reloaded.effect === 'function') {
+            rule.effect = reloaded.effect
+            return true
+          }
+        } catch { }
         return false
       }
+      return true
+    }
 
-      // 检查限制条件
+    // ── 阶段一：按顺序收集所有待执行规则 ──────────────────────────────────────
+    // 每个 RuleItem 携带规则对象、标识符、以及一个 buildCtx 函数用于构建执行上下文
+    type RuleItem = {
+      rule: any
+      ruleId: string
+      sourceId?: string
+      buildCtx: (ctx: TriggerContext) => TriggerContext
+    }
+    const allRuleItems: RuleItem[] = []
+    const globalCollectedIds = new Set<string>()  // 已加入全局区的规则ID，避免棋子区重复
+
+    // 1. 全局规则（含棋子所有权检测）
+    writeLog('[checkTriggers] Global rules count: ' + this.rules.length);
+    const globalMatchingRules = this.rules.filter(rule => {
+      if (ctxPendingRuleId && rule.id !== ctxPendingRuleId) return false
+      if (rule.trigger.type !== context.type) return false
       const limits = rule.limits
       if (limits) {
-        // 检查冷却
-        if (limits.currentCooldown && limits.currentCooldown > 0) {
-          return false
-        }
-
-        // 检查使用次数
-        if (limits.maxUses && (limits.uses || 0) >= limits.maxUses) {
-          return false
-        }
+        if (limits.currentCooldown && limits.currentCooldown > 0) return false
+        if (limits.maxUses && (limits.uses || 0) >= limits.maxUses) return false
       }
-
       return true
     })
-    
     globalMatchingRules.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
     writeLog('[checkTriggers] Global matching rules for ' + context.type + ': ' + JSON.stringify(globalMatchingRules.map(r => r.id)));
 
-    // 跟踪已执行的规则ID，避免重复执行
-    const executedRuleIds = new Set<string>();
-
-    // 执行全局匹配的规则
     for (const rule of globalMatchingRules) {
-      if (blocked) break
-      // 记录已执行的规则
-      executedRuleIds.add(rule.id);
-      // 检查规则对象是否有效
-      writeLog('[checkTriggers] Checking global rule: ' + rule?.id + ', effect type: ' + typeof rule?.effect);
-      if (!rule || typeof rule.effect !== 'function') {
-        writeLog('Skipping invalid global rule: rule or rule.effect is not a function, ruleId: ' + rule?.id)
-        continue
-      }
-      
-      try {
-        // 找到拥有该规则的所有棋子，为每个棋子执行规则
-        const owningPieces = battle.pieces?.filter((p: any) => 
-          p.rules?.some((r: any) => r.id === rule.id)
-        ) || [];
-        
-        if (owningPieces.length === 0) {
-          // 如果没有棋子拥有该规则，直接执行（兼容旧逻辑）
-          const result = rule.effect(battle, context)
-          if (result && (result as any).needsOptionSelection) {
-            needsOptionSelection = true
-            pendingOptions = (result as any).options
-            pendingTitle = (result as any).title
-          }
-          if (result && (result as any).needsTargetSelection && !needsTargetSelection) {
-            needsTargetSelection = true
-            pendingTargetType = (result as any).targetType
-            pendingRange = (result as any).range
-            pendingFilter = (result as any).filter
-          }
-          if (result.success) {
-            success = true
-            if (result.message) {
-              triggeredEffects.push(result.message)
-            }
-            if (result.blocked) {
-              blocked = true
-            }
-          }
-        } else {
-          // 为每个拥有该规则的棋子执行
-          for (const owningPiece of owningPieces) {
-            if (blocked) break
-            const pieceContext = { ...context, piece: context.sourcePiece, rulePiece: owningPiece }
-            const result = rule.effect(battle, pieceContext)
-            // 回写 damage，使后续规则看到修改后的值
-            if (pieceContext.damage !== context.damage) {
-              context.damage = pieceContext.damage;
-            }
-            if (context.damage !== undefined && context.damage <= 0) {
-              blocked = true;
-            }
-            if (result && (result as any).needsOptionSelection) {
-              needsOptionSelection = true
-              pendingOptions = (result as any).options
-              pendingTitle = (result as any).title
-            }
-            if (result && (result as any).needsTargetSelection && !needsTargetSelection) {
-              needsTargetSelection = true
-              pendingTargetType = (result as any).targetType
-              pendingRange = (result as any).range
-              pendingFilter = (result as any).filter
-            }
-            if (result && result.success) {
-              success = true
-              if (result.message) {
-                triggeredEffects.push(result.message)
-              }
-              if (result.blocked) {
-                blocked = true
-              }
-
-              // 更新规则的限制状态
-              if (rule.limits) {
-                if (rule.limits.uses !== undefined) {
-                  rule.limits.uses++
-                } else {
-                  rule.limits.uses = 1
-                }
-                if (rule.limits.cooldownTurns) {
-                  rule.limits.currentCooldown = rule.limits.cooldownTurns
-                }
-              }
-            }
-          }
+      globalCollectedIds.add(rule.id)
+      const owningPieces = battle.pieces?.filter((p: any) =>
+        p.rules?.some((r: any) => r.id === rule.id) &&
+        (!ctxPendingSourceId || p.instanceId === ctxPendingSourceId)
+      ) || []
+      if (owningPieces.length === 0) {
+        allRuleItems.push({ rule, ruleId: rule.id, buildCtx: ctx => ctx })
+      } else {
+        for (const op of owningPieces) {
+          allRuleItems.push({
+            rule, ruleId: rule.id, sourceId: op.instanceId,
+            buildCtx: ctx => ({ ...ctx, triggerPlayerId: ctx.playerId, ruleOwnerPlayerId: op.ownerPlayerId, piece: ctx.sourcePiece, rulePiece: op })
+          })
         }
-      } catch (error) {
-        writeLog('Error executing global rule ' + rule.id + ': ' + error)
       }
     }
 
-    // 2. 检查所有棋子实例的规则（对所有触发类型都扫描全部棋子）
-    // 这样"移动后"、"技能使用后"等事件可以触发任意棋子上绑定的规则，而不仅限于事件发起者
+    // 2. 棋子实例规则（跳过已在全局区收集的规则）
     writeLog('[checkTriggers] Checking piece rules, pieces count: ' + (battle.pieces?.length || 0));
     if (battle.pieces) {
       for (const piece of battle.pieces) {
-        if (blocked) break
         if (!piece.rules || piece.rules.length === 0) continue
         writeLog('[checkTriggers] Piece ' + piece.name + ' has ' + piece.rules.length + ' rules: ' + JSON.stringify(piece.rules.map((r: any) => r.id)));
-
         const pieceMatchingRules = piece.rules.filter((rule: any) => {
           if (!rule || !rule.trigger) return false
           if (rule.trigger.type !== context.type) return false
+          if (ctxPendingRuleId && rule.id !== ctxPendingRuleId) return false
+          if (ctxPendingSourceId && piece.instanceId !== ctxPendingSourceId) return false
+          if (globalCollectedIds.has(rule.id)) return false  // 已在全局区收集，跳过
           const limits = rule.limits
           if (limits) {
             if (limits.currentCooldown && limits.currentCooldown > 0) return false
@@ -345,102 +314,26 @@ export class TriggerSystem {
           }
           return true
         })
-
         pieceMatchingRules.sort((a: any, b: any) => (b.priority ?? 0) - (a.priority ?? 0))
         for (const rule of pieceMatchingRules) {
-          if (blocked) break
-          // 跳过已在全局规则中执行过的规则
-          if (executedRuleIds.has(rule.id)) {
-            writeLog('[checkTriggers] Skipping already executed rule: ' + rule.id);
-            continue;
-          }
-
-          // 检查是否是默认函数（只返回 "xxx触发" 消息，尚未加载真实逻辑）
-          const isDefaultEffect = typeof rule.effect === 'function' &&
-            rule.effect.toString().includes('ruleData.name') &&
-            rule.effect.toString().includes('触发') &&
-            !rule.effect.toString().includes('checkToxin')
-
-          if (typeof rule.effect !== 'function' || isDefaultEffect) {
-            writeLog('[checkTriggers] Reloading rule effect for: ' + rule.id + ', isDefaultEffect: ' + isDefaultEffect)
-            try {
-              const { loadRuleById } = require('./skills')
-              const reloadedRule = loadRuleById(rule.id)
-              writeLog('[checkTriggers] Reloaded rule: ' + rule.id + ', effect type: ' + typeof reloadedRule?.effect)
-              if (reloadedRule && typeof reloadedRule.effect === 'function') {
-                rule.effect = reloadedRule.effect
-                writeLog('[checkTriggers] Rule effect reloaded successfully: ' + rule.id)
-              } else {
-                writeLog('[checkTriggers] Failed to reload rule effect for: ' + rule.id)
-                continue
-              }
-            } catch (e) {
-              writeLog('[checkTriggers] Error reloading rule: ' + rule.id + ', error: ' + e)
-              continue
-            }
-          }
-
-          try {
-            // 设置当前执行规则的棋子，让技能代码知道是哪个棋子的规则正在执行
-            // 同时设置 piece 字段，用于检查事件发起者是否为当前规则绑定者
-            context.piece = context.sourcePiece
-            context.rulePiece = piece
-            const result = rule.effect(battle, context)
-            // damage 直接通过引用传递，检查是否归零
-            if (context.damage !== undefined && context.damage <= 0) {
-              blocked = true;
-            }
-            if (result && (result as any).needsOptionSelection) {
-              needsOptionSelection = true
-              pendingOptions = (result as any).options
-              pendingTitle = (result as any).title
-            }
-            if (result && (result as any).needsTargetSelection && !needsTargetSelection) {
-              needsTargetSelection = true
-              pendingTargetType = (result as any).targetType
-              pendingRange = (result as any).range
-              pendingFilter = (result as any).filter
-            }
-            if (result.success) {
-              success = true
-              if (result.message) {
-                triggeredEffects.push(result.message)
-              }
-              if (result.blocked) {
-                blocked = true
-              }
-              if (rule.limits) {
-                if (rule.limits.uses !== undefined) {
-                  rule.limits.uses++
-                } else {
-                  rule.limits.uses = 1
-                }
-                if (rule.limits.cooldownTurns) {
-                  rule.limits.currentCooldown = rule.limits.cooldownTurns
-                }
-              }
-            }
-          } catch (error) {
-            writeLog('Error executing rule ' + rule.id + ' on piece ' + piece.instanceId + ': ' + error)
-          }
+          allRuleItems.push({
+            rule, ruleId: rule.id, sourceId: piece.instanceId,
+            buildCtx: ctx => ({ ...ctx, triggerPlayerId: ctx.playerId, ruleOwnerPlayerId: piece.ownerPlayerId, piece: ctx.sourcePiece, rulePiece: piece })
+          })
         }
       }
     }
 
-    // 3. 检查所有玩家的玩家级别规则（player.rules[]）
+    // 3. 玩家级规则
     if (battle.players) {
       writeLog('[checkTriggers] Checking player rules, players count: ' + battle.players.length)
       for (const player of battle.players) {
-        if (blocked) break
-        writeLog('[checkTriggers] Checking player: ' + player.playerId + ', rules: ' + ((player as any).rules?.length || 0))
-        if (!(player as any).rules || (player as any).rules.length === 0) {
-          writeLog('[checkTriggers] Player has no rules, skipping')
-          continue
-        }
-
+        if (!(player as any).rules || (player as any).rules.length === 0) continue
         const playerMatchingRules = ((player as any).rules as any[]).filter((rule: any) => {
           if (!rule || !rule.trigger) return false
           if (rule.trigger.type !== context.type) return false
+          if (ctxPendingRuleId && rule.id !== ctxPendingRuleId) return false
+          if (ctxPendingSourceId && player.playerId !== ctxPendingSourceId) return false
           const limits = rule.limits
           if (limits) {
             if (limits.currentCooldown && limits.currentCooldown > 0) return false
@@ -448,72 +341,90 @@ export class TriggerSystem {
           }
           return true
         })
-        
-        writeLog('[checkTriggers] Found matching rules for player: ' + player.playerId + ', count: ' + playerMatchingRules.length)
-
         for (const rule of playerMatchingRules) {
-          if (blocked) break
-          writeLog('[checkTriggers] Executing rule: ' + rule.id + ' for player: ' + player.playerId)
-          // 如果 effect 是存根函数，重新加载
-          const isDefaultEffect = typeof rule.effect === 'function' &&
-            rule.effect.toString().includes('ruleData.name') &&
-            rule.effect.toString().includes('触发') &&
-            !rule.effect.toString().includes('checkToxin')
-
-          if (typeof rule.effect !== 'function' || isDefaultEffect) {
-            try {
-              const { loadRuleById } = require('./skills')
-              const reloadedRule = loadRuleById(rule.id, true)
-              if (reloadedRule && typeof reloadedRule.effect === 'function') {
-                rule.effect = reloadedRule.effect
-              } else {
-                continue
-              }
-            } catch {
-              continue
-            }
-          }
-
-          try {
-            // 把玩家的 playerId 和 player 对象注入到 context，供 triggerSkill 技能读取
-            const playerContext = { ...context, playerId: player.playerId, player: player }
-            writeLog('[checkTriggers] Calling rule.effect for: ' + rule.id + ', effect type: ' + typeof rule.effect)
-            const result = rule.effect(battle, playerContext)
-            writeLog('[checkTriggers] Rule effect result for ' + rule.id + ': ' + JSON.stringify(result))
-            // 回写 damage，使后续规则看到修改后的值
-            if (playerContext.damage !== context.damage) {
-              context.damage = playerContext.damage;
-            }
-            if (context.damage !== undefined && context.damage <= 0) {
-              blocked = true;
-            }
-            if (result && (result as any).needsOptionSelection) {
-              needsOptionSelection = true
-              pendingOptions = (result as any).options
-              pendingTitle = (result as any).title
-            }
-            if (result && (result as any).needsTargetSelection && !needsTargetSelection) {
-              needsTargetSelection = true
-              pendingTargetType = (result as any).targetType
-              pendingRange = (result as any).range
-              pendingFilter = (result as any).filter
-            }
-            if (result.success) {
-              success = true
-              if (result.message) triggeredEffects.push(result.message)
-              if (result.blocked) blocked = true
-              // 检查是否修改了伤害值
-              if (rule.limits) {
-                rule.limits.uses = (rule.limits.uses || 0) + 1
-                if (rule.limits.cooldownTurns) rule.limits.currentCooldown = rule.limits.cooldownTurns
-              }
-            }
-          } catch (error) {
-            writeLog('[checkTriggers] Error executing player rule ' + rule.id + ' for player ' + player.playerId + ': ' + error)
-            writeLog('Error executing player rule ' + rule.id + ' for player ' + player.playerId + ': ' + error)
-          }
+          allRuleItems.push({
+            rule, ruleId: rule.id, sourceId: player.playerId,
+            buildCtx: ctx => ({ ...ctx, triggerPlayerId: ctx.playerId, ruleOwnerPlayerId: player.playerId, playerId: player.playerId, player })
+          })
         }
       }
+    }
+
+    // ── 阶段二：按顺序执行，遇到需要玩家交互的规则立即停止 ──────────────────────
+    // 若 ctxPendingRuleId 指定了恢复点，从该规则开始执行（跳过其之前的规则）
+    let startIdx = 0
+    if (ctxPendingRuleId) {
+      const idx = allRuleItems.findIndex(r =>
+        r.ruleId === ctxPendingRuleId && (!ctxPendingSourceId || r.sourceId === ctxPendingSourceId)
+      )
+      if (idx !== -1) startIdx = idx
+    }
+
+    let interactionNeeded = false
+    for (let i = startIdx; i < allRuleItems.length; i++) {
+      if (blocked) break
+      const item = allRuleItems[i]
+      writeLog('[checkTriggers] Executing rule: ' + item.ruleId + ' sourceId: ' + (item.sourceId || 'none'))
+
+      if (!ensureRuleEffect(item.rule)) {
+        writeLog('[checkTriggers] Failed to load effect for rule: ' + item.ruleId)
+        continue
+      }
+
+      try {
+        const ruleCtx = item.buildCtx(context)
+        const ruleOwnerPlayerId = (ruleCtx as any).ruleOwnerPlayerId || (ruleCtx as any).playerId || context.playerId
+        const result = item.rule.effect(battle, ruleCtx)
+        // 回写 damage
+        if ((ruleCtx as any).damage !== (context as any).damage) {
+          (context as any).damage = (ruleCtx as any).damage
+        }
+        if ((context as any).damage !== undefined && (context as any).damage <= 0) {
+          blocked = true
+        }
+
+        if (result && result.needsOptionSelection) {
+          needsOptionSelection = true
+          pendingOptions = result.options
+          pendingTitle = result.title
+          pendingPlayerId = result.playerId || ruleOwnerPlayerId
+          pendingRuleId = item.ruleId
+          pendingRuleSourceId = item.sourceId
+          // 收集后续未执行的规则作为队列
+          pendingQueue = allRuleItems.slice(i + 1).map(r => ({ ruleId: r.ruleId, sourceId: r.sourceId }))
+          interactionNeeded = true
+          break
+        }
+        if (result && result.needsTargetSelection) {
+          needsTargetSelection = true
+          pendingTargetType = result.targetType
+          pendingRange = result.range
+          pendingFilter = result.filter
+          pendingTitle = result.title
+          pendingPlayerId = result.playerId || ruleOwnerPlayerId
+          pendingRuleId = item.ruleId
+          pendingRuleSourceId = item.sourceId
+          pendingQueue = allRuleItems.slice(i + 1).map(r => ({ ruleId: r.ruleId, sourceId: r.sourceId }))
+          interactionNeeded = true
+          break
+        }
+        if (result && result.success) {
+          success = true
+          if (result.message) triggeredEffects.push(result.message)
+          if (result.blocked) blocked = true
+          if (item.rule.limits) {
+            item.rule.limits.uses = (item.rule.limits.uses || 0) + 1
+            if (item.rule.limits.cooldownTurns) item.rule.limits.currentCooldown = item.rule.limits.cooldownTurns
+          }
+        }
+      } catch (error) {
+        writeLog('Error executing rule ' + item.ruleId + ': ' + error)
+      }
+    }
+
+    // 只在没有挂起交互时才执行手牌/附加效果（避免乱序）
+    if (interactionNeeded) {
+      return { success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined } as any
     }
 
     // 4. 检查所有玩家手牌中的 reactive 卡牌（全场两个玩家都扫描）
@@ -551,14 +462,17 @@ export class TriggerSystem {
 
     // 5. 处理 AttachedEffect 触发器（新统一系统，替代分散的 rule + statusTag）
     if (battle.pieces) {
-      const { buildSelfObject, removeEffectFromPiece, applyEffectToPiece, getEffectOnPiece } = require('./attached-effect')
-      const _skills = require('./skills')
+      let skillsModule: any = null
+      const getSkillsModule = () => {
+        if (!skillsModule) skillsModule = require('./skills')
+        return skillsModule
+      }
 
       // 构建注入到 effectCode / filterCode 的辅助函数（与 rule skillCode 环境对齐）
-      const _dealDamage = (src: any, tgt: any, dmg: number, type: string, sid?: string) =>
-        _skills.dealDamage(src, tgt, dmg, type, battle, sid)
+      const _dealDamage = (src: any, tgt: any, dmg: number, type: string, sid?: string, skipBefore?: boolean, killerPlayerId?: string) =>
+        getSkillsModule().dealDamage(src, tgt, dmg, type, battle, sid, skipBefore, killerPlayerId)
       const _healDamage = (healer: any, tgt: any, heal: number, sid?: string) =>
-        _skills.healDamage(healer, tgt, heal, battle, sid)
+        getSkillsModule().healDamage(healer, tgt, heal, battle, sid)
       const _removeStatusEffectById = (pieceId: string, statusId: string) => {
         const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
         if (p?.statusTags) {
@@ -576,7 +490,7 @@ export class TriggerSystem {
       const _addRuleById = (pieceId: string, ruleId: string) => {
         const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
         if (p) {
-          const rule = _skills.loadRuleById(ruleId)
+          const rule = getSkillsModule().loadRuleById(ruleId, FORCE_RULE_RELOAD)
           if (rule) {
             if (!p.rules) p.rules = []
             if (!p.rules.some((r: any) => r.id === ruleId)) p.rules.push(rule)
@@ -639,12 +553,19 @@ export class TriggerSystem {
                   needsOptionSelection = true
                   pendingOptions = result.options
                   pendingTitle = result.title
+                  pendingPlayerId = (result as any).playerId
+                  pendingRuleId = effect.id || effect.effectId
+                  pendingRuleSourceId = piece.instanceId
                 }
                 if (result.needsTargetSelection && !needsTargetSelection) {
                   needsTargetSelection = true
                   pendingTargetType = result.targetType
                   pendingRange = result.range
                   pendingFilter = result.filter
+                  pendingTitle = result.title
+                  pendingPlayerId = (result as any).playerId
+                  pendingRuleId = effect.id || effect.effectId
+                  pendingRuleSourceId = piece.instanceId
                 }
               }
             } catch (e) {
@@ -655,7 +576,7 @@ export class TriggerSystem {
       }
     }
 
-    return { success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter }
+    return { success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined } as any
   }
 
   // 条件评估方法已移除，所有条件判断都在技能代码中通过if语句实现

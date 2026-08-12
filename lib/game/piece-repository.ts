@@ -1,4 +1,5 @@
-import type { PieceTemplate } from "./piece"
+import type { Faction, PieceTemplate } from "./piece"
+import { loadJsonFilesServer } from './file-loader'
 
 // 客户端版本：初始为空对象，通过API获取数据
 export let DEFAULT_PIECES: Record<string, PieceTemplate> = {}
@@ -32,7 +33,6 @@ export async function loadPieces(): Promise<void> {
 if (typeof window === 'undefined') {
   // 只在服务器端执行
   try {
-    const { loadJsonFilesServer } = require('./file-loader')
     const loadedPieces = loadJsonFilesServer<PieceTemplate>('data/pieces')
     // 直接使用加载的数据，不使用默认数据
     DEFAULT_PIECES = loadedPieces
@@ -49,7 +49,7 @@ export function getPieceById(id: string): PieceTemplate | undefined {
   return DEFAULT_PIECES[id]
 }
 
-export function getPiecesByFaction(faction: "red" | "blue"): PieceTemplate[] {
+export function getPiecesByFaction(faction: Faction): PieceTemplate[] {
   return Object.values(DEFAULT_PIECES).filter(
     (piece) => piece.faction === faction
   )
@@ -58,4 +58,3 @@ export function getPiecesByFaction(faction: "red" | "blue"): PieceTemplate[] {
 export function getAllPieces(): PieceTemplate[] {
   return Object.values(DEFAULT_PIECES)
 }
-

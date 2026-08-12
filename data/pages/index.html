@@ -80,6 +80,29 @@
     .menu-item.primary:active { background: #2d1a2a; }
     .menu-item.online { border-color: #3b82f6; background: #111827; }
     .menu-item.online:active { background: #1a2540; }
+    .menu-item.debug-pvp {
+      border-color: rgba(125,211,252,.52);
+      background: rgba(15,23,42,.58);
+      backdrop-filter: blur(18px) saturate(160%);
+      box-shadow: 0 14px 34px rgba(2,6,23,.24), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .menu-item.debug-pvp:active {
+      transform: scale(.985);
+      background: rgba(14,116,144,.22);
+      transition: transform 100ms ease-out, background 100ms ease-out;
+    }
+    .debug-status {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 12px;
+      color: #a7f3d0;
+      background: rgba(6,78,59,.18);
+      backdrop-filter: blur(16px) saturate(150%);
+      font-size: 12px;
+      line-height: 1.45;
+      display: none;
+    }
 
     .item-icon {
       width: 40px; height: 40px;
@@ -109,7 +132,8 @@
     }
     .overlay.show { display: flex; }
     .sheet {
-      background: #1e293b;
+      background: rgba(30,41,59,.82);
+      backdrop-filter: blur(24px) saturate(180%);
       border-radius: 16px 16px 0 0;
       padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
       width: 100%;
@@ -267,13 +291,22 @@
       </div>
       <span class="item-arrow">›</span>
     </div>
-    <div class="menu-item" style="border-color:#f59e0b;background:#1a1205;cursor:pointer" onclick="loadPage('pve.html')">
+    <div class="menu-item debug-pvp" id="debugPvpBtn" style="cursor:pointer" onclick="startLocalPvpDebug()">
+      <div class="item-icon" style="background:rgba(125,211,252,.14);color:#bae6fd">PVP</div>
+      <div class="item-text">
+        <div class="item-title">本机 PVP 调试</div>
+        <div class="item-desc" id="debugPvpDesc">一键创建双方各 8 棋子的真实联机战斗</div>
+      </div>
+      <span class="item-arrow" id="debugPvpArrow">Open</span>
+    </div>
+    <div class="debug-status" id="debugPvpStatus"></div>
+    <div class="menu-item" style="border-color:#f59e0b;background:#1a1205;cursor:pointer" id="pveBtn" onclick="startPve()">
       <div class="item-icon" style="background:rgba(245,158,11,.16)">PVE</div>
       <div class="item-text">
-        <div class="item-title">PVE 冒险模式</div>
-        <div class="item-desc">单人 Roguelike 入口，关卡、事件、奖励系统在这里扩展</div>
+        <div class="item-title">单人练习 (PVE)</div>
+        <div class="item-desc" id="pveBtnDesc">对阵 AI，测试完整对战流程</div>
       </div>
-      <span class="item-arrow">›</span>
+      <span class="item-arrow" id="pveBtnArrow">›</span>
     </div>
     <div class="menu-item" style="cursor:pointer" onclick="loadPage('pieces.html')">
       <div class="item-icon icon-gray">📖</div>
@@ -491,8 +524,31 @@
 
       // Android: start mobile server（非阻塞，回调通知）
       if (window.RvBBridge && typeof window.RvBBridge.startMobileServer === 'function') {
+        let debugTimer = null
+        const updateDebugStatus = () => {
+          if (!window.RvBBridge || typeof window.RvBBridge.getMobileServerDebugStatus !== 'function') return
+          try {
+            const dbg = JSON.parse(window.RvBBridge.getMobileServerDebugStatus() || '{}')
+            const bits = [
+              'stage=' + (dbg.stage || ''),
+              'running=' + !!dbg.running,
+              'starting=' + !!dbg.starting,
+              'selfTest=' + (dbg.selfTest || ''),
+              'engine=' + (dbg.engine && dbg.engine.lastEvent ? dbg.engine.lastEvent : 'none'),
+              dbg.engine && dbg.engine.lastError ? ('engineError=' + dbg.engine.lastError) : '',
+              dbg.lastError ? ('error=' + dbg.lastError) : '',
+            ].filter(Boolean)
+            document.getElementById('hostErrBox').style.display = 'block'
+            document.getElementById('hostErrBox').textContent = bits.join('\n')
+          } catch {}
+        }
+        const stopDebugStatus = () => {
+          if (debugTimer) clearInterval(debugTimer)
+          debugTimer = null
+        }
         // 服务器就绪回调（由 Java evaluateJavascript 触发）
         window._onMobileServerReady = function(status) {
+          stopDebugStatus()
           if (status && (status.running || status.ok)) {
             let ip = '127.0.0.1'
             try { if (window.RvBBridge.getLocalIp) ip = window.RvBBridge.getLocalIp() || ip } catch {}
@@ -509,6 +565,7 @@
             document.getElementById('hostStatus').innerHTML = ''
             document.getElementById('hostErrBox').textContent = '启动失败：' + ((status && status.error) || '引擎初始化超时')
             document.getElementById('hostErrBox').style.display = 'block'
+            updateDebugStatus()
           }
         }
         try {
@@ -516,6 +573,8 @@
           if (res.running) {
             window._onMobileServerReady(res) // 已在运行
           } else if (res.starting) {
+            updateDebugStatus()
+            debugTimer = setInterval(updateDebugStatus, 1000)
             document.getElementById('hostStatus').innerHTML =
               '<div class="lan-scanning"><span class="spin">⟳</span><span>正在启动游戏引擎…（首次约 30-60 秒）</span></div>'
             // 等待 Java 回调 window._onMobileServerReady
@@ -553,7 +612,7 @@
 
     async function enterAsHost() {
       if (!_hostServerUrl) return
-      RvBUtils.saveServerUrl(_hostServerUrl)
+      RvBUtils.saveServerConfig({ mode: 'local', url: _hostServerUrl })
       closeHostSheet()
       await checkPackAndGo(_hostServerUrl, 'local')
     }
@@ -578,7 +637,7 @@
         window._onUdpHostFound = function(info) {
           if (!info || !info.ip || !info.port) return
           addLanServer({ url: 'http://' + info.ip + ':' + info.port,
-            ip: info.ip, port: info.port, name: (info.name || '局域网主机') + ' 📡' })
+            ip: info.ip, port: info.port, wsPort: info.wsPort || info.port, name: (info.name || '局域网主机') + ' 📡' })
         }
         window.RvBBridge.discoverHosts(3000)
       } else if (window.electronAPI && typeof window.electronAPI.startDiscoverHosts === 'function') {
@@ -587,7 +646,7 @@
         window.electronAPI.onUdpHostFound(function(info) {
           if (!info || !info.ip || !info.port) return
           addLanServer({ url: 'http://' + info.ip + ':' + info.port,
-            ip: info.ip, port: info.port, name: (info.name || '局域网主机') + ' 📡' })
+            ip: info.ip, port: info.port, wsPort: info.wsPort || info.port, name: (info.name || '局域网主机') + ' 📡' })
         })
         window.electronAPI.startDiscoverHosts(3000)
       }
@@ -649,13 +708,13 @@
       if (empty) empty.remove()
       const div = document.createElement('div')
       div.className = 'lan-server-item'
-      div.onclick = () => connectLanServer(info.url)
+      div.onclick = () => connectLanServer(info.url, info.wsPort)
       div.innerHTML = `<div><div class="lan-server-name">${escHtml(info.name || 'RED vs BLUE')}</div><div class="lan-server-url">${escHtml(info.url)}</div></div><span style="color:#3b82f6;font-size:13px;font-weight:700;flex-shrink:0">连接 ›</span>`
       list.appendChild(div)
     }
 
-    async function connectLanServer(url) {
-      RvBUtils.saveServerUrl(url)
+    async function connectLanServer(url, wsPort) {
+      RvBUtils.saveServerConfig({ mode: 'lan', url: url, wsPort: wsPort })
       closeLanSheet()
       await checkPackAndGo(url, 'lan')
     }
@@ -668,8 +727,116 @@
     async function goToTraining() {
       // For training, use local embedded server if available
       const localUrl = await _detectLocalServerUrl()
-      if (localUrl) RvBUtils.saveServerUrl(localUrl)
+      if (localUrl) RvBUtils.saveServerConfig({ mode: 'local', url: localUrl })
+      if (window.RvBBridge && (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)) {
+        try {
+          await (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)(65000)
+          if (RvBUtils.mobileServerFetch) {
+            const probe = await RvBUtils.mobileServerFetch('/api/maps', { method: 'GET' })
+            if (!probe.ok) {
+              const text = await probe.text().catch(() => '')
+              throw new Error('engine probe failed: HTTP ' + probe.status + ' ' + text)
+            }
+          }
+        } catch (e) {
+          alert('无法启动本地训练营服务：' + ((e && e.message) || e))
+          return
+        }
+      }
       window.location.href = 'battle.html?mode=training'
+    }
+
+    // ── PVE single-player ─────────────────────────────────────────────────────
+    async function startLocalPvpDebug() {
+      const status = document.getElementById('debugPvpStatus')
+      const desc = document.getElementById('debugPvpDesc')
+      const arrow = document.getElementById('debugPvpArrow')
+      const firstWin = window.open('', 'rvb-debug-red')
+      const secondWin = window.open('', 'rvb-debug-blue')
+      if (status) {
+        status.style.display = 'block'
+        status.textContent = '正在创建本机 PVP 调试房...'
+      }
+      if (desc) desc.textContent = '创建 debug room / identities / server-state 中...'
+      if (arrow) arrow.textContent = '...'
+
+      try {
+        const localUrl = await _detectLocalDebugServerUrl()
+        if (!localUrl) {
+          throw new Error('未检测到本机 PVP 调试 API；请先启动 npm run dev，并确认 /api/debug/battle 可访问')
+        }
+        if (localUrl) RvBUtils.saveServerConfig({ mode: 'local', url: localUrl, wsPort: 3001 })
+        const res = await fetch(localUrl + '/api/debug/battle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'create-selection-room' })
+        })
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+          if (res.status === 404 && /This page could not be found|_not-found|<!DOCTYPE html/i.test(text)) {
+            throw new Error('本机 API 返回 404：' + localUrl + '/api/debug/battle。请刷新/重开客户端；如果仍失败，请停止旧的 npm run dev 后重新启动。')
+          }
+          throw new Error('HTTP ' + res.status + ' ' + text)
+        }
+        const data = await res.json()
+        const urls = (data.urls || []).map(function(url) {
+          const extra = RvBUtils.appendServerParams(new URLSearchParams())
+          return url + (url.indexOf('?') === -1 ? '?' : '&') + extra.toString()
+        })
+        if (firstWin && urls[0]) firstWin.location.href = urls[0]
+        if (secondWin && urls[1]) secondWin.location.href = urls[1]
+        if (status) {
+          status.innerHTML = '房间 #' + escHtml(data.roomId || '') + ' 已创建。'
+            + ' <a style="color:#bae6fd" href="' + escHtml(urls[0] || '#') + '" target="_blank">先手窗口</a>'
+            + ' / <a style="color:#bae6fd" href="' + escHtml(urls[1] || '#') + '" target="_blank">后手窗口</a>'
+            + '<br>双方各选 8 个棋子后会自动进入战斗'
+        }
+        if (desc) desc.textContent = '已创建，可在两个窗口中完整调试 PVP'
+        if (arrow) arrow.textContent = 'Open'
+      } catch (e) {
+        if (firstWin) firstWin.close()
+        if (secondWin) secondWin.close()
+        if (status) {
+          status.style.display = 'block'
+          status.textContent = '创建失败：' + ((e && e.message) || e)
+        }
+        if (desc) desc.textContent = '一键创建双方各 8 棋子的真实联机战斗'
+        if (arrow) arrow.textContent = 'Open'
+      }
+    }
+
+    async function startPve() {
+      const localUrl = await _detectLocalServerUrl()
+      if (localUrl) RvBUtils.saveServerConfig({ mode: 'local', url: localUrl })
+      if (window.RvBBridge && (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)) {
+        try {
+          await (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)(65000)
+        } catch (e) { alert('无法启动本地服务：' + ((e && e.message) || e)); return }
+      }
+      const serverUrl = RvBUtils.getServerUrl()
+      if (!serverUrl) { alert('请先连接服务器'); return }
+      const identity = RvBIdentity.getIdentity()
+      if (!identity) { alert('请先设置账号'); return }
+      const { id: hostId, displayName: playerName } = identity
+      const btn = document.getElementById('pveBtnArrow')
+      const desc = document.getElementById('pveBtnDesc')
+      if (btn) btn.textContent = '⏳'
+      if (desc) desc.textContent = '创建 PVE 房间中…'
+      try {
+        const res = await RvBUtils.serverFetch('/api/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'pve', hostId, playerName })
+        })
+        if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + ' ' + t) }
+        const room = await res.json()
+        const params = new URLSearchParams({ roomId: room.id, playerId: hostId, playerName })
+        window.location.href = 'piece-selection.html?' + params
+      } catch (e) {
+        if (btn) btn.textContent = '›'
+        if (desc) desc.textContent = '对阵 AI，测试完整对战流程'
+        alert('创建 PVE 房间失败：' + ((e && e.message) || e))
+      }
     }
 
     async function _detectLocalServerUrl() {
@@ -680,6 +847,52 @@
         try {
           const mode = await window.electronAPI.getMode()
           if (mode && mode.localUrl) return mode.localUrl
+        } catch {}
+      }
+      // Plain browser/file debug mode. Next may move to 3002 when 3000 is busy.
+      const candidates = ['http://localhost:3000', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3002', 'http://localhost:7878']
+      for (const url of candidates) {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 700)
+          const res = await fetch(url + '/api/ping', { signal: ctrl.signal })
+          clearTimeout(timer)
+          if (res && res.ok) return url
+        } catch {}
+      }
+      return null
+    }
+
+    async function _detectLocalDebugServerUrl() {
+      const candidates = []
+      const add = url => {
+        if (url && candidates.indexOf(url) === -1) candidates.push(url.replace(/\/+$/, ''))
+      }
+      if (window.RvBUtils && RvBUtils.getConnectionConfig) {
+        const cfg = RvBUtils.getConnectionConfig()
+        if (cfg && cfg.url) add(cfg.url)
+      }
+      add('http://localhost:3000')
+      add('http://localhost:3002')
+      add('http://localhost:3003')
+      add('http://127.0.0.1:3000')
+      add('http://127.0.0.1:3002')
+      add('http://127.0.0.1:3003')
+      if (/^https?:\/\/(localhost|127\.0\.0\.1):/i.test(location.origin)) add(location.origin)
+
+      for (const url of candidates) {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 900)
+          const res = await fetch(url + '/api/debug/battle', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal: ctrl.signal
+          })
+          clearTimeout(timer)
+          if (!res || !res.ok) continue
+          const data = await res.json().catch(() => null)
+          if (data && data.service === 'debug-battle') return url
         } catch {}
       }
       return null
@@ -732,7 +945,7 @@
       const url = document.getElementById('forceConnectUrl').value || document.getElementById('urlInput').value.trim()
       let cleanUrl = url.trim().replace(/\/$/, '')
       if (!cleanUrl.startsWith('http')) cleanUrl = 'http://' + cleanUrl
-      RvBUtils.saveServerUrl(cleanUrl)
+      RvBUtils.saveServerConfig({ mode: 'remote', url: cleanUrl })
       closeOverlay('connectOverlay')
       document.getElementById('serverStatusDesc').textContent = '已连接：' + cleanUrl.replace(/^https?:\/\//, '').slice(0, 30)
       await checkPackAndGo(cleanUrl, 'remote')
@@ -984,8 +1197,11 @@
 
     // ── Pack hash check ───────────────────────────────────────────────────────
     async function checkPackMd5(serverUrl) {
+      if (window.RvBBridge && /^http:\/\/(localhost|127\.0\.0\.1):7878\b/.test(serverUrl || '')) return
       try {
-        const res = await fetch(serverUrl + '/api/admin/resource-pack')
+        const res = window.RvBUtils && RvBUtils.serverFetch
+          ? await RvBUtils.serverFetch('/api/admin/resource-pack', { timeoutMs: 3000 })
+          : await fetch(serverUrl + '/api/admin/resource-pack')
         if (!res.ok) return
         const data = await res.json()
         const serverMd5 = data.meta?.md5
@@ -1004,24 +1220,32 @@
         window.location.href = 'lobby.html?v=' + Date.now()
         return
       }
-      const params = new URLSearchParams({ server: mode })
-      if (serverUrl) params.set('url', serverUrl)
+      if (serverUrl) RvBUtils.saveServerConfig({ mode: mode, url: serverUrl })
+      const params = RvBUtils.appendServerParams(new URLSearchParams())
+      params.set('server', mode)
       params.set('v', Date.now().toString())
       window.location.href = 'lobby.html?' + params.toString()
     }
 
     async function checkPackAndGo(serverUrl, mode) {
+      if (window.RvBBridge && /^http:\/\/(localhost|127\.0\.0\.1):7878\b/.test(serverUrl || '')) {
+        goLobby(mode, serverUrl)
+        return
+      }
       try {
-        const res = await fetch(serverUrl + '/api/admin/resource-pack')
+        const res = window.RvBUtils && RvBUtils.serverFetch
+          ? await RvBUtils.serverFetch('/api/admin/resource-pack', { timeoutMs: 3000 })
+          : await fetch(serverUrl + '/api/admin/resource-pack')
         if (!res.ok) { goLobby(mode, serverUrl); return }
         const data = await res.json()
         const serverMd5 = data.meta?.md5
         const clientMd5 = localStorage.getItem('rvb_pack_md5')
         if (serverMd5 && clientMd5 && serverMd5 !== clientMd5) {
-          window.location.href = 'pack.html'
+          try { localStorage.setItem('rvb_pack_mismatch', '1') } catch {}
         } else {
-          goLobby(mode, serverUrl)
+          try { localStorage.removeItem('rvb_pack_mismatch') } catch {}
         }
+        goLobby(mode, serverUrl)
       } catch {
         goLobby(mode, serverUrl)
       }

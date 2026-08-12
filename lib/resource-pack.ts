@@ -6,6 +6,19 @@ import { getAppRoot, getUserDataDir } from './app-paths'
 const PACK_DATA_DIR = path.join(getUserDataDir(), 'resource-pack', 'data')
 
 let loaded = false
+let warnedInvalidPack = false
+
+function getMissingRequiredFiles(dataDir: string): string[] {
+  const required = [
+    path.join('pieces', 'manifest.json'),
+    path.join('skills', 'manifest.json'),
+    path.join('cards', 'manifest.json'),
+    path.join('effects', 'effect-lucky-coin.json'),
+    path.join('cards', 'lucky-coin.json'),
+    path.join('skills', 'basic-attack.json'),
+  ]
+  return required.filter(rel => !fs.existsSync(path.join(dataDir, rel)))
+}
 
 function calcHash(filePath: string): string {
   const buf = fs.readFileSync(filePath)
@@ -14,6 +27,14 @@ function calcHash(filePath: string): string {
 
 export function getResourcePackDataDir(): string | null {
   if (!fs.existsSync(PACK_DATA_DIR)) {
+    return null
+  }
+  const missing = getMissingRequiredFiles(PACK_DATA_DIR)
+  if (missing.length > 0) {
+    if (!warnedInvalidPack) {
+      warnedInvalidPack = true
+      console.warn('[resource-pack] Ignoring incomplete resource pack:', PACK_DATA_DIR, 'missing:', missing.join(', '))
+    }
     return null
   }
   return PACK_DATA_DIR

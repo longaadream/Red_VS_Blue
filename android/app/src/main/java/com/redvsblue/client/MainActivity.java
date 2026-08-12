@@ -19,14 +19,23 @@ import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.FileNotFoundException;
+import java.nio.charset.StandardCharsets;
 import java.net.Inet4Address;
 import java.net.NetworkInterface;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
 
@@ -41,10 +50,146 @@ public class MainActivity extends BridgeActivity {
     private MobileHttpServer  mobileHttpServer  = null;
     private boolean           serverStarting    = false;
     private boolean           engineWarming     = false;
+    private volatile boolean  pendingOpenPackPage = false;
+    private final Map<String, PendingMobileRequest> pendingMobileRequests = new ConcurrentHashMap<>();
+    private final Map<String, String[]> pendingMobileResponses = new ConcurrentHashMap<>();
+    private static final int BRIDGE_CHUNK_SIZE = 48 * 1024;
+    private static final int HTTP_START_TIMEOUT_MS = 5000;
+    private volatile String mobileServerStage = "idle";
+    private volatile String mobileServerLastError = "";
+    private volatile String mobileServerSelfTest = "not-run";
 
     // ── UDP host broadcast ────────────────────────────────────────────────────
     private Thread            broadcastThread   = null;
     private volatile boolean  broadcastRunning  = false;
+
+    private File getPackRoot() {
+        return new File(getFilesDir(), "resource-pack");
+    }
+
+    private File resolvePackFile(String rawPath) throws IOException {
+        String rel = rawPath != null ? rawPath : "";
+        int queryIdx = rel.indexOf('?');
+        if (queryIdx >= 0) rel = rel.substring(0, queryIdx);
+        rel = rel.replace('\\', '/');
+        while (rel.startsWith("/")) rel = rel.substring(1);
+        if (rel.length() == 0) rel = "index.html";
+        File root = getPackRoot().getCanonicalFile();
+        File out = new File(root, rel).getCanonicalFile();
+        if (!out.getPath().startsWith(root.getPath() + File.separator) && !out.equals(root)) {
+            throw new IOException("Unsafe resource pack path");
+        }
+        return out;
+    }
+
+    private boolean shouldBypassPackOverride(String rawPath) {
+        String rel = rawPath != null ? rawPath : "";
+        int queryIdx = rel.indexOf('?');
+        if (queryIdx >= 0) rel = rel.substring(0, queryIdx);
+        rel = rel.replace('\\', '/').toLowerCase();
+        while (rel.startsWith("/")) rel = rel.substring(1);
+        return rel.equals("pack.html")
+            || rel.equals("data/pages/pack.html")
+            || rel.equals("js/pack-fetch.js");
+    }
+
+    private boolean shouldSkipProtectedPackFile(String rawPath) {
+        return shouldBypassPackOverride(rawPath);
+    }
+
+    private boolean isUiHtmlPath(String rawPath) {
+        String rel = rawPath != null ? rawPath : "";
+        int queryIdx = rel.indexOf('?');
+        if (queryIdx >= 0) rel = rel.substring(0, queryIdx);
+        rel = rel.replace('\\', '/').toLowerCase();
+        while (rel.startsWith("/")) rel = rel.substring(1);
+        return rel.equals("battle.html")
+            || rel.equals("training.html")
+            || rel.equals("data/pages/battle.html")
+            || rel.equals("data/pages/training.html");
+    }
+
+    private boolean packUiFileIsCurrent(File file) {
+        if (file == null || !file.exists() || !file.isFile()) return false;
+        try (InputStream in = new java.io.FileInputStream(file)) {
+            byte[] buf = new byte[(int)Math.min(file.length(), 256 * 1024)];
+            int n = in.read(buf);
+            if (n <= 0) return false;
+            String text = new String(buf, 0, n, StandardCharsets.UTF_8);
+            return text.contains("UI 20260517");
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void deleteRecursive(File file) {
+        if (file == null || !file.exists()) return;
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) deleteRecursive(child);
+            }
+        }
+        file.delete();
+    }
+
+    private void openPackPage(WebView webView) {
+        if (webView == null) return;
+        String current = webView.getUrl();
+        String target = "https://localhost/pack.html";
+        try {
+            if (current != null && (current.startsWith("http://") || current.startsWith("https://"))) {
+                Uri uri = Uri.parse(current);
+                String scheme = uri.getScheme() != null ? uri.getScheme() : "https";
+                String authority = uri.getAuthority() != null ? uri.getAuthority() : "localhost";
+                target = scheme + "://" + authority + "/pack.html";
+            }
+        } catch (Exception ignored) {}
+        webView.loadUrl(target);
+    }
+
+    private void listPackFiles(File root, File dir, JSONArray files) {
+        File[] children = dir.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            if (child.isDirectory()) {
+                listPackFiles(root, child, files);
+            } else {
+                String rel = root.toURI().relativize(child.toURI()).getPath();
+                files.put("/" + rel.replace('\\', '/'));
+            }
+        }
+    }
+
+    private static class PendingMobileRequest {
+        final String method;
+        final String path;
+        final String headersJson;
+        final StringBuilder body = new StringBuilder();
+        PendingMobileRequest(String method, String path, String headersJson) {
+            this.method = method;
+            this.path = path;
+            this.headersJson = headersJson;
+        }
+    }
+
+    private static class ServerStartResult {
+        MobileHttpServer server;
+        Exception error;
+        boolean done;
+    }
+
+    private static String[] splitBridgeChunks(String value) {
+        String s = value != null ? value : "";
+        int count = Math.max(1, (s.length() + BRIDGE_CHUNK_SIZE - 1) / BRIDGE_CHUNK_SIZE);
+        String[] chunks = new String[count];
+        for (int i = 0; i < count; i++) {
+            int start = i * BRIDGE_CHUNK_SIZE;
+            int end = Math.min(s.length(), start + BRIDGE_CHUNK_SIZE);
+            chunks[i] = s.substring(start, end);
+        }
+        return chunks;
+    }
 
     private void stopHostBroadcastInternal() {
         broadcastRunning = false;
@@ -99,10 +244,116 @@ public class MainActivity extends BridgeActivity {
             return uri != null ? uri : "";
         }
 
+        @JavascriptInterface
+        public String packWriteFiles(String filesJson) {
+            try {
+                JSONArray files = new JSONArray(filesJson != null ? filesJson : "[]");
+                File root = getPackRoot();
+                if (!root.exists()) root.mkdirs();
+                int count = 0;
+                for (int i = 0; i < files.length(); i++) {
+                    JSONObject file = files.getJSONObject(i);
+                    String path = file.optString("path", "");
+                    if (path.equals("/pack.json") || path.equals("pack.json")) continue;
+                    if (shouldSkipProtectedPackFile(path)) continue;
+                    byte[] data = android.util.Base64.decode(file.optString("content", ""), android.util.Base64.DEFAULT);
+                    File out = resolvePackFile(path);
+                    File parent = out.getParentFile();
+                    if (parent != null && !parent.exists()) parent.mkdirs();
+                    try (FileOutputStream fos = new FileOutputStream(out)) {
+                        fos.write(data);
+                    }
+                    count++;
+                }
+                return "{\"ok\":true,\"count\":" + count + "}";
+            } catch (Exception e) {
+                String msg = e.getMessage() != null ? e.getMessage().replace("\"", "'") : "unknown";
+                return "{\"ok\":false,\"error\":\"" + msg + "\"}";
+            }
+        }
+
+        @JavascriptInterface
+        public String packClear() {
+            try {
+                deleteRecursive(getPackRoot());
+                return "{\"ok\":true}";
+            } catch (Exception e) {
+                String msg = e.getMessage() != null ? e.getMessage().replace("\"", "'") : "unknown";
+                return "{\"ok\":false,\"error\":\"" + msg + "\"}";
+            }
+        }
+
+        @JavascriptInterface
+        public String packList() {
+            try {
+                JSONArray files = new JSONArray();
+                File root = getPackRoot();
+                if (root.exists()) listPackFiles(root.getCanonicalFile(), root.getCanonicalFile(), files);
+                JSONObject out = new JSONObject();
+                out.put("ok", true);
+                out.put("files", files);
+                return out.toString();
+            } catch (Exception e) {
+                String msg = e.getMessage() != null ? e.getMessage().replace("\"", "'") : "unknown";
+                return "{\"ok\":false,\"files\":[],\"error\":\"" + msg + "\"}";
+            }
+        }
+
         // ── LAN host server ───────────────────────────────────────────────────
 
         @JavascriptInterface
+        public String startMobileEngine() {
+            if (gameEngineWebView != null && gameEngineWebView.isReady()) {
+                return "{\"ok\":true,\"ready\":true}";
+            }
+            if (engineWarming || serverStarting) return "{\"ok\":false,\"starting\":true,\"ready\":false}";
+            engineWarming = true;
+            mobileServerStage = "engine-start-called";
+            mobileServerLastError = "";
+            new Thread(() -> {
+                try {
+                    final GameEngineWebView[] holder = { null };
+                    final CountDownLatch uiLatch = new CountDownLatch(1);
+                    runOnUiThread(() -> {
+                        if (gameEngineWebView == null) {
+                            gameEngineWebView = new GameEngineWebView(MainActivity.this);
+                        }
+                        holder[0] = gameEngineWebView;
+                        uiLatch.countDown();
+                    });
+                    if (!uiLatch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        mobileServerStage = "engine-ui-init-timeout";
+                        mobileServerLastError = "UI init timeout";
+                        engineWarming = false;
+                        fireServerReady("{\"ok\":false,\"ready\":false,\"error\":\"UI init timeout\"}");
+                        return;
+                    }
+                    mobileServerStage = "engine-waiting-ready";
+                    if (holder[0] == null || !holder[0].waitForReady(60)) {
+                        mobileServerStage = "engine-ready-timeout";
+                        mobileServerLastError = "engine init timeout";
+                        engineWarming = false;
+                        fireServerReady("{\"ok\":false,\"ready\":false,\"error\":\"engine init timeout\"}");
+                        return;
+                    }
+                    mobileServerStage = "engine-ready";
+                    engineWarming = false;
+                    fireServerReady("{\"ok\":true,\"ready\":true}");
+                } catch (Exception e) {
+                    engineWarming = false;
+                    mobileServerStage = "engine-failed";
+                    String msg = e.getMessage() != null ? e.getMessage().replace("\"","'") : "unknown";
+                    mobileServerLastError = msg;
+                    fireServerReady("{\"ok\":false,\"ready\":false,\"error\":\"" + msg + "\"}");
+                }
+            }).start();
+            return "{\"ok\":false,\"starting\":true,\"ready\":false}";
+        }
+
+        @JavascriptInterface
         public String startMobileServer() {
+            mobileServerStage = "start-called";
+            mobileServerLastError = "";
             if (mobileHttpServer != null && mobileHttpServer.isAlive()) {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putString(KEY_URL, "http://localhost:" + MOBILE_SERVER_PORT)
@@ -114,6 +365,7 @@ public class MainActivity extends BridgeActivity {
             // 在后台线程初始化（waitForReady 最多 15 秒），完成后通过 JS 回调通知
             new Thread(() -> {
                 try {
+                    mobileServerStage = "creating-engine";
                     GameEngineWebView engine = gameEngineWebView;
                     if (engine == null) {
                         final GameEngineWebView[] holder = { null };
@@ -124,32 +376,87 @@ public class MainActivity extends BridgeActivity {
                             uiLatch.countDown();
                         });
                         if (!uiLatch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                            mobileServerStage = "ui-init-timeout";
+                            mobileServerLastError = "UI init timeout";
                             serverStarting = false;
                             fireServerReady("{\"ok\":false,\"error\":\"UI init timeout\",\"running\":false}");
                             return;
                         }
                         engine = holder[0];
                     }
+                    mobileServerStage = "waiting-engine-ready";
                     if (!engine.waitForReady(60)) {
                         final GameEngineWebView failedEngine = engine;
                         runOnUiThread(() -> failedEngine.destroy());
                         if (gameEngineWebView == engine) gameEngineWebView = null;
+                        mobileServerStage = "engine-ready-timeout";
+                        mobileServerLastError = "engine init timeout";
                         serverStarting = false;
                         fireServerReady("{\"ok\":false,\"error\":\"游戏引擎初始化超时（60秒）\",\"running\":false}");
                         return;
                     }
-                    MobileHttpServer server = new MobileHttpServer(MOBILE_SERVER_PORT, engine);
+                    mobileServerStage = "starting-http";
+                    final GameEngineWebView readyEngine = engine;
+                    final ServerStartResult startResult = new ServerStartResult();
+                    Thread serverThread = new Thread(() -> {
+                        try {
+                            startResult.server = new MobileHttpServer(MOBILE_SERVER_PORT, readyEngine);
+                        } catch (Exception e) {
+                            startResult.error = e;
+                        } finally {
+                            synchronized (startResult) {
+                                startResult.done = true;
+                                startResult.notifyAll();
+                            }
+                        }
+                    }, "RvB-MobileHttpServer-Start");
+                    serverThread.setDaemon(true);
+                    serverThread.start();
+                    synchronized (startResult) {
+                        if (!startResult.done) startResult.wait(HTTP_START_TIMEOUT_MS);
+                    }
+                    if (!startResult.done) {
+                        serverStarting = false;
+                        mobileServerStage = "http-start-timeout";
+                        mobileServerLastError = "HTTP server start timed out after " + HTTP_START_TIMEOUT_MS + "ms";
+                        fireServerReady("{\"ok\":false,\"error\":\"HTTP start timeout\",\"running\":false}");
+                        return;
+                    }
+                    if (startResult.error != null) {
+                        serverStarting = false;
+                        mobileServerStage = "http-start-failed";
+                        mobileServerLastError = startResult.error.getMessage() != null ? startResult.error.getMessage() : startResult.error.getClass().getSimpleName();
+                        fireServerReady("{\"ok\":false,\"error\":\"" + mobileServerLastError.replace("\"","'") + "\",\"running\":false}");
+                        return;
+                    }
+                    MobileHttpServer server = startResult.server;
                     engine.setWsServer(server);
+                    mobileServerStage = "self-test";
+                    String selfTestResponse = engine.processRequest("GET", "/api/maps", "{}", "{}");
+                    mobileServerSelfTest = selfTestResponse != null && selfTestResponse.contains("\"error\"")
+                        ? selfTestResponse
+                        : "ok";
+                    if (!"ok".equals(mobileServerSelfTest)) {
+                        server.stop();
+                        serverStarting = false;
+                        mobileServerStage = "self-test-failed";
+                        mobileServerLastError = mobileServerSelfTest;
+                        fireServerReady("{\"ok\":false,\"error\":\"self-test failed\",\"running\":false}");
+                        return;
+                    }
                     gameEngineWebView = engine;
                     mobileHttpServer  = server;
                     getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                         .putString(KEY_URL, "http://localhost:" + MOBILE_SERVER_PORT)
                         .apply();
                     serverStarting = false;
+                    mobileServerStage = "running";
                     fireServerReady(getMobileServerStatus());
                 } catch (Exception e) {
                     serverStarting = false;
+                    mobileServerStage = "failed";
                     String msg = e.getMessage() != null ? e.getMessage().replace("\"","'") : "unknown";
+                    mobileServerLastError = msg;
                     fireServerReady("{\"ok\":false,\"error\":\"" + msg + "\",\"running\":false}");
                 }
             }).start();
@@ -205,7 +512,8 @@ public class MainActivity extends BridgeActivity {
             final String myIp = getLocalIpAddress();
             final String model = android.os.Build.MODEL.replace("\"", "'");
             final String payload = "{\"magic\":\"RVB_DISCOVER\",\"name\":\"" + model
-                    + "\",\"ip\":\"" + myIp + "\",\"port\":" + MOBILE_SERVER_PORT + "}";
+                    + "\",\"ip\":\"" + myIp + "\",\"port\":" + MOBILE_SERVER_PORT
+                    + ",\"wsPort\":" + MOBILE_SERVER_PORT + "}";
             // 获取 MulticastLock（广播收发在部分 Android WiFi 驱动上需要此锁）
             WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             final WifiManager.MulticastLock mcastLock = wifi.createMulticastLock("rvb-broadcast");
@@ -295,7 +603,24 @@ public class MainActivity extends BridgeActivity {
             boolean running = mobileHttpServer != null && mobileHttpServer.isAlive();
             String ip = running ? getLocalIpAddress() : "";
             return "{\"ok\":" + running + ",\"running\":" + running +
-                   ",\"ip\":\"" + ip + "\",\"port\":" + MOBILE_SERVER_PORT + "}";
+                   ",\"ip\":\"" + ip + "\",\"port\":" + MOBILE_SERVER_PORT +
+                   ",\"wsPort\":" + MOBILE_SERVER_PORT + "}";
+        }
+
+        @JavascriptInterface
+        public String getMobileServerDebugStatus() {
+            boolean running = mobileHttpServer != null && mobileHttpServer.isAlive();
+            GameEngineWebView engine = gameEngineWebView;
+            String engineJson = engine != null ? engine.getDebugStatusJson() : "null";
+            return "{"
+                + "\"running\":" + running + ","
+                + "\"starting\":" + serverStarting + ","
+                + "\"warming\":" + engineWarming + ","
+                + "\"stage\":" + JSONObject.quote(mobileServerStage) + ","
+                + "\"lastError\":" + JSONObject.quote(mobileServerLastError) + ","
+                + "\"selfTest\":" + JSONObject.quote(mobileServerSelfTest) + ","
+                + "\"engine\":" + engineJson
+                + "}";
         }
 
         @JavascriptInterface
@@ -303,6 +628,92 @@ public class MainActivity extends BridgeActivity {
             GameEngineWebView engine = gameEngineWebView;
             if (engine == null) return "{\"error\":\"Server not ready\",\"_status\":503}";
             return engine.processRequest(method, path, bodyJson != null ? bodyJson : "{}", headersJson != null ? headersJson : "{}");
+        }
+
+        @JavascriptInterface
+        public String requestMobileEngine(String method, String path, String bodyJson, String headersJson) {
+            GameEngineWebView engine = gameEngineWebView;
+            if (engine == null) return "{\"error\":\"Engine not ready\",\"_status\":503}";
+            return engine.processRequest(method, path, bodyJson != null ? bodyJson : "{}", headersJson != null ? headersJson : "{}");
+        }
+
+        @JavascriptInterface
+        public void requestMobileServerAsync(String method, String path, String bodyJson, String headersJson, String callbackId) {
+            new Thread(() -> {
+                String responseJson;
+                try {
+                    GameEngineWebView engine = gameEngineWebView;
+                    if (engine == null) {
+                        responseJson = "{\"error\":\"Engine not ready\",\"_status\":503}";
+                    } else {
+                        responseJson = engine.processRequest(
+                            method != null ? method : "GET",
+                            path != null ? path : "/",
+                            bodyJson != null ? bodyJson : "{}",
+                            headersJson != null ? headersJson : "{}"
+                        );
+                    }
+                } catch (Exception e) {
+                    String msg = e.getMessage() != null ? e.getMessage().replace("\"","'") : "unknown";
+                    responseJson = "{\"error\":\"" + msg + "\",\"_status\":500}";
+                }
+                final String safeCallbackId = callbackId != null ? callbackId.replace("\\", "\\\\").replace("'", "\\'") : "";
+                final String safeResponse = JSONObject.quote(responseJson != null ? responseJson : "{}");
+                runOnUiThread(() -> getBridge().getWebView().evaluateJavascript(
+                    "window._rvbMobileServerCallbacks&&window._rvbMobileServerCallbacks['" + safeCallbackId + "']&&window._rvbMobileServerCallbacks['" + safeCallbackId + "'](" + safeResponse + ")",
+                    null
+                ));
+            }, "RvB-MobileServer-AsyncRequest").start();
+        }
+
+        @JavascriptInterface
+        public String beginMobileServerRequest(String method, String path, String headersJson) {
+            String reqId = UUID.randomUUID().toString().replace("-", "");
+            pendingMobileRequests.put(reqId, new PendingMobileRequest(
+                method != null ? method : "GET",
+                path != null ? path : "/",
+                headersJson != null ? headersJson : "{}"
+            ));
+            return reqId;
+        }
+
+        @JavascriptInterface
+        public void appendMobileServerRequestChunk(String reqId, String chunk) {
+            PendingMobileRequest req = pendingMobileRequests.get(reqId);
+            if (req != null && chunk != null) req.body.append(chunk);
+        }
+
+        @JavascriptInterface
+        public String finishMobileServerRequest(String reqId) {
+            PendingMobileRequest req = pendingMobileRequests.remove(reqId);
+            if (req == null) return "{\"error\":\"Request not found\",\"_status\":400}";
+            GameEngineWebView engine = gameEngineWebView;
+            if (engine == null) return "{\"error\":\"Server not ready\",\"_status\":503}";
+            String responseJson = engine.processRequest(req.method, req.path, req.body.length() > 0 ? req.body.toString() : "{}", req.headersJson);
+            if (responseJson != null && responseJson.length() > 32000) {
+                String responseId = UUID.randomUUID().toString().replace("-", "");
+                pendingMobileResponses.put(responseId, splitBridgeChunks(responseJson));
+                return "{\"_bridgeChunked\":true,\"responseId\":\"" + responseId + "\"}";
+            }
+            return responseJson;
+        }
+
+        @JavascriptInterface
+        public int getMobileServerResponseChunkCount(String responseId) {
+            String[] chunks = pendingMobileResponses.get(responseId);
+            return chunks != null ? chunks.length : 0;
+        }
+
+        @JavascriptInterface
+        public String getMobileServerResponseChunk(String responseId, int index) {
+            String[] chunks = pendingMobileResponses.get(responseId);
+            if (chunks == null || index < 0 || index >= chunks.length) return "";
+            return chunks[index];
+        }
+
+        @JavascriptInterface
+        public void clearMobileServerResponse(String responseId) {
+            pendingMobileResponses.remove(responseId);
         }
 
         @JavascriptInterface
@@ -315,8 +726,14 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public String readFileAsBase64(String uriString) {
             try {
-                Uri uri = Uri.parse(uriString);
-                InputStream inputStream = getContentResolver().openInputStream(uri);
+                InputStream inputStream;
+                // Absolute path saved by handleZipIntent (cache dir) — no ContentResolver needed
+                if (uriString != null && uriString.startsWith("/")) {
+                    inputStream = new java.io.FileInputStream(uriString);
+                } else {
+                    Uri uri = Uri.parse(uriString);
+                    inputStream = getContentResolver().openInputStream(uri);
+                }
                 if (inputStream == null) return null;
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 byte[] buffer = new byte[4096];
@@ -335,6 +752,17 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Fullscreen: hide status bar across all Android versions
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            getWindow().getInsetsController().hide(android.view.WindowInsets.Type.statusBars());
+            getWindow().getInsetsController().setSystemBarsBehavior(
+                android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        } else {
+            getWindow().setFlags(
+                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+            );
+        }
         super.onCreate(savedInstanceState);
 
         handleZipIntent(getIntent());
@@ -352,21 +780,52 @@ public class MainActivity extends BridgeActivity {
             public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, android.webkit.WebResourceRequest request) {
                 String urlPath = request.getUrl().getPath();
 
-                if (urlPath != null && (urlPath.endsWith(".json") || urlPath.endsWith(".html"))) {
-                    return super.shouldInterceptRequest(view, request);
-                }
-                if (urlPath != null && urlPath.startsWith("/data/")) {
-                    String assetPath = "game_assets" + urlPath;
+                // 1. Pack override: non-bypassed paths check resource-pack/ first
+                if (urlPath != null && !shouldBypassPackOverride(urlPath)) {
                     try {
-                        AssetManager am = getAssets();
-                        InputStream stream = am.open(assetPath);
-                        String mimeType = getMimeType(urlPath);
-                        return new android.webkit.WebResourceResponse(mimeType, "utf-8", stream);
-                    } catch (FileNotFoundException e) {
-                    } catch (IOException e) {
+                        File packFile = resolvePackFile(urlPath);
+                        if (packFile.exists() && packFile.isFile()) {
+                            boolean packIsCurrent = !isUiHtmlPath(urlPath) || packUiFileIsCurrent(packFile);
+                            if (packIsCurrent) {
+                                return new android.webkit.WebResourceResponse(
+                                    getMimeType(urlPath),
+                                    "utf-8",
+                                    new java.io.FileInputStream(packFile)
+                                );
+                            }
+                            // outdated UI file — fall through to APK asset below
+                        }
+                    } catch (Exception ignored) {
                     }
                 }
+
+                // 2. Serve any file directly from APK public/ assets.
+                //    This bypasses Capacitor's WebViewAssetLoader which can return null on
+                //    some Android versions, causing a white/blank screen on normal startup.
+                if (urlPath != null) {
+                    String rel = urlPath.startsWith("/") ? urlPath.substring(1) : urlPath;
+                    // Strip query string
+                    int qi = rel.indexOf('?');
+                    if (qi >= 0) rel = rel.substring(0, qi);
+                    if (rel.isEmpty()) rel = "index.html";
+                    try {
+                        InputStream stream = getAssets().open("public/" + rel);
+                        return new android.webkit.WebResourceResponse(getMimeType(rel), "utf-8", stream);
+                    } catch (IOException ignored) {
+                        // File not in APK public/ — fall through to Capacitor
+                    }
+                }
+
                 return super.shouldInterceptRequest(view, request);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (pendingOpenPackPage) {
+                    pendingOpenPackPage = false;
+                    openPackPage(view);
+                }
             }
 
             @Override
@@ -387,15 +846,47 @@ public class MainActivity extends BridgeActivity {
     private void handleZipIntent(Intent intent) {
         if (intent == null) return;
         String action = intent.getAction();
-        if (Intent.ACTION_VIEW.equals(action)) {
-            Uri data = intent.getData();
-            if (data != null) {
-                String mimeType = getContentResolver().getType(data);
-                if ("application/zip".equals(mimeType) || data.toString().endsWith(".zip")) {
-                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_IMPORT_URI, data.toString()).apply();
+        if (!Intent.ACTION_VIEW.equals(action)) return;
+        Uri data = intent.getData();
+        if (data == null) return;
+        String mimeType = getContentResolver().getType(data);
+        String uriStr = data.toString();
+        String uriLower = uriStr != null ? uriStr.toLowerCase() : "";
+        boolean isZip = "application/zip".equals(mimeType)
+            || "application/x-zip-compressed".equals(mimeType)
+            || "application/octet-stream".equals(mimeType)
+            || uriLower.endsWith(".zip")
+            || uriLower.contains(".zip?");
+        if (!isZip) return;
+
+        // Copy ZIP to cache immediately while content:// URI permission is still valid.
+        // Saving the URI string and reading it later from JS often fails because the
+        // temporary ContentResolver grant expires after the intent is handled.
+        new Thread(() -> {
+            try {
+                File tmpZip = new File(getCacheDir(), "pending-pack.zip");
+                try (InputStream in = getContentResolver().openInputStream(data);
+                     FileOutputStream fos = new FileOutputStream(tmpZip)) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) != -1) fos.write(buf, 0, n);
                 }
+                // Store absolute path so readFileAsBase64 can read it without permissions
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString(KEY_IMPORT_URI, tmpZip.getAbsolutePath())
+                    .apply();
+                pendingOpenPackPage = true;
+                runOnUiThread(() -> {
+                    WebView wv = getBridge().getWebView();
+                    if (wv != null && wv.getUrl() != null) {
+                        pendingOpenPackPage = false;
+                        openPackPage(wv);
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.e("RvB", "handleZipIntent copy failed: " + e.getMessage());
             }
-        }
+        }).start();
     }
 
     private String getMimeType(String path) {

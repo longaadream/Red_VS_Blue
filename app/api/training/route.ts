@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { BattleState, BattleAction } from "@/lib/game/turn"
-import { applyBattleAction, summonPiece } from "@/lib/game/turn"
+import { summonPiece } from "@/lib/game/turn"
 import type { PieceInstance, PieceTemplate } from "@/lib/game/piece"
-import { getAllPieces } from "@/lib/game/piece-repository"
-import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { loadJsonFilesServer } from "@/lib/game/file-loader"
 import { reloadSkills } from "@/lib/game/skill-repository"
 import { loadRuleById } from "@/lib/game/skills"
+import { runBattleAction } from "@/lib/game/battle-runner"
+import { createDebugDuel } from "@/lib/game/debug-battle"
+import { normalizePlayerAlignment } from "@/lib/game/room-store"
 
 // 全局棋子 ID 计数器，用于生成唯一的 instanceId
 let globalPieceIdCounter = 0
@@ -71,56 +72,38 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const mapId = body.mapId as string | undefined
+    const firstSeat = body.firstFaction === 'blue' ? 'blue' : 'red'
+    const secondSeat = body.secondFaction === 'red' ? 'red' : 'blue'
+    const firstAlignment = normalizePlayerAlignment(body.firstAlignment) ?? (firstSeat === 'blue' ? 'light' : 'dark')
+    const secondAlignment = normalizePlayerAlignment(body.secondAlignment) ?? (secondSeat === 'blue' ? 'light' : 'dark')
+    const firstTemplateIds = Array.isArray(body.firstTemplateIds)
+      ? body.firstTemplateIds.filter((id: unknown): id is string => typeof id === 'string')
+      : (typeof body.firstTemplateId === 'string' ? [body.firstTemplateId] : [])
+    const secondTemplateIds = Array.isArray(body.secondTemplateIds)
+      ? body.secondTemplateIds.filter((id: unknown): id is string => typeof id === 'string')
+      : (typeof body.secondTemplateId === 'string' ? [body.secondTemplateId] : [])
+    const firstPlayerId = body.firstPlayerId === 'training-blue' ? 'training-blue' : 'training-red'
+    const secondPlayerId = firstPlayerId === 'training-red' ? 'training-blue' : 'training-red'
 
     reloadSkills()
 
-    const allPieces = getAllPieces()
-    const redPiece = allPieces.find(p => p.id === "red-sasuke") || allPieces.find(p => p.id?.startsWith("red-")) || allPieces[0]
-    const bluePiece = allPieces.find(p => p.id === "blue-naruto") || allPieces.find(p => p.id?.startsWith("blue-")) || allPieces[1] || allPieces[0]
-
-    const playerSelectedPieces = [
-      { playerId: 'training-red', pieces: redPiece ? [redPiece] : [] },
-      { playerId: 'training-blue', pieces: bluePiece ? [bluePiece] : [] },
-    ]
-
-    const battleState = await createInitialBattleForPlayers(
-      ['training-red', 'training-blue'],
-      [],
-      playerSelectedPieces,
+    const debugDuel = await createDebugDuel({
       mapId,
-    )
-
-    if (!battleState) {
-      return NextResponse.json({ error: 'Failed to create training battle state' }, { status: 500 })
-    }
+      first: { playerId: firstPlayerId, seat: firstSeat, alignment: firstAlignment, templateIds: firstTemplateIds },
+      second: { playerId: secondPlayerId, seat: secondSeat, alignment: secondAlignment, templateIds: secondTemplateIds },
+      piecesPerPlayer: 8,
+    })
+    const battleState = debugDuel.state
 
     // 训练营特有设置：行动点上限为 10（正式对战为 1）
     battleState.players = battleState.players.map(player => ({
       ...player,
-      actionPoints: player.playerId === 'training-red' ? 10 : 0,
+      faction: player.playerId === firstPlayerId ? firstSeat : secondSeat,
+      alignment: player.playerId === firstPlayerId ? firstAlignment : secondAlignment,
+      actionPoints: player.playerId === firstPlayerId ? 10 : 0,
       maxActionPoints: 10,
     }))
-
-    const bluePlayer = battleState.players.find(player => player.playerId === 'training-blue')
-    if (bluePlayer) {
-      if (!bluePlayer.hand) bluePlayer.hand = []
-      const hasLuckyCoin = bluePlayer.hand.some(card => card.cardId === 'lucky-coin')
-      if (!hasLuckyCoin) {
-        bluePlayer.hand.push({
-          cardId: 'lucky-coin',
-          instanceId: `training-lucky-coin-${Date.now()}`,
-          ownerPlayerId: bluePlayer.playerId,
-          actionPointCost: 0,
-        } as any)
-        if (!battleState.actions) battleState.actions = []
-        battleState.actions.push({
-          type: 'triggerEffect',
-          playerId: bluePlayer.playerId,
-          turn: battleState.turn.turnNumber,
-          payload: { message: 'training-blue 获得了幸运币' },
-        } as any)
-      }
-    }
+    battleState.turn.currentPlayerId = firstPlayerId
 
     return NextResponse.json(battleState)
   } catch (error) {
@@ -150,7 +133,7 @@ export async function PUT(req: NextRequest) {
 
     console.log('[PUT] Before applyBattleAction, pieces:', battleState.pieces.map(p => `${p.templateId}(${p.instanceId})`))
     // 使用原版的 applyBattleAction 处理战斗逻辑
-    const newState = applyBattleAction(battleState, action)
+    const newState = runBattleAction(battleState, action).state
     console.log('[PUT] After applyBattleAction, pieces count:', newState.pieces.length)
     console.log('[PUT] After applyBattleAction, pieces:', newState.pieces.map(p => `${p.templateId}(${p.instanceId})`))
     console.log('[PUT] Graveyard:', newState.graveyard?.map(p => `${p.templateId}(${p.instanceId})`))
@@ -178,6 +161,7 @@ export async function PUT(req: NextRequest) {
           targetType: err.targetType,
           range: err.range,
           filter: err.filter,
+          targetIndex: err.targetIndex,
         },
         { status: 400 }
       )
@@ -222,14 +206,15 @@ export async function PATCH(req: NextRequest) {
 
     switch (type) {
       case "addPiece": {
-        const { faction, templateId, x, y } = body as {
+        const { faction, ownerPlayerId: requestedOwnerPlayerId, templateId, x, y } = body as {
           faction: "red" | "blue"
+          ownerPlayerId?: string
           templateId: string
           x: number
           y: number
         }
 
-        console.log('[addPiece] faction:', faction, 'templateId:', templateId, 'x:', x, 'y:', y)
+        console.log('[addPiece] ownerPlayerId:', requestedOwnerPlayerId, 'faction:', faction, 'templateId:', templateId, 'x:', x, 'y:', y)
 
         // 检查位置是否有效
         const targetTile = battleState.map.tiles.find((t: { x: number; y: number; props: { walkable: boolean } }) => t.x === x && t.y === y)
@@ -249,7 +234,9 @@ export async function PATCH(req: NextRequest) {
           )
         }
 
-        const ownerPlayerId = faction === "red" ? "training-red" : "training-blue"
+        const ownerPlayerId = requestedOwnerPlayerId === "training-blue" ? "training-blue" : "training-red"
+        const ownerPlayer = battleState.players.find(player => player.playerId === ownerPlayerId) as any
+        const ownerFaction = ownerPlayer?.faction || faction || (ownerPlayerId === "training-blue" ? "blue" : "red")
         const existingPieces = battleState.pieces.filter(p => p.ownerPlayerId === ownerPlayerId)
         const newIndex = existingPieces.length + 1
 
@@ -262,7 +249,7 @@ export async function PATCH(req: NextRequest) {
           newState,
           {
             templateId,
-            faction,
+            faction: ownerFaction,
             ownerPlayerId,
             x,
             y,

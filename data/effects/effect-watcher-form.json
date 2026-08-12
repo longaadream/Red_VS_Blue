@@ -9,25 +9,13 @@
       "on": "beginTurn",
       "priority": 50,
       "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return false; return ctx.playerId === piece.ownerPlayerId; }",
-      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return { success: false }; if (ctx.playerId !== piece.ownerPlayerId) return { success: false }; var chosen = selectOption({ title: piece.name + ' 红蓝形态：选择加入手牌的卡', options: [{ id: 'calm', label: '平静（护盾2点，进入平静姿态）' }, { id: 'rage', label: '暴怒（攻击100%伤害，进入暴怒姿态）' }] }); if (!chosen || chosen.needsOptionSelection) return chosen; var cardId = (chosen === 'calm' || chosen.id === 'calm') ? 'watcher-calm' : 'watcher-rage'; addCardToHand(cardId, piece.ownerPlayerId); return { success: true, message: piece.name + '的红蓝形态发动：' + (cardId === 'watcher-calm' ? '获得平静' : '获得暴怒') }; }"
+      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece || piece.currentHp <= 0) return { success: false }; if (ctx.playerId !== piece.ownerPlayerId) return { success: false }; var chosen = selectOption({ title: piece.name + ' 红蓝形态：选择加入手牌的卡', options: [{ id: 'calm', label: '平静（护盾2点，进入平静姿态）' }, { id: 'rage', label: '暴怒（攻击100%伤害，进入暴怒姿态）' }] }); if (!chosen || chosen.needsOptionSelection) return chosen; var value = chosen.value || chosen.id || chosen; var cardId = value === 'calm' ? 'watcher-calm' : 'watcher-rage'; addCardToHand(cardId, piece.ownerPlayerId); return { success: true, message: piece.name + '的红蓝形态发动：' + (cardId === 'watcher-calm' ? '获得平静' : '获得暴怒') }; }"
     },
     {
       "on": "beforeDamageTaken",
       "priority": 50,
       "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; var shield = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'calm-shield'; }); if (!shield || !shield.intensity || shield.intensity <= 0) return false; return !!(ctx.damage && ctx.damage > 0); }",
       "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var shield = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'calm-shield'; }); if (!shield || !shield.intensity || shield.intensity <= 0) return { success: false }; var absorbed = Math.min(shield.intensity, ctx.damage || 0); if (absorbed <= 0) return { success: false }; shield.intensity -= absorbed; ctx.damage = (ctx.damage || 0) - absorbed; var msg = piece.name + '的平静护盾格挡了' + absorbed + '点伤害'; if (shield.intensity <= 0) { removeStatusEffectById(piece.instanceId, shield.id); msg += '，护盾破碎'; } else { msg += '，剩余护盾' + shield.intensity + '点'; } return { success: true, message: msg }; }"
-    },
-    {
-      "on": "beforeDamageDealt",
-      "priority": 50,
-      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.sourcePiece || ctx.sourcePiece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'rage-stance'; })); }",
-      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var rageStance = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (!rageStance) return { success: false }; var baseDamage = ctx.damage || 0; ctx.damage = baseDamage * 2; return { success: true, message: piece.name + '暴怒姿态：伤害翻倍！' + baseDamage + '→' + ctx.damage + '点' }; }"
-    },
-    {
-      "on": "beforeDamageTaken",
-      "priority": 49,
-      "filterCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return false; if (!ctx.piece || ctx.piece.instanceId !== piece.instanceId) return false; return !!(piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'rage-stance'; })); }",
-      "effectCode": "function(ctx, battle, self) { var piece = battle.pieces.find(function(p) { return p.instanceId === self.ownerId; }); if (!piece) return { success: false }; var rageStance = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (!rageStance) return { success: false }; var baseDamage = ctx.damage || 0; ctx.damage = baseDamage * 2; return { success: true, message: piece.name + '处于暴怒姿态，受到双倍伤害！' + baseDamage + '→' + ctx.damage + '点' }; }"
     }
   ]
 }

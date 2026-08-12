@@ -59,6 +59,8 @@ function createPieceInstance(
       usesRemaining: isUltimate(s.skillId) ? 1 : -1,
     })),
     buffs: [],
+    debuffs: [],
+    ruleTags: [],
     statusTags: [],
     rules,
   }

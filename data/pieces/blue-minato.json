@@ -1,0 +1,38 @@
+{
+  "id": "blue-minato",
+  "name": "????",
+  "faction": "good",
+  "description": "????????????????????????????????",
+  "rarity": "legendary",
+  "image": "minato.jpg",
+  "stats": {
+    "maxHp": 11,
+    "attack": 3,
+    "defense": 0,
+    "moveRange": 5,
+    "speed": 5
+  },
+  "skills": [
+    {
+      "skillId": "minato-flying-raijin-passive",
+      "level": 1
+    },
+    {
+      "skillId": "minato-rasengan",
+      "level": 1
+    },
+    {
+      "skillId": "minato-kunai-formula",
+      "level": 1
+    },
+    {
+      "skillId": "minato-spiral-barrage",
+      "level": 1
+    }
+  ],
+  "rules": [
+    "rule-minato-anchor-begin-turn",
+    "rule-minato-flying-raijin-trigger"
+  ],
+  "isDefault": false
+}

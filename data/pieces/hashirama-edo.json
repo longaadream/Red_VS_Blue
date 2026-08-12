@@ -1,7 +1,7 @@
 {
   "id": "hashirama-edo",
   "name": "秽土转生·千手柱间",
-  "faction": "blue",
+  "faction": "good",
   "description": "忍者世界之神，秽土转生重临。木遁扦插沉默敌人，木龙汲取力量，化佛降临制敌",
   "rarity": "legendary",
   "image": "hashirama-edo.jpg",
@@ -12,12 +12,30 @@
     "moveRange": 4
   },
   "skills": [
-    { "skillId": "hashirama-edo-wood-spike", "level": 1 },
-    { "skillId": "hashirama-edo-wood-dragon", "level": 1 },
-    { "skillId": "hashirama-edo-sage-buddha", "level": 1, "initialCharges": 0 },
-    { "skillId": "hashirama-edo-regen", "level": 1 }
+    {
+      "skillId": "hashirama-edo-wood-spike",
+      "level": 1
+    },
+    {
+      "skillId": "hashirama-edo-wood-dragon",
+      "level": 1
+    },
+    {
+      "skillId": "hashirama-edo-sage-buddha",
+      "level": 1,
+      "initialCharges": 0
+    },
+    {
+      "skillId": "hashirama-edo-regen",
+      "level": 1
+    }
   ],
-  "rules": ["rule-hashirama-edo-regen"],
-  "relatedCards": ["hashirama-edo-thousand-hands", "hashirama-edo-nature-heal"],
+  "rules": [
+    "rule-hashirama-edo-regen"
+  ],
+  "relatedCards": [
+    "hashirama-edo-thousand-hands",
+    "hashirama-edo-nature-heal"
+  ],
   "isDefault": false
 }

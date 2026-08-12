@@ -94,7 +94,10 @@ export function buildDefaultPieceStats(): Record<string, PieceStats> {
 interface PlayerSelectedPieces {
   playerId: string
   pieces: PieceTemplate[]
+  faction?: 'red' | 'blue'
 }
+
+const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
 /** 将棋子模板中的 initialEffects 和 rules 应用到棋子实例上 */
 function applyInitialEffects(piece: PieceInstance, pieceTemplate: PieceTemplate, battle: any): void {
@@ -110,7 +113,7 @@ function applyInitialEffects(piece: PieceInstance, pieceTemplate: PieceTemplate,
   if (templateRules && Array.isArray(templateRules)) {
     if (!piece.rules) piece.rules = []
     for (const ruleId of templateRules) {
-      const rule = loadRuleById(ruleId)
+      const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
       if (rule && !piece.rules.some((r: any) => r.id === ruleId)) {
         piece.rules.push(rule)
       }
@@ -125,16 +128,20 @@ export function buildInitialPiecesForPlayers(
   playerSelectedPieces?: PlayerSelectedPieces[]
 ): PieceInstance[] {
   if (players.length !== 2) return []
-  
+
   const [p1, p2] = players
-  
-  // 固定分配玩家到红方和蓝方，避免随机导致的问题
-  // 玩家数组已按红方在前、蓝方在后的顺序排序
-  const redPlayer = p1
-  const bluePlayer = p2
-  
-  // 为每个玩家创建棋子
+
   const pieces: PieceInstance[] = []
+  const playerFactionById = new Map<string, 'red' | 'blue'>()
+  if (playerSelectedPieces) {
+    for (const playerInfo of playerSelectedPieces) {
+      if (playerInfo.faction === 'red' || playerInfo.faction === 'blue') {
+        playerFactionById.set(playerInfo.playerId.toLowerCase(), playerInfo.faction)
+      }
+    }
+  }
+  const redPlayer = players.find(playerId => playerFactionById.get(playerId.toLowerCase()) === 'red') || p1
+  const bluePlayer = players.find(playerId => playerFactionById.get(playerId.toLowerCase()) === 'blue') || players.find(playerId => playerId !== redPlayer) || p2
   
   // 找到所有可走的地板方格（F方格）
   const floorTiles = map.tiles.filter(tile => 
@@ -188,27 +195,24 @@ export function buildInitialPiecesForPlayers(
     playerSelectedPieces.forEach((playerInfo) => {
       const playerId = playerInfo.playerId
       
-      // 根据 playerId 在 players 数组中的位置确定阵营
-      // players 数组已按红方在前、蓝方在后的顺序排序
-      // 使用大小写不敏感的匹配
       const playerIndexInArray = players.findIndex(p => p.toLowerCase() === playerId.toLowerCase())
-      
-      // 如果找不到玩家，跳过
+
       if (playerIndexInArray === -1) {
         console.error(`Player ${playerId} not found in players array:`, players)
         return
       }
-      
-      // 使用 players 数组中的实际 ID 作为 ownerPlayerId，确保大小写一致
+
       const ownerPlayerId = players[playerIndexInArray]
-      const expectedFaction = playerIndexInArray === 0 ? "red" : "blue"
+      const expectedFaction: 'red' | 'blue' =
+        (playerInfo.faction as 'red' | 'blue')
+        || playerFactionById.get(ownerPlayerId.toLowerCase())
+        || (ownerPlayerId === bluePlayer ? 'blue' : 'red')
       
-      console.log(`Allocating pieces for player ${playerId} (owner: ${ownerPlayerId}, expected faction: ${expectedFaction}, index: ${playerIndexInArray})`)
-      
+      console.log(`Allocating pieces for player ${playerId} (owner: ${ownerPlayerId}, faction: ${expectedFaction}, index: ${playerIndexInArray})`)
+
       let pieceIndex = 0
       playerInfo.pieces.forEach(pieceTemplate => {
         const position = getRandomPosition()
-        // 强制使用对应玩家的阵营，确保红方玩家获得红方棋子，蓝方玩家获得蓝方棋子
         const actualFaction = expectedFaction
         pieces.push({
           instanceId: `${ownerPlayerId}-${pieceIndex + 1}`,
@@ -251,147 +255,50 @@ export function buildInitialPiecesForPlayers(
       })
     })
   } else {
-    // 没有玩家选择的棋子信息，根据棋子模板的faction属性分配，
-    // 确保每个玩家至少有一个棋子，并且分配给正确的阵营
-    console.log('Using default allocation based on piece faction')
-    
-    // 收集红方和蓝方的棋子模板
-    const redPieces = selectedPieces.filter(piece => piece.faction === "red")
-    const bluePieces = selectedPieces.filter(piece => piece.faction === "blue")
-    
-    console.log('Red pieces found:', redPieces.length)
-    console.log('Blue pieces found:', bluePieces.length)
-    
-    // 为红方玩家分配棋子
-    if (redPieces.length > 0) {
-      redPieces.forEach((pieceTemplate, index) => {
-        const position = getRandomPosition()
-        pieces.push({
-          instanceId: `${redPlayer}-${index + 1}`,
-          templateId: pieceTemplate.id,
-          name: pieceTemplate.name,
-          ownerPlayerId: redPlayer,
-          faction: "red",
-          currentHp: pieceTemplate.stats.maxHp,
-          maxHp: pieceTemplate.stats.maxHp,
-          attack: pieceTemplate.stats.attack,
-          defense: pieceTemplate.stats.defense,
-          moveRange: pieceTemplate.stats.moveRange,
-          x: position.x,
-          y: position.y,
-          skills: pieceTemplate.skills.map(s => {
-            // 检查技能是否为限定技
-            const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult');
-            return {
-              skillId: s.skillId,
-              currentCooldown: 0,
-              currentCharges: 0,
-              unlocked: true,
-              usesRemaining: isUltimate ? 1 : -1, // 限定技1次，普通技能无限制
-            } as SkillState;
-          }),
-          rules: [],
-          buffs: [],
-          debuffs: [],
-          ruleTags: [],
-          statusTags: [],
-        })
-        redPieceIndex++
+    // 没有玩家选择的棋子信息，按玩家顺序平均分配所有棋子（奇数给红方，偶数给蓝方）
+    // 不再依赖棋子模板的 faction 字段（已改为 evil/good 正邪阵营，与队伍颜色无关）
+    console.log('Using default allocation by player order')
+    const half = Math.ceil(selectedPieces.length / 2)
+    selectedPieces.forEach((pieceTemplate, index) => {
+      const isRedPlayer = index < half
+      const playerId = isRedPlayer ? redPlayer : bluePlayer
+      const faction: 'red' | 'blue' = isRedPlayer ? 'red' : 'blue'
+      const pieceIndex = isRedPlayer ? redPieceIndex : bluePieceIndex
+
+      const position = getRandomPosition()
+      pieces.push({
+        instanceId: `${playerId}-${pieceIndex + 1}`,
+        templateId: pieceTemplate.id,
+        name: pieceTemplate.name,
+        ownerPlayerId: playerId,
+        faction,
+        currentHp: pieceTemplate.stats.maxHp,
+        maxHp: pieceTemplate.stats.maxHp,
+        attack: pieceTemplate.stats.attack,
+        defense: pieceTemplate.stats.defense,
+        moveRange: pieceTemplate.stats.moveRange,
+        x: position.x,
+        y: position.y,
+        skills: pieceTemplate.skills.map(s => {
+          const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult')
+          return {
+            skillId: s.skillId,
+            currentCooldown: 0,
+            currentCharges: 0,
+            unlocked: true,
+            usesRemaining: isUltimate ? 1 : -1,
+          } as SkillState
+        }),
+        rules: [],
+        buffs: [],
+        debuffs: [],
+        ruleTags: [],
+        statusTags: [],
       })
-    }
-    
-    // 为蓝方玩家分配棋子
-    if (bluePieces.length > 0) {
-      bluePieces.forEach((pieceTemplate, index) => {
-        const position = getRandomPosition()
-        pieces.push({
-          instanceId: `${bluePlayer}-${index + 1}`,
-          templateId: pieceTemplate.id,
-          name: pieceTemplate.name,
-          ownerPlayerId: bluePlayer,
-          faction: "blue",
-          currentHp: pieceTemplate.stats.maxHp,
-          maxHp: pieceTemplate.stats.maxHp,
-          attack: pieceTemplate.stats.attack,
-          defense: pieceTemplate.stats.defense,
-          moveRange: pieceTemplate.stats.moveRange,
-          x: position.x,
-          y: position.y,
-          skills: pieceTemplate.skills.map(s => {
-            // 检查技能是否为限定技
-            const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult');
-            return {
-              skillId: s.skillId,
-              currentCooldown: 0,
-              currentCharges: 0,
-              unlocked: true,
-              usesRemaining: isUltimate ? 1 : -1, // 限定技1次，普通技能无限制
-            } as SkillState;
-          }),
-          rules: [],
-          buffs: [],
-          debuffs: [],
-          ruleTags: [],
-          statusTags: [],
-        })
-        bluePieceIndex++
-      })
-    }
-    
-    // 如果没有按阵营分配到足够的棋子，将剩余棋子平均分配给两个玩家
-    const remainingPieces = selectedPieces.filter(piece => 
-      !redPieces.includes(piece) && !bluePieces.includes(piece)
-    )
-    
-    console.log('Remaining pieces to distribute:', remainingPieces.length)
-    
-    if (remainingPieces.length > 0) {
-      remainingPieces.forEach((pieceTemplate, index) => {
-        // 交替分配给两个玩家
-        const isRedPlayer = index % 2 === 0
-        const playerId = isRedPlayer ? redPlayer : bluePlayer
-        const faction = isRedPlayer ? "red" : "blue"
-        const pieceIndex = isRedPlayer ? redPieceIndex : bluePieceIndex
-        
-        const position = getRandomPosition()
-        pieces.push({
-          instanceId: `${playerId}-${pieceIndex + 1}`,
-          templateId: pieceTemplate.id,
-          name: pieceTemplate.name,
-          ownerPlayerId: playerId,
-          faction: faction,
-          currentHp: pieceTemplate.stats.maxHp,
-          maxHp: pieceTemplate.stats.maxHp,
-          attack: pieceTemplate.stats.attack,
-          defense: pieceTemplate.stats.defense,
-          moveRange: pieceTemplate.stats.moveRange,
-          x: position.x,
-          y: position.y,
-          skills: pieceTemplate.skills.map(s => {
-            // 检查技能是否为限定技
-            const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult');
-            return {
-              skillId: s.skillId,
-              currentCooldown: 0,
-              currentCharges: 0,
-              unlocked: true,
-              usesRemaining: isUltimate ? 1 : -1, // 限定技1次，普通技能无限制
-            } as SkillState;
-          }),
-          rules: [],
-          buffs: [],
-          debuffs: [],
-          ruleTags: [],
-          statusTags: [],
-        })
-        
-        if (isRedPlayer) {
-          redPieceIndex++
-        } else {
-          bluePieceIndex++
-        }
-      })
-    }
+
+      if (isRedPlayer) redPieceIndex++
+      else bluePieceIndex++
+    })
   }
   
   console.log('Red pieces created:', redPieceIndex)
@@ -567,12 +474,16 @@ export function buildInitialPiecesForPlayers(
 export async function createInitialBattleForPlayers(
   playerIds: PlayerId[],
   selectedPieces: PieceTemplate[],
-  playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[] }>,
+  playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[]; faction?: 'red' | 'blue' }>,
   mapId?: string,
+  options?: { firstPlayerId?: PlayerId },
 ): Promise<BattleState | null> {
   if (playerIds.length !== 2) return null
 
-  const [p1, p2] = playerIds
+  let orderedIds = [...playerIds]
+  let orderedPSP = playerSelectedPieces ? [...playerSelectedPieces] : undefined
+
+  const [p1, p2] = orderedIds
   
   writeLog('[createInitialBattleForPlayers] mapId: ' + mapId)
   writeLog('[createInitialBattleForPlayers] DEFAULT_MAP_ID: ' + DEFAULT_MAP_ID)
@@ -638,9 +549,15 @@ export async function createInitialBattleForPlayers(
     map = defaultMap
   }
 
-  const pieces = buildInitialPiecesForPlayers(map, playerIds, selectedPieces, playerSelectedPieces)
-  // 玩家数组已按红方在前、蓝方在后的顺序排序，所以第一个玩家是红方
-  const redPlayer = playerIds[0]
+  // 只有 psp 里有实际棋子时才传给 buildInitialPiecesForPlayers，否则用 selectedPieces
+  const pspForBuild = (orderedPSP && orderedPSP.some(p => p.pieces.length > 0)) ? orderedPSP : undefined
+  const pieces = buildInitialPiecesForPlayers(map, orderedIds, selectedPieces, pspForBuild)
+
+  // 先后手：由 battle-setup 统一决定（不在调用方重复随机）
+  const firstPlayer = options?.firstPlayerId && orderedIds.includes(options.firstPlayerId)
+    ? options.firstPlayerId
+    : (rng() < 0.5 ? orderedIds[0] : orderedIds[1])
+  const secondPlayer = firstPlayer === orderedIds[0] ? orderedIds[1] : orderedIds[0]
 
   const skills = buildDefaultSkills()
   console.log('Skills for battle:', Object.keys(skills))
@@ -656,11 +573,11 @@ export async function createInitialBattleForPlayers(
     pieceStatsByTemplateId: buildDefaultPieceStats(),
     skillsById: skills,
     players: [
-      { playerId: p1, chargePoints: 0, actionPoints: 1, maxActionPoints: 1, hand: [], discardPile: [], rules: [] },
-      { playerId: p2, chargePoints: 0, actionPoints: 0, maxActionPoints: 0, hand: [], discardPile: [], rules: [] },
+      { playerId: p1, chargePoints: 0, actionPoints: firstPlayer === p1 ? 1 : 0, maxActionPoints: firstPlayer === p1 ? 1 : 0, hand: [], discardPile: [], rules: [] },
+      { playerId: p2, chargePoints: 0, actionPoints: firstPlayer === p2 ? 1 : 0, maxActionPoints: firstPlayer === p2 ? 1 : 0, hand: [], discardPile: [], rules: [] },
     ],
     turn: {
-      currentPlayerId: redPlayer,
+      currentPlayerId: firstPlayer,
       turnNumber: 1,
       phase: "start",
       actions: {
@@ -673,8 +590,8 @@ export async function createInitialBattleForPlayers(
 
   // 为每个棋子应用 initialEffects 和 rules
   const allSelectedPieces: PieceTemplate[] = []
-  if (playerSelectedPieces && playerSelectedPieces.length > 0) {
-    playerSelectedPieces.forEach(pi => pi.pieces.forEach(pt => allSelectedPieces.push(pt)))
+  if (orderedPSP && orderedPSP.some(p => p.pieces.length > 0)) {
+    orderedPSP.forEach(pi => pi.pieces.forEach(pt => allSelectedPieces.push(pt)))
   } else {
     selectedPieces.forEach(pt => allSelectedPieces.push(pt))
   }
@@ -686,13 +603,16 @@ export async function createInitialBattleForPlayers(
     }
   })
 
-  // 为玩家2应用 effect-lucky-coin（幸运币）
-  const p2Piece = state.pieces.find(p => p.ownerPlayerId === p2)
-  if (p2Piece) {
-    applyEffectToPiece(state, p2Piece.instanceId, 'effect-lucky-coin')
-    writeLog('[createInitialBattle] Applied effect-lucky-coin to p2 piece: ' + p2Piece.instanceId)
+  // 将幸运币规则绑到后手玩家，gameStart 时由规则自动发牌（规则发牌，非硬编码）
+  const luckyRule = loadRuleById('rule-lucky-coin-gamestart', FORCE_RULE_RELOAD)
+  const secondPlayerState = state.players.find(p => p.playerId === secondPlayer) as any
+  if (luckyRule && secondPlayerState) {
+    if (!secondPlayerState.rules) secondPlayerState.rules = []
+    secondPlayerState.rules.push(luckyRule)
+    writeLog('[createInitialBattle] First player: ' + firstPlayer + ', rule-lucky-coin-gamestart → second player: ' + secondPlayer)
   }
 
+  // 触发游戏开始规则（包括幸运币发牌、基尔加丹隐匿等）
   fireInitialGameStart(state)
 
   writeLog('[createInitialBattle] Battle state created, pieces count: ' + state.pieces.length)

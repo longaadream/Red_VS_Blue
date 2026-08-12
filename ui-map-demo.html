@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RED vs BLUE UI Map Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 50% 35%, #1e293b, #07111f 68%);
+      color: #e2e8f0;
+    }
+    .hud {
+      position: fixed; inset: 10px 10px auto 10px; z-index: 10;
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+      pointer-events: none;
+    }
+    .hud-left, .hud-right {
+      pointer-events: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      background: rgba(5,10,20,.62); border: 1px solid rgba(148,163,184,.24);
+      border-radius: 10px; padding: 6px; backdrop-filter: blur(10px);
+      box-shadow: 0 14px 34px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .turn { padding: 5px 12px; border-radius: 999px; color: #4ade80; background: rgba(20,83,45,.72); border: 1px solid #22c55e; font-size: 12px; font-weight: 900; }
+    .phase { display: grid; gap: 1px; padding: 0 4px; font-size: 11px; color: #94a3b8; }
+    .phase b { color: #f8fafc; font-size: 12px; }
+    .res, .hand {
+      min-height: 30px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px;
+      border-radius: 8px; border: 1px solid rgba(148,163,184,.24); font-size: 12px; font-weight: 900;
+    }
+    .ap { background: rgba(30,64,175,.38); color: #bfdbfe; }
+    .cp { background: rgba(88,28,135,.36); color: #e9d5ff; }
+    .hand { background: rgba(15,23,42,.74); color: #cbd5e1; }
+    button {
+      min-width: 34px; height: 32px; border-radius: 8px; border: 1px solid rgba(148,163,184,.26);
+      background: rgba(15,23,42,.78); color: #dbeafe; font-weight: 900; cursor: pointer;
+    }
+    button:active { transform: translateY(1px); filter: brightness(1.12); }
+    .arena {
+      height: 100%; display: flex; align-items: center; justify-content: center; padding: 72px 14px 150px;
+    }
+    #viewport {
+      width: min(96vw, 920px); height: min(68vh, 620px); overflow: hidden; touch-action: none;
+      display: flex; align-items: center; justify-content: center; cursor: grab;
+    }
+    #viewport.dragging { cursor: grabbing; }
+    #map {
+      display: grid; grid-template-columns: repeat(10, 58px); gap: 2px;
+      transform-origin: 0 0; will-change: transform;
+      background: #050816; padding: 2px; border-radius: 8px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.55);
+    }
+    .cell {
+      width: 58px; height: 58px; border-radius: 5px; position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; background-size: cover; background-position: center;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .floor { background-image: url("public/terrain/floor.webp"); }
+    .wall { background-image: url("public/terrain/wall.webp"); }
+    .trap { background-image: url("public/terrain/trap.webp"); }
+    .cover { background-image: url("public/terrain/cover.webp"); }
+    .cell.move { outline: 2px solid #22c55e; outline-offset: -2px; }
+    .cell.target { outline: 2px solid #f59e0b; outline-offset: -2px; }
+    .piece {
+      width: 42px; height: 42px; border-radius: 8px; display: grid; place-items: center;
+      background: rgba(15,23,42,.82); border: 2px solid #ef4444; box-shadow: 0 8px 18px rgba(0,0,0,.48);
+      position: relative; z-index: 2; font-size: 18px;
+    }
+    .piece.blue { border-color: #3b82f6; }
+    .piece::after {
+      content: ""; position: absolute; left: 3px; right: 3px; bottom: -5px; height: 4px;
+      border-radius: 999px; background: linear-gradient(90deg, #22c55e 72%, #0f172a 72%);
+    }
+    .cards {
+      position: fixed; left: 0; right: 0; bottom: -78px; height: 132px; pointer-events: none;
+    }
+    .card {
+      position: absolute; bottom: 0; width: 80px; height: 124px; border-radius: 8px;
+      background: linear-gradient(180deg, #1a2744, #0f1929); border: 2px solid #4a6a9a;
+      display: grid; grid-template-rows: 56px 1fr 18px; place-items: center;
+      color: #cbd5e1; font-size: 10px; font-weight: 800; pointer-events: auto;
+      transition: transform .2s, box-shadow .2s; transform-origin: bottom center;
+    }
+    .card:hover { transform: translateY(-70px) scale(1.12) !important; z-index: 5; border-color: #f59e0b; box-shadow: 0 12px 32px rgba(0,0,0,.9); }
+    .card-art { width: 100%; height: 56px; display: grid; place-items: center; background: rgba(0,0,0,.24); font-size: 24px; }
+    @media (max-width: 700px) {
+      .hud { inset: 6px 6px auto 6px; gap: 6px; }
+      .hud-left { max-width: calc(100vw - 68px); }
+      .hud-right { max-width: 58px; justify-content: flex-end; }
+      #map { grid-template-columns: repeat(10, 48px); }
+      .cell { width: 48px; height: 48px; }
+      .piece { width: 34px; height: 34px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <div class="hud-left">
+      <div class="turn">我的回合</div>
+      <div class="phase"><span>第 3 回合</span><b>行动阶段</b></div>
+      <div class="res ap">⚡ 7/10</div>
+      <div class="res cp">💠 3/6</div>
+      <div class="hand">🃏 5</div>
+    </div>
+    <div class="hud-right">
+      <button title="离开">←</button>
+      <button title="投降">⚑</button>
+      <button title="全图">⛶</button>
+      <button title="重置地图视图" onclick="resetMap()">◎</button>
+      <button title="日志">☰</button>
+    </div>
+  </div>
+  <main class="arena">
+    <div id="viewport">
+      <div id="map"></div>
+    </div>
+  </main>
+  <div class="cards" id="cards"></div>
+  <script>
+    const terrain = [
+      "wall","wall","wall","wall","wall","wall","wall","wall","wall","wall",
+      "wall","floor","floor","cover","floor","floor","trap","floor","floor","wall",
+      "wall","floor","trap","floor","floor","cover","floor","floor","floor","wall",
+      "wall","floor","floor","floor","wall","wall","floor","trap","floor","wall",
+      "wall","cover","floor","floor","floor","floor","floor","floor","cover","wall",
+      "wall","floor","floor","trap","floor","cover","floor","floor","floor","wall",
+      "wall","floor","cover","floor","floor","floor","trap","floor","floor","wall",
+      "wall","floor","floor","floor","trap","floor","floor","cover","floor","wall",
+      "wall","floor","floor","floor","floor","floor","floor","floor","floor","wall",
+      "wall","wall","wall","wall","wall","wall","wall","wall","wall","wall"
+    ];
+    const pieces = { "2,2": "🔴", "7,3": "🔵", "4,6": "🔴", "6,7": "🔵" };
+    const map = document.getElementById("map");
+    terrain.forEach((t, i) => {
+      const x = i % 10, y = Math.floor(i / 10);
+      const cell = document.createElement("div");
+      cell.className = "cell " + t + ((x + y) % 7 === 0 ? " move" : "") + ((x === 6 && y === 3) ? " target" : "");
+      const p = pieces[x + "," + y];
+      if (p) cell.innerHTML = `<div class="piece ${p === "🔵" ? "blue" : ""}">${p}</div>`;
+      map.appendChild(cell);
+    });
+    const cards = document.getElementById("cards");
+    ["斩击","圣光","洞穴","冲锋","护盾"].forEach((name, i, arr) => {
+      const t = arr.length === 1 ? 0 : (i / (arr.length - 1)) * 2 - 1;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.style.left = `calc(50% + ${t * 170}px - 40px)`;
+      card.style.transform = `rotate(${t * 18}deg) translateY(${-t * t * 16}px)`;
+      card.innerHTML = `<div class="card-art">🃏</div><div>${name}</div><div>主动</div>`;
+      cards.appendChild(card);
+    });
+    const viewport = document.getElementById("viewport");
+    let scale = 1, x = 0, y = 0, pan = false, last = null, clickSuppressed = false, pinch = 0;
+    const pointers = new Map();
+    function apply() { map.style.transform = `translate(${x}px, ${y}px) scale(${scale})`; }
+    function resetMap() { scale = 1; x = 0; y = 0; apply(); }
+    function clamp(v) { return Math.max(1, Math.min(2.5, v)); }
+    function dist() { const p = [...pointers.values()]; return p.length < 2 ? 0 : Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); }
+    viewport.addEventListener("pointerdown", e => {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size >= 2) { pinch = dist(); clickSuppressed = true; e.preventDefault(); return; }
+      if (scale > 1 || e.target === viewport) { pan = scale > 1; last = { x: e.clientX, y: e.clientY }; }
+    });
+    viewport.addEventListener("pointermove", e => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size >= 2) {
+        const d = dist(); if (pinch) scale = clamp(scale * (d / pinch)); pinch = d; clickSuppressed = true; apply(); e.preventDefault(); return;
+      }
+      if (pan && last && scale > 1) {
+        const dx = e.clientX - last.x, dy = e.clientY - last.y;
+        if (Math.abs(dx) + Math.abs(dy) > 2) { x += dx; y += dy; last = { x: e.clientX, y: e.clientY }; clickSuppressed = true; viewport.classList.add("dragging"); apply(); }
+        e.preventDefault();
+      }
+    }, { passive: false });
+    function end(e) { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = 0; if (!pointers.size) { pan = false; last = null; viewport.classList.remove("dragging"); setTimeout(() => clickSuppressed = false, 60); } }
+    viewport.addEventListener("pointerup", end);
+    viewport.addEventListener("pointercancel", end);
+    viewport.addEventListener("dblclick", e => { resetMap(); e.preventDefault(); });
+    viewport.addEventListener("wheel", e => { scale = clamp(scale * (e.deltaY < 0 ? 1.1 : .9)); apply(); e.preventDefault(); }, { passive: false });
+  </script>
+</body>
+</html>

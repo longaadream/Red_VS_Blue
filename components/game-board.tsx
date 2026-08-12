@@ -83,7 +83,7 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
 
   // 计算可移动的格子
   const getValidMoveTargets = (): { x: number, y: number }[] => {
-    if (!selectedPiece || !isSelectingMoveTarget) return []
+    if (!selectedPiece || !isSelectingMoveTarget || selectedPiece.x == null || selectedPiece.y == null) return []
     
     const targets: { x: number, y: number }[] = []
     const { x: startX, y: startY } = selectedPiece
@@ -109,7 +109,7 @@ export function GameBoard({ map, pieces = [], onTileClick, onPieceClick, selecte
 
   // 计算可传送的格子
   const getValidTeleportTargets = (): { x: number, y: number }[] => {
-    if (!selectedPiece || !isSelectingTeleportTarget) return []
+    if (!selectedPiece || !isSelectingTeleportTarget || selectedPiece.x == null || selectedPiece.y == null) return []
     
     const targets: { x: number, y: number }[] = []
     const { x: startX, y: startY } = selectedPiece

@@ -1,4 +1,5 @@
-import { getMapById, getAllMaps, loadMaps, type BoardMap } from "@/lib/game/map-repository"
+import { getMapById, getAllMaps, loadMaps } from "@/lib/game/map-repository"
+import type { BoardMap } from "@/lib/game/map"
 
 // 预加载地图数据
 loadMaps().catch(error => {

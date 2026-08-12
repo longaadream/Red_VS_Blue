@@ -12,6 +12,7 @@ import * as http from 'http'
 
 const LOCAL_PORT_HINT = 38521  // 首选端口，被占用时自动递增（避开 54300-54400 被 QMUpload 占用的范围）
 let actualLocalPort = LOCAL_PORT_HINT  // 实际绑定成功的端口
+let actualWsPort = 3001
 
 function findFreePort(start: number): Promise<number> {
   return new Promise((resolve) => {
@@ -82,26 +83,100 @@ function clearOnlineServerUrl(): void {
 function killProcessTree(proc: ChildProcess): void {
   if (!proc.pid) return
   if (process.platform === 'win32') {
-    try { execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore' }) } catch {}
+    // execSync 在 taskkill 卡住时会阻塞整个 quit 流程，导致 Electron 主进程
+    // 和 GPU/renderer 子进程一起僵死。用 try/setTimeout 兜底 + 短超时。
+    try {
+      execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore', timeout: 3000 })
+    } catch {
+      // taskkill 失败或超时——再尝试软杀一次，不阻塞
+      try { proc.kill('SIGKILL') } catch {}
+    }
   } else {
     try { process.kill(-proc.pid, 'SIGKILL') } catch { try { proc.kill('SIGKILL') } catch {} }
   }
 }
 
 function killServer(): void {
+  if (gatewayServer) {
+    try { gatewayServer.close() } catch {}
+    gatewayServer = null
+  }
+  localServerReady = false
   if (!serverProcess) return
   const proc = serverProcess
   serverProcess = null
-  localServerReady = false
   killProcessTree(proc)
 }
 
 // ─── 本地服务器管理 ───────────────────────────────────────────────────────────
 
 let serverProcess: ChildProcess | null = null
+let gatewayServer: http.Server | null = null
 let localServerReady = false
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
+let actualBackendPort = 0
+
+function proxyUpgrade(req: http.IncomingMessage, socket: net.Socket, head: Buffer, targetPort: number, targetPath?: string): void {
+  const target = net.connect(targetPort, '127.0.0.1')
+  let settled = false
+  target.on('connect', () => {
+    settled = true
+    const lines = [`${req.method} ${targetPath || req.url} HTTP/${req.httpVersion}`]
+    for (let i = 0; i < req.rawHeaders.length; i += 2) {
+      lines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`)
+    }
+    target.write(lines.join('\r\n') + '\r\n\r\n')
+    if (head.length) target.write(head)
+    socket.pipe(target)
+    target.pipe(socket)
+  })
+  target.on('error', () => {
+    if (!settled) {
+      try { socket.write('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n') } catch {}
+    }
+    try { socket.destroy() } catch {}
+  })
+  socket.on('error', () => { try { target.destroy() } catch {} })
+}
+
+function startPublicGateway(publicPort: number, backendPort: number, wsPort: number): Promise<void> {
+  if (gatewayServer) return Promise.resolve()
+  gatewayServer = http.createServer((req, res) => {
+    const proxyReq = http.request({
+      hostname: '127.0.0.1',
+      port: backendPort,
+      method: req.method,
+      path: req.url || '/',
+      headers: { ...req.headers, host: `127.0.0.1:${backendPort}` },
+    }, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 502, proxyRes.headers)
+      proxyRes.pipe(res)
+    })
+    proxyReq.on('error', () => {
+      if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' })
+      res.end('Bad Gateway')
+    })
+    req.pipe(proxyReq)
+  })
+  gatewayServer.on('upgrade', (req, socket, head) => {
+    const url = String(req.url || '')
+    const isPublicWs = url === '/ws' || url === '/ws/' || url.startsWith('/ws/rooms')
+    proxyUpgrade(req, socket as net.Socket, head, isPublicWs ? wsPort : backendPort, isPublicWs ? '/' : undefined)
+  })
+  return new Promise((resolve, reject) => {
+    const onError = (err: Error) => {
+      gatewayServer = null
+      reject(err)
+    }
+    gatewayServer!.once('error', onError)
+    gatewayServer!.listen(publicPort, '0.0.0.0', () => {
+      gatewayServer!.off('error', onError)
+      console.log(`[client] Public HTTP/WS gateway: ${publicPort} -> http ${backendPort}, ws ${wsPort}`)
+      resolve()
+    })
+  })
+}
 
 function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
@@ -226,7 +301,9 @@ async function startLocalServer(): Promise<void> {
 
   localServerReady = false
   actualLocalPort = await findFreePort(LOCAL_PORT_HINT)
-  console.log(`[client] Local server port: ${actualLocalPort}`)
+  actualBackendPort = await findFreePort(actualLocalPort + 1)
+  console.log(`[client] Public server port: ${actualLocalPort}`)
+  console.log(`[client] Internal HTTP port: ${actualBackendPort}`)
 
   const appRoot = getAppRoot()
   const userData = getUserData()
@@ -249,15 +326,15 @@ async function startLocalServer(): Promise<void> {
   }
 
   // 为 WebSocket 服务器找一个独立的空闲端口（避开主端口和 QMUpload 占用区间）
-  const wsPort = await findFreePort(actualLocalPort + 1)
-  console.log(`[client] WebSocket port: ${wsPort}`)
+  actualWsPort = await findFreePort(actualBackendPort + 1)
+  console.log(`[client] WebSocket port: ${actualWsPort}`)
 
   serverProcess = spawn(getNodeBin(), [serverEntry], {
     cwd: path.dirname(serverEntry),
     env: {
       ...process.env,
-      PORT: String(actualLocalPort),
-      WS_PORT: String(wsPort),
+      PORT: String(actualBackendPort),
+      WS_PORT: String(actualWsPort),
       NODE_ENV: 'production',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
@@ -285,9 +362,22 @@ async function startLocalServer(): Promise<void> {
   })
 
   // 等待服务器启动
-  localServerReady = await waitForLocalServerReady(actualLocalPort)
+  const backendReady = await waitForLocalServerReady(actualBackendPort)
+  if (!backendReady) {
+    localServerReady = false
+    console.warn(`[client] local server did not become ready on port ${actualBackendPort}`)
+    return
+  }
+
+  try {
+    await startPublicGateway(actualLocalPort, actualBackendPort, actualWsPort)
+    localServerReady = await waitForLocalServerReady(actualLocalPort, 5000)
+  } catch (err) {
+    localServerReady = false
+    console.error('[client] public gateway failed:', err)
+  }
   if (!localServerReady) {
-    console.warn(`[client] local server did not become ready on port ${actualLocalPort}`)
+    console.warn(`[client] public gateway did not become ready on port ${actualLocalPort}`)
   }
 }
 
@@ -297,6 +387,13 @@ async function startLocalServer(): Promise<void> {
 function setupPackProtocol(): void {
   // Direct-write approach: pack files are written straight into getHtmlRoot()
   // on import, so no file:// interception is needed.
+}
+
+function shouldSkipProtectedPackFile(relPath: string): boolean {
+  const rel = relPath.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase()
+  return rel === 'pack.html'
+    || rel === 'data/pages/pack.html'
+    || rel === 'js/pack-fetch.js'
 }
 
 /** IPC: 收到 ZIP 文件路径，直接解压到 htmlRoot 目录（覆盖同名文件）*/
@@ -331,6 +428,7 @@ ipcMain.handle('pack-import-from-path', async (_e, zipPath: string) => {
       const rel = entryName.replace(/^resource-pack\//, '').replace(/^\/+/, '')
       // 跳过元数据文件，不写入 www 目录
       if (!rel || rel === 'pack.json') continue
+      if (shouldSkipProtectedPackFile(rel)) continue
 
       const dest = path.join(htmlRoot, rel)
 
@@ -360,6 +458,7 @@ ipcMain.handle('pack-write-files', async (_e, files: { path: string; content: st
   let count = 0
   for (const { path: filePath, content } of files) {
     const rel = filePath.startsWith('/') ? filePath.slice(1) : filePath
+    if (!rel || rel === 'pack.json' || shouldSkipProtectedPackFile(rel)) continue
     const dest = path.join(htmlRoot, rel)
     if (!path.resolve(dest).startsWith(resolvedHtmlRoot)) continue
     fs.mkdirSync(path.dirname(dest), { recursive: true })
@@ -461,9 +560,16 @@ function loadLocalGame(): void {
     if (!serverProcess || !localServerReady) return
     win.webContents.executeJavaScript(`
       (function() {
-        var key = 'rvb_server_url';
-        localStorage.setItem(key, 'http://localhost:${actualLocalPort}');
-        localStorage.setItem('rvb_remote_server_url', 'http://localhost:${actualLocalPort}');
+        var url = 'http://localhost:${actualLocalPort}';
+        if (window.RvBUtils && RvBUtils.saveServerConfig) {
+          RvBUtils.saveServerConfig({ mode: 'local', url: url, wsPort: ${actualLocalPort} });
+        } else {
+          localStorage.setItem('rvb_server_url', url);
+          localStorage.setItem('rvb_lobby_server_mode', 'local');
+          localStorage.setItem('rvb_local_server_url', url);
+          localStorage.setItem('rvb_remote_server_url', url);
+          localStorage.setItem('rvb_ws_port', '${actualLocalPort}');
+        }
         if (typeof updateFloatBar === 'function') updateFloatBar();
         if (typeof refreshUserUI === 'function') refreshUserUI();
       })();
@@ -480,8 +586,14 @@ function loadOnlineGame(serverUrl: string): void {
   win.webContents.once('did-finish-load', () => {
     win.webContents.executeJavaScript(`
       (function() {
-        localStorage.setItem('rvb_server_url', ${JSON.stringify(serverUrl)});
-        localStorage.setItem('rvb_remote_server_url', ${JSON.stringify(serverUrl)});
+        var url = ${JSON.stringify(serverUrl)};
+        if (window.RvBUtils && RvBUtils.saveServerConfig) {
+          RvBUtils.saveServerConfig({ mode: 'remote', url: url });
+        } else {
+          localStorage.setItem('rvb_server_url', url);
+          localStorage.setItem('rvb_lobby_server_mode', 'remote');
+          localStorage.setItem('rvb_remote_server_url', url);
+        }
         if (typeof updateFloatBar === 'function') updateFloatBar();
         if (typeof refreshUserUI === 'function') refreshUserUI();
       })();
@@ -570,6 +682,7 @@ ipcMain.handle('open-local-game', async () => {
 ipcMain.handle('get-mode', () => ({
   isLocal: localServerReady,
   localUrl: `http://localhost:${actualLocalPort}`,
+  wsPort: actualLocalPort,
   ready: localServerReady,
 }))
 
@@ -600,7 +713,7 @@ ipcMain.handle('get-host-info', () => {
       if (iface.family === 'IPv4' && !iface.internal) ips.push(iface.address)
     }
   }
-  return { port: actualLocalPort, ips, running: serverProcess !== null && localServerReady, ready: localServerReady }
+  return { port: actualLocalPort, wsPort: actualLocalPort, ips, running: serverProcess !== null && localServerReady, ready: localServerReady }
 })
 
 // ─── UDP LAN 主机广播与发现 ───────────────────────────────────────────────────
@@ -628,10 +741,11 @@ ipcMain.handle('start-host-broadcast', () => {
   const myIps = getLanIpList()
   const hostname = os.hostname()
   const port = actualLocalPort
+  const wsPort = actualLocalPort
 
   const send = () => {
     for (const ip of myIps) {
-      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', name: hostname, ip, port })
+      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', name: hostname, ip, port, wsPort })
       const buf = Buffer.from(payload)
       const subnet = ip.substring(0, ip.lastIndexOf('.') + 1) + '255'
       for (const target of [subnet, '255.255.255.255']) {
@@ -693,11 +807,10 @@ ipcMain.handle('start-discover-hosts', (_e, timeoutMs: number) => {
 // 资源包状态
 ipcMain.handle('get-resource-pack-status', async () => {
   try {
-    const http = require('http')
     return new Promise((resolve) => {
       const req = http.get(`http://localhost:${actualLocalPort}/api/admin/resource-pack`, (res) => {
         let data = ''
-        res.on('data', chunk => data += chunk)
+        res.on('data', (chunk: Buffer) => data += chunk)
         res.on('end', () => {
           try { resolve(JSON.parse(data)) } catch { resolve({ error: 'Parse error' }) }
         })
@@ -709,10 +822,8 @@ ipcMain.handle('get-resource-pack-status', async () => {
 })
 
 // 资源包上传（文件路径）
-ipcMain.handle('upload-resource-pack', async (_event, filePath) => {
+ipcMain.handle('upload-resource-pack', async (_event, filePath: string) => {
   try {
-    const http = require('http')
-    const fs = require('fs')
     const boundary = '----FormBoundary' + Date.now()
     const fileContent = fs.readFileSync(filePath)
     const filename = filePath.split(/[\\/]/).pop()
@@ -736,24 +847,24 @@ ipcMain.handle('upload-resource-pack', async (_event, filePath) => {
         }
       }, (res) => {
         let data = ''
-        res.on('data', chunk => data += chunk)
+        res.on('data', (chunk: Buffer) => data += chunk)
         res.on('end', () => {
           try { resolve(JSON.parse(data)) } catch { resolve({ success: false, message: 'Parse error' }) }
         })
       })
-      req.on('error', (e) => resolve({ success: false, message: e.message }))
+      req.on('error', (e: Error) => resolve({ success: false, message: e.message }))
       req.write(body)
       req.end()
     })
-  } catch (e) {
-    return { success: false, message: e.message }
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e)
+    return { success: false, message }
   }
 })
 
 // 资源包上传（base64 数据）
-ipcMain.handle('upload-resource-pack-data', async (_event, base64, filename) => {
+ipcMain.handle('upload-resource-pack-data', async (_event, base64: string, filename: string) => {
   try {
-    const http = require('http')
     const buffer = Buffer.from(base64, 'base64')
     const boundary = '----FormBoundary' + Date.now()
 
@@ -776,17 +887,18 @@ ipcMain.handle('upload-resource-pack-data', async (_event, base64, filename) => 
         }
       }, (res) => {
         let data = ''
-        res.on('data', chunk => data += chunk)
+        res.on('data', (chunk: Buffer) => data += chunk)
         res.on('end', () => {
           try { resolve(JSON.parse(data)) } catch { resolve({ success: false, message: 'Parse error' }) }
         })
       })
-      req.on('error', (e) => resolve({ success: false, message: e.message }))
+      req.on('error', (e: Error) => resolve({ success: false, message: e.message }))
       req.write(body)
       req.end()
     })
-  } catch (e) {
-    return { success: false, message: e.message }
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e)
+    return { success: false, message }
   }
 })
 
@@ -804,6 +916,25 @@ app.on('certificate-error', (event, _webContents, _url, _error, _certificate, ca
 })
 
 // ─── 应用生命周期 ─────────────────────────────────────────────────────────────
+
+// 防止双开：第二个实例启动会立即退出，并让第一个实例聚焦窗口。
+// 这是避免"关掉一个窗口还有一堆 RED vs BLUE 进程留下"的根本之策——
+// 之前可能因为偶然双击双开累积了多份 Electron + Node 子进程。
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0)
+} else {
+  app.on('second-instance', () => {
+    if (mainWin && !mainWin.isDestroyed()) {
+      if (mainWin.isMinimized()) mainWin.restore()
+      mainWin.focus()
+    }
+  })
+}
+
+// 主进程异常退出兜底——保证 Node 子进程不会成为孤儿进程
+process.on('exit', () => { try { killServer() } catch {} })
+process.on('SIGINT', () => { try { killServer() } catch {} ; app.exit(0) })
+process.on('SIGTERM', () => { try { killServer() } catch {} ; app.exit(0) })
 
 setupPackProtocol()
 
@@ -831,10 +962,18 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   killServer()
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform !== 'darwin') {
+    app.quit()
+    // 兜底：如果 app.quit() 因某种原因没让所有子进程退出，1.5s 后强制 exit。
+    setTimeout(() => app.exit(0), 1500).unref()
+  }
 })
 
 app.on('before-quit', () => killServer())
+
+// 关键兜底：所有窗口都关闭、quit 完成后强制退出主进程，
+// 杜绝 Electron GPU/renderer/utility 子进程残留。
+app.on('quit', () => { try { process.exit(0) } catch {} })
 
 app.on('activate', () => {
   if (!mainWin || mainWin.isDestroyed()) loadLocalGame()

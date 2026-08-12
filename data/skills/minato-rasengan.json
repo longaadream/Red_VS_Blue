@@ -1,0 +1,20 @@
+{
+  "id": "minato-rasengan",
+  "name": "螺旋丸",
+  "description": "对1格内1名敌人造成攻击力100%的物理伤害，水门攻击力+1，并给该敌方角色附加1层飞雷神标记。",
+  "keywords": ["飞雷神"],
+  "targetText": "1格内1名敌人",
+  "effectTags": ["物理伤害", "标记", "强化"],
+  "icon": "🌐",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": 1,
+  "targetType": "piece",
+  "filter": "enemy",
+  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; if (target.currentHp <= 0) return { success: false, message: '目标已出局' }; var dmg = caster.attack; var result = dealDamage(caster, target, dmg, 'physical', battle, context.skill.id); caster.attack += 1; if (!target.statusTags) target.statusTags = []; var tag = target.statusTags.find(function(t) { return t.type === 'flying-raijin-mark' && t.sourceId === caster.instanceId; }); if (tag) { tag.stacks = (tag.stacks || 1) + 1; tag.currentDuration = -1; } else { target.statusTags.push({ id: 'flying-raijin-mark-' + caster.instanceId + '-' + target.instanceId + '-' + Date.now(), type: 'flying-raijin-mark', name: '飞雷神', visible: true, currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, sourceId: caster.instanceId }); } return { success: true, message: caster.name + '对' + target.name + '释放螺旋丸，造成' + result.damage + '点伤害，攻击力+1，并附加1层飞雷神标记' }; }",
+  "previewCode": "function calculatePreview(piece) { return { description: '对1格内1名敌人造成' + (piece.attack || 0) + '点物理伤害，攻击力+1并附加飞雷神标记。', expectedValues: { damage: piece.attack || 0, buff: 1 } }; }"
+}

@@ -94,6 +94,16 @@ export interface BattleState {
     options: any[]
     title: string
   }
+  /** 技能使用前待处理的选项选择（需要非当前回合玩家响应的被动，如飞雷神） */
+  pendingBeforeSkillChoice?: {
+    playerId: string
+    title: string
+    options: any[]
+    pendingAction: any
+    /** 若为 'grid'，客户端应进入格子选择模式而非弹出选项框 */
+    targetType?: 'grid'
+    range?: number
+  }
 }
 
 export type BattleAction =
@@ -173,6 +183,17 @@ export type BattleAction =
       targetPieceId?: string
       targetX?: number
       targetY?: number
+    }
+  | {
+      type: "beforeSkillChoice"
+      playerId: PlayerId
+      selectedOption: any
+    }
+  | {
+      type: "placeMinatoFreeAnchor"
+      playerId: PlayerId
+      targetX: number
+      targetY: number
     }
 
 export class BattleRuleError extends Error {

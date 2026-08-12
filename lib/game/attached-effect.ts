@@ -48,8 +48,10 @@ export interface AttachedEffectDefinition {
 export interface AttachedEffectInstance {
   /** 唯一实例 ID，格式为 `{definitionId}-{ownerId}` */
   instanceId: string
+  id?: string
   /** 对应的 data/effects/*.json 的 id */
   definitionId: string
+  effectId?: string
   /** 拥有此效果的棋子 instanceId */
   ownerId: string
   /** 视觉属性（从定义复制过来） */

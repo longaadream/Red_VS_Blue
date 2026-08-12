@@ -18,7 +18,7 @@ export function loadJsonFilesServer<T>(directory: string): Record<string, T> {
       const content = readFileSync(join(dirPath, file), 'utf-8')
       const data = JSON.parse(content) as T
       if (data && typeof data === 'object' && 'id' in (data as Record<string, unknown>)) {
-        result[(data as { id: string }).id] = data
+        result[(data as unknown as { id: string }).id] = data
       }
     } catch {}
   }

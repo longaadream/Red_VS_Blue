@@ -1,7 +1,7 @@
 {
   "id": "blue-naruto",
   "name": "漩涡鸣人",
-  "faction": "blue",
+  "faction": "good",
   "description": "木叶的英雄，以螺旋手里剑克敌，影分身迷惑敌人，仙人模式蓄势待发",
   "rarity": "legendary",
   "image": "naruto.jpg",
@@ -12,10 +12,21 @@
     "moveRange": 4
   },
   "skills": [
-    { "skillId": "naruto-rasengan", "level": 1 },
-    { "skillId": "naruto-shadow-clone", "level": 1 },
-    { "skillId": "naruto-sage-mode", "level": 1 }
+    {
+      "skillId": "naruto-rasengan",
+      "level": 1
+    },
+    {
+      "skillId": "naruto-shadow-clone",
+      "level": 1
+    },
+    {
+      "skillId": "naruto-sage-mode",
+      "level": 1
+    }
   ],
-  "rules": ["rule-naruto-clone-endturn-charge"],
+  "rules": [
+    "rule-naruto-clone-endturn-charge"
+  ],
   "isDefault": false
 }

@@ -1,12 +1,12 @@
 {
   "id": "red-shishio",
   "name": "志志雄真实",
-  "faction": "red",
+  "faction": "evil",
   "description": "自燃之力。以灵力燃尽己身，将一切对手化为灰烬。",
   "rarity": "legendary",
   "image": "shishio.jpg",
   "stats": {
-    "maxHp": 6,
+    "maxHp": 7,
     "attack": 4,
     "defense": 0,
     "moveRange": 3
@@ -26,12 +26,9 @@
     }
   ],
   "rules": [
-    "rule-shishio-damage-cap",
     "rule-shishio-cooldown-once",
     "rule-shishio-combustion",
     "rule-shishio-kill-track",
-    "rule-shishio-burn-move",
-    "rule-shishio-burn-endturn",
     "rule-shishio-no-heal"
   ],
   "isDefault": false

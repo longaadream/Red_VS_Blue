@@ -2,18 +2,6 @@
 export const BATTLE_STATE_VERSION = 1
 
 // 从 battle-types 导入类型（避免客户端导入时加载服务器端代码）
-import type {
-  TurnPhase,
-  PlayerId,
-  PlayerTurnMeta,
-  PerTurnActionFlags,
-  TurnState,
-  BattleActionLog,
-  BattleState,
-  BattleAction,
-  BattleRuleError as BattleRuleErrorType
-} from "./battle-types"
-
 // 简单的日志写入函数
 function writeLog(message: string) {
   if (process.env.NODE_ENV === 'production') return
@@ -33,24 +21,15 @@ function writeLog(message: string) {
 }
 
 // 重新导出类型，保持向后兼容
-export type {
-  TurnPhase,
-  PlayerId,
-  PlayerTurnMeta,
-  PerTurnActionFlags,
-  TurnState,
-  BattleActionLog,
-  BattleState,
-  BattleAction
-}
-
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, healDamage, loadRuleById } from "./skills"
+import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction } from "./skills"
 import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
+
+const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
 // ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
 function restorePieceRules(state: BattleState): void {
@@ -65,7 +44,7 @@ function restorePieceRules(state: BattleState): void {
       piece.rules = piece.rules.map((rule: any) => {
         if (rule.id) {
           try {
-            const reloadedRule = loadRuleById(rule.id)
+            const reloadedRule = loadRuleById(rule.id, FORCE_RULE_RELOAD)
             if (reloadedRule && typeof reloadedRule.effect === 'function') {
               return reloadedRule
             }
@@ -88,7 +67,7 @@ function restorePieceRules(state: BattleState): void {
             if (!existingRule) {
               // 规则不存在，重新添加
               try {
-                const reloadedRule = loadRuleById(ruleId)
+                const reloadedRule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
                 if (reloadedRule && typeof reloadedRule.effect === 'function') {
                   piece.rules!.push(reloadedRule)
                 }
@@ -120,7 +99,7 @@ function restorePlayerRules(state: BattleState): void {
       player.rules = player.rules.map((rule: any) => {
         if (rule.id) {
           try {
-            const reloadedRule = loadRuleById(rule.id)
+            const reloadedRule = loadRuleById(rule.id, FORCE_RULE_RELOAD)
             if (reloadedRule && typeof reloadedRule.effect === 'function') {
               return reloadedRule
             }
@@ -136,73 +115,33 @@ function restorePlayerRules(state: BattleState): void {
 
 // ─── 辅助函数：安全地克隆 BattleState（处理函数无法克隆的问题）────────────────
 export function safeCloneBattleState(state: BattleState): BattleState {
-  // 临时存储所有棋子的规则函数
-  const pieceRulesFunctions: Map<number, any[]> = new Map()
-  // 临时存储所有玩家的规则函数
-  const playerRulesFunctions: Map<number, any[]> = new Map()
+  // 收集所有规则的 effect 函数（pieces + graveyard + players）
+  type RuleFnMap = Map<number, any[]>
+  const collectRuleFns = (list: any[]): RuleFnMap => {
+    const map: RuleFnMap = new Map()
+    list.forEach((item, i) => {
+      const rules = item.rules
+      if (rules && rules.length > 0) map.set(i, rules.map((r: any) => r.effect))
+    })
+    return map
+  }
+  const pieceFns   = collectRuleFns(state.pieces)
+  const graveFns   = collectRuleFns((state as any).graveyard || [])
+  const playerFns  = collectRuleFns(state.players)
 
-  // 提取棋子规则函数
-  state.pieces.forEach((piece, index) => {
-    if (piece.rules && piece.rules.length > 0) {
-      pieceRulesFunctions.set(index, piece.rules.map(rule => rule.effect))
-      // 移除函数以便克隆
-      piece.rules.forEach((rule: any) => {
-        delete rule.effect
-      })
-    }
-  })
+  // JSON 序列化/反序列化：自动剥离所有函数（编译缓存、effect 等），不需要临时删除
+  const cloned = JSON.parse(JSON.stringify(state)) as BattleState
 
-  // 提取玩家规则函数
-  state.players.forEach((player, index) => {
-    const playerRules = (player as any).rules
-    if (playerRules && Array.isArray(playerRules) && playerRules.length > 0) {
-      const effects = playerRules.map((rule: any) => rule.effect)
-      playerRulesFunctions.set(index, effects)
-      // 移除函数以便克隆
-      playerRules.forEach((rule: any) => {
-        delete rule.effect
-      })
-    }
-  })
-
-  // 克隆状态
-  const cloned = structuredClone(state) as BattleState
-   
-  // 恢复棋子规则函数到原始状态
-  state.pieces.forEach((piece, index) => {
-    if (piece.rules && piece.rules.length > 0) {
-      const functions = pieceRulesFunctions.get(index)
-      if (functions) {
-        piece.rules.forEach((rule: any, ruleIndex: number) => {
-          rule.effect = functions[ruleIndex]
-        })
-        // 同时恢复克隆对象中的函数
-        if (cloned.pieces[index].rules) {
-          cloned.pieces[index].rules.forEach((rule: any, ruleIndex: number) => {
-            rule.effect = functions[ruleIndex]
-          })
-        }
-      }
-    }
-  })
-
-  // 恢复玩家规则函数到原始状态
-  state.players.forEach((player, index) => {
-    if ((player as any).rules && (player as any).rules.length > 0) {
-      const functions = playerRulesFunctions.get(index)
-      if (functions) {
-        (player as any).rules.forEach((rule: any, ruleIndex: number) => {
-          rule.effect = functions[ruleIndex]
-        })
-        // 同时恢复克隆对象中的函数
-        if ((cloned.players[index] as any).rules) {
-          (cloned.players[index] as any).rules.forEach((rule: any, ruleIndex: number) => {
-            rule.effect = functions[ruleIndex]
-          })
-        }
-      }
-    }
-  })
+  // 恢复 effect 函数到克隆对象
+  const restoreRuleFns = (clonedList: any[], fnMap: RuleFnMap) => {
+    fnMap.forEach((fns, i) => {
+      const rules = clonedList[i]?.rules
+      if (rules) rules.forEach((r: any, j: number) => { r.effect = fns[j] })
+    })
+  }
+  restoreRuleFns(cloned.pieces, pieceFns)
+  restoreRuleFns((cloned as any).graveyard || [], graveFns)
+  restoreRuleFns(cloned.players, playerFns)
 
   cloned._v = BATTLE_STATE_VERSION
   return cloned
@@ -223,7 +162,16 @@ export interface PlayerTurnMeta {
   /** 最大行动点 */
   maxActionPoints: number
   /** 当前手牌（最多 10 张） */
-  hand: { cardId: string; instanceId: string; ownerPlayerId: string }[]
+  hand: {
+    cardId: string
+    instanceId: string
+    ownerPlayerId: string
+    actionPointCost?: number
+    name?: string
+    description?: string
+    icon?: string
+    type?: string
+  }[]
   /** 弃牌堆（只记 cardId） */
   discardPile: string[]
   /** 玩家级别规则（挂在玩家身上而非棋子上的被动触发器） */
@@ -275,35 +223,30 @@ export interface BattleState {
   actions?: BattleActionLog[]
   /** 扩展数据 - 角色特定的数据存储在这里 */
   extensions?: Record<string, any>
+  customCards?: Record<string, any>
   /** gameStart 触发器是否已触发过 */
   gameStartFired?: boolean
-  /** 回合开始时待处理的选项选择（被动技能需要玩家选择时使用） */
-  pendingBeginTurnChoice?: {
-    ruleId: string
+  /** 任意时机挂起的玩家选项选择 */
+  pendingOptionSelection?: {
     playerId: string
-    options: any[]
     title: string
+    options: any[]
+    pendingAction?: any
+    triggerContext?: any
+    cancelValue?: any
+    pendingQueue?: Array<{ruleId: string, sourceId?: string}>
   }
-  /** 回合开始时待处理的目标选择 */
-  pendingBeginTurnTarget?: {
+  /** 任意时机挂起的玩家目标选择，由数据脚本提供完成后的 effectCode */
+  pendingTargetSelection?: {
     playerId: string
-    targetType: 'piece' | 'cell'
+    title?: string
+    targetType: 'piece' | 'cell' | 'grid'
     range?: number
     filter?: string
-  }
-  /** 回合结束时待处理的选项选择 */
-  pendingEndTurnChoice?: {
-    ruleId: string
-    playerId: string
-    options: any[]
-    title: string
-  }
-  /** 回合结束时待处理的目标选择 */
-  pendingEndTurnTarget?: {
-    playerId: string
-    targetType: 'piece' | 'cell'
-    range?: number
-    filter?: string
+    effectCode?: string
+    payload?: any
+    triggerContext?: any
+    pendingQueue?: Array<{ruleId: string, sourceId?: string}>
   }
   /** 状态序列化版本号，升级时不兼容的旧状态会被拒绝 */
   _v?: number
@@ -363,28 +306,20 @@ export type BattleAction =
       selectedOption?: any
     }
   | {
-      type: "beginTurnChoice"
+      type: "pendingOptionSelect"
       playerId: PlayerId
       selectedOption: any
     }
   | {
-      type: "beginTurnTargetSelect"
+      type: "pendingTargetSelect"
       playerId: PlayerId
       targetPieceId?: string
-      targetX?: number
-      targetY?: number
+      targetX: number
+      targetY: number
     }
   | {
-      type: "endTurnChoice"
+      type: "cancelPendingSelection"
       playerId: PlayerId
-      selectedOption: any
-    }
-  | {
-      type: "endTurnTargetSelect"
-      playerId: PlayerId
-      targetPieceId?: string
-      targetX?: number
-      targetY?: number
     }
 
 export class BattleRuleError extends Error {
@@ -468,6 +403,405 @@ function validateMove(
   }
 }
 
+function getSkillDefinitionOrThrow(state: BattleState, skillId: string): SkillDefinition {
+  const skillDef = state.skillsById[skillId] || getSkillById(skillId)
+  if (!skillDef) {
+    throw new BattleRuleError(`Skill ${skillId} not found`)
+  }
+  return skillDef
+}
+
+function validateDeclaredSkillTarget(
+  state: BattleState,
+  piece: PieceInstance,
+  skillDef: SkillDefinition,
+  action: { targetPieceId?: string; targetX?: number; targetY?: number },
+): void {
+  const targetType = (skillDef as any).targetType
+  const filter = (skillDef as any).filter
+  const range = (skillDef as any).range
+  if (!targetType || (action.targetPieceId === undefined && (action.targetX === undefined || action.targetY === undefined))) {
+    return
+  }
+
+  if (targetType === "piece") {
+    const target = action.targetPieceId
+      ? state.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
+      : state.pieces.find(p => p.x === action.targetX && p.y === action.targetY && p.currentHp > 0)
+    if (!target) {
+      throw new BattleRuleError("Invalid skill target")
+    }
+    const isAlly = isSamePlayer(target.ownerPlayerId, piece.ownerPlayerId)
+    if (filter === "ally" && !isAlly) throw new BattleRuleError("Skill target must be an ally")
+    if (filter === "enemy" && isAlly) throw new BattleRuleError("Skill target must be an enemy")
+    if (typeof range === "number") {
+      if (piece.x == null || piece.y == null || target.x == null || target.y == null) {
+        throw new BattleRuleError("Skill target is out of range")
+      }
+      const distance = Math.abs(piece.x - target.x) + Math.abs(piece.y - target.y)
+      if (distance > range) throw new BattleRuleError("Skill target is out of range")
+    }
+    return
+  }
+
+  if ((targetType === "grid" || targetType === "cell") && action.targetX !== undefined && action.targetY !== undefined) {
+    const tile = state.map.tiles.find(t => t.x === action.targetX && t.y === action.targetY)
+    if (!tile) throw new BattleRuleError("Skill target is outside of the board")
+    if (typeof range === "number") {
+      if (piece.x == null || piece.y == null) {
+        throw new BattleRuleError("Skill target is out of range")
+      }
+      const distance = Math.max(Math.abs(piece.x - action.targetX), Math.abs(piece.y - action.targetY))
+      if (distance > range) throw new BattleRuleError("Skill target is out of range")
+    }
+  }
+}
+
+function validateSkillActionBasics(
+  state: BattleState,
+  piece: PieceInstance,
+  playerId: PlayerId,
+  skillId: string,
+  action: { targetPieceId?: string; targetX?: number; targetY?: number },
+  checkChargeCost: boolean,
+): SkillDefinition {
+  const skillDef = getSkillDefinitionOrThrow(state, skillId)
+  const playerMeta = getPlayerMeta(state, playerId)
+  if (playerMeta.actionPoints < (skillDef.actionPointCost || 0)) {
+    throw new BattleRuleError(`Not enough action points to use ${skillDef.name}`)
+  }
+  if (checkChargeCost && (skillDef.chargeCost ?? 0) > 0 && playerMeta.chargePoints < (skillDef.chargeCost ?? 0)) {
+    throw new BattleRuleError("Not enough charge points to use this skill")
+  }
+  if (piece.skills) {
+    const skillState = piece.skills.find(s => s.skillId === skillId)
+    if (skillState && skillState.currentCooldown && skillState.currentCooldown > 0) {
+      throw new BattleRuleError(`Skill ${skillId} is on cooldown for ${skillState.currentCooldown} more turns`)
+    }
+    if (skillState && skillDef.type === "ultimate" && (skillState.usesRemaining ?? 0) <= 0) {
+      throw new BattleRuleError(`Ultimate skill ${skillId} has already been used`)
+    }
+  }
+  const directionProjectileSkillIds = new Set(["sleep-dart", "blackwidow-lethal-strike", "hellfire-shotgun"])
+  if (directionProjectileSkillIds.has(skillId)) {
+    const explicitTarget = action.targetPieceId
+      ? state.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
+      : undefined
+    const targetX = explicitTarget?.x ?? action.targetX
+    const targetY = explicitTarget?.y ?? action.targetY
+    if (targetX === undefined || targetY === undefined) {
+      throw new BattleRuleError("Please choose a target direction")
+    }
+    const sameRowOrColumn = piece.x === targetX || piece.y === targetY
+    if (!sameRowOrColumn) {
+      throw new BattleRuleError("This projectile must target a tile in the same row or column")
+    }
+    if (piece.x === targetX && piece.y === targetY) {
+      throw new BattleRuleError("This projectile cannot target the caster's own tile")
+    }
+  }
+  validateDeclaredSkillTarget(state, piece, skillDef, action)
+  return skillDef
+}
+
+function applySkillPayment(
+  state: BattleState,
+  piece: PieceInstance,
+  playerId: PlayerId,
+  skillId: string,
+  skillDef: SkillDefinition,
+  chargeCost = 0,
+): void {
+  const playerMeta = getPlayerMeta(state, playerId)
+  playerMeta.actionPoints -= skillDef.actionPointCost || 0
+
+  if (chargeCost > 0) {
+    playerMeta.chargePoints -= chargeCost
+  }
+
+  if (skillDef.cooldownTurns > 0 || skillDef.type === "ultimate") {
+    if (piece.skills) {
+      const skillIndex = piece.skills.findIndex(s => s.skillId === skillId)
+      if (skillIndex !== -1) {
+        if (skillDef.cooldownTurns > 0) {
+          piece.skills[skillIndex].currentCooldown = skillDef.cooldownTurns
+        }
+        if (skillDef.type === "ultimate") {
+          piece.skills[skillIndex].usesRemaining = (piece.skills[skillIndex].usesRemaining ?? 0) - 1
+        }
+      }
+    } else {
+      piece.skills = [{
+        skillId,
+        level: 1,
+        currentCooldown: skillDef.cooldownTurns,
+        usesRemaining: skillDef.type === "ultimate" ? 0 : -1,
+      }]
+    }
+  }
+}
+
+function pushInterruptedSkillLog(
+  state: BattleState,
+  actionType: "useBasicSkill" | "useChargeSkill",
+  playerId: PlayerId,
+  piece: PieceInstance,
+  skillId: string,
+  skillDef: SkillDefinition,
+): void {
+  if (!state.actions) {
+    state.actions = []
+  }
+  const pieceName = piece.name || piece.templateId
+  state.actions.push({
+    type: actionType,
+    playerId,
+    turn: state.turn.turnNumber,
+    payload: {
+      message: `${pieceName} used ${skillDef.name || skillId}, but the release was interrupted`,
+      skillId,
+      pieceId: piece.instanceId,
+      interrupted: true,
+    },
+  } as any)
+}
+
+function validateDeclaredCardTarget(
+  state: BattleState,
+  action: { targetPieceId?: string; targetX?: number; targetY?: number },
+): void {
+  if (action.targetPieceId) {
+    const target = state.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
+    if (!target) {
+      throw new BattleRuleError("Invalid card target")
+    }
+  }
+  if (action.targetX !== undefined && action.targetY !== undefined) {
+    const tile = state.map.tiles.find(t => t.x === action.targetX && t.y === action.targetY)
+    if (!tile) {
+      throw new BattleRuleError("Card target is outside of the board")
+    }
+  }
+}
+
+function getCardTargetArgs(
+  state: BattleState,
+  action: { targetPieceId?: string; targetX?: number; targetY?: number },
+): { targetPiece?: PieceInstance; targetPosition?: { x: number; y: number } } {
+  const targetPiece = action.targetPieceId
+    ? state.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
+    : undefined
+  const targetPosition = action.targetX !== undefined && action.targetY !== undefined
+    ? { x: action.targetX, y: action.targetY }
+    : undefined
+  return { targetPiece, targetPosition }
+}
+
+function assertCardDryRunResult(result: any): void {
+  if (result.needsTargetSelection) {
+    const err = new BattleRuleError('需要选择目标') as any
+    err.needsTargetSelection = true
+    err.targetType = result.targetType || 'piece'
+    err.range = result.range || 999
+    err.filter = result.filter || 'all'
+    err.targetIndex = result.targetIndex
+    throw err
+  }
+  if (result.needsOptionSelection) {
+    const err = new BattleRuleError('需要选择选项') as any
+    err.needsOptionSelection = true
+    err.options = result.options || []
+    err.title = result.title || '请选择'
+    throw err
+  }
+  if (!result.success) {
+    throw new BattleRuleError(result.message || "卡牌效果执行失败")
+  }
+}
+
+function dryRunCardAction(
+  state: BattleState,
+  action: any,
+  cardDef: any,
+  executeCardFunction: Function,
+): void {
+  const dryState = safeCloneBattleState(state)
+  const { targetPiece, targetPosition } = getCardTargetArgs(dryState, action)
+  const result = executeCardFunction(
+    cardDef,
+    action.playerId,
+    dryState,
+    undefined,
+    targetPiece,
+    targetPosition,
+    action.selectedOption,
+    action.extraTargets,
+  )
+  assertCardDryRunResult(result)
+}
+
+function buildSkillTargetSlot(
+  state: BattleState,
+  pieceId: string | undefined,
+  tx: number | undefined,
+  ty: number | undefined,
+) {
+  if (pieceId) {
+    const tp = state.pieces.find(p => p.instanceId === pieceId)
+    if (tp) {
+      return {
+        info: {
+          instanceId: tp.instanceId,
+          templateId: tp.templateId,
+          ownerPlayerId: tp.ownerPlayerId,
+          currentHp: tp.currentHp,
+          maxHp: tp.maxHp,
+          attack: tp.attack,
+          defense: tp.defense,
+          x: tp.x || 0,
+          y: tp.y || 0,
+        },
+        pos: { x: tp.x || 0, y: tp.y || 0 },
+      }
+    }
+  } else if (tx !== undefined && ty !== undefined) {
+    return { info: null, pos: { x: tx, y: ty } }
+  }
+  return { info: null, pos: null }
+}
+
+function buildSkillExecutionContext(
+  state: BattleState,
+  piece: PieceInstance,
+  action: any,
+  skillDef: SkillDefinition,
+) {
+  const t1 = buildSkillTargetSlot(state, action.targetPieceId, action.targetX, action.targetY)
+  const extraTargets: Array<{pieceId?: string; x?: number; y?: number}> = action.extraTargets || []
+  const targets = [
+    t1,
+    ...extraTargets.map(et => buildSkillTargetSlot(state, et.pieceId, et.x, et.y)),
+  ]
+  return {
+    piece,
+    target: t1.info,
+    targetPosition: t1.pos,
+    targets,
+    selectedOption: action.selectedOption,
+    playerId: action.playerId,
+    battle: state,
+    skill: {
+      id: skillDef.id,
+      name: skillDef.name,
+      type: skillDef.type,
+      powerMultiplier: skillDef.powerMultiplier,
+    },
+  }
+}
+
+function assertSkillDryRunResult(result: any): void {
+  if (result.needsTargetSelection) {
+    const err = new BattleRuleError('??????') as any
+    err.needsTargetSelection = true
+    err.targetType = result.targetType || 'piece'
+    err.range = result.range || 5
+    err.filter = result.filter || 'enemy'
+    err.targetIndex = result.targetIndex
+    throw err
+  }
+  if (result.needsOptionSelection) {
+    const err = new BattleRuleError('??????') as any
+    err.needsOptionSelection = true
+    err.options = result.options || []
+    err.title = result.title || '???'
+    throw err
+  }
+  if (!result.success) {
+    throw new BattleRuleError(result.message || '??????')
+  }
+}
+function dryRunSkillAction(
+  state: BattleState,
+  piece: PieceInstance,
+  action: any,
+  skillDef: SkillDefinition,
+): void {
+  const dryState = safeCloneBattleState(state)
+  if (!(dryState as any).extensions) (dryState as any).extensions = {}
+  ;(dryState as any).extensions.__dryRunSkillPreflight = true
+  const dryPiece = dryState.pieces.find(p => p.instanceId === piece.instanceId && p.currentHp > 0)
+  if (!dryPiece) {
+    throw new BattleRuleError("Piece not found or is defeated")
+  }
+  const drySkillDef = dryState.skillsById[skillDef.id] || skillDef
+  const result = executeSkillFunction(
+    drySkillDef,
+    buildSkillExecutionContext(dryState, dryPiece, action, drySkillDef),
+    dryState,
+  )
+  assertSkillDryRunResult(result)
+}
+
+export function validateSkillActionByDryRun(state: BattleState, action: any): void {
+  if (action.type !== "useBasicSkill" && action.type !== "useChargeSkill") {
+    throw new BattleRuleError("Action is not a skill action")
+  }
+  const piece = state.pieces.find(
+    (p) =>
+      p.instanceId === action.pieceId &&
+      isSamePlayer(p.ownerPlayerId, action.playerId) &&
+      p.currentHp > 0,
+  )
+  if (!piece) {
+    throw new BattleRuleError(
+      "Piece not found or does not belong to current player",
+    )
+  }
+  const skillDef = validateSkillActionBasics(
+    state,
+    piece,
+    action.playerId,
+    action.skillId,
+    action,
+    action.type === "useChargeSkill",
+  )
+  dryRunSkillAction(state, piece, action, skillDef)
+}
+
+function applyCardPayment(
+  playerMeta: PlayerTurnMeta,
+  cardIdx: number,
+  cardApCost: number,
+): any {
+  playerMeta.actionPoints -= cardApCost
+  const [cardInstance] = (playerMeta.hand as any[]).splice(cardIdx, 1)
+  if (!playerMeta.discardPile) playerMeta.discardPile = []
+  ;(playerMeta.discardPile as any[]).push(cardInstance.cardId)
+  return cardInstance
+}
+
+function pushInterruptedCardLog(
+  state: BattleState,
+  playerId: PlayerId,
+  cardInstance: any,
+  cardDef: any,
+): void {
+  if (!state.actions) {
+    state.actions = []
+  }
+  state.actions.push({
+    type: "playCard",
+    playerId,
+    turn: state.turn.turnNumber,
+    payload: {
+      message: `Used card ${cardDef.name || cardInstance.cardId}, but the effect was interrupted`,
+      cardId: cardInstance.cardId,
+      cardInstanceId: cardInstance.instanceId,
+      interrupted: true,
+    },
+  } as any)
+}
+
 function requireActionPhase(state: BattleState) {
   if (state.turn.phase !== "action") {
     throw new BattleRuleError("Action can only be performed during action phase")
@@ -489,6 +823,67 @@ export function applyBattleAction(
   // 恢复棋子和玩家规则的 effect 函数（API 传输后函数会丢失）
   restorePieceRules(state)
   restorePlayerRules(state)
+
+  if (action.type === 'cancelPendingSelection') {
+    const next = safeCloneBattleState(state)
+    const pendingPlayerId = next.pendingOptionSelection?.playerId || next.pendingTargetSelection?.playerId
+    if (pendingPlayerId && String(pendingPlayerId).toLowerCase() !== String(action.playerId).toLowerCase()) {
+      throw new BattleRuleError(`[cancelPendingSelection] player mismatch; pending=${pendingPlayerId}, action=${action.playerId}`)
+    }
+    next.pendingOptionSelection = undefined
+    next.pendingTargetSelection = undefined
+    if (!next.actions) next.actions = []
+    next.actions.push({
+      type: 'cancelPendingSelection',
+      playerId: action.playerId,
+      turn: next.turn.turnNumber,
+      payload: { message: 'Selection cancelled' },
+    } as any)
+    return next
+  }
+
+  // 飞雷神等被动触发待选择时，禁止非选择动作（防止攻击方绕过等待）
+  if (state.pendingOptionSelection && action.type !== 'pendingOptionSelect') {
+    throw new BattleRuleError('请等待对方选择完成后再行动')
+  }
+
+  // 辅助：选择完成后按顺序继续处理挂起的规则队列（每次遇到需要交互的规则就再次挂起）
+  const processPendingQueue = (queueState: BattleState, queue: Array<{ruleId: string, sourceId?: string}>, trigCtx: any, actPlayerId: string) => {
+    let remaining = [...queue]
+    while (remaining.length > 0) {
+      const item = remaining.shift()!
+      const resumeCtx = { ...trigCtx, pendingRuleId: item.ruleId, pendingRuleSourceId: item.sourceId }
+      const result = globalTriggerSystem.checkTriggers(queueState, resumeCtx)
+      if (result.messages && result.messages.length > 0) {
+        if (!queueState.actions) queueState.actions = []
+        result.messages.forEach(msg => {
+          queueState.actions!.push({ type: 'triggerEffect', playerId: actPlayerId, turn: queueState.turn.turnNumber, payload: { message: msg } })
+        })
+      }
+      if (result.needsOptionSelection) {
+        queueState.pendingOptionSelection = {
+          playerId: (result as any).playerId || actPlayerId,
+          options: result.options || [],
+          title: result.title || '请选择',
+          triggerContext: { ...trigCtx, pendingRuleId: (result as any).pendingRuleId, pendingRuleSourceId: (result as any).pendingRuleSourceId },
+          pendingQueue: remaining.length > 0 ? remaining : undefined,
+        }
+        return
+      }
+      if (result.needsTargetSelection) {
+        queueState.pendingTargetSelection = {
+          playerId: (result as any).playerId || actPlayerId,
+          title: result.title || '请选择目标',
+          targetType: (result.targetType || 'piece') as 'piece' | 'cell' | 'grid',
+          range: result.range,
+          filter: result.filter,
+          triggerContext: { ...trigCtx, pendingRuleId: (result as any).pendingRuleId, pendingRuleSourceId: (result as any).pendingRuleSourceId },
+          pendingQueue: remaining.length > 0 ? remaining : undefined,
+        }
+        return
+      }
+    }
+  }
 
   switch (action.type) {
     case "beginPhase": {
@@ -549,20 +944,24 @@ export function applyBattleAction(
 
         // 检查是否有需要选项选择的回合开始规则
         if (beginTurnResult.needsOptionSelection) {
-          next.pendingBeginTurnChoice = {
-            ruleId: 'pending',
-            playerId: next.turn.currentPlayerId,
+          next.pendingOptionSelection = {
+            playerId: (beginTurnResult as any).playerId || next.turn.currentPlayerId,
             options: beginTurnResult.options || [],
-            title: beginTurnResult.title || '请选择'
+            title: beginTurnResult.title || '请选择',
+            triggerContext: { type: "beginTurn", turnNumber: next.turn.turnNumber, playerId: next.turn.currentPlayerId, pendingRuleId: (beginTurnResult as any).pendingRuleId, pendingRuleSourceId: (beginTurnResult as any).pendingRuleSourceId },
+            pendingQueue: (beginTurnResult as any).pendingQueue,
           }
         }
         // 检查是否有需要目标选择的回合开始规则
         if (beginTurnResult.needsTargetSelection) {
-          next.pendingBeginTurnTarget = {
-            playerId: next.turn.currentPlayerId,
-            targetType: (beginTurnResult.targetType || 'piece') as 'piece' | 'cell',
+          next.pendingTargetSelection = {
+            playerId: (beginTurnResult as any).playerId || next.turn.currentPlayerId,
+            title: beginTurnResult.title || '请选择目标',
+            targetType: (beginTurnResult.targetType || 'piece') as 'piece' | 'cell' | 'grid',
             range: beginTurnResult.range,
             filter: beginTurnResult.filter,
+            triggerContext: { type: "beginTurn", turnNumber: next.turn.turnNumber, playerId: next.turn.currentPlayerId, pendingRuleId: (beginTurnResult as any).pendingRuleId, pendingRuleSourceId: (beginTurnResult as any).pendingRuleSourceId },
+            pendingQueue: (beginTurnResult as any).pendingQueue,
           }
         }
 
@@ -714,20 +1113,24 @@ export function applyBattleAction(
 
         // 检查是否有需要选项选择的回合开始规则
         if (beginTurnResult.needsOptionSelection) {
-          next.pendingBeginTurnChoice = {
-            ruleId: 'pending',
-            playerId: next.turn.currentPlayerId,
+          next.pendingOptionSelection = {
+            playerId: (beginTurnResult as any).playerId || next.turn.currentPlayerId,
             options: beginTurnResult.options || [],
-            title: beginTurnResult.title || '请选择'
+            title: beginTurnResult.title || '请选择',
+            triggerContext: { type: "beginTurn", turnNumber: next.turn.turnNumber, playerId: next.turn.currentPlayerId, pendingRuleId: (beginTurnResult as any).pendingRuleId, pendingRuleSourceId: (beginTurnResult as any).pendingRuleSourceId },
+            pendingQueue: (beginTurnResult as any).pendingQueue,
           }
         }
         // 检查是否有需要目标选择的回合开始规则
         if (beginTurnResult.needsTargetSelection) {
-          next.pendingBeginTurnTarget = {
-            playerId: next.turn.currentPlayerId,
-            targetType: (beginTurnResult.targetType || 'piece') as 'piece' | 'cell',
+          next.pendingTargetSelection = {
+            playerId: (beginTurnResult as any).playerId || next.turn.currentPlayerId,
+            title: beginTurnResult.title || '请选择目标',
+            targetType: (beginTurnResult.targetType || 'piece') as 'piece' | 'cell' | 'grid',
             range: beginTurnResult.range,
             filter: beginTurnResult.filter,
+            triggerContext: { type: "beginTurn", turnNumber: next.turn.turnNumber, playerId: next.turn.currentPlayerId, pendingRuleId: (beginTurnResult as any).pendingRuleId, pendingRuleSourceId: (beginTurnResult as any).pendingRuleSourceId },
+            pendingQueue: (beginTurnResult as any).pendingQueue,
           }
         }
 
@@ -874,6 +1277,8 @@ export function applyBattleAction(
 
       // 触发即将移动前的规则（检查冰冻等状态）
       // 使用可修改的上下文对象，触发器可以修改 targetX/targetY 来改变移动目标
+      validateMove(next, piece, action.toX, action.toY)
+
       const moveContext = {
         type: "beforeMove" as const,
         sourcePiece: piece,
@@ -1023,11 +1428,21 @@ export function applyBattleAction(
 
       // 触发即将使用技能前的规则（检查冰冻等状态）
       // 使用可修改的上下文对象，触发器可以修改 skillId 来改变使用的技能
+      validateSkillActionByDryRun(next, action)
+
       const skillUseContext = {
         type: "beforeSkillUse" as const,
         sourcePiece: piece,
+        targetPiece: action.targetPieceId
+          ? next.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
+          : (action.targetX !== undefined && action.targetY !== undefined
+            ? next.pieces.find(p => p.x === action.targetX && p.y === action.targetY && p.currentHp > 0)
+            : undefined),
+        targetX: action.targetX,
+        targetY: action.targetY,
         playerId: action.playerId,
-        skillId: action.skillId
+        skillId: action.skillId,
+        selectedOption: (action as any).selectedOption,
       };
       const beforeSkillUseResult = globalTriggerSystem.checkTriggers(next, skillUseContext);
 
@@ -1053,12 +1468,16 @@ export function applyBattleAction(
       if (beforeSkillUseResult.blocked) {
         return next; // 返回包含消息的状态，不执行技能
       }
-
-      // 检查施法者是否还活着（可能被 beforeSkillUse 触发器杀死）
-      const currentPiece = next.pieces.find(p => p.instanceId === piece.instanceId)
-      if (!currentPiece || currentPiece.currentHp <= 0) {
-        writeLog(`[applyBattleAction] Caster ${piece.name} was killed by beforeSkillUse trigger, aborting skill execution`)
-        return next; // 施法者已死亡，不执行技能
+      if (beforeSkillUseResult.needsOptionSelection) {
+        // 存入状态，由正确的玩家客户端响应（不 throw，避免路由给错误的客户端）
+        next.pendingOptionSelection = {
+          playerId: (beforeSkillUseResult as any).playerId || action.playerId,
+          title: beforeSkillUseResult.title || '请选择',
+          options: beforeSkillUseResult.options || [],
+          pendingAction: action,
+          cancelValue: 'no',
+        }
+        return next
       }
 
       // 触发器可能修改了技能ID，使用修改后的值
@@ -1084,12 +1503,31 @@ export function applyBattleAction(
         }
 
         // 检查限定技的使用次数
-        if (skillState && skillDef.type === "ultimate" && skillState.usesRemaining <= 0) {
+        if (skillState && skillDef.type === "ultimate" && (skillState.usesRemaining ?? 0) <= 0) {
           throw new BattleRuleError(`Ultimate skill ${finalSkillId} has already been used`)
         }
       }
 
       // 执行技能（使用触发器可能修改后的技能ID）
+      applySkillPayment(next, piece, action.playerId, finalSkillId, skillDef)
+
+      // Payment happens before the actual release. If a beforeSkillUse effect killed
+      // the caster or removed the target, the skill is consumed but has no effect.
+      const currentPiece = next.pieces.find(p => p.instanceId === piece.instanceId)
+      if (!currentPiece || currentPiece.currentHp <= 0) {
+        writeLog(`[applyBattleAction] Caster ${piece.name} was killed by beforeSkillUse trigger, interrupting skill execution after payment`)
+        pushInterruptedSkillLog(next, "useBasicSkill", action.playerId, piece, finalSkillId, skillDef)
+        return next
+      }
+      if (skillUseContext.targetPiece) {
+        const currentTarget = next.pieces.find(p => p.instanceId === skillUseContext.targetPiece!.instanceId)
+        if (!currentTarget || currentTarget.currentHp <= 0) {
+          writeLog(`[applyBattleAction] Target was killed by beforeSkillUse trigger, interrupting skill execution after payment`)
+          pushInterruptedSkillLog(next, "useBasicSkill", action.playerId, piece, finalSkillId, skillDef)
+          return next
+        }
+      }
+
       const { executeSkillFunction } = require('./skills')
       
       // 构建目标信息（支持 N 次 selectTarget 调用）
@@ -1143,6 +1581,7 @@ export function applyBattleAction(
         targetSelectionError.targetType = result.targetType || 'piece'
         targetSelectionError.range = result.range || 5
         targetSelectionError.filter = result.filter || 'enemy'
+        targetSelectionError.targetIndex = (result as any).targetIndex
         throw targetSelectionError
       }
 
@@ -1162,39 +1601,21 @@ export function applyBattleAction(
 
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
-
-        // 消耗行动点
-        const playerMeta = getPlayerMeta(next, action.playerId)
-        playerMeta.actionPoints -= skillDef.actionPointCost
-
-        // 设置技能冷却
-        if (skillDef.cooldownTurns > 0 || skillDef.type === "ultimate") {
-          // 找到棋子的技能状态并设置冷却
-          if (piece.skills) {
-            const skillIndex = piece.skills.findIndex(s => s.skillId === finalSkillId)
-            if (skillIndex !== -1) {
-              // 设置冷却
-              if (skillDef.cooldownTurns > 0) {
-                piece.skills[skillIndex].currentCooldown = skillDef.cooldownTurns
-              }
-
-              // 减少限定技使用次数
-              if (skillDef.type === "ultimate") {
-                piece.skills[skillIndex].usesRemaining -= 1
-              }
-            }
-            // 注意：不在此处重新添加技能，规则系统可能已在技能执行期间移除了该技能
-          } else {
-            // 如果棋子没有skills属性，初始化它
-            const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
-            piece.skills = [{
-              skillId: finalSkillId,
-              level: 1,
-              currentCooldown: skillDef.cooldownTurns,
-              usesRemaining: usesRemaining
-            }]
+        const pendingTarget = (result as any).pendingTargetSelection
+        console.log('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
+        if (pendingTarget) {
+          next.pendingTargetSelection = {
+            playerId: pendingTarget.playerId || action.playerId,
+            title: pendingTarget.title || '请选择目标',
+            targetType: pendingTarget.targetType || 'cell',
+            range: pendingTarget.range || 99,
+            filter: pendingTarget.filter || 'all',
+            effectCode: pendingTarget.effectCode,
+            payload: pendingTarget.payload,
           }
+          console.log('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
         }
+
       }
 
       // 初始化actions数组
@@ -1289,11 +1710,21 @@ export function applyBattleAction(
 
       // 触发即将使用技能前的规则（检查冰冻等状态）
       // 使用可修改的上下文对象，触发器可以修改 skillId 来改变使用的技能
+      validateSkillActionByDryRun(next, action)
+
       const skillUseContext = {
         type: "beforeSkillUse" as const,
         sourcePiece: piece,
+        targetPiece: action.targetPieceId
+          ? next.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
+          : (action.targetX !== undefined && action.targetY !== undefined
+            ? next.pieces.find(p => p.x === action.targetX && p.y === action.targetY && p.currentHp > 0)
+            : undefined),
+        targetX: action.targetX,
+        targetY: action.targetY,
         playerId: action.playerId,
-        skillId: action.skillId
+        skillId: action.skillId,
+        selectedOption: (action as any).selectedOption,
       };
       const beforeSkillUseResult = globalTriggerSystem.checkTriggers(next, skillUseContext);
 
@@ -1337,7 +1768,7 @@ export function applyBattleAction(
         }
 
         // 检查限定技的使用次数
-        if (skillState && skillDef.type === "ultimate" && skillState.usesRemaining <= 0) {
+        if (skillState && skillDef.type === "ultimate" && (skillState.usesRemaining ?? 0) <= 0) {
           throw new BattleRuleError(`Ultimate skill ${finalSkillId} has already been used`)
         }
       }
@@ -1364,6 +1795,16 @@ export function applyBattleAction(
       if (beforeSkillUseResult.blocked) {
         return next; // 返回包含消息的状态，不执行技能
       }
+      if (beforeSkillUseResult.needsOptionSelection) {
+        next.pendingOptionSelection = {
+          playerId: (beforeSkillUseResult as any).playerId || action.playerId,
+          title: beforeSkillUseResult.title || '请选择',
+          options: beforeSkillUseResult.options || [],
+          pendingAction: action,
+          cancelValue: 'no',
+        }
+        return next
+      }
 
       const cost = skillDef.chargeCost ?? 0
       // 从 next 状态获取 playerMeta，确保修改能正确保存
@@ -1373,8 +1814,23 @@ export function applyBattleAction(
       }
 
       // 消耗充能点
-      if (cost > 0) {
-        nextPlayerMeta.chargePoints -= cost
+      applySkillPayment(next, piece, action.playerId, finalSkillId, skillDef, cost)
+
+      // Payment happens before the actual release. If a beforeSkillUse effect killed
+      // the caster or removed the target, the skill is consumed but has no effect.
+      const currentPiece = next.pieces.find(p => p.instanceId === piece.instanceId)
+      if (!currentPiece || currentPiece.currentHp <= 0) {
+        writeLog(`[applyBattleAction] Caster ${piece.name} was killed by beforeSkillUse trigger, interrupting charge skill execution after payment`)
+        pushInterruptedSkillLog(next, "useChargeSkill", action.playerId, piece, finalSkillId, skillDef)
+        return next
+      }
+      if (skillUseContext.targetPiece) {
+        const currentTarget = next.pieces.find(p => p.instanceId === skillUseContext.targetPiece!.instanceId)
+        if (!currentTarget || currentTarget.currentHp <= 0) {
+          writeLog(`[applyBattleAction] Target was killed by beforeSkillUse trigger, interrupting charge skill execution after payment`)
+          pushInterruptedSkillLog(next, "useChargeSkill", action.playerId, piece, finalSkillId, skillDef)
+          return next
+        }
       }
 
       // 执行技能
@@ -1438,6 +1894,7 @@ export function applyBattleAction(
         targetSelectionError.targetType = result.targetType || 'piece'
         targetSelectionError.range = result.range || 5
         targetSelectionError.filter = result.filter || 'enemy'
+        targetSelectionError.targetIndex = (result as any).targetIndex
         throw targetSelectionError
       }
 
@@ -1457,39 +1914,21 @@ export function applyBattleAction(
 
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
-
-        // 消耗行动点
-        const playerMeta = getPlayerMeta(next, action.playerId)
-        playerMeta.actionPoints -= skillDef.actionPointCost
-
-        // 设置技能冷却
-        if (skillDef.cooldownTurns > 0 || skillDef.type === "ultimate") {
-          // 找到棋子的技能状态并设置冷却
-          if (piece.skills) {
-            const skillIndex = piece.skills.findIndex(s => s.skillId === finalSkillId)
-            if (skillIndex !== -1) {
-              // 设置冷却
-              if (skillDef.cooldownTurns > 0) {
-                piece.skills[skillIndex].currentCooldown = skillDef.cooldownTurns
-              }
-
-              // 减少限定技使用次数
-              if (skillDef.type === "ultimate") {
-                piece.skills[skillIndex].usesRemaining -= 1
-              }
-            }
-            // 注意：不在此处重新添加技能，规则系统可能已在技能执行期间移除了该技能
-          } else {
-            // 如果棋子没有skills属性，初始化它
-            const usesRemaining = skillDef.type === "ultimate" ? 0 : -1 // 限定技使用后剩余0次，其他技能无限制
-            piece.skills = [{
-              skillId: finalSkillId,
-              level: 1,
-              currentCooldown: skillDef.cooldownTurns,
-              usesRemaining: usesRemaining
-            }]
+        const pendingTarget = (result as any).pendingTargetSelection
+        console.log('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
+        if (pendingTarget) {
+          next.pendingTargetSelection = {
+            playerId: pendingTarget.playerId || action.playerId,
+            title: pendingTarget.title || '请选择目标',
+            targetType: pendingTarget.targetType || 'cell',
+            range: pendingTarget.range || 99,
+            filter: pendingTarget.filter || 'all',
+            effectCode: pendingTarget.effectCode,
+            payload: pendingTarget.payload,
           }
+          console.log('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
         }
+
       }
 
       // 初始化actions数组
@@ -1589,19 +2028,23 @@ export function applyBattleAction(
 
       // 检查 endTurn 触发器是否需要选项选择或目标选择
       if (endTurnResult.needsOptionSelection) {
-        next.pendingEndTurnChoice = {
-          ruleId: 'pending',
-          playerId: action.playerId,
+        next.pendingOptionSelection = {
+          playerId: (endTurnResult as any).playerId || action.playerId,
           options: endTurnResult.options || [],
-          title: endTurnResult.title || '请选择'
+          title: endTurnResult.title || '请选择',
+          triggerContext: { type: "endTurn", turnNumber: next.turn.turnNumber, playerId: action.playerId, pendingRuleId: (endTurnResult as any).pendingRuleId, pendingRuleSourceId: (endTurnResult as any).pendingRuleSourceId },
+          pendingQueue: (endTurnResult as any).pendingQueue,
         }
       }
       if (endTurnResult.needsTargetSelection) {
-        next.pendingEndTurnTarget = {
-          playerId: action.playerId,
-          targetType: (endTurnResult.targetType || 'piece') as 'piece' | 'cell',
+        next.pendingTargetSelection = {
+          playerId: (endTurnResult as any).playerId || action.playerId,
+          title: endTurnResult.title || '请选择目标',
+          targetType: (endTurnResult.targetType || 'piece') as 'piece' | 'cell' | 'grid',
           range: endTurnResult.range,
           filter: endTurnResult.filter,
+          triggerContext: { type: "endTurn", turnNumber: next.turn.turnNumber, playerId: action.playerId, pendingRuleId: (endTurnResult as any).pendingRuleId, pendingRuleSourceId: (endTurnResult as any).pendingRuleSourceId },
+          pendingQueue: (endTurnResult as any).pendingQueue,
         }
       }
 
@@ -1722,93 +2165,115 @@ export function applyBattleAction(
       return next
     }
 
-    case "beginTurnChoice": {
+    case "pendingOptionSelect": {
       const next = safeCloneBattleState(state)
-      // 清除待处理选项
-      const pending = next.pendingBeginTurnChoice
-      next.pendingBeginTurnChoice = undefined
-      if (!pending) return next
-      // 以 selectedOption 重新触发 beginTurn 规则
-      const choiceCtx: any = {
-        type: "beginTurn",
-        turnNumber: next.turn.turnNumber,
-        playerId: next.turn.currentPlayerId,
-        selectedOption: action.selectedOption
+      const pending = next.pendingOptionSelection
+      if (!pending) {
+        throw new BattleRuleError(`[pendingOptionSelect] no pendingOptionSelection in state; player=${action.playerId}, selected=${JSON.stringify(action.selectedOption)}`)
       }
-      const choiceResult = globalTriggerSystem.checkTriggers(next, choiceCtx)
-      if (choiceResult.messages.length > 0) {
-        if (!next.actions) next.actions = []
-        choiceResult.messages.forEach(message => {
-          next.actions!.push({
-            type: "triggerEffect",
-            playerId: next.turn.currentPlayerId,
-            turn: next.turn.turnNumber,
-            payload: { message }
+      if (pending.playerId && String(pending.playerId).toLowerCase() !== String(action.playerId).toLowerCase()) {
+        throw new BattleRuleError(`[pendingOptionSelect] player mismatch; pending=${pending.playerId}, action=${action.playerId}, selected=${JSON.stringify(action.selectedOption)}`)
+      }
+      next.pendingOptionSelection = undefined
+      if (pending.pendingAction) {
+        const resumeAction = { ...pending.pendingAction, selectedOption: action.selectedOption }
+        try {
+          return applyBattleAction(next, resumeAction)
+        } catch (e) {
+          // 技能条件已失效（如目标移位、目标已死），取消技能，游戏继续
+          writeLog(`[pendingOptionSelect] resume skill failed, cancelling: ${(e as Error).message}`)
+          return next
+        }
+      }
+      if (pending.triggerContext) {
+        const ctx = { ...pending.triggerContext, selectedOption: action.selectedOption }
+        const result = globalTriggerSystem.checkTriggers(next, ctx)
+        if (result.messages && result.messages.length > 0) {
+          if (!next.actions) next.actions = []
+          result.messages.forEach(message => {
+            next.actions!.push({ type: "triggerEffect", playerId: action.playerId, turn: next.turn.turnNumber, payload: { message } })
           })
-        })
+        }
+        // 继续处理队列中剩余的规则（顺序触发）
+        const queueAfterThis = (result as any).pendingQueue || pending.pendingQueue
+        if (queueAfterThis && queueAfterThis.length > 0 && !result.needsOptionSelection && !result.needsTargetSelection) {
+          processPendingQueue(next, queueAfterThis, pending.triggerContext, action.playerId)
+        }
       }
       return next
     }
 
-    case "beginTurnTargetSelect": {
+    case "pendingTargetSelect": {
+      console.log('[STAGE6-pre] pendingTargetSelect case entered; state.pendingTargetSelection=', !!(state as any).pendingTargetSelection, 'playerId=', action.playerId)
       const next = safeCloneBattleState(state)
-      next.pendingBeginTurnTarget = undefined
-      const ctx: any = {
-        type: "beginTurn",
-        turnNumber: next.turn.turnNumber,
-        playerId: next.turn.currentPlayerId,
-        targetPieceId: action.targetPieceId,
-        targetX: action.targetX,
-        targetY: action.targetY,
+      const pending = next.pendingTargetSelection
+      console.log('[STAGE6-pre2] after safeClone; pending=', !!pending, 'effectCodeLen=', pending?.effectCode?.length ?? 0)
+      if (!pending) {
+        throw new BattleRuleError(`[pendingTargetSelect] no pendingTargetSelection in state; player=${action.playerId}, target=(${(action as any).targetX},${(action as any).targetY}), targetPiece=${(action as any).targetPieceId || ''}`)
       }
-      const result = globalTriggerSystem.checkTriggers(next, ctx)
-      if (result.messages.length > 0) {
-        if (!next.actions) next.actions = []
-        result.messages.forEach(message => {
-          next.actions!.push({ type: "triggerEffect", playerId: next.turn.currentPlayerId, turn: next.turn.turnNumber, payload: { message } })
+      if (pending.playerId && String(pending.playerId).toLowerCase() !== String(action.playerId).toLowerCase()) {
+        throw new BattleRuleError(`[pendingTargetSelect] player mismatch; pending=${pending.playerId}, action=${action.playerId}, target=(${(action as any).targetX},${(action as any).targetY}), title=${pending.title || ''}`)
+      }
+      const x = (action as any).targetX
+      const y = (action as any).targetY
+      const targetPiece = (action as any).targetPieceId
+        ? next.pieces.find(p => p.instanceId === (action as any).targetPieceId)
+        : undefined
+      const tile = x !== undefined && y !== undefined ? next.map.tiles.find(t => t.x === x && t.y === y) : undefined
+      if ((pending.targetType === 'cell' || pending.targetType === 'grid') && (!tile || !tile.props.walkable)) {
+        throw new BattleRuleError(`[pendingTargetSelect] invalid tile; targetType=${pending.targetType}, target=(${x},${y}), tile=${tile ? JSON.stringify(tile.props) : 'missing'}, title=${pending.title || ''}`)
+      }
+      next.pendingTargetSelection = undefined
+      let result: any = { success: true }
+      console.log('[STAGE6] pendingTargetSelect: effectCode present=', !!pending.effectCode, 'targetX=', x, 'targetY=', y, 'playerId=', action.playerId)
+      if (pending.effectCode) {
+        let fn: any
+        try {
+          fn = eval('(' + pending.effectCode + ')')
+        } catch (evalErr) {
+          throw new BattleRuleError('[STAGE6] effectCode eval failed: ' + (evalErr instanceof Error ? evalErr.message : String(evalErr)))
+        }
+        if (typeof fn !== 'function') {
+          throw new BattleRuleError('[STAGE6] effectCode did not eval to a function, got: ' + typeof fn)
+        }
+        try {
+          result = fn({
+            battle: next,
+            playerId: action.playerId,
+            targetPiece,
+            targetX: x,
+            targetY: y,
+            pending,
+            payload: pending.payload,
+          }) || { success: true }
+          console.log('[STAGE6] effectCode result:', result)
+        } catch (execErr) {
+          throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))
+        }
+      }
+      if (!pending.effectCode && pending.triggerContext) {
+        result = globalTriggerSystem.checkTriggers(next, {
+          ...pending.triggerContext,
+          targetPieceId: action.targetPieceId,
+          targetX: action.targetX,
+          targetY: action.targetY,
         })
       }
-      return next
-    }
-
-    case "endTurnChoice": {
-      const next = safeCloneBattleState(state)
-      const pending = next.pendingEndTurnChoice
-      next.pendingEndTurnChoice = undefined
-      if (!pending) return next
-      const choiceCtx: any = {
-        type: "endTurn",
-        turnNumber: next.turn.turnNumber,
-        playerId: action.playerId,
-        selectedOption: action.selectedOption
+      if (!next.actions) next.actions = []
+      if (result.message) {
+        next.actions.push({ type: 'triggerEffect', playerId: action.playerId, turn: next.turn.turnNumber, payload: { message: result.message } })
       }
-      const choiceResult = globalTriggerSystem.checkTriggers(next, choiceCtx)
-      if (choiceResult.messages.length > 0) {
-        if (!next.actions) next.actions = []
-        choiceResult.messages.forEach(message => {
+      if (result.messages && result.messages.length > 0) {
+        result.messages.forEach((message: string) => {
           next.actions!.push({ type: "triggerEffect", playerId: action.playerId, turn: next.turn.turnNumber, payload: { message } })
         })
       }
-      return next
-    }
-
-    case "endTurnTargetSelect": {
-      const next = safeCloneBattleState(state)
-      next.pendingEndTurnTarget = undefined
-      const ctx: any = {
-        type: "endTurn",
-        turnNumber: next.turn.turnNumber,
-        playerId: action.playerId,
-        targetPieceId: action.targetPieceId,
-        targetX: action.targetX,
-        targetY: action.targetY,
-      }
-      const result = globalTriggerSystem.checkTriggers(next, ctx)
-      if (result.messages.length > 0) {
-        if (!next.actions) next.actions = []
-        result.messages.forEach(message => {
-          next.actions!.push({ type: "triggerEffect", playerId: action.playerId, turn: next.turn.turnNumber, payload: { message } })
-        })
+      // 继续处理队列中剩余的规则（顺序触发）
+      if (pending.triggerContext) {
+        const queueAfterThis = (result as any).pendingQueue || pending.pendingQueue
+        if (queueAfterThis && queueAfterThis.length > 0 && !result.needsOptionSelection && !result.needsTargetSelection) {
+          processPendingQueue(next, queueAfterThis, pending.triggerContext, action.playerId)
+        }
       }
       return next
     }
@@ -1829,7 +2294,6 @@ export function applyBattleAction(
       const cardInstance = playerMeta.hand[cardIdx]
 
       // 加载卡牌定义（先查文件，再查战局自定义卡）
-      const { loadCardById, executeCardFunction } = require('./skills')
       const cardDef = loadCardById(cardInstance.cardId, true) ?? next.customCards?.[cardInstance.cardId] ?? null
       if (!cardDef) throw new BattleRuleError(`卡牌定义找不到: ${cardInstance.cardId}`)
       if (cardDef.type !== 'active' && cardDef.type !== 'reactive') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
@@ -1839,6 +2303,9 @@ export function applyBattleAction(
       if (playerMeta.actionPoints < cardApCost) {
         throw new BattleRuleError(`行动点不足，打出 ${cardDef.name} 需要 ${cardApCost} 点，当前 ${playerMeta.actionPoints} 点`)
       }
+
+      validateDeclaredCardTarget(next, action)
+      dryRunCardAction(next, action as any, cardDef, executeCardFunction)
 
       // 触发手牌使用前规则
       const beforeCardPlayResult = globalTriggerSystem.checkTriggers(next, {
@@ -1862,18 +2329,18 @@ export function applyBattleAction(
         return next;
       }
 
+      const paidCardInstance = applyCardPayment(playerMeta, cardIdx, cardApCost)
+
       // 构建目标信息
-      let targetPiece = undefined
-      let targetPosition = undefined
-      if (action.targetPieceId) {
-        targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId)
-      }
-      if (action.targetX !== undefined && action.targetY !== undefined) {
-        targetPosition = { x: action.targetX, y: action.targetY }
+      let { targetPiece, targetPosition } = getCardTargetArgs(next, action)
+      if (action.targetPieceId && !targetPiece) {
+        writeLog(`[applyBattleAction] Card target was removed by beforeCardPlay trigger, interrupting card effect after payment`)
+        pushInterruptedCardLog(next, action.playerId, paidCardInstance, cardDef)
+        return next
       }
 
       // 执行卡牌
-      const result = executeCardFunction(cardDef, action.playerId, next, undefined, targetPiece, targetPosition, action.selectedOption)
+      const result = executeCardFunction(cardDef, action.playerId, next, undefined, targetPiece, targetPosition, action.selectedOption, (action as any).extraTargets)
 
       // 处理目标选择
       if (result.needsTargetSelection) {
@@ -1882,6 +2349,7 @@ export function applyBattleAction(
         err.targetType = result.targetType || 'piece'
         err.range = result.range || 999
         err.filter = result.filter || 'all'
+        err.targetIndex = (result as any).targetIndex
         throw err
       }
 
@@ -1899,12 +2367,10 @@ export function applyBattleAction(
       }
 
       // 扣除行动点
-      playerMeta.actionPoints -= cardApCost
+      // Card payment was already applied before release.
 
       // 弃牌
-      if (!playerMeta.discardPile) playerMeta.discardPile = []
-      playerMeta.hand.splice(cardIdx, 1)
-      playerMeta.discardPile.push(cardInstance.cardId)
+      // Card was already moved from hand to discard before release.
 
       // 写入战斗日志
       if (!next.actions) next.actions = []
@@ -2004,9 +2470,12 @@ export function summonPiece(
   // 将棋子的规则加载到全局触发器系统
   if (template.rules && Array.isArray(template.rules)) {
     template.rules.forEach((ruleId: string) => {
-      const rule = loadRuleById(ruleId)
+      const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
       if (rule) {
-        globalTriggerSystem.addRule(rule)
+        if (!newPiece.rules) newPiece.rules = []
+        if (!newPiece.rules.some((r: any) => r.id === rule.id)) {
+          newPiece.rules.push(rule)
+        }
       }
     })
   }

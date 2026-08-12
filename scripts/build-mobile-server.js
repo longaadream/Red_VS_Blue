@@ -109,6 +109,8 @@ const gameDataPlugin = {
         pieces:        loadDir('pieces'),
         maps:          loadDir('maps'),
         cards:         loadDir('cards'),
+        rules:         loadDir('rules'),
+        effects:       loadDir('effects'),
         tiles:         loadDir('tiles'),
         statusEffects: loadDir('status-effects'),
       }
@@ -151,6 +153,9 @@ async function main() {
     },
     plugins:  [resolvePlugin, gameDataPlugin],
     outfile:  outFile,
+    banner: {
+      js: "var process = globalThis.process || { env: { NODE_ENV: 'production', MOBILE_SERVER: 'true' }, cwd: function () { return '.' } }; if (!globalThis.structuredClone) globalThis.structuredClone = function (value) { return JSON.parse(JSON.stringify(value)); }; if (globalThis.console) { console.log = function () {}; console.info = function () {}; console.debug = function () {}; }",
+    },
     logLevel: 'warning',
     minify:   false,
   })

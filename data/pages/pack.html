@@ -226,6 +226,7 @@
     // ── 环境检测 ─────────────────────────────────────────────────────────────
     // Electron 通过 preload 注入 window.electronAPI；Android/浏览器走 Service Worker
     const isElectron = !!(window.electronAPI && window.electronAPI.packWriteFiles)
+    const isAndroidNativePack = !!(window.RvBBridge && window.RvBBridge.packWriteFiles)
     // file:// 协议说明在 Electron 内，但 preload 可能是旧版本（无 packWriteFiles）
     // 此时走本地服务器 API 写入资源包文件
     const isFileProtocol = window.location.protocol === 'file:'
@@ -267,6 +268,26 @@
         req.onsuccess = e => resolve(e.target.result)
         req.onerror = e => reject(e.target.error)
       })
+    }
+
+    function parseBridgeJson(raw) {
+      try { return JSON.parse(raw || '{}') } catch { return {} }
+    }
+
+    function normalizePackEntryPath(path) {
+      return String(path || '')
+        .replace(/\\/g, '/')
+        .replace(/^resource-pack\//, '')
+        .replace(/^\/+/, '')
+    }
+
+    function shouldSkipPackEntry(path) {
+      const rel = normalizePackEntryPath(path).toLowerCase()
+      return !rel
+        || rel === 'pack.json'
+        || rel === 'pack.html'
+        || rel === 'data/pages/pack.html'
+        || rel === 'js/pack-fetch.js'
     }
 
     async function swMessage(msg) {
@@ -376,33 +397,62 @@
           // Electron: 分批写入，每批 20 个文件，避免单次 IPC 消息过大
           const BATCH = 20
           let totalCount = 0
-          const validEntries = entries.filter(([p]) => p !== 'pack.json')
+          const validEntries = entries.filter(([p]) => !shouldSkipPackEntry(p))
           for (let b = 0; b < validEntries.length; b += BATCH) {
             const batch = validEntries.slice(b, b + BATCH)
             const files = []
             for (let i = 0; i < batch.length; i++) {
               const [filePath, entry] = batch[i]
               const content = await entry.async('base64')
-              files.push({ path: '/' + filePath, content })
+              files.push({ path: '/' + normalizePackEntryPath(filePath), content })
               setProgress(40 + ((b + i) / validEntries.length) * 35, '写入 ' + (b + i + 1) + '/' + validEntries.length + ' 文件…')
             }
             const batchResult = await window.electronAPI.packWriteFiles(files)
+            if (!batchResult.ok) throw new Error(batchResult.error || 'packWriteFiles failed')
             totalCount += batchResult.count
+          }
+          result = { ok: true, count: totalCount }
+        } else if (isAndroidNativePack) {
+          const BATCH = 20
+          let totalCount = 0
+          const validEntries = entries.filter(([p]) => !shouldSkipPackEntry(p))
+          try {
+            const db = await openPackIDB()
+            await idbClear(db)
+            db.close()
+          } catch {}
+          if (window.RvBBridge.packClear) {
+            const clearResult = parseBridgeJson(window.RvBBridge.packClear())
+            if (!clearResult.ok) throw new Error(clearResult.error || 'packClear failed')
+          }
+          for (let b = 0; b < validEntries.length; b += BATCH) {
+            const batch = validEntries.slice(b, b + BATCH)
+            const files = []
+            for (let i = 0; i < batch.length; i++) {
+              const [filePath, entry] = batch[i]
+              const content = await entry.async('base64')
+              files.push({ path: '/' + normalizePackEntryPath(filePath), content })
+              setProgress(40 + ((b + i) / validEntries.length) * 35, 'Writing ' + (b + i + 1) + '/' + validEntries.length + ' files...')
+            }
+            const batchResult = parseBridgeJson(window.RvBBridge.packWriteFiles(JSON.stringify(files)))
+            if (!batchResult.ok) throw new Error(batchResult.error || 'packWriteFiles failed')
+            totalCount += batchResult.count || 0
           }
           result = { ok: true, count: totalCount }
         } else if (isFileProtocol) {
           // Electron 旧版 preload（无 packWriteFiles）→ 通过本地服务器 API 写入
-          const serverUrl = (localStorage.getItem('rvb_server_url') || 'http://localhost:3001').replace(/\/$/, '')
+          const serverUrl = ((window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || localStorage.getItem('rvb_server_url') || '').replace(/\/$/, '')
+          if (!serverUrl) throw new Error('未配置服务器地址')
           const BATCH = 20
           let totalCount = 0
-          const validEntries = entries.filter(([p]) => p !== 'pack.json')
+          const validEntries = entries.filter(([p]) => !shouldSkipPackEntry(p))
           for (let b = 0; b < validEntries.length; b += BATCH) {
             const batch = validEntries.slice(b, b + BATCH)
             const files = []
             for (let i = 0; i < batch.length; i++) {
               const [filePath, entry] = batch[i]
               const b64 = await entry.async('base64')
-              files.push({ path: '/' + filePath, content: b64 })
+              files.push({ path: '/' + normalizePackEntryPath(filePath), content: b64 })
               setProgress(40 + ((b + i) / validEntries.length) * 35, '写入 ' + (b + i + 1) + '/' + validEntries.length + ' 文件…')
             }
             const res = await fetch(serverUrl + '/api/resource-pack/import', {
@@ -419,11 +469,11 @@
           // Android / 浏览器: 直接写入 IndexedDB，SW fetch 拦截时从 IDB 读取
           // 完全不使用 postMessage，规避 Android WebView 的 postMessage 限制
           const db = await openPackIDB()
-          const validEntries = entries.filter(([p]) => p !== 'pack.json')
+          const validEntries = entries.filter(([p]) => !shouldSkipPackEntry(p))
           for (let i = 0; i < validEntries.length; i++) {
             const [filePath, entry] = validEntries[i]
             const arrayBuffer = await entry.async('arraybuffer')
-            const normPath = ('/' + filePath.replace(/\\/g, '/')).replace('//', '/')
+            const normPath = ('/' + normalizePackEntryPath(filePath)).replace('//', '/')
             await idbPut(db, normPath, arrayBuffer, guessMime(filePath))
             setProgress(40 + (i / validEntries.length) * 55, '写入 ' + (i + 1) + '/' + validEntries.length + ' 文件…')
           }
@@ -509,6 +559,14 @@
       try {
         if (isElectron) {
           await window.electronAPI.packClear()
+        } else if (isAndroidNativePack) {
+          const result = parseBridgeJson(window.RvBBridge.packClear())
+          if (!result.ok) throw new Error(result.error || 'packClear failed')
+          try {
+            const db = await openPackIDB()
+            await idbClear(db)
+            db.close()
+          } catch {}
         } else {
           const db = await openPackIDB()
           await idbClear(db)
@@ -542,6 +600,8 @@
           let res
           if (isElectron) {
             res = await window.electronAPI.packList()
+          } else if (isAndroidNativePack) {
+            res = parseBridgeJson(window.RvBBridge.packList())
           } else if (isFileProtocol) {
             res = { files: [] }
           } else {
@@ -573,11 +633,11 @@
     // ── Init ─────────────────────────────────────────────────────────────────
 
     window.addEventListener('load', async () => {
-      if (isElectron || isFileProtocol) {
+      if (isElectron || isAndroidNativePack || isFileProtocol) {
         refreshPackStatus()
-        return
+        if (!window.RvBBridge) return
       }
-      if ('serviceWorker' in navigator) {
+      if (!isAndroidNativePack && 'serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(() => {})
       }
       refreshPackStatus()

@@ -6,6 +6,7 @@
   <title>房间 · RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/ws-client.js"></script>
   <script src="js/identity.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -146,6 +147,7 @@
     <button type="button" class="back-btn" onclick="leaveAndGoLobby()">← 离开</button>
     <div class="topbar-title">房间等待中</div>
     <div class="room-id-badge" id="roomIdBadge">—</div>
+    <button type="button" class="back-btn" id="dissolveBtn" style="display:none;color:#f87171;border-color:#7f1d1d;background:#1a0a0a" onclick="dissolveRoom()">解散</button>
   </div>
 
   <div class="section">
@@ -187,12 +189,17 @@
     const roomId = params.get('roomId') || ''
     const playerId = (params.get('playerId') || '').trim().toLowerCase()
     const playerName = params.get('playerName') || '玩家'
-    const RELAY_MODE = params.get('relay') === '1'
+    function shouldUseRelayMode() {
+      if (params.get('relay') === '1' || params.get('server') === 'remote') return true
+      return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
+    }
 
     let pollTimer = null
     let _lastRoom = null
     let _navigating = false
     let _busy = false
+    let roomWsReady = false
+    let roomWsConnecting = null
     const MAPS_CACHE = {}
 
     if (!roomId || !playerId) {
@@ -220,7 +227,67 @@
     }
 
     function factionIcon(f) { return f === 'red' ? '🔴' : f === 'blue' ? '🔵' : '⚪' }
-    function factionLabel(f) { return f === 'red' ? '红方' : f === 'blue' ? '蓝方' : '未分配' }
+    function factionLabel(f) { return f === 'red' ? '先手' : f === 'blue' ? '后手' : '未分配' }
+    function alignmentIcon(a) { return a === 'evil' ? '🌑' : a === 'good' ? '☀️' : '❓' }
+    function alignmentLabel(a) { return a === 'evil' ? '🌑 暗' : a === 'good' ? '☀️ 光' : '未选阵营' }
+
+    function navigateBattle() {
+      if (_navigating) return
+      _navigating = true
+      window.location.href = 'battle.html'
+        + '?roomId=' + encodeURIComponent(roomId)
+        + '&playerId=' + encodeURIComponent(playerId)
+        + '&playerName=' + encodeURIComponent(playerName)
+        + (shouldUseRelayMode() ? '&relay=1' : '')
+    }
+
+    function navigatePieceSelection() {
+      if (_navigating) return
+      _navigating = true
+      window.location.href = 'piece-selection.html'
+        + '?roomId=' + encodeURIComponent(roomId)
+        + '&playerId=' + encodeURIComponent(playerId)
+        + '&playerName=' + encodeURIComponent(playerName)
+        + (shouldUseRelayMode() ? '&relay=1' : '')
+    }
+
+    async function ensureRoomWs() {
+      if (roomWsReady && window.RvBWs && RvBWs.isConnected()) return
+      if (roomWsConnecting) return roomWsConnecting
+      roomWsConnecting = new Promise((resolve, reject) => {
+        if (typeof RvBWs === 'undefined') {
+          reject(new Error('WebSocket 客户端未加载'))
+          return
+        }
+        const timer = setTimeout(() => reject(new Error('WebSocket 连接超时')), 5000)
+        RvBWs.on('connect', function() {
+          roomWsReady = true
+          clearTimeout(timer)
+          resolve()
+        })
+        RvBWs.on('disconnect', function() { roomWsReady = false })
+        RvBWs.on('message', async function(msg) {
+          if (msg.type === 'roomUpdate' && msg.room) {
+            _lastRoom = msg.room
+            await renderRoom(msg.room)
+            if (msg.room.status === 'in-progress' || msg.room.status === 'playing' || msg.room.status === 'battle') navigateBattle()
+            else if (msg.room.status === 'ready') {
+              const me = (msg.room.players || []).find(p => p.id && p.id.toLowerCase() === playerId)
+              if (me && me.ready) navigatePieceSelection()
+            }
+          } else if (msg.type === 'stateUpdate' || msg.type === 'battleSnapshot') {
+            navigateBattle()
+          }
+        })
+        RvBWs.connect(roomId, playerId, shouldUseRelayMode() ? 'relay' : 'lan')
+      }).finally(() => { roomWsConnecting = null })
+      return roomWsConnecting
+    }
+
+    async function wsRequest(method, data, timeoutMs) {
+      await ensureRoomWs()
+      return RvBWs.request(method, data || {}, timeoutMs || 6000)
+    }
 
     function renderSlot(slotLabel, p, myId, hostId, isMySlot) {
       if (!p) {
@@ -238,13 +305,15 @@
       const ready = p.ready === true
       const factionCls = p.faction === 'red' ? 'red' : (p.faction === 'blue' ? 'blue' : 'unknown')
       const cls = 'player-slot filled' + (isMe ? ' self' : ' opponent') + (ready ? ' ready' : '')
+      const orderBadge = p.faction ? factionLabel(p.faction) : ''
+      const alignBadge = alignmentLabel(p.alignment)
       return '<div class="' + cls + '">'
         + '<div class="slot-label">' + slotLabel + (isHost ? '<span class="host-tag">主机</span>' : '') + '</div>'
         + '<div class="slot-body">'
-          + '<div class="player-faction-badge ' + factionCls + '">' + factionIcon(p.faction) + '</div>'
+          + '<div class="player-faction-badge ' + factionCls + '">' + alignmentIcon(p.alignment) + '</div>'
           + '<div class="player-name">'
             + '<div class="player-name-text">' + escHtml(p.name || p.id) + '<span class="name-tag">#' + escHtml((p.id || '').slice(0, 6).toUpperCase()) + '</span></div>'
-            + '<div class="player-name-sub">' + factionLabel(p.faction) + ' · ID: ' + escHtml((p.id || '').slice(0, 8)) + '</div>'
+            + '<div class="player-name-sub">' + alignBadge + (orderBadge ? ' · ' + orderBadge : '') + '</div>'
           + '</div>'
           + '<div class="player-ready-badge ' + (ready ? 'yes' : 'no') + '">' + (ready ? '✓ 已准备' : '准备中…') + '</div>'
         + '</div>'
@@ -254,46 +323,25 @@
     async function refreshRoom() {
       if (_navigating) return
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId)
-        if (!res.ok) {
-          if (res.status === 404) {
-            stopPolling()
-            document.getElementById('statusLine').textContent = '房间已不存在，返回大厅…'
-            document.getElementById('statusLine').className = 'status-line warn'
-            setTimeout(() => goBackToLobby(), 1200)
-          }
-          return
-        }
-        const room = await res.json()
+        const room = await wsRequest('rooms.get', { roomId })
         _lastRoom = room
         await renderRoom(room)
 
         // 战斗已开始（status=in-progress / playing / battle）→ 跳转 battle
         if (room.status === 'in-progress' || room.status === 'playing' || room.status === 'battle') {
-          _navigating = true
-          stopPolling()
-          window.location.href = 'battle.html'
-            + '?roomId=' + encodeURIComponent(roomId)
-            + '&playerId=' + encodeURIComponent(playerId)
-            + '&playerName=' + encodeURIComponent(playerName)
-            + (RELAY_MODE ? '&relay=1' : '')
+          navigateBattle()
           return
         }
         // 双方都已选完棋子但还没开战，也跳 battle（兼容旧流程）
         const allSelected = (room.players || []).length >= 2 &&
           room.players.every(p => p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
         if (allSelected) {
-          _navigating = true
-          stopPolling()
-          window.location.href = 'battle.html'
-            + '?roomId=' + encodeURIComponent(roomId)
-            + '&playerId=' + encodeURIComponent(playerId)
-            + '&playerName=' + encodeURIComponent(playerName)
-            + (RELAY_MODE ? '&relay=1' : '')
+          navigateBattle()
           return
         }
       } catch (e) {
-        // 网络错误：暂不跳，等下一次轮询
+        document.getElementById('statusLine').textContent = 'WebSocket 房间同步失败：' + e.message
+        document.getElementById('statusLine').className = 'status-line warn'
       }
     }
 
@@ -319,6 +367,13 @@
       list.innerHTML =
         renderSlot('自己', me, playerId, hostId, true) +
         renderSlot('对手', opp, playerId, hostId, false)
+
+      // 解散按钮：仅主机在 waiting 状态可见
+      const dissolveBtn = document.getElementById('dissolveBtn')
+      if (dissolveBtn) {
+        const amHost = me && me.id && me.id.toLowerCase() === hostId
+        dissolveBtn.style.display = (amHost && room.status === 'waiting') ? 'block' : 'none'
+      }
 
       // 按钮 + 状态文字
       const btn = document.getElementById('readyBtn')
@@ -350,14 +405,7 @@
           status.className = 'status-line ok'
           // 双方都准备 → 跳选人页（仅本玩家自己已准备时才跳，否则让 polling 等待）
           if (me.ready && !_navigating) {
-            _navigating = true
-            stopPolling()
-            setTimeout(() => {
-              window.location.href = 'piece-selection.html'
-                + '?roomId=' + encodeURIComponent(roomId)
-                + '&playerId=' + encodeURIComponent(playerId)
-                + '&playerName=' + encodeURIComponent(playerName)
-            }, 400)
+            setTimeout(navigatePieceSelection, 400)
           }
         } else {
           status.textContent = '已准备 ' + readyCount + ' / ' + cap + '，等待全部准备就绪'
@@ -372,13 +420,7 @@
       const btn = document.getElementById('readyBtn')
       btn.disabled = true
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'toggle-ready', playerId, playerName })
-        })
-        if (!res.ok) throw new Error('HTTP ' + res.status)
-        const room = await res.json()
+        const room = await wsRequest('rooms.action', { roomId, action: 'toggle-ready', playerId, playerName })
         await renderRoom(room)
       } catch (e) {
         alert('准备失败：' + e.message)
@@ -388,25 +430,31 @@
       }
     }
 
+    async function dissolveRoom() {
+      if (!confirm('确认解散房间？')) return
+      try {
+        const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl) ? RvBUtils.getServerUrl() : ''
+        await fetch(serverUrl + '/api/rooms/' + encodeURIComponent(roomId), {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json', 'x-player-id': playerId },
+          body: JSON.stringify({ playerId })
+        })
+      } catch (e) {
+        console.warn('[room] dissolve failed', e)
+      }
+      _navigating = true
+      goBackToLobby()
+    }
+
     function leaveAndGoLobby() {
       console.log('[room] leave clicked')
       _navigating = true  // 防止 beforeunload 再次发 leave
       stopPolling()
-      // 先发离开通知（不等响应，sendBeacon 或 fire-and-forget fetch）
-      const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
+      // 先发离开通知（WS fire-and-forget，不阻塞跳转）
       if (roomId && playerId) {
-        const payload = JSON.stringify({ action: 'leave', playerId, playerName })
         try {
-          if (serverUrl && navigator.sendBeacon) {
-            const blob = new Blob([payload], { type: 'application/json' })
-            navigator.sendBeacon(serverUrl + '/api/rooms/' + roomId + '/actions', blob)
-          } else if (window.RvBUtils && RvBUtils.serverFetch) {
-            // fire-and-forget，不 await，不阻塞跳转
-            RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: payload,
-            }).catch(() => {})
+          if (window.RvBWs && RvBWs.isConnected()) {
+            RvBWs.send({ type: 'roomAction', action: 'leave', playerId, playerName })
           }
         } catch (e) { console.warn('[room] leave beacon failed', e) }
       }
@@ -415,10 +463,9 @@
     }
 
     function goBackToLobby() {
-      const mode = localStorage.getItem('rvb_lobby_server_mode') || 'remote'
-      const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
-      const p = new URLSearchParams({ server: mode })
-      if (serverUrl && mode !== 'local') p.set('url', serverUrl)
+      const p = window.RvBUtils && RvBUtils.appendServerParams
+        ? RvBUtils.appendServerParams(new URLSearchParams())
+        : new URLSearchParams()
       p.set('v', Date.now().toString())
       window.location.href = 'lobby.html?' + p.toString()
     }
@@ -440,10 +487,7 @@
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
     }
 
-    function startPolling() {
-      if (pollTimer) clearInterval(pollTimer)
-      pollTimer = setInterval(refreshRoom, 1500)
-    }
+    function startPolling() {}
     function stopPolling() {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
     }
@@ -452,17 +496,18 @@
     window.addEventListener('beforeunload', () => {
       if (_navigating) return  // 正常跳转 battle / piece-selection 不当作离开
       try {
-        // 同步信标，浏览器在 unload 时仍能发送
-        const blob = new Blob([JSON.stringify({ action: 'leave', playerId, playerName })], { type: 'application/json' })
-        const url = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || ''
-        if (url) navigator.sendBeacon(url + '/api/rooms/' + roomId + '/actions', blob)
+        if (window.RvBWs && RvBWs.isConnected()) {
+          RvBWs.send({ type: 'roomAction', action: 'leave', playerId, playerName })
+        }
       } catch {}
     })
 
     window.addEventListener('load', () => {
       if (!roomId || !playerId) return
-      refreshRoom()
-      startPolling()
+      ensureRoomWs().then(refreshRoom).catch(e => {
+        document.getElementById('statusLine').textContent = e.message
+        document.getElementById('statusLine').className = 'status-line warn'
+      })
     })
   </script>
 </body>

@@ -1,7 +1,7 @@
 {
   "id": "reaper",
   "name": "死神",
-  "faction": "red",
+  "faction": "evil",
   "description": "高机动性的刺客，擅长近距离爆发伤害和自我恢复",
   "rarity": "epic",
   "image": "reaper.jpg",
@@ -29,6 +29,8 @@
       "level": 1
     }
   ],
-  "rules": ["rule-reap"],
+  "rules": [
+    "rule-reap"
+  ],
   "isDefault": false
 }

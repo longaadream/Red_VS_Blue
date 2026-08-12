@@ -279,11 +279,15 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
               }
             }
             if (effect.target === 'area' && context.sourcePiece && effect.range) {
+              if (context.sourcePiece.x == null || context.sourcePiece.y == null) {
+                break
+              }
               // 找到范围内的所有敌方棋子
               const range = effect.range
               battle.pieces.forEach(piece => {
                 // 只选择敌方棋子，并且在范围内
                 if (piece.ownerPlayerId !== context.sourcePiece.ownerPlayerId && piece.currentHp > 0) {
+                  if (piece.x == null || piece.y == null) return
                   const distance = Math.abs(piece.x - context.sourcePiece.x) + Math.abs(piece.y - context.sourcePiece.y)
                   if (distance <= range) {
                     targets.push({ ...piece, type: 'area' })
@@ -353,6 +357,7 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                     x: context.targetPiece.x,
                     y: context.targetPiece.y
                   } : null,
+                  targetPosition: context.targetPosition || (context.targetX !== undefined && context.targetY !== undefined ? { x: context.targetX, y: context.targetY } : null),
                   battle: {
                     turn: {
                       turnNumber: battle.turn.turnNumber,
@@ -423,7 +428,7 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
           }
 
           default:
-            console.warn(`Unknown effect type: ${ruleDef.effect.type}`)
+            console.warn(`Unknown effect type: ${(ruleDef.effect as any).type}`)
             break
         }
 

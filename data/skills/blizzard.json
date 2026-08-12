@@ -2,9 +2,16 @@
   "id": "blizzard",
   "name": "暴风雪",
   "description": "在全场1个地格周围召唤7x7暴风雪区域。敌方回合结束时，区域内敌人受到等同攻击力150%的法术伤害，并冰冻1回合。",
-  "keywords": ["召唤", "冰冻"],
+  "keywords": [
+    "召唤",
+    "冰冻"
+  ],
   "targetText": "全场1个地格",
-  "effectTags": ["召唤", "法术伤害", "冰冻"],
+  "effectTags": [
+    "召唤",
+    "法术伤害",
+    "冰冻"
+  ],
   "icon": "🌐️",
   "kind": "active",
   "type": "super",
@@ -15,6 +22,6 @@
   "actionPointCost": 2,
   "range": "area",
   "areaSize": 7,
-  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const targetPosition = selectTarget({ type: 'grid', range: 10, filter: 'all' });\n  if (!targetPosition || targetPosition.needsTargetSelection) {\n    return targetPosition;\n  }\n  const statusId = 'blizzard-' + Date.now();\n  addPlayerStatusEffectById(sourcePiece.ownerPlayerId, {\n    id: statusId,\n    type: 'blizzard',\n    centerX: targetPosition.x,\n    centerY: targetPosition.y,\n    damage: damageValue\n  });\n  addPlayerRuleById(sourcePiece.ownerPlayerId, 'rule-blizzard-active');\n  addPlayerSkillById(sourcePiece.ownerPlayerId, 'blizzard-damage');\n  if (!battle.extensions) battle.extensions = {};\n  if (!battle.extensions.tileEffects) battle.extensions.tileEffects = [];\n  var blizzardRadius = 3;\n  for (var bx = targetPosition.x - blizzardRadius; bx <= targetPosition.x + blizzardRadius; bx++) {\n    for (var by = targetPosition.y - blizzardRadius; by <= targetPosition.y + blizzardRadius; by++) {\n      battle.extensions.tileEffects.push({ x: bx, y: by, sourceId: statusId, tileType: 'blizzard', icon: '❄️', bgColor: 'rgba(96, 165, 250, 0.4)', boxShadow: 'inset 0 0 4px rgba(147, 197, 253, 0.6)', iconPosition: 'top-right' });\n    }\n  }\n  return {\n    message: sourcePiece.name + '使用了暴风雪，在(' + targetPosition.x + ',' + targetPosition.y + ')创造了暴风雪区域，将在对方回合结束时对7x7范围内的敌人造成' + damageValue + '点伤害并使其冰冻',\n    success: true\n  };\n}",
+  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const targetPosition = selectTarget({ type: 'grid', range: 10, filter: 'all' });\n  if (!targetPosition || targetPosition.needsTargetSelection) {\n    return targetPosition;\n  }\n  const statusId = 'blizzard-' + Date.now();\n  addPlayerStatusEffectById(sourcePiece.ownerPlayerId, {\n    id: statusId,\n    type: 'blizzard',\n    centerX: targetPosition.x,\n    centerY: targetPosition.y,\n    damage: damageValue\n  });\n  addPlayerRuleById(sourcePiece.ownerPlayerId, 'rule-blizzard-active');\n  addPlayerSkillById(sourcePiece.ownerPlayerId, 'blizzard-damage');\n  if (!battle.extensions) battle.extensions = {};\n  if (!battle.extensions.tileEffects) battle.extensions.tileEffects = [];\n  var blizzardRadius = 3;\n  for (var bx = targetPosition.x - blizzardRadius; bx <= targetPosition.x + blizzardRadius; bx++) {\n    for (var by = targetPosition.y - blizzardRadius; by <= targetPosition.y + blizzardRadius; by++) {\n      battle.extensions.tileEffects.push({ x: bx, y: by, sourceId: statusId, tileType: 'blizzard', icon: '❄️', bgColor: 'rgba(96, 165, 250, 0.12)', boxShadow: 'inset 0 0 0 2px rgba(147, 197, 253, 0.65)', iconPosition: 'top-right' });\n    }\n  }\n  return {\n    message: sourcePiece.name + '使用了暴风雪，在(' + targetPosition.x + ',' + targetPosition.y + ')创造了暴风雪区域，将在对方回合结束时对7x7范围内的敌人造成' + damageValue + '点伤害并使其冰冻',\n    success: true\n  };\n}",
   "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '在全场1个地格周围召唤7x7暴风雪区域。敌方回合结束时，区域内敌人受到' + damageValue + '点法术伤害，并冰冻1回合。',\n    expectedValues: { damage: damageValue }\n  };\n}"
 }

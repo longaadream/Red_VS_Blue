@@ -1,7 +1,7 @@
 {
   "id": "liadrin",
   "name": "莉亚德琳",
-  "faction": "blue",
+  "faction": "good",
   "description": "血骑士的领袖，能够萃取圣盾转化为圣光手牌，驾驭纳鲁的力量为团队带来毁灭性的爆发",
   "rarity": "epic",
   "image": "liadrin.jpg",
@@ -25,7 +25,13 @@
       "level": 1
     }
   ],
-  "rules": ["rule-blood-echo"],
-  "relatedCards": ["holy-smite", "holy-heal", "holy-charge"],
+  "rules": [
+    "rule-blood-echo"
+  ],
+  "relatedCards": [
+    "holy-smite",
+    "holy-heal",
+    "holy-charge"
+  ],
   "isDefault": false
 }

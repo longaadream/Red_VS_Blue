@@ -1,5 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getRoomStore } from '@/lib/game/room-store'
+import { getPlayerSeat, getRoomStore } from '@/lib/game/room-store'
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}))
+    const { mode, hostId, playerName, mapId } = body
+
+    if (mode !== 'pve') {
+      return NextResponse.json({ error: 'Only mode=pve is supported via REST' }, { status: 400 })
+    }
+    if (!hostId) {
+      return NextResponse.json({ error: 'hostId is required' }, { status: 400 })
+    }
+
+    const roomStore = getRoomStore()
+    const roomId = 'pve-' + hostId.slice(0, 8) + '-' + Date.now().toString(36)
+    const room = await roomStore.createRoom(roomId, (playerName || hostId) + ' 的 PVE 练习')
+
+    // Add human player (red)
+    room.players = [{
+      id: hostId,
+      name: playerName || hostId,
+      seat: 'red' as const,
+      faction: 'red' as const,
+      joinedAt: Date.now(),
+      ready: true,
+      hasSelectedPieces: false,
+      selectedPieces: [],
+    }]
+    // Add bot player (blue)
+    room.players.push({
+      id: 'bot',
+      name: 'AI',
+      seat: 'blue' as const,
+      faction: 'blue' as const,
+      joinedAt: Date.now(),
+      ready: true,
+      isBot: true,
+      hasSelectedPieces: false,
+      selectedPieces: [],
+    })
+    room.hostId = hostId
+    room.mapId = mapId || 'large-trap-arena'
+    room.visibility = 'private'
+    room.maxPlayers = 2
+
+    await roomStore.setRoom(roomId, room)
+    return NextResponse.json({ id: roomId, status: room.status })
+  } catch (error) {
+    console.error('[POST /api/rooms] Error creating PVE room:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,8 +64,11 @@ export async function GET(req: NextRequest) {
       status: room.status,
       players: room.players.map(player => ({
         id: player.id,
+        accountId: player.accountId,
         name: player.name,
+        seat: getPlayerSeat(player),
         faction: player.faction,
+        alignment: player.alignment,
         hasSelectedPieces: player.hasSelectedPieces || false,
       })),
       playerCount: room.players.length,

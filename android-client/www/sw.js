@@ -40,16 +40,8 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
-    .then(() => self.clients.matchAll({ type: 'window' }))
-    .then(clients => {
-      clients.forEach(client => {
-        const url = new URL(client.url)
-        if (!url.searchParams.has('rvb_sw_refresh')) {
-          url.searchParams.set('rvb_sw_refresh', Date.now().toString())
-          client.navigate(url.toString()).catch(() => {})
-        }
-      })
-    })
+    // client.navigate() removed: the page's controllerchange → reload is sufficient
+    // and client.navigate() can race with that reload causing white screen on Android
   )
 })
 
@@ -70,7 +62,7 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // HTML/JS/CSS：网络优先，失败时回退缓存
+  // HTML/JS/CSS：网络优先，失败时回退缓存（无缓存时透传让浏览器自行处理，避免返回 undefined 导致白屏）
   event.respondWith(
     fetch(event.request)
       .then(res => {
@@ -80,6 +72,6 @@ self.addEventListener('fetch', event => {
         }
         return res
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request).then(cached => cached || fetch(event.request)))
   )
 })

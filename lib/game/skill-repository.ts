@@ -1,4 +1,5 @@
 import type { SkillDefinition } from "./skills"
+import { loadJsonFilesServer } from './file-loader'
 
 // 默认技能数据（作为后备）
 const defaultSkillsData: Record<string, SkillDefinition> = {
@@ -55,7 +56,6 @@ export async function loadSkills(): Promise<void> {
 if (typeof window === 'undefined') {
   // 只在服务器端执行
   try {
-    const { loadJsonFilesServer } = require('./file-loader')
     const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
     // 合并加载的数据和默认数据，确保默认数据总是可用
     DEFAULT_SKILLS = { ...defaultSkillsData, ...loadedSkills }
@@ -84,7 +84,6 @@ export function getSkillsByIds(ids: string[]): SkillDefinition[] {
 export function reloadSkills(): void {
   if (typeof window === 'undefined') {
     try {
-      const { loadJsonFilesServer } = require('./file-loader')
       const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
       DEFAULT_SKILLS = { ...defaultSkillsData, ...loadedSkills }
       console.log('[reloadSkills] Reloaded skills:', Object.keys(DEFAULT_SKILLS))

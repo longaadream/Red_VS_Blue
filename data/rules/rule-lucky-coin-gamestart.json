@@ -1,0 +1,8 @@
+{
+  "id": "rule-lucky-coin-gamestart",
+  "name": "幸运币",
+  "description": "后手玩家在游戏开始时获得一枚幸运币",
+  "trigger": { "type": "gameStart" },
+  "skillCode": "var pid = context.playerId || (context.player && context.player.playerId); if (pid) { addCardToHand('lucky-coin', pid); } return { success: true, message: '后手获得幸运币' };",
+  "limits": { "maxUses": 1 }
+}

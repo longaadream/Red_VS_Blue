@@ -8,10 +8,10 @@
   "icon": "👁️",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 2,
+  "cooldownTurns": 3,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 3,
+  "actionPointCost": 1,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var dmgResult = dealDamage(caster, target, caster.attack, 'magical', battle, context.skill.id); var actualDamage = dmgResult.damage || 0; var healResult = healDamage(caster, caster, actualDamage, battle, context.skill.id); return { success: true, message: caster.name + '释放眼棱，对' + target.name + '造成' + actualDamage + '点伤害并恢复' + healResult.heal + '点生命值' }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内1个敌方棋子造成' + piece.attack + '点魔法伤害，并治疗自身等量生命。', expectedValues: { damage: piece.attack, heal: piece.attack } }; }",
   "range": "single"

@@ -3,5 +3,5 @@
   "name": "暴怒·受创加倍",
   "description": "（暴怒姿态）受到的伤害翻倍",
   "trigger": { "type": "beforeDamageTaken" },
-  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var rageStance = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (!rageStance) return { success: false, message: '' }; var baseDamage = context.damage || 0; context.damage = baseDamage * 2; return { success: true, message: piece.name + '处于暴怒姿态，受到双倍伤害！' + baseDamage + '→' + context.damage + '点' };"
+  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var rageStance = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (!rageStance) return { success: false, message: '' }; var baseDamage = context.damage || 0; context.damage = baseDamage * 2; return { success: true, message: piece.name + '处于暴怒姿态，受到双倍伤害！' + baseDamage + '→' + context.damage + '点' };"
 }

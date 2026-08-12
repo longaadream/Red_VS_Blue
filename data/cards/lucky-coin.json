@@ -4,9 +4,12 @@
   "description": "获得1点行动点。",
   "keywords": [],
   "targetText": "自身",
-  "effectTags": ["行动点"],
+  "effectTags": [
+    "行动点"
+  ],
   "type": "active",
   "actionPointCost": 0,
   "icon": "Coins",
-  "code": "function executeCard(context) {\n  const player = battle.players.find(p => p.playerId === playerId);\n  if (!player) return { success: false, message: '找不到玩家' };\n  player.actionPoints += 1;\n  return { success: true, message: `幸运币：获得1点行动力（当前：${player.actionPoints}）` };\n}"
+  "code": "function executeCard(context) {\n  const player = battle.players.find(p => p.playerId === playerId);\n  if (!player) return { success: false, message: '找不到玩家' };\n  player.actionPoints += 1;\n  return { success: true, message: `幸运币：获得1点行动力（当前：${player.actionPoints}）` };\n}",
+  "image": "the-coin.jpg"
 }

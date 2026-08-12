@@ -1,7 +1,7 @@
 {
   "id": "red-rafaam",
   "name": "拉法姆",
-  "faction": "red",
+  "faction": "evil",
   "description": "神秘的术士，擅长操控时间与诅咒之力",
   "rarity": "legendary",
   "image": "rafaam.jpg",
@@ -28,6 +28,8 @@
   "rules": [
     "rule-rafaam-curse-ward"
   ],
-  "relatedCards": ["rafaam-curse-sample"],
+  "relatedCards": [
+    "rafaam-curse-sample"
+  ],
   "isDefault": false
 }

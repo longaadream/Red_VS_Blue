@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf \"/c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/.claude/worktrees/eager-maxwell-69026b\")",
+      "Bash(rm -rf \"/c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/.claude/worktrees/hardcore-moore-f7cd7e\")",
+      "Bash(rm -rf \"/c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/.claude/worktrees/hopeful-margulis-00d0e7\")",
+      "Bash(rm -rf \"/c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/.claude/worktrees/nice-mcclintock-4360cb\")",
+      "Bash(wait)",
+      "Bash(ls /c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/app/api/)",
+      "Bash(cat /c/Users/lngsc/Documents/GitHub/v0-game-menu-design/v0-game-menu-design/prisma/schema.prisma)"
+    ]
+  }
+}

@@ -36,7 +36,7 @@ export async function POST(
   }
 
   // Verify signature is over the record body (without signatures field)
-  const { signatures: _sig, ...recordToSign } = room.gameRecord as Record<string, unknown>
+  const { signatures: _sig, ...recordToSign } = room.gameRecord as unknown as Record<string, unknown>
   void _sig
   if (!await verifyRecordSignature(recordToSign, signature, publicKey)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })

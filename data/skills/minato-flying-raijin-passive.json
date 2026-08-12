@@ -1,0 +1,16 @@
+{
+  "id": "minato-flying-raijin-passive",
+  "name": "飞雷神",
+  "description": "每回合开始时，标记一处位置作为飞雷神锚点，最多存在3个，多于3个时清除最早的锚点。当带有飞雷神标记的棋子成为技能目标时，水门可选择触发，传送到敌方身边并释放螺旋丸，触发后移除一层标记。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": ["位移", "标记"],
+  "icon": "⚡",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { return { success: false, message: '' }; }"
+}

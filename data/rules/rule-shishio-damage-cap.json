@@ -1,9 +1,0 @@
-{
-  "id": "rule-shishio-damage-cap",
-  "name": "自燃·炼狱之躯",
-  "description": "志志雄真実单次受到的伤害最多为1点。",
-  "trigger": {
-    "type": "beforeDamageTaken"
-  },
-  "skillCode": "var piece = context.rulePiece; if (!piece || !context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (context.damage <= 1) return { success: false, message: '' }; context.damage = 1; return { success: true, message: piece.name + ' 炼狱之躯：伤害被压制为1点' };"
-}

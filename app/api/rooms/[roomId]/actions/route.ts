@@ -17,7 +17,7 @@ import { getPieceById, getAllPieces } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
 import { applyBattleAction } from "@/lib/game/turn"
 import type { PieceTemplate } from "@/lib/game/piece"
-import { getRoomStore } from "@/lib/game/room-store"
+import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, getRoomStore } from "@/lib/game/room-store"
 import { verifyJoinAuth } from "@/lib/game/identity-verify"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
@@ -36,15 +36,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     action?: "select-pieces" | "start-game" | "claim-faction" | "join" | "toggle-ready" | "leave"
     pieces?: Array<{ templateId: string; faction: string }>
   }) ?? {}
+  const accountId = String((body as { accountId?: unknown; identityId?: unknown })?.accountId || (body as { accountId?: unknown; identityId?: unknown })?.identityId || '').trim().toLowerCase() || undefined
+  const requestedAlignment = normalizePlayerAlignment((body as { alignment?: unknown })?.alignment)
 
   if (!playerId?.trim()) {
     return NextResponse.json({ error: "playerId is required" }, { status: 400 })
   }
 
   const roomStore = getRoomStore()
-  const room = await roomStore.getRoom(roomId)
+  let room = await roomStore.getRoom(roomId)
   if (!room) {
-    return NextResponse.json({ error: "Room not found" }, { status: 404 })
+    if (action === "claim-faction" || action === "select-pieces") {
+      room = await roomStore.createRoom(roomId, `Room ${roomId}`)
+    } else {
+      return NextResponse.json({ error: "Room not found" }, { status: 404 })
+    }
   }
 
   if (action === "join") {
@@ -68,16 +74,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     )
 
     if (existing) {
-      if (!existing.faction) {
-        const assignedFactions = latestRoom.players
-          .filter(p => p.id.toLowerCase() !== normalizedPlayerId)
-          .map(p => p.faction)
-          .filter(Boolean) as Array<"red" | "blue">
-        existing.faction = assignedFactions.length === 0 || assignedFactions[0] === "blue" ? "red" : "blue"
+      if (!getPlayerSeat(existing)) {
+        const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
+        existing.seat = seat
+        existing.faction = seat
       }
+      if (requestedAlignment) existing.alignment = requestedAlignment
       if (trimmedPlayerName) existing.name = trimmedPlayerName
       await roomStore.setRoom(roomId, latestRoom)
-      console.log('Player rejoined room:', { roomId, playerId: normalizedPlayerId, faction: existing.faction })
+      console.log('Player rejoined room:', { roomId, playerId: normalizedPlayerId, faction: existing.faction, alignment: existing.alignment })
       return NextResponse.json(latestRoom)
     }
 
@@ -92,27 +97,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       return NextResponse.json({ error: "Room is full" }, { status: 400 })
     }
 
-    // Auto-assign faction on join
-    const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
-    let faction: "red" | "blue"
-    if (assignedFactions.length === 0) {
-      faction = Math.random() > 0.5 ? "red" : "blue"
-    } else {
-      faction = assignedFactions[0] === "red" ? "blue" : "red"
-    }
+    // Turn order (red/blue) is randomly assigned; ensure two players get opposite factions
+    const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
 
-    const player = {
+    const player: Record<string, unknown> = {
       id: normalizedPlayerId,
+      accountId,
       name: trimmedPlayerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
       joinedAt: Date.now(),
-      faction,
+      seat,
+      faction: seat,
     }
-    latestRoom.players.push(player)
+    if (requestedAlignment) player.alignment = requestedAlignment
+    if (accountId) player.accountId = accountId
+
+    latestRoom.players.push(player as any)
 
     if (!latestRoom.hostId) {
       latestRoom.hostId = normalizedPlayerId
     }
-    console.log('Player joined room:', { roomId, playerId: normalizedPlayerId, faction, totalPlayers: latestRoom.players.length })
+    console.log('Player joined room:', { roomId, playerId: normalizedPlayerId, seat, alignment: player.alignment, totalPlayers: latestRoom.players.length })
 
     await roomStore.setRoom(roomId, latestRoom)
     return NextResponse.json(latestRoom)
@@ -134,6 +138,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     if (!existingPlayer) {
       const newPlayer = {
         id: normalizedPlayerId,
+        accountId,
         name: playerName?.trim() || `Player ${normalizedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
       }
@@ -141,27 +146,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       existingPlayer = newPlayer
     }
 
-    if (existingPlayer.faction) {
-      return NextResponse.json({ success: true, faction: existingPlayer.faction, message: "Faction already claimed" })
+    if (accountId) existingPlayer.accountId = accountId
+    if (requestedAlignment) existingPlayer.alignment = requestedAlignment
+
+    if (getPlayerSeat(existingPlayer)) {
+      await roomStore.setRoom(roomId, latestRoom)
+      return NextResponse.json({ success: true, seat: getPlayerSeat(existingPlayer), faction: existingPlayer.faction, alignment: existingPlayer.alignment, message: "Seat already claimed" })
     }
 
-    const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
-
-    if (assignedFactions.length >= 2) {
-      return NextResponse.json({ error: "All factions are already claimed" }, { status: 400 })
-    }
-
-    let faction: "red" | "blue";
-    if (assignedFactions.length === 0) {
-      faction = Math.random() > 0.5 ? "red" : "blue"
-    } else {
-      faction = assignedFactions[0] === "red" ? "blue" : "red"
-    }
-
-    existingPlayer.faction = faction
+    const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
+    existingPlayer.seat = seat
+    existingPlayer.faction = seat
 
     await roomStore.setRoom(roomId, latestRoom)
-    return NextResponse.json({ success: true, faction, message: `Faction ${faction} claimed successfully` })
+    return NextResponse.json({ success: true, seat, faction: seat, alignment: existingPlayer.alignment, message: `Seat ${seat} claimed successfully` })
   }
 
   if (action === "toggle-ready") {
@@ -224,31 +222,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     )
 
     if (!targetPlayer) {
-      const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
-      let faction: "red" | "blue" = "red"
-      if (assignedFactions.length > 0) {
-        faction = assignedFactions[0] === "red" ? "blue" : "red"
-      }
+      const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
       targetPlayer = {
         id: normalizedPlayerId,
+        accountId,
         name: playerName?.trim() || `Player ${normalizedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
-        faction,
+        seat,
+        faction: seat,
+        ...(requestedAlignment ? { alignment: requestedAlignment } : {}),
         hasSelectedPieces: true,
         selectedPieces: pieces
       }
       latestRoom.players.push(targetPlayer)
     } else {
+      if (accountId) targetPlayer.accountId = accountId
       targetPlayer.hasSelectedPieces = true
       targetPlayer.selectedPieces = pieces
-      if (!targetPlayer.faction) {
-        const assignedFactions = latestRoom.players.map(p => p.faction).filter(Boolean) as Array<"red" | "blue">
-        let faction: "red" | "blue" = "red"
-        if (assignedFactions.length > 0) {
-          faction = assignedFactions[0] === "red" ? "blue" : "red"
-        }
-        targetPlayer.faction = faction
+      if (requestedAlignment) targetPlayer.alignment = requestedAlignment
+      if (!getPlayerSeat(targetPlayer)) {
+        const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
+        targetPlayer.seat = seat
+        targetPlayer.faction = seat
       }
+    }
+
+    // PVE: auto-assign default pieces to the bot player
+    const botPlayer = latestRoom.players.find((p: any) => p.isBot === true || p.id === 'bot')
+    if (botPlayer && !botPlayer.hasSelectedPieces) {
+      const humanIds = new Set(pieces.map(p => p.templateId))
+      const allAvailable = getAllPieces()
+      const botPieces = allAvailable
+        .filter(p => !humanIds.has(p.id))
+        .slice(0, pieces.length)
+        .map(p => ({ templateId: p.id, faction: botPlayer.faction || 'blue' }))
+      botPlayer.selectedPieces = botPieces.length > 0
+        ? botPieces
+        : allAvailable.slice(0, 3).map(p => ({ templateId: p.id, faction: 'blue' }))
+      botPlayer.hasSelectedPieces = true
     }
 
     await roomStore.setRoom(roomId, latestRoom)
@@ -266,8 +277,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       console.log('=== ALL PLAYERS HAVE SELECTED PIECES, AUTO-STARTING GAME ===')
 
       const sortedPlayers = [...checkRoom.players.slice(0, 2)].sort((a, b) => {
-        if (a.faction === "red" && b.faction === "blue") return -1
-        if (a.faction === "blue" && b.faction === "red") return 1
+        if (getPlayerSeat(a) === "red" && getPlayerSeat(b) === "blue") return -1
+        if (getPlayerSeat(a) === "blue" && getPlayerSeat(b) === "red") return 1
         return 0
       })
 
@@ -276,7 +287,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       const playerSelectedPieces = sortedPlayers.map(player => {
         const playerPieceTemplates = player.selectedPieces?.map(piece => getPieceById(piece.templateId))
           .filter(Boolean) as PieceTemplate[] || []
-        return { playerId: player.id, pieces: playerPieceTemplates }
+        return { playerId: player.id, pieces: playerPieceTemplates, faction: getPlayerSeat(player) as 'red' | 'blue' | undefined }
       })
 
       let pieceTemplates = checkRoom.players
@@ -296,7 +307,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       writeLog('[select-pieces] mapId from room: ' + mapId)
 
       try {
-        const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId)
+        const firstSeatPlayer = sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0]
+        const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId: firstSeatPlayer?.id })
 
         if (!battle) {
           return NextResponse.json({ error: "Failed to create battle: invalid player count or battle setup" }, { status: 500 })
@@ -379,9 +391,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       return NextResponse.json({ error: "At least 2 players are required to start game" }, { status: 400 })
     }
 
-    const playersWithFaction = latestRoom.players.filter(p => p.faction)
+    const playersWithFaction = latestRoom.players.filter(p => getPlayerSeat(p))
     if (playersWithFaction.length < 2) {
-      return NextResponse.json({ error: "All players must claim a faction before starting the game" }, { status: 400 })
+      return NextResponse.json({ error: "All players must claim a seat before starting the game" }, { status: 400 })
     }
 
     let pieceTemplates = latestRoom.players
@@ -390,8 +402,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       .filter(Boolean) as any[]
 
     const sortedPlayers = [...latestRoom.players.slice(0, 2)].sort((a, b) => {
-      if (a.faction === "red" && b.faction === "blue") return -1
-      if (a.faction === "blue" && b.faction === "red") return 1
+      if (getPlayerSeat(a) === "red" && getPlayerSeat(b) === "blue") return -1
+      if (getPlayerSeat(a) === "blue" && getPlayerSeat(b) === "red") return 1
       return 0
     })
 
@@ -400,7 +412,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     const playerSelectedPieces = sortedPlayers.map(player => {
       const playerPieceTemplates = player.selectedPieces?.map(piece => getPieceById(piece.templateId))
         .filter(Boolean) as PieceTemplate[] || []
-      return { playerId: player.id, pieces: playerPieceTemplates }
+      return { playerId: player.id, pieces: playerPieceTemplates, faction: getPlayerSeat(player) as 'red' | 'blue' | undefined }
     })
 
     if (pieceTemplates.length < 2) {
@@ -414,7 +426,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     const mapId = latestRoom.mapId || "large-battlefield"
     writeLog('[start-game] mapId from room: ' + mapId)
 
-    const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId)
+    const firstSeatPlayer = sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0]
+    const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId: firstSeatPlayer?.id })
 
     if (!battle) {
       return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })

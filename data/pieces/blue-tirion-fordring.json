@@ -1,7 +1,7 @@
 {
   "id": "blue-tirion-fordring",
   "name": "提里奥弗丁",
-  "faction": "blue",
+  "faction": "good",
   "description": "圣骑士的领袖，手持灰烬使者，能够给予敌人致命的真实伤害",
   "rarity": "legendary",
   "image": "tirion-fordring.jpg",
@@ -25,6 +25,8 @@
       "level": 1
     }
   ],
-  "rules": ["rule-tirion-divine-shield-start"],
+  "rules": [
+    "rule-tirion-divine-shield-start"
+  ],
   "isDefault": false
 }

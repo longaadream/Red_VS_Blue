@@ -1,7 +1,7 @@
 {
   "id": "red-illidan",
   "name": "伊利丹怒风",
-  "faction": "red",
+  "faction": "evil",
   "description": "堕落的精灵王子，以恶魔之力为刃，在战场上横冲直撞",
   "rarity": "legendary",
   "image": "illidan.jpg",
@@ -12,13 +12,25 @@
     "moveRange": 4
   },
   "skills": [
-    { "skillId": "illidan-blade-dash", "level": 1 },
-    { "skillId": "illidan-eye-beam", "level": 1 },
-    { "skillId": "illidan-metamorphosis", "level": 1 }
+    {
+      "skillId": "illidan-blade-dash",
+      "level": 1
+    },
+    {
+      "skillId": "illidan-eye-beam",
+      "level": 1
+    },
+    {
+      "skillId": "illidan-metamorphosis",
+      "level": 1
+    }
   ],
   "rules": [],
   "transformedSkills": [
-    { "skillId": "illidan-demon-strike", "triggeredBy": "illidan-metamorphosis" }
+    {
+      "skillId": "illidan-demon-strike",
+      "triggeredBy": "illidan-metamorphosis"
+    }
   ],
   "isDefault": false
 }

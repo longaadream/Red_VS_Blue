@@ -6,6 +6,7 @@
   <title>1v1 大厅 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/ws-client.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
   <style>
@@ -136,6 +137,27 @@
       background: #450a0a; border: 1px solid #7f1d1d; border-radius: 8px;
       color: #fca5a5; font-size: 13px; padding: 10px 14px; margin-top: 10px;
       display: none;
+    }
+
+    /* ── Faction picker ── */
+    .faction-row {
+      display: flex; gap: 12px; margin-top: 8px;
+    }
+    .btn-faction {
+      flex: 1; padding: 16px 8px; border-radius: 12px; font-size: 15px; font-weight: 700;
+      cursor: pointer; border: 2px solid transparent; transition: all .15s;
+    }
+    .btn-faction.red {
+      background: #2d0a0a; border-color: #7f1d1d; color: #fca5a5;
+    }
+    .btn-faction.red:active, .btn-faction.red.selected {
+      background: #7f1d1d; border-color: #ef4444; color: #fff;
+    }
+    .btn-faction.blue {
+      background: #0a1830; border-color: #1e3a8a; color: #93c5fd;
+    }
+    .btn-faction.blue:active, .btn-faction.blue.selected {
+      background: #1e3a8a; border-color: #3b82f6; color: #fff;
     }
 
     /* ── Room cards ── */
@@ -285,7 +307,10 @@
 
     let pollTimer = null
     const _lp = new URLSearchParams(window.location.search)
-    const RELAY_MODE = _lp.get('relay') === '1' || _lp.get('server') === 'remote'
+    function shouldUseRelayMode() {
+      if (_lp.get('relay') === '1' || _lp.get('server') === 'remote') return true
+      return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
+    }
 
     function goBack() { window.location.href = 'index.html' }
 
@@ -321,24 +346,28 @@
     async function applyLobbyServerMode() {
       const params = new URLSearchParams(window.location.search)
       const mode = params.get('server')
-      const url = params.get('url')
+      const url = params.get('serverUrl') || params.get('url')
+      const wsPort = params.get('wsPort') || params.get('ws_port')
+      if (url) {
+        RvBUtils.saveServerConfig({ mode: mode || RvBUtils.getServerModeForUrl(url), url, wsPort })
+        return
+      }
       if (mode === 'local') {
         const localUrl = await detectLocalServerUrl()
-        if (localUrl) RvBUtils.saveServerUrl(localUrl)
-        localStorage.setItem('rvb_lobby_server_mode', 'local')
+        if (localUrl) RvBUtils.saveServerConfig({ mode: 'local', url: localUrl })
       } else if (mode === 'lan' || mode === 'remote') {
-        if (url) RvBUtils.saveServerUrl(url)
         localStorage.setItem('rvb_lobby_server_mode', mode)
       }
     }
 
     async function reconcileLobbyServerMode() {
+      const params = new URLSearchParams(window.location.search)
+      const hasExplicitServerUrl = !!(params.get('serverUrl') || params.get('url'))
       await applyLobbyServerMode()
       const savedMode = localStorage.getItem('rvb_lobby_server_mode') || ''
       const runningLocalUrl = await detectRunningLocalServerUrl()
-      if (runningLocalUrl && (savedMode === 'local' || !savedMode)) {
-        RvBUtils.saveServerUrl(runningLocalUrl)
-        localStorage.setItem('rvb_lobby_server_mode', 'local')
+      if (!hasExplicitServerUrl && runningLocalUrl && (savedMode === 'local' || !savedMode)) {
+        RvBUtils.saveServerConfig({ mode: 'local', url: runningLocalUrl })
       }
       const el = document.getElementById('serverUrlDisplay')
       if (el) el.textContent = RvBUtils.getServerUrl() || '未连接'
@@ -356,6 +385,37 @@
       const tag = identity.id ? (' #' + identity.id.slice(0, 6).toUpperCase()) : ''
       document.getElementById('userName').textContent = (identity.displayName || '玩家') + tag
       document.getElementById('userDot').style.background = '#22c55e'
+    }
+
+    let lobbyWsReady = false
+    let lobbyWsConnecting = null
+    async function ensureLobbyWs() {
+      if (lobbyWsReady && window.RvBWs && RvBWs.isConnected()) return
+      if (lobbyWsConnecting) return lobbyWsConnecting
+      lobbyWsConnecting = new Promise((resolve, reject) => {
+        if (typeof RvBWs === 'undefined') {
+          reject(new Error('WebSocket 客户端未加载'))
+          return
+        }
+        const identity = RvBIdentity.getIdentity()
+        const timer = setTimeout(() => reject(new Error('WebSocket 连接超时')), 5000)
+        RvBWs.on('connect', function() {
+          lobbyWsReady = true
+          clearTimeout(timer)
+          resolve()
+        })
+        RvBWs.on('disconnect', function() { lobbyWsReady = false })
+        RvBWs.on('message', function(msg) {
+          if (msg.type === 'lobbyUpdate' && Array.isArray(msg.rooms)) renderRooms(msg.rooms)
+        })
+        RvBWs.connect('__lobby', identity.id || 'lobby-' + Date.now(), shouldUseRelayMode() ? 'relay' : 'lan')
+      }).finally(() => { lobbyWsConnecting = null })
+      return lobbyWsConnecting
+    }
+
+    async function wsRequest(method, data, timeoutMs) {
+      await ensureLobbyWs()
+      return RvBWs.request(method, data || {}, timeoutMs || 6000)
     }
 
     function updateFloatBar() {
@@ -384,13 +444,8 @@
       btn.disabled = true
       statusBar.innerHTML = '<span class="spinner-sm"></span><span>加载中…</span>'
       try {
-        let res = await RvBUtils.serverFetch('/api/rooms')
-        if (!res.ok && res.status >= 500) {
-          res = await RvBUtils.serverFetch('/api/lobby')
-        }
-        if (!res.ok) throw new Error('HTTP ' + res.status)
-        const data = await res.json()
-        renderRooms(Array.isArray(data) ? data : (data.rooms || []))
+        const data = await wsRequest('rooms.list')
+        renderRooms(data.rooms || [])
         statusBar.textContent = '上次更新：' + new Date().toLocaleTimeString()
       } catch (e) {
         document.getElementById('roomList').innerHTML =
@@ -427,7 +482,7 @@
               <div class="room-meta">玩家 ${players}/2 · 地图：${escHtml(r.mapId || '默认')}${inviteInfo}</div>
             </div>
             ${deleteBtn}
-            <button class="btn-join" onclick="joinRoom('${escHtml(r.id)}')">加入</button>
+            <button class="btn-join" onclick="showFactionPicker('${escHtml(r.id)}')">加入</button>
           </div>`
         }).join('')
       }
@@ -458,7 +513,27 @@
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
     }
 
-    async function joinRoom(roomId) {
+    let _pendingJoinRoomId = null
+    function showFactionPicker(roomId) {
+      if (!RvBUtils.getServerUrl()) { alert('请先连接服务器'); return }
+      _pendingJoinRoomId = roomId
+      document.getElementById('factionBtnRed').classList.remove('selected')
+      document.getElementById('factionBtnBlue').classList.remove('selected')
+      document.getElementById('factionSheet').style.display = 'flex'
+    }
+    function closeFactionSheet() {
+      document.getElementById('factionSheet').style.display = 'none'
+      _pendingJoinRoomId = null
+    }
+    async function confirmJoin(faction) {
+      const roomId = _pendingJoinRoomId
+      if (!roomId) return
+      document.getElementById('factionSheet').style.display = 'none'
+      _pendingJoinRoomId = null
+      await joinRoom(roomId, faction)
+    }
+
+    async function joinRoom(roomId, faction) {
       try {
         const identity = RvBIdentity.getIdentity()
         if (!identity) { alert('请先设置账号'); return }
@@ -466,34 +541,30 @@
         const publicKey = typeof RvBIdentity.getPublicKey === 'function'
           ? RvBIdentity.getPublicKey()
           : (identity.publicKey || '')
+        const packMd5 = localStorage.getItem('rvb_pack_md5') || ''
         const payload = { action: 'join', roomId, playerId, timestamp: Date.now() }
         const signature = await RvBIdentity.sign(payload)
-        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/actions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'join', playerId, playerName, publicKey, payload, signature })
-        })
-        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const body = { action: 'join', roomId, playerId, playerName, publicKey, payload, signature, packMd5 }
+        if (faction) body.alignment = faction
+        const result = await wsRequest('rooms.action', body)
+        if (result && result.packMismatch) {
+          alert('⚠️ 警告：双方资源包版本不一致，可能导致技能、棋子数据不同步。请确认双方已导入相同版本的资源包后再开始游戏。')
+        }
         window.location.href = 'room.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(playerId)
           + '&playerName=' + encodeURIComponent(playerName)
-          + (RELAY_MODE ? '&relay=1' : '')
+          + (shouldUseRelayMode() ? '&relay=1' : '')
       } catch (e) { alert('加入房间失败：' + e.message) }
     }
 
     async function spectateRoom(roomId) {
       const { id: spectatorId, displayName: spectatorName } = RvBIdentity.getIdentity()
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId + '/spectate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ spectatorId, spectatorName })
-        })
-        if (!res.ok) throw new Error('HTTP ' + res.status)
+        await wsRequest('rooms.spectate', { roomId, spectatorId, spectatorName })
         window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(spectatorId)
           + '&mode=spectate'
-          + (RELAY_MODE ? '&relay=1' : '')
+          + (shouldUseRelayMode() ? '&relay=1' : '')
       } catch (e) { alert('观战失败：' + e.message) }
     }
 
@@ -502,14 +573,7 @@
       if (!confirm('确定要删除这个房间吗？')) return
       const { id: playerId } = RvBIdentity.getIdentity()
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms/' + roomId, {
-          method: 'DELETE',
-          headers: { 'x-player-id': playerId }
-        })
-        if (!res.ok) {
-          const data = await res.json()
-          throw new Error(data.error || 'HTTP ' + res.status)
-        }
+        await wsRequest('rooms.delete', { roomId, playerId })
         loadRooms()
       } catch (e) { alert('删除房间失败：' + e.message) }
     }
@@ -564,14 +628,8 @@
       errEl.style.display = 'none'
       try {
         await reconcileLobbyServerMode()
-        const res = await RvBUtils.serverFetch('/api/lobby', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: playerName + ' 的 1v1 房间', hostId, mapId, visibility })
-        })
-        if (!res.ok) throw new Error('HTTP ' + res.status)
-        const room = await res.json()
-        if (room.id) { closeCreateSheet(); await joinRoom(room.id) }
+        const room = await wsRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, mapId, visibility })
+        if (room.id) { closeCreateSheet(); showFactionPicker(room.id) }
         else throw new Error('未返回房间 ID')
       } catch (e) {
         const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || '未设置'
@@ -585,12 +643,10 @@
       if (!raw) return
       const code = raw.toUpperCase()
       try {
-        const res = await RvBUtils.serverFetch('/api/lobby')
-        if (!res.ok) throw new Error('HTTP ' + res.status)
-        const data = await res.json()
-        const rooms = Array.isArray(data) ? data : (data.rooms || [])
+        const data = await wsRequest('rooms.list')
+        const rooms = data.rooms || []
         const match = rooms.find(r => r.inviteCode && r.inviteCode.toUpperCase() === code && r.status === 'waiting')
-        if (match) { await joinRoom(match.id) }
+        if (match) { showFactionPicker(match.id) }
         else { alert('邀请码无效或房间已关闭') }
       } catch (e) { alert('查找房间失败：' + e.message) }
     }
@@ -611,7 +667,7 @@
       const { roomId, playerId, playerName } = window._rejoinInfo
       const url = RvBUtils.getServerUrl()
       if (!url) { alert('未连接服务器，无法重新加入'); return }
-      window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId) + '&playerId=' + encodeURIComponent(playerId) + (playerName ? '&playerName=' + encodeURIComponent(playerName) : '') + (RELAY_MODE ? '&relay=1' : '')
+      window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId) + '&playerId=' + encodeURIComponent(playerId) + (playerName ? '&playerName=' + encodeURIComponent(playerName) : '') + (shouldUseRelayMode() ? '&relay=1' : '')
     }
     function dismissRejoin() {
       try { localStorage.removeItem('rvb_active_battle') } catch {}
@@ -626,9 +682,19 @@
       updateFloatBar()
       checkRejoin()
       loadRooms()
-      pollTimer = setInterval(loadRooms, 3000)
     })
     window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
   </script>
+  <!-- Faction picker overlay -->
+  <div id="factionSheet" class="overlay" style="display:none" onclick="if(event.target===this)closeFactionSheet()">
+    <div class="sheet">
+      <div class="sheet-title">选择阵营</div>
+      <div class="faction-row">
+        <button class="btn-faction red" id="factionBtnRed" onclick="confirmJoin('evil')">🌑 暗<br><span style="font-size:11px;font-weight:400;opacity:.85">只选暗阵营棋子</span></button>
+        <button class="btn-faction blue" id="factionBtnBlue" onclick="confirmJoin('good')">☀️ 光<br><span style="font-size:11px;font-weight:400;opacity:.85">只选光阵营棋子</span></button>
+      </div>
+      <button class="btn-cancel" style="margin-top:14px" onclick="closeFactionSheet()">取消</button>
+    </div>
+  </div>
 </body>
 </html>

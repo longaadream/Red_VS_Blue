@@ -26,6 +26,7 @@ vi.mock('@/lib/game/attached-effect', () => ({
 
 import { applyBattleAction, BATTLE_STATE_VERSION } from '@/lib/game/turn'
 import { makeState, makePiece } from '../helpers/minimal-state'
+import { globalTriggerSystem } from '@/lib/game/triggers'
 
 // ─── 移动 ────────────────────────────────────────────────────────────────────
 
@@ -151,5 +152,317 @@ describe('state immutability', () => {
     })
 
     expect(state.pieces[0].x).toBe(originalX)
+  })
+})
+
+describe('projectile target validation', () => {
+  it.each(['sleep-dart', 'blackwidow-lethal-strike', 'hellfire-shotgun'])(
+    'rejects diagonal %s targets before beforeSkillUse triggers',
+    (skillId) => {
+      const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+      ;(caster as any).skills = [{ skillId, currentCooldown: 0, usesRemaining: -1 }]
+      const minato = makePiece({ instanceId: 'minato', ownerPlayerId: 'player-blue', x: 1, y: 1, faction: 'blue' })
+      const state = makeState({ pieces: [caster, minato], currentPlayerId: 'player-red', phase: 'action' }) as any
+      state.skillsById[skillId] = {
+        id: skillId,
+        name: skillId,
+        description: '',
+        kind: 'active',
+        type: 'normal',
+        cooldownTurns: 0,
+        maxCharges: 0,
+        powerMultiplier: 1,
+        actionPointCost: 0,
+        range: 'single',
+        requiresTarget: true,
+        code: 'function executeSkill(context) { return { success: true } }',
+      }
+      vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+
+      expect(() => applyBattleAction(state, {
+        type: 'useBasicSkill',
+        playerId: 'player-red',
+        pieceId: 'caster',
+        skillId,
+        targetPieceId: 'minato',
+        targetX: 1,
+        targetY: 1,
+      } as any)).toThrow(/same row or column/)
+
+      expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
+    },
+  )
+
+  it('rejects script-level invalid targets before beforeSkillUse triggers', () => {
+    const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    ;(caster as any).skills = [{ skillId: 'ally-only-test', currentCooldown: 0, usesRemaining: -1 }]
+    const minato = makePiece({ instanceId: 'minato', ownerPlayerId: 'player-blue', x: 1, y: 0, faction: 'blue' })
+    const state = makeState({ pieces: [caster, minato], currentPlayerId: 'player-red', phase: 'action' }) as any
+    state.skillsById['ally-only-test'] = {
+      id: 'ally-only-test',
+      name: 'Ally Only Test',
+      description: '',
+      kind: 'active',
+      type: 'normal',
+      cooldownTurns: 0,
+      maxCharges: 0,
+      powerMultiplier: 1,
+      actionPointCost: 0,
+      range: 'single',
+      requiresTarget: true,
+      code: "function executeSkill(context) { var target = selectTarget({ type: 'piece', range: 99, filter: 'ally' }); if (!target || target.needsTargetSelection) return target; context.battle.extensions.executed = true; return { success: true, message: 'ok' }; }",
+    }
+    vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+
+    expect(() => applyBattleAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'caster',
+      skillId: 'ally-only-test',
+      targetPieceId: 'minato',
+    } as any)).toThrow()
+
+    expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
+    expect(state.extensions.executed).toBeUndefined()
+  })
+})
+
+describe('interrupted skill release', () => {
+  it('pays AP, cooldown, and uses when the caster dies during beforeSkillUse', () => {
+    const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    ;(caster as any).skills = [{ skillId: 'paid-fizzle', currentCooldown: 0, usesRemaining: 1 }]
+    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' }) as any
+    state.players.find((p: any) => p.playerId === 'player-red').actionPoints = 2
+    state.skillsById['paid-fizzle'] = {
+      id: 'paid-fizzle',
+      name: 'Paid Fizzle',
+      description: '',
+      kind: 'active',
+      type: 'ultimate',
+      cooldownTurns: 2,
+      maxCharges: 0,
+      powerMultiplier: 1,
+      actionPointCost: 1,
+      range: 'self',
+      requiresTarget: false,
+      code: "function executeSkill(context) { context.battle.extensions.executed = true; return { success: true, message: 'executed' } }",
+    }
+
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: any, context: any) => {
+      expect(context.type).toBe('beforeSkillUse')
+      battle.pieces.find((p: any) => p.instanceId === 'caster').currentHp = 0
+      return { success: true, messages: ['Tracer interrupted the release'], blocked: false }
+    })
+
+    const next = applyBattleAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'caster',
+      skillId: 'paid-fizzle',
+    } as any) as any
+
+    expect(next.players.find((p: any) => p.playerId === 'player-red').actionPoints).toBe(1)
+    expect(next.pieces.find((p: any) => p.instanceId === 'caster').currentHp).toBe(0)
+    expect(next.pieces.find((p: any) => p.instanceId === 'caster').skills[0].currentCooldown).toBe(2)
+    expect(next.pieces.find((p: any) => p.instanceId === 'caster').skills[0].usesRemaining).toBe(0)
+    expect(next.extensions.executed).toBeUndefined()
+    expect(next.actions.some((a: any) => a.type === 'useBasicSkill' && a.payload?.interrupted)).toBe(true)
+  })
+})
+
+describe('card preflight and interrupted release', () => {
+  it('rejects invalid card effects before beforeCardPlay triggers', () => {
+    const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, y: 1, faction: 'blue' })
+    const state = makeState({ pieces: [caster, target], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    red.hand = [{ cardId: 'line-card', instanceId: 'card-1', actionPointCost: 1 }]
+    red.actionPoints = 2
+    state.customCards = {
+      'line-card': {
+        id: 'line-card',
+        name: 'Line Card',
+        description: '',
+        type: 'active',
+        actionPointCost: 1,
+        code: "function executeCard(context) { if (!context.target) return { needsTargetSelection: true, targetType: 'piece', filter: 'enemy' }; if (context.target.x !== 0 && context.target.y !== 0) return { success: false, message: 'same row or column only' }; context.battle.extensions.executed = true; return { success: true, message: 'ok' }; }",
+      },
+    }
+    vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+
+    expect(() => applyBattleAction(state, {
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'card-1',
+      targetPieceId: 'target',
+      targetX: 1,
+      targetY: 1,
+    } as any)).toThrow(/same row or column only/)
+
+    expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
+  })
+
+  it('pays AP and discards when the card target dies during beforeCardPlay', () => {
+    const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, y: 0, faction: 'blue' })
+    const state = makeState({ pieces: [target], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    red.hand = [{ cardId: 'paid-card', instanceId: 'card-1', actionPointCost: 1 }]
+    red.discardPile = []
+    red.actionPoints = 2
+    state.customCards = {
+      'paid-card': {
+        id: 'paid-card',
+        name: 'Paid Card',
+        description: '',
+        type: 'active',
+        actionPointCost: 1,
+        code: "function executeCard(context) { if (!context.target) return { needsTargetSelection: true, targetType: 'piece', filter: 'enemy' }; context.battle.extensions.executed = true; return { success: true, message: 'card executed' }; }",
+      },
+    }
+
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: any, context: any) => {
+      expect(context.type).toBe('beforeCardPlay')
+      battle.pieces.find((p: any) => p.instanceId === 'target').currentHp = 0
+      return { success: true, messages: ['Target was removed'], blocked: false }
+    })
+
+    const next = applyBattleAction(state, {
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'card-1',
+      targetPieceId: 'target',
+      targetX: 1,
+      targetY: 0,
+    } as any) as any
+
+    const nextRed = next.players.find((p: any) => p.playerId === 'player-red')
+    expect(nextRed.actionPoints).toBe(1)
+    expect(nextRed.hand).toEqual([])
+    expect(nextRed.discardPile).toEqual(['paid-card'])
+    expect(next.pieces.find((p: any) => p.instanceId === 'target').currentHp).toBe(0)
+    expect(next.extensions.executed).toBeUndefined()
+    expect(next.actions.some((a: any) => a.type === 'playCard' && a.payload?.interrupted)).toBe(true)
+  })
+
+  it('resolves multi-target cards with a piece target followed by a grid target', () => {
+    const anchor = makePiece({ instanceId: 'anchor', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3 })
+    const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    red.hand = [{ cardId: 'summon-final', instanceId: 'card-1', actionPointCost: 1 }]
+    red.discardPile = []
+    red.actionPoints = 3
+    state.extensions.kiljaedanPiece = {
+      instanceId: 'kiljaedan-hidden',
+      templateId: 'kiljaedan',
+      name: 'Kiljaedan',
+      ownerPlayerId: 'player-red',
+      faction: 'red',
+      currentHp: 1,
+      maxHp: 17,
+      attack: 4,
+      defense: 3,
+      moveRange: 4,
+      x: 0,
+      y: 0,
+      skills: [],
+      rules: [],
+    }
+    state.customCards = {
+      'summon-final': {
+        id: 'summon-final',
+        name: 'Summon Final',
+        description: '',
+        type: 'active',
+        actionPointCost: 1,
+        code: "function executeCard(context) { var anchor = selectTarget({ type: 'piece', filter: 'ally', range: 99 }); if (!anchor || anchor.needsTargetSelection) return anchor; var pos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var kj = context.battle.extensions.kiljaedanPiece; kj.x = pos.x; kj.y = pos.y; kj.currentHp = kj.maxHp; context.battle.pieces.push(kj); delete context.battle.extensions.kiljaedanPiece; return { success: true, message: 'summoned' }; }",
+      },
+    }
+    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
+
+    const next = applyBattleAction(state, {
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'card-1',
+      targetPieceId: 'anchor',
+      targetX: 0,
+      targetY: 0,
+      extraTargets: [{ x: 2, y: 2 }],
+    } as any) as any
+
+    expect(next.extensions.kiljaedanPiece).toBeUndefined()
+    const summoned = next.pieces.find((p: any) => p.instanceId === 'kiljaedan-hidden')
+    expect(summoned?.x).toBe(2)
+    expect(summoned?.y).toBe(2)
+    expect(summoned?.currentHp).toBe(17)
+    expect(next.players.find((p: any) => p.playerId === 'player-red').discardPile).toEqual(['summon-final'])
+  })
+
+  it('resolves the real demon-summon-5 card with an ally target followed by a grid target', () => {
+    const anchor = makePiece({ instanceId: 'anchor', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3, faction: 'red' })
+    const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    red.hand = [{ cardId: 'demon-summon-5', instanceId: 'card-5', actionPointCost: 3 }]
+    red.discardPile = []
+    red.actionPoints = 3
+    state.extensions.kiljaedanPiece = {
+      instanceId: 'kiljaedan-hidden',
+      templateId: 'kiljaedan',
+      name: 'Kiljaedan',
+      ownerPlayerId: 'player-red',
+      faction: 'red',
+      currentHp: 1,
+      maxHp: 17,
+      attack: 4,
+      defense: 3,
+      moveRange: 4,
+      x: 0,
+      y: 0,
+      skills: [],
+      rules: [],
+      statusTags: [],
+    }
+    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
+
+    const next = applyBattleAction(state, {
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'card-5',
+      targetPieceId: 'anchor',
+      targetX: 0,
+      targetY: 0,
+      extraTargets: [{ x: 2, y: 2 }],
+    } as any) as any
+
+    expect(next.extensions.kiljaedanPiece).toBeUndefined()
+    const summoned = next.pieces.find((p: any) => p.instanceId === 'kiljaedan-hidden')
+    expect(summoned?.x).toBe(2)
+    expect(summoned?.y).toBe(2)
+    expect(summoned?.currentHp).toBe(17)
+    expect(next.players.find((p: any) => p.playerId === 'player-red').discardPile).toEqual(['demon-summon-5'])
+  })
+})
+
+describe('generic pending target selection', () => {
+  it('pendingTargetSelect clears selector and applies effectCode', () => {
+    const state = makeState({ currentPlayerId: 'player-blue', phase: 'action' }) as any
+    state.pendingTargetSelection = {
+      playerId: 'player-blue',
+      title: '选择测试格',
+      targetType: 'cell',
+      range: 99,
+      filter: 'all',
+      effectCode: "function(ctx) { if (!ctx.battle.extensions) ctx.battle.extensions = {}; ctx.battle.extensions.tileEffects = [{ x: ctx.targetX, y: ctx.targetY, tileType: 'test-anchor' }]; return { success: true, message: 'ok' }; }",
+    }
+
+    const next = applyBattleAction(state, {
+      type: 'pendingTargetSelect',
+      playerId: 'player-blue',
+      targetX: 1,
+      targetY: 1,
+    } as any) as any
+
+    expect(next.pendingTargetSelection).toBeUndefined()
+    expect(next.extensions.tileEffects).toEqual([{ x: 1, y: 1, tileType: 'test-anchor' }])
+    expect(next.actions.at(-1)?.payload?.message).toBe('ok')
   })
 })
