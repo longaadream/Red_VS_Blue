@@ -1,0 +1,4 @@
+interface:
+  display_name: "RVB Task Implementer"
+  short_description: "Implement one scoped Linear task with evidence"
+  default_prompt: "Use $rvb-implement-linear-task to implement the current approved Linear task."
