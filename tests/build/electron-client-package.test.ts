@@ -82,6 +82,22 @@ describe('Electron client package verification', () => {
     )
   })
 
+  it('reports offline data that exists in the package but is stale', () => {
+    const { dataSourceRoot, packageRoot, pageSourceRoot } = createFixture()
+    fs.cpSync(pageSourceRoot, path.join(packageRoot, 'resources', 'app', 'www'), { recursive: true })
+    fs.cpSync(dataSourceRoot, path.join(packageRoot, 'resources', 'app', 'www', 'data'), {
+      recursive: true,
+    })
+    fs.writeFileSync(
+      path.join(packageRoot, 'resources', 'app', 'www', 'data', 'pieces', 'red-1.json'),
+      '{"id":"stale"}',
+    )
+
+    expect(findClientPackageIssues(packageRoot, pageSourceRoot, dataSourceRoot)).toContain(
+      'stale offline data asset: resources/app/www/data/pieces/red-1.json',
+    )
+  })
+
   it('accepts source pages and offline data copied byte-for-byte into the package', () => {
     const { dataSourceRoot, packageRoot, pageSourceRoot } = createFixture()
     fs.cpSync(pageSourceRoot, path.join(packageRoot, 'resources', 'app', 'www'), { recursive: true })

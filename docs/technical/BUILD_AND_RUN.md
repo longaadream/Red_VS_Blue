@@ -381,7 +381,7 @@ npm.cmd run build:electron:server
 
 ### 其他检查
 
-- `npm.cmd run test`：验证时曾因沙箱禁止写入 `logs/game.log` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。白屏、图鉴数据与用户数据库排除共包含 4 个产物回归测试；最终 5 个测试文件、36 个测试全部通过。
+- `npm.cmd run test`：验证时曾因沙箱禁止写入 `logs/game.log` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。白屏、图鉴数据缺失/陈旧与用户数据库排除共包含 5 个产物回归测试；最终 5 个测试文件、37 个测试全部通过。
 - `npm.cmd run check:encoding`：退出码 0，485 个文本文件通过。
 - 根 TypeScript 与 Electron Client TypeScript：退出码均为 0。
 - `node scripts/verify-electron-client-package.js`：退出码 0，27 个页面源资源和 305 个白名单离线数据资源与最终候选一致；`resources/app/www/data/users.json` 不存在。
