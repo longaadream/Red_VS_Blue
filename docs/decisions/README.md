@@ -95,6 +95,8 @@
 
 ## 当前已确定的基础决策
 
+- [`ADR-0001-deployment-visibility.md`](./ADR-0001-deployment-visibility.md)：部署重投阶段公开双方站位。
+
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 
 - GitHub 作为代码、PR、构建和发布记录的主要平台。
