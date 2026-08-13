@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "build:electron": "npm run build:electron:client",
-    "build:electron:client": "npm run build && node scripts/stage-client-resources.js && npx tsc -p electron-client/tsconfig.json && electron-builder --config electron-builder.client.json && node scripts/cleanup-client-resources.js",
+    "build:electron:client": "npm run build && npm run sync:pages && node scripts/stage-client-resources.js && npx tsc -p electron-client/tsconfig.json && electron-builder --config electron-builder.client.json && node scripts/verify-electron-client-package.js && node scripts/cleanup-client-resources.js",
     "dev:electron:server": "npx tsc -p electron/tsconfig.json && npx electron .",
     "dev:electron:client": "npx tsc -p electron-client/tsconfig.json && npx electron electron-client/dist/main.js",
     "build:game-engine": "node scripts/build-game-engine.js",
