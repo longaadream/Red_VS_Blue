@@ -305,7 +305,13 @@ npm.cmd ls electron-builder app-builder-lib builder-util node-gyp tar tmp form-d
 npm.cmd run build:electron:client
 ```
 
-结果：退出码 0，耗时 88.9 秒。`electron-builder 26.15.3` 生成 Windows x64 unpacked 目录：
+初始结果：退出码 0，耗时 88.9 秒。`electron-builder 26.15.3` 生成 Windows x64 unpacked 目录。人工验收随后发现，点击“使用本机服务器”会白屏；根因是干净 worktree 中被忽略的 `android-client/www/*.html` 等生成资源不存在，而构建命令没有先从受跟踪的 `data/pages` 同步页面。旧候选的 `resources/app/www` 只有 `js/` 和 `sw.js`，缺少运行时加载的 `index.html`。
+
+修复后，Client 构建会先执行现有 `sync:pages`，再运行 `scripts/verify-electron-client-package.js`。校验器既检查关键运行文件，也逐一比较 `data/pages` 中 27 个页面源资源与最终 `resources/app/www` 产物；旧候选会稳定报告缺少 `index.html`、其余 HTML、生成脚本和地形图片。
+
+2026-08-13 完整重建先在 electron-builder 下载 Electron 时两次连接 GitHub 超时（`ETIMEDOUT`），没有生成可验收的新候选。随后通过 electron-builder 26 正式支持的临时 `electronDist=node_modules/electron/dist` 验证路径，使用本机相同版本 Electron 33.4.11 完成打包：builder 退出码 0，产物校验退出码 0，耗时 13.0 秒。该临时参数没有写入项目构建配置。
+
+最终 Windows x64 unpacked 目录：
 
 - `dist/client-build/win-unpacked/RED vs BLUE.exe`
 - EXE SHA-256：`615af01fe4445068ee344f21a7f8186445949f17e45b0cb5e1132e4cf849f644`
@@ -317,11 +323,17 @@ npm.cmd run build:electron:client
 - `resources/app/public`
 - `resources/app/data`
 - `resources/app/prisma`
-- `resources/app/www`
+- `resources/app/www/index.html`
+- `resources/app/www/lobby.html`
+- `resources/app/www/js/server-utils.js`
+- `resources/app/www/js/game-engine.js`
+- `resources/app/www/images/terrain/floor.webp`
 - `resources/app/init-db.js`
 - `resources/node.exe`
 
-产物结构与 `electron-builder.client.json` 一致：继续使用 `asar: false` 和 Windows `dir` 目标，没有生成安装器。
+GUI 回归验证：新候选从“连接服务器”点击“使用本机服务器”后，渲染 URL 切换至最终产物中的 `resources/app/www/index.html`；页面状态为 `complete`，Windows 窗口显示“我当主机”“连接主机”“已连接：localhost:38521”等主菜单内容，`RvBUtils` 已加载，没有捕获脚本异常或损坏图片。关闭窗口后 Client/Node 进程以及 9229、38521–38523 端口全部释放。
+
+产物结构与 `electron-builder.client.json` 一致：继续使用 `asar: false` 和 Windows `dir` 目标，没有生成安装器。由于本次只修复旁载的 `resources/app/www`，启动器 EXE SHA-256 保持不变；候选内容变化由逐文件页面资源校验和 GUI 回归证明。
 
 ### Electron 编辑器
 
@@ -368,8 +380,10 @@ npm.cmd run build:electron:server
 
 ### 其他检查
 
-- `npm.cmd run test`：首次因隔离 worktree 的沙箱禁止创建 `logs/` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0，3 个测试文件、29 个测试全部通过。
-- `npm.cmd run check:encoding`：退出码 0，483 个文本文件通过。
+- `npm.cmd run test`：首次因隔离 worktree 的沙箱禁止创建 `logs/` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。白屏修复增加 2 个产物回归测试后，4 个测试文件、31 个测试全部通过。
+- `npm.cmd run check:encoding`：退出码 0，484 个文本文件通过。
+- 根 TypeScript 与 Electron Client TypeScript：退出码均为 0。
+- `node scripts/verify-electron-client-package.js`：退出码 0，27 个页面源资源与最终候选一致。
 - `npm.cmd run lint`：退出码 1，`eslint` 命令不存在。当前 `package.json` 声明了 lint 脚本但没有 ESLint 依赖；这是现有基线缺口，RED-18 不增加范围外依赖。
 
 回退时还原 RED-18 的独立提交，即可同时恢复 `package.json` 中旧版 builder 声明和对应 `package-lock.json` 构建依赖树。构建产物不提交到仓库。
