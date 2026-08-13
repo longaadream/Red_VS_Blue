@@ -102,6 +102,8 @@
     "electron-builder": "^25.0.0",
     "electron-store": "^8.2.0",
     "esbuild": "^0.25.12",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.1.6",
     "jszip": "^3.10.1",
     "null-loader": "^4.0.1",
     "postcss": "^8.5",
