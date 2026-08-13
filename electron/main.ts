@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } from 'electron'
-import { spawn, ChildProcess, execSync } from 'child_process'
+import { spawn, ChildProcess, execFileSync, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 
@@ -8,6 +8,7 @@ let tray: Tray | null = null
 let dashboardWin: BrowserWindow | null = null
 let serverRunning = false
 let cleanupInterval: NodeJS.Timeout | null = null
+let serverLock: { release: () => void } | null = null
 
 // ─── 路径工具 ────────────────────────────────────────────────────────────────
 
@@ -54,29 +55,47 @@ function findStandaloneModules(appRoot: string): string | null {
 }
 
 function initDatabase(dbPath: string, appRoot: string): void {
-  // Locate the init-db.js helper script (bundled as extraResource at resources/app/init-db.js)
-  const initScript = path.join(appRoot, 'init-db.js')
-  if (!fs.existsSync(initScript)) {
-    console.error('[electron] init-db.js not found at', initScript, '— skipping DB init')
-    return
-  }
+  // Packaged builds place the runner at app/init-db.js; development uses scripts/init-db.js.
+  const initScript = [
+    path.join(appRoot, 'init-db.js'),
+    path.join(appRoot, 'scripts', 'init-db.js'),
+  ].find(candidate => fs.existsSync(candidate))
+  if (!initScript) throw new Error(`init-db.js not found under ${appRoot}`)
 
   const moduleRoot = findStandaloneModules(appRoot)
   if (!moduleRoot) {
-    console.error('[electron] Standalone node_modules (with .prisma/client) not found — skipping DB init')
-    return
+    throw new Error('Standalone node_modules (with .prisma/client) not found')
   }
 
+  const migrationsDir = path.join(appRoot, 'prisma', 'migrations')
   console.log('[electron] Initialising database:', dbPath)
-  try {
-    execSync(
-      `"${getNodeBin()}" "${initScript}" "file:${dbPath}" "${moduleRoot}"`,
-      { env: process.env, cwd: appRoot, stdio: 'pipe' }
-    )
-    console.log('[electron] Database ready.')
-  } catch (err) {
-    console.error('[electron] initDatabase error:', err)
+  execFileSync(
+    getNodeBin(),
+    [initScript, `file:${dbPath.replace(/\\/g, '/')}`, moduleRoot, migrationsDir],
+    { env: process.env, cwd: appRoot, stdio: 'pipe' },
+  )
+  console.log('[electron] Database ready.')
+}
+
+function acquireGameServerLock(appRoot: string): { release: () => void } {
+  const candidates = [
+    path.join(appRoot, 'scripts', 'server-lock.js'),
+    path.join(appRoot, 'server-lock.js'),
+  ]
+  const lockModule = candidates.find(candidate => fs.existsSync(candidate))
+  if (!lockModule) throw new Error(`server-lock.js not found under ${appRoot}`)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { acquireServerLock } = require(lockModule) as {
+    acquireServerLock: (lockPath?: string, owner?: string) => { release: () => void }
   }
+  return acquireServerLock(undefined, 'Electron game server')
+}
+
+function releaseGameServerLock(): void {
+  if (!serverLock) return
+  const lock = serverLock
+  serverLock = null
+  lock.release()
 }
 
 // ─── Static 资源复制 ──────────────────────────────────────────────────────────
@@ -153,20 +172,37 @@ function startGameServer(): void {
   const appRoot = getAppRoot()
   const userData = getUserData()
 
+  try {
+    serverLock = acquireGameServerLock(appRoot)
+  } catch (err) {
+    const msg = String(err)
+    console.error('[electron] Cannot start game server:', msg)
+    dialog.showErrorBox('服务器已在运行', msg)
+    return
+  }
+
   // 开发模式：复用项目里的 prisma/dev.db（与 npm run dev 共享同一数据库）
   // 打包后：使用 AppData 里的独立数据库，并自动跑 migration
   let databaseUrl: string
-  if (app.isPackaged) {
-    const dbPath = path.join(userData, 'game.db')
-    if (!fs.existsSync(userData)) fs.mkdirSync(userData, { recursive: true })
-    try { initDatabase(dbPath, appRoot) } catch (err) {
-      console.error('[electron] initDatabase error:', err)
+  try {
+    if (app.isPackaged) {
+      const dbPath = path.join(userData, 'game.db')
+      if (!fs.existsSync(userData)) fs.mkdirSync(userData, { recursive: true })
+      initDatabase(dbPath, appRoot)
+      databaseUrl = `file:${dbPath.replace(/\\/g, '/')}`
+    } else {
+      // 开发模式：使用项目目录下的 dev.db，并在启动服务前应用 migration。
+      const dbPath = path.join(appRoot, 'prisma', 'dev.db')
+      initDatabase(dbPath, appRoot)
+      databaseUrl = `file:${dbPath.replace(/\\/g, '/')}`
+      console.log('[electron] Dev mode: using', databaseUrl)
     }
-    databaseUrl = `file:${dbPath}`
-  } else {
-    // 开发模式：直接用项目目录下的 dev.db（绝对路径避免 cwd 差异）
-    databaseUrl = `file:${path.join(appRoot, 'prisma', 'dev.db')}`
-    console.log('[electron] Dev mode: using', databaseUrl)
+  } catch (err) {
+    releaseGameServerLock()
+    const msg = `Database initialization failed:\n${String(err)}`
+    console.error('[electron]', msg)
+    dialog.showErrorBox('数据库初始化失败', msg)
+    return
   }
 
   const serverEntry = findServerEntry(appRoot)
@@ -174,6 +210,7 @@ function startGameServer(): void {
     const msg = `server.js not found under .next/standalone/\n\nAppRoot: ${appRoot}\n\nPlease run "npm run build" first.`
     console.error('[electron]', msg)
     dialog.showErrorBox('服务器未构建', msg)
+    releaseGameServerLock()
     return
   }
 
@@ -197,6 +234,7 @@ function startGameServer(): void {
     const msg = `Failed to spawn server process:\n${err}`
     console.error('[electron]', msg)
     dialog.showErrorBox('无法启动服务器', msg)
+    releaseGameServerLock()
     return
   }
 
@@ -208,6 +246,7 @@ function startGameServer(): void {
     dialog.showErrorBox('服务器错误', String(err))
     serverRunning = false
     serverProcess = null
+    releaseGameServerLock()
     dashboardWin?.webContents.send('server-status', { running: false })
     updateTrayMenu()
   })
@@ -215,6 +254,7 @@ function startGameServer(): void {
   serverProcess.on('exit', (code) => {
     serverRunning = false
     serverProcess = null
+    releaseGameServerLock()
     dashboardWin?.webContents.send('server-status', { running: false, code })
     console.log(`[electron] Server exited with code ${code}`)
     if (code === 1) {
@@ -274,6 +314,7 @@ function stopGameServer(): void {
     killProcessTree(proc)
     updateTrayMenu()
   }
+  releaseGameServerLock()
 }
 
 function restartGameServer(): void {
