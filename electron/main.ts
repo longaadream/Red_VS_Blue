@@ -2,6 +2,7 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } from 'el
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
+import { fileURLToPath } from 'url'
 
 let serverProcess: ChildProcess | null = null
 let tray: Tray | null = null
@@ -22,6 +23,25 @@ function getAppRoot(): string {
 
 function getUserData(): string {
   return app.getPath('userData')
+}
+
+function restrictWindowNavigation(win: BrowserWindow, allowedRoot: string): void {
+  const resolvedRoot = path.resolve(allowedRoot)
+  const isAllowed = (rawUrl: string): boolean => {
+    try {
+      const url = new URL(rawUrl)
+      if (url.protocol !== 'file:') return false
+      const target = path.resolve(fileURLToPath(url))
+      return target === resolvedRoot || target.startsWith(resolvedRoot + path.sep)
+    } catch {
+      return false
+    }
+  }
+
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowed(url)) event.preventDefault()
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 }
 
 // 找到可用的 node 可执行文件
@@ -299,10 +319,14 @@ function createDashboardWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
 
-  dashboardWin.loadFile(path.join(__dirname, '..', 'dashboard', 'index.html'))
+  const dashboardRoot = path.join(__dirname, '..', 'dashboard')
+  restrictWindowNavigation(dashboardWin, dashboardRoot)
+  dashboardWin.loadFile(path.join(dashboardRoot, 'index.html'))
   dashboardWin.on('close', (e) => {
     e.preventDefault()
     dashboardWin?.hide()
