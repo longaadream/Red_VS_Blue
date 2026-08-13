@@ -70,15 +70,24 @@ npm.cmd run build:electron:editor
 
 单次网络重试：退出码 1。NSIS 与 7zip 辅助资源下载成功，之后连接被重置（`ECONNRESET`），未生成最终 `dist/editor/RED vs BLUE Editor 0.1.0.exe`。
 
-已生成并验证的中间产物：
+2026-08-13 在辅助资源已缓存后再次执行：退出码 0，耗时 533.6 秒，最终 portable EXE 生成成功。
+
+最终产物：
+
+- `dist/editor/RED vs BLUE Editor 0.1.0.exe`
+- 文件大小：137,680,764 bytes
+- SHA-256：`30ce82535c920d9bbedeb1e300e8c34a91d5a9e292a35620b07a8d2d48a0fe8b`
+
+已验证的 unpacked 产物与资源：
 
 - `dist/editor/win-unpacked/RED vs BLUE Editor.exe`
 - EXE SHA-256：`22116c92edfc7e172c5ca1c1c7ae1121f4e54276725c0d4e88e2090709634b35`
 - `resources/app/electron-editor/dist/main.js`
 - `resources/app/data`
 - `resources/app/scripts`
+- `resources/app/package.json`
 
-配置仍使用 `asar: false` 和 Windows `portable` 目标。需在能稳定访问 GitHub 下载资源的 Windows 候选构建机上再次运行该命令，并确认最终 portable EXE 存在后，才能把编辑器入口标记为通过。
+配置仍使用 `asar: false` 和 Windows `portable` 目标。编辑器打包入口已标记为通过；首次构建机仍需要访问 GitHub 下载 NSIS、7zip、NSIS resources 和 winCodeSign 辅助资源。
 
 ### Electron 服务端
 
@@ -86,11 +95,13 @@ npm.cmd run build:electron:editor
 npm.cmd run build:electron:server
 ```
 
-结果：退出码 1，npm 报告 `Missing script: "build:electron:server"`。当前重构基线只保留 `dev:electron:server`；`build:electron:server` 与 `electron-builder.server.json` 已在基线提交 `ac9b3bf` 中移除。RED-18 不恢复被明确移除的服务端打包入口，只记录当前真实状态。
+结果：退出码 1，npm 报告 `Missing script: "build:electron:server"`。当前重构基线只保留 `dev:electron:server`；`build:electron:server` 与 `electron-builder.server.json` 已在基线提交 `ac9b3bf` 中移除。
+
+经项目负责人批准，RED-18 只验收当前存在的 client/editor 打包入口，不恢复服务端入口。是否恢复独立服务端桌面包由 Linear `RED-23` 单独评估；该任务只做架构决策，不在 RED-18 顺带实现。
 
 ### 签名与回退
 
-两个现有 builder 配置都没有证书、发布或安装器签名配置。本次未修改 `electron-builder.client.json` 或 `electron-builder.editor.json`。日志中的 `signing with signtool.exe` 是 electron-builder 对 Windows 可执行文件的处理步骤，不表示配置了发行证书。
+两个现有 builder 配置都没有证书、发布或安装器签名配置。本次未修改 `electron-builder.client.json` 或 `electron-builder.editor.json`。日志中的 `signing with signtool.exe` 是 electron-builder 对 Windows 可执行文件的处理步骤；PowerShell `Get-AuthenticodeSignature` 对 portable 和 unpacked editor EXE 均返回 `NotSigned`，确认没有配置发行证书。
 
 ### 其他检查
 
