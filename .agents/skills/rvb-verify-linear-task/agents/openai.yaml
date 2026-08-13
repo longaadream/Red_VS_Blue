@@ -1,0 +1,4 @@
+interface:
+  display_name: "RVB Independent Verifier"
+  short_description: "Independently verify one Linear task and its evidence"
+  default_prompt: "Use $rvb-verify-linear-task to independently verify the current Linear task and PR."
