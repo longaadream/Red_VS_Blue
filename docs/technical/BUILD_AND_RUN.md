@@ -304,9 +304,9 @@ RED-18 最初锁文件节点由 917 个变为 845 个；合并 RED-13、RED-15�
 npm.cmd run build:electron:client
 ```
 
-初始结果：退出码 0，耗时 88.9 秒。`electron-builder 26.15.3` 生成 Windows x64 unpacked 目录。人工验收随后发现，点击“使用本机服务器”会白屏；根因是干净 worktree 中被忽略的 `android-client/www/*.html` 等生成资源不存在，而构建命令没有先从受跟踪的 `data/pages` 同步页面。旧候选的 `resources/app/www` 只有 `js/` 和 `sw.js`，缺少运行时加载的 `index.html`。
+初始结果：退出码 0，耗时 88.9 秒。`electron-builder 26.15.3` 生成 Windows x64 unpacked 目录。第一次人工验收随后发现，点击“使用本机服务器”会白屏；根因是干净 worktree 中被忽略的 `android-client/www/*.html` 等生成资源不存在，而构建命令没有先从受跟踪的 `data/pages` 同步页面。旧候选的 `resources/app/www` 只有 `js/` 和 `sw.js`，缺少运行时加载的 `index.html`。第二次人工验收发现页面虽能打开，但“棋子图鉴”为空；根因是页面通过 `./data/pieces/manifest.json` 等相对路径读取静态游戏数据，而候选的 `resources/app/www/data` 不存在。
 
-修复后，Client 构建会先执行现有 `sync:pages`，再运行 `scripts/verify-electron-client-package.js`。校验器既检查关键运行文件，也逐一比较 `data/pages` 中 27 个页面源资源与最终 `resources/app/www` 产物；旧候选会稳定报告缺少 `index.html`、其余 HTML、生成脚本和地形图片。
+修复后，Client 构建会先执行现有 `sync:pages`，再运行 `scripts/verify-electron-client-package.js`。`electron-builder.client.json` 将页面实际使用的卡牌、效果、地图、棋子、PVE、规则、技能、状态、地块和 `skill-keywords.json` 白名单复制到 `resources/app/www/data`；本地账号数据库 `data/users.json` 与页面源码副本不会进入该前端目录。校验器既检查关键运行文件，也逐一比较 `data/pages` 中 27 个页面源资源和 305 个白名单离线数据资源与最终产物；两个旧候选分别会稳定报告缺少页面资源或离线数据资源。
 
 2026-08-13 完整重建先在 electron-builder 下载 Electron 时两次连接 GitHub 超时（`ETIMEDOUT`），没有生成可验收的新候选。随后通过 electron-builder 26 正式支持的临时 `electronDist=node_modules/electron/dist` 验证路径，使用本机相同版本 Electron 33.4.11 完成打包。合并最新主线并重新执行 Next.js 16.3.0 production build 后，最终 builder 退出码 0、产物校验退出码 0，打包与校验步骤耗时 35.7 秒。该临时参数没有写入项目构建配置。
 
@@ -327,12 +327,14 @@ npm.cmd run build:electron:client
 - `resources/app/www/js/server-utils.js`
 - `resources/app/www/js/game-engine.js`
 - `resources/app/www/images/terrain/floor.webp`
+- `resources/app/www/data/pieces/manifest.json`（25 个棋子 ID）
+- `resources/app/www/data/pieces/*.json`（含 manifest 共 26 个文件）
 - `resources/app/init-db.js`
 - `resources/node.exe`
 
-GUI 回归验证：最终候选从“连接服务器”真实点击“使用本机服务器”后，渲染 URL 切换至最终产物中的 `resources/app/www/index.html`；页面状态为 `complete`，Windows 窗口显示“我当主机”“连接主机”“已连接：localhost:38521”等主菜单内容，`RvBUtils` 已加载，没有捕获脚本异常或损坏图片。关闭窗口后 Client/Node 进程以及 9229、38521–38523 端口全部释放。验收机当时另有旧 Server Electron 进程使用相同的 `my-project` 用户目录和单实例锁，因此本次候选使用隔离的临时 `--user-data-dir` 启动；现有桌面应用身份冲突不属于 RED-18 的 builder 升级或白屏修复范围。
+GUI 回归验证：最终候选从“连接服务器”真实点击“使用本机服务器”后，渲染 URL 切换至最终产物中的 `resources/app/www/index.html`；再真实点击“棋子图鉴”，页面切换至 `resources/app/www/pieces.html`，显示“25 个棋子”，DOM 中实际有 25 张 `.piece-card`。页面状态为 `complete`，没有捕获脚本异常、控制台错误或损坏图片。验收机另有旧 Server Electron 进程使用相同的 `my-project` 用户目录和单实例锁，因此本次候选使用隔离的临时 `--user-data-dir` 启动；现有桌面应用身份冲突不属于 RED-18 的 builder 升级、白屏或图鉴数据修复范围。源数据 `data/pieces/blue-minato.json` 的名称和描述本身是字面量问号，候选如实显示该既有内容问题，修复棋子文案不在 RED-18 范围。
 
-产物结构与 `electron-builder.client.json` 一致：继续使用 `asar: false` 和 Windows `dir` 目标，没有生成安装器。由于本次只修复旁载的 `resources/app/www`，启动器 EXE SHA-256 保持不变；候选内容变化由逐文件页面资源校验和 GUI 回归证明。
+产物结构与 `electron-builder.client.json` 一致：继续使用 `asar: false` 和 Windows `dir` 目标，没有生成安装器。由于本次只修复旁载的 `resources/app/www`，启动器 EXE SHA-256 保持不变；候选内容变化由逐文件页面及离线数据资源校验和 GUI 回归证明。
 
 ### Electron 编辑器
 
@@ -375,14 +377,14 @@ npm.cmd run build:electron:server
 
 ### 签名与回退
 
-两个现有 builder 配置都没有证书、发布或安装器签名配置。本次未修改 `electron-builder.client.json` 或 `electron-builder.editor.json`。日志中的 `signing with signtool.exe` 是 electron-builder 对 Windows 可执行文件的处理步骤；PowerShell `Get-AuthenticodeSignature` 对 portable 和 unpacked editor EXE 均返回 `NotSigned`，确认没有配置发行证书。
+两个现有 builder 配置都没有证书、发布或安装器签名配置。本次仅修改 `electron-builder.client.json` 的静态资源白名单，没有修改 `electron-builder.editor.json`。日志中的 `signing with signtool.exe` 是 electron-builder 对 Windows 可执行文件的处理步骤；PowerShell `Get-AuthenticodeSignature` 对 portable 和 unpacked editor EXE 均返回 `NotSigned`，确认没有配置发行证书。
 
 ### 其他检查
 
-- `npm.cmd run test`：首次因隔离 worktree 的沙箱禁止创建 `logs/` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。白屏修复增加 2 个产物回归测试，主线新增 ws 测试；最终 5 个测试文件、34 个测试全部通过。
+- `npm.cmd run test`：验证时曾因沙箱禁止写入 `logs/game.log` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。白屏、图鉴数据与用户数据库排除共包含 4 个产物回归测试；最终 5 个测试文件、36 个测试全部通过。
 - `npm.cmd run check:encoding`：退出码 0，485 个文本文件通过。
 - 根 TypeScript 与 Electron Client TypeScript：退出码均为 0。
-- `node scripts/verify-electron-client-package.js`：退出码 0，27 个页面源资源与最终候选一致。
+- `node scripts/verify-electron-client-package.js`：退出码 0，27 个页面源资源和 305 个白名单离线数据资源与最终候选一致；`resources/app/www/data/users.json` 不存在。
 - `npm.cmd run lint`：ESLint 正常运行，退出码 1；结果为主线既有的 1005 项（657 errors、348 warnings）。RED-18 新增的 CommonJS 产物校验脚本使用局部规则豁免，没有增加 lint 问题。
 
 回退时还原 RED-18 的独立提交，即可同时恢复 `package.json` 中旧版 builder 声明和对应 `package-lock.json` 构建依赖树。构建产物不提交到仓库。
