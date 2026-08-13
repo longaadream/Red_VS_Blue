@@ -78,13 +78,11 @@ npm.cmd test
 npm.cmd run lint
 ```
 
-实测：退出码 1，错误为：
+RED-13 已补齐 `eslint@9.39.5` 与匹配当前 Next.js 16.1.6 的
+`eslint-config-next@16.1.6`，因此该命令现在能够启动 ESLint 并检查真实源码。
 
-```text
-'eslint' is not recognized as an internal or external command
-```
-
-原因已确认：`package.json#scripts.lint` 定义为 `eslint .`，但 `package.json` 和 `package-lock.json` 均没有 ESLint。RED-13 负责补齐并单独处理随后暴露的 lint 结果。当前不得把 lint 写成通过。
+实测：ESLint 正常运行，退出码 1；当前仓库存在 1005 项既有问题（657 errors、348 warnings）。
+这些问题属于后续 lint 治理范围，不得把当前结果写成 lint 通过，也不应在 RED-13 中批量修复。
 
 ### 3.3 TypeScript
 
