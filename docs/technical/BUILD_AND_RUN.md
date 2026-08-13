@@ -78,13 +78,11 @@ npm.cmd test
 npm.cmd run lint
 ```
 
-实测：退出码 1，错误为：
+RED-13 已补齐 `eslint@9.39.5` 与匹配当前 Next.js 16.3.0 的
+`eslint-config-next@16.3.0`，因此该命令现在能够启动 ESLint 并检查真实源码。
 
-```text
-'eslint' is not recognized as an internal or external command
-```
-
-原因已确认：`package.json#scripts.lint` 定义为 `eslint .`，但 `package.json` 和 `package-lock.json` 均没有 ESLint。RED-13 负责补齐并单独处理随后暴露的 lint 结果。当前不得把 lint 写成通过。
+实测：ESLint 正常运行，退出码 1；当前仓库存在 1005 项既有问题（657 errors、348 warnings）。
+这些问题属于后续 lint 治理范围，不得把当前结果写成 lint 通过，也不应在 RED-13 中批量修复。
 
 ### 3.3 TypeScript
 
@@ -280,11 +278,12 @@ npm.cmd audit --json
 npm.cmd ls electron-builder app-builder-lib builder-util node-gyp tar tmp form-data --all
 ```
 
-- `npm ci`：退出码 0，安装 738 个包。
+- `npm ci`：在合并 RED-13、RED-15、RED-16 后的最终锁文件上退出码 0，安装 998 个包。
 - 升级前 audit：32 项（1 critical、29 high、1 moderate、1 low）。
-- 升级后 audit：17 项（1 critical、15 high、1 moderate）。
+- RED-18 首次升级后 audit：17 项（1 critical、15 high、1 moderate）。
+- 合并最新主线后的最终 audit：12 项（1 critical、10 high、1 moderate）。
 - 升级后不再报告 `electron-builder`、`app-builder-lib`、`builder-util`、`builder-util-runtime`、`@electron/rebuild`、`node-gyp`、`tmp` 或 `form-data` 漏洞。
-- 仍报告的 `tar` 位于根 `node_modules/tar@6.2.1`，修复建议指向 `@capacitor/cli@8.5.0`；它不在 electron-builder 依赖链中，属于 RED-18 明确排除的 Android/Capacitor 升级范围。
+- 仍报告的 `tar@6.2.1` 位于 `@capacitor/cli@6.2.1` 下，修复建议指向 `@capacitor/cli@8.5.0`；它不在 electron-builder 依赖链中，属于 RED-18 明确排除的 Android/Capacitor 升级范围。其余报告来自既有 Electron 33、Capacitor 以及前端/测试依赖，不是 builder 26 工具链回归。
 
 升级后的关键构建依赖为：
 
@@ -297,7 +296,7 @@ npm.cmd ls electron-builder app-builder-lib builder-util node-gyp tar tmp form-d
 - `tmp@0.2.7`
 - `form-data@4.0.6`
 
-锁文件节点由 917 个变为 845 个：新增 65 个、移除 137 个、版本变化 39 个。这些变化来自 electron-builder 25 到 26 的构建依赖树替换；未修改其他直接依赖声明。
+RED-18 最初锁文件节点由 917 个变为 845 个；合并 RED-13、RED-15、RED-16 的 ESLint、Next.js 与 ws 更新后，最终锁文件包含 1129 个节点。最终直接依赖同时保留主线的 `next@16.3.0`、`ws@^8.21.0`、`eslint@9.39.5`、`eslint-config-next@16.3.0`，以及 RED-18 的精确 `electron-builder@26.15.3`。
 
 ### Electron 客户端
 
@@ -309,7 +308,7 @@ npm.cmd run build:electron:client
 
 修复后，Client 构建会先执行现有 `sync:pages`，再运行 `scripts/verify-electron-client-package.js`。校验器既检查关键运行文件，也逐一比较 `data/pages` 中 27 个页面源资源与最终 `resources/app/www` 产物；旧候选会稳定报告缺少 `index.html`、其余 HTML、生成脚本和地形图片。
 
-2026-08-13 完整重建先在 electron-builder 下载 Electron 时两次连接 GitHub 超时（`ETIMEDOUT`），没有生成可验收的新候选。随后通过 electron-builder 26 正式支持的临时 `electronDist=node_modules/electron/dist` 验证路径，使用本机相同版本 Electron 33.4.11 完成打包：builder 退出码 0，产物校验退出码 0，耗时 13.0 秒。该临时参数没有写入项目构建配置。
+2026-08-13 完整重建先在 electron-builder 下载 Electron 时两次连接 GitHub 超时（`ETIMEDOUT`），没有生成可验收的新候选。随后通过 electron-builder 26 正式支持的临时 `electronDist=node_modules/electron/dist` 验证路径，使用本机相同版本 Electron 33.4.11 完成打包。合并最新主线并重新执行 Next.js 16.3.0 production build 后，最终 builder 退出码 0、产物校验退出码 0，打包与校验步骤耗时 35.7 秒。该临时参数没有写入项目构建配置。
 
 最终 Windows x64 unpacked 目录：
 
@@ -331,7 +330,7 @@ npm.cmd run build:electron:client
 - `resources/app/init-db.js`
 - `resources/node.exe`
 
-GUI 回归验证：新候选从“连接服务器”点击“使用本机服务器”后，渲染 URL 切换至最终产物中的 `resources/app/www/index.html`；页面状态为 `complete`，Windows 窗口显示“我当主机”“连接主机”“已连接：localhost:38521”等主菜单内容，`RvBUtils` 已加载，没有捕获脚本异常或损坏图片。关闭窗口后 Client/Node 进程以及 9229、38521–38523 端口全部释放。
+GUI 回归验证：最终候选从“连接服务器”真实点击“使用本机服务器”后，渲染 URL 切换至最终产物中的 `resources/app/www/index.html`；页面状态为 `complete`，Windows 窗口显示“我当主机”“连接主机”“已连接：localhost:38521”等主菜单内容，`RvBUtils` 已加载，没有捕获脚本异常或损坏图片。关闭窗口后 Client/Node 进程以及 9229、38521–38523 端口全部释放。验收机当时另有旧 Server Electron 进程使用相同的 `my-project` 用户目录和单实例锁，因此本次候选使用隔离的临时 `--user-data-dir` 启动；现有桌面应用身份冲突不属于 RED-18 的 builder 升级或白屏修复范围。
 
 产物结构与 `electron-builder.client.json` 一致：继续使用 `asar: false` 和 Windows `dir` 目标，没有生成安装器。由于本次只修复旁载的 `resources/app/www`，启动器 EXE SHA-256 保持不变；候选内容变化由逐文件页面资源校验和 GUI 回归证明。
 
@@ -380,10 +379,10 @@ npm.cmd run build:electron:server
 
 ### 其他检查
 
-- `npm.cmd run test`：首次因隔离 worktree 的沙箱禁止创建 `logs/` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。白屏修复增加 2 个产物回归测试后，4 个测试文件、31 个测试全部通过。
-- `npm.cmd run check:encoding`：退出码 0，484 个文本文件通过。
+- `npm.cmd run test`：首次因隔离 worktree 的沙箱禁止创建 `logs/` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。白屏修复增加 2 个产物回归测试，主线新增 ws 测试；最终 5 个测试文件、34 个测试全部通过。
+- `npm.cmd run check:encoding`：退出码 0，485 个文本文件通过。
 - 根 TypeScript 与 Electron Client TypeScript：退出码均为 0。
 - `node scripts/verify-electron-client-package.js`：退出码 0，27 个页面源资源与最终候选一致。
-- `npm.cmd run lint`：退出码 1，`eslint` 命令不存在。当前 `package.json` 声明了 lint 脚本但没有 ESLint 依赖；这是现有基线缺口，RED-18 不增加范围外依赖。
+- `npm.cmd run lint`：ESLint 正常运行，退出码 1；结果为主线既有的 1005 项（657 errors、348 warnings）。RED-18 新增的 CommonJS 产物校验脚本使用局部规则豁免，没有增加 lint 问题。
 
 回退时还原 RED-18 的独立提交，即可同时恢复 `package.json` 中旧版 builder 声明和对应 `package-lock.json` 构建依赖树。构建产物不提交到仓库。
