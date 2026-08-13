@@ -70,7 +70,7 @@ Get-ChildItem "$env:TEMP\electron-download-*\electron-v33.4.11-win32-x64.zip" -F
 npm.cmd test
 ```
 
-实测：退出码 0；3 个测试文件、29 个测试全部通过。入口由 `package.json#scripts.test` 指向 `vitest run`，配置见 `vitest.config.ts`，用例位于 `tests/**/*.test.ts`。
+RED-11 基线当时为 3 个测试文件、29 个测试。RED-14 完成后实测退出码 0；5 个测试文件、44 个测试全部通过。入口由 `package.json#scripts.test` 指向 `vitest run`，配置见 `vitest.config.ts`，用例位于 `tests/**/*.test.ts`。
 
 ### 3.2 ESLint
 
@@ -121,35 +121,31 @@ BUILD_EXIT=1
 
 设置 Prisma 5.22 自带的 `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1` 后，校验文件错误被跳过，但引擎主体仍无法下载，构建仍退出 1。因此当前冷环境的第一个稳定阻塞点是 Prisma Windows 引擎下载，而不是 Next 编译。不要从其他工作区手工复制二进制后把冷环境写成通过；应先恢复对 `binaries.prisma.sh` 的访问或提供经过项目批准的引擎缓存方案。
 
-## 4. 数据库初始化现状
+## 4. 数据库初始化
 
-`lib/db.ts#prisma` 从 `DATABASE_URL` 创建 Prisma Client。`electron/main.ts#startGameServer()` 在开发模式直接使用 `prisma/dev.db`，但只有打包模式会调用 `electron/main.ts#initDatabase()`。
+`lib/db.ts#prisma` 从 `DATABASE_URL` 创建 Prisma Client。`npm run dev`、`npm start` 和 Electron 服务端都会在启动 Next.js 之前完成以下步骤：
 
-空环境直接运行服务时：
+1. 取得系统临时目录中的跨进程服务锁；
+2. 按名称顺序读取 `prisma/migrations/*/migration.sql`；
+3. 在事务中应用尚未记录的 migration；
+4. 初始化成功后才启动 HTTP/WebSocket 服务；
+5. 服务退出时释放锁。
 
-- `GET /api/ping`：200；
-- WebSocket 3001：可以握手；
-- `GET /api/rooms`：500；
-- 原始 Prisma 错误：`P2021`，`The table main.Room does not exist in the current database.`
+`prisma/migrations` 是唯一可执行的数据库结构变更历史。`scripts/init-db.js` 不维护第二份手写表结构；它只执行已提交的 migration，并按 Prisma 标准格式在 `_prisma_migrations` 中记录名称和 SHA-256。migration 一旦被应用后不得改写，否则校验会拒绝启动；未来 schema engine 恢复可用后，官方 `prisma migrate deploy` 也能继续识别这些记录。
 
-RED-14 负责修复开发模式首次启动没有建表的问题。在修复前，可用仓库现有 `scripts/init-db.js` 建立临时调试数据库。该脚本的第二个参数必须是绝对路径：
+空数据库首次启动后，`GET /api/rooms` 返回 200 和 `{"rooms":[]}`。空房间列表是正常业务结果；初始化、校验或 migration 失败时，服务不会进入运行状态。
 
-```powershell
-$taskDir = Join-Path $env:TEMP 'rvb-debug-db'
-New-Item -ItemType Directory -Force -Path $taskDir | Out-Null
-$dbPath = (Join-Path $taskDir 'game.db').Replace('\', '/')
-$moduleRoot = (Resolve-Path '.next\standalone\node_modules').Path
-node scripts\init-db.js "file:$dbPath" $moduleRoot
-$env:DATABASE_URL = "file:$dbPath"
-```
+为保留 RED-14 之前的开发数据，初始化器只接受两个已知旧结构：最初 Prisma migration 的结构，以及旧 `init-db.js` 建出的完整结构。它会先逐表逐列校验，再登记对应 migration；未知、残缺或损坏结构会明确失败，不会重建、清空或猜测迁移。
 
-实测：`scripts/init-db.js` 退出码 0，生成 32 KB SQLite 文件；随后 Prisma `Room` 查询成功，`GET /api/rooms` 返回 200 和 `{"rooms":[]}`。
+当前环境中 Prisma 5.22 的 `prisma migrate deploy` 和 `prisma db push` 会返回退出码 1 及空泛的 `Schema engine error`。因此启动入口通过 Prisma query engine 事务化执行已提交 SQL，不依赖 schema engine。
 
-当前环境中 Prisma 5.22 的 `prisma db push` 对绝对 URL、正斜杠 URL和临时目录相对 URL都返回退出码 1及空泛的 `Schema engine error`，所以本文不把它列为可靠初始化步骤。
+同一用户只能运行一个 RED vs BLUE 游戏服务。第二个 Electron、第二次 `npm run dev`，或 Electron 与 `npm run dev` 交叉启动时，后启动者会在数据库初始化前退出。`RVB_SERVER_LOCK_PATH` 仅用于自动测试覆盖，不是常规运行配置。
+
+回退 RED-14 时应回滚代码提交，不执行数据逆迁移。RED-14 只补齐当前 `schema.prisma` 已有的表和列，不删除业务数据；类型规范化 migration 会在事务内重建 `User`/`Room` 表并复制全部已有行。回滚后新增列/表可以保留。若初始化失败，先复制数据库文件作为证据，不要删除原库或手工编辑 `_prisma_migrations`。
 
 ## 5. Next.js / WebSocket 开发模式
 
-先完成生产构建和上一节的临时数据库初始化，再执行：
+直接执行：
 
 ```powershell
 $env:PORT = '3000'
@@ -159,11 +155,13 @@ npm.cmd run dev
 
 真实入口链：
 
-1. `package.json#scripts.dev` 启动 `next dev`。
-2. `instrumentation.ts#register()` 在 Node runtime 导入 `lib/ws-server.ts#startWsServer()`。
-3. HTTP 默认监听 3000；`lib/ws-server.ts#getWsPort()` 默认返回 3001。
+1. `package.json#scripts.dev` 启动 `scripts/start-server.js dev`。
+2. 启动脚本取得单服务锁并应用 SQLite migration。
+3. 初始化成功后启动 `next dev`。
+4. `instrumentation.ts#register()` 在 Node runtime 导入 `lib/ws-server.ts#startWsServer()`。
+5. HTTP 默认监听 3000；`lib/ws-server.ts#getWsPort()` 默认返回 3001。
 
-实测：Next 约 1 秒进入 Ready；`GET /api/ping` 为 200；`GET /api/rooms` 在初始化临时数据库后为 200；WebSocket 3001 握手成功。
+RED-14 验证：空临时数据库由启动入口自动初始化；`GET /api/ping` 为 200；`GET /api/rooms` 为 200 和空房间列表；WebSocket 3001 握手成功。
 
 2026-08-13 17:49 的可审计冒烟输出：
 
@@ -209,9 +207,10 @@ npm.cmd run build
 真实启动链：
 
 1. `electron/main.ts` 调用 `app.whenReady()`。
-2. `startGameServer()` 通过 `findServerEntry()` 找到 `.next/standalone/server.js`。
-3. `spawn(getNodeBin(), [serverEntry])` 启动系统 Node 子进程，并传入 `PORT=3000`、`DATABASE_URL`、`APP_ROOT_DIR`、`USER_DATA_DIR`。
-4. `createDashboardWindow()` 加载 `electron/dashboard/index.html`。
+2. `startGameServer()` 先取得跨进程服务锁，再调用 migration runner；任何一步失败都不启动服务。
+3. `startGameServer()` 通过 `findServerEntry()` 找到 `.next/standalone/server.js`。
+4. `spawn(getNodeBin(), [serverEntry])` 启动系统 Node 子进程，并传入 `PORT=3000`、`DATABASE_URL`、`APP_ROOT_DIR`、`USER_DATA_DIR`。
+5. `createDashboardWindow()` 加载 `electron/dashboard/index.html`。
 
 本次 Windows 冒烟使用同版本 Prisma 5.22.0 已缓存引擎生成的 standalone 产物；它证明 Electron 启动链可运行，不代表上一节的冷环境引擎下载阻塞已经消失。
 
@@ -249,7 +248,7 @@ Electron 命令由测试执行单元人工终止，没有自然退出码；本�
 | --- | --- |
 | 锁文件安装 | 通过，最终 `npm ci` 退出码 0 |
 | 依赖树 | 通过，`npm ls --depth=0` 退出码 0 |
-| Vitest | 通过，3 文件 / 29 测试 |
+| Vitest | 通过，5 文件 / 44 测试 |
 | ESLint | 失败，缺少 ESLint；RED-13 |
 | 根 TypeScript | 通过 |
 | Electron 服务端 TypeScript | 通过 |
@@ -257,7 +256,7 @@ Electron 命令由测试执行单元人工终止，没有自然退出码；本�
 | Next 生产构建 | 冷环境失败，阻塞于 Prisma Windows 引擎下载；显式使用同版本缓存引擎时生成产物并退出 0，但日志仍有 Prisma 初始化错误 |
 | Next HTTP / WS | 通过 |
 | Electron 服务端 HTTP / WS | 通过 |
-| 空数据库业务接口 | 失败，`P2021`；RED-14 |
+| 空数据库业务接口 | RED-14 自动初始化后通过，`GET /api/rooms` 返回 200 |
 | 依赖漏洞 | 待审计，33 项；RED-12 |
 | Windows 服务端打包 | 未运行：没有确认的服务端打包脚本 |
 | Android 双向联机 | 未运行，不属于 RED-11 |
