@@ -96,6 +96,7 @@
 ## 当前已确定的基础决策
 
 - [`ADR-0001-deployment-visibility.md`](./ADR-0001-deployment-visibility.md)：部署重投阶段公开双方站位。
+- [`ADR-0002-match-identity-model.md`](./ADR-0002-match-identity-model.md)：分离对局座位、内容阵营、所有权与先后手。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

@@ -17,7 +17,7 @@ import { getPieceById, getAllPieces } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
 import { applyBattleAction } from "@/lib/game/turn"
 import type { PieceTemplate } from "@/lib/game/piece"
-import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, getRoomStore } from "@/lib/game/room-store"
+import { alignmentToPieceFaction, assignNextSeat, getPlayerSeat, normalizePlayerAlignment, getRoomStore } from "@/lib/game/room-store"
 import { verifyJoinAuth } from "@/lib/game/identity-verify"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }) ?? {}
   const accountId = String((body as { accountId?: unknown; identityId?: unknown })?.accountId || (body as { accountId?: unknown; identityId?: unknown })?.identityId || '').trim().toLowerCase() || undefined
   const requestedAlignment = normalizePlayerAlignment((body as { alignment?: unknown })?.alignment)
+  const requestedFirstPlayerId = String((body as { firstPlayerId?: unknown })?.firstPlayerId || '').trim().toLowerCase() || undefined
 
   if (!playerId?.trim()) {
     return NextResponse.json({ error: "playerId is required" }, { status: 400 })
@@ -247,6 +248,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       }
     }
 
+    if (!targetPlayer.alignment) {
+      return NextResponse.json({ error: "alignment is required before selecting pieces" }, { status: 400 })
+    }
+    const requiredPieceFaction = alignmentToPieceFaction(targetPlayer.alignment)
+    const hasWrongAlignmentPiece = pieces.some(piece => getPieceById(piece.templateId)?.faction !== requiredPieceFaction)
+    if (hasWrongAlignmentPiece) {
+      return NextResponse.json({ error: "Selected pieces must belong to the player's alignment" }, { status: 400 })
+    }
+
     // PVE: auto-assign default pieces to the bot player
     const botPlayer = latestRoom.players.find((p: any) => p.isBot === true || p.id === 'bot')
     if (botPlayer && !botPlayer.hasSelectedPieces) {
@@ -307,8 +317,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       writeLog('[select-pieces] mapId from room: ' + mapId)
 
       try {
-        const firstSeatPlayer = sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0]
-        const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId: firstSeatPlayer?.id })
+        if (requestedFirstPlayerId) checkRoom.firstPlayerId = requestedFirstPlayerId
+        const firstPlayerId = checkRoom.firstPlayerId || (sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0])?.id
+        if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
+          return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
+        }
+        const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId })
 
         if (!battle) {
           return NextResponse.json({ error: "Failed to create battle: invalid player count or battle setup" }, { status: 500 })
@@ -426,8 +440,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     const mapId = latestRoom.mapId || "large-battlefield"
     writeLog('[start-game] mapId from room: ' + mapId)
 
-    const firstSeatPlayer = sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0]
-    const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId: firstSeatPlayer?.id })
+    if (requestedFirstPlayerId) latestRoom.firstPlayerId = requestedFirstPlayerId
+    const firstPlayerId = latestRoom.firstPlayerId || (sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0])?.id
+    if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
+      return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
+    }
+    const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId })
 
     if (!battle) {
       return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })

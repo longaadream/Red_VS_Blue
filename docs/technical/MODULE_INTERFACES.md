@@ -53,6 +53,10 @@
 - 已知问题：全局触发器；seed 不保证在初始化前注入。
 - 最小调试：显式传入 `firstPlayer`，固定 RNG，输出初始状态 hash 和棋子列表。
 
+### 身份模型（RED-27）
+
+对局座位 `seat: red | blue`、内容阵营 `alignment: light | dark`、棋子 `ownerPlayerId` 与先手 `firstPlayerId` 是独立字段。敌我只能按 `ownerPlayerId` 判断；`room-store` 中的 `faction: red | blue` 仅用于读取旧房间数据的座位兼容。详见 [ADR-0002](../decisions/ADR-0002-match-identity-model.md)。
+
 ## 4. 技能、卡牌与规则数据
 
 - 入口：`lib/game/skills.ts` 的 `loadCardById()`、`loadRuleById()`、`executeCardFunction()`、`executeSkillFunction()`。

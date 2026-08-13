@@ -1,13 +1,12 @@
 import type { BattleState } from './turn'
 import { prisma } from '../db'
+import { isPlayerSeat, normalizeContentAlignment, type ContentAlignment, type PlayerSeat } from './match-identity'
 
-export type PlayerSeat = "red" | "blue"
-export type PlayerAlignment = "light" | "dark"
+export type { PlayerSeat } from './match-identity'
+export type PlayerAlignment = ContentAlignment
 
 export function normalizePlayerAlignment(value: unknown): PlayerAlignment | undefined {
-  if (value === "light" || value === "good") return "light"
-  if (value === "dark" || value === "evil") return "dark"
-  return undefined
+  return normalizeContentAlignment(value)
 }
 
 export function alignmentToPieceFaction(alignment: PlayerAlignment | undefined): "good" | "evil" | undefined {
@@ -17,7 +16,7 @@ export function alignmentToPieceFaction(alignment: PlayerAlignment | undefined):
 }
 
 export function getPlayerSeat(player: { seat?: PlayerSeat; faction?: PlayerSeat }): PlayerSeat | undefined {
-  return player.seat || player.faction
+  return isPlayerSeat(player.seat) ? player.seat : isPlayerSeat(player.faction) ? player.faction : undefined
 }
 
 export function assignNextSeat(players: Array<{ id?: string; seat?: PlayerSeat; faction?: PlayerSeat }>, playerId?: string): PlayerSeat {
@@ -91,6 +90,8 @@ export interface Room {
   actions: GameAction[]
   maxPlayers?: number
   hostId?: string
+  /** The player who takes the first turn; independent of seat and alignment. */
+  firstPlayerId?: string
   mapId?: string
   createdAt?: number
   visibility?: "private" | "public"

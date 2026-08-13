@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getRoomStore, type Room, type Player } from "@/lib/game/room-store"
+import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment, type Room, type Player } from "@/lib/game/room-store"
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getAllPieces } from "@/lib/game/piece-repository"
 
@@ -44,6 +44,7 @@ type JoinBody = {
   playerId: string
   playerName?: string
   packMd5?: string
+  alignment?: 'light' | 'dark' | 'good' | 'evil'
 }
 
 type RoomPostBody = StartBody | JoinBody
@@ -81,20 +82,20 @@ export async function POST(
       return NextResponse.json({ error: "playerId is required" }, { status: 400 })
     }
 
-    const requestedFaction = (body as any).faction === "red" || (body as any).faction === "blue"
-      ? (body as any).faction as "red" | "blue"
-      : null
+    const requestedAlignment = normalizePlayerAlignment(body.alignment)
+    if (!requestedAlignment) {
+      return NextResponse.json({ error: "alignment must be light or dark" }, { status: 400 })
+    }
 
     const existing = room.players.find(
       (p) => p.id.toLowerCase() === normalizedPlayerId,
     )
 
     if (existing) {
-      if (requestedFaction) {
-        existing.faction = requestedFaction
-      } else if (!existing.faction) {
-        existing.faction = Math.random() < 0.5 ? "red" : "blue"
-      }
+      const seat = getPlayerSeat(existing) || assignNextSeat(room.players, normalizedPlayerId)
+      existing.seat = seat
+      existing.faction = seat
+      existing.alignment = requestedAlignment
       if (playerName) existing.name = playerName
       if (packMd5) existing.packMd5 = packMd5
       await roomStore.setRoom(room.id.trim(), room)
@@ -113,18 +114,15 @@ export async function POST(
       return NextResponse.json({ error: "Room is full" }, { status: 400 })
     }
 
-    let faction: "red" | "blue"
-    if (requestedFaction) {
-      faction = requestedFaction
-    } else {
-      faction = Math.random() < 0.5 ? "red" : "blue"
-    }
+    const seat = assignNextSeat(room.players, normalizedPlayerId)
 
     const player = {
       id: normalizedPlayerId,
       name: playerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
       joinedAt: Date.now(),
-      faction,
+      seat,
+      faction: seat,
+      alignment: requestedAlignment,
       packMd5,
     }
     room.players.push(player)
@@ -154,9 +152,16 @@ export async function POST(
     }
 
     const playerIds = room.players.map((p: any) => p.id)
+    if (room.players.some(player => !getPlayerSeat(player) || !player.alignment)) {
+      return NextResponse.json({ error: "All players require a seat and alignment" }, { status: 400 })
+    }
     const defaultPieces = getAllPieces()
-    const playerFactions = room.players.map((p: any) => ({ playerId: p.id, faction: p.faction as 'red' | 'blue', pieces: [] as any[] }))
-    const battle = await createInitialBattleForPlayers(playerIds, defaultPieces, playerFactions, room.mapId)
+    const playerFactions = room.players.map((p: any) => ({ playerId: p.id, faction: getPlayerSeat(p) as 'red' | 'blue', pieces: [] as any[] }))
+    const firstPlayerId = room.firstPlayerId || room.players.find(player => getPlayerSeat(player) === 'red')?.id
+    if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
+      return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
+    }
+    const battle = await createInitialBattleForPlayers(playerIds, defaultPieces, playerFactions, room.mapId, { firstPlayerId })
     if (!battle) {
       return NextResponse.json(
         { error: "Failed to initialize battle state" },
