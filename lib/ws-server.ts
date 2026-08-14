@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws'
-import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
+import { alignmentToPieceFaction, assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
 import { applyBattleAction } from './game/turn'
 import { getBattleStorage, withServerSkills, withoutServerSkills } from './game/battle-storage'
 import { hashStable, runBattleAction } from './game/battle-runner'
@@ -236,6 +236,11 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
   if (action === 'select-pieces') {
     if (!Array.isArray(body.pieces) || body.pieces.length === 0) throw new Error('Please select at least 1 piece')
     if (requestedAlignment) player.alignment = requestedAlignment
+    if (!player.alignment) throw new Error('alignment is required before selecting pieces')
+    const requiredPieceFaction = alignmentToPieceFaction(player.alignment)
+    if ((body.pieces as any[]).some(piece => getPieceById(piece.templateId)?.faction !== requiredPieceFaction)) {
+      throw new Error('Selected pieces must belong to the player\'s alignment')
+    }
     player.selectedPieces = body.pieces
     player.hasSelectedPieces = true
 
@@ -270,6 +275,8 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
   }
 
   if (action === 'start-game') {
+    const requestedFirstPlayerId = String(body.firstPlayerId || '').trim().toLowerCase()
+    if (requestedFirstPlayerId) room.firstPlayerId = requestedFirstPlayerId
     await startBattleFromSelections(roomId, room)
     await broadcastRoom(roomId)
     const clients = roomClients.get(roomId)
@@ -304,13 +311,15 @@ async function startBattleFromSelections(roomId: string, room: any): Promise<voi
     pieceTemplates = [...pieceTemplates, ...defaults.slice(0, 2)]
   }
 
-  const firstSeatPlayer = roomPlayers.find((p: any) => getPlayerSeat(p) === 'red') || roomPlayers[0]
+  const requestedFirstPlayerId = String(room.firstPlayerId || '').trim().toLowerCase()
+  const firstPlayerId = requestedFirstPlayerId || (roomPlayers.find((p: any) => getPlayerSeat(p) === 'red') || roomPlayers[0])?.id
+  if (!firstPlayerId || !playerIds.includes(firstPlayerId)) throw new Error('firstPlayerId must identify a room player')
   const battle = await createInitialBattleForPlayers(
     playerIds,
     pieceTemplates,
     playerSelectedPieces,
     room.mapId || 'large-battlefield',
-    { firstPlayerId: firstSeatPlayer?.id },
+    { firstPlayerId },
   )
   if (!battle) throw new Error('Failed to initialize battle state')
 

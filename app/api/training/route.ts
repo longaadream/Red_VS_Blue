@@ -8,6 +8,7 @@ import { loadRuleById } from "@/lib/game/skills"
 import { runBattleAction } from "@/lib/game/battle-runner"
 import { createDebugDuel } from "@/lib/game/debug-battle"
 import { normalizePlayerAlignment } from "@/lib/game/room-store"
+import { isPlayerSeat } from "@/lib/game/match-identity"
 
 // 全局棋子 ID 计数器，用于生成唯一的 instanceId
 let globalPieceIdCounter = 0
@@ -72,8 +73,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const mapId = body.mapId as string | undefined
-    const firstSeat = body.firstFaction === 'blue' ? 'blue' : 'red'
-    const secondSeat = body.secondFaction === 'red' ? 'red' : 'blue'
+    const firstSeat = isPlayerSeat(body.firstSeat) ? body.firstSeat : (body.firstFaction === 'blue' ? 'blue' : 'red')
+    const secondSeat = isPlayerSeat(body.secondSeat) ? body.secondSeat : (body.secondFaction === 'red' ? 'red' : 'blue')
+    // Legacy training requests coupled faction to alignment. New callers must use
+    // firstAlignment/secondAlignment; this fallback is confined to this adapter.
     const firstAlignment = normalizePlayerAlignment(body.firstAlignment) ?? (firstSeat === 'blue' ? 'light' : 'dark')
     const secondAlignment = normalizePlayerAlignment(body.secondAlignment) ?? (secondSeat === 'blue' ? 'light' : 'dark')
     const firstTemplateIds = Array.isArray(body.firstTemplateIds)

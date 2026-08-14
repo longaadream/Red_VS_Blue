@@ -30,6 +30,21 @@ describe('debug battle pipeline', () => {
     expect(darkMirror.players.map(player => player.alignment)).toEqual(['dark', 'dark'])
   })
 
+  it('keeps content alignment and ownership stable when seats are swapped', async () => {
+    const duel = await createDebugDuel({
+      seed: 3,
+      beginPhase: false,
+      first: { playerId: 'alice', seat: 'blue', alignment: 'light' },
+      second: { playerId: 'bob', seat: 'red', alignment: 'light' },
+    })
+
+    expect(duel.players).toMatchObject([
+      { playerId: 'alice', seat: 'blue', alignment: 'light' },
+      { playerId: 'bob', seat: 'red', alignment: 'light' },
+    ])
+    expect(duel.state.pieces.every(piece => piece.ownerPlayerId === 'alice' || piece.ownerPlayerId === 'bob')).toBe(true)
+  })
+
   it('replays scripted actions through the same battle runner', async () => {
     const duel = await createDebugDuel({ seed: 99, beginPhase: false })
     const action = { type: 'beginPhase' as const }

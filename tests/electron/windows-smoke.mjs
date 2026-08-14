@@ -90,6 +90,13 @@ async function connectTarget(target) {
       }
       return response.result?.result?.value
     },
+    evaluateFireAndForget(expression) {
+      socket.send(JSON.stringify({
+        id: ++nextId,
+        method: 'Runtime.evaluate',
+        params: { expression, awaitPromise: false, returnByValue: false },
+      }))
+    },
     close() { socket.close() },
   }
 }
@@ -231,9 +238,18 @@ async function smokeClient() {
         .finally(() => clearTimeout(timer))
     })`, true, 20000)
     assert(tlsProbe === 'rejected', `Client unexpectedly accepted an invalid HTTPS certificate: ${tlsProbe}`)
-    await connection.evaluate(`window.__red19LocalResult = undefined; window.electronAPI.openLocalGame().then((result) => { window.__red19LocalResult = result }); 'started'`, false)
-    const gameTarget = await waitForTargets(application.debugPort, (candidate) => candidate.url.includes('/app/www/index.html'))
+    connection.evaluateFireAndForget(`window.electronAPI.openLocalGame()`)
+    const gameTarget = await waitForTargets(application.debugPort, (candidate) => candidate.url.startsWith('rvb-client://app/index.html'))
     connection.close()
+    let gameBridgeReady = false
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      try {
+        gameBridgeReady = await evaluate(gameTarget, `typeof window.electronAPI?.getMode === 'function'`)
+      } catch {}
+      if (gameBridgeReady) break
+      await delay(250)
+    }
+    assert(gameBridgeReady, 'Client game preload bridge did not become ready')
     const mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
     const packagedAssets = await evaluate(gameTarget, `Promise.all([
       'index.html',
