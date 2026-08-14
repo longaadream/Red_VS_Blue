@@ -7,6 +7,7 @@ import * as os from 'os'
 import * as net from 'net'
 import * as dgram from 'dgram'
 import * as http from 'http'
+import { fileURLToPath } from 'url'
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,25 @@ function getPackRoot(): string {
 
 function getConfigPath(): string {
   return path.join(getUserData(), 'rvb-client-config.json')
+}
+
+function restrictWindowNavigation(win: BrowserWindow, allowedRoot: string): void {
+  const resolvedRoot = path.resolve(allowedRoot)
+  const isAllowed = (rawUrl: string): boolean => {
+    try {
+      const url = new URL(rawUrl)
+      if (url.protocol !== 'file:') return false
+      const target = path.resolve(fileURLToPath(url))
+      return target === resolvedRoot || target.startsWith(resolvedRoot + path.sep)
+    } catch {
+      return false
+    }
+  }
+
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowed(url)) event.preventDefault()
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 }
 
 function getOnlineServerUrl(): string | null {
@@ -507,10 +527,12 @@ function createGameWindow(): BrowserWindow {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
 
+  restrictWindowNavigation(win, getHtmlRoot())
   win.setMenuBarVisibility(false)
 
   win.webContents.on('before-input-event', (_event, input) => {
@@ -538,12 +560,14 @@ function openAdminWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
   const adminPath = app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'electron-client', 'admin', 'index.html')
     : path.join(__dirname, '../../electron-client/admin/index.html')
+  restrictWindowNavigation(win, path.dirname(adminPath))
   win.loadURL(`file:///${adminPath.replace(/\\/g, '/')}?v=${Date.now()}`)
   adminWin = win
   win.on('closed', () => { adminWin = null })
@@ -617,12 +641,14 @@ function openConnectWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
   const connectPath = app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'electron-client', 'connect', 'index.html')
     : path.join(__dirname, '../../electron-client/connect/index.html')
+  restrictWindowNavigation(win, path.dirname(connectPath))
   win.loadURL(`file:///${connectPath.replace(/\\/g, '/')}?v=${Date.now()}`)
   connectWin = win
   win.on('closed', () => { connectWin = null })
@@ -902,18 +928,10 @@ ipcMain.handle('upload-resource-pack-data', async (_event, base64: string, filen
   }
 })
 
-// ─── 证书 ─────────────────────────────────────────────────────────────────────
-
-app.commandLine.appendSwitch('ignore-certificate-errors')
 // Bypass system proxy (Clash/V2Ray/etc.) — game server is accessed directly via frp
 app.commandLine.appendSwitch('no-proxy-server')
 // Disable disk cache so Chromium never serves stale file:// responses
 app.commandLine.appendSwitch('disable-http-cache')
-
-app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
-  event.preventDefault()
-  callback(true)
-})
 
 // ─── 应用生命周期 ─────────────────────────────────────────────────────────────
 

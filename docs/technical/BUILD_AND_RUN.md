@@ -1,15 +1,18 @@
 
-# Red VS Blue：Windows 构建与运行基线
+# Red VS Blue：Windows 构建基线与 Electron 安全候选
 
-状态：已在 RED-11 中实测，等待独立复核与人工确认
+状态：第 1–7 节为 RED-11 历史基线；第 8 节为 RED-19 当前候选，均等待人工确认
 
 基线：远程 `main` 合并提交 `aa9c853d3e6597d151de8570d9a6f05ca2a1a687`
 
-验证日期：2026-08-13
+验证日期：RED-11 基线为 2026-08-13；RED-19 最新候选为 2026-08-14
 
 平台：Windows 10 22H2（10.0.19045，x64）
 
 本文只描述当前仓库能够复现的结果，不代表 Android 双向联机、Windows 安装包或公开测试发布已经验收通过。
+
+第 1–7 节保留 RED-11 在 Electron 33.4.11 上取得的原始证据，不应解读为当前依赖版本；
+RED-19 已将当前候选更新为 Electron 43.4.0，升级后的命令、边界与结果见第 8 节。
 
 ## 1. 已确认的工具链
 
@@ -20,7 +23,7 @@
 | Next.js | 16.1.6 | `package-lock.json` / 实际安装 |
 | React | 19.2.4 | `package-lock.json` / 实际安装 |
 | TypeScript | 5.7.3 | `package-lock.json` / 实际安装 |
-| Electron | 33.4.11 | `package-lock.json` / 实际安装 |
+| Electron | 33.4.11 | RED-11 当时的 `package-lock.json` / 实际安装；当前版本见第 8 节 |
 | Prisma | 5.22.0 | `package-lock.json` / 实际安装 |
 | Vitest | 4.1.5 | `package-lock.json` / 实际安装 |
 
@@ -261,3 +264,128 @@ Electron 命令由测试执行单元人工终止，没有自然退出码；本�
 | Android 双向联机 | 未运行，不属于 RED-11 |
 
 这套基线证明当前代码可以在 Windows 上完成规则测试和类型检查；已有 Prisma 引擎缓存时可以生成 standalone，并通过 Next 和 Electron 的 HTTP/WebSocket 启动冒烟。全新环境的 `npm ci` 虽返回 0，但首次构建仍可能因 Prisma Windows 引擎下载失败而被阻塞。它尚未达到“全功能可公开测试”的完成定义。
+## 8. RED-19 Electron 43 安全候选
+
+状态：RED-19 桌面运行时安全基线，基于以上 RED-11 可复现结果继续验证
+适用平台：Windows x64
+运行时：Node.js 22.12.0 以上、Electron 43.4.0
+
+### 8.1 安装与通用检查
+
+```powershell
+npm.cmd ci
+npx.cmd install-electron
+npm.cmd audit
+npm.cmd test
+npm.cmd run lint
+npx.cmd tsc --noEmit
+```
+
+Electron 43 的安装工具要求 Node.js 22.12.0 以上。PowerShell 禁止执行
+`npm.ps1` 时使用 `npm.cmd`/`npx.cmd`。Electron 43 将运行时下载器暴露为独立的
+`install-electron` 命令；若 `npm ci` 后直接启动提示二进制未安装，必须先运行上面的
+安装命令。下载器会按包内 checksums 校验产物。
+
+### 8.2 桌面入口
+
+| 入口 | 开发启动 | Windows 打包 |
+| --- | --- | --- |
+| 服务端管理器 | `npm.cmd run dev:electron:server` | `npm.cmd run build:electron:server` |
+| 玩家客户端 | `npm.cmd run dev:electron:client` | `npm.cmd run build:electron:client` |
+| 数据编辑器 | `npm.cmd run dev:electron:editor` | `npm.cmd run build:electron:editor` |
+
+服务端和客户端启动前都需要已有 Next standalone 输出；开发启动前先运行
+`npm.cmd run build`。客户端和服务端打包会自行执行这一步。
+
+Windows 输出目录：
+
+- 服务端：`dist/server-build/win-unpacked/`
+- 客户端：`dist/client-build/win-unpacked/`
+- 编辑器：`dist/editor/`
+
+### 8.3 桌面安全边界
+
+三个入口的每个 `BrowserWindow` 都必须显式保持：
+
+- `contextIsolation: true`
+- `nodeIntegration: false`
+- `sandbox: true`
+- `webSecurity: true`
+- 仅加载其受信任的本地页面根目录
+- 拒绝超出本地根目录的导航与所有 `window.open` 请求
+
+客户端不再使用 `webSecurity: false`，也不再全局忽略或接受无效 TLS
+证书。游戏页面仍通过浏览器同源规则访问本地/LAN/HTTPS API；Next API
+已经返回 CORS 响应头。连接自签名 HTTPS 服务会按 Chromium 默认行为失败，
+这是预期安全边界，不能通过恢复全局证书绕过解决。
+
+Preload 只暴露列出的 IPC 能力，不暴露原始 `ipcRenderer`。当前客户端的本地
+资源包能力会写入游戏页面根目录，因此它属于高权限入口；导航限制与 sender
+校验仍应在后续独立安全任务中继续收紧。
+
+### 8.4 Windows 最小烟测
+
+对开发启动和每个打包产物分别执行：
+
+1. 启动应用并确认窗口可见、标题正确。
+2. 在 DevTools 控制台确认 `process`/`require` 对 renderer 不可用。
+3. 服务端：管理面板出现，启动/停止按钮可用，退出后没有遗留服务进程。
+4. 客户端：连接窗口出现；本地模式可进入游戏首页；HTTPS 证书错误不会被静默放行。
+5. 编辑器：主界面出现，能列出数据文件；不执行写入操作即可完成本次烟测。
+6. 关闭窗口/托盘应用，确认主进程退出（服务端按托盘“退出”）。
+
+记录命令、退出码、窗口截图、致命控制台错误和产物路径。不要把仅完成编译写成
+“启动烟测通过”。
+
+打包产物生成后，可从管理员 PowerShell 运行可重复的自动烟测：
+
+```powershell
+npm.cmd run smoke:electron:windows
+```
+
+脚本只清理与上述产物绝对路径、启动 PID 进程树和专用调试端口相匹配的测试进程。
+服务端会验证 3000 端口的启动/停止；客户端会验证本机模式、无效 TLS 证书拒绝和退出
+清理；编辑器会直接启动最终 portable EXE，在最长 300 秒内等待 renderer，并记录实际
+启动耗时、正式构建中的数据文件列表和退出清理结果。
+
+### 8.5 候选验证记录（2026-08-13；2026-08-14 根据人工反馈修订）
+
+- 在最新 `origin/main` 合并基线上执行 `npm.cmd ci`：退出码 0，安装 1047 个包；
+  `npx.cmd install-electron` 完成运行时校验，
+  `electron --version` 为 `v43.4.0`。
+- `npm.cmd audit`：不再包含 Electron 或旧 `extract-zip` 漏洞链；仍有 23 个范围外依赖
+  漏洞（1 low、1 moderate、20 high、1 critical），不能描述为 audit 全绿。
+- `npm.cmd test`：5 个测试文件、44 个测试通过；其中 Electron 安全边界 12/12。
+- 根工程及 `electron`、`electron-client`、`electron-editor` TypeScript 检查通过；
+  `npm.cmd run build` 通过。
+- `npm.cmd run lint` 能正常启动 ESLint，退出码 1；排除本机未跟踪 worktree 后复现
+  最新基线已记录的 1005 项既有问题（657 errors、348 warnings）。RED-19 修改未增加 lint
+  问题；全仓 lint 债务不在本次依赖升级范围。
+- 服务端 `dir`、客户端 `dir` 和编辑器 `portable` 正式构建均退出码 0。编辑器构建首次
+  从 GitHub 下载 NSIS 超时，改用一次性 `ELECTRON_BUILDER_BINARIES_MIRROR` 环境变量后
+  成功；镜像地址未写入仓库配置。
+- 人工核验发现点击“停止服务器”后会把 `taskkill` 导致的退出码 1 误报成“端口 3000
+  已被占用”。最新候选会区分主动停止与非预期退出，并隔离旧进程的异步回调，相关
+  回归断言通过；修订后的服务端正式产物已重建，仍等待人工再次点击确认不再弹窗。
+- `npm.cmd run smoke:electron:windows` 三入口分别退出码 0：renderer 中 `process` 与
+  `require` 均为 `undefined`；服务端越界导航保持原 URL，停止后 3000 不可达；客户端
+  无效 TLS 探针被拒绝，受版本控制的 HTML/JS/数据/图片资产均可读取，本机模式为
+  ready，退出后网关不可达；编辑器列出 pieces 26、skills 114、cards 17、rules 82 个
+  文件并正常退出。
+- 初版烟测只确认 portable 文件存在并启动 `win-unpacked`，因此没有覆盖人工报告的
+  “便携版没反应”。直接启动旧 portable 后复现约 4 分 44 秒的无反馈等待；原因是编辑器
+  误打包整棵生产依赖。最新配置只保留资源包构建所需的 JSZip 依赖树，portable 从
+  158.0 MB 降至 88.6 MB，解包内容从约 840 MB / 24,520 文件降至 351 MB / 592 文件。
+  最终三入口组合烟测直接启动 portable，编辑器在 16,710 ms 内出现“数据编辑器”，数据
+  断言与退出清理通过；打包内 JSZip 生成探针也通过。
+
+已知但未在 RED-19 扩大的边界：构建仍未签名且沿用 `asar: false`；客户端资源包写入
+受信任页面根目录、IPC sender 校验和 `adm-zip` audit 告警需要独立安全任务跟进。
+
+### 8.6 回退
+
+RED-19 在独立分支中以本 PR 交付。若 Electron 43 候选构建出现阻断性回归，
+回退本 PR 的最终合并提交即可恢复 Electron 33.4.11 的 `package.json`/`package-lock.json`
+及旧窗口
+配置；回退后必须明确记录旧 Electron 与 `extract-zip` 漏洞重新出现，旧构建不得
+发布。

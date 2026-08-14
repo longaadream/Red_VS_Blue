@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "build:electron": "npm run build:electron:client",
+    "build:electron:server": "npm run build && node scripts/stage-client-resources.js && npx tsc -p electron/tsconfig.json && electron-builder --config electron-builder.server.json && node scripts/cleanup-client-resources.js",
     "build:electron:client": "npm run build && node scripts/stage-client-resources.js && npx tsc -p electron-client/tsconfig.json && electron-builder --config electron-builder.client.json && node scripts/cleanup-client-resources.js",
     "dev:electron:server": "npx tsc -p electron/tsconfig.json && npx electron .",
     "dev:electron:client": "npx tsc -p electron-client/tsconfig.json && npx electron electron-client/dist/main.js",
@@ -26,7 +27,8 @@
     "sync:pages": "node scripts/sync-pages.js",
     "watch:pages": "node scripts/sync-pages.js --watch",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:electron:windows": "node tests/electron/windows-smoke.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -98,7 +100,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitest/coverage-v8": "^4.1.5",
-    "electron": "^33.4.11",
+    "electron": "43.4.0",
     "electron-builder": "^25.0.0",
     "electron-store": "^8.2.0",
     "esbuild": "^0.25.12",
