@@ -33,6 +33,8 @@ const OFFLINE_DATA_ENTRIES = [
   'skill-keywords.json',
 ]
 
+const OFFLINE_IMAGE_DIRECTORIES = ['card-art']
+
 function listFiles(root) {
   const files = []
   if (!fs.existsSync(root)) return files
@@ -66,6 +68,21 @@ function listOfflineDataFiles(dataSourceRoot) {
   return files.sort()
 }
 
+function listOfflineImageFiles(publicSourceRoot) {
+  const files = fs
+    .readdirSync(publicSourceRoot, { withFileTypes: true })
+    .filter(entry => entry.isFile() && path.extname(entry.name).toLowerCase() === '.jpg')
+    .map(entry => entry.name)
+
+  for (const directory of OFFLINE_IMAGE_DIRECTORIES) {
+    const source = path.join(publicSourceRoot, directory)
+    if (!fs.existsSync(source) || !fs.statSync(source).isDirectory()) continue
+    for (const relative of listFiles(source)) files.push(path.join(directory, relative))
+  }
+
+  return files.sort()
+}
+
 function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 }
@@ -94,7 +111,7 @@ function compareSourceTree(
   }
 }
 
-function findClientPackageIssues(packageRoot, pageSourceRoot, dataSourceRoot) {
+function findClientPackageIssues(packageRoot, pageSourceRoot, dataSourceRoot, publicSourceRoot) {
   const issues = []
 
   for (const relative of REQUIRED_FILES) {
@@ -133,12 +150,25 @@ function findClientPackageIssues(packageRoot, pageSourceRoot, dataSourceRoot) {
     'offline data asset',
     listOfflineDataFiles(dataSourceRoot),
   )
+  compareSourceTree(
+    issues,
+    publicSourceRoot,
+    path.join(packagedPagesRoot, 'images'),
+    path.join('resources', 'app', 'www', 'images'),
+    'offline image asset',
+    listOfflineImageFiles(publicSourceRoot),
+  )
 
   return issues
 }
 
-function verifyClientPackage(packageRoot, pageSourceRoot, dataSourceRoot) {
-  const issues = findClientPackageIssues(packageRoot, pageSourceRoot, dataSourceRoot)
+function verifyClientPackage(packageRoot, pageSourceRoot, dataSourceRoot, publicSourceRoot) {
+  const issues = findClientPackageIssues(
+    packageRoot,
+    pageSourceRoot,
+    dataSourceRoot,
+    publicSourceRoot,
+  )
   if (issues.length > 0) {
     throw new Error(`Electron client package verification failed:\n- ${issues.join('\n- ')}`)
   }
@@ -149,11 +179,12 @@ if (require.main === module) {
   const packageRoot = path.join(projectRoot, 'dist', 'client-build', 'win-unpacked')
   const pageSourceRoot = path.join(projectRoot, 'data', 'pages')
   const dataSourceRoot = path.join(projectRoot, 'data')
+  const publicSourceRoot = path.join(projectRoot, 'public')
 
   try {
-    verifyClientPackage(packageRoot, pageSourceRoot, dataSourceRoot)
+    verifyClientPackage(packageRoot, pageSourceRoot, dataSourceRoot, publicSourceRoot)
     console.log(
-      `[verify-client-package] OK (${listFiles(pageSourceRoot).length} source page assets and ${listOfflineDataFiles(dataSourceRoot).length} offline data assets checked)`,
+      `[verify-client-package] OK (${listFiles(pageSourceRoot).length} source page assets, ${listOfflineDataFiles(dataSourceRoot).length} offline data assets, and ${listOfflineImageFiles(publicSourceRoot).length} offline image assets checked)`,
     )
   } catch (error) {
     console.error(`[verify-client-package] ${error.message}`)
