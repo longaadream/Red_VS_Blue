@@ -91,9 +91,9 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.2.1",
-    "@capacitor/cli": "^6.2.1",
-    "@capacitor/core": "^6.2.1",
+    "@capacitor/android": "8.5.0",
+    "@capacitor/cli": "8.5.0",
+    "@capacitor/core": "8.5.0",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22",
@@ -113,5 +113,9 @@
     "tw-animate-css": "1.3.3",
     "typescript": "5.7.3",
     "vitest": "^4.1.5"
+  },
+  "overrides": {
+    "@xmldom/xmldom": "0.8.13",
+    "uuid": "11.1.1"
   }
 }

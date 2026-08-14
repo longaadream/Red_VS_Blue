@@ -350,11 +350,11 @@ npm.cmd run smoke:electron:windows
 
 ### 8.5 候选验证记录（2026-08-13；2026-08-14 根据人工反馈修订）
 
-- 在最新 `origin/main` 基线上执行 `npm.cmd ci`：退出码 0，安装 1042 个包；
+- 在最新 `origin/main` 合并基线上执行 `npm.cmd ci`：退出码 0，安装 1047 个包；
   `npx.cmd install-electron` 完成运行时校验，
   `electron --version` 为 `v43.4.0`。
-- `npm.cmd audit`：不再包含 Electron 或旧 `extract-zip` 漏洞链；仍有 25 个范围外依赖
-  漏洞，不能描述为 audit 全绿。
+- `npm.cmd audit`：不再包含 Electron 或旧 `extract-zip` 漏洞链；仍有 23 个范围外依赖
+  漏洞（1 low、1 moderate、20 high、1 critical），不能描述为 audit 全绿。
 - `npm.cmd test`：5 个测试文件、44 个测试通过；其中 Electron 安全边界 12/12。
 - 根工程及 `electron`、`electron-client`、`electron-editor` TypeScript 检查通过；
   `npm.cmd run build` 通过。
@@ -376,7 +376,7 @@ npm.cmd run smoke:electron:windows
   “便携版没反应”。直接启动旧 portable 后复现约 4 分 44 秒的无反馈等待；原因是编辑器
   误打包整棵生产依赖。最新配置只保留资源包构建所需的 JSZip 依赖树，portable 从
   158.0 MB 降至 88.6 MB，解包内容从约 840 MB / 24,520 文件降至 351 MB / 592 文件。
-  最终三入口组合烟测直接启动 portable，编辑器在 19,921 ms 内出现“数据编辑器”，数据
+  最终三入口组合烟测直接启动 portable，编辑器在 16,710 ms 内出现“数据编辑器”，数据
   断言与退出清理通过；打包内 JSZip 生成探针也通过。
 
 已知但未在 RED-19 扩大的边界：构建仍未签名且沿用 `asar: false`；客户端资源包写入
