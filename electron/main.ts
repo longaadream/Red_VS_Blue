@@ -2,8 +2,11 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } from 'el
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
+import { fileURLToPath } from 'url'
+import { shouldReportServerStartupFailure } from './server-process-lifecycle'
 
 let serverProcess: ChildProcess | null = null
+const requestedServerStops = new WeakSet<ChildProcess>()
 let tray: Tray | null = null
 let dashboardWin: BrowserWindow | null = null
 let serverRunning = false
@@ -22,6 +25,25 @@ function getAppRoot(): string {
 
 function getUserData(): string {
   return app.getPath('userData')
+}
+
+function restrictWindowNavigation(win: BrowserWindow, allowedRoot: string): void {
+  const resolvedRoot = path.resolve(allowedRoot)
+  const isAllowed = (rawUrl: string): boolean => {
+    try {
+      const url = new URL(rawUrl)
+      if (url.protocol !== 'file:') return false
+      const target = path.resolve(fileURLToPath(url))
+      return target === resolvedRoot || target.startsWith(resolvedRoot + path.sep)
+    } catch {
+      return false
+    }
+  }
+
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowed(url)) event.preventDefault()
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 }
 
 // 找到可用的 node 可执行文件
@@ -180,8 +202,9 @@ function startGameServer(): void {
   // 确保 CSS / JS / 图片等 static 资源在 standalone 目录下
   ensureStandaloneAssets(appRoot, serverEntry)
 
+  let spawnedProcess: ChildProcess
   try {
-    serverProcess = spawn(getNodeBin(), [serverEntry], {
+    spawnedProcess = spawn(getNodeBin(), [serverEntry], {
       cwd: path.dirname(serverEntry),
       env: {
         ...process.env,
@@ -193,6 +216,7 @@ function startGameServer(): void {
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
+    serverProcess = spawnedProcess
   } catch (err) {
     const msg = `Failed to spawn server process:\n${err}`
     console.error('[electron]', msg)
@@ -200,35 +224,43 @@ function startGameServer(): void {
     return
   }
 
-  serverProcess.stdout?.on('data', (d) => process.stdout.write(d))
-  serverProcess.stderr?.on('data', (d) => process.stderr.write(d))
+  spawnedProcess.stdout?.on('data', (d) => process.stdout.write(d))
+  spawnedProcess.stderr?.on('data', (d) => process.stderr.write(d))
 
-  serverProcess.on('error', (err) => {
+  spawnedProcess.on('error', (err) => {
     console.error('[electron] Server process error:', err)
-    dialog.showErrorBox('服务器错误', String(err))
-    serverRunning = false
-    serverProcess = null
-    dashboardWin?.webContents.send('server-status', { running: false })
-    updateTrayMenu()
+    if (!requestedServerStops.has(spawnedProcess)) {
+      dialog.showErrorBox('服务器错误', String(err))
+    }
+    if (serverProcess === spawnedProcess) {
+      serverRunning = false
+      serverProcess = null
+      dashboardWin?.webContents.send('server-status', { running: false })
+      updateTrayMenu()
+    }
   })
 
-  serverProcess.on('exit', (code) => {
-    serverRunning = false
-    serverProcess = null
-    dashboardWin?.webContents.send('server-status', { running: false, code })
+  spawnedProcess.on('exit', (code) => {
+    const stoppedByRequest = requestedServerStops.has(spawnedProcess)
+    requestedServerStops.delete(spawnedProcess)
+    if (serverProcess === spawnedProcess) {
+      serverRunning = false
+      serverProcess = null
+      dashboardWin?.webContents.send('server-status', { running: false, code })
+      updateTrayMenu()
+    }
     console.log(`[electron] Server exited with code ${code}`)
-    if (code === 1) {
+    if (shouldReportServerStartupFailure(code, stoppedByRequest)) {
       dialog.showErrorBox(
         '服务器启动失败',
         '端口 3000 已被占用。\n\n请关闭占用 3000 端口的其他程序（如 npm run dev），然后点击"启动服务器"重试。'
       )
     }
-    updateTrayMenu()
   })
 
   // 给服务器一点时间启动后再标记为 running
   setTimeout(() => {
-    if (serverProcess) {
+    if (serverProcess === spawnedProcess) {
       serverRunning = true
       dashboardWin?.webContents.send('server-status', { running: true })
       updateTrayMenu()
@@ -265,6 +297,7 @@ function startRoomCleanup(): void {
 function stopGameServer(): void {
   if (serverProcess) {
     const proc = serverProcess
+    requestedServerStops.add(proc)
     serverProcess = null
     serverRunning = false
     if (cleanupInterval) {
@@ -272,6 +305,7 @@ function stopGameServer(): void {
       cleanupInterval = null
     }
     killProcessTree(proc)
+    dashboardWin?.webContents.send('server-status', { running: false })
     updateTrayMenu()
   }
 }
@@ -299,10 +333,14 @@ function createDashboardWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
 
-  dashboardWin.loadFile(path.join(__dirname, '..', 'dashboard', 'index.html'))
+  const dashboardRoot = path.join(__dirname, '..', 'dashboard')
+  restrictWindowNavigation(dashboardWin, dashboardRoot)
+  dashboardWin.loadFile(path.join(dashboardRoot, 'index.html'))
   dashboardWin.on('close', (e) => {
     e.preventDefault()
     dashboardWin?.hide()

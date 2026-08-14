@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "build:electron": "npm run build:electron:client",
+    "build:electron:server": "npm run build && node scripts/stage-client-resources.js && npx tsc -p electron/tsconfig.json && electron-builder --config electron-builder.server.json && node scripts/cleanup-client-resources.js",
     "build:electron:client": "npm run build && npm run sync:pages && node scripts/stage-client-resources.js && npx tsc -p electron-client/tsconfig.json && electron-builder --config electron-builder.client.json && node scripts/verify-electron-client-package.js && node scripts/cleanup-client-resources.js",
     "dev:electron:server": "npx tsc -p electron/tsconfig.json && npx electron .",
     "dev:electron:client": "npx tsc -p electron-client/tsconfig.json && npx electron electron-client/dist/main.js",
@@ -26,7 +27,8 @@
     "sync:pages": "node scripts/sync-pages.js",
     "watch:pages": "node scripts/sync-pages.js --watch",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:electron:windows": "node tests/electron/windows-smoke.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -89,16 +91,16 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.2.1",
-    "@capacitor/cli": "^6.2.1",
-    "@capacitor/core": "^6.2.1",
+    "@capacitor/android": "8.5.0",
+    "@capacitor/cli": "8.5.0",
+    "@capacitor/core": "8.5.0",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitest/coverage-v8": "^4.1.5",
-    "electron": "^33.4.11",
+    "electron": "43.4.0",
     "electron-builder": "26.15.3",
     "electron-store": "^8.2.0",
     "esbuild": "^0.25.12",
@@ -111,5 +113,11 @@
     "tw-animate-css": "1.3.3",
     "typescript": "5.7.3",
     "vitest": "^4.1.5"
+  },
+  "overrides": {
+    "@xmldom/xmldom": "0.8.13",
+    "fast-uri": "3.1.5",
+    "lodash": "4.18.1",
+    "uuid": "11.1.1"
   }
 }

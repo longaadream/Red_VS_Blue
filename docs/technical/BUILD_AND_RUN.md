@@ -1,15 +1,18 @@
 
-# Red VS Blue：Windows 构建与运行基线
+# Red VS Blue：Windows 构建基线与 Electron 安全候选
 
-状态：已在 RED-11 中实测，等待独立复核与人工确认
+状态：第 1–7 节为 RED-11 历史基线；第 8 节为 RED-19 当前候选，均等待人工确认
 
 基线：远程 `main` 合并提交 `aa9c853d3e6597d151de8570d9a6f05ca2a1a687`
 
-验证日期：2026-08-13
+验证日期：RED-11 基线为 2026-08-13；RED-19 最新候选为 2026-08-14
 
 平台：Windows 10 22H2（10.0.19045，x64）
 
 本文只描述当前仓库能够复现的结果，不代表 Android 双向联机、Windows 安装包或公开测试发布已经验收通过。
+
+第 1–7 节保留 RED-11 在 Electron 33.4.11 上取得的原始证据，不应解读为当前依赖版本；
+RED-19 已将当前候选更新为 Electron 43.4.0，升级后的命令、边界与结果见第 8 节。
 
 ## 1. 已确认的工具链
 
@@ -20,7 +23,7 @@
 | Next.js | 16.1.6 | `package-lock.json` / 实际安装 |
 | React | 19.2.4 | `package-lock.json` / 实际安装 |
 | TypeScript | 5.7.3 | `package-lock.json` / 实际安装 |
-| Electron | 33.4.11 | `package-lock.json` / 实际安装 |
+| Electron | 33.4.11 | RED-11 当时的 `package-lock.json` / 实际安装；当前版本见第 8 节 |
 | Prisma | 5.22.0 | `package-lock.json` / 实际安装 |
 | Vitest | 4.1.5 | `package-lock.json` / 实际安装 |
 
@@ -78,8 +81,8 @@ npm.cmd test
 npm.cmd run lint
 ```
 
-RED-13 已补齐 `eslint@9.39.5` 与匹配当前 Next.js 16.3.0 的
-`eslint-config-next@16.3.0`，因此该命令现在能够启动 ESLint 并检查真实源码。
+RED-13 已补齐 `eslint@9.39.5` 与匹配当前 Next.js 16.1.6 的
+`eslint-config-next@16.1.6`，因此该命令现在能够启动 ESLint 并检查真实源码。
 
 实测：ESLint 正常运行，退出码 1；当前仓库存在 1005 项既有问题（657 errors、348 warnings）。
 这些问题属于后续 lint 治理范围，不得把当前结果写成 lint 通过，也不应在 RED-13 中批量修复。
@@ -261,145 +264,186 @@ Electron 命令由测试执行单元人工终止，没有自然退出码；本�
 | Android 双向联机 | 未运行，不属于 RED-11 |
 
 这套基线证明当前代码可以在 Windows 上完成规则测试和类型检查；已有 Prisma 引擎缓存时可以生成 standalone，并通过 Next 和 Electron 的 HTTP/WebSocket 启动冒烟。全新环境的 `npm ci` 虽返回 0，但首次构建仍可能因 Prisma Windows 引擎下载失败而被阻塞。它尚未达到“全功能可公开测试”的完成定义。
+## 8. RED-19 Electron 43 安全候选
 
-## 8. RED-18：electron-builder 26.15.3 候选验证
+状态：RED-19 桌面运行时安全基线，基于以上 RED-11 可复现结果继续验证
+适用平台：Windows x64
+运行时：Node.js 22.12.0 以上、Electron 43.4.0
 
-验证日期：2026-08-13
-
-验证环境：Windows 10.0.19045、Node.js 24.19.0、npm 11.17.0
-
-验证分支：`codex/red-18-electron-builder-upgrade`
-
-### 依赖安装与审计
+### 8.1 安装与通用检查
 
 ```powershell
 npm.cmd ci
-npm.cmd audit --json
-npm.cmd ls electron-builder app-builder-lib builder-util node-gyp tar tmp form-data --all
+npx.cmd install-electron
+npm.cmd audit
+npm.cmd test
+npm.cmd run lint
+npx.cmd tsc --noEmit
 ```
 
-- `npm ci`：在合并 RED-13、RED-15、RED-16 后的最终锁文件上退出码 0，安装 998 个包。
-- 升级前 audit：32 项（1 critical、29 high、1 moderate、1 low）。
-- RED-18 首次升级后 audit：17 项（1 critical、15 high、1 moderate）。
-- 合并最新主线后的最终 audit：12 项（1 critical、10 high、1 moderate）。
-- 升级后不再报告 `electron-builder`、`app-builder-lib`、`builder-util`、`builder-util-runtime`、`@electron/rebuild`、`node-gyp`、`tmp` 或 `form-data` 漏洞。
-- 仍报告的 `tar@6.2.1` 位于 `@capacitor/cli@6.2.1` 下，修复建议指向 `@capacitor/cli@8.5.0`；它不在 electron-builder 依赖链中，属于 RED-18 明确排除的 Android/Capacitor 升级范围。其余报告来自既有 Electron 33、Capacitor 以及前端/测试依赖，不是 builder 26 工具链回归。
+Electron 43 的安装工具要求 Node.js 22.12.0 以上。PowerShell 禁止执行
+`npm.ps1` 时使用 `npm.cmd`/`npx.cmd`。Electron 43 将运行时下载器暴露为独立的
+`install-electron` 命令；若 `npm ci` 后直接启动提示二进制未安装，必须先运行上面的
+安装命令。下载器会按包内 checksums 校验产物。
 
-升级后的关键构建依赖为：
+### 8.2 桌面入口
 
-- `electron-builder@26.15.3`
-- `app-builder-lib@26.15.3`
-- `builder-util@26.15.3`
-- `builder-util-runtime@9.7.0`
-- `@electron/rebuild@4.2.0`
-- `node-gyp@12.4.0`，其内部使用 `tar@7.5.22`
-- `tmp@0.2.7`
-- `form-data@4.0.6`
+| 入口 | 开发启动 | Windows 打包 |
+| --- | --- | --- |
+| 服务端管理器 | `npm.cmd run dev:electron:server` | `npm.cmd run build:electron:server` |
+| 玩家客户端 | `npm.cmd run dev:electron:client` | `npm.cmd run build:electron:client` |
+| 数据编辑器 | `npm.cmd run dev:electron:editor` | `npm.cmd run build:electron:editor` |
 
-RED-18 最初锁文件节点由 917 个变为 845 个；合并 RED-13、RED-15、RED-16 的 ESLint、Next.js 与 ws 更新后，最终锁文件包含 1129 个节点。最终直接依赖同时保留主线的 `next@16.3.0`、`ws@^8.21.0`、`eslint@9.39.5`、`eslint-config-next@16.3.0`，以及 RED-18 的精确 `electron-builder@26.15.3`。
+服务端和客户端启动前都需要已有 Next standalone 输出；开发启动前先运行
+`npm.cmd run build`。客户端和服务端打包会自行执行这一步。
 
-### Electron 客户端
+Windows 输出目录：
+
+- 服务端：`dist/server-build/win-unpacked/`
+- 客户端：`dist/client-build/win-unpacked/`
+- 编辑器：`dist/editor/`
+
+### 8.3 桌面安全边界
+
+三个入口的每个 `BrowserWindow` 都必须显式保持：
+
+- `contextIsolation: true`
+- `nodeIntegration: false`
+- `sandbox: true`
+- `webSecurity: true`
+- 仅加载其受信任的本地页面根目录
+- 拒绝超出本地根目录的导航与所有 `window.open` 请求
+
+客户端不再使用 `webSecurity: false`，也不再全局忽略或接受无效 TLS
+证书。游戏页面仍通过浏览器同源规则访问本地/LAN/HTTPS API；Next API
+已经返回 CORS 响应头。连接自签名 HTTPS 服务会按 Chromium 默认行为失败，
+这是预期安全边界，不能通过恢复全局证书绕过解决。
+
+Preload 只暴露列出的 IPC 能力，不暴露原始 `ipcRenderer`。当前客户端的本地
+资源包能力会写入游戏页面根目录，因此它属于高权限入口；导航限制与 sender
+校验仍应在后续独立安全任务中继续收紧。
+
+### 8.4 Windows 最小烟测
+
+对开发启动和每个打包产物分别执行：
+
+1. 启动应用并确认窗口可见、标题正确。
+2. 在 DevTools 控制台确认 `process`/`require` 对 renderer 不可用。
+3. 服务端：管理面板出现，启动/停止按钮可用，退出后没有遗留服务进程。
+4. 客户端：连接窗口出现；本地模式可进入游戏首页；HTTPS 证书错误不会被静默放行。
+5. 编辑器：主界面出现，能列出数据文件；不执行写入操作即可完成本次烟测。
+6. 关闭窗口/托盘应用，确认主进程退出（服务端按托盘“退出”）。
+
+记录命令、退出码、窗口截图、致命控制台错误和产物路径。不要把仅完成编译写成
+“启动烟测通过”。
+
+打包产物生成后，可从管理员 PowerShell 运行可重复的自动烟测：
 
 ```powershell
-npm.cmd run build:electron:client
+npm.cmd run smoke:electron:windows
 ```
 
-初始结果：退出码 0，耗时 88.9 秒。`electron-builder 26.15.3` 生成 Windows x64 unpacked 目录。第一次人工验收随后发现，点击“使用本机服务器”会白屏；根因是干净 worktree 中被忽略的 `android-client/www/*.html` 等生成资源不存在，而构建命令没有先从受跟踪的 `data/pages` 同步页面。旧候选的 `resources/app/www` 只有 `js/` 和 `sw.js`，缺少运行时加载的 `index.html`。第二次人工验收发现页面虽能打开，但“棋子图鉴”为空；根因是页面通过 `./data/pieces/manifest.json` 等相对路径读取静态游戏数据，而候选的 `resources/app/www/data` 不存在。第三次人工验收发现图鉴卡片已经出现，但人物贴图全部回退成阵营占位内容；根因是页面从 `./images/*.jpg` 读取头像，而候选只在服务端的 `resources/app/public` 中包含这些图片，没有复制到离线页面的 `resources/app/www/images`。
+脚本只清理与上述产物绝对路径、启动 PID 进程树和专用调试端口相匹配的测试进程。
+服务端会验证 3000 端口的启动/停止；客户端会验证本机模式、无效 TLS 证书拒绝和退出
+清理；编辑器会直接启动最终 portable EXE，在最长 300 秒内等待 renderer，并记录实际
+启动耗时、正式构建中的数据文件列表和退出清理结果。
 
-修复后，Client 构建会先执行现有 `sync:pages`，再运行 `scripts/verify-electron-client-package.js`。`electron-builder.client.json` 将页面实际使用的卡牌、效果、地图、棋子、PVE、规则、技能、状态、地块和 `skill-keywords.json` 白名单复制到 `resources/app/www/data`，并将 `public` 顶层 JPG 与 `public/card-art` 白名单复制到 `resources/app/www/images`；本地账号数据库 `data/users.json` 与页面源码副本不会进入该前端目录。校验器既检查关键运行文件，也逐一比较 `data/pages` 中 27 个页面源资源、305 个白名单离线数据资源和 38 个离线图片资源与最终产物；三个旧候选分别会稳定报告缺少页面、离线数据或离线图片资源。
+### 8.5 候选验证记录（2026-08-13；2026-08-14 根据人工反馈修订）
 
-2026-08-13 完整重建先在 electron-builder 下载 Electron 时两次连接 GitHub 超时（`ETIMEDOUT`），没有生成可验收的新候选。随后通过 electron-builder 26 正式支持的临时 `electronDist=node_modules/electron/dist` 验证路径，使用本机相同版本 Electron 33.4.11 完成打包。合并最新主线并重新执行 Next.js 16.3.0 production build 后，最终 builder 退出码 0、产物校验退出码 0，打包与校验步骤耗时 35.7 秒。该临时参数没有写入项目构建配置。
+- 在最新 `origin/main` 合并基线上执行 `npm.cmd ci`：退出码 0，安装 1047 个包；
+  `npx.cmd install-electron` 完成运行时校验，
+  `electron --version` 为 `v43.4.0`。
+- `npm.cmd audit`：不再包含 Electron 或旧 `extract-zip` 漏洞链；仍有 23 个范围外依赖
+  漏洞（1 low、1 moderate、20 high、1 critical），不能描述为 audit 全绿。
+- `npm.cmd test`：5 个测试文件、44 个测试通过；其中 Electron 安全边界 12/12。
+- 根工程及 `electron`、`electron-client`、`electron-editor` TypeScript 检查通过；
+  `npm.cmd run build` 通过。
+- `npm.cmd run lint` 能正常启动 ESLint，退出码 1；排除本机未跟踪 worktree 后复现
+  最新基线已记录的 1005 项既有问题（657 errors、348 warnings）。RED-19 修改未增加 lint
+  问题；全仓 lint 债务不在本次依赖升级范围。
+- 服务端 `dir`、客户端 `dir` 和编辑器 `portable` 正式构建均退出码 0。编辑器构建首次
+  从 GitHub 下载 NSIS 超时，改用一次性 `ELECTRON_BUILDER_BINARIES_MIRROR` 环境变量后
+  成功；镜像地址未写入仓库配置。
+- 人工核验发现点击“停止服务器”后会把 `taskkill` 导致的退出码 1 误报成“端口 3000
+  已被占用”。最新候选会区分主动停止与非预期退出，并隔离旧进程的异步回调，相关
+  回归断言通过；修订后的服务端正式产物已重建，仍等待人工再次点击确认不再弹窗。
+- `npm.cmd run smoke:electron:windows` 三入口分别退出码 0：renderer 中 `process` 与
+  `require` 均为 `undefined`；服务端越界导航保持原 URL，停止后 3000 不可达；客户端
+  无效 TLS 探针被拒绝，受版本控制的 HTML/JS/数据/图片资产均可读取，本机模式为
+  ready，退出后网关不可达；编辑器列出 pieces 26、skills 114、cards 17、rules 82 个
+  文件并正常退出。
+- 初版烟测只确认 portable 文件存在并启动 `win-unpacked`，因此没有覆盖人工报告的
+  “便携版没反应”。直接启动旧 portable 后复现约 4 分 44 秒的无反馈等待；原因是编辑器
+  误打包整棵生产依赖。最新配置只保留资源包构建所需的 JSZip 依赖树，portable 从
+  158.0 MB 降至 88.6 MB，解包内容从约 840 MB / 24,520 文件降至 351 MB / 592 文件。
+  最终三入口组合烟测直接启动 portable，编辑器在 16,710 ms 内出现“数据编辑器”，数据
+  断言与退出清理通过；打包内 JSZip 生成探针也通过。
 
-最终 Windows x64 unpacked 目录：
+已知但未在 RED-19 扩大的边界：构建仍未签名且沿用 `asar: false`；客户端资源包写入
+受信任页面根目录、IPC sender 校验和 `adm-zip` audit 告警需要独立安全任务跟进。
 
-- `dist/client-build/win-unpacked/RED vs BLUE.exe`
-- EXE SHA-256：`615af01fe4445068ee344f21a7f8186445949f17e45b0cb5e1132e4cf849f644`
+### 8.6 回退
 
-已验证以下资源仍存在：
+RED-19 在独立分支中以本 PR 交付。若 Electron 43 候选构建出现阻断性回归，
+回退本 PR 的最终合并提交即可恢复 Electron 33.4.11 的 `package.json`/`package-lock.json`
+及旧窗口
+配置；回退后必须明确记录旧 Electron 与 `extract-zip` 漏洞重新出现，旧构建不得
+发布。
 
-- `resources/app/electron-client/dist/main.js`
-- `resources/app/standalone/server.js`
-- `resources/app/public`
-- `resources/app/data`
-- `resources/app/prisma`
-- `resources/app/www/index.html`
-- `resources/app/www/lobby.html`
-- `resources/app/www/js/server-utils.js`
-- `resources/app/www/js/game-engine.js`
-- `resources/app/www/images/terrain/floor.webp`
-- `resources/app/www/images/ana.jpg`
-- `resources/app/www/images/card-art/holy-charge.jpg`
-- `resources/app/www/data/pieces/manifest.json`（25 个棋子 ID）
-- `resources/app/www/data/pieces/*.json`（含 manifest 共 26 个文件）
-- `resources/app/init-db.js`
-- `resources/node.exe`
+## 9. RED-18：electron-builder 26.15.3、Editor ASAR 与双分发候选
 
-GUI 回归验证：最终候选从“连接服务器”真实点击“使用本机服务器”后，渲染 URL 切换至最终产物中的 `resources/app/www/index.html`；再真实点击“棋子图鉴”，页面切换至 `resources/app/www/pieces.html`，显示“25 个棋子”，DOM 中实际有 25 张 `.piece-card` 和 25 张 `<img>`。25 张图片均为 `complete` 且 `naturalWidth > 0`，损坏图片数为 0；没有捕获脚本异常或控制台错误。验收机另有旧 Server Electron 进程使用相同的 `my-project` 用户目录和单实例锁，因此本次候选使用隔离的临时 `--user-data-dir` 启动；现有桌面应用身份冲突不属于 RED-18 的 builder 升级、白屏或图鉴数据修复范围。源数据 `data/pieces/blue-minato.json` 的名称和描述本身是字面量问号，候选如实显示该既有内容问题，修复棋子文案不在 RED-18 范围。
+本节记录 2026-08-14 在最新 `origin/main`（`b7a90c4`）合并后的最终候选证据。第 8 节是
+RED-19 在旧候选上的历史记录，不代表 RED-18 的最终依赖树或产物。RED-18 继承主线的
+Electron `43.4.0` 和 Server 构建入口；`electron-builder.server.json` 与主线逐字节一致，
+Server 不属于 RED-18 的实现差异。
 
-产物结构与 `electron-builder.client.json` 一致：继续使用 `asar: false` 和 Windows `dir` 目标，没有生成安装器。由于本次只修复旁载的 `resources/app/www`，启动器 EXE SHA-256 保持不变；候选内容变化由逐文件页面、离线数据及离线图片资源校验和 GUI 回归证明。
+### 9.1 依赖与安全审计
 
-### Electron 编辑器
+- 从干净依赖安装执行 `npm.cmd ci`：退出码 0，安装 949 个包；随后
+  `npx.cmd install-electron --no` 退出码 0，`npx.cmd electron --version` 输出 `v43.4.0`。
+- `electron-builder`、`app-builder-lib`、`builder-util` 均为 `26.15.3`；构建链中的
+  `@electron/rebuild` 为 `4.2.0`、`node-gyp` 为 `12.4.0`、`tar` 为 `7.5.22`、
+  `tmp` 为 `0.2.7`、`form-data` 为 `4.0.6`。兼容范围内额外固定 `fast-uri` `3.1.5`
+  与 `lodash` `4.18.1`，避免新 advisory 再次污染构建工具链。
+- 最终 `npm.cmd audit --json` 为 5 项（1 moderate、4 high、0 critical）；剩余名称为
+  `adm-zip`、`brace-expansion`、`serialize-javascript`、`terser-webpack-plugin`、`vite`，
+  均不在 `electron-builder` / `app-builder-lib` 构建链中。因此只能描述为“RED-18 目标
+  构建工具链漏洞清零”，不能描述为全仓 audit 全绿。
 
-```powershell
-npm.cmd run build:electron:editor
-```
+### 9.2 自动测试与构建验证
 
-首次结果：退出码 1。TypeScript 编译、Windows x64 unpacked 打包成功，随后下载 portable 辅助资源时连接 GitHub 超时（`ETIMEDOUT`）。
+- `npm.cmd test`：7 个测试文件、59/59 通过；RED-18 三个重点测试文件为 27/27 通过。
+- 根工程、`electron`、`electron-client`、`electron-editor` TypeScript 检查均通过；
+  RED-18 脚本和直接相关测试的 ESLint 退出码 0；编码检查 489 个文本文件通过；
+  `git diff --check` 通过。
+- Client 正式构建退出码 0；验证器逐 SHA-256 核对 27 个页面资源、305 个离线数据资源
+  和 38 张离线图片。`dist/client-build/win-unpacked/RED vs BLUE.exe` 为
+  225,533,440 bytes，SHA-256
+  `ACC1A09EEB8AF3DCDE9E6C7CE52ED4423A88148CA94453AA927D9D5C2C76194D`，未签名。
+- Editor 正式构建同时生成 Portable 和 assisted NSIS（当前用户/当前机器可选安装目录），
+  退出码 0；验证器核对 333 个数据资源、19 个脚本资源和 165 个运行时资源。
+- Editor 的 `app.asar` 为 45,084 bytes，SHA-256
+  `E7858424141EFFFBB59EA9979FD0AC3BA819E11CF1E4CFE5773E592DAB844F0F`；其中只有
+  `package.json`、编译后的 main/preload 与 UI 共 7 个条目，没有 `node_modules`。
+  JSZip 的最小运行时闭包作为 `extraResources` 保持在 ASAR 外部。
+- 主线 Server 入口也在相同依赖树上重新构建并通过 smoke：renderer 不暴露
+  `process`/`require`，越界导航被拒绝，停止后 3000 端口不可达。该项仅作为兼容性证据，
+  Server 配置和实现没有 RED-18 差异。
 
-单次网络重试：退出码 1。NSIS 与 7zip 辅助资源下载成功，之后连接被重置（`ECONNRESET`），未生成最终 `dist/editor/RED vs BLUE Editor 0.1.0.exe`。
+### 9.3 Portable 与 NSIS 生命周期证据
 
-2026-08-13 在辅助资源已缓存后再次执行：退出码 0，耗时 533.6 秒，首次 portable EXE 生成成功。人工验收随后发现，双击该候选只短暂显示忙碌光标，没有编辑器窗口；重复点击实际产生了 4 个并行的无窗口解压进程。清理后对单个进程计时，180 秒仍未创建窗口。该候选使用 `asar: false`，每次启动需要把 137,680,764 bytes 的 portable 展开为 736,964,306 bytes、23,595 个散装文件。相同候选的 `win-unpacked` EXE 约 1 秒完成页面加载，证明编辑器本体正常，问题位于 portable 自解压布局。
+- Portable：`RED vs BLUE Editor 0.1.0.exe` 为 90,171,912 bytes，SHA-256
+  `D4C9E86C55D6A76BDC61D9C79F9D53100A44F7CA36DE1BF365F1B7C2353E2D66`，未签名。
+  直接启动到“数据编辑器”renderer 用时 22,968 ms；renderer 中 `process`/`require` 均为
+  `undefined`，可列出 pieces 26、skills 114、cards 17、rules 82 个文件，关窗后进程干净退出。
+- NSIS：`RED vs BLUE Editor Setup 0.1.0.exe` 为 90,401,895 bytes，SHA-256
+  `169E1E4FA389522D67EB2321D0D63ED51399CDE5321B180F562F6C6070D87F8F`，未签名。
+  静默安装到隔离的当前用户目录退出码 0、耗时 23,381 ms；安装后启动到相同 renderer
+  用时 3,143 ms，安全边界和数据 IPC 断言与 Portable 一致。
+- 静默卸载退出码 0、耗时 8,178 ms；安装目录被删除，HKCU 卸载项从 1 变为 0，桌面与
+  开始菜单快捷方式从 2 变为 0。验收专用用户目录也已删除。
 
-经项目负责人批准，2026-08-14 将 Editor 切换为 ASAR。第一次中间候选虽然把散装文件收进归档，但仍把根 Next.js 项目的 25,915 个 `node_modules` 条目收入 287,602,908 bytes 的 `app.asar`；portable 在 47.34 秒后才创建窗口，因此没有作为最终候选。最终配置通过 `beforeBuild` 正式接口声明由项目自行处理 Editor 运行依赖，ASAR 只保留 7 个应用条目；资源包脚本需要的 JSZip 最小依赖闭包作为 165 个外部运行文件复制。最终完整构建退出码 0，耗时 153.6 秒；`scripts/verify-electron-editor-package.js` 自动验证 333 个数据资源、19 个脚本资源和 165 个运行资源的缺失/陈旧状态，并确认归档中不存在 `node_modules`。
-
-Git 历史只显示 Windows `portable` 目标随 2026-05-11 的首次项目批量同步提交 `920f8af` 一起进入仓库；没有关联 ADR、注释或后续提交解释选择理由。经项目负责人批准，2026-08-14 保留 Portable 供免安装分发，同时新增 assisted NSIS 安装版。安装向导支持当前用户/所有用户模式、允许选择安装目录，并创建标准桌面和开始菜单快捷方式。双目标最终构建退出码 0，耗时 145.5 秒；Portable 与安装版复用同一个 `win-unpacked` 应用内容和 ASAR/外置资源边界。
-
-最终产物：
-
-- Portable：`dist/editor/RED vs BLUE Editor 0.1.0.exe`
-- Portable 文件大小：72,991,230 bytes
-- Portable SHA-256：`8cfbffef6d4253ffcfbc2f985ef3e9f485e0207d3d0a60c49ba67b29dfffc8d2`
-- 安装版：`dist/editor/RED vs BLUE Editor Setup 0.1.0.exe`
-- 安装版文件大小：73,221,215 bytes
-- 安装版 SHA-256：`6f13ebed065ff66d75e87ec2b5d60ed474d2f5a3377d0634e369bb9787a125d1`
-
-已验证的 unpacked 产物与资源：
-
-- `dist/editor/win-unpacked/RED vs BLUE Editor.exe`
-- EXE SHA-256：`cc20c2f6b38ea9d6945e468d2983515497f4706ca10b922e5a2408f3cc324ab8`
-- `resources/app.asar`：44,058 bytes，SHA-256 `70d4bc9649df4d5338fe7972881e68dd708e3fd8cd5fc86b8bb4b75637ad94b3`
-- `resources/app/data`：333 个资源与源码逐文件一致
-- `resources/app/scripts`：19 个资源与源码逐文件一致
-- `resources/app/node_modules`：165 个 JSZip 最小运行资源与源码逐文件一致
-- `resources/app/electron-editor/dist/main.js` 不存在；应用入口只位于 `app.asar`
-
-首个 ASAR Portable 候选从单进程启动到页面调试目标出现耗时 14.69 秒；页面状态为 `complete`，棋子列表包含 26 个 JSON 文件，`ana.json` 可读取。通过真实 IPC 创建并读回临时 JSON 成功，测试文件随后精确删除；Portable 临时目录在程序关闭后自动清理。外部资源包脚本可从最终临时解压目录解析并加载 JSZip，运行时异常和控制台错误均为 0。新增 NSIS 目标后，对精确 SHA-256 为 `8cfbffef6d4253ffcfbc2f985ef3e9f485e0207d3d0a60c49ba67b29dfffc8d2` 的最终 Portable 冷启动复验，页面目标在 37.63 秒出现，随后页面同样为 `complete`、标题为“数据编辑器”且 `window.editorAPI` 可用。两次结果说明 ASAR 已消除 180 秒无窗口的问题，但新生成、未签名单文件的自解压/扫描时间仍有明显波动，不应把 14.69 秒当作固定启动承诺。
-
-安装版使用 `/S /currentuser` 安装到工作区内经过边界校验的临时目录：安装器退出码 0，23.32 秒完成；安装目录包含 591 个文件、285,117,440 bytes。已安装 EXE 到页面调试目标出现耗时 1.61 秒；等待页面导航稳定后，页面状态为 `complete`、标题为“数据编辑器”、`window.editorAPI` 为对象、棋子目录可列出 26 个 JSON 文件且 `ana.json` 内容可读取。候选自带卸载器以当前用户模式退出码 0，22.34 秒完成；安装目录被删除，当前用户卸载注册项和桌面/开始菜单快捷方式均为 0 残留。验收创建的隔离浏览器缓存目录随后精确清理。
-
-配置使用 `asar: true`，Windows 同时生成 `portable` 与 `nsis` 目标；NSIS 使用 assisted 安装向导（`oneClick: false`、`perMachine: false`、允许选择安装目录）。`data`、`scripts` 与 JSZip 运行闭包继续作为真实外部文件；根 Next.js/Prisma 等生产依赖不进入 Editor。首次构建机仍需要访问 GitHub 下载 Electron、NSIS、7zip、NSIS resources 和 winCodeSign 辅助资源。Editor UI 中“构建资源包”的完整写出流程没有在 RED-18 中执行，因为它会修改 Android/资源包输出；该流程应在独立任务中验证，不把本次 JSZip 解析检查描述为完整资源包构建通过。
-
-### Electron 服务端
-
-```powershell
-npm.cmd run build:electron:server
-```
-
-结果：退出码 1，npm 报告 `Missing script: "build:electron:server"`。当前重构基线只保留 `dev:electron:server`；`build:electron:server` 与 `electron-builder.server.json` 已在基线提交 `ac9b3bf` 中移除。
-
-经项目负责人批准，RED-18 只验收当前存在的 client/editor 打包入口，不恢复服务端入口。是否恢复独立服务端桌面包由 Linear `RED-23` 单独评估；该任务只做架构决策，不在 RED-18 顺带实现。
-
-### 签名与回退
-
-两个现有 builder 配置都没有证书或发布配置。本次修改 `electron-builder.client.json` 的静态资源白名单，并修改 `electron-builder.editor.json` 的 ASAR、外部运行依赖、Portable/NSIS 双目标和产物校验边界；没有新增证书或发布配置。日志中的 `signing with signtool.exe` 是 electron-builder 对 Windows 可执行文件的处理步骤；PowerShell `Get-AuthenticodeSignature` 对最终 Portable、NSIS 安装器和 unpacked Editor EXE 均返回 `NotSigned`，确认没有配置发行证书。
-
-### 其他检查
-
-- `npm.cmd run test`：验证时曾因沙箱禁止写入 `logs/game.log` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。Client 产物包含 6 个回归测试，Editor ASAR/外置资源/双目标包含 9 个回归测试；最终 6 个测试文件、47 个测试全部通过。
-- `npm.cmd run check:encoding`：退出码 0，487 个文本文件通过。
-- 根 TypeScript、Electron Client TypeScript 与 Electron Editor TypeScript：退出码均为 0。
-- `node scripts/verify-electron-client-package.js`：退出码 0，27 个页面源资源、305 个白名单离线数据资源和 38 个离线图片资源与最终候选一致；`resources/app/www/data/users.json` 不存在。
-- `node scripts/verify-electron-editor-package.js`：退出码 0，ASAR 入口、333 个数据资源、19 个脚本资源和 165 个外部运行资源与最终候选一致；归档中没有 `node_modules`，外部 JSZip 可以解析。
-- `npm.cmd run lint`：ESLint 正常运行，退出码 1；结果为主线既有的 1005 项（657 errors、348 warnings）。RED-18 新增的 CommonJS 产物校验脚本使用局部规则豁免，没有增加 lint 问题。
-
-回退时还原 RED-18 的独立提交，即可同时恢复 `package.json` 中旧版 builder 声明、对应 `package-lock.json` 构建依赖树与 Editor 的旧散装文件布局；若只回退安装版，则移除 `electron-builder.editor.json` 的 `nsis` target/config，并恢复校验器和测试只要求 Portable。构建产物不提交到仓库。
+当前候选的已知边界：Windows EXE 尚未配置发布证书；本轮 smoke 只读取正式包内数据，
+没有执行会写出完整资源包的人工操作。回退 RED-18 的最终提交会保留主线 Electron 43.4
+和 Server 入口，但会撤销 editor-builder 26.15.3、ASAR、NSIS 及资源验证器，并重新暴露
+本任务所清理的构建工具链风险；回退后的旧构建不得发布。

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { spawn } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
+import { fileURLToPath } from 'url'
 
 // ─── 路径工具 ─────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,25 @@ function getProjectRoot(): string {
 
 function getDataRoot(): string {
   return path.join(getProjectRoot(), 'data')
+}
+
+function restrictWindowNavigation(browserWindow: BrowserWindow, allowedRoot: string): void {
+  const resolvedRoot = path.resolve(allowedRoot)
+  const isAllowed = (rawUrl: string): boolean => {
+    try {
+      const url = new URL(rawUrl)
+      if (url.protocol !== 'file:') return false
+      const target = path.resolve(fileURLToPath(url))
+      return target === resolvedRoot || target.startsWith(resolvedRoot + path.sep)
+    } catch {
+      return false
+    }
+  }
+
+  browserWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowed(url)) event.preventDefault()
+  })
+  browserWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 }
 
 // ─── 安全校验 ─────────────────────────────────────────────────────────────────
@@ -48,9 +68,13 @@ function createWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
-  win.loadFile(path.join(__dirname, '..', 'ui', 'index.html'))
+  const uiRoot = path.join(__dirname, '..', 'ui')
+  restrictWindowNavigation(win, uiRoot)
+  win.loadFile(path.join(uiRoot, 'index.html'))
   win.setMenu(null)
   // win.webContents.openDevTools()
 }
