@@ -157,11 +157,14 @@ git grep -n "build:electron:server\|electron-builder.server" origin/main -- `
 
 ```powershell
 npm.cmd run build:electron:server
+node scripts/verify-electron-server-package.js
 node tests/electron/windows-smoke.mjs server
 ```
 
-RED-23 只改变文档，不重新生成候选包。上述运行验证沿用 RED-19/RED-18 已记录的真实结果；
-后续实现合同必须在当时最新主线重新执行并记录退出码、资源清单、产物路径和清理结果。
+RED-23 只改变文档，不重新生成候选包。RED-44 在最新主线增加资源 manifest：构建时先按
+预期源树逐文件验证，staging 清理后再按 manifest 回放同一候选，并记录 Server EXE、
+独立 Node、完整资源清单及 smoke 的真实证据。候选记录见
+[`RED_44_ELECTRON_SERVER_CANDIDATE.md`](../technical/RED_44_ELECTRON_SERVER_CANDIDATE.md)。
 
 ## 回退方式
 
