@@ -56,15 +56,15 @@
 
 执行顺序：
 
-1. 从动作读取或生成 client action ID。
-2. 读取/创建 `state.extensions.debugBattle`。
+1. 从动作读取 client action ID。
+2. 只读检查已有 `state.extensions.debugBattle`，识别重复动作。
 3. 补回运行时技能定义。
 4. 调用 `applyBattleAction()`。
 5. 去除不适合序列化的技能函数。
-6. 记录动作、action hash 和 state hash。
+6. 动作成功后在下一状态创建/更新调试元数据，并记录动作、action hash 和 state hash。
 7. 返回 `{ state, stateHash, actionHash, duplicate }`。
 
-已知隐式修改：`getDebugMetadata(state)` 会在输入状态缺少 `extensions` 时直接写入，因此 runner 不是严格的纯函数。
+原子性边界：规则校验、规则函数恢复或运行时技能补全失败时，输入状态、AP、actions 和调试 action trace 保持不变。
 
 幂等边界：重复 client action ID 可以被标记为 `duplicate`；没有确认所有 UI、Relay 和 mobile 消息都稳定提供该 ID。
 
@@ -107,7 +107,9 @@
 ## 6. 实体、地图和附加效果
 
 - 棋子和实体：`lib/game/piece.ts`。
-- 地图和移动：`lib/game/map.ts` 及地图数据加载逻辑。
+- 地图定义：`lib/game/map.ts` 及地图数据加载逻辑。
+- 共享空间规则：`lib/game/spatial.ts`。默认距离使用曼哈顿距离；方形范围和直线格序列必须显式调用对应工具。
+- 普通移动：`turn.ts`、AI 与浏览器高亮共同调用 `spatial.ts`；横向/纵向路径上的不可行走地形和任意存活棋子都会阻挡，技能位移不自动套用普通移动规则。
 - 召唤入口：`lib/game/turn.ts::summonPiece()`。
 - 附加效果：`lib/game/attached-effect.ts::applyEffectToPiece()` 等。
 - 触发器：`lib/game/triggers.ts::TriggerSystem`。
@@ -178,7 +180,7 @@ function evaluateGameResult(state: BattleState): GameResult;
 
 ## 12. 当前不变量和测试覆盖
 
-现有 `tests/game/turn.test.ts` 覆盖部分移动、回合、版本、不可变性、目标和中断选择；`tests/game/debug-battle.test.ts` 覆盖固定 seed、hash、回放和 action ID 幂等。
+现有 `tests/game/turn.test.ts` 覆盖普通移动、回合、版本、不可变性、目标和中断选择；`tests/game/spatial.test.ts` 与 `tests/game/movement-contract.test.ts` 覆盖空间工具属性、占位/地形阻挡及 UI/服务端合法集合契约；`tests/game/debug-battle.test.ts` 覆盖固定 seed、hash、回放和 action ID 幂等。
 
 尚缺：
 

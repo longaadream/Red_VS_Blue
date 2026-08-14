@@ -23,6 +23,17 @@
 - 已知问题：文件职责过大；与 `battle-types.ts`/`training-types.ts` 类型重复。
 - 最小调试：使用固定 `_v` 的状态调用 `applyBattleAction(state, action)`，比较输入和输出 hash。
 
+### 1.1 共享空间规则（RED-30）
+
+- 入口：`lib/game/spatial.ts`。
+- 职责：提供曼哈顿距离/范围、方形范围、横纵直线格序列、存活棋子占位查询和普通移动合法集合。
+- 输入：只读地图、棋子和坐标；不访问窗口、存储、时间或随机源。
+- 输出：确定性的坐标/占位结果，或包含拒绝代码、位置与消息的普通移动失败结果。
+- 调用方：`turn.ts` 的权威移动验证、`ai.ts` 的候选动作、`engine-browser-entry.ts` 导出的 UI 高亮接口，以及默认距离调用点。
+- 普通移动边界：仅横向/纵向且不超过 `moveRange`；不可行走地形与路径上的任意存活棋子阻挡；死亡/墓地棋子不阻挡；掩体是否可进入由地图的 `walkable` 属性决定。
+- 排除：技能位移、推拉、传送不会隐式调用普通移动验证器，必须由技能实现明确选择空间工具。
+- 测试：`tests/game/spatial.test.ts`、`tests/game/movement-contract.test.ts`、`tests/game/turn.test.ts`、`tests/game/ai-movement.test.ts`。
+
 ## 2. 战斗 Runner 与回放
 
 - 入口：`lib/game/battle-runner.ts::runBattleAction()`、`replayBattle()`。
@@ -31,11 +42,11 @@
 - 输出：状态、`stateHash`、`actionHash`、`duplicate`，或回放结果。
 - 调用方：WS、房间 HTTP API、训练/调试 API、测试。
 - 调用：`applyBattleAction()`、稳定 JSON/hash、RNG。
-- 状态变化：会写入 `state.extensions.debugBattle`；返回下一状态。
+- 状态变化：仅在动作成功后写入下一状态的 `extensions.debugBattle`；拒绝动作不会修改输入状态或 action trace。
 - 错误：规则错误直接向上抛；上层转换方式不统一。
 - 日志：主要依赖调用方；调试元数据保存在状态扩展中。
 - 测试：`tests/game/debug-battle.test.ts`。
-- 已知问题：输入状态存在隐式写入；回放后不恢复原自定义 RNG。
+- 已知问题：回放后不恢复调用方注入的自定义 RNG，只恢复到 `Math.random`。
 - 最小调试：保存初始状态、seed、动作序列，调用 `replayBattle()` 并核对最终 hash。
 
 ## 3. 战斗初始化
@@ -152,8 +163,8 @@
 - 状态变化：全局 `G`、DOM、localStorage；Relay 模式还会执行规则。
 - 错误：网络失败、引擎异常或状态不兼容；部分异常只显示提示或被忽略。
 - 日志：浏览器 console；生产 mobile 构建会削弱部分 console 输出。
-- 测试：没有确认到真实浏览器 E2E。
-- 已知问题：大文件跨层；复制胜负/目标逻辑；不同模式承担不同权威职责。
+- 测试：`tests/game/movement-contract.test.ts` 会执行页面实际加载的 `data/pages/js/game-engine.js`，验证共享移动导出和固定状态候选集合；尚无真实浏览器 E2E。
+- 已知问题：大文件跨层；部分胜负/目标逻辑仍有复制；不同模式承担不同权威职责。
 - 最小调试：捕获连接模式、roomId、seed、最后 action、服务端/客户端 state hash 和截图。
 
 ## 10. Electron IPC
@@ -194,12 +205,14 @@
 - 入口：`scripts/build-game-engine.js`、`sync-pages.js`、`sync-android-assets.js` 和根 `package.json` Android scripts。
 - 职责：把 TS/JS、页面和 mobile server 转换成 Android 发布资源。
 - 输入：`lib/game`、`data/pages`、`mobile-server`。
-- 输出：`android-client/www` 等生成物，最终进入安装包。
+- 输出：页面实际加载并提交的 `data/pages/js/game-engine.js`，以及被忽略的 `android-client/www/js/game-engine.js` 派生副本。
 - 调用方：Android 打包命令。
 - 错误：缺失依赖、构建顺序或覆盖错误会生成与源码不一致的安装包。
-- 测试：没有确认到生成物 hash/来源验证。
-- 已知问题：当前正式发布物与预期唯一源码关系不清。
+- 测试：`tests/game/movement-contract.test.ts` 直接执行 canonical bundle 并检查 RED-30 共享空间导出；尚无完整 Android 安装包来源/hash 验证。
+- 已知问题：完整 Android 发布物仍缺少端到端的来源/hash 验证。
 - 最小调试：清空临时构建目录后从源码生成，记录命令、commit、文件 hash，再安装冒烟验证。删除正式目录前必须另行审批。
+
+- 浏览器兼容：`build-game-engine.js` 将 `node:fs/path/crypto/zlib` 规范化为 runtime shim 已支持的普通 external 名称，并在浏览器 bundle 内联不执行文件操作的 `adm-zip` 占位模块；`movement-contract.test.ts` 禁止 canonical bundle 重新引入这些不受支持的动态 require。
 
 ## 12. 重复公共类型
 

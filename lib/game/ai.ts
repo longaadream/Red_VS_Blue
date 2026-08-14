@@ -1,50 +1,12 @@
 import type { BattleState } from './battle-types'
 import { getSkillById } from './skill-repository'
+import { getLegalNormalMoveTargets, manhattanDistance } from './spatial'
 
-function manhattanDist(ax: number, ay: number, bx: number, by: number): number {
-  return Math.abs(ax - bx) + Math.abs(ay - by)
-}
-
-function getWalkableSet(state: BattleState): Set<string> {
-  const s = new Set<string>()
-  for (const t of state.map.tiles) {
-    if (t.props.walkable) s.add(`${t.x},${t.y}`)
-  }
-  return s
-}
-
-function getOccupiedSet(state: BattleState): Set<string> {
-  const s = new Set<string>()
-  for (const p of state.pieces) {
-    if (p.currentHp > 0 && p.x != null && p.y != null) s.add(`${p.x},${p.y}`)
-  }
-  return s
-}
-
-// Rook-style reachable cells (mirrors validateMove in turn.ts)
 function getValidMoves(
   state: BattleState,
   piece: any,
 ): Array<{ x: number; y: number }> {
-  if (piece.x == null || piece.y == null) return []
-  const walkable = getWalkableSet(state)
-  const occupied = getOccupiedSet(state)
-  const maxRange = piece.moveRange ?? 99
-  const { width, height } = state.map
-  const results: Array<{ x: number; y: number }> = []
-
-  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as [number, number][]) {
-    for (let d = 1; d <= maxRange; d++) {
-      const tx = piece.x + dx * d
-      const ty = piece.y + dy * d
-      if (tx < 0 || tx >= width || ty < 0 || ty >= height) break
-      const key = `${tx},${ty}`
-      if (!walkable.has(key)) break // wall blocks this direction entirely
-      if (!occupied.has(key)) results.push({ x: tx, y: ty })
-      // occupied intermediate cells don't block (matches "暂时不检查路径被阻挡")
-    }
-  }
-  return results
+  return getLegalNormalMoveTargets(state, piece)
 }
 
 // Find valid skill targets for one piece and one skill definition
@@ -65,7 +27,7 @@ function findSkillTargets(
     const pool = filter === 'ally' ? allies : enemies
     const inRange = pool.filter(
       t => t.currentHp > 0 && t.x != null && t.y != null &&
-        manhattanDist(piece.x, piece.y, t.x, t.y) <= range,
+        manhattanDistance(piece, t) <= range,
     )
     return inRange.length > 0 ? inRange : null
   }
@@ -74,7 +36,7 @@ function findSkillTargets(
   if (targetType === 'grid' || targetType === 'cell') {
     const inRange = enemies.filter(
       e => e.currentHp > 0 && e.x != null && e.y != null &&
-        manhattanDist(piece.x, piece.y, e.x, e.y) <= range,
+        manhattanDistance(piece, e) <= range,
     )
     return inRange.length > 0 ? inRange : null
   }
@@ -158,21 +120,21 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
       const liveEnemies = enemies.filter(e => e.x != null && e.y != null)
       if (validMoves.length > 0 && liveEnemies.length > 0) {
         const nearestEnemy = liveEnemies.reduce((best, e) => {
-          return manhattanDist(piece.x!, piece.y!, e.x!, e.y!) <
-            manhattanDist(piece.x!, piece.y!, best.x!, best.y!)
+          return manhattanDistance(piece, e) <
+            manhattanDistance(piece, best)
             ? e
             : best
         }, liveEnemies[0])
 
         const bestMove = validMoves.reduce((best, m) => {
-          return manhattanDist(m.x, m.y, nearestEnemy.x!, nearestEnemy.y!) <
-            manhattanDist(best.x, best.y, nearestEnemy.x!, nearestEnemy.y!)
+          return manhattanDistance(m, nearestEnemy) <
+            manhattanDistance(best, nearestEnemy)
             ? m
             : best
         }, validMoves[0])
 
-        const currentDist = manhattanDist(piece.x!, piece.y!, nearestEnemy.x!, nearestEnemy.y!)
-        const newDist = manhattanDist(bestMove.x, bestMove.y, nearestEnemy.x!, nearestEnemy.y!)
+        const currentDist = manhattanDistance(piece, nearestEnemy)
+        const newDist = manhattanDistance(bestMove, nearestEnemy)
 
         if (newDist < currentDist) {
           actions.push({ type: 'move', playerId: botPlayerId, pieceId: piece.instanceId, toX: bestMove.x, toY: bestMove.y })
