@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getPieceById } from "@/lib/game/piece-repository"
 import type { Faction, PieceTemplate } from "@/lib/game/piece"
+import { createRootSeed } from "@/lib/game/rule-runtime"
 
 /**
  * POST /api/relay-battle-init
@@ -44,16 +45,18 @@ export async function POST(req: NextRequest) {
   // Flat list for the overloaded first arg
   const allPieces = playerSelectedPieces.flatMap(p => p.pieces)
 
+  const seed = createRootSeed()
   const state = await createInitialBattleForPlayers(
     playerIds,
     allPieces,
     playerSelectedPieces,
-    body.mapId
+    body.mapId,
+    { rootSeed: seed },
   )
 
   if (!state) {
     return NextResponse.json({ error: "Failed to create battle state" }, { status: 500 })
   }
 
-  return NextResponse.json({ state })
+  return NextResponse.json({ state, seed })
 }

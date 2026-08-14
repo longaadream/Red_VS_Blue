@@ -28,6 +28,7 @@ import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction
 import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
+import { getRuleDate, getRuleMath, withRuleRuntimeCheckpoint } from "./rule-runtime"
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -625,19 +626,21 @@ function dryRunCardAction(
   cardDef: any,
   executeCardFunction: Function,
 ): void {
-  const dryState = safeCloneBattleState(state)
-  const { targetPiece, targetPosition } = getCardTargetArgs(dryState, action)
-  const result = executeCardFunction(
-    cardDef,
-    action.playerId,
-    dryState,
-    undefined,
-    targetPiece,
-    targetPosition,
-    action.selectedOption,
-    action.extraTargets,
-  )
-  assertCardDryRunResult(result)
+  withRuleRuntimeCheckpoint(() => {
+    const dryState = safeCloneBattleState(state)
+    const { targetPiece, targetPosition } = getCardTargetArgs(dryState, action)
+    const result = executeCardFunction(
+      cardDef,
+      action.playerId,
+      dryState,
+      undefined,
+      targetPiece,
+      targetPosition,
+      action.selectedOption,
+      action.extraTargets,
+    )
+    assertCardDryRunResult(result)
+  })
 }
 
 function buildSkillTargetSlot(
@@ -726,20 +729,22 @@ function dryRunSkillAction(
   action: any,
   skillDef: SkillDefinition,
 ): void {
-  const dryState = safeCloneBattleState(state)
-  if (!(dryState as any).extensions) (dryState as any).extensions = {}
-  ;(dryState as any).extensions.__dryRunSkillPreflight = true
-  const dryPiece = dryState.pieces.find(p => p.instanceId === piece.instanceId && p.currentHp > 0)
-  if (!dryPiece) {
-    throw new BattleRuleError("Piece not found or is defeated")
-  }
-  const drySkillDef = dryState.skillsById[skillDef.id] || skillDef
-  const result = executeSkillFunction(
-    drySkillDef,
-    buildSkillExecutionContext(dryState, dryPiece, action, drySkillDef),
-    dryState,
-  )
-  assertSkillDryRunResult(result)
+  withRuleRuntimeCheckpoint(() => {
+    const dryState = safeCloneBattleState(state)
+    if (!(dryState as any).extensions) (dryState as any).extensions = {}
+    ;(dryState as any).extensions.__dryRunSkillPreflight = true
+    const dryPiece = dryState.pieces.find(p => p.instanceId === piece.instanceId && p.currentHp > 0)
+    if (!dryPiece) {
+      throw new BattleRuleError("Piece not found or is defeated")
+    }
+    const drySkillDef = dryState.skillsById[skillDef.id] || skillDef
+    const result = executeSkillFunction(
+      drySkillDef,
+      buildSkillExecutionContext(dryState, dryPiece, action, drySkillDef),
+      dryState,
+    )
+    assertSkillDryRunResult(result)
+  })
 }
 
 export function validateSkillActionByDryRun(state: BattleState, action: any): void {
@@ -1528,8 +1533,6 @@ export function applyBattleAction(
         }
       }
 
-      const { executeSkillFunction } = require('./skills')
-      
       // 构建目标信息（支持 N 次 selectTarget 调用）
       const buildTargetSlot = (pieceId: string | undefined, tx: number | undefined, ty: number | undefined) => {
         if (pieceId) {
@@ -1834,10 +1837,7 @@ export function applyBattleAction(
       }
 
       // 执行技能
-      const skillsModule = require('./skills')
-      const { executeSkillFunction } = skillsModule
       console.log('[useChargeSkill] executeSkillFunction imported: ' + typeof executeSkillFunction)
-      console.log('[useChargeSkill] skillsModule keys:', Object.keys(skillsModule).join(', '))
       console.log('[useChargeSkill] executeSkillFunction toString:', executeSkillFunction.toString().substring(0, 500))
       console.log('[useChargeSkill] skillDef id: ' + skillDef.id)
       console.log('[useChargeSkill] skillDef has code: ' + !!skillDef.code)
@@ -2229,7 +2229,8 @@ export function applyBattleAction(
       if (pending.effectCode) {
         let fn: any
         try {
-          fn = eval('(' + pending.effectCode + ')')
+          const compileEffect = eval('(function(Math, Date) { return (' + pending.effectCode + '); })')
+          fn = compileEffect(getRuleMath(), getRuleDate())
         } catch (evalErr) {
           throw new BattleRuleError('[STAGE6] effectCode eval failed: ' + (evalErr instanceof Error ? evalErr.message : String(evalErr)))
         }

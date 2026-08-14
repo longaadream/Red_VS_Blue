@@ -6,6 +6,7 @@ import {
   getEffectOnPiece,
   removeEffectFromPiece,
 } from './attached-effect'
+import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -513,7 +514,11 @@ export class TriggerSystem {
         const player = battle.players?.find((p: any) => p.playerId === targetPlayerId)
         if (!player) return false
         if (!player.hand) player.hand = []
-        player.hand.push({ cardId, instanceId: cardId + '-' + Date.now(), ownerPlayerId: targetPlayerId })
+        const runtime = getActiveRuleRuntime()
+        const instanceId = runtime
+          ? runtime.nextInstanceId('card', `ci-${cardId}`)
+          : `${cardId}-${getRuleDate().now()}`
+        player.hand.push({ cardId, instanceId, ownerPlayerId: targetPlayerId })
         return true
       }
 
@@ -521,8 +526,8 @@ export class TriggerSystem {
       const wrapCode = (code: string) => {
         // eslint-disable-next-line no-eval
         return eval(
-          `(function(dealDamage,healDamage,removeStatusEffectById,addStatusEffectById,addRuleById,removeRuleById,applyEffect,removeEffect,getPieceEffect,fireEvent,addCardToHand){ return (${code}); })`
-        )(_dealDamage, _healDamage, _removeStatusEffectById, _addStatusEffectById, _addRuleById, _removeRuleById, _applyEffect, _removeEffect, _getPieceEffect, _fireEvent, _addCardToHand)
+          `(function(dealDamage,healDamage,removeStatusEffectById,addStatusEffectById,addRuleById,removeRuleById,applyEffect,removeEffect,getPieceEffect,fireEvent,addCardToHand,Math,Date){ return (${code}); })`
+        )(_dealDamage, _healDamage, _removeStatusEffectById, _addStatusEffectById, _addRuleById, _removeRuleById, _applyEffect, _removeEffect, _getPieceEffect, _fireEvent, _addCardToHand, getRuleMath(), getRuleDate())
       }
 
       const piecesSnap = [...battle.pieces]

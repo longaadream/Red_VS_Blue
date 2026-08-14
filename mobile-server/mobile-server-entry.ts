@@ -14,6 +14,8 @@
 
 import { applyBattleAction } from '../lib/game/turn'
 import { createInitialBattleForPlayers } from '../lib/game/battle-setup'
+import { runBattleAction } from '../lib/game/battle-runner'
+import { createRootSeed } from '../lib/game/rule-runtime'
 import { loadAllSkillsById, loadRuleById } from '../lib/game/skills'
 import { DEFAULT_PIECES, getAllPieces } from '../lib/game/piece-repository'
 import type { BattleState } from '../lib/game/turn'
@@ -309,21 +311,29 @@ async function _startGame(room: Room): Promise<string> {
         .filter((t): t is PieceTemplate => !!t),
     }))
 
-    const state = await createInitialBattleForPlayers(playerIds, [], playerSelectedPieces, room.mapId)
+    const seed = createRootSeed()
+    const state = await createInitialBattleForPlayers(
+      playerIds,
+      [],
+      playerSelectedPieces,
+      room.mapId,
+      { rootSeed: seed },
+    )
     if (!state) return err('Failed to create battle state', 500)
 
     if (!state.skillsById || !Object.keys(state.skillsById).length) {
       state.skillsById = loadAllSkillsById() as typeof state.skillsById
     }
 
-    // Apply beginPhase to get clean initial state
-    let initState = state
-    try { initState = applyBattleAction(state, { type: 'beginPhase' } as Parameters<typeof applyBattleAction>[1]) } catch {}
+    // Apply beginPhase through the deterministic authority runner.
+    const initState = runBattleAction(
+      state,
+      { type: 'beginPhase' } as Parameters<typeof applyBattleAction>[1],
+      { rootSeed: seed },
+    ).state
 
     const { skillsById: _sk, ...initPayload } = initState as unknown as Record<string, unknown>
     void _sk
-    const seed = Math.floor(Math.random() * 4294967296)
-
     room.battleState = {
       type: 'action-log',
       seed,
@@ -682,14 +692,16 @@ async function handleRelayBattleInit(body: Record<string, unknown>): Promise<str
   const allPieces = playerSelectedPieces.flatMap(p => p.pieces)
 
   try {
+    const seed = createRootSeed()
     const state = await createInitialBattleForPlayers(
       playerIds,
       allPieces,
       playerSelectedPieces,
-      (body.mapId as string | undefined)
+      (body.mapId as string | undefined),
+      { rootSeed: seed },
     )
     if (!state) return err('Failed to create battle state', 500)
-    return ok({ state } as unknown as Record<string, unknown>)
+    return ok({ state, seed } as unknown as Record<string, unknown>)
   } catch (e) {
     return err('createInitialBattleForPlayers failed: ' + String(e), 500)
   }

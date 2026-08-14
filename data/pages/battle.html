@@ -1654,7 +1654,6 @@
     let relaySeq = 0            // outbound action/stateUpdate sequence
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
-    let preOptimisticGForEcho = null  // saved state before optimistic pendingOptionSelect, for echo correction
 
     // 鈹€鈹€ Piece helpers 鈹€鈹€
     function pieceName(p) {
@@ -2423,19 +2422,42 @@
 
     // Apply an authoritative state snapshot received from server (WS or GET)
     var _lastAppliedState = null
+    function resolveAuthoritySeed(state, seed) {
+      var resolved = typeof seed === 'number' && Number.isInteger(seed) ? (seed >>> 0) : null
+      if (resolved === null && state && typeof GameEngine !== 'undefined' && GameEngine.getBattleRootSeed) {
+        var tracedSeed = GameEngine.getBattleRootSeed(state)
+        if (typeof tracedSeed === 'number') resolved = tracedSeed >>> 0
+      }
+      if (resolved === null) return gameSeed
+      if (typeof gameSeed === 'number' && gameSeed !== resolved) {
+        throw new Error('Authority root seed changed from ' + gameSeed + ' to ' + resolved)
+      }
+      if (typeof gameSeed !== 'number') {
+        gameSeed = resolved
+        if (typeof GameEngine !== 'undefined' && GameEngine.setRng) {
+          GameEngine.setRng(GameEngine.mulberry32(resolved))
+        }
+      }
+      return gameSeed
+    }
+
+    function runDeterministicAuthorityAction(state, action) {
+      if (!state || typeof GameEngine === 'undefined' || !GameEngine.runBattleAction) {
+        throw new Error('Deterministic authority runner is unavailable')
+      }
+      var seed = resolveAuthoritySeed(state, null)
+      if (typeof seed !== 'number') throw new Error('Missing authority root seed')
+      return GameEngine.runBattleAction(state, action, { rootSeed: seed })
+    }
+
     function applyServerState(state, seed, preserveWsSeq) {
       if (!state) return
+      resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
       const oldG = G
       G = state
       G.skillsById = Object.assign({}, skillsById || {}, G.skillsById || {})
-
-      // Init seeded RNG once
-      if (seed && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
-        gameSeed = seed
-        GameEngine.setRng(GameEngine.mulberry32(seed))
-      }
 
       // Derive myFaction from pieces
       if (!myFaction && G.pieces) {
@@ -2465,7 +2487,7 @@
       if (!entry || typeof entry.seq !== 'number' || entry.seq <= wsActionSeq) return
       if (entry.type === 'init') {
         wsActionSeq = entry.seq
-        applyServerState(entry.payload, entry.seed || gameSeed || null, true)
+        applyServerState(entry.payload, typeof entry.seed === 'number' ? entry.seed : gameSeed, true)
         return
       }
       if (!G) return
@@ -2476,23 +2498,16 @@
         handleGameOver()
         return
       }
-      if (entry.action && typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
+      if (entry.action && typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
         try {
           const oldG = G
-          const nextG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), entry.action)
+          const nextG = runDeterministicAuthorityAction(G, entry.action).state
           wsActionSeq = entry.seq
           applyServerState(nextG, null, true)
           spawnStateFloaters(oldG, G)
         } catch (e) {
           const msg = e && e.message ? e.message : String(e)
-          // Keep the UI responsive even if a legacy pending option echo cannot replay locally.
-          if (entry.action.type === 'pendingOptionSelect') {
-            wsActionSeq = entry.seq
-            preOptimisticGForEcho = null
-            addLog('[WS] pendingOptionSelect 处理异常，已恢复操作：' + msg, 'warn')
-            render()
-            return
-          }
+          // Replay failures remain fail-closed: do not advance wsActionSeq.
           addLog('[WS] 动作日志回放失败：' + msg, 'err')
           setStatusMsg('WS 动作日志回放失败：' + msg)
         }
@@ -2501,12 +2516,9 @@
 
     function applyLegacyBattleSnapshot(msg) {
       const actions = msg && Array.isArray(msg.actions) ? msg.actions : []
-      if (typeof msg.seed === 'number' && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
-        gameSeed = msg.seed
-        GameEngine.setRng(GameEngine.mulberry32(msg.seed))
-      }
+      resolveAuthoritySeed(actions.length && actions[0].payload ? actions[0].payload : null, msg && msg.seed)
       actions.forEach(applyLegacyBattleEntry)
-      if (!actions.length && msg && msg.state) applyServerState(msg.state, msg.seed || null)
+      if (!actions.length && msg && msg.state) applyServerState(msg.state, msg.seed)
     }
 
     // Connect WebSocket for the given mode ('lan' | 'relay')
@@ -2538,7 +2550,7 @@
           if (_use3d && window.BattleRenderer3D && G && msg.state) {
             BattleRenderer3D.animateAction(msg.lastAction || null, G, msg.state)
           }
-          applyServerState(msg.state, msg.seed || null)
+          applyServerState(msg.state, msg.seed)
         } else if (msg.type === 'battleSnapshot') {
           applyLegacyBattleSnapshot(msg)
         } else if (msg.type === 'roomUpdate') {
@@ -2602,12 +2614,13 @@
         } else if (msg.type === 'pendingAction') {
           // Relay host: process guest action locally and push stateUpdate.
           if (wsMode === 'relay' && wsRole === 'host' && G &&
-              typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
+              typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
             try {
-              var newG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), msg.action)
-              applyServerState(newG, null)
+              var result = runDeterministicAuthorityAction(G, msg.action)
+              var newG = result.state
+              applyServerState(newG, gameSeed)
               relaySeq++
-              RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
+              RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
             } catch (e) { addLog('处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err') }
           }
         } else if (msg.type === 'hostResume') {
@@ -2655,7 +2668,7 @@
         const data = await res.json()
         if (data && data.state) {
           addLog('[HTTP fallback] 已拉取服务端战斗状态 ' + String(data.stateHash || '').slice(0, 12), 'info')
-          applyServerState(data.state, data.seed || null)
+          applyServerState(data.state, data.seed)
           return
         }
         throw new Error('empty battle state')
@@ -3940,7 +3953,6 @@
 
     async function doAction(action) {
       action = withClientActionId(action)
-      let optimisticPendingState = null
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) { addLog('未连接服务器', 'err'); return }
@@ -3959,13 +3971,12 @@
                 typeof GameEngine.validateSkillActionByDryRun === 'function') {
               GameEngine.validateSkillActionByDryRun(clone, action)
             } else {
-              dryRunState = GameEngine.applyBattleAction(clone, action)
+              // Authority actions may only be previewed through the seeded runner. The
+              // returned state is deliberately discarded; the action-log echo is the
+              // single commit point for Android/LAN clients.
+              dryRunState = runDeterministicAuthorityAction(clone, action).state
             }
             if (action.type === 'pendingTargetSelect' || action.type === 'pendingOptionSelect') {
-              if (action.type === 'pendingOptionSelect') {
-                preOptimisticGForEcho = GameEngine.safeCloneBattleState(G)
-              }
-              optimisticPendingState = dryRunState
               addLog('[DEBUG pendingDryRun] ok; pendingTargetAfter=' + (!!dryRunState.pendingTargetSelection) + ', pendingOptionAfter=' + (!!dryRunState.pendingOptionSelection), 'info')
             }
           } catch (e) {
@@ -4027,27 +4038,30 @@
         // Relay guest: submit action via WS, wait for stateUpdate.
         if (wsMode === 'relay' && wsRole === 'guest') {
           relaySeq++
-          RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: '' })
+          var relayPrevHash = typeof GameEngine !== 'undefined' && GameEngine.hashBattleState
+            ? GameEngine.hashBattleState(G)
+            : ''
+          RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: relayPrevHash })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
           pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
-          if (optimisticPendingState) applyServerState(optimisticPendingState, null, true)
           return
         }
 
         // Relay host: apply locally + push stateUpdate.
         if (wsMode === 'relay' && wsRole === 'host' && G &&
-            typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
+            typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
           try {
-            const newG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), action)
+            const result = runDeterministicAuthorityAction(G, action)
+            const newG = result.state
             if (action.pieceId && newG.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
               selectedPieceId = action.pieceId
             } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
             pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
-            applyServerState(newG, null)
+            applyServerState(newG, gameSeed)
             relaySeq++
-            RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
+            RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
           } catch (e) { addLog('本地处理失败：' + e.message, 'err'); renderActionBar() }
           return
         }
@@ -4059,7 +4073,6 @@
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
           pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
-          if (optimisticPendingState) applyServerState(optimisticPendingState, null, true)
           return
         }
 

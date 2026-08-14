@@ -63,7 +63,7 @@ export async function POST(
 
   let result: ReturnType<typeof runBattleAction>
   try {
-    result = runBattleAction(storage.state as any, action as any)
+    result = runBattleAction(storage.state as any, action as any, { rootSeed: storage.seed })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     const errAny = err as any
@@ -75,6 +75,7 @@ export async function POST(
         range: errAny.range ?? 10,
         filter: errAny.filter ?? '',
         targetIndex: errAny.targetIndex ?? undefined,
+        determinism: errAny.determinism ?? undefined,
       }, { status: 400 })
     }
     if (errAny?.needsOptionSelection) {
@@ -83,9 +84,10 @@ export async function POST(
         needsOptionSelection: true,
         title: errAny.title ?? '请选择',
         options: errAny.options ?? [],
+        determinism: errAny.determinism ?? undefined,
       }, { status: 400 })
     }
-    return NextResponse.json({ error: msg }, { status: 400 })
+    return NextResponse.json({ error: msg, determinism: errAny.determinism ?? undefined }, { status: 400 })
   }
 
   storage.state = result.state

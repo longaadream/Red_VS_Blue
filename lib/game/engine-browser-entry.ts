@@ -10,6 +10,7 @@
  */
 
 export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } from './turn'
+export { getBattleRootSeed, hashBattleState, runBattleAction } from './battle-runner'
 export { setRng, mulberry32 } from './rng'
 export type { BattleState, BattleAction, BattleActionLog } from './turn'
 
@@ -31,7 +32,7 @@ export async function createInitialBattleForPlayers(
   selectedPieces: PieceTemplate[],
   playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[]; faction?: 'red' | 'blue' }>,
   mapId?: string,
-  options?: { firstPlayerId?: PlayerId },
+  options?: { firstPlayerId?: PlayerId; rootSeed?: number },
 ): Promise<BattleState | null> {
   const state = await _createInitialBattleForPlayers(playerIds, selectedPieces, playerSelectedPieces, mapId, options)
   if (!state) return null

@@ -13,10 +13,11 @@ function writeLog(message: string) {
 }
 
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
+import { runBattleAction } from "@/lib/game/battle-runner"
 import { getPieceById, getAllPieces } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
-import { applyBattleAction } from "@/lib/game/turn"
 import type { PieceTemplate } from "@/lib/game/piece"
+import { createRootSeed } from "@/lib/game/rule-runtime"
 import { alignmentToPieceFaction, assignNextSeat, getPlayerSeat, normalizePlayerAlignment, getRoomStore } from "@/lib/game/room-store"
 import { verifyJoinAuth } from "@/lib/game/identity-verify"
 import { isMatchPlayerId } from "@/lib/game/match-identity"
@@ -329,7 +330,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         if (!firstPlayerId || !isMatchPlayerId(playerIds, firstPlayerId)) {
           return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
         }
-        const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId })
+        const seed = createRootSeed()
+        const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId, rootSeed: seed })
 
         if (!battle) {
           return NextResponse.json({ error: "Failed to create battle: invalid player count or battle setup" }, { status: 500 })
@@ -338,7 +340,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         // Apply beginPhase on server (triggers BATTLE_START, initialEffects 等)
         let initState = battle
         try {
-          initState = applyBattleAction(battle, { type: "beginPhase" })
+          initState = runBattleAction(battle, { type: "beginPhase" }, { rootSeed: seed }).state
           console.log('[select-pieces] beginPhase applied successfully')
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e)
@@ -348,8 +350,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
         // Strip skillsById (large static data, clients reload locally)
         const { skillsById: _sk, ...initPayload } = initState as any
-
-        const seed = Math.floor(Math.random() * 4294967296)
 
         checkRoom.status = "in-progress"
         checkRoom.currentTurnIndex = 0
@@ -452,7 +452,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
       return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
     }
-    const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId })
+    const seed = createRootSeed()
+    const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId, rootSeed: seed })
 
     if (!battle) {
       return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })
@@ -460,20 +461,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     let initState = battle
     try {
-      initState = applyBattleAction(battle, { type: "beginPhase" })
+      initState = runBattleAction(battle, { type: "beginPhase" }, { rootSeed: seed }).state
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.error('[start-game] beginPhase failed:', msg)
       return NextResponse.json({ error: 'Failed to init battle phase: ' + msg }, { status: 500 })
     }
     const { skillsById: _sk2, ...initPayload2 } = initState as any
-    const seed2 = Math.floor(Math.random() * 4294967296)
-
     latestRoom.status = "in-progress"
     latestRoom.currentTurnIndex = 0
     latestRoom.battleState = {
       type: 'server-state',
-      seed: seed2,
+      seed,
       state: initPayload2,
     } as any
     await roomStore.setRoom(roomId, latestRoom)

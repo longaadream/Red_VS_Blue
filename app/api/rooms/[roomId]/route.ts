@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment, type Room, type Player } from "@/lib/game/room-store"
 import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getAllPieces } from "@/lib/game/piece-repository"
+import { createRootSeed } from "@/lib/game/rule-runtime"
 
 function checkPackMismatch(players: Player[]): boolean {
   const hashes = players.map(p => p.packMd5).filter(Boolean)
@@ -173,7 +174,14 @@ export async function POST(
     if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
       return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
     }
-    const battle = await createInitialBattleForPlayers(playerIds, defaultPieces, playerFactions, room.mapId, { firstPlayerId })
+    const seed = createRootSeed()
+    const battle = await createInitialBattleForPlayers(
+      playerIds,
+      defaultPieces,
+      playerFactions,
+      room.mapId,
+      { firstPlayerId, rootSeed: seed },
+    )
     if (!battle) {
       return NextResponse.json(
         { error: "Failed to initialize battle state" },
@@ -184,7 +192,7 @@ export async function POST(
     room.currentTurnIndex = 0
     room.battleState = {
       type: 'server-state',
-      seed: Math.floor(Math.random() * 4294967296),
+      seed,
       state: battle,
     } as any
     await roomStore.setRoom(room.id.trim(), room)
