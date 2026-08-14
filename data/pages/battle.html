@@ -4094,11 +4094,14 @@
 
     function checkClientGameOver() {
       if (!G || G.gameOver || G.winner) return
-      const living = G.pieces.filter(p => p.currentHp > 0)
-      const redAlive = living.filter(p => p.faction === 'red').length
-      const blueAlive = living.filter(p => p.faction === 'blue').length
-      if (redAlive === 0 && blueAlive > 0) { G.winner = 'blue'; G.gameOver = true; handleGameOver() }
-      else if (blueAlive === 0 && redAlive > 0) { G.winner = 'red'; G.gameOver = true; handleGameOver() }
+      const livingOwners = new Set(G.pieces.filter(p => p.currentHp > 0).map(p => p.ownerPlayerId))
+      const playerIds = (G.players || []).map(p => p.playerId).filter(Boolean)
+      const defeated = playerIds.filter(playerId => !livingOwners.has(playerId))
+      if (defeated.length === 1 && playerIds.length === 2) {
+        G.winner = playerIds.find(playerId => playerId !== defeated[0])
+        G.gameOver = true
+        handleGameOver()
+      }
     }
 
     function handleGameOver() {
