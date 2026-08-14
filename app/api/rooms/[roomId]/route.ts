@@ -58,20 +58,32 @@ export async function POST(
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
   const roomStore = getRoomStore()
-  let room = await roomStore.getRoom(roomId)
-
-  // 如果房间不存在，创建一个新的房间
-  if (!room) {
-    console.log('Room not found, creating new room:', roomId)
-    room = await roomStore.createRoom(roomId, `Room ${roomId}`)
-    console.log('New room created:', room.id)
-  }
 
   let body: RoomPostBody
   try {
     body = (await req.json()) as RoomPostBody
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+
+  // Reject malformed joins before reading or creating persistent room state.
+  if (body.action === "join") {
+    if (!body.playerId?.trim()) {
+      return NextResponse.json({ error: "playerId is required" }, { status: 400 })
+    }
+    if (!normalizePlayerAlignment(body.alignment)) {
+      return NextResponse.json({ error: "alignment must be light or dark" }, { status: 400 })
+    }
+  }
+
+  let room = await roomStore.getRoom(roomId)
+  if (!room) {
+    if (body.action !== "join") {
+      return NextResponse.json({ error: "Room not found" }, { status: 404 })
+    }
+    console.log('Room not found, creating new room:', roomId)
+    room = await roomStore.createRoom(roomId, `Room ${roomId}`)
+    console.log('New room created:', room.id)
   }
 
   if (body.action === "join") {
