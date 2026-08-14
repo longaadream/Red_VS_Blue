@@ -72,6 +72,9 @@ describe('Windows Electron client runtime', () => {
 
     expect(page).toContain('id="identityError"')
     expect(page).toContain('function showIdentityError(')
+    expect(page).toContain('function assertIdentityPersisted(')
+    expect(page).toContain("assertIdentityPersisted(created, '初始化账号')")
+    expect(page).toContain("assertIdentityPersisted(updated, '保存名称')")
     expect(page).not.toMatch(/ensureIdentity\(\)\s*}\s*catch\s*\{\s*}/)
     expect(page).toContain("showIdentityError(e, '初始化账号')")
     expect(page).toContain("showIdentityError(e, '保存名称')")

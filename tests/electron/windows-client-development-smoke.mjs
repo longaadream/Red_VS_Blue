@@ -206,6 +206,57 @@ async function waitForServerConfiguration(target, timeoutMs = 5000) {
   throw new Error(`Shared server configuration did not appear: ${JSON.stringify(observed)}`)
 }
 
+async function verifyIdentityWriteFailures(target) {
+  return evaluate(target, `(async () => {
+    const storageKey = 'rvb_identity_v2'
+    const originalRaw = localStorage.getItem(storageKey)
+    const originalSetItem = Storage.prototype.setItem
+    const result = {}
+    try {
+      localStorage.removeItem(storageKey)
+      Storage.prototype.setItem = function () {
+        throw new Error('simulated storage write failure')
+      }
+      await window.openIdentitySheet()
+      result.initialize = {
+        identity: window.RvBIdentity.getIdentity(),
+        error: document.getElementById('identityError')?.textContent || '',
+        errorVisible: document.getElementById('identityError')?.style.display !== 'none',
+        userName: document.getElementById('userName')?.textContent || '',
+      }
+
+      Storage.prototype.setItem = originalSetItem
+      if (originalRaw === null) localStorage.removeItem(storageKey)
+      else localStorage.setItem(storageKey, originalRaw)
+      window.closeIdentitySheet()
+      window.clearIdentityError()
+      window.refreshUserUI()
+
+      const beforeSave = window.RvBIdentity.getIdentity()
+      document.getElementById('identityNameInput').value = 'RED46 Should Not Persist'
+      Storage.prototype.setItem = function () {
+        throw new Error('simulated storage write failure')
+      }
+      await window.saveIdentityName()
+      result.save = {
+        before: beforeSave,
+        after: window.RvBIdentity.getIdentity(),
+        error: document.getElementById('identityError')?.textContent || '',
+        errorVisible: document.getElementById('identityError')?.style.display !== 'none',
+        userName: document.getElementById('userName')?.textContent || '',
+      }
+      return result
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+      if (originalRaw === null) localStorage.removeItem(storageKey)
+      else localStorage.setItem(storageKey, originalRaw)
+      window.closeIdentitySheet()
+      window.clearIdentityError()
+      window.refreshUserUI()
+    }
+  })()`)
+}
+
 assert(process.platform === 'win32', 'This smoke test requires Windows')
 assert(electronExecutable, `Electron executable not found: ${electronCandidates.join(', ')}`)
 assert(existsSync(mainEntry), `Compile the Electron client first: ${mainEntry}`)
@@ -239,6 +290,9 @@ try {
   const duplicate = launch({ port: 19343, profile: 'red46-smoke-one' })
   const duplicateExitCode = await waitForExit(duplicate)
   assert(duplicateExitCode !== null, 'A second instance using the same development profile stayed running')
+  assert(duplicateExitCode === 0, `The duplicate development profile exited unexpectedly: ${duplicateExitCode}`)
+  assert(first.exitCode === null, 'The original development profile exited with its duplicate')
+  assert(await evaluate(firstTarget, "document.readyState === 'complete'"), 'The original development profile stopped responding')
 
   await evaluateFireAndForget(firstTarget, 'window.close()')
   assert(await waitForExit(first) !== null, 'The first profile did not exit after its game window closed')
@@ -247,13 +301,25 @@ try {
   const persisted = await readIdentity(restartedTarget)
   assert(persisted.identity?.id === profileOne.identity?.id, 'The profile identity changed after restart')
   assert(persisted.identity?.displayName === 'RED46 Player One', `The saved name did not persist: ${JSON.stringify(persisted)}`)
+  const writeFailures = await verifyIdentityWriteFailures(restartedTarget)
+  assert(writeFailures.initialize.identity === null, `Failed identity initialization appeared persisted: ${JSON.stringify(writeFailures)}`)
+  assert(writeFailures.initialize.errorVisible && writeFailures.initialize.error, `Failed identity initialization was hidden: ${JSON.stringify(writeFailures)}`)
+  assert(writeFailures.initialize.userName === '账号错误', `Failed identity initialization kept a success label: ${JSON.stringify(writeFailures)}`)
+  assert(writeFailures.save.after?.displayName === writeFailures.save.before?.displayName, `Failed name save changed the persisted identity: ${JSON.stringify(writeFailures)}`)
+  assert(writeFailures.save.after?.displayName !== 'RED46 Should Not Persist', `Failed name save appeared persisted: ${JSON.stringify(writeFailures)}`)
+  assert(writeFailures.save.errorVisible && writeFailures.save.error, `Failed name save was hidden: ${JSON.stringify(writeFailures)}`)
+  assert(writeFailures.save.userName === '账号错误', `Failed name save kept a success label: ${JSON.stringify(writeFailures)}`)
 
   const defaultRoot = path.join(smokeRoot, 'default-user-data')
   const defaultFirst = launch({ port: 19345, userDataRoot: defaultRoot })
   await waitForTarget(19345, (target) => target.title === '连接服务器')
   const defaultSecond = launch({ port: 19346, userDataRoot: defaultRoot })
+  const defaultTarget = await waitForTarget(19345, (target) => target.type === 'page')
   const defaultSecondExitCode = await waitForExit(defaultSecond)
   assert(defaultSecondExitCode !== null, 'The default invocation no longer enforces a single instance')
+  assert(defaultSecondExitCode === 0, `The duplicate default instance exited unexpectedly: ${defaultSecondExitCode}`)
+  assert(defaultFirst.exitCode === null, 'The original default instance exited with its duplicate')
+  assert(await evaluate(defaultTarget, "document.readyState === 'complete'"), 'The original default instance stopped responding')
 
   console.log(JSON.stringify({
     secureContext: profileOne.secureContext,
@@ -264,6 +330,7 @@ try {
     sameProfileSingleInstance: true,
     defaultSingleInstance: true,
     identityPersistedAfterRestart: true,
+    identityWriteFailuresVisible: true,
   }))
 
   stopProcessTree(second)
