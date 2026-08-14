@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * stage-client-resources.js
  *
@@ -121,14 +122,14 @@ function __rvbProxyWsUpgrade(req, socket, head) {
     for (const i in req.rawHeaders) {
       if (Number(i) % 2 === 0) lines.push(req.rawHeaders[i] + ': ' + req.rawHeaders[Number(i) + 1])
     }
-    target.write(lines.join('\\\\r\\\\n') + '\\\\r\\\\n\\\\r\\\\n')
+    target.write(lines.join('\\r\\n') + '\\r\\n\\r\\n')
     if (head && head.length) target.write(head)
     socket.pipe(target)
     target.pipe(socket)
   })
   target.on('error', function() {
     if (!settled) {
-      try { socket.write('HTTP/1.1 502 Bad Gateway\\\\r\\\\nConnection: close\\\\r\\\\n\\\\r\\\\n') } catch {}
+      try { socket.write('HTTP/1.1 502 Bad Gateway\\r\\nConnection: close\\r\\n\\r\\n') } catch {}
     }
     try { socket.destroy() } catch {}
   })

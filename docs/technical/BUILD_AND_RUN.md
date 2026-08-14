@@ -327,6 +327,12 @@ node tests/electron/windows-smoke.mjs server
 拒绝缺失、增加或被修改的文件。manifest 和 `win-unpacked` 都是未跟踪的本机候选证据，
 不得加入 Git 或上传到公开下载渠道。**内部候选 ≠ 公开发行物**。
 
+Server Windows smoke 还会同时验证公开同端口入口
+`ws://127.0.0.1:3000/ws/rooms/__lobby` 与内部入口 `ws://127.0.0.1:3001/`：
+两条连接都必须收到 `subscribed`，且 `rooms.list` 必须返回 `ok: true`。这项探测用于防止
+standalone staging 把 WebSocket 握手的 CRLF 写成字面量转义、导致玩家客户端只看到连接
+超时；仅有 `/api/ping` 成功不能代替该证据。
+
 ### 8.3 桌面安全边界
 
 三个入口的每个 `BrowserWindow` 都必须显式保持：

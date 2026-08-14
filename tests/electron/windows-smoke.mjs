@@ -171,6 +171,72 @@ async function isReachable(port) {
   }
 }
 
+async function probeGameWebSocket(url) {
+  const requestId = 'windows-smoke-rooms-' + process.pid + '-' + Date.now()
+  const socket = new WebSocket(url)
+  return new Promise((resolve, reject) => {
+    let subscribed = null
+    let roomsResult = null
+    const timer = setTimeout(() => {
+      socket.close()
+      reject(new Error('Game WebSocket probe timed out: ' + url))
+    }, 5000)
+    const finish = () => {
+      if (!subscribed || !roomsResult) return
+      clearTimeout(timer)
+      socket.close()
+      resolve({
+        url,
+        subscribed: {
+          roomId: subscribed.roomId,
+          role: subscribed.role,
+        },
+        roomsResult: {
+          ok: roomsResult.ok,
+          rooms: roomsResult.data?.rooms,
+        },
+      })
+    }
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({
+        type: 'subscribe',
+        roomId: '__lobby',
+        playerId: 'red53-windows-smoke',
+      }))
+      socket.send(JSON.stringify({
+        type: 'rpc',
+        requestId,
+        method: 'rooms.list',
+        data: {},
+      }))
+    }, { once: true })
+    socket.addEventListener('message', (event) => {
+      let message = null
+      try {
+        message = JSON.parse(String(event.data))
+      } catch {
+        return
+      }
+      if (message?.type === 'subscribed' && message.roomId === '__lobby') {
+        subscribed = message
+      }
+      if (message?.type === 'rpcResult' && message.requestId === requestId) {
+        roomsResult = message
+      }
+      finish()
+    })
+    socket.addEventListener('error', () => {
+      clearTimeout(timer)
+      reject(new Error('Game WebSocket connection failed: ' + url))
+    }, { once: true })
+    socket.addEventListener('close', () => {
+      if (subscribed && roomsResult) return
+      clearTimeout(timer)
+      reject(new Error('Game WebSocket closed before the probe completed: ' + url))
+    }, { once: true })
+  })
+}
+
 async function waitForDebuggerExit(port, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -231,6 +297,22 @@ async function smokeServer() {
       await delay(250)
     }
     assert(initial?.running === true && initial.port === 3000 && await isReachable(3000), `Server did not become ready on port 3000: ${JSON.stringify(initial)}`)
+    const ping = await getJson('http://127.0.0.1:3000/api/ping')
+    const rooms = await getJson('http://127.0.0.1:3000/api/rooms')
+    const publicWebSocket = await probeGameWebSocket(
+      'ws://127.0.0.1:3000/ws/rooms/__lobby',
+    )
+    const internalWebSocket = await probeGameWebSocket('ws://127.0.0.1:3001/')
+    assert(
+      publicWebSocket.roomsResult.ok === true &&
+        Array.isArray(publicWebSocket.roomsResult.rooms),
+      'Public same-port WebSocket rooms.list failed: ' + JSON.stringify(publicWebSocket),
+    )
+    assert(
+      internalWebSocket.roomsResult.ok === true &&
+        Array.isArray(internalWebSocket.roomsResult.rooms),
+      'Internal WebSocket rooms.list failed: ' + JSON.stringify(internalWebSocket),
+    )
     const rejectedNavigation = await evaluate(target, `new Promise((resolve) => {
       const original = location.href
       location.href = 'https://example.com/red19-navigation-probe'
@@ -265,6 +347,12 @@ async function smokeServer() {
     result = {
       entry: 'server',
       rendererBoundary,
+      http: {
+        ping,
+        rooms,
+      },
+      publicWebSocket,
+      internalWebSocket,
       rejectedNavigation,
       stopped: true,
       port3000Reachable: false,
