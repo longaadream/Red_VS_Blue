@@ -20,7 +20,7 @@
     "build:android": "npm run build:game-engine && npm run build:mobile-server && npm run build:crypto-lib && node scripts/sync-android-assets.js && npx cap sync android",
     "build:android:apk": "npm run build:game-engine && npm run build:mobile-server && node scripts/sync-android-assets.js && npx cap sync android && cd android && JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ANDROID_HOME=\"/c/Users/lngsc/AppData/Local/Android/Sdk\" ./gradlew assembleDebug",
     "dev:electron:editor": "npx tsc -p electron-editor/tsconfig.json && npx electron electron-editor/dist/main.js",
-    "build:electron:editor": "npx tsc -p electron-editor/tsconfig.json && electron-builder --config electron-builder.editor.json",
+    "build:electron:editor": "npx tsc -p electron-editor/tsconfig.json && electron-builder --config electron-builder.editor.json && node scripts/verify-electron-editor-package.js",
     "build:all": "npm run build:electron:client",
     "check:encoding": "node scripts/check-encoding.js",
     "sync:pages": "node scripts/sync-pages.js",
