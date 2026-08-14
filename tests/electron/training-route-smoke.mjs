@@ -8,7 +8,6 @@ const electronExecutable = path.join(root, 'node_modules', 'electron', 'dist', '
 const electronEntry = path.join(root, 'electron-client', 'dist', 'main.js')
 const standaloneEntry = path.join(root, '.next', 'standalone', 'server.js')
 const debugPort = 19471
-const userDataDirectory = mkdtempSync(path.join(os.tmpdir(), 'rvb-red47-training-smoke-'))
 const screenshotPath = path.join(os.tmpdir(), 'red-47-electron-training-smoke.png')
 const logs = []
 
@@ -156,6 +155,7 @@ for (const requiredPath of [electronExecutable, electronEntry, standaloneEntry])
   assert(existsSync(requiredPath), `Missing prerequisite: ${requiredPath}`)
 }
 
+const userDataDirectory = mkdtempSync(path.join(os.tmpdir(), 'rvb-red47-training-smoke-'))
 let electronProcess = null
 try {
   electronProcess = spawn(electronExecutable, [
