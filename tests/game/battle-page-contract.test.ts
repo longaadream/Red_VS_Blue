@@ -88,4 +88,18 @@ describe('battle page route contract', () => {
     expect(battlePage).toMatch(/if \(!roomId \|\| !myPlayerId\) \{ showMsg\([^\n]+, 'err'\); return \}/)
     expect(battlePage).toContain("spinner.style.display = type === 'err' ? 'none' : ''")
   })
+
+  it('recovers training data from the connected server and rejects empty starting rosters', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('async function loadServerBattleDataFallback()')
+    expect(battlePage).toContain('RvBUtils.serverFetch(path, { timeoutMs: timeoutMs || 3500 })')
+    expect(battlePage).toMatch(
+      /if \(!Object\.keys\(PIECES_BY_ID\)\.length\) \{\s*try \{\s*await loadServerBattleDataFallback\(\)/,
+    )
+    expect(battlePage).toContain('return { ok: recoveredFromServer || errors.length === 0, errors }')
+    expect(battlePage).toMatch(
+      /if \(!firstPieces\.length \|\| !secondPieces\.length\) \{\s*throw new Error\('训练棋子资源未加载/,
+    )
+  })
 })
