@@ -3,6 +3,7 @@ import type { PieceInstance } from "./piece"
 import { globalTriggerSystem } from "./triggers"
 import { rng } from "./rng"
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
+import { manhattanDistance } from './spatial'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -222,7 +223,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       const needsTargetSelection = () => ({ needsTargetSelection: true, targetType: opts.type, range: opts.range, filter: opts.filter, targetIndex: callIdx })
       const isInRange = (x: number, y: number) => {
         if (opts.range === undefined || !source) return true
-        return Math.max(Math.abs((source.x || 0) - x), Math.abs((source.y || 0) - y)) <= opts.range
+        return manhattanDistance({ x: source.x ?? 0, y: source.y ?? 0 }, { x, y }) <= opts.range
       }
       if (opts.type === 'piece' && selectedTarget) {
         const isAlly = selectedTarget.ownerPlayerId === playerId
@@ -970,7 +971,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     },
                     getAllEnemiesInRange: (range: any) => [],
                     getAllAlliesInRange: (range: any) => [],
-                    calculateDistance: (x1: any, y1: any, x2: any, y2: any) => Math.abs(x1 - x2) + Math.abs(y1 - y2),
+                    calculateDistance: (x1: any, y1: any, x2: any, y2: any) => manhattanDistance({ x: x1, y: y1 }, { x: x2, y: y2 }),
                     isTargetInRange: (target: any, range: any) => false,
                     Math: Math,
                     console: console
@@ -1244,7 +1245,7 @@ export function getAllEnemiesInRange(context: SkillExecutionContext, range: numb
     // 只考虑存活的敌人
     if (p.currentHp > 0 && p.ownerPlayerId !== piece.ownerPlayerId) {
       if (p.x == null || p.y == null) continue
-      const distance = Math.abs(p.x - piece.x) + Math.abs(p.y - piece.y)
+      const distance = manhattanDistance(piece, p)
       if (distance <= range) {
         enemies.push({
           instanceId: p.instanceId,
@@ -1294,7 +1295,7 @@ export function getAllAlliesInRange(context: SkillExecutionContext, range: numbe
     // 只考虑存活的盟友
     if (p.currentHp > 0 && p.ownerPlayerId === piece.ownerPlayerId) {
       if (p.x == null || p.y == null) continue
-      const distance = Math.abs(p.x - piece.x) + Math.abs(p.y - piece.y)
+      const distance = manhattanDistance(piece, p)
       if (distance <= range) {
         allies.push({
           instanceId: p.instanceId,
@@ -1316,7 +1317,7 @@ export function getAllAlliesInRange(context: SkillExecutionContext, range: numbe
 
 // 计算两点之间的距离
 export function calculateDistance(x1: number, y1: number, x2: number, y2: number): number {
-  return Math.abs(x1 - x2) + Math.abs(y1 - y2)
+  return manhattanDistance({ x: x1, y: y1 }, { x: x2, y: y2 })
 }
 
 // 检查目标是否在范围内
@@ -1381,8 +1382,8 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
       if (enemies.length === 0) return null;
       
       return enemies.reduce((nearest, current) => {
-        const nearestDistance = Math.abs(nearest.x! - sourcePiece.x!) + Math.abs(nearest.y! - sourcePiece.y!);
-        const currentDistance = Math.abs(current.x! - sourcePiece.x!) + Math.abs(current.y! - sourcePiece.y!);
+        const nearestDistance = manhattanDistance(nearest, sourcePiece);
+        const currentDistance = manhattanDistance(current, sourcePiece);
         return currentDistance < nearestDistance ? current : nearest;
       });
     },
@@ -1458,7 +1459,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
         if (p.ownerPlayerId === sourcePiece.ownerPlayerId || p.currentHp <= 0) {
           return false;
         }
-        const distance = Math.abs(p.x! - sourcePiece.x!) + Math.abs(p.y! - sourcePiece.y!);
+        const distance = manhattanDistance(p, sourcePiece);
         return distance <= range;
       });
     },
@@ -1469,7 +1470,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
         if (p.ownerPlayerId !== sourcePiece.ownerPlayerId || p.currentHp <= 0) {
           return false;
         }
-        const distance = Math.abs(p.x! - sourcePiece.x!) + Math.abs(p.y! - sourcePiece.y!);
+        const distance = manhattanDistance(p, sourcePiece);
         return distance <= range;
       });
     }
@@ -1550,7 +1551,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
 
         // 检查目标是否在范围内
         if (defaultOptions.range !== undefined && activeTarget.x != null && activeTarget.y != null && sourcePiece.x != null && sourcePiece.y != null) {
-          const distance = Math.abs(sourcePiece.x - activeTarget.x) + Math.abs(sourcePiece.y - activeTarget.y);
+          const distance = manhattanDistance(sourcePiece, activeTarget);
           if (distance > defaultOptions.range) {
             return needsTargetSelection();
           }
@@ -1579,9 +1580,9 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         // 如果需要选择格子，从 targets[] 或 targetPosition 中取坐标
         const gridPos = activePos;
         if (gridPos) {
-          // 距离校验：使用切比雪夫距离（max(|dx|,|dy|)），对应 "N×N 格" 的描述
+          // 未显式声明特殊形状时，格子目标统一使用曼哈顿距离。
           if (defaultOptions.range !== undefined && sourcePiece.x != null && sourcePiece.y != null) {
-            const dist = Math.max(Math.abs(sourcePiece.x - gridPos.x), Math.abs(sourcePiece.y - gridPos.y));
+            const dist = manhattanDistance(sourcePiece, gridPos);
             if (dist > defaultOptions.range) {
               return needsTargetSelection();
             }

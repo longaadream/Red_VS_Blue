@@ -28,6 +28,7 @@ import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction
 import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
+import { getNormalMoveRejection, manhattanDistance } from "./spatial"
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -347,17 +348,8 @@ function isSamePlayer(playerId1: PlayerId, playerId2: PlayerId): boolean {
   return playerId1.toLowerCase() === playerId2.toLowerCase()
 }
 
-function isCellOccupied(state: BattleState, x: number, y: number): boolean {
-  return state.pieces.some((p) => p.x === x && p.y === y && p.currentHp > 0)
-}
-
 /**
- * 简化版移动规则：
- * - 直线移动（水平或垂直），类似象棋车。
- * - 距离不能超过棋子的 moveRange（如果未设置，则视为无限制）。
- * - 起点终点必须在地图范围内。
- * - 终点格必须可通行且没有其它棋子占据。
- * - 暂时不检查“路径被阻挡”，以后可以按需要增加。
+ * 普通移动统一使用 spatial.ts 的纯规则：直线、moveRange、地形与存活棋子阻挡。
  */
 function validateMove(
   state: BattleState,
@@ -365,42 +357,8 @@ function validateMove(
   toX: number,
   toY: number,
 ): void {
-  if (piece.x == null || piece.y == null) {
-    throw new BattleRuleError("Piece is not on the board")
-  }
-
-  const { width, height, tiles } = state.map
-  if (toX < 0 || toX >= width || toY < 0 || toY >= height) {
-    throw new BattleRuleError("Target position is outside of the board")
-  }
-
-  if (piece.x !== toX && piece.y !== toY) {
-    throw new BattleRuleError("Move must be in a straight line (rook-style)")
-  }
-
-  const maxRange = piece.moveRange
-  const distance = Math.abs(piece.x - toX) + Math.abs(piece.y - toY)
-  if (maxRange != null && maxRange > 0 && distance > maxRange) {
-    throw new BattleRuleError("Move distance exceeds piece moveRange")
-  }
-
-  // 检查路径上每个格子（含终点）是否可通行
-  const stepX = toX === piece.x ? 0 : toX > piece.x ? 1 : -1
-  const stepY = toY === piece.y ? 0 : toY > piece.y ? 1 : -1
-  let cx = piece.x + stepX
-  let cy = piece.y + stepY
-  while (cx !== toX + stepX || cy !== toY + stepY) {
-    const tile = tiles.find((t) => t.x === cx && t.y === cy)
-    if (!tile || !tile.props.walkable) {
-      throw new BattleRuleError("Path is blocked by a wall")
-    }
-    cx += stepX
-    cy += stepY
-  }
-
-  if (isCellOccupied(state, toX, toY)) {
-    throw new BattleRuleError("Target tile is already occupied")
-  }
+  const rejection = getNormalMoveRejection(state, piece, { x: toX, y: toY })
+  if (rejection) throw new BattleRuleError(rejection.message)
 }
 
 function getSkillDefinitionOrThrow(state: BattleState, skillId: string): SkillDefinition {
@@ -438,7 +396,7 @@ function validateDeclaredSkillTarget(
       if (piece.x == null || piece.y == null || target.x == null || target.y == null) {
         throw new BattleRuleError("Skill target is out of range")
       }
-      const distance = Math.abs(piece.x - target.x) + Math.abs(piece.y - target.y)
+      const distance = manhattanDistance(piece, target)
       if (distance > range) throw new BattleRuleError("Skill target is out of range")
     }
     return
@@ -451,7 +409,7 @@ function validateDeclaredSkillTarget(
       if (piece.x == null || piece.y == null) {
         throw new BattleRuleError("Skill target is out of range")
       }
-      const distance = Math.max(Math.abs(piece.x - action.targetX), Math.abs(piece.y - action.targetY))
+      const distance = manhattanDistance(piece, { x: action.targetX, y: action.targetY })
       if (distance > range) throw new BattleRuleError("Skill target is out of range")
     }
   }
@@ -820,9 +778,11 @@ export function applyBattleAction(
     )
   }
 
-  // 恢复棋子和玩家规则的 effect 函数（API 传输后函数会丢失）
-  restorePieceRules(state)
-  restorePlayerRules(state)
+  // 规则恢复会补充数组和 effect 函数；先克隆，确保非法动作不会污染权威输入状态。
+  const hydratedState = safeCloneBattleState(state)
+  restorePieceRules(hydratedState)
+  restorePlayerRules(hydratedState)
+  state = hydratedState
 
   if (action.type === 'cancelPendingSelection') {
     const next = safeCloneBattleState(state)
