@@ -384,7 +384,8 @@ npm.cmd run smoke:electron:windows
 
 ### 8.6 回退
 
-RED-19 在独立分支与提交中升级运行时。若 Electron 43 候选构建出现阻断性回归，
-回退该提交即可恢复 Electron 33.4.11 的 `package.json`/`package-lock.json` 及旧窗口
+RED-19 在独立分支中以本 PR 交付。若 Electron 43 候选构建出现阻断性回归，
+回退本 PR 的最终合并提交即可恢复 Electron 33.4.11 的 `package.json`/`package-lock.json`
+及旧窗口
 配置；回退后必须明确记录旧 Electron 与 `extract-zip` 漏洞重新出现，旧构建不得
 发布。
