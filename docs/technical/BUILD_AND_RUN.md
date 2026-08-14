@@ -303,6 +303,11 @@ Windows 输出目录：
 - 客户端：`dist/client-build/win-unpacked/`
 - 编辑器：`dist/editor/`
 
+服务端 `win-unpacked` 当前仅用于内部候选、打包态安全检查和生命周期烟测，不是公开
+发行物；它不进入 `build:electron` 或 `build:all`，也没有安装器、签名或自动更新承诺。
+普通 Windows 玩家开服仍由客户端内嵌本地服务承担。完整决策边界见
+[`ADR-0003`](../decisions/ADR-0003-electron-server-packaging.md)。
+
 ### 8.3 桌面安全边界
 
 三个入口的每个 `BrowserWindow` 都必须显式保持：
