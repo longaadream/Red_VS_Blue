@@ -319,9 +319,16 @@ Windows 输出目录：
 已经返回 CORS 响应头。连接自签名 HTTPS 服务会按 Chromium 默认行为失败，
 这是预期安全边界，不能通过恢复全局证书绕过解决。
 
-Preload 只暴露列出的 IPC 能力，不暴露原始 `ipcRenderer`。当前客户端的本地
-资源包能力会写入游戏页面根目录，因此它属于高权限入口；导航限制与 sender
-校验仍应在后续独立安全任务中继续收紧。
+Preload 只暴露列出的 IPC 能力，不暴露原始 `ipcRenderer`。RED-24 起，所有 handler
+还会绑定到预先登记的 `BrowserWindow.webContents`、该 WebContents 的主 frame 和受信
+页面 URL；客户端会按 game/admin/connect 窗口角色限制 channel。子 frame 导航一律
+拒绝，即使目标 URL 位于受信目录内；renderer 内的 iframe 也不能调用高权限 IPC。
+
+Electron 客户端游戏页通过只读 `rvb-client://app/` 协议加载内置 HTML/JS/CSS。
+资源包保存在 `userData/resource-pack/versions/<archive-sha256>/`，只有
+`data/**/*.json` 和 `images/**/*.{jpg,jpeg,png,webp}` 可以覆盖同路径的内置资源；
+HTML、JavaScript、CSS、SVG 和未知类型始终从内置包读取。导入完成全部校验和暂存后
+才原子替换 `active.json`，清除资源包只把活动版本设为 `null`，不会删除保留版本。
 
 ### 8.4 Windows 最小烟测
 
@@ -379,8 +386,9 @@ npm.cmd run smoke:electron:windows
   最终三入口组合烟测直接启动 portable，编辑器在 16,710 ms 内出现“数据编辑器”，数据
   断言与退出清理通过；打包内 JSZip 生成探针也通过。
 
-已知但未在 RED-19 扩大的边界：构建仍未签名且沿用 `asar: false`；客户端资源包写入
-受信任页面根目录、IPC sender 校验和 `adm-zip` audit 告警需要独立安全任务跟进。
+已知但未在 RED-19 扩大的边界：构建仍未签名且沿用 `asar: false`。客户端资源包写入
+受信任页面根目录和 IPC sender 校验由 RED-24 收紧；`adm-zip` 版本按已完成的 RED-19
+合同保持不变，本任务不升级、替换或移除该依赖。
 
 ### 8.6 回退
 
@@ -390,14 +398,82 @@ RED-19 在独立分支中以本 PR 交付。若 Electron 43 候选构建出现�
 配置；回退后必须明确记录旧 Electron 与 `extract-zip` 漏洞重新出现，旧构建不得
 发布。
 
-## 9. RED-18：electron-builder 26.15.3、Editor ASAR 与双分发候选
+## 9. RED-24 IPC 与资源包信任边界
+
+RED-24 是 High 风险安全变更。三个 Electron 入口统一执行以下不变量：
+
+- IPC sender 必须是 channel 允许的精确窗口、精确 `webContents`、主 frame 和受信 URL；
+- `will-frame-navigate` 拒绝所有子 frame 导航，`will-navigate` 拒绝越界主页面导航；
+- 客户端资源包压缩体最大 32 MiB、声明解压总量最大 128 MiB、单文件最大 16 MiB、
+  entry 最多 2048；
+- 读取 entry 内容前先拒绝绝对路径、盘符路径、反斜杠、目录穿越、大小写冲突、重复项、
+  符号链接、加密项和不支持的 Unix 文件类型；
+- `pack.json` 必须是合法 JSON，`name`/`version`/`fileCount` 必须满足 schema，所有准备
+  激活的 data JSON 也必须能解析；
+- 导入失败只删除本次 staging，不切换 `active.json`；旧版本目录保留用于人工回退。
+
+自动验证顺序：
+
+```powershell
+npx.cmd vitest run tests/electron/ipc-trust.test.ts tests/electron/resource-pack-security.test.ts tests/electron/security-boundary.test.ts
+npx.cmd tsc --noEmit
+npx.cmd tsc -p electron/tsconfig.json --noEmit
+npx.cmd tsc -p electron-client/tsconfig.json --noEmit
+npx.cmd tsc -p electron-editor/tsconfig.json --noEmit
+npm.cmd test
+npm.cmd run build:electron:server
+npm.cmd run build:electron:client
+npm.cmd run build:electron:editor
+npm.cmd run smoke:electron:windows
+```
+
+### 9.1 候选验证记录（2026-08-14）
+
+- RED-24 聚焦测试：3 个文件、46 个测试通过；全量 `npm.cmd test`：7 个文件、78 个测试通过。
+- 根工程与 `electron`、`electron-client`、`electron-editor` 四组 TypeScript 检查均退出码 0。
+- `build:electron:server`、`build:electron:client`、`build:electron:editor` 均退出码 0，分别生成
+  server/client `win-unpacked` 与 editor portable 候选。构建仍报告既有的未签名、`asar: false`
+  和动态文件 tracing 警告；这些不在 RED-24 修改范围。
+- `smoke:electron:windows` 退出码 0：server 拒绝越界导航并释放 3000；client 从
+  `rvb-client://app/index.html` 读取内置 HTML/JS/data/image，非法 TLS 被拒，本地网关 ready 且
+  退出后释放；editor portable 在 28,086 ms 内出现窗口并列出 pieces 26、skills 114、cards 17、
+  rules 82 个文件。三个 renderer 的 `process`/`require` 均为 `undefined`。
+- 独立 `npm.cmd ci` 未改变 lockfile；audit 仍报告既有依赖问题。根据批准合同，本任务不升级、
+  替换或移除 `adm-zip`，也不把 audit 清零作为验收项。
+
+人工候选验证在隔离 profile 中通过：Pack A 只激活合法 JSON/PNG，包内 HTML/JS/SVG
+未落盘且协议请求返回 404；非法 JSON、路径穿越、大小写碰撞和单文件超限均被拒绝，
+活动指针、时间戳和版本目录保持不变。clear 后 `version: null` 且 `previousVersion` 保留
+Pack A；随后激活 Pack B、重复激活 B，均保持 previous version 指向 A，没有 self-reference
+或 staging 残留。game 窗口越权调用 connect-only IPC 被拒绝，新窗口和可信 iframe 导航
+被阻止。正常关窗后 Electron 与内置 Node 进程均退出，38521/3001 无监听。
+
+### 9.2 合入最新主线后的复验（2026-08-14）
+
+- 合入包含 RED-18 的 `origin/main` 后，RED-24 与构建边界联合聚焦测试 5 个文件、61 个测试
+  通过；全量 `npm.cmd test` 为 9 个文件、93 个测试通过；编码检查 491 个文本文件通过。
+- 根工程与 `electron`、`electron-client`、`electron-editor` 四组 TypeScript 检查再次通过。
+- Server、Client、Editor 三个正式构建均退出码 0；Client 验证器核对 27 个页面资源、305 个
+  离线数据资源和 38 个离线图片，Editor 验证器核对 333 个数据资源、19 个脚本资源和
+  165 个运行时资源。
+- `smoke:electron:windows` 在普通 Windows 用户权限下退出码 0：三个 renderer 都不暴露
+  `process`/`require`，server 拒绝越界导航并释放 3000，client 拒绝无效 TLS 且本地模式
+  ready，editor portable 可读取预期数据，三个入口均干净退出。沙箱内首次运行因 AppData
+  目录只有读权限而无法创建 Chromium 单实例锁；以候选实际运行权限复验后通过。
+- 相对最新 `origin/main` 的差异仍只包含 RED-24 合同允许路径；`package.json`、
+  `package-lock.json` 与主线一致，没有升级、替换或移除 `adm-zip`。
+
+回退代码时还原 RED-24 提交；只回退运行时资源时，将 `active.json.version` 原子改回其中
+记录的 `previousVersion`，不要删除版本目录。
+
+## 10. RED-18：electron-builder 26.15.3、Editor ASAR 与双分发候选
 
 本节记录 2026-08-14 在最新 `origin/main`（`b7a90c4`）合并后的最终候选证据。第 8 节是
 RED-19 在旧候选上的历史记录，不代表 RED-18 的最终依赖树或产物。RED-18 继承主线的
 Electron `43.4.0` 和 Server 构建入口；`electron-builder.server.json` 与主线逐字节一致，
 Server 不属于 RED-18 的实现差异。
 
-### 9.1 依赖与安全审计
+### 10.1 依赖与安全审计
 
 - 从干净依赖安装执行 `npm.cmd ci`：退出码 0，安装 949 个包；随后
   `npx.cmd install-electron --no` 退出码 0，`npx.cmd electron --version` 输出 `v43.4.0`。
@@ -415,7 +491,7 @@ Server 不属于 RED-18 的实现差异。
   只命中 Capacitor 嵌套节点，顶层 `minimatch` 来自 ESLint/TypeScript 工具。因此只能
   描述为“RED-18 目标构建工具链漏洞清零”，不能描述为全仓 audit 全绿。
 
-### 9.2 自动测试与构建验证
+### 10.2 自动测试与构建验证
 
 - `npm.cmd test`：7 个测试文件、59/59 通过；RED-18 三个重点测试文件为 27/27 通过。
 - 根工程、`electron`、`electron-client`、`electron-editor` TypeScript 检查均通过；
@@ -435,7 +511,7 @@ Server 不属于 RED-18 的实现差异。
   `process`/`require`，越界导航被拒绝，停止后 3000 端口不可达。该项仅作为兼容性证据，
   Server 配置和实现没有 RED-18 差异。
 
-### 9.3 Portable 与 NSIS 生命周期证据
+### 10.3 Portable 与 NSIS 生命周期证据
 
 - Portable：`RED vs BLUE Editor 0.1.0.exe` 为 90,171,912 bytes，SHA-256
   `D4C9E86C55D6A76BDC61D9C79F9D53100A44F7CA36DE1BF365F1B7C2353E2D66`，未签名。

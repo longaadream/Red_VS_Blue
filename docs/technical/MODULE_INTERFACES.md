@@ -154,10 +154,31 @@
 - 输入/输出：基于字符串 channel 的参数和结果。
 - 调用方：Electron 渲染页面。
 - 状态变化：进程、窗口、本地文件/设置。
-- 错误：启动、文件、IPC 或窗口异常；不同 handler 处理方式不一致。
-- 测试：没有确认到 Electron 自动测试。
-- 已知问题：没有共享 TypeScript 合同、协议版本和统一错误结果。
+- 信任边界：每个 handler 在读取参数前验证精确 `BrowserWindow.webContents`、主 frame、受信
+  URL 和该窗口角色允许的 channel；server/editor 只接受各自单一窗口，client 区分
+  game/admin/connect。所有子 frame 导航和所有新窗口请求都被拒绝。
+- 错误：sender 不可信时 handler 抛出包含 channel 和拒绝原因的错误；业务启动、文件或
+  窗口错误仍由各 handler 返回或抛出。
+- 测试：`tests/electron/ipc-trust.test.ts` 覆盖错误窗口、iframe、错误 URL、空 frame 和销毁
+  窗口；`security-boundary.test.ts` 检查所有注册都经过 sender 包装器。
+- 已知问题：仍没有共享的跨进程协议版本和统一业务错误结果；三个编译根目录各自保留一份
+  很小的 sender 判定模块，语义由同一测试矩阵锁定。
 - 最小调试：记录 channel、请求 ID、参数摘要、结果类型和异常栈，禁止记录密钥。
+
+### 10.1 Electron 资源包存储
+
+- 入口：客户端 `pack-import-from-path`/`pack-import-data`，服务端 dashboard 资源包导入，
+  以及 `lib/resource-pack.ts::syncResourcePack()`。
+- 存储：`userData/resource-pack/versions/<sha256>/` 为不可变版本，`active.json` 是唯一活动
+  指针；旧版固定 `resource-pack/data` 只在尚不存在指针时作为读取兼容回退。
+- 激活类型：仅 `data/**/*.json` 与 `images/**/*.{jpg,jpeg,png,webp}`；内置 HTML/JS/CSS/SVG
+  不接受热更新。
+- 事务边界：ZIP 中央目录、预算、entry 类型、manifest 和内容全部验证成功后，staging 才
+  重命名为版本目录并原子切换指针。失败不改变当前活动版本。
+- 测试：`tests/electron/resource-pack-security.test.ts` 覆盖路径穿越、绝对/盘符/反斜杠路径、
+  大小写冲突、符号链接、非法 JSON、预算、活动内容隔离、失败不切换和清除回退。
+- 回退：优先把 `active.json.version` 切回 `previousVersion`；代码回退使用 RED-24 PR revert，
+  不删除已有版本目录。
 
 ## 11. Android 资源构建
 
