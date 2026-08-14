@@ -12,7 +12,7 @@
 ## 1. 结论摘要
 
 - 当前没有覆盖所有运行模式的统一服务端核心。Windows LAN 由 Next/WebSocket 服务端负责，Android 由 Java 网络层和隐藏 WebView 中的 mobile server 负责，Relay 则由主机客户端负责。
-- 实际玩家战斗界面主要是 `data/pages/battle.html`，不是 React 页面。它同时承担渲染、网络、动作预演、Relay 规则执行和胜负判断。
+- 实际玩家战斗界面是 `data/pages/battle.html`，不是 React 页面。真实对战、观战和训练营共用这一个入口；`mode=training` 只切换 fixture 与调试能力，旧 `training.html` 只做兼容跳转。`battle.html` 同时承担渲染、网络、动作预演、Relay 规则执行和胜负判断。
 - TypeScript 规则核心集中在 `lib/game/turn.ts`、`battle-setup.ts`、`skills.ts` 和 `triggers.ts`，但公共状态类型、随机、日志、存储格式和命令协议没有完全统一。
 - Android 安装包是当前发布产物。项目负责人确认的目标是：以可维护的 JS/TS 源码为唯一真实源，Android 资源只能由构建生成，不能继续成为人工维护的第二份源码。
 - 当前提交被指定为正式故障基线。`BUILD_AND_RUN.md` 为空，且最后一版存在尚未定位的重大运行问题，因此下一项工程工作应先恢复可重复运行基线。
