@@ -36,7 +36,7 @@ export function hashStable(value: unknown): string {
 
 export function runBattleAction(state: BattleState, action: BattleAction): BattleActionResult {
   const actionId = getActionId(action)
-  const metadata = getDebugMetadata(state)
+  const metadata = readDebugMetadata(state)
   if (actionId && metadata.appliedActionIds.includes(actionId)) {
     return {
       state,
@@ -116,6 +116,20 @@ function getActionId(action: BattleAction): string | undefined {
   const id = (action as unknown as { clientActionId?: unknown; requestId?: unknown }).clientActionId
     ?? (action as unknown as { requestId?: unknown }).requestId
   return typeof id === 'string' && id.trim() ? id.trim() : undefined
+}
+
+function readDebugMetadata(state: BattleState): {
+  appliedActionIds: string[]
+  actionLog: Array<{ action: BattleAction; actionHash: string; stateHash: string; index: number }>
+} {
+  const metadata = state.extensions?.debugBattle as {
+    appliedActionIds?: unknown
+    actionLog?: unknown
+  } | undefined
+  return {
+    appliedActionIds: Array.isArray(metadata?.appliedActionIds) ? metadata.appliedActionIds : [],
+    actionLog: Array.isArray(metadata?.actionLog) ? metadata.actionLog : [],
+  }
 }
 
 function getDebugMetadata(state: BattleState): {

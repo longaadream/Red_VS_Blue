@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import type { TriggerRule } from './triggers'
 import { executeSkillFunction } from './skills'
+import { manhattanDistance } from './spatial'
 
 // 效果类型
 export type EffectType =
@@ -288,7 +289,7 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                 // 只选择敌方棋子，并且在范围内
                 if (piece.ownerPlayerId !== context.sourcePiece.ownerPlayerId && piece.currentHp > 0) {
                   if (piece.x == null || piece.y == null) return
-                  const distance = Math.abs(piece.x - context.sourcePiece.x) + Math.abs(piece.y - context.sourcePiece.y)
+                  const distance = manhattanDistance(piece, context.sourcePiece)
                   if (distance <= range) {
                     targets.push({ ...piece, type: 'area' })
                   }

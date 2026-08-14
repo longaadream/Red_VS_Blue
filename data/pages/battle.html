@@ -2705,9 +2705,9 @@
       const skillId = pendingSkill.skillId
       const valid = new Set()
 
-      // Fall back to heuristic highlighting when the game engine is unavailable.
-      if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) {
-        return _computeValidSkillTargetsHeuristic(sp)
+      // Shared engine rules are required for authoritative highlighting.
+      if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction || !GameEngine.manhattanDistance) {
+        return new Set()
       }
 
       const skDef = (G.skillsById && G.skillsById[skillId]) || skillsById[skillId] || {}
@@ -2723,7 +2723,6 @@
       const filterLower = (pendingSkill.filter || '').toLowerCase()
       const isPieceTarget = ttLower === 'piece' || ttLower === 'enemy' || ttLower === 'enemies'
         || ttLower === 'ally' || ttLower === 'allies'
-      const isGridTarget = ttLower === 'grid'
       const isSelfTarget = ttLower === 'self'
 
       // Pre-filter targetType and filter before trial runs.
@@ -2731,9 +2730,7 @@
       // It also reduces GameEngine.applyBattleAction calls.
       function _preFilter(t) {
         const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
-        const dist = isGridTarget
-          ? Math.max(Math.abs(t.x - sp.x), Math.abs(t.y - sp.y))
-          : Math.abs(t.x - sp.x) + Math.abs(t.y - sp.y)
+        const dist = GameEngine.manhattanDistance(sp, t)
         if (dist > maxRange) return false
         if (isSelfTarget) return t.x === sp.x && t.y === sp.y
         if (isPieceTarget) {
@@ -2767,41 +2764,6 @@
         }
       }
 
-      return valid.size > 0 ? valid : _computeValidSkillTargetsHeuristic(sp)
-    }
-    // Heuristic fallback based on targetType and filter when GameEngine is unavailable.
-    function _computeValidSkillTargetsHeuristic(sp) {
-      if (!G || !sp || !pendingSkill) return new Set()
-      const maxRange = pendingSkill.range ?? 10
-      const targetType = (pendingSkill.targetType || '').toLowerCase()
-      const filter = (pendingSkill.filter || '').toLowerCase()
-      const valid = new Set()
-      G.map.tiles.forEach(t => {
-        const dist = targetType === 'grid'
-          ? Math.max(Math.abs(t.x - sp.x), Math.abs(t.y - sp.y))
-          : Math.abs(t.x - sp.x) + Math.abs(t.y - sp.y)
-        if (dist > maxRange) return
-        const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
-        let ok = false
-        if (targetType === 'piece') {
-          if (!occ) ok = false
-          else if (filter === 'enemy') ok = occ.ownerPlayerId !== sp.ownerPlayerId
-          else if (filter === 'ally')  ok = occ.ownerPlayerId === sp.ownerPlayerId
-          else ok = true
-        } else if (targetType === 'grid') {
-          ok = true
-        } else if (targetType === 'self') {
-          ok = t.x === sp.x && t.y === sp.y
-        } else {
-          switch (targetType) {
-            case 'enemy': case 'enemies': ok = !!occ && occ.ownerPlayerId !== sp.ownerPlayerId; break
-            case 'ally': case 'allies':   ok = !!occ && occ.ownerPlayerId === sp.ownerPlayerId; break
-            case 'empty': case 'tile':    ok = !occ; break
-            default: ok = true
-          }
-        }
-        if (ok) valid.add(t.x + ',' + t.y)
-      })
       return valid
     }
 
@@ -2869,10 +2831,9 @@
 
     function canAutoMovePiece(piece) {
       if (!G || !piece || piece.currentHp <= 0) return false
-      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      const inAction = G.turn && G.turn.phase === 'action'
-      const isOwn = piece.ownerPlayerId && piece.ownerPlayerId.toLowerCase() === myPlayerId
-      return !!(isMyTurn && inAction && isOwn)
+      if (typeof GameEngine === 'undefined' ||
+          typeof GameEngine.getLegalNormalMoveTargetsForPlayer !== 'function') return false
+      return GameEngine.getLegalNormalMoveTargetsForPlayer(G, myPlayerId, piece.instanceId).length > 0
     }
 
     function autoMoveSelectedIfPossible() {
@@ -3090,19 +3051,13 @@
       }
       const sp = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       validMoves = new Set()
-      if (sp && pendingMove) {
-        const range = sp.moveRange !== undefined ? sp.moveRange : ((sp.stats && sp.stats.moveRange) || 3)
-        const tileMap = {}
-        tiles.forEach(t => { tileMap[t.x + ',' + t.y] = t })
-        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-          for (let step = 1; step <= range; step++) {
-            const x = sp.x + dx * step, y = sp.y + dy * step
-            const key = x + ',' + y
-            const t = tileMap[key]
-            if (!t || !t.props || !t.props.walkable) break
-            if (!cellMap[key]) { validMoves.add(key); hlMoveKeys.add(key) }
-          }
-        }
+      if (sp && pendingMove && typeof GameEngine !== 'undefined' &&
+          typeof GameEngine.getLegalNormalMoveTargetsForPlayer === 'function') {
+        GameEngine.getLegalNormalMoveTargetsForPlayer(G, myPlayerId, sp.instanceId).forEach(pos => {
+          const key = pos.x + ',' + pos.y
+          validMoves.add(key)
+          hlMoveKeys.add(key)
+        })
       }
       if (pendingSkill) {
         (pendingSkill.validTargets || new Set()).forEach(k => hlSkillKeys.add(k))
@@ -3562,7 +3517,8 @@
 
       const _selPiece = G && G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
       const _isOwnSelected = _selPiece && _selPiece.ownerPlayerId && _selPiece.ownerPlayerId.toLowerCase() === myPlayerId
-      setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected)
+      const _canMoveSelected = canAutoMovePiece(_selPiece)
+      setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
         setStatusMsg(getSkillHint())
