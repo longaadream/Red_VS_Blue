@@ -352,11 +352,16 @@ npm.cmd run build:electron:editor
 
 经项目负责人批准，2026-08-14 将 Editor 切换为 ASAR。第一次中间候选虽然把散装文件收进归档，但仍把根 Next.js 项目的 25,915 个 `node_modules` 条目收入 287,602,908 bytes 的 `app.asar`；portable 在 47.34 秒后才创建窗口，因此没有作为最终候选。最终配置通过 `beforeBuild` 正式接口声明由项目自行处理 Editor 运行依赖，ASAR 只保留 7 个应用条目；资源包脚本需要的 JSZip 最小依赖闭包作为 165 个外部运行文件复制。最终完整构建退出码 0，耗时 153.6 秒；`scripts/verify-electron-editor-package.js` 自动验证 333 个数据资源、19 个脚本资源和 165 个运行资源的缺失/陈旧状态，并确认归档中不存在 `node_modules`。
 
+Git 历史只显示 Windows `portable` 目标随 2026-05-11 的首次项目批量同步提交 `920f8af` 一起进入仓库；没有关联 ADR、注释或后续提交解释选择理由。经项目负责人批准，2026-08-14 保留 Portable 供免安装分发，同时新增 assisted NSIS 安装版。安装向导支持当前用户/所有用户模式、允许选择安装目录，并创建标准桌面和开始菜单快捷方式。双目标最终构建退出码 0，耗时 145.5 秒；Portable 与安装版复用同一个 `win-unpacked` 应用内容和 ASAR/外置资源边界。
+
 最终产物：
 
-- `dist/editor/RED vs BLUE Editor 0.1.0.exe`
-- 文件大小：72,991,281 bytes
-- SHA-256：`de10de3ea27ed05b975dc87839febd4feb980727e50dd3e114fcbc5a569c3849`
+- Portable：`dist/editor/RED vs BLUE Editor 0.1.0.exe`
+- Portable 文件大小：72,991,230 bytes
+- Portable SHA-256：`8cfbffef6d4253ffcfbc2f985ef3e9f485e0207d3d0a60c49ba67b29dfffc8d2`
+- 安装版：`dist/editor/RED vs BLUE Editor Setup 0.1.0.exe`
+- 安装版文件大小：73,221,215 bytes
+- 安装版 SHA-256：`6f13ebed065ff66d75e87ec2b5d60ed474d2f5a3377d0634e369bb9787a125d1`
 
 已验证的 unpacked 产物与资源：
 
@@ -368,9 +373,11 @@ npm.cmd run build:electron:editor
 - `resources/app/node_modules`：165 个 JSZip 最小运行资源与源码逐文件一致
 - `resources/app/electron-editor/dist/main.js` 不存在；应用入口只位于 `app.asar`
 
-最终 portable 从单进程启动到页面调试目标出现耗时 14.69 秒；页面状态为 `complete`，棋子列表包含 26 个 JSON 文件，`ana.json` 可读取。通过真实 IPC 创建并读回临时 JSON 成功，测试文件随后精确删除；portable 临时目录在程序关闭后自动清理。外部资源包脚本可从最终临时解压目录解析并加载 JSZip，运行时异常和控制台错误均为 0。
+首个 ASAR Portable 候选从单进程启动到页面调试目标出现耗时 14.69 秒；页面状态为 `complete`，棋子列表包含 26 个 JSON 文件，`ana.json` 可读取。通过真实 IPC 创建并读回临时 JSON 成功，测试文件随后精确删除；Portable 临时目录在程序关闭后自动清理。外部资源包脚本可从最终临时解压目录解析并加载 JSZip，运行时异常和控制台错误均为 0。新增 NSIS 目标后，对精确 SHA-256 为 `8cfbffef6d4253ffcfbc2f985ef3e9f485e0207d3d0a60c49ba67b29dfffc8d2` 的最终 Portable 冷启动复验，页面目标在 37.63 秒出现，随后页面同样为 `complete`、标题为“数据编辑器”且 `window.editorAPI` 可用。两次结果说明 ASAR 已消除 180 秒无窗口的问题，但新生成、未签名单文件的自解压/扫描时间仍有明显波动，不应把 14.69 秒当作固定启动承诺。
 
-配置使用 `asar: true` 和 Windows `portable` 目标。`data`、`scripts` 与 JSZip 运行闭包继续作为真实外部文件；根 Next.js/Prisma 等生产依赖不进入 Editor。首次构建机仍需要访问 GitHub 下载 Electron、NSIS、7zip、NSIS resources 和 winCodeSign 辅助资源。Editor UI 中“构建资源包”的完整写出流程没有在 RED-18 中执行，因为它会修改 Android/资源包输出；该流程应在独立任务中验证，不把本次 JSZip 解析检查描述为完整资源包构建通过。
+安装版使用 `/S /currentuser` 安装到工作区内经过边界校验的临时目录：安装器退出码 0，23.32 秒完成；安装目录包含 591 个文件、285,117,440 bytes。已安装 EXE 到页面调试目标出现耗时 1.61 秒；等待页面导航稳定后，页面状态为 `complete`、标题为“数据编辑器”、`window.editorAPI` 为对象、棋子目录可列出 26 个 JSON 文件且 `ana.json` 内容可读取。候选自带卸载器以当前用户模式退出码 0，22.34 秒完成；安装目录被删除，当前用户卸载注册项和桌面/开始菜单快捷方式均为 0 残留。验收创建的隔离浏览器缓存目录随后精确清理。
+
+配置使用 `asar: true`，Windows 同时生成 `portable` 与 `nsis` 目标；NSIS 使用 assisted 安装向导（`oneClick: false`、`perMachine: false`、允许选择安装目录）。`data`、`scripts` 与 JSZip 运行闭包继续作为真实外部文件；根 Next.js/Prisma 等生产依赖不进入 Editor。首次构建机仍需要访问 GitHub 下载 Electron、NSIS、7zip、NSIS resources 和 winCodeSign 辅助资源。Editor UI 中“构建资源包”的完整写出流程没有在 RED-18 中执行，因为它会修改 Android/资源包输出；该流程应在独立任务中验证，不把本次 JSZip 解析检查描述为完整资源包构建通过。
 
 ### Electron 服务端
 
@@ -384,15 +391,15 @@ npm.cmd run build:electron:server
 
 ### 签名与回退
 
-两个现有 builder 配置都没有证书、发布或安装器签名配置。本次修改 `electron-builder.client.json` 的静态资源白名单，并修改 `electron-builder.editor.json` 的 ASAR、外部运行依赖和产物校验边界；没有新增证书或发布配置。日志中的 `signing with signtool.exe` 是 electron-builder 对 Windows 可执行文件的处理步骤；PowerShell `Get-AuthenticodeSignature` 对最终 portable 和 unpacked editor EXE 均返回 `NotSigned`，确认没有配置发行证书。
+两个现有 builder 配置都没有证书或发布配置。本次修改 `electron-builder.client.json` 的静态资源白名单，并修改 `electron-builder.editor.json` 的 ASAR、外部运行依赖、Portable/NSIS 双目标和产物校验边界；没有新增证书或发布配置。日志中的 `signing with signtool.exe` 是 electron-builder 对 Windows 可执行文件的处理步骤；PowerShell `Get-AuthenticodeSignature` 对最终 Portable、NSIS 安装器和 unpacked Editor EXE 均返回 `NotSigned`，确认没有配置发行证书。
 
 ### 其他检查
 
-- `npm.cmd run test`：验证时曾因沙箱禁止写入 `logs/game.log` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。Client 产物包含 6 个回归测试，Editor ASAR/外置资源包含 8 个回归测试；最终 6 个测试文件、46 个测试全部通过。
+- `npm.cmd run test`：验证时曾因沙箱禁止写入 `logs/game.log` 而有 7 个 `EPERM` 失败；允许正常写入该目录后重跑，退出码 0。Client 产物包含 6 个回归测试，Editor ASAR/外置资源/双目标包含 9 个回归测试；最终 6 个测试文件、47 个测试全部通过。
 - `npm.cmd run check:encoding`：退出码 0，487 个文本文件通过。
 - 根 TypeScript、Electron Client TypeScript 与 Electron Editor TypeScript：退出码均为 0。
 - `node scripts/verify-electron-client-package.js`：退出码 0，27 个页面源资源、305 个白名单离线数据资源和 38 个离线图片资源与最终候选一致；`resources/app/www/data/users.json` 不存在。
 - `node scripts/verify-electron-editor-package.js`：退出码 0，ASAR 入口、333 个数据资源、19 个脚本资源和 165 个外部运行资源与最终候选一致；归档中没有 `node_modules`，外部 JSZip 可以解析。
 - `npm.cmd run lint`：ESLint 正常运行，退出码 1；结果为主线既有的 1005 项（657 errors、348 warnings）。RED-18 新增的 CommonJS 产物校验脚本使用局部规则豁免，没有增加 lint 问题。
 
-回退时还原 RED-18 的独立提交，即可同时恢复 `package.json` 中旧版 builder 声明、对应 `package-lock.json` 构建依赖树与 Editor 的旧散装文件布局。构建产物不提交到仓库。
+回退时还原 RED-18 的独立提交，即可同时恢复 `package.json` 中旧版 builder 声明、对应 `package-lock.json` 构建依赖树与 Editor 的旧散装文件布局；若只回退安装版，则移除 `electron-builder.editor.json` 的 `nsis` target/config，并恢复校验器和测试只要求 Portable。构建产物不提交到仓库。

@@ -78,7 +78,7 @@ function compareSourceTree(issues, sourceRoot, packagedRoot, displayRoot, assetL
   }
 }
 
-function findEditorPackageIssues(packageRoot, projectRoot, portablePath) {
+function findEditorPackageIssues(packageRoot, projectRoot, portablePath, installerPath) {
   const issues = []
   const archivePath = path.join(packageRoot, 'resources', 'app.asar')
 
@@ -167,11 +167,19 @@ function findEditorPackageIssues(packageRoot, projectRoot, portablePath) {
     }
   }
 
+  if (installerPath) {
+    if (!fs.existsSync(installerPath) || !fs.statSync(installerPath).isFile()) {
+      issues.push(`missing editor installer: ${path.basename(installerPath)}`)
+    } else if (fs.statSync(installerPath).size === 0) {
+      issues.push(`empty editor installer: ${path.basename(installerPath)}`)
+    }
+  }
+
   return issues
 }
 
-function verifyEditorPackage(packageRoot, projectRoot, portablePath) {
-  const issues = findEditorPackageIssues(packageRoot, projectRoot, portablePath)
+function verifyEditorPackage(packageRoot, projectRoot, portablePath, installerPath) {
+  const issues = findEditorPackageIssues(packageRoot, projectRoot, portablePath, installerPath)
   if (issues.length > 0) {
     throw new Error(`Electron editor package verification failed:\n- ${issues.join('\n- ')}`)
   }
@@ -192,9 +200,13 @@ if (require.main === module) {
       outputRoot,
       `${builderConfig.productName} ${packageMetadata.version}.exe`,
     )
+    const installerPath = path.join(
+      outputRoot,
+      `${builderConfig.productName} Setup ${packageMetadata.version}.exe`,
+    )
 
     try {
-      verifyEditorPackage(packageRoot, projectRoot, portablePath)
+      verifyEditorPackage(packageRoot, projectRoot, portablePath, installerPath)
       console.log(
         `[verify-editor-package] OK (${listFiles(path.join(projectRoot, 'data')).length} data assets, ${listFiles(path.join(projectRoot, 'scripts')).length} script assets, and ${EDITOR_RUNTIME_PACKAGES.reduce((total, packageName) => total + listFiles(path.join(projectRoot, 'node_modules', packageName)).length, 0)} runtime assets checked)`,
       )

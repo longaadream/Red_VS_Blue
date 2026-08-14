@@ -15,6 +15,12 @@ interface EditorBuilderConfig {
   beforeBuild?: string
   extraResources?: Array<{ from: string; to: string }>
   files?: string[]
+  nsis?: {
+    allowToChangeInstallationDirectory?: boolean
+    oneClick?: boolean
+    perMachine?: boolean
+  }
+  win?: { target?: string | string[] }
 }
 
 function readEditorBuilderConfig(): EditorBuilderConfig {
@@ -34,6 +40,7 @@ async function createPackageFixture(options: { archivedNodeModules?: boolean } =
   const packageRoot = path.join(root, 'package')
   const archiveSourceRoot = path.join(root, 'archive')
   const portablePath = path.join(root, 'RED vs BLUE Editor 0.1.0.exe')
+  const installerPath = path.join(root, 'RED vs BLUE Editor Setup 0.1.0.exe')
 
   fs.mkdirSync(path.join(archiveSourceRoot, 'electron-editor', 'dist'), { recursive: true })
   fs.mkdirSync(path.join(archiveSourceRoot, 'electron-editor', 'ui'), { recursive: true })
@@ -80,8 +87,9 @@ async function createPackageFixture(options: { archivedNodeModules?: boolean } =
     )
   }
   fs.writeFileSync(portablePath, 'portable')
+  fs.writeFileSync(installerPath, 'installer')
 
-  return { packageRoot, portablePath, projectRoot }
+  return { installerPath, packageRoot, portablePath, projectRoot }
 }
 
 afterEach(() => {
@@ -100,6 +108,12 @@ describe('Electron editor packaging', () => {
     expect(config.asar).toBe(true)
     expect(config.beforeBuild).toBe('scripts/editor-before-build.js')
     expect(config.files).toContain('!**/node_modules/**')
+    expect(config.win?.target).toEqual(expect.arrayContaining(['portable', 'nsis']))
+    expect(config.nsis).toMatchObject({
+      allowToChangeInstallationDirectory: true,
+      oneClick: false,
+      perMachine: false,
+    })
     expect(extraResources.get('data')).toBe('app/data')
     expect(extraResources.get('scripts')).toBe('app/scripts')
     for (const packageName of EDITOR_RUNTIME_PACKAGES) {
@@ -163,17 +177,26 @@ describe('Electron editor packaging', () => {
   })
 
   it('reports a missing portable executable', async () => {
-    const { packageRoot, portablePath, projectRoot } = await createPackageFixture()
+    const { installerPath, packageRoot, portablePath, projectRoot } = await createPackageFixture()
     fs.rmSync(portablePath)
 
-    expect(findEditorPackageIssues(packageRoot, projectRoot, portablePath)).toContain(
+    expect(findEditorPackageIssues(packageRoot, projectRoot, portablePath, installerPath)).toContain(
       'missing editor portable: RED vs BLUE Editor 0.1.0.exe',
     )
   })
 
-  it('accepts an archived app and byte-identical external resources', async () => {
-    const { packageRoot, portablePath, projectRoot } = await createPackageFixture()
+  it('reports a missing NSIS installer', async () => {
+    const { installerPath, packageRoot, portablePath, projectRoot } = await createPackageFixture()
+    fs.rmSync(installerPath)
 
-    expect(findEditorPackageIssues(packageRoot, projectRoot, portablePath)).toEqual([])
+    expect(findEditorPackageIssues(packageRoot, projectRoot, portablePath, installerPath)).toContain(
+      'missing editor installer: RED vs BLUE Editor Setup 0.1.0.exe',
+    )
+  })
+
+  it('accepts an archived app and byte-identical external resources', async () => {
+    const { installerPath, packageRoot, portablePath, projectRoot } = await createPackageFixture()
+
+    expect(findEditorPackageIssues(packageRoot, projectRoot, portablePath, installerPath)).toEqual([])
   })
 })

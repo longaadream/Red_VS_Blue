@@ -31,7 +31,12 @@
   ],
   "asar": true,
   "win": {
-    "target": "portable"
+    "target": ["portable", "nsis"]
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true
   },
   "mac": {
     "target": "dmg"
