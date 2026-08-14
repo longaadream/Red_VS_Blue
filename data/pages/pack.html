@@ -225,10 +225,9 @@
 
     // ── 环境检测 ─────────────────────────────────────────────────────────────
     // Electron 通过 preload 注入 window.electronAPI；Android/浏览器走 Service Worker
-    const isElectron = !!(window.electronAPI && window.electronAPI.packWriteFiles)
+    const isElectron = !!(window.electronAPI && (window.electronAPI.packImportFromPath || window.electronAPI.packImportData))
     const isAndroidNativePack = !!(window.RvBBridge && window.RvBBridge.packWriteFiles)
-    // file:// 协议说明在 Electron 内，但 preload 可能是旧版本（无 packWriteFiles）
-    // 此时走本地服务器 API 写入资源包文件
+    // 旧版 file:// 页面仍保留兼容检测；RED-24 Electron 使用 rvb-client://。
     const isFileProtocol = window.location.protocol === 'file:'
 
     // ── IndexedDB helpers（Android/浏览器路径，替代 postMessage）────────────────
@@ -318,7 +317,7 @@
         isFile: zipData instanceof File,
         hasPackGetFilePath: !!(window.electronAPI && window.electronAPI.packGetFilePath),
         hasPackImportFromPath: !!(window.electronAPI && window.electronAPI.packImportFromPath),
-        hasPackWriteFiles: !!(window.electronAPI && window.electronAPI.packWriteFiles),
+        hasPackImportData: !!(window.electronAPI && window.electronAPI.packImportData),
       })
 
       // Electron 快速路径：获取本地文件路径，直接传给主进程解压
@@ -367,6 +366,44 @@
         return
       }
 
+      // Electron downloads and non-path File objects are sent as one complete ZIP.
+      // The main process validates and stages the whole archive before switching active.json.
+      if (isElectron) {
+        setProgress(10, '校验资源包…')
+        try {
+          if (!window.electronAPI.packImportData) throw new Error('当前客户端不支持原子资源包导入')
+          const blob = zipData instanceof Blob ? zipData : new Blob([zipData])
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result)
+            reader.onerror = () => reject(reader.error || new Error('读取 ZIP 失败'))
+            reader.readAsDataURL(blob)
+          })
+          const base64 = String(dataUrl).split(',', 2)[1] || ''
+          const result = await window.electronAPI.packImportData(base64, sourceName || 'resource-pack.zip')
+          if (!result.ok) throw new Error(result.error || '资源包导入失败')
+          const m = result.meta || {}
+          localStorage.setItem('rvb_pack_meta', JSON.stringify({
+            name: m.name || sourceName || '未命名包',
+            version: m.version || '—',
+            description: m.description || '',
+            fileCount: result.count,
+            importedAt: m.importedAt || new Date().toISOString(),
+          }))
+          setProgress(100, '完成！')
+          setTimeout(() => {
+            hideProgress()
+            refreshPackStatus()
+            showToast('✅ 资源包已导入，共 ' + result.count + ' 个文件')
+          }, 500)
+        } catch (e) {
+          console.error('[pack] packImportData error:', e)
+          hideProgress()
+          showToast('❌ 写入失败[IPC]：' + e.message)
+        }
+        return
+      }
+
       console.log('[pack] falling through to JSZip path, isElectron=', isElectron, 'electronFilePath=', electronFilePath)
       setProgress(5, '解析 ZIP…')
       let zip
@@ -393,26 +430,7 @@
       setProgress(75, '写入文件…')
       let result
       try {
-        if (isElectron) {
-          // Electron: 分批写入，每批 20 个文件，避免单次 IPC 消息过大
-          const BATCH = 20
-          let totalCount = 0
-          const validEntries = entries.filter(([p]) => !shouldSkipPackEntry(p))
-          for (let b = 0; b < validEntries.length; b += BATCH) {
-            const batch = validEntries.slice(b, b + BATCH)
-            const files = []
-            for (let i = 0; i < batch.length; i++) {
-              const [filePath, entry] = batch[i]
-              const content = await entry.async('base64')
-              files.push({ path: '/' + normalizePackEntryPath(filePath), content })
-              setProgress(40 + ((b + i) / validEntries.length) * 35, '写入 ' + (b + i + 1) + '/' + validEntries.length + ' 文件…')
-            }
-            const batchResult = await window.electronAPI.packWriteFiles(files)
-            if (!batchResult.ok) throw new Error(batchResult.error || 'packWriteFiles failed')
-            totalCount += batchResult.count
-          }
-          result = { ok: true, count: totalCount }
-        } else if (isAndroidNativePack) {
+        if (isAndroidNativePack) {
           const BATCH = 20
           let totalCount = 0
           const validEntries = entries.filter(([p]) => !shouldSkipPackEntry(p))
@@ -440,7 +458,7 @@
           }
           result = { ok: true, count: totalCount }
         } else if (isFileProtocol) {
-          // Electron 旧版 preload（无 packWriteFiles）→ 通过本地服务器 API 写入
+          // 旧版 file:// 宿主兼容路径：通过本地服务器 API 写入
           const serverUrl = ((window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || localStorage.getItem('rvb_server_url') || '').replace(/\/$/, '')
           if (!serverUrl) throw new Error('未配置服务器地址')
           const BATCH = 20

@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 资源包管理（Electron 端用文件系统替代 Service Worker Cache）
   packGetFilePath: (file: File) => webUtils.getPathForFile(file),
   packImportFromPath: (zipPath: string) => ipcRenderer.invoke('pack-import-from-path', zipPath),
-  packWriteFiles: (files: { path: string; content: string }[]) => ipcRenderer.invoke('pack-write-files', files),
+  packImportData: (base64: string, filename: string) => ipcRenderer.invoke('pack-import-data', base64, filename),
   packClear: () => ipcRenderer.invoke('pack-clear'),
   packList: () => ipcRenderer.invoke('pack-list'),
   // 获取本机局域网 IP（供 LAN 自动发现）

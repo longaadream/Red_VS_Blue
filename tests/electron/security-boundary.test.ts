@@ -93,7 +93,56 @@ describe('Electron desktop security boundary', () => {
   ])('%s blocks out-of-scope navigation and child windows', (relativePath) => {
     const source = read(relativePath)
     expect(source).toContain(".webContents.on('will-navigate'")
+    expect(source).toContain(".webContents.on('will-frame-navigate'")
+    expect(source).toContain('!details.isMainFrame')
     expect(source).toContain(".webContents.setWindowOpenHandler(() => ({ action: 'deny' }))")
+  })
+
+  test('keeps the RED-19 adm-zip dependency contract unchanged', () => {
+    const packageJson = JSON.parse(read('package.json')) as { dependencies: Record<string, string> }
+    const lock = JSON.parse(read('package-lock.json')) as {
+      packages: Record<string, { version?: string }>
+    }
+
+    expect(packageJson.dependencies['adm-zip']).toBe('^0.5.16')
+    expect(lock.packages['node_modules/adm-zip']?.version).toBe('0.5.16')
+  })
+
+  test.each([
+    'electron/main.ts',
+    'electron-client/main.ts',
+    'electron-editor/main.ts',
+  ])('%s registers IPC only through the trusted sender wrapper', (relativePath) => {
+    const source = read(relativePath)
+    expect(source.match(/ipcMain\.handle\(/g)).toHaveLength(1)
+    expect(source).toContain('assertTrustedIpcSender(event, channel,')
+  })
+
+  test('client resource packs are isolated from the bundled executable root', () => {
+    const main = read('electron-client/main.ts')
+    const preload = read('electron-client/preload.ts')
+    const packPage = read('data/pages/pack.html')
+
+    expect(main).toContain("return path.join(getUserData(), 'resource-pack')")
+    expect(main).toContain('session.defaultSession.protocol.handle(CLIENT_SCHEME')
+    expect(main).toContain('isActivatableResourcePackPath(relativePath)')
+    expect(main).not.toContain('extractAllTo(')
+    expect(main).not.toContain('extractEntryTo(')
+    expect(main).not.toContain("'pack-write-files'")
+    expect(preload).toContain("ipcRenderer.invoke('pack-import-data'")
+    expect(preload).not.toContain("ipcRenderer.invoke('pack-write-files'")
+    expect(packPage).toContain('window.electronAPI.packImportData(base64')
+  })
+
+  test('server resource import no longer performs direct ZIP extraction', () => {
+    const main = read('electron/main.ts')
+    const store = read('electron/resource-pack-store.ts')
+    const resourcePack = read('lib/resource-pack.ts')
+
+    expect(main).not.toContain('extractAllTo(')
+    expect(store).toContain("path.join(packRoot, 'versions', version)")
+    expect(store).toContain("path.join(packRoot, 'active.json')")
+    expect(resourcePack).toContain("path.join(PACK_ROOT, 'versions', pointer.version)")
   })
 
   test('client does not bypass Chromium origin or certificate validation', () => {
