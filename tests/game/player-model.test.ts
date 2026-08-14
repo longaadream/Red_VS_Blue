@@ -6,7 +6,7 @@ import {
   getPlayerSeat,
   normalizePlayerAlignment,
 } from '@/lib/game/room-store'
-import { areAllies, areEnemies, isPlayerSeat, normalizeContentAlignment } from '@/lib/game/match-identity'
+import { areAllies, areEnemies, isMatchPlayerId, isPlayerSeat, normalizeContentAlignment } from '@/lib/game/match-identity'
 
 describe('player seat and alignment model', () => {
   it('assigns opposite red/blue seats while keeping light/dark independent', () => {
@@ -50,5 +50,10 @@ describe('player seat and alignment model', () => {
     expect(isPlayerSeat('light')).toBe(false)
     expect(normalizeContentAlignment('good')).toBe('light')
     expect(normalizeContentAlignment('blue')).toBeUndefined()
+  })
+
+  it('rejects a requested first player who is not in the match', () => {
+    expect(isMatchPlayerId(['alice', 'bob'], 'bob')).toBe(true)
+    expect(isMatchPlayerId(['alice', 'bob'], 'not-in-room')).toBe(false)
   })
 })

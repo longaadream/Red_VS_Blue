@@ -20,3 +20,8 @@ export function areAllies(firstOwnerPlayerId: string, secondOwnerPlayerId: strin
 export function areEnemies(firstOwnerPlayerId: string, secondOwnerPlayerId: string): boolean {
   return !areAllies(firstOwnerPlayerId, secondOwnerPlayerId)
 }
+
+/** A requested starting player must already belong to the match. */
+export function isMatchPlayerId(playerIds: readonly string[], requestedPlayerId: string): boolean {
+  return playerIds.some(playerId => playerId.toLowerCase() === requestedPlayerId.toLowerCase())
+}

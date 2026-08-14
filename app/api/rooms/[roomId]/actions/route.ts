@@ -19,6 +19,7 @@ import { applyBattleAction } from "@/lib/game/turn"
 import type { PieceTemplate } from "@/lib/game/piece"
 import { alignmentToPieceFaction, assignNextSeat, getPlayerSeat, normalizePlayerAlignment, getRoomStore } from "@/lib/game/room-store"
 import { verifyJoinAuth } from "@/lib/game/identity-verify"
+import { isMatchPlayerId } from "@/lib/game/match-identity"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -217,6 +218,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       latestRoom = await roomStore.createRoom(roomId, `Room ${roomId}`)
     }
 
+    // Validate before mutating or persisting a player's selection.  A rejected
+    // first-player choice must leave the room exactly as it was.
+    if (requestedFirstPlayerId && !isMatchPlayerId(latestRoom.players.map(player => player.id), requestedFirstPlayerId)) {
+      return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
+    }
+
     const normalizedPlayerId = playerId.trim().toLowerCase()
     let targetPlayer = latestRoom.players.find(
       (p) => p.id.toLowerCase() === normalizedPlayerId
@@ -319,7 +326,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       try {
         if (requestedFirstPlayerId) checkRoom.firstPlayerId = requestedFirstPlayerId
         const firstPlayerId = checkRoom.firstPlayerId || (sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0])?.id
-        if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
+        if (!firstPlayerId || !isMatchPlayerId(playerIds, firstPlayerId)) {
           return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
         }
         const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId })
