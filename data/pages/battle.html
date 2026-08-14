@@ -632,13 +632,13 @@
       font-size: 18px; font-weight: 900; color: #f8fafc;
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
-        <div class="training-setup-sub">????????????????????????????????????</div>
+    .training-setup-sub { margin-top: 5px; color: #94a3b8; font-size: 12px; line-height: 1.5; }
     .training-setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .training-setup-col {
       border: 1px solid rgba(51,65,85,.9); border-radius: 10px;
       background: rgba(15,23,42,.72); padding: 12px; display: flex; flex-direction: column; gap: 10px;
     }
-          <div class="training-setup-label">??</div>
+    .training-setup-label { color: #e2e8f0; font-size: 13px; font-weight: 900; }
     .training-setup-field { display: flex; flex-direction: column; gap: 5px; }
     .training-setup-field span { font-size: 11px; color: #64748b; font-weight: 800; }
     .training-setup-field select {
@@ -659,7 +659,7 @@
     .training-piece-option:has(input:checked) {
       border-color: #22c55e; background: rgba(22,101,52,.28); color: #dcfce7;
     }
-            <div class="training-setup-hint">???????????????????</div>
+    .training-setup-hint { color: #64748b; font-size: 11px; line-height: 1.45; }
     .training-setup-actions { display: flex; gap: 10px; justify-content: flex-end; }
     .training-setup-btn {
       border: 1px solid rgba(148,163,184,.34); border-radius: 12px; padding: 10px 14px;
@@ -1194,7 +1194,7 @@
     <div style="font-size:12px;color:#64748b" id="roundLabel"></div>
     <button id="btnSurrender" class="btn-surrender" onclick="confirmSurrender()">🏳 鎶曢檷</button>
     <button id="btnSwitchPov" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 鍒囨崲瑙嗚 🔴</button>
-        <div class="legend-item"><div class="legend-dot" style="background:#3b0764"></div>???</div>
+    <button id="btnResetCD" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
     <button class="btn-fullmap" id="btnFullMap" onclick="toggleFullMap()" title="????">?</button>
     <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
     <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
@@ -1376,13 +1376,13 @@
       list.innerHTML = pieces.length ? pieces.map(function(piece) {
         const checked = selectedIds.indexOf(piece.id) !== -1 ? ' checked' : ''
         return `<label class="training-piece-option"><input type="checkbox" value="${piece.id}"${checked}><span>${piece.name || piece.id}</span></label>`
-            <div class="training-setup-hint">???????????????????</div>
+      }).join('') : '<div class="training-setup-hint">当前阵营没有可用棋子。</div>'
     }
     function refreshTrainingSetupPieces() {
       const firstFaction = document.getElementById('trainingFirstFaction')?.value || 'red'
       const secondFaction = document.getElementById('trainingSecondFaction')?.value || 'blue'
-            <div id="trainingFirstPieces" class="training-piece-list">?????...</div>
-            <div id="trainingSecondPieces" class="training-piece-list">?????...</div>
+      fillTrainingSetupList('trainingFirstPieces', firstFaction, trainingSetupConfig?.firstTemplateIds?.[0])
+      fillTrainingSetupList('trainingSecondPieces', secondFaction, trainingSetupConfig?.secondTemplateIds?.[0])
     }
     function getSelectedTrainingPieceIds(selectId) {
       const list = document.getElementById(selectId)
@@ -1395,11 +1395,11 @@
         firstPlayerId: 'training-red',
         firstFaction,
         secondFaction,
-            <div id="trainingFirstPieces" class="training-piece-list">?????...</div>
-            <div id="trainingSecondPieces" class="training-piece-list">?????...</div>
+        firstTemplateIds: getSelectedTrainingPieceIds('trainingFirstPieces'),
+        secondTemplateIds: getSelectedTrainingPieceIds('trainingSecondPieces'),
       }
     }
-        <button class="tb-btn" onclick="showTrainingSetup()" style="background:#0c1a0c;border-color:#166534;color:#86efac">??</button>
+    function showTrainingSetup() {
       placingMode = false
       selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
       const btnPlace = document.getElementById('btnPlace')
@@ -1412,7 +1412,7 @@
       const overlay = document.getElementById('trainingSetupOverlay')
       if (overlay) overlay.classList.add('show')
     }
-        <button class="training-setup-btn primary" onclick="startTrainingFromSetup()">????</button>
+    async function startTrainingFromSetup() {
       trainingSetupConfig = getTrainingSetupConfig()
       const overlay = document.getElementById('trainingSetupOverlay')
       if (overlay) overlay.classList.remove('show')
@@ -2287,7 +2287,7 @@
         const trainingLoad = await loadLocalData()
         if (!trainingLoad.ok) showMsg('本地资源读取异常：' + (trainingLoad.errors[0] || 'unknown'), 'err')
         refreshPlaceTemplates()
-        <button class="tb-btn" onclick="showTrainingSetup()" style="background:#0c1a0c;border-color:#166534;color:#86efac">??</button>
+        showTrainingSetup()
         return
       }
       if (!roomId || !myPlayerId) { showMsg('缺少 roomId 或 playerId 参数', 'err'); return }
@@ -2360,7 +2360,7 @@
     }
 
     // 鈹€鈹€ Training: resource editor 鈹€鈹€
-        <button class="tb-btn" onclick="openResourceEditor()" style="background:#1a2a1a;border-color:#15803d;color:#86efac" title="????/??/???">??</button>
+    function openResourceEditor() {
       const sheet = document.getElementById('resEditorSheet')
       if (!sheet || !G) return
       // Pre-fill with current values of the active player
@@ -2672,6 +2672,7 @@
     // 骞茶繍琛岄€愭牸娴嬭瘯锛氬灏勭▼鍐呮瘡涓牸瀛愯窇涓€娆℃湰鍦?applyBattleAction
     // Avoid exhaustive dry-runs here; use cheap metadata first.
     // Full GameEngine checks happen when the action is submitted.
+    function _actionHasFirstTarget(action) {
       return !!(action && (action.targetPieceId || action.targetX != null || action.targetY != null))
     }
 
@@ -2893,6 +2894,7 @@
 
     // 鈹€鈹€ Render 鈹€鈹€
     // Render
+    function pendingTargetSelectionForMe() {
       const pbt = G && G.pendingTargetSelection
       return !!(pbt && pbt.playerId && clientOwns(pbt.playerId))
     }
@@ -3005,8 +3007,8 @@
       }
       const tags = pieceDispTags(piece).filter(t => t.visible !== false)
       const tagsHtml = tags.length
+        ? tags.map(t => `<span class="status-tag" title="${escHtml(t.id || t.description || '')}">${escHtml(statusTagLabel(t))}</span>`).join('')
         : '<span class="status-empty">无状态</span>'
-        : '<span class="status-empty">鏃犵姸鎬?/span>'
       el.className = 'selected-status-card'
       el.innerHTML = `
         <div class="selected-piece-name">${escHtml(pieceName(piece))}</div>
@@ -3018,18 +3020,18 @@
 
     function renderHUD() {
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      const badge = document.getElementById('turnBadge')
       badge.textContent = isMyTurn ? '我方回合' : '对方回合'
-      badge.textContent = isMyTurn ? '鎴戠殑鍥炲悎' : '对方回合'
       badge.className = 'turn-badge ' + (isMyTurn ? 'my-turn' : 'opp-turn')
 
       // Turn announcement on change
       const curTurnPlayer = G.turn && G.turn.currentPlayerId
       if (curTurnPlayer && curTurnPlayer !== _lastAnnouncedTurnPlayer) {
         _lastAnnouncedTurnPlayer = curTurnPlayer
-        if (isMyTurn) showTurnAnnounce('鈿?浣犵殑鍥炲悎', '#4ade80')
+        if (isMyTurn) showTurnAnnounce('你的回合', '#4ade80')
         else showTurnAnnounce('🛡 对方回合', '#f87171')
       }
-      document.getElementById('roundLabel').textContent = '绗?' + (G.turn ? G.turn.turnNumber : 1) + ' 鍥炲悎'
+      document.getElementById('roundLabel').textContent = '第 ' + (G.turn ? G.turn.turnNumber : 1) + ' 回合'
       document.getElementById('phaseLabel').textContent = PHASE_LABELS[G.turn ? G.turn.phase : ''] || ''
 
       const apD = document.getElementById('resApDisplay')
@@ -4162,7 +4164,7 @@
         const restartBtn = document.createElement('button')
         restartBtn.style.cssText = 'background:#1d4ed8;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px'
         restartBtn.textContent = '重新开始'
-        <button class="tb-btn" onclick="showTrainingSetup()" style="background:#0c1a0c;border-color:#166534;color:#86efac">??</button>
+        restartBtn.onclick = () => { overlay.style.display = 'none'; showTrainingSetup() }
         overlay.appendChild(restartBtn)
       }
       document.getElementById('resultOverlay').style.display = 'flex'
@@ -4227,8 +4229,11 @@
       if (el) el.textContent = msg
     }
     function showMsg(msg, type) {
-      document.getElementById('loadingMsg').textContent = msg
-      if (type === 'err') document.getElementById('loadingMsg').style.color = '#f87171'
+      const loadingMsg = document.getElementById('loadingMsg')
+      const spinner = document.querySelector('#loadingOverlay .spinner')
+      loadingMsg.textContent = msg
+      loadingMsg.style.color = type === 'err' ? '#f87171' : '#64748b'
+      if (spinner) spinner.style.display = type === 'err' ? 'none' : ''
     }
     function openLog() { document.getElementById('logOverlay').classList.add('show') }
     function closeLog() { document.getElementById('logOverlay').classList.remove('show') }
@@ -4451,6 +4456,7 @@
 
       // 淇鎵嬫満绔瀛愬睘鎬у脊绐楀叧闂寜閽?
       // Close piece info modal when tapping the backdrop on mobile.
+      const pieceModal = document.getElementById('pieceInfoModal')
       if (pieceModal) {
         pieceModal.addEventListener('touchend', function(e) {
           if (e.target === pieceModal) { e.preventDefault(); closePieceInfo() }
