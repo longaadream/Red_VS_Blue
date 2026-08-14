@@ -96,10 +96,7 @@
 ## 当前已确定的基础决策
 
 - [`ADR-0001-deployment-visibility.md`](./ADR-0001-deployment-visibility.md)：部署重投阶段公开双方站位。
-
-## 提议中的决策
-
-- [`ADR-0002-electron-server-packaging.md`](./ADR-0002-electron-server-packaging.md)：保留 Electron Server 内部候选打包入口，但不作为公开发行物（RED-23，等待人工批准）。
+- [`ADR-0002-electron-server-packaging.md`](./ADR-0002-electron-server-packaging.md)：保留 Electron Server 内部候选打包入口，但不作为公开发行物（RED-23，已接受）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 
