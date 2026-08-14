@@ -71,7 +71,7 @@ Android 已存在开服实现，不是仅能加入的客户端：
 | Windows 开服 | Next/WS 服务端中的房间状态 | `runBattleAction()` → `applyBattleAction()` | Prisma `Room.battleState` |
 | Android 开服 | `mobile-server-entry.ts` 的房间状态 | 当前直接使用 `applyBattleAction()` | 内存；正式持久化待实现 |
 | Relay | 主机客户端 | 浏览器 `GameEngine.applyBattleAction()` | Relay 仅保存/转发最新状态 |
-| Training | 客户端提供初始/当前状态，API 执行动作 | Training API → `runBattleAction()` | 待确认 |
+| Training | `battle.html?mode=training` 的客户端内存状态 | 浏览器 `trainingApiFetch()` → `GameEngine.applyBattleAction()` | 仅页面内存 |
 | Mobile embedded server | Android 进程内房间 Map | `mobile-server` 独立处理 | 进程内；持久化待确认 |
 
 同一设备可以同时承担服务端和客户端角色，但两种职责必须保持独立；本机玩家也必须通过与远端玩家相同的命令协议操作权威服务端。公开测试的目标是 Windows 和 Android 功能对等，均可开服或加入。Relay 和 Training 不阻塞该基线。
