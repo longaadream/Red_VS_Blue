@@ -405,10 +405,15 @@ Server 不属于 RED-18 的实现差异。
   `@electron/rebuild` 为 `4.2.0`、`node-gyp` 为 `12.4.0`、`tar` 为 `7.5.22`、
   `tmp` 为 `0.2.7`、`form-data` 为 `4.0.6`。兼容范围内额外固定 `fast-uri` `3.1.5`
   与 `lodash` `4.18.1`，避免新 advisory 再次污染构建工具链。
-- 最终 `npm.cmd audit --json` 为 5 项（1 moderate、4 high、0 critical）；剩余名称为
-  `adm-zip`、`brace-expansion`、`serialize-javascript`、`terser-webpack-plugin`、`vite`，
-  均不在 `electron-builder` / `app-builder-lib` 构建链中。因此只能描述为“RED-18 目标
-  构建工具链漏洞清零”，不能描述为全仓 audit 全绿。
+- 相同最终 lockfile 的 `npm.cmd audit --json` 在当前 registry advisory 快照间出现漂移：
+  实现者连续 5 次得到 5 项（1 moderate、4 high），独立审查者得到 21 项（17 moderate、
+  4 high）；两者均为 0 critical。证据按最坏的 21 项记录：`@capacitor/cli`、6 个
+  `@typescript-eslint` / `typescript-eslint` 包、`@vitest/coverage-v8`、`@vitest/mocker`、
+  `adm-zip`、`brace-expansion`、`eslint-config-next`、`glob`、`minimatch`、`null-loader`、
+  `rimraf`、`serialize-javascript`、`terser-webpack-plugin`、`vite`、`vitest`、`webpack`。
+  两种快照都没有命中 `electron-builder` / `app-builder-lib` 目标构建链；`glob`/`rimraf`
+  只命中 Capacitor 嵌套节点，顶层 `minimatch` 来自 ESLint/TypeScript 工具。因此只能
+  描述为“RED-18 目标构建工具链漏洞清零”，不能描述为全仓 audit 全绿。
 
 ### 9.2 自动测试与构建验证
 
