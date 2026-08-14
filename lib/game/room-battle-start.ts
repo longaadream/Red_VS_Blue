@@ -5,6 +5,8 @@ import { assertDemoRostersReady, type RosterRoomStore } from './roster-contract'
 import { getPlayerSeat, type Room } from './room-store'
 import { applyBattleAction } from './turn'
 
+export const DEMO_FIXED_MAP_ID = 'large-trap-arena'
+
 export interface StartLockedRosterBattleOptions {
   firstPlayerId?: string
 }
@@ -49,7 +51,7 @@ export async function startBattleFromLockedRosters(
       playerIds,
       pieceTemplates,
       playerSelectedPieces,
-      room.mapId || 'large-battlefield',
+      DEMO_FIXED_MAP_ID,
       { firstPlayerId },
     )
     if (!battle) throw new Error('Failed to initialize battle state')
@@ -65,6 +67,7 @@ export async function startBattleFromLockedRosters(
     const nextRoom: Room = {
       ...room,
       firstPlayerId,
+      mapId: DEMO_FIXED_MAP_ID,
       status: 'in-progress',
       currentTurnIndex: 0,
       battleState: {

@@ -11,7 +11,7 @@ import {
   lockDefaultBotRosterInStore,
   lockDemoRosterInStore,
 } from './game/roster-contract'
-import { startBattleFromLockedRosters } from './game/room-battle-start'
+import { DEMO_FIXED_MAP_ID, startBattleFromLockedRosters } from './game/room-battle-start'
 
 // HMR-safe: keep server + client maps on globalThis so Next.js hot reloads
 // can tear down the old WebSocketServer (which holds stale handler closures)
@@ -401,7 +401,7 @@ export function startWsServer(): void {
                   maxPlayers: 2,
                   players: initialPlayers,
                   hostId,
-                  mapId: String(data.mapId || 'large-battlefield').trim(),
+                  mapId: DEMO_FIXED_MAP_ID,
                   visibility: data.visibility === 'private' ? 'private' as const : 'public' as const,
                   inviteCode: makeInviteCode(),
                   spectators: [],

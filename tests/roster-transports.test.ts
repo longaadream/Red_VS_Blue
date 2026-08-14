@@ -37,6 +37,20 @@ const memoryStore = vi.hoisted(() => {
     async getAllRooms() {
       return [...rooms.values()].map(copy)
     },
+    async createRoom(roomId: string, name: string) {
+      const id = normalize(roomId)
+      const created: Room = {
+        id,
+        name,
+        status: 'waiting',
+        players: [],
+        spectators: [],
+        currentTurnIndex: 0,
+        actions: [],
+      }
+      rooms.set(id, copy(created))
+      return copy(created)
+    },
     async setRoom(roomId: string, room: Room) {
       const id = normalize(roomId)
       const current = rooms.get(id)
@@ -61,6 +75,7 @@ vi.mock('../lib/game/room-store', async importOriginal => {
 
 import { POST as roomActionPost } from '../app/api/rooms/[roomId]/actions/route'
 import { POST as roomPost } from '../app/api/rooms/[roomId]/route'
+import { POST as roomsPost } from '../app/api/rooms/route'
 import { startWsServer } from '../lib/ws-server'
 
 const lightRoster = [
@@ -126,6 +141,32 @@ function receiveJson(client: WebSocket): Promise<JsonObject> {
       reject(error)
     })
   })
+}
+
+async function httpCreate(mapId: string) {
+  const request = new NextRequest('http://localhost/api/rooms', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ mode: 'pve', hostId: 'alice', playerName: 'Alice', mapId }),
+  })
+  const response = await roomsPost(request)
+  return { status: response.status, body: await response.json() as JsonObject }
+}
+
+async function wsCreate(mapId: string) {
+  const client = await openClient()
+  try {
+    const response = receiveJson(client)
+    client.send(JSON.stringify({
+      type: 'rpc',
+      requestId: 'create-fixed-map',
+      method: 'rooms.create',
+      data: { hostId: 'alice', name: 'Fixed map room', mapId },
+    }))
+    return await response
+  } finally {
+    client.close()
+  }
 }
 
 async function httpSelect(roomId: string, playerId: string, templateIds: string[]) {
@@ -205,6 +246,19 @@ describe('Demo roster HTTP/WebSocket integration', () => {
   })
 
   beforeEach(() => memoryStore.reset())
+
+  it('forces the Demo map at HTTP and WebSocket room creation boundaries', async () => {
+    const http = await httpCreate('large-battlefield')
+    expect(http.status).toBe(200)
+    const httpRoomId = String(http.body.id)
+    expect(memoryStore.snapshot(httpRoomId)?.mapId).toBe('large-trap-arena')
+
+    memoryStore.reset()
+    const ws = await wsCreate('large-battlefield')
+    expect(ws).toMatchObject({ ok: true, data: { mapId: 'large-trap-arena' } })
+    const wsRoomId = String((ws.data as JsonObject).id)
+    expect(memoryStore.snapshot(wsRoomId)?.mapId).toBe('large-trap-arena')
+  })
 
   it('returns equivalent stable errors and leaves state untouched', async () => {
     memoryStore.seed(room('http-invalid'))
@@ -289,7 +343,14 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const started = memoryStore.snapshot('mirror-room')
     if (!started) throw new Error('Expected mirror-room to remain in the store')
     expect(started.status).toBe('in-progress')
-    const battleState = started.battleState as unknown as { state: { pieces: Array<{ templateId: string; ownerPlayerId: string }> } }
+    expect(started.mapId).toBe('large-trap-arena')
+    const battleState = started.battleState as unknown as {
+      state: {
+        map: { id: string }
+        pieces: Array<{ templateId: string; ownerPlayerId: string }>
+      }
+    }
+    expect(battleState.state.map.id).toBe('large-trap-arena')
     const battlePieces = battleState.state.pieces
     expect(battlePieces).toHaveLength(16)
     expect(battlePieces.filter(piece => piece.templateId === lightRoster[0])).toEqual(expect.arrayContaining([
