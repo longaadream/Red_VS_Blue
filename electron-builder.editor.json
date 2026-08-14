@@ -2,6 +2,7 @@
   "appId": "com.redvsblue.editor",
   "productName": "RED vs BLUE Editor",
   "directories": { "output": "dist/editor" },
+  "beforeBuild": "scripts/editor-before-build.js",
   "extraMetadata": {
     "main": "electron-editor/dist/main.js"
   },
@@ -9,25 +10,33 @@
     "electron-editor/dist/**",
     "electron-editor/ui/**",
     "package.json",
-    "!node_modules/**"
+    "!**/node_modules/**"
   ],
   "extraResources": [
     { "from": "data",    "to": "app/data" },
     { "from": "scripts", "to": "app/scripts" },
-    { "from": "node_modules/jszip", "to": "app/node_modules/jszip" },
-    { "from": "node_modules/lie", "to": "app/node_modules/lie" },
-    { "from": "node_modules/immediate", "to": "app/node_modules/immediate" },
-    { "from": "node_modules/pako", "to": "app/node_modules/pako" },
-    { "from": "node_modules/core-util-is", "to": "app/node_modules/core-util-is" },
-    { "from": "node_modules/inherits", "to": "app/node_modules/inherits" },
-    { "from": "node_modules/isarray", "to": "app/node_modules/isarray" },
+    { "from": "node_modules/jszip",             "to": "app/node_modules/jszip" },
+    { "from": "node_modules/jszip/node_modules/readable-stream", "to": "app/node_modules/jszip/node_modules/readable-stream" },
+    { "from": "node_modules/jszip/node_modules/safe-buffer", "to": "app/node_modules/jszip/node_modules/safe-buffer" },
+    { "from": "node_modules/jszip/node_modules/string_decoder", "to": "app/node_modules/jszip/node_modules/string_decoder" },
+    { "from": "node_modules/lie",               "to": "app/node_modules/lie" },
+    { "from": "node_modules/pako",              "to": "app/node_modules/pako" },
+    { "from": "node_modules/setimmediate",      "to": "app/node_modules/setimmediate" },
+    { "from": "node_modules/immediate",         "to": "app/node_modules/immediate" },
+    { "from": "node_modules/core-util-is",      "to": "app/node_modules/core-util-is" },
+    { "from": "node_modules/inherits",          "to": "app/node_modules/inherits" },
+    { "from": "node_modules/isarray",           "to": "app/node_modules/isarray" },
     { "from": "node_modules/process-nextick-args", "to": "app/node_modules/process-nextick-args" },
-    { "from": "node_modules/setimmediate", "to": "app/node_modules/setimmediate" },
-    { "from": "node_modules/util-deprecate", "to": "app/node_modules/util-deprecate" }
+    { "from": "node_modules/util-deprecate",    "to": "app/node_modules/util-deprecate" }
   ],
-  "asar": false,
+  "asar": true,
   "win": {
-    "target": "portable"
+    "target": ["portable", "nsis"]
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true
   },
   "mac": {
     "target": "dmg"

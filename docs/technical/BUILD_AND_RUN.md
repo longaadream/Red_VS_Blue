@@ -389,3 +389,66 @@ RED-19 在独立分支中以本 PR 交付。若 Electron 43 候选构建出现�
 及旧窗口
 配置；回退后必须明确记录旧 Electron 与 `extract-zip` 漏洞重新出现，旧构建不得
 发布。
+
+## 9. RED-18：electron-builder 26.15.3、Editor ASAR 与双分发候选
+
+本节记录 2026-08-14 在最新 `origin/main`（`b7a90c4`）合并后的最终候选证据。第 8 节是
+RED-19 在旧候选上的历史记录，不代表 RED-18 的最终依赖树或产物。RED-18 继承主线的
+Electron `43.4.0` 和 Server 构建入口；`electron-builder.server.json` 与主线逐字节一致，
+Server 不属于 RED-18 的实现差异。
+
+### 9.1 依赖与安全审计
+
+- 从干净依赖安装执行 `npm.cmd ci`：退出码 0，安装 949 个包；随后
+  `npx.cmd install-electron --no` 退出码 0，`npx.cmd electron --version` 输出 `v43.4.0`。
+- `electron-builder`、`app-builder-lib`、`builder-util` 均为 `26.15.3`；构建链中的
+  `@electron/rebuild` 为 `4.2.0`、`node-gyp` 为 `12.4.0`、`tar` 为 `7.5.22`、
+  `tmp` 为 `0.2.7`、`form-data` 为 `4.0.6`。兼容范围内额外固定 `fast-uri` `3.1.5`
+  与 `lodash` `4.18.1`，避免新 advisory 再次污染构建工具链。
+- 相同最终 lockfile 的 `npm.cmd audit --json` 在当前 registry advisory 快照间出现漂移：
+  实现者连续 5 次得到 5 项（1 moderate、4 high），独立审查者得到 21 项（17 moderate、
+  4 high）；两者均为 0 critical。证据按最坏的 21 项记录：`@capacitor/cli`、6 个
+  `@typescript-eslint` / `typescript-eslint` 包、`@vitest/coverage-v8`、`@vitest/mocker`、
+  `adm-zip`、`brace-expansion`、`eslint-config-next`、`glob`、`minimatch`、`null-loader`、
+  `rimraf`、`serialize-javascript`、`terser-webpack-plugin`、`vite`、`vitest`、`webpack`。
+  两种快照都没有命中 `electron-builder` / `app-builder-lib` 目标构建链；`glob`/`rimraf`
+  只命中 Capacitor 嵌套节点，顶层 `minimatch` 来自 ESLint/TypeScript 工具。因此只能
+  描述为“RED-18 目标构建工具链漏洞清零”，不能描述为全仓 audit 全绿。
+
+### 9.2 自动测试与构建验证
+
+- `npm.cmd test`：7 个测试文件、59/59 通过；RED-18 三个重点测试文件为 27/27 通过。
+- 根工程、`electron`、`electron-client`、`electron-editor` TypeScript 检查均通过；
+  RED-18 脚本和直接相关测试的 ESLint 退出码 0；编码检查 489 个文本文件通过；
+  `git diff --check` 通过。
+- Client 正式构建退出码 0；验证器逐 SHA-256 核对 27 个页面资源、305 个离线数据资源
+  和 38 张离线图片。`dist/client-build/win-unpacked/RED vs BLUE.exe` 为
+  225,533,440 bytes，SHA-256
+  `ACC1A09EEB8AF3DCDE9E6C7CE52ED4423A88148CA94453AA927D9D5C2C76194D`，未签名。
+- Editor 正式构建同时生成 Portable 和 assisted NSIS（当前用户/当前机器可选安装目录），
+  退出码 0；验证器核对 333 个数据资源、19 个脚本资源和 165 个运行时资源。
+- Editor 的 `app.asar` 为 45,084 bytes，SHA-256
+  `E7858424141EFFFBB59EA9979FD0AC3BA819E11CF1E4CFE5773E592DAB844F0F`；其中只有
+  `package.json`、编译后的 main/preload 与 UI 共 7 个条目，没有 `node_modules`。
+  JSZip 的最小运行时闭包作为 `extraResources` 保持在 ASAR 外部。
+- 主线 Server 入口也在相同依赖树上重新构建并通过 smoke：renderer 不暴露
+  `process`/`require`，越界导航被拒绝，停止后 3000 端口不可达。该项仅作为兼容性证据，
+  Server 配置和实现没有 RED-18 差异。
+
+### 9.3 Portable 与 NSIS 生命周期证据
+
+- Portable：`RED vs BLUE Editor 0.1.0.exe` 为 90,171,912 bytes，SHA-256
+  `D4C9E86C55D6A76BDC61D9C79F9D53100A44F7CA36DE1BF365F1B7C2353E2D66`，未签名。
+  直接启动到“数据编辑器”renderer 用时 22,968 ms；renderer 中 `process`/`require` 均为
+  `undefined`，可列出 pieces 26、skills 114、cards 17、rules 82 个文件，关窗后进程干净退出。
+- NSIS：`RED vs BLUE Editor Setup 0.1.0.exe` 为 90,401,895 bytes，SHA-256
+  `169E1E4FA389522D67EB2321D0D63ED51399CDE5321B180F562F6C6070D87F8F`，未签名。
+  静默安装到隔离的当前用户目录退出码 0、耗时 23,381 ms；安装后启动到相同 renderer
+  用时 3,143 ms，安全边界和数据 IPC 断言与 Portable 一致。
+- 静默卸载退出码 0、耗时 8,178 ms；安装目录被删除，HKCU 卸载项从 1 变为 0，桌面与
+  开始菜单快捷方式从 2 变为 0。验收专用用户目录也已删除。
+
+当前候选的已知边界：Windows EXE 尚未配置发布证书；本轮 smoke 只读取正式包内数据，
+没有执行会写出完整资源包的人工操作。回退 RED-18 的最终提交会保留主线 Electron 43.4
+和 Server 入口，但会撤销 editor-builder 26.15.3、ASAR、NSIS 及资源验证器，并重新暴露
+本任务所清理的构建工具链风险；回退后的旧构建不得发布。

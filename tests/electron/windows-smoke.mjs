@@ -17,7 +17,12 @@ const applications = {
     debugPort: 19222,
   },
   editor: {
-    executable: path.join(root, 'dist', 'editor', 'RED vs BLUE Editor 0.1.0.exe'),
+    executable: process.env.RVB_SMOKE_EDITOR_EXE
+      ? path.resolve(process.env.RVB_SMOKE_EDITOR_EXE)
+      : path.join(root, 'dist', 'editor', 'RED vs BLUE Editor 0.1.0.exe'),
+    launchArguments: process.env.RVB_SMOKE_USER_DATA_DIR
+      ? [`--user-data-dir=${path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)}`]
+      : [],
     title: '数据编辑器',
     debugPort: 19223,
   },
@@ -154,7 +159,10 @@ async function launch(application, timeoutMs = 30000) {
   assert(existsSync(application.executable), `Missing executable: ${application.executable}`)
   stopApplication(application)
   stopDebugTarget(application.debugPort)
-  const child = spawn(application.executable, [`--remote-debugging-port=${application.debugPort}`], {
+  const child = spawn(application.executable, [
+    `--remote-debugging-port=${application.debugPort}`,
+    ...(application.launchArguments ?? []),
+  ], {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,

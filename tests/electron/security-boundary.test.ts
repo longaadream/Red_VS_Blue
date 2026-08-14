@@ -120,7 +120,7 @@ describe('Electron desktop security boundary', () => {
     }
   })
 
-  test('editor portable excludes unrelated app dependencies but keeps its resource-pack builder runtime', () => {
+  test('editor packages exclude unrelated app dependencies but keep the resource-pack runtime', () => {
     const config = JSON.parse(read('electron-builder.editor.json')) as {
       files?: string[]
       extraResources?: { from?: string; to?: string }[]
@@ -138,7 +138,7 @@ describe('Electron desktop security boundary', () => {
       'util-deprecate',
     ]
 
-    expect(config.files).toContain('!node_modules/**')
+    expect(config.files).toContain('!**/node_modules/**')
     for (const moduleName of requiredModules) {
       expect(config.extraResources).toContainEqual({
         from: `node_modules/${moduleName}`,
@@ -147,24 +147,38 @@ describe('Electron desktop security boundary', () => {
     }
   })
 
-  test('client packages its source HTML pages instead of relying on ignored generated files', () => {
+  test('client generates tracked pages and exposes only allowlisted offline data', () => {
+    const packageJson = JSON.parse(read('package.json')) as { scripts?: Record<string, string> }
     const config = JSON.parse(read('electron-builder.client.json')) as {
       extraResources?: { from?: string; to?: string; filter?: string[] }[]
     }
+    expect(packageJson.scripts?.['build:electron:client']).toContain('npm run sync:pages')
     expect(config.extraResources).toContainEqual({
-      from: 'data/pages',
+      from: 'android-client/www',
       to: 'app/www',
-      filter: ['**/*.html'],
-    })
-    expect(config.extraResources).toContainEqual({
-      from: 'android-client/www/js',
-      to: 'app/www/js',
     })
     expect(config.extraResources).toContainEqual({
       from: 'public',
       to: 'app/www/images',
+      filter: ['*.jpg', 'card-art/**'],
     })
     expect(config.extraResources).toContainEqual({
+      from: 'data',
+      to: 'app/www/data',
+      filter: [
+        'cards/**',
+        'effects/**',
+        'maps/**',
+        'pieces/**',
+        'pve/**',
+        'rules/**',
+        'skills/**',
+        'status-effects/**',
+        'tiles/**',
+        'skill-keywords.json',
+      ],
+    })
+    expect(config.extraResources).not.toContainEqual({
       from: 'data',
       to: 'app/www/data',
     })
