@@ -5,7 +5,7 @@
 
 基线：远程 `main` 合并提交 `aa9c853d3e6597d151de8570d9a6f05ca2a1a687`
 
-验证日期：2026-08-13
+验证日期：RED-11 基线为 2026-08-13；RED-19 最新候选为 2026-08-14
 
 平台：Windows 10 22H2（10.0.19045，x64）
 
@@ -343,19 +343,19 @@ Preload 只暴露列出的 IPC 能力，不暴露原始 `ipcRenderer`。当前�
 npm.cmd run smoke:electron:windows
 ```
 
-脚本只清理与上述产物绝对路径、专用调试端口相匹配的测试进程。服务端会验证 3000
-端口的启动/停止；客户端会验证本机模式、无效 TLS 证书拒绝和退出清理；编辑器会
-验证正式构建中的数据文件列表。编辑器 portable 外壳需另外启动一次确认最终封装可
-执行，脚本对同一次正式构建的 `win-unpacked` 内容执行 renderer 断言。
+脚本只清理与上述产物绝对路径、启动 PID 进程树和专用调试端口相匹配的测试进程。
+服务端会验证 3000 端口的启动/停止；客户端会验证本机模式、无效 TLS 证书拒绝和退出
+清理；编辑器会直接启动最终 portable EXE，在最长 300 秒内等待 renderer，并记录实际
+启动耗时、正式构建中的数据文件列表和退出清理结果。
 
-### 8.5 候选验证记录（2026-08-13）
+### 8.5 候选验证记录（2026-08-13；2026-08-14 根据人工反馈修订）
 
 - 在最新 `origin/main` 基线上执行 `npm.cmd ci`：退出码 0，安装 1042 个包；
   `npx.cmd install-electron` 完成运行时校验，
   `electron --version` 为 `v43.4.0`。
 - `npm.cmd audit`：不再包含 Electron 或旧 `extract-zip` 漏洞链；仍有 25 个范围外依赖
   漏洞，不能描述为 audit 全绿。
-- `npm.cmd test`：5 个测试文件、42 个测试通过；其中 Electron 安全边界 10/10。
+- `npm.cmd test`：5 个测试文件、44 个测试通过；其中 Electron 安全边界 12/12。
 - 根工程及 `electron`、`electron-client`、`electron-editor` TypeScript 检查通过；
   `npm.cmd run build` 通过。
 - `npm.cmd run lint` 能正常启动 ESLint，退出码 1；排除本机未跟踪 worktree 后复现
@@ -364,14 +364,20 @@ npm.cmd run smoke:electron:windows
 - 服务端 `dir`、客户端 `dir` 和编辑器 `portable` 正式构建均退出码 0。编辑器构建首次
   从 GitHub 下载 NSIS 超时，改用一次性 `ELECTRON_BUILDER_BINARIES_MIRROR` 环境变量后
   成功；镜像地址未写入仓库配置。
+- 人工核验发现点击“停止服务器”后会把 `taskkill` 导致的退出码 1 误报成“端口 3000
+  已被占用”。最新候选会区分主动停止与非预期退出，并隔离旧进程的异步回调，相关
+  回归断言通过；修订后的服务端正式产物已重建，仍等待人工再次点击确认不再弹窗。
 - `npm.cmd run smoke:electron:windows` 三入口分别退出码 0：renderer 中 `process` 与
   `require` 均为 `undefined`；服务端越界导航保持原 URL，停止后 3000 不可达；客户端
   无效 TLS 探针被拒绝，受版本控制的 HTML/JS/数据/图片资产均可读取，本机模式为
   ready，退出后网关不可达；编辑器列出 pieces 26、skills 114、cards 17、rules 82 个
   文件并正常退出。
-- 编辑器最终 `RED vs BLUE Editor 0.1.0.exe` 已独立启动并出现“数据编辑器”窗口；自动
-  数据断言使用同一次正式构建的 `win-unpacked` 内容。Windows 安全扫描使 portable 首次
-  解包明显变慢，但未发现应用级致命错误。
+- 初版烟测只确认 portable 文件存在并启动 `win-unpacked`，因此没有覆盖人工报告的
+  “便携版没反应”。直接启动旧 portable 后复现约 4 分 44 秒的无反馈等待；原因是编辑器
+  误打包整棵生产依赖。最新配置只保留资源包构建所需的 JSZip 依赖树，portable 从
+  158.0 MB 降至 88.6 MB，解包内容从约 840 MB / 24,520 文件降至 351 MB / 592 文件。
+  最终三入口组合烟测直接启动 portable，编辑器在 19,921 ms 内出现“数据编辑器”，数据
+  断言与退出清理通过；打包内 JSZip 生成探针也通过。
 
 已知但未在 RED-19 扩大的边界：构建仍未签名且沿用 `asar: false`；客户端资源包写入
 受信任页面根目录、IPC sender 校验和 `adm-zip` audit 告警需要独立安全任务跟进。

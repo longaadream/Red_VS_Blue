@@ -1,6 +1,5 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..', '..')
@@ -18,8 +17,7 @@ const applications = {
     debugPort: 19222,
   },
   editor: {
-    executable: path.join(root, 'dist', 'editor', 'win-unpacked', 'RED vs BLUE Editor.exe'),
-    portable: path.join(root, 'dist', 'editor', 'RED vs BLUE Editor 0.1.0.exe'),
+    executable: path.join(root, 'dist', 'editor', 'RED vs BLUE Editor 0.1.0.exe'),
     title: '数据编辑器',
     debugPort: 19223,
   },
@@ -108,7 +106,16 @@ function stopCandidates(executable) {
   } catch {}
 }
 
+function stopProcessTree(pid) {
+  if (!Number.isInteger(pid)) return
+  try {
+    execFileSync('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore', timeout: 5000 })
+  } catch {}
+}
+
 function stopApplication(application) {
+  stopProcessTree(application.launchedPid)
+  application.launchedPid = null
   for (const executable of [application.executable, ...(application.helperExecutables ?? [])]) {
     stopCandidates(executable)
   }
@@ -147,11 +154,15 @@ async function launch(application, timeoutMs = 30000) {
   assert(existsSync(application.executable), `Missing executable: ${application.executable}`)
   stopApplication(application)
   stopDebugTarget(application.debugPort)
-  const escapedExecutable = application.executable.replaceAll("'", "''")
-  const stdoutPath = path.join(os.tmpdir(), `red19-${application.debugPort}-stdout.log`).replaceAll("'", "''")
-  const stderrPath = path.join(os.tmpdir(), `red19-${application.debugPort}-stderr.log`).replaceAll("'", "''")
-  const script = `Start-Process -FilePath '${escapedExecutable}' -ArgumentList '--remote-debugging-port=${application.debugPort}' -RedirectStandardOutput '${stdoutPath}' -RedirectStandardError '${stderrPath}' -WindowStyle Hidden`
-  execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { stdio: 'ignore', timeout: 10000 })
+  const child = spawn(application.executable, [`--remote-debugging-port=${application.debugPort}`], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  })
+  child.unref()
+  const launchedPid = child.pid
+  assert(Number.isInteger(launchedPid), `Could not determine launched process ID for ${application.executable}`)
+  application.launchedPid = launchedPid
   const target = await waitForTargets(application.debugPort, (candidate) => candidate.title === application.title, timeoutMs)
   const rendererBoundary = await evaluate(target, `({
     title: document.title,
@@ -241,13 +252,14 @@ async function smokeClient() {
 async function smokeEditor() {
   const application = applications.editor
   try {
-    assert(existsSync(application.portable), `Missing portable artifact: ${application.portable}`)
-    const { target, rendererBoundary } = await launch(application)
+    const startedAt = Date.now()
+    const { target, rendererBoundary } = await launch(application, 300000)
+    const startupMilliseconds = Date.now() - startedAt
     const counts = await evaluate(target, `Promise.all(['pieces', 'skills', 'cards', 'rules'].map(async (directory) => [directory, (await window.editorAPI.listFiles(directory)).length]))`)
     assert(counts.every(([, count]) => count > 0), `Editor could not list packaged data files: ${JSON.stringify(counts)}`)
     await evaluate(target, 'window.close(); true', false)
     assert(await waitForDebuggerExit(application.debugPort), 'Editor portable process did not exit after its window closed')
-    console.log(JSON.stringify({ entry: 'editor', portableArtifact: application.portable, rendererBoundary, dataFileCounts: Object.fromEntries(counts), exitedCleanly: true }))
+    console.log(JSON.stringify({ entry: 'editor', portableArtifact: application.executable, startupMilliseconds, rendererBoundary, dataFileCounts: Object.fromEntries(counts), exitedCleanly: true }))
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import ts from 'typescript'
 import { describe, expect, test } from 'vitest'
+import { shouldReportServerStartupFailure } from '../../electron/server-process-lifecycle'
 
 const root = path.resolve(__dirname, '..', '..')
 
@@ -50,6 +51,12 @@ function browserWindowPreferences(relativePath: string): Map<string, ts.Expressi
 }
 
 describe('Electron desktop security boundary', () => {
+  test('does not report an intentional server stop as a startup failure', () => {
+    expect(shouldReportServerStartupFailure(1, true)).toBe(false)
+    expect(shouldReportServerStartupFailure(1, false)).toBe(true)
+    expect(shouldReportServerStartupFailure(0, false)).toBe(false)
+  })
+
   test('pins the remediated Electron runtime without the vulnerable extract-zip chain', () => {
     const packageJson = JSON.parse(read('package.json')) as { devDependencies: Record<string, string> }
     const lock = JSON.parse(read('package-lock.json')) as {
@@ -110,6 +117,33 @@ describe('Electron desktop security boundary', () => {
       }
       expect(config.extraMetadata?.main).toBe(main)
       expect(config.win?.target).toBeTruthy()
+    }
+  })
+
+  test('editor portable excludes unrelated app dependencies but keeps its resource-pack builder runtime', () => {
+    const config = JSON.parse(read('electron-builder.editor.json')) as {
+      files?: string[]
+      extraResources?: { from?: string; to?: string }[]
+    }
+    const requiredModules = [
+      'jszip',
+      'lie',
+      'immediate',
+      'pako',
+      'core-util-is',
+      'inherits',
+      'isarray',
+      'process-nextick-args',
+      'setimmediate',
+      'util-deprecate',
+    ]
+
+    expect(config.files).toContain('!node_modules/**')
+    for (const moduleName of requiredModules) {
+      expect(config.extraResources).toContainEqual({
+        from: `node_modules/${moduleName}`,
+        to: `app/node_modules/${moduleName}`,
+      })
     }
   })
 
