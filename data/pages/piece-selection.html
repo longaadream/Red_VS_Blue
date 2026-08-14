@@ -559,12 +559,12 @@
         for (const id of ids) {
           try { loaded.push(await fetchJson('./data/pieces/' + id + '.json')) } catch {}
         }
-        // Alignment is the player's identity preference. Prefer matching pieces,
-        // but keep enough pieces visible while the art/content pool is incomplete.
+        // Client filtering is only immediate feedback. The server re-reads the
+        // versioned Demo manifest and enforces alignment, count and uniqueness.
         if (playerAlignment === 'dark' || playerAlignment === 'evil') {
-          PIECE_TEMPLATES = loaded.slice().sort((a, b) => (a.faction === 'evil' ? 0 : 1) - (b.faction === 'evil' ? 0 : 1))
+          PIECE_TEMPLATES = loaded.filter(piece => piece.faction === 'evil')
         } else if (playerAlignment === 'light' || playerAlignment === 'good') {
-          PIECE_TEMPLATES = loaded.slice().sort((a, b) => (a.faction === 'good' ? 0 : 1) - (b.faction === 'good' ? 0 : 1))
+          PIECE_TEMPLATES = loaded.filter(piece => piece.faction === 'good')
         } else {
           PIECE_TEMPLATES = loaded
         }

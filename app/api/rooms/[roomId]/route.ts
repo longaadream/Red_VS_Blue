@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment, type Room, type Player } from "@/lib/game/room-store"
-import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
-import { getAllPieces } from "@/lib/game/piece-repository"
+import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment, type Player } from "@/lib/game/room-store"
+import { ensureRosterAlignmentMutable, getRosterErrorPayload } from "@/lib/game/roster-contract"
+import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
 
 function checkPackMismatch(players: Player[]): boolean {
   const hashes = players.map(p => p.packMd5).filter(Boolean)
@@ -107,7 +107,13 @@ export async function POST(
       const seat = getPlayerSeat(existing) || assignNextSeat(room.players, normalizedPlayerId)
       existing.seat = seat
       existing.faction = seat
-      existing.alignment = requestedAlignment
+      try {
+        ensureRosterAlignmentMutable(existing, requestedAlignment)
+      } catch (error) {
+        const rosterError = getRosterErrorPayload(error)
+        return NextResponse.json({ success: false, error: rosterError?.message, code: rosterError?.code, context: rosterError?.context }, { status: 409 })
+      }
+      if (requestedAlignment) existing.alignment = requestedAlignment
       if (playerName) existing.name = playerName
       if (packMd5) existing.packMd5 = packMd5
       await roomStore.setRoom(room.id.trim(), room)
@@ -149,47 +155,17 @@ export async function POST(
   }
 
   if (body.action === "start") {
-    if (room.status !== "waiting") {
-      return NextResponse.json(
-        { error: "Game is already in progress or finished" },
-        { status: 400 },
-      )
+    try {
+      const result = await startBattleFromLockedRosters(roomStore, roomId)
+      return NextResponse.json(result.room)
+    } catch (error) {
+      const rosterError = getRosterErrorPayload(error)
+      if (rosterError) {
+        return NextResponse.json({ success: false, error: rosterError.message, code: rosterError.code, context: rosterError.context }, { status: 400 })
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      return NextResponse.json({ success: false, error: message }, { status: 400 })
     }
-
-    if (room.players.length !== 2) {
-      return NextResponse.json(
-        { error: "Exactly two players are required to start a 1v1 game" },
-        { status: 400 },
-      )
-    }
-
-    const playerIds = room.players.map((p: any) => p.id)
-    if (room.players.some(player => !getPlayerSeat(player) || !player.alignment)) {
-      return NextResponse.json({ error: "All players require a seat and alignment" }, { status: 400 })
-    }
-    const defaultPieces = getAllPieces()
-    const playerFactions = room.players.map((p: any) => ({ playerId: p.id, faction: getPlayerSeat(p) as 'red' | 'blue', pieces: [] as any[] }))
-    const firstPlayerId = room.firstPlayerId || room.players.find(player => getPlayerSeat(player) === 'red')?.id
-    if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
-      return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
-    }
-    const battle = await createInitialBattleForPlayers(playerIds, defaultPieces, playerFactions, room.mapId, { firstPlayerId })
-    if (!battle) {
-      return NextResponse.json(
-        { error: "Failed to initialize battle state" },
-        { status: 500 }
-      )
-    }
-    room.status = "in-progress"
-    room.currentTurnIndex = 0
-    room.battleState = {
-      type: 'server-state',
-      seed: Math.floor(Math.random() * 4294967296),
-      state: battle,
-    } as any
-    await roomStore.setRoom(room.id.trim(), room)
-
-    return NextResponse.json(room)
   }
 
   return NextResponse.json({ error: "Unsupported action" }, { status: 400 })
