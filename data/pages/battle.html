@@ -1477,6 +1477,9 @@
         const secondEngineFaction = 'blue'
         const firstPieces = resolveTrainingInitialPieces(firstAlignment, body && (body.firstTemplateIds || body.firstTemplateId))
         const secondPieces = resolveTrainingInitialPieces(secondAlignment, body && (body.secondTemplateIds || body.secondTemplateId))
+        if (!firstPieces.length || !secondPieces.length) {
+          throw new Error('训练棋子资源未加载，请返回后重试')
+        }
         const state = await Engine.createInitialBattleForPlayers(
           ['training-red', 'training-blue'],
           [],
@@ -2204,6 +2207,30 @@
       return res.json()
     }
 
+    async function fetchServerJson(path, timeoutMs) {
+      const res = await RvBUtils.serverFetch(path, { timeoutMs: timeoutMs || 3500 })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      return res.json()
+    }
+
+    async function loadServerBattleDataFallback() {
+      const payloads = await Promise.all([
+        fetchServerJson('/api/pieces'),
+        fetchServerJson('/api/skills'),
+      ])
+      const pieces = payloads[0] && Array.isArray(payloads[0].pieces) ? payloads[0].pieces : []
+      pieces.forEach(function(piece) {
+        if (piece && piece.id) PIECES_BY_ID[piece.id] = piece
+      })
+      const serverSkills = payloads[1] && payloads[1].skills
+      if (serverSkills && typeof serverSkills === 'object') {
+        Object.assign(skillsById, serverSkills)
+      }
+      if (!Object.keys(PIECES_BY_ID).length) {
+        throw new Error('服务器未返回棋子资源')
+      }
+    }
+
     async function loadJsonRequired(path, errors) {
       try {
         return await fetchLocalJson(path)
@@ -2225,6 +2252,7 @@
 
     async function loadLocalData() {
       const errors = []
+      let recoveredFromServer = false
       try {
         try {
           const glossary = await loadJsonOptional('./data/skill-keywords.json', errors)
@@ -2269,10 +2297,18 @@
       } catch (e) {
         console.warn('[battle] loadLocalData error:', e.message)
       }
-      if (errors.length) {
-        console.warn('[battle] local data load failures:', errors)
+      if (!Object.keys(PIECES_BY_ID).length) {
+        try {
+          await loadServerBattleDataFallback()
+          recoveredFromServer = true
+        } catch (e) {
+          errors.push('server battle data: ' + (e && e.message ? e.message : String(e)))
+        }
       }
-      return { ok: errors.length === 0, errors }
+      if (errors.length) {
+        console.warn('[battle] local data load failures' + (recoveredFromServer ? ' (recovered from server)' : '') + ':', errors)
+      }
+      return { ok: recoveredFromServer || errors.length === 0, errors }
     }
 
     // 鈹€鈹€ Init 鈹€鈹€
