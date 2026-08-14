@@ -415,6 +415,7 @@
       </div>
       <!-- View: main -->
       <div id="identityViewMain">
+        <div id="identityError" role="alert" style="display:none;background:#2a1014;border:1px solid #b91c1c;border-radius:10px;padding:11px 13px;margin-bottom:14px;color:#fca5a5;font-size:13px;line-height:1.5"></div>
         <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;margin-bottom:16px">
           <div style="font-size:11px;color:#475569;margin-bottom:4px">玩家 ID</div>
           <div id="identityIdDisplay" style="font-size:13px;color:#94a3b8;font-family:monospace"></div>
@@ -954,16 +955,45 @@
     function closeOverlay(id) { document.getElementById(id).classList.remove('show') }
 
     // ── Identity UI ───────────────────────────────────────────────────────────
+    let identityUiError = ''
+
+    function showIdentityError(error, action) {
+      const detail = error && error.message ? error.message : String(error || '未知错误')
+      identityUiError = `${action}失败：${detail}。请重启客户端；若仍失败，请打开开发者工具并记录 [identity] 错误。`
+      console.error(`[identity] ${action} failed`, error)
+      const errorEl = document.getElementById('identityError')
+      if (errorEl) {
+        errorEl.textContent = identityUiError
+        errorEl.style.display = 'block'
+      }
+      document.getElementById('userName').textContent = '账号错误'
+      document.getElementById('userDot').style.background = '#ef4444'
+    }
+
+    function clearIdentityError() {
+      identityUiError = ''
+      const errorEl = document.getElementById('identityError')
+      if (errorEl) {
+        errorEl.textContent = ''
+        errorEl.style.display = 'none'
+      }
+    }
+
     function refreshUserUI() {
       try {
         const identity = RvBIdentity.getIdentity()
-        document.getElementById('userName').textContent = identity ? (identity.displayName || '玩家') : '设置账号'
-        document.getElementById('userDot').style.background = identity ? '#22c55e' : '#f59e0b'
+        if (identityUiError) {
+          document.getElementById('userName').textContent = '账号错误'
+          document.getElementById('userDot').style.background = '#ef4444'
+        } else {
+          document.getElementById('userName').textContent = identity ? (identity.displayName || '玩家') : '设置账号'
+          document.getElementById('userDot').style.background = identity ? '#22c55e' : '#f59e0b'
+        }
         // Show ELO
         const elo = _calcLocalElo()
         document.getElementById('userElo').textContent = elo !== null ? ('ELO ' + elo) : ''
-      } catch {
-        document.getElementById('userName').textContent = '玩家'
+      } catch (e) {
+        showIdentityError(e, '读取账号')
       }
       _updateRecordsSummary()
     }
@@ -1026,7 +1056,14 @@
       let identity = RvBIdentity.getIdentity()
       if (!identity) {
         document.getElementById('userName').textContent = '创建中…'
-        try { identity = await RvBIdentity.ensureIdentity() } catch {}
+        try {
+          identity = await RvBIdentity.ensureIdentity()
+          clearIdentityError()
+        } catch (e) {
+          showIdentityError(e, '初始化账号')
+        }
+      } else {
+        clearIdentityError()
       }
       if (identity) {
         document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' · ' + identity.id
@@ -1044,12 +1081,23 @@
     async function saveIdentityName() {
       const name = document.getElementById('identityNameInput').value.trim()
       if (!name) return
-      if (typeof RvBIdentity.setDisplayName === 'function') {
-        RvBIdentity.setDisplayName(name)
+      try {
+        if (typeof RvBIdentity.setDisplayName !== 'function') {
+          throw new Error('身份模块不支持保存名称')
+        }
+        const updated = RvBIdentity.setDisplayName(name)
+        const identity = RvBIdentity.getIdentity()
+        if (!updated || !identity) {
+          throw new Error('当前没有可保存的本机账号')
+        }
+        clearIdentityError()
+        document.getElementById('identityIdDisplay').textContent = name + ' · ' + identity.id
+        closeIdentitySheet()
+      } catch (e) {
+        showIdentityError(e, '保存名称')
+        identityShowMain()
+        document.getElementById('identityOverlay').classList.add('show')
       }
-      const identity = RvBIdentity.getIdentity()
-      if (identity) document.getElementById('identityIdDisplay').textContent = name + ' · ' + identity.id
-      closeIdentitySheet()
     }
 
     function switchIdentityAccount(id) {
@@ -1060,6 +1108,7 @@
             document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' 路 ' + identity.id
             document.getElementById('identityNameInput').value = identity.displayName || ''
           }
+          clearIdentityError()
           renderIdentityAccountList()
           refreshUserUI()
         }
@@ -1077,6 +1126,7 @@
           document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' 路 ' + identity.id
           document.getElementById('identityNameInput').value = identity.displayName || ''
         }
+        clearIdentityError()
         renderIdentityAccountList()
         refreshUserUI()
         identityShowMnemonic()
@@ -1105,6 +1155,7 @@
       btn.textContent = '导入中…'; btn.disabled = true
       try {
         await RvBIdentity.importFromMnemonic(input)
+        clearIdentityError()
         renderIdentityAccountList()
         refreshUserUI()
         btn.textContent = '导入成功！'
@@ -1292,7 +1343,12 @@
     // ── Init ──────────────────────────────────────────────────────────────────
     window.addEventListener('load', async () => {
       if (!RvBIdentity.getIdentity()) {
-        try { await RvBIdentity.ensureIdentity() } catch {}
+        try {
+          await RvBIdentity.ensureIdentity()
+          clearIdentityError()
+        } catch (e) {
+          showIdentityError(e, '初始化账号')
+        }
       }
       refreshUserUI()
       updatePackBadge()

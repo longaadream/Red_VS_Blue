@@ -178,3 +178,29 @@ interface GameLogContext {
 长期的端到端加密、密钥恢复、服务端迁移/撤销、规则沙箱和公开回放安全测试应拆分为 High Risk 任务，不作为恢复当前运行基线的前置条件。
 
 每项都应单独建 Linear 任务、独立分支、测试证据和人工批准。
+
+## 11. Windows Electron 同机双客户端验收
+
+网页玩家端已移除。`http://127.0.0.1:3000` 是服务端状态/API 页面，不能用于玩家账号或双玩家验收。Windows 玩家必须使用 Electron 客户端。
+
+开发模式可使用命名 profile 启动两个隔离客户端：
+
+```powershell
+npm run dev:electron:client -- --rvb-dev-profile=player-one
+npm run dev:electron:client -- --rvb-dev-profile=player-two
+```
+
+两个命令应在不同终端运行。profile 名称只允许 1–32 个 ASCII 字母、数字、连字符或下划线，且必须以字母或数字开头。每个 profile 的 `userData`、Chromium localStorage、身份与单实例锁均位于默认 `userData/dev-profiles/<profile>` 下：不同 profile 可同时运行，同一 profile 仍保持单实例。
+
+开发版 Electron 直接读取 `data/pages/`，无需先把玩家页面同步到 Android 生成目录。打包客户端仍读取构建流程生成并装入安装包的 `app/www`。
+
+人工验收顺序：
+
+1. 在两个客户端分别打开玩家首页；确认不是服务端状态页。
+2. 在开发者工具执行 `({ secureContext: window.isSecureContext, hasSubtleCrypto: !!window.crypto?.subtle })`，两项都应为 `true`。
+3. 两端分别设置不同玩家名称，右上角应立即显示名称。
+4. 关闭并用相同 profile 重启，名称应保留；两个 profile 的名称与身份 ID 应不同。
+5. 两端连接同一个 Windows 服务端，完成建房、加入与进入对局。
+6. 不带 profile 参数重复启动客户端时，第二个实例应退出并聚焦第一个实例。
+
+`--rvb-dev-profile` 仅允许源码开发模式使用。打包客户端传入该参数会拒绝启动，正式 `userData` 和默认单实例行为不会改变。账号初始化失败时，首页右上角显示“账号错误”；点击后可在账号面板查看错误，并在开发者工具中查找带 `[identity]` 前缀的日志。

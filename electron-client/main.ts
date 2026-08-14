@@ -9,6 +9,7 @@ import * as dgram from 'dgram'
 import * as http from 'http'
 import { pathToFileURL } from 'url'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
+import { resolveDevelopmentProfile } from './development-profile'
 import {
   RESOURCE_PACK_LIMITS,
   clearActiveResourcePack,
@@ -29,8 +30,24 @@ const CLIENT_SCHEME = 'rvb-client'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: CLIENT_SCHEME,
-  privileges: { standard: true, supportFetchAPI: true, corsEnabled: true },
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
 }])
+
+// Development-only named profiles isolate Chromium storage, local identity,
+// client configuration, and the ProcessSingleton lock. Electron keys
+// requestSingleInstanceLock() by the current userData path, so this must run
+// before the existing lock is requested.
+const developmentProfile = resolveDevelopmentProfile(
+  process.argv,
+  app.isPackaged,
+  app.getPath('userData'),
+)
+if (developmentProfile) {
+  fs.mkdirSync(developmentProfile.userDataPath, { recursive: true })
+  app.setPath('userData', developmentProfile.userDataPath)
+  app.setPath('sessionData', developmentProfile.userDataPath)
+  console.info(`[client] Development profile "${developmentProfile.name}" uses isolated userData: ${developmentProfile.userDataPath}`)
+}
 
 function findFreePort(start: number): Promise<number> {
   return new Promise((resolve) => {
@@ -56,7 +73,7 @@ function getAppRoot(): string {
 function getHtmlRoot(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'www')
-    : path.join(__dirname, '../../android-client/www')
+    : path.join(__dirname, '../../data/pages')
 }
 
 function getUserData(): string {
