@@ -68,6 +68,14 @@
 
 对局座位 `seat: red | blue`、内容阵营 `alignment: light | dark`、棋子 `ownerPlayerId` 与先手 `firstPlayerId` 是独立字段。敌我只能按 `ownerPlayerId` 判断；`room-store` 中的 `faction: red | blue` 仅用于读取旧房间数据的座位兼容。详见 [ADR-0002](../decisions/ADR-0002-match-identity-model.md)。
 
+### Demo 阵容合同（RED-26）
+
+- `lib/game/roster-contract.ts` 是 HTTP 与 WebSocket 的共享服务端校验边界；客户端筛选仅用于即时提示。
+- 服务端按 `demo-v0.1` 读取 `data/pieces/manifest.json`，要求玩家从自己的 `alignment` 中提交正好 8 个不同、已准入且存在的 `templateId`。
+- 成功确认会写入 `rosterLocked` 与 `rosterManifestVersion`。同一组模板的重排提交返回幂等成功；锁定后的不同阵容或阵营修改返回 `ROSTER_LOCKED`。
+- 错误响应包含稳定的 `code`、`message` 与 `context`；HTTP 与 WebSocket 复用同一错误载荷。
+- `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容，并通过房间版本号原子提交战斗状态；只有双方合法锁定时才可通过当前战斗初始化入口。该入口忽略房间请求中的地图覆盖，强制使用并持久化 Demo 固定地图 `large-trap-arena`。
+
 ## 4. 技能、卡牌与规则数据
 
 - 入口：`lib/game/skills.ts` 的 `loadCardById()`、`loadRuleById()`、`executeCardFunction()`、`executeSkillFunction()`。
@@ -146,6 +154,7 @@
 ## 9. 浏览器战斗 UI
 
 - 入口：`data/pages/battle.html::doAction()`、`applyServerState()`、`checkClientGameOver()`。
+- 路由：`battle.html` 是真实对战、观战和训练营的唯一战斗页面；训练营通过 `mode=training` 启用 fixture 与调试控件。`training.html` 仅保留兼容跳转，不得实现棋盘、选中、目标高亮或动作提交。
 - 职责：显示状态、收集输入、发送动作和接收服务端状态。
 - 输入：玩家交互、WS/Relay 消息、完整战斗状态。
 - 输出：动作消息、页面渲染、客户端胜负状态。
@@ -202,6 +211,8 @@
 - 测试：`tests/game/movement-contract.test.ts` 直接执行 canonical bundle 并检查 RED-30 共享空间导出；尚无完整 Android 安装包来源/hash 验证。
 - 已知问题：完整 Android 发布物仍缺少端到端的来源/hash 验证。
 - 最小调试：清空临时构建目录后从源码生成，记录命令、commit、文件 hash，再安装冒烟验证。删除正式目录前必须另行审批。
+
+- 浏览器兼容：`build-game-engine.js` 将 `node:fs/path/crypto/zlib` 规范化为 runtime shim 已支持的普通 external 名称，并在浏览器 bundle 内联不执行文件操作的 `adm-zip` 占位模块；`movement-contract.test.ts` 禁止 canonical bundle 重新引入这些不受支持的动态 require。
 
 ## 12. 重复公共类型
 

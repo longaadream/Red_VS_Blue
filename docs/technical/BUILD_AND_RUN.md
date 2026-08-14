@@ -308,6 +308,25 @@ Windows 输出目录：
 普通 Windows 玩家开服仍由客户端内嵌本地服务承担。完整决策边界见
 [`ADR-0003`](../decisions/ADR-0003-electron-server-packaging.md)。
 
+`build:electron:server` 会在清理 staging 前自动运行 Server 产物验证器，逐 SHA-256
+核对 Electron main、管理面板、Next standalone 与静态资源、`public`、`data`、
+`prisma`、`init-db.js`、`adm-zip` 和独立 `node.exe`。electron-builder 需要通过一条
+独立映射复制 `_client-stage/node_modules`；缺少该映射时，顶层 standalone 文件仍可能
+存在，但 Next 运行依赖会被漏掉，验证器会拒绝该候选。
+
+成功构建会在 `dist/server-build/server-candidate-manifest.json` 写入内部候选标记、
+基线 commit、工具链版本、完整资源路径/大小/SHA-256，以及 Server EXE 和 Node 运行时
+证据。`_client-stage` 与 `_client-node` 清理后，可独立重放验证：
+
+```powershell
+node scripts/verify-electron-server-package.js
+node tests/electron/windows-smoke.mjs server
+```
+
+独立验证会按 manifest 重新计算全部资源、Server EXE 和 `node.exe` 的大小与 SHA-256，
+拒绝缺失、增加或被修改的文件。manifest 和 `win-unpacked` 都是未跟踪的本机候选证据，
+不得加入 Git 或上传到公开下载渠道。**内部候选 ≠ 公开发行物**。
+
 ### 8.3 桌面安全边界
 
 三个入口的每个 `BrowserWindow` 都必须显式保持：

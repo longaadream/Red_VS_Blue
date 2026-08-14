@@ -48,6 +48,10 @@ export interface Player {
   packMd5?: string
   selectedPieces?: Array<{ templateId: string; faction: string }>
   hasSelectedPieces?: boolean
+  /** A confirmed Demo roster. Once true, only an equivalent resubmission is accepted. */
+  rosterLocked?: boolean
+  /** Admission-manifest version used when the roster was locked. */
+  rosterManifestVersion?: string
   ready?: boolean
   isBot?: boolean
 }
@@ -120,7 +124,7 @@ function deserializeRoom(row: {
     ...p,
     seat: p.seat || p.faction,
     faction: p.faction || p.seat,
-    hasSelectedPieces: p.hasSelectedPieces === true || (p.selectedPieces != null && p.selectedPieces.length > 0),
+    hasSelectedPieces: p.rosterLocked === true,
     selectedPieces: p.selectedPieces || []
   }))
 
@@ -152,7 +156,7 @@ function serializeRoom(room: Room) {
       ...p,
       seat: p.seat || p.faction,
       faction: p.faction || p.seat,
-      hasSelectedPieces: p.hasSelectedPieces === true || (p.selectedPieces != null && p.selectedPieces.length > 0),
+      hasSelectedPieces: p.rosterLocked === true,
       selectedPieces: p.selectedPieces || []
     }))
   )

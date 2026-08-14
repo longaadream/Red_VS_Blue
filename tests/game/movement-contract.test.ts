@@ -66,6 +66,12 @@ describe('UI/server normal movement contract', () => {
 
   it('实际浏览器 bundle 导出并执行共享空间规则', () => {
     const bundlePath = resolve(process.cwd(), 'data/pages/js/game-engine.js')
+    const bundleSource = readFileSync(bundlePath, 'utf8')
+    expect(bundleSource).not.toContain('"node:crypto"')
+    expect(bundleSource).not.toContain('"node:fs"')
+    expect(bundleSource).not.toContain('"node:path"')
+    expect(bundleSource).not.toContain('"node:zlib"')
+    expect(bundleSource).not.toContain('"adm-zip"')
     const context: Record<string, unknown> = {
       Buffer,
       clearTimeout,
@@ -74,7 +80,7 @@ describe('UI/server normal movement contract', () => {
       require: createRequire(import.meta.url),
       setTimeout,
     }
-    runInNewContext(readFileSync(bundlePath, 'utf8'), context, { filename: bundlePath })
+    runInNewContext(bundleSource, context, { filename: bundlePath })
 
     const engine = context.GameEngine as {
       manhattanDistance?: (from: { x: number; y: number }, to: { x: number; y: number }) => number

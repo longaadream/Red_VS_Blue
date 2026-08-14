@@ -118,6 +118,35 @@ function stopCandidates(executable) {
   } catch {}
 }
 
+function countExecutableProcesses(executable) {
+  const escaped = executable.replaceAll("'", "''")
+  const script = `@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq '${escaped}' }).Count`
+  try {
+    const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', script], {
+      encoding: 'utf8',
+      timeout: 5000,
+      windowsHide: true,
+    }).trim()
+    const count = Number(output)
+    return Number.isInteger(count) ? count : null
+  } catch {
+    return null
+  }
+}
+
+async function waitForExecutableCleanup(executables, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs
+  let counts = Object.fromEntries(executables.map((executable) => [executable, null]))
+  while (Date.now() < deadline) {
+    counts = Object.fromEntries(
+      executables.map((executable) => [executable, countExecutableProcesses(executable)]),
+    )
+    if (Object.values(counts).every((count) => count === 0)) return counts
+    await delay(250)
+  }
+  return counts
+}
+
 function stopProcessTree(pid) {
   if (!Number.isInteger(pid)) return
   try {
@@ -192,6 +221,7 @@ async function launch(application, timeoutMs = 30000) {
 
 async function smokeServer() {
   const application = applications.server
+  let result = null
   try {
     const { target, rendererBoundary } = await launch(application, 90000)
     let initial = null
@@ -209,20 +239,51 @@ async function smokeServer() {
     assert(rejectedNavigation.current === rejectedNavigation.original, `Server renderer escaped its trusted file root: ${JSON.stringify(rejectedNavigation)}`)
     await evaluate(target, `window.electronAPI.stopServer()`)
     let stopped = false
+    let helperProcessCounts = null
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const status = await evaluate(target, `window.electronAPI.getStatus()`)
-      if (!status.running && !(await isReachable(3000))) {
+      helperProcessCounts = Object.fromEntries(
+        (application.helperExecutables ?? []).map((executable) => [
+          executable,
+          countExecutableProcesses(executable),
+        ]),
+      )
+      if (
+        !status.running &&
+        !(await isReachable(3000)) &&
+        Object.values(helperProcessCounts).every((count) => count === 0)
+      ) {
         stopped = true
         break
       }
       await delay(250)
     }
-    assert(stopped, 'Server stop did not release port 3000')
-    console.log(JSON.stringify({ entry: 'server', rendererBoundary, rejectedNavigation, stopped: true, port3000Reachable: false }))
+    assert(
+      stopped,
+      `Server stop did not release port 3000 and its helper process: ${JSON.stringify(helperProcessCounts)}`,
+    )
+    result = {
+      entry: 'server',
+      rendererBoundary,
+      rejectedNavigation,
+      stopped: true,
+      port3000Reachable: false,
+      helperProcessCountsAfterStop: helperProcessCounts,
+    }
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)
   }
+
+  const candidateExecutables = [application.executable, ...(application.helperExecutables ?? [])]
+  const processCountsAfterExit = await waitForExecutableCleanup(candidateExecutables)
+  assert(
+    Object.values(processCountsAfterExit).every((count) => count === 0),
+    `Server candidate left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
+  )
+  assert(!(await isReachable(3000)), 'Server candidate left port 3000 reachable after exit')
+  assert(await waitForDebuggerExit(application.debugPort), 'Server Electron process remained reachable after exit')
+  console.log(JSON.stringify({ ...result, exitedCleanly: true, processCountsAfterExit }))
 }
 
 async function smokeClient() {
