@@ -14,6 +14,7 @@
 - [`GAME_RULES.md`](./GAME_RULES.md)：规则任务的入口与合同章节映射。
 - [`TERMS.md`](./TERMS.md)：统一术语与命名。
 - [`CHARACTER_ROLE_STANDARD.md`](./CHARACTER_ROLE_STANDARD.md)：角色主副定位、构筑标签与复杂度的分类标准（待人工确认）。
+- [`CHARACTER_ONBOARDING_PLAN.md`](./CHARACTER_ONBOARDING_PLAN.md)：降低新手角色理解与构筑门槛的 Demo 方案（待人工产品确认）。
 - [`DEMO_V0_1_CORE_MATCH_CONTRACT.md`](./DEMO_V0_1_CORE_MATCH_CONTRACT.md)：Demo v0.1 核心对局合同（权威来源）。
 
 ## 历史资料的处理
