@@ -580,6 +580,28 @@
     .result-title { font-size: 28px; font-weight: 800; }
     .result-sub { font-size: 15px; color: #94a3b8; }
 
+    #red43QaPanel {
+      display: none; position: fixed; left: 12px; bottom: 12px; z-index: 190;
+      width: min(360px, calc(100vw - 24px)); padding: 12px 14px;
+      border: 1px solid rgba(96,165,250,.62); border-radius: 12px;
+      background: rgba(3,7,18,.92); color: #dbeafe;
+      box-shadow: 0 18px 50px rgba(0,0,0,.46); backdrop-filter: blur(12px);
+      font-size: 11px; line-height: 1.55;
+    }
+    body.red43-qa #red43QaPanel { display: block; }
+    #red43QaPanel[data-consistent="true"] { border-color: rgba(74,222,128,.78); }
+    #red43QaPanel[data-consistent="false"] { border-color: rgba(248,113,113,.76); }
+    .red43-qa-title { color: #93c5fd; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+    .red43-qa-grid { display: grid; grid-template-columns: 84px 1fr; gap: 2px 8px; margin-top: 7px; }
+    .red43-qa-key { color: #64748b; }
+    .red43-qa-value { color: #e2e8f0; overflow-wrap: anywhere; }
+    .red43-qa-button {
+      width: 100%; margin-top: 9px; padding: 7px 10px; border: 1px solid #3b82f6;
+      border-radius: 8px; background: #1d4ed8; color: #fff; cursor: pointer;
+      font-size: 11px; font-weight: 900;
+    }
+    .red43-qa-button:disabled { cursor: not-allowed; opacity: .48; }
+
     /* 鈹€鈹€ Option picker overlay 鈹€鈹€ */
     #optionPickerOverlay {
       display: none; position: fixed; inset: 0;
@@ -1086,6 +1108,19 @@
     <div style="font-size:14px;color:#64748b" id="loadingMsg">连接战场…</div>
   </div>
 
+  <aside id="red43QaPanel" aria-live="polite">
+    <div class="red43-qa-title">RED-43 · OWNER TARGET QA</div>
+    <div class="red43-qa-grid">
+      <span class="red43-qa-key">场景</span><span class="red43-qa-value" id="red43QaScenario">-</span>
+      <span class="red43-qa-key">Room / Seed</span><span class="red43-qa-value" id="red43QaRoom">-</span>
+      <span class="red43-qa-key">playerId</span><span class="red43-qa-value" id="red43QaPlayer">-</span>
+      <span class="red43-qa-key">所有权集合</span><span class="red43-qa-value" id="red43QaOwners">等待状态</span>
+      <span class="red43-qa-key">目标集合</span><span class="red43-qa-value" id="red43QaTargets">尚未加载技能</span>
+      <span class="red43-qa-key">UI / 规则</span><span class="red43-qa-value" id="red43QaMatch">等待高亮</span>
+    </div>
+    <button class="red43-qa-button" id="red43QaLoadSkill" onclick="loadRed43QaSkill()">加载验收技能</button>
+  </aside>
+
   <!-- Card Detail Modal -->
   <div id="cardDetailModal" onclick="if(event.target===this)closeCardDetail()">
     <div class="cd-layout">
@@ -1321,6 +1356,8 @@
     const myPlayerName = params.get('playerName') || '鐜╁'
     const TRAINING_MODE = params.get('mode') === 'training'
     const SPECTATE_MODE = params.get('mode') === 'spectate'
+    const RED43_QA_MODE = params.get('qa') === 'RED-43'
+    if (RED43_QA_MODE) document.body.classList.add('red43-qa')
     function shouldUseRelayMode() {
       if (params.get('relay') === '1' || params.get('server') === 'remote') return true
       return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
@@ -1658,6 +1695,101 @@
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
     let preOptimisticGForEcho = null  // saved state before optimistic pendingOptionSelect, for echo correction
+
+    function red43QaSnapshot() {
+      if (!RED43_QA_MODE) return null
+      const pieces = G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
+      const allies = pieces.filter(p => String(p.ownerPlayerId || '').toLowerCase() === myPlayerId)
+      const enemies = pieces.filter(p => String(p.ownerPlayerId || '').toLowerCase() !== myPlayerId)
+      const expectedFilter = params.get('qaExpected') || ''
+      const expectedIds = (params.get('qaExpectedTargets') || '').split(',').filter(Boolean).sort()
+      const targetKeys = pendingSkill && pendingSkill.validTargets
+        ? Array.from(pendingSkill.validTargets).sort()
+        : []
+      const highlightedPieces = targetKeys.map(key => {
+        const parts = key.split(',')
+        const x = Number(parts[0]), y = Number(parts[1])
+        const piece = pieces.find(p => p.x === x && p.y === y)
+        if (!piece) return null
+        return {
+          key,
+          pieceId: piece.instanceId,
+          ownerPlayerId: piece.ownerPlayerId,
+          relation: String(piece.ownerPlayerId || '').toLowerCase() === myPlayerId ? 'ally' : 'enemy',
+        }
+      }).filter(Boolean)
+      const actualIds = highlightedPieces.map(target => target.pieceId).sort()
+      const consistent = expectedIds.length > 0 && actualIds.length === expectedIds.length &&
+        actualIds.every((id, index) => id === expectedIds[index])
+      return {
+        roomId,
+        seed: gameSeed,
+        scenario: params.get('qaScenario') || '',
+        alignment: params.get('qaAlignment') || '',
+        playerId: myPlayerId,
+        skillId: pendingSkill && pendingSkill.skillId ? pendingSkill.skillId : '',
+        expectedFilter,
+        allyPieceIds: allies.map(p => p.instanceId).sort(),
+        enemyPieceIds: enemies.map(p => p.instanceId).sort(),
+        expectedTargetPieceIds: expectedIds,
+        highlightedTargets: highlightedPieces,
+        actualTargetPieceIds: actualIds,
+        consistent,
+      }
+    }
+
+    function updateRed43QaEvidence() {
+      if (!RED43_QA_MODE) return
+      const snapshot = red43QaSnapshot()
+      window.__RVB_RED43_LAST_SNAPSHOT__ = snapshot
+      const setText = (id, value) => {
+        const element = document.getElementById(id)
+        if (element) element.textContent = value
+      }
+      setText('red43QaScenario', (snapshot.scenario || '-') + ' · ' + (snapshot.alignment || '-'))
+      setText('red43QaRoom', snapshot.roomId + ' / ' + (snapshot.seed == null ? '等待' : snapshot.seed))
+      setText('red43QaPlayer', snapshot.playerId || '-')
+      setText('red43QaOwners', '我方 ' + snapshot.allyPieceIds.length + ' / 对方 ' + snapshot.enemyPieceIds.length)
+      setText('red43QaTargets', snapshot.skillId
+        ? snapshot.expectedFilter + ' · UI ' + snapshot.actualTargetPieceIds.length + ' / 规则 ' + snapshot.expectedTargetPieceIds.length
+        : '尚未加载技能')
+      setText('red43QaMatch', snapshot.skillId ? (snapshot.consistent ? '是' : '否') : '等待高亮')
+      const panel = document.getElementById('red43QaPanel')
+      if (panel) panel.dataset.consistent = snapshot.skillId ? String(snapshot.consistent) : ''
+      const button = document.getElementById('red43QaLoadSkill')
+      const casterTemplateId = params.get('qaCaster') || ''
+      const caster = piecesForRed43Qa().find(p => p.templateId === casterTemplateId && String(p.ownerPlayerId || '').toLowerCase() === myPlayerId)
+      if (button) {
+        button.disabled = !caster || !(G && G.turn && String(G.turn.currentPlayerId || '').toLowerCase() === myPlayerId)
+        button.textContent = caster ? '加载验收技能 · ' + (params.get('qaSkill') || '') : '此视角仅验收敌我分组'
+      }
+    }
+
+    function piecesForRed43Qa() {
+      return G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
+    }
+
+    async function loadRed43QaSkill() {
+      if (!RED43_QA_MODE || !G) return
+      const casterTemplateId = params.get('qaCaster') || ''
+      const skillId = params.get('qaSkill') || ''
+      const caster = piecesForRed43Qa().find(p =>
+        p.templateId === casterTemplateId && String(p.ownerPlayerId || '').toLowerCase() === myPlayerId,
+      )
+      if (!caster || !skillId) return
+      selectPiece(caster.instanceId)
+      await selectSkillCard(skillId)
+      updateRed43QaEvidence()
+      console.info('[RED-43 QA client]', JSON.stringify(red43QaSnapshot()))
+    }
+
+    if (RED43_QA_MODE) {
+      window.__RVB_RED43__ = {
+        snapshot: red43QaSnapshot,
+        loadSuggestedSkill: loadRed43QaSkill,
+      }
+      updateRed43QaEvidence()
+    }
 
     // 鈹€鈹€ Piece helpers 鈹€鈹€
     function pieceName(p) {
@@ -2327,6 +2459,12 @@
         return
       }
       if (!roomId || !myPlayerId) { showMsg('缺少 roomId 或 playerId 参数', 'err'); return }
+      // A direct QA/deep link has not visited the lobby, so it may not have a
+      // persisted server URL yet. Restore the explicit query configuration
+      // before applying the connection guard.
+      if (window.RvBUtils && RvBUtils.restoreServerFromParams) {
+        await RvBUtils.restoreServerFromParams(params)
+      }
       if (!getServerUrl()) { showMsg('未连接服务器', 'err'); return }
       document.getElementById('roomNameLabel').textContent = '房间 ' + roomId
       showMsg('加载本地资源...')
@@ -2669,9 +2807,6 @@
     // Initialize a real battle: connect WS (server will push initial stateUpdate on subscribe).
     // State arrives through WS; HTTP is only used as a recovery fallback.
     async function initBattle() {
-      if (window.RvBUtils && RvBUtils.restoreServerFromParams) {
-        await RvBUtils.restoreServerFromParams(params)
-      }
       connectBattleWs(wsMode)
       setTimeout(function() {
         if (!G) {
@@ -2809,6 +2944,7 @@
       if (!pendingSkill || !G) return
       const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
       pendingSkill.validTargets = sp ? computeValidSkillTargets(sp) : new Set()
+      updateRed43QaEvidence()
     }
 
     // 鈹€鈹€ Target overlay 鈹€鈹€
@@ -2971,6 +3107,7 @@
         renderActionBar()
         renderTargetOverlay()
       }
+      updateRed43QaEvidence()
     }
 
     function statusTagLabel(t) {
@@ -3175,7 +3312,10 @@
             </div>`
           }
           const _ctxAttr = piece ? ` oncontextmenu="event.preventDefault();showPieceInfo('${escHtml(piece.instanceId)}')"` : ''
-          cells.push(`<div class="${cls}" onclick="onCellClick(${x},${y})"${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
+          const _pieceAttrs = piece
+            ? ` data-piece-id="${escHtml(piece.instanceId)}" data-owner-player-id="${escHtml(piece.ownerPlayerId || '')}" data-relation="${String(piece.ownerPlayerId || '').toLowerCase() === myPlayerId ? 'ally' : 'enemy'}"`
+            : ''
+          cells.push(`<div class="${cls}" data-x="${x}" data-y="${y}" onclick="onCellClick(${x},${y})"${_pieceAttrs}${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
         }
       }
       grid.innerHTML = cells.join('')
@@ -3272,7 +3412,7 @@
       const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
       const onclick = !dead ? `onclick="selectPiece('${piece.instanceId}')"` : ''
       const iid = escHtml(piece.instanceId)
-      return `<div class="piece-card ${dead?'dead':''} ${sel?'selected':''}" ${onclick}
+      return `<div class="piece-card ${dead?'dead':''} ${sel?'selected':''}" data-piece-id="${iid}" data-owner-player-id="${escHtml(piece.ownerPlayerId || '')}" data-relation="${isMe ? 'ally' : 'enemy'}" ${onclick}
         ontouchstart="startPressTimer(event,'${iid}')"
         ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
         oncontextmenu="event.preventDefault();showPieceInfo('${iid}')">
@@ -3559,7 +3699,7 @@
       setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
-        setStatusMsg(getSkillHint())
+        setStatusMsg(_targetPromptText() || '选择回合目标')
       } else if (pendingOptionSelectionForOther()) {
         setStatusMsg('等待对方选择...')
         pendingMove = false
