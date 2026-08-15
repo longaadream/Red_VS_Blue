@@ -152,11 +152,21 @@
 - 状态变化：全局 `G`、DOM、localStorage；Relay 模式还会执行规则。
 - 错误：网络失败、引擎异常或状态不兼容；部分异常只显示提示或被忽略。
 - 日志：浏览器 console；生产 mobile 构建会削弱部分 console 输出。
-- 测试：没有确认到真实浏览器 E2E。
-- 已知问题：大文件跨层；复制胜负/目标逻辑；不同模式承担不同权威职责。
+- 测试：`tests/game/battle-ui-boundary.test.ts` 覆盖展示模型、规则适配器与生命周期合同；RED-48 使用 Playwright 在训练模式完成 1280×720、390×844 的投影命中、选择/取消、目标模式和重复挂载冒烟，证据见 `output/playwright/red-48-browser-evidence.md`。
+- 已知问题：页面控制器仍跨越网络、Relay 规则执行和胜负判断；不同模式承担不同权威职责。服务端版本化合法操作接口完成前，合法格集合仍需在克隆快照上调用规则引擎验证。
 - 最小调试：捕获连接模式、roomId、seed、最后 action、服务端/客户端 state hash 和截图。
 
-### 9.1 真实联机棋子选择页资源来源
+### 9.1 战场表现边界（RED-48）
+
+- 展示输入：`battle-ui/battle-view-model.js::create()` 把完整快照、已选对象和规则层返回的合法集合投影为最小模型；训练、LAN、relay 不进入投影字段。
+- 合法集合：`battle-ui/battle-legal-actions.js` 只调用浏览器 `GameEngine` 的克隆/验证入口，不包含移动距离、技能范围、伤害或结算公式。
+- 组合器：`battle-ui/battle-presentation.js` 将同一个模型对象传入 renderer 与 DOM，并统一输出 `select-piece`、`select-skill`、`activate-cell`、`inspect-piece` 和 `cancel-target` 意图。
+- Three.js：`battle-renderer-3d.js` 的公共生命周期是 `init(options)`、`update(model)`、`resize()`、`projectCell()`、`screenToCell()`、`dispose()`；只负责棋盘内表现。
+- DOM：`battle-ui/battle-dom-ui.js` 负责 HUD 和选中棋子摘要；`data-battle-ui-region` 为技能、手牌和后续响应式任务保留稳定挂载点。
+- 规则权威：页面控制器把意图转换为现有 action；非法操作仍由规则层/服务端最终拒绝。
+- 决策：见 `docs/decisions/ADR-0004-battle-presentation-boundary.md`。
+
+### 9.2 真实联机棋子选择页资源来源
 
 - 入口：`data/pages/piece-selection.html::loadPieces()`。
 - 本地优先：先通过 `fetchPackJson()` 读取版本化 `data/pieces/manifest.json` 及其中每个棋子；
