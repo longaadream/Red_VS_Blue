@@ -4317,13 +4317,22 @@
       if (!_use3d) initMapControls()
       init()
 
-      // Click outside a selected hand card to cancel card targeting.
+      function shouldCancelPendingCardTarget(pendingAction, target) {
+        if (!pendingAction) return false
+        if (!target || typeof target.closest !== 'function') return true
+        // A battlefield pointerup can synchronously advance a card to its next
+        // target step before the matching click bubbles to document.
+        return !target.closest('.arc-card, .card-item, #boardWrap, #targetOverlay')
+      }
+
+      // Click outside the hand and battlefield to cancel card targeting.
       document.addEventListener('click', function(e) {
-        if (!pendingCardAction) return
-        if (e.target.closest && (e.target.closest('.arc-card') || e.target.closest('.card-item'))) return
+        if (!shouldCancelPendingCardTarget(pendingCardAction, e.target)) return
         pendingCardAction = null
         renderArcHand()
         renderHand()
+        renderBoard()
+        renderTargetOverlay()
       }, false)
 
       // 淇鎵嬫満绔瀛愬睘鎬у脊绐楀叧闂寜閽?

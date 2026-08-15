@@ -495,6 +495,29 @@ describe('Demo targeting admission fixture', () => {
 })
 
 describe('targeting consumers and performance contract', () => {
+  it('keeps a multi-step card target session alive across battlefield clicks', () => {
+    const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
+    const helperStart = html.indexOf('function shouldCancelPendingCardTarget')
+    const helperEnd = html.indexOf('\n\n      // Click outside', helperStart)
+    const helperSource = html.slice(helperStart, helperEnd)
+
+    expect(helperStart).toBeGreaterThanOrEqual(0)
+    expect(helperEnd).toBeGreaterThan(helperStart)
+
+    const shouldCancel = new Function(
+      `${helperSource}; return shouldCancelPendingCardTarget`,
+    )() as (pendingAction: unknown, target: unknown) => boolean
+    const targetWithin = (matchedSelector: string | null) => ({
+      closest: (selector: string) => matchedSelector && selector.includes(matchedSelector) ? {} : null,
+    })
+
+    expect(shouldCancel({ step: 1 }, targetWithin('#boardWrap'))).toBe(false)
+    expect(shouldCancel({ step: 1 }, targetWithin('.arc-card'))).toBe(false)
+    expect(shouldCancel({ step: 1 }, targetWithin(null))).toBe(true)
+    expect(shouldCancel(null, targetWithin(null))).toBe(false)
+    expect(html).toContain('if (!shouldCancelPendingCardTarget(pendingCardAction, e.target)) return')
+  })
+
   it('battle UI consumes exact candidate arrays and contains no reducer/heuristic target fallback', () => {
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
     const start = html.indexOf('function computeValidSkillTargets')
