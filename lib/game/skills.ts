@@ -702,7 +702,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               return getEffectOnPiece(battle, pieceId, effectId);
             };
             const fireEvent = (eventName: string, ctx: any) => {
-              return globalTriggerSystem.checkTriggers(battle, { ...ctx, type: eventName });
+              return globalTriggerSystem.fireEvent(battle, context, eventName, ctx);
             };
 
             const codeEnvironment = `
@@ -2375,7 +2375,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       },
       /** 触发任意字符串名称的事件（包括自定义事件，其他效果可通过 "on" 字段监听） */
       fireEvent: (eventName: string, ctx: any) => {
-        return globalTriggerSystem.checkTriggers(battle, { ...ctx, type: eventName })
+        return globalTriggerSystem.fireEvent(battle, context as any, eventName, ctx)
       },
       // 技能管理函数
       addSkillById: (targetPieceId: string, skillId: string) => {
