@@ -10,6 +10,16 @@
  */
 
 export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } from './turn'
+export {
+  getLegalNormalMoveTargets,
+  getLegalNormalMoveTargetsForPlayer,
+  getLivingOccupantAt,
+  getManhattanArea,
+  getNormalMoveRejection,
+  getOrthogonalLineCells,
+  getSquareArea,
+  manhattanDistance,
+} from './spatial'
 export { setRng, mulberry32 } from './rng'
 export type { BattleState, BattleAction, BattleActionLog } from './turn'
 
