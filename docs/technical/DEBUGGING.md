@@ -89,6 +89,18 @@ seed:
 6. 确认 `RoomStore.setRoom()` 成功。
 7. 确认 `stateUpdate` 广播并进入 `applyServerState()`。
 
+### 对战页永久停留在“连接战场…”
+
+`battle.html` 的“连接战场…”是脚本执行前的静态初始文案。正常初始化会先把它改成“加载本地资源...”，再连接战场；如果初始文案始终不变，应先检查页面脚本是否解析或执行失败，而不是直接归因于 WebSocket。
+
+先运行战场页源码回归：
+
+```powershell
+npm run test -- tests/electron/battle-page-runtime.test.ts
+```
+
+该测试会解析所有内联脚本、拒绝 CSS 块中的 HTML 节点、检查实际 DOM 的重复 `id`，并确认终止初始化错误会停止加载动画。真实 Windows Electron 冒烟测试还会直接打开缺少 room/player 参数的战场页；预期显示红色错误，且 spinner 为隐藏状态。
+
 ### 状态在 Electron 与 Android 不一致
 
 1. 确认两端连接同一个 roomId 和服务端。
