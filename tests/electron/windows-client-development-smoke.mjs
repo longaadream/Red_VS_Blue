@@ -206,6 +206,35 @@ async function waitForServerConfiguration(target, timeoutMs = 5000) {
   throw new Error(`Shared server configuration did not appear: ${JSON.stringify(observed)}`)
 }
 
+async function readBuiltInPieceResources(target) {
+  return evaluate(target, `(async () => {
+    const manifestResponse = await fetch('./data/pieces/manifest.json')
+    const manifest = manifestResponse.ok ? await manifestResponse.json() : []
+    const pieces = []
+    const imageStatuses = []
+    for (const id of manifest) {
+      const response = await fetch('./data/pieces/' + id + '.json')
+      if (response.ok) {
+        const piece = await response.json()
+        pieces.push(piece)
+        if (piece.image) {
+          const imageResponse = await fetch('./images/' + piece.image)
+          imageStatuses.push(imageResponse.status)
+        }
+      }
+    }
+    return {
+      manifestStatus: manifestResponse.status,
+      manifestCount: manifest.length,
+      loadedCount: pieces.length,
+      goodCount: pieces.filter((piece) => piece.faction === 'good').length,
+      evilCount: pieces.filter((piece) => piece.faction === 'evil').length,
+      imageCount: imageStatuses.length,
+      loadedImageCount: imageStatuses.filter((status) => status === 200).length,
+    }
+  })()`)
+}
+
 async function verifyIdentityWriteFailures(target) {
   return evaluate(target, `(async () => {
     const storageKey = 'rvb_identity_v2'
@@ -269,12 +298,20 @@ try {
   const firstTarget = await openGame(19341)
   profileOne = await readIdentity(firstTarget, 'RED46 Player One')
   const firstServer = await waitForServerConfiguration(firstTarget)
+  const pieceResources = await readBuiltInPieceResources(firstTarget)
   assert(profileOne.secureContext, 'rvb-client:// is not a secure context')
   assert(profileOne.hasSubtleCrypto, 'window.crypto.subtle is unavailable')
   assert(profileOne.url.startsWith('rvb-client://app/index.html'), `First profile opened the wrong page: ${profileOne.url}`)
   assert(profileOne.identity?.displayName === 'RED46 Player One', `First profile name did not save: ${JSON.stringify(profileOne)}`)
   assert(profileOne.userName === 'RED46 Player One', `First profile UI did not refresh its name: ${JSON.stringify(profileOne)}`)
   assert(firstServer.active === 'http://127.0.0.1:3000', `First profile did not select the shared server: ${JSON.stringify(firstServer)}`)
+  assert(pieceResources.manifestStatus === 200, `Development piece manifest was not served: ${JSON.stringify(pieceResources)}`)
+  assert(pieceResources.manifestCount >= 16 && pieceResources.loadedCount === pieceResources.manifestCount,
+    `Development piece resources were incomplete: ${JSON.stringify(pieceResources)}`)
+  assert(pieceResources.goodCount >= 8 && pieceResources.evilCount >= 8,
+    `Development piece resources did not provide both alignments: ${JSON.stringify(pieceResources)}`)
+  assert(pieceResources.imageCount > 0 && pieceResources.loadedImageCount === pieceResources.imageCount,
+    `Development piece images were incomplete: ${JSON.stringify(pieceResources)}`)
 
   const second = launch({ port: 19342, profile: 'red46-smoke-two' })
   const secondTarget = await openGame(19342)
@@ -331,6 +368,7 @@ try {
     defaultSingleInstance: true,
     identityPersistedAfterRestart: true,
     identityWriteFailuresVisible: true,
+    pieceResources,
   }))
 
   stopProcessTree(second)
@@ -342,5 +380,10 @@ try {
   const resolvedSmokeRoot = path.resolve(smokeRoot)
   const resolvedTempRoot = path.resolve(os.tmpdir())
   assert(resolvedSmokeRoot.startsWith(`${resolvedTempRoot}${path.sep}`), `Refusing to clean unexpected smoke root: ${resolvedSmokeRoot}`)
-  rmSync(resolvedSmokeRoot, { recursive: true, force: true })
+  rmSync(resolvedSmokeRoot, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 200,
+  })
 }

@@ -10,6 +10,7 @@ import * as http from 'http'
 import { pathToFileURL } from 'url'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { resolveDevelopmentProfile } from './development-profile'
+import { resolveClientProtocolFile } from './client-protocol-resource'
 import {
   RESOURCE_PACK_LIMITS,
   clearActiveResourcePack,
@@ -478,20 +479,16 @@ async function setupPackProtocol(): Promise<void> {
         return new Response('Not found', { status: 404 })
       }
       const relativePath = segments.join('/')
-      let root = getHtmlRoot()
-      if (isActivatableResourcePackPath(relativePath)) {
-        const activeRoot = resolveActiveResourcePackRoot(getPackRoot())
-        if (activeRoot) {
-          const candidate = path.join(activeRoot, ...segments)
-          if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) root = activeRoot
-        }
-      }
-      const target = path.resolve(root, ...segments)
-      const relative = path.relative(path.resolve(root), target)
-      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
-        || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
-        return new Response('Not found', { status: 404 })
-      }
+      const target = resolveClientProtocolFile({
+        relativePath,
+        htmlRoot: getHtmlRoot(),
+        appRoot: getAppRoot(),
+        activePackRoot: isActivatableResourcePackPath(relativePath)
+          ? resolveActiveResourcePackRoot(getPackRoot())
+          : null,
+        isPackaged: app.isPackaged,
+      })
+      if (!target) return new Response('Not found', { status: 404 })
       return electronNet.fetch(pathToFileURL(target).toString())
     } catch {
       return new Response('Not found', { status: 404 })

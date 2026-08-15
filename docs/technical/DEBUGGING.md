@@ -190,6 +190,13 @@ npm run dev:electron:client -- --rvb-dev-profile=player-one
 npm run dev:electron:client -- --rvb-dev-profile=player-two
 ```
 
+开发模式的 `rvb-client://app/` 会从 `data/pages/` 提供页面，并把允许的
+`data/**/*.json` 请求映射到仓库 `data/`；页面内不存在的允许图片会从 `public/`
+回退读取。进入棋子选择页前可在 DevTools 执行
+`fetch('./data/pieces/manifest.json').then(r => ({ status: r.status, url: r.url }))`；
+预期 `status` 为 `200`。资源包中的同名文件仍优先于仓库内置数据，打包客户端仍只读取
+候选包内的 `app/www`。
+
 两个命令应在不同终端运行。profile 名称只允许 1–32 个 ASCII 字母、数字、连字符或下划线，且必须以字母或数字开头。每个 profile 的 `userData`、Chromium localStorage、身份与单实例锁均位于默认 `userData/dev-profiles/<profile>` 下：不同 profile 可同时运行，同一 profile 仍保持单实例。
 
 开发版 Electron 直接读取 `data/pages/`，无需先把玩家页面同步到 Android 生成目录。打包客户端仍读取构建流程生成并装入安装包的 `app/www`。
