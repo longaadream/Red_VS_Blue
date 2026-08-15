@@ -65,6 +65,33 @@ Error: request to https://binaries.prisma.sh/.../windows/schema-engine.exe.gz.sh
 Get-ChildItem "$env:TEMP\electron-download-*\electron-v33.4.11-win32-x64.zip" -File
 ```
 
+### 2.1 隔离 worktree 初始化与 Electron 预检
+
+每个 Git worktree 都是独立的项目根目录，必须在该 worktree 内安装自己的依赖。不要复用父仓库或其他 worktree 的 `node_modules`，也不要用目录联接、符号链接或扩大 `turbopack.root` 绕过隔离边界。
+
+在准备运行 Electron 开发入口的 worktree 根目录执行：
+
+```powershell
+npm.cmd ci --foreground-scripts
+npm.cmd ls --depth=0
+```
+
+不要在同一个 worktree 中并发运行 `npm ci`、Next.js 构建或 Electron；`npm ci` 会重建本地 `node_modules`，并发进程可能在包目录被替换时误用到父目录工具或读到不完整依赖。
+
+三种 Electron 开发命令会在 TypeScript 编译和 Electron 启动前自动运行对应的只读预检，也可以单独执行：
+
+```powershell
+npm.cmd run preflight:electron:client
+npm.cmd run preflight:electron:server
+npm.cmd run preflight:electron:editor
+```
+
+预检会验证当前目录确实是脚本所属的 worktree 根目录，并只接受该 worktree 内的本地依赖。Client 与 Server 还需要 `.next\standalone\server.js`，Editor 不需要 Next.js standalone 构建。
+
+- 提示缺少本地依赖时，在错误中显示的 worktree 根目录运行 `npm.cmd ci --foreground-scripts`。
+- 仅提示缺少 `.next\standalone\server.js` 时，依赖已经就绪；在同一目录运行 `npm.cmd run build`。
+- 预检不会安装依赖、创建链接或修改任何项目文件。
+
 ## 3. 测试、静态检查与构建
 
 ### 3.1 自动测试
