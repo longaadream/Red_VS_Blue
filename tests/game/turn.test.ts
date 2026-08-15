@@ -24,10 +24,46 @@ vi.mock('@/lib/game/attached-effect', () => ({
   applyEffectToPiece: vi.fn(),
 }))
 
-import { applyBattleAction, BATTLE_STATE_VERSION } from '@/lib/game/turn'
+import { applyBattleAction, BATTLE_STATE_VERSION, summonPiece } from '@/lib/game/turn'
 import type { BattleState } from '@/lib/game/turn'
+import type { PieceInstance } from '@/lib/game/piece'
 import { makeState, makePiece, makeTile } from '../helpers/minimal-state'
 import { globalTriggerSystem } from '@/lib/game/triggers'
+
+describe('summon trigger contract', () => {
+  it('dispatches the declared before and after summon events', () => {
+    const state = makeState({ pieces: [] })
+    const summoned: PieceInstance = {
+      ...makePiece({
+        instanceId: 'summoned-piece',
+        templateId: 'test-piece',
+        ownerPlayerId: 'player-red',
+        faction: 'red',
+        x: 2,
+        y: 3,
+      }),
+      name: 'Summoned piece',
+      skills: [],
+      buffs: [],
+      debuffs: [],
+      ruleTags: [],
+    }
+    vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+
+    const result = summonPiece(
+      state,
+      { templateId: 'test-piece', faction: 'red', ownerPlayerId: 'player-red', x: 2, y: 3 },
+      () => ({ id: 'test-piece', rules: [] }),
+      () => summoned,
+    )
+
+    expect(result).toMatchObject({ success: true, piece: summoned })
+    expect(vi.mocked(globalTriggerSystem.checkTriggers).mock.calls.map(([, context]) => context.type)).toEqual([
+      'beforePieceSummoned',
+      'afterPieceSummoned',
+    ])
+  })
+})
 
 // ─── 移动 ────────────────────────────────────────────────────────────────────
 
