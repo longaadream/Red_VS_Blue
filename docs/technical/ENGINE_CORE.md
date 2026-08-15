@@ -98,7 +98,7 @@
 - 未知运行时动作失败关闭，不得作为 no-op 推进 `targetingRevision`。
 - 查询不得执行技能/卡牌效果、全局触发器、reducer 或 RNG。UI 与 AI 不得复制过滤规则。
 
-相关决策：[`ADR-0004`](../decisions/ADR-0004-authoritative-target-selection.md)。
+相关决策：[`ADR-0005`](../decisions/ADR-0005-authoritative-target-selection.md)。
 
 入口集中在 `lib/game/skills.ts`：
 

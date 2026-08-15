@@ -12,7 +12,11 @@
   <script src="js/game-engine.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/three.min.js"></script>
+  <script src="js/battle-ui/battle-view-model.js"></script>
+  <script src="js/battle-ui/battle-legal-actions.js"></script>
+  <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
+  <script src="js/battle-ui/battle-presentation.js"></script>
   <style>
     :root {
       --bg: #0f172a; --bg2: #1e293b; --border: #334155;
@@ -1186,7 +1190,7 @@
   </div>
 
   <!-- Topbar -->
-  <div class="topbar">
+  <div class="topbar" data-battle-ui-region="player-hud">
     <button class="back-btn" onclick="confirmLeave()">鈫?绂诲紑</button>
     <div class="room-name" id="roomNameLabel">对战</div>
     <div class="turn-badge" id="turnBadge">等待中</div>
@@ -1212,7 +1216,7 @@
 
     <!-- Board + actions + log -->
     <div class="main-panel">
-      <div class="phase-bar">
+      <div class="phase-bar" data-battle-ui-region="turn-hud">
         <div id="phaseLabel" style="font-weight:600">-</div>
         <div id="playerResCards" style="display:flex;gap:6px"></div>
       </div>
@@ -1230,10 +1234,10 @@
 
       <div class="board-wrap" id="boardWrap">
         <div class="board-shell board-shell-3d">
-          <div class="board-stage" id="boardStage3d">
+          <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
             <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:2"></div>
           </div>
-          <aside class="board-side-rail">
+          <aside class="board-side-rail" data-battle-ui-region="selected-piece">
             <div id="selectedPieceStatus" class="selected-status-empty">?????</div>
             <div class="turn-control-wrap">
               <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
@@ -1243,7 +1247,7 @@
       </div>
 
       <!-- Skill card bar (appears when piece selected) -->
-      <div id="skillBar"></div>
+      <div id="skillBar" data-battle-ui-region="skill-panel"></div>
 
       <!-- Training bar (training mode only) -->
       <div class="training-bar" id="trainingBar" style="display:none">
@@ -1290,7 +1294,7 @@
       </div>
 
       <!-- Hand (always visible) -->
-      <div class="hand-panel" id="handPanel">
+      <div class="hand-panel" id="handPanel" data-battle-ui-region="hand">
         <div style="display:flex;align-items:center;gap:8px;padding:3px 10px;font-size:11px;color:#64748b;border-bottom:1px solid #1a2540;flex-shrink:0">
           <span>🃏 鎵嬬墝</span>
           <span id="handCount" style="font-weight:700;color:#93c5fd">0</span>
@@ -1595,7 +1599,7 @@
       'shadow-step': { icon: '影', color: '#d8b4fe', bg: 'rgba(88,28,135,.72)', border: '#a855f7' },
     }
     function tileEffectMeta(effect) {
-      return TILE_EFFECT_META[(effect && effect.tileType) || ''] || {
+      return TILE_EFFECT_META[(effect && (effect.tileType || effect.type)) || ''] || {
         icon: (effect && effect.icon) || '效',
         color: '#e5e7eb',
         bg: 'rgba(15,23,42,.72)',
@@ -1707,6 +1711,9 @@
     let relaySeq = 0            // outbound action/stateUpdate sequence
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
+    let battlePresentation = null
+    let currentBattleViewModel = null
+    let preOptimisticGForEcho = null  // saved state before optimistic pendingOptionSelect, for echo correction
 
     // 鈹€鈹€ Piece helpers 鈹€鈹€
     function pieceName(p) {
@@ -1905,7 +1912,6 @@
 
     // 鈹€鈹€ Server action log flush 鈹€鈹€
     // 鈹€鈹€ Turn announcement 鈹€鈹€
-    let _lastAnnouncedTurnPlayer = null
     function showTurnAnnounce(text, color) {
       const el = document.getElementById('turnAnnounce')
       if (!el) return
@@ -1918,8 +1924,8 @@
 
     // 鈹€鈹€ Damage / heal floaters 鈹€鈹€
     function spawnFloater(x, y, text, color, big) {
-      if (_use3d && window.BattleRenderer3D) {
-        BattleRenderer3D.spawnFloater(x, y, text, color, big)
+      if (_use3d && battlePresentation) {
+        battlePresentation.spawnFloater(x, y, text, color, big)
         return
       }
       const layer = document.getElementById('floatLayer')
@@ -2620,8 +2626,12 @@
           try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
           if (wsMode === 'relay' && wsRole === 'host') initRelayHostBattle()
         } else if (msg.type === 'stateUpdate') {
-          if (_use3d && window.BattleRenderer3D && G && msg.state) {
-            BattleRenderer3D.animateAction(msg.lastAction || null, G, msg.state)
+          if (_use3d && battlePresentation && G && msg.state) {
+            battlePresentation.animateAction(
+              msg.lastAction || null,
+              createBattlePresentationModel(G),
+              createBattlePresentationModel(msg.state)
+            )
           }
           applyServerState(msg.state, msg.seed || null)
         } else if (msg.type === 'battleSnapshot') {
@@ -2756,7 +2766,8 @@
     async function pollActions() { /* deprecated: state arrives via WS only */ }
 
     // Exact target candidates are produced by the authoritative rule query.
-    // The UI only converts stable TargetRef values into board highlight keys.
+    // The page controller only converts stable TargetRef values into presentation
+    // cells and intent payloads; the presentation layer never reimplements legality.
     function _actionHasFirstTarget(action) {
       return !!(action && (action.targetPieceId || action.targetX != null || action.targetY != null))
     }
@@ -2808,7 +2819,7 @@
     function _updatePendingSkillTargets() {
       if (!pendingSkill || !G) return
       const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
-      pendingSkill.validTargets = sp ? computeValidSkillTargets(sp) : new Set()
+      pendingSkill.validTargets = computeValidSkillTargets(sp || { instanceId: '' })
     }
 
     // 鈹€鈹€ Target overlay 鈹€鈹€
@@ -2874,9 +2885,13 @@
 
     function canAutoMovePiece(piece) {
       if (!G || !piece || piece.currentHp <= 0) return false
-      if (typeof GameEngine === 'undefined' ||
-          typeof GameEngine.getLegalNormalMoveTargetsForPlayer !== 'function') return false
-      return GameEngine.getLegalNormalMoveTargetsForPlayer(G, myPlayerId, piece.instanceId).length > 0
+      if (!window.BattleLegalActions || typeof GameEngine === 'undefined') return false
+      return BattleLegalActions.queryMoveCells({
+        snapshot: G,
+        playerId: myPlayerId,
+        pieceId: piece.instanceId,
+        engine: GameEngine,
+      }).size > 0
     }
 
     function autoMoveSelectedIfPossible() {
@@ -2912,14 +2927,71 @@
       return !!(pbc && pbc.playerId && !clientOwns(pbc.playerId))
     }
 
+    function battleInteractionMode() {
+      if (TRAINING_MODE && placingMode) return 'place'
+      if (pendingSkill || (pendingCardAction && pendingCardAction.type)) return 'target'
+      if (pendingMove) return 'move'
+      return 'inspect'
+    }
+
+    function refreshBattleLegalActions() {
+      if (!G || !window.BattleLegalActions) return
+      if (pendingMove && selectedPieceId) {
+        validMoves = BattleLegalActions.queryMoveCells({
+          snapshot: G,
+          playerId: myPlayerId,
+          pieceId: selectedPieceId,
+          engine: typeof GameEngine === 'undefined' ? null : GameEngine,
+        })
+      } else {
+        validMoves = new Set()
+      }
+      if (pendingSkill) _updatePendingSkillTargets()
+      if (pendingCardAction && pendingCardAction.type) {
+        const preparation = pendingCardAction.preparation
+        const cells = new Set()
+        if (preparation && Array.isArray(preparation.candidates)) {
+          preparation.candidates.forEach(ref => {
+            if (ref.type === 'cell') cells.add(ref.x + ',' + ref.y)
+            if (ref.type === 'piece') {
+              const piece = G.pieces.find(p => p.instanceId === ref.pieceId && p.currentHp > 0)
+              if (piece && piece.x != null && piece.y != null) cells.add(piece.x + ',' + piece.y)
+            }
+          })
+        }
+        pendingCardAction.validTargets = cells
+      }
+    }
+
+    function createBattlePresentationModel(snapshot) {
+      if (!snapshot || !window.BattleViewModel) return null
+      const isCurrentSnapshot = snapshot === G
+      const targetCells = isCurrentSnapshot && pendingSkill
+        ? (pendingSkill.validTargets || new Set())
+        : (isCurrentSnapshot && pendingCardAction && pendingCardAction.type
+            ? (pendingCardAction.validTargets || new Set())
+            : new Set())
+      return BattleViewModel.create({
+        snapshot: snapshot,
+        viewerId: myPlayerId,
+        selectedPieceId: selectedPieceId,
+        interactionMode: battleInteractionMode(),
+        legal: {
+          moveCells: isCurrentSnapshot ? validMoves : new Set(),
+          targetCells: targetCells,
+          placementCells: isCurrentSnapshot && TRAINING_MODE && placingMode
+            ? BattleLegalActions.queryTrainingPlacementCells(snapshot)
+            : new Set(),
+        },
+      })
+    }
+
     let _pendingChoiceShown = null  // track which pendingOptionSelection we've shown
     function render() {
       if (!G) return
       checkClientGameOver()
       renderBoard()
       renderPanels()
-      renderHUD()
-      renderSelectedPieceStatus()
       renderActionBar()
       renderHand()
       renderTargetOverlay()
@@ -2967,8 +3039,7 @@
             },
             validTargets: new Set(),
           }
-          const _sp = G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
-          pendingSkill.validTargets = computeValidSkillTargets(_sp || { instanceId: '' })
+          _updatePendingSkillTargets()
           console.log('[STAGE4] entered target-select mode, validTargets count=' + pendingSkill.validTargets.size)
           setStatusMsg(pbt.title || _targetPromptText() || '请选择目标')
           renderBoard()
@@ -2982,162 +3053,31 @@
       }
     }
 
-    function statusTagLabel(t) {
-      const label = t.name || t.type || t.id || '?'
-      const extra = t.stacks ? `x${t.stacks}` : (t.duration ? `${t.duration}T` : '')
-      return `${label}${extra ? extra : ''}`
-    }
-
-    function isLuckyCoinStatus(t) {
-      const raw = String(t.id || t.type || t.name || '').toLowerCase()
-      return raw.includes('lucky-coin') || raw.includes('幸运币')
-    }
-
-    function playerFaction(playerId, fallbackIndex) {
-      const pid = (playerId || '').toLowerCase()
-      const owned = G && G.pieces && G.pieces.find(p => p.ownerPlayerId && p.ownerPlayerId.toLowerCase() === pid)
-      if (owned && owned.faction) return owned.faction === 'blue' ? 'blue' : 'red'
-      if (pid.includes('blue')) return 'blue'
-      if (pid.includes('red')) return 'red'
-      return fallbackIndex === 1 ? 'blue' : 'red'
-    }
-
-    function renderSelectedPieceStatus() {
-      const el = document.getElementById('selectedPieceStatus')
-      if (!el) return
-      const piece = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-      if (!piece) {
-        el.className = 'selected-status-empty'
-        el.innerHTML = '未选中棋子'
-        return
-      }
-      const tags = pieceDispTags(piece).filter(t => t.visible !== false)
-      const tagsHtml = tags.length
-        ? tags.map(t => `<span class="status-tag" title="${escHtml(t.id || t.description || '')}">${escHtml(statusTagLabel(t))}</span>`).join('')
-        : '<span class="status-empty">无状态</span>'
-      el.className = 'selected-status-card'
-      el.innerHTML = `
-        <div class="selected-piece-name">${escHtml(pieceName(piece))}</div>
-        <div class="selected-piece-hp">HP ${pieceDispHp(piece)} / ${pieceMaxHp(piece)}</div>
-        <div class="selected-status-title">状态</div>
-        <div class="selected-status-tags">${tagsHtml}</div>
-      `
-    }
-
-    function renderHUD() {
-      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      const badge = document.getElementById('turnBadge')
-      badge.textContent = isMyTurn ? '我方回合' : '对方回合'
-      badge.className = 'turn-badge ' + (isMyTurn ? 'my-turn' : 'opp-turn')
-
-      // Turn announcement on change
-      const curTurnPlayer = G.turn && G.turn.currentPlayerId
-      if (curTurnPlayer && curTurnPlayer !== _lastAnnouncedTurnPlayer) {
-        _lastAnnouncedTurnPlayer = curTurnPlayer
-        if (isMyTurn) showTurnAnnounce('你的回合', '#4ade80')
-        else showTurnAnnounce('🛡 对方回合', '#f87171')
-      }
-      document.getElementById('roundLabel').textContent = '第 ' + (G.turn ? G.turn.turnNumber : 1) + ' 回合'
-      document.getElementById('phaseLabel').textContent = PHASE_LABELS[G.turn ? G.turn.phase : ''] || ''
-
-      const apD = document.getElementById('resApDisplay')
-      const cpD = document.getElementById('resCpDisplay')
-      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-      const currentMeta = myMeta || (G.players && G.players.find(p => p.playerId === (G.turn && G.turn.currentPlayerId))) || (G.players && G.players[0])
-      if (apD && currentMeta) {
-        apD.style.display = ''
-        const apVal = document.getElementById('resApVal')
-        const apMax = document.getElementById('resApMax')
-        if (apVal) apVal.textContent = currentMeta.actionPoints || 0
-        if (apMax) apMax.textContent = currentMeta.maxActionPoints || 10
-      }
-      if (cpD && currentMeta) {
-        cpD.style.display = ''
-        const cpVal = document.getElementById('resCpVal')
-        const cpMax = document.getElementById('resCpMax')
-        if (cpVal) cpVal.textContent = currentMeta.chargePoints || 0
-        if (cpMax) cpMax.textContent = currentMeta.maxChargePoints || currentMeta.maxCharge || 0
-      }
-
-      const cardsEl = document.getElementById('playerResCards')
-      if (G.players) {
-        cardsEl.className = 'player-state-strip'
-        cardsEl.innerHTML = G.players.map((p, idx) => {
-          const isCur = p.playerId && p.playerId.toLowerCase() === (G.turn ? G.turn.currentPlayerId : '')
-          const faction = playerFaction(p.playerId, idx)
-          const sideName = faction === 'blue' ? '🔵后手' : '🔴先手'
-          const tags = (p.statusTags || []).filter(t => t.visible !== false && !isLuckyCoinStatus(t))
-          const tagsHtml = tags.map(t => {
-            return `<span class="status-tag" title="${escHtml(t.id || t.description || '')}">${escHtml(statusTagLabel(t))}</span>`
-          }).join('')
-          return `<div class="player-state-chip ${faction} ${isCur ? 'active' : ''}" title="${escHtml((p.playerId || '').toString())}">
-            <div class="player-state-main">
-              <span class="player-side-name">${sideName}</span>
-              <span class="resource-orb action" title="行动点"><span class="resource-glyph action"></span>${p.actionPoints || 0}</span>
-              <span class="resource-orb charge" title="充能点"><span class="resource-glyph charge"></span>${p.chargePoints || 0}</span>
-              ${isCur ? '<span>当前</span>' : ''}
-            </div>
-            <div class="player-state-tags">${tagsHtml}</div>
-          </div>`
-        }).join('')
-      }
-    }
-
     function renderBoard() {
       if (!G || !G.map) return
+      refreshBattleLegalActions()
+      currentBattleViewModel = createBattlePresentationModel(G)
+      if (!currentBattleViewModel) return
+      if (battlePresentation) battlePresentation.update(currentBattleViewModel)
       recalcCellSize()
 
       // 鈹€鈹€ Compute highlights (shared between 3D and HTML paths) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-      const tiles = G.map.tiles
+      const tiles = currentBattleViewModel.board.tiles
       const cellMap = {}
-      G.pieces.forEach(p => { if (p.currentHp > 0) cellMap[p.x + ',' + p.y] = p })
+      currentBattleViewModel.pieces.forEach(p => { if (p.visible) cellMap[p.x + ',' + p.y] = p })
 
-      const hlMoveKeys = new Set(), hlSkillKeys = new Set(), hlPlaceKeys = new Set()
-      if (TRAINING_MODE && placingMode) {
-        tiles.forEach(t => { if (t.props && t.props.walkable && !cellMap[t.x + ',' + t.y]) hlPlaceKeys.add(t.x + ',' + t.y) })
-      }
-      const sp = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-      validMoves = new Set()
-      if (sp && pendingMove && typeof GameEngine !== 'undefined' &&
-          typeof GameEngine.getLegalNormalMoveTargetsForPlayer === 'function') {
-        GameEngine.getLegalNormalMoveTargetsForPlayer(G, myPlayerId, sp.instanceId).forEach(pos => {
-          const key = pos.x + ',' + pos.y
-          validMoves.add(key)
-          hlMoveKeys.add(key)
-        })
-      }
-      if (pendingSkill) {
-        (pendingSkill.validTargets || new Set()).forEach(k => hlSkillKeys.add(k))
-      }
-      if (pendingCardAction && pendingCardAction.preparation && Array.isArray(pendingCardAction.preparation.candidates)) {
-        pendingCardAction.preparation.candidates.forEach(ref => {
-          if (ref.type === 'cell') hlSkillKeys.add(ref.x + ',' + ref.y)
-          if (ref.type === 'piece') {
-            const targetPiece = G.pieces.find(p => p.instanceId === ref.pieceId && p.currentHp > 0)
-            if (targetPiece && targetPiece.x != null && targetPiece.y != null) {
-              hlSkillKeys.add(targetPiece.x + ',' + targetPiece.y)
-            }
-          }
-        })
-      }
+      const toKey = cell => cell.x + ',' + cell.y
+      const hlMoveKeys = new Set(currentBattleViewModel.legal.moveCells.map(toKey))
+      const hlSkillKeys = new Set(currentBattleViewModel.legal.targetCells.map(toKey))
+      const hlPlaceKeys = new Set(currentBattleViewModel.legal.placementCells.map(toKey))
 
       // 鈹€鈹€ 3D path 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-      if (_use3d && window.BattleRenderer3D) {
-        BattleRenderer3D.syncState(G)
-        const toXZ = k => { const [x,z] = k.split(','); return { x: +x, z: +z } }
-        BattleRenderer3D.setHighlights({
-          move:     [...hlMoveKeys].map(toXZ),
-          skill:    [...hlSkillKeys].map(toXZ),
-          place:    [...hlPlaceKeys].map(toXZ),
-          selected: selectedPieceId || null,
-        })
-        return
-      }
+      if (_use3d) return
 
       // 鈹€鈹€ HTML grid fallback 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
       const grid = document.getElementById('gameGrid')
       if (!grid) return
-      const { width, height } = G.map
+      const { width, height } = currentBattleViewModel.board
       grid.style.gridTemplateColumns = 'repeat(' + width + ', var(--cell-size, 44px))'
 
       const cells = []
@@ -3148,7 +3088,7 @@
           const tclass = TILE_CLASS[ttype] || 't-floor'
           const key = x + ',' + y
           const piece = cellMap[key]
-          const isSel = piece && piece.instanceId === selectedPieceId
+          const isSel = piece && piece.id === selectedPieceId
 
           let cls = 'cell ' + tclass
           if (isSel) cls += ' hl-selected'
@@ -3156,16 +3096,14 @@
           else if (hlSkillKeys.has(key)) cls += ' hl-skill'
           else if (hlPlaceKeys.has(key)) cls += ' hl-place'
 
-          const tileEfxList = G && G.extensions && G.extensions.tileEffects
-            ? G.extensions.tileEffects.filter(te => te.x === x && te.y === y)
-            : []
+          const tileEfxList = currentBattleViewModel.effects.filter(te => te.x === x && te.y === y)
           let tileEfxHtml = ''
           if (tileEfxList.length) {
             const icons = tileEfxList
               .map(te => {
                 const meta = tileEffectMeta(te)
-                const label = te.icon || meta.icon
-                return `<span title="${escHtml(te.tileType || '')}" style="display:inline-flex;align-items:center;justify-content:center;min-width:13px;height:13px;border-radius:999px;border:1px solid ${escHtml(meta.border)};background:${escHtml(meta.bg)};color:${escHtml(meta.color)};font-size:10px;line-height:1;font-weight:900">${escHtml(label)}</span>`
+                const label = meta.icon
+                return `<span title="${escHtml(te.type || '')}" style="display:inline-flex;align-items:center;justify-content:center;min-width:13px;height:13px;border-radius:999px;border:1px solid ${escHtml(meta.border)};background:${escHtml(meta.bg)};color:${escHtml(meta.color)};font-size:10px;line-height:1;font-weight:900">${escHtml(label)}</span>`
               })
               .join('')
             if (icons) {
@@ -3175,13 +3113,13 @@
 
           let inner = ''
           if (piece) {
-            const maxHp = pieceMaxHp(piece)
-            const pct = Math.max(0, Math.round(pieceDispHp(piece) / maxHp * 100))
+            const maxHp = piece.health.max
+            const pct = Math.max(0, Math.round(piece.health.current / maxHp * 100))
             const fillCls = pct < 30 ? 'crit' : pct < 60 ? 'low' : ''
             const faction = piece.faction || 'red'
             const tokCls = 'piece-tok ' + faction + (isSel ? ' selected-tok' : '')
-            const tags = pieceDispTags(piece).filter(t => t.visible !== false)
-            const tagsHtml = tags.map(t => `<span class="status-tag" title="${escHtml(t.id || '')}">${escHtml(t.name || t.type || t.id || '?')}</span>`).join('')
+            const tags = piece.statusSummary
+            const tagsHtml = tags.map(t => `<span class="status-tag" title="${escHtml(t.id || '')}">${escHtml(t.label || t.id || '?')}</span>`).join('')
             const tmpl = PIECES_BY_ID[piece.templateId]
             const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
             const imgHtml = imgSrc
@@ -3194,8 +3132,8 @@
               <div class="tok-hp-bar"><div class="tok-hp-fill ${fillCls}" style="width:${pct}%"></div></div>
             </div>`
           }
-          const _ctxAttr = piece ? ` oncontextmenu="event.preventDefault();showPieceInfo('${escHtml(piece.instanceId)}')"` : ''
-          cells.push(`<div class="${cls}" onclick="onCellClick(${x},${y})"${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
+          const _ctxAttr = piece ? ` oncontextmenu="event.preventDefault();dispatchBattleIntent({type:'inspect-piece',pieceId:'${escHtml(piece.id)}'})"` : ''
+          cells.push(`<div class="${cls}" onclick="dispatchBattleIntent({type:'activate-cell',x:${x},y:${y}})"${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
         }
       }
       grid.innerHTML = cells.join('')
@@ -3290,7 +3228,7 @@
       const tmpl = PIECES_BY_ID[piece.templateId]
       const displayName = piece.name || (tmpl && tmpl.name) || piece.templateId
       const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
-      const onclick = !dead ? `onclick="selectPiece('${piece.instanceId}')"` : ''
+      const onclick = !dead ? `onclick="dispatchBattleIntent({type:'select-piece',pieceId:'${piece.instanceId}'})"` : ''
       const iid = escHtml(piece.instanceId)
       return `<div class="piece-card ${dead?'dead':''} ${sel?'selected':''}" ${onclick}
         ontouchstart="startPressTimer(event,'${iid}')"
@@ -3365,7 +3303,7 @@
         titleParts.push(`行动点消耗：${apCost}`)
         titleParts.push(`充能点消耗：${cpCost}`)
 
-        return `<div class="${cls}" onclick="selectSkillCard('${escHtml(sid)}')" title="${escHtml(titleParts.join('\n'))}">
+        return `<div class="${cls}" onclick="dispatchBattleIntent({type:'select-skill',skillId:'${escHtml(sid)}'})" title="${escHtml(titleParts.join('\n'))}">
           ${cdCover}
           <div class="sk-cost-row">
             <span class="sk-cost-orb action ${apLow ? 'low' : ''}" title="行动点消耗"><span class="resource-glyph action"></span>${apCost}</span>
@@ -3614,6 +3552,22 @@
     }
 
     // 鈹€鈹€ Cell click 鈹€鈹€
+    function handleBattleIntent(intent) {
+      if (!intent) return
+      if (intent.type === 'activate-cell') return onCellClick(intent.x, intent.y)
+      if (intent.type === 'inspect-piece') return showPieceInfo(intent.pieceId)
+      if (intent.type === 'select-piece') return selectPiece(intent.pieceId)
+      if (intent.type === 'clear-selection') return clearPieceSelection()
+      if (intent.type === 'select-skill') return selectSkillCard(intent.skillId)
+      if (intent.type === 'cancel-target') return cancelTargetSelection()
+      if (intent.type === 'toggle-move') return toggleMove()
+    }
+
+    function dispatchBattleIntent(intent) {
+      if (battlePresentation) return battlePresentation.dispatch(intent)
+      return handleBattleIntent(intent)
+    }
+
     function onCellClick(x, y) {
       if (!G) return
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
@@ -3630,9 +3584,9 @@
         const templateId = document.getElementById('placeTemplate')?.value
         if (!templateId) { addLog('请先选择棋子类型', 'err'); return }
         if (!templateId) { addLog('请先选择棋子类型', 'err'); return }
-        const tile = G.map.tiles.find(t => t.x === x && t.y === y)
-        if (!tile || !tile.props || !tile.props.walkable) { addLog('不可放置此处', 'err'); return }
-        if (piece) { addLog('该位置已有棋子', 'err'); return }
+        const placementAllowed = currentBattleViewModel && currentBattleViewModel.legal.placementCells
+          .some(cell => cell.x === x && cell.y === y)
+        if (!placementAllowed) { addLog('不可放置此处', 'err'); return }
         sendPatch({ type: 'addPiece', ownerPlayerId, templateId, x, y }).then(ok => {
           if (ok) addLog('放置 ' + (PIECES_BY_ID[templateId]?.name || templateId), 'info')
         })
@@ -3668,6 +3622,7 @@
         delete action.clientActionId
         delete action.requestId
         delete action.preparation
+        delete action.validTargets
         pendingCardAction = null
         document.getElementById('handTarget').style.display = 'none'
         doAction(action)
@@ -3675,6 +3630,11 @@
       }
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
+        const turnTargets = pendingSkill.validTargets
+        if (turnTargets && !turnTargets.has(x + ',' + y)) {
+          setStatusMsg('目标不在权威合法目标集合内')
+          return
+        }
         const turnTargetType = pendingSkill.preparation && pendingSkill.preparation.targetType
         const action = {
           type: pendingSkill.turnTargetActionType,
@@ -3756,7 +3716,23 @@
       }
     }
 
+    function clearPieceSelection() {
+      selectedPieceId = null
+      pendingMove = false
+      pendingSkill = null
+      validMoves = new Set()
+      setMoveButtonClass(false)
+      const pieceSelect = document.getElementById('pieceSelect')
+      if (pieceSelect) pieceSelect.value = ''
+      renderSkillBar(null)
+      render()
+    }
+
     function selectPiece(instanceId) {
+      if (selectedPieceId === instanceId) {
+        clearPieceSelection()
+        return
+      }
       selectedPieceId = instanceId
       pendingSkill = null
       // Sync dropdown
@@ -3773,7 +3749,7 @@
 
     function selectPieceFromDropdown() {
       const val = document.getElementById('pieceSelect')?.value
-      if (val) selectPiece(val)
+      if (val) dispatchBattleIntent({ type: 'select-piece', pieceId: val })
     }
 
     function toggleMove() {
@@ -4275,7 +4251,7 @@
     // 鈹€鈹€ Start 鈹€鈹€
     // 鈹€鈹€ Dynamic cell sizing 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     function recalcCellSize() {
-      if (_use3d && window.BattleRenderer3D) { BattleRenderer3D.resize(); return }
+      if (_use3d && battlePresentation) { battlePresentation.resize(); return }
       if (!G || !G.map) return
       const cols = G.map.width
       const rows = G.map.height
@@ -4326,18 +4302,19 @@
     }
 
     window.addEventListener('load', () => {
-      if (window.THREE && window.BattleRenderer3D) {
-        const container = document.getElementById('boardStage3d')
-        BattleRenderer3D.init(
-          container,
-          function(x, z) { onCellClick(x, z) },
-          function(piece) { if (piece) showPieceInfo(piece.instanceId) }
-        )
-        BattleRenderer3D.setFloatLayer(document.getElementById('floatLayer'))
-        _use3d = true
-      } else {
-        initMapControls()
+      const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
+      const renderer = hasThreeRenderer ? window.BattleRenderer3D : {
+        init() {}, update() {}, resize() {}, projectCell() { return null },
+        screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
+      const domUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
+      battlePresentation = BattlePresentation.create({ renderer, domUi, onIntent: handleBattleIntent })
+      battlePresentation.mount({
+        boardContainer: document.getElementById('boardStage3d'),
+        floatLayer: document.getElementById('floatLayer'),
+      })
+      _use3d = hasThreeRenderer
+      if (!_use3d) initMapControls()
       init()
 
       // Click outside a selected hand card to cancel card targeting.
@@ -4378,9 +4355,13 @@
         }
       }
     })
-    window.addEventListener('unload', () => {
+    function disposeBattlePage() {
       if (pollTimer) clearInterval(pollTimer)
-    })
+      pollTimer = null
+      if (battlePresentation) battlePresentation.dispose()
+    }
+    window.addEventListener('pagehide', disposeBattlePage)
+    window.addEventListener('unload', disposeBattlePage)
 
     // 鈹€鈹€ Debug modifier panel (backtick key toggle) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     document.addEventListener('keydown', e => {
@@ -4449,7 +4430,7 @@
   <!-- Target selection overlay (pointer-events:none so board stays clickable) -->
   <div id="targetOverlay">
     <div class="target-prompt" id="targetPromptText">选择目标</div>
-    <button class="target-cancel-btn" onclick="cancelTargetSelection()">取消</button>
+    <button class="target-cancel-btn" onclick="dispatchBattleIntent({type:'cancel-target'})">取消</button>
   </div>
 
   <!-- Fullscreen log overlay -->

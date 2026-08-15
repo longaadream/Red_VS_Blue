@@ -60,9 +60,11 @@ describe('UI/server normal movement contract', () => {
     expect([...uiTargets].sort()).toEqual([...serverTargets].sort())
   })
 
-  it('战斗 UI 直接调用浏览器引擎导出的共享普通移动集合', () => {
+  it('战斗 UI 通过表现适配器调用浏览器引擎导出的共享普通移动集合', () => {
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
-    expect(html).toContain('GameEngine.getLegalNormalMoveTargetsForPlayer(G, myPlayerId, sp.instanceId)')
+    const legalAdapter = readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-legal-actions.js'), 'utf8')
+    expect(html).toContain('BattleLegalActions.queryMoveCells')
+    expect(legalAdapter).toContain('input.engine.getLegalNormalMoveTargetsForPlayer')
   })
 
   it('实际浏览器 bundle 导出并执行共享空间规则', () => {
