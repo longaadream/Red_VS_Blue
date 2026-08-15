@@ -113,6 +113,32 @@ async function evaluate(target, expression, awaitPromise = true) {
   }
 }
 
+async function verifyBattleTerminalError(port, target, timeoutMs = 5000) {
+  await evaluate(target, "window.location.href = 'rvb-client://app/battle.html'; true", false)
+  const battleTarget = await waitForTargets(
+    port,
+    (candidate) => candidate.url.startsWith('rvb-client://app/battle.html'),
+    timeoutMs,
+  )
+  const deadline = Date.now() + timeoutMs
+  let observed = null
+  while (Date.now() < deadline) {
+    try {
+      observed = await evaluate(battleTarget, `({
+        readyState: document.readyState,
+        message: document.getElementById('loadingMsg')?.textContent || '',
+        messageColor: document.getElementById('loadingMsg')?.style.color || '',
+        spinnerDisplay: document.querySelector('#loadingOverlay .spinner')?.style.display || '',
+      })`)
+      if (observed.message.includes('缺少 roomId 或 playerId')) {
+        return { target: battleTarget, runtime: observed }
+      }
+    } catch {}
+    await delay(100)
+  }
+  throw new Error(`Battle page did not expose its terminal setup error: ${JSON.stringify(observed)}`)
+}
+
 function stopCandidates(executable) {
   const escaped = executable.replaceAll("'", "''")
   const script = `Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq '${escaped}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`
@@ -356,7 +382,11 @@ async function smokeClient() {
     assert(mode.ready === true && mode.isLocal === true, `Client local mode is not ready: ${JSON.stringify(mode)}`)
     const localGatewayPort = mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521
     assert(await isReachable(localGatewayPort), 'Client local gateway is not reachable')
-    await evaluate(gameTarget, 'window.close(); true', false)
+    const battle = await verifyBattleTerminalError(application.debugPort, gameTarget)
+    assert(battle.runtime.readyState === 'complete', `Battle page did not finish loading: ${JSON.stringify(battle.runtime)}`)
+    assert(battle.runtime.messageColor === 'rgb(248, 113, 113)', `Battle page did not style its terminal error: ${JSON.stringify(battle.runtime)}`)
+    assert(battle.runtime.spinnerDisplay === 'none', `Battle page kept spinning after a terminal error: ${JSON.stringify(battle.runtime)}`)
+    await evaluate(battle.target, 'window.close(); true', false)
     assert(await waitForDebuggerExit(application.debugPort), 'Client left its main Electron process after its last window closed')
     assert(await waitForUnreachable(localGatewayPort), 'Client left its local gateway listening after exit')
     const candidateExecutables = [application.executable, ...(application.helperExecutables ?? [])]
@@ -365,7 +395,7 @@ async function smokeClient() {
       Object.values(processCountsAfterExit).every((count) => count === 0),
       `Client candidate left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
     )
-    console.log(JSON.stringify({ entry: 'client', rendererBoundary, invalidTlsCertificate: tlsProbe, homepageWindowBoundary, packagedAssets, localMode: mode, exitedCleanly: true, processCountsAfterExit }))
+    console.log(JSON.stringify({ entry: 'client', rendererBoundary, invalidTlsCertificate: tlsProbe, homepageWindowBoundary, packagedAssets, localMode: mode, battleRuntime: battle.runtime, exitedCleanly: true, processCountsAfterExit }))
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)
