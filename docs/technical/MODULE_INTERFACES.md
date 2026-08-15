@@ -78,6 +78,16 @@
 
 ## 4. 技能、卡牌与规则数据
 
+### 4.1 权威目标查询边界
+
+- 入口：`lib/game/targeting.ts::prepareAction()`、`validateTargetRef()`。
+- 输入：只读 `BattleState` 与行动草稿；选择提交还包含 `selectionId` 和 `stateRevision`。
+- 输出：`ready`、稳定 `invalid.code`、声明式 `needOption`，或包含精确棋子/地格候选的 `needTarget`。
+- 调用方：`turn.ts` 最终校验、`ai.ts`、`battle.html`、pending target 会话、HTTP/WS 错误 envelope。
+- 纯度：不得调用 reducer、触发器、效果代码、时间或 RNG；候选枚举和最终提交必须复用同一验证器。
+- 数据边界：动态选择必须补充 `targeting.steps`；无法声明时以 `TARGET_DECLARATION_MISSING` 失败关闭。
+- 兼容边界：两份现存 `skill-targeting.js` 仅映射 `preparation.candidates` 到展示坐标，不再执行技能。
+
 - 入口：`lib/game/skills.ts` 的 `loadCardById()`、`loadRuleById()`、`executeCardFunction()`、`executeSkillFunction()`。
 - 职责：加载并执行数据驱动规则。
 - 输入：ID、状态、使用者、目标和效果上下文。
@@ -163,8 +173,8 @@
 - 状态变化：全局 `G`、DOM、localStorage；Relay 模式还会执行规则。
 - 错误：网络失败、引擎异常或状态不兼容；部分异常只显示提示或被忽略。
 - 日志：浏览器 console；生产 mobile 构建会削弱部分 console 输出。
-- 测试：`tests/game/movement-contract.test.ts` 验证页面实际加载的共享移动导出；`tests/game/battle-ui-boundary.test.ts` 覆盖展示模型、规则适配器与生命周期合同。RED-48 使用 Playwright 在训练模式完成 1280×720、390×844 的投影命中、选择/取消、目标模式和重复挂载冒烟，证据见 `output/playwright/red-48-browser-evidence.md`。
-- 已知问题：页面控制器仍跨越网络、Relay 规则执行和胜负判断；不同模式承担不同权威职责。服务端版本化合法操作接口完成前，规则适配器会先读取共享移动候选，再在克隆快照上执行候选动作以排除被状态效果正常拦截的移动。
+- 测试：`tests/game/movement-contract.test.ts` 会执行页面实际加载的 `data/pages/js/game-engine.js`，验证共享移动导出和固定状态目标候选；`tests/game/battle-ui-boundary.test.ts` 覆盖展示模型、规则适配器与生命周期合同。RED-48 使用 Playwright 在训练模式完成 1280×720、390×844 的投影命中、选择/取消、目标模式和重复挂载冒烟，证据见 `output/playwright/red-48-browser-evidence.md`。
+- 已知问题：页面控制器仍跨越网络、Relay 规则执行和胜负判断；不同模式承担不同权威职责。移动规则适配器仍在克隆快照上验证共享移动候选；技能、卡牌和 pending 目标则只消费核心 `preparation` 的精确候选。
 - 最小调试：捕获连接模式、roomId、seed、最后 action、服务端/客户端 state hash 和截图。
 
 ### 9.1 战场表现边界（RED-48）

@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
 import { applyBattleAction } from './game/turn'
+import { assertActionPlayer } from './game/targeting'
 import { getBattleStorage, withServerSkills, withoutServerSkills } from './game/battle-storage'
 import { hashStable, runBattleAction } from './game/battle-runner'
 import { verifyJoinAuth, verifyRecordSignature, derivePlayerId } from './game/identity-verify'
@@ -554,6 +555,7 @@ export function startWsServer(): void {
               if (msg.type === 'action') {
                 if (msg.action == null) return
                 try {
+                  assertActionPlayer(playerId, msg.action)
                   const result = runBattleAction(storage.state as any, msg.action as any)
                   storage.state = result.state
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -581,7 +583,9 @@ export function startWsServer(): void {
                     sender.send(JSON.stringify({
                       type: 'actionError',
                       error: message,
+                      code: errAny?.code ?? undefined,
                       action: msg.action,
+                      preparation: errAny?.preparation ?? undefined,
                       needsTargetSelection: errAny?.needsTargetSelection || undefined,
                       targetType: errAny?.targetType ?? undefined,
                       range: errAny?.range ?? undefined,
@@ -647,7 +651,7 @@ async function runBotTurn(roomId: string): Promise<void> {
     const st = storage.state as any
     if (st?.turn?.phase !== 'action' || st?.turn?.currentPlayerId !== 'bot') return
 
-    const { generateBotActions } = await import('./game/ai')
+    const { generateBotActions, prepareBotAction } = await import('./game/ai')
     const hydratedState = withServerSkills(storage.state)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let currentState: any = hydratedState
@@ -655,7 +659,15 @@ async function runBotTurn(roomId: string): Promise<void> {
     const actions = generateBotActions(currentState as any, 'bot')
     for (const action of actions) {
       try {
-        currentState = applyBattleAction(currentState, action)
+        const currentAction = action.type === 'useBasicSkill' || action.type === 'useChargeSkill'
+          ? prepareBotAction(currentState, {
+              type: action.type,
+              playerId: action.playerId,
+              pieceId: action.pieceId,
+              skillId: action.skillId,
+            }, 'bot')
+          : action
+        if (currentAction) currentState = applyBattleAction(currentState, currentAction)
       } catch {
         // Skip invalid bot action
       }

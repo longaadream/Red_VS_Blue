@@ -161,6 +161,39 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
 
 // ─── 卡牌系统类型 ─────────────────────────────────────────────────────────────
 
+export interface SelectionOptionDefinition {
+  label: string
+  value: unknown
+  description?: string
+}
+
+export type SelectionStepDefinition =
+  | {
+      kind: 'option'
+      title: string
+      options: SelectionOptionDefinition[]
+      canCancel?: boolean
+    }
+  | {
+      kind: 'target'
+      type: 'piece' | 'grid' | 'cell'
+      filter?: 'enemy' | 'ally' | 'all' | 'self'
+      range?: number
+      distanceMetric?: 'manhattan' | 'chebyshev'
+      requireWalkable?: boolean
+      requireUnoccupied?: boolean
+      allowSourceOccupant?: boolean
+      allowSourceOccupantOptions?: unknown[]
+    }
+
+export interface SelectionContractDefinition {
+  source?: {
+    templateId?: string
+    boundInstanceField?: string
+  }
+  steps: SelectionStepDefinition[]
+}
+
 export interface CardDefinition {
   id: string
   name: string
@@ -173,6 +206,8 @@ export interface CardDefinition {
   code: string
   actionPointCost?: number
   icon?: string
+  /** Pure, machine-readable source/option/target declaration (RED-59). */
+  targeting?: SelectionContractDefinition
 }
 
 // 卡牌定义缓存
@@ -1139,6 +1174,7 @@ export interface SkillExecutionContext {
     name: string
     type: SkillType
     powerMultiplier: number
+    targeting?: SelectionContractDefinition
   }
 }
 
@@ -1198,6 +1234,8 @@ export interface SkillDefinition {
   actionPointCost: number
   /** 技能图标 */
   icon?: string
+  /** Pure, machine-readable option/target declaration (RED-59). */
+  targeting?: SelectionContractDefinition
 }
 
 /**
@@ -1528,6 +1566,10 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
       const activeTarget = activeSlot?.info || null;
       const activePos = activeSlot?.pos ||
         (callIdx === 0 ? ctx.targetPosition : null);
+      const declaredTargetStep = ctx.skill?.targeting?.steps
+        ?.filter((step: SelectionStepDefinition) => step.kind === 'target')[callIdx] as
+          | Extract<SelectionStepDefinition, { kind: 'target' }>
+          | undefined;
       const needsTargetSelection = () => ({
         needsTargetSelection: true,
         targetType: defaultOptions.type,
@@ -1551,7 +1593,9 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
 
         // 检查目标是否在范围内
         if (defaultOptions.range !== undefined && activeTarget.x != null && activeTarget.y != null && sourcePiece.x != null && sourcePiece.y != null) {
-          const distance = manhattanDistance(sourcePiece, activeTarget);
+          const distance = declaredTargetStep?.distanceMetric === 'chebyshev'
+            ? Math.max(Math.abs(sourcePiece.x - activeTarget.x), Math.abs(sourcePiece.y - activeTarget.y))
+            : manhattanDistance(sourcePiece, activeTarget);
           if (distance > defaultOptions.range) {
             return needsTargetSelection();
           }
@@ -1580,9 +1624,11 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         // 如果需要选择格子，从 targets[] 或 targetPosition 中取坐标
         const gridPos = activePos;
         if (gridPos) {
-          // 未显式声明特殊形状时，格子目标统一使用曼哈顿距离。
+          // Execution uses the same declared distance metric as prepareAction.
           if (defaultOptions.range !== undefined && sourcePiece.x != null && sourcePiece.y != null) {
-            const dist = manhattanDistance(sourcePiece, gridPos);
+            const dist = declaredTargetStep?.distanceMetric === 'chebyshev'
+              ? Math.max(Math.abs(sourcePiece.x - gridPos.x), Math.abs(sourcePiece.y - gridPos.y))
+              : manhattanDistance(sourcePiece, gridPos);
             if (dist > defaultOptions.range) {
               return needsTargetSelection();
             }

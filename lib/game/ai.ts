@@ -1,5 +1,7 @@
-import type { BattleState } from './battle-types'
+import type { BattleState } from './turn'
 import { getSkillById } from './skill-repository'
+import { prepareAction } from './targeting'
+import type { TargetRef } from './targeting'
 import { getLegalNormalMoveTargets, manhattanDistance } from './spatial'
 
 function getValidMoves(
@@ -9,39 +11,65 @@ function getValidMoves(
   return getLegalNormalMoveTargets(state, piece)
 }
 
-// Find valid skill targets for one piece and one skill definition
-function findSkillTargets(
-  state: BattleState,
-  piece: any,
-  skillDef: any,
-  enemies: any[],
-  allies: any[],
-): any[] | null {
-  const targetType = skillDef.targetType
-  const filter = skillDef.filter
-  const range: number = typeof skillDef.range === 'number' ? skillDef.range : 99
-
-  if (!targetType || targetType === 'none') return [null] // no target needed
-
-  if (targetType === 'piece') {
-    const pool = filter === 'ally' ? allies : enemies
-    const inRange = pool.filter(
-      t => t.currentHp > 0 && t.x != null && t.y != null &&
-        manhattanDistance(piece, t) <= range,
-    )
-    return inRange.length > 0 ? inRange : null
+function appendTargetRef(action: any, ref: TargetRef): any {
+  const next = { ...action }
+  const hasPrimary = next.targetPieceId || (next.targetX !== undefined && next.targetY !== undefined)
+  if (!hasPrimary) {
+    if (ref.type === 'piece') next.targetPieceId = ref.pieceId
+    else { next.targetX = ref.x; next.targetY = ref.y }
+    return next
   }
+  const extraTargets = Array.isArray(next.extraTargets) ? [...next.extraTargets] : []
+  extraTargets.push(ref.type === 'piece' ? { pieceId: ref.pieceId } : { x: ref.x, y: ref.y })
+  next.extraTargets = extraTargets
+  return next
+}
 
-  // grid / cell target — pick the enemy's cell
-  if (targetType === 'grid' || targetType === 'cell') {
-    const inRange = enemies.filter(
-      e => e.currentHp > 0 && e.x != null && e.y != null &&
-        manhattanDistance(piece, e) <= range,
-    )
-    return inRange.length > 0 ? inRange : null
+function chooseTarget(state: BattleState, candidates: TargetRef[], enemies: any[]): TargetRef | undefined {
+  const pieceCandidates = candidates
+    .filter((ref): ref is Extract<TargetRef, { type: 'piece' }> => ref.type === 'piece')
+    .map(ref => ({ ref, piece: state.pieces.find(piece => piece.instanceId === ref.pieceId) }))
+    .filter(entry => entry.piece)
+  if (pieceCandidates.length > 0) {
+    return pieceCandidates.reduce((best, current) =>
+      (current.piece!.currentHp < best.piece!.currentHp ? current : best), pieceCandidates[0]).ref
   }
+  const lowestEnemy = enemies.length > 0
+    ? enemies.reduce((best, enemy) => enemy.currentHp < best.currentHp ? enemy : best, enemies[0])
+    : undefined
+  if (lowestEnemy) {
+    const enemyCell = candidates.find(ref => ref.type === 'cell' && ref.x === lowestEnemy.x && ref.y === lowestEnemy.y)
+    if (enemyCell) return enemyCell
+  }
+  return candidates[0]
+}
 
-  return null
+function prepareBotSkillAction(state: BattleState, draft: any, enemies: any[]): any | undefined {
+  let action = { ...draft }
+  for (let guard = 0; guard < 8; guard += 1) {
+    const preparation = prepareAction(state, action)
+    if (preparation.kind === 'invalid') return undefined
+    if (preparation.kind === 'ready') return action
+    if (preparation.kind === 'needOption') {
+      const option = preparation.options[0]
+      if (!option) return undefined
+      action.selectionId = preparation.selectionId
+      action.stateRevision = preparation.stateRevision
+      action.selectedOption = option.value
+      continue
+    }
+    const target = chooseTarget(state, preparation.candidates, enemies)
+    if (!target) return undefined
+    action.selectionId = preparation.selectionId
+    action.stateRevision = preparation.stateRevision
+    action = appendTargetRef(action, target)
+  }
+  return undefined
+}
+
+export function prepareBotAction(state: BattleState, draft: any, botPlayerId: string): any | undefined {
+  const enemies = state.pieces.filter(piece => piece.ownerPlayerId !== botPlayerId && piece.currentHp > 0)
+  return prepareBotSkillAction(state, draft, enemies)
 }
 
 export function generateBotActions(state: BattleState, botPlayerId: string): any[] {
@@ -61,7 +89,6 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
   for (const piece of botPieces) {
     if (piece.x == null || piece.y == null || ap < 1) continue
 
-    const allies = botPieces.filter(p => p.instanceId !== piece.instanceId)
     let actedThisPiece = false
 
     // ── 1. Try to use a skill ──────────────────────────────────────────────
@@ -83,30 +110,15 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
         // Skip skills that need user interaction (pending option/target)
         if (skillDef.needsOptionSelection || skillDef.interactive) continue
 
-        const targets = findSkillTargets(state, piece, skillDef, enemies, allies)
-        if (!targets) continue
-
         const actionType = chargeCost > 0 ? 'useChargeSkill' : 'useBasicSkill'
-
-        if (targets[0] === null) {
-          // Self or area — no explicit target needed
-          actions.push({ type: actionType, playerId: botPlayerId, pieceId: piece.instanceId, skillId: pieceSkill.skillId })
-        } else {
-          // Pick the enemy with the lowest current HP (finish-off priority)
-          const target = targets.reduce(
-            (best: any, t: any) => (t.currentHp < best.currentHp ? t : best),
-            targets[0],
-          )
-          actions.push({
-            type: actionType,
-            playerId: botPlayerId,
-            pieceId: piece.instanceId,
-            skillId: pieceSkill.skillId,
-            targetPieceId: target.instanceId,
-            targetX: target.x,
-            targetY: target.y,
-          })
-        }
+        const action = prepareBotSkillAction(state, {
+          type: actionType,
+          playerId: botPlayerId,
+          pieceId: piece.instanceId,
+          skillId: pieceSkill.skillId,
+        }, enemies)
+        if (!action) continue
+        actions.push(action)
 
         ap -= apCost
         actedThisPiece = true

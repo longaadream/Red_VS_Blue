@@ -27,8 +27,20 @@ vi.mock('@/lib/game/attached-effect', () => ({
 import { applyBattleAction, BATTLE_STATE_VERSION, summonPiece } from '@/lib/game/turn'
 import type { BattleState } from '@/lib/game/turn'
 import type { PieceInstance } from '@/lib/game/piece'
+import { finalizePendingTargetSession, prepareAction } from '@/lib/game/targeting'
 import { makeState, makePiece, makeTile } from '../helpers/minimal-state'
 import { globalTriggerSystem } from '@/lib/game/triggers'
+
+function withTargetCredentials(state: BattleState, action: Record<string, any>): Record<string, any> {
+  const draft = { ...action }
+  delete draft.targetPieceId
+  delete draft.targetX
+  delete draft.targetY
+  delete draft.extraTargets
+  const prepared = prepareAction(state, draft as any)
+  if (prepared.kind !== 'needTarget') throw new Error(`Expected target preparation, received ${prepared.kind}`)
+  return { ...action, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision }
+}
 
 describe('summon trigger contract', () => {
   it('dispatches the declared before and after summon events', () => {
@@ -348,12 +360,15 @@ describe('projectile target validation', () => {
         powerMultiplier: 1,
         actionPointCost: 0,
         range: 'single',
+        targetType: 'piece',
+        filter: 'enemy',
+        targetRange: 99,
         requiresTarget: true,
         code: 'function executeSkill(context) { return { success: true } }',
       }
       vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
 
-      expect(() => applyBattleAction(state, {
+      expect(() => applyBattleAction(state, withTargetCredentials(state, {
         type: 'useBasicSkill',
         playerId: 'player-red',
         pieceId: 'caster',
@@ -361,7 +376,7 @@ describe('projectile target validation', () => {
         targetPieceId: 'minato',
         targetX: 1,
         targetY: 1,
-      } as any)).toThrow(/same row or column/)
+      }) as any)).toThrow(/same row or column/)
 
       expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
     },
@@ -388,13 +403,13 @@ describe('projectile target validation', () => {
     }
     vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
 
-    expect(() => applyBattleAction(state, {
+    expect(() => applyBattleAction(state, withTargetCredentials(state, {
       type: 'useBasicSkill',
       playerId: 'player-red',
       pieceId: 'caster',
       skillId: 'ally-only-test',
       targetPieceId: 'minato',
-    } as any)).toThrow()
+    }) as any)).toThrow()
 
     expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
     expect(state.extensions.executed).toBeUndefined()
@@ -459,19 +474,21 @@ describe('card preflight and interrupted release', () => {
         description: '',
         type: 'active',
         actionPointCost: 1,
-        code: "function executeCard(context) { if (!context.target) return { needsTargetSelection: true, targetType: 'piece', filter: 'enemy' }; if (context.target.x !== 0 && context.target.y !== 0) return { success: false, message: 'same row or column only' }; context.battle.extensions.executed = true; return { success: true, message: 'ok' }; }",
+        targetType: 'piece',
+        filter: 'ally',
+        code: "function executeCard(context) { context.battle.extensions.executed = true; return { success: true, message: 'ok' }; }",
       },
     }
     vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
 
-    expect(() => applyBattleAction(state, {
+    expect(() => applyBattleAction(state, withTargetCredentials(state, {
       type: 'playCard',
       playerId: 'player-red',
       cardInstanceId: 'card-1',
       targetPieceId: 'target',
       targetX: 1,
       targetY: 1,
-    } as any)).toThrow(/same row or column only/)
+    }) as any)).toThrow(/ally/)
 
     expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
   })
@@ -490,6 +507,8 @@ describe('card preflight and interrupted release', () => {
         description: '',
         type: 'active',
         actionPointCost: 1,
+        targetType: 'piece',
+        filter: 'enemy',
         code: "function executeCard(context) { if (!context.target) return { needsTargetSelection: true, targetType: 'piece', filter: 'enemy' }; context.battle.extensions.executed = true; return { success: true, message: 'card executed' }; }",
       },
     }
@@ -500,14 +519,14 @@ describe('card preflight and interrupted release', () => {
       return { success: true, messages: ['Target was removed'], blocked: false }
     })
 
-    const next = applyBattleAction(state, {
+    const next = applyBattleAction(state, withTargetCredentials(state, {
       type: 'playCard',
       playerId: 'player-red',
       cardInstanceId: 'card-1',
       targetPieceId: 'target',
       targetX: 1,
       targetY: 0,
-    } as any) as any
+    }) as any) as any
 
     const nextRed = next.players.find((p: any) => p.playerId === 'player-red')
     expect(nextRed.actionPoints).toBe(1)
@@ -553,7 +572,7 @@ describe('card preflight and interrupted release', () => {
     }
     vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
 
-    const next = applyBattleAction(state, {
+    const next = applyBattleAction(state, withTargetCredentials(state, {
       type: 'playCard',
       playerId: 'player-red',
       cardInstanceId: 'card-1',
@@ -561,7 +580,7 @@ describe('card preflight and interrupted release', () => {
       targetX: 0,
       targetY: 0,
       extraTargets: [{ x: 2, y: 2 }],
-    } as any) as any
+    }) as any) as any
 
     expect(next.extensions.kiljaedanPiece).toBeUndefined()
     const summoned = next.pieces.find((p: any) => p.instanceId === 'kiljaedan-hidden')
@@ -597,7 +616,7 @@ describe('card preflight and interrupted release', () => {
     }
     vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
 
-    const next = applyBattleAction(state, {
+    const next = applyBattleAction(state, withTargetCredentials(state, {
       type: 'playCard',
       playerId: 'player-red',
       cardInstanceId: 'card-5',
@@ -605,7 +624,7 @@ describe('card preflight and interrupted release', () => {
       targetX: 0,
       targetY: 0,
       extraTargets: [{ x: 2, y: 2 }],
-    } as any) as any
+    }) as any) as any
 
     expect(next.extensions.kiljaedanPiece).toBeUndefined()
     const summoned = next.pieces.find((p: any) => p.instanceId === 'kiljaedan-hidden')
@@ -619,20 +638,22 @@ describe('card preflight and interrupted release', () => {
 describe('generic pending target selection', () => {
   it('pendingTargetSelect clears selector and applies effectCode', () => {
     const state = makeState({ currentPlayerId: 'player-blue', phase: 'action' }) as any
-    state.pendingTargetSelection = {
+    state.pendingTargetSelection = finalizePendingTargetSession(state, {
       playerId: 'player-blue',
       title: '选择测试格',
       targetType: 'cell',
       range: 99,
       filter: 'all',
       effectCode: "function(ctx) { if (!ctx.battle.extensions) ctx.battle.extensions = {}; ctx.battle.extensions.tileEffects = [{ x: ctx.targetX, y: ctx.targetY, tileType: 'test-anchor' }]; return { success: true, message: 'ok' }; }",
-    }
+    }, 0)
 
     const next = applyBattleAction(state, {
       type: 'pendingTargetSelect',
       playerId: 'player-blue',
       targetX: 1,
       targetY: 1,
+      selectionId: state.pendingTargetSelection.selectionId,
+      stateRevision: state.pendingTargetSelection.stateRevision,
     } as any) as any
 
     expect(next.pendingTargetSelection).toBeUndefined()
