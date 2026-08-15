@@ -25,7 +25,8 @@ vi.mock('@/lib/game/attached-effect', () => ({
 }))
 
 import { applyBattleAction, BATTLE_STATE_VERSION } from '@/lib/game/turn'
-import { makeState, makePiece } from '../helpers/minimal-state'
+import type { BattleState } from '@/lib/game/turn'
+import { makeState, makePiece, makeTile } from '../helpers/minimal-state'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 
 // ─── 移动 ────────────────────────────────────────────────────────────────────
@@ -78,6 +79,143 @@ describe('move action', () => {
 
     const afterAP = next.players.find(p => p.playerId === 'player-red')?.actionPoints ?? 2
     expect(afterAP).toBeLessThan(initialAP)
+  })
+
+  it.each([
+    ['友方存活棋子', makePiece({ instanceId: 'blocker-ally', ownerPlayerId: 'player-red', x: 1, y: 0 })],
+    ['敌方存活棋子', makePiece({ instanceId: 'blocker-enemy', ownerPlayerId: 'player-blue', x: 1, y: 0 })],
+    ['存活召唤物', makePiece({ instanceId: 'summon', templateId: 'summoned-unit', ownerPlayerId: 'player-red', x: 1, y: 0 })],
+  ])('路径上的%s阻挡普通移动且不污染状态', (_label, blocker) => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [mover, blocker], currentPlayerId: 'player-red', phase: 'action' })
+    state.actions!.push({ type: 'existing', playerId: 'player-red', turn: 1 })
+    state.extensions!.debugBattle = {
+      appliedActionIds: ['existing-action'],
+      actionLog: [{ index: 0, action: { type: 'existing' } }],
+    }
+    const before = JSON.stringify(state)
+
+    expect(() => applyBattleAction(state, {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: 'mover',
+      toX: 2,
+      toY: 0,
+    })).toThrow(/blocked|occupied/i)
+
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
+  it.each([
+    {
+      label: '斜线',
+      target: { x: 1, y: 1 },
+      prepare: () => {},
+      error: /straight line/i,
+    },
+    {
+      label: '超出 moveRange',
+      target: { x: 4, y: 0 },
+      prepare: () => {},
+      error: /moveRange/i,
+    },
+    {
+      label: '终点不可行走',
+      target: { x: 2, y: 0 },
+      prepare: (state: BattleState) => {
+        state.map.tiles = state.map.tiles.map(tile => tile.x === 2 && tile.y === 0
+          ? { ...makeTile(2, 0, false), props: { ...makeTile(2, 0, false).props, type: 'hole' } } as unknown as typeof tile
+          : tile)
+      },
+      error: /terrain/i,
+    },
+    {
+      label: '路径地形阻挡',
+      target: { x: 2, y: 0 },
+      prepare: (state: BattleState) => {
+        state.map.tiles = state.map.tiles.map(tile => tile.x === 1 && tile.y === 0
+          ? { ...makeTile(1, 0, false), props: { ...makeTile(1, 0, false).props, type: 'wall' } } as unknown as typeof tile
+          : tile)
+      },
+      error: /terrain/i,
+    },
+    {
+      label: '终点被占用',
+      target: { x: 2, y: 0 },
+      prepare: (state: BattleState) => {
+        state.pieces.push(makePiece({
+          instanceId: 'occupant', ownerPlayerId: 'player-blue', x: 2, y: 0,
+        }) as unknown as (typeof state.pieces)[number])
+      },
+      error: /occupied/i,
+    },
+  ])('$label的普通移动被拒绝且不扣 AP、不写 action trace', ({ target, prepare, error }) => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [mover], currentPlayerId: 'player-red', phase: 'action' })
+    prepare(state)
+    const before = JSON.stringify(state)
+
+    expect(() => applyBattleAction(state, {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: 'mover',
+      toX: target.x,
+      toY: target.y,
+    })).toThrow(error)
+
+    expect(JSON.stringify(state)).toBe(before)
+    expect(state.players.find(p => p.playerId === 'player-red')?.actionPoints).toBe(2)
+    expect(state.actions).toEqual([])
+  })
+
+  it('可行走掩体格允许进入并停留', () => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [mover], currentPlayerId: 'player-red', phase: 'action' })
+    state.map.tiles = state.map.tiles.map(tile => tile.x === 1 && tile.y === 0
+      ? { ...makeTile(1, 0, true), props: { ...makeTile(1, 0, true).props, type: 'cover' } } as unknown as typeof tile
+      : tile)
+
+    const next = applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: 'mover', toX: 1, toY: 0,
+    })
+
+    expect(next.pieces.find(p => p.instanceId === 'mover')).toMatchObject({ x: 1, y: 0 })
+  })
+
+  it('死亡棋子和墓地棋子不再阻挡普通移动', () => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const dead = makePiece({ instanceId: 'dead', ownerPlayerId: 'player-blue', x: 1, y: 0, currentHp: 0 })
+    const state = makeState({ pieces: [mover, dead], currentPlayerId: 'player-red', phase: 'action' })
+    state.graveyard.push(makePiece({
+      instanceId: 'buried', ownerPlayerId: 'player-blue', x: 1, y: 0, currentHp: 0,
+    }) as unknown as (typeof state.graveyard)[number])
+
+    const next = applyBattleAction(state, {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: 'mover',
+      toX: 2,
+      toY: 0,
+    })
+
+    expect(next.pieces.find(p => p.instanceId === 'mover')).toMatchObject({ x: 2, y: 0 })
+  })
+
+  it('同一棋子可在行动点足够时连续普通移动，每次固定扣 1 AP', () => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    let state = makeState({ pieces: [mover], currentPlayerId: 'player-red', phase: 'action' })
+    state.players.find(p => p.playerId === 'player-red')!.actionPoints = 2
+
+    state = applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: 'mover', toX: 2, toY: 0,
+    })
+    state = applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: 'mover', toX: 2, toY: 1,
+    })
+
+    expect(state.pieces.find(p => p.instanceId === 'mover')).toMatchObject({ x: 2, y: 1 })
+    expect(state.players.find(p => p.playerId === 'player-red')?.actionPoints).toBe(0)
+    expect(state.actions?.filter(action => action.type === 'move')).toHaveLength(2)
   })
 })
 

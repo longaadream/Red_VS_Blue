@@ -2827,10 +2827,13 @@
 
     function canAutoMovePiece(piece) {
       if (!G || !piece || piece.currentHp <= 0) return false
-      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      const inAction = G.turn && G.turn.phase === 'action'
-      const isOwn = piece.ownerPlayerId && piece.ownerPlayerId.toLowerCase() === myPlayerId
-      return !!(isMyTurn && inAction && isOwn)
+      if (!window.BattleLegalActions || typeof GameEngine === 'undefined') return false
+      return BattleLegalActions.queryMoveCells({
+        snapshot: G,
+        playerId: myPlayerId,
+        pieceId: piece.instanceId,
+        engine: GameEngine,
+      }).size > 0
     }
 
     function autoMoveSelectedIfPossible() {
@@ -3438,7 +3441,8 @@
 
       const _selPiece = G && G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
       const _isOwnSelected = _selPiece && _selPiece.ownerPlayerId && _selPiece.ownerPlayerId.toLowerCase() === myPlayerId
-      setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected)
+      const _canMoveSelected = canAutoMovePiece(_selPiece)
+      setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
         setStatusMsg(getSkillHint())
