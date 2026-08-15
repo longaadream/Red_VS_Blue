@@ -194,6 +194,15 @@
   `tests/electron/piece-selection-smoke.mjs`，运行前先构建 Next standalone、同步页面并编译
   `electron-client`。
 
+### 9.3 同阵营对局本地 UI 验收（RED-43）
+
+- 入口：Next 开发服务的 `/qa/same-alignment`，可创建固定 seed 的 `light/light` 和 `dark/dark` 真实房间。
+- 门禁：启动页、`create-ui-acceptance-room` API 和 `/qa/client/**` 资源只在非 production 且 loopback 请求下提供，production 或远端请求返回 404。
+- 客户端：`/qa/client/battle.html` 不复制 `battle.html`；直达链接会在连接检查前从 URL 恢复服务器配置。
+- 证据：服务端通过规则干运行产生目标集；页面 RED-43 面板显示 room/player/seed、按 `ownerPlayerId` 划分的敌我数量、客户端高亮集与服务端目标集的对比。
+- 边界：入口与面板只组织验收并暴露证据，不改变动作协议、规则引擎、随机算法或 production 资源发布。
+- 测试：`tests/qa/red43-ui-acceptance.test.ts`；可重复浏览器步骤与证据见 `docs/qa/RED-43-same-alignment-ui.md`。
+
 ## 10. Electron IPC
 
 - 入口：各 `preload.ts` 暴露的 `electronAPI`/`editorAPI`，以及 `ipcMain` handler。
