@@ -28,6 +28,7 @@ import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction
 import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
+import { getRuleDate, getRuleMath, withRuleRuntimeCheckpoint } from "./rule-runtime"
 import { getNormalMoveRejection, manhattanDistance } from "./spatial"
 import {
   TargetingRuleError,
@@ -551,6 +552,154 @@ function getCardTargetArgs(
   return { targetPiece, targetPosition }
 }
 
+function assertCardDryRunResult(result: any): void {
+  if (result.needsTargetSelection) {
+    const err = new BattleRuleError('需要选择目标') as any
+    err.needsTargetSelection = true
+    err.targetType = result.targetType || 'piece'
+    err.range = result.range || 999
+    err.filter = result.filter || 'all'
+    err.targetIndex = result.targetIndex
+    throw err
+  }
+  if (result.needsOptionSelection) {
+    const err = new BattleRuleError('需要选择选项') as any
+    err.needsOptionSelection = true
+    err.options = result.options || []
+    err.title = result.title || '请选择'
+    throw err
+  }
+  if (!result.success) {
+    throw new BattleRuleError(result.message || "卡牌效果执行失败")
+  }
+}
+
+function dryRunCardAction(
+  state: BattleState,
+  action: any,
+  cardDef: any,
+  executeCardFunction: Function,
+): void {
+  withRuleRuntimeCheckpoint(() => {
+    const dryState = safeCloneBattleState(state)
+    const { targetPiece, targetPosition } = getCardTargetArgs(dryState, action)
+    const result = executeCardFunction(
+      cardDef,
+      action.playerId,
+      dryState,
+      undefined,
+      targetPiece,
+      targetPosition,
+      action.selectedOption,
+      action.extraTargets,
+    )
+    assertCardDryRunResult(result)
+  })
+}
+
+function buildSkillTargetSlot(
+  state: BattleState,
+  pieceId: string | undefined,
+  tx: number | undefined,
+  ty: number | undefined,
+) {
+  if (pieceId) {
+    const tp = state.pieces.find(p => p.instanceId === pieceId)
+    if (tp) {
+      return {
+        info: {
+          instanceId: tp.instanceId,
+          templateId: tp.templateId,
+          ownerPlayerId: tp.ownerPlayerId,
+          currentHp: tp.currentHp,
+          maxHp: tp.maxHp,
+          attack: tp.attack,
+          defense: tp.defense,
+          x: tp.x || 0,
+          y: tp.y || 0,
+        },
+        pos: { x: tp.x || 0, y: tp.y || 0 },
+      }
+    }
+  } else if (tx !== undefined && ty !== undefined) {
+    return { info: null, pos: { x: tx, y: ty } }
+  }
+  return { info: null, pos: null }
+}
+
+function buildSkillExecutionContext(
+  state: BattleState,
+  piece: PieceInstance,
+  action: any,
+  skillDef: SkillDefinition,
+) {
+  const t1 = buildSkillTargetSlot(state, action.targetPieceId, action.targetX, action.targetY)
+  const extraTargets: Array<{pieceId?: string; x?: number; y?: number}> = action.extraTargets || []
+  const targets = [
+    t1,
+    ...extraTargets.map(et => buildSkillTargetSlot(state, et.pieceId, et.x, et.y)),
+  ]
+  return {
+    piece,
+    target: t1.info,
+    targetPosition: t1.pos,
+    targets,
+    selectedOption: action.selectedOption,
+    playerId: action.playerId,
+    battle: state,
+    skill: {
+      id: skillDef.id,
+      name: skillDef.name,
+      type: skillDef.type,
+      powerMultiplier: skillDef.powerMultiplier,
+    },
+  }
+}
+
+function assertSkillDryRunResult(result: any): void {
+  if (result.needsTargetSelection) {
+    const err = new BattleRuleError('??????') as any
+    err.needsTargetSelection = true
+    err.targetType = result.targetType || 'piece'
+    err.range = result.range || 5
+    err.filter = result.filter || 'enemy'
+    err.targetIndex = result.targetIndex
+    throw err
+  }
+  if (result.needsOptionSelection) {
+    const err = new BattleRuleError('??????') as any
+    err.needsOptionSelection = true
+    err.options = result.options || []
+    err.title = result.title || '???'
+    throw err
+  }
+  if (!result.success) {
+    throw new BattleRuleError(result.message || '??????')
+  }
+}
+function dryRunSkillAction(
+  state: BattleState,
+  piece: PieceInstance,
+  action: any,
+  skillDef: SkillDefinition,
+): void {
+  withRuleRuntimeCheckpoint(() => {
+    const dryState = safeCloneBattleState(state)
+    if (!(dryState as any).extensions) (dryState as any).extensions = {}
+    ;(dryState as any).extensions.__dryRunSkillPreflight = true
+    const dryPiece = dryState.pieces.find(p => p.instanceId === piece.instanceId && p.currentHp > 0)
+    if (!dryPiece) {
+      throw new BattleRuleError("Piece not found or is defeated")
+    }
+    const drySkillDef = dryState.skillsById[skillDef.id] || skillDef
+    const result = executeSkillFunction(
+      drySkillDef,
+      buildSkillExecutionContext(dryState, dryPiece, action, drySkillDef),
+      dryState,
+    )
+    assertSkillDryRunResult(result)
+  })
+}
 export function validateSkillActionByDryRun(state: BattleState, action: any): void {
   if (action.type !== "useBasicSkill" && action.type !== "useChargeSkill") {
     throw new BattleRuleError("Action is not a skill action")
@@ -2069,7 +2218,8 @@ function applyBattleActionInternal(
       if (pending.effectCode) {
         let fn: any
         try {
-          fn = eval('(' + pending.effectCode + ')')
+          const compileEffect = eval('(function(Math, Date) { return (' + pending.effectCode + '); })')
+          fn = compileEffect(getRuleMath(), getRuleDate())
         } catch (evalErr) {
           throw new BattleRuleError('[STAGE6] effectCode eval failed: ' + (evalErr instanceof Error ? evalErr.message : String(evalErr)))
         }

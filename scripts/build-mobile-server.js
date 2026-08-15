@@ -49,10 +49,10 @@ const resolvePlugin = {
   setup(build) {
 
     // ── Bare Node.js built-ins ─────────────────────────────────────────────
-    build.onResolve({ filter: /^fs$/ },   () => ({ path: shimDir + '/fs-shim.ts' }))
-    build.onResolve({ filter: /^path$/ }, () => ({ path: shimDir + '/path-shim.ts' }))
-    build.onResolve({ filter: /^os$/ },   () => ({ path: shimDir + '/os-shim.ts' }))
-    build.onResolve({ filter: /^(zlib|crypto|stream|net|http|https|child_process|worker_threads)$/ }, () => ({
+    build.onResolve({ filter: /^(?:node:)?fs$/ },   () => ({ path: shimDir + '/fs-shim.ts' }))
+    build.onResolve({ filter: /^(?:node:)?path$/ }, () => ({ path: shimDir + '/path-shim.ts' }))
+    build.onResolve({ filter: /^(?:node:)?os$/ },   () => ({ path: shimDir + '/os-shim.ts' }))
+    build.onResolve({ filter: /^(?:node:)?(zlib|crypto|stream|net|http|https|child_process|worker_threads)$/ }, () => ({
       path: shimDir + '/empty-shim.ts'
     }))
 
@@ -80,6 +80,7 @@ const resolvePlugin = {
 
     // ── lib/game module shims ──────────────────────────────────────────────
     const moduleShims = [
+      ['app-paths',        shimDir + '/app-paths-shim.ts'],
       ['file-loader',       shimDir + '/file-loader-shim.ts'],
       ['piece-repository',  shimDir + '/piece-repository-shim.ts'],
       ['skill-repository',  shimDir + '/skill-repository-shim.ts'],

@@ -1,0 +1,134 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
+import { describe, expect, it } from 'vitest'
+
+const AUTHORITY_INITIALIZATION_FILES = [
+  'lib/game/room-battle-start.ts',
+  'app/api/battle/route.ts',
+  'app/api/relay-battle-init/route.ts',
+]
+
+const ROOM_START_DELEGATES = [
+  'lib/ws-server.ts',
+  'app/api/rooms/[roomId]/route.ts',
+  'app/api/rooms/[roomId]/actions/route.ts',
+]
+
+const CROSS_PLATFORM_AUTHORITY_FILES = {
+  mobileServer: 'mobile-server/mobile-server-entry.ts',
+  battlePage: 'data/pages/battle.html',
+  browserEntry: 'lib/game/engine-browser-entry.ts',
+}
+
+const DATA_RULE_BOUNDARIES = [
+  'lib/game/skills.ts',
+  'lib/game/triggers.ts',
+  'lib/game/rule-loader.ts',
+  'lib/game/turn.ts',
+]
+
+const DIRECT_RULE_CAPABILITY_EXEMPTIONS: Record<string, RegExp[]> = {
+  'lib/game/identity-verify.ts': [/Date\.now\(\)/],
+  'lib/game/rng.ts': [/Math\.random\.bind\(Math\)/],
+  'lib/game/room-cleanup-config.ts': [/Date\.now\(\)/],
+  'lib/game/rule-runtime.ts': [/Math\.random\(\)/, /Date\.now\(\)/],
+}
+
+function read(relativePath: string): string {
+  return fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8')
+}
+
+function listTypeScriptFiles(directory: string): string[] {
+  const absoluteDirectory = path.join(process.cwd(), directory)
+  return fs.readdirSync(absoluteDirectory, { withFileTypes: true }).flatMap(entry => {
+    const relativePath = path.posix.join(directory, entry.name)
+    if (entry.isDirectory()) return listTypeScriptFiles(relativePath)
+    return entry.isFile() && entry.name.endsWith('.ts') ? [relativePath] : []
+  })
+}
+
+describe('authority determinism audit', () => {
+  it('injects a root seed before every authoritative battle initialization', () => {
+    for (const relativePath of AUTHORITY_INITIALIZATION_FILES) {
+      const source = read(relativePath)
+      const initializationCount = source.match(/createInitialBattleForPlayers\s*\(/g)?.length ?? 0
+      const injectedSeedCount = source.match(/rootSeed:\s*seed\b/g)?.length ?? 0
+
+      expect(initializationCount, relativePath).toBeGreaterThan(0)
+      expect(injectedSeedCount, relativePath).toBeGreaterThanOrEqual(initializationCount)
+      expect(source, relativePath).not.toMatch(/seed\s*:\s*Math\.floor\(Math\.random\(/)
+    }
+
+    for (const relativePath of ROOM_START_DELEGATES) {
+      expect(read(relativePath), relativePath).toContain('startBattleFromLockedRosters')
+    }
+  })
+
+  it('contains no unclassified direct wall-clock or random calls in lib/game', () => {
+    const violations: string[] = []
+
+    for (const relativePath of listTypeScriptFiles('lib/game')) {
+      const exemptions = DIRECT_RULE_CAPABILITY_EXEMPTIONS[relativePath] ?? []
+      for (const [lineIndex, line] of read(relativePath).split(/\r?\n/).entries()) {
+        if (!/Math\.random|Date\.now/.test(line)) continue
+        if (exemptions.some(pattern => pattern.test(line))) continue
+        violations.push(`${relativePath}:${lineIndex + 1}: ${line.trim()}`)
+      }
+    }
+
+    expect(violations).toEqual([])
+  })
+
+  it('routes Android and Relay authority through the seeded deterministic runner', () => {
+    const mobileServer = read(CROSS_PLATFORM_AUTHORITY_FILES.mobileServer)
+    expect(mobileServer.match(/const seed = createRootSeed\(\)/g)?.length, 'mobile root seeds').toBeGreaterThanOrEqual(2)
+    expect(mobileServer.match(/rootSeed:\s*seed\b/g)?.length, 'mobile seed injection').toBeGreaterThanOrEqual(2)
+    expect(mobileServer).toContain('runBattleAction(')
+    expect(mobileServer).toContain('return ok({ state, seed }')
+    expect(mobileServer).not.toMatch(/seed\s*=\s*Math\.floor\(Math\.random\(/)
+    expect(mobileServer).toContain('room.firstPlayerId = initState.turn.currentPlayerId')
+    expect(mobileServer).toContain('Invalid deterministic action trace')
+    expect(mobileServer).toContain('Trace pre-state hash does not match the authoritative action log')
+    expect(mobileServer).toContain('if (trace) Object.assign(entry, trace)')
+
+    const roomStart = read('lib/game/room-battle-start.ts')
+    expect(roomStart).toContain('{ rootSeed: seed }')
+    expect(roomStart).toContain('const firstPlayerId = initState.turn.currentPlayerId')
+    expect(roomStart).not.toContain('getPlayerSeat(player) === \'red\') || roomPlayers[0]')
+
+    const battlePage = read(CROSS_PLATFORM_AUTHORITY_FILES.battlePage)
+    expect(battlePage).toContain('function runDeterministicAuthorityAction(state, action)')
+    expect(battlePage).toContain('GameEngine.runBattleAction(state, action, { rootSeed: seed })')
+    expect(battlePage).toContain("throw new Error('Missing authority root seed')")
+    expect(battlePage).not.toMatch(/GameEngine\.applyBattleAction\s*\([^)]*\baction\b/)
+    expect(battlePage).not.toContain('optimisticPendingState')
+    expect(battlePage).not.toContain('preOptimisticGForEcho')
+    expect(battlePage).toContain('var authorityTrace = null')
+    expect(battlePage).toContain('trace: authorityTrace')
+    expect(battlePage).not.toMatch(/entry\.action\.type\s*===\s*['"]pending(?:Option|Target)Select['"][\s\S]{0,200}wsActionSeq\s*=/)
+    expect(battlePage.match(/runDeterministicAuthorityAction\(/g)?.length, 'authority runner call sites').toBeGreaterThanOrEqual(4)
+
+    const browserEntry = read(CROSS_PLATFORM_AUTHORITY_FILES.browserEntry)
+    expect(browserEntry).toContain('getBattleRootSeed, hashBattleState, runBattleAction')
+  })
+
+  it('keeps browser candidate builds on explicit platform shims', () => {
+    const gameEngineBuild = read('scripts/build-game-engine.js')
+    const mobileServerBuild = read('scripts/build-mobile-server.js')
+
+    expect(gameEngineBuild).toContain("filter: /^node:(fs|path|crypto|zlib)$/")
+    expect(gameEngineBuild).toContain("namespace: 'rvb-browser-stub'")
+    expect(gameEngineBuild).toContain('plugins: [browserRuntimeCompatibility]')
+    expect(mobileServerBuild).toContain("filter: /^(?:node:)?fs$/")
+    expect(mobileServerBuild).toContain("['app-paths',")
+  })
+
+  it('injects deterministic Math and Date at every data-rule execution boundary', () => {
+    for (const relativePath of DATA_RULE_BOUNDARIES) {
+      const source = read(relativePath)
+      expect(source, relativePath).toContain('getRuleMath')
+      expect(source, relativePath).toContain('getRuleDate')
+    }
+  })
+})

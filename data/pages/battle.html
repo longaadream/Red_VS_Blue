@@ -1750,8 +1750,6 @@
     let _use3d = false           // Three.js renderer active
     let battlePresentation = null
     let currentBattleViewModel = null
-    let preOptimisticGForEcho = null  // saved state before optimistic pendingOptionSelect, for echo correction
-
     function red43QaSnapshot() {
       if (!RED43_QA_MODE) return null
       const pieces = G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
@@ -2652,8 +2650,26 @@
 
     // Apply an authoritative state snapshot received from server (WS or GET)
     var _lastAppliedState = null
+    function resolveAuthoritySeed(state, seed) {
+      var resolved = typeof seed === 'number' && Number.isInteger(seed) ? (seed >>> 0) : null
+      if (resolved === null && state && typeof GameEngine !== 'undefined' && GameEngine.getBattleRootSeed) {
+        var tracedSeed = GameEngine.getBattleRootSeed(state)
+        if (typeof tracedSeed === 'number') resolved = tracedSeed >>> 0
+      }
+      if (resolved === null) return gameSeed
+      if (typeof gameSeed === 'number' && gameSeed !== resolved) throw new Error('Authority root seed changed')
+      if (typeof gameSeed !== 'number') gameSeed = resolved
+      return gameSeed
+    }
+    function runDeterministicAuthorityAction(state, action) {
+      if (!state || typeof GameEngine === 'undefined' || !GameEngine.runBattleAction) throw new Error('Deterministic authority runner is unavailable')
+      var seed = resolveAuthoritySeed(state, null)
+      if (typeof seed !== 'number') throw new Error('Missing authority root seed')
+      return GameEngine.runBattleAction(state, action, { rootSeed: seed })
+    }
     function applyServerState(state, seed, preserveWsSeq) {
       if (!state) return
+      resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
       const oldG = G
@@ -2708,19 +2724,12 @@
       if (entry.action && typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
         try {
           const oldG = G
-          const nextG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), entry.action)
+          const nextG = runDeterministicAuthorityAction(G, entry.action).state
           wsActionSeq = entry.seq
           applyServerState(nextG, null, true)
           spawnStateFloaters(oldG, G)
         } catch (e) {
           const msg = e && e.message ? e.message : String(e)
-          // Keep the UI responsive even if a legacy pending option echo cannot replay locally.
-          if (entry.action.type === 'pendingOptionSelect') {
-            wsActionSeq = entry.seq
-            addLog('[WS] pendingOptionSelect 处理异常，已恢复操作：' + msg, 'warn')
-            render()
-            return
-          }
           addLog('[WS] 动作日志回放失败：' + msg, 'err')
           setStatusMsg('WS 动作日志回放失败：' + msg)
         }
@@ -2813,7 +2822,7 @@
         } else if (msg.type === 'pendingAction') {
           // Relay host: process guest action locally and push stateUpdate.
           if (wsMode === 'relay' && wsRole === 'host' && G &&
-              typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
+              typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
             try {
               if (!msg.action || !msg.from || !msg.action.playerId ||
                   String(msg.from).toLowerCase() !== String(msg.action.playerId).toLowerCase()) {
@@ -2821,10 +2830,11 @@
                 playerMismatch.code = 'ACTION_PLAYER_MISMATCH'
                 throw playerMismatch
               }
-              var newG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), msg.action)
-              applyServerState(newG, null)
+              var result = runDeterministicAuthorityAction(G, msg.action)
+              var newG = result.state
+              applyServerState(newG, gameSeed)
               relaySeq++
-              RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
+              RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
             } catch (e) {
               addLog('处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err')
               RvBWs.send({
@@ -4025,6 +4035,7 @@
 
     async function doAction(action) {
       action = withClientActionId(action)
+      var authorityTrace = null
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) { addLog('未连接服务器', 'err'); return }
@@ -4034,10 +4045,19 @@
         setMoveButtonDisabled(true)
         if (action.type === 'endTurn') addLog('正在结束回合...', 'info')
 
+        if (typeof GameEngine !== 'undefined' && GameEngine.safeCloneBattleState) {
+          try {
+            authorityTrace = runDeterministicAuthorityAction(GameEngine.safeCloneBattleState(G), action).trace || null
+          } catch (e) {
+            if (enterActionTargetMode(action, targetPreparationFromError(e))) return
+            throw e
+          }
+        }
+
         // Relay guest: submit action via WS, wait for stateUpdate.
         if (wsMode === 'relay' && wsRole === 'guest') {
           relaySeq++
-          RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: '' })
+          RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: '', trace: authorityTrace })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -4047,16 +4067,17 @@
 
         // Relay host: apply locally + push stateUpdate.
         if (wsMode === 'relay' && wsRole === 'host' && G &&
-            typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
+            typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
           try {
-            const newG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), action)
+            const result = runDeterministicAuthorityAction(G, action)
+            const newG = result.state
             if (action.pieceId && newG.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
               selectedPieceId = action.pieceId
             } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
             pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
-            applyServerState(newG, null)
+            applyServerState(newG, gameSeed)
             relaySeq++
-            RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
+            RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
           } catch (e) {
             if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
               addLog('本地处理失败：' + e.message, 'err')
@@ -4068,7 +4089,7 @@
 
         // LAN WS: submit action via WS only.
         if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
-          RvBWs.send({ type: 'action', action, playerId: myPlayerId })
+          RvBWs.send({ type: 'action', action, playerId: myPlayerId, trace: authorityTrace })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }

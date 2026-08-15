@@ -2,6 +2,7 @@ import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import { globalTriggerSystem } from "./triggers"
 import { rng } from "./rng"
+import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance } from './spatial'
 
@@ -124,7 +125,10 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
     return false
   }
   
-  const instanceId = `ci-${cardId}-${Math.floor(rng() * 1e9)}`
+  const runtime = getActiveRuleRuntime()
+  const instanceId = runtime
+    ? runtime.nextInstanceId('card', `ci-${cardId}`)
+    : `ci-${cardId}-${Math.floor(rng() * 1e9)}`
   const staticCard = loadCardById(cardId)
   const customCard = (battle as any).customCards?.[cardId]
   const cardDef = staticCard || customCard
@@ -436,7 +440,8 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       return false
     },
 
-    Math,
+    Math: getRuleMath(),
+    Date: getRuleDate(),
     console
   }
 }
@@ -501,6 +506,7 @@ export function executeCardFunction(
         const addPlayerRuleById = env.addPlayerRuleById;
         const removePlayerRuleById = env.removePlayerRuleById;
         const Math = env.Math;
+        const Date = env.Date;
         const console = env.console;
 
         ${cardDef.code}
@@ -553,13 +559,22 @@ export function loadAllSkillsById(): Record<string, SkillDefinition> {
 }
 
 // 从文件中加载规则的函数（导出以便在需要时重新注入 effect 函数）
+function instantiateRuleForBattle(rule: TriggerRule): TriggerRule {
+  return {
+    ...rule,
+    limits: rule.limits
+      ? { ...rule.limits, uses: 0, currentCooldown: 0, remainingDuration: undefined }
+      : undefined,
+  }
+}
+
 export function loadRuleById(ruleId: string, forceReload: boolean = false): TriggerRule | null {
   console.log(`[loadRuleById] Called with ruleId: ${ruleId}, forceReload: ${forceReload}`);
   // 命中缓存时返回拷贝（深拷贝 limits，避免跨游戏共享 uses/currentCooldown 计数）
   const cached = ruleCache.get(ruleId)
   if (cached && !forceReload) {
     console.log(`[loadRuleById] Cache hit for rule: ${ruleId}`);
-    return { ...cached, limits: cached.limits ? { ...cached.limits, uses: 0, currentCooldown: 0, remainingDuration: undefined } : undefined }
+    return instantiateRuleForBattle(cached)
   }
   if (forceReload && cached) {
     console.log(`[loadRuleById] Force reloading rule: ${ruleId}`);
@@ -741,16 +756,17 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             };
 
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent, Math, Date) {
                 ${ruleData.skillCode}
-              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent)
+              })
             `;
 
             if (ruleId === 'rule-shishio-combustion') {
               const ctr = (context.rulePiece?.statusTags ?? []).find((t: any) => t.type === 'shishio-dmg-counter');
               console.log(`[combustion-debug] skillId="${context.skillId ?? 'undefined'}" damage=${context.damage} src=${context.sourcePiece?.name} tgt=${context.targetPiece?.name} counter_before=${ctr?.intensity ?? 0}`);
             }
-            const result = eval(codeEnvironment);
+            const executeRuleCode = eval(codeEnvironment);
+            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent, getRuleMath(), getRuleDate());
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
@@ -1008,7 +1024,8 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     getAllAlliesInRange: (range: any) => [],
                     calculateDistance: (x1: any, y1: any, x2: any, y2: any) => manhattanDistance({ x: x1, y: y1 }, { x: x2, y: y2 }),
                     isTargetInRange: (target: any, range: any) => false,
-                    Math: Math,
+                    Math: getRuleMath(),
+                    Date: getRuleDate(),
                     console: console
                   };
                   
@@ -1043,6 +1060,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                       const addPlayerStatusEffectById = environment.addPlayerStatusEffectById;
                       const removePlayerStatusEffectById = environment.removePlayerStatusEffectById;
                       const Math = environment.Math;
+                      const Date = environment.Date;
                       const console = environment.console;
 
                       ${skillDef.code}
@@ -1088,7 +1106,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
       console.log(`Loaded rule successfully: ${ruleId}`);
       // 写入缓存，后续复用时无需再读文件
       ruleCache.set(ruleId, rule)
-      return rule;
+      return instantiateRuleForBattle(rule);
     } else {
       console.error(`Rule file not found: ${rulePath}`);
     }
@@ -2555,7 +2573,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       },
 
       // 工具函数
-      Math,
+      Math: getRuleMath(),
+      Date: getRuleDate(),
       console
     }
 
@@ -2607,6 +2626,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const getPieceEffect = environment.getPieceEffect;
               const fireEvent = environment.fireEvent;
               const Math = environment.Math;
+              const Date = environment.Date;
               const console = environment.console;
 
               // 定义技能执行函数

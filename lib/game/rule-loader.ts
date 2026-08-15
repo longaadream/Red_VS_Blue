@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import type { TriggerRule } from './triggers'
 import { executeSkillFunction } from './skills'
+import { getRuleDate, getRuleMath } from './rule-runtime'
 import { manhattanDistance } from './spatial'
 
 // 效果类型
@@ -413,7 +414,10 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                     playerId: context.playerId
                   }
                   const skillCode = skillDef.code
-                  const skillResult = eval(`(function(context) { ${skillCode}; return executeSkill(context); })(playerSkillContext)`)
+                  const executeRuleSkill = eval(
+                    `(function(context, Math, Date) { ${skillCode}; return executeSkill(context); })`,
+                  ) as (context: unknown, math: Math, date: DateConstructor) => { success?: boolean; message?: string } | undefined
+                  const skillResult = executeRuleSkill(playerSkillContext, getRuleMath(), getRuleDate())
                   if (skillResult?.success) {
                     message = skillResult.message || resolveMessage(effect.message, context)
                     success = true
