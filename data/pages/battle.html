@@ -29,7 +29,7 @@
       background: var(--bg); color: var(--text); display: flex; flex-direction: column;
     }
 
-    /* 鈹€鈹€ Topbar 鈹€鈹€ */
+    /* ── Topbar ── */
     .topbar {
       position: fixed; top: 10px; right: 10px; z-index: 86;
       display: flex; align-items: center; justify-content: flex-end; gap: 6px;
@@ -120,12 +120,12 @@
       .hud-btn { min-width: 28px; height: 28px; padding: 0 6px; font-size: 12px; }
     }
 
-    /* 鈹€鈹€ Main layout 鈹€鈹€ */
+    /* ── Main layout ── */
     .battle-layout {
       display: flex; flex: 1; overflow: hidden; min-height: 0;
     }
 
-    /* 鈹€鈹€ Side panels 鈹€鈹€ */
+    /* ── Side panels ── */
     .side-panel {
       width: 110px; flex-shrink: 0; overflow-y: auto;
       border-right: 1px solid var(--border); padding: 6px;
@@ -151,7 +151,7 @@
     .hp-fill.crit { background: #ef4444; }
     .res-row { font-size: 10px; color: #94a3b8; margin-top: 1px; }
 
-    /* 鈹€鈹€ Main board area 鈹€鈹€ */
+    /* ── Main board area ── */
     .main-panel {
       flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
     }
@@ -225,7 +225,7 @@
       display: grid; gap: 1px; background: #0a0a0f;
     }
 
-    /* 鈹€鈹€ Tiles 鈹€鈹€ */
+    /* ── Tiles ── */
     .cell {
       width: var(--cell-size, 44px); height: var(--cell-size, 44px);
       position: relative; cursor: pointer;
@@ -253,7 +253,7 @@
     .hl-place    { outline: 2px solid #8b5cf6; z-index: 1; }
     .hl-selected { outline: 3px solid #60a5fa; z-index: 2; }
 
-    /* 鈹€鈹€ Piece token 鈹€鈹€ */
+    /* ── Piece token ── */
     .piece-tok {
       width: calc(var(--cell-size, 44px) - 8px); height: calc(var(--cell-size, 44px) - 8px);
       border-radius: 6px; overflow: visible;
@@ -270,7 +270,7 @@
     .tok-hp-fill.low  { background: #f59e0b; }
     .tok-hp-fill.crit { background: #ef4444; }
 
-    /* 鈹€鈹€ StatusTags 鈹€鈹€ */
+    /* ── StatusTags ── */
     .piece-tags {
       position: absolute; top: -14px; left: 0; right: 0;
       display: flex; flex-wrap: wrap; gap: 1px; justify-content: center;
@@ -280,7 +280,7 @@
       border-radius: 3px; padding: 1px 3px; white-space: nowrap; line-height: 1.3;
     }
 
-    /* 鈹€鈹€ Action bar 鈹€鈹€ */
+    /* ── Action bar ── */
     .action-bar {
       border-top: 1px solid var(--border); padding: 8px 10px;
       display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap;
@@ -394,7 +394,7 @@
       color: #cbd5e1;
     }
 
-    /* 鈹€鈹€ Hand panel 鈹€鈹€ */
+    /* ── Hand panel ── */
     .hand-panel {
       border-top: 1px solid var(--border); flex-shrink: 0;
       background: #080f1e;
@@ -411,7 +411,7 @@
     }
     .hand-scroll::-webkit-scrollbar { height: 3px; }
     .hand-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-    /* 鈹€鈹€ Hearthstone-style cards 鈹€鈹€ */
+    /* ── Hearthstone-style cards ── */
     .card-item {
       flex-shrink: 0; width: 88px; height: 138px;
       background: linear-gradient(180deg, #1a2744 0%, #0f1929 55%, #131c30 100%);
@@ -474,7 +474,7 @@
     .card-type-badge { font-size: 8px; color: #475569; font-weight: 600; text-align: center; }
     .hand-empty { font-size: 12px; color: #334155; padding: 10px; }
 
-    /* 鈹€鈹€ Turn announcement overlay 鈹€鈹€ */
+    /* ── Turn announcement overlay ── */
     #turnAnnounce {
       position: fixed; top: 50%; left: 50%;
       transform: translate(-50%,-50%);
@@ -490,7 +490,7 @@
       100% { opacity: 0; transform: translate(-50%,-50%) scale(1.12); }
     }
 
-    /* 鈹€鈹€ Log 鈹€鈹€ */
+    /* ── Log ── */
     .log-panel {
       flex-shrink: 0; border-top: 1px solid var(--border);
       display: flex; flex-direction: column;
@@ -513,13 +513,13 @@
     .collapse-arrow { font-size: 10px; color: var(--muted); transition: transform .2s; }
     .collapse-arrow.open { transform: rotate(90deg); }
 
-    /* 鈹€鈹€ Hand panel collapsible 鈹€鈹€ */
+    /* ── Hand panel collapsible ── */
     .hand-body { }
     .hand-body.collapsed { display: none; }
     .hand-header { cursor: pointer; user-select: none; }
     .hand-header:active { background: #0d1929; }
 
-    /* 鈹€鈹€ Fullscreen map mode 鈹€鈹€ */
+    /* ── Fullscreen map mode ── */
     .btn-fullmap {
       background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
       color: #94a3b8; padding: 5px 9px; font-size: 14px; cursor: pointer; flex-shrink: 0;
@@ -549,7 +549,7 @@
     }
     body.full-map #fullMapExitBtn { display: block; }
 
-    /* 鈹€鈹€ Damage floaters 鈹€鈹€ */
+    /* ── Damage floaters ── */
     .dmg-float {
       position: absolute; pointer-events: none; white-space: nowrap;
       font-size: 16px; font-weight: 900; z-index: 50;
@@ -564,7 +564,7 @@
       100% { opacity: 0; transform: translateX(-50%) translateY(-54px); }
     }
 
-    /* 鈹€鈹€ Loading / result overlays 鈹€鈹€ */
+    /* ── Loading / result overlays ── */
     #loadingOverlay {
       position: fixed; inset: 0; background: var(--bg);
       display: flex; align-items: center; justify-content: center;
@@ -584,7 +584,29 @@
     .result-title { font-size: 28px; font-weight: 800; }
     .result-sub { font-size: 15px; color: #94a3b8; }
 
-    /* 鈹€鈹€ Option picker overlay 鈹€鈹€ */
+    #red43QaPanel {
+      display: none; position: fixed; left: 12px; bottom: 12px; z-index: 190;
+      width: min(360px, calc(100vw - 24px)); padding: 12px 14px;
+      border: 1px solid rgba(96,165,250,.62); border-radius: 12px;
+      background: rgba(3,7,18,.92); color: #dbeafe;
+      box-shadow: 0 18px 50px rgba(0,0,0,.46); backdrop-filter: blur(12px);
+      font-size: 11px; line-height: 1.55;
+    }
+    body.red43-qa #red43QaPanel { display: block; }
+    #red43QaPanel[data-consistent="true"] { border-color: rgba(74,222,128,.78); }
+    #red43QaPanel[data-consistent="false"] { border-color: rgba(248,113,113,.76); }
+    .red43-qa-title { color: #93c5fd; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+    .red43-qa-grid { display: grid; grid-template-columns: 84px 1fr; gap: 2px 8px; margin-top: 7px; }
+    .red43-qa-key { color: #64748b; }
+    .red43-qa-value { color: #e2e8f0; overflow-wrap: anywhere; }
+    .red43-qa-button {
+      width: 100%; margin-top: 9px; padding: 7px 10px; border: 1px solid #3b82f6;
+      border-radius: 8px; background: #1d4ed8; color: #fff; cursor: pointer;
+      font-size: 11px; font-weight: 900;
+    }
+    .red43-qa-button:disabled { cursor: not-allowed; opacity: .48; }
+
+    /* ── Option picker overlay ── */
     #optionPickerOverlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.65); z-index: 300;
@@ -691,13 +713,13 @@
     .legend-item { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #64748b; }
     .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 
-    /* 鈹€鈹€ Piece info button 鈹€鈹€ */
+    /* ── Piece info button ── */
     .piece-info-btn {
       float: right; background: none; border: none; color: #475569;
       font-size: 13px; cursor: pointer; padding: 0 0 0 4px; line-height: 1;
     }
 
-    /* 鈹€鈹€ Piece info modal 鈹€鈹€ */
+    /* ── Piece info modal ── */
     #pieceInfoModal {
       position: fixed; inset: 0; background: rgba(0,0,0,.85);
       z-index: 150; display: none; align-items: flex-start; justify-content: center;
@@ -751,7 +773,7 @@
     .pi-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
     .pi-keywords { margin-top: 8px; }
 
-    /* 鈹€鈹€ Card detail modal 鈹€鈹€ */
+    /* ── Card detail modal ── */
     #cardDetailModal {
       position: fixed; inset: 0; background: rgba(0,0,0,.85);
       z-index: 160; display: none; align-items: center; justify-content: center;
@@ -848,7 +870,7 @@
       .resource-orb { padding: 1px 4px; }
     }
 
-    /* 鈹€鈹€ Arc hand (all screens) 鈹€鈹€ */
+    /* ── Arc hand (all screens) ── */
     .hand-panel { display: none !important; }
     #arcHandContainer {
       display: block;
@@ -913,7 +935,7 @@
       overflow: hidden;
     }
     .arc-card-type { font-size: 8px; color: #64748b; padding-bottom: 4px; }
-    /* 鈹€鈹€ Windows hover 鈹€鈹€ */
+    /* ── Windows hover ── */
     @media (hover: hover) {
       .back-btn:hover { background: #263348; }
       .piece-card:hover:not(.dead) { border-color: #475569; }
@@ -924,7 +946,7 @@
       .keyword-badge:hover { border-color: #60a5fa; color: #eff6ff; }
     }
 
-    /* 鈹€鈹€ Resource gem display (Hearthstone-style AP/CP) 鈹€鈹€ */
+    /* ── Resource gem display (Hearthstone-style AP/CP) ── */
     .res-gem { display:flex; align-items:center; gap:4px; padding:3px 9px; border-radius:20px; font-weight:800; flex-shrink:0; }
     .res-gem.ap { background:#071429; border:1.5px solid #3b82f6; color:#93c5fd; box-shadow:0 0 8px rgba(59,130,246,.35); }
     .res-gem.cp { background:#120922; border:1.5px solid #7c3aed; color:#d8b4fe; box-shadow:0 0 8px rgba(124,58,237,.35); }
@@ -932,18 +954,18 @@
     .res-gem-val { font-size:17px; line-height:1; letter-spacing:-.5px; }
     .res-gem-frac { font-size:10px; opacity:.65; }
 
-    /* 鈹€鈹€ Side panels: fullscreen map by default 鈹€鈹€ */
+    /* ── Side panels: fullscreen map by default ── */
     .side-panel { display:none !important; }
 
-    /* 鈹€鈹€ Training bar 鈹€鈹€ */
+    /* ── Training bar ── */
     .training-bar { align-items:center; gap:5px; flex-wrap:wrap; padding:4px 8px; background:#04080f; border-top:1px solid #1a2540; flex-shrink:0; }
     .training-bar select { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:6px; font-size:11px; padding:3px 6px; }
     .tb-btn { border-radius:6px; font-size:11px; padding:3px 9px; cursor:pointer; border:1px solid; white-space:nowrap; background:transparent; }
 
-    /* 鈹€鈹€ Hand always visible 鈹€鈹€ */
+    /* ── Hand always visible ── */
     .hand-body { display:block !important; }
 
-    /* 鈹€鈹€ Skill card bar 鈹€鈹€ */
+    /* ── Skill card bar ── */
     #skillBar {
       display:none; flex-direction:row; gap:6px; flex-shrink:0;
       padding:5px 10px; overflow-x:auto; overflow-y:hidden;
@@ -1009,13 +1031,13 @@
     .sk-cd-num { font-size:20px; font-weight:900; color:#64748b; }
     .sk-cd-lbl { font-size:8px; color:#475569; }
 
-    /* 鈹€鈹€ Fullscreen log overlay 鈹€鈹€ */
+    /* ── Fullscreen log overlay ── */
     #logOverlay { position:fixed; inset:0; background:rgba(2,8,22,.96); z-index:400; flex-direction:column; display:none; }
     #logOverlay.show { display:flex; }
     #logBody { flex:1; overflow-y:auto; padding:10px 16px; }
     #logBody p { margin:3px 0; line-height:1.45; }
 
-    /* 鈹€鈹€ Target selection overlay 鈹€鈹€ */
+    /* ── Target selection overlay ── */
     #targetOverlay {
       position:fixed; inset:0; background:rgba(0,0,0,.58);
       pointer-events:none; z-index:60;
@@ -1079,7 +1101,7 @@
 <body>
 
   <!-- Fullscreen map exit button -->
-  <div id="fullMapExitBtn" onclick="toggleFullMap()">????</div>
+  <div id="fullMapExitBtn" onclick="toggleFullMap()">退出全图</div>
 
   <!-- Turn announcement -->
   <div id="turnAnnounce"></div>
@@ -1090,11 +1112,24 @@
     <div style="font-size:14px;color:#64748b" id="loadingMsg">连接战场…</div>
   </div>
 
+  <aside id="red43QaPanel" aria-live="polite">
+    <div class="red43-qa-title">RED-43 · OWNER TARGET QA</div>
+    <div class="red43-qa-grid">
+      <span class="red43-qa-key">场景</span><span class="red43-qa-value" id="red43QaScenario">-</span>
+      <span class="red43-qa-key">Room / Seed</span><span class="red43-qa-value" id="red43QaRoom">-</span>
+      <span class="red43-qa-key">playerId</span><span class="red43-qa-value" id="red43QaPlayer">-</span>
+      <span class="red43-qa-key">所有权集合</span><span class="red43-qa-value" id="red43QaOwners">等待状态</span>
+      <span class="red43-qa-key">目标集合</span><span class="red43-qa-value" id="red43QaTargets">尚未加载技能</span>
+      <span class="red43-qa-key">UI / 规则</span><span class="red43-qa-value" id="red43QaMatch">等待高亮</span>
+    </div>
+    <button class="red43-qa-button" id="red43QaLoadSkill" onclick="loadRed43QaSkill()">加载验收技能</button>
+  </aside>
+
   <!-- Card Detail Modal -->
   <div id="cardDetailModal" onclick="if(event.target===this)closeCardDetail()">
     <div class="cd-layout">
       <div class="cd-sheet">
-      <button class="cd-close" onclick="closeCardDetail()">?</button>
+      <button class="cd-close" onclick="closeCardDetail()">✕</button>
       <div class="cd-icon" id="cdIcon">🃏</div>
       <div class="cd-name" id="cdName"></div>
       <div id="cdCost"></div>
@@ -1113,7 +1148,7 @@
       <div class="pi-sheet">
       <div class="pi-header">
         <div class="pi-name" id="pieceInfoName"></div>
-        <button class="pi-close" onclick="closePieceInfo()">?</button>
+        <button class="pi-close" onclick="closePieceInfo()">✕</button>
       </div>
         <div id="pieceInfoContent"></div>
       </div>
@@ -1126,7 +1161,7 @@
     <div class="option-sheet">
       <div class="option-title" id="optionPickerTitle">请选择</div>
       <div id="optionPickerList"></div>
-      <button class="option-cancel" onclick="cancelOptionPicker()">??</button>
+      <button class="option-cancel" onclick="cancelOptionPicker()">取消</button>
     </div>
   </div>
 
@@ -1185,24 +1220,24 @@
     <div class="result-title" id="resultTitle">胜利！</div>
     <div class="result-sub" id="resultSub"></div>
     <div id="recordStatus" style="font-size:13px;color:#64748b;margin-top:12px;min-height:18px"></div>
-    <button id="recordDownloadBtn" onclick="downloadGameRecord()" style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;margin-top:8px">涓嬭浇鎴樻姤</button>
-    <button style="background:#3b82f6;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px" onclick="goBack()">鈫?杩斿洖澶у巺</button>
+    <button id="recordDownloadBtn" onclick="downloadGameRecord()" style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;margin-top:8px">下载战报</button>
+    <button style="background:#3b82f6;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px" onclick="goBack()">← 返回大厅</button>
   </div>
 
   <!-- Topbar -->
   <div class="topbar" data-battle-ui-region="player-hud">
-    <button class="back-btn" onclick="confirmLeave()">鈫?绂诲紑</button>
+    <button class="back-btn" onclick="confirmLeave()">← 离开</button>
     <div class="room-name" id="roomNameLabel">对战</div>
     <div class="turn-badge" id="turnBadge">等待中</div>
     <div id="wsStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● WS</div>
     <div style="font-size:12px;color:#64748b" id="roundLabel"></div>
-    <button id="btnSurrender" class="btn-surrender" onclick="confirmSurrender()">🏳 鎶曢檷</button>
-    <button id="btnSwitchPov" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 鍒囨崲瑙嗚 🔴</button>
+    <button id="btnSurrender" class="btn-surrender" onclick="confirmSurrender()">🏳 投降</button>
+    <button id="btnSwitchPov" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
     <button id="btnResetCD" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
-    <button class="btn-fullmap" id="btnFullMap" onclick="toggleFullMap()" title="????">?</button>
+    <button class="btn-fullmap" id="btnFullMap" onclick="toggleFullMap()" title="全屏地图">⛶</button>
     <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
     <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
-    <button class="btn-fullmap" onclick="openLog()" title="鎴樻枟鏃ュ織">📜</button>
+    <button class="btn-fullmap" onclick="openLog()" title="战斗日志">📜</button>
   </div>
 
   <!-- Main layout -->
@@ -1210,7 +1245,7 @@
 
     <!-- My pieces panel (left) -->
     <div class="side-panel" id="myPanel">
-      <div class="panel-label" id="myLabel">鎴戞柟</div>
+      <div class="panel-label" id="myLabel">我方</div>
       <div id="myPieces"></div>
     </div>
 
@@ -1222,14 +1257,14 @@
       </div>
 
       <div class="tile-legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#3f3f46"></div>??</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#18181b"></div>?</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#064e3b"></div>???</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#78350f"></div>??</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#082f49"></div>??</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#7c2d12"></div>??</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#134e4a"></div>??</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#3b0764"></div>???</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3f3f46"></div>地板</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#18181b"></div>墙壁</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#064e3b"></div>出生点</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#78350f"></div>掩体</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#082f49"></div>陷阱</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7c2d12"></div>熔岩</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#134e4a"></div>治愈泉</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3b0764"></div>充能台</div>
       </div>
 
       <div class="board-wrap" id="boardWrap">
@@ -1238,7 +1273,7 @@
             <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:2"></div>
           </div>
           <aside class="board-side-rail" data-battle-ui-region="selected-piece">
-            <div id="selectedPieceStatus" class="selected-status-empty">?????</div>
+            <div id="selectedPieceStatus" class="selected-status-empty">未选中棋子</div>
             <div class="turn-control-wrap">
               <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
             </div>
@@ -1266,29 +1301,29 @@
       <!-- Resource editor sheet (training mode) -->
       <div id="resEditorSheet" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeResourceEditor()">
         <div style="background:#0f1623;border:1px solid #334155;border-radius:14px;padding:20px 22px;min-width:260px;color:#e2e8f0;font-size:14px">
-          <div style="font-weight:700;font-size:15px;margin-bottom:14px">鈿○煉?淇敼璧勬簮</div>
+          <div style="font-weight:700;font-size:15px;margin-bottom:14px">⚡💠 修改资源</div>
           <div style="display:flex;flex-direction:column;gap:10px">
             <label style="display:flex;align-items:center;gap:8px;color:#a5b4fc">
-              鐜╁
+              玩家
               <select id="resEditorPlayer" onchange="_syncResourceEditorInputs(this.value)" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;padding:4px 6px">
-          <option value="training-red">??</option>
-          <option value="training-blue">??</option>
+          <option value="training-red">🔴 红方</option>
+          <option value="training-blue">🔵 蓝方</option>
               </select>
             </label>
             <label style="display:flex;align-items:center;gap:8px">
-              <span style="width:60px;color:#fbbf24">鈿?琛屽姩</span>
+              <span style="width:60px;color:#fbbf24">⚡ 行动</span>
               <input id="resEditorAP" type="number" min="0" max="20" value="10"
                 style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#fbbf24;padding:4px 8px;font-size:14px">
             </label>
             <label style="display:flex;align-items:center;gap:8px">
-              <span style="width:60px;color:#67e8f9">💠 鍏呰兘</span>
+              <span style="width:60px;color:#67e8f9">💠 充能</span>
               <input id="resEditorCP" type="number" min="0" max="20" value="0"
                 style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#67e8f9;padding:4px 8px;font-size:14px">
             </label>
           </div>
           <div style="display:flex;gap:10px;margin-top:16px">
-            <button onclick="applyResourceEdit()" style="flex:1;background:#166534;border:1px solid #15803d;border-radius:8px;color:#86efac;padding:8px;font-size:13px;cursor:pointer">??</button>
-            <button onclick="closeResourceEditor()" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#94a3b8;padding:8px;font-size:13px;cursor:pointer">鍙栨秷</button>
+            <button onclick="applyResourceEdit()" style="flex:1;background:#166534;border:1px solid #15803d;border-radius:8px;color:#86efac;padding:8px;font-size:13px;cursor:pointer">✔ 确认</button>
+            <button onclick="closeResourceEditor()" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#94a3b8;padding:8px;font-size:13px;cursor:pointer">取消</button>
           </div>
         </div>
       </div>
@@ -1296,13 +1331,13 @@
       <!-- Hand (always visible) -->
       <div class="hand-panel" id="handPanel" data-battle-ui-region="hand">
         <div style="display:flex;align-items:center;gap:8px;padding:3px 10px;font-size:11px;color:#64748b;border-bottom:1px solid #1a2540;flex-shrink:0">
-          <span>🃏 鎵嬬墝</span>
+          <span>🃏 手牌</span>
           <span id="handCount" style="font-weight:700;color:#93c5fd">0</span>
-          <span id="handTarget" style="color:#f59e0b;display:none"> 路 点击目标施放</span>
+          <span id="handTarget" style="color:#f59e0b;display:none"> · 点击目标施放</span>
         </div>
         <div id="handBody">
           <div class="hand-scroll" id="handCards">
-            <div class="hand-empty">鏆傛棤鎵嬬墝</div>
+            <div class="hand-empty">暂无手牌</div>
           </div>
         </div>
       </div>
@@ -1317,23 +1352,25 @@
   </div><!-- /battle-layout -->
 
   <script>
-    // 鈹€鈹€ URL params 鈹€鈹€
+    // ── URL params ──
     const params = new URLSearchParams(location.search)
     const roomId = (params.get('roomId') || '').trim().toLowerCase()
     let myPlayerId = (params.get('playerId') || '').trim().toLowerCase()
     const myAccountId = (params.get('accountId') || params.get('account') || '').trim().toLowerCase()
-    const myPlayerName = params.get('playerName') || '鐜╁'
+    const myPlayerName = params.get('playerName') || '玩家'
     const TRAINING_MODE = params.get('mode') === 'training'
     const SPECTATE_MODE = params.get('mode') === 'spectate'
+    const RED43_QA_MODE = params.get('qa') === 'RED-43'
+    if (RED43_QA_MODE) document.body.classList.add('red43-qa')
     function shouldUseRelayMode() {
       if (params.get('relay') === '1' || params.get('server') === 'remote') return true
       return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
     }
 
-    // 鈹€鈹€ Server URL 鈹€鈹€
+    // ── Server URL ──
     const getServerUrl = () => RvBUtils.getServerUrl()
 
-    // 鈹€鈹€ Training mode: server URL helpers 鈹€鈹€
+    // ── Training mode: server URL helpers ──
     let _trainingBaseUrl = null
     async function _getTrainingUrl() {
       if (_trainingBaseUrl) return _trainingBaseUrl
@@ -1351,7 +1388,7 @@
           } catch (e) { console.warn('[training] getHostInfo failed:', e) }
           await new Promise(r => setTimeout(r, 500))
         }
-        // 瓒呮椂鍚庡皾璇曠洿杩為粯璁ょ鍙?
+        // 超时后尝试直连默认端口
         try {
           const info = await window.electronAPI.getHostInfo()
           if (info && info.port) { _trainingBaseUrl = 'http://localhost:' + info.port; return _trainingBaseUrl }
@@ -1582,10 +1619,10 @@
       throw new Error('Unsupported training method: ' + method)
     }
 
-    // 鈹€鈹€ Training-only state 鈹€鈹€
+    // ── Training-only state ──
     let placingMode = false
 
-    // 鈹€鈹€ Constants 鈹€鈹€
+    // ── Constants ──
     const TILE_CLASS = {
       wall:'t-wall', floor:'t-floor', spawn:'t-spawn',
       cover:'t-cover', hole:'t-hole', lava:'t-lava',
@@ -1607,7 +1644,7 @@
       }
     }
 
-    // 鈹€鈹€ State 鈹€鈹€
+    // ── State ──
     let G = null               // BattleState
     let skillsById = {}        // loaded locally from ./data/skills/
     let PIECES_BY_ID = {}      // loaded locally from ./data/pieces/
@@ -1627,7 +1664,7 @@
     let isHost = false         // am I the room host?
     let gameSeed = null        // shared PRNG seed (from server action log)
     let pressTimer = null      // long-press timer
-    let playerNames = {}       // playerId 鈫?display name, loaded from room
+    let playerNames = {}       // playerId → display name, loaded from room
     let pendingOptionAction = null  // original action awaiting selectedOption
 
     function clearCardPrimaryTarget(action) {
@@ -1715,7 +1752,102 @@
     let currentBattleViewModel = null
     let preOptimisticGForEcho = null  // saved state before optimistic pendingOptionSelect, for echo correction
 
-    // 鈹€鈹€ Piece helpers 鈹€鈹€
+    function red43QaSnapshot() {
+      if (!RED43_QA_MODE) return null
+      const pieces = G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
+      const allies = pieces.filter(p => String(p.ownerPlayerId || '').toLowerCase() === myPlayerId)
+      const enemies = pieces.filter(p => String(p.ownerPlayerId || '').toLowerCase() !== myPlayerId)
+      const expectedFilter = params.get('qaExpected') || ''
+      const expectedIds = (params.get('qaExpectedTargets') || '').split(',').filter(Boolean).sort()
+      const targetKeys = pendingSkill && pendingSkill.validTargets
+        ? Array.from(pendingSkill.validTargets).sort()
+        : []
+      const highlightedPieces = targetKeys.map(key => {
+        const parts = key.split(',')
+        const x = Number(parts[0]), y = Number(parts[1])
+        const piece = pieces.find(p => p.x === x && p.y === y)
+        if (!piece) return null
+        return {
+          key,
+          pieceId: piece.instanceId,
+          ownerPlayerId: piece.ownerPlayerId,
+          relation: String(piece.ownerPlayerId || '').toLowerCase() === myPlayerId ? 'ally' : 'enemy',
+        }
+      }).filter(Boolean)
+      const actualIds = highlightedPieces.map(target => target.pieceId).sort()
+      const consistent = expectedIds.length > 0 && actualIds.length === expectedIds.length &&
+        actualIds.every((id, index) => id === expectedIds[index])
+      return {
+        roomId,
+        seed: gameSeed,
+        scenario: params.get('qaScenario') || '',
+        alignment: params.get('qaAlignment') || '',
+        playerId: myPlayerId,
+        skillId: pendingSkill && pendingSkill.skillId ? pendingSkill.skillId : '',
+        expectedFilter,
+        allyPieceIds: allies.map(p => p.instanceId).sort(),
+        enemyPieceIds: enemies.map(p => p.instanceId).sort(),
+        expectedTargetPieceIds: expectedIds,
+        highlightedTargets: highlightedPieces,
+        actualTargetPieceIds: actualIds,
+        consistent,
+      }
+    }
+
+    function updateRed43QaEvidence() {
+      if (!RED43_QA_MODE) return
+      const snapshot = red43QaSnapshot()
+      window.__RVB_RED43_LAST_SNAPSHOT__ = snapshot
+      const setText = (id, value) => {
+        const element = document.getElementById(id)
+        if (element) element.textContent = value
+      }
+      setText('red43QaScenario', (snapshot.scenario || '-') + ' · ' + (snapshot.alignment || '-'))
+      setText('red43QaRoom', snapshot.roomId + ' / ' + (snapshot.seed == null ? '等待' : snapshot.seed))
+      setText('red43QaPlayer', snapshot.playerId || '-')
+      setText('red43QaOwners', '我方 ' + snapshot.allyPieceIds.length + ' / 对方 ' + snapshot.enemyPieceIds.length)
+      setText('red43QaTargets', snapshot.skillId
+        ? snapshot.expectedFilter + ' · UI ' + snapshot.actualTargetPieceIds.length + ' / 规则 ' + snapshot.expectedTargetPieceIds.length
+        : '尚未加载技能')
+      setText('red43QaMatch', snapshot.skillId ? (snapshot.consistent ? '是' : '否') : '等待高亮')
+      const panel = document.getElementById('red43QaPanel')
+      if (panel) panel.dataset.consistent = snapshot.skillId ? String(snapshot.consistent) : ''
+      const button = document.getElementById('red43QaLoadSkill')
+      const casterTemplateId = params.get('qaCaster') || ''
+      const caster = piecesForRed43Qa().find(p => p.templateId === casterTemplateId && String(p.ownerPlayerId || '').toLowerCase() === myPlayerId)
+      if (button) {
+        button.disabled = !caster || !(G && G.turn && String(G.turn.currentPlayerId || '').toLowerCase() === myPlayerId)
+        button.textContent = caster ? '加载验收技能 · ' + (params.get('qaSkill') || '') : '此视角仅验收敌我分组'
+      }
+    }
+
+    function piecesForRed43Qa() {
+      return G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
+    }
+
+    async function loadRed43QaSkill() {
+      if (!RED43_QA_MODE || !G) return
+      const casterTemplateId = params.get('qaCaster') || ''
+      const skillId = params.get('qaSkill') || ''
+      const caster = piecesForRed43Qa().find(p =>
+        p.templateId === casterTemplateId && String(p.ownerPlayerId || '').toLowerCase() === myPlayerId,
+      )
+      if (!caster || !skillId) return
+      selectPiece(caster.instanceId)
+      await selectSkillCard(skillId)
+      updateRed43QaEvidence()
+      console.info('[RED-43 QA client]', JSON.stringify(red43QaSnapshot()))
+    }
+
+    if (RED43_QA_MODE) {
+      window.__RVB_RED43__ = {
+        snapshot: red43QaSnapshot,
+        loadSuggestedSkill: loadRed43QaSkill,
+      }
+      updateRed43QaEvidence()
+    }
+
+    // ── Piece helpers ──
     function pieceName(p) {
       const tmpl = PIECES_BY_ID[p.templateId]
       return p.name || (tmpl && tmpl.name) || p.templateId || p.instanceId || '?'
@@ -1910,8 +2042,8 @@
       return logs
     }
 
-    // 鈹€鈹€ Server action log flush 鈹€鈹€
-    // 鈹€鈹€ Turn announcement 鈹€鈹€
+    // ── Server action log flush ──
+    // ── Turn announcement ──
     function showTurnAnnounce(text, color) {
       const el = document.getElementById('turnAnnounce')
       if (!el) return
@@ -1922,7 +2054,7 @@
       el.className = 'show'
     }
 
-    // 鈹€鈹€ Damage / heal floaters 鈹€鈹€
+    // ── Damage / heal floaters ──
     function spawnFloater(x, y, text, color, big) {
       if (_use3d && battlePresentation) {
         battlePresentation.spawnFloater(x, y, text, color, big)
@@ -1980,7 +2112,7 @@
       lastActionCount = newG.actions.length
     }
 
-    // 鈹€鈹€ Long-press / right-click helpers 鈹€鈹€
+    // ── Long-press / right-click helpers ──
     function startPressTimer(e, instanceId) {
       if (pressTimer) clearTimeout(pressTimer)
       pressTimer = setTimeout(() => { pressTimer = null; showPieceInfo(instanceId) }, 600)
@@ -1993,7 +2125,7 @@
       if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
     }
 
-    // 鈹€鈹€ Card detail modal 鈹€鈹€
+    // ── Card detail modal ──
     function showCardDetail(cardInstanceId, cardId, preserveKeyword) {
       const def = cardsById[cardId] || (G && G.customCards && G.customCards[cardId]) || {}
       const cost = def.actionPointCost || 0
@@ -2002,20 +2134,20 @@
       if (!preserveKeyword || !currentCardKeywords.includes(activeCardKeyword)) {
         activeCardKeyword = currentCardKeywords[0] || ''
       }
-      const typeLabel = def.type === 'reactive' ? '琚姩瑙﹀彂' : def.type === 'passive' ? '鎸佺画' : def.type === 'active' ? '涓诲姩' : '鎵嬬墝'
+      const typeLabel = def.type === 'reactive' ? '被动触发' : def.type === 'passive' ? '持续' : def.type === 'active' ? '主动' : '手牌'
 
       document.getElementById('cdIcon').textContent = def.icon || '🃏'
       document.getElementById('cdName').textContent = def.name || cardId
       document.getElementById('cdType').textContent = typeLabel
       document.getElementById('cdCost').innerHTML =
-        `<div style="text-align:center;margin-bottom:8px"><span class="cd-cost ${cost===0?'free':''}">${cost===0?'璐圭敤: 鍏嶈垂':'璐圭敤: '+cost+' AP'}</span></div>`
+        `<div style="text-align:center;margin-bottom:8px"><span class="cd-cost ${cost===0?'free':''}">${cost===0?'费用: 免费':'费用: '+cost+' AP'}</span></div>`
       document.getElementById('cdDesc').textContent = def.description || '暂无描述'
 
       const isPassiveCard = def.type === 'passive'
       const meta = []
       if (!isPassiveCard) {
-        meta.push('琛屽姩 ' + (def.actionPointCost ?? 0))
-        if (def.chargeCost != null) meta.push('鍏呰兘 ' + def.chargeCost)
+        meta.push('行动 ' + (def.actionPointCost ?? 0))
+        if (def.chargeCost != null) meta.push('充能 ' + def.chargeCost)
         const cdTurns = def.cooldownTurns ?? def.cooldown ?? 0
         meta.push('冷却 ' + cdTurns + ' 回合')
       }
@@ -2041,7 +2173,7 @@
       document.getElementById('cardDetailModal').style.display = 'none'
     }
 
-    // 鈹€鈹€ Surrender 鈹€鈹€
+    // ── Surrender ──
     function confirmSurrender() {
       if (!G || G.gameOver || G.winner) { goBack(); return }
       const overlay = document.getElementById('surrenderConfirmOverlay')
@@ -2117,7 +2249,7 @@
       renderActionBar()
     }
 
-    // 鈹€鈹€ Piece info modal 鈹€鈹€
+    // ── Piece info modal ──
     function showPieceInfo(instanceId, preserveKeyword) {
       if (!G) return
       const piece = G.pieces.find(p => p.instanceId === instanceId)
@@ -2236,7 +2368,7 @@
       document.getElementById('pieceInfoModal').style.display = 'none'
     }
 
-    // 鈹€鈹€ Load local static data 鈹€鈹€
+    // ── Load local static data ──
     function withTimeout(promise, ms, label) {
       let timer = null
       const timeout = new Promise((_, reject) => {
@@ -2366,7 +2498,7 @@
       return { ok: recoveredFromServer || errors.length === 0, errors }
     }
 
-    // 鈹€鈹€ Init 鈹€鈹€
+    // ── Init ──
     async function init() {
       if (TRAINING_MODE) {
         document.getElementById('btnSurrender').style.display = 'none'
@@ -2382,6 +2514,12 @@
         return
       }
       if (!roomId || !myPlayerId) { showMsg('缺少 roomId 或 playerId 参数', 'err'); return }
+      // A direct QA/deep link has not visited the lobby, so it may not have a
+      // persisted server URL yet. Restore the explicit query configuration
+      // before applying the connection guard.
+      if (window.RvBUtils && RvBUtils.restoreServerFromParams) {
+        await RvBUtils.restoreServerFromParams(params)
+      }
       if (!getServerUrl()) { showMsg('未连接服务器', 'err'); return }
       document.getElementById('roomNameLabel').textContent = '房间 ' + roomId
       showMsg('加载本地资源...')
@@ -2426,7 +2564,7 @@
       }
     }
 
-    // 鈹€鈹€ Training: send admin patch 鈹€鈹€
+    // ── Training: send admin patch ──
     async function sendPatch(body) {
       try {
         G = await trainingApiFetch('PATCH', Object.assign({}, body, { battleState: G }))
@@ -2434,7 +2572,7 @@
       } catch (e) { addLog('失败：' + e.message, 'err'); return false }
     }
 
-    // 鈹€鈹€ Training: switch perspective 鈹€鈹€
+    // ── Training: switch perspective ──
     function switchPerspective() {
       const next = myPlayerId === 'training-red' ? 'training-blue' : 'training-red'
       myPlayerId = next
@@ -2450,7 +2588,7 @@
       if (await sendPatch({ type: 'resetCooldowns' })) addLog('冷却已重置', 'info')
     }
 
-    // 鈹€鈹€ Training: resource editor 鈹€鈹€
+    // ── Training: resource editor ──
     function openResourceEditor() {
       const sheet = document.getElementById('resEditorSheet')
       if (!sheet || !G) return
@@ -2489,7 +2627,7 @@
       }
     }
 
-    // 鈹€鈹€ Training: piece placement 鈹€鈹€
+    // ── Training: piece placement ──
     function refreshPlaceTemplates() {
       const ownerEl = document.getElementById('placeOwner')
       const sel = document.getElementById('placeTemplate')
@@ -2510,7 +2648,7 @@
       renderBoard()
     }
 
-    // 鈹€鈹€ Server-authoritative state handling 鈹€鈹€
+    // ── Server-authoritative state handling ──
 
     // Apply an authoritative state snapshot received from server (WS or GET)
     var _lastAppliedState = null
@@ -2731,9 +2869,6 @@
     // Initialize a real battle: connect WS (server will push initial stateUpdate on subscribe).
     // State arrives through WS; HTTP is only used as a recovery fallback.
     async function initBattle() {
-      if (window.RvBUtils && RvBUtils.restoreServerFromParams) {
-        await RvBUtils.restoreServerFromParams(params)
-      }
       connectBattleWs(wsMode)
       setTimeout(function() {
         if (!G) {
@@ -2820,9 +2955,10 @@
       if (!pendingSkill || !G) return
       const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
       pendingSkill.validTargets = computeValidSkillTargets(sp || { instanceId: '' })
+      updateRed43QaEvidence()
     }
 
-    // 鈹€鈹€ Target overlay 鈹€鈹€
+    // ── Target overlay ──
     function targetTypeText(targetType, filter) {
       const tt = (targetType || '').toLowerCase()
       const ff = (filter || '').toLowerCase()
@@ -2910,7 +3046,7 @@
       return String(pid).toLowerCase() === String(myPlayerId).toLowerCase()
     }
 
-    // 鈹€鈹€ Render 鈹€鈹€
+    // ── Render ──
     // Render
     function pendingTargetSelectionForMe() {
       const pbt = G && G.pendingTargetSelection
@@ -3051,6 +3187,7 @@
         renderActionBar()
         renderTargetOverlay()
       }
+      updateRed43QaEvidence()
     }
 
     function renderBoard() {
@@ -3061,7 +3198,7 @@
       if (battlePresentation) battlePresentation.update(currentBattleViewModel)
       recalcCellSize()
 
-      // 鈹€鈹€ Compute highlights (shared between 3D and HTML paths) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      // ── Compute highlights (shared between 3D and HTML paths) ───────────────
       const tiles = currentBattleViewModel.board.tiles
       const cellMap = {}
       currentBattleViewModel.pieces.forEach(p => { if (p.visible) cellMap[p.x + ',' + p.y] = p })
@@ -3071,10 +3208,10 @@
       const hlSkillKeys = new Set(currentBattleViewModel.legal.targetCells.map(toKey))
       const hlPlaceKeys = new Set(currentBattleViewModel.legal.placementCells.map(toKey))
 
-      // 鈹€鈹€ 3D path 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      // ── 3D path ─────────────────────────────────────────────────────────────
       if (_use3d) return
 
-      // 鈹€鈹€ HTML grid fallback 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      // ── HTML grid fallback ───────────────────────────────────────────────────
       const grid = document.getElementById('gameGrid')
       if (!grid) return
       const { width, height } = currentBattleViewModel.board
@@ -3133,7 +3270,10 @@
             </div>`
           }
           const _ctxAttr = piece ? ` oncontextmenu="event.preventDefault();dispatchBattleIntent({type:'inspect-piece',pieceId:'${escHtml(piece.id)}'})"` : ''
-          cells.push(`<div class="${cls}" onclick="dispatchBattleIntent({type:'activate-cell',x:${x},y:${y}})"${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
+          const _pieceAttrs = piece
+            ? ` data-piece-id="${escHtml(piece.id)}" data-owner-player-id="${escHtml(piece.ownerPlayerId || '')}" data-relation="${String(piece.ownerPlayerId || '').toLowerCase() === myPlayerId ? 'ally' : 'enemy'}"`
+            : ''
+          cells.push(`<div class="${cls}" data-x="${x}" data-y="${y}" onclick="dispatchBattleIntent({type:'activate-cell',x:${x},y:${y}})"${_pieceAttrs}${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
         }
       }
       grid.innerHTML = cells.join('')
@@ -3230,7 +3370,7 @@
       const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
       const onclick = !dead ? `onclick="dispatchBattleIntent({type:'select-piece',pieceId:'${piece.instanceId}'})"` : ''
       const iid = escHtml(piece.instanceId)
-      return `<div class="piece-card ${dead?'dead':''} ${sel?'selected':''}" ${onclick}
+      return `<div class="piece-card ${dead?'dead':''} ${sel?'selected':''}" data-piece-id="${iid}" data-owner-player-id="${escHtml(piece.ownerPlayerId || '')}" data-relation="${isMe ? 'ally' : 'enemy'}" ${onclick}
         ontouchstart="startPressTimer(event,'${iid}')"
         ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
         oncontextmenu="event.preventDefault();showPieceInfo('${iid}')">
@@ -3330,7 +3470,7 @@
         if (topbar) {
           const handBadge = document.createElement('div')
           handBadge.className = 'hud-hand'
-          handBadge.title = '鎵嬬墝'
+          handBadge.title = '手牌'
           handBadge.innerHTML = '🃏 <span id="hudHandCount">0</span>'
           topbar.appendChild(handBadge)
           hudHand = document.getElementById('hudHandCount')
@@ -3517,7 +3657,7 @@
       setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
-        setStatusMsg(getSkillHint())
+        setStatusMsg(_targetPromptText() || '选择回合目标')
       } else if (pendingOptionSelectionForOther()) {
         setStatusMsg('等待对方选择...')
         pendingMove = false
@@ -3551,7 +3691,7 @@
       }
     }
 
-    // 鈹€鈹€ Cell click 鈹€鈹€
+    // ── Cell click ──
     function handleBattleIntent(intent) {
       if (!intent) return
       if (intent.type === 'activate-cell') return onCellClick(intent.x, intent.y)
@@ -3657,7 +3797,7 @@
           triggerContext: _pts.triggerContext
         } : null), 'info')
         pendingSkill = null
-        setStatusMsg('宸叉彁浜ょ洰鏍囬€夋嫨')
+        setStatusMsg('已提交目标选择')
         renderBoard()
         renderActionBar()
         renderTargetOverlay()
@@ -3670,9 +3810,9 @@
           selectPiece(piece.instanceId)
           return
         }
-        // 鍚堟硶鎬ф嫤鎴細鍙厑璁哥偣鍑婚珮浜牸
+        // 合法性拦截：只允许点击高亮格
         if (!validMoves.has(x + ',' + y)) {
-          setStatusMsg('鉂?鏃犳硶绉诲姩鍒拌浣嶇疆')
+          setStatusMsg('❌ 无法移动到该位置')
           return
         }
         doAction({ type: 'move', playerId: myPlayerId, pieceId: selectedPieceId, toX: x, toY: y })
@@ -3851,7 +3991,7 @@
           myPlayerId = G.turn.currentPlayerId
           myFaction = getTrainingPlayerFaction(myPlayerId)
           const btn = document.getElementById('btnSwitchPov')
-          if (btn) btn.textContent = '鍒囨崲瑙嗚 ' + trainingPlayerLabel(myPlayerId)
+          if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(myPlayerId)
         }
         if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
           selectedPieceId = action.pieceId
@@ -4091,7 +4231,7 @@
       URL.revokeObjectURL(url)
     }
 
-    // 鈹€鈹€ Helpers 鈹€鈹€
+    // ── Helpers ──
     function escHtml(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
     }
@@ -4136,7 +4276,7 @@
       goBack()
     }
 
-    // 鈹€鈹€ Map pan / zoom 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    // ── Map pan / zoom ───────────────────────────────────────────────────────
     let mapViewScale = 1
     let mapViewX = 0
     let mapViewY = 0
@@ -4248,8 +4388,8 @@
       }, { passive: false })
     }
 
-    // 鈹€鈹€ Start 鈹€鈹€
-    // 鈹€鈹€ Dynamic cell sizing 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    // ── Start ──
+    // ── Dynamic cell sizing ───────────────────────────────────────────────────
     function recalcCellSize() {
       if (_use3d && battlePresentation) { battlePresentation.resize(); return }
       if (!G || !G.map) return
@@ -4274,7 +4414,7 @@
     }
     window.addEventListener('resize', recalcCellSize)
 
-    // 鈹€鈹€ Fullscreen map mode 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    // ── Fullscreen map mode ───────────────────────────────────────────────────
     let fullMapMode = false
     function toggleFullMap() {
       fullMapMode = !fullMapMode
@@ -4283,7 +4423,7 @@
       setTimeout(recalcCellSize, 50)
     }
 
-    // 鈹€鈹€ Collapsible sections (log / hand) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    // ── Collapsible sections (log / hand) ─────────────────────────────────────
     function toggleSection(section) {
       if (section === 'log') {
         const body = document.getElementById('logBody')
@@ -4335,7 +4475,7 @@
         renderTargetOverlay()
       }, false)
 
-      // 淇鎵嬫満绔瀛愬睘鎬у脊绐楀叧闂寜閽?
+      // 修复手机端棋子属性弹窗关闭按钮
       // Close piece info modal when tapping the backdrop on mobile.
       const pieceModal = document.getElementById('pieceInfoModal')
       if (pieceModal) {
@@ -4350,7 +4490,7 @@
         }
       }
 
-      // 淇鎵嬫満绔崱鐗岃鎯呭脊绐楀叧闂寜閽?
+      // 修复手机端卡牌详情弹窗关闭按钮
       const cardModal = document.getElementById('cardDetailModal')
       if (cardModal) {
         cardModal.addEventListener('touchend', function(e) {
@@ -4372,7 +4512,7 @@
     window.addEventListener('pagehide', disposeBattlePage)
     window.addEventListener('unload', disposeBattlePage)
 
-    // 鈹€鈹€ Debug modifier panel (backtick key toggle) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    // ── Debug modifier panel (backtick key toggle) ────────────────────────────
     document.addEventListener('keydown', e => {
       if (e.key === '`' || e.key === '~') {
         const p = document.getElementById('debugPanel')
@@ -4386,27 +4526,27 @@
     function debugSetAP(n) {
       const mp = _debugMyPlayer(); if (!mp) return
       mp.actionPoints = Math.max(0, (mp.actionPoints || 0) + n)
-      render(); addLog('[淇敼鍣╙ AP +' + n, 'info')
+      render(); addLog('[修改器] AP +' + n, 'info')
     }
     function debugSetCP(n) {
       const mp = _debugMyPlayer(); if (!mp) return
       mp.chargePoints = Math.max(0, (mp.chargePoints || 0) + n)
-      render(); addLog('[淇敼鍣╙ CP +' + n, 'info')
+      render(); addLog('[修改器] CP +' + n, 'info')
     }
     function debugHealSelected(hp) {
-      if (!G || !selectedPieceId) { addLog('[淇敼鍣╙ 未选中棋子', 'err'); return }
+      if (!G || !selectedPieceId) { addLog('[修改器] 未选中棋子', 'err'); return }
       const p = G.pieces && G.pieces.find(pc => pc.instanceId === selectedPieceId)
       if (!p) return
       const max = p.maxHp || (p.stats && p.stats.maxHp) || 1
       p.currentHp = Math.min(max, (p.currentHp || 0) + hp)
-      render(); addLog('[淇敼鍣╙ 娌绘剤 ' + (p.name || p.instanceId), 'info')
+      render(); addLog('[修改器] 治疗 ' + (p.name || p.instanceId), 'info')
     }
     function debugKillSelected() {
-      if (!G || !selectedPieceId) { addLog('[淇敼鍣╙ 未选中棋子', 'err'); return }
+      if (!G || !selectedPieceId) { addLog('[修改器] 未选中棋子', 'err'); return }
       const p = G.pieces && G.pieces.find(pc => pc.instanceId === selectedPieceId)
       if (!p) return
       p.currentHp = 0
-      render(); addLog('[淇敼鍣╙ 鍑绘潃 ' + (p.name || p.instanceId), 'info')
+      render(); addLog('[修改器] 击杀 ' + (p.name || p.instanceId), 'info')
     }
     function debugResetCooldowns() {
       if (!G) return
@@ -4416,7 +4556,7 @@
       myPieces.forEach(p => {
         if (p.skills) p.skills.forEach(sk => { sk.currentCooldown = 0 })
       })
-      render(); addLog('[淇敼鍣╙ 已重置所有CD', 'info')
+      render(); addLog('[修改器] 已重置所有CD', 'info')
     }
   </script>
 
@@ -4445,11 +4585,11 @@
   <!-- Fullscreen log overlay -->
   <div id="logOverlay">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #334155;flex-shrink:0;background:#070f1e">
-      <div style="font-size:15px;font-weight:700;color:#e2e8f0">📜 鎴樻枟鏃ュ織</div>
-      <div style="font-size:15px;font-weight:700;color:#e2e8f0">战斗日志</div>
-        <button onclick="clearLog()" style="background:none;border:1px solid #334155;border-radius:6px;color:#64748b;padding:4px 10px;font-size:12px;cursor:pointer">娓呯┖</button>
+      <div style="font-size:15px;font-weight:700;color:#e2e8f0">📜 战斗日志</div>
+      <div style="display:flex;gap:8px;align-items:center">
         <button onclick="clearLog()" style="background:none;border:1px solid #334155;border-radius:6px;color:#64748b;padding:4px 10px;font-size:12px;cursor:pointer">清空</button>
-        <button onclick="closeLog()" style="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">?</button>
+        <button onclick="closeLog()" style="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">✕</button>
+      </div>
     </div>
     <div id="logBody" style="flex:1;overflow-y:auto;padding:10px 16px;font-size:13px;"></div>
   </div>
@@ -4457,7 +4597,7 @@
   <!-- Surrender confirm overlay -->
   <div id="surrenderConfirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
     <div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px 24px;max-width:300px;width:90%;text-align:center">
-      <div style="font-size:32px;margin-bottom:12px">!</div>
+      <div style="font-size:32px;margin-bottom:12px">🏳️</div>
       <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0">确认投降？</div>
       <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">这将立即结束对战。</div>
       <div style="display:flex;gap:10px;justify-content:center">

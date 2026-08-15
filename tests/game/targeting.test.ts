@@ -498,7 +498,7 @@ describe('targeting consumers and performance contract', () => {
   it('keeps a multi-step card target session alive across battlefield clicks', () => {
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
     const helperStart = html.indexOf('function shouldCancelPendingCardTarget')
-    const helperEnd = html.indexOf('\n\n      // Click outside', helperStart)
+    const helperEnd = html.indexOf('// Click outside the hand and battlefield', helperStart)
     const helperSource = html.slice(helperStart, helperEnd)
 
     expect(helperStart).toBeGreaterThanOrEqual(0)
