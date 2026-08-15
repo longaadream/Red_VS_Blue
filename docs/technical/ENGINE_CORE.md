@@ -148,6 +148,10 @@ WebSocket、房间开战、Battle API、Android mobile server 与 Relay 初始�
 
 Action Trace 的稳定 JSON 与 SHA-256 位于 browser-safe 的 `lib/game/battle-trace.ts`，不依赖 Node `crypto`。数据驱动技能、规则、附加效果和 pending target 脚本在执行边界获得确定性的 `Math.random()` 与 `Date.now()`；规则定义缓存始终返回独立且规范化的 limits，避免 cache miss/hit 改变状态 hash。没有 runtime 的训练与非权威预检路径仍可经 `lib/game/rng.ts` 旧适配器运行，便于按模块回退。
 
+跨端候选验证中，表现层水合的 `skillsById` 缓存不属于权威规则状态。`runBattleAction()` 计算动作前状态哈希时会排除该缓存；规则执行仍保留完整状态，以兼容以数据形式加载的技能。
+
+Android mobile server 当前负责转发并记录 browser runner 生成的 action trace。它会将 trace 格式、根种子或前置哈希不一致记录为 `traceValidationError`，但不会因此拒绝动作，避免尚无重试协议的 WebSocket 客户端被冻结。候选验收要求该诊断字段为空；服务端完全权威地重放规则属于后续工作。
+
 非规则豁免：房间 ID/邀请码、鉴权过期、连接和清理时间、日志、game record 时间及纯视觉随机。它们不得影响权威规则状态。
 
 ## 9. 存储和版本

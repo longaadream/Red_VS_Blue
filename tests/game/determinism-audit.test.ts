@@ -87,6 +87,15 @@ describe('authority determinism audit', () => {
     expect(mobileServer).toContain('runBattleAction(')
     expect(mobileServer).toContain('return ok({ state, seed }')
     expect(mobileServer).not.toMatch(/seed\s*=\s*Math\.floor\(Math\.random\(/)
+    expect(mobileServer).toContain('room.firstPlayerId = initState.turn.currentPlayerId')
+    expect(mobileServer).toContain('Invalid deterministic action trace')
+    expect(mobileServer).toContain('Trace pre-state hash does not match the authoritative action log')
+    expect(mobileServer).toContain('if (trace) Object.assign(entry, trace)')
+
+    const roomStart = read('lib/game/room-battle-start.ts')
+    expect(roomStart).toContain('{ rootSeed: seed }')
+    expect(roomStart).toContain('const firstPlayerId = initState.turn.currentPlayerId')
+    expect(roomStart).not.toContain('getPlayerSeat(player) === \'red\') || roomPlayers[0]')
 
     const battlePage = read(CROSS_PLATFORM_AUTHORITY_FILES.battlePage)
     expect(battlePage).toContain('function runDeterministicAuthorityAction(state, action)')
@@ -95,6 +104,8 @@ describe('authority determinism audit', () => {
     expect(battlePage).not.toMatch(/GameEngine\.applyBattleAction\s*\([^)]*\baction\b/)
     expect(battlePage).not.toContain('optimisticPendingState')
     expect(battlePage).not.toContain('preOptimisticGForEcho')
+    expect(battlePage).toContain('var authorityTrace = null')
+    expect(battlePage).toContain('trace: authorityTrace')
     expect(battlePage).not.toMatch(/entry\.action\.type\s*===\s*['"]pending(?:Option|Target)Select['"][\s\S]{0,200}wsActionSeq\s*=/)
     expect(battlePage.match(/runDeterministicAuthorityAction\(/g)?.length, 'authority runner call sites').toBeGreaterThanOrEqual(4)
 

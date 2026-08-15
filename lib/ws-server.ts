@@ -272,8 +272,7 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
   }
 
   if (action === 'start-game') {
-    const requestedFirstPlayerId = String(body.firstPlayerId || '').trim().toLowerCase()
-    await startBattleFromLockedRosters(roomStore, roomId, { firstPlayerId: requestedFirstPlayerId || undefined })
+    await startBattleFromLockedRosters(roomStore, roomId)
     await broadcastRoom(roomId)
     const clients = roomClients.get(roomId)
     if (clients) for (const client of clients) await sendBattleSnapshot(client, roomId)

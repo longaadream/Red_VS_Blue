@@ -95,7 +95,11 @@ export function runBattleAction(
         cursors: collectRuntimeCursors(metadata.actionLog),
         tick: actionIndex,
       })
-  const preStateHash = hashBattleState(state)
+  // Presentation clients hydrate `skillsById` locally for rendering. It is a
+  // runtime cache, not authoritative battle state, so it must not alter the
+  // cross-platform pre-action hash.
+  const canonicalState = withoutServerSkills(state) as BattleState
+  const preStateHash = hashBattleState(canonicalState)
 
   try {
     const clonedState = safeCloneBattleState(state)

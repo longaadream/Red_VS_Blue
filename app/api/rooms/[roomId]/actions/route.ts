@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, getRoomStore } from "@/lib/game/room-store"
 import { verifyJoinAuth } from "@/lib/game/identity-verify"
-import { isMatchPlayerId } from "@/lib/game/match-identity"
 import {
   ensureRosterAlignmentMutable,
   getDemoRosterReadiness,
@@ -29,7 +28,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }) ?? {}
   const accountId = String((body as { accountId?: unknown; identityId?: unknown })?.accountId || (body as { accountId?: unknown; identityId?: unknown })?.identityId || '').trim().toLowerCase() || undefined
   const requestedAlignment = normalizePlayerAlignment((body as { alignment?: unknown })?.alignment)
-  const requestedFirstPlayerId = String((body as { firstPlayerId?: unknown })?.firstPlayerId || '').trim().toLowerCase() || undefined
 
   if (!playerId?.trim()) {
     return NextResponse.json({ error: "playerId is required" }, { status: 400 })
@@ -207,10 +205,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   if (action === "select-pieces") {
-    if (requestedFirstPlayerId && !isMatchPlayerId(room.players.map(player => player.id), requestedFirstPlayerId)) {
-      return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
-    }
-
     const normalizedPlayerId = playerId.trim().toLowerCase()
     let locked
     try {
@@ -234,7 +228,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     if (allPlayersSelected) {
       try {
-        await startBattleFromLockedRosters(roomStore, roomId, { firstPlayerId: requestedFirstPlayerId })
+        await startBattleFromLockedRosters(roomStore, roomId)
       } catch (error) {
         console.error('Error starting game:', error)
         return NextResponse.json(
@@ -273,7 +267,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
   if (action === "start-game") {
     try {
-      const result = await startBattleFromLockedRosters(roomStore, roomId, { firstPlayerId: requestedFirstPlayerId })
+      const result = await startBattleFromLockedRosters(roomStore, roomId)
       return NextResponse.json({ success: true, started: result.started, message: "Game started", room: result.room })
     } catch (error) {
       const rosterError = getRosterErrorPayload(error)

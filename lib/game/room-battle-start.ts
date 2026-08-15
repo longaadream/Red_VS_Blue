@@ -8,10 +8,6 @@ import { createRootSeed } from './rule-runtime'
 
 export const DEMO_FIXED_MAP_ID = 'large-trap-arena'
 
-export interface StartLockedRosterBattleOptions {
-  firstPlayerId?: string
-}
-
 export interface StartLockedRosterBattleResult {
   room: Room
   started: boolean
@@ -20,7 +16,6 @@ export interface StartLockedRosterBattleResult {
 export async function startBattleFromLockedRosters(
   store: RosterRoomStore,
   roomId: string,
-  options: StartLockedRosterBattleOptions = {},
 ): Promise<StartLockedRosterBattleResult> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const room = await store.getRoom(roomId)
@@ -35,13 +30,6 @@ export async function startBattleFromLockedRosters(
       return 0
     })
     const playerIds = roomPlayers.map(player => player.id)
-    const requestedFirstPlayerId = (options.firstPlayerId || room.firstPlayerId || '').trim().toLowerCase()
-    const firstPlayerId = requestedFirstPlayerId ||
-      (roomPlayers.find(player => getPlayerSeat(player) === 'red') || roomPlayers[0])?.id
-    if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
-      throw new Error('firstPlayerId must identify a room player')
-    }
-
     const playerSelectedPieces = roomPlayers.map(player => ({
       playerId: player.id,
       pieces: (player.selectedPieces ?? []).map(piece => getPieceById(piece.templateId)!),
@@ -54,7 +42,7 @@ export async function startBattleFromLockedRosters(
       pieceTemplates,
       playerSelectedPieces,
       DEMO_FIXED_MAP_ID,
-      { firstPlayerId, rootSeed: seed },
+      { rootSeed: seed },
     )
     if (!battle) throw new Error('Failed to initialize battle state')
 
@@ -65,6 +53,11 @@ export async function startBattleFromLockedRosters(
       const message = error instanceof Error ? error.message : String(error)
       throw new Error('Failed to init battle phase: ' + message)
     }
+
+    // The battle setup is the sole authority for turn order.  It draws from
+    // the root seed's turn-order stream, so neither seat, join order, nor a
+    // client request can choose the first player.
+    const firstPlayerId = initState.turn.currentPlayerId
 
     const nextRoom: Room = {
       ...room,

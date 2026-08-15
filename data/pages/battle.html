@@ -4006,6 +4006,7 @@
 
     async function doAction(action) {
       action = withClientActionId(action)
+      var authorityTrace = null
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) { addLog('未连接服务器', 'err'); return }
@@ -4023,11 +4024,16 @@
             if ((action.type === 'useBasicSkill' || action.type === 'useChargeSkill') &&
                 typeof GameEngine.validateSkillActionByDryRun === 'function') {
               GameEngine.validateSkillActionByDryRun(clone, action)
+              var skillDryRunResult = runDeterministicAuthorityAction(clone, action)
+              dryRunState = skillDryRunResult.state
+              authorityTrace = skillDryRunResult.trace || null
             } else {
               // Authority actions may only be previewed through the seeded runner. The
               // returned state is deliberately discarded; the action-log echo is the
               // single commit point for Android/LAN clients.
-              dryRunState = runDeterministicAuthorityAction(clone, action).state
+              var dryRunResult = runDeterministicAuthorityAction(clone, action)
+              dryRunState = dryRunResult.state
+              authorityTrace = dryRunResult.trace || null
             }
             if (action.type === 'pendingTargetSelect' || action.type === 'pendingOptionSelect') {
               addLog('[DEBUG pendingDryRun] ok; pendingTargetAfter=' + (!!dryRunState.pendingTargetSelection) + ', pendingOptionAfter=' + (!!dryRunState.pendingOptionSelection), 'info')
@@ -4094,7 +4100,7 @@
           var relayPrevHash = typeof GameEngine !== 'undefined' && GameEngine.hashBattleState
             ? GameEngine.hashBattleState(G)
             : ''
-          RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: relayPrevHash })
+          RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: relayPrevHash, trace: authorityTrace })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -4121,7 +4127,7 @@
 
         // LAN WS: submit action via WS only.
         if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
-          RvBWs.send({ type: 'action', action, playerId: myPlayerId })
+          RvBWs.send({ type: 'action', action, playerId: myPlayerId, trace: authorityTrace })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }

@@ -203,6 +203,20 @@ describe('deterministic battle runner', () => {
     expect(getBattleRootSeed(result.state)).toBe(8080)
   })
 
+  it('excludes a client-hydrated skill cache from the pre-action hash', () => {
+    const canonical = makeState({ currentPlayerId: 'player-red', phase: 'action' }) as any
+    const clientHydrated = JSON.parse(JSON.stringify(canonical))
+    clientHydrated.skillsById['ui-only-skill'] = {
+      id: 'ui-only-skill', name: 'UI-only cache', type: 'normal', cooldownTurns: 0,
+    }
+    const action = { type: 'endTurn', playerId: 'player-red', clientActionId: 'end-turn-cache-test' } as any
+
+    const fromCanonical = runBattleAction(canonical, action, { rootSeed: 9001 })
+    const fromClient = runBattleAction(clientHydrated, action, { rootSeed: 9001 })
+
+    expect(fromClient.trace?.preStateHash).toBe(fromCanonical.trace?.preStateHash)
+  })
+
   it.each([
     {
       name: 'pending option',
