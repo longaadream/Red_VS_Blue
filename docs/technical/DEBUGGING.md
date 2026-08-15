@@ -117,6 +117,15 @@ npm run test -- tests/electron/battle-page-runtime.test.ts
 4. 若核心回放一致而 UI 不一致，检查客户端胜负、目标过滤和本地 dry-run。
 5. 若核心回放不一致，检查 RNG 注入、动态效果代码和全局触发器。
 
+### 目标高亮与提交不一致
+
+1. 保存动作草稿、`selectionId`、`stateRevision`、步骤和完整候选数组。
+2. 比较提交时的 `BattleState.targetingRevision`；不同则应稳定返回 `TARGET_SELECTION_STALE`，不得尝试旧候选。
+3. 重复提交或取消已经结束的会话应返回 `TARGET_SELECTION_ALREADY_RESOLVED`；错误 ID 返回 `TARGET_SELECTION_ID_MISMATCH`，两者都不得产生新日志或推进 revision。
+4. 对候选和提交分别记录 source action/card/skill ID、source piece、owner player、filter、range 与目标引用。
+5. 确认 UI/AI 只消费 `prepareAction()` 结果，`skill-targeting.js` 没有执行效果或 reducer。
+6. 在 20x16 fixture 上运行 `tests/game/targeting.test.ts`；预期 320 格扫描、0 次 reducer 执行，且 fixture hash 不变。
+
 ### 新格式存档读取后行为改变
 
 1. 保留原始存档副本，不在原文件上测试。

@@ -1635,7 +1635,7 @@
       return next
     }
 
-    function prepareCardTargetRetry(action, targetIndex, targetType, filter) {
+    function prepareCardTargetRetry(action, targetIndex, targetType, filter, preparation) {
       const idx = Number(targetIndex)
       const next = idx === 0 ? clearCardPrimaryTarget(action) : Object.assign({}, action || {})
       delete next.clientActionId
@@ -1643,7 +1643,57 @@
       next.pendingTargetIndex = Number.isFinite(idx) ? idx : 0
       next.pendingTargetType = targetType || next.pendingTargetType || ''
       next.pendingTargetFilter = filter || next.pendingTargetFilter || ''
+      next.preparation = preparation || next.preparation || null
+      if (next.preparation) {
+        next.selectionId = next.preparation.selectionId
+        next.stateRevision = next.preparation.stateRevision
+      }
       return next
+    }
+
+    function targetPreparationFromError(errorLike) {
+      return errorLike && errorLike.preparation && errorLike.preparation.kind === 'needTarget'
+        ? errorLike.preparation
+        : null
+    }
+
+    function enterActionTargetMode(action, preparation) {
+      if (!action || !preparation || preparation.kind !== 'needTarget') return false
+      if (action.type === 'playCard') {
+        pendingCardAction = prepareCardTargetRetry(
+          action,
+          preparation.step,
+          preparation.targetType,
+          preparation.filter,
+          preparation,
+        )
+        renderHand()
+        renderArcHand()
+      } else if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
+        const skData = skillDefOf(action.skillId)
+        pendingMove = false
+        const baseAction = Object.assign({}, action, {
+          selectionId: preparation.selectionId,
+          stateRevision: preparation.stateRevision,
+        })
+        pendingSkill = {
+          skillId: action.skillId,
+          skillType: skData.type || 'normal',
+          range: preparation.range,
+          targetType: preparation.targetType,
+          filter: preparation.filter,
+          pendingTargetIndex: preparation.step,
+          preparation,
+          baseAction,
+        }
+        _updatePendingSkillTargets()
+      } else {
+        return false
+      }
+      setStatusMsg(targetStepPrefix(preparation.step) + targetTypeText(preparation.targetType, preparation.filter))
+      const selected = G && G.pieces ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+      renderBoard(); renderSkillBar(selected || null); renderActionBar(); renderTargetOverlay()
+      return true
     }
     let currentCardDetail = null
     let currentCardKeywords = []
@@ -1657,7 +1707,6 @@
     let relaySeq = 0            // outbound action/stateUpdate sequence
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
-    let preOptimisticGForEcho = null  // saved state before optimistic pendingOptionSelect, for echo correction
 
     // 鈹€鈹€ Piece helpers 鈹€鈹€
     function pieceName(p) {
@@ -2524,7 +2573,6 @@
           // Keep the UI responsive even if a legacy pending option echo cannot replay locally.
           if (entry.action.type === 'pendingOptionSelect') {
             wsActionSeq = entry.seq
-            preOptimisticGForEcho = null
             addLog('[WS] pendingOptionSelect 处理异常，已恢复操作：' + msg, 'warn')
             render()
             return
@@ -2565,6 +2613,7 @@
       })
 
       RvBWs.on('message', function(msg) {
+        if (msg.to && String(msg.to).toLowerCase() !== myPlayerId) return
         if (msg.type === 'subscribed') {
           wsRole = msg.role || 'guest'
           addLog('[WS] 角色：' + wsRole, 'info')
@@ -2599,36 +2648,14 @@
           applyLegacyBattleEntry(msg.entry)
         } else if (msg.type === 'actionError') {
           addLog('[DEBUG actionError] action=' + JSON.stringify(msg.action || null) + ' error=' + (msg.error || 'unknown') + ' needsTarget=' + (!!msg.needsTargetSelection) + ' needsOption=' + (!!msg.needsOptionSelection), 'err')
-          if (msg.needsTargetSelection && msg.action && msg.action.type === 'playCard') {
-            pendingCardAction = prepareCardTargetRetry(msg.action, msg.targetIndex, msg.targetType, msg.filter)
-            renderHand()
-            renderArcHand()
-            setStatusMsg(targetStepPrefix(msg.targetIndex) + targetTypeText(msg.targetType, msg.filter))
-            renderActionBar()
-            renderTargetOverlay()
-            return
-          }
-          if (msg.needsTargetSelection && msg.action &&
-              (msg.action.type === 'useBasicSkill' || msg.action.type === 'useChargeSkill')) {
-            const skData = skillDefOf(msg.action.skillId)
-            pendingMove = false
-            pendingSkill = {
-              skillId: msg.action.skillId,
-              skillType: skData.type || 'normal',
-              range: msg.range || (typeof skData.range === 'number' ? skData.range : 10),
-              targetType: msg.targetType || '',
-              filter: msg.filter || '',
-              pendingTargetIndex: Number(msg.targetIndex) || 0,
-              hint: '',
-              baseAction: msg.action,
-            }
-            _updatePendingSkillTargets()
-            const _spWsErr = G && G.pieces ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-            renderBoard(); renderSkillBar(_spWsErr || null); renderActionBar(); renderTargetOverlay()
-            return
-          }
+          if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
           if (msg.needsOptionSelection && msg.action) {
-            showOptionPicker(msg.title || '请选择', msg.options || [], msg.action)
+            var optionAction = Object.assign({}, msg.action)
+            if (msg.preparation && msg.preparation.kind === 'needOption') {
+              optionAction.selectionId = msg.preparation.selectionId
+              optionAction.stateRevision = msg.preparation.stateRevision
+            }
+            showOptionPicker(msg.title || '请选择', msg.options || [], optionAction)
             renderActionBar()
             return
           }
@@ -2640,11 +2667,36 @@
           if (wsMode === 'relay' && wsRole === 'host' && G &&
               typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
             try {
+              if (!msg.action || !msg.from || !msg.action.playerId ||
+                  String(msg.from).toLowerCase() !== String(msg.action.playerId).toLowerCase()) {
+                var playerMismatch = new Error('Relay sender does not match action player')
+                playerMismatch.code = 'ACTION_PLAYER_MISMATCH'
+                throw playerMismatch
+              }
               var newG = GameEngine.applyBattleAction(GameEngine.safeCloneBattleState(G), msg.action)
               applyServerState(newG, null)
               relaySeq++
               RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
-            } catch (e) { addLog('处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err') }
+            } catch (e) {
+              addLog('处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err')
+              RvBWs.send({
+                type: 'actionError',
+                to: msg.from,
+                from: myPlayerId,
+                action: msg.action,
+                error: e.message || String(e),
+                code: e.code,
+                preparation: e.preparation,
+                needsTargetSelection: e.needsTargetSelection,
+                targetType: e.targetType,
+                range: e.range,
+                filter: e.filter,
+                targetIndex: e.targetIndex,
+                needsOptionSelection: e.needsOptionSelection,
+                title: e.title,
+                options: e.options,
+              })
+            }
           }
         } else if (msg.type === 'hostResume') {
           if (wsMode === 'relay' && wsRole === 'host' && msg.state) applyServerState(msg.state, null)
@@ -2703,25 +2755,24 @@
     // Kept as a no-op for old call sites.
     async function pollActions() { /* deprecated: state arrives via WS only */ }
 
-    // Valid skill targets: heuristic using targetType + range from server.
-    // (Dry-run approach fails because G.skillsById from JSON has no effect functions)
-    // 骞茶繍琛岄€愭牸娴嬭瘯锛氬灏勭▼鍐呮瘡涓牸瀛愯窇涓€娆℃湰鍦?applyBattleAction
-    // Avoid exhaustive dry-runs here; use cheap metadata first.
-    // Full GameEngine checks happen when the action is submitted.
+    // Exact target candidates are produced by the authoritative rule query.
+    // The UI only converts stable TargetRef values into board highlight keys.
     function _actionHasFirstTarget(action) {
       return !!(action && (action.targetPieceId || action.targetX != null || action.targetY != null))
     }
 
-    function _targetPayloadFromCell(piece, x, y) {
-      return piece ? { pieceId: piece.instanceId, x: piece.x, y: piece.y } : { x, y }
+    function _targetPayloadFromCell(piece, x, y, targetType) {
+      return targetType === 'piece' && piece
+        ? { pieceId: piece.instanceId, x: piece.x, y: piece.y }
+        : { x, y }
     }
 
-    function _appendTargetToAction(action, piece, x, y) {
+    function _appendTargetToAction(action, piece, x, y, targetType) {
       delete action.target
       delete action.clientActionId
       delete action.requestId
       if (!_actionHasFirstTarget(action)) {
-        if (piece) {
+        if (targetType === 'piece' && piece) {
           action.targetPieceId = piece.instanceId
           delete action.targetX; delete action.targetY
         } else {
@@ -2732,75 +2783,24 @@
         return action
       }
       const extraTargets = Array.isArray(action.extraTargets) ? action.extraTargets.slice() : []
-      extraTargets.push(_targetPayloadFromCell(piece, x, y))
+      extraTargets.push(_targetPayloadFromCell(piece, x, y, targetType))
       action.extraTargets = extraTargets
       return action
     }
 
     function computeValidSkillTargets(sp) {
       if (!G || !sp || !pendingSkill) return new Set()
-      const skillId = pendingSkill.skillId
       const valid = new Set()
-
-      // Shared engine rules are required for authoritative highlighting.
-      if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction || !GameEngine.manhattanDistance) {
-        return new Set()
-      }
-
-      const skDef = (G.skillsById && G.skillsById[skillId]) || skillsById[skillId] || {}
-      const isCharge = pendingSkill.skillType === 'super' || skDef.type === 'super'
-      const baseAction = pendingSkill.baseAction
-        ? { ...pendingSkill.baseAction }
-        : { type: isCharge ? 'useChargeSkill' : 'useBasicSkill',
-            playerId: myPlayerId, pieceId: sp.instanceId, skillId }
-
-      // Pre-filter by range when possible; unknown range defaults to 99.
-      const maxRange = pendingSkill.range != null ? pendingSkill.range : 99
-      const ttLower = (pendingSkill.targetType || '').toLowerCase()
-      const filterLower = (pendingSkill.filter || '').toLowerCase()
-      const isPieceTarget = ttLower === 'piece' || ttLower === 'enemy' || ttLower === 'enemies'
-        || ttLower === 'ally' || ttLower === 'allies'
-      const isSelfTarget = ttLower === 'self'
-
-      // Pre-filter targetType and filter before trial runs.
-      // This avoids useless trial runs on empty or invalid tiles.
-      // It also reduces GameEngine.applyBattleAction calls.
-      function _preFilter(t) {
-        const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
-        const dist = GameEngine.manhattanDistance(sp, t)
-        if (dist > maxRange) return false
-        if (isSelfTarget) return t.x === sp.x && t.y === sp.y
-        if (isPieceTarget) {
-          if (!occ) return false
-          if (filterLower === 'enemy') return occ.ownerPlayerId !== sp.ownerPlayerId
-          if (filterLower === 'ally' || filterLower === 'friendly') return occ.ownerPlayerId === sp.ownerPlayerId
-          return true
-        }
-        // grid / 其他：保留可行走地块
-        return !t.props || t.props.walkable !== false
-      }
-
-      // 构造瘦身状态：skillsById 鍙斁褰撳墠鎶€鑳斤紝澶у箙缂╁噺 JSON 浣撶Н
-      const savedSkillsById = G.skillsById
-      G.skillsById = { [skillId]: skDef }
-      const baseCloneStr = JSON.stringify(G)
-      G.skillsById = savedSkillsById
-
-      for (const t of G.map.tiles) {
-        if (!_preFilter(t)) continue
-
-        const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
-        const testAction = _appendTargetToAction({ ...baseAction, extraTargets: Array.isArray(baseAction.extraTargets) ? baseAction.extraTargets.slice() : undefined }, occ, t.x, t.y)
-
-        try {
-          GameEngine.applyBattleAction(JSON.parse(baseCloneStr), testAction)
-          valid.add(t.x + ',' + t.y)
-        } catch (e) {
-          // A second target request means this tile is valid for the current step.
-          if (e && e.needsTargetSelection) valid.add(t.x + ',' + t.y)
+      const preparation = pendingSkill.preparation
+      if (!preparation || !Array.isArray(preparation.candidates)) return valid
+      for (const ref of preparation.candidates) {
+        if (ref.type === 'cell') {
+          valid.add(ref.x + ',' + ref.y)
+        } else if (ref.type === 'piece') {
+          const piece = G.pieces.find(p => p.instanceId === ref.pieceId && p.currentHp > 0)
+          if (piece && piece.x != null && piece.y != null) valid.add(piece.x + ',' + piece.y)
         }
       }
-
       return valid
     }
 
@@ -2848,7 +2848,13 @@
     }
     function cancelTargetSelection() {
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
-        doAction({ type: 'cancelPendingSelection', playerId: myPlayerId })
+        const pendingTarget = G.pendingTargetSelection
+        doAction({
+          type: 'cancelPendingSelection',
+          playerId: myPlayerId,
+          selectionId: pendingTarget && pendingTarget.selectionId,
+          stateRevision: pendingTarget && pendingTarget.stateRevision,
+        })
       }
       pendingSkill = null; pendingCardAction = null; pendingMove = false
       setMoveButtonClass(false)
@@ -2946,20 +2952,23 @@
             targetType: pbt.targetType,
             range: pbt.range || 99,
             filter: pbt.filter || 'all',
-            pendingTargetIndex: Number(pbt.targetIndex) || 0,
+            pendingTargetIndex: Number(pbt.step) || 0,
             turnTargetActionType: actionType,
             turnTargetPlayerId: pbt.playerId,
+            preparation: {
+              kind: 'needTarget',
+              selectionId: pbt.selectionId,
+              stateRevision: pbt.stateRevision,
+              step: Number(pbt.step) || 0,
+              targetType: pbt.targetType === 'piece' ? 'piece' : 'cell',
+              filter: pbt.filter || 'all',
+              range: pbt.range,
+              candidates: Array.isArray(pbt.candidates) ? pbt.candidates : [],
+            },
             validTargets: new Set(),
           }
-          // Compute likely valid targets while the server is waiting for a target.
           const _sp = G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
-          if (_sp) {
-            pendingSkill.validTargets = _computeValidSkillTargetsHeuristic(_sp)
-          } else {
-            // If the caster is unknown, fall back to all walkable tiles.
-            const tiles = (G.map && G.map.tiles) || []
-            tiles.forEach(t => { if (t.props && t.props.walkable) pendingSkill.validTargets.add(t.x + ',' + t.y) })
-          }
+          pendingSkill.validTargets = computeValidSkillTargets(_sp || { instanceId: '' })
           console.log('[STAGE4] entered target-select mode, validTargets count=' + pendingSkill.validTargets.size)
           setStatusMsg(pbt.title || _targetPromptText() || '请选择目标')
           renderBoard()
@@ -3099,6 +3108,17 @@
       }
       if (pendingSkill) {
         (pendingSkill.validTargets || new Set()).forEach(k => hlSkillKeys.add(k))
+      }
+      if (pendingCardAction && pendingCardAction.preparation && Array.isArray(pendingCardAction.preparation.candidates)) {
+        pendingCardAction.preparation.candidates.forEach(ref => {
+          if (ref.type === 'cell') hlSkillKeys.add(ref.x + ',' + ref.y)
+          if (ref.type === 'piece') {
+            const targetPiece = G.pieces.find(p => p.instanceId === ref.pieceId && p.currentHp > 0)
+            if (targetPiece && targetPiece.x != null && targetPiece.y != null) {
+              hlSkillKeys.add(targetPiece.x + ',' + targetPiece.y)
+            }
+          }
+        })
       }
 
       // 鈹€鈹€ 3D path 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
@@ -3621,21 +3641,33 @@
 
       // Pending card target selection
       if (pendingCardAction) {
+        const cardPreparation = pendingCardAction.preparation
+        if (cardPreparation && Array.isArray(cardPreparation.candidates)) {
+          const allowed = cardPreparation.candidates.some(ref =>
+            (ref.type === 'cell' && ref.x === x && ref.y === y) ||
+            (ref.type === 'piece' && piece && ref.pieceId === piece.instanceId),
+          )
+          if (!allowed) {
+            setStatusMsg('目标不在权威候选集合内')
+            return
+          }
+        }
         let action
+        const cardTargetType = cardPreparation && cardPreparation.targetType
         const hasPrimaryTarget = pendingCardAction.targetPieceId || pendingCardAction.targetX !== undefined || pendingCardAction.targetY !== undefined
         if (hasPrimaryTarget) {
-          const newExtra = { x, y }
-          if (piece) newExtra.pieceId = piece.instanceId
+          const newExtra = _targetPayloadFromCell(piece, x, y, cardTargetType)
           action = Object.assign({}, pendingCardAction, {
             extraTargets: (pendingCardAction.extraTargets || []).concat([newExtra])
           })
         } else {
           const firstTarget = { targetX: x, targetY: y }
-          if (piece) firstTarget.targetPieceId = piece.instanceId
+          if (cardTargetType === 'piece' && piece) firstTarget.targetPieceId = piece.instanceId
           action = Object.assign({}, pendingCardAction, firstTarget)
         }
         delete action.clientActionId
         delete action.requestId
+        delete action.preparation
         pendingCardAction = null
         document.getElementById('handTarget').style.display = 'none'
         doAction(action)
@@ -3643,8 +3675,16 @@
       }
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
-        const action = { type: pendingSkill.turnTargetActionType, playerId: pendingSkill.turnTargetPlayerId || myPlayerId, targetX: x, targetY: y }
-        if (piece) action.targetPieceId = piece.instanceId
+        const turnTargetType = pendingSkill.preparation && pendingSkill.preparation.targetType
+        const action = {
+          type: pendingSkill.turnTargetActionType,
+          playerId: pendingSkill.turnTargetPlayerId || myPlayerId,
+          targetX: x,
+          targetY: y,
+          selectionId: pendingSkill.preparation && pendingSkill.preparation.selectionId,
+          stateRevision: pendingSkill.preparation && pendingSkill.preparation.stateRevision,
+        }
+        if (turnTargetType === 'piece' && piece) action.targetPieceId = piece.instanceId
         const _pts = G && G.pendingTargetSelection
         console.log('[STAGE5] submitting ' + action.type + ' targetX=' + x + ' targetY=' + y + ' playerId=' + action.playerId + ' | G.pendingTargetSelection:', _pts ? { hasEffectCode: !!_pts.effectCode, effectCodeLen: _pts.effectCode ? _pts.effectCode.length : 0 } : null)
         addLog('[DEBUG pendingTargetClick] action=' + JSON.stringify(action) + ' pending=' + JSON.stringify(_pts ? {
@@ -3685,7 +3725,7 @@
         // Only allow clicks on highlighted valid skill targets.
         const key = x + ',' + y
         const vt = pendingSkill.validTargets
-        if (vt && vt.size > 0 && !vt.has(key)) {
+        if (vt && !vt.has(key)) {
           // Invalid target: inspect a piece if present, otherwise show a hint.
           if (piece) { selectPiece(piece.instanceId); return }
           setStatusMsg('目标不在技能范围内')
@@ -3703,7 +3743,7 @@
               skillId: pendingSkill.skillId
             }
         // Set target using the first flat slot, then append later selectTarget calls to extraTargets.
-        _appendTargetToAction(action, piece, x, y)
+        _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
         pendingSkill = null
         doAction(action)
         return
@@ -3745,50 +3785,6 @@
       renderBoard(); renderSkillBar(sp); renderActionBar()
     }
 
-    // Probe target requirements with a local dry run of GameEngine.
-    // Returns { needsTarget, range, targetType, filter } or null.
-    function _probeSkillTargetInfo(sp, skId) {
-      if (!G || typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) return null
-      const skDef = (G.skillsById && G.skillsById[skId]) || skillsById[skId] || {}
-      if (!skDef.code) return null
-      const isCharge = skDef.type === 'super'
-      const probeAction = {
-        type: isCharge ? 'useChargeSkill' : 'useBasicSkill',
-        playerId: myPlayerId, pieceId: sp.instanceId, skillId: skId
-      }
-      const savedSkillsById = G.skillsById
-      G.skillsById = { [skId]: skDef }
-      const stateStr = JSON.stringify(G)
-      G.skillsById = savedSkillsById
-      try {
-        GameEngine.applyBattleAction(JSON.parse(stateStr), probeAction)
-        return { needsTarget: false }
-      } catch (e) {
-        if (e && e.needsTargetSelection) {
-          return { needsTarget: true, range: e.range != null ? e.range : 99,
-            targetType: e.targetType || '', filter: e.filter || '', targetIndex: e.targetIndex }
-        }
-        if (e && e.needsOptionSelection) return { needsTarget: false }
-        return null
-      }
-    }
-
-    function enterPendingSkillTargetMode(sp, skId, isCharge, probe) {
-      const skData = skillDefOf(skId)
-      pendingSkill = {
-        skillId: skId,
-        skillType: isCharge ? 'super' : 'normal',
-        range: probe && probe.range != null ? probe.range : (typeof skData.range === 'number' ? skData.range : 10),
-        targetType: probe && probe.targetType ? probe.targetType : (skData.targetType || ''),
-        filter: probe && probe.filter ? probe.filter : (skData.filter || ''),
-        pendingTargetIndex: probe && probe.targetIndex != null ? Number(probe.targetIndex) || 0 : 0,
-        baseAction: null
-      }
-      _updatePendingSkillTargets()
-      setMoveButtonClass(false)
-      renderBoard(); renderSkillBar(sp); renderActionBar(); renderTargetOverlay()
-    }
-
     // selectSkillCard: called when a skill card in the skill bar is clicked
     async function selectSkillCard(skId) {
       if (!selectedPieceId || !skId || !G) return
@@ -3826,26 +3822,8 @@
         }
       }
 
-      // Probe whether this skill needs target selection.
-      const probe = _probeSkillTargetInfo(sp, skId)
-
-      if (!probe) {
-        if (skData.targetText || skData.targetType || skData.filter || typeof skData.range === 'number') {
-          enterPendingSkillTargetMode(sp, skId, isCharge, null)
-          return
-        }
-        // If probing is unavailable and no target metadata exists, submit directly.
-        await doAction({ type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId })
-        return
-      }
-
-      if (!probe.needsTarget) {
-        await doAction({ type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId })
-        return
-      }
-
-      // Enter target selection mode with probe-provided range/type/filter.
-      enterPendingSkillTargetMode(sp, skId, isCharge, probe)
+      const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
+      await doAction(draftAction)
     }
 
     async function doTurnControl() {
@@ -3909,19 +3887,16 @@
         render(); checkClientGameOver()
       } catch (e) {
         if (e.needsTargetSelection) {
-          if (action.type === 'playCard') {
-            pendingCardAction = prepareCardTargetRetry(action, e.targetIndex, e.targetType, e.filter)
-            renderHand()
-          } else {
-            const skData = skillDefOf(action.skillId)
-            pendingSkill = { skillId: action.skillId, skillType: skData.type||'normal', range: e.range||10,
-              targetType: e.targetType||'', filter: e.filter||'', pendingTargetIndex: Number(e.targetIndex) || 0, hint: e.hint||'', baseAction: action }
-            _updatePendingSkillTargets()
+          if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
+            setStatusMsg('权威目标查询未返回候选集合')
           }
-          const _sp1 = G.pieces.find(p => p.instanceId === selectedPieceId)
-          renderBoard(); renderSkillBar(_sp1||null); renderTargetOverlay()
         } else if (e.needsOptionSelection) {
-          showOptionPicker(e.title||'请选择', e.options||[], action)
+          var optionRetry = Object.assign({}, action)
+          if (e.preparation && e.preparation.kind === 'needOption') {
+            optionRetry.selectionId = e.preparation.selectionId
+            optionRetry.stateRevision = e.preparation.stateRevision
+          }
+          showOptionPicker(e.title||'请选择', e.options||[], optionRetry)
         } else {
           const errMsg = e.message || String(e) || '操作失败'
           addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
@@ -3934,7 +3909,6 @@
 
     async function doAction(action) {
       action = withClientActionId(action)
-      let optimisticPendingState = null
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) { addLog('未连接服务器', 'err'); return }
@@ -3944,80 +3918,6 @@
         setMoveButtonDisabled(true)
         if (action.type === 'endTurn') addLog('正在结束回合...', 'info')
 
-        // Validate locally before posting so invalid actions never trigger server-side "before" effects.
-        if (typeof GameEngine !== 'undefined' && GameEngine.safeCloneBattleState) {
-          try {
-            const clone = GameEngine.safeCloneBattleState(G)
-            let dryRunState = clone
-            if ((action.type === 'useBasicSkill' || action.type === 'useChargeSkill') &&
-                typeof GameEngine.validateSkillActionByDryRun === 'function') {
-              GameEngine.validateSkillActionByDryRun(clone, action)
-            } else {
-              dryRunState = GameEngine.applyBattleAction(clone, action)
-            }
-            if (action.type === 'pendingTargetSelect' || action.type === 'pendingOptionSelect') {
-              if (action.type === 'pendingOptionSelect') {
-                preOptimisticGForEcho = GameEngine.safeCloneBattleState(G)
-              }
-              optimisticPendingState = dryRunState
-              addLog('[DEBUG pendingDryRun] ok; pendingTargetAfter=' + (!!dryRunState.pendingTargetSelection) + ', pendingOptionAfter=' + (!!dryRunState.pendingOptionSelection), 'info')
-            }
-          } catch (e) {
-            if (action.type === 'pendingTargetSelect' || action.type === 'pendingOptionSelect') {
-              addLog('[DEBUG pendingDryRun] failed: ' + (e && e.message ? e.message : String(e)), 'err')
-            }
-            if (e && e.needsTargetSelection) {
-              if (action.type === 'playCard') {
-                pendingCardAction = prepareCardTargetRetry(action, e.targetIndex, e.targetType, e.filter); renderHand(); setStatusMsg(_targetPromptText() || '选择卡牌目标')
-              } else if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
-                const skData = skillDefOf(action.skillId)
-                pendingMove = false
-                pendingSkill = { skillId: action.skillId, skillType: skData.type || 'normal',
-                  range: e.range || (typeof skData.range === 'number' ? skData.range : 10),
-                  targetType: e.targetType || '', filter: e.filter || '', pendingTargetIndex: Number(e.targetIndex) || 0, hint: e.hint || '', baseAction: action }
-                _updatePendingSkillTargets()
-              }
-              const _sp2 = G.pieces.find(p => p.instanceId === selectedPieceId)
-              renderBoard(); renderSkillBar(_sp2||null); renderActionBar(); renderTargetOverlay(); return
-            }
-            if (e && e.needsOptionSelection) {
-              showOptionPicker(e.title || '请选择', e.options || [], action); renderActionBar(); return
-            }
-            // Fallback: if the browser dry-run cannot fully execute a target action,
-            // enter local target selection when the data clearly declares targetText.
-            const _hasTarget = action.targetX != null || action.targetY != null ||
-                               !!action.targetPieceId || !!action.targetPos
-            if (!_hasTarget) {
-              if (action.type === 'playCard') {
-                // Resolve cardId from cardInstanceId in the current hand.
-                const _myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-                const _card = _myMeta && _myMeta.hand && _myMeta.hand.find(c => c.instanceId === action.cardInstanceId)
-                const _cardId = _card && _card.cardId
-                const _cdef = _cardId
-                  ? (cardsById[_cardId] || (G.customCards && G.customCards[_cardId]) || null)
-                  : null
-                if (_cdef && _cdef.targetText) {
-                  pendingCardAction = action; renderHand()
-                  setStatusMsg(_targetPromptText() || '选择卡牌目标')
-                  setStatusMsg(_targetPromptText() || '选择卡牌目标')
-                }
-              } else if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
-                const _skData = skillDefOf(action.skillId)
-                if (_skData && _skData.targetText) {
-                  pendingMove = false
-                  pendingSkill = { skillId: action.skillId, skillType: _skData.type || 'normal',
-                    range: typeof _skData.range === 'number' ? _skData.range : 10,
-                    targetType: '', filter: '', pendingTargetIndex: 0, hint: '', baseAction: action }
-                  _updatePendingSkillTargets()
-                  const _sp3 = G.pieces.find(p => p.instanceId === selectedPieceId)
-                  renderBoard(); renderSkillBar(_sp3 || null); renderActionBar(); renderTargetOverlay(); return
-                }
-              }
-            }
-            // Still unknown: let the server decide.
-          }
-        }
-
         // Relay guest: submit action via WS, wait for stateUpdate.
         if (wsMode === 'relay' && wsRole === 'guest') {
           relaySeq++
@@ -4026,7 +3926,6 @@
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
           pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
-          if (optimisticPendingState) applyServerState(optimisticPendingState, null, true)
           return
         }
 
@@ -4042,7 +3941,12 @@
             applyServerState(newG, null)
             relaySeq++
             RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
-          } catch (e) { addLog('本地处理失败：' + e.message, 'err'); renderActionBar() }
+          } catch (e) {
+            if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
+              addLog('本地处理失败：' + e.message, 'err')
+              renderActionBar()
+            }
+          }
           return
         }
 
@@ -4053,7 +3957,6 @@
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
           pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
-          if (optimisticPendingState) applyServerState(optimisticPendingState, null, true)
           return
         }
 

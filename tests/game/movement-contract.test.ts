@@ -29,6 +29,7 @@ vi.mock('@/lib/game/attached-effect', () => ({
 
 import { getLegalNormalMoveTargetsForPlayer } from '@/lib/game/spatial'
 import { applyBattleAction } from '@/lib/game/turn'
+import { prepareAction } from '@/lib/game/targeting'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const key = ({ x, y }: { x: number; y: number }) => `${x},${y}`
@@ -87,9 +88,11 @@ describe('UI/server normal movement contract', () => {
       getLegalNormalMoveTargetsForPlayer?: (
         state: ReturnType<typeof makeState>, playerId: string, pieceId: string,
       ) => Array<{ x: number; y: number }>
+      applyBattleAction?: (state: ReturnType<typeof makeState>, action: Record<string, unknown>) => ReturnType<typeof makeState>
     }
     expect(engine.manhattanDistance).toBeTypeOf('function')
     expect(engine.getLegalNormalMoveTargetsForPlayer).toBeTypeOf('function')
+    expect(engine.applyBattleAction).toBeTypeOf('function')
 
     const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 2, y: 2, moveRange: 3 })
     const blocker = makePiece({ instanceId: 'summon', ownerPlayerId: 'player-blue', x: 3, y: 2 })
@@ -99,6 +102,34 @@ describe('UI/server normal movement contract', () => {
     expect(engine.getLegalNormalMoveTargetsForPlayer!(state, 'player-red', 'mover').map(key).sort()).toEqual([
       '0,2', '1,2', '2,0', '2,1', '2,3', '2,4',
     ])
+
+    mover.skills = [{ skillId: 'bundle-target-contract', currentCooldown: 0, usesRemaining: -1 }] as never
+    state.skillsById['bundle-target-contract'] = {
+      id: 'bundle-target-contract',
+      name: 'Bundle target contract',
+      description: '',
+      kind: 'active',
+      type: 'normal',
+      cooldownTurns: 0,
+      maxCharges: 0,
+      powerMultiplier: 1,
+      actionPointCost: 0,
+      code: "function executeSkill(context) { return selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); }",
+    } as never
+    let preparation: any
+    try {
+      engine.applyBattleAction!(state, {
+        type: 'useBasicSkill', playerId: 'player-red', pieceId: 'mover', skillId: 'bundle-target-contract',
+      })
+    } catch (error) {
+      preparation = (error as any).preparation
+    }
+    expect(preparation).toMatchObject({
+      kind: 'needTarget',
+      stateRevision: 0,
+      candidates: [{ type: 'piece', pieceId: 'summon' }],
+    })
+    expect(preparation.selectionId).toMatch(/^sel-1-/)
   })
 
   it('行动点不足时 UI 与服务端都没有合法普通移动目标', () => {
@@ -132,6 +163,15 @@ describe('UI/server normal movement contract', () => {
       code: 'function executeSkill() { return { success: true } }',
     } as unknown as (typeof state.skillsById)[string]
 
+    const prepared = prepareAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'caster',
+      skillId: 'grid-range-test',
+    })
+    expect(prepared.kind).toBe('needTarget')
+    if (prepared.kind !== 'needTarget') return
+
     expect(() => applyBattleAction(state, {
       type: 'useBasicSkill',
       playerId: 'player-red',
@@ -139,6 +179,8 @@ describe('UI/server normal movement contract', () => {
       skillId: 'grid-range-test',
       targetX: 2,
       targetY: 2,
+      selectionId: prepared.selectionId,
+      stateRevision: prepared.stateRevision,
     })).toThrow(/out of range/i)
   })
 })

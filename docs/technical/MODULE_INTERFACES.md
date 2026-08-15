@@ -78,6 +78,16 @@
 
 ## 4. 技能、卡牌与规则数据
 
+### 4.1 权威目标查询边界
+
+- 入口：`lib/game/targeting.ts::prepareAction()`、`validateTargetRef()`。
+- 输入：只读 `BattleState` 与行动草稿；选择提交还包含 `selectionId` 和 `stateRevision`。
+- 输出：`ready`、稳定 `invalid.code`、声明式 `needOption`，或包含精确棋子/地格候选的 `needTarget`。
+- 调用方：`turn.ts` 最终校验、`ai.ts`、`battle.html`、pending target 会话、HTTP/WS 错误 envelope。
+- 纯度：不得调用 reducer、触发器、效果代码、时间或 RNG；候选枚举和最终提交必须复用同一验证器。
+- 数据边界：动态选择必须补充 `targeting.steps`；无法声明时以 `TARGET_DECLARATION_MISSING` 失败关闭。
+- 兼容边界：两份现存 `skill-targeting.js` 仅映射 `preparation.candidates` 到展示坐标，不再执行技能。
+
 - 入口：`lib/game/skills.ts` 的 `loadCardById()`、`loadRuleById()`、`executeCardFunction()`、`executeSkillFunction()`。
 - 职责：加载并执行数据驱动规则。
 - 输入：ID、状态、使用者、目标和效果上下文。
@@ -164,7 +174,7 @@
 - 错误：网络失败、引擎异常或状态不兼容；部分异常只显示提示或被忽略。
 - 日志：浏览器 console；生产 mobile 构建会削弱部分 console 输出。
 - 测试：`tests/game/movement-contract.test.ts` 会执行页面实际加载的 `data/pages/js/game-engine.js`，验证共享移动导出和固定状态候选集合；尚无真实浏览器 E2E。
-- 已知问题：大文件跨层；部分胜负/目标逻辑仍有复制；不同模式承担不同权威职责。
+- 已知问题：大文件跨层；胜负逻辑仍位于 UI；不同模式承担不同权威职责。目标候选已统一消费服务端/核心 preparation。
 - 最小调试：捕获连接模式、roomId、seed、最后 action、服务端/客户端 state hash 和截图。
 
 ### 9.1 真实联机棋子选择页资源来源

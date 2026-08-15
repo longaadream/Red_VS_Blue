@@ -98,6 +98,7 @@
 - [`ADR-0001-deployment-visibility.md`](./ADR-0001-deployment-visibility.md)：部署重投阶段公开双方站位。
 - [`ADR-0002-match-identity-model.md`](./ADR-0002-match-identity-model.md)：分离对局座位、内容阵营、所有权与先后手。
 - [`ADR-0003-electron-server-packaging.md`](./ADR-0003-electron-server-packaging.md)：保留 Electron Server 内部候选打包入口，但不作为公开发行物（RED-23，已接受）。
+- [`ADR-0004-authoritative-target-selection.md`](./ADR-0004-authoritative-target-selection.md)：提议以纯查询、精确候选和版本凭证统一 UI、AI 与服务端目标语义（RED-59）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 
