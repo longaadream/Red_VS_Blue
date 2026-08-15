@@ -12,7 +12,7 @@
 ## 1. 结论摘要
 
 - 当前没有覆盖所有运行模式的统一服务端核心。Windows LAN 由 Next/WebSocket 服务端负责，Android 由 Java 网络层和隐藏 WebView 中的 mobile server 负责，Relay 则由主机客户端负责。
-- 实际玩家战斗界面是 `data/pages/battle.html`，不是 React 页面。真实对战、观战和训练营共用这一个入口；`mode=training` 只切换 fixture 与调试能力，旧 `training.html` 只做兼容跳转。`battle.html` 同时承担渲染、网络、动作预演、Relay 规则执行和胜负判断。
+- 实际玩家战斗界面是 `data/pages/battle.html`，不是 React 页面。真实对战、观战和训练营共用这一个入口；`mode=training` 只切换 fixture 与调试能力，旧 `training.html` 只做兼容跳转。RED-48 起，战场 Three.js 与 HUD DOM 共用 `battle-ui/battle-view-model.js` 的展示模型和 `battle-presentation.js` 的单向输入/意图输出边界；页面仍承担网络、训练 fixture、动作预演、Relay 规则执行和胜负判断等历史职责。
 - TypeScript 规则核心集中在 `lib/game/turn.ts`、`battle-setup.ts`、`skills.ts` 和 `triggers.ts`，但公共状态类型、随机、日志、存储格式和命令协议没有完全统一。
 - Android 安装包是当前发布产物。项目负责人确认的目标是：以可维护的 JS/TS 源码为唯一真实源，Android 资源只能由构建生成，不能继续成为人工维护的第二份源码。
 - 当前提交被指定为正式故障基线。`BUILD_AND_RUN.md` 为空，且最后一版存在尚未定位的重大运行问题，因此下一项工程工作应先恢复可重复运行基线。
@@ -21,7 +21,7 @@
 
 | 层          | 当前入口                                                            | 当前职责                                  | 已知边界问题                         |
 | ---------- | --------------------------------------------------------------- | ------------------------------------- | ------------------------------ |
-| 表现层        | `data/pages/battle.html`                                        | 战斗 UI、输入、网络消息、客户端状态和部分胜负判断            | 包含部分规则和权威状态处理                  |
+| 表现层        | `data/pages/battle.html`、`data/pages/js/battle-ui/**`、`battle-renderer-3d.js` | 页面控制器、统一展示模型、DOM HUD、Three.js 战场和用户意图 | 页面仍包含网络、Relay 执行和部分胜负判断 |
 | Next 服务层   | `app/`、`instrumentation.ts`                                     | HTTP API、状态页、训练/PVE/房间接口、启动 WebSocket | API 与 WS 共享规则，但错误协议不统一         |
 | 游戏规则层      | `lib/game/`                                                     | 状态创建、动作执行、技能、触发器、地图和回放                | 类型重复、模块级缓存和全局触发器               |
 | 房间/持久化层    | `lib/game/room-store.ts`、`lib/game/battle-storage.ts`、`prisma/` | 房间状态序列化、SQLite 存取、旧格式兼容               | 外层存档无正式格式版本和迁移链                |
@@ -92,7 +92,7 @@ Android 已存在开服实现，不是仅能加入的客户端：
 
 ## 6. 当前架构风险
 
-1. `battle.html` 跨越表现、规则、网络和结果判断层。
+1. `battle.html` 的战场/DOM 表现已建立模块边界，但页面控制器仍跨越网络、Relay 规则执行和结果判断层。
 2. LAN、Relay、Training 和 mobile server 的权威边界不同。
 3. `lib/game/turn.ts`、`battle-types.ts`、`training-types.ts` 都定义了相似状态/动作类型。
 4. `globalTriggerSystem`、规则缓存和 RNG 是模块级状态，并发隔离未验证。
