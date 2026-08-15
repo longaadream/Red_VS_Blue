@@ -240,9 +240,11 @@ describe('deterministic battle runner', () => {
       prepare(state: any) {
         state.pendingTargetSelection = {
           playerId: 'player-red',
+          ownerPlayerId: 'player-red',
+          selectionId: 'pending-target-selection-1',
+          stateRevision: 0,
           title: 'Choose a cell',
           targetType: 'cell',
-          range: 99,
           filter: 'all',
           effectCode: "function(ctx) { ctx.battle.extensions.pendingTargetApplied = [ctx.targetX, ctx.targetY]; return { success: true, message: 'ok' }; }",
         }
@@ -252,6 +254,8 @@ describe('deterministic battle runner', () => {
         playerId: 'player-red',
         targetX: 0,
         targetY: 0,
+        selectionId: 'pending-target-selection-1',
+        stateRevision: 0,
         clientActionId: 'pending-target-1',
       },
       pendingKey: 'pendingTargetSelection',

@@ -29,7 +29,7 @@
 输出：新的 `BattleState`。
 
 状态变化：回合、阶段、位置、生命、资源、卡牌、待选目标、投降等。
-失败：版本不匹配、非法阶段、非法玩家、非法目标或资源不足时抛错。当前调用层没有统一的错误代码 envelope。
+失败：版本不匹配、非法阶段、非法玩家、非法目标或资源不足时抛错。目标选择错误已使用稳定代码和统一 preparation envelope；其他规则错误仍未统一。
 
 ## 2. 战斗初始化
 
@@ -90,6 +90,18 @@
 这些动作构成核心命令集合，但房间、选人、PVE、Relay 和 Electron IPC 使用各自字符串协议，并未纳入同一公共命令类型。
 
 ## 5. 卡牌、技能和资源
+
+### 5.1 权威选择准备（RED-59）
+
+- `targeting.ts::prepareAction()` 在 reducer、触发器、支付和效果执行前读取行动草稿。
+- 返回 `ready`、`invalid`、`needOption` 或 `needTarget`；后两者包含协议版本、`selectionId`、`stateRevision`、步骤与精确候选。
+- 默认距离是曼哈顿；方形范围、空地、直线、来源棋子和多段选择必须由静态声明或权威约束明确表达。
+- 最终提交由同一验证器重新检查。成功动作仅增加一次 `targetingRevision`；pending target 保存来源、所有者、步骤列表、已选目标、候选和凭证，多步会话只在最后一步执行效果。
+- 目标类型来自权威候选：即使格子上有棋子，`cell` 候选仍提交坐标，不能被 UI 改写成 `piece`；声明为 Chebyshev 的查询与效果执行使用相同距离。
+- 未知运行时动作失败关闭，不得作为 no-op 推进 `targetingRevision`。
+- 查询不得执行技能/卡牌效果、全局触发器、reducer 或 RNG。UI 与 AI 不得复制过滤规则。
+
+相关决策：[`ADR-0005`](../decisions/ADR-0005-authoritative-target-selection.md)。
 
 入口集中在 `lib/game/skills.ts`：
 

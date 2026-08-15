@@ -117,6 +117,15 @@ npm run test -- tests/electron/battle-page-runtime.test.ts
 4. 若核心回放一致而 UI 不一致，检查客户端胜负、目标过滤和本地 dry-run。
 5. 若核心回放不一致，检查 RNG 注入、动态效果代码和全局触发器。
 
+### 目标高亮与提交不一致
+
+1. 保存动作草稿、`selectionId`、`stateRevision`、步骤和完整候选数组。
+2. 比较提交时的 `BattleState.targetingRevision`；不同则应稳定返回 `TARGET_SELECTION_STALE`，不得尝试旧候选。
+3. 重复提交或取消已经结束的会话应返回 `TARGET_SELECTION_ALREADY_RESOLVED`；错误 ID 返回 `TARGET_SELECTION_ID_MISMATCH`，两者都不得产生新日志或推进 revision。
+4. 对候选和提交分别记录 source action/card/skill ID、source piece、owner player、filter、range 与目标引用。
+5. 确认 UI/AI 只消费 `prepareAction()` 结果，`skill-targeting.js` 没有执行效果或 reducer。
+6. 在 20x16 fixture 上运行 `tests/game/targeting.test.ts`；预期 320 格扫描、0 次 reducer 执行，且 fixture hash 不变。
+
 ### 新格式存档读取后行为改变
 
 1. 保留原始存档副本，不在原文件上测试。
@@ -223,3 +232,15 @@ npm run dev:electron:client -- --rvb-dev-profile=player-two
 6. 不带 profile 参数重复启动客户端时，第二个实例应退出并聚焦第一个实例。
 
 `--rvb-dev-profile` 仅允许源码开发模式使用。打包客户端传入该参数会拒绝启动，正式 `userData` 和默认单实例行为不会改变。账号初始化失败时，首页右上角显示“账号错误”；点击后可在账号面板查看错误，并在开发者工具中查找带 `[identity]` 前缀的日志。
+
+## 大厅重新加入入口验证（RED-58）
+
+Windows Electron 大厅只会在本地 `rvb_active_battle` 结构完整、服务端房间仍处于对战状态，且保存的玩家仍属于该房间时显示“重新加入”。可按以下步骤复验：
+
+1. 无记录：在大厅开发者工具执行 `localStorage.removeItem('rvb_active_battle')` 后刷新；预期不显示重新加入横幅。
+2. 有效记录：进入一场真实对局并返回大厅，保留该对局写入的 `roomId`、`playerId` 和 `playerName`；预期横幅显示，点击后进入对应 `battle.html`。
+3. 失效记录：结束或删除服务端房间后再次打开大厅；预期横幅不显示，本地记录被清理，并在页面状态提示和控制台 `[lobby:rejoin]` 日志中说明记录已失效。
+4. 损坏记录：执行 `localStorage.setItem('rvb_active_battle', '{broken')` 后刷新；预期记录被清理、横幅隐藏，并显示“保存的对局信息无效”。
+5. 空状态点击：在开发者工具执行 `rejoinBattle()`；预期显示“没有可重新加入的对局”，不得静默无响应。
+
+如果服务器暂时不可达，入口保持隐藏并显示验证失败原因，但不清理本地记录；恢复连接后刷新大厅重新验证。

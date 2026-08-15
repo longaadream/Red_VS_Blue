@@ -100,6 +100,7 @@
 - [`ADR-0003-electron-server-packaging.md`](./ADR-0003-electron-server-packaging.md)：保留 Electron Server 内部候选打包入口，但不作为公开发行物（RED-23，已接受）。
 - [`ADR-0004-deterministic-rule-runtime.md`](./ADR-0004-deterministic-rule-runtime.md)：权威规则使用根种子、命名随机流、确定性实例 ID 与逻辑时钟（RED-28，已接受）。
 - [`ADR-0004-battle-presentation-boundary.md`](./ADR-0004-battle-presentation-boundary.md)：定义战场 Three.js、DOM HUD、展示模型与用户意图的单向边界（RED-48，提议中）。
+- [`ADR-0005-authoritative-target-selection.md`](./ADR-0005-authoritative-target-selection.md)：提议以纯查询、精确候选和版本凭证统一 UI、AI 与服务端目标语义（RED-59）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

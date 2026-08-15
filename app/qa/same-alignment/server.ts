@@ -5,6 +5,7 @@ import {
   type BattleAction,
   type BattleState,
 } from '@/lib/game/turn'
+import { prepareAction } from '@/lib/game/targeting'
 
 export type Red43ScenarioId = 'light-light' | 'dark-dark'
 
@@ -30,6 +31,11 @@ export interface Red43TargetEvidence {
   rejectedTargetPieceIds: string[]
   rejectionReasons: Record<string, string>
 }
+
+type Red43TargetAction = Extract<
+  BattleAction,
+  { type: 'useBasicSkill' | 'useChargeSkill' }
+>
 
 export const RED43_SCENARIOS: Record<Red43ScenarioId, Red43Scenario> = {
   'light-light': {
@@ -120,16 +126,27 @@ export function collectRed43TargetEvidence(
   const rejectionReasons: Record<string, string> = {}
 
   for (const candidate of state.pieces.filter(piece => piece.currentHp > 0)) {
-    const action: BattleAction = {
+    const draftAction: Red43TargetAction = {
       type: scenario.actionType,
       playerId,
       pieceId: caster.instanceId,
       skillId: scenario.skillId,
-      targetPieceId: candidate.instanceId,
     }
 
     try {
       const candidateState = withServerSkills(safeCloneBattleState(state)) as BattleState
+      const preparation = prepareAction(candidateState, draftAction)
+      if (preparation.kind === 'invalid') {
+        throw new Error(preparation.message || preparation.code)
+      }
+      const action: Red43TargetAction = {
+        ...draftAction,
+        targetPieceId: candidate.instanceId,
+      }
+      if (preparation.kind === 'needTarget') {
+        action.selectionId = preparation.selectionId
+        action.stateRevision = preparation.stateRevision
+      }
       validateSkillActionByDryRun(candidateState, action)
       acceptedTargetPieceIds.push(candidate.instanceId)
     } catch (error) {

@@ -133,6 +133,12 @@ export function runBattleAction(
     }
   } catch (error) {
     if (!runtime) throw error
+    // A rejected command is atomic: its random and clock reads are diagnostic
+    // only and must not advance the committed cursor chain.
+    runtime.restore({
+      cursors: collectRuntimeCursors(metadata.actionLog),
+      clockCursor: 0,
+    })
     throw decorateRuleError(error, runtime, state, action, actionId)
   }
 }
