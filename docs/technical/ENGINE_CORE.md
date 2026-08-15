@@ -21,7 +21,7 @@
 
 - `lib/game/battle-runner.ts::runBattleAction()`：LAN、HTTP、训练和调试的包装入口。
 - `lib/game/battle-runner.ts::replayBattle()`：命令回放。
-- `lib/game/engine-browser-entry.ts`：浏览器/Android 引擎出口。
+- `lib/game/engine-browser-entry.ts`：浏览器/Android 引擎出口；RED-64 以 `origin/main@17a3036daddefdb9a25cd7c167d4ca081070b786` 恢复入口（blob `e074b671d44b4b4336d988de5264bf895fbb57d0`），并通过 `tests/game/engine-browser-differential.test.ts` 的固定种子 Node/browser fixture 验证。
 - 测试：`tests/game/turn.test.ts`、`tests/game/debug-battle.test.ts`。
 
 输入：`BattleState`、`BattleAction`。
