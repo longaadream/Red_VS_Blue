@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import fs from 'fs'
-import path from 'path'
-
-function writeLog(message: string) {
-  const logDir = path.join(process.cwd(), 'logs')
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true })
-  }
-  const logFile = path.join(logDir, 'game.log')
-  const timestamp = new Date().toISOString()
-  fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`)
-}
-
-import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
-import { runBattleAction } from "@/lib/game/battle-runner"
-import { getPieceById, getAllPieces } from "@/lib/game/piece-repository"
-import type { BattleState } from "@/lib/game/turn"
-import type { PieceTemplate } from "@/lib/game/piece"
-import { createRootSeed } from "@/lib/game/rule-runtime"
-import { alignmentToPieceFaction, assignNextSeat, getPlayerSeat, normalizePlayerAlignment, getRoomStore } from "@/lib/game/room-store"
+import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, getRoomStore } from "@/lib/game/room-store"
 import { verifyJoinAuth } from "@/lib/game/identity-verify"
 import { isMatchPlayerId } from "@/lib/game/match-identity"
+import {
+  ensureRosterAlignmentMutable,
+  getDemoRosterReadiness,
+  getRosterErrorPayload,
+  lockDefaultBotRosterInStore,
+  lockDemoRosterInStore,
+} from "@/lib/game/roster-contract"
+import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -49,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   const roomStore = getRoomStore()
   let room = await roomStore.getRoom(roomId)
   if (!room) {
-    if (action === "claim-faction" || action === "select-pieces") {
+    if (action === "claim-faction") {
       room = await roomStore.createRoom(roomId, `Room ${roomId}`)
     } else {
       return NextResponse.json({ error: "Room not found" }, { status: 404 })
@@ -81,6 +70,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
         existing.seat = seat
         existing.faction = seat
+      }
+      try {
+        ensureRosterAlignmentMutable(existing, requestedAlignment)
+      } catch (error) {
+        const rosterError = getRosterErrorPayload(error)
+        return NextResponse.json({ success: false, error: rosterError?.message, code: rosterError?.code, context: rosterError?.context }, { status: 409 })
       }
       if (requestedAlignment) existing.alignment = requestedAlignment
       if (trimmedPlayerName) existing.name = trimmedPlayerName
@@ -150,6 +145,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     }
 
     if (accountId) existingPlayer.accountId = accountId
+    try {
+      ensureRosterAlignmentMutable(existingPlayer, requestedAlignment)
+    } catch (error) {
+      const rosterError = getRosterErrorPayload(error)
+      return NextResponse.json({ success: false, error: rosterError?.message, code: rosterError?.code, context: rosterError?.context }, { status: 409 })
+    }
     if (requestedAlignment) existingPlayer.alignment = requestedAlignment
 
     if (getPlayerSeat(existingPlayer)) {
@@ -206,160 +207,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   if (action === "select-pieces") {
-    console.log('=== FORCE SELECT PIECES ACTION ===')
-    console.log('Request received:', { roomId, playerId, piecesCount: pieces?.length || 0 })
-
-    if (!pieces || pieces.length === 0) {
-      return NextResponse.json({ error: "Please select at least 1 piece" }, { status: 400 })
-    }
-
-    let latestRoom = await roomStore.getRoom(roomId)
-    if (!latestRoom) {
-      console.log('Room not found, creating new room:', roomId)
-      latestRoom = await roomStore.createRoom(roomId, `Room ${roomId}`)
-    }
-
-    // Validate before mutating or persisting a player's selection.  A rejected
-    // first-player choice must leave the room exactly as it was.
-    if (requestedFirstPlayerId && !isMatchPlayerId(latestRoom.players.map(player => player.id), requestedFirstPlayerId)) {
+    if (requestedFirstPlayerId && !isMatchPlayerId(room.players.map(player => player.id), requestedFirstPlayerId)) {
       return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
     }
 
     const normalizedPlayerId = playerId.trim().toLowerCase()
-    let targetPlayer = latestRoom.players.find(
-      (p) => p.id.toLowerCase() === normalizedPlayerId
-    )
-
-    if (!targetPlayer) {
-      const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
-      targetPlayer = {
-        id: normalizedPlayerId,
-        accountId,
-        name: playerName?.trim() || `Player ${normalizedPlayerId.slice(0, 8)}`,
-        joinedAt: Date.now(),
-        seat,
-        faction: seat,
-        ...(requestedAlignment ? { alignment: requestedAlignment } : {}),
-        hasSelectedPieces: true,
-        selectedPieces: pieces
+    let locked
+    try {
+      locked = await lockDemoRosterInStore(roomStore, roomId, {
+        playerId: normalizedPlayerId,
+        alignment: requestedAlignment,
+        pieces,
+      })
+      await lockDefaultBotRosterInStore(roomStore, roomId)
+    } catch (error) {
+      const rosterError = getRosterErrorPayload(error)
+      if (rosterError) {
+        const status = rosterError.code === 'ROSTER_LOCKED' || rosterError.code === 'ROSTER_WRITE_CONFLICT' ? 409 : 400
+        return NextResponse.json({ success: false, error: rosterError.message, code: rosterError.code, context: rosterError.context }, { status })
       }
-      latestRoom.players.push(targetPlayer)
-    } else {
-      if (accountId) targetPlayer.accountId = accountId
-      targetPlayer.hasSelectedPieces = true
-      targetPlayer.selectedPieces = pieces
-      if (requestedAlignment) targetPlayer.alignment = requestedAlignment
-      if (!getPlayerSeat(targetPlayer)) {
-        const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
-        targetPlayer.seat = seat
-        targetPlayer.faction = seat
-      }
+      throw error
     }
 
-    if (!targetPlayer.alignment) {
-      return NextResponse.json({ error: "alignment is required before selecting pieces" }, { status: 400 })
-    }
-    const requiredPieceFaction = alignmentToPieceFaction(targetPlayer.alignment)
-    const hasWrongAlignmentPiece = pieces.some(piece => getPieceById(piece.templateId)?.faction !== requiredPieceFaction)
-    if (hasWrongAlignmentPiece) {
-      return NextResponse.json({ error: "Selected pieces must belong to the player's alignment" }, { status: 400 })
-    }
-
-    // PVE: auto-assign default pieces to the bot player
-    const botPlayer = latestRoom.players.find((p: any) => p.isBot === true || p.id === 'bot')
-    if (botPlayer && !botPlayer.hasSelectedPieces) {
-      const humanIds = new Set(pieces.map(p => p.templateId))
-      const allAvailable = getAllPieces()
-      const botPieces = allAvailable
-        .filter(p => !humanIds.has(p.id))
-        .slice(0, pieces.length)
-        .map(p => ({ templateId: p.id, faction: botPlayer.faction || 'blue' }))
-      botPlayer.selectedPieces = botPieces.length > 0
-        ? botPieces
-        : allAvailable.slice(0, 3).map(p => ({ templateId: p.id, faction: 'blue' }))
-      botPlayer.hasSelectedPieces = true
-    }
-
-    await roomStore.setRoom(roomId, latestRoom)
-
-    const savedRoom = await roomStore.getRoom(roomId)
-    if (!savedRoom) {
-      console.error('ERROR: Failed to save room')
-    }
-
-    // Use DB-fresh savedRoom so we can see ALL players' piece selections, not just the current player's
-    const checkRoom = savedRoom || latestRoom
-    const allPlayersSelected = checkRoom.players.length >= 2 && checkRoom.players.every(p => p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
+    const checkRoom = await roomStore.getRoom(roomId) ?? locked.room
+    const allPlayersSelected = getDemoRosterReadiness(checkRoom).ready
 
     if (allPlayersSelected) {
-      console.log('=== ALL PLAYERS HAVE SELECTED PIECES, AUTO-STARTING GAME ===')
-
-      const sortedPlayers = [...checkRoom.players.slice(0, 2)].sort((a, b) => {
-        if (getPlayerSeat(a) === "red" && getPlayerSeat(b) === "blue") return -1
-        if (getPlayerSeat(a) === "blue" && getPlayerSeat(b) === "red") return 1
-        return 0
-      })
-
-      const playerIds = sortedPlayers.map(p => p.id)
-
-      const playerSelectedPieces = sortedPlayers.map(player => {
-        const playerPieceTemplates = player.selectedPieces?.map(piece => getPieceById(piece.templateId))
-          .filter(Boolean) as PieceTemplate[] || []
-        return { playerId: player.id, pieces: playerPieceTemplates, faction: getPlayerSeat(player) as 'red' | 'blue' | undefined }
-      })
-
-      let pieceTemplates = checkRoom.players
-        .flatMap(p => p.selectedPieces || [])
-        .map(piece => getPieceById(piece.templateId))
-        .filter(Boolean) as any[]
-
-      if (pieceTemplates.length < 2) {
-        const defaultPieces = getAllPieces()
-        if (defaultPieces.length >= 2) {
-          pieceTemplates.push(defaultPieces[0])
-          pieceTemplates.push(defaultPieces[1])
-        }
-      }
-
-      const mapId = checkRoom.mapId || "large-battlefield"
-      writeLog('[select-pieces] mapId from room: ' + mapId)
-
       try {
-        if (requestedFirstPlayerId) checkRoom.firstPlayerId = requestedFirstPlayerId
-        const firstPlayerId = checkRoom.firstPlayerId || (sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0])?.id
-        if (!firstPlayerId || !isMatchPlayerId(playerIds, firstPlayerId)) {
-          return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
-        }
-        const seed = createRootSeed()
-        const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId, rootSeed: seed })
-
-        if (!battle) {
-          return NextResponse.json({ error: "Failed to create battle: invalid player count or battle setup" }, { status: 500 })
-        }
-
-        // Apply beginPhase on server (triggers BATTLE_START, initialEffects 等)
-        let initState = battle
-        try {
-          initState = runBattleAction(battle, { type: "beginPhase" }, { rootSeed: seed }).state
-          console.log('[select-pieces] beginPhase applied successfully')
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e)
-          console.error('[select-pieces] beginPhase failed:', msg)
-          return NextResponse.json({ error: 'Failed to init battle phase: ' + msg }, { status: 500 })
-        }
-
-        // Strip skillsById (large static data, clients reload locally)
-        const { skillsById: _sk, ...initPayload } = initState as any
-
-        checkRoom.status = "in-progress"
-        checkRoom.currentTurnIndex = 0
-        checkRoom.battleState = {
-          type: 'server-state',
-          seed,
-          state: initPayload,
-        } as any
-
-        await roomStore.setRoom(roomId, checkRoom)
+        await startBattleFromLockedRosters(roomStore, roomId, { firstPlayerId: requestedFirstPlayerId })
       } catch (error) {
         console.error('Error starting game:', error)
         return NextResponse.json(
@@ -373,11 +248,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     return NextResponse.json({
       success: true,
+      duplicate: locked.duplicate,
+      locked: true,
+      manifestVersion: locked.manifestVersion,
+      playerId: locked.playerId,
+      selectedPiecesCount: locked.selectedPiecesCount,
       message: "Pieces selected successfully",
       player: {
-        id: targetPlayer.id,
+        id: locked.playerId,
         hasSelectedPieces: true,
-        selectedPiecesCount: pieces.length
+        selectedPiecesCount: locked.selectedPiecesCount
       },
       room: {
         id: finalRoom?.id,
@@ -385,100 +265,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         players: finalRoom?.players.map(p => ({
           id: p.id,
           name: p.name,
-          hasSelectedPieces: p.hasSelectedPieces || false
+          hasSelectedPieces: p.rosterLocked === true
         }))
       }
     })
   }
 
   if (action === "start-game") {
-    const latestRoom = await roomStore.getRoom(roomId)
-    if (!latestRoom) {
-      return NextResponse.json({ error: "Room not found" }, { status: 404 })
-    }
-
-    console.log('Start game request received:', {
-      roomId,
-      playerId,
-      roomStatus: latestRoom.status,
-      playersCount: latestRoom.players.length,
-    })
-
-    if (latestRoom.status !== "waiting" && latestRoom.status !== "ready") {
-      return NextResponse.json({ error: "Game is already in progress or finished" }, { status: 400 })
-    }
-
-    if (latestRoom.players.length < 2) {
-      return NextResponse.json({ error: "At least 2 players are required to start game" }, { status: 400 })
-    }
-
-    const playersWithFaction = latestRoom.players.filter(p => getPlayerSeat(p))
-    if (playersWithFaction.length < 2) {
-      return NextResponse.json({ error: "All players must claim a seat before starting the game" }, { status: 400 })
-    }
-
-    let pieceTemplates = latestRoom.players
-      .flatMap(p => p.selectedPieces || [])
-      .map(piece => getPieceById(piece.templateId))
-      .filter(Boolean) as any[]
-
-    const sortedPlayers = [...latestRoom.players.slice(0, 2)].sort((a, b) => {
-      if (getPlayerSeat(a) === "red" && getPlayerSeat(b) === "blue") return -1
-      if (getPlayerSeat(a) === "blue" && getPlayerSeat(b) === "red") return 1
-      return 0
-    })
-
-    const playerIds = sortedPlayers.map(p => p.id)
-
-    const playerSelectedPieces = sortedPlayers.map(player => {
-      const playerPieceTemplates = player.selectedPieces?.map(piece => getPieceById(piece.templateId))
-        .filter(Boolean) as PieceTemplate[] || []
-      return { playerId: player.id, pieces: playerPieceTemplates, faction: getPlayerSeat(player) as 'red' | 'blue' | undefined }
-    })
-
-    if (pieceTemplates.length < 2) {
-      const defaultPieces = getAllPieces()
-      if (defaultPieces.length >= 2) {
-        pieceTemplates.push(defaultPieces[0])
-        pieceTemplates.push(defaultPieces[1])
-      }
-    }
-
-    const mapId = latestRoom.mapId || "large-battlefield"
-    writeLog('[start-game] mapId from room: ' + mapId)
-
-    if (requestedFirstPlayerId) latestRoom.firstPlayerId = requestedFirstPlayerId
-    const firstPlayerId = latestRoom.firstPlayerId || (sortedPlayers.find(player => getPlayerSeat(player) === 'red') || sortedPlayers[0])?.id
-    if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
-      return NextResponse.json({ error: "firstPlayerId must identify a room player" }, { status: 400 })
-    }
-    const seed = createRootSeed()
-    const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces, mapId, { firstPlayerId, rootSeed: seed })
-
-    if (!battle) {
-      return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })
-    }
-
-    let initState = battle
     try {
-      initState = runBattleAction(battle, { type: "beginPhase" }, { rootSeed: seed }).state
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error('[start-game] beginPhase failed:', msg)
-      return NextResponse.json({ error: 'Failed to init battle phase: ' + msg }, { status: 500 })
+      const result = await startBattleFromLockedRosters(roomStore, roomId, { firstPlayerId: requestedFirstPlayerId })
+      return NextResponse.json({ success: true, started: result.started, message: "Game started", room: result.room })
+    } catch (error) {
+      const rosterError = getRosterErrorPayload(error)
+      if (rosterError) {
+        return NextResponse.json({ success: false, error: rosterError.message, code: rosterError.code, context: rosterError.context }, { status: 400 })
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      return NextResponse.json({ success: false, error: message }, { status: message === 'Room not found' ? 404 : 400 })
     }
-    const { skillsById: _sk2, ...initPayload2 } = initState as any
-    latestRoom.status = "in-progress"
-    latestRoom.currentTurnIndex = 0
-    latestRoom.battleState = {
-      type: 'server-state',
-      seed,
-      state: initPayload2,
-    } as any
-    await roomStore.setRoom(roomId, latestRoom)
-
-    console.log('Game started successfully for room:', roomId)
-    return NextResponse.json({ success: true, message: "Game started" })
   }
 
   return NextResponse.json({ error: "Unsupported action" }, { status: 400 })

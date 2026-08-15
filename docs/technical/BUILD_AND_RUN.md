@@ -308,6 +308,31 @@ Windows 输出目录：
 普通 Windows 玩家开服仍由客户端内嵌本地服务承担。完整决策边界见
 [`ADR-0003`](../decisions/ADR-0003-electron-server-packaging.md)。
 
+`build:electron:server` 会在清理 staging 前自动运行 Server 产物验证器，逐 SHA-256
+核对 Electron main、管理面板、Next standalone 与静态资源、`public`、`data`、
+`prisma`、`init-db.js`、`adm-zip` 和独立 `node.exe`。electron-builder 需要通过一条
+独立映射复制 `_client-stage/node_modules`；缺少该映射时，顶层 standalone 文件仍可能
+存在，但 Next 运行依赖会被漏掉，验证器会拒绝该候选。
+
+成功构建会在 `dist/server-build/server-candidate-manifest.json` 写入内部候选标记、
+基线 commit、工具链版本、完整资源路径/大小/SHA-256，以及 Server EXE 和 Node 运行时
+证据。`_client-stage` 与 `_client-node` 清理后，可独立重放验证：
+
+```powershell
+node scripts/verify-electron-server-package.js
+node tests/electron/windows-smoke.mjs server
+```
+
+独立验证会按 manifest 重新计算全部资源、Server EXE 和 `node.exe` 的大小与 SHA-256，
+拒绝缺失、增加或被修改的文件。manifest 和 `win-unpacked` 都是未跟踪的本机候选证据，
+不得加入 Git 或上传到公开下载渠道。**内部候选 ≠ 公开发行物**。
+
+Server Windows smoke 还会同时验证公开同端口入口
+`ws://127.0.0.1:3000/ws/rooms/__lobby` 与内部入口 `ws://127.0.0.1:3001/`：
+两条连接都必须收到 `subscribed`，且 `rooms.list` 必须返回 `ok: true`。这项探测用于防止
+standalone staging 把 WebSocket 握手的 CRLF 写成字面量转义、导致玩家客户端只看到连接
+超时；仅有 `/api/ping` 成功不能代替该证据。
+
 ### 8.3 桌面安全边界
 
 三个入口的每个 `BrowserWindow` 都必须显式保持：
@@ -359,6 +384,22 @@ npm.cmd run smoke:electron:windows
 服务端会验证 3000 端口的启动/停止；客户端会验证本机模式、无效 TLS 证书拒绝和退出
 清理；编辑器会直接启动最终 portable EXE，在最长 300 秒内等待 renderer，并记录实际
 启动耗时、正式构建中的数据文件列表和退出清理结果。
+
+RED-54 的开发态 Electron 棋子选择页使用聚焦冒烟。它启动真实 Electron Client 和内嵌
+本机服务器，创建两名真实 PVP 玩家，强制两个阵营的本地棋子读取失败，验证服务器回退在
+5 秒内返回正确阵营；第一名玩家提交 8 枚后进入等待，第二名提交 8 枚后进入共用
+`battle.html`。运行命令：
+
+```powershell
+npm.cmd run build
+npm.cmd run sync:pages
+npx.cmd tsc -p electron-client/tsconfig.json
+node.exe tests/electron/piece-selection-smoke.mjs
+```
+
+脚本使用独立的临时 `userData` 和调试端口 `19254`，只终止自身启动的 PID 进程树并在退出
+时清理该临时目录；端口已占用时直接失败，不清理未知进程。可通过
+`RVB_RED54_DEBUG_PORT` 和 `RVB_ELECTRON_EXE` 覆盖调试端口或 Electron 可执行文件。
 
 ### 8.5 候选验证记录（2026-08-13；2026-08-14 根据人工反馈修订）
 

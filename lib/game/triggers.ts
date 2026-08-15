@@ -134,12 +134,107 @@ export interface TriggerContext {
   rulePiece?: PieceInstance
   piece?: PieceInstance
   selectedOption?: any
+  /** Identifies this dispatch within a synchronous fireEvent chain. */
+  eventId?: string
+  /** The dispatch that synchronously fired this event, when applicable. */
+  parentEventId?: string
+  /** The root dispatch for this chain. */
+  rootEventId?: string
+  /** Zero for a root event; incremented by fireEvent. */
+  eventDepth?: number
+  /** Internal chain state, returned as an immutable snapshot in TriggerResult. */
+  eventChain?: EventChainState
   [key: string]: any
+}
+
+export const MAX_EVENT_CHAIN_DEPTH = 20
+export const MAX_EVENT_CHAIN_DISPATCHES = 100
+
+export interface EventChainEntry {
+  eventId: string
+  parentEventId?: string
+  type: string
+  depth: number
+}
+
+export interface EventChainState {
+  rootEventId: string
+  dispatches: EventChainEntry[]
+}
+
+export interface TriggerResult {
+  success: boolean
+  messages: string[]
+  blocked: boolean
+  error?: {
+    code: 'EVENT_CHAIN_DEPTH_EXCEEDED' | 'EVENT_CHAIN_BUDGET_EXCEEDED'
+    message: string
+    eventChain: EventChainEntry[]
+  }
+  eventChain?: EventChainEntry[]
+  needsOptionSelection?: boolean
+  options?: any[]
+  title?: string
+  needsTargetSelection?: boolean
+  targetType?: string
+  range?: number
+  filter?: string
+  pendingQueue?: Array<{ruleId: string, sourceId?: string}>
 }
 
 // 触发系统类
 export class TriggerSystem {
   private rules: TriggerRule[] = []
+  private nextRootEventId = 0
+
+  /**
+   * Dispatch a child event while preserving the current synchronous event chain.
+   * All skill-code environments use this entry point instead of calling
+   * checkTriggers directly so recursive fireEvent calls cannot lose ancestry.
+   */
+  fireEvent(battle: BattleState, parentContext: TriggerContext, eventName: string, childContext: any = {}): TriggerResult {
+    return this.checkTriggers(battle, {
+      ...childContext,
+      type: eventName,
+      parentEventId: parentContext.eventId,
+      rootEventId: parentContext.rootEventId,
+      eventDepth: (parentContext.eventDepth ?? 0) + 1,
+      eventChain: parentContext.eventChain,
+    })
+  }
+
+  private prepareEventContext(context: TriggerContext): TriggerResult | undefined {
+    const chain = context.eventChain ?? {
+      rootEventId: `event-${++this.nextRootEventId}`,
+      dispatches: [],
+    }
+    const depth = context.eventDepth ?? 0
+    const rootEventId = context.rootEventId ?? chain.rootEventId
+
+    context.eventChain = chain
+    context.rootEventId = rootEventId
+    context.eventDepth = depth
+    context.eventId = context.eventId ?? `${rootEventId}:${chain.dispatches.length + 1}`
+
+    const limit = depth >= MAX_EVENT_CHAIN_DEPTH
+      ? { code: 'EVENT_CHAIN_DEPTH_EXCEEDED' as const, message: `Event chain depth exceeded ${MAX_EVENT_CHAIN_DEPTH}` }
+      : chain.dispatches.length >= MAX_EVENT_CHAIN_DISPATCHES
+        ? { code: 'EVENT_CHAIN_BUDGET_EXCEEDED' as const, message: `Event chain dispatch budget exceeded ${MAX_EVENT_CHAIN_DISPATCHES}` }
+        : undefined
+
+    if (limit) {
+      const eventChain = chain.dispatches.map(entry => ({ ...entry }))
+      writeLog(`[checkTriggers] ${limit.code}: ${limit.message}; chain=${JSON.stringify(eventChain)}`)
+      return { success: false, messages: [limit.message], blocked: true, error: { ...limit, eventChain }, eventChain }
+    }
+
+    chain.dispatches.push({ eventId: context.eventId, parentEventId: context.parentEventId, type: context.type, depth })
+    return undefined
+  }
+
+  private withEventChain(result: TriggerResult, context: TriggerContext): TriggerResult {
+    return { ...result, eventChain: context.eventChain?.dispatches.map(entry => ({ ...entry })) }
+  }
 
   // 构造函数
   constructor() {
@@ -204,7 +299,7 @@ export class TriggerSystem {
 
 
   // 检查并触发规则
-  checkTriggers(battle: BattleState, context: TriggerContext): { success: boolean; messages: string[]; blocked: boolean; needsOptionSelection?: boolean; options?: any[]; title?: string; needsTargetSelection?: boolean; targetType?: string; range?: number; filter?: string; pendingQueue?: Array<{ruleId: string, sourceId?: string}> } {
+  checkTriggers(battle: BattleState, context: TriggerContext): TriggerResult {
     const triggeredEffects: string[] = []
     let success = false
     let blocked = false
@@ -223,6 +318,9 @@ export class TriggerSystem {
     if ((battle as any).extensions?.__dryRunSkillPreflight) {
       return { success: false, messages: [], blocked: false } as any
     }
+
+    const rejectedEvent = this.prepareEventContext(context)
+    if (rejectedEvent) return rejectedEvent
 
     // 从 context 中读取恢复状态（用于从 pendingTargetSelect/pendingOptionSelect 恢复执行）
     const ctxPendingRuleId = (context as any).pendingRuleId as string | undefined
@@ -425,7 +523,7 @@ export class TriggerSystem {
 
     // 只在没有挂起交互时才执行手牌/附加效果（避免乱序）
     if (interactionNeeded) {
-      return { success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined } as any
+      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined } as any, context)
     }
 
     // 4. 检查所有玩家手牌中的 reactive 卡牌（全场两个玩家都扫描）
@@ -509,7 +607,7 @@ export class TriggerSystem {
       const _getPieceEffect = (pieceId: string, effectId: string) =>
         getEffectOnPiece(battle, pieceId, effectId)
       const _fireEvent = (eventName: string, ctx: any) =>
-        globalTriggerSystem.checkTriggers(battle, { ...ctx, type: eventName })
+        this.fireEvent(battle, context, eventName, ctx)
       const _addCardToHand = (cardId: string, targetPlayerId: string) => {
         const player = battle.players?.find((p: any) => p.playerId === targetPlayerId)
         if (!player) return false
@@ -581,7 +679,7 @@ export class TriggerSystem {
       }
     }
 
-    return { success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined } as any
+    return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined } as any, context)
   }
 
   // 条件评估方法已移除，所有条件判断都在技能代码中通过if语句实现

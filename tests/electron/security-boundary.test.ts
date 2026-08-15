@@ -98,6 +98,35 @@ describe('Electron desktop security boundary', () => {
     expect(source).toContain(".webContents.setWindowOpenHandler(() => ({ action: 'deny' }))")
   })
 
+  test('client routes game, admin, and connect windows through the shared popup denial', () => {
+    const source = read('electron-client/main.ts')
+
+    expect(source.match(/restrictWindowNavigation\(win,/g)).toHaveLength(3)
+    expect(source).toContain('restrictWindowNavigation(win, isGameClientUrl)')
+    expect(source).toContain('restrictWindowNavigation(win, (url) => isFileUrlWithinRoot(url, getAdminRoot()))')
+    expect(source).toContain('restrictWindowNavigation(win, (url) => isFileUrlWithinRoot(url, getConnectRoot()))')
+    expect(source.match(/setWindowOpenHandler\(\(\) => \(\{ action: 'deny' \}\)\)/g)).toHaveLength(1)
+  })
+
+  test('client homepage omits the unsupported multi-window PVP debugger', () => {
+    const page = read('data/pages/index.html')
+
+    expect(page).not.toContain('本机 PVP 调试')
+    expect(page).not.toContain('debug-pvp')
+    expect(page).not.toContain('startLocalPvpDebug')
+    expect(page).not.toContain('_detectLocalDebugServerUrl')
+    expect(page).not.toContain('debugPvpBtn')
+    expect(page).not.toContain('debugPvpDesc')
+    expect(page).not.toContain('debugPvpArrow')
+    expect(page).not.toContain('debugPvpStatus')
+    expect(page).not.toContain('rvb-debug-red')
+    expect(page).not.toContain('rvb-debug-blue')
+    expect(page).not.toContain('/api/debug/battle')
+    expect(page).not.toContain('window.open(')
+    expect(page).not.toContain('target="_blank">先手窗口</a>')
+    expect(page).not.toContain('target="_blank">后手窗口</a>')
+  })
+
   test('keeps the RED-19 adm-zip dependency contract unchanged', () => {
     const packageJson = JSON.parse(read('package.json')) as { dependencies: Record<string, string> }
     const lock = JSON.parse(read('package-lock.json')) as {

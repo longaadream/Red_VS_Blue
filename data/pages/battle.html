@@ -12,7 +12,11 @@
   <script src="js/game-engine.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/three.min.js"></script>
+  <script src="js/battle-ui/battle-view-model.js"></script>
+  <script src="js/battle-ui/battle-legal-actions.js"></script>
+  <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
+  <script src="js/battle-ui/battle-presentation.js"></script>
   <style>
     :root {
       --bg: #0f172a; --bg2: #1e293b; --border: #334155;
@@ -580,6 +584,28 @@
     .result-title { font-size: 28px; font-weight: 800; }
     .result-sub { font-size: 15px; color: #94a3b8; }
 
+    #red43QaPanel {
+      display: none; position: fixed; left: 12px; bottom: 12px; z-index: 190;
+      width: min(360px, calc(100vw - 24px)); padding: 12px 14px;
+      border: 1px solid rgba(96,165,250,.62); border-radius: 12px;
+      background: rgba(3,7,18,.92); color: #dbeafe;
+      box-shadow: 0 18px 50px rgba(0,0,0,.46); backdrop-filter: blur(12px);
+      font-size: 11px; line-height: 1.55;
+    }
+    body.red43-qa #red43QaPanel { display: block; }
+    #red43QaPanel[data-consistent="true"] { border-color: rgba(74,222,128,.78); }
+    #red43QaPanel[data-consistent="false"] { border-color: rgba(248,113,113,.76); }
+    .red43-qa-title { color: #93c5fd; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+    .red43-qa-grid { display: grid; grid-template-columns: 84px 1fr; gap: 2px 8px; margin-top: 7px; }
+    .red43-qa-key { color: #64748b; }
+    .red43-qa-value { color: #e2e8f0; overflow-wrap: anywhere; }
+    .red43-qa-button {
+      width: 100%; margin-top: 9px; padding: 7px 10px; border: 1px solid #3b82f6;
+      border-radius: 8px; background: #1d4ed8; color: #fff; cursor: pointer;
+      font-size: 11px; font-weight: 900;
+    }
+    .red43-qa-button:disabled { cursor: not-allowed; opacity: .48; }
+
     /* 鈹€鈹€ Option picker overlay 鈹€鈹€ */
     #optionPickerOverlay {
       display: none; position: fixed; inset: 0;
@@ -632,13 +658,13 @@
       font-size: 18px; font-weight: 900; color: #f8fafc;
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
-        <div class="training-setup-sub">????????????????????????????????????</div>
+    .training-setup-sub { margin-top: 5px; color: #94a3b8; font-size: 12px; line-height: 1.5; }
     .training-setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .training-setup-col {
       border: 1px solid rgba(51,65,85,.9); border-radius: 10px;
       background: rgba(15,23,42,.72); padding: 12px; display: flex; flex-direction: column; gap: 10px;
     }
-          <div class="training-setup-label">??</div>
+    .training-setup-label { color: #e2e8f0; font-size: 13px; font-weight: 900; }
     .training-setup-field { display: flex; flex-direction: column; gap: 5px; }
     .training-setup-field span { font-size: 11px; color: #64748b; font-weight: 800; }
     .training-setup-field select {
@@ -659,7 +685,7 @@
     .training-piece-option:has(input:checked) {
       border-color: #22c55e; background: rgba(22,101,52,.28); color: #dcfce7;
     }
-            <div class="training-setup-hint">???????????????????</div>
+    .training-setup-hint { color: #64748b; font-size: 11px; line-height: 1.45; }
     .training-setup-actions { display: flex; gap: 10px; justify-content: flex-end; }
     .training-setup-btn {
       border: 1px solid rgba(148,163,184,.34); border-radius: 12px; padding: 10px 14px;
@@ -1086,6 +1112,19 @@
     <div style="font-size:14px;color:#64748b" id="loadingMsg">连接战场…</div>
   </div>
 
+  <aside id="red43QaPanel" aria-live="polite">
+    <div class="red43-qa-title">RED-43 · OWNER TARGET QA</div>
+    <div class="red43-qa-grid">
+      <span class="red43-qa-key">场景</span><span class="red43-qa-value" id="red43QaScenario">-</span>
+      <span class="red43-qa-key">Room / Seed</span><span class="red43-qa-value" id="red43QaRoom">-</span>
+      <span class="red43-qa-key">playerId</span><span class="red43-qa-value" id="red43QaPlayer">-</span>
+      <span class="red43-qa-key">所有权集合</span><span class="red43-qa-value" id="red43QaOwners">等待状态</span>
+      <span class="red43-qa-key">目标集合</span><span class="red43-qa-value" id="red43QaTargets">尚未加载技能</span>
+      <span class="red43-qa-key">UI / 规则</span><span class="red43-qa-value" id="red43QaMatch">等待高亮</span>
+    </div>
+    <button class="red43-qa-button" id="red43QaLoadSkill" onclick="loadRed43QaSkill()">加载验收技能</button>
+  </aside>
+
   <!-- Card Detail Modal -->
   <div id="cardDetailModal" onclick="if(event.target===this)closeCardDetail()">
     <div class="cd-layout">
@@ -1186,7 +1225,7 @@
   </div>
 
   <!-- Topbar -->
-  <div class="topbar">
+  <div class="topbar" data-battle-ui-region="player-hud">
     <button class="back-btn" onclick="confirmLeave()">鈫?绂诲紑</button>
     <div class="room-name" id="roomNameLabel">对战</div>
     <div class="turn-badge" id="turnBadge">等待中</div>
@@ -1194,7 +1233,7 @@
     <div style="font-size:12px;color:#64748b" id="roundLabel"></div>
     <button id="btnSurrender" class="btn-surrender" onclick="confirmSurrender()">🏳 鎶曢檷</button>
     <button id="btnSwitchPov" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 鍒囨崲瑙嗚 🔴</button>
-        <div class="legend-item"><div class="legend-dot" style="background:#3b0764"></div>???</div>
+    <button id="btnResetCD" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
     <button class="btn-fullmap" id="btnFullMap" onclick="toggleFullMap()" title="????">?</button>
     <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
     <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
@@ -1212,7 +1251,7 @@
 
     <!-- Board + actions + log -->
     <div class="main-panel">
-      <div class="phase-bar">
+      <div class="phase-bar" data-battle-ui-region="turn-hud">
         <div id="phaseLabel" style="font-weight:600">-</div>
         <div id="playerResCards" style="display:flex;gap:6px"></div>
       </div>
@@ -1230,10 +1269,10 @@
 
       <div class="board-wrap" id="boardWrap">
         <div class="board-shell board-shell-3d">
-          <div class="board-stage" id="boardStage3d">
+          <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
             <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:2"></div>
           </div>
-          <aside class="board-side-rail">
+          <aside class="board-side-rail" data-battle-ui-region="selected-piece">
             <div id="selectedPieceStatus" class="selected-status-empty">?????</div>
             <div class="turn-control-wrap">
               <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
@@ -1243,7 +1282,7 @@
       </div>
 
       <!-- Skill card bar (appears when piece selected) -->
-      <div id="skillBar"></div>
+      <div id="skillBar" data-battle-ui-region="skill-panel"></div>
 
       <!-- Training bar (training mode only) -->
       <div class="training-bar" id="trainingBar" style="display:none">
@@ -1290,7 +1329,7 @@
       </div>
 
       <!-- Hand (always visible) -->
-      <div class="hand-panel" id="handPanel">
+      <div class="hand-panel" id="handPanel" data-battle-ui-region="hand">
         <div style="display:flex;align-items:center;gap:8px;padding:3px 10px;font-size:11px;color:#64748b;border-bottom:1px solid #1a2540;flex-shrink:0">
           <span>🃏 鎵嬬墝</span>
           <span id="handCount" style="font-weight:700;color:#93c5fd">0</span>
@@ -1321,6 +1360,8 @@
     const myPlayerName = params.get('playerName') || '鐜╁'
     const TRAINING_MODE = params.get('mode') === 'training'
     const SPECTATE_MODE = params.get('mode') === 'spectate'
+    const RED43_QA_MODE = params.get('qa') === 'RED-43'
+    if (RED43_QA_MODE) document.body.classList.add('red43-qa')
     function shouldUseRelayMode() {
       if (params.get('relay') === '1' || params.get('server') === 'remote') return true
       return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
@@ -1376,13 +1417,13 @@
       list.innerHTML = pieces.length ? pieces.map(function(piece) {
         const checked = selectedIds.indexOf(piece.id) !== -1 ? ' checked' : ''
         return `<label class="training-piece-option"><input type="checkbox" value="${piece.id}"${checked}><span>${piece.name || piece.id}</span></label>`
-            <div class="training-setup-hint">???????????????????</div>
+      }).join('') : '<div class="training-setup-hint">当前阵营没有可用棋子。</div>'
     }
     function refreshTrainingSetupPieces() {
       const firstFaction = document.getElementById('trainingFirstFaction')?.value || 'red'
       const secondFaction = document.getElementById('trainingSecondFaction')?.value || 'blue'
-            <div id="trainingFirstPieces" class="training-piece-list">?????...</div>
-            <div id="trainingSecondPieces" class="training-piece-list">?????...</div>
+      fillTrainingSetupList('trainingFirstPieces', firstFaction, trainingSetupConfig?.firstTemplateIds?.[0])
+      fillTrainingSetupList('trainingSecondPieces', secondFaction, trainingSetupConfig?.secondTemplateIds?.[0])
     }
     function getSelectedTrainingPieceIds(selectId) {
       const list = document.getElementById(selectId)
@@ -1395,11 +1436,11 @@
         firstPlayerId: 'training-red',
         firstFaction,
         secondFaction,
-            <div id="trainingFirstPieces" class="training-piece-list">?????...</div>
-            <div id="trainingSecondPieces" class="training-piece-list">?????...</div>
+        firstTemplateIds: getSelectedTrainingPieceIds('trainingFirstPieces'),
+        secondTemplateIds: getSelectedTrainingPieceIds('trainingSecondPieces'),
       }
     }
-        <button class="tb-btn" onclick="showTrainingSetup()" style="background:#0c1a0c;border-color:#166534;color:#86efac">??</button>
+    function showTrainingSetup() {
       placingMode = false
       selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
       const btnPlace = document.getElementById('btnPlace')
@@ -1412,7 +1453,7 @@
       const overlay = document.getElementById('trainingSetupOverlay')
       if (overlay) overlay.classList.add('show')
     }
-        <button class="training-setup-btn primary" onclick="startTrainingFromSetup()">????</button>
+    async function startTrainingFromSetup() {
       trainingSetupConfig = getTrainingSetupConfig()
       const overlay = document.getElementById('trainingSetupOverlay')
       if (overlay) overlay.classList.remove('show')
@@ -1477,6 +1518,9 @@
         const secondEngineFaction = 'blue'
         const firstPieces = resolveTrainingInitialPieces(firstAlignment, body && (body.firstTemplateIds || body.firstTemplateId))
         const secondPieces = resolveTrainingInitialPieces(secondAlignment, body && (body.secondTemplateIds || body.secondTemplateId))
+        if (!firstPieces.length || !secondPieces.length) {
+          throw new Error('训练棋子资源未加载，请返回后重试')
+        }
         const state = await Engine.createInitialBattleForPlayers(
           ['training-red', 'training-blue'],
           [],
@@ -1592,7 +1636,7 @@
       'shadow-step': { icon: '影', color: '#d8b4fe', bg: 'rgba(88,28,135,.72)', border: '#a855f7' },
     }
     function tileEffectMeta(effect) {
-      return TILE_EFFECT_META[(effect && effect.tileType) || ''] || {
+      return TILE_EFFECT_META[(effect && (effect.tileType || effect.type)) || ''] || {
         icon: (effect && effect.icon) || '效',
         color: '#e5e7eb',
         bg: 'rgba(15,23,42,.72)',
@@ -1654,6 +1698,103 @@
     let relaySeq = 0            // outbound action/stateUpdate sequence
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
+    let battlePresentation = null
+    let currentBattleViewModel = null
+
+    function red43QaSnapshot() {
+      if (!RED43_QA_MODE) return null
+      const pieces = G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
+      const allies = pieces.filter(p => String(p.ownerPlayerId || '').toLowerCase() === myPlayerId)
+      const enemies = pieces.filter(p => String(p.ownerPlayerId || '').toLowerCase() !== myPlayerId)
+      const expectedFilter = params.get('qaExpected') || ''
+      const expectedIds = (params.get('qaExpectedTargets') || '').split(',').filter(Boolean).sort()
+      const targetKeys = pendingSkill && pendingSkill.validTargets
+        ? Array.from(pendingSkill.validTargets).sort()
+        : []
+      const highlightedPieces = targetKeys.map(key => {
+        const parts = key.split(',')
+        const x = Number(parts[0]), y = Number(parts[1])
+        const piece = pieces.find(p => p.x === x && p.y === y)
+        if (!piece) return null
+        return {
+          key,
+          pieceId: piece.instanceId,
+          ownerPlayerId: piece.ownerPlayerId,
+          relation: String(piece.ownerPlayerId || '').toLowerCase() === myPlayerId ? 'ally' : 'enemy',
+        }
+      }).filter(Boolean)
+      const actualIds = highlightedPieces.map(target => target.pieceId).sort()
+      const consistent = expectedIds.length > 0 && actualIds.length === expectedIds.length &&
+        actualIds.every((id, index) => id === expectedIds[index])
+      return {
+        roomId,
+        seed: gameSeed,
+        scenario: params.get('qaScenario') || '',
+        alignment: params.get('qaAlignment') || '',
+        playerId: myPlayerId,
+        skillId: pendingSkill && pendingSkill.skillId ? pendingSkill.skillId : '',
+        expectedFilter,
+        allyPieceIds: allies.map(p => p.instanceId).sort(),
+        enemyPieceIds: enemies.map(p => p.instanceId).sort(),
+        expectedTargetPieceIds: expectedIds,
+        highlightedTargets: highlightedPieces,
+        actualTargetPieceIds: actualIds,
+        consistent,
+      }
+    }
+
+    function updateRed43QaEvidence() {
+      if (!RED43_QA_MODE) return
+      const snapshot = red43QaSnapshot()
+      window.__RVB_RED43_LAST_SNAPSHOT__ = snapshot
+      const setText = (id, value) => {
+        const element = document.getElementById(id)
+        if (element) element.textContent = value
+      }
+      setText('red43QaScenario', (snapshot.scenario || '-') + ' · ' + (snapshot.alignment || '-'))
+      setText('red43QaRoom', snapshot.roomId + ' / ' + (snapshot.seed == null ? '等待' : snapshot.seed))
+      setText('red43QaPlayer', snapshot.playerId || '-')
+      setText('red43QaOwners', '我方 ' + snapshot.allyPieceIds.length + ' / 对方 ' + snapshot.enemyPieceIds.length)
+      setText('red43QaTargets', snapshot.skillId
+        ? snapshot.expectedFilter + ' · UI ' + snapshot.actualTargetPieceIds.length + ' / 规则 ' + snapshot.expectedTargetPieceIds.length
+        : '尚未加载技能')
+      setText('red43QaMatch', snapshot.skillId ? (snapshot.consistent ? '是' : '否') : '等待高亮')
+      const panel = document.getElementById('red43QaPanel')
+      if (panel) panel.dataset.consistent = snapshot.skillId ? String(snapshot.consistent) : ''
+      const button = document.getElementById('red43QaLoadSkill')
+      const casterTemplateId = params.get('qaCaster') || ''
+      const caster = piecesForRed43Qa().find(p => p.templateId === casterTemplateId && String(p.ownerPlayerId || '').toLowerCase() === myPlayerId)
+      if (button) {
+        button.disabled = !caster || !(G && G.turn && String(G.turn.currentPlayerId || '').toLowerCase() === myPlayerId)
+        button.textContent = caster ? '加载验收技能 · ' + (params.get('qaSkill') || '') : '此视角仅验收敌我分组'
+      }
+    }
+
+    function piecesForRed43Qa() {
+      return G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
+    }
+
+    async function loadRed43QaSkill() {
+      if (!RED43_QA_MODE || !G) return
+      const casterTemplateId = params.get('qaCaster') || ''
+      const skillId = params.get('qaSkill') || ''
+      const caster = piecesForRed43Qa().find(p =>
+        p.templateId === casterTemplateId && String(p.ownerPlayerId || '').toLowerCase() === myPlayerId,
+      )
+      if (!caster || !skillId) return
+      selectPiece(caster.instanceId)
+      await selectSkillCard(skillId)
+      updateRed43QaEvidence()
+      console.info('[RED-43 QA client]', JSON.stringify(red43QaSnapshot()))
+    }
+
+    if (RED43_QA_MODE) {
+      window.__RVB_RED43__ = {
+        snapshot: red43QaSnapshot,
+        loadSuggestedSkill: loadRed43QaSkill,
+      }
+      updateRed43QaEvidence()
+    }
 
     // 鈹€鈹€ Piece helpers 鈹€鈹€
     function pieceName(p) {
@@ -1852,7 +1993,6 @@
 
     // 鈹€鈹€ Server action log flush 鈹€鈹€
     // 鈹€鈹€ Turn announcement 鈹€鈹€
-    let _lastAnnouncedTurnPlayer = null
     function showTurnAnnounce(text, color) {
       const el = document.getElementById('turnAnnounce')
       if (!el) return
@@ -1865,8 +2005,8 @@
 
     // 鈹€鈹€ Damage / heal floaters 鈹€鈹€
     function spawnFloater(x, y, text, color, big) {
-      if (_use3d && window.BattleRenderer3D) {
-        BattleRenderer3D.spawnFloater(x, y, text, color, big)
+      if (_use3d && battlePresentation) {
+        battlePresentation.spawnFloater(x, y, text, color, big)
         return
       }
       const layer = document.getElementById('floatLayer')
@@ -2203,6 +2343,30 @@
       return res.json()
     }
 
+    async function fetchServerJson(path, timeoutMs) {
+      const res = await RvBUtils.serverFetch(path, { timeoutMs: timeoutMs || 3500 })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      return res.json()
+    }
+
+    async function loadServerBattleDataFallback() {
+      const payloads = await Promise.all([
+        fetchServerJson('/api/pieces'),
+        fetchServerJson('/api/skills'),
+      ])
+      const pieces = payloads[0] && Array.isArray(payloads[0].pieces) ? payloads[0].pieces : []
+      pieces.forEach(function(piece) {
+        if (piece && piece.id) PIECES_BY_ID[piece.id] = piece
+      })
+      const serverSkills = payloads[1] && payloads[1].skills
+      if (serverSkills && typeof serverSkills === 'object') {
+        Object.assign(skillsById, serverSkills)
+      }
+      if (!Object.keys(PIECES_BY_ID).length) {
+        throw new Error('服务器未返回棋子资源')
+      }
+    }
+
     async function loadJsonRequired(path, errors) {
       try {
         return await fetchLocalJson(path)
@@ -2224,6 +2388,7 @@
 
     async function loadLocalData() {
       const errors = []
+      let recoveredFromServer = false
       try {
         try {
           const glossary = await loadJsonOptional('./data/skill-keywords.json', errors)
@@ -2268,10 +2433,18 @@
       } catch (e) {
         console.warn('[battle] loadLocalData error:', e.message)
       }
-      if (errors.length) {
-        console.warn('[battle] local data load failures:', errors)
+      if (!Object.keys(PIECES_BY_ID).length) {
+        try {
+          await loadServerBattleDataFallback()
+          recoveredFromServer = true
+        } catch (e) {
+          errors.push('server battle data: ' + (e && e.message ? e.message : String(e)))
+        }
       }
-      return { ok: errors.length === 0, errors }
+      if (errors.length) {
+        console.warn('[battle] local data load failures' + (recoveredFromServer ? ' (recovered from server)' : '') + ':', errors)
+      }
+      return { ok: recoveredFromServer || errors.length === 0, errors }
     }
 
     // 鈹€鈹€ Init 鈹€鈹€
@@ -2286,10 +2459,16 @@
         const trainingLoad = await loadLocalData()
         if (!trainingLoad.ok) showMsg('本地资源读取异常：' + (trainingLoad.errors[0] || 'unknown'), 'err')
         refreshPlaceTemplates()
-        <button class="tb-btn" onclick="showTrainingSetup()" style="background:#0c1a0c;border-color:#166534;color:#86efac">??</button>
+        showTrainingSetup()
         return
       }
       if (!roomId || !myPlayerId) { showMsg('缺少 roomId 或 playerId 参数', 'err'); return }
+      // A direct QA/deep link has not visited the lobby, so it may not have a
+      // persisted server URL yet. Restore the explicit query configuration
+      // before applying the connection guard.
+      if (window.RvBUtils && RvBUtils.restoreServerFromParams) {
+        await RvBUtils.restoreServerFromParams(params)
+      }
       if (!getServerUrl()) { showMsg('未连接服务器', 'err'); return }
       document.getElementById('roomNameLabel').textContent = '房间 ' + roomId
       showMsg('加载本地资源...')
@@ -2359,7 +2538,7 @@
     }
 
     // 鈹€鈹€ Training: resource editor 鈹€鈹€
-        <button class="tb-btn" onclick="openResourceEditor()" style="background:#1a2a1a;border-color:#15803d;color:#86efac" title="????/??/???">??</button>
+    function openResourceEditor() {
       const sheet = document.getElementById('resEditorSheet')
       if (!sheet || !G) return
       // Pre-fill with current values of the active player
@@ -2547,8 +2726,12 @@
           try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
           if (wsMode === 'relay' && wsRole === 'host') initRelayHostBattle()
         } else if (msg.type === 'stateUpdate') {
-          if (_use3d && window.BattleRenderer3D && G && msg.state) {
-            BattleRenderer3D.animateAction(msg.lastAction || null, G, msg.state)
+          if (_use3d && battlePresentation && G && msg.state) {
+            battlePresentation.animateAction(
+              msg.lastAction || null,
+              createBattlePresentationModel(G),
+              createBattlePresentationModel(msg.state)
+            )
           }
           applyServerState(msg.state, msg.seed)
         } else if (msg.type === 'battleSnapshot') {
@@ -2646,9 +2829,6 @@
     // Initialize a real battle: connect WS (server will push initial stateUpdate on subscribe).
     // State arrives through WS; HTTP is only used as a recovery fallback.
     async function initBattle() {
-      if (window.RvBUtils && RvBUtils.restoreServerFromParams) {
-        await RvBUtils.restoreServerFromParams(params)
-      }
       connectBattleWs(wsMode)
       setTimeout(function() {
         if (!G) {
@@ -2680,11 +2860,9 @@
     // Kept as a no-op for old call sites.
     async function pollActions() { /* deprecated: state arrives via WS only */ }
 
-    // Valid skill targets: heuristic using targetType + range from server.
-    // (Dry-run approach fails because G.skillsById from JSON has no effect functions)
-    // 骞茶繍琛岄€愭牸娴嬭瘯锛氬灏勭▼鍐呮瘡涓牸瀛愯窇涓€娆℃湰鍦?applyBattleAction
-    // Avoid exhaustive dry-runs here; use cheap metadata first.
-    // Full GameEngine checks happen when the action is submitted.
+    // Intent payload shaping belongs to the page controller; legality comes only
+    // from BattleLegalActions, which delegates to the existing rule engine.
+    function _actionHasFirstTarget(action) {
       return !!(action && (action.targetPieceId || action.targetX != null || action.targetY != null))
     }
 
@@ -2714,115 +2892,31 @@
     }
 
     function computeValidSkillTargets(sp) {
-      if (!G || !sp || !pendingSkill) return new Set()
-      const skillId = pendingSkill.skillId
-      const valid = new Set()
-
-      // Fall back to heuristic highlighting when the game engine is unavailable.
-      if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) {
-        return _computeValidSkillTargetsHeuristic(sp)
-      }
-
-      const skDef = (G.skillsById && G.skillsById[skillId]) || skillsById[skillId] || {}
-      const isCharge = pendingSkill.skillType === 'super' || skDef.type === 'super'
-      const baseAction = pendingSkill.baseAction
-        ? { ...pendingSkill.baseAction }
-        : { type: isCharge ? 'useChargeSkill' : 'useBasicSkill',
-            playerId: myPlayerId, pieceId: sp.instanceId, skillId }
-
-      // Pre-filter by range when possible; unknown range defaults to 99.
-      const maxRange = pendingSkill.range != null ? pendingSkill.range : 99
-      const ttLower = (pendingSkill.targetType || '').toLowerCase()
-      const filterLower = (pendingSkill.filter || '').toLowerCase()
-      const isPieceTarget = ttLower === 'piece' || ttLower === 'enemy' || ttLower === 'enemies'
-        || ttLower === 'ally' || ttLower === 'allies'
-      const isGridTarget = ttLower === 'grid'
-      const isSelfTarget = ttLower === 'self'
-
-      // Pre-filter targetType and filter before trial runs.
-      // This avoids useless trial runs on empty or invalid tiles.
-      // It also reduces GameEngine.applyBattleAction calls.
-      function _preFilter(t) {
-        const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
-        const dist = isGridTarget
-          ? Math.max(Math.abs(t.x - sp.x), Math.abs(t.y - sp.y))
-          : Math.abs(t.x - sp.x) + Math.abs(t.y - sp.y)
-        if (dist > maxRange) return false
-        if (isSelfTarget) return t.x === sp.x && t.y === sp.y
-        if (isPieceTarget) {
-          if (!occ) return false
-          if (filterLower === 'enemy') return occ.ownerPlayerId !== sp.ownerPlayerId
-          if (filterLower === 'ally' || filterLower === 'friendly') return occ.ownerPlayerId === sp.ownerPlayerId
-          return true
-        }
-        // grid / 其他：保留可行走地块
-        return !t.props || t.props.walkable !== false
-      }
-
-      // 构造瘦身状态：skillsById 鍙斁褰撳墠鎶€鑳斤紝澶у箙缂╁噺 JSON 浣撶Н
-      const savedSkillsById = G.skillsById
-      G.skillsById = { [skillId]: skDef }
-      const baseCloneStr = JSON.stringify(G)
-      G.skillsById = savedSkillsById
-
-      for (const t of G.map.tiles) {
-        if (!_preFilter(t)) continue
-
-        const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
-        const testAction = _appendTargetToAction({ ...baseAction, extraTargets: Array.isArray(baseAction.extraTargets) ? baseAction.extraTargets.slice() : undefined }, occ, t.x, t.y)
-
-        try {
-          GameEngine.applyBattleAction(JSON.parse(baseCloneStr), testAction)
-          valid.add(t.x + ',' + t.y)
-        } catch (e) {
-          // A second target request means this tile is valid for the current step.
-          if (e && e.needsTargetSelection) valid.add(t.x + ',' + t.y)
-        }
-      }
-
-      return valid.size > 0 ? valid : _computeValidSkillTargetsHeuristic(sp)
-    }
-    // Heuristic fallback based on targetType and filter when GameEngine is unavailable.
-    function _computeValidSkillTargetsHeuristic(sp) {
-      if (!G || !sp || !pendingSkill) return new Set()
-      const maxRange = pendingSkill.range ?? 10
-      const targetType = (pendingSkill.targetType || '').toLowerCase()
-      const filter = (pendingSkill.filter || '').toLowerCase()
-      const valid = new Set()
-      G.map.tiles.forEach(t => {
-        const dist = targetType === 'grid'
-          ? Math.max(Math.abs(t.x - sp.x), Math.abs(t.y - sp.y))
-          : Math.abs(t.x - sp.x) + Math.abs(t.y - sp.y)
-        if (dist > maxRange) return
-        const occ = G.pieces.find(p => p.x === t.x && p.y === t.y && p.currentHp > 0)
-        let ok = false
-        if (targetType === 'piece') {
-          if (!occ) ok = false
-          else if (filter === 'enemy') ok = occ.ownerPlayerId !== sp.ownerPlayerId
-          else if (filter === 'ally')  ok = occ.ownerPlayerId === sp.ownerPlayerId
-          else ok = true
-        } else if (targetType === 'grid') {
-          ok = true
-        } else if (targetType === 'self') {
-          ok = t.x === sp.x && t.y === sp.y
-        } else {
-          switch (targetType) {
-            case 'enemy': case 'enemies': ok = !!occ && occ.ownerPlayerId !== sp.ownerPlayerId; break
-            case 'ally': case 'allies':   ok = !!occ && occ.ownerPlayerId === sp.ownerPlayerId; break
-            case 'empty': case 'tile':    ok = !occ; break
-            default: ok = true
-          }
-        }
-        if (ok) valid.add(t.x + ',' + t.y)
+      if (!G || !sp || !pendingSkill || !window.BattleLegalActions) return new Set()
+      return BattleLegalActions.querySkillTargetCells({
+        snapshot: G,
+        engine: typeof GameEngine === 'undefined' ? null : GameEngine,
+        baseAction: pendingSkill.baseAction,
+        targetIndex: pendingSkill.pendingTargetIndex,
+        targetType: pendingSkill.targetType,
+        filter: pendingSkill.filter,
       })
-      return valid
     }
 
     // Cache valid targets on pendingSkill once (not per frame)
     function _updatePendingSkillTargets() {
       if (!pendingSkill || !G) return
+      if (pendingSkill.turnTargetActionType) {
+        pendingSkill.validTargets = BattleLegalActions.queryPendingTargetCells({
+          snapshot: G,
+          playerId: pendingSkill.turnTargetPlayerId || myPlayerId,
+          engine: typeof GameEngine === 'undefined' ? null : GameEngine,
+        })
+        return
+      }
       const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
       pendingSkill.validTargets = sp ? computeValidSkillTargets(sp) : new Set()
+      updateRed43QaEvidence()
     }
 
     // 鈹€鈹€ Target overlay 鈹€鈹€
@@ -2882,10 +2976,13 @@
 
     function canAutoMovePiece(piece) {
       if (!G || !piece || piece.currentHp <= 0) return false
-      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      const inAction = G.turn && G.turn.phase === 'action'
-      const isOwn = piece.ownerPlayerId && piece.ownerPlayerId.toLowerCase() === myPlayerId
-      return !!(isMyTurn && inAction && isOwn)
+      if (!window.BattleLegalActions || typeof GameEngine === 'undefined') return false
+      return BattleLegalActions.queryMoveCells({
+        snapshot: G,
+        playerId: myPlayerId,
+        pieceId: piece.instanceId,
+        engine: GameEngine,
+      }).size > 0
     }
 
     function autoMoveSelectedIfPossible() {
@@ -2906,6 +3003,7 @@
 
     // 鈹€鈹€ Render 鈹€鈹€
     // Render
+    function pendingTargetSelectionForMe() {
       const pbt = G && G.pendingTargetSelection
       return !!(pbt && pbt.playerId && clientOwns(pbt.playerId))
     }
@@ -2920,14 +3018,67 @@
       return !!(pbc && pbc.playerId && !clientOwns(pbc.playerId))
     }
 
+    function battleInteractionMode() {
+      if (TRAINING_MODE && placingMode) return 'place'
+      if (pendingSkill || (pendingCardAction && pendingCardAction.type)) return 'target'
+      if (pendingMove) return 'move'
+      return 'inspect'
+    }
+
+    function refreshBattleLegalActions() {
+      if (!G || !window.BattleLegalActions) return
+      if (pendingMove && selectedPieceId) {
+        validMoves = BattleLegalActions.queryMoveCells({
+          snapshot: G,
+          playerId: myPlayerId,
+          pieceId: selectedPieceId,
+          engine: typeof GameEngine === 'undefined' ? null : GameEngine,
+        })
+      } else {
+        validMoves = new Set()
+      }
+      if (pendingSkill) _updatePendingSkillTargets()
+      if (pendingCardAction && pendingCardAction.type) {
+        pendingCardAction.validTargets = BattleLegalActions.queryActionTargetCells({
+          snapshot: G,
+          baseAction: pendingCardAction,
+          engine: typeof GameEngine === 'undefined' ? null : GameEngine,
+          targetIndex: pendingCardAction.pendingTargetIndex,
+          targetType: pendingCardAction.pendingTargetType,
+          filter: pendingCardAction.pendingTargetFilter,
+        })
+      }
+    }
+
+    function createBattlePresentationModel(snapshot) {
+      if (!snapshot || !window.BattleViewModel) return null
+      const isCurrentSnapshot = snapshot === G
+      const targetCells = isCurrentSnapshot && pendingSkill
+        ? (pendingSkill.validTargets || new Set())
+        : (isCurrentSnapshot && pendingCardAction && pendingCardAction.type
+            ? (pendingCardAction.validTargets || new Set())
+            : new Set())
+      return BattleViewModel.create({
+        snapshot: snapshot,
+        viewerId: myPlayerId,
+        selectedPieceId: selectedPieceId,
+        interactionMode: battleInteractionMode(),
+        legal: {
+          moveCells: isCurrentSnapshot ? validMoves : new Set(),
+          targetCells: targetCells,
+          placementCells: isCurrentSnapshot && TRAINING_MODE && placingMode
+            ? BattleLegalActions.queryTrainingPlacementCells(snapshot)
+            : new Set(),
+        },
+      })
+    }
+
     let _pendingChoiceShown = null  // track which pendingOptionSelection we've shown
     function render() {
       if (!G) return
       checkClientGameOver()
       renderBoard()
       renderPanels()
-      renderHUD()
-      renderSelectedPieceStatus()
       renderActionBar()
       renderHand()
       renderTargetOverlay()
@@ -2965,15 +3116,7 @@
             turnTargetPlayerId: pbt.playerId,
             validTargets: new Set(),
           }
-          // Compute likely valid targets while the server is waiting for a target.
-          const _sp = G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
-          if (_sp) {
-            pendingSkill.validTargets = _computeValidSkillTargetsHeuristic(_sp)
-          } else {
-            // If the caster is unknown, fall back to all walkable tiles.
-            const tiles = (G.map && G.map.tiles) || []
-            tiles.forEach(t => { if (t.props && t.props.walkable) pendingSkill.validTargets.add(t.x + ',' + t.y) })
-          }
+          _updatePendingSkillTargets()
           console.log('[STAGE4] entered target-select mode, validTargets count=' + pendingSkill.validTargets.size)
           setStatusMsg(pbt.title || _targetPromptText() || '请选择目标')
           renderBoard()
@@ -2985,159 +3128,34 @@
         renderActionBar()
         renderTargetOverlay()
       }
-    }
-
-    function statusTagLabel(t) {
-      const label = t.name || t.type || t.id || '?'
-      const extra = t.stacks ? `x${t.stacks}` : (t.duration ? `${t.duration}T` : '')
-      return `${label}${extra ? extra : ''}`
-    }
-
-    function isLuckyCoinStatus(t) {
-      const raw = String(t.id || t.type || t.name || '').toLowerCase()
-      return raw.includes('lucky-coin') || raw.includes('幸运币')
-    }
-
-    function playerFaction(playerId, fallbackIndex) {
-      const pid = (playerId || '').toLowerCase()
-      const owned = G && G.pieces && G.pieces.find(p => p.ownerPlayerId && p.ownerPlayerId.toLowerCase() === pid)
-      if (owned && owned.faction) return owned.faction === 'blue' ? 'blue' : 'red'
-      if (pid.includes('blue')) return 'blue'
-      if (pid.includes('red')) return 'red'
-      return fallbackIndex === 1 ? 'blue' : 'red'
-    }
-
-    function renderSelectedPieceStatus() {
-      const el = document.getElementById('selectedPieceStatus')
-      if (!el) return
-      const piece = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-      if (!piece) {
-        el.className = 'selected-status-empty'
-        el.innerHTML = '未选中棋子'
-        return
-      }
-      const tags = pieceDispTags(piece).filter(t => t.visible !== false)
-      const tagsHtml = tags.length
-        : '<span class="status-empty">无状态</span>'
-        : '<span class="status-empty">鏃犵姸鎬?/span>'
-      el.className = 'selected-status-card'
-      el.innerHTML = `
-        <div class="selected-piece-name">${escHtml(pieceName(piece))}</div>
-        <div class="selected-piece-hp">HP ${pieceDispHp(piece)} / ${pieceMaxHp(piece)}</div>
-        <div class="selected-status-title">状态</div>
-        <div class="selected-status-tags">${tagsHtml}</div>
-      `
-    }
-
-    function renderHUD() {
-      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      badge.textContent = isMyTurn ? '我方回合' : '对方回合'
-      badge.textContent = isMyTurn ? '鎴戠殑鍥炲悎' : '对方回合'
-      badge.className = 'turn-badge ' + (isMyTurn ? 'my-turn' : 'opp-turn')
-
-      // Turn announcement on change
-      const curTurnPlayer = G.turn && G.turn.currentPlayerId
-      if (curTurnPlayer && curTurnPlayer !== _lastAnnouncedTurnPlayer) {
-        _lastAnnouncedTurnPlayer = curTurnPlayer
-        if (isMyTurn) showTurnAnnounce('鈿?浣犵殑鍥炲悎', '#4ade80')
-        else showTurnAnnounce('🛡 对方回合', '#f87171')
-      }
-      document.getElementById('roundLabel').textContent = '绗?' + (G.turn ? G.turn.turnNumber : 1) + ' 鍥炲悎'
-      document.getElementById('phaseLabel').textContent = PHASE_LABELS[G.turn ? G.turn.phase : ''] || ''
-
-      const apD = document.getElementById('resApDisplay')
-      const cpD = document.getElementById('resCpDisplay')
-      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-      const currentMeta = myMeta || (G.players && G.players.find(p => p.playerId === (G.turn && G.turn.currentPlayerId))) || (G.players && G.players[0])
-      if (apD && currentMeta) {
-        apD.style.display = ''
-        const apVal = document.getElementById('resApVal')
-        const apMax = document.getElementById('resApMax')
-        if (apVal) apVal.textContent = currentMeta.actionPoints || 0
-        if (apMax) apMax.textContent = currentMeta.maxActionPoints || 10
-      }
-      if (cpD && currentMeta) {
-        cpD.style.display = ''
-        const cpVal = document.getElementById('resCpVal')
-        const cpMax = document.getElementById('resCpMax')
-        if (cpVal) cpVal.textContent = currentMeta.chargePoints || 0
-        if (cpMax) cpMax.textContent = currentMeta.maxChargePoints || currentMeta.maxCharge || 0
-      }
-
-      const cardsEl = document.getElementById('playerResCards')
-      if (G.players) {
-        cardsEl.className = 'player-state-strip'
-        cardsEl.innerHTML = G.players.map((p, idx) => {
-          const isCur = p.playerId && p.playerId.toLowerCase() === (G.turn ? G.turn.currentPlayerId : '')
-          const faction = playerFaction(p.playerId, idx)
-          const sideName = faction === 'blue' ? '🔵后手' : '🔴先手'
-          const tags = (p.statusTags || []).filter(t => t.visible !== false && !isLuckyCoinStatus(t))
-          const tagsHtml = tags.map(t => {
-            return `<span class="status-tag" title="${escHtml(t.id || t.description || '')}">${escHtml(statusTagLabel(t))}</span>`
-          }).join('')
-          return `<div class="player-state-chip ${faction} ${isCur ? 'active' : ''}" title="${escHtml((p.playerId || '').toString())}">
-            <div class="player-state-main">
-              <span class="player-side-name">${sideName}</span>
-              <span class="resource-orb action" title="行动点"><span class="resource-glyph action"></span>${p.actionPoints || 0}</span>
-              <span class="resource-orb charge" title="充能点"><span class="resource-glyph charge"></span>${p.chargePoints || 0}</span>
-              ${isCur ? '<span>当前</span>' : ''}
-            </div>
-            <div class="player-state-tags">${tagsHtml}</div>
-          </div>`
-        }).join('')
-      }
+      updateRed43QaEvidence()
     }
 
     function renderBoard() {
       if (!G || !G.map) return
+      refreshBattleLegalActions()
+      currentBattleViewModel = createBattlePresentationModel(G)
+      if (!currentBattleViewModel) return
+      if (battlePresentation) battlePresentation.update(currentBattleViewModel)
       recalcCellSize()
 
       // 鈹€鈹€ Compute highlights (shared between 3D and HTML paths) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-      const tiles = G.map.tiles
+      const tiles = currentBattleViewModel.board.tiles
       const cellMap = {}
-      G.pieces.forEach(p => { if (p.currentHp > 0) cellMap[p.x + ',' + p.y] = p })
+      currentBattleViewModel.pieces.forEach(p => { if (p.visible) cellMap[p.x + ',' + p.y] = p })
 
-      const hlMoveKeys = new Set(), hlSkillKeys = new Set(), hlPlaceKeys = new Set()
-      if (TRAINING_MODE && placingMode) {
-        tiles.forEach(t => { if (t.props && t.props.walkable && !cellMap[t.x + ',' + t.y]) hlPlaceKeys.add(t.x + ',' + t.y) })
-      }
-      const sp = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-      validMoves = new Set()
-      if (sp && pendingMove) {
-        const range = sp.moveRange !== undefined ? sp.moveRange : ((sp.stats && sp.stats.moveRange) || 3)
-        const tileMap = {}
-        tiles.forEach(t => { tileMap[t.x + ',' + t.y] = t })
-        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-          for (let step = 1; step <= range; step++) {
-            const x = sp.x + dx * step, y = sp.y + dy * step
-            const key = x + ',' + y
-            const t = tileMap[key]
-            if (!t || !t.props || !t.props.walkable) break
-            if (!cellMap[key]) { validMoves.add(key); hlMoveKeys.add(key) }
-          }
-        }
-      }
-      if (pendingSkill) {
-        (pendingSkill.validTargets || new Set()).forEach(k => hlSkillKeys.add(k))
-      }
+      const toKey = cell => cell.x + ',' + cell.y
+      const hlMoveKeys = new Set(currentBattleViewModel.legal.moveCells.map(toKey))
+      const hlSkillKeys = new Set(currentBattleViewModel.legal.targetCells.map(toKey))
+      const hlPlaceKeys = new Set(currentBattleViewModel.legal.placementCells.map(toKey))
 
       // 鈹€鈹€ 3D path 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-      if (_use3d && window.BattleRenderer3D) {
-        BattleRenderer3D.syncState(G)
-        const toXZ = k => { const [x,z] = k.split(','); return { x: +x, z: +z } }
-        BattleRenderer3D.setHighlights({
-          move:     [...hlMoveKeys].map(toXZ),
-          skill:    [...hlSkillKeys].map(toXZ),
-          place:    [...hlPlaceKeys].map(toXZ),
-          selected: selectedPieceId || null,
-        })
-        return
-      }
+      if (_use3d) return
 
       // 鈹€鈹€ HTML grid fallback 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
       const grid = document.getElementById('gameGrid')
       if (!grid) return
-      const { width, height } = G.map
+      const { width, height } = currentBattleViewModel.board
       grid.style.gridTemplateColumns = 'repeat(' + width + ', var(--cell-size, 44px))'
 
       const cells = []
@@ -3148,7 +3166,7 @@
           const tclass = TILE_CLASS[ttype] || 't-floor'
           const key = x + ',' + y
           const piece = cellMap[key]
-          const isSel = piece && piece.instanceId === selectedPieceId
+          const isSel = piece && piece.id === selectedPieceId
 
           let cls = 'cell ' + tclass
           if (isSel) cls += ' hl-selected'
@@ -3156,16 +3174,14 @@
           else if (hlSkillKeys.has(key)) cls += ' hl-skill'
           else if (hlPlaceKeys.has(key)) cls += ' hl-place'
 
-          const tileEfxList = G && G.extensions && G.extensions.tileEffects
-            ? G.extensions.tileEffects.filter(te => te.x === x && te.y === y)
-            : []
+          const tileEfxList = currentBattleViewModel.effects.filter(te => te.x === x && te.y === y)
           let tileEfxHtml = ''
           if (tileEfxList.length) {
             const icons = tileEfxList
               .map(te => {
                 const meta = tileEffectMeta(te)
-                const label = te.icon || meta.icon
-                return `<span title="${escHtml(te.tileType || '')}" style="display:inline-flex;align-items:center;justify-content:center;min-width:13px;height:13px;border-radius:999px;border:1px solid ${escHtml(meta.border)};background:${escHtml(meta.bg)};color:${escHtml(meta.color)};font-size:10px;line-height:1;font-weight:900">${escHtml(label)}</span>`
+                const label = meta.icon
+                return `<span title="${escHtml(te.type || '')}" style="display:inline-flex;align-items:center;justify-content:center;min-width:13px;height:13px;border-radius:999px;border:1px solid ${escHtml(meta.border)};background:${escHtml(meta.bg)};color:${escHtml(meta.color)};font-size:10px;line-height:1;font-weight:900">${escHtml(label)}</span>`
               })
               .join('')
             if (icons) {
@@ -3175,13 +3191,13 @@
 
           let inner = ''
           if (piece) {
-            const maxHp = pieceMaxHp(piece)
-            const pct = Math.max(0, Math.round(pieceDispHp(piece) / maxHp * 100))
+            const maxHp = piece.health.max
+            const pct = Math.max(0, Math.round(piece.health.current / maxHp * 100))
             const fillCls = pct < 30 ? 'crit' : pct < 60 ? 'low' : ''
             const faction = piece.faction || 'red'
             const tokCls = 'piece-tok ' + faction + (isSel ? ' selected-tok' : '')
-            const tags = pieceDispTags(piece).filter(t => t.visible !== false)
-            const tagsHtml = tags.map(t => `<span class="status-tag" title="${escHtml(t.id || '')}">${escHtml(t.name || t.type || t.id || '?')}</span>`).join('')
+            const tags = piece.statusSummary
+            const tagsHtml = tags.map(t => `<span class="status-tag" title="${escHtml(t.id || '')}">${escHtml(t.label || t.id || '?')}</span>`).join('')
             const tmpl = PIECES_BY_ID[piece.templateId]
             const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
             const imgHtml = imgSrc
@@ -3194,8 +3210,11 @@
               <div class="tok-hp-bar"><div class="tok-hp-fill ${fillCls}" style="width:${pct}%"></div></div>
             </div>`
           }
-          const _ctxAttr = piece ? ` oncontextmenu="event.preventDefault();showPieceInfo('${escHtml(piece.instanceId)}')"` : ''
-          cells.push(`<div class="${cls}" onclick="onCellClick(${x},${y})"${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
+          const _ctxAttr = piece ? ` oncontextmenu="event.preventDefault();dispatchBattleIntent({type:'inspect-piece',pieceId:'${escHtml(piece.id)}'})"` : ''
+          const _pieceAttrs = piece
+            ? ` data-piece-id="${escHtml(piece.id)}" data-owner-player-id="${escHtml(piece.ownerPlayerId || '')}" data-relation="${String(piece.ownerPlayerId || '').toLowerCase() === myPlayerId ? 'ally' : 'enemy'}"`
+            : ''
+          cells.push(`<div class="${cls}" data-x="${x}" data-y="${y}" onclick="dispatchBattleIntent({type:'activate-cell',x:${x},y:${y}})"${_pieceAttrs}${_ctxAttr}>${tileEfxHtml}${inner}</div>`)
         }
       }
       grid.innerHTML = cells.join('')
@@ -3290,9 +3309,9 @@
       const tmpl = PIECES_BY_ID[piece.templateId]
       const displayName = piece.name || (tmpl && tmpl.name) || piece.templateId
       const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
-      const onclick = !dead ? `onclick="selectPiece('${piece.instanceId}')"` : ''
+      const onclick = !dead ? `onclick="dispatchBattleIntent({type:'select-piece',pieceId:'${piece.instanceId}'})"` : ''
       const iid = escHtml(piece.instanceId)
-      return `<div class="piece-card ${dead?'dead':''} ${sel?'selected':''}" ${onclick}
+      return `<div class="piece-card ${dead?'dead':''} ${sel?'selected':''}" data-piece-id="${iid}" data-owner-player-id="${escHtml(piece.ownerPlayerId || '')}" data-relation="${isMe ? 'ally' : 'enemy'}" ${onclick}
         ontouchstart="startPressTimer(event,'${iid}')"
         ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
         oncontextmenu="event.preventDefault();showPieceInfo('${iid}')">
@@ -3365,7 +3384,7 @@
         titleParts.push(`行动点消耗：${apCost}`)
         titleParts.push(`充能点消耗：${cpCost}`)
 
-        return `<div class="${cls}" onclick="selectSkillCard('${escHtml(sid)}')" title="${escHtml(titleParts.join('\n'))}">
+        return `<div class="${cls}" onclick="dispatchBattleIntent({type:'select-skill',skillId:'${escHtml(sid)}'})" title="${escHtml(titleParts.join('\n'))}">
           ${cdCover}
           <div class="sk-cost-row">
             <span class="sk-cost-orb action ${apLow ? 'low' : ''}" title="行动点消耗"><span class="resource-glyph action"></span>${apCost}</span>
@@ -3575,10 +3594,11 @@
 
       const _selPiece = G && G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
       const _isOwnSelected = _selPiece && _selPiece.ownerPlayerId && _selPiece.ownerPlayerId.toLowerCase() === myPlayerId
-      setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected)
+      const _canMoveSelected = canAutoMovePiece(_selPiece)
+      setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
-        setStatusMsg(getSkillHint())
+        setStatusMsg(_targetPromptText() || '选择回合目标')
       } else if (pendingOptionSelectionForOther()) {
         setStatusMsg('等待对方选择...')
         pendingMove = false
@@ -3613,6 +3633,22 @@
     }
 
     // 鈹€鈹€ Cell click 鈹€鈹€
+    function handleBattleIntent(intent) {
+      if (!intent) return
+      if (intent.type === 'activate-cell') return onCellClick(intent.x, intent.y)
+      if (intent.type === 'inspect-piece') return showPieceInfo(intent.pieceId)
+      if (intent.type === 'select-piece') return selectPiece(intent.pieceId)
+      if (intent.type === 'clear-selection') return clearPieceSelection()
+      if (intent.type === 'select-skill') return selectSkillCard(intent.skillId)
+      if (intent.type === 'cancel-target') return cancelTargetSelection()
+      if (intent.type === 'toggle-move') return toggleMove()
+    }
+
+    function dispatchBattleIntent(intent) {
+      if (battlePresentation) return battlePresentation.dispatch(intent)
+      return handleBattleIntent(intent)
+    }
+
     function onCellClick(x, y) {
       if (!G) return
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
@@ -3629,9 +3665,9 @@
         const templateId = document.getElementById('placeTemplate')?.value
         if (!templateId) { addLog('请先选择棋子类型', 'err'); return }
         if (!templateId) { addLog('请先选择棋子类型', 'err'); return }
-        const tile = G.map.tiles.find(t => t.x === x && t.y === y)
-        if (!tile || !tile.props || !tile.props.walkable) { addLog('不可放置此处', 'err'); return }
-        if (piece) { addLog('该位置已有棋子', 'err'); return }
+        const placementAllowed = currentBattleViewModel && currentBattleViewModel.legal.placementCells
+          .some(cell => cell.x === x && cell.y === y)
+        if (!placementAllowed) { addLog('不可放置此处', 'err'); return }
         sendPatch({ type: 'addPiece', ownerPlayerId, templateId, x, y }).then(ok => {
           if (ok) addLog('放置 ' + (PIECES_BY_ID[templateId]?.name || templateId), 'info')
         })
@@ -3639,7 +3675,12 @@
       }
 
       // Pending card target selection
-      if (pendingCardAction) {
+      if (pendingCardAction && pendingCardAction.type) {
+        const cardTargets = pendingCardAction.validTargets
+        if (cardTargets && !cardTargets.has(x + ',' + y)) {
+          setStatusMsg('目标不在卡牌的合法目标集合内')
+          return
+        }
         let action
         const hasPrimaryTarget = pendingCardAction.targetPieceId || pendingCardAction.targetX !== undefined || pendingCardAction.targetY !== undefined
         if (hasPrimaryTarget) {
@@ -3655,6 +3696,7 @@
         }
         delete action.clientActionId
         delete action.requestId
+        delete action.validTargets
         pendingCardAction = null
         document.getElementById('handTarget').style.display = 'none'
         doAction(action)
@@ -3662,6 +3704,11 @@
       }
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
+        const turnTargets = pendingSkill.validTargets
+        if (turnTargets && !turnTargets.has(x + ',' + y)) {
+          setStatusMsg('目标不在权威合法目标集合内')
+          return
+        }
         const action = { type: pendingSkill.turnTargetActionType, playerId: pendingSkill.turnTargetPlayerId || myPlayerId, targetX: x, targetY: y }
         if (piece) action.targetPieceId = piece.instanceId
         const _pts = G && G.pendingTargetSelection
@@ -3704,7 +3751,7 @@
         // Only allow clicks on highlighted valid skill targets.
         const key = x + ',' + y
         const vt = pendingSkill.validTargets
-        if (vt && vt.size > 0 && !vt.has(key)) {
+        if (vt && !vt.has(key)) {
           // Invalid target: inspect a piece if present, otherwise show a hint.
           if (piece) { selectPiece(piece.instanceId); return }
           setStatusMsg('目标不在技能范围内')
@@ -3735,7 +3782,23 @@
       }
     }
 
+    function clearPieceSelection() {
+      selectedPieceId = null
+      pendingMove = false
+      pendingSkill = null
+      validMoves = new Set()
+      setMoveButtonClass(false)
+      const pieceSelect = document.getElementById('pieceSelect')
+      if (pieceSelect) pieceSelect.value = ''
+      renderSkillBar(null)
+      render()
+    }
+
     function selectPiece(instanceId) {
+      if (selectedPieceId === instanceId) {
+        clearPieceSelection()
+        return
+      }
       selectedPieceId = instanceId
       pendingSkill = null
       // Sync dropdown
@@ -3752,7 +3815,7 @@
 
     function selectPieceFromDropdown() {
       const val = document.getElementById('pieceSelect')?.value
-      if (val) selectPiece(val)
+      if (val) dispatchBattleIntent({ type: 'select-piece', pieceId: val })
     }
 
     function toggleMove() {
@@ -3764,32 +3827,17 @@
       renderBoard(); renderSkillBar(sp); renderActionBar()
     }
 
-    // Probe target requirements with a local dry run of GameEngine.
-    // Returns { needsTarget, range, targetType, filter } or null.
+    // Rule-layer target probe; the page only translates the result into UI state.
     function _probeSkillTargetInfo(sp, skId) {
-      if (!G || typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) return null
-      const skDef = (G.skillsById && G.skillsById[skId]) || skillsById[skId] || {}
-      if (!skDef.code) return null
-      const isCharge = skDef.type === 'super'
-      const probeAction = {
-        type: isCharge ? 'useChargeSkill' : 'useBasicSkill',
-        playerId: myPlayerId, pieceId: sp.instanceId, skillId: skId
-      }
-      const savedSkillsById = G.skillsById
-      G.skillsById = { [skId]: skDef }
-      const stateStr = JSON.stringify(G)
-      G.skillsById = savedSkillsById
-      try {
-        GameEngine.applyBattleAction(JSON.parse(stateStr), probeAction)
-        return { needsTarget: false }
-      } catch (e) {
-        if (e && e.needsTargetSelection) {
-          return { needsTarget: true, range: e.range != null ? e.range : 99,
-            targetType: e.targetType || '', filter: e.filter || '', targetIndex: e.targetIndex }
-        }
-        if (e && e.needsOptionSelection) return { needsTarget: false }
-        return null
-      }
+      if (!G || !window.BattleLegalActions) return null
+      return BattleLegalActions.probeSkillTarget({
+        snapshot: G,
+        playerId: myPlayerId,
+        pieceId: sp.instanceId,
+        skillId: skId,
+        skillsById: skillsById,
+        engine: typeof GameEngine === 'undefined' ? null : GameEngine,
+      })
     }
 
     function enterPendingSkillTargetMode(sp, skId, isCharge, probe) {
@@ -3801,7 +3849,12 @@
         targetType: probe && probe.targetType ? probe.targetType : (skData.targetType || ''),
         filter: probe && probe.filter ? probe.filter : (skData.filter || ''),
         pendingTargetIndex: probe && probe.targetIndex != null ? Number(probe.targetIndex) || 0 : 0,
-        baseAction: null
+        baseAction: probe && probe.baseAction ? probe.baseAction : {
+          type: isCharge ? 'useChargeSkill' : 'useBasicSkill',
+          playerId: myPlayerId,
+          pieceId: sp.instanceId,
+          skillId: skId,
+        }
       }
       _updatePendingSkillTargets()
       setMoveButtonClass(false)
@@ -4175,7 +4228,7 @@
         const restartBtn = document.createElement('button')
         restartBtn.style.cssText = 'background:#1d4ed8;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px'
         restartBtn.textContent = '重新开始'
-        <button class="tb-btn" onclick="showTrainingSetup()" style="background:#0c1a0c;border-color:#166534;color:#86efac">??</button>
+        restartBtn.onclick = () => { overlay.style.display = 'none'; showTrainingSetup() }
         overlay.appendChild(restartBtn)
       }
       document.getElementById('resultOverlay').style.display = 'flex'
@@ -4240,8 +4293,11 @@
       if (el) el.textContent = msg
     }
     function showMsg(msg, type) {
-      document.getElementById('loadingMsg').textContent = msg
-      if (type === 'err') document.getElementById('loadingMsg').style.color = '#f87171'
+      const loadingMsg = document.getElementById('loadingMsg')
+      const spinner = document.querySelector('#loadingOverlay .spinner')
+      loadingMsg.textContent = msg
+      loadingMsg.style.color = type === 'err' ? '#f87171' : '#64748b'
+      if (spinner) spinner.style.display = type === 'err' ? 'none' : ''
     }
     function openLog() { document.getElementById('logOverlay').classList.add('show') }
     function closeLog() { document.getElementById('logOverlay').classList.remove('show') }
@@ -4388,7 +4444,7 @@
     // 鈹€鈹€ Start 鈹€鈹€
     // 鈹€鈹€ Dynamic cell sizing 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     function recalcCellSize() {
-      if (_use3d && window.BattleRenderer3D) { BattleRenderer3D.resize(); return }
+      if (_use3d && battlePresentation) { battlePresentation.resize(); return }
       if (!G || !G.map) return
       const cols = G.map.width
       const rows = G.map.height
@@ -4439,18 +4495,19 @@
     }
 
     window.addEventListener('load', () => {
-      if (window.THREE && window.BattleRenderer3D) {
-        const container = document.getElementById('boardStage3d')
-        BattleRenderer3D.init(
-          container,
-          function(x, z) { onCellClick(x, z) },
-          function(piece) { if (piece) showPieceInfo(piece.instanceId) }
-        )
-        BattleRenderer3D.setFloatLayer(document.getElementById('floatLayer'))
-        _use3d = true
-      } else {
-        initMapControls()
+      const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
+      const renderer = hasThreeRenderer ? window.BattleRenderer3D : {
+        init() {}, update() {}, resize() {}, projectCell() { return null },
+        screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
+      const domUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
+      battlePresentation = BattlePresentation.create({ renderer, domUi, onIntent: handleBattleIntent })
+      battlePresentation.mount({
+        boardContainer: document.getElementById('boardStage3d'),
+        floatLayer: document.getElementById('floatLayer'),
+      })
+      _use3d = hasThreeRenderer
+      if (!_use3d) initMapControls()
       init()
 
       // Click outside a selected hand card to cancel card targeting.
@@ -4464,6 +4521,7 @@
 
       // 淇鎵嬫満绔瀛愬睘鎬у脊绐楀叧闂寜閽?
       // Close piece info modal when tapping the backdrop on mobile.
+      const pieceModal = document.getElementById('pieceInfoModal')
       if (pieceModal) {
         pieceModal.addEventListener('touchend', function(e) {
           if (e.target === pieceModal) { e.preventDefault(); closePieceInfo() }
@@ -4490,9 +4548,13 @@
         }
       }
     })
-    window.addEventListener('unload', () => {
+    function disposeBattlePage() {
       if (pollTimer) clearInterval(pollTimer)
-    })
+      pollTimer = null
+      if (battlePresentation) battlePresentation.dispose()
+    }
+    window.addEventListener('pagehide', disposeBattlePage)
+    window.addEventListener('unload', disposeBattlePage)
 
     // 鈹€鈹€ Debug modifier panel (backtick key toggle) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     document.addEventListener('keydown', e => {
@@ -4561,7 +4623,7 @@
   <!-- Target selection overlay (pointer-events:none so board stays clickable) -->
   <div id="targetOverlay">
     <div class="target-prompt" id="targetPromptText">选择目标</div>
-    <button class="target-cancel-btn" onclick="cancelTargetSelection()">取消</button>
+    <button class="target-cancel-btn" onclick="dispatchBattleIntent({type:'cancel-target'})">取消</button>
   </div>
 
   <!-- Fullscreen log overlay -->

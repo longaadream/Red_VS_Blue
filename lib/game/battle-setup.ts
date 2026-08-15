@@ -22,7 +22,7 @@ function fireInitialGameStart(state: BattleState): void {
 
   for (const piece of [...state.pieces]) {
     globalTriggerSystem.checkTriggers(state, {
-      type: "afterPieceSummon",
+      type: "afterPieceSummoned",
       playerId: piece.ownerPlayerId,
       sourcePiece: piece,
       pieceTemplateId: piece.templateId,

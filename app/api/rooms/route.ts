@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { DEMO_FIXED_MAP_ID } from '@/lib/game/room-battle-start'
 import { getPlayerSeat, getRoomStore } from '@/lib/game/room-store'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
-    const { mode, hostId, playerName, mapId } = body
+    const { mode, hostId, playerName } = body
 
     if (mode !== 'pve') {
       return NextResponse.json({ error: 'Only mode=pve is supported via REST' }, { status: 400 })
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
       name: 'AI',
       seat: 'blue' as const,
       faction: 'blue' as const,
+      alignment: 'dark' as const,
       joinedAt: Date.now(),
       ready: true,
       isBot: true,
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
       selectedPieces: [],
     })
     room.hostId = hostId
-    room.mapId = mapId || 'large-trap-arena'
+    room.mapId = DEMO_FIXED_MAP_ID
     room.visibility = 'private'
     room.maxPlayers = 2
 
@@ -69,7 +71,7 @@ export async function GET(req: NextRequest) {
         seat: getPlayerSeat(player),
         faction: player.faction,
         alignment: player.alignment,
-        hasSelectedPieces: player.hasSelectedPieces || false,
+        hasSelectedPieces: player.rosterLocked === true,
       })),
       playerCount: room.players.length,
       playersCount: room.players.length,

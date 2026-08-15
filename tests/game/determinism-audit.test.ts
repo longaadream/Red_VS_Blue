@@ -4,11 +4,15 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const AUTHORITY_INITIALIZATION_FILES = [
-  'lib/ws-server.ts',
+  'lib/game/room-battle-start.ts',
   'app/api/battle/route.ts',
+  'app/api/relay-battle-init/route.ts',
+]
+
+const ROOM_START_DELEGATES = [
+  'lib/ws-server.ts',
   'app/api/rooms/[roomId]/route.ts',
   'app/api/rooms/[roomId]/actions/route.ts',
-  'app/api/relay-battle-init/route.ts',
 ]
 
 const CROSS_PLATFORM_AUTHORITY_FILES = {
@@ -55,6 +59,10 @@ describe('authority determinism audit', () => {
       expect(injectedSeedCount, relativePath).toBeGreaterThanOrEqual(initializationCount)
       expect(source, relativePath).not.toMatch(/seed\s*:\s*Math\.floor\(Math\.random\(/)
     }
+
+    for (const relativePath of ROOM_START_DELEGATES) {
+      expect(read(relativePath), relativePath).toContain('startBattleFromLockedRosters')
+    }
   })
 
   it('contains no unclassified direct wall-clock or random calls in lib/game', () => {
@@ -98,9 +106,9 @@ describe('authority determinism audit', () => {
     const gameEngineBuild = read('scripts/build-game-engine.js')
     const mobileServerBuild = read('scripts/build-mobile-server.js')
 
-    expect(gameEngineBuild).toContain("filter: /[/\\\\]app-paths$/")
-    expect(gameEngineBuild).toContain("filter: /^node:fs$/")
-    expect(gameEngineBuild).toContain('plugins: [browserResolvePlugin]')
+    expect(gameEngineBuild).toContain("filter: /^node:(fs|path|crypto|zlib)$/")
+    expect(gameEngineBuild).toContain("namespace: 'rvb-browser-stub'")
+    expect(gameEngineBuild).toContain('plugins: [browserRuntimeCompatibility]')
     expect(mobileServerBuild).toContain("filter: /^(?:node:)?fs$/")
     expect(mobileServerBuild).toContain("['app-paths',")
   })
