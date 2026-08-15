@@ -12,7 +12,7 @@
 ## 1. 结论摘要
 
 - 当前没有覆盖所有运行模式的统一服务端核心。Windows LAN 由 Next/WebSocket 服务端负责，Android 由 Java 网络层和隐藏 WebView 中的 mobile server 负责，Relay 则由主机客户端负责。
-- 实际玩家战斗界面主要是 `data/pages/battle.html`，不是 React 页面。它同时承担渲染、网络、动作预演、Relay 规则执行和胜负判断。
+- 实际玩家战斗界面是 `data/pages/battle.html`，不是 React 页面。真实对战、观战和训练营共用这一个入口；`mode=training` 只切换 fixture 与调试能力，旧 `training.html` 只做兼容跳转。`battle.html` 同时承担渲染、网络、动作预演、Relay 规则执行和胜负判断。
 - TypeScript 规则核心集中在 `lib/game/turn.ts`、`battle-setup.ts`、`skills.ts` 和 `triggers.ts`，但公共状态类型、随机、日志、存储格式和命令协议没有完全统一。
 - Android 安装包是当前发布产物。项目负责人确认的目标是：以可维护的 JS/TS 源码为唯一真实源，Android 资源只能由构建生成，不能继续成为人工维护的第二份源码。
 - 当前提交被指定为正式故障基线。`BUILD_AND_RUN.md` 为空，且最后一版存在尚未定位的重大运行问题，因此下一项工程工作应先恢复可重复运行基线。
@@ -71,7 +71,7 @@ Android 已存在开服实现，不是仅能加入的客户端：
 | Windows 开服 | Next/WS 服务端中的房间状态 | `runBattleAction()` → `applyBattleAction()` | Prisma `Room.battleState` |
 | Android 开服 | `mobile-server-entry.ts` 的房间状态 | 当前直接使用 `applyBattleAction()` | 内存；正式持久化待实现 |
 | Relay | 主机客户端 | 浏览器 `GameEngine.applyBattleAction()` | Relay 仅保存/转发最新状态 |
-| Training | 客户端提供初始/当前状态，API 执行动作 | Training API → `runBattleAction()` | 待确认 |
+| Training | `battle.html?mode=training` 的客户端内存状态 | 浏览器 `trainingApiFetch()` → `GameEngine.applyBattleAction()` | 仅页面内存 |
 | Mobile embedded server | Android 进程内房间 Map | `mobile-server` 独立处理 | 进程内；持久化待确认 |
 
 同一设备可以同时承担服务端和客户端角色，但两种职责必须保持独立；本机玩家也必须通过与远端玩家相同的命令协议操作权威服务端。公开测试的目标是 Windows 和 Android 功能对等，均可开服或加入。Relay 和 Training 不阻塞该基线。

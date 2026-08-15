@@ -385,6 +385,22 @@ npm.cmd run smoke:electron:windows
 清理；编辑器会直接启动最终 portable EXE，在最长 300 秒内等待 renderer，并记录实际
 启动耗时、正式构建中的数据文件列表和退出清理结果。
 
+RED-54 的开发态 Electron 棋子选择页使用聚焦冒烟。它启动真实 Electron Client 和内嵌
+本机服务器，创建两名真实 PVP 玩家，强制两个阵营的本地棋子读取失败，验证服务器回退在
+5 秒内返回正确阵营；第一名玩家提交 8 枚后进入等待，第二名提交 8 枚后进入共用
+`battle.html`。运行命令：
+
+```powershell
+npm.cmd run build
+npm.cmd run sync:pages
+npx.cmd tsc -p electron-client/tsconfig.json
+node.exe tests/electron/piece-selection-smoke.mjs
+```
+
+脚本使用独立的临时 `userData` 和调试端口 `19254`，只终止自身启动的 PID 进程树并在退出
+时清理该临时目录；端口已占用时直接失败，不清理未知进程。可通过
+`RVB_RED54_DEBUG_PORT` 和 `RVB_ELECTRON_EXE` 覆盖调试端口或 Electron 可执行文件。
+
 ### 8.5 候选验证记录（2026-08-13；2026-08-14 根据人工反馈修订）
 
 - 在最新 `origin/main` 合并基线上执行 `npm.cmd ci`：退出码 0，安装 1047 个包；

@@ -110,7 +110,7 @@ const http = require('http')
 const __rvbOriginalCreateServer = http.createServer
 function __rvbProxyWsUpgrade(req, socket, head) {
   const url = String((req && req.url) || '')
-  if (!(url === '/ws' || url === '/ws/' || url.indexOf('/ws/rooms') === 0)) return false
+  if (!(url === '/ws' || url === '/ws/' || url.indexOf('/ws/rooms/') === 0)) return false
   if (req.__rvbWsProxyHandled) return true
   req.__rvbWsProxyHandled = true
   const wsPort = parseInt(process.env.WS_PORT || '3001', 10)

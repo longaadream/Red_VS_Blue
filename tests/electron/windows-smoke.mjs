@@ -13,6 +13,9 @@ const applications = {
   client: {
     executable: path.join(root, 'dist', 'client-build', 'win-unpacked', 'RED vs BLUE.exe'),
     helperExecutables: [path.join(root, 'dist', 'client-build', 'win-unpacked', 'resources', 'node.exe')],
+    launchArguments: process.env.RVB_SMOKE_USER_DATA_DIR
+      ? [`--user-data-dir=${path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)}`]
+      : [],
     title: '连接服务器',
     debugPort: 19222,
   },
@@ -108,6 +111,32 @@ async function evaluate(target, expression, awaitPromise = true) {
   } finally {
     connection.close()
   }
+}
+
+async function verifyBattleTerminalError(port, target, timeoutMs = 5000) {
+  await evaluate(target, "window.location.href = 'rvb-client://app/battle.html'; true", false)
+  const battleTarget = await waitForTargets(
+    port,
+    (candidate) => candidate.url.startsWith('rvb-client://app/battle.html'),
+    timeoutMs,
+  )
+  const deadline = Date.now() + timeoutMs
+  let observed = null
+  while (Date.now() < deadline) {
+    try {
+      observed = await evaluate(battleTarget, `({
+        readyState: document.readyState,
+        message: document.getElementById('loadingMsg')?.textContent || '',
+        messageColor: document.getElementById('loadingMsg')?.style.color || '',
+        spinnerDisplay: document.querySelector('#loadingOverlay .spinner')?.style.display || '',
+      })`)
+      if (observed.message.includes('缺少 roomId 或 playerId')) {
+        return { target: battleTarget, runtime: observed }
+      }
+    } catch {}
+    await delay(100)
+  }
+  throw new Error(`Battle page did not expose its terminal setup error: ${JSON.stringify(observed)}`)
 }
 
 function stopCandidates(executable) {
@@ -237,6 +266,15 @@ async function probeGameWebSocket(url) {
   })
 }
 
+async function waitForUnreachable(port, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (!(await isReachable(port))) return true
+    await delay(250)
+  }
+  return false
+}
+
 async function waitForDebuggerExit(port, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -266,7 +304,7 @@ async function launch(application, timeoutMs = 30000) {
     ...(application.launchArguments ?? []),
   ], {
     detached: true,
-    stdio: 'ignore',
+    stdio: process.env.RVB_SMOKE_CHILD_STDIO === 'inherit' ? 'inherit' : 'ignore',
     windowsHide: true,
   })
   child.unref()
@@ -400,6 +438,25 @@ async function smokeClient() {
     }
     assert(gameBridgeReady, 'Client game preload bridge did not become ready')
     const mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
+    const homepageWindowBoundary = await evaluate(gameTarget, `new Promise((resolve) => {
+      const childWindow = window.open('https://example.com/red55-popup-probe', '_blank')
+      setTimeout(() => resolve({
+        debugButtonPresent: document.getElementById('debugPvpBtn') !== null,
+        debugStatusPresent: document.getElementById('debugPvpStatus') !== null,
+        debugFunctionType: typeof window.startLocalPvpDebug,
+        childWindowWasDenied: childWindow === null
+      }), 500)
+    })`)
+    assert(
+      homepageWindowBoundary.debugButtonPresent === false
+        && homepageWindowBoundary.debugStatusPresent === false
+        && homepageWindowBoundary.debugFunctionType === 'undefined',
+      `Client still exposes the removed local PVP debugger: ${JSON.stringify(homepageWindowBoundary)}`,
+    )
+    assert(
+      homepageWindowBoundary.childWindowWasDenied === true,
+      `Client game renderer opened a child window: ${JSON.stringify(homepageWindowBoundary)}`,
+    )
     const packagedAssets = await evaluate(gameTarget, `Promise.all([
       'index.html',
       'js/server-utils.js',
@@ -411,11 +468,22 @@ async function smokeClient() {
     }))`)
     assert(packagedAssets.every(([, ok, size]) => ok && size > 0), `Client packaged assets are incomplete: ${JSON.stringify(packagedAssets)}`)
     assert(mode.ready === true && mode.isLocal === true, `Client local mode is not ready: ${JSON.stringify(mode)}`)
-    assert(await isReachable(mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521), 'Client local gateway is not reachable')
-    await evaluate(gameTarget, 'window.close(); true', false)
+    const localGatewayPort = mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521
+    assert(await isReachable(localGatewayPort), 'Client local gateway is not reachable')
+    const battle = await verifyBattleTerminalError(application.debugPort, gameTarget)
+    assert(battle.runtime.readyState === 'complete', `Battle page did not finish loading: ${JSON.stringify(battle.runtime)}`)
+    assert(battle.runtime.messageColor === 'rgb(248, 113, 113)', `Battle page did not style its terminal error: ${JSON.stringify(battle.runtime)}`)
+    assert(battle.runtime.spinnerDisplay === 'none', `Battle page kept spinning after a terminal error: ${JSON.stringify(battle.runtime)}`)
+    await evaluate(battle.target, 'window.close(); true', false)
     assert(await waitForDebuggerExit(application.debugPort), 'Client left its main Electron process after its last window closed')
-    assert(!(await isReachable(mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521)), 'Client left its local gateway listening after exit')
-    console.log(JSON.stringify({ entry: 'client', rendererBoundary, invalidTlsCertificate: tlsProbe, packagedAssets, localMode: mode, exitedCleanly: true }))
+    assert(await waitForUnreachable(localGatewayPort), 'Client left its local gateway listening after exit')
+    const candidateExecutables = [application.executable, ...(application.helperExecutables ?? [])]
+    const processCountsAfterExit = await waitForExecutableCleanup(candidateExecutables)
+    assert(
+      Object.values(processCountsAfterExit).every((count) => count === 0),
+      `Client candidate left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
+    )
+    console.log(JSON.stringify({ entry: 'client', rendererBoundary, invalidTlsCertificate: tlsProbe, homepageWindowBoundary, packagedAssets, localMode: mode, battleRuntime: battle.runtime, exitedCleanly: true, processCountsAfterExit }))
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)

@@ -173,8 +173,15 @@ internalHttpServer.listen(Number(process.env.WS_PORT), '127.0.0.1', function() {
         connectAndReceive(`ws://127.0.0.1:${publicPort}${pathname}`),
       ).resolves.toBe('path:/;header:forwarded')
     }
-    await expect(
-      getUpgradeStatus(`ws://127.0.0.1:${publicPort}/not-websocket-proxy`),
-    ).resolves.toBe(418)
+    for (const pathname of ['/not-websocket-proxy', '/ws/rooms-not-a-room']) {
+      await expect(
+        getUpgradeStatus(`ws://127.0.0.1:${publicPort}${pathname}`),
+      ).resolves.toBe(418)
+    }
+
+    const httpResponse = await fetch(
+      `http://127.0.0.1:${publicPort}/ws/rooms/__lobby`,
+    )
+    await expect(httpResponse.text()).resolves.toBe('ok')
   }, 15000)
 })
