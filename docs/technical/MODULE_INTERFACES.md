@@ -155,6 +155,23 @@
 - 已知问题：大文件跨层；复制胜负/目标逻辑；不同模式承担不同权威职责。
 - 最小调试：捕获连接模式、roomId、seed、最后 action、服务端/客户端 state hash 和截图。
 
+### 9.1 真实联机棋子选择页资源来源
+
+- 入口：`data/pages/piece-selection.html::loadPieces()`。
+- 本地优先：先通过 `fetchPackJson()` 读取版本化 `data/pieces/manifest.json` 及其中每个棋子；
+  没有 Electron bridge 时沿用页面相对资源。正常本地读取不会请求服务器棋子接口。
+- 服务器回退：任一本地清单或棋子读取失败、格式非法或总加载超过 2 秒时，通过当前连接的
+  `RvBUtils.serverFetch('/api/pieces')` 读取服务器棋子，包含响应正文解析在内的总请求预算为
+  2.5 秒。两个来源都要求非重复 `id`、`good/evil` faction，且已确定阵营时至少有 8 枚候选。
+- 表现边界：页面只按玩家 `light/good` 或 `dark/evil` 阵营提供即时筛选；8 枚数量、唯一性、
+  Demo 清单和阵营仍由服务器最终校验，页面不复制规则。
+- 错误：两个来源都失败时，棋子区域显示本地来源和服务器来源的具体原因，并记录带
+  `[piece-selection]` 上下文的 console 错误；不得退化为永久加载或无原因空列表。
+- 测试：`tests/electron/piece-selection-resource-fallback.test.ts` 覆盖本地成功、局部读取失败后
+  回退、超时回退、双重失败、阵营刷新及 8 枚提交合同；开发态真实 Electron 冒烟入口为
+  `tests/electron/piece-selection-smoke.mjs`，运行前先构建 Next standalone、同步页面并编译
+  `electron-client`。
+
 ## 10. Electron IPC
 
 - 入口：各 `preload.ts` 暴露的 `electronAPI`/`editorAPI`，以及 `ipcMain` handler。
