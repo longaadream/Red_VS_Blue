@@ -260,11 +260,12 @@
 
     <div class="status-bar" id="statusBar"></div>
     <!-- 断线重连提示 -->
-    <div id="rejoinBar" style="display:none;background:#1e3a5f;border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div id="rejoinBar" style="display:none;background:#1e3a5f;border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;margin-top:10px;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="flex:1;font-size:13px;color:#93c5fd">⚔️ 您有一场进行中的对局</span>
       <button id="rejoinBtn" onclick="rejoinBattle()" style="background:#1d4ed8;border:none;border-radius:8px;color:#fff;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">重新加入</button>
       <button onclick="dismissRejoin()" style="background:none;border:1px solid #334155;border-radius:8px;color:#64748b;padding:6px 10px;font-size:12px;cursor:pointer">忽略</button>
     </div>
+    <div id="rejoinFeedback" role="status" style="display:none;color:#f59e0b;font-size:12px;margin-top:8px"></div>
   </div>
 
   <!-- Room list -->
@@ -651,19 +652,98 @@
       } catch (e) { alert('查找房间失败：' + e.message) }
     }
 
-    function checkRejoin() {
+    function hideRejoin() {
+      window._rejoinInfo = null
+      const bar = document.getElementById('rejoinBar')
+      if (bar) bar.style.display = 'none'
+    }
+    function showRejoinFeedback(message) {
+      const feedback = document.getElementById('rejoinFeedback')
+      if (feedback) {
+        feedback.textContent = message
+        feedback.style.display = message ? 'block' : 'none'
+      }
+      if (message) console.warn('[lobby:rejoin] ' + message)
+    }
+    function clearInvalidRejoin(message) {
+      try { localStorage.removeItem('rvb_active_battle') } catch (e) {
+        console.warn('[lobby:rejoin] 无法清理本地对局记录', e)
+      }
+      hideRejoin()
+      showRejoinFeedback(message)
+    }
+    function isValidRejoinInfo(info) {
+      return !!info && typeof info === 'object' &&
+        typeof info.roomId === 'string' && info.roomId.trim().length > 0 &&
+        typeof info.playerId === 'string' && info.playerId.trim().length > 0
+    }
+    function isActiveBattleRoom(room, playerId) {
+      const activeStatuses = ['in-progress', 'playing', 'battle']
+      if (!room || !activeStatuses.includes(room.status) || !Array.isArray(room.players)) return false
+      const normalizedPlayerId = playerId.toLowerCase()
+      return room.players.some(player =>
+        player && typeof player.id === 'string' && player.id.toLowerCase() === normalizedPlayerId
+      )
+    }
+    async function checkRejoin() {
+      hideRejoin()
+      showRejoinFeedback('')
+      let saved = null
       try {
-        const saved = localStorage.getItem('rvb_active_battle')
-        if (!saved) return
-        const info = JSON.parse(saved)
-        if (!info || !info.roomId || !info.playerId) return
+        saved = localStorage.getItem('rvb_active_battle')
+      } catch (e) {
+        showRejoinFeedback('无法读取本地对局记录：' + (e && e.message ? e.message : String(e)))
+        return
+      }
+      if (!saved) return
+
+      let info
+      try {
+        info = JSON.parse(saved)
+      } catch {
+        clearInvalidRejoin('保存的对局信息无效，已清理')
+        return
+      }
+      if (!isValidRejoinInfo(info)) {
+        clearInvalidRejoin('保存的对局信息缺失，已清理')
+        return
+      }
+      info = {
+        ...info,
+        roomId: info.roomId.trim(),
+        playerId: info.playerId.trim(),
+      }
+
+      if (!RvBUtils.getServerUrl()) {
+        showRejoinFeedback('未连接服务器，暂时无法验证保存的对局')
+        return
+      }
+      try {
+        const room = await wsRequest('rooms.get', { roomId: info.roomId })
+        if (!isActiveBattleRoom(room, info.playerId)) {
+          clearInvalidRejoin('保存的对局已失效，已清理')
+          return
+        }
+        window._rejoinInfo = info
         const bar = document.getElementById('rejoinBar')
         if (bar) bar.style.display = 'flex'
-        window._rejoinInfo = info
-      } catch {}
+      } catch (e) {
+        const message = e && e.message ? e.message : String(e)
+        if (/room not found/i.test(message)) {
+          clearInvalidRejoin('保存的对局已不存在，已清理')
+          return
+        }
+        showRejoinFeedback('无法验证保存的对局：' + message)
+      }
     }
     function rejoinBattle() {
-      if (!window._rejoinInfo) return
+      if (!window._rejoinInfo) {
+        dismissRejoin()
+        const message = '没有可重新加入的对局，请刷新大厅后重试'
+        showRejoinFeedback(message)
+        alert(message)
+        return
+      }
       const { roomId, playerId, playerName } = window._rejoinInfo
       const url = RvBUtils.getServerUrl()
       if (!url) { alert('未连接服务器，无法重新加入'); return }
@@ -671,8 +751,7 @@
     }
     function dismissRejoin() {
       try { localStorage.removeItem('rvb_active_battle') } catch {}
-      const bar = document.getElementById('rejoinBar')
-      if (bar) bar.style.display = 'none'
+      hideRejoin()
     }
 
     window.addEventListener('load', async () => {
@@ -680,7 +759,7 @@
       document.getElementById('serverUrlDisplay').textContent = RvBUtils.getServerUrl() || '未连接'
       refreshUserUI()
       updateFloatBar()
-      checkRejoin()
+      await checkRejoin()
       loadRooms()
     })
     window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
