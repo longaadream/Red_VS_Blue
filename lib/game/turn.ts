@@ -854,10 +854,10 @@ export function applyBattleAction(
         if (!next.gameStartFired && next.turn.turnNumber === 1) {
           writeLog('[beginPhase] Triggering gameStart rules...')
           next.gameStartFired = true
-          // 为初始棋子补发 afterPieceSummon，确保"进入战场"类规则对初始棋子也能生效
+          // 为初始棋子补发 afterPieceSummoned，确保"进入战场"类规则对初始棋子也能生效
           for (const piece of next.pieces) {
             globalTriggerSystem.checkTriggers(next, {
-              type: "afterPieceSummon",
+              type: "afterPieceSummoned",
               playerId: piece.ownerPlayerId,
               sourcePiece: piece,
               pieceTemplateId: piece.templateId,
@@ -2392,7 +2392,7 @@ export interface SummonPieceResult {
 
 /**
  * 召唤棋子到棋盘
- * 触发 beforePieceSummon 和 afterPieceSummon 触发器
+ * 触发 beforePieceSummoned 和 afterPieceSummoned 触发器
  */
 export function summonPiece(
   battle: BattleState,
@@ -2410,7 +2410,7 @@ export function summonPiece(
 
   // 触发召唤前触发器
   const beforeSummonResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "beforePieceSummon",
+    type: "beforePieceSummoned",
     playerId: ownerPlayerId,
     targetPosition: { x, y },
     pieceTemplateId: templateId,
@@ -2442,7 +2442,7 @@ export function summonPiece(
 
   // 触发召唤后触发器
   const afterSummonResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "afterPieceSummon",
+    type: "afterPieceSummoned",
     playerId: ownerPlayerId,
     sourcePiece: newPiece,
     pieceTemplateId: templateId,
