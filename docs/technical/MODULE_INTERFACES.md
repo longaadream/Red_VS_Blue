@@ -143,6 +143,7 @@
 ## 9. 浏览器战斗 UI
 
 - 入口：`data/pages/battle.html::doAction()`、`applyServerState()`、`checkClientGameOver()`。
+- 路由：`battle.html` 是真实对战、观战和训练营的唯一战斗页面；训练营通过 `mode=training` 启用 fixture 与调试控件。`training.html` 仅保留兼容跳转，不得实现棋盘、选中、目标高亮或动作提交。
 - 职责：显示状态、收集输入、发送动作和接收服务端状态。
 - 输入：玩家交互、WS/Relay 消息、完整战斗状态。
 - 输出：动作消息、页面渲染、客户端胜负状态。
