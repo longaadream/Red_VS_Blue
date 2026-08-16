@@ -17,6 +17,19 @@
     return status.label + extra
   }
 
+  function formatTimer(seconds) {
+    if (seconds == null || seconds === '' || !Number.isFinite(Number(seconds))) return '--:--'
+    const total = Math.max(0, Math.floor(Number(seconds)))
+    const minutes = Math.floor(total / 60)
+    const remainder = total % 60
+    return String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0')
+  }
+
+  function playerInitial(player) {
+    const label = String(player.name || player.id || '?').trim()
+    return label ? label.slice(0, 1).toUpperCase() : '?'
+  }
+
   function create(options) {
     const input = options || {}
     const doc = input.document || root.document
@@ -32,6 +45,8 @@
       if (!piece) {
         element.className = 'selected-status-empty'
         element.textContent = '未选中棋子'
+        if (element.dataset) element.dataset.pieceId = ''
+        element.setAttribute('aria-label', '未选中棋子')
         return
       }
       const tags = piece.statusSummary || []
@@ -41,10 +56,13 @@
           }).join('')
         : '<span class="status-empty">无状态</span>'
       element.className = 'selected-status-card'
+      if (element.dataset) element.dataset.pieceId = piece.id
+      element.setAttribute('aria-label', '查看 ' + piece.name + ' 的完整技能与状态')
       element.innerHTML = '<div class="selected-piece-name">' + escapeHtml(piece.name) + '</div>'
         + '<div class="selected-piece-hp">HP ' + piece.health.current + ' / ' + piece.health.max + '</div>'
         + '<div class="selected-status-title">状态</div>'
         + '<div class="selected-status-tags">' + tagsHtml + '</div>'
+        + '<span class="selected-detail-hint">查看完整技能与状态</span>'
     }
 
     function updateHud(model) {
@@ -61,6 +79,13 @@
       if (roundLabel) roundLabel.textContent = '第 ' + model.turn.number + ' 回合'
       const phaseLabel = byId('phaseLabel')
       if (phaseLabel) phaseLabel.textContent = PHASE_LABELS[model.turn.phase] || model.turn.phase
+      const turnClock = byId('turnClock')
+      if (turnClock) {
+        turnClock.textContent = formatTimer(model.turn.remainingSeconds)
+        turnClock.setAttribute('aria-label', model.turn.remainingSeconds == null
+          ? '当前对局未提供回合计时'
+          : '回合剩余 ' + Math.floor(model.turn.remainingSeconds) + ' 秒')
+      }
 
       const viewer = model.viewer || model.players.find(function (player) { return player.isCurrent }) || model.players[0]
       const apDisplay = byId('resApDisplay')
@@ -82,15 +107,21 @@
       if (!players) return
       players.className = 'player-state-strip'
       players.innerHTML = model.players.map(function (player) {
-        const sideName = player.faction === 'blue' ? '🔵后手' : '🔴先手'
-        const tags = player.statusSummary.map(function (status) {
+        const sideName = player.faction === 'blue' ? '蓝方 · 后手' : '红方 · 先手'
+        const tags = (player.statusSummary || []).map(function (status) {
           return '<span class="status-tag" title="' + escapeHtml(status.id) + '">' + escapeHtml(statusLabel(status)) + '</span>'
         }).join('')
-        return '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '') + '" title="' + escapeHtml(player.id) + '">'
-          + '<div class="player-state-main"><span class="player-side-name">' + sideName + '</span>'
+        const currentLabel = player.isCurrent ? '，当前行动方' : ''
+        return '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '')
+          + '" role="group" aria-label="' + escapeHtml(player.name + '，' + sideName + currentLabel) + '" title="' + escapeHtml(player.id) + '">'
+          + '<span class="player-avatar" aria-hidden="true">' + escapeHtml(playerInitial(player)) + '</span>'
+          + '<span class="player-state-copy"><span class="player-display-name">' + escapeHtml(player.name) + '</span>'
+          + '<span class="player-side-name">' + sideName + '</span></span>'
+          + '<span class="player-state-resources">'
           + '<span class="resource-orb action" title="行动点"><span class="resource-glyph action"></span>' + player.resources.action + '</span>'
           + '<span class="resource-orb charge" title="充能点"><span class="resource-glyph charge"></span>' + player.resources.charge + '</span>'
-          + (player.isCurrent ? '<span>当前</span>' : '') + '</div>'
+          + '</span>'
+          + (player.isCurrent ? '<span class="current-player-marker" aria-hidden="true">◆</span>' : '')
           + '<div class="player-state-tags">' + tags + '</div></div>'
       }).join('')
     }

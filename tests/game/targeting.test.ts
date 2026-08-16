@@ -512,10 +512,11 @@ describe('targeting consumers and performance contract', () => {
     })
 
     expect(shouldCancel({ step: 1 }, targetWithin('#boardWrap'))).toBe(false)
-    expect(shouldCancel({ step: 1 }, targetWithin('.arc-card'))).toBe(false)
+    expect(shouldCancel({ step: 1 }, targetWithin('.card-item'))).toBe(false)
     expect(shouldCancel({ step: 1 }, targetWithin(null))).toBe(true)
     expect(shouldCancel(null, targetWithin(null))).toBe(false)
     expect(html).toContain('if (!shouldCancelPendingCardTarget(pendingCardAction, e.target)) return')
+    expect(html).not.toContain('arcHandContainer')
   })
 
   it('battle UI consumes exact candidate arrays and contains no reducer/heuristic target fallback', () => {

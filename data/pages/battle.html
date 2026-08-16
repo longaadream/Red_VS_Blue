@@ -870,71 +870,6 @@
       .resource-orb { padding: 1px 4px; }
     }
 
-    /* ── Arc hand (all screens) ── */
-    .hand-panel { display: none !important; }
-    #arcHandContainer {
-      display: block;
-      position: fixed;
-      bottom: -80px;
-      left: 0; right: 0;
-      height: 130px;
-      z-index: 55;
-      pointer-events: none;
-      overflow: visible;
-    }
-    .arc-card {
-      position: absolute;
-      bottom: 0;
-      width: 80px; height: 124px;
-      border-radius: 8px;
-      background: linear-gradient(180deg, #1a2744 0%, #0f1929 100%);
-      border: 2px solid #4a6a9a;
-      display: flex; flex-direction: column; align-items: center;
-      pointer-events: all; cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s;
-      transform-origin: bottom center;
-      overflow: hidden;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .arc-card.arc-hover {
-      transform: translateY(-70px) scale(1.12) !important;
-      z-index: 10;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.9);
-      border-color: #f59e0b;
-    }
-    @media (hover: hover) and (pointer: fine) {
-      .arc-card:hover {
-        transform: translateY(-70px) scale(1.12) !important;
-        z-index: 10;
-        box-shadow: 0 12px 32px rgba(0,0,0,0.9);
-        border-color: #f59e0b;
-      }
-    }
-    .arc-card.arc-pending { border-color: #f59e0b; background: linear-gradient(180deg, #2d1802 0%, #1a1205 100%); }
-    .arc-card.arc-disabled { opacity: 0.45; }
-    .arc-card-art {
-      width: 100%; height: 58px; flex-shrink: 0; overflow: hidden;
-      background: rgba(0,0,0,0.3);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px;
-    }
-    .arc-card-art img { width: 100%; height: 100%; object-fit: cover; }
-    .arc-card-cost {
-      position: absolute; top: 3px; left: 4px;
-      font-size: 12px; font-weight: bold; color: #93c5fd;
-      background: #1e3a5f; border-radius: 50%;
-      width: 22px; height: 22px;
-      display: flex; align-items: center; justify-content: center;
-      z-index: 2; flex-shrink: 0;
-    }
-    .arc-card-name {
-      font-size: 9px; color: #cbd5e1; text-align: center;
-      padding: 3px 4px; flex: 1; align-self: stretch;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .arc-card-type { font-size: 8px; color: #64748b; padding-bottom: 4px; }
     /* ── Windows hover ── */
     @media (hover: hover) {
       .back-btn:hover { background: #263348; }
@@ -1097,6 +1032,7 @@
     .board-stage { transform-origin: 0 0 !important; will-change: transform !important; }
     .cell::before { opacity: .68 !important; filter: saturate(.72) contrast(.78) brightness(.86) !important; }
   </style>
+  <link rel="stylesheet" href="css/battle-responsive.css" />
 </head>
 <body>
 
@@ -1126,7 +1062,7 @@
   </aside>
 
   <!-- Card Detail Modal -->
-  <div id="cardDetailModal" onclick="if(event.target===this)closeCardDetail()">
+  <div id="cardDetailModal" role="dialog" aria-modal="true" aria-label="卡牌详情" onclick="if(event.target===this)closeCardDetail()">
     <div class="cd-layout">
       <div class="cd-sheet">
       <button class="cd-close" onclick="closeCardDetail()">✕</button>
@@ -1143,7 +1079,7 @@
   </div>
 
   <!-- Piece Info Modal -->
-  <div id="pieceInfoModal" onclick="if(event.target===this)closePieceInfo()">
+  <div id="pieceInfoModal" role="dialog" aria-modal="true" aria-label="棋子详情" onclick="if(event.target===this)closePieceInfo()">
     <div class="pi-layout">
       <div class="pi-sheet">
       <div class="pi-header">
@@ -1226,18 +1162,16 @@
 
   <!-- Topbar -->
   <div class="topbar" data-battle-ui-region="player-hud">
-    <button class="back-btn" onclick="confirmLeave()">← 离开</button>
+    <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">← 离开</button>
     <div class="room-name" id="roomNameLabel">对战</div>
-    <div class="turn-badge" id="turnBadge">等待中</div>
     <div id="wsStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● WS</div>
-    <div style="font-size:12px;color:#64748b" id="roundLabel"></div>
-    <button id="btnSurrender" class="btn-surrender" onclick="confirmSurrender()">🏳 投降</button>
-    <button id="btnSwitchPov" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
-    <button id="btnResetCD" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
-    <button class="btn-fullmap" id="btnFullMap" onclick="toggleFullMap()" title="全屏地图">⛶</button>
+    <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">🏳 投降</button>
+    <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
+    <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
+    <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">⛶</button>
     <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
     <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
-    <button class="btn-fullmap" onclick="openLog()" title="战斗日志">📜</button>
+    <button class="btn-fullmap" aria-label="打开战斗日志" onclick="openLog()" title="战斗日志">📜</button>
   </div>
 
   <!-- Main layout -->
@@ -1252,7 +1186,16 @@
     <!-- Board + actions + log -->
     <div class="main-panel">
       <div class="phase-bar" data-battle-ui-region="turn-hud">
-        <div id="phaseLabel" style="font-weight:600">-</div>
+        <div class="turn-summary">
+          <div class="turn-summary-primary">
+            <div class="turn-badge" id="turnBadge" aria-live="polite">等待中</div>
+            <div id="roundLabel" style="font-size:11px;color:#94a3b8"></div>
+          </div>
+          <div class="turn-summary-secondary">
+            <span id="phaseLabel">-</span>
+            <span class="turn-clock" id="turnClock" title="回合计时">--:--</span>
+          </div>
+        </div>
         <div id="playerResCards" style="display:flex;gap:6px"></div>
       </div>
 
@@ -1268,12 +1211,16 @@
       </div>
 
       <div class="board-wrap" id="boardWrap">
+        <div class="board-camera-controls" aria-label="棋盘视图控制">
+          <button class="board-view-button" id="btnResetBoardView" type="button" onclick="resetBoardView()" title="复位棋盘镜头" aria-label="复位棋盘镜头">⌖ <span>复位</span></button>
+          <button class="board-view-button" id="btnToggleBattleDetail" type="button" onclick="toggleBattleDetail()" title="切换棋子详情栏" aria-label="切换棋子详情栏" aria-pressed="true">◧ <span>详情</span></button>
+        </div>
         <div class="board-shell board-shell-3d">
           <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
             <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:2"></div>
           </div>
-          <aside class="board-side-rail" data-battle-ui-region="selected-piece">
-            <div id="selectedPieceStatus" class="selected-status-empty">未选中棋子</div>
+          <aside class="board-side-rail" id="battleDetailRail" data-battle-ui-region="selected-piece" aria-label="选中棋子详情">
+            <button type="button" id="selectedPieceStatus" class="selected-status-empty" data-piece-id="" onclick="if(this.dataset.pieceId)dispatchBattleIntent({type:'inspect-piece',pieceId:this.dataset.pieceId})">未选中棋子</button>
             <div class="turn-control-wrap">
               <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
             </div>
@@ -1328,7 +1275,7 @@
         </div>
       </div>
 
-      <!-- Hand (always visible) -->
+      <!-- Independent horizontally scrollable hand -->
       <div class="hand-panel" id="handPanel" data-battle-ui-region="hand">
         <div style="display:flex;align-items:center;gap:8px;padding:3px 10px;font-size:11px;color:#64748b;border-bottom:1px solid #1a2540;flex-shrink:0">
           <span>🃏 手牌</span>
@@ -1336,7 +1283,7 @@
           <span id="handTarget" style="color:#f59e0b;display:none"> · 点击目标施放</span>
         </div>
         <div id="handBody">
-          <div class="hand-scroll" id="handCards">
+          <div class="hand-scroll" id="handCards" role="region" aria-label="手牌列表" tabindex="0">
             <div class="hand-empty">暂无手牌</div>
           </div>
         </div>
@@ -1709,7 +1656,6 @@
           preparation,
         )
         renderHand()
-        renderArcHand()
       } else if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
         const skData = skillDefOf(action.skillId)
         pendingMove = false
@@ -3492,7 +3438,6 @@
 
       const container = document.getElementById('handCards')
       if (!hand.length) {
-        renderArcHand()
         container.innerHTML = '<div class="hand-empty">暂无手牌</div>'
         return
       }
@@ -3522,7 +3467,9 @@
 
         const cid = escHtml(card.instanceId)
         const cdid = escHtml(card.cardId)
-        return `<div class="${cls}"
+        const cardName = def.name || card.cardId
+        return `<button type="button" class="${cls}"
+          aria-label="${escHtml(cardName)}，行动点 ${cost}" aria-pressed="${isPending}" aria-disabled="${!canPlay}"
           onclick="onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
@@ -3534,82 +3481,8 @@
             <div class="card-desc">${escHtml(def.description || '暂无描述')}</div>
             <div class="card-type-badge">${typeLabel}${cdHtml}</div>
           </div>
-        </div>`
+        </button>`
       }).join('')
-      renderArcHand()
-    }
-
-    function renderArcHand() {
-      const container = document.getElementById('arcHandContainer')
-      if (!container) return
-      if (!G) { container.innerHTML = ''; return }
-
-      container.innerHTML = ''
-      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-      const hand = (myMeta && myMeta.hand) || []
-      if (!hand.length) return
-
-      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      const ap = myMeta ? myMeta.actionPoints : 0
-      const n = hand.length
-      const W = window.innerWidth
-      const cardW = 80
-      const maxSpread = Math.min(W * 0.85, n * 84)
-      const maxAngle = Math.min(28, n * 5)
-
-      hand.forEach((card, i) => {
-        const def = cardsById[card.cardId] || (G.customCards && G.customCards[card.cardId]) || {}
-        const cost = card.actionPointCost ?? def.actionPointCost ?? 0
-        const canPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
-        const isPending = pendingCardAction && pendingCardAction.cardInstanceId === card.instanceId
-
-        const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1
-        const angle = t * maxAngle
-        const xPos = W / 2 + t * (maxSpread / 2) - cardW / 2
-        const yLift = -(t * t) * 16
-
-        const el = document.createElement('div')
-        let cls = 'arc-card'
-        if (isPending) cls += ' arc-pending arc-hover'
-        else if (!canPlay) cls += ' arc-disabled'
-        el.className = cls
-        el.style.left = xPos + 'px'
-        el.style.transform = `rotate(${angle}deg) translateY(${yLift}px)`
-
-        const artSrc = def.image ? `images/card-art/${def.image}` : null
-        const artHtml = artSrc
-          ? `<img src="${artSrc}" onerror="this.style.display='none'">`
-          : (def.icon || '*')
-        const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
-
-        el.innerHTML = `
-          <div class="arc-card-cost">${cost}</div>
-          <div class="arc-card-art">${artHtml}</div>
-          <div class="arc-card-name">${escHtml(def.name || card.cardId || '')}</div>
-          <div class="arc-card-type">${typeLabel}</div>
-        `
-
-        el.addEventListener('click', () => onCardClick(card.instanceId, card.cardId))
-        el.addEventListener('contextmenu', (event) => {
-          event.preventDefault()
-          showCardDetail(card.instanceId, card.cardId)
-        })
-        let pressTimer = null
-        el.addEventListener('touchstart', () => {
-          el.classList.add('arc-hover')
-          pressTimer = setTimeout(() => showCardDetail(card.instanceId, card.cardId), 600)
-        }, { passive: true })
-        el.addEventListener('touchend', () => {
-          clearTimeout(pressTimer)
-          setTimeout(() => el.classList.remove('arc-hover'), 300)
-        })
-        el.addEventListener('touchmove', () => {
-          clearTimeout(pressTimer)
-          el.classList.remove('arc-hover')
-        }, { passive: true })
-
-        container.appendChild(el)
-      })
     }
 
     function onCardClick(cardInstanceId, cardId) {
@@ -3633,7 +3506,6 @@
       if (pendingCardAction && pendingCardAction.cardInstanceId === cardInstanceId) {
         pendingCardAction = null
         renderHand()
-        renderArcHand()
         doAction({ type: 'playCard', playerId: myPlayerId, cardInstanceId })
         return
       }
@@ -3641,7 +3513,6 @@
       // First click: select/preview the card
       pendingCardAction = { cardInstanceId, cardId }
       renderHand()
-      renderArcHand()
       setStatusMsg('🃏 再次点击释放，点其他地方取消')
     }
 
@@ -4321,6 +4192,27 @@
       mapViewY = 0
       applyMapView()
     }
+
+    function resetBoardView() {
+      if (_use3d && battlePresentation && battlePresentation.resetView) {
+        battlePresentation.resetView()
+      } else {
+        resetMapView()
+      }
+      setStatusMsg('棋盘镜头已复位')
+    }
+
+    function toggleBattleDetail() {
+      const collapsed = document.body.classList.toggle('battle-detail-collapsed')
+      const button = document.getElementById('btnToggleBattleDetail')
+      if (button) {
+        button.setAttribute('aria-pressed', String(!collapsed))
+        button.title = collapsed ? '显示棋子详情栏' : '隐藏棋子详情栏'
+      }
+      requestAnimationFrame(function () {
+        if (battlePresentation) battlePresentation.resize()
+      })
+    }
     function clampMapScale(v) {
       return Math.max(1, Math.min(2.5, v))
     }
@@ -4465,7 +4357,7 @@
     window.addEventListener('load', () => {
       const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
       const renderer = hasThreeRenderer ? window.BattleRenderer3D : {
-        init() {}, update() {}, resize() {}, projectCell() { return null },
+        init() {}, update() {}, resize() {}, resetView() {}, projectCell() { return null },
         screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
       const domUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
@@ -4483,14 +4375,13 @@
         if (!target || typeof target.closest !== 'function') return true
         // A battlefield pointerup can synchronously advance a card to its next
         // target step before the matching click bubbles to document.
-        return !target.closest('.arc-card, .card-item, #boardWrap, #targetOverlay')
+        return !target.closest('.card-item, #boardWrap, #targetOverlay')
       }
 
       // Click outside the hand and battlefield to cancel card targeting.
       document.addEventListener('click', function(e) {
         if (!shouldCancelPendingCardTarget(pendingCardAction, e.target)) return
         pendingCardAction = null
-        renderArcHand()
         renderHand()
         renderBoard()
         renderTargetOverlay()
@@ -4628,7 +4519,5 @@
     </div>
   </div>
 
-  <!-- Arc hand container (all screens) -->
-  <div id="arcHandContainer"></div>
 </body>
 </html>
