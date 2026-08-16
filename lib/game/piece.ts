@@ -41,6 +41,8 @@ export interface PieceTemplate {
 
 export interface PieceInstance {
   instanceId: string
+  /** Demo 初始阵容身份；召唤物不得继承。 */
+  isCore?: boolean
   templateId: PieceId
   name: string
   ownerPlayerId: string

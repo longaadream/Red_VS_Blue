@@ -99,6 +99,12 @@ interface PlayerSelectedPieces {
   faction?: 'red' | 'blue'
 }
 
+export const DEMO_DEPLOYMENT_MAP_ID = 'large-hole-arena'
+
+export interface InitialPieceBuildOptions {
+  deterministicDeployment?: boolean
+}
+
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
 /** 将棋子模板中的 initialEffects 和 rules 应用到棋子实例上 */
@@ -129,8 +135,21 @@ export function buildInitialPiecesForPlayers(
   selectedPieces: PieceTemplate[],
   playerSelectedPieces?: PlayerSelectedPieces[],
   randomFloat: () => number = rng,
+  options: InitialPieceBuildOptions = {},
 ): PieceInstance[] {
   if (players.length !== 2) return []
+
+  const deterministicDeployment = options.deterministicDeployment === true
+  if (deterministicDeployment) {
+    if (map.id !== DEMO_DEPLOYMENT_MAP_ID) {
+      throw new Error(`Demo deployment requires map ${DEMO_DEPLOYMENT_MAP_ID}; received ${map.id}`)
+    }
+    if (!playerSelectedPieces || playerSelectedPieces.length !== 2 || playerSelectedPieces.some(player => player.pieces.length !== 8)) {
+      throw new Error('Demo deployment requires exactly two players with eight pieces each')
+    }
+    players = [...players].sort(compareStableText)
+    playerSelectedPieces = [...playerSelectedPieces].sort((left, right) => compareStableText(left.playerId, right.playerId))
+  }
 
   const [p1, p2] = players
 
@@ -151,11 +170,31 @@ export function buildInitialPiecesForPlayers(
     tile.props.walkable && tile.props.type === "floor"
   )
   
-  // 如果没有地板方格，使用所有可走的方格
-  const availableTiles = floorTiles.length > 0 ? floorTiles : map.tiles.filter(tile => tile.props.walkable)
+  // Demo 部署严格使用普通地板；旧入口保留历史回退行为。
+  const availableTiles = (deterministicDeployment
+    ? floorTiles
+    : (floorTiles.length > 0 ? floorTiles : map.tiles.filter(tile => tile.props.walkable)))
+    .slice()
+    .sort((left, right) => left.y - right.y || left.x - right.x)
+  const deploymentPositions: Array<{ x: number; y: number }> = []
+  if (deterministicDeployment) {
+    if (availableTiles.length < 16) throw new Error('Demo deployment map does not contain sixteen ordinary floor tiles')
+    for (let index = 0; index < 16; index += 1) {
+      const swapIndex = index + Math.floor(randomFloat() * (availableTiles.length - index))
+      const selected = availableTiles[swapIndex]
+      availableTiles[swapIndex] = availableTiles[index]
+      availableTiles[index] = selected
+      deploymentPositions.push({ x: selected.x, y: selected.y })
+    }
+  }
   
   // 随机选择位置的函数，确保位置不重叠
   const getRandomPosition = () => {
+    if (deterministicDeployment) {
+      const position = deploymentPositions[pieces.length]
+      if (!position) throw new Error('Demo deployment exhausted its precomputed positions')
+      return position
+    }
     if (availableTiles.length === 0) {
       // 如果没有可走的方格，返回默认位置
       return { x: Math.floor(map.width / 2), y: Math.floor(map.height / 2) }
@@ -219,6 +258,7 @@ export function buildInitialPiecesForPlayers(
         const actualFaction = expectedFaction
         pieces.push({
           instanceId: `${ownerPlayerId}-${pieceIndex + 1}`,
+          ...(deterministicDeployment ? { isCore: true } : {}),
           templateId: pieceTemplate.id,
           name: pieceTemplate.name,
           ownerPlayerId,
@@ -306,6 +346,10 @@ export function buildInitialPiecesForPlayers(
   
   console.log('Red pieces created:', redPieceIndex)
   console.log('Blue pieces created:', bluePieceIndex)
+
+  if (deterministicDeployment && pieces.length !== 16) {
+    throw new Error(`Demo deployment created ${pieces.length} pieces instead of sixteen`)
+  }
   
   // 确保每个玩家至少有一个棋子
   if (pieces.length === 0) {
@@ -479,12 +523,21 @@ export async function createInitialBattleForPlayers(
   selectedPieces: PieceTemplate[],
   playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[]; faction?: 'red' | 'blue' }>,
   mapId?: string,
-  options?: { firstPlayerId?: PlayerId; rootSeed?: number },
+  options?: { firstPlayerId?: PlayerId; rootSeed?: number; deploymentEnabled?: boolean },
 ): Promise<BattleState | null> {
   if (playerIds.length !== 2) return null
 
-  let orderedIds = [...playerIds]
-  let orderedPSP = playerSelectedPieces ? [...playerSelectedPieces] : undefined
+  const orderedIds = [...playerIds]
+  const orderedPSP = playerSelectedPieces ? [...playerSelectedPieces] : undefined
+
+  if (options?.deploymentEnabled) {
+    if (typeof options.rootSeed !== 'number') throw new Error('Demo deployment requires an explicit root seed')
+    if (mapId !== DEMO_DEPLOYMENT_MAP_ID) {
+      throw new Error(`Demo deployment requires map ${DEMO_DEPLOYMENT_MAP_ID}; received ${String(mapId)}`)
+    }
+    orderedIds.sort(compareStableText)
+    orderedPSP?.sort((left, right) => compareStableText(left.playerId, right.playerId))
+  }
 
   const [p1, p2] = orderedIds
   
@@ -496,14 +549,18 @@ export async function createInitialBattleForPlayers(
   writeLog('[createInitialBattleForPlayers] map from getMap: ' + (map ? map.name : 'NOT FOUND'))
   
   // 如果地图没有加载成功，尝试异步加载
-  if (!map) {
+  if (!map && !options?.deploymentEnabled) {
     writeLog('Map ' + (mapId || DEFAULT_MAP_ID) + ' not found in cache, trying to load...')
     await loadMaps()
     map = getMap(mapId || DEFAULT_MAP_ID)
     writeLog('[createInitialBattleForPlayers] map after loadMaps: ' + (map ? map.name : 'NOT FOUND'))
   }
   
-  // 如果地图仍然没有加载成功，使用默认地图
+  if (!map && options?.deploymentEnabled) {
+    throw new Error(`Map ${DEMO_DEPLOYMENT_MAP_ID} not found`)
+  }
+
+  // 如果地图仍然没有加载成功，旧入口使用默认地图
   if (!map) {
     console.warn(`Map ${mapId || DEFAULT_MAP_ID} not found, using default map`)
     
@@ -560,7 +617,14 @@ export async function createInitialBattleForPlayers(
     ? () => runtime.nextRandom(RANDOM_STREAM_NAMES.deployment)
     : rng
   const pspForBuild = (orderedPSP && orderedPSP.some(p => p.pieces.length > 0)) ? orderedPSP : undefined
-  const pieces = buildInitialPiecesForPlayers(map, orderedIds, selectedPieces, pspForBuild, deploymentRandom)
+  const pieces = buildInitialPiecesForPlayers(
+    map,
+    orderedIds,
+    selectedPieces,
+    pspForBuild,
+    deploymentRandom,
+    { deterministicDeployment: options?.deploymentEnabled === true },
+  )
 
   // 先后手：由 battle-setup 统一决定（不在调用方重复随机）
   const firstPlayer = options?.firstPlayerId && orderedIds.includes(options.firstPlayerId)
@@ -597,6 +661,12 @@ export async function createInitialBattleForPlayers(
         hasUsedChargeSkill: false,
       },
     },
+    deployment: options?.deploymentEnabled ? {
+      status: 'awaiting-choices',
+      playerIds: [...orderedIds],
+      choices: {},
+      initialPositions: collectCorePositions(pieces),
+    } : undefined,
   }
 
   // 为每个棋子应用 initialEffects 和 rules
@@ -624,8 +694,8 @@ export async function createInitialBattleForPlayers(
       writeLog('[createInitialBattle] First player: ' + firstPlayer + ', rule-lucky-coin-gamestart → second player: ' + secondPlayer)
     }
 
-    // 触发游戏开始规则（包括幸运币发牌、基尔加丹隐匿等）
-    fireInitialGameStart(state)
+    // 部署完成后由首个 beginPhase 触发 gameStart；旧入口保持立即触发。
+    if (!options?.deploymentEnabled) fireInitialGameStart(state)
   }
 
   if (runtime) {
@@ -637,4 +707,14 @@ export async function createInitialBattleForPlayers(
 
   writeLog('[createInitialBattle] Battle state created, pieces count: ' + state.pieces.length)
   return state
+}
+
+function compareStableText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
+function collectCorePositions(pieces: PieceInstance[]): Record<string, { x: number; y: number }> {
+  return Object.fromEntries(pieces
+    .filter(piece => piece.isCore && piece.x !== null && piece.y !== null)
+    .map(piece => [piece.instanceId, { x: piece.x as number, y: piece.y as number }]))
 }

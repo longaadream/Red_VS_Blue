@@ -74,6 +74,7 @@ vi.mock('../lib/game/room-store', async importOriginal => {
 })
 
 import { POST as roomActionPost } from '../app/api/rooms/[roomId]/actions/route'
+import { POST as battlePost } from '../app/api/rooms/[roomId]/battle/route'
 import { POST as roomPost } from '../app/api/rooms/[roomId]/route'
 import { POST as roomsPost } from '../app/api/rooms/route'
 import { startWsServer } from '../lib/ws-server'
@@ -141,6 +142,14 @@ function receiveJson(client: WebSocket): Promise<JsonObject> {
       reject(error)
     })
   })
+}
+
+async function receiveType(client: WebSocket, expectedType: string): Promise<JsonObject> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const message = await receiveJson(client)
+    if (message.type === expectedType) return message
+  }
+  throw new Error(`Timed out waiting for WebSocket message ${expectedType}`)
 }
 
 async function httpCreate(mapId: string) {
@@ -225,6 +234,28 @@ async function wsSelect(roomId: string, playerId: string, templateIds: string[])
   }
 }
 
+async function httpBattleAction(roomId: string, playerId: string, action: JsonObject) {
+  const request = new NextRequest(`http://localhost/api/rooms/${roomId}/battle`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ playerId, action }),
+  })
+  const response = await battlePost(request, { params: Promise.resolve({ roomId }) })
+  return { status: response.status, body: await response.json() as JsonObject }
+}
+
+async function wsBattleAction(roomId: string, playerId: string, action: JsonObject) {
+  const client = await openClient()
+  try {
+    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId }))
+    await receiveType(client, 'subscribed')
+    client.send(JSON.stringify({ type: 'action', action }))
+    return await receiveType(client, 'stateUpdate')
+  } finally {
+    client.close()
+  }
+}
+
 describe('Demo roster HTTP/WebSocket integration', () => {
   beforeAll(async () => {
     process.env.WS_PORT = '0'
@@ -251,13 +282,49 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const http = await httpCreate('large-battlefield')
     expect(http.status).toBe(200)
     const httpRoomId = String(http.body.id)
-    expect(memoryStore.snapshot(httpRoomId)?.mapId).toBe('large-trap-arena')
+    expect(memoryStore.snapshot(httpRoomId)?.mapId).toBe('large-hole-arena')
 
     memoryStore.reset()
     const ws = await wsCreate('large-battlefield')
-    expect(ws).toMatchObject({ ok: true, data: { mapId: 'large-trap-arena' } })
+    expect(ws).toMatchObject({ ok: true, data: { mapId: 'large-hole-arena' } })
     const wsRoomId = String((ws.data as JsonObject).id)
-    expect(memoryStore.snapshot(wsRoomId)?.mapId).toBe('large-trap-arena')
+    expect(memoryStore.snapshot(wsRoomId)?.mapId).toBe('large-hole-arena')
+  })
+
+  it('submits a deterministic keep-all deployment choice for the PVE bot', async () => {
+    const created = await httpCreate('large-battlefield')
+    const roomId = String(created.body.id)
+
+    const selected = await httpSelect(roomId, 'alice', lightRoster)
+    expect(selected.status).toBe(200)
+
+    const started = memoryStore.snapshot(roomId)
+    const awaitingState = (started?.battleState as unknown as {
+      state: {
+        deployment: { status: string; choices: Record<string, { pieceId: string | null }> }
+        gameStartFired?: boolean
+      }
+    })?.state
+    expect(awaitingState.deployment).toMatchObject({
+      status: 'awaiting-choices',
+      choices: { bot: { pieceId: null } },
+    })
+    expect(awaitingState.gameStartFired).toBeFalsy()
+
+    const completed = await httpBattleAction(roomId, 'alice', {
+      type: 'deploymentChoice',
+      playerId: 'alice',
+      pieceId: null,
+      clientActionId: 'alice-pve-keep',
+    })
+    expect(completed.status).toBe(200)
+
+    const completedState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
+      state: { deployment: { status: string }; gameStartFired?: boolean; turn: { phase: string } }
+    }).state
+    expect(completedState.deployment.status).toBe('complete')
+    expect(completedState.gameStartFired).toBe(true)
+    expect(completedState.turn.phase).toBe('action')
   })
 
   it('returns equivalent stable errors and leaves state untouched', async () => {
@@ -343,20 +410,46 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const started = memoryStore.snapshot('mirror-room')
     if (!started) throw new Error('Expected mirror-room to remain in the store')
     expect(started.status).toBe('in-progress')
-    expect(started.mapId).toBe('large-trap-arena')
+    expect(started.mapId).toBe('large-hole-arena')
     const battleState = started.battleState as unknown as {
       state: {
         map: { id: string }
-        pieces: Array<{ templateId: string; ownerPlayerId: string }>
+        pieces: Array<{ templateId: string; ownerPlayerId: string; isCore?: boolean }>
+        deployment: { status: string }
+        gameStartFired?: boolean
       }
     }
-    expect(battleState.state.map.id).toBe('large-trap-arena')
+    expect(battleState.state.map.id).toBe('large-hole-arena')
+    expect(battleState.state.deployment.status).toBe('awaiting-choices')
+    expect(battleState.state.gameStartFired).toBeFalsy()
     const battlePieces = battleState.state.pieces
     expect(battlePieces).toHaveLength(16)
+    expect(battlePieces.every(piece => piece.isCore === true)).toBe(true)
     expect(battlePieces.filter(piece => piece.templateId === lightRoster[0])).toEqual(expect.arrayContaining([
       expect.objectContaining({ ownerPlayerId: 'alice' }),
       expect.objectContaining({ ownerPlayerId: 'bob' }),
     ]))
     expect(battlePieces.filter(piece => piece.templateId === lightRoster[0])).toHaveLength(2)
+  })
+
+  it('applies the same deployment command through HTTP and WebSocket authority', async () => {
+    memoryStore.seed(room('transport-source', 'light'))
+    await httpSelect('transport-source', 'alice', lightRoster)
+    await wsSelect('transport-source', 'bob', lightRoster)
+    const source = memoryStore.snapshot('transport-source')
+    if (!source?.battleState) throw new Error('Expected a started deployment battle')
+
+    memoryStore.seed({ ...source, id: 'http-deployment', version: 1 })
+    memoryStore.seed({ ...source, id: 'ws-deployment', version: 1 })
+    const action = { type: 'deploymentChoice', playerId: 'alice', pieceId: null, clientActionId: 'alice-keep' }
+
+    const http = await httpBattleAction('http-deployment', 'alice', action)
+    const ws = await wsBattleAction('ws-deployment', 'alice', action)
+
+    expect(http.status).toBe(200)
+    expect(ws.stateHash).toBe(http.body.stateHash)
+    const httpState = (memoryStore.snapshot('http-deployment')?.battleState as unknown as { state: unknown }).state
+    const wsState = (memoryStore.snapshot('ws-deployment')?.battleState as unknown as { state: unknown }).state
+    expect(wsState).toEqual(httpState)
   })
 })
