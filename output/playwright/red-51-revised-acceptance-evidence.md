@@ -17,6 +17,8 @@ Risk: Medium
 - 1280×720: selecting an owned piece opened the compact translucent menu beside its projected position. Selecting `霜之哀伤` removed the menu before the target prompt appeared; cancelling restored it.
 - 1024×768: the fixed phase/player HUD and top-right controls did not overlap. The board, end-turn control, training controls, and hand remained reachable.
 - 760×720: exactly five cards rendered from the existing `#handCards` source with symmetric transforms (`-25°`, `-12.5°`, `0°`, `12.5°`, `25°`) and no clipping; the context menu stayed within the board stage.
+- 760×720 frameless follow-up: the hand panel and training command container both computed to a zero border and transparent background; the hand edge pseudo-element computed to `content: none`, while five fanned cards and every local training control remained visible.
+- 390×844 frameless follow-up: the page stayed exactly 390px wide, the five-card hand remained horizontally browsable (`532px` scroll width in a `390px` client), and removing the container materials caused no viewport overflow.
 - 760×720 detail return: opening complete skills/status closed the context menu; pressing `✕` preserved `selectedPieceId` and immediately restored the same piece menu inside the stage.
 - 390×844: the contextual skill and info controls were at least 44px high, stayed inside the board stage, and the info control opened the complete detail as a bottom sheet.
 - 390×844 fresh load: the setup sheet scrolls internally while `返回` and `开始训练` stay visible. `开始训练` was activated successfully.
@@ -37,6 +39,8 @@ The training setup creates one visible coin card in this isolated harness. For t
 - `red-51-context-menu-mobile-390x844-final.png`
 - `red-51-status-sheet-mobile-390x844.png`
 - `red-51-training-setup-mobile-390x844.png`
+- `red-51-frameless-hand-training-760x720.png`
+- `red-51-frameless-hand-training-390x844.png`
 
 ## Automated checks
 
@@ -56,3 +60,5 @@ npm run check:encoding
 git diff --check
 passed
 ```
+
+The first full-suite run was executed concurrently with ESLint and the encoding scan and saw one temporary Electron archive read as zero bytes. The isolated failing packaging case then passed, and the serial candidate run passed all 303 tests; the initial I/O anomaly is retained here rather than hidden by the retry.
