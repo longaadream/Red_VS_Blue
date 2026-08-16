@@ -40,6 +40,26 @@ describe('debug battle pipeline', () => {
     expect(darkMirror.players.map(player => player.alignment)).toEqual(['dark', 'dark'])
   })
 
+  it('keeps concurrent rooms and mirror seats isolated', async () => {
+    const [firstRoom, mirrorRoom] = await Promise.all([
+      createDebugDuel({ seed: 4101, beginPhase: false }),
+      createDebugDuel({
+        seed: 4102,
+        beginPhase: false,
+        first: { playerId: 'mirror-blue', seat: 'blue', alignment: 'light' },
+        second: { playerId: 'mirror-red', seat: 'red', alignment: 'light' },
+      }),
+    ])
+    const mirrorBefore = hashStable(mirrorRoom.state)
+
+    const firstAfter = runBattleAction(firstRoom.state, { type: 'beginPhase', clientActionId: 'room-a-1' } as any)
+
+    expect(firstAfter.stateHash).not.toBe(hashStable(firstRoom.state))
+    expect(hashStable(mirrorRoom.state)).toBe(mirrorBefore)
+    expect(mirrorRoom.state.players.map(player => player.playerId)).toEqual(['mirror-blue', 'mirror-red'])
+    expect(mirrorRoom.state.pieces.every(piece => piece.ownerPlayerId === 'mirror-blue' || piece.ownerPlayerId === 'mirror-red')).toBe(true)
+  })
+
   it('keeps content alignment and ownership stable when seats are swapped', async () => {
     const duel = await createDebugDuel({
       seed: 3,
