@@ -453,6 +453,38 @@ describe('projectile target validation', () => {
 })
 
 describe('interrupted skill release', () => {
+  it('resumes a pending skill trigger without replaying before consumers', () => {
+    const caster = makePiece({ instanceId: 'pending-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' }) as any
+    state.skillsById['pending-skill'] = {
+      id: 'pending-skill', name: 'Pending Skill', description: '', kind: 'active', type: 'normal',
+      cooldownTurns: 0, maxCharges: 0, powerMultiplier: 1, actionPointCost: 1, range: 'self', requiresTarget: false,
+      code: "function executeSkill(context) { context.battle.extensions.skillOption = context.selectedOption; return { success: true, message: 'ok' }; }",
+    }
+    const beforeCalls: any[] = []
+    vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((battle: any, context: any) => {
+      if (context.type === 'beforeSkillUse') {
+        beforeCalls.push(context)
+        if (!context.pendingRuleId) return { success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'], title: 'Choose', pendingRuleId: 'pending-rule', pendingRuleSourceId: 'pending-caster' } as any
+      }
+      return { success: true, messages: [], blocked: false } as any
+    })
+
+    const pending = applyBattleAction(state, { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'pending-caster', skillId: 'pending-skill' } as any) as any
+    expect(pending.pendingOptionSelection).toBeDefined()
+    expect(pending.players[0].actionPoints).toBe(2)
+
+    const resumed = applyBattleAction(pending, { type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'yes' } as any) as any
+    expect(resumed.pendingOptionSelection).toBeUndefined()
+    expect(resumed.extensions.skillOption).toBe('yes')
+    expect(resumed.players[0].actionPoints).toBe(1)
+    expect(beforeCalls).toHaveLength(2)
+    expect(vi.mocked(globalTriggerSystem.checkTriggers).mock.calls.filter(([, context]) => context.type === 'afterSkillUsed')).toHaveLength(1)
+    expect(resumed.actions.some((entry: any) => entry.type === 'useBasicSkill')).toBe(true)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
+  })
+
   it('pays AP, cooldown, and uses when the caster dies during beforeSkillUse', () => {
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
     ;(caster as any).skills = [{ skillId: 'paid-fizzle', currentCooldown: 0, usesRemaining: 1 }]

@@ -1425,7 +1425,9 @@ function applyBattleActionInternal(
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
       };
-      const beforeSkillUseResult = globalTriggerSystem.checkTriggers(next, skillUseContext);
+      const beforeSkillUseResult = (action as any).__skipBeforeSkillUse
+        ? { success: true, messages: [], blocked: false } as any
+        : globalTriggerSystem.checkTriggers(next, skillUseContext);
 
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
@@ -1433,7 +1435,7 @@ function applyBattleActionInternal(
         if (!next.actions) {
           next.actions = [];
         }
-        beforeSkillUseResult.messages.forEach(message => {
+        beforeSkillUseResult.messages.forEach((message: string) => {
           next.actions!.push({
             type: "triggerEffect",
             playerId: action.playerId,
@@ -1456,6 +1458,8 @@ function applyBattleActionInternal(
           title: beforeSkillUseResult.title || '请选择',
           options: beforeSkillUseResult.options || [],
           pendingAction: action,
+          triggerContext: { ...skillUseContext, pendingRuleId: (beforeSkillUseResult as any).pendingRuleId, pendingRuleSourceId: (beforeSkillUseResult as any).pendingRuleSourceId },
+          pendingQueue: (beforeSkillUseResult as any).pendingQueue,
           cancelValue: 'no',
         }
         return next
@@ -1706,7 +1710,9 @@ function applyBattleActionInternal(
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
       };
-      const beforeSkillUseResult = globalTriggerSystem.checkTriggers(next, skillUseContext);
+      const beforeSkillUseResult = (action as any).__skipBeforeSkillUse
+        ? { success: true, messages: [], blocked: false } as any
+        : globalTriggerSystem.checkTriggers(next, skillUseContext);
 
       // 触发器可能修改了技能ID，使用修改后的值
       const finalSkillId = skillUseContext.skillId;
@@ -1759,7 +1765,7 @@ function applyBattleActionInternal(
         if (!next.actions) {
           next.actions = [];
         }
-        beforeSkillUseResult.messages.forEach(message => {
+        beforeSkillUseResult.messages.forEach((message: string) => {
           next.actions!.push({
             type: "triggerEffect",
             playerId: action.playerId,
@@ -1781,6 +1787,8 @@ function applyBattleActionInternal(
           title: beforeSkillUseResult.title || '请选择',
           options: beforeSkillUseResult.options || [],
           pendingAction: action,
+          triggerContext: { ...skillUseContext, pendingRuleId: (beforeSkillUseResult as any).pendingRuleId, pendingRuleSourceId: (beforeSkillUseResult as any).pendingRuleSourceId },
+          pendingQueue: (beforeSkillUseResult as any).pendingQueue,
           cancelValue: 'no',
         }
         return next
@@ -2153,14 +2161,36 @@ function applyBattleActionInternal(
       }
       next.pendingOptionSelection = undefined
       if (pending.pendingAction) {
-        const resumeAction = { ...pending.pendingAction, selectedOption: action.selectedOption }
-        try {
-          return applyBattleActionInternal(next, resumeAction)
-        } catch (e) {
-          // 技能条件已失效（如目标移位、目标已死），取消技能，游戏继续
-          writeLog(`[pendingOptionSelect] resume skill failed, cancelling: ${(e as Error).message}`)
-          return next
+        if (pending.triggerContext) {
+          const resumedTrigger = globalTriggerSystem.checkTriggers(next, {
+            ...pending.triggerContext,
+            selectedOption: action.selectedOption,
+          })
+          if (resumedTrigger.messages?.length) {
+            if (!next.actions) next.actions = []
+            resumedTrigger.messages.forEach(message => next.actions!.push({
+              type: 'triggerEffect', playerId: action.playerId, turn: next.turn.turnNumber, payload: { message },
+            }))
+          }
+          if (resumedTrigger.needsOptionSelection || resumedTrigger.needsTargetSelection) {
+            next.pendingOptionSelection = {
+              playerId: (resumedTrigger as any).playerId || action.playerId,
+              options: resumedTrigger.options || [],
+              title: resumedTrigger.title || '请选择',
+              pendingAction: pending.pendingAction,
+              triggerContext: pending.triggerContext,
+              pendingQueue: (resumedTrigger as any).pendingQueue || pending.pendingQueue,
+            }
+            return next
+          }
+          const queueAfterThis = (resumedTrigger as any).pendingQueue || pending.pendingQueue
+          if (queueAfterThis?.length) {
+            processPendingQueue(next, queueAfterThis, pending.triggerContext, action.playerId)
+            if (next.pendingOptionSelection || next.pendingTargetSelection) return next
+          }
         }
+        const resumeAction = { ...pending.pendingAction, selectedOption: action.selectedOption, __skipBeforeSkillUse: true }
+        return applyBattleActionInternal(next, resumeAction)
       }
       if (pending.triggerContext) {
         const ctx = { ...pending.triggerContext, selectedOption: action.selectedOption }
