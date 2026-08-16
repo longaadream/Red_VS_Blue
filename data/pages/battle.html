@@ -1464,8 +1464,11 @@
     }
 
     let trainingSetupConfig = null
+    function getTemplateFactionForBattleFaction(faction) {
+      return faction === 'red' ? 'evil' : faction === 'blue' ? 'good' : faction
+    }
     function getPiecesForSetupFaction(faction) {
-      const alignment = faction === 'red' ? 'evil' : 'good'
+      const alignment = getTemplateFactionForBattleFaction(faction)
       return Object.values(PIECES_BY_ID || {}).filter(function(piece) {
         return piece && piece.faction === alignment
       }).sort(function(a, b) {
@@ -2710,7 +2713,8 @@
       if (!ownerEl || !sel) return
       const ownerPlayerId = ownerEl.value || (trainingSetupConfig && trainingSetupConfig.firstPlayerId) || 'training-red'
       const faction = getTrainingPlayerFaction(ownerPlayerId)
-      const pieces = Object.values(PIECES_BY_ID).filter(p => !p.faction || p.faction === faction || p.faction === 'neutral')
+      const templateFaction = getTemplateFactionForBattleFaction(faction)
+      const pieces = Object.values(PIECES_BY_ID).filter(p => !p.faction || p.faction === templateFaction || p.faction === 'neutral')
       sel.innerHTML = '<option value="">选择棋子...</option>' + pieces.map(p =>
         `<option value="${p.id}">${p.name || p.id}</option>`
       ).join('')

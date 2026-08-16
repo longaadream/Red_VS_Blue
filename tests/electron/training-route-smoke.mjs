@@ -290,6 +290,34 @@ try {
     `Training battle UI is not visible: ${JSON.stringify(battle)}`,
   )
 
+  const placementOptions = await evaluate(battleTarget, `(() => {
+    const owner = document.getElementById('placeOwner')
+    if (!owner || typeof refreshPlaceTemplates !== 'function') return []
+    return G.players.map((player) => {
+      owner.value = player.playerId
+      refreshPlaceTemplates()
+      const templateIds = Array.from(document.querySelectorAll('#placeTemplate option'))
+        .map((option) => option.value)
+        .filter(Boolean)
+      return {
+        faction: player.faction,
+        templateIds,
+        templateFactions: templateIds.map((id) => PIECES_BY_ID[id]?.faction || null),
+      }
+    })
+  })()`)
+  assert(
+    placementOptions.length === 2 && placementOptions.every((entry) => entry.templateIds.length > 0),
+    `Training placement templates are empty: ${JSON.stringify(placementOptions)}`,
+  )
+  assert(
+    placementOptions.every((entry) => {
+      const expectedFaction = entry.faction === 'red' ? 'evil' : 'good'
+      return entry.templateFactions.every((faction) => faction === expectedFaction || faction === 'neutral' || faction === null)
+    }),
+    `Training placement templates include the wrong faction: ${JSON.stringify(placementOptions)}`,
+  )
+
   const screenshotConnection = await connectTarget(battleTarget)
   const screenshot = await screenshotConnection.command('Page.captureScreenshot', {
     format: 'png',
@@ -305,6 +333,7 @@ try {
     setupElapsedMs,
     setup,
     battle,
+    placementOptions,
     screenshotPath,
   }))
 } catch (error) {
