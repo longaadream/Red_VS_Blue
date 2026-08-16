@@ -261,8 +261,8 @@
   </div>
 
   <div class="alignment-panel">
-    <button class="alignment-btn light" id="alignmentLightBtn" onclick="setAlignment('light')">光方</button>
-    <button class="alignment-btn dark" id="alignmentDarkBtn" onclick="setAlignment('dark')">暗方</button>
+    <button class="alignment-btn light" id="alignmentLightBtn" disabled>光方</button>
+    <button class="alignment-btn dark" id="alignmentDarkBtn" disabled>暗方</button>
   </div>
 
   <!-- Piece list -->
@@ -442,19 +442,6 @@
       if (result && result.alignment) playerAlignment = result.alignment
       if (result && result.room) latestRoom = result.room
       return result
-    }
-
-    async function setAlignment(alignment) {
-      if (alignment !== 'light' && alignment !== 'dark') return
-      if (alignment === playerAlignment) return
-      playerAlignment = alignment
-      selectedIds.clear()
-      updateFactionBadge()
-      await loadPieces()
-      updateConfirmBar()
-      if (wsReady && roomId) {
-        try { await claimFactionViaWs() } catch {}
-      }
     }
 
     function navigateBattle() {

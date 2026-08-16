@@ -18,6 +18,11 @@ describe('RED-67 cross-page player alignment flow', () => {
     expect(room).toContain("f === 'red' ? '红方座位' : f === 'blue' ? '蓝方座位'")
     expect(room).not.toContain("f === 'red' ? '先手' : f === 'blue' ? '后手'")
     expect(selection).toContain("p.set('alignment', playerAlignment)")
+    expect(selection).toContain('id="alignmentLightBtn" disabled')
+    expect(selection).toContain('id="alignmentDarkBtn" disabled')
+    expect(selection).not.toContain("onclick=\"setAlignment('light')\"")
+    expect(selection).not.toContain("onclick=\"setAlignment('dark')\"")
+    expect(selection).not.toContain('async function setAlignment(alignment)')
   })
 
   it('restores battle labels from authoritative player alignment metadata', () => {
