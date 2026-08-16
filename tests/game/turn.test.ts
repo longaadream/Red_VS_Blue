@@ -80,6 +80,42 @@ describe('summon trigger contract', () => {
 // ─── 移动 ────────────────────────────────────────────────────────────────────
 
 describe('move action', () => {
+  it('does not dispatch afterMove when beforeMove blocks the action', () => {
+    const piece = makePiece({ instanceId: 'blocked-move', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
+    vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: any) =>
+      context.type === 'beforeMove'
+        ? { success: true, messages: ['blocked'], blocked: true }
+        : { success: true, messages: [], blocked: false } as any,
+    )
+
+    const next = applyBattleAction(state as any, {
+      type: 'move', playerId: 'player-red', pieceId: 'blocked-move', toX: 1, toY: 0,
+    }) as any
+
+    expect(next.pieces[0].x).toBe(0)
+    expect(vi.mocked(globalTriggerSystem.checkTriggers).mock.calls.map(([, context]) => context.type)).toEqual(['beforeMove'])
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
+  })
+
+  it('rolls back the action when a before trigger throws', () => {
+    const piece = makePiece({ instanceId: 'throwing-move', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const before = JSON.stringify(state)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: any) => {
+      battle.players[0].actionPoints = 0
+      throw new Error('trigger exploded')
+    })
+
+    expect(() => applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: 'throwing-move', toX: 1, toY: 0,
+    } as any)).toThrow('trigger exploded')
+    expect(JSON.stringify(state)).toBe(before)
+    expect(vi.mocked(globalTriggerSystem.checkTriggers)).toHaveBeenCalledTimes(1)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
+  })
   it('移动到合法格子后位置更新', () => {
     const piece = makePiece({ instanceId: 'p1', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
     const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
