@@ -377,6 +377,14 @@
   .card-item { margin-left: -14px; }
 }
 
+@media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
+  .training-tools-toggle,
+  .training-popover select,
+  .training-popover .tb-btn {
+    min-height: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .training-tools-toggle,
   .training-popover,

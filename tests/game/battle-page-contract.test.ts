@@ -116,6 +116,7 @@ describe('battle page route contract', () => {
     expect(responsiveCss).not.toContain('@media (max-width: 760px)')
     expect(responsiveCss).toContain('touch-action: pan-x')
     expect(mobileCss).toContain('@media (max-width: 760px)')
+    expect(contextCss).toMatch(/orientation: landscape[\s\S]*?\.training-popover \.tb-btn[\s\S]*?min-height:\s*44px/)
     expect(mobileCss).toMatch(/\.board-view-button\s*\{[\s\S]*?min-height:\s*42px/)
     expect(mobileCss).toMatch(/\.piece-context-skill\s*\{[\s\S]*?min-height:\s*44px/)
     expect(mobileCss).toMatch(/\.training-setup-sheet\s*\{[\s\S]*?max-height:\s*calc\(100dvh - 16px\)/)
@@ -296,6 +297,7 @@ describe('battle page route contract', () => {
 
     expect(battlePage).toContain('<div id="statusMsg" role="status" aria-live="polite">')
     expect(battlePage).toContain('<div id="targetOverlay" role="status" aria-live="polite">')
+    expect(battlePage).toContain('border: 0; border-radius: 0; background: transparent;')
     expect(battlePage).toContain('id="targetSourceName"')
     expect(battlePage).toContain('id="targetCancelButton"')
     expect(battlePage).toMatch(/function renderTargetOverlay\(\)[\s\S]*?closePieceContextMenu\(\)/)

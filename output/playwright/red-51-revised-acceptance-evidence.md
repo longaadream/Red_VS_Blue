@@ -79,3 +79,27 @@ passed
 For the 2026-08-17 follow-up, the first full-suite run exposed one stale `targeting.test.ts` assertion that still required the removed `#handTarget` node. The assertion was updated to preserve the actual contract—clear `pendingCardAction`, then submit the existing action—and the final serial run passed all 303 tests. ESLint passed for the changed RED-51 contract test; linting the whole legacy `targeting.test.ts` reports 14 pre-existing `no-explicit-any` violations outside the changed assertion, which were left out of this UI scope.
 
 The first full-suite run was executed concurrently with ESLint and the encoding scan and saw one temporary Electron archive read as zero bytes. The isolated failing packaging case then passed, and the serial candidate run passed all 303 tests; the initial I/O anomaly is retained here rather than hidden by the retry.
+
+## 2026-08-17 post-merge landscape acceptance
+
+- The RED-51 branch was merged with `origin/main@a6544ba`, preserving the newer RED-50 authoritative target feedback, RED-32 projectile tracing, and the mobile landscape orientation policy.
+- At 844×390, five cards rendered directly from the single `#handCards` source with symmetric `-25° / -12.5° / 0° / 12.5° / 25°` transforms, transparent background, zero border, no shadow, hidden scrollbar, and zero page overflow. The only visible uses of the word “手牌” were inside card rules text, not a section label.
+- The remaining battle instruction strip was removed as a visual region: `#statusMsg` computed to zero border, transparent background, no shadow, and no backdrop filter.
+- The training modification UI remained collapsed as one floating trigger. Its expanded popover stayed inside the viewport; after the 170ms transition, both selects and all three command buttons measured 44px high.
+- A real canvas click on `training-red-1` selected the piece and opened the lightweight menu beside it, fully inside the board stage. The training popover stayed closed.
+- Clicking the real “移动” control closed the piece menu before rendering 7 legal route cells; interaction mode reported `move`, so the menu cannot cover the route.
+- A real right-click on the same projected piece opened the complete skills/status detail and closed the lightweight menu while preserving `selectedPieceId`.
+- Browser console review found only the known static-harness 404s for `game-engine-runtime.js` and the absent `evil-explosion` skill entry; no runtime JavaScript exception was observed.
+
+Post-merge artifacts:
+
+- `red-51-direct-cards-training-844x390.png`
+- `red-51-training-popover-844x390.png`
+- `red-51-piece-menu-844x390.png`
+- `red-51-move-route-clear-844x390.png`
+
+Post-merge checks:
+
+- Focused merge coverage: 8 files passed, 103 tests passed.
+- Full Vitest candidate: 38 files passed, 335 tests passed.
+- Encoding: 549 text files checked.

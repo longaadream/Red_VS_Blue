@@ -946,10 +946,10 @@
     }
     #statusMsg {
       position: fixed; left: 50%; bottom: 70px; z-index: 82; transform: translateX(-50%);
-      width: min(620px, calc(100vw - 32px)); min-height: 32px; padding: 7px 12px;
-      border: 1px solid rgba(148,163,184,.24); border-radius: 9px;
-      background: rgba(2,6,23,.82); color: #cbd5e1; text-align: center;
-      font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: blur(9px);
+      width: min(620px, calc(100vw - 32px)); min-height: 0; padding: 3px 8px;
+      border: 0; border-radius: 0; background: transparent;
+      color: #cbd5e1; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.9);
+      font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: none;
     }
     @media (max-width: 760px) {
       #targetOverlay { padding-top: 116px; }
