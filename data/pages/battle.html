@@ -155,7 +155,7 @@
 
     /* ── Main board area ── */
     .main-panel {
-      flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+      position: relative; flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
     }
     .phase-bar {
       position: fixed; top: 10px; left: 10px; z-index: 85;
@@ -403,16 +403,7 @@
       color: #cbd5e1;
     }
 
-    /* ── Hand panel ── */
-    .hand-panel {
-      border-top: 1px solid var(--border); flex-shrink: 0;
-      background: #080f1e;
-    }
-    .hand-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 4px 10px; font-size: 11px; color: var(--muted);
-      border-bottom: 1px solid #1a2540;
-    }
+    /* ── Unsectioned hand fan ── */
     .hand-scroll {
       display: flex; gap: 6px; padding: 6px 10px;
       overflow-x: auto; overflow-y: hidden;
@@ -522,11 +513,6 @@
     .collapse-arrow { font-size: 10px; color: var(--muted); transition: transform .2s; }
     .collapse-arrow.open { transform: rotate(90deg); }
 
-    /* ── Hand panel collapsible ── */
-    .hand-body { }
-    .hand-body.collapsed { display: none; }
-    .hand-header { cursor: pointer; user-select: none; }
-    .hand-header:active { background: #0d1929; }
 
     /* ── Fullscreen map mode ── */
     .btn-fullmap {
@@ -536,7 +522,8 @@
     .btn-fullmap:active { opacity: .7; }
     body.full-map .side-panel,
     body.full-map .action-bar,
-    body.full-map .hand-panel,
+    body.full-map .hand-scroll,
+    body.full-map .training-tools,
     body.full-map .log-panel,
     body.full-map .phase-bar,
     body.full-map .tile-legend {
@@ -911,13 +898,9 @@
     /* ── Side panels: fullscreen map by default ── */
     .side-panel { display:none !important; }
 
-    /* ── Training bar ── */
-    .training-bar { align-items:center; gap:5px; flex-wrap:wrap; padding:4px 8px; background:#04080f; border-top:1px solid #1a2540; flex-shrink:0; }
-    .training-bar select { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:6px; font-size:11px; padding:3px 6px; }
+    /* ── Training popover controls ── */
+    .training-popover select { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:6px; font-size:11px; padding:3px 6px; }
     .tb-btn { border-radius:6px; font-size:11px; padding:3px 9px; cursor:pointer; border:1px solid; white-space:nowrap; background:transparent; }
-
-    /* ── Hand always visible ── */
-    .hand-body { display:block !important; }
 
     /* ── Fullscreen log overlay ── */
     #logOverlay { position:fixed; inset:0; background:rgba(2,8,22,.96); z-index:400; flex-direction:column; display:none; }
@@ -1187,20 +1170,27 @@
         <div class="turn-control-wrap battle-turn-control">
           <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
         </div>
-      </div>
-
-      <!-- Training bar (training mode only) -->
-      <div class="training-bar" id="trainingBar" style="display:none">
-        <select id="placeOwner" onchange="refreshPlaceTemplates()">
-          <option value="training-red">先手</option>
-          <option value="training-blue">后手</option>
-        </select>
-        <select id="placeTemplate" style="flex:1;min-width:90px">
-          <option value="">选择棋子…</option>
-        </select>
-        <button id="btnPlace" class="tb-btn" onclick="togglePlaceMode()" style="background:#2d1a4e;border-color:#6d28d9;color:#c4b5fd">放置</button>
-        <button class="tb-btn" onclick="openResourceEditor()" style="background:#1a2a1a;border-color:#15803d;color:#86efac" title="修改资源/充能/行动点">资源</button>
-        <button class="tb-btn" onclick="showTrainingSetup()" style="background:#0c1a0c;border-color:#166534;color:#86efac">设置</button>
+        <div class="training-tools" id="trainingTools" style="display:none">
+          <button class="training-tools-toggle" id="trainingToolsToggle" type="button"
+            aria-controls="trainingBar" aria-expanded="false" aria-haspopup="dialog"
+            onclick="toggleTrainingTools()">
+            <span class="training-tools-icon" aria-hidden="true">✦</span>
+            <span>训练工具</span>
+            <span class="training-tools-chevron" aria-hidden="true">⌃</span>
+          </button>
+          <div id="trainingBar" class="training-popover" role="dialog" aria-hidden="true" aria-label="训练修改工具">
+            <select id="placeOwner" aria-label="放置方" onchange="refreshPlaceTemplates()">
+              <option value="training-red">先手</option>
+              <option value="training-blue">后手</option>
+            </select>
+            <select id="placeTemplate" aria-label="选择放置棋子">
+              <option value="">选择棋子…</option>
+            </select>
+            <button id="btnPlace" class="tb-btn is-place" onclick="togglePlaceMode()">放置</button>
+            <button class="tb-btn is-resource" onclick="openResourceEditor()" title="修改资源/充能/行动点">资源</button>
+            <button class="tb-btn is-settings" onclick="showTrainingSetup()">设置</button>
+          </div>
+        </div>
       </div>
 
       <!-- Resource editor sheet (training mode) -->
@@ -1233,19 +1223,8 @@
         </div>
       </div>
 
-      <!-- Independent horizontally scrollable hand -->
-      <div class="hand-panel" id="handPanel" data-battle-ui-region="hand">
-        <div class="hand-label" style="display:flex;align-items:center;gap:8px;padding:3px 10px;font-size:11px;color:#64748b;flex-shrink:0">
-          <span>🃏 手牌</span>
-          <span id="handCount" style="font-weight:700;color:#93c5fd">0</span>
-          <span id="handTarget" style="color:#f59e0b;display:none"> · 点击目标施放</span>
-        </div>
-        <div id="handBody">
-          <div class="hand-scroll" id="handCards" role="region" aria-label="手牌列表" tabindex="0">
-            <div class="hand-empty">暂无手牌</div>
-          </div>
-        </div>
-      </div>
+      <!-- The cards themselves are the hand; no panel, header, or visual section. -->
+      <div class="hand-scroll" id="handCards" data-battle-ui-region="hand" role="region" aria-label="手牌列表" tabindex="0"></div>
     </div>
 
     <!-- Opponent pieces panel (right): hidden, kept for renderPanels() -->
@@ -1345,7 +1324,25 @@
         secondTemplateIds: getSelectedTrainingPieceIds('trainingSecondPieces'),
       }
     }
+    function setTrainingToolsOpen(open) {
+      const root = document.getElementById('trainingTools')
+      const toggle = document.getElementById('trainingToolsToggle')
+      const popover = document.getElementById('trainingBar')
+      if (!root || !toggle || !popover) return
+      const next = !!open && root.style.display !== 'none'
+      if (next) closePieceContextMenu()
+      root.classList.toggle('is-open', next)
+      toggle.setAttribute('aria-expanded', String(next))
+      popover.setAttribute('aria-hidden', String(!next))
+    }
+
+    function toggleTrainingTools() {
+      const root = document.getElementById('trainingTools')
+      if (!root) return
+      setTrainingToolsOpen(!root.classList.contains('is-open'))
+    }
     function showTrainingSetup() {
+      setTrainingToolsOpen(false)
       placingMode = false
       selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
       const btnPlace = document.getElementById('btnPlace')
@@ -2427,7 +2424,9 @@
         document.getElementById('btnSurrender').style.display = 'none'
         document.getElementById('btnSwitchPov').style.display = ''
         document.getElementById('btnResetCD').style.display = ''
-        document.getElementById('trainingBar').style.display = 'flex'
+        const trainingTools = document.getElementById('trainingTools')
+        if (trainingTools) trainingTools.style.display = ''
+        setTrainingToolsOpen(false)
         document.getElementById('roomNameLabel').textContent = '训练营'
         showMsg('加载本地资源...')
         const trainingLoad = await loadLocalData()
@@ -2513,6 +2512,7 @@
 
     // ── Training: resource editor ──
     function openResourceEditor() {
+      setTrainingToolsOpen(false)
       const sheet = document.getElementById('resEditorSheet')
       if (!sheet || !G) return
       // Pre-fill with current values of the active player
@@ -2565,6 +2565,7 @@
 
     function togglePlaceMode() {
       placingMode = !placingMode
+      if (placingMode) setTrainingToolsOpen(false)
       const btn = document.getElementById('btnPlace')
       if (btn) { btn.style.background = placingMode ? '#4c1d95' : '#2d1a4e'; btn.textContent = placingMode ? '取消放置' : '点击棋盘放置' }
       setStatusMsg(placingMode ? '点击棋盘上的可行走格子放置棋子' : '已取消放置')
@@ -2955,7 +2956,7 @@
       }
       pendingSkill = null; pendingCardAction = null; pendingMove = false
       setMoveButtonClass(false)
-      const sp = autoMoveSelectedIfPossible()
+      const sp = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       renderBoard(); renderPieceContextMenu(sp || null); renderActionBar(); renderTargetOverlay()
     }
 
@@ -3397,9 +3398,10 @@
       const skillsContainer = document.getElementById('pieceContextSkills')
       if (!menu || !skillsContainer) return
 
-      const isTargeting = !!pendingSkill || !!pendingCardAction ||
+      const trainingOpen = document.getElementById('trainingTools')?.classList.contains('is-open')
+      const isTargeting = !!pendingMove || !!pendingSkill || !!pendingCardAction ||
         pendingTargetSelectionForMe() || pendingOptionSelectionForMe()
-      if (!piece || piece.currentHp <= 0 || isTargeting) {
+      if (!piece || piece.currentHp <= 0 || isTargeting || trainingOpen) {
         closePieceContextMenu()
         return
       }
@@ -3408,6 +3410,7 @@
       const isMyTurn = G && G.turn && G.turn.currentPlayerId &&
         G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const inAction = G && G.turn && G.turn.phase === 'action'
+      const canMove = isOwner && isMyTurn && inAction && canAutoMovePiece(piece)
       const skills = isOwner ? pieceDispSkills(piece).filter(sk => {
         const skData = skillDefOf(skillIdOf(sk))
         return skData.kind !== 'passive'
@@ -3419,7 +3422,13 @@
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
       menu.dataset.pieceId = piece.instanceId
 
-      skillsContainer.innerHTML = skills.length ? skills.map(sk => {
+      const moveButton = isOwner
+        ? '<button type="button" class="piece-context-skill is-move"' +
+          ' onclick="dispatchBattleIntent({type:\'toggle-move\'})"' + (canMove ? '' : ' disabled') + '>' +
+          '<span class="piece-context-skill-icon">&#8599;</span><span class="piece-context-skill-name">移动</span>' +
+          '<span class="piece-context-skill-cost">选择路线</span></button>'
+        : ''
+      const skillButtons = skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
         const skData = skillDefOf(sid)
         const isCharge = skData.type === 'super'
@@ -3448,6 +3457,7 @@
             (status || ('⚡' + apCost + (cpCost ? ' ◆' + cpCost : ''))) +
           '</span></button>'
       }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
+      skillsContainer.innerHTML = moveButton + skillButtons
 
       menu.classList.add('is-open')
       menu.setAttribute('aria-hidden', 'false')
@@ -3461,7 +3471,6 @@
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const ap = myMeta ? myMeta.actionPoints : 0
 
-      document.getElementById('handCount').textContent = hand.length
       let hudHand = document.getElementById('hudHandCount')
       if (!hudHand) {
         const topbar = document.querySelector('.topbar')
@@ -3475,12 +3484,12 @@
         }
       }
       if (hudHand) hudHand.textContent = hand.length
-      const targetHint = document.getElementById('handTarget')
-      targetHint.style.display = pendingCardAction ? 'inline' : 'none'
 
       const container = document.getElementById('handCards')
+      if (!container) return
+      container.setAttribute('aria-hidden', String(!hand.length))
       if (!hand.length) {
-        container.innerHTML = '<div class="hand-empty">暂无手牌</div>'
+        container.replaceChildren()
         return
       }
 
@@ -3692,7 +3701,6 @@
         delete action.preparation
         delete action.validTargets
         pendingCardAction = null
-        document.getElementById('handTarget').style.display = 'none'
         doAction(action)
         return
       }
@@ -3809,8 +3817,11 @@
         const hasOption = Array.from(pieceSelect.options || []).some(opt => opt.value === instanceId)
         pieceSelect.value = hasOption ? instanceId : ''
       }
-      // Open the contextual menu at the selected piece.
-      const sp = autoMoveSelectedIfPossible()
+      // Inspect first; explicit movement closes the menu before route selection.
+      pendingMove = false
+      validMoves = new Set()
+      setMoveButtonClass(false)
+      const sp = G && G.pieces.find(p => p.instanceId === selectedPieceId)
       renderPieceContextMenu(sp)
       render()
     }
@@ -3826,7 +3837,7 @@
       pendingSkill = null
       setMoveButtonClass(pendingMove)
       const sp = G && G.pieces.find(p => p.instanceId === selectedPieceId)
-      renderBoard(); renderPieceContextMenu(sp); renderActionBar()
+      renderBoard(); renderPieceContextMenu(pendingMove ? null : sp); renderActionBar()
     }
 
     // selectSkillCard: called from the board-anchored piece menu.
@@ -3841,7 +3852,8 @@
       // Toggle off: clicking the active skill again cancels selection
       if (pendingSkill && pendingSkill.skillId === skId) {
         pendingSkill = null
-        autoMoveSelectedIfPossible()
+        pendingMove = false
+        setMoveButtonClass(false)
         renderBoard(); renderPieceContextMenu(sp); renderActionBar(); renderTargetOverlay()
         return
       }
@@ -4352,8 +4364,7 @@
       const topbarH = document.querySelector('.topbar')?.offsetHeight || 44
       const phaseH  = document.querySelector('.phase-bar')?.offsetHeight || 0
       const actionH = document.querySelector('.action-bar')?.offsetHeight || 0
-      const trainingBarH = document.getElementById('trainingBar')?.offsetHeight || 0
-      const availH  = window.innerHeight - topbarH - phaseH - actionH - trainingBarH - 20
+      const availH  = window.innerHeight - topbarH - phaseH - actionH - 20
       const byW = Math.floor(availW / cols)
       const byH = Math.floor(availH / rows)
       const sz = Math.max(28, Math.min(72, byW, byH))
@@ -4372,23 +4383,6 @@
       setTimeout(recalcCellSize, 50)
     }
 
-    // ── Collapsible sections (log / hand) ─────────────────────────────────────
-    function toggleSection(section) {
-      if (section === 'log') {
-        const body = document.getElementById('logBody')
-        const arrow = document.getElementById('logArrow')
-        const open = !body.classList.contains('collapsed')
-        body.classList.toggle('collapsed', open)
-        if (arrow) { arrow.textContent = open ? '>' : 'v'; arrow.classList.toggle('open', !open) }
-      } else if (section === 'hand') {
-        const body = document.getElementById('handBody')
-        const arrow = document.getElementById('handArrow')
-        const open = !body.classList.contains('collapsed')
-        body.classList.toggle('collapsed', open)
-        if (arrow) { arrow.textContent = open ? '>' : 'v'; arrow.classList.toggle('open', !open) }
-      }
-      setTimeout(recalcCellSize, 50)
-    }
 
     window.addEventListener('load', () => {
       const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
@@ -4405,6 +4399,16 @@
       _use3d = hasThreeRenderer
       if (!_use3d) initMapControls()
       init()
+      document.addEventListener('pointerdown', function (event) {
+        const root = document.getElementById('trainingTools')
+        if (!root || !root.classList.contains('is-open')) return
+        if (event.target && typeof event.target.closest === 'function' && event.target.closest('#trainingTools')) return
+        setTrainingToolsOpen(false)
+      }, true)
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') setTrainingToolsOpen(false)
+      })
 
       function shouldCancelPendingCardTarget(pendingAction, target) {
         if (!pendingAction) return false

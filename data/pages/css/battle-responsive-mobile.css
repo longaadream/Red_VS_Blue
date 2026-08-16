@@ -146,8 +146,19 @@
   .piece-context-skill { min-width: 80px; min-height: 44px; padding: 6px 7px; }
   .battle-turn-control { right: 12px; bottom: 12px; }
 
-  .hand-panel { padding-bottom: env(safe-area-inset-bottom); }
-  .hand-scroll { justify-content: flex-start; gap: 0; padding: 28px 68px 8px !important; scroll-padding-inline: 68px; }
+  .training-tools { left: 12px; bottom: 12px; }
+  .training-tools-toggle { min-height: 44px; padding-inline: 12px; }
+  .training-popover {
+    width: min(330px, calc(100vw - 24px));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .training-popover #placeOwner { grid-column: 1; }
+  .training-popover #placeTemplate { grid-column: 2 / -1; min-width: 0; }
+  .training-popover .tb-btn { min-width: 0; min-height: 44px; padding-inline: 8px; }
+
+  .hand-scroll {
+    justify-content: flex-start; gap: 0; padding: 20px 68px calc(8px + env(safe-area-inset-bottom)) !important; scroll-padding-inline: 68px;
+  }
   .card-item { width: 88px; min-width: 88px; height: 106px; margin-left: -11px; border-radius: 9px; }
   .card-art { height: 47px; }
 

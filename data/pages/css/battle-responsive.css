@@ -248,55 +248,37 @@ body {
   background: rgba(30, 41, 59, 0.94);
 }
 
-.hand-panel {
+.hand-scroll {
   position: relative;
   display: flex !important;
   flex: 0 0 var(--battle-hand-height);
+  width: 100%;
   height: var(--battle-hand-height);
   min-height: 0;
-  flex-direction: column;
-  border-top-color: rgba(100, 116, 139, 0.36);
-  background: linear-gradient(180deg, rgba(8, 15, 30, 0.98), rgba(3, 7, 18, 1));
-  box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.22);
-  overflow: hidden;
-}
-
-.hand-panel::after {
-  content: "";
-  position: absolute;
-  top: 27px;
-  right: 0;
-  bottom: 0;
-  width: 28px;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(3, 7, 18, 0.96));
-}
-
-.hand-panel > div:first-child { min-height: 28px; color: #94a3b8 !important; }
-#handBody { min-height: 0; flex: 1; }
-
-.hand-scroll {
-  height: 100%;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 9px;
-  padding: 8px 34px 10px 12px;
+  padding: 18px 34px 10px 12px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   overflow-x: auto;
+  overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-padding-inline: 12px;
   scroll-snap-type: x proximity;
-  scrollbar-width: auto;
-  scrollbar-color: #475569 #111827;
+  scrollbar-width: none;
   touch-action: pan-x;
 }
 
-.hand-scroll::-webkit-scrollbar { height: 7px; }
-.hand-scroll::-webkit-scrollbar-track { background: #111827; }
-.hand-scroll::-webkit-scrollbar-thumb {
-  min-width: 40px;
-  border: 1px solid #111827;
-  border-radius: 999px;
-  background: #475569;
+.hand-scroll:empty {
+  flex-basis: 0;
+  height: 0;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: hidden;
 }
+
+.hand-scroll::-webkit-scrollbar { display: none; }
 
 .card-item {
   width: 94px;

@@ -34,23 +34,108 @@
   backdrop-filter: blur(10px);
 }
 
-.training-bar {
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  backdrop-filter: none;
+.training-tools {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  z-index: 16;
+  width: max-content;
+  max-width: calc(100% - 36px);
+  pointer-events: none;
+}
+
+.training-tools-toggle {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  color: #dbeafe;
+  background: rgba(8, 15, 29, 0.72);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px) saturate(1.08);
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease;
+}
+
+.training-tools-toggle:active {
+  transform: scale(0.97);
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.training-tools-chevron {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.training-tools.is-open .training-tools-chevron { transform: rotate(180deg); }
+
+.training-popover {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  display: grid;
+  grid-template-columns: minmax(68px, auto) minmax(150px, 1fr) repeat(3, auto);
+  gap: 6px;
+  width: min(520px, calc(100vw - 36px));
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  color: #e2e8f0;
+  background: rgba(8, 15, 29, 0.9);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(16px) saturate(1.12);
+  transform: translateY(7px) scale(0.97);
+  transform-origin: bottom left;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 170ms cubic-bezier(0.23, 1, 0.32, 1), visibility 0s linear 170ms;
+}
+
+.training-tools.is-open .training-popover {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 
 .action-bar select,
-.training-bar select,
+.training-popover select,
 .tb-btn {
   border-color: transparent !important;
-  background-color: rgba(30, 41, 59, 0.52) !important;
+  background-color: rgba(30, 41, 59, 0.68) !important;
 }
 
+.training-popover select {
+  min-width: 0;
+  min-height: 38px;
+}
+
+.training-popover #placeTemplate { min-width: 150px; }
+
+.tb-btn {
+  min-height: 38px;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease;
+}
+
+.tb-btn:active { transform: scale(0.97); }
+.tb-btn.is-place { color: #ddd6fe; background-color: rgba(76, 29, 149, 0.72) !important; }
+.tb-btn.is-resource { color: #bbf7d0; background-color: rgba(20, 83, 45, 0.68) !important; }
+.tb-btn.is-settings { color: #bbf7d0; background-color: rgba(20, 83, 45, 0.5) !important; }
+
 .action-bar select:focus-visible,
-.training-bar select:focus-visible,
-.tb-btn:focus-visible { outline: 2px solid rgba(96, 165, 250, 0.76); }
+.training-tools-toggle:focus-visible,
+.training-popover select:focus-visible,
+.tb-btn:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.76);
+  outline-offset: 2px;
+}
 
 .board-wrap,
 .board-shell,
@@ -216,6 +301,10 @@
   background: rgba(88, 28, 135, 0.5);
 }
 
+.piece-context-skill.is-move {
+  background: rgba(20, 83, 45, 0.56);
+}
+
 .piece-context-skill:disabled {
   opacity: 0.42;
   cursor: not-allowed;
@@ -248,32 +337,16 @@
   font-size: 10px;
 }
 
-.hand-panel {
+.hand-scroll {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-}
-
-.hand-panel::after { content: none !important; }
-
-.hand-label {
-  position: absolute;
-  top: 2px;
-  left: 8px;
-  z-index: 2;
-  min-height: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-  pointer-events: none;
-}
-
-.hand-scroll {
   align-items: flex-end;
   justify-content: center;
   gap: 0 !important;
-  padding: 28px 42px 8px !important;
+  padding: 18px 42px 8px !important;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
 }
 
 .card-item {
@@ -305,6 +378,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .training-tools-toggle,
+  .training-popover,
   .piece-context-menu,
   .piece-context-skill,
   .card-item { transition-duration: 1ms !important; }
@@ -313,6 +388,8 @@
 @media (prefers-reduced-transparency: reduce) {
   .phase-bar,
   .topbar,
+  .training-tools-toggle,
+  .training-popover,
   .piece-context-menu {
     background: rgb(8, 15, 29) !important;
     backdrop-filter: none;

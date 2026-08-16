@@ -527,7 +527,7 @@ describe('targeting consumers and performance contract', () => {
     expect(implementation).toContain('preparation.candidates')
     expect(implementation).not.toContain('GameEngine.applyBattleAction')
     expect(html).not.toContain('_computeValidSkillTargetsHeuristic')
-    expect(html).toMatch(/pendingCardAction = null\s+document\.getElementById\('handTarget'\)[\s\S]*?doAction\(action\)/)
+    expect(html).toMatch(/pendingCardAction = null\s+doAction\(action\)/)
     expect(html).toMatch(/_appendTargetToAction\(action, piece, x, y, pendingSkill\.preparation && pendingSkill\.preparation\.targetType\)\s+pendingSkill = null\s+doAction\(action\)/)
     expect(html).toContain("targetType === 'piece' && piece")
   })
