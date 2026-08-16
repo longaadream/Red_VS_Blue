@@ -10,6 +10,8 @@
   const PIECE_H = 0.22     // piece cylinder height
   const RING_R  = 0.40     // faction ring radius
   const RING_T  = 0.045    // faction ring tube radius
+  const SELECTED_RING_R = 0.445
+  const SELECTED_RING_T = 0.018
 
   const TILE_COLORS = {
     floor:     0x374151,
@@ -141,7 +143,7 @@
     // Shared geometries
     _tileGeom       = new THREE.BoxGeometry(TILE_W, TILE_H, TILE_W)
     _hlPlaneGeom    = new THREE.PlaneGeometry(TILE_W - 0.06, TILE_W - 0.06)
-    _selectedRingGeom = new THREE.TorusGeometry(RING_R, RING_T * 0.7, 8, 24)
+    _selectedRingGeom = new THREE.TorusGeometry(SELECTED_RING_R, SELECTED_RING_T, 8, 32)
     _pieceBodyGeom  = new THREE.CylinderGeometry(PIECE_R, PIECE_R, PIECE_H, 24)
     _pieceRingGeom  = new THREE.TorusGeometry(RING_R, RING_T, 8, 32)
     _portraitDiscGeom = new THREE.CircleGeometry(PIECE_R, 24)
@@ -162,10 +164,11 @@
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     _container.insertBefore(_renderer.domElement, _container.firstChild)
 
-    // HP bar overlay (absolute over canvas)
+    // Compact piece summary overlay (absolute over canvas)
     _hpLayer = document.createElement('div')
     _hpLayer.id = 'hpBarLayer3d'
-    _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:visible'
+    _hpLayer.className = 'piece-summary-layer-3d'
+    _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'
     _container.appendChild(_hpLayer)
 
     // Camera (orthographic, top-down)
@@ -194,7 +197,7 @@
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     _renderer.setSize(w, h, false)
     _updateCameraFrustum(w, h)
-    _updateHpBarPositions()
+    _updatePieceSummaryPositions()
   }
 
   function _updateCameraFrustum(w, h) {
@@ -288,6 +291,13 @@
         obj.group.position.set(piece.x, 0, piece.y)
       }
 
+      // Faction is snapshot-driven and can change without respawning the mesh.
+      if (obj.faction !== piece.faction) {
+        obj.faction = piece.faction
+        obj.body.material.color.setHex(FACTION_COLORS[piece.faction] || FACTION_COLORS.red)
+        obj.ring.material = getFactionMat(piece.faction)
+      }
+
       // Portrait texture (load once)
       if (!obj.portraitLoaded && piece.portraitId) {
         const tex = loadTexture(portraitUrl(piece.portraitId))
@@ -296,8 +306,8 @@
         obj.portraitLoaded = true
       }
 
-      // Update HP bar DOM element
-      _updateHpBar(obj, piece)
+      // Update the snapshot-driven piece summary.
+      _updatePieceSummary(obj, piece)
 
       // Show/hide based on alive
       obj.group.visible = piece.visible !== false
@@ -309,7 +319,7 @@
         _scene.remove(obj.group)
         if (obj.body.material && obj.body.material.dispose) obj.body.material.dispose()
         if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
-        if (obj.hpBarEl && obj.hpBarEl.parentNode) obj.hpBarEl.remove()
+        if (obj.summaryEl && obj.summaryEl.parentNode) obj.summaryEl.remove()
         _pieceObjects.delete(id)
       }
     })
@@ -390,61 +400,105 @@
     ring.position.y = TILE_H / 2 + 0.02
     group.add(ring)
 
-    // HP bar div
-    const hpBarEl = _createHpBarEl(piece)
+    // Compact health and negative-status summary.
+    const summaryEl = _createPieceSummaryEl(piece)
 
     _scene.add(group)
     _pieceObjects.set(piece.id, {
       group, body, ring, portraitMesh,
-      hpBarEl,
+      summaryEl,
+      faction,
       portraitLoaded: false,
       animating: false,
       targetX: piece.x, targetZ: piece.y,
     })
   }
 
-  // ── HP Bar overlay ────────────────────────────────────────────────────────────
-  function _createHpBarEl(piece) {
+  // ── Piece summary overlay ─────────────────────────────────────────────────────
+  function _createPieceSummaryEl(piece) {
     const wrap = document.createElement('div')
-    wrap.style.cssText = `
-      position:absolute; transform:translateX(-50%);
-      width:36px; pointer-events:none;
-      display:flex; flex-direction:column; align-items:center; gap:1px;
-    `
-    const bar = document.createElement('div')
-    bar.style.cssText = 'width:100%;height:4px;background:#1e293b;border-radius:2px;overflow:hidden'
-    const fill = document.createElement('div')
-    fill.style.cssText = 'height:100%;background:#22c55e;transition:width .2s;border-radius:2px'
-    bar.appendChild(fill)
-    wrap.appendChild(bar)
-    wrap.dataset.id = piece.id
+    wrap.className = 'piece-board-summary'
+    wrap.dataset.pieceId = piece.id
+
+    const health = document.createElement('span')
+    health.className = 'piece-board-health'
+    const statuses = document.createElement('span')
+    statuses.className = 'piece-board-statuses'
+    statuses.hidden = true
+    wrap.appendChild(health)
+    wrap.appendChild(statuses)
     _hpLayer.appendChild(wrap)
     return wrap
   }
 
-  function _updateHpBar(obj, piece) {
-    if (!obj.hpBarEl) return
+  function _updatePieceSummary(obj, piece) {
+    if (!obj.summaryEl) return
     const currentHp = piece.health ? piece.health.current : 0
     const maxHp = piece.health ? piece.health.max : 1
-    const pct = Math.max(0, Math.min(100, Math.round(currentHp / maxHp * 100)))
-    const fill = obj.hpBarEl.querySelector('div div')
-    if (fill) {
-      fill.style.width = pct + '%'
-      fill.style.background = pct < 30 ? '#ef4444' : pct < 60 ? '#f59e0b' : '#22c55e'
+    const health = obj.summaryEl.querySelector('.piece-board-health')
+    if (health) {
+      health.textContent = String(currentHp)
+      const ratio = currentHp / Math.max(1, maxHp)
+      health.dataset.level = ratio < 0.3 ? 'critical' : (ratio < 0.6 ? 'low' : 'healthy')
     }
-    obj.hpBarEl.style.display = piece.visible !== false ? '' : 'none'
+
+    const presentation = window.BattleStatusPresentation
+    const summary = presentation
+      ? presentation.boardSummary(piece.statusSummary || [])
+      : (piece.statusSummary || []).slice(0, 2).map(status => ({ status, meta: { color: '#a78bfa' } }))
+    const statuses = obj.summaryEl.querySelector('.piece-board-statuses')
+    if (statuses) {
+      statuses.replaceChildren()
+      summary.forEach(function (entry) {
+        const dot = document.createElement('span')
+        dot.className = 'piece-board-status-dot'
+        dot.style.setProperty('--status-color', entry.meta.color)
+        dot.dataset.statusId = entry.status.id || ''
+        dot.title = entry.status.label || entry.status.id || ''
+        statuses.appendChild(dot)
+      })
+      statuses.hidden = summary.length === 0
+    }
+
+    const statusNames = summary.map(function (entry) { return entry.status.label || entry.status.id }).filter(Boolean)
+    const accessible = (piece.name || piece.id) + '\uff0c\u751f\u547d ' + currentHp + ' / ' + maxHp
+      + (statusNames.length ? '\uff0c\u8d1f\u9762\u72b6\u6001 ' + statusNames.join('\u3001') : '')
+    obj.summaryEl.dataset.health = currentHp + '/' + maxHp
+    obj.summaryEl.dataset.statusCount = String(summary.length)
+    obj.summaryEl.dataset.statusIds = summary.map(function (entry) { return entry.status.id || '' }).join(',')
+    obj.summaryEl.setAttribute('aria-label', accessible)
+    obj.summaryEl.title = accessible
+    obj.summaryEl.style.display = piece.visible !== false ? '' : 'none'
   }
 
-  function _updateHpBarPositions() {
+  function _projectedCellSpan(x, y) {
+    const center = projectCell(x, y, TILE_H / 2)
+    if (!center) return 36
+    const horizontal = projectCell(x + 1, y, TILE_H / 2)
+    const vertical = projectCell(x, y + 1, TILE_H / 2)
+    const distances = [horizontal, vertical].filter(Boolean).map(function (point) {
+      const dx = point.left - center.left
+      const dy = point.top - center.top
+      return Math.sqrt(dx * dx + dy * dy)
+    })
+    return distances.length ? Math.min.apply(Math, distances) : 36
+  }
+
+  function _updatePieceSummaryPositions() {
     if (!_camera || !_renderer) return
 
     _pieceObjects.forEach(obj => {
-      if (!obj.hpBarEl || !obj.group.visible) { if (obj.hpBarEl) obj.hpBarEl.style.display = 'none'; return }
-      const projected = projectCell(obj.group.position.x, obj.group.position.z, TILE_H / 2 + PIECE_H + 0.1)
+      if (!obj.summaryEl || !obj.group.visible) { if (obj.summaryEl) obj.summaryEl.style.display = 'none'; return }
+      const x = obj.group.position.x
+      const y = obj.group.position.z
+      const projected = projectCell(x, y, TILE_H / 2 + PIECE_H + 0.1)
       if (!projected) return
-      obj.hpBarEl.style.left = projected.left + 'px'
-      obj.hpBarEl.style.top  = (projected.top - 6) + 'px'
-      obj.hpBarEl.style.display = ''
+      const cellSpan = _projectedCellSpan(x, y)
+      const scale = Math.max(0.36, Math.min(1, cellSpan / 38))
+      obj.summaryEl.style.setProperty('--piece-summary-scale', scale.toFixed(3))
+      obj.summaryEl.style.left = projected.left + 'px'
+      obj.summaryEl.style.top = (projected.top + Math.max(3, cellSpan * 0.28)) + 'px'
+      obj.summaryEl.style.display = ''
     })
   }
 
@@ -466,7 +520,8 @@
         const ring = new THREE.Mesh(_selectedRingGeom, getHlMat('selected'))
         ring.rotation.x = Math.PI / 2
         ring.position.copy(obj.group.position)
-        ring.position.y = TILE_H / 2 + 0.01
+        ring.position.y = TILE_H / 2 + 0.04
+        ring.renderOrder = 5
         _scene.add(ring)
         _hlObjects.selected = ring
       }
@@ -550,7 +605,7 @@
         if (t >= 1) { a.obj.group.visible = false; _anims.splice(i, 1) }
       }
     }
-    _updateHpBarPositions()
+    _updatePieceSummaryPositions()
   }
 
   function _ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t }
@@ -654,7 +709,7 @@
   function _applyZoom(z) {
     _camera.zoom = Math.max(0.4, Math.min(5, z))
     _camera.updateProjectionMatrix()
-    _updateHpBarPositions()
+    _updatePieceSummaryPositions()
   }
 
   function _resetCamera() {
