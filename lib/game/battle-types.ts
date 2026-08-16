@@ -68,6 +68,23 @@ export interface BattleActionLog {
   }
 }
 
+export interface DeploymentPosition {
+  x: number
+  y: number
+}
+
+export interface DeploymentChoice {
+  pieceId: string | null
+}
+
+export interface DeploymentState {
+  status: 'awaiting-choices' | 'complete'
+  playerIds: PlayerId[]
+  choices: Record<PlayerId, DeploymentChoice>
+  initialPositions: Record<string, DeploymentPosition>
+  finalPositions?: Record<string, DeploymentPosition>
+}
+
 export interface BattleState {
   map: BoardMap
   pieces: PieceInstance[]
@@ -80,6 +97,8 @@ export interface BattleState {
   /** 两个玩家的资源状态（充能点等） */
   players: PlayerTurnMeta[]
   turn: TurnState
+  /** RED-29 同时部署状态；完成前普通战斗命令均被拒绝。 */
+  deployment?: DeploymentState
   /** 战斗日志 */
   actions?: BattleActionLog[]
   /** 毒素列表 - 存放黑百合等技能放置的毒素 */
@@ -120,6 +139,12 @@ type TargetedActionFields = TargetSelectionCredential & {
 
 export type BattleAction =
   | { type: "beginPhase" } // 用于从 start -> action 或 end -> 下个回合的 start
+  | {
+      type: "deploymentChoice"
+      playerId: PlayerId
+      pieceId?: string | null
+      clientActionId?: string
+    }
   | {
       type: "move"
       playerId: PlayerId

@@ -62,7 +62,15 @@ describe('battle piece health and negative-status summary', () => {
     const board = statusPresentation.boardSummary(details)
 
     expect(details).toHaveLength(5)
-    expect(Object.keys(details[0]).sort()).toEqual(['duration', 'id', 'label', 'stacks'])
+    expect(details[0]).toMatchObject({
+      id: 'bleeding-1',
+      label: 'Bleeding',
+      stacks: 3,
+      duration: 2,
+      description: '',
+      uses: 0,
+      intensity: 0,
+    })
     expect(details.map((status: { duration: number }) => status.duration)).toEqual([2, 2, 3, 2, 1])
     expect(board.map((entry: { status: { id: string } }) => entry.status.id)).toEqual(['sleep-1', 'freeze-1'])
     expect(board).toHaveLength(statusPresentation.MAX_BOARD_STATUSES)

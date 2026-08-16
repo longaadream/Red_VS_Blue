@@ -91,9 +91,13 @@
     const parts = []
     const stacks = Number(status && status.stacks)
     const duration = durationValue(status)
+    const uses = Number(status && status.uses)
+    const intensity = Number(status && status.intensity)
     if (Number.isFinite(stacks) && stacks > 0) parts.push(stacks + '层')
     if (duration < 0) parts.push('持续：永久')
     else if (duration > 0) parts.push('剩余：' + duration + '回合')
+    if (Number.isFinite(uses) && uses > 0) parts.push('剩余：' + uses + '次')
+    if (Number.isFinite(intensity) && intensity > 0 && intensity !== 1) parts.push('强度：' + intensity)
     return parts.join(' · ')
   }
 

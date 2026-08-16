@@ -1,0 +1,279 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, expect, it, vi } from 'vitest'
+
+import { buildInitialPiecesForPlayers } from '@/lib/game/battle-setup'
+import { recordBattleInitialization, runBattleAction } from '@/lib/game/battle-runner'
+import type { BoardMap } from '@/lib/game/map'
+import type { PieceTemplate } from '@/lib/game/piece'
+import { RANDOM_STREAM_NAMES, RuleRuntime } from '@/lib/game/rule-runtime'
+import { summonPiece } from '@/lib/game/turn'
+import { makeState } from '../helpers/minimal-state'
+
+const PLAYERS = ['player-red', 'player-blue'] as const
+
+function makeDeploymentMap(): BoardMap {
+  const tiles: BoardMap['tiles'] = []
+  for (let y = 0; y < 5; y += 1) {
+    for (let x = 0; x < 8; x += 1) {
+      const type = x === 7 && y === 4 ? 'cover' : 'floor'
+      tiles.push({
+        id: `tile-${x}-${y}`,
+        x,
+        y,
+        props: {
+          type,
+          walkable: true,
+          bulletPassable: type === 'floor',
+        },
+      })
+    }
+  }
+  return { id: 'large-hole-arena', name: 'Large Hole Arena', width: 8, height: 5, tiles, rules: [] }
+}
+
+function makeTemplates(prefix: string): PieceTemplate[] {
+  return Array.from({ length: 8 }, (_, index) => ({
+    id: `${prefix}-${index + 1}`,
+    name: `${prefix} ${index + 1}`,
+    faction: prefix === 'red' ? 'good' : 'evil',
+    rarity: 'common',
+    stats: { maxHp: 100, attack: 10, defense: 0, moveRange: 3 },
+    skills: [],
+  }))
+}
+
+function buildDeployment(seed: number, reversePlayers = false) {
+  const map = makeDeploymentMap()
+  const red = makeTemplates('red')
+  const blue = makeTemplates('blue')
+  const runtime = new RuleRuntime({ rootSeed: seed })
+  const playerIds = reversePlayers ? [...PLAYERS].reverse() : [...PLAYERS]
+  const selections = reversePlayers
+    ? [
+        { playerId: PLAYERS[1], pieces: blue, faction: 'red' as const },
+        { playerId: PLAYERS[0], pieces: red, faction: 'blue' as const },
+      ]
+    : [
+        { playerId: PLAYERS[0], pieces: red, faction: 'red' as const },
+        { playerId: PLAYERS[1], pieces: blue, faction: 'blue' as const },
+      ]
+  const pieces = buildInitialPiecesForPlayers(
+    map,
+    playerIds,
+    [...red, ...blue],
+    selections,
+    () => runtime.nextRandom(RANDOM_STREAM_NAMES.deployment),
+    { deterministicDeployment: true },
+  )
+  return { map, pieces, runtime }
+}
+
+function positions(pieces: Array<{ instanceId: string; x: number | null; y: number | null }>) {
+  return Object.fromEntries(
+    [...pieces]
+      .sort((left, right) => left.instanceId.localeCompare(right.instanceId))
+      .map(piece => [piece.instanceId, [piece.x, piece.y]]),
+  )
+}
+
+function makeDeploymentState(seed = 2029) {
+  const { map, pieces, runtime } = buildDeployment(seed)
+  const state = makeState({ pieces: pieces as any, phase: 'start' }) as any
+  state.map = map
+  state.gameStartFired = false
+  state.deployment = {
+    status: 'awaiting-choices',
+    playerIds: [...PLAYERS].sort(),
+    choices: {},
+    initialPositions: Object.fromEntries(pieces.map(piece => [
+      piece.instanceId,
+      { x: piece.x, y: piece.y },
+    ])),
+  }
+  recordBattleInitialization(state, runtime, [...PLAYERS].sort())
+  return state
+}
+
+describe('RED-29 deterministic deployment', () => {
+  it('allocates sixteen unique core pieces on ordinary floor with a frozen cursor count', () => {
+    const { map, pieces, runtime } = buildDeployment(0x12345678)
+
+    expect(pieces).toHaveLength(16)
+    expect(new Set(pieces.map(piece => `${piece.x},${piece.y}`)).size).toBe(16)
+    expect(pieces.every(piece => piece.isCore === true)).toBe(true)
+    expect(pieces.filter(piece => piece.ownerPlayerId === PLAYERS[0])).toHaveLength(8)
+    expect(pieces.filter(piece => piece.ownerPlayerId === PLAYERS[1])).toHaveLength(8)
+    expect(pieces.every(piece => map.tiles.some(tile => (
+      tile.x === piece.x
+      && tile.y === piece.y
+      && tile.props.walkable === true
+      && tile.props.type === 'floor'
+    )))).toBe(true)
+    expect(runtime.getCursor(RANDOM_STREAM_NAMES.deployment)).toBe(16)
+    expect(positions(pieces)).toEqual({
+      'player-blue-1': [3, 3], 'player-blue-2': [3, 2], 'player-blue-3': [4, 4], 'player-blue-4': [2, 4],
+      'player-blue-5': [1, 2], 'player-blue-6': [5, 0], 'player-blue-7': [0, 2], 'player-blue-8': [6, 1],
+      'player-red-1': [1, 4], 'player-red-2': [6, 3], 'player-red-3': [2, 3], 'player-red-4': [3, 1],
+      'player-red-5': [0, 1], 'player-red-6': [6, 0], 'player-red-7': [4, 3], 'player-red-8': [2, 0],
+    })
+  })
+
+  it('is stable across player/seat array order and changes with the root seed', () => {
+    expect(positions(buildDeployment(77).pieces)).toEqual(positions(buildDeployment(77, true).pieces))
+    expect(positions(buildDeployment(77).pieces)).not.toEqual(positions(buildDeployment(78).pieces))
+  })
+
+  it('fails closed on the filename-style map ID before consuming deployment random', () => {
+    const map = { ...makeDeploymentMap(), id: 'large-trap-arena' }
+    const red = makeTemplates('red')
+    const blue = makeTemplates('blue')
+    const runtime = new RuleRuntime({ rootSeed: 91 })
+
+    expect(() => buildInitialPiecesForPlayers(
+      map,
+      [...PLAYERS],
+      [...red, ...blue],
+      [
+        { playerId: PLAYERS[0], pieces: red, faction: 'red' },
+        { playerId: PLAYERS[1], pieces: blue, faction: 'blue' },
+      ],
+      () => runtime.nextRandom(RANDOM_STREAM_NAMES.deployment),
+      { deterministicDeployment: true },
+    )).toThrow('large-hole-arena')
+    expect(runtime.getCursor(RANDOM_STREAM_NAMES.deployment)).toBe(0)
+  })
+
+  it('records initial positions and the fixed deployment cursor in initialization trace', () => {
+    const state = makeDeploymentState()
+    const initialization = state.extensions.debugBattle.actionLog[0]
+
+    expect(initialization.deployment.initialPositions).toEqual(state.deployment.initialPositions)
+    expect(initialization.randomStreams).toContainEqual(expect.objectContaining({
+      name: RANDOM_STREAM_NAMES.deployment,
+      startCursor: 0,
+      endCursor: 16,
+    }))
+  })
+
+  it('resolves both choices only after both submit and is independent of submission order', () => {
+    const initial = makeDeploymentState()
+    const redPiece = initial.pieces.find((piece: any) => piece.ownerPlayerId === PLAYERS[0])
+    const bluePiece = initial.pieces.find((piece: any) => piece.ownerPlayerId === PLAYERS[1])
+    const before = positions(initial.pieces)
+
+    const redFirst = runBattleAction(initial, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: redPiece.instanceId, clientActionId: 'red-choice',
+    } as any, { rootSeed: 2029 })
+    expect(positions(redFirst.state.pieces)).toEqual(before)
+    expect((redFirst.state as any).deployment.status).toBe('awaiting-choices')
+
+    const redThenBlue = runBattleAction(redFirst.state, {
+      type: 'deploymentChoice', playerId: PLAYERS[1], pieceId: bluePiece.instanceId, clientActionId: 'blue-choice',
+    } as any, { rootSeed: 2029 })
+
+    const blueFirst = runBattleAction(initial, {
+      type: 'deploymentChoice', playerId: PLAYERS[1], pieceId: bluePiece.instanceId, clientActionId: 'blue-choice',
+    } as any, { rootSeed: 2029 })
+    const blueThenRed = runBattleAction(blueFirst.state, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: redPiece.instanceId, clientActionId: 'red-choice',
+    } as any, { rootSeed: 2029 })
+
+    expect(positions(redThenBlue.state.pieces)).toEqual(positions(blueThenRed.state.pieces))
+    expect((redThenBlue.state as any).deployment.status).toBe('complete')
+    expect((redThenBlue.state as any).gameStartFired).toBe(true)
+    expect((redThenBlue.state as any).turn.phase).toBe('action')
+    expect(positions(redThenBlue.state.pieces)[redPiece.instanceId]).not.toEqual(before[redPiece.instanceId])
+    expect(positions(redThenBlue.state.pieces)[bluePiece.instanceId]).not.toEqual(before[bluePiece.instanceId])
+    expect(redThenBlue.trace?.randomStreams).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: `deployment-reroll/${PLAYERS[0]}`, startCursor: 0, endCursor: 1 }),
+      expect.objectContaining({ name: `deployment-reroll/${PLAYERS[1]}`, startCursor: 0, endCursor: 1 }),
+    ]))
+    expect(redThenBlue.trace?.deployment).toMatchObject({
+      choices: {
+        [PLAYERS[0]]: { pieceId: redPiece.instanceId },
+        [PLAYERS[1]]: { pieceId: bluePiece.instanceId },
+      },
+      finalPositions: expect.any(Object),
+    })
+    expect(positions(redThenBlue.state.pieces)).toEqual({
+      'player-blue-1': [2, 1], 'player-blue-2': [1, 4], 'player-blue-3': [3, 4], 'player-blue-4': [0, 3],
+      'player-blue-5': [0, 4], 'player-blue-6': [4, 2], 'player-blue-7': [6, 3], 'player-blue-8': [3, 3],
+      'player-red-1': [1, 0], 'player-red-2': [6, 0], 'player-red-3': [4, 1], 'player-red-4': [5, 3],
+      'player-red-5': [5, 2], 'player-red-6': [6, 1], 'player-red-7': [2, 2], 'player-red-8': [3, 2],
+    })
+  })
+
+  it('supports keeping all pieces without consuming a reroll stream', () => {
+    const initial = makeDeploymentState()
+    const red = runBattleAction(initial, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: null, clientActionId: 'red-keep',
+    } as any, { rootSeed: 2029 })
+    const complete = runBattleAction(red.state, {
+      type: 'deploymentChoice', playerId: PLAYERS[1], pieceId: null, clientActionId: 'blue-keep',
+    } as any, { rootSeed: 2029 })
+
+    expect(positions(complete.state.pieces)).toEqual(positions(initial.pieces))
+    expect(complete.trace?.randomStreams.some(stream => stream.name.startsWith('deployment-reroll/'))).toBe(false)
+  })
+
+  it.each([
+    ['unknown', () => 'missing-piece'],
+    ['enemy', (state: any) => state.pieces.find((piece: any) => piece.ownerPlayerId === PLAYERS[1]).instanceId],
+    ['summon', (state: any) => {
+      const summon = { ...state.pieces[0], instanceId: 'summon-1', isCore: false }
+      state.pieces.push(summon)
+      return summon.instanceId
+    }],
+    ['defeated', (state: any) => {
+      const piece = state.pieces.find((candidate: any) => candidate.ownerPlayerId === PLAYERS[0])
+      piece.currentHp = 0
+      return piece.instanceId
+    }],
+    ['multi-piece', (state: any) => state.pieces
+      .filter((piece: any) => piece.ownerPlayerId === PLAYERS[0])
+      .slice(0, 2)
+      .map((piece: any) => piece.instanceId)],
+  ])('rejects a %s piece atomically before random consumption', (_name, selectPiece) => {
+    const state = makeDeploymentState()
+    const pieceId = selectPiece(state)
+    const before = JSON.parse(JSON.stringify(state))
+
+    expect(() => runBattleAction(state, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId, clientActionId: 'invalid-choice',
+    } as any, { rootSeed: 2029 })).toThrow()
+    expect(state).toEqual(before)
+  })
+
+  it('rejects ordinary actions during deployment and deployment choices after completion', () => {
+    const initial = makeDeploymentState()
+    expect(() => runBattleAction(initial, { type: 'beginPhase', clientActionId: 'too-early' } as any, { rootSeed: 2029 })).toThrow()
+
+    const red = runBattleAction(initial, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: null, clientActionId: 'red-keep',
+    } as any, { rootSeed: 2029 })
+    const complete = runBattleAction(red.state, {
+      type: 'deploymentChoice', playerId: PLAYERS[1], pieceId: null, clientActionId: 'blue-keep',
+    } as any, { rootSeed: 2029 })
+    expect(() => runBattleAction(complete.state, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: null, clientActionId: 'late-choice',
+    } as any, { rootSeed: 2029 })).toThrow()
+  })
+
+  it('strips core identity from summons even if a factory accidentally copies it', () => {
+    const state = makeState({ pieces: [] }) as any
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const result = summonPiece(
+      state,
+      { templateId: 'summon', faction: 'red', ownerPlayerId: PLAYERS[0], x: 1, y: 1 },
+      () => ({ id: 'summon', rules: [] }),
+      () => ({
+        instanceId: 'summon-1', templateId: 'summon', name: 'Summon', ownerPlayerId: PLAYERS[0], faction: 'red',
+        currentHp: 1, maxHp: 1, attack: 0, defense: 0, x: 1, y: 1, moveRange: 1, skills: [], buffs: [], debuffs: [],
+        ruleTags: [], statusTags: [], rules: [], isCore: true,
+      } as any),
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.piece?.isCore).toBe(false)
+  })
+})

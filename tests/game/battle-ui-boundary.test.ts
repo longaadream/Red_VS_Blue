@@ -86,6 +86,130 @@ describe('battle presentation boundary', () => {
     })
   })
 
+  it('projects all visible selected-piece statuses and never carries the previous selection forward', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const baseSnapshot = fixtureSnapshot()
+    const snapshot = {
+      ...baseSnapshot,
+      pieces: [{
+        ...baseSnapshot.pieces[0],
+        buffs: [{ id: 'guard', name: 'Guard', currentDuration: 2, intensity: 1, visible: true }],
+        debuffs: [{ id: 'slow', name: 'Slow', remainingDuration: 1, stacks: 1, visible: true }],
+      }],
+    }
+
+    const selected = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'piece-red',
+      pieceTemplates: { 'red-warrior': { image: 'red-warrior.jpg' } },
+    })
+
+    expect(selected.selection.piece).toMatchObject({
+      id: 'piece-red',
+    })
+    expect(selected.selection.piece).not.toHaveProperty('portraitSrc')
+    expect(selected.selection.piece).not.toHaveProperty('stats')
+    expect(selected.selection.piece).not.toHaveProperty('readOnly')
+    expect(selected.selection.piece).not.toHaveProperty('skills')
+    expect(selected.selection.piece.statuses.map((status: { id: string }) => status.id)).toEqual([
+      'burn', 'guard', 'slow',
+    ])
+    expect(selected.selection.piece.statuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'guard', duration: 2, intensity: 1 }),
+      expect.objectContaining({ id: 'slow', duration: 1, stacks: 1 }),
+    ]))
+
+    const cleared = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'missing-piece',
+    })
+    expect(cleared.selection).toMatchObject({ pieceId: null, piece: null })
+  })
+
+  it('keeps enemy visible statuses readable without projecting duplicate skill details', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const baseSnapshot = fixtureSnapshot()
+    const snapshot = {
+      ...baseSnapshot,
+      pieces: [{
+        ...baseSnapshot.pieces[0],
+        ownerPlayerId: 'player-blue',
+        debuffs: [{ id: 'slow', name: 'Slow', remainingDuration: 1, visible: true }],
+      }],
+    }
+
+    const model = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'piece-red',
+    })
+
+    expect(model.selection.piece).toMatchObject({ name: 'Red Warrior' })
+    expect(model.selection.piece.statuses.map((status: { id: string }) => status.id)).toEqual(['burn', 'slow'])
+    expect(model.selection.piece).not.toHaveProperty('skills')
+  })
+
+  it('renders only special statuses and clears stale status content through the DOM boundary', () => {
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const selectedPieceStatus = {
+      className: '',
+      textContent: '',
+      innerHTML: '',
+      dataset: {},
+      setAttribute: vi.fn(),
+      querySelectorAll: vi.fn(() => []),
+    }
+    const document = {
+      getElementById: vi.fn((id: string) => id === 'selectedPieceStatus' ? selectedPieceStatus : null),
+    }
+    const ui = domUi.create({ document })
+    const model = {
+      selection: {
+        mode: 'inspect',
+        piece: {
+          id: 'piece-red', name: 'Red Warrior', portraitSrc: 'images/red-warrior.jpg', readOnly: false,
+          health: { current: 8, max: 10 }, stats: { attack: 4, defense: 2, moveRange: 3 },
+          statuses: [{
+            id: 'burn', label: 'Burn', description: 'Takes damage each turn.',
+            stacks: 2, duration: 3, uses: 0, intensity: 0,
+          }],
+          skills: [{
+            id: 'cooldown-skill', name: 'Cooling', description: 'Not ready.', icon: 'S',
+            kind: 'active', type: 'normal', actionCost: 1, chargeCost: 0,
+            cooldown: { current: 2, max: 3 }, available: false,
+            unavailableReason: '冷却中（剩余 2 回合）',
+          }],
+        },
+      },
+      turn: { currentPlayerId: 'player-red', isViewerTurn: true, number: 2, phase: 'action' },
+      players: [],
+      viewer: null,
+    }
+
+    ui.update(model)
+
+    expect(selectedPieceStatus.className).toContain('has-selection')
+    expect(selectedPieceStatus.innerHTML).toContain('特殊状态')
+    expect(selectedPieceStatus.innerHTML).toContain('Burn')
+    expect(selectedPieceStatus.innerHTML).toContain('2 层')
+    expect(selectedPieceStatus.innerHTML).toContain('剩余 3 回合')
+    expect(selectedPieceStatus.innerHTML).toContain('Takes damage each turn.')
+    expect(selectedPieceStatus.innerHTML).not.toContain('Red Warrior')
+    expect(selectedPieceStatus.innerHTML).not.toContain('生命')
+    expect(selectedPieceStatus.innerHTML).not.toContain('攻击')
+    expect(selectedPieceStatus.innerHTML).not.toContain('Cooling')
+    expect(selectedPieceStatus.innerHTML).not.toContain('selected-skill-item')
+    expect(selectedPieceStatus.setAttribute).toHaveBeenCalledWith('aria-label', '特殊状态，共 1 个')
+
+    model.selection.piece.statuses = []
+    ui.update(model)
+
+    expect(selectedPieceStatus.innerHTML).toContain('无特殊状态')
+    expect(selectedPieceStatus.innerHTML).not.toContain('Burn')
+  })
+
   it('sends the identical model to Three.js and DOM and owns repeatable mount/dispose', () => {
     const presentation = loadBrowserModule('js/battle-ui/battle-presentation.js', 'BattlePresentation')
     const renderer = {

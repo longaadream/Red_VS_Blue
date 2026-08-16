@@ -164,6 +164,7 @@ describe('battle page route contract', () => {
       },
       myPlayerId: 'training-red',
       TRAINING_MODE: true,
+      targetSubmissionPending: false,
       placingMode: true,
       pendingOptionSelectionForOther: () => false,
       document: {
@@ -189,5 +190,79 @@ describe('battle page route contract', () => {
     expect(JSON.parse(JSON.stringify(patches))).toEqual([
       { type: 'addPiece', ownerPlayerId: 'training-blue', templateId: 'ana', x: 2, y: 3 },
     ])
+  })
+
+  it('keeps target submission single-flight and clears transient targeting on every authoritative exit', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('function submitTargetAction(action, label)')
+    expect(battlePage).toMatch(
+      /function submitTargetAction\(action, label\) \{\s*if \(targetSubmissionPending\)/,
+    )
+    expect(battlePage).toContain('目标指令已提交，正在等待权威确认')
+    expect(battlePage).toContain("clearTargetInteraction('user-cancelled')")
+    expect(battlePage).toContain("clearTargetInteraction('piece-switched')")
+    expect(battlePage).toContain("clearTargetInteraction('turn-changed')")
+    expect(battlePage).toContain("clearTargetInteraction('selected-piece-unavailable')")
+    expect(battlePage).toContain("clearTargetInteraction('server-rejected')")
+    expect(battlePage).toContain('function reconcileBattleInteractionState(previousState, nextState)')
+  })
+
+  it('keeps the side rail status-only while preserving the existing right-click piece detail', () => {
+    const battlePage = readPage('battle.html')
+    const domUi = readPage('js/battle-ui/battle-dom-ui.js')
+
+    expect(domUi).toContain('特殊状态')
+    expect(domUi).toContain('无特殊状态')
+    expect(domUi).not.toContain('selected-detail-portrait')
+    expect(domUi).not.toContain('selected-detail-stats')
+    expect(domUi).not.toContain('selected-skill-list')
+    expect(domUi).not.toContain('data-skill-id')
+    expect(battlePage).toContain('function resolveSkillAvailability(piece, skillOrId)')
+    expect(battlePage).toMatch(
+      /function selectSkillCard[\s\S]*?resolveSkillAvailability\(sp, skId\)/,
+    )
+    expect(battlePage).not.toContain('detailPiece.skills')
+    expect(battlePage).toContain('oncontextmenu="event.preventDefault();dispatchBattleIntent({type:\'inspect-piece\'')
+    expect(battlePage).toContain('function showPieceInfo(instanceId, preserveKeyword)')
+    expect(battlePage).toContain('statsHtml + tagsHtml')
+    expect(battlePage).toContain('\`<div class="pi-section-label">技能</div>\` + skillsHtml')
+  })
+
+  it('exposes accessible target feedback and a mobile target mode that removes obstructing detail UI', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('<div id="statusMsg" role="status" aria-live="polite">')
+    expect(battlePage).toContain('<div id="targetOverlay" role="status" aria-live="polite">')
+    expect(battlePage).toContain('id="targetSourceName"')
+    expect(battlePage).toContain('id="targetCancelButton"')
+    expect(battlePage).toContain('.board-side-rail.target-mode { display: none; }')
+    expect(battlePage).toContain('body.target-mode-active #skillBar')
+    expect(battlePage).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(battlePage).toContain('button:focus-visible')
+  })
+
+  it('keeps skill availability feedback in the existing skill operation area', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('sk-unavailable-reason')
+    expect(battlePage).toContain('#skillBar:not(:empty)')
+    expect(battlePage).not.toMatch(/^\s*#skillBar \{ display: none !important; \}/m)
+    for (const reason of ['冷却中', '可用次数已耗尽', '行动点不足', '充能点不足']) {
+      expect(battlePage).toContain(reason)
+    }
+  })
+
+  it('requires landscape play on phones and reserves usable space at both mobile acceptance sizes', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('id="orientationGuard"')
+    expect(battlePage).toContain('请旋转设备')
+    expect(battlePage).toContain('@media (orientation: portrait) and (max-width: 760px)')
+    expect(battlePage).toContain('@media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px)')
+    expect(battlePage).toContain('--mobile-landscape-min: 844px')
+    expect(battlePage).toContain('--mobile-landscape-recommended: 932px')
+    expect(battlePage).toContain('.board-side-rail.target-mode')
+    expect(battlePage).toContain('body.target-mode-active #statusMsg')
   })
 })

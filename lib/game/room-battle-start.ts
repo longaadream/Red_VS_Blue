@@ -6,7 +6,7 @@ import { assertDemoRostersReady, type RosterRoomStore } from './roster-contract'
 import { getPlayerSeat, type Room } from './room-store'
 import { createRootSeed } from './rule-runtime'
 
-export const DEMO_FIXED_MAP_ID = 'large-trap-arena'
+export const DEMO_FIXED_MAP_ID = 'large-hole-arena'
 
 export interface StartLockedRosterBattleResult {
   room: Room
@@ -34,6 +34,7 @@ export async function startBattleFromLockedRosters(
       playerId: player.id,
       pieces: (player.selectedPieces ?? []).map(piece => getPieceById(piece.templateId)!),
       faction: getPlayerSeat(player),
+      alignment: player.alignment,
     }))
     const pieceTemplates = playerSelectedPieces.flatMap(player => player.pieces)
     const seed = createRootSeed()
@@ -42,22 +43,29 @@ export async function startBattleFromLockedRosters(
       pieceTemplates,
       playerSelectedPieces,
       DEMO_FIXED_MAP_ID,
-      { rootSeed: seed },
+      { rootSeed: seed, deploymentEnabled: true },
     )
     if (!battle) throw new Error('Failed to initialize battle state')
 
-    let initState = battle
-    try {
-      initState = runBattleAction(battle, { type: 'beginPhase' }, { rootSeed: seed }).state
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      throw new Error('Failed to init battle phase: ' + message)
+    // Bots have no deployment UI. Submit the same keep-all command used by a
+    // human client so PVE still goes through the authoritative deployment
+    // state machine and waits only for the human choice.
+    let initialState = battle
+    for (const bot of roomPlayers
+      .filter(player => player.isBot === true || player.id === 'bot')
+      .sort((left, right) => left.id.localeCompare(right.id))) {
+      initialState = runBattleAction(initialState, {
+        type: 'deploymentChoice',
+        playerId: bot.id,
+        pieceId: null,
+        clientActionId: `system-deployment-keep:${bot.id}`,
+      }, { rootSeed: seed }).state
     }
 
     // The battle setup is the sole authority for turn order.  It draws from
     // the root seed's turn-order stream, so neither seat, join order, nor a
     // client request can choose the first player.
-    const firstPlayerId = initState.turn.currentPlayerId
+    const firstPlayerId = initialState.turn.currentPlayerId
 
     const nextRoom: Room = {
       ...room,
@@ -68,7 +76,7 @@ export async function startBattleFromLockedRosters(
       battleState: {
         type: 'server-state',
         seed,
-        state: withoutServerSkills(initState),
+        state: withoutServerSkills(initialState),
       } as unknown as Room['battleState'],
     }
 
