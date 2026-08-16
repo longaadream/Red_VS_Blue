@@ -122,6 +122,10 @@ export function runBattleAction(
       preStateHash,
       postStateHash,
       randomStreams: runtime?.randomTrace(true) ?? [],
+      deployment: action.type === 'deploymentChoice' && next.deployment ? {
+        choices: copyDeploymentChoices(next.deployment.choices),
+        finalPositions: copyDeploymentPositions(next.deployment.finalPositions),
+      } : undefined,
     }
     nextMetadata.actionLog.push(trace)
 
@@ -141,6 +145,23 @@ export function runBattleAction(
     })
     throw decorateRuleError(error, runtime, state, action, actionId)
   }
+}
+
+function copyDeploymentChoices(
+  choices: Record<string, { pieceId: string | null }>,
+): Record<string, { pieceId: string | null }> {
+  return Object.fromEntries(
+    Object.entries(choices).map(([playerId, choice]) => [playerId, { pieceId: choice.pieceId }]),
+  )
+}
+
+function copyDeploymentPositions(
+  positions: Record<string, { x: number; y: number }> | undefined,
+): Record<string, { x: number; y: number }> | undefined {
+  if (!positions) return undefined
+  return Object.fromEntries(
+    Object.entries(positions).map(([pieceId, position]) => [pieceId, { ...position }]),
+  )
 }
 
 export function replayBattle(input: BattleReplayInput): BattleReplayResult {

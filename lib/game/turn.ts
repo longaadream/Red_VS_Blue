@@ -28,7 +28,13 @@ import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction
 import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
-import { getRuleDate, getRuleMath, withRuleRuntimeCheckpoint } from "./rule-runtime"
+import {
+  RANDOM_STREAM_NAMES,
+  getActiveRuleRuntime,
+  getRuleDate,
+  getRuleMath,
+  withRuleRuntimeCheckpoint,
+} from "./rule-runtime"
 import { getNormalMoveRejection, manhattanDistance } from "./spatial"
 import {
   TargetingRuleError,
@@ -218,6 +224,23 @@ export interface BattleActionLog {
   }
 }
 
+export interface DeploymentPosition {
+  x: number
+  y: number
+}
+
+export interface DeploymentChoice {
+  pieceId: string | null
+}
+
+export interface DeploymentState {
+  status: 'awaiting-choices' | 'complete'
+  playerIds: PlayerId[]
+  choices: Record<PlayerId, DeploymentChoice>
+  initialPositions: Record<string, DeploymentPosition>
+  finalPositions?: Record<string, DeploymentPosition>
+}
+
 export interface BattleState {
   map: BoardMap
   pieces: PieceInstance[]
@@ -230,6 +253,8 @@ export interface BattleState {
   /** 两个玩家的资源状态（充能点等） */
   players: PlayerTurnMeta[]
   turn: TurnState
+  /** RED-29 同时部署状态；完成前普通战斗命令均被拒绝。 */
+  deployment?: DeploymentState
   /** 战斗日志 */
   actions?: BattleActionLog[]
   /** 扩展数据 - 角色特定的数据存储在这里 */
@@ -264,6 +289,12 @@ type TargetedActionFields = TargetSelectionCredential & {
 
 export type BattleAction =
   | { type: "beginPhase" } // 用于从 start -> action 或 end -> 下个回合的 start
+  | {
+      type: "deploymentChoice"
+      playerId: PlayerId
+      pieceId?: string | null
+      clientActionId?: string
+    }
   | {
       type: "move"
       playerId: PlayerId
@@ -338,6 +369,54 @@ function getPlayerMeta(state: BattleState, playerId: PlayerId): PlayerTurnMeta {
 function isCurrentPlayer(state: BattleState, playerId: PlayerId): boolean {
   // 使用大小写不敏感的比较
   return state.turn.currentPlayerId.toLowerCase() === playerId.toLowerCase()
+}
+
+function normalizeStablePlayerId(playerId: string): string {
+  return playerId.trim().toLowerCase()
+}
+
+function compareStableText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
+function resolveDeploymentChoices(state: BattleState, deployment: DeploymentState): void {
+  const runtime = getActiveRuleRuntime()
+  if (!runtime) throw new BattleRuleError('Deployment resolution requires a deterministic rule runtime')
+
+  for (const playerId of [...deployment.playerIds].sort(compareStableText)) {
+    const pieceId = deployment.choices[playerId]?.pieceId
+    if (!pieceId) continue
+
+    const piece = state.pieces.find(candidate => candidate.instanceId === pieceId)
+    if (!piece || piece.x === null || piece.y === null) {
+      throw new BattleRuleError(`Deployment piece ${pieceId} is unavailable during resolution`)
+    }
+    const original = deployment.initialPositions[pieceId]
+    if (!original) throw new BattleRuleError(`Deployment piece ${pieceId} has no initial position`)
+
+    const occupied = new Set(state.pieces
+      .filter(candidate => candidate.currentHp > 0 && candidate.instanceId !== pieceId && candidate.x !== null && candidate.y !== null)
+      .map(candidate => `${candidate.x},${candidate.y}`))
+    const candidates = state.map.tiles
+      .filter(tile => (
+        tile.props.walkable === true
+        && tile.props.type === 'floor'
+        && (tile.x !== original.x || tile.y !== original.y)
+        && !occupied.has(`${tile.x},${tile.y}`)
+      ))
+      .sort((left, right) => left.y - right.y || left.x - right.x)
+    if (candidates.length === 0) throw new BattleRuleError(`No legal reroll position exists for ${pieceId}`)
+
+    const streamName = `${RANDOM_STREAM_NAMES.deploymentReroll}/${playerId}`
+    const target = candidates[runtime.nextInt(streamName, candidates.length)]
+    piece.x = target.x
+    piece.y = target.y
+  }
+
+  deployment.status = 'complete'
+  deployment.finalPositions = Object.fromEntries(state.pieces
+    .filter(piece => piece.isCore === true && piece.x !== null && piece.y !== null)
+    .map(piece => [piece.instanceId, { x: piece.x as number, y: piece.y as number }]))
 }
 
 // 辅助函数：大小写不敏感地比较两个玩家ID
@@ -778,6 +857,10 @@ function applyBattleActionInternal(
     )
   }
 
+  if (state.deployment?.status === 'awaiting-choices' && action.type !== 'deploymentChoice') {
+    throw new BattleRuleError('Battle actions are unavailable until deployment is complete')
+  }
+
   // RED-59: all target discovery and final target validation happen before
   // cloning, triggers, payment, logging, or effect execution.
   assertActionTargetingReady(state, action)
@@ -867,6 +950,46 @@ function applyBattleActionInternal(
   }
 
   switch (action.type) {
+    case "deploymentChoice": {
+      const next = safeCloneBattleState(state)
+      const deployment = next.deployment
+      if (!deployment || deployment.status !== 'awaiting-choices') {
+        throw new BattleRuleError('Deployment choice is only available during deployment')
+      }
+      const playerId = normalizeStablePlayerId(action.playerId)
+      const stablePlayerId = deployment.playerIds.find(candidate => normalizeStablePlayerId(candidate) === playerId)
+      if (!stablePlayerId) throw new BattleRuleError('Player is not part of this deployment')
+      if (deployment.choices[stablePlayerId]) throw new BattleRuleError('Player has already submitted a deployment choice')
+      if (action.pieceId !== undefined && action.pieceId !== null && typeof action.pieceId !== 'string') {
+        throw new BattleRuleError('Deployment choice accepts at most one piece ID')
+      }
+
+      const pieceId = typeof action.pieceId === 'string' && action.pieceId.trim()
+        ? action.pieceId.trim()
+        : null
+      if (pieceId) {
+        const piece = next.pieces.find(candidate => candidate.instanceId === pieceId)
+        if (!piece) throw new BattleRuleError('Deployment piece was not found')
+        if (normalizeStablePlayerId(piece.ownerPlayerId) !== playerId) {
+          throw new BattleRuleError('Deployment piece belongs to another player')
+        }
+        if (piece.isCore !== true) throw new BattleRuleError('Only a core piece may be rerolled')
+        if (piece.currentHp <= 0 || piece.x === null || piece.y === null) {
+          throw new BattleRuleError('A defeated or unplaced piece cannot be rerolled')
+        }
+      }
+
+      deployment.choices[stablePlayerId] = { pieceId }
+      if (deployment.playerIds.every(candidate => deployment.choices[candidate])) {
+        resolveDeploymentChoices(next, deployment)
+        // Deployment replaces the old room-start beginPhase call. Once both
+        // choices resolve, enter the first action phase exactly once so
+        // gameStart/beginTurn effects remain delayed but cannot stall.
+        return applyBattleActionInternal(next, { type: 'beginPhase' })
+      }
+      return next
+    }
+
     case "beginPhase": {
       const next = safeCloneBattleState(state)
       writeLog('[beginPhase] Current phase: ' + next.turn.phase + ', gameStartFired: ' + next.gameStartFired + ', turnNumber: ' + next.turn.turnNumber)
@@ -2495,6 +2618,7 @@ export function summonPiece(
 
   // 创建棋子实例
   const newPiece = createPieceInstance(template, ownerPlayerId, faction, x, y, index)
+  newPiece.isCore = false
 
   // 将棋子添加到棋盘
   battle.pieces.push(newPiece)

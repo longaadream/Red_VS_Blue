@@ -102,6 +102,7 @@
 - [`ADR-0004-battle-presentation-boundary.md`](./ADR-0004-battle-presentation-boundary.md)：定义战场 Three.js、DOM HUD、展示模型与用户意图的单向边界（RED-48，提议中）。
 - [`ADR-0005-authoritative-target-selection.md`](./ADR-0005-authoritative-target-selection.md)：提议以纯查询、精确候选和版本凭证统一 UI、AI 与服务端目标语义（RED-59）。
 - [`ADR-0006-combat-trigger-ordering.md`](./ADR-0006-combat-trigger-ordering.md)：统一战斗触发器的跨类别稳定排序（RED-61，已接受）。
+- [`ADR-0007-deterministic-deployment.md`](./ADR-0007-deterministic-deployment.md)：固定全地图部署、核心身份与玩家独立重投流（RED-29，已接受）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

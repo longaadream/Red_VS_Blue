@@ -93,8 +93,8 @@ describe('authority determinism audit', () => {
     expect(mobileServer).toContain('if (trace) Object.assign(entry, trace)')
 
     const roomStart = read('lib/game/room-battle-start.ts')
-    expect(roomStart).toContain('{ rootSeed: seed }')
-    expect(roomStart).toContain('const firstPlayerId = initState.turn.currentPlayerId')
+    expect(roomStart).toContain('{ rootSeed: seed, deploymentEnabled: true }')
+    expect(roomStart).toContain('const firstPlayerId = initialState.turn.currentPlayerId')
     expect(roomStart).not.toContain('getPlayerSeat(player) === \'red\') || roomPlayers[0]')
 
     const battlePage = read(CROSS_PLATFORM_AUTHORITY_FILES.battlePage)
