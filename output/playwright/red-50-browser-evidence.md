@@ -51,16 +51,18 @@
 
 ## 最新 main 合并复验
 
-- 最终合入基线：`origin/main@0003730`（包含 PR #55 / RED-49 与 PR #59 / RED-70）。
+- 最终合入基线：`origin/main@12e1327`（继续包含 RED-49，并新增 RED-67 玩家阵营对齐、RED-72 战斗触发原子性、RED-29 确定性部署等主线改动）。
 - 三处文本冲突按职责合并：RED-49 负责棋盘生命/负面状态摘要与共享状态样式；RED-50 负责右侧纯特殊状态栏、技能操作区、目标反馈和移动横屏布局。
 - 合并回放发现并修复技能选择入口仍读取已移除的 `selection.piece.skills`；现在技能栏渲染与点击统一使用 `resolveSkillAvailability()`，右侧展示模型仍不携带技能。
 - 桌面 1280×720：左键选中后右栏为 0 状态空态，棋盘棋子显示生命数字；既有 `inspect-piece` 意图仍打开含生命、基础属性和 3 个技能的详情。
 - 844×390 目标态：状态栏与技能栏均为 `display: none`，棋盘扩展到 `844 × 390`，取消按钮尺寸 `90 × 26`，提交前命令数为 `0`。
 - 390×844：旋转层为 `display: grid`、`pointer-events: auto`、`z-index: 12000`，边界精确覆盖 `390 × 844`。
-- 直接回归：4 个文件、42 项测试通过；全量 Vitest 为 34 个文件、284 项测试通过。
-- TypeScript、541 个文本文件的编码检查、相关 ESLint 和相关文件 `diff --check` 均通过。
+- 与 `12e1327` 的唯一文本冲突位于 `applyServerState()`：保留主线 `playerAlignments` 快照同步，并在其后继续调用 RED-50 的 `reconcileBattleInteractionState()`。
+- 冲突直接回归：6 个文件、52 项测试通过；全量并行 Vitest 为 31/36 个文件、300/308 项通过，8 项失败均为 5 秒超时且没有断言差异。
+- 将 5 个超时文件改为单线程复跑后，5 个文件、36 项全部通过。TypeScript、543 个文本文件的编码检查、相关文件 ESLint 和 `diff --check` 均通过。
+- `tests/game/targeting.test.ts` 单独 ESLint 仍报告 14 个既有 `no-explicit-any`；逐行 blame 均来自已合入主线的 RED-59 提交，RED-50 在该文件只修改两条目标提交正则断言。
 
 ## Console
 
-- RED-50 状态栏与技能目标交互期间没有新增 Console error，也没有 `TypeError` 或 `ReferenceError`。
+- 在 `844 × 390` 真实浏览器中同时验证“暗 先手”阵营标签、纯特殊状态栏、技能可用性、进入目标模式与取消恢复；RED-50 交互期间没有新增 Console error，也没有 `TypeError` 或 `ReferenceError`。
 - 最新 main 的训练入口初始化时仍会请求缺失的 `evil-explosion.json`、favicon 等资源并产生 404；RED-50 相对 `origin/main` 不修改这些资源或运行时文件，建议另建 Linear 任务跟踪基线资源告警。

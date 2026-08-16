@@ -24,7 +24,6 @@ type PageContract = {
   getPieces: () => Piece[]
   loadPieces: () => Promise<void>
   pollRoomStatus: () => Promise<void>
-  setAlignment: (alignment: 'light' | 'dark') => Promise<void>
   setSelectedIds: (ids: string[]) => void
   updateFactionBadge: () => void
 }
@@ -135,7 +134,6 @@ function createHarness(options: {
     getPieces: () => PIECE_TEMPLATES,
     loadPieces,
     pollRoomStatus,
-    setAlignment,
     setSelectedIds: (ids) => { selectedIds = new Set(ids) },
     updateFactionBadge,
   }`, context)
@@ -193,11 +191,6 @@ describe('Electron piece-selection resource contract', () => {
     expect(harness.contract.getPieces().every(piece => piece.faction === 'good')).toBe(true)
     expect(harness.element('alignmentLightBtn').disabled).toBe(true)
     expect(harness.element('alignmentDarkBtn').disabled).toBe(true)
-
-    await harness.contract.setAlignment('dark')
-    expect(harness.contract.getPieces()).toHaveLength(lightPieces.length)
-    expect(harness.contract.getPieces().every(piece => piece.faction === 'good')).toBe(true)
-    expect(harness.alerts).toEqual(['阵营已在大厅锁定，无法在选棋阶段切换'])
     expect(harness.serverFetch).toHaveBeenCalledWith('/api/pieces', { timeoutMs: expect.any(Number) })
   })
 

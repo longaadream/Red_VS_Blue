@@ -42,12 +42,13 @@
 - 地图 ID。
 - 可选先手玩家。
 - 可选 `rootSeed`；权威入口必须在初始化前传入。
+- Demo 房间对局传入 `deploymentEnabled: true`，并固定使用地图状态 ID `large-hole-arena`。
 
 调用：地图加载、棋子创建、技能/规则加载、`globalTriggerSystem.clearRules()`、开局触发器。
 
 输出：`Promise<BattleState | null>`；玩家数不是两个时返回 `null`。
 
-状态变化：创建初始棋子、卡牌/资源/回合状态并注册规则。由于使用模块级触发器系统，该过程也会修改进程级状态。
+状态变化：创建初始棋子、卡牌/资源/回合状态并注册规则。Demo 房间对局的 16 枚初始棋子标记为核心棋子并进入 `deployment.status = "awaiting-choices"`；PVE 机器人通过同一权威命令自动选择保留全部，部署完成前不触发 `gameStart`。由于使用模块级触发器系统，该过程也会修改进程级状态。
 
 待确认：同一 Node 进程并行初始化多个房间时，清理全局触发器是否会影响其他房间。
 
@@ -72,6 +73,13 @@
 幂等边界：重复 client action ID 可以被标记为 `duplicate`；没有确认所有 UI、Relay 和 mobile 消息都稳定提供该 ID。
 
 ## 4. 回合与阶段
+
+Demo 房间对局在回合阶段前增加部署门禁：
+
+- `deploymentChoice` 只允许每名稳定玩家提交一次；空 `pieceId` 表示保留全部。
+- 双方选择齐备后才按稳定玩家顺序解析，使用 `deployment-reroll/<playerId>` 独立流。
+- 部署完成前所有普通战斗动作均失败且不推进随机 cursor；完成后的首个 `beginPhase` 才触发 `gameStart`。
+- 初始位置、选择、最终位置与流 cursor 记录在 Action Trace。冻结细节见 [`ADR-0007`](../decisions/ADR-0007-deterministic-deployment.md)。
 
 `TurnState`、`TurnPhase` 和 `PlayerTurnMeta` 位于 `lib/game/turn.ts`。动作包括：
 

@@ -24,6 +24,10 @@ export async function POST(req: NextRequest) {
       name: playerName || hostId,
       seat: 'red' as const,
       faction: 'red' as const,
+      // PVE has no lobby alignment picker. Persist the default explicitly so
+      // RED-67's roster lock can validate the human selection without
+      // deriving content alignment from the red/blue seat.
+      alignment: 'light' as const,
       joinedAt: Date.now(),
       ready: true,
       hasSelectedPieces: false,
