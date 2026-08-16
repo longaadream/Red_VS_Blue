@@ -1,6 +1,6 @@
 # RED-51 revised responsive battle acceptance evidence
 
-Date: 2026-08-16
+Date: 2026-08-17
 Branch: `codex/red-51-responsive-battle`
 Risk: Medium
 
@@ -11,6 +11,16 @@ Risk: Medium
 - Board-anchored piece skill menu, target-mode collapse, cancel restore, pan/zoom position signal, and 44px mobile controls.
 - Existing single `#handCards` source rendered as a fanned hand; no duplicate arc hand container.
 - Mobile training setup from a fresh reload, including reaching and activating `开始训练`.
+
+## 2026-08-17 direct-hand and floating-tools follow-up
+
+- The visible hand section was removed entirely: no panel, header, “手牌” label, empty-state strip, border, background, shadow, edge fade, or visible browser scrollbar remains. The existing `#handCards` node directly carries the fanned cards and collapses to `0px` when empty.
+- At 760×720 and 390×844, a five-card in-memory visual fixture rendered from the same `#handCards` source with no page overflow. The computed scrollbar style was `none`.
+- Training modification controls now start as one 44px floating trigger. The expanded popover remained fully inside both viewports; on 390×844 all three command buttons measured 44px high.
+- Training tools and the piece action menu are mutually exclusive. Opening training tools changed the piece menu to `aria-hidden="true"`.
+- Selecting an owned piece opens the anchored lightweight menu. Choosing “移动” hides it before legal routes appear; the browser observed 8 legal cells at 760px, then clicked a route successfully from `(12,11)` to `(13,11)`. The final 390px route screenshot likewise shows no menu over the green cells.
+- Right-click/long-press remains the entry to complete skills and status; selection itself only opens the lightweight nearby actions.
+- Console review found no runtime JavaScript exception from this follow-up. Remaining errors were only the known static-harness 404s for `game-engine-runtime.js`, `favicon.ico`, and the absent `evil-explosion` pack entry.
 
 ## Results
 
@@ -42,6 +52,11 @@ The training setup creates one visible coin card in this isolated harness. For t
 - `red-51-frameless-hand-training-760x720.png`
 - `red-51-frameless-hand-training-390x844.png`
 
+- `red-51-direct-cards-training-760x720.png`
+- `red-51-direct-cards-collapsed-training-390x844.png`
+- `red-51-training-popover-760x720.png`
+- `red-51-training-popover-390x844.png`
+- `red-51-move-route-clear-390x844.png`
 ## Automated checks
 
 ```text
@@ -60,5 +75,7 @@ npm run check:encoding
 git diff --check
 passed
 ```
+
+For the 2026-08-17 follow-up, the first full-suite run exposed one stale `targeting.test.ts` assertion that still required the removed `#handTarget` node. The assertion was updated to preserve the actual contract—clear `pendingCardAction`, then submit the existing action—and the final serial run passed all 303 tests. ESLint passed for the changed RED-51 contract test; linting the whole legacy `targeting.test.ts` reports 14 pre-existing `no-explicit-any` violations outside the changed assertion, which were left out of this UI scope.
 
 The first full-suite run was executed concurrently with ESLint and the encoding scan and saw one temporary Electron archive read as zero bytes. The isolated failing packaging case then passed, and the serial candidate run passed all 303 tests; the initial I/O anomaly is retained here rather than hidden by the retry.
