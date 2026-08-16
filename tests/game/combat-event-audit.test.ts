@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- audit fixtures intentionally exercise heterogeneous runtime event shapes */
 import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { TriggerSystem } from '@/lib/game/triggers'
+import { TriggerSystem, globalTriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
 import { EventTraceProbe } from '../helpers/event-trace'
 
@@ -100,17 +100,45 @@ describe('RED-45 event audit', () => {
     expect(seen).toEqual(['global-high', 'global-low', 'piece', 'player'])
   })
 
-  it('observes blocked and exception semantics without declaring them correct', () => {
+  it('commits blocked semantics but propagates exceptions and stops later consumers', () => {
     const seen: string[] = []
     const system = new TriggerSystem()
+    const throwingRule: any = rule('throws', 3, () => { seen.push('throws'); throw new Error('audit') })
+    throwingRule.limits = { uses: 4, currentCooldown: 0 }
     system.addRules([
-      rule('throws', 3, () => { seen.push('throws'); throw new Error('audit') }),
-      rule('blocks', 2, () => { seen.push('blocks'); return { success: true, blocked: true } }),
+      throwingRule,
       rule('after', 1, () => { seen.push('after'); return { success: true } }),
     ] as any)
-    const result = system.checkTriggers(makeState() as any, { type: 'audit' })
-    expect(seen).toEqual(['throws', 'blocks'])
-    expect(result.blocked).toBe(true)
+    expect(() => system.checkTriggers(makeState() as any, { type: 'audit' })).toThrow(/consumer=rule:throws/)
+    expect(seen).toEqual(['throws'])
+    expect(throwingRule.limits).toEqual({ uses: 4, currentCooldown: 0 })
+  })
+
+  it('rolls back trigger mutations when an action fails in a trigger', async () => {
+    const { runBattleAction } = await import('@/lib/game/battle-runner')
+    const state = makeState({ pieces: [makePiece()] }) as any
+    const piece = state.pieces[0]
+    const system = new TriggerSystem()
+    system.addRules([{
+      id: 'mutate-then-throw', name: 'mutate-then-throw', description: '', priority: 1,
+      trigger: { type: 'beforeMove' },
+      effect: (battle: any) => {
+        battle.players[0].actionPoints = 0
+        battle.pieces[0].currentHp = 1
+        throw new Error('boom')
+      },
+    }] as any)
+    const previous = (globalTriggerSystem as any).getRules()
+    ;(globalTriggerSystem as any).clearRules()
+    ;(globalTriggerSystem as any).addRules(system.getRules())
+    try {
+      expect(() => runBattleAction(state, { type: 'move', playerId: 'player-red', pieceId: piece.instanceId, toX: 1, toY: 0 } as any)).toThrow(/event=beforeMove/)
+      expect(state.players[0].actionPoints).toBe(2)
+      expect(state.pieces[0].currentHp).toBeGreaterThan(1)
+    } finally {
+      ;(globalTriggerSystem as any).clearRules()
+      ;(globalTriggerSystem as any).addRules(previous)
+    }
   })
 
   it('records deterministic test-side event evidence', () => {
@@ -134,11 +162,9 @@ describe('RED-45 event audit', () => {
     expect(seen).toEqual([])
   })
 
-  it('observes attached effects still run after a reactive-card attempt', () => {
+  it('executes attached effects when no earlier consumer fails', () => {
     const seen: string[] = []
     const state = makeState({ pieces: [makePiece()] }) as any
-    state.players[0].hand = [{ cardId: 'audit-card', instanceId: 'card-1', ownerPlayerId: 'player-red' }]
-    state.customCards = { 'audit-card': { id: 'audit-card', name: 'audit', type: 'reactive', trigger: { type: 'audit' }, code: "function executeCard(context) { context.battle.extensions.auditSeen.push('card'); return { success: true }; }" } }
     state.extensions.auditSeen = seen
     state.pieces[0].attachedEffects = [{ instanceId: 'effect-1', definitionId: 'effect-1', ownerId: state.pieces[0].instanceId, data: {}, triggers: [{ on: 'audit', filterCode: 'function() { return true }', effectCode: "function(ctx, battle) { battle.extensions.auditSeen.push('effect'); return { success: true } }" }] }]
     new TriggerSystem().checkTriggers(state, { type: 'audit', playerId: 'player-red' })

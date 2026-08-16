@@ -7,6 +7,7 @@ import {
   removeEffectFromPiece,
 } from './attached-effect'
 import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
+import { dealDamage, executeCardFunction, healDamage, loadCardById, loadRuleById } from './skills'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -300,6 +301,31 @@ export class TriggerSystem {
 
   // 检查并触发规则
   checkTriggers(battle: BattleState, context: TriggerContext): TriggerResult {
+    const ruleLimitSnapshots = this.rules.map(rule => ({
+      rule,
+      limits: rule.limits ? { ...rule.limits } : undefined,
+    }))
+    const restoreRuleLimits = () => {
+      for (const snapshot of ruleLimitSnapshots) {
+        if (snapshot.limits) snapshot.rule.limits = { ...snapshot.limits }
+        else delete snapshot.rule.limits
+      }
+    }
+    const rethrowTriggerError = (error: unknown, consumerKind: string, consumerId: string): never => {
+      restoreRuleLimits()
+      const cause = error instanceof Error ? error : new Error(String(error))
+      const details = {
+        eventType: context.type,
+        eventId: context.eventId,
+        consumerKind,
+        consumerId,
+        rootEventId: context.rootEventId,
+        eventDepth: context.eventDepth,
+      }
+      Object.assign(cause, { triggerContext: details })
+      cause.message = `${cause.message} [event=${context.type} eventId=${context.eventId ?? 'unknown'} consumer=${consumerKind}:${consumerId}]`
+      throw cause
+    }
     const triggeredEffects: string[] = []
     let success = false
     let blocked = false
@@ -338,7 +364,6 @@ export class TriggerSystem {
         !rule.effect.toString().includes('checkToxin')
       if (typeof rule.effect !== 'function' || isDefaultEffect) {
         try {
-          const { loadRuleById } = require('./skills')
           const reloaded = loadRuleById(rule.id, FORCE_RULE_RELOAD)
           if (reloaded && typeof reloaded.effect === 'function') {
             rule.effect = reloaded.effect
@@ -519,6 +544,7 @@ export class TriggerSystem {
         }
       } catch (error) {
         writeLog('Error executing rule ' + item.ruleId + ': ' + error)
+        rethrowTriggerError(error, 'rule', item.ruleId)
       }
     }
 
@@ -536,12 +562,11 @@ export class TriggerSystem {
         const cardsSnap = [...player.hand]
         for (const cardInstance of cardsSnap) {
           try {
-            const { loadCardById, executeCardFunction } = require('./skills')
             const cardDef = loadCardById(cardInstance.cardId) || (battle as any).customCards?.[cardInstance.cardId]
             if (!cardDef || cardDef.type !== 'reactive') continue
             if (!cardDef.trigger || cardDef.trigger.type !== context.type) continue
 
-            const result = executeCardFunction(cardDef, player.playerId, battle, context)
+            const result = executeCardFunction(cardDef, player.playerId, battle, context) as any
             if (result && result.success) {
               success = true
               if (result.message) triggeredEffects.push(result.message)
@@ -558,6 +583,7 @@ export class TriggerSystem {
             }
           } catch (error) {
             writeLog('Error executing reactive card ' + cardInstance.cardId + ': ' + error)
+            rethrowTriggerError(error, 'reactiveCard', cardInstance.cardId)
           }
         }
       }
@@ -565,17 +591,11 @@ export class TriggerSystem {
 
     // 5. 处理 AttachedEffect 触发器（新统一系统，替代分散的 rule + statusTag）
     if (battle.pieces) {
-      let skillsModule: any = null
-      const getSkillsModule = () => {
-        if (!skillsModule) skillsModule = require('./skills')
-        return skillsModule
-      }
-
       // 构建注入到 effectCode / filterCode 的辅助函数（与 rule skillCode 环境对齐）
       const _dealDamage = (src: any, tgt: any, dmg: number, type: string, sid?: string, skipBefore?: boolean, killerPlayerId?: string) =>
-        getSkillsModule().dealDamage(src, tgt, dmg, type, battle, sid, skipBefore, killerPlayerId)
+        dealDamage(src, tgt, dmg, type as any, battle, sid, skipBefore, killerPlayerId)
       const _healDamage = (healer: any, tgt: any, heal: number, sid?: string) =>
-        getSkillsModule().healDamage(healer, tgt, heal, battle, sid)
+        healDamage(healer, tgt, heal, battle, sid)
       const _removeStatusEffectById = (pieceId: string, statusId: string) => {
         const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
         if (p?.statusTags) {
@@ -593,7 +613,7 @@ export class TriggerSystem {
       const _addRuleById = (pieceId: string, ruleId: string) => {
         const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
         if (p) {
-          const rule = getSkillsModule().loadRuleById(ruleId, FORCE_RULE_RELOAD)
+          const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
           if (rule) {
             if (!p.rules) p.rules = []
             if (!p.rules.some((r: any) => r.id === ruleId)) p.rules.push(rule)
@@ -674,8 +694,9 @@ export class TriggerSystem {
             pendingRuleId = effect.id || effect.effectId
             pendingRuleSourceId = piece.instanceId
           }
-        } catch (e) {
-          writeLog('[checkTriggers] AttachedEffect error in ' + effect.instanceId + ': ' + e)
+          } catch (e) {
+            writeLog('[checkTriggers] AttachedEffect error in ' + effect.instanceId + ': ' + e)
+            rethrowTriggerError(e, 'attachedEffect', effect.instanceId || effect.effectId || 'unknown')
         }
       }
     }
