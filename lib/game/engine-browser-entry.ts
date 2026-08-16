@@ -1,6 +1,11 @@
 /**
  * engine-browser-entry.ts
  *
+ * RED-64 权威恢复来源：
+ * - commit: 17a3036daddefdb9a25cd7c167d4ca081070b786
+ * - source blob: e074b671d44b4b4336d988de5264bf895fbb57d0
+ * RED-70 仅补充本来源记录；下方入口实现保持与该来源一致。
+ *
  * esbuild 打包入口 —— 供 Android 训练营 (training.html) 使用。
  * 编译命令见 package.json build:game-engine 脚本。
  *
