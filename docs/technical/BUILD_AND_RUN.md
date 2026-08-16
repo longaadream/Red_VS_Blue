@@ -31,6 +31,12 @@ RED-19 已将当前候选更新为 Electron 43.4.0，升级后的命令、边界
 
 PowerShell 可能因执行策略阻止 `npm.ps1`。本次没有修改系统执行策略，所有命令使用 Windows 自带的 `npm.cmd`。
 
+## Browser game engine build and differential fixture
+
+Run `npm.cmd run build:game-engine` from the repository root before the differential test. The build writes `data/pages/js/game-engine.js` and `android-client/www/js/game-engine.js`; these files are generated and must not be edited manually.
+
+Run `npx.cmd vitest run tests/game/engine-browser-differential.test.ts` to execute the fixed fixture (`normal-move-with-blocker`, seed `0x5eed64`) against the Node module and the browser IIFE bundle. The test evaluates the bundle in a VM with the same `process`/`require` compatibility shims expected by the existing training runtime; it is not a full browser or Android smoke test.
+
 ## 2. 安装
 
 在仓库根目录执行：

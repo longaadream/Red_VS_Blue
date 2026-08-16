@@ -21,7 +21,7 @@
 
 - `lib/game/battle-runner.ts::runBattleAction()`：LAN、HTTP、训练和调试的包装入口。
 - `lib/game/battle-runner.ts::replayBattle()`：命令回放。
-- `lib/game/engine-browser-entry.ts`：浏览器/Android 引擎出口。
+- `lib/game/engine-browser-entry.ts`：浏览器/Android 引擎出口；RED-64 以 `origin/main@17a3036daddefdb9a25cd7c167d4ca081070b786` 恢复入口（blob `e074b671d44b4b4336d988de5264bf895fbb57d0`），并通过 `tests/game/engine-browser-differential.test.ts` 的固定种子 Node/browser fixture 验证。
 - 测试：`tests/game/turn.test.ts`、`tests/game/debug-battle.test.ts`。
 
 输入：`BattleState`、`BattleAction`。
@@ -41,6 +41,7 @@
 - 阵营模板和选择结果。
 - 地图 ID。
 - 可选先手玩家。
+- 可选 `rootSeed`；权威入口必须在初始化前传入。
 
 调用：地图加载、棋子创建、技能/规则加载、`globalTriggerSystem.clearRules()`、开局触发器。
 
@@ -56,15 +57,17 @@
 
 执行顺序：
 
-1. 从动作读取 client action ID。
-2. 只读检查已有 `state.extensions.debugBattle`，识别重复动作。
-3. 补回运行时技能定义。
-4. 调用 `applyBattleAction()`。
-5. 去除不适合序列化的技能函数。
-6. 动作成功后在下一状态创建/更新调试元数据，并记录动作、action hash 和 state hash。
-7. 返回 `{ state, stateHash, actionHash, duplicate }`。
+1. 从动作读取或稳定生成 action ID，并只读检查幂等信息。
+2. 从既有 Action Trace 恢复命名随机流 cursor，创建动作级 `RuleRuntime`。
+3. 克隆输入状态并补回运行时技能定义。
+4. 在同步 runtime 作用域内调用 `applyBattleAction()`；预检使用 checkpoint，不提交随机、时钟或 ID 消耗。
+5. 去除不适合序列化的技能函数，计算排除 `extensions.debugBattle` 的权威状态 hash。
+6. 成功后记录根种子、动作 ID、随机流起止 cursor、回合/玩家及前后状态 hash。
+7. 返回 `{ state, stateHash, actionHash, duplicate, trace }`。
 
-原子性边界：规则校验、规则函数恢复或运行时技能补全失败时，输入状态、AP、actions 和调试 action trace 保持不变。
+失败动作不会写入调用方状态或 Action Trace；错误会附加 seed、stream/cursor、turn、player 和 actionId。重复 client action ID 返回原状态，不产生新 trace。
+
+原子性边界：规则校验、规则函数恢复或运行时技能补全失败时，输入状态、AP、actions 和调试 Action Trace 保持不变。
 
 幂等边界：重复 client action ID 可以被标记为 `duplicate`；没有确认所有 UI、Relay 和 mobile 消息都稳定提供该 ID。
 
@@ -151,11 +154,17 @@ function evaluateGameResult(state: BattleState): GameResult;
 
 ## 8. 随机和确定性
 
-`lib/game/rng.ts` 提供 `setRng()`、`rng()` 和 `mulberry32()`，但房间、客户端、Relay、mobile server 和部分 API 仍直接调用 `Math.random()`。
+`lib/game/rule-runtime.ts` 定义根种子、稳定命名流、确定性规则时钟和实例 ID。命名流当前至少包括 `deployment`、`deployment-reroll`、`turn-order` 与 `skill/effect`；实例 ID 使用独立的 `instance-id/<namespace>` 流。流 seed 和 Mulberry32/cursor 算法由 [ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md) 冻结。
 
-`replayBattle()` 可以用 seed 重放动作，但结束时恢复为默认 `Math.random`，没有恢复调用前的自定义 RNG。时间也直接来自 `Date.now()`。
+WebSocket、房间开战、Battle API、Android mobile server 与 Relay 初始化等权威入口必须先生成根种子，再初始化状态，并在每次 `runBattleAction(..., { rootSeed })` 时沿用同一 seed。Relay 初始化响应同时返回 seed；Relay host 和 Android action-log 回放只调用 browser bundle 暴露的确定性 runner，缺失 seed 时拒绝执行。初始化的随机消耗记录为 `system-initialize` trace；动作 runner 从 trace 恢复 seed/cursor。`replayBattle()` 返回逐动作 `stateHashes`。
 
-结论：固定 seed 回放只覆盖部分核心动作，不覆盖所有初始状态生成、时间、存储和跨端消息。
+Action Trace 的稳定 JSON 与 SHA-256 位于 browser-safe 的 `lib/game/battle-trace.ts`，不依赖 Node `crypto`。数据驱动技能、规则、附加效果和 pending target 脚本在执行边界获得确定性的 `Math.random()` 与 `Date.now()`；规则定义缓存始终返回独立且规范化的 limits，避免 cache miss/hit 改变状态 hash。没有 runtime 的训练与非权威预检路径仍可经 `lib/game/rng.ts` 旧适配器运行，便于按模块回退。
+
+跨端候选验证中，表现层水合的 `skillsById` 缓存不属于权威规则状态。`runBattleAction()` 计算动作前状态哈希时会排除该缓存；规则执行仍保留完整状态，以兼容以数据形式加载的技能。
+
+Android mobile server 当前负责转发并记录 browser runner 生成的 action trace。它会将 trace 格式、根种子或前置哈希不一致记录为 `traceValidationError`，但不会因此拒绝动作，避免尚无重试协议的 WebSocket 客户端被冻结。候选验收要求该诊断字段为空；服务端完全权威地重放规则属于后续工作。
+
+非规则豁免：房间 ID/邀请码、鉴权过期、连接和清理时间、日志、game record 时间及纯视觉随机。它们不得影响权威规则状态。
 
 ## 9. 存储和版本
 
@@ -192,7 +201,7 @@ function evaluateGameResult(state: BattleState): GameResult;
 
 ## 12. 当前不变量和测试覆盖
 
-现有 `tests/game/turn.test.ts` 覆盖普通移动、回合、版本、不可变性、目标和中断选择；`tests/game/spatial.test.ts` 与 `tests/game/movement-contract.test.ts` 覆盖空间工具属性、占位/地形阻挡及 UI/服务端合法集合契约；`tests/game/debug-battle.test.ts` 覆盖固定 seed、hash、回放和 action ID 幂等。
+现有 `tests/game/turn.test.ts` 覆盖普通移动、回合、版本、不可变性、目标和中断选择；`tests/game/spatial.test.ts` 与 `tests/game/movement-contract.test.ts` 覆盖空间工具属性、占位/地形阻挡及 UI/服务端合法集合契约；`tests/game/debug-battle.test.ts` 覆盖固定 seed、hash、回放和 action ID 幂等；`tests/game/deterministic-runtime.test.ts` 覆盖派生向量、流隔离、规则时钟/ID、预检回滚、墙上时间隔离、失败无污染和逐动作 hash；`tests/game/determinism-audit.test.ts` 锁定权威初始化 seed 注入、规则层直接随机/时间豁免和数据脚本执行边界。
 
 尚缺：
 
@@ -201,4 +210,4 @@ function evaluateGameResult(state: BattleState): GameResult;
 - 保存—读取状态等价测试。
 - 多房间触发器/RNG 隔离测试。
 - Electron 服务端与 Android 客户端协议测试。
-- 非法操作不污染原状态的跨模块测试。
+- 多动作失败/重试及并发房间的端到端确定性测试。

@@ -1,10 +1,10 @@
 import { createInitialBattleForPlayers } from './battle-setup'
 import { withoutServerSkills } from './battle-storage'
-import { hashStable, runBattleAction } from './battle-runner'
+import { hashBattleState, runBattleAction } from './battle-runner'
 import { loadJsonFilesServer } from './file-loader'
 import type { PieceTemplate } from './piece'
 import { alignmentToPieceFaction, normalizePlayerAlignment } from './room-store'
-import { mulberry32, setRng } from './rng'
+import { createRootSeed } from './rule-runtime'
 import type { BattleState } from './turn'
 
 export const DEBUG_FIRST_PLAYER_ID = 'debug-red'
@@ -40,7 +40,7 @@ export interface DebugDuelResult {
 }
 
 export async function createDebugDuel(config: DebugDuelConfig = {}): Promise<DebugDuelResult> {
-  const seed = Number.isInteger(config.seed) ? config.seed! : Math.floor(Math.random() * 4294967296)
+  const seed = Number.isInteger(config.seed) ? config.seed! : createRootSeed()
   const piecesPerPlayer = config.piecesPerPlayer ?? DEBUG_PIECES_PER_PLAYER
   const firstAlignment = normalizePlayerAlignment(config.first?.alignment) ?? 'dark'
   const secondAlignment = normalizePlayerAlignment(config.second?.alignment) ?? 'light'
@@ -49,11 +49,7 @@ export async function createDebugDuel(config: DebugDuelConfig = {}): Promise<Deb
 
   const firstPieces = resolveDebugPieces(firstAlignment, config.first?.templateIds, piecesPerPlayer)
   const secondPieces = resolveDebugPieces(secondAlignment, config.second?.templateIds, piecesPerPlayer)
-  const previousRng = Math.random.bind(Math)
-
-  setRng(mulberry32(seed))
-  try {
-    const battle = await createInitialBattleForPlayers(
+  const battle = await createInitialBattleForPlayers(
       [firstPlayerId, secondPlayerId],
       [...firstPieces, ...secondPieces],
       [
@@ -61,29 +57,26 @@ export async function createDebugDuel(config: DebugDuelConfig = {}): Promise<Deb
         { playerId: secondPlayerId, pieces: secondPieces, faction: config.second?.seat || 'blue' },
       ],
       config.mapId || 'large-battlefield',
-      { firstPlayerId },
+      { firstPlayerId, rootSeed: seed },
     )
 
-    if (!battle) {
-      throw new Error('Failed to create debug duel battle state')
-    }
+  if (!battle) {
+    throw new Error('Failed to create debug duel battle state')
+  }
 
-    let state = withoutServerSkills(battle) as BattleState
-    if (config.beginPhase !== false) {
-      state = runBattleAction(state, { type: 'beginPhase' }).state
-    }
+  let state = withoutServerSkills(battle) as BattleState
+  if (config.beginPhase !== false) {
+    state = runBattleAction(state, { type: 'beginPhase' }, { rootSeed: seed }).state
+  }
 
-    return {
-      state,
-      seed,
-      stateHash: hashStable(state),
-      players: [
-        { playerId: firstPlayerId, seat: config.first?.seat || 'red', alignment: firstAlignment, templateIds: firstPieces.map(p => p.id) },
-        { playerId: secondPlayerId, seat: config.second?.seat || 'blue', alignment: secondAlignment, templateIds: secondPieces.map(p => p.id) },
-      ],
-    }
-  } finally {
-    setRng(previousRng)
+  return {
+    state,
+    seed,
+    stateHash: hashBattleState(state),
+    players: [
+      { playerId: firstPlayerId, seat: config.first?.seat || 'red', alignment: firstAlignment, templateIds: firstPieces.map(p => p.id) },
+      { playerId: secondPlayerId, seat: config.second?.seat || 'blue', alignment: secondAlignment, templateIds: secondPieces.map(p => p.id) },
+    ],
   }
 }
 

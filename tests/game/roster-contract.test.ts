@@ -132,6 +132,36 @@ describe('Demo roster contract', () => {
     expect(room).toEqual(before)
   })
 
+  it('locks a ready player to the lobby alignment for forged roster requests', () => {
+    const room = makeRoom()
+    room.players[0].ready = true
+    const before = structuredClone(room)
+
+    expectRosterError(
+      () => lockDemoRosterInRoom(room, {
+        playerId: 'alice',
+        alignment: 'dark',
+        pieces: selection(darkRoster),
+      }),
+      'ROSTER_ALIGNMENT_LOCKED',
+    )
+    expect(room).toEqual(before)
+  })
+
+  it('uses the stored lobby alignment rather than a client selection alignment', () => {
+    const room = makeRoom()
+    room.players[0].ready = true
+
+    const locked = lockDemoRosterInRoom(room, {
+      playerId: 'alice',
+      alignment: 'light',
+      pieces: selection(lightRoster),
+    })
+
+    expect(locked.room.players[0]).toMatchObject({ alignment: 'light', rosterLocked: true })
+    expect(locked.room.players[0].selectedPieces?.every(piece => piece.faction === 'good')).toBe(true)
+  })
+
   it('treats the same locked roster as idempotent and rejects a later modification', () => {
     const first = lockDemoRosterInRoom(makeRoom(), {
       playerId: 'alice',

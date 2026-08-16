@@ -129,6 +129,11 @@ describe('battle page route contract', () => {
     expect(domUi).not.toContain('selected-detail-stats')
     expect(domUi).not.toContain('selected-skill-list')
     expect(domUi).not.toContain('data-skill-id')
+    expect(battlePage).toContain('function resolveSkillAvailability(piece, skillOrId)')
+    expect(battlePage).toMatch(
+      /function selectSkillCard[\s\S]*?resolveSkillAvailability\(sp, skId\)/,
+    )
+    expect(battlePage).not.toContain('detailPiece.skills')
     expect(battlePage).toContain('oncontextmenu="event.preventDefault();dispatchBattleIntent({type:\'inspect-piece\'')
     expect(battlePage).toContain('function showPieceInfo(instanceId, preserveKeyword)')
     expect(battlePage).toContain('statsHtml + tagsHtml')

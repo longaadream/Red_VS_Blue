@@ -1,9 +1,8 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
-import { applyBattleAction } from './game/turn'
 import { assertActionPlayer } from './game/targeting'
-import { getBattleStorage, withServerSkills, withoutServerSkills } from './game/battle-storage'
-import { hashStable, runBattleAction } from './game/battle-runner'
+import { getBattleStorage, withServerSkills } from './game/battle-storage'
+import { hashBattleState, runBattleAction } from './game/battle-runner'
 import { verifyJoinAuth, verifyRecordSignature, derivePlayerId } from './game/identity-verify'
 import {
   ensureRosterAlignmentMutable,
@@ -274,8 +273,7 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
   }
 
   if (action === 'start-game') {
-    const requestedFirstPlayerId = String(body.firstPlayerId || '').trim().toLowerCase()
-    await startBattleFromLockedRosters(roomStore, roomId, { firstPlayerId: requestedFirstPlayerId || undefined })
+    await startBattleFromLockedRosters(roomStore, roomId)
     await broadcastRoom(roomId)
     const clients = roomClients.get(roomId)
     if (clients) for (const client of clients) await sendBattleSnapshot(client, roomId)
@@ -324,7 +322,7 @@ async function sendBattleSnapshot(ws: WebSocket, roomId: string): Promise<void> 
   }
   const storage = getBattleStorage(room)
   if (storage) {
-    sendJson(ws, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: hashStable(storage.state) })
+    sendJson(ws, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: hashBattleState(storage.state as any) })
     return
   }
   sendJson(ws, { type: 'battleUnavailable', reason: 'battle-not-started', room: publicRoom(room) })
@@ -556,7 +554,7 @@ export function startWsServer(): void {
                 if (msg.action == null) return
                 try {
                   assertActionPlayer(playerId, msg.action)
-                  const result = runBattleAction(storage.state as any, msg.action as any)
+                  const result = runBattleAction(storage.state as any, msg.action as any, { rootSeed: storage.seed })
                   storage.state = result.state
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   ;(room as any).battleState = storage
@@ -594,6 +592,7 @@ export function startWsServer(): void {
                       needsOptionSelection: errAny?.needsOptionSelection || undefined,
                       title: errAny?.title ?? undefined,
                       options: errAny?.options ?? undefined,
+                      determinism: errAny?.determinism ?? undefined,
                     }))
                   }
                 }
@@ -654,9 +653,9 @@ async function runBotTurn(roomId: string): Promise<void> {
     const { generateBotActions, prepareBotAction } = await import('./game/ai')
     const hydratedState = withServerSkills(storage.state)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let currentState: any = hydratedState
+    let currentState: any = storage.state
 
-    const actions = generateBotActions(currentState as any, 'bot')
+    const actions = generateBotActions(hydratedState as any, 'bot')
     for (const action of actions) {
       try {
         const currentAction = action.type === 'useBasicSkill' || action.type === 'useChargeSkill'
@@ -667,7 +666,7 @@ async function runBotTurn(roomId: string): Promise<void> {
               skillId: action.skillId,
             }, 'bot')
           : action
-        if (currentAction) currentState = applyBattleAction(currentState, currentAction)
+        if (currentAction) currentState = runBattleAction(currentState, currentAction as any, { rootSeed: storage.seed }).state
       } catch {
         // Skip invalid bot action
       }
@@ -676,18 +675,18 @@ async function runBotTurn(roomId: string): Promise<void> {
     // After bot endTurn (phase="end"), advance to next player's action phase
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((currentState as any)?.turn?.phase === 'end') {
-      try { currentState = applyBattleAction(currentState, { type: 'beginPhase' } as any) } catch {}
+      try { currentState = runBattleAction(currentState, { type: 'beginPhase' } as any, { rootSeed: storage.seed }).state } catch {}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((currentState as any)?.turn?.phase === 'start') {
-        try { currentState = applyBattleAction(currentState, { type: 'beginPhase' } as any) } catch {}
+        try { currentState = runBattleAction(currentState, { type: 'beginPhase' } as any, { rootSeed: storage.seed }).state } catch {}
       }
     }
 
-    storage.state = withoutServerSkills(currentState)
+    storage.state = currentState
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(room as any).battleState = storage
     await roomStore.setRoom(roomId, room)
-    broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: hashStable(storage.state) })
+    broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: hashBattleState(storage.state as any) })
   } catch (e) {
     console.warn('[WS] runBotTurn error:', e)
   }

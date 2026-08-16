@@ -6,6 +6,7 @@ import {
   getEffectOnPiece,
   removeEffectFromPiece,
 } from './attached-effect'
+import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -439,6 +440,7 @@ export class TriggerSystem {
           }
           return true
         })
+        playerMatchingRules.sort((a: any, b: any) => (b.priority ?? 0) - (a.priority ?? 0))
         for (const rule of playerMatchingRules) {
           allRuleItems.push({
             rule, ruleId: rule.id, sourceId: player.playerId,
@@ -530,9 +532,9 @@ export class TriggerSystem {
       for (const player of battle.players) {
         if (blocked) break
         if (!player.hand || player.hand.length === 0) continue
-        // 从后往前遍历，因为触发后可能弃牌（会 splice）
-        for (let i = player.hand.length - 1; i >= 0; i--) {
-          const cardInstance = player.hand[i]
+        // 在事件开始时快照手牌，避免本次分发中的弃牌改变剩余消费者顺序。
+        const cardsSnap = [...player.hand]
+        for (const cardInstance of cardsSnap) {
           try {
             const { loadCardById, executeCardFunction } = require('./skills')
             const cardDef = loadCardById(cardInstance.cardId) || (battle as any).customCards?.[cardInstance.cardId]
@@ -547,8 +549,11 @@ export class TriggerSystem {
               // 弃牌（keepInHand=true 时保留在手牌中）
               if (!result.keepInHand) {
                 if (!player.discardPile) player.discardPile = []
-                player.hand.splice(i, 1)
-                player.discardPile.push(cardInstance.cardId)
+                const handIndex = player.hand.findIndex((card: any) => card.instanceId === cardInstance.instanceId)
+                if (handIndex !== -1) {
+                  player.hand.splice(handIndex, 1)
+                  player.discardPile.push(cardInstance.cardId)
+                }
               }
             }
           } catch (error) {
@@ -611,7 +616,11 @@ export class TriggerSystem {
         const player = battle.players?.find((p: any) => p.playerId === targetPlayerId)
         if (!player) return false
         if (!player.hand) player.hand = []
-        player.hand.push({ cardId, instanceId: cardId + '-' + Date.now(), ownerPlayerId: targetPlayerId })
+        const runtime = getActiveRuleRuntime()
+        const instanceId = runtime
+          ? runtime.nextInstanceId('card', `ci-${cardId}`)
+          : `${cardId}-${getRuleDate().now()}`
+        player.hand.push({ cardId, instanceId, ownerPlayerId: targetPlayerId })
         return true
       }
 
@@ -619,57 +628,54 @@ export class TriggerSystem {
       const wrapCode = (code: string) => {
         // eslint-disable-next-line no-eval
         return eval(
-          `(function(dealDamage,healDamage,removeStatusEffectById,addStatusEffectById,addRuleById,removeRuleById,applyEffect,removeEffect,getPieceEffect,fireEvent,addCardToHand){ return (${code}); })`
-        )(_dealDamage, _healDamage, _removeStatusEffectById, _addStatusEffectById, _addRuleById, _removeRuleById, _applyEffect, _removeEffect, _getPieceEffect, _fireEvent, _addCardToHand)
+          `(function(dealDamage,healDamage,removeStatusEffectById,addStatusEffectById,addRuleById,removeRuleById,applyEffect,removeEffect,getPieceEffect,fireEvent,addCardToHand,Math,Date){ return (${code}); })`
+        )(_dealDamage, _healDamage, _removeStatusEffectById, _addStatusEffectById, _addRuleById, _removeRuleById, _applyEffect, _removeEffect, _getPieceEffect, _fireEvent, _addCardToHand, getRuleMath(), getRuleDate())
       }
 
-      const piecesSnap = [...battle.pieces]
-      for (const piece of piecesSnap) {
-        if (blocked) break
-        if (!piece.attachedEffects || piece.attachedEffects.length === 0) continue
-        const effectsSnap = [...piece.attachedEffects]
-        for (const effect of effectsSnap) {
-          if (blocked) break
-          if (!effect.triggers || effect.triggers.length === 0) continue
-          const matching = effect.triggers
-            .filter((t: any) => t.on === context.type)
-            .sort((a: any, b: any) => (a.priority ?? 50) - (b.priority ?? 50))
-          if (matching.length === 0) continue
-          const selfObj = buildSelfObject(effect, piece, battle)
-          for (const trigger of matching) {
-            if (blocked) break
-            try {
-              const filterFn = wrapCode(trigger.filterCode)
-              if (!filterFn(context, battle, selfObj)) continue
-              const effectFn = wrapCode(trigger.effectCode)
-              const result = effectFn(context, battle, selfObj)
-              if (result) {
-                if (result.success) success = true
-                if (result.message) triggeredEffects.push(result.message)
-                if (result.blocked) blocked = true
-                if (result.needsOptionSelection) {
-                  needsOptionSelection = true
-                  pendingOptions = result.options
-                  pendingTitle = result.title
-                  pendingPlayerId = (result as any).playerId
-                  pendingRuleId = effect.id || effect.effectId
-                  pendingRuleSourceId = piece.instanceId
-                }
-                if (result.needsTargetSelection && !needsTargetSelection) {
-                  needsTargetSelection = true
-                  pendingTargetType = result.targetType
-                  pendingRange = result.range
-                  pendingFilter = result.filter
-                  pendingTitle = result.title
-                  pendingPlayerId = (result as any).playerId
-                  pendingRuleId = effect.id || effect.effectId
-                  pendingRuleSourceId = piece.instanceId
-                }
-              }
-            } catch (e) {
-              writeLog('[checkTriggers] AttachedEffect error in ' + effect.instanceId + ': ' + e)
-            }
+      const attachedTriggerItems: Array<{ piece: any; effect: any; trigger: any; order: number }> = []
+      let attachedOrder = 0
+      for (const piece of [...battle.pieces]) {
+        for (const effect of [...(piece.attachedEffects || [])]) {
+          for (const trigger of [...(effect.triggers || [])]) {
+            if (trigger.on === context.type) attachedTriggerItems.push({ piece, effect, trigger, order: attachedOrder++ })
           }
+        }
+      }
+      attachedTriggerItems.sort((a, b) =>
+        (b.trigger.priority ?? 0) - (a.trigger.priority ?? 0) || a.order - b.order,
+      )
+      for (const { piece, effect, trigger } of attachedTriggerItems) {
+        if (blocked) break
+        try {
+          const selfObj = buildSelfObject(effect, piece, battle)
+          const filterFn = wrapCode(trigger.filterCode)
+          if (!filterFn(context, battle, selfObj)) continue
+          const effectFn = wrapCode(trigger.effectCode)
+          const result = effectFn(context, battle, selfObj)
+          if (!result) continue
+          if (result.success) success = true
+          if (result.message) triggeredEffects.push(result.message)
+          if (result.blocked) blocked = true
+          if (result.needsOptionSelection) {
+            needsOptionSelection = true
+            pendingOptions = result.options
+            pendingTitle = result.title
+            pendingPlayerId = (result as any).playerId
+            pendingRuleId = effect.id || effect.effectId
+            pendingRuleSourceId = piece.instanceId
+          }
+          if (result.needsTargetSelection && !needsTargetSelection) {
+            needsTargetSelection = true
+            pendingTargetType = result.targetType
+            pendingRange = result.range
+            pendingFilter = result.filter
+            pendingTitle = result.title
+            pendingPlayerId = (result as any).playerId
+            pendingRuleId = effect.id || effect.effectId
+            pendingRuleSourceId = piece.instanceId
+          }
+        } catch (e) {
+          writeLog('[checkTriggers] AttachedEffect error in ' + effect.instanceId + ': ' + e)
         }
       }
     }

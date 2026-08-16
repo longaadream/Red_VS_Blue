@@ -37,23 +37,23 @@
 ## 2. 战斗 Runner 与回放
 
 - 入口：`lib/game/battle-runner.ts::runBattleAction()`、`replayBattle()`。
-- 职责：动作 ID、运行时技能补全、hash、幂等和回放。
-- 输入：状态/动作，或初始状态/seed/动作序列。
-- 输出：状态、`stateHash`、`actionHash`、`duplicate`，或回放结果。
+- 职责：动作 ID、动作级确定性 runtime、运行时技能补全、权威 hash、幂等、Action Trace 和回放。
+- 输入：状态/动作/`rootSeed`，或初始状态/seed/动作序列。
+- 输出：状态、`stateHash`、`actionHash`、`duplicate`、`trace`，或含逐动作 `stateHashes` 的回放结果。
 - 调用方：WS、房间 HTTP API、训练/调试 API、测试。
-- 调用：`applyBattleAction()`、稳定 JSON/hash、RNG。
-- 状态变化：仅在动作成功后写入下一状态的 `extensions.debugBattle`；拒绝动作不会修改输入状态或 action trace。
-- 错误：规则错误直接向上抛；上层转换方式不统一。
+- 调用：`applyBattleAction()`、稳定 JSON/hash、`RuleRuntime`。
+- 状态变化：会写入 `state.extensions.debugBattle`；返回下一状态。
+- 错误：规则错误附加 seed、stream/cursor、turn、player、actionId 后向上抛；上层保留原选择中断字段。
 - 日志：主要依赖调用方；调试元数据保存在状态扩展中。
-- 测试：`tests/game/debug-battle.test.ts`。
-- 已知问题：回放后不恢复调用方注入的自定义 RNG，只恢复到 `Math.random`。
+- 测试：`tests/game/debug-battle.test.ts`、`tests/game/deterministic-runtime.test.ts`。
+- 已知问题：runtime 是同步进程作用域，不能跨异步规则边界；旧训练/浏览器调用方尚可省略 seed。
 - 最小调试：保存初始状态、seed、动作序列，调用 `replayBattle()` 并核对最终 hash。
 
 ## 3. 战斗初始化
 
 - 入口：`lib/game/battle-setup.ts::createInitialBattleForPlayers()`。
 - 职责：根据玩家、选人和地图生成初始状态。
-- 输入：玩家 ID、阵营模板、选择、地图 ID、先手选项。
+- 输入：玩家 ID、阵营模板、选择、地图 ID、先手选项和可选 `rootSeed`。
 - 输出：`Promise<BattleState | null>`。
 - 调用方：房间开战、训练/PVE/调试场景。
 - 调用：地图、技能、规则、棋子和全局触发器。
@@ -61,8 +61,17 @@
 - 错误：玩家数错误返回 `null`；数据加载/效果错误可能抛出。
 - 日志：`battle-setup.ts` 本地日志。
 - 测试：缺少独立初始化和多房间隔离测试。
-- 已知问题：全局触发器；seed 不保证在初始化前注入。
-- 最小调试：显式传入 `firstPlayer`，固定 RNG，输出初始状态 hash 和棋子列表。
+- 已知问题：全局触发器；所有新增权威入口都必须显式传入 root seed。
+- 最小调试：显式传入 `firstPlayerId` 与 `rootSeed`，输出初始化 trace、状态 hash 和棋子列表。
+
+### 确定性规则运行时（RED-28）
+
+- 入口：`lib/game/rule-runtime.ts::RuleRuntime`、`withRuleRuntime()`、`withRuleRuntimeCheckpoint()`。
+- 职责：根种子规范化、命名流派生与 cursor、规则时钟、实例 ID、动态规则 `Math`/`Date` 能力。
+- 稳定流：`deployment`、`deployment-reroll`、`turn-order`、`skill/effect`；实例 ID 为 `instance-id/<namespace>`。
+- 约束：规则执行保持同步；预检必须使用 checkpoint；视觉随机不得进入权威 seed、状态或 hash。
+- 兼容：`rng()` 在 runtime 激活时路由至 `skill/effect`，未激活时保留旧适配器。
+- 决策：[ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md)。
 
 ### 身份模型（RED-27）
 
@@ -75,6 +84,12 @@
 - 成功确认会写入 `rosterLocked` 与 `rosterManifestVersion`。同一组模板的重排提交返回幂等成功；锁定后的不同阵容或阵营修改返回 `ROSTER_LOCKED`。
 - 错误响应包含稳定的 `code`、`message` 与 `context`；HTTP 与 WebSocket 复用同一错误载荷。
 - `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容，并通过房间版本号原子提交战斗状态；只有双方合法锁定时才可通过当前战斗初始化入口。该入口忽略房间请求中的地图覆盖，强制使用并持久化 Demo 固定地图 `large-trap-arena`。
+
+### PVP alignment lock (RED-56)
+
+- Once a player marks ready in the lobby, the server-recorded `alignment` is immutable for piece selection. A forged cross-alignment `claim-faction` or `select-pieces` request returns `ROSTER_ALIGNMENT_LOCKED` and leaves the room unchanged.
+- `select-pieces` validates against the stored player alignment, never the request alignment. Seat (`red`/`blue`) remains independent, so same-alignment matches remain valid.
+- `piece-selection.html` renders the lobby alignment as read-only, disables both alignment controls, and filters the displayed templates to that locked alignment.
 
 ## 4. 技能、卡牌与规则数据
 
@@ -254,6 +269,9 @@
 - 输出：页面实际加载并提交的 `data/pages/js/game-engine.js`，以及被忽略的 `android-client/www/js/game-engine.js` 派生副本。
 - 调用方：Android 打包命令。
 - 错误：缺失依赖、构建顺序或覆盖错误会生成与源码不一致的安装包。
+- 测试：RED-28 候选验证会分别执行 `build:game-engine`、`build:mobile-server`，再加载两个生成 bundle，并核对 Android Relay 初始化 seed/trace 与 browser runner 固定 seed 重放 hash。
+- 构建边界：两条 browser 构建通过显式 shim 解析相对 `app-paths` 与 `node:*`，不得把 Electron resource-pack 的 Node 能力带入 WebView bundle。
+- 已知问题：当前正式发布物与预期唯一源码关系仍不清；RED-28 的生成物只用于候选验证，不提交。
 - 测试：`tests/game/movement-contract.test.ts` 直接执行 canonical bundle 并检查 RED-30 共享空间导出；尚无完整 Android 安装包来源/hash 验证。
 - 已知问题：完整 Android 发布物仍缺少端到端的来源/hash 验证。
 - 最小调试：清空临时构建目录后从源码生成，记录命令、commit、文件 hash，再安装冒烟验证。删除正式目录前必须另行审批。

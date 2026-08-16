@@ -30,6 +30,21 @@
 
     function byId(id) { return doc && doc.getElementById ? doc.getElementById(id) : null }
 
+    function statusDetailHtml(status) {
+      const presentation = root.BattleStatusPresentation
+      const meta = presentation
+        ? presentation.resolve(status)
+        : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
+      const detail = presentation ? presentation.detailText(status) : statusMeta(status)
+      const description = status.description || meta.description
+      return '<div class="selected-status-row" data-status-id="' + escapeHtml(status.id || '') + '">'
+        + '<span class="selected-status-icon" style="--status-color:' + escapeHtml(meta.color) + '">' + escapeHtml(meta.glyph) + '</span>'
+        + '<span class="selected-status-copy"><span class="selected-status-name">' + escapeHtml(status.label || status.id || '?') + '</span>'
+        + (detail ? '<span class="selected-status-meta">' + escapeHtml(detail) + '</span>' : '')
+        + (description ? '<span class="selected-status-description">' + escapeHtml(description) + '</span>' : '')
+        + '</span></div>'
+    }
+
     function updateSelectedPiece(model) {
       const element = byId('selectedPieceStatus')
       if (!element) return
@@ -44,18 +59,12 @@
         element.className = 'selected-status-empty'
         element.textContent = '未选中棋子'
         if (element.dataset) delete element.dataset.pieceId
+        if (element.removeAttribute) element.removeAttribute('aria-label')
         return
       }
       const statuses = piece.statuses || piece.statusSummary || []
       const statusesHtml = statuses.length
-        ? statuses.map(function (status) {
-            const meta = statusMeta(status)
-            return '<article class="selected-status-item">'
-              + '<div class="selected-status-item-name">' + escapeHtml(status.label) + '</div>'
-              + (meta ? '<div class="selected-status-item-meta">' + escapeHtml(meta) + '</div>' : '')
-              + (status.description ? '<div class="selected-status-item-desc">' + escapeHtml(status.description) + '</div>' : '')
-              + '</article>'
-          }).join('')
+        ? statuses.map(statusDetailHtml).join('')
         : '<div class="selected-status-zero">无特殊状态</div>'
       element.className = 'selected-status-card has-selection' + (targetMode ? ' target-mode' : '')
       if (element.dataset) element.dataset.pieceId = piece.id

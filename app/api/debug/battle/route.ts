@@ -15,7 +15,7 @@ import { isRed43LocalDevelopmentHostname } from '@/app/qa/same-alignment/access'
 
 type DebugBattleBody =
   | { mode?: 'create-duel'; mapId?: string; seed?: number; first?: unknown; second?: unknown; piecesPerPlayer?: number }
-  | { mode: 'apply-action'; state?: BattleState; action?: BattleAction }
+  | { mode: 'apply-action'; state?: BattleState; action?: BattleAction; seed?: number }
   | { mode: 'replay'; initialState?: BattleState; actions?: BattleAction[]; seed?: number }
   | { mode: 'identities'; labels?: string[] }
   | { mode: 'create-selection-room'; mapId?: string }
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       if (!body.state || !body.action) {
         return json({ error: 'state and action are required' }, { status: 400 })
       }
-      return json(runBattleAction(body.state, body.action))
+      return json(runBattleAction(body.state, body.action, { rootSeed: body.seed }))
     }
 
     if (body.mode === 'replay') {

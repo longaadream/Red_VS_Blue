@@ -13,6 +13,15 @@ describe('debug battle pipeline', () => {
     expect(duel.players[1].templateIds).toHaveLength(8)
     expect(duel.state.pieces.some(piece => piece.ownerPlayerId === 'debug-red')).toBe(true)
     expect(duel.state.pieces.some(piece => piece.ownerPlayerId === 'debug-blue')).toBe(true)
+    expect((duel.state.extensions as any).debugBattle.actionLog[0]).toMatchObject({
+      actionId: 'system-initialize',
+      rootSeed: 1234,
+      preStateHash: expect.any(String),
+      postStateHash: expect.any(String),
+      randomStreams: expect.arrayContaining([
+        expect.objectContaining({ name: 'deployment', startCursor: 0 }),
+      ]),
+    })
   })
 
   it('allows light/light and dark/dark mirror debug duels', async () => {

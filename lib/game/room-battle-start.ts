@@ -1,15 +1,12 @@
 import { createInitialBattleForPlayers } from './battle-setup'
+import { runBattleAction } from './battle-runner'
 import { withoutServerSkills } from './battle-storage'
 import { getPieceById } from './piece-repository'
 import { assertDemoRostersReady, type RosterRoomStore } from './roster-contract'
 import { getPlayerSeat, type Room } from './room-store'
-import { applyBattleAction } from './turn'
+import { createRootSeed } from './rule-runtime'
 
 export const DEMO_FIXED_MAP_ID = 'large-trap-arena'
-
-export interface StartLockedRosterBattleOptions {
-  firstPlayerId?: string
-}
 
 export interface StartLockedRosterBattleResult {
   room: Room
@@ -19,7 +16,6 @@ export interface StartLockedRosterBattleResult {
 export async function startBattleFromLockedRosters(
   store: RosterRoomStore,
   roomId: string,
-  options: StartLockedRosterBattleOptions = {},
 ): Promise<StartLockedRosterBattleResult> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const room = await store.getRoom(roomId)
@@ -34,35 +30,34 @@ export async function startBattleFromLockedRosters(
       return 0
     })
     const playerIds = roomPlayers.map(player => player.id)
-    const requestedFirstPlayerId = (options.firstPlayerId || room.firstPlayerId || '').trim().toLowerCase()
-    const firstPlayerId = requestedFirstPlayerId ||
-      (roomPlayers.find(player => getPlayerSeat(player) === 'red') || roomPlayers[0])?.id
-    if (!firstPlayerId || !playerIds.includes(firstPlayerId)) {
-      throw new Error('firstPlayerId must identify a room player')
-    }
-
     const playerSelectedPieces = roomPlayers.map(player => ({
       playerId: player.id,
       pieces: (player.selectedPieces ?? []).map(piece => getPieceById(piece.templateId)!),
       faction: getPlayerSeat(player),
     }))
     const pieceTemplates = playerSelectedPieces.flatMap(player => player.pieces)
+    const seed = createRootSeed()
     const battle = await createInitialBattleForPlayers(
       playerIds,
       pieceTemplates,
       playerSelectedPieces,
       DEMO_FIXED_MAP_ID,
-      { firstPlayerId },
+      { rootSeed: seed },
     )
     if (!battle) throw new Error('Failed to initialize battle state')
 
     let initState = battle
     try {
-      initState = applyBattleAction(battle, { type: 'beginPhase' })
+      initState = runBattleAction(battle, { type: 'beginPhase' }, { rootSeed: seed }).state
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       throw new Error('Failed to init battle phase: ' + message)
     }
+
+    // The battle setup is the sole authority for turn order.  It draws from
+    // the root seed's turn-order stream, so neither seat, join order, nor a
+    // client request can choose the first player.
+    const firstPlayerId = initState.turn.currentPlayerId
 
     const nextRoom: Room = {
       ...room,
@@ -72,7 +67,7 @@ export async function startBattleFromLockedRosters(
       currentTurnIndex: 0,
       battleState: {
         type: 'server-state',
-        seed: Math.floor(Math.random() * 4294967296),
+        seed,
         state: withoutServerSkills(initState),
       } as unknown as Room['battleState'],
     }
