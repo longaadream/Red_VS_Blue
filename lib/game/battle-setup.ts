@@ -97,6 +97,7 @@ interface PlayerSelectedPieces {
   playerId: string
   pieces: PieceTemplate[]
   faction?: 'red' | 'blue'
+  alignment?: 'light' | 'dark'
 }
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
@@ -477,7 +478,7 @@ export function buildInitialPiecesForPlayers(
 export async function createInitialBattleForPlayers(
   playerIds: PlayerId[],
   selectedPieces: PieceTemplate[],
-  playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[]; faction?: 'red' | 'blue' }>,
+  playerSelectedPieces?: PlayerSelectedPieces[],
   mapId?: string,
   options?: { firstPlayerId?: PlayerId; rootSeed?: number },
 ): Promise<BattleState | null> {
@@ -577,6 +578,12 @@ export async function createInitialBattleForPlayers(
   // 清除旧规则系统（rules 已迁移为 initialEffects）
   globalTriggerSystem.clearRules()
 
+  const playerAlignments = Object.fromEntries(
+    (playerSelectedPieces ?? [])
+      .filter(player => player.alignment === 'light' || player.alignment === 'dark')
+      .map(player => [player.playerId.toLowerCase(), player.alignment]),
+  )
+
   const state: BattleState = {
     map,
     pieces,
@@ -597,6 +604,7 @@ export async function createInitialBattleForPlayers(
         hasUsedChargeSkill: false,
       },
     },
+    ...(Object.keys(playerAlignments).length > 0 ? { extensions: { playerAlignments } } : {}),
   }
 
   // 为每个棋子应用 initialEffects 和 rules

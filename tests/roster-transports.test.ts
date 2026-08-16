@@ -89,6 +89,17 @@ const lightRoster = [
   'hashirama-edo',
 ]
 
+const darkRoster = [
+  'arthas',
+  'guldan',
+  'kiljaedan',
+  'reaper',
+  'red-blackwidow',
+  'red-doomsday-fist',
+  'red-hidan',
+  'red-illidan',
+]
+
 function pieces(templateIds: string[]) {
   return templateIds.map(templateId => ({ templateId, faction: 'client-value-is-ignored' }))
 }
@@ -169,11 +180,11 @@ async function wsCreate(mapId: string) {
   }
 }
 
-async function httpSelect(roomId: string, playerId: string, templateIds: string[]) {
+async function httpSelect(roomId: string, playerId: string, templateIds: string[], alignment: 'light' | 'dark' = 'light') {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'select-pieces', playerId, alignment: 'light', pieces: pieces(templateIds) }),
+    body: JSON.stringify({ action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds) }),
   })
   const response = await roomActionPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -209,7 +220,7 @@ async function legacyHttpJoin(roomId: string, playerId: string, alignment: 'ligh
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function wsSelect(roomId: string, playerId: string, templateIds: string[]) {
+async function wsSelect(roomId: string, playerId: string, templateIds: string[], alignment: 'light' | 'dark' = 'light') {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -217,7 +228,23 @@ async function wsSelect(roomId: string, playerId: string, templateIds: string[])
       type: 'rpc',
       requestId: `${roomId}-${playerId}`,
       method: 'rooms.action',
-      data: { roomId, action: 'select-pieces', playerId, alignment: 'light', pieces: pieces(templateIds) },
+      data: { roomId, action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds) },
+    }))
+    return await response
+  } finally {
+    client.close()
+  }
+}
+
+async function wsGet(roomId: string) {
+  const client = await openClient()
+  try {
+    const response = receiveJson(client)
+    client.send(JSON.stringify({
+      type: 'rpc',
+      requestId: `${roomId}-reconnect`,
+      method: 'rooms.get',
+      data: { roomId },
     }))
     return await response
   } finally {
@@ -348,6 +375,9 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       state: {
         map: { id: string }
         pieces: Array<{ templateId: string; ownerPlayerId: string }>
+        extensions?: {
+          playerAlignments?: Record<string, 'light' | 'dark'>
+        }
       }
     }
     expect(battleState.state.map.id).toBe('large-trap-arena')
@@ -358,5 +388,45 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       expect.objectContaining({ ownerPlayerId: 'bob' }),
     ]))
     expect(battlePieces.filter(piece => piece.templateId === lightRoster[0])).toHaveLength(2)
+    expect(battleState.state.extensions?.playerAlignments).toEqual({
+      alice: 'light',
+      bob: 'light',
+    })
+  })
+
+  it('preserves canonical alignments when players reconnect through a new WebSocket', async () => {
+    memoryStore.seed(room('reconnect-room'))
+
+    await legacyHttpJoin('reconnect-room', 'alice', 'light')
+    await legacyHttpJoin('reconnect-room', 'bob', 'dark')
+    const reconnected = await wsGet('reconnect-room')
+
+    expect(reconnected).toMatchObject({
+      ok: true,
+      data: {
+        players: [
+          { id: 'alice', seat: 'red', faction: 'red', alignment: 'light' },
+          { id: 'bob', seat: 'blue', faction: 'blue', alignment: 'dark' },
+        ],
+      },
+    })
+  })
+
+  it('carries mixed alignments into battle independently of seat and turn order', async () => {
+    memoryStore.seed(room('mixed-room'))
+
+    await httpSelect('mixed-room', 'alice', lightRoster, 'light')
+    await wsSelect('mixed-room', 'bob', darkRoster, 'dark')
+
+    const started = memoryStore.snapshot('mixed-room')
+    const state = (started?.battleState as unknown as {
+      state: { extensions?: { playerAlignments?: Record<string, 'light' | 'dark'> } }
+    }).state
+    expect(started?.players).toMatchObject([
+      { id: 'alice', seat: 'red', alignment: 'light' },
+      { id: 'bob', seat: 'blue', alignment: 'dark' },
+    ])
+    expect(state.extensions?.playerAlignments).toEqual({ alice: 'light', bob: 'dark' })
+    expect(['alice', 'bob']).toContain(started?.firstPlayerId)
   })
 })

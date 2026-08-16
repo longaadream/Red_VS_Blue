@@ -34,6 +34,7 @@ export async function startBattleFromLockedRosters(
       playerId: player.id,
       pieces: (player.selectedPieces ?? []).map(piece => getPieceById(piece.templateId)!),
       faction: getPlayerSeat(player),
+      alignment: player.alignment,
     }))
     const pieceTemplates = playerSelectedPieces.flatMap(player => player.pieces)
     const seed = createRootSeed()
