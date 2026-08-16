@@ -437,24 +437,6 @@ function validateSkillActionBasics(
       throw new BattleRuleError(`Ultimate skill ${skillId} has already been used`)
     }
   }
-  const directionProjectileSkillIds = new Set(["sleep-dart", "blackwidow-lethal-strike", "hellfire-shotgun"])
-  if (directionProjectileSkillIds.has(skillId)) {
-    const explicitTarget = action.targetPieceId
-      ? state.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
-      : undefined
-    const targetX = explicitTarget?.x ?? action.targetX
-    const targetY = explicitTarget?.y ?? action.targetY
-    if (targetX === undefined || targetY === undefined) {
-      throw new BattleRuleError("Please choose a target direction")
-    }
-    const sameRowOrColumn = piece.x === targetX || piece.y === targetY
-    if (!sameRowOrColumn) {
-      throw new BattleRuleError("This projectile must target a tile in the same row or column")
-    }
-    if (piece.x === targetX && piece.y === targetY) {
-      throw new BattleRuleError("This projectile cannot target the caster's own tile")
-    }
-  }
   validateDeclaredSkillTarget(state, piece, skillDef, action)
   return skillDef
 }

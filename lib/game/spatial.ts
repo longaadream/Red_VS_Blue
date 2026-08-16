@@ -16,6 +16,10 @@ export interface GridBounds {
 export interface SpatialTile extends GridPosition {
   props?: {
     walkable?: boolean
+    bulletPassable?: boolean
+    /** Legacy alias retained while map data is migrated. */
+    bullet?: boolean
+    type?: string
   }
 }
 
@@ -36,6 +40,22 @@ export interface SpatialBattleState {
   map: SpatialMap
   pieces: readonly SpatialPiece[]
 }
+
+export interface ProjectileTraceOptions {
+  /** Do not report the firing piece as a collision if the origin is occupied. */
+  excludePieceId?: string
+  /** Optional range cap. Omit to trace until the first board boundary. */
+  maxDistance?: number
+}
+
+export type ProjectileTraceEvent<
+  TTile extends SpatialTile = SpatialTile,
+  TPiece extends SpatialPiece = SpatialPiece,
+> =
+  | { type: 'cell'; x: number; y: number; distance: number; tile: TTile }
+  | { type: 'piece'; x: number; y: number; distance: number; piece: TPiece }
+  | { type: 'terrain'; x: number; y: number; distance: number; tile: TTile; blocksProjectile: boolean }
+  | { type: 'boundary'; x: number; y: number; distance: number }
 
 export interface NormalMoveActionState extends SpatialBattleState {
   players: ReadonlyArray<{
@@ -165,6 +185,69 @@ export function getLivingOccupantAt<TPiece extends SpatialPiece>(
     && piece.x === position.x
     && piece.y === position.y
     && (excludeInstanceId === undefined || piece.instanceId !== excludeInstanceId))
+}
+
+/**
+ * Return deterministic projectile facts without deciding any skill effect.
+ *
+ * Each in-bounds position emits a cell fact, every living occupant in battle
+ * order, then its terrain fact. This intentional ordering lets an occupant on
+ * cover receive a collision opportunity before the cover's blocking fact.
+ * Tracing continues after all facts; the skill decides when to stop, pierce,
+ * bounce, explode, damage allies, or ignore terrain.
+ */
+export function traceProjectile<
+  TTile extends SpatialTile,
+  TPiece extends SpatialPiece,
+>(
+  state: {
+    map: GridBounds & { tiles: readonly TTile[] }
+    pieces: readonly TPiece[]
+  },
+  origin: GridPosition,
+  direction: GridPosition,
+  options: ProjectileTraceOptions = {},
+): ProjectileTraceEvent<TTile, TPiece>[] {
+  if (!isInsideBounds(origin, state.map)) {
+    throw new RangeError('Projectile origin must be inside the board')
+  }
+  if (!Number.isInteger(direction.x) || !Number.isInteger(direction.y)
+    || Math.abs(direction.x) + Math.abs(direction.y) !== 1) {
+    throw new RangeError('Projectile direction must be one cardinal unit vector')
+  }
+  if (options.maxDistance !== undefined) {
+    assertNonNegativeInteger(options.maxDistance, 'maxDistance')
+  }
+
+  const events: ProjectileTraceEvent<TTile, TPiece>[] = []
+  for (let distance = 1; options.maxDistance === undefined || distance <= options.maxDistance; distance += 1) {
+    const x = origin.x + direction.x * distance
+    const y = origin.y + direction.y * distance
+    if (!isInsideBounds({ x, y }, state.map)) {
+      events.push({ type: 'boundary', x, y, distance })
+      break
+    }
+
+    const tile = state.map.tiles.find(candidate => candidate.x === x && candidate.y === y)
+    if (!tile) throw new RangeError(`Projectile trace map is missing tile (${x},${y})`)
+
+    events.push({ type: 'cell', x, y, distance, tile })
+    for (const piece of state.pieces) {
+      if (piece.currentHp > 0
+        && piece.x === x
+        && piece.y === y
+        && piece.instanceId !== options.excludePieceId) {
+        events.push({ type: 'piece', x, y, distance, piece })
+      }
+    }
+
+    const explicitPassable = tile.props?.bulletPassable ?? tile.props?.bullet
+    const blocksProjectile = typeof explicitPassable === 'boolean'
+      ? !explicitPassable
+      : tile.props?.type === 'wall' || tile.props?.type === 'cover'
+    events.push({ type: 'terrain', x, y, distance, tile, blocksProjectile })
+  }
+  return events
 }
 
 export function getNormalMoveRejection(
