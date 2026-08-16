@@ -153,4 +153,41 @@ describe('battle page route contract', () => {
     expect(select.innerHTML).toContain('value="neutral"')
     expect(select.innerHTML).toContain('value="mercenary"')
   })
+
+  it('places the selected template for the selected training owner', () => {
+    const battlePage = readPage('battle.html')
+    const patches: unknown[] = []
+    const context = createContext({
+      G: {
+        turn: { currentPlayerId: 'training-red' },
+        pieces: [],
+      },
+      myPlayerId: 'training-red',
+      TRAINING_MODE: true,
+      placingMode: true,
+      pendingOptionSelectionForOther: () => false,
+      document: {
+        getElementById: (id: string) => {
+          if (id === 'placeTemplate') return { value: 'ana' }
+          if (id === 'placeOwner') return { value: 'training-blue' }
+          return null
+        },
+      },
+      currentBattleViewModel: {
+        legal: { placementCells: [{ x: 2, y: 3 }] },
+      },
+      sendPatch: (body: unknown) => {
+        patches.push(body)
+        return Promise.resolve(true)
+      },
+      addLog: () => undefined,
+      PIECES_BY_ID: { ana: { id: 'ana', name: 'Ana' } },
+    })
+    new Script(readNamedFunction(battlePage, 'onCellClick')).runInContext(context)
+
+    expect(() => new Script('onCellClick(2, 3)').runInContext(context)).not.toThrow()
+    expect(JSON.parse(JSON.stringify(patches))).toEqual([
+      { type: 'addPiece', ownerPlayerId: 'training-blue', templateId: 'ana', x: 2, y: 3 },
+    ])
+  })
 })
