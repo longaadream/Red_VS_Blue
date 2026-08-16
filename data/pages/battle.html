@@ -22,6 +22,8 @@
     :root {
       --bg: #0f172a; --bg2: #1e293b; --border: #334155;
       --text: #e2e8f0; --muted: #64748b; --red: #ef4444; --blue: #3b82f6;
+      --mobile-landscape-min: 844px;
+      --mobile-landscape-recommended: 932px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html, body { height: 100%; overflow: hidden; }
@@ -190,36 +192,34 @@
       width: 100% !important; height: 100% !important; display: block;
     }
     .board-side-rail {
-      width: 146px; align-self: stretch; min-height: 100%;
-      display: flex; flex-direction: column; justify-content: center; gap: 16px;
-      flex-shrink: 0;
+      width: clamp(188px, 18vw, 232px); align-self: stretch; min-height: 100%;
+      display: flex; flex-direction: column; justify-content: flex-start; gap: 12px;
+      flex-shrink: 0; padding: 84px 0 2px; overflow: hidden;
     }
     .selected-status-card {
-      max-height: min(52vh, 360px); overflow-y: auto;
-      border: 1px solid rgba(148,163,184,.2); border-left-width: 3px;
+      min-height: 132px; max-height: calc(100vh - 204px); overflow-y: auto;
+      border: 1px solid rgba(148,163,184,.2);
       background: linear-gradient(180deg, rgba(15,23,42,.94), rgba(15,23,42,.68));
-      border-radius: 8px; padding: 9px 9px 10px;
+      border-radius: 8px; padding: 10px 10px 11px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
-      scrollbar-width: thin;
+      scrollbar-width: thin; scrollbar-color: #334155 transparent;
     }
-    .selected-status-card.faction-red { border-left-color: #ef4444; }
-    .selected-status-card.faction-blue { border-left-color: #3b82f6; }
     .selected-status-empty {
       min-height: 110px; display: flex; align-items: center; justify-content: center;
       color: rgba(148,163,184,.46); font-size: 12px; font-weight: 700;
       border: 1px dashed rgba(148,163,184,.18); border-radius: 8px;
       background: rgba(15,23,42,.28);
     }
-    .selected-piece-name { font-size: 14px; font-weight: 900; color: #f8fafc; margin-bottom: 4px; line-height: 1.25; }
-    .selected-piece-hp { font-size: 11px; color: #cbd5e1; margin-bottom: 10px; font-variant-numeric: tabular-nums; }
     .selected-status-title {
-      font-size: 9px; font-weight: 800; color: #64748b;
-      letter-spacing: .08em; margin-bottom: 4px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      font-size: 10px; font-weight: 800; color: #94a3b8;
+      letter-spacing: .08em; margin-bottom: 8px;
     }
+    .selected-status-title span { color: #94a3b8; }
     .selected-status-list { display: flex; flex-direction: column; }
     .selected-status-row {
       display: grid; grid-template-columns: 12px minmax(0,1fr); gap: 6px;
-      padding: 6px 0; border-top: 1px solid rgba(148,163,184,.1);
+      padding: 7px 0; border-top: 1px solid rgba(148,163,184,.1);
     }
     .selected-status-icon {
       width: 10px; height: 10px; margin-top: 2px; border-radius: 999px;
@@ -227,13 +227,19 @@
       color: #020617; background: var(--status-color); font-size: 7px; font-weight: 950;
       box-shadow: 0 0 0 1px rgba(255,255,255,.42), 0 0 8px rgba(168,85,247,.28);
     }
-    .selected-status-copy { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
-    .selected-status-name { color: #e2e8f0; font-size: 10px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
-    .selected-status-meta { color: #fbbf24; font-size: 9px; line-height: 1.3; }
-    .selected-status-description { color: #94a3b8; font-size: 9px; line-height: 1.35; }
-    .selected-status-none { color: rgba(148,163,184,.55); font-size: 10px; padding-top: 4px; }
+    .selected-status-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+    .selected-status-name { color: #e2e8f0; font-size: 11px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+    .selected-status-meta { color: #fbbf24; font-size: 10px; line-height: 1.3; }
+    .selected-status-description { color: #94a3b8; font-size: 10px; line-height: 1.4; }
+    .selected-status-zero {
+      padding: 10px; border: 1px dashed rgba(148,163,184,.18); border-radius: 8px;
+      color: rgba(148,163,184,.52); font-size: 11px; text-align: center;
+    }
     .turn-control-wrap {
       display: flex; justify-content: center;
+    }
+    button:focus-visible, [role="button"]:focus-visible, select:focus-visible {
+      outline: 3px solid #fbbf24; outline-offset: 2px;
     }
     #gameGrid {
       display: grid; gap: 1px; background: #0a0a0f;
@@ -918,8 +924,20 @@
       .cd-sheet { width: 100%; }
       .keyword-panel { width: 100%; }
       .board-shell { gap: 8px; align-items: center; }
-      .board-side-rail { width: 124px; gap: 10px; }
-      .selected-status-empty { min-height: 110px; }
+      .board-side-rail {
+        position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 74;
+        width: auto; min-height: 0; max-height: min(62vh, 540px); gap: 8px; padding: 8px;
+        border: 1px solid rgba(148,163,184,.22); border-radius: 14px;
+        background: rgba(2,6,23,.94); box-shadow: 0 -16px 48px rgba(0,0,0,.55);
+        backdrop-filter: blur(14px);
+      }
+      .board-side-rail:not(.has-selection) {
+        left: auto; border-color: transparent; background: transparent; box-shadow: none; backdrop-filter: none;
+      }
+      .board-side-rail:not(.has-selection) .selected-status-empty { display: none; }
+      .board-side-rail.target-mode { display: none; }
+      .selected-status-card { min-height: 0; max-height: calc(min(62vh, 540px) - 58px); }
+      .selected-status-empty { min-height: 0; }
       .btn-end { min-width: 112px; padding: 8px 13px; font-size: 12px; }
       .player-state-chip { min-width: 116px; }
       .topbar { top: 6px; right: 6px; max-width: 58px; padding: 5px; gap: 4px; border-radius: 9px; }
@@ -1095,6 +1113,10 @@
     }
     .sk-cd-num { font-size:20px; font-weight:900; color:#64748b; }
     .sk-cd-lbl { font-size:8px; color:#475569; }
+    .sk-unavailable-reason {
+      width: 70px; color: #fca5a5; font-size: 8px; line-height: 1.25;
+      text-align: center; white-space: normal;
+    }
 
     /* ── Fullscreen log overlay ── */
     #logOverlay { position:fixed; inset:0; background:rgba(2,8,22,.96); z-index:400; flex-direction:column; display:none; }
@@ -1109,6 +1131,13 @@
       display:none; flex-direction:column; align-items:center; padding-top:72px; gap:10px;
     }
     #targetOverlay.show { display:flex; }
+    .target-mode-card {
+      display: grid; justify-items: center; gap: 7px; padding: 10px 14px;
+      border: 1px solid rgba(245,158,11,.5); border-radius: 12px;
+      background: rgba(2,6,23,.9); box-shadow: 0 12px 32px rgba(0,0,0,.48);
+      backdrop-filter: blur(10px);
+    }
+    .target-source-name { color: #fde68a; font-size: 12px; font-weight: 800; }
     .target-prompt {
       font-size:22px; font-weight:900; color:#fbbf24;
       letter-spacing:1.5px;
@@ -1121,9 +1150,30 @@
       color:#94a3b8; padding:6px 18px; font-size:13px; cursor:pointer;
     }
     .target-cancel-btn:active { background:#1e293b; }
+    .target-cancel-btn[disabled] { opacity: .5; cursor: wait; }
     @keyframes targetPulse {
       0%,100% { opacity:.85; }
       50%      { opacity:1; text-shadow:0 0 32px rgba(245,158,11,1), 0 2px 6px rgba(0,0,0,.9); }
+    }
+    #statusMsg {
+      position: fixed; left: 50%; bottom: 70px; z-index: 82; transform: translateX(-50%);
+      width: min(620px, calc(100vw - 32px)); min-height: 32px; padding: 7px 12px;
+      border: 1px solid rgba(148,163,184,.24); border-radius: 9px;
+      background: rgba(2,6,23,.82); color: #cbd5e1; text-align: center;
+      font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: blur(9px);
+    }
+    body.target-mode-active #skillBar,
+    body.target-mode-active #arcHandContainer { display: none !important; }
+    @media (max-width: 760px) {
+      #targetOverlay { padding-top: 116px; }
+      .target-prompt { font-size: 17px; }
+      #statusMsg { top: 116px; bottom: auto; font-size: 11px; }
+      body.target-mode-active #statusMsg { top: auto; bottom: 54px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; }
+      .target-prompt, .dmg-float, .spinner, #turnAnnounce { animation: none !important; }
+      .skill-card, .arc-card { transition: none !important; }
     }
 
     /* Final Android/Windows parity override. Keep this at the end of CSS. */
@@ -1161,9 +1211,178 @@
     }
     .board-stage { transform-origin: 0 0 !important; will-change: transform !important; }
     .cell::before { opacity: .68 !important; filter: saturate(.72) contrast(.78) brightness(.86) !important; }
+
+    /* Mobile battle acceptance contract: portrait is guarded; landscape remains playable. */
+    #orientationGuard {
+      display: none; position: fixed; inset: 0; z-index: 12000;
+      place-items: center; padding: 24px;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(37,99,235,.2), transparent 42%),
+        linear-gradient(155deg, #020617, #0f172a 58%, #111827);
+      color: #e2e8f0; text-align: center; pointer-events: auto;
+    }
+    .orientation-guard-card {
+      width: min(330px, 100%); display: grid; justify-items: center; gap: 10px;
+      padding: 24px 20px; border: 1px solid rgba(148,163,184,.28); border-radius: 20px;
+      background: rgba(15,23,42,.82); box-shadow: 0 28px 80px rgba(0,0,0,.5);
+      backdrop-filter: blur(18px);
+    }
+    .orientation-guard-icon {
+      width: 72px; height: 46px; display: grid; place-items: center;
+      border: 3px solid #60a5fa; border-radius: 10px; color: #bfdbfe;
+      font-size: 24px; transform: rotate(-8deg); box-shadow: 0 0 24px rgba(59,130,246,.28);
+    }
+    .orientation-guard-card strong { font-size: 21px; color: #f8fafc; }
+    .orientation-guard-card span { color: #94a3b8; font-size: 13px; line-height: 1.6; }
+    .orientation-guard-card small { color: #64748b; font-size: 11px; }
+
+    @media (orientation: portrait) and (max-width: 760px) {
+      #orientationGuard { display: grid; }
+    }
+
+    @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
+      body { --mobile-battle-rail-width: clamp(176px, 22vw, 214px); }
+      .battle-layout, .main-panel, .board-wrap, .board-shell-3d { min-height: 0; min-width: 0; }
+      .topbar {
+        top: 5px !important; right: 5px !important; max-width: 220px !important;
+        flex-wrap: nowrap !important; padding: 3px !important; gap: 3px !important;
+      }
+      .topbar button, .topbar a, .topbar .btn-fullmap, .topbar .btn-surrender {
+        min-width: 28px !important; height: 26px !important; padding: 0 5px !important;
+        font-size: 10px !important;
+      }
+      .phase-bar {
+        top: 5px !important; left: 5px !important; max-width: calc(100vw - 235px) !important;
+        min-height: 32px !important; padding: 3px 5px !important; gap: 4px !important;
+        flex-wrap: nowrap !important; overflow: hidden !important;
+      }
+      #phaseLabel { flex-shrink: 0; font-size: 10px; }
+      #playerResCards { max-width: none; flex-wrap: nowrap; gap: 3px; }
+      .player-state-chip { min-width: 94px; padding: 2px 4px; }
+      .player-state-main { gap: 3px; font-size: 9px; }
+      .resource-orb { padding: 1px 3px; font-size: 9px; }
+
+      .board-wrap { padding: 0 !important; }
+      .board-shell-3d {
+        width: 100%; height: 100%; gap: 0; align-items: stretch; justify-content: stretch;
+      }
+      .board-shell-3d .board-stage { min-height: 0; }
+      .board-side-rail {
+        position: relative; inset: auto; z-index: 74;
+        width: var(--mobile-battle-rail-width); min-height: 0; max-height: none;
+        align-self: stretch; padding: 43px 6px 4px; gap: 5px;
+        border: 0; border-left: 1px solid rgba(148,163,184,.18); border-radius: 0;
+        background: linear-gradient(180deg, rgba(2,6,23,.94), rgba(15,23,42,.84));
+        box-shadow: -14px 0 36px rgba(0,0,0,.24); backdrop-filter: blur(12px);
+      }
+      .board-side-rail:not(.has-selection) {
+        left: auto; border-color: rgba(148,163,184,.18);
+        background: linear-gradient(180deg, rgba(2,6,23,.94), rgba(15,23,42,.84));
+        box-shadow: -14px 0 36px rgba(0,0,0,.24); backdrop-filter: blur(12px);
+      }
+      .board-side-rail:not(.has-selection) .selected-status-empty { display: flex; }
+      .board-side-rail.target-mode { display: none !important; }
+      .selected-status-card {
+        flex: 1; min-height: 0; max-height: none; padding: 7px; overflow-y: auto; border-radius: 7px;
+      }
+      .selected-status-empty { flex: 1; min-height: 0; font-size: 11px; }
+      .selected-status-title { margin-bottom: 4px; font-size: 9px; }
+      .selected-status-list { gap: 4px; }
+      .selected-status-row { padding: 5px 0; gap: 5px; }
+      .selected-status-description { font-size: 9px; line-height: 1.35; }
+      .selected-status-zero { padding: 7px; font-size: 9px; }
+      .turn-control-wrap { flex: 0 0 auto; }
+      .btn-end { min-width: 108px; padding: 6px 11px; font-size: 11px; border-width: 1px; }
+
+      #skillBar:not(:empty) {
+        display: flex !important; min-height: 58px; max-height: 58px;
+        gap: 4px; padding: 3px 5px;
+      }
+      #skillBar:empty { display: none !important; }
+      #skillBar .skill-card {
+        width: 126px; height: 50px; min-height: 50px;
+        display: grid; grid-template-columns: 30px minmax(0, 1fr);
+        grid-template-rows: 17px 15px 14px; align-items: center;
+        gap: 0 4px; padding: 2px 4px;
+      }
+      #skillBar .sk-icon {
+        grid-column: 1; grid-row: 1 / 3; font-size: 21px;
+      }
+      #skillBar .sk-cost-row {
+        grid-column: 2; grid-row: 1; width: auto;
+        justify-content: flex-start; gap: 2px; margin: 0;
+      }
+      #skillBar .sk-cost-orb {
+        min-width: 30px; height: 16px; padding: 0 4px 0 2px; font-size: 8px;
+      }
+      #skillBar .sk-cost-orb .resource-glyph { width: 11px; height: 11px; }
+      #skillBar .sk-name {
+        grid-column: 2; grid-row: 2; width: auto; text-align: left; font-size: 9px;
+      }
+      #skillBar .sk-type-tag {
+        grid-column: 1; grid-row: 3; justify-self: center; font-size: 7px;
+      }
+      #skillBar .sk-unavailable-reason {
+        grid-column: 2; grid-row: 3; width: auto; max-width: 86px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        text-align: left; font-size: 7px; line-height: 1.1;
+      }
+      .training-bar {
+        min-height: 30px; max-height: 30px; flex-wrap: nowrap; gap: 4px; padding: 3px 5px;
+        overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+      }
+      .training-bar::-webkit-scrollbar { display: none; }
+      .training-bar select { flex: 0 0 auto !important; max-width: 190px; height: 23px; padding: 1px 5px; font-size: 10px; }
+      .training-bar .tb-btn { height: 23px; padding: 2px 7px; font-size: 10px; }
+      #arcHandContainer { bottom: -105px; height: 124px; }
+
+      #statusMsg {
+        left: 5px; bottom: 94px; transform: none;
+        width: calc(100vw - var(--mobile-battle-rail-width) - 10px);
+        min-height: 26px; padding: 5px 9px; font-size: 10px;
+      }
+      #targetOverlay { padding-top: 42px; gap: 5px; }
+      .target-mode-card { gap: 4px; padding: 6px 10px; border-radius: 9px; }
+      .target-source-name { font-size: 10px; }
+      .target-prompt { font-size: 15px; letter-spacing: .7px; }
+      .target-cancel-btn { height: 26px; padding: 3px 14px; font-size: 10px; }
+      body.target-mode-active #trainingBar { display: none !important; }
+      body.target-mode-active #statusMsg {
+        top: auto; left: 50%; bottom: 5px; transform: translateX(-50%);
+        width: min(440px, calc(100vw - 20px));
+      }
+      body.red43-qa #red43QaPanel { display: none; }
+
+      #trainingSetupOverlay { padding: 6px; }
+      .training-setup-sheet {
+        width: min(760px, calc(100vw - 12px)); max-height: calc(100dvh - 12px);
+        overflow-y: auto; padding: 10px 12px; gap: 7px; border-radius: 12px;
+      }
+      .training-setup-title { font-size: 15px; }
+      .training-setup-sub { margin-top: 2px; font-size: 10px; line-height: 1.3; }
+      .training-setup-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .training-setup-col { padding: 7px; gap: 5px; }
+      .training-setup-field { gap: 2px; }
+      .training-setup-field select { padding: 4px 6px; font-size: 11px; }
+      .training-piece-list { max-height: 92px; gap: 4px; padding: 4px; }
+      .training-piece-option { min-height: 28px; padding: 4px 6px; font-size: 10px; }
+      .training-piece-option input { width: 15px; height: 15px; }
+      .training-setup-hint { font-size: 9px; line-height: 1.25; }
+      .training-setup-actions { gap: 6px; }
+      .training-setup-btn { padding: 6px 10px; border-radius: 9px; font-size: 11px; }
+    }
   </style>
 </head>
 <body>
+
+  <div id="orientationGuard" role="status" aria-live="polite">
+    <div class="orientation-guard-card">
+      <div class="orientation-guard-icon" aria-hidden="true">↻</div>
+      <strong>请旋转设备</strong>
+      <span>战斗需要横屏空间。旋转后会自动恢复棋盘与技能操作。</span>
+      <small>最低 844 × 390 · 推荐 932 × 430</small>
+    </div>
+  </div>
 
   <!-- Fullscreen map exit button -->
   <div id="fullMapExitBtn" onclick="toggleFullMap()">退出全图</div>
@@ -1176,6 +1395,8 @@
     <div class="spinner"></div>
     <div style="font-size:14px;color:#64748b" id="loadingMsg">连接战场…</div>
   </div>
+
+  <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
 
   <aside id="red43QaPanel" aria-live="polite">
     <div class="red43-qa-title">RED-43 · OWNER TARGET QA</div>
@@ -1507,7 +1728,8 @@
     }
     function showTrainingSetup() {
       placingMode = false
-      selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
+      selectedPieceId = null
+      clearTargetInteraction('training-setup-opened')
       const btnPlace = document.getElementById('btnPlace')
       if (btnPlace) btnPlace.style.background = '#2d1a4e'
       const loading = document.getElementById('loadingOverlay')
@@ -1736,6 +1958,68 @@
       playerAlignments[myPlayerId] = initialAlignment
     }
     let pendingOptionAction = null  // original action awaiting selectedOption
+    let targetSubmissionPending = null // one target command waiting for authoritative confirmation
+    let locallyCancelledSelectionId = null
+    const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
+    window.__RVB_RED50_EVIDENCE__ = red50Evidence
+
+    function recordTargetClear(reason) {
+      red50Evidence.clearEvents.push({ reason: reason || 'unknown', at: Date.now() })
+      if (red50Evidence.clearEvents.length > 40) red50Evidence.clearEvents.shift()
+    }
+
+    function clearTargetInteraction(reason, options) {
+      const input = options || {}
+      const hadTarget = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      pendingSkill = null
+      pendingCardAction = null
+      targetSubmissionPending = null
+      if (input.keepMove !== true) pendingMove = false
+      if (hadTarget) recordTargetClear(reason)
+      document.body.classList.remove('target-mode-active')
+      if (input.message) setStatusMsg(input.message)
+      return hadTarget
+    }
+
+    function currentTargetSourceName() {
+      if (targetSubmissionPending && targetSubmissionPending.label) return targetSubmissionPending.label
+      if (pendingCardAction) {
+        const card = cardsById[pendingCardAction.cardId] || {}
+        return card.name || pendingCardAction.cardId || '当前卡牌'
+      }
+      if (pendingSkill && pendingSkill.skillId) {
+        const skill = skillDefOf(pendingSkill.skillId)
+        return skill.name || pendingSkill.skillId
+      }
+      return pendingSkill && pendingSkill.turnTargetActionType ? '规则目标选择' : '当前技能'
+    }
+
+    function submitTargetAction(action, label) {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return false
+      }
+      const stamped = withClientActionId(action)
+      targetSubmissionPending = {
+        clientActionId: stamped.clientActionId,
+        type: stamped.type,
+        label: label || currentTargetSourceName(),
+      }
+      red50Evidence.targetCommands.push({
+        clientActionId: stamped.clientActionId,
+        type: stamped.type,
+        pieceId: stamped.pieceId || stamped.targetPieceId || null,
+        targetX: stamped.targetX,
+        targetY: stamped.targetY,
+        selectionId: stamped.selectionId || null,
+      })
+      setStatusMsg('目标指令已提交，正在等待权威确认')
+      renderBoard()
+      renderTargetOverlay()
+      renderActionBar()
+      void doAction(stamped)
+      return true
+    }
 
     function clearCardPrimaryTarget(action) {
       const next = Object.assign({}, action || {})
@@ -1770,6 +2054,10 @@
 
     function enterActionTargetMode(action, preparation) {
       if (!action || !preparation || preparation.kind !== 'needTarget') return false
+      if (targetSubmissionPending) {
+        targetSubmissionPending = null
+        recordTargetClear('authoritative-next-target-step')
+      }
       if (action.type === 'playCard') {
         pendingCardAction = prepareCardTargetRetry(
           action,
@@ -2630,7 +2918,8 @@
         }
         myPlayerId = G.turn.currentPlayerId
         myFaction = getTrainingPlayerFaction(myPlayerId)
-        selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
+        selectedPieceId = null
+        clearTargetInteraction('training-started')
         lastActionCount = 0
         document.getElementById('loadingOverlay').style.display = 'none'
         syncTrainingPlayerOptionLabels()
@@ -2648,8 +2937,12 @@
     // ── Training: send admin patch ──
     async function sendPatch(body) {
       try {
+        const oldG = G
         G = await trainingApiFetch('PATCH', Object.assign({}, body, { battleState: G }))
-        render(); return true
+        const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+        render()
+        if (interactionFeedback) setStatusMsg(interactionFeedback)
+        return true
       } catch (e) { addLog('失败：' + e.message, 'err'); return false }
     }
 
@@ -2658,7 +2951,8 @@
       const next = myPlayerId === 'training-red' ? 'training-blue' : 'training-red'
       myPlayerId = next
       myFaction = getTrainingPlayerFaction(myPlayerId)
-      selectedPieceId = null; pendingMove = false; pendingSkill = null
+      selectedPieceId = null
+      clearTargetInteraction('perspective-switched')
       addLog('控制方 -> ' + trainingPlayerLabel(next), 'turn')
       const btn = document.getElementById('btnSwitchPov')
       if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(next)
@@ -2731,6 +3025,48 @@
 
     // ── Server-authoritative state handling ──
 
+    function reconcileBattleInteractionState(previousState, nextState) {
+      if (!nextState) return ''
+      const authoritativeSelectionId = nextState.pendingTargetSelection && nextState.pendingTargetSelection.selectionId
+      if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
+        locallyCancelledSelectionId = null
+      }
+      const selected = selectedPieceId && nextState.pieces
+        ? nextState.pieces.find(p => p.instanceId === selectedPieceId && p.currentHp > 0)
+        : null
+      if (selectedPieceId && !selected) {
+        selectedPieceId = null
+        clearTargetInteraction('selected-piece-unavailable')
+        validMoves = new Set()
+        return '选中棋子已离场，目标选择已清除'
+      }
+
+      const previousTurn = previousState && previousState.turn && previousState.turn.currentPlayerId
+      const nextTurn = nextState.turn && nextState.turn.currentPlayerId
+      if (previousTurn && nextTurn && String(previousTurn).toLowerCase() !== String(nextTurn).toLowerCase()) {
+        clearTargetInteraction('turn-changed')
+        validMoves = new Set()
+        return '回合已切换，目标选择已清除'
+      }
+
+      const preparation = (pendingSkill && pendingSkill.preparation)
+        || (pendingCardAction && pendingCardAction.preparation)
+      if (preparation && Number.isFinite(Number(preparation.stateRevision))) {
+        const revision = Number(nextState.targetingRevision || 0)
+        if (revision !== Number(preparation.stateRevision)) {
+          clearTargetInteraction('targeting-revision-changed')
+          validMoves = new Set()
+          return '战局状态已更新，请重新选择技能目标'
+        }
+      }
+
+      if (targetSubmissionPending) {
+        clearTargetInteraction('authoritative-confirmation')
+        return '目标指令已确认'
+      }
+      return ''
+    }
+
     // Apply an authoritative state snapshot received from server (WS or GET)
     var _lastAppliedState = null
     function resolveAuthoritySeed(state, seed) {
@@ -2764,6 +3100,7 @@
           if (alignment === 'light' || alignment === 'dark') playerAlignments[playerId.toLowerCase()] = alignment
         })
       }
+      const interactionFeedback = reconcileBattleInteractionState(oldG, G)
 
       // Init seeded RNG once
       if (seed && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
@@ -2785,6 +3122,7 @@
 
       if (oldG) { flushActionLog(oldG, G); spawnStateFloaters(oldG, G) }
       render()
+      if (interactionFeedback) setStatusMsg(interactionFeedback)
 
       if (G.gameOver || G.winner) { handleGameOver(); return }
 
@@ -2898,6 +3236,10 @@
           addLog('[DEBUG actionError] action=' + JSON.stringify(msg.action || null) + ' error=' + (msg.error || 'unknown') + ' needsTarget=' + (!!msg.needsTargetSelection) + ' needsOption=' + (!!msg.needsOptionSelection), 'err')
           if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
           if (msg.needsOptionSelection && msg.action) {
+            if (targetSubmissionPending) {
+              targetSubmissionPending = null
+              recordTargetClear('authoritative-next-option-step')
+            }
             var optionAction = Object.assign({}, msg.action)
             if (msg.preparation && msg.preparation.kind === 'needOption') {
               optionAction.selectionId = msg.preparation.selectionId
@@ -2907,9 +3249,12 @@
             renderActionBar()
             return
           }
+          const rejectionMessage = msg.error || 'unknown error'
+          red50Evidence.rejections.push({ code: msg.code || '', message: rejectionMessage, at: Date.now() })
+          clearTargetInteraction('server-rejected')
           addLog('服务端处理动作失败：' + (msg.error || 'unknown error'), 'err')
-          setStatusMsg('服务端处理动作失败：' + (msg.error || 'unknown error'))
-          renderActionBar()
+          render()
+          setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
         } else if (msg.type === 'pendingAction') {
           // Relay host: process guest action locally and push stateUpdate.
           if (wsMode === 'relay' && wsRole === 'host' && G &&
@@ -3087,16 +3432,31 @@
     function renderTargetOverlay() {
       const el = document.getElementById('targetOverlay')
       if (!el) return
-      if (pendingSkill || pendingCardAction) {
-        document.getElementById('targetPromptText').textContent = _targetPromptText()
+      const active = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      document.body.classList.toggle('target-mode-active', active)
+      if (active) {
+        document.getElementById('targetSourceName').textContent = currentTargetSourceName()
+        document.getElementById('targetPromptText').textContent = targetSubmissionPending
+          ? '指令已提交 · 等待权威确认'
+          : _targetPromptText()
+        const cancelButton = document.getElementById('targetCancelButton')
+        if (cancelButton) {
+          cancelButton.disabled = !!targetSubmissionPending
+          cancelButton.textContent = targetSubmissionPending ? '等待确认…' : '取消目标选择'
+        }
         el.classList.add('show')
       } else {
         el.classList.remove('show')
       }
     }
     function cancelTargetSelection() {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
         const pendingTarget = G.pendingTargetSelection
+        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
         doAction({
           type: 'cancelPendingSelection',
           playerId: myPlayerId,
@@ -3104,10 +3464,11 @@
           stateRevision: pendingTarget && pendingTarget.stateRevision,
         })
       }
-      pendingSkill = null; pendingCardAction = null; pendingMove = false
+      clearTargetInteraction('user-cancelled')
       setMoveButtonClass(false)
       const sp = autoMoveSelectedIfPossible()
       renderBoard(); renderSkillBar(sp || null); renderActionBar(); renderTargetOverlay()
+      setStatusMsg('已取消目标选择')
     }
 
     function setMoveButtonClass(active) {
@@ -3151,7 +3512,7 @@
     // Render
     function pendingTargetSelectionForMe() {
       const pbt = G && G.pendingTargetSelection
-      return !!(pbt && pbt.playerId && clientOwns(pbt.playerId))
+      return !!(pbt && pbt.playerId && clientOwns(pbt.playerId) && pbt.selectionId !== locallyCancelledSelectionId)
     }
 
     function pendingOptionSelectionForMe() {
@@ -3166,7 +3527,7 @@
 
     function battleInteractionMode() {
       if (TRAINING_MODE && placingMode) return 'place'
-      if (pendingSkill || (pendingCardAction && pendingCardAction.type)) return 'target'
+      if (pendingSkill || (pendingCardAction && pendingCardAction.type) || targetSubmissionPending) return 'target'
       if (pendingMove) return 'move'
       return 'inspect'
     }
@@ -3212,6 +3573,8 @@
         snapshot: snapshot,
         viewerId: myPlayerId,
         selectedPieceId: selectedPieceId,
+        skillsById: skillsById,
+        pieceTemplates: PIECES_BY_ID,
         interactionMode: battleInteractionMode(),
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
@@ -3488,6 +3851,54 @@
       </div>`
     }
 
+    function resolveSkillAvailability(piece, skillOrId) {
+      const sid = typeof skillOrId === 'string' ? skillOrId : skillIdOf(skillOrId)
+      const skill = typeof skillOrId === 'string'
+        ? pieceDispSkills(piece).find(candidate => skillIdOf(candidate) === sid)
+        : skillOrId
+      const skillData = skillDefOf(sid)
+      const isCharge = skillData.type === 'super'
+      const myMeta = G && G.players && G.players.find(player =>
+        player.playerId && player.playerId.toLowerCase() === myPlayerId
+      )
+      const actionPoints = myMeta ? (myMeta.actionPoints || 0) : 0
+      const chargePoints = myMeta ? (myMeta.chargePoints || 0) : 0
+      const actionCost = skillData.actionPointCost || 0
+      const chargeCost = isCharge ? (skillData.chargeCost ?? 1) : (skillData.chargeCost || 0)
+      const ownerId = String(piece && piece.ownerPlayerId || '').toLowerCase()
+      const viewerId = String(myPlayerId || '').toLowerCase()
+      const isOwned = !!ownerId && ownerId === viewerId
+      const isMyTurn = !!(G && G.turn && G.turn.currentPlayerId) &&
+        String(G.turn.currentPlayerId).toLowerCase() === viewerId
+      const inAction = !!(G && G.turn && G.turn.phase === 'action')
+      const onCooldown = !!skill && (skill.currentCooldown || 0) > 0
+      const noUses = !!skill && skill.usesRemaining === 0
+      const actionLow = actionPoints < actionCost
+      const chargeLow = chargePoints < chargeCost
+      const unavailableReason = !skill ? '该棋子不拥有此技能'
+        : skillData.kind === 'passive' ? '被动技能无法主动使用'
+          : !isOwned ? '不能操作敌方棋子'
+            : !isMyTurn ? '当前不是你的回合'
+              : !inAction ? '当前阶段不可使用技能'
+                : onCooldown ? '冷却中（剩余 ' + skill.currentCooldown + ' 回合）'
+                  : noUses ? '可用次数已耗尽'
+                    : actionLow ? '行动点不足（需要 ' + actionCost + '，当前 ' + actionPoints + '）'
+                      : chargeLow ? '充能点不足（需要 ' + chargeCost + '，当前 ' + chargePoints + '）'
+                        : ''
+      return {
+        available: !unavailableReason,
+        unavailableReason,
+        skillData,
+        isCharge,
+        onCooldown,
+        noUses,
+        actionCost,
+        chargeCost,
+        actionLow,
+        chargeLow,
+      }
+    }
+
     function renderSkillBar(piece) {
       const bar = document.getElementById('skillBar')
       if (!bar) return
@@ -3497,12 +3908,6 @@
         return
       }
 
-      const isMyTurn = G && G.turn && G.turn.currentPlayerId &&
-        G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      const inAction = G && G.turn && G.turn.phase === 'action'
-      const myMeta = G && G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-      const ap = myMeta ? (myMeta.actionPoints || 0) : 0
-      const cp = myMeta ? (myMeta.chargePoints || 0) : 0
       const skills = pieceDispSkills(piece).filter(sk => {
         const skData = skillDefOf(skillIdOf(sk))
         return skData.kind !== 'passive'
@@ -3512,24 +3917,25 @@
       bar.style.display = 'flex'
       bar.innerHTML = skills.map(sk => {
         const sid = skillIdOf(sk)
-        const skData = skillDefOf(sid)
-        const isCharge = skData.type === 'super'
-        const onCD = (sk.currentCooldown || 0) > 0
-        const noUses = sk.usesRemaining === 0
+        const availability = resolveSkillAvailability(piece, sk)
+        const skData = availability.skillData
+        const isCharge = availability.isCharge
+        const onCD = availability.onCooldown
+        const noUses = availability.noUses
         const isActive = pendingSkill && pendingSkill.skillId === sid
         const icon = skData.icon || (isCharge ? 'C' : 'S')
         const rawName = skData.name || sid
         const rawDesc = skData.description || ''
-        const apCost = skData.actionPointCost || 0
-        const cpCost = isCharge ? (skData.chargeCost ?? 1) : (skData.chargeCost || 0)
-        const apLow = ap < apCost
-        const cpLow = cp < cpCost
+        const apCost = availability.actionCost
+        const cpCost = availability.chargeCost
+        const apLow = availability.actionLow
+        const cpLow = availability.chargeLow
         const displayName = rawName.length > 7 ? rawName.slice(0, 6) + '...' : rawName
         const displayDesc = rawDesc.length > 22 ? rawDesc.slice(0, 21) + '...' : rawDesc
         const typeLabel = isCharge ? '充能' : '基础'
         const typeCls = isCharge ? 'cp' : 'ap'
-        const canAct = isMyTurn && inAction && piece.ownerPlayerId.toLowerCase() === myPlayerId
-        const disabled = !canAct || onCD || noUses
+        const disabled = !availability.available
+        const unavailableReason = availability.unavailableReason
 
         let cls = 'skill-card'
         if (isCharge) cls += ' sk-charge'
@@ -3546,8 +3952,9 @@
         if (rawDesc) titleParts.push(rawDesc)
         titleParts.push(`行动点消耗：${apCost}`)
         titleParts.push(`充能点消耗：${cpCost}`)
+        if (unavailableReason) titleParts.push('不可用：' + unavailableReason)
 
-        return `<div class="${cls}" onclick="dispatchBattleIntent({type:'select-skill',skillId:'${escHtml(sid)}'})" title="${escHtml(titleParts.join('\n'))}">
+        return `<button type="button" class="${cls}" onclick="dispatchBattleIntent({type:'select-skill',skillId:'${escHtml(sid)}'})" title="${escHtml(titleParts.join('\n'))}" aria-label="${escHtml(rawName + (unavailableReason ? '，' + unavailableReason : '，可使用'))}" aria-pressed="${isActive ? 'true' : 'false'}"${disabled ? ' disabled aria-disabled="true"' : ''}>
           ${cdCover}
           <div class="sk-cost-row">
             <span class="sk-cost-orb action ${apLow ? 'low' : ''}" title="行动点消耗"><span class="resource-glyph action"></span>${apCost}</span>
@@ -3556,7 +3963,8 @@
           <div class="sk-icon">${icon}</div>
           <div class="sk-name">${escHtml(displayName)}</div>
           <div class="sk-type-tag ${typeCls}">${typeLabel}</div>
-        </div>`
+          ${unavailableReason ? `<div class="sk-unavailable-reason">${escHtml(unavailableReason)}</div>` : ''}
+        </button>`
       }).join('')
     }
 
@@ -3750,7 +4158,7 @@
       const _waitingForOther = pendingOptionSelectionForOther()
       const btnEnd = document.getElementById('btnEnd')
       if (btnEnd) {
-        btnEnd.disabled = _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
+        btnEnd.disabled = !!targetSubmissionPending || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
         btnEnd.textContent = inAction ? '结束回合 ->' : '继续 ->'
         btnEnd.classList.toggle('is-start', inStart || inEnd)
       }
@@ -3758,9 +4166,11 @@
       const _selPiece = G && G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
       const _isOwnSelected = _selPiece && _selPiece.ownerPlayerId && _selPiece.ownerPlayerId.toLowerCase() === myPlayerId
       const _canMoveSelected = canAutoMovePiece(_selPiece)
-      setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
+      setMoveButtonDisabled(!!targetSubmissionPending || _waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
-      if (pendingSkill && pendingSkill.turnTargetActionType) {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+      } else if (pendingSkill && pendingSkill.turnTargetActionType) {
         setStatusMsg(_targetPromptText() || '选择回合目标')
       } else if (pendingOptionSelectionForOther()) {
         setStatusMsg('等待对方选择...')
@@ -3814,6 +4224,10 @@
 
     function onCellClick(x, y) {
       if (!G) return
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
 
@@ -3867,9 +4281,10 @@
         delete action.requestId
         delete action.preparation
         delete action.validTargets
+        const targetLabel = currentTargetSourceName()
         pendingCardAction = null
         document.getElementById('handTarget').style.display = 'none'
-        doAction(action)
+        submitTargetAction(action, targetLabel)
         return
       }
 
@@ -3900,12 +4315,13 @@
           hasEffectCode: !!_pts.effectCode,
           triggerContext: _pts.triggerContext
         } : null), 'info')
+        const targetLabel = currentTargetSourceName()
         pendingSkill = null
         setStatusMsg('已提交目标选择')
         renderBoard()
         renderActionBar()
         renderTargetOverlay()
-        doAction(action)
+        submitTargetAction(action, targetLabel)
         return
       }
 
@@ -3948,8 +4364,9 @@
             }
         // Set target using the first flat slot, then append later selectTarget calls to extraTargets.
         _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
+        const targetLabel = currentTargetSourceName()
         pendingSkill = null
-        doAction(action)
+        submitTargetAction(action, targetLabel)
         return
       }
 
@@ -3961,9 +4378,22 @@
     }
 
     function clearPieceSelection() {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
+      if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
+        const pendingTarget = G.pendingTargetSelection
+        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        void doAction({
+          type: 'cancelPendingSelection',
+          playerId: myPlayerId,
+          selectionId: pendingTarget && pendingTarget.selectionId,
+          stateRevision: pendingTarget && pendingTarget.stateRevision,
+        })
+      }
+      clearTargetInteraction('selection-cleared')
       selectedPieceId = null
-      pendingMove = false
-      pendingSkill = null
       validMoves = new Set()
       setMoveButtonClass(false)
       const pieceSelect = document.getElementById('pieceSelect')
@@ -3973,12 +4403,26 @@
     }
 
     function selectPiece(instanceId) {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
       if (selectedPieceId === instanceId) {
         clearPieceSelection()
         return
       }
+      if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
+        const pendingTarget = G.pendingTargetSelection
+        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        void doAction({
+          type: 'cancelPendingSelection',
+          playerId: myPlayerId,
+          selectionId: pendingTarget && pendingTarget.selectionId,
+          stateRevision: pendingTarget && pendingTarget.stateRevision,
+        })
+      }
+      clearTargetInteraction('piece-switched')
       selectedPieceId = instanceId
-      pendingSkill = null
       // Sync dropdown
       const pieceSelect = document.getElementById('pieceSelect')
       if (pieceSelect) {
@@ -4008,6 +4452,10 @@
     // selectSkillCard: called when a skill card in the skill bar is clicked
     async function selectSkillCard(skId) {
       if (!selectedPieceId || !skId || !G) return
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
       const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
       if (!sp) return
       const skData = skillDefOf(skId)
@@ -4016,31 +4464,21 @@
 
       // Toggle off: clicking the active skill again cancels selection
       if (pendingSkill && pendingSkill.skillId === skId) {
-        pendingSkill = null
+        clearTargetInteraction('active-skill-cancelled')
         autoMoveSelectedIfPossible()
         renderBoard(); renderSkillBar(sp); renderActionBar(); renderTargetOverlay()
+        setStatusMsg('已取消技能目标选择')
         return
       }
 
-      pendingMove = false
-      setMoveButtonClass(false)
-
-      // Pre-check resources so failed clicks explain themselves before sending an action.
-      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-      if (myMeta) {
-        const apCost = skData.actionPointCost || 0
-        if (apCost > 0 && (myMeta.actionPoints || 0) < apCost) {
-          setStatusMsg('行动点不足（需要 ' + apCost + '，剩余 ' + (myMeta.actionPoints || 0) + '）')
-          return
-        }
-        if (isCharge) {
-          const cpCost = skData.chargeCost ?? 1
-          if ((myMeta.chargePoints || 0) < cpCost) {
-            setStatusMsg('充能点不足（需要 ' + cpCost + '，剩余 ' + (myMeta.chargePoints || 0) + '）')
-            return
-          }
-        }
+      const availability = resolveSkillAvailability(sp, skId)
+      if (!availability.available) {
+        setStatusMsg(availability.unavailableReason || '该技能当前不可用')
+        return
       }
+
+      clearTargetInteraction('skill-selected')
+      setMoveButtonClass(false)
 
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
       await doAction(draftAction)
@@ -4079,6 +4517,7 @@
     async function trainingDoAction(action) {
       if (!G) return
       try {
+        const wasTargetSubmission = !!targetSubmissionPending
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
         const oldG = G
@@ -4102,15 +4541,22 @@
         } else if (action.type === 'endTurn' || action.type === 'beginPhase') {
           selectedPieceId = null
         }
-        pendingSkill = null; pendingCardAction = null
+        const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+        if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
         autoMoveSelectedIfPossible()
         render(); checkClientGameOver()
+        if (interactionFeedback) setStatusMsg(interactionFeedback)
       } catch (e) {
+        let rejectionFeedback = ''
         if (e.needsTargetSelection) {
           if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
             setStatusMsg('权威目标查询未返回候选集合')
           }
         } else if (e.needsOptionSelection) {
+          if (targetSubmissionPending) {
+            targetSubmissionPending = null
+            recordTargetClear('authoritative-next-option-step')
+          }
           var optionRetry = Object.assign({}, action)
           if (e.preparation && e.preparation.kind === 'needOption') {
             optionRetry.selectionId = e.preparation.selectionId
@@ -4119,11 +4565,13 @@
           showOptionPicker(e.title||'请选择', e.options||[], optionRetry)
         } else {
           const errMsg = e.message || String(e) || '操作失败'
+          red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
+          clearTargetInteraction('server-rejected')
           addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
-          setStatusMsg(errMsg)
-          pendingSkill = null; pendingMove = false
+          rejectionFeedback = '操作被拒绝：' + errMsg + '；目标选择已清除'
         }
         renderActionBar()
+        if (rejectionFeedback) setStatusMsg(rejectionFeedback)
       }
     }
 
@@ -4132,8 +4580,17 @@
       var authorityTrace = null
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
-      if (!url) { addLog('未连接服务器', 'err'); return }
-      if (!G) { addLog('游戏状态未就绪', 'err'); return }
+      if (!url) {
+        clearTargetInteraction('transport-unavailable')
+        addLog('未连接服务器', 'err')
+        setStatusMsg('未连接服务器；目标选择已清除')
+        return
+      }
+      if (!G) {
+        clearTargetInteraction('state-unavailable')
+        addLog('游戏状态未就绪', 'err')
+        return
+      }
       try {
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
@@ -4174,8 +4631,12 @@
             RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
           } catch (e) {
             if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
-              addLog('本地处理失败：' + e.message, 'err')
-              renderActionBar()
+              const errMsg = e.message || String(e)
+              red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
+              clearTargetInteraction('server-rejected')
+              addLog('本地处理失败：' + errMsg, 'err')
+              render()
+              setStatusMsg('操作被拒绝：' + errMsg + '；目标选择已清除')
             }
           }
           return
@@ -4192,11 +4653,14 @@
         }
 
         addLog('WebSocket 未连接，无法发送动作；请检查网络和服务端', 'err')
-        setStatusMsg('WebSocket 未连接')
+        clearTargetInteraction('transport-unavailable')
         renderActionBar()
+        setStatusMsg('WebSocket 未连接；目标选择已清除')
       } catch (e) {
+        clearTargetInteraction('transport-failed')
         addLog('发送动作失败：' + e.message, 'err')
         renderActionBar()
+        setStatusMsg('发送动作失败：' + e.message + '；目标选择已清除')
       }
     }
 
@@ -4692,9 +5156,12 @@
   </div>
 
   <!-- Target selection overlay (pointer-events:none so board stays clickable) -->
-  <div id="targetOverlay">
-    <div class="target-prompt" id="targetPromptText">选择目标</div>
-    <button class="target-cancel-btn" onclick="dispatchBattleIntent({type:'cancel-target'})">取消</button>
+  <div id="targetOverlay" role="status" aria-live="polite">
+    <div class="target-mode-card">
+      <div class="target-source-name" id="targetSourceName">当前技能</div>
+      <div class="target-prompt" id="targetPromptText">选择目标</div>
+      <button type="button" class="target-cancel-btn" id="targetCancelButton" onclick="dispatchBattleIntent({type:'cancel-target'})">取消目标选择</button>
+    </div>
   </div>
 
   <!-- Fullscreen log overlay -->

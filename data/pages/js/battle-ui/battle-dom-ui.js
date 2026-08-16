@@ -12,9 +12,14 @@
       .replace(/'/g, '&#039;')
   }
 
-  function statusLabel(status) {
-    const extra = status.stacks ? 'x' + status.stacks : (status.duration ? status.duration + 'T' : '')
-    return status.label + extra
+  function statusMeta(status) {
+    const parts = []
+    if (status.stacks > 0) parts.push(status.stacks + ' 层')
+    if (status.duration > 0) parts.push('剩余 ' + status.duration + ' 回合')
+    if (status.duration < 0) parts.push('永久')
+    if (status.uses > 0) parts.push('剩余 ' + status.uses + ' 次')
+    if (status.intensity && status.intensity !== 1) parts.push('强度 ' + status.intensity)
+    return parts.join(' · ')
   }
 
   function create(options) {
@@ -30,34 +35,45 @@
       const meta = presentation
         ? presentation.resolve(status)
         : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
-      const detail = presentation ? presentation.detailText(status) : statusLabel(status)
+      const detail = presentation ? presentation.detailText(status) : statusMeta(status)
+      const description = status.description || meta.description
       return '<div class="selected-status-row" data-status-id="' + escapeHtml(status.id || '') + '">'
         + '<span class="selected-status-icon" style="--status-color:' + escapeHtml(meta.color) + '">' + escapeHtml(meta.glyph) + '</span>'
         + '<span class="selected-status-copy"><span class="selected-status-name">' + escapeHtml(status.label || status.id || '?') + '</span>'
         + (detail ? '<span class="selected-status-meta">' + escapeHtml(detail) + '</span>' : '')
-        + '<span class="selected-status-description">' + escapeHtml(meta.description) + '</span></span></div>'
+        + (description ? '<span class="selected-status-description">' + escapeHtml(description) + '</span>' : '')
+        + '</span></div>'
     }
 
     function updateSelectedPiece(model) {
       const element = byId('selectedPieceStatus')
       if (!element) return
       const piece = model.selection && model.selection.piece
+      const rail = element.closest ? element.closest('.board-side-rail') : null
+      const targetMode = !!(model.selection && model.selection.mode === 'target')
+      if (rail && rail.classList) {
+        rail.classList.toggle('has-selection', !!piece)
+        rail.classList.toggle('target-mode', targetMode)
+      }
       if (!piece) {
         element.className = 'selected-status-empty'
-        element.textContent = '\u672a\u9009\u4e2d\u68cb\u5b50'
-        element.removeAttribute('aria-label')
+        element.textContent = '未选中棋子'
+        if (element.dataset) delete element.dataset.pieceId
+        if (element.removeAttribute) element.removeAttribute('aria-label')
         return
       }
-      const tags = piece.statusSummary || []
-      const statusHtml = tags.length
-        ? '<div class="selected-status-list">' + tags.map(statusDetailHtml).join('') + '</div>'
-        : '<div class="selected-status-none">\u5f53\u524d\u65e0\u53ef\u89c1\u72b6\u6001</div>'
-      element.className = 'selected-status-card faction-' + piece.faction
-      element.setAttribute('aria-label', (piece.name || piece.id) + '\uff0c\u751f\u547d ' + piece.health.current + ' / ' + piece.health.max + '\uff0c\u53ef\u89c1\u72b6\u6001 ' + tags.length + ' \u4e2a')
-      element.innerHTML = '<div class="selected-piece-name">' + escapeHtml(piece.name) + '</div>'
-        + '<div class="selected-piece-hp">HP ' + piece.health.current + ' / ' + piece.health.max + '</div>'
-        + '<div class="selected-status-title">\u5168\u90e8\u53ef\u89c1\u72b6\u6001</div>'
-        + statusHtml
+      const statuses = piece.statuses || piece.statusSummary || []
+      const statusesHtml = statuses.length
+        ? statuses.map(statusDetailHtml).join('')
+        : '<div class="selected-status-zero">无特殊状态</div>'
+      element.className = 'selected-status-card has-selection' + (targetMode ? ' target-mode' : '')
+      if (element.dataset) element.dataset.pieceId = piece.id
+      if (element.setAttribute) {
+        element.setAttribute('aria-label', '特殊状态，共 ' + statuses.length + ' 个')
+        element.setAttribute('aria-live', 'polite')
+      }
+      element.innerHTML = '<div class="selected-status-title">特殊状态 <span>' + statuses.length + '</span></div>'
+        + '<div class="selected-status-list">' + statusesHtml + '</div>'
     }
 
     function updateHud(model) {

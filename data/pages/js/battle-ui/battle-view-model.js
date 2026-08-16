@@ -5,6 +5,15 @@
     return Number.isFinite(Number(value)) ? Number(value) : fallback
   }
 
+  function firstNumber(values, fallback) {
+    for (let index = 0; index < values.length; index += 1) {
+      if (values[index] !== null && values[index] !== undefined && Number.isFinite(Number(values[index]))) {
+        return Number(values[index])
+      }
+    }
+    return fallback
+  }
+
   function cellKey(x, y) {
     return numberOr(x, 0) + ',' + numberOr(y, 0)
   }
@@ -41,46 +50,72 @@
     return String(status.name || status.type || status.id || '?')
   }
 
-  function normalizeStatuses(piece) {
+  function normalizeStatuses(piece, visibleTags) {
     const statuses = []
     const seen = new Set()
-    ;[].concat(piece.statusTags || [], piece.buffs || [], piece.debuffs || []).forEach(function (status) {
+    const tags = visibleTags !== undefined ? visibleTags : piece.statusTags
+    ;[].concat(tags || [], piece.buffs || [], piece.debuffs || []).forEach(function (status) {
       if (!status || status.visible === false) return
-      const id = String(status.id || status.type || status.name || statusLabel(status))
-      const key = id + ':' + String(status.sourceId || '')
+      const item = typeof status === 'string' ? { id: status, name: status } : status
+      const id = String(item.id || item.type || item.name || statusLabel(item))
+      const key = id + ':' + String(item.sourceId || '')
       if (seen.has(key)) return
       seen.add(key)
       statuses.push({
         id: id,
-        label: statusLabel(status),
-        stacks: numberOr(status.stacks, 0),
-        duration: numberOr(
-          status.remainingDuration,
-          numberOr(status.currentDuration, numberOr(status.duration, 0))
-        ),
+        label: statusLabel(item),
+        description: String(item.description || item.message || ''),
+        stacks: firstNumber([item.stacks], 0),
+        duration: firstNumber([
+          item.remainingDuration,
+          item.currentDuration,
+          item.remainingTurns,
+          item.duration,
+        ], 0),
+        uses: firstNumber([item.remainingUses, item.currentUses], 0),
+        intensity: firstNumber([item.intensity], 0),
       })
     })
     return statuses
   }
 
-  function pieceMaxHealth(piece) {
-    return Math.max(1, numberOr(piece.maxHp, numberOr(piece.stats && piece.stats.maxHp, numberOr(piece.currentHp, 1))))
-  }
-
-  function normalizePiece(piece) {
-    const currentHealth = Math.max(0, numberOr(piece.currentHp, 0))
+  function normalizePiece(piece, context) {
+    const rawPieces = context.rawPieces || []
+    const template = (context.pieceTemplates || {})[piece.templateId] || {}
+    const master = piece.masterPieceId && rawPieces.find(function (candidate) {
+      return candidate.instanceId === piece.masterPieceId && candidate.currentHp > 0
+    })
+    const currentHealth = Math.max(0, firstNumber([
+      master && master.currentHp,
+      piece.displayCurrentHp,
+      piece.currentHp,
+    ], 0))
+    const maxHealth = Math.max(1, firstNumber([
+      master && (master.maxHp || (master.stats && master.stats.maxHp)),
+      piece.displayMaxHp,
+      piece.maxHp,
+      piece.stats && piece.stats.maxHp,
+      currentHealth,
+    ], 1))
+    const ownerPlayerId = String(piece.ownerPlayerId || '')
+    const statuses = normalizeStatuses(
+      piece,
+      piece.displayStatusTags !== undefined ? piece.displayStatusTags : piece.statusTags,
+    )
     return {
       id: String(piece.instanceId || piece.id || ''),
       templateId: String(piece.templateId || ''),
       portraitId: String(piece.templateId || ''),
-      name: String(piece.name || piece.templateId || piece.instanceId || '?'),
-      ownerPlayerId: String(piece.ownerPlayerId || ''),
+      name: String(piece.name || template.name || piece.templateId || piece.instanceId || '?'),
+      ownerPlayerId: ownerPlayerId,
       faction: piece.faction === 'blue' ? 'blue' : 'red',
       x: piece.x == null ? null : numberOr(piece.x, 0),
       y: piece.y == null ? null : numberOr(piece.y, 0),
-      health: { current: currentHealth, max: pieceMaxHealth(piece) },
+      health: { current: currentHealth, max: maxHealth },
       visible: piece.visible !== false && currentHealth > 0,
-      statusSummary: normalizeStatuses(piece),
+      alive: piece.currentHp > 0,
+      statuses: statuses,
+      statusSummary: statuses,
     }
   }
 
@@ -127,14 +162,19 @@
     const input = options || {}
     const snapshot = input.snapshot || {}
     const map = snapshot.map || { width: 0, height: 0, tiles: [] }
-    const pieces = (snapshot.pieces || []).map(normalizePiece)
     const turn = snapshot.turn || {}
+    const viewerId = String(input.viewerId || '')
+    const rawPieces = snapshot.pieces || []
+    const pieceContext = {
+      rawPieces: rawPieces,
+      pieceTemplates: input.pieceTemplates || {},
+    }
+    const pieces = rawPieces.map(function (piece) { return normalizePiece(piece, pieceContext) })
     const selectedPieceId = input.selectedPieceId || null
     const selectedPiece = selectedPieceId
       ? pieces.find(function (piece) { return piece.id === selectedPieceId }) || null
       : null
     const legal = input.legal || {}
-    const viewerId = String(input.viewerId || '')
     const players = (snapshot.players || []).map(function (player) {
       return normalizePlayer(player, pieces, turn.currentPlayerId)
     })
