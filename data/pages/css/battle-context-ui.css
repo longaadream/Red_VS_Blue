@@ -27,12 +27,18 @@
   box-shadow: inset 2px 0 0 rgba(96, 165, 250, 0.72) !important;
 }
 
-.action-bar,
-.training-bar {
+.action-bar {
   border-color: transparent !important;
   background: rgba(5, 11, 23, 0.52) !important;
   box-shadow: none !important;
   backdrop-filter: blur(10px);
+}
+
+.training-bar {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
 }
 
 .action-bar select,
@@ -243,14 +249,22 @@
 }
 
 .hand-panel {
-  border-color: transparent !important;
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0.04), rgba(2, 6, 23, 0.78) 46%, rgba(2, 6, 23, 0.94)) !important;
+  border: 0 !important;
+  background: transparent !important;
   box-shadow: none !important;
 }
 
+.hand-panel::after { content: none !important; }
+
 .hand-label {
-  border-color: transparent !important;
+  position: absolute;
+  top: 2px;
+  left: 8px;
+  z-index: 2;
+  min-height: 0 !important;
+  border: 0 !important;
   background: transparent !important;
+  pointer-events: none;
 }
 
 .hand-scroll {
