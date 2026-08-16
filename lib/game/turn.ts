@@ -2172,6 +2172,7 @@ function applyBattleActionInternal(
               type: 'triggerEffect', playerId: action.playerId, turn: next.turn.turnNumber, payload: { message },
             }))
           }
+          if (resumedTrigger.blocked) return next
           if (resumedTrigger.needsOptionSelection || resumedTrigger.needsTargetSelection) {
             next.pendingOptionSelection = {
               playerId: (resumedTrigger as any).playerId || action.playerId,

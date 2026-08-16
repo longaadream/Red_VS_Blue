@@ -485,6 +485,32 @@ describe('interrupted skill release', () => {
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
   })
 
+  it('does not pay or execute a skill when the resumed trigger blocks', () => {
+    const caster = makePiece({ instanceId: 'blocked-pending-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' }) as any
+    state.skillsById['blocked-pending-skill'] = {
+      id: 'blocked-pending-skill', name: 'Blocked Pending Skill', description: '', kind: 'active', type: 'normal',
+      cooldownTurns: 0, maxCharges: 0, powerMultiplier: 1, actionPointCost: 1, range: 'self', requiresTarget: false,
+      code: "function executeSkill(context) { context.battle.extensions.executed = true; return { success: true }; }",
+    }
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce(() => ({
+      success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'],
+      title: 'Choose', pendingRuleId: 'blocked-rule', pendingRuleSourceId: 'blocked-pending-caster',
+    } as any)).mockImplementationOnce(() => ({ success: true, messages: ['blocked'], blocked: true } as any))
+
+    const pending = applyBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: 'blocked-pending-caster', skillId: 'blocked-pending-skill',
+    } as any) as any
+    const resumed = applyBattleAction(pending, {
+      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'yes',
+    } as any) as any
+
+    expect(resumed.players[0].actionPoints).toBe(2)
+    expect(resumed.extensions.executed).toBeUndefined()
+    expect(resumed.actions.some((entry: any) => entry.type === 'useBasicSkill')).toBe(false)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
+  })
+
   it('pays AP, cooldown, and uses when the caster dies during beforeSkillUse', () => {
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
     ;(caster as any).skills = [{ skillId: 'paid-fizzle', currentCooldown: 0, usesRemaining: 1 }]
