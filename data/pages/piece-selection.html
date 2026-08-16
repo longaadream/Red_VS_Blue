@@ -266,8 +266,8 @@
   </div>
 
   <div class="alignment-panel">
-    <button class="alignment-btn light" id="alignmentLightBtn" onclick="setAlignment('light')">光方</button>
-    <button class="alignment-btn dark" id="alignmentDarkBtn" onclick="setAlignment('dark')">暗方</button>
+    <button class="alignment-btn light" id="alignmentLightBtn" disabled>光方</button>
+    <button class="alignment-btn dark" id="alignmentDarkBtn" disabled>暗方</button>
   </div>
   <div id="alignmentLockNotice" class="alignment-lock-notice">阵营将在大厅准备后锁定</div>
 
@@ -352,7 +352,7 @@
     let selectedIds = new Set()
     let pollTimer = null
     let playerFaction = null    // 'red' | 'blue' turn order seat
-    let playerAlignment = null  // 'good' | 'evil' piece pool
+    let playerAlignment = null  // 'light' | 'dark' content alignment
     playerAlignment = params.get('alignment') || playerAlignment
     let wsReady = false
     let latestRoom = null
@@ -450,15 +450,10 @@
       return result
     }
 
-    async function setAlignment(alignment) {
-      if (alignment !== 'light' && alignment !== 'dark') return
-      if (alignment === playerAlignment) return
-      alert('阵营已在大厅锁定，无法在选棋阶段切换')
-    }
-
     function navigateBattle() {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       const p = new URLSearchParams({ roomId, playerId, playerName })
+      if (playerAlignment) p.set('alignment', playerAlignment)
       if (accountId) p.set('accountId', accountId)
       if (params.get('debug')) p.set('debug', params.get('debug'))
       if (window.RvBUtils && RvBUtils.appendServerParams) RvBUtils.appendServerParams(p)

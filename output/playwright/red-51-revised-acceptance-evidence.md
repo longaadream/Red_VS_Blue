@@ -41,17 +41,17 @@ The training setup creates one visible coin card in this isolated harness. For t
 ## Automated checks
 
 ```text
-npm test -- --run tests/game/battle-context-layout.test.ts tests/game/battle-page-contract.test.ts tests/game/battle-piece-status-summary.test.ts tests/game/battle-ui-boundary.test.ts
-4 files passed, 18 tests passed
+npm test -- --run tests/game/battle-context-layout.test.ts tests/game/battle-page-contract.test.ts tests/game/battle-piece-status-summary.test.ts tests/game/battle-ui-boundary.test.ts tests/red67-player-alignment.test.ts
+5 files passed, 20 tests passed
 
 npm test -- --run
-35 files passed, 279 tests passed
+37 files passed, 303 tests passed
 
 npx eslint <affected RED-51 JS/TS files>
 passed
 
 npm run check:encoding
-546 text files checked
+548 text files checked
 
 git diff --check
 passed
