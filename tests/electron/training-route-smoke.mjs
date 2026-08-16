@@ -290,6 +290,79 @@ try {
     `Training battle UI is not visible: ${JSON.stringify(battle)}`,
   )
 
+  const placementOptions = await evaluate(battleTarget, `(() => {
+    const owner = document.getElementById('placeOwner')
+    if (!owner || typeof refreshPlaceTemplates !== 'function') return []
+    return G.players.map((player) => {
+      owner.value = player.playerId
+      refreshPlaceTemplates()
+      const templateIds = Array.from(document.querySelectorAll('#placeTemplate option'))
+        .map((option) => option.value)
+        .filter(Boolean)
+      return {
+        faction: player.faction,
+        templateIds,
+        templateFactions: templateIds.map((id) => PIECES_BY_ID[id]?.faction || null),
+      }
+    })
+  })()`)
+  assert(
+    placementOptions.length === 2 && placementOptions.every((entry) => entry.templateIds.length > 0),
+    `Training placement templates are empty: ${JSON.stringify(placementOptions)}`,
+  )
+  assert(
+    placementOptions.every((entry) => {
+      const expectedFaction = entry.faction === 'red' ? 'evil' : 'good'
+      return entry.templateFactions.every((faction) => faction === expectedFaction || faction === 'neutral' || faction === null)
+    }),
+    `Training placement templates include the wrong faction: ${JSON.stringify(placementOptions)}`,
+  )
+
+  const placementRequest = await evaluate(battleTarget, `(() => {
+    const owner = document.getElementById('placeOwner')
+    const template = document.getElementById('placeTemplate')
+    if (!owner || !template) return null
+    owner.value = G.players[1].playerId
+    refreshPlaceTemplates()
+    const option = Array.from(template.options).find((candidate) => candidate.value)
+    if (!option) return null
+    template.value = option.value
+    if (!placingMode) togglePlaceMode()
+    const cell = currentBattleViewModel?.legal?.placementCells?.[0]
+    if (!cell) return null
+    const request = {
+      beforeCount: G.pieces.length,
+      ownerPlayerId: owner.value,
+      templateId: template.value,
+      x: cell.x,
+      y: cell.y,
+    }
+    onCellClick(cell.x, cell.y)
+    return request
+  })()`)
+  assert(placementRequest, 'Training placement request could not be prepared')
+  await waitForExpression(
+    async () => (await listTargets()).find((target) => target.url.includes('/battle.html?mode=training')),
+    `G.pieces.length === ${placementRequest.beforeCount + 1}`,
+    5000,
+    'Placed training piece',
+  )
+  const placedPiece = await evaluate(battleTarget, `(() => {
+    const piece = G.pieces.find((candidate) =>
+      candidate.ownerPlayerId === ${JSON.stringify(placementRequest.ownerPlayerId)}
+      && candidate.templateId === ${JSON.stringify(placementRequest.templateId)}
+      && candidate.x === ${placementRequest.x}
+      && candidate.y === ${placementRequest.y}
+      && candidate.currentHp > 0)
+    return piece ? {
+      ownerPlayerId: piece.ownerPlayerId,
+      templateId: piece.templateId,
+      x: piece.x,
+      y: piece.y,
+    } : null
+  })()`)
+  assert(placedPiece, `Training piece was not placed: ${JSON.stringify(placementRequest)}`)
+
   const screenshotConnection = await connectTarget(battleTarget)
   const screenshot = await screenshotConnection.command('Page.captureScreenshot', {
     format: 'png',
@@ -305,6 +378,9 @@ try {
     setupElapsedMs,
     setup,
     battle,
+    placementOptions,
+    placementRequest,
+    placedPiece,
     screenshotPath,
   }))
 } catch (error) {
