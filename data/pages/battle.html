@@ -21,6 +21,8 @@
     :root {
       --bg: #0f172a; --bg2: #1e293b; --border: #334155;
       --text: #e2e8f0; --muted: #64748b; --red: #ef4444; --blue: #3b82f6;
+      --mobile-landscape-min: 844px;
+      --mobile-landscape-recommended: 932px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html, body { height: 100%; overflow: hidden; }
@@ -1202,9 +1204,161 @@
     }
     .board-stage { transform-origin: 0 0 !important; will-change: transform !important; }
     .cell::before { opacity: .68 !important; filter: saturate(.72) contrast(.78) brightness(.86) !important; }
+
+    /* Mobile battle acceptance contract: portrait is guarded; landscape remains playable. */
+    #orientationGuard {
+      display: none; position: fixed; inset: 0; z-index: 12000;
+      place-items: center; padding: 24px;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(37,99,235,.2), transparent 42%),
+        linear-gradient(155deg, #020617, #0f172a 58%, #111827);
+      color: #e2e8f0; text-align: center; pointer-events: auto;
+    }
+    .orientation-guard-card {
+      width: min(330px, 100%); display: grid; justify-items: center; gap: 10px;
+      padding: 24px 20px; border: 1px solid rgba(148,163,184,.28); border-radius: 20px;
+      background: rgba(15,23,42,.82); box-shadow: 0 28px 80px rgba(0,0,0,.5);
+      backdrop-filter: blur(18px);
+    }
+    .orientation-guard-icon {
+      width: 72px; height: 46px; display: grid; place-items: center;
+      border: 3px solid #60a5fa; border-radius: 10px; color: #bfdbfe;
+      font-size: 24px; transform: rotate(-8deg); box-shadow: 0 0 24px rgba(59,130,246,.28);
+    }
+    .orientation-guard-card strong { font-size: 21px; color: #f8fafc; }
+    .orientation-guard-card span { color: #94a3b8; font-size: 13px; line-height: 1.6; }
+    .orientation-guard-card small { color: #64748b; font-size: 11px; }
+
+    @media (orientation: portrait) and (max-width: 760px) {
+      #orientationGuard { display: grid; }
+    }
+
+    @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
+      body { --mobile-battle-rail-width: clamp(226px, 30vw, 276px); }
+      .battle-layout, .main-panel, .board-wrap, .board-shell-3d { min-height: 0; min-width: 0; }
+      .topbar {
+        top: 5px !important; right: 5px !important; max-width: 220px !important;
+        flex-wrap: nowrap !important; padding: 3px !important; gap: 3px !important;
+      }
+      .topbar button, .topbar a, .topbar .btn-fullmap, .topbar .btn-surrender {
+        min-width: 28px !important; height: 26px !important; padding: 0 5px !important;
+        font-size: 10px !important;
+      }
+      .phase-bar {
+        top: 5px !important; left: 5px !important; max-width: calc(100vw - 235px) !important;
+        min-height: 32px !important; padding: 3px 5px !important; gap: 4px !important;
+        flex-wrap: nowrap !important; overflow: hidden !important;
+      }
+      #phaseLabel { flex-shrink: 0; font-size: 10px; }
+      #playerResCards { max-width: none; flex-wrap: nowrap; gap: 3px; }
+      .player-state-chip { min-width: 94px; padding: 2px 4px; }
+      .player-state-main { gap: 3px; font-size: 9px; }
+      .resource-orb { padding: 1px 3px; font-size: 9px; }
+
+      .board-wrap { padding: 0 !important; }
+      .board-shell-3d {
+        width: 100%; height: 100%; gap: 0; align-items: stretch; justify-content: stretch;
+      }
+      .board-shell-3d .board-stage { min-height: 0; }
+      .board-side-rail {
+        position: relative; inset: auto; z-index: 74;
+        width: var(--mobile-battle-rail-width); min-height: 0; max-height: none;
+        align-self: stretch; padding: 43px 6px 4px; gap: 5px;
+        border: 0; border-left: 1px solid rgba(148,163,184,.18); border-radius: 0;
+        background: linear-gradient(180deg, rgba(2,6,23,.94), rgba(15,23,42,.84));
+        box-shadow: -14px 0 36px rgba(0,0,0,.24); backdrop-filter: blur(12px);
+      }
+      .board-side-rail:not(.has-selection) {
+        left: auto; border-color: rgba(148,163,184,.18);
+        background: linear-gradient(180deg, rgba(2,6,23,.94), rgba(15,23,42,.84));
+        box-shadow: -14px 0 36px rgba(0,0,0,.24); backdrop-filter: blur(12px);
+      }
+      .board-side-rail:not(.has-selection) .selected-status-empty { display: flex; }
+      .board-side-rail.target-mode { display: none !important; }
+      .selected-status-card {
+        flex: 1; min-height: 0; max-height: none; padding: 7px; overflow-y: auto; border-radius: 7px;
+      }
+      .selected-status-empty { flex: 1; min-height: 0; font-size: 11px; }
+      .selected-detail-header { gap: 7px; }
+      .selected-detail-portrait { width: 40px; height: 40px; flex-basis: 40px; border-radius: 9px; font-size: 19px; }
+      .selected-piece-name { font-size: 13px; }
+      .selected-detail-access { margin-bottom: 2px; font-size: 9px; }
+      .selected-piece-hp { font-size: 10px; }
+      .selected-detail-close { width: 26px; height: 26px; border-radius: 7px; font-size: 16px; }
+      .selected-detail-stats { gap: 4px; margin: 7px 0; }
+      .selected-detail-stats > div { gap: 1px; padding: 4px 2px; border-radius: 6px; }
+      .selected-detail-stats strong { font-size: 12px; }
+      .selected-detail-stats span { font-size: 8px; }
+      .selected-detail-section { margin-top: 7px; }
+      .selected-status-title { margin-bottom: 4px; font-size: 9px; }
+      .selected-status-list, .selected-skill-list { gap: 4px; }
+      .selected-status-item, .selected-skill-item { padding: 6px; border-radius: 7px; }
+      .selected-status-item-desc, .selected-skill-desc { font-size: 9px; line-height: 1.35; }
+      .selected-skill-item { gap: 4px; }
+      .selected-skill-icon { width: 18px; font-size: 14px; }
+      .selected-skill-name { font-size: 10px; }
+      .selected-skill-meta > span { font-size: 8px; }
+      .selected-detail-zero { padding: 7px; font-size: 9px; }
+      .turn-control-wrap { flex: 0 0 auto; }
+      .btn-end { min-width: 108px; padding: 6px 11px; font-size: 11px; border-width: 1px; }
+
+      #skillBar { display: none !important; }
+      .training-bar {
+        min-height: 30px; max-height: 30px; flex-wrap: nowrap; gap: 4px; padding: 3px 5px;
+        overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+      }
+      .training-bar::-webkit-scrollbar { display: none; }
+      .training-bar select { flex: 0 0 auto !important; max-width: 190px; height: 23px; padding: 1px 5px; font-size: 10px; }
+      .training-bar .tb-btn { height: 23px; padding: 2px 7px; font-size: 10px; }
+      #arcHandContainer { bottom: -105px; height: 124px; }
+
+      #statusMsg {
+        left: 5px; bottom: 34px; transform: none;
+        width: calc(100vw - var(--mobile-battle-rail-width) - 10px);
+        min-height: 26px; padding: 5px 9px; font-size: 10px;
+      }
+      #targetOverlay { padding-top: 42px; gap: 5px; }
+      .target-mode-card { gap: 4px; padding: 6px 10px; border-radius: 9px; }
+      .target-source-name { font-size: 10px; }
+      .target-prompt { font-size: 15px; letter-spacing: .7px; }
+      .target-cancel-btn { height: 26px; padding: 3px 14px; font-size: 10px; }
+      body.target-mode-active #trainingBar { display: none !important; }
+      body.target-mode-active #statusMsg {
+        top: auto; left: 50%; bottom: 5px; transform: translateX(-50%);
+        width: min(440px, calc(100vw - 20px));
+      }
+      body.red43-qa #red43QaPanel { display: none; }
+
+      #trainingSetupOverlay { padding: 6px; }
+      .training-setup-sheet {
+        width: min(760px, calc(100vw - 12px)); max-height: calc(100dvh - 12px);
+        overflow-y: auto; padding: 10px 12px; gap: 7px; border-radius: 12px;
+      }
+      .training-setup-title { font-size: 15px; }
+      .training-setup-sub { margin-top: 2px; font-size: 10px; line-height: 1.3; }
+      .training-setup-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .training-setup-col { padding: 7px; gap: 5px; }
+      .training-setup-field { gap: 2px; }
+      .training-setup-field select { padding: 4px 6px; font-size: 11px; }
+      .training-piece-list { max-height: 92px; gap: 4px; padding: 4px; }
+      .training-piece-option { min-height: 28px; padding: 4px 6px; font-size: 10px; }
+      .training-piece-option input { width: 15px; height: 15px; }
+      .training-setup-hint { font-size: 9px; line-height: 1.25; }
+      .training-setup-actions { gap: 6px; }
+      .training-setup-btn { padding: 6px 10px; border-radius: 9px; font-size: 11px; }
+    }
   </style>
 </head>
 <body>
+
+  <div id="orientationGuard" role="status" aria-live="polite">
+    <div class="orientation-guard-card">
+      <div class="orientation-guard-icon" aria-hidden="true">↻</div>
+      <strong>请旋转设备</strong>
+      <span>战斗需要横屏空间。旋转后会自动恢复棋盘与技能详情。</span>
+      <small>最低 844 × 390 · 推荐 932 × 430</small>
+    </div>
+  </div>
 
   <!-- Fullscreen map exit button -->
   <div id="fullMapExitBtn" onclick="toggleFullMap()">退出全图</div>

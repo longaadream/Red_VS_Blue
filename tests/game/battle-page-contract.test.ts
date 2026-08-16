@@ -131,4 +131,17 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('@media (prefers-reduced-motion: reduce)')
     expect(battlePage).toContain('button:focus-visible')
   })
+
+  it('requires landscape play on phones and reserves usable space at both mobile acceptance sizes', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('id="orientationGuard"')
+    expect(battlePage).toContain('请旋转设备')
+    expect(battlePage).toContain('@media (orientation: portrait) and (max-width: 760px)')
+    expect(battlePage).toContain('@media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px)')
+    expect(battlePage).toContain('--mobile-landscape-min: 844px')
+    expect(battlePage).toContain('--mobile-landscape-recommended: 932px')
+    expect(battlePage).toContain('.board-side-rail.target-mode')
+    expect(battlePage).toContain('body.target-mode-active #statusMsg')
+  })
 })
