@@ -632,6 +632,11 @@
     canvas.style.touchAction = 'none'
 
     _listen(canvas, 'pointerdown', e => {
+      // Right-click is reserved for piece inspection. Never let it enter the
+      // pan/pinch state: browsers may omit the matching pointerup when the
+      // context menu is suppressed, leaving a stale pointer that pans the
+      // board before the next inspection attempt.
+      if (e.pointerType === 'mouse' && e.button !== 0) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (_pointers.size === 1) {
         _panStart = { x: e.clientX, y: e.clientY }
@@ -692,11 +697,26 @@
 
     _listen(canvas, 'contextmenu', e => {
       e.preventDefault()
-      const coords = screenToCell(e.clientX, e.clientY)
-      if (!coords) return
-      const piece = _findPieceAt(coords.x, coords.y)
+      _resetPointerState(canvas)
+      let piece = _findPieceFromPointer(e.clientX, e.clientY)
+      if (!piece) {
+        const coords = screenToCell(e.clientX, e.clientY)
+        if (coords) piece = _findPieceAt(coords.x, coords.y)
+      }
       if (piece && _onIntent) _onIntent({ type: 'inspect-piece', pieceId: piece.id })
     })
+  }
+
+  function _resetPointerState(canvas) {
+    _pointers.forEach(function (_, pointerId) {
+      if (canvas && canvas.hasPointerCapture && canvas.hasPointerCapture(pointerId)) {
+        canvas.releasePointerCapture(pointerId)
+      }
+    })
+    _pointers.clear()
+    _panStart = null
+    _panMoved = false
+    _pinchDist = 0
   }
 
   function _getPinchDist() {
@@ -766,6 +786,29 @@
   function _findPieceAt(x, y) {
     if (!_currentModel) return null
     return (_currentModel.pieces || []).find(p => p.x === x && p.y === y && p.visible !== false) || null
+  }
+  function _findPieceFromPointer(clientX, clientY) {
+    if (!_currentModel || !_renderer || !_camera) return null
+    let closest = null
+    let closestDistance = Infinity
+
+    ;(_currentModel.pieces || []).forEach(piece => {
+      if (piece.visible === false) return
+      const obj = _pieceObjects.get(piece.id)
+      const x = obj ? obj.group.position.x : piece.x
+      const y = obj ? obj.group.position.z : piece.y
+      const point = projectCell(x, y, TILE_H / 2 + PIECE_H + 0.002)
+      if (!point) return
+      const dx = clientX - point.clientX
+      const dy = clientY - point.clientY
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      const hitRadius = Math.max(10, _projectedCellSpan(x, y) * 0.55)
+      if (distance > hitRadius || distance >= closestDistance) return
+      closest = piece
+      closestDistance = distance
+    })
+
+    return closest
   }
 
   // ── update — one-way presentation model input ─────────────────────────────────
