@@ -91,7 +91,7 @@ describe('battle piece health and negative-status summary', () => {
     expect(statusPresentation.detailText(negatives[3])).toContain('2回合')
   })
 
-  it('wires the shared presentation config into Three.js, fallback tokens, and full DOM detail', () => {
+  it('wires the shared presentation config into Three.js, fallback tokens, and the full detail modal', () => {
     const battlePage = readFileSync(resolve(pagesDir, 'battle.html'), 'utf8')
     const renderer = readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8')
     const domUi = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-dom-ui.js'), 'utf8')
@@ -108,7 +108,8 @@ describe('battle piece health and negative-status summary', () => {
     expect(renderer).toContain('_resetPointerState(canvas)')
     expect(renderer).toContain('const obj = _pieceObjects.get(piece.id)')
     expect(renderer).toContain('_projectedCellSpan(x, y) * 0.55')
-    expect(domUi).toContain('selected-status-row')
-    expect(domUi).toContain('detailText(status)')
+    expect(domUi).not.toContain('selectedPieceStatus')
+    expect(domUi).not.toContain('selected-status-row')
+    expect(domUi).not.toContain('updateSelectedPiece')
   })
 })

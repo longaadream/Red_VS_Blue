@@ -198,9 +198,9 @@
 - 合法集合：`battle-ui/battle-legal-actions.js` 只调用浏览器 `GameEngine` 的克隆/验证入口，不包含移动距离、技能范围、伤害或结算公式。
 - 组合器：`battle-ui/battle-presentation.js` 将同一个模型对象传入 renderer 与 DOM，并统一输出 `select-piece`、`select-skill`、`activate-cell`、`inspect-piece` 和 `cancel-target` 意图。
 - Three.js：`battle-renderer-3d.js` 的公共生命周期是 `init(options)`、`update(model)`、`resize()`、`resetView()`、`projectCell()`、`screenToCell()`、`dispose()`；只负责棋盘内表现。`resetView()` 只恢复镜头，不修改战局状态。
-- DOM：`battle-ui/battle-dom-ui.js` 负责 HUD 和选中棋子摘要；`data-battle-ui-region` 为技能、手牌和后续响应式任务保留稳定挂载点。
-- 响应式布局（RED-51）：`battle-responsive.css` 只重排上述稳定挂载点，`battle-responsive-mobile.css` 隔离 760px 及以下的可独立回退规则。HUD 固定在顶部安全区，棋盘占据剩余主区域，手牌使用独立横向滚动容器；移动端详情改为底部 sheet，右侧详情栏不再占用棋盘宽度。布局层不得复制行动合法性、目标或费用规则。
-- 坐标与手势：renderer 以 canvas 的 CSS 边界完成指针反投影，并在 resize/DPR/详情栏切换后同步 backing store；单指拖动、双指缩放和 `resetView()` 都保留同一 `projectCell()` / `screenToCell()` 合同。
+- DOM：`battle-ui/battle-dom-ui.js` 负责 HUD；PR #55 的紧凑生命/负面状态摘要留在棋盘表现层，完整技能与状态继续由 `battle.html` 的详情 modal/sheet 展示。`battle-context-layout.js` 只计算棋子菜单锚点和现有 `handCards` 容器的弧形变量，不创建第二份手牌或规则状态。
+- 响应式布局（RED-51）：`battle-responsive.css` 负责共享/桌面重排，`battle-responsive-mobile.css` 隔离 760px 及以下规则，`battle-context-ui.css` 负责透明 HUD、棋子附近技能菜单和单源弧形手牌。目标选择会收起技能菜单；移动端完整详情使用底部 sheet，训练开局列表内部滚动以保持操作按钮可达。布局层不得复制行动合法性、目标或费用规则。
+- 坐标与手势：renderer 以 canvas 的 CSS 边界完成指针反投影，并在 resize/DPR、平移、缩放、镜头复位或棋子移动后发出 `viewport-change`，页面据 `projectCell()` 重算菜单锚点；单指拖动、双指缩放和 `resetView()` 都保留同一 `projectCell()` / `screenToCell()` 合同。
 - 规则权威：页面控制器把意图转换为现有 action；非法操作仍由规则层/服务端最终拒绝。
 - 决策：见 `docs/decisions/ADR-0004-battle-presentation-boundary.md`。
 

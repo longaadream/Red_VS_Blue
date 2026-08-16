@@ -43,6 +43,9 @@
   let _hpLayer = null
   let _floatLayer = null
   let _onIntent = null
+  function _notifyViewportChange() {
+    if (_onIntent) _onIntent({ type: 'viewport-change' })
+  }
   let _resizeObserver = null
   let _hitPlane = null
   let _mounted = false
@@ -201,6 +204,7 @@
     _renderer.setSize(w, h, false)
     _updateCameraFrustum(w, h)
     _updatePieceSummaryPositions()
+    _notifyViewportChange()
   }
 
   function _fitWorldHalfHeight(w, h) {
@@ -611,6 +615,7 @@
         const ex = a.fromX + (a.toX - a.fromX) * _ease(t)
         const ez = a.fromZ + (a.toZ - a.fromZ) * _ease(t)
         a.obj.group.position.set(ex, 0, ez)
+        _notifyViewportChange()
         if (t >= 1) { a.obj.group.position.set(a.toX, 0, a.toZ); a.obj.animating = false; _anims.splice(i, 1) }
       } else if (a.type === 'flash') {
         const intensity = (1 - t) * 0.8
@@ -693,6 +698,7 @@
           _camera.position.x -= dx * fov
           _camera.position.z -= dy * fov
           _camera.lookAt(_camera.position.x, 0, _camera.position.z)
+          _notifyViewportChange()
           _panStart = { x: e.clientX, y: e.clientY }
         }
       }
@@ -759,6 +765,7 @@
     _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(5, z))
     _camera.updateProjectionMatrix()
     _updatePieceSummaryPositions()
+    _notifyViewportChange()
   }
 
   function _resetCamera() {
@@ -769,7 +776,8 @@
     _camera.position.set(_mapW / 2, 50, _mapH / 2)
     _camera.lookAt(_mapW / 2, 0, _mapH / 2)
     _updateCameraFrustum(w, h)
-    _updateHpBarPositions()
+    _updatePieceSummaryPositions()
+    _notifyViewportChange()
   }
 
   function resetView() { _resetCamera() }

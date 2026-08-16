@@ -9,6 +9,7 @@
     'inspect-piece',
     'cancel-target',
     'toggle-move',
+    'viewport-change',
   ])
 
   function create(options) {
