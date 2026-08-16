@@ -12,11 +12,6 @@
       .replace(/'/g, '&#039;')
   }
 
-  function statusLabel(status) {
-    const extra = status.stacks ? 'x' + status.stacks : (status.duration ? status.duration + 'T' : '')
-    return status.label + extra
-  }
-
   function statusMeta(status) {
     const parts = []
     if (status.stacks > 0) parts.push(status.stacks + ' 层')
@@ -27,24 +22,10 @@
     return parts.join(' · ')
   }
 
-  function skillTypeLabel(skill) {
-    if (skill.kind === 'passive' || skill.type === 'passive') return '被动'
-    if (skill.type === 'super') return '充能'
-    return '主动'
-  }
-
-  function skillCostHtml(skill) {
-    const cooldown = skill.cooldown || { current: 0, max: 0 }
-    return '<span class="selected-skill-cost action">行动 ' + skill.actionCost + '</span>'
-      + '<span class="selected-skill-cost charge">充能 ' + skill.chargeCost + '</span>'
-      + '<span class="selected-skill-cooldown">冷却 ' + cooldown.current + '/' + cooldown.max + '</span>'
-  }
-
   function create(options) {
     const input = options || {}
     const doc = input.document || root.document
     const announce = typeof input.onTurnAnnounce === 'function' ? input.onTurnAnnounce : function () {}
-    let onIntent = typeof input.onIntent === 'function' ? input.onIntent : function () {}
     let previousTurnPlayerId = null
 
     function byId(id) { return doc && doc.getElementById ? doc.getElementById(id) : null }
@@ -75,60 +56,15 @@
               + (status.description ? '<div class="selected-status-item-desc">' + escapeHtml(status.description) + '</div>' : '')
               + '</article>'
           }).join('')
-        : '<div class="selected-detail-zero">无可见状态</div>'
-      const skills = piece.skills || []
-      const skillsHtml = skills.length
-        ? skills.map(function (skill) {
-            const disabled = !skill.available
-            const reason = skill.unavailableReason || ''
-            return '<button type="button" class="selected-skill-item' + (disabled ? ' is-disabled' : ' is-available') + '"'
-              + ' data-skill-id="' + escapeHtml(skill.id) + '"'
-              + (disabled ? ' disabled aria-disabled="true"' : '') + '>'
-              + '<span class="selected-skill-head"><span class="selected-skill-icon" aria-hidden="true">'
-              + escapeHtml(skill.icon || 'S') + '</span><span class="selected-skill-name">'
-              + escapeHtml(skill.name) + '</span><span class="selected-skill-type">'
-              + escapeHtml(skillTypeLabel(skill)) + '</span></span>'
-              + '<span class="selected-skill-desc">' + escapeHtml(skill.description) + '</span>'
-              + '<span class="selected-skill-meta">' + skillCostHtml(skill) + '</span>'
-              + (reason ? '<span class="selected-skill-reason">' + escapeHtml(reason) + '</span>' : '')
-              + '</button>'
-          }).join('')
-        : '<div class="selected-detail-zero">无公开技能</div>'
-      const portrait = piece.portraitSrc
-        ? '<img src="' + escapeHtml(piece.portraitSrc) + '" alt="" loading="lazy">'
-        : '<span aria-hidden="true">' + escapeHtml((piece.name || '?').slice(0, 1)) + '</span>'
+        : '<div class="selected-status-zero">无特殊状态</div>'
       element.className = 'selected-status-card has-selection' + (targetMode ? ' target-mode' : '')
       if (element.dataset) element.dataset.pieceId = piece.id
       if (element.setAttribute) {
-        element.setAttribute('aria-label', piece.name + '详情')
+        element.setAttribute('aria-label', '特殊状态，共 ' + statuses.length + ' 个')
         element.setAttribute('aria-live', 'polite')
       }
-      element.innerHTML = '<div class="selected-detail-header">'
-        + '<div class="selected-detail-portrait">' + portrait + '</div>'
-        + '<div class="selected-detail-identity"><div class="selected-piece-name">' + escapeHtml(piece.name) + '</div>'
-        + '<div class="selected-detail-access">' + (piece.readOnly ? '敌方公开详情 · 只读' : '我方棋子 · 可操作') + '</div>'
-        + '<div class="selected-piece-hp">生命 ' + piece.health.current + ' / ' + piece.health.max + '</div></div>'
-        + '<button type="button" class="selected-detail-close" data-battle-action="clear-selection" aria-label="关闭棋子详情">×</button>'
-        + '</div>'
-        + '<div class="selected-detail-stats" role="list" aria-label="基础属性">'
-        + '<div role="listitem"><strong>' + piece.stats.attack + '</strong><span>攻击</span></div>'
-        + '<div role="listitem"><strong>' + piece.stats.defense + '</strong><span>防御</span></div>'
-        + '<div role="listitem"><strong>' + piece.stats.moveRange + '</strong><span>移动</span></div></div>'
-        + '<section class="selected-detail-section"><div class="selected-status-title">可见状态 <span>' + statuses.length + '</span></div>'
-        + '<div class="selected-status-list">' + statusesHtml + '</div></section>'
-        + '<section class="selected-detail-section"><div class="selected-status-title">技能 <span>' + skills.length + '</span></div>'
-        + '<div class="selected-skill-list">' + skillsHtml + '</div></section>'
-
-      if (element.querySelectorAll) {
-        element.querySelectorAll('[data-skill-id]:not([disabled])').forEach(function (button) {
-          button.addEventListener('click', function () {
-            onIntent({ type: 'select-skill', skillId: button.getAttribute('data-skill-id') })
-          })
-        })
-        element.querySelectorAll('[data-battle-action="clear-selection"]').forEach(function (button) {
-          button.addEventListener('click', function () { onIntent({ type: 'clear-selection' }) })
-        })
-      }
+      element.innerHTML = '<div class="selected-status-title">特殊状态 <span>' + statuses.length + '</span></div>'
+        + '<div class="selected-status-list">' + statusesHtml + '</div>'
     }
 
     function updateHud(model) {
@@ -186,11 +122,8 @@
     }
 
     function dispose() { previousTurnPlayerId = null }
-    function setOnIntent(handler) {
-      onIntent = typeof handler === 'function' ? handler : function () {}
-    }
 
-    return { update: update, dispose: dispose, setOnIntent: setOnIntent }
+    return { update: update, dispose: dispose }
   }
 
   root.BattleDomUI = { create: create }

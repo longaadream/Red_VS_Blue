@@ -191,7 +191,7 @@
       width: 100% !important; height: 100% !important; display: block;
     }
     .board-side-rail {
-      width: clamp(286px, 27vw, 348px); align-self: stretch; min-height: 100%;
+      width: clamp(188px, 18vw, 232px); align-self: stretch; min-height: 100%;
       display: flex; flex-direction: column; justify-content: flex-start; gap: 12px;
       flex-shrink: 0; padding: 84px 0 2px; overflow: hidden;
     }
@@ -209,39 +209,13 @@
       border: 1px dashed rgba(148,163,184,.14); border-radius: 8px;
       background: rgba(15,23,42,.28);
     }
-    .selected-detail-header { display: flex; align-items: center; gap: 10px; position: relative; }
-    .selected-detail-portrait {
-      width: 54px; height: 54px; flex: 0 0 54px; overflow: hidden; border-radius: 12px;
-      display: flex; align-items: center; justify-content: center; color: #bfdbfe;
-      border: 1px solid rgba(96,165,250,.42); background: rgba(30,58,138,.28);
-      font-size: 24px; font-weight: 900;
-    }
-    .selected-detail-portrait img { width: 100%; height: 100%; object-fit: cover; }
-    .selected-detail-identity { min-width: 0; flex: 1; }
-    .selected-piece-name { font-size: 15px; font-weight: 900; color: #f8fafc; margin-bottom: 2px; }
-    .selected-detail-access { font-size: 10px; color: #64748b; margin-bottom: 5px; }
-    .selected-piece-hp { font-size: 12px; color: #cbd5e1; }
-    .selected-detail-close {
-      width: 30px; height: 30px; border: 1px solid rgba(148,163,184,.22); border-radius: 8px;
-      background: rgba(15,23,42,.74); color: #94a3b8; font-size: 19px; cursor: pointer;
-      align-self: flex-start;
-    }
-    .selected-detail-stats {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0;
-    }
-    .selected-detail-stats > div {
-      display: grid; place-items: center; gap: 2px; padding: 7px 4px; border-radius: 8px;
-      background: rgba(2,6,23,.52); border: 1px solid rgba(51,65,85,.68);
-    }
-    .selected-detail-stats strong { color: #f8fafc; font-size: 15px; }
-    .selected-detail-stats span { color: #64748b; font-size: 9px; letter-spacing: .08em; }
-    .selected-detail-section { margin-top: 12px; }
     .selected-status-title {
-      font-size: 10px; font-weight: 800; color: #64748b;
-      letter-spacing: .08em; margin-bottom: 7px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      font-size: 10px; font-weight: 800; color: #94a3b8;
+      letter-spacing: .08em; margin-bottom: 8px;
     }
     .selected-status-title span { color: #94a3b8; }
-    .selected-status-list, .selected-skill-list { display: grid; gap: 6px; }
+    .selected-status-list { display: grid; gap: 6px; }
     .selected-status-item {
       padding: 8px; border-radius: 8px; background: rgba(76,29,149,.14);
       border: 1px solid rgba(167,139,250,.25);
@@ -249,37 +223,10 @@
     .selected-status-item-name { color: #ddd6fe; font-size: 11px; font-weight: 800; }
     .selected-status-item-meta { color: #a78bfa; font-size: 10px; margin-top: 2px; }
     .selected-status-item-desc { color: #94a3b8; font-size: 10px; line-height: 1.45; margin-top: 4px; }
-    .selected-detail-zero {
+    .selected-status-zero {
       padding: 10px; border: 1px dashed rgba(148,163,184,.18); border-radius: 8px;
       color: rgba(148,163,184,.52); font-size: 11px; text-align: center;
     }
-    .selected-skill-item {
-      width: 100%; display: grid; gap: 5px; padding: 9px; text-align: left;
-      border: 1px solid rgba(51,65,85,.88); border-radius: 9px;
-      color: #e2e8f0; background: rgba(2,6,23,.56); cursor: pointer;
-    }
-    .selected-skill-item.is-available { border-color: rgba(59,130,246,.5); }
-    .selected-skill-item.is-disabled { opacity: .72; cursor: not-allowed; }
-    .selected-skill-head { display: flex; align-items: center; gap: 6px; }
-    .selected-skill-icon { width: 22px; text-align: center; font-size: 17px; }
-    .selected-skill-name { flex: 1; color: #f8fafc; font-size: 12px; font-weight: 800; }
-    .selected-skill-type { color: #94a3b8; font-size: 9px; }
-    .selected-skill-desc { color: #94a3b8; font-size: 10px; line-height: 1.45; }
-    .selected-skill-meta { display: flex; flex-wrap: wrap; gap: 5px; }
-    .selected-skill-meta > span {
-      padding: 2px 5px; border-radius: 999px; font-size: 9px;
-      border: 1px solid rgba(71,85,105,.72); color: #cbd5e1;
-    }
-    .selected-skill-cost.action { border-color: rgba(59,130,246,.5); color: #bfdbfe; }
-    .selected-skill-cost.charge { border-color: rgba(168,85,247,.5); color: #e9d5ff; }
-    .selected-skill-reason { color: #fca5a5; font-size: 10px; line-height: 1.35; }
-    .selected-status-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-    .selected-status-tags .status-tag {
-      font-size: 10px; padding: 3px 6px; border-radius: 999px;
-      background: rgba(124,58,237,.2); border: 1px solid rgba(167,139,250,.38);
-      color: #ddd6fe;
-    }
-    .selected-status-tags .status-empty { font-size: 12px; color: rgba(148,163,184,.42); }
     .turn-control-wrap {
       display: flex; justify-content: center;
     }
@@ -1166,7 +1113,7 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; }
       .target-prompt, .dmg-float, .spinner, #turnAnnounce { animation: none !important; }
-      .skill-card, .selected-skill-item, .arc-card { transition: none !important; }
+      .skill-card, .arc-card { transition: none !important; }
     }
 
     /* Final Android/Windows parity override. Keep this at the end of CSS. */
@@ -1234,7 +1181,7 @@
     }
 
     @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
-      body { --mobile-battle-rail-width: clamp(226px, 30vw, 276px); }
+      body { --mobile-battle-rail-width: clamp(176px, 22vw, 214px); }
       .battle-layout, .main-panel, .board-wrap, .board-shell-3d { min-height: 0; min-width: 0; }
       .topbar {
         top: 5px !important; right: 5px !important; max-width: 220px !important;
@@ -1279,30 +1226,47 @@
         flex: 1; min-height: 0; max-height: none; padding: 7px; overflow-y: auto; border-radius: 7px;
       }
       .selected-status-empty { flex: 1; min-height: 0; font-size: 11px; }
-      .selected-detail-header { gap: 7px; }
-      .selected-detail-portrait { width: 40px; height: 40px; flex-basis: 40px; border-radius: 9px; font-size: 19px; }
-      .selected-piece-name { font-size: 13px; }
-      .selected-detail-access { margin-bottom: 2px; font-size: 9px; }
-      .selected-piece-hp { font-size: 10px; }
-      .selected-detail-close { width: 26px; height: 26px; border-radius: 7px; font-size: 16px; }
-      .selected-detail-stats { gap: 4px; margin: 7px 0; }
-      .selected-detail-stats > div { gap: 1px; padding: 4px 2px; border-radius: 6px; }
-      .selected-detail-stats strong { font-size: 12px; }
-      .selected-detail-stats span { font-size: 8px; }
-      .selected-detail-section { margin-top: 7px; }
       .selected-status-title { margin-bottom: 4px; font-size: 9px; }
-      .selected-status-list, .selected-skill-list { gap: 4px; }
-      .selected-status-item, .selected-skill-item { padding: 6px; border-radius: 7px; }
-      .selected-status-item-desc, .selected-skill-desc { font-size: 9px; line-height: 1.35; }
-      .selected-skill-item { gap: 4px; }
-      .selected-skill-icon { width: 18px; font-size: 14px; }
-      .selected-skill-name { font-size: 10px; }
-      .selected-skill-meta > span { font-size: 8px; }
-      .selected-detail-zero { padding: 7px; font-size: 9px; }
+      .selected-status-list { gap: 4px; }
+      .selected-status-item { padding: 6px; border-radius: 7px; }
+      .selected-status-item-desc { font-size: 9px; line-height: 1.35; }
+      .selected-status-zero { padding: 7px; font-size: 9px; }
       .turn-control-wrap { flex: 0 0 auto; }
       .btn-end { min-width: 108px; padding: 6px 11px; font-size: 11px; border-width: 1px; }
 
-      #skillBar { display: none !important; }
+      #skillBar:not(:empty) {
+        display: flex !important; min-height: 58px; max-height: 58px;
+        gap: 4px; padding: 3px 5px;
+      }
+      #skillBar:empty { display: none !important; }
+      #skillBar .skill-card {
+        width: 126px; height: 50px; min-height: 50px;
+        display: grid; grid-template-columns: 30px minmax(0, 1fr);
+        grid-template-rows: 17px 15px 14px; align-items: center;
+        gap: 0 4px; padding: 2px 4px;
+      }
+      #skillBar .sk-icon {
+        grid-column: 1; grid-row: 1 / 3; font-size: 21px;
+      }
+      #skillBar .sk-cost-row {
+        grid-column: 2; grid-row: 1; width: auto;
+        justify-content: flex-start; gap: 2px; margin: 0;
+      }
+      #skillBar .sk-cost-orb {
+        min-width: 30px; height: 16px; padding: 0 4px 0 2px; font-size: 8px;
+      }
+      #skillBar .sk-cost-orb .resource-glyph { width: 11px; height: 11px; }
+      #skillBar .sk-name {
+        grid-column: 2; grid-row: 2; width: auto; text-align: left; font-size: 9px;
+      }
+      #skillBar .sk-type-tag {
+        grid-column: 1; grid-row: 3; justify-self: center; font-size: 7px;
+      }
+      #skillBar .sk-unavailable-reason {
+        grid-column: 2; grid-row: 3; width: auto; max-width: 86px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        text-align: left; font-size: 7px; line-height: 1.1;
+      }
       .training-bar {
         min-height: 30px; max-height: 30px; flex-wrap: nowrap; gap: 4px; padding: 3px 5px;
         overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
@@ -1313,7 +1277,7 @@
       #arcHandContainer { bottom: -105px; height: 124px; }
 
       #statusMsg {
-        left: 5px; bottom: 34px; transform: none;
+        left: 5px; bottom: 94px; transform: none;
         width: calc(100vw - var(--mobile-battle-rail-width) - 10px);
         min-height: 26px; padding: 5px 9px; font-size: 10px;
       }
@@ -1355,7 +1319,7 @@
     <div class="orientation-guard-card">
       <div class="orientation-guard-icon" aria-hidden="true">↻</div>
       <strong>请旋转设备</strong>
-      <span>战斗需要横屏空间。旋转后会自动恢复棋盘与技能详情。</span>
+      <span>战斗需要横屏空间。旋转后会自动恢复棋盘与技能操作。</span>
       <small>最低 844 × 390 · 推荐 932 × 430</small>
     </div>
   </div>

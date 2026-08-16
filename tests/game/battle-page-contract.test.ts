@@ -119,6 +119,22 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('function reconcileBattleInteractionState(previousState, nextState)')
   })
 
+  it('keeps the side rail status-only while preserving the existing right-click piece detail', () => {
+    const battlePage = readPage('battle.html')
+    const domUi = readPage('js/battle-ui/battle-dom-ui.js')
+
+    expect(domUi).toContain('特殊状态')
+    expect(domUi).toContain('无特殊状态')
+    expect(domUi).not.toContain('selected-detail-portrait')
+    expect(domUi).not.toContain('selected-detail-stats')
+    expect(domUi).not.toContain('selected-skill-list')
+    expect(domUi).not.toContain('data-skill-id')
+    expect(battlePage).toContain('oncontextmenu="event.preventDefault();dispatchBattleIntent({type:\'inspect-piece\'')
+    expect(battlePage).toContain('function showPieceInfo(instanceId, preserveKeyword)')
+    expect(battlePage).toContain('statsHtml + tagsHtml')
+    expect(battlePage).toContain('\`<div class="pi-section-label">技能</div>\` + skillsHtml')
+  })
+
   it('exposes accessible target feedback and a mobile target mode that removes obstructing detail UI', () => {
     const battlePage = readPage('battle.html')
 
@@ -130,6 +146,17 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('body.target-mode-active #skillBar')
     expect(battlePage).toContain('@media (prefers-reduced-motion: reduce)')
     expect(battlePage).toContain('button:focus-visible')
+  })
+
+  it('keeps skill availability feedback in the existing skill operation area', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('sk-unavailable-reason')
+    expect(battlePage).toContain('#skillBar:not(:empty)')
+    expect(battlePage).not.toMatch(/^\s*#skillBar \{ display: none !important; \}/m)
+    for (const reason of ['冷却中', '可用次数已耗尽', '行动点不足', '充能点不足']) {
+      expect(battlePage).toContain(reason)
+    }
   })
 
   it('requires landscape play on phones and reserves usable space at both mobile acceptance sizes', () => {
