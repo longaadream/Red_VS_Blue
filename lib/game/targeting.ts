@@ -2,7 +2,7 @@
 import type { PieceInstance } from './piece'
 import { getSkillById } from './skill-repository'
 import { loadCardById } from './skills'
-import { manhattanDistance } from './spatial'
+import { manhattanDistance, traceProjectile } from './spatial'
 import type { BattleAction, BattleState } from './turn'
 
 export const TARGET_SELECTION_PROTOCOL_VERSION = 1
@@ -12,6 +12,10 @@ export type TargetRef =
   | { type: 'cell'; x: number; y: number }
 
 export type TargetFilter = 'enemy' | 'ally' | 'all' | 'self'
+
+export interface ProjectileTargetingRequirement {
+  requiredCollision: 'piece-before-blocker'
+}
 
 export interface TargetConstraint {
   type: 'piece' | 'cell'
@@ -29,6 +33,7 @@ export interface TargetConstraint {
   excludeSourceCell?: boolean
   distanceMetric?: 'manhattan' | 'chebyshev'
   allowSourceOccupant?: boolean
+  projectile?: ProjectileTargetingRequirement
 }
 
 export type TargetValidationCode =
@@ -130,6 +135,9 @@ export interface PendingTargetStep {
   requireUnoccupied?: boolean
   allowSourceOccupant?: boolean
   canCancel?: boolean
+  sameRowOrColumn?: boolean
+  excludeSourceCell?: boolean
+  projectile?: ProjectileTargetingRequirement
 }
 
 export interface PendingTargetSelectionSession {
@@ -169,6 +177,9 @@ interface TargetSpec {
   requireUnoccupied?: boolean
   allowSourceOccupant?: boolean
   allowSourceOccupantOptions?: unknown[]
+  sameRowOrColumn?: boolean
+  excludeSourceCell?: boolean
+  projectile?: ProjectileTargetingRequirement
 }
 
 interface OptionSpec {
@@ -211,25 +222,19 @@ const WALKABLE_TARGET_ACTIONS = new Set([
 ])
 
 const ORTHOGONAL_ACTIONS = new Set([
-  'blackwidow-lethal-strike',
-  'hellfire-shotgun',
   'illidan-blade-dash',
   'rocket-punch',
   'sasuke-chidori',
   'sasuke-indra-arrow',
   'shadow-bolt',
-  'sleep-dart',
 ])
 
 const SOURCE_CELL_FORBIDDEN_ACTIONS = new Set([
-  'blackwidow-lethal-strike',
-  'hellfire-shotgun',
   'illidan-blade-dash',
   'rocket-punch',
   'sasuke-chidori',
   'sasuke-indra-arrow',
   'shadow-bolt',
-  'sleep-dart',
 ])
 
 function issue(code: TargetValidationCode, message: string): TargetValidationIssue {
@@ -318,6 +323,11 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
         allowSourceOccupant: raw.allowSourceOccupant,
         allowSourceOccupantOptions: Array.isArray(raw.allowSourceOccupantOptions)
           ? raw.allowSourceOccupantOptions
+          : undefined,
+        sameRowOrColumn: raw.sameRowOrColumn === true,
+        excludeSourceCell: raw.excludeSourceCell === true,
+        projectile: raw.projectile?.requiredCollision === 'piece-before-blocker'
+          ? { requiredCollision: 'piece-before-blocker' }
           : undefined,
       })
     }
@@ -560,12 +570,13 @@ function constraintFor(
     requireUnoccupied:
       spec.type === 'cell' && (spec.requireUnoccupied ??
       (EMPTY_DESTINATION_ACTIONS.has(sourceId) || (sourceId === 'demon-summon-5' && step === 1))),
-    sameRowOrColumn: ORTHOGONAL_ACTIONS.has(sourceId),
-    excludeSourceCell: spec.type === 'cell' && SOURCE_CELL_FORBIDDEN_ACTIONS.has(sourceId),
+    sameRowOrColumn: spec.sameRowOrColumn ?? ORTHOGONAL_ACTIONS.has(sourceId),
+    excludeSourceCell: spec.type === 'cell' && (spec.excludeSourceCell ?? SOURCE_CELL_FORBIDDEN_ACTIONS.has(sourceId)),
     distanceMetric: spec.distanceMetric || 'manhattan',
     allowSourceOccupant: spec.allowSourceOccupant || spec.allowSourceOccupantOptions?.some(
       option => Object.is(option, selectedOption),
     ),
+    projectile: spec.projectile,
   }
   return constraint
 }
@@ -588,23 +599,6 @@ function validateSourceSpecificCell(
 
   if (sourceId === 'shadow-bolt' && ref.x === 0) {
     return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Shadow Bolt cannot use the zero-column direction reference')
-  }
-
-  if (sourceId === 'hellfire-shotgun' && sourcePiece?.x != null && sourcePiece.y != null) {
-    const dx = Math.sign(ref.x - sourcePiece.x)
-    const dy = Math.sign(ref.y - sourcePiece.y)
-    let foundPiece = false
-    for (let distance = 1; distance <= 5; distance += 1) {
-      const x = sourcePiece.x + dx * distance
-      const y = sourcePiece.y + dy * distance
-      const tile = state.map.tiles.find(candidate => candidate.x === x && candidate.y === y)
-      if (!tile || (tile.props as any).bullet === false) break
-      if (state.pieces.some(piece => piece.currentHp > 0 && piece.x === x && piece.y === y)) {
-        foundPiece = true
-        break
-      }
-    }
-    if (!foundPiece) return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'No living piece is in the selected shotgun direction')
   }
 
   if (sourceId === 'illidan-blade-dash' && sourcePiece?.x != null && sourcePiece.y != null) {
@@ -700,6 +694,37 @@ function validateSourceSpecificPiece(
   return undefined
 }
 
+function validateProjectileRequirement(
+  state: BattleState,
+  constraint: TargetConstraint,
+  ref: Extract<TargetRef, { type: 'cell' }>,
+): TargetValidationIssue | undefined {
+  if (constraint.projectile?.requiredCollision !== 'piece-before-blocker') return undefined
+  const sourcePiece = getSourcePiece(state, constraint)
+  if (!sourcePiece || sourcePiece.x == null || sourcePiece.y == null) {
+    return issue('TARGET_SOURCE_MISSING', 'A positioned source is required for projectile targeting')
+  }
+  const direction = {
+    x: Math.sign(ref.x - sourcePiece.x),
+    y: Math.sign(ref.y - sourcePiece.y),
+  }
+  if (Math.abs(direction.x) + Math.abs(direction.y) !== 1) {
+    return issue('TARGET_NOT_ORTHOGONAL', 'Projectile direction must be cardinal')
+  }
+
+  const events = traceProjectile(state, { x: sourcePiece.x, y: sourcePiece.y }, direction, {
+    excludePieceId: sourcePiece.instanceId,
+    maxDistance: constraint.range,
+  })
+  for (const event of events) {
+    if (event.type === 'piece') return undefined
+    if (event.type === 'terrain' && event.blocksProjectile) {
+      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Blocking terrain appears before any living piece')
+    }
+  }
+  return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'No living piece is in the selected projectile direction')
+}
+
 export function validateTargetRef(
   state: BattleState,
   constraint: TargetConstraint,
@@ -769,6 +794,8 @@ export function validateTargetRef(
     )
     if (occupied) return issue('TARGET_OCCUPIED', `Cell (${ref.x},${ref.y}) is occupied`)
   }
+  const projectileIssue = validateProjectileRequirement(state, constraint, ref)
+  if (projectileIssue) return projectileIssue
   return validateSourceSpecificCell(state, constraint, ref)
 }
 
@@ -972,6 +999,9 @@ function pendingConstraint(pending: PendingTargetSelectionSession): TargetConstr
     requireUnoccupied: activeStep?.requireUnoccupied,
     distanceMetric: activeStep?.distanceMetric || 'manhattan',
     allowSourceOccupant: activeStep?.allowSourceOccupant,
+    sameRowOrColumn: activeStep?.sameRowOrColumn,
+    excludeSourceCell: type === 'cell' && activeStep?.excludeSourceCell,
+    projectile: activeStep?.projectile,
   }
 }
 

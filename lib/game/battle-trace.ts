@@ -36,6 +36,13 @@ export interface BattleActionTrace {
   preStateHash: string
   postStateHash: string
   randomStreams: RandomStreamTrace[]
+  deployment?: DeploymentTraceEvidence
+}
+
+export interface DeploymentTraceEvidence {
+  initialPositions?: Record<string, { x: number; y: number }>
+  choices?: Record<string, { pieceId: string | null }>
+  finalPositions?: Record<string, { x: number; y: number }>
 }
 
 export interface DebugBattleMetadata {
@@ -155,9 +162,21 @@ export function recordBattleInitialization(
     preStateHash: hashStable({ type: 'uninitializedBattle', playerIds: [...playerIds] }),
     postStateHash,
     randomStreams: runtime.randomTrace(true),
+    deployment: state.deployment ? {
+      initialPositions: copyPositions(state.deployment.initialPositions),
+    } : undefined,
   }
   metadata.actionLog.push(trace)
   return trace
+}
+
+function copyPositions(
+  positions: Record<string, { x: number; y: number }> | undefined,
+): Record<string, { x: number; y: number }> | undefined {
+  if (!positions) return undefined
+  return Object.fromEntries(
+    Object.entries(positions).map(([pieceId, position]) => [pieceId, { ...position }]),
+  )
 }
 
 export function readDebugMetadata(state: BattleState): DebugBattleMetadata {

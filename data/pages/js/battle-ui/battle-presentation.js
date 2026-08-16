@@ -26,6 +26,8 @@
       onIntent(intent)
     }
 
+    if (domUi && typeof domUi.setOnIntent === 'function') domUi.setOnIntent(dispatch)
+
     function mount(mountOptions) {
       if (mounted) dispose()
       const mountInput = mountOptions || {}

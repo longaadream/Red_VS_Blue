@@ -400,6 +400,13 @@ describe('projectile target validation', () => {
         filter: 'enemy',
         targetRange: 99,
         requiresTarget: true,
+        targeting: {
+          steps: [{
+            type: 'grid', filter: 'all', range: 99,
+            sameRowOrColumn: true,
+            excludeSourceCell: true,
+          }],
+        },
         code: 'function executeSkill(context) { return { success: true } }',
       }
       vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
@@ -409,7 +416,6 @@ describe('projectile target validation', () => {
         playerId: 'player-red',
         pieceId: 'caster',
         skillId,
-        targetPieceId: 'minato',
         targetX: 1,
         targetY: 1,
       }) as any)).toThrow(/same row or column/)
