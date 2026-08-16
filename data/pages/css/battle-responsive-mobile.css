@@ -1,0 +1,222 @@
+@media (max-width: 760px) {
+  :root { --battle-hud-offset: 112px; --battle-hand-height: 142px; }
+
+  .topbar {
+    top: 6px !important;
+    right: 6px !important;
+    max-width: 54px !important;
+  }
+
+  .topbar #resApDisplay,
+  .topbar #resCpDisplay,
+  .topbar .hud-hand { display: none !important; }
+
+  .topbar .back-btn,
+  .topbar .btn-surrender,
+  .topbar .btn-fullmap,
+  .topbar #btnSwitchPov,
+  .topbar #btnResetCD {
+    min-width: 28px !important;
+    width: 28px;
+    overflow: hidden;
+    padding: 0 !important;
+    font-size: 0 !important;
+  }
+
+  .topbar .back-btn::before { content: "←"; font-size: 15px; }
+  .topbar .btn-surrender::before { content: "⚑"; font-size: 14px; }
+  .topbar #btnSwitchPov::before { content: "↺"; font-size: 14px; }
+  .topbar #btnResetCD::before { content: "CD"; font-size: 9px; }
+  .topbar .btn-fullmap { font-size: 13px !important; }
+
+  .phase-bar {
+    top: 6px !important;
+    left: 6px !important;
+    right: 66px !important;
+    min-height: 100px;
+    max-height: 100px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 5px !important;
+    padding: 5px 6px !important;
+    overflow: hidden;
+  }
+
+  .turn-summary {
+    min-height: 25px;
+    padding: 0 0 4px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    border-right: 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  }
+
+  .turn-summary-primary,
+  .turn-summary-secondary { gap: 5px; }
+  .turn-badge { padding: 3px 8px; font-size: 10px; }
+  #roundLabel { display: none; }
+
+  #playerResCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px !important;
+  }
+
+  .player-state-chip {
+    min-height: 52px;
+    grid-template-columns: 25px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 5px !important;
+    row-gap: 2px !important;
+    padding: 4px 5px !important;
+  }
+
+  .player-avatar {
+    width: 25px;
+    height: 25px;
+    grid-row: 1 / span 2;
+    font-size: 9px;
+  }
+
+  .player-display-name { max-width: none; font-size: 10px; }
+  .player-side-name { display: none; }
+  .player-state-resources { grid-column: 2; }
+  .player-state-resources .resource-orb {
+    min-width: 33px;
+    height: 18px;
+    padding: 0 4px 0 3px;
+    font-size: 10px;
+  }
+  .player-state-resources .resource-glyph { width: 11px; height: 11px; }
+
+  .board-wrap { padding: 5px 5px 4px !important; }
+  .board-shell { display: block; }
+  .board-shell-3d .board-stage { width: 100%; height: 100%; border-radius: 8px; }
+
+  .board-side-rail {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 7;
+    width: auto !important;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0;
+    pointer-events: none;
+  }
+
+  .board-side-rail .selected-status-empty { display: none; }
+  .board-side-rail .selected-status-card {
+    width: min(42vw, 164px);
+    min-height: 42px;
+    max-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 7px;
+    padding: 6px 9px;
+    overflow: hidden;
+    pointer-events: auto;
+    border-color: rgba(147, 197, 253, 0.48);
+    background: rgba(3, 7, 18, 0.86);
+    box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+  }
+  .board-side-rail .selected-status-card .selected-piece-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .board-side-rail .selected-status-card .selected-piece-hp,
+  .board-side-rail .selected-status-card .selected-status-title,
+  .board-side-rail .selected-status-card .selected-status-tags { display: none; }
+  .board-side-rail .selected-status-card .selected-detail-hint {
+    flex: 0 0 auto;
+    margin: 0;
+    color: #bfdbfe;
+  }
+  .turn-control-wrap { pointer-events: auto; }
+  .btn-end { min-width: 104px; min-height: 42px; padding: 7px 11px; }
+  #btnToggleBattleDetail { display: none; }
+
+  .board-camera-controls { top: 11px; left: 11px; }
+  .board-view-button {
+    min-width: 42px;
+    min-height: 42px;
+    padding: 0 9px;
+    font-size: 12px;
+  }
+  .board-view-button span { display: none; }
+
+  #skillBar { min-height: 84px; padding: 5px 8px; }
+  .hand-panel { padding-bottom: env(safe-area-inset-bottom); }
+  .hand-scroll { gap: 7px; padding: 7px 30px 9px 8px; scroll-padding-inline: 8px; }
+  .card-item { width: 88px; min-width: 88px; height: 106px; border-radius: 9px; }
+  .card-art { height: 47px; }
+
+  #pieceInfoModal,
+  #cardDetailModal {
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    background: rgba(2, 6, 23, 0.66);
+  }
+
+  .pi-layout,
+  .cd-layout {
+    position: relative;
+    width: 100%;
+    max-width: none;
+    max-height: min(72dvh, 620px);
+    flex-direction: column;
+    gap: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 18px 18px 0 0;
+    background: rgba(15, 23, 42, 0.98);
+    box-shadow: 0 -22px 60px rgba(0, 0, 0, 0.48);
+  }
+
+  .pi-layout::before,
+  .cd-layout::before {
+    content: "";
+    position: sticky;
+    top: 6px;
+    z-index: 2;
+    align-self: center;
+    width: 38px;
+    min-height: 4px;
+    margin: 6px auto 0;
+    border-radius: 999px;
+    background: #64748b;
+  }
+
+  .pi-sheet,
+  .cd-sheet {
+    width: 100%;
+    max-width: none;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .pi-layout .keyword-panel,
+  .cd-layout .keyword-panel {
+    width: auto;
+    margin: 0 16px 16px;
+    flex: 0 0 auto;
+  }
+
+  #targetOverlay {
+    z-index: 90;
+    padding: calc(var(--battle-hud-offset) + 8px) 12px 0;
+  }
+
+  .target-prompt { max-width: 100%; font-size: 16px; text-align: center; }
+}

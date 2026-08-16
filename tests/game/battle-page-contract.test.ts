@@ -51,6 +51,25 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('keeps one responsive HUD, board, detail, and hand structure', () => {
+    const battlePage = readPage('battle.html')
+    const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')
+    const mobileCss = readFileSync(resolve(pagesDir, 'css/battle-responsive-mobile.css'), 'utf8')
+
+    expect(battlePage).toContain('<link rel="stylesheet" href="css/battle-responsive.css" />')
+    expect(battlePage).toContain('<link rel="stylesheet" href="css/battle-responsive-mobile.css" />')
+    expect(battlePage).toContain('id="btnResetBoardView"')
+    expect(battlePage).toContain('id="btnToggleBattleDetail"')
+    expect(battlePage).toContain('id="battleDetailRail"')
+    expect(battlePage).toContain('id="handCards" role="region" aria-label="手牌列表" tabindex="0"')
+    expect(battlePage).not.toContain('arcHandContainer')
+    expect(responsiveCss).not.toContain('@media (max-width: 760px)')
+    expect(responsiveCss).toContain('touch-action: pan-x')
+    expect(mobileCss).toContain('@media (max-width: 760px)')
+    expect(mobileCss).toMatch(/\.board-view-button\s*\{[\s\S]*?min-height:\s*42px/)
+    expect(mobileCss).toMatch(/\.board-side-rail \.selected-status-card\s*\{[\s\S]*?min-height:\s*42px/)
+  })
+
   it('routes the lobby training entry to battle.html training mode', () => {
     const lobby = readPage('index.html')
 

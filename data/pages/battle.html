@@ -1033,6 +1033,7 @@
     .cell::before { opacity: .68 !important; filter: saturate(.72) contrast(.78) brightness(.86) !important; }
   </style>
   <link rel="stylesheet" href="css/battle-responsive.css" />
+  <link rel="stylesheet" href="css/battle-responsive-mobile.css" />
 </head>
 <body>
 
@@ -2943,6 +2944,12 @@
       const el = document.getElementById('targetOverlay')
       if (!el) return
       if (pendingSkill || pendingCardAction) {
+        if (window.matchMedia && window.matchMedia('(max-width: 760px)').matches) {
+          const pieceInfo = document.getElementById('pieceInfoModal')
+          const cardInfo = document.getElementById('cardDetailModal')
+          if (pieceInfo && pieceInfo.style.display !== 'none' && pieceInfo.style.display !== '') closePieceInfo()
+          if (cardInfo && cardInfo.style.display !== 'none' && cardInfo.style.display !== '') closeCardDetail()
+        }
         document.getElementById('targetPromptText').textContent = _targetPromptText()
         el.classList.add('show')
       } else {
