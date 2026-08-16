@@ -18,6 +18,7 @@ export type RosterContractErrorCode =
   | 'ROSTER_TEMPLATE_NOT_ADMITTED'
   | 'ROSTER_ALIGNMENT_REQUIRED'
   | 'ROSTER_ALIGNMENT_MISMATCH'
+  | 'ROSTER_ALIGNMENT_LOCKED'
   | 'ROSTER_PLAYER_NOT_FOUND'
   | 'ROSTER_LOCKED'
   | 'ROSTER_NOT_ALL_LOCKED'
@@ -35,6 +36,7 @@ const ERROR_MESSAGES: Record<RosterContractErrorCode, string> = {
   ROSTER_TEMPLATE_NOT_ADMITTED: 'Roster contains a template that is not admitted to this Demo manifest',
   ROSTER_ALIGNMENT_REQUIRED: 'Player content alignment is required before locking a roster',
   ROSTER_ALIGNMENT_MISMATCH: 'Roster templates must belong to the player content alignment',
+  ROSTER_ALIGNMENT_LOCKED: 'Player content alignment is locked after the player is ready',
   ROSTER_PLAYER_NOT_FOUND: 'Player is not in the room',
   ROSTER_LOCKED: 'The player roster is already locked and cannot be changed',
   ROSTER_NOT_ALL_LOCKED: 'Both player rosters must be valid and locked before deployment',
@@ -147,13 +149,9 @@ function sameRoster(left: string[], right: string[]): boolean {
 }
 
 export function ensureRosterAlignmentMutable(player: Player, requestedAlignment: ContentAlignment | undefined): void {
-  if (
-    requestedAlignment &&
-    player.rosterLocked === true &&
-    player.alignment !== requestedAlignment
-  ) {
-    throw new RosterContractError('ROSTER_LOCKED', { playerId: player.id })
-  }
+  if (!requestedAlignment || player.alignment === requestedAlignment) return
+  if (player.rosterLocked === true) throw new RosterContractError('ROSTER_LOCKED', { playerId: player.id })
+  if (player.ready === true) throw new RosterContractError('ROSTER_ALIGNMENT_LOCKED', { playerId: player.id })
 }
 
 export interface LockDemoRosterRequest {
@@ -177,7 +175,7 @@ export function lockDemoRosterInRoom(room: Room, request: LockDemoRosterRequest)
 
   const player = room.players[playerIndex]
   ensureRosterAlignmentMutable(player, request.alignment)
-  const alignment = request.alignment ?? player.alignment
+  const alignment = player.alignment
   const requestedTemplateIds = readTemplateIds(request.pieces)
 
   if (player.rosterLocked === true) {

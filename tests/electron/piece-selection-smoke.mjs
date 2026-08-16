@@ -208,6 +208,7 @@ assert(fs.existsSync(generatedSelectionPage), `Sync generated pages first; missi
 userDataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-red54-smoke-'))
 
 let child = null
+let electronLog = ''
 try {
   try {
     await getJson(`http://127.0.0.1:${debugPort}/json`, 500)
@@ -223,12 +224,20 @@ try {
   ], {
     cwd: root,
     detached: false,
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   })
   assert(Number.isInteger(child.pid), 'Could not determine Electron client PID')
+  const captureElectronLog = chunk => {
+    electronLog = (electronLog + String(chunk)).slice(-6000)
+  }
+  child.stdout?.on('data', captureElectronLog)
+  child.stderr?.on('data', captureElectronLog)
 
-  const connectPageTarget = await waitForTarget(candidate => candidate.title === '连接服务器')
+  const connectPageTarget = await waitForTarget(candidate => (
+    candidate.type === 'page'
+    && candidate.url.includes('/electron-client/connect/index.html')
+  ))
   const rendererBoundary = await evaluate(connectPageTarget, `({
     processType: typeof process,
     requireType: typeof require,
@@ -241,7 +250,15 @@ try {
   connectPageConnection.fireAndForget('window.electronAPI.openLocalGame()')
   await delay(100)
   connectPageConnection.close()
-  const gameTarget = await waitForTarget(candidate => candidate.url.startsWith('rvb-client://app/index.html'), 90000)
+  let gameTarget
+  try {
+    gameTarget = await waitForTarget(candidate => candidate.url.startsWith('rvb-client://app/index.html'), 90000)
+  } catch (error) {
+    throw new Error(
+      `Electron local game page did not appear: ${error instanceof Error ? error.message : String(error)}\n`
+      + `Electron log:\n${electronLog || '(no output)'}`,
+    )
+  }
   const mode = await waitForEvaluation(gameTarget, `(async () => {
     if (typeof window.electronAPI?.getMode !== 'function') return null
     const value = await window.electronAPI.getMode()
@@ -265,6 +282,20 @@ try {
   assert(lightFallback.elapsedMs < 5000, `Light fallback exceeded five seconds: ${JSON.stringify(lightFallback)}`)
   assert(lightFallback.ids.length >= 8, `Light fallback did not show enough pieces: ${JSON.stringify(lightFallback)}`)
   assert(lightFallback.factions.every(faction => faction === 'good'), `Light fallback mixed factions: ${JSON.stringify(lightFallback)}`)
+  const lightAlignmentLock = await evaluate(lightTarget, `(async () => {
+    const before = PIECE_TEMPLATES.map(piece => piece.id)
+    await setAlignment('dark')
+    return {
+      before,
+      after: PIECE_TEMPLATES.map(piece => piece.id),
+      lightDisabled: document.getElementById('alignmentLightBtn').disabled,
+      darkDisabled: document.getElementById('alignmentDarkBtn').disabled,
+      notice: document.getElementById('alignmentLockNotice').textContent,
+      alerts: window.__red54SmokeAlerts,
+    }
+  })()`)
+  assert(lightAlignmentLock.lightDisabled && lightAlignmentLock.darkDisabled, `Light alignment controls were not locked: ${JSON.stringify(lightAlignmentLock)}`)
+  assert(JSON.stringify(lightAlignmentLock.after) === JSON.stringify(lightAlignmentLock.before), `Light player switched alignment locally: ${JSON.stringify(lightAlignmentLock)}`)
 
   const firstSelection = await evaluate(lightTarget, `(async () => {
     Array.from(document.querySelectorAll('.piece-card'), card => card.dataset.pid)
@@ -284,6 +315,12 @@ try {
   assert(darkFallback.elapsedMs < 5000, `Dark fallback exceeded five seconds: ${JSON.stringify(darkFallback)}`)
   assert(darkFallback.ids.length >= 8, `Dark fallback did not show enough pieces: ${JSON.stringify(darkFallback)}`)
   assert(darkFallback.factions.every(faction => faction === 'evil'), `Dark fallback mixed factions: ${JSON.stringify(darkFallback)}`)
+  const darkAlignmentLock = await evaluate(darkTarget, `({
+    lightDisabled: document.getElementById('alignmentLightBtn').disabled,
+    darkDisabled: document.getElementById('alignmentDarkBtn').disabled,
+    notice: document.getElementById('alignmentLockNotice').textContent,
+  })`)
+  assert(darkAlignmentLock.lightDisabled && darkAlignmentLock.darkDisabled, `Dark alignment controls were not locked: ${JSON.stringify(darkAlignmentLock)}`)
 
   const connection = await connectTarget(darkTarget)
   connection.fireAndForget(`
@@ -310,8 +347,10 @@ try {
     rendererBoundary,
     localServer: mode.localUrl,
     lightFallback,
+    lightAlignmentLock,
     firstSelection,
     darkFallback,
+    darkAlignmentLock,
     battle,
   }))
 } finally {
