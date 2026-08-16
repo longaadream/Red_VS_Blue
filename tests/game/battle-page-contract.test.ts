@@ -287,6 +287,7 @@ describe('battle page route contract', () => {
     )
     expect(battlePage).not.toContain('detailPiece.skills')
     expect(battlePage).toContain('oncontextmenu="event.preventDefault();dispatchBattleIntent({type:\'inspect-piece\'')
+    expect(battlePage).toContain('aria-label="查看棋子完整技能与状态"')
     expect(battlePage).toContain('function showPieceInfo(instanceId, preserveKeyword)')
     expect(battlePage).toContain('statsHtml + tagsHtml')
     expect(battlePage).toContain('\`<div class="pi-section-label">技能</div>\` + skillsHtml')

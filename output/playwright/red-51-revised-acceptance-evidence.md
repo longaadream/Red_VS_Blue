@@ -19,7 +19,7 @@ Risk: Medium
 - Training modification controls now start as one 44px floating trigger. The expanded popover remained fully inside both viewports; on 390×844 all three command buttons measured 44px high.
 - Training tools and the piece action menu are mutually exclusive. Opening training tools changed the piece menu to `aria-hidden="true"`.
 - Selecting an owned piece opens the anchored lightweight menu. Choosing “移动” hides it before legal routes appear; the browser observed 8 legal cells at 760px, then clicked a route successfully from `(12,11)` to `(13,11)`. The final 390px route screenshot likewise shows no menu over the green cells.
-- Right-click/long-press remains the entry to complete skills and status; selection itself only opens the lightweight nearby actions.
+- The lightweight menu's explicit info button is the touch entry to complete skills and status; desktop right-click is an additional entry. Selection itself only opens the lightweight nearby actions.
 - Console review found no runtime JavaScript exception from this follow-up. Remaining errors were only the known static-harness 404s for `game-engine-runtime.js`, `favicon.ico`, and the absent `evil-explosion` pack entry.
 
 ## Results
