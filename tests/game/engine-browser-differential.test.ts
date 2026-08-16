@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- the VM bridge validates runtime bundle values without shared static types */
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
@@ -39,6 +40,11 @@ const FIXTURE_SEED = 0x5eed64
 
 type BrowserEngine = {
   applyBattleAction: typeof applyBattleAction
+  globalTriggerSystem: {
+    addRules: (rules: any[]) => void
+    checkTriggers: (state: any, context: any) => { success: boolean }
+    clearRules: () => void
+  }
   mulberry32: typeof mulberry32
   setRng: typeof setRng
 }
@@ -91,5 +97,78 @@ describe('game engine Node/browser differential fixture', () => {
       seed: FIXTURE_SEED,
       result: nodeResult,
     })
+  })
+
+  it('executes all five trigger consumer categories in the approved order', () => {
+    const trace: string[] = []
+    const browser = loadBrowserEngine()
+    const browserRule = (id: string, priority: number) => ({
+      id,
+      name: id,
+      description: id,
+      priority,
+      trigger: { type: 'ordering' },
+      effect: () => { trace.push(id); return { success: true } },
+    })
+    const piece = makePiece({
+      rules: [browserRule('piece-rule', 0)],
+    }) as any
+    piece.attachedEffects = [{
+      instanceId: 'effect-1',
+      definitionId: 'effect-1',
+      ownerId: piece.instanceId,
+      data: {},
+      triggers: [{
+        on: 'ordering',
+        priority: 0,
+        filterCode: 'function() { return true }',
+        effectCode: "function(ctx, battle) { battle.extensions.trace.push('attached-effect'); return { success: true } }",
+      }],
+    }]
+    const state = makeState({ pieces: [piece] }) as any
+    state.extensions.trace = trace
+    state.players[0].rules = [browserRule('player-rule', 0)]
+    state.players[0].hand = [
+      { cardId: 'ordering-response-first', instanceId: 'card-1', ownerPlayerId: 'player-red' },
+      { cardId: 'ordering-response-second', instanceId: 'card-2', ownerPlayerId: 'player-red' },
+    ]
+    state.customCards = {
+      'ordering-response-first': {
+        id: 'ordering-response-first',
+        name: 'ordering-response-first',
+        description: 'ordering-response-first',
+        type: 'reactive',
+        trigger: { type: 'ordering' },
+        code: "function executeCard(context) { context.battle.extensions.trace.push('response-card-first'); return { success: true } }",
+      },
+      'ordering-response-second': {
+        id: 'ordering-response-second',
+        name: 'ordering-response-second',
+        description: 'ordering-response-second',
+        type: 'reactive',
+        trigger: { type: 'ordering' },
+        code: "function executeCard(context) { context.battle.extensions.trace.push('response-card-second'); return { success: true } }",
+      },
+    }
+
+    browser.globalTriggerSystem.clearRules()
+    try {
+      browser.globalTriggerSystem.addRules([browserRule('global-rule', 0)])
+      const result = browser.globalTriggerSystem.checkTriggers(state, { type: 'ordering', playerId: 'player-red' })
+
+      expect(result.success).toBe(true)
+      expect(trace).toEqual([
+        'global-rule',
+        'piece-rule',
+        'player-rule',
+        'response-card-first',
+        'response-card-second',
+        'attached-effect',
+      ])
+      expect(state.players[0].hand).toEqual([])
+      expect(state.players[0].discardPile).toEqual(['ordering-response-first', 'ordering-response-second'])
+    } finally {
+      browser.globalTriggerSystem.clearRules()
+    }
   })
 })

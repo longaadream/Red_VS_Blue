@@ -41,6 +41,7 @@
   }
 
   function statusLabel(status) {
+    if (typeof status === 'string') return status
     return String(status.name || status.type || status.id || '?')
   }
 
@@ -57,7 +58,10 @@
         id: id,
         label: statusLabel(status),
         stacks: numberOr(status.stacks, 0),
-        duration: numberOr(status.duration, 0),
+        duration: numberOr(
+          status.remainingDuration,
+          numberOr(status.currentDuration, numberOr(status.duration, 0))
+        ),
       })
     })
     return statuses

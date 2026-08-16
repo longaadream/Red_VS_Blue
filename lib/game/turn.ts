@@ -658,7 +658,7 @@ function buildSkillExecutionContext(
 
 function assertSkillDryRunResult(result: any): void {
   if (result.needsTargetSelection) {
-    const err = new BattleRuleError('??????') as any
+    const err = new BattleRuleError('需要选择目标') as any
     err.needsTargetSelection = true
     err.targetType = result.targetType || 'piece'
     err.range = result.range || 5
@@ -667,14 +667,14 @@ function assertSkillDryRunResult(result: any): void {
     throw err
   }
   if (result.needsOptionSelection) {
-    const err = new BattleRuleError('??????') as any
+    const err = new BattleRuleError('需要选择选项') as any
     err.needsOptionSelection = true
     err.options = result.options || []
-    err.title = result.title || '???'
+    err.title = result.title || '请选择'
     throw err
   }
   if (!result.success) {
-    throw new BattleRuleError(result.message || '??????')
+    throw new BattleRuleError(result.message || '技能预检失败')
   }
 }
 function dryRunSkillAction(
