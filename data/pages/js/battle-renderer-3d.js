@@ -161,6 +161,9 @@
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     _container.insertBefore(_renderer.domElement, _container.firstChild)
+    _renderer.domElement.tabIndex = 0
+    _renderer.domElement.setAttribute('role', 'application')
+    _renderer.domElement.setAttribute('aria-label', '20 × 16 战术棋盘，可拖动平移、滚轮或双指缩放')
 
     // HP bar overlay (absolute over canvas)
     _hpLayer = document.createElement('div')
@@ -197,12 +200,27 @@
     _updateHpBarPositions()
   }
 
+  function _fitWorldHalfHeight(w, h) {
+    if (!_mapW) return 1
+    const aspect = w / (h || 1)
+    const halfH = _mapH / 2 + 1
+    const halfW = _mapW / 2 + 1
+    return Math.max(halfH, halfW / aspect)
+  }
+
+  function _minimumUsableZoom(w, h) {
+    if (!_mapW) return 1
+    const narrowViewport = w <= 760
+    const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
+    if (!narrowViewport && !coarsePointer) return 1
+    const pixelsPerCell = h / (_fitWorldHalfHeight(w, h) * 2)
+    return Math.max(1, Math.min(1.8, 24 / Math.max(1, pixelsPerCell)))
+  }
+
   function _updateCameraFrustum(w, h) {
     if (!_camera || !_mapW) return
     const aspect = w / (h || 1)
-    const halfH = (_mapH / 2 + 1) / _camera.zoom
-    const halfW = (_mapW / 2 + 1) / _camera.zoom
-    const fitH = Math.max(halfH, halfW / aspect)
+    const fitH = _fitWorldHalfHeight(w, h)
     _camera.left   = -fitH * aspect
     _camera.right  =  fitH * aspect
     _camera.top    =  fitH
@@ -250,6 +268,7 @@
     // Camera target: center of map
     _camera.position.set(_mapW / 2, 50, _mapH / 2)
     _camera.lookAt(_mapW / 2, 0, _mapH / 2)
+    _camera.zoom = _minimumUsableZoom(_container.clientWidth || 320, _container.clientHeight || 320)
 
     // Hit plane for raycasting (invisible, covers full map)
     if (_hitPlane) {
@@ -581,9 +600,10 @@
       if (_pointers.size === 1) {
         _panStart = { x: e.clientX, y: e.clientY }
         _panMoved = false
-        canvas.setPointerCapture(e.pointerId)
+        if (typeof canvas.setPointerCapture === 'function') canvas.setPointerCapture(e.pointerId)
       } else if (_pointers.size === 2) {
         _pinchDist = _getPinchDist()
+        _panStart = null
       }
       e.preventDefault()
     }, { passive: false })
@@ -608,7 +628,8 @@
         const dy = e.clientY - _panStart.y
         if (Math.abs(dx) + Math.abs(dy) > 4) {
           _panMoved = true
-          const fov = (_camera.right - _camera.left) / _renderer.domElement.width
+          const canvasWidth = _renderer.domElement.getBoundingClientRect().width || 1
+          const fov = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
           _camera.position.x -= dx * fov
           _camera.position.z -= dy * fov
           _camera.lookAt(_camera.position.x, 0, _camera.position.z)
@@ -618,15 +639,21 @@
       e.preventDefault()
     }, { passive: false })
 
-    const endPointer = e => {
+    const endPointer = (e, allowClick) => {
       const wasClick = !_panMoved && _pointers.size === 1
       _pointers.delete(e.pointerId)
       if (_pointers.size < 2) _pinchDist = 0
-      if (!_pointers.size) { _panStart = null }
-      if (wasClick) _handleClick(e)
+      if (_pointers.size === 1) {
+        const remaining = Array.from(_pointers.values())[0]
+        _panStart = { x: remaining.x, y: remaining.y }
+        _panMoved = true
+      } else if (!_pointers.size) {
+        _panStart = null
+      }
+      if (allowClick && wasClick) _handleClick(e)
     }
-    _listen(canvas, 'pointerup', endPointer)
-    _listen(canvas, 'pointercancel', endPointer)
+    _listen(canvas, 'pointerup', e => endPointer(e, true))
+    _listen(canvas, 'pointercancel', e => endPointer(e, false))
 
     _listen(canvas, 'wheel', e => {
       _applyZoom(_camera.zoom * (e.deltaY < 0 ? 1.12 : 0.89))
@@ -652,20 +679,25 @@
   }
 
   function _applyZoom(z) {
-    _camera.zoom = Math.max(0.4, Math.min(5, z))
+    const w = _container.clientWidth || 320
+    const h = _container.clientHeight || 320
+    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(5, z))
     _camera.updateProjectionMatrix()
     _updateHpBarPositions()
   }
 
   function _resetCamera() {
     if (!_mapW) return
-    _camera.zoom = 1
-    _camera.position.set(_mapW / 2, 50, _mapH / 2)
-    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
+    _camera.zoom = _minimumUsableZoom(w, h)
+    _camera.position.set(_mapW / 2, 50, _mapH / 2)
+    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
     _updateCameraFrustum(w, h)
+    _updateHpBarPositions()
   }
+
+  function resetView() { _resetCamera() }
 
   // ── Raycasting ────────────────────────────────────────────────────────────────
   const _raycaster = new THREE.Raycaster()
@@ -840,6 +872,7 @@
     animateAction,
     spawnFloater,
     resize,
+    resetView,
     projectCell,
     screenToCell,
     dispose,

@@ -55,6 +55,7 @@ presentation.mount({ boardContainer, floatLayer })
 presentation.update(model)
 presentation.dispatch({ type: 'select-skill', skillId })
 presentation.resize()
+presentation.resetView()
 presentation.dispose()
 ```
 
@@ -75,6 +76,7 @@ presentation.dispose()
 
 - 展示模型来源一致性测试。
 - presentation 重复 mount/dispose 和同对象双层输入测试。
+- resize、详情栏切换与 DPR 变化后，`projectCell()` / `screenToCell()` 必须保持同一格子；镜头复位通过 presentation 生命周期转发，不进入规则命令。
 - renderer 脚本语法、初始化/resize/投影/dispose 浏览器回放。
 - 1280×720 与 390×844 的格子投影/命中和选择/取消/目标模式冒烟。
 - 浏览器截图与 console 检查记录在 `output/playwright/red-48-browser-evidence.md`。

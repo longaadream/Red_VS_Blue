@@ -42,9 +42,16 @@ function fixtureSnapshot() {
       },
     ],
     players: [
-      { playerId: 'player-red', actionPoints: 2, maxActionPoints: 3, chargePoints: 1, maxChargePoints: 4 },
+      {
+        playerId: 'player-red',
+        name: 'A deliberately long tactical player name',
+        actionPoints: 2,
+        maxActionPoints: 3,
+        chargePoints: 1,
+        maxChargePoints: 4,
+      },
     ],
-    turn: { currentPlayerId: 'player-red', turnNumber: 2, phase: 'action' },
+    turn: { currentPlayerId: 'player-red', turnNumber: 2, phase: 'action', remainingSeconds: 89 },
     extensions: { tileEffects: [{ id: 'fire', tileType: 'amaterasu', x: 1, y: 0 }] },
   }
 }
@@ -82,6 +89,8 @@ describe('battle presentation boundary', () => {
         },
       ],
       selection: { pieceId: 'piece-red', mode: 'move' },
+      players: [{ name: 'A deliberately long tactical player name' }],
+      turn: { remainingSeconds: 89 },
       legal: { moveCells: [{ x: 1, y: 0 }], targetCells: [{ x: 1, y: 0 }], placementCells: [] },
     })
   })
@@ -92,6 +101,7 @@ describe('battle presentation boundary', () => {
       init: vi.fn(),
       update: vi.fn(),
       resize: vi.fn(),
+      resetView: vi.fn(),
       projectCell: vi.fn(() => ({ left: 20, top: 30 })),
       screenToCell: vi.fn(() => ({ x: 1, y: 0 })),
       dispose: vi.fn(),
@@ -108,6 +118,7 @@ describe('battle presentation boundary', () => {
     boundary.update(model)
     boundary.dispatch({ type: 'select-piece', pieceId: 'piece-red' })
     boundary.resize()
+    boundary.resetView()
     boundary.dispose()
 
     expect(renderer.dispose).toHaveBeenCalledTimes(2)
@@ -115,6 +126,7 @@ describe('battle presentation boundary', () => {
     expect(renderer.update).toHaveBeenCalledWith(model)
     expect(domUi.update).toHaveBeenCalledWith(model)
     expect(onIntent).toHaveBeenCalledWith({ type: 'select-piece', pieceId: 'piece-red' })
+    expect(renderer.resetView).toHaveBeenCalledTimes(1)
     expect(boundary.projectCell(1, 0)).toEqual({ left: 20, top: 30 })
     expect(boundary.screenToCell(20, 30)).toEqual({ x: 1, y: 0 })
   })
@@ -232,9 +244,12 @@ describe('battle presentation boundary', () => {
     expect(renderer).toMatch(/function init\b/)
     expect(renderer).toMatch(/function update\b/)
     expect(renderer).toMatch(/function resize\b/)
+    expect(renderer).toMatch(/function resetView\b/)
     expect(renderer).toMatch(/function projectCell\b/)
     expect(renderer).toMatch(/function screenToCell\b/)
     expect(renderer).toMatch(/function dispose\b/)
+    expect(renderer).toContain("_renderer.domElement.getBoundingClientRect().width")
+    expect(renderer).toMatch(/\(_camera\.right - _camera\.left\) \/ _camera\.zoom/)
     expect(renderer).not.toContain('syncState(G)')
     expect(() => new Script(renderer, { filename: 'battle-renderer-3d.js' })).not.toThrow()
   })
