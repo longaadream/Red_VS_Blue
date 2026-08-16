@@ -102,4 +102,33 @@ describe('battle page route contract', () => {
       /if \(!firstPieces\.length \|\| !secondPieces\.length\) \{\s*throw new Error\('训练棋子资源未加载/,
     )
   })
+
+  it('keeps target submission single-flight and clears transient targeting on every authoritative exit', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('function submitTargetAction(action, label)')
+    expect(battlePage).toMatch(
+      /function submitTargetAction\(action, label\) \{\s*if \(targetSubmissionPending\)/,
+    )
+    expect(battlePage).toContain('目标指令已提交，正在等待权威确认')
+    expect(battlePage).toContain("clearTargetInteraction('user-cancelled')")
+    expect(battlePage).toContain("clearTargetInteraction('piece-switched')")
+    expect(battlePage).toContain("clearTargetInteraction('turn-changed')")
+    expect(battlePage).toContain("clearTargetInteraction('selected-piece-unavailable')")
+    expect(battlePage).toContain("clearTargetInteraction('server-rejected')")
+    expect(battlePage).toContain('function reconcileBattleInteractionState(previousState, nextState)')
+  })
+
+  it('exposes accessible target feedback and a mobile target mode that removes obstructing detail UI', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('<div id="statusMsg" role="status" aria-live="polite">')
+    expect(battlePage).toContain('<div id="targetOverlay" role="status" aria-live="polite">')
+    expect(battlePage).toContain('id="targetSourceName"')
+    expect(battlePage).toContain('id="targetCancelButton"')
+    expect(battlePage).toContain('.board-side-rail.target-mode { display: none; }')
+    expect(battlePage).toContain('body.target-mode-active #skillBar')
+    expect(battlePage).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(battlePage).toContain('button:focus-visible')
+  })
 })

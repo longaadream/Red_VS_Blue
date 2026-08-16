@@ -1122,6 +1122,13 @@
       display:none; flex-direction:column; align-items:center; padding-top:72px; gap:10px;
     }
     #targetOverlay.show { display:flex; }
+    .target-mode-card {
+      display: grid; justify-items: center; gap: 7px; padding: 10px 14px;
+      border: 1px solid rgba(245,158,11,.5); border-radius: 12px;
+      background: rgba(2,6,23,.9); box-shadow: 0 12px 32px rgba(0,0,0,.48);
+      backdrop-filter: blur(10px);
+    }
+    .target-source-name { color: #fde68a; font-size: 12px; font-weight: 800; }
     .target-prompt {
       font-size:22px; font-weight:900; color:#fbbf24;
       letter-spacing:1.5px;
@@ -1134,9 +1141,30 @@
       color:#94a3b8; padding:6px 18px; font-size:13px; cursor:pointer;
     }
     .target-cancel-btn:active { background:#1e293b; }
+    .target-cancel-btn[disabled] { opacity: .5; cursor: wait; }
     @keyframes targetPulse {
       0%,100% { opacity:.85; }
       50%      { opacity:1; text-shadow:0 0 32px rgba(245,158,11,1), 0 2px 6px rgba(0,0,0,.9); }
+    }
+    #statusMsg {
+      position: fixed; left: 50%; bottom: 70px; z-index: 82; transform: translateX(-50%);
+      width: min(620px, calc(100vw - 32px)); min-height: 32px; padding: 7px 12px;
+      border: 1px solid rgba(148,163,184,.24); border-radius: 9px;
+      background: rgba(2,6,23,.82); color: #cbd5e1; text-align: center;
+      font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: blur(9px);
+    }
+    body.target-mode-active #skillBar,
+    body.target-mode-active #arcHandContainer { display: none !important; }
+    @media (max-width: 760px) {
+      #targetOverlay { padding-top: 116px; }
+      .target-prompt { font-size: 17px; }
+      #statusMsg { top: 116px; bottom: auto; font-size: 11px; }
+      body.target-mode-active #statusMsg { top: auto; bottom: 54px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; }
+      .target-prompt, .dmg-float, .spinner, #turnAnnounce { animation: none !important; }
+      .skill-card, .selected-skill-item, .arc-card { transition: none !important; }
     }
 
     /* Final Android/Windows parity override. Keep this at the end of CSS. */
@@ -1189,6 +1217,8 @@
     <div class="spinner"></div>
     <div style="font-size:14px;color:#64748b" id="loadingMsg">连接战场…</div>
   </div>
+
+  <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
 
   <aside id="red43QaPanel" aria-live="polite">
     <div class="red43-qa-title">RED-43 · OWNER TARGET QA</div>
@@ -1520,7 +1550,8 @@
     }
     function showTrainingSetup() {
       placingMode = false
-      selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
+      selectedPieceId = null
+      clearTargetInteraction('training-setup-opened')
       const btnPlace = document.getElementById('btnPlace')
       if (btnPlace) btnPlace.style.background = '#2d1a4e'
       const loading = document.getElementById('loadingOverlay')
@@ -1744,6 +1775,68 @@
     let pressTimer = null      // long-press timer
     let playerNames = {}       // playerId → display name, loaded from room
     let pendingOptionAction = null  // original action awaiting selectedOption
+    let targetSubmissionPending = null // one target command waiting for authoritative confirmation
+    let locallyCancelledSelectionId = null
+    const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
+    window.__RVB_RED50_EVIDENCE__ = red50Evidence
+
+    function recordTargetClear(reason) {
+      red50Evidence.clearEvents.push({ reason: reason || 'unknown', at: Date.now() })
+      if (red50Evidence.clearEvents.length > 40) red50Evidence.clearEvents.shift()
+    }
+
+    function clearTargetInteraction(reason, options) {
+      const input = options || {}
+      const hadTarget = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      pendingSkill = null
+      pendingCardAction = null
+      targetSubmissionPending = null
+      if (input.keepMove !== true) pendingMove = false
+      if (hadTarget) recordTargetClear(reason)
+      document.body.classList.remove('target-mode-active')
+      if (input.message) setStatusMsg(input.message)
+      return hadTarget
+    }
+
+    function currentTargetSourceName() {
+      if (targetSubmissionPending && targetSubmissionPending.label) return targetSubmissionPending.label
+      if (pendingCardAction) {
+        const card = cardsById[pendingCardAction.cardId] || {}
+        return card.name || pendingCardAction.cardId || '当前卡牌'
+      }
+      if (pendingSkill && pendingSkill.skillId) {
+        const skill = skillDefOf(pendingSkill.skillId)
+        return skill.name || pendingSkill.skillId
+      }
+      return pendingSkill && pendingSkill.turnTargetActionType ? '规则目标选择' : '当前技能'
+    }
+
+    function submitTargetAction(action, label) {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return false
+      }
+      const stamped = withClientActionId(action)
+      targetSubmissionPending = {
+        clientActionId: stamped.clientActionId,
+        type: stamped.type,
+        label: label || currentTargetSourceName(),
+      }
+      red50Evidence.targetCommands.push({
+        clientActionId: stamped.clientActionId,
+        type: stamped.type,
+        pieceId: stamped.pieceId || stamped.targetPieceId || null,
+        targetX: stamped.targetX,
+        targetY: stamped.targetY,
+        selectionId: stamped.selectionId || null,
+      })
+      setStatusMsg('目标指令已提交，正在等待权威确认')
+      renderBoard()
+      renderTargetOverlay()
+      renderActionBar()
+      void doAction(stamped)
+      return true
+    }
 
     function clearCardPrimaryTarget(action) {
       const next = Object.assign({}, action || {})
@@ -1778,6 +1871,10 @@
 
     function enterActionTargetMode(action, preparation) {
       if (!action || !preparation || preparation.kind !== 'needTarget') return false
+      if (targetSubmissionPending) {
+        targetSubmissionPending = null
+        recordTargetClear('authoritative-next-target-step')
+      }
       if (action.type === 'playCard') {
         pendingCardAction = prepareCardTargetRetry(
           action,
@@ -2627,7 +2724,8 @@
         }
         myPlayerId = G.turn.currentPlayerId
         myFaction = getTrainingPlayerFaction(myPlayerId)
-        selectedPieceId = null; pendingMove = false; pendingSkill = null; pendingCardAction = null
+        selectedPieceId = null
+        clearTargetInteraction('training-started')
         lastActionCount = 0
         document.getElementById('loadingOverlay').style.display = 'none'
         syncTrainingPlayerOptionLabels()
@@ -2645,8 +2743,12 @@
     // ── Training: send admin patch ──
     async function sendPatch(body) {
       try {
+        const oldG = G
         G = await trainingApiFetch('PATCH', Object.assign({}, body, { battleState: G }))
-        render(); return true
+        const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+        render()
+        if (interactionFeedback) setStatusMsg(interactionFeedback)
+        return true
       } catch (e) { addLog('失败：' + e.message, 'err'); return false }
     }
 
@@ -2655,7 +2757,8 @@
       const next = myPlayerId === 'training-red' ? 'training-blue' : 'training-red'
       myPlayerId = next
       myFaction = getTrainingPlayerFaction(myPlayerId)
-      selectedPieceId = null; pendingMove = false; pendingSkill = null
+      selectedPieceId = null
+      clearTargetInteraction('perspective-switched')
       addLog('控制方 -> ' + trainingPlayerLabel(next), 'turn')
       const btn = document.getElementById('btnSwitchPov')
       if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(next)
@@ -2728,6 +2831,48 @@
 
     // ── Server-authoritative state handling ──
 
+    function reconcileBattleInteractionState(previousState, nextState) {
+      if (!nextState) return ''
+      const authoritativeSelectionId = nextState.pendingTargetSelection && nextState.pendingTargetSelection.selectionId
+      if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
+        locallyCancelledSelectionId = null
+      }
+      const selected = selectedPieceId && nextState.pieces
+        ? nextState.pieces.find(p => p.instanceId === selectedPieceId && p.currentHp > 0)
+        : null
+      if (selectedPieceId && !selected) {
+        selectedPieceId = null
+        clearTargetInteraction('selected-piece-unavailable')
+        validMoves = new Set()
+        return '选中棋子已离场，目标选择已清除'
+      }
+
+      const previousTurn = previousState && previousState.turn && previousState.turn.currentPlayerId
+      const nextTurn = nextState.turn && nextState.turn.currentPlayerId
+      if (previousTurn && nextTurn && String(previousTurn).toLowerCase() !== String(nextTurn).toLowerCase()) {
+        clearTargetInteraction('turn-changed')
+        validMoves = new Set()
+        return '回合已切换，目标选择已清除'
+      }
+
+      const preparation = (pendingSkill && pendingSkill.preparation)
+        || (pendingCardAction && pendingCardAction.preparation)
+      if (preparation && Number.isFinite(Number(preparation.stateRevision))) {
+        const revision = Number(nextState.targetingRevision || 0)
+        if (revision !== Number(preparation.stateRevision)) {
+          clearTargetInteraction('targeting-revision-changed')
+          validMoves = new Set()
+          return '战局状态已更新，请重新选择技能目标'
+        }
+      }
+
+      if (targetSubmissionPending) {
+        clearTargetInteraction('authoritative-confirmation')
+        return '目标指令已确认'
+      }
+      return ''
+    }
+
     // Apply an authoritative state snapshot received from server (WS or GET)
     var _lastAppliedState = null
     function applyServerState(state, seed, preserveWsSeq) {
@@ -2737,6 +2882,7 @@
       const oldG = G
       G = state
       G.skillsById = Object.assign({}, skillsById || {}, G.skillsById || {})
+      const interactionFeedback = reconcileBattleInteractionState(oldG, G)
 
       // Init seeded RNG once
       if (seed && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
@@ -2758,6 +2904,7 @@
 
       if (oldG) { flushActionLog(oldG, G); spawnStateFloaters(oldG, G) }
       render()
+      if (interactionFeedback) setStatusMsg(interactionFeedback)
 
       if (G.gameOver || G.winner) { handleGameOver(); return }
 
@@ -2876,6 +3023,10 @@
           addLog('[DEBUG actionError] action=' + JSON.stringify(msg.action || null) + ' error=' + (msg.error || 'unknown') + ' needsTarget=' + (!!msg.needsTargetSelection) + ' needsOption=' + (!!msg.needsOptionSelection), 'err')
           if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
           if (msg.needsOptionSelection && msg.action) {
+            if (targetSubmissionPending) {
+              targetSubmissionPending = null
+              recordTargetClear('authoritative-next-option-step')
+            }
             var optionAction = Object.assign({}, msg.action)
             if (msg.preparation && msg.preparation.kind === 'needOption') {
               optionAction.selectionId = msg.preparation.selectionId
@@ -2885,9 +3036,12 @@
             renderActionBar()
             return
           }
+          const rejectionMessage = msg.error || 'unknown error'
+          red50Evidence.rejections.push({ code: msg.code || '', message: rejectionMessage, at: Date.now() })
+          clearTargetInteraction('server-rejected')
           addLog('服务端处理动作失败：' + (msg.error || 'unknown error'), 'err')
-          setStatusMsg('服务端处理动作失败：' + (msg.error || 'unknown error'))
-          renderActionBar()
+          render()
+          setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
         } else if (msg.type === 'pendingAction') {
           // Relay host: process guest action locally and push stateUpdate.
           if (wsMode === 'relay' && wsRole === 'host' && G &&
@@ -3064,16 +3218,31 @@
     function renderTargetOverlay() {
       const el = document.getElementById('targetOverlay')
       if (!el) return
-      if (pendingSkill || pendingCardAction) {
-        document.getElementById('targetPromptText').textContent = _targetPromptText()
+      const active = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      document.body.classList.toggle('target-mode-active', active)
+      if (active) {
+        document.getElementById('targetSourceName').textContent = currentTargetSourceName()
+        document.getElementById('targetPromptText').textContent = targetSubmissionPending
+          ? '指令已提交 · 等待权威确认'
+          : _targetPromptText()
+        const cancelButton = document.getElementById('targetCancelButton')
+        if (cancelButton) {
+          cancelButton.disabled = !!targetSubmissionPending
+          cancelButton.textContent = targetSubmissionPending ? '等待确认…' : '取消目标选择'
+        }
         el.classList.add('show')
       } else {
         el.classList.remove('show')
       }
     }
     function cancelTargetSelection() {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
         const pendingTarget = G.pendingTargetSelection
+        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
         doAction({
           type: 'cancelPendingSelection',
           playerId: myPlayerId,
@@ -3081,10 +3250,11 @@
           stateRevision: pendingTarget && pendingTarget.stateRevision,
         })
       }
-      pendingSkill = null; pendingCardAction = null; pendingMove = false
+      clearTargetInteraction('user-cancelled')
       setMoveButtonClass(false)
       const sp = autoMoveSelectedIfPossible()
       renderBoard(); renderSkillBar(sp || null); renderActionBar(); renderTargetOverlay()
+      setStatusMsg('已取消目标选择')
     }
 
     function setMoveButtonClass(active) {
@@ -3128,7 +3298,7 @@
     // Render
     function pendingTargetSelectionForMe() {
       const pbt = G && G.pendingTargetSelection
-      return !!(pbt && pbt.playerId && clientOwns(pbt.playerId))
+      return !!(pbt && pbt.playerId && clientOwns(pbt.playerId) && pbt.selectionId !== locallyCancelledSelectionId)
     }
 
     function pendingOptionSelectionForMe() {
@@ -3143,7 +3313,7 @@
 
     function battleInteractionMode() {
       if (TRAINING_MODE && placingMode) return 'place'
-      if (pendingSkill || (pendingCardAction && pendingCardAction.type)) return 'target'
+      if (pendingSkill || (pendingCardAction && pendingCardAction.type) || targetSubmissionPending) return 'target'
       if (pendingMove) return 'move'
       return 'inspect'
     }
@@ -3735,7 +3905,7 @@
       const _waitingForOther = pendingOptionSelectionForOther()
       const btnEnd = document.getElementById('btnEnd')
       if (btnEnd) {
-        btnEnd.disabled = _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
+        btnEnd.disabled = !!targetSubmissionPending || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
         btnEnd.textContent = inAction ? '结束回合 ->' : '继续 ->'
         btnEnd.classList.toggle('is-start', inStart || inEnd)
       }
@@ -3743,9 +3913,11 @@
       const _selPiece = G && G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
       const _isOwnSelected = _selPiece && _selPiece.ownerPlayerId && _selPiece.ownerPlayerId.toLowerCase() === myPlayerId
       const _canMoveSelected = canAutoMovePiece(_selPiece)
-      setMoveButtonDisabled(_waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
+      setMoveButtonDisabled(!!targetSubmissionPending || _waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
-      if (pendingSkill && pendingSkill.turnTargetActionType) {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+      } else if (pendingSkill && pendingSkill.turnTargetActionType) {
         setStatusMsg(_targetPromptText() || '选择回合目标')
       } else if (pendingOptionSelectionForOther()) {
         setStatusMsg('等待对方选择...')
@@ -3799,6 +3971,10 @@
 
     function onCellClick(x, y) {
       if (!G) return
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
 
@@ -3852,9 +4028,10 @@
         delete action.requestId
         delete action.preparation
         delete action.validTargets
+        const targetLabel = currentTargetSourceName()
         pendingCardAction = null
         document.getElementById('handTarget').style.display = 'none'
-        doAction(action)
+        submitTargetAction(action, targetLabel)
         return
       }
 
@@ -3885,12 +4062,13 @@
           hasEffectCode: !!_pts.effectCode,
           triggerContext: _pts.triggerContext
         } : null), 'info')
+        const targetLabel = currentTargetSourceName()
         pendingSkill = null
         setStatusMsg('已提交目标选择')
         renderBoard()
         renderActionBar()
         renderTargetOverlay()
-        doAction(action)
+        submitTargetAction(action, targetLabel)
         return
       }
 
@@ -3933,8 +4111,9 @@
             }
         // Set target using the first flat slot, then append later selectTarget calls to extraTargets.
         _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
+        const targetLabel = currentTargetSourceName()
         pendingSkill = null
-        doAction(action)
+        submitTargetAction(action, targetLabel)
         return
       }
 
@@ -3946,9 +4125,22 @@
     }
 
     function clearPieceSelection() {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
+      if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
+        const pendingTarget = G.pendingTargetSelection
+        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        void doAction({
+          type: 'cancelPendingSelection',
+          playerId: myPlayerId,
+          selectionId: pendingTarget && pendingTarget.selectionId,
+          stateRevision: pendingTarget && pendingTarget.stateRevision,
+        })
+      }
+      clearTargetInteraction('selection-cleared')
       selectedPieceId = null
-      pendingMove = false
-      pendingSkill = null
       validMoves = new Set()
       setMoveButtonClass(false)
       const pieceSelect = document.getElementById('pieceSelect')
@@ -3958,12 +4150,26 @@
     }
 
     function selectPiece(instanceId) {
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
       if (selectedPieceId === instanceId) {
         clearPieceSelection()
         return
       }
+      if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
+        const pendingTarget = G.pendingTargetSelection
+        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        void doAction({
+          type: 'cancelPendingSelection',
+          playerId: myPlayerId,
+          selectionId: pendingTarget && pendingTarget.selectionId,
+          stateRevision: pendingTarget && pendingTarget.stateRevision,
+        })
+      }
+      clearTargetInteraction('piece-switched')
       selectedPieceId = instanceId
-      pendingSkill = null
       // Sync dropdown
       const pieceSelect = document.getElementById('pieceSelect')
       if (pieceSelect) {
@@ -3993,6 +4199,10 @@
     // selectSkillCard: called when a skill card in the skill bar is clicked
     async function selectSkillCard(skId) {
       if (!selectedPieceId || !skId || !G) return
+      if (targetSubmissionPending) {
+        setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
       const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
       if (!sp) return
       const skData = skillDefOf(skId)
@@ -4001,13 +4211,22 @@
 
       // Toggle off: clicking the active skill again cancels selection
       if (pendingSkill && pendingSkill.skillId === skId) {
-        pendingSkill = null
+        clearTargetInteraction('active-skill-cancelled')
         autoMoveSelectedIfPossible()
         renderBoard(); renderSkillBar(sp); renderActionBar(); renderTargetOverlay()
+        setStatusMsg('已取消技能目标选择')
         return
       }
 
-      pendingMove = false
+      const detailModel = createBattlePresentationModel(G)
+      const detailPiece = detailModel && detailModel.selection && detailModel.selection.piece
+      const detailSkill = detailPiece && (detailPiece.skills || []).find(skill => skill.id === skId)
+      if (!detailSkill || !detailSkill.available) {
+        setStatusMsg((detailSkill && detailSkill.unavailableReason) || '该技能当前不可用')
+        return
+      }
+
+      clearTargetInteraction('skill-selected')
       setMoveButtonClass(false)
 
       // Pre-check resources so failed clicks explain themselves before sending an action.
@@ -4064,6 +4283,7 @@
     async function trainingDoAction(action) {
       if (!G) return
       try {
+        const wasTargetSubmission = !!targetSubmissionPending
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
         const oldG = G
@@ -4087,15 +4307,22 @@
         } else if (action.type === 'endTurn' || action.type === 'beginPhase') {
           selectedPieceId = null
         }
-        pendingSkill = null; pendingCardAction = null
+        const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+        if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
         autoMoveSelectedIfPossible()
         render(); checkClientGameOver()
+        if (interactionFeedback) setStatusMsg(interactionFeedback)
       } catch (e) {
+        let rejectionFeedback = ''
         if (e.needsTargetSelection) {
           if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
             setStatusMsg('权威目标查询未返回候选集合')
           }
         } else if (e.needsOptionSelection) {
+          if (targetSubmissionPending) {
+            targetSubmissionPending = null
+            recordTargetClear('authoritative-next-option-step')
+          }
           var optionRetry = Object.assign({}, action)
           if (e.preparation && e.preparation.kind === 'needOption') {
             optionRetry.selectionId = e.preparation.selectionId
@@ -4104,11 +4331,13 @@
           showOptionPicker(e.title||'请选择', e.options||[], optionRetry)
         } else {
           const errMsg = e.message || String(e) || '操作失败'
+          red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
+          clearTargetInteraction('server-rejected')
           addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
-          setStatusMsg(errMsg)
-          pendingSkill = null; pendingMove = false
+          rejectionFeedback = '操作被拒绝：' + errMsg + '；目标选择已清除'
         }
         renderActionBar()
+        if (rejectionFeedback) setStatusMsg(rejectionFeedback)
       }
     }
 
@@ -4116,8 +4345,17 @@
       action = withClientActionId(action)
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
-      if (!url) { addLog('未连接服务器', 'err'); return }
-      if (!G) { addLog('游戏状态未就绪', 'err'); return }
+      if (!url) {
+        clearTargetInteraction('transport-unavailable')
+        addLog('未连接服务器', 'err')
+        setStatusMsg('未连接服务器；目标选择已清除')
+        return
+      }
+      if (!G) {
+        clearTargetInteraction('state-unavailable')
+        addLog('游戏状态未就绪', 'err')
+        return
+      }
       try {
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
@@ -4148,8 +4386,12 @@
             RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG })
           } catch (e) {
             if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
-              addLog('本地处理失败：' + e.message, 'err')
-              renderActionBar()
+              const errMsg = e.message || String(e)
+              red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
+              clearTargetInteraction('server-rejected')
+              addLog('本地处理失败：' + errMsg, 'err')
+              render()
+              setStatusMsg('操作被拒绝：' + errMsg + '；目标选择已清除')
             }
           }
           return
@@ -4166,11 +4408,14 @@
         }
 
         addLog('WebSocket 未连接，无法发送动作；请检查网络和服务端', 'err')
-        setStatusMsg('WebSocket 未连接')
+        clearTargetInteraction('transport-unavailable')
         renderActionBar()
+        setStatusMsg('WebSocket 未连接；目标选择已清除')
       } catch (e) {
+        clearTargetInteraction('transport-failed')
         addLog('发送动作失败：' + e.message, 'err')
         renderActionBar()
+        setStatusMsg('发送动作失败：' + e.message + '；目标选择已清除')
       }
     }
 
@@ -4666,9 +4911,12 @@
   </div>
 
   <!-- Target selection overlay (pointer-events:none so board stays clickable) -->
-  <div id="targetOverlay">
-    <div class="target-prompt" id="targetPromptText">选择目标</div>
-    <button class="target-cancel-btn" onclick="dispatchBattleIntent({type:'cancel-target'})">取消</button>
+  <div id="targetOverlay" role="status" aria-live="polite">
+    <div class="target-mode-card">
+      <div class="target-source-name" id="targetSourceName">当前技能</div>
+      <div class="target-prompt" id="targetPromptText">选择目标</div>
+      <button type="button" class="target-cancel-btn" id="targetCancelButton" onclick="dispatchBattleIntent({type:'cancel-target'})">取消目标选择</button>
+    </div>
   </div>
 
   <!-- Fullscreen log overlay -->
