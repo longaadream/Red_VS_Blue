@@ -29,7 +29,12 @@ const CLIENT_SCHEME = 'rvb-client'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: CLIENT_SCHEME,
-  privileges: { standard: true, supportFetchAPI: true, corsEnabled: true },
+  privileges: {
+    standard: true,
+    secure: true,
+    supportFetchAPI: true,
+    corsEnabled: true,
+  },
 }])
 
 function findFreePort(start: number): Promise<number> {

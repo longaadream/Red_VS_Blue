@@ -65,6 +65,12 @@
 - 错误响应包含稳定的 `code`、`message` 与 `context`；HTTP 与 WebSocket 复用同一错误载荷。
 - `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容，并通过房间版本号原子提交战斗状态；只有双方合法锁定时才可通过当前战斗初始化入口。该入口忽略房间请求中的地图覆盖，强制使用并持久化 Demo 固定地图 `large-trap-arena`。
 
+### PVP alignment lock (RED-56)
+
+- Once a player marks ready in the lobby, the server-recorded `alignment` is immutable for piece selection. A forged cross-alignment `claim-faction` or `select-pieces` request returns `ROSTER_ALIGNMENT_LOCKED` and leaves the room unchanged.
+- `select-pieces` validates against the stored player alignment, never the request alignment. Seat (`red`/`blue`) remains independent, so same-alignment matches remain valid.
+- `piece-selection.html` renders the lobby alignment as read-only, disables both alignment controls, and filters the displayed templates to that locked alignment.
+
 ## 4. 技能、卡牌与规则数据
 
 - 入口：`lib/game/skills.ts` 的 `loadCardById()`、`loadRuleById()`、`executeCardFunction()`、`executeSkillFunction()`。
