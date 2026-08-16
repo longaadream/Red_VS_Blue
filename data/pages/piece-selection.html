@@ -241,6 +241,11 @@
     .alignment-btn.active.dark {
       color: #fecaca; border-color: #f87171; background: rgba(185,28,28,.22);
     }
+    .alignment-btn:disabled { cursor: not-allowed; opacity: .58; }
+    .alignment-lock-notice {
+      width: min(1120px, 100%); margin: 0 auto; padding: 4px 14px 0;
+      color: #94a3b8; font-size: 11px; text-align: center;
+    }
     @media (max-width: 560px) {
       body { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
       .piece-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -264,6 +269,7 @@
     <button class="alignment-btn light" id="alignmentLightBtn" onclick="setAlignment('light')">光方</button>
     <button class="alignment-btn dark" id="alignmentDarkBtn" onclick="setAlignment('dark')">暗方</button>
   </div>
+  <div id="alignmentLockNotice" class="alignment-lock-notice">阵营将在大厅准备后锁定</div>
 
   <!-- Piece list -->
   <div class="section">
@@ -447,14 +453,7 @@
     async function setAlignment(alignment) {
       if (alignment !== 'light' && alignment !== 'dark') return
       if (alignment === playerAlignment) return
-      playerAlignment = alignment
-      selectedIds.clear()
-      updateFactionBadge()
-      await loadPieces()
-      updateConfirmBar()
-      if (wsReady && roomId) {
-        try { await claimFactionViaWs() } catch {}
-      }
+      alert('阵营已在大厅锁定，无法在选棋阶段切换')
     }
 
     function navigateBattle() {
@@ -641,8 +640,15 @@
       const label = document.getElementById('sectionLabel')
       const lightBtn = document.getElementById('alignmentLightBtn')
       const darkBtn = document.getElementById('alignmentDarkBtn')
+      const lockNotice = document.getElementById('alignmentLockNotice')
+      const alignmentLocked = playerAlignment === 'light' || playerAlignment === 'dark' || playerAlignment === 'good' || playerAlignment === 'evil'
       if (lightBtn) lightBtn.classList.toggle('active', playerAlignment === 'light' || playerAlignment === 'good')
       if (darkBtn) darkBtn.classList.toggle('active', playerAlignment === 'dark' || playerAlignment === 'evil')
+      if (lightBtn) lightBtn.disabled = alignmentLocked
+      if (darkBtn) darkBtn.disabled = alignmentLocked
+      if (lockNotice) lockNotice.textContent = alignmentLocked
+        ? '阵营已在大厅锁定，只能选择本阵营棋子'
+        : '正在读取大厅分配的阵营'
       if (!badge) return
       const orderLabel = playerFaction === 'red' ? '座位 red' : playerFaction === 'blue' ? '座位 blue' : null
       if (playerAlignment === 'dark' || playerAlignment === 'evil') {

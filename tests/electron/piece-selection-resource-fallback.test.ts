@@ -26,6 +26,7 @@ type PageContract = {
   pollRoomStatus: () => Promise<void>
   setAlignment: (alignment: 'light' | 'dark') => Promise<void>
   setSelectedIds: (ids: string[]) => void
+  updateFactionBadge: () => void
 }
 
 type MockElement = {
@@ -136,6 +137,7 @@ function createHarness(options: {
     pollRoomStatus,
     setAlignment,
     setSelectedIds: (ids) => { selectedIds = new Set(ids) },
+    updateFactionBadge,
   }`, context)
 
   return {
@@ -174,7 +176,7 @@ describe('Electron piece-selection resource contract', () => {
     expect(harness.serverFetch).not.toHaveBeenCalled()
   })
 
-  test('falls back to current server pieces and refreshes the alignment filter', async () => {
+  test('falls back to current server pieces without allowing a locked alignment switch', async () => {
     const harness = createHarness({
       fetchPackJson: async resourcePath => {
         if (resourcePath.endsWith('/manifest.json')) return allPieces.map(piece => piece.id)
@@ -187,11 +189,15 @@ describe('Electron piece-selection resource contract', () => {
     })
 
     await harness.contract.loadPieces()
+    harness.contract.updateFactionBadge()
     expect(harness.contract.getPieces().every(piece => piece.faction === 'good')).toBe(true)
+    expect(harness.element('alignmentLightBtn').disabled).toBe(true)
+    expect(harness.element('alignmentDarkBtn').disabled).toBe(true)
 
     await harness.contract.setAlignment('dark')
-    expect(harness.contract.getPieces()).toHaveLength(darkPieces.length)
-    expect(harness.contract.getPieces().every(piece => piece.faction === 'evil')).toBe(true)
+    expect(harness.contract.getPieces()).toHaveLength(lightPieces.length)
+    expect(harness.contract.getPieces().every(piece => piece.faction === 'good')).toBe(true)
+    expect(harness.alerts).toEqual(['阵营已在大厅锁定，无法在选棋阶段切换'])
     expect(harness.serverFetch).toHaveBeenCalledWith('/api/pieces', { timeoutMs: expect.any(Number) })
   })
 
