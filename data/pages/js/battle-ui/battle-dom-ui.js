@@ -12,10 +12,6 @@
       .replace(/'/g, '&#039;')
   }
 
-  function statusLabel(status) {
-    const extra = status.stacks ? 'x' + status.stacks : (status.duration ? status.duration + 'T' : '')
-    return status.label + extra
-  }
 
   function formatTimer(seconds) {
     if (seconds == null || seconds === '' || !Number.isFinite(Number(seconds))) return '--:--'

@@ -4,7 +4,7 @@ import { globalTriggerSystem } from "./triggers"
 import { rng } from "./rng"
 import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
-import { manhattanDistance } from './spatial'
+import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -188,6 +188,9 @@ export type SelectionStepDefinition =
       requireUnoccupied?: boolean
       allowSourceOccupant?: boolean
       allowSourceOccupantOptions?: unknown[]
+      sameRowOrColumn?: boolean
+      excludeSourceCell?: boolean
+      projectile?: { requiredCollision: 'piece-before-blocker' }
     }
 
 export interface SelectionContractDefinition {
@@ -2259,6 +2262,11 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       teleport: effects.teleport,
       dealDamage: effects.dealDamage,
       healDamage: effects.healDamage,
+      traceProjectile: (
+        origin: { x: number; y: number },
+        direction: { x: number; y: number },
+        options?: { excludePieceId?: string; maxDistance?: number },
+      ) => traceProjectilePath(battle, origin, direction, options),
 
       // 状态效果函数
       addStatusEffectById: (targetPieceId: string, statusObject: any) => {
@@ -2608,6 +2616,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const dealDamage = environment.dealDamage;
               const healDamage = environment.healDamage;
               const addRuleById = environment.addRuleById;
+              const traceProjectile = environment.traceProjectile;
               const removeRuleById = environment.removeRuleById;
               const addPlayerRuleById = environment.addPlayerRuleById;
               const removePlayerRuleById = environment.removePlayerRuleById;

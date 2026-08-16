@@ -133,6 +133,7 @@ Demo 房间对局在回合阶段前增加部署门禁：
 - 地图定义：`lib/game/map.ts` 及地图数据加载逻辑。
 - 共享空间规则：`lib/game/spatial.ts`。默认距离使用曼哈顿距离；方形范围和直线格序列必须显式调用对应工具。
 - 普通移动：`turn.ts`、AI 与浏览器高亮共同调用 `spatial.ts`；横向/纵向路径上的不可行走地形和任意存活棋子都会阻挡，技能位移不自动套用普通移动规则。
+- 弹道事实：`spatial.ts::traceProjectile()` 返回有序格子、存活棋子、地形和边界事件并继续追踪；技能脚本按普通循环自行停止、穿透或决定友军效果。权威候选查询复用同一 API，不能按技能 ID 维护弹道白名单。
 - 召唤入口：`lib/game/turn.ts::summonPiece()`。
 - 附加效果：`lib/game/attached-effect.ts::applyEffectToPiece()` 等。
 - 触发器：`lib/game/triggers.ts::TriggerSystem`。

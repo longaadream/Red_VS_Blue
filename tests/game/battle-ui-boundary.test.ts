@@ -95,6 +95,104 @@ describe('battle presentation boundary', () => {
     })
   })
 
+  it('projects all visible selected-piece statuses and never carries the previous selection forward', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const baseSnapshot = fixtureSnapshot()
+    const snapshot = {
+      ...baseSnapshot,
+      pieces: [{
+        ...baseSnapshot.pieces[0],
+        buffs: [{ id: 'guard', name: 'Guard', currentDuration: 2, intensity: 1, visible: true }],
+        debuffs: [{ id: 'slow', name: 'Slow', remainingDuration: 1, stacks: 1, visible: true }],
+      }],
+    }
+
+    const selected = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'piece-red',
+      pieceTemplates: { 'red-warrior': { image: 'red-warrior.jpg' } },
+    })
+
+    expect(selected.selection.piece).toMatchObject({
+      id: 'piece-red',
+    })
+    expect(selected.selection.piece).not.toHaveProperty('portraitSrc')
+    expect(selected.selection.piece).not.toHaveProperty('stats')
+    expect(selected.selection.piece).not.toHaveProperty('readOnly')
+    expect(selected.selection.piece).not.toHaveProperty('skills')
+    expect(selected.selection.piece.statuses.map((status: { id: string }) => status.id)).toEqual([
+      'burn', 'guard', 'slow',
+    ])
+    expect(selected.selection.piece.statuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'guard', duration: 2, intensity: 1 }),
+      expect.objectContaining({ id: 'slow', duration: 1, stacks: 1 }),
+    ]))
+
+    const cleared = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'missing-piece',
+    })
+    expect(cleared.selection).toMatchObject({ pieceId: null, piece: null })
+  })
+
+  it('keeps enemy visible statuses readable without projecting duplicate skill details', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const baseSnapshot = fixtureSnapshot()
+    const snapshot = {
+      ...baseSnapshot,
+      pieces: [{
+        ...baseSnapshot.pieces[0],
+        ownerPlayerId: 'player-blue',
+        debuffs: [{ id: 'slow', name: 'Slow', remainingDuration: 1, visible: true }],
+      }],
+    }
+
+    const model = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'piece-red',
+    })
+
+    expect(model.selection.piece).toMatchObject({ name: 'Red Warrior' })
+    expect(model.selection.piece.statuses.map((status: { id: string }) => status.id)).toEqual(['burn', 'slow'])
+    expect(model.selection.piece).not.toHaveProperty('skills')
+  })
+
+  it('keeps the DOM boundary focused on the shared HUD when a piece is selected', () => {
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const document = {
+      getElementById: vi.fn(() => null),
+    }
+    const ui = domUi.create({ document })
+    const model = {
+      selection: {
+        mode: 'inspect',
+        piece: {
+          id: 'piece-red',
+          name: 'Red Warrior',
+          statuses: [{ id: 'burn', label: 'Burn' }],
+        },
+      },
+      turn: {
+        currentPlayerId: 'player-red',
+        isViewerTurn: true,
+        number: 2,
+        phase: 'action',
+        remainingSeconds: 89,
+      },
+      players: [],
+      viewer: null,
+    }
+
+    ui.update(model)
+
+    expect(document.getElementById).toHaveBeenCalledWith('turnBadge')
+    expect(document.getElementById).toHaveBeenCalledWith('playerResCards')
+    expect(document.getElementById).not.toHaveBeenCalledWith('selectedPieceStatus')
+  })
+
   it('sends the identical model to Three.js and DOM and owns repeatable mount/dispose', () => {
     const presentation = loadBrowserModule('js/battle-ui/battle-presentation.js', 'BattlePresentation')
     const renderer = {

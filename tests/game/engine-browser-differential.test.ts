@@ -32,7 +32,10 @@ vi.mock('@/lib/game/attached-effect', () => ({
 }))
 
 import { mulberry32, setRng } from '@/lib/game/rng'
+import type { SkillDefinition } from '@/lib/game/skills'
+import type { TargetRef } from '@/lib/game/targeting'
 import { applyBattleAction } from '@/lib/game/turn'
+import type { BattleAction } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const FIXTURE_NAME = 'normal-move-with-blocker'
@@ -47,6 +50,15 @@ type BrowserEngine = {
   }
   mulberry32: typeof mulberry32
   setRng: typeof setRng
+}
+
+type BrowserTargetingError = {
+  needsTargetSelection?: true
+  preparation?: { selectionId: string; stateRevision: number; candidates: TargetRef[] }
+}
+
+function loadSkill(skillId: string): SkillDefinition {
+  return JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills', `${skillId}.json`), 'utf8'))
 }
 
 function loadBrowserEngine(): BrowserEngine {
@@ -170,5 +182,79 @@ describe('game engine Node/browser differential fixture', () => {
     } finally {
       browser.globalTriggerSystem.clearRules()
     }
+  })
+  it('executes a migrated projectile skill through the tracked browser bundle', () => {
+    const browser = loadBrowserEngine()
+    const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 10 })
+    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 1, y: 0 })
+    const state = makeState({ pieces: [caster, enemy], currentPlayerId: 'player-red', phase: 'action', width: 6, height: 1 })
+    const skill = loadSkill('blackwidow-lethal-strike')
+    state.skillsById[skill.id] = skill
+    state.pieces[0].skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
+
+    let targetingError: BrowserTargetingError | undefined
+    try {
+      browser.applyBattleAction(state, {
+        type: 'useBasicSkill',
+        playerId: 'player-red',
+        pieceId: 'caster',
+        skillId: skill.id,
+      } as BattleAction)
+    } catch (error) {
+      targetingError = error as BrowserTargetingError
+    }
+    expect(targetingError?.needsTargetSelection).toBe(true)
+    const preparation = targetingError?.preparation
+    expect(preparation).toBeDefined()
+    if (!preparation) throw new Error('Browser bundle did not provide target preparation')
+
+    const result = browser.applyBattleAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'caster',
+      skillId: skill.id,
+      targetX: 5,
+      targetY: 0,
+      selectionId: preparation.selectionId,
+      stateRevision: preparation.stateRevision,
+    } as BattleAction)
+
+    expect(result.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(89)
+  })
+
+  it('does not offer shotgun directions hidden behind blocking cover in the tracked browser bundle', () => {
+    const browser = loadBrowserEngine()
+    const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 2, y: 2, attack: 10 })
+    const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 4, y: 2 })
+    const state = makeState({ pieces: [caster, target], currentPlayerId: 'player-red', phase: 'action', width: 6, height: 5 })
+    const skill = loadSkill('hellfire-shotgun')
+    state.skillsById[skill.id] = skill
+    state.pieces[0].skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
+    const cover = state.map.tiles.find(tile => tile.x === 3 && tile.y === 2)
+    if (!cover) throw new Error('Cover fixture tile is missing')
+    cover.props = { ...cover.props, type: 'cover', bulletPassable: false }
+
+    let targetingError: BrowserTargetingError | undefined
+    try {
+      browser.applyBattleAction(state, {
+        type: 'useBasicSkill',
+        playerId: 'player-red',
+        pieceId: 'caster',
+        skillId: skill.id,
+      } as BattleAction)
+    } catch (error) {
+      targetingError = error as BrowserTargetingError
+    }
+
+    expect(targetingError?.needsTargetSelection).toBe(true)
+    const preparation = targetingError?.preparation
+    expect(preparation).toBeDefined()
+    if (!preparation) throw new Error('Browser bundle did not provide target preparation')
+    const candidates = preparation.candidates
+      .filter((ref): ref is Extract<TargetRef, { type: 'cell' }> => ref.type === 'cell')
+      .map(ref => `${ref.x},${ref.y}`)
+    expect(candidates).not.toContain('3,2')
+    expect(candidates).not.toContain('4,2')
+    expect(candidates).not.toContain('5,2')
   })
 })
