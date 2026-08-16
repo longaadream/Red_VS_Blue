@@ -25,26 +25,39 @@
 
     function byId(id) { return doc && doc.getElementById ? doc.getElementById(id) : null }
 
+    function statusDetailHtml(status) {
+      const presentation = root.BattleStatusPresentation
+      const meta = presentation
+        ? presentation.resolve(status)
+        : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
+      const detail = presentation ? presentation.detailText(status) : statusLabel(status)
+      return '<div class="selected-status-row" data-status-id="' + escapeHtml(status.id || '') + '">'
+        + '<span class="selected-status-icon" style="--status-color:' + escapeHtml(meta.color) + '">' + escapeHtml(meta.glyph) + '</span>'
+        + '<span class="selected-status-copy"><span class="selected-status-name">' + escapeHtml(status.label || status.id || '?') + '</span>'
+        + (detail ? '<span class="selected-status-meta">' + escapeHtml(detail) + '</span>' : '')
+        + '<span class="selected-status-description">' + escapeHtml(meta.description) + '</span></span></div>'
+    }
+
     function updateSelectedPiece(model) {
       const element = byId('selectedPieceStatus')
       if (!element) return
       const piece = model.selection && model.selection.piece
       if (!piece) {
         element.className = 'selected-status-empty'
-        element.textContent = '未选中棋子'
+        element.textContent = '\u672a\u9009\u4e2d\u68cb\u5b50'
+        element.removeAttribute('aria-label')
         return
       }
       const tags = piece.statusSummary || []
-      const tagsHtml = tags.length
-        ? tags.map(function (status) {
-            return '<span class="status-tag" title="' + escapeHtml(status.id) + '">' + escapeHtml(statusLabel(status)) + '</span>'
-          }).join('')
-        : '<span class="status-empty">无状态</span>'
-      element.className = 'selected-status-card'
+      const statusHtml = tags.length
+        ? '<div class="selected-status-list">' + tags.map(statusDetailHtml).join('') + '</div>'
+        : '<div class="selected-status-none">\u5f53\u524d\u65e0\u53ef\u89c1\u72b6\u6001</div>'
+      element.className = 'selected-status-card faction-' + piece.faction
+      element.setAttribute('aria-label', (piece.name || piece.id) + '\uff0c\u751f\u547d ' + piece.health.current + ' / ' + piece.health.max + '\uff0c\u53ef\u89c1\u72b6\u6001 ' + tags.length + ' \u4e2a')
       element.innerHTML = '<div class="selected-piece-name">' + escapeHtml(piece.name) + '</div>'
         + '<div class="selected-piece-hp">HP ' + piece.health.current + ' / ' + piece.health.max + '</div>'
-        + '<div class="selected-status-title">状态</div>'
-        + '<div class="selected-status-tags">' + tagsHtml + '</div>'
+        + '<div class="selected-status-title">\u5168\u90e8\u53ef\u89c1\u72b6\u6001</div>'
+        + statusHtml
     }
 
     function updateHud(model) {

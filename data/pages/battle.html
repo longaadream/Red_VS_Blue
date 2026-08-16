@@ -13,6 +13,7 @@
   <script src="js/ws-client.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
+  <script src="js/battle-ui/battle-status-presentation.js"></script>
   <script src="js/battle-ui/battle-legal-actions.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
@@ -194,30 +195,43 @@
       flex-shrink: 0;
     }
     .selected-status-card {
-      min-height: 132px; border: 1px solid rgba(148,163,184,.2);
-      background: linear-gradient(180deg, rgba(15,23,42,.9), rgba(15,23,42,.58));
-      border-radius: 8px; padding: 10px 10px 11px;
+      max-height: min(52vh, 360px); overflow-y: auto;
+      border: 1px solid rgba(148,163,184,.2); border-left-width: 3px;
+      background: linear-gradient(180deg, rgba(15,23,42,.94), rgba(15,23,42,.68));
+      border-radius: 8px; padding: 9px 9px 10px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+      scrollbar-width: thin;
     }
+    .selected-status-card.faction-red { border-left-color: #ef4444; }
+    .selected-status-card.faction-blue { border-left-color: #3b82f6; }
     .selected-status-empty {
-      min-height: 132px; display: flex; align-items: center; justify-content: center;
-      color: rgba(148,163,184,.38); font-size: 13px; font-weight: 700;
-      border: 1px dashed rgba(148,163,184,.14); border-radius: 8px;
+      min-height: 110px; display: flex; align-items: center; justify-content: center;
+      color: rgba(148,163,184,.46); font-size: 12px; font-weight: 700;
+      border: 1px dashed rgba(148,163,184,.18); border-radius: 8px;
       background: rgba(15,23,42,.28);
     }
-    .selected-piece-name { font-size: 15px; font-weight: 900; color: #f8fafc; margin-bottom: 6px; }
-    .selected-piece-hp { font-size: 12px; color: #cbd5e1; margin-bottom: 14px; }
+    .selected-piece-name { font-size: 14px; font-weight: 900; color: #f8fafc; margin-bottom: 4px; line-height: 1.25; }
+    .selected-piece-hp { font-size: 11px; color: #cbd5e1; margin-bottom: 10px; font-variant-numeric: tabular-nums; }
     .selected-status-title {
-      font-size: 10px; font-weight: 800; color: #64748b;
-      letter-spacing: .08em; margin-bottom: 7px;
+      font-size: 9px; font-weight: 800; color: #64748b;
+      letter-spacing: .08em; margin-bottom: 4px;
     }
-    .selected-status-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-    .selected-status-tags .status-tag {
-      font-size: 10px; padding: 3px 6px; border-radius: 999px;
-      background: rgba(124,58,237,.2); border: 1px solid rgba(167,139,250,.38);
-      color: #ddd6fe;
+    .selected-status-list { display: flex; flex-direction: column; }
+    .selected-status-row {
+      display: grid; grid-template-columns: 12px minmax(0,1fr); gap: 6px;
+      padding: 6px 0; border-top: 1px solid rgba(148,163,184,.1);
     }
-    .selected-status-tags .status-empty { font-size: 12px; color: rgba(148,163,184,.42); }
+    .selected-status-icon {
+      width: 10px; height: 10px; margin-top: 2px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #020617; background: var(--status-color); font-size: 7px; font-weight: 950;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.42), 0 0 8px rgba(168,85,247,.28);
+    }
+    .selected-status-copy { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+    .selected-status-name { color: #e2e8f0; font-size: 10px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+    .selected-status-meta { color: #fbbf24; font-size: 9px; line-height: 1.3; }
+    .selected-status-description { color: #94a3b8; font-size: 9px; line-height: 1.35; }
+    .selected-status-none { color: rgba(148,163,184,.55); font-size: 10px; padding-top: 4px; }
     .turn-control-wrap {
       display: flex; justify-content: center;
     }
@@ -254,6 +268,30 @@
     .hl-selected { outline: 3px solid #60a5fa; z-index: 2; }
 
     /* ── Piece token ── */
+    .piece-board-summary {
+      --piece-summary-scale: 1;
+      position: absolute; z-index: 8;
+      min-width: 22px; max-width: 36px; height: 13px; padding: 1px 3px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+      transform: translate(-50%, -50%) scale(var(--piece-summary-scale));
+      transform-origin: 50% 50%; border: 1px solid rgba(248,250,252,.76);
+      border-radius: 999px; background: rgba(2,6,23,.9); color: #f8fafc;
+      box-shadow: 0 1px 4px rgba(0,0,0,.82); white-space: nowrap;
+    }
+    .piece-board-health {
+      min-width: 10px; text-align: center; font-size: 9px; line-height: 1;
+      font-weight: 950; font-variant-numeric: tabular-nums;
+    }
+    .piece-board-health[data-level="healthy"] { color: #f8fafc; }
+    .piece-board-health[data-level="low"] { color: #fbbf24; }
+    .piece-board-health[data-level="critical"] { color: #fb7185; }
+    .piece-board-statuses { display: inline-flex; align-items: center; gap: 2px; }
+    .piece-board-statuses[hidden] { display: none; }
+    .piece-board-status-dot {
+      width: 5px; height: 5px; flex: 0 0 5px; border-radius: 999px;
+      background: var(--status-color); box-shadow: 0 0 0 1px rgba(255,255,255,.7);
+    }
+
     .piece-tok {
       width: calc(var(--cell-size, 44px) - 8px); height: calc(var(--cell-size, 44px) - 8px);
       border-radius: 6px; overflow: visible;
@@ -265,20 +303,33 @@
     .piece-tok.selected-tok { box-shadow: 0 0 0 2px #60a5fa; }
     .piece-tok img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
     .piece-tok-ph { font-size: 20px; line-height: 1; }
-    .tok-hp-bar { position: absolute; bottom: -4px; left: 0; right: 0; height: 3px; background: #0f172a; border-radius: 2px; }
-    .tok-hp-fill { height: 100%; background: #22c55e; border-radius: 2px; transition: width .3s; }
-    .tok-hp-fill.low  { background: #f59e0b; }
-    .tok-hp-fill.crit { background: #ef4444; }
 
     /* ── StatusTags ── */
     .piece-tags {
-      position: absolute; top: -14px; left: 0; right: 0;
-      display: flex; flex-wrap: wrap; gap: 1px; justify-content: center;
+      position: absolute; top: 2px; left: 2px; right: auto;
+      display: flex; flex-wrap: nowrap; gap: 2px; justify-content: center;
+      max-width: calc(100% - 4px); overflow: hidden;
     }
+    .piece-tags:empty { display: none; }
     .status-tag {
       background: #7c3aed; color: #fff; font-size: 8px; font-weight: 700;
       border-radius: 3px; padding: 1px 3px; white-space: nowrap; line-height: 1.3;
     }
+
+    /* ── Compact token overlays ── */
+    .piece-status-dot {
+      width: 6px; height: 6px; flex: 0 0 6px; border-radius: 999px;
+      background: var(--status-color); box-shadow: 0 0 0 1px rgba(255,255,255,.8), 0 1px 3px rgba(0,0,0,.8);
+    }
+    .tok-health-number {
+      position: absolute; right: 1px; bottom: 1px; min-width: 14px; height: 12px;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0 3px; border-radius: 999px; border: 1px solid rgba(248,250,252,.7);
+      background: rgba(2,6,23,.9); color: #f8fafc; font-size: 8px; font-weight: 950;
+      font-variant-numeric: tabular-nums; box-shadow: 0 1px 3px rgba(0,0,0,.8);
+    }
+    .tok-health-number.low { color: #fbbf24; }
+    .tok-health-number.crit { color: #fb7185; }
 
     /* ── Action bar ── */
     .action-bar {
@@ -772,6 +823,21 @@
     .pi-skill-meta { font-size: 10px; color: #475569; margin-top: 3px; }
     .pi-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
     .pi-keywords { margin-top: 8px; }
+    .pi-status-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .pi-status-row {
+      display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 8px;
+      padding: 8px; border: 1px solid #334155; border-radius: 8px; background: #0f172a;
+    }
+    .pi-status-icon {
+      width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 999px; color: #020617; background: var(--status-color);
+      font-size: 12px; font-weight: 950; box-shadow: 0 0 0 1px rgba(255,255,255,.46);
+    }
+    .pi-status-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+    .pi-status-name { color: #f8fafc; font-size: 12px; font-weight: 800; }
+    .pi-status-meta { color: #fbbf24; font-size: 10px; }
+    .pi-status-desc { color: #94a3b8; font-size: 10px; line-height: 1.45; }
+    .pi-status-none { color: #64748b; font-size: 11px; margin: -2px 0 12px; }
 
     /* ── Card detail modal ── */
     #cardDetailModal {
@@ -853,7 +919,6 @@
       .keyword-panel { width: 100%; }
       .board-shell { gap: 8px; align-items: center; }
       .board-side-rail { width: 124px; gap: 10px; }
-      .selected-status-card,
       .selected-status-empty { min-height: 110px; }
       .btn-end { min-width: 112px; padding: 8px 13px; font-size: 12px; }
       .player-state-chip { min-width: 116px; }
@@ -2262,10 +2327,23 @@
 
       // Tags (display* aware)
       const tags = pieceDispTags(piece).filter(t => t.visible !== false)
+      const statusPresentation = window.BattleStatusPresentation
       const tagsHtml = tags.length
-        ? `<div class="pi-tags">${tags.map(t =>
-            `<span class="status-tag" style="font-size:10px;padding:2px 6px">${escHtml(t.name || t.type || t.id || '?')}</span>`
-          ).join('')}</div>` : ''
+        ? `<div class="pi-section-label">\u5168\u90e8\u53ef\u89c1\u72b6\u6001</div><div class="pi-status-list">${tags.map(t => {
+            const meta = statusPresentation
+              ? statusPresentation.resolve(t)
+              : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
+            const detail = statusPresentation ? statusPresentation.detailText(t) : ''
+            const label = t.name || t.label || t.type || t.id || '?'
+            const description = t.description || meta.description
+            return `<div class="pi-status-row" data-status-id="${escHtml(t.id || t.type || '')}">
+              <span class="pi-status-icon" style="--status-color:${escHtml(meta.color)}">${escHtml(t.icon || meta.glyph)}</span>
+              <span class="pi-status-copy"><span class="pi-status-name">${escHtml(label)}</span>
+              ${detail ? `<span class="pi-status-meta">${escHtml(detail)}</span>` : ''}
+              <span class="pi-status-desc">${escHtml(description)}</span></span>
+            </div>`
+          }).join('')}</div>`
+        : '<div class="pi-section-label">\u5168\u90e8\u53ef\u89c1\u72b6\u6001</div><div class="pi-status-none">\u5f53\u524d\u65e0\u53ef\u89c1\u72b6\u6001</div>'
 
       // Stats (display* aware)
       const pstats = pieceDispStats(piece)
@@ -3265,8 +3343,10 @@
             const fillCls = pct < 30 ? 'crit' : pct < 60 ? 'low' : ''
             const faction = piece.faction || 'red'
             const tokCls = 'piece-tok ' + faction + (isSel ? ' selected-tok' : '')
-            const tags = piece.statusSummary
-            const tagsHtml = tags.map(t => `<span class="status-tag" title="${escHtml(t.id || '')}">${escHtml(t.label || t.id || '?')}</span>`).join('')
+            const boardStatuses = window.BattleStatusPresentation
+              ? BattleStatusPresentation.boardSummary(piece.statusSummary || [])
+              : (piece.statusSummary || []).slice(0, 2).map(status => ({ status, meta: { color: '#a78bfa' } }))
+            const tagsHtml = boardStatuses.map(entry => `<span class="piece-status-dot" style="--status-color:${escHtml(entry.meta.color)}" title="${escHtml(entry.status.label || entry.status.id || '?')}"></span>`).join('')
             const tmpl = PIECES_BY_ID[piece.templateId]
             const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
             const imgHtml = imgSrc
@@ -3276,7 +3356,7 @@
               <div class="piece-tags">${tagsHtml}</div>
               ${imgHtml}
               <span class="piece-tok-ph" style="${imgSrc?'display:none':'display:flex'}">${faction==='red'?'🔴':'🔵'}</span>
-              <div class="tok-hp-bar"><div class="tok-hp-fill ${fillCls}" style="width:${pct}%"></div></div>
+              <span class="tok-health-number ${fillCls}">${piece.health.current}</span>
             </div>`
           }
           const _ctxAttr = piece ? ` oncontextmenu="event.preventDefault();dispatchBattleIntent({type:'inspect-piece',pieceId:'${escHtml(piece.id)}'})"` : ''
