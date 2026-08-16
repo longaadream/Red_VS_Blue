@@ -189,15 +189,17 @@
       width: 100% !important; height: 100% !important; display: block;
     }
     .board-side-rail {
-      width: 146px; align-self: stretch; min-height: 100%;
-      display: flex; flex-direction: column; justify-content: center; gap: 16px;
-      flex-shrink: 0;
+      width: clamp(286px, 27vw, 348px); align-self: stretch; min-height: 100%;
+      display: flex; flex-direction: column; justify-content: flex-start; gap: 12px;
+      flex-shrink: 0; padding: 84px 0 2px; overflow: hidden;
     }
     .selected-status-card {
-      min-height: 132px; border: 1px solid rgba(148,163,184,.2);
+      min-height: 132px; max-height: calc(100vh - 204px); overflow-y: auto;
+      border: 1px solid rgba(148,163,184,.2);
       background: linear-gradient(180deg, rgba(15,23,42,.9), rgba(15,23,42,.58));
       border-radius: 8px; padding: 10px 10px 11px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+      scrollbar-width: thin; scrollbar-color: #334155 transparent;
     }
     .selected-status-empty {
       min-height: 132px; display: flex; align-items: center; justify-content: center;
@@ -205,12 +207,70 @@
       border: 1px dashed rgba(148,163,184,.14); border-radius: 8px;
       background: rgba(15,23,42,.28);
     }
-    .selected-piece-name { font-size: 15px; font-weight: 900; color: #f8fafc; margin-bottom: 6px; }
-    .selected-piece-hp { font-size: 12px; color: #cbd5e1; margin-bottom: 14px; }
+    .selected-detail-header { display: flex; align-items: center; gap: 10px; position: relative; }
+    .selected-detail-portrait {
+      width: 54px; height: 54px; flex: 0 0 54px; overflow: hidden; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; color: #bfdbfe;
+      border: 1px solid rgba(96,165,250,.42); background: rgba(30,58,138,.28);
+      font-size: 24px; font-weight: 900;
+    }
+    .selected-detail-portrait img { width: 100%; height: 100%; object-fit: cover; }
+    .selected-detail-identity { min-width: 0; flex: 1; }
+    .selected-piece-name { font-size: 15px; font-weight: 900; color: #f8fafc; margin-bottom: 2px; }
+    .selected-detail-access { font-size: 10px; color: #64748b; margin-bottom: 5px; }
+    .selected-piece-hp { font-size: 12px; color: #cbd5e1; }
+    .selected-detail-close {
+      width: 30px; height: 30px; border: 1px solid rgba(148,163,184,.22); border-radius: 8px;
+      background: rgba(15,23,42,.74); color: #94a3b8; font-size: 19px; cursor: pointer;
+      align-self: flex-start;
+    }
+    .selected-detail-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0;
+    }
+    .selected-detail-stats > div {
+      display: grid; place-items: center; gap: 2px; padding: 7px 4px; border-radius: 8px;
+      background: rgba(2,6,23,.52); border: 1px solid rgba(51,65,85,.68);
+    }
+    .selected-detail-stats strong { color: #f8fafc; font-size: 15px; }
+    .selected-detail-stats span { color: #64748b; font-size: 9px; letter-spacing: .08em; }
+    .selected-detail-section { margin-top: 12px; }
     .selected-status-title {
       font-size: 10px; font-weight: 800; color: #64748b;
       letter-spacing: .08em; margin-bottom: 7px;
     }
+    .selected-status-title span { color: #94a3b8; }
+    .selected-status-list, .selected-skill-list { display: grid; gap: 6px; }
+    .selected-status-item {
+      padding: 8px; border-radius: 8px; background: rgba(76,29,149,.14);
+      border: 1px solid rgba(167,139,250,.25);
+    }
+    .selected-status-item-name { color: #ddd6fe; font-size: 11px; font-weight: 800; }
+    .selected-status-item-meta { color: #a78bfa; font-size: 10px; margin-top: 2px; }
+    .selected-status-item-desc { color: #94a3b8; font-size: 10px; line-height: 1.45; margin-top: 4px; }
+    .selected-detail-zero {
+      padding: 10px; border: 1px dashed rgba(148,163,184,.18); border-radius: 8px;
+      color: rgba(148,163,184,.52); font-size: 11px; text-align: center;
+    }
+    .selected-skill-item {
+      width: 100%; display: grid; gap: 5px; padding: 9px; text-align: left;
+      border: 1px solid rgba(51,65,85,.88); border-radius: 9px;
+      color: #e2e8f0; background: rgba(2,6,23,.56); cursor: pointer;
+    }
+    .selected-skill-item.is-available { border-color: rgba(59,130,246,.5); }
+    .selected-skill-item.is-disabled { opacity: .72; cursor: not-allowed; }
+    .selected-skill-head { display: flex; align-items: center; gap: 6px; }
+    .selected-skill-icon { width: 22px; text-align: center; font-size: 17px; }
+    .selected-skill-name { flex: 1; color: #f8fafc; font-size: 12px; font-weight: 800; }
+    .selected-skill-type { color: #94a3b8; font-size: 9px; }
+    .selected-skill-desc { color: #94a3b8; font-size: 10px; line-height: 1.45; }
+    .selected-skill-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+    .selected-skill-meta > span {
+      padding: 2px 5px; border-radius: 999px; font-size: 9px;
+      border: 1px solid rgba(71,85,105,.72); color: #cbd5e1;
+    }
+    .selected-skill-cost.action { border-color: rgba(59,130,246,.5); color: #bfdbfe; }
+    .selected-skill-cost.charge { border-color: rgba(168,85,247,.5); color: #e9d5ff; }
+    .selected-skill-reason { color: #fca5a5; font-size: 10px; line-height: 1.35; }
     .selected-status-tags { display: flex; flex-wrap: wrap; gap: 5px; }
     .selected-status-tags .status-tag {
       font-size: 10px; padding: 3px 6px; border-radius: 999px;
@@ -220,6 +280,9 @@
     .selected-status-tags .status-empty { font-size: 12px; color: rgba(148,163,184,.42); }
     .turn-control-wrap {
       display: flex; justify-content: center;
+    }
+    button:focus-visible, [role="button"]:focus-visible, select:focus-visible {
+      outline: 3px solid #fbbf24; outline-offset: 2px;
     }
     #gameGrid {
       display: grid; gap: 1px; background: #0a0a0f;
@@ -852,9 +915,20 @@
       .cd-sheet { width: 100%; }
       .keyword-panel { width: 100%; }
       .board-shell { gap: 8px; align-items: center; }
-      .board-side-rail { width: 124px; gap: 10px; }
-      .selected-status-card,
-      .selected-status-empty { min-height: 110px; }
+      .board-side-rail {
+        position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 74;
+        width: auto; min-height: 0; max-height: min(62vh, 540px); gap: 8px; padding: 8px;
+        border: 1px solid rgba(148,163,184,.22); border-radius: 14px;
+        background: rgba(2,6,23,.94); box-shadow: 0 -16px 48px rgba(0,0,0,.55);
+        backdrop-filter: blur(14px);
+      }
+      .board-side-rail:not(.has-selection) {
+        left: auto; border-color: transparent; background: transparent; box-shadow: none; backdrop-filter: none;
+      }
+      .board-side-rail:not(.has-selection) .selected-status-empty { display: none; }
+      .board-side-rail.target-mode { display: none; }
+      .selected-status-card { min-height: 0; max-height: calc(min(62vh, 540px) - 58px); }
+      .selected-status-empty { min-height: 0; }
       .btn-end { min-width: 112px; padding: 8px 13px; font-size: 12px; }
       .player-state-chip { min-width: 116px; }
       .topbar { top: 6px; right: 6px; max-width: 58px; padding: 5px; gap: 4px; border-radius: 9px; }
@@ -1030,6 +1104,10 @@
     }
     .sk-cd-num { font-size:20px; font-weight:900; color:#64748b; }
     .sk-cd-lbl { font-size:8px; color:#475569; }
+    .sk-unavailable-reason {
+      width: 70px; color: #fca5a5; font-size: 8px; line-height: 1.25;
+      text-align: center; white-space: normal;
+    }
 
     /* ── Fullscreen log overlay ── */
     #logOverlay { position:fixed; inset:0; background:rgba(2,8,22,.96); z-index:400; flex-direction:column; display:none; }
@@ -3111,6 +3189,8 @@
         snapshot: snapshot,
         viewerId: myPlayerId,
         selectedPieceId: selectedPieceId,
+        skillsById: skillsById,
+        pieceTemplates: PIECES_BY_ID,
         interactionMode: battleInteractionMode(),
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
@@ -3425,7 +3505,14 @@
         const typeLabel = isCharge ? '充能' : '基础'
         const typeCls = isCharge ? 'cp' : 'ap'
         const canAct = isMyTurn && inAction && piece.ownerPlayerId.toLowerCase() === myPlayerId
-        const disabled = !canAct || onCD || noUses
+        const disabled = !canAct || onCD || noUses || apLow || cpLow
+        const unavailableReason = !isMyTurn ? '当前不是你的回合'
+          : !inAction ? '当前阶段不可使用技能'
+            : onCD ? '冷却中（剩余 ' + sk.currentCooldown + ' 回合）'
+              : noUses ? '可用次数已耗尽'
+                : apLow ? '行动点不足（需要 ' + apCost + '，当前 ' + ap + '）'
+                  : cpLow ? '充能点不足（需要 ' + cpCost + '，当前 ' + cp + '）'
+                    : ''
 
         let cls = 'skill-card'
         if (isCharge) cls += ' sk-charge'
@@ -3442,8 +3529,9 @@
         if (rawDesc) titleParts.push(rawDesc)
         titleParts.push(`行动点消耗：${apCost}`)
         titleParts.push(`充能点消耗：${cpCost}`)
+        if (unavailableReason) titleParts.push('不可用：' + unavailableReason)
 
-        return `<div class="${cls}" onclick="dispatchBattleIntent({type:'select-skill',skillId:'${escHtml(sid)}'})" title="${escHtml(titleParts.join('\n'))}">
+        return `<button type="button" class="${cls}" onclick="dispatchBattleIntent({type:'select-skill',skillId:'${escHtml(sid)}'})" title="${escHtml(titleParts.join('\n'))}" aria-label="${escHtml(rawName + (unavailableReason ? '，' + unavailableReason : '，可使用'))}" aria-pressed="${isActive ? 'true' : 'false'}"${disabled ? ' disabled aria-disabled="true"' : ''}>
           ${cdCover}
           <div class="sk-cost-row">
             <span class="sk-cost-orb action ${apLow ? 'low' : ''}" title="行动点消耗"><span class="resource-glyph action"></span>${apCost}</span>
@@ -3452,7 +3540,8 @@
           <div class="sk-icon">${icon}</div>
           <div class="sk-name">${escHtml(displayName)}</div>
           <div class="sk-type-tag ${typeCls}">${typeLabel}</div>
-        </div>`
+          ${unavailableReason ? `<div class="sk-unavailable-reason">${escHtml(unavailableReason)}</div>` : ''}
+        </button>`
       }).join('')
     }
 
