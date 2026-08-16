@@ -86,6 +86,163 @@ describe('battle presentation boundary', () => {
     })
   })
 
+  it('projects complete selected-piece details and never carries the previous selection forward', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const baseSnapshot = fixtureSnapshot()
+    const snapshot = {
+      ...baseSnapshot,
+      pieces: [{
+        ...baseSnapshot.pieces[0],
+        attack: 4,
+        defense: 2,
+        moveRange: 3,
+        buffs: [{ id: 'guard', name: 'Guard', currentDuration: 2, intensity: 1, visible: true }],
+        debuffs: [{ id: 'slow', name: 'Slow', remainingDuration: 1, stacks: 1, visible: true }],
+        skills: [
+          { skillId: 'ready-skill', currentCooldown: 0, usesRemaining: -1 },
+          { skillId: 'cooldown-skill', currentCooldown: 2, usesRemaining: -1 },
+          { skillId: 'expensive-skill', currentCooldown: 0, usesRemaining: -1 },
+          { skillId: 'passive-skill', currentCooldown: 0, usesRemaining: -1 },
+        ],
+      }],
+    }
+    Object.assign(snapshot.players[0], { actionPoints: 2, chargePoints: 0 })
+    Object.assign(snapshot, {
+      skillsById: {
+        'ready-skill': {
+          id: 'ready-skill', name: 'Ready', description: 'Can be used now.', kind: 'active',
+          type: 'normal', actionPointCost: 1, cooldownTurns: 0,
+        },
+        'cooldown-skill': {
+          id: 'cooldown-skill', name: 'Cooling', description: 'Not ready.', kind: 'active',
+          type: 'normal', actionPointCost: 1, cooldownTurns: 3,
+        },
+        'expensive-skill': {
+          id: 'expensive-skill', name: 'Expensive', description: 'Needs charge.', kind: 'active',
+          type: 'super', actionPointCost: 1, chargeCost: 2, cooldownTurns: 0,
+        },
+        'passive-skill': {
+          id: 'passive-skill', name: 'Passive', description: 'Always on.', kind: 'passive',
+          type: 'normal', actionPointCost: 0, cooldownTurns: 0,
+        },
+      },
+    })
+
+    const selected = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'piece-red',
+      pieceTemplates: { 'red-warrior': { image: 'red-warrior.jpg' } },
+    })
+
+    expect(selected.selection.piece).toMatchObject({
+      id: 'piece-red',
+      portraitSrc: 'images/red-warrior.jpg',
+      stats: { attack: 4, defense: 2, moveRange: 3 },
+      readOnly: false,
+    })
+    expect(selected.selection.piece.statuses.map((status: { id: string }) => status.id)).toEqual([
+      'burn', 'guard', 'slow',
+    ])
+    expect(selected.selection.piece.statuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'guard', duration: 2, intensity: 1 }),
+      expect.objectContaining({ id: 'slow', duration: 1, stacks: 1 }),
+    ]))
+    expect(selected.selection.piece.skills).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'ready-skill', available: true, unavailableReason: '' }),
+      expect.objectContaining({ id: 'cooldown-skill', available: false, unavailableReason: '冷却中（剩余 2 回合）' }),
+      expect.objectContaining({ id: 'expensive-skill', available: false, unavailableReason: '充能点不足（需要 2，当前 0）' }),
+      expect.objectContaining({ id: 'passive-skill', available: false, unavailableReason: '被动技能' }),
+    ]))
+
+    const cleared = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'missing-piece',
+    })
+    expect(cleared.selection).toMatchObject({ pieceId: null, piece: null })
+  })
+
+  it('keeps enemy details readable while making every skill explicitly read-only', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const baseSnapshot = fixtureSnapshot()
+    const snapshot = {
+      ...baseSnapshot,
+      pieces: [{
+        ...baseSnapshot.pieces[0],
+        ownerPlayerId: 'player-blue',
+        skills: [{ skillId: 'enemy-skill', currentCooldown: 0, usesRemaining: -1 }],
+      }],
+    }
+    Object.assign(snapshot, {
+      skillsById: {
+        'enemy-skill': {
+          id: 'enemy-skill', name: 'Enemy skill', description: 'Public description.',
+          kind: 'active', type: 'normal', actionPointCost: 0, cooldownTurns: 0,
+        },
+      },
+    })
+
+    const model = viewModel.create({
+      snapshot,
+      viewerId: 'player-red',
+      selectedPieceId: 'piece-red',
+    })
+
+    expect(model.selection.piece).toMatchObject({ readOnly: true, name: 'Red Warrior' })
+    expect(model.selection.piece.skills).toEqual([
+      expect.objectContaining({
+        id: 'enemy-skill',
+        available: false,
+        unavailableReason: '敌方棋子仅可查看',
+      }),
+    ])
+  })
+
+  it('renders full detail, zero-state text, and visible skill reasons through the DOM boundary', () => {
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const selectedPieceStatus = {
+      className: '',
+      textContent: '',
+      innerHTML: '',
+      dataset: {},
+      setAttribute: vi.fn(),
+      querySelectorAll: vi.fn(() => []),
+    }
+    const document = {
+      getElementById: vi.fn((id: string) => id === 'selectedPieceStatus' ? selectedPieceStatus : null),
+    }
+    const ui = domUi.create({ document })
+    const model = {
+      selection: {
+        mode: 'inspect',
+        piece: {
+          id: 'piece-red', name: 'Red Warrior', portraitSrc: '', readOnly: false,
+          health: { current: 8, max: 10 }, stats: { attack: 4, defense: 2, moveRange: 3 },
+          statuses: [],
+          skills: [{
+            id: 'cooldown-skill', name: 'Cooling', description: 'Not ready.', icon: 'S',
+            kind: 'active', type: 'normal', actionCost: 1, chargeCost: 0,
+            cooldown: { current: 2, max: 3 }, available: false,
+            unavailableReason: '冷却中（剩余 2 回合）',
+          }],
+        },
+      },
+      turn: { currentPlayerId: 'player-red', isViewerTurn: true, number: 2, phase: 'action' },
+      players: [],
+      viewer: null,
+    }
+
+    ui.update(model)
+
+    expect(selectedPieceStatus.className).toContain('has-selection')
+    expect(selectedPieceStatus.innerHTML).toContain('Red Warrior')
+    expect(selectedPieceStatus.innerHTML).toContain('攻击')
+    expect(selectedPieceStatus.innerHTML).toContain('无可见状态')
+    expect(selectedPieceStatus.innerHTML).toContain('Cooling')
+    expect(selectedPieceStatus.innerHTML).toContain('冷却中（剩余 2 回合）')
+  })
+
   it('sends the identical model to Three.js and DOM and owns repeatable mount/dispose', () => {
     const presentation = loadBrowserModule('js/battle-ui/battle-presentation.js', 'BattlePresentation')
     const renderer = {
