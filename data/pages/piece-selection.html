@@ -346,7 +346,7 @@
     let selectedIds = new Set()
     let pollTimer = null
     let playerFaction = null    // 'red' | 'blue' turn order seat
-    let playerAlignment = null  // 'good' | 'evil' piece pool
+    let playerAlignment = null  // 'light' | 'dark' content alignment
     playerAlignment = params.get('alignment') || playerAlignment
     let wsReady = false
     let latestRoom = null
@@ -460,6 +460,7 @@
     function navigateBattle() {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       const p = new URLSearchParams({ roomId, playerId, playerName })
+      if (playerAlignment) p.set('alignment', playerAlignment)
       if (accountId) p.set('accountId', accountId)
       if (params.get('debug')) p.set('debug', params.get('debug'))
       if (window.RvBUtils && RvBUtils.appendServerParams) RvBUtils.appendServerParams(p)

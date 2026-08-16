@@ -1665,6 +1665,11 @@
     let gameSeed = null        // shared PRNG seed (from server action log)
     let pressTimer = null      // long-press timer
     let playerNames = {}       // playerId → display name, loaded from room
+    let playerAlignments = {}  // playerId → authoritative light/dark content alignment
+    const initialAlignment = params.get('alignment')
+    if (myPlayerId && (initialAlignment === 'light' || initialAlignment === 'dark')) {
+      playerAlignments[myPlayerId] = initialAlignment
+    }
     let pendingOptionAction = null  // original action awaiting selectedOption
 
     function clearCardPrimaryTarget(action) {
@@ -2675,6 +2680,12 @@
       const oldG = G
       G = state
       G.skillsById = Object.assign({}, skillsById || {}, G.skillsById || {})
+      if (G.extensions && G.extensions.playerAlignments) {
+        Object.keys(G.extensions.playerAlignments).forEach(function(playerId) {
+          var alignment = G.extensions.playerAlignments[playerId]
+          if (alignment === 'light' || alignment === 'dark') playerAlignments[playerId.toLowerCase()] = alignment
+        })
+      }
 
       // Init seeded RNG once
       if (seed && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
@@ -2789,7 +2800,9 @@
             ;(msg.room.players || []).forEach(function(p) {
               var pid = (p.id || '').toLowerCase()
               if (pid && p.name) playerNames[pid] = p.name
+              if (pid && (p.alignment === 'light' || p.alignment === 'dark')) playerAlignments[pid] = p.alignment
             })
+            if (G) render()
           }
         } else if (msg.type === 'battleUnavailable') {
           var reason = msg.reason || 'unknown'
@@ -3330,8 +3343,9 @@
       const myName = myPlayerName || playerNames[myPlayerId] || '我方'
       const oppPid = oppMeta && (oppMeta.playerId || '').toLowerCase()
       const oppName = (oppPid && playerNames[oppPid]) || (oppMeta && oppMeta.name) || (myFaction === 'red' ? '对方' : '对方')
-      document.getElementById('myLabel').textContent = factionIcon + ' ' + myName
-      document.getElementById('oppLabel').textContent = oppIcon + ' ' + oppName
+      const alignmentText = function(alignment) { return alignment === 'light' ? '☀️ 光' : alignment === 'dark' ? '🌑 暗' : '阵营未知' }
+      document.getElementById('myLabel').textContent = factionIcon + ' ' + alignmentText(playerAlignments[myPlayerId]) + ' · ' + myName
+      document.getElementById('oppLabel').textContent = oppIcon + ' ' + alignmentText(playerAlignments[oppPid]) + ' · ' + oppName
 
       document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, true)).join('')
       document.getElementById('oppPieces').innerHTML = oppPieces.map(p => renderPieceCard(p, false)).join('')
