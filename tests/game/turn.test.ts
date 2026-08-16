@@ -754,4 +754,41 @@ describe('generic pending target selection', () => {
     expect(next.extensions.tileEffects).toEqual([{ x: 1, y: 1, tileType: 'test-anchor' }])
     expect(next.actions.at(-1)?.payload?.message).toBe('ok')
   })
+
+  it('preserves the first target across a two-step pending session and executes only at completion', () => {
+    const state = makeState({ currentPlayerId: 'player-blue', phase: 'action' }) as any
+    state.pendingTargetSelection = finalizePendingTargetSession(state, {
+      playerId: 'player-blue',
+      title: 'two targets',
+      targetType: 'cell',
+      filter: 'all',
+      steps: [
+        { type: 'cell', filter: 'all', canCancel: true },
+        { type: 'cell', filter: 'all', canCancel: true },
+      ],
+      effectCode: "function(ctx) { ctx.battle.extensions.completedTargets = ctx.pending.selectedTargets; return { success: true, message: 'complete' }; }",
+    }, 0)
+
+    const afterFirst = applyBattleAction(state, {
+      type: 'pendingTargetSelect', playerId: 'player-blue', targetX: 1, targetY: 1,
+      selectionId: state.pendingTargetSelection.selectionId,
+      stateRevision: state.pendingTargetSelection.stateRevision,
+    } as any) as any
+
+    expect(afterFirst.pendingTargetSelection).toMatchObject({ step: 1, selectedTargets: [{ type: 'cell', x: 1, y: 1 }] })
+    expect(afterFirst.extensions.completedTargets).toBeUndefined()
+
+    const completed = applyBattleAction(afterFirst, {
+      type: 'pendingTargetSelect', playerId: 'player-blue', targetX: 2, targetY: 2,
+      selectionId: afterFirst.pendingTargetSelection.selectionId,
+      stateRevision: afterFirst.pendingTargetSelection.stateRevision,
+    } as any) as any
+
+    expect(completed.pendingTargetSelection).toBeUndefined()
+    expect(completed.extensions.completedTargets).toEqual([
+      { type: 'cell', x: 1, y: 1 },
+      { type: 'cell', x: 2, y: 2 },
+    ])
+    expect(completed.actions.at(-1)?.payload?.message).toBe('complete')
+  })
 })
