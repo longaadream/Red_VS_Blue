@@ -9,6 +9,8 @@ import * as dgram from 'dgram'
 import * as http from 'http'
 import { pathToFileURL } from 'url'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
+import { resolveDevelopmentProfile } from './development-profile'
+import { resolveClientProtocolFile } from './client-protocol-resource'
 import {
   RESOURCE_PACK_LIMITS,
   clearActiveResourcePack,
@@ -29,13 +31,24 @@ const CLIENT_SCHEME = 'rvb-client'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: CLIENT_SCHEME,
-  privileges: {
-    standard: true,
-    secure: true,
-    supportFetchAPI: true,
-    corsEnabled: true,
-  },
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
 }])
+
+// Development-only named profiles isolate Chromium storage, local identity,
+// client configuration, and the ProcessSingleton lock. Electron keys
+// requestSingleInstanceLock() by the current userData path, so this must run
+// before the existing lock is requested.
+const developmentProfile = resolveDevelopmentProfile(
+  process.argv,
+  app.isPackaged,
+  app.getPath('userData'),
+)
+if (developmentProfile) {
+  fs.mkdirSync(developmentProfile.userDataPath, { recursive: true })
+  app.setPath('userData', developmentProfile.userDataPath)
+  app.setPath('sessionData', developmentProfile.userDataPath)
+  console.info(`[client] Development profile "${developmentProfile.name}" uses isolated userData: ${developmentProfile.userDataPath}`)
+}
 
 function findFreePort(start: number): Promise<number> {
   return new Promise((resolve) => {
@@ -61,7 +74,7 @@ function getAppRoot(): string {
 function getHtmlRoot(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'www')
-    : path.join(__dirname, '../../android-client/www')
+    : path.join(__dirname, '../../data/pages')
 }
 
 function getUserData(): string {
@@ -466,20 +479,16 @@ async function setupPackProtocol(): Promise<void> {
         return new Response('Not found', { status: 404 })
       }
       const relativePath = segments.join('/')
-      let root = getHtmlRoot()
-      if (isActivatableResourcePackPath(relativePath)) {
-        const activeRoot = resolveActiveResourcePackRoot(getPackRoot())
-        if (activeRoot) {
-          const candidate = path.join(activeRoot, ...segments)
-          if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) root = activeRoot
-        }
-      }
-      const target = path.resolve(root, ...segments)
-      const relative = path.relative(path.resolve(root), target)
-      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
-        || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
-        return new Response('Not found', { status: 404 })
-      }
+      const target = resolveClientProtocolFile({
+        relativePath,
+        htmlRoot: getHtmlRoot(),
+        appRoot: getAppRoot(),
+        activePackRoot: isActivatableResourcePackPath(relativePath)
+          ? resolveActiveResourcePackRoot(getPackRoot())
+          : null,
+        isPackaged: app.isPackaged,
+      })
+      if (!target) return new Response('Not found', { status: 404 })
       return electronNet.fetch(pathToFileURL(target).toString())
     } catch {
       return new Response('Not found', { status: 404 })

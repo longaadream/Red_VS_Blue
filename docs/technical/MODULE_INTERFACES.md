@@ -23,26 +23,37 @@
 - 已知问题：文件职责过大；与 `battle-types.ts`/`training-types.ts` 类型重复。
 - 最小调试：使用固定 `_v` 的状态调用 `applyBattleAction(state, action)`，比较输入和输出 hash。
 
+### 1.1 共享空间规则（RED-30）
+
+- 入口：`lib/game/spatial.ts`。
+- 职责：提供曼哈顿距离/范围、方形范围、横纵直线格序列、存活棋子占位查询和普通移动合法集合。
+- 输入：只读地图、棋子和坐标；不访问窗口、存储、时间或随机源。
+- 输出：确定性的坐标/占位结果，或包含拒绝代码、位置与消息的普通移动失败结果。
+- 调用方：`turn.ts` 的权威移动验证、`ai.ts` 的候选动作、`engine-browser-entry.ts` 导出的 UI 高亮接口，以及默认距离调用点。
+- 普通移动边界：仅横向/纵向且不超过 `moveRange`；不可行走地形与路径上的任意存活棋子阻挡；死亡/墓地棋子不阻挡；掩体是否可进入由地图的 `walkable` 属性决定。
+- 排除：技能位移、推拉、传送不会隐式调用普通移动验证器，必须由技能实现明确选择空间工具。
+- 测试：`tests/game/spatial.test.ts`、`tests/game/movement-contract.test.ts`、`tests/game/turn.test.ts`、`tests/game/ai-movement.test.ts`。
+
 ## 2. 战斗 Runner 与回放
 
 - 入口：`lib/game/battle-runner.ts::runBattleAction()`、`replayBattle()`。
-- 职责：动作 ID、运行时技能补全、hash、幂等和回放。
-- 输入：状态/动作，或初始状态/seed/动作序列。
-- 输出：状态、`stateHash`、`actionHash`、`duplicate`，或回放结果。
+- 职责：动作 ID、动作级确定性 runtime、运行时技能补全、权威 hash、幂等、Action Trace 和回放。
+- 输入：状态/动作/`rootSeed`，或初始状态/seed/动作序列。
+- 输出：状态、`stateHash`、`actionHash`、`duplicate`、`trace`，或含逐动作 `stateHashes` 的回放结果。
 - 调用方：WS、房间 HTTP API、训练/调试 API、测试。
-- 调用：`applyBattleAction()`、稳定 JSON/hash、RNG。
+- 调用：`applyBattleAction()`、稳定 JSON/hash、`RuleRuntime`。
 - 状态变化：会写入 `state.extensions.debugBattle`；返回下一状态。
-- 错误：规则错误直接向上抛；上层转换方式不统一。
+- 错误：规则错误附加 seed、stream/cursor、turn、player、actionId 后向上抛；上层保留原选择中断字段。
 - 日志：主要依赖调用方；调试元数据保存在状态扩展中。
-- 测试：`tests/game/debug-battle.test.ts`。
-- 已知问题：输入状态存在隐式写入；回放后不恢复原自定义 RNG。
+- 测试：`tests/game/debug-battle.test.ts`、`tests/game/deterministic-runtime.test.ts`。
+- 已知问题：runtime 是同步进程作用域，不能跨异步规则边界；旧训练/浏览器调用方尚可省略 seed。
 - 最小调试：保存初始状态、seed、动作序列，调用 `replayBattle()` 并核对最终 hash。
 
 ## 3. 战斗初始化
 
 - 入口：`lib/game/battle-setup.ts::createInitialBattleForPlayers()`。
 - 职责：根据玩家、选人和地图生成初始状态。
-- 输入：玩家 ID、阵营模板、选择、地图 ID、先手选项。
+- 输入：玩家 ID、阵营模板、选择、地图 ID、先手选项和可选 `rootSeed`。
 - 输出：`Promise<BattleState | null>`。
 - 调用方：房间开战、训练/PVE/调试场景。
 - 调用：地图、技能、规则、棋子和全局触发器。
@@ -50,8 +61,17 @@
 - 错误：玩家数错误返回 `null`；数据加载/效果错误可能抛出。
 - 日志：`battle-setup.ts` 本地日志。
 - 测试：缺少独立初始化和多房间隔离测试。
-- 已知问题：全局触发器；seed 不保证在初始化前注入。
-- 最小调试：显式传入 `firstPlayer`，固定 RNG，输出初始状态 hash 和棋子列表。
+- 已知问题：全局触发器；所有新增权威入口都必须显式传入 root seed。
+- 最小调试：显式传入 `firstPlayerId` 与 `rootSeed`，输出初始化 trace、状态 hash 和棋子列表。
+
+### 确定性规则运行时（RED-28）
+
+- 入口：`lib/game/rule-runtime.ts::RuleRuntime`、`withRuleRuntime()`、`withRuleRuntimeCheckpoint()`。
+- 职责：根种子规范化、命名流派生与 cursor、规则时钟、实例 ID、动态规则 `Math`/`Date` 能力。
+- 稳定流：`deployment`、`deployment-reroll`、`turn-order`、`skill/effect`；实例 ID 为 `instance-id/<namespace>`。
+- 约束：规则执行保持同步；预检必须使用 checkpoint；视觉随机不得进入权威 seed、状态或 hash。
+- 兼容：`rng()` 在 runtime 激活时路由至 `skill/effect`，未激活时保留旧适配器。
+- 决策：[ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md)。
 
 ### 身份模型（RED-27）
 
@@ -72,6 +92,16 @@
 - `piece-selection.html` renders the lobby alignment as read-only, disables both alignment controls, and filters the displayed templates to that locked alignment.
 
 ## 4. 技能、卡牌与规则数据
+
+### 4.1 权威目标查询边界
+
+- 入口：`lib/game/targeting.ts::prepareAction()`、`validateTargetRef()`。
+- 输入：只读 `BattleState` 与行动草稿；选择提交还包含 `selectionId` 和 `stateRevision`。
+- 输出：`ready`、稳定 `invalid.code`、声明式 `needOption`，或包含精确棋子/地格候选的 `needTarget`。
+- 调用方：`turn.ts` 最终校验、`ai.ts`、`battle.html`、pending target 会话、HTTP/WS 错误 envelope。
+- 纯度：不得调用 reducer、触发器、效果代码、时间或 RNG；候选枚举和最终提交必须复用同一验证器。
+- 数据边界：动态选择必须补充 `targeting.steps`；无法声明时以 `TARGET_DECLARATION_MISSING` 失败关闭。
+- 兼容边界：两份现存 `skill-targeting.js` 仅映射 `preparation.candidates` 到展示坐标，不再执行技能。
 
 - 入口：`lib/game/skills.ts` 的 `loadCardById()`、`loadRuleById()`、`executeCardFunction()`、`executeSkillFunction()`。
 - 职责：加载并执行数据驱动规则。
@@ -149,6 +179,7 @@
 ## 9. 浏览器战斗 UI
 
 - 入口：`data/pages/battle.html::doAction()`、`applyServerState()`、`checkClientGameOver()`。
+- 路由：`battle.html` 是真实对战、观战和训练营的唯一战斗页面；训练营通过 `mode=training` 启用 fixture 与调试控件。`training.html` 仅保留兼容跳转，不得实现棋盘、选中、目标高亮或动作提交。
 - 职责：显示状态、收集输入、发送动作和接收服务端状态。
 - 输入：玩家交互、WS/Relay 消息、完整战斗状态。
 - 输出：动作消息、页面渲染、客户端胜负状态。
@@ -157,11 +188,21 @@
 - 状态变化：全局 `G`、DOM、localStorage；Relay 模式还会执行规则。
 - 错误：网络失败、引擎异常或状态不兼容；部分异常只显示提示或被忽略。
 - 日志：浏览器 console；生产 mobile 构建会削弱部分 console 输出。
-- 测试：没有确认到真实浏览器 E2E。
-- 已知问题：大文件跨层；复制胜负/目标逻辑；不同模式承担不同权威职责。
+- 测试：`tests/game/movement-contract.test.ts` 会执行页面实际加载的 `data/pages/js/game-engine.js`，验证共享移动导出和固定状态目标候选；`tests/game/battle-ui-boundary.test.ts` 覆盖展示模型、规则适配器与生命周期合同。RED-48 使用 Playwright 在训练模式完成 1280×720、390×844 的投影命中、选择/取消、目标模式和重复挂载冒烟，证据见 `output/playwright/red-48-browser-evidence.md`。
+- 已知问题：页面控制器仍跨越网络、Relay 规则执行和胜负判断；不同模式承担不同权威职责。移动规则适配器仍在克隆快照上验证共享移动候选；技能、卡牌和 pending 目标则只消费核心 `preparation` 的精确候选。
 - 最小调试：捕获连接模式、roomId、seed、最后 action、服务端/客户端 state hash 和截图。
 
-### 9.1 真实联机棋子选择页资源来源
+### 9.1 战场表现边界（RED-48）
+
+- 展示输入：`battle-ui/battle-view-model.js::create()` 把完整快照、已选对象和规则层返回的合法集合投影为最小模型；训练、LAN、relay 不进入投影字段。
+- 合法集合：`battle-ui/battle-legal-actions.js` 只调用浏览器 `GameEngine` 的克隆/验证入口，不包含移动距离、技能范围、伤害或结算公式。
+- 组合器：`battle-ui/battle-presentation.js` 将同一个模型对象传入 renderer 与 DOM，并统一输出 `select-piece`、`select-skill`、`activate-cell`、`inspect-piece` 和 `cancel-target` 意图。
+- Three.js：`battle-renderer-3d.js` 的公共生命周期是 `init(options)`、`update(model)`、`resize()`、`projectCell()`、`screenToCell()`、`dispose()`；只负责棋盘内表现。
+- DOM：`battle-ui/battle-dom-ui.js` 负责 HUD 和选中棋子摘要；`data-battle-ui-region` 为技能、手牌和后续响应式任务保留稳定挂载点。
+- 规则权威：页面控制器把意图转换为现有 action；非法操作仍由规则层/服务端最终拒绝。
+- 决策：见 `docs/decisions/ADR-0004-battle-presentation-boundary.md`。
+
+### 9.2 真实联机棋子选择页资源来源
 
 - 入口：`data/pages/piece-selection.html::loadPieces()`。
 - 本地优先：先通过 `fetchPackJson()` 读取版本化 `data/pieces/manifest.json` 及其中每个棋子；
@@ -177,6 +218,15 @@
   回退、超时回退、双重失败、阵营刷新及 8 枚提交合同；开发态真实 Electron 冒烟入口为
   `tests/electron/piece-selection-smoke.mjs`，运行前先构建 Next standalone、同步页面并编译
   `electron-client`。
+
+### 9.3 同阵营对局本地 UI 验收（RED-43）
+
+- 入口：Next 开发服务的 `/qa/same-alignment`，可创建固定 seed 的 `light/light` 和 `dark/dark` 真实房间。
+- 门禁：启动页、`create-ui-acceptance-room` API 和 `/qa/client/**` 资源只在非 production 且 loopback 请求下提供，production 或远端请求返回 404。
+- 客户端：`/qa/client/battle.html` 不复制 `battle.html`；直达链接会在连接检查前从 URL 恢复服务器配置。
+- 证据：服务端通过规则干运行产生目标集；页面 RED-43 面板显示 room/player/seed、按 `ownerPlayerId` 划分的敌我数量、客户端高亮集与服务端目标集的对比。
+- 边界：入口与面板只组织验收并暴露证据，不改变动作协议、规则引擎、随机算法或 production 资源发布。
+- 测试：`tests/qa/red43-ui-acceptance.test.ts`；可重复浏览器步骤与证据见 `docs/qa/RED-43-same-alignment-ui.md`。
 
 ## 10. Electron IPC
 
@@ -216,12 +266,17 @@
 - 入口：`scripts/build-game-engine.js`、`sync-pages.js`、`sync-android-assets.js` 和根 `package.json` Android scripts。
 - 职责：把 TS/JS、页面和 mobile server 转换成 Android 发布资源。
 - 输入：`lib/game`、`data/pages`、`mobile-server`。
-- 输出：`android-client/www` 等生成物，最终进入安装包。
+- 输出：页面实际加载并提交的 `data/pages/js/game-engine.js`，以及被忽略的 `android-client/www/js/game-engine.js` 派生副本。
 - 调用方：Android 打包命令。
 - 错误：缺失依赖、构建顺序或覆盖错误会生成与源码不一致的安装包。
-- 测试：没有确认到生成物 hash/来源验证。
-- 已知问题：当前正式发布物与预期唯一源码关系不清。
+- 测试：RED-28 候选验证会分别执行 `build:game-engine`、`build:mobile-server`，再加载两个生成 bundle，并核对 Android Relay 初始化 seed/trace 与 browser runner 固定 seed 重放 hash。
+- 构建边界：两条 browser 构建通过显式 shim 解析相对 `app-paths` 与 `node:*`，不得把 Electron resource-pack 的 Node 能力带入 WebView bundle。
+- 已知问题：当前正式发布物与预期唯一源码关系仍不清；RED-28 的生成物只用于候选验证，不提交。
+- 测试：`tests/game/movement-contract.test.ts` 直接执行 canonical bundle 并检查 RED-30 共享空间导出；尚无完整 Android 安装包来源/hash 验证。
+- 已知问题：完整 Android 发布物仍缺少端到端的来源/hash 验证。
 - 最小调试：清空临时构建目录后从源码生成，记录命令、commit、文件 hash，再安装冒烟验证。删除正式目录前必须另行审批。
+
+- 浏览器兼容：`build-game-engine.js` 将 `node:fs/path/crypto/zlib` 规范化为 runtime shim 已支持的普通 external 名称，并在浏览器 bundle 内联不执行文件操作的 `adm-zip` 占位模块；`movement-contract.test.ts` 禁止 canonical bundle 重新引入这些不受支持的动态 require。
 
 ## 12. 重复公共类型
 

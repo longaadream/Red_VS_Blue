@@ -28,6 +28,17 @@ import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction
 import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
+import { getRuleDate, getRuleMath, withRuleRuntimeCheckpoint } from "./rule-runtime"
+import { getNormalMoveRejection, manhattanDistance } from "./spatial"
+import {
+  TargetingRuleError,
+  advancePendingTargetSession,
+  assertActionTargetingReady,
+  assertPendingTargetCancellation,
+  stampTargetingRevision,
+  validatePendingTargetSubmission,
+} from "./targeting"
+import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -236,20 +247,19 @@ export interface BattleState {
     cancelValue?: any
     pendingQueue?: Array<{ruleId: string, sourceId?: string}>
   }
-  /** 任意时机挂起的玩家目标选择，由数据脚本提供完成后的 effectCode */
-  pendingTargetSelection?: {
-    playerId: string
-    title?: string
-    targetType: 'piece' | 'cell' | 'grid'
-    range?: number
-    filter?: string
-    effectCode?: string
-    payload?: any
-    triggerContext?: any
-    pendingQueue?: Array<{ruleId: string, sourceId?: string}>
-  }
+  /** 任意时机挂起的可版本化玩家目标选择会话。 */
+  pendingTargetSelection?: PendingTargetSelectionSession
+  /** 仅用于目标查询/提交的新旧状态判定；每个成功动作单调递增。 */
+  targetingRevision?: number
   /** 状态序列化版本号，升级时不兼容的旧状态会被拒绝 */
   _v?: number
+}
+
+type TargetedActionFields = TargetSelectionCredential & {
+  targetX?: number
+  targetY?: number
+  targetPieceId?: string
+  extraTargets?: Array<{ pieceId?: string; x?: number; y?: number }>
 }
 
 export type BattleAction =
@@ -261,28 +271,22 @@ export type BattleAction =
       toX: number
       toY: number
     }
-  | {
+  | ({
       type: "useBasicSkill"
       playerId: PlayerId
       pieceId: string
       skillId: string
-      targetX?: number
-      targetY?: number
-      targetPieceId?: string
       /** 用户通过选项选择器选择的值 */
       selectedOption?: any
-    }
-  | {
+    } & TargetedActionFields)
+  | ({
       type: "useChargeSkill"
       playerId: PlayerId
       pieceId: string
       skillId: string
-      targetX?: number
-      targetY?: number
-      targetPieceId?: string
       /** 用户通过选项选择器选择的值 */
       selectedOption?: any
-    }
+    } & TargetedActionFields)
   | {
       type: "endTurn"
       playerId: PlayerId
@@ -296,31 +300,25 @@ export type BattleAction =
       type: "surrender"
       playerId: PlayerId
     }
-  | {
+  | ({
       type: "playCard"
       playerId: PlayerId
       cardInstanceId: string
-      targetPieceId?: string
-      targetX?: number
-      targetY?: number
       selectedOption?: any
-    }
+    } & TargetedActionFields)
   | {
       type: "pendingOptionSelect"
       playerId: PlayerId
       selectedOption: any
     }
-  | {
+  | ({
       type: "pendingTargetSelect"
       playerId: PlayerId
-      targetPieceId?: string
-      targetX: number
-      targetY: number
-    }
-  | {
+    } & TargetedActionFields)
+  | ({
       type: "cancelPendingSelection"
       playerId: PlayerId
-    }
+    } & TargetSelectionCredential)
 
 export class BattleRuleError extends Error {
   constructor(message: string) {
@@ -347,17 +345,8 @@ function isSamePlayer(playerId1: PlayerId, playerId2: PlayerId): boolean {
   return playerId1.toLowerCase() === playerId2.toLowerCase()
 }
 
-function isCellOccupied(state: BattleState, x: number, y: number): boolean {
-  return state.pieces.some((p) => p.x === x && p.y === y && p.currentHp > 0)
-}
-
 /**
- * 简化版移动规则：
- * - 直线移动（水平或垂直），类似象棋车。
- * - 距离不能超过棋子的 moveRange（如果未设置，则视为无限制）。
- * - 起点终点必须在地图范围内。
- * - 终点格必须可通行且没有其它棋子占据。
- * - 暂时不检查“路径被阻挡”，以后可以按需要增加。
+ * 普通移动统一使用 spatial.ts 的纯规则：直线、moveRange、地形与存活棋子阻挡。
  */
 function validateMove(
   state: BattleState,
@@ -365,42 +354,8 @@ function validateMove(
   toX: number,
   toY: number,
 ): void {
-  if (piece.x == null || piece.y == null) {
-    throw new BattleRuleError("Piece is not on the board")
-  }
-
-  const { width, height, tiles } = state.map
-  if (toX < 0 || toX >= width || toY < 0 || toY >= height) {
-    throw new BattleRuleError("Target position is outside of the board")
-  }
-
-  if (piece.x !== toX && piece.y !== toY) {
-    throw new BattleRuleError("Move must be in a straight line (rook-style)")
-  }
-
-  const maxRange = piece.moveRange
-  const distance = Math.abs(piece.x - toX) + Math.abs(piece.y - toY)
-  if (maxRange != null && maxRange > 0 && distance > maxRange) {
-    throw new BattleRuleError("Move distance exceeds piece moveRange")
-  }
-
-  // 检查路径上每个格子（含终点）是否可通行
-  const stepX = toX === piece.x ? 0 : toX > piece.x ? 1 : -1
-  const stepY = toY === piece.y ? 0 : toY > piece.y ? 1 : -1
-  let cx = piece.x + stepX
-  let cy = piece.y + stepY
-  while (cx !== toX + stepX || cy !== toY + stepY) {
-    const tile = tiles.find((t) => t.x === cx && t.y === cy)
-    if (!tile || !tile.props.walkable) {
-      throw new BattleRuleError("Path is blocked by a wall")
-    }
-    cx += stepX
-    cy += stepY
-  }
-
-  if (isCellOccupied(state, toX, toY)) {
-    throw new BattleRuleError("Target tile is already occupied")
-  }
+  const rejection = getNormalMoveRejection(state, piece, { x: toX, y: toY })
+  if (rejection) throw new BattleRuleError(rejection.message)
 }
 
 function getSkillDefinitionOrThrow(state: BattleState, skillId: string): SkillDefinition {
@@ -438,7 +393,7 @@ function validateDeclaredSkillTarget(
       if (piece.x == null || piece.y == null || target.x == null || target.y == null) {
         throw new BattleRuleError("Skill target is out of range")
       }
-      const distance = Math.abs(piece.x - target.x) + Math.abs(piece.y - target.y)
+      const distance = manhattanDistance(piece, target)
       if (distance > range) throw new BattleRuleError("Skill target is out of range")
     }
     return
@@ -451,7 +406,7 @@ function validateDeclaredSkillTarget(
       if (piece.x == null || piece.y == null) {
         throw new BattleRuleError("Skill target is out of range")
       }
-      const distance = Math.max(Math.abs(piece.x - action.targetX), Math.abs(piece.y - action.targetY))
+      const distance = manhattanDistance(piece, { x: action.targetX, y: action.targetY })
       if (distance > range) throw new BattleRuleError("Skill target is out of range")
     }
   }
@@ -625,19 +580,21 @@ function dryRunCardAction(
   cardDef: any,
   executeCardFunction: Function,
 ): void {
-  const dryState = safeCloneBattleState(state)
-  const { targetPiece, targetPosition } = getCardTargetArgs(dryState, action)
-  const result = executeCardFunction(
-    cardDef,
-    action.playerId,
-    dryState,
-    undefined,
-    targetPiece,
-    targetPosition,
-    action.selectedOption,
-    action.extraTargets,
-  )
-  assertCardDryRunResult(result)
+  withRuleRuntimeCheckpoint(() => {
+    const dryState = safeCloneBattleState(state)
+    const { targetPiece, targetPosition } = getCardTargetArgs(dryState, action)
+    const result = executeCardFunction(
+      cardDef,
+      action.playerId,
+      dryState,
+      undefined,
+      targetPiece,
+      targetPosition,
+      action.selectedOption,
+      action.extraTargets,
+    )
+    assertCardDryRunResult(result)
+  })
 }
 
 function buildSkillTargetSlot(
@@ -726,22 +683,23 @@ function dryRunSkillAction(
   action: any,
   skillDef: SkillDefinition,
 ): void {
-  const dryState = safeCloneBattleState(state)
-  if (!(dryState as any).extensions) (dryState as any).extensions = {}
-  ;(dryState as any).extensions.__dryRunSkillPreflight = true
-  const dryPiece = dryState.pieces.find(p => p.instanceId === piece.instanceId && p.currentHp > 0)
-  if (!dryPiece) {
-    throw new BattleRuleError("Piece not found or is defeated")
-  }
-  const drySkillDef = dryState.skillsById[skillDef.id] || skillDef
-  const result = executeSkillFunction(
-    drySkillDef,
-    buildSkillExecutionContext(dryState, dryPiece, action, drySkillDef),
-    dryState,
-  )
-  assertSkillDryRunResult(result)
+  withRuleRuntimeCheckpoint(() => {
+    const dryState = safeCloneBattleState(state)
+    if (!(dryState as any).extensions) (dryState as any).extensions = {}
+    ;(dryState as any).extensions.__dryRunSkillPreflight = true
+    const dryPiece = dryState.pieces.find(p => p.instanceId === piece.instanceId && p.currentHp > 0)
+    if (!dryPiece) {
+      throw new BattleRuleError("Piece not found or is defeated")
+    }
+    const drySkillDef = dryState.skillsById[skillDef.id] || skillDef
+    const result = executeSkillFunction(
+      drySkillDef,
+      buildSkillExecutionContext(dryState, dryPiece, action, drySkillDef),
+      dryState,
+    )
+    assertSkillDryRunResult(result)
+  })
 }
-
 export function validateSkillActionByDryRun(state: BattleState, action: any): void {
   if (action.type !== "useBasicSkill" && action.type !== "useChargeSkill") {
     throw new BattleRuleError("Action is not a skill action")
@@ -757,7 +715,8 @@ export function validateSkillActionByDryRun(state: BattleState, action: any): vo
       "Piece not found or does not belong to current player",
     )
   }
-  const skillDef = validateSkillActionBasics(
+  assertActionTargetingReady(state, action)
+  validateSkillActionBasics(
     state,
     piece,
     action.playerId,
@@ -765,7 +724,6 @@ export function validateSkillActionByDryRun(state: BattleState, action: any): vo
     action,
     action.type === "useChargeSkill",
   )
-  dryRunSkillAction(state, piece, action, skillDef)
 }
 
 function applyCardPayment(
@@ -808,7 +766,7 @@ function requireActionPhase(state: BattleState) {
   }
 }
 
-export function applyBattleAction(
+function applyBattleActionInternal(
   state: BattleState,
   action: BattleAction,
 ): BattleState {
@@ -820,9 +778,25 @@ export function applyBattleAction(
     )
   }
 
-  // 恢复棋子和玩家规则的 effect 函数（API 传输后函数会丢失）
-  restorePieceRules(state)
-  restorePlayerRules(state)
+  // RED-59: all target discovery and final target validation happen before
+  // cloning, triggers, payment, logging, or effect execution.
+  assertActionTargetingReady(state, action)
+  const validatedPendingTarget = action.type === 'pendingTargetSelect'
+    ? validatePendingTargetSubmission(state, action)
+    : undefined
+  if (action.type === 'cancelPendingSelection') {
+    if (state.pendingTargetSelection) {
+      assertPendingTargetCancellation(state, action)
+    } else if (!state.pendingOptionSelection) {
+      assertPendingTargetCancellation(state, action)
+    }
+  }
+
+  // 规则恢复会补充数组和 effect 函数；先克隆，确保非法动作不会污染权威输入状态。
+  const hydratedState = safeCloneBattleState(state)
+  restorePieceRules(hydratedState)
+  restorePlayerRules(hydratedState)
+  state = hydratedState
 
   if (action.type === 'cancelPendingSelection') {
     const next = safeCloneBattleState(state)
@@ -845,6 +819,13 @@ export function applyBattleAction(
   // 飞雷神等被动触发待选择时，禁止非选择动作（防止攻击方绕过等待）
   if (state.pendingOptionSelection && action.type !== 'pendingOptionSelect') {
     throw new BattleRuleError('请等待对方选择完成后再行动')
+  }
+  if (state.pendingTargetSelection && action.type !== 'pendingTargetSelect') {
+    throw new TargetingRuleError({
+      kind: 'invalid',
+      code: 'PENDING_SELECTION_ACTIVE',
+      message: '请等待目标选择完成后再行动',
+    })
   }
 
   // 辅助：选择完成后按顺序继续处理挂起的规则队列（每次遇到需要交互的规则就再次挂起）
@@ -894,10 +875,10 @@ export function applyBattleAction(
         if (!next.gameStartFired && next.turn.turnNumber === 1) {
           writeLog('[beginPhase] Triggering gameStart rules...')
           next.gameStartFired = true
-          // 为初始棋子补发 afterPieceSummon，确保"进入战场"类规则对初始棋子也能生效
+          // 为初始棋子补发 afterPieceSummoned，确保"进入战场"类规则对初始棋子也能生效
           for (const piece of next.pieces) {
             globalTriggerSystem.checkTriggers(next, {
-              type: "afterPieceSummon",
+              type: "afterPieceSummoned",
               playerId: piece.ownerPlayerId,
               sourcePiece: piece,
               pieceTemplateId: piece.templateId,
@@ -1528,8 +1509,6 @@ export function applyBattleAction(
         }
       }
 
-      const { executeSkillFunction } = require('./skills')
-      
       // 构建目标信息（支持 N 次 selectTarget 调用）
       const buildTargetSlot = (pieceId: string | undefined, tx: number | undefined, ty: number | undefined) => {
         if (pieceId) {
@@ -1560,6 +1539,7 @@ export function applyBattleAction(
           name: skillDef.name,
           type: skillDef.type,
           powerMultiplier: skillDef.powerMultiplier,
+          targeting: skillDef.targeting,
         },
       }
 
@@ -1834,11 +1814,7 @@ export function applyBattleAction(
       }
 
       // 执行技能
-      const skillsModule = require('./skills')
-      const { executeSkillFunction } = skillsModule
       console.log('[useChargeSkill] executeSkillFunction imported: ' + typeof executeSkillFunction)
-      console.log('[useChargeSkill] skillsModule keys:', Object.keys(skillsModule).join(', '))
-      console.log('[useChargeSkill] executeSkillFunction toString:', executeSkillFunction.toString().substring(0, 500))
       console.log('[useChargeSkill] skillDef id: ' + skillDef.id)
       console.log('[useChargeSkill] skillDef has code: ' + !!skillDef.code)
       console.log('[useChargeSkill] About to build target info...')
@@ -1873,6 +1849,7 @@ export function applyBattleAction(
           name: skillDef.name,
           type: skillDef.type,
           powerMultiplier: skillDef.powerMultiplier,
+          targeting: skillDef.targeting,
         },
       }
 
@@ -2178,7 +2155,7 @@ export function applyBattleAction(
       if (pending.pendingAction) {
         const resumeAction = { ...pending.pendingAction, selectedOption: action.selectedOption }
         try {
-          return applyBattleAction(next, resumeAction)
+          return applyBattleActionInternal(next, resumeAction)
         } catch (e) {
           // 技能条件已失效（如目标移位、目标已死），取消技能，游戏继续
           writeLog(`[pendingOptionSelect] resume skill failed, cancelling: ${(e as Error).message}`)
@@ -2214,14 +2191,26 @@ export function applyBattleAction(
       if (pending.playerId && String(pending.playerId).toLowerCase() !== String(action.playerId).toLowerCase()) {
         throw new BattleRuleError(`[pendingTargetSelect] player mismatch; pending=${pending.playerId}, action=${action.playerId}, target=(${(action as any).targetX},${(action as any).targetY}), title=${pending.title || ''}`)
       }
-      const x = (action as any).targetX
-      const y = (action as any).targetY
-      const targetPiece = (action as any).targetPieceId
-        ? next.pieces.find(p => p.instanceId === (action as any).targetPieceId)
+      const x = validatedPendingTarget?.type === 'cell'
+        ? validatedPendingTarget.x
+        : (action as any).targetX
+      const y = validatedPendingTarget?.type === 'cell'
+        ? validatedPendingTarget.y
+        : (action as any).targetY
+      const targetPieceId = validatedPendingTarget?.type === 'piece'
+        ? validatedPendingTarget.pieceId
+        : (action as any).targetPieceId
+      const targetPiece = targetPieceId
+        ? next.pieces.find(p => p.instanceId === targetPieceId && p.currentHp > 0)
         : undefined
-      const tile = x !== undefined && y !== undefined ? next.map.tiles.find(t => t.x === x && t.y === y) : undefined
-      if ((pending.targetType === 'cell' || pending.targetType === 'grid') && (!tile || !tile.props.walkable)) {
-        throw new BattleRuleError(`[pendingTargetSelect] invalid tile; targetType=${pending.targetType}, target=(${x},${y}), tile=${tile ? JSON.stringify(tile.props) : 'missing'}, title=${pending.title || ''}`)
+      const resolvedPending = {
+        ...pending,
+        selectedTargets: [...(pending.selectedTargets || []), validatedPendingTarget!],
+      }
+      const advancedPending = advancePendingTargetSession(pending, validatedPendingTarget!)
+      if (advancedPending) {
+        next.pendingTargetSelection = advancedPending
+        return next
       }
       next.pendingTargetSelection = undefined
       let result: any = { success: true }
@@ -2229,7 +2218,8 @@ export function applyBattleAction(
       if (pending.effectCode) {
         let fn: any
         try {
-          fn = eval('(' + pending.effectCode + ')')
+          const compileEffect = eval('(function(Math, Date) { return (' + pending.effectCode + '); })')
+          fn = compileEffect(getRuleMath(), getRuleDate())
         } catch (evalErr) {
           throw new BattleRuleError('[STAGE6] effectCode eval failed: ' + (evalErr instanceof Error ? evalErr.message : String(evalErr)))
         }
@@ -2243,7 +2233,7 @@ export function applyBattleAction(
             targetPiece,
             targetX: x,
             targetY: y,
-            pending,
+            pending: resolvedPending,
             payload: pending.payload,
           }) || { success: true }
           console.log('[STAGE6] effectCode result:', result)
@@ -2257,6 +2247,8 @@ export function applyBattleAction(
           targetPieceId: action.targetPieceId,
           targetX: action.targetX,
           targetY: action.targetY,
+          selectedTargets: resolvedPending.selectedTargets,
+          pendingTargetSelection: resolvedPending,
         })
       }
       if (!next.actions) next.actions = []
@@ -2305,8 +2297,6 @@ export function applyBattleAction(
       }
 
       validateDeclaredCardTarget(next, action)
-      dryRunCardAction(next, action as any, cardDef, executeCardFunction)
-
       // 触发手牌使用前规则
       const beforeCardPlayResult = globalTriggerSystem.checkTriggers(next, {
         type: "beforeCardPlay",
@@ -2408,8 +2398,19 @@ export function applyBattleAction(
     }
 
     default:
-      return state
+      throw new BattleRuleError(`Unknown battle action: ${String((action as any)?.type || '')}`)
   }
+}
+
+/**
+ * Public reducer wrapper. A successful command advances the target-query
+ * revision exactly once, including commands that create a pending session.
+ */
+export function applyBattleAction(
+  state: BattleState,
+  action: BattleAction,
+): BattleState {
+  return stampTargetingRevision(state, applyBattleActionInternal(state, action))
 }
 
 // 召唤棋子接口
@@ -2432,7 +2433,7 @@ export interface SummonPieceResult {
 
 /**
  * 召唤棋子到棋盘
- * 触发 beforePieceSummon 和 afterPieceSummon 触发器
+ * 触发 beforePieceSummoned 和 afterPieceSummoned 触发器
  */
 export function summonPiece(
   battle: BattleState,
@@ -2450,7 +2451,7 @@ export function summonPiece(
 
   // 触发召唤前触发器
   const beforeSummonResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "beforePieceSummon",
+    type: "beforePieceSummoned",
     playerId: ownerPlayerId,
     targetPosition: { x, y },
     pieceTemplateId: templateId,
@@ -2482,7 +2483,7 @@ export function summonPiece(
 
   // 触发召唤后触发器
   const afterSummonResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "afterPieceSummon",
+    type: "afterPieceSummoned",
     playerId: ownerPlayerId,
     sourcePiece: newPiece,
     pieceTemplateId: templateId,

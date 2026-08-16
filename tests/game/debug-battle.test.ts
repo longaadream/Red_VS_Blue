@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { replayBattle, runBattleAction } from '@/lib/game/battle-runner'
+import { hashStable, replayBattle, runBattleAction } from '@/lib/game/battle-runner'
 import { createDebugDuel } from '@/lib/game/debug-battle'
+import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('debug battle pipeline', () => {
   it('creates a local duel with eight pieces per player', async () => {
@@ -12,6 +13,15 @@ describe('debug battle pipeline', () => {
     expect(duel.players[1].templateIds).toHaveLength(8)
     expect(duel.state.pieces.some(piece => piece.ownerPlayerId === 'debug-red')).toBe(true)
     expect(duel.state.pieces.some(piece => piece.ownerPlayerId === 'debug-blue')).toBe(true)
+    expect((duel.state.extensions as any).debugBattle.actionLog[0]).toMatchObject({
+      actionId: 'system-initialize',
+      rootSeed: 1234,
+      preStateHash: expect.any(String),
+      postStateHash: expect.any(String),
+      randomStreams: expect.arrayContaining([
+        expect.objectContaining({ name: 'deployment', startCursor: 0 }),
+      ]),
+    })
   })
 
   it('allows light/light and dark/dark mirror debug duels', async () => {
@@ -120,5 +130,35 @@ describe('debug battle pipeline', () => {
     expect(duplicate.duplicate).toBe(true)
     expect(duplicate.stateHash).toBe(first.stateHash)
     expect((duplicate.state.extensions as any).debugBattle.appliedActionIds).toContain('debug-action-1')
+  })
+
+  it('rejects an illegal move without mutating authoritative state or action trace', () => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const blocker = makePiece({ instanceId: 'blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 })
+    const state = makeState({ pieces: [mover, blocker], currentPlayerId: 'player-red', phase: 'action' })
+    delete state.extensions
+    Reflect.deleteProperty(state.pieces[0], 'rules')
+    Reflect.deleteProperty(state.players[0], 'rules')
+
+    const beforeJson = JSON.stringify(state)
+    const beforeHash = hashStable(state)
+    const beforeActionPoints = state.players[0].actionPoints
+    const beforeActions = [...(state.actions ?? [])]
+
+    const illegalMove = {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: 'mover',
+      toX: 2,
+      toY: 0,
+      clientActionId: 'illegal-move-1',
+    } as Parameters<typeof runBattleAction>[1] & { clientActionId: string }
+    expect(() => runBattleAction(state, illegalMove)).toThrow(/blocked|occupied/i)
+
+    expect(hashStable(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(state.players[0].actionPoints).toBe(beforeActionPoints)
+    expect(state.actions).toEqual(beforeActions)
+    expect(state.extensions).toBeUndefined()
   })
 })

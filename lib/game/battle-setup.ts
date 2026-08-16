@@ -12,6 +12,8 @@ import { loadRuleById } from './skills'
 import path from 'path'
 import fs from 'fs'
 import { getUserDataDir } from '@/lib/app-paths'
+import { recordBattleInitialization } from './battle-trace'
+import { RANDOM_STREAM_NAMES, RuleRuntime, withRuleRuntime } from './rule-runtime'
 
 function fireInitialGameStart(state: BattleState): void {
   if (state.gameStartFired || state.turn.turnNumber !== 1) return
@@ -20,7 +22,7 @@ function fireInitialGameStart(state: BattleState): void {
 
   for (const piece of [...state.pieces]) {
     globalTriggerSystem.checkTriggers(state, {
-      type: "afterPieceSummon",
+      type: "afterPieceSummoned",
       playerId: piece.ownerPlayerId,
       sourcePiece: piece,
       pieceTemplateId: piece.templateId,
@@ -125,7 +127,8 @@ export function buildInitialPiecesForPlayers(
   map: BoardMap,
   players: PlayerId[],
   selectedPieces: PieceTemplate[],
-  playerSelectedPieces?: PlayerSelectedPieces[]
+  playerSelectedPieces?: PlayerSelectedPieces[],
+  randomFloat: () => number = rng,
 ): PieceInstance[] {
   if (players.length !== 2) return []
 
@@ -160,7 +163,7 @@ export function buildInitialPiecesForPlayers(
     
     // 尝试最多100次，找到一个未被占用的位置
     for (let i = 0; i < 100; i++) {
-      const randomIndex = Math.floor(rng() * availableTiles.length)
+      const randomIndex = Math.floor(randomFloat() * availableTiles.length)
       const position = { x: availableTiles[randomIndex].x, y: availableTiles[randomIndex].y }
       
       // 检查位置是否已经被占用
@@ -476,7 +479,7 @@ export async function createInitialBattleForPlayers(
   selectedPieces: PieceTemplate[],
   playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[]; faction?: 'red' | 'blue' }>,
   mapId?: string,
-  options?: { firstPlayerId?: PlayerId },
+  options?: { firstPlayerId?: PlayerId; rootSeed?: number },
 ): Promise<BattleState | null> {
   if (playerIds.length !== 2) return null
 
@@ -550,13 +553,21 @@ export async function createInitialBattleForPlayers(
   }
 
   // 只有 psp 里有实际棋子时才传给 buildInitialPiecesForPlayers，否则用 selectedPieces
+  const runtime = typeof options?.rootSeed === 'number'
+    ? new RuleRuntime({ rootSeed: options.rootSeed, tick: 0 })
+    : undefined
+  const deploymentRandom = runtime
+    ? () => runtime.nextRandom(RANDOM_STREAM_NAMES.deployment)
+    : rng
   const pspForBuild = (orderedPSP && orderedPSP.some(p => p.pieces.length > 0)) ? orderedPSP : undefined
-  const pieces = buildInitialPiecesForPlayers(map, orderedIds, selectedPieces, pspForBuild)
+  const pieces = buildInitialPiecesForPlayers(map, orderedIds, selectedPieces, pspForBuild, deploymentRandom)
 
   // 先后手：由 battle-setup 统一决定（不在调用方重复随机）
   const firstPlayer = options?.firstPlayerId && orderedIds.includes(options.firstPlayerId)
     ? options.firstPlayerId
-    : (rng() < 0.5 ? orderedIds[0] : orderedIds[1])
+    : ((runtime
+        ? runtime.nextRandom(RANDOM_STREAM_NAMES.turnOrder)
+        : rng()) < 0.5 ? orderedIds[0] : orderedIds[1])
   const secondPlayer = firstPlayer === orderedIds[0] ? orderedIds[1] : orderedIds[0]
 
   const skills = buildDefaultSkills()
@@ -596,24 +607,33 @@ export async function createInitialBattleForPlayers(
     selectedPieces.forEach(pt => allSelectedPieces.push(pt))
   }
 
-  state.pieces.forEach(piece => {
-    const template = allSelectedPieces.find(t => t.id === piece.templateId)
-    if (template) {
-      applyInitialEffects(piece, template, state)
-    }
-  })
+  const initializeRules = () => {
+    state.pieces.forEach(piece => {
+      const template = allSelectedPieces.find(t => t.id === piece.templateId)
+      if (template) {
+        applyInitialEffects(piece, template, state)
+      }
+    })
 
-  // 将幸运币规则绑到后手玩家，gameStart 时由规则自动发牌（规则发牌，非硬编码）
-  const luckyRule = loadRuleById('rule-lucky-coin-gamestart', FORCE_RULE_RELOAD)
-  const secondPlayerState = state.players.find(p => p.playerId === secondPlayer) as any
-  if (luckyRule && secondPlayerState) {
-    if (!secondPlayerState.rules) secondPlayerState.rules = []
-    secondPlayerState.rules.push(luckyRule)
-    writeLog('[createInitialBattle] First player: ' + firstPlayer + ', rule-lucky-coin-gamestart → second player: ' + secondPlayer)
+    // 将幸运币规则绑到后手玩家，gameStart 时由规则自动发牌（规则发牌，非硬编码）
+    const luckyRule = loadRuleById('rule-lucky-coin-gamestart', FORCE_RULE_RELOAD)
+    const secondPlayerState = state.players.find(p => p.playerId === secondPlayer) as any
+    if (luckyRule && secondPlayerState) {
+      if (!secondPlayerState.rules) secondPlayerState.rules = []
+      secondPlayerState.rules.push(luckyRule)
+      writeLog('[createInitialBattle] First player: ' + firstPlayer + ', rule-lucky-coin-gamestart → second player: ' + secondPlayer)
+    }
+
+    // 触发游戏开始规则（包括幸运币发牌、基尔加丹隐匿等）
+    fireInitialGameStart(state)
   }
 
-  // 触发游戏开始规则（包括幸运币发牌、基尔加丹隐匿等）
-  fireInitialGameStart(state)
+  if (runtime) {
+    withRuleRuntime(runtime, initializeRules)
+    recordBattleInitialization(state, runtime, orderedIds)
+  } else {
+    initializeRules()
+  }
 
   writeLog('[createInitialBattle] Battle state created, pieces count: ' + state.pieces.length)
   return state

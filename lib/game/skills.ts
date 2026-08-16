@@ -2,7 +2,9 @@ import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import { globalTriggerSystem } from "./triggers"
 import { rng } from "./rng"
+import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
+import { manhattanDistance } from './spatial'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -123,7 +125,10 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
     return false
   }
   
-  const instanceId = `ci-${cardId}-${Math.floor(rng() * 1e9)}`
+  const runtime = getActiveRuleRuntime()
+  const instanceId = runtime
+    ? runtime.nextInstanceId('card', `ci-${cardId}`)
+    : `ci-${cardId}-${Math.floor(rng() * 1e9)}`
   const staticCard = loadCardById(cardId)
   const customCard = (battle as any).customCards?.[cardId]
   const cardDef = staticCard || customCard
@@ -160,6 +165,39 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
 
 // ─── 卡牌系统类型 ─────────────────────────────────────────────────────────────
 
+export interface SelectionOptionDefinition {
+  label: string
+  value: unknown
+  description?: string
+}
+
+export type SelectionStepDefinition =
+  | {
+      kind: 'option'
+      title: string
+      options: SelectionOptionDefinition[]
+      canCancel?: boolean
+    }
+  | {
+      kind: 'target'
+      type: 'piece' | 'grid' | 'cell'
+      filter?: 'enemy' | 'ally' | 'all' | 'self'
+      range?: number
+      distanceMetric?: 'manhattan' | 'chebyshev'
+      requireWalkable?: boolean
+      requireUnoccupied?: boolean
+      allowSourceOccupant?: boolean
+      allowSourceOccupantOptions?: unknown[]
+    }
+
+export interface SelectionContractDefinition {
+  source?: {
+    templateId?: string
+    boundInstanceField?: string
+  }
+  steps: SelectionStepDefinition[]
+}
+
 export interface CardDefinition {
   id: string
   name: string
@@ -172,6 +210,8 @@ export interface CardDefinition {
   code: string
   actionPointCost?: number
   icon?: string
+  /** Pure, machine-readable source/option/target declaration (RED-59). */
+  targeting?: SelectionContractDefinition
 }
 
 // 卡牌定义缓存
@@ -222,7 +262,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       const needsTargetSelection = () => ({ needsTargetSelection: true, targetType: opts.type, range: opts.range, filter: opts.filter, targetIndex: callIdx })
       const isInRange = (x: number, y: number) => {
         if (opts.range === undefined || !source) return true
-        return Math.max(Math.abs((source.x || 0) - x), Math.abs((source.y || 0) - y)) <= opts.range
+        return manhattanDistance({ x: source.x ?? 0, y: source.y ?? 0 }, { x, y }) <= opts.range
       }
       if (opts.type === 'piece' && selectedTarget) {
         const isAlly = selectedTarget.ownerPlayerId === playerId
@@ -400,7 +440,8 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       return false
     },
 
-    Math,
+    Math: getRuleMath(),
+    Date: getRuleDate(),
     console
   }
 }
@@ -465,6 +506,7 @@ export function executeCardFunction(
         const addPlayerRuleById = env.addPlayerRuleById;
         const removePlayerRuleById = env.removePlayerRuleById;
         const Math = env.Math;
+        const Date = env.Date;
         const console = env.console;
 
         ${cardDef.code}
@@ -517,13 +559,22 @@ export function loadAllSkillsById(): Record<string, SkillDefinition> {
 }
 
 // 从文件中加载规则的函数（导出以便在需要时重新注入 effect 函数）
+function instantiateRuleForBattle(rule: TriggerRule): TriggerRule {
+  return {
+    ...rule,
+    limits: rule.limits
+      ? { ...rule.limits, uses: 0, currentCooldown: 0, remainingDuration: undefined }
+      : undefined,
+  }
+}
+
 export function loadRuleById(ruleId: string, forceReload: boolean = false): TriggerRule | null {
   console.log(`[loadRuleById] Called with ruleId: ${ruleId}, forceReload: ${forceReload}`);
   // 命中缓存时返回拷贝（深拷贝 limits，避免跨游戏共享 uses/currentCooldown 计数）
   const cached = ruleCache.get(ruleId)
   if (cached && !forceReload) {
     console.log(`[loadRuleById] Cache hit for rule: ${ruleId}`);
-    return { ...cached, limits: cached.limits ? { ...cached.limits, uses: 0, currentCooldown: 0, remainingDuration: undefined } : undefined }
+    return instantiateRuleForBattle(cached)
   }
   if (forceReload && cached) {
     console.log(`[loadRuleById] Force reloading rule: ${ruleId}`);
@@ -701,20 +752,21 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               return getEffectOnPiece(battle, pieceId, effectId);
             };
             const fireEvent = (eventName: string, ctx: any) => {
-              return globalTriggerSystem.checkTriggers(battle, { ...ctx, type: eventName });
+              return globalTriggerSystem.fireEvent(battle, context, eventName, ctx);
             };
 
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent, Math, Date) {
                 ${ruleData.skillCode}
-              })(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent)
+              })
             `;
 
             if (ruleId === 'rule-shishio-combustion') {
               const ctr = (context.rulePiece?.statusTags ?? []).find((t: any) => t.type === 'shishio-dmg-counter');
               console.log(`[combustion-debug] skillId="${context.skillId ?? 'undefined'}" damage=${context.damage} src=${context.sourcePiece?.name} tgt=${context.targetPiece?.name} counter_before=${ctr?.intensity ?? 0}`);
             }
-            const result = eval(codeEnvironment);
+            const executeRuleCode = eval(codeEnvironment);
+            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent, getRuleMath(), getRuleDate());
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
@@ -970,9 +1022,10 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     },
                     getAllEnemiesInRange: (range: any) => [],
                     getAllAlliesInRange: (range: any) => [],
-                    calculateDistance: (x1: any, y1: any, x2: any, y2: any) => Math.abs(x1 - x2) + Math.abs(y1 - y2),
+                    calculateDistance: (x1: any, y1: any, x2: any, y2: any) => manhattanDistance({ x: x1, y: y1 }, { x: x2, y: y2 }),
                     isTargetInRange: (target: any, range: any) => false,
-                    Math: Math,
+                    Math: getRuleMath(),
+                    Date: getRuleDate(),
                     console: console
                   };
                   
@@ -1007,6 +1060,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                       const addPlayerStatusEffectById = environment.addPlayerStatusEffectById;
                       const removePlayerStatusEffectById = environment.removePlayerStatusEffectById;
                       const Math = environment.Math;
+                      const Date = environment.Date;
                       const console = environment.console;
 
                       ${skillDef.code}
@@ -1052,7 +1106,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
       console.log(`Loaded rule successfully: ${ruleId}`);
       // 写入缓存，后续复用时无需再读文件
       ruleCache.set(ruleId, rule)
-      return rule;
+      return instantiateRuleForBattle(rule);
     } else {
       console.error(`Rule file not found: ${rulePath}`);
     }
@@ -1138,6 +1192,7 @@ export interface SkillExecutionContext {
     name: string
     type: SkillType
     powerMultiplier: number
+    targeting?: SelectionContractDefinition
   }
 }
 
@@ -1197,6 +1252,8 @@ export interface SkillDefinition {
   actionPointCost: number
   /** 技能图标 */
   icon?: string
+  /** Pure, machine-readable option/target declaration (RED-59). */
+  targeting?: SelectionContractDefinition
 }
 
 /**
@@ -1244,7 +1301,7 @@ export function getAllEnemiesInRange(context: SkillExecutionContext, range: numb
     // 只考虑存活的敌人
     if (p.currentHp > 0 && p.ownerPlayerId !== piece.ownerPlayerId) {
       if (p.x == null || p.y == null) continue
-      const distance = Math.abs(p.x - piece.x) + Math.abs(p.y - piece.y)
+      const distance = manhattanDistance(piece, p)
       if (distance <= range) {
         enemies.push({
           instanceId: p.instanceId,
@@ -1294,7 +1351,7 @@ export function getAllAlliesInRange(context: SkillExecutionContext, range: numbe
     // 只考虑存活的盟友
     if (p.currentHp > 0 && p.ownerPlayerId === piece.ownerPlayerId) {
       if (p.x == null || p.y == null) continue
-      const distance = Math.abs(p.x - piece.x) + Math.abs(p.y - piece.y)
+      const distance = manhattanDistance(piece, p)
       if (distance <= range) {
         allies.push({
           instanceId: p.instanceId,
@@ -1316,7 +1373,7 @@ export function getAllAlliesInRange(context: SkillExecutionContext, range: numbe
 
 // 计算两点之间的距离
 export function calculateDistance(x1: number, y1: number, x2: number, y2: number): number {
-  return Math.abs(x1 - x2) + Math.abs(y1 - y2)
+  return manhattanDistance({ x: x1, y: y1 }, { x: x2, y: y2 })
 }
 
 // 检查目标是否在范围内
@@ -1381,8 +1438,8 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
       if (enemies.length === 0) return null;
       
       return enemies.reduce((nearest, current) => {
-        const nearestDistance = Math.abs(nearest.x! - sourcePiece.x!) + Math.abs(nearest.y! - sourcePiece.y!);
-        const currentDistance = Math.abs(current.x! - sourcePiece.x!) + Math.abs(current.y! - sourcePiece.y!);
+        const nearestDistance = manhattanDistance(nearest, sourcePiece);
+        const currentDistance = manhattanDistance(current, sourcePiece);
         return currentDistance < nearestDistance ? current : nearest;
       });
     },
@@ -1458,7 +1515,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
         if (p.ownerPlayerId === sourcePiece.ownerPlayerId || p.currentHp <= 0) {
           return false;
         }
-        const distance = Math.abs(p.x! - sourcePiece.x!) + Math.abs(p.y! - sourcePiece.y!);
+        const distance = manhattanDistance(p, sourcePiece);
         return distance <= range;
       });
     },
@@ -1469,7 +1526,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
         if (p.ownerPlayerId !== sourcePiece.ownerPlayerId || p.currentHp <= 0) {
           return false;
         }
-        const distance = Math.abs(p.x! - sourcePiece.x!) + Math.abs(p.y! - sourcePiece.y!);
+        const distance = manhattanDistance(p, sourcePiece);
         return distance <= range;
       });
     }
@@ -1527,6 +1584,10 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
       const activeTarget = activeSlot?.info || null;
       const activePos = activeSlot?.pos ||
         (callIdx === 0 ? ctx.targetPosition : null);
+      const declaredTargetStep = ctx.skill?.targeting?.steps
+        ?.filter((step: SelectionStepDefinition) => step.kind === 'target')[callIdx] as
+          | Extract<SelectionStepDefinition, { kind: 'target' }>
+          | undefined;
       const needsTargetSelection = () => ({
         needsTargetSelection: true,
         targetType: defaultOptions.type,
@@ -1550,7 +1611,9 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
 
         // 检查目标是否在范围内
         if (defaultOptions.range !== undefined && activeTarget.x != null && activeTarget.y != null && sourcePiece.x != null && sourcePiece.y != null) {
-          const distance = Math.abs(sourcePiece.x - activeTarget.x) + Math.abs(sourcePiece.y - activeTarget.y);
+          const distance = declaredTargetStep?.distanceMetric === 'chebyshev'
+            ? Math.max(Math.abs(sourcePiece.x - activeTarget.x), Math.abs(sourcePiece.y - activeTarget.y))
+            : manhattanDistance(sourcePiece, activeTarget);
           if (distance > defaultOptions.range) {
             return needsTargetSelection();
           }
@@ -1579,9 +1642,11 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         // 如果需要选择格子，从 targets[] 或 targetPosition 中取坐标
         const gridPos = activePos;
         if (gridPos) {
-          // 距离校验：使用切比雪夫距离（max(|dx|,|dy|)），对应 "N×N 格" 的描述
+          // Execution uses the same declared distance metric as prepareAction.
           if (defaultOptions.range !== undefined && sourcePiece.x != null && sourcePiece.y != null) {
-            const dist = Math.max(Math.abs(sourcePiece.x - gridPos.x), Math.abs(sourcePiece.y - gridPos.y));
+            const dist = declaredTargetStep?.distanceMetric === 'chebyshev'
+              ? Math.max(Math.abs(sourcePiece.x - gridPos.x), Math.abs(sourcePiece.y - gridPos.y))
+              : manhattanDistance(sourcePiece, gridPos);
             if (dist > defaultOptions.range) {
               return needsTargetSelection();
             }
@@ -2374,7 +2439,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       },
       /** 触发任意字符串名称的事件（包括自定义事件，其他效果可通过 "on" 字段监听） */
       fireEvent: (eventName: string, ctx: any) => {
-        return globalTriggerSystem.checkTriggers(battle, { ...ctx, type: eventName })
+        return globalTriggerSystem.fireEvent(battle, context as any, eventName, ctx)
       },
       // 技能管理函数
       addSkillById: (targetPieceId: string, skillId: string) => {
@@ -2508,7 +2573,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       },
 
       // 工具函数
-      Math,
+      Math: getRuleMath(),
+      Date: getRuleDate(),
       console
     }
 
@@ -2560,6 +2626,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const getPieceEffect = environment.getPieceEffect;
               const fireEvent = environment.fireEvent;
               const Math = environment.Math;
+              const Date = environment.Date;
               const console = environment.console;
 
               // 定义技能执行函数

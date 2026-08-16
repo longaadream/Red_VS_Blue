@@ -5,6 +5,7 @@
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
+import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 
 export type TurnPhase = "start" | "action" | "end"
 
@@ -104,6 +105,17 @@ export interface BattleState {
     targetType?: 'grid'
     range?: number
   }
+  /** RED-59 authoritative selection protocol revision. */
+  targetingRevision?: number
+  /** Versioned target session created by an interrupted rule/effect. */
+  pendingTargetSelection?: PendingTargetSelectionSession
+}
+
+type TargetedActionFields = TargetSelectionCredential & {
+  targetX?: number
+  targetY?: number
+  targetPieceId?: string
+  extraTargets?: Array<{ pieceId?: string; x?: number; y?: number }>
 }
 
 export type BattleAction =
@@ -115,29 +127,23 @@ export type BattleAction =
       toX: number
       toY: number
     }
-  | {
+  | ({
       type: "useBasicSkill"
       playerId: PlayerId
       pieceId: string
       skillId: string
-      targetX?: number
-      targetY?: number
-      targetPieceId?: string
       /** 用户通过选项选择器选择的值 */
       selectedOption?: any
-    }
-  | {
+    } & TargetedActionFields)
+  | ({
       type: "useChargeSkill"
       playerId: PlayerId
       pieceId: string
       skillId: string
-      targetX?: number
-      targetY?: number
-      targetPieceId?: string
       /** 用户通过选项选择器选择的值 */
       selectedOption?: any
-    }
-  | {
+    } & TargetedActionFields)
+  | ({
       type: "endTurn"
       playerId: PlayerId
     }
@@ -155,11 +161,8 @@ export type BattleAction =
       playerId: PlayerId
       /** 要打出的手牌实例 ID */
       cardInstanceId: string
-      targetPieceId?: string
-      targetX?: number
-      targetY?: number
       selectedOption?: any
-    }
+    } & TargetedActionFields)
   | {
       type: "beginTurnChoice"
       playerId: PlayerId

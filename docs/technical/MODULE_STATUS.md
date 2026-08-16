@@ -30,6 +30,7 @@
 | 战斗初始化 | 部分核对 | `battle-setup.ts::createInitialBattleForPlayers()` | 全局触发器、seed 注入顺序 | 固定 seed 初始化测试 |
 | Runner/回放 | 部分核对 | `battle-runner.ts` | 输入隐式修改、RNG 恢复问题 | 状态 trace 与纯度测试 |
 | 技能/卡牌 | 部分核对 | `skills.ts` | 动态代码、模块缓存、日志分散 | 建最小技能 fixture 测试 |
+| 权威目标选择 | 已核对/已测试 | `targeting.ts::prepareAction()` | Relay 仍依赖主机客户端执行核心 | 补真实双端 Relay/WS E2E |
 | 触发器 | 部分核对 | `triggers.ts::globalTriggerSystem` | 进程级单例、并发隔离未知 | 多房间隔离测试 |
 | 胜负判断 | 历史遗留 | `battle.html::checkClientGameOver()` | UI 承担规则、无统一出口 | 独立设计/迁移任务 |
 | LAN WebSocket | 部分核对 | `ws-server.ts::startWsServer()` | 协议/错误无版本，空 catch | WS 集成测试与日志上下文 |

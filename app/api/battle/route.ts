@@ -4,6 +4,7 @@ import { getPieceById } from "@/lib/game/piece-repository"
 import type { BattleState } from "@/lib/game/turn"
 import { roomStore, type Room } from "@/lib/game/room-store"
 import type { Faction } from "@/lib/game/piece"
+import { createRootSeed } from "@/lib/game/rule-runtime"
 
 export async function POST(req: NextRequest) {
   let body: unknown
@@ -56,7 +57,14 @@ export async function POST(req: NextRequest) {
     { playerId: playerIds[1], pieces: finalBluePieces as import("@/lib/game/piece").PieceTemplate[] }
   ];
 
-  const battle = await createInitialBattleForPlayers(playerIds, pieceTemplates, playerSelectedPieces)
+  const seed = createRootSeed()
+  const battle = await createInitialBattleForPlayers(
+    playerIds,
+    pieceTemplates,
+    playerSelectedPieces,
+    undefined,
+    { rootSeed: seed },
+  )
 
   if (!battle) {
     return NextResponse.json({ error: "Failed to initialize battle state" }, { status: 500 })
@@ -75,11 +83,15 @@ export async function POST(req: NextRequest) {
     spectators: [],
     currentTurnIndex: 0,
     actions: [],
-    battleState: battle,
+    battleState: {
+      type: 'server-state',
+      seed,
+      state: battle,
+    } as unknown as BattleState,
   }
 
   await roomStore.setRoom(roomId, room)
 
   console.log('Battle room created with ID:', roomId)
-  return NextResponse.json({ roomId, battle }, { status: 201 })
+  return NextResponse.json({ roomId, battle, seed }, { status: 201 })
 }

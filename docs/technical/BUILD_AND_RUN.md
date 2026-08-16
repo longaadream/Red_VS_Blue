@@ -31,6 +31,12 @@ RED-19 已将当前候选更新为 Electron 43.4.0，升级后的命令、边界
 
 PowerShell 可能因执行策略阻止 `npm.ps1`。本次没有修改系统执行策略，所有命令使用 Windows 自带的 `npm.cmd`。
 
+## Browser game engine build and differential fixture
+
+Run `npm.cmd run build:game-engine` from the repository root before the differential test. The build writes `data/pages/js/game-engine.js` and `android-client/www/js/game-engine.js`; these files are generated and must not be edited manually.
+
+Run `npx.cmd vitest run tests/game/engine-browser-differential.test.ts` to execute the fixed fixture (`normal-move-with-blocker`, seed `0x5eed64`) against the Node module and the browser IIFE bundle. The test evaluates the bundle in a VM with the same `process`/`require` compatibility shims expected by the existing training runtime; it is not a full browser or Android smoke test.
+
 ## 2. 安装
 
 在仓库根目录执行：
@@ -64,6 +70,33 @@ Error: request to https://binaries.prisma.sh/.../windows/schema-engine.exe.gz.sh
 ```powershell
 Get-ChildItem "$env:TEMP\electron-download-*\electron-v33.4.11-win32-x64.zip" -File
 ```
+
+### 2.1 隔离 worktree 初始化与 Electron 预检
+
+每个 Git worktree 都是独立的项目根目录，必须在该 worktree 内安装自己的依赖。不要复用父仓库或其他 worktree 的 `node_modules`，也不要用目录联接、符号链接或扩大 `turbopack.root` 绕过隔离边界。
+
+在准备运行 Electron 开发入口的 worktree 根目录执行：
+
+```powershell
+npm.cmd ci --foreground-scripts
+npm.cmd ls --depth=0
+```
+
+不要在同一个 worktree 中并发运行 `npm ci`、Next.js 构建或 Electron；`npm ci` 会重建本地 `node_modules`，并发进程可能在包目录被替换时误用到父目录工具或读到不完整依赖。
+
+三种 Electron 开发命令会在 TypeScript 编译和 Electron 启动前自动运行对应的只读预检，也可以单独执行：
+
+```powershell
+npm.cmd run preflight:electron:client
+npm.cmd run preflight:electron:server
+npm.cmd run preflight:electron:editor
+```
+
+预检会验证当前目录确实是脚本所属的 worktree 根目录，并只接受该 worktree 内的本地依赖。Client 与 Server 还需要 `.next\standalone\server.js`，Editor 不需要 Next.js standalone 构建。
+
+- 提示缺少本地依赖时，在错误中显示的 worktree 根目录运行 `npm.cmd ci --foreground-scripts`。
+- 仅提示缺少 `.next\standalone\server.js` 时，依赖已经就绪；在同一目录运行 `npm.cmd run build`。
+- 预检不会安装依赖、创建链接或修改任何项目文件。
 
 ## 3. 测试、静态检查与构建
 
@@ -326,6 +359,12 @@ node tests/electron/windows-smoke.mjs server
 独立验证会按 manifest 重新计算全部资源、Server EXE 和 `node.exe` 的大小与 SHA-256，
 拒绝缺失、增加或被修改的文件。manifest 和 `win-unpacked` 都是未跟踪的本机候选证据，
 不得加入 Git 或上传到公开下载渠道。**内部候选 ≠ 公开发行物**。
+
+Server Windows smoke 还会同时验证公开同端口入口
+`ws://127.0.0.1:3000/ws/rooms/__lobby` 与内部入口 `ws://127.0.0.1:3001/`：
+两条连接都必须收到 `subscribed`，且 `rooms.list` 必须返回 `ok: true`。这项探测用于防止
+standalone staging 把 WebSocket 握手的 CRLF 写成字面量转义、导致玩家客户端只看到连接
+超时；仅有 `/api/ping` 成功不能代替该证据。
 
 ### 8.3 桌面安全边界
 
