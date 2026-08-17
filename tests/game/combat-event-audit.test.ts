@@ -89,6 +89,29 @@ describe('RED-45 event audit', () => {
     ]))
   })
 
+  it('catalogs every data execution field and its helper/free-variable evidence', () => {
+    let output = ''
+    try { output = execFileSync(process.execPath, ['scripts/audit-skillcode-compat.mjs'], { encoding: 'utf8' }) }
+    catch (error: any) { output = error.stdout }
+    const report = JSON.parse(output)
+
+    expect(report.schemaVersion).toBe(2)
+    expect(Object.keys(report.executionSurfaces).sort()).toEqual([
+      'attachedEffectCode', 'cardCode', 'pendingEffectCode', 'ruleSkillCode', 'ruleTriggerSkill', 'skillCode',
+    ])
+    for (const group of ['skills', 'rules', 'cards', 'effects']) {
+      expect(report.groups[group].length, group).toBeGreaterThan(0)
+      for (const entry of report.groups[group]) {
+        expect(entry.executionFields.length, entry.file).toBeGreaterThan(0)
+        for (const field of entry.executionFields) {
+          expect(['code', 'skillCode', 'filterCode', 'effectCode']).toContain(field.field)
+          expect(field.freeVariables).toEqual(expect.any(Array))
+        }
+      }
+    }
+    expect(report.helperUse).toMatchObject({ selectTarget: expect.any(Number), dealDamage: expect.any(Number) })
+  })
+
   it('observes global then piece then player ordering, with descending rule priority', () => {
     const seen: string[] = []
     const system = new TriggerSystem()
