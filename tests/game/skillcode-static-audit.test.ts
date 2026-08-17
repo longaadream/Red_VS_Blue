@@ -78,24 +78,11 @@ describe('RED-45 skillCode static compatibility audit', () => {
     }
   })
 
-  it('records the malformed passive skill body as a syntax FAIL', () => {
+  it('keeps every skill code field syntactically valid', () => {
     const { status, report } = runCompatibilityAudit()
 
     expect(status).toBe(1)
-    expect(report.syntaxErrors).toEqual([
-      expect.objectContaining({
-        file: 'data/skills/shishio-combustion-passive.json',
-        field: 'code',
-        path: 'code',
-        message: 'Expression expected.',
-      }),
-      expect.objectContaining({
-        file: 'data/skills/shishio-combustion-passive.json',
-        field: 'code',
-        path: 'code',
-        message: 'Declaration or statement expected.',
-      }),
-    ])
+    expect(report.syntaxErrors).toEqual([])
   })
 
   it('records every AttachedEffect helper that production does not inject', () => {
