@@ -5,6 +5,10 @@
     return Number.isFinite(Number(value)) ? Number(value) : fallback
   }
 
+  function finiteOrNull(value) {
+    return value != null && value !== '' && Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : null
+  }
+
   function firstNumber(values, fallback) {
     for (let index = 0; index < values.length; index += 1) {
       if (values[index] !== null && values[index] !== undefined && Number.isFinite(Number(values[index]))) {
@@ -105,7 +109,7 @@
     return {
       id: String(piece.instanceId || piece.id || ''),
       templateId: String(piece.templateId || ''),
-      portraitId: String(piece.templateId || ''),
+      portraitId: String(template.image || piece.templateId || ''),
       name: String(piece.name || template.name || piece.templateId || piece.instanceId || '?'),
       ownerPlayerId: ownerPlayerId,
       faction: piece.faction === 'blue' ? 'blue' : 'red',
@@ -170,6 +174,12 @@
       pieceTemplates: input.pieceTemplates || {},
     }
     const pieces = rawPieces.map(function (piece) { return normalizePiece(piece, pieceContext) })
+    const turnTimer = (snapshot.extensions && snapshot.extensions.turnTimer) || {}
+    const remainingSeconds = [
+      turn.remainingSeconds,
+      turn.remainingTimeSeconds,
+      turnTimer.remainingSeconds,
+    ].map(finiteOrNull).find(function (value) { return value != null })
     const selectedPieceId = input.selectedPieceId || null
     const selectedPiece = selectedPieceId
       ? pieces.find(function (piece) { return piece.id === selectedPieceId }) || null
@@ -195,6 +205,7 @@
         currentPlayerId: String(turn.currentPlayerId || ''),
         number: numberOr(turn.turnNumber, 1),
         phase: String(turn.phase || ''),
+        remainingSeconds: remainingSeconds == null ? null : remainingSeconds,
         isViewerTurn: !!viewerId && String(turn.currentPlayerId || '').toLowerCase() === viewerId.toLowerCase(),
       },
       selection: {

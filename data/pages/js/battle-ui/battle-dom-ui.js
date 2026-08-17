@@ -12,14 +12,47 @@
       .replace(/'/g, '&#039;')
   }
 
-  function statusMeta(status) {
+
+  function statusLabel(status) {
+    return String(status && (status.label || status.name || status.id || status.type) || '未知状态')
+  }
+
+  function statusDetailText(status) {
+    const presentation = root.BattleStatusPresentation
+    if (presentation && typeof presentation.detailText === 'function') {
+      return presentation.detailText(status)
+    }
     const parts = []
-    if (status.stacks > 0) parts.push(status.stacks + ' 层')
-    if (status.duration > 0) parts.push('剩余 ' + status.duration + ' 回合')
-    if (status.duration < 0) parts.push('永久')
-    if (status.uses > 0) parts.push('剩余 ' + status.uses + ' 次')
-    if (status.intensity && status.intensity !== 1) parts.push('强度 ' + status.intensity)
+    const stacks = Number(status && status.stacks)
+    const duration = Number(status && status.duration)
+    const uses = Number(status && status.uses)
+    const intensity = Number(status && status.intensity)
+    if (Number.isFinite(stacks) && stacks > 0) parts.push(stacks + '层')
+    if (duration < 0) parts.push('持续：永久')
+    else if (duration > 0) parts.push('剩余：' + duration + '回合')
+    if (Number.isFinite(uses) && uses > 0) parts.push('剩余：' + uses + '次')
+    if (Number.isFinite(intensity) && intensity > 0 && intensity !== 1) parts.push('强度：' + intensity)
     return parts.join(' · ')
+  }
+
+  function statusColor(status) {
+    const presentation = root.BattleStatusPresentation
+    const meta = presentation && typeof presentation.resolve === 'function'
+      ? presentation.resolve(status)
+      : null
+    return meta && meta.color ? meta.color : '#a78bfa'
+  }
+  function formatTimer(seconds) {
+    if (seconds == null || seconds === '' || !Number.isFinite(Number(seconds))) return '--:--'
+    const total = Math.max(0, Math.floor(Number(seconds)))
+    const minutes = Math.floor(total / 60)
+    const remainder = total % 60
+    return String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0')
+  }
+
+  function playerInitial(player) {
+    const label = String(player.name || player.id || '?').trim()
+    return label ? label.slice(0, 1).toUpperCase() : '?'
   }
 
   function create(options) {
@@ -30,52 +63,41 @@
 
     function byId(id) { return doc && doc.getElementById ? doc.getElementById(id) : null }
 
-    function statusDetailHtml(status) {
-      const presentation = root.BattleStatusPresentation
-      const meta = presentation
-        ? presentation.resolve(status)
-        : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
-      const detail = presentation ? presentation.detailText(status) : statusMeta(status)
-      const description = status.description || meta.description
-      return '<div class="selected-status-row" data-status-id="' + escapeHtml(status.id || '') + '">'
-        + '<span class="selected-status-icon" style="--status-color:' + escapeHtml(meta.color) + '">' + escapeHtml(meta.glyph) + '</span>'
-        + '<span class="selected-status-copy"><span class="selected-status-name">' + escapeHtml(status.label || status.id || '?') + '</span>'
-        + (detail ? '<span class="selected-status-meta">' + escapeHtml(detail) + '</span>' : '')
-        + (description ? '<span class="selected-status-description">' + escapeHtml(description) + '</span>' : '')
-        + '</span></div>'
-    }
 
-    function updateSelectedPiece(model) {
-      const element = byId('selectedPieceStatus')
+    function updateSelectedStatus(model) {
+      const element = byId('selectedStatusOverlay')
       if (!element) return
-      const piece = model.selection && model.selection.piece
-      const rail = element.closest ? element.closest('.board-side-rail') : null
-      const targetMode = !!(model.selection && model.selection.mode === 'target')
-      if (rail && rail.classList) {
-        rail.classList.toggle('has-selection', !!piece)
-        rail.classList.toggle('target-mode', targetMode)
-      }
-      if (!piece) {
-        element.className = 'selected-status-empty'
-        element.textContent = '未选中棋子'
+      const selection = model.selection || {}
+      const piece = selection.piece
+      const visible = !!piece && selection.mode === 'inspect'
+      element.hidden = !visible
+      if (!visible) {
         if (element.dataset) delete element.dataset.pieceId
-        if (element.removeAttribute) element.removeAttribute('aria-label')
+        element.innerHTML = ''
         return
       }
-      const statuses = piece.statuses || piece.statusSummary || []
-      const statusesHtml = statuses.length
-        ? statuses.map(statusDetailHtml).join('')
-        : '<div class="selected-status-zero">无特殊状态</div>'
-      element.className = 'selected-status-card has-selection' + (targetMode ? ' target-mode' : '')
-      if (element.dataset) element.dataset.pieceId = piece.id
-      if (element.setAttribute) {
-        element.setAttribute('aria-label', '特殊状态，共 ' + statuses.length + ' 个')
-        element.setAttribute('aria-live', 'polite')
-      }
-      element.innerHTML = '<div class="selected-status-title">特殊状态 <span>' + statuses.length + '</span></div>'
-        + '<div class="selected-status-list">' + statusesHtml + '</div>'
-    }
 
+      const statuses = piece.statuses || piece.statusSummary || []
+      const statusHtml = statuses.length
+        ? statuses.map(function (status) {
+            const detail = statusDetailText(status)
+            return '<article class="selected-status-item">'
+              + '<span class="selected-status-dot" style="--selected-status-color:' + escapeHtml(statusColor(status)) + '"></span>'
+              + '<span class="selected-status-copy"><strong>' + escapeHtml(statusLabel(status)) + '</strong>'
+              + (detail ? '<small>' + escapeHtml(detail) + '</small>' : '')
+              + (status.description ? '<span>' + escapeHtml(status.description) + '</span>' : '')
+              + '</span></article>'
+          }).join('')
+        : '<div class="selected-status-zero">无特殊状态</div>'
+
+      if (element.dataset) element.dataset.pieceId = piece.id
+      element.setAttribute('aria-label', piece.name + '，特殊状态 ' + statuses.length + ' 个')
+      element.setAttribute('aria-live', 'polite')
+      element.innerHTML = '<div class="selected-status-heading">'
+        + '<span>' + escapeHtml(piece.name) + '</span>'
+        + '<strong>特殊状态 <b>' + statuses.length + '</b></strong>'
+        + '</div><div class="selected-status-list">' + statusHtml + '</div>'
+    }
     function updateHud(model) {
       const turnBadge = byId('turnBadge')
       if (turnBadge) {
@@ -90,6 +112,13 @@
       if (roundLabel) roundLabel.textContent = '第 ' + model.turn.number + ' 回合'
       const phaseLabel = byId('phaseLabel')
       if (phaseLabel) phaseLabel.textContent = PHASE_LABELS[model.turn.phase] || model.turn.phase
+      const turnClock = byId('turnClock')
+      if (turnClock) {
+        turnClock.textContent = formatTimer(model.turn.remainingSeconds)
+        turnClock.setAttribute('aria-label', model.turn.remainingSeconds == null
+          ? '当前对局未提供回合计时'
+          : '回合剩余 ' + Math.floor(model.turn.remainingSeconds) + ' 秒')
+      }
 
       const viewer = model.viewer || model.players.find(function (player) { return player.isCurrent }) || model.players[0]
       const apDisplay = byId('resApDisplay')
@@ -111,15 +140,21 @@
       if (!players) return
       players.className = 'player-state-strip'
       players.innerHTML = model.players.map(function (player) {
-        const sideName = player.faction === 'blue' ? '🔵后手' : '🔴先手'
-        const tags = player.statusSummary.map(function (status) {
+        const sideName = player.faction === 'blue' ? '蓝方 · 后手' : '红方 · 先手'
+        const tags = (player.statusSummary || []).map(function (status) {
           return '<span class="status-tag" title="' + escapeHtml(status.id) + '">' + escapeHtml(statusLabel(status)) + '</span>'
         }).join('')
-        return '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '') + '" title="' + escapeHtml(player.id) + '">'
-          + '<div class="player-state-main"><span class="player-side-name">' + sideName + '</span>'
+        const currentLabel = player.isCurrent ? '，当前行动方' : ''
+        return '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '')
+          + '" role="group" aria-label="' + escapeHtml(player.name + '，' + sideName + currentLabel) + '" title="' + escapeHtml(player.id) + '">'
+          + '<span class="player-avatar" aria-hidden="true">' + escapeHtml(playerInitial(player)) + '</span>'
+          + '<span class="player-state-copy"><span class="player-display-name">' + escapeHtml(player.name) + '</span>'
+          + '<span class="player-side-name">' + sideName + '</span></span>'
+          + '<span class="player-state-resources">'
           + '<span class="resource-orb action" title="行动点"><span class="resource-glyph action"></span>' + player.resources.action + '</span>'
           + '<span class="resource-orb charge" title="充能点"><span class="resource-glyph charge"></span>' + player.resources.charge + '</span>'
-          + (player.isCurrent ? '<span>当前</span>' : '') + '</div>'
+          + '</span>'
+          + (player.isCurrent ? '<span class="current-player-marker" aria-hidden="true">◆</span>' : '')
           + '<div class="player-state-tags">' + tags + '</div></div>'
       }).join('')
     }
@@ -127,7 +162,7 @@
     function update(model) {
       if (!model) return
       updateHud(model)
-      updateSelectedPiece(model)
+      updateSelectedStatus(model)
     }
 
     function dispose() { previousTurnPlayerId = null }

@@ -43,6 +43,9 @@
   let _hpLayer = null
   let _floatLayer = null
   let _onIntent = null
+  function _notifyViewportChange() {
+    if (_onIntent) _onIntent({ type: 'viewport-change' })
+  }
   let _resizeObserver = null
   let _hitPlane = null
   let _mounted = false
@@ -55,6 +58,7 @@
   const _hlObjects = { move: [], skill: [], place: [], selected: null }
   const _anims = []                    // {mesh, fromX, fromZ, toX, toZ, elapsed, duration, type, ...}
   const _texCache = new Map()
+  let _textureLoadGeneration = 0
   const _floaters = new Set()
   const _floaterTimers = new Set()
   let _currentModel = null
@@ -114,20 +118,63 @@
   }
 
   // ── Texture loading ───────────────────────────────────────────────────────────
-  function loadTexture(url) {
-    if (_texCache.has(url)) return _texCache.get(url)
+  function loadTexture(url, onLoad, onError) {
+    if (_texCache.has(url)) {
+      const entry = _texCache.get(url)
+      if (entry.status === 'loaded') {
+        onLoad(entry.texture)
+      } else {
+        entry.loadCallbacks.push(onLoad)
+        entry.errorCallbacks.push(onError)
+      }
+      return
+    }
+
+    const loadGeneration = _textureLoadGeneration
+    const entry = {
+      texture: null,
+      status: 'loading',
+      loadCallbacks: [onLoad],
+      errorCallbacks: [onError],
+    }
+    _texCache.set(url, entry)
+
     const loader = new THREE.TextureLoader()
-    const tex = loader.load(url, undefined, undefined, () => {
-      // On error, texture stays default (black) — acceptable fallback
+    const texture = loader.load(url, loadedTexture => {
+      const resolvedTexture = loadedTexture || texture
+      const current = _texCache.get(url)
+      if (!_mounted || loadGeneration !== _textureLoadGeneration || current !== entry) {
+        if (resolvedTexture && typeof resolvedTexture.dispose === 'function') resolvedTexture.dispose()
+        return
+      }
+
+      resolvedTexture.colorSpace = THREE.SRGBColorSpace || 'srgb'
+      entry.texture = resolvedTexture
+      entry.status = 'loaded'
+      const callbacks = entry.loadCallbacks.splice(0)
+      entry.errorCallbacks.length = 0
+      callbacks.forEach(callback => callback(resolvedTexture))
+    }, undefined, error => {
+      const current = _texCache.get(url)
+      if (current === entry) _texCache.delete(url)
+      if (entry.texture && typeof entry.texture.dispose === 'function') entry.texture.dispose()
+      if (!_mounted || loadGeneration !== _textureLoadGeneration || current !== entry) return
+
+      const callbacks = entry.errorCallbacks.splice(0)
+      entry.loadCallbacks.length = 0
+      callbacks.forEach(callback => callback(error))
     })
-    tex.colorSpace = THREE.SRGBColorSpace || 'srgb'
-    _texCache.set(url, tex)
-    return tex
+    texture.colorSpace = THREE.SRGBColorSpace || 'srgb'
+    entry.texture = texture
   }
 
-  function portraitUrl(templateId) {
-    const name = templateId.replace(/^(red|blue)-/, '')
-    return 'images/' + name + '.jpg'
+  function portraitUrl(portraitRef) {
+    const ref = String(portraitRef || '').replace(/^images\//, '')
+    if (!ref) return ''
+    const fileName = /\.[a-z0-9]+$/i.test(ref)
+      ? ref
+      : ref.replace(/^(red|blue)-/, '') + '.jpg'
+    return 'images/' + fileName
   }
 
   // ── Init ─────────────────────────────────────────────────────────────────────
@@ -138,6 +185,7 @@
     _container = input.container
     _floatLayer = input.floatLayer || null
     _onIntent = typeof input.onIntent === 'function' ? input.onIntent : null
+    _textureLoadGeneration += 1
     _mounted = true
 
     // Shared geometries
@@ -163,6 +211,9 @@
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     _container.insertBefore(_renderer.domElement, _container.firstChild)
+    _renderer.domElement.tabIndex = 0
+    _renderer.domElement.setAttribute('role', 'application')
+    _renderer.domElement.setAttribute('aria-label', '20 × 16 战术棋盘，可拖动平移、滚轮或双指缩放')
 
     // Compact piece summary overlay (absolute over canvas)
     _hpLayer = document.createElement('div')
@@ -198,14 +249,38 @@
     _renderer.setSize(w, h, false)
     _updateCameraFrustum(w, h)
     _updatePieceSummaryPositions()
+    _notifyViewportChange()
+  }
+
+  function _fitWorldHalfHeight(w, h) {
+    if (!_mapW) return 1
+    const aspect = w / (h || 1)
+    const halfH = _mapH / 2 + 1
+    const halfW = _mapW / 2 + 1
+    return Math.max(halfH, halfW / aspect)
+  }
+
+  function _minimumUsableZoom(w, h) {
+    if (!_mapW) return 1
+    const narrowViewport = w <= 760
+    const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
+    if (!narrowViewport && !coarsePointer) return 1
+    const pixelsPerCell = h / (_fitWorldHalfHeight(w, h) * 2)
+    return Math.max(1, Math.min(1.8, 24 / Math.max(1, pixelsPerCell)))
+  }
+
+  function _preferredInitialZoom(w, h) {
+    if (!_mapW) return 1
+    const aspect = w / (h || 1)
+    const visibleWorldWidth = _fitWorldHalfHeight(w, h) * 2 * aspect
+    const widthCoverageZoom = (visibleWorldWidth / (_mapW + 2)) * 0.86
+    return Math.max(_minimumUsableZoom(w, h), Math.min(1.8, widthCoverageZoom))
   }
 
   function _updateCameraFrustum(w, h) {
     if (!_camera || !_mapW) return
     const aspect = w / (h || 1)
-    const halfH = (_mapH / 2 + 1) / _camera.zoom
-    const halfW = (_mapW / 2 + 1) / _camera.zoom
-    const fitH = Math.max(halfH, halfW / aspect)
+    const fitH = _fitWorldHalfHeight(w, h)
     _camera.left   = -fitH * aspect
     _camera.right  =  fitH * aspect
     _camera.top    =  fitH
@@ -253,6 +328,7 @@
     // Camera target: center of map
     _camera.position.set(_mapW / 2, 50, _mapH / 2)
     _camera.lookAt(_mapW / 2, 0, _mapH / 2)
+    _camera.zoom = _preferredInitialZoom(_container.clientWidth || 320, _container.clientHeight || 320)
 
     // Hit plane for raycasting (invisible, covers full map)
     if (_hitPlane) {
@@ -298,12 +374,36 @@
         obj.ring.material = getFactionMat(piece.faction)
       }
 
-      // Portrait texture (load once)
-      if (!obj.portraitLoaded && piece.portraitId) {
-        const tex = loadTexture(portraitUrl(piece.portraitId))
-        if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
-        obj.portraitMesh.material = new THREE.MeshBasicMaterial({ map: tex, side: THREE.FrontSide })
-        obj.portraitLoaded = true
+      // Portrait texture comes from the template-declared asset and only becomes
+      // complete after TextureLoader succeeds. A failed training placement can
+      // therefore retry on the next authoritative snapshot.
+      const portraitSrc = portraitUrl(piece.portraitId)
+      if (obj.portraitSrc !== portraitSrc) {
+        obj.portraitSrc = portraitSrc
+        obj.portraitLoaded = false
+        obj.portraitLoading = false
+      }
+      if (!obj.portraitLoaded && !obj.portraitLoading && portraitSrc) {
+        const pieceId = piece.id
+        obj.portraitLoading = true
+        loadTexture(portraitSrc, texture => {
+          const liveObject = _pieceObjects.get(pieceId)
+          if (liveObject !== obj || liveObject.portraitSrc !== portraitSrc) return
+          if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
+          obj.portraitMesh.material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.FrontSide })
+          obj.portraitLoaded = true
+          obj.portraitLoading = false
+        }, error => {
+          const liveObject = _pieceObjects.get(pieceId)
+          if (liveObject === obj && liveObject.portraitSrc === portraitSrc) {
+            obj.portraitLoaded = false
+            obj.portraitLoading = false
+          }
+          console.error('[battle-renderer] Failed to load piece portrait', {
+            pieceId: pieceId,
+            portraitSrc: portraitSrc,
+          }, error)
+        })
       }
 
       // Update the snapshot-driven piece summary.
@@ -409,6 +509,8 @@
       summaryEl,
       faction,
       portraitLoaded: false,
+      portraitLoading: false,
+      portraitSrc: '',
       animating: false,
       targetX: piece.x, targetZ: piece.y,
     })
@@ -592,6 +694,7 @@
         const ex = a.fromX + (a.toX - a.fromX) * _ease(t)
         const ez = a.fromZ + (a.toZ - a.fromZ) * _ease(t)
         a.obj.group.position.set(ex, 0, ez)
+        _notifyViewportChange()
         if (t >= 1) { a.obj.group.position.set(a.toX, 0, a.toZ); a.obj.animating = false; _anims.splice(i, 1) }
       } else if (a.type === 'flash') {
         const intensity = (1 - t) * 0.8
@@ -641,9 +744,10 @@
       if (_pointers.size === 1) {
         _panStart = { x: e.clientX, y: e.clientY }
         _panMoved = false
-        canvas.setPointerCapture(e.pointerId)
+        if (typeof canvas.setPointerCapture === 'function') canvas.setPointerCapture(e.pointerId)
       } else if (_pointers.size === 2) {
         _pinchDist = _getPinchDist()
+        _panStart = null
       }
       e.preventDefault()
     }, { passive: false })
@@ -668,25 +772,33 @@
         const dy = e.clientY - _panStart.y
         if (Math.abs(dx) + Math.abs(dy) > 4) {
           _panMoved = true
-          const fov = (_camera.right - _camera.left) / _renderer.domElement.width
+          const canvasWidth = _renderer.domElement.getBoundingClientRect().width || 1
+          const fov = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
           _camera.position.x -= dx * fov
           _camera.position.z -= dy * fov
           _camera.lookAt(_camera.position.x, 0, _camera.position.z)
+          _notifyViewportChange()
           _panStart = { x: e.clientX, y: e.clientY }
         }
       }
       e.preventDefault()
     }, { passive: false })
 
-    const endPointer = e => {
+    const endPointer = (e, allowClick) => {
       const wasClick = !_panMoved && _pointers.size === 1
       _pointers.delete(e.pointerId)
       if (_pointers.size < 2) _pinchDist = 0
-      if (!_pointers.size) { _panStart = null }
-      if (wasClick) _handleClick(e)
+      if (_pointers.size === 1) {
+        const remaining = Array.from(_pointers.values())[0]
+        _panStart = { x: remaining.x, y: remaining.y }
+        _panMoved = true
+      } else if (!_pointers.size) {
+        _panStart = null
+      }
+      if (allowClick && wasClick) _handleClick(e)
     }
-    _listen(canvas, 'pointerup', endPointer)
-    _listen(canvas, 'pointercancel', endPointer)
+    _listen(canvas, 'pointerup', e => endPointer(e, true))
+    _listen(canvas, 'pointercancel', e => endPointer(e, false))
 
     _listen(canvas, 'wheel', e => {
       _applyZoom(_camera.zoom * (e.deltaY < 0 ? 1.12 : 0.89))
@@ -727,20 +839,27 @@
   }
 
   function _applyZoom(z) {
-    _camera.zoom = Math.max(0.4, Math.min(5, z))
+    const w = _container.clientWidth || 320
+    const h = _container.clientHeight || 320
+    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(5, z))
     _camera.updateProjectionMatrix()
     _updatePieceSummaryPositions()
+    _notifyViewportChange()
   }
 
   function _resetCamera() {
     if (!_mapW) return
-    _camera.zoom = 1
-    _camera.position.set(_mapW / 2, 50, _mapH / 2)
-    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
+    _camera.zoom = _preferredInitialZoom(w, h)
+    _camera.position.set(_mapW / 2, 50, _mapH / 2)
+    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
     _updateCameraFrustum(w, h)
+    _updatePieceSummaryPositions()
+    _notifyViewportChange()
   }
+
+  function resetView() { _resetCamera() }
 
   // ── Raycasting ────────────────────────────────────────────────────────────────
   const _raycaster = new THREE.Raycaster()
@@ -864,6 +983,7 @@
 
   // ── Dispose ───────────────────────────────────────────────────────────────────
   function dispose() {
+    _textureLoadGeneration += 1
     _mounted = false
     if (_animFrameId != null) cancelAnimationFrame(_animFrameId)
     _animFrameId = null
@@ -888,7 +1008,7 @@
       geometries.forEach(function (geometry) { if (geometry.dispose) geometry.dispose() })
       materials.forEach(function (material) { if (material.dispose) material.dispose() })
     }
-    _texCache.forEach(function (texture) { if (texture && texture.dispose) texture.dispose() })
+    _texCache.forEach(function (entry) { if (entry && entry.texture && entry.texture.dispose) entry.texture.dispose() })
     if (_renderer) {
       _renderer.dispose()
       if (_renderer.forceContextLoss) _renderer.forceContextLoss()
@@ -938,6 +1058,7 @@
     animateAction,
     spawnFloater,
     resize,
+    resetView,
     projectCell,
     screenToCell,
     dispose,
