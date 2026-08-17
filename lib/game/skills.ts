@@ -1,6 +1,6 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
-import { globalTriggerSystem } from "./triggers"
+import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { rng } from "./rng"
 import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
@@ -760,6 +760,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
+            if (error instanceof DamagePipelineError) throw error;
             console.error('[Rule] Error executing skillCode:', error);
             return { success: false, message: '规则执行失败' };
           }
@@ -1724,312 +1725,660 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
   };
 }
 
-/**
- * 处理伤害计算和应用的函数
- * @param attacker 攻击者棋子
- * @param target 目标棋子
- * @param baseDamage 基础伤害值
- * @param damageType 伤害类型
- * @param battle 战斗状态
- * @param skillId 技能ID（可选）
- * @returns 伤害结果
- */
-export function dealDamage(attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType, battle: BattleState, skillId?: string, skipBeforeTrigger = false, killerPlayerId?: string, selectedOption?: any): any {
-  // 支持传入目标数组：beforeDamageDealt 只触发一次，buff 只消耗一次，对所有目标生效
-  if (Array.isArray(target)) {
-    if (target.length === 0) {
-      return { success: false, damages: [], totalDamage: 0, results: [], message: '没有目标' };
-    }
-    const damageCtx = {
-      type: "beforeDamageDealt" as const,
-      piece: attacker,
-      sourcePiece: attacker,
-      targetPiece: target[0],
-      target: target[0],
-      damage: baseDamage,
-      skillId,
-      selectedOption
-    };
-    const beforeRes = globalTriggerSystem.checkTriggers(battle, damageCtx);
-    if (beforeRes.needsOptionSelection) {
-      throw { needsOptionSelection: true, options: beforeRes.options, title: beforeRes.title };
-    }
-    if (beforeRes.blocked) {
-      if (!battle.actions) battle.actions = [];
-      battle.actions.push({
-        type: "triggerEffect",
-        playerId: attacker.ownerPlayerId,
-        turn: battle.turn.turnNumber,
-        payload: { message: `${attacker.name || attacker.templateId}的攻击被规则阻止` }
-      });
-      return { success: false, damages: [], totalDamage: 0, results: [], message: '攻击被规则阻止' };
-    }
-    const modifiedDmg = damageCtx.damage;
-    const results = target.map(t => dealDamage(attacker, t, modifiedDmg, damageType, battle, skillId, true));
-    const damages = results.map((r: any) => r.damage || 0);
-    const totalDamage = damages.reduce((sum: number, d: number) => sum + d, 0);
-    return { success: true, damages, totalDamage, results, message: `对${target.length}个目标共造成${totalDamage}点伤害` };
+/** RED-33 result for one target inside a deterministic damage batch. */
+export interface DamageResult {
+  success: boolean
+  batchId: string
+  chainId: string
+  parentBatchId?: string
+  sourceId: string
+  targetId: string
+  skillId?: string
+  damageType: DamageType
+  rawDamage: number
+  modifiedDamage: number
+  defense: number
+  shieldAbsorbed: number
+  damage: number
+  blocked: boolean
+  isKilled: boolean
+  targetHp: number
+  message: string
+}
+
+export interface DamageBatchResult {
+  success: boolean
+  batchId?: string
+  chainId?: string
+  damages: number[]
+  totalDamage: number
+  results: DamageResult[]
+  message: string
+}
+
+interface DamageBatchRequest {
+  attacker: PieceInstance
+  targets: PieceInstance[]
+  baseDamage: number
+  damageType: DamageType
+  skillId?: string
+  skipBeforeTrigger: boolean
+  killerPlayerId?: string
+  selectedOption?: any
+  parentBatchId?: string
+  depth: number
+}
+
+interface DamageChain {
+  chainId?: string
+  pending: DamageBatchRequest[]
+  processedBatches: number
+  fallbackStart: number
+  sequence: number
+  currentBatchId?: string
+  currentDepth?: number
+}
+
+interface PreparedDamage {
+  target: PieceInstance
+  hpBefore: number
+  result: DamageResult
+  emitBlocked: boolean
+}
+
+const MAX_DAMAGE_CHAIN_DEPTH = 20
+const MAX_DAMAGE_CHAIN_BATCHES = 100
+const DAMAGE_TYPES = new Set<DamageType>(['physical', 'magical', 'true', 'toxin'])
+const activeDamageChains = new WeakMap<BattleState, DamageChain>()
+
+export class DamagePipelineError extends Error {
+  readonly code: string
+  readonly context: Record<string, unknown>
+
+  constructor(code: string, message: string, context: Record<string, unknown>) {
+    super(`${message}; context=${JSON.stringify(context)}`)
+    this.name = 'DamagePipelineError'
+    this.code = code
+    this.context = context
+  }
+}
+
+function compareDamageTarget(left: PieceInstance, right: PieceInstance): number {
+  if (left.instanceId === right.instanceId) return 0
+  return left.instanceId < right.instanceId ? -1 : 1
+}
+
+function damageContext(
+  battle: BattleState,
+  attacker: PieceInstance,
+  skillId: string | undefined,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const runtime = getActiveRuleRuntime()
+  return {
+    sourceId: attacker?.instanceId,
+    playerId: attacker?.ownerPlayerId,
+    skillId,
+    turn: battle?.turn?.turnNumber ?? 0,
+    rootSeed: runtime?.rootSeed ?? null,
+    ...extra,
+  }
+}
+
+function validateDamageRequest(
+  attacker: PieceInstance,
+  targets: PieceInstance[],
+  baseDamage: number,
+  damageType: DamageType,
+  battle: BattleState,
+  skillId?: string,
+): PieceInstance[] {
+  if (!attacker || typeof attacker.instanceId !== 'string' || !attacker.instanceId) {
+    throw new DamagePipelineError('RVB_DAMAGE_SOURCE_INVALID', 'Damage source must have a stable instanceId', damageContext(battle, attacker, skillId))
+  }
+  if (!Number.isFinite(baseDamage) || baseDamage < 0) {
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_VALUE_INVALID',
+      `Damage must be a finite non-negative number; received ${String(baseDamage)}`,
+      damageContext(battle, attacker, skillId, { baseDamage }),
+    )
+  }
+  if (!DAMAGE_TYPES.has(damageType)) {
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_TYPE_INVALID',
+      `Unsupported damage type ${String(damageType)}`,
+      damageContext(battle, attacker, skillId, { damageType }),
+    )
   }
 
-  let modifiedBaseDamage = baseDamage;
-
-  if (!skipBeforeTrigger) {
-    // 创建一个可修改的上下文对象，触发器可以直接修改其中的值
-    // piece = 攻击者（事件源），target = 被攻击者（事件目标）
-    const damageContext = {
-      type: "beforeDamageDealt" as const,
-      piece: attacker,
-      sourcePiece: attacker,
-      targetPiece: target,
-      target: target,
-      damage: baseDamage,
-      skillId,
-      selectedOption
-    };
-
-    // 触发即将造成伤害前的触发器
-    const beforeDamageDealtResult = globalTriggerSystem.checkTriggers(battle, damageContext);
-
-    // 检查是否需要玩家选择选项（如处决/正常造成伤害）
-    if (beforeDamageDealtResult.needsOptionSelection) {
-      throw { needsOptionSelection: true, options: beforeDamageDealtResult.options, title: beforeDamageDealtResult.title };
+  const seen = new Set<string>()
+  const canonicalTargets: PieceInstance[] = []
+  for (const requestedTarget of targets) {
+    const targetId = requestedTarget?.instanceId
+    if (!targetId) {
+      throw new DamagePipelineError('RVB_DAMAGE_TARGET_INVALID', 'Damage target must have a stable instanceId', damageContext(battle, attacker, skillId))
     }
-
-    // 检查是否有规则阻止了伤害
-    if (beforeDamageDealtResult.blocked) {
-      // 记录阻止信息到战斗日志
-      const attackerName = attacker.name || attacker.templateId;
-
-      if (!battle.actions) {
-        battle.actions = [];
-      }
-
-      battle.actions.push({
-        type: "triggerEffect",
-        playerId: attacker.ownerPlayerId,
-        turn: battle.turn.turnNumber,
-        payload: {
-          message: `${attackerName}的攻击被规则阻止`
-        }
-      });
-
-      return {
-        success: false,
-        damage: 0,
-        isKilled: false,
-        targetHp: target.currentHp,
-        message: "攻击被规则阻止"
-      };
+    if (seen.has(targetId)) {
+      throw new DamagePipelineError(
+        'RVB_DAMAGE_TARGET_DUPLICATE',
+        `Damage batch contains duplicate target ${targetId}`,
+        damageContext(battle, attacker, skillId, { targetId }),
+      )
     }
-
-    // 触发器可能已经修改了 damageContext.damage，使用修改后的值
-    modifiedBaseDamage = damageContext.damage;
-
-    // 将 beforeDamageDealt 触发器的消息添加到战斗日志
-    if (beforeDamageDealtResult.messages.length > 0) {
-      if (!battle.actions) battle.actions = [];
-      beforeDamageDealtResult.messages.forEach(message => {
-        battle.actions!.push({
-          type: "triggerEffect",
-          playerId: attacker.ownerPlayerId,
-          turn: battle.turn?.turnNumber || 0,
-          payload: { message }
-        });
-      });
+    seen.add(targetId)
+    const canonical = battle.pieces.find(piece => piece.instanceId === targetId)
+    if (!canonical || canonical.currentHp <= 0) {
+      throw new DamagePipelineError(
+        'RVB_DAMAGE_TARGET_UNAVAILABLE',
+        `Damage target ${targetId} is not an active living piece`,
+        damageContext(battle, attacker, skillId, { targetId }),
+      )
     }
+    canonicalTargets.push(canonical)
   }
+  return canonicalTargets
+}
 
-  // 触发即将受到伤害前的触发器
-  // piece = 被攻击者（事件源），target = 攻击者（事件目标）
-  const beforeDamageTakenCtx = {
-    type: "beforeDamageTaken" as const,
+function appendDamageMessages(battle: BattleState, playerId: string, messages: string[]): void {
+  if (messages.length === 0) return
+  battle.actions ??= []
+  for (const message of messages) {
+    battle.actions.push({
+      type: 'triggerEffect',
+      playerId,
+      turn: battle.turn?.turnNumber ?? 0,
+      payload: { message },
+    })
+  }
+}
+
+function nextDamageBatchId(battle: BattleState, chain: DamageChain): string {
+  const runtime = getActiveRuleRuntime()
+  if (runtime) return runtime.nextInstanceId('damage-batch', 'damage-batch')
+  const id = `damage-batch-${battle.turn?.turnNumber ?? 0}-${chain.fallbackStart + chain.sequence}`
+  chain.sequence += 1
+  return id
+}
+
+function collectFollowUpDamage(
+  queue: NonNullable<import('./triggers').TriggerContext['damageQueue']>,
+  chain: DamageChain,
+  parentBatchId: string,
+  depth: number,
+  battle: BattleState,
+): void {
+  for (const request of queue) {
+    if (depth > MAX_DAMAGE_CHAIN_DEPTH) {
+      throw new DamagePipelineError('RVB_DAMAGE_CHAIN_DEPTH', `Damage chain exceeded depth ${MAX_DAMAGE_CHAIN_DEPTH}`, {
+        chainId: chain.chainId,
+        parentBatchId,
+        depth,
+        turn: battle.turn?.turnNumber ?? 0,
+        rootSeed: getActiveRuleRuntime()?.rootSeed ?? null,
+      })
+    }
+    const targets = Array.isArray(request.target) ? request.target : [request.target]
+    chain.pending.push({
+      attacker: request.attacker,
+      targets,
+      baseDamage: request.damage,
+      damageType: request.damageType,
+      skillId: request.skillId,
+      skipBeforeTrigger: false,
+      killerPlayerId: request.killerPlayerId,
+      parentBatchId,
+      depth,
+    })
+  }
+}
+
+function prepareTargetDamage(
+  request: DamageBatchRequest,
+  target: PieceInstance,
+  sourceDamage: number,
+  sourceBlocked: boolean,
+  batchId: string,
+  chain: DamageChain,
+  queuedDamage: NonNullable<import('./triggers').TriggerContext['damageQueue']>,
+  battle: BattleState,
+): PreparedDamage {
+  const beforeTakenQueue: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
+  const beforeTakenContext = {
+    type: 'beforeDamageTaken' as const,
     piece: target,
     sourcePiece: target,
-    targetPiece: attacker,
-    target: attacker,
-    damage: modifiedBaseDamage,
-    damageType,
-    skillId
-  };
-  const beforeDamageTakenResult = globalTriggerSystem.checkTriggers(battle, beforeDamageTakenCtx);
+    targetPiece: request.attacker,
+    target: request.attacker,
+    damage: sourceDamage,
+    damageType: request.damageType,
+    skillId: request.skillId,
+    damageBatchId: batchId,
+    damageChainId: chain.chainId,
+    parentDamageBatchId: request.parentBatchId,
+    rawDamage: request.baseDamage,
+    damageQueue: beforeTakenQueue,
+  }
+  const beforeTaken: TriggerResult = sourceBlocked
+    ? { success: false, blocked: true, messages: [] }
+    : globalTriggerSystem.checkTriggers(battle, beforeTakenContext)
+  if (beforeTaken.needsOptionSelection) throw beforeTaken
+  if (beforeTaken.needsTargetSelection) throw beforeTaken
+  appendDamageMessages(battle, request.attacker.ownerPlayerId, beforeTaken.messages || [])
+  queuedDamage.push(...beforeTakenQueue)
 
-  // 捕回触发器管道中被修改的 damage 值
-  if (!beforeDamageTakenResult.blocked) {
-    modifiedBaseDamage = beforeDamageTakenCtx.damage;
+  const modifiedDamage = Number(beforeTakenContext.damage)
+  if (!Number.isFinite(modifiedDamage) || modifiedDamage < 0) {
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_MODIFIER_INVALID',
+      `Damage trigger produced invalid value ${String(beforeTakenContext.damage)}`,
+      damageContext(battle, request.attacker, request.skillId, { batchId, targetId: target.instanceId }),
+    )
   }
 
-  // 检查是否有规则阻止了伤害
-  if (beforeDamageTakenResult.blocked) {
-    if (!battle.actions) battle.actions = [];
-    // 优先显示规则自身的具体消息；没有则回退到通用提示
-    if (beforeDamageTakenResult.messages.length > 0) {
-      beforeDamageTakenResult.messages.forEach(message => {
-        battle.actions!.push({
-          type: "triggerEffect",
-          playerId: attacker.ownerPlayerId,
-          turn: battle.turn.turnNumber,
-          payload: { message }
-        });
-      });
-    } else {
-      const targetName = target.name || target.templateId;
-      battle.actions.push({
-        type: "triggerEffect",
-        playerId: attacker.ownerPlayerId,
-        turn: battle.turn.turnNumber,
-        payload: { message: `${targetName}受到的伤害被规则阻止` }
-      });
-    }
+  let blocked = sourceBlocked || Boolean(beforeTaken.blocked)
+  const defense = request.damageType === 'physical' || request.damageType === 'magical'
+    ? Number(target.defense) || 0
+    : 0
+  let defendedDamage = 0
+  if (!blocked && modifiedDamage > 0) {
+    defendedDamage = Math.max(1, Math.floor(modifiedDamage - defense))
+  }
 
-    // 触发格挡后事件（死亡者视角：target 是被保护的棋子）
-    globalTriggerSystem.checkTriggers(battle, {
-      type: "afterDamageBlocked",
+  let shieldAbsorbed = 0
+  let damageAfterShield = defendedDamage
+  if (!blocked && damageAfterShield > 0) {
+    const shieldQueue: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
+    const shieldContext = {
+      type: 'beforeDamageShield' as const,
+      piece: target,
       sourcePiece: target,
-      targetPiece: attacker,
-      damage: modifiedBaseDamage,
-      skillId
-    });
+      targetPiece: request.attacker,
+      target: request.attacker,
+      damage: damageAfterShield,
+      damageType: request.damageType,
+      skillId: request.skillId,
+      damageBatchId: batchId,
+      damageChainId: chain.chainId,
+      parentDamageBatchId: request.parentBatchId,
+      rawDamage: request.baseDamage,
+      modifiedDamage,
+      defenseApplied: defense,
+      damageQueue: shieldQueue,
+    }
+    const shieldResult = globalTriggerSystem.checkTriggers(battle, shieldContext)
+    appendDamageMessages(battle, request.attacker.ownerPlayerId, shieldResult.messages)
+    queuedDamage.push(...shieldQueue)
+    const ruleShieldDamage = Math.max(0, Number(shieldContext.damage) || 0)
+    shieldAbsorbed += Math.max(0, damageAfterShield - ruleShieldDamage)
+    damageAfterShield = ruleShieldDamage
+    blocked = Boolean(shieldResult.blocked) || damageAfterShield === 0
 
-    return {
-      success: false,
-      damage: 0,
+    if (!blocked && damageAfterShield > 0 && Number(target.shield) > 0) {
+      const availableShield = Math.max(0, Number(target.shield) || 0)
+      const absorbed = Math.min(availableShield, damageAfterShield)
+      target.shield = availableShield - absorbed
+      shieldAbsorbed += absorbed
+      damageAfterShield -= absorbed
+      blocked = damageAfterShield === 0
+    }
+  }
+
+  if (!blocked && damageAfterShield > 0) {
+    const appliedQueue: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
+    const appliedContext = {
+      type: 'beforeDamageApplied' as const,
+      piece: target,
+      sourcePiece: target,
+      targetPiece: request.attacker,
+      target: request.attacker,
+      damage: damageAfterShield,
+      damageType: request.damageType,
+      skillId: request.skillId,
+      damageBatchId: batchId,
+      damageChainId: chain.chainId,
+      parentDamageBatchId: request.parentBatchId,
+      rawDamage: request.baseDamage,
+      modifiedDamage,
+      defenseApplied: defense,
+      shieldAbsorbed,
+      damageQueue: appliedQueue,
+    }
+    const appliedResult = globalTriggerSystem.checkTriggers(battle, appliedContext)
+    appendDamageMessages(battle, request.attacker.ownerPlayerId, appliedResult.messages)
+    queuedDamage.push(...appliedQueue)
+    damageAfterShield = Math.max(0, Number(appliedContext.damage) || 0)
+    blocked = Boolean(appliedResult.blocked) || damageAfterShield === 0
+  }
+
+  const finalDamage = blocked ? 0 : damageAfterShield
+  const hpBefore = target.currentHp
+  const targetName = target.name || target.templateId
+  const attackerName = request.attacker.name || request.attacker.templateId
+  const typeName = request.damageType === 'physical' ? '物理' : request.damageType === 'magical' ? '魔法' : request.damageType === 'toxin' ? '毒素' : '真实'
+  return {
+    target,
+    hpBefore,
+    emitBlocked: blocked && sourceDamage > 0,
+    result: {
+      success: !blocked,
+      batchId,
+      chainId: chain.chainId || batchId,
+      parentBatchId: request.parentBatchId,
+      sourceId: request.attacker.instanceId,
+      targetId: target.instanceId,
+      skillId: request.skillId,
+      damageType: request.damageType,
+      rawDamage: request.baseDamage,
+      modifiedDamage,
+      defense,
+      shieldAbsorbed,
+      damage: finalDamage,
+      blocked,
       isKilled: false,
       targetHp: target.currentHp,
-      message: "伤害被规则阻止"
-    };
+      message: blocked
+        ? `${targetName}受到的伤害被完整抵挡`
+        : `${attackerName}对${targetName}造成${finalDamage}点${typeName}伤害`,
+    },
+  }
+}
+
+function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, chain: DamageChain): DamageBatchResult {
+  chain.processedBatches += 1
+  if (chain.processedBatches > MAX_DAMAGE_CHAIN_BATCHES) {
+    throw new DamagePipelineError('RVB_DAMAGE_CHAIN_BUDGET', `Damage chain exceeded ${MAX_DAMAGE_CHAIN_BATCHES} batches`, {
+      chainId: chain.chainId,
+      parentBatchId: request.parentBatchId,
+      depth: request.depth,
+      turn: battle.turn?.turnNumber ?? 0,
+      rootSeed: getActiveRuleRuntime()?.rootSeed ?? null,
+    })
   }
 
-  // 计算最终伤害（考虑防御力）
-  let finalDamage: number;
+  const canonicalTargets = validateDamageRequest(
+    request.attacker,
+    request.targets,
+    request.baseDamage,
+    request.damageType,
+    battle,
+    request.skillId,
+  )
+  const stableTargets = [...canonicalTargets].sort(compareDamageTarget)
+  const batchId = nextDamageBatchId(battle, chain)
+  chain.chainId ??= batchId
+  chain.currentBatchId = batchId
+  chain.currentDepth = request.depth
+  const queuedDamage: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
 
-  // 使用触发器可能修改后的伤害值
-  const validBaseDamage = Number(modifiedBaseDamage) || 0;
-  const validDefense = Number(target.defense) || 0;
-
-  switch (damageType) {
-    case "physical":
-      finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense));
-      break;
-    case "magical":
-      finalDamage = Math.max(1, Math.floor(validBaseDamage - validDefense));
-      break;
-    case "true":
-    case "toxin":
-      finalDamage = Math.max(1, Math.floor(validBaseDamage));
-      break;
-   }
-  
-  // 记录原始生命值
-  const originalHp = target.currentHp;
-  
-  // 应用伤害
-  target.currentHp = Math.max(0, target.currentHp - finalDamage);
-  
-  // 触发伤害相关的触发器
-  // 1. 攻击者的伤害触发
-  const damageDealtResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "afterDamageDealt",
-    sourcePiece: attacker,
-    targetPiece: target,
-    damage: finalDamage,
-    skillId
-  });
-
-  // 2. 目标的伤害触发
-  const damageTakenResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "afterDamageTaken",
-    sourcePiece: target,
-    targetPiece: attacker,
-    damage: finalDamage,
-    skillId
-  });
-
-  // 将触发器的消息添加到战斗日志
-  if (!battle.actions) {
-    battle.actions = [];
+  let sourceDamage = request.baseDamage
+  let sourceBlocked = false
+  if (!request.skipBeforeTrigger) {
+    const sourceQueue: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
+    const sourceContext = {
+      type: 'beforeDamageDealt' as const,
+      piece: request.attacker,
+      sourcePiece: request.attacker,
+      targetPiece: stableTargets[0],
+      target: stableTargets[0],
+      damage: request.baseDamage,
+      damageType: request.damageType,
+      skillId: request.skillId,
+      selectedOption: request.selectedOption,
+      damageBatchId: batchId,
+      damageChainId: chain.chainId,
+      parentDamageBatchId: request.parentBatchId,
+      rawDamage: request.baseDamage,
+      damageQueue: sourceQueue,
+    }
+    const sourceResult = globalTriggerSystem.checkTriggers(battle, sourceContext)
+    if (sourceResult.needsOptionSelection) {
+      throw { needsOptionSelection: true, options: sourceResult.options, title: sourceResult.title }
+    }
+    if (sourceResult.needsTargetSelection) throw sourceResult
+    appendDamageMessages(battle, request.attacker.ownerPlayerId, sourceResult.messages)
+    queuedDamage.push(...sourceQueue)
+    sourceDamage = Number(sourceContext.damage)
+    sourceBlocked = Boolean(sourceResult.blocked)
   }
-  [...damageDealtResult.messages, ...damageTakenResult.messages].forEach(message => {
-    battle.actions!.push({
-      type: "triggerEffect",
-      playerId: target.ownerPlayerId,
-      turn: battle.turn?.turnNumber || 0,
-      payload: { message }
-    });
-  });
-  
-  // 检查是否击杀了目标
-  let isKilled = false;
-  if (originalHp > 0 && target.currentHp === 0) {
-    isKilled = true;
-    
-    // 触发即将击杀的触发器
-    globalTriggerSystem.checkTriggers(battle, {
-      type: "beforePieceKilled",
-      sourcePiece: target,
-      targetPiece: attacker,
-      skillId
-    });
-    
-    // 触发击杀相关的触发器（击杀者视角）
-    globalTriggerSystem.checkTriggers(battle, {
-      type: "afterPieceKilled",
-      sourcePiece: attacker,
-      targetPiece: target,
-      skillId
-    });
+  if (!Number.isFinite(sourceDamage) || sourceDamage < 0) {
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_MODIFIER_INVALID',
+      `Source damage trigger produced invalid value ${String(sourceDamage)}`,
+      damageContext(battle, request.attacker, request.skillId, { batchId }),
+    )
+  }
 
-    // 触发死亡事件（死亡棋子自身视角，用于"我死亡时做X"效果）
-    // 在移出棋盘前触发，此时棋子仍在 battle.pieces 中
-    globalTriggerSystem.checkTriggers(battle, {
-      type: "onPieceDied",
-      sourcePiece: target,
-      targetPiece: attacker,
-      damage: finalDamage,
-      skillId
-    });
+  const prepared = stableTargets.map(target => prepareTargetDamage(
+    request,
+    target,
+    sourceDamage,
+    sourceBlocked,
+    batchId,
+    chain,
+    queuedDamage,
+    battle,
+  ))
 
-    // 击杀敌人后，为击杀者添加充能点（noKillCharge=true 的棋子不计入）
-    if (!(target as any).noKillCharge) {
-      const killCreditId = killerPlayerId || attacker.ownerPlayerId;
-      const playerMeta = battle.players.find(p => p.playerId === killCreditId);
+  // Commit every target's HP before any after-damage or lifecycle event can observe the batch.
+  for (const entry of prepared) {
+    if (entry.result.damage > 0) {
+      entry.target.currentHp = Math.max(0, entry.hpBefore - entry.result.damage)
+      entry.result.targetHp = entry.target.currentHp
+    }
+  }
+
+  for (const entry of prepared) {
+    const sharedContext = {
+      sourcePiece: request.attacker,
+      targetPiece: entry.target,
+      damage: entry.result.damage,
+      damageType: request.damageType,
+      skillId: request.skillId,
+      damageBatchId: batchId,
+      damageChainId: chain.chainId,
+      parentDamageBatchId: request.parentBatchId,
+      rawDamage: request.baseDamage,
+      modifiedDamage: entry.result.modifiedDamage,
+      defenseApplied: entry.result.defense,
+      shieldAbsorbed: entry.result.shieldAbsorbed,
+      damageQueue: queuedDamage,
+    }
+    if (entry.emitBlocked) {
+      const blockedResult = globalTriggerSystem.checkTriggers(battle, {
+        ...sharedContext,
+        type: 'afterDamageBlocked',
+        sourcePiece: entry.target,
+        targetPiece: request.attacker,
+      })
+      appendDamageMessages(battle, request.attacker.ownerPlayerId, blockedResult.messages)
+      continue
+    }
+    if (entry.result.damage <= 0) continue
+    const dealtResult = globalTriggerSystem.checkTriggers(battle, { ...sharedContext, type: 'afterDamageDealt' })
+    const takenResult = globalTriggerSystem.checkTriggers(battle, {
+      ...sharedContext,
+      type: 'afterDamageTaken',
+      sourcePiece: entry.target,
+      targetPiece: request.attacker,
+    })
+    appendDamageMessages(battle, entry.target.ownerPlayerId, [...dealtResult.messages, ...takenResult.messages])
+  }
+
+  for (const entry of prepared) {
+    if (entry.hpBefore <= 0 || entry.target.currentHp !== 0) {
+      entry.result.targetHp = entry.target.currentHp
+      continue
+    }
+    if (!battle.pieces.some(piece => piece.instanceId === entry.target.instanceId)) continue
+
+    globalTriggerSystem.checkTriggers(battle, {
+      type: 'beforePieceKilled',
+      sourcePiece: entry.target,
+      targetPiece: request.attacker,
+      skillId: request.skillId,
+      damageBatchId: batchId,
+      damageChainId: chain.chainId,
+    })
+    globalTriggerSystem.checkTriggers(battle, {
+      type: 'afterPieceKilled',
+      sourcePiece: request.attacker,
+      targetPiece: entry.target,
+      skillId: request.skillId,
+      damageBatchId: batchId,
+      damageChainId: chain.chainId,
+    })
+    globalTriggerSystem.checkTriggers(battle, {
+      type: 'onPieceDied',
+      sourcePiece: entry.target,
+      targetPiece: request.attacker,
+      damage: entry.result.damage,
+      skillId: request.skillId,
+      damageBatchId: batchId,
+      damageChainId: chain.chainId,
+    })
+
+    // A death consumer may revive the target before graveyard/charge finalization.
+    if (entry.target.currentHp > 0) {
+      entry.result.targetHp = entry.target.currentHp
+      continue
+    }
+
+    const killCreditId = request.killerPlayerId || request.attacker.ownerPlayerId
+    const isEnemyKill = entry.target.ownerPlayerId !== killCreditId
+    if (isEnemyKill && !(entry.target as any).noKillCharge) {
+      const playerMeta = battle.players.find(player => player.playerId === killCreditId)
       if (playerMeta) {
-        playerMeta.chargePoints += 1; // 每次击杀获得1点充能
-        // 触发充能获得事件（可用于"获得充能时做X"效果）
+        playerMeta.chargePoints += 1
         globalTriggerSystem.checkTriggers(battle, {
-          type: "afterChargeGained",
-          sourcePiece: attacker,
+          type: 'afterChargeGained',
+          sourcePiece: request.attacker,
           amount: 1,
-          playerId: killCreditId
-        });
+          playerId: killCreditId,
+          damageBatchId: batchId,
+          damageChainId: chain.chainId,
+        })
       }
     }
 
-    // 从棋盘上移除死亡的棋子，并将其移到墓地中
-    const targetIndex = battle.pieces.findIndex(p => p.instanceId === target.instanceId);
+    const targetIndex = battle.pieces.findIndex(piece => piece.instanceId === entry.target.instanceId)
     if (targetIndex !== -1) {
-      // 确保墓地数组存在
-      if (!battle.graveyard) {
-        battle.graveyard = [];
-      }
-      
-      // 将死亡的棋子移到墓地中
-      const killedPiece = battle.pieces.splice(targetIndex, 1)[0];
-      battle.graveyard.push(killedPiece);
-      console.log(`Moved killed piece ${target.instanceId} to graveyard`);
+      battle.graveyard ??= []
+      battle.graveyard.push(battle.pieces.splice(targetIndex, 1)[0])
+      entry.result.isKilled = true
+      entry.result.targetHp = 0
     }
   }
-  
-  // 尝试获取攻击者和目标的名字
-  const attackerName = attacker.name || attacker.templateId;
-  const targetName = target.name || target.templateId;
-  
+
+  battle.actions ??= []
+  for (const entry of prepared) {
+    battle.actions.push({
+      type: 'damage',
+      playerId: request.attacker.ownerPlayerId,
+      turn: battle.turn?.turnNumber ?? 0,
+      payload: {
+        batchId,
+        chainId: chain.chainId,
+        parentBatchId: request.parentBatchId,
+        sourceId: request.attacker.instanceId,
+        skillId: request.skillId,
+        targetId: entry.target.instanceId,
+        damageType: request.damageType,
+        rawDamage: request.baseDamage,
+        modifiedDamage: entry.result.modifiedDamage,
+        defense: entry.result.defense,
+        shieldAbsorbed: entry.result.shieldAbsorbed,
+        finalDamage: entry.result.damage,
+        blocked: entry.result.blocked,
+        killed: entry.result.isKilled,
+      },
+    })
+  }
+
+  collectFollowUpDamage(queuedDamage, chain, batchId, request.depth + 1, battle)
+
+  const byTargetId = new Map(prepared.map(entry => [entry.target.instanceId, entry.result]))
+  const orderedResults = canonicalTargets.map(target => byTargetId.get(target.instanceId)!)
+  const damages = orderedResults.map(result => result.damage)
+  const totalDamage = damages.reduce((sum, damage) => sum + damage, 0)
   return {
-    success: true,
-    damage: finalDamage,
-    isKilled,
-    targetHp: target.currentHp,
-    message: `${attackerName}对${targetName}造成${finalDamage}点${damageType === 'physical' ? '物理' : damageType === 'magical' ? '魔法' : '真实'}伤害${isKilled ? '，击杀敌人获得1点充能' : ''}`
-  };
+    success: orderedResults.some(result => result.success),
+    batchId,
+    chainId: chain.chainId,
+    damages,
+    totalDamage,
+    results: orderedResults,
+    message: `对${orderedResults.length}个目标共造成${totalDamage}点伤害`,
+  }
+}
+
+/**
+ * Shared single- and multi-target damage entry point. A single target is a
+ * one-target batch; arrays preserve result alignment while resolving by stable ID.
+ */
+export function dealDamage(
+  attacker: PieceInstance,
+  target: PieceInstance | PieceInstance[],
+  baseDamage: number,
+  damageType: DamageType,
+  battle: BattleState,
+  skillId?: string,
+  skipBeforeTrigger = false,
+  killerPlayerId?: string,
+  selectedOption?: any,
+): any {
+  const targets = Array.isArray(target) ? target : [target]
+  if (targets.length === 0) {
+    return { success: false, damages: [], totalDamage: 0, results: [], message: '没有目标' } as DamageBatchResult
+  }
+
+  const activeChain = activeDamageChains.get(battle)
+  if (activeChain) {
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_REENTRANT_CALL',
+      'Nested dealDamage calls must enqueue follow-up damage through context.damageQueue',
+      damageContext(battle, attacker, skillId, {
+        chainId: activeChain.chainId,
+        parentBatchId: activeChain.currentBatchId,
+        depth: (activeChain.currentDepth ?? 0) + 1,
+      }),
+    )
+  }
+
+  const chain: DamageChain = {
+    pending: [],
+    processedBatches: 0,
+    fallbackStart: (battle.actions || []).filter(action => action.type === 'damage').length,
+    sequence: 0,
+  }
+  const rootRequest: DamageBatchRequest = {
+    attacker,
+    targets,
+    baseDamage,
+    damageType,
+    skillId,
+    skipBeforeTrigger,
+    killerPlayerId,
+    selectedOption,
+    depth: 0,
+  }
+  activeDamageChains.set(battle, chain)
+  try {
+    const rootResult = resolveDamageBatch(rootRequest, battle, chain)
+    while (chain.pending.length > 0) {
+      const followUp = chain.pending.shift()!
+      // A prior batch may already have removed a reflected target. That follow-up
+      // has no remaining state to affect and is deterministically skipped.
+      followUp.targets = followUp.targets.filter(candidate => battle.pieces.some(piece => (
+        piece.instanceId === candidate.instanceId && piece.currentHp > 0
+      )))
+      if (followUp.targets.length === 0) continue
+      resolveDamageBatch(followUp, battle, chain)
+    }
+
+    return Array.isArray(target) ? rootResult : rootResult.results[0]
+  } finally {
+    activeDamageChains.delete(battle)
+  }
 }
 
 /**

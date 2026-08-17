@@ -26,6 +26,7 @@
 
 - `ARCHITECTURE.md`：整体架构和模块依赖关系。
 - `ENGINE_CORE.md`：游戏引擎核心、状态变化和执行流程。
+- `DAMAGE_PIPELINE.md`：RED-33 确定性单体/多目标伤害阶段、日志、连锁保护和生命周期合同。
 - `MODULE_INTERFACES.md`：各模块公开接口和数据结构。
 - `GAME_STATE.md`：游戏状态结构、序列化和不变量。
 - `COMMAND_SYSTEM.md`：玩家命令、执行结果、记录和回放。
