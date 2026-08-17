@@ -132,3 +132,32 @@ Density follow-up checks:
 - Full Vitest candidate: 38 files passed, 336 tests passed.
 - Encoding: 549 text files checked.
 - Focused ESLint, JavaScript syntax, and `git diff --check`: passed.
+
+## 2026-08-17 full-viewport hand-overlay follow-up
+
+- The user's final visual acceptance explicitly superseded the earlier vertically divided board/hand layout: the single `#handCards` source is now an absolute transparent overlay, while `#boardWrap` occupies the complete battle viewport.
+- At 844x390, `#boardWrap` measured 844x390 and the rendered stage measured 836x386. The 112px hand overlay occupied y=278..390 and overlapped the board by the full 112px; the previous density layout ended the board stage at y=276 and began the hand at y=278.
+- The preferred initial/reset camera projected the 20x16 map across 619x489px at 844x390, using the expanded canvas as the main surface while allowing the vertical edges to be recovered by pan or zoom-out.
+- Hit testing at an empty bottom-overlay point returned the Three.js `CANVAS`, while a card-center point returned the card subtree. The hand container therefore does not create an invisible gesture-blocking strip; real cards remain interactive.
+- Final-code gesture replay changed cell (0,0) from client (95.98,-65.81) to (56.86,-97.11) after wheel zoom, then to (106.86,-62.11) after a 50x35 drag. The visible reset control restored the exact initial (95.98,-65.81) projection.
+- At 760x390, the board and stage remained 760x390 / 752x386, the map projected 619px wide, eight cards stayed in one centered fan, and the training/end-turn controls ended 10px above the hand overlay.
+- At 1024x768, the stage measured 1016x764, the map projected 804x635, and the 134px hand overlapped the board instead of reducing its height.
+- At 1280x720, the stage measured 1272x716, the map projected 943px wide, and the 142px hand overlapped the board.
+- At 390x844, the orientation guard still displayed as a full-viewport grid. Every measured viewport had zero horizontal page overflow and `body::after` computed to `content: none`.
+- Browser console review found only the known static-harness 404s for `game-engine-runtime.js` and the absent `evil-explosion` fixture; no runtime JavaScript exception was observed.
+
+Full-viewport overlay artifacts:
+
+- `red-51-overlay-hand-844x390.png`
+- `red-51-overlay-hand-760x390.png`
+- `red-51-overlay-hand-1024x768.png`
+- `red-51-overlay-hand-1280x720.png`
+- `red-51-overlay-hand-390x844-guard.png`
+
+Full-viewport overlay checks:
+
+- Focused layout/renderer contracts: 2 files passed, 26 tests passed.
+- Serial full Vitest candidate: 38 files passed, 338 tests passed.
+- Encoding: 549 text files checked.
+- Focused ESLint, renderer JavaScript syntax, and `git diff --check`: passed.
+- The first full-suite run overlapped the encoding scan and reproduced the retained Electron archive zero-byte read anomaly (37 files/336 tests passed, one packaging case failed). The isolated packaging file then passed 9/9, and the non-concurrent full candidate passed 338/338.
