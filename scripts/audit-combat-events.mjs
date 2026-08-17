@@ -8,7 +8,7 @@ const declared = new Set([...declaredSource.matchAll(/^\s*\|\s*"([^"]+)"/gm)].ma
 const emitted = new Map()
 const consumed = new Map()
 const dynamicCalls = []
-const CODE_FIELDS = new Set(['code', 'skillCode', 'filterCode', 'effectCode'])
+const CODE_FIELDS = new Set(['code', 'skillCode'])
 
 function addEvidence(catalog, event, source) {
   const sources = catalog.get(event) ?? new Set()
@@ -104,10 +104,6 @@ function collectDataEvidence(value, file, trail = []) {
   if (value.trigger && typeof value.trigger === 'object' && typeof value.trigger.type === 'string') {
     addEvidence(consumed, value.trigger.type, `${file}#${[...trail, 'trigger.type'].join('.')}`)
   }
-  if (typeof value.on === 'string' && (typeof value.filterCode === 'string' || typeof value.effectCode === 'string')) {
-    addEvidence(consumed, value.on, `${file}#${[...trail, 'on'].join('.')}`)
-  }
-
   for (const [key, child] of Object.entries(value)) {
     if (CODE_FIELDS.has(key) && typeof child === 'string') {
       for (const match of child.matchAll(/\bfireEvent\s*\(\s*(['"])([^'"]+)\1/g)) {
@@ -118,7 +114,7 @@ function collectDataEvidence(value, file, trail = []) {
   }
 }
 
-for (const group of ['skills', 'rules', 'cards', 'effects']) {
+for (const group of ['skills', 'rules', 'cards']) {
   for (const file of globSync(`data/${group}/**/*.json`).sort()) {
     collectDataEvidence(JSON.parse(readFileSync(file, 'utf8')), file.replace(/\\/g, '/'))
   }

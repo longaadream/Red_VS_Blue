@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- dynamic trigger fixtures intentionally exercise runtime shapes */
 import { describe, expect, it } from 'vitest'
 import { TriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
@@ -8,7 +9,7 @@ const rule = (id: string, priority: number, trace: string[]) => ({
 })
 
 describe('RED-61 combat trigger ordering', () => {
-  it('uses category rank, descending priority, and snapshot order across trigger consumers', () => {
+  it('uses category rank, descending priority, and snapshot order across the four trigger consumers', () => {
     const trace: string[] = []
     const system = new TriggerSystem()
     system.addRules([rule('global-low', 1, trace), rule('global-high', 2, trace)] as any)
@@ -16,29 +17,34 @@ describe('RED-61 combat trigger ordering', () => {
     const piece = makePiece({
       rules: [rule('piece-low', 1, trace), rule('piece-high', 2, trace)],
     }) as any
-    piece.attachedEffects = [{
-      instanceId: 'effect-1', definitionId: 'effect-1', ownerId: piece.instanceId, data: {},
-      triggers: [
-        { on: 'ordering', priority: 1, filterCode: 'function() { return true }', effectCode: "function(ctx, battle) { battle.extensions.trace.push('effect-low'); return { success: true } }" },
-        { on: 'ordering', priority: 2, filterCode: 'function() { return true }', effectCode: "function(ctx, battle) { battle.extensions.trace.push('effect-high'); return { success: true } }" },
-      ],
-    }, {
-      instanceId: 'effect-2', definitionId: 'effect-2', ownerId: piece.instanceId, data: {},
-      triggers: [{
-        on: 'ordering', priority: 3, filterCode: 'function() { return true }',
-        effectCode: "function(ctx, battle) { battle.extensions.trace.push('effect-top'); return { success: true } }",
-      }],
-    }]
     const state = makeState({ pieces: [piece] }) as any
     state.extensions.trace = trace
     state.players[0].rules = [rule('player-low', 1, trace), rule('player-high', 2, trace)]
+    state.players[0].hand = [{
+      cardId: 'ordering-response',
+      instanceId: 'ordering-response-instance',
+      ownerPlayerId: 'player-red',
+    }]
+    state.customCards = {
+      'ordering-response': {
+        id: 'ordering-response',
+        name: 'ordering-response',
+        description: 'ordering-response',
+        type: 'reactive',
+        trigger: { type: 'ordering' },
+        code: "function executeCard(context) { context.battle.extensions.trace.push('response-card'); return { success: true }; }",
+      },
+    }
+
     system.checkTriggers(state, { type: 'ordering', playerId: 'player-red' })
 
     expect(trace).toEqual([
       'global-high', 'global-low',
       'piece-high', 'piece-low',
       'player-high', 'player-low',
-      'effect-top', 'effect-high', 'effect-low',
+      'response-card',
     ])
+    expect(state.players[0].hand).toEqual([])
+    expect(state.players[0].discardPile).toEqual(['ordering-response'])
   })
 })

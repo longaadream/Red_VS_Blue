@@ -21,9 +21,9 @@ describe('RED-45 complex combat mechanisms', () => {
   afterEach(() => globalTriggerSystem.clearRules())
 
   it('applies one modified damage value to multiple targets', () => {
-    const attacker = makePiece({ instanceId: 'multi-attacker', ownerPlayerId: 'player-red' })
-    const first = makePiece({ instanceId: 'multi-first', ownerPlayerId: 'player-blue' })
-    const second = makePiece({ instanceId: 'multi-second', ownerPlayerId: 'player-blue' })
+    const attacker = makePiece({ instanceId: 'multi-attacker', ownerPlayerId: 'player-red' }) as any
+    const first = makePiece({ instanceId: 'multi-first', ownerPlayerId: 'player-blue' }) as any
+    const second = makePiece({ instanceId: 'multi-second', ownerPlayerId: 'player-blue' }) as any
     const state = makeState({ pieces: [attacker, first, second] }) as any
 
     const result = dealDamage(attacker, [first, second], 7, 'true', state, 'matrix-multi')
@@ -138,20 +138,8 @@ describe('RED-45 complex combat mechanisms', () => {
     expect(cursed.rules).toEqual([])
   })
 
-  it('executes and discards a reactive response card before AttachedEffects', () => {
-    const owner = makePiece({ instanceId: 'response-owner' }) as any
-    owner.attachedEffects = [{
-      instanceId: 'response-effect',
-      definitionId: 'response-effect',
-      ownerId: owner.instanceId,
-      data: {},
-      triggers: [{
-        on: 'matrix-response',
-        filterCode: 'function() { return true; }',
-        effectCode: "function(ctx, battle) { battle.extensions.runtimeTrace.push('attached'); return { success: true }; }",
-      }],
-    }]
-    const state = makeState({ pieces: [owner] }) as any
+  it('executes and discards a reactive response card', () => {
+    const state = makeState() as any
     state.extensions.runtimeTrace = []
     state.players[0].hand = [{ cardId: 'matrix-response', instanceId: 'response-card', ownerPlayerId: 'player-red' }]
     state.customCards = {
@@ -165,7 +153,7 @@ describe('RED-45 complex combat mechanisms', () => {
     const result = new TriggerSystem().checkTriggers(state, { type: 'matrix-response', playerId: 'player-red' } as any)
 
     expect(result.success).toBe(true)
-    expect(state.extensions.runtimeTrace).toEqual(['response', 'attached'])
+    expect(state.extensions.runtimeTrace).toEqual(['response'])
     expect(state.players[0].hand).toEqual([])
     expect(state.players[0].discardPile).toEqual(['matrix-response'])
   })

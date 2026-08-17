@@ -23,7 +23,6 @@ const CROSS_PLATFORM_AUTHORITY_FILES = {
 
 const DATA_RULE_BOUNDARIES = [
   'lib/game/skills.ts',
-  'lib/game/triggers.ts',
   'lib/game/rule-loader.ts',
   'lib/game/turn.ts',
 ]
@@ -124,7 +123,7 @@ describe('authority determinism audit', () => {
     expect(mobileServerBuild).toContain("['app-paths',")
   })
 
-  it('injects deterministic Math and Date at every data-rule execution boundary', () => {
+  it('injects deterministic Math and Date at every remaining data-code compilation boundary', () => {
     for (const relativePath of DATA_RULE_BOUNDARIES) {
       const source = read(relativePath)
       expect(source, relativePath).toContain('getRuleMath')

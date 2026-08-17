@@ -12,5 +12,5 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "return { success: false, message: '' };"
+  "code": "function executeSkill(context) { return { success: false, message: '' }; }"
 }

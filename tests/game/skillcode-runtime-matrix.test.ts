@@ -61,17 +61,4 @@ describe('RED-45 runtime skillCode matrix', () => {
     expect(state.extensions.cardSurface).toBe('player-red')
   })
 
-  it('runs attached filterCode/effectCode with context, battle, and self', () => {
-    const piece = makePiece({ instanceId: 'effect-owner' }) as any
-    piece.attachedEffects = [{
-      instanceId: 'matrix-effect', definitionId: 'matrix-effect', ownerId: piece.instanceId, data: {},
-      triggers: [{ on: 'matrix', filterCode: 'function(ctx, battle, self) { return self.ownerId === "effect-owner"; }', effectCode: 'function(ctx, battle) { battle.extensions.effectSurface = ctx.playerId; return { success: true }; }' }],
-    }]
-    const state = makeState({ pieces: [piece] }) as any
-
-    const result = new TriggerSystem().checkTriggers(state, { type: 'matrix', playerId: 'player-red' } as any)
-
-    expect(result.success).toBe(true)
-    expect(state.extensions.effectSurface).toBe('player-red')
-  })
 })

@@ -86,7 +86,6 @@ const SURFACE_SEEDS = {
   ruleTriggerSkill: 0x750002,
   skillCode: 0x750003,
   cardCode: 0x750004,
-  attachedEffectCode: 0x750005,
   pendingEffectCode: 0x750006,
 } as const
 
@@ -238,36 +237,6 @@ function executeCardCode(runtime: Runtime): SkillCodeTraceEvidence {
   )
 }
 
-function executeAttachedEffectCode(runtime: Runtime): SkillCodeTraceEvidence {
-  seedSkillCodeRuntime(runtime, SURFACE_SEEDS.attachedEffectCode)
-  const piece = makePiece({ instanceId: 'effect-owner' }) as any
-  piece.attachedEffects = [{
-    instanceId: 'matrix-effect',
-    definitionId: 'matrix-effect',
-    ownerId: piece.instanceId,
-    data: {},
-    triggers: [{
-      on: 'matrix-attached',
-      filterCode: 'function(ctx, battle, self) { return self.ownerId === "effect-owner" && ctx.playerId === "player-red"; }',
-      effectCode: "function(ctx, battle) { battle.extensions.runtimeTrace.push({ surface: 'attachedEffectCode', playerId: ctx.playerId }); return { success: true, message: 'effect-ok' }; }",
-    }],
-  }]
-  const state = makeState({ pieces: [piece] }) as any
-  state.extensions.runtimeTrace = []
-  const command = { type: 'dispatchTrigger', eventType: 'matrix-attached', playerId: 'player-red' }
-  const result = runtime.checkTriggers(state, { type: command.eventType, playerId: command.playerId })
-
-  return captureSurfaceEvidence(
-    runtime,
-    'attached-effect-filter-effect-code',
-    'attachedEffectCode',
-    command,
-    state,
-    [...normalizeEventChain(result), ...state.extensions.runtimeTrace],
-    { blocked: result.blocked, messages: result.messages, success: result.success },
-  )
-}
-
 function executePendingEffectCode(runtime: Runtime): SkillCodeTraceEvidence {
   seedSkillCodeRuntime(runtime, SURFACE_SEEDS.pendingEffectCode)
   const state = makeState({ currentPlayerId: 'player-blue', phase: 'action' }) as any
@@ -309,7 +278,6 @@ const SURFACES = [
   ['rule-trigger-skill', executeRuleTriggerSkill],
   ['piece-skill-code', executeSkillCode],
   ['active-card-code', executeCardCode],
-  ['attached-effect-filter-effect-code', executeAttachedEffectCode],
   ['pending-serialized-effect-code', executePendingEffectCode],
 ] as const
 

@@ -4,7 +4,6 @@ import { basename, extname } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { loadAllEffects } from '@/lib/game/attached-effect'
 import { loadAllSkillsById, loadCardById, loadRuleById } from '@/lib/game/skills'
 
 type AuditFailure = Error & { status?: number; stdout?: string }
@@ -42,7 +41,7 @@ function runCompatibilityAudit(): { status: number; report: CompatibilityAuditRe
   }
 }
 
-function readDefinitions(group: 'skills' | 'rules' | 'cards' | 'effects'): Array<{ file: string; definition: DefinitionWithId }> {
+function readDefinitions(group: 'skills' | 'rules' | 'cards'): Array<{ file: string; definition: DefinitionWithId }> {
   return globSync(`data/${group}/**/*.json`).sort()
     .map(file => ({
       file: file.replace(/\\/g, '/'),
@@ -56,9 +55,9 @@ describe('RED-45 skillCode static compatibility audit', () => {
     const { report } = runCompatibilityAudit()
 
     expect(report.schemaVersion).toBe(2)
-    expect(report.analysisVersion).toBe(3)
+    expect(report.analysisVersion).toBe(4)
     expect(Object.keys(report.executionSurfaces).sort()).toEqual([
-      'attachedEffectCode', 'cardCode', 'pendingEffectCode', 'ruleSkillCode', 'ruleTriggerSkill', 'skillCode',
+      'cardCode', 'pendingEffectCode', 'ruleSkillCode', 'ruleTriggerSkill', 'skillCode',
     ])
     const loadedSkills = loadAllSkillsById()
     for (const reference of report.triggerSkills) {
@@ -68,7 +67,7 @@ describe('RED-45 skillCode static compatibility audit', () => {
 
     expect(report.unclassifiedFields).toEqual([])
     expect(report.triggerSkills).toHaveLength(27)
-    for (const group of ['skills', 'rules', 'cards', 'effects']) {
+    for (const group of ['skills', 'rules', 'cards']) {
       for (const entry of report.groups[group]) {
         for (const field of entry.executionFields) {
           expect(field.surface, `${entry.file}#${field.path}`).toBeTruthy()
@@ -78,55 +77,26 @@ describe('RED-45 skillCode static compatibility audit', () => {
     }
   })
 
-  it('records the malformed passive skill body as a syntax FAIL', () => {
+  it('accepts every remaining execution field as valid syntax', () => {
     const { status, report } = runCompatibilityAudit()
 
-    expect(status).toBe(1)
-    expect(report.syntaxErrors).toEqual([
-      expect.objectContaining({
-        file: 'data/skills/shishio-combustion-passive.json',
-        field: 'code',
-        path: 'code',
-        message: 'Expression expected.',
-      }),
-      expect.objectContaining({
-        file: 'data/skills/shishio-combustion-passive.json',
-        field: 'code',
-        path: 'code',
-        message: 'Declaration or statement expected.',
-      }),
-    ])
+    expect(status).toBe(0)
+    expect(report.syntaxErrors).toEqual([])
   })
 
-  it('records every AttachedEffect helper that production does not inject', () => {
+  it('reports no unsupported free-variable use in the remaining data surfaces', () => {
     const { report } = runCompatibilityAudit()
 
-    expect(Object.keys(report.unsupportedUse).sort()).toEqual([
-      'removePlayerSkillById',
-      'removePlayerStatusEffectById',
-      'selectOption',
-    ])
-    expect(report.unsupportedUse).toMatchObject({
-      removePlayerSkillById: [expect.objectContaining({ file: 'data/effects/effect-blizzard.json', path: 'triggers.0.effectCode' })],
-      removePlayerStatusEffectById: expect.arrayContaining([
-        expect.objectContaining({ file: 'data/effects/effect-blackwidow-toxin.json' }),
-        expect.objectContaining({ file: 'data/effects/effect-blizzard.json' }),
-      ]),
-      selectOption: expect.arrayContaining([
-        expect.objectContaining({ file: 'data/effects/effect-shishio.json', path: 'triggers.3.effectCode' }),
-        expect.objectContaining({ file: 'data/effects/effect-watcher-form.json', path: 'triggers.0.effectCode' }),
-      ]),
-    })
+    expect(report.unsupportedUse).toEqual({})
   })
 })
 
 describe('RED-45 data parse and production loader smoke', () => {
-  it('parses every JSON definition and loads every skill, rule, card, and AttachedEffect', () => {
+  it('parses every JSON definition and loads every skill, rule, and card', () => {
     const definitions = {
       skills: readDefinitions('skills'),
       rules: readDefinitions('rules'),
       cards: readDefinitions('cards'),
-      effects: readDefinitions('effects'),
     }
 
     const loadedSkills = loadAllSkillsById()
@@ -139,15 +109,10 @@ describe('RED-45 data parse and production loader smoke', () => {
     for (const { file, definition } of definitions.cards) {
       expect(loadCardById(definition.id, true), file).not.toBeNull()
     }
-    const loadedEffects = loadAllEffects()
-    for (const { file, definition } of definitions.effects) {
-      expect(loadedEffects[definition.id], file).toBeDefined()
-    }
 
     expect(definitions.skills.map(entry => entry.definition.id)).toHaveLength(113)
     expect(definitions.rules.map(entry => entry.definition.id)).toHaveLength(81)
     expect(definitions.cards.map(entry => entry.definition.id)).toHaveLength(16)
-    expect(definitions.effects.map(entry => entry.definition.id)).toHaveLength(47)
     expect(definitions.skills.every(entry => basename(entry.file, extname(entry.file)) === entry.definition.id)).toBe(true)
   })
 })

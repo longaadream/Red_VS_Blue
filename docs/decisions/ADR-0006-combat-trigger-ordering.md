@@ -6,6 +6,8 @@
 关联任务：[RED-61](https://linear.app/redvsblue/issue/RED-61/定义并实现战斗触发器跨类别稳定排序)  
 风险：Medium
 
+> 取代说明：本 ADR 中关于 AttachedEffect 第五类别、priority 和快照的条款已由 [ADR-0008](./ADR-0008-rule-status-authority.md) 取代；其余四类别排序原则继续有效。
+
 ## 背景
 
 `TriggerSystem.checkTriggers()` 依次处理全局规则、棋子规则、玩家规则、响应卡和 AttachedEffect。此前全局/棋子规则按 priority 降序，玩家与响应卡不排序，AttachedEffect 按升序且默认值为 `50`；同优先级依赖数组或注册顺序。

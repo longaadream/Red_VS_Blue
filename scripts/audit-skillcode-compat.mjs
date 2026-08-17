@@ -4,8 +4,8 @@ import { globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import ts from 'typescript'
 
-const GROUPS = ['skills', 'rules', 'cards', 'effects']
-const CODE_FIELDS = new Set(['code', 'skillCode', 'filterCode', 'effectCode'])
+const GROUPS = ['skills', 'rules', 'cards']
+const CODE_FIELDS = new Set(['code', 'skillCode'])
 const JS_AMBIENT = new Set([
   'Array', 'Boolean', 'Error', 'Infinity', 'JSON', 'Map', 'NaN', 'Number', 'Object',
   'Promise', 'RegExp', 'Set', 'String', 'Symbol', 'console', 'isFinite', 'isNaN',
@@ -22,7 +22,7 @@ const SURFACES = {
       'addStatusEffectById', 'removeStatusEffectById', 'addPlayerRuleById',
       'removePlayerRuleById', 'addRuleById', 'removeRuleById', 'addPlayerStatusEffectById',
       'removePlayerStatusEffectById', 'addPlayerSkillById', 'removePlayerSkillById',
-      'selectOption', 'applyEffect', 'removeEffect', 'getPieceEffect', 'fireEvent',
+      'selectOption', 'fireEvent',
       'Math', 'Date',
     ],
     runtimeEvidence: 'tests/game/skillcode-browser-differential.test.ts',
@@ -47,7 +47,7 @@ const SURFACES = {
       'addPlayerRuleById', 'removePlayerRuleById', 'addPlayerSkillById',
       'removePlayerSkillById', 'addPlayerStatusEffectById', 'removePlayerStatusEffectById',
       'addSkillById', 'removeSkillById', 'addCardToHand', 'discardCard', 'getHand',
-      'applyEffect', 'removeEffect', 'getPieceEffect', 'fireEvent', 'Math', 'Date', 'console',
+      'fireEvent', 'Math', 'Date', 'console',
     ],
     runtimeEvidence: 'tests/game/skillcode-browser-differential.test.ts',
   },
@@ -62,18 +62,6 @@ const SURFACES = {
       'removePlayerRuleById', 'Math', 'Date', 'console',
     ],
     semanticDifference: 'cards have no guaranteed sourcePiece; reactive cards reuse the mutable trigger context',
-    runtimeEvidence: 'tests/game/skillcode-browser-differential.test.ts',
-  },
-  attachedEffectCode: {
-    dataFields: ['effects.filterCode', 'effects.effectCode'],
-    runtime: 'lib/game/triggers.ts::TriggerSystem.checkTriggers',
-    signature: '(ctx, battle, self) plus the attached-effect helper subset',
-    bindings: [
-      'dealDamage', 'healDamage', 'removeStatusEffectById', 'addStatusEffectById',
-      'addRuleById', 'removeRuleById', 'applyEffect', 'removeEffect', 'getPieceEffect',
-      'fireEvent', 'addCardToHand', 'Math', 'Date',
-    ],
-    semanticDifference: 'uses ctx/battle/self parameters and exposes fewer helpers than skill code',
     runtimeEvidence: 'tests/game/skillcode-browser-differential.test.ts',
   },
   pendingEffectCode: {
@@ -92,7 +80,6 @@ function surfaceFor(group, field) {
   if (group === 'rules' && field === 'skillCode') return 'ruleSkillCode'
   if (group === 'skills' && field === 'code') return 'skillCode'
   if (group === 'cards' && field === 'code') return 'cardCode'
-  if (group === 'effects' && (field === 'filterCode' || field === 'effectCode')) return 'attachedEffectCode'
   return null
 }
 
@@ -243,7 +230,7 @@ for (const group of GROUPS) {
 
 const report = {
   schemaVersion: 2,
-  analysisVersion: 3,
+  analysisVersion: 4,
   groups,
   executionSurfaces: SURFACES,
   triggerSkills,

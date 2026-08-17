@@ -5,6 +5,8 @@
 - 人工批准：2026-08-14
 - 关联任务：RED-28
 - 风险：High
+> 取代说明：本 ADR 中关于 AttachedEffect 执行面的描述已由 [ADR-0008](./ADR-0008-rule-status-authority.md) 取代；技能、规则和 pending 脚本的确定性要求继续有效。
+
 
 ## 背景
 

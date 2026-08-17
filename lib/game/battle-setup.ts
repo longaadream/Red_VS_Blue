@@ -7,8 +7,8 @@ import type { BattleState, PlayerId } from "./turn"
 import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 import { globalTriggerSystem } from "./triggers"
-import { applyEffectToPiece } from './attached-effect'
 import { loadRuleById } from './skills'
+import { assertNoLegacyInitialEffects } from './legacy-state'
 import path from 'path'
 import fs from 'fs'
 import { getUserDataDir } from '@/lib/app-paths'
@@ -108,17 +108,11 @@ export interface InitialPieceBuildOptions {
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
-/** 将棋子模板中的 initialEffects 和 rules 应用到棋子实例上 */
-function applyInitialEffects(piece: PieceInstance, pieceTemplate: PieceTemplate, battle: any): void {
-  const initialEffects = (pieceTemplate as any).initialEffects
-  if (initialEffects && Array.isArray(initialEffects)) {
-    for (const effectId of initialEffects) {
-      applyEffectToPiece(battle, piece.instanceId, effectId)
-    }
-  }
+/** 将棋子模板中的 rules 加载到棋子实例上。 */
+function applyInitialRules(piece: PieceInstance, pieceTemplate: PieceTemplate): void {
+  assertNoLegacyInitialEffects(pieceTemplate)
 
-  // 加载模板中声明的 rules（旧规则系统，如 rule-kiljaedan-gamestart、rule-reap 等）
-  const templateRules = (pieceTemplate as any).rules
+  const templateRules = pieceTemplate.rules
   if (templateRules && Array.isArray(templateRules)) {
     if (!piece.rules) piece.rules = []
     for (const ruleId of templateRules) {
@@ -639,7 +633,7 @@ export async function createInitialBattleForPlayers(
   console.log('Skills for battle:', Object.keys(skills))
   console.log('Teleport in skills:', 'teleport' in skills)
 
-  // 清除旧规则系统（rules 已迁移为 initialEffects）
+  // 重置全局规则注册表，避免上一场战斗残留规则。
   globalTriggerSystem.clearRules()
 
   const playerAlignments = Object.fromEntries(
@@ -677,7 +671,7 @@ export async function createInitialBattleForPlayers(
     ...(Object.keys(playerAlignments).length > 0 ? { extensions: { playerAlignments } } : {}),
   }
 
-  // 为每个棋子应用 initialEffects 和 rules
+  // 为每个棋子加载模板 rules。
   const allSelectedPieces: PieceTemplate[] = []
   if (orderedPSP && orderedPSP.some(p => p.pieces.length > 0)) {
     orderedPSP.forEach(pi => pi.pieces.forEach(pt => allSelectedPieces.push(pt)))
@@ -689,7 +683,7 @@ export async function createInitialBattleForPlayers(
     state.pieces.forEach(piece => {
       const template = allSelectedPieces.find(t => t.id === piece.templateId)
       if (template) {
-        applyInitialEffects(piece, template, state)
+        applyInitialRules(piece, template)
       }
     })
 
