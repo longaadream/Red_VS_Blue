@@ -233,6 +233,76 @@ npm run dev:electron:client -- --rvb-dev-profile=player-two
 
 `--rvb-dev-profile` 仅允许源码开发模式使用。打包客户端传入该参数会拒绝启动，正式 `userData` 和默认单实例行为不会改变。账号初始化失败时，首页右上角显示“账号错误”；点击后可在账号面板查看错误，并在开发者工具中查找带 `[identity]` 前缀的日志。
 
+### Windows 源码工作树验收前置检查与 AI 引导护栏
+
+本次人工引导暴露了以下错误操作，后续 AI 不得重复：
+
+- 未先确认 Windows PowerShell 的命令解析方式，直接提供了可能命中受限 `npm.ps1` 的 `npm` 命令。
+- 未先执行 worktree 环境预检或检查本地依赖，就要求启动 Electron，导致缺少 `node_modules` 后才补救。
+- 未先确认 Electron 服务端要求 Next.js standalone 产物，就要求启动服务端，导致缺少 `.next/standalone/server.js` 后才补救。
+- 未在调用调试房间 API 前确认本地数据库 migration 状态，导致请求进入缺少 `Room` 表的数据库。
+- 建议执行 Prisma migration 时没有同时给出 Electron 实际数据库的会话级 `DATABASE_URL`，导致 Prisma CLI 再次失败。
+- 后续只要求“重新创建 `$red73Room`”，没有重新提供变量定义和完整请求，使人工必须猜测上一段上下文。
+- 在给出下一条命令前没有先读取预检输出、仓库脚本和实际运行路径，形成了报错后逐项猜测的低效引导。
+
+在独立 Git worktree 中进行 Electron 人工验收时，必须先完成下面的前置检查，再让人工启动窗口或调用调试 API。不得根据报错逐项猜测环境，也不得省略变量的完整定义后只要求人工“重试上一条命令”。
+
+本流程在 Windows PowerShell 中统一调用 `npm.cmd` 和 `npx.cmd`。不要直接调用 `npm` 或 `npx`，因为 PowerShell 可能优先解析到被执行策略禁止的 `npm.ps1` 或 `npx.ps1`。不得为了运行 npm 建议修改系统级 ExecutionPolicy。
+
+从一个全新的源码 worktree 开始时，按以下顺序执行：
+
+```powershell
+Set-Location 'C:\path\to\worktree'
+
+# 1. 每个 worktree 必须安装自己的本地依赖。
+npm.cmd ci --foreground-scripts
+
+# 2. Electron 服务端预检要求 Next.js standalone 产物存在。
+npm.cmd run build
+
+# 3. 开发版 Electron 服务端使用当前 worktree 的 prisma/dev.db。
+#    Prisma CLI 不会自动获得 Electron 子进程设置的 DATABASE_URL，
+#    因此 migration 前必须在当前 PowerShell 会话显式设置同一路径。
+$qaPrismaDir = (Resolve-Path '.\prisma').Path
+$env:DATABASE_URL = 'file:' + ((Join-Path $qaPrismaDir 'dev.db') -replace '\\', '/')
+npx.cmd prisma migrate deploy
+
+# 4. migration 成功后再启动服务端和两个隔离客户端。
+npm.cmd run dev:electron:server
+npm.cmd run dev:electron:client -- --rvb-dev-profile=player-one
+npm.cmd run dev:electron:client -- --rvb-dev-profile=player-two
+```
+
+服务端和两个客户端命令必须分别在独立终端运行。`npm audit` 报告不属于功能验收前置条件；不得在任务未授权依赖升级时执行 `npm audit fix --force`。
+
+创建固定种子的双客户端调试房间时，必须提供完整、可复制的命令，不能假设调用者仍保留上一个终端会话中的变量：
+
+```powershell
+$qaRoomBody = @{
+  mode = 'create-loopback-room'
+  seed = 2173765951
+  first = @{
+    alignment = 'dark'
+    templateIds = @('kiljaedan')
+  }
+  second = @{
+    alignment = 'light'
+  }
+  piecesPerPlayer = 8
+} | ConvertTo-Json -Depth 5
+
+$qaRoom = Invoke-RestMethod `
+  -Method Post `
+  -Uri 'http://127.0.0.1:3000/api/debug/battle' `
+  -ContentType 'application/json' `
+  -Body $qaRoomBody
+
+$qaRoom | Select-Object roomId, seed, stateHash
+$qaRoom.urls
+```
+
+如果 API 返回 HTTP 500，应先读取响应体和服务端堆栈，不得直接建议重建、删除数据库或改动 schema。常见的 `The table main.Room does not exist` 表示 migration 尚未应用到 Electron 实际使用的 `prisma/dev.db`；应停止服务端、设置上面的会话级 `DATABASE_URL`、执行 `prisma migrate deploy`，然后重启。仓库已有 migration 时不得改用 `prisma db push`。
+
 ## 大厅重新加入入口验证（RED-58）
 
 Windows Electron 大厅只会在本地 `rvb_active_battle` 结构完整、服务端房间仍处于对战状态，且保存的玩家仍属于该房间时显示“重新加入”。可按以下步骤复验：
