@@ -159,5 +159,13 @@ Full-viewport overlay checks:
 - Focused layout/renderer contracts: 2 files passed, 26 tests passed.
 - Serial full Vitest candidate: 38 files passed, 338 tests passed.
 - Encoding: 549 text files checked.
+
+Post-sync candidate:
+
+- Merged `origin/main@b8201dd` without conflicts; the upstream delta added combat-event and SkillCode audits/tests and did not replace RED-51 battle UI files.
+- Final focused contracts: 2 files passed, 26 tests passed.
+- Final serial full candidate: 45 files passed, 370 tests passed.
+- Final encoding scan: 556 text files checked.
+- Focused ESLint, renderer JavaScript syntax, range `git diff --check`, 0-behind status, and clean worktree: passed.
 - Focused ESLint, renderer JavaScript syntax, and `git diff --check`: passed.
 - The first full-suite run overlapped the encoding scan and reproduced the retained Electron archive zero-byte read anomaly (37 files/336 tests passed, one packaging case failed). The isolated packaging file then passed 9/9, and the non-concurrent full candidate passed 338/338.
