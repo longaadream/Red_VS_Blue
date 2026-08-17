@@ -75,6 +75,21 @@ flowchart LR
 
 > **历史兼容：** `getBattleStorage()` 仍能读取旧 `action-log` 和裸 `BattleState`。这只是恢复兼容，不表示三种格式具有相同的权威语义。
 
+### 2.3 Windows 与 Android 可以统一到什么程度
+
+结论是：**游戏逻辑核心可以、也应该完全共用；平台外壳不应强求同一实现。** 当前 Windows 的 `server-state` 与 Android 的 `action-log` 分裂是尚未收敛的历史架构，不是游戏规则存在平台差异。
+
+| 边界 | 应当共用 | 必须平台适配 |
+| --- | --- | --- |
+| 规则核心 | `BattleState`、`BattleAction`、`runBattleAction()`、Targeting、Spatial、RuleRuntime、Trace | 无 |
+| 命令协议 | actor、request/action ID、root seed、action、结果/error envelope | 传输编码和连接生命周期 |
+| 权威执行 | 同一初始状态、seed 和命令必须产生同一 hash/trace | Windows 在 Node 进程；Android 可在隐藏 WebView 的 browser-safe bundle |
+| 网络 | 相同的订阅、动作、错误和状态消息语义 | Windows Node WebSocket/HTTP；Android Java Socket/Bridge |
+| 存储 | 相同的版本化 `server-state` 格式和恢复合同 | Windows Prisma；Android 本地数据库/文件适配器 |
+| 系统能力 | 通过接口注入 entropy、storage、broadcast、日志 | Node 文件系统与 Android 生命周期/权限不同 |
+
+近期最小收敛路径不是把 Next.js、Prisma 或 Node 文件系统搬进 Android，而是让 Android 隐藏 WebView 对每个命令权威调用同一个 browser-safe Runner，保存完整 `server-state`，Java 层只负责网络和生命周期。Action log/Trace 可以继续保留为审计证据，但不再由客户端各自回放来决定共享状态。
+
 ## 3. 核心数据与公共接口
 
 ### 3.1 `BattleState`
@@ -203,7 +218,9 @@ interface BattleReplayResult {
 
 ### 3.7 技能、卡牌与触发器
 
-主要定义：`lib/game/skills.ts`、`lib/game/triggers.ts`、`lib/game/attached-effect.ts`。
+主要定义：`lib/game/skills.ts`、`lib/game/triggers.ts`。
+
+> **迁移中的历史遗留：** 核对基线仍包含 `lib/game/attached-effect.ts`、第五类触发消费者及 `data/effects/**`，所以本节保留其当前执行顺序；但 [RED-80](https://linear.app/redvsblue/issue/RED-80) 的静态调用图已确认内置内容没有生产入口，现役玩法已经统一使用 Rule + statusTag。RED-80 正在删除该模块、数据、helper 和消费者阶段；不要新增 AttachedEffect 调用。[RED-75](https://linear.app/redvsblue/issue/RED-75) 是随后重跑 Node/浏览器执行面差分的测试任务，不是实际删除实现的任务。
 
 - `SkillDefinition`、卡牌定义和 `TriggerRule` 保存元数据、资源、目标声明、动态代码及优先级。
 - `executeSkillFunction()` / `executeCardFunction()` 在传入的战斗副本上执行数据驱动效果。
@@ -211,15 +228,15 @@ interface BattleReplayResult {
 - `TriggerSystem.checkTriggers(battle, context)` 收集和执行一个事件的消费者；`fireEvent()` 保留父子事件链。
 - `globalTriggerSystem` 是进程级实例；初始化会清理/注册规则，这是当前跨房间隔离的重点风险。
 
-当前消费者大类顺序固定为：
+核对基线中的消费者大类顺序为：
 
 1. 全局规则；
 2. 棋子实例规则；
 3. 玩家规则；
 4. reactive 手牌；
-5. AttachedEffect。
+5. AttachedEffect（内置内容不可达，RED-80 正在移除）。
 
-同一类别按 `priority` 降序；未设置视为 0；同优先级保持快照/收集顺序。嵌套事件最大深度 20，每条根事件链最多分发 100 次，超限返回带事件链的阻断错误。规则、响应牌或附加效果抛异常时会附加 `event/consumer` 上下文并重新抛出，Runner 不提交该命令；规则定义无法重新加载时当前会写日志并跳过。
+同一类别按 `priority` 降序；未设置视为 0；同优先级保持快照/收集顺序。嵌套事件最大深度 20，每条根事件链最多分发 100 次，超限返回带事件链的阻断错误。规则、响应牌或基线中的遗留附加效果抛异常时会附加 `event/consumer` 上下文并重新抛出，Runner 不提交该命令；规则定义无法重新加载时当前会写日志并跳过。
 
 ## 4. 主要模块接口卡片
 
@@ -371,7 +388,7 @@ flowchart TD
   Prepared -->|invalid| Reject["抛稳定错误<br/>状态/trace/cursor 不提交"]
   Prepared -->|needOption / needTarget| Select["返回 preparation<br/>不执行效果或支付"]
   Prepared -->|ready| Before["派发 before 事件"]
-  Before --> Queue["消费者快照<br/>全局 → 棋子 → 玩家 → reactive → attached"]
+  Before --> Queue["消费者快照<br/>全局 → 棋子 → 玩家 → reactive → attached 遗留"]
   Queue --> Execute["类别内 priority 降序执行"]
   Execute --> Outcome{"before 结果"}
   Outcome -->|blocked| Blocked["提交已完成 before 消费者<br/>不执行核心效果和 after"]
@@ -512,6 +529,8 @@ commit + 运行模式 + roomId
 | 浏览器 bundle 与 Node 的固定种子差分、战斗表现边界 | `tests/game/engine-browser-differential.test.ts`、`tests/game/battle-ui-boundary.test.ts` |
 | WebSocket 基础连接、ping/pong、坏 JSON 与 RPC 错误 | `tests/ws-server.test.ts` |
 
+RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule → 玩家 Rule → reactive 手牌”；RED-75 的差分矩阵也会移除 AttachedEffect surface。当前人工构造 `attachedEffects` 的测试只证明遗留执行路径，不代表内置玩法可达。
+
 ### 8.2 主要缺口
 
 - 服务端权威胜负归约及开局到终局的固定 seed 回归。
@@ -535,7 +554,7 @@ commit + 运行模式 + roomId
 | 空间、移动与弹道事实 | `lib/game/spatial.ts` |
 | 技能、卡牌、伤害、治疗 | `lib/game/skills.ts` |
 | 触发器与事件链 | `lib/game/triggers.ts` |
-| 附加效果 | `lib/game/attached-effect.ts` |
+| AttachedEffect 遗留（RED-80 正在删除） | `lib/game/attached-effect.ts` |
 | 战斗存储兼容 | `lib/game/battle-storage.ts` |
 | Prisma 房间 | `lib/game/room-store.ts` |
 | Windows WebSocket | `lib/ws-server.ts` |
