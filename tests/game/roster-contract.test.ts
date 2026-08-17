@@ -66,12 +66,12 @@ function expectRosterError(run: () => unknown, code: string) {
 }
 
 describe('Demo roster contract', () => {
-  it('reads the current 13-light / 12-dark candidate pool from the server manifest', () => {
+  it('reads the current 13-light / 13-dark candidate pool from the server manifest', () => {
     const admittedPieces = getDemoPieceIds().map(templateId => DEFAULT_PIECES[templateId])
 
-    expect(admittedPieces).toHaveLength(25)
+    expect(admittedPieces).toHaveLength(26)
     expect(admittedPieces.filter(piece => piece.faction === 'good')).toHaveLength(13)
-    expect(admittedPieces.filter(piece => piece.faction === 'evil')).toHaveLength(12)
+    expect(admittedPieces.filter(piece => piece.faction === 'evil')).toHaveLength(13)
   })
 
   it.each([

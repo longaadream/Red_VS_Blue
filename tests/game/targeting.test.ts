@@ -430,7 +430,7 @@ describe('authoritative target preparation', () => {
 })
 
 describe('Demo targeting admission fixture', () => {
-  it('covers the fixed 25-piece / 79-skill / 16-card manifest with a stable preparation hash', () => {
+  it('covers the fixed 26-piece / 82-skill / 16-card manifest with a stable preparation hash', () => {
     const pieceIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/pieces/manifest.json'), 'utf8')) as string[]
     const cardIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/cards/manifest.json'), 'utf8')) as string[]
     const skillIds = [...new Set(pieceIds.flatMap(pieceId => {
@@ -438,7 +438,7 @@ describe('Demo targeting admission fixture', () => {
       return (piece.skills || []).map((skill: any) => skill.skillId as string)
     }))].sort()
     expect({ pieces: pieceIds.length, skills: skillIds.length, cards: cardIds.length })
-      .toEqual({ pieces: 25, skills: 79, cards: 16 })
+      .toEqual({ pieces: 26, skills: 82, cards: 16 })
 
     const source = makePiece({ instanceId: 'fixture-source', templateId: 'blue-minato', ownerPlayerId: 'player-red', x: 10, y: 8 })
     source.statusTags = [{ id: 'fixture-divine-shield', type: 'divine-shield' }] as never
@@ -484,7 +484,7 @@ describe('Demo targeting admission fixture', () => {
     }
 
     const fixtureHash = createHash('sha256').update(JSON.stringify(fixture)).digest('hex')
-    expect(fixtureHash).toBe('463c53edf669b388339f5ca81cd847a0357aa97c3d14fba4344129e76e11b9e1')
+    expect(fixtureHash).toBe('a6d421ba6423651d25b4c7622e4e56c810479daf073ba25c517e2d1b6066fbdc')
   })
 })
 
