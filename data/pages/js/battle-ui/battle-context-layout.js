@@ -15,12 +15,12 @@
 
     const safeIndex = clamp(Number(index) || 0, 0, total - 1)
     const progress = (safeIndex / (total - 1)) * 2 - 1
-    const maximumAngle = Math.min(28, total * 5)
+    const maximumAngle = Math.min(20, total * 4)
     const distanceFromCenter = Math.abs(progress)
 
     return {
       angle: Number((progress * maximumAngle).toFixed(3)),
-      lift: Number((-(progress * progress) * 16).toFixed(3)),
+      lift: Number((-(progress * progress) * 10).toFixed(3)),
       zIndex: Math.max(1, Math.round((1 - distanceFromCenter) * total) + 1),
     }
   }

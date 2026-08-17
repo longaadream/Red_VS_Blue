@@ -123,6 +123,21 @@ describe('battle page route contract', () => {
     expect(mobileCss).toMatch(/\.training-setup-grid\s*\{[\s\S]*?overflow-y:\s*auto/)
   })
 
+  it('keeps the board dominant in low-height landscape battle layouts', () => {
+    const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')
+    const contextCss = readFileSync(resolve(pagesDir, 'css/battle-context-ui.css'), 'utf8')
+    const mobileCss = readFileSync(resolve(pagesDir, 'css/battle-responsive-mobile.css'), 'utf8')
+
+    expect(responsiveCss).toContain('--battle-hand-height: 142px')
+    expect(responsiveCss).toMatch(/@media \(max-width: 1024px\)[\s\S]*?--battle-hand-height:\s*134px/)
+    expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?--battle-hud-offset:\s*44px[\s\S]*?--battle-hand-height:\s*112px/)
+    expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?\.card-item\s*\{[\s\S]*?width:\s*76px[\s\S]*?height:\s*90px/)
+    expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?\.turn-summary-secondary\s*\{\s*display:\s*none/)
+    expect(contextCss).toMatch(/\.topbar #resApDisplay,[\s\S]*?\.topbar \.hud-hand\s*\{\s*display:\s*none/)
+    expect(contextCss).toMatch(/#statusMsg\s*\{[\s\S]*?bottom:\s*calc\(var\(--battle-hand-height\) \+ 8px\)/)
+    expect(mobileCss).toMatch(/@media \(max-width: 760px\)[\s\S]*?--battle-hand-height:\s*112px/)
+  })
+
   it('routes the lobby training entry to battle.html training mode', () => {
     const lobby = readPage('index.html')
 

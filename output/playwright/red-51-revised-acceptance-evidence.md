@@ -103,3 +103,32 @@ Post-merge checks:
 - Focused merge coverage: 8 files passed, 103 tests passed.
 - Full Vitest candidate: 38 files passed, 335 tests passed.
 - Encoding: 549 text files checked.
+
+## 2026-08-17 board-priority density follow-up
+
+- The 844x390 baseline confirmed the crowding report: the hand consumed 160px / 41.0% of the viewport while the board stage received only 134px / 34.4%. The phase HUD was 76.6px tall, and the switch-view label had 70px of scroll content inside a 24px content box.
+- The final 844x390 layout assigns 230px / 59.0% to the board stage and 112px / 28.7% to the hand. The phase HUD is 36px tall, the cards use a 76x90px base box, and all visible top controls have equal 32px scroll/client content height with no wrapping.
+- The hand fan remains visible but is calmer: maximum rotation changed from 28deg to 20deg and maximum lift from 16px to 10px. Five cards remain individually selectable; low-height cards keep art, cost, name, and type while the existing detail interaction carries the full description.
+- Duplicate AP, charge, and hand-count badges were removed from the top-right toolbar because the player HUD and visible cards already carry that information. At 1280x720 the toolbar therefore returned from 74px to a single 40px row.
+- The transparent status instruction now ends 8px above the hand budget at every viewport instead of crossing the card fan. At 844x390 its bottom was 270px and the hand began at 278px; at 1024x768 its bottom was 626px and the hand began at 634px.
+- 1280x720: board stage 496px / 68.9%, hand 142px / 19.7%, zero page overflow, and the first rotated card ended at 718.5px inside the 720px viewport.
+- 1024x768: board stage 548px / 71.4%, hand 134px / 17.4%, zero page overflow, and every rotated card ended at or above 766.5px.
+- 760x390: the phase HUD ended at x=564 and the toolbar began at x=568; the board stage was 230px tall, the hand 112px, and the first rotated card ended at 389px with zero page overflow.
+- 390x844: the orientation guard covered the exact 390x844 viewport and the page reported zero horizontal and vertical overflow.
+- Console output remained limited to the known read-only static-harness 404s; the density changes introduced no runtime exception.
+
+Density artifacts:
+
+- `red-51-density-baseline-844x390.png`
+- `red-51-density-844x390.png`
+- `red-51-density-760x390.png`
+- `red-51-density-1024x768.png`
+- `red-51-density-1280x720.png`
+- `red-51-density-390x844-guard.png`
+
+Density follow-up checks:
+
+- Focused density contracts: 2 files passed, 16 tests passed.
+- Full Vitest candidate: 38 files passed, 336 tests passed.
+- Encoding: 549 text files checked.
+- Focused ESLint, JavaScript syntax, and `git diff --check`: passed.

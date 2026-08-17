@@ -1,6 +1,6 @@
 :root {
-  --battle-hud-offset: 76px;
-  --battle-hand-height: 170px;
+  --battle-hud-offset: 68px;
+  --battle-hand-height: 142px;
   --battle-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -25,12 +25,12 @@ body {
   right: clamp(72px, 31vw, 372px) !important;
   width: auto !important;
   max-width: none !important;
-  min-height: 58px;
+  min-height: 52px;
   display: grid !important;
   grid-template-columns: minmax(132px, auto) minmax(0, 1fr);
   align-items: stretch !important;
-  gap: 8px !important;
-  padding: 6px 8px !important;
+  gap: 6px !important;
+  padding: 5px 7px !important;
   background: rgba(3, 7, 18, 0.84) !important;
   border-color: rgba(148, 163, 184, 0.2) !important;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34) !important;
@@ -41,8 +41,8 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 5px;
-  padding-right: 8px;
+  gap: 3px;
+  padding-right: 6px;
   border-right: 1px solid rgba(148, 163, 184, 0.18);
 }
 
@@ -51,7 +51,7 @@ body {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
 }
 
 .turn-summary-secondary {
@@ -79,20 +79,20 @@ body {
   max-width: none !important;
   min-width: 0;
   display: grid !important;
-  grid-template-columns: repeat(2, minmax(126px, 1fr));
-  gap: 6px !important;
+  grid-template-columns: repeat(2, minmax(118px, 1fr));
+  gap: 4px !important;
   overflow: visible;
 }
 
 .player-state-chip {
   position: relative;
   min-width: 0 !important;
-  min-height: 44px;
-  padding: 5px 7px !important;
+  min-height: 38px;
+  padding: 4px 6px !important;
   display: grid !important;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px !important;
+  gap: 5px !important;
   border-width: 1px;
   overflow: hidden;
 }
@@ -113,15 +113,15 @@ body {
 }
 
 .player-avatar {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(254, 202, 202, 0.52);
   border-radius: 50%;
   color: #fee2e2;
   background: rgba(127, 29, 29, 0.5);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 950;
 }
 
@@ -136,7 +136,7 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .player-display-name {
@@ -163,13 +163,13 @@ body {
 }
 
 .player-state-resources .resource-orb {
-  min-width: 36px;
-  height: 21px;
-  padding: 0 5px 0 4px;
-  font-size: 11px;
+  min-width: 34px;
+  height: 20px;
+  padding: 0 4px 0 3px;
+  font-size: 10px;
 }
 
-.player-state-resources .resource-glyph { width: 13px; height: 13px; }
+.player-state-resources .resource-glyph { width: 12px; height: 12px; }
 
 .current-player-marker {
   position: absolute;
@@ -257,7 +257,7 @@ body {
   min-height: 0;
   align-items: flex-end;
   gap: 9px;
-  padding: 18px 34px 10px 12px;
+  padding: 15px 34px 8px 12px;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -281,9 +281,9 @@ body {
 .hand-scroll::-webkit-scrollbar { display: none; }
 
 .card-item {
-  width: 94px;
-  height: 112px;
-  min-width: 94px;
+  width: 90px;
+  height: 106px;
+  min-width: 90px;
   padding: 0;
   color: inherit;
   font-family: inherit;
@@ -291,7 +291,7 @@ body {
   scroll-snap-align: start;
 }
 
-.card-art { height: 52px; }
+.card-art { height: 48px; }
 .card-desc { -webkit-line-clamp: 2; }
 
 @media (hover: hover) and (pointer: fine) {
@@ -299,7 +299,7 @@ body {
 }
 
 @media (max-width: 1024px) {
-  :root { --battle-hud-offset: 82px; --battle-hand-height: 148px; }
+  :root { --battle-hud-offset: 72px; --battle-hand-height: 134px; }
   .phase-bar {
     right: 372px !important;
     grid-template-columns: minmax(104px, 112px) minmax(0, 1fr);

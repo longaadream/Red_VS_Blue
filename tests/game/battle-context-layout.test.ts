@@ -32,6 +32,8 @@ describe('battle contextual layout', () => {
 
     expect(left.angle).toBe(-right.angle)
     expect(left.lift).toBe(right.lift)
+    expect(Math.abs(left.angle)).toBeLessThanOrEqual(20)
+    expect(left.lift).toBeGreaterThanOrEqual(-10)
     expect(inner.zIndex).toBeGreaterThan(left.zIndex)
     expect(single).toEqual({ angle: 0, lift: 0, zIndex: 1 })
   })

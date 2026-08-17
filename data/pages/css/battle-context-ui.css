@@ -14,6 +14,25 @@
 
 .turn-summary { border-color: rgba(148, 163, 184, 0.1) !important; }
 
+.topbar #resApDisplay,
+.topbar #resCpDisplay,
+.topbar .hud-hand { display: none !important; }
+
+#statusMsg {
+  left: 50% !important;
+  bottom: calc(var(--battle-hand-height) + 8px) !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  max-width: calc(100vw - 24px);
+  min-height: 0;
+  padding: 2px 7px;
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .player-state-chip {
   border-color: transparent !important;
   background: rgba(15, 23, 42, 0.42) !important;
@@ -344,7 +363,7 @@
   align-items: flex-end;
   justify-content: center;
   gap: 0 !important;
-  padding: 18px 42px 8px !important;
+  padding: 16px 38px 8px !important;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -352,7 +371,7 @@
 .card-item {
   z-index: var(--hand-arc-z, 1);
   flex: 0 0 auto;
-  margin-left: -16px;
+  margin-left: -15px;
   border-color: rgba(96, 165, 250, 0.22) !important;
   background: rgba(12, 21, 40, 0.88) !important;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24) !important;
@@ -367,17 +386,130 @@
 .card-item:focus-visible:not(.card-disabled),
 .card-item.card-pending {
   z-index: 40;
-  transform: translateY(calc(var(--hand-arc-lift, 0px) - 18px)) rotate(0deg) scale(1.04);
+  transform: translateY(calc(var(--hand-arc-lift, 0px) - 14px)) rotate(0deg) scale(1.04);
 }
 
 @media (max-width: 1024px) {
-  :root { --battle-hand-height: 160px; }
+  :root { --battle-hand-height: 134px; }
   .battle-turn-control { right: 14px; bottom: 14px; }
-  .hand-scroll { padding-inline: 32px !important; }
-  .card-item { margin-left: -14px; }
+  .hand-scroll { padding-inline: 28px !important; }
+  .card-item { margin-left: -13px; }
 }
 
 @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
+  :root { --battle-hud-offset: 44px; --battle-hand-height: 112px; }
+
+  .phase-bar {
+    right: 196px !important;
+    min-height: 36px;
+    max-height: 36px;
+    grid-template-columns: minmax(88px, auto) minmax(0, 1fr);
+    gap: 4px !important;
+    padding: 2px 4px !important;
+  }
+
+  .turn-summary {
+    min-width: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 3px;
+    padding-right: 4px;
+  }
+
+  .turn-summary-primary { gap: 4px; }
+  .turn-summary-secondary { display: none; }
+  .turn-badge { padding: 2px 7px; font-size: 10px; }
+  #roundLabel { display: none; }
+
+  #playerResCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px !important;
+  }
+
+  .player-state-chip {
+    min-height: 30px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 2px 5px !important;
+    gap: 4px !important;
+  }
+
+  .player-avatar,
+  .player-side-name { display: none; }
+  .player-state-copy { display: block; }
+  .player-display-name { max-width: 90px; font-size: 10px; }
+  .player-state-resources { gap: 2px; }
+  .player-state-resources .resource-orb {
+    min-width: 29px;
+    height: 18px;
+    padding: 0 3px;
+    font-size: 9px;
+  }
+  .player-state-resources .resource-glyph { width: 11px; height: 11px; }
+
+  .topbar {
+    max-width: 186px !important;
+    padding: 2px !important;
+    gap: 3px !important;
+    flex-wrap: nowrap !important;
+  }
+
+
+  .topbar .back-btn,
+  .topbar .btn-surrender,
+  .topbar .btn-fullmap,
+  .topbar #btnSwitchPov,
+  .topbar #btnResetCD {
+    width: 34px;
+    min-width: 34px !important;
+    height: 34px !important;
+    padding: 0 !important;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 0 !important;
+  }
+
+  .topbar .back-btn::before { content: "\2190"; font-size: 15px; }
+  .topbar .btn-surrender::before { content: "\2691"; font-size: 14px; }
+  .topbar #btnSwitchPov::before { content: "\21ba"; font-size: 14px; }
+  .topbar #btnResetCD::before { content: "CD"; font-size: 9px; }
+  .topbar .btn-fullmap { font-size: 13px !important; }
+
+  .board-wrap { padding: 2px 4px !important; }
+  .board-camera-controls { top: 8px; left: 8px; }
+
+  .hand-scroll {
+    padding: 10px 36px 5px !important;
+    scroll-padding-inline: 36px;
+  }
+
+  .card-item {
+    width: 76px;
+    min-width: 76px;
+    height: 90px;
+    margin-left: -12px;
+    border-radius: 8px;
+  }
+
+  .card-art { height: 39px; }
+  .card-mana-gem {
+    top: -6px;
+    left: -6px;
+    width: 22px;
+    height: 22px;
+    border-width: 1px;
+    font-size: 11px;
+  }
+  .card-name-banner { padding: 2px 6px; font-size: 9px; }
+  .card-body { justify-content: center; padding: 2px 4px; }
+  .card-desc { display: none; }
+  .card-type-badge { font-size: 7px; }
+
+  .card-item:hover:not(.card-disabled),
+  .card-item:focus-visible:not(.card-disabled),
+  .card-item.card-pending {
+    transform: translateY(calc(var(--hand-arc-lift, 0px) - 10px)) rotate(0deg) scale(1.03);
+  }
+
   .training-tools-toggle,
   .training-popover select,
   .training-popover .tb-btn {
