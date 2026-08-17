@@ -95,6 +95,27 @@ describe('battle presentation boundary', () => {
     })
   })
 
+  it('projects the template-declared portrait asset for pieces added after training starts', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const snapshot = fixtureSnapshot()
+    snapshot.pieces[0].templateId = 'red-training-piece'
+
+    const model = viewModel.create({
+      snapshot,
+      source: 'training',
+      viewerId: 'player-red',
+      pieceTemplates: {
+        'red-training-piece': { image: 'training-piece-portrait.webp' },
+      },
+    })
+
+    expect(model.pieces[0]).toMatchObject({
+      id: 'piece-red',
+      templateId: 'red-training-piece',
+      portraitId: 'training-piece-portrait.webp',
+    })
+  })
+
   it('projects all visible selected-piece statuses and never carries the previous selection forward', () => {
     const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
     const baseSnapshot = fixtureSnapshot()
@@ -160,7 +181,7 @@ describe('battle presentation boundary', () => {
     expect(model.selection.piece).not.toHaveProperty('skills')
   })
 
-  it('keeps the DOM boundary focused on the shared HUD when a piece is selected', () => {
+  it('keeps the DOM boundary focused on HUD and read-only selected status', () => {
     const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
     const document = {
       getElementById: vi.fn(() => null),
@@ -191,6 +212,56 @@ describe('battle presentation boundary', () => {
     expect(document.getElementById).toHaveBeenCalledWith('turnBadge')
     expect(document.getElementById).toHaveBeenCalledWith('playerResCards')
     expect(document.getElementById).not.toHaveBeenCalledWith('selectedPieceStatus')
+  })
+
+
+  it('renders every selected-piece status in a non-blocking overlay and hides it outside inspect mode', () => {
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const overlay = {
+      hidden: true,
+      dataset: {} as Record<string, string>,
+      innerHTML: '',
+      setAttribute: vi.fn(),
+    }
+    const document = {
+      getElementById: vi.fn((id: string) => id === 'selectedStatusOverlay' ? overlay : null),
+    }
+    const ui = domUi.create({ document })
+    const model = {
+      selection: {
+        mode: 'inspect',
+        piece: {
+          id: 'piece-red',
+          name: 'Red Warrior',
+          statuses: [{ id: 'freeze', label: '冰冻', duration: 2, description: '无法行动' }],
+        },
+      },
+      turn: {
+        currentPlayerId: 'player-red',
+        isViewerTurn: true,
+        number: 2,
+        phase: 'action',
+        remainingSeconds: 89,
+      },
+      players: [],
+      viewer: null,
+    }
+
+    ui.update(model)
+
+    expect(document.getElementById).toHaveBeenCalledWith('selectedStatusOverlay')
+    expect(overlay.hidden).toBe(false)
+    expect(overlay.dataset.pieceId).toBe('piece-red')
+    expect(overlay.innerHTML).toContain('Red Warrior')
+    expect(overlay.innerHTML).toContain('冰冻')
+    expect(overlay.innerHTML).toContain('2回合')
+    expect(overlay.setAttribute).toHaveBeenCalledWith('aria-live', 'polite')
+
+    ui.update({
+      ...model,
+      selection: { ...model.selection, mode: 'move' },
+    })
+    expect(overlay.hidden).toBe(true)
   })
 
   it('sends the identical model to Three.js and DOM and owns repeatable mount/dispose', () => {

@@ -17,7 +17,7 @@ function loadContextLayout() {
     placeMenu(
       anchor: { left: number; top: number },
       menu: { width: number; height: number },
-      bounds: { width: number; height: number },
+      bounds: { width: number; height: number; topPadding?: number },
     ): { left: number; top: number; side: string; originX: number; originY: number }
   }
 }
@@ -50,8 +50,15 @@ describe('battle contextual layout', () => {
       { width: 164, height: 112 },
       { width: 390, height: 300 },
     )
+    const belowHud = layout.placeMenu(
+      { left: 28, top: 24 },
+      { width: 164, height: 112 },
+      { width: 390, height: 300, topPadding: 52 },
+    )
+
 
     expect(fromLeft.side).toBe('right')
+    expect(belowHud.top).toBe(52)
     expect(fromRight.side).toBe('left')
     for (const placed of [fromLeft, fromRight]) {
       expect(placed.left).toBeGreaterThanOrEqual(8)

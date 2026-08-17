@@ -30,6 +30,7 @@
     const anchorTop = Number(anchor && anchor.top) || 0
     const menuWidth = Math.max(0, Number(menu && menu.width) || 0)
     const menuHeight = Math.max(0, Number(menu && menu.height) || 0)
+    const topPadding = Math.max(MENU_PADDING, Number(bounds && bounds.topPadding) || MENU_PADDING)
     const boundsWidth = Math.max(0, Number(bounds && bounds.width) || 0)
     const boundsHeight = Math.max(0, Number(bounds && bounds.height) || 0)
     const availableRight = boundsWidth - anchorLeft
@@ -39,7 +40,7 @@
       : anchorLeft - menuWidth - MENU_GAP
     const rawTop = anchorTop - menuHeight / 2
     const left = clamp(rawLeft, MENU_PADDING, boundsWidth - menuWidth - MENU_PADDING)
-    const top = clamp(rawTop, MENU_PADDING, boundsHeight - menuHeight - MENU_PADDING)
+    const top = clamp(rawTop, topPadding, boundsHeight - menuHeight - MENU_PADDING)
 
     return {
       left: Number(left.toFixed(3)),

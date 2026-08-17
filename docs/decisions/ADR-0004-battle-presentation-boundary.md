@@ -25,7 +25,7 @@ flowchart LR
   L --> V
   V --> P["BattlePresentation.update"]
   P --> R["BattleRenderer3D<br/>棋盘、棋子、摘要、高亮、特效"]
-  P --> D["BattleDomUI<br/>HUD"]
+  P --> D["BattleDomUI<br/>HUD、选中状态摘要"]
   R --> I["Battle UI intent"]
   D --> I
   I --> C["battle.html 页面控制器"]
@@ -37,7 +37,7 @@ flowchart LR
 - `BattleLegalActions` 不实现距离、范围、伤害或结算公式，只用克隆快照调用现有 `GameEngine` 验证入口并返回合法格集合。
 - `BattlePresentation` 把同一个展示模型对象交给 Three.js 与 DOM，并拥有 mount、resize、dispose 和用户意图出口。
 - `BattleRenderer3D` 只接收最小展示模型，生命周期固定为 `init → update/resize/project → dispose`，不接收或修改全量 `BattleState`。
-- `BattleDomUI` 负责 HUD；`battle.html` 保留网络、训练 fixture、动作提交、棋子附近技能菜单、完整详情和仍待后续拆分的 DOM 控制器代码。`BattleContextLayout` 只计算菜单锚点与弧形手牌几何。
+- `BattleDomUI` 负责 HUD 和由同一展示模型驱动的只读选中状态摘要；`battle.html` 保留网络、训练 fixture、动作提交、棋子附近技能菜单、完整详情和仍待后续拆分的 DOM 控制器代码。`BattleContextLayout` 只计算含 HUD 安全区的菜单锚点与弧形手牌几何。
 - 所有棋盘、棋子和技能点击先发出 `select-piece`、`clear-selection`、`select-skill`、`activate-cell`、`inspect-piece`、`cancel-target` 等意图，再由页面控制器接入原有流程；服务端/规则层仍是非法操作的最终拒绝者。
 - renderer 的 `viewport-change` 是表现层位置同步信号，不是规则命令；页面用它把浮动菜单继续锚定在投影后的棋子附近。
 

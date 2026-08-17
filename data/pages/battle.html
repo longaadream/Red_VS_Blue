@@ -1292,6 +1292,7 @@
               </div>
               <div id="pieceContextSkills" class="piece-context-skills"></div>
             </div>
+            <aside id="selectedStatusOverlay" class="selected-status-overlay" data-battle-ui-region="selected-status" aria-label="选中棋子特殊状态" aria-live="polite" hidden></aside>
           </div>
         </div>
         <div class="turn-control-wrap battle-turn-control">
@@ -3697,9 +3698,12 @@
       }
       if (!anchor) return closePieceContextMenu()
 
+      const hudOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--battle-hud-offset')) || 0
+      const menuTopPadding = hudOffset + 8
       const placement = layout.placeMenu(anchor, { width: menu.offsetWidth, height: menu.offsetHeight }, {
         width: stage.clientWidth,
         height: stage.clientHeight,
+        topPadding: menuTopPadding,
       })
       menu.style.left = placement.left + 'px'
       menu.style.top = placement.top + 'px'

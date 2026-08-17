@@ -1,4 +1,5 @@
 @media (max-width: 760px) {
+  .selected-status-overlay { display: none !important; }
   :root { --battle-hud-offset: 44px; --battle-hand-height: 112px; }
 
   .topbar {
