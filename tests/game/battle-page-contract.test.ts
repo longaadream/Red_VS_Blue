@@ -149,6 +149,13 @@ describe('battle page route contract', () => {
     expect(responsiveCss).toMatch(/\.card-item\s*\{[\s\S]*?pointer-events:\s*auto/)
   })
 
+  it('keeps mobile battle controls clear of the floating hand', () => {
+    const mobileCss = readFileSync(resolve(pagesDir, 'css/battle-responsive-mobile.css'), 'utf8')
+
+    expect(mobileCss).toMatch(/\.battle-turn-control\s*\{[\s\S]*?bottom:\s*calc\(var\(--battle-hand-height\) \+ 10px\)/)
+    expect(mobileCss).toMatch(/\.training-tools\s*\{[\s\S]*?bottom:\s*calc\(var\(--battle-hand-height\) \+ 10px\)/)
+  })
+
   it('routes the lobby training entry to battle.html training mode', () => {
     const lobby = readPage('index.html')
 

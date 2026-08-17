@@ -89,7 +89,7 @@
   .turn-control-wrap { pointer-events: auto; }
   .btn-end { min-width: 104px; min-height: 42px; padding: 7px 11px; }
 
-  .board-camera-controls { top: 11px; left: 11px; }
+  .board-camera-controls { top: calc(var(--battle-hud-offset) + 8px); left: 11px; }
   .board-view-button {
     min-width: 42px;
     min-height: 42px;
@@ -137,9 +137,9 @@
     overscroll-behavior-inline: contain;
   }
   .piece-context-skill { min-width: 80px; min-height: 44px; padding: 6px 7px; }
-  .battle-turn-control { right: 12px; bottom: 12px; }
+  .battle-turn-control { right: 12px; bottom: calc(var(--battle-hand-height) + 10px); }
 
-  .training-tools { left: 12px; bottom: 12px; }
+  .training-tools { left: 12px; bottom: calc(var(--battle-hand-height) + 10px); }
   .training-tools-toggle { min-height: 44px; padding-inline: 12px; }
   .training-popover {
     width: min(330px, calc(100vw - 24px));
@@ -150,7 +150,7 @@
   .training-popover .tb-btn { min-width: 0; min-height: 44px; padding-inline: 8px; }
 
   .hand-scroll {
-    justify-content: flex-start; gap: 0; padding: 10px 48px calc(5px + env(safe-area-inset-bottom)) !important; scroll-padding-inline: 48px;
+    justify-content: safe center; gap: 0; padding: 10px 48px calc(5px + env(safe-area-inset-bottom)) !important; scroll-padding-inline: 48px;
   }
   .card-item { width: 76px; min-width: 76px; height: 90px; margin-left: -10px; border-radius: 8px; }
   .card-art { height: 39px; }
