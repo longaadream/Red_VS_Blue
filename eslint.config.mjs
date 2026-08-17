@@ -5,6 +5,14 @@ import nextTypeScript from 'eslint-config-next/typescript'
 export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
+  {
+    rules: {
+      '@next/next/no-img-element': 'error',
+      '@typescript-eslint/no-unused-expressions': 'error',
+      '@typescript-eslint/no-unused-vars': 'error',
+      'import/no-anonymous-default-export': 'error',
+    },
+  },
   globalIgnores([
     '.next/**',
     'out/**',
@@ -29,6 +37,7 @@ export default defineConfig([
     'android-client/www/game-engine.js',
     'android-client/www/js/crypto-lib.js',
     'android-client/www/js/game-engine.js',
+    'data/pages/js/game-engine.js',
     '**/*.min.js',
     'app/tailwind-compiled.css',
     'lib/generated/**',

@@ -602,7 +602,6 @@ export function startWsServer(): void {
               if (msg.type === 'gameOver') {
                 if (!room.gameRecord) {
                   room.status = 'finished'
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   room.gameRecord = {
                     gameId: _roomId + '-' + Date.now(),
                     timestamp: Date.now(),

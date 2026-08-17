@@ -832,9 +832,7 @@ interface AndroidBridge {
 declare global {
   // window may not exist (typeof window === 'undefined' defined at build time)
   // but the actual WebView global IS accessible via globalThis
-  // eslint-disable-next-line no-var
   var AndroidServerBridge: AndroidBridge | undefined
-  // eslint-disable-next-line no-var
   var RvBMobileServer: {
     processRequest(reqId: string, method: string, path: string, bodyJson: string, headersJson?: string): void
     processRequestFromBridge(reqId: string): void
