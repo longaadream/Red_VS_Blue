@@ -1,6 +1,6 @@
 # skillCode 兼容矩阵（RED-45 / RED-75 / RED-80）
 
-状态：RED-80 已按批准方案移除不可达的 AttachedEffect 执行面；当前权威架构为 Rule + statusTag。RED-75 的 Node/浏览器差分矩阵由六类收敛为五类。审计日期：2026-08-17。风险：High（跨模块架构清理）。
+状态：RED-80 已按批准方案移除不可达的 AttachedEffect 执行面；当前权威架构为 Rule + statusTag。RED-75 已按同步后的合同将 Node/浏览器差分矩阵由历史六类收敛并固化为五类现役执行面。审计日期：2026-08-17。风险：RED-80 High（跨模块架构清理）；RED-75 Medium（测试与文档收口）。
 
 本矩阵区分两类证据：
 
@@ -15,7 +15,7 @@
 
 | 数据组 | 带 `id` 的定义 | 含可执行代码字段 | 其他执行引用 |
 | --- | ---: | ---: | ---: |
-| skills | 113 | 110 个 `code` | 其余为无代码/元数据定义 |
+| skills | 116 | 113 个 `code` | 其余为无代码/元数据定义 |
 | rules | 81 | 54 个 `skillCode` | 27 个 `effect.type=triggerSkill` |
 | cards | 16 | 16 个 `code` | active/reactive 共用执行器 |
 
@@ -118,14 +118,16 @@ RED-28 提供命名随机流、规则时钟和确定性实例 ID。规则、技�
 | --- | --- |
 | RED-80 聚焦回归 | PASS：10 个文件 / 92 项（旧状态拒绝 fixture 已随兼容层删除；覆盖触发顺序、五面 Node/浏览器差分、RED-76 真实被动回归和核心动作） |
 | 五面 Node/浏览器 trace + action log + hash | PASS：浏览器相关 3 个文件 / 15 项；五个 surface 保持固定 hash |
-| 三类 JSON 解析和生产 loader | PASS：113 skills / 81 rules / 16 cards |
+| 三类 JSON 解析和生产 loader | PASS：116 skills / 81 rules / 16 cards |
 | 执行字段分类 | PASS：0 unclassified；27 个 `triggerSkill` 引用可解析 |
 | 全量语法/helper 静态审计 | PASS：0 个语法诊断；`unsupportedUse={}` |
 | 旧状态残留扫描 | PASS：`legacy-state.ts` 不存在；生产源码、运行时测试 fixture、浏览器/Android bundle 中旧错误码、字段识别函数和字段名均为 0 |
-| 完整 Vitest / TypeScript / 编码 | PASS：47 个文件 / 375 项；`npx tsc --noEmit`；510 个文本文件 |
-| ESLint | RED-80 剩余 7 个新建/实质重写文件定向 PASS；全仓 `npm run lint` 既有基线仍 FAIL（639 errors / 334 warnings） |
+| 完整 Vitest | PASS：48 个文件 / 401 项 |
+| TypeScript 额外诊断 | 范围外既有 FAIL：`tests/game/venom-skills.test.ts` 的 RED-89 fixture 有 2 个类型错误；RED-75 不修改该文件，且同步后的合同不以全仓 TypeScript 为阻断项 |
+| 编码 | PASS：`npm run check:encoding` 检查 515 个文本文件 |
+| ESLint | PASS：RED-88 合并后全仓 `npm run lint` 退出码 0、0 warning |
 | 构建 / 真实浏览器冒烟 | PASS：bundle 构建；QA 训练局完成 Rule pending 选择与 statusTag 显示；0 个旧 API 或状态兼容残留 |
-| 独立审查 | 实现与真实浏览器证据无其他阻断；合同验收 BLOCKED：全仓 `npm run lint` 基线未通过，需人工 waiver 或另行清债 |
+| RED-75 独立审查 | PASS：独立复验五面差分、完整门禁、allowed_paths 与文档一致性；无 P1–P3 阻断 |
 
 真实浏览器步骤：在本地 QA 路由启动“志志雄真实 vs 观者”训练局；结束先手回合后，`rule-watcher-form` 打开 pending 选项；选择“平静”使手牌 1→2，出牌后行动点 10→9、手牌 2→1。选中观者时详情栏显示“平静护盾（1层、永久、强度2）”和“平静姿态（1层、永久）”，权威状态只包含 Rule + statusTag。
 
