@@ -2,7 +2,7 @@
   "id": "minato-rasengan",
   "name": "螺旋丸",
   "description": "对1格内1名敌人造成攻击力100%的物理伤害，水门攻击力+1，并给该敌方角色附加1层飞雷神标记。",
-  "keywords": ["飞雷神"],
+  "keywords": [],
   "targetText": "1格内1名敌人",
   "effectTags": ["物理伤害", "标记", "强化"],
   "icon": "🌐",
