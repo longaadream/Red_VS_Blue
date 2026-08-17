@@ -518,12 +518,12 @@
   },
   "tests/game/targeting.test.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 14
+      "count": 15
     }
   },
   "tests/game/turn.test.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 93
+      "count": 102
     }
   },
   "tests/helpers/minimal-state.ts": {

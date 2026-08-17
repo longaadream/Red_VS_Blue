@@ -13,11 +13,13 @@ ESLint 9 的 bulk suppression 以 `eslint-suppressions.json` 记录当前存量�
 
 ## 2026-08-17 初始证据
 
-最新 `main`（包含 RED-80）直接运行 ESLint 的基线为：
+RED-80 合并提交 `0207b63` 上直接运行 ESLint 的基线为：
 
 - 639 errors、334 warnings，共 973 项；
 - 90 个文件；
 - 主要规则为 `no-explicit-any` 555、`no-unused-expressions` 211、`no-unused-vars` 112、`no-require-imports` 66。
+
+候选同步最新主线 `e51dcd7`（RED-73）后，两个既有测试文件新增 10 个 `no-explicit-any`；门禁按设计失败，最终基线将这 10 项作为合入前存量纳入。
 
 RED-88 做了三类治理：
 
@@ -25,11 +27,11 @@ RED-88 做了三类治理：
 2. 删除 4 条 ESLint 已确认无效的行级 disable 注释；只删除注释，不修改运行时代码。
 3. 将原 warning 规则提升为 error，并用官方 suppression 记录剩余存量。
 
-提交的 suppression 基线为 780 项、89 个文件、118 个“文件 + 规则”桶：
+提交的 suppression 基线为 790 项、89 个文件、118 个“文件 + 规则”桶：
 
 | 规则 | 数量 |
 | --- | ---: |
-| `@typescript-eslint/no-explicit-any` | 555 |
+| `@typescript-eslint/no-explicit-any` | 565 |
 | `@typescript-eslint/no-unused-vars` | 81 |
 | `@typescript-eslint/no-require-imports` | 66 |
 | `@typescript-eslint/no-unused-expressions` | 53 |
