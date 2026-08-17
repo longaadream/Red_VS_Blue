@@ -24,6 +24,7 @@
 
 ## 计划建立的文档
 
+- [`GAME_LOGIC_SYSTEM.md`](./GAME_LOGIC_SYSTEM.md)：当前游戏逻辑接口、状态流转、运行模式差异和执行流程示意图。
 - `ARCHITECTURE.md`：整体架构和模块依赖关系。
 - `ENGINE_CORE.md`：游戏引擎核心、状态变化和执行流程。
 - `MODULE_INTERFACES.md`：各模块公开接口和数据结构。
