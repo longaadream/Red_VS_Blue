@@ -291,6 +291,81 @@ describe('battle page route contract', () => {
     ])
   })
 
+  it('does not submit a typeless battle action when a card preview is cancelled on the board', () => {
+    const battlePage = readPage('battle.html')
+    const submittedActions: unknown[] = []
+    const statusMessages: string[] = []
+    const context = createContext({
+      G: {
+        turn: { currentPlayerId: 'player-red' },
+        pieces: [],
+      },
+      myPlayerId: 'player-red',
+      targetSubmissionPending: false,
+      TRAINING_MODE: false,
+      placingMode: false,
+      pendingCardAction: { cardInstanceId: 'demon-summon-1-instance', cardId: 'demon-summon-1' },
+      pendingSkill: null,
+      pendingMove: false,
+      selectedPieceId: null,
+      pendingOptionSelectionForOther: () => false,
+      submitTargetAction: (action: unknown) => submittedActions.push(action),
+      setStatusMsg: (message: string) => statusMessages.push(message),
+      currentTargetSourceName: () => '恶魔召唤（1）',
+      renderHand: () => undefined,
+      renderTargetOverlay: () => undefined,
+      document: {
+        getElementById: () => ({ style: { display: '' } }),
+      },
+    })
+    new Script(readNamedFunction(battlePage, 'onCellClick')).runInContext(context)
+
+    new Script('onCellClick(4, 3)').runInContext(context)
+
+    expect(JSON.parse(JSON.stringify(submittedActions))).toEqual([])
+    expect(new Script('pendingCardAction').runInContext(context)).toBeNull()
+    expect(statusMessages).toContain('已取消卡牌预览')
+
+    context.G.pieces = [{ instanceId: 'ally-piece', x: 1, y: 1, currentHp: 10 }]
+    context.pendingCardAction = {
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'demon-summon-1-instance',
+      cardId: 'demon-summon-1',
+      preparation: { targetType: 'piece', filter: 'ally', candidates: [{ type: 'piece', pieceId: 'ally-piece' }] },
+    }
+    new Script('onCellClick(4, 3)').runInContext(context)
+
+    expect(JSON.parse(JSON.stringify(submittedActions))).toEqual([])
+    expect(new Script('pendingCardAction.type').runInContext(context)).toBe('playCard')
+    expect(statusMessages.at(-1)).toBe('目标不在权威候选集合内')
+  })
+
+  it('fails closed before transport when a target action has no type', () => {
+    const battlePage = readPage('battle.html')
+    const sentActions: unknown[] = []
+    const statusMessages: string[] = []
+    const logs: string[] = []
+    const context = createContext({
+      targetSubmissionPending: null,
+      red50Evidence: { targetCommands: [], rejections: [] },
+      addLog: (message: string) => logs.push(message),
+      setStatusMsg: (message: string) => statusMessages.push(message),
+      doAction: (action: unknown) => sentActions.push(action),
+    })
+    new Script(readNamedFunction(battlePage, 'submitTargetAction')).runInContext(context)
+
+    const accepted = new Script("submitTargetAction({}, '恶魔召唤（1）')").runInContext(context)
+
+    expect(accepted).toBe(false)
+    expect(sentActions).toEqual([])
+    expect(JSON.parse(JSON.stringify(context.red50Evidence.rejections))).toMatchObject([
+      { code: 'CLIENT_ACTION_TYPE_MISSING', message: '目标动作缺少有效类型，未发送' },
+    ])
+    expect(statusMessages.at(-1)).toBe('目标动作缺少有效类型，未发送')
+    expect(logs.at(-1)).toContain('目标动作缺少有效类型')
+  })
+
   it('keeps target submission single-flight and clears transient targeting on every authoritative exit', () => {
     const battlePage = readPage('battle.html')
 

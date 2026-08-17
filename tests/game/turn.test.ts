@@ -25,6 +25,7 @@ vi.mock('@/lib/game/attached-effect', () => ({
 }))
 
 import { applyBattleAction, BATTLE_STATE_VERSION, summonPiece } from '@/lib/game/turn'
+import { runBattleAction } from '@/lib/game/battle-runner'
 import type { BattleState } from '@/lib/game/turn'
 import type { PieceInstance } from '@/lib/game/piece'
 import { finalizePendingTargetSession, prepareAction } from '@/lib/game/targeting'
@@ -688,6 +689,52 @@ describe('card preflight and interrupted release', () => {
     expect(summoned?.y).toBe(2)
     expect(summoned?.currentHp).toBe(17)
     expect(next.players.find((p: any) => p.playerId === 'player-red').discardPile).toEqual(['summon-final'])
+  })
+
+  it('resolves demon-summon-1 exactly once and deterministically after an allied piece target', () => {
+    const ally = makePiece({ instanceId: 'ally-piece', ownerPlayerId: 'player-red', x: 1, y: 1, currentHp: 18, maxHp: 18, attack: 3, faction: 'red' })
+    const state = makeState({ pieces: [ally], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    red.hand = [{ cardId: 'demon-summon-1', instanceId: 'card-1', actionPointCost: 1 }]
+    red.discardPile = []
+    red.actionPoints = 1
+    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
+
+    const draft = {
+      type: 'playCard' as const,
+      playerId: 'player-red',
+      cardInstanceId: 'card-1',
+      clientActionId: 'red73-demon-summon-1',
+    }
+    const prepared = prepareAction(state, draft)
+    expect(prepared).toMatchObject({ kind: 'needTarget', targetType: 'piece', filter: 'ally' })
+    if (prepared.kind !== 'needTarget') return
+    expect(prepared.candidates).toContainEqual({ type: 'piece', pieceId: 'ally-piece' })
+    const action = {
+      ...draft,
+      targetPieceId: 'ally-piece',
+      targetX: 1,
+      targetY: 1,
+      selectionId: prepared.selectionId,
+      stateRevision: prepared.stateRevision,
+    }
+    const peerState = structuredClone(state)
+
+    const authority = runBattleAction(state, action as any, { rootSeed: 2173765951 })
+    const peer = runBattleAction(peerState, action as any, { rootSeed: 2173765951 })
+    const next = authority.state as any
+    const nextRed = next.players.find((p: any) => p.playerId === 'player-red')
+    const nextAlly = next.pieces.find((p: any) => p.instanceId === 'ally-piece')
+
+    expect(authority.stateHash).toBe(peer.stateHash)
+    expect(next.pendingTargetSelection).toBeUndefined()
+    expect(nextRed.actionPoints).toBe(0)
+    expect(nextAlly.currentHp).toBe(16)
+    expect(nextAlly.attack).toBe(4)
+    expect(nextRed.hand.map((card: any) => card.cardId)).toEqual(['demon-summon-2'])
+    expect(nextRed.discardPile).toEqual(['demon-summon-1'])
+    expect(red.actionPoints).toBe(1)
+    expect(ally.currentHp).toBe(18)
   })
 
   it('resolves the real demon-summon-5 card with an ally target followed by a grid target', () => {

@@ -36,7 +36,7 @@ import {
 } from '@/lib/game/targeting'
 import { applyBattleAction } from '@/lib/game/turn'
 import { generateBotActions } from '@/lib/game/ai'
-import { hashStable } from '@/lib/game/battle-runner'
+import { hashStable, runBattleAction } from '@/lib/game/battle-runner'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState, makeTile } from '../helpers/minimal-state'
 
@@ -533,11 +533,31 @@ describe('targeting consumers and performance contract', () => {
     expect(html).toContain("targetType === 'piece' && piece")
   })
 
-  it('rejects unknown runtime commands without advancing the targeting revision', () => {
-    const state = makeState({ pieces: [] }) as any
+  it('rejects unknown runtime commands without mutating state, cursors, logs, or triggers', () => {
+    const piece = makePiece({ instanceId: 'red73-piece', ownerPlayerId: 'player-red' })
+    piece.skills = [{ skillId: 'red73-skill', currentCooldown: 2, usesRemaining: -1 }] as never
+    const state = makeState({ pieces: [piece] }) as any
+    state.players[0].actionPoints = 1
+    state.actions = [{ type: 'existing-log', playerId: 'player-red', turn: 1 }]
     const before = JSON.stringify(state)
-    expect(() => applyBattleAction(state, { type: 'not-a-real-command' } as never)).toThrow(/Unknown battle action/)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+
+    let thrown: any
+    try {
+      runBattleAction(state, {
+        type: 'not-a-real-command',
+        playerId: 'player-red',
+        clientActionId: 'red73-unknown-action',
+      } as never, { rootSeed: 2173765951 })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(Error)
+    expect(thrown.message).toMatch(/Unknown battle action/)
+    expect(thrown.determinism).toMatchObject({ rootSeed: 2173765951, streamName: 'skill/effect', cursor: 0 })
     expect(JSON.stringify(state)).toBe(before)
+    expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
   })
 
   it('exposes stable selection errors over WS/API and keeps legacy targeting adapters presentation-only', () => {
