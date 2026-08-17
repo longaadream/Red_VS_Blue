@@ -1,6 +1,6 @@
-# skillCode 兼容矩阵（RED-45）
+# skillCode 兼容矩阵（RED-45 / RED-75）
 
-状态：六类最小 Node/浏览器差分 PASS；全量静态数据审计发现生产兼容 FAIL，等待独立 issue 建单授权。基线：`origin/main@a6544ba`。审计日期：2026-08-17。风险：Medium。
+状态：RED-75 六类固定 seed Node/浏览器 trace bridge 差分 PASS；全量静态数据审计仍发现生产兼容 FAIL，等待独立 issue 建单授权。基线：`origin/main@b8201dd`。审计日期：2026-08-17。风险：Medium。
 
 本矩阵区分两类证据：
 
@@ -34,6 +34,29 @@
 | pending target `effectCode` | `pendingTargetSelect`；序列化 `function(ctx)` | PASS：真实 selection ID/revision 恢复，轨迹/hash 一致 | 闭包不可序列化；只保留 `ctx` 和确定性 `Math`/`Date` |
 
 运行时证据：`tests/game/skillcode-browser-differential.test.ts`，六个表驱动 fixture 全部 PASS。Node 最小执行面基线仍保留在 `tests/game/skillcode-runtime-matrix.test.ts`。
+
+## RED-75 统一 trace bridge
+
+`tests/helpers/skillcode-trace-bridge.ts` 将两端证据规范化为 `fixture`、`surface`、`seed`、`command`、有序 `trace`、`actionLog`、`outcome` 和由各自 runtime 计算的 `stateHash`。比较按字段顺序递归定位首个差异；失败信息包含 fixture、十六进制/十进制 seed、完整命令、首差异路径、两端值及可复制的构建/聚焦测试命令。诊断消息本身有独立回归测试。
+
+| Fixture / surface | 固定 seed | 命令 / trace 摘要 | action log | 最终 hash |
+| --- | ---: | --- | --- | --- |
+| `rule-skill-code` / 规则 `skillCode` | `0x00750001` | `dispatchTrigger(beforeDamageDealt, damage=3)` → damage 6 | `[]` | `c92ec38086b617c933aea911d3c959a4a67032d8abd55e0a265613e7d631da9c` |
+| `rule-trigger-skill` / 规则 `triggerSkill` | `0x00750002` | 同一事件 → damage 7、状态被消费 | `[]` | `f24b9b3865ec0f9e0c065da2c1faf086c36b6a624b5d8311bc9454b1ebc35255` |
+| `piece-skill-code` / 棋子技能 `code` | `0x00750003` | `useBasicSkill(matrix-skill)` → `skillCode` trace | `useBasicSkill` | `0324fa769920e669c017bc52b02639f17bb709bd209b682971c30b33327acb23` |
+| `active-card-code` / 卡牌 `code` | `0x00750004` | `playCard(matrix-card-instance)` → `cardCode` trace | `playCard` | `f4dbc6696eb93775044b6d09b9c98c4ab3b6d92f27c5eadddab0531adf790e71` |
+| `attached-effect-filter-effect-code` | `0x00750005` | `dispatchTrigger(matrix-attached)` → event + effect trace | `[]` | `483a2b12844fd070c11ead7e69a3de599f20602f04bb382ed9e6a1e24da98757` |
+| `pending-serialized-effect-code` | `0x00750006` | `pendingTargetSelect(2,1)` → pending effect trace | `triggerEffect` | `1f1f5a5cb80a85f90deb68222cc289efc675a7c1a16875794f0d5150e5502cf3` |
+
+`dispatchTrigger` 是测试侧对真实 `TriggerSystem.checkTriggers` 调用的可序列化命令描述，不是新增生产动作；它不提交玩家动作，因此对应 `actionLog` 预期为空，但两端仍逐项比较该空日志。技能、卡牌和 pending fixture 通过真实 reducer 生成非空日志。所有 fixture 都在 Node 实现与由 `npm run build:game-engine` 生成的实际 IIFE bundle 中执行，不使用触发器 mock。
+
+需要保留完整证据时，可启用受控报告模式；默认测试不输出这些 JSON：
+
+```powershell
+$env:RED75_TRACE_REPORT = '1'
+npx.cmd --no-install vitest run tests/game/skillcode-browser-differential.test.ts --reporter=verbose --silent=false
+Remove-Item Env:RED75_TRACE_REPORT
+```
 
 ## 实际注入绑定
 
@@ -104,12 +127,16 @@ S01 与 S02 应分别建立 Medium Risk 修复 issue，并关联 RED-45/RED-35 �
 
 | 检查 | 结果 | 证据 |
 | --- | --- | --- |
-| 六面 Node/浏览器轨迹 + hash | PASS | 6/6 fixture |
+| 六面 Node/浏览器 seed + command + trace + action log + hash | PASS | 六个 fixture 分别 1/1；矩阵 7/7（含差异诊断回归） |
 | 四类 JSON 解析和生产 loader | PASS | 113 skills / 81 rules / 16 cards / 47 effects |
 | 执行字段分类 | PASS | 0 unclassified；27 个 `triggerSkill` 引用均解析到现有技能 |
 | 全量语法/helper 静态审计 | FAIL（预期审计发现） | S01、S02；CLI 退出码 1 |
-| 完整 Vitest | PASS | `npm test`：44 个文件 / 364 项测试 |
-| 浏览器引擎构建 | PASS | `npm run build:game-engine`；构建后浏览器差分 2 个文件 / 10 项测试通过 |
+| 浏览器引擎构建与相关套件 | PASS | `npm run build:game-engine`；3 个文件 / 16 项测试 |
+| 定向 ESLint | PASS | RED-75 测试与 trace bridge helper 无错误 |
+| 完整 Vitest | PASS | `npm test`：44 个文件 / 365 项测试 |
+| 编码检查 | PASS | `npm run check:encoding`：552 个文本文件 |
+| 根 TypeScript 检查 | FAIL（既有范围外） | `combat-complex-mechanisms.test.ts:29` 的既有 `PieceInstance` fixture 缺少 `name/buffs/debuffs/ruleTags`；RED-75 未修改该文件 |
+| 独立 AI 审查 | PASS | 只读复验 build、6/6 fixture、相关 16/16、完整 365/365、编码、ESLint、allowed_paths；无 P1–P3 发现 |
 
 ## 回退
 
