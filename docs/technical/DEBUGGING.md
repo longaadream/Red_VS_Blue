@@ -301,7 +301,11 @@ $qaRoom | Select-Object roomId, seed, stateHash
 $qaRoom.urls
 ```
 
-如果 API 返回 HTTP 500，应先读取响应体和服务端堆栈，不得直接建议重建、删除数据库或改动 schema。常见的 `The table main.Room does not exist` 表示 migration 尚未应用到 Electron 实际使用的 `prisma/dev.db`；应停止服务端、设置上面的会话级 `DATABASE_URL`、执行 `prisma migrate deploy`，然后重启。仓库已有 migration 时不得改用 `prisma db push`。
+如果 API 返回 HTTP 500，应先读取响应体和服务端堆栈，不得直接建议重建、删除数据库或改动 schema。常见的 `The table main.Room does not exist` 表示 migration 尚未应用到 Electron 实际使用的 `prisma/dev.db`；应停止服务端、设置上面的会话级 `DATABASE_URL`、执行 `prisma migrate deploy`，然后重启。
+
+如果 `prisma migrate status` 显示已是最新，但运行时代码仍报告 P2022、缺少当前 `schema.prisma` 已声明的列，说明仓库 migration 历史落后于 schema。仅对可丢弃的本地开发数据库，可以在停止服务端并确认路径后执行 `npx.cmd prisma db push`；不得把这一做法用于生产或持久数据，也不得未经明确批准添加 `--force-reset` 或 `--accept-data-loss`。同时应记录缺失 migration 的基线问题，不能把 schema drift 误判为当前功能修改引入。
+
+本次 RED-73 人工验收实际遇到的 `Room.spectators` 缺列即属于上述基线 drift；只同步本地 QA 数据库，不修改仓库 schema 或 migration 文件。
 
 ## 大厅重新加入入口验证（RED-58）
 
