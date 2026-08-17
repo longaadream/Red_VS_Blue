@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
+import { createInitialBattleForPlayers, DEMO_FIXED_MAP_ID } from "@/lib/game/battle-setup"
 import { getPieceById } from "@/lib/game/piece-repository"
 import type { Faction, PieceTemplate } from "@/lib/game/piece"
 import { createRootSeed } from "@/lib/game/rule-runtime"
+import { hashBattleState } from "@/lib/game/battle-runner"
+import { stampPendingDeploymentAuthorityVersion } from "@/lib/game/battle-trace"
 
 /**
  * POST /api/relay-battle-init
@@ -50,13 +52,17 @@ export async function POST(req: NextRequest) {
     playerIds,
     allPieces,
     playerSelectedPieces,
-    body.mapId,
-    { rootSeed: seed },
+    DEMO_FIXED_MAP_ID,
+    { rootSeed: seed, deploymentEnabled: true, deploymentStartedAt: Date.now() },
   )
 
   if (!state) {
     return NextResponse.json({ error: "Failed to create battle state" }, { status: 500 })
   }
 
-  return NextResponse.json({ state, seed })
+  const authorityVersion = 1
+  stampPendingDeploymentAuthorityVersion(state, authorityVersion)
+  return NextResponse.json({
+    state, seed, stateHash: hashBattleState(state), authorityVersion,
+  })
 }

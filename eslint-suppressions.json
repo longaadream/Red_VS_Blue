@@ -59,7 +59,7 @@
   },
   "app/api/rooms/[roomId]/battle/route.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 5
+      "count": 3
     }
   },
   "app/api/rooms/[roomId]/join/route.ts": {
@@ -317,7 +317,7 @@
   },
   "lib/ws-server.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 14
+      "count": 11
     }
   },
   "mobile-server/db-shim.ts": {

@@ -445,4 +445,27 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('body.target-mode-active #trainingTools')
     expect(battlePage).toContain('body.target-mode-active #statusMsg')
   })
+
+  it('exposes deployment selection and irreversible confirmation while keeping relay choices private', () => {
+    const battlePage = readPage('battle.html')
+    const browserEngine = readPage('js/game-engine.js')
+
+    expect(battlePage).toContain("G.deployment.status === 'awaiting-locks'")
+    expect(battlePage).toMatch(
+      /function selectPiece\(instanceId\)[\s\S]*?type: 'deploymentChoice'[\s\S]*?pieceId: localDeploymentChoiceId/,
+    )
+    expect(battlePage).toMatch(
+      /async function doTurnControl\(\)[\s\S]*?type: 'deploymentLock'[\s\S]*?playerId: myPlayerId/,
+    )
+    expect(battlePage).toContain("btnEnd.textContent = locked ? '部署已锁定' : '确认部署'")
+    expect(battlePage).toContain('点击“确认部署”后不可更改')
+    expect(battlePage).toContain('function publicRelayBattleState(state)')
+    expect(battlePage).toContain('GameEngine.toPublicBattleState(state)')
+    expect(battlePage).toContain('const publicState = publicRelayBattleState(relayAuthorityState)')
+    expect(battlePage).toContain('authorityVersion: relaySeq')
+    expect(battlePage).toContain("type: 'deploymentTimeout'")
+    expect(battlePage).toContain("clientActionId: 'relay-deployment-timeout-'")
+    expect(battlePage).not.toContain("RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG")
+    expect(browserEngine).toContain('toPublicBattleState')
+  })
 })

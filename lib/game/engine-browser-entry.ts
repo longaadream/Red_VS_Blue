@@ -27,6 +27,8 @@ export {
   manhattanDistance,
 } from './spatial'
 export { setRng, mulberry32 } from './rng'
+export { toPublicBattleState } from './deployment'
+export { stampPendingDeploymentAuthorityVersion } from './battle-trace'
 export type { BattleState, BattleAction, BattleActionLog } from './turn'
 
 import { createInitialBattleForPlayers as _createInitialBattleForPlayers } from './battle-setup'
@@ -47,7 +49,12 @@ export async function createInitialBattleForPlayers(
   selectedPieces: PieceTemplate[],
   playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[]; faction?: 'red' | 'blue' }>,
   mapId?: string,
-  options?: { firstPlayerId?: PlayerId; rootSeed?: number },
+  options?: {
+    firstPlayerId?: PlayerId
+    rootSeed?: number
+    deploymentEnabled?: boolean
+    deploymentStartedAt?: number
+  },
 ): Promise<BattleState | null> {
   const state = await _createInitialBattleForPlayers(playerIds, selectedPieces, playerSelectedPieces, mapId, options)
   if (!state) return null

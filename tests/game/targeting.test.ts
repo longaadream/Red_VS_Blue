@@ -557,12 +557,15 @@ describe('targeting consumers and performance contract', () => {
   it('exposes stable selection errors over WS/API and keeps legacy targeting adapters presentation-only', () => {
     const ws = readFileSync(resolve(process.cwd(), 'lib/ws-server.ts'), 'utf8')
     const route = readFileSync(resolve(process.cwd(), 'app/api/rooms/[roomId]/battle/route.ts'), 'utf8')
-    expect(ws).toContain('assertActionPlayer(playerId, msg.action)')
+    const coordinator = readFileSync(resolve(process.cwd(), 'lib/game/room-battle-actions.ts'), 'utf8')
+    expect(ws).toContain('dispatchRoomBattleAction(roomStore, _roomId, verified.playerId, msg.action')
     expect(ws).toContain('preparation: errAny?.preparation')
-    expect(route).toContain('assertActionPlayer(body.playerId, action)')
+    expect(route).toContain('dispatchRoomBattleAction(roomStore, roomId, viewerPlayerId, action')
     expect(route).toContain('preparation: errAny.preparation')
+    expect(coordinator).toContain('assertActionPlayer(viewerPlayerId, action)')
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
-    expect(html).toContain("String(msg.from).toLowerCase() !== String(msg.action.playerId).toLowerCase()")
+    expect(html).toContain('await verifyRelayBattleActionAuth(msg)')
+    expect(html).toContain("signedPlayer !== actionPlayer")
 
     for (const path of [
       'data/pages/js/skill-targeting.js',

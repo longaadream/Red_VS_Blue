@@ -77,10 +77,19 @@ export interface DeploymentChoice {
   pieceId: string | null
 }
 
+export interface DeploymentLock {
+  locked: boolean
+  reason?: 'player' | 'timeout'
+}
+
 export interface DeploymentState {
-  status: 'awaiting-choices' | 'complete'
+  status: 'awaiting-locks' | 'complete'
   playerIds: PlayerId[]
   choices: Record<PlayerId, DeploymentChoice>
+  locks: Record<PlayerId, DeploymentLock>
+  startedAt: number
+  deadlineAt: number
+  revision: number
   initialPositions: Record<string, DeploymentPosition>
   finalPositions?: Record<string, DeploymentPosition>
 }
@@ -143,6 +152,16 @@ export type BattleAction =
       type: "deploymentChoice"
       playerId: PlayerId
       pieceId?: string | null
+      clientActionId?: string
+    }
+  | {
+      type: "deploymentLock"
+      playerId: PlayerId
+      clientActionId?: string
+    }
+  | {
+      type: "deploymentTimeout"
+      now: number
       clientActionId?: string
     }
   | {

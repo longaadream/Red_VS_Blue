@@ -84,6 +84,38 @@
     return urls
   }
 
+  async function buildSubscribeMessage() {
+    var roomId = String(_roomId || '').trim().toLowerCase()
+    var playerId = String(_playerId || '').trim().toLowerCase()
+    var message = { type: 'subscribe', roomId: roomId, playerId: playerId }
+    if (_mode !== 'relay') return message
+
+    if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') {
+      throw new Error('Signed identity is required for Relay WebSocket subscriptions')
+    }
+    var identity = window.RvBIdentity.getIdentity && window.RvBIdentity.getIdentity()
+    if (!identity || String(identity.id || '').toLowerCase() !== playerId) {
+      throw new Error('Active identity does not match the Relay WebSocket player')
+    }
+    var publicKey = window.RvBIdentity.getPublicKey && window.RvBIdentity.getPublicKey()
+    if (!publicKey) throw new Error('Relay WebSocket identity has no public key')
+
+    var payload = {
+      type: 'battle-subscribe',
+      roomId: roomId,
+      playerId: playerId,
+      timestamp: Date.now(),
+    }
+    return {
+      type: 'subscribe',
+      roomId: roomId,
+      playerId: playerId,
+      publicKey: publicKey,
+      payload: payload,
+      signature: await window.RvBIdentity.sign(payload),
+    }
+  }
+
   function connectWithoutHttpPortProbe(roomId) {
     var configured = readConfiguredWsPort()
     if (configured) _wsPort = configured
@@ -106,11 +138,20 @@
       return
     }
 
-    _ws.onopen = function () {
+    _ws.onopen = async function () {
       opened = true
       if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
-      _ws.send(JSON.stringify({ type: 'subscribe', roomId: _roomId, playerId: _playerId }))
-      _emit('connect')
+      try {
+        var subscribeMessage = await buildSubscribeMessage()
+        if (!_ws || _ws.readyState !== 1) return
+        _ws.send(JSON.stringify(subscribeMessage))
+        _emit('connect')
+      } catch (e) {
+        console.error('[WS] subscribe failed', e)
+        _emit('error', e)
+        _shouldReconnect = false
+        if (_ws) _ws.close()
+      }
     }
 
     _ws.onmessage = function (e) {

@@ -13,8 +13,9 @@
  */
 
 import { applyBattleAction } from '../lib/game/turn'
-import { createInitialBattleForPlayers } from '../lib/game/battle-setup'
-import { runBattleAction, type BattleActionTrace } from '../lib/game/battle-runner'
+import { createInitialBattleForPlayers, DEMO_FIXED_MAP_ID } from '../lib/game/battle-setup'
+import { hashBattleState, runBattleAction, type BattleActionTrace } from '../lib/game/battle-runner'
+import { stampPendingDeploymentAuthorityVersion } from '../lib/game/battle-trace'
 import { createRootSeed } from '../lib/game/rule-runtime'
 import { loadAllSkillsById, loadRuleById } from '../lib/game/skills'
 import { DEFAULT_PIECES, getAllPieces } from '../lib/game/piece-repository'
@@ -710,7 +711,7 @@ async function handleTraining(method: string, body: Record<string, unknown>): Pr
 }
 
 // POST /api/relay-battle-init — create initial state for relay mode host
-async function handleRelayBattleInit(body: Record<string, unknown>): Promise<string> {
+export async function handleRelayBattleInit(body: Record<string, unknown>): Promise<string> {
   const players = body.players as Array<{
     id: string
     faction: 'red' | 'blue'
@@ -743,11 +744,18 @@ async function handleRelayBattleInit(body: Record<string, unknown>): Promise<str
       playerIds,
       allPieces,
       playerSelectedPieces,
-      (body.mapId as string | undefined),
-      { rootSeed: seed },
+      DEMO_FIXED_MAP_ID,
+      { rootSeed: seed, deploymentEnabled: true, deploymentStartedAt: Date.now() },
     )
     if (!state) return err('Failed to create battle state', 500)
-    return ok({ state, seed } as unknown as Record<string, unknown>)
+    const authorityVersion = 1
+    stampPendingDeploymentAuthorityVersion(state, authorityVersion)
+    return ok({
+      state,
+      seed,
+      stateHash: hashBattleState(state),
+      authorityVersion,
+    } as unknown as Record<string, unknown>)
   } catch (e) {
     return err('createInitialBattleForPlayers failed: ' + String(e), 500)
   }
