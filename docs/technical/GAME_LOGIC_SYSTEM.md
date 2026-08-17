@@ -4,6 +4,8 @@
 
 核对基线：`b8201dd`（2026-08-17）
 
+架构约定更新（2026-08-17）：Windows 的服务端完整状态方案是唯一目标标准；Android 现有 action-log 是 RED-81 将完整删除的遗留实现，不再作为可长期并存的第二套框架。动态代码执行的集中编译与缓存由 RED-82 跟进。
+
 适用范围：TypeScript 规则核心、Windows LAN、浏览器战斗页、Relay 与 Android 内嵌服务。
 
 本文面向开发、调试和测试人员，集中说明当前游戏逻辑系统的公共接口、权威边界和典型执行顺序。模块细节可继续查阅 [`MODULE_INTERFACES.md`](./MODULE_INTERFACES.md)、[`ENGINE_CORE.md`](./ENGINE_CORE.md) 和 [`ARCHITECTURE.md`](./ARCHITECTURE.md)。
@@ -16,14 +18,15 @@
 - **历史兼容**：仍可被当前代码读取或执行，但不是新增功能应采用的首选边界。
 - **目标设计**：ADR 或架构文档提出的方向，当前尚不可调用。
 
-先记住六个结论：
+先记住七个结论：
 
 1. `lib/game/turn.ts::applyBattleAction()` 是规则归约入口；`runBattleAction()` 是需要确定性、hash、幂等和 Action Trace 的权威包装入口。
 2. `RuleRuntime` 用一个根种子派生命名随机流、逻辑时钟和实例 ID；权威初始化必须先创建 seed，后续每个动作必须沿用同一 seed。
 3. `targeting.ts::prepareAction()` 是纯查询合同，返回精确候选和选择凭证；最终提交仍由归约器使用同一验证器复核。
 4. Demo 房间在普通回合前有同时部署门禁；双方提交 `deploymentChoice` 后才完成部署，首个 `beginPhase` 才触发 `gameStart`。
-5. Windows LAN 的共享权威是服务端保存并广播的完整状态；Android 当前权威记录是 action log，Relay 当前权威执行者是主机客户端。
+5. Windows LAN 的“服务端执行命令、保存完整状态、广播完整状态”是唯一跨端标准；Android 当前 action-log 只是待由 RED-81 删除的遗留实现。
 6. 胜负判断仍主要位于 `battle.html::checkClientGameOver()`，尚未收敛为服务端 `GameResult` 规则接口。
+7. JSON 中的技能代码使用 `eval` 会产生重复编译成本，但更重要的是它只把内容与主代码分开发布，并没有隔离权限；RED-82 将集中编译、缓存和失效处理。
 
 ## 2. 系统总览
 
@@ -41,7 +44,7 @@ flowchart LR
   Domain["规则能力<br/>skills / triggers / targeting / spatial"]
   Setup["房间开战与初始化<br/>room-battle-start / battle-setup"]
   Store["RoomStore + battle-storage"]
-  Android["Android action log<br/>mobile-server-entry.ts"]
+  Android["Android action log（遗留）<br/>RED-81 将删除"]
   Relay["Relay 主机客户端"]
 
   UI -->|action| Transport
@@ -69,7 +72,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | Windows LAN WebSocket | Prisma 房间中的 `server-state` | 服务端 `runBattleAction(state, action, { rootSeed })` | `RoomStore.setRoom()` 后广播完整 `stateUpdate` |
 | 房间 HTTP `POST` | 与 Windows LAN 相同 | 服务端校验 actor 后调用同一 Runner | 保存后广播；HTTP 同时返回 state/hash |
-| Android 内嵌房间 | 内存 `action-log` | 浏览器 Runner 生成 trace 并按日志确定性回放；移动服务只校验 trace 形状/链 | 追加带 `seq` 的日志并广播 `actionLog`；无 Prisma |
+| Android 内嵌房间（当前遗留） | 内存 `action-log` | 浏览器 Runner 生成 trace 并按日志确定性回放；移动服务只校验 trace 形状/链 | 追加带 `seq` 的日志并广播 `actionLog`；RED-81 将完整删除该框架 |
 | Relay | Relay 主机浏览器状态 | 主机浏览器调用 `runBattleAction()` | 主机向客机发送完整 `stateUpdate` |
 | Training / Debug | 各自的训练或调试状态 | 新旧入口并存；部分旧路径可不带 seed | 不等同于房间权威链，不应用来证明跨端一致性 |
 
@@ -77,7 +80,7 @@ flowchart LR
 
 ### 2.3 Windows 与 Android 可以统一到什么程度
 
-结论是：**游戏逻辑核心可以、也应该完全共用；平台外壳不应强求同一实现。** 当前 Windows 的 `server-state` 与 Android 的 `action-log` 分裂是尚未收敛的历史架构，不是游戏规则存在平台差异。
+结论是：**玩家看到的功能、游戏规则、命令语义和权威状态标准必须相同；操作系统外壳可以采用不同实现。** 当前 Windows 的 `server-state` 与 Android 的 `action-log` 分裂是待删除的历史架构，不是需要保留的平台差异。
 
 | 边界 | 应当共用 | 必须平台适配 |
 | --- | --- | --- |
@@ -88,7 +91,19 @@ flowchart LR
 | 存储 | 相同的版本化 `server-state` 格式和恢复合同 | Windows Prisma；Android 本地数据库/文件适配器 |
 | 系统能力 | 通过接口注入 entropy、storage、broadcast、日志 | Node 文件系统与 Android 生命周期/权限不同 |
 
-近期最小收敛路径不是把 Next.js、Prisma 或 Node 文件系统搬进 Android，而是让 Android 隐藏 WebView 对每个命令权威调用同一个 browser-safe Runner，保存完整 `server-state`，Java 层只负责网络和生命周期。Action log/Trace 可以继续保留为审计证据，但不再由客户端各自回放来决定共享状态。
+通俗地说，Windows 像“裁判在服务器上算完比分，再把记分牌发给所有人”；Android 现在则像“只广播每一步操作，让每台手机自己重算比分”。后者更容易因为版本、丢包或恢复顺序不同而分叉，所以不再保留。
+
+| 对比项 | Windows 当前标准 | Android 当前遗留 | Android 迁移后 |
+| --- | --- | --- | --- |
+| 谁计算共享结果 | 房间服务端 | 每个客户端分别回放 | Android 房间宿主中的同一 Runner |
+| 服务端保存什么 | 完整 `server-state` | `actions + seq + seed` | 完整、版本化 `server-state` |
+| 客户端收到什么 | 完整 `stateUpdate` | `battleSnapshot` / `actionLog` | 与 Windows 同语义的状态与错误消息 |
+| 重连恢复 | 读取完整权威状态 | 从 init 开始重放日志 | 读取完整权威状态 |
+| 进程生命周期 | Windows 进程可能退出，由桌面外壳处理 | Android 后台更容易被系统暂停或回收 | Android 前台服务/通知、恢复和持久化适配；不改变规则协议 |
+
+迁移不是把 Next.js、Prisma、Electron 或 Windows 文件系统整个塞进 Android。Android 隐藏 WebView 可运行同一个 browser-safe Runner 并保存完整状态；Java 层只适配 Socket、前台服务、通知、权限、本地存储和系统恢复。这样“发动机和交通规则”相同，只是 Windows 与 Android 使用不同的外壳和启动方式。
+
+RED-81 将删除生产路径中的 `action-log` / `actionLog`、`battleSnapshot.actions/seq` 和客户端按序回放分支，不保留双模式或兼容降级。`BattleActionTrace` 可以作为权威执行后的调试证据继续存在，但它不是状态来源，也不是 action-log 的改名版本。实施顺序是先稳定 Windows 标准，再迁移 Android。
 
 ## 3. 核心数据与公共接口
 
@@ -238,6 +253,24 @@ interface BattleReplayResult {
 
 同一类别按 `priority` 降序；未设置视为 0；同优先级保持快照/收集顺序。嵌套事件最大深度 20，每条根事件链最多分发 100 次，超限返回带事件链的阻断错误。规则、响应牌或基线中的遗留附加效果抛异常时会附加 `event/consumer` 上下文并重新抛出，Runner 不提交该命令；规则定义无法重新加载时当前会写日志并跳过。
 
+### 3.8 JSON 动态代码与 `eval`
+
+当前技能、卡牌和规则把一部分可后续开发的效果代码保存在 JSON 中，再由规则模块直接 `eval`。这让内容可以独立于主进程源码更新，但代码仍然在调用它的 Node 或浏览器进程中执行：它能访问传入对象和该进程暴露的能力，因此这不是安全沙箱，也不是进程隔离。注入确定性的 `Math` / `Date` 解决的是复现问题，不会自动限制权限；单纯把 `eval` 换成 `new Function` 也不会改变这一点。动态代码只应加载受信任、经过版本和 hash 校验的项目内容。
+
+核对基线中有 8 个直接 `eval` 调用点，分布在 `rule-loader.ts`、`skills.ts`、`triggers.ts` 和 `turn.ts`。数据面约含 110 段技能代码、16 段卡牌代码与 54 段 Rule `skillCode`；AttachedEffect 的动态代码由 RED-80 删除，不纳入长期方案。本机 Windows Node 的一次冷编译诊断约为技能 4.0 ms、卡牌 0.8 ms、Rule 4.6 ms。这只测“把字符串编译成函数”，不包含状态克隆、执行、日志、hash、浏览器或 Android 成本，因此不能当成整场性能结论。
+
+真正值得优化的是重复次数：一次玩家操作可能先进行 dry-run，目标高亮还会对许多候选格逐个 dry-run，最终提交又执行一次。如果每次都重新 `eval` 同一字符串，几毫秒会被候选数量放大。当前已有规则或卡牌数据缓存，但没有覆盖所有动态代码面的统一“已编译函数缓存”。所以它不是现阶段阻塞 Demo 的最高优先级，却适合在内容接口稳定、RED-80/RED-75 完成后集中处理；对应任务为 RED-82。
+
+RED-82 的目标流程：
+
+```text
+当前：读取 JSON 字符串 → 每次 dry-run / 候选检查 / 正式执行时 eval → 调用
+目标：加载或更新内容 → 校验版本/hash → 集中编译一次 → 按 {surface,id,version,codeHash} 缓存 → 多次调用
+                                            ↘ 内容变化时精准失效并重新编译
+```
+
+编译后的函数只保存在进程内存中，不写入 `BattleState`、存档或网络消息。Node 与 browser bundle 必须走同一运行时合同和差分测试；若未来需要加载不受信任的玩家脚本，则应另建真正的隔离方案（独立进程/受限运行时、超时和能力白名单），不能继续把直接 `eval` 当作隔离边界。
+
 ## 4. 主要模块接口卡片
 
 ### 4.1 规则归约器
@@ -294,6 +327,8 @@ interface BattleReplayResult {
 - **Android：** `mobile-server-entry.ts::handleBattleAction()` 只追加动作与 trace。trace 格式、seed 或前置 hash 不匹配时写 `traceValidationError`，当前不会拒绝动作。
 - **Android 回放：** `battle.html::applyLegacyBattleEntry()` 按 `seq` 调用浏览器 Runner；缺 root seed 或 Runner 时失败关闭。
 - **存储：** Android 房间只在 WebView 内存 `Map`，没有 Prisma 或正式离线恢复协议。
+- **迁移合同：** 上述 Android action-log 路径全部是 RED-81 的删除对象；迁移完成后浏览器只消费宿主计算并保存的完整权威状态，不保留客户端日志回放降级。
+
 ## 5. 执行流程示例
 
 ### 5.1 Demo 房间初始化与同时部署
@@ -439,7 +474,7 @@ sequenceDiagram
 - `Room.version`：数据库并发修订。
 - `targetingRevision`：选择凭证的新旧状态版本。
 
-### 5.5 Android action-log 示例
+### 5.5 Android action-log 遗留流程与迁移边界
 
 Android 内嵌服务与 Windows 完整状态协议不同：
 
@@ -450,7 +485,8 @@ Android 内嵌服务与 Windows 完整状态协议不同：
 5. 服务广播 `actionLog`；各客户端按序调用浏览器 Runner 重放，并核对本地 seed/trace。
 6. 新订阅者收到 `battleSnapshot { actions, total, seed }` 后从 init 条目开始重放。
 
-> **历史兼容与风险：** Android 服务没有从自己的权威状态重跑常规动作；它权威记录“发生了哪些日志条目”，客户端各自计算状态。因此 trace 诊断为空是验收证据，但还不是服务端权威裁决。
+> **只用于解释待删除代码：** Android 服务没有从自己的权威状态重跑常规动作；它权威记录“发生了哪些日志条目”，客户端各自计算状态。因此 trace 诊断为空是验收证据，但还不是服务端权威裁决。RED-81 完成后，本节应替换成与 5.2 同语义的 Android 权威状态流程。
+
 ## 6. 回合、选择与胜负
 
 ### 6.1 部署与回合阶段
@@ -498,7 +534,8 @@ Demo 房间状态先经历部署，再进入 `TurnPhase = start | action | end`�
 | WebSocket | 只向发送者回 `actionError` | roomId、connection player、action、错误 envelope |
 | HTTP | 400 JSON；选择与普通错误字段略有差异 | roomId、body 摘要、status、response |
 | RoomStore | Prisma/JSON 错误向上传播；普通动作无 CAS | 读取与写入 Room.version、写前/后 hash |
-| Android log | trace 问题写 `traceValidationError`，不拒绝日志 | seq、seed、pre/post hash、诊断文本 |
+| Android log（遗留） | trace 问题写 `traceValidationError`，不拒绝日志 | seq、seed、pre/post hash、诊断文本；RED-81 后删除本行 |
+| 动态代码 | 编译或执行错误向上传播，当前调用点分散 | surface、内容 ID/version/codeHash、dry-run/正式执行阶段；RED-82 后补缓存命中信息 |
 | 浏览器 | 状态栏、战斗日志、console；部分兼容路径仍有空 catch | 运行模式、最后 seq/action/stateUpdate、截图 |
 
 推荐最小复现包：
@@ -510,7 +547,7 @@ commit + 运行模式 + roomId
 完整动作序列（含 clientActionId 与选择凭证）
 每步 actionHash + pre/post stateHash + randomStreams
 预期结果 + 实际结果
-服务端日志 + 浏览器日志 + Android traceValidationError（若有）+ 截图
+服务端日志 + 浏览器日志 + Android 遗留 traceValidationError（若有）+ 截图
 ```
 
 ## 8. 当前测试覆盖与缺口
@@ -527,6 +564,7 @@ commit + 运行模式 + roomId
 | 消费者大类/priority/快照顺序与队列可见性 | `tests/game/triggers-ordering.test.ts`、`tests/game/combat-trigger-queue-visibility.test.ts` |
 | 调试对局、镜像阵营、房间隔离、Runner 回放、幂等与非法动作原子性 | `tests/game/debug-battle.test.ts` |
 | 浏览器 bundle 与 Node 的固定种子差分、战斗表现边界 | `tests/game/engine-browser-differential.test.ts`、`tests/game/battle-ui-boundary.test.ts` |
+| SkillCode 的 Node/浏览器执行矩阵、差分与静态审计 | `tests/game/skillcode-runtime-matrix.test.ts`、`tests/game/skillcode-browser-differential.test.ts`、`tests/game/skillcode-static-audit.test.ts` |
 | WebSocket 基础连接、ping/pong、坏 JSON 与 RPC 错误 | `tests/ws-server.test.ts` |
 
 RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule → 玩家 Rule → reactive 手牌”；RED-75 的差分矩阵也会移除 AttachedEffect surface。当前人工构造 `attachedEffects` 的测试只证明遗留执行路径，不代表内置玩法可达。
@@ -536,8 +574,9 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 - 服务端权威胜负归约及开局到终局的固定 seed 回归。
 - `RoomStore` 对完整 `server-state` 的保存—读取等价与迁移测试。
 - 常规 WS/HTTP 动作的 CAS 并发竞争测试。
-- 同一快照和动作走 WS、HTTP、Relay、Android 后的跨端最终状态一致性。
-- Android 安装包内生成 bundle 的来源/hash 与完整开服—重放端到端验证。
+- 同一快照和动作走 WS、HTTP、Relay、迁移后 Android 权威 Runner 的跨端最终状态一致性。
+- Android 安装包内生成 bundle 的来源/hash，以及完整开服—保存—重连端到端验证；不再验收 action-log 回放。
+- 动态代码统一缓存的命中、精准失效、编译失败关闭、Node/browser 一致性和候选枚举性能基线。
 - 多房间共享 `globalTriggerSystem` 的压力与隔离测试。
 - 事件审计仍记录 `beforeAttack` 等声明/生产者和部分数据脚本问题；以 [`COMBAT_EVENT_PIPELINE_AUDIT.md`](./COMBAT_EVENT_PIPELINE_AUDIT.md) 为准。
 
@@ -562,6 +601,9 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 | 浏览器引擎出口 | `lib/game/engine-browser-entry.ts` |
 | 浏览器战斗页 | `data/pages/battle.html` |
 | Android 内嵌服务 | `mobile-server/mobile-server-entry.ts`、`android/app/src/main/java/com/redvsblue/client/MobileHttpServer.java` |
+| 动态代码执行面 | `lib/game/rule-loader.ts`、`lib/game/skills.ts`、`lib/game/triggers.ts`、`lib/game/turn.ts` |
+| Android 权威架构迁移 | RED-81（完整删除 action-log，以 Windows server-state 为准） |
+| 动态代码集中编译缓存 | RED-82 |
 | 确定性运行时决策 | `docs/decisions/ADR-0004-deterministic-rule-runtime.md`（Accepted） |
 | 权威目标选择决策 | `docs/decisions/ADR-0005-authoritative-target-selection.md`（Proposed） |
 | 触发顺序决策 | `docs/decisions/ADR-0006-combat-trigger-ordering.md`（Accepted） |
@@ -578,6 +620,7 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 - 改变根种子、命名流、cursor、逻辑时钟、实例 ID、hash 或 trace 结构。
 - 调整同时部署、回合、目标选择、技能/卡牌或触发器执行顺序。
 - 改变 WS、HTTP、Relay、Android 的权威执行者或消息结构。
+- 新增、删除或改变 JSON 动态代码 surface、编译缓存键、失效策略或隔离边界。
 - 改变 RoomStore 序列化、战斗存储外层或版本策略。
 - 把胜负判断从客户端迁移到规则/服务端。
 
