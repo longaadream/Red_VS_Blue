@@ -77,7 +77,7 @@ describe('RED-45 skillCode static compatibility audit', () => {
     }
   })
 
-  it('accepts every remaining execution field as valid syntax', () => {
+  it('keeps every skill code field syntactically valid', () => {
     const { status, report } = runCompatibilityAudit()
 
     expect(status).toBe(0)

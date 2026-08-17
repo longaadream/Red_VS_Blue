@@ -42,9 +42,16 @@ function fixtureSnapshot() {
       },
     ],
     players: [
-      { playerId: 'player-red', actionPoints: 2, maxActionPoints: 3, chargePoints: 1, maxChargePoints: 4 },
+      {
+        playerId: 'player-red',
+        name: 'A deliberately long tactical player name',
+        actionPoints: 2,
+        maxActionPoints: 3,
+        chargePoints: 1,
+        maxChargePoints: 4,
+      },
     ],
-    turn: { currentPlayerId: 'player-red', turnNumber: 2, phase: 'action' },
+    turn: { currentPlayerId: 'player-red', turnNumber: 2, phase: 'action', remainingSeconds: 89 },
     extensions: { tileEffects: [{ id: 'fire', tileType: 'amaterasu', x: 1, y: 0 }] },
   }
 }
@@ -82,7 +89,30 @@ describe('battle presentation boundary', () => {
         },
       ],
       selection: { pieceId: 'piece-red', mode: 'move' },
+      players: [{ name: 'A deliberately long tactical player name' }],
+      turn: { remainingSeconds: 89 },
       legal: { moveCells: [{ x: 1, y: 0 }], targetCells: [{ x: 1, y: 0 }], placementCells: [] },
+    })
+  })
+
+  it('projects the template-declared portrait asset for pieces added after training starts', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const snapshot = fixtureSnapshot()
+    snapshot.pieces[0].templateId = 'red-training-piece'
+
+    const model = viewModel.create({
+      snapshot,
+      source: 'training',
+      viewerId: 'player-red',
+      pieceTemplates: {
+        'red-training-piece': { image: 'training-piece-portrait.webp' },
+      },
+    })
+
+    expect(model.pieces[0]).toMatchObject({
+      id: 'piece-red',
+      templateId: 'red-training-piece',
+      portraitId: 'training-piece-portrait.webp',
     })
   })
 
@@ -151,63 +181,87 @@ describe('battle presentation boundary', () => {
     expect(model.selection.piece).not.toHaveProperty('skills')
   })
 
-  it('renders only special statuses and clears stale status content through the DOM boundary', () => {
+  it('keeps the DOM boundary focused on HUD and read-only selected status', () => {
     const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
-    const selectedPieceStatus = {
-      className: '',
-      textContent: '',
-      innerHTML: '',
-      dataset: {},
-      setAttribute: vi.fn(),
-      querySelectorAll: vi.fn(() => []),
-    }
     const document = {
-      getElementById: vi.fn((id: string) => id === 'selectedPieceStatus' ? selectedPieceStatus : null),
+      getElementById: vi.fn(() => null),
     }
     const ui = domUi.create({ document })
     const model = {
       selection: {
         mode: 'inspect',
         piece: {
-          id: 'piece-red', name: 'Red Warrior', portraitSrc: 'images/red-warrior.jpg', readOnly: false,
-          health: { current: 8, max: 10 }, stats: { attack: 4, defense: 2, moveRange: 3 },
-          statuses: [{
-            id: 'burn', label: 'Burn', description: 'Takes damage each turn.',
-            stacks: 2, duration: 3, uses: 0, intensity: 0,
-          }],
-          skills: [{
-            id: 'cooldown-skill', name: 'Cooling', description: 'Not ready.', icon: 'S',
-            kind: 'active', type: 'normal', actionCost: 1, chargeCost: 0,
-            cooldown: { current: 2, max: 3 }, available: false,
-            unavailableReason: '冷却中（剩余 2 回合）',
-          }],
+          id: 'piece-red',
+          name: 'Red Warrior',
+          statuses: [{ id: 'burn', label: 'Burn' }],
         },
       },
-      turn: { currentPlayerId: 'player-red', isViewerTurn: true, number: 2, phase: 'action' },
+      turn: {
+        currentPlayerId: 'player-red',
+        isViewerTurn: true,
+        number: 2,
+        phase: 'action',
+        remainingSeconds: 89,
+      },
       players: [],
       viewer: null,
     }
 
     ui.update(model)
 
-    expect(selectedPieceStatus.className).toContain('has-selection')
-    expect(selectedPieceStatus.innerHTML).toContain('特殊状态')
-    expect(selectedPieceStatus.innerHTML).toContain('Burn')
-    expect(selectedPieceStatus.innerHTML).toContain('2 层')
-    expect(selectedPieceStatus.innerHTML).toContain('剩余 3 回合')
-    expect(selectedPieceStatus.innerHTML).toContain('Takes damage each turn.')
-    expect(selectedPieceStatus.innerHTML).not.toContain('Red Warrior')
-    expect(selectedPieceStatus.innerHTML).not.toContain('生命')
-    expect(selectedPieceStatus.innerHTML).not.toContain('攻击')
-    expect(selectedPieceStatus.innerHTML).not.toContain('Cooling')
-    expect(selectedPieceStatus.innerHTML).not.toContain('selected-skill-item')
-    expect(selectedPieceStatus.setAttribute).toHaveBeenCalledWith('aria-label', '特殊状态，共 1 个')
+    expect(document.getElementById).toHaveBeenCalledWith('turnBadge')
+    expect(document.getElementById).toHaveBeenCalledWith('playerResCards')
+    expect(document.getElementById).not.toHaveBeenCalledWith('selectedPieceStatus')
+  })
 
-    model.selection.piece.statuses = []
+
+  it('renders every selected-piece status in a non-blocking overlay and hides it outside inspect mode', () => {
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const overlay = {
+      hidden: true,
+      dataset: {} as Record<string, string>,
+      innerHTML: '',
+      setAttribute: vi.fn(),
+    }
+    const document = {
+      getElementById: vi.fn((id: string) => id === 'selectedStatusOverlay' ? overlay : null),
+    }
+    const ui = domUi.create({ document })
+    const model = {
+      selection: {
+        mode: 'inspect',
+        piece: {
+          id: 'piece-red',
+          name: 'Red Warrior',
+          statuses: [{ id: 'freeze', label: '冰冻', duration: 2, description: '无法行动' }],
+        },
+      },
+      turn: {
+        currentPlayerId: 'player-red',
+        isViewerTurn: true,
+        number: 2,
+        phase: 'action',
+        remainingSeconds: 89,
+      },
+      players: [],
+      viewer: null,
+    }
+
     ui.update(model)
 
-    expect(selectedPieceStatus.innerHTML).toContain('无特殊状态')
-    expect(selectedPieceStatus.innerHTML).not.toContain('Burn')
+    expect(document.getElementById).toHaveBeenCalledWith('selectedStatusOverlay')
+    expect(overlay.hidden).toBe(false)
+    expect(overlay.dataset.pieceId).toBe('piece-red')
+    expect(overlay.innerHTML).toContain('Red Warrior')
+    expect(overlay.innerHTML).toContain('冰冻')
+    expect(overlay.innerHTML).toContain('2回合')
+    expect(overlay.setAttribute).toHaveBeenCalledWith('aria-live', 'polite')
+
+    ui.update({
+      ...model,
+      selection: { ...model.selection, mode: 'move' },
+    })
+    expect(overlay.hidden).toBe(true)
   })
 
   it('sends the identical model to Three.js and DOM and owns repeatable mount/dispose', () => {
@@ -216,6 +270,7 @@ describe('battle presentation boundary', () => {
       init: vi.fn(),
       update: vi.fn(),
       resize: vi.fn(),
+      resetView: vi.fn(),
       projectCell: vi.fn(() => ({ left: 20, top: 30 })),
       screenToCell: vi.fn(() => ({ x: 1, y: 0 })),
       dispose: vi.fn(),
@@ -231,7 +286,9 @@ describe('battle presentation boundary', () => {
     boundary.mount(mount)
     boundary.update(model)
     boundary.dispatch({ type: 'select-piece', pieceId: 'piece-red' })
+    boundary.dispatch({ type: 'viewport-change' })
     boundary.resize()
+    boundary.resetView()
     boundary.dispose()
 
     expect(renderer.dispose).toHaveBeenCalledTimes(2)
@@ -239,6 +296,8 @@ describe('battle presentation boundary', () => {
     expect(renderer.update).toHaveBeenCalledWith(model)
     expect(domUi.update).toHaveBeenCalledWith(model)
     expect(onIntent).toHaveBeenCalledWith({ type: 'select-piece', pieceId: 'piece-red' })
+    expect(onIntent).toHaveBeenCalledWith({ type: 'viewport-change' })
+    expect(renderer.resetView).toHaveBeenCalledTimes(1)
     expect(boundary.projectCell(1, 0)).toEqual({ left: 20, top: 30 })
     expect(boundary.screenToCell(20, 30)).toEqual({ x: 1, y: 0 })
   })
@@ -356,10 +415,17 @@ describe('battle presentation boundary', () => {
     expect(renderer).toMatch(/function init\b/)
     expect(renderer).toMatch(/function update\b/)
     expect(renderer).toMatch(/function resize\b/)
+    expect(renderer).toMatch(/function resetView\b/)
+    expect(renderer).toMatch(/function _preferredInitialZoom\b[\s\S]*?widthCoverageZoom/)
+    expect(renderer.match(/_camera\.zoom = _preferredInitialZoom/g)).toHaveLength(2)
     expect(renderer).toMatch(/function projectCell\b/)
     expect(renderer).toMatch(/function screenToCell\b/)
     expect(renderer).toMatch(/function dispose\b/)
+    expect(renderer).toContain("_renderer.domElement.getBoundingClientRect().width")
+    expect(renderer).toMatch(/\(_camera\.right - _camera\.left\) \/ _camera\.zoom/)
     expect(renderer).not.toContain('syncState(G)')
+    expect(renderer).toContain("_onIntent({ type: 'viewport-change' })")
+    expect(renderer).not.toContain('_updateHpBarPositions')
     expect(() => new Script(renderer, { filename: 'battle-renderer-3d.js' })).not.toThrow()
   })
 })

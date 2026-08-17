@@ -7,7 +7,7 @@
 - **运行时差分**：同一 fixture 分别由 Node 模块和实际 `data/pages/js/game-engine.js` 执行，比较有序轨迹、关键结果和最终权威状态 hash。
 - **全量静态审计**：扫描所有数据代码字段，使用 TypeScript AST 验证语法和词法自由变量，再按生产注入面标记 `supported`、`ambient` 或 `unsupported`。
 
-最小 fixture PASS 不等于每一条数据定义都可执行；静态语法 FAIL 仍单独保留。
+最小 fixture PASS 不等于每一条数据定义都可执行；全量静态审计结论仍单独保留。
 
 ## 数据覆盖
 
@@ -106,16 +106,22 @@ RED-28 提供命名随机流、规则时钟和确定性实例 ID。规则、技�
 
 所有保留的执行字段均通过语法检查，且没有使用未注入 helper。原 AttachedEffect 使用缺失 helper 的问题已由 RED-80 删除整个不可达执行面和数据组解决，不再是运行时兼容项；RED-78 的缺失 helper 症状因此应由 RED-80 取代，而不是重新扩展旧系统。
 
+### RED-76 志志雄被动回归
+
+`data/skills/shishio-combustion-passive.json#code` 保持为生产执行器可调用的 `function executeSkill(context) { ... }`。入口仍为 `kind: passive`；错误主动调用会返回 `success:false`，外层动作以固定 seed `7601` 拒绝且输入状态不变。实际效果继续由 `beforeHealTaken`、`afterDamageDealt` 和 `beforeDamageDealt` 三个棋子 Rule 触发。
+
+该真实数据回归由 `tests/game/shishio-combustion-passive.test.ts` 与 `tests/game/skillcode-browser-differential.test.ts` 保留。它属于棋子技能 `code` 的额外 fixture，不是新的执行面，也不会恢复 AttachedEffect。
+
 ## 验证结果
 
 | 检查 | 当前结果 |
 | --- | --- |
-| RED-80 聚焦回归 | PASS：10 个文件 / 93 项（覆盖移除守卫、触发顺序、五面 Node/浏览器差分和核心动作） |
+| RED-80 聚焦回归 | PASS：10 个文件 / 94 项（覆盖移除守卫、触发顺序、五面 Node/浏览器差分、RED-76 真实被动回归和核心动作） |
 | 五面 Node/浏览器 trace + action log + hash | PASS：浏览器相关 3 个文件 / 15 项；五个 surface 保持固定 hash |
 | 三类 JSON 解析和生产 loader | PASS：113 skills / 81 rules / 16 cards |
 | 执行字段分类 | PASS：0 unclassified；27 个 `triggerSkill` 引用可解析 |
 | 全量语法/helper 静态审计 | PASS：0 个语法诊断；`unsupportedUse={}` |
-| 完整 Vitest / TypeScript / 编码 | PASS：46 个文件 / 368 项；`npx tsc --noEmit`；506 个文本文件 |
+| 完整 Vitest / TypeScript / 编码 | PASS：47 个文件 / 377 项；`npx tsc --noEmit`；511 个文本文件 |
 | ESLint | RED-80 新建/实质重写的 8 个文件定向 PASS；全仓 `npm run lint` 既有基线仍 FAIL（639 errors / 334 warnings） |
 | 构建 / 真实浏览器冒烟 | PASS：bundle 构建；QA 训练局完成 Rule pending 选择与 statusTag 显示；0 个旧 API export |
 | 独立审查 | 实现与真实浏览器证据无其他阻断；合同验收 BLOCKED：全仓 `npm run lint` 基线未通过，需人工 waiver 或另行清债 |

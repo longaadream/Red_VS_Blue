@@ -14,6 +14,7 @@
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
   <script src="js/battle-ui/battle-status-presentation.js"></script>
+  <script src="js/battle-ui/battle-context-layout.js"></script>
   <script src="js/battle-ui/battle-legal-actions.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
@@ -156,7 +157,7 @@
 
     /* ── Main board area ── */
     .main-panel {
-      flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+      position: relative; flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
     }
     .phase-bar {
       position: fixed; top: 10px; left: 10px; z-index: 85;
@@ -190,50 +191,6 @@
     .board-shell-3d .board-stage canvas {
       position: absolute !important; inset: 0 !important;
       width: 100% !important; height: 100% !important; display: block;
-    }
-    .board-side-rail {
-      width: clamp(188px, 18vw, 232px); align-self: stretch; min-height: 100%;
-      display: flex; flex-direction: column; justify-content: flex-start; gap: 12px;
-      flex-shrink: 0; padding: 84px 0 2px; overflow: hidden;
-    }
-    .selected-status-card {
-      min-height: 132px; max-height: calc(100vh - 204px); overflow-y: auto;
-      border: 1px solid rgba(148,163,184,.2);
-      background: linear-gradient(180deg, rgba(15,23,42,.94), rgba(15,23,42,.68));
-      border-radius: 8px; padding: 10px 10px 11px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
-      scrollbar-width: thin; scrollbar-color: #334155 transparent;
-    }
-    .selected-status-empty {
-      min-height: 110px; display: flex; align-items: center; justify-content: center;
-      color: rgba(148,163,184,.46); font-size: 12px; font-weight: 700;
-      border: 1px dashed rgba(148,163,184,.18); border-radius: 8px;
-      background: rgba(15,23,42,.28);
-    }
-    .selected-status-title {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      font-size: 10px; font-weight: 800; color: #94a3b8;
-      letter-spacing: .08em; margin-bottom: 8px;
-    }
-    .selected-status-title span { color: #94a3b8; }
-    .selected-status-list { display: flex; flex-direction: column; }
-    .selected-status-row {
-      display: grid; grid-template-columns: 12px minmax(0,1fr); gap: 6px;
-      padding: 7px 0; border-top: 1px solid rgba(148,163,184,.1);
-    }
-    .selected-status-icon {
-      width: 10px; height: 10px; margin-top: 2px; border-radius: 999px;
-      display: inline-flex; align-items: center; justify-content: center;
-      color: #020617; background: var(--status-color); font-size: 7px; font-weight: 950;
-      box-shadow: 0 0 0 1px rgba(255,255,255,.42), 0 0 8px rgba(168,85,247,.28);
-    }
-    .selected-status-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-    .selected-status-name { color: #e2e8f0; font-size: 11px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
-    .selected-status-meta { color: #fbbf24; font-size: 10px; line-height: 1.3; }
-    .selected-status-description { color: #94a3b8; font-size: 10px; line-height: 1.4; }
-    .selected-status-zero {
-      padding: 10px; border: 1px dashed rgba(148,163,184,.18); border-radius: 8px;
-      color: rgba(148,163,184,.52); font-size: 11px; text-align: center;
     }
     .turn-control-wrap {
       display: flex; justify-content: center;
@@ -451,16 +408,7 @@
       color: #cbd5e1;
     }
 
-    /* ── Hand panel ── */
-    .hand-panel {
-      border-top: 1px solid var(--border); flex-shrink: 0;
-      background: #080f1e;
-    }
-    .hand-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 4px 10px; font-size: 11px; color: var(--muted);
-      border-bottom: 1px solid #1a2540;
-    }
+    /* ── Unsectioned hand fan ── */
     .hand-scroll {
       display: flex; gap: 6px; padding: 6px 10px;
       overflow-x: auto; overflow-y: hidden;
@@ -570,11 +518,6 @@
     .collapse-arrow { font-size: 10px; color: var(--muted); transition: transform .2s; }
     .collapse-arrow.open { transform: rotate(90deg); }
 
-    /* ── Hand panel collapsible ── */
-    .hand-body { }
-    .hand-body.collapsed { display: none; }
-    .hand-header { cursor: pointer; user-select: none; }
-    .hand-header:active { background: #0d1929; }
 
     /* ── Fullscreen map mode ── */
     .btn-fullmap {
@@ -584,15 +527,14 @@
     .btn-fullmap:active { opacity: .7; }
     body.full-map .side-panel,
     body.full-map .action-bar,
-    body.full-map .hand-panel,
+    body.full-map .hand-scroll,
+    body.full-map .training-tools,
     body.full-map .log-panel,
     body.full-map .phase-bar,
-    body.full-map .tile-legend,
-    body.full-map .board-side-rail {
+    body.full-map .tile-legend {
       display: none !important;
     }
     body.full-map .topbar   { display: none !important; }
-    body.full-map #skillBar { display: none !important; }
     body.full-map .board-wrap {
       align-items: center; justify-content: center; padding: 2px;
     }
@@ -924,20 +866,6 @@
       .cd-sheet { width: 100%; }
       .keyword-panel { width: 100%; }
       .board-shell { gap: 8px; align-items: center; }
-      .board-side-rail {
-        position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 74;
-        width: auto; min-height: 0; max-height: min(62vh, 540px); gap: 8px; padding: 8px;
-        border: 1px solid rgba(148,163,184,.22); border-radius: 14px;
-        background: rgba(2,6,23,.94); box-shadow: 0 -16px 48px rgba(0,0,0,.55);
-        backdrop-filter: blur(14px);
-      }
-      .board-side-rail:not(.has-selection) {
-        left: auto; border-color: transparent; background: transparent; box-shadow: none; backdrop-filter: none;
-      }
-      .board-side-rail:not(.has-selection) .selected-status-empty { display: none; }
-      .board-side-rail.target-mode { display: none; }
-      .selected-status-card { min-height: 0; max-height: calc(min(62vh, 540px) - 58px); }
-      .selected-status-empty { min-height: 0; }
       .btn-end { min-width: 112px; padding: 8px 13px; font-size: 12px; }
       .player-state-chip { min-width: 116px; }
       .topbar { top: 6px; right: 6px; max-width: 58px; padding: 5px; gap: 4px; border-radius: 9px; }
@@ -953,71 +881,6 @@
       .resource-orb { padding: 1px 4px; }
     }
 
-    /* ── Arc hand (all screens) ── */
-    .hand-panel { display: none !important; }
-    #arcHandContainer {
-      display: block;
-      position: fixed;
-      bottom: -80px;
-      left: 0; right: 0;
-      height: 130px;
-      z-index: 55;
-      pointer-events: none;
-      overflow: visible;
-    }
-    .arc-card {
-      position: absolute;
-      bottom: 0;
-      width: 80px; height: 124px;
-      border-radius: 8px;
-      background: linear-gradient(180deg, #1a2744 0%, #0f1929 100%);
-      border: 2px solid #4a6a9a;
-      display: flex; flex-direction: column; align-items: center;
-      pointer-events: all; cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s;
-      transform-origin: bottom center;
-      overflow: hidden;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .arc-card.arc-hover {
-      transform: translateY(-70px) scale(1.12) !important;
-      z-index: 10;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.9);
-      border-color: #f59e0b;
-    }
-    @media (hover: hover) and (pointer: fine) {
-      .arc-card:hover {
-        transform: translateY(-70px) scale(1.12) !important;
-        z-index: 10;
-        box-shadow: 0 12px 32px rgba(0,0,0,0.9);
-        border-color: #f59e0b;
-      }
-    }
-    .arc-card.arc-pending { border-color: #f59e0b; background: linear-gradient(180deg, #2d1802 0%, #1a1205 100%); }
-    .arc-card.arc-disabled { opacity: 0.45; }
-    .arc-card-art {
-      width: 100%; height: 58px; flex-shrink: 0; overflow: hidden;
-      background: rgba(0,0,0,0.3);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px;
-    }
-    .arc-card-art img { width: 100%; height: 100%; object-fit: cover; }
-    .arc-card-cost {
-      position: absolute; top: 3px; left: 4px;
-      font-size: 12px; font-weight: bold; color: #93c5fd;
-      background: #1e3a5f; border-radius: 50%;
-      width: 22px; height: 22px;
-      display: flex; align-items: center; justify-content: center;
-      z-index: 2; flex-shrink: 0;
-    }
-    .arc-card-name {
-      font-size: 9px; color: #cbd5e1; text-align: center;
-      padding: 3px 4px; flex: 1; align-self: stretch;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .arc-card-type { font-size: 8px; color: #64748b; padding-bottom: 4px; }
     /* ── Windows hover ── */
     @media (hover: hover) {
       .back-btn:hover { background: #263348; }
@@ -1040,83 +903,9 @@
     /* ── Side panels: fullscreen map by default ── */
     .side-panel { display:none !important; }
 
-    /* ── Training bar ── */
-    .training-bar { align-items:center; gap:5px; flex-wrap:wrap; padding:4px 8px; background:#04080f; border-top:1px solid #1a2540; flex-shrink:0; }
-    .training-bar select { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:6px; font-size:11px; padding:3px 6px; }
+    /* ── Training popover controls ── */
+    .training-popover select { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:6px; font-size:11px; padding:3px 6px; }
     .tb-btn { border-radius:6px; font-size:11px; padding:3px 9px; cursor:pointer; border:1px solid; white-space:nowrap; background:transparent; }
-
-    /* ── Hand always visible ── */
-    .hand-body { display:block !important; }
-
-    /* ── Skill card bar ── */
-    #skillBar {
-      display:none; flex-direction:row; gap:6px; flex-shrink:0;
-      padding:5px 10px; overflow-x:auto; overflow-y:hidden;
-      background:rgba(2,6,23,.95); border-top:1px solid #1a2540;
-      -webkit-overflow-scrolling:touch; scrollbar-width:none;
-    }
-    #skillBar::-webkit-scrollbar { display:none; }
-    .skill-card {
-      position:relative; flex-shrink:0; width:78px; border-radius:8px;
-      background:#141f33; border:1.5px solid #2a3a54;
-      cursor:pointer; display:flex; flex-direction:column;
-      align-items:center; padding:5px 5px 5px; gap:3px;
-      user-select:none; -webkit-tap-highlight-color:transparent;
-      transition:border-color .12s, background .12s, box-shadow .12s;
-    }
-    .skill-card:active { opacity:.75; }
-    .skill-card.sk-charge { border-color:#4c1d95; }
-    .skill-card.sk-active {
-      border-color:#f59e0b !important; background:#2d1802 !important;
-      box-shadow:0 0 14px rgba(245,158,11,.55);
-    }
-    .skill-card.sk-disabled { opacity:.35; pointer-events:none; }
-    .sk-icon { font-size:24px; line-height:1.1; }
-    .sk-name {
-      font-size:9.5px; color:#94a3b8; text-align:center;
-      width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    }
-    .sk-desc-unused {
-      width:70px; min-height:22px; font-size:8px; line-height:1.25;
-      color:#64748b; text-align:center; overflow:hidden;
-      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-    }
-    .sk-cost-row {
-      width:70px; display:flex; justify-content:center; gap:4px; margin-bottom:1px;
-    }
-    .sk-cost-orb {
-      min-width:34px; height:20px; padding:0 6px 0 4px; border-radius:999px;
-      display:inline-flex; align-items:center; justify-content:center; gap:2px;
-      font-size:10px; font-weight:900; line-height:1;
-      background:rgba(7,12,22,.76); border:1px solid #334155;
-    }
-    .sk-cost-orb.action {
-      color:#dbeafe; border-color:rgba(59,130,246,.55);
-    }
-    .sk-cost-orb.charge {
-      color:#f5d0fe; border-color:rgba(168,85,247,.55);
-    }
-    .sk-cost-orb.low {
-      color:#fecaca; background:#221016; border-color:#ef4444;
-    }
-    .sk-cost-orb .resource-glyph { width:14px; height:14px; }
-    .sk-type-tag {
-      font-size:8px; padding:1px 5px; border-radius:8px; letter-spacing:.3px;
-    }
-    .sk-type-tag.ap { background:#071429; color:#93c5fd; border:1px solid #1e3a6e; }
-    .sk-type-tag.cp { background:#130929; color:#d8b4fe; border:1px solid #4c1d95; }
-    .sk-cd-cover {
-      position:absolute; inset:0; border-radius:7px;
-      background:rgba(0,0,0,.72); display:flex;
-      align-items:center; justify-content:center; flex-direction:column; gap:1px;
-      pointer-events:none;
-    }
-    .sk-cd-num { font-size:20px; font-weight:900; color:#64748b; }
-    .sk-cd-lbl { font-size:8px; color:#475569; }
-    .sk-unavailable-reason {
-      width: 70px; color: #fca5a5; font-size: 8px; line-height: 1.25;
-      text-align: center; white-space: normal;
-    }
 
     /* ── Fullscreen log overlay ── */
     #logOverlay { position:fixed; inset:0; background:rgba(2,8,22,.96); z-index:400; flex-direction:column; display:none; }
@@ -1157,13 +946,11 @@
     }
     #statusMsg {
       position: fixed; left: 50%; bottom: 70px; z-index: 82; transform: translateX(-50%);
-      width: min(620px, calc(100vw - 32px)); min-height: 32px; padding: 7px 12px;
-      border: 1px solid rgba(148,163,184,.24); border-radius: 9px;
-      background: rgba(2,6,23,.82); color: #cbd5e1; text-align: center;
-      font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: blur(9px);
+      width: min(620px, calc(100vw - 32px)); min-height: 0; padding: 3px 8px;
+      border: 0; border-radius: 0; background: transparent;
+      color: #cbd5e1; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.9);
+      font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: none;
     }
-    body.target-mode-active #skillBar,
-    body.target-mode-active #arcHandContainer { display: none !important; }
     @media (max-width: 760px) {
       #targetOverlay { padding-top: 116px; }
       .target-prompt { font-size: 17px; }
@@ -1173,17 +960,8 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; }
       .target-prompt, .dmg-float, .spinner, #turnAnnounce { animation: none !important; }
-      .skill-card, .arc-card { transition: none !important; }
     }
 
-    /* Final Android/Windows parity override. Keep this at the end of CSS. */
-    body::after {
-      content: "UI 20260517";
-      position: fixed; right: 6px; bottom: 6px; z-index: 9999;
-      padding: 2px 5px; border-radius: 5px;
-      background: rgba(2,6,23,.55); border: 1px solid rgba(148,163,184,.18);
-      color: rgba(203,213,225,.58); font-size: 9px; pointer-events: none;
-    }
     .topbar {
       position: fixed !important; top: 8px !important; right: 8px !important; left: auto !important;
       width: auto !important; max-width: min(48vw, 360px) !important; min-height: 0 !important;
@@ -1241,7 +1019,6 @@
     }
 
     @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
-      body { --mobile-battle-rail-width: clamp(176px, 22vw, 214px); }
       .battle-layout, .main-panel, .board-wrap, .board-shell-3d { min-height: 0; min-width: 0; }
       .topbar {
         top: 5px !important; right: 5px !important; max-width: 220px !important;
@@ -1267,78 +1044,13 @@
         width: 100%; height: 100%; gap: 0; align-items: stretch; justify-content: stretch;
       }
       .board-shell-3d .board-stage { min-height: 0; }
-      .board-side-rail {
-        position: relative; inset: auto; z-index: 74;
-        width: var(--mobile-battle-rail-width); min-height: 0; max-height: none;
-        align-self: stretch; padding: 43px 6px 4px; gap: 5px;
-        border: 0; border-left: 1px solid rgba(148,163,184,.18); border-radius: 0;
-        background: linear-gradient(180deg, rgba(2,6,23,.94), rgba(15,23,42,.84));
-        box-shadow: -14px 0 36px rgba(0,0,0,.24); backdrop-filter: blur(12px);
-      }
-      .board-side-rail:not(.has-selection) {
-        left: auto; border-color: rgba(148,163,184,.18);
-        background: linear-gradient(180deg, rgba(2,6,23,.94), rgba(15,23,42,.84));
-        box-shadow: -14px 0 36px rgba(0,0,0,.24); backdrop-filter: blur(12px);
-      }
-      .board-side-rail:not(.has-selection) .selected-status-empty { display: flex; }
-      .board-side-rail.target-mode { display: none !important; }
-      .selected-status-card {
-        flex: 1; min-height: 0; max-height: none; padding: 7px; overflow-y: auto; border-radius: 7px;
-      }
-      .selected-status-empty { flex: 1; min-height: 0; font-size: 11px; }
-      .selected-status-title { margin-bottom: 4px; font-size: 9px; }
-      .selected-status-list { gap: 4px; }
-      .selected-status-row { padding: 5px 0; gap: 5px; }
-      .selected-status-description { font-size: 9px; line-height: 1.35; }
-      .selected-status-zero { padding: 7px; font-size: 9px; }
       .turn-control-wrap { flex: 0 0 auto; }
       .btn-end { min-width: 108px; padding: 6px 11px; font-size: 11px; border-width: 1px; }
 
-      #skillBar:not(:empty) {
-        display: flex !important; min-height: 58px; max-height: 58px;
-        gap: 4px; padding: 3px 5px;
-      }
-      #skillBar:empty { display: none !important; }
-      #skillBar .skill-card {
-        width: 126px; height: 50px; min-height: 50px;
-        display: grid; grid-template-columns: 30px minmax(0, 1fr);
-        grid-template-rows: 17px 15px 14px; align-items: center;
-        gap: 0 4px; padding: 2px 4px;
-      }
-      #skillBar .sk-icon {
-        grid-column: 1; grid-row: 1 / 3; font-size: 21px;
-      }
-      #skillBar .sk-cost-row {
-        grid-column: 2; grid-row: 1; width: auto;
-        justify-content: flex-start; gap: 2px; margin: 0;
-      }
-      #skillBar .sk-cost-orb {
-        min-width: 30px; height: 16px; padding: 0 4px 0 2px; font-size: 8px;
-      }
-      #skillBar .sk-cost-orb .resource-glyph { width: 11px; height: 11px; }
-      #skillBar .sk-name {
-        grid-column: 2; grid-row: 2; width: auto; text-align: left; font-size: 9px;
-      }
-      #skillBar .sk-type-tag {
-        grid-column: 1; grid-row: 3; justify-self: center; font-size: 7px;
-      }
-      #skillBar .sk-unavailable-reason {
-        grid-column: 2; grid-row: 3; width: auto; max-width: 86px;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        text-align: left; font-size: 7px; line-height: 1.1;
-      }
-      .training-bar {
-        min-height: 30px; max-height: 30px; flex-wrap: nowrap; gap: 4px; padding: 3px 5px;
-        overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
-      }
-      .training-bar::-webkit-scrollbar { display: none; }
-      .training-bar select { flex: 0 0 auto !important; max-width: 190px; height: 23px; padding: 1px 5px; font-size: 10px; }
-      .training-bar .tb-btn { height: 23px; padding: 2px 7px; font-size: 10px; }
-      #arcHandContainer { bottom: -105px; height: 124px; }
 
       #statusMsg {
         left: 5px; bottom: 94px; transform: none;
-        width: calc(100vw - var(--mobile-battle-rail-width) - 10px);
+        width: calc(100vw - 10px);
         min-height: 26px; padding: 5px 9px; font-size: 10px;
       }
       #targetOverlay { padding-top: 42px; gap: 5px; }
@@ -1346,7 +1058,7 @@
       .target-source-name { font-size: 10px; }
       .target-prompt { font-size: 15px; letter-spacing: .7px; }
       .target-cancel-btn { height: 26px; padding: 3px 14px; font-size: 10px; }
-      body.target-mode-active #trainingBar { display: none !important; }
+      body.target-mode-active #trainingTools { display: none !important; }
       body.target-mode-active #statusMsg {
         top: auto; left: 50%; bottom: 5px; transform: translateX(-50%);
         width: min(440px, calc(100vw - 20px));
@@ -1372,6 +1084,9 @@
       .training-setup-btn { padding: 6px 10px; border-radius: 9px; font-size: 11px; }
     }
   </style>
+  <link rel="stylesheet" href="css/battle-responsive.css" />
+  <link rel="stylesheet" href="css/battle-context-ui.css" />
+  <link rel="stylesheet" href="css/battle-responsive-mobile.css" />
 </head>
 <body>
 
@@ -1412,7 +1127,7 @@
   </aside>
 
   <!-- Card Detail Modal -->
-  <div id="cardDetailModal" onclick="if(event.target===this)closeCardDetail()">
+  <div id="cardDetailModal" role="dialog" aria-modal="true" aria-label="卡牌详情" onclick="if(event.target===this)closeCardDetail()">
     <div class="cd-layout">
       <div class="cd-sheet">
       <button class="cd-close" onclick="closeCardDetail()">✕</button>
@@ -1429,7 +1144,7 @@
   </div>
 
   <!-- Piece Info Modal -->
-  <div id="pieceInfoModal" onclick="if(event.target===this)closePieceInfo()">
+  <div id="pieceInfoModal" role="dialog" aria-modal="true" aria-label="棋子详情" onclick="if(event.target===this)closePieceInfo()">
     <div class="pi-layout">
       <div class="pi-sheet">
       <div class="pi-header">
@@ -1512,18 +1227,16 @@
 
   <!-- Topbar -->
   <div class="topbar" data-battle-ui-region="player-hud">
-    <button class="back-btn" onclick="confirmLeave()">← 离开</button>
+    <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">← 离开</button>
     <div class="room-name" id="roomNameLabel">对战</div>
-    <div class="turn-badge" id="turnBadge">等待中</div>
     <div id="wsStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● WS</div>
-    <div style="font-size:12px;color:#64748b" id="roundLabel"></div>
-    <button id="btnSurrender" class="btn-surrender" onclick="confirmSurrender()">🏳 投降</button>
-    <button id="btnSwitchPov" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
-    <button id="btnResetCD" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
-    <button class="btn-fullmap" id="btnFullMap" onclick="toggleFullMap()" title="全屏地图">⛶</button>
+    <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">🏳 投降</button>
+    <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
+    <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
+    <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">⛶</button>
     <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
     <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
-    <button class="btn-fullmap" onclick="openLog()" title="战斗日志">📜</button>
+    <button class="btn-fullmap" aria-label="打开战斗日志" onclick="openLog()" title="战斗日志">📜</button>
   </div>
 
   <!-- Main layout -->
@@ -1538,7 +1251,16 @@
     <!-- Board + actions + log -->
     <div class="main-panel">
       <div class="phase-bar" data-battle-ui-region="turn-hud">
-        <div id="phaseLabel" style="font-weight:600">-</div>
+        <div class="turn-summary">
+          <div class="turn-summary-primary">
+            <div class="turn-badge" id="turnBadge" aria-live="polite">等待中</div>
+            <div id="roundLabel" style="font-size:11px;color:#94a3b8"></div>
+          </div>
+          <div class="turn-summary-secondary">
+            <span id="phaseLabel">-</span>
+            <span class="turn-clock" id="turnClock" title="回合计时">--:--</span>
+          </div>
+        </div>
         <div id="playerResCards" style="display:flex;gap:6px"></div>
       </div>
 
@@ -1554,34 +1276,49 @@
       </div>
 
       <div class="board-wrap" id="boardWrap">
+        <div class="board-camera-controls" aria-label="棋盘视图控制">
+          <button class="board-view-button" id="btnResetBoardView" type="button" onclick="resetBoardView()" title="复位棋盘镜头" aria-label="复位棋盘镜头">⌖ <span>复位</span></button>
+        </div>
         <div class="board-shell board-shell-3d">
           <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
             <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:2"></div>
-          </div>
-          <aside class="board-side-rail" data-battle-ui-region="selected-piece">
-            <div id="selectedPieceStatus" class="selected-status-empty">未选中棋子</div>
-            <div class="turn-control-wrap">
-              <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
+            <div id="pieceContextMenu" class="piece-context-menu" role="toolbar" aria-label="棋子可用技能" aria-hidden="true" data-piece-id="" data-side="right">
+              <div class="piece-context-heading">
+                <span class="piece-context-identity">
+                  <span id="pieceContextName" class="piece-context-name"></span>
+                  <span id="pieceContextHp" class="piece-context-hp"></span>
+                </span>
+                <button type="button" class="piece-context-info" onclick="if(selectedPieceId)dispatchBattleIntent({type:'inspect-piece',pieceId:selectedPieceId})" aria-label="查看棋子完整技能与状态" title="完整技能与状态">i</button>
+              </div>
+              <div id="pieceContextSkills" class="piece-context-skills"></div>
             </div>
-          </aside>
+            <aside id="selectedStatusOverlay" class="selected-status-overlay" data-battle-ui-region="selected-status" aria-label="选中棋子特殊状态" aria-live="polite" hidden></aside>
+          </div>
         </div>
-      </div>
-
-      <!-- Skill card bar (appears when piece selected) -->
-      <div id="skillBar" data-battle-ui-region="skill-panel"></div>
-
-      <!-- Training bar (training mode only) -->
-      <div class="training-bar" id="trainingBar" style="display:none">
-        <select id="placeOwner" onchange="refreshPlaceTemplates()">
-          <option value="training-red">先手</option>
-          <option value="training-blue">后手</option>
-        </select>
-        <select id="placeTemplate" style="flex:1;min-width:90px">
-          <option value="">选择棋子…</option>
-        </select>
-        <button id="btnPlace" class="tb-btn" onclick="togglePlaceMode()" style="background:#2d1a4e;border-color:#6d28d9;color:#c4b5fd">放置</button>
-        <button class="tb-btn" onclick="openResourceEditor()" style="background:#1a2a1a;border-color:#15803d;color:#86efac" title="修改资源/充能/行动点">资源</button>
-        <button class="tb-btn" onclick="showTrainingSetup()" style="background:#0c1a0c;border-color:#166534;color:#86efac">设置</button>
+        <div class="turn-control-wrap battle-turn-control">
+          <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
+        </div>
+        <div class="training-tools" id="trainingTools" style="display:none">
+          <button class="training-tools-toggle" id="trainingToolsToggle" type="button"
+            aria-controls="trainingBar" aria-expanded="false" aria-haspopup="dialog"
+            onclick="toggleTrainingTools()">
+            <span class="training-tools-icon" aria-hidden="true">✦</span>
+            <span>训练工具</span>
+            <span class="training-tools-chevron" aria-hidden="true">⌃</span>
+          </button>
+          <div id="trainingBar" class="training-popover" role="dialog" aria-hidden="true" aria-label="训练修改工具">
+            <select id="placeOwner" aria-label="放置方" onchange="refreshPlaceTemplates()">
+              <option value="training-red">先手</option>
+              <option value="training-blue">后手</option>
+            </select>
+            <select id="placeTemplate" aria-label="选择放置棋子">
+              <option value="">选择棋子…</option>
+            </select>
+            <button id="btnPlace" class="tb-btn is-place" onclick="togglePlaceMode()">放置</button>
+            <button class="tb-btn is-resource" onclick="openResourceEditor()" title="修改资源/充能/行动点">资源</button>
+            <button class="tb-btn is-settings" onclick="showTrainingSetup()">设置</button>
+          </div>
+        </div>
       </div>
 
       <!-- Resource editor sheet (training mode) -->
@@ -1614,19 +1351,8 @@
         </div>
       </div>
 
-      <!-- Hand (always visible) -->
-      <div class="hand-panel" id="handPanel" data-battle-ui-region="hand">
-        <div style="display:flex;align-items:center;gap:8px;padding:3px 10px;font-size:11px;color:#64748b;border-bottom:1px solid #1a2540;flex-shrink:0">
-          <span>🃏 手牌</span>
-          <span id="handCount" style="font-weight:700;color:#93c5fd">0</span>
-          <span id="handTarget" style="color:#f59e0b;display:none"> · 点击目标施放</span>
-        </div>
-        <div id="handBody">
-          <div class="hand-scroll" id="handCards">
-            <div class="hand-empty">暂无手牌</div>
-          </div>
-        </div>
-      </div>
+      <!-- The cards themselves are the hand; no panel, header, or visual section. -->
+      <div class="hand-scroll" id="handCards" data-battle-ui-region="hand" role="region" aria-label="手牌列表" tabindex="0"></div>
     </div>
 
     <!-- Opponent pieces panel (right): hidden, kept for renderPanels() -->
@@ -1729,7 +1455,25 @@
         secondTemplateIds: getSelectedTrainingPieceIds('trainingSecondPieces'),
       }
     }
+    function setTrainingToolsOpen(open) {
+      const root = document.getElementById('trainingTools')
+      const toggle = document.getElementById('trainingToolsToggle')
+      const popover = document.getElementById('trainingBar')
+      if (!root || !toggle || !popover) return
+      const next = !!open && root.style.display !== 'none'
+      if (next) closePieceContextMenu()
+      root.classList.toggle('is-open', next)
+      toggle.setAttribute('aria-expanded', String(next))
+      popover.setAttribute('aria-hidden', String(!next))
+    }
+
+    function toggleTrainingTools() {
+      const root = document.getElementById('trainingTools')
+      if (!root) return
+      setTrainingToolsOpen(!root.classList.contains('is-open'))
+    }
     function showTrainingSetup() {
+      setTrainingToolsOpen(false)
       placingMode = false
       selectedPieceId = null
       clearTargetInteraction('training-setup-opened')
@@ -2070,7 +1814,6 @@
           preparation,
         )
         renderHand()
-        renderArcHand()
       } else if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
         const skData = skillDefOf(action.skillId)
         pendingMove = false
@@ -2094,7 +1837,7 @@
       }
       setStatusMsg(targetStepPrefix(preparation.step) + targetTypeText(preparation.targetType, preparation.filter))
       const selected = G && G.pieces ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-      renderBoard(); renderSkillBar(selected || null); renderActionBar(); renderTargetOverlay()
+      renderBoard(); renderPieceContextMenu(selected || null); renderActionBar(); renderTargetOverlay()
       return true
     }
     let currentCardDetail = null
@@ -2604,13 +2347,14 @@
         doAction({ type: 'cancelPendingSelection', playerId: myPlayerId })
       }
       const _sp = G && selectedPieceId && G.pieces.find(p => p.instanceId === selectedPieceId)
-      renderSkillBar(_sp || null)
+      renderPieceContextMenu(_sp || null)
       renderActionBar()
     }
 
     // ── Piece info modal ──
     function showPieceInfo(instanceId, preserveKeyword) {
       if (!G) return
+      closePieceContextMenu()
       const piece = G.pieces.find(p => p.instanceId === instanceId)
       if (!piece) return
       currentPieceInfoId = instanceId
@@ -2738,6 +2482,8 @@
       currentPieceKeywords = []
       activePieceKeyword = ''
       document.getElementById('pieceInfoModal').style.display = 'none'
+      const selected = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+      renderPieceContextMenu(selected || null)
     }
 
     // ── Load local static data ──
@@ -2876,7 +2622,9 @@
         document.getElementById('btnSurrender').style.display = 'none'
         document.getElementById('btnSwitchPov').style.display = ''
         document.getElementById('btnResetCD').style.display = ''
-        document.getElementById('trainingBar').style.display = 'flex'
+        const trainingTools = document.getElementById('trainingTools')
+        if (trainingTools) trainingTools.style.display = ''
+        setTrainingToolsOpen(false)
         document.getElementById('roomNameLabel').textContent = '训练营'
         showMsg('加载本地资源...')
         const trainingLoad = await loadLocalData()
@@ -2968,6 +2716,7 @@
 
     // ── Training: resource editor ──
     function openResourceEditor() {
+      setTrainingToolsOpen(false)
       const sheet = document.getElementById('resEditorSheet')
       if (!sheet || !G) return
       // Pre-fill with current values of the active player
@@ -3021,6 +2770,7 @@
 
     function togglePlaceMode() {
       placingMode = !placingMode
+      if (placingMode) setTrainingToolsOpen(false)
       const btn = document.getElementById('btnPlace')
       if (btn) { btn.style.background = placingMode ? '#4c1d95' : '#2d1a4e'; btn.textContent = placingMode ? '取消放置' : '点击棋盘放置' }
       setStatusMsg(placingMode ? '点击棋盘上的可行走格子放置棋子' : '已取消放置')
@@ -3439,6 +3189,13 @@
       const active = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
       document.body.classList.toggle('target-mode-active', active)
       if (active) {
+        closePieceContextMenu()
+        if (window.matchMedia && window.matchMedia('(max-width: 760px)').matches) {
+          const pieceInfo = document.getElementById('pieceInfoModal')
+          const cardInfo = document.getElementById('cardDetailModal')
+          if (pieceInfo && pieceInfo.style.display !== 'none' && pieceInfo.style.display !== '') closePieceInfo()
+          if (cardInfo && cardInfo.style.display !== 'none' && cardInfo.style.display !== '') closeCardDetail()
+        }
         document.getElementById('targetSourceName').textContent = currentTargetSourceName()
         document.getElementById('targetPromptText').textContent = targetSubmissionPending
           ? '指令已提交 · 等待权威确认'
@@ -3470,8 +3227,8 @@
       }
       clearTargetInteraction('user-cancelled')
       setMoveButtonClass(false)
-      const sp = autoMoveSelectedIfPossible()
-      renderBoard(); renderSkillBar(sp || null); renderActionBar(); renderTargetOverlay()
+      const sp = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+      renderBoard(); renderPieceContextMenu(sp || null); renderActionBar(); renderTargetOverlay()
       setStatusMsg('已取消目标选择')
     }
 
@@ -3496,10 +3253,12 @@
       }).size > 0
     }
 
-    function autoMoveSelectedIfPossible() {
+    function restoreSelectedPieceMenu() {
       const sp = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-      pendingMove = canAutoMovePiece(sp)
-      setMoveButtonClass(pendingMove)
+      pendingMove = false
+      validMoves = new Set()
+      setMoveButtonClass(false)
+      renderPieceContextMenu(sp || null)
       return sp
     }
 
@@ -3815,9 +3574,9 @@
         }
       }
 
-      // Update skill bar
-      const _skillBarPiece = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-      renderSkillBar(_skillBarPiece)
+      // Keep the board-anchored menu in sync with the current selection.
+      const contextPiece = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+      renderPieceContextMenu(contextPiece)
     }
 
     function renderPieceCard(piece, isMe) {
@@ -3903,73 +3662,137 @@
       }
     }
 
-    function renderSkillBar(piece) {
-      const bar = document.getElementById('skillBar')
-      if (!bar) return
-      if (!piece || piece.currentHp <= 0) { bar.style.display = 'none'; return }
-      if (!(piece.ownerPlayerId && piece.ownerPlayerId.toLowerCase() === myPlayerId)) {
-        bar.style.display = 'none'
+    let pieceContextPositionFrame = null
+
+    function closePieceContextMenu() {
+      const menu = document.getElementById('pieceContextMenu')
+      if (!menu) return
+      menu.classList.remove('is-open')
+      menu.setAttribute('aria-hidden', 'true')
+      menu.dataset.pieceId = ''
+    }
+
+    function positionPieceContextMenu() {
+      const menu = document.getElementById('pieceContextMenu')
+      const stage = document.getElementById('boardStage3d')
+      const piece = G && selectedPieceId && G.pieces.find(p => p.instanceId === selectedPieceId)
+      const layout = window.BattleContextLayout
+      if (!menu || !stage || !piece || !layout || !menu.classList.contains('is-open')) return
+
+      let anchor = null
+      if (_use3d && battlePresentation && battlePresentation.projectCell) {
+        anchor = battlePresentation.projectCell(piece.x, piece.y, 0.72)
+      }
+      if (!anchor) {
+        const cell = document.querySelector('.cell[data-x="' + piece.x + '"][data-y="' + piece.y + '"]')
+        if (cell) {
+          const cellRect = cell.getBoundingClientRect()
+          const stageRect = stage.getBoundingClientRect()
+          anchor = {
+            left: cellRect.left - stageRect.left,
+            top: cellRect.top - stageRect.top,
+            width: cellRect.width,
+            height: cellRect.height,
+          }
+        }
+      }
+      if (!anchor) return closePieceContextMenu()
+
+      const hudOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--battle-hud-offset')) || 0
+      const menuTopPadding = hudOffset + 8
+      const placement = layout.placeMenu(anchor, { width: menu.offsetWidth, height: menu.offsetHeight }, {
+        width: stage.clientWidth,
+        height: stage.clientHeight,
+        topPadding: menuTopPadding,
+      })
+      menu.style.left = placement.left + 'px'
+      menu.style.top = placement.top + 'px'
+      menu.style.setProperty('--piece-menu-origin-x', placement.originX + 'px')
+      menu.style.setProperty('--piece-menu-origin-y', placement.originY + 'px')
+      menu.dataset.side = placement.side
+    }
+
+    function schedulePieceContextMenuPosition() {
+      if (pieceContextPositionFrame !== null) return
+      pieceContextPositionFrame = requestAnimationFrame(function () {
+        pieceContextPositionFrame = null
+        positionPieceContextMenu()
+      })
+    }
+
+    function renderPieceContextMenu(piece) {
+      const menu = document.getElementById('pieceContextMenu')
+      const skillsContainer = document.getElementById('pieceContextSkills')
+      if (!menu || !skillsContainer) return
+
+      const trainingOpen = document.getElementById('trainingTools')?.classList.contains('is-open')
+      const isTargeting = !!pendingMove || !!pendingSkill || !!pendingCardAction || !!targetSubmissionPending ||
+        pendingTargetSelectionForMe() || pendingOptionSelectionForMe()
+      if (!piece || piece.currentHp <= 0 || isTargeting || trainingOpen) {
+        closePieceContextMenu()
         return
       }
 
-      const skills = pieceDispSkills(piece).filter(sk => {
+      const isOwner = !!piece.ownerPlayerId && piece.ownerPlayerId.toLowerCase() === myPlayerId
+      const isMyTurn = G && G.turn && G.turn.currentPlayerId &&
+        G.turn.currentPlayerId.toLowerCase() === myPlayerId
+      const inAction = G && G.turn && G.turn.phase === 'action'
+      const canMove = isOwner && isMyTurn && inAction && canAutoMovePiece(piece)
+      const skills = isOwner ? pieceDispSkills(piece).filter(sk => {
         const skData = skillDefOf(skillIdOf(sk))
         return skData.kind !== 'passive'
-      })
-      if (!skills.length) { bar.style.display = 'none'; return }
+      }) : []
 
-      bar.style.display = 'flex'
-      bar.innerHTML = skills.map(sk => {
+      const template = PIECES_BY_ID[piece.templateId]
+      const displayName = piece.name || (template && template.name) || piece.templateId
+      document.getElementById('pieceContextName').textContent = displayName
+      document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
+      menu.dataset.pieceId = piece.instanceId
+
+      const moveButton = isOwner
+        ? '<button type="button" class="piece-context-skill is-move"' +
+          ' onclick="dispatchBattleIntent({type:\'toggle-move\'})"' + (canMove ? '' : ' disabled') + '>' +
+          '<span class="piece-context-skill-icon">&#8599;</span><span class="piece-context-skill-name">移动</span>' +
+          '<span class="piece-context-skill-cost">选择路线</span></button>'
+        : ''
+      const skillButtons = skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
         const availability = resolveSkillAvailability(piece, sk)
         const skData = availability.skillData
         const isCharge = availability.isCharge
-        const onCD = availability.onCooldown
-        const noUses = availability.noUses
-        const isActive = pendingSkill && pendingSkill.skillId === sid
-        const icon = skData.icon || (isCharge ? 'C' : 'S')
         const rawName = skData.name || sid
         const rawDesc = skData.description || ''
         const apCost = availability.actionCost
         const cpCost = availability.chargeCost
-        const apLow = availability.actionLow
-        const cpLow = availability.chargeLow
-        const displayName = rawName.length > 7 ? rawName.slice(0, 6) + '...' : rawName
-        const displayDesc = rawDesc.length > 22 ? rawDesc.slice(0, 21) + '...' : rawDesc
-        const typeLabel = isCharge ? '充能' : '基础'
-        const typeCls = isCharge ? 'cp' : 'ap'
         const disabled = !availability.available
-        const unavailableReason = availability.unavailableReason
-
-        let cls = 'skill-card'
-        if (isCharge) cls += ' sk-charge'
-        if (isActive) cls += ' sk-active'
-        if (disabled) cls += ' sk-disabled'
-
-        const cdCover = (onCD || noUses) ? `
-          <div class="sk-cd-cover">
-            <div class="sk-cd-num">${onCD ? sk.currentCooldown : 'OK'}</div>
-            <div class="sk-cd-lbl">${onCD ? 'CD' : '已用'}</div>
-          </div>` : ''
-
+        const rawIcon = skData.icon || (isCharge ? '◆' : '✦')
+        const icon = /^[a-z0-9_-]{2,}$/i.test(String(rawIcon)) ? (isCharge ? '◆' : '✦') : rawIcon
+        const status = availability.onCooldown ? 'CD ' + sk.currentCooldown
+          : availability.noUses ? '已用'
+            : availability.actionLow ? 'AP不足'
+              : availability.chargeLow ? 'CP不足' : (disabled ? '不可用' : '')
         const titleParts = [rawName]
         if (rawDesc) titleParts.push(rawDesc)
-        titleParts.push(`行动点消耗：${apCost}`)
-        titleParts.push(`充能点消耗：${cpCost}`)
-        if (unavailableReason) titleParts.push('不可用：' + unavailableReason)
+        titleParts.push('行动点消耗：' + apCost)
+        if (cpCost) titleParts.push('充能点消耗：' + cpCost)
+        if (availability.unavailableReason) titleParts.push('不可用：' + availability.unavailableReason)
 
-        return `<button type="button" class="${cls}" onclick="dispatchBattleIntent({type:'select-skill',skillId:'${escHtml(sid)}'})" title="${escHtml(titleParts.join('\n'))}" aria-label="${escHtml(rawName + (unavailableReason ? '，' + unavailableReason : '，可使用'))}" aria-pressed="${isActive ? 'true' : 'false'}"${disabled ? ' disabled aria-disabled="true"' : ''}>
-          ${cdCover}
-          <div class="sk-cost-row">
-            <span class="sk-cost-orb action ${apLow ? 'low' : ''}" title="行动点消耗"><span class="resource-glyph action"></span>${apCost}</span>
-            <span class="sk-cost-orb charge ${cpLow ? 'low' : ''}" title="充能点消耗"><span class="resource-glyph charge"></span>${cpCost}</span>
-          </div>
-          <div class="sk-icon">${icon}</div>
-          <div class="sk-name">${escHtml(displayName)}</div>
-          <div class="sk-type-tag ${typeCls}">${typeLabel}</div>
-          ${unavailableReason ? `<div class="sk-unavailable-reason">${escHtml(unavailableReason)}</div>` : ''}
-        </button>`
-      }).join('')
+        return '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
+          '" data-skill-id="' + escHtml(sid) + '"' +
+          ' onclick="dispatchBattleIntent({type:\'select-skill\',skillId:this.dataset.skillId})"' +
+          ' title="' + escHtml(titleParts.join('\n')) + '"' +
+          ' aria-label="' + escHtml(rawName + (availability.unavailableReason ? '，' + availability.unavailableReason : '，可使用')) + '"' + (disabled ? ' disabled aria-disabled="true"' : '') + '>' +
+          '<span class="piece-context-skill-icon">' + escHtml(String(icon)) + '</span>' +
+          '<span class="piece-context-skill-name">' + escHtml(rawName) + '</span>' +
+          '<span class="piece-context-skill-cost">' +
+            (status || ('⚡' + apCost + (cpCost ? ' ◆' + cpCost : ''))) +
+          '</span></button>'
+      }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
+      skillsContainer.innerHTML = moveButton + skillButtons
+
+      menu.classList.add('is-open')
+      menu.setAttribute('aria-hidden', 'false')
+      schedulePieceContextMenuPosition()
     }
 
     function renderHand() {
@@ -3979,7 +3802,6 @@
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const ap = myMeta ? myMeta.actionPoints : 0
 
-      document.getElementById('handCount').textContent = hand.length
       let hudHand = document.getElementById('hudHandCount')
       if (!hudHand) {
         const topbar = document.querySelector('.topbar')
@@ -3993,17 +3815,16 @@
         }
       }
       if (hudHand) hudHand.textContent = hand.length
-      const targetHint = document.getElementById('handTarget')
-      targetHint.style.display = pendingCardAction ? 'inline' : 'none'
 
       const container = document.getElementById('handCards')
+      if (!container) return
+      container.setAttribute('aria-hidden', String(!hand.length))
       if (!hand.length) {
-        renderArcHand()
-        container.innerHTML = '<div class="hand-empty">暂无手牌</div>'
+        container.replaceChildren()
         return
       }
 
-      container.innerHTML = hand.map(card => {
+      container.innerHTML = hand.map((card, index) => {
         const def = cardsById[card.cardId] || (G.customCards && G.customCards[card.cardId]) || {}
         const cost = card.actionPointCost ?? def.actionPointCost ?? 0
         const canPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
@@ -4028,7 +3849,10 @@
 
         const cid = escHtml(card.instanceId)
         const cdid = escHtml(card.cardId)
-        return `<div class="${cls}"
+        const cardName = def.name || card.cardId
+        const arc = window.BattleContextLayout.handArc(index, hand.length)
+        return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
+          aria-label="${escHtml(cardName)}，行动点 ${cost}" aria-pressed="${isPending}" aria-disabled="${!canPlay}"
           onclick="onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
@@ -4040,82 +3864,8 @@
             <div class="card-desc">${escHtml(def.description || '暂无描述')}</div>
             <div class="card-type-badge">${typeLabel}${cdHtml}</div>
           </div>
-        </div>`
+        </button>`
       }).join('')
-      renderArcHand()
-    }
-
-    function renderArcHand() {
-      const container = document.getElementById('arcHandContainer')
-      if (!container) return
-      if (!G) { container.innerHTML = ''; return }
-
-      container.innerHTML = ''
-      const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-      const hand = (myMeta && myMeta.hand) || []
-      if (!hand.length) return
-
-      const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      const ap = myMeta ? myMeta.actionPoints : 0
-      const n = hand.length
-      const W = window.innerWidth
-      const cardW = 80
-      const maxSpread = Math.min(W * 0.85, n * 84)
-      const maxAngle = Math.min(28, n * 5)
-
-      hand.forEach((card, i) => {
-        const def = cardsById[card.cardId] || (G.customCards && G.customCards[card.cardId]) || {}
-        const cost = card.actionPointCost ?? def.actionPointCost ?? 0
-        const canPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
-        const isPending = pendingCardAction && pendingCardAction.cardInstanceId === card.instanceId
-
-        const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1
-        const angle = t * maxAngle
-        const xPos = W / 2 + t * (maxSpread / 2) - cardW / 2
-        const yLift = -(t * t) * 16
-
-        const el = document.createElement('div')
-        let cls = 'arc-card'
-        if (isPending) cls += ' arc-pending arc-hover'
-        else if (!canPlay) cls += ' arc-disabled'
-        el.className = cls
-        el.style.left = xPos + 'px'
-        el.style.transform = `rotate(${angle}deg) translateY(${yLift}px)`
-
-        const artSrc = def.image ? `images/card-art/${def.image}` : null
-        const artHtml = artSrc
-          ? `<img src="${artSrc}" onerror="this.style.display='none'">`
-          : (def.icon || '*')
-        const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
-
-        el.innerHTML = `
-          <div class="arc-card-cost">${cost}</div>
-          <div class="arc-card-art">${artHtml}</div>
-          <div class="arc-card-name">${escHtml(def.name || card.cardId || '')}</div>
-          <div class="arc-card-type">${typeLabel}</div>
-        `
-
-        el.addEventListener('click', () => onCardClick(card.instanceId, card.cardId))
-        el.addEventListener('contextmenu', (event) => {
-          event.preventDefault()
-          showCardDetail(card.instanceId, card.cardId)
-        })
-        let pressTimer = null
-        el.addEventListener('touchstart', () => {
-          el.classList.add('arc-hover')
-          pressTimer = setTimeout(() => showCardDetail(card.instanceId, card.cardId), 600)
-        }, { passive: true })
-        el.addEventListener('touchend', () => {
-          clearTimeout(pressTimer)
-          setTimeout(() => el.classList.remove('arc-hover'), 300)
-        })
-        el.addEventListener('touchmove', () => {
-          clearTimeout(pressTimer)
-          el.classList.remove('arc-hover')
-        }, { passive: true })
-
-        container.appendChild(el)
-      })
     }
 
     function onCardClick(cardInstanceId, cardId) {
@@ -4133,13 +3883,12 @@
       pendingMove = false
       pendingSkill = null
       setMoveButtonClass(false)
-      renderSkillBar(G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null)
+      renderPieceContextMenu(G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null)
 
       // Second click on same card: confirm and play
       if (pendingCardAction && pendingCardAction.cardInstanceId === cardInstanceId) {
         pendingCardAction = null
         renderHand()
-        renderArcHand()
         doAction({ type: 'playCard', playerId: myPlayerId, cardInstanceId })
         return
       }
@@ -4147,7 +3896,6 @@
       // First click: select/preview the card
       pendingCardAction = { cardInstanceId, cardId }
       renderHand()
-      renderArcHand()
       setStatusMsg('🃏 再次点击释放，点其他地方取消')
     }
 
@@ -4181,7 +3929,7 @@
         pendingMove = false
         pendingSkill = null
         setMoveButtonClass(false)
-        renderSkillBar(_selPiece || null)
+        renderPieceContextMenu(_selPiece || null)
       } else if (pendingOptionSelectionForMe() || pendingTargetSelectionForMe()) {
         setStatusMsg('等待你的选择')
       } else if (!isMyTurn) {
@@ -4189,7 +3937,7 @@
         pendingMove = false
         pendingSkill = null
         setMoveButtonClass(false)
-        renderSkillBar(_selPiece || null)
+        renderPieceContextMenu(_selPiece || null)
       } else if (inEnd) {
         setStatusMsg('结束阶段：点击继续推进回合')
       } else if (inStart) {
@@ -4203,7 +3951,7 @@
       } else if (selectedPieceId && _isOwnSelected) {
         setStatusMsg('已选中棋子，选择行动')
       } else if (selectedPieceId) {
-        setStatusMsg('已选中棋子。右键查看详细信息')
+        setStatusMsg('已选中棋子。点击菜单 i 或右键查看详细信息')
       } else {
         setStatusMsg('选择棋子开始行动')
       }
@@ -4212,6 +3960,10 @@
     // ── Cell click ──
     function handleBattleIntent(intent) {
       if (!intent) return
+      if (intent.type === 'viewport-change') {
+        schedulePieceContextMenuPosition()
+        return
+      }
       if (intent.type === 'activate-cell') return onCellClick(intent.x, intent.y)
       if (intent.type === 'inspect-piece') return showPieceInfo(intent.pieceId)
       if (intent.type === 'select-piece') return selectPiece(intent.pieceId)
@@ -4288,7 +4040,6 @@
         delete action.validTargets
         const targetLabel = currentTargetSourceName()
         pendingCardAction = null
-        document.getElementById('handTarget').style.display = 'none'
         submitTargetAction(action, targetLabel)
         return
       }
@@ -4375,8 +4126,8 @@
         return
       }
 
-      // Left-click selects any piece for the compact status rail.
-      // Right-click on a piece opens the detailed info modal.
+      // Left-click selects any piece and opens its board-anchored contextual summary.
+      // Right-click opens the complete skills and status detail.
       if (piece) {
         selectPiece(piece.instanceId)
       }
@@ -4403,7 +4154,7 @@
       setMoveButtonClass(false)
       const pieceSelect = document.getElementById('pieceSelect')
       if (pieceSelect) pieceSelect.value = ''
-      renderSkillBar(null)
+      renderPieceContextMenu(null)
       render()
     }
 
@@ -4434,9 +4185,12 @@
         const hasOption = Array.from(pieceSelect.options || []).some(opt => opt.value === instanceId)
         pieceSelect.value = hasOption ? instanceId : ''
       }
-      // Render skill bar
-      const sp = autoMoveSelectedIfPossible()
-      renderSkillBar(sp)
+      // Inspect first; explicit movement closes the menu before route selection.
+      pendingMove = false
+      validMoves = new Set()
+      setMoveButtonClass(false)
+      const sp = G && G.pieces.find(p => p.instanceId === selectedPieceId)
+      renderPieceContextMenu(sp)
       render()
     }
 
@@ -4451,10 +4205,10 @@
       pendingSkill = null
       setMoveButtonClass(pendingMove)
       const sp = G && G.pieces.find(p => p.instanceId === selectedPieceId)
-      renderBoard(); renderSkillBar(sp); renderActionBar()
+      renderBoard(); renderPieceContextMenu(pendingMove ? null : sp); renderActionBar()
     }
 
-    // selectSkillCard: called when a skill card in the skill bar is clicked
+    // selectSkillCard: called from the board-anchored piece menu.
     async function selectSkillCard(skId) {
       if (!selectedPieceId || !skId || !G) return
       if (targetSubmissionPending) {
@@ -4470,8 +4224,9 @@
       // Toggle off: clicking the active skill again cancels selection
       if (pendingSkill && pendingSkill.skillId === skId) {
         clearTargetInteraction('active-skill-cancelled')
-        autoMoveSelectedIfPossible()
-        renderBoard(); renderSkillBar(sp); renderActionBar(); renderTargetOverlay()
+        pendingMove = false
+        setMoveButtonClass(false)
+        renderBoard(); renderPieceContextMenu(sp); renderActionBar(); renderTargetOverlay()
         setStatusMsg('已取消技能目标选择')
         return
       }
@@ -4486,6 +4241,7 @@
       setMoveButtonClass(false)
 
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
+      closePieceContextMenu()
       await doAction(draftAction)
     }
 
@@ -4548,7 +4304,7 @@
         }
         const interactionFeedback = reconcileBattleInteractionState(oldG, G)
         if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
-        autoMoveSelectedIfPossible()
+        restoreSelectedPieceMenu()
         render(); checkClientGameOver()
         if (interactionFeedback) setStatusMsg(interactionFeedback)
       } catch (e) {
@@ -4617,7 +4373,7 @@
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-          pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
+          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
           return
         }
 
@@ -4630,7 +4386,7 @@
             if (action.pieceId && newG.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
               selectedPieceId = action.pieceId
             } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-            pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
+            pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
             applyServerState(newG, gameSeed)
             relaySeq++
             RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
@@ -4653,7 +4409,7 @@
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-          pendingSkill = null; pendingCardAction = null; autoMoveSelectedIfPossible()
+          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
           return
         }
 
@@ -4877,6 +4633,7 @@
       const target = getMapTarget()
       if (!target) return
       target.style.transform = `translate(${mapViewX}px, ${mapViewY}px) scale(${mapViewScale})`
+      schedulePieceContextMenuPosition()
     }
     function resetMapView() {
       mapViewScale = 1
@@ -4884,6 +4641,16 @@
       mapViewY = 0
       applyMapView()
     }
+
+    function resetBoardView() {
+      if (_use3d && battlePresentation && battlePresentation.resetView) {
+        battlePresentation.resetView()
+      } else {
+        resetMapView()
+      }
+      setStatusMsg('棋盘镜头已复位')
+    }
+
     function clampMapScale(v) {
       return Math.max(1, Math.min(2.5, v))
     }
@@ -4981,14 +4748,11 @@
       const rows = G.map.height
       const wrap = document.getElementById('boardWrap')
       if (!wrap) return
-      const railW = document.querySelector('.board-side-rail')?.offsetWidth || 0
-      const availW = wrap.clientWidth - railW - 28
+      const availW = wrap.clientWidth - 20
       const topbarH = document.querySelector('.topbar')?.offsetHeight || 44
       const phaseH  = document.querySelector('.phase-bar')?.offsetHeight || 0
       const actionH = document.querySelector('.action-bar')?.offsetHeight || 0
-      const trainingBarH = document.getElementById('trainingBar')?.offsetHeight || 0
-      const skillBarH = document.getElementById('skillBar')?.offsetHeight || 0
-      const availH  = window.innerHeight - topbarH - phaseH - actionH - trainingBarH - skillBarH - 20
+      const availH  = window.innerHeight - topbarH - phaseH - actionH - 20
       const byW = Math.floor(availW / cols)
       const byH = Math.floor(availH / rows)
       const sz = Math.max(28, Math.min(72, byW, byH))
@@ -5007,28 +4771,11 @@
       setTimeout(recalcCellSize, 50)
     }
 
-    // ── Collapsible sections (log / hand) ─────────────────────────────────────
-    function toggleSection(section) {
-      if (section === 'log') {
-        const body = document.getElementById('logBody')
-        const arrow = document.getElementById('logArrow')
-        const open = !body.classList.contains('collapsed')
-        body.classList.toggle('collapsed', open)
-        if (arrow) { arrow.textContent = open ? '>' : 'v'; arrow.classList.toggle('open', !open) }
-      } else if (section === 'hand') {
-        const body = document.getElementById('handBody')
-        const arrow = document.getElementById('handArrow')
-        const open = !body.classList.contains('collapsed')
-        body.classList.toggle('collapsed', open)
-        if (arrow) { arrow.textContent = open ? '>' : 'v'; arrow.classList.toggle('open', !open) }
-      }
-      setTimeout(recalcCellSize, 50)
-    }
 
     window.addEventListener('load', () => {
       const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
       const renderer = hasThreeRenderer ? window.BattleRenderer3D : {
-        init() {}, update() {}, resize() {}, projectCell() { return null },
+        init() {}, update() {}, resize() {}, resetView() {}, projectCell() { return null },
         screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
       const domUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
@@ -5040,20 +4787,29 @@
       _use3d = hasThreeRenderer
       if (!_use3d) initMapControls()
       init()
+      document.addEventListener('pointerdown', function (event) {
+        const root = document.getElementById('trainingTools')
+        if (!root || !root.classList.contains('is-open')) return
+        if (event.target && typeof event.target.closest === 'function' && event.target.closest('#trainingTools')) return
+        setTrainingToolsOpen(false)
+      }, true)
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') setTrainingToolsOpen(false)
+      })
 
       function shouldCancelPendingCardTarget(pendingAction, target) {
         if (!pendingAction) return false
         if (!target || typeof target.closest !== 'function') return true
         // A battlefield pointerup can synchronously advance a card to its next
         // target step before the matching click bubbles to document.
-        return !target.closest('.arc-card, .card-item, #boardWrap, #targetOverlay')
+        return !target.closest('.card-item, #boardWrap, #targetOverlay')
       }
 
       // Click outside the hand and battlefield to cancel card targeting.
       document.addEventListener('click', function(e) {
         if (!shouldCancelPendingCardTarget(pendingCardAction, e.target)) return
         pendingCardAction = null
-        renderArcHand()
         renderHand()
         renderBoard()
         renderTargetOverlay()
@@ -5194,7 +4950,5 @@
     </div>
   </div>
 
-  <!-- Arc hand container (all screens) -->
-  <div id="arcHandContainer"></div>
 </body>
 </html>

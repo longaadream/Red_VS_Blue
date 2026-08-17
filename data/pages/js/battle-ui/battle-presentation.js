@@ -9,6 +9,7 @@
     'inspect-piece',
     'cancel-target',
     'toggle-move',
+    'viewport-change',
   ])
 
   function create(options) {
@@ -55,6 +56,7 @@
     }
 
     function resize() { if (mounted) renderer.resize() }
+    function resetView() { if (mounted && renderer.resetView) renderer.resetView() }
     function projectCell(x, y, elevation) { return renderer.projectCell(x, y, elevation) }
     function screenToCell(clientX, clientY) { return renderer.screenToCell(clientX, clientY) }
 
@@ -73,6 +75,7 @@
       spawnFloater: spawnFloater,
       dispatch: dispatch,
       resize: resize,
+      resetView: resetView,
       projectCell: projectCell,
       screenToCell: screenToCell,
       dispose: dispose,

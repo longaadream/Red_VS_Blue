@@ -7,6 +7,7 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 
 import { hashBattleState } from '@/lib/game/battle-trace'
+import { runBattleAction } from '@/lib/game/battle-runner'
 import { mulberry32, setRng } from '@/lib/game/rng'
 import { loadRuleById } from '@/lib/game/skills'
 import { finalizePendingTargetSession } from '@/lib/game/targeting'
@@ -27,6 +28,7 @@ type Runtime = {
   hashBattleState: typeof hashBattleState
   loadRuleById: typeof loadRuleById
   mulberry32: typeof mulberry32
+  runBattleAction: typeof runBattleAction
   reset: () => void
   setRng: typeof setRng
 }
@@ -51,6 +53,7 @@ function loadBrowserRuntime(): Runtime {
     hashBattleState: browser.hashBattleState,
     loadRuleById: browser.loadRuleById,
     mulberry32: browser.mulberry32,
+    runBattleAction: browser.runBattleAction,
     reset: () => browser.globalTriggerSystem.clearRules(),
     setRng: browser.setRng,
   }
@@ -64,6 +67,7 @@ function loadNodeRuntime(): Runtime {
     hashBattleState,
     loadRuleById,
     mulberry32,
+    runBattleAction,
     reset: () => {
       triggerSystem.clearRules()
       globalTriggerSystem.clearRules()
@@ -200,6 +204,59 @@ function executeSkillCode(runtime: Runtime): SkillCodeTraceEvidence {
   )
 }
 
+function rejectShishioPassiveActiveUse(runtime: Runtime): SkillCodeTraceEvidence {
+  const seed = 7601
+  seedSkillCodeRuntime(runtime, seed)
+  const passive = JSON.parse(readFileSync(
+    resolve(process.cwd(), 'data/skills/shishio-combustion-passive.json'),
+    'utf8',
+  ))
+  const piece = makePiece({
+    instanceId: 'shishio',
+    templateId: 'red-shishio',
+    ownerPlayerId: 'player-red',
+    currentHp: 7,
+    maxHp: 7,
+  }) as any
+  piece.skills = [{ skillId: passive.id, currentCooldown: 0, usesRemaining: -1 }]
+  const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' }) as any
+  state.skillsById[passive.id] = passive
+  const player = state.players.find((entry: any) => entry.playerId === 'player-red')
+  const beforeHash = runtime.hashBattleState(state)
+  const command = {
+    type: 'useBasicSkill',
+    playerId: 'player-red',
+    pieceId: piece.instanceId,
+    skillId: passive.id,
+    clientActionId: 'red-76-browser-differential',
+  }
+  let rejection = ''
+
+  try {
+    runtime.runBattleAction(state, command as any, { rootSeed: seed })
+  } catch (error) {
+    rejection = String((error as any)?.message ?? error)
+  }
+
+  const stateHash = runtime.hashBattleState(state)
+  return captureSkillCodeTraceEvidence({
+    fixture: 'shishio-passive-active-rejection',
+    surface: 'skillCode:shishio-combustion-passive',
+    seed,
+    command,
+    state,
+    trace: [],
+    outcome: {
+      actionPoints: player.actionPoints,
+      currentHp: piece.currentHp,
+      currentCooldown: piece.skills[0].currentCooldown,
+      inputUnchanged: stateHash === beforeHash,
+      rejection,
+    },
+    stateHash,
+  })
+}
+
 function executeCardCode(runtime: Runtime): SkillCodeTraceEvidence {
   seedSkillCodeRuntime(runtime, SURFACE_SEEDS.cardCode)
   const state = makeState({ currentPlayerId: 'player-red', phase: 'action' }) as any
@@ -323,5 +380,26 @@ describe('RED-75 skillCode Node/browser trace differential matrix', () => {
     expect(() => assertSkillCodeTraceParity(node, browser)).toThrowError(
       /fixture: diagnostic-fixture[\s\S]*seed: 0x007500ff[\s\S]*first difference: trace\[0\]\.stage[\s\S]*npm\.cmd run build:game-engine[\s\S]*-t "diagnostic-fixture"/,
     )
+  })
+})
+
+describe('RED-76 Shishio passive Node/browser differential', () => {
+  it('rejects the same fixed-seed active attempt with the same final hash', () => {
+    const node = loadNodeRuntime()
+    const browser = loadBrowserRuntime()
+    node.reset()
+    browser.reset()
+    try {
+      const nodeEvidence = rejectShishioPassiveActiveUse(node)
+      const browserEvidence = rejectShishioPassiveActiveUse(browser)
+      expect(nodeEvidence.outcome).toMatchObject({
+        inputUnchanged: true,
+        rejection: expect.stringMatching(/^技能施放失败 \[seed=7601 /),
+      })
+      assertSkillCodeTraceParity(nodeEvidence, browserEvidence)
+    } finally {
+      node.reset()
+      browser.reset()
+    }
   })
 })

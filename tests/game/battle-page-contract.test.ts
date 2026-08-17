@@ -62,6 +62,105 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('keeps one responsive HUD, board-anchored piece menu, and unsectioned curved hand', () => {
+    const battlePage = readPage('battle.html')
+    const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')
+    const contextCss = readFileSync(resolve(pagesDir, 'css/battle-context-ui.css'), 'utf8')
+    const mobileCss = readFileSync(resolve(pagesDir, 'css/battle-responsive-mobile.css'), 'utf8')
+
+    expect(battlePage).toContain('<link rel="stylesheet" href="css/battle-responsive.css" />')
+    expect(battlePage).toContain('<link rel="stylesheet" href="css/battle-context-ui.css" />')
+    expect(battlePage).toContain('<script src="js/battle-ui/battle-context-layout.js"></script>')
+    expect(battlePage).toContain('<link rel="stylesheet" href="css/battle-responsive-mobile.css" />')
+    expect(battlePage).toContain('id="btnResetBoardView"')
+    expect(battlePage).toContain('id="pieceContextMenu"')
+    expect(battlePage).toContain('id="pieceContextSkills"')
+    expect(battlePage).not.toContain('id="btnToggleBattleDetail"')
+    expect(battlePage).not.toContain('id="battleDetailRail"')
+    expect(battlePage).not.toContain('skillBar')
+    expect(battlePage).not.toContain('.board-side-rail')
+    expect(battlePage).not.toContain('.selected-status-card')
+    expect(responsiveCss).not.toContain('.board-side-rail')
+    expect(battlePage).toContain('class="hand-scroll" id="handCards" data-battle-ui-region="hand" role="region" aria-label="手牌列表" tabindex="0"')
+    expect(battlePage).not.toContain('arcHandContainer')
+    expect(battlePage).toContain('--hand-arc-angle:')
+    expect(contextCss).toContain('.piece-context-menu')
+    expect(contextCss).toMatch(/\.piece-context-menu\s*\{[\s\S]*?max-width:\s*min\(520px, calc\(100% - 16px\)\)/)
+    expect(contextCss).toMatch(/\.piece-context-skills\s*\{[\s\S]*?max-width:\s*100%[\s\S]*?overflow-x:\s*auto/)
+    expect(contextCss).toContain('var(--hand-arc-angle')
+    expect(battlePage).not.toContain('class="hand-panel"')
+    expect(battlePage).not.toContain('class="hand-label"')
+    expect(battlePage).not.toContain('id="handCount"')
+    expect(battlePage).not.toContain('id="handTarget"')
+    expect(battlePage).not.toContain('id="handBody"')
+    expect(battlePage).not.toContain('暂无手牌')
+    expect(responsiveCss).not.toContain('.hand-panel')
+    expect(contextCss).not.toContain('.hand-panel')
+    expect(contextCss).not.toContain('.hand-label')
+    expect(contextCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?background:\s*transparent/)
+    expect(battlePage).toContain('id="selectedStatusOverlay"')
+    expect(contextCss).toMatch(/\.selected-status-overlay\s*\{[\s\S]*?position:\s*absolute[\s\S]*?border:\s*0[\s\S]*?pointer-events:\s*none/)
+    expect(contextCss).toMatch(/\.selected-status-overlay\[hidden\]\s*\{\s*display:\s*none/)
+    expect(battlePage).toContain('id="trainingToolsToggle"')
+    expect(battlePage).toContain('aria-controls="trainingBar" aria-expanded="false"')
+    expect(battlePage).toContain('id="trainingBar" class="training-popover" role="dialog" aria-hidden="true"')
+    expect(contextCss).toMatch(/\.training-tools\s*\{[\s\S]*?position:\s*absolute/)
+    expect(responsiveCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?scrollbar-width:\s*none/)
+    expect(contextCss).toMatch(/\.training-popover\s*\{[\s\S]*?transform-origin:\s*bottom left/)
+    expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?aria-expanded[\s\S]*?aria-hidden/)
+    expect(battlePage).toMatch(/const active = !!\(pendingSkill \|\| pendingCardAction \|\| targetSubmissionPending\)[\s\S]*?if \(active\) \{\s*closePieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?if \(next\) closePieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/const draftAction[^\n]+\s*closePieceContextMenu\(\)\s*await doAction\(draftAction\)/)
+    expect(battlePage).toMatch(/function closePieceInfo\(\)[\s\S]*?style\.display = 'none'[\s\S]*?renderPieceContextMenu\(selected \|\| null\)/)
+    expect(battlePage).toMatch(/dispatchBattleIntent\(\{type:\\?'toggle-move\\?'\}\)/)
+    expect(battlePage).toMatch(/const isTargeting = !!pendingMove \|\| !!pendingSkill/)
+    expect(battlePage).toMatch(/function selectPiece\(instanceId\)[\s\S]*?pendingMove = false[\s\S]*?renderPieceContextMenu\(sp\)/)
+    expect(battlePage).toMatch(/function toggleMove\(\)[\s\S]*?renderPieceContextMenu\(pendingMove \? null : sp\)/)
+    expect(battlePage).toContain('const disabled = !availability.available')
+    expect(battlePage).toMatch(/function resolveSkillAvailability\(piece, skillOrId\)[\s\S]*?actionLow[\s\S]*?chargeLow/)
+    expect(responsiveCss).not.toContain('@media (max-width: 760px)')
+    expect(responsiveCss).toContain('touch-action: pan-x')
+    expect(mobileCss).toContain('@media (max-width: 760px)')
+    expect(contextCss).toMatch(/orientation: landscape[\s\S]*?\.training-popover \.tb-btn[\s\S]*?min-height:\s*44px/)
+    expect(mobileCss).toMatch(/\.board-view-button\s*\{[\s\S]*?min-height:\s*42px/)
+    expect(mobileCss).toMatch(/\.piece-context-skill\s*\{[\s\S]*?min-height:\s*44px/)
+    expect(mobileCss).toMatch(/\.training-setup-sheet\s*\{[\s\S]*?max-height:\s*calc\(100dvh - 16px\)/)
+    expect(mobileCss).toMatch(/\.training-setup-grid\s*\{[\s\S]*?overflow-y:\s*auto/)
+  })
+
+  it('keeps the board dominant in low-height landscape battle layouts', () => {
+    const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')
+    const contextCss = readFileSync(resolve(pagesDir, 'css/battle-context-ui.css'), 'utf8')
+    const mobileCss = readFileSync(resolve(pagesDir, 'css/battle-responsive-mobile.css'), 'utf8')
+
+    expect(responsiveCss).toContain('--battle-hand-height: 142px')
+    expect(responsiveCss).toMatch(/@media \(max-width: 1024px\)[\s\S]*?--battle-hand-height:\s*134px/)
+    expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?--battle-hud-offset:\s*44px[\s\S]*?--battle-hand-height:\s*112px/)
+    expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?\.card-item\s*\{[\s\S]*?width:\s*76px[\s\S]*?height:\s*90px/)
+    expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?\.turn-summary-secondary\s*\{\s*display:\s*none/)
+    expect(contextCss).toMatch(/\.topbar #resApDisplay,[\s\S]*?\.topbar \.hud-hand\s*\{\s*display:\s*none/)
+    expect(contextCss).toMatch(/#statusMsg\s*\{[\s\S]*?bottom:\s*calc\(var\(--battle-hand-height\) \+ 8px\)/)
+    expect(mobileCss).toMatch(/@media \(max-width: 760px\)[\s\S]*?--battle-hand-height:\s*112px/)
+  })
+
+  it('floats the hand over a full-viewport battlefield without a build watermark', () => {
+    const battlePage = readPage('battle.html')
+    const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')
+
+    expect(battlePage).not.toContain('UI 20260517')
+    expect(responsiveCss).toMatch(/\.main-panel\s*\{[\s\S]*?padding-top:\s*0/)
+    expect(responsiveCss).toMatch(/\.board-wrap\s*\{[\s\S]*?position:\s*absolute\s*!important;[\s\S]*?inset:\s*0/)
+    expect(responsiveCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?bottom:\s*0;[\s\S]*?pointer-events:\s*none/)
+    expect(responsiveCss).toMatch(/\.card-item\s*\{[\s\S]*?pointer-events:\s*auto/)
+  })
+
+  it('keeps mobile battle controls clear of the floating hand', () => {
+    const mobileCss = readFileSync(resolve(pagesDir, 'css/battle-responsive-mobile.css'), 'utf8')
+
+    expect(mobileCss).toMatch(/\.battle-turn-control\s*\{[\s\S]*?bottom:\s*calc\(var\(--battle-hand-height\) \+ 10px\)/)
+    expect(mobileCss).toMatch(/\.training-tools\s*\{[\s\S]*?bottom:\s*calc\(var\(--battle-hand-height\) \+ 10px\)/)
+  })
+
   it('routes the lobby training entry to battle.html training mode', () => {
     const lobby = readPage('index.html')
 
@@ -208,12 +307,11 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('function reconcileBattleInteractionState(previousState, nextState)')
   })
 
-  it('keeps the side rail status-only while preserving the existing right-click piece detail', () => {
+  it('keeps the nearby piece menu action-only while preserving the existing right-click piece detail', () => {
     const battlePage = readPage('battle.html')
     const domUi = readPage('js/battle-ui/battle-dom-ui.js')
 
-    expect(domUi).toContain('特殊状态')
-    expect(domUi).toContain('无特殊状态')
+    expect(domUi).not.toContain('selectedPieceStatus')
     expect(domUi).not.toContain('selected-detail-portrait')
     expect(domUi).not.toContain('selected-detail-stats')
     expect(domUi).not.toContain('selected-skill-list')
@@ -222,8 +320,12 @@ describe('battle page route contract', () => {
     expect(battlePage).toMatch(
       /function selectSkillCard[\s\S]*?resolveSkillAvailability\(sp, skId\)/,
     )
+    expect(battlePage).toMatch(
+      /function renderPieceContextMenu\(piece\)[\s\S]*?resolveSkillAvailability\(piece, sk\)/,
+    )
     expect(battlePage).not.toContain('detailPiece.skills')
     expect(battlePage).toContain('oncontextmenu="event.preventDefault();dispatchBattleIntent({type:\'inspect-piece\'')
+    expect(battlePage).toContain('aria-label="查看棋子完整技能与状态"')
     expect(battlePage).toContain('function showPieceInfo(instanceId, preserveKeyword)')
     expect(battlePage).toContain('statsHtml + tagsHtml')
     expect(battlePage).toContain('\`<div class="pi-section-label">技能</div>\` + skillsHtml')
@@ -234,20 +336,23 @@ describe('battle page route contract', () => {
 
     expect(battlePage).toContain('<div id="statusMsg" role="status" aria-live="polite">')
     expect(battlePage).toContain('<div id="targetOverlay" role="status" aria-live="polite">')
+    expect(battlePage).toContain('border: 0; border-radius: 0; background: transparent;')
     expect(battlePage).toContain('id="targetSourceName"')
     expect(battlePage).toContain('id="targetCancelButton"')
-    expect(battlePage).toContain('.board-side-rail.target-mode { display: none; }')
-    expect(battlePage).toContain('body.target-mode-active #skillBar')
+    expect(battlePage).toMatch(/function renderTargetOverlay\(\)[\s\S]*?closePieceContextMenu\(\)/)
+    expect(battlePage).toContain('body.target-mode-active #trainingTools')
     expect(battlePage).toContain('@media (prefers-reduced-motion: reduce)')
     expect(battlePage).toContain('button:focus-visible')
   })
 
-  it('keeps skill availability feedback in the existing skill operation area', () => {
+  it('keeps authoritative skill availability feedback in the nearby piece menu', () => {
     const battlePage = readPage('battle.html')
 
-    expect(battlePage).toContain('sk-unavailable-reason')
-    expect(battlePage).toContain('#skillBar:not(:empty)')
-    expect(battlePage).not.toMatch(/^\s*#skillBar \{ display: none !important; \}/m)
+    expect(battlePage).toContain('class="piece-context-skills"')
+    expect(battlePage).toContain('const availability = resolveSkillAvailability(piece, sk)')
+    expect(battlePage).toContain('const disabled = !availability.available')
+    expect(battlePage).toContain("titleParts.push('不可用：' + availability.unavailableReason)")
+    expect(battlePage).not.toContain('skillBar')
     for (const reason of ['冷却中', '可用次数已耗尽', '行动点不足', '充能点不足']) {
       expect(battlePage).toContain(reason)
     }
@@ -262,7 +367,7 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('@media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px)')
     expect(battlePage).toContain('--mobile-landscape-min: 844px')
     expect(battlePage).toContain('--mobile-landscape-recommended: 932px')
-    expect(battlePage).toContain('.board-side-rail.target-mode')
+    expect(battlePage).toContain('body.target-mode-active #trainingTools')
     expect(battlePage).toContain('body.target-mode-active #statusMsg')
   })
 })

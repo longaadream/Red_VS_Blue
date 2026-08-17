@@ -506,10 +506,11 @@ describe('targeting consumers and performance contract', () => {
     })
 
     expect(shouldCancel({ step: 1 }, targetWithin('#boardWrap'))).toBe(false)
-    expect(shouldCancel({ step: 1 }, targetWithin('.arc-card'))).toBe(false)
+    expect(shouldCancel({ step: 1 }, targetWithin('.card-item'))).toBe(false)
     expect(shouldCancel({ step: 1 }, targetWithin(null))).toBe(true)
     expect(shouldCancel(null, targetWithin(null))).toBe(false)
     expect(html).toContain('if (!shouldCancelPendingCardTarget(pendingCardAction, e.target)) return')
+    expect(html).not.toContain('arcHandContainer')
   })
 
   it('battle UI consumes exact candidate arrays and contains no reducer/heuristic target fallback', () => {
@@ -520,7 +521,7 @@ describe('targeting consumers and performance contract', () => {
     expect(implementation).toContain('preparation.candidates')
     expect(implementation).not.toContain('GameEngine.applyBattleAction')
     expect(html).not.toContain('_computeValidSkillTargetsHeuristic')
-    expect(html).toMatch(/pendingCardAction = null\s+document\.getElementById\('handTarget'\)[\s\S]*?doAction\(action\)/)
+    expect(html).toMatch(/pendingCardAction = null\s+submitTargetAction\(action, targetLabel\)/)
     expect(html).toMatch(/_appendTargetToAction\(action, piece, x, y, pendingSkill\.preparation && pendingSkill\.preparation\.targetType\)[\s\S]*?pendingSkill = null\s+submitTargetAction\(action, targetLabel\)/)
     expect(html).toMatch(/function submitTargetAction\(action, label\)[\s\S]*?if \(targetSubmissionPending\)[\s\S]*?void doAction\(stamped\)/)
     expect(html).toContain("targetType === 'piece' && piece")
