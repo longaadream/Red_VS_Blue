@@ -7,6 +7,7 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 
 import { hashBattleState } from '@/lib/game/battle-trace'
+import { runBattleAction } from '@/lib/game/battle-runner'
 import { loadRuleById } from '@/lib/game/skills'
 import { finalizePendingTargetSession } from '@/lib/game/targeting'
 import { TriggerSystem, globalTriggerSystem } from '@/lib/game/triggers'
@@ -17,6 +18,7 @@ type Runtime = {
   applyBattleAction: typeof applyBattleAction
   checkTriggers: (state: any, context: any) => any
   loadRuleById: typeof loadRuleById
+  runBattleAction: typeof runBattleAction
   reset: () => void
 }
 
@@ -45,6 +47,7 @@ function loadBrowserRuntime(): Runtime {
     applyBattleAction: browser.applyBattleAction,
     checkTriggers: browser.globalTriggerSystem.checkTriggers.bind(browser.globalTriggerSystem),
     loadRuleById: browser.loadRuleById,
+    runBattleAction: browser.runBattleAction,
     reset: () => browser.globalTriggerSystem.clearRules(),
   }
 }
@@ -55,6 +58,7 @@ function loadNodeRuntime(): Runtime {
     applyBattleAction,
     checkTriggers: triggerSystem.checkTriggers.bind(triggerSystem),
     loadRuleById,
+    runBattleAction,
     reset: () => {
       triggerSystem.clearRules()
       globalTriggerSystem.clearRules()
@@ -150,6 +154,52 @@ function executeSkillCode(runtime: Runtime): SurfaceEvidence {
     trace: next.extensions.runtimeTrace,
     outcome: { actionType: next.actions.at(-1)?.type, successMessage: next.actions.at(-1)?.payload?.message },
     stateHash: hashBattleState(next),
+  }
+}
+
+function rejectShishioPassiveActiveUse(runtime: Runtime): SurfaceEvidence {
+  const passive = JSON.parse(readFileSync(
+    resolve(process.cwd(), 'data/skills/shishio-combustion-passive.json'),
+    'utf8',
+  ))
+  const piece = makePiece({
+    instanceId: 'shishio',
+    templateId: 'red-shishio',
+    ownerPlayerId: 'player-red',
+    currentHp: 7,
+    maxHp: 7,
+  }) as any
+  piece.skills = [{ skillId: passive.id, currentCooldown: 0, usesRemaining: -1 }]
+  const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' }) as any
+  state.skillsById[passive.id] = passive
+  const player = state.players.find((entry: any) => entry.playerId === 'player-red')
+  const beforeHash = hashBattleState(state)
+  let rejection = ''
+
+  try {
+    runtime.runBattleAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: piece.instanceId,
+      skillId: passive.id,
+      clientActionId: 'red-76-browser-differential',
+    } as any, { rootSeed: 7601 })
+  } catch (error) {
+    rejection = String((error as any)?.message ?? error)
+  }
+
+  const stateHash = hashBattleState(state)
+  return {
+    surface: 'skillCode:shishio-combustion-passive',
+    trace: [],
+    outcome: {
+      actionPoints: player.actionPoints,
+      currentHp: piece.currentHp,
+      currentCooldown: piece.skills[0].currentCooldown,
+      inputUnchanged: stateHash === beforeHash,
+      rejection,
+    },
+    stateHash,
   }
 }
 
@@ -268,4 +318,25 @@ describe('RED-45 skillCode Node/browser differential matrix', () => {
       }
     },
   )
+})
+
+describe('RED-76 Shishio passive Node/browser differential', () => {
+  it('rejects the same fixed-seed active attempt with the same final hash', () => {
+    const node = loadNodeRuntime()
+    const browser = loadBrowserRuntime()
+    node.reset()
+    browser.reset()
+    try {
+      const nodeEvidence = rejectShishioPassiveActiveUse(node)
+      const browserEvidence = rejectShishioPassiveActiveUse(browser)
+      expect(nodeEvidence.outcome).toMatchObject({
+        inputUnchanged: true,
+        rejection: expect.stringMatching(/^技能施放失败 \[seed=7601 /),
+      })
+      expect(browserEvidence).toEqual(nodeEvidence)
+    } finally {
+      node.reset()
+      browser.reset()
+    }
+  })
 })
