@@ -17,7 +17,7 @@ body {
   width: 100%;
 }
 
-.main-panel { padding-top: var(--battle-hud-offset); }
+.main-panel { padding-top: 0; }
 
 .phase-bar {
   top: 8px !important;
@@ -181,9 +181,10 @@ body {
 }
 
 .board-wrap {
-  position: relative !important;
+  position: absolute !important;
+  inset: 0;
   min-height: 0;
-  padding: 8px 10px 6px !important;
+  padding: 2px 4px !important;
   overflow: hidden !important;
 }
 
@@ -216,13 +217,15 @@ body {
 
 .board-camera-controls {
   position: absolute;
-  top: 16px;
+  top: calc(var(--battle-hud-offset) + 8px);
   left: 18px;
   z-index: 6;
   display: flex;
   gap: 5px;
   pointer-events: auto;
 }
+
+body.full-map .board-camera-controls { top: 12px; }
 
 .board-view-button {
   min-height: 34px;
@@ -249,9 +252,13 @@ body {
 }
 
 .hand-scroll {
-  position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 14;
   display: flex !important;
-  flex: 0 0 var(--battle-hand-height);
+  flex: none;
   width: 100%;
   height: var(--battle-hand-height);
   min-height: 0;
@@ -268,6 +275,7 @@ body {
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-x;
+  pointer-events: none;
 }
 
 .hand-scroll:empty {
@@ -284,6 +292,7 @@ body {
   width: 90px;
   height: 106px;
   min-width: 90px;
+  pointer-events: auto;
   padding: 0;
   color: inherit;
   font-family: inherit;

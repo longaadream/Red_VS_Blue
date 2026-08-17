@@ -138,6 +138,17 @@ describe('battle page route contract', () => {
     expect(mobileCss).toMatch(/@media \(max-width: 760px\)[\s\S]*?--battle-hand-height:\s*112px/)
   })
 
+  it('floats the hand over a full-viewport battlefield without a build watermark', () => {
+    const battlePage = readPage('battle.html')
+    const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')
+
+    expect(battlePage).not.toContain('UI 20260517')
+    expect(responsiveCss).toMatch(/\.main-panel\s*\{[\s\S]*?padding-top:\s*0/)
+    expect(responsiveCss).toMatch(/\.board-wrap\s*\{[\s\S]*?position:\s*absolute\s*!important;[\s\S]*?inset:\s*0/)
+    expect(responsiveCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?bottom:\s*0;[\s\S]*?pointer-events:\s*none/)
+    expect(responsiveCss).toMatch(/\.card-item\s*\{[\s\S]*?pointer-events:\s*auto/)
+  })
+
   it('routes the lobby training entry to battle.html training mode', () => {
     const lobby = readPage('index.html')
 

@@ -182,7 +182,7 @@
   position: absolute;
   right: 18px;
   bottom: 18px;
-  z-index: 12;
+  z-index: 16;
   pointer-events: auto;
 }
 
@@ -475,7 +475,7 @@
   .topbar .btn-fullmap { font-size: 13px !important; }
 
   .board-wrap { padding: 2px 4px !important; }
-  .board-camera-controls { top: 8px; left: 8px; }
+  .board-camera-controls { top: calc(var(--battle-hud-offset) + 8px); left: 8px; }
 
   .hand-scroll {
     padding: 10px 36px 5px !important;
