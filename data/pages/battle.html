@@ -1746,6 +1746,14 @@
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return false
       }
+      if (!action || typeof action.type !== 'string' || !action.type.trim()) {
+        const message = '目标动作缺少有效类型，未发送'
+        red50Evidence.rejections.push({ code: 'CLIENT_ACTION_TYPE_MISSING', message, at: Date.now() })
+        addLog('[ERROR] ' + message, 'err')
+        setStatusMsg(message)
+        return false
+      }
+
       const stamped = withClientActionId(action)
       targetSubmissionPending = {
         clientActionId: stamped.clientActionId,
@@ -4006,6 +4014,14 @@
           if (ok) addLog('放置 ' + (PIECES_BY_ID[templateId]?.name || templateId), 'info')
         })
         return
+      }
+
+      // A first card click is only a preview; a board click cancels it instead of serializing it as an action.
+      if (pendingCardAction && pendingCardAction.type !== 'playCard') {
+        pendingCardAction = null
+        renderHand()
+        renderTargetOverlay()
+        setStatusMsg('已取消卡牌预览')
       }
 
       // Pending card target selection

@@ -108,6 +108,7 @@ Demo 房间对局在回合阶段前增加部署门禁：
 - 目标类型来自权威候选：即使格子上有棋子，`cell` 候选仍提交坐标，不能被 UI 改写成 `piece`；声明为 Chebyshev 的查询与效果执行使用相同距离。
 - 未知运行时动作失败关闭，不得作为 no-op 推进 `targetingRevision`。
 - 查询不得执行技能/卡牌效果、全局触发器、reducer 或 RNG。UI 与 AI 不得复制过滤规则。
+- 卡牌首次点击的预览状态不是战斗命令；只有保留原始 `BattleAction.type` 和选择凭证的目标重试才允许进入传输层，`piece` pending 中点击空地只返回目标提示。
 
 相关决策：[`ADR-0005`](../decisions/ADR-0005-authoritative-target-selection.md)。
 
