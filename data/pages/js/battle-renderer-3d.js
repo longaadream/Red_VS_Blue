@@ -224,6 +224,14 @@
     return Math.max(1, Math.min(1.8, 24 / Math.max(1, pixelsPerCell)))
   }
 
+  function _preferredInitialZoom(w, h) {
+    if (!_mapW) return 1
+    const aspect = w / (h || 1)
+    const visibleWorldWidth = _fitWorldHalfHeight(w, h) * 2 * aspect
+    const widthCoverageZoom = (visibleWorldWidth / (_mapW + 2)) * 0.86
+    return Math.max(_minimumUsableZoom(w, h), Math.min(1.8, widthCoverageZoom))
+  }
+
   function _updateCameraFrustum(w, h) {
     if (!_camera || !_mapW) return
     const aspect = w / (h || 1)
@@ -275,7 +283,7 @@
     // Camera target: center of map
     _camera.position.set(_mapW / 2, 50, _mapH / 2)
     _camera.lookAt(_mapW / 2, 0, _mapH / 2)
-    _camera.zoom = _minimumUsableZoom(_container.clientWidth || 320, _container.clientHeight || 320)
+    _camera.zoom = _preferredInitialZoom(_container.clientWidth || 320, _container.clientHeight || 320)
 
     // Hit plane for raycasting (invisible, covers full map)
     if (_hitPlane) {
@@ -772,7 +780,7 @@
     if (!_mapW) return
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
-    _camera.zoom = _minimumUsableZoom(w, h)
+    _camera.zoom = _preferredInitialZoom(w, h)
     _camera.position.set(_mapW / 2, 50, _mapH / 2)
     _camera.lookAt(_mapW / 2, 0, _mapH / 2)
     _updateCameraFrustum(w, h)

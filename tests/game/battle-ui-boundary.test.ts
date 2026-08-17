@@ -345,6 +345,8 @@ describe('battle presentation boundary', () => {
     expect(renderer).toMatch(/function update\b/)
     expect(renderer).toMatch(/function resize\b/)
     expect(renderer).toMatch(/function resetView\b/)
+    expect(renderer).toMatch(/function _preferredInitialZoom\b[\s\S]*?widthCoverageZoom/)
+    expect(renderer.match(/_camera\.zoom = _preferredInitialZoom/g)).toHaveLength(2)
     expect(renderer).toMatch(/function projectCell\b/)
     expect(renderer).toMatch(/function screenToCell\b/)
     expect(renderer).toMatch(/function dispose\b/)
