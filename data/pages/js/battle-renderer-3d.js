@@ -58,6 +58,7 @@
   const _hlObjects = { move: [], skill: [], place: [], selected: null }
   const _anims = []                    // {mesh, fromX, fromZ, toX, toZ, elapsed, duration, type, ...}
   const _texCache = new Map()
+  let _textureLoadGeneration = 0
   const _floaters = new Set()
   const _floaterTimers = new Set()
   let _currentModel = null
@@ -117,20 +118,63 @@
   }
 
   // ── Texture loading ───────────────────────────────────────────────────────────
-  function loadTexture(url) {
-    if (_texCache.has(url)) return _texCache.get(url)
+  function loadTexture(url, onLoad, onError) {
+    if (_texCache.has(url)) {
+      const entry = _texCache.get(url)
+      if (entry.status === 'loaded') {
+        onLoad(entry.texture)
+      } else {
+        entry.loadCallbacks.push(onLoad)
+        entry.errorCallbacks.push(onError)
+      }
+      return
+    }
+
+    const loadGeneration = _textureLoadGeneration
+    const entry = {
+      texture: null,
+      status: 'loading',
+      loadCallbacks: [onLoad],
+      errorCallbacks: [onError],
+    }
+    _texCache.set(url, entry)
+
     const loader = new THREE.TextureLoader()
-    const tex = loader.load(url, undefined, undefined, () => {
-      // On error, texture stays default (black) — acceptable fallback
+    const texture = loader.load(url, loadedTexture => {
+      const resolvedTexture = loadedTexture || texture
+      const current = _texCache.get(url)
+      if (!_mounted || loadGeneration !== _textureLoadGeneration || current !== entry) {
+        if (resolvedTexture && typeof resolvedTexture.dispose === 'function') resolvedTexture.dispose()
+        return
+      }
+
+      resolvedTexture.colorSpace = THREE.SRGBColorSpace || 'srgb'
+      entry.texture = resolvedTexture
+      entry.status = 'loaded'
+      const callbacks = entry.loadCallbacks.splice(0)
+      entry.errorCallbacks.length = 0
+      callbacks.forEach(callback => callback(resolvedTexture))
+    }, undefined, error => {
+      const current = _texCache.get(url)
+      if (current === entry) _texCache.delete(url)
+      if (entry.texture && typeof entry.texture.dispose === 'function') entry.texture.dispose()
+      if (!_mounted || loadGeneration !== _textureLoadGeneration || current !== entry) return
+
+      const callbacks = entry.errorCallbacks.splice(0)
+      entry.loadCallbacks.length = 0
+      callbacks.forEach(callback => callback(error))
     })
-    tex.colorSpace = THREE.SRGBColorSpace || 'srgb'
-    _texCache.set(url, tex)
-    return tex
+    texture.colorSpace = THREE.SRGBColorSpace || 'srgb'
+    entry.texture = texture
   }
 
-  function portraitUrl(templateId) {
-    const name = templateId.replace(/^(red|blue)-/, '')
-    return 'images/' + name + '.jpg'
+  function portraitUrl(portraitRef) {
+    const ref = String(portraitRef || '').replace(/^images\//, '')
+    if (!ref) return ''
+    const fileName = /\.[a-z0-9]+$/i.test(ref)
+      ? ref
+      : ref.replace(/^(red|blue)-/, '') + '.jpg'
+    return 'images/' + fileName
   }
 
   // ── Init ─────────────────────────────────────────────────────────────────────
@@ -141,6 +185,7 @@
     _container = input.container
     _floatLayer = input.floatLayer || null
     _onIntent = typeof input.onIntent === 'function' ? input.onIntent : null
+    _textureLoadGeneration += 1
     _mounted = true
 
     // Shared geometries
@@ -329,12 +374,36 @@
         obj.ring.material = getFactionMat(piece.faction)
       }
 
-      // Portrait texture (load once)
-      if (!obj.portraitLoaded && piece.portraitId) {
-        const tex = loadTexture(portraitUrl(piece.portraitId))
-        if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
-        obj.portraitMesh.material = new THREE.MeshBasicMaterial({ map: tex, side: THREE.FrontSide })
-        obj.portraitLoaded = true
+      // Portrait texture comes from the template-declared asset and only becomes
+      // complete after TextureLoader succeeds. A failed training placement can
+      // therefore retry on the next authoritative snapshot.
+      const portraitSrc = portraitUrl(piece.portraitId)
+      if (obj.portraitSrc !== portraitSrc) {
+        obj.portraitSrc = portraitSrc
+        obj.portraitLoaded = false
+        obj.portraitLoading = false
+      }
+      if (!obj.portraitLoaded && !obj.portraitLoading && portraitSrc) {
+        const pieceId = piece.id
+        obj.portraitLoading = true
+        loadTexture(portraitSrc, texture => {
+          const liveObject = _pieceObjects.get(pieceId)
+          if (liveObject !== obj || liveObject.portraitSrc !== portraitSrc) return
+          if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
+          obj.portraitMesh.material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.FrontSide })
+          obj.portraitLoaded = true
+          obj.portraitLoading = false
+        }, error => {
+          const liveObject = _pieceObjects.get(pieceId)
+          if (liveObject === obj && liveObject.portraitSrc === portraitSrc) {
+            obj.portraitLoaded = false
+            obj.portraitLoading = false
+          }
+          console.error('[battle-renderer] Failed to load piece portrait', {
+            pieceId: pieceId,
+            portraitSrc: portraitSrc,
+          }, error)
+        })
       }
 
       // Update the snapshot-driven piece summary.
@@ -440,6 +509,8 @@
       summaryEl,
       faction,
       portraitLoaded: false,
+      portraitLoading: false,
+      portraitSrc: '',
       animating: false,
       targetX: piece.x, targetZ: piece.y,
     })
@@ -912,6 +983,7 @@
 
   // ── Dispose ───────────────────────────────────────────────────────────────────
   function dispose() {
+    _textureLoadGeneration += 1
     _mounted = false
     if (_animFrameId != null) cancelAnimationFrame(_animFrameId)
     _animFrameId = null
@@ -936,7 +1008,7 @@
       geometries.forEach(function (geometry) { if (geometry.dispose) geometry.dispose() })
       materials.forEach(function (material) { if (material.dispose) material.dispose() })
     }
-    _texCache.forEach(function (texture) { if (texture && texture.dispose) texture.dispose() })
+    _texCache.forEach(function (entry) { if (entry && entry.texture && entry.texture.dispose) entry.texture.dispose() })
     if (_renderer) {
       _renderer.dispose()
       if (_renderer.forceContextLoss) _renderer.forceContextLoss()

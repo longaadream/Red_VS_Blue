@@ -109,7 +109,7 @@
     return {
       id: String(piece.instanceId || piece.id || ''),
       templateId: String(piece.templateId || ''),
-      portraitId: String(piece.templateId || ''),
+      portraitId: String(template.image || piece.templateId || ''),
       name: String(piece.name || template.name || piece.templateId || piece.instanceId || '?'),
       ownerPlayerId: ownerPlayerId,
       faction: piece.faction === 'blue' ? 'blue' : 'red',
