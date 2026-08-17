@@ -1,63 +1,90 @@
-# skillCode 兼容矩阵（RED-45）
+# skillCode 兼容矩阵（RED-45 / RED-75 / RED-80）
 
-状态：六类执行面 Node/浏览器差分 PASS；S01 已由 RED-76 修复，静态审计仅剩 S02 生产兼容 FAIL。基线：`origin/main@b8201dd` + RED-76。更新日期：2026-08-17。风险：Medium。
+状态：RED-80 已按批准方案移除不可达的 AttachedEffect 执行面；当前权威架构为 Rule + statusTag。RED-75 的 Node/浏览器差分矩阵由六类收敛为五类。审计日期：2026-08-17。风险：High（跨模块架构清理）。
 
 本矩阵区分两类证据：
 
 - **运行时差分**：同一 fixture 分别由 Node 模块和实际 `data/pages/js/game-engine.js` 执行，比较有序轨迹、关键结果和最终权威状态 hash。
 - **全量静态审计**：扫描所有数据代码字段，使用 TypeScript AST 验证语法和词法自由变量，再按生产注入面标记 `supported`、`ambient` 或 `unsupported`。
 
-最小 fixture PASS 不等于每一条数据定义都可执行；下面的静态 FAIL 正是这种区别的证据。
+最小 fixture PASS 不等于每一条数据定义都可执行；全量静态审计结论仍单独保留。
 
 ## 数据覆盖
 
-`scripts/audit-skillcode-compat.mjs` 保持兼容 `schemaVersion: 2`，使用 `analysisVersion: 3` 输出 AST 结果。当前生产加载冒烟覆盖：
+`scripts/audit-skillcode-compat.mjs` 保持 `schemaVersion: 2`，以 `analysisVersion: 4` 输出 AST 结果。当前生产加载冒烟覆盖：
 
 | 数据组 | 带 `id` 的定义 | 含可执行代码字段 | 其他执行引用 |
 | --- | ---: | ---: | ---: |
 | skills | 113 | 110 个 `code` | 其余为无代码/元数据定义 |
 | rules | 81 | 54 个 `skillCode` | 27 个 `effect.type=triggerSkill` |
 | cards | 16 | 16 个 `code` | active/reactive 共用执行器 |
-| effects | 47 | 47 个定义含 `filterCode/effectCode` | 每个 trigger 分别分析 |
 
-所有 JSON 均能解析并由生产 loader 找到；所有执行字段均已归入六类 surface，没有 unclassified 字段。语法和 helper 兼容性另见 FAIL。
+所有 JSON 均能解析并由生产 loader 找到；所有执行字段均已归入五类 surface，没有 unclassified 字段。AttachedEffect 的 47 个定义和 manifest 已由 RED-80 删除，不再被审计或加载。
 
-## 六类执行面
+## 五类执行面
 
 | Surface | 生产入口 / 签名 | Node/浏览器结果 | 语义差异与限制 |
 | --- | --- | --- | --- |
-| 规则 `skillCode` | `loadRuleById`；语句体获得 `battle`, `context` 和 helper | PASS：真实 `rule-watcher-rage-dealt` 修改同一 context，轨迹/hash 一致 | 内联规则环境；内部异常被规则 wrapper 转为 `success:false` |
-| 规则 `triggerSkill` | `loadRuleById` → 被引用技能执行环境 | PASS：真实 `rule-divine-blessing` 修改伤害并消费状态，轨迹/hash 一致 | 不等价于 inline `skillCode`；会适配并修改原触发 context |
-| 棋子技能 `code` | `executeSkillFunction`；`executeSkill(context)` | PASS：最小技能和真实 `shishio-combustion-passive` 的轨迹/hash 一致 | 支持技能选择与完整技能 helper；passive 的主动调用返回 `success:false` 并保持输入状态不变 |
-| active/reactive 卡牌 `code` | `executeCardFunction`；`executeCard(context)` | PASS：active 卡经真实支付/弃牌路径执行；响应卡顺序另有 fixture | 卡牌无保证的 `sourcePiece`；reactive 卡复用可修改触发 context |
-| AttachedEffect `filterCode/effectCode` | `TriggerSystem.checkTriggers`；`(ctx,battle,self)` | PASS：最小 filter/effect 轨迹/hash 一致 | helper 子集少于技能；异常由 TriggerSystem 附加 consumer/event 后抛出 |
-| pending target `effectCode` | `pendingTargetSelect`；序列化 `function(ctx)` | PASS：真实 selection ID/revision 恢复，轨迹/hash 一致 | 闭包不可序列化；只保留 `ctx` 和确定性 `Math`/`Date` |
+| 规则 `skillCode` | `loadRuleById`；语句体获得 `battle`、`context` 和 helper | 真实 `rule-watcher-rage-dealt` 修改同一 context | 内联规则环境；内部异常被规则 wrapper 转为 `success:false` |
+| 规则 `triggerSkill` | `loadRuleById` → 被引用技能执行环境 | 真实 `rule-divine-blessing` 修改伤害并消费状态 | 不等价于 inline `skillCode`；会适配并修改原触发 context |
+| 棋子技能 `code` | `executeSkillFunction`；`executeSkill(context)` | 最小技能经真实 action reducer 执行 | 支持技能选择与完整技能 helper；失败通常返回 `success:false` |
+| active/reactive 卡牌 `code` | `executeCardFunction`；`executeCard(context)` | active 卡经真实支付/弃牌路径执行 | 卡牌无保证的 `sourcePiece`；reactive 卡复用可修改触发 context |
+| pending target `effectCode` | `pendingTargetSelect`；序列化 `function(ctx)` | 真实 selection ID/revision 恢复 | 闭包不可序列化；只保留 `ctx` 和确定性 `Math`/`Date` |
 
-运行时证据：`tests/game/skillcode-browser-differential.test.ts`，六个通用 surface fixture 与一个真实 Shishio passive 固定 seed fixture 全部 PASS。Node 最小执行面基线仍保留在 `tests/game/skillcode-runtime-matrix.test.ts`。
+`pendingTargetSelection.effectCode` 中的 “effect” 只是“完成这次待选交互后执行的续接函数”的历史字段名，不是 AttachedEffect 实例，也不读取 `data/effects`。RED-80 明确保留 pending target/option 会话、选择 revision 和规则剩余队列。
+
+运行时证据：`tests/game/skillcode-browser-differential.test.ts` 的五个表驱动 fixture，以及 `tests/game/skillcode-runtime-matrix.test.ts` 的 Node 最小执行面基线。
+
+## RED-75 统一 trace bridge
+
+`tests/helpers/skillcode-trace-bridge.ts` 将两端证据规范化为 `fixture`、`surface`、`seed`、`command`、有序 `trace`、`actionLog`、`outcome` 和由各自 runtime 计算的 `stateHash`。比较按字段顺序递归定位首个差异；失败信息包含 fixture、十六进制/十进制 seed、完整命令、首差异路径、两端值及可复制的构建/聚焦测试命令。
+
+| Fixture / surface | 固定 seed | 命令 / trace 摘要 | action log | 最终 hash |
+| --- | ---: | --- | --- | --- |
+| `rule-skill-code` / 规则 `skillCode` | `0x00750001` | `dispatchTrigger(beforeDamageDealt, damage=3)` → damage 6 | `[]` | `c92ec38086b617c933aea911d3c959a4a67032d8abd55e0a265613e7d631da9c` |
+| `rule-trigger-skill` / 规则 `triggerSkill` | `0x00750002` | 同一事件 → damage 7、状态被消费 | `[]` | `f24b9b3865ec0f9e0c065da2c1faf086c36b6a624b5d8311bc9454b1ebc35255` |
+| `piece-skill-code` / 棋子技能 `code` | `0x00750003` | `useBasicSkill(matrix-skill)` → `skillCode` trace | `useBasicSkill` | `0324fa769920e669c017bc52b02639f17bb709bd209b682971c30b33327acb23` |
+| `active-card-code` / 卡牌 `code` | `0x00750004` | `playCard(matrix-card-instance)` → `cardCode` trace | `playCard` | `f4dbc6696eb93775044b6d09b9c98c4ab3b6d92f27c5eadddab0531adf790e71` |
+| `pending-serialized-effect-code` | `0x00750006` | `pendingTargetSelect(2,1)` → pending trace | `triggerEffect` | `1f1f5a5cb80a85f90deb68222cc289efc675a7c1a16875794f0d5150e5502cf3` |
+
+`dispatchTrigger` 是测试侧对真实 `TriggerSystem.checkTriggers` 调用的可序列化命令描述，不是新增生产动作。所有 fixture 都在 Node 实现与由 `npm run build:game-engine` 生成的实际 IIFE bundle 中执行，不使用 reducer、触发器或 loader mock。
+
+需要保留完整证据时，可启用受控报告模式：
+
+```powershell
+$env:RED75_TRACE_REPORT = '1'
+npx.cmd --no-install vitest run tests/game/skillcode-browser-differential.test.ts --reporter=verbose --silent=false
+Remove-Item Env:RED75_TRACE_REPORT
+```
+
+## Rule + statusTag 权威基线
+
+`tests/game/attached-effect-removal.test.ts` 使用真实规则 loader 和 `TriggerSystem` 固定六个代表场景；RED-80 清理前后结果与 hash 必须一致：
+
+| 场景 | 规则 | 最终 hash |
+| --- | --- | --- |
+| 沉默阻止技能 | `rule-silenced-block` | `b9100a73f0572db09ab117d6996acb0e7a138fc3eb4f63efdb9a8c2491b29d49` |
+| 冰冻阻止移动 | `rule-freeze-prevent-move` | `d323adef5d280060b1421cda440baffa4af6dca232ef937d0b051ff6c392f03b` |
+| 圣盾阻止伤害 | `rule-divine-shield` | `1235a749ff165ff000ef7ccd4c9da1c615a7d915cc7af42273b2dea53258c9cb` |
+| 睡眠阻止移动 | `rule-sleep-prevent-move` | `b10bb61b0e19f0bd1a305763d31e4224b6d0b395bf517bd877a8a5f4344bb2fd` |
+| 观察者狂怒增伤 | `rule-watcher-rage-dealt` | `0170d1b8e9ad9875536a5e2862ffcc0c71f5483d31f54f95fb41357d45219446` |
+| 血誓回合结算 | `rule-blood-oath-tick` | `e07b203a91a4adb51cb157b50679476f09c7b2f90d7bc888e225e3ed59f47948` |
+
+生产运行时不再包含旧状态兼容模块、错误码或字段识别路径。旧快照和旧自定义资源包不属于支持范围；如未来需要兼容，必须另建版本化迁移任务。
 
 ## 实际注入绑定
 
-AST 报告在每个 `file#path` 下列出自由变量及结论；以下是生产面允许的绑定集合摘要。
-
 ### 规则 `skillCode`
 
-支持：`battle`, `context`, `dealDamage`, `healDamage`, `addCardToHand`, `checkToxin`, `addStatusEffectById`, `removeStatusEffectById`, `addPlayerRuleById`, `removePlayerRuleById`, `addRuleById`, `removeRuleById`, `addPlayerStatusEffectById`, `removePlayerStatusEffectById`, `addPlayerSkillById`, `removePlayerSkillById`, `selectOption`, `applyEffect`, `removeEffect`, `getPieceEffect`, `fireEvent`, `Math`, `Date`。
+支持：`battle`、`context`、伤害/治疗、卡牌、Rule、statusTag、player rule/skill/status 增删 helper、`selectOption`、`fireEvent`、`Math`、`Date`。不再注入 `applyEffect`、`removeEffect`、`getPieceEffect`。
 
 ### 技能 `code`
 
-支持：`context`, `sourcePiece`, `battle`, `select`, `selectTarget`, `selectOption`, `teleport`, `dealDamage`, `healDamage`, `traceProjectile`, `addStatusEffectById`, `removeStatusEffectById`, `getAllEnemiesInRange`, `getAllAlliesInRange`, `calculateDistance`, `isTargetInRange`, `addRuleById`, `removeRuleById`,所有 player rule/skill/status 增删 helper、`addSkillById`, `removeSkillById`, `addCardToHand`, `discardCard`, `getHand`, `applyEffect`, `removeEffect`, `getPieceEffect`, `fireEvent`, `Math`, `Date`, `console`。
+支持完整技能选择/位移/伤害/治疗/Rule/statusTag/卡牌 helper、`fireEvent`、`Math`、`Date`、`console`。不再注入 AttachedEffect helper。
 
 ### 卡牌 `code`
 
-支持：`context`, `battle`, `playerId`, `selectTarget`, `selectOption`, `dealDamage`, `healDamage`, `addCardToHand`, `discardCard`, `getHand`, `addStatusEffectById`, `removeStatusEffectById`, `addRuleById`, `removeRuleById`, `addPlayerRuleById`, `removePlayerRuleById`, `Math`, `Date`, `console`。
-
-`context` 统一包含 card、playerId、battle、piece（可能为 null）、target、targetPosition、targets 和 selectedOption。多目标由 `targets`/`extraTargets` 保留顺序。
-
-### AttachedEffect
-
-参数：`ctx`, `battle`, `self`。注入 helper：`dealDamage`, `healDamage`, `removeStatusEffectById`, `addStatusEffectById`, `addRuleById`, `removeRuleById`, `applyEffect`, `removeEffect`, `getPieceEffect`, `fireEvent`, `addCardToHand`, `Math`, `Date`。
-
-`self` 是附加效果实例视图并提供 `expire()` 等能力。它不是规则拥有者 context，也不自动拥有 skill/card 的全部 helper。
+支持 `context`、`battle`、`playerId`、选择、伤害/治疗、手牌、Rule/statusTag helper、`Math`、`Date`、`console`。
 
 ### pending `effectCode`
 
@@ -65,61 +92,45 @@ AST 报告在每个 `file#path` 下列出自由变量及结论；以下是生产
 
 ### JS ambient
 
-`Array`, `Boolean`, `Error`, `Infinity`, `JSON`, `Map`, `NaN`, `Number`, `Object`, `Promise`, `RegExp`, `Set`, `String`, `Symbol`, `console`, `isFinite`, `isNaN`, `parseFloat`, `parseInt`, `setTimeout`, `undefined` 被标记为 `ambient`。它们不是 Red VS Blue helper；在未来 eval 沙箱化任务中必须重新审查，不在 RED-45 修改安全边界。
+`Array`、`Boolean`、`Error`、`JSON`、`Map`、`Object`、`Promise`、`Set`、`String`、`console` 等被标记为 `ambient`。它们不是 Red VS Blue helper；未来 eval 沙箱化时必须重新审查。
 
-## RNG、时钟与实例 ID
+## RNG、克隆与恢复
 
-RED-28 已提供命名随机流、规则时钟和确定性实例 ID。规则、技能、卡牌、AttachedEffect 和 pending wrapper 均使用注入的 `Math`/`Date`；固定 state/seed/action 的 Node/浏览器最终 hash 由差分测试验证。`addCardToHand` 等创建实例的 helper 在存在 active `RuleRuntime` 时使用确定性实例 ID 流。
-
-本审计不宣称任意 JS ambient 都是确定性的；只有显式注入的规则 `Math`/`Date` 和生产 runtime trace 属于权威证据。
-
-## 克隆、序列化与恢复
+RED-28 提供命名随机流、规则时钟和确定性实例 ID。规则、技能、卡牌和 pending wrapper 使用注入的 `Math`/`Date`；固定 state/seed/action 的 Node/浏览器最终 hash 由差分测试验证。
 
 - `safeCloneBattleState` JSON 克隆状态，并由 loader 恢复规则/技能运行时函数；函数本身不进入权威状态 hash。
 - pending `effectCode` 保存字符串并在恢复时重新编译；闭包不保留是已记录的语义差异。
-- 规则和卡牌缓存必须返回独立、可恢复的运行时对象；并行房间/镜像测试证明本次 fixture 未串状态。
-- 浏览器 bundle 通过相同 fixture 执行六面；测试不要求修改 `engine-browser-entry.ts` 或提交生成物。
+- 规则和卡牌缓存必须返回独立、可恢复的运行时对象；并行房间/镜像测试负责防止串状态。
 
-## 静态兼容状态
+## 静态兼容结论
 
-### S01：技能代码不是可调用入口（RED-76 已修复）
+所有保留的执行字段均通过语法检查，且没有使用未注入 helper。原 AttachedEffect 使用缺失 helper 的问题已由 RED-80 删除整个不可达执行面和数据组解决，不再是运行时兼容项；RED-78 的缺失 helper 症状因此应由 RED-80 取代，而不是重新扩展旧系统。
 
-`data/skills/shishio-combustion-passive.json#code` 已改为生产执行器可调用的 `function executeSkill(context) { ... }`。入口保持 `kind: passive`，被错误主动调用时只返回 `success:false` 且不修改状态；实际效果继续由 `beforeHealTaken`、`afterDamageDealt` 和 `beforeDamageDealt` 三个既有棋子规则触发。AST 语法诊断为 0。
+### RED-76 志志雄被动回归
 
-#### RED-35 受影响准入行
+`data/skills/shishio-combustion-passive.json#code` 保持为生产执行器可调用的 `function executeSkill(context) { ... }`。入口仍为 `kind: passive`；错误主动调用会返回 `success:false`，外层动作以固定 seed `7601` 拒绝且输入状态不变。实际效果继续由 `beforeHealTaken`、`afterDamageDealt` 和 `beforeDamageDealt` 三个棋子 Rule 触发。
 
-| RED-35 候选棋子 | 修复任务 | 直接证据 | 结论 |
-| --- | --- | --- | --- |
-| `red-shishio` / 志志雄真实 | [RED-76](https://linear.app/redvsblue/issue/RED-76) | `tests/game/shishio-combustion-passive.test.ts`、`tests/game/skillcode-static-audit.test.ts`、固定 seed `7601` | F06 的 skillCode 准入阻塞已解除；完整 25 枚准入结论仍由 RED-35 汇总 |
-
-### S02：AttachedEffect 使用未注入 helper
-
-| 未支持 helper | 数据引用 |
-| --- | --- |
-| `removePlayerSkillById` | `effect-blizzard#triggers.0.effectCode` |
-| `removePlayerStatusEffectById` | `effect-blackwidow-toxin#triggers.0.effectCode`, `effect-blizzard#triggers.0.effectCode` |
-| `selectOption` | `effect-shishio#triggers.3.effectCode`, `effect-watcher-form#triggers.0.effectCode` |
-
-这些名字存在于其他执行面，但 AttachedEffect wrapper 没有注入；触发相应分支会产生 `ReferenceError`，并按 TriggerSystem 异常合同中止/回滚外层动作。不得把其他 surface 的 helper 存在误当作兼容。
-
-### 跟踪状态
-
-S01 由 Medium Risk 任务 [RED-76](https://linear.app/redvsblue/issue/RED-76) 修复；S02 由独立任务 [RED-78](https://linear.app/redvsblue/issue/RED-78) 跟踪。两项均关联 RED-45，S01 另作为 RED-35 的 `red-shishio` 准入证据。
+该真实数据回归由 `tests/game/shishio-combustion-passive.test.ts` 与 `tests/game/skillcode-browser-differential.test.ts` 保留。它属于棋子技能 `code` 的额外 fixture，不是新的执行面，也不会恢复 AttachedEffect。
 
 ## 验证结果
 
-| 检查 | 结果 | 证据 |
-| --- | --- | --- |
-| 六面 Node/浏览器轨迹 + hash | PASS | 6 个通用 surface fixture + 1 个真实 Shishio passive 固定 seed fixture |
-| 四类 JSON 解析和生产 loader | PASS | 113 skills / 81 rules / 16 cards / 47 effects |
-| 执行字段分类 | PASS | 0 unclassified；27 个 `triggerSkill` 引用均解析到现有技能 |
-| 全量语法/helper 静态审计 | FAIL（仅剩既知 S02） | 语法诊断 0；AttachedEffect unsupported helper 仍令 CLI 退出码为 1 |
-| RED-76 聚焦回归 | PASS | 3 个文件 / 14 项测试；seed `7601` 的主动调用拒绝、触发时机与 Node/浏览器最终 hash 一致 |
-| 完整 Vitest | PASS | `npm test`：45 个文件 / 368 项测试 |
-| 浏览器引擎构建与受影响套件 | PASS | `npm run build:game-engine`；随后 6 个文件 / 45 项测试通过 |
-| RED-76 修改测试文件 ESLint | PASS | 3 个测试文件定向 ESLint，退出码 0 |
-| 完整 ESLint | FAIL（既存基线；原始命令环境受限） | 原始 `npm run lint` 因递归扫描 `.worktrees` 超过 6 分钟、约 2.6 GB 后中止；排除 `.worktrees` 后完成并复现既存 1040 项（692 errors / 348 warnings） |
+| 检查 | 当前结果 |
+| --- | --- |
+| RED-80 聚焦回归 | PASS：10 个文件 / 92 项（旧状态拒绝 fixture 已随兼容层删除；覆盖触发顺序、五面 Node/浏览器差分、RED-76 真实被动回归和核心动作） |
+| 五面 Node/浏览器 trace + action log + hash | PASS：浏览器相关 3 个文件 / 15 项；五个 surface 保持固定 hash |
+| 三类 JSON 解析和生产 loader | PASS：113 skills / 81 rules / 16 cards |
+| 执行字段分类 | PASS：0 unclassified；27 个 `triggerSkill` 引用可解析 |
+| 全量语法/helper 静态审计 | PASS：0 个语法诊断；`unsupportedUse={}` |
+| 旧状态残留扫描 | PASS：`legacy-state.ts` 不存在；生产源码、运行时测试 fixture、浏览器/Android bundle 中旧错误码、字段识别函数和字段名均为 0 |
+| 完整 Vitest / TypeScript / 编码 | PASS：47 个文件 / 375 项；`npx tsc --noEmit`；510 个文本文件 |
+| ESLint | RED-80 剩余 7 个新建/实质重写文件定向 PASS；全仓 `npm run lint` 既有基线仍 FAIL（639 errors / 334 warnings） |
+| 构建 / 真实浏览器冒烟 | PASS：bundle 构建；QA 训练局完成 Rule pending 选择与 statusTag 显示；0 个旧 API 或状态兼容残留 |
+| 独立审查 | 实现与真实浏览器证据无其他阻断；合同验收 BLOCKED：全仓 `npm run lint` 基线未通过，需人工 waiver 或另行清债 |
+
+真实浏览器步骤：在本地 QA 路由启动“志志雄真实 vs 观者”训练局；结束先手回合后，`rule-watcher-form` 打开 pending 选项；选择“平静”使手牌 1→2，出牌后行动点 10→9、手牌 2→1。选中观者时详情栏显示“平静护盾（1层、永久、强度2）”和“平静姿态（1层、永久）”，权威状态只包含 Rule + statusTag。
+
+QA 路由控制台仍记录资源包候选路径探测及既有缺失 `data/skills/evil-explosion.json` 的 404；训练局、Rule/pending/出牌/statusTag 流程均完成，未观察到规则执行异常。该资源缺口不在 RED-80 范围内。
 
 ## 回退
 
-RED-76 的数据修复可独立 revert；回退时保留静态审计、Shishio 固定 seed fixture 与任务记录，使 S01 重新显式失败。S02 证据继续保留并由 RED-78 处理；不得用删除候选棋子或放宽审计掩盖失败。
+RED-80 可整体 revert 以恢复旧模块、数据、第五触发阶段、六面矩阵和 bundle。不得只恢复 `data/effects` 而不恢复 loader/执行器，也不得只恢复 helper 名称制造半迁移状态。回退后必须重跑六面差分与固定 seed 规则回放。

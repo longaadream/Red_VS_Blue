@@ -1,5 +1,3 @@
-import type { AttachedEffectInstance } from './attached-effect'
-
 export type PieceId = string
 
 export type Faction = "red" | "blue" | "neutral" | "good" | "evil" | "light" | "dark"
@@ -33,8 +31,6 @@ export interface PieceTemplate {
   stats: PieceStats
   skills: PieceSkill[]
   rules?: string[]
-  /** 战斗开始时自动应用的效果 ID 列表（新统一效果系统） */
-  initialEffects?: string[]
   isDefault?: boolean
   relatedCards?: string[]
 }
@@ -72,9 +68,7 @@ export interface PieceInstance {
     relatedRules?: string[]
     visible?: boolean
   }> // 存储状态变量的标签数组，如"bleeding-duration"
-  rules: any[] // 存储对该棋子生效的规则（旧系统，迁移期间保留）
-  /** 新统一效果系统：被动触发器 + 视觉状态合一 */
-  attachedEffects?: AttachedEffectInstance[]
+  rules: any[] // 对该棋子生效的可执行规则；显示状态由 statusTags 表达
 }
 
 export interface PieceBuff {

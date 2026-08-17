@@ -741,25 +741,12 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               return { needsOptionSelection: true, options: config.options, title: config.title || '请选择' };
             };
 
-            // ── 新统一效果 API（供 rule skillCode 使用）──────────────
-            const applyEffect = (pieceId: string, effectId: string, dataOverrides?: any) => {
-              const { applyEffectToPiece } = require('./attached-effect');
-              return applyEffectToPiece(battle, pieceId, effectId, dataOverrides);
-            };
-            const removeEffect = (pieceId: string, effectId: string) => {
-              const { removeEffectFromPiece } = require('./attached-effect');
-              return removeEffectFromPiece(battle, pieceId, effectId);
-            };
-            const getPieceEffect = (pieceId: string, effectId: string) => {
-              const { getEffectOnPiece } = require('./attached-effect');
-              return getEffectOnPiece(battle, pieceId, effectId);
-            };
             const fireEvent = (eventName: string, ctx: any) => {
               return globalTriggerSystem.fireEvent(battle, context, eventName, ctx);
             };
 
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent, Math, Date) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, fireEvent, Math, Date) {
                 ${ruleData.skillCode}
               })
             `;
@@ -769,7 +756,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               console.log(`[combustion-debug] skillId="${context.skillId ?? 'undefined'}" damage=${context.damage} src=${context.sourcePiece?.name} tgt=${context.targetPiece?.name} counter_before=${ctr?.intensity ?? 0}`);
             }
             const executeRuleCode = eval(codeEnvironment);
-            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, applyEffect, removeEffect, getPieceEffect, fireEvent, getRuleMath(), getRuleDate());
+            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate());
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
@@ -2429,22 +2416,6 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         }
         return false;
       },
-      // ── 新统一效果系统 API ──────────────────────────────────────────
-      /** 将 data/effects/{effectId}.json 效果挂载到棋子（替代 addStatusEffectById + addRuleById 组合） */
-      applyEffect: (pieceId: string, effectId: string, dataOverrides?: Record<string, any>) => {
-        const { applyEffectToPiece } = require('./attached-effect')
-        return applyEffectToPiece(battle, pieceId, effectId, dataOverrides)
-      },
-      /** 从棋子移除效果（自动清理 statusTag，替代 removeStatusEffectById + removeRuleById） */
-      removeEffect: (pieceId: string, effectId: string) => {
-        const { removeEffectFromPiece } = require('./attached-effect')
-        return removeEffectFromPiece(battle, pieceId, effectId)
-      },
-      /** 获取棋子上的效果实例（不存在时返回 null） */
-      getPieceEffect: (pieceId: string, effectId: string) => {
-        const { getEffectOnPiece } = require('./attached-effect')
-        return getEffectOnPiece(battle, pieceId, effectId)
-      },
       /** 触发任意字符串名称的事件（包括自定义事件，其他效果可通过 "on" 字段监听） */
       fireEvent: (eventName: string, ctx: any) => {
         return globalTriggerSystem.fireEvent(battle, context as any, eventName, ctx)
@@ -2630,9 +2601,6 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const addCardToHand = environment.addCardToHand;
               const discardCard = environment.discardCard;
               const getHand = environment.getHand;
-              const applyEffect = environment.applyEffect;
-              const removeEffect = environment.removeEffect;
-              const getPieceEffect = environment.getPieceEffect;
               const fireEvent = environment.fireEvent;
               const Math = environment.Math;
               const Date = environment.Date;

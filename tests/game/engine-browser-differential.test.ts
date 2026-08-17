@@ -19,16 +19,9 @@ vi.mock('@/lib/game/triggers', () => ({
   },
   TriggerType: {},
 }))
-
 vi.mock('@/lib/game/skill-repository', () => ({
   getAllSkills: vi.fn(() => []),
   getSkillById: vi.fn(() => null),
-}))
-
-vi.mock('@/lib/game/attached-effect', () => ({
-  applyEffectToPiece: vi.fn(),
-  buildSelfObject: vi.fn(() => ({})),
-  removeEffectFromPiece: vi.fn(),
 }))
 
 import { mulberry32, setRng } from '@/lib/game/rng'
@@ -111,7 +104,7 @@ describe('game engine Node/browser differential fixture', () => {
     })
   })
 
-  it('executes all five trigger consumer categories in the approved order', () => {
+  it('executes all four trigger consumer categories in the approved order', () => {
     const trace: string[] = []
     const browser = loadBrowserEngine()
     const browserRule = (id: string, priority: number) => ({
@@ -125,18 +118,6 @@ describe('game engine Node/browser differential fixture', () => {
     const piece = makePiece({
       rules: [browserRule('piece-rule', 0)],
     }) as any
-    piece.attachedEffects = [{
-      instanceId: 'effect-1',
-      definitionId: 'effect-1',
-      ownerId: piece.instanceId,
-      data: {},
-      triggers: [{
-        on: 'ordering',
-        priority: 0,
-        filterCode: 'function() { return true }',
-        effectCode: "function(ctx, battle) { battle.extensions.trace.push('attached-effect'); return { success: true } }",
-      }],
-    }]
     const state = makeState({ pieces: [piece] }) as any
     state.extensions.trace = trace
     state.players[0].rules = [browserRule('player-rule', 0)]
@@ -175,7 +156,6 @@ describe('game engine Node/browser differential fixture', () => {
         'player-rule',
         'response-card-first',
         'response-card-second',
-        'attached-effect',
       ])
       expect(state.players[0].hand).toEqual([])
       expect(state.players[0].discardPile).toEqual(['ordering-response-first', 'ordering-response-second'])

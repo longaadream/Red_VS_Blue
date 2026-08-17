@@ -43,7 +43,7 @@ describe('RED-45 producer/consumer event catalog', () => {
         event: 'beforeMove',
         declared: true,
         producers: expect.arrayContaining(['lib/game/turn.ts']),
-        consumers: expect.arrayContaining(['data/effects/effect-freeze.json#triggers.1.on']),
+        consumers: expect.arrayContaining(['data/rules/rule-freeze-prevent-move.json#trigger.type']),
       }),
     ]))
   })
@@ -59,7 +59,6 @@ describe('RED-45 producer/consumer event catalog', () => {
         declared: false,
         producers: [],
         consumers: [
-          'data/effects/effect-freeze.json#triggers.0.on',
           'data/rules/rule-freeze-prevent-attack.json#trigger.type',
         ],
       }),

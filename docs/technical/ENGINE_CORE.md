@@ -127,7 +127,7 @@ Demo 房间对局在回合阶段前增加部署门禁：
 
 失败行为：数据缺失、动态代码异常、目标不合法或效果函数错误会抛错；部分上层调用会只写普通文本日志或吞掉异常。
 
-## 6. 实体、地图和附加效果
+## 6. 实体、地图、规则和状态标签
 
 - 棋子和实体：`lib/game/piece.ts`。
 - 地图定义：`lib/game/map.ts` 及地图数据加载逻辑。
@@ -135,7 +135,7 @@ Demo 房间对局在回合阶段前增加部署门禁：
 - 普通移动：`turn.ts`、AI 与浏览器高亮共同调用 `spatial.ts`；横向/纵向路径上的不可行走地形和任意存活棋子都会阻挡，技能位移不自动套用普通移动规则。
 - 弹道事实：`spatial.ts::traceProjectile()` 返回有序格子、存活棋子、地形和边界事件并继续追踪；技能脚本按普通循环自行停止、穿透或决定友军效果。权威候选查询复用同一 API，不能按技能 ID 维护弹道白名单。
 - 召唤入口：`lib/game/turn.ts::summonPiece()`。
-- 附加效果：`lib/game/attached-effect.ts::applyEffectToPiece()` 等。
+- 持续规则与显示状态：`PieceInstance.rules` 保存可执行 Rule，`PieceInstance.statusTags` 保存状态、持续时间、层数和可见标记；AttachedEffect 已由 ADR-0008 移除。
 - 触发器：`lib/game/triggers.ts::TriggerSystem`。
 - 全局实例：`lib/game/triggers.ts::globalTriggerSystem`。
 
@@ -167,7 +167,7 @@ function evaluateGameResult(state: BattleState): GameResult;
 
 WebSocket、房间开战、Battle API、Android mobile server 与 Relay 初始化等权威入口必须先生成根种子，再初始化状态，并在每次 `runBattleAction(..., { rootSeed })` 时沿用同一 seed。Relay 初始化响应同时返回 seed；Relay host 和 Android action-log 回放只调用 browser bundle 暴露的确定性 runner，缺失 seed 时拒绝执行。初始化的随机消耗记录为 `system-initialize` trace；动作 runner 从 trace 恢复 seed/cursor。`replayBattle()` 返回逐动作 `stateHashes`。
 
-Action Trace 的稳定 JSON 与 SHA-256 位于 browser-safe 的 `lib/game/battle-trace.ts`，不依赖 Node `crypto`。数据驱动技能、规则、附加效果和 pending target 脚本在执行边界获得确定性的 `Math.random()` 与 `Date.now()`；规则定义缓存始终返回独立且规范化的 limits，避免 cache miss/hit 改变状态 hash。没有 runtime 的训练与非权威预检路径仍可经 `lib/game/rng.ts` 旧适配器运行，便于按模块回退。
+Action Trace 的稳定 JSON 与 SHA-256 位于 browser-safe 的 `lib/game/battle-trace.ts`，不依赖 Node `crypto`。数据驱动技能、规则和 pending target 脚本在执行边界获得确定性的 `Math.random()` 与 `Date.now()`；规则定义缓存始终返回独立且规范化的 limits，避免 cache miss/hit 改变状态 hash。没有 runtime 的训练与非权威预检路径仍可经 `lib/game/rng.ts` 旧适配器运行，便于按模块回退。
 
 跨端候选验证中，表现层水合的 `skillsById` 缓存不属于权威规则状态。`runBattleAction()` 计算动作前状态哈希时会排除该缓存；规则执行仍保留完整状态，以兼容以数据形式加载的技能。
 

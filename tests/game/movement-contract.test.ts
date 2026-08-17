@@ -21,12 +21,6 @@ vi.mock('@/lib/game/skill-repository', () => ({
   getSkillById: vi.fn(() => null),
   getAllSkills: vi.fn(() => []),
 }))
-vi.mock('@/lib/game/attached-effect', () => ({
-  buildSelfObject: vi.fn(() => ({})),
-  removeEffectFromPiece: vi.fn(),
-  applyEffectToPiece: vi.fn(),
-}))
-
 import { getLegalNormalMoveTargetsForPlayer } from '@/lib/game/spatial'
 import { applyBattleAction } from '@/lib/game/turn'
 import { prepareAction } from '@/lib/game/targeting'

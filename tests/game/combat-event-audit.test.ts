@@ -97,14 +97,14 @@ describe('RED-45 event audit', () => {
 
     expect(report.schemaVersion).toBe(2)
     expect(Object.keys(report.executionSurfaces).sort()).toEqual([
-      'attachedEffectCode', 'cardCode', 'pendingEffectCode', 'ruleSkillCode', 'ruleTriggerSkill', 'skillCode',
+      'cardCode', 'pendingEffectCode', 'ruleSkillCode', 'ruleTriggerSkill', 'skillCode',
     ])
-    for (const group of ['skills', 'rules', 'cards', 'effects']) {
+    for (const group of ['skills', 'rules', 'cards']) {
       expect(report.groups[group].length, group).toBeGreaterThan(0)
       for (const entry of report.groups[group]) {
         expect(entry.executionFields.length, entry.file).toBeGreaterThan(0)
         for (const field of entry.executionFields) {
-          expect(['code', 'skillCode', 'filterCode', 'effectCode']).toContain(field.field)
+          expect(['code', 'skillCode']).toContain(field.field)
           expect(field.freeVariables).toEqual(expect.any(Array))
         }
       }
@@ -112,15 +112,28 @@ describe('RED-45 event audit', () => {
     expect(report.helperUse).toMatchObject({ selectTarget: expect.any(Number), dealDamage: expect.any(Number) })
   })
 
-  it('observes global then piece then player ordering, with descending rule priority', () => {
+  it('observes global then piece then player then response-card ordering, with descending rule priority', () => {
     const seen: string[] = []
     const system = new TriggerSystem()
     system.addRules([rule('global-low', 1, () => { seen.push('global-low'); return { success: true } }), rule('global-high', 2, () => { seen.push('global-high'); return { success: true } })] as any)
     const piece = makePiece({ rules: [rule('piece', 0, () => { seen.push('piece'); return { success: true } })] })
     const state = makeState({ pieces: [piece] }) as any
     state.players[0].rules = [rule('player', 0, () => { seen.push('player'); return { success: true } })]
+    state.players[0].hand = [{ cardId: 'audit-response', instanceId: 'audit-response-instance', ownerPlayerId: 'player-red' }]
+    state.customCards = {
+      'audit-response': {
+        id: 'audit-response', name: 'audit-response', description: '', type: 'reactive',
+        trigger: { type: 'audit' },
+        code: "function executeCard(context) { context.battle.extensions.auditSeen.push('response'); return { success: true }; }",
+      },
+    }
+    state.extensions.auditSeen = seen
+
     system.checkTriggers(state, { type: 'audit', playerId: 'player-red' })
-    expect(seen).toEqual(['global-high', 'global-low', 'piece', 'player'])
+
+    expect(seen).toEqual(['global-high', 'global-low', 'piece', 'player', 'response'])
+    expect(state.players[0].hand).toEqual([])
+    expect(state.players[0].discardPile).toEqual(['audit-response'])
   })
 
   it('commits blocked semantics but propagates exceptions and stops later consumers', () => {
@@ -185,14 +198,4 @@ describe('RED-45 event audit', () => {
     expect(seen).toEqual([])
   })
 
-  it('executes attached effects when no earlier consumer fails', () => {
-    const seen: string[] = []
-    const state = makeState({ pieces: [makePiece()] }) as any
-    state.extensions.auditSeen = seen
-    state.pieces[0].attachedEffects = [{ instanceId: 'effect-1', definitionId: 'effect-1', ownerId: state.pieces[0].instanceId, data: {}, triggers: [{ on: 'audit', filterCode: 'function() { return true }', effectCode: "function(ctx, battle) { battle.extensions.auditSeen.push('effect'); return { success: true } }" }] }]
-    new TriggerSystem().checkTriggers(state, { type: 'audit', playerId: 'player-red' })
-    // The intentionally minimal custom card is not loaded by the production card repository;
-    // this proves the trigger system catches the card-path failure and continues to effects.
-    expect(seen).toEqual(['effect'])
-  })
 })

@@ -15,7 +15,7 @@ export type EventTraceEntry = {
   turn?: number
   phase?: string
   eventType: string
-  consumerKind: 'globalRule' | 'pieceRule' | 'playerRule' | 'responseCard' | 'attachedEffect'
+  consumerKind: 'globalRule' | 'pieceRule' | 'playerRule' | 'responseCard'
   consumerId?: string
   ownerId?: string
   sourceId?: string

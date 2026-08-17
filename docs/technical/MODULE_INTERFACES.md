@@ -15,7 +15,7 @@
 - 输入：`BattleState`、`BattleAction`。
 - 输出：`BattleState`。
 - 调用方：`battle-runner.ts`、`engine-browser-entry.ts`、规则测试。
-- 调用：技能、触发器、地图/棋子和附加效果逻辑。
+- 调用：技能、触发器、地图/棋子、Rule 和 statusTag 逻辑。
 - 状态变化：回合、阶段、单位、资源、卡牌和 pending selection。
 - 错误：`BattleRuleError`、版本错误、效果执行异常。
 - 日志：`turn.ts` 的本地日志函数及 `game.log`。
@@ -114,7 +114,7 @@
 - 输入：ID、状态、使用者、目标和效果上下文。
 - 输出：定义或执行后的状态/结果。
 - 调用方：`turn.ts`、触发器、战斗初始化。
-- 调用：卡牌/规则数据、伤害、治疗、附加效果和触发器。
+- 调用：卡牌/规则数据、伤害、治疗、Rule/statusTag 和触发器。
 - 状态变化：单位 HP、资源、卡牌、规则和 pending target。
 - 错误：定义缺失、动态代码失败、目标不合法。
 - 日志：`skills.ts` 本地日志和 `game.log`。

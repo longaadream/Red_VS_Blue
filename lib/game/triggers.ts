@@ -1,13 +1,6 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
-import {
-  applyEffectToPiece,
-  buildSelfObject,
-  getEffectOnPiece,
-  removeEffectFromPiece,
-} from './attached-effect'
-import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
-import { dealDamage, executeCardFunction, healDamage, loadCardById, loadRuleById } from './skills'
+import { executeCardFunction, loadCardById, loadRuleById } from './skills'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -548,7 +541,7 @@ export class TriggerSystem {
       }
     }
 
-    // 只在没有挂起交互时才执行手牌/附加效果（避免乱序）
+    // 只在没有挂起交互时才执行响应卡（避免乱序）
     if (interactionNeeded) {
       return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined } as any, context)
     }
@@ -589,117 +582,6 @@ export class TriggerSystem {
       }
     }
 
-    // 5. 处理 AttachedEffect 触发器（新统一系统，替代分散的 rule + statusTag）
-    if (battle.pieces) {
-      // 构建注入到 effectCode / filterCode 的辅助函数（与 rule skillCode 环境对齐）
-      const _dealDamage = (src: any, tgt: any, dmg: number, type: string, sid?: string, skipBefore?: boolean, killerPlayerId?: string) =>
-        dealDamage(src, tgt, dmg, type as any, battle, sid, skipBefore, killerPlayerId)
-      const _healDamage = (healer: any, tgt: any, heal: number, sid?: string) =>
-        healDamage(healer, tgt, heal, battle, sid)
-      const _removeStatusEffectById = (pieceId: string, statusId: string) => {
-        const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
-        if (p?.statusTags) {
-          const idx = p.statusTags.findIndex((t: any) => t.id === statusId)
-          if (idx !== -1) p.statusTags.splice(idx, 1)
-        }
-      }
-      const _addStatusEffectById = (pieceId: string, status: any) => {
-        const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
-        if (p) {
-          if (!p.statusTags) p.statusTags = []
-          if (!p.statusTags.some((t: any) => t.id === status.id)) p.statusTags.push({ ...status })
-        }
-      }
-      const _addRuleById = (pieceId: string, ruleId: string) => {
-        const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
-        if (p) {
-          const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
-          if (rule) {
-            if (!p.rules) p.rules = []
-            if (!p.rules.some((r: any) => r.id === ruleId)) p.rules.push(rule)
-          }
-        }
-      }
-      const _removeRuleById = (pieceId: string, ruleId: string) => {
-        const p = battle.pieces.find((x: any) => x.instanceId === pieceId)
-        if (p?.rules) p.rules = p.rules.filter((r: any) => r.id !== ruleId)
-      }
-      const _applyEffect = (pieceId: string, effectId: string, data?: any) =>
-        applyEffectToPiece(battle, pieceId, effectId, data)
-      const _removeEffect = (pieceId: string, effectId: string) =>
-        removeEffectFromPiece(battle, pieceId, effectId)
-      const _getPieceEffect = (pieceId: string, effectId: string) =>
-        getEffectOnPiece(battle, pieceId, effectId)
-      const _fireEvent = (eventName: string, ctx: any) =>
-        this.fireEvent(battle, context, eventName, ctx)
-      const _addCardToHand = (cardId: string, targetPlayerId: string) => {
-        const player = battle.players?.find((p: any) => p.playerId === targetPlayerId)
-        if (!player) return false
-        if (!player.hand) player.hand = []
-        const runtime = getActiveRuleRuntime()
-        const instanceId = runtime
-          ? runtime.nextInstanceId('card', `ci-${cardId}`)
-          : `${cardId}-${getRuleDate().now()}`
-        player.hand.push({ cardId, instanceId, ownerPlayerId: targetPlayerId })
-        return true
-      }
-
-      /** 将辅助函数注入到 effectCode/filterCode 的 eval 作用域中 */
-      const wrapCode = (code: string) => {
-        // eslint-disable-next-line no-eval
-        return eval(
-          `(function(dealDamage,healDamage,removeStatusEffectById,addStatusEffectById,addRuleById,removeRuleById,applyEffect,removeEffect,getPieceEffect,fireEvent,addCardToHand,Math,Date){ return (${code}); })`
-        )(_dealDamage, _healDamage, _removeStatusEffectById, _addStatusEffectById, _addRuleById, _removeRuleById, _applyEffect, _removeEffect, _getPieceEffect, _fireEvent, _addCardToHand, getRuleMath(), getRuleDate())
-      }
-
-      const attachedTriggerItems: Array<{ piece: any; effect: any; trigger: any; order: number }> = []
-      let attachedOrder = 0
-      for (const piece of [...battle.pieces]) {
-        for (const effect of [...(piece.attachedEffects || [])]) {
-          for (const trigger of [...(effect.triggers || [])]) {
-            if (trigger.on === context.type) attachedTriggerItems.push({ piece, effect, trigger, order: attachedOrder++ })
-          }
-        }
-      }
-      attachedTriggerItems.sort((a, b) =>
-        (b.trigger.priority ?? 0) - (a.trigger.priority ?? 0) || a.order - b.order,
-      )
-      for (const { piece, effect, trigger } of attachedTriggerItems) {
-        if (blocked) break
-        try {
-          const selfObj = buildSelfObject(effect, piece, battle)
-          const filterFn = wrapCode(trigger.filterCode)
-          if (!filterFn(context, battle, selfObj)) continue
-          const effectFn = wrapCode(trigger.effectCode)
-          const result = effectFn(context, battle, selfObj)
-          if (!result) continue
-          if (result.success) success = true
-          if (result.message) triggeredEffects.push(result.message)
-          if (result.blocked) blocked = true
-          if (result.needsOptionSelection) {
-            needsOptionSelection = true
-            pendingOptions = result.options
-            pendingTitle = result.title
-            pendingPlayerId = (result as any).playerId
-            pendingRuleId = effect.id || effect.effectId
-            pendingRuleSourceId = piece.instanceId
-          }
-          if (result.needsTargetSelection && !needsTargetSelection) {
-            needsTargetSelection = true
-            pendingTargetType = result.targetType
-            pendingRange = result.range
-            pendingFilter = result.filter
-            pendingTitle = result.title
-            pendingPlayerId = (result as any).playerId
-            pendingRuleId = effect.id || effect.effectId
-            pendingRuleSourceId = piece.instanceId
-          }
-          } catch (e) {
-            writeLog('[checkTriggers] AttachedEffect error in ' + effect.instanceId + ': ' + e)
-            rethrowTriggerError(e, 'attachedEffect', effect.instanceId || effect.effectId || 'unknown')
-        }
-      }
-    }
 
     return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined } as any, context)
   }

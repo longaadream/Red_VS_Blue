@@ -17,13 +17,6 @@ vi.mock('@/lib/game/skill-repository', () => ({
   getSkillById: vi.fn(() => null),
   getAllSkills: vi.fn(() => []),
 }))
-// attached-effect 依赖 fs，也一并 mock
-vi.mock('@/lib/game/attached-effect', () => ({
-  buildSelfObject: vi.fn(() => ({})),
-  removeEffectFromPiece: vi.fn(),
-  applyEffectToPiece: vi.fn(),
-}))
-
 import { applyBattleAction, BATTLE_STATE_VERSION, summonPiece } from '@/lib/game/turn'
 import type { BattleState } from '@/lib/game/turn'
 import type { PieceInstance } from '@/lib/game/piece'
