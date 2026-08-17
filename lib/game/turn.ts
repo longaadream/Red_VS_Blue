@@ -45,7 +45,6 @@ import {
   validatePendingTargetSubmission,
 } from "./targeting"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
-import { assertNoLegacyAttachedEffects, assertNoLegacyInitialEffects } from "./legacy-state"
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -2547,7 +2546,6 @@ export function applyBattleAction(
   state: BattleState,
   action: BattleAction,
 ): BattleState {
-  assertNoLegacyAttachedEffects(state)
   return stampTargetingRevision(state, applyBattleActionInternal(state, action))
 }
 
@@ -2587,7 +2585,6 @@ export function summonPiece(
     return { success: false, message: `棋子模板未找到: ${templateId}` }
   }
 
-  assertNoLegacyInitialEffects(template)
   // 触发召唤前触发器
   const beforeSummonResult = globalTriggerSystem.checkTriggers(battle, {
     type: "beforePieceSummoned",

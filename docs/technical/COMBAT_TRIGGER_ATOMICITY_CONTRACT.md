@@ -18,7 +18,7 @@ Exceptions include event type/id, consumer kind/id, root/depth, turn, player, ac
 
 ## Evidence
 
-The RED-72 regression suite covers fixed minimal states for blocked `beforeMove`, trigger exceptions, action rollback, and event consumer continuation. RED-80 adds four-category ordering plus explicit legacy AttachedEffect-state rejection. The required validation order is focused regression, affected-module tests, `npm test`, and `npm run build:game-engine`.
+The RED-72 regression suite covers fixed minimal states for blocked `beforeMove`, trigger exceptions, action rollback, and event consumer continuation. RED-80 retains the four-category ordering evidence after removing the obsolete AttachedEffect state path. The required validation order is focused regression, affected-module tests, `npm test`, and `npm run build:game-engine`.
 
 ## Rollback
 

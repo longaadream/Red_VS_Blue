@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- legacy and data-driven fixtures intentionally use runtime shapes */
+/* eslint-disable @typescript-eslint/no-explicit-any -- data-driven fixtures intentionally use runtime shapes */
 import { describe, expect, it } from 'vitest'
 
 import { hashBattleState } from '@/lib/game/battle-trace'
 import { loadRuleById } from '@/lib/game/skills'
 import { TriggerSystem } from '@/lib/game/triggers'
-import { applyBattleAction, summonPiece } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 function requiredRule(id: string) {
@@ -43,7 +42,7 @@ function runRuleStatusFixture(
 }
 
 describe('RED-80 Rule + statusTag authority', () => {
-  it('freezes representative Rule + statusTag behavior and state hashes before removing AttachedEffect', () => {
+  it('freezes representative Rule + statusTag behavior and state hashes after removing AttachedEffect', () => {
     const evidence = [
       runRuleStatusFixture(
         'silenced',
@@ -109,31 +108,5 @@ describe('RED-80 Rule + statusTag authority', () => {
       { fixture: 'watcher-rage', blocked: false, damage: 6, statusTypes: ['rage-stance'], ruleIds: ['rule-watcher-rage-dealt'], stateHash: '0170d1b8e9ad9875536a5e2862ffcc0c71f5483d31f54f95fb41357d45219446' },
       { fixture: 'blood-oath', blocked: false, damage: null, statusTypes: [], ruleIds: [], stateHash: 'e07b203a91a4adb51cb157b50679476f09c7b2f90d7bc888e225e3ed59f47948' },
     ])
-  })
-
-  it('rejects a legacy state with non-empty attachedEffects before applying an action', () => {
-    const piece = makePiece({ instanceId: 'legacy-effect-owner' }) as any
-    piece.attachedEffects = [{ instanceId: 'legacy-effect' }]
-    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red' }) as any
-    const before = structuredClone(state)
-
-    expect(() => applyBattleAction(state, { type: 'endTurn', playerId: 'player-red' } as any))
-      .toThrowError(/LEGACY_ATTACHED_EFFECT_UNSUPPORTED/)
-    expect(state).toEqual(before)
-  })
-
-  it('rejects a legacy custom template with non-empty initialEffects before summoning', () => {
-    const state = makeState({ pieces: [] }) as any
-    const legacyTemplate = { id: 'legacy-template', initialEffects: ['effect-freeze'] }
-
-    expect(() => summonPiece(
-      state,
-      { templateId: legacyTemplate.id, faction: 'red', ownerPlayerId: 'player-red', x: 0, y: 0 },
-      () => legacyTemplate,
-      () => {
-        throw new Error('legacy template must be rejected before instance creation')
-      },
-    )).toThrowError(/LEGACY_ATTACHED_EFFECT_UNSUPPORTED/)
-    expect(state.pieces).toEqual([])
   })
 })

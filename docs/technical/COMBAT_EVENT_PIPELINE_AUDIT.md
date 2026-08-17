@@ -97,10 +97,10 @@ Rule 类别内按 priority 降序，默认 `0`；同 priority 保留事件开始
 
 | 检查 | 当前结果 |
 | --- | --- |
-| RED-80 聚焦回归 | PASS：10 个文件 / 94 项（含五面 Node/浏览器差分与 RED-76 真实被动回归） |
+| RED-80 聚焦回归 | PASS：10 个文件 / 92 项（旧状态拒绝 fixture 已随兼容层删除；保留五面 Node/浏览器差分与 RED-76 真实被动回归） |
 | 事件目录 CLI | FAIL（预期）：仅 `beforeAttack` 为 undeclared + consumed-only |
 | skillCode 静态 CLI | PASS：0 个语法诊断；无 unsupported helper |
-| 浏览器构建、五面差分、完整测试和静态检查 | PASS：完整 47 文件 / 377 项、TypeScript、8 文件定向 ESLint、511 文件编码检查和真实训练局 Rule/statusTag 冒烟 |
+| 浏览器构建、五面差分、完整测试和静态检查 | PASS：完整 47 文件 / 375 项、TypeScript、剩余 7 文件定向 ESLint、510 文件编码检查、生产/测试/bundle 旧状态残留为 0，且真实训练局 Rule/statusTag 冒烟通过 |
 | 全仓 ESLint | FAIL（既有基线）：`npm run lint` 为 639 errors / 334 warnings；RED-80 定向文件无新增问题 |
 
 ## 回退

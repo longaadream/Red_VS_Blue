@@ -8,7 +8,6 @@ import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 import { globalTriggerSystem } from "./triggers"
 import { loadRuleById } from './skills'
-import { assertNoLegacyInitialEffects } from './legacy-state'
 import path from 'path'
 import fs from 'fs'
 import { getUserDataDir } from '@/lib/app-paths'
@@ -110,8 +109,6 @@ const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
 /** 将棋子模板中的 rules 加载到棋子实例上。 */
 function applyInitialRules(piece: PieceInstance, pieceTemplate: PieceTemplate): void {
-  assertNoLegacyInitialEffects(pieceTemplate)
-
   const templateRules = pieceTemplate.rules
   if (templateRules && Array.isArray(templateRules)) {
     if (!piece.rules) piece.rules = []

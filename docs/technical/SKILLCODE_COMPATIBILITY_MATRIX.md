@@ -70,7 +70,7 @@ Remove-Item Env:RED75_TRACE_REPORT
 | 观察者狂怒增伤 | `rule-watcher-rage-dealt` | `0170d1b8e9ad9875536a5e2862ffcc0c71f5483d31f54f95fb41357d45219446` |
 | 血誓回合结算 | `rule-blood-oath-tick` | `e07b203a91a4adb51cb157b50679476f09c7b2f90d7bc888e225e3ed59f47948` |
 
-非空旧 `piece.attachedEffects` / `graveyard[].attachedEffects` 在动作入口抛出 `LEGACY_ATTACHED_EFFECT_UNSUPPORTED`；旧/custom 棋子模板的非空 `initialEffects` 在初始化时同样拒绝。守卫只识别并报错，不保留任何旧代码执行能力。
+生产运行时不再包含旧状态兼容模块、错误码或字段识别路径。旧快照和旧自定义资源包不属于支持范围；如未来需要兼容，必须另建版本化迁移任务。
 
 ## 实际注入绑定
 
@@ -116,17 +116,18 @@ RED-28 提供命名随机流、规则时钟和确定性实例 ID。规则、技�
 
 | 检查 | 当前结果 |
 | --- | --- |
-| RED-80 聚焦回归 | PASS：10 个文件 / 94 项（覆盖移除守卫、触发顺序、五面 Node/浏览器差分、RED-76 真实被动回归和核心动作） |
+| RED-80 聚焦回归 | PASS：10 个文件 / 92 项（旧状态拒绝 fixture 已随兼容层删除；覆盖触发顺序、五面 Node/浏览器差分、RED-76 真实被动回归和核心动作） |
 | 五面 Node/浏览器 trace + action log + hash | PASS：浏览器相关 3 个文件 / 15 项；五个 surface 保持固定 hash |
 | 三类 JSON 解析和生产 loader | PASS：113 skills / 81 rules / 16 cards |
 | 执行字段分类 | PASS：0 unclassified；27 个 `triggerSkill` 引用可解析 |
 | 全量语法/helper 静态审计 | PASS：0 个语法诊断；`unsupportedUse={}` |
-| 完整 Vitest / TypeScript / 编码 | PASS：47 个文件 / 377 项；`npx tsc --noEmit`；511 个文本文件 |
-| ESLint | RED-80 新建/实质重写的 8 个文件定向 PASS；全仓 `npm run lint` 既有基线仍 FAIL（639 errors / 334 warnings） |
-| 构建 / 真实浏览器冒烟 | PASS：bundle 构建；QA 训练局完成 Rule pending 选择与 statusTag 显示；0 个旧 API export |
+| 旧状态残留扫描 | PASS：`legacy-state.ts` 不存在；生产源码、运行时测试 fixture、浏览器/Android bundle 中旧错误码、字段识别函数和字段名均为 0 |
+| 完整 Vitest / TypeScript / 编码 | PASS：47 个文件 / 375 项；`npx tsc --noEmit`；510 个文本文件 |
+| ESLint | RED-80 剩余 7 个新建/实质重写文件定向 PASS；全仓 `npm run lint` 既有基线仍 FAIL（639 errors / 334 warnings） |
+| 构建 / 真实浏览器冒烟 | PASS：bundle 构建；QA 训练局完成 Rule pending 选择与 statusTag 显示；0 个旧 API 或状态兼容残留 |
 | 独立审查 | 实现与真实浏览器证据无其他阻断；合同验收 BLOCKED：全仓 `npm run lint` 基线未通过，需人工 waiver 或另行清债 |
 
-真实浏览器步骤：在本地 QA 路由启动“志志雄真实 vs 观者”训练局；结束先手回合后，`rule-watcher-form` 打开 pending 选项；选择“平静”使手牌 1→2，出牌后行动点 10→9、手牌 2→1。选中观者时详情栏显示“平静护盾（1层、永久、强度2）”和“平静姿态（1层、永久）”，权威状态含 `rule-watcher-shield`，两枚棋子均无 `attachedEffects` 字段。
+真实浏览器步骤：在本地 QA 路由启动“志志雄真实 vs 观者”训练局；结束先手回合后，`rule-watcher-form` 打开 pending 选项；选择“平静”使手牌 1→2，出牌后行动点 10→9、手牌 2→1。选中观者时详情栏显示“平静护盾（1层、永久、强度2）”和“平静姿态（1层、永久）”，权威状态只包含 Rule + statusTag。
 
 QA 路由控制台仍记录资源包候选路径探测及既有缺失 `data/skills/evil-explosion.json` 的 404；训练局、Rule/pending/出牌/statusTag 流程均完成，未观察到规则执行异常。该资源缺口不在 RED-80 范围内。
 
