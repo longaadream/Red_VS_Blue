@@ -1,0 +1,534 @@
+{
+  "android-client/www/js/battle-renderer-3d.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "android-client/www/js/game-engine-runtime.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "android-client/www/js/lan-discover.js": {
+    "@typescript-eslint/no-unused-expressions": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "android-client/www/js/pack-fetch.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "android-client/www/js/ws-client.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "app/api/debug-battle/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    }
+  },
+  "app/api/debug/battle/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    }
+  },
+  "app/api/lobby/route.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "app/api/maps/route.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "app/api/pieces/route.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "app/api/rooms/[roomId]/actions/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "app/api/rooms/[roomId]/battle/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "app/api/rooms/[roomId]/join/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "app/api/rooms/route.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "app/api/skills/route.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "app/api/training/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "app/api/tutorial/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 4
+    }
+  },
+  "app/page.tsx": {
+    "react/no-unescaped-entities": {
+      "count": 2
+    }
+  },
+  "components/game-board.tsx": {
+    "@next/next/no-img-element": {
+      "count": 2
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "components/game-menu/player-card.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "components/ui/carousel.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "components/ui/sidebar.tsx": {
+    "react-hooks/purity": {
+      "count": 1
+    }
+  },
+  "components/ui/use-mobile.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "components/ui/use-toast.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "data/pages/js/crypto-lib.js": {
+    "@typescript-eslint/no-this-alias": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-expressions": {
+      "count": 44
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "data/pages/js/game-engine-runtime.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "data/pages/js/lan-discover.js": {
+    "@typescript-eslint/no-unused-expressions": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "data/pages/js/pack-fetch.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "data/pages/js/ws-client.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "electron-client/main.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "electron-client/preload.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "electron-client/resource-pack-store.ts": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "electron-editor/preload.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "electron/main.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "electron/resource-pack-store.ts": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "hooks/use-mobile.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "hooks/use-toast.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "lib/custom-logger.ts": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "lib/game/ai.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 12
+    }
+  },
+  "lib/game/battle-setup.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "lib/game/battle-types.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 13
+    }
+  },
+  "lib/game/file-loader.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "lib/game/piece.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "lib/game/room-store.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "lib/game/rule-loader.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    },
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "lib/game/skills.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 153
+    },
+    "@typescript-eslint/no-require-imports": {
+      "count": 10
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 17
+    },
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "lib/game/training-types.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "lib/game/triggers.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 40
+    },
+    "@typescript-eslint/no-require-imports": {
+      "count": 3
+    }
+  },
+  "lib/game/turn.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 129
+    },
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unsafe-function-type": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    },
+    "prefer-const": {
+      "count": 4
+    }
+  },
+  "lib/resource-pack.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "lib/ws-server.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 14
+    }
+  },
+  "mobile-server/db-shim.ts": {
+    "import/no-anonymous-default-export": {
+      "count": 1
+    }
+  },
+  "mobile-server/empty-shim.ts": {
+    "import/no-anonymous-default-export": {
+      "count": 1
+    }
+  },
+  "mobile-server/fs-shim.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 8
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 9
+    },
+    "import/no-anonymous-default-export": {
+      "count": 1
+    }
+  },
+  "mobile-server/mobile-server-entry.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "mobile-server/os-shim.ts": {
+    "import/no-anonymous-default-export": {
+      "count": 1
+    }
+  },
+  "mobile-server/path-shim.ts": {
+    "import/no-anonymous-default-export": {
+      "count": 1
+    }
+  },
+  "mobile-server/piece-repository-shim.ts": {
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "mobile-server/skill-repository-shim.ts": {
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "relay-server/src/routes/lobby.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "relay-server/src/routes/rooms.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "relay-server/src/store.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 8
+    },
+    "@typescript-eslint/no-unused-expressions": {
+      "count": 1
+    }
+  },
+  "relay-server/src/ws/handler.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "scripts/build-crypto-lib.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 3
+    }
+  },
+  "scripts/build-game-engine.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "scripts/build-mobile-server.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 3
+    }
+  },
+  "scripts/build-resource-pack.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 5
+    }
+  },
+  "scripts/cleanup-client-resources.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "scripts/cleanup-server-resources.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "scripts/init-db.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "scripts/migrate-player-ids.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "scripts/stage-server-resources.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "scripts/sync-android-assets.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "scripts/sync-pages.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 3
+    }
+  },
+  "test-map-load.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "test-map-path.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "test-map-repository.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "test-nilasec-fix.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    }
+  },
+  "test-room-deletion-fix.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "test-room-deletion.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 3
+    }
+  },
+  "test-room-storage.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 3
+    }
+  },
+  "test-status-json.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "test-status-system.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "test-storage.js": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "tests/game/debug-battle.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    }
+  },
+  "tests/game/movement-contract.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "tests/game/targeting.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 14
+    }
+  },
+  "tests/game/turn.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 93
+    }
+  },
+  "tests/helpers/minimal-state.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  }
+}
