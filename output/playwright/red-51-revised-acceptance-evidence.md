@@ -169,3 +169,27 @@ Post-sync candidate:
 - Focused ESLint, renderer JavaScript syntax, range `git diff --check`, 0-behind status, and clean worktree: passed.
 - Focused ESLint, renderer JavaScript syntax, and `git diff --check`: passed.
 - The first full-suite run overlapped the encoding scan and reproduced the retained Electron archive zero-byte read anomaly (37 files/336 tests passed, one packaging case failed). The isolated packaging file then passed 9/9, and the non-concurrent full candidate passed 338/338.
+
+## 2026-08-17 manual-feedback menu, status, and training-portrait follow-up
+
+- Linear history confirmed that RED-49/PR #55 owns compact board health/status summaries and complete selected-piece detail, while the fixed special-status rail came from RED-50. This follow-up restores the latter information as a read-only desktop overlay rather than reintroducing a board-shrinking rail or skill panel.
+- The reported skill-menu baseline measured a 330px shell with 390px scroll content; the last skill extended beyond the material and the shared skill row computed to `overflow-x: visible`. The final 1000x390 menu measured 397px shell / 397px scroll width, with a 383px skill row and the fourth button ending 7px inside the shell. Extra skills and narrower containers scroll inside the same material.
+- A top-row piece previously clamped the menu to y=11 under the HUD. `BattleContextLayout.placeMenu()` now receives the responsive HUD safe inset; the final menu began at y=55, leaving its identity header and every skill visible.
+- The selected-status overlay consumes every visible status from the shared presentation model, has no layout width or border, does not receive pointer events, and is absent without a selection. The in-memory visual fixture showed freeze and bleeding with authoritative stack/duration fields; menu/overlay overlap was 0 at 1000x390.
+- Entering move mode produced 8 legal route cells and hid the status overlay immediately; cancelling restored it. At 844x390 the desktop overlay computed to `display: none`, preserving the existing menu `i` / bottom-sheet detail path and zero horizontal page overflow.
+- The training portrait regression was traced to the view model guessing a filename from `templateId` and the renderer marking portrait loading complete before `TextureLoader` success. The model now forwards the template-declared `image`, and the renderer only marks completion on success, logs contextual piece/resource data on failure, and can retry on a later snapshot.
+- A real training-tools placement selected 死神, clicked the board center, and created `templateId=reaper`, `portraitId=reaper.jpg` at (10,8). The browser recorded `images/reaper.jpg` request and success with a loaded width of 850px; the resulting Three.js token visibly used the portrait texture.
+- The static harness retained its known runtime/fixture 404s. The final scan found no `TypeError`, `ReferenceError`, or `[battle-renderer]` portrait error.
+
+Manual-feedback artifacts:
+
+- `red-51-menu-status-overlay-1000x390.png`
+- `red-51-training-placed-portrait-1000x390.png`
+
+Manual-feedback checks:
+
+- Focused layout/status/menu/portrait contracts: 4 files passed, 33 tests passed.
+- Full serial Vitest candidate: 45 files passed, 372 tests passed.
+- Focused ESLint and four JavaScript syntax checks: passed.
+- Encoding: 556 text files checked.
+- `git diff --check`: passed.
