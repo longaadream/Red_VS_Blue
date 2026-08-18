@@ -27,6 +27,16 @@ import { makePiece, makeState, makeTile } from '../helpers/minimal-state'
 
 const DATA_ROOT = join(process.cwd(), 'data')
 
+type SkillData = SkillDefinition & { keywords: string[] }
+
+type DragFailureSetup = {
+  enemyX: number
+  enemyY: number
+  targetX: number
+  targetY: number
+  blockLanding?: boolean
+}
+
 function loadJson<T>(...segments: string[]): T {
   return JSON.parse(readFileSync(join(DATA_ROOT, ...segments), 'utf8')) as T
 }
@@ -139,7 +149,7 @@ describe('Venom data contract', () => {
     ]
 
     expect(minato.name).toBe('波风水门')
-    for (const file of minatoSkillFiles) expect(loadJson<SkillDefinition>('skills', file).keywords).toEqual([])
+    for (const file of minatoSkillFiles) expect(loadJson<SkillData>('skills', file).keywords).toEqual([])
   })
 })
 
@@ -260,7 +270,7 @@ describe('共生拖行', () => {
     expect(JSON.stringify(state.pieces)).toBe(before)
   })
 
-  it.each([
+  it.each<[string, DragFailureSetup]>([
     ['相邻敌人', { enemyX: 1, enemyY: 1, targetX: 5, targetY: 1 }],
     ['斜线方向', { enemyX: 4, enemyY: 1, targetX: 4, targetY: 2 }],
     ['非法落点', { enemyX: 4, enemyY: 1, targetX: 5, targetY: 1, blockLanding: true }],
