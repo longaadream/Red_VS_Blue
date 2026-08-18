@@ -26,7 +26,9 @@
     "sync:pages": "node scripts/sync-pages.js",
     "watch:pages": "node scripts/sync-pages.js --watch",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "rvb": "node scripts/rvb.mjs",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
