@@ -269,12 +269,9 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
     const authErr = await verifyJoinAuth(body)
     if (authErr) return err(authErr, 401)
     const packMd5 = (body.packMd5 as string) || undefined
-    const requestedFaction = (body.faction === 'red' || body.faction === 'blue') ? body.faction as 'red' | 'blue' : null
     const existing = room.players.find(p => p.id.toLowerCase() === normalizedPlayerId)
     if (existing) {
-      if (requestedFaction) {
-        existing.faction = requestedFaction
-      } else if (!existing.faction) {
+      if (!existing.faction) {
         existing.faction = nextFaction(room)
       }
       if (playerName) existing.name = playerName
@@ -285,12 +282,7 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
     }
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
     const publicKey = (body.publicKey as string) || undefined
-    let faction: 'red' | 'blue'
-    if (requestedFaction) {
-      faction = requestedFaction
-    } else {
-      faction = nextFaction(room)
-    }
+    const faction = nextFaction(room)
     room.players.push({ id: normalizedPlayerId, name: playerName, publicKey, faction, packMd5, joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] })
     room.version++
     _broadcastRoomUpdate(room)
@@ -326,6 +318,13 @@ async function _startGame(room: Room): Promise<string> {
   try {
     const allPieces = getAllPieces()
     const roomPlayers = room.players.slice(0, 2)
+    const redPlayers = roomPlayers.filter(player => player.faction === 'red')
+    const bluePlayers = roomPlayers.filter(player => player.faction === 'blue')
+    if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
+      return err('Cannot start battle without exactly one red and one blue seat', 400)
+    }
+    const firstPlayerId = redPlayers[0].id
+
     const playerIds = roomPlayers.map(p => p.id) as [string, string]
     const playerSelectedPieces = roomPlayers.map(p => ({
       playerId: p.id,
@@ -341,7 +340,7 @@ async function _startGame(room: Room): Promise<string> {
       [],
       playerSelectedPieces,
       room.mapId,
-      { rootSeed: seed },
+      { firstPlayerId, rootSeed: seed },
     )
     if (!state) return err('Failed to create battle state', 500)
 
@@ -385,7 +384,10 @@ function getAssignedFactions(room: Room): Array<'red' | 'blue'> {
   return room.players.map(p => p.faction).filter(Boolean) as Array<'red' | 'blue'>
 }
 
-function nextFaction(_room: Room): 'red' | 'blue' {
+function nextFaction(room: Room): 'red' | 'blue' {
+  const assigned = getAssignedFactions(room)
+  if (assigned.includes('red') && !assigned.includes('blue')) return 'blue'
+  if (assigned.includes('blue') && !assigned.includes('red')) return 'red'
   return Math.random() < 0.5 ? 'red' : 'blue'
 }
 
@@ -447,19 +449,11 @@ function handleClaimFaction(roomId: string, body: Record<string, unknown>): stri
   const playerName = ((body.playerName as string) || '').trim()
   if (!playerId) return err('playerId is required', 400)
 
-  const requestedFaction = (body.faction === 'red' || body.faction === 'blue')
-    ? body.faction as 'red' | 'blue'
-    : null
 
   let player = room.players.find(p => p.id.toLowerCase() === playerId)
   if (!player) {
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
-    let faction: 'red' | 'blue'
-    if (requestedFaction) {
-      faction = requestedFaction
-    } else {
-      faction = nextFaction(room)
-    }
+    const faction = nextFaction(room)
     player = {
       id: playerId,
       name: playerName || `Player ${playerId.slice(0, 8)}`,
@@ -469,9 +463,6 @@ function handleClaimFaction(roomId: string, body: Record<string, unknown>): stri
       selectedPieces: [],
     }
     room.players.push(player)
-    room.version++
-  } else if (requestedFaction && player.faction !== requestedFaction) {
-    player.faction = requestedFaction
     room.version++
   } else if (!player.faction) {
     player.faction = nextFaction(room)
@@ -722,6 +713,13 @@ export async function handleRelayBattleInit(body: Record<string, unknown>): Prom
     return err('players array with at least 2 entries required', 400)
   }
 
+  const redPlayers = players.filter(player => player.faction === 'red')
+  const bluePlayers = players.filter(player => player.faction === 'blue')
+  if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
+    return err('players must contain exactly one red and one blue seat', 400)
+  }
+  const firstPlayerId = redPlayers[0].id
+
   const playerIds = players.map(p => p.id)
 
   const playerSelectedPieces = players.map(player => {
@@ -745,7 +743,12 @@ export async function handleRelayBattleInit(body: Record<string, unknown>): Prom
       allPieces,
       playerSelectedPieces,
       DEMO_FIXED_MAP_ID,
-      { rootSeed: seed, deploymentEnabled: true, deploymentStartedAt: Date.now() },
+      {
+        firstPlayerId,
+        rootSeed: seed,
+        deploymentEnabled: true,
+        deploymentStartedAt: Date.now(),
+      },
     )
     if (!state) return err('Failed to create battle state', 500)
     const authorityVersion = 1

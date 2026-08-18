@@ -340,3 +340,27 @@ interface ServerCore {
 禁止能力：玩家私钥、任意网络/文件、系统命令、动态模块和宿主对象。资源使用签名清单、内容 hash 和缓存配额；资源本身不得执行代码。
 
 具体沙箱 ABI、签名格式和资源协议待独立 High Risk ADR。
+
+## RED-31 2026-08-18 接口修订
+
+本节取代本文中与“座位、先手完全独立”以及旧部署阶段命名冲突的说明。
+
+### PVP 房间编排
+
+- `room-store.assignNextSeat()`：空房首位使用可注入的等概率选择器分配 `red | blue`，已有一席时返回另一席；已持久化座位由调用方直接复用。
+- `room-battle-start.startBattleForRoom()`：要求阵容中恰有一名红方玩家，并将其 ID 显式传给规则层的 `firstPlayerId`。
+- Relay 与移动端开局入口：要求恰有一红一蓝；红方先手，非法或重复座位直接拒绝。
+- `turn-order` 随机流仍为兼容接口；Demo PVP 房间开局不再消费它来决定先手。
+
+### 部署状态展示
+
+- 权威阶段为 `deployment.status = awaiting-locks`。
+- 客户端只依据服务端下发的 `deployment.deadlineAt` 计算剩余秒数，不自行延长或重置期限。
+- 未锁定玩家的选择继续保持私有；公开快照只包含锁定状态和可公开结果。
+
+### LAN 连接发现
+
+- HTTP 健康检查继续使用 `/api/ping`。
+- 客户端随后读取 `/api/ws-info` 获取 WebSocket 监听端口。
+- 标准本机配置在接口不可用时回退为 HTTP `3000`、WebSocket `3001`；非标准端口仅在未提供独立 WS 端口时回退为同端口。
+- UDP 与快速扫描结果统一经过同一端口解析逻辑，避免“HTTP 可用但 WebSocket 连接到错误端口”。

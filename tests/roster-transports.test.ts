@@ -610,7 +610,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     })
   })
 
-  it('carries mixed alignments into battle independently of seat and turn order', async () => {
+  it('carries mixed alignments independently while deriving first turn from the red seat', async () => {
     memoryStore.seed(room('mixed-room'))
 
     await httpSelect('mixed-room', 'alice', lightRoster, 'light')
@@ -618,14 +618,36 @@ describe('Demo roster HTTP/WebSocket integration', () => {
 
     const started = memoryStore.snapshot('mixed-room')
     const state = (started?.battleState as unknown as {
-      state: { extensions?: { playerAlignments?: Record<string, 'light' | 'dark'> } }
+      state: {
+        turn: { currentPlayerId: string }
+        extensions?: { playerAlignments?: Record<string, 'light' | 'dark'> }
+      }
     }).state
     expect(started?.players).toMatchObject([
       { id: 'alice', seat: 'red', alignment: 'light' },
       { id: 'bob', seat: 'blue', alignment: 'dark' },
     ])
     expect(state.extensions?.playerAlignments).toEqual({ alice: 'light', bob: 'dark' })
-    expect(['alice', 'bob']).toContain(started?.firstPlayerId)
+    expect(started?.firstPlayerId).toBe('alice')
+    expect(state.turn.currentPlayerId).toBe('alice')
+  })
+
+  it('rejects duplicate seats before writing a battle state', async () => {
+    const invalidRoom = room('duplicate-seats')
+    invalidRoom.players[1].seat = 'red'
+    invalidRoom.players[1].faction = 'red'
+    memoryStore.seed(invalidRoom)
+
+    const first = await httpSelect('duplicate-seats', 'alice', lightRoster, 'light')
+    const second = await httpSelect('duplicate-seats', 'bob', darkRoster, 'dark')
+
+    expect(first.status).toBe(200)
+    expect(second).toMatchObject({
+      status: 500,
+      body: { error: expect.stringContaining('exactly one red and one blue seat') },
+    })
+    expect(memoryStore.snapshot('duplicate-seats')).toMatchObject({ status: 'ready' })
+    expect(memoryStore.snapshot('duplicate-seats')?.battleState).toBeUndefined()
   })
 
   it('publishes one identical public deployment snapshot to both players and spectators', async () => {

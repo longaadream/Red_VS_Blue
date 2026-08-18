@@ -17,6 +17,7 @@
   <script src="js/battle-ui/battle-context-layout.js"></script>
   <script src="js/battle-ui/battle-legal-actions.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
+  <script src="js/battle-ui/deployment-status.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
   <style>
@@ -1087,6 +1088,111 @@
   <link rel="stylesheet" href="css/battle-responsive.css" />
   <link rel="stylesheet" href="css/battle-context-ui.css" />
   <link rel="stylesheet" href="css/battle-responsive-mobile.css" />
+  <style>
+    /* RED-31: compact player identity/resources and authoritative deployment clock. */
+    .phase-bar {
+      right: auto !important;
+      width: auto !important;
+      max-width: min(560px, calc(100vw - 390px)) !important;
+      grid-template-columns: minmax(108px, auto) auto !important;
+    }
+    #playerResCards {
+      width: auto !important;
+      display: flex !important;
+      grid-template-columns: none !important;
+      flex-wrap: nowrap !important;
+    }
+    .player-state-chip {
+      width: auto;
+      min-width: 126px !important;
+      max-width: 168px;
+      min-height: 32px;
+      grid-template-columns: 22px minmax(44px, 1fr) auto !important;
+      gap: 4px !important;
+      padding: 3px 5px !important;
+      overflow: visible !important;
+      opacity: .84;
+    }
+    .player-state-chip.active { opacity: 1; }
+    .player-state-chip .player-avatar { width: 22px; height: 22px; font-size: 9px; }
+    .player-state-chip .player-display-name { max-width: 72px; font-size: 10px; }
+    .player-state-chip .player-side-name { font-size: 8px; }
+    .player-state-chip .player-state-resources { gap: 3px; }
+    .player-state-chip .resource-orb {
+      min-width: 28px;
+      height: 18px;
+      padding: 0 3px;
+      gap: 2px;
+      font-size: 10px;
+    }
+    .player-state-chip .resource-glyph { width: 11px; height: 11px; }
+    .player-state-chip.is-local-player {
+      opacity: 1;
+      border-color: rgba(248,250,252,.72) !important;
+      box-shadow: 0 0 0 1px rgba(248,250,252,.14), 0 8px 24px rgba(15,23,42,.34) !important;
+    }
+    .player-state-chip.is-local-player.red { box-shadow: 0 0 0 1px rgba(248,250,252,.14), 0 0 18px rgba(239,68,68,.24) !important; }
+    .player-state-chip.is-local-player.blue { box-shadow: 0 0 0 1px rgba(248,250,252,.14), 0 0 18px rgba(59,130,246,.26) !important; }
+    .player-state-chip.is-local-player::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -5px;
+      width: 8px;
+      height: 8px;
+      border: solid currentColor;
+      border-width: 0 1px 1px 0;
+      color: rgba(248,250,252,.72);
+      background: inherit;
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .local-player-mark {
+      position: absolute;
+      top: -7px;
+      left: 15px;
+      z-index: 2;
+      min-width: 20px;
+      height: 15px;
+      padding: 0 5px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid rgba(248,250,252,.72);
+      border-radius: 999px;
+      color: #f8fafc;
+      background: #0f172a;
+      font-size: 9px;
+      font-weight: 950;
+      line-height: 1;
+    }
+    .battle-turn-control { align-items: flex-end; gap: 8px; }
+    .deployment-status {
+      min-width: 220px;
+      padding: 8px 10px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 12px;
+      border: 1px solid rgba(148,163,184,.24);
+      border-radius: 12px;
+      background: rgba(3,7,18,.84);
+      box-shadow: 0 12px 34px rgba(0,0,0,.3);
+      backdrop-filter: blur(14px);
+    }
+    .deployment-status[hidden] { display: none !important; }
+    .deployment-status-label { color: #cbd5e1; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+    .deployment-countdown { color: #f8fafc; font-size: 22px; font-weight: 950; line-height: 1; font-variant-numeric: tabular-nums; }
+    .deployment-status-state { grid-column: 1 / -1; color: #94a3b8; font-size: 11px; font-weight: 750; }
+    .deployment-status.urgent { border-color: rgba(248,113,113,.54); }
+    .deployment-status.urgent .deployment-countdown { color: #fca5a5; }
+    @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
+      .phase-bar { max-width: calc(100vw - 210px) !important; }
+      .player-state-chip { min-width: 102px !important; max-width: 128px; grid-template-columns: minmax(38px, 1fr) auto !important; }
+      .player-state-chip .player-avatar { display: none; }
+      .player-state-chip .player-side-name { display: none; }
+      .local-player-mark { top: -5px; left: -4px; }
+      .deployment-status { min-width: 190px; padding: 6px 8px; }
+      .deployment-countdown { font-size: 18px; }
+    }
+  </style>
 </head>
 <body>
 
@@ -1296,6 +1402,11 @@
           </div>
         </div>
         <div class="turn-control-wrap battle-turn-control">
+          <div class="deployment-status" id="deploymentStatus" role="status" aria-live="polite" hidden>
+            <span class="deployment-status-label">部署确认</span>
+            <strong class="deployment-countdown" id="deploymentCountdown">00:45</strong>
+            <span class="deployment-status-state" id="deploymentState">等待双方确认</span>
+          </div>
           <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
         </div>
         <div class="training-tools" id="trainingTools" style="display:none">
@@ -1690,6 +1801,7 @@
     let pendingCardAction = null  // { type:'playCard', playerId, cardInstanceId } awaiting target
     let validMoves = new Set()   // reachable cells for current move (wall-aware)
     let pollTimer = null
+    let deploymentStatusTimer = null
     let myFaction = null       // 'red' | 'blue' (derived from ownerPlayerId)
     let recordSaved = false
     let actionLog = []
@@ -4127,8 +4239,32 @@
       setStatusMsg('🃏 再次点击释放，点其他地方取消')
     }
 
+    function renderDeploymentStatus() {
+      const panel = document.getElementById('deploymentStatus')
+      if (!panel || typeof RvBDeploymentStatus === 'undefined') return
+      const selected = G && localDeploymentChoiceId
+        ? G.pieces.find(p => p.instanceId === localDeploymentChoiceId)
+        : null
+      const view = RvBDeploymentStatus.create({
+        deployment: G && G.deployment,
+        playerId: myPlayerId,
+        selectedPieceName: selected ? pieceName(selected) : '',
+        spectating: SPECTATE_MODE,
+        now: Date.now(),
+      })
+      panel.hidden = !view.visible
+      panel.classList.toggle('urgent', view.visible && view.urgent)
+      if (!view.visible) return
+      const clock = document.getElementById('deploymentCountdown')
+      const state = document.getElementById('deploymentState')
+      if (clock) clock.textContent = view.clockText
+      if (state) state.textContent = view.stateText
+      panel.setAttribute('aria-label', '部署剩余 ' + view.remainingSeconds + ' 秒，' + view.stateText)
+    }
+
     function renderActionBar() {
       if (!G) return
+      renderDeploymentStatus()
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const phase = G.turn ? G.turn.phase : ''
       const inAction = phase === 'action'
@@ -4141,11 +4277,6 @@
       if (deploymentPending) {
         const lock = G.deployment.locks && G.deployment.locks[myPlayerId]
         const locked = !!(lock && lock.locked)
-        const selected = localDeploymentChoiceId
-          ? G.pieces.find(p => p.instanceId === localDeploymentChoiceId)
-          : null
-        const remainingMs = Math.max(0, Number(G.deployment.deadlineAt || 0) - Date.now())
-        const remainingSeconds = Math.ceil(remainingMs / 1000)
         if (btnEnd) {
           btnEnd.disabled = SPECTATE_MODE || locked || !!targetSubmissionPending
           btnEnd.textContent = locked ? '部署已锁定' : '确认部署'
@@ -4155,15 +4286,7 @@
         pendingMove = false
         pendingSkill = null
         setMoveButtonClass(false)
-        if (SPECTATE_MODE) {
-          setStatusMsg('部署阶段：双方公开站位，等待玩家同时确认（' + remainingSeconds + '秒）')
-        } else if (locked) {
-          setStatusMsg('部署已锁定，等待对方确认（' + remainingSeconds + '秒）')
-        } else if (selected) {
-          setStatusMsg('已选择重投 ' + pieceName(selected) + '；再次点击取消，点击“确认部署”后不可更改')
-        } else {
-          setStatusMsg('部署阶段：可点击己方一枚核心棋子选择重投，或直接确认保留全部（' + remainingSeconds + '秒）')
-        }
+        setStatusMsg('')
         return
       }
       if (btnEnd) {
@@ -5082,6 +5205,7 @@
       })
       _use3d = hasThreeRenderer
       if (!_use3d) initMapControls()
+      if (!deploymentStatusTimer) deploymentStatusTimer = setInterval(renderDeploymentStatus, 250)
       init()
       document.addEventListener('pointerdown', function (event) {
         const root = document.getElementById('trainingTools')
@@ -5143,6 +5267,8 @@
     function disposeBattlePage() {
       if (pollTimer) clearInterval(pollTimer)
       pollTimer = null
+      if (deploymentStatusTimer) clearInterval(deploymentStatusTimer)
+      deploymentStatusTimer = null
       if (battlePresentation) battlePresentation.dispose()
     }
     window.addEventListener('pagehide', disposeBattlePage)

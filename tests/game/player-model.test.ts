@@ -9,6 +9,18 @@ import {
 import { areAllies, areEnemies, isMatchPlayerId, isPlayerSeat, normalizeContentAlignment } from '@/lib/game/match-identity'
 
 describe('player seat and alignment model', () => {
+  it('randomizes the first occupied seat while keeping the second seat opposite', () => {
+    expect(assignNextSeat([], 'alice', () => 'red')).toBe('red')
+    expect(assignNextSeat([], 'alice', () => 'blue')).toBe('blue')
+
+    expect(assignNextSeat([{ id: 'alice', seat: 'red' }], 'bob', () => 'red')).toBe('blue')
+    expect(assignNextSeat([{ id: 'alice', seat: 'blue' }], 'bob', () => 'blue')).toBe('red')
+  })
+
+  it('does not redraw a persisted seat when reading the player model', () => {
+    expect(getPlayerSeat({ seat: 'blue', faction: 'blue' })).toBe('blue')
+  })
+
   it('assigns opposite red/blue seats while keeping light/dark independent', () => {
     const first = { id: 'alice', seat: 'red' as const, faction: 'red' as const, alignment: 'light' as const }
     const secondSeat = assignNextSeat([first], 'bob')

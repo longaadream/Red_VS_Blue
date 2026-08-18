@@ -458,7 +458,9 @@ describe('battle page route contract', () => {
       /async function doTurnControl\(\)[\s\S]*?type: 'deploymentLock'[\s\S]*?playerId: myPlayerId/,
     )
     expect(battlePage).toContain("btnEnd.textContent = locked ? '部署已锁定' : '确认部署'")
-    expect(battlePage).toContain('点击“确认部署”后不可更改')
+    expect(battlePage).toContain('id="deploymentStatus"')
+    expect(battlePage).toContain('RvBDeploymentStatus.create')
+    expect(battlePage).not.toContain('点击“确认部署”后不可更改')
     expect(battlePage).toContain('function publicRelayBattleState(state)')
     expect(battlePage).toContain('GameEngine.toPublicBattleState(state)')
     expect(battlePage).toContain('const publicState = publicRelayBattleState(relayAuthorityState)')

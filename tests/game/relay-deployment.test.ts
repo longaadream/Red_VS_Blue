@@ -56,6 +56,7 @@ describe('legacy relay deployment initialization', () => {
       revision: 0,
     })
     expect(body.state.deployment.deadlineAt - body.state.deployment.startedAt).toBe(DEPLOYMENT_DURATION_MS)
+    expect(body.state.turn.currentPlayerId).toBe('alice')
     expect(body.state.gameStartFired).toBeFalsy()
     expect(body.authorityVersion).toBe(1)
     expect(body.state.extensions.debugBattle.actionLog[0].deployment.authorityVersion).toBe(1)
@@ -82,7 +83,28 @@ describe('legacy relay deployment initialization', () => {
       revision: 0,
     })
     expect(body.state.deployment.deadlineAt - body.state.deployment.startedAt).toBe(DEPLOYMENT_DURATION_MS)
+    expect(body.state.turn.currentPlayerId).toBe('alice')
     expect(body.state.extensions.debugBattle.actionLog[0].deployment.authorityVersion).toBe(1)
+  })
+
+  it('rejects duplicate seats instead of allowing a client to bypass red/blue order', async () => {
+    const duplicateSeats = players.map(player => ({ ...player, faction: 'red' as const }))
+    const request = new NextRequest('http://localhost/api/relay-battle-init', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ players: duplicateSeats }),
+    })
+
+    const response = await POST(request)
+    const body = await response.json()
+    const mobileBody = JSON.parse(await handleRelayBattleInit({ players: duplicateSeats }))
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain('exactly one red and one blue')
+    expect(mobileBody).toMatchObject({
+      _status: 400,
+      error: expect.stringContaining('exactly one red and one blue'),
+    })
   })
 
   it('commits timeout before any Relay player command received at or after the deadline', () => {

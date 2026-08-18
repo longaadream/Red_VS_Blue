@@ -344,9 +344,6 @@
   "mobile-server/mobile-server-entry.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 2
     }
   },
   "mobile-server/os-shim.ts": {

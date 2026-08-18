@@ -52,6 +52,13 @@ export async function startBattleFromLockedRosters(
       if (getPlayerSeat(left) === 'blue' && getPlayerSeat(right) === 'red') return 1
       return 0
     })
+    const redPlayers = roomPlayers.filter(player => getPlayerSeat(player) === 'red')
+    const bluePlayers = roomPlayers.filter(player => getPlayerSeat(player) === 'blue')
+    if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
+      throw new Error('Cannot start battle without exactly one red and one blue seat')
+    }
+    const firstPlayerId = redPlayers[0].id
+
     const playerIds = roomPlayers.map(player => player.id)
     const playerSelectedPieces = roomPlayers.map(player => ({
       playerId: player.id,
@@ -66,7 +73,12 @@ export async function startBattleFromLockedRosters(
       pieceTemplates,
       playerSelectedPieces,
       DEMO_FIXED_MAP_ID,
-      { rootSeed: seed, deploymentEnabled: true, deploymentStartedAt: clock.now() },
+      {
+        firstPlayerId,
+        rootSeed: seed,
+        deploymentEnabled: true,
+        deploymentStartedAt: clock.now(),
+      },
     )
     if (!battle) throw new Error('Failed to initialize battle state')
 
@@ -82,11 +94,6 @@ export async function startBattleFromLockedRosters(
         clientActionId: `system-deployment-keep:${bot.id}`,
       }, { rootSeed: seed }).state
     }
-
-    // The battle setup is the sole authority for turn order.  It draws from
-    // the root seed's turn-order stream, so neither seat, join order, nor a
-    // client request can choose the first player.
-    const firstPlayerId = initialState.turn.currentPlayerId
 
     if (typeof room.version === 'number') {
       stampPendingDeploymentAuthorityVersion(initialState, room.version + 1)
