@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { store } from '../store'
 import type { Room } from '../types'
+import { createRelayRoomPlayer } from '../room-seats'
 
 export const lobbyRouter = new Hono()
 
@@ -27,8 +28,8 @@ lobbyRouter.post('/', async c => {
     publicKey: string
   }>()
 
-  if (!body.hostId || !body.name) {
-    return c.json({ error: 'missing hostId or name' }, 400)
+  if (!body.hostId || !body.name || !body.publicKey?.trim()) {
+    return c.json({ error: 'missing hostId, name, or publicKey' }, 400)
   }
 
   const id = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
@@ -39,14 +40,11 @@ lobbyRouter.post('/', async c => {
     hostId: body.hostId,
     name: body.name,
     status: 'waiting',
-    players: [
-      {
-        id: body.hostId,
-        name: body.hostName ?? 'Host',
-        publicKey: body.publicKey ?? '',
-        connected: false,
-      },
-    ],
+    players: [createRelayRoomPlayer([], {
+      id: body.hostId,
+      name: body.hostName ?? 'Host',
+      publicKey: body.publicKey,
+    })],
     inviteCode,
     actionLog: [],
     createdAt: Date.now(),

@@ -348,6 +348,7 @@ interface ServerCore {
 ### PVP 房间编排
 
 - `room-store.assignNextSeat()`：空房首位使用可注入的等概率选择器分配 `red | blue`，已有一席时返回另一席；已持久化座位由调用方直接复用。
+- Relay lobby/join 使用同一服务端权威规则分配并持久化座位；兼容 `claim-faction` 仅返回既有座位，不接受客户端覆盖。
 - `room-battle-start.startBattleForRoom()`：要求阵容中恰有一名红方玩家，并将其 ID 显式传给规则层的 `firstPlayerId`。
 - Relay 与移动端开局入口：要求恰有一红一蓝；红方先手，非法或重复座位直接拒绝。
 - `turn-order` 随机流仍为兼容接口；Demo PVP 房间开局不再消费它来决定先手。

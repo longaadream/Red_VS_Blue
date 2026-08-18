@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { store } from '../store'
 import { db } from '../db/client'
 import type { Room } from '../types'
+import { claimRelayRoomSeat, createRelayRoomPlayer, ensureRelayRoomSeats } from '../room-seats'
 
 export const roomsRouter = new Hono()
 
@@ -48,31 +49,47 @@ roomsRouter.post('/:id/actions', async c => {
       if (room.status !== 'waiting') return c.json({ error: 'room not open' }, 400)
       if (room.players.length >= 2) return c.json({ error: 'room full' }, 400)
       if (room.players.find(p => p.id === body.playerId)) return c.json({ error: 'already joined' }, 400)
+      let player
+      try {
+        player = createRelayRoomPlayer(room.players, {
+          id: body.playerId,
+          name: body.playerName ?? 'Player',
+          publicKey: body.publicKey ?? '',
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return c.json({ error: message }, message.includes('duplicate') ? 409 : 400)
+      }
 
-      room.players.push({
-        id: body.playerId,
-        name: body.playerName ?? 'Player',
-        publicKey: body.publicKey ?? '',
-        connected: false,
-      })
+      room.players.push(player)
       room.status = 'selecting'
       store.setRoom(room)
       store.broadcastToRoom(room.id, { type: 'roomUpdate', room: publicRoom(room) })
-      return c.json({ ok: true, faction: null, inviteCode: room.inviteCode })
+      return c.json({ ok: true, faction: player.faction, inviteCode: room.inviteCode })
     }
 
     case 'claim-faction': {
       const player = room.players.find(p => p.id === body.playerId)
       if (!player) return c.json({ error: 'not in room' }, 403)
-      player.faction = body.faction
+      let faction
+      try {
+        faction = claimRelayRoomSeat(room.players, body.playerId)
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 409)
+      }
       store.setRoom(room)
       store.broadcastToRoom(room.id, { type: 'roomUpdate', room: publicRoom(room) })
-      return c.json({ ok: true, faction: body.faction })
+      return c.json({ ok: true, faction })
     }
 
     case 'select-pieces': {
       const player = room.players.find(p => p.id === body.playerId)
       if (!player) return c.json({ error: 'not in room' }, 403)
+      try {
+        ensureRelayRoomSeats(room.players)
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 409)
+      }
       player.pieces = body.pieces
       store.setRoom(room)
 

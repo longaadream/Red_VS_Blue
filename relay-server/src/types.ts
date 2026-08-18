@@ -1,11 +1,12 @@
 export type RoomStatus = 'waiting' | 'selecting' | 'battle' | 'waiting_host' | 'finished'
 export type PlayerRole = 'host' | 'guest' | 'spectator'
+export type RelaySeat = 'red' | 'blue'
 
 export interface RoomPlayer {
   id: string
   name: string
   publicKey: string
-  faction?: string
+  faction?: RelaySeat
   pieces?: string[]
   connected: boolean
 }

@@ -79,4 +79,68 @@ describe('LAN server discovery', () => {
     expect(api.resolveWsPort({ url: 'http://host:3000', ip: 'host', port: 3000 })).toBe(3001)
     expect(api.resolveWsPort({ url: 'http://host:8080', ip: 'host', port: 8080 })).toBe(8080)
   })
+
+  it('persists the discovered WS port across reload and connects to the final 3001 URL', () => {
+    const persisted = new Map<string, string>()
+    const localStorage = {
+      getItem(key: string) { return persisted.get(key) ?? null },
+      setItem(key: string, value: string) { persisted.set(key, String(value)) },
+      removeItem(key: string) { persisted.delete(key) },
+    }
+    const serverUtilsSource = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+    const lanDiscoverSource = readFileSync(resolve(process.cwd(), 'data/pages/js/lan-discover.js'), 'utf8')
+    const wsClientSource = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+
+    const initialWindow: Record<string, unknown> = { location: { search: '' } }
+    const initialContext = createContext({
+      window: initialWindow,
+      localStorage,
+      URLSearchParams,
+      AbortController,
+      setTimeout,
+      clearTimeout,
+    })
+    new Script(serverUtilsSource, { filename: 'server-utils.js' }).runInContext(initialContext)
+    new Script(lanDiscoverSource, { filename: 'lan-discover.js' }).runInContext(initialContext)
+    const utils = initialWindow.RvBUtils as {
+      saveServerConfig(config: { mode: string; url: string; wsPort: number }): boolean
+    }
+    const discover = initialWindow.RvBLanDiscover as LanDiscoverApi
+    const wsPort = discover.resolveWsPort({
+      url: 'http://192.168.1.100:3000',
+      ip: '192.168.1.100',
+      port: 3000,
+      wsPort: 3001,
+    })
+    expect(utils.saveServerConfig({ mode: 'lan', url: 'http://192.168.1.100:3000', wsPort })).toBe(true)
+    expect(persisted.get('rvb_ws_port')).toBe('3001')
+
+    const urls: string[] = []
+    class FakeWebSocket {
+      readyState = 0
+      constructor(url: string) { urls.push(url) }
+      close() {}
+      send() {}
+    }
+    const reloadedWindow: Record<string, unknown> = { location: { search: '' } }
+    const reloadedContext = createContext({
+      window: reloadedWindow,
+      localStorage,
+      URLSearchParams,
+      WebSocket: FakeWebSocket,
+      setTimeout,
+      clearTimeout,
+      console,
+    })
+    new Script(serverUtilsSource, { filename: 'server-utils-reloaded.js' }).runInContext(reloadedContext)
+    new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(reloadedContext)
+    const ws = reloadedWindow.RvBWs as {
+      connect(roomId: string, playerId: string, mode: string): void
+      disconnect(): void
+    }
+    ws.connect('room-1', 'alice', 'lan')
+
+    expect(urls[0]).toBe('ws://192.168.1.100:3001/ws/rooms/room-1')
+    ws.disconnect()
+  })
 })
