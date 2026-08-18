@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
-import { getBattleStorage } from "@/lib/game/battle-storage"
-import { runBattleAction } from "@/lib/game/battle-runner"
 import { broadcastToRoom } from "@/lib/ws-server"
+import {
+  createPublicBattleSnapshot,
+  dispatchRoomBattleAction,
+} from "@/lib/game/room-battle-actions"
+import { verifyBattleActionAuth } from "@/lib/game/identity-verify"
 
 // ── GET — return current authoritative battle state ──────────────────────────
 
@@ -15,10 +18,14 @@ export async function GET(
   const room = await roomStore.getRoom(roomId)
   if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
 
-  const storage = getBattleStorage(room)
-  if (!storage) return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
-
-  return NextResponse.json({ state: storage.state, seed: storage.seed })
+  const viewerPlayerId = req.headers.get('x-player-id')
+    ?? req.nextUrl.searchParams.get('viewerPlayerId')
+    ?? undefined
+  try {
+    return NextResponse.json(createPublicBattleSnapshot(room, viewerPlayerId))
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 400 })
+  }
 }
 
 // ── POST — apply action authoritatively, broadcast new state via WS ──────────
@@ -30,7 +37,7 @@ export async function POST(
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
 
-  let body: { type?: string; playerId?: string; action?: unknown; winner?: string } = {}
+  let body: { type?: string; playerId?: string; viewerPlayerId?: string; action?: unknown; auth?: unknown; winner?: string } = {}
   try { body = await req.json() } catch {}
 
   const room = await roomStore.getRoom(roomId)
@@ -55,51 +62,94 @@ export async function POST(
   }
 
   // ── regular battle action: apply on server ──
-  const storage = getBattleStorage(room)
-  if (!storage) return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
-
   const action = body.action
   if (!action) return NextResponse.json({ error: 'action is required' }, { status: 400 })
 
-  let result: ReturnType<typeof runBattleAction>
+  let verifiedPlayerId: string
   try {
-    result = runBattleAction(storage.state as any, action as any)
+    verifiedPlayerId = (await verifyBattleActionAuth(body.auth, { roomId, action })).playerId
+  } catch (error) {
+    const authError = error as { code?: string; message?: string }
+    return NextResponse.json({
+      error: authError.message ?? 'Battle action authentication failed',
+      code: authError.code ?? 'BATTLE_AUTH_INVALID',
+    }, { status: 401 })
+  }
+
+  const headerViewer = req.headers.get('x-player-id')?.trim().toLowerCase()
+  const bodyViewer = (body.viewerPlayerId ?? body.playerId)?.trim().toLowerCase()
+  if (
+    (headerViewer && headerViewer !== verifiedPlayerId)
+    || (bodyViewer && bodyViewer !== verifiedPlayerId)
+  ) {
+    return NextResponse.json({
+      error: 'Request player identity does not match the authenticated viewer.',
+      code: 'ACTION_PLAYER_MISMATCH',
+    }, { status: 403 })
+  }
+  const viewerPlayerId = verifiedPlayerId
+
+  let result: Awaited<ReturnType<typeof dispatchRoomBattleAction>>
+  try {
+    result = await dispatchRoomBattleAction(roomStore, roomId, viewerPlayerId, action as any)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     const errAny = err as any
     if (errAny?.needsTargetSelection) {
       return NextResponse.json({
         error: msg,
+        code: errAny.code,
         needsTargetSelection: true,
+        preparation: errAny.preparation,
         targetType: errAny.targetType ?? '',
         range: errAny.range ?? 10,
         filter: errAny.filter ?? '',
         targetIndex: errAny.targetIndex ?? undefined,
+        determinism: errAny.determinism ?? undefined,
+        context: errAny.context ?? undefined,
       }, { status: 400 })
     }
     if (errAny?.needsOptionSelection) {
       return NextResponse.json({
         error: msg,
+        code: errAny.code,
         needsOptionSelection: true,
+        preparation: errAny.preparation,
         title: errAny.title ?? '请选择',
         options: errAny.options ?? [],
+        determinism: errAny.determinism ?? undefined,
+        context: errAny.context ?? undefined,
       }, { status: 400 })
     }
-    return NextResponse.json({ error: msg }, { status: 400 })
+    const status = errAny?.code === 'VIEWER_FORBIDDEN' || errAny?.code === 'ACTION_PLAYER_MISMATCH'
+      ? 403
+      : 400
+    return NextResponse.json({
+      error: msg,
+      code: errAny?.code,
+      determinism: errAny?.determinism ?? undefined,
+      context: errAny?.context ?? undefined,
+    }, { status })
   }
 
-  storage.state = result.state
-  room.battleState = storage as any
-  await roomStore.setRoom(roomId, room)
-
-  broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: result.stateHash, duplicate: result.duplicate })
+  const stateUpdate = {
+    type: 'stateUpdate',
+    ...result.snapshot,
+    duplicate: result.kind === 'duplicate',
+  }
+  if (result.kind !== 'duplicate') broadcastToRoom(roomId, stateUpdate)
+  if (result.kind === 'expired') {
+    return NextResponse.json({
+      error: 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
+      code: 'DEPLOYMENT_EXPIRED',
+      ...result.snapshot,
+    }, { status: 409 })
+  }
 
   return NextResponse.json({
     ok: true,
-    state: storage.state,
-    seed: storage.seed,
-    stateHash: result.stateHash,
-    actionHash: result.actionHash,
-    duplicate: result.duplicate === true,
+    ...result.snapshot,
+    actionHash: result.actionResult.actionHash,
+    duplicate: result.kind === 'duplicate',
   })
 }

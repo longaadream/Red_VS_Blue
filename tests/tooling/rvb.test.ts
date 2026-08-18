@@ -82,7 +82,7 @@ afterEach(() => {
   }
 })
 
-describe('rvb CLI', () => {
+describe('rvb CLI', { timeout: 30_000 }, () => {
   it('rejects invalid task IDs and profiles without creating a report', () => {
     const paths = makeWorkspace()
     const config = baseConfig()

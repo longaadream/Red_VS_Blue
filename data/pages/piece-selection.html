@@ -6,6 +6,8 @@
   <title>选择棋子 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/crypto-lib.js"></script>
+  <script src="js/identity.js"></script>
   <script src="js/ws-client.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -241,6 +243,11 @@
     .alignment-btn.active.dark {
       color: #fecaca; border-color: #f87171; background: rgba(185,28,28,.22);
     }
+    .alignment-btn:disabled { cursor: not-allowed; opacity: .58; }
+    .alignment-lock-notice {
+      width: min(1120px, 100%); margin: 0 auto; padding: 4px 14px 0;
+      color: #94a3b8; font-size: 11px; text-align: center;
+    }
     @media (max-width: 560px) {
       body { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
       .piece-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -261,9 +268,10 @@
   </div>
 
   <div class="alignment-panel">
-    <button class="alignment-btn light" id="alignmentLightBtn" onclick="setAlignment('light')">光方</button>
-    <button class="alignment-btn dark" id="alignmentDarkBtn" onclick="setAlignment('dark')">暗方</button>
+    <button class="alignment-btn light" id="alignmentLightBtn" disabled>光方</button>
+    <button class="alignment-btn dark" id="alignmentDarkBtn" disabled>暗方</button>
   </div>
+  <div id="alignmentLockNotice" class="alignment-lock-notice">阵营将在大厅准备后锁定</div>
 
   <!-- Piece list -->
   <div class="section">
@@ -346,10 +354,14 @@
     let selectedIds = new Set()
     let pollTimer = null
     let playerFaction = null    // 'red' | 'blue' turn order seat
-    let playerAlignment = null  // 'good' | 'evil' piece pool
+    let playerAlignment = null  // 'light' | 'dark' content alignment
     playerAlignment = params.get('alignment') || playerAlignment
     let wsReady = false
     let latestRoom = null
+    let pieceLoadError = ''
+
+    const LOCAL_PIECE_LOAD_TIMEOUT_MS = 2000
+    const SERVER_PIECE_LOAD_TIMEOUT_MS = 2500
 
     // Skill cache
     const SKILL_CACHE = {}
@@ -440,22 +452,10 @@
       return result
     }
 
-    async function setAlignment(alignment) {
-      if (alignment !== 'light' && alignment !== 'dark') return
-      if (alignment === playerAlignment) return
-      playerAlignment = alignment
-      selectedIds.clear()
-      updateFactionBadge()
-      await loadPieces()
-      updateConfirmBar()
-      if (wsReady && roomId) {
-        try { await claimFactionViaWs() } catch {}
-      }
-    }
-
     function navigateBattle() {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       const p = new URLSearchParams({ roomId, playerId, playerName })
+      if (playerAlignment) p.set('alignment', playerAlignment)
       if (accountId) p.set('accountId', accountId)
       if (params.get('debug')) p.set('debug', params.get('debug'))
       if (window.RvBUtils && RvBUtils.appendServerParams) RvBUtils.appendServerParams(p)
@@ -476,6 +476,112 @@
       const res = await fetch(path)
       if (!res.ok) throw new Error(res.status)
       return res.json()
+    }
+
+    function errorReason(error) {
+      return error && error.message ? error.message : String(error)
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[char])
+    }
+
+    function withTimeout(promise, timeoutMs, source) {
+      let timer = null
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(source + ' timeout after ' + timeoutMs + 'ms')), timeoutMs)
+      })
+      return Promise.race([promise, timeout]).finally(() => {
+        if (timer) clearTimeout(timer)
+      })
+    }
+
+    async function loadLocalPieceTemplates() {
+      const manifestPath = './data/pieces/manifest.json'
+      let ids
+      try {
+        ids = await fetchJson(manifestPath)
+      } catch (error) {
+        throw new Error(manifestPath + ': ' + errorReason(error))
+      }
+      if (!Array.isArray(ids) || ids.length === 0 || ids.some(id => typeof id !== 'string' || !id)) {
+        throw new Error(manifestPath + ': expected a non-empty string array')
+      }
+      return Promise.all(ids.map(async id => {
+        const resourcePath = './data/pieces/' + id + '.json'
+        try {
+          const piece = await fetchJson(resourcePath)
+          if (!piece || typeof piece !== 'object' || piece.id !== id) {
+            throw new Error('expected a piece object whose id matches the manifest')
+          }
+          return piece
+        } catch (error) {
+          throw new Error(resourcePath + ': ' + errorReason(error))
+        }
+      })).then(pieces => validatePieceTemplates(pieces))
+    }
+
+    async function loadServerPieceTemplates() {
+      if (!window.RvBUtils || !RvBUtils.serverFetch) {
+        throw new Error('当前页面没有可用的服务器连接')
+      }
+      const response = await RvBUtils.serverFetch('/api/pieces', {
+        timeoutMs: SERVER_PIECE_LOAD_TIMEOUT_MS
+      })
+      let data = null
+      try {
+        data = await response.json()
+      } catch (error) {
+        throw new Error('响应不是有效 JSON: ' + errorReason(error))
+      }
+      if (!response.ok) {
+        throw new Error((data && data.error) || ('HTTP ' + response.status))
+      }
+      if (!data || !Array.isArray(data.pieces) || data.pieces.length === 0) {
+        throw new Error('响应缺少非空 pieces 数组')
+      }
+      return validatePieceTemplates(data.pieces)
+    }
+
+    function validatePieceTemplates(pieces) {
+      const seen = new Set()
+      for (const piece of pieces) {
+        if (!piece || typeof piece !== 'object' || typeof piece.id !== 'string' || !piece.id) {
+          throw new Error('棋子数据缺少有效 id')
+        }
+        if (piece.faction !== 'good' && piece.faction !== 'evil') {
+          throw new Error('棋子 ' + piece.id + ' 的 faction 必须是 good 或 evil')
+        }
+        if (seen.has(piece.id)) throw new Error('棋子数据包含重复 id：' + piece.id)
+        seen.add(piece.id)
+      }
+      const expectedFaction = (playerAlignment === 'light' || playerAlignment === 'good')
+        ? 'good'
+        : (playerAlignment === 'dark' || playerAlignment === 'evil') ? 'evil' : null
+      if (expectedFaction) {
+        const available = pieces.filter(piece => piece.faction === expectedFaction).length
+        if (available < 8) {
+          const label = expectedFaction === 'good' ? '光方' : '暗方'
+          throw new Error(label + '可用棋子不足 8 个（实际 ' + available + ' 个）')
+        }
+      }
+      return pieces
+    }
+
+    function filterPiecesForAlignment(pieces) {
+      if (playerAlignment === 'dark' || playerAlignment === 'evil') {
+        return pieces.filter(piece => piece.faction === 'evil')
+      }
+      if (playerAlignment === 'light' || playerAlignment === 'good') {
+        return pieces.filter(piece => piece.faction === 'good')
+      }
+      return pieces
     }
 
     async function sendRoomAction(payload) {
@@ -531,8 +637,15 @@
       const label = document.getElementById('sectionLabel')
       const lightBtn = document.getElementById('alignmentLightBtn')
       const darkBtn = document.getElementById('alignmentDarkBtn')
+      const lockNotice = document.getElementById('alignmentLockNotice')
+      const alignmentLocked = playerAlignment === 'light' || playerAlignment === 'dark' || playerAlignment === 'good' || playerAlignment === 'evil'
       if (lightBtn) lightBtn.classList.toggle('active', playerAlignment === 'light' || playerAlignment === 'good')
       if (darkBtn) darkBtn.classList.toggle('active', playerAlignment === 'dark' || playerAlignment === 'evil')
+      if (lightBtn) lightBtn.disabled = alignmentLocked
+      if (darkBtn) darkBtn.disabled = alignmentLocked
+      if (lockNotice) lockNotice.textContent = alignmentLocked
+        ? '阵营已在大厅锁定，只能选择本阵营棋子'
+        : '正在读取大厅分配的阵营'
       if (!badge) return
       const orderLabel = playerFaction === 'red' ? '座位 red' : playerFaction === 'blue' ? '座位 blue' : null
       if (playerAlignment === 'dark' || playerAlignment === 'evil') {
@@ -553,23 +666,39 @@
     }
 
     async function loadPieces() {
+      pieceLoadError = ''
       try {
-        const ids = await fetchJson('./data/pieces/manifest.json')
-        const loaded = []
-        for (const id of ids) {
-          try { loaded.push(await fetchJson('./data/pieces/' + id + '.json')) } catch {}
+        let loaded
+        try {
+          loaded = await withTimeout(
+            loadLocalPieceTemplates(),
+            LOCAL_PIECE_LOAD_TIMEOUT_MS,
+            '本地资源'
+          )
+        } catch (localError) {
+          console.warn('[piece-selection] local piece resources failed; falling back to current server:', localError)
+          try {
+            loaded = await withTimeout(
+              loadServerPieceTemplates(),
+              SERVER_PIECE_LOAD_TIMEOUT_MS,
+              '服务器 /api/pieces'
+            )
+          } catch (serverError) {
+            pieceLoadError = '棋子资源加载失败。本地资源：' + errorReason(localError)
+              + '；服务器 /api/pieces：' + errorReason(serverError)
+            console.error('[piece-selection] piece resources unavailable:', {
+              local: errorReason(localError),
+              server: errorReason(serverError)
+            })
+            throw new Error(pieceLoadError)
+          }
         }
-        // Alignment is the player's identity preference. Prefer matching pieces,
-        // but keep enough pieces visible while the art/content pool is incomplete.
-        if (playerAlignment === 'dark' || playerAlignment === 'evil') {
-          PIECE_TEMPLATES = loaded.slice().sort((a, b) => (a.faction === 'evil' ? 0 : 1) - (b.faction === 'evil' ? 0 : 1))
-        } else if (playerAlignment === 'light' || playerAlignment === 'good') {
-          PIECE_TEMPLATES = loaded.slice().sort((a, b) => (a.faction === 'good' ? 0 : 1) - (b.faction === 'good' ? 0 : 1))
-        } else {
-          PIECE_TEMPLATES = loaded
-        }
-      } catch {
+        // Client filtering is only immediate feedback. The server re-reads the
+        // versioned Demo manifest and enforces alignment, count and uniqueness.
+        PIECE_TEMPLATES = filterPiecesForAlignment(loaded)
+      } catch (error) {
         PIECE_TEMPLATES = []
+        if (!pieceLoadError) pieceLoadError = '棋子资源加载失败：' + errorReason(error)
       }
       renderPieces()
     }
@@ -584,7 +713,10 @@
     function renderPieces() {
       const grid = document.getElementById('pieceGrid')
       if (!PIECE_TEMPLATES.length) {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#475569">暂无可用棋子</div>'
+        const message = pieceLoadError || '暂无可用棋子'
+        const color = pieceLoadError ? '#f87171' : '#475569'
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:' + color + '">'
+          + escapeHtml(message) + '</div>'
         return
       }
       grid.innerHTML = PIECE_TEMPLATES.map(p => {

@@ -1,0 +1,26 @@
+{
+  "id": "venom-host-transfer",
+  "name": "宿主转移",
+  "description": "选择7格内任意另一名角色，与其交换位置。",
+  "keywords": [],
+  "targetText": "7格内任意另一名存活角色",
+  "effectTags": [],
+  "icon": "🧬",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "single",
+  "targetType": "piece",
+  "filter": "all",
+  "requiresTarget": true,
+  "targeting": {
+    "steps": [
+      { "kind": "target", "type": "piece", "filter": "all", "range": 7 }
+    ]
+  },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 7, filter: 'all' }); if (!target || target.needsTargetSelection) return target; if (target.instanceId === caster.instanceId) return { success: false, message: '宿主转移不能选择毒液自身' }; if (target.currentHp <= 0 || target.x == null || target.y == null) return { success: false, message: '宿主转移只能选择场上的存活角色' }; if (caster.x == null || caster.y == null) return { success: false, message: '毒液当前不在战场上' }; var distance = Math.abs(caster.x - target.x) + Math.abs(caster.y - target.y); if (distance > 7) return { success: false, message: '目标距离超过7格' }; var casterX = caster.x; var casterY = caster.y; caster.x = target.x; caster.y = target.y; target.x = casterX; target.y = casterY; return { success: true, message: caster.name + '发动宿主转移，与' + target.name + '交换位置' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '与7格内任意另一名存活角色交换位置，不造成伤害。', expectedValues: { range: 7 } }; }"
+}

@@ -2,7 +2,7 @@
   "id": "minato-kunai-formula",
   "name": "苦无术式",
   "description": "选择一名友方角色（包括自己）并传送至一个飞雷神锚点处，清除该锚点并给该角色附加1层飞雷神标记。",
-  "keywords": ["飞雷神", "传送"],
+  "keywords": [],
   "targetText": "1名友方角色，然后1个飞雷神锚点",
   "effectTags": ["位移", "标记"],
   "icon": "🗡",

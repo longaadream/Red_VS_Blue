@@ -2,8 +2,12 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } from 'el
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
+import { shouldReportServerStartupFailure } from './server-process-lifecycle'
+import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
+import { RESOURCE_PACK_LIMITS, importResourcePackArchive } from './resource-pack-store'
 
 let serverProcess: ChildProcess | null = null
+const requestedServerStops = new WeakSet<ChildProcess>()
 let tray: Tray | null = null
 let dashboardWin: BrowserWindow | null = null
 let serverRunning = false
@@ -22,6 +26,22 @@ function getAppRoot(): string {
 
 function getUserData(): string {
   return app.getPath('userData')
+}
+
+function getDashboardRoot(): string {
+  return path.join(__dirname, '..', 'dashboard')
+}
+
+function restrictWindowNavigation(win: BrowserWindow, allowedRoot: string): void {
+  const isAllowed = (rawUrl: string): boolean => isFileUrlWithinRoot(rawUrl, allowedRoot)
+
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowed(url)) event.preventDefault()
+  })
+  win.webContents.on('will-frame-navigate', (details) => {
+    if (!details.isMainFrame || !isAllowed(details.url)) details.preventDefault()
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 }
 
 // 找到可用的 node 可执行文件
@@ -180,8 +200,9 @@ function startGameServer(): void {
   // 确保 CSS / JS / 图片等 static 资源在 standalone 目录下
   ensureStandaloneAssets(appRoot, serverEntry)
 
+  let spawnedProcess: ChildProcess
   try {
-    serverProcess = spawn(getNodeBin(), [serverEntry], {
+    spawnedProcess = spawn(getNodeBin(), [serverEntry], {
       cwd: path.dirname(serverEntry),
       env: {
         ...process.env,
@@ -193,6 +214,7 @@ function startGameServer(): void {
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
+    serverProcess = spawnedProcess
   } catch (err) {
     const msg = `Failed to spawn server process:\n${err}`
     console.error('[electron]', msg)
@@ -200,35 +222,43 @@ function startGameServer(): void {
     return
   }
 
-  serverProcess.stdout?.on('data', (d) => process.stdout.write(d))
-  serverProcess.stderr?.on('data', (d) => process.stderr.write(d))
+  spawnedProcess.stdout?.on('data', (d) => process.stdout.write(d))
+  spawnedProcess.stderr?.on('data', (d) => process.stderr.write(d))
 
-  serverProcess.on('error', (err) => {
+  spawnedProcess.on('error', (err) => {
     console.error('[electron] Server process error:', err)
-    dialog.showErrorBox('服务器错误', String(err))
-    serverRunning = false
-    serverProcess = null
-    dashboardWin?.webContents.send('server-status', { running: false })
-    updateTrayMenu()
+    if (!requestedServerStops.has(spawnedProcess)) {
+      dialog.showErrorBox('服务器错误', String(err))
+    }
+    if (serverProcess === spawnedProcess) {
+      serverRunning = false
+      serverProcess = null
+      dashboardWin?.webContents.send('server-status', { running: false })
+      updateTrayMenu()
+    }
   })
 
-  serverProcess.on('exit', (code) => {
-    serverRunning = false
-    serverProcess = null
-    dashboardWin?.webContents.send('server-status', { running: false, code })
+  spawnedProcess.on('exit', (code) => {
+    const stoppedByRequest = requestedServerStops.has(spawnedProcess)
+    requestedServerStops.delete(spawnedProcess)
+    if (serverProcess === spawnedProcess) {
+      serverRunning = false
+      serverProcess = null
+      dashboardWin?.webContents.send('server-status', { running: false, code })
+      updateTrayMenu()
+    }
     console.log(`[electron] Server exited with code ${code}`)
-    if (code === 1) {
+    if (shouldReportServerStartupFailure(code, stoppedByRequest)) {
       dialog.showErrorBox(
         '服务器启动失败',
         '端口 3000 已被占用。\n\n请关闭占用 3000 端口的其他程序（如 npm run dev），然后点击"启动服务器"重试。'
       )
     }
-    updateTrayMenu()
   })
 
   // 给服务器一点时间启动后再标记为 running
   setTimeout(() => {
-    if (serverProcess) {
+    if (serverProcess === spawnedProcess) {
       serverRunning = true
       dashboardWin?.webContents.send('server-status', { running: true })
       updateTrayMenu()
@@ -265,6 +295,7 @@ function startRoomCleanup(): void {
 function stopGameServer(): void {
   if (serverProcess) {
     const proc = serverProcess
+    requestedServerStops.add(proc)
     serverProcess = null
     serverRunning = false
     if (cleanupInterval) {
@@ -272,6 +303,7 @@ function stopGameServer(): void {
       cleanupInterval = null
     }
     killProcessTree(proc)
+    dashboardWin?.webContents.send('server-status', { running: false })
     updateTrayMenu()
   }
 }
@@ -299,10 +331,14 @@ function createDashboardWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
 
-  dashboardWin.loadFile(path.join(__dirname, '..', 'dashboard', 'index.html'))
+  const dashboardRoot = getDashboardRoot()
+  restrictWindowNavigation(dashboardWin, dashboardRoot)
+  dashboardWin.loadFile(path.join(dashboardRoot, 'index.html'))
   dashboardWin.on('close', (e) => {
     e.preventDefault()
     dashboardWin?.hide()
@@ -338,11 +374,22 @@ function updateTrayMenu(): void {
 
 // ─── IPC 处理器 ───────────────────────────────────────────────────────────────
 
-ipcMain.handle('get-status', () => ({ running: serverRunning, port: 3000 }))
-ipcMain.handle('restart-server', () => { restartGameServer() })
-ipcMain.handle('stop-server', () => { stopGameServer() })
-ipcMain.handle('start-server', () => { startGameServer() })
-ipcMain.handle('get-lobby', async () => {
+function handleTrusted(channel: string, listener: Parameters<typeof ipcMain.handle>[1]): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedIpcSender(event, channel, [{
+      role: 'dashboard',
+      window: dashboardWin,
+      allowUrl: (rawUrl) => isFileUrlWithinRoot(rawUrl, getDashboardRoot()),
+    }])
+    return listener(event, ...args)
+  })
+}
+
+handleTrusted('get-status', () => ({ running: serverRunning, port: 3000 }))
+handleTrusted('restart-server', () => { restartGameServer() })
+handleTrusted('stop-server', () => { stopGameServer() })
+handleTrusted('start-server', () => { startGameServer() })
+handleTrusted('get-lobby', async () => {
   try {
     const res = await fetch('http://localhost:3000/api/lobby')
     return res.ok ? await res.json() : { rooms: [] }
@@ -350,7 +397,7 @@ ipcMain.handle('get-lobby', async () => {
     return { rooms: [] }
   }
 })
-ipcMain.handle('get-rooms', async () => {
+handleTrusted('get-rooms', async () => {
   try {
     const res = await fetch('http://localhost:3000/api/rooms')
     return res.ok ? await res.json() : { rooms: [] }
@@ -358,7 +405,7 @@ ipcMain.handle('get-rooms', async () => {
     return { rooms: [] }
   }
 })
-ipcMain.handle('delete-room', async (_event, roomId: string) => {
+handleTrusted('delete-room', async (_event, roomId: string) => {
   try {
     const adminKey = process.env.ROOM_ADMIN_KEY || 'admin-secret-key'
     const res = await fetch(`http://localhost:3000/api/rooms/${roomId}`, {
@@ -370,7 +417,7 @@ ipcMain.handle('delete-room', async (_event, roomId: string) => {
     return { success: false, error: String(e) }
   }
 })
-ipcMain.handle('get-resource-pack-status', async () => {
+handleTrusted('get-resource-pack-status', async () => {
   try {
     const res = await fetch('http://localhost:3000/api/admin/resource-pack')
     if (!res.ok) return { error: `HTTP ${res.status}` }
@@ -379,44 +426,15 @@ ipcMain.handle('get-resource-pack-status', async () => {
     return { error: String(e) }
   }
 })
-ipcMain.handle('upload-resource-pack-data', async (_event, base64Data: string, _fileName: string) => {
+handleTrusted('upload-resource-pack-data', async (_event, base64Data: string, _fileName: string) => {
   try {
+    const maxBase64Length = Math.ceil(RESOURCE_PACK_LIMITS.maxArchiveBytes / 3) * 4 + 4
+    if (typeof base64Data !== 'string' || base64Data.length > maxBase64Length) {
+      throw new Error('Resource-pack compressed archive exceeds the 32 MiB limit')
+    }
     const buffer = Buffer.from(base64Data, 'base64')
-
-    // Verify ZIP signature (PK\x03\x04)
-    if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
-      return { success: false, message: '无效的 ZIP 文件（签名校验失败）' }
-    }
-
-    const userData = getUserData()
-    const destDir = path.join(userData, 'resource-pack')
-    const destPack = path.join(destDir, 'resource-pack.zip')
-    const dataDir = path.join(destDir, 'data')
-    const metaPath = path.join(destDir, 'pack.json')
-
-    fs.mkdirSync(destDir, { recursive: true })
-    fs.writeFileSync(destPack, buffer)
-
-    const { createHash } = require('crypto') as typeof import('crypto')
-    const packMd5 = createHash('sha256').update(buffer).digest('hex')
-
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const AdmZip = require('adm-zip')
-    const zip = new AdmZip(buffer)
-
-    if (fs.existsSync(dataDir)) {
-      fs.rmSync(dataDir, { recursive: true, force: true })
-    }
-    zip.extractAllTo(destDir, true)
-
-    let meta: Record<string, unknown> = {}
-    if (fs.existsSync(metaPath)) {
-      try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) } catch {}
-    }
-    meta = { ...meta, md5: packMd5, importedAt: new Date().toISOString() }
-    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8')
-
-    return { success: true, message: '上传成功', meta }
+    const result = importResourcePackArchive(path.join(getUserData(), 'resource-pack'), buffer)
+    return { success: true, message: '上传成功', meta: result.meta, count: result.count }
   } catch (e) {
     console.error('[electron] upload-resource-pack-data error:', e)
     return { success: false, message: String(e) }

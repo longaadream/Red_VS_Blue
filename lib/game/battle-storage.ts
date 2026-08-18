@@ -27,14 +27,22 @@ export function getBattleStorage(room: any): ServerBattleState | null {
 
 export function withServerSkills(state: unknown): unknown {
   if (!state || typeof state !== 'object') return state
+  const currentState = state as Record<string, unknown>
+  const embeddedSkills = currentState.skillsById && typeof currentState.skillsById === 'object'
+    ? currentState.skillsById as Record<string, unknown>
+    : {}
   return {
-    ...(state as Record<string, unknown>),
-    skillsById: loadAllSkillsById(),
+    ...currentState,
+    skillsById: {
+      ...loadAllSkillsById(),
+      ...embeddedSkills,
+    },
   }
 }
 
 export function withoutServerSkills(state: unknown): unknown {
   if (!state || typeof state !== 'object') return state
-  const { skillsById: _skillsById, ...rest } = state as Record<string, unknown>
+  const rest = { ...(state as Record<string, unknown>) }
+  delete rest.skillsById
   return rest
 }

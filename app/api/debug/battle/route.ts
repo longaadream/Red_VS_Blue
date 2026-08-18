@@ -1,18 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { replayBattle, runBattleAction } from '@/lib/game/battle-runner'
+import { hashStable, replayBattle, runBattleAction } from '@/lib/game/battle-runner'
 import { createDebugDuel } from '@/lib/game/debug-battle'
 import { DebugIdentityProvider } from '@/lib/game/debug-identity'
-import { getRoomStore, type Room } from '@/lib/game/room-store'
+import { alignmentToPieceFaction, getRoomStore, type Room } from '@/lib/game/room-store'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
+import {
+  collectRed43TargetEvidence,
+  getRed43Scenario,
+  prepareRed43State,
+  type Red43ScenarioId,
+} from '@/app/qa/same-alignment/server'
+import { isRed43LocalDevelopmentHostname } from '@/app/qa/same-alignment/access'
 
 type DebugBattleBody =
   | { mode?: 'create-duel'; mapId?: string; seed?: number; first?: unknown; second?: unknown; piecesPerPlayer?: number }
-  | { mode: 'apply-action'; state?: BattleState; action?: BattleAction }
+  | { mode: 'apply-action'; state?: BattleState; action?: BattleAction; seed?: number }
   | { mode: 'replay'; initialState?: BattleState; actions?: BattleAction[]; seed?: number }
   | { mode: 'identities'; labels?: string[] }
   | { mode: 'create-selection-room'; mapId?: string }
   | { mode: 'create-loopback-room'; mapId?: string; seed?: number; first?: unknown; second?: unknown; piecesPerPlayer?: number }
+  | { mode: 'create-ui-acceptance-room'; scenario?: Red43ScenarioId }
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,7 +46,15 @@ export async function GET() {
   return json({
     ok: true,
     service: 'debug-battle',
-    modes: ['create-duel', 'apply-action', 'replay', 'identities', 'create-selection-room', 'create-loopback-room'],
+    modes: [
+      'create-duel',
+      'apply-action',
+      'replay',
+      'identities',
+      'create-selection-room',
+      'create-loopback-room',
+      'create-ui-acceptance-room',
+    ],
   })
 }
 
@@ -64,7 +80,7 @@ export async function POST(req: NextRequest) {
       if (!body.state || !body.action) {
         return json({ error: 'state and action are required' }, { status: 400 })
       }
-      return json(runBattleAction(body.state, body.action))
+      return json(runBattleAction(body.state, body.action, { rootSeed: body.seed }))
     }
 
     if (body.mode === 'replay') {
@@ -83,6 +99,132 @@ export async function POST(req: NextRequest) {
       const labels = body.labels && body.labels.length > 0 ? body.labels : ['red', 'blue']
       const identities = await Promise.all(labels.map(label => provider.createIdentity(label)))
       return json({ identities })
+    }
+
+    if (body.mode === 'create-ui-acceptance-room') {
+      if (!isRed43LocalDevelopmentHostname(req.nextUrl.hostname)) {
+        return json({ error: 'RED-43 QA rooms are available only from local development.' }, { status: 404 })
+      }
+
+      const scenario = getRed43Scenario(body.scenario)
+      if (!scenario) {
+        return json({ error: 'scenario must be light-light or dark-dark' }, { status: 400 })
+      }
+
+      const provider = new DebugIdentityProvider('red-43-ui-acceptance')
+      const [aliceIdentity, bobIdentity] = await Promise.all([
+        provider.createIdentity('alice'),
+        provider.createIdentity('bob'),
+      ])
+      const duel = await createDebugDuel({
+        seed: scenario.seed,
+        first: {
+          playerId: aliceIdentity.playerId,
+          seat: 'red',
+          alignment: scenario.alignment,
+          templateIds: scenario.roster,
+        },
+        second: {
+          playerId: bobIdentity.playerId,
+          seat: 'blue',
+          alignment: scenario.alignment,
+          templateIds: scenario.roster,
+        },
+        piecesPerPlayer: scenario.roster.length,
+      })
+      const state = prepareRed43State(duel.state, aliceIdentity.playerId, scenario)
+      const targetEvidence = collectRed43TargetEvidence(state, aliceIdentity.playerId, scenario)
+      const roomId = `red43-${scenario.alignment}-${Date.now().toString(36)}`
+      const accountId = `red43-local-${Date.now().toString(36)}`
+      const contentFaction = alignmentToPieceFaction(scenario.alignment)!
+      const room: Room = {
+        id: roomId,
+        name: `RED-43 ${scenario.id} UI acceptance`,
+        status: 'in-progress',
+        createdAt: Date.now(),
+        maxPlayers: 2,
+        players: [
+          {
+            id: aliceIdentity.playerId,
+            accountId,
+            name: 'Alice',
+            publicKey: aliceIdentity.publicKey,
+            seat: 'red',
+            faction: 'red',
+            alignment: scenario.alignment,
+            hasSelectedPieces: true,
+            selectedPieces: scenario.roster.map(templateId => ({ templateId, faction: contentFaction })),
+            ready: true,
+          },
+          {
+            id: bobIdentity.playerId,
+            accountId,
+            name: 'Bob',
+            publicKey: bobIdentity.publicKey,
+            seat: 'blue',
+            faction: 'blue',
+            alignment: scenario.alignment,
+            hasSelectedPieces: true,
+            selectedPieces: scenario.roster.map(templateId => ({ templateId, faction: contentFaction })),
+            ready: true,
+          },
+        ],
+        spectators: [],
+        currentTurnIndex: 0,
+        actions: [],
+        hostId: aliceIdentity.playerId,
+        firstPlayerId: aliceIdentity.playerId,
+        mapId: 'large-battlefield',
+        visibility: 'private',
+        battleState: {
+          type: 'server-state',
+          seed: duel.seed,
+          state,
+        } as unknown as BattleState,
+      }
+
+      await getRoomStore().setRoom(roomId, room)
+
+      const origin = req.nextUrl.origin
+      const wsPort = process.env.WS_PORT || '3001'
+      const buildBattleUrl = (player: { playerId: string; name: string }) => {
+        const url = new URL('/qa/client/battle.html', origin)
+        url.searchParams.set('roomId', roomId)
+        url.searchParams.set('playerId', player.playerId)
+        url.searchParams.set('accountId', accountId)
+        url.searchParams.set('playerName', player.name)
+        url.searchParams.set('server', 'local')
+        url.searchParams.set('serverUrl', origin)
+        url.searchParams.set('wsPort', wsPort)
+        url.searchParams.set('debug', '1')
+        url.searchParams.set('qa', 'RED-43')
+        url.searchParams.set('qaScenario', scenario.id)
+        url.searchParams.set('qaAlignment', scenario.alignment)
+        url.searchParams.set('qaCaster', scenario.casterTemplateId)
+        url.searchParams.set('qaSkill', scenario.skillId)
+        url.searchParams.set('qaExpected', scenario.expectedFilter)
+        url.searchParams.set('qaExpectedTargets', targetEvidence.acceptedTargetPieceIds.join(','))
+        return url.toString()
+      }
+      const stateHash = hashStable(state)
+      const evidence = {
+        roomId,
+        seed: duel.seed,
+        stateHash,
+        scenario: scenario.id,
+        alignment: scenario.alignment,
+        players: {
+          alice: { playerId: aliceIdentity.playerId, name: 'Alice' },
+          bob: { playerId: bobIdentity.playerId, name: 'Bob' },
+        },
+        urls: {
+          alice: buildBattleUrl({ playerId: aliceIdentity.playerId, name: 'Alice' }),
+          bob: buildBattleUrl({ playerId: bobIdentity.playerId, name: 'Bob' }),
+        },
+        targetEvidence,
+      }
+      console.info('[RED-43 QA]', JSON.stringify(evidence))
+      return json(evidence)
     }
 
     if (body.mode === 'create-selection-room') {

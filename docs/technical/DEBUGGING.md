@@ -89,6 +89,18 @@ seed:
 6. 确认 `RoomStore.setRoom()` 成功。
 7. 确认 `stateUpdate` 广播并进入 `applyServerState()`。
 
+### 对战页永久停留在“连接战场…”
+
+`battle.html` 的“连接战场…”是脚本执行前的静态初始文案。正常初始化会先把它改成“加载本地资源...”，再连接战场；如果初始文案始终不变，应先检查页面脚本是否解析或执行失败，而不是直接归因于 WebSocket。
+
+先运行战场页源码回归：
+
+```powershell
+npm run test -- tests/electron/battle-page-runtime.test.ts
+```
+
+该测试会解析所有内联脚本、拒绝 CSS 块中的 HTML 节点、检查实际 DOM 的重复 `id`，并确认终止初始化错误会停止加载动画。真实 Windows Electron 冒烟测试还会直接打开缺少 room/player 参数的战场页；预期显示红色错误，且 spinner 为隐藏状态。
+
 ### 状态在 Electron 与 Android 不一致
 
 1. 确认两端连接同一个 roomId 和服务端。
@@ -104,6 +116,15 @@ seed:
 3. 用 `replayBattle()` 执行两次并比较每一步 hash。
 4. 若核心回放一致而 UI 不一致，检查客户端胜负、目标过滤和本地 dry-run。
 5. 若核心回放不一致，检查 RNG 注入、动态效果代码和全局触发器。
+
+### 目标高亮与提交不一致
+
+1. 保存动作草稿、`selectionId`、`stateRevision`、步骤和完整候选数组。
+2. 比较提交时的 `BattleState.targetingRevision`；不同则应稳定返回 `TARGET_SELECTION_STALE`，不得尝试旧候选。
+3. 重复提交或取消已经结束的会话应返回 `TARGET_SELECTION_ALREADY_RESOLVED`；错误 ID 返回 `TARGET_SELECTION_ID_MISMATCH`，两者都不得产生新日志或推进 revision。
+4. 对候选和提交分别记录 source action/card/skill ID、source piece、owner player、filter、range 与目标引用。
+5. 确认 UI/AI 只消费 `prepareAction()` 结果，`skill-targeting.js` 没有执行效果或 reducer。
+6. 在 20x16 fixture 上运行 `tests/game/targeting.test.ts`；预期 320 格扫描、0 次 reducer 执行，且 fixture hash 不变。
 
 ### 新格式存档读取后行为改变
 
@@ -178,3 +199,122 @@ interface GameLogContext {
 长期的端到端加密、密钥恢复、服务端迁移/撤销、规则沙箱和公开回放安全测试应拆分为 High Risk 任务，不作为恢复当前运行基线的前置条件。
 
 每项都应单独建 Linear 任务、独立分支、测试证据和人工批准。
+
+## 11. Windows Electron 同机双客户端验收
+
+网页玩家端已移除。`http://127.0.0.1:3000` 是服务端状态/API 页面，不能用于玩家账号或双玩家验收。Windows 玩家必须使用 Electron 客户端。
+
+开发模式可使用命名 profile 启动两个隔离客户端：
+
+```powershell
+npm run dev:electron:client -- --rvb-dev-profile=player-one
+npm run dev:electron:client -- --rvb-dev-profile=player-two
+```
+
+开发模式的 `rvb-client://app/` 会从 `data/pages/` 提供页面，并把允许的
+`data/**/*.json` 请求映射到仓库 `data/`；页面内不存在的允许图片会从 `public/`
+回退读取。进入棋子选择页前可在 DevTools 执行
+`fetch('./data/pieces/manifest.json').then(r => ({ status: r.status, url: r.url }))`；
+预期 `status` 为 `200`。资源包中的同名文件仍优先于仓库内置数据，打包客户端仍只读取
+候选包内的 `app/www`。
+
+两个命令应在不同终端运行。profile 名称只允许 1–32 个 ASCII 字母、数字、连字符或下划线，且必须以字母或数字开头。每个 profile 的 `userData`、Chromium localStorage、身份与单实例锁均位于默认 `userData/dev-profiles/<profile>` 下：不同 profile 可同时运行，同一 profile 仍保持单实例。
+
+开发版 Electron 直接读取 `data/pages/`，无需先把玩家页面同步到 Android 生成目录。打包客户端仍读取构建流程生成并装入安装包的 `app/www`。
+
+人工验收顺序：
+
+1. 在两个客户端分别打开玩家首页；确认不是服务端状态页。
+2. 在开发者工具执行 `({ secureContext: window.isSecureContext, hasSubtleCrypto: !!window.crypto?.subtle })`，两项都应为 `true`。
+3. 两端分别设置不同玩家名称，右上角应立即显示名称。
+4. 关闭并用相同 profile 重启，名称应保留；两个 profile 的名称与身份 ID 应不同。
+5. 两端连接同一个 Windows 服务端，完成建房、加入与进入对局。
+6. 不带 profile 参数重复启动客户端时，第二个实例应退出并聚焦第一个实例。
+
+`--rvb-dev-profile` 仅允许源码开发模式使用。打包客户端传入该参数会拒绝启动，正式 `userData` 和默认单实例行为不会改变。账号初始化失败时，首页右上角显示“账号错误”；点击后可在账号面板查看错误，并在开发者工具中查找带 `[identity]` 前缀的日志。
+
+### Windows 源码工作树验收前置检查与 AI 引导护栏
+
+本次人工引导暴露了以下错误操作，后续 AI 不得重复：
+
+- 未先确认 Windows PowerShell 的命令解析方式，直接提供了可能命中受限 `npm.ps1` 的 `npm` 命令。
+- 未先执行 worktree 环境预检或检查本地依赖，就要求启动 Electron，导致缺少 `node_modules` 后才补救。
+- 未先确认 Electron 服务端要求 Next.js standalone 产物，就要求启动服务端，导致缺少 `.next/standalone/server.js` 后才补救。
+- 未在调用调试房间 API 前确认本地数据库 migration 状态，导致请求进入缺少 `Room` 表的数据库。
+- 建议执行 Prisma migration 时没有同时给出 Electron 实际数据库的会话级 `DATABASE_URL`，导致 Prisma CLI 再次失败。
+- 后续只要求“重新创建 `$red73Room`”，没有重新提供变量定义和完整请求，使人工必须猜测上一段上下文。
+- 在给出下一条命令前没有先读取预检输出、仓库脚本和实际运行路径，形成了报错后逐项猜测的低效引导。
+
+在独立 Git worktree 中进行 Electron 人工验收时，必须先完成下面的前置检查，再让人工启动窗口或调用调试 API。不得根据报错逐项猜测环境，也不得省略变量的完整定义后只要求人工“重试上一条命令”。
+
+本流程在 Windows PowerShell 中统一调用 `npm.cmd` 和 `npx.cmd`。不要直接调用 `npm` 或 `npx`，因为 PowerShell 可能优先解析到被执行策略禁止的 `npm.ps1` 或 `npx.ps1`。不得为了运行 npm 建议修改系统级 ExecutionPolicy。
+
+从一个全新的源码 worktree 开始时，按以下顺序执行：
+
+```powershell
+Set-Location 'C:\path\to\worktree'
+
+# 1. 每个 worktree 必须安装自己的本地依赖。
+npm.cmd ci --foreground-scripts
+
+# 2. Electron 服务端预检要求 Next.js standalone 产物存在。
+npm.cmd run build
+
+# 3. 开发版 Electron 服务端使用当前 worktree 的 prisma/dev.db。
+#    Prisma CLI 不会自动获得 Electron 子进程设置的 DATABASE_URL，
+#    因此 migration 前必须在当前 PowerShell 会话显式设置同一路径。
+$qaPrismaDir = (Resolve-Path '.\prisma').Path
+$env:DATABASE_URL = 'file:' + ((Join-Path $qaPrismaDir 'dev.db') -replace '\\', '/')
+npx.cmd prisma migrate deploy
+
+# 4. migration 成功后再启动服务端和两个隔离客户端。
+npm.cmd run dev:electron:server
+npm.cmd run dev:electron:client -- --rvb-dev-profile=player-one
+npm.cmd run dev:electron:client -- --rvb-dev-profile=player-two
+```
+
+服务端和两个客户端命令必须分别在独立终端运行。`npm audit` 报告不属于功能验收前置条件；不得在任务未授权依赖升级时执行 `npm audit fix --force`。
+
+创建固定种子的双客户端调试房间时，必须提供完整、可复制的命令，不能假设调用者仍保留上一个终端会话中的变量：
+
+```powershell
+$qaRoomBody = @{
+  mode = 'create-loopback-room'
+  seed = 2173765951
+  first = @{
+    alignment = 'dark'
+    templateIds = @('kiljaedan')
+  }
+  second = @{
+    alignment = 'light'
+  }
+  piecesPerPlayer = 8
+} | ConvertTo-Json -Depth 5
+
+$qaRoom = Invoke-RestMethod `
+  -Method Post `
+  -Uri 'http://127.0.0.1:3000/api/debug/battle' `
+  -ContentType 'application/json' `
+  -Body $qaRoomBody
+
+$qaRoom | Select-Object roomId, seed, stateHash
+$qaRoom.urls
+```
+
+如果 API 返回 HTTP 500，应先读取响应体和服务端堆栈，不得直接建议重建、删除数据库或改动 schema。常见的 `The table main.Room does not exist` 表示 migration 尚未应用到 Electron 实际使用的 `prisma/dev.db`；应停止服务端、设置上面的会话级 `DATABASE_URL`、执行 `prisma migrate deploy`，然后重启。
+
+如果 `prisma migrate status` 显示已是最新，但运行时代码仍报告 P2022、缺少当前 `schema.prisma` 已声明的列，说明仓库 migration 历史落后于 schema。仅对可丢弃的本地开发数据库，可以在停止服务端并确认路径后执行 `npx.cmd prisma db push`；不得把这一做法用于生产或持久数据，也不得未经明确批准添加 `--force-reset` 或 `--accept-data-loss`。同时应记录缺失 migration 的基线问题，不能把 schema drift 误判为当前功能修改引入。
+
+本次 RED-73 人工验收实际遇到的 `Room.spectators` 缺列即属于上述基线 drift；只同步本地 QA 数据库，不修改仓库 schema 或 migration 文件。
+
+## 大厅重新加入入口验证（RED-58）
+
+Windows Electron 大厅只会在本地 `rvb_active_battle` 结构完整、服务端房间仍处于对战状态，且保存的玩家仍属于该房间时显示“重新加入”。可按以下步骤复验：
+
+1. 无记录：在大厅开发者工具执行 `localStorage.removeItem('rvb_active_battle')` 后刷新；预期不显示重新加入横幅。
+2. 有效记录：进入一场真实对局并返回大厅，保留该对局写入的 `roomId`、`playerId` 和 `playerName`；预期横幅显示，点击后进入对应 `battle.html`。
+3. 失效记录：结束或删除服务端房间后再次打开大厅；预期横幅不显示，本地记录被清理，并在页面状态提示和控制台 `[lobby:rejoin]` 日志中说明记录已失效。
+4. 损坏记录：执行 `localStorage.setItem('rvb_active_battle', '{broken')` 后刷新；预期记录被清理、横幅隐藏，并显示“保存的对局信息无效”。
+5. 空状态点击：在开发者工具执行 `rejoinBattle()`；预期显示“没有可重新加入的对局”，不得静默无响应。
+
+如果服务器暂时不可达，入口保持隐藏并显示验证失败原因，但不清理本地记录；恢复连接后刷新大厅重新验证。

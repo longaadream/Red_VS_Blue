@@ -5,6 +5,7 @@
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
+import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 
 export type TurnPhase = "start" | "action" | "end"
 
@@ -67,6 +68,32 @@ export interface BattleActionLog {
   }
 }
 
+export interface DeploymentPosition {
+  x: number
+  y: number
+}
+
+export interface DeploymentChoice {
+  pieceId: string | null
+}
+
+export interface DeploymentLock {
+  locked: boolean
+  reason?: 'player' | 'timeout'
+}
+
+export interface DeploymentState {
+  status: 'awaiting-locks' | 'complete'
+  playerIds: PlayerId[]
+  choices: Record<PlayerId, DeploymentChoice>
+  locks: Record<PlayerId, DeploymentLock>
+  startedAt: number
+  deadlineAt: number
+  revision: number
+  initialPositions: Record<string, DeploymentPosition>
+  finalPositions?: Record<string, DeploymentPosition>
+}
+
 export interface BattleState {
   map: BoardMap
   pieces: PieceInstance[]
@@ -79,6 +106,8 @@ export interface BattleState {
   /** 两个玩家的资源状态（充能点等） */
   players: PlayerTurnMeta[]
   turn: TurnState
+  /** RED-29 同时部署状态；完成前普通战斗命令均被拒绝。 */
+  deployment?: DeploymentState
   /** 战斗日志 */
   actions?: BattleActionLog[]
   /** 毒素列表 - 存放黑百合等技能放置的毒素 */
@@ -104,10 +133,37 @@ export interface BattleState {
     targetType?: 'grid'
     range?: number
   }
+  /** RED-59 authoritative selection protocol revision. */
+  targetingRevision?: number
+  /** Versioned target session created by an interrupted rule/effect. */
+  pendingTargetSelection?: PendingTargetSelectionSession
+}
+
+type TargetedActionFields = TargetSelectionCredential & {
+  targetX?: number
+  targetY?: number
+  targetPieceId?: string
+  extraTargets?: Array<{ pieceId?: string; x?: number; y?: number }>
 }
 
 export type BattleAction =
   | { type: "beginPhase" } // 用于从 start -> action 或 end -> 下个回合的 start
+  | {
+      type: "deploymentChoice"
+      playerId: PlayerId
+      pieceId?: string | null
+      clientActionId?: string
+    }
+  | {
+      type: "deploymentLock"
+      playerId: PlayerId
+      clientActionId?: string
+    }
+  | {
+      type: "deploymentTimeout"
+      now: number
+      clientActionId?: string
+    }
   | {
       type: "move"
       playerId: PlayerId
@@ -115,29 +171,23 @@ export type BattleAction =
       toX: number
       toY: number
     }
-  | {
+  | ({
       type: "useBasicSkill"
       playerId: PlayerId
       pieceId: string
       skillId: string
-      targetX?: number
-      targetY?: number
-      targetPieceId?: string
       /** 用户通过选项选择器选择的值 */
       selectedOption?: any
-    }
-  | {
+    } & TargetedActionFields)
+  | ({
       type: "useChargeSkill"
       playerId: PlayerId
       pieceId: string
       skillId: string
-      targetX?: number
-      targetY?: number
-      targetPieceId?: string
       /** 用户通过选项选择器选择的值 */
       selectedOption?: any
-    }
-  | {
+    } & TargetedActionFields)
+  | ({
       type: "endTurn"
       playerId: PlayerId
     }
@@ -155,11 +205,8 @@ export type BattleAction =
       playerId: PlayerId
       /** 要打出的手牌实例 ID */
       cardInstanceId: string
-      targetPieceId?: string
-      targetX?: number
-      targetY?: number
       selectedOption?: any
-    }
+    } & TargetedActionFields)
   | {
       type: "beginTurnChoice"
       playerId: PlayerId

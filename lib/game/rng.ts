@@ -1,20 +1,26 @@
-let _rng: () => number = Math.random.bind(Math)
+import {
+  RANDOM_STREAM_NAMES,
+  getActiveRuleRuntime,
+  mulberry32,
+} from './rule-runtime'
+
+// RED-28 migration adapter. Authoritative rule runners install RuleRuntime;
+// legacy/non-authoritative callers keep the previous injectable local source.
+let legacyRng: () => number = Math.random.bind(Math)
 
 export function setRng(fn: () => number): void {
-  _rng = fn
+  legacyRng = fn
+}
+
+export function getRng(): () => number {
+  return legacyRng
 }
 
 export function rng(): number {
-  return _rng()
+  const runtime = getActiveRuleRuntime()
+  return runtime
+    ? runtime.nextRandom(RANDOM_STREAM_NAMES.skillEffect)
+    : legacyRng()
 }
 
-/** Mulberry32 — fast 32-bit seeded PRNG, no dependencies */
-export function mulberry32(seed: number): () => number {
-  let s = seed >>> 0
-  return (): number => {
-    s = (s + 0x6D2B79F5) >>> 0
-    let t = Math.imul(s ^ (s >>> 15), 1 | s)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
+export { mulberry32 }

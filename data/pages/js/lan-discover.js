@@ -17,25 +17,41 @@
   // 不依赖 Electron bridge 时扫描的默认子网
   const DEFAULT_SUBNETS = ['192.168.1', '192.168.0', '192.168.2', '10.0.0']
 
-  // ── 单 IP 探测 ─────────────────────────────────────────────────────────────────
-  async function probeOne(ip, port) {
+  function validPort(value) {
+    const port = Number(value)
+    return Number.isInteger(port) && port > 0 && port <= 65535 ? port : null
+  }
+
+  function resolveWsPort(server) {
+    const explicit = validPort(server && server.wsPort)
+    if (explicit) return explicit
+    const httpPort = validPort(server && server.port)
+    return httpPort === 3000 ? 3001 : (httpPort || 3001)
+  }
+
+  async function fetchJson(url) {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS)
     try {
-      const res = await fetch('http://' + ip + ':' + port + '/api/ping', {
-        signal: ctrl.signal,
-        cache: 'no-store',
-      })
-      clearTimeout(timer)
-      if (!res.ok) return null
-      const data = await res.json()
-      if (data && data.name === 'RED vs BLUE Server') {
-        return { url: 'http://' + ip + ':' + port, ip, port }
-      }
+      const response = await fetch(url, { signal: ctrl.signal, cache: 'no-store' })
+      if (!response.ok) return null
+      return await response.json()
     } catch {
+      return null
+    } finally {
       clearTimeout(timer)
     }
-    return null
+  }
+
+  // ── 单 IP 探测 ─────────────────────────────────────────────────────────────────
+  async function probeOne(ip, port) {
+    const url = 'http://' + ip + ':' + port
+    const ping = await fetchJson(url + '/api/ping')
+    if (!ping || ping.name !== 'RED vs BLUE Server') return null
+
+    const wsInfo = await fetchJson(url + '/api/ws-info')
+    const server = { url, ip, port, wsPort: wsInfo && wsInfo.wsPort }
+    return { url, ip, port, wsPort: resolveWsPort(server) }
   }
 
   // ── 批量并发扫描 ───────────────────────────────────────────────────────────────
@@ -133,5 +149,5 @@
   }
 
   // ── 导出到全局 ────────────────────────────────────────────────────────────────
-  window.RvBLanDiscover = { startLanScan }
+  window.RvBLanDiscover = { startLanScan, resolveWsPort }
 })()

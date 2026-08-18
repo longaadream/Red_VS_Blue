@@ -1,24 +1,60 @@
-import { app, BrowserWindow, ipcMain, session } from 'electron'
+import { app, BrowserWindow, ipcMain, net as electronNet, protocol, session } from 'electron'
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as zlib from 'zlib'
 import * as os from 'os'
-import * as net from 'net'
+import * as nodeNet from 'net'
 import * as dgram from 'dgram'
 import * as http from 'http'
+import { pathToFileURL } from 'url'
+import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
+import { resolveDevelopmentProfile } from './development-profile'
+import { resolveClientProtocolFile } from './client-protocol-resource'
+import {
+  RESOURCE_PACK_LIMITS,
+  clearActiveResourcePack,
+  getActiveResourcePackMeta,
+  importResourcePackArchive,
+  importResourcePackFromPath,
+  isActivatableResourcePackPath,
+  listActiveResourcePackFiles,
+  resolveActiveResourcePackRoot,
+} from './resource-pack-store'
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 const LOCAL_PORT_HINT = 38521  // 首选端口，被占用时自动递增（避开 54300-54400 被 QMUpload 占用的范围）
 let actualLocalPort = LOCAL_PORT_HINT  // 实际绑定成功的端口
 let actualWsPort = 3001
+const CLIENT_SCHEME = 'rvb-client'
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: CLIENT_SCHEME,
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+}])
+
+// Development-only named profiles isolate Chromium storage, local identity,
+// client configuration, and the ProcessSingleton lock. Electron keys
+// requestSingleInstanceLock() by the current userData path, so this must run
+// before the existing lock is requested.
+const developmentProfile = resolveDevelopmentProfile(
+  process.argv,
+  app.isPackaged,
+  app.getPath('userData'),
+)
+if (developmentProfile) {
+  fs.mkdirSync(developmentProfile.userDataPath, { recursive: true })
+  app.setPath('userData', developmentProfile.userDataPath)
+  app.setPath('sessionData', developmentProfile.userDataPath)
+  console.info(`[client] Development profile "${developmentProfile.name}" uses isolated userData: ${developmentProfile.userDataPath}`)
+}
 
 function findFreePort(start: number): Promise<number> {
   return new Promise((resolve) => {
-    const srv = net.createServer()
+    const srv = nodeNet.createServer()
     srv.listen(start, '127.0.0.1', () => {
-      const port = (srv.address() as net.AddressInfo).port
+      const port = (srv.address() as nodeNet.AddressInfo).port
       srv.close(() => resolve(port))
     })
     srv.on('error', () => resolve(findFreePort(start + 1)))
@@ -38,7 +74,7 @@ function getAppRoot(): string {
 function getHtmlRoot(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'www')
-    : path.join(__dirname, '../../android-client/www')
+    : path.join(__dirname, '../../data/pages')
 }
 
 function getUserData(): string {
@@ -46,16 +82,64 @@ function getUserData(): string {
 }
 
 function getPackRoot(): string {
-  if (app.isPackaged) {
-    // 打包模式：资源包放在 resources/app/resource-pack，与 data 同级
-    return path.join(process.resourcesPath, 'app', 'resource-pack')
-  }
-  // 开发模式：放在项目根目录下
-  return path.join(getAppRoot(), 'resource-pack')
+  return path.join(getUserData(), 'resource-pack')
 }
 
 function getConfigPath(): string {
   return path.join(getUserData(), 'rvb-client-config.json')
+}
+
+function restrictWindowNavigation(win: BrowserWindow, isAllowed: (rawUrl: string) => boolean): void {
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowed(url)) event.preventDefault()
+  })
+  win.webContents.on('will-frame-navigate', (details) => {
+    if (!details.isMainFrame || !isAllowed(details.url)) details.preventDefault()
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+}
+
+function getAdminRoot(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'electron-client', 'admin')
+    : path.join(__dirname, '../../electron-client/admin')
+}
+
+function getConnectRoot(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'electron-client', 'connect')
+    : path.join(__dirname, '../../electron-client/connect')
+}
+
+function isGameClientUrl(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl)
+    return url.protocol === `${CLIENT_SCHEME}:` && url.hostname === 'app'
+  } catch {
+    return false
+  }
+}
+
+type ClientWindowRole = 'game' | 'admin' | 'connect'
+
+function trustedTargets(roles: readonly ClientWindowRole[]) {
+  const targets = {
+    game: { role: 'game', window: mainWin, allowUrl: isGameClientUrl },
+    admin: { role: 'admin', window: adminWin, allowUrl: (url: string) => isFileUrlWithinRoot(url, getAdminRoot()) },
+    connect: { role: 'connect', window: connectWin, allowUrl: (url: string) => isFileUrlWithinRoot(url, getConnectRoot()) },
+  }
+  return roles.map((role) => targets[role])
+}
+
+function handleTrusted(
+  channel: string,
+  roles: readonly ClientWindowRole[],
+  listener: Parameters<typeof ipcMain.handle>[1],
+): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedIpcSender(event, channel, trustedTargets(roles))
+    return listener(event, ...args)
+  })
 }
 
 function getOnlineServerUrl(): string | null {
@@ -117,8 +201,8 @@ let lastServerExitCode: number | null = null
 let lastServerStderr = ''
 let actualBackendPort = 0
 
-function proxyUpgrade(req: http.IncomingMessage, socket: net.Socket, head: Buffer, targetPort: number, targetPath?: string): void {
-  const target = net.connect(targetPort, '127.0.0.1')
+function proxyUpgrade(req: http.IncomingMessage, socket: nodeNet.Socket, head: Buffer, targetPort: number, targetPath?: string): void {
+  const target = nodeNet.connect(targetPort, '127.0.0.1')
   let settled = false
   target.on('connect', () => {
     settled = true
@@ -162,7 +246,7 @@ function startPublicGateway(publicPort: number, backendPort: number, wsPort: num
   gatewayServer.on('upgrade', (req, socket, head) => {
     const url = String(req.url || '')
     const isPublicWs = url === '/ws' || url === '/ws/' || url.startsWith('/ws/rooms')
-    proxyUpgrade(req, socket as net.Socket, head, isPublicWs ? wsPort : backendPort, isPublicWs ? '/' : undefined)
+    proxyUpgrade(req, socket as nodeNet.Socket, head, isPublicWs ? wsPort : backendPort, isPublicWs ? '/' : undefined)
   })
   return new Promise((resolve, reject) => {
     const onError = (err: Error) => {
@@ -383,112 +467,73 @@ async function startLocalServer(): Promise<void> {
 
 // ─── 资源包管理（Electron IPC，替代 Android 端的 Service Worker 方案）────────
 
-/** 资源包直接写入 htmlRoot，无需 protocol 拦截 — 此函数保留为空壳供将来扩展 */
-function setupPackProtocol(): void {
-  // Direct-write approach: pack files are written straight into getHtmlRoot()
-  // on import, so no file:// interception is needed.
+async function setupPackProtocol(): Promise<void> {
+  await session.defaultSession.protocol.handle(CLIENT_SCHEME, async (request) => {
+    try {
+      const requestUrl = new URL(request.url)
+      if (requestUrl.hostname !== 'app') return new Response('Not found', { status: 404 })
+      const decodedPath = decodeURIComponent(requestUrl.pathname)
+      if (decodedPath.includes('\\') || decodedPath.includes('\0')) return new Response('Not found', { status: 404 })
+      const segments = decodedPath.replace(/^\/+/, '').split('/')
+      if (segments.length === 0 || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+        return new Response('Not found', { status: 404 })
+      }
+      const relativePath = segments.join('/')
+      const target = resolveClientProtocolFile({
+        relativePath,
+        htmlRoot: getHtmlRoot(),
+        appRoot: getAppRoot(),
+        activePackRoot: isActivatableResourcePackPath(relativePath)
+          ? resolveActiveResourcePackRoot(getPackRoot())
+          : null,
+        isPackaged: app.isPackaged,
+      })
+      if (!target) return new Response('Not found', { status: 404 })
+      return electronNet.fetch(pathToFileURL(target).toString())
+    } catch {
+      return new Response('Not found', { status: 404 })
+    }
+  })
 }
 
-function shouldSkipProtectedPackFile(relPath: string): boolean {
-  const rel = relPath.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase()
-  return rel === 'pack.html'
-    || rel === 'data/pages/pack.html'
-    || rel === 'js/pack-fetch.js'
-}
-
-/** IPC: 收到 ZIP 文件路径，直接解压到 htmlRoot 目录（覆盖同名文件）*/
-ipcMain.handle('pack-import-from-path', async (_e, zipPath: string) => {
-  const htmlRoot = getHtmlRoot()
-  fs.mkdirSync(htmlRoot, { recursive: true })
-
+/** IPC: import one complete archive into an isolated immutable version. */
+handleTrusted('pack-import-from-path', ['game'], async (_e, zipPath: string) => {
   try {
-    // 使用 adm-zip 库解压（更可靠）
-    const AdmZip = require('adm-zip')
-    const zip = new AdmZip(zipPath)
-    const zipEntries = zip.getEntries()
-    let count = 0
-    const resolvedHtmlRoot = path.resolve(htmlRoot)
-
-    // 先从 ZIP 读取 pack.json 元数据
-    let meta: Record<string, unknown> = {}
-    const packJsonEntry = zip.getEntry('pack.json')
-    if (packJsonEntry) {
-      try {
-        meta = JSON.parse(packJsonEntry.getData().toString('utf-8'))
-      } catch (e) {
-        console.error('[pack-import] Failed to parse pack.json:', e)
-      }
-    }
-
-    for (const entry of zipEntries) {
-      if (entry.isDirectory) continue
-
-      const entryName = entry.entryName
-      // 跳过 resource-pack 根目录，直接解压其内容
-      const rel = entryName.replace(/^resource-pack\//, '').replace(/^\/+/, '')
-      // 跳过元数据文件，不写入 www 目录
-      if (!rel || rel === 'pack.json') continue
-      if (shouldSkipProtectedPackFile(rel)) continue
-
-      const dest = path.join(htmlRoot, rel)
-
-      // 安全检查：防止路径穿越
-      if (!path.resolve(dest).startsWith(resolvedHtmlRoot)) {
-        console.warn('[pack-import] Skipping unsafe path:', entryName)
-        continue
-      }
-
-      fs.mkdirSync(path.dirname(dest), { recursive: true })
-      zip.extractEntryTo(entry, path.dirname(dest), false, true)
-      count++
-    }
-
-    console.log(`[pack-import] Extracted ${count} files to ${htmlRoot}`)
-    return { ok: true, count, meta }
+    const result = importResourcePackFromPath(getPackRoot(), zipPath)
+    return { ok: true, count: result.count, meta: result.meta }
   } catch (e) {
     console.error('[pack-import] Failed:', e)
     return { ok: false, error: String(e) }
   }
 })
 
-/** IPC: 将解压好的资源包文件直接写入 htmlRoot（备用：URL 下载等无本地路径场景）*/
-ipcMain.handle('pack-write-files', async (_e, files: { path: string; content: string }[]) => {
-  const htmlRoot = getHtmlRoot()
-  const resolvedHtmlRoot = path.resolve(htmlRoot)
-  let count = 0
-  for (const { path: filePath, content } of files) {
-    const rel = filePath.startsWith('/') ? filePath.slice(1) : filePath
-    if (!rel || rel === 'pack.json' || shouldSkipProtectedPackFile(rel)) continue
-    const dest = path.join(htmlRoot, rel)
-    if (!path.resolve(dest).startsWith(resolvedHtmlRoot)) continue
-    fs.mkdirSync(path.dirname(dest), { recursive: true })
-    fs.writeFileSync(dest, Buffer.from(content, 'base64'))
-    count++
+handleTrusted('pack-import-data', ['game'], async (_e, base64Data: string) => {
+  try {
+    const maxBase64Length = Math.ceil(RESOURCE_PACK_LIMITS.maxArchiveBytes / 3) * 4 + 4
+    if (typeof base64Data !== 'string' || base64Data.length > maxBase64Length) {
+      throw new Error('Resource-pack compressed archive exceeds the 32 MiB limit')
+    }
+    const result = importResourcePackArchive(getPackRoot(), Buffer.from(base64Data, 'base64'))
+    return { ok: true, count: result.count, meta: result.meta }
+  } catch (e) {
+    console.error('[pack-import] Failed:', e)
+    return { ok: false, error: String(e) }
   }
-  return { ok: true, count }
 })
 
-/** IPC: 清除整个资源包 */
-ipcMain.handle('pack-clear', async () => {
-  const packRoot = getPackRoot()
-  if (fs.existsSync(packRoot)) fs.rmSync(packRoot, { recursive: true, force: true })
+/** IPC: reset activation to built-in assets while retaining immutable versions. */
+handleTrusted('pack-clear', ['game'], async () => {
+  clearActiveResourcePack(getPackRoot())
   return { ok: true }
 })
 
 /** IPC: 列出当前资源包中的所有文件路径 */
-ipcMain.handle('pack-list', async () => {
-  const packRoot = getPackRoot()
-  const files: string[] = []
-  function walk(dir: string) {
-    if (!fs.existsSync(dir)) return
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name)
-      if (entry.isDirectory()) walk(full)
-      else files.push('/' + path.relative(packRoot, full).replace(/\\/g, '/'))
-    }
+handleTrusted('pack-list', ['game'], async () => {
+  return {
+    ok: true,
+    files: listActiveResourcePackFiles(getPackRoot()),
+    meta: getActiveResourcePackMeta(getPackRoot()),
   }
-  walk(packRoot)
-  return { ok: true, files }
 })
 
 // ─── 游戏窗口 ─────────────────────────────────────────────────────────────────
@@ -507,10 +552,12 @@ function createGameWindow(): BrowserWindow {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
 
+  restrictWindowNavigation(win, isGameClientUrl)
   win.setMenuBarVisibility(false)
 
   win.webContents.on('before-input-event', (_event, input) => {
@@ -538,12 +585,12 @@ function openAdminWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
-  const adminPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'app', 'electron-client', 'admin', 'index.html')
-    : path.join(__dirname, '../../electron-client/admin/index.html')
+  const adminPath = path.join(getAdminRoot(), 'index.html')
+  restrictWindowNavigation(win, (url) => isFileUrlWithinRoot(url, getAdminRoot()))
   win.loadURL(`file:///${adminPath.replace(/\\/g, '/')}?v=${Date.now()}`)
   adminWin = win
   win.on('closed', () => { adminWin = null })
@@ -551,9 +598,7 @@ function openAdminWindow(): void {
 
 function loadLocalGame(): void {
   const win = createGameWindow()
-  // loadURL with cache-busting param to prevent Chromium from serving stale file:// cache
-  const indexPath = path.join(getHtmlRoot(), 'index.html').replace(/\\/g, '/')
-  win.loadURL(`file:///${indexPath}?v=${Date.now()}`)
+  win.loadURL(`${CLIENT_SCHEME}://app/index.html?v=${Date.now()}`)
 
   // 仅当本地服务器实际启动后，才注入默认服务器 URL（once：只注入一次，不影响后续页面导航）
   win.webContents.once('did-finish-load', () => {
@@ -579,8 +624,7 @@ function loadLocalGame(): void {
 
 function loadOnlineGame(serverUrl: string): void {
   const win = createGameWindow()
-  const indexPath = path.join(getHtmlRoot(), 'index.html').replace(/\\/g, '/')
-  win.loadURL(`file:///${indexPath}?v=${Date.now()}`)
+  win.loadURL(`${CLIENT_SCHEME}://app/index.html?v=${Date.now()}`)
 
   // once：只在首次加载 index.html 时注入，不覆盖用户后续切换 LAN/本机模式时的地址
   win.webContents.once('did-finish-load', () => {
@@ -617,12 +661,12 @@ function openConnectWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
-  const connectPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'app', 'electron-client', 'connect', 'index.html')
-    : path.join(__dirname, '../../electron-client/connect/index.html')
+  const connectPath = path.join(getConnectRoot(), 'index.html')
+  restrictWindowNavigation(win, (url) => isFileUrlWithinRoot(url, getConnectRoot()))
   win.loadURL(`file:///${connectPath.replace(/\\/g, '/')}?v=${Date.now()}`)
   connectWin = win
   win.on('closed', () => { connectWin = null })
@@ -631,15 +675,15 @@ function openConnectWindow(): void {
 // ─── IPC ─────────────────────────────────────────────────────────────────────
 
 // 读取已保存的远程服务器地址（UI 初始化时调用）
-ipcMain.handle('get-remote-url', () => getOnlineServerUrl())
+handleTrusted('get-remote-url', ['connect'], () => getOnlineServerUrl())
 
 // 保存远程服务器地址（连接成功后调用，不跳转页面）
-ipcMain.handle('set-remote-url', (_e, url: string) => {
+handleTrusted('set-remote-url', ['connect', 'game'], (_e, url: string) => {
   saveOnlineServerUrl(url)
 })
 
 // 连接服务器并在新窗口中打开游戏
-ipcMain.handle('connect-server', async (_e, url: string) => {
+handleTrusted('connect-server', ['connect'], async (_e, url: string) => {
   saveOnlineServerUrl(url)
   // 关闭连接窗口，打开游戏窗口
   if (connectWin && !connectWin.isDestroyed()) {
@@ -651,16 +695,16 @@ ipcMain.handle('connect-server', async (_e, url: string) => {
 })
 
 // 清除远程服务器地址
-ipcMain.handle('clear-remote-url', () => {
+handleTrusted('clear-remote-url', ['connect', 'game'], () => {
   clearOnlineServerUrl()
 })
 
 // 返回离线模式
-ipcMain.handle('go-offline', () => {
+handleTrusted('go-offline', ['connect', 'game'], () => {
   clearOnlineServerUrl()
 })
 
-ipcMain.handle('open-local-game', async () => {
+handleTrusted('open-local-game', ['connect'], async () => {
   clearOnlineServerUrl()
   await startLocalServer()
   if (!localServerReady) {
@@ -679,7 +723,7 @@ ipcMain.handle('open-local-game', async () => {
 })
 
 // 查询当前模式
-ipcMain.handle('get-mode', () => ({
+handleTrusted('get-mode', ['game'], () => ({
   isLocal: localServerReady,
   localUrl: `http://localhost:${actualLocalPort}`,
   wsPort: actualLocalPort,
@@ -687,7 +731,7 @@ ipcMain.handle('get-mode', () => ({
 }))
 
 // 重启本地服务器
-ipcMain.handle('restart-server', async () => {
+handleTrusted('restart-server', ['admin'], async () => {
   killServer()
   await new Promise(resolve => setTimeout(resolve, 1000))
   await startLocalServer()
@@ -695,7 +739,7 @@ ipcMain.handle('restart-server', async () => {
 })
 
 // 获取本机局域网 IPv4 地址列表（供 LAN 扫描定位子网）
-ipcMain.handle('get-lan-ips', () => {
+handleTrusted('get-lan-ips', ['game'], () => {
   const ips: string[] = []
   for (const ifaces of Object.values(os.networkInterfaces())) {
     for (const iface of ifaces ?? []) {
@@ -706,7 +750,7 @@ ipcMain.handle('get-lan-ips', () => {
 })
 
 // 获取主机信息（端口 + LAN IP 列表），供"我当主机"功能使用
-ipcMain.handle('get-host-info', () => {
+handleTrusted('get-host-info', ['game'], () => {
   const ips: string[] = []
   for (const ifaces of Object.values(os.networkInterfaces())) {
     for (const iface of ifaces ?? []) {
@@ -733,7 +777,7 @@ function getLanIpList(): string[] {
 let broadcastSocket: dgram.Socket | null = null
 let broadcastTimer: NodeJS.Timeout | null = null
 
-ipcMain.handle('start-host-broadcast', () => {
+handleTrusted('start-host-broadcast', ['game'], () => {
   // 停掉旧的
   if (broadcastTimer) { clearInterval(broadcastTimer); broadcastTimer = null }
   if (broadcastSocket) { try { broadcastSocket.close() } catch {} broadcastSocket = null }
@@ -764,17 +808,16 @@ ipcMain.handle('start-host-broadcast', () => {
   return { ok: true }
 })
 
-ipcMain.handle('stop-host-broadcast', () => {
+handleTrusted('stop-host-broadcast', ['game'], () => {
   if (broadcastTimer) { clearInterval(broadcastTimer); broadcastTimer = null }
   if (broadcastSocket) { try { broadcastSocket.close() } catch {} broadcastSocket = null }
   return { ok: true }
 })
 
 // 发现主机：监听 UDP 广播 timeoutMs 毫秒，通过 webContents.send 推送结果
-ipcMain.handle('start-discover-hosts', (_e, timeoutMs: number) => {
+handleTrusted('start-discover-hosts', ['game'], (event, timeoutMs: number) => {
   const timeout = timeoutMs > 0 ? timeoutMs : 3000
-  const win = BrowserWindow.getAllWindows()[0]
-  if (!win) return { ok: false }
+  const sender = event.sender
 
   const seen = new Set<string>()
   let sock: dgram.Socket | null = null
@@ -790,7 +833,7 @@ ipcMain.handle('start-discover-hosts', (_e, timeoutMs: number) => {
         const key = info.ip + ':' + info.port
         if (seen.has(key)) return
         seen.add(key)
-        if (!win.isDestroyed()) win.webContents.send('udp-host-found', info)
+        if (!sender.isDestroyed()) sender.send('udp-host-found', info)
       } catch {}
     })
     sock.on('error', () => { try { sock!.close() } catch {} })
@@ -798,14 +841,14 @@ ipcMain.handle('start-discover-hosts', (_e, timeoutMs: number) => {
 
   setTimeout(() => {
     try { sock!.close() } catch {}
-    if (!win.isDestroyed()) win.webContents.send('udp-discovery-done')
+    if (!sender.isDestroyed()) sender.send('udp-discovery-done')
   }, timeout)
 
   return { ok: true }
 })
 
 // 资源包状态
-ipcMain.handle('get-resource-pack-status', async () => {
+handleTrusted('get-resource-pack-status', ['admin'], async () => {
   try {
     return new Promise((resolve) => {
       const req = http.get(`http://localhost:${actualLocalPort}/api/admin/resource-pack`, (res) => {
@@ -822,11 +865,15 @@ ipcMain.handle('get-resource-pack-status', async () => {
 })
 
 // 资源包上传（文件路径）
-ipcMain.handle('upload-resource-pack', async (_event, filePath: string) => {
+handleTrusted('upload-resource-pack', ['admin'], async (_event, filePath: string) => {
   try {
     const boundary = '----FormBoundary' + Date.now()
+    const stat = fs.statSync(filePath)
+    if (!stat.isFile() || stat.size <= 0 || stat.size > RESOURCE_PACK_LIMITS.maxArchiveBytes) {
+      throw new Error('Resource-pack compressed archive is empty or exceeds 32 MiB')
+    }
     const fileContent = fs.readFileSync(filePath)
-    const filename = filePath.split(/[\\/]/).pop()
+    const filename = (filePath.split(/[\\/]/).pop() || 'resource-pack.zip').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
 
     const header = Buffer.from(
       `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/zip\r\n\r\n`
@@ -863,13 +910,21 @@ ipcMain.handle('upload-resource-pack', async (_event, filePath: string) => {
 })
 
 // 资源包上传（base64 数据）
-ipcMain.handle('upload-resource-pack-data', async (_event, base64: string, filename: string) => {
+handleTrusted('upload-resource-pack-data', ['admin'], async (_event, base64: string, filename: string) => {
   try {
+    const maxBase64Length = Math.ceil(RESOURCE_PACK_LIMITS.maxArchiveBytes / 3) * 4 + 4
+    if (typeof base64 !== 'string' || base64.length > maxBase64Length) {
+      throw new Error('Resource-pack compressed archive exceeds the 32 MiB limit')
+    }
     const buffer = Buffer.from(base64, 'base64')
+    if (buffer.length === 0 || buffer.length > RESOURCE_PACK_LIMITS.maxArchiveBytes) {
+      throw new Error('Resource-pack compressed archive is empty or exceeds 32 MiB')
+    }
+    const safeFilename = String(filename || 'resource-pack.zip').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
     const boundary = '----FormBoundary' + Date.now()
 
     const header = Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/zip\r\n\r\n`
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${safeFilename}"\r\nContent-Type: application/zip\r\n\r\n`
     )
     const footer = Buffer.from(`\r\n--${boundary}--\r\n`)
     const body = Buffer.concat([header, buffer, footer])
@@ -902,18 +957,10 @@ ipcMain.handle('upload-resource-pack-data', async (_event, base64: string, filen
   }
 })
 
-// ─── 证书 ─────────────────────────────────────────────────────────────────────
-
-app.commandLine.appendSwitch('ignore-certificate-errors')
 // Bypass system proxy (Clash/V2Ray/etc.) — game server is accessed directly via frp
 app.commandLine.appendSwitch('no-proxy-server')
 // Disable disk cache so Chromium never serves stale file:// responses
 app.commandLine.appendSwitch('disable-http-cache')
-
-app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
-  event.preventDefault()
-  callback(true)
-})
 
 // ─── 应用生命周期 ─────────────────────────────────────────────────────────────
 
@@ -936,9 +983,8 @@ process.on('exit', () => { try { killServer() } catch {} })
 process.on('SIGINT', () => { try { killServer() } catch {} ; app.exit(0) })
 process.on('SIGTERM', () => { try { killServer() } catch {} ; app.exit(0) })
 
-setupPackProtocol()
-
 app.whenReady().then(async () => {
+  await setupPackProtocol()
   // 启动时清除上一版本残留的 Service Worker / Cache Storage，避免旧缓存遮蔽新页面
   try {
     await session.defaultSession.clearStorageData({

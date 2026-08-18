@@ -1,9 +1,10 @@
 import fs from 'fs'
 import path from 'path'
-import crypto from 'crypto'
 import { getAppRoot, getUserDataDir } from './app-paths'
+import { RESOURCE_PACK_LIMITS, importResourcePackArchive } from '../electron/resource-pack-store'
 
-const PACK_DATA_DIR = path.join(getUserDataDir(), 'resource-pack', 'data')
+const PACK_ROOT = path.join(getUserDataDir(), 'resource-pack')
+const LEGACY_PACK_DATA_DIR = path.join(PACK_ROOT, 'data')
 
 let loaded = false
 let warnedInvalidPack = false
@@ -20,28 +21,42 @@ function getMissingRequiredFiles(dataDir: string): string[] {
   return required.filter(rel => !fs.existsSync(path.join(dataDir, rel)))
 }
 
-function calcHash(filePath: string): string {
-  const buf = fs.readFileSync(filePath)
-  return crypto.createHash('sha256').update(buf).digest('hex')
+function getActiveVersionRoot(): string | null {
+  const pointerPath = path.join(PACK_ROOT, 'active.json')
+  if (!fs.existsSync(pointerPath)) {
+    return fs.existsSync(LEGACY_PACK_DATA_DIR) ? PACK_ROOT : null
+  }
+  try {
+    const pointer = JSON.parse(fs.readFileSync(pointerPath, 'utf8')) as { version?: unknown }
+    if (pointer.version === null) return null
+    if (typeof pointer.version !== 'string' || !/^[a-f0-9]{64}$/.test(pointer.version)) return null
+    const versionRoot = path.join(PACK_ROOT, 'versions', pointer.version)
+    return fs.existsSync(versionRoot) && fs.statSync(versionRoot).isDirectory() ? versionRoot : null
+  } catch {
+    return null
+  }
 }
 
 export function getResourcePackDataDir(): string | null {
-  if (!fs.existsSync(PACK_DATA_DIR)) {
-    return null
-  }
-  const missing = getMissingRequiredFiles(PACK_DATA_DIR)
+  const versionRoot = getActiveVersionRoot()
+  if (!versionRoot) return null
+  const dataDir = path.join(versionRoot, 'data')
+  if (!fs.existsSync(dataDir)) return null
+  const missing = getMissingRequiredFiles(dataDir)
   if (missing.length > 0) {
     if (!warnedInvalidPack) {
       warnedInvalidPack = true
-      console.warn('[resource-pack] Ignoring incomplete resource pack:', PACK_DATA_DIR, 'missing:', missing.join(', '))
+      console.warn('[resource-pack] Ignoring incomplete resource pack:', dataDir, 'missing:', missing.join(', '))
     }
     return null
   }
-  return PACK_DATA_DIR
+  return dataDir
 }
 
-export function getResourcePackMeta(): { version: string; name: string; importedAt: string; md5: string } | null {
-  const metaPath = path.join(path.dirname(PACK_DATA_DIR), 'pack.json')
+export function getResourcePackMeta(): { version: string; name: string; importedAt: string; sha256?: string; md5?: string } | null {
+  const versionRoot = getActiveVersionRoot()
+  if (!versionRoot) return null
+  const metaPath = path.join(versionRoot, 'pack.json')
   if (!fs.existsSync(metaPath)) {
     return null
   }
@@ -55,41 +70,25 @@ export function getResourcePackMeta(): { version: string; name: string; imported
 
 export async function syncResourcePack(): Promise<{ success: boolean; message: string; meta?: any }> {
   const sourcePack = path.join(getAppRoot(), 'dist', 'resource-pack.zip')
-  const destDir = path.dirname(PACK_DATA_DIR)
-  const destPack = path.join(destDir, 'resource-pack.zip')
 
   if (!fs.existsSync(sourcePack)) {
     return { success: false, message: '资源包文件不存在，请先构建资源包 (npm run build:pack)' }
   }
 
   try {
-    fs.mkdirSync(destDir, { recursive: true })
-
-    const AdmZip = require('adm-zip')
-    const zip = new AdmZip(sourcePack)
-
-    if (fs.existsSync(PACK_DATA_DIR)) {
-      fs.rmSync(PACK_DATA_DIR, { recursive: true, force: true })
+    const stat = fs.statSync(sourcePack)
+    if (!stat.isFile() || stat.size <= 0 || stat.size > RESOURCE_PACK_LIMITS.maxArchiveBytes) {
+      throw new Error('资源包压缩文件为空或超过 32 MiB 限制')
     }
-
-    zip.extractAllTo(destDir, true)
-
-    const packMd5 = calcHash(sourcePack)
-
-    const metaPath = path.join(destDir, 'pack.json')
-    let meta = {}
-    if (fs.existsSync(metaPath)) {
-      try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) } catch {}
-    }
-    meta = { ...meta, md5: packMd5, importedAt: new Date().toISOString() }
-    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8')
+    const result = importResourcePackArchive(PACK_ROOT, fs.readFileSync(sourcePack))
 
     loaded = false
+    warnedInvalidPack = false
 
     return {
       success: true,
       message: '资源包同步成功',
-      meta
+      meta: result.meta,
     }
   } catch (error) {
     console.error('[resource-pack] Sync error:', error)

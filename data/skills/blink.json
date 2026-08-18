@@ -12,6 +12,11 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
+  "targeting": {
+    "steps": [
+      { "kind": "target", "type": "grid", "filter": "all", "range": 2, "distanceMetric": "chebyshev", "requireWalkable": true, "requireUnoccupied": true }
+    ]
+  },
   "range": "single",
   "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = Math.abs(pos.x - caster.x); var dy = Math.abs(pos.y - caster.y); if (Math.max(dx, dy) > 2) return { success: false, message: '目标超出闪现范围（5x5格内）' }; var tile = battle.map.tiles.find(function(t) { return t.x === pos.x && t.y === pos.y; }); if (!tile || !tile.props.walkable) return { success: false, message: '目标位置不可行走' }; var pieceAtPos = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (pieceAtPos) return { success: false, message: '目标位置已被占用' }; caster.x = pos.x; caster.y = pos.y; return { success: true, message: caster.name + '闪现至(' + pos.x + ',' + pos.y + ')' }; }"
 }

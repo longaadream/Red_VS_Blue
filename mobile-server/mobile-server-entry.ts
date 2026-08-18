@@ -13,7 +13,10 @@
  */
 
 import { applyBattleAction } from '../lib/game/turn'
-import { createInitialBattleForPlayers } from '../lib/game/battle-setup'
+import { createInitialBattleForPlayers, DEMO_FIXED_MAP_ID } from '../lib/game/battle-setup'
+import { hashBattleState, runBattleAction, type BattleActionTrace } from '../lib/game/battle-runner'
+import { stampPendingDeploymentAuthorityVersion } from '../lib/game/battle-trace'
+import { createRootSeed } from '../lib/game/rule-runtime'
 import { loadAllSkillsById, loadRuleById } from '../lib/game/skills'
 import { DEFAULT_PIECES, getAllPieces } from '../lib/game/piece-repository'
 import type { BattleState } from '../lib/game/turn'
@@ -66,6 +69,17 @@ interface ActionLogEntry {
   action?: unknown
   winner?: string
   timestamp: number
+  /** Deterministic trace supplied by the client-side authority runner. */
+  rootSeed?: number | null
+  actionId?: string
+  actionHash?: string
+  tick?: number
+  turn?: number
+  preStateHash?: string
+  postStateHash?: string
+  randomStreams?: BattleActionTrace['randomStreams']
+  /** Trace diagnostics must not prevent relay clients from completing a turn. */
+  traceValidationError?: string
 }
 
 interface ActionLog {
@@ -74,12 +88,24 @@ interface ActionLog {
   actions: ActionLogEntry[]
 }
 
+function readTrace(value: unknown): BattleActionTrace | null {
+  if (!value || typeof value !== 'object') return null
+  const trace = value as Partial<BattleActionTrace>
+  if (typeof trace.rootSeed !== 'number' || !Number.isInteger(trace.rootSeed)) return null
+  if (typeof trace.actionId !== 'string' || typeof trace.actionHash !== 'string') return null
+  if (!Number.isSafeInteger(trace.tick) || typeof trace.preStateHash !== 'string' || typeof trace.postStateHash !== 'string') return null
+  if (!Array.isArray(trace.randomStreams)) return null
+  return trace as BattleActionTrace
+}
+
 interface Room {
   id: string
   name: string
   status: 'waiting' | 'ready' | 'in-progress' | 'finished'
   players: Player[]
   hostId?: string
+  /** Authoritative first player, drawn from the battle root seed. */
+  firstPlayerId?: string
   maxPlayers: number
   mapId: string
   battleState?: ActionLog
@@ -243,12 +269,9 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
     const authErr = await verifyJoinAuth(body)
     if (authErr) return err(authErr, 401)
     const packMd5 = (body.packMd5 as string) || undefined
-    const requestedFaction = (body.faction === 'red' || body.faction === 'blue') ? body.faction as 'red' | 'blue' : null
     const existing = room.players.find(p => p.id.toLowerCase() === normalizedPlayerId)
     if (existing) {
-      if (requestedFaction) {
-        existing.faction = requestedFaction
-      } else if (!existing.faction) {
+      if (!existing.faction) {
         existing.faction = nextFaction(room)
       }
       if (playerName) existing.name = playerName
@@ -259,12 +282,7 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
     }
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
     const publicKey = (body.publicKey as string) || undefined
-    let faction: 'red' | 'blue'
-    if (requestedFaction) {
-      faction = requestedFaction
-    } else {
-      faction = nextFaction(room)
-    }
+    const faction = nextFaction(room)
     room.players.push({ id: normalizedPlayerId, name: playerName, publicKey, faction, packMd5, joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] })
     room.version++
     _broadcastRoomUpdate(room)
@@ -300,6 +318,13 @@ async function _startGame(room: Room): Promise<string> {
   try {
     const allPieces = getAllPieces()
     const roomPlayers = room.players.slice(0, 2)
+    const redPlayers = roomPlayers.filter(player => player.faction === 'red')
+    const bluePlayers = roomPlayers.filter(player => player.faction === 'blue')
+    if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
+      return err('Cannot start battle without exactly one red and one blue seat', 400)
+    }
+    const firstPlayerId = redPlayers[0].id
+
     const playerIds = roomPlayers.map(p => p.id) as [string, string]
     const playerSelectedPieces = roomPlayers.map(p => ({
       playerId: p.id,
@@ -309,26 +334,43 @@ async function _startGame(room: Room): Promise<string> {
         .filter((t): t is PieceTemplate => !!t),
     }))
 
-    const state = await createInitialBattleForPlayers(playerIds, [], playerSelectedPieces, room.mapId)
+    const seed = createRootSeed()
+    const state = await createInitialBattleForPlayers(
+      playerIds,
+      [],
+      playerSelectedPieces,
+      room.mapId,
+      { firstPlayerId, rootSeed: seed },
+    )
     if (!state) return err('Failed to create battle state', 500)
 
     if (!state.skillsById || !Object.keys(state.skillsById).length) {
       state.skillsById = loadAllSkillsById() as typeof state.skillsById
     }
 
-    // Apply beginPhase to get clean initial state
-    let initState = state
-    try { initState = applyBattleAction(state, { type: 'beginPhase' } as Parameters<typeof applyBattleAction>[1]) } catch {}
+    // Apply beginPhase through the deterministic authority runner.
+    const initState = runBattleAction(
+      state,
+      { type: 'beginPhase' } as Parameters<typeof applyBattleAction>[1],
+      { rootSeed: seed },
+    ).state
 
     const { skillsById: _sk, ...initPayload } = initState as unknown as Record<string, unknown>
     void _sk
-    const seed = Math.floor(Math.random() * 4294967296)
-
+    const initTrace = ((initState.extensions as { debugBattle?: { actionLog?: BattleActionTrace[] } } | undefined)
+      ?.debugBattle?.actionLog ?? []).at(-1)
     room.battleState = {
       type: 'action-log',
       seed,
-      actions: [{ seq: 0, type: 'init', payload: initPayload, timestamp: Date.now() }],
+      actions: [{
+        seq: 0,
+        type: 'init',
+        payload: initPayload,
+        timestamp: Date.now(),
+        ...(initTrace ?? {}),
+      }],
     }
+    room.firstPlayerId = initState.turn.currentPlayerId
     room.status = 'in-progress'
     room.version++
     _broadcastBattleSnapshot(room)
@@ -342,7 +384,10 @@ function getAssignedFactions(room: Room): Array<'red' | 'blue'> {
   return room.players.map(p => p.faction).filter(Boolean) as Array<'red' | 'blue'>
 }
 
-function nextFaction(_room: Room): 'red' | 'blue' {
+function nextFaction(room: Room): 'red' | 'blue' {
+  const assigned = getAssignedFactions(room)
+  if (assigned.includes('red') && !assigned.includes('blue')) return 'blue'
+  if (assigned.includes('blue') && !assigned.includes('red')) return 'red'
   return Math.random() < 0.5 ? 'red' : 'blue'
 }
 
@@ -404,19 +449,11 @@ function handleClaimFaction(roomId: string, body: Record<string, unknown>): stri
   const playerName = ((body.playerName as string) || '').trim()
   if (!playerId) return err('playerId is required', 400)
 
-  const requestedFaction = (body.faction === 'red' || body.faction === 'blue')
-    ? body.faction as 'red' | 'blue'
-    : null
 
   let player = room.players.find(p => p.id.toLowerCase() === playerId)
   if (!player) {
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
-    let faction: 'red' | 'blue'
-    if (requestedFaction) {
-      faction = requestedFaction
-    } else {
-      faction = nextFaction(room)
-    }
+    const faction = nextFaction(room)
     player = {
       id: playerId,
       name: playerName || `Player ${playerId.slice(0, 8)}`,
@@ -426,9 +463,6 @@ function handleClaimFaction(roomId: string, body: Record<string, unknown>): stri
       selectedPieces: [],
     }
     room.players.push(player)
-    room.version++
-  } else if (requestedFaction && player.faction !== requestedFaction) {
-    player.faction = requestedFaction
     room.version++
   } else if (!player.faction) {
     player.faction = nextFaction(room)
@@ -515,8 +549,20 @@ async function handleBattleAction(roomId: string, body: Record<string, unknown>)
   const authErr = await verifyBattleAuth(room, body)
   if (authErr) return err(authErr, 401)
 
-  const { type = 'action', playerId, action, winner } = body as {
+  const { type = 'action', playerId, action, winner, trace: rawTrace } = body as {
     type?: string; playerId?: string; action?: unknown; winner?: string
+    trace?: unknown
+  }
+  const trace = readTrace(rawTrace)
+  // The mobile server relays actions rather than applying the full rules engine.
+  // Trace failures are audit evidence, not permission to freeze an otherwise valid
+  // relay turn: the WS bridge has no error/retry path for a rejected action.
+  let traceValidationError: string | undefined
+  if (rawTrace !== undefined && rawTrace !== null && !trace) traceValidationError = 'Invalid deterministic action trace'
+  if (trace && (trace.rootSeed === null || (trace.rootSeed >>> 0) !== (log.seed >>> 0))) traceValidationError = 'Trace root seed does not match room seed'
+  const previousTrace = [...log.actions].reverse().find(entry => typeof entry.postStateHash === 'string')
+  if (trace && previousTrace?.postStateHash && trace.preStateHash !== previousTrace.postStateHash) {
+    traceValidationError = 'Trace pre-state hash does not match the authoritative action log'
   }
   const seq = log.actions.length
   const entry: ActionLogEntry = {
@@ -527,6 +573,8 @@ async function handleBattleAction(roomId: string, body: Record<string, unknown>)
   }
   if (action !== undefined) entry.action = action
   if (winner !== undefined) entry.winner = winner
+  if (trace) Object.assign(entry, trace)
+  if (traceValidationError) entry.traceValidationError = traceValidationError
 
   log.actions.push(entry)
   room.version++
@@ -550,7 +598,7 @@ async function handleBattleAction(roomId: string, body: Record<string, unknown>)
     }
   }
 
-  return ok({ seq })
+  return ok({ seq, trace })
 }
 
 function handleGetGameRecord(roomId: string): string {
@@ -654,7 +702,7 @@ async function handleTraining(method: string, body: Record<string, unknown>): Pr
 }
 
 // POST /api/relay-battle-init — create initial state for relay mode host
-async function handleRelayBattleInit(body: Record<string, unknown>): Promise<string> {
+export async function handleRelayBattleInit(body: Record<string, unknown>): Promise<string> {
   const players = body.players as Array<{
     id: string
     faction: 'red' | 'blue'
@@ -664,6 +712,13 @@ async function handleRelayBattleInit(body: Record<string, unknown>): Promise<str
   if (!Array.isArray(players) || players.length < 2) {
     return err('players array with at least 2 entries required', 400)
   }
+
+  const redPlayers = players.filter(player => player.faction === 'red')
+  const bluePlayers = players.filter(player => player.faction === 'blue')
+  if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
+    return err('players must contain exactly one red and one blue seat', 400)
+  }
+  const firstPlayerId = redPlayers[0].id
 
   const playerIds = players.map(p => p.id)
 
@@ -682,14 +737,28 @@ async function handleRelayBattleInit(body: Record<string, unknown>): Promise<str
   const allPieces = playerSelectedPieces.flatMap(p => p.pieces)
 
   try {
+    const seed = createRootSeed()
     const state = await createInitialBattleForPlayers(
       playerIds,
       allPieces,
       playerSelectedPieces,
-      (body.mapId as string | undefined)
+      DEMO_FIXED_MAP_ID,
+      {
+        firstPlayerId,
+        rootSeed: seed,
+        deploymentEnabled: true,
+        deploymentStartedAt: Date.now(),
+      },
     )
     if (!state) return err('Failed to create battle state', 500)
-    return ok({ state } as unknown as Record<string, unknown>)
+    const authorityVersion = 1
+    stampPendingDeploymentAuthorityVersion(state, authorityVersion)
+    return ok({
+      state,
+      seed,
+      stateHash: hashBattleState(state),
+      authorityVersion,
+    } as unknown as Record<string, unknown>)
   } catch (e) {
     return err('createInitialBattleForPlayers failed: ' + String(e), 500)
   }
@@ -774,9 +843,7 @@ interface AndroidBridge {
 declare global {
   // window may not exist (typeof window === 'undefined' defined at build time)
   // but the actual WebView global IS accessible via globalThis
-  // eslint-disable-next-line no-var
   var AndroidServerBridge: AndroidBridge | undefined
-  // eslint-disable-next-line no-var
   var RvBMobileServer: {
     processRequest(reqId: string, method: string, path: string, bodyJson: string, headersJson?: string): void
     processRequestFromBridge(reqId: string): void

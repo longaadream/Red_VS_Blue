@@ -6,6 +6,7 @@
   <title>房间 · RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/crypto-lib.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/identity.js"></script>
   <style>
@@ -227,9 +228,14 @@
     }
 
     function factionIcon(f) { return f === 'red' ? '🔴' : f === 'blue' ? '🔵' : '⚪' }
-    function factionLabel(f) { return f === 'red' ? '先手' : f === 'blue' ? '后手' : '未分配' }
-    function alignmentIcon(a) { return a === 'evil' ? '🌑' : a === 'good' ? '☀️' : '❓' }
-    function alignmentLabel(a) { return a === 'evil' ? '🌑 暗' : a === 'good' ? '☀️ 光' : '未选阵营' }
+    function factionLabel(f) { return f === 'red' ? '红方座位' : f === 'blue' ? '蓝方座位' : '未分配座位' }
+    function alignmentIcon(a) { return a === 'dark' || a === 'evil' ? '🌑' : a === 'light' || a === 'good' ? '☀️' : '❓' }
+    function alignmentLabel(a) { return a === 'dark' || a === 'evil' ? '🌑 暗' : a === 'light' || a === 'good' ? '☀️ 光' : '未选阵营' }
+
+    function currentPlayerAlignment() {
+      const me = _lastRoom && (_lastRoom.players || []).find(p => p.id && p.id.toLowerCase() === playerId)
+      return me && me.alignment ? me.alignment : ''
+    }
 
     function navigateBattle() {
       if (_navigating) return
@@ -238,6 +244,7 @@
         + '?roomId=' + encodeURIComponent(roomId)
         + '&playerId=' + encodeURIComponent(playerId)
         + '&playerName=' + encodeURIComponent(playerName)
+        + (currentPlayerAlignment() ? '&alignment=' + encodeURIComponent(currentPlayerAlignment()) : '')
         + (shouldUseRelayMode() ? '&relay=1' : '')
     }
 
@@ -248,6 +255,7 @@
         + '?roomId=' + encodeURIComponent(roomId)
         + '&playerId=' + encodeURIComponent(playerId)
         + '&playerName=' + encodeURIComponent(playerName)
+        + (currentPlayerAlignment() ? '&alignment=' + encodeURIComponent(currentPlayerAlignment()) : '')
         + (shouldUseRelayMode() ? '&relay=1' : '')
     }
 
