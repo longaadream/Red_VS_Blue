@@ -12,6 +12,8 @@ describe('tile status side panel', () => {
     expect(battleHtml).toContain('closeTileStatus()')
     expect(battleHtml).toContain("e.key === 'Escape'")
     expect(battleHtml).toContain('position: absolute;')
+    expect(battleHtml).toContain("panel.style.display = 'flex'")
+    expect(battleHtml).toContain('flex: 1 1 auto;')
     expect(battleHtml).not.toContain('position: fixed; inset: 0; z-index: 155')
     expect(battleHtml).not.toContain('onclick="if(event.target===this)closeTileStatus()"')
   })

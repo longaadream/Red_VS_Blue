@@ -612,6 +612,7 @@
       right: 14px;
       z-index: 17;
       display: none;
+      flex-direction: column;
       width: min(248px, calc(100% - 28px));
       max-height: min(330px, calc(100% - var(--battle-hud-offset, 56px) - var(--battle-hand-height, 128px) - 28px));
       overflow: hidden;
@@ -626,8 +627,9 @@
     #selectedStatusOverlay:not([hidden]) ~ #tileStatusPanel { right: 232px; }
     .ts-sheet {
       width: 100%;
-      max-height: inherit;
+      min-height: 0;
       display: flex;
+      flex: 1 1 auto;
       flex-direction: column;
       overflow: hidden;
     }
@@ -664,7 +666,15 @@
       overflow-y: auto;
       padding: 0 10px 8px;
       scrollbar-width: thin;
+      scrollbar-color: rgba(148,163,184,.42) transparent;
     }
+    .ts-body::-webkit-scrollbar { width: 4px; }
+    .ts-body::-webkit-scrollbar-track { background: transparent; }
+    .ts-body::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background: rgba(148,163,184,.34);
+    }
+    .ts-body::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.52); }
     .ts-terrain {
       min-height: 28px;
       display: flex;
@@ -2676,7 +2686,7 @@
             `</div>`
           }).join('')
         : '<div class="ts-empty">当前没有持续地格效果</div>'
-      panel.style.display = 'block'
+      panel.style.display = 'flex'
       panel.setAttribute('aria-hidden', 'false')
     }
 
