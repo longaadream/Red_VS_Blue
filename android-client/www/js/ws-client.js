@@ -17,6 +17,10 @@
     return Number.isFinite(n) && n > 0 && n <= 65535 ? n : null
   }
 
+  function normalizeServerUrl(url) {
+    return String(url || '').trim().replace(/\/+$/, '')
+  }
+
   function readExplicitQueryWsPort() {
     try {
       var params = new URLSearchParams(window.location.search || '')
@@ -34,13 +38,46 @@
     try {
       var params = new URLSearchParams(window.location.search || '')
       var fromQuery = parsePort(params.get('wsPort') || params.get('ws_port'))
-      if (fromQuery) return fromQuery
+      if (fromQuery) {
+        saveWsPortForServer(fromQuery, getServerUrl(), 'query')
+        return fromQuery
+      }
     } catch {}
     try {
       var fromStorage = parsePort(localStorage.getItem('rvb_ws_port'))
-      if (fromStorage) return fromStorage
+      var scopedUrl = normalizeServerUrl(localStorage.getItem('rvb_ws_port_server_url'))
+      if (fromStorage && scopedUrl && scopedUrl === normalizeServerUrl(getServerUrl())) return fromStorage
     } catch {}
     return null
+  }
+
+  function readLegacyWsPort() {
+    if (window.RvBUtils && window.RvBUtils.getLegacyWsPort) {
+      return parsePort(window.RvBUtils.getLegacyWsPort())
+    }
+    try {
+      if (normalizeServerUrl(localStorage.getItem('rvb_ws_port_server_url'))) return null
+      return parsePort(localStorage.getItem('rvb_ws_port'))
+    } catch {
+      return null
+    }
+  }
+
+  function saveWsPortForServer(port, serverUrl, source) {
+    var parsed = parsePort(port)
+    if (!parsed) return null
+    if (window.RvBUtils && window.RvBUtils.saveWsPortForServer) {
+      return window.RvBUtils.saveWsPortForServer(parsed, serverUrl, source)
+    }
+    try {
+      localStorage.setItem('rvb_ws_port', String(parsed))
+      var normalizedUrl = normalizeServerUrl(serverUrl)
+      if (normalizedUrl) localStorage.setItem('rvb_ws_port_server_url', normalizedUrl)
+      else localStorage.removeItem('rvb_ws_port_server_url')
+      if (source) localStorage.setItem('rvb_ws_port_source', String(source))
+      else localStorage.removeItem('rvb_ws_port_source')
+    } catch {}
+    return parsed
   }
 
   function getServerUrl() {
@@ -126,8 +163,11 @@
   }
 
   async function connectWithHttpPortProbe(roomId) {
+    var explicitQuery = readExplicitQueryWsPort()
     var configured = readConfiguredWsPort()
+    var legacy = readLegacyWsPort()
     if (configured) _wsPort = configured
+    else if (legacy) _wsPort = legacy
 
     var base = getServerUrl()
     var withoutScheme = String(base || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
@@ -135,17 +175,13 @@
     var basePort = basePortMatch ? parsePort(basePortMatch[1]) : null
     var isLocalOrLan = /^(localhost|127\.0\.0\.1)(:\d+)?\b/.test(withoutScheme) ||
       /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
-    var shouldProbe = !configured || (
-      !readExplicitQueryWsPort() &&
-      configured === 3000 &&
-      basePort === 3000 &&
-      isLocalOrLan
-    )
+    var shouldProbe = isLocalOrLan && !explicitQuery && !configured
     if (!shouldProbe) {
       _doConnect(roomId)
       return
     }
 
+    var resolved = false
     if (base && typeof fetch === 'function') {
       var controller = typeof AbortController !== 'undefined' ? new AbortController() : null
       var timeout = controller ? setTimeout(function () { controller.abort() }, 1500) : null
@@ -159,13 +195,22 @@
           var discovered = parsePort(info && info.wsPort)
           if (discovered) {
             _wsPort = discovered
-            try { localStorage.setItem('rvb_ws_port', String(discovered)) } catch {}
+            saveWsPortForServer(discovered, base, 'discovered')
+            resolved = true
           }
         }
       } catch {}
       finally {
         if (timeout) clearTimeout(timeout)
       }
+    }
+
+    if (!resolved && legacy) {
+      _wsPort = legacy
+      saveWsPortForServer(legacy, base, 'legacy-fallback')
+    } else if (!resolved && basePort === 3000) {
+      _wsPort = 3001
+      saveWsPortForServer(3001, base, 'standard-fallback')
     }
 
     _doConnect(roomId)
@@ -265,7 +310,7 @@
     var parsed = parsePort(port)
     if (!parsed) return false
     _wsPort = parsed
-    try { localStorage.setItem('rvb_ws_port', String(parsed)) } catch {}
+    saveWsPortForServer(parsed, getServerUrl(), 'runtime')
     return true
   }
 

@@ -363,5 +363,8 @@ interface ServerCore {
 
 - HTTP 健康检查继续使用 `/api/ping`。
 - 客户端随后读取 `/api/ws-info` 获取 WebSocket 监听端口。
+- 持久化的 WebSocket 端口必须同时记录规范化服务器 URL 与来源；切换 URL 后不得复用上一台服务器的端口。
+- query/config 显式 `wsPort` 始终优先且不被探测覆盖；远程/Relay 与公开同端口网关继续使用显式端口或同源候选。
+- 旧版没有 URL 归属的 `rvb_ws_port` 只在当前本地/LAN 探测失败后作为兼容兜底，并在使用时绑定到当前 URL。
 - 标准本机配置在接口不可用时回退为 HTTP `3000`、WebSocket `3001`；非标准端口仅在未提供独立 WS 端口时回退为同端口。
 - UDP 与快速扫描结果统一经过同一端口解析逻辑，避免“HTTP 可用但 WebSocket 连接到错误端口”。

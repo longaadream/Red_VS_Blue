@@ -15,6 +15,8 @@
   var LAN_SERVER_KEY = 'rvb_lan_server_url'
   var REMOTE_SERVER_KEY = 'rvb_remote_server_url'
   var WS_PORT_KEY = 'rvb_ws_port'
+  var WS_PORT_SERVER_URL_KEY = 'rvb_ws_port_server_url'
+  var WS_PORT_SOURCE_KEY = 'rvb_ws_port_source'
 
   function normalizeServerUrl(url) {
     return String(url || '').trim().replace(/\/+$/, '')
@@ -75,24 +77,52 @@
     return 'remote'
   }
 
-  function saveWsPort(wsPort) {
+  function parseWsPort(wsPort) {
     var n = parseInt(wsPort, 10)
-    if (Number.isFinite(n) && n > 0 && n <= 65535) {
-      localStorage.setItem(WS_PORT_KEY, String(n))
-      return n
-    }
-    return null
+    return Number.isFinite(n) && n > 0 && n <= 65535 ? n : null
   }
 
-  function getConfiguredWsPort(search) {
+  function getStoredWsPortRecord() {
+    return {
+      port: parseWsPort(localStorage.getItem(WS_PORT_KEY)),
+      serverUrl: normalizeServerUrl(localStorage.getItem(WS_PORT_SERVER_URL_KEY)),
+      source: localStorage.getItem(WS_PORT_SOURCE_KEY) || '',
+    }
+  }
+
+  function saveWsPortForServer(wsPort, serverUrl, source) {
+    var n = parseWsPort(wsPort)
+    if (!n) return null
+    var normalizedUrl = normalizeServerUrl(serverUrl || getServerUrl())
+    localStorage.setItem(WS_PORT_KEY, String(n))
+    if (normalizedUrl) localStorage.setItem(WS_PORT_SERVER_URL_KEY, normalizedUrl)
+    else localStorage.removeItem(WS_PORT_SERVER_URL_KEY)
+    if (source) localStorage.setItem(WS_PORT_SOURCE_KEY, String(source))
+    else localStorage.removeItem(WS_PORT_SOURCE_KEY)
+    return n
+  }
+
+  function getLegacyWsPort() {
+    var record = getStoredWsPortRecord()
+    return record.port && !record.serverUrl ? record.port : null
+  }
+
+  function getConfiguredWsPort(search, serverUrl) {
+    var params = null
     try {
-      var params = search instanceof URLSearchParams
+      params = search instanceof URLSearchParams
         ? search
         : new URLSearchParams(search || (window.location && window.location.search) || '')
-      var fromQuery = saveWsPort(params.get('wsPort') || params.get('ws_port'))
-      if (fromQuery) return fromQuery
     } catch {}
-    return saveWsPort(localStorage.getItem(WS_PORT_KEY))
+    var url = normalizeServerUrl(
+      serverUrl ||
+      (params && (params.get('serverUrl') || params.get('url'))) ||
+      getServerUrl()
+    )
+    var fromQuery = parseWsPort(params && (params.get('wsPort') || params.get('ws_port')))
+    if (fromQuery) return saveWsPortForServer(fromQuery, url, 'query')
+    var record = getStoredWsPortRecord()
+    return record.port && record.serverUrl && record.serverUrl === url ? record.port : null
   }
 
   function saveServerConfig(config) {
@@ -123,14 +153,14 @@
     }
     if (!url) url = getServerUrl()
     if (!mode) mode = getActiveServerMode() || getServerModeForUrl(url)
-    return { mode: mode, url: url, serverUrl: url, wsPort: getConfiguredWsPort(params) }
+    return { mode: mode, url: url, serverUrl: url, wsPort: getConfiguredWsPort(params, url) }
   }
 
   function saveServerUrl(url, wsPort) {
     url = normalizeServerUrl(url)
     var mode = getServerModeForUrl(url)
     activateServerUrl(url, mode)
-    if (wsPort) saveWsPort(wsPort)
+    if (wsPort) saveWsPortForServer(wsPort, url, 'configured')
     if (mode === 'remote') {
       localStorage.setItem(REMOTE_SERVER_KEY, url)
     } else if (mode === 'local') {
@@ -150,7 +180,7 @@
     localStorage.setItem(LOCAL_SERVER_KEY, url)
     localStorage.setItem(REMOTE_SERVER_KEY, url)
     activateServerUrl(url, 'local')
-    if (wsPort) saveWsPort(wsPort)
+    if (wsPort) saveWsPortForServer(wsPort, url, 'configured')
     if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
       window.RvBBridge.saveUrl(url)
     }
@@ -161,7 +191,7 @@
     localStorage.setItem(LAN_SERVER_KEY, url)
     localStorage.setItem(REMOTE_SERVER_KEY, url)
     activateServerUrl(url, 'lan')
-    if (wsPort) saveWsPort(wsPort)
+    if (wsPort) saveWsPortForServer(wsPort, url, 'configured')
     if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
       window.RvBBridge.saveUrl(url)
     }
@@ -171,7 +201,7 @@
     url = normalizeServerUrl(url)
     localStorage.setItem(REMOTE_SERVER_KEY, url)
     activateServerUrl(url, 'remote')
-    if (wsPort) saveWsPort(wsPort)
+    if (wsPort) saveWsPortForServer(wsPort, url, 'configured')
     if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
       window.RvBBridge.saveUrl(url)
     }
@@ -200,14 +230,14 @@
       if (typeof window.electronAPI.getMode === 'function') {
         try {
           var mode = await window.electronAPI.getMode()
-          if (mode && mode.wsPort) saveWsPort(mode.wsPort)
+          if (mode && mode.wsPort && mode.localUrl) saveWsPortForServer(mode.wsPort, mode.localUrl, 'bridge')
           if (mode && mode.localUrl) return mode.localUrl
         } catch {}
       }
       if (typeof window.electronAPI.getHostInfo === 'function') {
         try {
           var host = await window.electronAPI.getHostInfo()
-          if (host && host.wsPort) saveWsPort(host.wsPort)
+          if (host && host.wsPort && host.localUrl) saveWsPortForServer(host.wsPort, host.localUrl, 'bridge')
           if (host && host.localUrl) return host.localUrl
         } catch {}
       }
@@ -264,7 +294,7 @@
     params = params || new URLSearchParams()
     var mode = getActiveServerMode()
     var url = getServerUrl()
-    var wsPort = getConfiguredWsPort()
+    var wsPort = getConfiguredWsPort(undefined, url)
     if (mode) params.set('server', mode)
     if (url) params.set('serverUrl', url)
     if (wsPort) params.set('wsPort', String(wsPort))
@@ -278,6 +308,8 @@
     localStorage.removeItem(LAN_SERVER_KEY)
     localStorage.removeItem(REMOTE_SERVER_KEY)
     localStorage.removeItem(WS_PORT_KEY)
+    localStorage.removeItem(WS_PORT_SERVER_URL_KEY)
+    localStorage.removeItem(WS_PORT_SOURCE_KEY)
     if (window.RvBBridge && typeof window.RvBBridge.clearUrl === 'function') {
       window.RvBBridge.clearUrl()
     }
@@ -709,9 +741,14 @@
   window.RvBUtils = {
     SERVER_KEY: SERVER_KEY,
     WS_PORT_KEY: WS_PORT_KEY,
+    WS_PORT_SERVER_URL_KEY: WS_PORT_SERVER_URL_KEY,
+    WS_PORT_SOURCE_KEY: WS_PORT_SOURCE_KEY,
     getServerUrl: getServerUrl,
     getConnectionConfig: getConnectionConfig,
     getConfiguredWsPort: getConfiguredWsPort,
+    getLegacyWsPort: getLegacyWsPort,
+    getStoredWsPortRecord: getStoredWsPortRecord,
+    saveWsPortForServer: saveWsPortForServer,
     getServerUrlForMode: getServerUrlForMode,
     getActiveServerMode: getActiveServerMode,
     getServerModeForUrl: getServerModeForUrl,

@@ -114,6 +114,8 @@ describe('LAN server discovery', () => {
     })
     expect(utils.saveServerConfig({ mode: 'lan', url: 'http://192.168.1.100:3000', wsPort })).toBe(true)
     expect(persisted.get('rvb_ws_port')).toBe('3001')
+    expect(persisted.get('rvb_ws_port_server_url')).toBe('http://192.168.1.100:3000')
+    expect(persisted.get('rvb_ws_port_source')).toBe('configured')
 
     const urls: string[] = []
     class FakeWebSocket {
@@ -146,7 +148,7 @@ describe('LAN server discovery', () => {
 
   it.each([
     { profileState: 'no saved WebSocket port', storedWsPort: undefined },
-    { profileState: 'a stale saved HTTP port', storedWsPort: '3000' },
+    { profileState: 'an unscoped legacy WebSocket port', storedWsPort: '4999' },
   ])('probes ws-info before a direct local connection with $profileState', async ({ storedWsPort }) => {
     const persisted = new Map<string, string>()
     const localStorage = {
@@ -155,8 +157,8 @@ describe('LAN server discovery', () => {
       removeItem(key: string) { persisted.delete(key) },
     }
     const fetch = vi.fn(async (input: string) => {
-      if (input === 'http://127.0.0.1:3000/api/ws-info') {
-        return response(true, { wsPort: 3001 })
+      if (input === 'http://127.0.0.1:4200/api/ws-info') {
+        return response(true, { wsPort: 4300 })
       }
       return response(false, {})
     })
@@ -185,7 +187,7 @@ describe('LAN server discovery', () => {
     const utils = browserWindow.RvBUtils as {
       saveServerConfig(config: { mode: string; url: string }): boolean
     }
-    expect(utils.saveServerConfig({ mode: 'local', url: 'http://127.0.0.1:3000' })).toBe(true)
+    expect(utils.saveServerConfig({ mode: 'local', url: 'http://127.0.0.1:4200' })).toBe(true)
     expect(persisted.has('rvb_ws_port')).toBe(false)
     if (storedWsPort) persisted.set('rvb_ws_port', storedWsPort)
 
@@ -196,9 +198,225 @@ describe('LAN server discovery', () => {
     }
     ws.connect('__lobby', 'alice', 'lan')
 
-    await vi.waitFor(() => expect(urls[0]).toBe('ws://127.0.0.1:3001/ws/rooms/__lobby'))
-    expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:3000/api/ws-info', expect.any(Object))
-    expect(persisted.get('rvb_ws_port')).toBe('3001')
+    await vi.waitFor(() => expect(urls[0]).toBe('ws://127.0.0.1:4300/ws/rooms/__lobby'))
+    expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:4200/api/ws-info', expect.any(Object))
+    expect(persisted.get('rvb_ws_port')).toBe('4300')
+    expect(persisted.get('rvb_ws_port_server_url')).toBe('http://127.0.0.1:4200')
+    expect(persisted.get('rvb_ws_port_source')).toBe('discovered')
+    ws.disconnect()
+  })
+
+  it('does not reuse a WebSocket port after switching server URLs', async () => {
+    const persisted = new Map<string, string>()
+    const localStorage = {
+      getItem(key: string) { return persisted.get(key) ?? null },
+      setItem(key: string, value: string) { persisted.set(key, String(value)) },
+      removeItem(key: string) { persisted.delete(key) },
+    }
+    const fetch = vi.fn(async (input: string) => {
+      if (input === 'http://192.168.1.20:5200/api/ws-info') {
+        return response(true, { wsPort: 5300 })
+      }
+      return response(false, {})
+    })
+    const urls: string[] = []
+    class FakeWebSocket {
+      readyState = 0
+      constructor(url: string) { urls.push(url) }
+      close() {}
+      send() {}
+    }
+    const browserWindow: Record<string, unknown> = { location: { search: '' } }
+    const context = createContext({
+      window: browserWindow,
+      localStorage,
+      URLSearchParams,
+      WebSocket: FakeWebSocket,
+      fetch,
+      AbortController,
+      setTimeout,
+      clearTimeout,
+      console,
+    })
+    const serverUtilsSource = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+    const wsClientSource = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    new Script(serverUtilsSource, { filename: 'server-utils.js' }).runInContext(context)
+    const utils = browserWindow.RvBUtils as {
+      saveServerConfig(config: { mode: string; url: string; wsPort?: number }): boolean
+    }
+    expect(utils.saveServerConfig({ mode: 'lan', url: 'http://192.168.1.10:4100', wsPort: 4101 })).toBe(true)
+    expect(utils.saveServerConfig({ mode: 'lan', url: 'http://192.168.1.20:5200' })).toBe(true)
+
+    new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(context)
+    const ws = browserWindow.RvBWs as {
+      connect(roomId: string, playerId: string, mode: string): void
+      disconnect(): void
+    }
+    ws.connect('room-switched', 'alice', 'lan')
+
+    await vi.waitFor(() => expect(urls[0]).toBe('ws://192.168.1.20:5300/ws/rooms/room-switched'))
+    expect(fetch).toHaveBeenCalledWith('http://192.168.1.20:5200/api/ws-info', expect.any(Object))
+    expect(persisted.get('rvb_ws_port')).toBe('5300')
+    expect(persisted.get('rvb_ws_port_server_url')).toBe('http://192.168.1.20:5200')
+    expect(persisted.get('rvb_ws_port_source')).toBe('discovered')
+    ws.disconnect()
+  })
+
+  it('probes before using an unscoped legacy port and scopes the fallback', async () => {
+    const persisted = new Map<string, string>([['rvb_ws_port', '6300']])
+    const localStorage = {
+      getItem(key: string) { return persisted.get(key) ?? null },
+      setItem(key: string, value: string) { persisted.set(key, String(value)) },
+      removeItem(key: string) { persisted.delete(key) },
+    }
+    const fetch = vi.fn(async () => response(false, {}))
+    const urls: string[] = []
+    class FakeWebSocket {
+      readyState = 0
+      constructor(url: string) { urls.push(url) }
+      close() {}
+      send() {}
+    }
+    const browserWindow: Record<string, unknown> = { location: { search: '' } }
+    const context = createContext({
+      window: browserWindow,
+      localStorage,
+      URLSearchParams,
+      WebSocket: FakeWebSocket,
+      fetch,
+      AbortController,
+      setTimeout,
+      clearTimeout,
+      console,
+    })
+    const serverUtilsSource = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+    const wsClientSource = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    new Script(serverUtilsSource, { filename: 'server-utils.js' }).runInContext(context)
+    const utils = browserWindow.RvBUtils as {
+      saveServerConfig(config: { mode: string; url: string }): boolean
+    }
+    expect(utils.saveServerConfig({ mode: 'local', url: 'http://127.0.0.1:6200' })).toBe(true)
+
+    new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(context)
+    const ws = browserWindow.RvBWs as {
+      connect(roomId: string, playerId: string, mode: string): void
+      disconnect(): void
+    }
+    ws.connect('room-legacy', 'alice', 'lan')
+
+    await vi.waitFor(() => expect(urls[0]).toBe('ws://127.0.0.1:6300/ws/rooms/room-legacy'))
+    expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:6200/api/ws-info', expect.any(Object))
+    expect(persisted.get('rvb_ws_port_server_url')).toBe('http://127.0.0.1:6200')
+    expect(persisted.get('rvb_ws_port_source')).toBe('legacy-fallback')
+    ws.disconnect()
+  })
+
+  it('keeps an unconfigured remote gateway on its public same-port URL without probing', () => {
+    const persisted = new Map<string, string>()
+    const localStorage = {
+      getItem(key: string) { return persisted.get(key) ?? null },
+      setItem(key: string, value: string) { persisted.set(key, String(value)) },
+      removeItem(key: string) { persisted.delete(key) },
+    }
+    const fetch = vi.fn(async () => response(true, { wsPort: 3001 }))
+    const urls: string[] = []
+    class FakeWebSocket {
+      readyState = 0
+      constructor(url: string) { urls.push(url) }
+      close() {}
+      send() {}
+    }
+    const browserWindow: Record<string, unknown> = { location: { search: '' } }
+    const context = createContext({
+      window: browserWindow,
+      localStorage,
+      URLSearchParams,
+      WebSocket: FakeWebSocket,
+      fetch,
+      AbortController,
+      setTimeout,
+      clearTimeout,
+      console,
+    })
+    const serverUtilsSource = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+    const wsClientSource = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    new Script(serverUtilsSource, { filename: 'server-utils.js' }).runInContext(context)
+    const utils = browserWindow.RvBUtils as {
+      saveServerConfig(config: { mode: string; url: string }): boolean
+    }
+    expect(utils.saveServerConfig({ mode: 'remote', url: 'https://gateway.example:8443' })).toBe(true)
+
+    new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(context)
+    const ws = browserWindow.RvBWs as {
+      connect(roomId: string, playerId: string, mode: string): void
+      disconnect(): void
+    }
+    ws.connect('room-gateway', 'alice', 'lan')
+
+    expect(urls[0]).toBe('wss://gateway.example:8443/ws/rooms/room-gateway')
+    expect(fetch).not.toHaveBeenCalled()
+    ws.disconnect()
+  })
+
+  it.each([
+    { httpPort: 3000, expectedWsPort: 3001, expectedSource: 'standard-fallback' },
+    { httpPort: 6200, expectedWsPort: 6200, expectedSource: undefined },
+  ])('uses the documented fallback for HTTP $httpPort when ws-info is unavailable', async ({
+    httpPort,
+    expectedWsPort,
+    expectedSource,
+  }) => {
+    const persisted = new Map<string, string>()
+    const localStorage = {
+      getItem(key: string) { return persisted.get(key) ?? null },
+      setItem(key: string, value: string) { persisted.set(key, String(value)) },
+      removeItem(key: string) { persisted.delete(key) },
+    }
+    const fetch = vi.fn(async () => response(false, {}))
+    const urls: string[] = []
+    class FakeWebSocket {
+      readyState = 0
+      constructor(url: string) { urls.push(url) }
+      close() {}
+      send() {}
+    }
+    const browserWindow: Record<string, unknown> = { location: { search: '' } }
+    const context = createContext({
+      window: browserWindow,
+      localStorage,
+      URLSearchParams,
+      WebSocket: FakeWebSocket,
+      fetch,
+      AbortController,
+      setTimeout,
+      clearTimeout,
+      console,
+    })
+    const serverUtilsSource = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+    const wsClientSource = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    new Script(serverUtilsSource, { filename: 'server-utils.js' }).runInContext(context)
+    const utils = browserWindow.RvBUtils as {
+      saveServerConfig(config: { mode: string; url: string }): boolean
+    }
+    const serverUrl = `http://127.0.0.1:${httpPort}`
+    expect(utils.saveServerConfig({ mode: 'local', url: serverUrl })).toBe(true)
+
+    new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(context)
+    const ws = browserWindow.RvBWs as {
+      connect(roomId: string, playerId: string, mode: string): void
+      disconnect(): void
+    }
+    ws.connect('room-fallback', 'alice', 'lan')
+
+    await vi.waitFor(() => expect(urls[0]).toBe(`ws://127.0.0.1:${expectedWsPort}/ws/rooms/room-fallback`))
+    expect(fetch).toHaveBeenCalledWith(`${serverUrl}/api/ws-info`, expect.any(Object))
+    if (expectedSource) {
+      expect(persisted.get('rvb_ws_port_server_url')).toBe(serverUrl)
+      expect(persisted.get('rvb_ws_port_source')).toBe(expectedSource)
+    } else {
+      expect(persisted.has('rvb_ws_port_server_url')).toBe(false)
+      expect(persisted.has('rvb_ws_port_source')).toBe(false)
+    }
     ws.disconnect()
   })
 
@@ -207,12 +425,16 @@ describe('LAN server discovery', () => {
       {
         serverUrl: 'http://127.0.0.1:3000',
         wsPort: 3007,
+        search: '?wsPort=3007',
+        expectedSource: 'query',
         expectedUrl: 'ws://127.0.0.1:3007/ws/rooms/room-explicit',
       },
       {
-        serverUrl: 'http://gateway.test:8080',
+        serverUrl: 'http://192.168.1.50:8080',
         wsPort: 8080,
-        expectedUrl: 'ws://gateway.test:8080/ws/rooms/room-explicit',
+        search: '',
+        expectedSource: 'configured',
+        expectedUrl: 'ws://192.168.1.50:8080/ws/rooms/room-explicit',
       },
     ]
 
@@ -232,7 +454,7 @@ describe('LAN server discovery', () => {
         send() {}
       }
       const browserWindow: Record<string, unknown> = {
-        location: { search: `?wsPort=${scenario.wsPort}` },
+        location: { search: scenario.search },
       }
       const context = createContext({
         window: browserWindow,
@@ -267,6 +489,8 @@ describe('LAN server discovery', () => {
       expect(urls[0]).toBe(scenario.expectedUrl)
       expect(fetch).not.toHaveBeenCalled()
       expect(persisted.get('rvb_ws_port')).toBe(String(scenario.wsPort))
+      expect(persisted.get('rvb_ws_port_server_url')).toBe(scenario.serverUrl)
+      expect(persisted.get('rvb_ws_port_source')).toBe(scenario.expectedSource)
       ws.disconnect()
     }
   })
