@@ -14,6 +14,66 @@
 第 1–7 节保留 RED-11 在 Electron 33.4.11 上取得的原始证据，不应解读为当前依赖版本；
 RED-19 已将当前候选更新为 Electron 43.4.0，升级后的命令、边界与结果见第 8 节。
 
+## 0. RED-93 推荐统一入口
+
+状态：2026-08-18 已建立统一编排入口；底层历史命令与候选证据继续保留在后续章节。
+
+安装锁定依赖后，日常开发与验收优先使用：
+
+```powershell
+npm.cmd run rvb -- doctor
+npm.cmd run rvb -- dev
+npm.cmd run rvb -- verify RED-123
+```
+
+| 目的 | 推荐命令 |
+| --- | --- |
+| 检查 Node、npm、Git、依赖和工作树 | `npm.cmd run rvb -- doctor` |
+| 启动默认 Next 开发服务 | `npm.cmd run rvb -- dev` |
+| 运行标准验收并留证 | `npm.cmd run rvb -- verify RED-123` |
+| 运行快速回归 | `npm.cmd run rvb -- verify RED-123 --profile quick` |
+| 预览步骤但不执行 | `npm.cmd run rvb -- verify RED-123 --profile standard --dry-run` |
+| 运行内部候选检查 | `npm.cmd run rvb -- verify RED-123 --profile candidate` |
+| 构建 Electron client 并留证 | `npm.cmd run rvb -- package RED-123` |
+| 预览打包但不创建产物 | `npm.cmd run rvb -- package RED-123 --dry-run` |
+
+任务编号必须使用真实的 `RED-<数字>`。默认 verify profile 为 `standard`。
+
+### 0.1 验证等级
+
+profile 由 `config/validation-profiles.json` 集中定义：
+
+- `quick`：编码检查和 Vitest，适合开发中的快速回归。
+- `standard`：编码、TypeScript、ESLint、Vitest 和 Next build，适合普通 PR 验收。
+- `candidate`：标准静态与测试检查，加 Electron client 打包，适合内部候选版本。
+
+TypeScript 检查遵循当前安装的 Next 16 指南，先运行 `next typegen` 刷新路由类型，再运行 `tsc --noEmit`。不要改回只读取现有 `.next` 缓存的裸 `tsc` 命令。
+
+修改 profile 时应在同一个 PR 中说明原因。不要在 AI 提示词或临时文档中复制另一套命令清单。
+
+### 0.2 验证证据
+
+verify 与 package 会写入：
+
+```text
+output/validation/<RED-ID>/<run-id>/
+├── manifest.json
+├── report.md
+└── logs/
+```
+
+报告包含 Git commit、分支、工作树状态、Node/npm 版本，以及每个步骤的实际命令、退出码、开始/结束时间和耗时。失败时流程停在第一个失败步骤，但仍写出报告和已执行步骤日志。
+
+`--dry-run` 会生成 `DRY-RUN` 报告但不执行底层命令，不能作为测试通过证据。失败时先查看报告所指向的第一个失败日志；不要用反复重跑掩盖不稳定失败。范围外失败应保留报告并建立独立 Linear 任务。
+
+### 0.3 边界与回退
+
+原有 npm scripts 仍可用于定位单个底层步骤。后续章节中的直接命令是历史基线、专项诊断或候选验证记录，不是团队日常入口的替代清单。
+
+PASS 报告不能代替 UI、核心流程、安装包、存档、局域网、Android 互通或发布判断。统一入口不得自动合并、自动发布或绕过 Medium/High 风险所需的独立审查和人工批准。
+
+回退 RED-93 的提交即可删除统一入口；底层原有 scripts 仍然保留。
+
 ## 1. 已确认的工具链
 
 | 项目 | 当前实测 | 来源或约束 |
@@ -196,6 +256,9 @@ npm.cmd run dev
 1. `package.json#scripts.dev` 启动 `next dev`。
 2. `instrumentation.ts#register()` 在 Node runtime 导入 `lib/ws-server.ts#startWsServer()`。
 3. HTTP 默认监听 3000；`lib/ws-server.ts#getWsPort()` 默认返回 3001。
+4. RED-93 起，`register()` 会等待 WebSocket 启动完成；同一进程内的 instrumentation/HMR
+   重复初始化通过全局生命周期 Promise 串行执行。旧客户端先断开，旧监听完成关闭后才会
+   重新绑定 3001，且成功日志只在真实 `listening` 事件后输出。
 
 实测：Next 约 1 秒进入 Ready；`GET /api/ping` 为 200；`GET /api/rooms` 在初始化临时数据库后为 200；WebSocket 3001 握手成功。
 

@@ -457,7 +457,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     firstIdentity = await createTestIdentity()
     secondIdentity = await createTestIdentity()
     process.env.WS_PORT = '0'
-    startWsServer()
+    await startWsServer()
     const server = globalWithWsServer.__rvbWss
     if (!server) throw new Error('WebSocket server did not start')
     await waitForServerListening(server)

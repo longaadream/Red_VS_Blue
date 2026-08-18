@@ -31,6 +31,7 @@ import { DEMO_FIXED_MAP_ID, startBattleFromLockedRosters } from './game/room-bat
 // and start a new one without requiring a full dev-server restart.
 const _g = globalThis as unknown as {
   __rvbWss?: WebSocketServer | null
+  __rvbWsLifecycle?: Promise<void>
   __rvbRoomClients?: Map<string, Set<WebSocket>>
   __rvbPlayerWs?: Map<string, WebSocket>
 }
@@ -361,13 +362,18 @@ async function sendBattleSnapshot(ws: WebSocket, roomId: string, viewerPlayerId?
   sendJson(ws, { type: 'battleUnavailable', reason: 'battle-not-started', room: publicRoom(room) })
 }
 
-export function startWsServer(): void {
-  if (_wss) {
-    // Module reloaded (HMR) but server is still bound — close it so new code's
-    // handlers replace the stale ones.
-    try { _wss.close() } catch {}
-    _wss = null
-    _g.__rvbWss = null
+async function restartWsServer(): Promise<void> {
+  const activeServer = _g.__rvbWss ?? _wss
+  if (activeServer) {
+    // HMR can initialize a new Next server instance before the prior async
+    // close has released its port. Disconnect stale clients and wait for the
+    // close callback before binding the replacement server.
+    for (const client of activeServer.clients) client.terminate()
+    await new Promise<void>((resolve, reject) => {
+      activeServer.close((error) => error ? reject(error) : resolve())
+    })
+    if (_wss === activeServer) _wss = null
+    if (_g.__rvbWss === activeServer) _g.__rvbWss = null
     roomClients.clear()
     playerWs.clear()
   }
@@ -377,16 +383,24 @@ export function startWsServer(): void {
   }
   const port = getWsPort()
 
-  _wss = new WebSocketServer({ port })
-  _g.__rvbWss = _wss
-
-  _wss.on('error', (err: Error) => {
-    console.error(`[WS] Failed to start on port ${port}:`, err.message)
-    _wss = null
-    _g.__rvbWss = null
+  const server = new WebSocketServer({ port })
+  _wss = server
+  _g.__rvbWss = server
+  const startup = new Promise<void>((resolve, reject) => {
+    server.once('listening', () => {
+      console.log(`[WS] WebSocket server listening on port ${port}`)
+      resolve()
+    })
+    server.once('error', reject)
   })
 
-  _wss.on('connection', (ws: WebSocket) => {
+  server.on('error', (err: Error) => {
+    console.error(`[WS] Failed to start on port ${port}:`, err.message)
+    if (_wss === server) _wss = null
+    if (_g.__rvbWss === server) _g.__rvbWss = null
+  })
+
+  server.on('connection', (ws: WebSocket) => {
     let roomId: string | null = null
     let playerId: string | null = null
 
@@ -669,7 +683,16 @@ export function startWsServer(): void {
     })
   })
 
-  console.log(`[WS] WebSocket server listening on port ${port}`)
+  await startup
+}
+
+export function startWsServer(): Promise<void> {
+  const previous = _g.__rvbWsLifecycle ?? Promise.resolve()
+  const current = previous
+    .catch(() => undefined)
+    .then(() => restartWsServer())
+  _g.__rvbWsLifecycle = current
+  return current
 }
 
 // ── PVE: run the bot's entire turn server-side ───────────────────────────────
