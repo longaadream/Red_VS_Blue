@@ -51,4 +51,4 @@ context.damageQueue.push({
 
 一次 batch 中，每个起始存活且最终为 0 的目标只进入一次生命周期。`onPieceDied` 执行后若目标恢复为正生命，不进墓地也不提供充能；否则敌方击杀者获得 1 充能，显式 `noKillCharge` 目标除外。目标随后按稳定顺序移入墓地。
 
-动作入口必须等 damage chain 清空后再做终局检查，因此后续终局实现可以同时观察双方核心全灭并判平局。
+动作入口等 damage chain 清空后由 `finalizeBattleTerminal()` 统一检查终局，因此可以同时观察双方核心全灭并判平局；pending 复活/选择未完成时继续延后。

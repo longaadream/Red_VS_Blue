@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
 import { getBattleStorage } from "@/lib/game/battle-storage"
-import { runBattleAction } from "@/lib/game/battle-runner"
 import { broadcastToRoom } from "@/lib/ws-server"
-import { assertActionPlayer } from "@/lib/game/targeting"
+import { getClientTerminalSubmissionError } from "@/lib/server/battle-terminal"
+import { commitAuthoritativeBattleAction } from "@/lib/server/battle-command"
 
 // ── GET — return current authoritative battle state ──────────────────────────
 
@@ -31,41 +31,34 @@ export async function POST(
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
 
-  let body: { type?: string; playerId?: string; action?: unknown; winner?: string } = {}
+  let body: { type?: string; playerId?: string; action?: unknown; winner?: unknown; terminalResult?: unknown } = {}
   try { body = await req.json() } catch {}
 
-  const room = await roomStore.getRoom(roomId)
-  if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
-
-  // ── gameOver: mark room finished, broadcast ──
-  if (body.type === 'gameOver') {
-    if (!room.gameRecord) {
-      room.status = 'finished'
-      room.gameRecord = {
-        gameId: roomId + '-' + Date.now(),
-        timestamp: Date.now(),
-        roomId,
-        players: room.players.map((p: any) => ({ id: p.id, name: p.name, publicKey: p.publicKey })),
-        winner: body.winner ?? null,
-        signatures: {},
-      }
-      await roomStore.setRoom(roomId, room)
-    }
-    broadcastToRoom(roomId, { type: 'gameOver', winner: body.winner })
-    return NextResponse.json({ ok: true })
+  const terminalSubmissionError = getClientTerminalSubmissionError(body)
+  if (terminalSubmissionError) {
+    return NextResponse.json({ error: terminalSubmissionError.message, code: terminalSubmissionError.code }, { status: 400 })
   }
-
-  // ── regular battle action: apply on server ──
-  const storage = getBattleStorage(room)
-  if (!storage) return NextResponse.json({ error: 'Battle not started' }, { status: 400 })
 
   const action = body.action
   if (!action) return NextResponse.json({ error: 'action is required' }, { status: 400 })
 
-  let result: ReturnType<typeof runBattleAction>
   try {
-    assertActionPlayer(body.playerId, action)
-    result = runBattleAction(storage.state as any, action as any, { rootSeed: storage.seed })
+    const { storage, result } = await commitAuthoritativeBattleAction({
+      roomId,
+      playerId: body.playerId as any,
+      action: action as any,
+    })
+
+    broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state as any, seed: storage.seed, stateHash: result.stateHash, duplicate: result.duplicate })
+
+    return NextResponse.json({
+      ok: true,
+      state: storage.state as any,
+      seed: storage.seed,
+      stateHash: result.stateHash,
+      actionHash: result.actionHash,
+      duplicate: result.duplicate === true,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     const errAny = err as any
@@ -93,21 +86,9 @@ export async function POST(
         determinism: errAny.determinism ?? undefined,
       }, { status: 400 })
     }
-    return NextResponse.json({ error: msg, code: errAny?.code, determinism: errAny?.determinism ?? undefined }, { status: 400 })
+    return NextResponse.json(
+      { error: msg, code: errAny?.code, determinism: errAny?.determinism ?? undefined },
+      { status: errAny?.status ?? 400 },
+    )
   }
-
-  storage.state = result.state
-  room.battleState = storage as any
-  await roomStore.setRoom(roomId, room)
-
-  broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: result.stateHash, duplicate: result.duplicate })
-
-  return NextResponse.json({
-    ok: true,
-    state: storage.state,
-    seed: storage.seed,
-    stateHash: result.stateHash,
-    actionHash: result.actionHash,
-    duplicate: result.duplicate === true,
-  })
 }

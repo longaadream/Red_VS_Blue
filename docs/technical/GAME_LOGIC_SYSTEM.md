@@ -45,7 +45,7 @@ flowchart LR
   Setup["房间开战与初始化<br/>room-battle-start / battle-setup"]
   Store["RoomStore + battle-storage"]
   Android["Android action log（遗留）<br/>RED-81 将删除"]
-  Relay["Relay 主机客户端"]
+  Relay["Relay 浏览器客户端"]
 
   UI -->|action| Transport
   Transport --> Runner
@@ -62,18 +62,18 @@ flowchart LR
   UI -.->|action + trace| Android
   Android -.->|actionLog| UI
   UI -.->|确定性回放| Runner
-  Relay -.->|主机本地执行| Runner
-  Relay -.->|stateUpdate| UI
+  Relay -->|action| Transport
+  Transport -->|stateUpdate| Relay
 ```
 
 ### 2.2 运行模式与权威边界
 
 | 运行模式 | 当前共享权威 | 动作执行 | 保存与同步 |
 | --- | --- | --- | --- |
-| Windows LAN WebSocket | Prisma 房间中的 `server-state` | 服务端 `runBattleAction(state, action, { rootSeed })` | `RoomStore.setRoom()` 后广播完整 `stateUpdate` |
-| 房间 HTTP `POST` | 与 Windows LAN 相同 | 服务端校验 actor 后调用同一 Runner | 保存后广播；HTTP 同时返回 state/hash |
+| Windows LAN WebSocket | Prisma 房间中的 `server-state` | 服务端 `runBattleAction(state, action, { rootSeed })` | `setRoomIfVersion()` CAS 成功后广播完整 `stateUpdate` |
+| 房间 HTTP `POST` | 与 Windows LAN 相同 | 服务端校验 actor 后调用同一共享命令服务 | CAS 保存后广播；HTTP 同时返回 state/hash |
 | Android 内嵌房间（当前遗留） | 内存 `action-log` | 浏览器 Runner 生成 trace 并按日志确定性回放；移动服务只校验 trace 形状/链 | 追加带 `seq` 的日志并广播 `actionLog`；RED-81 将完整删除该框架 |
-| Relay | Relay 主机浏览器状态 | 主机浏览器调用 `runBattleAction()` | 主机向客机发送完整 `stateUpdate` |
+| Relay | 同合同的远端权威房间服务 | 浏览器只发送 action | 只消费服务端 `stateUpdate`；旧 host 权威协议被拒绝 |
 | Training / Debug | 各自的训练或调试状态 | 新旧入口并存；部分旧路径可不带 seed | 不等同于房间权威链，不应用来证明跨端一致性 |
 
 > **历史兼容：** `getBattleStorage()` 仍能读取旧 `action-log` 和裸 `BattleState`。这只是恢复兼容，不表示三种格式具有相同的权威语义。
@@ -297,18 +297,18 @@ RED-82 的目标流程：
 - **房间合同：** 两名玩家 roster 均锁定后，固定地图状态 ID 为 `large-hole-arena`，先生成 root seed，再以 `deploymentEnabled: true` 初始化。
 - **初始化合同：** 玩家数、模板、按玩家选人、地图及 `{ firstPlayerId?, rootSeed?, deploymentEnabled? }`；返回 `Promise<BattleState | null>`。
 - **部署：** 16 枚初始棋子标记 `isCore: true`；稳定玩家顺序与固定随机消费产生初始位置和先手；召唤物强制 `isCore: false`。
-- **提交：** PVE bot 自动提交保留全部；房间启动使用 `setRoomIfVersion()` 最多重试三次。常规 WS/HTTP 动作写入目前仍使用 `setRoom()`。
+- **提交：** 房间启动使用 `setRoomIfVersion()` 最多重试三次；常规 WS/HTTP 动作与 PVE bot 状态使用同一 CAS 持久化边界。
 - **错误：** 权威部署缺 seed 或固定地图缺失时失败关闭；玩家数不是 2 返回 `null`；数据/效果错误可抛出。
 - **测试：** `deployment.test.ts` 和房间 roster/identity 相关测试。
 
 ### 4.4 Windows WebSocket 与 HTTP
 
 - **入口：** `lib/ws-server.ts::startWsServer()`；`app/api/rooms/[roomId]/battle/route.ts::GET()`、`app/api/rooms/[roomId]/battle/route.ts::POST()`。
-- **动作合同：** 读取 Room 和 `ServerBattleState`，用 `assertActionPlayer()` 比较连接/请求玩家，再调用带 room seed 的 Runner。
-- **成功：** 更新 `room.battleState`，等待 `RoomStore.setRoom()`，然后广播 `stateUpdate { state, seed, stateHash, duplicate }`。
-- **失败：** WS 向发送者返回 `actionError`；HTTP 返回 400 JSON。二者都可携带 preparation 和 determinism 上下文，但 envelope 不完全相同。
-- **并发边界：** 常规动作不是 compare-and-swap；两个并发请求可能从同一 Room.version 计算并后写覆盖。
-- **测试：** `tests/ws-server.test.ts` 覆盖连接、ping/pong、坏 JSON 和 RPC 错误，不覆盖权威战斗动作全链；房间 Battle API 仍缺同快照 WS/HTTP 一致性集成测试。
+- **动作合同：** `commitAuthoritativeBattleAction()` 读取 Room 和 `ServerBattleState`，校验连接/请求玩家，再调用带 room seed 的 Runner。
+- **成功：** 更新 `room.battleState`，用读取到的 `Room.version` 调用 `setRoomIfVersion()`；只有 CAS 成功才广播 `stateUpdate { state, seed, stateHash, duplicate }`。
+- **失败：** WS 向发送者返回 `actionError`；HTTP 返回 JSON。版本竞争稳定返回 `BATTLE_STATE_CONFLICT`（HTTP 409）；选择与普通错误仍可携带 preparation 和 determinism 上下文。
+- **并发边界：** HTTP、WS 与 Bot 的房间写入都受数据库版本 CAS 保护；失败计算被丢弃，不广播也不覆盖已提交终局。
+- **测试：** `tests/roster-transports.test.ts` 覆盖同房间 HTTP/WS 双投降竞争；`terminal-transport.test.ts` 与 `battle-command.test.ts` 覆盖守卫、CAS 和 Bot 终局持久化。
 
 ### 4.5 RoomStore 与战斗存储
 
@@ -323,7 +323,7 @@ RED-82 的目标流程：
 - **浏览器出口：** `lib/game/engine-browser-entry.ts` 暴露归约器、Runner、hash、普通移动和旧 RNG 适配器；`data/pages/js/game-engine.js` 是构建产物。
 - **战斗页：** `battle.html::doAction()` 生成 clientActionId，先在克隆状态上调用确定性 Runner 取得 trace/preparation，再按 LAN、Relay 或 action-log 模式提交。
 - **LAN：** 浏览器本地运行只用于交互准备和诊断；共享结果以服务端 `stateUpdate` 为准。
-- **Relay：** 主机浏览器本地执行 Runner 并发送完整状态；客机等待主机状态。
+- **Relay：** 所有浏览器都只发送 action 并等待服务端完整状态；旧 `pendingAction`/`hostResume` 权威消息被忽略，客户端禁止上传 `stateUpdate`。
 - **Android：** `mobile-server-entry.ts::handleBattleAction()` 只追加动作与 trace。trace 格式、seed 或前置 hash 不匹配时写 `traceValidationError`，当前不会拒绝动作。
 - **Android 回放：** `battle.html::applyLegacyBattleEntry()` 按 `seq` 调用浏览器 Runner；缺 root seed 或 Runner 时失败关闭。
 - **存储：** Android 房间只在 WebView 内存 `Map`，没有 Prisma 或正式离线恢复协议。
@@ -517,11 +517,11 @@ Demo 房间状态先经历部署，再进入 `TurnPhase = start | action | end`�
 
 ### 6.3 胜负状态
 
-**当前实现：** `data/pages/battle.html::checkClientGameOver()` 统计两名玩家是否仍有存活棋子，向页面状态写入 winner/gameOver，并发送 `gameOver`。Windows/Android 服务随后写 `gameRecord` 并广播结果。
+**当前实现（RED-34）：** `lib/game/terminal.ts::finalizeBattleTerminal()` 在完整动作、伤害 batch、死亡/复活与触发链结束后归约一次 `BattleState.terminalResult`。若仍有 pending 选择则延后；主动投降与预留的超时投降原因立即结算。
 
-**历史边界：** `BattleState` 的正式接口没有统一 `GameResult` 字段或服务端终局归约命令；页面动态字段和 transport 的 `gameOver` 消息承担了收口。
+核心存活按 `isCore === true` 与 `ownerPlayerId` 计算，召唤物不计；双方同时全灭为平局。第 40 个完整轮次的 `end` 结算先检查核心胜利，再检查轮次平局。终局写入可追踪的 action/turn/phase/round 位置并追加唯一 `terminalResult` 日志。
 
-**目标设计：** 服务端规则核心应从权威状态计算、持久化并签署终局，客户端只负责展示。这个接口尚未实现，不能在调用方代码中假定存在。
+HTTP 与 WebSocket 都拒绝客户端提交的 `gameOver`、`winner` 或 `terminalResult`，并通过房间版本 CAS 只提交和广播一次权威结果；竞争失败返回 `BATTLE_STATE_CONFLICT`。Bot 使用同一持久化边界，房间与 `terminalResult` 在一次 CAS 写入中同步为 `finished`。终局后的 gameplay 命令以 `BATTLE_ALREADY_TERMINAL` 拒绝且不改变状态；`battle.html` 仅展示服务端结果。
 
 ## 7. 失败语义与调试证据
 
@@ -533,7 +533,7 @@ Demo 房间状态先经历部署，再进入 `TurnPhase = start | action | end`�
 | Trigger | 异常重新抛并附 `triggerContext`；链预算返回阻断错误 | event/root/parent ID、depth、consumer kind/ID、eventChain |
 | WebSocket | 只向发送者回 `actionError` | roomId、connection player、action、错误 envelope |
 | HTTP | 400 JSON；选择与普通错误字段略有差异 | roomId、body 摘要、status、response |
-| RoomStore | Prisma/JSON 错误向上传播；普通动作无 CAS | 读取与写入 Room.version、写前/后 hash |
+| RoomStore | Prisma/JSON 错误向上传播；版本竞争返回稳定冲突 | 读取与写入 Room.version、写前/后 hash、CAS 结果 |
 | Android log（遗留） | trace 问题写 `traceValidationError`，不拒绝日志 | seq、seed、pre/post hash、诊断文本；RED-81 后删除本行 |
 | 动态代码 | 编译或执行错误向上传播，当前调用点分散 | surface、内容 ID/version/codeHash、dry-run/正式执行阶段；RED-82 后补缓存命中信息 |
 | 浏览器 | 状态栏、战斗日志、console；部分兼容路径仍有空 catch | 运行模式、最后 seq/action/stateUpdate、截图 |
@@ -559,6 +559,7 @@ commit + 运行模式 + roomId
 | 归约、移动、阶段、版本、输入不可变、技能/卡牌挂起与异常回滚 | `tests/game/turn.test.ts` |
 | 根种子、命名流、逻辑时间/ID、checkpoint、trace、逐动作回放 hash | `tests/game/deterministic-runtime.test.ts` |
 | 16 核心棋子部署、固定 cursor、提交顺序无关、部署门禁、召唤物身份 | `tests/game/deployment.test.ts` |
+| 单边/同时核心全灭、复活、召唤物、40 轮、投降、同阵营身份、终局幂等、固定 seed 回放、HTTP/WS 竞争和 Bot CAS | `tests/game/terminal.test.ts`、`tests/game/terminal-transport.test.ts`、`tests/game/battle-command.test.ts`、`tests/roster-transports.test.ts` |
 | 精确候选、纯查询、同一验证器、凭证、pending、多段目标、UI/AI 一致 | `tests/game/targeting.test.ts` |
 | 曼哈顿/方形/直线、占位、普通移动、弹道事实和 UI/服务端集合一致 | `tests/game/spatial.test.ts`、`tests/game/projectile-trace.test.ts`、`tests/game/movement-contract.test.ts` |
 | 消费者大类/priority/快照顺序与队列可见性 | `tests/game/triggers-ordering.test.ts`、`tests/game/combat-trigger-queue-visibility.test.ts` |
@@ -571,9 +572,8 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 
 ### 8.2 主要缺口
 
-- 服务端权威胜负归约及开局到终局的固定 seed 回归。
+- 真实 Prisma、多服务实例和客户端断线条件下的终局广播竞争 E2E。
 - `RoomStore` 对完整 `server-state` 的保存—读取等价与迁移测试。
-- 常规 WS/HTTP 动作的 CAS 并发竞争测试。
 - 同一快照和动作走 WS、HTTP、Relay、迁移后 Android 权威 Runner 的跨端最终状态一致性。
 - Android 安装包内生成 bundle 的来源/hash，以及完整开服—保存—重连端到端验证；不再验收 action-log 回放。
 - 动态代码统一缓存的命中、精准失效、编译失败关闭、Node/browser 一致性和候选枚举性能基线。

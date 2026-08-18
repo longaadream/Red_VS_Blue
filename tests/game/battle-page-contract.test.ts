@@ -62,6 +62,22 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('renders the authoritative terminal result without judging or submitting gameOver locally', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('G.terminalResult')
+    expect(battlePage).toContain('winnerPlayerId')
+    expect(battlePage).not.toContain('function checkClientGameOver')
+    expect(battlePage).not.toMatch(/\bG\.(?:gameOver|winner)\b/)
+    expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]gameOver['"]/)
+    expect(battlePage).not.toMatch(/msg\.type\s*===\s*['"]gameOver['"]/)
+    expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]stateUpdate['"]/)
+    expect(battlePage).not.toMatch(/wsMode === ['"]relay['"] && wsRole === ['"]host['"] && G/)
+    expect(battlePage).toContain("if (wsMode === 'relay')")
+    expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
+    expect(battlePage).toContain('已忽略非权威 Relay 恢复状态')
+  })
+
   it('keeps one responsive HUD, board-anchored piece menu, and unsectioned curved hand', () => {
     const battlePage = readPage('battle.html')
     const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')

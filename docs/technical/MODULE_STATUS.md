@@ -30,21 +30,21 @@
 | 战斗初始化 | 部分核对 | `battle-setup.ts::createInitialBattleForPlayers()` | 全局触发器、seed 注入顺序 | 固定 seed 初始化测试 |
 | Runner/回放 | 部分核对 | `battle-runner.ts` | 输入隐式修改、RNG 恢复问题 | 状态 trace 与纯度测试 |
 | 技能/卡牌 | 部分核对 | `skills.ts` | 动态代码、模块缓存、日志分散 | 建最小技能 fixture 测试 |
-| 权威目标选择 | 已核对/已测试 | `targeting.ts::prepareAction()` | Relay 仍依赖主机客户端执行核心 | 补真实双端 Relay/WS E2E |
+| 权威目标选择 | 已核对/已测试 | `targeting.ts::prepareAction()` | 真实远端服务与断线场景仍缺 | 补真实双端 WS E2E |
 | 触发器 | 部分核对 | `triggers.ts::globalTriggerSystem` | 进程级单例、并发隔离未知 | 多房间隔离测试 |
-| 胜负判断 | 历史遗留 | `battle.html::checkClientGameOver()` | UI 承担规则、无统一出口 | 独立设计/迁移任务 |
+| 权威终局 | 已核对/已测试 | `terminal.ts::finalizeBattleTerminal()` | 真实 Prisma 多实例与断线 E2E 尚缺 | 补候选环境双客户端验证 |
 | LAN WebSocket | 部分核对 | `ws-server.ts::startWsServer()` | 协议/错误无版本，空 catch | WS 集成测试与日志上下文 |
-| HTTP 动作 API | 部分核对 | `rooms/[roomId]/battle::POST` | 与 WS 验证可能漂移 | 同快照双入口一致性测试 |
+| HTTP 动作 API | 已核对/已测试 | `rooms/[roomId]/battle::POST` | 错误 envelope 与 WS 仍有差异 | 统一版本化错误合同 |
 | Prisma RoomStore | 部分核对 | `RoomStore` | 外层无格式版本，字段读取重置 | 定义新格式并做 round-trip |
 | Electron 服务端 | 未运行 | `electron/main.ts` | 最后版本重大故障、启动链复杂 | 第一优先级冒烟基线 |
 | Electron 客户端 | 未运行 | `electron-client/main.ts` | 本地服务和静态资源分支复杂 | LAN 加入房间冒烟测试 |
 | Android 客户端/服务端 | 正式产物/未验证 | `android-client`、`MobileHttpServer`、`mobile-server-entry.ts` | 生成物漂移；服务端外壳与 Windows 重复 | 双向开服冒烟和共享 Server Core |
 | 浏览器战斗 UI | 已核对/历史遗留 | `data/pages/battle.html` | 超大跨层文件、全局 `G` | 先记录状态边界，再逐步抽离 |
-| Relay | 非首要链路 | `relay-server` | 主机客户端权威 | 暂不阻塞 LAN+Android 基线 |
+| Relay | 遗留权威已禁用 | `relay-server` | standalone 服务尚未实现权威状态合同 | 重建服务后再启用在线战斗 |
 | Training/PVE | 非首要链路 | `app/api/training`、`app/api/pve` | 状态边界与 LAN 不同 | 基线稳定后单独核对 |
 | Electron IPC | 部分核对 | preload + `ipcMain` | 字符串协议、无共享类型 | 定义协议清单和错误 envelope |
 | 构建与运行文档 | 缺失 | `BUILD_AND_RUN.md` | 文件为空 | 故障定位后用真实证据补写 |
-| 自动测试 | 部分存在/未运行 | `tests/game` | 无跨层、存档、胜负、Android 测试 | 恢复依赖后先运行现有测试 |
+| 自动测试 | 部分存在/已运行 | `tests/game`、`tests/roster-transports.test.ts` | 仍缺存档、真实 Prisma 多实例与移动端 E2E | 按模块补回归与候选验证 |
 
 ## 2. 类型状态
 
@@ -127,7 +127,7 @@
 
 ### 阶段 E：收敛模块边界
 
-1. 统一服务端胜负归约，并让 Android/Electron 只显示结果。
+1. Windows/Electron 与浏览器已统一服务端胜负归约；移动端在新框架中另行接入，只显示结果。
 2. 核对并收敛重复状态类型。
 3. 建立共享 WS/Electron 协议类型。
 4. 最后再逐步拆分 `battle.html`、`turn.ts` 和 `skills.ts`。

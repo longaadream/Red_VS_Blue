@@ -1,8 +1,13 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
-import { assertActionPlayer } from './game/targeting'
 import { getBattleStorage, withServerSkills } from './game/battle-storage'
 import { hashBattleState, runBattleAction } from './game/battle-runner'
+import { getClientTerminalSubmissionError } from './server/battle-terminal'
+import {
+  commitAuthoritativeBattleAction,
+  isBattleStateConflict,
+  persistAuthoritativeBattleState,
+} from './server/battle-command'
 import { verifyJoinAuth, verifyRecordSignature, derivePlayerId } from './game/identity-verify'
 import {
   ensureRosterAlignmentMutable,
@@ -542,29 +547,25 @@ export function startWsServer(): void {
           const sender = ws
           ;(async () => {
             try {
-              const room = await roomStore.getRoom(_roomId)
-              if (!room) return
-              const storage = getBattleStorage(room)
-              if (!storage) {
-                console.warn('[WS] no battle storage for room', _roomId, 'msg.type=', msg.type)
+              const terminalSubmissionError = getClientTerminalSubmissionError(msg)
+              if (terminalSubmissionError) {
+                sendJson(sender, { type: 'actionError', error: terminalSubmissionError.message, code: terminalSubmissionError.code })
                 return
               }
-
               if (msg.type === 'action') {
                 if (msg.action == null) return
                 try {
-                  assertActionPlayer(playerId, msg.action)
-                  const result = runBattleAction(storage.state as any, msg.action as any, { rootSeed: storage.seed })
-                  storage.state = result.state
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  ;(room as any).battleState = storage
-                  await roomStore.setRoom(_roomId, room)
+                  const { room, storage, result } = await commitAuthoritativeBattleAction({
+                    roomId: _roomId,
+                    playerId: playerId as any,
+                    action: msg.action as any,
+                  })
                   broadcastToRoom(_roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: result.stateHash, duplicate: result.duplicate })
                   // PVE: if it's now the bot's action phase, run AI after a short delay
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const st = storage.state as any
                   const hasBotPlayer = (room.players as any[]).some(p => p.isBot === true || p.id === 'bot')
-                  if (hasBotPlayer && st?.turn?.phase === 'action' && st?.turn?.currentPlayerId === 'bot') {
+                  if (!st?.terminalResult && hasBotPlayer && st?.turn?.phase === 'action' && st?.turn?.currentPlayerId === 'bot') {
                     setTimeout(() => { runBotTurn(_roomId).catch(() => {}) }, 800)
                   }
                 } catch (err) {
@@ -596,24 +597,6 @@ export function startWsServer(): void {
                     }))
                   }
                 }
-                return
-              }
-
-              if (msg.type === 'gameOver') {
-                if (!room.gameRecord) {
-                  room.status = 'finished'
-                  room.gameRecord = {
-                    gameId: _roomId + '-' + Date.now(),
-                    timestamp: Date.now(),
-                    roomId: _roomId,
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    players: (room.players as any[]).map(p => ({ id: p.id, name: p.name, publicKey: p.publicKey })),
-                    winner: msg.winner ?? null,
-                    signatures: {},
-                  }
-                  await roomStore.setRoom(_roomId, room)
-                }
-                broadcastToRoom(_roomId, { type: 'gameOver', winner: msg.winner })
                 return
               }
             } catch (e) {
@@ -682,9 +665,13 @@ async function runBotTurn(roomId: string): Promise<void> {
     }
 
     storage.state = currentState
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(room as any).battleState = storage
-    await roomStore.setRoom(roomId, room)
+    try {
+      await persistAuthoritativeBattleState({ roomId, room, storage })
+    } catch (error) {
+      // A player command won the room-version race; discard this stale bot turn.
+      if (isBattleStateConflict(error)) return
+      throw error
+    }
     broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: hashBattleState(storage.state as any) })
   } catch (e) {
     console.warn('[WS] runBotTurn error:', e)

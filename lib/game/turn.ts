@@ -45,6 +45,7 @@ import {
   validatePendingTargetSubmission,
 } from "./targeting"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
+import { finalizeBattleTerminal, type TerminalResult } from "./terminal"
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -253,6 +254,8 @@ export interface BattleState {
   /** 两个玩家的资源状态（充能点等） */
   players: PlayerTurnMeta[]
   turn: TurnState
+  /** RED-34 authoritative terminal result committed exactly once by the server. */
+  terminalResult?: TerminalResult
   /** RED-29 同时部署状态；完成前普通战斗命令均被拒绝。 */
   deployment?: DeploymentState
   /** 战斗日志 */
@@ -330,6 +333,7 @@ export type BattleAction =
   | {
       type: "surrender"
       playerId: PlayerId
+      reason?: "voluntary" | "timeout"
     }
   | ({
       type: "playCard"
@@ -352,8 +356,10 @@ export type BattleAction =
     } & TargetSelectionCredential)
 
 export class BattleRuleError extends Error {
-  constructor(message: string) {
+  readonly code?: string
+  constructor(message: string, code?: string) {
     super(message)
+    this.code = code
     this.name = "BattleRuleError"
   }
 }
@@ -839,13 +845,17 @@ function applyBattleActionInternal(
     )
   }
 
-  if (state.deployment?.status === 'awaiting-choices' && action.type !== 'deploymentChoice') {
+  if (
+    state.deployment?.status === 'awaiting-choices'
+    && action.type !== 'deploymentChoice'
+    && action.type !== 'surrender'
+  ) {
     throw new BattleRuleError('Battle actions are unavailable until deployment is complete')
   }
 
   // RED-59: all target discovery and final target validation happen before
   // cloning, triggers, payment, logging, or effect execution.
-  assertActionTargetingReady(state, action)
+  if (action.type !== 'surrender') assertActionTargetingReady(state, action)
   const validatedPendingTarget = action.type === 'pendingTargetSelect'
     ? validatePendingTargetSubmission(state, action)
     : undefined
@@ -882,10 +892,10 @@ function applyBattleActionInternal(
   }
 
   // 飞雷神等被动触发待选择时，禁止非选择动作（防止攻击方绕过等待）
-  if (state.pendingOptionSelection && action.type !== 'pendingOptionSelect') {
+  if (state.pendingOptionSelection && action.type !== 'pendingOptionSelect' && action.type !== 'surrender') {
     throw new BattleRuleError('请等待对方选择完成后再行动')
   }
-  if (state.pendingTargetSelection && action.type !== 'pendingTargetSelect') {
+  if (state.pendingTargetSelection && action.type !== 'pendingTargetSelect' && action.type !== 'surrender') {
     throw new TargetingRuleError({
       kind: 'invalid',
       code: 'PENDING_SELECTION_ACTIVE',
@@ -2219,39 +2229,11 @@ function applyBattleActionInternal(
     }
 
     case "surrender": {
-      // 投降逻辑：将投降玩家的所有棋子设置为阵亡状态
       const next = safeCloneBattleState(state)
-
-      // 找到投降玩家的所有棋子并设置为阵亡
-      next.pieces.forEach(piece => {
-        if (isSamePlayer(piece.ownerPlayerId, action.playerId)) {
-          piece.currentHp = 0
-        }
-      })
-      
-      // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
-        type: "whenever",
-        playerId: action.playerId
-      });
-
-      // 处理whenever触发效果的消息
-      if (wheneverResult.success && wheneverResult.messages.length > 0) {
-        if (!next.actions) {
-          next.actions = [];
-        }
-        wheneverResult.messages.forEach(message => {
-          next.actions!.push({
-            type: "triggerEffect",
-            playerId: action.playerId,
-            turn: next.turn.turnNumber,
-            payload: {
-              message
-            }
-          });
-        });
+      if (next.players.length !== 2) {
+        throw new BattleRuleError('Surrender requires exactly two battle players', 'INVALID_SURRENDER_PLAYER')
       }
-      
+      getPlayerMeta(next, action.playerId)
       return next
     }
 
@@ -2538,6 +2520,15 @@ function applyBattleActionInternal(
   }
 }
 
+export function assertBattleNotTerminal(state: BattleState): void {
+  if (state.terminalResult) {
+    throw new BattleRuleError(
+      'Battle is already terminal; gameplay commands are no longer accepted',
+      'BATTLE_ALREADY_TERMINAL',
+    )
+  }
+}
+
 /**
  * Public reducer wrapper. A successful command advances the target-query
  * revision exactly once, including commands that create a pending session.
@@ -2546,7 +2537,13 @@ export function applyBattleAction(
   state: BattleState,
   action: BattleAction,
 ): BattleState {
-  return stampTargetingRevision(state, applyBattleActionInternal(state, action))
+  assertBattleNotTerminal(state)
+  const actionIndex = Array.isArray(state.extensions?.debugBattle?.actionLog)
+    ? state.extensions.debugBattle.actionLog.length
+    : 0
+  const next = stampTargetingRevision(state, applyBattleActionInternal(state, action))
+  finalizeBattleTerminal(next, action, { actionIndex })
+  return next
 }
 
 // 召唤棋子接口

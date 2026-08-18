@@ -2285,7 +2285,7 @@
 
     // ── Surrender ──
     function confirmSurrender() {
-      if (!G || G.gameOver || G.winner) { goBack(); return }
+      if (!G || G.terminalResult) { goBack(); return }
       const overlay = document.getElementById('surrenderConfirmOverlay')
       if (overlay) { overlay.style.display = 'flex'; return }
       // Fallback if overlay not present
@@ -2886,7 +2886,7 @@
       render()
       if (interactionFeedback) setStatusMsg(interactionFeedback)
 
-      if (G.gameOver || G.winner) { handleGameOver(); return }
+      if (G.terminalResult) { handleGameOver(); return }
 
       // Auto-advance start phase (only the current player sends beginPhase)
       if (G.turn && G.turn.phase === 'start') {
@@ -2904,10 +2904,8 @@
       }
       if (!G) return
       if (entry.type === 'gameOver') {
-        G.gameOver = true
-        G.winner = entry.winner || G.winner
         wsActionSeq = entry.seq
-        handleGameOver()
+        addLog('Ignored a client-authored legacy gameOver entry', 'err')
         return
       }
       if (entry.action && typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
@@ -3018,46 +3016,11 @@
           render()
           setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
         } else if (msg.type === 'pendingAction') {
-          // Relay host: process guest action locally and push stateUpdate.
-          if (wsMode === 'relay' && wsRole === 'host' && G &&
-              typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
-            try {
-              if (!msg.action || !msg.from || !msg.action.playerId ||
-                  String(msg.from).toLowerCase() !== String(msg.action.playerId).toLowerCase()) {
-                var playerMismatch = new Error('Relay sender does not match action player')
-                playerMismatch.code = 'ACTION_PLAYER_MISMATCH'
-                throw playerMismatch
-              }
-              var result = runDeterministicAuthorityAction(G, msg.action)
-              var newG = result.state
-              applyServerState(newG, gameSeed)
-              relaySeq++
-              RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
-            } catch (e) {
-              addLog('处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err')
-              RvBWs.send({
-                type: 'actionError',
-                to: msg.from,
-                from: myPlayerId,
-                action: msg.action,
-                error: e.message || String(e),
-                code: e.code,
-                preparation: e.preparation,
-                needsTargetSelection: e.needsTargetSelection,
-                targetType: e.targetType,
-                range: e.range,
-                filter: e.filter,
-                targetIndex: e.targetIndex,
-                needsOptionSelection: e.needsOptionSelection,
-                title: e.title,
-                options: e.options,
-              })
-            }
-          }
+          // Old relay servers delegated authority to the host client. That path is
+          // intentionally disabled: network clients only consume server stateUpdate.
+          addLog('已忽略旧 Relay 客户端权威动作；等待服务端状态', 'err')
         } else if (msg.type === 'hostResume') {
-          if (wsMode === 'relay' && wsRole === 'host' && msg.state) applyServerState(msg.state, null)
-        } else if (msg.type === 'gameOver') {
-          if (G && !G.gameOver) { G.gameOver = true; G.winner = msg.winner; handleGameOver() }
+          addLog('已忽略非权威 Relay 恢复状态；等待服务端快照', 'err')
         }
       })
 
@@ -3360,7 +3323,6 @@
     let _pendingChoiceShown = null  // track which pendingOptionSelection we've shown
     function render() {
       if (!G) return
-      checkClientGameOver()
       renderBoard()
       renderPanels()
       renderActionBar()
@@ -4321,7 +4283,7 @@
         const interactionFeedback = reconcileBattleInteractionState(oldG, G)
         if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
         restoreSelectedPieceMenu()
-        render(); checkClientGameOver()
+        render(); if (G.terminalResult) handleGameOver()
         if (interactionFeedback) setStatusMsg(interactionFeedback)
       } catch (e) {
         let rejectionFeedback = ''
@@ -4382,40 +4344,14 @@
           }
         }
 
-        // Relay guest: submit action via WS, wait for stateUpdate.
-        if (wsMode === 'relay' && wsRole === 'guest') {
+        // Relay clients submit commands to the server and only consume stateUpdate.
+        if (wsMode === 'relay') {
           relaySeq++
           RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: '', trace: authorityTrace })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
           pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
-          return
-        }
-
-        // Relay host: apply locally + push stateUpdate.
-        if (wsMode === 'relay' && wsRole === 'host' && G &&
-            typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
-          try {
-            const result = runDeterministicAuthorityAction(G, action)
-            const newG = result.state
-            if (action.pieceId && newG.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
-              selectedPieceId = action.pieceId
-            } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-            pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
-            applyServerState(newG, gameSeed)
-            relaySeq++
-            RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
-          } catch (e) {
-            if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
-              const errMsg = e.message || String(e)
-              red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
-              clearTargetInteraction('server-rejected')
-              addLog('本地处理失败：' + errMsg, 'err')
-              render()
-              setStatusMsg('操作被拒绝：' + errMsg + '；目标选择已清除')
-            }
-          }
           return
         }
 
@@ -4461,25 +4397,10 @@
       return 'info'
     }
 
-    function checkClientGameOver() {
-      if (!G || G.gameOver || G.winner) return
-      const livingOwners = new Set(G.pieces.filter(p => p.currentHp > 0).map(p => p.ownerPlayerId))
-      const playerIds = (G.players || []).map(p => p.playerId).filter(Boolean)
-      const defeated = playerIds.filter(playerId => !livingOwners.has(playerId))
-      if (defeated.length === 1 && playerIds.length === 2) {
-        G.winner = playerIds.find(playerId => playerId !== defeated[0])
-        G.gameOver = true
-        handleGameOver()
-      }
-    }
-
     function handleGameOver() {
+      if (!G || !G.terminalResult) return
+      const terminalResult = G.terminalResult
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-      // Notify the WS server about gameOver before disconnecting so it can record the game.
-      if (!TRAINING_MODE && !SPECTATE_MODE && G && (G.winner || G.gameOver) &&
-          typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
-        try { RvBWs.send({ type: 'gameOver', playerId: myPlayerId, winner: G.winner || 'draw' }) } catch {}
-      }
       if (typeof RvBWs !== 'undefined') RvBWs.disconnect()
       try { localStorage.removeItem('rvb_active_battle') } catch {}
       if (recordSaved) return
@@ -4489,9 +4410,9 @@
       try {
         const identity = (typeof RvBIdentity !== 'undefined') ? RvBIdentity.getIdentity() : null
         if (identity && G) {
-          const winner = G.winner
+          const winner = terminalResult.winnerPlayerId
           const myResult = winner
-            ? (winner === myFaction || winner === myPlayerId ? 'win' : 'loss')
+            ? (String(winner).toLowerCase() === String(myPlayerId).toLowerCase() ? 'win' : 'loss')
             : 'draw'
           const oppPlayer = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() !== myPlayerId)
           const record = {
@@ -4510,20 +4431,25 @@
           localStorage.setItem('rvb_battle_records', JSON.stringify(records))
         }
       } catch {}
-      // gameOver notification is sent before disconnect.
       }
-      const winner = G.winner
-      const iWon = winner && (
-        winner.toLowerCase() === myFaction ||
-        winner.toLowerCase() === myPlayerId
-      )
+      const winner = terminalResult.winnerPlayerId
+      const iWon = winner && String(winner).toLowerCase() === String(myPlayerId).toLowerCase()
       const isDraw = !winner
       const winnerLabel = winner
         ? (playerNames[String(winner).toLowerCase()] || winner)
         : ''
       document.getElementById('resultIcon').textContent = isDraw ? '=' : (iWon ? 'WIN' : 'LOSE')
       document.getElementById('resultTitle').textContent = isDraw ? '平局' : (iWon ? '胜利' : '失败')
-      document.getElementById('resultSub').textContent = (winnerLabel ? winnerLabel + ' 获胜 - ' : '') + '第 ' + (G.turn ? G.turn.turnNumber : '?') + ' 回合结束'
+      const terminalReasonLabels = {
+        'core-eliminated': '核心棋子全灭',
+        'mutual-core-elimination': '双方核心棋子同时全灭',
+        'round-limit': '40 轮平局',
+        'surrender': '投降',
+        'timeout-surrender': '超时投降',
+      }
+      const settledRound = terminalResult.settledAt && terminalResult.settledAt.completedRound
+      const reasonLabel = terminalReasonLabels[terminalResult.reason] || terminalResult.reason
+      document.getElementById('resultSub').textContent = (winnerLabel ? winnerLabel + ' 获胜 · ' : '') + reasonLabel + ' · 已完成 ' + (settledRound ?? '?') + ' 轮'
       if (TRAINING_MODE) {
         // Replace the lobby button with restart in training mode.
         const overlay = document.getElementById('resultOverlay')
@@ -4628,7 +4554,7 @@
       }
     }
     function confirmLeave() {
-      if (TRAINING_MODE || !G || G.gameOver || G.winner) { goBack(); return }
+      if (TRAINING_MODE || !G || G.terminalResult) { goBack(); return }
       goBack()
     }
 
