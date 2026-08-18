@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "entrypoints": {
+    "dev": "dev",
+    "package": "package-electron-client"
+  },
+  "commands": {
+    "dev": {
+      "label": "Next development server",
+      "executable": "npm",
+      "args": ["run", "dev"]
+    },
+    "encoding": {
+      "label": "Text encoding check",
+      "executable": "npm",
+      "args": ["run", "check:encoding"]
+    },
+    "lint": {
+      "label": "ESLint",
+      "executable": "npm",
+      "args": ["run", "lint"]
+    },
+    "typecheck": {
+      "label": "TypeScript type check",
+      "executable": "npm",
+      "args": ["run", "typecheck"]
+    },
+    "test": {
+      "label": "Vitest suite",
+      "executable": "npm",
+      "args": ["test"]
+    },
+    "build": {
+      "label": "Next standalone build",
+      "executable": "npm",
+      "args": ["run", "build"]
+    },
+    "package-electron-client": {
+      "label": "Electron client package",
+      "executable": "npm",
+      "args": ["run", "build:electron:client"]
+    }
+  },
+  "profiles": {
+    "quick": ["encoding", "test"],
+    "standard": ["encoding", "typecheck", "lint", "test", "build"],
+    "candidate": ["encoding", "typecheck", "lint", "test", "package-electron-client"]
+  }
+}

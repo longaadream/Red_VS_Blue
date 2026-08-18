@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="志志雄灼烧">
+  <circle cx="32" cy="32" r="29" fill="#2a0907" stroke="#ff5138" stroke-width="4"/>
+  <path d="M18 54c-8-10-4-21 5-30 0 8 4 10 7 14-1-12 7-19 15-29-1 13 9 17 8 29-1 14-11 21-23 21-4 0-8-2-12-5Z" fill="#ff4c2f" stroke="#ffc04d" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M16 49c-5-7-2-14 3-20 0 6 5 8 5 14 0 4-2 7-8 6Zm16 8c-6-7-3-16 4-23 0 7 6 10 6 16 0 5-4 8-10 7Zm15-2c-3-6 0-12 5-17 0 6 4 8 3 13-1 4-4 6-8 4Z" fill="#ff9f33"/>
+</svg>

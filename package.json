@@ -33,7 +33,9 @@
     "watch:pages": "node scripts/sync-pages.js --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke:electron:windows": "node tests/electron/windows-smoke.mjs"
+    "smoke:electron:windows": "node tests/electron/windows-smoke.mjs",
+    "rvb": "node scripts/rvb.mjs",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

@@ -63,6 +63,10 @@ describe('RED-43 same-alignment UI acceptance contract', () => {
       new NextRequest('http://localhost:3000/qa/client/images/kenshin.jpg'),
       { params: Promise.resolve({ path: ['images', 'kenshin.jpg'] }) },
     )
+    const tileEffectResponse = await getQaClientResource(
+      new NextRequest('http://localhost:3000/qa/client/images/tile-effects/amaterasu.svg'),
+      { params: Promise.resolve({ path: ['images', 'tile-effects', 'amaterasu.svg'] }) },
+    )
     const traversalResponse = await getQaClientResource(
       new NextRequest('http://localhost:3000/qa/client/package.json'),
       { params: Promise.resolve({ path: ['..', 'package.json'] }) },
@@ -79,6 +83,11 @@ describe('RED-43 same-alignment UI acceptance contract', () => {
     expect(await dataResponse.json()).toContain('ana')
     expect(imageResponse.status).toBe(200)
     expect(imageResponse.headers.get('content-type')).toBe('image/jpeg')
+    expect(tileEffectResponse.status).toBe(200)
+    expect(tileEffectResponse.headers.get('content-type')).toBe('image/svg+xml')
+    expect(await tileEffectResponse.text()).toBe(
+      readFileSync(resolve(process.cwd(), 'public/tile-effects/amaterasu.svg'), 'utf8'),
+    )
     expect(traversalResponse.status).toBe(404)
     expect(nonLoopbackResponse.status).toBe(404)
   })

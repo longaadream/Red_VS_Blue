@@ -606,6 +606,137 @@
     }
     .red43-qa-button:disabled { cursor: not-allowed; opacity: .48; }
 
+    /* Compact non-modal tile status panel */
+    #tileStatusPanel {
+      position: absolute;
+      top: calc(var(--battle-hud-offset, 56px) + 12px);
+      right: 14px;
+      z-index: 17;
+      display: none;
+      flex-direction: column;
+      width: min(248px, calc(100% - 28px));
+      max-height: min(330px, calc(100% - var(--battle-hud-offset, 56px) - var(--battle-hand-height, 128px) - 28px));
+      overflow: hidden;
+      border: 0;
+      border-radius: 13px;
+      color: #dbeafe;
+      background: linear-gradient(155deg, rgba(8,15,29,.86), rgba(15,23,42,.66));
+      box-shadow: 0 14px 36px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04);
+      backdrop-filter: blur(16px) saturate(1.1);
+      pointer-events: auto;
+    }
+    #selectedStatusOverlay:not([hidden]) ~ #tileStatusPanel { right: 232px; }
+    .ts-sheet {
+      width: 100%;
+      min-height: 0;
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ts-header {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 8px 6px 10px;
+    }
+    .ts-heading { min-width: 0; }
+    .ts-title { color: #f8fafc; font-size: 11px; font-weight: 850; }
+    .ts-coords { margin-top: 1px; color: #64748b; font-size: 9px; font-variant-numeric: tabular-nums; }
+    .ts-close {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 28px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      color: #94a3b8;
+      background: rgba(148,163,184,.08);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      transition: transform 140ms cubic-bezier(.23,1,.32,1), background-color 140ms ease;
+    }
+    .ts-close:active { transform: scale(.96); background: rgba(148,163,184,.16); }
+    .ts-body {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0 10px 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148,163,184,.42) transparent;
+    }
+    .ts-body::-webkit-scrollbar { width: 4px; }
+    .ts-body::-webkit-scrollbar-track { background: transparent; }
+    .ts-body::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background: rgba(148,163,184,.34);
+    }
+    .ts-body::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.52); }
+    .ts-terrain {
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 5px 0;
+      border-top: 1px solid rgba(148,163,184,.1);
+    }
+    .ts-terrain-label, .ts-section-label { color: #64748b; font-size: 9px; font-weight: 750; }
+    .ts-terrain-value {
+      min-width: 0;
+      overflow: hidden;
+      color: #cbd5e1;
+      font-size: 9px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ts-section-label { padding: 5px 0 3px; }
+    .ts-effects { display: grid; }
+    .ts-effect {
+      min-height: 39px;
+      display: grid;
+      grid-template-columns: 30px minmax(0,1fr);
+      align-items: center;
+      gap: 7px;
+      padding: 5px 0;
+      border-top: 1px solid rgba(148,163,184,.1);
+    }
+    .ts-effect-icon {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--effect-color, #94a3b8) 13%, transparent);
+    }
+    .ts-effect-icon img { width: 24px; height: 24px; object-fit: contain; }
+    .ts-effect-name { color: #e5eefc; font-size: 10px; font-weight: 820; }
+    .ts-effect-type {
+      margin-top: 1px;
+      overflow-wrap: anywhere;
+      color: #64748b;
+      font: 8px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .ts-empty {
+      padding: 9px 0 4px;
+      border-top: 1px solid rgba(148,163,184,.1);
+      color: #64748b;
+      font-size: 9px;
+    }
+    @media (max-width: 760px), (orientation: landscape) and (max-height: 500px) {
+      #tileStatusPanel {
+        top: calc(var(--battle-hud-offset, 44px) + 8px);
+        right: 8px !important;
+        width: min(232px, calc(100% - 16px));
+        max-height: min(52vh, calc(100% - var(--battle-hud-offset, 44px) - var(--battle-hand-height, 112px) - 18px));
+      }
+    }
+
     /* ── Option picker overlay ── */
     #optionPickerOverlay {
       display: none; position: fixed; inset: 0;
@@ -1399,6 +1530,25 @@
               <div id="pieceContextSkills" class="piece-context-skills"></div>
             </div>
             <aside id="selectedStatusOverlay" class="selected-status-overlay" data-battle-ui-region="selected-status" aria-label="选中棋子特殊状态" aria-live="polite" hidden></aside>
+            <aside id="tileStatusPanel" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="tileStatusTitle">
+              <div class="ts-sheet">
+                <div class="ts-header">
+                  <div class="ts-heading">
+                    <div class="ts-title" id="tileStatusTitle">地格状态</div>
+                    <div class="ts-coords" id="tileStatusCoords"></div>
+                  </div>
+                  <button class="ts-close" type="button" aria-label="关闭地格状态" onclick="closeTileStatus()">×</button>
+                </div>
+                <div class="ts-body">
+                  <div class="ts-terrain">
+                    <span class="ts-terrain-label">基础地形</span>
+                    <span class="ts-terrain-value" id="tileStatusTerrain"></span>
+                  </div>
+                  <div class="ts-section-label" id="tileStatusEffectCount">持续地格效果</div>
+                  <div class="ts-effects" id="tileStatusContent"></div>
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
         <div class="turn-control-wrap battle-turn-control">
@@ -1773,20 +1923,32 @@
       cover:'t-cover', hole:'t-hole', lava:'t-lava',
       spring:'t-spring', chargepad:'t-chargepad'
     }
+    const TILE_TYPE_LABELS = Object.freeze({
+      floor: '普通地面', wall: '墙壁', spawn: '出生点', cover: '掩体',
+      hole: '陷阱', lava: '熔岩', spring: '治疗泉', chargepad: '充能台', trap: '陷阱',
+    })
     const PHASE_LABELS = { start:'开始阶段', action:'行动阶段', end:'结束阶段' }
-    const TILE_EFFECT_META = {
-      amaterasu: { icon: '炎', color: '#f97316', bg: 'rgba(127,29,29,.72)', border: '#fb923c' },
-      'flying-raijin-anchor': { icon: '雷', color: '#7dd3fc', bg: 'rgba(8,47,73,.78)', border: '#38bdf8' },
-      'shishio-burn': { icon: '燃', color: '#fdba74', bg: 'rgba(124,45,18,.75)', border: '#f97316' },
-      'shadow-step': { icon: '影', color: '#d8b4fe', bg: 'rgba(88,28,135,.72)', border: '#a855f7' },
-    }
+    const TILE_EFFECT_META = Object.freeze({
+      'amaterasu': { label: '天照黑炎' },
+      'flying-raijin-anchor': { label: '飞雷神锚点' },
+      'shishio-burn': { label: '志志雄灼烧' },
+      'shadow-step': { label: '暗影潜行' },
+      'lethal-toxin': { label: '致命毒素' },
+      'blizzard': { label: '暴风雪' },
+      'sticky-bomb': { label: '黏弹' },
+    })
     function tileEffectMeta(effect) {
-      return TILE_EFFECT_META[(effect && (effect.tileType || effect.type)) || ''] || {
-        icon: (effect && effect.icon) || '效',
-        color: '#e5e7eb',
-        bg: 'rgba(15,23,42,.72)',
-        border: '#94a3b8'
-      }
+      const tileType = (effect && (effect.tileType || effect.type)) || ''
+      const visuals = (window.BattleRenderer3D && window.BattleRenderer3D.TILE_EFFECT_VISUALS) || {}
+      const visual = visuals[tileType] || visuals.fallback || { colorCss: '#e5e7eb', bg: 'rgba(15,23,42,.76)', border: '#94a3b8', icon: 'images/tile-effects/fallback.svg' }
+      const label = TILE_EFFECT_META[tileType] ? TILE_EFFECT_META[tileType].label : '未知地格效果'
+      return Object.assign({ label }, visual)
+    }
+    function tileEffectSortKey(effect) {
+      return [
+        (effect && (effect.tileType || effect.type)) || 'effect',
+        (effect && (effect.sourceId || effect.id || effect.instanceId || effect.effectId)) || '',
+      ].join(':')
     }
 
     // ── State ──
@@ -2608,6 +2770,47 @@
       document.getElementById('pieceInfoModal').style.display = 'none'
       const selected = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       renderPieceContextMenu(selected || null)
+    }
+
+    function showTileStatus(x, y) {
+      if (!G || !G.map) return
+      const tile = G.map.tiles.find(function(entry) { return entry.x === x && entry.y === y })
+      const terrainType = tile
+        ? ((tile.props && tile.props.type) || tile.type || 'floor')
+        : 'unknown'
+      const effects = (G.extensions && G.extensions.tileEffects ? G.extensions.tileEffects : [])
+        .filter(function(effect) { return effect.x === x && effect.y === y })
+        .slice()
+        .sort(function(left, right) { return tileEffectSortKey(left).localeCompare(tileEffectSortKey(right)) })
+      const panel = document.getElementById('tileStatusPanel')
+      const coords = document.getElementById('tileStatusCoords')
+      const terrain = document.getElementById('tileStatusTerrain')
+      const count = document.getElementById('tileStatusEffectCount')
+      const content = document.getElementById('tileStatusContent')
+      if (!panel || !coords || !terrain || !count || !content) return
+
+      coords.textContent = '坐标 (' + x + ', ' + y + ')'
+      terrain.textContent = (TILE_TYPE_LABELS[terrainType] || '未知地形') + ' · ' + terrainType
+      count.textContent = '持续地格效果 · ' + effects.length
+      content.innerHTML = effects.length
+        ? effects.map(function(effect) {
+            const meta = tileEffectMeta(effect)
+            const tileType = effect.tileType || effect.type || 'unknown'
+            return `<div class="ts-effect" style="--effect-color:${escHtml(meta.colorCss || meta.border)}">` +
+              `<div class="ts-effect-icon"><img src="${escHtml(meta.icon)}" alt=""></div>` +
+              `<div><div class="ts-effect-name">${escHtml(meta.label)}</div><div class="ts-effect-type">${escHtml(tileType)}</div></div>` +
+            `</div>`
+          }).join('')
+        : '<div class="ts-empty">当前没有持续地格效果</div>'
+      panel.style.display = 'flex'
+      panel.setAttribute('aria-hidden', 'false')
+    }
+
+    function closeTileStatus() {
+      const panel = document.getElementById('tileStatusPanel')
+      if (!panel) return
+      panel.style.display = 'none'
+      panel.setAttribute('aria-hidden', 'true')
     }
 
     // ── Load local static data ──
@@ -3804,10 +4007,12 @@
           let tileEfxHtml = ''
           if (tileEfxList.length) {
             const icons = tileEfxList
+              .slice()
+              .sort((left, right) => tileEffectSortKey(left).localeCompare(tileEffectSortKey(right)))
+              .slice(0, 4)
               .map(te => {
                 const meta = tileEffectMeta(te)
-                const label = meta.icon
-                return `<span title="${escHtml(te.type || '')}" style="display:inline-flex;align-items:center;justify-content:center;min-width:13px;height:13px;border-radius:999px;border:1px solid ${escHtml(meta.border)};background:${escHtml(meta.bg)};color:${escHtml(meta.color)};font-size:10px;line-height:1;font-weight:900">${escHtml(label)}</span>`
+                return `<span title="${escHtml(meta.label)}" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:4px;border:1px solid ${escHtml(meta.border)};background:${escHtml(meta.bg)}"><img src="${escHtml(meta.icon)}" alt="" style="display:block;width:13px;height:13px;object-fit:contain"></span>`
               })
               .join('')
             if (icons) {
@@ -4519,6 +4724,7 @@
       if (piece) {
         selectPiece(piece.instanceId)
       }
+      if (typeof showTileStatus === 'function') showTileStatus(x, y)
     }
 
     function clearPieceSelection() {
@@ -5276,6 +5482,13 @@
 
     // ── Debug modifier panel (backtick key toggle) ────────────────────────────
     document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const tilePanel = document.getElementById('tileStatusPanel')
+        if (tilePanel && tilePanel.style.display !== 'none') {
+          e.preventDefault()
+          closeTileStatus()
+        }
+      }
       if (e.key === '`' || e.key === '~') {
         const p = document.getElementById('debugPanel')
         if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'

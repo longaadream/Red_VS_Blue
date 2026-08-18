@@ -36,6 +36,22 @@
     place:    { color: 0x8b5cf6, opacity: 0.50 },
     selected: { color: 0x60a5fa, opacity: 0.70 },
   }
+  const TILE_EFFECT_VISUALS = Object.freeze({
+    'flying-raijin-anchor': Object.freeze({ color: 0x38bdf8, colorCss: '#7dd3fc', bg: 'rgba(8,47,73,.78)', border: '#38bdf8', icon: 'images/tile-effects/flying-raijin-anchor.svg' }),
+    'shadow-step': Object.freeze({ color: 0xa855f7, colorCss: '#d8b4fe', bg: 'rgba(88,28,135,.72)', border: '#a855f7', icon: 'images/tile-effects/shadow-step.svg' }),
+    'lethal-toxin': Object.freeze({ color: 0x4ade80, colorCss: '#86efac', bg: 'rgba(20,83,45,.76)', border: '#4ade80', icon: 'images/tile-effects/lethal-toxin.svg' }),
+    'amaterasu': Object.freeze({ color: 0xf97316, colorCss: '#fdba74', bg: 'rgba(127,29,29,.72)', border: '#fb923c', icon: 'images/tile-effects/amaterasu.svg' }),
+    'blizzard': Object.freeze({ color: 0x67e8f9, colorCss: '#cffafe', bg: 'rgba(14,116,144,.72)', border: '#67e8f9', icon: 'images/tile-effects/blizzard.svg' }),
+    'shishio-burn': Object.freeze({ color: 0xfb4934, colorCss: '#fdba74', bg: 'rgba(124,45,18,.75)', border: '#fb4934', icon: 'images/tile-effects/shishio-burn.svg' }),
+    'sticky-bomb': Object.freeze({ color: 0xfacc15, colorCss: '#fef08a', bg: 'rgba(113,63,18,.78)', border: '#facc15', icon: 'images/tile-effects/sticky-bomb.svg' }),
+    fallback: Object.freeze({ color: 0x94a3b8, colorCss: '#e5e7eb', bg: 'rgba(15,23,42,.76)', border: '#94a3b8', icon: 'images/tile-effects/fallback.svg' }),
+  })
+  const TILE_EFFECT_ICON_SLOTS = Object.freeze([
+    Object.freeze({ x: -0.29, z: -0.29 }),
+    Object.freeze({ x: 0.29, z: -0.29 }),
+    Object.freeze({ x: -0.29, z: 0.29 }),
+    Object.freeze({ x: 0.29, z: 0.29 }),
+  ])
 
   // ── State ────────────────────────────────────────────────────────────────────
   let _renderer, _camera, _scene, _animFrameId
@@ -75,6 +91,7 @@
   const _factionMats = {}
   const _hlMats = {}
   const _tileEffectMats = {}
+  const _tileEffectIconMats = {}
 
   function getTileMat(type) {
     if (_tileMats[type]) return _tileMats[type]
@@ -103,17 +120,35 @@
   }
 
   function getTileEffectMat(tileType) {
-    const key = tileType || 'default'
+    const key = TILE_EFFECT_VISUALS[tileType] ? tileType : 'fallback'
     if (_tileEffectMats[key]) return _tileEffectMats[key]
-    const colorByType = {
-      'flying-raijin-anchor': 0x38bdf8,
-      'amaterasu': 0xf97316,
-      'shishio-burn': 0xfb923c,
-      'shadow-step': 0xa855f7,
-    }
-    const color = colorByType[key] || 0xfacc15
+    const color = TILE_EFFECT_VISUALS[key].color
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.82, depthWrite: false })
     _tileEffectMats[key] = mat
+    return mat
+  }
+
+  function getTileEffectIconMat(tileType) {
+    const key = TILE_EFFECT_VISUALS[tileType] ? tileType : 'fallback'
+    if (_tileEffectIconMats[key]) return _tileEffectIconMats[key]
+    const visual = TILE_EFFECT_VISUALS[key]
+    const mat = new THREE.SpriteMaterial({
+      color: visual.color,
+      transparent: true,
+      opacity: 0.86,
+      alphaTest: 0.05,
+      depthWrite: false,
+    })
+    _tileEffectIconMats[key] = mat
+    loadTexture(visual.icon, function (texture) {
+      if (_tileEffectIconMats[key] !== mat) return
+      mat.map = texture
+      mat.color.setHex(0xffffff)
+      mat.opacity = 1
+      mat.needsUpdate = true
+    }, function (error) {
+      console.error('[battle-renderer] Failed to load tile effect icon', { tileType: key, icon: visual.icon }, error)
+    })
     return mat
   }
 
@@ -425,51 +460,76 @@
     })
   }
 
-  function _effectKey(effect, index) {
+  function _effectType(effect) {
+    return effect.type || effect.tileType || 'effect'
+  }
+
+  function _effectSortKey(effect) {
     return [
-      effect.id || effect.instanceId || effect.effectId || 'tile-effect',
-      effect.type || effect.tileType || 'effect',
-      effect.sourceId || '',
-      effect.x,
-      effect.y,
-      index,
+      _effectType(effect),
+      effect.sourceId || effect.id || effect.instanceId || effect.effectId || '',
     ].join(':')
   }
 
   function _updateTileEffects(effects) {
     const seen = new Set()
-    ;(effects || []).forEach((effect, index) => {
+    const effectsByCell = new Map()
+    ;(effects || []).forEach(effect => {
       if (effect.x == null || effect.y == null) return
-      const key = _effectKey(effect, index)
-      seen.add(key)
-      if (!_tileEffectObjects.has(key)) {
-        const group = new THREE.Group()
-        const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(0.32, 0.025, 8, 32),
-          getTileEffectMat(effect.type || effect.tileType)
-        )
-        ring.rotation.x = Math.PI / 2
-        ring.position.y = TILE_H / 2 + 0.035
-        group.add(ring)
-
-        const dot = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.055, 0.055, 0.06, 16),
-          getTileEffectMat(effect.type || effect.tileType)
-        )
-        dot.position.y = TILE_H / 2 + 0.06
-        group.add(dot)
-
-        _scene.add(group)
-        _tileEffectObjects.set(key, group)
-      }
-      const group = _tileEffectObjects.get(key)
-      if (group) group.position.set(effect.x, 0, effect.y)
+      const key = effect.x + ':' + effect.y
+      if (!effectsByCell.has(key)) effectsByCell.set(key, [])
+      effectsByCell.get(key).push(effect)
     })
 
-    _tileEffectObjects.forEach((group, key) => {
+    effectsByCell.forEach((cellEffects, key) => {
+      seen.add(key)
+      const sortedEffects = cellEffects
+        .slice()
+        .sort((left, right) => _effectSortKey(left).localeCompare(_effectSortKey(right)))
+        .slice(0, TILE_EFFECT_ICON_SLOTS.length)
+      const signature = sortedEffects.map(_effectSortKey).join('|')
+      let entry = _tileEffectObjects.get(key)
+      if (!entry || entry.signature !== signature) {
+        if (entry) {
+          _scene.remove(entry.group)
+          entry.group.traverse(obj => {
+            if (obj.geometry && obj.geometry.dispose) obj.geometry.dispose()
+          })
+        }
+        const group = new THREE.Group()
+        sortedEffects.forEach((effect, index) => {
+          const effectType = _effectType(effect)
+          const ringRadius = 0.36 - index * 0.045
+          const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(ringRadius, 0.018, 8, 32),
+            getTileEffectMat(effectType)
+          )
+          ring.rotation.x = Math.PI / 2
+          ring.position.y = TILE_H / 2 + 0.025 + index * 0.004
+          group.add(ring)
+
+          const slot = TILE_EFFECT_ICON_SLOTS[index]
+          const icon = new THREE.Sprite(getTileEffectIconMat(effectType))
+          icon.position.set(slot.x, TILE_H / 2 + 0.20, slot.z)
+          icon.scale.set(0.24, 0.24, 0.24)
+          icon.renderOrder = 8
+          group.add(icon)
+        })
+        const first = sortedEffects[0]
+        group.position.set(first.x, 0, first.y)
+        _scene.add(group)
+        entry = { group, signature }
+        _tileEffectObjects.set(key, entry)
+      } else {
+        const first = sortedEffects[0]
+        entry.group.position.set(first.x, 0, first.y)
+      }
+    })
+
+    _tileEffectObjects.forEach((entry, key) => {
       if (!seen.has(key)) {
-        _scene.remove(group)
-        group.traverse(obj => {
+        _scene.remove(entry.group)
+        entry.group.traverse(obj => {
           if (obj.geometry && obj.geometry.dispose) obj.geometry.dispose()
         })
         _tileEffectObjects.delete(key)
@@ -1002,7 +1062,7 @@
       })
       ;[_tileGeom, _hlPlaneGeom, _selectedRingGeom, _pieceBodyGeom, _pieceRingGeom, _portraitDiscGeom]
         .forEach(function (geometry) { if (geometry) geometries.add(geometry) })
-      ;[_tileMats, _factionMats, _hlMats, _tileEffectMats].forEach(function (cache) {
+      ;[_tileMats, _factionMats, _hlMats, _tileEffectMats, _tileEffectIconMats].forEach(function (cache) {
         Object.keys(cache).forEach(function (key) { if (cache[key]) materials.add(cache[key]) })
       })
       geometries.forEach(function (geometry) { if (geometry.dispose) geometry.dispose() })
@@ -1021,6 +1081,7 @@
     Object.keys(_factionMats).forEach(function (key) { delete _factionMats[key] })
     Object.keys(_hlMats).forEach(function (key) { delete _hlMats[key] })
     Object.keys(_tileEffectMats).forEach(function (key) { delete _tileEffectMats[key] })
+    Object.keys(_tileEffectIconMats).forEach(function (key) { delete _tileEffectIconMats[key] })
     _anims.length = 0
     _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
     _floaterTimers.clear()
@@ -1062,5 +1123,6 @@
     projectCell,
     screenToCell,
     dispose,
+    TILE_EFFECT_VISUALS,
   }
 })()
