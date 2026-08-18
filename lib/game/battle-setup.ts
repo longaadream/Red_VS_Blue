@@ -14,6 +14,9 @@ import { getUserDataDir } from '@/lib/app-paths'
 import { recordBattleInitialization } from './battle-trace'
 import { RANDOM_STREAM_NAMES, RuleRuntime, withRuleRuntime } from './rule-runtime'
 
+import { DEPLOYMENT_DURATION_MS } from './deployment'
+
+export const DEMO_FIXED_MAP_ID = 'large-hole-arena'
 function fireInitialGameStart(state: BattleState): void {
   if (state.gameStartFired || state.turn.turnNumber !== 1) return
 
@@ -515,7 +518,7 @@ export async function createInitialBattleForPlayers(
   selectedPieces: PieceTemplate[],
   playerSelectedPieces?: PlayerSelectedPieces[],
   mapId?: string,
-  options?: { firstPlayerId?: PlayerId; rootSeed?: number; deploymentEnabled?: boolean },
+  options?: { firstPlayerId?: PlayerId; rootSeed?: number; deploymentEnabled?: boolean; deploymentStartedAt?: number },
 ): Promise<BattleState | null> {
   if (playerIds.length !== 2) return null
 
@@ -524,6 +527,9 @@ export async function createInitialBattleForPlayers(
 
   if (options?.deploymentEnabled) {
     if (typeof options.rootSeed !== 'number') throw new Error('Demo deployment requires an explicit root seed')
+    if (!Number.isSafeInteger(options.deploymentStartedAt) || (options.deploymentStartedAt ?? -1) < 0) {
+      throw new Error('Demo deployment requires an explicit non-negative deployment start time')
+    }
     if (mapId !== DEMO_DEPLOYMENT_MAP_ID) {
       throw new Error(`Demo deployment requires map ${DEMO_DEPLOYMENT_MAP_ID}; received ${String(mapId)}`)
     }
@@ -660,10 +666,14 @@ export async function createInitialBattleForPlayers(
       },
     },
     deployment: options?.deploymentEnabled ? {
-      status: 'awaiting-choices',
+      status: 'awaiting-locks',
       playerIds: [...orderedIds],
       choices: {},
       initialPositions: collectCorePositions(pieces),
+      locks: Object.fromEntries(orderedIds.map(playerId => [playerId, { locked: false }])),
+      startedAt: options.deploymentStartedAt!,
+      deadlineAt: options.deploymentStartedAt! + DEPLOYMENT_DURATION_MS,
+      revision: 0,
     } : undefined,
     ...(Object.keys(playerAlignments).length > 0 ? { extensions: { playerAlignments } } : {}),
   }

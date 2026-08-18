@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment, type Player } from "@/lib/game/room-store"
 import { ensureRosterAlignmentMutable, getRosterErrorPayload } from "@/lib/game/roster-contract"
 import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
+import { broadcastToRoom } from "@/lib/ws-server"
+import { createPublicRoomSnapshot } from "@/lib/game/room-battle-actions"
 
 function checkPackMismatch(players: Player[]): boolean {
   const hashes = players.map(p => p.packMd5).filter(Boolean)
@@ -32,7 +34,7 @@ export async function GET(
       selectedPiecesCount: p.selectedPieces?.length || 0
     }))
   })
-  return NextResponse.json(room)
+  return NextResponse.json(createPublicRoomSnapshot(room))
 }
 
 type StartBody = {
@@ -118,7 +120,7 @@ export async function POST(
       if (packMd5) existing.packMd5 = packMd5
       await roomStore.setRoom(room.id.trim(), room)
       const packMismatch = checkPackMismatch(room.players)
-      return NextResponse.json({ ...room, packMismatch })
+      return NextResponse.json({ ...createPublicRoomSnapshot(room), packMismatch })
     }
 
     if (room.status !== "waiting") {
@@ -151,13 +153,15 @@ export async function POST(
 
     await roomStore.setRoom(room.id.trim(), room)
     const packMismatch = checkPackMismatch(room.players)
-    return NextResponse.json({ ...room, packMismatch })
+    return NextResponse.json({ ...createPublicRoomSnapshot(room), packMismatch })
   }
 
   if (body.action === "start") {
     try {
-      const result = await startBattleFromLockedRosters(roomStore, roomId)
-      return NextResponse.json(result.room)
+      const result = await startBattleFromLockedRosters(roomStore, roomId, {
+        onDeploymentUpdate: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
+      })
+      return NextResponse.json(createPublicRoomSnapshot(result.room))
     } catch (error) {
       const rosterError = getRosterErrorPayload(error)
       if (rosterError) {

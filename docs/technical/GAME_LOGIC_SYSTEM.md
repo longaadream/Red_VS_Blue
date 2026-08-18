@@ -304,9 +304,9 @@ RED-82 的目标流程：
 ### 4.4 Windows WebSocket 与 HTTP
 
 - **入口：** `lib/ws-server.ts::startWsServer()`；`app/api/rooms/[roomId]/battle/route.ts::GET()`、`app/api/rooms/[roomId]/battle/route.ts::POST()`。
-- **动作合同：** `commitAuthoritativeBattleAction()` 读取 Room 和 `ServerBattleState`，校验连接/请求玩家，再调用带 room seed 的 Runner。
+- **动作合同：** `dispatchRoomBattleAction()` 读取 Room 和 `ServerBattleState`，校验签名身份与动作玩家，再调用带 room seed 的 Runner。
 - **成功：** 更新 `room.battleState`，用读取到的 `Room.version` 调用 `setRoomIfVersion()`；只有 CAS 成功才广播 `stateUpdate { state, seed, stateHash, duplicate }`。
-- **失败：** WS 向发送者返回 `actionError`；HTTP 返回 JSON。版本竞争稳定返回 `BATTLE_STATE_CONFLICT`（HTTP 409）；选择与普通错误仍可携带 preparation 和 determinism 上下文。
+- **失败：** WS 向发送者返回 `actionError`；HTTP 返回 JSON。持续版本竞争返回 `ROOM_VERSION_CONFLICT`（HTTP 409）；竞争后读到终局返回 `BATTLE_ALREADY_TERMINAL`；选择与普通错误仍可携带 preparation 和 determinism 上下文。
 - **并发边界：** HTTP、WS 与 Bot 的房间写入都受数据库版本 CAS 保护；失败计算被丢弃，不广播也不覆盖已提交终局。
 - **测试：** `tests/roster-transports.test.ts` 覆盖同房间 HTTP/WS 双投降竞争；`terminal-transport.test.ts` 与 `battle-command.test.ts` 覆盖守卫、CAS 和 Bot 终局持久化。
 
@@ -521,7 +521,7 @@ Demo 房间状态先经历部署，再进入 `TurnPhase = start | action | end`�
 
 核心存活按 `isCore === true` 与 `ownerPlayerId` 计算，召唤物不计；双方同时全灭为平局。第 40 个完整轮次的 `end` 结算先检查核心胜利，再检查轮次平局。终局写入可追踪的 action/turn/phase/round 位置并追加唯一 `terminalResult` 日志。
 
-HTTP 与 WebSocket 都拒绝客户端提交的 `gameOver`、`winner` 或 `terminalResult`，并通过房间版本 CAS 只提交和广播一次权威结果；竞争失败返回 `BATTLE_STATE_CONFLICT`。Bot 使用同一持久化边界，房间与 `terminalResult` 在一次 CAS 写入中同步为 `finished`。终局后的 gameplay 命令以 `BATTLE_ALREADY_TERMINAL` 拒绝且不改变状态；`battle.html` 仅展示服务端结果。
+HTTP 与 WebSocket 都拒绝客户端提交的 `gameOver`、`winner` 或 `terminalResult`，并通过房间版本 CAS 只提交和广播一次权威结果；并发失败方重读后以 `BATTLE_ALREADY_TERMINAL` 拒绝，持续版本竞争以 `ROOM_VERSION_CONFLICT` 拒绝。Bot 使用同语义持久化边界，房间与 `terminalResult` 在一次 CAS 写入中同步为 `finished`。终局后的 gameplay 命令不改变状态；`battle.html` 仅展示服务端结果。
 
 ## 7. 失败语义与调试证据
 
@@ -625,3 +625,27 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 - 把胜负判断从客户端迁移到规则/服务端。
 
 更新时必须重新核对源码入口、对应测试和 ADR 状态，不能只根据历史文档转述。
+
+## RED-31 2026-08-18 规则修订
+
+本节取代本文中由 `turn-order` 随机流决定 Demo PVP 先手、以及部署阶段使用 `awaiting-choices` 的旧说明。
+
+### 座位与先后手
+
+1. 空 PVP 房间的首位玩家等概率随机获得红方或蓝方座位。
+2. 第二位玩家获得剩余座位，座位随房间持久化，刷新和重连不重新抽取。
+3. 开局编排层查找红方玩家，并把其 ID 作为显式 `firstPlayerId` 传入规则引擎。
+4. 因此红方固定为先手、蓝方固定为后手；阵营 `alignment` 与座位保持独立。
+5. Relay lobby/join、桌面服务端和移动端统一由服务端分配座位；所有开局入口都必须校验一红一蓝不变量，客户端不能通过兼容命令覆盖。
+
+`turn-order` 流保留在稳定流名称清单中以兼容其它调用者，但 Demo PVP 房间不再使用它选择先手。
+
+### 同步部署
+
+1. 战斗以固定公开地图和 `deployment.status = awaiting-locks` 开始。
+2. 双方选择在锁定前保持私有；锁定命令公开该玩家已锁定，但不泄露另一方选择。
+3. 双方均锁定，或服务端 45 秒 `deadlineAt` 到期后，部署一次性结算并进入正式对战。
+4. 所有客户端显示的读秒都从同一个服务端期限推导；本地计时器只负责刷新文本，不拥有规则时间。
+5. 红方结算后仍为第一个行动玩家，蓝方为第二个行动玩家。
+
+回退仅需恢复房间编排层先手选择与客户端展示，不改变核心战斗状态格式。

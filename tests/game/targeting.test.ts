@@ -557,15 +557,15 @@ describe('targeting consumers and performance contract', () => {
   it('exposes stable selection errors over WS/API and keeps legacy targeting adapters presentation-only', () => {
     const ws = readFileSync(resolve(process.cwd(), 'lib/ws-server.ts'), 'utf8')
     const route = readFileSync(resolve(process.cwd(), 'app/api/rooms/[roomId]/battle/route.ts'), 'utf8')
-    const command = readFileSync(resolve(process.cwd(), 'lib/server/battle-command.ts'), 'utf8')
-    expect(ws).toContain('commitAuthoritativeBattleAction({')
+    const coordinator = readFileSync(resolve(process.cwd(), 'lib/game/room-battle-actions.ts'), 'utf8')
+    expect(ws).toContain('dispatchRoomBattleAction(roomStore, _roomId, verified.playerId, msg.action')
     expect(ws).toContain('preparation: errAny?.preparation')
-    expect(route).toContain('commitAuthoritativeBattleAction({')
+    expect(route).toContain('dispatchRoomBattleAction(roomStore, roomId, viewerPlayerId, action')
     expect(route).toContain('preparation: errAny.preparation')
-    expect(command).toContain('assertActionPlayer(input.playerId, input.action)')
+    expect(coordinator).toContain('assertActionPlayer(viewerPlayerId, action)')
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
     expect(html).toContain('已忽略旧 Relay 客户端权威动作')
-    expect(html).not.toContain("String(msg.from).toLowerCase() !== String(msg.action.playerId).toLowerCase()")
+    expect(html).not.toContain('runRelayAuthorityAction(action)')
 
     for (const path of [
       'data/pages/js/skill-targeting.js',

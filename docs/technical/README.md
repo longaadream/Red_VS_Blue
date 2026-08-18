@@ -37,6 +37,7 @@
 - `TEST_HARNESS.md`：自动控制、状态读取、截图和追踪接口。
 - `BUILD_AND_RUN.md`：安装、启动、测试和 Windows 打包命令。
 - `ESLINT_BASELINE.md`：零新增 lint 门禁、历史 suppression 基线和清债流程。
+- [`DEVELOPMENT_WORKFLOW.md`](./DEVELOPMENT_WORKFLOW.md)：任务分支 main 基线、本地预检、PR 新鲜度门禁和同步流程。
 - `MODULE_STATUS.md`：模块现状、负责人、风险和重构进度。
 
 ## 目标架构边界

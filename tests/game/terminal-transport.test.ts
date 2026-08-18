@@ -35,18 +35,19 @@ describe('authoritative terminal transport contract', () => {
     expect(room.status).toBe('finished')
   })
 
-  it('guards forged results before the shared CAS command and syncs terminal room status before persistence', () => {
+  it('guards forged results before the shared dispatcher and commits terminal room status in the same CAS', () => {
     const http = readFileSync(resolve(process.cwd(), 'app/api/rooms/[roomId]/battle/route.ts'), 'utf8')
     const ws = readFileSync(resolve(process.cwd(), 'lib/ws-server.ts'), 'utf8')
-    const command = readFileSync(resolve(process.cwd(), 'lib/server/battle-command.ts'), 'utf8')
+    const coordinator = readFileSync(resolve(process.cwd(), 'lib/game/room-battle-actions.ts'), 'utf8')
     const httpPost = http.slice(http.indexOf('export async function POST'))
     const wsActionHandler = ws.slice(ws.indexOf("msg.type === 'action' || msg.type === 'gameOver'"))
 
     for (const source of [httpPost, wsActionHandler]) {
-      expect(source.indexOf('getClientTerminalSubmissionError')).toBeLessThan(source.indexOf('commitAuthoritativeBattleAction'))
+      expect(source.indexOf('getClientTerminalSubmissionError')).toBeLessThan(source.indexOf('dispatchRoomBattleAction'))
     }
-    expect(command).toContain('setRoomIfVersion')
-    expect(command.indexOf('syncRoomTerminalStatus')).toBeLessThan(command.indexOf('setRoomIfVersion'))
+    const dispatch = coordinator.slice(coordinator.indexOf('export async function dispatchRoomBattleAction'))
+    expect(dispatch).toContain("const isTerminal = actionResult.state.terminalResult?.status === 'finished'")
+    expect(dispatch.indexOf("status: 'finished' as const")).toBeLessThan(dispatch.indexOf('if (!await store.setRoomIfVersion'))
     expect(httpPost).not.toContain('roomStore.setRoom(')
     expect(wsActionHandler).not.toContain('roomStore.setRoom(')
     expect(httpPost).not.toContain("body.type === 'gameOver'")

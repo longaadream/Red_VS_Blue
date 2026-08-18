@@ -16,7 +16,7 @@
 4. 一方核心全灭则另一方胜；双方同时全灭为平局。第 40 个完整轮次的 end 结算先检查核心胜利，再检查轮次平局。
 5. `surrender` 直接提交终局，不修改棋子生命或触发 whenever；`reason: "timeout"` 为 RED-36 预留明确原因。
 6. 终局只提交一次并追加一个 `terminalResult` 日志。之后所有 gameplay 命令以 `BATTLE_ALREADY_TERMINAL` 拒绝，状态与 hash 不变。
-7. HTTP 与 WebSocket 共用 `commitAuthoritativeBattleAction`，以房间 `version` 和 `setRoomIfVersion` 做 CAS。竞争命令只有一个可以提交和广播，其余以 `BATTLE_STATE_CONFLICT` 拒绝。Bot 状态也通过同一 CAS 持久化边界保存。
+7. HTTP 与 WebSocket 共用 `dispatchRoomBattleAction()`，以房间 `version` 和 `setRoomIfVersion()` 做 CAS，并沿用部署指令的有限版本重试。竞争命令只有一个可以提交和广播；重试后看到已提交终局的命令以 `BATTLE_ALREADY_TERMINAL` 拒绝，持续版本竞争以 `ROOM_VERSION_CONFLICT` 拒绝。Bot 状态通过独立的同语义 CAS 持久化边界保存。
 8. HTTP/WS 共用伪造输入守卫，拒绝客户端提交 `winner`、`gameOver` 或 `terminalResult`。房间只在权威 `terminalResult` 提交时同步为 `finished`。
 9. 浏览器 LAN 与 Relay 都只提交动作并消费服务端 `stateUpdate`；Relay host 不再本地执行对手动作、上传 `stateUpdate` 或采用 `hostResume` 状态。
 10. 移动端框架正在重塑；本任务不迁移或维护旧 action-log 入口，后续移动端只接入同一权威状态合同。

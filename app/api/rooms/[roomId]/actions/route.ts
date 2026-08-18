@@ -9,6 +9,8 @@ import {
   lockDemoRosterInStore,
 } from "@/lib/game/roster-contract"
 import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
+import { broadcastToRoom } from "@/lib/ws-server"
+import { createPublicRoomSnapshot } from "@/lib/game/room-battle-actions"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       if (trimmedPlayerName) existing.name = trimmedPlayerName
       await roomStore.setRoom(roomId, latestRoom)
       console.log('Player rejoined room:', { roomId, playerId: normalizedPlayerId, faction: existing.faction, alignment: existing.alignment })
-      return NextResponse.json(latestRoom)
+      return NextResponse.json(createPublicRoomSnapshot(latestRoom))
     }
 
     if (latestRoom.status !== "waiting") {
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     console.log('Player joined room:', { roomId, playerId: normalizedPlayerId, seat, alignment: player.alignment, totalPlayers: latestRoom.players.length })
 
     await roomStore.setRoom(roomId, latestRoom)
-    return NextResponse.json(latestRoom)
+    return NextResponse.json(createPublicRoomSnapshot(latestRoom))
   }
 
   if (action === "claim-faction") {
@@ -181,7 +183,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       latestRoom.status = "waiting"
     }
     await roomStore.setRoom(roomId, latestRoom)
-    return NextResponse.json(latestRoom)
+    return NextResponse.json(createPublicRoomSnapshot(latestRoom))
   }
 
   if (action === "leave") {
@@ -201,7 +203,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       latestRoom.hostId = latestRoom.players[0].id
     }
     await roomStore.setRoom(roomId, latestRoom)
-    return NextResponse.json({ success: true, left: before !== latestRoom.players.length, room: latestRoom })
+    return NextResponse.json({ success: true, left: before !== latestRoom.players.length, room: createPublicRoomSnapshot(latestRoom) })
   }
 
   if (action === "select-pieces") {
@@ -228,7 +230,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
     if (allPlayersSelected) {
       try {
-        await startBattleFromLockedRosters(roomStore, roomId)
+        await startBattleFromLockedRosters(roomStore, roomId, {
+          onDeploymentUpdate: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
+        })
       } catch (error) {
         console.error('Error starting game:', error)
         return NextResponse.json(
@@ -267,8 +271,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
 
   if (action === "start-game") {
     try {
-      const result = await startBattleFromLockedRosters(roomStore, roomId)
-      return NextResponse.json({ success: true, started: result.started, message: "Game started", room: result.room })
+      const result = await startBattleFromLockedRosters(roomStore, roomId, {
+        onDeploymentUpdate: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
+      })
+      return NextResponse.json({ success: true, started: result.started, message: "Game started", room: createPublicRoomSnapshot(result.room) })
     } catch (error) {
       const rosterError = getRosterErrorPayload(error)
       if (rosterError) {

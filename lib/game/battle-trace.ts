@@ -40,9 +40,15 @@ export interface BattleActionTrace {
 }
 
 export interface DeploymentTraceEvidence {
+  command?: 'initialize' | 'select' | 'lock' | 'timeout'
   initialPositions?: Record<string, { x: number; y: number }>
   choices?: Record<string, { pieceId: string | null }>
+  locks?: Record<string, { locked: boolean; reason?: 'player' | 'timeout' }>
+  timedOutPlayerIds?: string[]
   finalPositions?: Record<string, { x: number; y: number }>
+  deadlineAt?: number
+  revision?: number
+  authorityVersion?: number
 }
 
 export interface DebugBattleMetadata {
@@ -163,7 +169,11 @@ export function recordBattleInitialization(
     postStateHash,
     randomStreams: runtime.randomTrace(true),
     deployment: state.deployment ? {
+      command: 'initialize',
       initialPositions: copyPositions(state.deployment.initialPositions),
+      locks: copyLocks(state.deployment.locks),
+      deadlineAt: state.deployment.deadlineAt,
+      revision: state.deployment.revision,
     } : undefined,
   }
   metadata.actionLog.push(trace)
@@ -178,6 +188,16 @@ function copyPositions(
     Object.entries(positions).map(([pieceId, position]) => [pieceId, { ...position }]),
   )
 }
+
+function copyLocks(
+  locks: Record<string, { locked: boolean; reason?: 'player' | 'timeout' }> | undefined,
+): Record<string, { locked: boolean; reason?: 'player' | 'timeout' }> | undefined {
+  if (!locks) return undefined
+  return Object.fromEntries(
+    Object.entries(locks).map(([playerId, lock]) => [playerId, { ...lock }]),
+  )
+}
+
 
 export function readDebugMetadata(state: BattleState): DebugBattleMetadata {
   const metadata = state.extensions?.debugBattle as Partial<DebugBattleMetadata> | undefined
@@ -198,6 +218,20 @@ export function getOrCreateDebugMetadata(state: BattleState): DebugBattleMetadat
   metadata.actionLog ??= []
   extensions.debugBattle = metadata
   return metadata as DebugBattleMetadata
+}
+
+export function stampPendingDeploymentAuthorityVersion(
+  state: BattleState,
+  authorityVersion: number,
+): void {
+  if (!Number.isSafeInteger(authorityVersion) || authorityVersion < 0) return
+  const metadata = state.extensions?.debugBattle as Partial<DebugBattleMetadata> | undefined
+  if (!Array.isArray(metadata?.actionLog)) return
+  for (const entry of metadata.actionLog) {
+    const trace = entry as Partial<BattleActionTrace>
+    if (!trace.deployment || trace.deployment.authorityVersion !== undefined) continue
+    trace.deployment.authorityVersion = authorityVersion
+  }
 }
 
 function sortForStableJson(value: unknown): unknown {

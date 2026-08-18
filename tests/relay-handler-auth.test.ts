@@ -1,0 +1,166 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Room, WsData } from '../relay-server/src/types'
+
+type JsonObject = Record<string, unknown>
+type TestIdentity = { id: string; publicKey: string; privateKey: CryptoKey }
+
+const relayStore = vi.hoisted(() => ({
+  getRoom: vi.fn(),
+  setRoom: vi.fn(),
+  addWsClient: vi.fn(),
+  removeWsClient: vi.fn(),
+  broadcastToRoom: vi.fn(),
+  appendAction: vi.fn(),
+  sendToHost: vi.fn(),
+  startHostTimeout: vi.fn(),
+  cancelHostTimeout: vi.fn(),
+}))
+
+vi.mock('../relay-server/src/store', () => ({ store: relayStore }))
+
+type RelaySocket = { readyState: number; url?: string; data: WsData; send(raw: string): unknown }
+type RelayHandler = { message(ws: RelaySocket, raw: string | Buffer): void | Promise<void> }
+let wsHandler: RelayHandler
+
+beforeAll(async () => {
+  const handlerPath = '../relay-server/src/ws/' + 'handler'
+  wsHandler = (await import(handlerPath) as { wsHandler: RelayHandler }).wsHandler
+})
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes).map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function createTestIdentity(): Promise<TestIdentity> {
+  const pair = await globalThis.crypto.subtle.generateKey(
+    { name: 'Ed25519' },
+    true,
+    ['sign', 'verify'],
+  ) as CryptoKeyPair
+  const publicBytes = new Uint8Array(await globalThis.crypto.subtle.exportKey('raw', pair.publicKey))
+  const publicKey = bytesToHex(publicBytes)
+  const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', publicBytes))
+  return { id: bytesToHex(digest).slice(0, 8), publicKey, privateKey: pair.privateKey }
+}
+
+async function signedSubscribe(
+  identity: TestIdentity,
+  roomId: string,
+  claimedPlayerId = identity.id,
+) {
+  const payload = {
+    type: 'battle-subscribe' as const,
+    roomId,
+    playerId: claimedPlayerId,
+    timestamp: Date.now(),
+  }
+  const signature = await globalThis.crypto.subtle.sign(
+    'Ed25519',
+    identity.privateKey,
+    new TextEncoder().encode(JSON.stringify(payload)),
+  )
+  return {
+    type: 'subscribe' as const,
+    roomId,
+    playerId: claimedPlayerId,
+    publicKey: identity.publicKey,
+    payload,
+    signature: bytesToHex(new Uint8Array(signature)),
+  }
+}
+
+function roomFor(host: TestIdentity): Room {
+  return {
+    id: 'relay-auth-room',
+    hostId: host.id,
+    name: 'Relay auth room',
+    status: 'battle',
+    players: [{
+      id: host.id,
+      name: 'Host',
+      publicKey: host.publicKey,
+      connected: true,
+    }],
+    actionLog: [],
+    createdAt: Date.now(),
+  }
+}
+
+function fakeWebSocket(roomId: string) {
+  const sent: JsonObject[] = []
+  const ws = {
+    readyState: 1,
+    url: `ws://relay.test/ws/rooms/${roomId}`,
+    data: {} as WsData,
+    send: vi.fn((raw: string) => sent.push(JSON.parse(raw) as JsonObject)),
+  } satisfies RelaySocket
+  return { ws, sent }
+}
+
+describe('Relay WebSocket signed subscription identity', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('rejects a forged host identity before assigning a role or accepting state', async () => {
+    const host = await createTestIdentity()
+    const attacker = await createTestIdentity()
+    const room = roomFor(host)
+    relayStore.getRoom.mockReturnValue(room)
+    const { ws, sent } = fakeWebSocket(room.id)
+
+    await wsHandler.message(ws, JSON.stringify(await signedSubscribe(attacker, room.id, host.id)))
+
+    expect(sent[0]).toMatchObject({ type: 'error', code: 'SUBSCRIBE_AUTH_INVALID' })
+    expect(ws.data).toEqual({})
+    expect(relayStore.addWsClient).not.toHaveBeenCalled()
+
+    await wsHandler.message(ws, JSON.stringify({
+      type: 'stateUpdate',
+      seq: 1,
+      authorityVersion: 99,
+      state: { forged: true },
+      stateHash: 'forged',
+    }))
+
+    expect(sent.at(-1)).toMatchObject({ type: 'error', message: 'not subscribed' })
+    expect(room.lastStateBlob).toBeUndefined()
+    expect(relayStore.setRoom).not.toHaveBeenCalled()
+    expect(relayStore.broadcastToRoom).not.toHaveBeenCalled()
+  })
+
+  it('binds a valid host signature and then accepts that host state update', async () => {
+    const host = await createTestIdentity()
+    const room = roomFor(host)
+    relayStore.getRoom.mockReturnValue(room)
+    const { ws, sent } = fakeWebSocket(room.id)
+
+    await wsHandler.message(ws, JSON.stringify(await signedSubscribe(host, room.id)))
+
+    expect(sent[0]).toEqual({ type: 'subscribed', role: 'host' })
+    expect(ws.data).toEqual({ roomId: room.id, playerId: host.id, role: 'host' })
+    expect(relayStore.addWsClient).toHaveBeenCalledWith(room.id, ws)
+
+    await wsHandler.message(ws, JSON.stringify({
+      type: 'stateUpdate',
+      seq: 1,
+      authorityVersion: 2,
+      state: { deployment: { status: 'awaiting-locks' } },
+      seed: 42,
+      stateHash: 'public-state',
+    }))
+
+    expect(JSON.parse(room.lastStateBlob ?? '{}')).toMatchObject({
+      type: 'stateUpdate',
+      authorityVersion: 2,
+      seed: 42,
+      stateHash: 'public-state',
+    })
+    expect(relayStore.setRoom).toHaveBeenCalledWith(room)
+    expect(relayStore.broadcastToRoom).toHaveBeenCalledWith(
+      room.id,
+      expect.objectContaining({ type: 'stateUpdate', authorityVersion: 2 }),
+      ws,
+    )
+  })
+})

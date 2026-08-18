@@ -50,7 +50,7 @@
 3. `doAction(action)` 发送 `{ type: "action", action }`。
 4. `lib/ws-server.ts` 接收消息并调用 `runBattleAction()`。
 5. `runBattleAction()` 调用 `applyBattleAction()`，返回新状态及 hash。
-6. `commitAuthoritativeBattleAction()` 用 `RoomStore.setRoomIfVersion()` CAS 保存房间，成功后才广播 `stateUpdate`。
+6. `dispatchRoomBattleAction()` 用 `RoomStore.setRoomIfVersion()` CAS 保存房间，成功后才广播 `stateUpdate`；终局状态与房间 `finished` 在同一次写入中提交。
 7. 客户端 `applyServerState()` 替换本地状态并重新渲染。
 
 HTTP 后备入口为 `app/api/rooms/[roomId]/battle/route.ts::POST`，与 WS 共用同一动作归约与 CAS 提交服务。

@@ -123,9 +123,16 @@ export function runBattleAction(
       preStateHash,
       postStateHash,
       randomStreams: runtime?.randomTrace(true) ?? [],
-      deployment: action.type === 'deploymentChoice' && next.deployment ? {
+      deployment: isDeploymentAction(action) && next.deployment ? {
+        command: deploymentCommand(action),
         choices: copyDeploymentChoices(next.deployment.choices),
+        locks: copyDeploymentLocks(next.deployment.locks),
+        timedOutPlayerIds: action.type === 'deploymentTimeout'
+          ? next.deployment.playerIds.filter(playerId => next.deployment?.locks[playerId]?.reason === 'timeout')
+          : undefined,
         finalPositions: copyDeploymentPositions(next.deployment.finalPositions),
+        deadlineAt: next.deployment.deadlineAt,
+        revision: next.deployment.revision,
       } : undefined,
     }
     nextMetadata.actionLog.push(trace)
@@ -155,6 +162,24 @@ function copyDeploymentChoices(
     Object.entries(choices).map(([playerId, choice]) => [playerId, { pieceId: choice.pieceId }]),
   )
 }
+function copyDeploymentLocks(
+  locks: Record<string, { locked: boolean; reason?: 'player' | 'timeout' }>,
+): Record<string, { locked: boolean; reason?: 'player' | 'timeout' }> {
+  return Object.fromEntries(
+    Object.entries(locks).map(([playerId, lock]) => [playerId, { ...lock }]),
+  )
+}
+
+function isDeploymentAction(action: BattleAction): boolean {
+  return action.type === 'deploymentChoice' || action.type === 'deploymentLock' || action.type === 'deploymentTimeout'
+}
+
+function deploymentCommand(action: BattleAction): 'select' | 'lock' | 'timeout' {
+  if (action.type === 'deploymentTimeout') return 'timeout'
+  if (action.type === 'deploymentLock') return 'lock'
+  return 'select'
+}
+
 
 function copyDeploymentPositions(
   positions: Record<string, { x: number; y: number }> | undefined,
@@ -212,6 +237,7 @@ function collectRuntimeCursors(actionLog: DebugBattleMetadata['actionLog']): Rec
 
 function getActionPlayerId(state: BattleState, action: BattleAction): string {
   const playerId = (action as unknown as { playerId?: unknown }).playerId
+  if (action.type === 'deploymentTimeout') return 'system'
   return typeof playerId === 'string' && playerId.trim()
     ? playerId.trim()
     : state.turn?.currentPlayerId ?? 'system'

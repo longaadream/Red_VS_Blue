@@ -5,11 +5,12 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.{ts,js}'],
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
+      hono: path.resolve(__dirname, 'tests/support/hono.ts'),
     },
   },
 })

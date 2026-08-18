@@ -1,7 +1,5 @@
-import { runBattleAction } from '../game/battle-runner'
-import { getBattleStorage, type ServerBattleState } from '../game/battle-storage'
+import type { ServerBattleState } from '../game/battle-storage'
 import { roomStore, type Room, type RoomStore } from '../game/room-store'
-import { assertActionPlayer } from '../game/targeting'
 import { syncRoomTerminalStatus } from './battle-terminal'
 
 export const BATTLE_STATE_CONFLICT = 'BATTLE_STATE_CONFLICT'
@@ -56,39 +54,6 @@ export async function persistAuthoritativeBattleState(input: {
 
   input.room.version = expectedVersion + 1
   return input.room
-}
-
-export async function commitAuthoritativeBattleAction(input: {
-  roomId: string
-  playerId?: string | null
-  action: unknown
-  store?: BattleCommandStore
-}) {
-  const store = input.store ?? roomStore
-  const room = await store.getRoom(input.roomId)
-  if (!room) {
-    throw new BattleCommandError('Room not found', 'ROOM_NOT_FOUND', 404)
-  }
-
-  const storage = getBattleStorage(room)
-  if (!storage) {
-    throw new BattleCommandError('Battle not started', 'BATTLE_NOT_STARTED', 400)
-  }
-
-  const expectedVersion = requireRoomVersion(room)
-  assertActionPlayer(input.playerId, input.action)
-  const result = runBattleAction(storage.state as never, input.action as never, { rootSeed: storage.seed })
-  storage.state = result.state
-
-  await persistAuthoritativeBattleState({
-    roomId: input.roomId,
-    room,
-    storage,
-    expectedVersion,
-    store,
-  })
-
-  return { room, storage, result }
 }
 
 export function isBattleStateConflict(error: unknown): boolean {

@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { buildInitialPiecesForPlayers } from '@/lib/game/battle-setup'
+import { DEPLOYMENT_DURATION_MS, toPublicBattleState } from '@/lib/game/deployment'
 import { recordBattleInitialization, runBattleAction } from '@/lib/game/battle-runner'
 import type { BoardMap } from '@/lib/game/map'
 import type { PieceTemplate } from '@/lib/game/piece'
@@ -82,9 +83,13 @@ function makeDeploymentState(seed = 2029) {
   state.map = map
   state.gameStartFired = false
   state.deployment = {
-    status: 'awaiting-choices',
+    status: 'awaiting-locks',
     playerIds: [...PLAYERS].sort(),
     choices: {},
+    locks: Object.fromEntries(PLAYERS.map(playerId => [playerId, { locked: false }])),
+    startedAt: 1_000,
+    deadlineAt: 1_000 + DEPLOYMENT_DURATION_MS,
+    revision: 0,
     initialPositions: Object.fromEntries(pieces.map(piece => [
       piece.instanceId,
       { x: piece.x, y: piece.y },
@@ -155,7 +160,7 @@ describe('RED-29 deterministic deployment', () => {
     }))
   })
 
-  it('resolves both choices only after both submit and is independent of submission order', () => {
+  it('resolves choices only after both players lock and is independent of submission order', () => {
     const initial = makeDeploymentState()
     const redPiece = initial.pieces.find((piece: any) => piece.ownerPlayerId === PLAYERS[0])
     const bluePiece = initial.pieces.find((piece: any) => piece.ownerPlayerId === PLAYERS[1])
@@ -165,17 +170,32 @@ describe('RED-29 deterministic deployment', () => {
       type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: redPiece.instanceId, clientActionId: 'red-choice',
     } as any, { rootSeed: 2029 })
     expect(positions(redFirst.state.pieces)).toEqual(before)
-    expect((redFirst.state as any).deployment.status).toBe('awaiting-choices')
+    expect((redFirst.state as any).deployment.status).toBe('awaiting-locks')
 
-    const redThenBlue = runBattleAction(redFirst.state, {
+    const redLocked = runBattleAction(redFirst.state, {
+      type: 'deploymentLock', playerId: PLAYERS[0], clientActionId: 'red-lock',
+    } as any, { rootSeed: 2029 })
+    expect(positions(redLocked.state.pieces)).toEqual(before)
+    expect((redLocked.state as any).deployment.locks[PLAYERS[0]]).toMatchObject({ locked: true, reason: 'player' })
+
+    const redThenBlueChoice = runBattleAction(redLocked.state, {
       type: 'deploymentChoice', playerId: PLAYERS[1], pieceId: bluePiece.instanceId, clientActionId: 'blue-choice',
+    } as any, { rootSeed: 2029 })
+    const redThenBlue = runBattleAction(redThenBlueChoice.state, {
+      type: 'deploymentLock', playerId: PLAYERS[1], clientActionId: 'blue-lock',
     } as any, { rootSeed: 2029 })
 
     const blueFirst = runBattleAction(initial, {
       type: 'deploymentChoice', playerId: PLAYERS[1], pieceId: bluePiece.instanceId, clientActionId: 'blue-choice',
     } as any, { rootSeed: 2029 })
-    const blueThenRed = runBattleAction(blueFirst.state, {
+    const blueLocked = runBattleAction(blueFirst.state, {
+      type: 'deploymentLock', playerId: PLAYERS[1], clientActionId: 'blue-lock',
+    } as any, { rootSeed: 2029 })
+    const blueThenRedChoice = runBattleAction(blueLocked.state, {
       type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: redPiece.instanceId, clientActionId: 'red-choice',
+    } as any, { rootSeed: 2029 })
+    const blueThenRed = runBattleAction(blueThenRedChoice.state, {
+      type: 'deploymentLock', playerId: PLAYERS[0], clientActionId: 'red-lock',
     } as any, { rootSeed: 2029 })
 
     expect(positions(redThenBlue.state.pieces)).toEqual(positions(blueThenRed.state.pieces))
@@ -203,13 +223,13 @@ describe('RED-29 deterministic deployment', () => {
     })
   })
 
-  it('supports keeping all pieces without consuming a reroll stream', () => {
+  it('supports locking with no selection without consuming a reroll stream', () => {
     const initial = makeDeploymentState()
     const red = runBattleAction(initial, {
-      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: null, clientActionId: 'red-keep',
+      type: 'deploymentLock', playerId: PLAYERS[0], clientActionId: 'red-lock',
     } as any, { rootSeed: 2029 })
     const complete = runBattleAction(red.state, {
-      type: 'deploymentChoice', playerId: PLAYERS[1], pieceId: null, clientActionId: 'blue-keep',
+      type: 'deploymentLock', playerId: PLAYERS[1], clientActionId: 'blue-lock',
     } as any, { rootSeed: 2029 })
 
     expect(positions(complete.state.pieces)).toEqual(positions(initial.pieces))
@@ -244,15 +264,140 @@ describe('RED-29 deterministic deployment', () => {
     expect(state).toEqual(before)
   })
 
-  it('rejects ordinary actions during deployment and deployment choices after completion', () => {
+  it('allows selection replacement and cancellation before lock, then rejects mutation and repeated lock', () => {
+    const initial = makeDeploymentState()
+    const owned = initial.pieces.filter((piece: any) => piece.ownerPlayerId === PLAYERS[0])
+
+    const selected = runBattleAction(initial, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: owned[0].instanceId, clientActionId: 'select-one',
+    } as any, { rootSeed: 2029 })
+    const replaced = runBattleAction(selected.state, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: owned[1].instanceId, clientActionId: 'select-two',
+    } as any, { rootSeed: 2029 })
+    const cancelled = runBattleAction(replaced.state, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: null, clientActionId: 'cancel',
+    } as any, { rootSeed: 2029 })
+    const locked = runBattleAction(cancelled.state, {
+      type: 'deploymentLock', playerId: PLAYERS[0], clientActionId: 'lock',
+    } as any, { rootSeed: 2029 })
+    const lockedBefore = JSON.parse(JSON.stringify(locked.state))
+
+    expect((cancelled.state as any).deployment.choices[PLAYERS[0]]).toEqual({ pieceId: null })
+    expect(() => runBattleAction(locked.state, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: owned[0].instanceId, clientActionId: 'change-after-lock',
+    } as any, { rootSeed: 2029 })).toThrow(/locked/i)
+    expect(() => runBattleAction(locked.state, {
+      type: 'deploymentLock', playerId: PLAYERS[0], clientActionId: 'lock-again',
+    } as any, { rootSeed: 2029 })).toThrow(/locked/i)
+    expect(locked.state).toEqual(lockedBefore)
+  })
+
+  it('publishes identical complete positions to both viewers without exposing pending choices', () => {
+    const initial = makeDeploymentState()
+    const selectedPiece = initial.pieces.find((piece: any) => piece.ownerPlayerId === PLAYERS[0])
+    const selected = runBattleAction(initial, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: selectedPiece.instanceId, clientActionId: 'private-select',
+    } as any, { rootSeed: 2029 })
+    const locked = runBattleAction(selected.state, {
+      type: 'deploymentLock', playerId: PLAYERS[0], clientActionId: 'red-lock',
+    } as any, { rootSeed: 2029 })
+
+    const alice = toPublicBattleState(locked.state, PLAYERS[0]) as any
+    const bob = toPublicBattleState(locked.state, PLAYERS[1]) as any
+    const spectator = toPublicBattleState(locked.state) as any
+
+    expect(alice).toEqual(bob)
+    expect(bob).toEqual(spectator)
+    expect(alice.pieces.filter((piece: any) => piece.isCore === true)).toHaveLength(16)
+    expect(positions(alice.pieces)).toEqual(positions(initial.pieces))
+    expect(alice.deployment.choices).toEqual({})
+    expect(alice.extensions.debugBattle.actionLog).toEqual([])
+    expect(alice.extensions.debugBattle.appliedActionIds).toEqual([])
+    expect(alice.deployment.locks).toMatchObject({
+      [PLAYERS[0]]: { locked: true },
+      [PLAYERS[1]]: { locked: false },
+    })
+  })
+
+  it('auto-locks all remaining players at the authoritative deadline and resolves once', () => {
+    const initial = makeDeploymentState()
+    const selectedPiece = initial.pieces.find((piece: any) => piece.ownerPlayerId === PLAYERS[0])
+    const selected = runBattleAction(initial, {
+      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: selectedPiece.instanceId, clientActionId: 'red-select',
+    } as any, { rootSeed: 2029 })
+
+    expect(() => runBattleAction(selected.state, {
+      type: 'deploymentTimeout', now: initial.deployment.deadlineAt - 1, clientActionId: 'too-early',
+    } as any, { rootSeed: 2029 })).toThrow(/deadline/i)
+
+    const timedOut = runBattleAction(selected.state, {
+      type: 'deploymentTimeout', now: initial.deployment.deadlineAt, clientActionId: 'deadline',
+    } as any, { rootSeed: 2029 })
+
+    expect((timedOut.state as any).deployment).toMatchObject({
+      status: 'complete',
+      locks: {
+        [PLAYERS[0]]: { locked: true, reason: 'timeout' },
+        [PLAYERS[1]]: { locked: true, reason: 'timeout' },
+      },
+    })
+    expect((timedOut.state as any).turn.phase).toBe('action')
+    expect(timedOut.trace?.deployment).toMatchObject({
+      command: 'timeout',
+      timedOutPlayerIds: [...PLAYERS].sort(),
+      finalPositions: expect.any(Object),
+    })
+  })
+
+  it('keeps a locked reroll while an unlocked opponent times out and keeps all pieces', () => {
+    const initial = makeDeploymentState()
+    const before = positions(initial.pieces)
+    const redPiece = initial.pieces.find((piece: any) => piece.ownerPlayerId === PLAYERS[0])
+    const bluePieces = initial.pieces.filter((piece: any) => piece.ownerPlayerId === PLAYERS[1])
+    const selected = runBattleAction(initial, {
+      type: 'deploymentChoice',
+      playerId: PLAYERS[0],
+      pieceId: redPiece.instanceId,
+      clientActionId: 'red-timeout-select',
+    } as any, { rootSeed: 2029 })
+    const locked = runBattleAction(selected.state, {
+      type: 'deploymentLock',
+      playerId: PLAYERS[0],
+      clientActionId: 'red-timeout-lock',
+    } as any, { rootSeed: 2029 })
+    const timedOut = runBattleAction(locked.state, {
+      type: 'deploymentTimeout',
+      now: initial.deployment.deadlineAt,
+      clientActionId: 'blue-timeout',
+    } as any, { rootSeed: 2029 })
+    const after = positions(timedOut.state.pieces)
+
+    expect((timedOut.state as any).deployment).toMatchObject({
+      status: 'complete',
+      locks: {
+        [PLAYERS[0]]: { locked: true, reason: 'player' },
+        [PLAYERS[1]]: { locked: true, reason: 'timeout' },
+      },
+    })
+    expect(after[redPiece.instanceId]).not.toEqual(before[redPiece.instanceId])
+    for (const piece of bluePieces) {
+      expect(after[piece.instanceId]).toEqual(before[piece.instanceId])
+    }
+    expect(timedOut.trace?.deployment).toMatchObject({
+      command: 'timeout',
+      timedOutPlayerIds: [PLAYERS[1]],
+    })
+  })
+
+  it('rejects ordinary actions during deployment and deployment commands after completion', () => {
     const initial = makeDeploymentState()
     expect(() => runBattleAction(initial, { type: 'beginPhase', clientActionId: 'too-early' } as any, { rootSeed: 2029 })).toThrow()
 
     const red = runBattleAction(initial, {
-      type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: null, clientActionId: 'red-keep',
+      type: 'deploymentLock', playerId: PLAYERS[0], clientActionId: 'red-lock',
     } as any, { rootSeed: 2029 })
     const complete = runBattleAction(red.state, {
-      type: 'deploymentChoice', playerId: PLAYERS[1], pieceId: null, clientActionId: 'blue-keep',
+      type: 'deploymentLock', playerId: PLAYERS[1], clientActionId: 'blue-lock',
     } as any, { rootSeed: 2029 })
     expect(() => runBattleAction(complete.state, {
       type: 'deploymentChoice', playerId: PLAYERS[0], pieceId: null, clientActionId: 'late-choice',

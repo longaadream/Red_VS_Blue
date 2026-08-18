@@ -1,0 +1,29 @@
+name: Main baseline
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-baseline-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  main-baseline:
+    name: main-baseline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the real pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Require the latest origin/main
+        env:
+          RVB_BASELINE_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: node scripts/check-main-baseline.mjs --ci
