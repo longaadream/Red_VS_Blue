@@ -107,6 +107,27 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(minimum).toMatchObject({ success: true, damage: 1, targetHp: 99, blocked: false })
   })
 
+  it('keeps original zero at zero when Icebound Fortitude modifies incoming damage', () => {
+    const attacker = makePiece({ instanceId: 'icebound-zero-attacker', ownerPlayerId: 'player-red' }) as any
+    const defender = makePiece({ instanceId: 'icebound-zero-defender', ownerPlayerId: 'player-blue' }) as any
+    defender.statusTags = [{ id: 'icebound-fortitude', type: 'icebound-fortitude', intensity: 1 }]
+    defender.rules = [requiredRule('rule-arthas-icebound')]
+    const state = makeState({ pieces: [attacker, defender] }) as any
+
+    const result = dealDamage(attacker, defender, 0, 'physical', state, 'icebound-zero')
+
+    expect(result).toMatchObject({
+      rawDamage: 0,
+      modifiedDamage: 0,
+      damage: 0,
+      targetHp: 100,
+    })
+    expect(defender.currentHp).toBe(100)
+    expect(damageLogs(state)).toEqual([
+      expect.objectContaining({ rawDamage: 0, modifiedDamage: 0, finalDamage: 0 }),
+    ])
+  })
+
   it('absorbs numeric shields after defense and emits afterDamageBlocked exactly once', () => {
     const attacker = makePiece({ instanceId: 'shield-attacker', ownerPlayerId: 'player-red' }) as any
     const target = makePiece({ instanceId: 'shield-target', ownerPlayerId: 'player-blue' }) as any
