@@ -29,6 +29,7 @@ const DATA_RULE_BOUNDARIES = [
 
 const DIRECT_RULE_CAPABILITY_EXEMPTIONS: Record<string, RegExp[]> = {
   'lib/game/identity-verify.ts': [/Date\.now\(\)/],
+  'lib/game/deployment.ts': [/Date\.now\(\)/],
   'lib/game/rng.ts': [/Math\.random\.bind\(Math\)/],
   'lib/game/room-cleanup-config.ts': [/Date\.now\(\)/],
   'lib/game/rule-runtime.ts': [/Math\.random\(\)/, /Date\.now\(\)/],
@@ -84,7 +85,9 @@ describe('authority determinism audit', () => {
     expect(mobileServer.match(/const seed = createRootSeed\(\)/g)?.length, 'mobile root seeds').toBeGreaterThanOrEqual(2)
     expect(mobileServer.match(/rootSeed:\s*seed\b/g)?.length, 'mobile seed injection').toBeGreaterThanOrEqual(2)
     expect(mobileServer).toContain('runBattleAction(')
-    expect(mobileServer).toContain('return ok({ state, seed }')
+    expect(mobileServer).toContain('authorityVersion = 1')
+    expect(mobileServer).toContain('stateHash: hashBattleState(state)')
+    expect(mobileServer).toContain('deploymentEnabled: true')
     expect(mobileServer).not.toMatch(/seed\s*=\s*Math\.floor\(Math\.random\(/)
     expect(mobileServer).toContain('room.firstPlayerId = initState.turn.currentPlayerId')
     expect(mobileServer).toContain('Invalid deterministic action trace')
@@ -92,9 +95,10 @@ describe('authority determinism audit', () => {
     expect(mobileServer).toContain('if (trace) Object.assign(entry, trace)')
 
     const roomStart = read('lib/game/room-battle-start.ts')
-    expect(roomStart).toContain('{ rootSeed: seed, deploymentEnabled: true }')
-    expect(roomStart).toContain('const firstPlayerId = initialState.turn.currentPlayerId')
-    expect(roomStart).not.toContain('getPlayerSeat(player) === \'red\') || roomPlayers[0]')
+    expect(roomStart).toContain("getPlayerSeat(player) === 'red'")
+    expect(roomStart).toContain('firstPlayerId,')
+    expect(roomStart).toContain('deploymentStartedAt: clock.now()')
+    expect(roomStart).not.toContain('RANDOM_STREAM_NAMES.turnOrder')
 
     const battlePage = read(CROSS_PLATFORM_AUTHORITY_FILES.battlePage)
     expect(battlePage).toContain('function runDeterministicAuthorityAction(state, action)')

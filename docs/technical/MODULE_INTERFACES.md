@@ -66,7 +66,7 @@
 - 状态变化：创建状态并修改全局触发器注册。
 - 错误：玩家数错误返回 `null`；数据加载/效果错误可能抛出。
 - 日志：`battle-setup.ts` 本地日志。
-- 测试：缺少独立初始化和多房间隔离测试。
+- 测试：`tests/game/deployment.test.ts`、`tests/game/deployment-room.test.ts`、`tests/roster-transports.test.ts`。
 - 已知问题：全局触发器；所有新增权威入口都必须显式传入 root seed。
 - 最小调试：显式传入 `firstPlayerId` 与 `rootSeed`，输出初始化 trace、状态 hash 和棋子列表。
 
@@ -89,7 +89,21 @@
 - 服务端按 `demo-v0.1` 读取 `data/pieces/manifest.json`，要求玩家从自己的 `alignment` 中提交正好 8 个不同、已准入且存在的 `templateId`。
 - 成功确认会写入 `rosterLocked` 与 `rosterManifestVersion`。同一组模板的重排提交返回幂等成功；锁定后的不同阵容或阵营修改返回 `ROSTER_LOCKED`。
 - 错误响应包含稳定的 `code`、`message` 与 `context`；HTTP 与 WebSocket 复用同一错误载荷。
-- `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容，并通过房间版本号原子提交战斗状态；只有双方合法锁定时才可通过当前战斗初始化入口。该入口忽略房间请求中的地图覆盖，强制使用并持久化 Demo 固定地图 `large-trap-arena`。
+- `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容，并通过房间版本号原子提交战斗状态；只有双方合法锁定时才可通过当前战斗初始化入口。该入口忽略房间请求中的地图覆盖，强制使用并持久化 Demo 固定地图状态 ID `large-hole-arena`（数据文件仍为 `large-trap-arena.json`）。
+
+### 部署房间协调器（RED-31）
+
+- 入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`、`scheduleRoomDeploymentTimeout()` 与 `createPublicBattleSnapshot()`。
+- 职责：验证 viewer/动作玩家、在 45 秒期限前后选择实际命令、调用唯一规则 Runner、通过 `Room.version` CAS 提交并生成公开快照。
+- 状态命令：`deploymentChoice` 可在锁定前替换/取消；`deploymentLock` 不可撤销；`deploymentTimeout` 仅允许权威服务端时钟发出。
+- 并发：玩家同时锁定或玩家锁定与超时竞争时，失败的 CAS 重新读取最新房间；最终位置只提交一次，`authorityVersion` 单调递增。
+- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 对玩家和观战者公开相同双方坐标与锁定状态，清除选择和内部调试动作记录，未完成前同时清除最终位置；完整 trace 只留在服务端权威状态。
+- 传输：房间 HTTP、WebSocket 和 Relay 使用 `{ state, seed, stateHash, authorityVersion }`；`viewerPlayerId` 只做提交权限校验，不参与站位隐藏。
+- 身份：玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；HTTP 与 LAN WS 在服务端验证，Relay guest 动作由 host 验证。Relay 订阅另签名 `battle-subscribe` 信封，relay-server 验证派生 ID、有效期及房间登记公钥后才绑定 host/guest 角色。header/body/subscribe 中的同名字符串不能单独授权命令或 host 状态写入。
+- 房间投影：`createPublicRoomSnapshot()` 覆盖普通 room GET、重复 start 与其他完整房间响应，不能绕过 battle API 读取 pending choice 或 debug trace。
+- Relay：桌面与 Android 本机初始化入口固定地图并从 authority version 1 开始；host 保留完整权威状态，只把公开状态、签名命令和版本 envelope 经 relay-server 转发/恢复。
+- 错误：非法、重复锁定、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
+- 决策：[ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
 
 ### PVP alignment lock (RED-56)
 
@@ -327,3 +341,28 @@ interface ServerCore {
 禁止能力：玩家私钥、任意网络/文件、系统命令、动态模块和宿主对象。资源使用签名清单、内容 hash 和缓存配额；资源本身不得执行代码。
 
 具体沙箱 ABI、签名格式和资源协议待独立 High Risk ADR。
+
+## RED-31 2026-08-18 接口修订
+
+本节取代本文中与“座位、先手完全独立”以及旧部署阶段命名冲突的说明。
+
+### PVP 房间编排
+
+- `room-store.assignNextSeat()`：空房首位使用可注入的等概率选择器分配 `red | blue`，已有一席时返回另一席；已持久化座位由调用方直接复用。
+- Relay lobby/join 使用同一服务端权威规则分配并持久化座位；兼容 `claim-faction` 仅返回既有座位，不接受客户端覆盖。
+- `room-battle-start.startBattleForRoom()`：要求阵容中恰有一名红方玩家，并将其 ID 显式传给规则层的 `firstPlayerId`。
+- Relay 与移动端开局入口：要求恰有一红一蓝；红方先手，非法或重复座位直接拒绝。
+- `turn-order` 随机流仍为兼容接口；Demo PVP 房间开局不再消费它来决定先手。
+
+### 部署状态展示
+
+- 权威阶段为 `deployment.status = awaiting-locks`。
+- 客户端只依据服务端下发的 `deployment.deadlineAt` 计算剩余秒数，不自行延长或重置期限。
+- 未锁定玩家的选择继续保持私有；公开快照只包含锁定状态和可公开结果。
+
+### LAN 连接发现
+
+- HTTP 健康检查继续使用 `/api/ping`。
+- 客户端随后读取 `/api/ws-info` 获取 WebSocket 监听端口。
+- 标准本机配置在接口不可用时回退为 HTTP `3000`、WebSocket `3001`；非标准端口仅在未提供独立 WS 端口时回退为同端口。
+- UDP 与快速扫描结果统一经过同一端口解析逻辑，避免“HTTP 可用但 WebSocket 连接到错误端口”。

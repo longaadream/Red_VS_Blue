@@ -233,10 +233,19 @@ export interface DeploymentChoice {
   pieceId: string | null
 }
 
+export interface DeploymentLock {
+  locked: boolean
+  reason?: 'player' | 'timeout'
+}
+
 export interface DeploymentState {
-  status: 'awaiting-choices' | 'complete'
+  status: 'awaiting-locks' | 'complete'
   playerIds: PlayerId[]
   choices: Record<PlayerId, DeploymentChoice>
+  locks: Record<PlayerId, DeploymentLock>
+  startedAt: number
+  deadlineAt: number
+  revision: number
   initialPositions: Record<string, DeploymentPosition>
   finalPositions?: Record<string, DeploymentPosition>
 }
@@ -293,6 +302,16 @@ export type BattleAction =
       type: "deploymentChoice"
       playerId: PlayerId
       pieceId?: string | null
+      clientActionId?: string
+    }
+  | {
+      type: "deploymentLock"
+      playerId: PlayerId
+      clientActionId?: string
+    }
+  | {
+      type: "deploymentTimeout"
+      now: number
       clientActionId?: string
     }
   | {
@@ -839,7 +858,10 @@ function applyBattleActionInternal(
     )
   }
 
-  if (state.deployment?.status === 'awaiting-choices' && action.type !== 'deploymentChoice') {
+  const isDeploymentCommand = action.type === 'deploymentChoice'
+    || action.type === 'deploymentLock'
+    || action.type === 'deploymentTimeout'
+  if (state.deployment?.status === 'awaiting-locks' && !isDeploymentCommand) {
     throw new BattleRuleError('Battle actions are unavailable until deployment is complete')
   }
 
@@ -935,13 +957,13 @@ function applyBattleActionInternal(
     case "deploymentChoice": {
       const next = safeCloneBattleState(state)
       const deployment = next.deployment
-      if (!deployment || deployment.status !== 'awaiting-choices') {
+      if (!deployment || deployment.status !== 'awaiting-locks') {
         throw new BattleRuleError('Deployment choice is only available during deployment')
       }
       const playerId = normalizeStablePlayerId(action.playerId)
       const stablePlayerId = deployment.playerIds.find(candidate => normalizeStablePlayerId(candidate) === playerId)
       if (!stablePlayerId) throw new BattleRuleError('Player is not part of this deployment')
-      if (deployment.choices[stablePlayerId]) throw new BattleRuleError('Player has already submitted a deployment choice')
+      if (deployment.locks[stablePlayerId]?.locked) throw new BattleRuleError('Deployment choice is locked')
       if (action.pieceId !== undefined && action.pieceId !== null && typeof action.pieceId !== 'string') {
         throw new BattleRuleError('Deployment choice accepts at most one piece ID')
       }
@@ -962,14 +984,51 @@ function applyBattleActionInternal(
       }
 
       deployment.choices[stablePlayerId] = { pieceId }
-      if (deployment.playerIds.every(candidate => deployment.choices[candidate])) {
+      deployment.revision += 1
+      return next
+    }
+
+    case "deploymentLock": {
+      const next = safeCloneBattleState(state)
+      const deployment = next.deployment
+      if (!deployment || deployment.status !== 'awaiting-locks') {
+        throw new BattleRuleError('Deployment lock is only available during deployment')
+      }
+      const playerId = normalizeStablePlayerId(action.playerId)
+      const stablePlayerId = deployment.playerIds.find(candidate => normalizeStablePlayerId(candidate) === playerId)
+      if (!stablePlayerId) throw new BattleRuleError('Player is not part of this deployment')
+      if (deployment.locks[stablePlayerId]?.locked) throw new BattleRuleError('Deployment is already locked for this player')
+
+      deployment.locks[stablePlayerId] = { locked: true, reason: 'player' }
+      deployment.revision += 1
+      if (deployment.playerIds.every(candidate => deployment.locks[candidate]?.locked === true)) {
         resolveDeploymentChoices(next, deployment)
-        // Deployment replaces the old room-start beginPhase call. Once both
-        // choices resolve, enter the first action phase exactly once so
-        // gameStart/beginTurn effects remain delayed but cannot stall.
         return applyBattleActionInternal(next, { type: 'beginPhase' })
       }
       return next
+    }
+
+    case "deploymentTimeout": {
+      const next = safeCloneBattleState(state)
+      const deployment = next.deployment
+      if (!deployment || deployment.status !== 'awaiting-locks') {
+        throw new BattleRuleError('Deployment timeout is only available during deployment')
+      }
+      if (!Number.isSafeInteger(action.now) || action.now < deployment.deadlineAt) {
+        throw new BattleRuleError('Deployment timeout cannot run before the deadline')
+      }
+
+      const timedOutPlayerIds = deployment.playerIds
+        .filter(playerId => deployment.locks[playerId]?.locked !== true)
+        .sort(compareStableText)
+      if (timedOutPlayerIds.length === 0) throw new BattleRuleError('Deployment is already locked')
+      for (const playerId of timedOutPlayerIds) {
+        deployment.choices[playerId] = { pieceId: null }
+        deployment.locks[playerId] = { locked: true, reason: 'timeout' }
+      }
+      deployment.revision += 1
+      resolveDeploymentChoices(next, deployment)
+      return applyBattleActionInternal(next, { type: 'beginPhase' })
     }
 
     case "beginPhase": {

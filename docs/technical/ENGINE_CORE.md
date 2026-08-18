@@ -42,13 +42,13 @@
 - 地图 ID。
 - 可选先手玩家。
 - 可选 `rootSeed`；权威入口必须在初始化前传入。
-- Demo 房间对局传入 `deploymentEnabled: true`，并固定使用地图状态 ID `large-hole-arena`。
+- Demo 房间对局传入 `deploymentEnabled: true` 与权威 `deploymentStartedAt`，并固定使用地图状态 ID `large-hole-arena`。
 
 调用：地图加载、棋子创建、技能/规则加载、`globalTriggerSystem.clearRules()`、开局触发器。
 
 输出：`Promise<BattleState | null>`；玩家数不是两个时返回 `null`。
 
-状态变化：创建初始棋子、卡牌/资源/回合状态并注册规则。Demo 房间对局的 16 枚初始棋子标记为核心棋子并进入 `deployment.status = "awaiting-choices"`；PVE 机器人通过同一权威命令自动选择保留全部，部署完成前不触发 `gameStart`。由于使用模块级触发器系统，该过程也会修改进程级状态。
+状态变化：创建初始棋子、卡牌/资源/回合状态并注册规则。Demo 房间对局的 16 枚初始棋子标记为核心棋子并进入 `deployment.status = "awaiting-locks"`；PVE 机器人通过同一 `deploymentLock` 权威命令锁定保留全部，部署完成前不触发 `gameStart`。由于使用模块级触发器系统，该过程也会修改进程级状态。
 
 待确认：同一 Node 进程并行初始化多个房间时，清理全局触发器是否会影响其他房间。
 
@@ -76,10 +76,13 @@
 
 Demo 房间对局在回合阶段前增加部署门禁：
 
-- `deploymentChoice` 只允许每名稳定玩家提交一次；空 `pieceId` 表示保留全部。
-- 双方选择齐备后才按稳定玩家顺序解析，使用 `deployment-reroll/<playerId>` 独立流。
-- 部署完成前所有普通战斗动作均失败且不推进随机 cursor；完成后的首个 `beginPhase` 才触发 `gameStart`。
-- 初始位置、选择、最终位置与流 cursor 记录在 Action Trace。冻结细节见 [`ADR-0007`](../decisions/ADR-0007-deterministic-deployment.md)。
+- `deploymentChoice` 在锁定前可选择、替换或以空 `pieceId` 取消一枚己方核心棋子的重投；选择不移动棋子或消费随机流。
+- `deploymentLock` 不可撤销；双方锁定后才按稳定玩家顺序解析，继续使用 `deployment-reroll/<playerId>` 独立流。
+- 权威 45 秒期限到达后，未锁定玩家按保留全部自动锁定；玩家命令与超时通过房间版本 CAS 串行化。
+- 部署完成前所有普通战斗动作均失败且不推进随机 cursor；完成时触发 `gameStart` 并进入首回合行动阶段。
+- 初始位置、锁定、超时、最终位置、authority version 与流 cursor 记录在 Action Trace；公开快照隐藏未完成选择但始终公开双方坐标。
+- 传输层在调用规则前验证 Ed25519 命令信封；签名覆盖 room/player/完整 action/timestamp，同名 header、body 或 WS subscribe 声明不能替代验证。
+- 随机冻结细节见 [`ADR-0007`](../decisions/ADR-0007-deterministic-deployment.md)，锁定与同步协议见 [`ADR-0009`](../decisions/ADR-0009-authoritative-deployment-lock.md)。
 
 `TurnState`、`TurnPhase` 和 `PlayerTurnMeta` 位于 `lib/game/turn.ts`。动作包括：
 
@@ -166,7 +169,7 @@ function evaluateGameResult(state: BattleState): GameResult;
 
 `lib/game/rule-runtime.ts` 定义根种子、稳定命名流、确定性规则时钟和实例 ID。命名流当前至少包括 `deployment`、`deployment-reroll`、`turn-order` 与 `skill/effect`；实例 ID 使用独立的 `instance-id/<namespace>` 流。流 seed 和 Mulberry32/cursor 算法由 [ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md) 冻结。
 
-WebSocket、房间开战、Battle API、Android mobile server 与 Relay 初始化等权威入口必须先生成根种子，再初始化状态，并在每次 `runBattleAction(..., { rootSeed })` 时沿用同一 seed。Relay 初始化响应同时返回 seed；Relay host 和 Android action-log 回放只调用 browser bundle 暴露的确定性 runner，缺失 seed 时拒绝执行。初始化的随机消耗记录为 `system-initialize` trace；动作 runner 从 trace 恢复 seed/cursor。`replayBattle()` 返回逐动作 `stateHashes`。
+WebSocket、房间开战、Battle API、Android mobile server 与 Relay 初始化等权威入口必须先生成根种子，再初始化状态，并在每次 `runBattleAction(..., { rootSeed })` 时沿用同一 seed。桌面与 Android Relay 初始化都固定 Demo 地图并返回 `{ state, seed, stateHash, authorityVersion: 1 }`；Relay host 从远端房间取阵容后调用本机入口，后续只使用 browser bundle 的确定性 runner，缺失 seed 或版本时拒绝执行。初始化的随机消耗记录为 `system-initialize` trace；动作 runner 从 trace 恢复 seed/cursor。`replayBattle()` 返回逐动作 `stateHashes`。
 
 Action Trace 的稳定 JSON 与 SHA-256 位于 browser-safe 的 `lib/game/battle-trace.ts`，不依赖 Node `crypto`。数据驱动技能、规则和 pending target 脚本在执行边界获得确定性的 `Math.random()` 与 `Date.now()`；规则定义缓存始终返回独立且规范化的 limits，避免 cache miss/hit 改变状态 hash。没有 runtime 的训练与非权威预检路径仍可经 `lib/game/rng.ts` 旧适配器运行，便于按模块回退。
 

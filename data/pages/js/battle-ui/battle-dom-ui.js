@@ -140,14 +140,17 @@
       if (!players) return
       players.className = 'player-state-strip'
       players.innerHTML = model.players.map(function (player) {
+        const isLocal = !!(model.viewer && String(model.viewer.id).toLowerCase() === String(player.id).toLowerCase())
         const sideName = player.faction === 'blue' ? '蓝方 · 后手' : '红方 · 先手'
         const tags = (player.statusSummary || []).map(function (status) {
           return '<span class="status-tag" title="' + escapeHtml(status.id) + '">' + escapeHtml(statusLabel(status)) + '</span>'
         }).join('')
         const currentLabel = player.isCurrent ? '，当前行动方' : ''
-        return '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '')
-          + '" role="group" aria-label="' + escapeHtml(player.name + '，' + sideName + currentLabel) + '" title="' + escapeHtml(player.id) + '">'
+        const localLabel = isLocal ? '，你' : ''
+        return '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '') + (isLocal ? ' is-local-player' : '')
+          + '" role="group" aria-label="' + escapeHtml(player.name + '，' + sideName + localLabel + currentLabel) + '" title="' + escapeHtml(player.id) + '">'
           + '<span class="player-avatar" aria-hidden="true">' + escapeHtml(playerInitial(player)) + '</span>'
+          + (isLocal ? '<span class="local-player-mark" aria-hidden="true">你</span>' : '')
           + '<span class="player-state-copy"><span class="player-display-name">' + escapeHtml(player.name) + '</span>'
           + '<span class="player-side-name">' + sideName + '</span></span>'
           + '<span class="player-state-resources">'

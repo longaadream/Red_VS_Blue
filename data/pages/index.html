@@ -604,8 +604,9 @@
         // Android 路径：Java 后台监听，结果通过全局回调传回
         window._onUdpHostFound = function(info) {
           if (!info || !info.ip || !info.port) return
+          const wsPort = RvBLanDiscover.resolveWsPort(info)
           addLanServer({ url: 'http://' + info.ip + ':' + info.port,
-            ip: info.ip, port: info.port, wsPort: info.wsPort || info.port, name: (info.name || '局域网主机') + ' 📡' })
+            ip: info.ip, port: info.port, wsPort: wsPort, name: (info.name || '局域网主机') + ' 📡' })
         }
         window.RvBBridge.discoverHosts(3000)
       } else if (window.electronAPI && typeof window.electronAPI.startDiscoverHosts === 'function') {
@@ -613,8 +614,9 @@
         if (window.electronAPI.offUdpDiscovery) window.electronAPI.offUdpDiscovery()
         window.electronAPI.onUdpHostFound(function(info) {
           if (!info || !info.ip || !info.port) return
+          const wsPort = RvBLanDiscover.resolveWsPort(info)
           addLanServer({ url: 'http://' + info.ip + ':' + info.port,
-            ip: info.ip, port: info.port, wsPort: info.wsPort || info.port, name: (info.name || '局域网主机') + ' 📡' })
+            ip: info.ip, port: info.port, wsPort: wsPort, name: (info.name || '局域网主机') + ' 📡' })
         })
         window.electronAPI.startDiscoverHosts(3000)
       }
@@ -668,16 +670,21 @@
     }
 
     function addLanServer(info) {
-      const existing = _lanFound.find(s => s.url === info.url)
-      if (existing) return
-      _lanFound.push(info)
+      const normalized = Object.assign({}, info, { wsPort: RvBLanDiscover.resolveWsPort(info) })
+      const existing = _lanFound.find(s => s.url === normalized.url)
+      if (existing) {
+        existing.wsPort = normalized.wsPort
+        existing.name = normalized.name || existing.name
+        return
+      }
+      _lanFound.push(normalized)
       const list = document.getElementById('lanServerList')
       const empty = list.querySelector('.lan-empty')
       if (empty) empty.remove()
       const div = document.createElement('div')
       div.className = 'lan-server-item'
-      div.onclick = () => connectLanServer(info.url, info.wsPort)
-      div.innerHTML = `<div><div class="lan-server-name">${escHtml(info.name || 'RED vs BLUE')}</div><div class="lan-server-url">${escHtml(info.url)}</div></div><span style="color:#3b82f6;font-size:13px;font-weight:700;flex-shrink:0">连接 ›</span>`
+      div.onclick = () => connectLanServer(normalized.url, normalized.wsPort)
+      div.innerHTML = `<div><div class="lan-server-name">${escHtml(normalized.name || 'RED vs BLUE')}</div><div class="lan-server-url">${escHtml(normalized.url)}</div></div><span style="color:#3b82f6;font-size:13px;font-weight:700;flex-shrink:0">连接 ›</span>`
       list.appendChild(div)
     }
 

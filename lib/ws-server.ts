@@ -1,9 +1,20 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
-import { assertActionPlayer } from './game/targeting'
 import { getBattleStorage, withServerSkills } from './game/battle-storage'
-import { hashBattleState, runBattleAction } from './game/battle-runner'
-import { verifyJoinAuth, verifyRecordSignature, derivePlayerId } from './game/identity-verify'
+import { runBattleAction } from './game/battle-runner'
+import {
+  createPublicBattleSnapshot,
+  createPublicRoomSnapshot,
+  dispatchRoomBattleAction,
+  type PublicBattleSnapshot,
+} from './game/room-battle-actions'
+import {
+  BattleActionAuthError,
+  derivePlayerId,
+  verifyBattleActionAuth,
+  verifyJoinAuth,
+  verifyRecordSignature,
+} from './game/identity-verify'
 import {
   ensureRosterAlignmentMutable,
   getDemoRosterReadiness,
@@ -18,6 +29,7 @@ import { DEMO_FIXED_MAP_ID, startBattleFromLockedRosters } from './game/room-bat
 // and start a new one without requiring a full dev-server restart.
 const _g = globalThis as unknown as {
   __rvbWss?: WebSocketServer | null
+  __rvbWsLifecycle?: Promise<void>
   __rvbRoomClients?: Map<string, Set<WebSocket>>
   __rvbPlayerWs?: Map<string, WebSocket>
 }
@@ -36,6 +48,7 @@ function publicRoom(room: any): unknown {
     hostId: room.hostId,
     mapId: room.mapId,
     maxPlayers: room.maxPlayers || 2,
+    authorityVersion: room.version ?? 0,
     visibility: room.visibility || 'public',
     inviteCode: room.inviteCode,
     createdAt: room.createdAt,
@@ -100,6 +113,23 @@ async function broadcastLobby(): Promise<void> {
   broadcastToRoom('__lobby', { type: 'lobbyUpdate', rooms: rooms.map(publicRoomList) })
 }
 
+function broadcastBattleSnapshot(roomId: string, snapshot: PublicBattleSnapshot): void {
+  broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot })
+}
+
+function startBattleWithDeploymentBroadcast(roomId: string) {
+  return startBattleFromLockedRosters(roomStore, roomId, {
+    onDeploymentUpdate: snapshot => broadcastBattleSnapshot(roomId, snapshot),
+  })
+}
+
+function sendActionError(ws: WebSocket, payload: Record<string, unknown>): void {
+  sendJson(ws, {
+    type: 'actionError',
+    ...payload,
+  })
+}
+
 async function broadcastRoom(roomId: string): Promise<void> {
   const room = await roomStore.getRoom(roomId)
   if (room) broadcastToRoom(roomId, { type: 'roomUpdate', room: publicRoom(room) })
@@ -149,7 +179,7 @@ async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
     if (packMd5) player.packMd5 = packMd5
     await roomStore.setRoom(roomId, room)
     await broadcastRoom(roomId)
-    return { ...room, packMismatch: checkPackMismatchWs(room.players) }
+    return { ...createPublicRoomSnapshot(room), packMismatch: checkPackMismatchWs(room.players) }
   }
 
   if (room.status !== 'waiting') throw new Error('Cannot join a game that has already started or finished')
@@ -169,7 +199,7 @@ async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
   if (!room.hostId) room.hostId = normalizedPlayerId
   await roomStore.setRoom(roomId, room)
   await broadcastRoom(roomId)
-  return { ...room, packMismatch: checkPackMismatchWs(room.players) }
+  return { ...createPublicRoomSnapshot(room), packMismatch: checkPackMismatchWs(room.players) }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,7 +229,7 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
     const afterBotLock = await lockDefaultBotRosterInStore(roomStore, roomId)
     const latest = afterBotLock ?? locked.room
     if (getDemoRosterReadiness(latest).ready && latest.status !== 'in-progress') {
-      await startBattleFromLockedRosters(roomStore, roomId)
+      await startBattleWithDeploymentBroadcast(roomId)
     }
 
     const finalRoom = await roomStore.getRoom(roomId)
@@ -256,7 +286,7 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
     else if (!allReady && room.status === 'ready') room.status = 'waiting'
     await roomStore.setRoom(roomId, room)
     await broadcastRoom(roomId)
-    return room
+    return createPublicRoomSnapshot(room)
   }
 
   if (action === 'leave') {
@@ -273,11 +303,13 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
   }
 
   if (action === 'start-game') {
-    await startBattleFromLockedRosters(roomStore, roomId)
+    await startBattleWithDeploymentBroadcast(roomId)
     await broadcastRoom(roomId)
     const clients = roomClients.get(roomId)
     if (clients) for (const client of clients) await sendBattleSnapshot(client, roomId)
-    return await roomStore.getRoom(roomId)
+    const started = await roomStore.getRoom(roomId)
+    if (!started) throw new Error('Room not found')
+    return createPublicRoomSnapshot(started)
   }
 
   throw new Error('Unsupported room action: ' + action)
@@ -297,13 +329,13 @@ async function ensureBattleReady(roomId: string): Promise<any | null> {
   if (getBattleStorage(room)) return room
 
   if (getDemoRosterReadiness(room).ready) {
-    await startBattleFromLockedRosters(roomStore, roomId)
+    await startBattleWithDeploymentBroadcast(roomId)
     room = await roomStore.getRoom(roomId)
   }
   return room
 }
 
-async function sendBattleSnapshot(ws: WebSocket, roomId: string): Promise<void> {
+async function sendBattleSnapshot(ws: WebSocket, roomId: string, viewerPlayerId?: string | null): Promise<void> {
   const room = await ensureBattleReady(roomId)
   if (!room) {
     sendJson(ws, { type: 'battleUnavailable', reason: 'room-not-found', roomId })
@@ -322,19 +354,24 @@ async function sendBattleSnapshot(ws: WebSocket, roomId: string): Promise<void> 
   }
   const storage = getBattleStorage(room)
   if (storage) {
-    sendJson(ws, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: hashBattleState(storage.state as any) })
+    sendJson(ws, { type: 'stateUpdate', ...createPublicBattleSnapshot(room, viewerPlayerId ?? undefined) })
     return
   }
   sendJson(ws, { type: 'battleUnavailable', reason: 'battle-not-started', room: publicRoom(room) })
 }
 
-export function startWsServer(): void {
-  if (_wss) {
-    // Module reloaded (HMR) but server is still bound — close it so new code's
-    // handlers replace the stale ones.
-    try { _wss.close() } catch {}
-    _wss = null
-    _g.__rvbWss = null
+async function restartWsServer(): Promise<void> {
+  const activeServer = _g.__rvbWss ?? _wss
+  if (activeServer) {
+    // HMR can initialize a new Next server instance before the prior async
+    // close has released its port. Disconnect stale clients and wait for the
+    // close callback before binding the replacement server.
+    for (const client of activeServer.clients) client.terminate()
+    await new Promise<void>((resolve, reject) => {
+      activeServer.close((error) => error ? reject(error) : resolve())
+    })
+    if (_wss === activeServer) _wss = null
+    if (_g.__rvbWss === activeServer) _g.__rvbWss = null
     roomClients.clear()
     playerWs.clear()
   }
@@ -344,16 +381,24 @@ export function startWsServer(): void {
   }
   const port = getWsPort()
 
-  _wss = new WebSocketServer({ port })
-  _g.__rvbWss = _wss
-
-  _wss.on('error', (err: Error) => {
-    console.error(`[WS] Failed to start on port ${port}:`, err.message)
-    _wss = null
-    _g.__rvbWss = null
+  const server = new WebSocketServer({ port })
+  _wss = server
+  _g.__rvbWss = server
+  const startup = new Promise<void>((resolve, reject) => {
+    server.once('listening', () => {
+      console.log(`[WS] WebSocket server listening on port ${port}`)
+      resolve()
+    })
+    server.once('error', reject)
   })
 
-  _wss.on('connection', (ws: WebSocket) => {
+  server.on('error', (err: Error) => {
+    console.error(`[WS] Failed to start on port ${port}:`, err.message)
+    if (_wss === server) _wss = null
+    if (_g.__rvbWss === server) _g.__rvbWss = null
+  })
+
+  server.on('connection', (ws: WebSocket) => {
     let roomId: string | null = null
     let playerId: string | null = null
 
@@ -415,7 +460,7 @@ export function startWsServer(): void {
                 const targetRoomId = String(data.roomId || '').trim().toLowerCase()
                 const room = await ensureBattleReady(targetRoomId)
                 if (!room) throw new Error('Room not found')
-                result = room
+                result = createPublicRoomSnapshot(room)
               } else if (method === 'rooms.delete') {
                 const targetRoomId = String(data.roomId || '').trim().toLowerCase()
                 const player = String(data.playerId || '').trim().toLowerCase()
@@ -488,7 +533,7 @@ export function startWsServer(): void {
           }
           const nextRoomId = msg.roomId.toLowerCase()
           roomId = nextRoomId
-          playerId = typeof msg.playerId === 'string' ? msg.playerId : null
+          playerId = typeof msg.playerId === 'string' ? msg.playerId.trim().toLowerCase() : null
 
           if (!roomClients.has(nextRoomId)) roomClients.set(nextRoomId, new Set())
           roomClients.get(nextRoomId)!.add(ws)
@@ -501,17 +546,17 @@ export function startWsServer(): void {
             try {
               const room = await roomStore.getRoom(nextRoomId)
               if (room) sendJson(ws, { type: 'roomUpdate', room: publicRoom(room) })
-              await sendBattleSnapshot(ws, nextRoomId)
+              await sendBattleSnapshot(ws, nextRoomId, playerId)
             } catch {}
           })()
         } else if (msg.type === 'roomState' && roomId) {
           ;(async () => {
             const room = await roomStore.getRoom(roomId!)
             if (room) sendJson(ws, { type: 'roomUpdate', room: publicRoom(room) })
-            await sendBattleSnapshot(ws, roomId!)
+            await sendBattleSnapshot(ws, roomId!, playerId)
           })()
         } else if (msg.type === 'requestBattleSnapshot' && roomId) {
-          ;(async () => { await sendBattleSnapshot(ws, roomId!) })()
+          ;(async () => { await sendBattleSnapshot(ws, roomId!, playerId) })()
         } else if (msg.type === 'roomAction' && roomId) {
           const _roomId = roomId
           const sender = ws
@@ -544,25 +589,39 @@ export function startWsServer(): void {
             try {
               const room = await roomStore.getRoom(_roomId)
               if (!room) return
-              const storage = getBattleStorage(room)
-              if (!storage) {
-                console.warn('[WS] no battle storage for room', _roomId, 'msg.type=', msg.type)
-                return
-              }
-
               if (msg.type === 'action') {
                 if (msg.action == null) return
                 try {
-                  assertActionPlayer(playerId, msg.action)
-                  const result = runBattleAction(storage.state as any, msg.action as any, { rootSeed: storage.seed })
-                  storage.state = result.state
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  ;(room as any).battleState = storage
-                  await roomStore.setRoom(_roomId, room)
-                  broadcastToRoom(_roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: result.stateHash, duplicate: result.duplicate })
+                  const verified = await verifyBattleActionAuth(msg.auth, {
+                    roomId: _roomId,
+                    action: msg.action,
+                  })
+                  if (!playerId || playerId !== verified.playerId) {
+                    throw new BattleActionAuthError(
+                      'BATTLE_AUTH_INVALID',
+                      'Signed battle player does not match the subscribed connection identity',
+                    )
+                  }
+                  const result = await dispatchRoomBattleAction(roomStore, _roomId, verified.playerId, msg.action as any)
+                  const stateUpdate = {
+                    type: 'stateUpdate',
+                    ...result.snapshot,
+                    duplicate: result.kind === 'duplicate',
+                  }
+                  if (result.kind === 'duplicate') sendJson(sender, stateUpdate)
+                  else broadcastToRoom(_roomId, stateUpdate)
+                  if (result.kind === 'expired') {
+                    sendActionError(sender, {
+                      error: 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
+                      code: 'DEPLOYMENT_EXPIRED',
+                      action: msg.action,
+                      ...result.snapshot,
+                    })
+                    return
+                  }
                   // PVE: if it's now the bot's action phase, run AI after a short delay
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const st = storage.state as any
+                  const st = result.actionResult.state as any
                   const hasBotPlayer = (room.players as any[]).some(p => p.isBot === true || p.id === 'bot')
                   if (hasBotPlayer && st?.turn?.phase === 'action' && st?.turn?.currentPlayerId === 'bot') {
                     setTimeout(() => { runBotTurn(_roomId).catch(() => {}) }, 800)
@@ -577,24 +636,22 @@ export function startWsServer(): void {
                       : errAny?.needsOptionSelection ? 'needsOptionSelection'
                       : message
                   )
-                  if (sender.readyState === WebSocket.OPEN) {
-                    sender.send(JSON.stringify({
-                      type: 'actionError',
-                      error: message,
-                      code: errAny?.code ?? undefined,
-                      action: msg.action,
-                      preparation: errAny?.preparation ?? undefined,
-                      needsTargetSelection: errAny?.needsTargetSelection || undefined,
-                      targetType: errAny?.targetType ?? undefined,
-                      range: errAny?.range ?? undefined,
-                      filter: errAny?.filter ?? undefined,
-                      targetIndex: errAny?.targetIndex ?? undefined,
-                      needsOptionSelection: errAny?.needsOptionSelection || undefined,
-                      title: errAny?.title ?? undefined,
-                      options: errAny?.options ?? undefined,
-                      determinism: errAny?.determinism ?? undefined,
-                    }))
-                  }
+                  sendActionError(sender, {
+                    error: message,
+                    code: errAny?.code ?? undefined,
+                    action: msg.action,
+                    preparation: errAny?.preparation ?? undefined,
+                    needsTargetSelection: errAny?.needsTargetSelection || undefined,
+                    targetType: errAny?.targetType ?? undefined,
+                    range: errAny?.range ?? undefined,
+                    filter: errAny?.filter ?? undefined,
+                    targetIndex: errAny?.targetIndex ?? undefined,
+                    needsOptionSelection: errAny?.needsOptionSelection || undefined,
+                    title: errAny?.title ?? undefined,
+                    options: errAny?.options ?? undefined,
+                    determinism: errAny?.determinism ?? undefined,
+                    context: errAny?.context ?? undefined,
+                  })
                 }
                 return
               }
@@ -634,7 +691,16 @@ export function startWsServer(): void {
     })
   })
 
-  console.log(`[WS] WebSocket server listening on port ${port}`)
+  await startup
+}
+
+export function startWsServer(): Promise<void> {
+  const previous = _g.__rvbWsLifecycle ?? Promise.resolve()
+  const current = previous
+    .catch(() => undefined)
+    .then(() => restartWsServer())
+  _g.__rvbWsLifecycle = current
+  return current
 }
 
 // ── PVE: run the bot's entire turn server-side ───────────────────────────────
@@ -685,7 +751,10 @@ async function runBotTurn(roomId: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(room as any).battleState = storage
     await roomStore.setRoom(roomId, room)
-    broadcastToRoom(roomId, { type: 'stateUpdate', state: storage.state, seed: storage.seed, stateHash: hashBattleState(storage.state as any) })
+    const committedRoom = await roomStore.getRoom(roomId)
+    if (committedRoom) {
+      broadcastBattleSnapshot(roomId, createPublicBattleSnapshot(committedRoom))
+    }
   } catch (e) {
     console.warn('[WS] runBotTurn error:', e)
   }

@@ -27,12 +27,15 @@
     "dev:electron:editor": "npm run preflight:electron:editor && npx tsc -p electron-editor/tsconfig.json && npx electron electron-editor/dist/main.js",
     "build:electron:editor": "npx tsc -p electron-editor/tsconfig.json && electron-builder --config electron-builder.editor.json && node scripts/verify-electron-editor-package.js",
     "build:all": "npm run build:electron:client",
+    "check:main-baseline": "node scripts/check-main-baseline.mjs",
     "check:encoding": "node scripts/check-encoding.js",
     "sync:pages": "node scripts/sync-pages.js",
     "watch:pages": "node scripts/sync-pages.js --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke:electron:windows": "node tests/electron/windows-smoke.mjs"
+    "smoke:electron:windows": "node tests/electron/windows-smoke.mjs",
+    "rvb": "node scripts/rvb.mjs",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
