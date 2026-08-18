@@ -699,6 +699,68 @@
       z-index: 150; display: none; align-items: flex-start; justify-content: center;
       padding: 16px; overflow-y: auto;
     }
+    /* Tile status side panel */
+    #tileStatusPanel {
+      position: fixed; top: 72px; right: 12px; z-index: 155;
+      display: none; width: min(360px, calc(100vw - 24px));
+      max-height: calc(100vh - 88px); overflow: hidden; pointer-events: auto;
+      background: #111c2f; border: 1px solid rgba(148,163,184,.28);
+      border-radius: 16px; box-shadow: 0 20px 64px rgba(0,0,0,.48);
+    }
+    .ts-sheet {
+      width: 100%; height: auto; max-height: inherit; min-height: 0;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .ts-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 16px 16px 12px; border-bottom: 1px solid rgba(148,163,184,.16);
+    }
+    .ts-title { font-size: 17px; font-weight: 900; color: #f8fafc; }
+    .ts-coords { margin-top: 3px; font-size: 11px; color: #94a3b8; }
+    .ts-close {
+      width: 40px; height: 40px; flex: 0 0 40px; border-radius: 10px;
+      border: 1px solid rgba(148,163,184,.22); background: rgba(30,41,59,.86);
+      color: #cbd5e1; font-size: 22px; line-height: 1; cursor: pointer;
+      touch-action: manipulation;
+    }
+    .ts-close:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+    .ts-body { min-height: 0; overflow-y: auto; padding: 14px 16px 16px; }
+    .ts-terrain {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 14px; padding: 10px 12px; border-radius: 10px;
+      background: rgba(15,23,42,.76); border: 1px solid rgba(148,163,184,.16);
+    }
+    .ts-terrain-label { font-size: 11px; color: #64748b; font-weight: 800; letter-spacing: .06em; }
+    .ts-terrain-value { text-align: right; font-size: 13px; color: #e2e8f0; font-weight: 800; }
+    .ts-section-label { margin-bottom: 8px; font-size: 11px; color: #94a3b8; font-weight: 800; }
+    .ts-effects { display: grid; gap: 8px; }
+    .ts-effect {
+      display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 10px;
+      align-items: center; min-height: 58px; padding: 8px 10px;
+      border: 1px solid var(--effect-border, #475569); border-radius: 11px;
+      background: var(--effect-bg, rgba(15,23,42,.76));
+    }
+    .ts-effect-icon {
+      width: 42px; height: 42px; display: grid; place-items: center;
+      border-radius: 9px; background: rgba(2,6,23,.5);
+    }
+    .ts-effect-icon img { width: 36px; height: 36px; object-fit: contain; }
+    .ts-effect-name { font-size: 14px; color: #f8fafc; font-weight: 900; }
+    .ts-effect-type { margin-top: 3px; font: 10px/1.3 ui-monospace, SFMono-Regular, Consolas, monospace; color: #94a3b8; overflow-wrap: anywhere; }
+    .ts-empty {
+      padding: 22px 14px; border: 1px dashed rgba(148,163,184,.28);
+      border-radius: 11px; text-align: center; color: #94a3b8; font-size: 13px;
+      background: rgba(15,23,42,.42);
+    }
+    @media (max-width: 560px) {
+      #tileStatusPanel {
+        top: 64px; right: 8px; bottom: auto;
+        width: min(320px, calc(100vw - 16px)); max-height: 68vh;
+      }
+      .ts-sheet { height: auto; max-height: 68vh; }
+      .ts-header { padding: 13px 14px 10px; }
+      .ts-body { padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); }
+    }
     .pi-layout {
       width: 100%; max-width: 760px; display: flex; gap: 14px; align-items: flex-start;
       margin: auto;
@@ -1117,6 +1179,27 @@
     </div>
   </div>
 
+
+  <!-- Tile Status Side Panel -->
+  <aside id="tileStatusPanel" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="tileStatusTitle">
+    <div class="ts-sheet">
+      <div class="ts-header">
+        <div>
+          <div class="ts-title" id="tileStatusTitle">地格状态</div>
+          <div class="ts-coords" id="tileStatusCoords"></div>
+        </div>
+        <button class="ts-close" type="button" aria-label="关闭地格状态" onclick="closeTileStatus()">×</button>
+      </div>
+      <div class="ts-body">
+        <div class="ts-terrain">
+          <span class="ts-terrain-label">基础地形</span>
+          <span class="ts-terrain-value" id="tileStatusTerrain"></span>
+        </div>
+        <div class="ts-section-label" id="tileStatusEffectCount">持续地格效果</div>
+        <div class="ts-effects" id="tileStatusContent"></div>
+      </div>
+    </div>
+  </aside>
   <!-- Option picker -->
   <div id="optionPickerOverlay">
     <div class="option-sheet">
@@ -1584,20 +1667,32 @@
       cover:'t-cover', hole:'t-hole', lava:'t-lava',
       spring:'t-spring', chargepad:'t-chargepad'
     }
+    const TILE_TYPE_LABELS = Object.freeze({
+      floor: '普通地面', wall: '墙体', spawn: '出生点', cover: '掩体',
+      hole: '坑洞', lava: '熔岩', spring: '弹射地格', chargepad: '充能地格', trap: '陷阱地格',
+    })
     const PHASE_LABELS = { start:'开始阶段', action:'行动阶段', end:'结束阶段' }
-    const TILE_EFFECT_META = {
-      amaterasu: { icon: '炎', color: '#f97316', bg: 'rgba(127,29,29,.72)', border: '#fb923c' },
-      'flying-raijin-anchor': { icon: '雷', color: '#7dd3fc', bg: 'rgba(8,47,73,.78)', border: '#38bdf8' },
-      'shishio-burn': { icon: '燃', color: '#fdba74', bg: 'rgba(124,45,18,.75)', border: '#f97316' },
-      'shadow-step': { icon: '影', color: '#d8b4fe', bg: 'rgba(88,28,135,.72)', border: '#a855f7' },
-    }
+    const TILE_EFFECT_META = Object.freeze({
+      'amaterasu': { label: '天照黑炎' },
+      'flying-raijin-anchor': { label: '飞雷神锚点' },
+      'shishio-burn': { label: '志志雄灼烧' },
+      'shadow-step': { label: '暗影潜行' },
+      'lethal-toxin': { label: '致命毒素' },
+      'blizzard': { label: '暴风雪' },
+      'sticky-bomb': { label: '黏弹' },
+    })
     function tileEffectMeta(effect) {
-      return TILE_EFFECT_META[(effect && effect.tileType) || ''] || {
-        icon: (effect && effect.icon) || '效',
-        color: '#e5e7eb',
-        bg: 'rgba(15,23,42,.72)',
-        border: '#94a3b8'
-      }
+      const tileType = (effect && effect.tileType) || ''
+      const visuals = (window.BattleRenderer3D && window.BattleRenderer3D.TILE_EFFECT_VISUALS) || {}
+      const visual = visuals[tileType] || visuals.fallback || { colorCss: '#e5e7eb', bg: 'rgba(15,23,42,.76)', border: '#94a3b8', icon: 'images/tile-effects/fallback.svg' }
+      const label = TILE_EFFECT_META[tileType] ? TILE_EFFECT_META[tileType].label : '未知地格效果'
+      return Object.assign({ label }, visual)
+    }
+    function tileEffectSortKey(effect) {
+      return [
+        (effect && effect.tileType) || 'effect',
+        (effect && (effect.sourceId || effect.id || effect.instanceId || effect.effectId)) || '',
+      ].join(':')
     }
 
     // 鈹€鈹€ State 鈹€鈹€
@@ -2176,6 +2271,47 @@
       currentPieceKeywords = []
       activePieceKeyword = ''
       document.getElementById('pieceInfoModal').style.display = 'none'
+    }
+
+    function showTileStatus(x, y) {
+      if (!G || !G.map) return
+      const tile = G.map.tiles.find(function(entry) { return entry.x === x && entry.y === y })
+      const terrainType = tile
+        ? ((tile.props && tile.props.type) || tile.type || 'floor')
+        : 'unknown'
+      const effects = (G.extensions && G.extensions.tileEffects ? G.extensions.tileEffects : [])
+        .filter(function(effect) { return effect.x === x && effect.y === y })
+        .slice()
+        .sort(function(left, right) { return tileEffectSortKey(left).localeCompare(tileEffectSortKey(right)) })
+      const panel = document.getElementById('tileStatusPanel')
+      const coords = document.getElementById('tileStatusCoords')
+      const terrain = document.getElementById('tileStatusTerrain')
+      const count = document.getElementById('tileStatusEffectCount')
+      const content = document.getElementById('tileStatusContent')
+      if (!panel || !coords || !terrain || !count || !content) return
+
+      coords.textContent = '坐标 (' + x + ', ' + y + ')'
+      terrain.textContent = (TILE_TYPE_LABELS[terrainType] || '未知地形') + ' · ' + terrainType
+      count.textContent = '持续地格效果 · ' + effects.length
+      content.innerHTML = effects.length
+        ? effects.map(function(effect) {
+            const meta = tileEffectMeta(effect)
+            const tileType = effect.tileType || 'unknown'
+            return `<div class="ts-effect" style="--effect-border:${escHtml(meta.border)};--effect-bg:${escHtml(meta.bg)}">` +
+              `<div class="ts-effect-icon"><img src="${escHtml(meta.icon)}" alt=""></div>` +
+              `<div><div class="ts-effect-name">${escHtml(meta.label)}</div><div class="ts-effect-type">${escHtml(tileType)}</div></div>` +
+            `</div>`
+          }).join('')
+        : '<div class="ts-empty">当前没有持续地格效果</div>'
+      panel.style.display = 'flex'
+      panel.setAttribute('aria-hidden', 'false')
+    }
+
+    function closeTileStatus() {
+      const panel = document.getElementById('tileStatusPanel')
+      if (!panel) return
+      panel.style.display = 'none'
+      panel.setAttribute('aria-hidden', 'true')
     }
 
     // 鈹€鈹€ Load local static data 鈹€鈹€
@@ -3149,10 +3285,12 @@
           let tileEfxHtml = ''
           if (tileEfxList.length) {
             const icons = tileEfxList
+              .slice()
+              .sort((left, right) => tileEffectSortKey(left).localeCompare(tileEffectSortKey(right)))
+              .slice(0, 4)
               .map(te => {
                 const meta = tileEffectMeta(te)
-                const label = te.icon || meta.icon
-                return `<span title="${escHtml(te.tileType || '')}" style="display:inline-flex;align-items:center;justify-content:center;min-width:13px;height:13px;border-radius:999px;border:1px solid ${escHtml(meta.border)};background:${escHtml(meta.bg)};color:${escHtml(meta.color)};font-size:10px;line-height:1;font-weight:900">${escHtml(label)}</span>`
+                return `<span title="${escHtml(meta.label)}" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:4px;border:1px solid ${escHtml(meta.border)};background:${escHtml(meta.bg)}"><img src="${escHtml(meta.icon)}" alt="" style="display:block;width:13px;height:13px;object-fit:contain"></span>`
               })
               .join('')
             if (icons) {
@@ -3720,6 +3858,7 @@
       if (piece) {
         selectPiece(piece.instanceId)
       }
+      showTileStatus(x, y)
     }
 
     function selectPiece(instanceId) {
@@ -4480,6 +4619,13 @@
 
     // 鈹€鈹€ Debug modifier panel (backtick key toggle) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const tilePanel = document.getElementById('tileStatusPanel')
+        if (tilePanel && tilePanel.style.display !== 'none') {
+          e.preventDefault()
+          closeTileStatus()
+        }
+      }
       if (e.key === '`' || e.key === '~') {
         const p = document.getElementById('debugPanel')
         if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'
