@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="暴风雪">
+  <circle cx="32" cy="32" r="29" fill="#09202c" stroke="#8cecff" stroke-width="4"/>
+  <g fill="none" stroke="#d8f9ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 10v44M13 21l38 22M13 43l38-22"/>
+    <path d="m25 15 7 7 7-7M25 49l7-7 7 7M15 29l10-3-2-10M49 35l-10 3 2 10M15 35l10 3-2 10M49 29l-10-3 2-10"/>
+  </g>
+</svg>

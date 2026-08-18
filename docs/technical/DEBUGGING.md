@@ -218,6 +218,8 @@ npm run dev:electron:client -- --rvb-dev-profile=player-two
 预期 `status` 为 `200`。资源包中的同名文件仍优先于仓库内置数据，打包客户端仍只读取
 候选包内的 `app/www`。
 
+仓库内置 SVG 可以从 `public/` 回退读取；可激活资源包仍只允许 JSON 和安全光栅图片，不允许 SVG 覆盖。
+
 两个命令应在不同终端运行。profile 名称只允许 1–32 个 ASCII 字母、数字、连字符或下划线，且必须以字母或数字开头。每个 profile 的 `userData`、Chromium localStorage、身份与单实例锁均位于默认 `userData/dev-profiles/<profile>` 下：不同 profile 可同时运行，同一 profile 仍保持单实例。
 
 开发版 Electron 直接读取 `data/pages/`，无需先把玩家页面同步到 Android 生成目录。打包客户端仍读取构建流程生成并装入安装包的 `app/www`。

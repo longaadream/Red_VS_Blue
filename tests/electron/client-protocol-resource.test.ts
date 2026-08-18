@@ -14,17 +14,21 @@ function createRoots() {
   const activePackRoot = path.join(root, 'pack')
   fs.mkdirSync(path.join(appRoot, 'data', 'pieces'), { recursive: true })
   fs.mkdirSync(path.join(appRoot, 'public'), { recursive: true })
+  fs.mkdirSync(path.join(appRoot, 'public', 'tile-effects'), { recursive: true })
   fs.mkdirSync(path.join(htmlRoot, 'data', 'pieces'), { recursive: true })
   fs.mkdirSync(path.join(htmlRoot, 'images', 'terrain'), { recursive: true })
   fs.mkdirSync(path.join(activePackRoot, 'data', 'pieces'), { recursive: true })
   fs.mkdirSync(path.join(activePackRoot, 'images'), { recursive: true })
+  fs.mkdirSync(path.join(activePackRoot, 'images', 'tile-effects'), { recursive: true })
   fs.writeFileSync(path.join(htmlRoot, 'index.html'), '<html></html>')
   fs.writeFileSync(path.join(appRoot, 'data', 'pieces', 'manifest.json'), '["development"]')
   fs.writeFileSync(path.join(appRoot, 'public', 'ana.jpg'), 'development portrait')
+  fs.writeFileSync(path.join(appRoot, 'public', 'tile-effects', 'amaterasu.svg'), '<svg>built in</svg>')
   fs.writeFileSync(path.join(htmlRoot, 'data', 'pieces', 'manifest.json'), '["packaged"]')
   fs.writeFileSync(path.join(htmlRoot, 'images', 'terrain', 'floor.webp'), 'page terrain')
   fs.writeFileSync(path.join(activePackRoot, 'data', 'pieces', 'manifest.json'), '["pack"]')
   fs.writeFileSync(path.join(activePackRoot, 'images', 'ana.jpg'), 'pack portrait')
+  fs.writeFileSync(path.join(activePackRoot, 'images', 'tile-effects', 'amaterasu.svg'), '<svg>pack</svg>')
   return { appRoot, htmlRoot, activePackRoot }
 }
 
@@ -77,6 +81,11 @@ describe('Electron client protocol resource resolution', () => {
       isPackaged: false,
       relativePath: 'images/ana.jpg',
     })).toBe(path.join(roots.appRoot, 'public', 'ana.jpg'))
+    expect(resolveClientProtocolFile({
+      ...roots,
+      isPackaged: false,
+      relativePath: 'images/tile-effects/amaterasu.svg',
+    })).toBe(path.join(roots.appRoot, 'public', 'tile-effects', 'amaterasu.svg'))
   })
 
   test('keeps active resource-pack images ahead of development fallbacks', () => {

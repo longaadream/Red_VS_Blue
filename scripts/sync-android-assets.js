@@ -162,30 +162,45 @@ const androidWwwImagesDst = path.join(ROOT, 'android-client', 'www', 'images')
 
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.svg', '.webp', '.gif'])
 
+function listImageFiles(srcDir) {
+  const imageFiles = []
+
+  function walk(currentDir) {
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const srcPath = path.join(currentDir, entry.name)
+      if (entry.isDirectory()) {
+        walk(srcPath)
+        continue
+      }
+      if (entry.isFile() && IMAGE_EXTS.has(path.extname(entry.name).toLowerCase())) {
+        imageFiles.push(srcPath)
+      }
+    }
+  }
+
+  walk(srcDir)
+  return imageFiles
+}
+
 function copyImagesFromDir(srcDir, dstDir) {
   if (!fs.existsSync(srcDir)) return 0
+  const imageFiles = listImageFiles(srcDir)
   if (fs.existsSync(dstDir)) {
     fs.rmSync(dstDir, { recursive: true, force: true })
   }
   fs.mkdirSync(dstDir, { recursive: true })
-  let imgCount = 0
-  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
-    if (!entry.isFile()) continue
-    const ext = path.extname(entry.name).toLowerCase()
-    if (!IMAGE_EXTS.has(ext)) continue
-    fs.copyFileSync(
-      path.join(srcDir, entry.name),
-      path.join(dstDir, entry.name)
-    )
-    imgCount++
+  for (const srcPath of imageFiles) {
+    const relativePath = path.relative(srcDir, srcPath)
+    const dstPath = path.join(dstDir, relativePath)
+    fs.mkdirSync(path.dirname(dstPath), { recursive: true })
+    fs.copyFileSync(srcPath, dstPath)
   }
-  return imgCount
+  return imageFiles.length
 }
 
 function countImagesInDir(srcDir) {
   if (!fs.existsSync(srcDir)) return 0
-  return fs.readdirSync(srcDir)
-    .filter(name => IMAGE_EXTS.has(path.extname(name).toLowerCase())).length
+  return listImageFiles(srcDir).length
 }
 
 let imgCount = 0
