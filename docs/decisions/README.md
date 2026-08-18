@@ -105,6 +105,7 @@
 - [`ADR-0007-deterministic-deployment.md`](./ADR-0007-deterministic-deployment.md)：固定全地图部署、核心身份与玩家独立重投流（RED-29，已接受）。
 - [`ADR-0008-rule-status-authority.md`](./ADR-0008-rule-status-authority.md)：Rule + statusTag 是棋子效果唯一权威架构，移除 AttachedEffect（RED-80，已接受）。
 - [`ADR-0009-venom-demo-admission.md`](./ADR-0009-venom-demo-admission.md)：将毒液准入 Demo v0.1 暗方候选池（RED-89，已接受）。
+- [`ADR-0010-deterministic-damage-batches.md`](./ADR-0010-deterministic-damage-batches.md)：单体与多目标伤害统一使用确定性 batch 和动作内连锁（RED-33，已接受）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 
