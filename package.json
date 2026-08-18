@@ -27,6 +27,7 @@
     "dev:electron:editor": "npm run preflight:electron:editor && npx tsc -p electron-editor/tsconfig.json && npx electron electron-editor/dist/main.js",
     "build:electron:editor": "npx tsc -p electron-editor/tsconfig.json && electron-builder --config electron-builder.editor.json && node scripts/verify-electron-editor-package.js",
     "build:all": "npm run build:electron:client",
+    "check:main-baseline": "node scripts/check-main-baseline.mjs",
     "check:encoding": "node scripts/check-encoding.js",
     "sync:pages": "node scripts/sync-pages.js",
     "watch:pages": "node scripts/sync-pages.js --watch",
