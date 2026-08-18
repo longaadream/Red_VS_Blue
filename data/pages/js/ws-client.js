@@ -116,9 +116,33 @@
     }
   }
 
-  function connectWithoutHttpPortProbe(roomId) {
+  async function connectWithHttpPortProbe(roomId) {
     var configured = readConfiguredWsPort()
     if (configured) _wsPort = configured
+
+    var base = getServerUrl()
+    if (base && typeof fetch === 'function') {
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+      var timeout = controller ? setTimeout(function () { controller.abort() }, 1500) : null
+      try {
+        var response = await fetch(base.replace(/\/$/, '') + '/api/ws-info', {
+          cache: 'no-store',
+          signal: controller ? controller.signal : undefined,
+        })
+        if (response.ok) {
+          var info = await response.json()
+          var discovered = parsePort(info && info.wsPort)
+          if (discovered) {
+            _wsPort = discovered
+            try { localStorage.setItem('rvb_ws_port', String(discovered)) } catch {}
+          }
+        }
+      } catch {}
+      finally {
+        if (timeout) clearTimeout(timeout)
+      }
+    }
+
     _doConnect(roomId)
   }
 
@@ -208,7 +232,7 @@
     if (_mode === 'relay') {
       _doConnect(roomId)
     } else {
-      connectWithoutHttpPortProbe(roomId)
+      connectWithHttpPortProbe(roomId)
     }
   }
 

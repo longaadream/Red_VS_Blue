@@ -143,4 +143,59 @@ describe('LAN server discovery', () => {
     expect(urls[0]).toBe('ws://192.168.1.100:3001/ws/rooms/room-1')
     ws.disconnect()
   })
+
+  it('probes ws-info before a direct local connection and repairs a stale HTTP port', async () => {
+    const persisted = new Map<string, string>()
+    const localStorage = {
+      getItem(key: string) { return persisted.get(key) ?? null },
+      setItem(key: string, value: string) { persisted.set(key, String(value)) },
+      removeItem(key: string) { persisted.delete(key) },
+    }
+    const fetch = vi.fn(async (input: string) => {
+      if (input === 'http://127.0.0.1:3000/api/ws-info') {
+        return response(true, { wsPort: 3001 })
+      }
+      return response(false, {})
+    })
+    const urls: string[] = []
+    class FakeWebSocket {
+      readyState = 0
+      constructor(url: string) { urls.push(url) }
+      close() {}
+      send() {}
+    }
+    const browserWindow: Record<string, unknown> = { location: { search: '' } }
+    const context = createContext({
+      window: browserWindow,
+      localStorage,
+      URLSearchParams,
+      WebSocket: FakeWebSocket,
+      fetch,
+      AbortController,
+      setTimeout,
+      clearTimeout,
+      console,
+    })
+    const serverUtilsSource = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+    const wsClientSource = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    new Script(serverUtilsSource, { filename: 'server-utils.js' }).runInContext(context)
+    const utils = browserWindow.RvBUtils as {
+      saveServerConfig(config: { mode: string; url: string }): boolean
+    }
+    expect(utils.saveServerConfig({ mode: 'local', url: 'http://127.0.0.1:3000' })).toBe(true)
+    expect(persisted.has('rvb_ws_port')).toBe(false)
+    persisted.set('rvb_ws_port', '3000')
+
+    new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(context)
+    const ws = browserWindow.RvBWs as {
+      connect(roomId: string, playerId: string, mode: string): void
+      disconnect(): void
+    }
+    ws.connect('__lobby', 'alice', 'lan')
+
+    await vi.waitFor(() => expect(urls[0]).toBe('ws://127.0.0.1:3001/ws/rooms/__lobby'))
+    expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:3000/api/ws-info', expect.any(Object))
+    expect(persisted.get('rvb_ws_port')).toBe('3001')
+    ws.disconnect()
+  })
 })
