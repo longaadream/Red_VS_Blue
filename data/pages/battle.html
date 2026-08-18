@@ -17,6 +17,7 @@
   <script src="js/battle-ui/battle-context-layout.js"></script>
   <script src="js/battle-ui/battle-legal-actions.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
+  <script src="js/battle-ui/deployment-status.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
   <style>
@@ -1087,6 +1088,111 @@
   <link rel="stylesheet" href="css/battle-responsive.css" />
   <link rel="stylesheet" href="css/battle-context-ui.css" />
   <link rel="stylesheet" href="css/battle-responsive-mobile.css" />
+  <style>
+    /* RED-31: compact player identity/resources and authoritative deployment clock. */
+    .phase-bar {
+      right: auto !important;
+      width: auto !important;
+      max-width: min(560px, calc(100vw - 390px)) !important;
+      grid-template-columns: minmax(108px, auto) auto !important;
+    }
+    #playerResCards {
+      width: auto !important;
+      display: flex !important;
+      grid-template-columns: none !important;
+      flex-wrap: nowrap !important;
+    }
+    .player-state-chip {
+      width: auto;
+      min-width: 126px !important;
+      max-width: 168px;
+      min-height: 32px;
+      grid-template-columns: 22px minmax(44px, 1fr) auto !important;
+      gap: 4px !important;
+      padding: 3px 5px !important;
+      overflow: visible !important;
+      opacity: .84;
+    }
+    .player-state-chip.active { opacity: 1; }
+    .player-state-chip .player-avatar { width: 22px; height: 22px; font-size: 9px; }
+    .player-state-chip .player-display-name { max-width: 72px; font-size: 10px; }
+    .player-state-chip .player-side-name { font-size: 8px; }
+    .player-state-chip .player-state-resources { gap: 3px; }
+    .player-state-chip .resource-orb {
+      min-width: 28px;
+      height: 18px;
+      padding: 0 3px;
+      gap: 2px;
+      font-size: 10px;
+    }
+    .player-state-chip .resource-glyph { width: 11px; height: 11px; }
+    .player-state-chip.is-local-player {
+      opacity: 1;
+      border-color: rgba(248,250,252,.72) !important;
+      box-shadow: 0 0 0 1px rgba(248,250,252,.14), 0 8px 24px rgba(15,23,42,.34) !important;
+    }
+    .player-state-chip.is-local-player.red { box-shadow: 0 0 0 1px rgba(248,250,252,.14), 0 0 18px rgba(239,68,68,.24) !important; }
+    .player-state-chip.is-local-player.blue { box-shadow: 0 0 0 1px rgba(248,250,252,.14), 0 0 18px rgba(59,130,246,.26) !important; }
+    .player-state-chip.is-local-player::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -5px;
+      width: 8px;
+      height: 8px;
+      border: solid currentColor;
+      border-width: 0 1px 1px 0;
+      color: rgba(248,250,252,.72);
+      background: inherit;
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .local-player-mark {
+      position: absolute;
+      top: -7px;
+      left: 15px;
+      z-index: 2;
+      min-width: 20px;
+      height: 15px;
+      padding: 0 5px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid rgba(248,250,252,.72);
+      border-radius: 999px;
+      color: #f8fafc;
+      background: #0f172a;
+      font-size: 9px;
+      font-weight: 950;
+      line-height: 1;
+    }
+    .battle-turn-control { align-items: flex-end; gap: 8px; }
+    .deployment-status {
+      min-width: 220px;
+      padding: 8px 10px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 12px;
+      border: 1px solid rgba(148,163,184,.24);
+      border-radius: 12px;
+      background: rgba(3,7,18,.84);
+      box-shadow: 0 12px 34px rgba(0,0,0,.3);
+      backdrop-filter: blur(14px);
+    }
+    .deployment-status[hidden] { display: none !important; }
+    .deployment-status-label { color: #cbd5e1; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+    .deployment-countdown { color: #f8fafc; font-size: 22px; font-weight: 950; line-height: 1; font-variant-numeric: tabular-nums; }
+    .deployment-status-state { grid-column: 1 / -1; color: #94a3b8; font-size: 11px; font-weight: 750; }
+    .deployment-status.urgent { border-color: rgba(248,113,113,.54); }
+    .deployment-status.urgent .deployment-countdown { color: #fca5a5; }
+    @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
+      .phase-bar { max-width: calc(100vw - 210px) !important; }
+      .player-state-chip { min-width: 102px !important; max-width: 128px; grid-template-columns: minmax(38px, 1fr) auto !important; }
+      .player-state-chip .player-avatar { display: none; }
+      .player-state-chip .player-side-name { display: none; }
+      .local-player-mark { top: -5px; left: -4px; }
+      .deployment-status { min-width: 190px; padding: 6px 8px; }
+      .deployment-countdown { font-size: 18px; }
+    }
+  </style>
 </head>
 <body>
 
@@ -1296,6 +1402,11 @@
           </div>
         </div>
         <div class="turn-control-wrap battle-turn-control">
+          <div class="deployment-status" id="deploymentStatus" role="status" aria-live="polite" hidden>
+            <span class="deployment-status-label">部署确认</span>
+            <strong class="deployment-countdown" id="deploymentCountdown">00:45</strong>
+            <span class="deployment-status-state" id="deploymentState">等待双方确认</span>
+          </div>
           <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
         </div>
         <div class="training-tools" id="trainingTools" style="display:none">
@@ -1690,6 +1801,7 @@
     let pendingCardAction = null  // { type:'playCard', playerId, cardInstanceId } awaiting target
     let validMoves = new Set()   // reachable cells for current move (wall-aware)
     let pollTimer = null
+    let deploymentStatusTimer = null
     let myFaction = null       // 'red' | 'blue' (derived from ownerPlayerId)
     let recordSaved = false
     let actionLog = []
@@ -1858,6 +1970,10 @@
     let wsRole = 'guest'        // 'host' | 'guest' from subscribed message
     let wsMode = 'lan'          // 'lan' | 'relay'
     let relaySeq = 0            // outbound action/stateUpdate sequence
+    let relayAuthorityState = null
+    let relayDeploymentTimer = null
+    let relayInitPromise = null
+    let localDeploymentChoiceId = null
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
     let battlePresentation = null
@@ -2842,7 +2958,173 @@
       if (typeof gameSeed !== 'number') gameSeed = resolved
       return gameSeed
     }
+    function publicRelayBattleState(state) {
+      if (!state) return state
+      if (typeof GameEngine !== 'undefined' && GameEngine.toPublicBattleState) {
+        return GameEngine.toPublicBattleState(state)
+      }
+      return state
+    }
+    function relayBattleAuthError(code, message) {
+      var error = new Error(message)
+      error.code = code
+      return error
+    }
+    function battleAuthHexToBytes(hex) {
+      if (typeof hex !== 'string' || !/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) {
+        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Invalid battle action public key')
+      }
+      var bytes = new Uint8Array(hex.length / 2)
+      for (var i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+      return bytes
+    }
+    async function battleAuthPlayerId(publicKey) {
+      var digest = await crypto.subtle.digest('SHA-256', battleAuthHexToBytes(publicKey))
+      return Array.from(new Uint8Array(digest))
+        .map(function(byte) { return byte.toString(16).padStart(2, '0') })
+        .join('')
+        .slice(0, 8)
+    }
+    async function createBattleActionAuth(action) {
+      if (!window.RvBIdentity) {
+        throw relayBattleAuthError('BATTLE_AUTH_REQUIRED', 'Battle action identity is unavailable')
+      }
+      var identity = RvBIdentity.getIdentity()
+      var publicKey = RvBIdentity.getPublicKey()
+      if (!identity || !publicKey || String(identity.id).toLowerCase() !== myPlayerId) {
+        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Active identity does not match this battle player')
+      }
+      var payload = {
+        type: 'battle-action',
+        roomId: roomId,
+        playerId: myPlayerId,
+        action: action,
+        timestamp: Date.now(),
+      }
+      return {
+        publicKey: publicKey,
+        payload: payload,
+        signature: await RvBIdentity.sign(payload),
+      }
+    }
+    async function verifyRelayBattleActionAuth(msg) {
+      var auth = msg && msg.auth
+      var payload = auth && auth.payload
+      if (!auth || !auth.publicKey || !auth.signature || !payload) {
+        throw relayBattleAuthError('BATTLE_AUTH_REQUIRED', 'Relay action requires a signed player identity')
+      }
+      var signedPlayer = String(payload.playerId || '').trim().toLowerCase()
+      var sender = String(msg.from || '').trim().toLowerCase()
+      var actionPlayer = String((msg.action && msg.action.playerId) || '').trim().toLowerCase()
+      if (
+        payload.type !== 'battle-action'
+        || String(payload.roomId || '').trim().toLowerCase() !== roomId
+        || !signedPlayer
+        || signedPlayer !== sender
+        || signedPlayer !== actionPlayer
+        || JSON.stringify(payload.action) !== JSON.stringify(msg.action)
+      ) {
+        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Signed Relay action does not match its sender or payload')
+      }
+      if (!Number.isSafeInteger(payload.timestamp) || Math.abs(Date.now() - payload.timestamp) > 60000) {
+        throw relayBattleAuthError('BATTLE_AUTH_EXPIRED', 'Signed Relay action identity has expired')
+      }
+      if (await battleAuthPlayerId(auth.publicKey) !== signedPlayer) {
+        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Relay public key does not match the action player')
+      }
+      if (!await RvBIdentity.verify(payload, auth.signature, auth.publicKey)) {
+        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Invalid Relay action signature')
+      }
+    }
+    async function handleRelayPendingAction(msg) {
+      if (wsMode !== 'relay' || wsRole !== 'host' || !G ||
+          typeof GameEngine === 'undefined' || !GameEngine.runBattleAction) return
+      try {
+        await verifyRelayBattleActionAuth(msg)
+        var result = runRelayAuthorityAction(msg.action)
+        publishRelayAuthorityResult(result)
+      } catch (e) {
+        addLog('处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err')
+        RvBWs.send({
+          type: 'actionError', to: msg.from, from: myPlayerId, action: msg.action,
+          error: e.message || String(e), code: e.code, preparation: e.preparation,
+          needsTargetSelection: e.needsTargetSelection, targetType: e.targetType,
+          range: e.range, filter: e.filter, targetIndex: e.targetIndex,
+          needsOptionSelection: e.needsOptionSelection, title: e.title, options: e.options,
+        })
+      }
+    }
+    function scheduleRelayDeploymentTimeout() {
+      if (relayDeploymentTimer) {
+        clearTimeout(relayDeploymentTimer)
+        relayDeploymentTimer = null
+      }
+      if (wsMode !== 'relay' || wsRole !== 'host' || !relayAuthorityState ||
+          !relayAuthorityState.deployment || relayAuthorityState.deployment.status !== 'awaiting-locks') return
+      const deadlineAt = Number(relayAuthorityState.deployment.deadlineAt || 0)
+      const delay = Math.max(0, deadlineAt - Date.now())
+      relayDeploymentTimer = setTimeout(function() {
+        relayDeploymentTimer = null
+        if (!relayAuthorityState || !relayAuthorityState.deployment ||
+            relayAuthorityState.deployment.status !== 'awaiting-locks') return
+        try {
+          const now = Date.now()
+          if (now < deadlineAt) {
+            scheduleRelayDeploymentTimeout()
+            return
+          }
+          const result = runDeterministicAuthorityAction(relayAuthorityState, {
+            type: 'deploymentTimeout',
+            now: now,
+            clientActionId: 'relay-deployment-timeout-' + roomId + '-' + deadlineAt,
+          })
+          publishRelayAuthorityResult(result)
+        } catch (e) {
+          addLog('部署超时结算失败：' + (e.message || String(e)), 'err')
+        }
+      }, delay)
+    }
+    function publishRelayAuthorityResult(result) {
+      relayAuthorityState = result.state
+      relaySeq++
+      if (typeof GameEngine !== 'undefined' && GameEngine.stampPendingDeploymentAuthorityVersion) {
+        GameEngine.stampPendingDeploymentAuthorityVersion(relayAuthorityState, relaySeq)
+      }
+      const publicState = publicRelayBattleState(relayAuthorityState)
+      applyServerState(publicState, gameSeed)
+      const publicStateHash = typeof GameEngine !== 'undefined' && GameEngine.hashBattleState
+        ? GameEngine.hashBattleState(publicState)
+        : result.stateHash
+      RvBWs.send({
+        type: 'stateUpdate',
+        seq: relaySeq,
+        authorityVersion: relaySeq,
+        state: publicState,
+        seed: gameSeed,
+        stateHash: publicStateHash,
+      })
+      scheduleRelayDeploymentTimeout()
+    }
+    function runRelayAuthorityAction(action) {
+      const state = relayAuthorityState || G
+      const deployment = state && state.deployment
+      const now = Date.now()
+      if (action.type !== 'deploymentTimeout' && deployment &&
+          deployment.status === 'awaiting-locks' && now >= Number(deployment.deadlineAt || 0)) {
+        const timeoutResult = runDeterministicAuthorityAction(state, {
+          type: 'deploymentTimeout',
+          now: now,
+          clientActionId: 'relay-deployment-timeout-' + roomId + '-' + deployment.deadlineAt,
+        })
+        publishRelayAuthorityResult(timeoutResult)
+        const expired = new Error('Deployment deadline elapsed; the authoritative timeout was committed instead.')
+        expired.code = 'DEPLOYMENT_EXPIRED'
+        throw expired
+      }
+      return runDeterministicAuthorityAction(state, action)
+    }
     function runDeterministicAuthorityAction(state, action) {
+
       if (!state || typeof GameEngine === 'undefined' || !GameEngine.runBattleAction) throw new Error('Deterministic authority runner is unavailable')
       var seed = resolveAuthoritySeed(state, null)
       if (typeof seed !== 'number') throw new Error('Missing authority root seed')
@@ -2853,8 +3135,13 @@
       resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
+      if (wsMode === 'relay' && wsRole === 'host' && !relayAuthorityState) {
+        relayAuthorityState = state
+      }
       const oldG = G
       G = state
+      if (!G.deployment || G.deployment.status === 'complete') localDeploymentChoiceId = null
+      if (wsMode === 'relay' && wsRole === 'host') scheduleRelayDeploymentTimeout()
       G.skillsById = Object.assign({}, skillsById || {}, G.skillsById || {})
       if (G.extensions && G.extensions.playerAlignments) {
         Object.keys(G.extensions.playerAlignments).forEach(function(playerId) {
@@ -2948,6 +3235,10 @@
       })
 
       RvBWs.on('disconnect', function() {
+        if (relayDeploymentTimer) {
+          clearTimeout(relayDeploymentTimer)
+          relayDeploymentTimer = null
+        }
         wsConnected = false
         var el = document.getElementById('wsStatus')
         if (el) el.style.display = 'none'
@@ -2962,6 +3253,7 @@
           try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
           if (wsMode === 'relay' && wsRole === 'host') initRelayHostBattle()
         } else if (msg.type === 'stateUpdate') {
+          if (wsMode === 'relay' && wsRole === 'host' && relayAuthorityState && msg.authorityVersion && msg.authorityVersion <= relaySeq) return
           if (_use3d && battlePresentation && G && msg.state) {
             battlePresentation.animateAction(
               msg.lastAction || null,
@@ -3018,44 +3310,15 @@
           render()
           setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
         } else if (msg.type === 'pendingAction') {
-          // Relay host: process guest action locally and push stateUpdate.
-          if (wsMode === 'relay' && wsRole === 'host' && G &&
-              typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
-            try {
-              if (!msg.action || !msg.from || !msg.action.playerId ||
-                  String(msg.from).toLowerCase() !== String(msg.action.playerId).toLowerCase()) {
-                var playerMismatch = new Error('Relay sender does not match action player')
-                playerMismatch.code = 'ACTION_PLAYER_MISMATCH'
-                throw playerMismatch
-              }
-              var result = runDeterministicAuthorityAction(G, msg.action)
-              var newG = result.state
-              applyServerState(newG, gameSeed)
-              relaySeq++
-              RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
-            } catch (e) {
-              addLog('处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err')
-              RvBWs.send({
-                type: 'actionError',
-                to: msg.from,
-                from: myPlayerId,
-                action: msg.action,
-                error: e.message || String(e),
-                code: e.code,
-                preparation: e.preparation,
-                needsTargetSelection: e.needsTargetSelection,
-                targetType: e.targetType,
-                range: e.range,
-                filter: e.filter,
-                targetIndex: e.targetIndex,
-                needsOptionSelection: e.needsOptionSelection,
-                title: e.title,
-                options: e.options,
-              })
-            }
-          }
+          void handleRelayPendingAction(msg)
         } else if (msg.type === 'hostResume') {
-          if (wsMode === 'relay' && wsRole === 'host' && msg.state) applyServerState(msg.state, null)
+          if (wsMode === 'relay' && wsRole === 'host' && msg.state) {
+            relayAuthorityState = msg.state
+            relaySeq = Math.max(relaySeq, Number(msg.authorityVersion || 0))
+            if (typeof msg.seed === 'number') gameSeed = msg.seed
+            applyServerState(publicRelayBattleState(relayAuthorityState), msg.seed || null)
+            scheduleRelayDeploymentTimeout()
+          }
         } else if (msg.type === 'gameOver') {
           if (G && !G.gameOver) { G.gameOver = true; G.winner = msg.winner; handleGameOver() }
         }
@@ -3065,13 +3328,82 @@
     }
 
     // Relay host: create initial battle state via local engine, push to relay
-    async function initRelayHostBattle() {
-      try {
-        addLog('正在通过 WebSocket 初始化对战', 'info')
-        if (window.RvBWs && RvBWs.request) {
-        await RvBWs.request('rooms.action', { roomId, action: 'start-game', playerId: myPlayerId, accountId: myAccountId, playerName: myPlayerName }, 8000)
+    function postLocalRelayInitialization(payload) {
+      var options = {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+        timeoutMs: 8000,
+      }
+      if (window.RvBBridge && typeof window.RvBBridge.requestMobileServer === 'function' &&
+          window.RvBUtils && RvBUtils.mobileServerFetch) {
+        return RvBUtils.mobileServerFetch('/api/relay-battle-init', options)
+      }
+      var localBase = window.RvBUtils && RvBUtils.getServerUrlForMode
+        ? String(RvBUtils.getServerUrlForMode('local') || '').replace(/\/+$/, '')
+        : ''
+      if (!localBase && /^https?:$/.test(window.location.protocol)) localBase = window.location.origin
+      if (!localBase) throw new Error('Local authority server is unavailable for Relay initialization')
+      return withTimeout(fetch(localBase + '/api/relay-battle-init', options), 8000, 'relay-battle-init')
+    }
+    function initRelayHostBattle() {
+      if (relayAuthorityState) return Promise.resolve()
+      if (relayInitPromise) return relayInitPromise
+      relayInitPromise = (async function() {
+        try {
+          addLog('正在通过本机权威引擎初始化 Relay 对战', 'info')
+          var roomResponse = await RvBUtils.serverFetch('/api/rooms/' + encodeURIComponent(roomId), {
+            method: 'GET',
+            timeoutMs: 8000,
+          })
+          if (!roomResponse.ok) throw new Error('Relay room HTTP ' + roomResponse.status)
+          var relayRoom = await roomResponse.json()
+          var players = (relayRoom.players || []).slice(0, 2).map(function(player, index) {
+            var selected = player.pieces || player.selectedPieces || []
+            return {
+              id: player.id,
+              faction: player.faction === 'blue' ? 'blue' : (player.faction === 'red' ? 'red' : (index === 0 ? 'red' : 'blue')),
+              pieces: selected.map(function(piece) {
+                return { templateId: typeof piece === 'string' ? piece : piece.templateId }
+              }).filter(function(piece) { return !!piece.templateId }),
+            }
+          })
+          var initResponse = await postLocalRelayInitialization({ players: players })
+          if (!initResponse.ok) {
+            var initError = await initResponse.text().catch(function() { return '' })
+            throw new Error('Local Relay initialization HTTP ' + initResponse.status + ' ' + initError)
+          }
+          var initialized = await initResponse.json()
+          if (!initialized || !initialized.state) throw new Error('Local authority returned no battle state')
+          if (relayAuthorityState) return
+
+          relayAuthorityState = initialized.state
+          gameSeed = initialized.seed
+          relaySeq = Number(initialized.authorityVersion || 1)
+          if (typeof GameEngine !== 'undefined' && GameEngine.stampPendingDeploymentAuthorityVersion) {
+            GameEngine.stampPendingDeploymentAuthorityVersion(relayAuthorityState, relaySeq)
+          }
+          var publicState = publicRelayBattleState(relayAuthorityState)
+          var publicStateHash = typeof GameEngine !== 'undefined' && GameEngine.hashBattleState
+            ? GameEngine.hashBattleState(publicState)
+            : initialized.stateHash
+          applyServerState(publicState, gameSeed)
+          RvBWs.send({
+            type: 'stateUpdate',
+            seq: relaySeq,
+            authorityVersion: relaySeq,
+            state: publicState,
+            seed: gameSeed,
+            stateHash: publicStateHash,
+          })
+          scheduleRelayDeploymentTimeout()
+        } catch (e) {
+          addLog('初始化出错：' + e.message, 'err')
+        } finally {
+          relayInitPromise = null
         }
-      } catch (e) { addLog('初始化出错：' + e.message, 'err') }
+      })()
+      return relayInitPromise
     }
 
     // Initialize a real battle: connect WS (server will push initial stateUpdate on subscribe).
@@ -3907,8 +4239,32 @@
       setStatusMsg('🃏 再次点击释放，点其他地方取消')
     }
 
+    function renderDeploymentStatus() {
+      const panel = document.getElementById('deploymentStatus')
+      if (!panel || typeof RvBDeploymentStatus === 'undefined') return
+      const selected = G && localDeploymentChoiceId
+        ? G.pieces.find(p => p.instanceId === localDeploymentChoiceId)
+        : null
+      const view = RvBDeploymentStatus.create({
+        deployment: G && G.deployment,
+        playerId: myPlayerId,
+        selectedPieceName: selected ? pieceName(selected) : '',
+        spectating: SPECTATE_MODE,
+        now: Date.now(),
+      })
+      panel.hidden = !view.visible
+      panel.classList.toggle('urgent', view.visible && view.urgent)
+      if (!view.visible) return
+      const clock = document.getElementById('deploymentCountdown')
+      const state = document.getElementById('deploymentState')
+      if (clock) clock.textContent = view.clockText
+      if (state) state.textContent = view.stateText
+      panel.setAttribute('aria-label', '部署剩余 ' + view.remainingSeconds + ' 秒，' + view.stateText)
+    }
+
     function renderActionBar() {
       if (!G) return
+      renderDeploymentStatus()
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const phase = G.turn ? G.turn.phase : ''
       const inAction = phase === 'action'
@@ -3917,6 +4273,22 @@
 
       const _waitingForOther = pendingOptionSelectionForOther()
       const btnEnd = document.getElementById('btnEnd')
+      const deploymentPending = G.deployment && G.deployment.status === 'awaiting-locks'
+      if (deploymentPending) {
+        const lock = G.deployment.locks && G.deployment.locks[myPlayerId]
+        const locked = !!(lock && lock.locked)
+        if (btnEnd) {
+          btnEnd.disabled = SPECTATE_MODE || locked || !!targetSubmissionPending
+          btnEnd.textContent = locked ? '部署已锁定' : '确认部署'
+          btnEnd.classList.add('is-start')
+        }
+        setMoveButtonDisabled(true)
+        pendingMove = false
+        pendingSkill = null
+        setMoveButtonClass(false)
+        setStatusMsg('')
+        return
+      }
       if (btnEnd) {
         btnEnd.disabled = !!targetSubmissionPending || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
         btnEnd.textContent = inAction ? '结束回合 ->' : '继续 ->'
@@ -4179,6 +4551,26 @@
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return
       }
+      if (G && G.deployment && G.deployment.status === 'awaiting-locks') {
+        const piece = G.pieces.find(p => p.instanceId === instanceId)
+        const lock = G.deployment.locks && G.deployment.locks[myPlayerId]
+        const canChoose = !SPECTATE_MODE
+          && !(lock && lock.locked)
+          && piece
+          && piece.isCore === true
+          && String(piece.ownerPlayerId || '').toLowerCase() === myPlayerId
+        if (canChoose) {
+          localDeploymentChoiceId = localDeploymentChoiceId === instanceId ? null : instanceId
+          selectedPieceId = instanceId
+          void doAction({
+            type: 'deploymentChoice',
+            playerId: myPlayerId,
+            pieceId: localDeploymentChoiceId,
+          })
+          render()
+          return
+        }
+      }
       if (selectedPieceId === instanceId) {
         clearPieceSelection()
         return
@@ -4262,7 +4654,17 @@
     }
 
     async function doTurnControl() {
-      if (!G || !G.turn) return
+      if (!G) return
+      if (G.deployment && G.deployment.status === 'awaiting-locks') {
+        const lock = G.deployment.locks && G.deployment.locks[myPlayerId]
+        if (SPECTATE_MODE || (lock && lock.locked)) return
+        await doAction({
+          type: 'deploymentLock',
+          playerId: myPlayerId,
+        })
+        return
+      }
+      if (!G.turn) return
       if (G.turn.phase === 'action') {
         await doEndTurn()
       } else {
@@ -4375,7 +4777,8 @@
 
         if (typeof GameEngine !== 'undefined' && GameEngine.safeCloneBattleState) {
           try {
-            authorityTrace = runDeterministicAuthorityAction(GameEngine.safeCloneBattleState(G), action).trace || null
+            const previewState = wsMode === 'relay' && wsRole === 'host' && relayAuthorityState ? relayAuthorityState : G
+            authorityTrace = runDeterministicAuthorityAction(GameEngine.safeCloneBattleState(previewState), action).trace || null
           } catch (e) {
             if (enterActionTargetMode(action, targetPreparationFromError(e))) return
             throw e
@@ -4385,7 +4788,8 @@
         // Relay guest: submit action via WS, wait for stateUpdate.
         if (wsMode === 'relay' && wsRole === 'guest') {
           relaySeq++
-          RvBWs.send({ type: 'action', seq: relaySeq, action, prevStateHash: '', trace: authorityTrace })
+          var relayActionAuth = await createBattleActionAuth(action)
+          RvBWs.send({ type: 'action', seq: relaySeq, action, auth: relayActionAuth, prevStateHash: '', trace: authorityTrace })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -4397,15 +4801,13 @@
         if (wsMode === 'relay' && wsRole === 'host' && G &&
             typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
           try {
-            const result = runDeterministicAuthorityAction(G, action)
+            const result = runRelayAuthorityAction(action)
             const newG = result.state
             if (action.pieceId && newG.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
               selectedPieceId = action.pieceId
             } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
             pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
-            applyServerState(newG, gameSeed)
-            relaySeq++
-            RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG, seed: gameSeed, stateHash: result.stateHash })
+            publishRelayAuthorityResult(result)
           } catch (e) {
             if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
               const errMsg = e.message || String(e)
@@ -4421,7 +4823,8 @@
 
         // LAN WS: submit action via WS only.
         if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
-          RvBWs.send({ type: 'action', action, playerId: myPlayerId, trace: authorityTrace })
+          var lanActionAuth = await createBattleActionAuth(action)
+          RvBWs.send({ type: 'action', action, auth: lanActionAuth, playerId: myPlayerId, trace: authorityTrace })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -4802,6 +5205,7 @@
       })
       _use3d = hasThreeRenderer
       if (!_use3d) initMapControls()
+      if (!deploymentStatusTimer) deploymentStatusTimer = setInterval(renderDeploymentStatus, 250)
       init()
       document.addEventListener('pointerdown', function (event) {
         const root = document.getElementById('trainingTools')
@@ -4863,6 +5267,8 @@
     function disposeBattlePage() {
       if (pollTimer) clearInterval(pollTimer)
       pollTimer = null
+      if (deploymentStatusTimer) clearInterval(deploymentStatusTimer)
+      deploymentStatusTimer = null
       if (battlePresentation) battlePresentation.dispose()
     }
     window.addEventListener('pagehide', disposeBattlePage)

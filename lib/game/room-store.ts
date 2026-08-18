@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import type { BattleState } from './turn'
 import { prisma } from '../db'
 import { isPlayerSeat, normalizeContentAlignment, type ContentAlignment, type PlayerSeat } from './match-identity'
@@ -19,7 +20,11 @@ export function getPlayerSeat(player: { seat?: PlayerSeat; faction?: PlayerSeat 
   return isPlayerSeat(player.seat) ? player.seat : isPlayerSeat(player.faction) ? player.faction : undefined
 }
 
-export function assignNextSeat(players: Array<{ id?: string; seat?: PlayerSeat; faction?: PlayerSeat }>, playerId?: string): PlayerSeat {
+export function randomPlayerSeat(): PlayerSeat {
+  return randomInt(2) === 0 ? 'red' : 'blue'
+}
+
+export function assignNextSeat(players: Array<{ id?: string; seat?: PlayerSeat; faction?: PlayerSeat }>, playerId?: string, chooseFirstSeat: () => PlayerSeat = randomPlayerSeat): PlayerSeat {
   const normalizedPlayerId = playerId ? playerId.trim().toLowerCase() : undefined
   const taken = players
     .filter(p => !normalizedPlayerId || !p.id || p.id.toLowerCase() !== normalizedPlayerId)
@@ -27,7 +32,7 @@ export function assignNextSeat(players: Array<{ id?: string; seat?: PlayerSeat; 
     .filter(Boolean) as PlayerSeat[]
   if (taken.includes("red") && !taken.includes("blue")) return "blue"
   if (taken.includes("blue") && !taken.includes("red")) return "red"
-  return "red"
+  return chooseFirstSeat()
 }
 
 // 玩家类型
@@ -94,7 +99,7 @@ export interface Room {
   actions: GameAction[]
   maxPlayers?: number
   hostId?: string
-  /** The player who takes the first turn; independent of seat and alignment. */
+  /** Explicit authority field derived from the red seat when the room battle starts. */
   firstPlayerId?: string
   mapId?: string
   createdAt?: number

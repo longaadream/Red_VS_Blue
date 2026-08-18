@@ -1,18 +1,19 @@
 import type { ServerWebSocket } from 'bun'
 import type { WsData, WsInbound } from '../types'
 import { store } from '../store'
+import { BattleSubscribeAuthError, verifyBattleSubscribeAuth } from '../../../lib/game/identity-verify'
 
 function send(ws: ServerWebSocket<WsData>, msg: object) {
   if (ws.readyState === 1) ws.send(JSON.stringify(msg))
 }
 
-function err(ws: ServerWebSocket<WsData>, message: string) {
-  send(ws, { type: 'error', message })
+function err(ws: ServerWebSocket<WsData>, message: string, code?: string) {
+  send(ws, { type: 'error', message, ...(code ? { code } : {}) })
 }
 
 // ── Subscribe ──────────────────────────────────────────────────────────────
 
-function handleSubscribe(
+async function handleSubscribe(
   ws: ServerWebSocket<WsData>,
   roomId: string,
   msg: Extract<WsInbound, { type: 'subscribe' }>
@@ -20,12 +21,23 @@ function handleSubscribe(
   const room = store.getRoom(roomId)
   if (!room) return err(ws, 'room not found')
 
-  const player = room.players.find(p => p.id === msg.playerId)
+  let verified: Awaited<ReturnType<typeof verifyBattleSubscribeAuth>>
+  try {
+    verified = await verifyBattleSubscribeAuth(msg, { roomId, playerId: msg.playerId })
+  } catch (error) {
+    const authError = error instanceof BattleSubscribeAuthError ? error : null
+    return err(ws, authError?.message ?? 'Invalid WebSocket subscription identity', authError?.code ?? 'SUBSCRIBE_AUTH_INVALID')
+  }
+
+  const player = room.players.find(p => p.id.toLowerCase() === verified.playerId)
+  if (player?.publicKey && player.publicKey.toLowerCase() !== verified.publicKey) {
+    return err(ws, 'Signed WebSocket identity does not match the registered player key', 'SUBSCRIBE_AUTH_INVALID')
+  }
   // Allow spectators even if not in players list yet
-  const role = msg.playerId === room.hostId ? 'host' : player ? 'guest' : 'spectator'
+  const role = verified.playerId === room.hostId.toLowerCase() ? 'host' : player ? 'guest' : 'spectator'
 
   ws.data.roomId = roomId
-  ws.data.playerId = msg.playerId
+  ws.data.playerId = verified.playerId
   ws.data.role = role
 
   store.addWsClient(roomId, ws)
@@ -37,7 +49,10 @@ function handleSubscribe(
     room.status = 'battle'
     store.setRoom(room)
     if (room.lastStateBlob) {
-      send(ws, { type: 'hostResume', state: JSON.parse(room.lastStateBlob) })
+      const saved = JSON.parse(room.lastStateBlob) as { type?: string; state?: unknown; authorityVersion?: number; seed?: number; stateHash?: string }
+      send(ws, saved?.type === 'stateUpdate'
+        ? { type: 'hostResume', state: saved.state, authorityVersion: saved.authorityVersion, seed: saved.seed, stateHash: saved.stateHash }
+        : { type: 'hostResume', state: saved })
     }
     store.broadcastToRoom(roomId, { type: 'roomUpdate', room: publicRoom(room) }, ws)
   }
@@ -64,7 +79,7 @@ function handleAction(
     action: msg.action,
     prevStateHash: msg.prevStateHash,
     timestamp: Date.now(),
-    signature: msg.signature,
+    signature: msg.signature ?? String((msg.auth as { signature?: unknown } | undefined)?.signature ?? ''),
   })
 
   // Forward to host
@@ -72,6 +87,7 @@ function handleAction(
     type: 'pendingAction',
     seq: msg.seq,
     action: msg.action,
+    auth: msg.auth,
     from: playerId,
   })
 }
@@ -90,13 +106,19 @@ function handleStateUpdate(
   if (!room) return err(ws, 'room not found')
 
   // Persist blob for reconnect
-  room.lastStateBlob = JSON.stringify(msg.state)
+  room.lastStateBlob = JSON.stringify({
+    type: 'stateUpdate',
+    state: msg.state,
+    authorityVersion: msg.authorityVersion,
+    seed: msg.seed,
+    stateHash: msg.stateHash,
+  })
   store.setRoom(room)
 
   // Relay to all guests
   store.broadcastToRoom(
     roomId,
-    { type: 'stateUpdate', seq: msg.seq, state: msg.state },
+    { type: 'stateUpdate', seq: msg.seq, authorityVersion: msg.authorityVersion, state: msg.state, seed: msg.seed, stateHash: msg.stateHash },
     ws // exclude host
   )
 }
@@ -147,7 +169,7 @@ function publicRoom(room: ReturnType<typeof store.getRoom>) {
 export const wsHandler = {
   open(_ws: ServerWebSocket<WsData>) {},
 
-  message(ws: ServerWebSocket<WsData>, raw: string | Buffer) {
+  async message(ws: ServerWebSocket<WsData>, raw: string | Buffer) {
     let msg: WsInbound
     try {
       msg = JSON.parse(raw.toString()) as WsInbound
@@ -159,7 +181,7 @@ export const wsHandler = {
 
     switch (msg.type) {
       case 'subscribe':
-        handleSubscribe(ws, roomId, msg)
+        await handleSubscribe(ws, roomId, msg)
         break
       case 'action':
         handleAction(ws, msg)

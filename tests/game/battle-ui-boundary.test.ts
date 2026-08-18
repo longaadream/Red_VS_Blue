@@ -214,6 +214,52 @@ describe('battle presentation boundary', () => {
     expect(document.getElementById).not.toHaveBeenCalledWith('selectedPieceStatus')
   })
 
+  it('marks only the local player inside the compact resource HUD', () => {
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const playerResCards = { className: '', innerHTML: '' }
+    const document = {
+      getElementById: vi.fn((id: string) => id === 'playerResCards' ? playerResCards : null),
+    }
+    const redPlayer = {
+      id: 'alice',
+      name: 'Alice',
+      faction: 'red',
+      isCurrent: true,
+      resources: { action: 2, maxAction: 3, charge: 1, maxCharge: 4 },
+      statusSummary: [],
+    }
+    const bluePlayer = {
+      id: 'bob',
+      name: 'Bob',
+      faction: 'blue',
+      isCurrent: false,
+      resources: { action: 3, maxAction: 3, charge: 0, maxCharge: 4 },
+      statusSummary: [],
+    }
+    const ui = domUi.create({ document })
+
+    ui.update({
+      selection: { mode: 'inspect', piece: null },
+      turn: {
+        currentPlayerId: 'alice',
+        isViewerTurn: false,
+        number: 1,
+        phase: 'start',
+        remainingSeconds: null,
+      },
+      players: [redPlayer, bluePlayer],
+      viewer: bluePlayer,
+    })
+
+    expect(playerResCards.className).toBe('player-state-strip')
+    expect(playerResCards.innerHTML).toContain('player-state-chip red active')
+    expect(playerResCards.innerHTML).toContain('player-state-chip blue is-local-player')
+    expect(playerResCards.innerHTML).toContain('class="local-player-mark"')
+    expect(playerResCards.innerHTML).toContain('>你</span>')
+    expect(playerResCards.innerHTML.match(/local-player-mark/g)).toHaveLength(1)
+    expect(playerResCards.innerHTML).toContain('Bob，蓝方 · 后手，你')
+  })
+
 
   it('renders every selected-piece status in a non-blocking overlay and hides it outside inspect mode', () => {
     const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
