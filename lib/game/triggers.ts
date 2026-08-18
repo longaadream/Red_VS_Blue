@@ -28,6 +28,8 @@ export type TriggerType =
   | "afterDamageTaken"      // 受到伤害后
   | "beforeDamageDealt"     // 即将造成伤害前
   | "beforeDamageTaken"     // 即将受到伤害前
+  | "beforeDamageShield"    // 防御结算后、数值护盾吸收前
+  | "beforeDamageApplied"   // 数值护盾结算后、生命扣减前
   | "afterPieceKilled"      // 击杀棋子后
   | "beforePieceKilled"     // 即将击杀棋子前
   | "afterPieceSummoned"    // 召唤棋子后
@@ -120,6 +122,23 @@ export interface TriggerContext {
   targetPieceId?: string
   /** 伤害类型，可以在 beforeDamageDealt 中被修改 */
   damageType?: 'physical' | 'magical' | 'true' | 'toxin'
+  /** RED-33 deterministic damage-chain metadata. */
+  damageBatchId?: string
+  damageChainId?: string
+  parentDamageBatchId?: string
+  rawDamage?: number
+  modifiedDamage?: number
+  defenseApplied?: number
+  shieldAbsorbed?: number
+  /** Follow-up damage drained after the parent batch has committed. */
+  damageQueue?: Array<{
+    attacker: PieceInstance
+    target: PieceInstance | PieceInstance[]
+    damage: number
+    damageType: 'physical' | 'magical' | 'true' | 'toxin'
+    skillId?: string
+    killerPlayerId?: string
+  }>
   /** 
    * 当前执行规则的棋子（规则绑定者）
    * 在全场扫描规则时，这个字段表示当前正在执行哪个棋子的规则
@@ -491,13 +510,16 @@ export class TriggerSystem {
 
       try {
         const ruleCtx = item.buildCtx(context)
+        const damageBeforeEffect = Number((ruleCtx as any).damage)
         const ruleOwnerPlayerId = (ruleCtx as any).ruleOwnerPlayerId || (ruleCtx as any).playerId || context.playerId
         const result = item.rule.effect(battle, ruleCtx)
         // 回写 damage
         if ((ruleCtx as any).damage !== (context as any).damage) {
           (context as any).damage = (ruleCtx as any).damage
         }
-        if ((context as any).damage !== undefined && (context as any).damage <= 0) {
+        if (Number.isFinite(damageBeforeEffect)
+          && damageBeforeEffect > 0
+          && Number((context as any).damage) <= 0) {
           blocked = true
         }
 

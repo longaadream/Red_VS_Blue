@@ -122,11 +122,23 @@ describe('RED-76 Shishio combustion passive', () => {
       expect(shishio.statusTags.find((tag: any) => tag.type === 'shishio-dmg-counter')?.intensity).toBe(4)
 
       target.skills[0].currentCooldown = 0
+      const damageLogStart = state.actions.filter((action: any) => action.type === 'damage').length
       const threshold = dealDamage(shishio, target, 1, 'true', state, 'red-76-direct-damage')
       expect(threshold).toMatchObject({ success: true, damage: 1 })
       expect(target.skills[0].currentCooldown).toBe(0)
       expect(shishio.currentHp).toBe(6)
       expect(shishio.statusTags.find((tag: any) => tag.type === 'shishio-dmg-counter')?.intensity).toBe(0)
+      const thresholdLogs = state.actions
+        .filter((action: any) => action.type === 'damage')
+        .slice(damageLogStart)
+        .map((action: any) => action.payload)
+      expect(thresholdLogs.map((payload: any) => payload.skillId)).toEqual([
+        'red-76-direct-damage',
+        'combustion-self',
+      ])
+      expect(thresholdLogs[0].batchId).toBe(threshold.batchId)
+      expect(thresholdLogs[1].parentBatchId).toBe(thresholdLogs[0].batchId)
+      expect(thresholdLogs[1].chainId).toBe(thresholdLogs[0].chainId)
 
       const blockedHeal = healDamage(target, shishio, 3, state, 'red-76-heal-attempt')
       expect(blockedHeal).toMatchObject({ success: false, heal: 0, targetHp: 6 })
