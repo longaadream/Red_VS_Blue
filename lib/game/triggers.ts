@@ -510,13 +510,16 @@ export class TriggerSystem {
 
       try {
         const ruleCtx = item.buildCtx(context)
+        const damageBeforeEffect = Number((ruleCtx as any).damage)
         const ruleOwnerPlayerId = (ruleCtx as any).ruleOwnerPlayerId || (ruleCtx as any).playerId || context.playerId
         const result = item.rule.effect(battle, ruleCtx)
         // 回写 damage
         if ((ruleCtx as any).damage !== (context as any).damage) {
           (context as any).damage = (ruleCtx as any).damage
         }
-        if ((context as any).damage !== undefined && (context as any).damage <= 0) {
+        if (Number.isFinite(damageBeforeEffect)
+          && damageBeforeEffect > 0
+          && Number((context as any).damage) <= 0) {
           blocked = true
         }
 

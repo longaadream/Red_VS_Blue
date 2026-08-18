@@ -113,18 +113,32 @@ describe('RED-33 deterministic damage pipeline', () => {
     defender.statusTags = [{ id: 'icebound-fortitude', type: 'icebound-fortitude', intensity: 1 }]
     defender.rules = [requiredRule('rule-arthas-icebound')]
     const state = makeState({ pieces: [attacker, defender] }) as any
+    state.extensions.beforeDealtCount = 0
+    state.extensions.blockedEvents = 0
+    globalTriggerSystem.addRules([
+      eventRule('observe-icebound-zero-source', 'beforeDamageDealt', battle => {
+        battle.extensions.beforeDealtCount += 1
+      }),
+      eventRule('observe-icebound-zero-blocked', 'afterDamageBlocked', battle => {
+        battle.extensions.blockedEvents += 1
+      }),
+    ] as any)
 
     const result = dealDamage(attacker, defender, 0, 'physical', state, 'icebound-zero')
 
     expect(result).toMatchObject({
+      success: true,
       rawDamage: 0,
       modifiedDamage: 0,
       damage: 0,
       targetHp: 100,
+      blocked: false,
     })
     expect(defender.currentHp).toBe(100)
+    expect(state.extensions.beforeDealtCount).toBe(1)
+    expect(state.extensions.blockedEvents).toBe(0)
     expect(damageLogs(state)).toEqual([
-      expect.objectContaining({ rawDamage: 0, modifiedDamage: 0, finalDamage: 0 }),
+      expect.objectContaining({ rawDamage: 0, modifiedDamage: 0, finalDamage: 0, blocked: false }),
     ])
   })
 
