@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -54,6 +54,7 @@ function runCli(
   args: string[],
   config: TestConfig,
   paths: ReturnType<typeof makeWorkspace>,
+  environment: Record<string, string> = {},
 ) {
   writeFileSync(paths.configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
   return spawnSync(process.execPath, [CLI_PATH, ...args], {
@@ -63,6 +64,7 @@ function runCli(
       ...process.env,
       RVB_CONFIG_PATH: paths.configPath,
       RVB_OUTPUT_DIR: paths.outputRoot,
+      ...environment,
     },
   })
 }
@@ -106,6 +108,23 @@ describe('rvb CLI', { timeout: 30_000 }, () => {
     expect(badCommand.status).not.toBe(0)
     expect(`${badCommand.stdout}${badCommand.stderr}`).toContain('Unknown command')
     expect(existsSync(paths.outputRoot)).toBe(false)
+  })
+
+  it('rejects an incomplete node_modules directory during doctor checks', () => {
+    const paths = makeWorkspace()
+    const config = baseConfig()
+    writeFileSync(path.join(paths.workspace, 'package.json'), '{}\n', 'utf8')
+    writeFileSync(path.join(paths.workspace, 'package-lock.json'), '{}\n', 'utf8')
+    mkdirSync(path.join(paths.workspace, 'node_modules'))
+
+    const result = runCli(['doctor'], config, paths, {
+      RVB_REPO_ROOT: paths.workspace,
+    })
+
+    expect(result.status).not.toBe(0)
+    expect(`${result.stdout}${result.stderr}`).toContain(
+      '[FAIL] Next.js dependency installed',
+    )
   })
 
   it('delegates dev to its configured existing entrypoint', () => {

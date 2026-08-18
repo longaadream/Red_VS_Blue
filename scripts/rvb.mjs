@@ -6,7 +6,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(SCRIPT_DIR, '..')
+const REPO_ROOT = process.env.RVB_REPO_ROOT
+  ? path.resolve(process.env.RVB_REPO_ROOT)
+  : path.resolve(SCRIPT_DIR, '..')
 const DEFAULT_CONFIG_PATH = path.join(REPO_ROOT, 'config', 'validation-profiles.json')
 const DEFAULT_OUTPUT_ROOT = path.join(REPO_ROOT, 'output', 'validation')
 const TASK_ID_PATTERN = /^RED-\d+$/i
@@ -191,7 +193,10 @@ function runDoctor(configPath) {
   checks.push({ label: `Config ${path.relative(REPO_ROOT, configPath) || configPath}`, ok: existsSync(configPath) })
   checks.push({ label: 'package.json', ok: existsSync(path.join(REPO_ROOT, 'package.json')) })
   checks.push({ label: 'package-lock.json', ok: existsSync(path.join(REPO_ROOT, 'package-lock.json')) })
-  checks.push({ label: 'node_modules installed', ok: existsSync(path.join(REPO_ROOT, 'node_modules')) })
+  checks.push({
+    label: 'Next.js dependency installed',
+    ok: existsSync(path.join(REPO_ROOT, 'node_modules', 'next', 'package.json')),
+  })
   checks.push({
     label: git.ok ? `Git repository on ${branch.stdout || 'detached HEAD'}` : `Git unavailable: ${git.error || git.stderr}`,
     ok: git.ok,
