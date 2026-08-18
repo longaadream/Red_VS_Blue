@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
+import { createServer } from 'node:net'
 import { WebSocket, WebSocketServer } from 'ws'
 import { startWsServer } from '../lib/ws-server'
 
@@ -21,6 +22,30 @@ function waitForServerListening(server: WebSocketServer): Promise<void> {
     server.once('listening', resolve)
     server.once('error', reject)
   })
+}
+
+function findFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer()
+    probe.once('error', reject)
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address()
+      if (!address || typeof address === 'string') {
+        probe.close()
+        reject(new Error('Port probe did not expose a TCP port'))
+        return
+      }
+      probe.close((error) => error ? reject(error) : resolve(address.port))
+    })
+  })
+}
+
+function updateServerUrl(server: WebSocketServer): void {
+  const address = server.address()
+  if (!address || typeof address === 'string') {
+    throw new Error('WebSocket server did not expose a TCP port')
+  }
+  serverUrl = `ws://127.0.0.1:${address.port}`
 }
 
 function openClient(): Promise<WebSocket> {
@@ -78,18 +103,13 @@ function closeClient(client: WebSocket): Promise<number> {
 
 describe('game WebSocket service', () => {
   beforeAll(async () => {
-    process.env.WS_PORT = '0'
-    startWsServer()
+    process.env.WS_PORT = String(await findFreePort())
+    await startWsServer()
 
     const server = globalWithWsServer.__rvbWss
     if (!server) throw new Error('WebSocket server did not start')
     await waitForServerListening(server)
-
-    const address = server.address()
-    if (!address || typeof address === 'string') {
-      throw new Error('WebSocket server did not expose a TCP port')
-    }
-    serverUrl = `ws://127.0.0.1:${address.port}`
+    updateServerUrl(server)
   })
 
   afterAll(async () => {
@@ -106,6 +126,24 @@ describe('game WebSocket service', () => {
   afterEach(() => {
     for (const client of activeClients) client.terminate()
     activeClients.clear()
+  })
+
+  test('serializes a same-port restart while an existing client is connected', async () => {
+    const originalServer = globalWithWsServer.__rvbWss
+    if (!originalServer) throw new Error('Original WebSocket server is unavailable')
+    const staleClient = await openClient()
+
+    await startWsServer()
+
+    const restartedServer = globalWithWsServer.__rvbWss
+    if (!restartedServer) throw new Error('Restarted WebSocket server is unavailable')
+    expect(restartedServer).not.toBe(originalServer)
+    await waitForServerListening(restartedServer)
+    updateServerUrl(restartedServer)
+
+    const replacementClient = await openClient()
+    await expect(closeClient(replacementClient)).resolves.toBe(1000)
+    expect(staleClient.readyState).not.toBe(WebSocket.OPEN)
   })
 
   test('connects, exchanges ping/pong messages, and closes normally', async () => {
