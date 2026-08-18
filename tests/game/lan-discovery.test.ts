@@ -198,4 +198,73 @@ describe('LAN server discovery', () => {
     expect(persisted.get('rvb_ws_port')).toBe('3001')
     ws.disconnect()
   })
+
+  it('preserves explicit and same-port gateway WS ports without probing', () => {
+    const scenarios = [
+      {
+        serverUrl: 'http://127.0.0.1:3000',
+        wsPort: 3007,
+        expectedUrl: 'ws://127.0.0.1:3007/ws/rooms/room-explicit',
+      },
+      {
+        serverUrl: 'http://gateway.test:8080',
+        wsPort: 8080,
+        expectedUrl: 'ws://gateway.test:8080/ws/rooms/room-explicit',
+      },
+    ]
+
+    for (const scenario of scenarios) {
+      const persisted = new Map<string, string>()
+      const localStorage = {
+        getItem(key: string) { return persisted.get(key) ?? null },
+        setItem(key: string, value: string) { persisted.set(key, String(value)) },
+        removeItem(key: string) { persisted.delete(key) },
+      }
+      const fetch = vi.fn(async () => response(true, { wsPort: 3001 }))
+      const urls: string[] = []
+      class FakeWebSocket {
+        readyState = 0
+        constructor(url: string) { urls.push(url) }
+        close() {}
+        send() {}
+      }
+      const browserWindow: Record<string, unknown> = {
+        location: { search: `?wsPort=${scenario.wsPort}` },
+      }
+      const context = createContext({
+        window: browserWindow,
+        localStorage,
+        URLSearchParams,
+        WebSocket: FakeWebSocket,
+        fetch,
+        AbortController,
+        setTimeout,
+        clearTimeout,
+        console,
+      })
+      const serverUtilsSource = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+      const wsClientSource = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+      new Script(serverUtilsSource, { filename: 'server-utils.js' }).runInContext(context)
+      const utils = browserWindow.RvBUtils as {
+        saveServerConfig(config: { mode: string; url: string; wsPort: number }): boolean
+      }
+      expect(utils.saveServerConfig({
+        mode: 'lan',
+        url: scenario.serverUrl,
+        wsPort: scenario.wsPort,
+      })).toBe(true)
+
+      new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(context)
+      const ws = browserWindow.RvBWs as {
+        connect(roomId: string, playerId: string, mode: string): void
+        disconnect(): void
+      }
+      ws.connect('room-explicit', 'alice', 'lan')
+
+      expect(urls[0]).toBe(scenario.expectedUrl)
+      expect(fetch).not.toHaveBeenCalled()
+      expect(persisted.get('rvb_ws_port')).toBe(String(scenario.wsPort))
+      ws.disconnect()
+    }
+  })
 })

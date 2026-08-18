@@ -17,6 +17,15 @@
     return Number.isFinite(n) && n > 0 && n <= 65535 ? n : null
   }
 
+  function readExplicitQueryWsPort() {
+    try {
+      var params = new URLSearchParams(window.location.search || '')
+      return parsePort(params.get('wsPort') || params.get('ws_port'))
+    } catch {
+      return null
+    }
+  }
+
   function readConfiguredWsPort() {
     if (window.RvBUtils && window.RvBUtils.getConfiguredWsPort) {
       var fromConfig = parsePort(window.RvBUtils.getConfiguredWsPort())
@@ -121,6 +130,22 @@
     if (configured) _wsPort = configured
 
     var base = getServerUrl()
+    var withoutScheme = String(base || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
+    var basePortMatch = withoutScheme.match(/:(\d+)(?:\/|$)/)
+    var basePort = basePortMatch ? parsePort(basePortMatch[1]) : null
+    var isLocalOrLan = /^(localhost|127\.0\.0\.1)(:\d+)?\b/.test(withoutScheme) ||
+      /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
+    var shouldProbe = !configured || (
+      !readExplicitQueryWsPort() &&
+      configured === 3000 &&
+      basePort === 3000 &&
+      isLocalOrLan
+    )
+    if (!shouldProbe) {
+      _doConnect(roomId)
+      return
+    }
+
     if (base && typeof fetch === 'function') {
       var controller = typeof AbortController !== 'undefined' ? new AbortController() : null
       var timeout = controller ? setTimeout(function () { controller.abort() }, 1500) : null
