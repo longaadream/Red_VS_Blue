@@ -57,7 +57,8 @@ export function resolveClientProtocolFile({
   const htmlFile = resolveExistingFile(htmlRoot, segments)
   if (htmlFile) return htmlFile
 
-  if (!isPackaged && isPackResource && relativePath.startsWith('images/')) {
+  // Built-in SVGs are trusted app assets; activatable resource packs remain raster-only.
+  if (!isPackaged && /^images\/.+\.(?:gif|jpe?g|png|svg|webp)$/i.test(relativePath)) {
     return resolveExistingFile(path.join(appRoot, 'public'), segments.slice(1))
   }
 

@@ -274,6 +274,7 @@
 - 入口：`scripts/build-game-engine.js`、`sync-pages.js`、`sync-android-assets.js` 和根 `package.json` Android scripts。
 - 职责：把 TS/JS、页面和 mobile server 转换成 Android 发布资源。
 - 输入：`lib/game`、`data/pages`、`mobile-server`。
+- 图片源：`public/tile-effects/**` 是地格效果 SVG 的唯一维护源；同步脚本递归保留子目录并派生到客户端 `images/tile-effects/**`，不得手工维护双份。
 - 输出：页面实际加载并提交的 `data/pages/js/game-engine.js`，以及被忽略的 `android-client/www/js/game-engine.js` 派生副本。
 - 调用方：Android 打包命令。
 - 错误：缺失依赖、构建顺序或覆盖错误会生成与源码不一致的安装包。

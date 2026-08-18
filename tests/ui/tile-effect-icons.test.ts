@@ -15,7 +15,7 @@ const TILE_EFFECT_TYPES = [
 describe('tile-effect icon registry', () => {
   const rendererPath = join(process.cwd(), 'data', 'pages', 'js', 'battle-renderer-3d.js')
   const battlePagePath = join(process.cwd(), 'data', 'pages', 'battle.html')
-  const iconDirectory = join(process.cwd(), 'data', 'pages', 'images', 'tile-effects')
+  const iconDirectory = join(process.cwd(), 'public', 'tile-effects')
 
   it('registers all persistent effects and an unknown-type fallback in 3D', () => {
     const renderer = readFileSync(rendererPath, 'utf8')
