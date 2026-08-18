@@ -6,6 +6,7 @@ import {
   getPlayerSeat,
   normalizePlayerAlignment,
 } from '@/lib/game/room-store'
+import { areAllies, areEnemies, isMatchPlayerId, isPlayerSeat, normalizeContentAlignment } from '@/lib/game/match-identity'
 
 describe('player seat and alignment model', () => {
   it('assigns opposite red/blue seats while keeping light/dark independent', () => {
@@ -36,5 +37,23 @@ describe('player seat and alignment model', () => {
   it('maps player alignment to existing piece-template factions', () => {
     expect(alignmentToPieceFaction('light')).toBe('good')
     expect(alignmentToPieceFaction('dark')).toBe('evil')
+  })
+
+  it('uses ownerPlayerId rather than seat or content alignment for ally/enemy', () => {
+    expect(areAllies('alice', 'alice')).toBe(true)
+    expect(areEnemies('alice', 'bob')).toBe(true)
+    expect(areEnemies('alice', 'alice')).toBe(false)
+  })
+
+  it('accepts only valid seats and content-alignment compatibility values', () => {
+    expect(isPlayerSeat('red')).toBe(true)
+    expect(isPlayerSeat('light')).toBe(false)
+    expect(normalizeContentAlignment('good')).toBe('light')
+    expect(normalizeContentAlignment('blue')).toBeUndefined()
+  })
+
+  it('rejects a requested first player who is not in the match', () => {
+    expect(isMatchPlayerId(['alice', 'bob'], 'bob')).toBe(true)
+    expect(isMatchPlayerId(['alice', 'bob'], 'not-in-room')).toBe(false)
   })
 })

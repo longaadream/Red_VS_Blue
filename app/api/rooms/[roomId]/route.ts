@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getRoomStore, type Room, type Player } from "@/lib/game/room-store"
-import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
-import { getAllPieces } from "@/lib/game/piece-repository"
+import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment, type Player } from "@/lib/game/room-store"
+import { ensureRosterAlignmentMutable, getRosterErrorPayload } from "@/lib/game/roster-contract"
+import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
 
 function checkPackMismatch(players: Player[]): boolean {
   const hashes = players.map(p => p.packMd5).filter(Boolean)
@@ -44,6 +44,7 @@ type JoinBody = {
   playerId: string
   playerName?: string
   packMd5?: string
+  alignment?: 'light' | 'dark' | 'good' | 'evil'
 }
 
 type RoomPostBody = StartBody | JoinBody
@@ -57,20 +58,32 @@ export async function POST(
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
   const roomStore = getRoomStore()
-  let room = await roomStore.getRoom(roomId)
-
-  // 如果房间不存在，创建一个新的房间
-  if (!room) {
-    console.log('Room not found, creating new room:', roomId)
-    room = await roomStore.createRoom(roomId, `Room ${roomId}`)
-    console.log('New room created:', room.id)
-  }
 
   let body: RoomPostBody
   try {
     body = (await req.json()) as RoomPostBody
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+
+  // Reject malformed joins before reading or creating persistent room state.
+  if (body.action === "join") {
+    if (!body.playerId?.trim()) {
+      return NextResponse.json({ error: "playerId is required" }, { status: 400 })
+    }
+    if (!normalizePlayerAlignment(body.alignment)) {
+      return NextResponse.json({ error: "alignment must be light or dark" }, { status: 400 })
+    }
+  }
+
+  let room = await roomStore.getRoom(roomId)
+  if (!room) {
+    if (body.action !== "join") {
+      return NextResponse.json({ error: "Room not found" }, { status: 404 })
+    }
+    console.log('Room not found, creating new room:', roomId)
+    room = await roomStore.createRoom(roomId, `Room ${roomId}`)
+    console.log('New room created:', room.id)
   }
 
   if (body.action === "join") {
@@ -81,20 +94,26 @@ export async function POST(
       return NextResponse.json({ error: "playerId is required" }, { status: 400 })
     }
 
-    const requestedFaction = (body as any).faction === "red" || (body as any).faction === "blue"
-      ? (body as any).faction as "red" | "blue"
-      : null
+    const requestedAlignment = normalizePlayerAlignment(body.alignment)
+    if (!requestedAlignment) {
+      return NextResponse.json({ error: "alignment must be light or dark" }, { status: 400 })
+    }
 
     const existing = room.players.find(
       (p) => p.id.toLowerCase() === normalizedPlayerId,
     )
 
     if (existing) {
-      if (requestedFaction) {
-        existing.faction = requestedFaction
-      } else if (!existing.faction) {
-        existing.faction = Math.random() < 0.5 ? "red" : "blue"
+      const seat = getPlayerSeat(existing) || assignNextSeat(room.players, normalizedPlayerId)
+      existing.seat = seat
+      existing.faction = seat
+      try {
+        ensureRosterAlignmentMutable(existing, requestedAlignment)
+      } catch (error) {
+        const rosterError = getRosterErrorPayload(error)
+        return NextResponse.json({ success: false, error: rosterError?.message, code: rosterError?.code, context: rosterError?.context }, { status: 409 })
       }
+      if (requestedAlignment) existing.alignment = requestedAlignment
       if (playerName) existing.name = playerName
       if (packMd5) existing.packMd5 = packMd5
       await roomStore.setRoom(room.id.trim(), room)
@@ -113,18 +132,15 @@ export async function POST(
       return NextResponse.json({ error: "Room is full" }, { status: 400 })
     }
 
-    let faction: "red" | "blue"
-    if (requestedFaction) {
-      faction = requestedFaction
-    } else {
-      faction = Math.random() < 0.5 ? "red" : "blue"
-    }
+    const seat = assignNextSeat(room.players, normalizedPlayerId)
 
     const player = {
       id: normalizedPlayerId,
       name: playerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
       joinedAt: Date.now(),
-      faction,
+      seat,
+      faction: seat,
+      alignment: requestedAlignment,
       packMd5,
     }
     room.players.push(player)
@@ -139,40 +155,17 @@ export async function POST(
   }
 
   if (body.action === "start") {
-    if (room.status !== "waiting") {
-      return NextResponse.json(
-        { error: "Game is already in progress or finished" },
-        { status: 400 },
-      )
+    try {
+      const result = await startBattleFromLockedRosters(roomStore, roomId)
+      return NextResponse.json(result.room)
+    } catch (error) {
+      const rosterError = getRosterErrorPayload(error)
+      if (rosterError) {
+        return NextResponse.json({ success: false, error: rosterError.message, code: rosterError.code, context: rosterError.context }, { status: 400 })
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      return NextResponse.json({ success: false, error: message }, { status: 400 })
     }
-
-    if (room.players.length !== 2) {
-      return NextResponse.json(
-        { error: "Exactly two players are required to start a 1v1 game" },
-        { status: 400 },
-      )
-    }
-
-    const playerIds = room.players.map((p: any) => p.id)
-    const defaultPieces = getAllPieces()
-    const playerFactions = room.players.map((p: any) => ({ playerId: p.id, faction: p.faction as 'red' | 'blue', pieces: [] as any[] }))
-    const battle = await createInitialBattleForPlayers(playerIds, defaultPieces, playerFactions, room.mapId)
-    if (!battle) {
-      return NextResponse.json(
-        { error: "Failed to initialize battle state" },
-        { status: 500 }
-      )
-    }
-    room.status = "in-progress"
-    room.currentTurnIndex = 0
-    room.battleState = {
-      type: 'server-state',
-      seed: Math.floor(Math.random() * 4294967296),
-      state: battle,
-    } as any
-    await roomStore.setRoom(room.id.trim(), room)
-
-    return NextResponse.json(room)
   }
 
   return NextResponse.json({ error: "Unsupported action" }, { status: 400 })

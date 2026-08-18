@@ -11,9 +11,21 @@ describe('tile status side panel', () => {
     expect(battleHtml).toContain('aria-modal="false"')
     expect(battleHtml).toContain('closeTileStatus()')
     expect(battleHtml).toContain("e.key === 'Escape'")
-    expect(battleHtml).toContain('position: fixed; top: 72px; right: 12px')
+    expect(battleHtml).toContain('position: absolute;')
     expect(battleHtml).not.toContain('position: fixed; inset: 0; z-index: 155')
     expect(battleHtml).not.toContain('onclick="if(event.target===this)closeTileStatus()"')
+  })
+
+  it('uses the current battle UI baseline and compact collision-safe sizing', () => {
+    expect(battleHtml).toContain('css/battle-context-ui.css')
+    expect(battleHtml).toContain('id="selectedStatusOverlay"')
+    expect(battleHtml).toContain('#selectedStatusOverlay:not([hidden]) ~ #tileStatusPanel')
+    expect(battleHtml).toContain('width: min(248px, calc(100% - 28px))')
+    expect(battleHtml).toContain('right: 232px')
+    expect(battleHtml).toContain('width: min(232px, calc(100% - 16px))')
+    expect(battleHtml).not.toContain('UI 20260517')
+    expect(battleHtml).not.toContain(String.fromCodePoint(0x9239, 0x20ac))
+    expect(battleHtml).not.toContain('?'.repeat(5))
   })
 
   it('reads terrain and tile effects from the authoritative battle snapshot', () => {

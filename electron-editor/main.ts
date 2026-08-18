@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { spawn } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
+import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 
 // ─── 路径工具 ─────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,22 @@ function getProjectRoot(): string {
 
 function getDataRoot(): string {
   return path.join(getProjectRoot(), 'data')
+}
+
+function getEditorUiRoot(): string {
+  return path.join(__dirname, '..', 'ui')
+}
+
+function restrictWindowNavigation(browserWindow: BrowserWindow, allowedRoot: string): void {
+  const isAllowed = (rawUrl: string): boolean => isFileUrlWithinRoot(rawUrl, allowedRoot)
+
+  browserWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowed(url)) event.preventDefault()
+  })
+  browserWindow.webContents.on('will-frame-navigate', (details) => {
+    if (!details.isMainFrame || !isAllowed(details.url)) details.preventDefault()
+  })
+  browserWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 }
 
 // ─── 安全校验 ─────────────────────────────────────────────────────────────────
@@ -48,9 +65,13 @@ function createWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   })
-  win.loadFile(path.join(__dirname, '..', 'ui', 'index.html'))
+  const uiRoot = getEditorUiRoot()
+  restrictWindowNavigation(win, uiRoot)
+  win.loadFile(path.join(uiRoot, 'index.html'))
   win.setMenu(null)
   // win.webContents.openDevTools()
 }
@@ -59,9 +80,20 @@ app.whenReady().then(createWindow)
 app.on('window-all-closed', () => app.quit())
 app.on('activate', () => { if (!win || win.isDestroyed()) createWindow() })
 
+function handleTrusted(channel: string, listener: Parameters<typeof ipcMain.handle>[1]): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedIpcSender(event, channel, [{
+      role: 'editor',
+      window: win,
+      allowUrl: (rawUrl) => isFileUrlWithinRoot(rawUrl, getEditorUiRoot()),
+    }])
+    return listener(event, ...args)
+  })
+}
+
 // ─── IPC: 文件列表 ─────────────────────────────────────────────────────────────
 
-ipcMain.handle('list-files', (_e, subdir: string) => {
+handleTrusted('list-files', (_e, subdir: string) => {
   if (!/^[a-zA-Z0-9_\-/]+$/.test(subdir)) return []
   const dir = path.join(getDataRoot(), subdir)
   if (!fs.existsSync(dir)) return []
@@ -73,7 +105,7 @@ ipcMain.handle('list-files', (_e, subdir: string) => {
 
 // ─── IPC: 读取文件 ─────────────────────────────────────────────────────────────
 
-ipcMain.handle('read-file', (_e, subdir: string, filename: string) => {
+handleTrusted('read-file', (_e, subdir: string, filename: string) => {
   const file = safePath(subdir, filename)
   if (!fs.existsSync(file)) throw new Error('File not found: ' + file)
   return JSON.parse(fs.readFileSync(file, 'utf-8'))
@@ -81,7 +113,7 @@ ipcMain.handle('read-file', (_e, subdir: string, filename: string) => {
 
 // ─── IPC: 写入文件 ─────────────────────────────────────────────────────────────
 
-ipcMain.handle('write-file', (_e, subdir: string, filename: string, data: unknown) => {
+handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown) => {
   const file = safePath(subdir, filename)
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf-8')
   return { ok: true }
@@ -89,14 +121,14 @@ ipcMain.handle('write-file', (_e, subdir: string, filename: string, data: unknow
 
 // ─── IPC: 在系统编辑器中打开 ───────────────────────────────────────────────────
 
-ipcMain.handle('open-in-editor', (_e, subdir: string, filename: string) => {
+handleTrusted('open-in-editor', (_e, subdir: string, filename: string) => {
   const file = safePath(subdir, filename)
   return shell.openPath(file)
 })
 
 // ─── IPC: 运行构建脚本（流式输出） ─────────────────────────────────────────────
 
-ipcMain.handle('run-build', (event, args: { name: string; version: string; desc: string }) => {
+handleTrusted('run-build', (event, args: { name: string; version: string; desc: string }) => {
   const projectRoot = getProjectRoot()
   const scriptPath = path.join(projectRoot, 'scripts', 'build-resource-pack.js')
 

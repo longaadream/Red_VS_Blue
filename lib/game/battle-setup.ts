@@ -7,11 +7,12 @@ import type { BattleState, PlayerId } from "./turn"
 import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 import { globalTriggerSystem } from "./triggers"
-import { applyEffectToPiece } from './attached-effect'
 import { loadRuleById } from './skills'
 import path from 'path'
 import fs from 'fs'
 import { getUserDataDir } from '@/lib/app-paths'
+import { recordBattleInitialization } from './battle-trace'
+import { RANDOM_STREAM_NAMES, RuleRuntime, withRuleRuntime } from './rule-runtime'
 
 function fireInitialGameStart(state: BattleState): void {
   if (state.gameStartFired || state.turn.turnNumber !== 1) return
@@ -20,7 +21,7 @@ function fireInitialGameStart(state: BattleState): void {
 
   for (const piece of [...state.pieces]) {
     globalTriggerSystem.checkTriggers(state, {
-      type: "afterPieceSummon",
+      type: "afterPieceSummoned",
       playerId: piece.ownerPlayerId,
       sourcePiece: piece,
       pieceTemplateId: piece.templateId,
@@ -95,21 +96,20 @@ interface PlayerSelectedPieces {
   playerId: string
   pieces: PieceTemplate[]
   faction?: 'red' | 'blue'
+  alignment?: 'light' | 'dark'
+}
+
+export const DEMO_DEPLOYMENT_MAP_ID = 'large-hole-arena'
+
+export interface InitialPieceBuildOptions {
+  deterministicDeployment?: boolean
 }
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
-/** 将棋子模板中的 initialEffects 和 rules 应用到棋子实例上 */
-function applyInitialEffects(piece: PieceInstance, pieceTemplate: PieceTemplate, battle: any): void {
-  const initialEffects = (pieceTemplate as any).initialEffects
-  if (initialEffects && Array.isArray(initialEffects)) {
-    for (const effectId of initialEffects) {
-      applyEffectToPiece(battle, piece.instanceId, effectId)
-    }
-  }
-
-  // 加载模板中声明的 rules（旧规则系统，如 rule-kiljaedan-gamestart、rule-reap 等）
-  const templateRules = (pieceTemplate as any).rules
+/** 将棋子模板中的 rules 加载到棋子实例上。 */
+function applyInitialRules(piece: PieceInstance, pieceTemplate: PieceTemplate): void {
+  const templateRules = pieceTemplate.rules
   if (templateRules && Array.isArray(templateRules)) {
     if (!piece.rules) piece.rules = []
     for (const ruleId of templateRules) {
@@ -125,9 +125,23 @@ export function buildInitialPiecesForPlayers(
   map: BoardMap,
   players: PlayerId[],
   selectedPieces: PieceTemplate[],
-  playerSelectedPieces?: PlayerSelectedPieces[]
+  playerSelectedPieces?: PlayerSelectedPieces[],
+  randomFloat: () => number = rng,
+  options: InitialPieceBuildOptions = {},
 ): PieceInstance[] {
   if (players.length !== 2) return []
+
+  const deterministicDeployment = options.deterministicDeployment === true
+  if (deterministicDeployment) {
+    if (map.id !== DEMO_DEPLOYMENT_MAP_ID) {
+      throw new Error(`Demo deployment requires map ${DEMO_DEPLOYMENT_MAP_ID}; received ${map.id}`)
+    }
+    if (!playerSelectedPieces || playerSelectedPieces.length !== 2 || playerSelectedPieces.some(player => player.pieces.length !== 8)) {
+      throw new Error('Demo deployment requires exactly two players with eight pieces each')
+    }
+    players = [...players].sort(compareStableText)
+    playerSelectedPieces = [...playerSelectedPieces].sort((left, right) => compareStableText(left.playerId, right.playerId))
+  }
 
   const [p1, p2] = players
 
@@ -148,11 +162,31 @@ export function buildInitialPiecesForPlayers(
     tile.props.walkable && tile.props.type === "floor"
   )
   
-  // 如果没有地板方格，使用所有可走的方格
-  const availableTiles = floorTiles.length > 0 ? floorTiles : map.tiles.filter(tile => tile.props.walkable)
+  // Demo 部署严格使用普通地板；旧入口保留历史回退行为。
+  const availableTiles = (deterministicDeployment
+    ? floorTiles
+    : (floorTiles.length > 0 ? floorTiles : map.tiles.filter(tile => tile.props.walkable)))
+    .slice()
+    .sort((left, right) => left.y - right.y || left.x - right.x)
+  const deploymentPositions: Array<{ x: number; y: number }> = []
+  if (deterministicDeployment) {
+    if (availableTiles.length < 16) throw new Error('Demo deployment map does not contain sixteen ordinary floor tiles')
+    for (let index = 0; index < 16; index += 1) {
+      const swapIndex = index + Math.floor(randomFloat() * (availableTiles.length - index))
+      const selected = availableTiles[swapIndex]
+      availableTiles[swapIndex] = availableTiles[index]
+      availableTiles[index] = selected
+      deploymentPositions.push({ x: selected.x, y: selected.y })
+    }
+  }
   
   // 随机选择位置的函数，确保位置不重叠
   const getRandomPosition = () => {
+    if (deterministicDeployment) {
+      const position = deploymentPositions[pieces.length]
+      if (!position) throw new Error('Demo deployment exhausted its precomputed positions')
+      return position
+    }
     if (availableTiles.length === 0) {
       // 如果没有可走的方格，返回默认位置
       return { x: Math.floor(map.width / 2), y: Math.floor(map.height / 2) }
@@ -160,7 +194,7 @@ export function buildInitialPiecesForPlayers(
     
     // 尝试最多100次，找到一个未被占用的位置
     for (let i = 0; i < 100; i++) {
-      const randomIndex = Math.floor(rng() * availableTiles.length)
+      const randomIndex = Math.floor(randomFloat() * availableTiles.length)
       const position = { x: availableTiles[randomIndex].x, y: availableTiles[randomIndex].y }
       
       // 检查位置是否已经被占用
@@ -216,6 +250,7 @@ export function buildInitialPiecesForPlayers(
         const actualFaction = expectedFaction
         pieces.push({
           instanceId: `${ownerPlayerId}-${pieceIndex + 1}`,
+          ...(deterministicDeployment ? { isCore: true } : {}),
           templateId: pieceTemplate.id,
           name: pieceTemplate.name,
           ownerPlayerId,
@@ -303,6 +338,10 @@ export function buildInitialPiecesForPlayers(
   
   console.log('Red pieces created:', redPieceIndex)
   console.log('Blue pieces created:', bluePieceIndex)
+
+  if (deterministicDeployment && pieces.length !== 16) {
+    throw new Error(`Demo deployment created ${pieces.length} pieces instead of sixteen`)
+  }
   
   // 确保每个玩家至少有一个棋子
   if (pieces.length === 0) {
@@ -474,14 +513,23 @@ export function buildInitialPiecesForPlayers(
 export async function createInitialBattleForPlayers(
   playerIds: PlayerId[],
   selectedPieces: PieceTemplate[],
-  playerSelectedPieces?: Array<{ playerId: string; pieces: PieceTemplate[]; faction?: 'red' | 'blue' }>,
+  playerSelectedPieces?: PlayerSelectedPieces[],
   mapId?: string,
-  options?: { firstPlayerId?: PlayerId },
+  options?: { firstPlayerId?: PlayerId; rootSeed?: number; deploymentEnabled?: boolean },
 ): Promise<BattleState | null> {
   if (playerIds.length !== 2) return null
 
-  let orderedIds = [...playerIds]
-  let orderedPSP = playerSelectedPieces ? [...playerSelectedPieces] : undefined
+  const orderedIds = [...playerIds]
+  const orderedPSP = playerSelectedPieces ? [...playerSelectedPieces] : undefined
+
+  if (options?.deploymentEnabled) {
+    if (typeof options.rootSeed !== 'number') throw new Error('Demo deployment requires an explicit root seed')
+    if (mapId !== DEMO_DEPLOYMENT_MAP_ID) {
+      throw new Error(`Demo deployment requires map ${DEMO_DEPLOYMENT_MAP_ID}; received ${String(mapId)}`)
+    }
+    orderedIds.sort(compareStableText)
+    orderedPSP?.sort((left, right) => compareStableText(left.playerId, right.playerId))
+  }
 
   const [p1, p2] = orderedIds
   
@@ -493,14 +541,18 @@ export async function createInitialBattleForPlayers(
   writeLog('[createInitialBattleForPlayers] map from getMap: ' + (map ? map.name : 'NOT FOUND'))
   
   // 如果地图没有加载成功，尝试异步加载
-  if (!map) {
+  if (!map && !options?.deploymentEnabled) {
     writeLog('Map ' + (mapId || DEFAULT_MAP_ID) + ' not found in cache, trying to load...')
     await loadMaps()
     map = getMap(mapId || DEFAULT_MAP_ID)
     writeLog('[createInitialBattleForPlayers] map after loadMaps: ' + (map ? map.name : 'NOT FOUND'))
   }
   
-  // 如果地图仍然没有加载成功，使用默认地图
+  if (!map && options?.deploymentEnabled) {
+    throw new Error(`Map ${DEMO_DEPLOYMENT_MAP_ID} not found`)
+  }
+
+  // 如果地图仍然没有加载成功，旧入口使用默认地图
   if (!map) {
     console.warn(`Map ${mapId || DEFAULT_MAP_ID} not found, using default map`)
     
@@ -550,21 +602,42 @@ export async function createInitialBattleForPlayers(
   }
 
   // 只有 psp 里有实际棋子时才传给 buildInitialPiecesForPlayers，否则用 selectedPieces
+  const runtime = typeof options?.rootSeed === 'number'
+    ? new RuleRuntime({ rootSeed: options.rootSeed, tick: 0 })
+    : undefined
+  const deploymentRandom = runtime
+    ? () => runtime.nextRandom(RANDOM_STREAM_NAMES.deployment)
+    : rng
   const pspForBuild = (orderedPSP && orderedPSP.some(p => p.pieces.length > 0)) ? orderedPSP : undefined
-  const pieces = buildInitialPiecesForPlayers(map, orderedIds, selectedPieces, pspForBuild)
+  const pieces = buildInitialPiecesForPlayers(
+    map,
+    orderedIds,
+    selectedPieces,
+    pspForBuild,
+    deploymentRandom,
+    { deterministicDeployment: options?.deploymentEnabled === true },
+  )
 
   // 先后手：由 battle-setup 统一决定（不在调用方重复随机）
   const firstPlayer = options?.firstPlayerId && orderedIds.includes(options.firstPlayerId)
     ? options.firstPlayerId
-    : (rng() < 0.5 ? orderedIds[0] : orderedIds[1])
+    : ((runtime
+        ? runtime.nextRandom(RANDOM_STREAM_NAMES.turnOrder)
+        : rng()) < 0.5 ? orderedIds[0] : orderedIds[1])
   const secondPlayer = firstPlayer === orderedIds[0] ? orderedIds[1] : orderedIds[0]
 
   const skills = buildDefaultSkills()
   console.log('Skills for battle:', Object.keys(skills))
   console.log('Teleport in skills:', 'teleport' in skills)
 
-  // 清除旧规则系统（rules 已迁移为 initialEffects）
+  // 重置全局规则注册表，避免上一场战斗残留规则。
   globalTriggerSystem.clearRules()
+
+  const playerAlignments = Object.fromEntries(
+    (playerSelectedPieces ?? [])
+      .filter(player => player.alignment === 'light' || player.alignment === 'dark')
+      .map(player => [player.playerId.toLowerCase(), player.alignment]),
+  )
 
   const state: BattleState = {
     map,
@@ -586,9 +659,16 @@ export async function createInitialBattleForPlayers(
         hasUsedChargeSkill: false,
       },
     },
+    deployment: options?.deploymentEnabled ? {
+      status: 'awaiting-choices',
+      playerIds: [...orderedIds],
+      choices: {},
+      initialPositions: collectCorePositions(pieces),
+    } : undefined,
+    ...(Object.keys(playerAlignments).length > 0 ? { extensions: { playerAlignments } } : {}),
   }
 
-  // 为每个棋子应用 initialEffects 和 rules
+  // 为每个棋子加载模板 rules。
   const allSelectedPieces: PieceTemplate[] = []
   if (orderedPSP && orderedPSP.some(p => p.pieces.length > 0)) {
     orderedPSP.forEach(pi => pi.pieces.forEach(pt => allSelectedPieces.push(pt)))
@@ -596,25 +676,44 @@ export async function createInitialBattleForPlayers(
     selectedPieces.forEach(pt => allSelectedPieces.push(pt))
   }
 
-  state.pieces.forEach(piece => {
-    const template = allSelectedPieces.find(t => t.id === piece.templateId)
-    if (template) {
-      applyInitialEffects(piece, template, state)
-    }
-  })
+  const initializeRules = () => {
+    state.pieces.forEach(piece => {
+      const template = allSelectedPieces.find(t => t.id === piece.templateId)
+      if (template) {
+        applyInitialRules(piece, template)
+      }
+    })
 
-  // 将幸运币规则绑到后手玩家，gameStart 时由规则自动发牌（规则发牌，非硬编码）
-  const luckyRule = loadRuleById('rule-lucky-coin-gamestart', FORCE_RULE_RELOAD)
-  const secondPlayerState = state.players.find(p => p.playerId === secondPlayer) as any
-  if (luckyRule && secondPlayerState) {
-    if (!secondPlayerState.rules) secondPlayerState.rules = []
-    secondPlayerState.rules.push(luckyRule)
-    writeLog('[createInitialBattle] First player: ' + firstPlayer + ', rule-lucky-coin-gamestart → second player: ' + secondPlayer)
+    // 将幸运币规则绑到后手玩家，gameStart 时由规则自动发牌（规则发牌，非硬编码）
+    const luckyRule = loadRuleById('rule-lucky-coin-gamestart', FORCE_RULE_RELOAD)
+    const secondPlayerState = state.players.find(p => p.playerId === secondPlayer) as any
+    if (luckyRule && secondPlayerState) {
+      if (!secondPlayerState.rules) secondPlayerState.rules = []
+      secondPlayerState.rules.push(luckyRule)
+      writeLog('[createInitialBattle] First player: ' + firstPlayer + ', rule-lucky-coin-gamestart → second player: ' + secondPlayer)
+    }
+
+    // 部署完成后由首个 beginPhase 触发 gameStart；旧入口保持立即触发。
+    if (!options?.deploymentEnabled) fireInitialGameStart(state)
   }
 
-  // 触发游戏开始规则（包括幸运币发牌、基尔加丹隐匿等）
-  fireInitialGameStart(state)
+  if (runtime) {
+    withRuleRuntime(runtime, initializeRules)
+    recordBattleInitialization(state, runtime, orderedIds)
+  } else {
+    initializeRules()
+  }
 
   writeLog('[createInitialBattle] Battle state created, pieces count: ' + state.pieces.length)
   return state
+}
+
+function compareStableText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
+function collectCorePositions(pieces: PieceInstance[]): Record<string, { x: number; y: number }> {
+  return Object.fromEntries(pieces
+    .filter(piece => piece.isCore && piece.x !== null && piece.y !== null)
+    .map(piece => [piece.instanceId, { x: piece.x as number, y: piece.y as number }]))
 }

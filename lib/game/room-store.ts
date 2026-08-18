@@ -1,13 +1,12 @@
 import type { BattleState } from './turn'
 import { prisma } from '../db'
+import { isPlayerSeat, normalizeContentAlignment, type ContentAlignment, type PlayerSeat } from './match-identity'
 
-export type PlayerSeat = "red" | "blue"
-export type PlayerAlignment = "light" | "dark"
+export type { PlayerSeat } from './match-identity'
+export type PlayerAlignment = ContentAlignment
 
 export function normalizePlayerAlignment(value: unknown): PlayerAlignment | undefined {
-  if (value === "light" || value === "good") return "light"
-  if (value === "dark" || value === "evil") return "dark"
-  return undefined
+  return normalizeContentAlignment(value)
 }
 
 export function alignmentToPieceFaction(alignment: PlayerAlignment | undefined): "good" | "evil" | undefined {
@@ -17,7 +16,7 @@ export function alignmentToPieceFaction(alignment: PlayerAlignment | undefined):
 }
 
 export function getPlayerSeat(player: { seat?: PlayerSeat; faction?: PlayerSeat }): PlayerSeat | undefined {
-  return player.seat || player.faction
+  return isPlayerSeat(player.seat) ? player.seat : isPlayerSeat(player.faction) ? player.faction : undefined
 }
 
 export function assignNextSeat(players: Array<{ id?: string; seat?: PlayerSeat; faction?: PlayerSeat }>, playerId?: string): PlayerSeat {
@@ -49,6 +48,10 @@ export interface Player {
   packMd5?: string
   selectedPieces?: Array<{ templateId: string; faction: string }>
   hasSelectedPieces?: boolean
+  /** A confirmed Demo roster. Once true, only an equivalent resubmission is accepted. */
+  rosterLocked?: boolean
+  /** Admission-manifest version used when the roster was locked. */
+  rosterManifestVersion?: string
   ready?: boolean
   isBot?: boolean
 }
@@ -91,6 +94,8 @@ export interface Room {
   actions: GameAction[]
   maxPlayers?: number
   hostId?: string
+  /** The player who takes the first turn; independent of seat and alignment. */
+  firstPlayerId?: string
   mapId?: string
   createdAt?: number
   visibility?: "private" | "public"
@@ -119,7 +124,7 @@ function deserializeRoom(row: {
     ...p,
     seat: p.seat || p.faction,
     faction: p.faction || p.seat,
-    hasSelectedPieces: p.hasSelectedPieces === true || (p.selectedPieces != null && p.selectedPieces.length > 0),
+    hasSelectedPieces: p.rosterLocked === true,
     selectedPieces: p.selectedPieces || []
   }))
 
@@ -151,7 +156,7 @@ function serializeRoom(room: Room) {
       ...p,
       seat: p.seat || p.faction,
       faction: p.faction || p.seat,
-      hasSelectedPieces: p.hasSelectedPieces === true || (p.selectedPieces != null && p.selectedPieces.length > 0),
+      hasSelectedPieces: p.rosterLocked === true,
       selectedPieces: p.selectedPieces || []
     }))
   )

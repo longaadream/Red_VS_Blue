@@ -1,85 +1,75 @@
-import type { BattleState } from './battle-types'
+import type { BattleState } from './turn'
 import { getSkillById } from './skill-repository'
+import { prepareAction } from './targeting'
+import type { TargetRef } from './targeting'
+import { getLegalNormalMoveTargets, manhattanDistance } from './spatial'
 
-function manhattanDist(ax: number, ay: number, bx: number, by: number): number {
-  return Math.abs(ax - bx) + Math.abs(ay - by)
-}
-
-function getWalkableSet(state: BattleState): Set<string> {
-  const s = new Set<string>()
-  for (const t of state.map.tiles) {
-    if (t.props.walkable) s.add(`${t.x},${t.y}`)
-  }
-  return s
-}
-
-function getOccupiedSet(state: BattleState): Set<string> {
-  const s = new Set<string>()
-  for (const p of state.pieces) {
-    if (p.currentHp > 0 && p.x != null && p.y != null) s.add(`${p.x},${p.y}`)
-  }
-  return s
-}
-
-// Rook-style reachable cells (mirrors validateMove in turn.ts)
 function getValidMoves(
   state: BattleState,
   piece: any,
 ): Array<{ x: number; y: number }> {
-  if (piece.x == null || piece.y == null) return []
-  const walkable = getWalkableSet(state)
-  const occupied = getOccupiedSet(state)
-  const maxRange = piece.moveRange ?? 99
-  const { width, height } = state.map
-  const results: Array<{ x: number; y: number }> = []
-
-  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as [number, number][]) {
-    for (let d = 1; d <= maxRange; d++) {
-      const tx = piece.x + dx * d
-      const ty = piece.y + dy * d
-      if (tx < 0 || tx >= width || ty < 0 || ty >= height) break
-      const key = `${tx},${ty}`
-      if (!walkable.has(key)) break // wall blocks this direction entirely
-      if (!occupied.has(key)) results.push({ x: tx, y: ty })
-      // occupied intermediate cells don't block (matches "暂时不检查路径被阻挡")
-    }
-  }
-  return results
+  return getLegalNormalMoveTargets(state, piece)
 }
 
-// Find valid skill targets for one piece and one skill definition
-function findSkillTargets(
-  state: BattleState,
-  piece: any,
-  skillDef: any,
-  enemies: any[],
-  allies: any[],
-): any[] | null {
-  const targetType = skillDef.targetType
-  const filter = skillDef.filter
-  const range: number = typeof skillDef.range === 'number' ? skillDef.range : 99
-
-  if (!targetType || targetType === 'none') return [null] // no target needed
-
-  if (targetType === 'piece') {
-    const pool = filter === 'ally' ? allies : enemies
-    const inRange = pool.filter(
-      t => t.currentHp > 0 && t.x != null && t.y != null &&
-        manhattanDist(piece.x, piece.y, t.x, t.y) <= range,
-    )
-    return inRange.length > 0 ? inRange : null
+function appendTargetRef(action: any, ref: TargetRef): any {
+  const next = { ...action }
+  const hasPrimary = next.targetPieceId || (next.targetX !== undefined && next.targetY !== undefined)
+  if (!hasPrimary) {
+    if (ref.type === 'piece') next.targetPieceId = ref.pieceId
+    else { next.targetX = ref.x; next.targetY = ref.y }
+    return next
   }
+  const extraTargets = Array.isArray(next.extraTargets) ? [...next.extraTargets] : []
+  extraTargets.push(ref.type === 'piece' ? { pieceId: ref.pieceId } : { x: ref.x, y: ref.y })
+  next.extraTargets = extraTargets
+  return next
+}
 
-  // grid / cell target — pick the enemy's cell
-  if (targetType === 'grid' || targetType === 'cell') {
-    const inRange = enemies.filter(
-      e => e.currentHp > 0 && e.x != null && e.y != null &&
-        manhattanDist(piece.x, piece.y, e.x, e.y) <= range,
-    )
-    return inRange.length > 0 ? inRange : null
+function chooseTarget(state: BattleState, candidates: TargetRef[], enemies: any[]): TargetRef | undefined {
+  const pieceCandidates = candidates
+    .filter((ref): ref is Extract<TargetRef, { type: 'piece' }> => ref.type === 'piece')
+    .map(ref => ({ ref, piece: state.pieces.find(piece => piece.instanceId === ref.pieceId) }))
+    .filter(entry => entry.piece)
+  if (pieceCandidates.length > 0) {
+    return pieceCandidates.reduce((best, current) =>
+      (current.piece!.currentHp < best.piece!.currentHp ? current : best), pieceCandidates[0]).ref
   }
+  const lowestEnemy = enemies.length > 0
+    ? enemies.reduce((best, enemy) => enemy.currentHp < best.currentHp ? enemy : best, enemies[0])
+    : undefined
+  if (lowestEnemy) {
+    const enemyCell = candidates.find(ref => ref.type === 'cell' && ref.x === lowestEnemy.x && ref.y === lowestEnemy.y)
+    if (enemyCell) return enemyCell
+  }
+  return candidates[0]
+}
 
-  return null
+function prepareBotSkillAction(state: BattleState, draft: any, enemies: any[]): any | undefined {
+  let action = { ...draft }
+  for (let guard = 0; guard < 8; guard += 1) {
+    const preparation = prepareAction(state, action)
+    if (preparation.kind === 'invalid') return undefined
+    if (preparation.kind === 'ready') return action
+    if (preparation.kind === 'needOption') {
+      const option = preparation.options[0]
+      if (!option) return undefined
+      action.selectionId = preparation.selectionId
+      action.stateRevision = preparation.stateRevision
+      action.selectedOption = option.value
+      continue
+    }
+    const target = chooseTarget(state, preparation.candidates, enemies)
+    if (!target) return undefined
+    action.selectionId = preparation.selectionId
+    action.stateRevision = preparation.stateRevision
+    action = appendTargetRef(action, target)
+  }
+  return undefined
+}
+
+export function prepareBotAction(state: BattleState, draft: any, botPlayerId: string): any | undefined {
+  const enemies = state.pieces.filter(piece => piece.ownerPlayerId !== botPlayerId && piece.currentHp > 0)
+  return prepareBotSkillAction(state, draft, enemies)
 }
 
 export function generateBotActions(state: BattleState, botPlayerId: string): any[] {
@@ -99,7 +89,6 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
   for (const piece of botPieces) {
     if (piece.x == null || piece.y == null || ap < 1) continue
 
-    const allies = botPieces.filter(p => p.instanceId !== piece.instanceId)
     let actedThisPiece = false
 
     // ── 1. Try to use a skill ──────────────────────────────────────────────
@@ -121,30 +110,15 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
         // Skip skills that need user interaction (pending option/target)
         if (skillDef.needsOptionSelection || skillDef.interactive) continue
 
-        const targets = findSkillTargets(state, piece, skillDef, enemies, allies)
-        if (!targets) continue
-
         const actionType = chargeCost > 0 ? 'useChargeSkill' : 'useBasicSkill'
-
-        if (targets[0] === null) {
-          // Self or area — no explicit target needed
-          actions.push({ type: actionType, playerId: botPlayerId, pieceId: piece.instanceId, skillId: pieceSkill.skillId })
-        } else {
-          // Pick the enemy with the lowest current HP (finish-off priority)
-          const target = targets.reduce(
-            (best: any, t: any) => (t.currentHp < best.currentHp ? t : best),
-            targets[0],
-          )
-          actions.push({
-            type: actionType,
-            playerId: botPlayerId,
-            pieceId: piece.instanceId,
-            skillId: pieceSkill.skillId,
-            targetPieceId: target.instanceId,
-            targetX: target.x,
-            targetY: target.y,
-          })
-        }
+        const action = prepareBotSkillAction(state, {
+          type: actionType,
+          playerId: botPlayerId,
+          pieceId: piece.instanceId,
+          skillId: pieceSkill.skillId,
+        }, enemies)
+        if (!action) continue
+        actions.push(action)
 
         ap -= apCost
         actedThisPiece = true
@@ -158,21 +132,21 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
       const liveEnemies = enemies.filter(e => e.x != null && e.y != null)
       if (validMoves.length > 0 && liveEnemies.length > 0) {
         const nearestEnemy = liveEnemies.reduce((best, e) => {
-          return manhattanDist(piece.x!, piece.y!, e.x!, e.y!) <
-            manhattanDist(piece.x!, piece.y!, best.x!, best.y!)
+          return manhattanDistance(piece, e) <
+            manhattanDistance(piece, best)
             ? e
             : best
         }, liveEnemies[0])
 
         const bestMove = validMoves.reduce((best, m) => {
-          return manhattanDist(m.x, m.y, nearestEnemy.x!, nearestEnemy.y!) <
-            manhattanDist(best.x, best.y, nearestEnemy.x!, nearestEnemy.y!)
+          return manhattanDistance(m, nearestEnemy) <
+            manhattanDistance(best, nearestEnemy)
             ? m
             : best
         }, validMoves[0])
 
-        const currentDist = manhattanDist(piece.x!, piece.y!, nearestEnemy.x!, nearestEnemy.y!)
-        const newDist = manhattanDist(bestMove.x, bestMove.y, nearestEnemy.x!, nearestEnemy.y!)
+        const currentDist = manhattanDistance(piece, nearestEnemy)
+        const newDist = manhattanDistance(bestMove, nearestEnemy)
 
         if (newDist < currentDist) {
           actions.push({ type: 'move', playerId: botPlayerId, pieceId: piece.instanceId, toX: bestMove.x, toY: bestMove.y })

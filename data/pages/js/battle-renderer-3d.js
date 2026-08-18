@@ -10,6 +10,8 @@
   const PIECE_H = 0.22     // piece cylinder height
   const RING_R  = 0.40     // faction ring radius
   const RING_T  = 0.045    // faction ring tube radius
+  const SELECTED_RING_R = 0.445
+  const SELECTED_RING_T = 0.018
 
   const TILE_COLORS = {
     floor:     0x374151,
@@ -55,9 +57,15 @@
   let _renderer, _camera, _scene, _animFrameId
   let _container = null
   let _hpLayer = null
-  let _floatLayer = null  // provided by caller (the existing #floatLayer)
-  let _onCellClick = null
-  let _onPieceRightClick = null
+  let _floatLayer = null
+  let _onIntent = null
+  function _notifyViewportChange() {
+    if (_onIntent) _onIntent({ type: 'viewport-change' })
+  }
+  let _resizeObserver = null
+  let _hitPlane = null
+  let _mounted = false
+  const _listeners = []
 
   let _mapW = 0, _mapH = 0
   const _tileObjects = new Map()       // "x,z" → THREE.Mesh
@@ -66,7 +74,10 @@
   const _hlObjects = { move: [], skill: [], place: [], selected: null }
   const _anims = []                    // {mesh, fromX, fromZ, toX, toZ, elapsed, duration, type, ...}
   const _texCache = new Map()
-  let _lastG = null
+  let _textureLoadGeneration = 0
+  const _floaters = new Set()
+  const _floaterTimers = new Set()
+  let _currentModel = null
   let _clock = { prev: 0 }
 
   // ── Geometry / Material cache (shared across all tiles/pieces) ────────────────
@@ -120,39 +131,102 @@
   function getTileEffectIconMat(tileType) {
     const key = TILE_EFFECT_VISUALS[tileType] ? tileType : 'fallback'
     if (_tileEffectIconMats[key]) return _tileEffectIconMats[key]
-    const mat = new THREE.SpriteMaterial({ map: loadTexture(TILE_EFFECT_VISUALS[key].icon), transparent: true, depthWrite: false })
+    const visual = TILE_EFFECT_VISUALS[key]
+    const mat = new THREE.SpriteMaterial({
+      color: visual.color,
+      transparent: true,
+      opacity: 0.86,
+      alphaTest: 0.05,
+      depthWrite: false,
+    })
     _tileEffectIconMats[key] = mat
+    loadTexture(visual.icon, function (texture) {
+      if (_tileEffectIconMats[key] !== mat) return
+      mat.map = texture
+      mat.color.setHex(0xffffff)
+      mat.opacity = 1
+      mat.needsUpdate = true
+    }, function (error) {
+      console.error('[battle-renderer] Failed to load tile effect icon', { tileType: key, icon: visual.icon }, error)
+    })
     return mat
   }
 
   // ── Texture loading ───────────────────────────────────────────────────────────
-  function loadTexture(url) {
-    if (_texCache.has(url)) return _texCache.get(url)
+  function loadTexture(url, onLoad, onError) {
+    if (_texCache.has(url)) {
+      const entry = _texCache.get(url)
+      if (entry.status === 'loaded') {
+        onLoad(entry.texture)
+      } else {
+        entry.loadCallbacks.push(onLoad)
+        entry.errorCallbacks.push(onError)
+      }
+      return
+    }
+
+    const loadGeneration = _textureLoadGeneration
+    const entry = {
+      texture: null,
+      status: 'loading',
+      loadCallbacks: [onLoad],
+      errorCallbacks: [onError],
+    }
+    _texCache.set(url, entry)
+
     const loader = new THREE.TextureLoader()
-    const tex = loader.load(url, undefined, undefined, () => {
-      // On error, texture stays default (black) — acceptable fallback
+    const texture = loader.load(url, loadedTexture => {
+      const resolvedTexture = loadedTexture || texture
+      const current = _texCache.get(url)
+      if (!_mounted || loadGeneration !== _textureLoadGeneration || current !== entry) {
+        if (resolvedTexture && typeof resolvedTexture.dispose === 'function') resolvedTexture.dispose()
+        return
+      }
+
+      resolvedTexture.colorSpace = THREE.SRGBColorSpace || 'srgb'
+      entry.texture = resolvedTexture
+      entry.status = 'loaded'
+      const callbacks = entry.loadCallbacks.splice(0)
+      entry.errorCallbacks.length = 0
+      callbacks.forEach(callback => callback(resolvedTexture))
+    }, undefined, error => {
+      const current = _texCache.get(url)
+      if (current === entry) _texCache.delete(url)
+      if (entry.texture && typeof entry.texture.dispose === 'function') entry.texture.dispose()
+      if (!_mounted || loadGeneration !== _textureLoadGeneration || current !== entry) return
+
+      const callbacks = entry.errorCallbacks.splice(0)
+      entry.loadCallbacks.length = 0
+      callbacks.forEach(callback => callback(error))
     })
-    tex.colorSpace = THREE.SRGBColorSpace || 'srgb'
-    _texCache.set(url, tex)
-    return tex
+    texture.colorSpace = THREE.SRGBColorSpace || 'srgb'
+    entry.texture = texture
   }
 
-  function portraitUrl(templateId) {
-    const name = templateId.replace(/^(red|blue)-/, '')
-    return 'images/' + name + '.jpg'
+  function portraitUrl(portraitRef) {
+    const ref = String(portraitRef || '').replace(/^images\//, '')
+    if (!ref) return ''
+    const fileName = /\.[a-z0-9]+$/i.test(ref)
+      ? ref
+      : ref.replace(/^(red|blue)-/, '') + '.jpg'
+    return 'images/' + fileName
   }
 
   // ── Init ─────────────────────────────────────────────────────────────────────
-  function init(container, onCellClick, onPieceRightClick) {
-    if (_renderer) destroy()
-    _container = container
-    _onCellClick = onCellClick || null
-    _onPieceRightClick = onPieceRightClick || null
+  function init(options) {
+    const input = options || {}
+    if (_mounted || _renderer || _container) dispose()
+    if (!input.container) throw new Error('BattleRenderer3D.init requires a container')
+    _container = input.container
+    _floatLayer = input.floatLayer || null
+    _onIntent = typeof input.onIntent === 'function' ? input.onIntent : null
+    _textureLoadGeneration += 1
+    _mounted = true
 
     // Shared geometries
     _tileGeom       = new THREE.BoxGeometry(TILE_W, TILE_H, TILE_W)
     _hlPlaneGeom    = new THREE.PlaneGeometry(TILE_W - 0.06, TILE_W - 0.06)
-    _selectedRingGeom = new THREE.TorusGeometry(RING_R, RING_T * 0.7, 8, 24)
+    _selectedRingGeom = new THREE.TorusGeometry(SELECTED_RING_R, SELECTED_RING_T, 8, 32)
     _pieceBodyGeom  = new THREE.CylinderGeometry(PIECE_R, PIECE_R, PIECE_H, 24)
     _pieceRingGeom  = new THREE.TorusGeometry(RING_R, RING_T, 8, 32)
     _portraitDiscGeom = new THREE.CircleGeometry(PIECE_R, 24)
@@ -171,13 +245,17 @@
     // Renderer
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    container.insertBefore(_renderer.domElement, container.firstChild)
+    _container.insertBefore(_renderer.domElement, _container.firstChild)
+    _renderer.domElement.tabIndex = 0
+    _renderer.domElement.setAttribute('role', 'application')
+    _renderer.domElement.setAttribute('aria-label', '20 × 16 战术棋盘，可拖动平移、滚轮或双指缩放')
 
-    // HP bar overlay (absolute over canvas)
+    // Compact piece summary overlay (absolute over canvas)
     _hpLayer = document.createElement('div')
     _hpLayer.id = 'hpBarLayer3d'
-    _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:visible'
-    container.appendChild(_hpLayer)
+    _hpLayer.className = 'piece-summary-layer-3d'
+    _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'
+    _container.appendChild(_hpLayer)
 
     // Camera (orthographic, top-down)
     _camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200)
@@ -189,11 +267,11 @@
     _initControls()
 
     // Resize observer
-    const ro = new ResizeObserver(() => resize())
-    ro.observe(container)
-    _container._ro = ro
+    _resizeObserver = new ResizeObserver(function () { resize() })
+    _resizeObserver.observe(_container)
 
     // Start render loop
+    _clock.prev = 0
     _animFrameId = requestAnimationFrame(_tick)
   }
 
@@ -202,16 +280,42 @@
     if (!_renderer || !_container) return
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
+    _renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     _renderer.setSize(w, h, false)
     _updateCameraFrustum(w, h)
+    _updatePieceSummaryPositions()
+    _notifyViewportChange()
+  }
+
+  function _fitWorldHalfHeight(w, h) {
+    if (!_mapW) return 1
+    const aspect = w / (h || 1)
+    const halfH = _mapH / 2 + 1
+    const halfW = _mapW / 2 + 1
+    return Math.max(halfH, halfW / aspect)
+  }
+
+  function _minimumUsableZoom(w, h) {
+    if (!_mapW) return 1
+    const narrowViewport = w <= 760
+    const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
+    if (!narrowViewport && !coarsePointer) return 1
+    const pixelsPerCell = h / (_fitWorldHalfHeight(w, h) * 2)
+    return Math.max(1, Math.min(1.8, 24 / Math.max(1, pixelsPerCell)))
+  }
+
+  function _preferredInitialZoom(w, h) {
+    if (!_mapW) return 1
+    const aspect = w / (h || 1)
+    const visibleWorldWidth = _fitWorldHalfHeight(w, h) * 2 * aspect
+    const widthCoverageZoom = (visibleWorldWidth / (_mapW + 2)) * 0.86
+    return Math.max(_minimumUsableZoom(w, h), Math.min(1.8, widthCoverageZoom))
   }
 
   function _updateCameraFrustum(w, h) {
     if (!_camera || !_mapW) return
     const aspect = w / (h || 1)
-    const halfH = (_mapH / 2 + 1) / _camera.zoom
-    const halfW = (_mapW / 2 + 1) / _camera.zoom
-    const fitH = Math.max(halfH, halfW / aspect)
+    const fitH = _fitWorldHalfHeight(w, h)
     _camera.left   = -fitH * aspect
     _camera.right  =  fitH * aspect
     _camera.top    =  fitH
@@ -221,6 +325,7 @@
 
   // ── Render loop ───────────────────────────────────────────────────────────────
   function _tick(now) {
+    if (!_mounted || !_renderer || !_scene || !_camera) return
     _animFrameId = requestAnimationFrame(_tick)
     const dt = Math.min((now - (_clock.prev || now)) / 1000, 0.1)
     _clock.prev = now
@@ -258,16 +363,21 @@
     // Camera target: center of map
     _camera.position.set(_mapW / 2, 50, _mapH / 2)
     _camera.lookAt(_mapW / 2, 0, _mapH / 2)
+    _camera.zoom = _preferredInitialZoom(_container.clientWidth || 320, _container.clientHeight || 320)
 
     // Hit plane for raycasting (invisible, covers full map)
-    if (_container._hitPlane) _scene.remove(_container._hitPlane)
+    if (_hitPlane) {
+      _scene.remove(_hitPlane)
+      if (_hitPlane.geometry) _hitPlane.geometry.dispose()
+      if (_hitPlane.material) _hitPlane.material.dispose()
+    }
     const hitGeom = new THREE.PlaneGeometry(_mapW + 2, _mapH + 2)
     const hitMat  = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
     const hitPlane = new THREE.Mesh(hitGeom, hitMat)
     hitPlane.rotation.x = -Math.PI / 2
     hitPlane.position.set(_mapW / 2, 0.02, _mapH / 2)
     _scene.add(hitPlane)
-    _container._hitPlane = hitPlane
+    _hitPlane = hitPlane
 
     resize()
   }
@@ -278,13 +388,13 @@
 
     pieces.forEach(piece => {
       if (piece.x == null || piece.y == null) return
-      seen.add(piece.instanceId)
+      seen.add(piece.id)
 
-      if (!_pieceObjects.has(piece.instanceId)) {
+      if (!_pieceObjects.has(piece.id)) {
         _spawnPieceMesh(piece)
       }
 
-      const obj = _pieceObjects.get(piece.instanceId)
+      const obj = _pieceObjects.get(piece.id)
       if (!obj) return
 
       // If not animating, snap to position
@@ -292,33 +402,71 @@
         obj.group.position.set(piece.x, 0, piece.y)
       }
 
-      // Portrait texture (load once)
-      if (!obj.portraitLoaded && piece.templateId) {
-        const tex = loadTexture(portraitUrl(piece.templateId))
-        obj.portraitMesh.material = new THREE.MeshBasicMaterial({ map: tex, side: THREE.FrontSide })
-        obj.portraitLoaded = true
+      // Faction is snapshot-driven and can change without respawning the mesh.
+      if (obj.faction !== piece.faction) {
+        obj.faction = piece.faction
+        obj.body.material.color.setHex(FACTION_COLORS[piece.faction] || FACTION_COLORS.red)
+        obj.ring.material = getFactionMat(piece.faction)
       }
 
-      // Update HP bar DOM element
-      _updateHpBar(obj, piece)
+      // Portrait texture comes from the template-declared asset and only becomes
+      // complete after TextureLoader succeeds. A failed training placement can
+      // therefore retry on the next authoritative snapshot.
+      const portraitSrc = portraitUrl(piece.portraitId)
+      if (obj.portraitSrc !== portraitSrc) {
+        obj.portraitSrc = portraitSrc
+        obj.portraitLoaded = false
+        obj.portraitLoading = false
+      }
+      if (!obj.portraitLoaded && !obj.portraitLoading && portraitSrc) {
+        const pieceId = piece.id
+        obj.portraitLoading = true
+        loadTexture(portraitSrc, texture => {
+          const liveObject = _pieceObjects.get(pieceId)
+          if (liveObject !== obj || liveObject.portraitSrc !== portraitSrc) return
+          if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
+          obj.portraitMesh.material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.FrontSide })
+          obj.portraitLoaded = true
+          obj.portraitLoading = false
+        }, error => {
+          const liveObject = _pieceObjects.get(pieceId)
+          if (liveObject === obj && liveObject.portraitSrc === portraitSrc) {
+            obj.portraitLoaded = false
+            obj.portraitLoading = false
+          }
+          console.error('[battle-renderer] Failed to load piece portrait', {
+            pieceId: pieceId,
+            portraitSrc: portraitSrc,
+          }, error)
+        })
+      }
+
+      // Update the snapshot-driven piece summary.
+      _updatePieceSummary(obj, piece)
 
       // Show/hide based on alive
-      obj.group.visible = piece.currentHp > 0
+      obj.group.visible = piece.visible !== false
     })
 
     // Remove departed pieces
     _pieceObjects.forEach((obj, id) => {
       if (!seen.has(id)) {
         _scene.remove(obj.group)
-        if (obj.hpBarEl && obj.hpBarEl.parentNode) obj.hpBarEl.remove()
+        if (obj.body.material && obj.body.material.dispose) obj.body.material.dispose()
+        if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
+        if (obj.summaryEl && obj.summaryEl.parentNode) obj.summaryEl.remove()
         _pieceObjects.delete(id)
       }
     })
   }
 
+  function _effectType(effect) {
+    return effect.type || effect.tileType || 'effect'
+  }
+
   function _effectSortKey(effect) {
     return [
-      effect.tileType || 'effect',
+      _effectType(effect),
       effect.sourceId || effect.id || effect.instanceId || effect.effectId || '',
     ].join(':')
   }
@@ -350,17 +498,18 @@
         }
         const group = new THREE.Group()
         sortedEffects.forEach((effect, index) => {
+          const effectType = _effectType(effect)
           const ringRadius = 0.36 - index * 0.045
           const ring = new THREE.Mesh(
             new THREE.TorusGeometry(ringRadius, 0.018, 8, 32),
-            getTileEffectMat(effect.tileType)
+            getTileEffectMat(effectType)
           )
           ring.rotation.x = Math.PI / 2
           ring.position.y = TILE_H / 2 + 0.025 + index * 0.004
           group.add(ring)
 
           const slot = TILE_EFFECT_ICON_SLOTS[index]
-          const icon = new THREE.Sprite(getTileEffectIconMat(effect.tileType))
+          const icon = new THREE.Sprite(getTileEffectIconMat(effectType))
           icon.position.set(slot.x, TILE_H / 2 + 0.20, slot.z)
           icon.scale.set(0.24, 0.24, 0.24)
           icon.renderOrder = 8
@@ -411,69 +560,107 @@
     ring.position.y = TILE_H / 2 + 0.02
     group.add(ring)
 
-    // HP bar div
-    const hpBarEl = _createHpBarEl(piece)
+    // Compact health and negative-status summary.
+    const summaryEl = _createPieceSummaryEl(piece)
 
     _scene.add(group)
-    _pieceObjects.set(piece.instanceId, {
+    _pieceObjects.set(piece.id, {
       group, body, ring, portraitMesh,
-      hpBarEl,
+      summaryEl,
+      faction,
       portraitLoaded: false,
+      portraitLoading: false,
+      portraitSrc: '',
       animating: false,
       targetX: piece.x, targetZ: piece.y,
     })
   }
 
-  // ── HP Bar overlay ────────────────────────────────────────────────────────────
-  function _createHpBarEl(piece) {
+  // ── Piece summary overlay ─────────────────────────────────────────────────────
+  function _createPieceSummaryEl(piece) {
     const wrap = document.createElement('div')
-    wrap.style.cssText = `
-      position:absolute; transform:translateX(-50%);
-      width:36px; pointer-events:none;
-      display:flex; flex-direction:column; align-items:center; gap:1px;
-    `
-    const bar = document.createElement('div')
-    bar.style.cssText = 'width:100%;height:4px;background:#1e293b;border-radius:2px;overflow:hidden'
-    const fill = document.createElement('div')
-    fill.style.cssText = 'height:100%;background:#22c55e;transition:width .2s;border-radius:2px'
-    bar.appendChild(fill)
-    wrap.appendChild(bar)
-    wrap.dataset.id = piece.instanceId
+    wrap.className = 'piece-board-summary'
+    wrap.dataset.pieceId = piece.id
+
+    const health = document.createElement('span')
+    health.className = 'piece-board-health'
+    const statuses = document.createElement('span')
+    statuses.className = 'piece-board-statuses'
+    statuses.hidden = true
+    wrap.appendChild(health)
+    wrap.appendChild(statuses)
     _hpLayer.appendChild(wrap)
     return wrap
   }
 
-  function _updateHpBar(obj, piece) {
-    if (!obj.hpBarEl) return
-    const maxHp = piece.maxHp || piece.stats?.maxHp || piece.currentHp || 1
-    const pct = Math.max(0, Math.min(100, Math.round(piece.currentHp / maxHp * 100)))
-    const fill = obj.hpBarEl.querySelector('div div')
-    if (fill) {
-      fill.style.width = pct + '%'
-      fill.style.background = pct < 30 ? '#ef4444' : pct < 60 ? '#f59e0b' : '#22c55e'
+  function _updatePieceSummary(obj, piece) {
+    if (!obj.summaryEl) return
+    const currentHp = piece.health ? piece.health.current : 0
+    const maxHp = piece.health ? piece.health.max : 1
+    const health = obj.summaryEl.querySelector('.piece-board-health')
+    if (health) {
+      health.textContent = String(currentHp)
+      const ratio = currentHp / Math.max(1, maxHp)
+      health.dataset.level = ratio < 0.3 ? 'critical' : (ratio < 0.6 ? 'low' : 'healthy')
     }
-    obj.hpBarEl.style.display = piece.currentHp > 0 ? '' : 'none'
+
+    const presentation = window.BattleStatusPresentation
+    const summary = presentation
+      ? presentation.boardSummary(piece.statusSummary || [])
+      : (piece.statusSummary || []).slice(0, 2).map(status => ({ status, meta: { color: '#a78bfa' } }))
+    const statuses = obj.summaryEl.querySelector('.piece-board-statuses')
+    if (statuses) {
+      statuses.replaceChildren()
+      summary.forEach(function (entry) {
+        const dot = document.createElement('span')
+        dot.className = 'piece-board-status-dot'
+        dot.style.setProperty('--status-color', entry.meta.color)
+        dot.dataset.statusId = entry.status.id || ''
+        dot.title = entry.status.label || entry.status.id || ''
+        statuses.appendChild(dot)
+      })
+      statuses.hidden = summary.length === 0
+    }
+
+    const statusNames = summary.map(function (entry) { return entry.status.label || entry.status.id }).filter(Boolean)
+    const accessible = (piece.name || piece.id) + '\uff0c\u751f\u547d ' + currentHp + ' / ' + maxHp
+      + (statusNames.length ? '\uff0c\u8d1f\u9762\u72b6\u6001 ' + statusNames.join('\u3001') : '')
+    obj.summaryEl.dataset.health = currentHp + '/' + maxHp
+    obj.summaryEl.dataset.statusCount = String(summary.length)
+    obj.summaryEl.dataset.statusIds = summary.map(function (entry) { return entry.status.id || '' }).join(',')
+    obj.summaryEl.setAttribute('aria-label', accessible)
+    obj.summaryEl.title = accessible
+    obj.summaryEl.style.display = piece.visible !== false ? '' : 'none'
   }
 
-  function _updateHpBarPositions() {
-    if (!_camera || !_renderer) return
-    const canvas = _renderer.domElement
-    const rect = canvas.getBoundingClientRect()
-    const containerRect = _container.getBoundingClientRect()
-    const offX = rect.left - containerRect.left
-    const offY = rect.top - containerRect.top
+  function _projectedCellSpan(x, y) {
+    const center = projectCell(x, y, TILE_H / 2)
+    if (!center) return 36
+    const horizontal = projectCell(x + 1, y, TILE_H / 2)
+    const vertical = projectCell(x, y + 1, TILE_H / 2)
+    const distances = [horizontal, vertical].filter(Boolean).map(function (point) {
+      const dx = point.left - center.left
+      const dy = point.top - center.top
+      return Math.sqrt(dx * dx + dy * dy)
+    })
+    return distances.length ? Math.min.apply(Math, distances) : 36
+  }
 
-    _pieceObjects.forEach((obj, id) => {
-      if (!obj.hpBarEl || !obj.group.visible) { if (obj.hpBarEl) obj.hpBarEl.style.display = 'none'; return }
-      // Project piece top to screen
-      const wp = obj.group.position.clone()
-      wp.y += TILE_H / 2 + PIECE_H + 0.1
-      const v = wp.clone().project(_camera)
-      const sx = (v.x + 1) / 2 * canvas.width / window.devicePixelRatio + offX
-      const sy = (-v.y + 1) / 2 * canvas.height / window.devicePixelRatio + offY
-      obj.hpBarEl.style.left = sx + 'px'
-      obj.hpBarEl.style.top  = (sy - 6) + 'px'
-      obj.hpBarEl.style.display = ''
+  function _updatePieceSummaryPositions() {
+    if (!_camera || !_renderer) return
+
+    _pieceObjects.forEach(obj => {
+      if (!obj.summaryEl || !obj.group.visible) { if (obj.summaryEl) obj.summaryEl.style.display = 'none'; return }
+      const x = obj.group.position.x
+      const y = obj.group.position.z
+      const projected = projectCell(x, y, TILE_H / 2 + PIECE_H + 0.1)
+      if (!projected) return
+      const cellSpan = _projectedCellSpan(x, y)
+      const scale = Math.max(0.36, Math.min(1, cellSpan / 38))
+      obj.summaryEl.style.setProperty('--piece-summary-scale', scale.toFixed(3))
+      obj.summaryEl.style.left = projected.left + 'px'
+      obj.summaryEl.style.top = (projected.top + Math.max(3, cellSpan * 0.28)) + 'px'
+      obj.summaryEl.style.display = ''
     })
   }
 
@@ -495,7 +682,8 @@
         const ring = new THREE.Mesh(_selectedRingGeom, getHlMat('selected'))
         ring.rotation.x = Math.PI / 2
         ring.position.copy(obj.group.position)
-        ring.position.y = TILE_H / 2 + 0.01
+        ring.position.y = TILE_H / 2 + 0.04
+        ring.renderOrder = 5
         _scene.add(ring)
         _hlObjects.selected = ring
       }
@@ -529,7 +717,7 @@
   }
 
   // ── Animation ─────────────────────────────────────────────────────────────────
-  function animateAction(action, oldG, newG) {
+  function animateAction(action, previousModel, nextModel) {
     if (!action) return
     if (action.type === 'move' && action.pieceId) {
       const obj = _pieceObjects.get(action.pieceId)
@@ -541,15 +729,15 @@
       }
     }
     // Damage flash: detect HP changes
-    if (oldG && newG && oldG.pieces && newG.pieces) {
-      newG.pieces.forEach(np => {
-        const op = oldG.pieces.find(p => p.instanceId === np.instanceId)
-        if (op && np.currentHp < op.currentHp) {
-          const obj = _pieceObjects.get(np.instanceId)
+    if (previousModel && nextModel && previousModel.pieces && nextModel.pieces) {
+      nextModel.pieces.forEach(np => {
+        const op = previousModel.pieces.find(p => p.id === np.id)
+        if (op && np.health.current < op.health.current) {
+          const obj = _pieceObjects.get(np.id)
           if (obj) _anims.push({ type: 'flash', obj, elapsed: 0, duration: 0.3 })
         }
-        if (op && op.currentHp > 0 && np.currentHp <= 0) {
-          const obj = _pieceObjects.get(np.instanceId)
+        if (op && op.health.current > 0 && np.health.current <= 0) {
+          const obj = _pieceObjects.get(np.id)
           if (obj) _anims.push({ type: 'death', obj, elapsed: 0, duration: 0.6 })
         }
       })
@@ -566,6 +754,7 @@
         const ex = a.fromX + (a.toX - a.fromX) * _ease(t)
         const ez = a.fromZ + (a.toZ - a.fromZ) * _ease(t)
         a.obj.group.position.set(ex, 0, ez)
+        _notifyViewportChange()
         if (t >= 1) { a.obj.group.position.set(a.toX, 0, a.toZ); a.obj.animating = false; _anims.splice(i, 1) }
       } else if (a.type === 'flash') {
         const intensity = (1 - t) * 0.8
@@ -579,7 +768,7 @@
         if (t >= 1) { a.obj.group.visible = false; _anims.splice(i, 1) }
       }
     }
-    _updateHpBarPositions()
+    _updatePieceSummaryPositions()
   }
 
   function _ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t }
@@ -590,23 +779,40 @@
   let _pinchDist = 0
   const _pointers = new Map()
 
+  function _listen(target, type, handler, options) {
+    target.addEventListener(type, handler, options)
+    _listeners.push({ target, type, handler, options })
+  }
+
+  function _removeAllListeners() {
+    _listeners.splice(0).forEach(function (entry) {
+      entry.target.removeEventListener(entry.type, entry.handler, entry.options)
+    })
+  }
+
   function _initControls() {
     const canvas = _renderer.domElement
     canvas.style.touchAction = 'none'
 
-    canvas.addEventListener('pointerdown', e => {
+    _listen(canvas, 'pointerdown', e => {
+      // Right-click is reserved for piece inspection. Never let it enter the
+      // pan/pinch state: browsers may omit the matching pointerup when the
+      // context menu is suppressed, leaving a stale pointer that pans the
+      // board before the next inspection attempt.
+      if (e.pointerType === 'mouse' && e.button !== 0) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (_pointers.size === 1) {
         _panStart = { x: e.clientX, y: e.clientY }
         _panMoved = false
-        canvas.setPointerCapture(e.pointerId)
+        if (typeof canvas.setPointerCapture === 'function') canvas.setPointerCapture(e.pointerId)
       } else if (_pointers.size === 2) {
         _pinchDist = _getPinchDist()
+        _panStart = null
       }
       e.preventDefault()
     }, { passive: false })
 
-    canvas.addEventListener('pointermove', e => {
+    _listen(canvas, 'pointermove', e => {
       if (!_pointers.has(e.pointerId)) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
@@ -626,40 +832,63 @@
         const dy = e.clientY - _panStart.y
         if (Math.abs(dx) + Math.abs(dy) > 4) {
           _panMoved = true
-          const fov = (_camera.right - _camera.left) / _renderer.domElement.width
+          const canvasWidth = _renderer.domElement.getBoundingClientRect().width || 1
+          const fov = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
           _camera.position.x -= dx * fov
           _camera.position.z -= dy * fov
           _camera.lookAt(_camera.position.x, 0, _camera.position.z)
+          _notifyViewportChange()
           _panStart = { x: e.clientX, y: e.clientY }
         }
       }
       e.preventDefault()
     }, { passive: false })
 
-    const endPointer = e => {
+    const endPointer = (e, allowClick) => {
       const wasClick = !_panMoved && _pointers.size === 1
       _pointers.delete(e.pointerId)
       if (_pointers.size < 2) _pinchDist = 0
-      if (!_pointers.size) { _panStart = null }
-      if (wasClick) _handleClick(e)
+      if (_pointers.size === 1) {
+        const remaining = Array.from(_pointers.values())[0]
+        _panStart = { x: remaining.x, y: remaining.y }
+        _panMoved = true
+      } else if (!_pointers.size) {
+        _panStart = null
+      }
+      if (allowClick && wasClick) _handleClick(e)
     }
-    canvas.addEventListener('pointerup', endPointer)
-    canvas.addEventListener('pointercancel', endPointer)
+    _listen(canvas, 'pointerup', e => endPointer(e, true))
+    _listen(canvas, 'pointercancel', e => endPointer(e, false))
 
-    canvas.addEventListener('wheel', e => {
+    _listen(canvas, 'wheel', e => {
       _applyZoom(_camera.zoom * (e.deltaY < 0 ? 1.12 : 0.89))
       e.preventDefault()
     }, { passive: false })
 
-    canvas.addEventListener('dblclick', () => _resetCamera())
+    _listen(canvas, 'dblclick', () => _resetCamera())
 
-    canvas.addEventListener('contextmenu', e => {
+    _listen(canvas, 'contextmenu', e => {
       e.preventDefault()
-      const coords = _raycastGrid(e)
-      if (!coords) return
-      const piece = _findPieceAt(coords.x, coords.z)
-      if (piece && _onPieceRightClick) _onPieceRightClick(piece)
+      _resetPointerState(canvas)
+      let piece = _findPieceFromPointer(e.clientX, e.clientY)
+      if (!piece) {
+        const coords = screenToCell(e.clientX, e.clientY)
+        if (coords) piece = _findPieceAt(coords.x, coords.y)
+      }
+      if (piece && _onIntent) _onIntent({ type: 'inspect-piece', pieceId: piece.id })
     })
+  }
+
+  function _resetPointerState(canvas) {
+    _pointers.forEach(function (_, pointerId) {
+      if (canvas && canvas.hasPointerCapture && canvas.hasPointerCapture(pointerId)) {
+        canvas.releasePointerCapture(pointerId)
+      }
+    })
+    _pointers.clear()
+    _panStart = null
+    _panMoved = false
+    _pinchDist = 0
   }
 
   function _getPinchDist() {
@@ -670,62 +899,116 @@
   }
 
   function _applyZoom(z) {
-    _camera.zoom = Math.max(0.4, Math.min(5, z))
+    const w = _container.clientWidth || 320
+    const h = _container.clientHeight || 320
+    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(5, z))
     _camera.updateProjectionMatrix()
-    _updateHpBarPositions()
+    _updatePieceSummaryPositions()
+    _notifyViewportChange()
   }
 
   function _resetCamera() {
     if (!_mapW) return
-    _camera.zoom = 1
-    _camera.position.set(_mapW / 2, 50, _mapH / 2)
-    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
+    _camera.zoom = _preferredInitialZoom(w, h)
+    _camera.position.set(_mapW / 2, 50, _mapH / 2)
+    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
     _updateCameraFrustum(w, h)
+    _updatePieceSummaryPositions()
+    _notifyViewportChange()
   }
+
+  function resetView() { _resetCamera() }
 
   // ── Raycasting ────────────────────────────────────────────────────────────────
   const _raycaster = new THREE.Raycaster()
 
-  function _raycastGrid(e) {
-    if (!_container._hitPlane) return null
+  function screenToCell(clientX, clientY) {
+    if (!_hitPlane || !_renderer || !_camera) return null
     const canvas = _renderer.domElement
     const rect = canvas.getBoundingClientRect()
-    const ndcX = ((e.clientX - rect.left) / rect.width)  * 2 - 1
-    const ndcY = -((e.clientY - rect.top)  / rect.height) * 2 + 1
+    if (!rect.width || !rect.height) return null
+    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
+    const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
-    const hits = _raycaster.intersectObject(_container._hitPlane)
+    const hits = _raycaster.intersectObject(_hitPlane)
     if (!hits.length) return null
     const pt = hits[0].point
-    return { x: Math.round(pt.x), z: Math.round(pt.z) }
+    const x = Math.round(pt.x)
+    const y = Math.round(pt.z)
+    if (x < 0 || y < 0 || x >= _mapW || y >= _mapH) return null
+    return { x, y }
+  }
+
+  function projectCell(x, y, elevation) {
+    if (!_renderer || !_camera || !_container) return null
+    const canvasRect = _renderer.domElement.getBoundingClientRect()
+    const containerRect = _container.getBoundingClientRect()
+    const point = new THREE.Vector3(x, elevation == null ? TILE_H / 2 : elevation, y).project(_camera)
+    const clientX = canvasRect.left + (point.x + 1) / 2 * canvasRect.width
+    const clientY = canvasRect.top + (-point.y + 1) / 2 * canvasRect.height
+    return {
+      left: clientX - containerRect.left,
+      top: clientY - containerRect.top,
+      clientX,
+      clientY,
+    }
   }
 
   function _handleClick(e) {
-    const coords = _raycastGrid(e)
+    const coords = screenToCell(e.clientX, e.clientY)
     if (!coords) return
-    if (_onCellClick) _onCellClick(coords.x, coords.z)
+    if (_onIntent) _onIntent({ type: 'activate-cell', x: coords.x, y: coords.y })
   }
 
-  function _findPieceAt(x, z) {
-    if (!_lastG) return null
-    return (_lastG.pieces || []).find(p => p.x === x && p.y === z && p.currentHp > 0) || null
+  function _findPieceAt(x, y) {
+    if (!_currentModel) return null
+    return (_currentModel.pieces || []).find(p => p.x === x && p.y === y && p.visible !== false) || null
+  }
+  function _findPieceFromPointer(clientX, clientY) {
+    if (!_currentModel || !_renderer || !_camera) return null
+    let closest = null
+    let closestDistance = Infinity
+
+    ;(_currentModel.pieces || []).forEach(piece => {
+      if (piece.visible === false) return
+      const obj = _pieceObjects.get(piece.id)
+      const x = obj ? obj.group.position.x : piece.x
+      const y = obj ? obj.group.position.z : piece.y
+      const point = projectCell(x, y, TILE_H / 2 + PIECE_H + 0.002)
+      if (!point) return
+      const dx = clientX - point.clientX
+      const dy = clientY - point.clientY
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      const hitRadius = Math.max(10, _projectedCellSpan(x, y) * 0.55)
+      if (distance > hitRadius || distance >= closestDistance) return
+      closest = piece
+      closestDistance = distance
+    })
+
+    return closest
   }
 
-  // ── syncState — called every render cycle when G changes ──────────────────────
-  function syncState(G) {
-    if (!G || !G.map) return
+  // ── update — one-way presentation model input ─────────────────────────────────
+  function update(model) {
+    if (!model || !model.board || !_mounted) return
 
     // Build / update tiles on first call or map change
-    const mapKey = G.map.width + 'x' + G.map.height
-    if (!_container._mapKey || _container._mapKey !== mapKey) {
-      _container._mapKey = mapKey
-      _buildTiles(G.map)
+    const mapKey = model.board.id + ':' + model.board.width + 'x' + model.board.height
+    if (!_currentModel || !_currentModel.board || _currentModel.board.id + ':' + _currentModel.board.width + 'x' + _currentModel.board.height !== mapKey) {
+      _buildTiles(model.board)
     }
 
-    _updatePieces(G.pieces || [])
-    _updateTileEffects(G.extensions && G.extensions.tileEffects ? G.extensions.tileEffects : [])
-    _lastG = G
+    _updatePieces(model.pieces || [])
+    _updateTileEffects(model.effects || [])
+    setHighlights({
+      move: model.legal && model.legal.moveCells,
+      skill: model.legal && model.legal.targetCells,
+      place: model.legal && model.legal.placementCells,
+      selected: model.selection && model.selection.pieceId,
+    })
+    _currentModel = model
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
@@ -733,17 +1016,13 @@
     // Find the floatLayer: use the existing one in the DOM if available
     const layer = _floatLayer || document.getElementById('floatLayer')
     if (!layer) return
-    const canvas = _renderer ? _renderer.domElement : null
     let left = x * 44 + 22  // fallback pixel estimate
     let top  = z * 44 + 4
 
-    if (canvas && _camera) {
-      const wp = new THREE.Vector3(x, TILE_H / 2 + PIECE_H + 0.2, z)
-      const v  = wp.project(_camera)
-      const rect = canvas.getBoundingClientRect()
-      const containerRect = _container.getBoundingClientRect()
-      left = (v.x + 1) / 2 * rect.width + (rect.left - containerRect.left)
-      top  = (-v.y + 1) / 2 * rect.height + (rect.top - containerRect.top) - 14
+    const projected = projectCell(x, z, TILE_H / 2 + PIECE_H + 0.2)
+    if (projected) {
+      left = projected.left
+      top = projected.top - 14
     }
 
     const el = document.createElement('div')
@@ -753,52 +1032,97 @@
     el.style.top   = top  + 'px'
     el.textContent = text
     layer.appendChild(el)
-    setTimeout(() => el.remove(), 1200)
+    _floaters.add(el)
+    const timer = setTimeout(function () {
+      el.remove()
+      _floaters.delete(el)
+      _floaterTimers.delete(timer)
+    }, 1200)
+    _floaterTimers.add(timer)
   }
 
-  function setFloatLayer(el) { _floatLayer = el }
-
-  // ── Destroy ───────────────────────────────────────────────────────────────────
-  function destroy() {
-    if (_animFrameId) cancelAnimationFrame(_animFrameId)
-    if (_container && _container._ro) { _container._ro.disconnect(); delete _container._ro }
+  // ── Dispose ───────────────────────────────────────────────────────────────────
+  function dispose() {
+    _textureLoadGeneration += 1
+    _mounted = false
+    if (_animFrameId != null) cancelAnimationFrame(_animFrameId)
+    _animFrameId = null
+    if (_resizeObserver) _resizeObserver.disconnect()
+    _resizeObserver = null
+    _removeAllListeners()
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
-    if (_renderer) { _renderer.dispose(); if (_renderer.domElement.parentNode) _renderer.domElement.remove() }
+    if (_scene) {
+      const geometries = new Set()
+      const materials = new Set()
+      _scene.traverse(function (object) {
+        if (object.geometry) geometries.add(object.geometry)
+        if (object.material) {
+          ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) { materials.add(material) })
+        }
+      })
+      ;[_tileGeom, _hlPlaneGeom, _selectedRingGeom, _pieceBodyGeom, _pieceRingGeom, _portraitDiscGeom]
+        .forEach(function (geometry) { if (geometry) geometries.add(geometry) })
+      ;[_tileMats, _factionMats, _hlMats, _tileEffectMats, _tileEffectIconMats].forEach(function (cache) {
+        Object.keys(cache).forEach(function (key) { if (cache[key]) materials.add(cache[key]) })
+      })
+      geometries.forEach(function (geometry) { if (geometry.dispose) geometry.dispose() })
+      materials.forEach(function (material) { if (material.dispose) material.dispose() })
+    }
+    _texCache.forEach(function (entry) { if (entry && entry.texture && entry.texture.dispose) entry.texture.dispose() })
+    if (_renderer) {
+      _renderer.dispose()
+      if (_renderer.forceContextLoss) _renderer.forceContextLoss()
+      if (_renderer.domElement.parentNode) _renderer.domElement.remove()
+    }
     _tileObjects.clear()
     _pieceObjects.clear()
-    _tileEffectObjects.forEach(entry => {
-      entry.group.traverse(obj => {
-        if (obj.geometry && obj.geometry.dispose) obj.geometry.dispose()
-      })
-    })
     _tileEffectObjects.clear()
+    Object.keys(_tileMats).forEach(function (key) { delete _tileMats[key] })
+    Object.keys(_factionMats).forEach(function (key) { delete _factionMats[key] })
+    Object.keys(_hlMats).forEach(function (key) { delete _hlMats[key] })
+    Object.keys(_tileEffectMats).forEach(function (key) { delete _tileEffectMats[key] })
+    Object.keys(_tileEffectIconMats).forEach(function (key) { delete _tileEffectIconMats[key] })
     _anims.length = 0
-    Object.keys(_tileEffectMats).forEach(key => {
-      _tileEffectMats[key].dispose()
-      delete _tileEffectMats[key]
-    })
-    Object.keys(_tileEffectIconMats).forEach(key => {
-      _tileEffectIconMats[key].dispose()
-      delete _tileEffectIconMats[key]
-    })
-    _texCache.forEach(texture => texture.dispose())
+    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+    _floaterTimers.clear()
+    _floaters.forEach(function (element) { element.remove() })
+    _floaters.clear()
     _texCache.clear()
+    _pointers.clear()
     _renderer = null
     _camera = null
     _scene = null
+    _hpLayer = null
+    _floatLayer = null
+    _onIntent = null
+    _hitPlane = null
+    _currentModel = null
+    _mapW = 0
+    _mapH = 0
+    _tileGeom = null
+    _hlPlaneGeom = null
+    _selectedRingGeom = null
+    _pieceBodyGeom = null
+    _pieceRingGeom = null
+    _portraitDiscGeom = null
+    _clock.prev = 0
+    _panStart = null
+    _panMoved = false
+    _pinchDist = 0
     _container = null
   }
 
   // ── Public API ────────────────────────────────────────────────────────────────
   window.BattleRenderer3D = {
     init,
-    syncState,
+    update,
     animateAction,
-    setHighlights,
     spawnFloater,
-    setFloatLayer,
     resize,
-    destroy,
+    resetView,
+    projectCell,
+    screenToCell,
+    dispose,
     TILE_EFFECT_VISUALS,
   }
 })()

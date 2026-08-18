@@ -4,7 +4,6 @@
 // Paths are matched relative to 'data/' (as returned by app-paths-shim.getDataRoot()).
 // Example: readFileSync('data/skills/fireball.json', 'utf-8') → skill JSON string.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const __GAME_DATA__: {
   skills: Record<string, any>
   pieces: Record<string, any>

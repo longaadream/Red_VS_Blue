@@ -2,6 +2,8 @@ import fs from 'fs'
 import path from 'path'
 import type { TriggerRule } from './triggers'
 import { executeSkillFunction } from './skills'
+import { getRuleDate, getRuleMath } from './rule-runtime'
+import { manhattanDistance } from './spatial'
 
 // 效果类型
 export type EffectType =
@@ -288,7 +290,7 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                 // 只选择敌方棋子，并且在范围内
                 if (piece.ownerPlayerId !== context.sourcePiece.ownerPlayerId && piece.currentHp > 0) {
                   if (piece.x == null || piece.y == null) return
-                  const distance = Math.abs(piece.x - context.sourcePiece.x) + Math.abs(piece.y - context.sourcePiece.y)
+                  const distance = manhattanDistance(piece, context.sourcePiece)
                   if (distance <= range) {
                     targets.push({ ...piece, type: 'area' })
                   }
@@ -412,7 +414,10 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                     playerId: context.playerId
                   }
                   const skillCode = skillDef.code
-                  const skillResult = eval(`(function(context) { ${skillCode}; return executeSkill(context); })(playerSkillContext)`)
+                  const executeRuleSkill = eval(
+                    `(function(context, Math, Date) { ${skillCode}; return executeSkill(context); })`,
+                  ) as (context: unknown, math: Math, date: DateConstructor) => { success?: boolean; message?: string } | undefined
+                  const skillResult = executeRuleSkill(playerSkillContext, getRuleMath(), getRuleDate())
                   if (skillResult?.success) {
                     message = skillResult.message || resolveMessage(effect.message, context)
                     success = true

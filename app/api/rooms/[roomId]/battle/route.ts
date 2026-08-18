@@ -3,6 +3,7 @@ import { roomStore } from "@/lib/game/room-store"
 import { getBattleStorage } from "@/lib/game/battle-storage"
 import { runBattleAction } from "@/lib/game/battle-runner"
 import { broadcastToRoom } from "@/lib/ws-server"
+import { assertActionPlayer } from "@/lib/game/targeting"
 
 // ── GET — return current authoritative battle state ──────────────────────────
 
@@ -63,29 +64,36 @@ export async function POST(
 
   let result: ReturnType<typeof runBattleAction>
   try {
-    result = runBattleAction(storage.state as any, action as any)
+    assertActionPlayer(body.playerId, action)
+    result = runBattleAction(storage.state as any, action as any, { rootSeed: storage.seed })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     const errAny = err as any
     if (errAny?.needsTargetSelection) {
       return NextResponse.json({
         error: msg,
+        code: errAny.code,
         needsTargetSelection: true,
+        preparation: errAny.preparation,
         targetType: errAny.targetType ?? '',
         range: errAny.range ?? 10,
         filter: errAny.filter ?? '',
         targetIndex: errAny.targetIndex ?? undefined,
+        determinism: errAny.determinism ?? undefined,
       }, { status: 400 })
     }
     if (errAny?.needsOptionSelection) {
       return NextResponse.json({
         error: msg,
+        code: errAny.code,
         needsOptionSelection: true,
+        preparation: errAny.preparation,
         title: errAny.title ?? '请选择',
         options: errAny.options ?? [],
+        determinism: errAny.determinism ?? undefined,
       }, { status: 400 })
     }
-    return NextResponse.json({ error: msg }, { status: 400 })
+    return NextResponse.json({ error: msg, code: errAny?.code, determinism: errAny?.determinism ?? undefined }, { status: 400 })
   }
 
   storage.state = result.state
