@@ -144,7 +144,10 @@ describe('LAN server discovery', () => {
     ws.disconnect()
   })
 
-  it('probes ws-info before a direct local connection and repairs a stale HTTP port', async () => {
+  it.each([
+    { profileState: 'no saved WebSocket port', storedWsPort: undefined },
+    { profileState: 'a stale saved HTTP port', storedWsPort: '3000' },
+  ])('probes ws-info before a direct local connection with $profileState', async ({ storedWsPort }) => {
     const persisted = new Map<string, string>()
     const localStorage = {
       getItem(key: string) { return persisted.get(key) ?? null },
@@ -184,7 +187,7 @@ describe('LAN server discovery', () => {
     }
     expect(utils.saveServerConfig({ mode: 'local', url: 'http://127.0.0.1:3000' })).toBe(true)
     expect(persisted.has('rvb_ws_port')).toBe(false)
-    persisted.set('rvb_ws_port', '3000')
+    if (storedWsPort) persisted.set('rvb_ws_port', storedWsPort)
 
     new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(context)
     const ws = browserWindow.RvBWs as {
