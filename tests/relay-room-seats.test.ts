@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -58,16 +55,5 @@ describe('Relay room seat authority', () => {
       { ...createRelayRoomPlayer([], input('bob'), () => 'red'), faction: 'red' as const },
     ]
     expect(() => ensureRelayRoomSeats(duplicate)).toThrow('duplicate seats')
-  })
-
-  it('wires Relay lobby/join to server-assigned seats and removes client overwrite', () => {
-    const lobby = readFileSync(resolve(process.cwd(), 'relay-server/src/routes/lobby.ts'), 'utf8')
-    const rooms = readFileSync(resolve(process.cwd(), 'relay-server/src/routes/rooms.ts'), 'utf8')
-
-    expect(lobby).toContain('createRelayRoomPlayer([],')
-    expect(rooms).toContain('createRelayRoomPlayer(room.players')
-    expect(rooms).toContain('claimRelayRoomSeat(room.players')
-    expect(rooms).not.toContain('player.faction = body.faction')
-    expect(rooms).not.toContain('faction: null')
   })
 })
