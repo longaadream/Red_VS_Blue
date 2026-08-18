@@ -256,6 +256,9 @@ npm.cmd run dev
 1. `package.json#scripts.dev` 启动 `next dev`。
 2. `instrumentation.ts#register()` 在 Node runtime 导入 `lib/ws-server.ts#startWsServer()`。
 3. HTTP 默认监听 3000；`lib/ws-server.ts#getWsPort()` 默认返回 3001。
+4. RED-93 起，`register()` 会等待 WebSocket 启动完成；同一进程内的 instrumentation/HMR
+   重复初始化通过全局生命周期 Promise 串行执行。旧客户端先断开，旧监听完成关闭后才会
+   重新绑定 3001，且成功日志只在真实 `listening` 事件后输出。
 
 实测：Next 约 1 秒进入 Ready；`GET /api/ping` 为 200；`GET /api/rooms` 在初始化临时数据库后为 200；WebSocket 3001 握手成功。
 
