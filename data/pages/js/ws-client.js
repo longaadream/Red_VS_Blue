@@ -10,75 +10,6 @@
   var _reqSeq = 1
   var _reconnectTimer = null
   var _shouldReconnect = false
-  var _wsPort = 3001
-
-  function parsePort(value) {
-    var n = parseInt(value, 10)
-    return Number.isFinite(n) && n > 0 && n <= 65535 ? n : null
-  }
-
-  function normalizeServerUrl(url) {
-    return String(url || '').trim().replace(/\/+$/, '')
-  }
-
-  function readExplicitQueryWsPort() {
-    try {
-      var params = new URLSearchParams(window.location.search || '')
-      return parsePort(params.get('wsPort') || params.get('ws_port'))
-    } catch {
-      return null
-    }
-  }
-
-  function readConfiguredWsPort() {
-    if (window.RvBUtils && window.RvBUtils.getConfiguredWsPort) {
-      var fromConfig = parsePort(window.RvBUtils.getConfiguredWsPort())
-      if (fromConfig) return fromConfig
-    }
-    try {
-      var params = new URLSearchParams(window.location.search || '')
-      var fromQuery = parsePort(params.get('wsPort') || params.get('ws_port'))
-      if (fromQuery) {
-        saveWsPortForServer(fromQuery, getServerUrl(), 'query')
-        return fromQuery
-      }
-    } catch {}
-    try {
-      var fromStorage = parsePort(localStorage.getItem('rvb_ws_port'))
-      var scopedUrl = normalizeServerUrl(localStorage.getItem('rvb_ws_port_server_url'))
-      if (fromStorage && scopedUrl && scopedUrl === normalizeServerUrl(getServerUrl())) return fromStorage
-    } catch {}
-    return null
-  }
-
-  function readLegacyWsPort() {
-    if (window.RvBUtils && window.RvBUtils.getLegacyWsPort) {
-      return parsePort(window.RvBUtils.getLegacyWsPort())
-    }
-    try {
-      if (normalizeServerUrl(localStorage.getItem('rvb_ws_port_server_url'))) return null
-      return parsePort(localStorage.getItem('rvb_ws_port'))
-    } catch {
-      return null
-    }
-  }
-
-  function saveWsPortForServer(port, serverUrl, source) {
-    var parsed = parsePort(port)
-    if (!parsed) return null
-    if (window.RvBUtils && window.RvBUtils.saveWsPortForServer) {
-      return window.RvBUtils.saveWsPortForServer(parsed, serverUrl, source)
-    }
-    try {
-      localStorage.setItem('rvb_ws_port', String(parsed))
-      var normalizedUrl = normalizeServerUrl(serverUrl)
-      if (normalizedUrl) localStorage.setItem('rvb_ws_port_server_url', normalizedUrl)
-      else localStorage.removeItem('rvb_ws_port_server_url')
-      if (source) localStorage.setItem('rvb_ws_port_source', String(source))
-      else localStorage.removeItem('rvb_ws_port_source')
-    } catch {}
-    return parsed
-  }
 
   function getServerUrl() {
     if (window.RvBUtils && window.RvBUtils.getConnectionConfig) {
@@ -91,43 +22,9 @@
   }
 
   function buildWsUrl() {
-    var urls = buildWsUrlCandidates()
-    return urls[0] || null
-  }
-
-  function pushUnique(list, value) {
-    if (value && list.indexOf(value) === -1) list.push(value)
-  }
-
-  function buildWsUrlCandidates() {
-    var base = getServerUrl()
-    if (!base) return []
-    var scheme = base.startsWith('https://') ? 'wss://' : 'ws://'
-    var withoutScheme = base.replace(/^https?:\/\//, '').replace(/\/$/, '')
-    var host = withoutScheme.replace(/:\d+$/, '').replace(/\/.*$/, '')
-    var explicitPort = readConfiguredWsPort()
-    var basePortMatch = withoutScheme.match(/:(\d+)(?:\/|$)/)
-    var basePort = basePortMatch ? parsePort(basePortMatch[1]) : null
-    var isLocalOrLan = /^(localhost|127\.0\.0\.1)(:\d+)?\b/.test(withoutScheme) ||
-      /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
-    var urls = []
-
-    if (explicitPort) pushUnique(urls, scheme + host + ':' + explicitPort + '/ws/rooms/' + _roomId)
-
-    // Prefer the same public port for NAT/frp users who expose a single HTTP port.
-    if (base.startsWith('http://') && !isLocalOrLan) {
-      pushUnique(urls, 'wss://' + withoutScheme + '/ws/rooms/' + _roomId)
-    }
-    pushUnique(urls, scheme + withoutScheme + '/ws/rooms/' + _roomId)
-
-    if (_mode === 'relay') {
-      if (basePort) pushUnique(urls, scheme + host + ':' + (basePort + 1) + '/ws/rooms/' + _roomId)
-      pushUnique(urls, scheme + host + ':' + _wsPort + '/ws/rooms/' + _roomId)
-    } else {
-      if (basePort) pushUnique(urls, scheme + host + ':' + (basePort + 1) + '/ws/rooms/' + _roomId)
-      pushUnique(urls, scheme + host + ':' + _wsPort + '/ws/rooms/' + _roomId)
-    }
-    return urls
+    var base = String(getServerUrl() || '').trim().replace(/\/+$/, '')
+    if (!base) return null
+    return base.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/ws/rooms/' + _roomId
   }
 
   async function buildSubscribeMessage() {
@@ -162,78 +59,19 @@
     }
   }
 
-  async function connectWithHttpPortProbe(roomId) {
-    var explicitQuery = readExplicitQueryWsPort()
-    var configured = readConfiguredWsPort()
-    var legacy = readLegacyWsPort()
-    if (configured) _wsPort = configured
-    else if (legacy) _wsPort = legacy
-
-    var base = getServerUrl()
-    var withoutScheme = String(base || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
-    var basePortMatch = withoutScheme.match(/:(\d+)(?:\/|$)/)
-    var basePort = basePortMatch ? parsePort(basePortMatch[1]) : null
-    var isLocalOrLan = /^(localhost|127\.0\.0\.1)(:\d+)?\b/.test(withoutScheme) ||
-      /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
-    var shouldProbe = isLocalOrLan && !explicitQuery && !configured
-    if (!shouldProbe) {
-      _doConnect(roomId)
-      return
-    }
-
-    var resolved = false
-    if (base && typeof fetch === 'function') {
-      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null
-      var timeout = controller ? setTimeout(function () { controller.abort() }, 1500) : null
-      try {
-        var response = await fetch(base.replace(/\/$/, '') + '/api/ws-info', {
-          cache: 'no-store',
-          signal: controller ? controller.signal : undefined,
-        })
-        if (response.ok) {
-          var info = await response.json()
-          var discovered = parsePort(info && info.wsPort)
-          if (discovered) {
-            _wsPort = discovered
-            saveWsPortForServer(discovered, base, 'discovered')
-            resolved = true
-          }
-        }
-      } catch {}
-      finally {
-        if (timeout) clearTimeout(timeout)
-      }
-    }
-
-    if (!resolved && legacy) {
-      _wsPort = legacy
-      saveWsPortForServer(legacy, base, 'legacy-fallback')
-    } else if (!resolved && basePort === 3000) {
-      _wsPort = 3001
-      saveWsPortForServer(3001, base, 'standard-fallback')
-    }
-
-    _doConnect(roomId)
-  }
-
-  function _doConnect(roomId, candidateIndex) {
+  function _doConnect(roomId) {
     if (_ws && (_ws.readyState === 0 || _ws.readyState === 1)) return
-    candidateIndex = candidateIndex || 0
-    var candidates = buildWsUrlCandidates()
-    var url = candidates[candidateIndex]
+    var url = buildWsUrl()
     if (!url) return
 
-    var opened = false
     try {
       _ws = new WebSocket(url)
     } catch (e) {
-      if (candidateIndex + 1 < candidates.length) _doConnect(roomId, candidateIndex + 1)
-      else _scheduleReconnect(roomId)
+      _scheduleReconnect(roomId)
       return
     }
 
     _ws.onopen = async function () {
-      opened = true
       if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
       try {
         var subscribeMessage = await buildSubscribeMessage()
@@ -264,11 +102,7 @@
     }
 
     _ws.onclose = function () {
-      if (!opened && candidateIndex + 1 < candidates.length) {
-        _ws = null
-        _doConnect(roomId, candidateIndex + 1)
-        return
-      }
+      _ws = null
       _emit('disconnect')
       if (_shouldReconnect) _scheduleReconnect(_roomId)
     }
@@ -290,28 +124,28 @@
     }
   }
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // Relay subscriptions require signed identity. A local/private URL entered
+  // through the remote connector is still a LAN authority unless relay=1 was
+  // explicitly requested for local Relay development.
+  function resolveTransportMode(mode) {
+    if (mode !== 'relay') return 'lan'
+    try {
+      var params = new URLSearchParams(window.location.search || '')
+      if (params.get('relay') === '1') return 'relay'
+    } catch {}
+    var base = getServerUrl()
+    var withoutScheme = String(base || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
+    var isLocalOrLan = /^(localhost|127\.0\.0\.1)(:\d+)?\b/.test(withoutScheme) ||
+      /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
+    return isLocalOrLan ? 'lan' : 'relay'
+  }
 
-  // connect(roomId, playerId, mode)
-  // mode: 'relay' for online relay server, 'lan' (default) for local LAN server
   function connect(roomId, playerId, mode) {
     _roomId = roomId
     _playerId = playerId || null
-    _mode = mode || 'lan'
+    _mode = resolveTransportMode(mode || 'lan')
     _shouldReconnect = true
-    if (_mode === 'relay') {
-      _doConnect(roomId)
-    } else {
-      connectWithHttpPortProbe(roomId)
-    }
-  }
-
-  function setWsPort(port) {
-    var parsed = parsePort(port)
-    if (!parsed) return false
-    _wsPort = parsed
-    saveWsPortForServer(parsed, getServerUrl(), 'runtime')
-    return true
+    _doConnect(roomId)
   }
 
   function disconnect() {
@@ -359,5 +193,5 @@
     return _ws !== null && _ws.readyState === 1
   }
 
-  window.RvBWs = { connect: connect, disconnect: disconnect, send: send, request: request, on: on, isConnected: isConnected, setWsPort: setWsPort }
+  window.RvBWs = { connect: connect, disconnect: disconnect, send: send, request: request, on: on, isConnected: isConnected }
 })()

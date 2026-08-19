@@ -26,7 +26,6 @@ import {
 
 const LOCAL_PORT_HINT = 38521  // 首选端口，被占用时自动递增（避开 54300-54400 被 QMUpload 占用的范围）
 let actualLocalPort = LOCAL_PORT_HINT  // 实际绑定成功的端口
-let actualWsPort = 3001
 const CLIENT_SCHEME = 'rvb-client'
 
 protocol.registerSchemesAsPrivileged([{
@@ -181,10 +180,6 @@ function killProcessTree(proc: ChildProcess): void {
 }
 
 function killServer(): void {
-  if (gatewayServer) {
-    try { gatewayServer.close() } catch {}
-    gatewayServer = null
-  }
   localServerReady = false
   if (!serverProcess) return
   const proc = serverProcess
@@ -195,73 +190,9 @@ function killServer(): void {
 // ─── 本地服务器管理 ───────────────────────────────────────────────────────────
 
 let serverProcess: ChildProcess | null = null
-let gatewayServer: http.Server | null = null
 let localServerReady = false
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
-let actualBackendPort = 0
-
-function proxyUpgrade(req: http.IncomingMessage, socket: nodeNet.Socket, head: Buffer, targetPort: number, targetPath?: string): void {
-  const target = nodeNet.connect(targetPort, '127.0.0.1')
-  let settled = false
-  target.on('connect', () => {
-    settled = true
-    const lines = [`${req.method} ${targetPath || req.url} HTTP/${req.httpVersion}`]
-    for (let i = 0; i < req.rawHeaders.length; i += 2) {
-      lines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`)
-    }
-    target.write(lines.join('\r\n') + '\r\n\r\n')
-    if (head.length) target.write(head)
-    socket.pipe(target)
-    target.pipe(socket)
-  })
-  target.on('error', () => {
-    if (!settled) {
-      try { socket.write('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n') } catch {}
-    }
-    try { socket.destroy() } catch {}
-  })
-  socket.on('error', () => { try { target.destroy() } catch {} })
-}
-
-function startPublicGateway(publicPort: number, backendPort: number, wsPort: number): Promise<void> {
-  if (gatewayServer) return Promise.resolve()
-  gatewayServer = http.createServer((req, res) => {
-    const proxyReq = http.request({
-      hostname: '127.0.0.1',
-      port: backendPort,
-      method: req.method,
-      path: req.url || '/',
-      headers: { ...req.headers, host: `127.0.0.1:${backendPort}` },
-    }, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode || 502, proxyRes.headers)
-      proxyRes.pipe(res)
-    })
-    proxyReq.on('error', () => {
-      if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' })
-      res.end('Bad Gateway')
-    })
-    req.pipe(proxyReq)
-  })
-  gatewayServer.on('upgrade', (req, socket, head) => {
-    const url = String(req.url || '')
-    const isPublicWs = url === '/ws' || url === '/ws/' || url.startsWith('/ws/rooms')
-    proxyUpgrade(req, socket as nodeNet.Socket, head, isPublicWs ? wsPort : backendPort, isPublicWs ? '/' : undefined)
-  })
-  return new Promise((resolve, reject) => {
-    const onError = (err: Error) => {
-      gatewayServer = null
-      reject(err)
-    }
-    gatewayServer!.once('error', onError)
-    gatewayServer!.listen(publicPort, '0.0.0.0', () => {
-      gatewayServer!.off('error', onError)
-      console.log(`[client] Public HTTP/WS gateway: ${publicPort} -> http ${backendPort}, ws ${wsPort}`)
-      resolve()
-    })
-  })
-}
-
 function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   let settled = false
@@ -325,6 +256,13 @@ function findServerEntry(appRoot: string): string | null {
   return candidates.find(p => fs.existsSync(p)) ?? null
 }
 
+function findSamePortPreload(appRoot: string, serverEntry: string): string | null {
+  return [
+    path.join(path.dirname(serverEntry), 'ws-same-port-server.cjs'),
+    path.join(appRoot, 'scripts', 'ws-same-port-server.cjs'),
+  ].find(candidate => fs.existsSync(candidate)) ?? null
+}
+
 function getNodeBin(): string {
   if (app.isPackaged) {
     const candidate = path.join(process.resourcesPath, process.platform === 'win32' ? 'node.exe' : 'node')
@@ -385,9 +323,7 @@ async function startLocalServer(): Promise<void> {
 
   localServerReady = false
   actualLocalPort = await findFreePort(LOCAL_PORT_HINT)
-  actualBackendPort = await findFreePort(actualLocalPort + 1)
   console.log(`[client] Public server port: ${actualLocalPort}`)
-  console.log(`[client] Internal HTTP port: ${actualBackendPort}`)
 
   const appRoot = getAppRoot()
   const userData = getUserData()
@@ -408,17 +344,19 @@ async function startLocalServer(): Promise<void> {
     localServerReady = false
     return
   }
+  const samePortPreload = findSamePortPreload(appRoot, serverEntry)
+  if (!samePortPreload) {
+    console.error(`[client] ws-same-port-server.cjs not found for ${serverEntry}`)
+    localServerReady = false
+    return
+  }
 
-  // 为 WebSocket 服务器找一个独立的空闲端口（避开主端口和 QMUpload 占用区间）
-  actualWsPort = await findFreePort(actualBackendPort + 1)
-  console.log(`[client] WebSocket port: ${actualWsPort}`)
 
-  serverProcess = spawn(getNodeBin(), [serverEntry], {
+  serverProcess = spawn(getNodeBin(), ['--require', samePortPreload, serverEntry], {
     cwd: path.dirname(serverEntry),
     env: {
       ...process.env,
-      PORT: String(actualBackendPort),
-      WS_PORT: String(actualWsPort),
+      PORT: String(actualLocalPort),
       NODE_ENV: 'production',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
@@ -445,23 +383,9 @@ async function startLocalServer(): Promise<void> {
     if (lastServerStderr) console.error('[client] last stderr:', lastServerStderr.slice(-500))
   })
 
-  // 等待服务器启动
-  const backendReady = await waitForLocalServerReady(actualBackendPort)
-  if (!backendReady) {
-    localServerReady = false
-    console.warn(`[client] local server did not become ready on port ${actualBackendPort}`)
-    return
-  }
-
-  try {
-    await startPublicGateway(actualLocalPort, actualBackendPort, actualWsPort)
-    localServerReady = await waitForLocalServerReady(actualLocalPort, 5000)
-  } catch (err) {
-    localServerReady = false
-    console.error('[client] public gateway failed:', err)
-  }
+  localServerReady = await waitForLocalServerReady(actualLocalPort)
   if (!localServerReady) {
-    console.warn(`[client] public gateway did not become ready on port ${actualLocalPort}`)
+    console.warn(`[client] local server did not become ready on port ${actualLocalPort}`)
   }
 }
 
@@ -607,13 +531,12 @@ function loadLocalGame(): void {
       (function() {
         var url = 'http://localhost:${actualLocalPort}';
         if (window.RvBUtils && RvBUtils.saveServerConfig) {
-          RvBUtils.saveServerConfig({ mode: 'local', url: url, wsPort: ${actualLocalPort} });
+          RvBUtils.saveServerConfig({ mode: 'local', url: url });
         } else {
           localStorage.setItem('rvb_server_url', url);
           localStorage.setItem('rvb_lobby_server_mode', 'local');
           localStorage.setItem('rvb_local_server_url', url);
           localStorage.setItem('rvb_remote_server_url', url);
-          localStorage.setItem('rvb_ws_port', '${actualLocalPort}');
         }
         if (typeof updateFloatBar === 'function') updateFloatBar();
         if (typeof refreshUserUI === 'function') refreshUserUI();
@@ -726,7 +649,6 @@ handleTrusted('open-local-game', ['connect'], async () => {
 handleTrusted('get-mode', ['game'], () => ({
   isLocal: localServerReady,
   localUrl: `http://localhost:${actualLocalPort}`,
-  wsPort: actualLocalPort,
   ready: localServerReady,
 }))
 
@@ -757,7 +679,7 @@ handleTrusted('get-host-info', ['game'], () => {
       if (iface.family === 'IPv4' && !iface.internal) ips.push(iface.address)
     }
   }
-  return { port: actualLocalPort, wsPort: actualLocalPort, ips, running: serverProcess !== null && localServerReady, ready: localServerReady }
+  return { port: actualLocalPort, ips, running: serverProcess !== null && localServerReady, ready: localServerReady }
 })
 
 // ─── UDP LAN 主机广播与发现 ───────────────────────────────────────────────────
@@ -785,11 +707,10 @@ handleTrusted('start-host-broadcast', ['game'], () => {
   const myIps = getLanIpList()
   const hostname = os.hostname()
   const port = actualLocalPort
-  const wsPort = actualLocalPort
 
   const send = () => {
     for (const ip of myIps) {
-      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', name: hostname, ip, port, wsPort })
+      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', name: hostname, ip, port })
       const buf = Buffer.from(payload)
       const subnet = ip.substring(0, ip.lastIndexOf('.') + 1) + '255'
       for (const target of [subnet, '255.255.255.255']) {

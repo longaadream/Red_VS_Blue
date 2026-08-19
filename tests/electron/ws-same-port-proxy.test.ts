@@ -3,7 +3,6 @@ import fs from 'node:fs'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
-import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
@@ -22,18 +21,6 @@ afterEach(() => {
   temporaryDirectories.clear()
 })
 
-function extractGeneratedProxyPatch(): string {
-  const stageScript = fs.readFileSync(
-    path.join(root, 'scripts', 'stage-client-resources.js'),
-    'utf8',
-  )
-  const match = stageScript.match(
-    /  const patch = `([\s\S]*?)`\r?\n\r?\n  if \(!text\.startsWith\(marker\)\)/,
-  )
-  if (!match) throw new Error('Could not extract the standalone WebSocket proxy patch')
-  return vm.runInNewContext(`\`${match[1]}\``)
-}
-
 async function reservePort(): Promise<number> {
   const server = net.createServer()
   await new Promise<void>((resolve, reject) => {
@@ -43,7 +30,7 @@ async function reservePort(): Promise<number> {
   const address = server.address()
   const port = typeof address === 'object' && address ? address.port : null
   await new Promise<void>((resolve, reject) => {
-    server.close((error) => error ? reject(error) : resolve())
+    server.close(error => error ? reject(error) : resolve())
   })
   if (!port) throw new Error('Could not reserve a loopback port')
   return port
@@ -51,19 +38,19 @@ async function reservePort(): Promise<number> {
 
 async function waitForReady(child: ChildProcessWithoutNullStreams): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Proxy fixture did not become ready')), 5000)
+    const timer = setTimeout(() => reject(new Error('Same-port fixture did not become ready')), 5_000)
     let stderr = ''
     child.stderr.setEncoding('utf8')
-    child.stderr.on('data', (chunk) => { stderr += chunk })
+    child.stderr.on('data', chunk => { stderr += chunk })
     child.stdout.setEncoding('utf8')
-    child.stdout.on('data', (chunk) => {
+    child.stdout.on('data', chunk => {
       if (!String(chunk).includes('READY')) return
       clearTimeout(timer)
       resolve()
     })
-    child.once('exit', (code) => {
+    child.once('exit', code => {
       clearTimeout(timer)
-      reject(new Error(`Proxy fixture exited with ${code}: ${stderr}`))
+      reject(new Error(`Same-port fixture exited with ${code}: ${stderr}`))
     })
   })
 }
@@ -74,9 +61,9 @@ async function connectAndReceive(url: string): Promise<string> {
     const timer = setTimeout(() => {
       socket.terminate()
       reject(new Error(`WebSocket timed out: ${url}`))
-    }, 3000)
+    }, 3_000)
     socket.once('open', () => socket.send('probe'))
-    socket.once('message', (data) => {
+    socket.once('message', data => {
       clearTimeout(timer)
       const message = String(data)
       socket.close()
@@ -86,7 +73,7 @@ async function connectAndReceive(url: string): Promise<string> {
       clearTimeout(timer)
       reject(new Error(`Unexpected HTTP ${response.statusCode} from ${url}`))
     })
-    socket.once('error', (error) => {
+    socket.once('error', error => {
       clearTimeout(timer)
       reject(error)
     })
@@ -99,7 +86,7 @@ async function getUpgradeStatus(url: string): Promise<number> {
     const timer = setTimeout(() => {
       socket.terminate()
       reject(new Error(`Upgrade probe timed out: ${url}`))
-    }, 3000)
+    }, 3_000)
     socket.once('unexpected-response', (_request, response) => {
       clearTimeout(timer)
       socket.terminate()
@@ -108,34 +95,48 @@ async function getUpgradeStatus(url: string): Promise<number> {
     socket.once('open', () => {
       clearTimeout(timer)
       socket.close()
-      reject(new Error(`Non-matching upgrade was unexpectedly proxied: ${url}`))
+      reject(new Error(`Non-game upgrade was unexpectedly claimed: ${url}`))
     })
-    socket.once('error', (error) => {
+    socket.once('error', error => {
       clearTimeout(timer)
       reject(error)
     })
   })
 }
 
-describe('standalone same-port WebSocket proxy', () => {
-  it('forwards the supported public paths with valid HTTP framing', async () => {
-    const publicPort = await reservePort()
-    let internalPort = await reservePort()
-    while (internalPort === publicPort) {
-      internalPort = await reservePort()
+describe('standalone same-origin WebSocket upgrade', () => {
+  it('stages the preload alongside the standalone server', () => {
+    const stageSource = fs.readFileSync(path.join(root, 'scripts', 'stage-client-resources.js'), 'utf8')
+    expect(stageSource).toContain("require('./ws-same-port-server.cjs')")
+    expect(stageSource).toContain("copyFile(path.join(__dirname, 'ws-same-port-server.cjs')")
+    for (const entry of ['electron/main.ts', 'electron-client/main.ts']) {
+      const electronSource = fs.readFileSync(path.join(root, ...entry.split('/')), 'utf8')
+      expect(electronSource).toContain('findSamePortPreload(appRoot, serverEntry)')
+      expect(electronSource).toContain("['--require', samePortPreload, serverEntry]")
+      expect(electronSource).not.toContain('WS_PORT:')
     }
-    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-ws-proxy-'))
+  })
+
+  it('serves HTTP and every supported game WebSocket path on one port', async () => {
+    const publicPort = await reservePort()
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-ws-same-port-'))
     temporaryDirectories.add(temporaryDirectory)
-    const fixturePath = path.join(temporaryDirectory, 'proxy-fixture.cjs')
+    const fixturePath = path.join(temporaryDirectory, 'same-port-fixture.cjs')
+    const preloadPath = path.join(root, 'scripts', 'ws-same-port-server.cjs')
     const wsModulePath = require.resolve('ws')
-    const proxyPatch = extractGeneratedProxyPatch()
 
-    fs.writeFileSync(fixturePath, `${proxyPatch}
-
+    fs.writeFileSync(fixturePath, `
+require(${JSON.stringify(preloadPath)})
+const http = require('node:http')
 const { WebSocketServer } = require(${JSON.stringify(wsModulePath)})
-const internalHttpServer = __rvbOriginalCreateServer()
-const internalWebSocketServer = new WebSocketServer({ server: internalHttpServer })
-internalWebSocketServer.on('connection', function(socket, request) {
+const wss = new WebSocketServer({ noServer: true })
+
+globalThis.__rvbWsUpgradeHandler = function(request, socket, head) {
+  wss.handleUpgrade(request, socket, head, function(client) {
+    wss.emit('connection', client, request)
+  })
+}
+wss.on('connection', function(socket, request) {
   socket.on('message', function() {
     socket.send('path:' + request.url + ';header:' + request.headers['x-rvb-probe'])
   })
@@ -146,22 +147,15 @@ const publicServer = http.createServer(function(_request, response) {
   response.end('ok')
 })
 publicServer.on('upgrade', function(_request, socket) {
-  socket.end('HTTP/1.1 418 Not Proxied\\r\\nConnection: close\\r\\n\\r\\n')
+  socket.end('HTTP/1.1 418 Not Claimed\\r\\nConnection: close\\r\\n\\r\\n')
 })
-
-internalHttpServer.listen(Number(process.env.WS_PORT), '127.0.0.1', function() {
-  publicServer.listen(Number(process.env.PUBLIC_PORT), '127.0.0.1', function() {
-    process.stdout.write('READY\\n')
-  })
+publicServer.listen(Number(process.env.PUBLIC_PORT), '127.0.0.1', function() {
+  process.stdout.write('READY\\n')
 })
 `, 'utf8')
 
     const child = spawn(process.execPath, [fixturePath], {
-      env: {
-        ...process.env,
-        PUBLIC_PORT: String(publicPort),
-        WS_PORT: String(internalPort),
-      },
+      env: { ...process.env, PUBLIC_PORT: String(publicPort) },
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     })
@@ -171,17 +165,15 @@ internalHttpServer.listen(Number(process.env.WS_PORT), '127.0.0.1', function() {
     for (const pathname of ['/ws', '/ws/', '/ws/rooms/__lobby']) {
       await expect(
         connectAndReceive(`ws://127.0.0.1:${publicPort}${pathname}`),
-      ).resolves.toBe('path:/;header:forwarded')
+      ).resolves.toBe(`path:${pathname};header:forwarded`)
     }
-    for (const pathname of ['/not-websocket-proxy', '/ws/rooms-not-a-room']) {
+    for (const pathname of ['/not-a-game-socket', '/ws/rooms-not-a-room']) {
       await expect(
         getUpgradeStatus(`ws://127.0.0.1:${publicPort}${pathname}`),
       ).resolves.toBe(418)
     }
 
-    const httpResponse = await fetch(
-      `http://127.0.0.1:${publicPort}/ws/rooms/__lobby`,
-    )
+    const httpResponse = await fetch(`http://127.0.0.1:${publicPort}/ws/rooms/__lobby`)
     await expect(httpResponse.text()).resolves.toBe('ok')
-  }, 15000)
+  }, 15_000)
 })

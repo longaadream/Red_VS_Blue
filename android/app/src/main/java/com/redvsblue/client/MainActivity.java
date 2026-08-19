@@ -512,8 +512,7 @@ public class MainActivity extends BridgeActivity {
             final String myIp = getLocalIpAddress();
             final String model = android.os.Build.MODEL.replace("\"", "'");
             final String payload = "{\"magic\":\"RVB_DISCOVER\",\"name\":\"" + model
-                    + "\",\"ip\":\"" + myIp + "\",\"port\":" + MOBILE_SERVER_PORT
-                    + ",\"wsPort\":" + MOBILE_SERVER_PORT + "}";
+                    + "\",\"ip\":\"" + myIp + "\",\"port\":" + MOBILE_SERVER_PORT + "}";
             // 获取 MulticastLock（广播收发在部分 Android WiFi 驱动上需要此锁）
             WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             final WifiManager.MulticastLock mcastLock = wifi.createMulticastLock("rvb-broadcast");
@@ -603,8 +602,7 @@ public class MainActivity extends BridgeActivity {
             boolean running = mobileHttpServer != null && mobileHttpServer.isAlive();
             String ip = running ? getLocalIpAddress() : "";
             return "{\"ok\":" + running + ",\"running\":" + running +
-                   ",\"ip\":\"" + ip + "\",\"port\":" + MOBILE_SERVER_PORT +
-                   ",\"wsPort\":" + MOBILE_SERVER_PORT + "}";
+                   ",\"ip\":\"" + ip + "\",\"port\":" + MOBILE_SERVER_PORT + "}";
         }
 
         @JavascriptInterface
