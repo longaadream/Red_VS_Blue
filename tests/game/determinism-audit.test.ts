@@ -80,7 +80,7 @@ describe('authority determinism audit', () => {
     expect(violations).toEqual([])
   })
 
-  it('routes Android and Relay authority through the seeded deterministic runner', () => {
+  it('keeps Android legacy replay seeded and Relay clients non-authoritative', () => {
     const mobileServer = read(CROSS_PLATFORM_AUTHORITY_FILES.mobileServer)
     expect(mobileServer.match(/const seed = createRootSeed\(\)/g)?.length, 'mobile root seeds').toBeGreaterThanOrEqual(2)
     expect(mobileServer.match(/rootSeed:\s*seed\b/g)?.length, 'mobile seed injection').toBeGreaterThanOrEqual(2)
@@ -110,7 +110,9 @@ describe('authority determinism audit', () => {
     expect(battlePage).not.toContain('var authorityTrace = null')
     expect(battlePage).not.toContain('trace: authorityTrace')
     expect(battlePage).not.toMatch(/entry\.action\.type\s*===\s*['"]pending(?:Option|Target)Select['"][\s\S]{0,200}wsActionSeq\s*=/)
-    expect(battlePage.match(/runDeterministicAuthorityAction\(/g)?.length, 'authority runner call sites').toBeGreaterThanOrEqual(4)
+    expect(battlePage.match(/runDeterministicAuthorityAction\(/g)?.length, 'legacy replay runner definition and call').toBe(2)
+    expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]stateUpdate['"]/)
+    expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
 
     const browserEntry = read(CROSS_PLATFORM_AUTHORITY_FILES.browserEntry)
     expect(browserEntry).toContain('getBattleRootSeed, hashBattleState, runBattleAction')

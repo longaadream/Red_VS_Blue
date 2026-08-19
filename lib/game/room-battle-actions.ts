@@ -168,12 +168,19 @@ export async function dispatchRoomBattleAction(
       seed: storage.seed,
       state: actionResult.state,
     }
-    const nextRoom: Room = { ...room, battleState: nextStorage as unknown as Room['battleState'] }
+    const isTerminal = actionResult.state.terminalResult?.status === 'finished'
+    const nextRoom: Room = {
+      ...room,
+      battleState: nextStorage as unknown as Room['battleState'],
+      ...(isTerminal ? { status: 'finished' as const } : {}),
+    }
     if (!await store.setRoomIfVersion(normalizedRoomId, nextRoom, room.version)) continue
 
     const committedRoom: Room = { ...nextRoom, version: room.version + 1 }
     const snapshot = createPublicBattleSnapshot(committedRoom, viewerPlayerId ?? undefined)
-    if (actionResult.state.deployment?.status === 'complete') clearRoomDeploymentTimeout(normalizedRoomId)
+    if (isTerminal || actionResult.state.deployment?.status === 'complete') {
+      clearRoomDeploymentTimeout(normalizedRoomId)
+    }
     return {
       kind: expired ? 'expired' : 'applied',
       snapshot,

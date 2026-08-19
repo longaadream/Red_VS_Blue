@@ -41,7 +41,7 @@ RED-28 需要建立 Demo 阶段的确定性基础，但不改变随机概率、�
 
 ### 兼容与边界
 
-- 保留 `setRng()`/`rng()` 旧适配器：没有显式 runtime 的训练、非权威预检和测试继续使用原行为；激活 runtime 时 `rng()` 路由到 `skill/effect`。Relay host 与 Android action-log 回放必须使用 `runBattleAction()`，缺失根 seed 时 fail-closed。
+- 保留 `setRng()`/`rng()` 旧适配器：没有显式 runtime 的训练、非权威预检和测试继续使用原行为；激活 runtime 时 `rng()` 路由到 `skill/effect`。服务端权威入口必须使用 `runBattleAction()`，缺失根 seed 时 fail-closed；浏览器 Relay host 权威和移动端 action-log 不再属于目标架构。
 - 不增加新的顶层存档字段，不提升 `BattleState._v`。根种子继续使用既有 `{ type: 'server-state', seed, state }`；审计数据继续位于既有 `state.extensions.debugBattle`。
 - 规则定义缓存只保存模板，每次装载都返回独立、规范化的运行实例，避免首次读取与缓存命中产生不同 limits 或共享冷却计数。
 - 房间 ID、邀请码、鉴权过期、连接/清理时间、日志时间、game record 时间和纯视觉随机属于非规则域，可继续使用系统时间或宿主随机。它们不得写入权威规则结果或权威状态 hash。

@@ -173,12 +173,12 @@
 - 输入：URL roomId 和请求 JSON 动作。
 - 输出：新状态或 HTTP 错误响应。
 - 调用方：浏览器/客户端 HTTP 后备路径。
-- 调用：`runBattleAction()`、`RoomStore.setRoom()`、WS 广播。
+- 调用：`dispatchRoomBattleAction()`、`RoomStore.setRoomIfVersion()`、WS 广播。
 - 状态变化：房间战斗状态和数据库修订号。
-- 错误：无效 JSON、房间不存在、规则/数据库错误。
+- 错误：无效 JSON、房间不存在、规则/数据库错误；持续 CAS 竞争返回 `ROOM_VERSION_CONFLICT`（409），终局后的竞争动作返回 `BATTLE_ALREADY_TERMINAL`（400）。
 - 日志：API 控制台输出。
-- 测试：没有确认到 API 集成测试。
-- 已知问题：与 WS 的验证、错误形状和并发策略可能不一致。
+- 测试：`tests/roster-transports.test.ts` 覆盖 HTTP/WS 同状态与并发双投降；终局守卫另见 `tests/game/terminal-transport.test.ts`。
+- 已知问题：HTTP 与 WS 的选择错误 envelope 仍不完全相同；真实 Prisma 多实例竞争尚无 E2E。
 - 最小调试：使用同一房间快照分别走 WS/HTTP，比较状态 hash。
 
 ## 8. RoomStore 和战斗存储
@@ -193,23 +193,23 @@
 - 错误：JSON 损坏、数据库错误、版本竞争。
 - 日志：主要由调用方记录。
 - 测试：没有新格式存档 round-trip 测试；公开测试前旧格式不要求兼容。
-- 已知问题：主要链路通常用 `setRoom()` 而非 `setRoomIfVersion()`；外层无格式版本；部分字段读取时重置。
+- 已知问题：权威战斗动作已用 `setRoomIfVersion()`；其他房间写入仍混用 `setRoom()`，且外层无格式版本、部分字段读取时重置。
 - 最小调试：用新格式 fixture 执行读取—写回—再读取，比较关键字段、动作链和状态 hash，而不是只比较 JSON 文本。
 
 ## 9. 浏览器战斗 UI
 
-- 入口：`data/pages/battle.html::doAction()`、`applyServerState()`、`checkClientGameOver()`。
+- 入口：`data/pages/battle.html::doAction()`、`applyServerState()`、`handleGameOver()`。
 - 路由：`battle.html` 是真实对战、观战和训练营的唯一战斗页面；训练营通过 `mode=training` 启用 fixture 与调试控件。`training.html` 仅保留兼容跳转，不得实现棋盘、选中、目标高亮或动作提交。
 - 职责：显示状态、收集输入、发送动作和接收服务端状态。
 - 输入：玩家交互、WS/Relay 消息、完整战斗状态。
-- 输出：动作消息、页面渲染、客户端胜负状态。
+- 输出：动作消息、页面渲染、权威 `terminalResult` 的只读展示。
 - 调用方：Electron 客户端和 Android WebView。
 - 调用：`RvBWs`、浏览器 `GameEngine`、localStorage 和 UI 函数。
-- 状态变化：全局 `G`、DOM、localStorage；Relay 模式还会执行规则。
+- 状态变化：全局 `G`、DOM、localStorage；联网模式只用服务端 `stateUpdate` 替换 `G`。
 - 错误：网络失败、引擎异常或状态不兼容；部分异常只显示提示或被忽略。
 - 日志：浏览器 console；生产 mobile 构建会削弱部分 console 输出。
 - 测试：`tests/game/movement-contract.test.ts` 会执行页面实际加载的 `data/pages/js/game-engine.js`，验证共享移动导出和固定状态目标候选；`tests/game/battle-ui-boundary.test.ts` 覆盖展示模型、规则适配器与生命周期合同。RED-48 使用 Playwright 在训练模式完成 1280×720、390×844 的投影命中、选择/取消、目标模式和重复挂载冒烟，证据见 `output/playwright/red-48-browser-evidence.md`。
-- 已知问题：页面控制器仍跨越网络、Relay 规则执行和胜负判断；不同模式承担不同权威职责。移动规则适配器仍在克隆快照上验证共享移动候选；技能、卡牌和 pending 目标则只消费核心 `preparation` 的精确候选。
+- 已知问题：页面控制器仍跨越网络、训练规则预演与展示；移动规则适配器仍在克隆快照上验证共享移动候选，技能、卡牌和 pending 目标则只消费核心 `preparation` 的精确候选。终局不再在 UI 重算，旧 Relay host 权威消息被忽略。
 - 最小调试：捕获连接模式、roomId、seed、最后 action、服务端/客户端 state hash 和截图。
 
 ### 9.1 战场表现边界（RED-48）

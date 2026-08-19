@@ -17,6 +17,8 @@ import {
   verifyJoinAuth,
   verifyRecordSignature,
 } from './game/identity-verify'
+import { getClientTerminalSubmissionError } from './server/battle-terminal'
+import { isBattleStateConflict, persistAuthoritativeBattleState } from './server/battle-command'
 import {
   ensureRosterAlignmentMutable,
   getDemoRosterReadiness,
@@ -594,6 +596,14 @@ async function restartWsServer(): Promise<void> {
           const sender = ws
           ;(async () => {
             try {
+              const terminalSubmissionError = getClientTerminalSubmissionError(msg)
+              if (terminalSubmissionError) {
+                sendActionError(sender, {
+                  error: terminalSubmissionError.message,
+                  code: terminalSubmissionError.code,
+                })
+                return
+              }
               const room = await roomStore.getRoom(_roomId)
               if (!room) return
               if (msg.type === 'action') {
@@ -630,7 +640,7 @@ async function restartWsServer(): Promise<void> {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const st = result.actionResult.state as any
                   const hasBotPlayer = (room.players as any[]).some(p => p.isBot === true || p.id === 'bot')
-                  if (hasBotPlayer && st?.turn?.phase === 'action' && st?.turn?.currentPlayerId === 'bot') {
+                  if (!st?.terminalResult && hasBotPlayer && st?.turn?.phase === 'action' && st?.turn?.currentPlayerId === 'bot') {
                     setTimeout(() => { runBotTurn(_roomId).catch(() => {}) }, 800)
                   }
                 } catch (err) {
@@ -660,24 +670,6 @@ async function restartWsServer(): Promise<void> {
                     context: errAny?.context ?? undefined,
                   })
                 }
-                return
-              }
-
-              if (msg.type === 'gameOver') {
-                if (!room.gameRecord) {
-                  room.status = 'finished'
-                  room.gameRecord = {
-                    gameId: _roomId + '-' + Date.now(),
-                    timestamp: Date.now(),
-                    roomId: _roomId,
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    players: (room.players as any[]).map(p => ({ id: p.id, name: p.name, publicKey: p.publicKey })),
-                    winner: msg.winner ?? null,
-                    signatures: {},
-                  }
-                  await roomStore.setRoom(_roomId, room)
-                }
-                broadcastToRoom(_roomId, { type: 'gameOver', winner: msg.winner })
                 return
               }
             } catch (e) {
@@ -754,12 +746,13 @@ async function runBotTurn(roomId: string): Promise<void> {
     }
 
     storage.state = currentState
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(room as any).battleState = storage
-    await roomStore.setRoom(roomId, room)
-    const committedRoom = await roomStore.getRoom(roomId)
-    if (committedRoom) {
+    try {
+      const committedRoom = await persistAuthoritativeBattleState({ roomId, room, storage })
       broadcastBattleSnapshot(roomId, createPublicBattleSnapshot(committedRoom))
+    } catch (error) {
+      // A player command won the room-version race; discard this stale bot turn.
+      if (isBattleStateConflict(error)) return
+      throw error
     }
   } catch (e) {
     console.warn('[WS] runBotTurn error:', e)

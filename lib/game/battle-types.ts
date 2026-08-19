@@ -6,6 +6,7 @@ import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
+import type { TerminalResult } from "./terminal"
 
 export type TurnPhase = "start" | "action" | "end"
 
@@ -106,6 +107,8 @@ export interface BattleState {
   /** 两个玩家的资源状态（充能点等） */
   players: PlayerTurnMeta[]
   turn: TurnState
+  /** RED-34 authoritative terminal result committed exactly once by the server. */
+  terminalResult?: TerminalResult
   /** RED-29 同时部署状态；完成前普通战斗命令均被拒绝。 */
   deployment?: DeploymentState
   /** 战斗日志 */
@@ -199,6 +202,7 @@ export type BattleAction =
   | {
       type: "surrender"
       playerId: PlayerId
+      reason?: "voluntary" | "timeout"
     }
   | {
       type: "playCard"
@@ -244,8 +248,10 @@ export type BattleAction =
     }
 
 export class BattleRuleError extends Error {
-  constructor(message: string) {
+  readonly code?: string
+  constructor(message: string, code?: string) {
     super(message)
+    this.code = code
     this.name = "BattleRuleError"
   }
 }

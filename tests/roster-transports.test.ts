@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { NextRequest } from 'next/server'
-import { WebSocket, WebSocketServer } from 'ws'
+import { WebSocket, WebSocketServer, type RawData } from 'ws'
 import type { Room } from '../lib/game/room-store'
 
 type JsonObject = Record<string, unknown>
@@ -40,6 +40,8 @@ async function signBattleAction(identity: TestIdentity, roomId: string, action: 
 const memoryStore = vi.hoisted(() => {
   const rooms = new Map<string, Room>()
   let writes = 0
+  let readBarrier: { remaining: number; promise: Promise<void>; release: () => void } | null = null
+
 
   const copy = <T>(value: T): T => JSON.parse(JSON.stringify(
     value,
@@ -49,8 +51,15 @@ const memoryStore = vi.hoisted(() => {
 
   return {
     reset() {
+      readBarrier?.release()
+      readBarrier = null
       rooms.clear()
       writes = 0
+    },
+    armReadBarrier(participants: number) {
+      let release = () => {}
+      const promise = new Promise<void>(resolve => { release = resolve })
+      readBarrier = { remaining: participants, promise, release }
     },
     seed(room: Room) {
       rooms.set(normalize(room.id), copy(room))
@@ -64,6 +73,15 @@ const memoryStore = vi.hoisted(() => {
     },
     async getRoom(roomId: string) {
       const room = rooms.get(normalize(roomId))
+      const barrier = readBarrier
+      if (barrier) {
+        barrier.remaining -= 1
+        if (barrier.remaining === 0) {
+          readBarrier = null
+          barrier.release()
+        }
+        await barrier.promise
+      }
       return room ? copy(room) : undefined
     },
     async getAllRooms() {
@@ -223,6 +241,44 @@ async function receiveType(client: WebSocket, expectedType: string): Promise<Jso
     if (message.type === expectedType) return message
   }
   throw new Error(`Timed out waiting for WebSocket message ${expectedType}`)
+}
+
+function collectMessages(client: WebSocket) {
+  const history = new Map<string, JsonObject>()
+  const waiters = new Map<string, (message: JsonObject) => void>()
+  const onMessage = (raw: RawData) => {
+    const message = JSON.parse(raw.toString()) as JsonObject
+    const type = String(message.type ?? '')
+    const resolve = waiters.get(type)
+    if (resolve) {
+      waiters.delete(type)
+      resolve(message)
+    } else {
+      history.set(type, message)
+    }
+  }
+  client.on('message', onMessage)
+
+  return {
+    waitFor(type: string): Promise<JsonObject> {
+      const existing = history.get(type)
+      if (existing) {
+        history.delete(type)
+        return Promise.resolve(existing)
+      }
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          waiters.delete(type)
+          reject(new Error(`Timed out waiting for WebSocket message ${type}`))
+        }, 10_000)
+        waiters.set(type, message => {
+          clearTimeout(timeout)
+          resolve(message)
+        })
+      })
+    },
+    stop() { client.off('message', onMessage) },
+  }
 }
 
 async function httpCreate(mapId: string, hostId = 'alice') {
@@ -793,4 +849,74 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const wsState = (memoryStore.snapshot('ws-deployment')?.battleState as unknown as { state: unknown }).state
     expect(wsState).toEqual(httpState)
   })
+
+  it('commits exactly one terminal result across a concurrent HTTP and WebSocket surrender', async () => {
+    memoryStore.seed(signedRoom('terminal-race', 'light'))
+    await httpSelect('terminal-race', firstIdentity.id, lightRoster)
+    await wsSelect('terminal-race', secondIdentity.id, lightRoster)
+    const started = memoryStore.snapshot('terminal-race')
+    if (!started?.battleState) throw new Error('Expected a started battle')
+
+    const client = await openClient()
+    const messages = collectMessages(client)
+    try {
+      client.send(JSON.stringify({ type: 'subscribe', roomId: 'terminal-race', playerId: secondIdentity.id }))
+      await messages.waitFor('subscribed')
+      await messages.waitFor('stateUpdate')
+
+      const terminalUpdate = messages.waitFor('stateUpdate')
+      const writesBeforeRace = memoryStore.writeCount()
+      memoryStore.armReadBarrier(2)
+
+      const httpAction = {
+        type: 'surrender',
+        playerId: firstIdentity.id,
+        reason: 'voluntary',
+      }
+      const wsAction = {
+        type: 'surrender',
+        playerId: secondIdentity.id,
+        reason: 'voluntary',
+      }
+      const wsAuth = await signBattleAction(secondIdentity, 'terminal-race', wsAction)
+      const httpResultPromise = httpBattleAction(
+        'terminal-race',
+        firstIdentity.id,
+        httpAction,
+        firstIdentity.id,
+        firstIdentity,
+      )
+      client.send(JSON.stringify({ type: 'action', action: wsAction, auth: wsAuth }))
+
+      const [httpResult, update] = await Promise.all([httpResultPromise, terminalUpdate])
+      expect([200, 400]).toContain(httpResult.status)
+      expect(update).toMatchObject({ type: 'stateUpdate' })
+
+      if (httpResult.status === 200) {
+        expect(await messages.waitFor('actionError')).toMatchObject({
+          type: 'actionError',
+          code: 'BATTLE_ALREADY_TERMINAL',
+        })
+      } else {
+        expect(httpResult.body).toMatchObject({ code: 'BATTLE_ALREADY_TERMINAL' })
+      }
+
+      const finalRoom = memoryStore.snapshot('terminal-race')
+      const finalStorage = finalRoom?.battleState as unknown as {
+        state: {
+          terminalResult?: { loserPlayerId?: string }
+          actions?: Array<{ type?: string }>
+        }
+      }
+      expect(memoryStore.writeCount() - writesBeforeRace).toBe(1)
+      expect(finalRoom?.status).toBe('finished')
+      expect(finalStorage.state.terminalResult?.loserPlayerId).toBe(
+        httpResult.status === 200 ? firstIdentity.id : secondIdentity.id,
+      )
+      expect(finalStorage.state.actions?.filter(action => action.type === 'terminalResult')).toHaveLength(1)
+    } finally {
+      messages.stop()
+      client.close()
+    }
+  }, 15_000)
 })

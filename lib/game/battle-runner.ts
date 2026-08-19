@@ -13,7 +13,7 @@ import {
   withRuleRuntime,
 } from './rule-runtime'
 import type { BattleAction, BattleState } from './turn'
-import { applyBattleAction, safeCloneBattleState } from './turn'
+import { applyBattleAction, assertBattleNotTerminal, safeCloneBattleState } from './turn'
 
 export {
   hashBattleState,
@@ -57,6 +57,7 @@ export function runBattleAction(
   action: BattleAction,
   options: RunBattleActionOptions = {},
 ): BattleActionResult {
+  assertBattleNotTerminal(state)
   const explicitActionId = getActionId(action)
   const metadata = readDebugMetadata(state)
   if (explicitActionId && metadata.appliedActionIds.includes(explicitActionId)) {

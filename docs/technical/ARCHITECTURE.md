@@ -3,7 +3,7 @@
 状态：RED-9 代码核对稿
 
 基线：`594977b`（2026-08-12）
-架构约定更新：2026-08-17（RED-79）
+架构约定更新：2026-08-18（RED-34）
 
 首要公开测试模式：先完成 LAN Windows/Electron；Android 后续按 RED-81 迁移到同一权威状态标准
 
@@ -13,8 +13,8 @@
 
 ## 1. 结论摘要
 
-- Windows LAN 已采用“宿主 Runner 执行命令、保存完整 `server-state`、广播完整 `stateUpdate`”的权威路径，并作为唯一跨端标准。Android 当前 Java + 隐藏 WebView 服务仍保存 action log，让客户端分别回放；这是 RED-81 将完整删除的遗留框架，不再是并行目标架构。Relay 仍由主机客户端负责。
-- 实际玩家战斗界面是 `data/pages/battle.html`，不是 React 页面。真实对战、观战和训练营共用这一个入口；`mode=training` 只切换 fixture 与调试能力，旧 `training.html` 只做兼容跳转。RED-48 起，战场 Three.js 与 HUD DOM 共用 `battle-ui/battle-view-model.js` 的展示模型和 `battle-presentation.js` 的单向输入/意图输出边界；页面仍承担网络、训练 fixture、动作预演、Relay 规则执行和胜负判断等历史职责。
+- Windows LAN 已采用“宿主 Runner 执行命令、CAS 保存完整 `server-state`、广播完整 `stateUpdate`”的权威路径，并作为唯一跨端标准。移动端框架正在重塑，不再把 action log 作为目标架构；RED-34 不修改旧移动端入口。浏览器 Relay host 权威已禁用，Relay 也必须连接同合同的权威服务。
+- 实际玩家战斗界面是 `data/pages/battle.html`，不是 React 页面。真实对战、观战和训练营共用这一个入口；`mode=training` 只切换 fixture 与调试能力，旧 `training.html` 只做兼容跳转。RED-48 起，战场 Three.js 与 HUD DOM 共用 `battle-ui/battle-view-model.js` 的展示模型和 `battle-presentation.js` 的单向输入/意图输出边界；页面仍承担网络、训练 fixture 和动作预演等历史职责；联网结果只展示权威 `terminalResult`。
 - TypeScript 规则核心集中在 `lib/game/turn.ts`、`battle-setup.ts`、`skills.ts` 和 `triggers.ts`，但公共状态类型、随机、日志、存储格式和命令协议没有完全统一。
 - 先稳定 Windows/Electron 发布链；Android 后续仍要支持与 Windows 相同的客户端功能和权威规则语义，但允许用 Java/WebView 适配移动端生命周期、权限、网络和存储。JS/TS 源码保持唯一真实源，Android 资源只能由构建生成。
 - 当前提交被指定为正式故障基线。`BUILD_AND_RUN.md` 为空，且最后一版存在尚未定位的重大运行问题，因此下一项工程工作应先恢复可重复运行基线。
@@ -23,13 +23,13 @@
 
 | 层          | 当前入口                                                            | 当前职责                                  | 已知边界问题                         |
 | ---------- | --------------------------------------------------------------- | ------------------------------------- | ------------------------------ |
-| 表现层        | `data/pages/battle.html`、`data/pages/js/battle-ui/**`、`battle-renderer-3d.js` | 页面控制器、统一展示模型、DOM HUD、Three.js 战场和用户意图 | 页面仍包含网络、Relay 执行和部分胜负判断 |
+| 表现层        | `data/pages/battle.html`、`data/pages/js/battle-ui/**`、`battle-renderer-3d.js` | 页面控制器、统一展示模型、DOM HUD、Three.js 战场和用户意图 | 页面仍包含网络与训练预演；联网终局只展示服务端结果 |
 | Next 服务层   | `app/`、`instrumentation.ts`                                     | HTTP API、状态页、训练/PVE/房间接口、启动 WebSocket | API 与 WS 共享规则，但错误协议不统一         |
 | 游戏规则层      | `lib/game/`                                                     | 状态创建、动作执行、技能、触发器、地图和回放                | 类型重复、模块级缓存和全局触发器               |
 | 房间/持久化层    | `lib/game/room-store.ts`、`lib/game/battle-storage.ts`、`prisma/` | 房间状态序列化、SQLite 存取、旧格式兼容               | 外层存档无正式格式版本和迁移链                |
 | Electron 层 | `electron/`、`electron-client/`、`electron-editor/`               | 进程、窗口、本地服务器和 IPC                      | IPC 是字符串协议，没有共享类型              |
-| Android 层  | `android-client/`、`android/`、`mobile-server/`                   | 当前客户端、Java LAN 服务和隐藏 WebView 日志服务；目标为同一权威 Runner | action-log 权威、客户端回放和多份生成物均待 RED-81/构建任务收敛 |
-| Relay 层    | `relay-server/`                                                 | 房间与消息转发                               | 规则权威在主机客户端，不在 Relay 服务端        |
+| Android 层  | `android-client/`、`android/`、`mobile-server/`                   | 移动端框架重塑中；后续目标为同一权威 Runner | RED-34 不维护旧 action-log 入口，移动端接入另行验收 |
+| Relay 层    | `relay-server/`                                                 | 遗留房间与消息转发                             | host 客户端权威已禁用；旧 standalone Relay 需重建为权威服务后才可用于战斗 |
 
 ## 3. 首要发布链路
 
@@ -50,10 +50,10 @@
 3. `doAction(action)` 发送 `{ type: "action", action }`。
 4. `lib/ws-server.ts` 接收消息并调用 `runBattleAction()`。
 5. `runBattleAction()` 调用 `applyBattleAction()`，返回新状态及 hash。
-6. `RoomStore.setRoom()` 保存房间并广播 `stateUpdate`。
+6. `dispatchRoomBattleAction()` 用 `RoomStore.setRoomIfVersion()` CAS 保存房间，成功后才广播 `stateUpdate`；终局状态与房间 `finished` 在同一次写入中提交。
 7. 客户端 `applyServerState()` 替换本地状态并重新渲染。
 
-HTTP 后备入口为 `app/api/rooms/[roomId]/battle/route.ts::POST`，同样调用 `runBattleAction()` 和 `RoomStore.setRoom()`。
+HTTP 后备入口为 `app/api/rooms/[roomId]/battle/route.ts::POST`，与 WS 共用同一动作归约与 CAS 提交服务。
 
 ### 3.3 Android 开服：当前遗留与迁移目标
 
@@ -73,7 +73,7 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 | --- | --- | --- | --- |
 | Windows 开服 | Next/WS 服务端中的房间状态 | `runBattleAction()` → `applyBattleAction()` | Prisma `Room.battleState` |
 | Android 开服（当前遗留） | `mobile-server-entry.ts` 的 action log | 客户端按 `seq` 调用浏览器 Runner 回放；宿主不裁决完整结果 | WebView 内存日志；RED-81 将删除 |
-| Relay | 主机客户端 | 浏览器 `GameEngine.applyBattleAction()` | Relay 仅保存/转发最新状态 |
+| Relay | 同合同的远端权威房间服务 | 浏览器只发送 action 并消费 `stateUpdate` | 旧 host 权威 Relay 被客户端拒绝，需重建服务后启用 |
 | Training | `battle.html?mode=training` 的客户端内存状态 | 浏览器 `trainingApiFetch()` → `GameEngine.applyBattleAction()` | 仅页面内存 |
 | Android 开服（迁移后目标） | Android 宿主中的完整 `server-state` | 隐藏 WebView 的同一 browser-safe Runner | Android 本地持久化适配器 |
 
@@ -95,7 +95,7 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 
 ## 6. 当前架构风险
 
-1. `battle.html` 的战场/DOM 表现已建立模块边界，但页面控制器仍跨越网络、Relay 规则执行和结果判断层。
+1. `battle.html` 的战场/DOM 表现已建立模块边界，但页面控制器仍跨越网络、训练规则预演和展示层。
 2. Android action-log 与 Windows server-state 会产生版本、丢包、重连回放和客户端分叉风险；RED-81 必须删除旧框架并禁止生产双模式。
 3. `lib/game/turn.ts`、`battle-types.ts`、`training-types.ts` 都定义了相似状态/动作类型。
 4. `globalTriggerSystem`、规则缓存和 RNG 是模块级状态，并发隔离未验证。

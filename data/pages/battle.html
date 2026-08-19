@@ -2132,9 +2132,6 @@
     let wsRole = 'guest'        // 'host' | 'guest' from subscribed message
     let wsMode = 'lan'          // 'lan' | 'relay'
     let relaySeq = 0            // outbound action/stateUpdate sequence
-    let relayAuthorityState = null
-    let relayDeploymentTimer = null
-    let relayInitPromise = null
     let localDeploymentChoiceId = null
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
@@ -2563,7 +2560,7 @@
 
     // ── Surrender ──
     function confirmSurrender() {
-      if (!G || G.gameOver || G.winner) { goBack(); return }
+      if (!G || G.terminalResult) { goBack(); return }
       const overlay = document.getElementById('surrenderConfirmOverlay')
       if (overlay) { overlay.style.display = 'flex'; return }
       // Fallback if overlay not present
@@ -3161,32 +3158,10 @@
       if (typeof gameSeed !== 'number') gameSeed = resolved
       return gameSeed
     }
-    function publicRelayBattleState(state) {
-      if (!state) return state
-      if (typeof GameEngine !== 'undefined' && GameEngine.toPublicBattleState) {
-        return GameEngine.toPublicBattleState(state)
-      }
-      return state
-    }
     function relayBattleAuthError(code, message) {
       var error = new Error(message)
       error.code = code
       return error
-    }
-    function battleAuthHexToBytes(hex) {
-      if (typeof hex !== 'string' || !/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) {
-        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Invalid battle action public key')
-      }
-      var bytes = new Uint8Array(hex.length / 2)
-      for (var i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-      return bytes
-    }
-    async function battleAuthPlayerId(publicKey) {
-      var digest = await crypto.subtle.digest('SHA-256', battleAuthHexToBytes(publicKey))
-      return Array.from(new Uint8Array(digest))
-        .map(function(byte) { return byte.toString(16).padStart(2, '0') })
-        .join('')
-        .slice(0, 8)
     }
     async function createBattleActionAuth(action) {
       if (!window.RvBIdentity) {
@@ -3210,122 +3185,6 @@
         signature: await RvBIdentity.sign(payload),
       }
     }
-    async function verifyRelayBattleActionAuth(msg) {
-      var auth = msg && msg.auth
-      var payload = auth && auth.payload
-      if (!auth || !auth.publicKey || !auth.signature || !payload) {
-        throw relayBattleAuthError('BATTLE_AUTH_REQUIRED', 'Relay action requires a signed player identity')
-      }
-      var signedPlayer = String(payload.playerId || '').trim().toLowerCase()
-      var sender = String(msg.from || '').trim().toLowerCase()
-      var actionPlayer = String((msg.action && msg.action.playerId) || '').trim().toLowerCase()
-      if (
-        payload.type !== 'battle-action'
-        || String(payload.roomId || '').trim().toLowerCase() !== roomId
-        || !signedPlayer
-        || signedPlayer !== sender
-        || signedPlayer !== actionPlayer
-        || JSON.stringify(payload.action) !== JSON.stringify(msg.action)
-      ) {
-        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Signed Relay action does not match its sender or payload')
-      }
-      if (!Number.isSafeInteger(payload.timestamp) || Math.abs(Date.now() - payload.timestamp) > 60000) {
-        throw relayBattleAuthError('BATTLE_AUTH_EXPIRED', 'Signed Relay action identity has expired')
-      }
-      if (await battleAuthPlayerId(auth.publicKey) !== signedPlayer) {
-        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Relay public key does not match the action player')
-      }
-      if (!await RvBIdentity.verify(payload, auth.signature, auth.publicKey)) {
-        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Invalid Relay action signature')
-      }
-    }
-    async function handleRelayPendingAction(msg) {
-      if (wsMode !== 'relay' || wsRole !== 'host' || !G ||
-          typeof GameEngine === 'undefined' || !GameEngine.runBattleAction) return
-      try {
-        await verifyRelayBattleActionAuth(msg)
-        var result = runRelayAuthorityAction(msg.action)
-        publishRelayAuthorityResult(result)
-      } catch (e) {
-        addLog('处理来自 ' + msg.from + ' 的动作失败：' + e.message, 'err')
-        RvBWs.send({
-          type: 'actionError', to: msg.from, from: myPlayerId, action: msg.action,
-          error: e.message || String(e), code: e.code, preparation: e.preparation,
-          needsTargetSelection: e.needsTargetSelection, targetType: e.targetType,
-          range: e.range, filter: e.filter, targetIndex: e.targetIndex,
-          needsOptionSelection: e.needsOptionSelection, title: e.title, options: e.options,
-        })
-      }
-    }
-    function scheduleRelayDeploymentTimeout() {
-      if (relayDeploymentTimer) {
-        clearTimeout(relayDeploymentTimer)
-        relayDeploymentTimer = null
-      }
-      if (wsMode !== 'relay' || wsRole !== 'host' || !relayAuthorityState ||
-          !relayAuthorityState.deployment || relayAuthorityState.deployment.status !== 'awaiting-locks') return
-      const deadlineAt = Number(relayAuthorityState.deployment.deadlineAt || 0)
-      const delay = Math.max(0, deadlineAt - Date.now())
-      relayDeploymentTimer = setTimeout(function() {
-        relayDeploymentTimer = null
-        if (!relayAuthorityState || !relayAuthorityState.deployment ||
-            relayAuthorityState.deployment.status !== 'awaiting-locks') return
-        try {
-          const now = Date.now()
-          if (now < deadlineAt) {
-            scheduleRelayDeploymentTimeout()
-            return
-          }
-          const result = runDeterministicAuthorityAction(relayAuthorityState, {
-            type: 'deploymentTimeout',
-            now: now,
-            clientActionId: 'relay-deployment-timeout-' + roomId + '-' + deadlineAt,
-          })
-          publishRelayAuthorityResult(result)
-        } catch (e) {
-          addLog('部署超时结算失败：' + (e.message || String(e)), 'err')
-        }
-      }, delay)
-    }
-    function publishRelayAuthorityResult(result) {
-      relayAuthorityState = result.state
-      relaySeq++
-      if (typeof GameEngine !== 'undefined' && GameEngine.stampPendingDeploymentAuthorityVersion) {
-        GameEngine.stampPendingDeploymentAuthorityVersion(relayAuthorityState, relaySeq)
-      }
-      const publicState = publicRelayBattleState(relayAuthorityState)
-      applyServerState(publicState, gameSeed)
-      const publicStateHash = typeof GameEngine !== 'undefined' && GameEngine.hashBattleState
-        ? GameEngine.hashBattleState(publicState)
-        : result.stateHash
-      RvBWs.send({
-        type: 'stateUpdate',
-        seq: relaySeq,
-        authorityVersion: relaySeq,
-        state: publicState,
-        seed: gameSeed,
-        stateHash: publicStateHash,
-      })
-      scheduleRelayDeploymentTimeout()
-    }
-    function runRelayAuthorityAction(action) {
-      const state = relayAuthorityState || G
-      const deployment = state && state.deployment
-      const now = Date.now()
-      if (action.type !== 'deploymentTimeout' && deployment &&
-          deployment.status === 'awaiting-locks' && now >= Number(deployment.deadlineAt || 0)) {
-        const timeoutResult = runDeterministicAuthorityAction(state, {
-          type: 'deploymentTimeout',
-          now: now,
-          clientActionId: 'relay-deployment-timeout-' + roomId + '-' + deployment.deadlineAt,
-        })
-        publishRelayAuthorityResult(timeoutResult)
-        const expired = new Error('Deployment deadline elapsed; the authoritative timeout was committed instead.')
-        expired.code = 'DEPLOYMENT_EXPIRED'
-        throw expired
-      }
-      return runDeterministicAuthorityAction(state, action)
-    }
     function runDeterministicAuthorityAction(state, action) {
 
       if (!state || typeof GameEngine === 'undefined' || !GameEngine.runBattleAction) throw new Error('Deterministic authority runner is unavailable')
@@ -3338,13 +3197,11 @@
       resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
-      if (wsMode === 'relay' && wsRole === 'host' && !relayAuthorityState) {
-        relayAuthorityState = state
-      }
+
       const oldG = G
       G = state
       if (!G.deployment || G.deployment.status === 'complete') localDeploymentChoiceId = null
-      if (wsMode === 'relay' && wsRole === 'host') scheduleRelayDeploymentTimeout()
+
       G.skillsById = Object.assign({}, skillsById || {}, G.skillsById || {})
       if (G.extensions && G.extensions.playerAlignments) {
         Object.keys(G.extensions.playerAlignments).forEach(function(playerId) {
@@ -3376,7 +3233,7 @@
       render()
       if (interactionFeedback) setStatusMsg(interactionFeedback)
 
-      if (G.gameOver || G.winner) { handleGameOver(); return }
+      if (G.terminalResult) { handleGameOver(); return }
 
       // Auto-advance start phase (only the current player sends beginPhase)
       if (G.turn && G.turn.phase === 'start') {
@@ -3394,10 +3251,8 @@
       }
       if (!G) return
       if (entry.type === 'gameOver') {
-        G.gameOver = true
-        G.winner = entry.winner || G.winner
         wsActionSeq = entry.seq
-        handleGameOver()
+        addLog('Ignored a client-authored legacy gameOver entry', 'err')
         return
       }
       if (entry.action && typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
@@ -3438,10 +3293,7 @@
       })
 
       RvBWs.on('disconnect', function() {
-        if (relayDeploymentTimer) {
-          clearTimeout(relayDeploymentTimer)
-          relayDeploymentTimer = null
-        }
+
         wsConnected = false
         var el = document.getElementById('wsStatus')
         if (el) el.style.display = 'none'
@@ -3454,9 +3306,9 @@
           wsRole = msg.role || 'guest'
           addLog('[WS] 角色：' + wsRole, 'info')
           try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
-          if (wsMode === 'relay' && wsRole === 'host') initRelayHostBattle()
+
         } else if (msg.type === 'stateUpdate') {
-          if (wsMode === 'relay' && wsRole === 'host' && relayAuthorityState && msg.authorityVersion && msg.authorityVersion <= relaySeq) return
+
           if (_use3d && battlePresentation && G && msg.state) {
             battlePresentation.animateAction(
               msg.lastAction || null,
@@ -3513,100 +3365,15 @@
           render()
           setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
         } else if (msg.type === 'pendingAction') {
-          void handleRelayPendingAction(msg)
+          // Old relay servers delegated authority to the host client. That path is
+          // intentionally disabled: network clients only consume server stateUpdate.
+          addLog('已忽略旧 Relay 客户端权威动作；等待服务端状态', 'err')
         } else if (msg.type === 'hostResume') {
-          if (wsMode === 'relay' && wsRole === 'host' && msg.state) {
-            relayAuthorityState = msg.state
-            relaySeq = Math.max(relaySeq, Number(msg.authorityVersion || 0))
-            if (typeof msg.seed === 'number') gameSeed = msg.seed
-            applyServerState(publicRelayBattleState(relayAuthorityState), msg.seed || null)
-            scheduleRelayDeploymentTimeout()
-          }
-        } else if (msg.type === 'gameOver') {
-          if (G && !G.gameOver) { G.gameOver = true; G.winner = msg.winner; handleGameOver() }
+          addLog('已忽略非权威 Relay 恢复状态；等待服务端快照', 'err')
         }
       })
 
       RvBWs.connect(roomId, myPlayerId, wsMode)
-    }
-
-    // Relay host: create initial battle state via local engine, push to relay
-    function postLocalRelayInitialization(payload) {
-      var options = {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
-        timeoutMs: 8000,
-      }
-      if (window.RvBBridge && typeof window.RvBBridge.requestMobileServer === 'function' &&
-          window.RvBUtils && RvBUtils.mobileServerFetch) {
-        return RvBUtils.mobileServerFetch('/api/relay-battle-init', options)
-      }
-      var localBase = window.RvBUtils && RvBUtils.getServerUrlForMode
-        ? String(RvBUtils.getServerUrlForMode('local') || '').replace(/\/+$/, '')
-        : ''
-      if (!localBase && /^https?:$/.test(window.location.protocol)) localBase = window.location.origin
-      if (!localBase) throw new Error('Local authority server is unavailable for Relay initialization')
-      return withTimeout(fetch(localBase + '/api/relay-battle-init', options), 8000, 'relay-battle-init')
-    }
-    function initRelayHostBattle() {
-      if (relayAuthorityState) return Promise.resolve()
-      if (relayInitPromise) return relayInitPromise
-      relayInitPromise = (async function() {
-        try {
-          addLog('正在通过本机权威引擎初始化 Relay 对战', 'info')
-          var roomResponse = await RvBUtils.serverFetch('/api/rooms/' + encodeURIComponent(roomId), {
-            method: 'GET',
-            timeoutMs: 8000,
-          })
-          if (!roomResponse.ok) throw new Error('Relay room HTTP ' + roomResponse.status)
-          var relayRoom = await roomResponse.json()
-          var players = (relayRoom.players || []).slice(0, 2).map(function(player, index) {
-            var selected = player.pieces || player.selectedPieces || []
-            return {
-              id: player.id,
-              faction: player.faction === 'blue' ? 'blue' : (player.faction === 'red' ? 'red' : (index === 0 ? 'red' : 'blue')),
-              pieces: selected.map(function(piece) {
-                return { templateId: typeof piece === 'string' ? piece : piece.templateId }
-              }).filter(function(piece) { return !!piece.templateId }),
-            }
-          })
-          var initResponse = await postLocalRelayInitialization({ players: players })
-          if (!initResponse.ok) {
-            var initError = await initResponse.text().catch(function() { return '' })
-            throw new Error('Local Relay initialization HTTP ' + initResponse.status + ' ' + initError)
-          }
-          var initialized = await initResponse.json()
-          if (!initialized || !initialized.state) throw new Error('Local authority returned no battle state')
-          if (relayAuthorityState) return
-
-          relayAuthorityState = initialized.state
-          gameSeed = initialized.seed
-          relaySeq = Number(initialized.authorityVersion || 1)
-          if (typeof GameEngine !== 'undefined' && GameEngine.stampPendingDeploymentAuthorityVersion) {
-            GameEngine.stampPendingDeploymentAuthorityVersion(relayAuthorityState, relaySeq)
-          }
-          var publicState = publicRelayBattleState(relayAuthorityState)
-          var publicStateHash = typeof GameEngine !== 'undefined' && GameEngine.hashBattleState
-            ? GameEngine.hashBattleState(publicState)
-            : initialized.stateHash
-          applyServerState(publicState, gameSeed)
-          RvBWs.send({
-            type: 'stateUpdate',
-            seq: relaySeq,
-            authorityVersion: relaySeq,
-            state: publicState,
-            seed: gameSeed,
-            stateHash: publicStateHash,
-          })
-          scheduleRelayDeploymentTimeout()
-        } catch (e) {
-          addLog('初始化出错：' + e.message, 'err')
-        } finally {
-          relayInitPromise = null
-        }
-      })()
-      return relayInitPromise
     }
 
     // Initialize a real battle: connect WS (server will push initial stateUpdate on subscribe).
@@ -3895,7 +3662,6 @@
     let _pendingChoiceShown = null  // track which pendingOptionSelection we've shown
     function render() {
       if (!G) return
-      checkClientGameOver()
       renderBoard()
       renderPanels()
       renderActionBar()
@@ -4929,7 +4695,7 @@
         const interactionFeedback = reconcileBattleInteractionState(oldG, G)
         if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
         restoreSelectedPieceMenu()
-        render(); checkClientGameOver()
+        render(); if (G.terminalResult) handleGameOver()
         if (interactionFeedback) setStatusMsg(interactionFeedback)
       } catch (e) {
         let rejectionFeedback = ''
@@ -4980,8 +4746,8 @@
         setMoveButtonDisabled(true)
         if (action.type === 'endTurn') addLog('正在结束回合...', 'info')
 
-        // Relay guest: submit action via WS, wait for stateUpdate.
-        if (wsMode === 'relay' && wsRole === 'guest') {
+        // Relay clients submit commands to the server and only consume stateUpdate.
+        if (wsMode === 'relay') {
           relaySeq++
           var relayActionAuth = await createBattleActionAuth(action)
           RvBWs.send({ type: 'action', seq: relaySeq, action, auth: relayActionAuth, prevStateHash: '' })
@@ -4992,29 +4758,6 @@
           return
         }
 
-        // Relay host: apply locally + push stateUpdate.
-        if (wsMode === 'relay' && wsRole === 'host' && G &&
-            typeof GameEngine !== 'undefined' && GameEngine.runBattleAction) {
-          try {
-            const result = runRelayAuthorityAction(action)
-            const newG = result.state
-            if (action.pieceId && newG.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
-              selectedPieceId = action.pieceId
-            } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-            pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
-            publishRelayAuthorityResult(result)
-          } catch (e) {
-            if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
-              const errMsg = e.message || String(e)
-              red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
-              clearTargetInteraction('server-rejected')
-              addLog('本地处理失败：' + errMsg, 'err')
-              render()
-              setStatusMsg('操作被拒绝：' + errMsg + '；目标选择已清除')
-            }
-          }
-          return
-        }
 
         // LAN WS: submit action via WS only.
         if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
@@ -5059,25 +4802,10 @@
       return 'info'
     }
 
-    function checkClientGameOver() {
-      if (!G || G.gameOver || G.winner) return
-      const livingOwners = new Set(G.pieces.filter(p => p.currentHp > 0).map(p => p.ownerPlayerId))
-      const playerIds = (G.players || []).map(p => p.playerId).filter(Boolean)
-      const defeated = playerIds.filter(playerId => !livingOwners.has(playerId))
-      if (defeated.length === 1 && playerIds.length === 2) {
-        G.winner = playerIds.find(playerId => playerId !== defeated[0])
-        G.gameOver = true
-        handleGameOver()
-      }
-    }
-
     function handleGameOver() {
+      if (!G || !G.terminalResult) return
+      const terminalResult = G.terminalResult
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-      // Notify the WS server about gameOver before disconnecting so it can record the game.
-      if (!TRAINING_MODE && !SPECTATE_MODE && G && (G.winner || G.gameOver) &&
-          typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
-        try { RvBWs.send({ type: 'gameOver', playerId: myPlayerId, winner: G.winner || 'draw' }) } catch {}
-      }
       if (typeof RvBWs !== 'undefined') RvBWs.disconnect()
       try { localStorage.removeItem('rvb_active_battle') } catch {}
       if (recordSaved) return
@@ -5087,9 +4815,9 @@
       try {
         const identity = (typeof RvBIdentity !== 'undefined') ? RvBIdentity.getIdentity() : null
         if (identity && G) {
-          const winner = G.winner
+          const winner = terminalResult.winnerPlayerId
           const myResult = winner
-            ? (winner === myFaction || winner === myPlayerId ? 'win' : 'loss')
+            ? (String(winner).toLowerCase() === String(myPlayerId).toLowerCase() ? 'win' : 'loss')
             : 'draw'
           const oppPlayer = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() !== myPlayerId)
           const record = {
@@ -5108,20 +4836,25 @@
           localStorage.setItem('rvb_battle_records', JSON.stringify(records))
         }
       } catch {}
-      // gameOver notification is sent before disconnect.
       }
-      const winner = G.winner
-      const iWon = winner && (
-        winner.toLowerCase() === myFaction ||
-        winner.toLowerCase() === myPlayerId
-      )
+      const winner = terminalResult.winnerPlayerId
+      const iWon = winner && String(winner).toLowerCase() === String(myPlayerId).toLowerCase()
       const isDraw = !winner
       const winnerLabel = winner
         ? (playerNames[String(winner).toLowerCase()] || winner)
         : ''
       document.getElementById('resultIcon').textContent = isDraw ? '=' : (iWon ? 'WIN' : 'LOSE')
       document.getElementById('resultTitle').textContent = isDraw ? '平局' : (iWon ? '胜利' : '失败')
-      document.getElementById('resultSub').textContent = (winnerLabel ? winnerLabel + ' 获胜 - ' : '') + '第 ' + (G.turn ? G.turn.turnNumber : '?') + ' 回合结束'
+      const terminalReasonLabels = {
+        'core-eliminated': '核心棋子全灭',
+        'mutual-core-elimination': '双方核心棋子同时全灭',
+        'round-limit': '40 轮平局',
+        'surrender': '投降',
+        'timeout-surrender': '超时投降',
+      }
+      const settledRound = terminalResult.settledAt && terminalResult.settledAt.completedRound
+      const reasonLabel = terminalReasonLabels[terminalResult.reason] || terminalResult.reason
+      document.getElementById('resultSub').textContent = (winnerLabel ? winnerLabel + ' 获胜 · ' : '') + reasonLabel + ' · 已完成 ' + (settledRound ?? '?') + ' 轮'
       if (TRAINING_MODE) {
         // Replace the lobby button with restart in training mode.
         const overlay = document.getElementById('resultOverlay')
@@ -5226,7 +4959,7 @@
       }
     }
     function confirmLeave() {
-      if (TRAINING_MODE || !G || G.gameOver || G.winner) { goBack(); return }
+      if (TRAINING_MODE || !G || G.terminalResult) { goBack(); return }
       goBack()
     }
 

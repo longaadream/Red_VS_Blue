@@ -147,29 +147,17 @@ Demo 房间对局在回合阶段前增加部署门禁：
 
 ## 7. 胜负状态
 
-当前核心 `BattleState` 没有确认到统一的 `GameResult` 归约入口。
+`BattleState.terminalResult` 是唯一权威终局字段，由 `lib/game/terminal.ts::finalizeBattleTerminal()` 在公共动作归约出口提交。结果包含 winner/loser playerId、稳定 reason，以及 action index、turn、phase、completed round 的结算位置。
 
-`data/pages/battle.html::checkClientGameOver()` 会统计红蓝存活单位并设置客户端全局 `G.winner`、`G.gameOver`；`handleGameOver()` 负责后续显示或记录。`surrender` 则通过令己方棋子失效/归零，间接触发客户端判断。
+普通动作必须先完成整条伤害、死亡、复活、触发与 batch；仍有 `pendingOptionSelection` / `pendingTargetSelection` 时不判终局。核心身份来自开局 `isCore: true`，召唤入口强制为 false，敌我按 `ownerPlayerId` 而不是内容阵营判断。核心全灭优先于第 40 个完整轮次平局。
 
-结论：胜负规则至少部分位于 UI。目标是由每局权威服务端根据该服务器绑定的规则包计算并签署结果，Windows/Android 客户端只显示结果。同一服务器规则版本内必须一致，但不同服务器可以采用不同胜负规则。
-
-去中心化账号系统不阻止在单个服务器规则版本内使用统一胜负入口。建议规则包提供类似纯接口：
-
-```ts
-type GameResult =
-  | { status: 'ongoing' }
-  | { status: 'finished'; winner: 'red' | 'blue' | null; reason: string };
-
-function evaluateGameResult(state: BattleState): GameResult;
-```
-
-这只是愿景，RED-9 不实现该接口。
+`surrender` 不再把己方棋子生命归零或触发 whenever，而是直接提交终局；`reason: "timeout"` 为 RED-36 预留相同权威入口。终局后 `applyBattleAction()` 与 `runBattleAction()` 都以 `BATTLE_ALREADY_TERMINAL` 拒绝命令。HTTP/WS 禁止客户端写 winner/gameOver，并通过 `Room.version` CAS 保证竞争中只提交一次；浏览器只渲染 `terminalResult`。
 
 ## 8. 随机和确定性
 
 `lib/game/rule-runtime.ts` 定义根种子、稳定命名流、确定性规则时钟和实例 ID。命名流当前至少包括 `deployment`、`deployment-reroll`、`turn-order` 与 `skill/effect`；实例 ID 使用独立的 `instance-id/<namespace>` 流。流 seed 和 Mulberry32/cursor 算法由 [ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md) 冻结。
 
-WebSocket、房间开战、Battle API、Android mobile server 与 Relay 初始化等权威入口必须先生成根种子，再初始化状态，并在每次 `runBattleAction(..., { rootSeed })` 时沿用同一 seed。桌面与 Android Relay 初始化都固定 Demo 地图并返回 `{ state, seed, stateHash, authorityVersion: 1 }`；Relay host 从远端房间取阵容后调用本机入口，后续只使用 browser bundle 的确定性 runner，缺失 seed 或版本时拒绝执行。初始化的随机消耗记录为 `system-initialize` trace；动作 runner 从 trace 恢复 seed/cursor。`replayBattle()` 返回逐动作 `stateHashes`。
+WebSocket、房间开战与 Battle API 等权威入口必须先生成根种子，再初始化状态，并在每次 `runBattleAction(..., { rootSeed })` 时沿用同一 seed。联网 Relay 浏览器不承担规则权威，只提交已认证的玩家命令并消费服务端 `{ state, seed, stateHash, authorityVersion }` 快照；移动端正在重塑框架，本任务不把旧 action-log 作为权威或兼容路径。初始化的随机消耗记录为 `system-initialize` trace；动作 runner 从 trace 恢复 seed/cursor。`replayBattle()` 返回逐动作 `stateHashes`。
 
 Action Trace 的稳定 JSON 与 SHA-256 位于 browser-safe 的 `lib/game/battle-trace.ts`，不依赖 Node `crypto`。数据驱动技能、规则和 pending target 脚本在执行边界获得确定性的 `Math.random()` 与 `Date.now()`；规则定义缓存始终返回独立且规范化的 limits，避免 cache miss/hit 改变状态 hash。没有 runtime 的训练与非权威预检路径仍可经 `lib/game/rng.ts` 旧适配器运行，便于按模块回退。
 

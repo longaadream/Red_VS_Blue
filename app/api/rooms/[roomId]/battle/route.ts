@@ -6,6 +6,7 @@ import {
   dispatchRoomBattleAction,
 } from "@/lib/game/room-battle-actions"
 import { verifyBattleActionAuth } from "@/lib/game/identity-verify"
+import { getClientTerminalSubmissionError } from "@/lib/server/battle-terminal"
 
 // ── GET — return current authoritative battle state ──────────────────────────
 
@@ -37,28 +38,20 @@ export async function POST(
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
 
-  let body: { type?: string; playerId?: string; viewerPlayerId?: string; action?: unknown; auth?: unknown; winner?: string } = {}
+  let body: {
+    type?: string
+    playerId?: string
+    viewerPlayerId?: string
+    action?: unknown
+    auth?: unknown
+    winner?: unknown
+    terminalResult?: unknown
+  } = {}
   try { body = await req.json() } catch {}
 
-  const room = await roomStore.getRoom(roomId)
-  if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
-
-  // ── gameOver: mark room finished, broadcast ──
-  if (body.type === 'gameOver') {
-    if (!room.gameRecord) {
-      room.status = 'finished'
-      room.gameRecord = {
-        gameId: roomId + '-' + Date.now(),
-        timestamp: Date.now(),
-        roomId,
-        players: room.players.map((p: any) => ({ id: p.id, name: p.name, publicKey: p.publicKey })),
-        winner: body.winner ?? null,
-        signatures: {},
-      }
-      await roomStore.setRoom(roomId, room)
-    }
-    broadcastToRoom(roomId, { type: 'gameOver', winner: body.winner })
-    return NextResponse.json({ ok: true })
+  const terminalSubmissionError = getClientTerminalSubmissionError(body)
+  if (terminalSubmissionError) {
+    return NextResponse.json({ error: terminalSubmissionError.message, code: terminalSubmissionError.code }, { status: 400 })
   }
 
   // ── regular battle action: apply on server ──
@@ -123,6 +116,8 @@ export async function POST(
     }
     const status = errAny?.code === 'VIEWER_FORBIDDEN' || errAny?.code === 'ACTION_PLAYER_MISMATCH'
       ? 403
+      : errAny?.code === 'ROOM_VERSION_CONFLICT'
+      ? 409
       : 400
     return NextResponse.json({
       error: msg,

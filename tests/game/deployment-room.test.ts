@@ -129,6 +129,34 @@ describe('RED-31 authoritative deployment room actions', () => {
     expect(state.extensions.debugBattle.actionLog.every((entry: any) => !entry.deployment || Number.isSafeInteger(entry.deployment.authorityVersion))).toBe(true)
   })
 
+  it('atomically commits surrender during deployment and rejects every later command', async () => {
+    const store = new MemoryRoomStore(makeDeploymentRoom('terminal-room'))
+
+    const result = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
+      type: 'surrender',
+      playerId: PLAYERS[0],
+      reason: 'voluntary',
+    }, { clock: { now: () => 2_000 } })
+
+    expect(result.kind).toBe('applied')
+    expect(result.snapshot.state.terminalResult).toMatchObject({
+      status: 'finished',
+      winnerPlayerId: PLAYERS[1],
+      loserPlayerId: PLAYERS[0],
+      reason: 'surrender',
+    })
+    expect(store.room).toMatchObject({ status: 'finished', version: 2 })
+    expect(store.writes).toBe(1)
+
+    await expect(dispatchRoomBattleAction(store, store.room.id, PLAYERS[1], {
+      type: 'deploymentLock',
+      playerId: PLAYERS[1],
+      clientActionId: 'late-blue-lock',
+    })).rejects.toMatchObject({ code: 'BATTLE_ALREADY_TERMINAL' })
+    expect(store.room).toMatchObject({ status: 'finished', version: 2 })
+    expect(store.writes).toBe(1)
+  })
+
   it('rejects forged, non-participant, and client-authored timeout identities without a write', async () => {
     const store = new MemoryRoomStore(makeDeploymentRoom())
     const before = clone(store.room)

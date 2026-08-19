@@ -564,8 +564,8 @@ describe('targeting consumers and performance contract', () => {
     expect(route).toContain('preparation: errAny.preparation')
     expect(coordinator).toContain('assertActionPlayer(viewerPlayerId, action)')
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
-    expect(html).toContain('await verifyRelayBattleActionAuth(msg)')
-    expect(html).toContain("signedPlayer !== actionPlayer")
+    expect(html).toContain('已忽略旧 Relay 客户端权威动作')
+    expect(html).not.toContain('runRelayAuthorityAction(action)')
 
     for (const path of [
       'data/pages/js/skill-targeting.js',

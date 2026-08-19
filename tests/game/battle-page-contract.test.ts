@@ -77,6 +77,22 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('renders the authoritative terminal result without judging or submitting gameOver locally', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('G.terminalResult')
+    expect(battlePage).toContain('winnerPlayerId')
+    expect(battlePage).not.toContain('function checkClientGameOver')
+    expect(battlePage).not.toMatch(/\bG\.(?:gameOver|winner)\b/)
+    expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]gameOver['"]/)
+    expect(battlePage).not.toMatch(/msg\.type\s*===\s*['"]gameOver['"]/)
+    expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]stateUpdate['"]/)
+    expect(battlePage).not.toMatch(/wsMode === ['"]relay['"] && wsRole === ['"]host['"] && G/)
+    expect(battlePage).toContain("if (wsMode === 'relay')")
+    expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
+    expect(battlePage).toContain('已忽略非权威 Relay 恢复状态')
+  })
+
   it('keeps one responsive HUD, board-anchored piece menu, and unsectioned curved hand', () => {
     const battlePage = readPage('battle.html')
     const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')
@@ -554,13 +570,13 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('id="deploymentStatus"')
     expect(battlePage).toContain('RvBDeploymentStatus.create')
     expect(battlePage).not.toContain('点击“确认部署”后不可更改')
-    expect(battlePage).toContain('function publicRelayBattleState(state)')
-    expect(battlePage).toContain('GameEngine.toPublicBattleState(state)')
-    expect(battlePage).toContain('const publicState = publicRelayBattleState(relayAuthorityState)')
-    expect(battlePage).toContain('authorityVersion: relaySeq')
-    expect(battlePage).toContain("type: 'deploymentTimeout'")
-    expect(battlePage).toContain("clientActionId: 'relay-deployment-timeout-'")
-    expect(battlePage).not.toContain("RvBWs.send({ type: 'stateUpdate', seq: relaySeq, state: newG")
+    expect(battlePage).toContain('var relayActionAuth = await createBattleActionAuth(action)')
+    expect(battlePage).toContain("RvBWs.send({ type: 'action', seq: relaySeq, action, auth: relayActionAuth")
+    expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
+    expect(battlePage).not.toContain('relayAuthorityState')
+    expect(battlePage).not.toContain('runRelayAuthorityAction')
+    expect(battlePage).not.toContain('publishRelayAuthorityResult')
+    expect(battlePage).not.toContain("RvBWs.send({ type: 'stateUpdate'")
     expect(browserEngine).toContain('toPublicBattleState')
   })
 })
