@@ -381,7 +381,7 @@ describe('battle page route contract', () => {
     expect(logs.at(-1)).toContain('目标动作缺少有效类型')
   })
 
-  it('submits deployment and targeted actions without executing a local authority preview', async () => {
+  it('submits LAN and Relay actions without executing a local authority preview', async () => {
     const battlePage = readPage('battle.html')
     const sentMessages: unknown[] = []
     const context = createContext({
@@ -401,6 +401,7 @@ describe('battle page route contract', () => {
       wsMode: 'lan',
       wsRole: 'guest',
       wsConnected: true,
+      relaySeq: 0,
       RvBWs: {
         isConnected: () => true,
         send: (message: unknown) => sentMessages.push(message),
@@ -424,6 +425,10 @@ describe('battle page route contract', () => {
 
     await new Script("doAction({ type: 'deploymentLock', playerId: 'player-red' })").runInContext(context)
     await new Script("doAction({ type: 'useBasicSkill', playerId: 'player-red', pieceId: 'caster', skillId: 'shot' })").runInContext(context)
+    await new Script("doAction({ type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 })").runInContext(context)
+    context.wsMode = 'relay'
+    context.wsRole = 'guest'
+    await new Script("doAction({ type: 'playCard', playerId: 'player-red', cardInstanceId: 'choice-card' })").runInContext(context)
 
     expect(JSON.parse(JSON.stringify(sentMessages))).toEqual([
       {
@@ -437,6 +442,19 @@ describe('battle page route contract', () => {
         action: { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'caster', skillId: 'shot' },
         auth: { signature: 'signed' },
         playerId: 'player-red',
+      },
+      {
+        type: 'action',
+        action: { type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 },
+        auth: { signature: 'signed' },
+        playerId: 'player-red',
+      },
+      {
+        type: 'action',
+        seq: 1,
+        action: { type: 'playCard', playerId: 'player-red', cardInstanceId: 'choice-card' },
+        auth: { signature: 'signed' },
+        prevStateHash: '',
       },
     ])
   })
