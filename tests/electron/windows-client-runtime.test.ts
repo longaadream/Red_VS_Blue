@@ -1,7 +1,9 @@
 import fs from 'node:fs'
+import net from 'node:net'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { resolveDevelopmentProfile } from '../../electron-client/development-profile'
+import { findFreePort } from '../../electron-client/local-port'
 
 const root = path.resolve(__dirname, '..', '..')
 
@@ -10,6 +12,27 @@ function read(relativePath: string): string {
 }
 
 describe('Windows Electron client runtime', () => {
+  test('selects another loopback port when the preferred port is already occupied publicly', async () => {
+    const occupied = net.createServer()
+    await new Promise<void>((resolve, reject) => {
+      occupied.once('error', reject)
+      occupied.listen(0, '0.0.0.0', resolve)
+    })
+
+    const address = occupied.address()
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected an occupied TCP port.')
+    }
+
+    try {
+      expect(await findFreePort(address.port)).not.toBe(address.port)
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        occupied.close((error) => error ? reject(error) : resolve())
+      })
+    }
+  })
+
   test('registers the game protocol as a secure standard origin', () => {
     const source = read('electron-client/main.ts')
 

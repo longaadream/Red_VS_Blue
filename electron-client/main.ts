@@ -4,12 +4,12 @@ import * as path from 'path'
 import * as fs from 'fs'
 import * as zlib from 'zlib'
 import * as os from 'os'
-import * as nodeNet from 'net'
 import * as dgram from 'dgram'
 import * as http from 'http'
 import { pathToFileURL } from 'url'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { resolveDevelopmentProfile } from './development-profile'
+import { findFreePort } from './local-port'
 import { resolveClientProtocolFile } from './client-protocol-resource'
 import {
   RESOURCE_PACK_LIMITS,
@@ -47,17 +47,6 @@ if (developmentProfile) {
   app.setPath('userData', developmentProfile.userDataPath)
   app.setPath('sessionData', developmentProfile.userDataPath)
   console.info(`[client] Development profile "${developmentProfile.name}" uses isolated userData: ${developmentProfile.userDataPath}`)
-}
-
-function findFreePort(start: number): Promise<number> {
-  return new Promise((resolve) => {
-    const srv = nodeNet.createServer()
-    srv.listen(start, '127.0.0.1', () => {
-      const port = (srv.address() as nodeNet.AddressInfo).port
-      srv.close(() => resolve(port))
-    })
-    srv.on('error', () => resolve(findFreePort(start + 1)))
-  })
 }
 
 // ─── 路径工具 ─────────────────────────────────────────────────────────────────
@@ -357,6 +346,7 @@ async function startLocalServer(): Promise<void> {
     env: {
       ...process.env,
       PORT: String(actualLocalPort),
+      HOSTNAME: '127.0.0.1',
       NODE_ENV: 'production',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
