@@ -58,8 +58,8 @@ flowchart LR
   Store -->|持久化后广播 stateUpdate| Transport
   Transport --> UI
 
-  UI -.->|候选展示 / 本地 trace| Domain
-  UI -.->|action + trace| Android
+  Transport -.->|actionError + preparation| UI
+  UI -.->|action| Android
   Android -.->|actionLog| UI
   UI -.->|确定性回放| Runner
   Relay -.->|主机本地执行| Runner
@@ -321,10 +321,11 @@ RED-82 的目标流程：
 ### 4.6 浏览器与 Android
 
 - **浏览器出口：** `lib/game/engine-browser-entry.ts` 暴露归约器、Runner、hash、普通移动和旧 RNG 适配器；`data/pages/js/game-engine.js` 是构建产物。
-- **战斗页：** `battle.html::doAction()` 生成 clientActionId，先在克隆状态上调用确定性 Runner 取得 trace/preparation，再按 LAN、Relay 或 action-log 模式提交。
-- **LAN：** 浏览器本地运行只用于交互准备和诊断；共享结果以服务端 `stateUpdate` 为准。
-- **Relay：** 主机浏览器本地执行 Runner 并发送完整状态；客机等待主机状态。
-- **Android：** `mobile-server-entry.ts::handleBattleAction()` 只追加动作与 trace。trace 格式、seed 或前置 hash 不匹配时写 `traceValidationError`，当前不会拒绝动作。
+- **战斗页：** 在线 `battle.html::doAction()` 只生成 `clientActionId`、签名并立即提交动作；不在发送前克隆战局、执行 Runner 或生成客户端 trace。
+- **LAN：** 浏览器提交命令并消费权威 `stateUpdate`；需要目标或选项时，由服务端以 `actionError + preparation` 返回候选和选择凭证。
+- **Relay：** guest 立即把命令交给 Relay host；host 浏览器只执行一次真实权威 Runner，成功广播完整状态，失败经 Relay 定向返回 `actionError + preparation`。
+- **Training：** `trainingDoAction()` 保留独立训练入口，不属于多人在线传输合同。
+- **Android：** `mobile-server-entry.ts::handleBattleAction()` 仍追加动作与可选 trace；在线战斗页不再生成 trace。旧 trace 的格式、seed 或前置 hash 不匹配时写 `traceValidationError`，当前不会拒绝动作。
 - **Android 回放：** `battle.html::applyLegacyBattleEntry()` 按 `seq` 调用浏览器 Runner；缺 root seed 或 Runner 时失败关闭。
 - **存储：** Android 房间只在 WebView 内存 `Map`，没有 Prisma 或正式离线恢复协议。
 - **迁移合同：** 上述 Android action-log 路径全部是 RED-81 的删除对象；迁移完成后浏览器只消费宿主计算并保存的完整权威状态，不保留客户端日志回放降级。
@@ -376,26 +377,26 @@ flowchart TD
 sequenceDiagram
   actor Player as 玩家
   participant UI as battle.html
-  participant Browser as Browser Runner
   participant WS as ws-server.ts
   participant Store as RoomStore
   participant Runner as battle-runner.ts
   participant Reducer as turn.ts
 
   Player->>UI: 点击移动、技能、卡牌或结束回合
-  UI->>UI: 添加 clientActionId
-  UI->>Browser: 在克隆状态执行动作，取得 trace/preparation
+  UI->>UI: 添加 clientActionId 并签名
+  UI->>WS: action + playerId + auth
+  WS->>Store: getRoom + getBattleStorage
+  Store-->>WS: state + root seed
+  WS->>WS: 校验连接身份与 action actor
+  WS->>Runner: runBattleAction(state, action, rootSeed)
+  Runner->>Runner: 恢复 cursor，创建 RuleRuntime，计算 pre-hash
+  Runner->>Reducer: 在 runtime 内 applyBattleAction
   alt 需要目标或选项
-    Browser-->>UI: TargetingRuleError + preparation
+    Reducer-->>Runner: TargetingRuleError + preparation
+    Runner-->>WS: 权威错误，不提交状态/trace/cursor
+    WS-->>UI: actionError + preparation
     UI-->>Player: 展示精确候选并补 selectionId/revision
-  else 本地准备完成
-    UI->>WS: action + playerId + trace
-    WS->>Store: getRoom + getBattleStorage
-    Store-->>WS: state + root seed
-    WS->>WS: assertActionPlayer
-    WS->>Runner: runBattleAction(state, action, rootSeed)
-    Runner->>Runner: 恢复 cursor，创建 RuleRuntime，计算 pre-hash
-    Runner->>Reducer: 在 runtime 内 applyBattleAction
+  else 动作就绪
     Reducer-->>Runner: next state
     Runner->>Runner: post-hash + Action Trace
     Runner-->>WS: state/hash/trace
@@ -408,9 +409,9 @@ sequenceDiagram
 
 权威边界：
 
-- Windows 服务端不信任浏览器本地得到的下一状态，仍会从已保存状态重新执行动作。
-- 浏览器随消息携带的 trace 当前主要用于跨端诊断；Windows WS/HTTP 会自行计算权威 trace。
-- 保存成功后的 `stateUpdate` 是共享状态。规则失败时 WS 只向发送者回 `actionError`，不会保存或广播失败状态。
+- Windows 客户端只提交命令，不计算或上传下一状态；服务端从已保存状态执行唯一一次权威动作。
+- 浏览器不再生成或上传预演 trace；Windows WS/HTTP 的权威 Runner 自行生成并保存 Action Trace。
+- 保存成功后的 `stateUpdate` 是共享状态。规则失败时 WS 只向发送者回 `actionError + preparation`，不会保存或广播失败状态。
 - 当前常规动作写入没有使用 `setRoomIfVersion()`，所以并发请求仍是已知风险。
 
 ### 5.3 技能、卡牌与触发器结算
@@ -478,14 +479,13 @@ sequenceDiagram
 
 Android 内嵌服务与 Windows 完整状态协议不同：
 
-1. 浏览器在当前状态和 root seed 上调用 `runBattleAction()`，得到动作 trace。
-2. 客户端提交 `action + trace`；Java `MobileHttpServer` 把请求转给隐藏 WebView 的 `mobile-server-entry.ts`。
-3. `handleBattleAction()` 校验房间和鉴权，检查 trace 格式、seed 及前置 hash 链。
-4. 失败诊断写入 `traceValidationError`，但当前仍把动作追加为下一个 `seq`，以免没有重试协议的客户端被冻结。
-5. 服务广播 `actionLog`；各客户端按序调用浏览器 Runner 重放，并核对本地 seed/trace。
-6. 新订阅者收到 `battleSnapshot { actions, total, seed }` 后从 init 条目开始重放。
+1. 客户端立即提交 `action`；Java `MobileHttpServer` 把请求转给隐藏 WebView 的 `mobile-server-entry.ts`。
+2. `handleBattleAction()` 校验房间和鉴权；若旧客户端仍携带 trace，则检查其格式、seed 及前置 hash 链。
+3. trace 失败诊断写入 `traceValidationError`，但当前仍把动作追加为下一个 `seq`，以免没有重试协议的客户端被冻结。
+4. 服务广播 `actionLog`；各客户端按序调用浏览器 Runner 重放并核对本地 seed；新在线客户端不再提供预演 trace。
+5. 新订阅者收到 `battleSnapshot { actions, total, seed }` 后从 init 条目开始重放。
 
-> **只用于解释待删除代码：** Android 服务没有从自己的权威状态重跑常规动作；它权威记录“发生了哪些日志条目”，客户端各自计算状态。因此 trace 诊断为空是验收证据，但还不是服务端权威裁决。RED-81 完成后，本节应替换成与 5.2 同语义的 Android 权威状态流程。
+> **只用于解释待删除代码：** Android 服务没有从自己的权威状态重跑常规动作；它权威记录“发生了哪些日志条目”，客户端各自计算状态。旧 trace 诊断是可选证据，并非服务端权威裁决。RED-81 完成后，本节应替换成与 5.2 同语义的 Android 权威状态流程。
 
 ## 6. 回合、选择与胜负
 

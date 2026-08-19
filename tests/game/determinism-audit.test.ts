@@ -114,6 +114,11 @@ describe('authority determinism audit', () => {
 
     const browserEntry = read(CROSS_PLATFORM_AUTHORITY_FILES.browserEntry)
     expect(browserEntry).toContain('getBattleRootSeed, hashBattleState, runBattleAction')
+
+    const gameLogicDoc = read('docs/technical/GAME_LOGIC_SYSTEM.md')
+    expect(gameLogicDoc).toContain('不在发送前克隆战局、执行 Runner 或生成客户端 trace')
+    expect(gameLogicDoc).toContain('actionError + preparation')
+    expect(gameLogicDoc).not.toContain('UI->>Browser: 在克隆状态执行动作')
   })
 
   it('keeps browser candidate builds on explicit platform shims', () => {
