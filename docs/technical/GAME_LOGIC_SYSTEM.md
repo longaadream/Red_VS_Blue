@@ -578,7 +578,7 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 - Android 安装包内生成 bundle 的来源/hash，以及完整开服—保存—重连端到端验证；不再验收 action-log 回放。
 - 动态代码统一缓存的命中、精准失效、编译失败关闭、Node/browser 一致性和候选枚举性能基线。
 - 多房间共享 `globalTriggerSystem` 的压力与隔离测试。
-- 事件审计仍记录 `beforeAttack` 等声明/生产者和部分数据脚本问题；以 [`COMBAT_EVENT_PIPELINE_AUDIT.md`](./COMBAT_EVENT_PIPELINE_AUDIT.md) 为准。
+- RED-77 已清理无定义的 `beforeAttack` 遗留消费者，事件目录审计当前没有未声明、仅消费或无生产者事件；以 [`COMBAT_EVENT_PIPELINE_AUDIT.md`](./COMBAT_EVENT_PIPELINE_AUDIT.md) 为准。
 
 ## 9. 源码与决策索引
 

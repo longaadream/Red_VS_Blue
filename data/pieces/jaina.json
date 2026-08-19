@@ -27,8 +27,7 @@
   ],
   "rules": [
     "rule-freeze-prevent-move",
-    "rule-freeze-prevent-skill",
-    "rule-freeze-prevent-attack"
+    "rule-freeze-prevent-skill"
   ],
   "isDefault": true
 }

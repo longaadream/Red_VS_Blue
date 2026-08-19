@@ -1,6 +1,6 @@
-# 战斗事件管线审计（RED-45 / RED-80）
+# 战斗事件管线审计（RED-45 / RED-77 / RED-80）
 
-状态：RED-80 已将消费者模型收敛为四个类别，并保留 RED-72 原子性与 pending 合同。审计日期：2026-08-17。风险：High（架构清理）。
+状态：RED-80 已将消费者模型收敛为四个类别；RED-77 已移除无定义的 `beforeAttack` 遗留消费者，并保留 RED-72 原子性与 pending 合同。审计日期：2026-08-18。RED-77 风险：Medium。
 
 ## 可执行阶段合同
 
@@ -19,7 +19,7 @@
 
 `scripts/audit-combat-events.mjs` schema 2 使用 TypeScript AST 解析 `checkTriggers`，解析局部 context 变量中的字面量 `type`，并扫描 skills、rules、cards 三类数据中的规则、响应卡消费者及字面量 `fireEvent()`。报告输出生产者、消费者、未声明事件、无生产者/消费者事件和动态调用。
 
-当前唯一未声明且无生产者的消费者仍是 `beforeAttack`；RED-80 删除 `effect-freeze` 后，其消费者只剩 `data/rules/rule-freeze-prevent-attack.json`。
+RED-77 确认当前产品合同没有独立 attack 动作或 attack 分类，因此没有新增 `beforeAttack` 声明或生产者。遗留的 `rule-freeze-prevent-attack` 及其 manifest、吉安娜、寒冰坚忍引用已删除；冰冻仍由权威 `beforeMove` 与 `beforeSkillUse` 阻断。事件目录现无 undeclared、consumed-only 或 declared-without-producer 事件。
 
 | 阶段 | 事件 | 主要生产者 | 关键语义 |
 | --- | --- | --- | --- |
@@ -32,11 +32,11 @@
 | 状态/充能 | status、charge 事件 | `skills.ts` | 仅在现有成功 helper 路径派发 |
 | 自定义 | `fireEvent(eventName, childContext)` | 五类代码执行面 | 深度 20、每 root 100 次派发预算 |
 
-### 事件目录 FAIL
+### 事件目录结果
 
 | ID | 结果 | 最小证据 |
 | --- | --- | --- |
-| F05 | FAIL | `beforeAttack` 未在 `TriggerType` 声明、无生产者，却被 `rule-freeze-prevent-attack` 消费；审计脚本退出码 1 |
+| F05 | PASS | RED-77 删除无定义的消费者及全部现役引用，未新增事件或生产行为；审计脚本退出码 0 |
 
 ## 消费者顺序、priority 与可见性
 
@@ -90,7 +90,7 @@ Rule 类别内按 priority 降序，默认 `0`；同 priority 保留事件开始
 | F02 | 消费者 priority/tie-breaker 不稳定 | RED-61 + ADR-0006 已修复；RED-80 将类别数从五收敛为四 |
 | F03 | 嵌套 `fireEvent` 无界 | RED-62 已修复 |
 | F04 | 异常、原子性和 after 合同不明确 | RED-72 已实现 |
-| F05 | `beforeAttack` 未声明且无生产者 | OPEN；RED-80 只更新消费者证据 |
+| F05 | `beforeAttack` 未声明且无生产者 | RED-77 已确认该语义无产品定义并删除遗留消费者；未新增事件 |
 | F07 | AttachedEffect 数据使用未注入 helper | RED-80 通过删除不可达执行面和数据定义解决，不扩展旧 helper |
 
 ## 验证结果
@@ -98,7 +98,9 @@ Rule 类别内按 priority 降序，默认 `0`；同 priority 保留事件开始
 | 检查 | 当前结果 |
 | --- | --- |
 | RED-80 聚焦回归 | PASS：10 个文件 / 92 项（旧状态拒绝 fixture 已随兼容层删除；保留五面 Node/浏览器差分与 RED-76 真实被动回归） |
-| 事件目录 CLI | FAIL（预期）：仅 `beforeAttack` 为 undeclared + consumed-only |
+| RED-77 冰冻动作回归 | PASS：移动、基础技能、充能技能 3 项；blocked 后不付 AP/充能、不改冷却/次数/生命、不发成功 after |
+| 事件目录 CLI | PASS：undeclared、consumed-only、declared-without-producer 均为空，退出码 0 |
+| RED-77 完整验证 | PASS：62 个测试文件 / 502 项、全仓 ESLint、TypeScript、game-engine 构建、构建后 Node/浏览器差分 2 个文件 / 11 项 |
 | skillCode 静态 CLI | PASS：0 个语法诊断；无 unsupported helper |
 | 浏览器构建、五面差分、完整测试和静态检查 | PASS：完整 47 文件 / 375 项、TypeScript、剩余 7 文件定向 ESLint、510 文件编码检查、生产/测试/bundle 旧状态残留为 0，且真实训练局 Rule/statusTag 冒烟通过 |
 | 全仓 ESLint | FAIL（既有基线）：`npm run lint` 为 639 errors / 334 warnings；RED-80 定向文件无新增问题 |
@@ -106,3 +108,5 @@ Rule 类别内按 priority 降序，默认 `0`；同 priority 保留事件开始
 ## 回退
 
 RED-80 必须整体回退生产模块、数据、测试、文档和 bundle；不得单独恢复第五消费者阶段或效果 JSON。RED-45/RED-72 的事件与原子性测试继续作为回退后的验收基线。
+
+RED-77 可独立恢复已删除规则文件及 manifest、吉安娜、寒冰坚忍三个引用点，但这会重新打开 F05。回退不得在没有 attack 产品合同的情况下单独新增 `beforeAttack` 生产者。

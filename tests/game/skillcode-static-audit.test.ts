@@ -66,7 +66,7 @@ describe('RED-45 skillCode static compatibility audit', () => {
     }
 
     expect(report.unclassifiedFields).toEqual([])
-    expect(report.triggerSkills).toHaveLength(27)
+    expect(report.triggerSkills).toHaveLength(26)
     for (const group of ['skills', 'rules', 'cards']) {
       for (const entry of report.groups[group]) {
         for (const field of entry.executionFields) {
@@ -111,7 +111,7 @@ describe('RED-45 data parse and production loader smoke', () => {
     }
 
     expect(definitions.skills.map(entry => entry.definition.id)).toHaveLength(116)
-    expect(definitions.rules.map(entry => entry.definition.id)).toHaveLength(81)
+    expect(definitions.rules.map(entry => entry.definition.id)).toHaveLength(80)
     expect(definitions.cards.map(entry => entry.definition.id)).toHaveLength(16)
     expect(definitions.skills.every(entry => basename(entry.file, extname(entry.file)) === entry.definition.id)).toBe(true)
   })
