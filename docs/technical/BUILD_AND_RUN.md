@@ -222,7 +222,7 @@ BUILD_EXIT=1
 空环境直接运行服务时：
 
 - `GET /api/ping`：200；
-- WebSocket 3001：可以握手；
+- WebSocket 与 HTTP 共用当前服务端口，并通过 `/ws/rooms/{roomId}` 握手；
 - `GET /api/rooms`：500；
 - 原始 Prisma 错误：`P2021`，`The table main.Room does not exist in the current database.`
 
@@ -241,57 +241,36 @@ $env:DATABASE_URL = "file:$dbPath"
 
 当前环境中 Prisma 5.22 的 `prisma db push` 对绝对 URL、正斜杠 URL和临时目录相对 URL都返回退出码 1及空泛的 `Schema engine error`，所以本文不把它列为可靠初始化步骤。
 
-## 5. Next.js / WebSocket 开发模式
+## 5. Next.js / WebSocket 单端口开发模式
 
-先完成生产构建和上一节的临时数据库初始化，再执行：
+完成数据库初始化后，只指定一个公开端口：
 
 ```powershell
-$env:PORT = '3000'
-$env:WS_PORT = '3001'
-npm.cmd run dev
+npm.cmd run dev -- --port 3000
 ```
 
-真实入口链：
+不得再设置 `WS_PORT`，也不需要 `wsBaseUrl`。真实入口链为：
 
-1. `package.json#scripts.dev` 启动 `next dev`。
-2. `instrumentation.ts#register()` 在 Node runtime 导入 `lib/ws-server.ts#startWsServer()`。
-3. HTTP 默认监听 3000；`lib/ws-server.ts#getWsPort()` 默认返回 3001。
-4. RED-93 起，`register()` 会等待 WebSocket 启动完成；同一进程内的 instrumentation/HMR
-   重复初始化通过全局生命周期 Promise 串行执行。旧客户端先断开，旧监听完成关闭后才会
-   重新绑定 3001，且成功日志只在真实 `listening` 事件后输出。
-
-实测：Next 约 1 秒进入 Ready；`GET /api/ping` 为 200；`GET /api/rooms` 在初始化临时数据库后为 200；WebSocket 3001 握手成功。
-
-2026-08-13 17:49 的可审计冒烟输出：
-
-```text
-> my-project@0.1.0 dev
-> next dev
-▲ Next.js 16.1.6 (Turbopack)
-- Local: http://localhost:3000
-✓ Starting...
-[WS] WebSocket server listening on port 3001
-✓ Ready in 1482ms
-GET /api/ping 200 in 304ms
-PING_STATUS=200
-WS_OPEN
-WS_EXIT=0
-```
-
-该开发服务由测试执行单元人工终止，不把人工终止记作自然退出码 0。2026-08-13 17:50:27 的清理探测为 `PORT_3000_RELEASED=true`、`PORT_3001_RELEASED=true`、`PORT_CHECK_EXIT=0`。
+1. `package.json#scripts.dev` 先通过 Node `--require` 加载 `scripts/ws-same-port-server.cjs`，再启动 `next dev`。
+2. 预加载器在 Next 创建 HTTP(S) server 时保留 `/ws`、`/ws/` 和 `/ws/rooms/**` Upgrade；Next 自己的 HMR Upgrade 不受影响。
+3. `instrumentation.ts#register()` 在 Node runtime 调用 `lib/ws-server.ts#startWsServer()`，创建 `noServer` WebSocket 服务并注册 Upgrade handler。
+4. HTTP 与游戏 WebSocket 始终监听同一个公开端口；HMR 重载会串行替换 handler 与旧连接，不会重新绑定第二个 TCP 端口。
 
 最小 HTTP 探测：
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:3000/api/ping
 Invoke-WebRequest http://127.0.0.1:3000/api/rooms -UseBasicParsing
+Invoke-RestMethod http://127.0.0.1:3000/api/ws-info
 ```
 
-最小 WebSocket 探测（服务正在运行时）：
+最小 WebSocket/RPC 探测（服务正在运行时）：
 
 ```powershell
-node -e "const WebSocket=require('ws');const ws=new WebSocket('ws://127.0.0.1:3001');ws.on('open',()=>{console.log('WS_OPEN');ws.close()});ws.on('error',e=>{console.error(e);process.exit(1)})"
+node -e "const WebSocket=require('ws');const ws=new WebSocket('ws://127.0.0.1:3000/ws/rooms/__lobby');ws.on('open',()=>ws.send(JSON.stringify({type:'rpc',requestId:'probe',method:'rooms.list',data:{}})));ws.on('message',raw=>{const msg=JSON.parse(String(raw));if(msg.requestId==='probe'){console.log(msg);ws.close();process.exit(msg.ok?0:1)}});ws.on('error',e=>{console.error(e);process.exit(1)})"
 ```
+
+预期 `/api/ws-info` 只返回 `transport: "same-origin"` 与路径模板，不返回端口。客户端只保存 `serverUrl`，并把上述 HTTP origin 同源转换成 WebSocket origin。
 
 ## 6. Windows Electron 服务端
 
@@ -307,7 +286,7 @@ npm.cmd run build
 
 1. `electron/main.ts` 调用 `app.whenReady()`。
 2. `startGameServer()` 通过 `findServerEntry()` 找到 `.next/standalone/server.js`。
-3. `spawn(getNodeBin(), [serverEntry])` 启动系统 Node 子进程，并传入 `PORT=3000`、`DATABASE_URL`、`APP_ROOT_DIR`、`USER_DATA_DIR`。
+3. `spawn()` 使用 `--require ws-same-port-server.cjs` 启动系统 Node 子进程，并传入唯一公开端口 `PORT=3000`、`DATABASE_URL`、`APP_ROOT_DIR`、`USER_DATA_DIR`；预加载器缺失时启动直接失败。
 4. `createDashboardWindow()` 加载 `electron/dashboard/index.html`。
 
 本次 Windows 冒烟使用同版本 Prisma 5.22.0 已缓存引擎生成的 standalone 产物；它证明 Electron 启动链可运行，不代表上一节的冷环境引擎下载阻塞已经消失。
@@ -423,11 +402,10 @@ node tests/electron/windows-smoke.mjs server
 拒绝缺失、增加或被修改的文件。manifest 和 `win-unpacked` 都是未跟踪的本机候选证据，
 不得加入 Git 或上传到公开下载渠道。**内部候选 ≠ 公开发行物**。
 
-Server Windows smoke 还会同时验证公开同端口入口
-`ws://127.0.0.1:3000/ws/rooms/__lobby` 与内部入口 `ws://127.0.0.1:3001/`：
-两条连接都必须收到 `subscribed`，且 `rooms.list` 必须返回 `ok: true`。这项探测用于防止
-standalone staging 把 WebSocket 握手的 CRLF 写成字面量转义、导致玩家客户端只看到连接
-超时；仅有 `/api/ping` 成功不能代替该证据。
+Server Windows smoke 会在唯一公开入口 `ws://127.0.0.1:3000/ws/rooms/__lobby`
+验证订阅与 `rooms.list` 返回 `ok: true`。这项探测用于防止 standalone staging 的 Upgrade
+预加载器失效、导致玩家客户端只看到连接超时；仅有 `/api/ping` 成功不能代替该证据，
+也不得再探测或暴露内部 WebSocket 端口。
 
 ### 8.3 桌面安全边界
 

@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createServer, type IncomingMessage, type Server } from 'node:http'
+import type { Duplex } from 'node:stream'
 import { NextRequest } from 'next/server'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { Room } from '../lib/game/room-store'
@@ -161,7 +163,10 @@ function signedRoom(id: string, secondAlignment: 'light' | 'dark' = 'dark'): Roo
   return next
 }
 
-const globalWithWsServer = globalThis as typeof globalThis & { __rvbWss?: WebSocketServer | null }
+const globalWithWsServer = globalThis as typeof globalThis & {
+  __rvbWss?: WebSocketServer | null
+  __rvbWsUpgradeHandler?: (request: IncomingMessage, socket: Duplex, head: Buffer) => void
+}
 const wsMessageQueues = new WeakMap<WebSocket, JsonObject[]>()
 const wsMessageWaiters = new WeakMap<WebSocket, {
   resolve: (message: JsonObject) => void
@@ -170,14 +175,8 @@ const wsMessageWaiters = new WeakMap<WebSocket, {
 }>()
 
 let serverUrl: string
+let httpServer: Server
 
-function waitForServerListening(server: WebSocketServer): Promise<void> {
-  if (server.address()) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    server.once('listening', resolve)
-    server.once('error', reject)
-  })
-}
 
 function openClient(): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
@@ -400,22 +399,38 @@ describe('Demo roster HTTP/WebSocket integration', () => {
   beforeAll(async () => {
     firstIdentity = await createTestIdentity()
     secondIdentity = await createTestIdentity()
-    process.env.WS_PORT = '0'
     await startWsServer()
-    const server = globalWithWsServer.__rvbWss
-    if (!server) throw new Error('WebSocket server did not start')
-    await waitForServerListening(server)
-    const address = server.address()
-    if (!address || typeof address === 'string') throw new Error('WebSocket server did not expose a port')
-    serverUrl = `ws://127.0.0.1:${address.port}`
+    if (!globalWithWsServer.__rvbWss || !globalWithWsServer.__rvbWsUpgradeHandler) {
+      throw new Error('WebSocket Upgrade handler did not start')
+    }
+    httpServer = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'text/plain' })
+      response.end('ok')
+    })
+    httpServer.on('upgrade', (request, socket, head) => {
+      const handler = globalWithWsServer.__rvbWsUpgradeHandler
+      if (handler) handler(request, socket, head)
+      else socket.destroy()
+    })
+    await new Promise<void>((resolve, reject) => {
+      httpServer.once('error', reject)
+      httpServer.listen(0, '127.0.0.1', resolve)
+    })
+    const address = httpServer.address()
+    if (!address || typeof address === 'string') throw new Error('HTTP server did not expose a port')
+    serverUrl = `ws://127.0.0.1:${address.port}/ws/rooms/__lobby`
   })
 
   afterAll(async () => {
-    delete process.env.WS_PORT
     const server = globalWithWsServer.__rvbWss
     globalWithWsServer.__rvbWss = null
-    if (!server) return
-    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    delete globalWithWsServer.__rvbWsUpgradeHandler
+    if (server) {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    }
+    await new Promise<void>((resolve, reject) => {
+      httpServer.close(error => error ? reject(error) : resolve())
+    })
   })
 
   beforeEach(() => memoryStore.reset())

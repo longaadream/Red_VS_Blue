@@ -6,9 +6,9 @@
   "private": true,
   "main": "electron/dist/main.js",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node --require ./scripts/ws-same-port-server.cjs ./node_modules/next/dist/bin/next dev",
     "build": "prisma generate && node scripts/build-tailwind.mjs && next build && node -e \"const fs=require('fs'),path=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){const ss=path.join(s,e.name),dd=path.join(d,e.name);e.isDirectory()?cp(ss,dd):fs.copyFileSync(ss,dd)}}cp('.next/static','.next/standalone/.next/static');cp('public','.next/standalone/public');console.log('Static assets copied to standalone.')\"",
-    "start": "next start",
+    "start": "node --require ./scripts/ws-same-port-server.cjs ./node_modules/next/dist/bin/next start",
     "lint": "eslint . --max-warnings 0",
     "lint:prune": "eslint . --max-warnings 0 --prune-suppressions",
     "build:electron": "npm run build:electron:client",

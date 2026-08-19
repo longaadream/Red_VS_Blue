@@ -9,6 +9,7 @@ const relayStore = vi.hoisted(() => ({
   setRoom: vi.fn(),
   addWsClient: vi.fn(),
   removeWsClient: vi.fn(),
+  getWsClients: vi.fn(),
   broadcastToRoom: vi.fn(),
   appendAction: vi.fn(),
   sendToHost: vi.fn(),
@@ -97,6 +98,12 @@ function fakeWebSocket(roomId: string) {
   return { ws, sent }
 }
 
+function roomForPair(host: TestIdentity, guest: TestIdentity): Room {
+  const room = roomFor(host)
+  room.players.push({ id: guest.id, name: 'Guest', publicKey: guest.publicKey, connected: true })
+  return room
+}
+
 describe('Relay WebSocket signed subscription identity', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -162,5 +169,118 @@ describe('Relay WebSocket signed subscription identity', () => {
       expect.objectContaining({ type: 'stateUpdate', authorityVersion: 2 }),
       ws,
     )
+  })
+
+  it('forwards host authority preparation only to the addressed guest', async () => {
+    const host = await createTestIdentity()
+    const guest = await createTestIdentity()
+    const outsider = await createTestIdentity()
+    const room = roomForPair(host, guest)
+    relayStore.getRoom.mockReturnValue(room)
+    const hostSocket = fakeWebSocket(room.id)
+    const guestSocket = fakeWebSocket(room.id)
+
+    await wsHandler.message(hostSocket.ws, JSON.stringify(await signedSubscribe(host, room.id)))
+    await wsHandler.message(guestSocket.ws, JSON.stringify(await signedSubscribe(guest, room.id)))
+    relayStore.getWsClients.mockReturnValue(new Set([hostSocket.ws, guestSocket.ws]))
+
+    const action = {
+      type: 'useBasicSkill',
+      playerId: guest.id,
+      pieceId: 'caster',
+      skillId: 'contract-shot',
+    }
+    const preparation = {
+      kind: 'needTarget',
+      selectionId: 'sel-1',
+      stateRevision: 3,
+      targetType: 'piece',
+      candidates: [{ type: 'piece', pieceId: 'enemy' }],
+    }
+    await wsHandler.message(hostSocket.ws, JSON.stringify({
+      type: 'actionError',
+      to: guest.id,
+      from: outsider.id,
+      action,
+      error: '需要选择目标',
+      code: 'TARGET_REQUIRED',
+      preparation,
+      needsTargetSelection: true,
+      targetType: 'piece',
+      range: 2,
+      filter: 'enemy',
+      targetIndex: 0,
+    }))
+
+    expect(guestSocket.sent.at(-1)).toEqual({
+      type: 'actionError',
+      from: host.id,
+      action,
+      error: '需要选择目标',
+      code: 'TARGET_REQUIRED',
+      preparation,
+      needsTargetSelection: true,
+      targetType: 'piece',
+      range: 2,
+      filter: 'enemy',
+      targetIndex: 0,
+    })
+    expect(hostSocket.sent).toHaveLength(1)
+    const optionAction = {
+      type: 'playCard',
+      playerId: guest.id,
+      cardInstanceId: 'choice-card',
+    }
+    const optionPreparation = {
+      kind: 'needOption',
+      selectionId: 'sel-2',
+      stateRevision: 3,
+      options: ['left', 'right'],
+    }
+    await wsHandler.message(hostSocket.ws, JSON.stringify({
+      type: 'actionError',
+      to: guest.id,
+      action: optionAction,
+      error: '需要选择选项',
+      preparation: optionPreparation,
+      needsOptionSelection: true,
+      title: '选择方向',
+      options: ['left', 'right'],
+    }))
+    expect(guestSocket.sent.at(-1)).toEqual({
+      type: 'actionError',
+      from: host.id,
+      action: optionAction,
+      error: '需要选择选项',
+      preparation: optionPreparation,
+      needsOptionSelection: true,
+      title: '选择方向',
+      options: ['left', 'right'],
+    })
+
+    await wsHandler.message(guestSocket.ws, JSON.stringify({
+      type: 'actionError',
+      to: host.id,
+      action,
+      error: 'forged',
+      needsOptionSelection: true,
+      title: 'forged',
+      options: ['forged'],
+    }))
+    expect(guestSocket.sent.at(-1)).toMatchObject({
+      type: 'error',
+      code: 'ACTION_ERROR_FORBIDDEN',
+    })
+    expect(hostSocket.sent).toHaveLength(1)
+
+    const guestMessageCount = guestSocket.sent.length
+    await wsHandler.message(hostSocket.ws, JSON.stringify({
+      type: 'actionError',
+      to: outsider.id,
+      action,
+      error: 'unknown target',
+    }))
+    expect(hostSocket.sent.at(-1)).toMatchObject({ type: 'error', code: 'ACTION_ERROR_TARGET_INVALID' })
+    expect(guestSocket.sent).toHaveLength(guestMessageCount)
   })
 })

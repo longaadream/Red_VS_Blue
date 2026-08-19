@@ -269,8 +269,7 @@ try {
   const connectedServer = await evaluate(gameTarget, `(() => {
     RvBUtils.saveServerConfig({
       mode: 'local',
-      url: ${JSON.stringify(mode.localUrl)},
-      wsPort: ${JSON.stringify(mode.wsPort)}
+      url: ${JSON.stringify(mode.localUrl)}
     })
     return RvBUtils.getServerUrl()
   })()`)

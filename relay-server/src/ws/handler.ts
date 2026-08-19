@@ -123,6 +123,57 @@ function handleStateUpdate(
   )
 }
 
+// ── Action error (host → relay → addressed guest) ─────────────────────────
+
+function handleActionError(
+  ws: ServerWebSocket<WsData>,
+  msg: Extract<WsInbound, { type: 'actionError' }>
+) {
+  const { roomId, playerId, role } = ws.data
+  if (!roomId || !playerId) return err(ws, 'not subscribed')
+  if (role !== 'host') return err(ws, 'only host can return action errors', 'ACTION_ERROR_FORBIDDEN')
+
+  const room = store.getRoom(roomId)
+  if (!room) return err(ws, 'room not found')
+  if (room.status !== 'battle') return err(ws, 'battle not active')
+
+  const targetId = String(msg.to ?? '').trim().toLowerCase()
+  const target = room.players.find(player => player.id.toLowerCase() === targetId)
+  if (!target || targetId === room.hostId.toLowerCase()) {
+    return err(ws, 'invalid action error recipient', 'ACTION_ERROR_TARGET_INVALID')
+  }
+
+  const outbound = {
+    type: 'actionError',
+    from: playerId,
+    action: msg.action,
+    error: msg.error,
+    code: msg.code,
+    preparation: msg.preparation,
+    needsTargetSelection: msg.needsTargetSelection,
+    targetType: msg.targetType,
+    range: msg.range,
+    filter: msg.filter,
+    targetIndex: msg.targetIndex,
+    needsOptionSelection: msg.needsOptionSelection,
+    title: msg.title,
+    options: msg.options,
+  }
+
+  let delivered = false
+  for (const candidate of store.getWsClients(roomId)) {
+    if (
+      candidate.data.playerId?.toLowerCase() === targetId
+      && candidate.data.role === 'guest'
+      && candidate.readyState === 1
+    ) {
+      send(candidate, outbound)
+      delivered = true
+    }
+  }
+  if (!delivered) return err(ws, 'action error recipient is not connected', 'ACTION_ERROR_TARGET_UNAVAILABLE')
+}
+
 // ── Disconnect ─────────────────────────────────────────────────────────────
 
 function handleClose(ws: ServerWebSocket<WsData>) {
@@ -188,6 +239,9 @@ export const wsHandler = {
         break
       case 'stateUpdate':
         handleStateUpdate(ws, msg)
+        break
+      case 'actionError':
+        handleActionError(ws, msg)
         break
       case 'ping':
         send(ws, { type: 'pong' })

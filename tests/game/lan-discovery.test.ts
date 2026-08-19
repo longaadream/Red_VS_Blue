@@ -8,7 +8,6 @@ type DiscoveredServer = {
   url: string
   ip: string
   port: number
-  wsPort?: number
 }
 
 type LanDiscoverApi = {
@@ -16,33 +15,24 @@ type LanDiscoverApi = {
     onFound?: (server: DiscoveredServer) => void
     onDone?: (servers: DiscoveredServer[]) => void
   }): { cancel(): void }
-  resolveWsPort(server: DiscoveredServer): number
 }
 
 function response(ok: boolean, body: unknown) {
-  return {
-    ok,
-    json: async () => body,
-  }
+  return { ok, json: async () => body }
 }
 
-describe('LAN server discovery', () => {
-  it('discovers HTTP 3000 with its authoritative WebSocket 3001 port', async () => {
+describe('LAN single-origin discovery', () => {
+  it('discovers one public server URL and never probes a WebSocket port API', async () => {
     const requests: string[] = []
     const fetch = vi.fn(async (input: string) => {
       requests.push(input)
-      if (input === 'http://192.168.1.100:3000/api/ping') {
+      if (input === 'http://192.168.1.100:7878/api/ping') {
         return response(true, { name: 'RED vs BLUE Server' })
-      }
-      if (input === 'http://192.168.1.100:3000/api/ws-info') {
-        return response(true, { wsPort: 3001 })
       }
       return response(false, {})
     })
     const browserWindow = {
-      electronAPI: {
-        getLanIps: async () => ['192.168.1.100'],
-      },
+      electronAPI: { getLanIps: async () => ['192.168.1.24'] },
     }
     const context = createContext({
       window: browserWindow,
@@ -55,92 +45,29 @@ describe('LAN server discovery', () => {
     new Script(source, { filename: 'lan-discover.js' }).runInContext(context)
     const api = (browserWindow as typeof browserWindow & { RvBLanDiscover: LanDiscoverApi }).RvBLanDiscover
 
-    const found = await new Promise<DiscoveredServer[]>((resolveFound) => {
+    const found = await new Promise<DiscoveredServer[]>(resolveFound => {
       api.startLanScan({ onDone: resolveFound })
     })
 
-    expect(requests).toContain('http://192.168.1.100:3000/api/ws-info')
-    expect(found).toContainEqual({
-      url: 'http://192.168.1.100:3000',
+    expect(found).toEqual([{
+      url: 'http://192.168.1.100:7878',
       ip: '192.168.1.100',
-      port: 3000,
-      wsPort: 3001,
-    })
+      port: 7878,
+    }])
+    expect(requests).toContain('http://192.168.1.100:7878/api/ping')
+    expect(requests.every(url => url.endsWith('/api/ping'))).toBe(true)
+    expect(requests.some(url => url.includes('/api/ws-info'))).toBe(false)
+    expect(found[0]).not.toHaveProperty('wsPort')
   })
 
-  it('keeps explicit ports and uses the desktop 3000/3001 compatibility fallback', () => {
-    const browserWindow: Record<string, unknown> = {}
-    const context = createContext({ window: browserWindow })
-    const source = readFileSync(resolve(process.cwd(), 'data/pages/js/lan-discover.js'), 'utf8')
-    new Script(source, { filename: 'lan-discover.js' }).runInContext(context)
-    const api = browserWindow.RvBLanDiscover as LanDiscoverApi
+  it('keeps desktop and Android discovery logic identical and free of split-port fallbacks', () => {
+    const desktop = readFileSync(resolve(process.cwd(), 'data/pages/js/lan-discover.js'), 'utf8')
+    const android = readFileSync(resolve(process.cwd(), 'android-client/www/js/lan-discover.js'), 'utf8')
 
-    expect(api.resolveWsPort({ url: 'http://host:3000', ip: 'host', port: 3000, wsPort: 3007 })).toBe(3007)
-    expect(api.resolveWsPort({ url: 'http://host:3000', ip: 'host', port: 3000 })).toBe(3001)
-    expect(api.resolveWsPort({ url: 'http://host:8080', ip: 'host', port: 8080 })).toBe(8080)
-  })
-
-  it('persists the discovered WS port across reload and connects to the final 3001 URL', () => {
-    const persisted = new Map<string, string>()
-    const localStorage = {
-      getItem(key: string) { return persisted.get(key) ?? null },
-      setItem(key: string, value: string) { persisted.set(key, String(value)) },
-      removeItem(key: string) { persisted.delete(key) },
-    }
-    const serverUtilsSource = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
-    const lanDiscoverSource = readFileSync(resolve(process.cwd(), 'data/pages/js/lan-discover.js'), 'utf8')
-    const wsClientSource = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
-
-    const initialWindow: Record<string, unknown> = { location: { search: '' } }
-    const initialContext = createContext({
-      window: initialWindow,
-      localStorage,
-      URLSearchParams,
-      AbortController,
-      setTimeout,
-      clearTimeout,
-    })
-    new Script(serverUtilsSource, { filename: 'server-utils.js' }).runInContext(initialContext)
-    new Script(lanDiscoverSource, { filename: 'lan-discover.js' }).runInContext(initialContext)
-    const utils = initialWindow.RvBUtils as {
-      saveServerConfig(config: { mode: string; url: string; wsPort: number }): boolean
-    }
-    const discover = initialWindow.RvBLanDiscover as LanDiscoverApi
-    const wsPort = discover.resolveWsPort({
-      url: 'http://192.168.1.100:3000',
-      ip: '192.168.1.100',
-      port: 3000,
-      wsPort: 3001,
-    })
-    expect(utils.saveServerConfig({ mode: 'lan', url: 'http://192.168.1.100:3000', wsPort })).toBe(true)
-    expect(persisted.get('rvb_ws_port')).toBe('3001')
-
-    const urls: string[] = []
-    class FakeWebSocket {
-      readyState = 0
-      constructor(url: string) { urls.push(url) }
-      close() {}
-      send() {}
-    }
-    const reloadedWindow: Record<string, unknown> = { location: { search: '' } }
-    const reloadedContext = createContext({
-      window: reloadedWindow,
-      localStorage,
-      URLSearchParams,
-      WebSocket: FakeWebSocket,
-      setTimeout,
-      clearTimeout,
-      console,
-    })
-    new Script(serverUtilsSource, { filename: 'server-utils-reloaded.js' }).runInContext(reloadedContext)
-    new Script(wsClientSource, { filename: 'ws-client.js' }).runInContext(reloadedContext)
-    const ws = reloadedWindow.RvBWs as {
-      connect(roomId: string, playerId: string, mode: string): void
-      disconnect(): void
-    }
-    ws.connect('room-1', 'alice', 'lan')
-
-    expect(urls[0]).toBe('ws://192.168.1.100:3001/ws/rooms/room-1')
-    ws.disconnect()
+    expect(android).toBe(desktop)
+    expect(desktop).not.toContain('/api/ws-info')
+    expect(desktop).not.toContain('resolveWsPort')
+    expect(desktop).not.toContain('3001')
+    expect(desktop).not.toContain('wsPort')
   })
 })

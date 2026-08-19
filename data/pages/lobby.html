@@ -348,9 +348,8 @@
       const params = new URLSearchParams(window.location.search)
       const mode = params.get('server')
       const url = params.get('serverUrl') || params.get('url')
-      const wsPort = params.get('wsPort') || params.get('ws_port')
       if (url) {
-        RvBUtils.saveServerConfig({ mode: mode || RvBUtils.getServerModeForUrl(url), url, wsPort })
+        RvBUtils.saveServerConfig({ mode: mode || RvBUtils.getServerModeForUrl(url), url })
         return
       }
       if (mode === 'local') {

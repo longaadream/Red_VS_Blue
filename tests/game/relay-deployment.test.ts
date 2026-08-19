@@ -123,6 +123,8 @@ describe('legacy relay deployment initialization', () => {
     const relayHandler = readFileSync(resolve(process.cwd(), 'relay-server/src/ws/handler.ts'), 'utf8')
     const wsClient = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
     const androidWsClient = readFileSync(resolve(process.cwd(), 'android-client/www/js/ws-client.js'), 'utf8')
+    const serverUtils = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+    const androidServerUtils = readFileSync(resolve(process.cwd(), 'android-client/www/js/server-utils.js'), 'utf8')
 
     expect(page).toContain("postLocalRelayInitialization({ players: players })")
     expect(page).toContain("RvBUtils.mobileServerFetch('/api/relay-battle-init', options)")
@@ -131,6 +133,7 @@ describe('legacy relay deployment initialization', () => {
     expect(wsClient).toContain("type: 'battle-subscribe'")
     expect(wsClient).toContain('signature: await window.RvBIdentity.sign(payload)')
     expect(androidWsClient).toBe(wsClient)
+    expect(androidServerUtils).toBe(serverUtils)
     expect(relayHandler).toContain('auth: msg.auth')
     expect(relayHandler).toContain('await verifyBattleSubscribeAuth(msg')
     expect(relayHandler).toContain('authorityVersion: msg.authorityVersion')

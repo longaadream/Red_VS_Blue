@@ -360,9 +360,13 @@ interface ServerCore {
 - 客户端只依据服务端下发的 `deployment.deadlineAt` 计算剩余秒数，不自行延长或重置期限。
 - 未锁定玩家的选择继续保持私有；公开快照只包含锁定状态和可公开结果。
 
-### LAN 连接发现
+### 单端口网络传输
 
-- HTTP 健康检查继续使用 `/api/ping`。
-- 客户端随后读取 `/api/ws-info` 获取 WebSocket 监听端口。
-- 标准本机配置在接口不可用时回退为 HTTP `3000`、WebSocket `3001`；非标准端口仅在未提供独立 WS 端口时回退为同端口。
-- UDP 与快速扫描结果统一经过同一端口解析逻辑，避免“HTTP 可用但 WebSocket 连接到错误端口”。
+- 客户端只配置并持久化一个规范化的 `serverUrl`；HTTP 与 WebSocket 始终使用该地址的同一协议主机和端口。
+- HTTP 健康检查使用 `/api/ping`，WebSocket 地址由客户端直接派生为 `/ws/rooms/{roomId}`；不得保存、探测或猜测 `wsPort`、`wsBaseUrl`。
+- 旧版 `rvb_ws_port` 及其 URL/来源缓存会被清除，且不能影响连接目标；不再兼容双端口客户端或配置。
+- Next.js 开发与 standalone 服务在创建 HTTP(S) server 前加载 `scripts/ws-same-port-server.cjs`，把游戏 `/ws` Upgrade 交给 `noServer` WebSocket 服务，同时保留 Next HMR Upgrade。
+- Electron 主机直接在一个公开端口运行 standalone，不再创建内部 HTTP/WS 端口或公开代理；Android 与 Relay 也在各自唯一的 HTTP 服务端口处理 WebSocket Upgrade。
+- `/api/ws-info` 仅作为诊断接口返回 `{ transport: 'same-origin', path: '/ws/rooms/{roomId}' }`，不得暴露或参与选择内部端口。
+- LAN/UDP/快速扫描只发现可通过 `/api/ping` 访问的完整 HTTP origin，加入后 WebSocket 必须连接该 origin，而不是第二个地址。
+- 传输模式按服务器地址判定：本机与私网地址走 LAN 权威主机；公网地址走 Relay，显式 `relay=1` 仅用于本机 Relay 调试，二者都遵守同端口 URL 规则。

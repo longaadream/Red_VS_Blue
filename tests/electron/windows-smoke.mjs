@@ -340,16 +340,10 @@ async function smokeServer() {
     const publicWebSocket = await probeGameWebSocket(
       'ws://127.0.0.1:3000/ws/rooms/__lobby',
     )
-    const internalWebSocket = await probeGameWebSocket('ws://127.0.0.1:3001/')
     assert(
       publicWebSocket.roomsResult.ok === true &&
         Array.isArray(publicWebSocket.roomsResult.rooms),
       'Public same-port WebSocket rooms.list failed: ' + JSON.stringify(publicWebSocket),
-    )
-    assert(
-      internalWebSocket.roomsResult.ok === true &&
-        Array.isArray(internalWebSocket.roomsResult.rooms),
-      'Internal WebSocket rooms.list failed: ' + JSON.stringify(internalWebSocket),
     )
     const rejectedNavigation = await evaluate(target, `new Promise((resolve) => {
       const original = location.href

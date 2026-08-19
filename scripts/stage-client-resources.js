@@ -93,74 +93,24 @@ function copyFile(src, dst) {
   fs.copyFileSync(src, dst)
 }
 
-function patchServerJsForWsProxy(filePath) {
+function patchServerJsForSamePortUpgrade(filePath) {
   if (!fs.existsSync(filePath)) return
   let text = fs.readFileSync(filePath, 'utf-8')
-  if (text.includes('__RVB_WS_SAME_PORT_PROXY__')) return
+  if (text.includes('__RVB_WS_SAME_PORT_UPGRADE__')) return
 
   const marker = "const path = require('path')"
-  const patch = `const path = require('path')
+  const patch = `// __RVB_WS_SAME_PORT_UPGRADE__
+require('./ws-same-port-server.cjs')
 
-// __RVB_WS_SAME_PORT_PROXY__
-// Expose the internal WebSocket server through the same public HTTP port.
-// NAT/frp users only need to publish the HTTP port; ws://host:port/ws/rooms/*
-// is proxied to 127.0.0.1:WS_PORT inside the host process.
-const net = require('net')
-const http = require('http')
-const __rvbOriginalCreateServer = http.createServer
-function __rvbProxyWsUpgrade(req, socket, head) {
-  const url = String((req && req.url) || '')
-  if (!(url === '/ws' || url === '/ws/' || url.indexOf('/ws/rooms/') === 0)) return false
-  if (req.__rvbWsProxyHandled) return true
-  req.__rvbWsProxyHandled = true
-  const wsPort = parseInt(process.env.WS_PORT || '3001', 10)
-  const target = net.connect(wsPort, '127.0.0.1')
-  let settled = false
-  target.on('connect', function() {
-    settled = true
-    const lines = [req.method + ' / HTTP/' + req.httpVersion]
-    for (const i in req.rawHeaders) {
-      if (Number(i) % 2 === 0) lines.push(req.rawHeaders[i] + ': ' + req.rawHeaders[Number(i) + 1])
-    }
-    target.write(lines.join('\\r\\n') + '\\r\\n\\r\\n')
-    if (head && head.length) target.write(head)
-    socket.pipe(target)
-    target.pipe(socket)
-  })
-  target.on('error', function() {
-    if (!settled) {
-      try { socket.write('HTTP/1.1 502 Bad Gateway\\r\\nConnection: close\\r\\n\\r\\n') } catch {}
-    }
-    try { socket.destroy() } catch {}
-  })
-  socket.on('error', function() { try { target.destroy() } catch {} })
-  return true
-}
-http.createServer = function rvbCreateServerWithWsProxy() {
-  const server = __rvbOriginalCreateServer.apply(this, arguments)
-  server.on('upgrade', function rvbDirectWsProxy(req, socket, head) {
-    __rvbProxyWsUpgrade(req, socket, head)
-  })
-  const originalOn = server.on.bind(server)
-  server.on = function rvbServerOn(eventName, listener) {
-    if (eventName === 'upgrade' && typeof listener === 'function') {
-      return originalOn(eventName, function rvbUpgradeRouter(req, socket, head) {
-        if (__rvbProxyWsUpgrade(req, socket, head)) return
-        return listener(req, socket, head)
-      })
-    }
-    return originalOn(eventName, listener)
-  }
-  return server
-}`
+const path = require('path')`
 
   if (!text.startsWith(marker)) {
-    console.warn('[stage-client] server.js patch marker not found; WS same-port proxy not injected.')
+    console.warn('[stage-client] server.js patch marker not found; same-port Upgrade preload not injected.')
     return
   }
   text = text.replace(marker, patch)
   fs.writeFileSync(filePath, text, 'utf-8')
-  console.log('[stage-client] Patched server.js with same-port WebSocket proxy.')
+  console.log('[stage-client] Patched server.js with same-port WebSocket Upgrade preload.')
 }
 
 // 直接落到 _client-stage 根下，不再多套 v0-game-menu-design/ 子目录。
@@ -172,7 +122,8 @@ fs.mkdirSync(dstRoot, { recursive: true })
 console.log('[stage-client] Copying package.json and server.js...')
 copyFile(path.join(standaloneDir, 'package.json'), path.join(dstRoot, 'package.json'))
 copyFile(path.join(standaloneDir, 'server.js'), path.join(dstRoot, 'server.js'))
-patchServerJsForWsProxy(path.join(dstRoot, 'server.js'))
+patchServerJsForSamePortUpgrade(path.join(dstRoot, 'server.js'))
+copyFile(path.join(__dirname, 'ws-same-port-server.cjs'), path.join(dstRoot, 'ws-same-port-server.cjs'))
 
 console.log('[stage-client] Copying .next directory...')
 const nextSrc = path.join(standaloneDir, '.next')

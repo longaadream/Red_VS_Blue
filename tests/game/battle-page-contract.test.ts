@@ -21,6 +21,21 @@ function readNamedFunction(html: string, name: string) {
   return html.slice(start, nextFunction)
 }
 
+function readNamedAsyncFunction(html: string, name: string) {
+  const marker = `async function ${name}(`
+  const start = html.indexOf(marker)
+  if (start === -1) throw new Error(`Missing async ${name} in battle.html`)
+
+  const candidates = [
+    html.indexOf('\n    function ', start + marker.length),
+    html.indexOf('\n    async function ', start + marker.length),
+  ].filter(index => index !== -1)
+  const nextFunction = Math.min(...candidates)
+  if (!Number.isFinite(nextFunction)) throw new Error(`Could not isolate async ${name} in battle.html`)
+
+  return html.slice(start, nextFunction)
+}
+
 function extractInlineScripts(html: string) {
   const scripts: Array<{ source: string; htmlLine: number }> = []
   const pattern = /<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi
@@ -364,6 +379,84 @@ describe('battle page route contract', () => {
     ])
     expect(statusMessages.at(-1)).toBe('目标动作缺少有效类型，未发送')
     expect(logs.at(-1)).toContain('目标动作缺少有效类型')
+  })
+
+  it('submits LAN and Relay actions without executing a local authority preview', async () => {
+    const battlePage = readPage('battle.html')
+    const sentMessages: unknown[] = []
+    const context = createContext({
+      withClientActionId: (action: unknown) => action,
+      TRAINING_MODE: false,
+      trainingDoAction: () => {
+        throw new Error('training path should not run')
+      },
+      getServerUrl: () => 'http://127.0.0.1:3000',
+      G: { pieces: [] },
+      document: { getElementById: () => ({ disabled: false }) },
+      setMoveButtonDisabled: () => undefined,
+      addLog: () => undefined,
+      clearTargetInteraction: () => undefined,
+      setStatusMsg: () => undefined,
+      renderActionBar: () => undefined,
+      wsMode: 'lan',
+      wsRole: 'guest',
+      wsConnected: true,
+      relaySeq: 0,
+      RvBWs: {
+        isConnected: () => true,
+        send: (message: unknown) => sentMessages.push(message),
+      },
+      createBattleActionAuth: async () => ({ signature: 'signed' }),
+      myPlayerId: 'player-red',
+      pendingSkill: null,
+      pendingCardAction: null,
+      selectedPieceId: null,
+      restoreSelectedPieceMenu: () => undefined,
+      GameEngine: {
+        safeCloneBattleState: () => {
+          throw new Error('local authority preview must not run')
+        },
+      },
+      runDeterministicAuthorityAction: () => {
+        throw new Error('local authority preview must not run')
+      },
+    })
+    new Script(readNamedAsyncFunction(battlePage, 'doAction')).runInContext(context)
+
+    await new Script("doAction({ type: 'deploymentLock', playerId: 'player-red' })").runInContext(context)
+    await new Script("doAction({ type: 'useBasicSkill', playerId: 'player-red', pieceId: 'caster', skillId: 'shot' })").runInContext(context)
+    await new Script("doAction({ type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 })").runInContext(context)
+    context.wsMode = 'relay'
+    context.wsRole = 'guest'
+    await new Script("doAction({ type: 'playCard', playerId: 'player-red', cardInstanceId: 'choice-card' })").runInContext(context)
+
+    expect(JSON.parse(JSON.stringify(sentMessages))).toEqual([
+      {
+        type: 'action',
+        action: { type: 'deploymentLock', playerId: 'player-red' },
+        auth: { signature: 'signed' },
+        playerId: 'player-red',
+      },
+      {
+        type: 'action',
+        action: { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'caster', skillId: 'shot' },
+        auth: { signature: 'signed' },
+        playerId: 'player-red',
+      },
+      {
+        type: 'action',
+        action: { type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 },
+        auth: { signature: 'signed' },
+        playerId: 'player-red',
+      },
+      {
+        type: 'action',
+        seq: 1,
+        action: { type: 'playCard', playerId: 'player-red', cardInstanceId: 'choice-card' },
+        auth: { signature: 'signed' },
+        prevStateHash: '',
+      },
+    ])
   })
 
   it('keeps target submission single-flight and clears transient targeting on every authoritative exit', () => {
