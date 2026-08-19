@@ -107,8 +107,8 @@ describe('authority determinism audit', () => {
     expect(battlePage).not.toMatch(/GameEngine\.applyBattleAction\s*\([^)]*\baction\b/)
     expect(battlePage).not.toContain('optimisticPendingState')
     expect(battlePage).not.toContain('preOptimisticGForEcho')
-    expect(battlePage).toContain('var authorityTrace = null')
-    expect(battlePage).toContain('trace: authorityTrace')
+    expect(battlePage).not.toContain('var authorityTrace = null')
+    expect(battlePage).not.toContain('trace: authorityTrace')
     expect(battlePage).not.toMatch(/entry\.action\.type\s*===\s*['"]pending(?:Option|Target)Select['"][\s\S]{0,200}wsActionSeq\s*=/)
     expect(battlePage.match(/runDeterministicAuthorityAction\(/g)?.length, 'authority runner call sites').toBeGreaterThanOrEqual(4)
 

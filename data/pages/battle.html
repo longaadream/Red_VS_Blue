@@ -4962,7 +4962,6 @@
 
     async function doAction(action) {
       action = withClientActionId(action)
-      var authorityTrace = null
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) {
@@ -4981,21 +4980,11 @@
         setMoveButtonDisabled(true)
         if (action.type === 'endTurn') addLog('正在结束回合...', 'info')
 
-        if (typeof GameEngine !== 'undefined' && GameEngine.safeCloneBattleState) {
-          try {
-            const previewState = wsMode === 'relay' && wsRole === 'host' && relayAuthorityState ? relayAuthorityState : G
-            authorityTrace = runDeterministicAuthorityAction(GameEngine.safeCloneBattleState(previewState), action).trace || null
-          } catch (e) {
-            if (enterActionTargetMode(action, targetPreparationFromError(e))) return
-            throw e
-          }
-        }
-
         // Relay guest: submit action via WS, wait for stateUpdate.
         if (wsMode === 'relay' && wsRole === 'guest') {
           relaySeq++
           var relayActionAuth = await createBattleActionAuth(action)
-          RvBWs.send({ type: 'action', seq: relaySeq, action, auth: relayActionAuth, prevStateHash: '', trace: authorityTrace })
+          RvBWs.send({ type: 'action', seq: relaySeq, action, auth: relayActionAuth, prevStateHash: '' })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -5030,7 +5019,7 @@
         // LAN WS: submit action via WS only.
         if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
           var lanActionAuth = await createBattleActionAuth(action)
-          RvBWs.send({ type: 'action', action, auth: lanActionAuth, playerId: myPlayerId, trace: authorityTrace })
+          RvBWs.send({ type: 'action', action, auth: lanActionAuth, playerId: myPlayerId })
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
