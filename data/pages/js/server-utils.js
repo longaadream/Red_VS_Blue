@@ -14,7 +14,15 @@
   var LOCAL_SERVER_KEY = 'rvb_local_server_url'
   var LAN_SERVER_KEY = 'rvb_lan_server_url'
   var REMOTE_SERVER_KEY = 'rvb_remote_server_url'
-  var WS_PORT_KEY = 'rvb_ws_port'
+  var LEGACY_WS_KEYS = ['rvb_ws_port', 'rvb_ws_port_server_url', 'rvb_ws_port_source']
+
+  function clearLegacyWebSocketConfig() {
+    try {
+      LEGACY_WS_KEYS.forEach(function (key) { localStorage.removeItem(key) })
+    } catch {}
+  }
+
+  clearLegacyWebSocketConfig()
 
   function normalizeServerUrl(url) {
     return String(url || '').trim().replace(/\/+$/, '')
@@ -75,36 +83,15 @@
     return 'remote'
   }
 
-  function saveWsPort(wsPort) {
-    var n = parseInt(wsPort, 10)
-    if (Number.isFinite(n) && n > 0 && n <= 65535) {
-      localStorage.setItem(WS_PORT_KEY, String(n))
-      return n
-    }
-    return null
-  }
-
-  function getConfiguredWsPort(search) {
-    try {
-      var params = search instanceof URLSearchParams
-        ? search
-        : new URLSearchParams(search || (window.location && window.location.search) || '')
-      var fromQuery = saveWsPort(params.get('wsPort') || params.get('ws_port'))
-      if (fromQuery) return fromQuery
-    } catch {}
-    return saveWsPort(localStorage.getItem(WS_PORT_KEY))
-  }
-
   function saveServerConfig(config) {
     config = config || {}
     var url = normalizeServerUrl(config.url || config.serverUrl)
     if (!url) return false
     var mode = config.mode || getServerModeForUrl(url)
-    var wsPort = config.wsPort || config.ws_port
-    if (mode === 'local') saveLocalServerUrl(url, wsPort)
-    else if (mode === 'lan') saveLanServerUrl(url, wsPort)
-    else if (mode === 'remote') saveRemoteServerUrl(url, wsPort)
-    else saveServerUrl(url, wsPort)
+    if (mode === 'local') saveLocalServerUrl(url)
+    else if (mode === 'lan') saveLanServerUrl(url)
+    else if (mode === 'remote') saveRemoteServerUrl(url)
+    else saveServerUrl(url)
     return true
   }
 
@@ -123,14 +110,13 @@
     }
     if (!url) url = getServerUrl()
     if (!mode) mode = getActiveServerMode() || getServerModeForUrl(url)
-    return { mode: mode, url: url, serverUrl: url, wsPort: getConfiguredWsPort(params) }
+    return { mode: mode, url: url, serverUrl: url }
   }
 
-  function saveServerUrl(url, wsPort) {
+  function saveServerUrl(url) {
     url = normalizeServerUrl(url)
     var mode = getServerModeForUrl(url)
     activateServerUrl(url, mode)
-    if (wsPort) saveWsPort(wsPort)
     if (mode === 'remote') {
       localStorage.setItem(REMOTE_SERVER_KEY, url)
     } else if (mode === 'local') {
@@ -145,33 +131,30 @@
     }
   }
 
-  function saveLocalServerUrl(url, wsPort) {
+  function saveLocalServerUrl(url) {
     url = normalizeServerUrl(url)
     localStorage.setItem(LOCAL_SERVER_KEY, url)
     localStorage.setItem(REMOTE_SERVER_KEY, url)
     activateServerUrl(url, 'local')
-    if (wsPort) saveWsPort(wsPort)
     if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
       window.RvBBridge.saveUrl(url)
     }
   }
 
-  function saveLanServerUrl(url, wsPort) {
+  function saveLanServerUrl(url) {
     url = normalizeServerUrl(url)
     localStorage.setItem(LAN_SERVER_KEY, url)
     localStorage.setItem(REMOTE_SERVER_KEY, url)
     activateServerUrl(url, 'lan')
-    if (wsPort) saveWsPort(wsPort)
     if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
       window.RvBBridge.saveUrl(url)
     }
   }
 
-  function saveRemoteServerUrl(url, wsPort) {
+  function saveRemoteServerUrl(url) {
     url = normalizeServerUrl(url)
     localStorage.setItem(REMOTE_SERVER_KEY, url)
     activateServerUrl(url, 'remote')
-    if (wsPort) saveWsPort(wsPort)
     if (window.RvBBridge && typeof window.RvBBridge.saveUrl === 'function') {
       window.RvBBridge.saveUrl(url)
     }
@@ -200,14 +183,12 @@
       if (typeof window.electronAPI.getMode === 'function') {
         try {
           var mode = await window.electronAPI.getMode()
-          if (mode && mode.wsPort) saveWsPort(mode.wsPort)
           if (mode && mode.localUrl) return mode.localUrl
         } catch {}
       }
       if (typeof window.electronAPI.getHostInfo === 'function') {
         try {
           var host = await window.electronAPI.getHostInfo()
-          if (host && host.wsPort) saveWsPort(host.wsPort)
           if (host && host.localUrl) return host.localUrl
         } catch {}
       }
@@ -252,8 +233,7 @@
       : new URLSearchParams(search || (window.location && window.location.search) || '')
     var mode = params.get('server') || ''
     var url = normalizeServerUrl(params.get('serverUrl') || params.get('url') || '')
-    var wsPort = params.get('wsPort') || params.get('ws_port') || ''
-    if (url) return saveServerConfig({ mode: mode || getServerModeForUrl(url), url: url, wsPort: wsPort })
+    if (url) return saveServerConfig({ mode: mode || getServerModeForUrl(url), url: url })
     if (mode) return ensureServerMode(mode, url)
     mode = getActiveServerMode()
     if (mode) return ensureServerMode(mode, getServerUrl())
@@ -264,10 +244,8 @@
     params = params || new URLSearchParams()
     var mode = getActiveServerMode()
     var url = getServerUrl()
-    var wsPort = getConfiguredWsPort()
     if (mode) params.set('server', mode)
     if (url) params.set('serverUrl', url)
-    if (wsPort) params.set('wsPort', String(wsPort))
     return params
   }
 
@@ -277,7 +255,7 @@
     localStorage.removeItem(LOCAL_SERVER_KEY)
     localStorage.removeItem(LAN_SERVER_KEY)
     localStorage.removeItem(REMOTE_SERVER_KEY)
-    localStorage.removeItem(WS_PORT_KEY)
+    clearLegacyWebSocketConfig()
     if (window.RvBBridge && typeof window.RvBBridge.clearUrl === 'function') {
       window.RvBBridge.clearUrl()
     }
@@ -708,10 +686,8 @@
   // Expose globally
   window.RvBUtils = {
     SERVER_KEY: SERVER_KEY,
-    WS_PORT_KEY: WS_PORT_KEY,
     getServerUrl: getServerUrl,
     getConnectionConfig: getConnectionConfig,
-    getConfiguredWsPort: getConfiguredWsPort,
     getServerUrlForMode: getServerUrlForMode,
     getActiveServerMode: getActiveServerMode,
     getServerModeForUrl: getServerModeForUrl,

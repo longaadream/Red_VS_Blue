@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="黏弹">
+  <circle cx="32" cy="32" r="29" fill="#251e05" stroke="#ffd84a" stroke-width="4"/>
+  <circle cx="31" cy="36" r="17" fill="#ffd43b" stroke="#fff2a8" stroke-width="2"/>
+  <rect x="25" y="13" width="13" height="8" rx="3" fill="#fff0a0"/>
+  <path d="M36 15c5-7 11-7 14-2" fill="none" stroke="#ffb62e" stroke-width="4" stroke-linecap="round"/>
+  <path d="m50 8 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#fff9c7"/>
+  <path d="M22 36h18M31 27v18" stroke="#5c4300" stroke-width="4" stroke-linecap="round"/>
+</svg>

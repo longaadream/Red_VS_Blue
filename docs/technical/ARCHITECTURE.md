@@ -37,7 +37,7 @@
 
 1. 根 `package.json` 的 `dev:electron:server` 编译 `electron/` 后启动 Electron。
 2. `electron/main.ts` 的 `app.whenReady()` 调用 `startGameServer()`。
-3. `startGameServer()` 启动 Next standalone 服务；打包流程通过 `scripts/stage-client-resources.js` 注入同端口 WebSocket 代理。
+3. `startGameServer()` 以 Node `--require` 显式加载同端口 Upgrade 预加载器后启动 Next standalone；打包流程同时把预加载器注入/复制到 staged 资源，不创建第二个监听端口。
 4. Next 在 `instrumentation.ts` 的 `register()` 中调用 `lib/ws-server.ts::startWsServer()`。
 5. `electron/main.ts` 加载服务管理界面。
 

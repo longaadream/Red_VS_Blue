@@ -186,7 +186,6 @@ export async function POST(req: NextRequest) {
       await getRoomStore().setRoom(roomId, room)
 
       const origin = req.nextUrl.origin
-      const wsPort = process.env.WS_PORT || '3001'
       const buildBattleUrl = (player: { playerId: string; name: string }) => {
         const url = new URL('/qa/client/battle.html', origin)
         url.searchParams.set('roomId', roomId)
@@ -195,7 +194,6 @@ export async function POST(req: NextRequest) {
         url.searchParams.set('playerName', player.name)
         url.searchParams.set('server', 'local')
         url.searchParams.set('serverUrl', origin)
-        url.searchParams.set('wsPort', wsPort)
         url.searchParams.set('debug', '1')
         url.searchParams.set('qa', 'RED-43')
         url.searchParams.set('qaScenario', scenario.id)

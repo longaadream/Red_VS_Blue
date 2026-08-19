@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="暗影潜行">
+  <circle cx="32" cy="32" r="29" fill="#160c28" stroke="#a86cff" stroke-width="4"/>
+  <path d="M8 33c7-12 15-18 24-18s17 6 24 18c-7 11-15 16-24 16S15 44 8 33Z" fill="#38205c" stroke="#d2b2ff" stroke-width="3"/>
+  <circle cx="32" cy="32" r="10" fill="#b77aff"/>
+  <path d="M32 22c-5 4-6 13 2 19-9 1-15-4-15-10 0-7 6-12 13-9Z" fill="#09050f"/>
+</svg>

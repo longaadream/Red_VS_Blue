@@ -1,3 +1,5 @@
+import type { IncomingMessage } from 'node:http'
+import type { Duplex } from 'node:stream'
 import { WebSocketServer, WebSocket } from 'ws'
 import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
 import { getBattleStorage, withServerSkills } from './game/battle-storage'
@@ -34,6 +36,7 @@ const _g = globalThis as unknown as {
   __rvbWsLifecycle?: Promise<void>
   __rvbRoomClients?: Map<string, Set<WebSocket>>
   __rvbPlayerWs?: Map<string, WebSocket>
+  __rvbWsUpgradeHandler?: (request: IncomingMessage, socket: Duplex, head: Buffer) => void
 }
 
 const roomClients = (_g.__rvbRoomClients ??= new Map<string, Set<WebSocket>>())
@@ -365,15 +368,14 @@ async function sendBattleSnapshot(ws: WebSocket, roomId: string, viewerPlayerId?
 async function restartWsServer(): Promise<void> {
   const activeServer = _g.__rvbWss ?? _wss
   if (activeServer) {
-    // HMR can initialize a new Next server instance before the prior async
-    // close has released its port. Disconnect stale clients and wait for the
-    // close callback before binding the replacement server.
+    // HMR installs a fresh noServer router on the existing HTTP server.
     for (const client of activeServer.clients) client.terminate()
     await new Promise<void>((resolve, reject) => {
       activeServer.close((error) => error ? reject(error) : resolve())
     })
     if (_wss === activeServer) _wss = null
     if (_g.__rvbWss === activeServer) _g.__rvbWss = null
+    delete _g.__rvbWsUpgradeHandler
     roomClients.clear()
     playerWs.clear()
   }
@@ -381,23 +383,28 @@ async function restartWsServer(): Promise<void> {
     console.log('[WS] WebSocket server disabled (DISABLE_WS=1)')
     return
   }
-  const port = getWsPort()
 
-  const server = new WebSocketServer({ port })
+  const server = new WebSocketServer({ noServer: true })
   _wss = server
   _g.__rvbWss = server
-  const startup = new Promise<void>((resolve, reject) => {
-    server.once('listening', () => {
-      console.log(`[WS] WebSocket server listening on port ${port}`)
-      resolve()
+  _g.__rvbWsUpgradeHandler = (request, socket, head) => {
+    if (_g.__rvbWss !== server) {
+      try { socket.destroy() } catch {}
+      return
+    }
+    server.handleUpgrade(request, socket, head, (ws) => {
+      server.emit('connection', ws, request)
     })
-    server.once('error', reject)
-  })
+  }
+  console.log('[WS] WebSocket service attached to the public HTTP(S) origin at /ws')
 
   server.on('error', (err: Error) => {
-    console.error(`[WS] Failed to start on port ${port}:`, err.message)
+    console.error('[WS] Same-origin WebSocket service failed:', err.message)
     if (_wss === server) _wss = null
-    if (_g.__rvbWss === server) _g.__rvbWss = null
+    if (_g.__rvbWss === server) {
+      _g.__rvbWss = null
+      delete _g.__rvbWsUpgradeHandler
+    }
   })
 
   server.on('connection', (ws: WebSocket) => {
@@ -683,7 +690,6 @@ async function restartWsServer(): Promise<void> {
     })
   })
 
-  await startup
 }
 
 export function startWsServer(): Promise<void> {
@@ -762,8 +768,4 @@ export function broadcastToRoom(roomId: string, data: unknown): void {
       try { ws.send(msg) } catch {}
     }
   }
-}
-
-export function getWsPort(): number {
-  return parseInt(process.env.WS_PORT || '3001', 10)
 }

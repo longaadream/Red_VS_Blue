@@ -57,6 +57,22 @@ export type WsInbound =
     }
   | { type: 'action'; seq: number; action: unknown; auth?: unknown; prevStateHash: string; signature?: string }
   | { type: 'stateUpdate'; seq: number; authorityVersion?: number; state: unknown; seed?: number; stateHash?: string }
+  | {
+      type: 'actionError'
+      to: string
+      action: unknown
+      error: string
+      code?: string
+      preparation?: unknown
+      needsTargetSelection?: boolean
+      targetType?: string
+      range?: number
+      filter?: string
+      targetIndex?: number
+      needsOptionSelection?: boolean
+      title?: string
+      options?: unknown[]
+    }
   | { type: 'ping' }
 
 // Outbound WS messages to clients
@@ -64,6 +80,22 @@ export type WsOutbound =
   | { type: 'subscribed'; role: PlayerRole }
   | { type: 'pendingAction'; seq: number; action: unknown; auth?: unknown; from: string }
   | { type: 'stateUpdate'; seq: number; authorityVersion?: number; state: unknown; seed?: number; stateHash?: string }
+  | {
+      type: 'actionError'
+      from: string
+      action: unknown
+      error: string
+      code?: string
+      preparation?: unknown
+      needsTargetSelection?: boolean
+      targetType?: string
+      range?: number
+      filter?: string
+      targetIndex?: number
+      needsOptionSelection?: boolean
+      title?: string
+      options?: unknown[]
+    }
   | { type: 'roomUpdate'; room: Omit<Room, 'lastStateBlob' | 'actionLog'> }
   | { type: 'gameOver'; winner: string }
   | { type: 'hostResume'; authorityVersion?: number; state: unknown; seed?: number; stateHash?: string }

@@ -9,7 +9,7 @@ import { stampPendingDeploymentAuthorityVersion } from "@/lib/game/battle-trace"
 /**
  * POST /api/relay-battle-init
  *
- * Called by the relay HOST CLIENT on their LOCAL server (localhost:7878 or :3001).
+ * Called by the relay HOST CLIENT on its same-origin local server.
  * Creates an initial BattleState from the relay room's player/piece selections
  * and returns it — no room is stored server-side.
  *

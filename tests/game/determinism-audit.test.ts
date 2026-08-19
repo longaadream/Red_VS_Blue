@@ -107,8 +107,8 @@ describe('authority determinism audit', () => {
     expect(battlePage).not.toMatch(/GameEngine\.applyBattleAction\s*\([^)]*\baction\b/)
     expect(battlePage).not.toContain('optimisticPendingState')
     expect(battlePage).not.toContain('preOptimisticGForEcho')
-    expect(battlePage).toContain('var authorityTrace = null')
-    expect(battlePage).toContain('trace: authorityTrace')
+    expect(battlePage).not.toContain('var authorityTrace = null')
+    expect(battlePage).not.toContain('trace: authorityTrace')
     expect(battlePage).not.toMatch(/entry\.action\.type\s*===\s*['"]pending(?:Option|Target)Select['"][\s\S]{0,200}wsActionSeq\s*=/)
     expect(battlePage.match(/runDeterministicAuthorityAction\(/g)?.length, 'local preview/replay runner call sites').toBeGreaterThanOrEqual(3)
     expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]stateUpdate['"]/)
@@ -116,6 +116,11 @@ describe('authority determinism audit', () => {
 
     const browserEntry = read(CROSS_PLATFORM_AUTHORITY_FILES.browserEntry)
     expect(browserEntry).toContain('getBattleRootSeed, hashBattleState, runBattleAction')
+
+    const gameLogicDoc = read('docs/technical/GAME_LOGIC_SYSTEM.md')
+    expect(gameLogicDoc).toContain('不在发送前克隆战局、执行 Runner 或生成客户端 trace')
+    expect(gameLogicDoc).toContain('actionError + preparation')
+    expect(gameLogicDoc).not.toContain('UI->>Browser: 在克隆状态执行动作')
   })
 
   it('keeps browser candidate builds on explicit platform shims', () => {

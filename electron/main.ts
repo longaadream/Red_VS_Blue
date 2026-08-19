@@ -167,6 +167,13 @@ function findServerEntry(appRoot: string): string | null {
   ].find(p => fs.existsSync(p)) ?? null
 }
 
+function findSamePortPreload(appRoot: string, serverEntry: string): string | null {
+  return [
+    path.join(path.dirname(serverEntry), 'ws-same-port-server.cjs'),
+    path.join(appRoot, 'scripts', 'ws-same-port-server.cjs'),
+  ].find(candidate => fs.existsSync(candidate)) ?? null
+}
+
 function startGameServer(): void {
   if (serverProcess) return
 
@@ -197,12 +204,20 @@ function startGameServer(): void {
     return
   }
 
+  const samePortPreload = findSamePortPreload(appRoot, serverEntry)
+  if (!samePortPreload) {
+    const msg = `ws-same-port-server.cjs not found for ${serverEntry}`
+    console.error('[electron]', msg)
+    dialog.showErrorBox('服务器网络入口缺失', msg)
+    return
+  }
+
   // 确保 CSS / JS / 图片等 static 资源在 standalone 目录下
   ensureStandaloneAssets(appRoot, serverEntry)
 
   let spawnedProcess: ChildProcess
   try {
-    spawnedProcess = spawn(getNodeBin(), [serverEntry], {
+    spawnedProcess = spawn(getNodeBin(), ['--require', samePortPreload, serverEntry], {
       cwd: path.dirname(serverEntry),
       env: {
         ...process.env,

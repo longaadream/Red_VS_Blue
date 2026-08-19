@@ -105,7 +105,7 @@ public class MobileHttpServer {
 
     private void handleHttp(OutputStream out, Request req) throws IOException {
         if ("GET".equals(req.method) && "/api/ws-info".equals(req.path)) {
-            writeJson(out, 200, "{\"wsPort\":" + serverPort + "}");
+            writeJson(out, 200, "{\"transport\":\"same-origin\",\"path\":\"/ws/rooms/{roomId}\"}");
             return;
         }
         if ("OPTIONS".equals(req.method)) {
