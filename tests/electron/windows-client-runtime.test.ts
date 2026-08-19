@@ -25,7 +25,48 @@ describe('Windows Electron client runtime', () => {
     }
 
     try {
-      expect(await findFreePort(address.port)).not.toBe(address.port)
+      const selected = await findFreePort(address.port)
+      expect(selected).not.toBe(address.port)
+
+      const verification = net.createServer()
+      await new Promise<void>((resolve, reject) => {
+        verification.once('error', reject)
+        verification.listen(selected, '127.0.0.1', resolve)
+      })
+      await new Promise<void>((resolve, reject) => {
+        verification.close((error) => error ? reject(error) : resolve())
+      })
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        occupied.close((error) => error ? reject(error) : resolve())
+      })
+    }
+  })
+
+  test('selects another loopback port when the preferred port is occupied on loopback', async () => {
+    const occupied = net.createServer()
+    await new Promise<void>((resolve, reject) => {
+      occupied.once('error', reject)
+      occupied.listen(0, '127.0.0.1', resolve)
+    })
+
+    const address = occupied.address()
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected an occupied TCP port.')
+    }
+
+    try {
+      const selected = await findFreePort(address.port)
+      expect(selected).not.toBe(address.port)
+
+      const verification = net.createServer()
+      await new Promise<void>((resolve, reject) => {
+        verification.once('error', reject)
+        verification.listen(selected, '127.0.0.1', resolve)
+      })
+      await new Promise<void>((resolve, reject) => {
+        verification.close((error) => error ? reject(error) : resolve())
+      })
     } finally {
       await new Promise<void>((resolve, reject) => {
         occupied.close((error) => error ? reject(error) : resolve())

@@ -1,38 +1,53 @@
 import * as nodeNet from 'node:net'
 
-const PORT_PROBE_HOST = '0.0.0.0'
+const PORT_PROBE_HOSTS = ['0.0.0.0', '127.0.0.1'] as const
 
-export function findFreePort(start: number): Promise<number> {
-  if (!Number.isInteger(start) || start < 1 || start > 65535) {
-    return Promise.reject(new RangeError(`Invalid TCP port: ${start}`))
-  }
-
+function canBind(port: number, host: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const server = nodeNet.createServer()
     server.once('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'EADDRINUSE' || error.code === 'EACCES') {
-        resolve(findFreePort(start + 1))
+        resolve(false)
         return
       }
       reject(error)
     })
 
     server.listen({
-      port: start,
-      host: PORT_PROBE_HOST,
+      port,
+      host,
       exclusive: true,
     }, () => {
-      const address = server.address()
-      if (!address || typeof address === 'string') {
-        server.close()
-        reject(new Error('Unable to resolve the selected local TCP port.'))
-        return
-      }
-
       server.close((error) => {
-        if (error) reject(error)
-        else resolve(address.port)
+        if (error) {
+          reject(error)
+          return
+        }
+        resolve(true)
       })
     })
   })
+}
+
+async function isPortAvailable(port: number): Promise<boolean> {
+  for (const host of PORT_PROBE_HOSTS) {
+    if (!await canBind(port, host)) {
+      return false
+    }
+  }
+  return true
+}
+
+export async function findFreePort(start: number): Promise<number> {
+  if (!Number.isInteger(start) || start < 1 || start > 65535) {
+    throw new RangeError(`Invalid TCP port: ${start}`)
+  }
+
+  for (let port = start; port <= 65535; port += 1) {
+    if (await isPortAvailable(port)) {
+      return port
+    }
+  }
+
+  throw new RangeError(`No available TCP port at or above ${start}.`)
 }
