@@ -9,7 +9,7 @@ type EventEvidence = { event: string }
 type EventAuditReport = {
   schemaVersion: number
   declaredWithoutProducers: unknown[]
-  events: unknown[]
+  events: EventEvidence[]
   emittedOnly: unknown[]
   undeclaredEvents: unknown[]
   consumedOnly: EventEvidence[]
@@ -48,22 +48,14 @@ describe('RED-45 producer/consumer event catalog', () => {
     ]))
   })
 
-  it('fails observably for the undeclared and producerless beforeAttack consumers', () => {
+  it('has no undeclared or producerless event consumers after RED-77 cleanup', () => {
     const { status, report } = runEventAudit()
 
-    expect(status).toBe(1)
+    expect(status).toBe(0)
     expect(report.emittedOnly).toEqual([])
-    expect(report.undeclaredEvents).toEqual([
-      expect.objectContaining({
-        event: 'beforeAttack',
-        declared: false,
-        producers: [],
-        consumers: [
-          'data/rules/rule-freeze-prevent-attack.json#trigger.type',
-        ],
-      }),
-    ])
-    expect(report.consumedOnly.map(entry => entry.event)).toEqual(['beforeAttack'])
+    expect(report.undeclaredEvents).toEqual([])
+    expect(report.consumedOnly).toEqual([])
+    expect(report.events.map(entry => entry.event)).not.toContain('beforeAttack')
   })
 
   it('reports declared events without current data consumers without treating them as producers', () => {
