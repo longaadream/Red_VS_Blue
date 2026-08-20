@@ -45,12 +45,12 @@ Additional acceptance evidence:
 - tap activation, 10px drag threshold, pan, pinch zoom, and reset;
 - blue faction emissive restoration after damage plus one-pip/two-pip non-color faction encoding;
 - unchanged serialized presentation input after interaction;
-- remount/dispose cleanup of RAF, listeners, resize observer, WebGL context, geometry, material, and canvas.
+- dynamic piece-removal and remount/dispose cleanup of RAF, listeners, resize observer, WebGL context, geometry, material, and canvas.
 
 ## Quality gates
 
-- Focused renderer/UI set: 6 files and 50 tests passed.
-- Full suite: 69 files and 546 tests passed.
+- Focused renderer/UI set: 6 files and 51 tests passed.
+- Full suite: 69 files and 547 tests passed.
 - `npm run typecheck`: passed.
 - `npm run check:encoding`: passed for 548 text files.
 - `npm run lint`: repository configuration stops before source lint because its last flat-config object references `import/no-anonymous-default-export` without registering the installed `eslint-plugin-import`.

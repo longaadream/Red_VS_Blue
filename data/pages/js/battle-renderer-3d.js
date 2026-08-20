@@ -521,6 +521,7 @@
         _scene.remove(obj.group)
         if (obj.body.material && obj.body.material.dispose) obj.body.material.dispose()
         if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
+        if (obj.markerMaterial && obj.markerMaterial.dispose) obj.markerMaterial.dispose()
         if (obj.summaryEl && obj.summaryEl.parentNode) obj.summaryEl.remove()
         _pieceObjects.delete(id)
       }
@@ -660,6 +661,7 @@
     _scene.add(group)
     _pieceObjects.set(piece.id, {
       group, body, ring, portraitMesh, contactShadow, factionMarkers,
+      markerMaterial,
       summaryEl,
       faction,
       portraitLoaded: false,

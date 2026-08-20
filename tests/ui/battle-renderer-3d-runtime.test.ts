@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { createRed68BattleFixture } from './fixtures/red-68-battle-fixture'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
-type ThreeMaterial = { emissive: { getHex(): number }; emissiveIntensity: number }
+type ThreeMaterial = { emissive: { getHex(): number }; emissiveIntensity: number; dispose(): void }
 type ThreeNode = { type: string; children: ThreeNode[]; visible: boolean; material?: ThreeMaterial }
 type ThreeScene = { children: ThreeNode[]; updateMatrixWorld(force: boolean): void }
 type ThreeCamera = { updateMatrixWorld(force: boolean): void }
@@ -365,5 +365,36 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(secondRenderer.disposed).toBe(true)
     expect(secondRenderer.contextLost).toBe(true)
     expect(harness.rafCallbacks.size).toBe(0)
+  })
+
+  it('disposes piece-owned materials when a piece leaves the presentation model', () => {
+    const harness = createHarness()
+    const model = runtimeModel()
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame()
+
+    const scene = harness.renderers[0].scene!
+    const pieceGroups = scene.children.filter((child) => child.type === 'Group')
+    expect(pieceGroups).toHaveLength(16)
+    const removedGroup = pieceGroups[0]
+    const markerMaterial = removedGroup.children[4].material!
+    let markerDisposed = false
+    const disposeMarker = markerMaterial.dispose.bind(markerMaterial)
+    markerMaterial.dispose = () => {
+      markerDisposed = true
+      disposeMarker()
+    }
+    const materialDisposalsBefore = harness.disposeCounts.material
+
+    const nextModel = structuredClone(model)
+    nextModel.pieces = nextModel.pieces.slice(1)
+    harness.renderer.update(nextModel)
+
+    expect(scene.children).not.toContain(removedGroup)
+    expect(scene.children.filter((child) => child.type === 'Group')).toHaveLength(15)
+    expect(markerDisposed).toBe(true)
+    expect(harness.disposeCounts.material - materialDisposalsBefore).toBe(3)
+    harness.renderer.dispose()
   })
 })
