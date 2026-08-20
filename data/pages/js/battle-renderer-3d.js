@@ -1,28 +1,46 @@
 ;(function () {
   'use strict'
 
-  // ── Requires THREE global (r134) loaded before this script ───────────────────
+  // ── Requires THREE and the presentation-only tactical geometry helper ───────
+  const TacticalGeometry = window.BattleTacticalGeometry
+  if (!TacticalGeometry) throw new Error('BattleRenderer3D requires BattleTacticalGeometry')
+  const TACTICAL_METRICS = TacticalGeometry.METRICS
 
   // ── Constants ────────────────────────────────────────────────────────────────
-  const TILE_H = 0.10      // tile box height
-  const TILE_W = 0.90      // tile box width/depth (0.1 gap gives grid lines)
-  const PIECE_R = 0.36     // piece cylinder radius
-  const PIECE_H = 0.22     // piece cylinder height
-  const RING_R  = 0.40     // faction ring radius
-  const RING_T  = 0.045    // faction ring tube radius
-  const SELECTED_RING_R = 0.445
+  const TILE_H = 0.12
+  const TILE_W = 0.92
+  const BOARD_BASE_H = 0.34
+  const PIECE_W = TACTICAL_METRICS.pieceWidth
+  const PIECE_D = TACTICAL_METRICS.pieceDepth
+  const PIECE_H = TACTICAL_METRICS.pieceHeight
+  const PIECE_PORTRAIT_W = 0.66
+  const PIECE_PORTRAIT_D = 0.50
+  const RING_T = 0.035
   const SELECTED_RING_T = 0.018
+  const PAN_ACTIVATION_PX = TACTICAL_METRICS.panActivationPx
+  const MIN_TOUCH_CELL_PIXELS = TACTICAL_METRICS.minTouchCellPixels
+  const TILE_HEIGHTS = Object.freeze({
+    floor: TILE_H,
+    spawn: TILE_H + 0.035,
+    spring: TILE_H + 0.055,
+    chargepad: TILE_H + 0.055,
+    trap: TILE_H + 0.075,
+    cover: 0.30,
+    wall: 0.52,
+    hole: 0.035,
+    lava: 0.08,
+  })
 
   const TILE_COLORS = {
-    floor:     0x374151,
-    wall:      0x111827,
-    spawn:     0x052e16,
-    cover:     0x78350f,
-    hole:      0x082f49,
-    lava:      0x7c2d12,
-    spring:    0x134e4a,
-    chargepad: 0x3b0764,
-    trap:      0x451a03,
+    floor:     0x252a30,
+    wall:      0x0c1015,
+    spawn:     0x173127,
+    cover:     0x4b3a26,
+    hole:      0x07131c,
+    lava:      0x6b2418,
+    spring:    0x17413d,
+    chargepad: 0x34244c,
+    trap:      0x4a3020,
   }
   const TILE_EMISSIVE = {
     lava:      { color: 0xff4400, intensity: 0.35 },
@@ -55,6 +73,7 @@
 
   // ── State ────────────────────────────────────────────────────────────────────
   let _renderer, _camera, _scene, _animFrameId
+  let _cameraTarget = null
   let _container = null
   let _hpLayer = null
   let _floatLayer = null
@@ -68,6 +87,7 @@
   const _listeners = []
 
   let _mapW = 0, _mapH = 0
+  let _boardBase = null
   const _tileObjects = new Map()       // "x,z" → THREE.Mesh
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
@@ -87,6 +107,8 @@
   let _pieceBodyGeom = null
   let _pieceRingGeom = null
   let _portraitDiscGeom = null
+  let _contactShadowGeom = null
+  let _contactShadowMat = null
   const _tileMats = {}
   const _factionMats = {}
   const _hlMats = {}
@@ -223,24 +245,30 @@
     _textureLoadGeneration += 1
     _mounted = true
 
-    // Shared geometries
-    _tileGeom       = new THREE.BoxGeometry(TILE_W, TILE_H, TILE_W)
-    _hlPlaneGeom    = new THREE.PlaneGeometry(TILE_W - 0.06, TILE_W - 0.06)
-    _selectedRingGeom = new THREE.TorusGeometry(SELECTED_RING_R, SELECTED_RING_T, 8, 32)
-    _pieceBodyGeom  = new THREE.CylinderGeometry(PIECE_R, PIECE_R, PIECE_H, 24)
-    _pieceRingGeom  = new THREE.TorusGeometry(RING_R, RING_T, 8, 32)
-    _portraitDiscGeom = new THREE.CircleGeometry(PIECE_R, 24)
+    // Shared geometries. Piece geometry stays unit-sized so the oval metrics are
+    // explicit and identical for portrait, faction ring, and touch projection.
+    _tileGeom = new THREE.BoxGeometry(TILE_W, 1, TILE_W)
+    _hlPlaneGeom = new THREE.PlaneGeometry(TILE_W - 0.06, TILE_W - 0.06)
+    _selectedRingGeom = new THREE.TorusGeometry(0.5, SELECTED_RING_T, 8, 32)
+    _pieceBodyGeom = new THREE.CylinderGeometry(0.5, 0.5, PIECE_H, 32)
+    _pieceRingGeom = new THREE.TorusGeometry(0.5, RING_T, 8, 32)
+    _portraitDiscGeom = new THREE.CircleGeometry(0.5, 32)
+    _contactShadowGeom = new THREE.CircleGeometry(0.5, 32)
+    _contactShadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false })
 
-    // Scene
+    // Scene and table lighting use dark neutral metal; faction color is reserved
+    // for the narrow base ring and the existing authoritative highlight layers.
     _scene = new THREE.Scene()
-    _scene.background = new THREE.Color(0x0a0f1a)
+    _scene.background = new THREE.Color(0x07090b)
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.55)
+    const ambient = new THREE.AmbientLight(0xdbe4ee, 0.48)
     _scene.add(ambient)
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.75)
-    dirLight.position.set(5, 12, 8)
+    const dirLight = new THREE.DirectionalLight(0xfff1dc, 0.72)
+    dirLight.position.set(-7, 13, 10)
     _scene.add(dirLight)
+    const edgeLight = new THREE.DirectionalLight(0x7ba3c9, 0.24)
+    edgeLight.position.set(10, 5, -8)
+    _scene.add(edgeLight)
 
     // Renderer
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
@@ -257,11 +285,11 @@
     _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'
     _container.appendChild(_hpLayer)
 
-    // Camera (orthographic, top-down)
+    // Fixed tactical orthographic camera. A stable 25° tilt avoids perspective
+    // distortion while exposing tile and piece height consistently.
     _camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200)
-    _camera.position.set(0, 50, 0)
-    _camera.lookAt(0, 0, 0)
-    _camera.up.set(0, 0, -1)
+    _cameraTarget = new THREE.Vector3(0, 0, 0)
+    _camera.up.set(0, 1, 0)
 
     // Pointer events on canvas
     _initControls()
@@ -280,6 +308,9 @@
     if (!_renderer || !_container) return
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
+    if (_mapW && _camera) {
+      _camera.zoom = Math.max(_camera.zoom, _minimumUsableZoom(w, h))
+    }
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     _renderer.setSize(w, h, false)
     _updateCameraFrustum(w, h)
@@ -297,11 +328,13 @@
 
   function _minimumUsableZoom(w, h) {
     if (!_mapW) return 1
-    const narrowViewport = w <= 760
+    const touchViewport = w <= 760 || (w > h && h <= 500)
     const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
-    if (!narrowViewport && !coarsePointer) return 1
+    if (!touchViewport && !coarsePointer) return 1
     const pixelsPerCell = h / (_fitWorldHalfHeight(w, h) * 2)
-    return Math.max(1, Math.min(1.8, 24 / Math.max(1, pixelsPerCell)))
+    const projectedDepthScale = Math.cos(TACTICAL_METRICS.cameraTiltDeg * Math.PI / 180)
+    const requiredZoom = MIN_TOUCH_CELL_PIXELS / Math.max(1, pixelsPerCell * projectedDepthScale)
+    return Math.max(1, Math.min(5, requiredZoom))
   }
 
   function _preferredInitialZoom(w, h) {
@@ -309,7 +342,22 @@
     const aspect = w / (h || 1)
     const visibleWorldWidth = _fitWorldHalfHeight(w, h) * 2 * aspect
     const widthCoverageZoom = (visibleWorldWidth / (_mapW + 2)) * 0.86
-    return Math.max(_minimumUsableZoom(w, h), Math.min(1.8, widthCoverageZoom))
+    return Math.max(_minimumUsableZoom(w, h), Math.min(2.35, widthCoverageZoom))
+  }
+
+  function _positionCameraFromTarget() {
+    if (!_camera || !_cameraTarget || !_mapW) return
+    const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
+    const offsetX = pose.position.x - pose.target.x
+    const offsetY = pose.position.y - pose.target.y
+    const offsetZ = pose.position.z - pose.target.z
+    _camera.position.set(_cameraTarget.x + offsetX, offsetY, _cameraTarget.z + offsetZ)
+    _camera.lookAt(_cameraTarget.x, _cameraTarget.y, _cameraTarget.z)
+  }
+
+  function _tileSurfaceHeightAt(x, z) {
+    const tile = _tileObjects.get(Math.round(x) + ',' + Math.round(z))
+    return tile && Number.isFinite(tile.userData.surfaceY) ? tile.userData.surfaceY : TILE_H
   }
 
   function _updateCameraFrustum(w, h) {
@@ -343,39 +391,54 @@
 
   // ── Tile map ─────────────────────────────────────────────────────────────────
   function _buildTiles(map) {
-    // Remove old tiles
     _tileObjects.forEach(m => _scene.remove(m))
     _tileObjects.clear()
+    if (_boardBase) {
+      _scene.remove(_boardBase)
+      if (_boardBase.geometry) _boardBase.geometry.dispose()
+      if (_boardBase.material) _boardBase.material.dispose()
+      _boardBase = null
+    }
 
     _mapW = map.width
     _mapH = map.height
 
+    const boardBaseGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, _mapH + 1.25)
+    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x101419 })
+    _boardBase = new THREE.Mesh(boardBaseGeometry, boardBaseMaterial)
+    _boardBase.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, (_mapH - 1) / 2)
+    _scene.add(_boardBase)
+
     map.tiles.forEach(tile => {
       const type = (tile.props && tile.props.type) ? tile.props.type : (tile.type || 'floor')
+      const tileHeight = TILE_HEIGHTS[type] || TILE_H
       const mesh = new THREE.Mesh(_tileGeom, getTileMat(type))
-      mesh.position.set(tile.x, 0, tile.y)
+      mesh.scale.y = tileHeight
+      mesh.position.set(tile.x, tileHeight / 2, tile.y)
       mesh.userData.tileX = tile.x
       mesh.userData.tileZ = tile.y
+      mesh.userData.surfaceY = tileHeight
       _scene.add(mesh)
       _tileObjects.set(tile.x + ',' + tile.y, mesh)
     })
 
-    // Camera target: center of map
-    _camera.position.set(_mapW / 2, 50, _mapH / 2)
-    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
+    const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
+    _cameraTarget.set(pose.target.x, pose.target.y, pose.target.z)
+    _positionCameraFromTarget()
     _camera.zoom = _preferredInitialZoom(_container.clientWidth || 320, _container.clientHeight || 320)
 
-    // Hit plane for raycasting (invisible, covers full map)
+    // The interaction plane remains a flat board-sized plane. It owns no rules;
+    // rounding and bounds checks stay in screenToCell().
     if (_hitPlane) {
       _scene.remove(_hitPlane)
       if (_hitPlane.geometry) _hitPlane.geometry.dispose()
       if (_hitPlane.material) _hitPlane.material.dispose()
     }
-    const hitGeom = new THREE.PlaneGeometry(_mapW + 2, _mapH + 2)
-    const hitMat  = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+    const hitGeom = new THREE.PlaneGeometry(_mapW, _mapH)
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
     const hitPlane = new THREE.Mesh(hitGeom, hitMat)
     hitPlane.rotation.x = -Math.PI / 2
-    hitPlane.position.set(_mapW / 2, 0.02, _mapH / 2)
+    hitPlane.position.set((_mapW - 1) / 2, TILE_H + 0.01, (_mapH - 1) / 2)
     _scene.add(hitPlane)
     _hitPlane = hitPlane
 
@@ -399,14 +462,18 @@
 
       // If not animating, snap to position
       if (!obj.animating) {
-        obj.group.position.set(piece.x, 0, piece.y)
+        obj.group.position.set(piece.x, _tileSurfaceHeightAt(piece.x, piece.y), piece.y)
       }
 
       // Faction is snapshot-driven and can change without respawning the mesh.
       if (obj.faction !== piece.faction) {
         obj.faction = piece.faction
-        obj.body.material.color.setHex(FACTION_COLORS[piece.faction] || FACTION_COLORS.red)
+        const markerPattern = TacticalGeometry.factionMarkerPattern(piece.faction)
+        obj.body.material.emissive.setHex(FACTION_COLORS[piece.faction] || FACTION_COLORS.red)
         obj.ring.material = getFactionMat(piece.faction)
+        obj.factionMarkers.forEach(function (marker, index) {
+          marker.visible = markerPattern[index]
+        })
       }
 
       // Portrait texture comes from the template-declared asset and only becomes
@@ -505,12 +572,12 @@
             getTileEffectMat(effectType)
           )
           ring.rotation.x = Math.PI / 2
-          ring.position.y = TILE_H / 2 + 0.025 + index * 0.004
+          ring.position.y = _tileSurfaceHeightAt(effect.x, effect.y) + 0.025 + index * 0.004
           group.add(ring)
 
           const slot = TILE_EFFECT_ICON_SLOTS[index]
           const icon = new THREE.Sprite(getTileEffectIconMat(effectType))
-          icon.position.set(slot.x, TILE_H / 2 + 0.20, slot.z)
+          icon.position.set(slot.x, _tileSurfaceHeightAt(effect.x, effect.y) + 0.20, slot.z)
           icon.scale.set(0.24, 0.24, 0.24)
           icon.renderOrder = 8
           group.add(icon)
@@ -540,32 +607,59 @@
   function _spawnPieceMesh(piece) {
     const faction = piece.faction || 'red'
     const group = new THREE.Group()
-    group.position.set(piece.x, 0, piece.y)
+    group.position.set(piece.x, _tileSurfaceHeightAt(piece.x, piece.y), piece.y)
 
-    // Body cylinder
-    const body = new THREE.Mesh(_pieceBodyGeom, new THREE.MeshLambertMaterial({ color: FACTION_COLORS[faction] || 0x888888 }))
-    body.position.y = TILE_H / 2 + PIECE_H / 2
+    const contactShadow = new THREE.Mesh(_contactShadowGeom, _contactShadowMat)
+    contactShadow.rotation.x = -Math.PI / 2
+    contactShadow.position.y = 0.004
+    contactShadow.scale.set(PIECE_W * 1.06, PIECE_D * 1.08, 1)
+    contactShadow.renderOrder = 1
+    group.add(contactShadow)
+
+    const factionColor = FACTION_COLORS[faction] || FACTION_COLORS.red
+    const bodyMaterial = new THREE.MeshLambertMaterial({
+      color: 0x22272d,
+      emissive: new THREE.Color(factionColor),
+      emissiveIntensity: 0.08,
+    })
+    const body = new THREE.Mesh(_pieceBodyGeom, bodyMaterial)
+    body.scale.set(PIECE_W, 1, PIECE_D)
+    body.position.y = PIECE_H / 2 + 0.012
     group.add(body)
 
-    // Portrait disc on top
-    const portraitMat = new THREE.MeshBasicMaterial({ color: FACTION_COLORS[faction] || 0x888888 })
+    const portraitMat = new THREE.MeshBasicMaterial({ color: 0x3b4148 })
     const portraitMesh = new THREE.Mesh(_portraitDiscGeom, portraitMat)
     portraitMesh.rotation.x = -Math.PI / 2
-    portraitMesh.position.y = TILE_H / 2 + PIECE_H + 0.002
+    portraitMesh.scale.set(PIECE_PORTRAIT_W, PIECE_PORTRAIT_D, 1)
+    portraitMesh.position.y = PIECE_H + 0.014
     group.add(portraitMesh)
 
-    // Faction ring at base of cylinder
     const ring = new THREE.Mesh(_pieceRingGeom, getFactionMat(faction))
     ring.rotation.x = Math.PI / 2
-    ring.position.y = TILE_H / 2 + 0.02
+    ring.scale.set(PIECE_W, PIECE_D, 1)
+    ring.position.y = 0.02
     group.add(ring)
+
+    // Faction remains readable without color: red uses one neutral pip and blue
+    // uses a pair. These markers share the portrait geometry but not its texture.
+    const markerPattern = TacticalGeometry.factionMarkerPattern(faction)
+    const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xf2e8d5 })
+    const factionMarkers = [0, -0.11, 0.11].map(function (x, index) {
+      const marker = new THREE.Mesh(_portraitDiscGeom, markerMaterial)
+      marker.rotation.x = -Math.PI / 2
+      marker.position.set(x, PIECE_H + 0.019, -PIECE_D * 0.45)
+      marker.scale.set(0.08, 0.08, 1)
+      marker.visible = markerPattern[index]
+      group.add(marker)
+      return marker
+    })
 
     // Compact health and negative-status summary.
     const summaryEl = _createPieceSummaryEl(piece)
 
     _scene.add(group)
     _pieceObjects.set(piece.id, {
-      group, body, ring, portraitMesh,
+      group, body, ring, portraitMesh, contactShadow, factionMarkers,
       summaryEl,
       faction,
       portraitLoaded: false,
@@ -634,10 +728,10 @@
   }
 
   function _projectedCellSpan(x, y) {
-    const center = projectCell(x, y, TILE_H / 2)
+    const center = projectCell(x, y, _tileSurfaceHeightAt(x, y))
     if (!center) return 36
-    const horizontal = projectCell(x + 1, y, TILE_H / 2)
-    const vertical = projectCell(x, y + 1, TILE_H / 2)
+    const horizontal = projectCell(x + 1, y, _tileSurfaceHeightAt(x + 1, y))
+    const vertical = projectCell(x, y + 1, _tileSurfaceHeightAt(x, y + 1))
     const distances = [horizontal, vertical].filter(Boolean).map(function (point) {
       const dx = point.left - center.left
       const dy = point.top - center.top
@@ -653,7 +747,7 @@
       if (!obj.summaryEl || !obj.group.visible) { if (obj.summaryEl) obj.summaryEl.style.display = 'none'; return }
       const x = obj.group.position.x
       const y = obj.group.position.z
-      const projected = projectCell(x, y, TILE_H / 2 + PIECE_H + 0.1)
+      const projected = projectCell(x, y, obj.group.position.y + PIECE_H + 0.1)
       if (!projected) return
       const cellSpan = _projectedCellSpan(x, y)
       const scale = Math.max(0.36, Math.min(1, cellSpan / 38))
@@ -682,7 +776,8 @@
         const ring = new THREE.Mesh(_selectedRingGeom, getHlMat('selected'))
         ring.rotation.x = Math.PI / 2
         ring.position.copy(obj.group.position)
-        ring.position.y = TILE_H / 2 + 0.04
+        ring.scale.set(PIECE_W * 1.14, PIECE_D * 1.14, 1)
+        ring.position.y += 0.035
         ring.renderOrder = 5
         _scene.add(ring)
         _hlObjects.selected = ring
@@ -710,7 +805,7 @@
 
       const mesh = new THREE.Mesh(_hlPlaneGeom, getHlMat(type))
       mesh.rotation.x = -Math.PI / 2
-      mesh.position.set(x, TILE_H / 2 + 0.01, z)
+      mesh.position.set(x, _tileSurfaceHeightAt(x, z) + 0.012, z)
       _scene.add(mesh)
       _hlObjects[type].push(mesh)
     })
@@ -723,9 +818,11 @@
       const obj = _pieceObjects.get(action.pieceId)
       if (obj && action.toX != null && action.toY != null) {
         const fromX = obj.group.position.x
+        const fromY = obj.group.position.y
         const fromZ = obj.group.position.z
+        const toY = _tileSurfaceHeightAt(action.toX, action.toY)
         obj.animating = true
-        _anims.push({ type: 'move', obj, fromX, fromZ, toX: action.toX, toZ: action.toY, elapsed: 0, duration: 0.25 })
+        _anims.push({ type: 'move', obj, fromX, fromY, fromZ, toX: action.toX, toY, toZ: action.toY, elapsed: 0, duration: 0.25 })
       }
     }
     // Damage flash: detect HP changes
@@ -752,17 +849,19 @@
 
       if (a.type === 'move') {
         const ex = a.fromX + (a.toX - a.fromX) * _ease(t)
+        const ey = a.fromY + (a.toY - a.fromY) * _ease(t)
         const ez = a.fromZ + (a.toZ - a.fromZ) * _ease(t)
-        a.obj.group.position.set(ex, 0, ez)
+        a.obj.group.position.set(ex, ey, ez)
         _notifyViewportChange()
-        if (t >= 1) { a.obj.group.position.set(a.toX, 0, a.toZ); a.obj.animating = false; _anims.splice(i, 1) }
+        if (t >= 1) { a.obj.group.position.set(a.toX, a.toY, a.toZ); a.obj.animating = false; _anims.splice(i, 1) }
       } else if (a.type === 'flash') {
-        const intensity = (1 - t) * 0.8
-        a.obj.body.material.emissive = new THREE.Color(0xff2200)
-        a.obj.body.material.emissiveIntensity = intensity
-        if (t >= 1) { a.obj.body.material.emissiveIntensity = 0; _anims.splice(i, 1) }
+        const flashStyle = TacticalGeometry.pieceFlashStyle(a.obj.faction, t)
+        a.obj.body.material.emissive.setHex(flashStyle.color)
+        a.obj.body.material.emissiveIntensity = flashStyle.intensity
+        if (t >= 1) _anims.splice(i, 1)
       } else if (a.type === 'death') {
         a.obj.group.children.forEach(m => {
+          if (m === a.obj.contactShadow) return
           if (m.material) { m.material.transparent = true; m.material.opacity = 1 - t }
         })
         if (t >= 1) { a.obj.group.visible = false; _anims.splice(i, 1) }
@@ -790,6 +889,35 @@
     })
   }
 
+  function _panCameraByPixels(dx, dy) {
+    if (!_camera || !_cameraTarget || !_renderer) return
+    const canvasWidth = _renderer.domElement.getBoundingClientRect().width || 1
+    const canvasHeight = _renderer.domElement.getBoundingClientRect().height || 1
+    // Keep the CSS-pixel frustum formula explicit: DPR must not change gesture speed.
+    const worldPerPixelX = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
+    const worldPerPixelY = ((_camera.top - _camera.bottom) / _camera.zoom) / canvasHeight
+    const screenRight3 = new THREE.Vector3(1, 0, 0).applyQuaternion(_camera.quaternion)
+    const screenUp3 = new THREE.Vector3(0, 1, 0).applyQuaternion(_camera.quaternion)
+    const delta = TacticalGeometry.screenPanDelta({
+      dx,
+      dy,
+      worldPerPixelX,
+      worldPerPixelY,
+      screenRight: { x: screenRight3.x, z: screenRight3.z },
+      screenUp: { x: screenUp3.x, z: screenUp3.z },
+    })
+    const clamped = TacticalGeometry.clampTarget({
+      x: _cameraTarget.x + delta.x,
+      z: _cameraTarget.z + delta.z,
+      mapWidth: _mapW,
+      mapHeight: _mapH,
+    })
+    _cameraTarget.set(clamped.x, 0, clamped.z)
+    _positionCameraFromTarget()
+    _updatePieceSummaryPositions()
+    _notifyViewportChange()
+  }
+
   function _initControls() {
     const canvas = _renderer.domElement
     canvas.style.touchAction = 'none'
@@ -800,9 +928,10 @@
       // context menu is suppressed, leaving a stale pointer that pans the
       // board before the next inspection attempt.
       if (e.pointerType === 'mouse' && e.button !== 0) return
+      if (_pointers.size >= 2) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (_pointers.size === 1) {
-        _panStart = { x: e.clientX, y: e.clientY }
+        _panStart = { x: e.clientX, y: e.clientY, originX: e.clientX, originY: e.clientY }
         _panMoved = false
         if (typeof canvas.setPointerCapture === 'function') canvas.setPointerCapture(e.pointerId)
       } else if (_pointers.size === 2) {
@@ -830,15 +959,13 @@
       if (_panStart) {
         const dx = e.clientX - _panStart.x
         const dy = e.clientY - _panStart.y
-        if (Math.abs(dx) + Math.abs(dy) > 4) {
+        const totalDx = e.clientX - _panStart.originX
+        const totalDy = e.clientY - _panStart.originY
+        if (_panMoved || Math.hypot(totalDx, totalDy) >= PAN_ACTIVATION_PX) {
           _panMoved = true
-          const canvasWidth = _renderer.domElement.getBoundingClientRect().width || 1
-          const fov = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
-          _camera.position.x -= dx * fov
-          _camera.position.z -= dy * fov
-          _camera.lookAt(_camera.position.x, 0, _camera.position.z)
-          _notifyViewportChange()
-          _panStart = { x: e.clientX, y: e.clientY }
+          _panCameraByPixels(dx, dy)
+          _panStart.x = e.clientX
+          _panStart.y = e.clientY
         }
       }
       e.preventDefault()
@@ -850,7 +977,7 @@
       if (_pointers.size < 2) _pinchDist = 0
       if (_pointers.size === 1) {
         const remaining = Array.from(_pointers.values())[0]
-        _panStart = { x: remaining.x, y: remaining.y }
+        _panStart = { x: remaining.x, y: remaining.y, originX: remaining.x, originY: remaining.y }
         _panMoved = true
       } else if (!_pointers.size) {
         _panStart = null
@@ -912,8 +1039,9 @@
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
     _camera.zoom = _preferredInitialZoom(w, h)
-    _camera.position.set(_mapW / 2, 50, _mapH / 2)
-    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
+    const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
+    _cameraTarget.set(pose.target.x, pose.target.y, pose.target.z)
+    _positionCameraFromTarget()
     _updateCameraFrustum(w, h)
     _updatePieceSummaryPositions()
     _notifyViewportChange()
@@ -945,7 +1073,7 @@
     if (!_renderer || !_camera || !_container) return null
     const canvasRect = _renderer.domElement.getBoundingClientRect()
     const containerRect = _container.getBoundingClientRect()
-    const point = new THREE.Vector3(x, elevation == null ? TILE_H / 2 : elevation, y).project(_camera)
+    const point = new THREE.Vector3(x, elevation == null ? _tileSurfaceHeightAt(x, y) : elevation, y).project(_camera)
     const clientX = canvasRect.left + (point.x + 1) / 2 * canvasRect.width
     const clientY = canvasRect.top + (-point.y + 1) / 2 * canvasRect.height
     return {
@@ -976,12 +1104,12 @@
       const obj = _pieceObjects.get(piece.id)
       const x = obj ? obj.group.position.x : piece.x
       const y = obj ? obj.group.position.z : piece.y
-      const point = projectCell(x, y, TILE_H / 2 + PIECE_H + 0.002)
+      const point = projectCell(x, y, (obj ? obj.group.position.y : _tileSurfaceHeightAt(x, y)) + PIECE_H + 0.014)
       if (!point) return
       const dx = clientX - point.clientX
       const dy = clientY - point.clientY
       const distance = Math.sqrt(dx * dx + dy * dy)
-      const hitRadius = Math.max(10, _projectedCellSpan(x, y) * 0.55)
+      const hitRadius = Math.max(22, _projectedCellSpan(x, y) * 0.55)
       if (distance > hitRadius || distance >= closestDistance) return
       closest = piece
       closestDistance = distance
@@ -1019,7 +1147,7 @@
     let left = x * 44 + 22  // fallback pixel estimate
     let top  = z * 44 + 4
 
-    const projected = projectCell(x, z, TILE_H / 2 + PIECE_H + 0.2)
+    const projected = projectCell(x, z, _tileSurfaceHeightAt(x, z) + PIECE_H + 0.2)
     if (projected) {
       left = projected.left
       top = projected.top - 14
@@ -1060,8 +1188,9 @@
           ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) { materials.add(material) })
         }
       })
-      ;[_tileGeom, _hlPlaneGeom, _selectedRingGeom, _pieceBodyGeom, _pieceRingGeom, _portraitDiscGeom]
+      ;[_tileGeom, _hlPlaneGeom, _selectedRingGeom, _pieceBodyGeom, _pieceRingGeom, _portraitDiscGeom, _contactShadowGeom]
         .forEach(function (geometry) { if (geometry) geometries.add(geometry) })
+      if (_contactShadowMat) materials.add(_contactShadowMat)
       ;[_tileMats, _factionMats, _hlMats, _tileEffectMats, _tileEffectIconMats].forEach(function (cache) {
         Object.keys(cache).forEach(function (key) { if (cache[key]) materials.add(cache[key]) })
       })
@@ -1091,6 +1220,7 @@
     _pointers.clear()
     _renderer = null
     _camera = null
+    _cameraTarget = null
     _scene = null
     _hpLayer = null
     _floatLayer = null
@@ -1099,12 +1229,15 @@
     _currentModel = null
     _mapW = 0
     _mapH = 0
+    _boardBase = null
     _tileGeom = null
     _hlPlaneGeom = null
     _selectedRingGeom = null
     _pieceBodyGeom = null
     _pieceRingGeom = null
     _portraitDiscGeom = null
+    _contactShadowGeom = null
+    _contactShadowMat = null
     _clock.prev = 0
     _panStart = null
     _panMoved = false
