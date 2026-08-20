@@ -212,3 +212,9 @@ Android mobile server 当前负责转发并记录 browser runner 生成的 actio
 - 多房间触发器/RNG 隔离测试。
 - Electron 服务端与 Android 客户端协议测试。
 - 多动作失败/重试及并发房间的端到端确定性测试。
+
+## 13. 无头 AI 环境（RED-84）
+
+`lib/game/ai-environment.ts::aiEnvironmentV1` 提供版本化 `observe`、`listLegalActions`、`simulate`、`isTerminal` 和 `stateKey`。它只消费正式规则：移动来自 `spatial.ts`，技能/卡牌 option/target 来自 `prepareAction()`，模拟来自 `runBattleAction()` 的隔离适配器，终局来自 `terminalResult`。
+
+Observation 不返回完整 BattleState；对手手牌、隐藏状态、Rule/effect、私有部署/pending 和 debug trace 被过滤。模拟不会写房间、广播或提交调用方状态，并要求 root seed。Node 与 browser bundle 共享同一导出和固定 seed 差分测试。接口与 unsupported 动作清单见 [`AI_ENVIRONMENT.md`](./AI_ENVIRONMENT.md)。
