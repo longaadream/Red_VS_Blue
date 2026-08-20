@@ -25,6 +25,7 @@ import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction } from "./skills"
+import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
@@ -2531,13 +2532,17 @@ function applyBattleActionInternal(
       if (pending.effectCode) {
         let fn: any
         try {
-          const compileEffect = eval('(function(Math, Date) { return (' + pending.effectCode + '); })')
+          const compileEffect = dynamicCodeRuntime.compileExpression<(math: Math, date: DateConstructor) => unknown>({
+            surface: 'pendingEffectCode', contentId: pending.selectionId || 'pending-target',
+            contentVersion: String(pending.stateRevision ?? 0),
+            code: '(function(Math, Date) { return (' + pending.effectCode + '); })', entry: 'serialized function(ctx)',
+          })
           fn = compileEffect(getRuleMath(), getRuleDate())
         } catch (evalErr) {
-          throw new BattleRuleError('[STAGE6] effectCode eval failed: ' + (evalErr instanceof Error ? evalErr.message : String(evalErr)))
+          throw new BattleRuleError('[STAGE6] effectCode dynamic compilation failed: ' + (evalErr instanceof Error ? evalErr.message : String(evalErr)))
         }
         if (typeof fn !== 'function') {
-          throw new BattleRuleError('[STAGE6] effectCode did not eval to a function, got: ' + typeof fn)
+          throw new BattleRuleError('[STAGE6] effectCode did not compile to a function, got: ' + typeof fn)
         }
         try {
           result = fn({
