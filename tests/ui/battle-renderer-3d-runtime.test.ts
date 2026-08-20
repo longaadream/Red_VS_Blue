@@ -7,6 +7,46 @@ import { describe, expect, it } from 'vitest'
 import { createRed68BattleFixture } from './fixtures/red-68-battle-fixture'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
+type ThreeMaterial = { emissive: { getHex(): number }; emissiveIntensity: number }
+type ThreeNode = { type: string; children: ThreeNode[]; visible: boolean; material?: ThreeMaterial }
+type ThreeScene = { children: ThreeNode[]; updateMatrixWorld(force: boolean): void }
+type ThreeCamera = { updateMatrixWorld(force: boolean): void }
+
+type RendererApi = {
+  init(options: unknown): void
+  update(model: unknown): void
+  animateAction(action: unknown, previousModel: unknown, nextModel: unknown): void
+  resize(): void
+  resetView(): void
+  projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number }
+  screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
+  dispose(): void
+}
+
+type WindowHarness = {
+  [key: string]: unknown
+  devicePixelRatio: number
+  BattleRenderer3D?: RendererApi
+  matchMedia(query: string): { matches: boolean }
+  addEventListener(): void
+  removeEventListener(): void
+}
+
+type FakeRendererRecord = {
+  domElement: FakeElement
+  pixelRatio: number
+  disposed: boolean
+  contextLost: boolean
+  scene: ThreeScene | null
+  camera: ThreeCamera | null
+}
+
+type DisposablePrototype = { dispose: (this: object) => unknown }
+type ThreeHarness = {
+  BufferGeometry: { prototype: DisposablePrototype }
+  Material: { prototype: DisposablePrototype }
+  WebGLRenderer: unknown
+}
 
 class FakeElement {
   readonly tagName: string
@@ -30,7 +70,7 @@ class FakeElement {
   constructor(tagName: string) {
     this.tagName = tagName.toUpperCase()
     this.style = Object.assign(Object.create(null), {
-      setProperty(name: string, value: string) { this[name] = value },
+      setProperty: (name: string, value: string) => { this.style[name] = value },
     })
   }
 
@@ -105,7 +145,7 @@ class FakeElement {
 function createHarness(width = 390, height = 844) {
   const container = new FakeElement('div')
   container.rect = { left: 0, top: 0, width, height }
-  const renderers: Array<Record<string, any>> = []
+  const renderers: FakeRendererRecord[] = []
   const observers: Array<{ disconnected: boolean }> = []
   const rafCallbacks = new Map<number, (now: number) => void>()
   const cancelledRafs = new Set<number>()
@@ -117,13 +157,13 @@ function createHarness(width = 390, height = 844) {
     createElement(tagName: string) { return new FakeElement(tagName) },
     getElementById() { return null },
   }
-  const windowObject: Record<string, any> = {
+  const windowObject: WindowHarness = {
     devicePixelRatio: 1,
     matchMedia(query: string) { return { matches: query.includes('pointer: coarse') } },
     addEventListener() {},
     removeEventListener() {},
   }
-  const sandbox: Record<string, any> = {
+  const sandbox: Record<string, unknown> = {
     window: windowObject,
     document,
     console,
@@ -149,7 +189,7 @@ function createHarness(width = 390, height = 844) {
     },
     ResizeObserver: class {
       disconnected = false
-      constructor(_callback: () => void) { observers.push(this) }
+      constructor(callback: () => void) { void callback; observers.push(this) }
       observe() {}
       disconnect() { this.disconnected = true }
     },
@@ -159,14 +199,14 @@ function createHarness(width = 390, height = 844) {
   const context = createContext(sandbox)
   new Script(readFileSync(resolve(pagesDir, 'js/three.min.js'), 'utf8'), { filename: 'three.min.js' }).runInContext(context)
 
-  const THREE = sandbox.THREE
+  const THREE = sandbox.THREE as ThreeHarness
   const geometryDispose = THREE.BufferGeometry.prototype.dispose
-  THREE.BufferGeometry.prototype.dispose = function () {
+  THREE.BufferGeometry.prototype.dispose = function (this: object) {
     disposeCounts.geometry += 1
     return geometryDispose.call(this)
   }
   const materialDispose = THREE.Material.prototype.dispose
-  THREE.Material.prototype.dispose = function () {
+  THREE.Material.prototype.dispose = function (this: object) {
     disposeCounts.material += 1
     return materialDispose.call(this)
   }
@@ -176,8 +216,8 @@ function createHarness(width = 390, height = 844) {
     pixelRatio = 1
     disposed = false
     contextLost = false
-    scene: any = null
-    camera: any = null
+    scene: ThreeScene | null = null
+    camera: ThreeCamera | null = null
     constructor() { renderers.push(this) }
     setPixelRatio(value: number) { this.pixelRatio = value }
     setSize(nextWidth: number, nextHeight: number) {
@@ -185,7 +225,7 @@ function createHarness(width = 390, height = 844) {
       this.domElement.height = nextHeight
       this.domElement.rect = { left: 0, top: 0, width: nextWidth, height: nextHeight }
     }
-    render(scene: any, camera: any) {
+    render(scene: ThreeScene, camera: ThreeCamera) {
       scene.updateMatrixWorld(true)
       camera.updateMatrixWorld(true)
       this.scene = scene
@@ -206,7 +246,7 @@ function createHarness(width = 390, height = 844) {
     next[1](now)
   }
 
-  return { container, windowObject, renderers, observers, rafCallbacks, cancelledRafs, disposeCounts, frame, renderer: windowObject.BattleRenderer3D }
+  return { container, windowObject, renderers, observers, rafCallbacks, cancelledRafs, disposeCounts, frame, renderer: windowObject.BattleRenderer3D! }
 }
 
 function runtimeModel() {
@@ -284,18 +324,18 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.resize()
     expect(harness.renderers[0].pixelRatio).toBe(2)
 
-    const blueGroup = harness.renderers[0].scene.children.find((child: any) =>
-      child.type === 'Group' && child.children.slice(4, 7).filter((marker: any) => marker.visible).length === 2,
+    const blueGroup = harness.renderers[0].scene!.children.find((child) =>
+      child.type === 'Group' && child.children.slice(4, 7).filter((marker) => marker.visible).length === 2,
     )
     expect(blueGroup).toBeTruthy()
-    const blueBody = blueGroup.children[1]
-    expect(blueBody.material.emissive.getHex()).toBe(0x3b82f6)
+    const blueBody = blueGroup!.children[1]
+    expect(blueBody.material!.emissive.getHex()).toBe(0x3b82f6)
     const nextModel = structuredClone(model)
     nextModel.pieces[8].health.current -= 1
     harness.renderer.animateAction({}, model, nextModel)
     for (let index = 0; index < 5; index += 1) harness.frame()
-    expect(blueBody.material.emissive.getHex()).toBe(0x3b82f6)
-    expect(blueBody.material.emissiveIntensity).toBe(0.08)
+    expect(blueBody.material!.emissive.getHex()).toBe(0x3b82f6)
+    expect(blueBody.material!.emissiveIntensity).toBe(0.08)
     expect(JSON.stringify(model)).toBe(authorityBefore)
   })
 

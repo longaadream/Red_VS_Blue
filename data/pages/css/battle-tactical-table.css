@@ -302,6 +302,15 @@ body {
 
 #orientationGuard { display: none !important; }
 
+.battle-log-title {
+  font-size: 0 !important;
+}
+
+.battle-log-title::after {
+  content: "战斗日志";
+  font-size: 15px;
+}
+
 button:focus-visible,
 [role="button"]:focus-visible,
 select:focus-visible,

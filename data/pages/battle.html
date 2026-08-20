@@ -1370,7 +1370,7 @@
     <div class="cd-layout">
       <div class="cd-sheet">
       <button class="cd-close" onclick="closeCardDetail()">✕</button>
-      <div class="cd-icon" id="cdIcon">🃏</div>
+      <div class="cd-icon" id="cdIcon">牌</div>
       <div class="cd-name" id="cdName"></div>
       <div id="cdCost"></div>
       <div class="cd-type" id="cdType"></div>
@@ -2523,7 +2523,7 @@
       }
       const typeLabel = def.type === 'reactive' ? '被动触发' : def.type === 'passive' ? '持续' : def.type === 'active' ? '主动' : '手牌'
 
-      document.getElementById('cdIcon').textContent = def.icon || '🃏'
+      document.getElementById('cdIcon').textContent = String(def.name || cardId || '牌').slice(0, 1)
       document.getElementById('cdName').textContent = def.name || cardId
       document.getElementById('cdType').textContent = typeLabel
       document.getElementById('cdCost').innerHTML =
@@ -3862,7 +3862,7 @@
       const myName = myPlayerName || playerNames[myPlayerId] || '我方'
       const oppPid = oppMeta && (oppMeta.playerId || '').toLowerCase()
       const oppName = (oppPid && playerNames[oppPid]) || (oppMeta && oppMeta.name) || (myFaction === 'red' ? '对方' : '对方')
-      const alignmentText = function(alignment) { return alignment === 'light' ? '☀️ 光' : alignment === 'dark' ? '🌑 暗' : '阵营未知' }
+      const alignmentText = function(alignment) { return alignment === 'light' ? '光' : alignment === 'dark' ? '暗' : '阵营未知' }
       document.getElementById('myLabel').textContent = factionIcon + ' ' + alignmentText(playerAlignments[myPlayerId]) + ' · ' + myName
       document.getElementById('oppLabel').textContent = oppIcon + ' ' + alignmentText(playerAlignments[oppPid]) + ' · ' + oppName
 
@@ -4078,8 +4078,7 @@
         const apCost = availability.actionCost
         const cpCost = availability.chargeCost
         const disabled = !availability.available
-        const rawIcon = skData.icon || (isCharge ? '◆' : '✦')
-        const icon = /^[a-z0-9_-]{2,}$/i.test(String(rawIcon)) ? (isCharge ? '◆' : '✦') : rawIcon
+        const icon = isCharge ? '◆' : '✦'
         const status = availability.onCooldown ? 'CD ' + sk.currentCooldown
           : availability.noUses ? '已用'
             : availability.actionLow ? 'AP不足'
@@ -4122,7 +4121,7 @@
           const handBadge = document.createElement('div')
           handBadge.className = 'hud-hand'
           handBadge.title = '手牌'
-          handBadge.innerHTML = '🃏 <span id="hudHandCount">0</span>'
+          handBadge.innerHTML = '手牌 <span id="hudHandCount">0</span>'
           topbar.appendChild(handBadge)
           hudHand = document.getElementById('hudHandCount')
         }
@@ -4149,7 +4148,7 @@
         if (isReactive) cls += ' card-reactive'
 
         const gemCls = cost === 0 ? 'free' : ''
-        const icon = def.icon || '*'
+        const icon = escHtml(String(def.name || card.cardId || '牌').slice(0, 1))
         const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
         const artSrc = def.image ? `images/card-art/${def.image}` : null
         const artContent = artSrc
@@ -4209,7 +4208,7 @@
       // First click: select/preview the card
       pendingCardAction = { cardInstanceId, cardId }
       renderHand()
-      setStatusMsg('🃏 再次点击释放，点其他地方取消')
+      setStatusMsg('再次点击释放，点其他地方取消')
     }
 
     function renderDeploymentStatus() {
@@ -4449,7 +4448,7 @@
         }
         // 合法性拦截：只允许点击高亮格
         if (!validMoves.has(x + ',' + y)) {
-          setStatusMsg('❌ 无法移动到该位置')
+          setStatusMsg('无法移动到该位置')
           return
         }
         doAction({ type: 'move', playerId: myPlayerId, pieceId: selectedPieceId, toX: x, toY: y })
@@ -5287,7 +5286,7 @@
   <!-- Fullscreen log overlay -->
   <div id="logOverlay">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #334155;flex-shrink:0;background:#070f1e">
-      <div style="font-size:15px;font-weight:700;color:#e2e8f0">战斗日志</div>
+      <div class="battle-log-title" aria-label="战斗日志" style="font-size:15px;font-weight:700;color:#e2e8f0">📜 战斗日志</div>
       <div style="display:flex;gap:8px;align-items:center">
         <button onclick="clearLog()" style="background:none;border:1px solid #334155;border-radius:6px;color:#64748b;padding:4px 10px;font-size:12px;cursor:pointer">清空</button>
         <button onclick="closeLog()" style="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">✕</button>

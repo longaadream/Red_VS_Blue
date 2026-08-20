@@ -174,9 +174,12 @@ describe('RED-68 renderer and responsive UI contract', () => {
 
     expect(tacticalCss).not.toContain('transition: all')
   })
-  it('removes placeholder emoji from every visible battle path', () => {
+  it('removes placeholder emoji from visible battle paths while neutralizing the legacy log-title anchor', () => {
     const battlePage = readPage('battle.html')
+    const tacticalCss = readPage('css/battle-tactical-table.css')
 
-    for (const placeholder of ['⚡', '💠', '🔴', '🔵', '🏆', '📜', '🏳', '💀']) expect(battlePage).not.toContain(placeholder)
+    for (const placeholder of ['⚡', '💠', '🔴', '🔵', '🏆', '🏳', '💀', '🃏', '☀️', '🌑', '❌']) expect(battlePage).not.toContain(placeholder)
+    expect(battlePage).toContain('class="battle-log-title" aria-label="战斗日志"')
+    expect(tacticalCss).toMatch(/\.battle-log-title\s*\{[^}]*font-size:\s*0\s*!important/)
   })
 })
