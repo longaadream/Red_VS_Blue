@@ -14,6 +14,7 @@ import {
 import {
   scheduleRoomDeploymentTimeout,
   createPublicBattleSnapshot,
+  resetRoomBattleAuthorityClock,
   type PublicBattleSnapshot,
 } from './room-battle-actions'
 
@@ -45,6 +46,7 @@ export async function startBattleFromLockedRosters(
       return { room, started: false }
     }
 
+    resetRoomBattleAuthorityClock(roomId)
     assertDemoRostersReady(room)
 
     const roomPlayers = [...room.players.slice(0, 2)].sort((left, right) => {
@@ -118,7 +120,7 @@ export async function startBattleFromLockedRosters(
       await store.setRoom(roomId, nextRoom)
     }
     const committedRoom = await store.getRoom(roomId) ?? nextRoom
-    await options.onDeploymentUpdate?.(createPublicBattleSnapshot(committedRoom))
+    await options.onDeploymentUpdate?.(createPublicBattleSnapshot(committedRoom, undefined, clock))
     await scheduleRoomDeploymentTimeout(store, roomId, {
       clock,
       onCommitted: options.onDeploymentUpdate,

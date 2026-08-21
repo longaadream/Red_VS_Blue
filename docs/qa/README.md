@@ -126,6 +126,7 @@ PR 中根据风险提供以下证据：
 ## 专项验收场景
 
 - [RED-43 同阵营对局客户端 UI 验收](RED-43-same-alignment-ui.md)
+- [RED-36 权威成长型回合计时验证](RED-36-authoritative-turn-timer.md)
 
 ## 不稳定测试
 

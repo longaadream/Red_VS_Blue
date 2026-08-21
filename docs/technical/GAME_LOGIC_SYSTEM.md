@@ -657,3 +657,24 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 接口提供版本化 `observe/listLegalActions/simulate/isTerminal/stateKey`。Observation 是显式玩家投影，不是完整 `BattleState`；对手手牌、隐藏状态、Rule/effect、私有部署选择、其他玩家 pending 内容和 debug trace 均不暴露。多阶段 option/target 会展开为带选择凭证的完整命令，候选使用固定类别和 stable JSON tie-breaker。
 
 `simulate()` 只返回隔离状态、正式 state hash、稳定 transition hash、Action Trace、动作日志增量和状态 diff，不保存房间或广播。没有显式或已记录 root seed 时失败关闭。详细合同见 [`AI_ENVIRONMENT.md`](./AI_ENVIRONMENT.md)，决策见 [`ADR-0013`](../decisions/ADR-0013-headless-ai-environment.md)。
+## RED-36 2026-08-20 规则修订
+
+### 成长时限与快速烧绳
+
+1. 完整轮次由 `ceil(turnNumber / 2)` 得到；完整轮次 1–2、3–4、5–6、7–8、9+ 的正常回合分别为 45、60、75、90、105 秒。
+2. 每回合最后 15 秒进入一次幂等的 `turnTimerBurn` 阶段。显示可在本地跨过阈值，但权威状态转换和广播只由服务端提交。
+3. 计时段归属于当前输入所有者，而不是固定归属于活动回合玩家；从 action 延续到 end，覆盖 pending 和“回合结束时”选项/目标输入，直到真正切换下一回合。pending 切换 owner 时保存活动玩家已消耗后的预算和烧绳状态，响应完成后恢复而不重置。玩家主动结束回合后产生的 pending 继续使用当前预算；action phase 超时仍执行一次 `endTurn`，但若强制结算才产生 pending，则清除该输入并直接 `beginPhase`，不能在 0 秒后新增预算。已经处于 end phase 的输入超时也直接 `beginPhase`，不重复触发回合结束规则或持续时间扣除。
+4. 只有输入所有者同时也是活动回合玩家、且没有任何被规则接受的玩法动作时超时，自己的连续次数才加一，下一次自己的回合固定为 20 秒。对手 pending 响应超时不伪装成其“自己的回合”，也不污染活动玩家 streak。
+5. 输入所有者的任一合法玩法动作把自己的连续次数清零，下一次拥有输入时恢复当前完整轮次对应的正常时限。非法动作、失败预检和刷新不能清零或延长期限。
+6. 第三次连续无操作超时复用 RED-34 的 surrender 结算，只生成一次 `timeout-surrender` 并停止计时。
+
+### 权威时间与传输
+
+- 生产规则使用单调 `performance` 时钟；房间协调器可注入伪时钟。测试固定状态、seed、时间和命令序列，不使用真实等待。
+- 协调器在异步读取前记录逻辑到达时间，并用每房间串行锁冻结逻辑权威时钟，直到规则、唯一 CAS、快照构造和 WS/HTTP 结果入队完成；恢复只推进进程内排除偏移，不改写 deadline。CAS 冲突重试不广播未提交版本，跨过 15 秒阈值的处理也不能令客户端烧绳状态反转。
+- RED-36 不包含断线/服务重启时钟恢复；当前逻辑时钟偏移以服务进程为生命周期，后续恢复协议必须持久化或重建该偏移。
+- `stateUpdate`/HTTP 快照包含 `serverNow` 和 `turnTimer` 投影。客户端用服务器期限显示倒计时，只提交签名玩法命令。
+- 45 秒部署保持 RED-31 的独立门禁；双方站位继续公开，尚未提交的个人重投选择不进入公开状态。
+- 超时推进到 `bot` 的 action phase 时，调度器调用统一 bot-turn 队列，PVE 不会等待机器人自己的 deadline。
+
+实现决策见 [ADR-0014](../decisions/ADR-0014-authoritative-growing-turn-timer.md)，专项验证见 [RED-36 QA](../qa/RED-36-authoritative-turn-timer.md)。
