@@ -15,6 +15,7 @@ import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { createRunningTurnTimer, syncTurnTimerAfterAcceptedAction } from '@/lib/game/turn-timer'
 import type { BattleState } from '@/lib/game/turn'
 import { globalTriggerSystem } from '@/lib/game/triggers'
+import { finalizePendingOptionSession } from '@/lib/game/pending-interaction'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
@@ -312,7 +313,7 @@ describe('RED-36 authoritative room timer integration', () => {
     const room = makeTimedRoom('end-turn-pending-room')
     const state = (room.battleState as any).state as BattleState
     state.turn.phase = 'end'
-    state.pendingOptionSelection = {
+    state.pendingOptionSelection = finalizePendingOptionSession({
       playerId: PLAYERS[1],
       title: 'Resolve end-of-turn effect',
       options: ['resolve'],
@@ -321,7 +322,7 @@ describe('RED-36 authoritative room timer integration', () => {
         turnNumber: state.turn.turnNumber,
         playerId: PLAYERS[0],
       },
-    }
+    }, state.targetingRevision ?? 0)
     state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
       receivedAt: 10_000,
       resumedAt: 10_000,
@@ -334,6 +335,8 @@ describe('RED-36 authoritative room timer integration', () => {
       type: 'pendingOptionSelect',
       playerId: PLAYERS[1],
       selectedOption: 'resolve',
+      selectionId: state.pendingOptionSelection.selectionId,
+      stateRevision: state.pendingOptionSelection.stateRevision,
       clientActionId: 'resolve-end-turn-pending',
     } as any, { clock })
 

@@ -85,7 +85,7 @@ describe('RED-45 event audit', () => {
     expect(report.emittedOnly).toEqual([])
     expect(report.events.map((entry: any) => entry.event)).not.toContain('triggerEffect')
     expect(report.dynamicCalls).toEqual(expect.arrayContaining([
-      expect.objectContaining({ file: 'lib/game/turn.ts', context: 'resumeCtx' }),
+      expect.objectContaining({ file: 'lib/game/turn.ts', context: 'currentContext' }),
     ]))
   })
 

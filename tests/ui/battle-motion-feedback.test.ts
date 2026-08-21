@@ -158,6 +158,16 @@ describe('RED-69 battle motion contract', () => {
     new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clientActionId: 'move-2' })").runInContext(context)
     new Script("rejectPendingActionFeedback('server-rejected')").runInContext(context)
     expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
+    expect(clearReasons).toContain('server-rejected')
+
+    const clearCountBeforePreservedRejection = clearReasons.length
+    context.targetSubmissionPending = { clientActionId: 'target-1' }
+    new Script("beginPendingActionFeedback({ type: 'pendingTargetSelect', pieceId: 'piece-a', clientActionId: 'target-1' })").runInContext(context)
+    new Script("rejectPendingActionFeedback('server-rejected', null, { preserveTargetInteraction: true })").runInContext(context)
+    expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
+    expect(new Script('targetSubmissionPending.clientActionId').runInContext(context)).toBe('target-1')
+    expect(clearReasons).toHaveLength(clearCountBeforePreservedRejection)
+
 
     new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clientActionId: 'move-3' })").runInContext(context)
     new Script("rejectPendingActionFeedback('disconnect')").runInContext(context)

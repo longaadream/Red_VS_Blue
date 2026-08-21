@@ -221,16 +221,21 @@ describe('deterministic battle runner', () => {
     {
       name: 'pending option',
       prepare(state: any) {
+        state.targetingRevision = 0
         state.pendingOptionSelection = {
           playerId: 'player-red',
           title: 'Choose',
           options: ['yes', 'no'],
+          selectionId: 'pending-option-selection-1',
+          stateRevision: 0,
         }
       },
       action: {
         type: 'pendingOptionSelect',
         playerId: 'player-red',
         selectedOption: 'yes',
+        selectionId: 'pending-option-selection-1',
+        stateRevision: 0,
         clientActionId: 'pending-option-1',
       },
       pendingKey: 'pendingOptionSelection',
