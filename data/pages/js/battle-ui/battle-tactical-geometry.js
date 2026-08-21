@@ -2,8 +2,9 @@
   'use strict'
 
   const METRICS = Object.freeze({
-    cameraTiltDeg: 25,
+    cameraTiltDeg: 45,
     cameraHeight: 28,
+    boardBaseHeight: 0.72,
     pieceWidth: 0.72,
     pieceDepth: 0.56,
     pieceHeight: 0.10,
@@ -25,13 +26,13 @@
       z: (mapHeight - 1) / 2,
     }
     const tiltRadians = METRICS.cameraTiltDeg * Math.PI / 180
-    const depthOffset = Math.tan(tiltRadians) * METRICS.cameraHeight
+    const groundOffset = Math.tan(tiltRadians) * METRICS.cameraHeight
     return {
       target,
       position: {
         x: target.x,
         y: METRICS.cameraHeight,
-        z: target.z + depthOffset,
+        z: target.z + groundOffset,
       },
     }
   }

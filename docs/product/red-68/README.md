@@ -4,6 +4,8 @@
 
 - Art-direction source: [dark tactical table v3](../art-direction-dark-tactical-table-v3.png).
 - Same-viewport reference: [v3 at 1280 × 720](./reference-1280x720.png), compared with the [1280 × 720 dense result](./after-1280x720-dense-8cards.png).
+- Fixed camera: a single-axis 45° rake with orthographic projection; the stronger pitch, 0.72-unit board slab, and balanced initial coverage make the table plane itself read as tilted while keeping authoritative grid coordinates unchanged.
+- Product-review simplification: player information stays inline at the top without individual boxes; the CSS board frame is removed; RED-68 button skin overrides are removed so existing battle controls keep their original UI and the board retains the dominant viewport share.
 - Fixed map: 20 × 16 with seed `red-68-fixed-seed-2026-08-20`.
 - The committed fixture contains 8 red pieces, 8 blue pieces, 0/1/2/3 negative statuses, and 5/8-card hands.
 - `battle-renderer-3d-runtime.test.ts` actually mounts and renders that 16-piece fixture. The interactive training pack currently creates 15 visible pieces after selecting eight templates for each side, so the density screenshots replace only the presentation model and hand DOM; they do not write to `G` or invoke rules.
@@ -30,7 +32,7 @@ Additional acceptance evidence:
 
 - The orientation guard stayed hidden and the Three.js canvas was available at all seven required viewports.
 - Final 844 × 390 measurement: projected cell minimum axis `44px`, page overflow `0px`, and zero visible buttons below 44 × 44.
-- Final 844 × 390 target flow selected Gul'dan and Fel Blessing. Phase bar, toolbar, hand, end-turn, training tools, piece detail, tile detail, and card detail all resolved to `display: none`; cancel measured 112 × 44 and page overflow remained zero.
+- Final 844 × 390 target flow selected Arthas and Frostmourne. Phase bar, toolbar, hand, end-turn, training tools, piece detail, tile detail, and card detail all resolved to `display: none`; cancel measured 112 × 44 and page overflow remained zero.
 - Final 390 × 844 density flow had 8 cards, horizontal scrolling enabled, the last card visible after scrolling, projected cell minimum axis `44px`, and zero page overflow.
 - Final 360 × 800 density flow had 5 cards, horizontal scrolling enabled, the last card visible after scrolling, and zero page overflow.
 - A 5 × 3px movement stayed a click; a 48 × 30px movement panned more than 20px. Chromium two-touch pinch increased the projected cell span by more than 35%; reset restored the fixed camera pose.
@@ -49,8 +51,8 @@ Additional acceptance evidence:
 
 ## Quality gates
 
-- Focused renderer/UI set: 6 files and 51 tests passed.
-- Full suite: 69 files and 547 tests passed.
+- Focused battle regression set after product-review changes: 9 files and 68 tests passed.
+- Full suite: 69 files and 548 tests passed.
 - `npm run typecheck`: passed.
 - `npm run check:encoding`: passed for 548 text files.
 - `npm run lint`: repository configuration stops before source lint because its last flat-config object references `import/no-anonymous-default-export` without registering the installed `eslint-plugin-import`.

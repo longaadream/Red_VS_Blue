@@ -21,6 +21,7 @@ function loadTacticalGeometry() {
   return window.BattleTacticalGeometry as {
     METRICS: {
       cameraTiltDeg: number
+      boardBaseHeight: number
       pieceWidth: number
       pieceDepth: number
       pieceHeight: number
@@ -66,7 +67,7 @@ describe('RED-68 fixed tactical table fixture', () => {
 })
 
 describe('RED-68 tactical geometry', () => {
-  it('uses a fixed 25° orthographic table pose and low oval piece metrics', () => {
+  it('uses a fixed single-axis 45° rake and low oval piece metrics', () => {
     const geometry = loadTacticalGeometry()
     const pose = geometry.cameraPose({ mapWidth: 20, mapHeight: 16 })
     const horizontalOffset = Math.hypot(
@@ -75,10 +76,11 @@ describe('RED-68 tactical geometry', () => {
     )
     const angleFromVertical = Math.atan2(horizontalOffset, pose.position.y - pose.target.y) * 180 / Math.PI
 
-    expect(angleFromVertical).toBeCloseTo(25, 5)
+    expect(angleFromVertical).toBeCloseTo(45, 5)
     expect(pose.target).toEqual({ x: 9.5, y: 0, z: 7.5 })
     expect(geometry.METRICS).toMatchObject({
-      cameraTiltDeg: 25,
+      cameraTiltDeg: 45,
+      boardBaseHeight: 0.72,
       pieceWidth: 0.72,
       pieceDepth: 0.56,
       pieceHeight: 0.1,

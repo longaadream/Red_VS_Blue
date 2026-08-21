@@ -142,7 +142,7 @@ class FakeElement {
   releasePointerCapture(pointerId: number) { this.capturedPointers.delete(pointerId) }
 }
 
-function createHarness(width = 390, height = 844) {
+function createHarness(width = 390, height = 844, coarsePointer = true) {
   const container = new FakeElement('div')
   container.rect = { left: 0, top: 0, width, height }
   const renderers: FakeRendererRecord[] = []
@@ -159,7 +159,7 @@ function createHarness(width = 390, height = 844) {
   }
   const windowObject: WindowHarness = {
     devicePixelRatio: 1,
-    matchMedia(query: string) { return { matches: query.includes('pointer: coarse') } },
+    matchMedia(query: string) { return { matches: coarsePointer && query.includes('pointer: coarse') } },
     addEventListener() {},
     removeEventListener() {},
   }
@@ -365,6 +365,28 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(secondRenderer.disposed).toBe(true)
     expect(secondRenderer.contextLost).toBe(true)
     expect(harness.rafCallbacks.size).toBe(0)
+  })
+
+  it('makes the board plane visibly rake on one axis and fill the desktop canvas', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame()
+
+    const left = harness.renderer.projectCell(0, 8)
+    const right = harness.renderer.projectCell(19, 8)
+    const backLeft = harness.renderer.projectCell(0, 0)
+    const frontLeft = harness.renderer.projectCell(0, 15)
+
+    expect(distance(left, right) / 1280).toBeGreaterThanOrEqual(0.78)
+    const projectedCellWidth = distance(left, right) / 19
+    const projectedCellDepth = distance(backLeft, frontLeft) / 15
+    expect(projectedCellDepth / projectedCellWidth).toBeCloseTo(Math.cos(45 * Math.PI / 180), 2)
+    expect(Math.abs(frontLeft.clientX - backLeft.clientX)).toBeLessThan(0.001)
+    expect(harness.renderer.screenToCell(backLeft.clientX, backLeft.clientY)).toEqual({ x: 0, y: 0 })
+    expect(harness.renderer.screenToCell(frontLeft.clientX, frontLeft.clientY)).toEqual({ x: 0, y: 15 })
+    harness.renderer.dispose()
   })
 
   it('disposes piece-owned materials when a piece leaves the presentation model', () => {

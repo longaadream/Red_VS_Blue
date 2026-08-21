@@ -9,7 +9,7 @@
   // ── Constants ────────────────────────────────────────────────────────────────
   const TILE_H = 0.12
   const TILE_W = 0.92
-  const BOARD_BASE_H = 0.34
+  const BOARD_BASE_H = TACTICAL_METRICS.boardBaseHeight
   const PIECE_W = TACTICAL_METRICS.pieceWidth
   const PIECE_D = TACTICAL_METRICS.pieceDepth
   const PIECE_H = TACTICAL_METRICS.pieceHeight
@@ -88,6 +88,7 @@
 
   let _mapW = 0, _mapH = 0
   let _boardBase = null
+  let _boardFront = null
   const _tileObjects = new Map()       // "x,z" → THREE.Mesh
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
@@ -285,8 +286,8 @@
     _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'
     _container.appendChild(_hpLayer)
 
-    // Fixed tactical orthographic camera. A stable 25° tilt avoids perspective
-    // distortion while exposing tile and piece height consistently.
+    // Fixed tactical orthographic camera. A single-axis 45° rake and thicker
+    // slab make the board plane readable without perspective or yaw drift.
     _camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200)
     _cameraTarget = new THREE.Vector3(0, 0, 0)
     _camera.up.set(0, 1, 0)
@@ -341,7 +342,7 @@
     if (!_mapW) return 1
     const aspect = w / (h || 1)
     const visibleWorldWidth = _fitWorldHalfHeight(w, h) * 2 * aspect
-    const widthCoverageZoom = (visibleWorldWidth / (_mapW + 2)) * 0.86
+    const widthCoverageZoom = (visibleWorldWidth / (_mapW + 2)) * 0.91
     return Math.max(_minimumUsableZoom(w, h), Math.min(2.35, widthCoverageZoom))
   }
 
@@ -393,6 +394,12 @@
   function _buildTiles(map) {
     _tileObjects.forEach(m => _scene.remove(m))
     _tileObjects.clear()
+    if (_boardFront) {
+      _scene.remove(_boardFront)
+      if (_boardFront.geometry) _boardFront.geometry.dispose()
+      if (_boardFront.material) _boardFront.material.dispose()
+      _boardFront = null
+    }
     if (_boardBase) {
       _scene.remove(_boardBase)
       if (_boardBase.geometry) _boardBase.geometry.dispose()
@@ -404,9 +411,15 @@
     _mapH = map.height
 
     const boardBaseGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, _mapH + 1.25)
-    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x101419 })
+    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x20272e })
     _boardBase = new THREE.Mesh(boardBaseGeometry, boardBaseMaterial)
     _boardBase.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, (_mapH - 1) / 2)
+    const boardFrontGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, 0.10)
+    const boardFrontMaterial = new THREE.MeshLambertMaterial({ color: 0x37414b })
+    _boardFront = new THREE.Mesh(boardFrontGeometry, boardFrontMaterial)
+    _boardFront.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, _mapH + 0.105)
+    _scene.add(_boardFront)
+
     _scene.add(_boardBase)
 
     map.tiles.forEach(tile => {
@@ -1030,7 +1043,7 @@
   function _applyZoom(z) {
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
-    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(5, z))
+    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(6, z))
     _camera.updateProjectionMatrix()
     _updatePieceSummaryPositions()
     _notifyViewportChange()
@@ -1065,8 +1078,10 @@
     const hits = _raycaster.intersectObject(_hitPlane)
     if (!hits.length) return null
     const pt = hits[0].point
-    const x = Math.round(pt.x)
-    const y = Math.round(pt.z)
+    const roundedX = Math.round(pt.x)
+    const roundedY = Math.round(pt.z)
+    const x = Object.is(roundedX, -0) ? 0 : roundedX
+    const y = Object.is(roundedY, -0) ? 0 : roundedY
     if (x < 0 || y < 0 || x >= _mapW || y >= _mapH) return null
     return { x, y }
   }
@@ -1232,6 +1247,7 @@
     _mapW = 0
     _mapH = 0
     _boardBase = null
+    _boardFront = null
     _tileGeom = null
     _hlPlaneGeom = null
     _selectedRingGeom = null

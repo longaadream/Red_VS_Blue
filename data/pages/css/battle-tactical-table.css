@@ -14,7 +14,7 @@
   --battle-radius-sm: 3px;
   --battle-radius-md: 6px;
   --battle-control-size: 44px;
-  --battle-hud-offset: 66px;
+  --battle-hud-offset: 52px;
   --battle-hand-height: 138px;
   --battle-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -42,127 +42,82 @@ body {
 .phase-bar,
 .topbar {
   border: 0 !important;
-  border-bottom: 1px solid var(--battle-metal-edge) !important;
   border-radius: 0 !important;
-  background:
-    linear-gradient(180deg, rgba(37, 39, 41, 0.98), rgba(14, 16, 18, 0.98)) !important;
-  box-shadow:
-    inset 0 -1px 0 rgba(0, 0, 0, 0.72),
-    inset 0 1px 0 rgba(255, 244, 214, 0.06),
-    0 9px 28px rgba(0, 0, 0, 0.32) !important;
+  background: transparent !important;
+  box-shadow: none !important;
   backdrop-filter: none !important;
 }
 
 .phase-bar {
-  top: 0 !important;
-  left: 0 !important;
+  top: 6px !important;
+  left: 8px !important;
   right: 306px !important;
   width: auto !important;
   max-width: none !important;
-  min-height: 64px;
-  padding: 7px 10px !important;
-  grid-template-columns: minmax(126px, auto) minmax(0, 1fr) !important;
+  min-height: 44px;
+  padding: 2px 4px !important;
+  grid-template-columns: minmax(108px, auto) minmax(0, 1fr) !important;
 }
 
 .topbar {
-  top: 0 !important;
-  right: 0 !important;
-  min-height: 64px;
+  top: 8px !important;
+  right: 8px !important;
+  min-height: 0;
   max-width: 306px !important;
-  padding: 8px 10px !important;
+  padding: 0 !important;
   flex-wrap: nowrap !important;
 }
 
-.topbar button::before { content: none !important; }
-
-.topbar button,
-.back-btn,
-.btn-surrender,
-.btn-fullmap,
-.board-view-button,
-.target-cancel-btn,
-.training-tools-toggle,
-.piece-context-info,
-.piece-context-skill,
-.btn-end,
-.pi-close,
-.cd-close,
-.ts-close {
-  min-height: var(--battle-control-size);
-  border: 1px solid var(--battle-metal-soft) !important;
-  border-radius: var(--battle-radius-sm) !important;
-  color: var(--battle-text) !important;
-  background: linear-gradient(180deg, #292c2f, #17191b) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 5px 14px rgba(0, 0, 0, 0.24) !important;
-  text-shadow: none !important;
-  transition:
-    transform 140ms var(--battle-ease-out),
-    border-color 140ms ease,
-    background-color 140ms ease !important;
-}
-
-.topbar button:active,
-.back-btn:active,
-.board-view-button:active,
-.target-cancel-btn:active,
-.training-tools-toggle:active,
-.piece-context-info:active,
-.piece-context-skill:active:not(:disabled),
-.btn-end:active:not(:disabled) {
-  transform: scale(0.97) !important;
-  border-color: #8b8170 !important;
-}
-
 .turn-summary {
-  border-color: rgba(134, 126, 111, 0.36) !important;
-}
-
-.turn-badge {
-  border-radius: 2px !important;
-  border-color: rgba(134, 126, 111, 0.48) !important;
-  background: #171a1d !important;
-  color: var(--battle-text-muted) !important;
-  box-shadow: none !important;
-  letter-spacing: 0.08em;
-}
-
-.turn-badge.my-turn {
-  border-color: #657f59 !important;
-  color: #d9e6c8 !important;
-  background: #1c291c !important;
-}
-
-.player-state-chip {
-  min-height: 40px !important;
+  padding-right: 6px !important;
   border: 0 !important;
-  border-left: 3px solid var(--battle-red) !important;
-  border-radius: 2px !important;
-  background: linear-gradient(90deg, rgba(126, 42, 42, 0.3), rgba(18, 20, 22, 0.74)) !important;
-  box-shadow: inset 0 0 0 1px rgba(118, 111, 99, 0.24) !important;
 }
 
-.player-state-chip.blue {
-  border-left-color: var(--battle-blue) !important;
-  background: linear-gradient(90deg, rgba(43, 69, 117, 0.34), rgba(18, 20, 22, 0.74)) !important;
+.turn-badge,
+.turn-badge.my-turn,
+.turn-badge.opp-turn {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-inline: 2px !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 
+.player-state-chip,
+.player-state-chip.red,
+.player-state-chip.blue,
 .player-state-chip.active,
 .player-state-chip.is-active,
-.player-state-chip.is-local-player {
-  border-color: var(--battle-focus) !important;
-  box-shadow: inset 0 0 0 1px rgba(226, 199, 132, 0.46) !important;
+.player-state-chip.is-local-player,
+.player-state-chip.is-local-player.red,
+.player-state-chip.is-local-player.blue {
+  min-height: 34px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  padding: 2px 4px !important;
+  opacity: 1 !important;
 }
 
-.local-player-mark {
-  border-radius: 2px !important;
-  border-color: #9d927f !important;
-  background: #181a1c !important;
-}
+.player-state-chip::before { width: 2px; }
+.player-state-chip.is-local-player::after,
+.player-avatar,
+.local-player-mark { display: none !important; }
 
 .resource-orb,
+.resource-orb.action,
+.resource-orb.charge,
 .res-gem {
-  border-radius: 2px !important;
+  border: 0 !important;
+  background: transparent !important;
   box-shadow: none !important;
+}
+
+.res-gem {
+  padding-inline: 4px;
 }
 
 .board-wrap {
@@ -172,38 +127,19 @@ body {
 }
 
 .board-shell-3d .board-stage {
-  border: 5px solid #24272a !important;
-  border-radius: var(--battle-radius-md) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
   background: #07090b !important;
-  box-shadow:
-    inset 0 0 0 1px #777064,
-    inset 0 0 44px rgba(0, 0, 0, 0.62),
-    0 18px 46px rgba(0, 0, 0, 0.44) !important;
+  box-shadow: none !important;
 }
 
 .board-shell-3d .board-stage::after {
-  content: "";
-  position: absolute;
-  inset: 7px;
-  z-index: 3;
-  border: 1px solid rgba(169, 151, 116, 0.22);
-  border-radius: 2px;
-  box-shadow: inset 0 0 34px rgba(0, 0, 0, 0.32);
-  pointer-events: none;
+  display: none;
 }
 
 .board-camera-controls {
   top: calc(var(--battle-hud-offset) + 10px) !important;
   left: max(14px, env(safe-area-inset-left)) !important;
-}
-
-.board-view-button {
-  min-width: 44px;
-  min-height: 44px;
-  padding-inline: 11px !important;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
 }
 
 .piece-board-summary {
@@ -233,55 +169,16 @@ body {
   backdrop-filter: none !important;
 }
 
-.piece-context-skill,
-.card-item { border-radius: var(--battle-radius-sm) !important; }
-
-.piece-context-skill:disabled,
-.btn-end:disabled,
-.target-cancel-btn:disabled {
-  opacity: 0.46 !important;
-  filter: saturate(0.45);
-  cursor: not-allowed;
-}
-
 .hand-scroll {
   padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
   scroll-padding-inline: max(16px, env(safe-area-inset-left));
   mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
 }
 
-.card-item {
-  border-color: #655f55 !important;
-  background: linear-gradient(180deg, #282723, #121416) !important;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.44) !important;
-  transition:
-    transform 180ms var(--battle-ease-out),
-    border-color 160ms ease !important;
-}
-
-.card-item.card-pending,
-.card-item:focus-visible {
-  border-color: var(--battle-focus) !important;
-  box-shadow: 0 0 0 2px rgba(230, 199, 132, 0.28), 0 12px 24px rgba(0, 0, 0, 0.5) !important;
-}
-
 .battle-turn-control {
   right: max(14px, env(safe-area-inset-right)) !important;
   bottom: calc(var(--battle-hand-height) + env(safe-area-inset-bottom) + 10px) !important;
 }
-
-.btn-end {
-  min-width: 132px;
-  min-height: 46px;
-  border-color: #788d5c !important;
-  border-radius: var(--battle-radius-sm) !important;
-  background: linear-gradient(180deg, #34442a, #1d281a) !important;
-  color: #edf4dd !important;
-  animation: none !important;
-  letter-spacing: 0.04em;
-}
-
-.btn-end::before { display: none !important; }
 
 #targetOverlay {
   padding-top: calc(var(--battle-hud-offset) + env(safe-area-inset-top) + 8px) !important;
@@ -320,16 +217,6 @@ canvas:focus-visible {
   outline-offset: 2px !important;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .topbar button:hover,
-  .board-view-button:hover,
-  .target-cancel-btn:hover,
-  .piece-context-skill:hover:not(:disabled) {
-    border-color: #8b8170 !important;
-    background: linear-gradient(180deg, #34373a, #1d2022) !important;
-  }
-}
-
 @media (hover: none) {
   .piece-context-skill:hover:not(:disabled),
   .card-item:hover:not(.card-disabled) { transform: none !important; }
@@ -337,7 +224,7 @@ canvas:focus-visible {
 
 @media (max-width: 760px) {
   :root {
-    --battle-hud-offset: 76px;
+    --battle-hud-offset: 58px;
     --battle-hand-height: 108px;
   }
 
@@ -347,12 +234,10 @@ canvas:focus-visible {
     right: max(6px, env(safe-area-inset-right)) !important;
     width: auto !important;
     max-width: none !important;
-    min-height: 68px;
-    max-height: 74px;
+    min-height: 48px;
+    max-height: 54px;
     grid-template-columns: minmax(72px, 82px) minmax(0, 1fr) !important;
-    padding: 5px 6px !important;
-    border: 1px solid var(--battle-metal-edge) !important;
-    border-radius: var(--battle-radius-sm) !important;
+    padding: 2px 4px !important;
     overflow: hidden;
   }
 
@@ -371,10 +256,10 @@ canvas:focus-visible {
   .player-state-chip {
     width: auto !important;
     min-width: 0 !important;
-    min-height: 56px !important;
-    grid-template-columns: minmax(0, 1fr) !important;
+    min-height: 42px !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
     align-content: center;
-    padding: 4px 5px !important;
+    padding: 2px 3px !important;
   }
 
   .player-display-name { max-width: 100% !important; font-size: 9px !important; }
@@ -407,22 +292,10 @@ canvas:focus-visible {
     min-height: 44px !important;
     padding: 0 !important;
     overflow: hidden;
-    font-size: 10px !important;
+    font-size: 0 !important;
     white-space: nowrap;
   }
-
-  .topbar .back-btn { width: 44px !important; }
-  .topbar #btnSwitchPov { font-size: 0 !important; }
-  .topbar #btnSwitchPov::after {
-    content: "视角";
-    font-size: 10px;
-    line-height: 1;
-  }
-
-  .board-shell-3d .board-stage {
-    border-width: 3px !important;
-    border-radius: var(--battle-radius-sm) !important;
-  }
+  .topbar .btn-fullmap { font-size: 11px !important; }
 
   .board-camera-controls {
     top: calc(var(--battle-hud-offset) + env(safe-area-inset-top) + 9px) !important;
@@ -508,7 +381,7 @@ canvas:focus-visible {
 
 @media (orientation: landscape) and (max-height: 500px) {
   :root {
-    --battle-hud-offset: 50px;
+    --battle-hud-offset: 46px;
     --battle-hand-height: 94px;
   }
 
@@ -530,9 +403,9 @@ canvas:focus-visible {
     min-height: 48px;
     max-width: 252px !important;
     padding: 2px 5px !important;
-    background: linear-gradient(180deg, rgba(37, 39, 41, 0.98), rgba(14, 16, 18, 0.98)) !important;
-    border-bottom: 1px solid var(--battle-metal-edge) !important;
-    box-shadow: 0 9px 28px rgba(0, 0, 0, 0.32) !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
   }
 
   .topbar button,
@@ -546,9 +419,10 @@ canvas:focus-visible {
     height: 44px !important;
     min-height: 44px !important;
     padding: 0 !important;
-    font-size: 9px !important;
+    font-size: 0 !important;
   }
 
+  .topbar .btn-fullmap { font-size: 10px !important; }
   .player-state-chip { min-height: 38px !important; }
   .board-camera-controls { top: 58px !important; }
   .battle-turn-control { bottom: calc(var(--battle-hand-height) + 7px) !important; }
@@ -597,8 +471,6 @@ canvas:focus-visible {
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .phase-bar,
-  .topbar,
   .piece-context-menu,
   .selected-status-overlay,
   .training-popover,
@@ -609,9 +481,6 @@ canvas:focus-visible {
 }
 
 @media (prefers-contrast: more) {
-  .phase-bar,
-  .topbar,
-  .board-shell-3d .board-stage,
   .piece-context-menu,
   .target-mode-card { border-color: #d5c9b4 !important; }
 }
