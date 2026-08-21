@@ -17,6 +17,24 @@
 export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } from './turn'
 export { getBattleRootSeed, hashBattleState, runBattleAction } from './battle-runner'
 export {
+  AI_ENVIRONMENT_CAPABILITIES,
+  aiEnvironmentV1,
+  aiStateKey,
+  isAITerminal,
+  listLegalAIActions,
+  observeBattleForAI,
+  simulateAITransition,
+} from './ai-environment'
+export { AI_ENVIRONMENT_PROTOCOL_VERSION } from './ai-types'
+export type {
+  AIEnvironment,
+  AIObservation,
+  AIObservationScope,
+  AISimulationContext,
+  CandidateAction,
+  TransitionResult,
+} from './ai-types'
+export {
   getLegalNormalMoveTargets,
   getLegalNormalMoveTargetsForPlayer,
   getLivingOccupantAt,

@@ -1,0 +1,351 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- fixtures exercise serialized game-data contracts. */
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
+import { runInNewContext } from 'node:vm'
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  AI_ENVIRONMENT_CAPABILITIES,
+  aiEnvironmentV1,
+  listLegalAIActions,
+  observeBattleForAI,
+  simulateAITransition,
+} from '@/lib/game/ai-environment'
+import type { AIEnvironment, CandidateAction } from '@/lib/game/ai-types'
+import { stableJson } from '@/lib/game/battle-trace'
+import { globalTriggerSystem } from '@/lib/game/triggers'
+import { prepareAction } from '@/lib/game/targeting'
+import { getLegalNormalMoveTargetsForPlayer } from '@/lib/game/spatial'
+import { loadRuleById } from '@/lib/game/skills'
+import { makePiece, makeState } from '../helpers/minimal-state'
+
+const FIXED_SEED = 0x84c0ffee
+
+function activeSkill(id: string, targeting: any, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    name: id,
+    description: id,
+    kind: 'active',
+    type: 'normal',
+    cooldownTurns: 0,
+    maxCharges: 0,
+    powerMultiplier: 1,
+    actionPointCost: 0,
+    range: 'self',
+    requiresTarget: !!targeting?.steps?.some((step: any) => step.kind === 'target'),
+    targeting,
+    code: "function executeSkill(context) { context.battle.extensions.executed = context.skill.id; return { success: true, message: 'executed' }; }",
+    ...overrides,
+  }
+}
+
+function loadBrowserEnvironment(): AIEnvironment {
+  const bundlePath = resolve(process.cwd(), 'data/pages/js/game-engine.js')
+  const source = readFileSync(bundlePath, 'utf8')
+  const context: Record<string, unknown> = {
+    Buffer,
+    clearTimeout,
+    console: { error: vi.fn(), log: vi.fn(), warn: vi.fn() },
+    process,
+    require: createRequire(import.meta.url),
+    setTimeout,
+  }
+  runInNewContext(source, context, { filename: bundlePath })
+  return (context.GameEngine as { aiEnvironmentV1: AIEnvironment }).aiEnvironmentV1
+}
+
+beforeEach(() => globalTriggerSystem.clearRules())
+afterEach(() => globalTriggerSystem.clearRules())
+
+describe('versioned headless AI environment', () => {
+  it('projects player-visible state without opponent hand, hidden status, code, rules, or debug trace', () => {
+    const red = makePiece({ instanceId: 'red-piece', ownerPlayerId: 'player-red' }) as any
+    const blue = makePiece({ instanceId: 'blue-piece', ownerPlayerId: 'player-blue', x: 4, y: 4 }) as any
+    blue.rules = [{ id: 'secret-rule', effect: () => 'secret' }]
+    blue.privateRuntimePayload = { opponentPlan: 'secret-plan' }
+    blue.statusTags = [
+      { id: 'visible', type: 'visible', visible: true },
+      { id: 'hidden', type: 'hidden', visible: false },
+    ]
+    const state = makeState({ pieces: [red, blue] }) as any
+    state.players[0].hand = [{ cardId: 'red-card', instanceId: 'red-card-1', ownerPlayerId: 'player-red' }]
+    state.players[1].hand = [{ cardId: 'blue-secret', instanceId: 'blue-card-1', ownerPlayerId: 'player-blue' }]
+    state.players[1].statusTags = [{
+      id: 'public-player-tag', type: 'aura', visible: true, intensity: 2,
+      effectCode: 'secret-player-code', privatePayload: { plan: 'secret-player-plan' },
+    }]
+    state.extensions.debugBattle = { actionLog: [{ secret: true }], appliedActionIds: [] }
+    state.pendingTargetSelection = {
+      playerId: 'player-blue',
+      effectCode: 'secret-code',
+      targetType: 'piece',
+      candidates: [{ type: 'piece', pieceId: 'red-piece' }],
+    }
+
+    const observation = observeBattleForAI(state, 'player-red')
+    const json = JSON.stringify(observation)
+
+    expect(observation.protocolVersion).toBe(1)
+    expect(observation.players[0].hand?.[0].cardId).toBe('red-card')
+    expect(observation.players[1]).toMatchObject({ handCount: 1, hand: undefined })
+    expect(observation.pieces.find(piece => piece.instanceId === 'blue-piece')?.statusTags)
+      .toEqual([{ id: 'visible', type: 'visible', visible: true }])
+    expect(observation.pendingTargetSelection).toBeUndefined()
+    expect(observation.players[1].statusTags).toEqual([{
+      id: 'public-player-tag', type: 'aura', visible: true, intensity: 2,
+    }])
+    expect(json).not.toMatch(/blue-secret|secret-rule|secret-code|secret-plan|secret-player|debugBattle|actionLog/)
+  })
+
+  it('enumerates stable complete move, option/target skill, zero-cost card, and end-turn candidates', () => {
+    const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 1, y: 1, moveRange: 2 }) as any
+    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 1 }) as any
+    caster.skills = [{ skillId: 'choice-shot', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [enemy, caster], width: 5, height: 4 }) as any
+    state.players[0].actionPoints = 10
+    state.skillsById['choice-shot'] = activeSkill('choice-shot', {
+      steps: [
+        { kind: 'option', title: 'mode', options: [{ label: 'B', value: 'b' }, { label: 'A', value: 'a' }] },
+        { kind: 'target', type: 'piece', filter: 'enemy', range: 3 },
+      ],
+    })
+    state.players[0].hand = [{
+      ...JSON.parse(readFileSync(resolve(process.cwd(), 'data/cards/lucky-coin.json'), 'utf8')),
+      cardId: 'lucky-coin', instanceId: 'zero-card-1', ownerPlayerId: 'player-red',
+    }]
+    const before = stableJson(state)
+
+    const first = listLegalAIActions(state, 'player-red')
+    const second = listLegalAIActions(state, 'player-red')
+
+    expect(second).toEqual(first)
+    expect(stableJson(state)).toBe(before)
+    expect(first.at(-1)?.kind).toBe('end-turn')
+    expect(first.filter(item => item.kind === 'basic-skill')).toHaveLength(2)
+    expect(first.some(item => item.kind === 'card' && item.action.type === 'playCard')).toBe(true)
+    const legalMoves = getLegalNormalMoveTargetsForPlayer(state, 'player-red', 'caster')
+    expect(first.filter(item => item.kind === 'move')).toHaveLength(legalMoves.length)
+    for (const item of first.filter(item => item.kind === 'basic-skill' || item.kind === 'card')) {
+      expect(prepareAction(state, item.action), item.id).toEqual({ kind: 'ready' })
+    }
+    for (const item of first) {
+      expect(
+        simulateAITransition(state, item, { rootSeed: FIXED_SEED }).accepted,
+        `${item.kind}:${stableJson(item.action)}`,
+      ).toBe(true)
+    }
+    expect(new Set(first.map(item => item.id)).size).toBe(first.length)
+  })
+
+  it('fails closed for non-player commands and exposes the admission matrix', () => {
+    expect(AI_ENVIRONMENT_CAPABILITIES.unsupportedActionTypes.map(entry => entry.type))
+      .toEqual(['deploymentTimeout', 'grantChargePoints', 'surrender'])
+    expect(AI_ENVIRONMENT_CAPABILITIES.supportedActionTypes).toContain('pendingTargetSelect')
+  })
+
+  it('records a large-board complete-candidate performance baseline without imposing a synthetic target', () => {
+    const caster = makePiece({ instanceId: 'perf-caster', ownerPlayerId: 'player-red', x: 10, y: 8 }) as any
+    caster.skills = [{ skillId: 'perf-global-cell', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [caster], width: 20, height: 16 }) as any
+    state.skillsById['perf-global-cell'] = activeSkill('perf-global-cell', {
+      steps: [{ kind: 'target', type: 'cell', filter: 'all', range: 99 }],
+    })
+
+    const started = performance.now()
+    const candidates = listLegalAIActions(state, 'player-red')
+    const elapsedMs = performance.now() - started
+    const targetCandidates = candidates.filter(item =>
+      item.action.type === 'useBasicSkill' && item.action.skillId === 'perf-global-cell',
+    )
+
+    expect(targetCandidates).toHaveLength(320)
+    console.info(`[RED-84 performance] board=20x16 candidates=${candidates.length} completeTargets=${targetCandidates.length} elapsedMs=${elapsedMs.toFixed(2)}`)
+  })
+
+  it('enumerates deployment, pending option, and a real rule-produced pending target', () => {
+    const red = makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red' }) as any
+    red.isCore = true
+    const state = makeState({ pieces: [red] }) as any
+    state.deployment = {
+      status: 'awaiting-locks',
+      playerIds: ['player-red', 'player-blue'],
+      choices: { 'player-red': { pieceId: null }, 'player-blue': { pieceId: 'secret-core' } },
+      locks: { 'player-red': { locked: false }, 'player-blue': { locked: false } },
+      startedAt: 1,
+      deadlineAt: 45_001,
+      revision: 0,
+      initialPositions: { 'red-core': { x: 0, y: 0 } },
+    }
+    expect(listLegalAIActions(state, 'player-red').map(item => item.kind))
+      .toEqual(['deployment-choice', 'deployment-choice', 'deployment-lock'])
+    expect(JSON.stringify(observeBattleForAI(state, 'player-red'))).not.toContain('secret-core')
+
+    delete state.deployment
+    state.pendingOptionSelection = {
+      playerId: 'player-red', title: 'choose', options: ['中', 'ä', 'z'], cancelValue: 'z',
+    }
+    const optionCandidates = listLegalAIActions(state, 'player-red')
+    expect(optionCandidates.map(item => item.kind))
+      .toEqual(['pending-option', 'pending-option', 'pending-option', 'cancel-selection'])
+    expect(optionCandidates.slice(0, 3).map(item => (
+      item.action.type === 'pendingOptionSelect' ? item.action.selectedOption : undefined
+    ))).toEqual(['z', 'ä', '中'])
+
+    const minato = makePiece({
+      instanceId: 'minato', templateId: 'blue-minato', ownerPlayerId: 'player-red', x: 1, y: 1,
+    }) as any
+    minato.rules = [loadRuleById('rule-minato-anchor-begin-turn', true)]
+    const pendingSeed = makeState({ pieces: [minato], phase: 'start' }) as any
+    const advance = listLegalAIActions(pendingSeed, 'player-red')[0]
+    const enteredPending = simulateAITransition(pendingSeed, advance, { rootSeed: FIXED_SEED })
+    expect(enteredPending.accepted).toBe(true)
+    if (!enteredPending.accepted) throw new Error('Expected Minato begin-turn rule to enter pending target state')
+    expect(enteredPending.state.pendingTargetSelection?.triggerContext).toMatchObject({
+      type: 'beginTurn', pendingRuleId: 'rule-minato-anchor-begin-turn',
+    })
+    const pending = listLegalAIActions(enteredPending.state, 'player-red')
+    expect(pending.some(item => item.kind === 'pending-target')).toBe(true)
+    expect(pending.at(-1)?.kind).toBe('cancel-selection')
+    for (const item of pending) {
+      expect(
+        simulateAITransition(enteredPending.state, item, { rootSeed: FIXED_SEED }).accepted,
+        `${item.kind}:${stableJson(item.action)}`,
+      ).toBe(true)
+    }
+  })
+
+  it('simulates on an isolated copy, returns structured diff/trace, and replays deterministically', () => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 1, y: 1, moveRange: 2 }) as any
+    const state = makeState({ pieces: [mover] }) as any
+    const action = listLegalAIActions(state, 'player-red').find(item =>
+      item.action.type === 'move' && item.action.toX === 1 && item.action.toY === 0,
+    )!
+    const before = stableJson(state)
+    const rulesBefore = [...globalTriggerSystem.getRules()]
+
+    const first = simulateAITransition(state, action, { rootSeed: FIXED_SEED })
+    const second = simulateAITransition(state, action, { rootSeed: FIXED_SEED })
+
+    expect(first.accepted).toBe(true)
+    expect(second.accepted).toBe(true)
+    expect(second.transitionHash).toBe(first.transitionHash)
+    expect(second.trace).toEqual(first.trace)
+    expect(stableJson(state)).toBe(before)
+    expect(globalTriggerSystem.getRules()).toEqual(rulesBefore)
+    if (first.accepted) {
+      expect(first.state.pieces.find(piece => piece.instanceId === 'mover')).toMatchObject({ x: 1, y: 0 })
+      expect(first.trace.actionTrace).toMatchObject({ rootSeed: FIXED_SEED })
+      expect(first.trace.actionTrace?.preStateHash).toMatch(/^[0-9a-f]{64}$/)
+      expect(first.trace.stateChanges.some(change => change.path.endsWith('.y'))).toBe(true)
+    }
+  })
+
+  it('restores nested trigger-rule runtime state after accepted and rejected simulations', () => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 1, y: 1 }) as any
+    const state = makeState({ pieces: [mover] }) as any
+    const move = listLegalAIActions(state, 'player-red').find(item => item.kind === 'move')!
+    const acceptedRule: any = {
+      id: 'ai-isolation-accepted', name: 'accepted', description: 'accepted',
+      trigger: { type: 'beforeMove' }, limits: { maxUses: 10, uses: 0, currentCooldown: 0 },
+      effect: () => ({ success: true }),
+    }
+    globalTriggerSystem.addRule(acceptedRule)
+
+    expect(simulateAITransition(state, move, { rootSeed: FIXED_SEED }).accepted).toBe(true)
+    expect(globalTriggerSystem.getRules()[0]).toBe(acceptedRule)
+    expect(acceptedRule.limits).toEqual({ maxUses: 10, uses: 0, currentCooldown: 0 })
+
+    globalTriggerSystem.clearRules()
+    const rejectedRule: any = {
+      id: 'ai-isolation-rejected', name: 'rejected', description: 'rejected',
+      trigger: { type: 'beforeMove' }, limits: { maxUses: 10, uses: 0 },
+      effect: () => {
+        rejectedRule.limits.uses = 9
+        throw new Error('fixture rejection')
+      },
+    }
+    globalTriggerSystem.addRule(rejectedRule)
+    expect(simulateAITransition(state, move, { rootSeed: FIXED_SEED }).accepted).toBe(false)
+    expect(globalTriggerSystem.getRules()[0]).toBe(rejectedRule)
+    expect(rejectedRule.limits).toEqual({ maxUses: 10, uses: 0 })
+  })
+
+  it('returns a stable rejected transition and never mutates the caller state', () => {
+    const state = makeState({ pieces: [makePiece({ instanceId: 'mover' })] }) as any
+    const before = stableJson(state)
+    const illegal = { type: 'move', playerId: 'player-red', pieceId: 'mover', toX: 99, toY: 99 } as const
+
+    const first = simulateAITransition(state, illegal, { rootSeed: FIXED_SEED })
+    const second = simulateAITransition(state, illegal, { rootSeed: FIXED_SEED })
+
+    expect(first.accepted).toBe(false)
+    expect(second.transitionHash).toBe(first.transitionHash)
+    expect(first.state).toBe(state)
+    expect(first.trace).toEqual({ actionLog: [], stateChanges: [] })
+    expect(stableJson(state)).toBe(before)
+
+    const missingSeed = simulateAITransition(state, illegal)
+    expect(missingSeed).toMatchObject({
+      accepted: false,
+      error: { code: 'AI_ENV_ROOT_SEED_REQUIRED' },
+    })
+  })
+
+  it('uses real summon and transformed-piece fixtures through the formal runner', () => {
+    const naruto = makePiece({
+      instanceId: 'naruto', templateId: 'red-naruto', ownerPlayerId: 'player-red', x: 1, y: 1,
+    }) as any
+    naruto.skills = [{ skillId: 'naruto-shadow-clone', currentCooldown: 0, usesRemaining: -1 }]
+    const transformed = makePiece({
+      instanceId: 'transformed', templateId: 'red-illidan', ownerPlayerId: 'player-red', x: 4, y: 3,
+    }) as any
+    transformed.skills = [{ skillId: 'illidan-metamorphosis', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [naruto, transformed], width: 6, height: 5 }) as any
+    state.players[0].actionPoints = 20
+    state.players[0].chargePoints = 20
+    state.skillsById['naruto-shadow-clone'] = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'data/skills/naruto-shadow-clone.json'), 'utf8'),
+    )
+    state.skillsById['illidan-metamorphosis'] = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'data/skills/illidan-metamorphosis.json'), 'utf8'),
+    )
+    const summon = listLegalAIActions(state, 'player-red').find(item =>
+      item.kind === 'basic-skill' && item.action.type === 'useBasicSkill' &&
+      item.action.skillId === 'naruto-shadow-clone' && item.action.selectedOption === 'summon',
+    )
+    expect(summon).toBeDefined()
+    const result = aiEnvironmentV1.simulate(state, summon!, { rootSeed: FIXED_SEED })
+    expect(result.accepted).toBe(true)
+    if (result.accepted) {
+      expect(result.state.pieces.some(piece => piece.instanceId.startsWith('naruto-clone-'))).toBe(true)
+    }
+    const transform = listLegalAIActions(state, 'player-red').find(item =>
+      item.kind === 'charge-skill' && item.action.type === 'useChargeSkill' &&
+      item.action.skillId === 'illidan-metamorphosis',
+    )
+    expect(transform).toBeDefined()
+    const transformedResult = aiEnvironmentV1.simulate(state, transform!, { rootSeed: FIXED_SEED })
+    expect(transformedResult.accepted).toBe(true)
+    if (transformedResult.accepted) {
+      expect(transformedResult.state.pieces.find(piece => piece.instanceId === 'transformed')?.statusTags)
+        .toContainEqual(expect.objectContaining({ type: 'demon-strike-charges' }))
+    }
+  })
+
+  it('matches the generated browser export for candidate order and transition hash', () => {
+    const browser = loadBrowserEnvironment()
+    const nodeState = makeState({ pieces: [makePiece({ instanceId: 'mover', x: 1, y: 1, moveRange: 2 })] }) as any
+    const browserState = JSON.parse(JSON.stringify(nodeState))
+    const nodeCandidates = aiEnvironmentV1.listLegalActions(nodeState, 'player-red')
+    const browserCandidates = browser.listLegalActions(browserState, 'player-red')
+    expect(JSON.parse(JSON.stringify(browserCandidates))).toEqual(nodeCandidates)
+
+    const selectMove = (items: CandidateAction[]) => items.find(item => item.kind === 'move')!
+    const nodeResult = aiEnvironmentV1.simulate(nodeState, selectMove(nodeCandidates), { rootSeed: FIXED_SEED })
+    const browserResult = browser.simulate(browserState, selectMove(browserCandidates), { rootSeed: FIXED_SEED })
+    expect(browserResult.transitionHash).toBe(nodeResult.transitionHash)
+  })
+})

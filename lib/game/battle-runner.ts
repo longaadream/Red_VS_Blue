@@ -14,6 +14,7 @@ import {
 } from './rule-runtime'
 import type { BattleAction, BattleState } from './turn'
 import { applyBattleAction, assertBattleNotTerminal, safeCloneBattleState } from './turn'
+import { globalTriggerSystem } from './triggers'
 
 export {
   hashBattleState,
@@ -153,6 +154,53 @@ export function runBattleAction(
     })
     throw decorateRuleError(error, runtime, state, action, actionId)
   }
+}
+
+/**
+ * Execute one authoritative transition while restoring process-level trigger
+ * registry state afterwards. This is the synchronous isolation boundary used
+ * by headless search/simulation; it does not save or broadcast the result.
+ */
+export function runBattleActionIsolated(
+  state: BattleState,
+  action: BattleAction,
+  options: RunBattleActionOptions = {},
+): BattleActionResult {
+  const ruleRegistry = globalTriggerSystem.getRules()
+  const rules = [...ruleRegistry]
+  const ruleSnapshots = rules.map(rule => ({
+    rule,
+    snapshot: cloneRuntimeValue(rule),
+  }))
+  const triggerInternals = globalTriggerSystem as unknown as {
+    rules?: typeof ruleRegistry
+    nextRootEventId?: number
+  }
+  const nextRootEventId = triggerInternals.nextRootEventId
+  try {
+    return runBattleAction(state, action, options)
+  } finally {
+    for (const { rule, snapshot } of ruleSnapshots) {
+      for (const key of Object.keys(rule)) delete (rule as unknown as Record<string, unknown>)[key]
+      Object.assign(rule, cloneRuntimeValue(snapshot))
+    }
+    ruleRegistry.splice(0, ruleRegistry.length, ...rules)
+    triggerInternals.rules = ruleRegistry
+    if (nextRootEventId !== undefined) triggerInternals.nextRootEventId = nextRootEventId
+  }
+}
+
+function cloneRuntimeValue<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+  if (value === null || typeof value !== 'object') return value
+  const source = value as object
+  const existing = seen.get(source)
+  if (existing) return existing as T
+  const copy: unknown[] | Record<string, unknown> = Array.isArray(value) ? [] : {}
+  seen.set(source, copy)
+  for (const [key, entry] of Object.entries(value)) {
+    ;(copy as Record<string, unknown>)[key] = cloneRuntimeValue(entry, seen)
+  }
+  return copy as T
 }
 
 function copyDeploymentChoices(
