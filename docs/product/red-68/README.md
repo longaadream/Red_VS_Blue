@@ -52,9 +52,9 @@ Additional acceptance evidence:
 ## Quality gates
 
 - Focused battle regression set after product-review changes: 9 files and 68 tests passed.
-- Full suite: 69 files and 548 tests passed.
+- Full suite after latest-main integration: 71 files and 564 tests passed.
 - `npm run typecheck`: passed.
-- `npm run check:encoding`: passed for 548 text files.
+- `npm run check:encoding`: passed for 555 text files.
 - `npm run lint`: repository configuration stops before source lint because its last flat-config object references `import/no-anonymous-default-export` without registering the installed `eslint-plugin-import`.
 - A temporary uncommitted mirror config that only adds that plugin mapping ran full ESLint with zero errors and zero warnings. The config was deleted after the gate.
 
