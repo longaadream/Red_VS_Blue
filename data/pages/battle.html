@@ -18,6 +18,7 @@
   <script src="js/battle-ui/battle-legal-actions.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-ui/deployment-status.js"></script>
+  <script src="js/battle-ui/turn-timer-status.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
   <style>
@@ -1314,6 +1315,11 @@
     .deployment-status-state { grid-column: 1 / -1; color: #94a3b8; font-size: 11px; font-weight: 750; }
     .deployment-status.urgent { border-color: rgba(248,113,113,.54); }
     .deployment-status.urgent .deployment-countdown { color: #fca5a5; }
+    .turn-clock { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+    .turn-clock.burning { color: #fca5a5; text-shadow: 0 0 12px rgba(239,68,68,.5); }
+    .turn-clock.fast { color: #fbbf24; }
+    .turn-clock.fast.burning { color: #fb7185; }
+    .turn-clock[hidden] { display: none !important; }
     @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
       .phase-bar { max-width: calc(100vw - 210px) !important; }
       .player-state-chip { min-width: 102px !important; max-width: 128px; grid-template-columns: minmax(38px, 1fr) auto !important; }
@@ -1964,6 +1970,8 @@
     let validMoves = new Set()   // reachable cells for current move (wall-aware)
     let pollTimer = null
     let deploymentStatusTimer = null
+    let authorityClockAnchor = null
+    let authoritativeTurnTimer = null
     let myFaction = null       // 'red' | 'blue' (derived from ownerPlayerId)
     let recordSaved = false
     let actionLog = []
@@ -3192,11 +3200,24 @@
       if (typeof seed !== 'number') throw new Error('Missing authority root seed')
       return GameEngine.runBattleAction(state, action, { rootSeed: seed })
     }
-    function applyServerState(state, seed, preserveWsSeq) {
+    function currentAuthorityNow() {
+      if (!authorityClockAnchor) return Date.now()
+      return authorityClockAnchor.serverNow + Math.max(0, Date.now() - authorityClockAnchor.localNow)
+    }
+    function syncAuthorityClock(serverNow, turnTimer) {
+      if (!Number.isFinite(Number(serverNow))) return
+      authorityClockAnchor = {
+        serverNow: Number(serverNow),
+        localNow: Date.now(),
+      }
+      authoritativeTurnTimer = turnTimer || null
+    }
+    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer) {
       if (!state) return
       resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
+      syncAuthorityClock(serverNow, turnTimer)
 
       const oldG = G
       G = state
@@ -3316,7 +3337,7 @@
               createBattlePresentationModel(msg.state)
             )
           }
-          applyServerState(msg.state, msg.seed || null)
+          applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer)
         } else if (msg.type === 'battleSnapshot') {
           applyLegacyBattleSnapshot(msg)
         } else if (msg.type === 'roomUpdate') {
@@ -3398,7 +3419,7 @@
         const data = await res.json()
         if (data && data.state) {
           addLog('[HTTP fallback] 已拉取服务端战斗状态 ' + String(data.stateHash || '').slice(0, 12), 'info')
-          applyServerState(data.state, data.seed || null)
+          applyServerState(data.state, data.seed || null, false, data.serverNow, data.turnTimer)
           return
         }
         throw new Error('empty battle state')
@@ -4210,6 +4231,24 @@
       setStatusMsg('🃏 再次点击释放，点其他地方取消')
     }
 
+    function renderTurnTimerStatus() {
+      const clock = document.getElementById('turnClock')
+      if (!clock || typeof RvBTurnTimerStatus === 'undefined') return
+      const view = RvBTurnTimerStatus.create({
+        timer: authoritativeTurnTimer,
+        now: currentAuthorityNow(),
+      })
+      clock.hidden = !view.visible
+      clock.classList.toggle('burning', view.visible && view.burning)
+      clock.classList.toggle('fast', view.visible && view.fast)
+      clock.textContent = view.clockText
+      clock.title = view.label
+      clock.setAttribute(
+        'aria-label',
+        view.visible ? view.label + '，剩余 ' + view.remainingSeconds + ' 秒' : '回合计时不可用',
+      )
+    }
+
     function renderDeploymentStatus() {
       const panel = document.getElementById('deploymentStatus')
       if (!panel || typeof RvBDeploymentStatus === 'undefined') return
@@ -4221,7 +4260,7 @@
         playerId: myPlayerId,
         selectedPieceName: selected ? pieceName(selected) : '',
         spectating: SPECTATE_MODE,
-        now: Date.now(),
+        now: currentAuthorityNow(),
       })
       panel.hidden = !view.visible
       panel.classList.toggle('urgent', view.visible && view.urgent)
@@ -4236,6 +4275,7 @@
     function renderActionBar() {
       if (!G) return
       renderDeploymentStatus()
+      renderTurnTimerStatus()
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const phase = G.turn ? G.turn.phase : ''
       const inAction = phase === 'action'
@@ -5133,7 +5173,12 @@
       })
       _use3d = hasThreeRenderer
       if (!_use3d) initMapControls()
-      if (!deploymentStatusTimer) deploymentStatusTimer = setInterval(renderDeploymentStatus, 250)
+      if (!deploymentStatusTimer) {
+        deploymentStatusTimer = setInterval(function() {
+          renderDeploymentStatus()
+          renderTurnTimerStatus()
+        }, 250)
+      }
       init()
       document.addEventListener('pointerdown', function (event) {
         const root = document.getElementById('trainingTools')

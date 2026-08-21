@@ -1,4 +1,5 @@
 import type { BattleAction, BattleState } from './turn'
+import { TURN_TIMEOUT_FORFEIT_STREAK } from './turn-timer'
 
 export const BATTLE_ROUND_LIMIT = 40
 
@@ -156,16 +157,30 @@ export function finalizeBattleTerminal(
   if (state.terminalResult) return state.terminalResult
 
   const settledAt = settlementPosition(state, action, options)
+  const timeoutForfeit = action.type === 'turnTimeout'
+    && !!state.turnTimer?.lastTimeout?.countsTowardNoOpStreak
+    && state.turnTimer.lastTimeout.streak >= TURN_TIMEOUT_FORFEIT_STREAK
+      ? surrenderResult(state, {
+          type: 'surrender',
+          playerId: state.turnTimer.lastTimeout.playerId,
+          reason: 'timeout',
+        }, settledAt)
+      : null
   const result = action.type === 'surrender'
     ? surrenderResult(state, action, settledAt)
-    : state.pendingOptionSelection || state.pendingTargetSelection
+    : timeoutForfeit ?? (state.pendingOptionSelection || state.pendingTargetSelection
       ? null
-      : coreEliminationResult(state, settledAt) ?? roundLimitResult(state, settledAt)
+      : coreEliminationResult(state, settledAt) ?? roundLimitResult(state, settledAt))
   if (!result) return null
 
   state.terminalResult = result
   state.pendingOptionSelection = undefined
   state.pendingTargetSelection = undefined
+  if (state.turnTimer) {
+    state.turnTimer.status = 'stopped'
+    state.turnTimer.remainingMs = 0
+    state.turnTimer.deadlineAt = state.turnTimer.lastTimeout?.at ?? state.turnTimer.deadlineAt
+  }
   if (!state.actions) state.actions = []
   state.actions.push({
     type: 'terminalResult',

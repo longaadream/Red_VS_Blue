@@ -1,14 +1,13 @@
 import type { BattleState } from './turn'
+import {
+  systemAuthoritativeRuleClock,
+  type AuthoritativeRuleClock,
+} from './turn-timer'
 
 export const DEPLOYMENT_DURATION_MS = 45_000
 
-export interface DeploymentRuleClock {
-  now(): number
-}
-
-export const systemDeploymentRuleClock: DeploymentRuleClock = {
-  now: () => Date.now(),
-}
+export type DeploymentRuleClock = AuthoritativeRuleClock
+export const systemDeploymentRuleClock: DeploymentRuleClock = systemAuthoritativeRuleClock
 
 /**
  * Deployment positions are public to players and spectators. Pending reroll
