@@ -71,11 +71,11 @@ for (const file of globSync('lib/game/**/*.ts')) {
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
   const initializers = collectVariableInitializers(sourceFile)
   const visit = (node) => {
-    if (
-      ts.isCallExpression(node)
-      && ts.isPropertyAccessExpression(node.expression)
-      && node.expression.name.text === 'checkTriggers'
-    ) {
+    const isTriggerCall = ts.isCallExpression(node) && (
+      (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'checkTriggers')
+      || (ts.isIdentifier(node.expression) && node.expression.text === 'checkSynchronousTriggers')
+    )
+    if (isTriggerCall && ts.isCallExpression(node)) {
       const contextNode = node.arguments[1]
       const event = literalEventType(contextNode, initializers)
       if (event) {

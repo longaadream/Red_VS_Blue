@@ -118,6 +118,8 @@ export interface AIObservation {
     playerId: string
     title: string
     options: unknown[]
+    selectionId?: string
+    stateRevision?: number
     canCancel: boolean
   }
   pendingTargetSelection?: {

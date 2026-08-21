@@ -18,6 +18,7 @@
   <script src="js/battle-ui/battle-legal-actions.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-ui/deployment-status.js"></script>
+  <script src="js/battle-ui/battle-tactical-geometry.js"></script>
   <script src="js/battle-ui/turn-timer-status.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
@@ -1064,7 +1065,7 @@
       font-size:22px; font-weight:900; color:#fbbf24;
       letter-spacing:1.5px;
       text-shadow:0 0 20px rgba(245,158,11,.9), 0 2px 6px rgba(0,0,0,.9);
-      animation:targetPulse 1.6s ease-in-out infinite;
+      transition:opacity var(--motion-fast, 140ms) var(--ease-out, ease-out);
     }
     .target-cancel-btn {
       pointer-events:auto; background:rgba(15,23,42,.85);
@@ -1330,6 +1331,7 @@
       .deployment-countdown { font-size: 18px; }
     }
   </style>
+  <link rel="stylesheet" href="css/battle-tactical-table.css" />
 </head>
 <body>
 
@@ -1374,7 +1376,7 @@
     <div class="cd-layout">
       <div class="cd-sheet">
       <button class="cd-close" onclick="closeCardDetail()">✕</button>
-      <div class="cd-icon" id="cdIcon">🃏</div>
+      <div class="cd-icon" id="cdIcon">牌</div>
       <div class="cd-name" id="cdName"></div>
       <div id="cdCost"></div>
       <div class="cd-type" id="cdType"></div>
@@ -1405,7 +1407,7 @@
     <div class="option-sheet">
       <div class="option-title" id="optionPickerTitle">请选择</div>
       <div id="optionPickerList"></div>
-      <button class="option-cancel" onclick="cancelOptionPicker()">取消</button>
+      <button class="option-cancel" id="optionPickerCancel" onclick="cancelOptionPicker()">取消</button>
     </div>
   </div>
 
@@ -1460,7 +1462,7 @@
 
   <!-- Result -->
   <div id="resultOverlay">
-    <div class="result-icon" id="resultIcon">🏆</div>
+    <div class="result-icon" id="resultIcon">结果</div>
     <div class="result-title" id="resultTitle">胜利！</div>
     <div class="result-sub" id="resultSub"></div>
     <div id="recordStatus" style="font-size:13px;color:#64748b;margin-top:12px;min-height:18px"></div>
@@ -1470,16 +1472,16 @@
 
   <!-- Topbar -->
   <div class="topbar" data-battle-ui-region="player-hud">
-    <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">← 离开</button>
+    <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">离开</button>
     <div class="room-name" id="roomNameLabel">对战</div>
     <div id="wsStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● WS</div>
-    <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">🏳 投降</button>
-    <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
-    <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
-    <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">⛶</button>
+    <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">投降</button>
+    <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">切换视角 红方</button>
+    <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">冷却</button>
+    <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">全图</button>
     <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
     <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
-    <button class="btn-fullmap" aria-label="打开战斗日志" onclick="openLog()" title="战斗日志">📜</button>
+    <button class="btn-fullmap" aria-label="打开战斗日志" onclick="openLog()" title="战斗日志">日志</button>
   </div>
 
   <!-- Main layout -->
@@ -1591,22 +1593,22 @@
       <!-- Resource editor sheet (training mode) -->
       <div id="resEditorSheet" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeResourceEditor()">
         <div style="background:#0f1623;border:1px solid #334155;border-radius:14px;padding:20px 22px;min-width:260px;color:#e2e8f0;font-size:14px">
-          <div style="font-weight:700;font-size:15px;margin-bottom:14px">⚡💠 修改资源</div>
+          <div style="font-weight:700;font-size:15px;margin-bottom:14px">修改资源</div>
           <div style="display:flex;flex-direction:column;gap:10px">
             <label style="display:flex;align-items:center;gap:8px;color:#a5b4fc">
               玩家
               <select id="resEditorPlayer" onchange="_syncResourceEditorInputs(this.value)" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;padding:4px 6px">
-          <option value="training-red">🔴 红方</option>
-          <option value="training-blue">🔵 蓝方</option>
+          <option value="training-red">红方</option>
+          <option value="training-blue">蓝方</option>
               </select>
             </label>
             <label style="display:flex;align-items:center;gap:8px">
-              <span style="width:60px;color:#fbbf24">⚡ 行动</span>
+              <span style="width:60px;color:#fbbf24">行动</span>
               <input id="resEditorAP" type="number" min="0" max="20" value="10"
                 style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#fbbf24;padding:4px 8px;font-size:14px">
             </label>
             <label style="display:flex;align-items:center;gap:8px">
-              <span style="width:60px;color:#67e8f9">💠 充能</span>
+              <span style="width:60px;color:#67e8f9">充能</span>
               <input id="resEditorCP" type="number" min="0" max="20" value="0"
                 style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#67e8f9;padding:4px 8px;font-size:14px">
             </label>
@@ -1991,6 +1993,59 @@
     let locallyCancelledSelectionId = null
     const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
     window.__RVB_RED50_EVIDENCE__ = red50Evidence
+    const stateFloaterEventKeys = new Set()
+    const stateFloaterEventOrder = []
+    const PENDING_ACTION_TIMEOUT_MS = 8000
+    let pendingActionFeedback = null
+    let pendingActionFeedbackTimer = null
+
+    function clearPendingActionFeedback(reason) {
+      if (pendingActionFeedbackTimer) clearTimeout(pendingActionFeedbackTimer)
+      pendingActionFeedbackTimer = null
+      const cleared = pendingActionFeedback
+      pendingActionFeedback = null
+      if (cleared) cleared.clearReason = reason || 'cleared'
+      return cleared
+    }
+
+    function beginPendingActionFeedback(action) {
+      if (!action || !action.clientActionId) return true
+      if (pendingActionFeedback) {
+        setStatusMsg('上一条指令仍在等待权威确认')
+        return false
+      }
+      pendingActionFeedback = {
+        clientActionId: action.clientActionId,
+        type: action.type,
+        pieceId: action.pieceId || action.targetPieceId || selectedPieceId || null,
+      }
+      pendingActionFeedbackTimer = setTimeout(function () {
+        rejectPendingActionFeedback('action-timeout', '指令确认超时，请检查连接后重试')
+      }, PENDING_ACTION_TIMEOUT_MS)
+      renderBoard()
+      renderActionBar()
+      return true
+    }
+
+    function rejectPendingActionFeedback(reason, message, options) {
+      const rejected = clearPendingActionFeedback(reason)
+      const preserveTargetInteraction = options && options.preserveTargetInteraction === true
+      if (!preserveTargetInteraction) {
+        if (reason === 'server-rejected') clearTargetInteraction('server-rejected')
+        else clearTargetInteraction(reason)
+      }
+      if (rejected && rejected.pieceId && battlePresentation && G) {
+        const model = createBattlePresentationModel(G)
+        battlePresentation.animateAction({
+          type: 'ui-reject',
+          pieceId: rejected.pieceId,
+          motionEventKey: 'reject:' + rejected.clientActionId + ':' + reason,
+        }, model, model)
+      }
+      render()
+      if (message) setStatusMsg(message)
+      return !!rejected
+    }
 
     function recordTargetClear(reason) {
       red50Evidence.clearEvents.push({ reason: reason || 'unknown', at: Date.now() })
@@ -2448,26 +2503,75 @@
     }
 
     // ── Damage / heal floaters ──
-    function spawnFloater(x, y, text, color, big) {
+    function spawnFloater(x, y, text, color, big, options) {
+      options = options || {}
       if (_use3d && battlePresentation) {
-        battlePresentation.spawnFloater(x, y, text, color, big)
+        battlePresentation.spawnFloater(x, y, text, color, big, options)
         return
       }
       const layer = document.getElementById('floatLayer')
       if (!layer) return
       const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 44
       const el = document.createElement('div')
-      el.className = 'dmg-float' + (big ? ' big' : '')
+      const kind = options.kind === 'heal' || options.kind === 'death' ? options.kind : 'damage'
+      const durationMs = Math.max(480, Math.min(650, Number(options.durationMs) || (kind === 'heal' ? 550 : 600)))
+      el.className = 'dmg-float is-' + kind + (big ? ' big' : '')
       el.style.color = color
       el.style.left = (x * cellSize + cellSize / 2) + 'px'
       el.style.top  = (y * cellSize + 4) + 'px'
+      el.style.setProperty('--floater-duration', durationMs + 'ms')
       el.textContent = text
       layer.appendChild(el)
-      setTimeout(() => el.remove(), 1200)
+      setTimeout(() => el.remove(), durationMs + 80)
     }
 
-    function spawnStateFloaters(oldG, newG) {
+    function battleStateMotionKey(state) {
+      const snapshot = state || {}
+      const deployment = snapshot.deployment
+      return JSON.stringify([
+        snapshot.turn && [snapshot.turn.turnNumber, snapshot.turn.phase, snapshot.turn.currentPlayerId],
+        snapshot.targetingRevision || 0,
+        (snapshot.actions || []).length,
+        (snapshot.pieces || []).map(p => [
+          p.instanceId, p.x, p.y, p.currentHp ?? p.hp, p.visible, p.shield,
+          p.statusTags || p.statuses || p.statusEffects || [], p.buffs || [], p.debuffs || [],
+        ]).sort(),
+        (snapshot.graveyard || []).map(p => [p.instanceId, p.currentHp ?? p.hp]).sort(),
+        (snapshot.players || []).map(p => [
+          p.playerId, p.actionPoints, p.chargePoints,
+          (p.hand || []).map(card => card.instanceId || card.cardInstanceId || card.cardId).sort(),
+          (p.discardPile || []).slice().sort(), p.statusTags || [],
+        ]).sort(),
+        deployment && [
+          deployment.status, deployment.revision,
+          Object.entries(deployment.choices || {}).sort(),
+          Object.entries(deployment.locks || {}).sort(),
+          deployment.finalPositions || null,
+        ],
+        snapshot.pendingOptionSelection && [
+          snapshot.pendingOptionSelection.selectionId, snapshot.pendingOptionSelection.stateRevision,
+          snapshot.pendingOptionSelection.selectedOption,
+        ],
+        snapshot.pendingTargetSelection && [
+          snapshot.pendingTargetSelection.selectionId, snapshot.pendingTargetSelection.stateRevision,
+          snapshot.pendingTargetSelection.step, snapshot.pendingTargetSelection.selectedTargets || [],
+        ],
+        snapshot.terminalResult || null,
+      ])
+    }
+
+    function authorityStateConfirmsPending(previousState, nextState) {
+      if (!previousState || !nextState) return false
+      return battleStateMotionKey(previousState) !== battleStateMotionKey(nextState)
+    }
+
+    function spawnStateFloaters(oldG, newG, eventKey) {
       if (!oldG || !newG || !oldG.pieces || !newG.pieces) return
+      const stableKey = eventKey || battleStateMotionKey(newG)
+      if (stateFloaterEventKeys.has(stableKey)) return
+      stateFloaterEventKeys.add(stableKey)
+      stateFloaterEventOrder.push(stableKey)
+      if (stateFloaterEventOrder.length > 256) stateFloaterEventKeys.delete(stateFloaterEventOrder.shift())
       for (const np of newG.pieces) {
         const op = oldG.pieces.find(p => p.instanceId === np.instanceId)
         if (!op) continue
@@ -2477,9 +2581,9 @@
         if (diff < 0) {
           const dead = newHp <= 0
           const big = dead || -diff >= 50
-          spawnFloater(np.x, np.y, dead ? '💀' : String(-diff), dead ? '#c4b5fd' : '#f87171', big)
+          spawnFloater(np.x, np.y, dead ? '阵亡' : String(-diff), dead ? '#c4b5fd' : '#f87171', big, { kind: dead ? 'death' : 'damage', durationMs: dead ? 650 : 600 })
         } else if (diff > 0) {
-          spawnFloater(np.x, np.y, '+' + diff, '#4ade80', false)
+          spawnFloater(np.x, np.y, '+' + diff, '#4ade80', false, { kind: 'heal', durationMs: 550 })
         }
       }
     }
@@ -2529,7 +2633,7 @@
       }
       const typeLabel = def.type === 'reactive' ? '被动触发' : def.type === 'passive' ? '持续' : def.type === 'active' ? '主动' : '手牌'
 
-      document.getElementById('cdIcon').textContent = def.icon || '🃏'
+      document.getElementById('cdIcon').textContent = String(def.name || cardId || '牌').slice(0, 1)
       document.getElementById('cdName').textContent = def.name || cardId
       document.getElementById('cdType').textContent = typeLabel
       document.getElementById('cdCost').innerHTML =
@@ -2590,6 +2694,9 @@
       pendingOptionAction = originalAction
       _pickerOptions = options
       document.getElementById('optionPickerTitle').textContent = title || '请选择'
+      const cancelButton = document.getElementById('optionPickerCancel')
+      const canCancel = !originalAction || originalAction.canCancel !== false
+      if (cancelButton) cancelButton.style.display = canCancel ? '' : 'none'
       const list = document.getElementById('optionPickerList')
       list.innerHTML = options.map((opt, i) =>
         `<button class="option-btn" data-opt-idx="${i}">
@@ -2621,6 +2728,10 @@
       doAction(action)
     }
     function cancelOptionPicker() {
+      if (pendingOptionAction && pendingOptionAction.canCancel === false) {
+        setStatusMsg('当前选择必须完成，不能取消')
+        return
+      }
       document.getElementById('optionPickerOverlay').classList.remove('show')
       const action = pendingOptionAction
       pendingOptionAction = null
@@ -2635,7 +2746,13 @@
         return
       }
       if (G && pendingOptionSelectionForMe()) {
-        doAction({ type: 'cancelPendingSelection', playerId: myPlayerId })
+        const pendingOption = G.pendingOptionSelection
+        doAction({
+          type: 'cancelPendingSelection',
+          playerId: pendingOption.playerId || myPlayerId,
+          selectionId: pendingOption.selectionId,
+          stateRevision: pendingOption.stateRevision,
+        })
       }
       const _sp = G && selectedPieceId && G.pieces.find(p => p.instanceId === selectedPieceId)
       renderPieceContextMenu(_sp || null)
@@ -3113,6 +3230,8 @@
 
     function reconcileBattleInteractionState(previousState, nextState) {
       if (!nextState) return ''
+      const stateAdvanced = authorityStateConfirmsPending(previousState, nextState)
+      const confirmedAction = pendingActionFeedback && stateAdvanced ? clearPendingActionFeedback('authoritative-confirmation') : null
       const authoritativeSelectionId = nextState.pendingTargetSelection && nextState.pendingTargetSelection.selectionId
       if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
         locallyCancelledSelectionId = null
@@ -3146,11 +3265,11 @@
         }
       }
 
-      if (targetSubmissionPending) {
+      if (targetSubmissionPending && stateAdvanced) {
         clearTargetInteraction('authoritative-confirmation')
         return '目标指令已确认'
       }
-      return ''
+      return confirmedAction ? '指令已确认' : ''
     }
 
     // Apply an authoritative state snapshot received from server (WS or GET)
@@ -3319,6 +3438,7 @@
         var el = document.getElementById('wsStatus')
         if (el) el.style.display = 'none'
         addLog('WebSocket 断开，等待重连', 'info')
+        rejectPendingActionFeedback('disconnect', '连接已断开；待确认指令已取消')
       })
 
       RvBWs.on('message', function(msg) {
@@ -3332,7 +3452,7 @@
 
           if (_use3d && battlePresentation && G && msg.state) {
             battlePresentation.animateAction(
-              msg.lastAction || null,
+              Object.assign({}, msg.lastAction || { type: 'stateUpdate' }, { motionEventKey: 'ws:' + String(msg.stateHash || msg.seq || msg.serverNow || battleStateMotionKey(msg.state)) }),
               createBattlePresentationModel(G),
               createBattlePresentationModel(msg.state)
             )
@@ -3364,7 +3484,9 @@
           applyLegacyBattleEntry(msg.entry)
         } else if (msg.type === 'actionError') {
           addLog('[DEBUG actionError] action=' + JSON.stringify(msg.action || null) + ' error=' + (msg.error || 'unknown') + ' needsTarget=' + (!!msg.needsTargetSelection) + ' needsOption=' + (!!msg.needsOptionSelection), 'err')
+          if (msg.needsTargetSelection) clearPendingActionFeedback('authoritative-target-step')
           if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
+          if (msg.needsOptionSelection) clearPendingActionFeedback('authoritative-option-step')
           if (msg.needsOptionSelection && msg.action) {
             if (targetSubmissionPending) {
               targetSubmissionPending = null
@@ -3381,7 +3503,22 @@
           }
           const rejectionMessage = msg.error || 'unknown error'
           red50Evidence.rejections.push({ code: msg.code || '', message: rejectionMessage, at: Date.now() })
-          clearTargetInteraction('server-rejected')
+          const rejectedPending = msg.action && (
+            (msg.action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
+            || (msg.action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
+          )
+          if (rejectedPending) {
+            targetSubmissionPending = null
+            _pendingChoiceShown = null
+            addLog('服务端拒绝本次选择：' + rejectionMessage, 'err')
+            rejectPendingActionFeedback(
+              'server-rejected',
+              '选择被拒绝：' + rejectionMessage + '；请重新选择',
+              { preserveTargetInteraction: true },
+            )
+            return
+          }
+          rejectPendingActionFeedback('server-rejected', '服务端拒绝：' + rejectionMessage + '；目标选择已清除')
           addLog('服务端处理动作失败：' + (msg.error || 'unknown error'), 'err')
           render()
           setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
@@ -3419,6 +3556,13 @@
         const data = await res.json()
         if (data && data.state) {
           addLog('[HTTP fallback] 已拉取服务端战斗状态 ' + String(data.stateHash || '').slice(0, 12), 'info')
+          if (_use3d && battlePresentation && G) {
+            battlePresentation.animateAction(
+              { type: 'stateUpdate', motionEventKey: 'http:' + String(data.stateHash || data.serverNow || battleStateMotionKey(data.state)) },
+              createBattlePresentationModel(G),
+              createBattlePresentationModel(data.state)
+            )
+          }
           applyServerState(data.state, data.seed || null, false, data.serverNow, data.turnTimer)
           return
         }
@@ -3521,7 +3665,7 @@
       document.body.classList.toggle('target-mode-active', active)
       if (active) {
         closePieceContextMenu()
-        if (window.matchMedia && window.matchMedia('(max-width: 760px)').matches) {
+        if (window.matchMedia && window.matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 500px)').matches) {
           const pieceInfo = document.getElementById('pieceInfoModal')
           const cardInfo = document.getElementById('cardDetailModal')
           if (pieceInfo && pieceInfo.style.display !== 'none' && pieceInfo.style.display !== '') closePieceInfo()
@@ -3670,6 +3814,10 @@
         skillsById: skillsById,
         pieceTemplates: PIECES_BY_ID,
         interactionMode: battleInteractionMode(),
+        interaction: {
+          pendingPieceId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.pieceId : null,
+          pendingCommandId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.clientActionId : null,
+        },
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
           targetCells: targetCells,
@@ -3690,13 +3838,16 @@
       renderTargetOverlay()
       const pbc = G.pendingOptionSelection
       if (pendingOptionSelectionForMe()) {
-        const key = pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(',')
+        const key = pbc.selectionId || (pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(','))
         if (_pendingChoiceShown !== key) {
           _pendingChoiceShown = key
           showOptionPicker(pbc.title || '请选择', pbc.options || [], {
             type: 'pendingOptionSelect',
             playerId: pbc.playerId,
-            cancelValue: pbc.cancelValue
+            selectionId: pbc.selectionId,
+            stateRevision: pbc.stateRevision,
+            cancelValue: pbc.cancelValue,
+            canCancel: pbc.canCancel !== false
           })
         }
       } else {
@@ -3826,7 +3977,7 @@
             inner = `<div class="${tokCls}">
               <div class="piece-tags">${tagsHtml}</div>
               ${imgHtml}
-              <span class="piece-tok-ph" style="${imgSrc?'display:none':'display:flex'}">${faction==='red'?'🔴':'🔵'}</span>
+              <span class="piece-tok-ph" style="${imgSrc?'display:none':'display:flex'}">${faction==='red'?'红':'蓝'}</span>
               <span class="tok-health-number ${fillCls}">${piece.health.current}</span>
             </div>`
           }
@@ -3881,7 +4032,7 @@
       const myName = myPlayerName || playerNames[myPlayerId] || '我方'
       const oppPid = oppMeta && (oppMeta.playerId || '').toLowerCase()
       const oppName = (oppPid && playerNames[oppPid]) || (oppMeta && oppMeta.name) || (myFaction === 'red' ? '对方' : '对方')
-      const alignmentText = function(alignment) { return alignment === 'light' ? '☀️ 光' : alignment === 'dark' ? '🌑 暗' : '阵营未知' }
+      const alignmentText = function(alignment) { return alignment === 'light' ? '光' : alignment === 'dark' ? '暗' : '阵营未知' }
       document.getElementById('myLabel').textContent = factionIcon + ' ' + alignmentText(playerAlignments[myPlayerId]) + ' · ' + myName
       document.getElementById('oppLabel').textContent = oppIcon + ' ' + alignmentText(playerAlignments[oppPid]) + ' · ' + oppName
 
@@ -4097,8 +4248,7 @@
         const apCost = availability.actionCost
         const cpCost = availability.chargeCost
         const disabled = !availability.available
-        const rawIcon = skData.icon || (isCharge ? '◆' : '✦')
-        const icon = /^[a-z0-9_-]{2,}$/i.test(String(rawIcon)) ? (isCharge ? '◆' : '✦') : rawIcon
+        const icon = isCharge ? '◆' : '✦'
         const status = availability.onCooldown ? 'CD ' + sk.currentCooldown
           : availability.noUses ? '已用'
             : availability.actionLow ? 'AP不足'
@@ -4117,7 +4267,7 @@
           '<span class="piece-context-skill-icon">' + escHtml(String(icon)) + '</span>' +
           '<span class="piece-context-skill-name">' + escHtml(rawName) + '</span>' +
           '<span class="piece-context-skill-cost">' +
-            (status || ('⚡' + apCost + (cpCost ? ' ◆' + cpCost : ''))) +
+            (status || ('行动 ' + apCost + (cpCost ? ' · 充能 ' + cpCost : ''))) +
           '</span></button>'
       }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
       skillsContainer.innerHTML = moveButton + skillButtons
@@ -4141,7 +4291,7 @@
           const handBadge = document.createElement('div')
           handBadge.className = 'hud-hand'
           handBadge.title = '手牌'
-          handBadge.innerHTML = '🃏 <span id="hudHandCount">0</span>'
+          handBadge.innerHTML = '手牌 <span id="hudHandCount">0</span>'
           topbar.appendChild(handBadge)
           hudHand = document.getElementById('hudHandCount')
         }
@@ -4168,7 +4318,7 @@
         if (isReactive) cls += ' card-reactive'
 
         const gemCls = cost === 0 ? 'free' : ''
-        const icon = def.icon || '*'
+        const icon = escHtml(String(def.name || card.cardId || '牌').slice(0, 1))
         const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
         const artSrc = def.image ? `images/card-art/${def.image}` : null
         const artContent = artSrc
@@ -4228,7 +4378,7 @@
       // First click: select/preview the card
       pendingCardAction = { cardInstanceId, cardId }
       renderHand()
-      setStatusMsg('🃏 再次点击释放，点其他地方取消')
+      setStatusMsg('再次点击释放，点其他地方取消')
     }
 
     function renderTurnTimerStatus() {
@@ -4487,7 +4637,7 @@
         }
         // 合法性拦截：只允许点击高亮格
         if (!validMoves.has(x + ',' + y)) {
-          setStatusMsg('❌ 无法移动到该位置')
+          setStatusMsg('无法移动到该位置')
           return
         }
         doAction({ type: 'move', playerId: myPlayerId, pieceId: selectedPieceId, toX: x, toY: y })
@@ -4539,13 +4689,17 @@
         return
       }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
-        const pendingTarget = G.pendingTargetSelection
-        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        const pendingSelection = G.pendingTargetSelection || G.pendingOptionSelection
+        if (pendingSelection && pendingSelection.canCancel === false) {
+          setStatusMsg('当前规则选择必须完成，不能清除棋子选择')
+          return
+        }
+        locallyCancelledSelectionId = pendingSelection && pendingSelection.selectionId
         void doAction({
           type: 'cancelPendingSelection',
           playerId: myPlayerId,
-          selectionId: pendingTarget && pendingTarget.selectionId,
-          stateRevision: pendingTarget && pendingTarget.stateRevision,
+          selectionId: pendingSelection && pendingSelection.selectionId,
+          stateRevision: pendingSelection && pendingSelection.stateRevision,
         })
       }
       clearTargetInteraction('selection-cleared')
@@ -4559,6 +4713,10 @@
     }
 
     function selectPiece(instanceId) {
+      if (pendingActionFeedback) {
+        setStatusMsg('指令仍在等待权威确认，暂不能切换棋子')
+        return
+      }
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return
@@ -4588,13 +4746,17 @@
         return
       }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
-        const pendingTarget = G.pendingTargetSelection
-        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        const pendingSelection = G.pendingTargetSelection || G.pendingOptionSelection
+        if (pendingSelection && pendingSelection.canCancel === false) {
+          setStatusMsg('请先完成当前规则选择')
+          return
+        }
+        locallyCancelledSelectionId = pendingSelection && pendingSelection.selectionId
         void doAction({
           type: 'cancelPendingSelection',
           playerId: myPlayerId,
-          selectionId: pendingTarget && pendingTarget.selectionId,
-          stateRevision: pendingTarget && pendingTarget.stateRevision,
+          selectionId: pendingSelection && pendingSelection.selectionId,
+          stateRevision: pendingSelection && pendingSelection.stateRevision,
         })
       }
       clearTargetInteraction('piece-switched')
@@ -4713,6 +4875,13 @@
         setMoveButtonDisabled(true)
         const oldG = G
         const newG = await trainingApiFetch('PUT', { action, battleState: G })
+        if (_use3d && battlePresentation) {
+          battlePresentation.animateAction(
+            Object.assign({}, action, { motionEventKey: 'training:' + action.clientActionId }),
+            createBattlePresentationModel(oldG),
+            createBattlePresentationModel(newG)
+          )
+        }
         G = newG
         console.log('[STAGE2.5] G updated: pendingTargetSelection=', G.pendingTargetSelection ? { playerId: G.pendingTargetSelection.playerId, hasEffectCode: !!G.pendingTargetSelection.effectCode, effectCodeLen: G.pendingTargetSelection.effectCode ? G.pendingTargetSelection.effectCode.length : 0 } : null, '| clientOwns(training-blue)=', clientOwns('training-blue'))
         console.log('[STAGE2.5b] pendingTargetSelectionForMe()=', pendingTargetSelectionForMe())
@@ -4740,10 +4909,12 @@
       } catch (e) {
         let rejectionFeedback = ''
         if (e.needsTargetSelection) {
+          clearPendingActionFeedback('authoritative-target-step')
           if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
             setStatusMsg('权威目标查询未返回候选集合')
           }
         } else if (e.needsOptionSelection) {
+          clearPendingActionFeedback('authoritative-option-step')
           if (targetSubmissionPending) {
             targetSubmissionPending = null
             recordTargetClear('authoritative-next-option-step')
@@ -4757,9 +4928,24 @@
         } else {
           const errMsg = e.message || String(e) || '操作失败'
           red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
-          clearTargetInteraction('server-rejected')
+          const rejectedPending = (
+            (action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
+            || (action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
+          )
+          if (rejectedPending) {
+            targetSubmissionPending = null
+            _pendingChoiceShown = null
+            rejectionFeedback = '选择被拒绝：' + errMsg + '；请重新选择'
+            rejectPendingActionFeedback(
+              'server-rejected',
+              rejectionFeedback,
+              { preserveTargetInteraction: true },
+            )
+          } else {
+            rejectionFeedback = '操作被拒绝：' + errMsg + '；目标选择已清除'
+            rejectPendingActionFeedback('server-rejected', rejectionFeedback)
+          }
           addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
-          rejectionFeedback = '操作被拒绝：' + errMsg + '；目标选择已清除'
         }
         renderActionBar()
         if (rejectionFeedback) setStatusMsg(rejectionFeedback)
@@ -4768,16 +4954,17 @@
 
     async function doAction(action) {
       action = withClientActionId(action)
+      if (typeof beginPendingActionFeedback === 'function' && !beginPendingActionFeedback(action)) return
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) {
-        clearTargetInteraction('transport-unavailable')
+        rejectPendingActionFeedback('transport-unavailable', '未连接服务器；目标选择已清除')
         addLog('未连接服务器', 'err')
         setStatusMsg('未连接服务器；目标选择已清除')
         return
       }
       if (!G) {
-        clearTargetInteraction('state-unavailable')
+        rejectPendingActionFeedback('state-unavailable', '游戏状态未就绪；指令未发送')
         addLog('游戏状态未就绪', 'err')
         return
       }
@@ -4811,11 +4998,11 @@
         }
 
         addLog('WebSocket 未连接，无法发送动作；请检查网络和服务端', 'err')
-        clearTargetInteraction('transport-unavailable')
+        rejectPendingActionFeedback('transport-unavailable', 'WebSocket 未连接；目标选择已清除')
         renderActionBar()
         setStatusMsg('WebSocket 未连接；目标选择已清除')
       } catch (e) {
-        clearTargetInteraction('transport-failed')
+        rejectPendingActionFeedback('transport-failed', '发送动作失败：' + e.message + '；目标选择已清除')
         addLog('发送动作失败：' + e.message, 'err')
         renderActionBar()
         setStatusMsg('发送动作失败：' + e.message + '；目标选择已清除')
@@ -5241,6 +5428,7 @@
       if (pollTimer) clearInterval(pollTimer)
       pollTimer = null
       if (deploymentStatusTimer) clearInterval(deploymentStatusTimer)
+      clearPendingActionFeedback('page-dispose')
       deploymentStatusTimer = null
       if (battlePresentation) battlePresentation.dispose()
     }
@@ -5330,7 +5518,7 @@
   <!-- Fullscreen log overlay -->
   <div id="logOverlay">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #334155;flex-shrink:0;background:#070f1e">
-      <div style="font-size:15px;font-weight:700;color:#e2e8f0">📜 战斗日志</div>
+      <div class="battle-log-title" aria-label="战斗日志" style="font-size:15px;font-weight:700;color:#e2e8f0">📜 战斗日志</div>
       <div style="display:flex;gap:8px;align-items:center">
         <button onclick="clearLog()" style="background:none;border:1px solid #334155;border-radius:6px;color:#64748b;padding:4px 10px;font-size:12px;cursor:pointer">清空</button>
         <button onclick="closeLog()" style="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">✕</button>
@@ -5342,7 +5530,7 @@
   <!-- Surrender confirm overlay -->
   <div id="surrenderConfirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
     <div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px 24px;max-width:300px;width:90%;text-align:center">
-      <div style="font-size:32px;margin-bottom:12px">🏳️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:12px;color:#fca5a5">投降确认</div>
       <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0">确认投降？</div>
       <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">这将立即结束对战。</div>
       <div style="display:flex;gap:10px;justify-content:center">

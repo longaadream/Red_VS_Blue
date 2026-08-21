@@ -475,7 +475,13 @@ describe('interrupted skill release', () => {
     expect(pending.pendingOptionSelection).toBeDefined()
     expect(pending.players[0].actionPoints).toBe(2)
 
-    const resumed = applyBattleAction(pending, { type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'yes' } as any) as any
+    const resumed = applyBattleAction(pending, {
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      selectedOption: 'yes',
+      selectionId: pending.pendingOptionSelection.selectionId,
+      stateRevision: pending.pendingOptionSelection.stateRevision,
+    } as any) as any
     expect(resumed.pendingOptionSelection).toBeUndefined()
     expect(resumed.extensions.skillOption).toBe('yes')
     expect(resumed.players[0].actionPoints).toBe(1)
@@ -503,6 +509,8 @@ describe('interrupted skill release', () => {
     } as any) as any
     const resumed = applyBattleAction(pending, {
       type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'yes',
+      selectionId: pending.pendingOptionSelection.selectionId,
+      stateRevision: pending.pendingOptionSelection.stateRevision,
     } as any) as any
 
     expect(resumed.players[0].actionPoints).toBe(2)

@@ -1,28 +1,62 @@
 ;(function () {
   'use strict'
 
-  // ── Requires THREE global (r134) loaded before this script ───────────────────
+  // ── Requires THREE and the presentation-only tactical geometry helper ───────
+  const TacticalGeometry = window.BattleTacticalGeometry
+  if (!TacticalGeometry) throw new Error('BattleRenderer3D requires BattleTacticalGeometry')
+  const TACTICAL_METRICS = TacticalGeometry.METRICS
 
   // ── Constants ────────────────────────────────────────────────────────────────
-  const TILE_H = 0.10      // tile box height
-  const TILE_W = 0.90      // tile box width/depth (0.1 gap gives grid lines)
-  const PIECE_R = 0.36     // piece cylinder radius
-  const PIECE_H = 0.22     // piece cylinder height
-  const RING_R  = 0.40     // faction ring radius
-  const RING_T  = 0.045    // faction ring tube radius
-  const SELECTED_RING_R = 0.445
+  const TILE_H = 0.12
+  const TILE_W = 0.92
+  const BOARD_BASE_H = TACTICAL_METRICS.boardBaseHeight
+  const PIECE_W = TACTICAL_METRICS.pieceWidth
+  const PIECE_D = TACTICAL_METRICS.pieceDepth
+  const PIECE_H = TACTICAL_METRICS.pieceHeight
+  const PIECE_PORTRAIT_W = 0.66
+  const PIECE_PORTRAIT_D = 0.50
+  const RING_T = 0.035
   const SELECTED_RING_T = 0.018
+  const PAN_ACTIVATION_PX = TACTICAL_METRICS.panActivationPx
+  const MIN_TOUCH_CELL_PIXELS = TACTICAL_METRICS.minTouchCellPixels
+  const MAX_CAMERA_ZOOM = 8
+  const MOTION_TOKENS = Object.freeze({
+    press: 100,
+    fast: 140,
+    action: 240,
+    result: 280,
+    reject: 160,
+    hit: 150,
+    heal: 180,
+    easeOut: Object.freeze([0.22, 1, 0.36, 1]),
+    easeIn: Object.freeze([0.4, 0, 1, 1]),
+    easeInOut: Object.freeze([0.65, 0, 0.35, 1]),
+  })
+  const MOTION_SECONDS = Object.freeze(Object.fromEntries(
+    Object.entries(MOTION_TOKENS).filter((entry) => typeof entry[1] === 'number').map((entry) => [entry[0], entry[1] / 1000])
+  ))
+  const TILE_HEIGHTS = Object.freeze({
+    floor: TILE_H,
+    spawn: TILE_H + 0.035,
+    spring: TILE_H + 0.055,
+    chargepad: TILE_H + 0.055,
+    trap: TILE_H + 0.075,
+    cover: 0.30,
+    wall: 0.52,
+    hole: 0.035,
+    lava: 0.08,
+  })
 
   const TILE_COLORS = {
-    floor:     0x374151,
-    wall:      0x111827,
-    spawn:     0x052e16,
-    cover:     0x78350f,
-    hole:      0x082f49,
-    lava:      0x7c2d12,
-    spring:    0x134e4a,
-    chargepad: 0x3b0764,
-    trap:      0x451a03,
+    floor:     0x252a30,
+    wall:      0x0c1015,
+    spawn:     0x173127,
+    cover:     0x4b3a26,
+    hole:      0x07131c,
+    lava:      0x6b2418,
+    spring:    0x17413d,
+    chargepad: 0x34244c,
+    trap:      0x4a3020,
   }
   const TILE_EMISSIVE = {
     lava:      { color: 0xff4400, intensity: 0.35 },
@@ -55,6 +89,7 @@
 
   // ── State ────────────────────────────────────────────────────────────────────
   let _renderer, _camera, _scene, _animFrameId
+  let _cameraTarget = null
   let _container = null
   let _hpLayer = null
   let _floatLayer = null
@@ -68,15 +103,23 @@
   const _listeners = []
 
   let _mapW = 0, _mapH = 0
+  let _boardBase = null
+  let _boardFront = null
   const _tileObjects = new Map()       // "x,z" → THREE.Mesh
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
-  const _hlObjects = { move: [], skill: [], place: [], selected: null }
-  const _anims = []                    // {mesh, fromX, fromZ, toX, toZ, elapsed, duration, type, ...}
+  const _hlObjects = { move: new Map(), skill: new Map(), place: new Map(), selected: null, selectedId: null }
+  const _anims = new Map()             // one controller per owner/property
+  const _playedEventKeys = new Set()
+  const _playedEventOrder = []
   const _texCache = new Map()
   let _textureLoadGeneration = 0
   const _floaters = new Set()
   const _floaterTimers = new Set()
+  let _pressedPiece = null
+  let _pressedHighlight = null
+  let _reducedMotion = false
+  let _motionQuery = null
   let _currentModel = null
   let _clock = { prev: 0 }
 
@@ -87,6 +130,8 @@
   let _pieceBodyGeom = null
   let _pieceRingGeom = null
   let _portraitDiscGeom = null
+  let _contactShadowGeom = null
+  let _contactShadowMat = null
   const _tileMats = {}
   const _factionMats = {}
   const _hlMats = {}
@@ -223,24 +268,30 @@
     _textureLoadGeneration += 1
     _mounted = true
 
-    // Shared geometries
-    _tileGeom       = new THREE.BoxGeometry(TILE_W, TILE_H, TILE_W)
-    _hlPlaneGeom    = new THREE.PlaneGeometry(TILE_W - 0.06, TILE_W - 0.06)
-    _selectedRingGeom = new THREE.TorusGeometry(SELECTED_RING_R, SELECTED_RING_T, 8, 32)
-    _pieceBodyGeom  = new THREE.CylinderGeometry(PIECE_R, PIECE_R, PIECE_H, 24)
-    _pieceRingGeom  = new THREE.TorusGeometry(RING_R, RING_T, 8, 32)
-    _portraitDiscGeom = new THREE.CircleGeometry(PIECE_R, 24)
+    // Shared geometries. Piece geometry stays unit-sized so the oval metrics are
+    // explicit and identical for portrait, faction ring, and touch projection.
+    _tileGeom = new THREE.BoxGeometry(TILE_W, 1, TILE_W)
+    _hlPlaneGeom = new THREE.PlaneGeometry(TILE_W - 0.06, TILE_W - 0.06)
+    _selectedRingGeom = new THREE.TorusGeometry(0.5, SELECTED_RING_T, 8, 32)
+    _pieceBodyGeom = new THREE.CylinderGeometry(0.5, 0.5, PIECE_H, 32)
+    _pieceRingGeom = new THREE.TorusGeometry(0.5, RING_T, 8, 32)
+    _portraitDiscGeom = new THREE.CircleGeometry(0.5, 32)
+    _contactShadowGeom = new THREE.CircleGeometry(0.5, 32)
+    _contactShadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false })
 
-    // Scene
+    // Scene and table lighting use dark neutral metal; faction color is reserved
+    // for the narrow base ring and the existing authoritative highlight layers.
     _scene = new THREE.Scene()
-    _scene.background = new THREE.Color(0x0a0f1a)
+    _scene.background = new THREE.Color(0x07090b)
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.55)
+    const ambient = new THREE.AmbientLight(0xdbe4ee, 0.48)
     _scene.add(ambient)
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.75)
-    dirLight.position.set(5, 12, 8)
+    const dirLight = new THREE.DirectionalLight(0xfff1dc, 0.72)
+    dirLight.position.set(-7, 13, 10)
     _scene.add(dirLight)
+    const edgeLight = new THREE.DirectionalLight(0x7ba3c9, 0.24)
+    edgeLight.position.set(10, 5, -8)
+    _scene.add(edgeLight)
 
     // Renderer
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
@@ -257,13 +308,24 @@
     _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'
     _container.appendChild(_hpLayer)
 
-    // Camera (orthographic, top-down)
-    _camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200)
-    _camera.position.set(0, 50, 0)
-    _camera.lookAt(0, 0, 0)
-    _camera.up.set(0, 0, -1)
+    // Fixed tactical perspective camera. It stays centered on the board's X axis,
+    // so depth converges into trapezoids without introducing any horizontal yaw.
+    _camera = new THREE.PerspectiveCamera(TACTICAL_METRICS.cameraFovDeg, 1, 0.1, 200)
+    _cameraTarget = new THREE.Vector3(0, 0, 0)
+    _camera.up.set(0, 1, 0)
 
     // Pointer events on canvas
+    _motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
+    _reducedMotion = !!(_motionQuery && _motionQuery.matches)
+    if (_motionQuery && typeof _motionQuery.addEventListener === 'function') {
+      _listen(_motionQuery, 'change', function (event) {
+        _reducedMotion = !!event.matches
+        if (_reducedMotion) {
+          _releasePressedFeedback()
+          _finishSpatialAnimations()
+        }
+      })
+    }
     _initControls()
 
     // Resize observer
@@ -282,45 +344,111 @@
     const h = _container.clientHeight || 320
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     _renderer.setSize(w, h, false)
-    _updateCameraFrustum(w, h)
+    _updateCameraProjection(w, h)
+    if (_mapW && _camera) {
+      _camera.zoom = Math.max(_camera.zoom, _minimumUsableZoom(w, h))
+      _camera.updateProjectionMatrix()
+    }
     _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
-  function _fitWorldHalfHeight(w, h) {
-    if (!_mapW) return 1
-    const aspect = w / (h || 1)
-    const halfH = _mapH / 2 + 1
-    const halfW = _mapW / 2 + 1
-    return Math.max(halfH, halfW / aspect)
+  function _withCameraZoomOne(callback) {
+    const previousZoom = _camera.zoom
+    _camera.zoom = 1
+    _camera.updateProjectionMatrix()
+    _camera.updateMatrixWorld(true)
+    const result = callback()
+    _camera.zoom = previousZoom
+    _camera.updateProjectionMatrix()
+    return result
+  }
+
+  function _projectToCss(point, w, h) {
+    const projected = point.clone().project(_camera)
+    return {
+      x: (projected.x + 1) * 0.5 * w,
+      y: (1 - projected.y) * 0.5 * h,
+    }
   }
 
   function _minimumUsableZoom(w, h) {
     if (!_mapW) return 1
-    const narrowViewport = w <= 760
+    const touchViewport = w <= 760 || (w > h && h <= 500)
     const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
-    if (!narrowViewport && !coarsePointer) return 1
-    const pixelsPerCell = h / (_fitWorldHalfHeight(w, h) * 2)
-    return Math.max(1, Math.min(1.8, 24 / Math.max(1, pixelsPerCell)))
+    if (!touchViewport && !coarsePointer) return 1
+    const minimumAxisAtZoomOne = _withCameraZoomOne(function () {
+      let minimum = Infinity
+      ;[0, (_mapW - 1) / 2, _mapW - 2].forEach(function (x) {
+        const origin = _projectToCss(new THREE.Vector3(x, TILE_H, 0), w, h)
+        const across = _projectToCss(new THREE.Vector3(x + 1, TILE_H, 0), w, h)
+        const depth = _projectToCss(new THREE.Vector3(x, TILE_H, 1), w, h)
+        minimum = Math.min(
+          minimum,
+          Math.hypot(across.x - origin.x, across.y - origin.y),
+          Math.hypot(depth.x - origin.x, depth.y - origin.y),
+        )
+      })
+      return minimum
+    })
+    // Keep one CSS pixel of headroom for fractional viewport sizes and the
+    // perspective edge samples that fall between our representative columns.
+    const requiredZoom = (MIN_TOUCH_CELL_PIXELS + 1) / Math.max(1, minimumAxisAtZoomOne)
+    return Math.max(1, Math.min(MAX_CAMERA_ZOOM, requiredZoom))
   }
 
   function _preferredInitialZoom(w, h) {
     if (!_mapW) return 1
-    const aspect = w / (h || 1)
-    const visibleWorldWidth = _fitWorldHalfHeight(w, h) * 2 * aspect
-    const widthCoverageZoom = (visibleWorldWidth / (_mapW + 2)) * 0.86
-    return Math.max(_minimumUsableZoom(w, h), Math.min(1.8, widthCoverageZoom))
+    const halfWidth = (_mapW + 1.25) / 2
+    const centerX = (_mapW - 1) / 2
+    const farZ = -1.125
+    const nearZ = _mapH + 0.16
+    const fitZoom = _withCameraZoomOne(function () {
+      let maxX = 0
+      let maxY = 0
+      ;[-BOARD_BASE_H, TILE_HEIGHTS.wall + 0.08].forEach(function (height) {
+        ;[centerX - halfWidth, centerX + halfWidth].forEach(function (x) {
+          ;[farZ, nearZ].forEach(function (z) {
+            const projected = new THREE.Vector3(x, height, z).project(_camera)
+            maxX = Math.max(maxX, Math.abs(projected.x))
+            maxY = Math.max(maxY, Math.abs(projected.y))
+          })
+        })
+      })
+      return Math.min(0.90 / Math.max(0.001, maxX), 0.90 / Math.max(0.001, maxY))
+    })
+    const widthCoverageZoom = fitZoom
+    return Math.max(_minimumUsableZoom(w, h), Math.min(4, widthCoverageZoom))
   }
 
-  function _updateCameraFrustum(w, h) {
+  function _positionCameraFromTarget() {
+    if (!_camera || !_cameraTarget || !_mapW) return
+    const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
+    const offsetX = pose.position.x - pose.target.x
+    const offsetY = pose.position.y - pose.target.y
+    const offsetZ = pose.position.z - pose.target.z
+    _camera.position.set(_cameraTarget.x + offsetX, offsetY, _cameraTarget.z + offsetZ)
+    _camera.lookAt(_cameraTarget.x, _cameraTarget.y, _cameraTarget.z)
+    _camera.updateMatrixWorld(true)
+  }
+
+  function _tileSurfaceHeightAt(x, z) {
+    const tile = _tileObjects.get(Math.round(x) + ',' + Math.round(z))
+    return tile && Number.isFinite(tile.userData.surfaceY) ? tile.userData.surfaceY : TILE_H
+  }
+
+  function _updateCameraProjection(w, h) {
     if (!_camera || !_mapW) return
-    const aspect = w / (h || 1)
-    const fitH = _fitWorldHalfHeight(w, h)
-    _camera.left   = -fitH * aspect
-    _camera.right  =  fitH * aspect
-    _camera.top    =  fitH
-    _camera.bottom = -fitH
+    _camera.aspect = w / (h || 1)
     _camera.updateProjectionMatrix()
+    // Retain target-plane bounds for gesture diagnostics and a safe pan
+    // fallback if a future camera pose makes the center ray parallel to y=0.
+    const targetDistance = _camera.position.distanceTo(_cameraTarget)
+    const halfHeightAtTarget = Math.tan(_camera.fov * Math.PI / 360) * targetDistance
+    _camera.left = -halfHeightAtTarget * _camera.aspect
+    _camera.right = halfHeightAtTarget * _camera.aspect
+    _camera.top = halfHeightAtTarget
+    _camera.bottom = -halfHeightAtTarget
   }
 
   // ── Render loop ───────────────────────────────────────────────────────────────
@@ -343,39 +471,69 @@
 
   // ── Tile map ─────────────────────────────────────────────────────────────────
   function _buildTiles(map) {
-    // Remove old tiles
     _tileObjects.forEach(m => _scene.remove(m))
     _tileObjects.clear()
+    if (_boardFront) {
+      _scene.remove(_boardFront)
+      if (_boardFront.geometry) _boardFront.geometry.dispose()
+      if (_boardFront.material) _boardFront.material.dispose()
+      _boardFront = null
+    }
+    if (_boardBase) {
+      _scene.remove(_boardBase)
+      if (_boardBase.geometry) _boardBase.geometry.dispose()
+      if (_boardBase.material) _boardBase.material.dispose()
+      _boardBase = null
+    }
 
     _mapW = map.width
     _mapH = map.height
 
+    const boardBaseGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, _mapH + 1.25)
+    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x20272e })
+    _boardBase = new THREE.Mesh(boardBaseGeometry, boardBaseMaterial)
+    _boardBase.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, (_mapH - 1) / 2)
+    const boardFrontGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, 0.10)
+    const boardFrontMaterial = new THREE.MeshLambertMaterial({ color: 0x37414b })
+    _boardFront = new THREE.Mesh(boardFrontGeometry, boardFrontMaterial)
+    _boardFront.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, _mapH + 0.105)
+    _scene.add(_boardFront)
+
+    _scene.add(_boardBase)
+
     map.tiles.forEach(tile => {
       const type = (tile.props && tile.props.type) ? tile.props.type : (tile.type || 'floor')
+      const tileHeight = TILE_HEIGHTS[type] || TILE_H
       const mesh = new THREE.Mesh(_tileGeom, getTileMat(type))
-      mesh.position.set(tile.x, 0, tile.y)
+      mesh.scale.y = tileHeight
+      mesh.position.set(tile.x, tileHeight / 2, tile.y)
       mesh.userData.tileX = tile.x
       mesh.userData.tileZ = tile.y
+      mesh.userData.surfaceY = tileHeight
       _scene.add(mesh)
       _tileObjects.set(tile.x + ',' + tile.y, mesh)
     })
 
-    // Camera target: center of map
-    _camera.position.set(_mapW / 2, 50, _mapH / 2)
-    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
+    const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
+    _cameraTarget.set(pose.target.x, pose.target.y, pose.target.z)
+    _positionCameraFromTarget()
+    _updateCameraProjection(_container.clientWidth || 320, _container.clientHeight || 320)
     _camera.zoom = _preferredInitialZoom(_container.clientWidth || 320, _container.clientHeight || 320)
 
-    // Hit plane for raycasting (invisible, covers full map)
+    // The interaction plane remains a flat board-sized plane. It owns no rules;
+    // rounding and bounds checks stay in screenToCell().
+    // Perspective rays from elevated far-edge tiles land slightly beyond the
+    // outer half-cell, so the invisible surface includes one cell of padding.
     if (_hitPlane) {
       _scene.remove(_hitPlane)
       if (_hitPlane.geometry) _hitPlane.geometry.dispose()
       if (_hitPlane.material) _hitPlane.material.dispose()
     }
     const hitGeom = new THREE.PlaneGeometry(_mapW + 2, _mapH + 2)
-    const hitMat  = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
     const hitPlane = new THREE.Mesh(hitGeom, hitMat)
     hitPlane.rotation.x = -Math.PI / 2
-    hitPlane.position.set(_mapW / 2, 0.02, _mapH / 2)
+    hitPlane.position.set((_mapW - 1) / 2, TILE_H + 0.01, (_mapH - 1) / 2)
     _scene.add(hitPlane)
     _hitPlane = hitPlane
 
@@ -397,16 +555,35 @@
       const obj = _pieceObjects.get(piece.id)
       if (!obj) return
 
-      // If not animating, snap to position
-      if (!obj.animating) {
-        obj.group.position.set(piece.x, 0, piece.y)
+      obj.baseX = piece.x
+      obj.baseY = _tileSurfaceHeightAt(piece.x, piece.y)
+      obj.baseZ = piece.y
+      if (!_anims.has(obj.motionId + ':position')) {
+        obj.motionBaseY = obj.baseY
+        obj.group.position.set(
+          obj.baseX,
+          obj.baseY + (obj.pending && !_reducedMotion ? 0.04 : 0),
+          obj.baseZ,
+        )
+      }
+
+      if (piece.visible !== false && obj.deathAnimating) {
+        _cancelAnimation(obj.motionId + ':visibility')
+        obj.deathAnimating = false
+        obj.group.visible = true
+        _restorePieceVisual(obj)
       }
 
       // Faction is snapshot-driven and can change without respawning the mesh.
       if (obj.faction !== piece.faction) {
         obj.faction = piece.faction
-        obj.body.material.color.setHex(FACTION_COLORS[piece.faction] || FACTION_COLORS.red)
-        obj.ring.material = getFactionMat(piece.faction)
+        const markerPattern = TacticalGeometry.factionMarkerPattern(piece.faction)
+        obj.body.material.emissive.setHex(FACTION_COLORS[piece.faction] || FACTION_COLORS.red)
+        if (obj.ring.material && obj.ring.material.dispose) obj.ring.material.dispose()
+        obj.ring.material = getFactionMat(piece.faction).clone()
+        obj.factionMarkers.forEach(function (marker, index) {
+          marker.visible = markerPattern[index]
+        })
       }
 
       // Portrait texture comes from the template-declared asset and only becomes
@@ -444,17 +621,16 @@
       // Update the snapshot-driven piece summary.
       _updatePieceSummary(obj, piece)
 
-      // Show/hide based on alive
-      obj.group.visible = piece.visible !== false
+      // Death feedback owns visibility until its authoritative result transition ends.
+      if (piece.visible !== false) obj.group.visible = true
+      else if (!obj.deathAnimating) obj.group.visible = false
     })
 
     // Remove departed pieces
     _pieceObjects.forEach((obj, id) => {
       if (!seen.has(id)) {
         _scene.remove(obj.group)
-        if (obj.body.material && obj.body.material.dispose) obj.body.material.dispose()
-        if (obj.portraitMesh.material && obj.portraitMesh.material.dispose) obj.portraitMesh.material.dispose()
-        if (obj.summaryEl && obj.summaryEl.parentNode) obj.summaryEl.remove()
+        _disposePieceObject(obj)
         _pieceObjects.delete(id)
       }
     })
@@ -505,12 +681,12 @@
             getTileEffectMat(effectType)
           )
           ring.rotation.x = Math.PI / 2
-          ring.position.y = TILE_H / 2 + 0.025 + index * 0.004
+          ring.position.y = _tileSurfaceHeightAt(effect.x, effect.y) + 0.025 + index * 0.004
           group.add(ring)
 
           const slot = TILE_EFFECT_ICON_SLOTS[index]
           const icon = new THREE.Sprite(getTileEffectIconMat(effectType))
-          icon.position.set(slot.x, TILE_H / 2 + 0.20, slot.z)
+          icon.position.set(slot.x, _tileSurfaceHeightAt(effect.x, effect.y) + 0.20, slot.z)
           icon.scale.set(0.24, 0.24, 0.24)
           icon.renderOrder = 8
           group.add(icon)
@@ -540,40 +716,100 @@
   function _spawnPieceMesh(piece) {
     const faction = piece.faction || 'red'
     const group = new THREE.Group()
-    group.position.set(piece.x, 0, piece.y)
+    group.userData.pieceId = piece.id
+    group.position.set(piece.x, _tileSurfaceHeightAt(piece.x, piece.y), piece.y)
 
-    // Body cylinder
-    const body = new THREE.Mesh(_pieceBodyGeom, new THREE.MeshLambertMaterial({ color: FACTION_COLORS[faction] || 0x888888 }))
-    body.position.y = TILE_H / 2 + PIECE_H / 2
+    const contactShadow = new THREE.Mesh(_contactShadowGeom, _contactShadowMat)
+    contactShadow.rotation.x = -Math.PI / 2
+    contactShadow.position.y = 0.004
+    contactShadow.scale.set(PIECE_W * 1.06, PIECE_D * 1.08, 1)
+    contactShadow.renderOrder = 1
+    group.add(contactShadow)
+
+    const factionColor = FACTION_COLORS[faction] || FACTION_COLORS.red
+    const bodyMaterial = new THREE.MeshLambertMaterial({
+      color: 0x22272d,
+      emissive: new THREE.Color(factionColor),
+      emissiveIntensity: 0.08,
+    })
+    const body = new THREE.Mesh(_pieceBodyGeom, bodyMaterial)
+    body.scale.set(PIECE_W, 1, PIECE_D)
+    body.position.y = PIECE_H / 2 + 0.012
     group.add(body)
 
-    // Portrait disc on top
-    const portraitMat = new THREE.MeshBasicMaterial({ color: FACTION_COLORS[faction] || 0x888888 })
+    const portraitMat = new THREE.MeshBasicMaterial({ color: 0x3b4148 })
     const portraitMesh = new THREE.Mesh(_portraitDiscGeom, portraitMat)
     portraitMesh.rotation.x = -Math.PI / 2
-    portraitMesh.position.y = TILE_H / 2 + PIECE_H + 0.002
+    portraitMesh.scale.set(PIECE_PORTRAIT_W, PIECE_PORTRAIT_D, 1)
+    portraitMesh.position.y = PIECE_H + 0.014
     group.add(portraitMesh)
 
-    // Faction ring at base of cylinder
-    const ring = new THREE.Mesh(_pieceRingGeom, getFactionMat(faction))
+    const ring = new THREE.Mesh(_pieceRingGeom, getFactionMat(faction).clone())
     ring.rotation.x = Math.PI / 2
-    ring.position.y = TILE_H / 2 + 0.02
+    ring.scale.set(PIECE_W, PIECE_D, 1)
+    ring.position.y = 0.02
     group.add(ring)
+
+    // Faction remains readable without color: red uses one neutral pip and blue
+    // uses a pair. These markers share the portrait geometry but not its texture.
+    const markerPattern = TacticalGeometry.factionMarkerPattern(faction)
+    const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xf2e8d5 })
+    const factionMarkers = [0, -0.11, 0.11].map(function (x, index) {
+      const marker = new THREE.Mesh(_portraitDiscGeom, markerMaterial)
+      marker.rotation.x = -Math.PI / 2
+      marker.position.set(x, PIECE_H + 0.019, -PIECE_D * 0.45)
+      marker.scale.set(0.08, 0.08, 1)
+      marker.visible = markerPattern[index]
+      group.add(marker)
+      return marker
+    })
+
+    const feedbackMaterial = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    })
+    const feedbackRing = new THREE.Mesh(_pieceRingGeom, feedbackMaterial)
+    feedbackRing.rotation.x = Math.PI / 2
+    feedbackRing.scale.set(PIECE_W * 1.12, PIECE_D * 1.12, 1)
+    feedbackRing.userData.motionRole = 'feedback-ring'
+    feedbackRing.position.y = PIECE_H + 0.03
+    feedbackRing.renderOrder = 7
+    group.add(feedbackRing)
 
     // Compact health and negative-status summary.
     const summaryEl = _createPieceSummaryEl(piece)
 
     _scene.add(group)
     _pieceObjects.set(piece.id, {
-      group, body, ring, portraitMesh,
+      id: piece.id,
+      motionId: 'piece:' + piece.id,
+      group, body, ring, portraitMesh, contactShadow, factionMarkers, feedbackRing,
+      markerMaterial,
       summaryEl,
       faction,
+      baseX: piece.x,
+      baseY: _tileSurfaceHeightAt(piece.x, piece.y),
+      baseZ: piece.y,
+      motionBaseY: _tileSurfaceHeightAt(piece.x, piece.y),
+      pending: false,
+      deathAnimating: false,
+      statusExitTimers: new Map(),
       portraitLoaded: false,
       portraitLoading: false,
       portraitSrc: '',
-      animating: false,
       targetX: piece.x, targetZ: piece.y,
     })
+  }
+
+  function _disposePieceObject(obj) {
+    _cancelAnimationsForPrefix(obj.motionId + ':')
+    obj.statusExitTimers.forEach(function (timer) { clearTimeout(timer) })
+    obj.statusExitTimers.clear()
+    ;[obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial, obj.feedbackRing.material]
+      .forEach(function (material) { if (material && material.dispose) material.dispose() })
+    if (obj.summaryEl && obj.summaryEl.parentNode) obj.summaryEl.remove()
   }
 
   // ── Piece summary overlay ─────────────────────────────────────────────────────
@@ -610,16 +846,41 @@
       : (piece.statusSummary || []).slice(0, 2).map(status => ({ status, meta: { color: '#a78bfa' } }))
     const statuses = obj.summaryEl.querySelector('.piece-board-statuses')
     if (statuses) {
-      statuses.replaceChildren()
-      summary.forEach(function (entry) {
-        const dot = document.createElement('span')
-        dot.className = 'piece-board-status-dot'
-        dot.style.setProperty('--status-color', entry.meta.color)
-        dot.dataset.statusId = entry.status.id || ''
-        dot.title = entry.status.label || entry.status.id || ''
-        statuses.appendChild(dot)
+      const existing = new Map()
+      Array.from(statuses.children || []).forEach(function (dot) {
+        existing.set(dot.dataset.statusId, dot)
       })
-      statuses.hidden = summary.length === 0
+      const desired = new Set()
+      summary.forEach(function (entry) {
+        const statusId = entry.status.id || entry.status.label || ''
+        desired.add(statusId)
+        let dot = existing.get(statusId)
+        if (dot) {
+          const exitTimer = obj.statusExitTimers.get(statusId)
+          if (exitTimer) clearTimeout(exitTimer)
+          obj.statusExitTimers.delete(statusId)
+          dot.className = 'piece-board-status-dot'
+          existing.delete(statusId)
+        } else {
+          dot = document.createElement('span')
+          dot.className = 'piece-board-status-dot is-entering'
+          statuses.appendChild(dot)
+        }
+        dot.style.setProperty('--status-color', entry.meta.color)
+        dot.dataset.statusId = statusId
+        dot.title = entry.status.label || entry.status.id || ''
+      })
+      existing.forEach(function (dot, statusId) {
+        if (desired.has(statusId) || obj.statusExitTimers.has(statusId)) return
+        dot.className = 'piece-board-status-dot is-exiting'
+        const timer = setTimeout(function () {
+          dot.remove()
+          obj.statusExitTimers.delete(statusId)
+          if (!statuses.children.length) statuses.hidden = true
+        }, MOTION_TOKENS.fast - 20)
+        obj.statusExitTimers.set(statusId, timer)
+      })
+      statuses.hidden = summary.length === 0 && existing.size === 0
     }
 
     const statusNames = summary.map(function (entry) { return entry.status.label || entry.status.id }).filter(Boolean)
@@ -634,10 +895,10 @@
   }
 
   function _projectedCellSpan(x, y) {
-    const center = projectCell(x, y, TILE_H / 2)
+    const center = projectCell(x, y, _tileSurfaceHeightAt(x, y))
     if (!center) return 36
-    const horizontal = projectCell(x + 1, y, TILE_H / 2)
-    const vertical = projectCell(x, y + 1, TILE_H / 2)
+    const horizontal = projectCell(x + 1, y, _tileSurfaceHeightAt(x + 1, y))
+    const vertical = projectCell(x, y + 1, _tileSurfaceHeightAt(x, y + 1))
     const distances = [horizontal, vertical].filter(Boolean).map(function (point) {
       const dx = point.left - center.left
       const dy = point.top - center.top
@@ -653,7 +914,7 @@
       if (!obj.summaryEl || !obj.group.visible) { if (obj.summaryEl) obj.summaryEl.style.display = 'none'; return }
       const x = obj.group.position.x
       const y = obj.group.position.z
-      const projected = projectCell(x, y, TILE_H / 2 + PIECE_H + 0.1)
+      const projected = projectCell(x, y, obj.group.position.y + PIECE_H + 0.1)
       if (!projected) return
       const cellSpan = _projectedCellSpan(x, y)
       const scale = Math.max(0.36, Math.min(1, cellSpan / 38))
@@ -666,112 +927,583 @@
 
   // ── Highlights ────────────────────────────────────────────────────────────────
   function setHighlights(hl) {
-    // hl: { move: [{x,z}], skill: [{x,z}|instanceId], place: [...], selected: instanceId|null }
-    _clearHL('move')
-    _clearHL('skill')
-    _clearHL('place')
-    _clearHL('selected')
+    _syncHighlightGroup('move', hl.move || [])
+    _syncHighlightGroup('skill', hl.skill || [])
+    _syncHighlightGroup('place', hl.place || [])
+    _syncSelectedHighlight(hl.selected || null)
+  }
 
-    _showHL('move',  hl.move  || [])
-    _showHL('skill', hl.skill || [])
-    _showHL('place', hl.place || [])
+  function _normalizeHighlightItem(item) {
+    let x
+    let z
+    if (typeof item === 'string') {
+      const parts = item.split(',')
+      x = Number(parts[0])
+      z = Number(parts[1])
+    } else if (item && item.x != null) {
+      x = Number(item.x)
+      z = Number(item.z !== undefined ? item.z : item.y)
+    }
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null
+    return { key: x + ',' + z, x, z }
+  }
 
-    if (hl.selected) {
-      const obj = _pieceObjects.get(hl.selected)
-      if (obj) {
-        const ring = new THREE.Mesh(_selectedRingGeom, getHlMat('selected'))
-        ring.rotation.x = Math.PI / 2
-        ring.position.copy(obj.group.position)
-        ring.position.y = TILE_H / 2 + 0.04
-        ring.renderOrder = 5
-        _scene.add(ring)
-        _hlObjects.selected = ring
+  function _syncHighlightGroup(type, items) {
+    const objects = _hlObjects[type]
+    objects.forEach(function (entry) { entry.desired = false })
+    ;(items || []).forEach(function (item) {
+      const cell = _normalizeHighlightItem(item)
+      if (!cell) return
+      let entry = objects.get(cell.key)
+      if (!entry) {
+        const cfg = HL_COLORS[type] || HL_COLORS.move
+        const material = getHlMat(type).clone()
+        material.opacity = 0
+        const mesh = new THREE.Mesh(_hlPlaneGeom, material)
+        mesh.rotation.x = -Math.PI / 2
+        mesh.position.set(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.012, cell.z)
+        const startScale = _reducedMotion ? 1 : 0.94
+        mesh.scale.set(startScale, startScale, 1)
+        _scene.add(mesh)
+        entry = { key: cell.key, mesh, x: cell.x, z: cell.z, desired: true, targetOpacity: cfg.opacity }
+        objects.set(cell.key, entry)
       }
-    }
-  }
-
-  function _clearHL(type) {
-    if (type === 'selected') {
-      if (_hlObjects.selected) { _scene.remove(_hlObjects.selected); _hlObjects.selected = null }
-      return
-    }
-    _hlObjects[type].forEach(m => _scene.remove(m))
-    _hlObjects[type] = []
-  }
-
-  function _showHL(type, items) {
-    items.forEach(item => {
-      let x, z
-      if (typeof item === 'string') {
-        const parts = item.split(','); x = +parts[0]; z = +parts[1]
-      } else if (item && item.x != null) {
-        x = item.x; z = item.z ?? item.y ?? 0
-      } else return
-
-      const mesh = new THREE.Mesh(_hlPlaneGeom, getHlMat(type))
-      mesh.rotation.x = -Math.PI / 2
-      mesh.position.set(x, TILE_H / 2 + 0.01, z)
-      _scene.add(mesh)
-      _hlObjects[type].push(mesh)
+      entry.desired = true
+      entry.mesh.position.set(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.012, cell.z)
+      if (Math.abs(entry.mesh.scale.x - 1) > 0.001 || Math.abs(entry.mesh.material.opacity - entry.targetOpacity) > 0.001) {
+        _animateHighlightAppearance(type, entry, 1, entry.targetOpacity, MOTION_SECONDS.fast)
+      }
+    })
+    objects.forEach(function (entry, key) {
+      if (entry.desired) return
+      _animateHighlightAppearance(type, entry, entry.mesh.scale.x, 0, 0.12, function () {
+        if (entry.desired || objects.get(key) !== entry) return
+        _scene.remove(entry.mesh)
+        if (entry.mesh.material && entry.mesh.material.dispose) entry.mesh.material.dispose()
+        objects.delete(key)
+      })
     })
   }
 
-  // ── Animation ─────────────────────────────────────────────────────────────────
-  function animateAction(action, previousModel, nextModel) {
-    if (!action) return
-    if (action.type === 'move' && action.pieceId) {
-      const obj = _pieceObjects.get(action.pieceId)
-      if (obj && action.toX != null && action.toY != null) {
-        const fromX = obj.group.position.x
-        const fromZ = obj.group.position.z
-        obj.animating = true
-        _anims.push({ type: 'move', obj, fromX, fromZ, toX: action.toX, toZ: action.toY, elapsed: 0, duration: 0.25 })
-      }
+  function _animateHighlightAppearance(type, entry, targetScale, targetOpacity, duration, onComplete) {
+    const fromScale = entry.mesh.scale.x
+    const fromOpacity = entry.mesh.material.opacity
+    const propertyPrefix = 'highlight:' + type + ':' + entry.key + ':'
+    _startAnimation(propertyPrefix + 'scale', {
+      duration,
+      easing: EASE.out,
+      update: function (progress) {
+        const scale = fromScale + (targetScale - fromScale) * progress
+        entry.mesh.scale.set(scale, scale, 1)
+      },
+    })
+    _startAnimation(propertyPrefix + 'opacity', {
+      duration,
+      easing: EASE.out,
+      update: function (progress) {
+        entry.mesh.material.opacity = fromOpacity + (targetOpacity - fromOpacity) * progress
+      },
+      complete: onComplete,
+    })
+  }
+
+  function _syncSelectedHighlight(pieceId) {
+    if (_hlObjects.selectedId === pieceId && _hlObjects.selected) {
+      _updateSelectedRingPosition()
+      return
     }
-    // Damage flash: detect HP changes
-    if (previousModel && nextModel && previousModel.pieces && nextModel.pieces) {
-      nextModel.pieces.forEach(np => {
-        const op = previousModel.pieces.find(p => p.id === np.id)
-        if (op && np.health.current < op.health.current) {
-          const obj = _pieceObjects.get(np.id)
-          if (obj) _anims.push({ type: 'flash', obj, elapsed: 0, duration: 0.3 })
-        }
-        if (op && op.health.current > 0 && np.health.current <= 0) {
-          const obj = _pieceObjects.get(np.id)
-          if (obj) _anims.push({ type: 'death', obj, elapsed: 0, duration: 0.6 })
-        }
+    if (_hlObjects.selected) {
+      const previous = _hlObjects.selected
+      _scene.remove(previous)
+      if (previous.material && previous.material.dispose) previous.material.dispose()
+      _cancelAnimation('highlight:selected:appearance')
+      _hlObjects.selected = null
+      _hlObjects.selectedId = null
+    }
+    if (!pieceId) return
+    const obj = _pieceObjects.get(pieceId)
+    if (!obj) return
+    const material = getHlMat('selected').clone()
+    material.opacity = 0
+    const ring = new THREE.Mesh(_selectedRingGeom, material)
+    ring.rotation.x = Math.PI / 2
+    const startScale = _reducedMotion ? 1 : 0.9
+    ring.scale.set(PIECE_W * 1.14 * startScale, PIECE_D * 1.14 * startScale, 1)
+    ring.renderOrder = 5
+    _scene.add(ring)
+    _hlObjects.selected = ring
+    _hlObjects.selectedId = pieceId
+    _updateSelectedRingPosition()
+    _startAnimation('highlight:selected:appearance', {
+      duration: MOTION_SECONDS.fast,
+      easing: EASE.out,
+      update: function (progress) {
+        const scale = startScale + (1 - startScale) * progress
+        ring.scale.set(PIECE_W * 1.14 * scale, PIECE_D * 1.14 * scale, 1)
+        material.opacity = 0.75 * progress
+      },
+    })
+  }
+
+  function _updateSelectedRingPosition() {
+    if (!_hlObjects.selected || !_hlObjects.selectedId) return
+    const obj = _pieceObjects.get(_hlObjects.selectedId)
+    if (!obj) return
+    _hlObjects.selected.position.copy(obj.group.position)
+    _hlObjects.selected.position.y += 0.035
+  }
+
+  // ── Animation ─────────────────────────────────────────────────────────────────
+
+  function _cubicBezier(values) {
+    const x1 = values[0], y1 = values[1], x2 = values[2], y2 = values[3]
+    function sample(a, b, t) { return 3 * a * (1 - t) * (1 - t) * t + 3 * b * (1 - t) * t * t + t * t * t }
+    return function (progress) {
+      if (progress <= 0 || progress >= 1) return progress
+      let low = 0, high = 1, time = progress
+      for (let index = 0; index < 8; index += 1) {
+        const x = sample(x1, x2, time)
+        if (Math.abs(x - progress) < 0.0001) break
+        if (x < progress) low = time
+        else high = time
+        time = (low + high) / 2
+      }
+      return sample(y1, y2, time)
+    }
+  }
+
+  const EASE = Object.freeze({
+    out: _cubicBezier(MOTION_TOKENS.easeOut),
+    in: _cubicBezier(MOTION_TOKENS.easeIn),
+    inOut: _cubicBezier(MOTION_TOKENS.easeInOut),
+  })
+
+  function _startAnimation(key, options) {
+    _cancelAnimation(key)
+    const controller = {
+      key,
+      elapsed: 0,
+      duration: Math.max(0.001, options.duration || MOTION_SECONDS.fast),
+      easing: options.easing || EASE.out,
+      update: options.update || function () {},
+      complete: options.complete || null,
+      cancel: options.cancel || null,
+    }
+    _anims.set(key, controller)
+    controller.update(0, 0)
+    return controller
+  }
+
+  function _cancelAnimation(key) {
+    const controller = _anims.get(key)
+    if (!controller) return
+    _anims.delete(key)
+    if (controller.cancel) controller.cancel()
+  }
+
+  function _cancelAnimationsForPrefix(prefix) {
+    Array.from(_anims.keys()).forEach(function (key) {
+      if (key.indexOf(prefix) === 0) _cancelAnimation(key)
+    })
+  }
+
+  function _finishSpatialAnimations() {
+    Array.from(_anims.entries()).forEach(function (entry) {
+      const key = entry[0]
+      if (!key.endsWith(':position') && !key.endsWith(':scale')) return
+      const controller = entry[1]
+      _anims.delete(key)
+      controller.update(1, 1)
+      if (controller.complete) controller.complete()
+    })
+  }
+
+  function _stepAnims(dt) {
+    Array.from(_anims.entries()).forEach(function (entry) {
+      const key = entry[0]
+      const controller = entry[1]
+      if (_anims.get(key) !== controller) return
+      controller.elapsed += dt
+      const raw = Math.min(1, controller.elapsed / controller.duration)
+      controller.update(controller.easing(raw), raw)
+      if (raw < 1 || _anims.get(key) !== controller) return
+      _anims.delete(key)
+      if (controller.complete) controller.complete()
+    })
+    _updateSelectedRingPosition()
+    _updatePieceSummaryPositions()
+  }
+
+  function _pieceById(model, pieceId) {
+    return ((model && model.pieces) || []).find(function (piece) { return piece.id === pieceId }) || null
+  }
+
+  function _pieceHealth(piece) {
+    if (!piece) return 0
+    if (piece.health && Number.isFinite(piece.health.current)) return piece.health.current
+    return Number.isFinite(piece.hp) ? piece.hp : 0
+  }
+
+  function _statusSignature(piece) {
+    return JSON.stringify((piece && (piece.statuses || piece.statusEffects)) || [])
+  }
+
+  function _diffSignature(previousModel, nextModel) {
+    return ((nextModel && nextModel.pieces) || []).map(function (nextPiece) {
+      const previousPiece = _pieceById(previousModel, nextPiece.id)
+      return [
+        nextPiece.id,
+        previousPiece && previousPiece.x, previousPiece && previousPiece.y,
+        nextPiece.x, nextPiece.y,
+        _pieceHealth(previousPiece), _pieceHealth(nextPiece),
+        _statusSignature(previousPiece), _statusSignature(nextPiece),
+        previousPiece && previousPiece.visible, nextPiece.visible,
+      ].join(':')
+    }).join('|')
+  }
+
+  function _eventKey(action, previousModel, nextModel) {
+    const explicit = action && (action.motionEventKey || action.eventKey || action.clientActionId || action.actionId || action.sequence || action.seq)
+    if (explicit != null && explicit !== '') return String(explicit)
+    return [action && action.type || 'state', action && action.pieceId || '', _diffSignature(previousModel, nextModel)].join('|')
+  }
+
+  function _rememberEvent(key) {
+    if (_playedEventKeys.has(key)) return false
+    _playedEventKeys.add(key)
+    _playedEventOrder.push(key)
+    if (_playedEventOrder.length > 256) _playedEventKeys.delete(_playedEventOrder.shift())
+    return true
+  }
+
+  function animateAction(action, previousModel, nextModel) {
+    if (!_mounted || !nextModel) return
+    const eventKey = _eventKey(action || {}, previousModel, nextModel)
+    if (!_rememberEvent(eventKey)) return
+    if (action && action.type === 'ui-reject') {
+      const rejected = _pieceObjects.get(action.pieceId)
+      if (rejected) _flashOutline(rejected, 0xef4444, MOTION_SECONDS.reject)
+      return
+    }
+
+    const damagedTargets = []
+    ;(nextModel.pieces || []).forEach(function (nextPiece) {
+      const previousPiece = _pieceById(previousModel, nextPiece.id)
+      if (!previousPiece) return
+      const obj = _pieceObjects.get(nextPiece.id)
+      if (!obj) return
+      if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
+        _animateMove(obj, nextPiece.x, nextPiece.y)
+      }
+      const healthDelta = _pieceHealth(nextPiece) - _pieceHealth(previousPiece)
+      if (healthDelta < 0) {
+        damagedTargets.push(nextPiece.id)
+        _animateHit(obj)
+      } else if (healthDelta > 0) {
+        _animateHeal(obj)
+      }
+      if (_statusSignature(previousPiece) !== _statusSignature(nextPiece)) _animateStatusChange(obj)
+      if (previousPiece.visible !== false && nextPiece.visible === false) _animateDeath(obj)
+    })
+
+    const sourceId = action && (action.sourcePieceId || action.attackerId || action.actorId || action.pieceId)
+    const targetId = action && (action.targetPieceId || action.targetId)
+    if (sourceId && targetId && damagedTargets.indexOf(targetId) >= 0 && sourceId !== targetId) {
+      _animateAttackerLunge(sourceId, targetId)
+    }
+  }
+
+  function _animateMove(obj, targetX, targetZ) {
+    const targetY = _tileSurfaceHeightAt(targetX, targetZ)
+    const from = { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z }
+    const fromBaseY = Number.isFinite(obj.motionBaseY) ? obj.motionBaseY : obj.baseY
+    const visibleArc = Math.max(0, Math.min(0.08, from.y - fromBaseY))
+    obj.baseX = targetX
+    obj.baseY = targetY
+    obj.baseZ = targetZ
+    if (_reducedMotion) {
+      obj.motionBaseY = targetY
+      obj.group.position.set(targetX, targetY, targetZ)
+      _flashOutline(obj, 0xf59e0b, MOTION_SECONDS.press)
+      return
+    }
+    _startAnimation(obj.motionId + ':position', {
+      duration: Math.min(0.32, MOTION_SECONDS.action),
+      easing: EASE.inOut,
+      update: function (progress, raw) {
+        const pathBaseY = fromBaseY + (targetY - fromBaseY) * progress
+        const desiredArc = Math.sin(Math.PI * raw) * 0.08
+        const arc = visibleArc + (desiredArc - visibleArc) * progress
+        obj.motionBaseY = pathBaseY
+        obj.group.position.set(
+          from.x + (targetX - from.x) * progress,
+          pathBaseY + Math.max(0, Math.min(0.08, arc)),
+          from.z + (targetZ - from.z) * progress,
+        )
+      },
+      complete: function () {
+        obj.motionBaseY = targetY
+        obj.group.position.set(targetX, targetY, targetZ)
+        _animateLanding(obj)
+      },
+    })
+  }
+
+  function _animateLanding(obj) {
+    const shadow = obj.contactShadow
+    if (!shadow || _reducedMotion) return
+    const startX = PIECE_W * 1.06 * 0.92
+    const startY = PIECE_D * 1.08 * 0.92
+    _startAnimation(obj.motionId + ':landing', {
+      duration: 0.12,
+      easing: EASE.out,
+      update: function (progress) {
+        shadow.scale.set(
+          startX + (PIECE_W * 1.06 - startX) * progress,
+          startY + (PIECE_D * 1.08 - startY) * progress,
+          1,
+        )
+      },
+    })
+  }
+
+  function _animatePieceScale(obj, targetScale, duration, keySuffix) {
+    const from = obj.group.scale.x
+    _startAnimation(obj.motionId + ':scale', {
+      duration,
+      easing: EASE.out,
+      update: function (progress) {
+        const scale = from + (targetScale - from) * progress
+        obj.group.scale.set(scale, 1, scale)
+      },
+      complete: keySuffix === 'release' ? function () { obj.group.scale.set(1, 1, 1) } : null,
+    })
+  }
+
+  function _syncPendingFeedback(interaction) {
+    const pendingId = interaction && interaction.pendingPieceId
+    _pieceObjects.forEach(function (obj, pieceId) {
+      const pending = pieceId === pendingId
+      if (obj.pending === pending) return
+      obj.pending = pending
+      if (pending) {
+        obj.feedbackRing.material.color.setHex(0xf59e0b)
+        obj.feedbackRing.material.opacity = 0.38
+        if (!_reducedMotion && !_anims.has(obj.motionId + ':position')) obj.group.position.y = obj.baseY + 0.04
+      } else {
+        obj.feedbackRing.material.opacity = 0
+        if (!_anims.has(obj.motionId + ':position') && !obj.deathAnimating) obj.group.position.y = obj.baseY
+      }
+    })
+  }
+
+  function _pressFeedbackAt(pointerId, clientX, clientY) {
+    _releasePressedFeedback()
+    const piece = _findPieceFromPointer(clientX, clientY)
+    if (piece) {
+      const obj = _pieceObjects.get(piece.id)
+      if (!obj) return
+      _pressedPiece = { pointerId, obj }
+      if (_reducedMotion) _flashOutline(obj, 0x60a5fa, MOTION_SECONDS.press)
+      else _animatePieceScale(obj, 0.96, MOTION_SECONDS.press, 'press')
+      return
+    }
+    const coords = screenToCell(clientX, clientY)
+    if (!coords) return
+    const key = coords.x + ',' + coords.y
+    ;['move', 'skill', 'place'].some(function (kind) {
+      const entry = _hlObjects[kind].get(key)
+      if (!entry) return false
+      const mesh = entry.mesh
+      _pressedHighlight = { pointerId, mesh, kind, key }
+      if (!_reducedMotion) {
+        const fromScale = mesh.scale.x
+        _startAnimation('highlight:' + kind + ':' + key + ':scale', {
+          duration: MOTION_SECONDS.press,
+          easing: EASE.out,
+          update: function (progress) {
+            const scale = fromScale + (0.97 - fromScale) * progress
+            mesh.scale.set(scale, scale, 1)
+          },
+        })
+      }
+      return true
+    })
+  }
+
+  function _releasePressedFeedback(pointerId) {
+    if (_pressedPiece && (pointerId == null || _pressedPiece.pointerId === pointerId)) {
+      const obj = _pressedPiece.obj
+      _pressedPiece = null
+      if (!_reducedMotion) _animatePieceScale(obj, 1, MOTION_SECONDS.fast, 'release')
+    }
+    if (_pressedHighlight && (pointerId == null || _pressedHighlight.pointerId === pointerId)) {
+      const pressed = _pressedHighlight
+      _pressedHighlight = null
+      const from = pressed.mesh.scale.x
+      _startAnimation('highlight:' + pressed.kind + ':' + pressed.key + ':scale', {
+        duration: MOTION_SECONDS.press,
+        easing: EASE.out,
+        update: function (progress) {
+          const scale = from + (1 - from) * progress
+          pressed.mesh.scale.set(scale, scale, 1)
+        },
       })
     }
   }
 
-  function _stepAnims(dt) {
-    for (let i = _anims.length - 1; i >= 0; i--) {
-      const a = _anims[i]
-      a.elapsed += dt
-      const t = Math.min(a.elapsed / a.duration, 1)
-
-      if (a.type === 'move') {
-        const ex = a.fromX + (a.toX - a.fromX) * _ease(t)
-        const ez = a.fromZ + (a.toZ - a.fromZ) * _ease(t)
-        a.obj.group.position.set(ex, 0, ez)
-        _notifyViewportChange()
-        if (t >= 1) { a.obj.group.position.set(a.toX, 0, a.toZ); a.obj.animating = false; _anims.splice(i, 1) }
-      } else if (a.type === 'flash') {
-        const intensity = (1 - t) * 0.8
-        a.obj.body.material.emissive = new THREE.Color(0xff2200)
-        a.obj.body.material.emissiveIntensity = intensity
-        if (t >= 1) { a.obj.body.material.emissiveIntensity = 0; _anims.splice(i, 1) }
-      } else if (a.type === 'death') {
-        a.obj.group.children.forEach(m => {
-          if (m.material) { m.material.transparent = true; m.material.opacity = 1 - t }
-        })
-        if (t >= 1) { a.obj.group.visible = false; _anims.splice(i, 1) }
-      }
+  function _flashOutline(obj, color, duration) {
+    if (!obj || !obj.feedbackRing || !obj.feedbackRing.material) return
+    const material = obj.feedbackRing.material
+    const fromOpacity = material.opacity
+    const fromColor = material.color && material.color.getHex ? material.color.getHex() : color
+    const resultDuration = _reducedMotion ? Math.min(duration, MOTION_SECONDS.fast) : duration
+    const mixHex = function (start, end, progress) {
+      const sr = (start >> 16) & 0xff, sg = (start >> 8) & 0xff, sb = start & 0xff
+      const er = (end >> 16) & 0xff, eg = (end >> 8) & 0xff, eb = end & 0xff
+      const r = Math.round(sr + (er - sr) * progress)
+      const g = Math.round(sg + (eg - sg) * progress)
+      const b = Math.round(sb + (eb - sb) * progress)
+      return (r << 16) | (g << 8) | b
     }
-    _updatePieceSummaryPositions()
+    const finalise = function () {
+      material.color.setHex(0xf59e0b)
+      material.opacity = obj.pending ? 0.38 : 0
+    }
+    _startAnimation(obj.motionId + ':outline', {
+      duration: resultDuration,
+      easing: EASE.out,
+      update: function (progress, raw) {
+        const timeline = Number.isFinite(raw) ? raw : progress
+        const rising = timeline <= 0.45
+        const phase = rising ? EASE.out(timeline / 0.45) : EASE.in((timeline - 0.45) / 0.55)
+        const baseOpacity = obj.pending ? 0.38 : 0
+        material.color.setHex(mixHex(fromColor, color, Math.min(1, progress * 2)))
+        material.opacity = rising
+          ? fromOpacity + (0.78 - fromOpacity) * phase
+          : 0.78 + (baseOpacity - 0.78) * phase
+      },
+      complete: finalise,
+    })
   }
 
-  function _ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t }
+  function _animateHit(obj) {
+    _flashOutline(obj, 0xffffff, MOTION_SECONDS.hit)
+    if (_reducedMotion) return
+    const from = obj.group.scale.x
+    _startAnimation(obj.motionId + ':scale', {
+      duration: MOTION_SECONDS.hit,
+      easing: EASE.out,
+      update: function (progress) {
+        const scale = progress < 0.45
+          ? from + (0.94 - from) * (progress / 0.45)
+          : 0.94 + 0.06 * ((progress - 0.45) / 0.55)
+        obj.group.scale.set(scale, scale, scale)
+      },
+      complete: function () { obj.group.scale.set(1, 1, 1) },
+    })
+  }
+
+  function _animateHeal(obj) {
+    _flashOutline(obj, 0x4ade80, MOTION_SECONDS.heal)
+  }
+
+  function _animateStatusChange(obj) {
+    _flashOutline(obj, 0x67e8f9, MOTION_SECONDS.fast)
+  }
+
+  function _ownedPieceMaterials(obj) {
+    return [obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial]
+      .filter(function (material, index, materials) { return material && materials.indexOf(material) === index })
+  }
+
+  function _restorePieceVisual(obj) {
+    obj.group.scale.set(1, 1, 1)
+    obj.group.position.set(obj.baseX, obj.baseY + (obj.pending && !_reducedMotion ? 0.04 : 0), obj.baseZ)
+    _ownedPieceMaterials(obj).forEach(function (material) {
+      material.opacity = 1
+      material.transparent = false
+    })
+    if (obj.body.material.color) obj.body.material.color.setHex(0x22272d)
+    if (obj.body.material.emissive) obj.body.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
+    obj.body.material.emissiveIntensity = 0.08
+    if (obj.ring.material.color) obj.ring.material.color.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
+    if (obj.ring.material.emissive) obj.ring.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
+    obj.ring.material.emissiveIntensity = 0.3
+    if (obj.markerMaterial.color) obj.markerMaterial.color.setHex(0xf2e8d5)
+  }
+
+  function _animateDeath(obj) {
+    _cancelAnimation(obj.motionId + ':position')
+    _cancelAnimation(obj.motionId + ':scale')
+    obj.deathAnimating = true
+    obj.group.visible = true
+    const fromY = obj.group.position.y
+    const materials = _ownedPieceMaterials(obj)
+    materials.forEach(function (material) { material.transparent = true })
+    if (obj.body.material.color) obj.body.material.color.setHex(0x59616a)
+    if (obj.body.material.emissive) obj.body.material.emissive.setHex(0x30363d)
+    const duration = _reducedMotion ? MOTION_SECONDS.fast : MOTION_SECONDS.result
+    _startAnimation(obj.motionId + ':visibility', {
+      duration,
+      easing: EASE.in,
+      update: function (progress) {
+        materials.forEach(function (material) { material.opacity = 1 - progress })
+        if (!_reducedMotion) obj.group.position.y = fromY - 0.06 * progress
+      },
+      complete: function () {
+        obj.group.visible = false
+        obj.deathAnimating = false
+        _restorePieceVisual(obj)
+      },
+      cancel: function () {
+        obj.deathAnimating = false
+        _restorePieceVisual(obj)
+      },
+    })
+  }
+
+  function _animateAttackerLunge(sourceId, targetId) {
+    if (_reducedMotion) return
+    const source = _pieceObjects.get(sourceId)
+    const target = _pieceObjects.get(targetId)
+    if (!source || !target || _anims.has(source.motionId + ':position')) return
+    const from = { x: source.group.position.x, y: source.group.position.y, z: source.group.position.z }
+    const dx = target.group.position.x - from.x
+    const dz = target.group.position.z - from.z
+    const distance = Math.hypot(dx, dz) || 1
+    const offsetX = dx / distance * 0.10
+    const offsetZ = dz / distance * 0.10
+    _startAnimation(source.motionId + ':position', {
+      duration: 0.19,
+      easing: function (progress) { return progress },
+      update: function (_, raw) {
+        const phase = raw <= (0.09 / 0.19)
+          ? EASE.out(raw / (0.09 / 0.19))
+          : 1 - EASE.in((raw - (0.09 / 0.19)) / (0.10 / 0.19))
+        source.group.position.set(from.x + offsetX * phase, from.y, from.z + offsetZ * phase)
+      },
+      complete: function () { source.group.position.set(from.x, from.y, from.z) },
+      cancel: function () {
+        if (!_anims.has(source.motionId + ':position')) source.group.position.set(from.x, from.y, from.z)
+      },
+    })
+  }
+
+  function getMotionDiagnostics() {
+    return {
+      activeAnimations: Array.from(_anims.keys()).sort(),
+      playedEventCount: _playedEventKeys.size,
+      floaterCount: _floaters.size,
+      pendingPieceIds: Array.from(_pieceObjects.values()).filter(function (obj) { return obj.pending }).map(function (obj) { return obj.id }).sort(),
+      highlightCounts: {
+        move: _hlObjects.move.size,
+        skill: _hlObjects.skill.size,
+        place: _hlObjects.place.size,
+        selected: _hlObjects.selected ? 1 : 0,
+      },
+    }
+  }
 
   // ── Camera controls ───────────────────────────────────────────────────────────
   let _panStart = null
@@ -790,6 +1522,62 @@
     })
   }
 
+  function _panCameraByPixels(dx, dy) {
+    if (!_camera || !_cameraTarget || !_renderer) return
+    const rect = _renderer.domElement.getBoundingClientRect()
+    const canvasWidth = _renderer.domElement.getBoundingClientRect().width || 1
+    const canvasHeight = rect.height || 1
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+    const from = _groundPointFromClient(centerX, centerY)
+    const to = _groundPointFromClient(centerX + dx, centerY + dy)
+    let deltaX
+    let deltaZ
+    if (from && to) {
+      deltaX = from.x - to.x
+      deltaZ = from.z - to.z
+    } else {
+      const worldPerPixelX = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
+      const worldPerPixelY = ((_camera.top - _camera.bottom) / _camera.zoom) / canvasHeight
+      const screenRight3 = new THREE.Vector3(1, 0, 0).applyQuaternion(_camera.quaternion)
+      const screenUp3 = new THREE.Vector3(0, 1, 0).applyQuaternion(_camera.quaternion)
+      const fallback = TacticalGeometry.screenPanDelta({
+        dx,
+        dy,
+        worldPerPixelX,
+        worldPerPixelY,
+        screenRight: { x: screenRight3.x, z: screenRight3.z },
+        screenUp: { x: screenUp3.x, z: screenUp3.z },
+      })
+      deltaX = fallback.x
+      deltaZ = fallback.z
+    }
+    const clamped = TacticalGeometry.clampTarget({
+      x: _cameraTarget.x + deltaX,
+      z: _cameraTarget.z + deltaZ,
+      mapWidth: _mapW,
+      mapHeight: _mapH,
+    })
+    _cameraTarget.set(clamped.x, 0, clamped.z)
+    _positionCameraFromTarget()
+    _updatePieceSummaryPositions()
+    _notifyViewportChange()
+  }
+
+  function _groundPointFromClient(clientX, clientY) {
+    const canvas = _renderer.domElement
+    const rect = canvas.getBoundingClientRect()
+    if (!rect.width || !rect.height) return null
+    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
+    const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
+    _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
+    const vertical = _raycaster.ray.direction.y
+    if (Math.abs(vertical) < 0.000001) return null
+    const distance = -_raycaster.ray.origin.y / vertical
+    if (distance < 0) return null
+    return _raycaster.ray.origin.clone().add(_raycaster.ray.direction.clone().multiplyScalar(distance))
+  }
+
   function _initControls() {
     const canvas = _renderer.domElement
     canvas.style.touchAction = 'none'
@@ -800,14 +1588,17 @@
       // context menu is suppressed, leaving a stale pointer that pans the
       // board before the next inspection attempt.
       if (e.pointerType === 'mouse' && e.button !== 0) return
+      if (_pointers.size >= 2) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (_pointers.size === 1) {
-        _panStart = { x: e.clientX, y: e.clientY }
+        _panStart = { x: e.clientX, y: e.clientY, originX: e.clientX, originY: e.clientY }
         _panMoved = false
+        _pressFeedbackAt(e.pointerId, e.clientX, e.clientY)
         if (typeof canvas.setPointerCapture === 'function') canvas.setPointerCapture(e.pointerId)
       } else if (_pointers.size === 2) {
         _pinchDist = _getPinchDist()
         _panStart = null
+        _releasePressedFeedback()
       }
       e.preventDefault()
     }, { passive: false })
@@ -830,15 +1621,14 @@
       if (_panStart) {
         const dx = e.clientX - _panStart.x
         const dy = e.clientY - _panStart.y
-        if (Math.abs(dx) + Math.abs(dy) > 4) {
+        const totalDx = e.clientX - _panStart.originX
+        const totalDy = e.clientY - _panStart.originY
+        if (_panMoved || Math.hypot(totalDx, totalDy) >= PAN_ACTIVATION_PX) {
           _panMoved = true
-          const canvasWidth = _renderer.domElement.getBoundingClientRect().width || 1
-          const fov = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
-          _camera.position.x -= dx * fov
-          _camera.position.z -= dy * fov
-          _camera.lookAt(_camera.position.x, 0, _camera.position.z)
-          _notifyViewportChange()
-          _panStart = { x: e.clientX, y: e.clientY }
+          _releasePressedFeedback()
+          _panCameraByPixels(dx, dy)
+          _panStart.x = e.clientX
+          _panStart.y = e.clientY
         }
       }
       e.preventDefault()
@@ -846,11 +1636,12 @@
 
     const endPointer = (e, allowClick) => {
       const wasClick = !_panMoved && _pointers.size === 1
+      _releasePressedFeedback(e.pointerId)
       _pointers.delete(e.pointerId)
       if (_pointers.size < 2) _pinchDist = 0
       if (_pointers.size === 1) {
         const remaining = Array.from(_pointers.values())[0]
-        _panStart = { x: remaining.x, y: remaining.y }
+        _panStart = { x: remaining.x, y: remaining.y, originX: remaining.x, originY: remaining.y }
         _panMoved = true
       } else if (!_pointers.size) {
         _panStart = null
@@ -880,6 +1671,7 @@
   }
 
   function _resetPointerState(canvas) {
+    _releasePressedFeedback()
     _pointers.forEach(function (_, pointerId) {
       if (canvas && canvas.hasPointerCapture && canvas.hasPointerCapture(pointerId)) {
         canvas.releasePointerCapture(pointerId)
@@ -901,7 +1693,7 @@
   function _applyZoom(z) {
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
-    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(5, z))
+    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(MAX_CAMERA_ZOOM, z))
     _camera.updateProjectionMatrix()
     _updatePieceSummaryPositions()
     _notifyViewportChange()
@@ -911,10 +1703,12 @@
     if (!_mapW) return
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
+    const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
+    _cameraTarget.set(pose.target.x, pose.target.y, pose.target.z)
+    _positionCameraFromTarget()
+    _updateCameraProjection(w, h)
     _camera.zoom = _preferredInitialZoom(w, h)
-    _camera.position.set(_mapW / 2, 50, _mapH / 2)
-    _camera.lookAt(_mapW / 2, 0, _mapH / 2)
-    _updateCameraFrustum(w, h)
+    _camera.updateProjectionMatrix()
     _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
@@ -932,11 +1726,20 @@
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
+    const tileHits = _raycaster.intersectObjects(Array.from(_tileObjects.values()), false)
+    if (tileHits.length) {
+      const tile = tileHits[0].object
+      const tileX = Number(tile.userData.tileX)
+      const tileY = Number(tile.userData.tileZ)
+      if (tileX >= 0 && tileY >= 0 && tileX < _mapW && tileY < _mapH) return { x: tileX, y: tileY }
+    }
     const hits = _raycaster.intersectObject(_hitPlane)
     if (!hits.length) return null
     const pt = hits[0].point
-    const x = Math.round(pt.x)
-    const y = Math.round(pt.z)
+    const roundedX = Math.round(pt.x)
+    const roundedY = Math.round(pt.z)
+    const x = Object.is(roundedX, -0) ? 0 : roundedX
+    const y = Object.is(roundedY, -0) ? 0 : roundedY
     if (x < 0 || y < 0 || x >= _mapW || y >= _mapH) return null
     return { x, y }
   }
@@ -945,7 +1748,7 @@
     if (!_renderer || !_camera || !_container) return null
     const canvasRect = _renderer.domElement.getBoundingClientRect()
     const containerRect = _container.getBoundingClientRect()
-    const point = new THREE.Vector3(x, elevation == null ? TILE_H / 2 : elevation, y).project(_camera)
+    const point = new THREE.Vector3(x, elevation == null ? _tileSurfaceHeightAt(x, y) : elevation, y).project(_camera)
     const clientX = canvasRect.left + (point.x + 1) / 2 * canvasRect.width
     const clientY = canvasRect.top + (-point.y + 1) / 2 * canvasRect.height
     return {
@@ -976,12 +1779,12 @@
       const obj = _pieceObjects.get(piece.id)
       const x = obj ? obj.group.position.x : piece.x
       const y = obj ? obj.group.position.z : piece.y
-      const point = projectCell(x, y, TILE_H / 2 + PIECE_H + 0.002)
+      const point = projectCell(x, y, (obj ? obj.group.position.y : _tileSurfaceHeightAt(x, y)) + PIECE_H + 0.014)
       if (!point) return
       const dx = clientX - point.clientX
       const dy = clientY - point.clientY
       const distance = Math.sqrt(dx * dx + dy * dy)
-      const hitRadius = Math.max(10, _projectedCellSpan(x, y) * 0.55)
+      const hitRadius = Math.max(22, _projectedCellSpan(x, y) * 0.55)
       if (distance > hitRadius || distance >= closestDistance) return
       closest = piece
       closestDistance = distance
@@ -1009,27 +1812,33 @@
       selected: model.selection && model.selection.pieceId,
     })
     _currentModel = model
+    _syncPendingFeedback(model.interaction || {})
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
-  function spawnFloater(x, z, text, color, big) {
+  function spawnFloater(x, z, text, color, big, options) {
+    options = options || {}
     // Find the floatLayer: use the existing one in the DOM if available
     const layer = _floatLayer || document.getElementById('floatLayer')
     if (!layer) return
     let left = x * 44 + 22  // fallback pixel estimate
     let top  = z * 44 + 4
 
-    const projected = projectCell(x, z, TILE_H / 2 + PIECE_H + 0.2)
+    const projected = projectCell(x, z, _tileSurfaceHeightAt(x, z) + PIECE_H + 0.2)
     if (projected) {
       left = projected.left
       top = projected.top - 14
     }
 
     const el = document.createElement('div')
-    el.className = 'dmg-float' + (big ? ' big' : '')
+    const kind = options.kind === 'heal' || options.kind === 'death' ? options.kind : 'damage'
+    const requestedDuration = Number(options.durationMs) || (kind === 'heal' ? 550 : 600)
+    const durationMs = _reducedMotion ? Math.min(140, requestedDuration) : Math.max(480, Math.min(650, requestedDuration))
+    el.className = 'dmg-float is-' + kind + (big ? ' big' : '')
     el.style.color = color
     el.style.left  = left + 'px'
     el.style.top   = top  + 'px'
+    el.style.setProperty('--floater-duration', durationMs + 'ms')
     el.textContent = text
     layer.appendChild(el)
     _floaters.add(el)
@@ -1037,7 +1846,7 @@
       el.remove()
       _floaters.delete(el)
       _floaterTimers.delete(timer)
-    }, 1200)
+    }, durationMs + 80)
     _floaterTimers.add(timer)
   }
 
@@ -1060,8 +1869,9 @@
           ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) { materials.add(material) })
         }
       })
-      ;[_tileGeom, _hlPlaneGeom, _selectedRingGeom, _pieceBodyGeom, _pieceRingGeom, _portraitDiscGeom]
+      ;[_tileGeom, _hlPlaneGeom, _selectedRingGeom, _pieceBodyGeom, _pieceRingGeom, _portraitDiscGeom, _contactShadowGeom]
         .forEach(function (geometry) { if (geometry) geometries.add(geometry) })
+      if (_contactShadowMat) materials.add(_contactShadowMat)
       ;[_tileMats, _factionMats, _hlMats, _tileEffectMats, _tileEffectIconMats].forEach(function (cache) {
         Object.keys(cache).forEach(function (key) { if (cache[key]) materials.add(cache[key]) })
       })
@@ -1075,6 +1885,10 @@
       if (_renderer.domElement.parentNode) _renderer.domElement.remove()
     }
     _tileObjects.clear()
+    _pieceObjects.forEach(function (obj) {
+      obj.statusExitTimers.forEach(function (timer) { clearTimeout(timer) })
+      obj.statusExitTimers.clear()
+    })
     _pieceObjects.clear()
     _tileEffectObjects.clear()
     Object.keys(_tileMats).forEach(function (key) { delete _tileMats[key] })
@@ -1082,7 +1896,16 @@
     Object.keys(_hlMats).forEach(function (key) { delete _hlMats[key] })
     Object.keys(_tileEffectMats).forEach(function (key) { delete _tileEffectMats[key] })
     Object.keys(_tileEffectIconMats).forEach(function (key) { delete _tileEffectIconMats[key] })
-    _anims.length = 0
+    _anims.clear()
+    _playedEventKeys.clear()
+    _playedEventOrder.length = 0
+    _pressedPiece = null
+    _pressedHighlight = null
+    _hlObjects.move.clear()
+    _hlObjects.skill.clear()
+    _hlObjects.place.clear()
+    _hlObjects.selected = null
+    _hlObjects.selectedId = null
     _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
@@ -1091,6 +1914,7 @@
     _pointers.clear()
     _renderer = null
     _camera = null
+    _cameraTarget = null
     _scene = null
     _hpLayer = null
     _floatLayer = null
@@ -1099,17 +1923,23 @@
     _currentModel = null
     _mapW = 0
     _mapH = 0
+    _boardBase = null
+    _boardFront = null
     _tileGeom = null
     _hlPlaneGeom = null
     _selectedRingGeom = null
     _pieceBodyGeom = null
     _pieceRingGeom = null
     _portraitDiscGeom = null
+    _contactShadowGeom = null
+    _contactShadowMat = null
     _clock.prev = 0
     _panStart = null
     _panMoved = false
     _pinchDist = 0
     _container = null
+    _motionQuery = null
+    _reducedMotion = false
   }
 
   // ── Public API ────────────────────────────────────────────────────────────────
@@ -1123,6 +1953,8 @@
     projectCell,
     screenToCell,
     dispose,
+    getMotionDiagnostics,
     TILE_EFFECT_VISUALS,
+    MOTION_TOKENS,
   }
 })()

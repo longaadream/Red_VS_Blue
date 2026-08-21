@@ -164,6 +164,7 @@
 
   function create(options) {
     const input = options || {}
+    const interaction = input.interaction || {}
     const snapshot = input.snapshot || {}
     const map = snapshot.map || { width: 0, height: 0, tiles: [] }
     const turn = snapshot.turn || {}
@@ -212,6 +213,10 @@
         pieceId: selectedPiece ? selectedPiece.id : null,
         piece: selectedPiece,
         mode: String(input.interactionMode || 'inspect'),
+      },
+      interaction: {
+        pendingPieceId: interaction.pendingPieceId || null,
+        pendingCommandId: interaction.pendingCommandId || null,
       },
       legal: {
         moveCells: normalizeCells(legal.moveCells),

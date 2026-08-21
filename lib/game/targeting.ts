@@ -4,6 +4,7 @@ import { getSkillById } from './skill-repository'
 import { loadCardById } from './skills'
 import { manhattanDistance, traceProjectile } from './spatial'
 import type { BattleAction, BattleState } from './turn'
+import type { PendingReactiveCardRef } from './pending-interaction'
 
 export const TARGET_SELECTION_PROTOCOL_VERSION = 1
 
@@ -150,7 +151,10 @@ export interface PendingTargetSelectionSession {
   effectCode?: string
   payload?: any
   triggerContext?: any
+  continuationContext?: any
   pendingQueue?: Array<{ ruleId: string; sourceId?: string }>
+  pendingReactiveCards?: PendingReactiveCardRef[]
+  pendingAction?: any
   source?: {
     type: 'skill' | 'card' | 'rule' | 'pending'
     id: string
