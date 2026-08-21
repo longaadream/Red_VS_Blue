@@ -3,6 +3,7 @@
 
   const METRICS = Object.freeze({
     cameraTiltDeg: 45,
+    cameraFovDeg: 35,
     cameraHeight: 28,
     boardBaseHeight: 0.72,
     pieceWidth: 0.72,

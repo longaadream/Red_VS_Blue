@@ -21,6 +21,7 @@ function loadTacticalGeometry() {
   return window.BattleTacticalGeometry as {
     METRICS: {
       cameraTiltDeg: number
+      cameraFovDeg: number
       boardBaseHeight: number
       pieceWidth: number
       pieceDepth: number
@@ -67,7 +68,7 @@ describe('RED-68 fixed tactical table fixture', () => {
 })
 
 describe('RED-68 tactical geometry', () => {
-  it('uses a fixed single-axis 45° rake and low oval piece metrics', () => {
+  it('uses a fixed single-axis perspective rake and low oval piece metrics', () => {
     const geometry = loadTacticalGeometry()
     const pose = geometry.cameraPose({ mapWidth: 20, mapHeight: 16 })
     const horizontalOffset = Math.hypot(
@@ -80,6 +81,7 @@ describe('RED-68 tactical geometry', () => {
     expect(pose.target).toEqual({ x: 9.5, y: 0, z: 7.5 })
     expect(geometry.METRICS).toMatchObject({
       cameraTiltDeg: 45,
+      cameraFovDeg: 35,
       boardBaseHeight: 0.72,
       pieceWidth: 0.72,
       pieceDepth: 0.56,
@@ -134,7 +136,8 @@ describe('RED-68 renderer and responsive UI contract', () => {
       battlePage.indexOf('js/battle-renderer-3d.js'),
     )
     expect(renderer).toContain('window.BattleTacticalGeometry')
-    expect(renderer).toContain('new THREE.OrthographicCamera')
+    expect(renderer).toContain('new THREE.PerspectiveCamera')
+    expect(renderer).not.toContain('new THREE.OrthographicCamera')
     expect(renderer).toContain('_cameraTarget')
     expect(renderer).toContain('_positionCameraFromTarget')
     expect(renderer).toContain('screenToCell(clientX, clientY)')

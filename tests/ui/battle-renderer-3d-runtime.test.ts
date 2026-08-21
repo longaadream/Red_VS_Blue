@@ -290,9 +290,16 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     }
 
     const center = harness.renderer.projectCell(10, 8)
-    const horizontal = harness.renderer.projectCell(11, 8)
-    const vertical = harness.renderer.projectCell(10, 9)
-    expect(Math.min(distance(center, horizontal), distance(center, vertical))).toBeGreaterThanOrEqual(43.5)
+    let minimumCellAxis = Infinity
+    for (let y = 0; y < 15; y += 1) {
+      for (let x = 0; x < 19; x += 1) {
+        const origin = harness.renderer.projectCell(x, y, 0.12)
+        const horizontal = harness.renderer.projectCell(x + 1, y, 0.12)
+        const vertical = harness.renderer.projectCell(x, y + 1, 0.12)
+        minimumCellAxis = Math.min(minimumCellAxis, distance(origin, horizontal), distance(origin, vertical))
+      }
+    }
+    expect(minimumCellAxis).toBeGreaterThanOrEqual(44)
 
     const canvas = harness.renderers[0].domElement as FakeElement
     canvas.dispatch('pointerdown', { pointerId: 1, pointerType: 'touch', button: 0, clientX: center.clientX, clientY: center.clientY })
@@ -367,25 +374,69 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(harness.rafCallbacks.size).toBe(0)
   })
 
-  it('makes the board plane visibly rake on one axis and fill the desktop canvas', () => {
-    const harness = createHarness(1280, 720, false)
+  it('keeps every projected cell axis at least 44px in mobile landscape', () => {
+    const harness = createHarness(844, 390, true)
     const model = runtimeModel()
     harness.renderer.init({ container: harness.container })
     harness.renderer.update(model)
     harness.frame()
 
-    const left = harness.renderer.projectCell(0, 8)
-    const right = harness.renderer.projectCell(19, 8)
-    const backLeft = harness.renderer.projectCell(0, 0)
-    const frontLeft = harness.renderer.projectCell(0, 15)
+    let minimumCellAxis = Infinity
+    for (let y = 0; y < 15; y += 1) {
+      for (let x = 0; x < 19; x += 1) {
+        const origin = harness.renderer.projectCell(x, y, 0.12)
+        const horizontal = harness.renderer.projectCell(x + 1, y, 0.12)
+        const vertical = harness.renderer.projectCell(x, y + 1, 0.12)
+        minimumCellAxis = Math.min(minimumCellAxis, distance(origin, horizontal), distance(origin, vertical))
+      }
+    }
 
-    expect(distance(left, right) / 1280).toBeGreaterThanOrEqual(0.78)
-    const projectedCellWidth = distance(left, right) / 19
-    const projectedCellDepth = distance(backLeft, frontLeft) / 15
-    expect(projectedCellDepth / projectedCellWidth).toBeCloseTo(Math.cos(45 * Math.PI / 180), 2)
-    expect(Math.abs(frontLeft.clientX - backLeft.clientX)).toBeLessThan(0.001)
-    expect(harness.renderer.screenToCell(backLeft.clientX, backLeft.clientY)).toEqual({ x: 0, y: 0 })
-    expect(harness.renderer.screenToCell(frontLeft.clientX, frontLeft.clientY)).toEqual({ x: 0, y: 15 })
+    expect(minimumCellAxis).toBeGreaterThanOrEqual(44)
+    harness.renderer.dispose()
+  })
+
+  it('uses centered one-axis perspective so near cells are wider while the full board stays visible', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    model.board.tiles[0].props.type = 'wall'
+    model.board.tiles[19].props.type = 'wall'
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame()
+
+    const farLeft = harness.renderer.projectCell(0, 0)
+    const farRight = harness.renderer.projectCell(19, 0)
+    const nearLeft = harness.renderer.projectCell(0, 15)
+    const nearRight = harness.renderer.projectCell(19, 15)
+    const farCenter = harness.renderer.projectCell(9.5, 0, 0.12)
+    const nearCenter = harness.renderer.projectCell(9.5, 15, 0.12)
+    const farWidth = distance(farLeft, farRight)
+    const nearWidth = distance(nearLeft, nearRight)
+
+    expect(nearWidth / farWidth).toBeGreaterThanOrEqual(1.25)
+    expect(nearWidth / farWidth).toBeLessThanOrEqual(1.4)
+    expect(Math.abs(farCenter.clientX - nearCenter.clientX)).toBeLessThan(0.001)
+    expect(farLeft.clientX + farRight.clientX).toBeCloseTo(1280, 3)
+    expect(nearLeft.clientX + nearRight.clientX).toBeCloseTo(1280, 3)
+
+    for (const point of [farLeft, farRight, nearLeft, nearRight]) {
+      expect(point.clientX).toBeGreaterThan(0)
+      expect(point.clientX).toBeLessThan(1280)
+      expect(point.clientY).toBeGreaterThan(0)
+      expect(point.clientY).toBeLessThan(720)
+    }
+    for (const [point, expected] of [
+      [farLeft, { x: 0, y: 0 }],
+      [farRight, { x: 19, y: 0 }],
+      [nearLeft, { x: 0, y: 15 }],
+      [nearRight, { x: 19, y: 15 }],
+    ] as const) {
+      expect(harness.renderer.screenToCell(point.clientX, point.clientY)).toEqual(expected)
+    }
+    const elevatedFarLeft = harness.renderer.projectCell(0, 0, 0.52)
+    expect(harness.renderer.screenToCell(elevatedFarLeft.clientX, elevatedFarLeft.clientY)).toEqual({ x: 0, y: 0 })
+    const elevatedFarRight = harness.renderer.projectCell(19, 0, 0.52)
+    expect(harness.renderer.screenToCell(elevatedFarRight.clientX, elevatedFarRight.clientY)).toEqual({ x: 19, y: 0 })
     harness.renderer.dispose()
   })
 

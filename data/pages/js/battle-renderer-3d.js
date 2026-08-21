@@ -19,6 +19,7 @@
   const SELECTED_RING_T = 0.018
   const PAN_ACTIVATION_PX = TACTICAL_METRICS.panActivationPx
   const MIN_TOUCH_CELL_PIXELS = TACTICAL_METRICS.minTouchCellPixels
+  const MAX_CAMERA_ZOOM = 8
   const TILE_HEIGHTS = Object.freeze({
     floor: TILE_H,
     spawn: TILE_H + 0.035,
@@ -286,9 +287,9 @@
     _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'
     _container.appendChild(_hpLayer)
 
-    // Fixed tactical orthographic camera. A single-axis 45° rake and thicker
-    // slab make the board plane readable without perspective or yaw drift.
-    _camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200)
+    // Fixed tactical perspective camera. It stays centered on the board's X axis,
+    // so depth converges into trapezoids without introducing any horizontal yaw.
+    _camera = new THREE.PerspectiveCamera(TACTICAL_METRICS.cameraFovDeg, 1, 0.1, 200)
     _cameraTarget = new THREE.Vector3(0, 0, 0)
     _camera.up.set(0, 1, 0)
 
@@ -309,22 +310,34 @@
     if (!_renderer || !_container) return
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
-    if (_mapW && _camera) {
-      _camera.zoom = Math.max(_camera.zoom, _minimumUsableZoom(w, h))
-    }
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     _renderer.setSize(w, h, false)
-    _updateCameraFrustum(w, h)
+    _updateCameraProjection(w, h)
+    if (_mapW && _camera) {
+      _camera.zoom = Math.max(_camera.zoom, _minimumUsableZoom(w, h))
+      _camera.updateProjectionMatrix()
+    }
     _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
-  function _fitWorldHalfHeight(w, h) {
-    if (!_mapW) return 1
-    const aspect = w / (h || 1)
-    const halfH = _mapH / 2 + 1
-    const halfW = _mapW / 2 + 1
-    return Math.max(halfH, halfW / aspect)
+  function _withCameraZoomOne(callback) {
+    const previousZoom = _camera.zoom
+    _camera.zoom = 1
+    _camera.updateProjectionMatrix()
+    _camera.updateMatrixWorld(true)
+    const result = callback()
+    _camera.zoom = previousZoom
+    _camera.updateProjectionMatrix()
+    return result
+  }
+
+  function _projectToCss(point, w, h) {
+    const projected = point.clone().project(_camera)
+    return {
+      x: (projected.x + 1) * 0.5 * w,
+      y: (1 - projected.y) * 0.5 * h,
+    }
   }
 
   function _minimumUsableZoom(w, h) {
@@ -332,18 +345,48 @@
     const touchViewport = w <= 760 || (w > h && h <= 500)
     const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
     if (!touchViewport && !coarsePointer) return 1
-    const pixelsPerCell = h / (_fitWorldHalfHeight(w, h) * 2)
-    const projectedDepthScale = Math.cos(TACTICAL_METRICS.cameraTiltDeg * Math.PI / 180)
-    const requiredZoom = MIN_TOUCH_CELL_PIXELS / Math.max(1, pixelsPerCell * projectedDepthScale)
-    return Math.max(1, Math.min(5, requiredZoom))
+    const minimumAxisAtZoomOne = _withCameraZoomOne(function () {
+      let minimum = Infinity
+      ;[0, (_mapW - 1) / 2, _mapW - 2].forEach(function (x) {
+        const origin = _projectToCss(new THREE.Vector3(x, TILE_H, 0), w, h)
+        const across = _projectToCss(new THREE.Vector3(x + 1, TILE_H, 0), w, h)
+        const depth = _projectToCss(new THREE.Vector3(x, TILE_H, 1), w, h)
+        minimum = Math.min(
+          minimum,
+          Math.hypot(across.x - origin.x, across.y - origin.y),
+          Math.hypot(depth.x - origin.x, depth.y - origin.y),
+        )
+      })
+      return minimum
+    })
+    // Keep one CSS pixel of headroom for fractional viewport sizes and the
+    // perspective edge samples that fall between our representative columns.
+    const requiredZoom = (MIN_TOUCH_CELL_PIXELS + 1) / Math.max(1, minimumAxisAtZoomOne)
+    return Math.max(1, Math.min(MAX_CAMERA_ZOOM, requiredZoom))
   }
 
   function _preferredInitialZoom(w, h) {
     if (!_mapW) return 1
-    const aspect = w / (h || 1)
-    const visibleWorldWidth = _fitWorldHalfHeight(w, h) * 2 * aspect
-    const widthCoverageZoom = (visibleWorldWidth / (_mapW + 2)) * 0.91
-    return Math.max(_minimumUsableZoom(w, h), Math.min(2.35, widthCoverageZoom))
+    const halfWidth = (_mapW + 1.25) / 2
+    const centerX = (_mapW - 1) / 2
+    const farZ = -1.125
+    const nearZ = _mapH + 0.16
+    const fitZoom = _withCameraZoomOne(function () {
+      let maxX = 0
+      let maxY = 0
+      ;[-BOARD_BASE_H, TILE_HEIGHTS.wall + 0.08].forEach(function (height) {
+        ;[centerX - halfWidth, centerX + halfWidth].forEach(function (x) {
+          ;[farZ, nearZ].forEach(function (z) {
+            const projected = new THREE.Vector3(x, height, z).project(_camera)
+            maxX = Math.max(maxX, Math.abs(projected.x))
+            maxY = Math.max(maxY, Math.abs(projected.y))
+          })
+        })
+      })
+      return Math.min(0.90 / Math.max(0.001, maxX), 0.90 / Math.max(0.001, maxY))
+    })
+    const widthCoverageZoom = fitZoom
+    return Math.max(_minimumUsableZoom(w, h), Math.min(4, widthCoverageZoom))
   }
 
   function _positionCameraFromTarget() {
@@ -354,6 +397,7 @@
     const offsetZ = pose.position.z - pose.target.z
     _camera.position.set(_cameraTarget.x + offsetX, offsetY, _cameraTarget.z + offsetZ)
     _camera.lookAt(_cameraTarget.x, _cameraTarget.y, _cameraTarget.z)
+    _camera.updateMatrixWorld(true)
   }
 
   function _tileSurfaceHeightAt(x, z) {
@@ -361,15 +405,18 @@
     return tile && Number.isFinite(tile.userData.surfaceY) ? tile.userData.surfaceY : TILE_H
   }
 
-  function _updateCameraFrustum(w, h) {
+  function _updateCameraProjection(w, h) {
     if (!_camera || !_mapW) return
-    const aspect = w / (h || 1)
-    const fitH = _fitWorldHalfHeight(w, h)
-    _camera.left   = -fitH * aspect
-    _camera.right  =  fitH * aspect
-    _camera.top    =  fitH
-    _camera.bottom = -fitH
+    _camera.aspect = w / (h || 1)
     _camera.updateProjectionMatrix()
+    // Retain target-plane bounds for gesture diagnostics and a safe pan
+    // fallback if a future camera pose makes the center ray parallel to y=0.
+    const targetDistance = _camera.position.distanceTo(_cameraTarget)
+    const halfHeightAtTarget = Math.tan(_camera.fov * Math.PI / 360) * targetDistance
+    _camera.left = -halfHeightAtTarget * _camera.aspect
+    _camera.right = halfHeightAtTarget * _camera.aspect
+    _camera.top = halfHeightAtTarget
+    _camera.bottom = -halfHeightAtTarget
   }
 
   // ── Render loop ───────────────────────────────────────────────────────────────
@@ -438,16 +485,19 @@
     const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
     _cameraTarget.set(pose.target.x, pose.target.y, pose.target.z)
     _positionCameraFromTarget()
+    _updateCameraProjection(_container.clientWidth || 320, _container.clientHeight || 320)
     _camera.zoom = _preferredInitialZoom(_container.clientWidth || 320, _container.clientHeight || 320)
 
     // The interaction plane remains a flat board-sized plane. It owns no rules;
     // rounding and bounds checks stay in screenToCell().
+    // Perspective rays from elevated far-edge tiles land slightly beyond the
+    // outer half-cell, so the invisible surface includes one cell of padding.
     if (_hitPlane) {
       _scene.remove(_hitPlane)
       if (_hitPlane.geometry) _hitPlane.geometry.dispose()
       if (_hitPlane.material) _hitPlane.material.dispose()
     }
-    const hitGeom = new THREE.PlaneGeometry(_mapW, _mapH)
+    const hitGeom = new THREE.PlaneGeometry(_mapW + 2, _mapH + 2)
     const hitMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
     const hitPlane = new THREE.Mesh(hitGeom, hitMat)
     hitPlane.rotation.x = -Math.PI / 2
@@ -906,24 +956,37 @@
 
   function _panCameraByPixels(dx, dy) {
     if (!_camera || !_cameraTarget || !_renderer) return
+    const rect = _renderer.domElement.getBoundingClientRect()
     const canvasWidth = _renderer.domElement.getBoundingClientRect().width || 1
-    const canvasHeight = _renderer.domElement.getBoundingClientRect().height || 1
-    // Keep the CSS-pixel frustum formula explicit: DPR must not change gesture speed.
-    const worldPerPixelX = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
-    const worldPerPixelY = ((_camera.top - _camera.bottom) / _camera.zoom) / canvasHeight
-    const screenRight3 = new THREE.Vector3(1, 0, 0).applyQuaternion(_camera.quaternion)
-    const screenUp3 = new THREE.Vector3(0, 1, 0).applyQuaternion(_camera.quaternion)
-    const delta = TacticalGeometry.screenPanDelta({
-      dx,
-      dy,
-      worldPerPixelX,
-      worldPerPixelY,
-      screenRight: { x: screenRight3.x, z: screenRight3.z },
-      screenUp: { x: screenUp3.x, z: screenUp3.z },
-    })
+    const canvasHeight = rect.height || 1
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+    const from = _groundPointFromClient(centerX, centerY)
+    const to = _groundPointFromClient(centerX + dx, centerY + dy)
+    let deltaX
+    let deltaZ
+    if (from && to) {
+      deltaX = from.x - to.x
+      deltaZ = from.z - to.z
+    } else {
+      const worldPerPixelX = ((_camera.right - _camera.left) / _camera.zoom) / canvasWidth
+      const worldPerPixelY = ((_camera.top - _camera.bottom) / _camera.zoom) / canvasHeight
+      const screenRight3 = new THREE.Vector3(1, 0, 0).applyQuaternion(_camera.quaternion)
+      const screenUp3 = new THREE.Vector3(0, 1, 0).applyQuaternion(_camera.quaternion)
+      const fallback = TacticalGeometry.screenPanDelta({
+        dx,
+        dy,
+        worldPerPixelX,
+        worldPerPixelY,
+        screenRight: { x: screenRight3.x, z: screenRight3.z },
+        screenUp: { x: screenUp3.x, z: screenUp3.z },
+      })
+      deltaX = fallback.x
+      deltaZ = fallback.z
+    }
     const clamped = TacticalGeometry.clampTarget({
-      x: _cameraTarget.x + delta.x,
-      z: _cameraTarget.z + delta.z,
+      x: _cameraTarget.x + deltaX,
+      z: _cameraTarget.z + deltaZ,
       mapWidth: _mapW,
       mapHeight: _mapH,
     })
@@ -931,6 +994,20 @@
     _positionCameraFromTarget()
     _updatePieceSummaryPositions()
     _notifyViewportChange()
+  }
+
+  function _groundPointFromClient(clientX, clientY) {
+    const canvas = _renderer.domElement
+    const rect = canvas.getBoundingClientRect()
+    if (!rect.width || !rect.height) return null
+    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
+    const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
+    _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
+    const vertical = _raycaster.ray.direction.y
+    if (Math.abs(vertical) < 0.000001) return null
+    const distance = -_raycaster.ray.origin.y / vertical
+    if (distance < 0) return null
+    return _raycaster.ray.origin.clone().add(_raycaster.ray.direction.clone().multiplyScalar(distance))
   }
 
   function _initControls() {
@@ -1043,7 +1120,7 @@
   function _applyZoom(z) {
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
-    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(6, z))
+    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(MAX_CAMERA_ZOOM, z))
     _camera.updateProjectionMatrix()
     _updatePieceSummaryPositions()
     _notifyViewportChange()
@@ -1053,11 +1130,12 @@
     if (!_mapW) return
     const w = _container.clientWidth || 320
     const h = _container.clientHeight || 320
-    _camera.zoom = _preferredInitialZoom(w, h)
     const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
     _cameraTarget.set(pose.target.x, pose.target.y, pose.target.z)
     _positionCameraFromTarget()
-    _updateCameraFrustum(w, h)
+    _updateCameraProjection(w, h)
+    _camera.zoom = _preferredInitialZoom(w, h)
+    _camera.updateProjectionMatrix()
     _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
@@ -1075,6 +1153,13 @@
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
+    const tileHits = _raycaster.intersectObjects(Array.from(_tileObjects.values()), false)
+    if (tileHits.length) {
+      const tile = tileHits[0].object
+      const tileX = Number(tile.userData.tileX)
+      const tileY = Number(tile.userData.tileZ)
+      if (tileX >= 0 && tileY >= 0 && tileX < _mapW && tileY < _mapH) return { x: tileX, y: tileY }
+    }
     const hits = _raycaster.intersectObject(_hitPlane)
     if (!hits.length) return null
     const pt = hits[0].point
