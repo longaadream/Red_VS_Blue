@@ -22,6 +22,10 @@ describe('debug battle pipeline', () => {
         expect.objectContaining({ name: 'deployment', startCursor: 0 }),
       ]),
     })
+    expect((duel.state.extensions as any).debugBattle.commandLog[0]).toEqual({
+      type: 'initializeBattle',
+      playerIds: ['debug-red', 'debug-blue'],
+    })
   })
 
   it('allows light/light and dark/dark mirror debug duels', async () => {
@@ -180,5 +184,41 @@ describe('debug battle pipeline', () => {
     expect(state.players[0].actionPoints).toBe(beforeActionPoints)
     expect(state.actions).toEqual(beforeActions)
     expect(state.extensions).toBeUndefined()
+  })
+
+  it('records the committed normalized command while removing transport secrets', async () => {
+    const duel = await createDebugDuel({ seed: 7301, beginPhase: false })
+    const result = runBattleAction(duel.state, {
+      type: 'beginPhase',
+      clientActionId: 'trace-command-1',
+      authorization: { token: 'must-not-leak' },
+      signature: 'must-not-leak',
+    } as any)
+
+    const metadata = (result.state.extensions as any).debugBattle
+    expect(result.trace).not.toHaveProperty('action')
+    expect(metadata.commandLog.at(-1)).toEqual({
+      type: 'beginPhase',
+      clientActionId: 'trace-command-1',
+    })
+    expect(JSON.stringify(metadata.commandLog)).not.toContain('must-not-leak')
+  })
+
+  it('keeps new commands aligned when continuing a trace created before command logging', async () => {
+    const duel = await createDebugDuel({ seed: 7302, beginPhase: false })
+    const legacyMetadata = (duel.state.extensions as any).debugBattle
+    delete legacyMetadata.commandLog
+
+    const result = runBattleAction(duel.state, {
+      type: 'beginPhase',
+      clientActionId: 'trace-command-after-upgrade',
+    } as any)
+    const metadata = (result.state.extensions as any).debugBattle
+
+    expect(metadata.commandLog[0]).toBeUndefined()
+    expect(metadata.commandLog[1]).toEqual({
+      type: 'beginPhase',
+      clientActionId: 'trace-command-after-upgrade',
+    })
   })
 })

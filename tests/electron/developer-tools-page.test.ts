@@ -1,0 +1,52 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+import { describe, expect, it } from 'vitest'
+
+const pagesDir = resolve(process.cwd(), 'data/pages')
+const readPage = (name: string) => readFileSync(resolve(pagesDir, name), 'utf8')
+
+describe('out-of-match developer center', () => {
+  it('is linked from the public main menu as a separate page', () => {
+    const menu = readPage('index.html')
+
+    expect(menu).toContain("loadPage('developer-tools.html')")
+    expect(menu).toContain('开发者中心')
+  })
+
+  it('fails closed while an active match marker exists and never connects to a room', () => {
+    const page = readPage('developer-tools.html')
+
+    expect(page).toContain('readActiveBattle')
+    expect(page).toContain('activeMatchGate')
+    expect(page).toContain('scenarioForm')
+    expect(page).toContain('/api/developer-tools/scenario')
+    expect(page).toContain('developerToolsFetch')
+    expect(page).toContain("window.location.protocol === 'http:'")
+    expect(page).toContain('match-trace.js')
+    expect(page).toContain('下载最近一场 Trace')
+    expect(page).not.toContain('RvBWs.connect')
+    expect(page).not.toContain('requestBattleSnapshot')
+    expect(page).not.toContain("type: 'action'")
+  })
+
+  it('removes the legacy in-match modifier and only stores trace from terminal handling', () => {
+    const battle = readPage('battle.html')
+
+    expect(battle).toContain('js/developer-tools/match-trace.js')
+    expect(battle).toContain('storeCompletedMatchTrace')
+    expect(battle.indexOf('latestAuthorityStateHash = msg.stateHash'))
+      .toBeLessThan(
+        battle.indexOf('applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer)'),
+      )
+    expect(battle).toMatch(/function handleGameOver\(\)[\s\S]*?storeCompletedMatchTrace\(\)/)
+    expect(battle).toContain('下载比赛 Trace')
+    expect(battle).not.toContain('debugPanel')
+    expect(battle).not.toContain('debugSetAP')
+    expect(battle).not.toContain('debugSetCP')
+    expect(battle).not.toContain('debugHealSelected')
+    expect(battle).not.toContain('debugKillSelected')
+    expect(battle).not.toContain('debugResetCooldowns')
+    expect(battle).not.toContain('局内修改器')
+  })
+})

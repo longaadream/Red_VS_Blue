@@ -1,4 +1,5 @@
 import type { BattleState } from './turn'
+import { readSanitizedBattleActionTrace } from './battle-trace'
 import {
   systemAuthoritativeRuleClock,
   type AuthoritativeRuleClock,
@@ -20,6 +21,16 @@ export function toPublicBattleState(
 ): BattleState {
   void viewerPlayerId
   const projected = cloneSerializable(state)
+  const debugBattle = projected.extensions?.debugBattle
+  const terminalTrace = projected.terminalResult
+    ? readSanitizedBattleActionTrace(projected)
+    : []
+  if (debugBattle) {
+    debugBattle.appliedActionIds = []
+    debugBattle.actionLog = terminalTrace
+    delete debugBattle.commandLog
+  }
+
   if (!projected.deployment) return projected
 
   projected.deployment.choices = {}
@@ -33,11 +44,6 @@ export function toPublicBattleState(
     delete projected.deployment.finalPositions
   }
 
-  const debugBattle = projected.extensions?.debugBattle
-  if (debugBattle) {
-    debugBattle.appliedActionIds = []
-    debugBattle.actionLog = []
-  }
 
   return projected
 }

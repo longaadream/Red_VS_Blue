@@ -43,7 +43,7 @@
 ## 2. 战斗 Runner 与回放
 
 - 入口：`lib/game/battle-runner.ts::runBattleAction()`、`replayBattle()`。
-- 职责：动作 ID、动作级确定性 runtime、运行时技能补全、权威 hash、幂等、Action Trace 和回放。
+- 职责：动作 ID、动作级确定性 runtime、运行时技能补全、权威 hash、幂等、脱敏规则命令 Action Trace 和回放。
 - 输入：状态/动作/`rootSeed`，或初始状态/seed/动作序列。
 - 输出：状态、`stateHash`、`actionHash`、`duplicate`、`trace`，或含逐动作 `stateHashes` 的回放结果。
 - 调用方：WS、房间 HTTP API、训练/调试 API、测试。
@@ -97,10 +97,10 @@
 - 职责：验证 viewer/动作玩家、在 45 秒期限前后选择实际命令、调用唯一规则 Runner、通过 `Room.version` CAS 提交并生成公开快照。
 - 状态命令：`deploymentChoice` 可在锁定前替换/取消；`deploymentLock` 不可撤销；`deploymentTimeout` 仅允许权威服务端时钟发出。
 - 并发：玩家同时锁定或玩家锁定与超时竞争时，失败的 CAS 重新读取最新房间；最终位置只提交一次，`authorityVersion` 单调递增。
-- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 对玩家和观战者公开相同双方坐标与锁定状态，清除选择和内部调试动作记录，未完成前同时清除最终位置；完整 trace 只留在服务端权威状态。
+- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 对玩家和观战者公开相同双方坐标与锁定状态，清除选择和 `appliedActionIds`，未完成前同时清除最终位置和完整 action trace；只有权威 `terminalResult` 已提交后才公开脱敏完整 trace。
 - 传输：房间 HTTP、WebSocket 和 Relay 使用 `{ state, seed, stateHash, authorityVersion }`；`viewerPlayerId` 只做提交权限校验，不参与站位隐藏。
 - 身份：玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；HTTP 与 LAN WS 在服务端验证，Relay guest 动作由 host 验证。Relay 订阅另签名 `battle-subscribe` 信封，relay-server 验证派生 ID、有效期及房间登记公钥后才绑定 host/guest 角色。header/body/subscribe 中的同名字符串不能单独授权命令或 host 状态写入。
-- 房间投影：`createPublicRoomSnapshot()` 覆盖普通 room GET、重复 start 与其他完整房间响应，不能绕过 battle API 读取 pending choice 或 debug trace。
+- 房间投影：`createPublicRoomSnapshot()` 覆盖普通 room GET、重复 start 与其他完整房间响应，不能绕过 battle API 读取 pending choice 或进行中对局的 debug trace；终局 trace 只经终局 battle snapshot 暴露。
 - Relay：桌面与 Android 本机初始化入口固定地图并从 authority version 1 开始；host 保留完整权威状态，只把公开状态、签名命令和版本 envelope 经 relay-server 转发/恢复。
 - 错误：非法、重复锁定、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
 - 决策：[ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
@@ -202,7 +202,7 @@
 - 路由：`battle.html` 是真实对战、观战和训练营的唯一战斗页面；训练营通过 `mode=training` 启用 fixture 与调试控件。`training.html` 仅保留兼容跳转，不得实现棋盘、选中、目标高亮或动作提交。
 - 职责：显示状态、收集输入、发送动作和接收服务端状态。
 - 输入：玩家交互、WS/Relay 消息、完整战斗状态。
-- 输出：动作消息、页面渲染、权威 `terminalResult` 的只读展示。
+- 输出：动作消息、页面渲染、权威 `terminalResult` 的只读展示，以及终局后 `rvb-match-trace/v1` 的本地保存与下载。
 - 调用方：Electron 客户端和 Android WebView。
 - 调用：`RvBWs`、浏览器 `GameEngine`、localStorage 和 UI 函数。
 - 状态变化：全局 `G`、DOM、localStorage；联网模式只用服务端 `stateUpdate` 替换 `G`。
@@ -251,6 +251,16 @@
 - 证据：服务端通过规则干运行产生目标集；页面 RED-43 面板显示 room/player/seed、按 `ownerPlayerId` 划分的敌我数量、客户端高亮集与服务端目标集的对比。
 - 边界：入口与面板只组织验收并暴露证据，不改变动作协议、规则引擎、随机算法或 production 资源发布。
 - 测试：`tests/qa/red43-ui-acceptance.test.ts`；可重复浏览器步骤与证据见 `docs/qa/RED-43-same-alignment-ui.md`。
+
+
+### 9.4 公开局外开发者中心与赛后 Trace（RED-94）
+
+- 页面：`data/pages/developer-tools.html` 仅从主菜单进入；存在 `rvb_active_battle` 时场景表单 fail closed。页面不加载 WebSocket 客户端，不接受 roomId，也不发送真实对局命令。
+- 隔离 API：`app/api/developer-tools/scenario/route.ts::POST` 校验 uint32 seed、地图 ID 与双方内容阵营，仅调用 `createDebugDuel()` 和正式 Runner，返回 `rvb-developer-scenario/v1` 的地图、回合/阶段、当前 actor、玩家、状态版本/hash 与脱敏 action trace。它不持久化状态。
+- Trace 记录器：`data/pages/js/developer-tools/match-trace.js` 仅接受含 `terminalResult` 的状态，输出 `rvb-match-trace/v1`；最近一场保存在 `rvb_last_completed_trace`，可从终局覆盖层立即下载或从开发者中心再次下载。
+- 格式字段：`format`、`exportedAt`、`roomId`、`seed`、`authorityVersion`、终局 map/turn/phase/stateVersion/stateHash/result、摘要、玩家公开标识和逐命令 trace。敏感传输/身份字段由服务端 trace 与客户端记录器双重递归剔除。
+- 生命周期：真实对局活跃期间公开投影不包含 action trace；终局投影才包含脱敏 trace。`appliedActionIds` 在所有公开投影中始终为空。
+- 不提供：局内面板、真实房间读取/控制、Trace 导入/恢复、回放码、跨版本回放或第二套规则执行器。
 
 ## 10. Electron IPC
 

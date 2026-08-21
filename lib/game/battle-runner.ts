@@ -5,6 +5,7 @@ import {
   hashBattleState,
   hashStable,
   readDebugMetadata,
+  sanitizeBattleTraceValue,
   type BattleActionTrace,
   type DebugBattleMetadata,
 } from './battle-trace'
@@ -137,6 +138,7 @@ export function runBattleAction(
       } : undefined,
     }
     nextMetadata.actionLog.push(trace)
+    nextMetadata.commandLog[trace.index] = sanitizeBattleTraceValue(action) as Record<string, unknown>
 
     return {
       state: next,

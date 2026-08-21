@@ -54,6 +54,7 @@ export interface DeploymentTraceEvidence {
 export interface DebugBattleMetadata {
   appliedActionIds: string[]
   actionLog: Array<BattleActionTrace | Record<string, unknown>>
+  commandLog: Array<Record<string, unknown>>
 }
 
 export function stableJson(value: unknown): string {
@@ -177,9 +178,76 @@ export function recordBattleInitialization(
     } : undefined,
   }
   metadata.actionLog.push(trace)
+  metadata.commandLog[trace.index] = sanitizeBattleTraceValue(action) as Record<string, unknown>
   return trace
 }
 
+
+export function sanitizeBattleTraceValue(value: unknown): unknown {
+  return sanitizeTraceValue(value, new WeakSet<object>())
+}
+
+function sanitizeTraceValue(value: unknown, seen: WeakSet<object>): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value !== 'object') return undefined
+
+  const source = value as object
+  if (seen.has(source)) return '[Circular]'
+  seen.add(source)
+
+  if (Array.isArray(value)) {
+    const sanitized = value.map(entry => {
+      const next = sanitizeTraceValue(entry, seen)
+      return next === undefined ? null : next
+    })
+    seen.delete(source)
+    return sanitized
+  }
+
+  const sanitized: Record<string, unknown> = {}
+  for (const [key, entry] of Object.entries(value)) {
+    if (isSensitiveTraceKey(key)) continue
+    const next = sanitizeTraceValue(entry, seen)
+    if (next !== undefined) sanitized[key] = next
+  }
+  seen.delete(source)
+  return sanitized
+}
+
+function isSensitiveTraceKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '')
+  return normalized === 'auth'
+    || normalized.includes('authorization')
+    || normalized.includes('signature')
+    || normalized.includes('privatekey')
+    || normalized.includes('publickey')
+    || normalized.includes('accountid')
+    || normalized.includes('mnemonic')
+    || normalized.includes('password')
+    || normalized.includes('passphrase')
+    || normalized.includes('credential')
+    || normalized.includes('secret')
+    || normalized.includes('token')
+    || normalized.includes('cookie')
+    || normalized.includes('sessionid')
+    || normalized.includes('recoveryphrase')
+}
+
+export function readSanitizedBattleActionTrace(state: BattleState): Array<Record<string, unknown>> {
+  const metadata = readDebugMetadata(state)
+  return metadata.actionLog.map((entry, index) => {
+    const sanitizedEntry = sanitizeBattleTraceValue(entry)
+    const trace: Record<string, unknown> = sanitizedEntry && typeof sanitizedEntry === 'object' && !Array.isArray(sanitizedEntry)
+      ? { ...(sanitizedEntry as Record<string, unknown>) }
+      : { index }
+    const command = metadata.commandLog[index]
+    if (command) {
+      trace.action = sanitizeBattleTraceValue(command)
+    }
+    return trace
+  })
+}
 function copyPositions(
   positions: Record<string, { x: number; y: number }> | undefined,
 ): Record<string, { x: number; y: number }> | undefined {
@@ -204,6 +272,7 @@ export function readDebugMetadata(state: BattleState): DebugBattleMetadata {
   return {
     appliedActionIds: Array.isArray(metadata?.appliedActionIds) ? [...metadata.appliedActionIds] : [],
     actionLog: Array.isArray(metadata?.actionLog) ? [...metadata.actionLog] : [],
+    commandLog: Array.isArray(metadata?.commandLog) ? [...metadata.commandLog] : [],
   }
 }
 
@@ -213,9 +282,11 @@ export function getOrCreateDebugMetadata(state: BattleState): DebugBattleMetadat
   const metadata = (extensions.debugBattle ?? {}) as {
     appliedActionIds?: string[]
     actionLog?: Array<BattleActionTrace | Record<string, unknown>>
+    commandLog?: Array<Record<string, unknown>>
   }
   metadata.appliedActionIds ??= []
   metadata.actionLog ??= []
+  metadata.commandLog ??= []
   extensions.debugBattle = metadata
   return metadata as DebugBattleMetadata
 }

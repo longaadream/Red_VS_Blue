@@ -176,6 +176,17 @@ interface GameLogContext {
 
 `lib/game/debug-battle.ts` 可以用固定 seed 创建调试对局并生成状态 hash，测试入口为 `tests/game/debug-battle.test.ts`。
 
+### RED-94 公开局外开发者中心
+
+- 页面入口：主菜单 `开发者中心` 打开 `data/pages/developer-tools.html`。
+- 局内门禁：页面通过 `RvBDeveloperTools.readActiveBattle()` 检查 `rvb_active_battle`；存在进行中对局标记时禁用场景表单并显示说明。该标记是 UX 门禁，不承担服务端授权。
+- 隔离边界：`POST /api/developer-tools/scenario` 只调用 `createDebugDuel()`，在内存中使用正式 `runBattleAction()` 生成固定种子状态、命令 trace 和 hash；请求不接受 roomId，不读取/创建房间，不写战绩、奖励或统计。
+- 真实对局 trace：进行中的公开快照清空 `extensions.debugBattle.actionLog` 和 `appliedActionIds`。只有权威 `terminalResult` 已提交的公开快照才携带脱敏完整 trace；客户端在 `handleGameOver()` 中生成 `rvb-match-trace/v1`、保存最近一场并提供 JSON 下载。
+- 脱敏：命令 trace 保留规则动作、actor、turn、seed、随机流、动作/前后状态 hash；认证信封、签名、token、账号 ID、公私钥、助记词、密码、session/cookie 和其他 secret/credential 字段递归删除。
+- 兼容范围：Trace 是诊断证据，不是存档或回放协议。MVP 不支持 trace 导入、可视化回放、压缩回放码和跨版本重演。
+- 旧入口：`battle.html` 的反引号局内修改器以及 AP/CP/生命/击杀/冷却直接修改函数已删除；训练营原有受控训练功能不属于真实对局开发者工具。
+
+
 ## 9. 当前测试缺口
 
 - Electron 启动和退出。
