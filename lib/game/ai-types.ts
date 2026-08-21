@@ -245,3 +245,44 @@ export interface AiCandidateActionFeatures {
   compatibility: AiCompatibility
   diagnostics?: string
 }
+
+/** Stable, versioned configuration for the generic turn planner. */
+export interface AiPlannerConfig {
+  version: 1
+  nodeBudget: number
+  beamWidth: number
+  maxActions: number
+  candidateLimit: number
+  weights: Readonly<Record<string, number>>
+}
+
+export type AiTurnGoalKind = 'eliminate' | 'protect' | 'control' | 'reposition' | 'conserve'
+
+export interface AiTurnGoal {
+  kind: AiTurnGoalKind
+  targetId?: string
+  rationale: string
+}
+
+export interface AiPlannerScore {
+  total: number
+  components: Readonly<Record<string, number>>
+}
+
+export interface AiPlannerTraceEntry {
+  candidateId: string
+  action: BattleAction
+  score: AiPlannerScore
+  pruned?: string
+  rejected?: string
+}
+
+export interface AiTurnPlan {
+  configVersion: number
+  goal: AiTurnGoal
+  actions: CandidateAction[]
+  nextAction: CandidateAction
+  nodesVisited: number
+  stateDuplicates: number
+  trace: AiPlannerTraceEntry[]
+}
