@@ -1065,7 +1065,7 @@
       font-size:22px; font-weight:900; color:#fbbf24;
       letter-spacing:1.5px;
       text-shadow:0 0 20px rgba(245,158,11,.9), 0 2px 6px rgba(0,0,0,.9);
-      animation:targetPulse 1.6s ease-in-out infinite;
+      transition:opacity var(--motion-fast, 140ms) var(--ease-out, ease-out);
     }
     .target-cancel-btn {
       pointer-events:auto; background:rgba(15,23,42,.85);
@@ -1993,6 +1993,59 @@
     let locallyCancelledSelectionId = null
     const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
     window.__RVB_RED50_EVIDENCE__ = red50Evidence
+    const stateFloaterEventKeys = new Set()
+    const stateFloaterEventOrder = []
+    const PENDING_ACTION_TIMEOUT_MS = 8000
+    let pendingActionFeedback = null
+    let pendingActionFeedbackTimer = null
+
+    function clearPendingActionFeedback(reason) {
+      if (pendingActionFeedbackTimer) clearTimeout(pendingActionFeedbackTimer)
+      pendingActionFeedbackTimer = null
+      const cleared = pendingActionFeedback
+      pendingActionFeedback = null
+      if (cleared) cleared.clearReason = reason || 'cleared'
+      return cleared
+    }
+
+    function beginPendingActionFeedback(action) {
+      if (!action || !action.clientActionId) return true
+      if (pendingActionFeedback) {
+        setStatusMsg('上一条指令仍在等待权威确认')
+        return false
+      }
+      pendingActionFeedback = {
+        clientActionId: action.clientActionId,
+        type: action.type,
+        pieceId: action.pieceId || action.targetPieceId || selectedPieceId || null,
+      }
+      pendingActionFeedbackTimer = setTimeout(function () {
+        rejectPendingActionFeedback('action-timeout', '指令确认超时，请检查连接后重试')
+      }, PENDING_ACTION_TIMEOUT_MS)
+      renderBoard()
+      renderActionBar()
+      return true
+    }
+
+    function rejectPendingActionFeedback(reason, message, options) {
+      const rejected = clearPendingActionFeedback(reason)
+      const preserveTargetInteraction = options && options.preserveTargetInteraction === true
+      if (!preserveTargetInteraction) {
+        if (reason === 'server-rejected') clearTargetInteraction('server-rejected')
+        else clearTargetInteraction(reason)
+      }
+      if (rejected && rejected.pieceId && battlePresentation && G) {
+        const model = createBattlePresentationModel(G)
+        battlePresentation.animateAction({
+          type: 'ui-reject',
+          pieceId: rejected.pieceId,
+          motionEventKey: 'reject:' + rejected.clientActionId + ':' + reason,
+        }, model, model)
+      }
+      render()
+      if (message) setStatusMsg(message)
+      return !!rejected
+    }
 
     function recordTargetClear(reason) {
       red50Evidence.clearEvents.push({ reason: reason || 'unknown', at: Date.now() })
@@ -2450,26 +2503,75 @@
     }
 
     // ── Damage / heal floaters ──
-    function spawnFloater(x, y, text, color, big) {
+    function spawnFloater(x, y, text, color, big, options) {
+      options = options || {}
       if (_use3d && battlePresentation) {
-        battlePresentation.spawnFloater(x, y, text, color, big)
+        battlePresentation.spawnFloater(x, y, text, color, big, options)
         return
       }
       const layer = document.getElementById('floatLayer')
       if (!layer) return
       const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 44
       const el = document.createElement('div')
-      el.className = 'dmg-float' + (big ? ' big' : '')
+      const kind = options.kind === 'heal' || options.kind === 'death' ? options.kind : 'damage'
+      const durationMs = Math.max(480, Math.min(650, Number(options.durationMs) || (kind === 'heal' ? 550 : 600)))
+      el.className = 'dmg-float is-' + kind + (big ? ' big' : '')
       el.style.color = color
       el.style.left = (x * cellSize + cellSize / 2) + 'px'
       el.style.top  = (y * cellSize + 4) + 'px'
+      el.style.setProperty('--floater-duration', durationMs + 'ms')
       el.textContent = text
       layer.appendChild(el)
-      setTimeout(() => el.remove(), 1200)
+      setTimeout(() => el.remove(), durationMs + 80)
     }
 
-    function spawnStateFloaters(oldG, newG) {
+    function battleStateMotionKey(state) {
+      const snapshot = state || {}
+      const deployment = snapshot.deployment
+      return JSON.stringify([
+        snapshot.turn && [snapshot.turn.turnNumber, snapshot.turn.phase, snapshot.turn.currentPlayerId],
+        snapshot.targetingRevision || 0,
+        (snapshot.actions || []).length,
+        (snapshot.pieces || []).map(p => [
+          p.instanceId, p.x, p.y, p.currentHp ?? p.hp, p.visible, p.shield,
+          p.statusTags || p.statuses || p.statusEffects || [], p.buffs || [], p.debuffs || [],
+        ]).sort(),
+        (snapshot.graveyard || []).map(p => [p.instanceId, p.currentHp ?? p.hp]).sort(),
+        (snapshot.players || []).map(p => [
+          p.playerId, p.actionPoints, p.chargePoints,
+          (p.hand || []).map(card => card.instanceId || card.cardInstanceId || card.cardId).sort(),
+          (p.discardPile || []).slice().sort(), p.statusTags || [],
+        ]).sort(),
+        deployment && [
+          deployment.status, deployment.revision,
+          Object.entries(deployment.choices || {}).sort(),
+          Object.entries(deployment.locks || {}).sort(),
+          deployment.finalPositions || null,
+        ],
+        snapshot.pendingOptionSelection && [
+          snapshot.pendingOptionSelection.selectionId, snapshot.pendingOptionSelection.stateRevision,
+          snapshot.pendingOptionSelection.selectedOption,
+        ],
+        snapshot.pendingTargetSelection && [
+          snapshot.pendingTargetSelection.selectionId, snapshot.pendingTargetSelection.stateRevision,
+          snapshot.pendingTargetSelection.step, snapshot.pendingTargetSelection.selectedTargets || [],
+        ],
+        snapshot.terminalResult || null,
+      ])
+    }
+
+    function authorityStateConfirmsPending(previousState, nextState) {
+      if (!previousState || !nextState) return false
+      return battleStateMotionKey(previousState) !== battleStateMotionKey(nextState)
+    }
+
+    function spawnStateFloaters(oldG, newG, eventKey) {
       if (!oldG || !newG || !oldG.pieces || !newG.pieces) return
+      const stableKey = eventKey || battleStateMotionKey(newG)
+      if (stateFloaterEventKeys.has(stableKey)) return
+      stateFloaterEventKeys.add(stableKey)
+      stateFloaterEventOrder.push(stableKey)
+      if (stateFloaterEventOrder.length > 256) stateFloaterEventKeys.delete(stateFloaterEventOrder.shift())
       for (const np of newG.pieces) {
         const op = oldG.pieces.find(p => p.instanceId === np.instanceId)
         if (!op) continue
@@ -2479,9 +2581,9 @@
         if (diff < 0) {
           const dead = newHp <= 0
           const big = dead || -diff >= 50
-          spawnFloater(np.x, np.y, dead ? '阵亡' : String(-diff), dead ? '#c4b5fd' : '#f87171', big)
+          spawnFloater(np.x, np.y, dead ? '阵亡' : String(-diff), dead ? '#c4b5fd' : '#f87171', big, { kind: dead ? 'death' : 'damage', durationMs: dead ? 650 : 600 })
         } else if (diff > 0) {
-          spawnFloater(np.x, np.y, '+' + diff, '#4ade80', false)
+          spawnFloater(np.x, np.y, '+' + diff, '#4ade80', false, { kind: 'heal', durationMs: 550 })
         }
       }
     }
@@ -3128,6 +3230,8 @@
 
     function reconcileBattleInteractionState(previousState, nextState) {
       if (!nextState) return ''
+      const stateAdvanced = authorityStateConfirmsPending(previousState, nextState)
+      const confirmedAction = pendingActionFeedback && stateAdvanced ? clearPendingActionFeedback('authoritative-confirmation') : null
       const authoritativeSelectionId = nextState.pendingTargetSelection && nextState.pendingTargetSelection.selectionId
       if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
         locallyCancelledSelectionId = null
@@ -3161,11 +3265,11 @@
         }
       }
 
-      if (targetSubmissionPending) {
+      if (targetSubmissionPending && stateAdvanced) {
         clearTargetInteraction('authoritative-confirmation')
         return '目标指令已确认'
       }
-      return ''
+      return confirmedAction ? '指令已确认' : ''
     }
 
     // Apply an authoritative state snapshot received from server (WS or GET)
@@ -3334,6 +3438,7 @@
         var el = document.getElementById('wsStatus')
         if (el) el.style.display = 'none'
         addLog('WebSocket 断开，等待重连', 'info')
+        rejectPendingActionFeedback('disconnect', '连接已断开；待确认指令已取消')
       })
 
       RvBWs.on('message', function(msg) {
@@ -3347,7 +3452,7 @@
 
           if (_use3d && battlePresentation && G && msg.state) {
             battlePresentation.animateAction(
-              msg.lastAction || null,
+              Object.assign({}, msg.lastAction || { type: 'stateUpdate' }, { motionEventKey: 'ws:' + String(msg.stateHash || msg.seq || msg.serverNow || battleStateMotionKey(msg.state)) }),
               createBattlePresentationModel(G),
               createBattlePresentationModel(msg.state)
             )
@@ -3379,7 +3484,9 @@
           applyLegacyBattleEntry(msg.entry)
         } else if (msg.type === 'actionError') {
           addLog('[DEBUG actionError] action=' + JSON.stringify(msg.action || null) + ' error=' + (msg.error || 'unknown') + ' needsTarget=' + (!!msg.needsTargetSelection) + ' needsOption=' + (!!msg.needsOptionSelection), 'err')
+          if (msg.needsTargetSelection) clearPendingActionFeedback('authoritative-target-step')
           if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
+          if (msg.needsOptionSelection) clearPendingActionFeedback('authoritative-option-step')
           if (msg.needsOptionSelection && msg.action) {
             if (targetSubmissionPending) {
               targetSubmissionPending = null
@@ -3404,11 +3511,14 @@
             targetSubmissionPending = null
             _pendingChoiceShown = null
             addLog('服务端拒绝本次选择：' + rejectionMessage, 'err')
-            render()
-            setStatusMsg('选择被拒绝：' + rejectionMessage + '；请重新选择')
+            rejectPendingActionFeedback(
+              'server-rejected',
+              '选择被拒绝：' + rejectionMessage + '；请重新选择',
+              { preserveTargetInteraction: true },
+            )
             return
           }
-          clearTargetInteraction('server-rejected')
+          rejectPendingActionFeedback('server-rejected', '服务端拒绝：' + rejectionMessage + '；目标选择已清除')
           addLog('服务端处理动作失败：' + (msg.error || 'unknown error'), 'err')
           render()
           setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
@@ -3446,6 +3556,13 @@
         const data = await res.json()
         if (data && data.state) {
           addLog('[HTTP fallback] 已拉取服务端战斗状态 ' + String(data.stateHash || '').slice(0, 12), 'info')
+          if (_use3d && battlePresentation && G) {
+            battlePresentation.animateAction(
+              { type: 'stateUpdate', motionEventKey: 'http:' + String(data.stateHash || data.serverNow || battleStateMotionKey(data.state)) },
+              createBattlePresentationModel(G),
+              createBattlePresentationModel(data.state)
+            )
+          }
           applyServerState(data.state, data.seed || null, false, data.serverNow, data.turnTimer)
           return
         }
@@ -3697,6 +3814,10 @@
         skillsById: skillsById,
         pieceTemplates: PIECES_BY_ID,
         interactionMode: battleInteractionMode(),
+        interaction: {
+          pendingPieceId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.pieceId : null,
+          pendingCommandId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.clientActionId : null,
+        },
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
           targetCells: targetCells,
@@ -4592,6 +4713,10 @@
     }
 
     function selectPiece(instanceId) {
+      if (pendingActionFeedback) {
+        setStatusMsg('指令仍在等待权威确认，暂不能切换棋子')
+        return
+      }
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return
@@ -4750,6 +4875,13 @@
         setMoveButtonDisabled(true)
         const oldG = G
         const newG = await trainingApiFetch('PUT', { action, battleState: G })
+        if (_use3d && battlePresentation) {
+          battlePresentation.animateAction(
+            Object.assign({}, action, { motionEventKey: 'training:' + action.clientActionId }),
+            createBattlePresentationModel(oldG),
+            createBattlePresentationModel(newG)
+          )
+        }
         G = newG
         console.log('[STAGE2.5] G updated: pendingTargetSelection=', G.pendingTargetSelection ? { playerId: G.pendingTargetSelection.playerId, hasEffectCode: !!G.pendingTargetSelection.effectCode, effectCodeLen: G.pendingTargetSelection.effectCode ? G.pendingTargetSelection.effectCode.length : 0 } : null, '| clientOwns(training-blue)=', clientOwns('training-blue'))
         console.log('[STAGE2.5b] pendingTargetSelectionForMe()=', pendingTargetSelectionForMe())
@@ -4777,10 +4909,12 @@
       } catch (e) {
         let rejectionFeedback = ''
         if (e.needsTargetSelection) {
+          clearPendingActionFeedback('authoritative-target-step')
           if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
             setStatusMsg('权威目标查询未返回候选集合')
           }
         } else if (e.needsOptionSelection) {
+          clearPendingActionFeedback('authoritative-option-step')
           if (targetSubmissionPending) {
             targetSubmissionPending = null
             recordTargetClear('authoritative-next-option-step')
@@ -4801,14 +4935,17 @@
           if (rejectedPending) {
             targetSubmissionPending = null
             _pendingChoiceShown = null
-            addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
-            render()
             rejectionFeedback = '选择被拒绝：' + errMsg + '；请重新选择'
+            rejectPendingActionFeedback(
+              'server-rejected',
+              rejectionFeedback,
+              { preserveTargetInteraction: true },
+            )
           } else {
-            clearTargetInteraction('server-rejected')
-            addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
             rejectionFeedback = '操作被拒绝：' + errMsg + '；目标选择已清除'
+            rejectPendingActionFeedback('server-rejected', rejectionFeedback)
           }
+          addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
         }
         renderActionBar()
         if (rejectionFeedback) setStatusMsg(rejectionFeedback)
@@ -4817,16 +4954,17 @@
 
     async function doAction(action) {
       action = withClientActionId(action)
+      if (typeof beginPendingActionFeedback === 'function' && !beginPendingActionFeedback(action)) return
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) {
-        clearTargetInteraction('transport-unavailable')
+        rejectPendingActionFeedback('transport-unavailable', '未连接服务器；目标选择已清除')
         addLog('未连接服务器', 'err')
         setStatusMsg('未连接服务器；目标选择已清除')
         return
       }
       if (!G) {
-        clearTargetInteraction('state-unavailable')
+        rejectPendingActionFeedback('state-unavailable', '游戏状态未就绪；指令未发送')
         addLog('游戏状态未就绪', 'err')
         return
       }
@@ -4860,11 +4998,11 @@
         }
 
         addLog('WebSocket 未连接，无法发送动作；请检查网络和服务端', 'err')
-        clearTargetInteraction('transport-unavailable')
+        rejectPendingActionFeedback('transport-unavailable', 'WebSocket 未连接；目标选择已清除')
         renderActionBar()
         setStatusMsg('WebSocket 未连接；目标选择已清除')
       } catch (e) {
-        clearTargetInteraction('transport-failed')
+        rejectPendingActionFeedback('transport-failed', '发送动作失败：' + e.message + '；目标选择已清除')
         addLog('发送动作失败：' + e.message, 'err')
         renderActionBar()
         setStatusMsg('发送动作失败：' + e.message + '；目标选择已清除')
@@ -5290,6 +5428,7 @@
       if (pollTimer) clearInterval(pollTimer)
       pollTimer = null
       if (deploymentStatusTimer) clearInterval(deploymentStatusTimer)
+      clearPendingActionFeedback('page-dispose')
       deploymentStatusTimer = null
       if (battlePresentation) battlePresentation.dispose()
     }

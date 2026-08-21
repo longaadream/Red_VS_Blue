@@ -493,6 +493,7 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('stateRevision: pbc.stateRevision')
     expect(battlePage).toContain("canCancel: pbc.canCancel !== false")
     expect(battlePage).toMatch(/const rejectedPending = [\s\S]*?targetSubmissionPending = null[\s\S]*?请重新选择/)
+    expect(battlePage).toMatch(/if \(rejectedPending\)[\s\S]*?rejectPendingActionFeedback\([\s\S]*?preserveTargetInteraction: true/)
     expect(battlePage.match(/_pendingChoiceShown = null/g)?.length || 0).toBeGreaterThanOrEqual(3)
     expect(battlePage).toMatch(/pendingSelection && pendingSelection\.canCancel === false[\s\S]*?return/)
     expect(battlePage).toContain('id="optionPickerCancel"')

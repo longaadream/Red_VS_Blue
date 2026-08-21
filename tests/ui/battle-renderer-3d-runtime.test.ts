@@ -7,8 +7,22 @@ import { describe, expect, it } from 'vitest'
 import { createRed68BattleFixture } from './fixtures/red-68-battle-fixture'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
-type ThreeMaterial = { emissive: { getHex(): number }; emissiveIntensity: number; dispose(): void }
-type ThreeNode = { type: string; children: ThreeNode[]; visible: boolean; material?: ThreeMaterial }
+type ThreeMaterial = {
+  color?: { getHex(): number }
+  emissive: { getHex(): number }
+  emissiveIntensity: number
+  opacity?: number
+  dispose(): void
+}
+type ThreeNode = {
+  type: string
+  children: ThreeNode[]
+  visible: boolean
+  material?: ThreeMaterial
+  position: { x: number; y: number; z: number }
+  scale: { x: number; y: number; z: number }
+  userData: Record<string, unknown>
+}
 type ThreeScene = { children: ThreeNode[]; updateMatrixWorld(force: boolean): void }
 type ThreeCamera = { updateMatrixWorld(force: boolean): void }
 
@@ -20,6 +34,13 @@ type RendererApi = {
   resetView(): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number }
   screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
+  getMotionDiagnostics(): {
+    activeAnimations: string[]
+    playedEventCount: number
+    floaterCount: number
+    pendingPieceIds: string[]
+    highlightCounts: { move: number; skill: number; place: number; selected: number }
+  }
   dispose(): void
 }
 
@@ -142,7 +163,7 @@ class FakeElement {
   releasePointerCapture(pointerId: number) { this.capturedPointers.delete(pointerId) }
 }
 
-function createHarness(width = 390, height = 844, coarsePointer = true) {
+function createHarness(width = 390, height = 844, coarsePointer = true, reducedMotion = false) {
   const container = new FakeElement('div')
   container.rect = { left: 0, top: 0, width, height }
   const renderers: FakeRendererRecord[] = []
@@ -159,7 +180,12 @@ function createHarness(width = 390, height = 844, coarsePointer = true) {
   }
   const windowObject: WindowHarness = {
     devicePixelRatio: 1,
-    matchMedia(query: string) { return { matches: coarsePointer && query.includes('pointer: coarse') } },
+    matchMedia(query: string) {
+      return {
+        matches: (coarsePointer && query.includes('pointer: coarse'))
+          || (reducedMotion && query.includes('prefers-reduced-motion: reduce')),
+      }
+    },
     addEventListener() {},
     removeEventListener() {},
   }
@@ -267,6 +293,7 @@ function runtimeModel() {
     effects: [],
     legal: { moveCells: [], targetCells: [], placementCells: [] },
     selection: { pieceId: null },
+    interaction: { pendingPieceId: null, pendingCommandId: null },
   }
 }
 
@@ -467,7 +494,212 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(scene.children).not.toContain(removedGroup)
     expect(scene.children.filter((child) => child.type === 'Group')).toHaveLength(15)
     expect(markerDisposed).toBe(true)
-    expect(harness.disposeCounts.material - materialDisposalsBefore).toBe(3)
+    expect(harness.disposeCounts.material - materialDisposalsBefore).toBe(5)
     harness.renderer.dispose()
   })
+
+  it('responds to piece press within one frame and clears it when the gesture becomes a pan', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const piece = model.pieces[0]
+    const group = harness.renderers[0].scene!.children.find((child) => child.userData.pieceId === piece.id)!
+    const point = harness.renderer.projectCell(piece.x, piece.y, group.position.y + 0.12)
+    const canvas = harness.renderers[0].domElement
+
+    canvas.dispatch('pointerdown', { pointerId: 41, pointerType: 'mouse', button: 0, clientX: point.clientX, clientY: point.clientY })
+    harness.frame(16)
+    expect(group.scale.x).toBeLessThan(1)
+    expect(group.scale.z).toBeLessThan(1)
+
+    canvas.dispatch('pointermove', { pointerId: 41, pointerType: 'mouse', clientX: point.clientX + 18, clientY: point.clientY + 4 })
+    for (let index = 0; index < 10; index += 1) harness.frame(16)
+    expect(group.scale.x).toBeCloseTo(1, 3)
+    expect(group.scale.z).toBeCloseTo(1, 3)
+    harness.renderer.dispose()
+  })
+
+  it('shows authoritative waiting feedback and retargets movement from the visible position without replaying an event', () => {
+    const harness = createHarness(844, 390, false)
+    const model: any = runtimeModel()
+    const pieceId = model.pieces[0].id
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const group = harness.renderers[0].scene!.children.find((child) => child.userData.pieceId === pieceId)!
+    const baseY = group.position.y
+
+    const pendingModel = structuredClone(model)
+    pendingModel.interaction = { pendingPieceId: pieceId, pendingCommandId: 'move-1' }
+    harness.renderer.update(pendingModel)
+    for (let index = 0; index < 10; index += 1) harness.frame(16)
+    expect(harness.renderer.getMotionDiagnostics().pendingPieceIds).toEqual([pieceId])
+
+    const firstTarget = structuredClone(model)
+    firstTarget.pieces[0].x += 3
+    harness.renderer.animateAction({ type: 'move', pieceId, motionEventKey: 'state-1' }, pendingModel, firstTarget)
+    harness.renderer.update(firstTarget)
+    for (let index = 0; index < 7; index += 1) harness.frame(16)
+
+    const visibleX = group.position.x
+    expect(visibleX).toBeGreaterThan(model.pieces[0].x)
+    expect(visibleX).toBeLessThan(firstTarget.pieces[0].x)
+
+    const secondTarget = structuredClone(firstTarget)
+    secondTarget.pieces[0].x += 2
+    harness.renderer.animateAction({ type: 'move', pieceId, motionEventKey: 'state-2' }, firstTarget, secondTarget)
+    harness.renderer.update(secondTarget)
+    harness.frame(16)
+    let maximumY = group.position.y
+    expect(group.position.x).toBeGreaterThanOrEqual(visibleX)
+    for (let index = 0; index < 20; index += 1) {
+      harness.frame(16)
+      maximumY = Math.max(maximumY, group.position.y)
+    }
+    expect(maximumY).toBeLessThanOrEqual(baseY + 0.0801)
+    expect(group.position.x).toBeCloseTo(secondTarget.pieces[0].x, 3)
+
+    harness.renderer.animateAction({ type: 'move', pieceId, motionEventKey: 'state-2' }, firstTarget, secondTarget)
+    for (let index = 0; index < 20; index += 1) harness.frame(16)
+    expect(group.position.x).toBeCloseTo(secondTarget.pieces[0].x, 3)
+    expect(harness.renderer.getMotionDiagnostics().playedEventCount).toBe(2)
+    harness.renderer.dispose()
+  })
+
+  it('removes spatial motion in reduced-motion mode while preserving result feedback and cleanup', () => {
+    const harness = createHarness(844, 390, false, true)
+    const model = runtimeModel()
+    const pieceId = model.pieces[0].id
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const nextModel = structuredClone(model)
+    nextModel.pieces[0].x += 4
+    nextModel.pieces[0].health.current -= 5
+    harness.renderer.animateAction({ type: 'move', pieceId, motionEventKey: 'reduced-1' }, model, nextModel)
+    harness.renderer.update(nextModel)
+
+    const group = harness.renderers[0].scene!.children.find((child) => child.userData.pieceId === pieceId)!
+    expect(group.position.x).toBe(nextModel.pieces[0].x)
+    expect(harness.renderer.getMotionDiagnostics().activeAnimations.some((key) => key.endsWith(':position'))).toBe(false)
+    expect(harness.renderer.getMotionDiagnostics().activeAnimations.length).toBeGreaterThan(0)
+
+    harness.renderer.dispose()
+    expect(harness.renderer.getMotionDiagnostics()).toMatchObject({
+      activeAnimations: [],
+      floaterCount: 0,
+      pendingPieceIds: [],
+    })
+  })
+  it('enters target cells simultaneously, does not replay stable highlights, and disposes them after exit', () => {
+    const harness = createHarness(844, 390, false)
+    const model: any = runtimeModel()
+    model.legal.targetCells = [{ x: 2, y: 2 }, { x: 4, y: 3 }]
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    const point = harness.renderer.projectCell(2, 2)
+    const canvas = harness.renderers[0].domElement
+    canvas.dispatch('pointerdown', { pointerId: 52, pointerType: 'mouse', button: 0, clientX: point.clientX, clientY: point.clientY })
+    expect(() => harness.frame(16)).not.toThrow()
+    expect(harness.renderer.getMotionDiagnostics().activeAnimations.filter((key) => key === 'highlight:skill:2,2:scale')).toHaveLength(1)
+    canvas.dispatch('pointerup', { pointerId: 52, pointerType: 'mouse', button: 0, clientX: point.clientX, clientY: point.clientY })
+
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.skill).toBe(2)
+    for (let index = 0; index < 10; index += 1) harness.frame(16)
+    harness.renderer.update(structuredClone(model))
+    expect(harness.renderer.getMotionDiagnostics().activeAnimations.filter((key) => (
+      key.includes('highlight:skill') && (key.endsWith(':scale') || key.endsWith(':opacity'))
+    ))).toEqual([])
+
+    const cleared = structuredClone(model)
+    cleared.legal.targetCells = []
+    harness.renderer.update(cleared)
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.skill).toBe(2)
+    for (let index = 0; index < 9; index += 1) harness.frame(16)
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.skill).toBe(0)
+    harness.renderer.dispose()
+  })
+
+  it('retargets result outlines from their visible opacity and bounds reduced result durations', () => {
+    const harness = createHarness(844, 390, false)
+    const model: any = runtimeModel()
+    const pieceId = model.pieces[0].id
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const group = harness.renderers[0].scene!.children.find((child) => child.userData.pieceId === pieceId)!
+    const feedback = group.children.find((child) => child.userData.motionRole === 'feedback-ring')!
+
+    const damaged = structuredClone(model)
+    damaged.pieces[0].health.current -= 5
+    harness.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'hit-1' }, model, damaged)
+    for (let index = 0; index < 5; index += 1) harness.frame(16)
+    const visibleOpacity = feedback.material!.opacity!
+    expect(visibleOpacity).toBeGreaterThan(0)
+
+    const healed = structuredClone(damaged)
+    healed.pieces[0].health.current += 2
+    harness.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'heal-1' }, damaged, healed)
+    expect(feedback.material!.opacity).toBeCloseTo(visibleOpacity, 6)
+
+    const statusAdded = structuredClone(healed)
+    statusAdded.pieces[0].statuses = [{ id: 'slow', label: '减速' }]
+    statusAdded.pieces[0].statusSummary = [{ id: 'slow', label: '减速' }]
+    harness.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'status-add' }, healed, statusAdded)
+    harness.renderer.update(statusAdded)
+    const hpLayer = harness.container.children.find((child) => child.id === 'hpBarLayer3d')!
+    const summary = hpLayer.children.find((child) => child.dataset.pieceId === pieceId)!
+    const statuses = summary.querySelector('.piece-board-statuses')!
+    expect(statuses.children).toHaveLength(1)
+    expect(statuses.children[0].className).toContain('is-entering')
+
+    const statusRemoved = structuredClone(statusAdded)
+    statusRemoved.pieces[0].statuses = []
+    statusRemoved.pieces[0].statusSummary = []
+    harness.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'status-remove' }, statusAdded, statusRemoved)
+    harness.renderer.update(statusRemoved)
+    expect(statuses.children).toHaveLength(1)
+    expect(statuses.children[0].className).toContain('is-exiting')
+
+    harness.renderer.dispose()
+
+    const reduced = createHarness(844, 390, false, true)
+    const reducedModel: any = runtimeModel()
+    const reducedPieceId = reducedModel.pieces[0].id
+    reduced.renderer.init({ container: reduced.container })
+    reduced.renderer.update(reducedModel)
+    reduced.frame(16)
+
+    const reducedDamage = structuredClone(reducedModel)
+    reducedDamage.pieces[0].health.current -= 5
+    reduced.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'reduced-hit' }, reducedModel, reducedDamage)
+    for (let index = 0; index < 9; index += 1) reduced.frame(16)
+    expect(reduced.renderer.getMotionDiagnostics().activeAnimations.some((key) => key.endsWith(':outline'))).toBe(false)
+
+    const reducedHeal = structuredClone(reducedDamage)
+    reducedHeal.pieces[0].health.current += 2
+    reduced.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'reduced-heal' }, reducedDamage, reducedHeal)
+    for (let index = 0; index < 9; index += 1) reduced.frame(16)
+    expect(reduced.renderer.getMotionDiagnostics().activeAnimations.some((key) => key.endsWith(':outline'))).toBe(false)
+
+    reduced.renderer.animateAction({ type: 'ui-reject', pieceId: reducedPieceId, motionEventKey: 'reduced-reject' }, reducedHeal, reducedHeal)
+    for (let index = 0; index < 9; index += 1) reduced.frame(16)
+    expect(reduced.renderer.getMotionDiagnostics().activeAnimations.some((key) => key.endsWith(':outline'))).toBe(false)
+
+    const dead = structuredClone(reducedHeal)
+    dead.pieces[0].health.current = 0
+    dead.pieces[0].visible = false
+    reduced.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'reduced-death' }, reducedHeal, dead)
+    reduced.renderer.update(dead)
+    for (let index = 0; index < 9; index += 1) reduced.frame(16)
+    expect(reduced.renderer.getMotionDiagnostics().activeAnimations.some((key) => key.endsWith(':visibility'))).toBe(false)
+    const deadGroup = reduced.renderers[0].scene!.children.find((child) => child.userData.pieceId === reducedPieceId)!
+    expect(deadGroup.visible).toBe(false)
+    reduced.renderer.dispose()
+  })
+
 })

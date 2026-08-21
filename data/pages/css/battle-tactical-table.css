@@ -484,3 +484,79 @@ canvas:focus-visible {
   .piece-context-menu,
   .target-mode-card { border-color: #d5c9b4 !important; }
 }
+/* RED-69: one shared, interruptible motion vocabulary for battle feedback. */
+:root {
+  --motion-press: 100ms;
+  --motion-fast: 140ms;
+  --motion-action: 240ms;
+  --motion-result: 280ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.piece-board-status-dot.is-entering {
+  animation: rvbStatusEnter var(--motion-fast) var(--ease-out) both;
+}
+
+.piece-board-status-dot.is-exiting {
+  animation: rvbStatusExit 120ms var(--ease-in) both;
+  pointer-events: none;
+}
+
+.dmg-float {
+  --floater-duration: 600ms;
+  animation: rvbResultFloat var(--floater-duration) var(--ease-out) both !important;
+}
+
+.dmg-float.is-heal {
+  --floater-duration: 550ms;
+  text-shadow: 0 1px 8px rgba(74, 222, 128, 0.42);
+}
+
+.dmg-float.is-death {
+  --floater-duration: 650ms;
+}
+
+@keyframes rvbStatusEnter {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes rvbStatusExit {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.94); }
+}
+
+@keyframes rvbResultFloat {
+  0% { opacity: 0; transform: translate(-50%, 3px) scale(0.96); }
+  18% { opacity: 1; transform: translate(-50%, -4px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -24px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piece-board-status-dot.is-entering {
+    animation-name: rvbResultFadeIn !important;
+    animation-duration: var(--motion-press) !important;
+  }
+
+  .piece-board-status-dot.is-exiting {
+    animation-name: rvbResultFadeOut !important;
+    animation-duration: var(--motion-press) !important;
+  }
+
+  .dmg-float {
+    animation-name: rvbResultFadeIn !important;
+    animation-duration: var(--motion-fast) !important;
+  }
+}
+
+@keyframes rvbResultFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rvbResultFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
