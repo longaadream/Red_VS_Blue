@@ -1408,7 +1408,7 @@
     <div class="option-sheet">
       <div class="option-title" id="optionPickerTitle">请选择</div>
       <div id="optionPickerList"></div>
-      <button class="option-cancel" onclick="cancelOptionPicker()">取消</button>
+      <button class="option-cancel" id="optionPickerCancel" onclick="cancelOptionPicker()">取消</button>
     </div>
   </div>
 
@@ -2032,10 +2032,13 @@
       return true
     }
 
-    function rejectPendingActionFeedback(reason, message) {
+    function rejectPendingActionFeedback(reason, message, options) {
       const rejected = clearPendingActionFeedback(reason)
-      if (reason === 'server-rejected') clearTargetInteraction('server-rejected')
-      else clearTargetInteraction(reason)
+      const preserveTargetInteraction = options && options.preserveTargetInteraction === true
+      if (!preserveTargetInteraction) {
+        if (reason === 'server-rejected') clearTargetInteraction('server-rejected')
+        else clearTargetInteraction(reason)
+      }
       if (rejected && rejected.pieceId && battlePresentation && G) {
         const model = createBattlePresentationModel(G)
         battlePresentation.animateAction({
@@ -2696,6 +2699,9 @@
       pendingOptionAction = originalAction
       _pickerOptions = options
       document.getElementById('optionPickerTitle').textContent = title || '请选择'
+      const cancelButton = document.getElementById('optionPickerCancel')
+      const canCancel = !originalAction || originalAction.canCancel !== false
+      if (cancelButton) cancelButton.style.display = canCancel ? '' : 'none'
       const list = document.getElementById('optionPickerList')
       list.innerHTML = options.map((opt, i) =>
         `<button class="option-btn" data-opt-idx="${i}">
@@ -2727,6 +2733,10 @@
       doAction(action)
     }
     function cancelOptionPicker() {
+      if (pendingOptionAction && pendingOptionAction.canCancel === false) {
+        setStatusMsg('当前选择必须完成，不能取消')
+        return
+      }
       document.getElementById('optionPickerOverlay').classList.remove('show')
       const action = pendingOptionAction
       pendingOptionAction = null
@@ -2741,7 +2751,13 @@
         return
       }
       if (G && pendingOptionSelectionForMe()) {
-        doAction({ type: 'cancelPendingSelection', playerId: myPlayerId })
+        const pendingOption = G.pendingOptionSelection
+        doAction({
+          type: 'cancelPendingSelection',
+          playerId: pendingOption.playerId || myPlayerId,
+          selectionId: pendingOption.selectionId,
+          stateRevision: pendingOption.stateRevision,
+        })
       }
       const _sp = G && selectedPieceId && G.pieces.find(p => p.instanceId === selectedPieceId)
       renderPieceContextMenu(_sp || null)
@@ -3500,6 +3516,21 @@
           }
           const rejectionMessage = msg.error || 'unknown error'
           red50Evidence.rejections.push({ code: msg.code || '', message: rejectionMessage, at: Date.now() })
+          const rejectedPending = msg.action && (
+            (msg.action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
+            || (msg.action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
+          )
+          if (rejectedPending) {
+            targetSubmissionPending = null
+            _pendingChoiceShown = null
+            addLog('服务端拒绝本次选择：' + rejectionMessage, 'err')
+            rejectPendingActionFeedback(
+              'server-rejected',
+              '选择被拒绝：' + rejectionMessage + '；请重新选择',
+              { preserveTargetInteraction: true },
+            )
+            return
+          }
           rejectPendingActionFeedback('server-rejected', '服务端拒绝：' + rejectionMessage + '；目标选择已清除')
           addLog('服务端处理动作失败：' + (msg.error || 'unknown error'), 'err')
           render()
@@ -3824,13 +3855,16 @@
       renderTargetOverlay()
       const pbc = G.pendingOptionSelection
       if (pendingOptionSelectionForMe()) {
-        const key = pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(',')
+        const key = pbc.selectionId || (pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(','))
         if (_pendingChoiceShown !== key) {
           _pendingChoiceShown = key
           showOptionPicker(pbc.title || '请选择', pbc.options || [], {
             type: 'pendingOptionSelect',
             playerId: pbc.playerId,
-            cancelValue: pbc.cancelValue
+            selectionId: pbc.selectionId,
+            stateRevision: pbc.stateRevision,
+            cancelValue: pbc.cancelValue,
+            canCancel: pbc.canCancel !== false
           })
         }
       } else {
@@ -4672,13 +4706,17 @@
         return
       }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
-        const pendingTarget = G.pendingTargetSelection
-        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        const pendingSelection = G.pendingTargetSelection || G.pendingOptionSelection
+        if (pendingSelection && pendingSelection.canCancel === false) {
+          setStatusMsg('当前规则选择必须完成，不能清除棋子选择')
+          return
+        }
+        locallyCancelledSelectionId = pendingSelection && pendingSelection.selectionId
         void doAction({
           type: 'cancelPendingSelection',
           playerId: myPlayerId,
-          selectionId: pendingTarget && pendingTarget.selectionId,
-          stateRevision: pendingTarget && pendingTarget.stateRevision,
+          selectionId: pendingSelection && pendingSelection.selectionId,
+          stateRevision: pendingSelection && pendingSelection.stateRevision,
         })
       }
       clearTargetInteraction('selection-cleared')
@@ -4725,13 +4763,17 @@
         return
       }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
-        const pendingTarget = G.pendingTargetSelection
-        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        const pendingSelection = G.pendingTargetSelection || G.pendingOptionSelection
+        if (pendingSelection && pendingSelection.canCancel === false) {
+          setStatusMsg('请先完成当前规则选择')
+          return
+        }
+        locallyCancelledSelectionId = pendingSelection && pendingSelection.selectionId
         void doAction({
           type: 'cancelPendingSelection',
           playerId: myPlayerId,
-          selectionId: pendingTarget && pendingTarget.selectionId,
-          stateRevision: pendingTarget && pendingTarget.stateRevision,
+          selectionId: pendingSelection && pendingSelection.selectionId,
+          stateRevision: pendingSelection && pendingSelection.stateRevision,
         })
       }
       clearTargetInteraction('piece-switched')
@@ -4903,9 +4945,24 @@
         } else {
           const errMsg = e.message || String(e) || '操作失败'
           red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
-          rejectPendingActionFeedback('server-rejected', '操作被拒绝：' + errMsg + '；目标选择已清除')
+          const rejectedPending = (
+            (action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
+            || (action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
+          )
+          if (rejectedPending) {
+            targetSubmissionPending = null
+            _pendingChoiceShown = null
+            rejectionFeedback = '选择被拒绝：' + errMsg + '；请重新选择'
+            rejectPendingActionFeedback(
+              'server-rejected',
+              rejectionFeedback,
+              { preserveTargetInteraction: true },
+            )
+          } else {
+            rejectionFeedback = '操作被拒绝：' + errMsg + '；目标选择已清除'
+            rejectPendingActionFeedback('server-rejected', rejectionFeedback)
+          }
           addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
-          rejectionFeedback = '操作被拒绝：' + errMsg + '；目标选择已清除'
         }
         renderActionBar()
         if (rejectionFeedback) setStatusMsg(rejectionFeedback)

@@ -9,6 +9,18 @@ import { dynamicCodeRuntime } from './dynamic-code-runtime'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
+function checkSynchronousTriggers(battle: BattleState, context: any): TriggerResult {
+  const result = globalTriggerSystem.checkTriggers(battle, context)
+  if (result.needsOptionSelection || result.needsTargetSelection) {
+    const kind = result.needsOptionSelection ? 'option' : 'target'
+    const error = new Error(`[${String(context?.type || 'unknown')}] interactive ${kind} trigger is unsupported at this call site`) as Error & { code?: string }
+    error.name = 'InteractiveTriggerUnsupportedError'
+    error.code = 'INTERACTIVE_TRIGGER_UNSUPPORTED'
+    throw error
+  }
+  return result
+}
+
 // 简单的日志写入函数
 function writeLog(message: string) {
   try {
@@ -91,7 +103,7 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
   if (!player.hand) player.hand = []
   
   // 触发手牌加入手里前规则
-  const beforeCardAddedResult = globalTriggerSystem.checkTriggers(battle, {
+  const beforeCardAddedResult = checkSynchronousTriggers(battle, {
     type: "beforeCardAdded",
     playerId: targetPlayerId,
     cardId: cardId,
@@ -140,7 +152,7 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
   })
   
   // 触发手牌加入手里后规则
-  const afterCardAddedResult = globalTriggerSystem.checkTriggers(battle, {
+  const afterCardAddedResult = checkSynchronousTriggers(battle, {
     type: "afterCardAdded",
     playerId: targetPlayerId,
     cardId: cardId,
@@ -296,7 +308,14 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
 
     selectOption: (config: any) => {
       if (context.selectedOption !== undefined) return context.selectedOption
-      return { needsOptionSelection: true, options: config.options, title: config.title || '请选择' }
+      return {
+        needsOptionSelection: true,
+        options: config.options,
+        title: config.title || '请选择',
+        playerId: config.playerId,
+        canCancel: config.canCancel,
+        cancelValue: config.cancelValue,
+      }
     },
 
     dealDamage: (attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = 'true', _battleState?: BattleState, skillId?: string) => {
@@ -645,7 +664,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                 const idx = targetPiece.statusTags.findIndex((t: any) => t.id === statusId);
                 if (idx !== -1) {
                   targetPiece.statusTags.splice(idx, 1);
-                  globalTriggerSystem.checkTriggers(battle, {
+                  checkSynchronousTriggers(battle, {
                     type: "afterStatusRemoved",
                     sourcePiece: targetPiece,
                     statusId: statusId,
@@ -742,7 +761,14 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
 
             const selectOption = (config: any) => {
               if (context.selectedOption !== undefined) return context.selectedOption;
-              return { needsOptionSelection: true, options: config.options, title: config.title || '请选择' };
+              return {
+                needsOptionSelection: true,
+                options: config.options,
+                title: config.title || '请选择',
+                playerId: config.playerId,
+                canCancel: config.canCancel,
+                cancelValue: config.cancelValue,
+              };
             };
 
             const fireEvent = (eventName: string, ctx: any) => {
@@ -875,7 +901,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                         if (statusTagIndex !== -1) {
                           targetPiece.statusTags.splice(statusTagIndex, 1);
                           // 触发状态移除后事件
-                          globalTriggerSystem.checkTriggers(battle, {
+                          checkSynchronousTriggers(battle, {
                             type: "afterStatusRemoved",
                             sourcePiece: targetPiece,
                             statusId: statusId,
@@ -1210,6 +1236,11 @@ export interface SkillExecutionResult {
   needsOptionSelection?: boolean
   options?: { label: string; value: any; description?: string }[]
   title?: string
+  playerId?: string
+  canCancel?: boolean
+  cancelValue?: any
+  pendingRuleId?: string
+  pendingRuleSourceId?: string
 }
 
 /**
@@ -1545,6 +1576,9 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
     selectOption: (config: {
       title?: string;
       options: { label: string; value: any; description?: string }[];
+      playerId?: string;
+      canCancel?: boolean;
+      cancelValue?: any;
     }) => {
       console.log('selectOption called, config:', config, 'context.selectedOption:', context && context.selectedOption);
       // 如果已有选项值（用户已选择），直接返回该值
@@ -1555,7 +1589,10 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
       return {
         needsOptionSelection: true,
         options: config.options,
-        title: config.title || '请选择'
+        title: config.title || '请选择',
+        playerId: config.playerId,
+        canCancel: config.canCancel,
+        cancelValue: config.cancelValue,
       };
     },
 
@@ -1723,7 +1760,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
     
     // 造成伤害（支持单目标或目标数组；传入数组时 beforeDamageDealt 只触发一次）
     dealDamage: (attacker: PieceInstance, targetPiece: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = "physical", battleState?: BattleState, skillId?: string, skipBefore = false, killerPlayerId?: string) => {
-      return dealDamage(attacker, targetPiece, baseDamage, damageType, battle, skillId, skipBefore, killerPlayerId);
+      return dealDamage(attacker, targetPiece, baseDamage, damageType, battle, skillId, skipBefore, killerPlayerId, context?.selectedOption);
     },
 
     // 治疗（支持单目标或目标数组；传入数组时 beforeHealDealt 只触发一次）
@@ -1961,6 +1998,7 @@ function prepareTargetDamage(
     damage: sourceDamage,
     damageType: request.damageType,
     skillId: request.skillId,
+    selectedOption: request.selectedOption,
     damageBatchId: batchId,
     damageChainId: chain.chainId,
     parentDamageBatchId: request.parentBatchId,
@@ -2006,6 +2044,7 @@ function prepareTargetDamage(
       damage: damageAfterShield,
       damageType: request.damageType,
       skillId: request.skillId,
+      selectedOption: request.selectedOption,
       damageBatchId: batchId,
       damageChainId: chain.chainId,
       parentDamageBatchId: request.parentBatchId,
@@ -2015,6 +2054,8 @@ function prepareTargetDamage(
       damageQueue: shieldQueue,
     }
     const shieldResult = globalTriggerSystem.checkTriggers(battle, shieldContext)
+    if (shieldResult.needsOptionSelection) throw shieldResult
+    if (shieldResult.needsTargetSelection) throw shieldResult
     appendDamageMessages(battle, request.attacker.ownerPlayerId, shieldResult.messages)
     queuedDamage.push(...shieldQueue)
     const ruleShieldDamage = Math.max(0, Number(shieldContext.damage) || 0)
@@ -2043,6 +2084,7 @@ function prepareTargetDamage(
       damage: damageAfterShield,
       damageType: request.damageType,
       skillId: request.skillId,
+      selectedOption: request.selectedOption,
       damageBatchId: batchId,
       damageChainId: chain.chainId,
       parentDamageBatchId: request.parentBatchId,
@@ -2053,6 +2095,8 @@ function prepareTargetDamage(
       damageQueue: appliedQueue,
     }
     const appliedResult = globalTriggerSystem.checkTriggers(battle, appliedContext)
+    if (appliedResult.needsOptionSelection) throw appliedResult
+    if (appliedResult.needsTargetSelection) throw appliedResult
     appendDamageMessages(battle, request.attacker.ownerPlayerId, appliedResult.messages)
     queuedDamage.push(...appliedQueue)
     damageAfterShield = Math.max(0, Number(appliedContext.damage) || 0)
@@ -2140,9 +2184,7 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       damageQueue: sourceQueue,
     }
     const sourceResult = globalTriggerSystem.checkTriggers(battle, sourceContext)
-    if (sourceResult.needsOptionSelection) {
-      throw { needsOptionSelection: true, options: sourceResult.options, title: sourceResult.title }
-    }
+    if (sourceResult.needsOptionSelection) throw sourceResult
     if (sourceResult.needsTargetSelection) throw sourceResult
     appendDamageMessages(battle, request.attacker.ownerPlayerId, sourceResult.messages)
     queuedDamage.push(...sourceQueue)
@@ -2193,7 +2235,7 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       damageQueue: queuedDamage,
     }
     if (entry.emitBlocked) {
-      const blockedResult = globalTriggerSystem.checkTriggers(battle, {
+      const blockedResult = checkSynchronousTriggers(battle, {
         ...sharedContext,
         type: 'afterDamageBlocked',
         sourcePiece: entry.target,
@@ -2203,8 +2245,8 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       continue
     }
     if (entry.result.damage <= 0) continue
-    const dealtResult = globalTriggerSystem.checkTriggers(battle, { ...sharedContext, type: 'afterDamageDealt' })
-    const takenResult = globalTriggerSystem.checkTriggers(battle, {
+    const dealtResult = checkSynchronousTriggers(battle, { ...sharedContext, type: 'afterDamageDealt' })
+    const takenResult = checkSynchronousTriggers(battle, {
       ...sharedContext,
       type: 'afterDamageTaken',
       sourcePiece: entry.target,
@@ -2220,7 +2262,7 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
     }
     if (!battle.pieces.some(piece => piece.instanceId === entry.target.instanceId)) continue
 
-    globalTriggerSystem.checkTriggers(battle, {
+    checkSynchronousTriggers(battle, {
       type: 'beforePieceKilled',
       sourcePiece: entry.target,
       targetPiece: request.attacker,
@@ -2228,7 +2270,7 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       damageBatchId: batchId,
       damageChainId: chain.chainId,
     })
-    globalTriggerSystem.checkTriggers(battle, {
+    checkSynchronousTriggers(battle, {
       type: 'afterPieceKilled',
       sourcePiece: request.attacker,
       targetPiece: entry.target,
@@ -2236,7 +2278,7 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       damageBatchId: batchId,
       damageChainId: chain.chainId,
     })
-    globalTriggerSystem.checkTriggers(battle, {
+    checkSynchronousTriggers(battle, {
       type: 'onPieceDied',
       sourcePiece: entry.target,
       targetPiece: request.attacker,
@@ -2258,7 +2300,7 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       const playerMeta = battle.players.find(player => player.playerId === killCreditId)
       if (playerMeta) {
         playerMeta.chargePoints += 1
-        globalTriggerSystem.checkTriggers(battle, {
+        checkSynchronousTriggers(battle, {
           type: 'afterChargeGained',
           sourcePiece: request.attacker,
           amount: 1,
@@ -2414,7 +2456,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance | PieceI
       heal: baseHeal,
       skillId
     };
-    const beforeRes = globalTriggerSystem.checkTriggers(battle, healCtx);
+    const beforeRes = checkSynchronousTriggers(battle, healCtx);
     if (beforeRes.blocked) {
       if (!battle.actions) battle.actions = [];
       battle.actions.push({
@@ -2445,7 +2487,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance | PieceI
   };
 
   // 触发即将造成治疗前的触发器
-  const beforeHealDealtResult = globalTriggerSystem.checkTriggers(battle, healContext);
+  const beforeHealDealtResult = checkSynchronousTriggers(battle, healContext);
 
   // 检查是否有规则阻止了治疗
   if (beforeHealDealtResult.blocked) {
@@ -2479,7 +2521,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance | PieceI
 
   // 触发即将受到治疗前的触发器
   // piece = 被治疗者（事件源），target = 治疗者（事件目标）
-  const beforeHealTakenResult = globalTriggerSystem.checkTriggers(battle, {
+  const beforeHealTakenResult = checkSynchronousTriggers(battle, {
     type: "beforeHealTaken",
     piece: target,
     sourcePiece: target,
@@ -2502,7 +2544,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance | PieceI
     });
 
     // 触发治疗格挡后事件
-    globalTriggerSystem.checkTriggers(battle, {
+    checkSynchronousTriggers(battle, {
       type: "afterHealBlocked",
       sourcePiece: target,
       targetPiece: healer,
@@ -2531,7 +2573,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance | PieceI
   const actualHeal = target.currentHp - originalHp;
   
   // 触发治疗相关的触发器
-  globalTriggerSystem.checkTriggers(battle, {
+  checkSynchronousTriggers(battle, {
     type: "afterHealDealt",
     sourcePiece: healer,
     targetPiece: target,
@@ -2539,7 +2581,7 @@ export function healDamage(healer: PieceInstance, target: PieceInstance | PieceI
     skillId
   });
   
-  globalTriggerSystem.checkTriggers(battle, {
+  checkSynchronousTriggers(battle, {
     type: "afterHealTaken",
     sourcePiece: target,
     targetPiece: healer,
@@ -2654,7 +2696,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           // 添加到状态标签数组
           targetPiece.statusTags.push(newStatus);
           // 触发状态施加后事件
-          globalTriggerSystem.checkTriggers(battle, {
+          checkSynchronousTriggers(battle, {
             type: "afterStatusApplied",
             sourcePiece: targetPiece,
             statusId: statusObject.id,
@@ -2706,7 +2748,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           targetPiece.statusTags.splice(statusTagIndex, 1);
           writeLog('[removeStatusEffectById] Status ' + statusId + ' removed from ' + targetPiece.name + ', triggering afterStatusRemoved');
           // 触发状态移除后事件
-          const triggerResult = globalTriggerSystem.checkTriggers(battle, {
+          const triggerResult = checkSynchronousTriggers(battle, {
             type: "afterStatusRemoved",
             sourcePiece: targetPiece,
             statusId: statusId,
@@ -3031,7 +3073,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
 
           // 仅在技能成功时触发 afterSkillUsed（失败技能不计入"释放技能"次数）
           if (result && result.success && !(battle as any).extensions?.__dryRunSkillPreflight) {
-            const skillUsedResult = globalTriggerSystem.checkTriggers(battle, {
+            const skillUsedResult = checkSynchronousTriggers(battle, {
               type: "afterSkillUsed",
               sourcePiece,
               skillId: skillDef.id
@@ -3046,6 +3088,9 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           return result;
         }
       } catch (error) {
+        if ((error as any)?.needsOptionSelection || (error as any)?.needsTargetSelection) {
+          return error as SkillExecutionResult
+        }
         console.error('Error executing skill code:', error);
         // 执行失败时，直接报错，不使用默认技能
         throw new Error('技能执行失败: ' + (error instanceof Error ? error.message : '未知错误'));

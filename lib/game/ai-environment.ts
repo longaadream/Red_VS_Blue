@@ -177,7 +177,9 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
       playerId: pendingOption.playerId,
       title: pendingOption.title,
       options: cloneSerializable(pendingOption.options),
-      canCancel: true,
+      selectionId: pendingOption.selectionId,
+      stateRevision: pendingOption.stateRevision,
+      canCancel: pendingOption.canCancel !== false,
     } : undefined,
     pendingTargetSelection: pendingTarget && samePlayer(
       pendingTarget.ownerPlayerId || pendingTarget.playerId,
@@ -278,9 +280,20 @@ function pendingCandidates(state: BattleState, playerId: string): CandidateActio
     ))
       .sort((left, right) => compareStableText(stableJson(left), stableJson(right)))
       .map(selectedOption => candidate('pending-option', {
-        type: 'pendingOptionSelect', playerId, selectedOption,
+        type: 'pendingOptionSelect',
+        playerId,
+        selectedOption,
+        selectionId: pendingOption.selectionId,
+        stateRevision: pendingOption.stateRevision,
       }))
-    options.push(candidate('cancel-selection', { type: 'cancelPendingSelection', playerId }))
+    if (pendingOption.canCancel !== false) {
+      options.push(candidate('cancel-selection', {
+        type: 'cancelPendingSelection',
+        playerId,
+        selectionId: pendingOption.selectionId,
+        stateRevision: pendingOption.stateRevision,
+      }))
+    }
     return sortCandidates(options)
   }
 
@@ -311,6 +324,10 @@ function pendingCandidates(state: BattleState, playerId: string): CandidateActio
 }
 
 export function listLegalAIActions(state: BattleState, playerId: string): CandidateAction[] {
+  // Some terminal settlement snapshots omit the runtime skill cache. Restore only
+  // the empty repository-fallback shape for read-only candidate preparation.
+  state = state.skillsById ? state : { ...state, skillsById: {} }
+
   if (state.terminalResult) return []
   const player = state.players.find(meta => samePlayer(meta.playerId, playerId))
   if (!player) return []
@@ -351,7 +368,7 @@ export function listLegalAIActions(state: BattleState, playerId: string): Candid
       }))
     }
     for (const skill of [...(piece.skills || [])].sort((left, right) => compareStableText(left.skillId, right.skillId))) {
-      const definition = state.skillsById[skill.skillId] || getSkillById(skill.skillId)
+      const definition = state.skillsById?.[skill.skillId] || getSkillById(skill.skillId)
       if (!definition || definition.kind !== 'active') continue
       const kind: CandidateActionKind = (definition?.chargeCost || 0) > 0 ? 'charge-skill' : 'basic-skill'
       const type = kind === 'charge-skill' ? 'useChargeSkill' : 'useBasicSkill'

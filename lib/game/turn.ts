@@ -27,7 +27,7 @@ import type { SkillDefinition } from "./skills"
 import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction } from "./skills"
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import type { DamageType } from "./skills"
-import { globalTriggerSystem } from "./triggers"
+import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { getSkillById } from "./skill-repository"
 import {
   RANDOM_STREAM_NAMES,
@@ -46,6 +46,14 @@ import {
   validatePendingTargetSubmission,
 } from "./targeting"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
+import {
+  assertPendingOptionCancellation,
+  finalizePendingOptionSession,
+  validatePendingOptionSubmission,
+  type PendingOptionSelectionSession,
+  type PendingReactiveCardRef,
+  type PendingRuleConsumerRef,
+} from './pending-interaction'
 import { finalizeBattleTerminal, type TerminalResult } from "./terminal"
 import {
   TURN_TIMEOUT_FORFEIT_STREAK,
@@ -286,15 +294,7 @@ export interface BattleState {
   /** gameStart 触发器是否已触发过 */
   gameStartFired?: boolean
   /** 任意时机挂起的玩家选项选择 */
-  pendingOptionSelection?: {
-    playerId: string
-    title: string
-    options: any[]
-    pendingAction?: any
-    triggerContext?: any
-    cancelValue?: any
-    pendingQueue?: Array<{ruleId: string, sourceId?: string}>
-  }
+  pendingOptionSelection?: PendingOptionSelectionSession
   /** 任意时机挂起的可版本化玩家目标选择会话。 */
   pendingTargetSelection?: PendingTargetSelectionSession
   /** 仅用于目标查询/提交的新旧状态判定；每个成功动作单调递增。 */
@@ -393,7 +393,7 @@ export type BattleAction =
       type: "pendingOptionSelect"
       playerId: PlayerId
       selectedOption: any
-    }
+    } & TargetSelectionCredential
   | ({
       type: "pendingTargetSelect"
       playerId: PlayerId
@@ -815,7 +815,7 @@ function dryRunSkillAction(
     assertSkillDryRunResult(result)
   })
 }
-export function validateSkillActionByDryRun(state: BattleState, action: any): void {
+export function validateSkillActionByDryRun(state: BattleState, action: any, skipTargetingValidation = false): void {
   if (action.type !== "useBasicSkill" && action.type !== "useChargeSkill") {
     throw new BattleRuleError("Action is not a skill action")
   }
@@ -830,7 +830,7 @@ export function validateSkillActionByDryRun(state: BattleState, action: any): vo
       "Piece not found or does not belong to current player",
     )
   }
-  assertActionTargetingReady(state, action)
+  if (!skipTargetingValidation) assertActionTargetingReady(state, action)
   validateSkillActionBasics(
     state,
     piece,
@@ -881,9 +881,18 @@ function requireActionPhase(state: BattleState) {
   }
 }
 
+type InternalContinuation = {
+  skipTargetingValidation?: boolean
+  skipBeginTurn?: boolean
+  skipEndTurnTrigger?: boolean
+  skipBeforeSkillUse?: boolean
+  skipBeforeCardPlay?: boolean
+}
+
 function applyBattleActionInternal(
   state: BattleState,
   action: BattleAction,
+  continuation: InternalContinuation = {},
 ): BattleState {
   // 版本检查：若状态已有版本号且与当前不兼容，拒绝处理
   if (state._v !== undefined && state._v !== BATTLE_STATE_VERSION) {
@@ -907,14 +916,21 @@ function applyBattleActionInternal(
 
   // RED-59: all target discovery and final target validation happen before
   // cloning, triggers, payment, logging, or effect execution.
-  if (action.type !== 'surrender' && !isTimerCommand) assertActionTargetingReady(state, action)
+  if (action.type !== 'surrender' && !isTimerCommand && !continuation.skipTargetingValidation) {
+    assertActionTargetingReady(state, action)
+  }
   const validatedPendingTarget = action.type === 'pendingTargetSelect'
     ? validatePendingTargetSubmission(state, action)
     : undefined
+  if (action.type === 'pendingOptionSelect') {
+    validatePendingOptionSubmission(state, action)
+  }
   if (action.type === 'cancelPendingSelection') {
     if (state.pendingTargetSelection) {
       assertPendingTargetCancellation(state, action)
-    } else if (!state.pendingOptionSelection) {
+    } else if (state.pendingOptionSelection) {
+      assertPendingOptionCancellation(state, action)
+    } else {
       assertPendingTargetCancellation(state, action)
     }
   }
@@ -925,12 +941,232 @@ function applyBattleActionInternal(
   restorePlayerRules(hydratedState)
   state = hydratedState
 
+  // 飞雷神等被动触发待选择时，禁止非选择动作（防止攻击方绕过等待）
+  if (state.pendingOptionSelection && action.type !== 'pendingOptionSelect' && action.type !== 'cancelPendingSelection' && action.type !== 'surrender' && !isTimerCommand) {
+    throw new BattleRuleError('请等待对方选择完成后再行动')
+  }
+  if (state.pendingTargetSelection && action.type !== 'pendingTargetSelect' && action.type !== 'cancelPendingSelection' && action.type !== 'surrender' && !isTimerCommand) {
+    throw new TargetingRuleError({
+      kind: 'invalid',
+      code: 'PENDING_SELECTION_ACTIVE',
+      message: '请等待目标选择完成后再行动',
+    })
+  }
+
+  type PendingSession = PendingOptionSelectionSession | PendingTargetSelectionSession
+  type PendingSeed = Partial<PendingSession> & {
+    continuationContext?: any
+    pendingQueue?: PendingRuleConsumerRef[]
+    pendingReactiveCards?: PendingReactiveCardRef[]
+    pendingAction?: any
+  }
+
+  const appendTriggerMessages = (next: BattleState, result: TriggerResult, playerId: string) => {
+    if (!result.messages?.length) return
+    if (!next.actions) next.actions = []
+    result.messages.forEach(message => next.actions!.push({
+      type: 'triggerEffect',
+      playerId,
+      turn: next.turn.turnNumber,
+      payload: { message },
+    }))
+  }
+
+  const assertNoUnhandledInteraction = (result: TriggerResult, eventType: string) => {
+    if (!result.needsOptionSelection && !result.needsTargetSelection) return
+    const kind = result.needsOptionSelection ? 'option' : 'target'
+    throw new BattleRuleError(
+      `[${eventType}] interactive ${kind} trigger is unsupported at this call site`,
+      'INTERACTIVE_TRIGGER_UNSUPPORTED',
+    )
+  }
+
+  const setPendingInteraction = (
+    next: BattleState,
+    result: TriggerResult,
+    currentContext: any,
+    seed: PendingSeed = {},
+  ): boolean => {
+    if (!result.needsOptionSelection && !result.needsTargetSelection) return false
+    const currentRuleId = result.pendingRuleId || currentContext.pendingRuleId
+    const currentRuleSourceId = result.pendingRuleSourceId || currentContext.pendingRuleSourceId
+    const triggerContext = {
+      ...currentContext,
+      pendingRuleId: currentRuleId,
+      pendingRuleSourceId: currentRuleSourceId,
+    }
+    const continuationContext = seed.continuationContext || currentContext
+    const pendingQueue = result.pendingQueue ?? seed.pendingQueue
+    const pendingReactiveCards = result.pendingReactiveCards ?? seed.pendingReactiveCards
+    const pendingAction = seed.pendingAction
+    next.pendingOptionSelection = undefined
+    next.pendingTargetSelection = undefined
+    if (result.needsOptionSelection) {
+      next.pendingOptionSelection = {
+        playerId: result.playerId || next.turn.currentPlayerId,
+        options: result.options || [],
+        title: result.title || '请选择',
+        source: {
+          type: currentRuleId ? 'rule' : 'pending',
+          id: currentRuleId || 'pending-option',
+          pieceId: currentRuleSourceId,
+        },
+        triggerContext,
+        continuationContext,
+        pendingQueue,
+        pendingReactiveCards,
+        pendingAction,
+        canCancel: result.canCancel,
+        cancelValue: result.cancelValue,
+      }
+      return true
+    }
+    next.pendingTargetSelection = {
+      playerId: result.playerId || next.turn.currentPlayerId,
+      ownerPlayerId: result.playerId || next.turn.currentPlayerId,
+      title: result.title || '请选择目标',
+      targetType: (result.targetType || 'piece') as 'piece' | 'cell' | 'grid',
+      range: result.range,
+      filter: result.filter,
+      source: {
+        type: currentRuleId ? 'rule' : 'pending',
+        id: currentRuleId || 'pending-target',
+        pieceId: currentRuleSourceId,
+      },
+      triggerContext,
+      continuationContext,
+      pendingQueue,
+      pendingReactiveCards,
+      pendingAction,
+      canCancel: result.canCancel,
+    }
+    return true
+  }
+
+  const setPendingActionOption = (
+    next: BattleState,
+    result: Pick<TriggerResult,
+      'needsOptionSelection' | 'options' | 'title' | 'playerId'
+      | 'canCancel' | 'cancelValue' | 'pendingRuleId' | 'pendingRuleSourceId'
+    >,
+    pendingAction: BattleAction,
+    fallbackSource: { type: 'skill' | 'card'; id: string; pieceId?: string },
+    continuationMode: 'skillReleaseOption' | 'cardReleaseOption',
+  ): BattleState => {
+    const canResolveCancellation = result.canCancel === true && result.cancelValue !== undefined
+    next.pendingTargetSelection = undefined
+    next.pendingOptionSelection = {
+      playerId: result.playerId || ('playerId' in pendingAction ? pendingAction.playerId : next.turn.currentPlayerId),
+      title: result.title || '请选择',
+      options: result.options || [],
+      source: result.pendingRuleId
+        ? {
+            type: 'rule',
+            id: result.pendingRuleId,
+            pieceId: result.pendingRuleSourceId,
+          }
+        : fallbackSource,
+      pendingAction: {
+        ...pendingAction,
+        __pendingContinuationMode: continuationMode,
+      },
+      canCancel: canResolveCancellation,
+      cancelValue: result.cancelValue,
+    }
+    return next
+  }
+
+  const resumeDeferredAction = (
+    next: BattleState,
+    pending: PendingSession,
+    input: Record<string, unknown>,
+    eventBlocked = false,
+  ): BattleState => {
+    if (!pending.pendingAction) return next
+    const resumeAction = { ...pending.pendingAction }
+    const mode = resumeAction.__pendingContinuationMode as string | undefined
+    delete resumeAction.__pendingContinuationMode
+    // begin/end trigger blockers stop the event consumer queue, not the phase
+    // settlement. A blocked before-skill/card event still cancels its core action.
+    if (eventBlocked && mode !== 'beginPhaseAfterTrigger' && mode !== 'endTurnAfterTrigger') return next
+    if (input.selectedOption !== undefined) resumeAction.selectedOption = input.selectedOption
+    const trustedContinuation: InternalContinuation = {}
+    if (mode === 'beginPhaseAfterTrigger') trustedContinuation.skipBeginTurn = true
+    if (mode === 'endTurnAfterTrigger') trustedContinuation.skipEndTurnTrigger = true
+    if (mode === 'skillAfterBeforeTrigger' || mode === 'skillReleaseOption') {
+      trustedContinuation.skipTargetingValidation = true
+      trustedContinuation.skipBeforeSkillUse = true
+    }
+    if (mode === 'cardReleaseOption') {
+      trustedContinuation.skipTargetingValidation = true
+      trustedContinuation.skipBeforeCardPlay = true
+    }
+    return applyBattleActionInternal(next, resumeAction, trustedContinuation)
+  }
+
+  const resumePendingInteraction = (
+    next: BattleState,
+    pending: PendingSession,
+    actorPlayerId: string,
+    input: Record<string, unknown> = {},
+    skipCurrentConsumer = false,
+  ): BattleState => {
+    const continuationContext = pending.continuationContext || pending.triggerContext || {}
+    if (!skipCurrentConsumer && pending.triggerContext) {
+      const currentContext = {
+        ...pending.triggerContext,
+        ...input,
+        __deferReactiveCards: true,
+        __pendingReactiveCards: pending.pendingReactiveCards,
+      }
+      const result = globalTriggerSystem.checkTriggers(next, currentContext)
+      appendTriggerMessages(next, result, actorPlayerId)
+      if (result.blocked) return resumeDeferredAction(next, pending, input, true)
+      if (setPendingInteraction(next, result, currentContext, {
+        continuationContext,
+        pendingQueue: result.pendingQueue ?? pending.pendingQueue,
+        pendingReactiveCards: result.pendingReactiveCards ?? pending.pendingReactiveCards,
+        pendingAction: pending.pendingAction,
+      })) return next
+    }
+
+    const remaining = [...(pending.pendingQueue || [])]
+    while (remaining.length > 0) {
+      const item = remaining.shift()!
+      const currentContext = {
+        ...continuationContext,
+        pendingRuleId: item.ruleId,
+        pendingRuleSourceId: item.sourceId,
+        __deferReactiveCards: true,
+        __pendingReactiveCards: pending.pendingReactiveCards,
+      }
+      const result = globalTriggerSystem.checkTriggers(next, currentContext)
+      appendTriggerMessages(next, result, actorPlayerId)
+      if (result.blocked) return resumeDeferredAction(next, pending, input, true)
+      if (setPendingInteraction(next, result, currentContext, {
+        continuationContext,
+        pendingQueue: remaining,
+        pendingReactiveCards: pending.pendingReactiveCards,
+        pendingAction: pending.pendingAction,
+      })) return next
+    }
+
+    if (pending.pendingReactiveCards?.length) {
+      const reactiveResult = globalTriggerSystem.checkTriggers(next, {
+        ...continuationContext,
+        __reactiveCardsOnly: true,
+        __pendingReactiveCards: pending.pendingReactiveCards,
+      })
+      appendTriggerMessages(next, reactiveResult, actorPlayerId)
+      if (reactiveResult.blocked) return resumeDeferredAction(next, pending, input, true)
+    }
+
+    return resumeDeferredAction(next, pending, input)
+  }
+
   if (action.type === 'cancelPendingSelection') {
     const next = safeCloneBattleState(state)
-    const pendingPlayerId = next.pendingOptionSelection?.playerId || next.pendingTargetSelection?.playerId
-    if (pendingPlayerId && String(pendingPlayerId).toLowerCase() !== String(action.playerId).toLowerCase()) {
-      throw new BattleRuleError(`[cancelPendingSelection] player mismatch; pending=${pendingPlayerId}, action=${action.playerId}`)
-    }
+    const pending = (next.pendingOptionSelection || next.pendingTargetSelection) as PendingSession
     next.pendingOptionSelection = undefined
     next.pendingTargetSelection = undefined
     if (!next.actions) next.actions = []
@@ -940,57 +1176,12 @@ function applyBattleActionInternal(
       turn: next.turn.turnNumber,
       payload: { message: 'Selection cancelled' },
     } as any)
-    return next
-  }
-
-  // 飞雷神等被动触发待选择时，禁止非选择动作（防止攻击方绕过等待）
-  if (state.pendingOptionSelection && action.type !== 'pendingOptionSelect' && action.type !== 'surrender' && !isTimerCommand) {
-    throw new BattleRuleError('请等待对方选择完成后再行动')
-  }
-  if (state.pendingTargetSelection && action.type !== 'pendingTargetSelect' && action.type !== 'surrender' && !isTimerCommand) {
-    throw new TargetingRuleError({
-      kind: 'invalid',
-      code: 'PENDING_SELECTION_ACTIVE',
-      message: '请等待目标选择完成后再行动',
-    })
-  }
-
-  // 辅助：选择完成后按顺序继续处理挂起的规则队列（每次遇到需要交互的规则就再次挂起）
-  const processPendingQueue = (queueState: BattleState, queue: Array<{ruleId: string, sourceId?: string}>, trigCtx: any, actPlayerId: string) => {
-    let remaining = [...queue]
-    while (remaining.length > 0) {
-      const item = remaining.shift()!
-      const resumeCtx = { ...trigCtx, pendingRuleId: item.ruleId, pendingRuleSourceId: item.sourceId }
-      const result = globalTriggerSystem.checkTriggers(queueState, resumeCtx)
-      if (result.messages && result.messages.length > 0) {
-        if (!queueState.actions) queueState.actions = []
-        result.messages.forEach(msg => {
-          queueState.actions!.push({ type: 'triggerEffect', playerId: actPlayerId, turn: queueState.turn.turnNumber, payload: { message: msg } })
-        })
-      }
-      if (result.needsOptionSelection) {
-        queueState.pendingOptionSelection = {
-          playerId: (result as any).playerId || actPlayerId,
-          options: result.options || [],
-          title: result.title || '请选择',
-          triggerContext: { ...trigCtx, pendingRuleId: (result as any).pendingRuleId, pendingRuleSourceId: (result as any).pendingRuleSourceId },
-          pendingQueue: remaining.length > 0 ? remaining : undefined,
-        }
-        return
-      }
-      if (result.needsTargetSelection) {
-        queueState.pendingTargetSelection = {
-          playerId: (result as any).playerId || actPlayerId,
-          title: result.title || '请选择目标',
-          targetType: (result.targetType || 'piece') as 'piece' | 'cell' | 'grid',
-          range: result.range,
-          filter: result.filter,
-          triggerContext: { ...trigCtx, pendingRuleId: (result as any).pendingRuleId, pendingRuleSourceId: (result as any).pendingRuleSourceId },
-          pendingQueue: remaining.length > 0 ? remaining : undefined,
-        }
-        return
-      }
+    if ('options' in pending && pending.cancelValue !== undefined) {
+      return resumePendingInteraction(next, pending, action.playerId, {
+        selectedOption: pending.cancelValue,
+      })
     }
+    return resumePendingInteraction(next, pending, action.playerId, {}, true)
   }
 
   switch (action.type) {
@@ -1092,12 +1283,27 @@ function applyBattleActionInternal(
       // Action-phase timeouts still execute end-turn rules exactly once. If
       // that forced settlement only now creates an end-of-turn interaction,
       // its budget has already expired: do not open a fresh timer window.
-      const ended = applyBattleActionInternal(next, {
+      let ended = applyBattleActionInternal(next, {
         type: 'endTurn',
         playerId: next.turn.currentPlayerId,
       })
-      ended.pendingOptionSelection = undefined
-      ended.pendingTargetSelection = undefined
+      // A timeout is an authoritative skip, not a raw state clear. Continue
+      // the remaining end-turn consumers and deferred settlement exactly as a
+      // player cancellation would, while skipping every interaction that was
+      // created inside the already-expired input window.
+      for (let skipped = 0; skipped < 100; skipped += 1) {
+        const expiredPending = (ended.pendingOptionSelection || ended.pendingTargetSelection) as PendingSession | undefined
+        if (!expiredPending) break
+        ended.pendingOptionSelection = undefined
+        ended.pendingTargetSelection = undefined
+        ended = resumePendingInteraction(ended, expiredPending, timeout.playerId, {}, true)
+      }
+      if (ended.pendingOptionSelection || ended.pendingTargetSelection) {
+        throw new BattleRuleError(
+          'Timed-out pending interaction chain exceeded the safety limit',
+          'PENDING_INTERACTION_TIMEOUT_LOOP',
+        )
+      }
       return applyBattleActionInternal(ended, { type: 'beginPhase' })
     }
 
@@ -1182,25 +1388,28 @@ function applyBattleActionInternal(
       const next = safeCloneBattleState(state)
       writeLog('[beginPhase] Current phase: ' + next.turn.phase + ', gameStartFired: ' + next.gameStartFired + ', turnNumber: ' + next.turn.turnNumber)
       if (next.turn.phase === "start") {
+        if (!continuation.skipBeginTurn) {
         // ── 游戏开始时触发一次 gameStart 规则（第一回合第一个 beginPhase）────
         if (!next.gameStartFired && next.turn.turnNumber === 1) {
           writeLog('[beginPhase] Triggering gameStart rules...')
           next.gameStartFired = true
           // 为初始棋子补发 afterPieceSummoned，确保"进入战场"类规则对初始棋子也能生效
           for (const piece of next.pieces) {
-            globalTriggerSystem.checkTriggers(next, {
+            const initialSummonResult = globalTriggerSystem.checkTriggers(next, {
               type: "afterPieceSummoned",
               playerId: piece.ownerPlayerId,
               sourcePiece: piece,
               pieceTemplateId: piece.templateId,
               faction: piece.faction
             })
+            assertNoUnhandledInteraction(initialSummonResult, 'afterPieceSummoned')
           }
           const gameStartResult = globalTriggerSystem.checkTriggers(next, {
             type: "gameStart",
             playerId: next.turn.currentPlayerId,
             turnNumber: 1
           })
+          assertNoUnhandledInteraction(gameStartResult, 'gameStart')
           writeLog('[beginPhase] gameStart result: ' + JSON.stringify(gameStartResult))
           if (gameStartResult.success && gameStartResult.messages.length > 0) {
             if (!next.actions) next.actions = []
@@ -1211,11 +1420,12 @@ function applyBattleActionInternal(
         }
 
         // 触发回合开始效果（只调用一次，checkTriggers会扫描所有棋子和玩家的规则）
-        const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
+        const beginTurnContext = {
           type: "beginTurn",
           turnNumber: next.turn.turnNumber,
           playerId: next.turn.currentPlayerId
-        });
+        }
+        const beginTurnResult = globalTriggerSystem.checkTriggers(next, beginTurnContext);
 
         // 处理触发效果的消息
         if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
@@ -1234,27 +1444,10 @@ function applyBattleActionInternal(
           });
         }
 
-        // 检查是否有需要选项选择的回合开始规则
-        if (beginTurnResult.needsOptionSelection) {
-          next.pendingOptionSelection = {
-            playerId: (beginTurnResult as any).playerId || next.turn.currentPlayerId,
-            options: beginTurnResult.options || [],
-            title: beginTurnResult.title || '请选择',
-            triggerContext: { type: "beginTurn", turnNumber: next.turn.turnNumber, playerId: next.turn.currentPlayerId, pendingRuleId: (beginTurnResult as any).pendingRuleId, pendingRuleSourceId: (beginTurnResult as any).pendingRuleSourceId },
-            pendingQueue: (beginTurnResult as any).pendingQueue,
-          }
-        }
-        // 检查是否有需要目标选择的回合开始规则
-        if (beginTurnResult.needsTargetSelection) {
-          next.pendingTargetSelection = {
-            playerId: (beginTurnResult as any).playerId || next.turn.currentPlayerId,
-            title: beginTurnResult.title || '请选择目标',
-            targetType: (beginTurnResult.targetType || 'piece') as 'piece' | 'cell' | 'grid',
-            range: beginTurnResult.range,
-            filter: beginTurnResult.filter,
-            triggerContext: { type: "beginTurn", turnNumber: next.turn.turnNumber, playerId: next.turn.currentPlayerId, pendingRuleId: (beginTurnResult as any).pendingRuleId, pendingRuleSourceId: (beginTurnResult as any).pendingRuleSourceId },
-            pendingQueue: (beginTurnResult as any).pendingQueue,
-          }
+        if (setPendingInteraction(next, beginTurnResult, beginTurnContext, {
+          continuationContext: beginTurnContext,
+          pendingAction: { type: 'beginPhase', __pendingContinuationMode: 'beginPhaseAfterTrigger' },
+        })) return next
         }
 
         // 更新冷却
@@ -1285,6 +1478,7 @@ function applyBattleActionInternal(
           playerId: next.turn.currentPlayerId,
           turnNumber: next.turn.turnNumber
         });
+        assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
         // 处理whenever触发效果的消息
         if (wheneverResult.success && wheneverResult.messages.length > 0) {
@@ -1378,135 +1572,8 @@ function applyBattleActionInternal(
           nextPlayerMeta.actionPoints = nextPlayerMeta.maxActionPoints
         }
         
-        // 获取当前玩家的所有棋子
-        // 触发回合开始效果（只调用一次，checkTriggers会扫描所有棋子和玩家的规则）
-        const beginTurnResult = globalTriggerSystem.checkTriggers(next, {
-          type: "beginTurn",
-          turnNumber: next.turn.turnNumber,
-          playerId: next.turn.currentPlayerId
-        });
-
-        // 处理触发效果的消息
-        if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
-          if (!next.actions) {
-            next.actions = [];
-          }
-          beginTurnResult.messages.forEach(message => {
-            next.actions!.push({
-              type: "triggerEffect",
-              playerId: next.turn.currentPlayerId,
-              turn: next.turn.turnNumber,
-              payload: {
-                message
-              }
-            });
-          });
-        }
-
-        // 检查是否有需要选项选择的回合开始规则
-        if (beginTurnResult.needsOptionSelection) {
-          next.pendingOptionSelection = {
-            playerId: (beginTurnResult as any).playerId || next.turn.currentPlayerId,
-            options: beginTurnResult.options || [],
-            title: beginTurnResult.title || '请选择',
-            triggerContext: { type: "beginTurn", turnNumber: next.turn.turnNumber, playerId: next.turn.currentPlayerId, pendingRuleId: (beginTurnResult as any).pendingRuleId, pendingRuleSourceId: (beginTurnResult as any).pendingRuleSourceId },
-            pendingQueue: (beginTurnResult as any).pendingQueue,
-          }
-        }
-        // 检查是否有需要目标选择的回合开始规则
-        if (beginTurnResult.needsTargetSelection) {
-          next.pendingTargetSelection = {
-            playerId: (beginTurnResult as any).playerId || next.turn.currentPlayerId,
-            title: beginTurnResult.title || '请选择目标',
-            targetType: (beginTurnResult.targetType || 'piece') as 'piece' | 'cell' | 'grid',
-            range: beginTurnResult.range,
-            filter: beginTurnResult.filter,
-            triggerContext: { type: "beginTurn", turnNumber: next.turn.turnNumber, playerId: next.turn.currentPlayerId, pendingRuleId: (beginTurnResult as any).pendingRuleId, pendingRuleSourceId: (beginTurnResult as any).pendingRuleSourceId },
-            pendingQueue: (beginTurnResult as any).pendingQueue,
-          }
-        }
-
-        // 更新冷却
-        globalTriggerSystem.updateCooldowns();
-
-        // 更新当前玩家棋子技能的冷却时间
-        next.pieces.forEach(piece => {
-          // 只减少当前玩家棋子的技能冷却
-          if (isSamePlayer(piece.ownerPlayerId, next.turn.currentPlayerId) && piece.skills) {
-            piece.skills.forEach(skill => {
-              if (skill.currentCooldown && skill.currentCooldown > 0) {
-                skill.currentCooldown--
-              }
-            })
-          }
-        })
-
-        // 触发whenever规则（每一步行动后检测）
-        const wheneverResult = globalTriggerSystem.checkTriggers(next, {
-          type: "whenever",
-          playerId: next.turn.currentPlayerId,
-          turnNumber: next.turn.turnNumber
-        });
-
-        // 处理whenever触发效果的消息
-        if (wheneverResult.success && wheneverResult.messages.length > 0) {
-          if (!next.actions) {
-            next.actions = [];
-          }
-          wheneverResult.messages.forEach(message => {
-            next.actions!.push({
-              type: "triggerEffect",
-              playerId: next.turn.currentPlayerId,
-              turn: next.turn.turnNumber,
-              payload: {
-                message
-              }
-            });
-          });
-        }
-        
-        // 特殊地形效果（每回合开始时，对当前玩家的棋子生效）
-        const tileEffectPieces = next.pieces.filter(
-          (p) => isSamePlayer(p.ownerPlayerId, next.turn.currentPlayerId) && p.currentHp > 0,
-        )
-        for (const piece of tileEffectPieces) {
-          if (piece.x == null || piece.y == null) continue
-          const tile = next.map.tiles.find((t) => t.x === piece.x && t.y === piece.y)
-          if (!tile) continue
-
-          // 熔岩伤害
-          if (tile.props.damagePerTurn && tile.props.damagePerTurn > 0) {
-            dealDamage(piece, piece, tile.props.damagePerTurn, "true", next, "lava-terrain")
-          }
-
-          // 治愈泉回复
-          if (tile.props.healPerTurn && tile.props.healPerTurn > 0 && piece.currentHp > 0) {
-            healDamage(piece, piece, tile.props.healPerTurn, next, "spring-terrain")
-          }
-
-          // 充能台
-          if (tile.props.chargePerTurn && tile.props.chargePerTurn > 0 && piece.currentHp > 0) {
-            const playerMeta = next.players.find((p) => isSamePlayer(p.playerId, piece.ownerPlayerId))
-            if (playerMeta) {
-              playerMeta.chargePoints += tile.props.chargePerTurn
-              if (!next.actions) next.actions = []
-              next.actions.push({
-                type: "tileEffect",
-                playerId: piece.ownerPlayerId,
-                turn: next.turn.turnNumber,
-                payload: {
-                  message: `${piece.name || piece.templateId} 在充能台上获得了 ${tile.props.chargePerTurn} 充能点`,
-                  pieceId: piece.instanceId,
-                },
-              })
-            }
-          }
-        }
-        
-        // 直接进入action阶段，不需要前端再次发送beginPhase
-        next.turn.phase = "action"
-        
-        return next
+        // Reuse the authoritative start-phase path so suspension and settlement cannot diverge.
+        return applyBattleActionInternal(next, { type: 'beginPhase' })
       }
       return next
     }
@@ -1521,6 +1588,7 @@ function applyBattleActionInternal(
         type: "whenever",
         playerId: action.playerId
       });
+      assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
       // 处理whenever触发效果的消息
       if (wheneverResult.success && wheneverResult.messages.length > 0) {
@@ -1579,6 +1647,7 @@ function applyBattleActionInternal(
         targetY: action.toY
       };
       const beforeMoveResult = globalTriggerSystem.checkTriggers(next, moveContext);
+      assertNoUnhandledInteraction(beforeMoveResult, 'beforeMove')
 
       // 检查是否有规则触发了效果
       if (beforeMoveResult.success) {
@@ -1650,6 +1719,7 @@ function applyBattleActionInternal(
         sourcePiece: piece,
         playerId: action.playerId
       });
+      assertNoUnhandledInteraction(moveResult, 'afterMove')
 
       // 处理触发效果的消息
       if (moveResult.success && moveResult.messages.length > 0) {
@@ -1674,6 +1744,7 @@ function applyBattleActionInternal(
         sourcePiece: piece,
         playerId: action.playerId
       });
+      assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
       // 处理whenever触发效果的消息
       if (wheneverResult.success && wheneverResult.messages.length > 0) {
@@ -1720,7 +1791,7 @@ function applyBattleActionInternal(
 
       // 触发即将使用技能前的规则（检查冰冻等状态）
       // 使用可修改的上下文对象，触发器可以修改 skillId 来改变使用的技能
-      validateSkillActionByDryRun(next, action)
+      validateSkillActionByDryRun(next, action, continuation.skipTargetingValidation)
 
       const skillUseContext = {
         type: "beforeSkillUse" as const,
@@ -1736,7 +1807,7 @@ function applyBattleActionInternal(
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
       };
-      const beforeSkillUseResult = (action as any).__skipBeforeSkillUse
+      const beforeSkillUseResult = continuation.skipBeforeSkillUse
         ? { success: true, messages: [], blocked: false } as any
         : globalTriggerSystem.checkTriggers(next, skillUseContext);
 
@@ -1762,17 +1833,12 @@ function applyBattleActionInternal(
       if (beforeSkillUseResult.blocked) {
         return next; // 返回包含消息的状态，不执行技能
       }
-      if (beforeSkillUseResult.needsOptionSelection) {
+      if (beforeSkillUseResult.needsOptionSelection || beforeSkillUseResult.needsTargetSelection) {
         // 存入状态，由正确的玩家客户端响应（不 throw，避免路由给错误的客户端）
-        next.pendingOptionSelection = {
-          playerId: (beforeSkillUseResult as any).playerId || action.playerId,
-          title: beforeSkillUseResult.title || '请选择',
-          options: beforeSkillUseResult.options || [],
-          pendingAction: action,
-          triggerContext: { ...skillUseContext, pendingRuleId: (beforeSkillUseResult as any).pendingRuleId, pendingRuleSourceId: (beforeSkillUseResult as any).pendingRuleSourceId },
-          pendingQueue: (beforeSkillUseResult as any).pendingQueue,
-          cancelValue: 'no',
-        }
+        setPendingInteraction(next, beforeSkillUseResult, skillUseContext, {
+          continuationContext: skillUseContext,
+          pendingAction: { ...action, __pendingContinuationMode: 'skillAfterBeforeTrigger' },
+        })
         return next
       }
 
@@ -1805,6 +1871,9 @@ function applyBattleActionInternal(
       }
 
       // 执行技能（使用触发器可能修改后的技能ID）
+      const releaseState = safeCloneBattleState(next)
+      const releaseRuntime = getActiveRuleRuntime()
+      const releaseRuntimeSnapshot = releaseRuntime?.snapshot()
       applySkillPayment(next, piece, action.playerId, finalSkillId, skillDef)
 
       // Payment happens before the actual release. If a beforeSkillUse effect killed
@@ -1882,11 +1951,12 @@ function applyBattleActionInternal(
 
       // 检查是否需要选项选择
       if (result.needsOptionSelection) {
-        const optionSelectionError = new BattleRuleError('需要选择选项') as any
-        optionSelectionError.needsOptionSelection = true
-        optionSelectionError.options = result.options || []
-        optionSelectionError.title = result.title || '请选择'
-        throw optionSelectionError
+        if (releaseRuntime && releaseRuntimeSnapshot) releaseRuntime.restore(releaseRuntimeSnapshot)
+        return setPendingActionOption(
+          releaseState, result, action,
+          { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+          'skillReleaseOption',
+        )
       }
       
       // 技能失败：当 success === false 时，视作无效操作，抛出错误不写日志
@@ -1959,6 +2029,7 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         skillId: action.skillId
       });
+      assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
       // 处理whenever触发效果的消息
       if (wheneverResult.success && wheneverResult.messages.length > 0) {
@@ -2005,7 +2076,7 @@ function applyBattleActionInternal(
 
       // 触发即将使用技能前的规则（检查冰冻等状态）
       // 使用可修改的上下文对象，触发器可以修改 skillId 来改变使用的技能
-      validateSkillActionByDryRun(next, action)
+      validateSkillActionByDryRun(next, action, continuation.skipTargetingValidation)
 
       const skillUseContext = {
         type: "beforeSkillUse" as const,
@@ -2021,7 +2092,7 @@ function applyBattleActionInternal(
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
       };
-      const beforeSkillUseResult = (action as any).__skipBeforeSkillUse
+      const beforeSkillUseResult = continuation.skipBeforeSkillUse
         ? { success: true, messages: [], blocked: false } as any
         : globalTriggerSystem.checkTriggers(next, skillUseContext);
 
@@ -2092,16 +2163,11 @@ function applyBattleActionInternal(
       if (beforeSkillUseResult.blocked) {
         return next; // 返回包含消息的状态，不执行技能
       }
-      if (beforeSkillUseResult.needsOptionSelection) {
-        next.pendingOptionSelection = {
-          playerId: (beforeSkillUseResult as any).playerId || action.playerId,
-          title: beforeSkillUseResult.title || '请选择',
-          options: beforeSkillUseResult.options || [],
-          pendingAction: action,
-          triggerContext: { ...skillUseContext, pendingRuleId: (beforeSkillUseResult as any).pendingRuleId, pendingRuleSourceId: (beforeSkillUseResult as any).pendingRuleSourceId },
-          pendingQueue: (beforeSkillUseResult as any).pendingQueue,
-          cancelValue: 'no',
-        }
+      if (beforeSkillUseResult.needsOptionSelection || beforeSkillUseResult.needsTargetSelection) {
+        setPendingInteraction(next, beforeSkillUseResult, skillUseContext, {
+          continuationContext: skillUseContext,
+          pendingAction: { ...action, __pendingContinuationMode: 'skillAfterBeforeTrigger' },
+        })
         return next
       }
 
@@ -2113,6 +2179,9 @@ function applyBattleActionInternal(
       }
 
       // 消耗充能点
+      const releaseState = safeCloneBattleState(next)
+      const releaseRuntime = getActiveRuleRuntime()
+      const releaseRuntimeSnapshot = releaseRuntime?.snapshot()
       applySkillPayment(next, piece, action.playerId, finalSkillId, skillDef, cost)
 
       // Payment happens before the actual release. If a beforeSkillUse effect killed
@@ -2196,11 +2265,12 @@ function applyBattleActionInternal(
 
       // 检查是否需要选项选择
       if (result.needsOptionSelection) {
-        const optionSelectionError = new BattleRuleError('需要选择选项') as any
-        optionSelectionError.needsOptionSelection = true
-        optionSelectionError.options = result.options || []
-        optionSelectionError.title = result.title || '请选择'
-        throw optionSelectionError
+        if (releaseRuntime && releaseRuntimeSnapshot) releaseRuntime.restore(releaseRuntimeSnapshot)
+        return setPendingActionOption(
+          releaseState, result, action,
+          { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+          'skillReleaseOption',
+        )
       }
 
       // 技能失败：视作无效操作，抛出错误不写日志（充能已在 next 中扣减，throw 后 next 被丢弃，自动回滚）
@@ -2274,6 +2344,7 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         skillId: action.skillId
       });
+      assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
       // 处理whenever触发效果的消息
       if (wheneverResult.success && wheneverResult.messages.length > 0) {
@@ -2302,46 +2373,21 @@ function applyBattleActionInternal(
 
       const next = safeCloneBattleState(state)
 
+      if (!continuation.skipEndTurnTrigger) {
       // 触发所有回合结束效果：一次调用，checkTriggers 内部自行迭代棋子规则、玩家规则、手牌 reactive 卡牌
       // context.playerId = 当前结束回合的玩家，供暴风雪等规则判断"是否是对方回合"
-      const endTurnResult = globalTriggerSystem.checkTriggers(next, {
+      const endTurnContext = {
         type: "endTurn",
         turnNumber: next.turn.turnNumber,
         playerId: action.playerId
-      });
-
-      if (endTurnResult.success && endTurnResult.messages.length > 0) {
-        if (!next.actions) next.actions = [];
-        endTurnResult.messages.forEach(message => {
-          next.actions!.push({
-            type: "triggerEffect",
-            playerId: action.playerId,
-            turn: next.turn.turnNumber,
-            payload: { message }
-          });
-        });
       }
+      const endTurnResult = globalTriggerSystem.checkTriggers(next, endTurnContext);
 
-      // 检查 endTurn 触发器是否需要选项选择或目标选择
-      if (endTurnResult.needsOptionSelection) {
-        next.pendingOptionSelection = {
-          playerId: (endTurnResult as any).playerId || action.playerId,
-          options: endTurnResult.options || [],
-          title: endTurnResult.title || '请选择',
-          triggerContext: { type: "endTurn", turnNumber: next.turn.turnNumber, playerId: action.playerId, pendingRuleId: (endTurnResult as any).pendingRuleId, pendingRuleSourceId: (endTurnResult as any).pendingRuleSourceId },
-          pendingQueue: (endTurnResult as any).pendingQueue,
-        }
-      }
-      if (endTurnResult.needsTargetSelection) {
-        next.pendingTargetSelection = {
-          playerId: (endTurnResult as any).playerId || action.playerId,
-          title: endTurnResult.title || '请选择目标',
-          targetType: (endTurnResult.targetType || 'piece') as 'piece' | 'cell' | 'grid',
-          range: endTurnResult.range,
-          filter: endTurnResult.filter,
-          triggerContext: { type: "endTurn", turnNumber: next.turn.turnNumber, playerId: action.playerId, pendingRuleId: (endTurnResult as any).pendingRuleId, pendingRuleSourceId: (endTurnResult as any).pendingRuleSourceId },
-          pendingQueue: (endTurnResult as any).pendingQueue,
-        }
+      appendTriggerMessages(next, endTurnResult, action.playerId)
+      if (setPendingInteraction(next, endTurnResult, endTurnContext, {
+        continuationContext: endTurnContext,
+        pendingAction: { ...action, __pendingContinuationMode: 'endTurnAfterTrigger' },
+      })) return next
       }
 
       // 触发whenever规则（每一步行动后检测）
@@ -2350,6 +2396,7 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         turnNumber: next.turn.turnNumber
       });
+      assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
       // 处理whenever触发效果的消息
       if (wheneverResult.success && wheneverResult.messages.length > 0) {
@@ -2436,74 +2483,18 @@ function applyBattleActionInternal(
     case "pendingOptionSelect": {
       const next = safeCloneBattleState(state)
       const pending = next.pendingOptionSelection
-      if (!pending) {
-        throw new BattleRuleError(`[pendingOptionSelect] no pendingOptionSelection in state; player=${action.playerId}, selected=${JSON.stringify(action.selectedOption)}`)
-      }
-      if (pending.playerId && String(pending.playerId).toLowerCase() !== String(action.playerId).toLowerCase()) {
-        throw new BattleRuleError(`[pendingOptionSelect] player mismatch; pending=${pending.playerId}, action=${action.playerId}, selected=${JSON.stringify(action.selectedOption)}`)
-      }
+      if (!pending) throw new BattleRuleError('[pendingOptionSelect] validated pending session disappeared')
       next.pendingOptionSelection = undefined
-      if (pending.pendingAction) {
-        if (pending.triggerContext) {
-          const resumedTrigger = globalTriggerSystem.checkTriggers(next, {
-            ...pending.triggerContext,
-            selectedOption: action.selectedOption,
-          })
-          if (resumedTrigger.messages?.length) {
-            if (!next.actions) next.actions = []
-            resumedTrigger.messages.forEach(message => next.actions!.push({
-              type: 'triggerEffect', playerId: action.playerId, turn: next.turn.turnNumber, payload: { message },
-            }))
-          }
-          if (resumedTrigger.blocked) return next
-          if (resumedTrigger.needsOptionSelection || resumedTrigger.needsTargetSelection) {
-            next.pendingOptionSelection = {
-              playerId: (resumedTrigger as any).playerId || action.playerId,
-              options: resumedTrigger.options || [],
-              title: resumedTrigger.title || '请选择',
-              pendingAction: pending.pendingAction,
-              triggerContext: pending.triggerContext,
-              pendingQueue: (resumedTrigger as any).pendingQueue || pending.pendingQueue,
-            }
-            return next
-          }
-          const queueAfterThis = (resumedTrigger as any).pendingQueue || pending.pendingQueue
-          if (queueAfterThis?.length) {
-            processPendingQueue(next, queueAfterThis, pending.triggerContext, action.playerId)
-            if (next.pendingOptionSelection || next.pendingTargetSelection) return next
-          }
-        }
-        const resumeAction = { ...pending.pendingAction, selectedOption: action.selectedOption, __skipBeforeSkillUse: true }
-        return applyBattleActionInternal(next, resumeAction)
-      }
-      if (pending.triggerContext) {
-        const ctx = { ...pending.triggerContext, selectedOption: action.selectedOption }
-        const result = globalTriggerSystem.checkTriggers(next, ctx)
-        if (result.messages && result.messages.length > 0) {
-          if (!next.actions) next.actions = []
-          result.messages.forEach(message => {
-            next.actions!.push({ type: "triggerEffect", playerId: action.playerId, turn: next.turn.turnNumber, payload: { message } })
-          })
-        }
-        // 继续处理队列中剩余的规则（顺序触发）
-        const queueAfterThis = (result as any).pendingQueue || pending.pendingQueue
-        if (queueAfterThis && queueAfterThis.length > 0 && !result.needsOptionSelection && !result.needsTargetSelection) {
-          processPendingQueue(next, queueAfterThis, pending.triggerContext, action.playerId)
-        }
-      }
-      return next
+      return resumePendingInteraction(next, pending, action.playerId, {
+        selectedOption: action.selectedOption,
+      })
     }
 
     case "pendingTargetSelect": {
-      console.log('[STAGE6-pre] pendingTargetSelect case entered; state.pendingTargetSelection=', !!(state as any).pendingTargetSelection, 'playerId=', action.playerId)
       const next = safeCloneBattleState(state)
       const pending = next.pendingTargetSelection
-      console.log('[STAGE6-pre2] after safeClone; pending=', !!pending, 'effectCodeLen=', pending?.effectCode?.length ?? 0)
       if (!pending) {
-        throw new BattleRuleError(`[pendingTargetSelect] no pendingTargetSelection in state; player=${action.playerId}, target=(${(action as any).targetX},${(action as any).targetY}), targetPiece=${(action as any).targetPieceId || ''}`)
-      }
-      if (pending.playerId && String(pending.playerId).toLowerCase() !== String(action.playerId).toLowerCase()) {
-        throw new BattleRuleError(`[pendingTargetSelect] player mismatch; pending=${pending.playerId}, action=${action.playerId}, target=(${(action as any).targetX},${(action as any).targetY}), title=${pending.title || ''}`)
+        throw new BattleRuleError('[pendingTargetSelect] validated pending session disappeared')
       }
       const x = validatedPendingTarget?.type === 'cell'
         ? validatedPendingTarget.x
@@ -2527,8 +2518,17 @@ function applyBattleActionInternal(
         return next
       }
       next.pendingTargetSelection = undefined
+      if (!pending.effectCode) {
+        return resumePendingInteraction(next, pending, action.playerId, {
+          targetPieceId,
+          targetX: x,
+          targetY: y,
+          selectedTargets: resolvedPending.selectedTargets,
+          pendingTargetSelection: resolvedPending,
+        })
+      }
+
       let result: any = { success: true }
-      console.log('[STAGE6] pendingTargetSelect: effectCode present=', !!pending.effectCode, 'targetX=', x, 'targetY=', y, 'playerId=', action.playerId)
       if (pending.effectCode) {
         let fn: any
         try {
@@ -2554,38 +2554,24 @@ function applyBattleActionInternal(
             pending: resolvedPending,
             payload: pending.payload,
           }) || { success: true }
-          console.log('[STAGE6] effectCode result:', result)
         } catch (execErr) {
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))
         }
-      }
-      if (!pending.effectCode && pending.triggerContext) {
-        result = globalTriggerSystem.checkTriggers(next, {
-          ...pending.triggerContext,
-          targetPieceId: action.targetPieceId,
-          targetX: action.targetX,
-          targetY: action.targetY,
-          selectedTargets: resolvedPending.selectedTargets,
-          pendingTargetSelection: resolvedPending,
-        })
       }
       if (!next.actions) next.actions = []
       if (result.message) {
         next.actions.push({ type: 'triggerEffect', playerId: action.playerId, turn: next.turn.turnNumber, payload: { message: result.message } })
       }
-      if (result.messages && result.messages.length > 0) {
-        result.messages.forEach((message: string) => {
-          next.actions!.push({ type: "triggerEffect", playerId: action.playerId, turn: next.turn.turnNumber, payload: { message } })
-        })
+      appendTriggerMessages(next, result, action.playerId)
+      if (setPendingInteraction(next, result, pending.triggerContext || {}, {
+        continuationContext: pending.continuationContext,
+        pendingQueue: pending.pendingQueue,
+        pendingReactiveCards: pending.pendingReactiveCards,
+        pendingAction: pending.pendingAction,
+      })) {
+        return next
       }
-      // 继续处理队列中剩余的规则（顺序触发）
-      if (pending.triggerContext) {
-        const queueAfterThis = (result as any).pendingQueue || pending.pendingQueue
-        if (queueAfterThis && queueAfterThis.length > 0 && !result.needsOptionSelection && !result.needsTargetSelection) {
-          processPendingQueue(next, queueAfterThis, pending.triggerContext, action.playerId)
-        }
-      }
-      return next
+      return resumePendingInteraction(next, pending, action.playerId, {}, true)
     }
 
     case "playCard": {
@@ -2616,12 +2602,16 @@ function applyBattleActionInternal(
 
       validateDeclaredCardTarget(next, action)
       // 触发手牌使用前规则
-      const beforeCardPlayResult = globalTriggerSystem.checkTriggers(next, {
-        type: "beforeCardPlay",
+      const beforeCardPlayContext = {
+        type: "beforeCardPlay" as const,
         playerId: action.playerId,
         cardId: cardInstance.cardId,
-        cardInstanceId: cardInstance.instanceId
-      });
+        cardInstanceId: cardInstance.instanceId,
+      }
+      const beforeCardPlayResult = continuation.skipBeforeCardPlay
+        ? { success: true, messages: [], blocked: false } as TriggerResult
+        : globalTriggerSystem.checkTriggers(next, beforeCardPlayContext);
+      assertNoUnhandledInteraction(beforeCardPlayResult, 'beforeCardPlay')
 
       // 检查是否有规则阻止了卡牌使用
       if (beforeCardPlayResult.blocked) {
@@ -2637,6 +2627,9 @@ function applyBattleActionInternal(
         return next;
       }
 
+      const releaseState = safeCloneBattleState(next)
+      const releaseRuntime = getActiveRuleRuntime()
+      const releaseRuntimeSnapshot = releaseRuntime?.snapshot()
       const paidCardInstance = applyCardPayment(playerMeta, cardIdx, cardApCost)
 
       // 构建目标信息
@@ -2663,11 +2656,12 @@ function applyBattleActionInternal(
 
       // 处理选项选择
       if (result.needsOptionSelection) {
-        const err = new BattleRuleError('需要选择选项') as any
-        err.needsOptionSelection = true
-        err.options = result.options || []
-        err.title = result.title || '请选择'
-        throw err
+        if (releaseRuntime && releaseRuntimeSnapshot) releaseRuntime.restore(releaseRuntimeSnapshot)
+        return setPendingActionOption(
+          releaseState, result, action,
+          { type: 'card', id: cardInstance.cardId },
+          'cardReleaseOption',
+        )
       }
 
       if (!result.success) {
@@ -2696,6 +2690,7 @@ function applyBattleActionInternal(
         cardId: cardInstance.cardId,
         cardInstanceId: cardInstance.instanceId
       });
+      assertNoUnhandledInteraction(afterCardPlayResult, 'afterCardPlay')
 
       // 处理触发效果的消息
       if (afterCardPlayResult.success && afterCardPlayResult.messages.length > 0) {
@@ -2710,7 +2705,8 @@ function applyBattleActionInternal(
       }
 
       // 触发 whenever
-      globalTriggerSystem.checkTriggers(next, { type: "whenever", playerId: action.playerId })
+      const wheneverResult = globalTriggerSystem.checkTriggers(next, { type: "whenever", playerId: action.playerId })
+      assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
       return next
     }
@@ -2742,9 +2738,13 @@ export function applyBattleAction(
     ? state.extensions.debugBattle.actionLog.length
     : 0
   const reduced = applyBattleActionInternal(state, action)
-  const next = isTurnTimerSystemAction(action)
+  let next = isTurnTimerSystemAction(action)
     ? reduced
     : stampTargetingRevision(state, reduced)
+  if (!isTurnTimerSystemAction(action) && next.pendingOptionSelection) {
+    const revision = Number.isSafeInteger(next.targetingRevision) ? next.targetingRevision! : 0
+    next = { ...next, pendingOptionSelection: finalizePendingOptionSession(next.pendingOptionSelection, revision) }
+  }
   finalizeBattleTerminal(next, action, { actionIndex })
   return next
 }
@@ -2793,6 +2793,9 @@ export function summonPiece(
     pieceTemplateId: templateId,
     faction
   })
+  if (beforeSummonResult.needsOptionSelection || beforeSummonResult.needsTargetSelection) {
+    throw new BattleRuleError('[beforePieceSummoned] interactive trigger is unsupported at this call site', 'INTERACTIVE_TRIGGER_UNSUPPORTED')
+  }
 
   if (beforeSummonResult.blocked) {
     return { success: false, message: "召唤被阻止", blocked: true }
@@ -2826,6 +2829,9 @@ export function summonPiece(
     pieceTemplateId: templateId,
     faction
   })
+  if (afterSummonResult.needsOptionSelection || afterSummonResult.needsTargetSelection) {
+    throw new BattleRuleError('[afterPieceSummoned] interactive trigger is unsupported at this call site', 'INTERACTIVE_TRIGGER_UNSUPPORTED')
+  }
 
   // 处理触发效果的消息
   if (afterSummonResult.success && afterSummonResult.messages.length > 0) {

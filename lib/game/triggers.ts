@@ -1,6 +1,7 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import { executeCardFunction, loadCardById, loadRuleById } from './skills'
+import type { PendingReactiveCardRef } from './pending-interaction'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -188,11 +189,17 @@ export interface TriggerResult {
   needsOptionSelection?: boolean
   options?: any[]
   title?: string
+  playerId?: string
+  canCancel?: boolean
+  cancelValue?: any
   needsTargetSelection?: boolean
   targetType?: string
   range?: number
   filter?: string
+  pendingRuleId?: string
+  pendingRuleSourceId?: string
   pendingQueue?: Array<{ruleId: string, sourceId?: string}>
+  pendingReactiveCards?: PendingReactiveCardRef[]
 }
 
 // 触发系统类
@@ -345,6 +352,8 @@ export class TriggerSystem {
     let pendingOptions: any[] | undefined
     let pendingTitle: string | undefined
     let pendingPlayerId: string | undefined
+    let pendingCanCancel: boolean | undefined
+    let pendingCancelValue: any
     let needsTargetSelection = false
     let pendingTargetType: string | undefined
     let pendingRange: number | undefined
@@ -363,6 +372,21 @@ export class TriggerSystem {
     // 从 context 中读取恢复状态（用于从 pendingTargetSelect/pendingOptionSelect 恢复执行）
     const ctxPendingRuleId = (context as any).pendingRuleId as string | undefined
     const ctxPendingSourceId = (context as any).pendingRuleSourceId as string | undefined
+    const reactiveOnly = (context as any).__reactiveCardsOnly === true
+    const deferredReactiveCards = (context as any).__deferReactiveCards === true
+    const suppliedReactiveCards = (context as any).__pendingReactiveCards as PendingReactiveCardRef[] | undefined
+    const pendingReactiveCards: PendingReactiveCardRef[] = suppliedReactiveCards
+      ? suppliedReactiveCards.map(card => ({ ...card }))
+      : (battle.players || []).flatMap(player => (player.hand || []).flatMap(cardInstance => {
+          const cardDef = loadCardById(cardInstance.cardId)
+            || (battle as any).customCards?.[cardInstance.cardId]
+          if (!cardDef || cardDef.type !== 'reactive' || cardDef.trigger?.type !== context.type) return []
+          return [{
+            playerId: player.playerId,
+            cardInstanceId: cardInstance.instanceId,
+            cardId: cardInstance.cardId,
+          }]
+        }))
 
     writeLog('[checkTriggers] Checking triggers for: ' + context.type + ', global rules count: ' + this.rules.length + ', players: ' + JSON.stringify(battle.players?.map(p => ({ playerId: p.playerId, rulesCount: (p as any).rules?.length || 0 }))))
     writeLog('[checkTriggers] Context: ' + JSON.stringify({ type: context.type, statusId: (context as any).statusId, playerId: context.playerId }));
@@ -489,7 +513,7 @@ export class TriggerSystem {
 
     // ── 阶段二：按顺序执行，遇到需要玩家交互的规则立即停止 ──────────────────────
     // 若 ctxPendingRuleId 指定了恢复点，从该规则开始执行（跳过其之前的规则）
-    let startIdx = 0
+    let startIdx = reactiveOnly ? allRuleItems.length : 0
     if (ctxPendingRuleId) {
       const idx = allRuleItems.findIndex(r =>
         r.ruleId === ctxPendingRuleId && (!ctxPendingSourceId || r.sourceId === ctxPendingSourceId)
@@ -528,6 +552,8 @@ export class TriggerSystem {
           pendingOptions = result.options
           pendingTitle = result.title
           pendingPlayerId = result.playerId || ruleOwnerPlayerId
+          pendingCanCancel = result.canCancel
+          pendingCancelValue = result.cancelValue
           pendingRuleId = item.ruleId
           pendingRuleSourceId = item.sourceId
           // 收集后续未执行的规则作为队列
@@ -542,6 +568,7 @@ export class TriggerSystem {
           pendingFilter = result.filter
           pendingTitle = result.title
           pendingPlayerId = result.playerId || ruleOwnerPlayerId
+          pendingCanCancel = result.canCancel
           pendingRuleId = item.ruleId
           pendingRuleSourceId = item.sourceId
           pendingQueue = allRuleItems.slice(i + 1).map(r => ({ ruleId: r.ruleId, sourceId: r.sourceId }))
@@ -565,41 +592,39 @@ export class TriggerSystem {
 
     // 只在没有挂起交互时才执行响应卡（避免乱序）
     if (interactionNeeded) {
-      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined } as any, context)
+      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards } as any, context)
     }
 
-    // 4. 检查所有玩家手牌中的 reactive 卡牌（全场两个玩家都扫描）
-    if (battle.players) {
-      for (const player of battle.players) {
+    // 4. 按事件开始时冻结的快照执行 reactive 卡牌，恢复规则队列时不得重复扫描。
+    if (!deferredReactiveCards) {
+      for (const cardRef of pendingReactiveCards) {
         if (blocked) break
-        if (!player.hand || player.hand.length === 0) continue
-        // 在事件开始时快照手牌，避免本次分发中的弃牌改变剩余消费者顺序。
-        const cardsSnap = [...player.hand]
-        for (const cardInstance of cardsSnap) {
-          try {
-            const cardDef = loadCardById(cardInstance.cardId) || (battle as any).customCards?.[cardInstance.cardId]
-            if (!cardDef || cardDef.type !== 'reactive') continue
-            if (!cardDef.trigger || cardDef.trigger.type !== context.type) continue
-
-            const result = executeCardFunction(cardDef, player.playerId, battle, context) as any
-            if (result && result.success) {
-              success = true
-              if (result.message) triggeredEffects.push(result.message)
-              if (result.blocked) blocked = true
-              // 弃牌（keepInHand=true 时保留在手牌中）
-              if (!result.keepInHand) {
-                if (!player.discardPile) player.discardPile = []
-                const handIndex = player.hand.findIndex((card: any) => card.instanceId === cardInstance.instanceId)
-                if (handIndex !== -1) {
-                  player.hand.splice(handIndex, 1)
-                  player.discardPile.push(cardInstance.cardId)
-                }
+        const player = battle.players?.find(candidate => candidate.playerId === cardRef.playerId)
+        const cardInstance = player?.hand?.find(card => card.instanceId === cardRef.cardInstanceId)
+        if (!player || !cardInstance || cardInstance.cardId !== cardRef.cardId) continue
+        try {
+          const cardDef = loadCardById(cardRef.cardId) || (battle as any).customCards?.[cardRef.cardId]
+          if (!cardDef || cardDef.type !== 'reactive' || cardDef.trigger?.type !== context.type) continue
+          const result = executeCardFunction(cardDef, player.playerId, battle, context) as any
+          if (result?.needsOptionSelection || result?.needsTargetSelection) {
+            throw new Error(`Reactive card ${cardRef.cardId} requested unsupported interaction during ${context.type}`)
+          }
+          if (result && result.success) {
+            success = true
+            if (result.message) triggeredEffects.push(result.message)
+            if (result.blocked) blocked = true
+            if (!result.keepInHand) {
+              if (!player.discardPile) player.discardPile = []
+              const handIndex = player.hand.findIndex((card: any) => card.instanceId === cardRef.cardInstanceId)
+              if (handIndex !== -1) {
+                player.hand.splice(handIndex, 1)
+                player.discardPile.push(cardRef.cardId)
               }
             }
-          } catch (error) {
-            writeLog('Error executing reactive card ' + cardInstance.cardId + ': ' + error)
-            rethrowTriggerError(error, 'reactiveCard', cardInstance.cardId)
           }
+        } catch (error) {
+          writeLog('Error executing reactive card ' + cardRef.cardId + ': ' + error)
+          rethrowTriggerError(error, 'reactiveCard', cardRef.cardId)
         }
       }
     }
