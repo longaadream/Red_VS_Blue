@@ -18,6 +18,7 @@
   <script src="js/battle-ui/battle-legal-actions.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-ui/deployment-status.js"></script>
+  <script src="js/battle-ui/battle-tactical-geometry.js"></script>
   <script src="js/battle-ui/turn-timer-status.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
@@ -1330,6 +1331,7 @@
       .deployment-countdown { font-size: 18px; }
     }
   </style>
+  <link rel="stylesheet" href="css/battle-tactical-table.css" />
 </head>
 <body>
 
@@ -1374,7 +1376,7 @@
     <div class="cd-layout">
       <div class="cd-sheet">
       <button class="cd-close" onclick="closeCardDetail()">✕</button>
-      <div class="cd-icon" id="cdIcon">🃏</div>
+      <div class="cd-icon" id="cdIcon">牌</div>
       <div class="cd-name" id="cdName"></div>
       <div id="cdCost"></div>
       <div class="cd-type" id="cdType"></div>
@@ -1460,7 +1462,7 @@
 
   <!-- Result -->
   <div id="resultOverlay">
-    <div class="result-icon" id="resultIcon">🏆</div>
+    <div class="result-icon" id="resultIcon">结果</div>
     <div class="result-title" id="resultTitle">胜利！</div>
     <div class="result-sub" id="resultSub"></div>
     <div id="recordStatus" style="font-size:13px;color:#64748b;margin-top:12px;min-height:18px"></div>
@@ -1470,16 +1472,16 @@
 
   <!-- Topbar -->
   <div class="topbar" data-battle-ui-region="player-hud">
-    <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">← 离开</button>
+    <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">离开</button>
     <div class="room-name" id="roomNameLabel">对战</div>
     <div id="wsStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● WS</div>
-    <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">🏳 投降</button>
-    <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">🔄 切换视角 🔴</button>
-    <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">↺ 冷却</button>
-    <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">⛶</button>
+    <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">投降</button>
+    <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">切换视角 红方</button>
+    <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">冷却</button>
+    <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">全图</button>
     <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
     <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
-    <button class="btn-fullmap" aria-label="打开战斗日志" onclick="openLog()" title="战斗日志">📜</button>
+    <button class="btn-fullmap" aria-label="打开战斗日志" onclick="openLog()" title="战斗日志">日志</button>
   </div>
 
   <!-- Main layout -->
@@ -1591,22 +1593,22 @@
       <!-- Resource editor sheet (training mode) -->
       <div id="resEditorSheet" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeResourceEditor()">
         <div style="background:#0f1623;border:1px solid #334155;border-radius:14px;padding:20px 22px;min-width:260px;color:#e2e8f0;font-size:14px">
-          <div style="font-weight:700;font-size:15px;margin-bottom:14px">⚡💠 修改资源</div>
+          <div style="font-weight:700;font-size:15px;margin-bottom:14px">修改资源</div>
           <div style="display:flex;flex-direction:column;gap:10px">
             <label style="display:flex;align-items:center;gap:8px;color:#a5b4fc">
               玩家
               <select id="resEditorPlayer" onchange="_syncResourceEditorInputs(this.value)" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;padding:4px 6px">
-          <option value="training-red">🔴 红方</option>
-          <option value="training-blue">🔵 蓝方</option>
+          <option value="training-red">红方</option>
+          <option value="training-blue">蓝方</option>
               </select>
             </label>
             <label style="display:flex;align-items:center;gap:8px">
-              <span style="width:60px;color:#fbbf24">⚡ 行动</span>
+              <span style="width:60px;color:#fbbf24">行动</span>
               <input id="resEditorAP" type="number" min="0" max="20" value="10"
                 style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#fbbf24;padding:4px 8px;font-size:14px">
             </label>
             <label style="display:flex;align-items:center;gap:8px">
-              <span style="width:60px;color:#67e8f9">💠 充能</span>
+              <span style="width:60px;color:#67e8f9">充能</span>
               <input id="resEditorCP" type="number" min="0" max="20" value="0"
                 style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#67e8f9;padding:4px 8px;font-size:14px">
             </label>
@@ -2477,7 +2479,7 @@
         if (diff < 0) {
           const dead = newHp <= 0
           const big = dead || -diff >= 50
-          spawnFloater(np.x, np.y, dead ? '💀' : String(-diff), dead ? '#c4b5fd' : '#f87171', big)
+          spawnFloater(np.x, np.y, dead ? '阵亡' : String(-diff), dead ? '#c4b5fd' : '#f87171', big)
         } else if (diff > 0) {
           spawnFloater(np.x, np.y, '+' + diff, '#4ade80', false)
         }
@@ -2529,7 +2531,7 @@
       }
       const typeLabel = def.type === 'reactive' ? '被动触发' : def.type === 'passive' ? '持续' : def.type === 'active' ? '主动' : '手牌'
 
-      document.getElementById('cdIcon').textContent = def.icon || '🃏'
+      document.getElementById('cdIcon').textContent = String(def.name || cardId || '牌').slice(0, 1)
       document.getElementById('cdName').textContent = def.name || cardId
       document.getElementById('cdType').textContent = typeLabel
       document.getElementById('cdCost').innerHTML =
@@ -3521,7 +3523,7 @@
       document.body.classList.toggle('target-mode-active', active)
       if (active) {
         closePieceContextMenu()
-        if (window.matchMedia && window.matchMedia('(max-width: 760px)').matches) {
+        if (window.matchMedia && window.matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 500px)').matches) {
           const pieceInfo = document.getElementById('pieceInfoModal')
           const cardInfo = document.getElementById('cardDetailModal')
           if (pieceInfo && pieceInfo.style.display !== 'none' && pieceInfo.style.display !== '') closePieceInfo()
@@ -3826,7 +3828,7 @@
             inner = `<div class="${tokCls}">
               <div class="piece-tags">${tagsHtml}</div>
               ${imgHtml}
-              <span class="piece-tok-ph" style="${imgSrc?'display:none':'display:flex'}">${faction==='red'?'🔴':'🔵'}</span>
+              <span class="piece-tok-ph" style="${imgSrc?'display:none':'display:flex'}">${faction==='red'?'红':'蓝'}</span>
               <span class="tok-health-number ${fillCls}">${piece.health.current}</span>
             </div>`
           }
@@ -3881,7 +3883,7 @@
       const myName = myPlayerName || playerNames[myPlayerId] || '我方'
       const oppPid = oppMeta && (oppMeta.playerId || '').toLowerCase()
       const oppName = (oppPid && playerNames[oppPid]) || (oppMeta && oppMeta.name) || (myFaction === 'red' ? '对方' : '对方')
-      const alignmentText = function(alignment) { return alignment === 'light' ? '☀️ 光' : alignment === 'dark' ? '🌑 暗' : '阵营未知' }
+      const alignmentText = function(alignment) { return alignment === 'light' ? '光' : alignment === 'dark' ? '暗' : '阵营未知' }
       document.getElementById('myLabel').textContent = factionIcon + ' ' + alignmentText(playerAlignments[myPlayerId]) + ' · ' + myName
       document.getElementById('oppLabel').textContent = oppIcon + ' ' + alignmentText(playerAlignments[oppPid]) + ' · ' + oppName
 
@@ -4097,8 +4099,7 @@
         const apCost = availability.actionCost
         const cpCost = availability.chargeCost
         const disabled = !availability.available
-        const rawIcon = skData.icon || (isCharge ? '◆' : '✦')
-        const icon = /^[a-z0-9_-]{2,}$/i.test(String(rawIcon)) ? (isCharge ? '◆' : '✦') : rawIcon
+        const icon = isCharge ? '◆' : '✦'
         const status = availability.onCooldown ? 'CD ' + sk.currentCooldown
           : availability.noUses ? '已用'
             : availability.actionLow ? 'AP不足'
@@ -4117,7 +4118,7 @@
           '<span class="piece-context-skill-icon">' + escHtml(String(icon)) + '</span>' +
           '<span class="piece-context-skill-name">' + escHtml(rawName) + '</span>' +
           '<span class="piece-context-skill-cost">' +
-            (status || ('⚡' + apCost + (cpCost ? ' ◆' + cpCost : ''))) +
+            (status || ('行动 ' + apCost + (cpCost ? ' · 充能 ' + cpCost : ''))) +
           '</span></button>'
       }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
       skillsContainer.innerHTML = moveButton + skillButtons
@@ -4141,7 +4142,7 @@
           const handBadge = document.createElement('div')
           handBadge.className = 'hud-hand'
           handBadge.title = '手牌'
-          handBadge.innerHTML = '🃏 <span id="hudHandCount">0</span>'
+          handBadge.innerHTML = '手牌 <span id="hudHandCount">0</span>'
           topbar.appendChild(handBadge)
           hudHand = document.getElementById('hudHandCount')
         }
@@ -4168,7 +4169,7 @@
         if (isReactive) cls += ' card-reactive'
 
         const gemCls = cost === 0 ? 'free' : ''
-        const icon = def.icon || '*'
+        const icon = escHtml(String(def.name || card.cardId || '牌').slice(0, 1))
         const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
         const artSrc = def.image ? `images/card-art/${def.image}` : null
         const artContent = artSrc
@@ -4228,7 +4229,7 @@
       // First click: select/preview the card
       pendingCardAction = { cardInstanceId, cardId }
       renderHand()
-      setStatusMsg('🃏 再次点击释放，点其他地方取消')
+      setStatusMsg('再次点击释放，点其他地方取消')
     }
 
     function renderTurnTimerStatus() {
@@ -4487,7 +4488,7 @@
         }
         // 合法性拦截：只允许点击高亮格
         if (!validMoves.has(x + ',' + y)) {
-          setStatusMsg('❌ 无法移动到该位置')
+          setStatusMsg('无法移动到该位置')
           return
         }
         doAction({ type: 'move', playerId: myPlayerId, pieceId: selectedPieceId, toX: x, toY: y })
@@ -5330,7 +5331,7 @@
   <!-- Fullscreen log overlay -->
   <div id="logOverlay">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #334155;flex-shrink:0;background:#070f1e">
-      <div style="font-size:15px;font-weight:700;color:#e2e8f0">📜 战斗日志</div>
+      <div class="battle-log-title" aria-label="战斗日志" style="font-size:15px;font-weight:700;color:#e2e8f0">📜 战斗日志</div>
       <div style="display:flex;gap:8px;align-items:center">
         <button onclick="clearLog()" style="background:none;border:1px solid #334155;border-radius:6px;color:#64748b;padding:4px 10px;font-size:12px;cursor:pointer">清空</button>
         <button onclick="closeLog()" style="background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">✕</button>
@@ -5342,7 +5343,7 @@
   <!-- Surrender confirm overlay -->
   <div id="surrenderConfirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
     <div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px 24px;max-width:300px;width:90%;text-align:center">
-      <div style="font-size:32px;margin-bottom:12px">🏳️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:12px;color:#fca5a5">投降确认</div>
       <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0">确认投降？</div>
       <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">这将立即结束对战。</div>
       <div style="display:flex;gap:10px;justify-content:center">
