@@ -3,9 +3,9 @@
 ## Comparison target
 
 - Source visual truth: docs/product/main-menu-screenprint-reference-v1.png
-- Rendered implementation: output/playwright/13-post-rebase-final-1280x800.png
-- Responsive evidence: output/playwright/14-post-rebase-final-960x640.png
-- Mode chooser evidence: output/playwright/16-post-rebase-mode-chooser-1280x800.png
+- Rendered implementation: output/playwright/13-post-rebase-final-1280x800.jpg
+- Responsive evidence: output/playwright/14-post-rebase-final-960x640.jpg
+- Mode chooser evidence: output/playwright/16-post-rebase-mode-chooser-1280x800.jpg
 - Final side-by-side comparison: output/playwright/15-post-rebase-reference-vs-implementation.jpg
 - State: local identity named “玩家”, default local rating ELO 1200, no local match records, main menu at rest.
 
