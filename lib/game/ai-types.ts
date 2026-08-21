@@ -1,3 +1,205 @@
+import type { BoardMap } from './map'
+import type { PieceInstance, PieceSkill } from './piece'
+import type { BattleAction, BattleActionLog, BattleState, TurnState } from './turn'
+import type { TerminalResult } from './terminal'
+import type { TargetRef } from './targeting'
+import type { BattleActionTrace } from './battle-trace'
+
+export const AI_ENVIRONMENT_PROTOCOL_VERSION = 1 as const
+
+export type AIEnvironmentProtocolVersion = typeof AI_ENVIRONMENT_PROTOCOL_VERSION
+
+export type CandidateActionKind =
+  | 'deployment-choice'
+  | 'deployment-lock'
+  | 'phase-advance'
+  | 'pending-option'
+  | 'pending-target'
+  | 'cancel-selection'
+  | 'move'
+  | 'basic-skill'
+  | 'charge-skill'
+  | 'card'
+  | 'end-turn'
+
+export interface CandidateAction {
+  protocolVersion: AIEnvironmentProtocolVersion
+  id: string
+  kind: CandidateActionKind
+  action: BattleAction
+}
+
+export type AIUnsupportedActionType =
+  | 'deploymentTimeout'
+  | 'grantChargePoints'
+  | 'surrender'
+
+export interface AIEnvironmentCapabilities {
+  protocolVersion: AIEnvironmentProtocolVersion
+  supportedActionTypes: readonly BattleAction['type'][]
+  unsupportedActionTypes: ReadonlyArray<{
+    type: AIUnsupportedActionType
+    reason: string
+  }>
+}
+
+export interface AIObservedPlayer {
+  playerId: string
+  name?: string
+  chargePoints: number
+  actionPoints: number
+  maxActionPoints: number
+  handCount: number
+  hand?: BattleState['players'][number]['hand']
+  discardPile: string[]
+  statusTags?: AIObservedStatusTag[]
+  skills?: Array<{ skillId: string; currentCooldown?: number }>
+}
+
+export interface AIObservedStatusTag {
+  id: string
+  type: string
+  name?: string
+  currentDuration?: number
+  remainingDuration?: number
+  currentUses?: number
+  intensity?: number
+  stacks?: number
+  value?: number
+  extraValue?: number
+  centerX?: number
+  centerY?: number
+  damage?: number
+  visible?: boolean
+}
+
+export interface AIObservedPiece {
+  instanceId: string
+  isCore?: boolean
+  templateId: string
+  name: string
+  ownerPlayerId: string
+  faction: PieceInstance['faction']
+  currentHp: number
+  maxHp: number
+  attack: number
+  defense: number
+  x: number | null
+  y: number | null
+  moveRange: number
+  skills: PieceSkill[]
+  displaySkills?: PieceSkill[]
+  buffs: PieceInstance['buffs']
+  debuffs: PieceInstance['debuffs']
+  shield?: number
+  statusTags: AIObservedStatusTag[]
+}
+
+export interface AIObservation {
+  protocolVersion: AIEnvironmentProtocolVersion
+  playerId: string
+  stateRevision: number
+  map: BoardMap
+  pieces: AIObservedPiece[]
+  graveyard: AIObservedPiece[]
+  players: AIObservedPlayer[]
+  turn: TurnState
+  terminalResult?: TerminalResult
+  deployment?: {
+    status: 'awaiting-locks' | 'complete'
+    playerIds: string[]
+    locks: Record<string, { locked: boolean }>
+    deadlineAt: number
+    revision: number
+    initialPositions: Record<string, { x: number; y: number }>
+    finalPositions?: Record<string, { x: number; y: number }>
+  }
+  pendingOptionSelection?: {
+    playerId: string
+    title: string
+    options: unknown[]
+    canCancel: boolean
+  }
+  pendingTargetSelection?: {
+    playerId: string
+    title?: string
+    targetType: 'piece' | 'cell' | 'grid'
+    selectionId?: string
+    stateRevision?: number
+    step: number
+    candidates: TargetRef[]
+    selectedTargets: TargetRef[]
+    canCancel: boolean
+  }
+}
+
+export interface AIStateDiffEntry {
+  path: string
+  before?: unknown
+  after?: unknown
+}
+
+export interface AITransitionTrace {
+  actionTrace?: BattleActionTrace
+  actionLog: BattleActionLog[]
+  stateChanges: AIStateDiffEntry[]
+}
+
+export interface AIEnvironmentError {
+  code: string
+  name: string
+  message: string
+  determinism?: {
+    rootSeed: number
+    streamName: string
+    cursor: number
+    turn: number
+    playerId: string
+    actionId: string
+  }
+}
+
+export type TransitionResult =
+  | {
+      protocolVersion: AIEnvironmentProtocolVersion
+      accepted: true
+      state: BattleState
+      stateHash: string
+      transitionHash: string
+      trace: AITransitionTrace
+    }
+  | {
+      protocolVersion: AIEnvironmentProtocolVersion
+      accepted: false
+      state: BattleState
+      stateHash: string
+      transitionHash: string
+      error: AIEnvironmentError
+      trace: AITransitionTrace
+    }
+
+export interface AISimulationContext {
+  rootSeed?: number
+}
+
+export type AIObservationScope =
+  | { kind: 'full' }
+  | { kind: 'player'; playerId: string }
+
+export interface AIEnvironment {
+  readonly protocolVersion: AIEnvironmentProtocolVersion
+  readonly capabilities: AIEnvironmentCapabilities
+  observe(state: BattleState, playerId: string): AIObservation
+  listLegalActions(state: BattleState, playerId: string): CandidateAction[]
+  simulate(
+    state: BattleState,
+    action: CandidateAction | BattleAction,
+    context?: AISimulationContext,
+  ): TransitionResult
+  isTerminal(state: BattleState): boolean
+  stateKey(state: BattleState, scope: AIObservationScope): string
+}
+
 /** Versioned, rule-independent vocabulary consumed by AI observers and planners. */
 export const AI_SEMANTICS_SCHEMA_VERSION = 1 as const
 
