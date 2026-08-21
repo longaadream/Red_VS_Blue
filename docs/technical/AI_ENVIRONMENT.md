@@ -63,7 +63,7 @@ interface AIEnvironment {
 | 普通移动 | `getLegalNormalMoveTargetsForPlayer()` |
 | 基础/充能技能 | 棋子技能实例、正式技能定义、`prepareAction()` |
 | 卡牌 | 当前玩家手牌、正式卡牌定义、`prepareAction()` |
-| pending option/target | 当前版本化 pending session；target 逐个调用正式 pending validator |
+| pending option/target | 当前版本化 pending session；option 与 target 都携带 `selectionId` / `stateRevision` 并调用正式 validator；只有 `canCancel !== false` 才枚举取消 |
 | endTurn | 当前行动玩家的正式命令 |
 
 多阶段技能/卡牌不会返回半成品。环境递归消费 `needOption` / `needTarget`，在每一步携带相同的 `selectionId` 和 `stateRevision`，直到 `prepareAction()` 返回 `ready`。空候选不发明 fallback；超过 16 个选择步骤以 `AI_ENV_SELECTION_DEPTH_EXCEEDED` 失败关闭。

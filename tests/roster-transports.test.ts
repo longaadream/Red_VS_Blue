@@ -544,11 +544,72 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(completed.status).toBe(200)
 
     const completedState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
-      state: { deployment: { status: string }; gameStartFired?: boolean; turn: { phase: string } }
+      state: {
+        deployment: { status: string }
+        gameStartFired?: boolean
+        turn: { phase: string }
+        pendingTargetSelection?: {
+          playerId: string
+          selectionId: string
+          stateRevision: number
+          source?: { id?: string }
+        }
+      }
     }).state
     expect(completedState.deployment.status).toBe('complete')
     expect(completedState.gameStartFired).toBe(true)
-    expect(completedState.turn.phase).toBe('action')
+    expect(completedState.turn.phase).toBe('start')
+    expect(completedState.pendingTargetSelection).toMatchObject({
+      playerId: firstIdentity.id,
+      source: { id: 'rule-minato-anchor-begin-turn' },
+    })
+
+    const minato = completedState.pendingTargetSelection!
+    const cancelled = await httpBattleAction(roomId, firstIdentity.id, {
+      type: 'cancelPendingSelection',
+      playerId: firstIdentity.id,
+      selectionId: minato.selectionId,
+      stateRevision: minato.stateRevision,
+      clientActionId: 'alice-pve-cancel-minato',
+    }, firstIdentity.id, firstIdentity)
+    expect(cancelled.status).toBe(200)
+
+    const watcherState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
+      state: {
+        turn: { phase: string }
+        pendingOptionSelection?: {
+          playerId: string
+          selectionId: string
+          stateRevision: number
+          canCancel?: boolean
+          source?: { id?: string }
+        }
+      }
+    }).state
+    expect(watcherState.turn.phase).toBe('start')
+    expect(watcherState.pendingOptionSelection).toMatchObject({
+      playerId: firstIdentity.id,
+      canCancel: false,
+      source: { id: 'rule-watcher-form' },
+    })
+
+    const watcher = watcherState.pendingOptionSelection!
+    const resolved = await httpBattleAction(roomId, firstIdentity.id, {
+      type: 'pendingOptionSelect',
+      playerId: firstIdentity.id,
+      selectedOption: 'calm',
+      selectionId: watcher.selectionId,
+      stateRevision: watcher.stateRevision,
+      clientActionId: 'alice-pve-watcher-calm',
+    }, firstIdentity.id, firstIdentity)
+    expect(resolved.status).toBe(200)
+
+    const actionState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
+      state: { turn: { phase: string }; pendingOptionSelection?: unknown; pendingTargetSelection?: unknown }
+    }).state
+    expect(actionState.turn.phase).toBe('action')
+    expect(actionState.pendingOptionSelection).toBeUndefined()
+    expect(actionState.pendingTargetSelection).toBeUndefined()
   })
 
   it('returns equivalent stable errors and leaves state untouched', async () => {

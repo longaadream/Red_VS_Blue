@@ -6,7 +6,7 @@ import type { SkillDefinition, SkillState } from "./skills"
 import type { BattleState, PlayerId } from "./turn"
 import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
-import { globalTriggerSystem } from "./triggers"
+import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { loadRuleById } from './skills'
 import path from 'path'
 import fs from 'fs'
@@ -17,19 +17,29 @@ import { RANDOM_STREAM_NAMES, RuleRuntime, withRuleRuntime } from './rule-runtim
 import { DEPLOYMENT_DURATION_MS } from './deployment'
 
 export const DEMO_FIXED_MAP_ID = 'large-hole-arena'
+
+function assertSetupTriggerIsSynchronous(result: TriggerResult, eventType: string): void {
+  if (!result.needsOptionSelection && !result.needsTargetSelection) return
+  const kind = result.needsOptionSelection ? 'option' : 'target'
+  const error = new Error(`[${eventType}] interactive ${kind} trigger is unsupported during battle setup`) as Error & { code?: string }
+  error.name = 'InteractiveTriggerUnsupportedError'
+  error.code = 'INTERACTIVE_TRIGGER_UNSUPPORTED'
+  throw error
+}
 function fireInitialGameStart(state: BattleState): void {
   if (state.gameStartFired || state.turn.turnNumber !== 1) return
 
   state.gameStartFired = true
 
   for (const piece of [...state.pieces]) {
-    globalTriggerSystem.checkTriggers(state, {
+    const result = globalTriggerSystem.checkTriggers(state, {
       type: "afterPieceSummoned",
       playerId: piece.ownerPlayerId,
       sourcePiece: piece,
       pieceTemplateId: piece.templateId,
       faction: piece.faction,
     } as any)
+    assertSetupTriggerIsSynchronous(result, 'afterPieceSummoned')
   }
 
   const result = globalTriggerSystem.checkTriggers(state, {
@@ -37,6 +47,7 @@ function fireInitialGameStart(state: BattleState): void {
     playerId: state.turn.currentPlayerId,
     turnNumber: state.turn.turnNumber,
   })
+  assertSetupTriggerIsSynchronous(result, 'gameStart')
 
   writeLog('[createInitialBattle] gameStart result: ' + JSON.stringify(result))
   if (result.success && result.messages.length > 0) {

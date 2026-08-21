@@ -110,6 +110,7 @@
 - [`ADR-0012-ai-observation-semantics.md`](./ADR-0012-ai-observation-semantics.md)：版本化 AI 观察、机制语义与候选动作特征合同（RED-85，提议中）。
 - [`ADR-0013-headless-ai-environment.md`](./ADR-0013-headless-ai-environment.md)：提议以版本化 observation、完整候选和隔离 transition 统一通用 AI 的规则消费边界（RED-84）。
 - [`ADR-0014-authoritative-growing-turn-timer.md`](./ADR-0014-authoritative-growing-turn-timer.md)：服务端权威成长型回合计时、快速烧绳与连续超时投降（RED-36，提议中）。
+- [`ADR-0015-authoritative-pending-interaction-lifecycle.md`](./ADR-0015-authoritative-pending-interaction-lifecycle.md)：统一 option/target 会话凭证、取消语义、规则队列续接与不支持调用点的失败关闭（RED-97，提议中）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

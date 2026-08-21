@@ -590,6 +590,7 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 | 稳定 hash 与 Action Trace | `lib/game/battle-trace.ts` |
 | Runner 与回放 | `lib/game/battle-runner.ts` |
 | 权威目标查询 | `lib/game/targeting.ts` |
+| 权威 option 会话与交互续接 | `lib/game/pending-interaction.ts`、`lib/game/turn.ts` |
 | 空间、移动与弹道事实 | `lib/game/spatial.ts` |
 | 技能、卡牌、伤害、治疗 | `lib/game/skills.ts` |
 | 触发器与事件链 | `lib/game/triggers.ts` |
@@ -678,3 +679,12 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 - 超时推进到 `bot` 的 action phase 时，调度器调用统一 bot-turn 队列，PVE 不会等待机器人自己的 deadline。
 
 实现决策见 [ADR-0014](../decisions/ADR-0014-authoritative-growing-turn-timer.md)，专项验证见 [RED-36 QA](../qa/RED-36-authoritative-turn-timer.md)。
+
+
+## RED-97 2026-08-21 交互生命周期修订
+
+- option 与 target 均使用带 `selectionId` 和 `stateRevision` 的服务端权威会话；非法、过期、重复或错误玩家提交在克隆前拒绝。
+- 可续接事件保存当前消费者、剩余规则队列、冻结响应卡快照和原动作。取消只处理当前消费者，并继续原队列；`canCancel: false` 不得由 UI、AI 或规则核心绕过。
+- 回合阶段、成本、冷却、手牌和成功日志只能在整条交互链完成后提交一次。内部 continuation 只来自已验证会话，客户端同名字段没有授权效果。
+- 不能安全续接的同步触发入口收到交互结果时以 `INTERACTIVE_TRIGGER_UNSUPPORTED` 失败关闭，由当前命令回滚，不再静默吞掉。
+- UI 的一次目标提交若被拒绝但权威会话仍存在，保留选择态并允许重试。详细决策见 [ADR-0015](../decisions/ADR-0015-authoritative-pending-interaction-lifecycle.md)。

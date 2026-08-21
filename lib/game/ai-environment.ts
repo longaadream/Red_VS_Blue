@@ -177,7 +177,9 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
       playerId: pendingOption.playerId,
       title: pendingOption.title,
       options: cloneSerializable(pendingOption.options),
-      canCancel: true,
+      selectionId: pendingOption.selectionId,
+      stateRevision: pendingOption.stateRevision,
+      canCancel: pendingOption.canCancel !== false,
     } : undefined,
     pendingTargetSelection: pendingTarget && samePlayer(
       pendingTarget.ownerPlayerId || pendingTarget.playerId,
@@ -278,9 +280,20 @@ function pendingCandidates(state: BattleState, playerId: string): CandidateActio
     ))
       .sort((left, right) => compareStableText(stableJson(left), stableJson(right)))
       .map(selectedOption => candidate('pending-option', {
-        type: 'pendingOptionSelect', playerId, selectedOption,
+        type: 'pendingOptionSelect',
+        playerId,
+        selectedOption,
+        selectionId: pendingOption.selectionId,
+        stateRevision: pendingOption.stateRevision,
       }))
-    options.push(candidate('cancel-selection', { type: 'cancelPendingSelection', playerId }))
+    if (pendingOption.canCancel !== false) {
+      options.push(candidate('cancel-selection', {
+        type: 'cancelPendingSelection',
+        playerId,
+        selectionId: pendingOption.selectionId,
+        stateRevision: pendingOption.stateRevision,
+      }))
+    }
     return sortCandidates(options)
   }
 
