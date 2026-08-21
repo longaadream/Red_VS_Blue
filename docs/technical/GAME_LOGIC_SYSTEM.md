@@ -656,4 +656,4 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 
 接口提供版本化 `observe/listLegalActions/simulate/isTerminal/stateKey`。Observation 是显式玩家投影，不是完整 `BattleState`；对手手牌、隐藏状态、Rule/effect、私有部署选择、其他玩家 pending 内容和 debug trace 均不暴露。多阶段 option/target 会展开为带选择凭证的完整命令，候选使用固定类别和 stable JSON tie-breaker。
 
-`simulate()` 只返回隔离状态、正式 state hash、稳定 transition hash、Action Trace、动作日志增量和状态 diff，不保存房间或广播。没有显式或已记录 root seed 时失败关闭。详细合同见 [`AI_ENVIRONMENT.md`](./AI_ENVIRONMENT.md)，决策见 [`ADR-0012`](../decisions/ADR-0012-headless-ai-environment.md)。
+`simulate()` 只返回隔离状态、正式 state hash、稳定 transition hash、Action Trace、动作日志增量和状态 diff，不保存房间或广播。没有显式或已记录 root seed 时失败关闭。详细合同见 [`AI_ENVIRONMENT.md`](./AI_ENVIRONMENT.md)，决策见 [`ADR-0013`](../decisions/ADR-0013-headless-ai-environment.md)。
