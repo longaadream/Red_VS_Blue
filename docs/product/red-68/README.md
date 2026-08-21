@@ -55,11 +55,11 @@ Additional acceptance evidence:
 
 - Perspective-focused renderer and presentation-boundary regression set: 3 files and 27 tests passed.
 - RED-68 renderer-only regression set: 2 files and 14 tests passed.
-- Full suite after the perspective change: 71 files and 565 tests passed.
+- RED-36 timer plus RED-68 perspective merge regression set: 4 files and 29 tests passed.
+- Full suite after integrating current `origin/main`: 75 files and 598 tests passed; `check:main-baseline` reported Ahead 11 / Behind 0.
 - `npm run typecheck`: passed.
-- `npm run check:encoding`: passed for 555 text files.
+- `npm run check:encoding`: passed for 563 text files.
 - `npm run lint`: repository configuration stops before source lint because its last flat-config object references `import/no-anonymous-default-export` without registering the installed `eslint-plugin-import`.
-- A temporary uncommitted mirror config that only adds that plugin mapping ran full ESLint with zero errors and zero warnings. The config was deleted after the gate.
 
 ## Remaining manual check
 
