@@ -51,8 +51,8 @@
       if (mounted && renderer.animateAction) renderer.animateAction(action, previousModel, nextModel)
     }
 
-    function spawnFloater(x, y, text, color, big) {
-      if (mounted && renderer.spawnFloater) renderer.spawnFloater(x, y, text, color, big)
+    function spawnFloater(x, y, text, color, big, options) {
+      if (mounted && renderer.spawnFloater) renderer.spawnFloater(x, y, text, color, big, options)
     }
 
     function resize() { if (mounted) renderer.resize() }
