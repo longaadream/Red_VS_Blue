@@ -247,3 +247,73 @@ export interface AiCandidateActionFeatures {
   compatibility: AiCompatibility
   diagnostics?: string
 }
+
+/** Stable, versioned configuration for the generic turn planner. */
+export interface AiPlannerConfig {
+  version: 1
+  nodeBudget: number
+  beamWidth: number
+  maxActions: number
+  candidateLimit: number
+  /** Non-structural actions at or below this immediate utility are not expanded. */
+  minActionScore: number
+  weights: Readonly<Record<string, number>>
+}
+
+export type AiTurnGoalKind = 'eliminate' | 'protect' | 'control' | 'reposition' | 'conserve'
+
+export interface AiTurnGoal {
+  kind: AiTurnGoalKind
+  targetId?: string
+  rationale: string
+}
+
+/** Caller-owned guard state carried only across accepted actions in one authoritative turn. */
+export interface AiPlannerContinuation {
+  version: 1
+  playerId: string
+  rootSeed: number
+  turnNumber: number
+  actionsTaken: number
+  visitedStateKeys: readonly string[]
+}
+
+export interface AiPlannerScore {
+  total: number
+  components: Readonly<Record<string, number>>
+}
+
+export interface AiPlannerTraceEntry {
+  candidateId: string
+  action: BattleAction
+  score: AiPlannerScore
+  depth: number
+  candidateRank: number
+  compatibility: AiCompatibility
+  contentId?: string
+  pruned?: string
+  pruneDetail?: string
+  rejected?: string
+}
+
+export type AiPlannerStopReason =
+  | 'completed-turn'
+  | 'terminal'
+  | 'no-legal-actions'
+  | 'budget-exhausted'
+  | 'action-limit'
+
+export interface AiTurnPlan {
+  configVersion: number
+  goal: AiTurnGoal
+  goalChanged: boolean
+  continuation: AiPlannerContinuation
+  actions: CandidateAction[]
+  /** The only action an authoritative caller may submit. Undefined means stop safely. */
+  nextAction?: CandidateAction
+  nodesVisited: number
+  candidatesConsidered: number
+  stateDuplicates: number
+  stopReason: AiPlannerStopReason
+  trace: AiPlannerTraceEntry[]
+}
