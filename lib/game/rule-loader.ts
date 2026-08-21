@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import type { TriggerRule } from './triggers'
 import { executeSkillFunction } from './skills'
+import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import { getRuleDate, getRuleMath } from './rule-runtime'
 import { manhattanDistance } from './spatial'
 
@@ -390,7 +391,7 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                 message = `技能 ${effect.skillId} 未找到`
               }
             } else if (context.playerId) {
-              // 玩家级规则触发技能（无棋子上下文），直接 eval 执行技能代码
+              // 玩家级规则触发技能（无棋子上下文），通过统一运行时执行技能代码
               const skillDef = battle.skillsById[effect.skillId]
               if (skillDef?.code) {
                 try {
@@ -414,9 +415,10 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                     playerId: context.playerId
                   }
                   const skillCode = skillDef.code
-                  const executeRuleSkill = eval(
-                    `(function(context, Math, Date) { ${skillCode}; return executeSkill(context); })`,
-                  ) as (context: unknown, math: Math, date: DateConstructor) => { success?: boolean; message?: string } | undefined
+                  const executeRuleSkill = dynamicCodeRuntime.compileExpression<(context: unknown, math: Math, date: DateConstructor) => { success?: boolean; message?: string }>({
+                    surface: 'ruleTriggerSkill', contentId: effect.skillId,
+                    code: `(function(context, Math, Date) { ${skillCode}; return executeSkill(context); })`, entry: 'executeSkill(context)',
+                  })
                   const skillResult = executeRuleSkill(playerSkillContext, getRuleMath(), getRuleDate())
                   if (skillResult?.success) {
                     message = skillResult.message || resolveMessage(effect.message, context)

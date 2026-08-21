@@ -33,6 +33,7 @@
     "watch:pages": "node scripts/sync-pages.js --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "benchmark:skillcode-runtime": "node scripts/benchmark-skillcode-runtime.mjs",
     "smoke:electron:windows": "node tests/electron/windows-smoke.mjs",
     "rvb": "node scripts/rvb.mjs",
     "typecheck": "next typegen && tsc --noEmit"
