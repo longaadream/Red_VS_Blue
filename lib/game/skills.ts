@@ -5,6 +5,7 @@ import { rng } from "./rng"
 import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
+import { dynamicCodeRuntime } from './dynamic-code-runtime'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -515,9 +516,12 @@ export function executeCardFunction(
         ${cardDef.code}
 
         return executeCard(context);
-      })(env)
+      })
     `
-    const result = eval(fullCode)
+    const executeCard = dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
+      surface: 'cardCode', contentId: cardDef.id, code: fullCode, entry: 'executeCard(context)',
+    })
+    const result = executeCard(env)
     return result || { success: false, message: '卡牌效果无返回值' }
   } catch (error: any) {
     if (error?.needsTargetSelection) return error as SkillExecutionResult
@@ -755,7 +759,9 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               const ctr = (context.rulePiece?.statusTags ?? []).find((t: any) => t.type === 'shishio-dmg-counter');
               console.log(`[combustion-debug] skillId="${context.skillId ?? 'undefined'}" damage=${context.damage} src=${context.sourcePiece?.name} tgt=${context.targetPiece?.name} counter_before=${ctr?.intensity ?? 0}`);
             }
-            const executeRuleCode = eval(codeEnvironment);
+            const executeRuleCode = dynamicCodeRuntime.compileExpression<any>({
+              surface: 'ruleSkillCode', contentId: ruleId, code: codeEnvironment, entry: 'rule skillCode body',
+            });
             const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate());
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
@@ -1057,12 +1063,15 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                       ${skillDef.code}
 
                       return executeSkill(context);
-                    })(skillEnvironment)
+                    })
                   `;
                   
                   // 执行技能代码
                   writeLog(`[triggerSkill] Executing skill code for ${skillId}...`);
-                  const result = eval(fullSkillCode);
+                  const executeTriggeredSkill = dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
+                    surface: 'ruleTriggerSkill', contentId: skillId, code: fullSkillCode, entry: 'executeSkill(context)',
+                  });
+                  const result = executeTriggeredSkill(skillEnvironment);
                   writeLog(`[triggerSkill] Skill execution result for ${skillId}: ${JSON.stringify(result)}`);
                   console.log(`Skill execution result:`, result);
                   return result;
@@ -2911,13 +2920,13 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       enemies: battle.pieces.filter(p => p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0).map(p => ({ instanceId: p.instanceId, currentHp: p.currentHp }))
     };
 
-    // 执行技能定义中的代码（所有技能统一走 eval 路径，不存在硬编码分支）
+    // 执行技能定义中的代码（所有技能统一走动态代码运行时，不存在硬编码分支）
     if (skillDef.code) {
       try {
-        console.log('Executing skill code via eval, skillId:', skillDef.id);
+        console.log('Executing skill code via dynamic runtime, skillId:', skillDef.id);
         console.log('Skill code:', skillDef.code.substring(0, 100) + '...');
         {
-          // 所有技能通过 eval 执行，确保效果完全由 code 字段控制
+          // 所有技能经统一动态代码运行时执行，确保效果完全由 code 字段控制
           const fullSkillCode = `
             (function(environment) {
               // 定义全局变量
@@ -2960,14 +2969,17 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               
               // 执行技能
               return executeSkill(context);
-            })(skillEnvironment)
+            })
           `;
 
           // 调试：检查 skillEnvironment 中是否包含 addPlayerRuleById
           console.log('[executeSkillFunction] skillEnvironment.addPlayerRuleById:', typeof skillEnvironment.addPlayerRuleById);
           
           // 执行技能代码
-          let result = eval(fullSkillCode);
+          const executeSkill = dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
+            surface: 'skillCode', contentId: skillDef.id, code: fullSkillCode, entry: 'executeSkill(context)',
+          });
+          let result = executeSkill(skillEnvironment);
           
           console.log('Skill execution result:', result);
           console.log('result.needsOptionSelection:', result && result.needsOptionSelection);
@@ -3083,14 +3095,22 @@ export function calculateSkillPreview(skillDef: SkillDefinition, piece: PieceIns
 
       // 构建预览函数执行代码
       const previewCode = `
-        (function() {
+        (function(environment) {
+          const piece = environment.piece;
+          const skillDef = environment.skillDef;
+          const currentCooldown = environment.currentCooldown;
+          const calculateDistance = environment.calculateDistance;
+          const Math = environment.Math;
           ${skillDef.previewCode}
           return calculatePreview(piece, skillDef, currentCooldown);
-        })()
+        })
       `
 
       // 执行预览函数
-      const result = eval(previewCode)
+      const calculatePreview = dynamicCodeRuntime.compileExpression<(environment: typeof previewEnvironment) => any>({
+        surface: 'previewCode', contentId: skillDef.id, code: previewCode, entry: 'calculatePreview(piece, skillDef, currentCooldown)',
+      })
+      const result = calculatePreview(previewEnvironment)
       // 添加冷却信息和充能点数信息
       return {
         ...result,

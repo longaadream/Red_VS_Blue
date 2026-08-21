@@ -8,6 +8,9 @@ import {
   createPublicBattleSnapshot,
   createPublicRoomSnapshot,
   dispatchRoomBattleAction,
+  getRoomBattleAuthorityNow,
+  runWithRoomBattleAuthorityPaused,
+  scheduleRoomBattleTimeout,
   type PublicBattleSnapshot,
 } from './game/room-battle-actions'
 import {
@@ -619,30 +622,45 @@ async function restartWsServer(): Promise<void> {
                       'Signed battle player does not match the subscribed connection identity',
                     )
                   }
-                  const result = await dispatchRoomBattleAction(roomStore, _roomId, verified.playerId, msg.action as any)
+                  const result = await dispatchRoomBattleAction(
+                    roomStore,
+                    _roomId,
+                    verified.playerId,
+                    msg.action as any,
+                    {
+                      onCommittedBeforeTimerResume: snapshot => {
+                        broadcastBattleSnapshot(_roomId, snapshot)
+                      },
+                    },
+                  )
                   const stateUpdate = {
                     type: 'stateUpdate',
                     ...result.snapshot,
                     duplicate: result.kind === 'duplicate',
                   }
                   if (result.kind === 'duplicate') sendJson(sender, stateUpdate)
-                  else broadcastToRoom(_roomId, stateUpdate)
+                  else if (!result.finalSnapshotAlreadyDelivered) {
+                    broadcastToRoom(_roomId, stateUpdate)
+                  }
+                  await scheduleRoomBattleTimeout(roomStore, _roomId, {
+                    onCommitted: snapshot => broadcastBattleSnapshot(_roomId, snapshot),
+                    onBotTurnReady: snapshot => {
+                      queueBotTurnIfReady(_roomId, snapshot.state)
+                    },
+                  })
                   if (result.kind === 'expired') {
+                    const turnExpired = result.expiredReason === 'turn'
                     sendActionError(sender, {
-                      error: 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
-                      code: 'DEPLOYMENT_EXPIRED',
+                      error: turnExpired
+                        ? 'Turn deadline elapsed; the authoritative timeout was committed instead.'
+                        : 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
+                      code: turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
                       action: msg.action,
                       ...result.snapshot,
                     })
                     return
                   }
-                  // PVE: if it's now the bot's action phase, run AI after a short delay
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const st = result.actionResult.state as any
-                  const hasBotPlayer = (room.players as any[]).some(p => p.isBot === true || p.id === 'bot')
-                  if (!st?.terminalResult && hasBotPlayer && st?.turn?.phase === 'action' && st?.turn?.currentPlayerId === 'bot') {
-                    setTimeout(() => { runBotTurn(_roomId).catch(() => {}) }, 800)
-                  }
+                  queueBotTurnIfReady(_roomId, result.actionResult.state)
                 } catch (err) {
                   const message = err instanceof Error ? err.message : String(err)
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -702,7 +720,29 @@ export function startWsServer(): Promise<void> {
 }
 
 // ── PVE: run the bot's entire turn server-side ───────────────────────────────
+export function queueBotTurnIfReady(
+  roomId: string,
+  state: PublicBattleSnapshot['state'],
+  delayMs = 800,
+): boolean {
+  if (
+    state.terminalResult
+    || state.turn.phase !== 'action'
+    || state.turn.currentPlayerId !== 'bot'
+  ) {
+    return false
+  }
+  setTimeout(() => {
+    runBotTurn(roomId).catch(() => {})
+  }, delayMs)
+  return true
+}
+
 async function runBotTurn(roomId: string): Promise<void> {
+  return runWithRoomBattleAuthorityPaused(roomId, () => runBotTurnWhilePaused(roomId))
+}
+
+async function runBotTurnWhilePaused(roomId: string): Promise<void> {
   try {
     const room = await roomStore.getRoom(roomId)
     if (!room) return
@@ -715,7 +755,7 @@ async function runBotTurn(roomId: string): Promise<void> {
 
     const { generateBotActions, prepareBotAction } = await import('./game/ai')
     const hydratedState = withServerSkills(storage.state)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const receivedAt = getRoomBattleAuthorityNow(roomId)
     let currentState: any = storage.state
 
     const actions = generateBotActions(hydratedState as any, 'bot')
@@ -744,11 +784,35 @@ async function runBotTurn(roomId: string): Promise<void> {
         try { currentState = runBattleAction(currentState, { type: 'beginPhase' } as any, { rootSeed: storage.seed }).state } catch {}
       }
     }
+    if (
+      !currentState?.terminalResult
+      && (
+        currentState?.turn?.turnNumber !== st?.turn?.turnNumber
+        || currentState?.turn?.currentPlayerId !== st?.turn?.currentPlayerId
+        || currentState?.turn?.phase !== st?.turn?.phase
+      )
+    ) {
+      const now = getRoomBattleAuthorityNow(roomId)
+      currentState = runBattleAction(currentState, {
+        type: 'turnTimerSync',
+        receivedAt,
+        now,
+        actorPlayerId: 'bot',
+        acceptedActionType: 'endTurn',
+        clientActionId: `system-bot-turn-timer-sync:${roomId}:${currentState.turn.turnNumber}`,
+      }, { rootSeed: storage.seed }).state
+    }
 
     storage.state = currentState
     try {
       const committedRoom = await persistAuthoritativeBattleState({ roomId, room, storage })
       broadcastBattleSnapshot(roomId, createPublicBattleSnapshot(committedRoom))
+      await scheduleRoomBattleTimeout(roomStore, roomId, {
+        onCommitted: snapshot => broadcastBattleSnapshot(roomId, snapshot),
+        onBotTurnReady: snapshot => {
+          queueBotTurnIfReady(roomId, snapshot.state)
+        },
+      })
     } catch (error) {
       // A player command won the room-version race; discard this stale bot turn.
       if (isBattleStateConflict(error)) return

@@ -371,3 +371,20 @@ interface ServerCore {
 - `/api/ws-info` 仅作为诊断接口返回 `{ transport: 'same-origin', path: '/ws/rooms/{roomId}' }`，不得暴露或参与选择内部端口。
 - LAN/UDP/快速扫描只发现可通过 `/api/ping` 访问的完整 HTTP origin，加入后 WebSocket 必须连接该 origin，而不是第二个地址。
 - 传输模式按服务器地址判定：本机与私网地址走 LAN 权威主机；公网地址走 Relay，显式 `relay=1` 仅用于本机 Relay 调试，二者都遵守同端口 URL 规则。
+
+## RED-36 2026-08-20 接口修订
+
+### 权威回合计时
+
+- `lib/game/turn-timer.ts`：定义可注入 `AuthoritativeRuleClock`、成长时长、20 秒快速回合、最终 15 秒烧绳、当前输入所有者、活动回合玩家、同回合各输入 owner 的剩余预算/烧绳状态、玩家独立连续无操作次数和只读投影。
+- `BattleState.turnTimer`：保存规则期限和 streak；`turnTimerSync | turnTimerBurn | turnTimeout` 是内部系统动作，客户端提交会以 `TURN_TIMER_SYSTEM_ACTION_FORBIDDEN` 拒绝且不写房间。
+- `dispatchRoomBattleAction()`：进入异步读取前采样逻辑接收时间；每房间串行冻结逻辑时钟，完成规则、唯一 CAS、快照构造和发送入队后恢复。传输层只获得真实提交版本，CAS 冲突不发布 speculative 快照，且处理跨越 15 秒阈值不会造成烧绳投影反转。进程重启恢复不在 RED-36 范围内。
+- 计时跟随当前输入所有者，并从 action 延续到 end，覆盖 pending 与“回合结束时”输入，直到下一回合真正开始；pending 返回活动玩家时恢复原剩余预算。主动结束回合产生的 pending 继续使用当前预算；action phase 超时若在强制 `endTurn` 时才产生 pending，则取消该输入并推进下一回合，不新增预算。end phase 输入超时也直接推进，不能重复执行 endTurn 触发。只有当前 owner 被接受的玩法动作才清零自己的 streak。
+- `scheduleRoomBattleTimeout()`：按部署期限、烧绳阈值和回合期限安排下一次唤醒；系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
+- 第三次连续无操作超时复用 RED-34 `terminalResult(reason = timeout-surrender)`，房间与终局在同一次 CAS 中变为 `finished`。
+
+### 客户端显示边界
+
+- `PublicBattleSnapshot` 增加 `serverNow` 与 `turnTimer?`；后者包含当前输入 owner、活动回合玩家、完整轮次、时长、剩余量、期限及 `burning/fast` 状态。
+- `battle.html` 和 `turn-timer-status.js` 只刷新 HUD。刷新、重连和 HTTP GET 不修改规则状态或期限，浏览器不持有超时授权。
+- 决策：[ADR-0014](../decisions/ADR-0014-authoritative-growing-turn-timer.md)。

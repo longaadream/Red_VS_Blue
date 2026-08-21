@@ -558,9 +558,13 @@ describe('targeting consumers and performance contract', () => {
     const ws = readFileSync(resolve(process.cwd(), 'lib/ws-server.ts'), 'utf8')
     const route = readFileSync(resolve(process.cwd(), 'app/api/rooms/[roomId]/battle/route.ts'), 'utf8')
     const coordinator = readFileSync(resolve(process.cwd(), 'lib/game/room-battle-actions.ts'), 'utf8')
-    expect(ws).toContain('dispatchRoomBattleAction(roomStore, _roomId, verified.playerId, msg.action')
+    expect(ws).toMatch(
+      /dispatchRoomBattleAction\(\s*roomStore,\s*_roomId,\s*verified\.playerId,\s*msg\.action/,
+    )
     expect(ws).toContain('preparation: errAny?.preparation')
-    expect(route).toContain('dispatchRoomBattleAction(roomStore, roomId, viewerPlayerId, action')
+    expect(route).toMatch(
+      /dispatchRoomBattleAction\(\s*roomStore,\s*roomId,\s*viewerPlayerId,\s*action/,
+    )
     expect(route).toContain('preparation: errAny.preparation')
     expect(coordinator).toContain('assertActionPlayer(viewerPlayerId, action)')
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')

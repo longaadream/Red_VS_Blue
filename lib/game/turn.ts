@@ -25,6 +25,7 @@ import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction } from "./skills"
+import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import type { DamageType } from "./skills"
 import { globalTriggerSystem } from "./triggers"
 import { getSkillById } from "./skill-repository"
@@ -46,6 +47,14 @@ import {
 } from "./targeting"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 import { finalizeBattleTerminal, type TerminalResult } from "./terminal"
+import {
+  TURN_TIMEOUT_FORFEIT_STREAK,
+  isTurnTimerSystemAction,
+  markTurnTimerBurning,
+  recordTurnTimeout,
+  syncTurnTimerAfterAcceptedAction,
+  type TurnTimerState,
+} from "./turn-timer"
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
@@ -265,6 +274,8 @@ export interface BattleState {
   turn: TurnState
   /** RED-34 authoritative terminal result committed exactly once by the server. */
   terminalResult?: TerminalResult
+  /** RED-36 server-authoritative growing turn clock and per-player no-op streaks. */
+  turnTimer?: TurnTimerState
   /** RED-29 同时部署状态；完成前普通战斗命令均被拒绝。 */
   deployment?: DeploymentState
   /** 战斗日志 */
@@ -314,6 +325,24 @@ export type BattleAction =
     }
   | {
       type: "deploymentTimeout"
+      now: number
+      clientActionId?: string
+    }
+  | {
+      type: "turnTimerSync"
+      receivedAt: number
+      now: number
+      actorPlayerId?: PlayerId
+      acceptedActionType?: BattleAction['type']
+      clientActionId?: string
+    }
+  | {
+      type: "turnTimerBurn"
+      now: number
+      clientActionId?: string
+    }
+  | {
+      type: "turnTimeout"
       now: number
       clientActionId?: string
     }
@@ -867,6 +896,7 @@ function applyBattleActionInternal(
   const isDeploymentCommand = action.type === 'deploymentChoice'
     || action.type === 'deploymentLock'
     || action.type === 'deploymentTimeout'
+  const isTimerCommand = isTurnTimerSystemAction(action)
   if (
     state.deployment?.status === 'awaiting-locks'
     && !isDeploymentCommand
@@ -877,7 +907,7 @@ function applyBattleActionInternal(
 
   // RED-59: all target discovery and final target validation happen before
   // cloning, triggers, payment, logging, or effect execution.
-  if (action.type !== 'surrender') assertActionTargetingReady(state, action)
+  if (action.type !== 'surrender' && !isTimerCommand) assertActionTargetingReady(state, action)
   const validatedPendingTarget = action.type === 'pendingTargetSelect'
     ? validatePendingTargetSubmission(state, action)
     : undefined
@@ -914,10 +944,10 @@ function applyBattleActionInternal(
   }
 
   // 飞雷神等被动触发待选择时，禁止非选择动作（防止攻击方绕过等待）
-  if (state.pendingOptionSelection && action.type !== 'pendingOptionSelect' && action.type !== 'surrender') {
+  if (state.pendingOptionSelection && action.type !== 'pendingOptionSelect' && action.type !== 'surrender' && !isTimerCommand) {
     throw new BattleRuleError('请等待对方选择完成后再行动')
   }
-  if (state.pendingTargetSelection && action.type !== 'pendingTargetSelect' && action.type !== 'surrender') {
+  if (state.pendingTargetSelection && action.type !== 'pendingTargetSelect' && action.type !== 'surrender' && !isTimerCommand) {
     throw new TargetingRuleError({
       kind: 'invalid',
       code: 'PENDING_SELECTION_ACTIVE',
@@ -964,6 +994,113 @@ function applyBattleActionInternal(
   }
 
   switch (action.type) {
+    case "turnTimerSync": {
+      const next = safeCloneBattleState(state)
+      const timer = syncTurnTimerAfterAcceptedAction(next, {
+        receivedAt: action.receivedAt,
+        resumedAt: action.now,
+        actorPlayerId: action.actorPlayerId,
+        acceptedActionType: action.acceptedActionType,
+      })
+      if (timer) next.turnTimer = timer
+      else delete next.turnTimer
+      if (!next.actions) next.actions = []
+      if (timer) {
+        next.actions.push({
+          type: 'turnTimerSync',
+          playerId: timer.ownerPlayerId,
+          turn: next.turn.turnNumber,
+          payload: {
+            phase: next.turn.phase,
+            fullRound: timer.fullRound,
+            deadlineAt: timer.deadlineAt,
+            acceptedGameplayAction: timer.acceptedGameplayAction,
+            noOpStreak: timer.noOpStreaks[timer.ownerPlayerId] ?? 0,
+          },
+        })
+      }
+      return next
+    }
+
+    case "turnTimerBurn": {
+      const next = safeCloneBattleState(state)
+      if (next.turnTimer?.burnPhase === 'burning') return next
+      try {
+        next.turnTimer = markTurnTimerBurning(next, action.now)
+      } catch (error) {
+        throw new BattleRuleError(error instanceof Error ? error.message : String(error), 'TURN_TIMER_BURN_REJECTED')
+      }
+      if (!next.actions) next.actions = []
+      next.actions.push({
+        type: 'turnTimerBurn',
+        playerId: next.turnTimer.ownerPlayerId,
+        turn: next.turn.turnNumber,
+        payload: {
+          message: 'Turn timer entered the final 15-second burn phase',
+          fullRound: next.turnTimer.fullRound,
+          deadlineAt: next.turnTimer.deadlineAt,
+          fast: next.turnTimer.fast,
+        },
+      })
+      return next
+    }
+
+    case "turnTimeout": {
+      const next = safeCloneBattleState(state)
+      try {
+        next.turnTimer = recordTurnTimeout(next, action.now)
+      } catch (error) {
+        throw new BattleRuleError(error instanceof Error ? error.message : String(error), 'TURN_TIMEOUT_REJECTED')
+      }
+      const timeout = next.turnTimer.lastTimeout!
+      if (!next.actions) next.actions = []
+      next.actions.push({
+        type: 'turnTimeout',
+        playerId: timeout.playerId,
+        turn: next.turn.turnNumber,
+        payload: {
+          message: timeout.noAcceptedGameplayAction
+            ? timeout.countsTowardNoOpStreak
+              ? `Own turn timed out without an accepted gameplay action (streak ${timeout.streak})`
+              : 'Pending input timed out outside the input owner\'s active turn'
+            : 'Turn timed out after an accepted gameplay action',
+          fullRound: timeout.fullRound,
+          deadlineAt: next.turnTimer.deadlineAt,
+          noAcceptedGameplayAction: timeout.noAcceptedGameplayAction,
+          countsTowardNoOpStreak: timeout.countsTowardNoOpStreak,
+          noOpStreak: timeout.streak,
+          timeoutReason: timeout.reason,
+        },
+      })
+
+      if (timeout.countsTowardNoOpStreak && timeout.streak >= TURN_TIMEOUT_FORFEIT_STREAK) {
+        next.pendingOptionSelection = undefined
+        next.pendingTargetSelection = undefined
+        return next
+      }
+
+      // Timeout owns the transition; pending UI input cannot keep the expired
+      // turn alive. If endTurn already ran and is waiting on an "at end of turn"
+      // input, advance directly so triggers and duration ticks are not applied twice.
+      const endTurnAlreadySettled = next.turn.phase === 'end'
+      next.pendingOptionSelection = undefined
+      next.pendingTargetSelection = undefined
+      if (endTurnAlreadySettled) {
+        return applyBattleActionInternal(next, { type: 'beginPhase' })
+      }
+
+      // Action-phase timeouts still execute end-turn rules exactly once. If
+      // that forced settlement only now creates an end-of-turn interaction,
+      // its budget has already expired: do not open a fresh timer window.
+      const ended = applyBattleActionInternal(next, {
+        type: 'endTurn',
+        playerId: next.turn.currentPlayerId,
+      })
+      ended.pendingOptionSelection = undefined
+      ended.pendingTargetSelection = undefined
+      return applyBattleActionInternal(ended, { type: 'beginPhase' })
+    }
+
     case "deploymentChoice": {
       const next = safeCloneBattleState(state)
       const deployment = next.deployment
@@ -2395,13 +2532,17 @@ function applyBattleActionInternal(
       if (pending.effectCode) {
         let fn: any
         try {
-          const compileEffect = eval('(function(Math, Date) { return (' + pending.effectCode + '); })')
+          const compileEffect = dynamicCodeRuntime.compileExpression<(math: Math, date: DateConstructor) => unknown>({
+            surface: 'pendingEffectCode', contentId: pending.selectionId || 'pending-target',
+            contentVersion: String(pending.stateRevision ?? 0),
+            code: '(function(Math, Date) { return (' + pending.effectCode + '); })', entry: 'serialized function(ctx)',
+          })
           fn = compileEffect(getRuleMath(), getRuleDate())
         } catch (evalErr) {
-          throw new BattleRuleError('[STAGE6] effectCode eval failed: ' + (evalErr instanceof Error ? evalErr.message : String(evalErr)))
+          throw new BattleRuleError('[STAGE6] effectCode dynamic compilation failed: ' + (evalErr instanceof Error ? evalErr.message : String(evalErr)))
         }
         if (typeof fn !== 'function') {
-          throw new BattleRuleError('[STAGE6] effectCode did not eval to a function, got: ' + typeof fn)
+          throw new BattleRuleError('[STAGE6] effectCode did not compile to a function, got: ' + typeof fn)
         }
         try {
           result = fn({
@@ -2600,7 +2741,10 @@ export function applyBattleAction(
   const actionIndex = Array.isArray(state.extensions?.debugBattle?.actionLog)
     ? state.extensions.debugBattle.actionLog.length
     : 0
-  const next = stampTargetingRevision(state, applyBattleActionInternal(state, action))
+  const reduced = applyBattleActionInternal(state, action)
+  const next = isTurnTimerSystemAction(action)
+    ? reduced
+    : stampTargetingRevision(state, reduced)
   finalizeBattleTerminal(next, action, { actionIndex })
   return next
 }
@@ -2702,4 +2846,3 @@ export function summonPiece(
     message: `${newPiece.name} 被召唤到 (${x}, ${y})`
   }
 }
-

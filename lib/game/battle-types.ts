@@ -7,6 +7,7 @@ import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 import type { TerminalResult } from "./terminal"
+import type { TurnTimerState } from "./turn-timer"
 
 export type TurnPhase = "start" | "action" | "end"
 
@@ -109,6 +110,8 @@ export interface BattleState {
   turn: TurnState
   /** RED-34 authoritative terminal result committed exactly once by the server. */
   terminalResult?: TerminalResult
+  /** RED-36 server-authoritative growing turn clock and per-player no-op streaks. */
+  turnTimer?: TurnTimerState
   /** RED-29 同时部署状态；完成前普通战斗命令均被拒绝。 */
   deployment?: DeploymentState
   /** 战斗日志 */
@@ -164,6 +167,24 @@ export type BattleAction =
     }
   | {
       type: "deploymentTimeout"
+      now: number
+      clientActionId?: string
+    }
+  | {
+      type: "turnTimerSync"
+      receivedAt: number
+      now: number
+      actorPlayerId?: PlayerId
+      acceptedActionType?: BattleAction['type']
+      clientActionId?: string
+    }
+  | {
+      type: "turnTimerBurn"
+      now: number
+      clientActionId?: string
+    }
+  | {
+      type: "turnTimeout"
       now: number
       clientActionId?: string
     }

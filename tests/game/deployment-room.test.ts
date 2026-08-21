@@ -265,10 +265,11 @@ describe('RED-31 authoritative deployment room actions', () => {
     const room = makeDeploymentRoom()
     const internalState = (room.battleState as any).state
     internalState.deployment.choices[PLAYERS[0]] = { pieceId: 'piece-1' }
+    const clock = { now: () => 2_000 }
 
-    const red = createPublicBattleSnapshot(room, PLAYERS[0])
-    const blue = createPublicBattleSnapshot(room, PLAYERS[1])
-    const spectator = createPublicBattleSnapshot(room)
+    const red = createPublicBattleSnapshot(room, PLAYERS[0], clock)
+    const blue = createPublicBattleSnapshot(room, PLAYERS[1], clock)
+    const spectator = createPublicBattleSnapshot(room, undefined, clock)
 
     expect(red).toEqual(blue)
     expect(blue).toEqual(spectator)

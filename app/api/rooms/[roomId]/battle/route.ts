@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
-import { broadcastToRoom } from "@/lib/ws-server"
+import { broadcastToRoom, queueBotTurnIfReady } from "@/lib/ws-server"
 import {
   createPublicBattleSnapshot,
   dispatchRoomBattleAction,
+  scheduleRoomBattleTimeout,
+  type PreResumeDeliveryContext,
+  type PublicBattleSnapshot,
 } from "@/lib/game/room-battle-actions"
 import { verifyBattleActionAuth } from "@/lib/game/identity-verify"
 import { getClientTerminalSubmissionError } from "@/lib/server/battle-terminal"
@@ -27,6 +30,28 @@ export async function GET(
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 400 })
   }
+}
+
+function createPreparedActionResponse(
+  context: PreResumeDeliveryContext,
+  snapshot: PublicBattleSnapshot,
+): NextResponse {
+  if (context.kind === 'expired') {
+    const turnExpired = context.expiredReason === 'turn'
+    return NextResponse.json({
+      error: turnExpired
+        ? 'Turn deadline elapsed; the authoritative timeout was committed instead.'
+        : 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
+      code: turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
+      ...snapshot,
+    }, { status: 409 })
+  }
+  return NextResponse.json({
+    ok: true,
+    ...snapshot,
+    actionHash: context.actionHash,
+    duplicate: false,
+  })
 }
 
 // ── POST — apply action authoritatively, broadcast new state via WS ──────────
@@ -82,9 +107,21 @@ export async function POST(
   }
   const viewerPlayerId = verifiedPlayerId
 
+  let preparedResponse: NextResponse | undefined
   let result: Awaited<ReturnType<typeof dispatchRoomBattleAction>>
   try {
-    result = await dispatchRoomBattleAction(roomStore, roomId, viewerPlayerId, action as any)
+    result = await dispatchRoomBattleAction(
+      roomStore,
+      roomId,
+      viewerPlayerId,
+      action as any,
+      {
+        onCommittedBeforeTimerResume: (snapshot, context) => {
+          broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot })
+          preparedResponse = createPreparedActionResponse(context, snapshot)
+        },
+      },
+    )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     const errAny = err as any
@@ -132,11 +169,24 @@ export async function POST(
     ...result.snapshot,
     duplicate: result.kind === 'duplicate',
   }
-  if (result.kind !== 'duplicate') broadcastToRoom(roomId, stateUpdate)
+  if (result.kind !== 'duplicate' && !result.finalSnapshotAlreadyDelivered) {
+    broadcastToRoom(roomId, stateUpdate)
+  }
+  await scheduleRoomBattleTimeout(roomStore, roomId, {
+    onCommitted: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
+    onBotTurnReady: snapshot => {
+      queueBotTurnIfReady(roomId, snapshot.state)
+    },
+  })
+  queueBotTurnIfReady(roomId, result.snapshot.state)
+  if (preparedResponse) return preparedResponse
   if (result.kind === 'expired') {
+    const turnExpired = result.expiredReason === 'turn'
     return NextResponse.json({
-      error: 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
-      code: 'DEPLOYMENT_EXPIRED',
+      error: turnExpired
+        ? 'Turn deadline elapsed; the authoritative timeout was committed instead.'
+        : 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
+      code: turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
       ...result.snapshot,
     }, { status: 409 })
   }
@@ -144,7 +194,7 @@ export async function POST(
   return NextResponse.json({
     ok: true,
     ...result.snapshot,
-    actionHash: result.actionResult.actionHash,
+    actionHash: result.submittedActionResult?.actionHash ?? result.actionResult.actionHash,
     duplicate: result.kind === 'duplicate',
   })
 }
