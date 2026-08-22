@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>开发者中心 · RED vs BLUE</title>
+  <link rel="stylesheet" href="css/developer-tools/developer-center.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="back-link" href="index.html">← 返回</a>
+    <div>
+      <div class="topbar-title">开发者中心</div>
+      <div class="topbar-subtitle">公开社区工具 · 严格局外 · 只读回放</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow">TRACE REPLAY LAB</div>
+      <h1>读入一场比赛，逐帧看清规则发生了什么</h1>
+      <p>Trace v2 保存权威命令边界的真实状态、语义事件、随机流与 Hash。回放器直接读取记录事实，不连接房间，也不会用当前版本规则重新结算旧对局。</p>
+    </section>
+
+    <div id="activeMatchGate" class="gate" hidden role="alert">
+      检测到尚未结束的真实对局，开发者中心已锁定。请先完成或离开对局；这里没有清除或绕过锁定的入口。
+      <div id="activeMatchLabel"></div>
+    </div>
+
+    <div class="workspace">
+      <section class="card primary-card">
+        <div class="badge">核心功能</div>
+        <h2>导入 Trace 并打开回放</h2>
+        <p class="card-description">接受权威终局导出的 <code>rvb-match-trace/v2</code> JSON。导入前会验证大小、结构、敏感字段、危险 URL、完整状态帧和 Hash 链。</p>
+
+        <fieldset id="replayToolFieldset">
+          <input class="visually-hidden" id="traceFileInput" type="file" accept=".json,application/json" />
+          <div id="traceDropZone" class="import-zone" tabindex="0" role="button" aria-controls="traceFileInput">
+            <div class="import-icon" aria-hidden="true">⇩</div>
+            <strong>把 Trace 文件拖到这里</strong>
+            <span>或按 Enter / 点击选择 JSON · 最大 32 MiB</span>
+          </div>
+          <div class="actions">
+            <button id="chooseTraceButton" class="button primary" type="button">导入 Trace</button>
+            <button id="openReplayButton" class="button" type="button" disabled>打开回放</button>
+          </div>
+        </fieldset>
+        <div id="traceStatus" class="status" role="status" aria-live="polite"></div>
+
+        <div class="recent">
+          <div class="recent-heading">
+            <h3>最近一份合法 Trace v2</h3>
+            <span id="traceFormatBadge" class="badge" hidden>v2</span>
+          </div>
+          <p id="traceEmpty" class="note">本机尚未保存可回放的 Trace。</p>
+          <div id="traceFacts" class="facts" hidden>
+            <div class="fact"><span>房间</span><strong id="traceRoom">—</strong></div>
+            <div class="fact"><span>终局</span><strong id="traceResult">—</strong></div>
+            <div class="fact"><span>地图 / 回合</span><strong id="traceMapTurn">—</strong></div>
+            <div class="fact"><span>命令 / 事件</span><strong id="traceCommands">—</strong></div>
+            <div class="fact"><span>最终 Hash</span><strong id="traceHash">—</strong></div>
+            <div class="fact"><span>导出时间</span><strong id="traceTime">—</strong></div>
+          </div>
+          <div class="actions">
+            <button id="downloadStoredTraceButton" class="button" type="button" disabled>再次下载 Trace</button>
+            <button id="clearStoredTraceButton" class="button danger" type="button" disabled>清除本地 Trace</button>
+          </div>
+        </div>
+      </section>
+
+      <details class="card">
+        <summary>固定 Seed 隔离规则场景（次要工具）</summary>
+        <p class="card-description">使用正式规则 Runner 在服务器内存中创建一次私有诊断状态；不创建房间、不写战绩、不发奖励。</p>
+        <form id="scenarioForm">
+          <fieldset id="scenarioToolFieldset">
+            <div class="fields">
+              <label>随机种子
+                <input id="scenarioSeed" type="number" min="0" max="4294967295" step="1" value="20260821" required />
+              </label>
+              <label>地图 ID
+                <input id="scenarioMap" type="text" value="large-battlefield" pattern="[a-z0-9][a-z0-9\-]{0,63}" required />
+              </label>
+              <label>红方内容阵营
+                <select id="firstAlignment"><option value="dark">Dark</option><option value="light">Light</option></select>
+              </label>
+              <label>蓝方内容阵营
+                <select id="secondAlignment"><option value="light">Light</option><option value="dark">Dark</option></select>
+              </label>
+            </div>
+            <div class="actions">
+              <button id="runScenarioButton" class="button" type="submit">运行隔离场景</button>
+            </div>
+          </fieldset>
+        </form>
+        <div id="scenarioStatus" class="status" role="status" aria-live="polite"></div>
+        <div id="scenarioFacts" class="facts" hidden>
+          <div class="fact"><span>地图</span><strong id="factMap">—</strong></div>
+          <div class="fact"><span>回合 / 阶段</span><strong id="factTurn">—</strong></div>
+          <div class="fact"><span>当前执行者</span><strong id="factActor">—</strong></div>
+          <div class="fact"><span>权威状态 Hash</span><strong id="factHash">—</strong></div>
+          <div class="fact"><span>种子</span><strong id="factSeed">—</strong></div>
+          <div class="fact"><span>命令数</span><strong id="factCommands">—</strong></div>
+        </div>
+        <pre id="scenarioOutput" aria-label="隔离场景 JSON 输出"></pre>
+      </details>
+    </div>
+
+    <p class="note">Trace v1 是旧诊断格式，不含状态检查点，因此会被明确拒绝为“不可回放”。MVP 不提供回放码、在线分享、实时观战、从任意帧继续操作或原始鼠标/镜头复刻。</p>
+  </main>
+
+  <script src="js/server-utils.js"></script>
+  <script src="js/developer-tools/match-trace.js"></script>
+  <script src="js/developer-tools/developer-center.js"></script>
+</body>
+</html>
