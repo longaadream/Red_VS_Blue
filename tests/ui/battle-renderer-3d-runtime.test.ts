@@ -327,6 +327,36 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
 }
 
 describe('RED-68 BattleRenderer3D runtime', () => {
+  it('renders one thin paper map with flat grid and terrain marks over hidden hit proxies', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    model.board.tiles[0].props.type = 'wall'
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame()
+
+    const scene = harness.renderers[0].scene!
+    const byRole = (role: string) => scene.children.find((child) => child.userData.motionRole === role)
+    const table = byRole('table-surface')
+    const paper = byRole('paper-map')
+    const underlay = byRole('paper-underlay')
+    const grid = byRole('paper-grid')
+    const marks = byRole('paper-map-marks')
+    const hitTiles = scene.children.filter((child) => Number.isFinite(child.userData.tileX))
+
+    expect(table?.type).toBe('Mesh')
+    expect(paper?.type).toBe('Mesh')
+    expect(underlay?.type).toBe('Mesh')
+    expect(grid?.type).toBe('LineSegments')
+    expect(marks?.type).toBe('LineSegments')
+    expect(paper?.position.y).toBeCloseTo(0.035, 4)
+    expect(table!.position.y).toBeLessThan(paper!.position.y)
+    expect(hitTiles).toHaveLength(20 * 16)
+    expect(hitTiles.every((tile) => (tile.material as ThreeMaterial & { visible?: boolean }).visible === false)).toBe(true)
+
+    harness.renderer.dispose()
+  })
+
   it('executes projection, hit, DPR, touch gestures, reset, flash recovery, and rule-state isolation', () => {
     const harness = createHarness()
     const intents: Array<Record<string, unknown>> = []

@@ -128,37 +128,39 @@ describe('RED-102 paper-puppet presentation contract', () => {
     expect(renderer).toContain('obj.standeeMesh.visible = false')
     expect(renderer).toContain('obj.portraitMesh.visible = true')
     expect(renderer).toContain('transparent: true')
-    expect(renderer).toContain('alphaTest: 0.08')
+    expect(renderer).toContain('alphaTest: 0.32')
     expect(renderer).toContain('screenToCell(clientX, clientY)')
     expect(renderer).toMatch(/function _handleClick[\s\S]*?screenToCell/)
     expect(renderer).toContain('function portraitUrl(portraitRef)')
     expect(renderer).not.toMatch(/piece\.templateId\s*\+\s*['"]\.png/)
   })
 
-  it('uses a real paper texture and avoids generated CSS gradients in the RED-102 layer', () => {
+  it('uses a thin torn paper map, a tabletop texture, and simple marks drawn directly on the map', () => {
     const css = readPage('css/battle-paper-puppet.css')
     const renderer = readPage('js/battle-renderer-3d.js')
 
     expect(existsSync(resolve(standeeDir, 'paper-board-texture.png'))).toBe(true)
-    for (const asset of ['terrain-wall.png', 'terrain-cover.png']) {
-      expect(pngHeader(resolve(standeeDir, asset))).toEqual({
-        width: 512,
-        height: 512,
-        bitDepth: 8,
-        colorType: 6,
-      })
-    }
+    expect(existsSync(resolve(standeeDir, 'tabletop-wood.svg'))).toBe(true)
     expect(css).toContain("url('../public/standees/paper-board-texture.png')")
     expect(css).not.toMatch(/(?:linear|radial|conic)-gradient/)
     expect(css).toContain('.piece-context-skill-icon img')
     expect(css).toContain('.turn-clock')
     expect(css).toContain('#tileStatusPanel')
     expect(renderer).toContain("loadTexture('public/standees/paper-board-texture.png'")
+    expect(renderer).toContain("loadTexture('public/standees/tabletop-wood.svg'")
     expect(renderer).toContain('texture.wrapS = THREE.RepeatWrapping')
-    expect(renderer).toContain("wall: Object.freeze({ src: 'public/standees/terrain-wall.png'")
-    expect(renderer).toContain("cover: Object.freeze({ src: 'public/standees/terrain-cover.png'")
-    expect(renderer).toContain("prop.userData.motionRole = 'paper-terrain'")
-    expect(renderer).toContain('const tileRenderHeight = TERRAIN_PROP_VISUALS[type] ? tileHeight : tileVisualHeight')
-    expect(renderer).toContain('mat.opacity = 0.10')
+    expect(renderer).toContain('const MAP_SYMBOL_SEGMENTS = Object.freeze({')
+    expect(renderer).toContain("marks.userData.motionRole = 'paper-map-marks'")
+    expect(renderer).toContain("lines.userData.motionRole = 'paper-grid'")
+    expect(renderer).toContain("_paperMap.userData.motionRole = 'paper-map'")
+    expect(renderer).toContain("_tableSurface.userData.motionRole = 'table-surface'")
+    expect(renderer).toContain('new THREE.ShapeGeometry(shape)')
+    expect(renderer).toContain('new THREE.LineSegments(geometry, material)')
+    expect(renderer).toContain('new THREE.PlaneGeometry(_mapW + 12, _mapH + 10)')
+    expect(renderer).toContain('new THREE.Mesh(_tileGeom, _tileHitMat)')
+    expect(renderer).toContain('new THREE.RingGeometry(ringRadius - 0.014')
+    expect(renderer).not.toContain('new THREE.Sprite(')
+    expect(renderer).not.toContain('TERRAIN_PROP_VISUALS')
+    expect(renderer).not.toContain('new THREE.BoxGeometry(_mapW + 1.25')
   })
 })
