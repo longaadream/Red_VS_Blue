@@ -5,6 +5,9 @@
   const TacticalGeometry = window.BattleTacticalGeometry
   if (!TacticalGeometry) throw new Error('BattleRenderer3D requires BattleTacticalGeometry')
   const TACTICAL_METRICS = TacticalGeometry.METRICS
+  const StandeeManifest = window.BattleStandeeManifest || Object.freeze({
+    resolve: function () { return null },
+  })
 
   // ── Constants ────────────────────────────────────────────────────────────────
   const TILE_H = 0.12
@@ -17,6 +20,9 @@
   const PIECE_PORTRAIT_D = 0.50
   const RING_T = 0.035
   const SELECTED_RING_T = 0.018
+  const STANDEE_W = 0.62
+  const STANDEE_H = 1.24
+  const STANDEE_BASE_Y = PIECE_H + 0.04
   const PAN_ACTIVATION_PX = TACTICAL_METRICS.panActivationPx
   const MIN_TOUCH_CELL_PIXELS = TACTICAL_METRICS.minTouchCellPixels
   const MAX_CAMERA_ZOOM = 8
@@ -46,22 +52,37 @@
     hole: 0.035,
     lava: 0.08,
   })
+  const TILE_VISUAL_HEIGHTS = Object.freeze({
+    floor: 0.09,
+    spawn: 0.105,
+    spring: 0.11,
+    chargepad: 0.11,
+    trap: 0.115,
+    cover: 0.115,
+    wall: 0.125,
+    hole: 0.035,
+    lava: 0.075,
+  })
 
   const TILE_COLORS = {
-    floor:     0x252a30,
-    wall:      0x0c1015,
-    spawn:     0x173127,
-    cover:     0x4b3a26,
-    hole:      0x07131c,
-    lava:      0x6b2418,
-    spring:    0x17413d,
-    chargepad: 0x34244c,
-    trap:      0x4a3020,
+    floor:     0xe3d5b6,
+    wall:      0xd1bd95,
+    spawn:     0xc9ae78,
+    cover:     0xd8c39a,
+    hole:      0x302a24,
+    lava:      0xb7684b,
+    spring:    0x87a095,
+    chargepad: 0x95839f,
+    trap:      0xaa895e,
   }
+  const TERRAIN_PROP_VISUALS = Object.freeze({
+    wall: Object.freeze({ src: 'public/standees/terrain-wall.png', width: 0.92, height: 0.92 }),
+    cover: Object.freeze({ src: 'public/standees/terrain-cover.png', width: 0.94, height: 0.64 }),
+  })
   const TILE_EMISSIVE = {
-    lava:      { color: 0xff4400, intensity: 0.35 },
-    chargepad: { color: 0x8800ff, intensity: 0.25 },
-    spring:    { color: 0x00ffcc, intensity: 0.15 },
+    lava:      { color: 0xa83a24, intensity: 0.18 },
+    chargepad: { color: 0x5b3d6f, intensity: 0.12 },
+    spring:    { color: 0x315d52, intensity: 0.08 },
   }
   const FACTION_COLORS = { red: 0xef4444, blue: 0x3b82f6 }
   const HL_COLORS = {
@@ -105,6 +126,7 @@
   let _mapW = 0, _mapH = 0
   let _boardBase = null
   let _boardFront = null
+  const _terrainPropObjects = []
   const _tileObjects = new Map()       // "x,z" → THREE.Mesh
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
@@ -114,6 +136,8 @@
   const _playedEventOrder = []
   const _texCache = new Map()
   let _textureLoadGeneration = 0
+  let _paperTexture = null
+  let _paperTextureRequested = false
   const _floaters = new Set()
   const _floaterTimers = new Set()
   let _pressedPiece = null
@@ -125,14 +149,17 @@
 
   // ── Geometry / Material cache (shared across all tiles/pieces) ────────────────
   let _tileGeom = null
+  let _terrainPropGeom = null
   let _hlPlaneGeom = null
   let _selectedRingGeom = null
   let _pieceBodyGeom = null
   let _pieceRingGeom = null
   let _portraitDiscGeom = null
+  let _standeeGeom = null
   let _contactShadowGeom = null
   let _contactShadowMat = null
   const _tileMats = {}
+  const _terrainPropMats = {}
   const _factionMats = {}
   const _hlMats = {}
   const _tileEffectMats = {}
@@ -143,8 +170,37 @@
     const col = TILE_COLORS[type] || TILE_COLORS.floor
     const em  = TILE_EMISSIVE[type]
     const mat = new THREE.MeshLambertMaterial({ color: col })
+    if (TERRAIN_PROP_VISUALS[type]) {
+      mat.transparent = true
+      mat.opacity = 0.10
+      mat.depthWrite = false
+    }
+    if (_paperTexture) mat.map = _paperTexture
     if (em) { mat.emissive = new THREE.Color(em.color); mat.emissiveIntensity = em.intensity }
     _tileMats[type] = mat
+    return mat
+  }
+
+  function getTerrainPropMat(type) {
+    if (_terrainPropMats[type]) return _terrainPropMats[type]
+    const visual = TERRAIN_PROP_VISUALS[type]
+    if (!visual) return null
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      alphaTest: 0.08,
+      side: THREE.DoubleSide,
+      depthWrite: true,
+    })
+    _terrainPropMats[type] = mat
+    loadTexture(visual.src, function (texture) {
+      mat.map = texture
+      mat.opacity = 1
+      mat.needsUpdate = true
+    }, function (error) {
+      console.warn('[battle-renderer] Paper terrain unavailable; using flat paper tile', { type, src: visual.src }, error)
+    })
     return mat
   }
 
@@ -248,6 +304,30 @@
     entry.texture = texture
   }
 
+  function _requestPaperTexture() {
+    if (_paperTextureRequested || typeof Image === 'undefined') return
+    _paperTextureRequested = true
+    loadTexture('public/standees/paper-board-texture.png', function (texture) {
+      _paperTexture = texture
+      texture.wrapS = THREE.RepeatWrapping
+      texture.wrapT = THREE.RepeatWrapping
+      texture.repeat.set(5, 4)
+      Object.keys(_tileMats).forEach(function (key) {
+        _tileMats[key].map = texture
+        _tileMats[key].needsUpdate = true
+      })
+    }, function (error) {
+      _paperTextureRequested = false
+      console.warn('[battle-renderer] Paper texture unavailable; using flat paper colors', error)
+    })
+  }
+
+  function standeeUrl(templateId) {
+    const entry = StandeeManifest.resolve(templateId)
+    if (!entry || entry.status !== 'ready' || !entry.src) return ''
+    return String(entry.src)
+  }
+
   function portraitUrl(portraitRef) {
     const ref = String(portraitRef || '').replace(/^images\//, '')
     if (!ref) return ''
@@ -267,29 +347,32 @@
     _onIntent = typeof input.onIntent === 'function' ? input.onIntent : null
     _textureLoadGeneration += 1
     _mounted = true
+    _requestPaperTexture()
 
     // Shared geometries. Piece geometry stays unit-sized so the oval metrics are
     // explicit and identical for portrait, faction ring, and touch projection.
     _tileGeom = new THREE.BoxGeometry(TILE_W, 1, TILE_W)
+    _terrainPropGeom = new THREE.PlaneGeometry(1, 1)
     _hlPlaneGeom = new THREE.PlaneGeometry(TILE_W - 0.06, TILE_W - 0.06)
     _selectedRingGeom = new THREE.TorusGeometry(0.5, SELECTED_RING_T, 8, 32)
     _pieceBodyGeom = new THREE.CylinderGeometry(0.5, 0.5, PIECE_H, 32)
     _pieceRingGeom = new THREE.TorusGeometry(0.5, RING_T, 8, 32)
     _portraitDiscGeom = new THREE.CircleGeometry(0.5, 32)
+    _standeeGeom = new THREE.PlaneGeometry(STANDEE_W, STANDEE_H)
     _contactShadowGeom = new THREE.CircleGeometry(0.5, 32)
     _contactShadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false })
 
-    // Scene and table lighting use dark neutral metal; faction color is reserved
+    // Scene and table lighting use warm paper neutrals; faction color is reserved
     // for the narrow base ring and the existing authoritative highlight layers.
     _scene = new THREE.Scene()
-    _scene.background = new THREE.Color(0x07090b)
+    _scene.background = new THREE.Color(0x211a13)
 
-    const ambient = new THREE.AmbientLight(0xdbe4ee, 0.48)
+    const ambient = new THREE.AmbientLight(0xffedce, 0.78)
     _scene.add(ambient)
-    const dirLight = new THREE.DirectionalLight(0xfff1dc, 0.72)
+    const dirLight = new THREE.DirectionalLight(0xffe8bd, 0.44)
     dirLight.position.set(-7, 13, 10)
     _scene.add(dirLight)
-    const edgeLight = new THREE.DirectionalLight(0x7ba3c9, 0.24)
+    const edgeLight = new THREE.DirectionalLight(0xa78b68, 0.10)
     edgeLight.position.set(10, 5, -8)
     _scene.add(edgeLight)
 
@@ -473,6 +556,8 @@
   function _buildTiles(map) {
     _tileObjects.forEach(m => _scene.remove(m))
     _tileObjects.clear()
+    _terrainPropObjects.forEach(function (mesh) { _scene.remove(mesh) })
+    _terrainPropObjects.length = 0
     if (_boardFront) {
       _scene.remove(_boardFront)
       if (_boardFront.geometry) _boardFront.geometry.dispose()
@@ -490,11 +575,11 @@
     _mapH = map.height
 
     const boardBaseGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, _mapH + 1.25)
-    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x20272e })
+    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x8d704c })
     _boardBase = new THREE.Mesh(boardBaseGeometry, boardBaseMaterial)
     _boardBase.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, (_mapH - 1) / 2)
     const boardFrontGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, 0.10)
-    const boardFrontMaterial = new THREE.MeshLambertMaterial({ color: 0x37414b })
+    const boardFrontMaterial = new THREE.MeshLambertMaterial({ color: 0xb79766 })
     _boardFront = new THREE.Mesh(boardFrontGeometry, boardFrontMaterial)
     _boardFront.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, _mapH + 0.105)
     _scene.add(_boardFront)
@@ -504,14 +589,28 @@
     map.tiles.forEach(tile => {
       const type = (tile.props && tile.props.type) ? tile.props.type : (tile.type || 'floor')
       const tileHeight = TILE_HEIGHTS[type] || TILE_H
+      const tileVisualHeight = TILE_VISUAL_HEIGHTS[type] || TILE_H
       const mesh = new THREE.Mesh(_tileGeom, getTileMat(type))
-      mesh.scale.y = tileHeight
-      mesh.position.set(tile.x, tileHeight / 2, tile.y)
+      const tileRenderHeight = TERRAIN_PROP_VISUALS[type] ? tileHeight : tileVisualHeight
+      mesh.scale.y = tileRenderHeight
+      mesh.position.set(tile.x, tileRenderHeight / 2, tile.y)
       mesh.userData.tileX = tile.x
       mesh.userData.tileZ = tile.y
       mesh.userData.surfaceY = tileHeight
       _scene.add(mesh)
       _tileObjects.set(tile.x + ',' + tile.y, mesh)
+
+      const terrainVisual = TERRAIN_PROP_VISUALS[type]
+      const terrainMaterial = getTerrainPropMat(type)
+      if (terrainVisual && terrainMaterial) {
+        const prop = new THREE.Mesh(_terrainPropGeom, terrainMaterial)
+        prop.scale.set(terrainVisual.width, terrainVisual.height, 1)
+        prop.position.set(tile.x, tileVisualHeight + terrainVisual.height / 2 - 0.015, tile.y + 0.025)
+        prop.renderOrder = 2
+        prop.userData.motionRole = 'paper-terrain'
+        _scene.add(prop)
+        _terrainPropObjects.push(prop)
+      }
     })
 
     const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
@@ -583,6 +682,51 @@
         obj.ring.material = getFactionMat(piece.faction).clone()
         obj.factionMarkers.forEach(function (marker, index) {
           marker.visible = markerPattern[index]
+        })
+      }
+
+      // RED-102: only explicit ready entries may request a standee texture.
+      // Missing mappings and failed loads keep the RED-68 portrait token visible.
+      const standeeSrc = standeeUrl(piece.templateId)
+      if (obj.standeeSrc !== standeeSrc) {
+        obj.standeeSrc = standeeSrc
+        obj.standeeLoaded = false
+        obj.standeeLoading = false
+        obj.standeeFailed = false
+        obj.standeeMesh.visible = false
+        obj.portraitMesh.visible = true
+      }
+      if (!standeeSrc) {
+        obj.standeeMesh.visible = false
+        obj.portraitMesh.visible = true
+      } else if (!obj.standeeLoaded && !obj.standeeLoading && !obj.standeeFailed) {
+        const pieceId = piece.id
+        obj.standeeLoading = true
+        loadTexture(standeeSrc, texture => {
+          const liveObject = _pieceObjects.get(pieceId)
+          if (liveObject !== obj || liveObject.standeeSrc !== standeeSrc) return
+          if (obj.standeeMesh.material && obj.standeeMesh.material.dispose) obj.standeeMesh.material.dispose()
+          obj.standeeMesh.material = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            alphaTest: 0.08,
+            side: THREE.DoubleSide,
+            depthWrite: true,
+            toneMapped: false,
+          })
+          obj.standeeLoaded = true
+          obj.standeeLoading = false
+          obj.standeeMesh.visible = true
+          obj.portraitMesh.visible = false
+        }, error => {
+          const liveObject = _pieceObjects.get(pieceId)
+          if (liveObject !== obj || liveObject.standeeSrc !== standeeSrc) return
+          obj.standeeLoaded = false
+          obj.standeeLoading = false
+          obj.standeeFailed = true
+          obj.standeeMesh.visible = false
+          obj.portraitMesh.visible = true
+          console.warn('[battle-renderer] Standee unavailable; using portrait fallback', { pieceId, standeeSrc }, error)
         })
       }
 
@@ -742,6 +886,7 @@
     portraitMesh.rotation.x = -Math.PI / 2
     portraitMesh.scale.set(PIECE_PORTRAIT_W, PIECE_PORTRAIT_D, 1)
     portraitMesh.position.y = PIECE_H + 0.014
+    portraitMesh.userData.motionRole = 'portrait-fallback'
     group.add(portraitMesh)
 
     const ring = new THREE.Mesh(_pieceRingGeom, getFactionMat(faction).clone())
@@ -778,6 +923,23 @@
     feedbackRing.renderOrder = 7
     group.add(feedbackRing)
 
+    // The paper figure is independent from the faction base. It stays hidden
+    // until its transparent texture succeeds, so fallback is never a blank tile.
+    const standeeMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 1,
+      alphaTest: 0.08,
+      side: THREE.DoubleSide,
+      depthWrite: true,
+    })
+    const standeeMesh = new THREE.Mesh(_standeeGeom, standeeMaterial)
+    standeeMesh.position.set(0, STANDEE_BASE_Y + STANDEE_H / 2, 0.02)
+    standeeMesh.visible = false
+    standeeMesh.renderOrder = 4
+    standeeMesh.userData.motionRole = 'paper-standee'
+    group.add(standeeMesh)
+
     // Compact health and negative-status summary.
     const summaryEl = _createPieceSummaryEl(piece)
 
@@ -785,7 +947,7 @@
     _pieceObjects.set(piece.id, {
       id: piece.id,
       motionId: 'piece:' + piece.id,
-      group, body, ring, portraitMesh, contactShadow, factionMarkers, feedbackRing,
+      group, body, ring, portraitMesh, standeeMesh, contactShadow, factionMarkers, feedbackRing,
       markerMaterial,
       summaryEl,
       faction,
@@ -799,6 +961,10 @@
       portraitLoaded: false,
       portraitLoading: false,
       portraitSrc: '',
+      standeeLoaded: false,
+      standeeLoading: false,
+      standeeFailed: false,
+      standeeSrc: '',
       targetX: piece.x, targetZ: piece.y,
     })
   }
@@ -807,7 +973,7 @@
     _cancelAnimationsForPrefix(obj.motionId + ':')
     obj.statusExitTimers.forEach(function (timer) { clearTimeout(timer) })
     obj.statusExitTimers.clear()
-    ;[obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial, obj.feedbackRing.material]
+    ;[obj.body.material, obj.portraitMesh.material, obj.standeeMesh.material, obj.ring.material, obj.markerMaterial, obj.feedbackRing.material]
       .forEach(function (material) { if (material && material.dispose) material.dispose() })
     if (obj.summaryEl && obj.summaryEl.parentNode) obj.summaryEl.remove()
   }
@@ -1413,7 +1579,7 @@
   }
 
   function _ownedPieceMaterials(obj) {
-    return [obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial]
+    return [obj.body.material, obj.portraitMesh.material, obj.standeeMesh.material, obj.ring.material, obj.markerMaterial]
       .filter(function (material, index, materials) { return material && materials.indexOf(material) === index })
   }
 
@@ -1424,6 +1590,7 @@
       material.opacity = 1
       material.transparent = false
     })
+    if (obj.standeeMesh.material) obj.standeeMesh.material.transparent = true
     if (obj.body.material.color) obj.body.material.color.setHex(0x22272d)
     if (obj.body.material.emissive) obj.body.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     obj.body.material.emissiveIntensity = 0.08
@@ -1869,10 +2036,10 @@
           ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) { materials.add(material) })
         }
       })
-      ;[_tileGeom, _hlPlaneGeom, _selectedRingGeom, _pieceBodyGeom, _pieceRingGeom, _portraitDiscGeom, _contactShadowGeom]
+      ;[_tileGeom, _terrainPropGeom, _hlPlaneGeom, _selectedRingGeom, _pieceBodyGeom, _pieceRingGeom, _portraitDiscGeom, _standeeGeom, _contactShadowGeom]
         .forEach(function (geometry) { if (geometry) geometries.add(geometry) })
       if (_contactShadowMat) materials.add(_contactShadowMat)
-      ;[_tileMats, _factionMats, _hlMats, _tileEffectMats, _tileEffectIconMats].forEach(function (cache) {
+      ;[_tileMats, _terrainPropMats, _factionMats, _hlMats, _tileEffectMats, _tileEffectIconMats].forEach(function (cache) {
         Object.keys(cache).forEach(function (key) { if (cache[key]) materials.add(cache[key]) })
       })
       geometries.forEach(function (geometry) { if (geometry.dispose) geometry.dispose() })
@@ -1885,6 +2052,7 @@
       if (_renderer.domElement.parentNode) _renderer.domElement.remove()
     }
     _tileObjects.clear()
+    _terrainPropObjects.length = 0
     _pieceObjects.forEach(function (obj) {
       obj.statusExitTimers.forEach(function (timer) { clearTimeout(timer) })
       obj.statusExitTimers.clear()
@@ -1892,6 +2060,7 @@
     _pieceObjects.clear()
     _tileEffectObjects.clear()
     Object.keys(_tileMats).forEach(function (key) { delete _tileMats[key] })
+    Object.keys(_terrainPropMats).forEach(function (key) { delete _terrainPropMats[key] })
     Object.keys(_factionMats).forEach(function (key) { delete _factionMats[key] })
     Object.keys(_hlMats).forEach(function (key) { delete _hlMats[key] })
     Object.keys(_tileEffectMats).forEach(function (key) { delete _tileEffectMats[key] })
@@ -1911,6 +2080,8 @@
     _floaters.forEach(function (element) { element.remove() })
     _floaters.clear()
     _texCache.clear()
+    _paperTexture = null
+    _paperTextureRequested = false
     _pointers.clear()
     _renderer = null
     _camera = null
@@ -1926,11 +2097,13 @@
     _boardBase = null
     _boardFront = null
     _tileGeom = null
+    _terrainPropGeom = null
     _hlPlaneGeom = null
     _selectedRingGeom = null
     _pieceBodyGeom = null
     _pieceRingGeom = null
     _portraitDiscGeom = null
+    _standeeGeom = null
     _contactShadowGeom = null
     _contactShadowMat = null
     _clock.prev = 0
