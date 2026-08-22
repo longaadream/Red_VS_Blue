@@ -40,20 +40,23 @@
 - 迁移清单：`sleep-dart`、`blackwidow-lethal-strike`、`hellfire-shotgun` 使用共享弹道事实；经人工批准，`death-blossom` 改为自身中心 3×3 的纯范围伤害并使用 `form: area`，不再参与弹道阻挡。
 - 测试：`tests/game/spatial.test.ts`、`tests/game/projectile-trace.test.ts`、`tests/game/movement-contract.test.ts`、`tests/game/turn.test.ts`、`tests/game/ai-movement.test.ts`。
 
-## 2. 战斗 Runner 与回放
+## 2. 战斗 Runner 与两类回放
 
-- 入口：`lib/game/battle-runner.ts::runBattleAction()`、`replayBattle()`。
-- 职责：动作 ID、动作级确定性 runtime、运行时技能补全、权威 hash、幂等、Action Trace 和回放。
+- 入口：`lib/game/battle-runner.ts::runBattleAction()`、`replayBattle()`，以及 `lib/game/battle-trace.ts` 的回放归档函数。
+- 职责：动作 ID、动作级确定性 runtime、运行时技能补全、权威 hash、幂等、脱敏规则命令 Action Trace；成功权威动作还追加 Trace v2 的记录状态帧。
 - 输入：状态/动作/`rootSeed`，或初始状态/seed/动作序列。
-- 输出：状态、`stateHash`、`actionHash`、`duplicate`、`trace`，或含逐动作 `stateHashes` 的回放结果。
+- 输出：状态、`stateHash`、`actionHash`、`duplicate`、`trace`，或含逐动作 `stateHashes` 的规则重放结果。
 - 调用方：WS、房间 HTTP API、训练/调试 API、测试。
 - 调用：`applyBattleAction()`、稳定 JSON/hash、`RuleRuntime`。
-- 状态变化：会写入 `state.extensions.debugBattle`；返回下一状态。
-- 错误：规则错误附加 seed、stream/cursor、turn、player、actionId 后向上抛；上层保留原选择中断字段。
+- 状态变化：会写入 `state.extensions.debugBattle`；初始化记录脱敏初始检查点，成功命令记录命令后检查点、语义事件、随机流和 hash 链；返回下一状态。
+- 错误：规则错误附加 seed、stream/cursor、turn、player、actionId 后向上抛；上层保留原选择中断字段。被拒绝动作和重复动作不能追加回放帧。
+- 两类回放必须区分：
+  - `replayBattle()` 是同版本开发/测试中的确定性规则重放，会执行当前规则。
+  - `rvb-match-trace/v2` 回放器是面向已结束比赛的记录状态查看器，只读取事实检查点，不执行当前规则。
 - 日志：主要依赖调用方；调试元数据保存在状态扩展中。
-- 测试：`tests/game/debug-battle.test.ts`、`tests/game/deterministic-runtime.test.ts`。
-- 已知问题：runtime 是同步进程作用域，不能跨异步规则边界；旧训练/浏览器调用方尚可省略 seed。
-- 最小调试：保存初始状态、seed、动作序列，调用 `replayBattle()` 并核对最终 hash。
+- 测试：`tests/game/debug-battle.test.ts`、`tests/game/deterministic-runtime.test.ts`、`tests/game/developer-tools-trace.test.ts`。
+- 已知问题：runtime 是同步进程作用域，不能跨异步规则边界；旧训练/浏览器调用方尚可省略 seed；完整检查点会增加终局投影体积。
+- 最小调试：同版本规则问题保存初始状态、seed、动作序列并调用 `replayBattle()`；线上已发生比赛优先导出 v2，在局外回放器核对记录状态和双 hash 链。
 
 ## 3. 战斗初始化
 
@@ -97,10 +100,10 @@
 - 职责：验证 viewer/动作玩家、在 45 秒期限前后选择实际命令、调用唯一规则 Runner、通过 `Room.version` CAS 提交并生成公开快照。
 - 状态命令：`deploymentChoice` 可在锁定前替换/取消；`deploymentLock` 不可撤销；`deploymentTimeout` 仅允许权威服务端时钟发出。
 - 并发：玩家同时锁定或玩家锁定与超时竞争时，失败的 CAS 重新读取最新房间；最终位置只提交一次，`authorityVersion` 单调递增。
-- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 对玩家和观战者公开相同双方坐标与锁定状态，清除选择和内部调试动作记录，未完成前同时清除最终位置；完整 trace 只留在服务端权威状态。
+- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 对玩家和观战者公开相同双方坐标与锁定状态，清除选择和 `appliedActionIds`，未完成前同时清除最终位置和完整 action trace；只有权威 `terminalResult` 已提交后才公开脱敏完整 trace。
 - 传输：房间 HTTP、WebSocket 和 Relay 使用 `{ state, seed, stateHash, authorityVersion }`；`viewerPlayerId` 只做提交权限校验，不参与站位隐藏。
 - 身份：玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；HTTP 与 LAN WS 在服务端验证，Relay guest 动作由 host 验证。Relay 订阅另签名 `battle-subscribe` 信封，relay-server 验证派生 ID、有效期及房间登记公钥后才绑定 host/guest 角色。header/body/subscribe 中的同名字符串不能单独授权命令或 host 状态写入。
-- 房间投影：`createPublicRoomSnapshot()` 覆盖普通 room GET、重复 start 与其他完整房间响应，不能绕过 battle API 读取 pending choice 或 debug trace。
+- 房间投影：`createPublicRoomSnapshot()` 覆盖普通 room GET、重复 start 与其他完整房间响应，不能绕过 battle API 读取 pending choice 或进行中对局的 debug trace；终局 trace 只经终局 battle snapshot 暴露。
 - Relay：桌面与 Android 本机初始化入口固定地图并从 authority version 1 开始；host 保留完整权威状态，只把公开状态、签名命令和版本 envelope 经 relay-server 转发/恢复。
 - 错误：非法、重复锁定、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
 - 决策：[ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
@@ -202,7 +205,7 @@
 - 路由：`battle.html` 是真实对战、观战和训练营的唯一战斗页面；训练营通过 `mode=training` 启用 fixture 与调试控件。`training.html` 仅保留兼容跳转，不得实现棋盘、选中、目标高亮或动作提交。
 - 职责：显示状态、收集输入、发送动作和接收服务端状态。
 - 输入：玩家交互、WS/Relay 消息、完整战斗状态。
-- 输出：动作消息、页面渲染、权威 `terminalResult` 的只读展示。
+- 输出：动作消息、页面渲染、权威 `terminalResult` 的只读展示，以及终局后 `rvb-match-trace/v1` 的本地保存与下载。
 - 调用方：Electron 客户端和 Android WebView。
 - 调用：`RvBWs`、浏览器 `GameEngine`、localStorage 和 UI 函数。
 - 状态变化：全局 `G`、DOM、localStorage；联网模式只用服务端 `stateUpdate` 替换 `G`。
@@ -252,6 +255,20 @@
 - 证据：服务端通过规则干运行产生目标集；页面 RED-43 面板显示 room/player/seed、按 `ownerPlayerId` 划分的敌我数量、客户端高亮集与服务端目标集的对比。
 - 边界：入口与面板只组织验收并暴露证据，不改变动作协议、规则引擎、随机算法或 production 资源发布。
 - 测试：`tests/qa/red43-ui-acceptance.test.ts`；可重复浏览器步骤与证据见 `docs/qa/RED-43-same-alignment-ui.md`。
+
+
+### 9.4 公开局外开发者中心与 Trace v2 可视化回放（RED-94）
+
+- 页面：`data/pages/developer-tools.html` 从主菜单进入，Trace 导入/最近记录是主功能，固定 seed 隔离场景是次级工具；`data/pages/replay.html` 是独立只读回放页。存在 `rvb_active_battle` 时两页 fail closed。
+- 隔离 API：`app/api/developer-tools/scenario/route.ts::POST` 校验 uint32 seed、地图 ID 与双方内容阵营，只调用 `createDebugDuel()` 和正式 Runner，返回 `rvb-developer-scenario/v1`；不接受 roomId、不持久化、不发奖励、不写统计。
+- 权威记录：`lib/game/battle-trace.ts` 初始化 `rvb-battle-replay/v2` 归档并抓取所用技能的最小展示定义；`runBattleAction()` 只在成功命令后追加可物化 postState、语义事件、随机流和权威/检查点 hash。当前帧的 preState 是上一检查点；地图不变时以 `inheritsMap` 继承，累计 actions 不重复进入检查点。
+- 生命周期：进行中 `PublicBattleSnapshot` 删除 action trace、applied action IDs 和回放归档；只有权威 `terminalResult` 已提交的终局投影保留完整脱敏归档。
+- Trace 导出：`data/pages/js/developer-tools/match-trace.js` 从终局归档生成紧凑 JSON `rvb-match-trace/v2`，包含展示内容快照、初始检查点、逐命令帧、终局、摘要和完整性元数据。它先物化帧状态再验证检查点 hash。最近有效记录以 IndexedDB 为主、localStorage 为受限环境回退。
+- 导入合同：只接受 v2；v1 明确拒绝为旧诊断格式。导入器限制 32 MiB、深度/节点/数组/字符串预算，拒绝危险键、敏感字段、非法 URL 和不连续或被篡改的双 hash 链；失败不得覆盖最近有效 Trace。
+- 展示边界：`replay-viewer.js` 复用 `battle-view-model.js`、`battle-renderer-3d.js`、`battle-status-presentation.js` 与 `battle-tactical-geometry.js`。棋盘覆盖整个视口；时间轴/播放控制与按命令、棋子、事件、变化、完整性分组的可折叠检查器作为浮窗。棋子页显示技能定义与当前冷却/次数/充能/解锁状态。它不复制规则，也不调用当前 Runner 重算历史。
+- 向前降级：Trace 携带棋子/技能的最小展示快照（名称、描述、类型、基础冷却/充能/消耗，不含执行代码）；未知角色、技能和事件用稳定 ID 与通用文本显示。未来破坏性合同必须使用新格式版本，不能静默套用当前规则。
+- 网络边界：开发者中心和回放页不加载 WebSocket、不读取真实房间、不发送动作，也不调用奖励或统计接口。
+- 决策：`docs/decisions/ADR-0016-trace-v2-recorded-state-replay.md`；验收：`docs/qa/RED-94-developer-tools.md`。
 
 ## 10. Electron IPC
 

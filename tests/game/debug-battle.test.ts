@@ -22,6 +22,22 @@ describe('debug battle pipeline', () => {
         expect.objectContaining({ name: 'deployment', startCursor: 0 }),
       ]),
     })
+    expect((duel.state.extensions as any).debugBattle.commandLog[0]).toEqual({
+      type: 'initializeBattle',
+      playerIds: ['debug-red', 'debug-blue'],
+    })
+    expect((duel.state.extensions as any).debugBattle.replay).toMatchObject({
+      format: 'rvb-battle-replay/v2',
+      initialStateHash: expect.any(String),
+      initialCheckpointHash: expect.any(String),
+      initialState: expect.objectContaining({
+        map: expect.any(Object),
+        pieces: expect.any(Array),
+      }),
+      frames: [],
+    })
+    expect(JSON.stringify((duel.state.extensions as any).debugBattle.replay))
+      .not.toContain('debugBattle')
   })
 
   it('allows light/light and dark/dark mirror debug duels', async () => {
@@ -150,6 +166,19 @@ describe('debug battle pipeline', () => {
     expect(duplicate.duplicate).toBe(true)
     expect(duplicate.stateHash).toBe(first.stateHash)
     expect((duplicate.state.extensions as any).debugBattle.appliedActionIds).toContain('debug-action-1')
+    const replay = (duplicate.state.extensions as any).debugBattle.replay
+    expect(replay.frames).toHaveLength(1)
+    expect((duel.state.extensions as any).debugBattle.replay.frames).toHaveLength(0)
+    expect(replay.frames[0]).toMatchObject({
+      index: 0,
+      traceIndex: 1,
+      actionType: 'beginPhase',
+      preStateHash: replay.initialStateHash,
+      postStateHash: first.stateHash,
+      postState: expect.objectContaining({ turn: expect.any(Object) }),
+      events: expect.any(Array),
+      randomStreams: expect.any(Array),
+    })
   })
 
   it('rejects an illegal move without mutating authoritative state or action trace', () => {
@@ -180,5 +209,59 @@ describe('debug battle pipeline', () => {
     expect(state.players[0].actionPoints).toBe(beforeActionPoints)
     expect(state.actions).toEqual(beforeActions)
     expect(state.extensions).toBeUndefined()
+  })
+
+  it('keeps replay checkpoints atomic when a command is rejected', async () => {
+    const duel = await createDebugDuel({ seed: 7300, beginPhase: false })
+    const beforeState = JSON.stringify(duel.state)
+    const beforeReplay = JSON.stringify((duel.state.extensions as any).debugBattle.replay)
+
+    expect(() => runBattleAction(duel.state, {
+      type: 'move',
+      playerId: 'debug-red',
+      pieceId: duel.state.pieces[0].instanceId,
+      toX: -1,
+      toY: -1,
+      clientActionId: 'rejected-replay-command',
+    } as any)).toThrow()
+
+    expect(JSON.stringify(duel.state)).toBe(beforeState)
+    expect(JSON.stringify((duel.state.extensions as any).debugBattle.replay)).toBe(beforeReplay)
+  })
+
+  it('records the committed normalized command while removing transport secrets', async () => {
+    const duel = await createDebugDuel({ seed: 7301, beginPhase: false })
+    const result = runBattleAction(duel.state, {
+      type: 'beginPhase',
+      clientActionId: 'trace-command-1',
+      authorization: { token: 'must-not-leak' },
+      signature: 'must-not-leak',
+    } as any)
+
+    const metadata = (result.state.extensions as any).debugBattle
+    expect(result.trace).not.toHaveProperty('action')
+    expect(metadata.commandLog.at(-1)).toEqual({
+      type: 'beginPhase',
+      clientActionId: 'trace-command-1',
+    })
+    expect(JSON.stringify(metadata.commandLog)).not.toContain('must-not-leak')
+  })
+
+  it('keeps new commands aligned when continuing a trace created before command logging', async () => {
+    const duel = await createDebugDuel({ seed: 7302, beginPhase: false })
+    const legacyMetadata = (duel.state.extensions as any).debugBattle
+    delete legacyMetadata.commandLog
+
+    const result = runBattleAction(duel.state, {
+      type: 'beginPhase',
+      clientActionId: 'trace-command-after-upgrade',
+    } as any)
+    const metadata = (result.state.extensions as any).debugBattle
+
+    expect(metadata.commandLog[0]).toBeUndefined()
+    expect(metadata.commandLog[1]).toEqual({
+      type: 'beginPhase',
+      clientActionId: 'trace-command-after-upgrade',
+    })
   })
 })

@@ -1,10 +1,12 @@
 import { getBattleStorage, withServerSkills, withoutServerSkills } from './battle-storage'
 import {
+  appendBattleReplayFrame,
   getOrCreateDebugMetadata,
   getBattleRootSeed,
   hashBattleState,
   hashStable,
   readDebugMetadata,
+  sanitizeBattleTraceValue,
   type BattleActionTrace,
   type DebugBattleMetadata,
 } from './battle-trace'
@@ -104,7 +106,7 @@ export function runBattleAction(
   const preStateHash = hashBattleState(canonicalState)
 
   try {
-    const clonedState = safeCloneBattleState(state)
+    const clonedState = cloneBattleStateForAction(state, metadata)
     const hydratedState = withServerSkills(clonedState) as BattleState
     const apply = () => applyBattleAction(hydratedState, action)
     const applied = runtime ? withRuleRuntime(runtime, apply) : apply()
@@ -137,6 +139,14 @@ export function runBattleAction(
       } : undefined,
     }
     nextMetadata.actionLog.push(trace)
+    nextMetadata.commandLog[trace.index] = sanitizeBattleTraceValue(action) as Record<string, unknown>
+    appendBattleReplayFrame(
+      next,
+      canonicalState,
+      next,
+      action as unknown as Record<string, unknown>,
+      trace,
+    )
 
     return {
       state: next,
@@ -188,6 +198,26 @@ export function runBattleActionIsolated(
     triggerInternals.rules = ruleRegistry
     if (nextRootEventId !== undefined) triggerInternals.nextRootEventId = nextRootEventId
   }
+}
+
+function cloneBattleStateForAction(
+  state: BattleState,
+  metadata: DebugBattleMetadata,
+): BattleState {
+  if (!metadata.replay) return safeCloneBattleState(state)
+
+  const extensions = { ...(state.extensions ?? {}) }
+  const debugBattle = { ...(extensions.debugBattle as Record<string, unknown> | undefined) }
+  delete debugBattle.replay
+  extensions.debugBattle = debugBattle
+  const cloneInput = { ...state, extensions }
+  const cloned = safeCloneBattleState(cloneInput)
+  const clonedMetadata = getOrCreateDebugMetadata(cloned)
+  clonedMetadata.replay = {
+    ...metadata.replay,
+    frames: [...metadata.replay.frames],
+  }
+  return cloned
 }
 
 function cloneRuntimeValue<T>(value: T, seen = new WeakMap<object, unknown>()): T {
