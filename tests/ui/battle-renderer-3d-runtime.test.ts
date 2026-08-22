@@ -67,6 +67,7 @@ type ThreeHarness = {
   BufferGeometry: { prototype: DisposablePrototype }
   Material: { prototype: DisposablePrototype }
   WebGLRenderer: unknown
+  TextureLoader: unknown
 }
 
 class FakeElement {
@@ -163,7 +164,13 @@ class FakeElement {
   releasePointerCapture(pointerId: number) { this.capturedPointers.delete(pointerId) }
 }
 
-function createHarness(width = 390, height = 844, coarsePointer = true, reducedMotion = false) {
+function createHarness(
+  width = 390,
+  height = 844,
+  coarsePointer = true,
+  reducedMotion = false,
+  textureOutcomes: Record<string, 'loaded' | 'error'> = {},
+) {
   const container = new FakeElement('div')
   container.rect = { left: 0, top: 0, width, height }
   const renderers: FakeRendererRecord[] = []
@@ -171,6 +178,8 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
   const rafCallbacks = new Map<number, (now: number) => void>()
   const cancelledRafs = new Set<number>()
   const disposeCounts = { geometry: 0, material: 0 }
+  const textureRequests: string[] = []
+  const textureJobs: Array<() => void> = []
   let nextRafId = 1
   let now = 0
 
@@ -236,6 +245,17 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
     disposeCounts.material += 1
     return materialDispose.call(this)
   }
+  THREE.TextureLoader = class {
+    load(url: string, onLoad: (texture: unknown) => void, _onProgress: unknown, onError: (error: Error) => void) {
+      const texture = new (sandbox.THREE as { Texture: new () => { colorSpace?: string } }).Texture()
+      textureRequests.push(url)
+      textureJobs.push(() => {
+        if (textureOutcomes[url] === 'error') onError(new Error('simulated texture failure: ' + url))
+        else onLoad(texture)
+      })
+      return texture
+    }
+  }
 
   THREE.WebGLRenderer = class {
     readonly domElement = new FakeElement('canvas')
@@ -262,6 +282,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
   }
 
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-tactical-geometry.js'), 'utf8'), { filename: 'battle-tactical-geometry.js' }).runInContext(context)
+  new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-standee-manifest.js'), 'utf8'), { filename: 'battle-standee-manifest.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8'), { filename: 'battle-renderer-3d.js' }).runInContext(context)
 
   function frame(step = 100) {
@@ -272,7 +293,11 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
     next[1](now)
   }
 
-  return { container, windowObject, renderers, observers, rafCallbacks, cancelledRafs, disposeCounts, frame, renderer: windowObject.BattleRenderer3D! }
+  function flushTextures() {
+    while (textureJobs.length) textureJobs.shift()!()
+  }
+
+  return { container, windowObject, renderers, observers, rafCallbacks, cancelledRafs, disposeCounts, textureRequests, flushTextures, frame, renderer: windowObject.BattleRenderer3D! }
 }
 
 function runtimeModel() {
@@ -302,6 +327,36 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
 }
 
 describe('RED-68 BattleRenderer3D runtime', () => {
+  it('renders one thin paper map with flat grid and terrain marks over hidden hit proxies', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    model.board.tiles[0].props.type = 'wall'
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame()
+
+    const scene = harness.renderers[0].scene!
+    const byRole = (role: string) => scene.children.find((child) => child.userData.motionRole === role)
+    const table = byRole('table-surface')
+    const paper = byRole('paper-map')
+    const underlay = byRole('paper-underlay')
+    const grid = byRole('paper-grid')
+    const marks = byRole('paper-map-marks')
+    const hitTiles = scene.children.filter((child) => Number.isFinite(child.userData.tileX))
+
+    expect(table?.type).toBe('Mesh')
+    expect(paper?.type).toBe('Mesh')
+    expect(underlay?.type).toBe('Mesh')
+    expect(grid?.type).toBe('LineSegments')
+    expect(marks?.type).toBe('LineSegments')
+    expect(paper?.position.y).toBeCloseTo(0.035, 4)
+    expect(table!.position.y).toBeLessThan(paper!.position.y)
+    expect(hitTiles).toHaveLength(20 * 16)
+    expect(hitTiles.every((tile) => (tile.material as ThreeMaterial & { visible?: boolean }).visible === false)).toBe(true)
+
+    harness.renderer.dispose()
+  })
+
   it('executes projection, hit, DPR, touch gestures, reset, flash recovery, and rule-state isolation', () => {
     const harness = createHarness()
     const intents: Array<Record<string, unknown>> = []
@@ -401,6 +456,57 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(harness.rafCallbacks.size).toBe(0)
   })
 
+  it('loads only explicit standees and keeps the portrait visible on missing or failed assets', () => {
+    const success = createHarness(1280, 720, false)
+    const successModel: any = runtimeModel()
+    successModel.pieces[0].templateId = 'blue-naruto'
+    successModel.pieces[0].portraitId = 'naruto.jpg'
+    success.renderer.init({ container: success.container })
+    success.renderer.update(successModel)
+    expect(success.textureRequests).toContain('public/standees/blue-naruto.png')
+    expect(success.textureRequests).toContain('images/naruto.jpg')
+    success.flushTextures()
+    success.frame()
+    const successGroup = success.renderers[0].scene!.children.find((child) => child.userData.pieceId === successModel.pieces[0].id)!
+    const successPortrait = successGroup.children.find((child) => child.userData.motionRole === 'portrait-fallback')!
+    const successStandee = successGroup.children.find((child) => child.userData.motionRole === 'paper-standee')!
+    expect(successPortrait.visible).toBe(false)
+    expect(successStandee.visible).toBe(true)
+    success.renderer.dispose()
+
+    const failed = createHarness(1280, 720, false, false, {
+      'public/standees/blue-naruto.png': 'error',
+    })
+    const failedModel: any = runtimeModel()
+    failedModel.pieces[0].templateId = 'blue-naruto'
+    failedModel.pieces[0].portraitId = 'naruto.jpg'
+    failed.renderer.init({ container: failed.container })
+    failed.renderer.update(failedModel)
+    failed.flushTextures()
+    failed.frame()
+    const failedGroup = failed.renderers[0].scene!.children.find((child) => child.userData.pieceId === failedModel.pieces[0].id)!
+    const failedPortrait = failedGroup.children.find((child) => child.userData.motionRole === 'portrait-fallback')!
+    const failedStandee = failedGroup.children.find((child) => child.userData.motionRole === 'paper-standee')!
+    expect(failedPortrait.visible).toBe(true)
+    expect(failedStandee.visible).toBe(false)
+    failed.renderer.dispose()
+
+    const unmapped = createHarness(1280, 720, false)
+    const unmappedModel: any = runtimeModel()
+    unmappedModel.pieces[0].templateId = 'anduin'
+    unmappedModel.pieces[0].portraitId = 'anduin.jpg'
+    unmapped.renderer.init({ container: unmapped.container })
+    unmapped.renderer.update(unmappedModel)
+    expect(unmapped.textureRequests.filter((url) => url.includes('/standees/'))).toEqual([])
+    expect(unmapped.textureRequests).toContain('images/anduin.jpg')
+    unmapped.flushTextures()
+    unmapped.frame()
+    const unmappedGroup = unmapped.renderers[0].scene!.children.find((child) => child.userData.pieceId === unmappedModel.pieces[0].id)!
+    expect(unmappedGroup.children.find((child) => child.userData.motionRole === 'portrait-fallback')!.visible).toBe(true)
+    expect(unmappedGroup.children.find((child) => child.userData.motionRole === 'paper-standee')!.visible).toBe(false)
+    unmapped.renderer.dispose()
+  })
+
   it('keeps every projected cell axis at least 44px in mobile landscape', () => {
     const harness = createHarness(844, 390, true)
     const model = runtimeModel()
@@ -494,7 +600,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(scene.children).not.toContain(removedGroup)
     expect(scene.children.filter((child) => child.type === 'Group')).toHaveLength(15)
     expect(markerDisposed).toBe(true)
-    expect(harness.disposeCounts.material - materialDisposalsBefore).toBe(5)
+    expect(harness.disposeCounts.material - materialDisposalsBefore).toBe(6)
     harness.renderer.dispose()
   })
 

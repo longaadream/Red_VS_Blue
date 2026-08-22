@@ -20,6 +20,7 @@
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-ui/deployment-status.js"></script>
   <script src="js/battle-ui/battle-tactical-geometry.js"></script>
+  <script src="js/battle-ui/battle-standee-manifest.js"></script>
   <script src="js/battle-ui/turn-timer-status.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
@@ -1333,6 +1334,7 @@
     }
   </style>
   <link rel="stylesheet" href="css/battle-tactical-table.css" />
+  <link rel="stylesheet" href="css/battle-paper-puppet.css" />
 </head>
 <body>
 
@@ -1524,7 +1526,7 @@
 
       <div class="board-wrap" id="boardWrap">
         <div class="board-camera-controls" aria-label="棋盘视图控制">
-          <button class="board-view-button" id="btnResetBoardView" type="button" onclick="resetBoardView()" title="复位棋盘镜头" aria-label="复位棋盘镜头">⌖ <span>复位</span></button>
+          <button class="board-view-button" id="btnResetBoardView" type="button" onclick="resetBoardView()" title="复位棋盘镜头" aria-label="复位棋盘镜头"><img src="images/tile-effects/fallback.svg" alt="" aria-hidden="true"> <span>复位</span></button>
         </div>
         <div class="board-shell board-shell-3d">
           <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
@@ -1567,7 +1569,7 @@
             <strong class="deployment-countdown" id="deploymentCountdown">00:45</strong>
             <span class="deployment-status-state" id="deploymentState">等待双方确认</span>
           </div>
-          <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
+          <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合</button>
         </div>
         <div class="training-tools" id="trainingTools" style="display:none">
           <button class="training-tools-toggle" id="trainingToolsToggle" type="button"
@@ -4252,8 +4254,8 @@
       const moveButton = isOwner
         ? '<button type="button" class="piece-context-skill is-move"' +
           ' onclick="dispatchBattleIntent({type:\'toggle-move\'})"' + (canMove ? '' : ' disabled') + '>' +
-          '<span class="piece-context-skill-icon">&#8599;</span><span class="piece-context-skill-name">移动</span>' +
-          '<span class="piece-context-skill-cost">选择路线</span></button>'
+          '<span class="piece-context-skill-icon"><img src="images/tile-effects/flying-raijin-anchor.svg" alt=""></span><span class="piece-context-skill-name">移动</span>' +
+          '<span class="piece-context-skill-cost">行动 1 · 选择路线</span></button>'
         : ''
       const skillButtons = skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
@@ -4265,7 +4267,9 @@
         const apCost = availability.actionCost
         const cpCost = availability.chargeCost
         const disabled = !availability.available
-        const icon = isCharge ? '◆' : '✦'
+        const tileEffectVisuals = (window.BattleRenderer3D && window.BattleRenderer3D.TILE_EFFECT_VISUALS) || {}
+        const iconVisual = tileEffectVisuals[sid] || tileEffectVisuals.fallback || {}
+        const iconSrc = iconVisual.icon || 'images/tile-effects/fallback.svg'
         const status = availability.onCooldown ? 'CD ' + sk.currentCooldown
           : availability.noUses ? '已用'
             : availability.actionLow ? 'AP不足'
@@ -4281,7 +4285,7 @@
           ' onclick="dispatchBattleIntent({type:\'select-skill\',skillId:this.dataset.skillId})"' +
           ' title="' + escHtml(titleParts.join('\n')) + '"' +
           ' aria-label="' + escHtml(rawName + (availability.unavailableReason ? '，' + availability.unavailableReason : '，可使用')) + '"' + (disabled ? ' disabled aria-disabled="true"' : '') + '>' +
-          '<span class="piece-context-skill-icon">' + escHtml(String(icon)) + '</span>' +
+          '<span class="piece-context-skill-icon"><img src="' + escHtml(iconSrc) + '" alt=""></span>' +
           '<span class="piece-context-skill-name">' + escHtml(rawName) + '</span>' +
           '<span class="piece-context-skill-cost">' +
             (status || ('行动 ' + apCost + (cpCost ? ' · 充能 ' + cpCost : ''))) +
@@ -4469,7 +4473,7 @@
       }
       if (btnEnd) {
         btnEnd.disabled = !!targetSubmissionPending || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
-        btnEnd.textContent = inAction ? '结束回合 ->' : '继续 ->'
+        btnEnd.textContent = inAction ? '结束回合' : '继续'
         btnEnd.classList.toggle('is-start', inStart || inEnd)
       }
 
