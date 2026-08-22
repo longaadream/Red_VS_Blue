@@ -474,7 +474,7 @@
       <button class="menu-close" type="button" aria-label="关闭"
         onclick="closeMenuOverlay('moreOverlay')">×</button>
       <h2 id="moreOverlayTitle">更多</h2>
-      <p>连接服务器，或管理本机资源包。</p>
+      <p>连接服务器、管理资源包，或进入局外开发工具。</p>
       <div class="menu-choice-list">
         <button class="menu-choice" type="button"
           onclick="openFunctionalOverlayFromMenu('moreOverlay', 'connectOverlay', showConnectSheet)">
@@ -484,6 +484,10 @@
         <button class="menu-choice" type="button" onclick="loadPage('pack.html')">
           <span class="choice-title">资源包管理</span>
           <span class="choice-desc" id="packDesc">导入更新包，无需重装应用</span>
+        </button>
+        <button class="menu-choice" type="button" onclick="loadPage('developer-tools.html')">
+          <span class="choice-title">开发者中心</span>
+          <span class="choice-desc">局外固定种子场景与赛后 Trace</span>
         </button>
       </div>
       <div id="packMismatchWarn" class="pack-warning">
