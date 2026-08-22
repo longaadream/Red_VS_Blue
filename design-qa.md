@@ -155,3 +155,94 @@ final result: passed
 - [x] 最终控制台 error 级别为 0。
 
 final result: passed
+
+
+---
+
+## 2026-08-22 用户反馈修订：全身纸偶与右侧技能栏
+
+> 本节覆盖并取代上一个“棋子图鉴增量 Design QA”的最终视觉结论；上节保留为变更历史。
+
+### Comparison target
+
+- Source visual truth: `output/playwright/18-pieces-reference-option-2.png`。
+- Rendered implementation: `output/playwright/35-pieces-paper-puppet-final-1280x800.png`。
+- Responsive evidence: `output/playwright/38-pieces-paper-puppet-final-960x640.png`。
+- Future full-body cutout evidence: `output/playwright/37-pieces-future-fullbody-fit-final.png`。
+- Final full-view comparison: `output/playwright/36-pieces-reference-vs-final.jpg`。
+- Focused character/skills comparison: `output/playwright/39-pieces-detail-skills-final.jpg`。
+- State: “全部”筛选，26 个棋子，默认选中安娜；中央使用当前旧肖像纸片，右侧常驻显示安娜 3 项完整技能。全身证据仅在浏览器临时替换为真实透明纸偶位图，截图后已重载恢复真实数据。
+
+### Normalization
+
+- Source pixels: 1586 × 992；implementation pixels: 1280 × 800。
+- CSS viewport: 1280 × 800；Playwright screenshot scale: CSS；device scale factor: 1。
+- 全视图对照把两侧分别等比归一为 800 × 500 并放入同一张 1600 × 540 图；无浏览器边框或设备外框。
+- 聚焦对照分别裁取中央人物与右侧技能区，再等比放入 820 × 620 画布；不拉伸文字或素材。
+- 响应式复核使用 960 × 640 CSS viewport，实测 document scroll size 正好为 960 × 640。
+
+### Full-view and focused comparison evidence
+
+`output/playwright/36-pieces-reference-vs-final.jpg` 证明主要构图已改为参考图的连续纸偶舞台：左侧窄纸签名册、中间独立站立位与竖向属性、右侧固定技能纸卷。内容不再使用圆形头像框、圆角网页卡或把技能放在人物下方。
+
+`output/playwright/39-pieces-detail-skills-final.jpg` 用可读尺寸核对中央与右侧。当前 JPG 肖像被处理为不规则纸片并落在真实舞台底座上；右侧同屏保留 3 张完整技能纸卡，包含名称、类型、说明、行动点、冷却、目标、充能与关键词。由于现有数据只有方形头像，中央人物主体与参考图存在可预期的内容差异；`output/playwright/37-pieces-future-fullbody-fit-final.png` 证明透明 PNG/WebP 会使用 235 × 440 CSS px 的完整 `contain` 槽位、无圆形裁切、无外围卡框，且不会挤走右侧技能栏。
+
+### Required fidelity surfaces
+
+- Fonts and typography: 标题使用楷体/系统中文回退；筛选实测 19px、技能名 18px，角色名在 1280 下占 308px 宽且完整显示。正文保持紧凑纸质规则书层级，长技能说明不截断。
+- Spacing and layout rhythm: 1280 下三栏实测约为 258 / 333 / 454px；顺序与顶边一致。960 下三栏仍为约 210 / 280 / 369px，没有掉列、遮挡或页面级滚动；名册长内容只在自身区域滚动。
+- Colors and visual tokens: 羊皮纸、朱红、群青、炭黑与低饱和金色来自同一真实位图舞台和其纸张裁片，不使用暗色控制台、玻璃拟态或圆角网页面板。Hover 实测红边为 `rgb(207, 51, 38)`。
+- Image quality and asset fidelity: 舞台和纸偶均为真实 raster 资产。现有 JPG 肖像保持 `object-fit: contain`、`border-radius: 0px`，使用不规则纸张边缘；未来透明图不使用 clip、圆框或 CSS 伪造角色。没有内联 SVG、Emoji、渐变插画或 div 角色。
+- Copy and content: 页面只显示“光方 / 暗方 / 中立”，不显示“红方 / 蓝方”；中立为 0 时给出明确预留说明。技能文本直接读取原有棋子与技能 JSON，未复制或改写规则。
+- Icons: 当前数据没有统一技能图标资产，因此没有用字符、手写 SVG 或 CSS 图形冒充参考图图标；技能通过文字、纸张层级和真实内容区分。
+- States and accessibility: 原生按钮/链接、`aria-pressed`、live region、alt 文本与 `:focus-visible` 均保留；reduced motion 受支持。
+
+### Browser and interaction evidence
+
+- 阵营数量实测 26 / 13 / 13 / 0；正文不含“红方”或“蓝方”。
+- 三栏位置实测 roster.right ≤ character.left ≤ skills.left，且三栏同顶边；技能始终在角色右侧。
+- 默认安娜显示 3 项技能且 3 项说明均非空。
+- 光方 Hover 红边为 `rgb(207, 51, 38)`；筛选字号 19px。
+- 键盘流程：从“全部”按 Tab 聚焦“光方”，Enter 后为 13 项；Shift+Tab 回到“全部”，Space 后恢复 26 项。
+- 中立筛选为 0 个并显示“中立阵营席位已预留”空状态。
+- 960 × 640 实测 document 为 960 × 640，三栏保持横向顺序。
+- 最终 Playwright console error 为 0 条。
+
+### Comparison history
+
+#### Iteration 1 — blocked by user feedback
+
+- [P1][imagery/surfaces] 上一版仍以头像卡和圆框语言为主，只有背景接近参考图，没有保留纸偶舞台的实体材质。
+- [P1][layout] 棋子技能没有作为固定第三栏与人物并排，无法满足“打开后立即看技能”的核心阅读路径。
+- Evidence: `output/playwright/19-pieces-final-1280x800.png` 与 `output/playwright/22-pieces-reference-comparison.png`。
+- Fix: 废弃头像卡构图，重建左名册 / 中站偶 / 右技能的连续三栏舞台；生成并接入无文字、无角色的真实纸偶剧场底板 `data/pages/images/menu/pieces-encyclopedia-paper-theater-v2.png`。
+
+#### Iteration 2 — blocked
+
+- [P2][imagery] 首个三栏版本把旧方形头像放在贯穿全高的纸框内，形成明显空白长框；该框会让当前素材看起来仍像网页海报。
+- [P2][surfaces] 名册与技能纸片的纹理和边缘强度不足，与舞台底板的实体纸张质感脱节。
+- Evidence: `output/playwright/26-pieces-paper-puppet-v2-1280x800.png` 与 `output/playwright/27-pieces-reference-vs-v2.jpg`。
+- Fix: 旧 JPG 改为舞台底座上的不规则纸片；透明 PNG/WebP 继续保留全高无框槽位。名册与技能改用同一真实纸张位图材质、朱红纸边和压印层次，并移除伪造舞台线。
+
+#### Iteration 3 — passed
+
+- Post-fix evidence: `output/playwright/36-pieces-reference-vs-final.jpg`、`output/playwright/39-pieces-detail-skills-final.jpg`、`output/playwright/37-pieces-future-fullbody-fit-final.png` 与 `output/playwright/38-pieces-paper-puppet-final-960x640.png`。
+- 先前 P1/P2 已解决；没有剩余可执行的 P0、P1 或 P2 问题。
+
+### Findings
+
+- 没有剩余的 P0、P1 或 P2 问题。
+- [P3][imagery] 当前仓库仍只有方形角色肖像，所以真实数据状态无法呈现参考图中的全身人物。该差异来自素材输入，不是 UI 槽位限制；未来透明全身图可直接替换。
+- [P3][icons] 参考图包含每项技能的专属纸切图标，当前技能数据没有对应资产。为避免 AI 味和错误语义，本次不使用通用占位图标。
+
+### Implementation checklist
+
+- [x] 同视口全视图与聚焦区域均在一张图内比较。
+- [x] 删除圆形头像框、圆角网页卡和伪造舞台装饰。
+- [x] 左名册 / 中全身站立槽 / 右固定技能栏三列完成。
+- [x] 当前 JPG 与未来透明全身图分别验证。
+- [x] 26 / 13 / 13 / 0、中立空状态、Hover、键盘与完整技能验证。
+- [x] 1280 × 800、960 × 640、内部滚动与 console error 验证。
+- [x] 字体、间距、色彩、图像、图标、文案与可访问性复核。
+
+final result: passed

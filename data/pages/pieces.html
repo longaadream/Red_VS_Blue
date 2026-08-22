@@ -7,65 +7,486 @@
   <link rel="icon" href="data:,">
   <script src="js/pack-fetch.js"></script>
   <style>
-    :root{--ink:#35271d;--muted:#766250;--paper:#f3dfb6;--paper2:#d9ba83;--red:#c9432d;--red-dark:#8f281f;--blue:#315b86;--neutral:#686155;--shadow:rgba(60,34,18,.27)}
+    :root{
+      --ink:#38281d;
+      --ink-soft:#69513e;
+      --paper:#efd6a8;
+      --paper-light:#f9e8c3;
+      --red:#b83225;
+      --red-dark:#77221c;
+      --blue:#143d68;
+      --gold:#aa6e24;
+      --paper-plate:url("images/menu/pieces-encyclopedia-paper-theater-v2.png");
+    }
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     html,body{width:100%;height:100%;overflow:hidden}
-    body{color:var(--ink);font-family:"Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;background:#d8c198 url("images/menu/pieces-encyclopedia-paper-theater-v1.png") center/cover no-repeat}
-    button,a{font:inherit}button{color:inherit}
-    .page{position:relative;display:grid;grid-template-rows:auto minmax(0,1fr);width:100%;height:100%;padding:clamp(14px,2vw,28px) clamp(18px,3vw,48px) clamp(16px,2.3vw,30px);isolation:isolate}
-    .page:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(rgba(255,248,223,.18),transparent 28%),radial-gradient(circle at 50% 20%,transparent 0 44%,rgba(66,35,19,.12) 100%);pointer-events:none}
-    .topbar{display:grid;grid-template-columns:110px minmax(280px,420px) minmax(330px,1fr);align-items:center;gap:18px;min-height:76px;padding:0 clamp(12px,2vw,28px) 10px}
-    .back,.filter,.ticket{border:3px solid rgba(82,57,38,.56);box-shadow:0 5px 0 rgba(82,48,28,.18),inset 0 1px rgba(255,255,255,.55);transition:border-color 130ms,transform 130ms,box-shadow 130ms,background 130ms}
-    .back{justify-self:start;min-height:44px;padding:7px 18px;border-radius:8px 12px 8px 11px;color:var(--ink);background:rgba(248,225,184,.95);font-size:17px;font-weight:900;letter-spacing:.04em;text-decoration:none;transform:rotate(-1deg)}
-    .title{text-align:center;min-width:270px}
-    h1{color:#472c1c;font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;font-size:clamp(34px,4vw,54px);line-height:1;letter-spacing:.13em;text-shadow:0 3px rgba(255,244,213,.8),0 6px 10px rgba(82,43,24,.22)}
-    .count{display:block;margin-top:5px;color:var(--muted);font-size:16px;font-weight:900;letter-spacing:.08em}
-    .filters{justify-self:start;display:flex;gap:8px}
-    .filter{min-width:70px;min-height:44px;padding:6px 12px;border-radius:9px 7px 10px 8px;background:rgba(244,222,181,.94);font-size:19px;font-weight:950;cursor:pointer}
-    .filter:nth-child(even){transform:rotate(.7deg)}
-    .filter.active{color:#fff8df;border-color:var(--red-dark);background:linear-gradient(#d75a3d,#a52d23);box-shadow:0 5px 0 rgba(82,29,22,.3),inset 0 1px rgba(255,255,255,.3)}
-    .back:hover,.filter:hover,.ticket:hover,.skill:hover{border-color:var(--red);box-shadow:0 5px 0 rgba(116,38,26,.24),0 0 0 2px rgba(255,238,201,.68);transform:translateY(-2px) rotate(0)}
-    .back:focus-visible,.filter:focus-visible,.ticket:focus-visible{outline:4px solid #fff3b0;outline-offset:3px;border-color:var(--red)}
-    .theater{min-height:0;display:grid;grid-template-columns:minmax(285px,31%) minmax(0,1fr);gap:clamp(20px,2.6vw,38px);padding:0 clamp(6px,1.8vw,25px)}
-    .paper{position:relative;min-height:0;border:4px solid rgba(94,58,35,.74);border-radius:14px 10px 16px 11px;background:linear-gradient(rgba(255,247,220,.86),rgba(236,211,167,.91)),url("images/menu/pieces-encyclopedia-paper-theater-v1.png") center/cover;box-shadow:0 14px 25px var(--shadow),inset 0 0 0 3px rgba(255,248,222,.45)}
-    .roster{display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden;padding:17px 12px 14px}
-    .panel-title{padding:0 8px 11px;color:#513523;font-family:"KaiTi","STKaiti",serif;font-size:24px;font-weight:900;letter-spacing:.12em}
-    .list,.skill-scroll{min-height:0;overflow-y:auto;scrollbar-color:var(--red) rgba(101,68,43,.16);scrollbar-width:thin}
-    .list{padding:2px 7px 12px}.list::-webkit-scrollbar,.skill-scroll::-webkit-scrollbar{width:9px}.list::-webkit-scrollbar-track,.skill-scroll::-webkit-scrollbar-track{background:rgba(94,58,35,.12);border-radius:99px}.list::-webkit-scrollbar-thumb,.skill-scroll::-webkit-scrollbar-thumb{background:#b44e36;border:2px solid rgba(255,239,205,.7);border-radius:99px}
-    .ticket{position:relative;display:grid;grid-template-columns:65px minmax(0,1fr);align-items:center;gap:11px;width:100%;min-height:84px;margin:0 0 12px;padding:8px 13px 8px 8px;border-radius:10px 7px 11px 8px;background:linear-gradient(100deg,rgba(255,246,215,.97),rgba(229,199,150,.94));text-align:left;cursor:pointer}
-    .ticket:nth-child(even){transform:rotate(.25deg)}.ticket.selected{border-color:var(--red-dark);background:linear-gradient(100deg,#fff4ce,#eebc78);box-shadow:0 5px 0 rgba(116,38,26,.28),inset 5px 0 var(--red);transform:translateX(4px)}
-    .ticket-img{width:65px;height:65px;border:3px solid #714d33;border-radius:50% 46% 51% 44%;background:#dcc28f;object-fit:cover;filter:saturate(.9) contrast(1.04)}
-    .ticket-name{display:block;overflow:hidden;color:#39291e;font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;font-size:21px;font-weight:900;line-height:1.1;text-overflow:ellipsis;white-space:nowrap}
-    .ticket-meta,.detail-meta,.skill-meta,.keywords,.cards{display:flex;flex-wrap:wrap;gap:6px}.ticket-meta{margin-top:6px;color:var(--muted);font-size:14px;font-weight:800}
-    .chip,.rarity,.type,.meta,.keyword{display:inline-flex;align-items:center;border:1px solid currentColor;border-radius:99px;padding:2px 8px;background:rgba(255,250,228,.5);font-size:13px;font-weight:900;line-height:1.35}
-    .light{color:#9b5c12}.dark{color:#5b3f70}.neutral{color:var(--neutral)}.arrow{color:var(--red);font:900 25px Georgia}
-    .detail{display:grid;grid-template-rows:minmax(220px,45%) minmax(0,1fr);overflow:hidden;padding:19px clamp(19px,2.5vw,36px) 17px}
-    .stage{position:relative;display:grid;grid-template-columns:minmax(210px,38%) minmax(0,1fr);gap:clamp(18px,2.3vw,32px);min-height:0;padding:5px 6px 19px;border-bottom:3px dashed rgba(113,73,44,.45)}
-    .stage:after{content:"";position:absolute;left:7%;right:7%;bottom:11px;height:16px;border-radius:50%;background:rgba(78,43,22,.18);filter:blur(5px)}
-    .portrait-wrap{position:relative;z-index:1;min-height:0;display:grid;place-items:center}
-    .portrait{display:block;width:min(100%,270px);max-height:100%;aspect-ratio:4/5;border:5px solid #75462c;border-radius:44% 48% 42% 47%/34% 36% 48% 44%;background:#d1aa70;object-fit:cover;filter:saturate(.92) contrast(1.04) drop-shadow(8px 11px 0 rgba(81,49,31,.19));transform:rotate(-1.2deg)}
-    .summary{position:relative;z-index:1;align-self:center;min-width:0;padding:7px 0}.kicker{color:var(--red-dark);font-size:15px;font-weight:900;letter-spacing:.18em}
-    .name{margin-top:3px;color:#3e281b;font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;font-size:clamp(32px,4vw,54px);font-weight:900;line-height:1;letter-spacing:.07em}
-    .detail-meta{margin-top:10px}.desc{max-width:700px;margin-top:11px;color:#625142;font-size:16px;font-weight:650;line-height:1.55}
-    .stats{display:grid;grid-template-columns:repeat(5,minmax(55px,1fr));gap:7px;margin-top:14px}.stat{min-width:0;padding:7px 4px 6px;border:2px solid rgba(103,67,42,.5);border-radius:8px 10px 7px 9px;background:rgba(255,239,199,.58);text-align:center}
-    .stat-v{color:var(--red-dark);font:900 22px/1 Georgia}.stat-l{margin-top:3px;color:#6e5a49;font-size:12px;font-weight:900}
-    .skills{min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);padding-top:13px}.skills-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:0 2px 8px}
-    .skills-head h2{color:#4e3221;font-family:"KaiTi","STKaiti",serif;font-size:26px;letter-spacing:.12em}.skills-head span{color:var(--muted);font-size:14px;font-weight:800}
-    .skill-scroll{padding:2px 9px 15px 2px}.skill{margin-bottom:10px;padding:12px 14px 11px;border:3px solid rgba(103,67,42,.48);border-radius:10px 8px 12px 9px;background:rgba(255,240,203,.74);box-shadow:0 4px 0 rgba(80,47,28,.13);transition:border-color 130ms,transform 130ms,box-shadow 130ms}
-    .skill:nth-child(even){transform:rotate(.15deg)}.skill-title{display:flex;align-items:center;flex-wrap:wrap;gap:7px}.skill-name{color:#3f2d20;font-size:19px;font-weight:950}.type{color:var(--blue);font-size:12px}.type.super{color:#7b3e83}
-    .skill-desc{margin-top:7px;color:#604e3e;font-size:15px;font-weight:650;line-height:1.5}.skill-meta,.keywords,.cards{margin-top:8px}.meta{color:#6e4a2e;border-color:rgba(109,73,46,.65)}.keyword{color:#70447a}
-    .related{padding:7px 9px;border-left:4px solid var(--red);background:rgba(255,249,226,.6);color:#4f3b2d;font-size:14px;font-weight:800}
-    .status{display:grid;place-items:center;min-height:170px;padding:25px;border:3px dashed rgba(115,74,46,.5);border-radius:13px;color:#684e39;background:rgba(255,239,201,.68);text-align:center}.status strong{display:block;margin-bottom:7px;color:#4b3222;font-family:"KaiTi","STKaiti",serif;font-size:25px}.status p{font-size:16px;font-weight:700;line-height:1.6}
-    @media(max-width:1050px){.page{padding-inline:16px}.topbar{grid-template-columns:auto 1fr;gap:9px 15px;padding-inline:8px}.title{min-width:0;text-align:left}h1{font-size:38px}.filters{grid-column:1/-1;justify-self:stretch;justify-content:center}.filter{flex:1 1 0;max-width:135px}.theater{grid-template-columns:minmax(260px,34%) minmax(0,1fr);gap:16px;padding:0}.detail{grid-template-rows:minmax(200px,46%) minmax(0,1fr);padding-inline:17px}.stage{grid-template-columns:minmax(155px,36%) minmax(0,1fr);gap:15px}.desc{font-size:14px;line-height:1.42}.stats{gap:4px}}
-    @media(max-height:690px){.page{padding-block:9px 11px}.topbar{min-height:64px;padding-bottom:7px}h1{font-size:35px}.count{margin-top:2px;font-size:14px}.back,.filter{min-height:38px}.roster{padding-top:11px}.panel-title{padding-bottom:7px;font-size:21px}.ticket{grid-template-columns:54px minmax(0,1fr) auto;min-height:70px;margin-bottom:8px}.ticket-img{width:54px;height:54px}.ticket-name{font-size:19px}.detail{grid-template-rows:minmax(185px,48%) minmax(0,1fr);padding-top:12px}.name{font-size:35px}.desc{margin-top:6px}.stats{margin-top:8px}.stat{padding-block:4px}.skill{padding:9px 12px}}
-    @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition-duration:.01ms!important;scroll-behavior:auto!important}}
+    body{
+      color:var(--ink);
+      font-family:"Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+      background:#caa879 var(--paper-plate) center/100% 100% no-repeat;
+    }
+    button,a{font:inherit;color:inherit}
+    .page{display:grid;grid-template-rows:112px minmax(0,1fr);width:100%;height:100%;overflow:hidden}
+    .topbar{
+      display:grid;
+      grid-template-columns:96px minmax(270px,390px) 90px minmax(300px,1fr);
+      align-items:center;
+      gap:12px;
+      padding:14px clamp(76px,8.2vw,126px) 9px;
+      min-width:0;
+    }
+    .back,.filter,.ticket{
+      cursor:pointer;
+      border:2px solid rgba(69,45,30,.72);
+      background-color:rgba(244,218,174,.94);
+      box-shadow:3px 4px 0 rgba(55,35,23,.18);
+      transition:border-color 120ms ease,box-shadow 120ms ease,transform 120ms ease,background-color 120ms ease;
+    }
+    .back{
+      justify-self:start;
+      padding:8px 15px;
+      color:#3e2c20;
+      font-size:17px;
+      font-weight:950;
+      text-decoration:none;
+      clip-path:polygon(3% 4%,96% 0,100% 89%,6% 100%,0 18%);
+    }
+    .heading{min-width:0}
+    h1{
+      overflow:hidden;
+      color:#33251b;
+      font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;
+      font-size:clamp(37px,4vw,55px);
+      font-weight:950;
+      line-height:1;
+      letter-spacing:.12em;
+      text-shadow:2px 3px rgba(255,244,214,.78);
+      white-space:nowrap;
+    }
+    .count{
+      display:block;
+      margin-top:5px;
+      color:var(--ink-soft);
+      font-size:14px;
+      font-weight:900;
+      letter-spacing:.08em;
+    }
+    .filter-caption{
+      align-self:center;
+      color:var(--red-dark);
+      font-family:"KaiTi","STKaiti",serif;
+      font-size:18px;
+      font-weight:950;
+      text-align:right;
+    }
+    .filters{display:flex;justify-content:flex-start;gap:7px;min-width:0}
+    .filter{
+      min-width:66px;
+      padding:7px 10px;
+      color:#493529;
+      font-size:19px;
+      font-weight:950;
+      clip-path:polygon(4% 0,96% 3%,100% 92%,7% 100%,0 12%);
+    }
+    .filter.active{
+      color:#fff1d1;
+      border-color:var(--red-dark);
+      background-color:var(--red);
+      box-shadow:3px 4px 0 rgba(90,28,22,.28);
+    }
+    .back:hover,.filter:hover,.ticket:hover{
+      border-color:#cf3326;
+      box-shadow:0 0 0 3px rgba(205,51,38,.2),3px 5px 0 rgba(78,34,24,.22);
+      transform:translateY(-2px);
+    }
+    .back:focus-visible,.filter:focus-visible,.ticket:focus-visible{
+      outline:4px solid #fff0a8;
+      outline-offset:2px;
+      border-color:#cf3326;
+    }
+    .theater{
+      min-height:0;
+      display:grid;
+      grid-template-columns:minmax(225px,24%) minmax(300px,31%) minmax(400px,45%);
+      gap:clamp(9px,1.15vw,18px);
+      padding:0 clamp(72px,8vw,124px) clamp(28px,4.5vh,46px);
+    }
+    .roster-zone,.character-zone,.skills-zone{min-width:0;min-height:0}
+    .roster-zone{
+      display:grid;
+      grid-template-rows:auto minmax(0,1fr);
+      padding:30px 18px 12px 16px;
+    }
+    .zone-title{
+      color:#472d20;
+      font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;
+      font-size:22px;
+      font-weight:950;
+      letter-spacing:.12em;
+    }
+    .roster-list{
+      min-height:0;
+      overflow-y:auto;
+      margin-top:10px;
+      padding:3px 8px 15px 2px;
+      scrollbar-color:var(--red) rgba(77,50,31,.14);
+      scrollbar-width:thin;
+    }
+    .roster-list::-webkit-scrollbar,.skills-scroll::-webkit-scrollbar{width:8px}
+    .roster-list::-webkit-scrollbar-track,.skills-scroll::-webkit-scrollbar-track{background:rgba(77,50,31,.12)}
+    .roster-list::-webkit-scrollbar-thumb,.skills-scroll::-webkit-scrollbar-thumb{background:var(--red);border:2px solid #e8cc97}
+    .ticket{
+      position:relative;
+      display:grid;
+      grid-template-columns:62px minmax(0,1fr);
+      align-items:center;
+      gap:9px;
+      width:100%;
+      min-height:78px;
+      margin:0 0 9px;
+      padding:5px 11px 5px 7px;
+      overflow:hidden;
+      text-align:left;
+      background-color:#efd3a0;
+      background-image:var(--paper-plate);
+      background-size:1500px 1000px;
+      background-position:18% 54%;
+      background-blend-mode:multiply;
+      border-color:rgba(145,49,38,.78);
+      box-shadow:inset 0 0 0 2px rgba(249,227,187,.72),inset 0 0 0 4px rgba(126,55,40,.22),3px 4px 0 rgba(55,35,23,.16);
+      clip-path:polygon(3% 0,98% 2%,100% 46%,98% 98%,4% 96%,0 80%,2% 57%,0 35%);
+    }
+    .ticket:nth-child(even){transform:rotate(.35deg)}
+    .ticket.selected{
+      border-color:var(--red-dark);
+      background-color:#efc987;
+      box-shadow:inset 6px 0 0 var(--red),4px 5px 0 rgba(80,36,24,.24);
+      transform:translateX(4px);
+    }
+    .ticket-art{
+      display:block;
+      width:62px;
+      height:68px;
+      object-fit:contain;
+      object-position:center bottom;
+      background:#d9b77f var(--paper-plate) 18% 54%/1500px 1000px;
+      border:2px solid rgba(117,48,37,.68);
+      clip-path:polygon(7% 1%,96% 5%,100% 91%,82% 100%,3% 94%,0 18%);
+      filter:saturate(.9) contrast(1.05);
+    }
+    .ticket-copy{min-width:0}
+    .ticket-name{
+      display:block;
+      overflow:hidden;
+      color:#38271d;
+      font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;
+      font-size:19px;
+      font-weight:950;
+      line-height:1.1;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .ticket-meta,.detail-meta,.skill-meta,.keyword-list,.related-list{
+      display:flex;
+      flex-wrap:wrap;
+      gap:5px;
+    }
+    .ticket-meta{margin-top:5px}
+    .label{
+      display:inline-flex;
+      align-items:center;
+      min-height:21px;
+      padding:2px 7px;
+      border:1px solid currentColor;
+      background:rgba(250,229,187,.72);
+      font-size:12px;
+      font-weight:950;
+      line-height:1.25;
+      clip-path:polygon(5% 0,97% 4%,100% 82%,92% 100%,3% 94%,0 16%);
+    }
+    .light{color:#9a5912}.dark{color:#593b6f}.neutral{color:#5c574e}
+    .character-zone{
+      display:grid;
+      grid-template-rows:auto minmax(0,1fr) auto;
+      padding:31px 9px 13px 12px;
+    }
+    .character-head{min-width:0;padding-left:4px}
+    .kicker{
+      color:var(--red-dark);
+      font-size:13px;
+      font-weight:950;
+      letter-spacing:.15em;
+    }
+    .character-name{
+      margin-top:2px;
+      color:#35241a;
+      font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;
+      font-size:clamp(29px,3.2vw,44px);
+      font-weight:950;
+      line-height:1;
+      letter-spacing:.04em;
+      overflow-wrap:anywhere;
+    }
+    .detail-meta{margin-top:7px}
+    .character-stage{
+      position:relative;
+      min-height:0;
+      display:grid;
+      grid-template-columns:66px minmax(0,1fr);
+      align-items:end;
+      gap:5px;
+      padding:8px 0 1px;
+    }
+    .stats-rail{
+      align-self:center;
+      position:relative;
+      z-index:2;
+      display:grid;
+      gap:5px;
+    }
+    .stat{
+      padding:4px 3px;
+      border-left:3px solid var(--red);
+      background:rgba(246,220,176,.72);
+      color:#5b4535;
+      text-align:center;
+      box-shadow:2px 2px rgba(75,46,29,.12);
+    }
+    .stat-value{
+      color:var(--red-dark);
+      font-family:Georgia,serif;
+      font-size:20px;
+      font-weight:900;
+      line-height:1;
+    }
+    .stat-label{margin-top:2px;font-size:10px;font-weight:950}
+    .standee-wrap{
+      position:relative;
+      align-self:stretch;
+      min-height:0;
+      display:grid;
+      place-items:end center;
+      padding:2px 3px 23px;
+    }
+    .standee-mat{
+      position:relative;
+      z-index:2;
+      width:min(100%,290px);
+      height:100%;
+      max-height:440px;
+      display:grid;
+      place-items:end center;
+      padding:8px;
+      overflow:hidden;
+      background-color:rgba(239,212,165,.82);
+      background-image:var(--paper-plate);
+      background-size:1450px 940px;
+      background-position:47% 54%;
+      background-blend-mode:multiply;
+      border:0;
+      clip-path:polygon(5% 1%,94% 0,100% 8%,97% 91%,88% 100%,7% 97%,0 86%,2% 12%);
+      filter:drop-shadow(7px 8px 0 rgba(65,40,26,.2));
+    }
+    .standee-mat:not(.direct-cutout){
+      align-self:end;
+      width:min(100%,220px);
+      height:auto;
+      aspect-ratio:1;
+      padding:7px;
+    }
+    .standee-mat.direct-cutout{
+      background:none;
+      border:0;
+      box-shadow:none;
+      filter:none;
+      clip-path:none;
+      padding:0;
+      overflow:visible;
+    }
+    .standee-art{
+      display:block;
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      object-position:center bottom;
+      filter:saturate(.92) contrast(1.05);
+      clip-path:polygon(4% 1%,96% 2%,100% 10%,98% 91%,89% 100%,8% 97%,0 88%,2% 11%);
+    }
+    .direct-cutout .standee-art{
+      clip-path:none;
+      filter:saturate(.95) contrast(1.04) drop-shadow(8px 9px 0 rgba(60,36,23,.22));
+    }
+    .character-foot{padding:7px 5px 0;border-top:2px solid rgba(119,62,37,.38)}
+    .description{
+      color:#5e4837;
+      font-size:13px;
+      font-weight:700;
+      line-height:1.45;
+    }
+    .skills-zone{
+      display:grid;
+      grid-template-rows:auto minmax(0,1fr);
+      padding:31px 21px 13px 21px;
+    }
+    .skills-head{
+      display:flex;
+      align-items:end;
+      justify-content:space-between;
+      gap:12px;
+      padding:0 3px 8px;
+      border-bottom:3px solid var(--red);
+    }
+    .skills-head h2{
+      color:#462c1f;
+      font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;
+      font-size:26px;
+      font-weight:950;
+      letter-spacing:.12em;
+    }
+    .skills-head span{color:#765c45;font-size:13px;font-weight:900;white-space:nowrap}
+    .skills-scroll{
+      min-height:0;
+      overflow-y:auto;
+      padding:10px 9px 18px 2px;
+      scrollbar-color:var(--red) rgba(77,50,31,.14);
+      scrollbar-width:thin;
+    }
+    .skill-card{
+      position:relative;
+      margin-bottom:9px;
+      padding:11px 14px 10px 17px;
+      border:2px solid rgba(72,47,30,.62);
+      border-left:6px solid var(--red);
+      background-color:rgba(246,221,179,.88);
+      background-image:var(--paper-plate);
+      background-size:1500px 1000px;
+      background-position:78% 57%;
+      background-blend-mode:multiply;
+      box-shadow:inset 0 0 0 2px rgba(248,226,187,.58),inset 0 0 0 3px rgba(129,61,44,.18),3px 4px 0 rgba(69,42,27,.14);
+      clip-path:polygon(1% 0,99% 2%,100% 92%,96% 100%,2% 97%,0 10%);
+    }
+    .skill-card:nth-child(even){transform:rotate(-.18deg)}
+    .skill-title{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+    .skill-name{color:#38271d;font-size:18px;font-weight:950}
+    .skill-type{
+      padding:1px 6px;
+      border:1px solid currentColor;
+      color:var(--blue);
+      font-size:11px;
+      font-weight:950;
+      clip-path:polygon(5% 0,100% 8%,95% 100%,0 91%);
+    }
+    .skill-type.super{color:#713b78}
+    .skill-description{
+      margin-top:5px;
+      color:#574333;
+      font-size:13px;
+      font-weight:700;
+      line-height:1.42;
+    }
+    .skill-meta,.keyword-list,.related-list{margin-top:7px}
+    .meta,.keyword{
+      padding:2px 6px;
+      border-bottom:2px solid rgba(131,62,38,.45);
+      background:rgba(255,235,196,.55);
+      color:#684d38;
+      font-size:11px;
+      font-weight:900;
+    }
+    .keyword{color:#633d6c;border-color:rgba(99,61,108,.45)}
+    .related-card{
+      flex:1 1 180px;
+      padding:7px 9px;
+      border:1px solid rgba(76,48,30,.55);
+      border-left:5px solid var(--blue);
+      background:rgba(245,219,175,.75);
+      color:#4e392a;
+      font-size:12px;
+      font-weight:750;
+      line-height:1.35;
+    }
+    .empty{
+      display:grid;
+      place-items:center;
+      min-height:150px;
+      padding:22px;
+      border:2px dashed rgba(100,58,35,.55);
+      background:rgba(242,215,169,.58);
+      color:#654b38;
+      text-align:center;
+      clip-path:polygon(2% 0,99% 3%,97% 100%,0 96%);
+    }
+    .empty strong{
+      display:block;
+      margin-bottom:7px;
+      color:#432c20;
+      font-family:"KaiTi","STKaiti",serif;
+      font-size:22px;
+    }
+    .empty p{font-size:14px;font-weight:750;line-height:1.55}
+    @media(max-width:1050px){
+      .page{grid-template-rows:94px minmax(0,1fr)}
+      .topbar{
+        grid-template-columns:74px minmax(190px,250px) 55px minmax(250px,1fr);
+        gap:7px;
+        padding:8px 46px 4px;
+      }
+      h1{font-size:34px}
+      .count{font-size:12px}
+      .filter-caption{font-size:15px}
+      .filter{min-width:55px;padding:6px 7px;font-size:17px}
+      .theater{
+        grid-template-columns:minmax(188px,24%) minmax(275px,32%) minmax(340px,44%);
+        gap:8px;
+        padding:0 43px 24px;
+      }
+      .roster-zone{padding:24px 10px 8px 8px}
+      .skills-zone{padding:24px 12px 8px}
+      .ticket{grid-template-columns:48px minmax(0,1fr);min-height:64px;padding:4px 8px 4px 5px}
+      .ticket-art{width:48px;height:55px}
+      .ticket-name{font-size:16px}
+      .label{font-size:10px;padding:1px 5px}
+      .character-zone{padding:24px 5px 8px}
+      .character-name{font-size:29px}
+      .character-stage{grid-template-columns:53px minmax(0,1fr)}
+      .stat-value{font-size:17px}
+      .description{font-size:11px}
+      .skills-head h2{font-size:22px}
+      .skill-card{padding:8px 10px 8px 13px}
+      .skill-name{font-size:16px}
+      .skill-description{font-size:12px;line-height:1.35}
+      .meta,.keyword{font-size:10px}
+    }
+    @media(max-height:690px){
+      .page{grid-template-rows:88px minmax(0,1fr)}
+      .topbar{padding-top:6px}
+      h1{font-size:32px}
+      .roster-zone,.character-zone,.skills-zone{padding-top:20px}
+      .zone-title{font-size:19px}
+      .ticket{min-height:60px;margin-bottom:6px}
+      .ticket-art{height:51px}
+      .character-head .kicker{font-size:11px}
+      .detail-meta{margin-top:4px}
+      .standee-mat{max-height:345px}
+      .character-foot{padding-top:5px}
+      .skill-card{margin-bottom:6px;padding-block:7px}
+      .skill-description{margin-top:3px}
+      .skill-meta,.keyword-list{margin-top:5px}
+    }
+    @media(prefers-reduced-motion:reduce){
+      *,*:before,*:after{transition-duration:.01ms!important;scroll-behavior:auto!important}
+    }
   </style>
 </head>
 <body>
   <main class="page">
     <header class="topbar">
       <a class="back" href="index.html" aria-label="返回主菜单">返回</a>
-      <div class="title"><h1>棋子图鉴</h1><span class="count" id="count" aria-live="polite">正在整理图鉴…</span></div>
+      <div class="heading">
+        <h1>棋子图鉴</h1>
+        <span class="count" id="count" aria-live="polite">正在整理图鉴…</span>
+      </div>
+      <span class="filter-caption">阵营</span>
       <nav class="filters" aria-label="阵营筛选">
         <button class="filter active" type="button" data-filter="all" aria-pressed="true">全部</button>
         <button class="filter" type="button" data-filter="light" aria-pressed="false">光方</button>
@@ -73,16 +494,33 @@
         <button class="filter" type="button" data-filter="neutral" aria-pressed="false">中立</button>
       </nav>
     </header>
+
     <section class="theater" aria-label="棋子纸偶剧场">
-      <aside class="paper roster" aria-label="棋子名册">
-        <h2 class="panel-title">角色名册</h2>
-        <div class="list" id="list"><div class="status"><p>正在装订棋子图鉴…</p></div></div>
+      <aside class="roster-zone" aria-label="棋子名册">
+        <div><h2 class="zone-title">角色名册</h2></div>
+        <div class="roster-list" id="rosterList">
+          <div class="empty"><p>正在装订棋子名册…</p></div>
+        </div>
       </aside>
-      <article class="paper detail" id="detail" aria-live="polite"><div class="status"><p>正在准备纸偶舞台…</p></div></article>
+
+      <section class="character-zone" id="characterZone" aria-live="polite">
+        <div class="empty"><p>正在搭建纸偶舞台…</p></div>
+      </section>
+
+      <aside class="skills-zone" aria-label="棋子技能">
+        <div class="skills-head">
+          <h2>棋子技能</h2>
+          <span id="skillCount">正在展开卷轴…</span>
+        </div>
+        <div class="skills-scroll" id="skillsScroll" aria-live="polite">
+          <div class="empty"><p>正在载入技能资料…</p></div>
+        </div>
+      </aside>
     </section>
   </main>
+
   <script>
-    var pieces=[],skillCache={},cardCache={},keywordsCache=null,currentFilter="all",selectedId=null;
+    var pieces=[],skillCache={},cardCache={},keywordCache=null,currentFilter="all",selectedId=null;
     var fallback="images/menu/pieces-paper-puppet-placeholder-v1.png";
 
     function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
@@ -91,52 +529,108 @@
     function sideName(f){var s=side(f);return s==="light"?"光方":s==="dark"?"暗方":"中立"}
     function rarity(r){return({common:"普通",uncommon:"精良",rare:"稀有",epic:"史诗",legendary:"传说"})[r]||r||"未定"}
     function image(p){return p.image&&p.image.indexOf(".")!==-1?"images/"+encodeURIComponent(p.image).replace(/%2F/g,"/"):fallback}
-    function imageAttrs(name){return'alt="'+esc(name)+'的纸偶形象" onerror="this.onerror=null;this.src=\''+fallback+'\'"'}
+    function directCutout(p){return /\.(png|webp)$/i.test(p.image||"")}
+    function imageAttrs(name){return'alt="'+esc(name)+'立绘" onerror="this.onerror=null;this.src=\''+fallback+'\'"'}
     function refId(ref){return typeof ref==="string"?ref:(ref&&(ref.skillId||ref.id))||""}
     function skillType(s){if(s.type==="super")return"充能技能";if(s.type==="buff")return"增益";if(s.kind==="passive"||s.type==="passive")return"被动";if(s.kind==="reaction"||s.type==="reaction")return"反应";return"主动"}
 
     async function load(){
       var ids=await json("./data/pieces/manifest.json"),loaded=[];
       for(var i=0;i<ids.length;i++){try{loaded.push(await json("./data/pieces/"+ids[i]+".json"))}catch(e){console.error("[pieces] Failed piece",ids[i],e)}}
-      if(!loaded.length)throw new Error("empty piece manifest");pieces=loaded
+      if(!loaded.length)throw new Error("empty piece manifest");
+      pieces=loaded
     }
     async function getSkill(id){if(!id)return null;if(skillCache[id])return skillCache[id];try{skillCache[id]=await json("./data/skills/"+id+".json");return skillCache[id]}catch(e){console.error("[pieces] Failed skill",id,e);return null}}
     async function getCard(id){if(!id)return null;if(cardCache[id])return cardCache[id];try{cardCache[id]=await json("./data/cards/"+id+".json");return cardCache[id]}catch(e){console.error("[pieces] Failed card",id,e);return null}}
-    async function getKeywords(){if(keywordsCache)return keywordsCache;try{keywordsCache=await json("./data/skill-keywords.json")}catch(e){console.error("[pieces] Failed keywords",e);keywordsCache=[]}return keywordsCache}
+    async function getKeywords(){if(keywordCache)return keywordCache;try{keywordCache=await json("./data/skill-keywords.json")}catch(e){console.error("[pieces] Failed keywords",e);keywordCache=[]}return keywordCache}
 
     function filtered(){return currentFilter==="all"?pieces:pieces.filter(function(p){return side(p.faction)===currentFilter})}
-    function emptyDetail(message){document.getElementById("detail").innerHTML='<div class="status"><div><strong>舞台待命</strong><p>'+esc(message)+'</p></div></div>'}
-
-    function renderList(){
-      var rows=filtered();document.getElementById("count").textContent=rows.length+" 个棋子";
-      document.querySelectorAll(".filter").forEach(function(b){var active=b.dataset.filter===currentFilter;b.classList.toggle("active",active);b.setAttribute("aria-pressed",active?"true":"false")});
-      var list=document.getElementById("list");
-      if(!rows.length){selectedId=null;var message=currentFilter==="neutral"?"中立阵营席位已预留。以后加入 faction: neutral 的棋子，会自动出现在这里。":"暂时没有符合这个阵营条件的棋子。";list.innerHTML='<div class="status"><div><strong>这页还是空白</strong><p>'+esc(message)+'</p></div></div>';emptyDetail(message);return}
-      if(!rows.some(function(p){return p.id===selectedId}))selectedId=rows[0].id;
-      list.innerHTML=rows.map(function(p){var chosen=p.id===selectedId,s=side(p.faction);return'<button class="ticket'+(chosen?' selected':'')+'" type="button" data-piece-id="'+esc(p.id)+'" aria-pressed="'+(chosen?'true':'false')+'"><img class="ticket-img" src="'+image(p)+'" '+imageAttrs(p.name||p.id)+'><span><span class="ticket-name">'+esc(p.name||p.id)+'</span><span class="ticket-meta"><span class="chip '+s+'">'+sideName(p.faction)+'</span><span class="rarity">'+esc(rarity(p.rarity))+'</span></span></span></button>'}).join("");
-      renderDetail()
+    function emptyPanels(message){
+      document.getElementById("characterZone").innerHTML='<div class="empty"><div><strong>舞台待命</strong><p>'+esc(message)+'</p></div></div>';
+      document.getElementById("skillCount").textContent="0 项技能";
+      document.getElementById("skillsScroll").innerHTML='<div class="empty"><div><strong>技能卷轴留白</strong><p>'+esc(message)+'</p></div></div>'
     }
-    function stat(value,label){return'<div class="stat"><div class="stat-v">'+esc(value==null?"—":value)+'</div><div class="stat-l">'+label+'</div></div>'}
-    function skillMeta(s){var parts=[];if(s.actionPointCost!=null)parts.push("行动点 "+s.actionPointCost);if(s.cooldownTurns)parts.push("冷却 "+s.cooldownTurns+" 回合");if(s.chargeCost)parts.push("充能 "+s.chargeCost+"/"+(s.maxCharges||s.chargeCost));if(s.targetText)parts.push(s.targetText);return parts.length?'<div class="skill-meta">'+parts.map(function(x){return'<span class="meta">'+esc(x)+'</span>'}).join("")+'</div>':""}
-    function skillHtml(s,ref,unlock){var name=s?(s.name||refId(ref)):refId(ref),desc=s?(s.description||"暂无技能说明"):"技能资料暂时未能载入。",keywords=s&&Array.isArray(s.keywords)?s.keywords:[],trigger=ref&&typeof ref==="object"?ref.triggeredBy:null;return'<section class="skill"><div class="skill-title"><h3 class="skill-name">'+esc(name)+'</h3><span class="type'+(s&&s.type==="super"?' super':'')+'">'+esc(s?skillType(s):"技能")+'</span>'+(unlock?'<span class="type super">可解锁</span>':'')+'</div><p class="skill-desc">'+esc(desc)+'</p>'+(s?skillMeta(s):"")+(trigger?'<div class="skill-meta"><span class="meta">由「'+esc(trigger)+'」解锁</span></div>':"")+(keywords.length?'<div class="keywords">'+keywords.map(function(k){return'<span class="keyword">'+esc(k)+'</span>'}).join("")+'</div>':"")+'</section>'}
 
-    async function renderDetail(){
-      var p=pieces.find(function(x){return x.id===selectedId});if(!p)return;var d=document.getElementById("detail"),st=p.stats||{},s=side(p.faction);
-      d.innerHTML='<section class="stage"><div class="portrait-wrap"><img class="portrait" src="'+image(p)+'" '+imageAttrs(p.name||p.id)+'></div><div class="summary"><div class="kicker">纸偶档案 · '+sideName(p.faction)+'</div><h2 class="name">'+esc(p.name||p.id)+'</h2><div class="detail-meta"><span class="chip '+s+'">'+sideName(p.faction)+'</span><span class="rarity">'+esc(rarity(p.rarity))+'</span></div><p class="desc">'+esc(p.description||"这位棋子的故事仍在装订中。")+'</p><div class="stats">'+stat(st.maxHp,"生命")+stat(st.attack,"攻击")+stat(st.defense,"防御")+stat(st.moveRange,"移动")+stat(st.attackRange,"射程")+'</div></div></section><section class="skills"><div class="skills-head"><h2>棋子技能</h2><span id="skillCount">正在展开技能卷轴…</span></div><div class="skill-scroll" id="skillScroll"><div class="status"><p>正在载入完整技能说明…</p></div></div></section>';
+    function renderRoster(){
+      var rows=filtered();
+      document.getElementById("count").textContent=rows.length+" 个棋子";
+      document.querySelectorAll(".filter").forEach(function(b){var active=b.dataset.filter===currentFilter;b.classList.toggle("active",active);b.setAttribute("aria-pressed",active?"true":"false")});
+      var list=document.getElementById("rosterList");
+      if(!rows.length){
+        selectedId=null;
+        var message=currentFilter==="neutral"?"中立阵营席位已预留。以后加入 faction: neutral 的棋子，会自动出现在这里。":"暂时没有符合这个阵营条件的棋子。";
+        list.innerHTML='<div class="empty"><div><strong>这张名册还是空白</strong><p>'+esc(message)+'</p></div></div>';
+        emptyPanels(message);
+        return
+      }
+      if(!rows.some(function(p){return p.id===selectedId}))selectedId=rows[0].id;
+      list.innerHTML=rows.map(function(p){
+        var selected=p.id===selectedId,s=side(p.faction);
+        return'<button class="ticket'+(selected?' selected':'')+'" type="button" data-piece-id="'+esc(p.id)+'" aria-pressed="'+(selected?'true':'false')+'">'+
+          '<img class="ticket-art" src="'+image(p)+'" '+imageAttrs(p.name||p.id)+'>'+
+          '<span class="ticket-copy"><span class="ticket-name">'+esc(p.name||p.id)+'</span><span class="ticket-meta">'+
+          '<span class="label '+s+'">'+sideName(p.faction)+'</span><span class="label">'+esc(rarity(p.rarity))+'</span>'+
+          '</span></span></button>'
+      }).join("");
+      renderSelected()
+    }
+
+    function stat(value,label){return'<div class="stat"><div class="stat-value">'+esc(value==null?"—":value)+'</div><div class="stat-label">'+label+'</div></div>'}
+    function skillMeta(s){
+      var parts=[];
+      if(s.actionPointCost!=null)parts.push("行动点 "+s.actionPointCost);
+      if(s.cooldownTurns)parts.push("冷却 "+s.cooldownTurns+" 回合");
+      if(s.chargeCost)parts.push("充能 "+s.chargeCost+"/"+(s.maxCharges||s.chargeCost));
+      if(s.targetText)parts.push(s.targetText);
+      return parts.length?'<div class="skill-meta">'+parts.map(function(x){return'<span class="meta">'+esc(x)+'</span>'}).join("")+'</div>':""
+    }
+    function skillHtml(s,ref,unlock){
+      var name=s?(s.name||refId(ref)):refId(ref),desc=s?(s.description||"暂无技能说明"):"技能资料暂时未能载入。";
+      var keywords=s&&Array.isArray(s.keywords)?s.keywords:[],trigger=ref&&typeof ref==="object"?ref.triggeredBy:null;
+      return'<article class="skill-card"><div class="skill-title"><h3 class="skill-name">'+esc(name)+'</h3>'+
+        '<span class="skill-type'+(s&&s.type==="super"?' super':'')+'">'+esc(s?skillType(s):"技能")+'</span>'+
+        (unlock?'<span class="skill-type super">可解锁</span>':'')+'</div>'+
+        '<p class="skill-description">'+esc(desc)+'</p>'+(s?skillMeta(s):"")+
+        (trigger?'<div class="skill-meta"><span class="meta">由「'+esc(trigger)+'」解锁</span></div>':"")+
+        (keywords.length?'<div class="keyword-list">'+keywords.map(function(k){return'<span class="keyword">'+esc(k)+'</span>'}).join("")+'</div>':"")+
+        '</article>'
+    }
+
+    async function renderSelected(){
+      var p=pieces.find(function(x){return x.id===selectedId});
+      if(!p)return;
+      var st=p.stats||{},s=side(p.faction),cutout=directCutout(p);
+      document.getElementById("characterZone").innerHTML=
+        '<header class="character-head"><div class="kicker">纸偶档案 · '+sideName(p.faction)+'</div><h2 class="character-name">'+esc(p.name||p.id)+'</h2>'+
+        '<div class="detail-meta"><span class="label '+s+'">'+sideName(p.faction)+'</span><span class="label">'+esc(rarity(p.rarity))+'</span></div></header>'+
+        '<div class="character-stage"><div class="stats-rail">'+stat(st.attack,"攻击")+stat(st.defense,"防御")+stat(st.maxHp,"生命")+stat(st.moveRange,"移动")+stat(st.attackRange,"射程")+'</div>'+
+        '<div class="standee-wrap"><div class="standee-mat'+(cutout?' direct-cutout':'')+'"><img class="standee-art" src="'+image(p)+'" '+imageAttrs(p.name||p.id)+'></div></div></div>'+
+        '<footer class="character-foot"><p class="description">'+esc(p.description||"这位棋子的故事仍在装订中。")+'</p></footer>';
+
       var normal=Array.isArray(p.skills)?p.skills:[],transformed=Array.isArray(p.transformedSkills)?p.transformedSkills:[],cards=[],html=[];
+      document.getElementById("skillCount").textContent="正在载入 "+(normal.length+transformed.length)+" 项技能…";
+      document.getElementById("skillsScroll").innerHTML='<div class="empty"><p>正在载入完整技能说明…</p></div>';
       for(var i=0;i<normal.length;i++)html.push(skillHtml(await getSkill(refId(normal[i])),normal[i],false));
       for(var j=0;j<transformed.length;j++)html.push(skillHtml(await getSkill(refId(transformed[j])),transformed[j],true));
       if(Array.isArray(p.relatedCards)){for(var k=0;k<p.relatedCards.length;k++){var card=await getCard(p.relatedCards[k]);if(card)cards.push(card)}}
-      var scroll=document.getElementById("skillScroll");if(!scroll||selectedId!==p.id)return;
-      if(cards.length)html.push('<section class="skill"><div class="skill-title"><h3 class="skill-name">相关手牌</h3></div><div class="cards">'+cards.map(function(c){return'<div class="related"><strong>'+esc(c.name||c.id)+'</strong><br>'+esc(c.description||"")+'</div>'}).join("")+'</div></section>');
-      scroll.innerHTML=html.length?html.join(""):'<div class="status"><p>这位棋子目前没有登记技能。</p></div>';
+      if(cards.length)html.push('<article class="skill-card"><div class="skill-title"><h3 class="skill-name">相关手牌</h3></div><div class="related-list">'+cards.map(function(c){return'<div class="related-card"><strong>'+esc(c.name||c.id)+'</strong><br>'+esc(c.description||"")+'</div>'}).join("")+'</div></article>');
+      var scroll=document.getElementById("skillsScroll");
+      if(!scroll||selectedId!==p.id)return;
+      scroll.innerHTML=html.length?html.join(""):'<div class="empty"><p>这位棋子目前没有登记技能。</p></div>';
       document.getElementById("skillCount").textContent=(normal.length+transformed.length)+" 项技能"+(cards.length?" · "+cards.length+" 张相关手牌":"");
-      var defs={},keywords=await getKeywords();if(Array.isArray(keywords))keywords.forEach(function(x){defs[x.name]=x.shortDescription||x.longDescription||""});scroll.querySelectorAll(".keyword").forEach(function(chip){if(defs[chip.textContent])chip.title=defs[chip.textContent]})
+      var defs={},keywords=await getKeywords();
+      if(Array.isArray(keywords))keywords.forEach(function(x){defs[x.name]=x.shortDescription||x.longDescription||""});
+      scroll.querySelectorAll(".keyword").forEach(function(chip){if(defs[chip.textContent])chip.title=defs[chip.textContent]})
     }
 
-    document.querySelector(".filters").addEventListener("click",function(e){var b=e.target.closest(".filter");if(!b)return;currentFilter=b.dataset.filter;renderList()});
-    document.getElementById("list").addEventListener("click",function(e){var t=e.target.closest(".ticket");if(!t)return;selectedId=t.dataset.pieceId;renderList()});
-    load().then(renderList).catch(function(e){console.error("[pieces] Failed to initialize",e);document.getElementById("count").textContent="载入失败";document.getElementById("list").innerHTML='<div class="status"><div><strong>图鉴没有打开</strong><p>未能读取本地棋子资料，请检查数据包后重试。</p></div></div>';emptyDetail("棋子数据未能载入。")});
+    document.querySelector(".filters").addEventListener("click",function(e){var b=e.target.closest(".filter");if(!b)return;currentFilter=b.dataset.filter;renderRoster()});
+    document.getElementById("rosterList").addEventListener("click",function(e){var t=e.target.closest(".ticket");if(!t)return;selectedId=t.dataset.pieceId;renderRoster()});
+    load().then(renderRoster).catch(function(e){
+      console.error("[pieces] Failed to initialize",e);
+      document.getElementById("count").textContent="载入失败";
+      document.getElementById("rosterList").innerHTML='<div class="empty"><div><strong>图鉴没有打开</strong><p>未能读取本地棋子资料，请检查数据包后重试。</p></div></div>';
+      emptyPanels("棋子数据未能载入。")
+    });
   </script>
 </body>
 </html>
