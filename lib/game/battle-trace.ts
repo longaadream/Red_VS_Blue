@@ -1,6 +1,8 @@
 import type { RuleRuntime, RandomStreamTrace } from './rule-runtime'
 import type { BattleState } from './turn'
 
+export const BATTLE_REPLAY_FORMAT = 'rvb-battle-replay/v2' as const
+
 const SHA256_INITIAL_STATE = [
   0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
   0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -51,10 +53,38 @@ export interface DeploymentTraceEvidence {
   authorityVersion?: number
 }
 
+export interface BattleReplayFrame {
+  index: number
+  traceIndex: number
+  action: Record<string, unknown>
+  actionType: string
+  playerId: string
+  turnBefore: number
+  turnAfter: number
+  phaseBefore: string
+  phaseAfter: string
+  preStateHash: string
+  postStateHash: string
+  preCheckpointHash: string
+  postCheckpointHash: string
+  postState: BattleState
+  events: Array<Record<string, unknown>>
+  randomStreams: RandomStreamTrace[]
+}
+
+export interface BattleReplayArchive {
+  format: typeof BATTLE_REPLAY_FORMAT
+  initialStateHash: string
+  initialCheckpointHash: string
+  initialState: BattleState
+  frames: BattleReplayFrame[]
+}
+
 export interface DebugBattleMetadata {
   appliedActionIds: string[]
   actionLog: Array<BattleActionTrace | Record<string, unknown>>
   commandLog: Array<Record<string, unknown>>
+  replay?: BattleReplayArchive
 }
 
 export function stableJson(value: unknown): string {
@@ -157,7 +187,8 @@ export function recordBattleInitialization(
   const metadata = getOrCreateDebugMetadata(state)
   const action = { type: 'initializeBattle', playerIds: [...playerIds] }
   const actionHash = hashStable(action)
-  const postStateHash = hashBattleState(state)
+  const canonicalState = withoutReplayRuntimeCaches(state)
+  const postStateHash = hashBattleState(canonicalState)
   const trace: BattleActionTrace = {
     index: metadata.actionLog.length,
     rootSeed: runtime.rootSeed,
@@ -179,6 +210,14 @@ export function recordBattleInitialization(
   }
   metadata.actionLog.push(trace)
   metadata.commandLog[trace.index] = sanitizeBattleTraceValue(action) as Record<string, unknown>
+  const initialState = createBattleReplayCheckpoint(canonicalState)
+  metadata.replay = {
+    format: BATTLE_REPLAY_FORMAT,
+    initialStateHash: postStateHash,
+    initialCheckpointHash: hashStable(initialState),
+    initialState,
+    frames: [],
+  }
   return trace
 }
 
@@ -248,6 +287,70 @@ export function readSanitizedBattleActionTrace(state: BattleState): Array<Record
     return trace
   })
 }
+
+export function readSanitizedBattleReplay(state: BattleState): BattleReplayArchive | undefined {
+  const replay = readDebugMetadata(state).replay
+  if (!replay || replay.format !== BATTLE_REPLAY_FORMAT) return undefined
+  return sanitizeBattleTraceValue(replay) as BattleReplayArchive
+}
+
+export function createBattleReplayCheckpoint(state: BattleState): BattleState {
+  const checkpoint = sanitizeBattleTraceValue(withoutDebugMetadata(state))
+  if (!checkpoint || typeof checkpoint !== 'object' || Array.isArray(checkpoint)) {
+    throw new Error('Battle replay checkpoint must be a serializable object')
+  }
+  return checkpoint as BattleState
+}
+
+export function appendBattleReplayFrame(
+  nextState: BattleState,
+  beforeState: BattleState,
+  afterState: BattleState,
+  action: Record<string, unknown>,
+  trace: BattleActionTrace,
+): BattleReplayFrame | undefined {
+  const metadata = getOrCreateDebugMetadata(nextState)
+  const replay = metadata.replay
+  if (!replay || replay.format !== BATTLE_REPLAY_FORMAT) return undefined
+
+  const preState = createBattleReplayCheckpoint(beforeState)
+  const postState = createBattleReplayCheckpoint(afterState)
+  const sanitizedAction = sanitizeBattleTraceValue(action) as Record<string, unknown>
+  const events = collectCommittedEvents(beforeState.actions, afterState.actions)
+  const frame: BattleReplayFrame = {
+    index: replay.frames.length,
+    traceIndex: trace.index,
+    action: sanitizedAction,
+    actionType: typeof sanitizedAction.type === 'string' ? sanitizedAction.type : 'unknown',
+    playerId: trace.playerId,
+    turnBefore: beforeState.turn?.turnNumber ?? 0,
+    turnAfter: afterState.turn?.turnNumber ?? 0,
+    phaseBefore: String(beforeState.turn?.phase ?? ''),
+    phaseAfter: String(afterState.turn?.phase ?? ''),
+    preStateHash: trace.preStateHash,
+    postStateHash: trace.postStateHash,
+    preCheckpointHash: hashStable(preState),
+    postCheckpointHash: hashStable(postState),
+    postState,
+    events,
+    randomStreams: trace.randomStreams.map(stream => ({ ...stream })),
+  }
+  replay.frames.push(frame)
+  return frame
+}
+
+function collectCommittedEvents(
+  before: BattleState['actions'],
+  after: BattleState['actions'],
+): Array<Record<string, unknown>> {
+  const previous = Array.isArray(before) ? before : []
+  const current = Array.isArray(after) ? after : []
+  const keepsPrefix = previous.length <= current.length
+    && previous.every((event, index) => stableJson(event) === stableJson(current[index]))
+  const committed = keepsPrefix ? current.slice(previous.length) : current
+  return sanitizeBattleTraceValue(committed) as Array<Record<string, unknown>>
+}
+
 function copyPositions(
   positions: Record<string, { x: number; y: number }> | undefined,
 ): Record<string, { x: number; y: number }> | undefined {
@@ -273,6 +376,7 @@ export function readDebugMetadata(state: BattleState): DebugBattleMetadata {
     appliedActionIds: Array.isArray(metadata?.appliedActionIds) ? [...metadata.appliedActionIds] : [],
     actionLog: Array.isArray(metadata?.actionLog) ? [...metadata.actionLog] : [],
     commandLog: Array.isArray(metadata?.commandLog) ? [...metadata.commandLog] : [],
+    replay: metadata?.replay,
   }
 }
 
@@ -283,6 +387,7 @@ export function getOrCreateDebugMetadata(state: BattleState): DebugBattleMetadat
     appliedActionIds?: string[]
     actionLog?: Array<BattleActionTrace | Record<string, unknown>>
     commandLog?: Array<Record<string, unknown>>
+    replay?: BattleReplayArchive
   }
   metadata.appliedActionIds ??= []
   metadata.actionLog ??= []
@@ -352,6 +457,12 @@ function encodeUtf8(value: string): number[] {
 
 function rotateRight(value: number, bits: number): number {
   return (value >>> bits) | (value << (32 - bits))
+}
+
+function withoutReplayRuntimeCaches(state: BattleState): BattleState {
+  const next = { ...state }
+  delete (next as Partial<BattleState>).skillsById
+  return next
 }
 
 function withoutDebugMetadata(state: BattleState): BattleState {

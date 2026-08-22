@@ -40,20 +40,23 @@
 - 迁移清单：`sleep-dart`、`blackwidow-lethal-strike`、`hellfire-shotgun` 使用共享弹道事实；经人工批准，`death-blossom` 改为自身中心 3×3 的纯范围伤害并使用 `form: area`，不再参与弹道阻挡。
 - 测试：`tests/game/spatial.test.ts`、`tests/game/projectile-trace.test.ts`、`tests/game/movement-contract.test.ts`、`tests/game/turn.test.ts`、`tests/game/ai-movement.test.ts`。
 
-## 2. 战斗 Runner 与回放
+## 2. 战斗 Runner 与两类回放
 
-- 入口：`lib/game/battle-runner.ts::runBattleAction()`、`replayBattle()`。
-- 职责：动作 ID、动作级确定性 runtime、运行时技能补全、权威 hash、幂等、脱敏规则命令 Action Trace 和回放。
+- 入口：`lib/game/battle-runner.ts::runBattleAction()`、`replayBattle()`，以及 `lib/game/battle-trace.ts` 的回放归档函数。
+- 职责：动作 ID、动作级确定性 runtime、运行时技能补全、权威 hash、幂等、脱敏规则命令 Action Trace；成功权威动作还追加 Trace v2 的记录状态帧。
 - 输入：状态/动作/`rootSeed`，或初始状态/seed/动作序列。
-- 输出：状态、`stateHash`、`actionHash`、`duplicate`、`trace`，或含逐动作 `stateHashes` 的回放结果。
+- 输出：状态、`stateHash`、`actionHash`、`duplicate`、`trace`，或含逐动作 `stateHashes` 的规则重放结果。
 - 调用方：WS、房间 HTTP API、训练/调试 API、测试。
 - 调用：`applyBattleAction()`、稳定 JSON/hash、`RuleRuntime`。
-- 状态变化：会写入 `state.extensions.debugBattle`；返回下一状态。
-- 错误：规则错误附加 seed、stream/cursor、turn、player、actionId 后向上抛；上层保留原选择中断字段。
+- 状态变化：会写入 `state.extensions.debugBattle`；初始化记录脱敏初始检查点，成功命令记录命令后检查点、语义事件、随机流和 hash 链；返回下一状态。
+- 错误：规则错误附加 seed、stream/cursor、turn、player、actionId 后向上抛；上层保留原选择中断字段。被拒绝动作和重复动作不能追加回放帧。
+- 两类回放必须区分：
+  - `replayBattle()` 是同版本开发/测试中的确定性规则重放，会执行当前规则。
+  - `rvb-match-trace/v2` 回放器是面向已结束比赛的记录状态查看器，只读取事实检查点，不执行当前规则。
 - 日志：主要依赖调用方；调试元数据保存在状态扩展中。
-- 测试：`tests/game/debug-battle.test.ts`、`tests/game/deterministic-runtime.test.ts`。
-- 已知问题：runtime 是同步进程作用域，不能跨异步规则边界；旧训练/浏览器调用方尚可省略 seed。
-- 最小调试：保存初始状态、seed、动作序列，调用 `replayBattle()` 并核对最终 hash。
+- 测试：`tests/game/debug-battle.test.ts`、`tests/game/deterministic-runtime.test.ts`、`tests/game/developer-tools-trace.test.ts`。
+- 已知问题：runtime 是同步进程作用域，不能跨异步规则边界；旧训练/浏览器调用方尚可省略 seed；完整检查点会增加终局投影体积。
+- 最小调试：同版本规则问题保存初始状态、seed、动作序列并调用 `replayBattle()`；线上已发生比赛优先导出 v2，在局外回放器核对记录状态和双 hash 链。
 
 ## 3. 战斗初始化
 
@@ -254,14 +257,18 @@
 - 测试：`tests/qa/red43-ui-acceptance.test.ts`；可重复浏览器步骤与证据见 `docs/qa/RED-43-same-alignment-ui.md`。
 
 
-### 9.4 公开局外开发者中心与赛后 Trace（RED-94）
+### 9.4 公开局外开发者中心与 Trace v2 可视化回放（RED-94）
 
-- 页面：`data/pages/developer-tools.html` 仅从主菜单进入；存在 `rvb_active_battle` 时场景表单 fail closed。页面不加载 WebSocket 客户端，不接受 roomId，也不发送真实对局命令。
-- 隔离 API：`app/api/developer-tools/scenario/route.ts::POST` 校验 uint32 seed、地图 ID 与双方内容阵营，仅调用 `createDebugDuel()` 和正式 Runner，返回 `rvb-developer-scenario/v1` 的地图、回合/阶段、当前 actor、玩家、状态版本/hash 与脱敏 action trace。它不持久化状态。
-- Trace 记录器：`data/pages/js/developer-tools/match-trace.js` 仅接受含 `terminalResult` 的状态，输出 `rvb-match-trace/v1`；最近一场保存在 `rvb_last_completed_trace`，可从终局覆盖层立即下载或从开发者中心再次下载。
-- 格式字段：`format`、`exportedAt`、`roomId`、`seed`、`authorityVersion`、终局 map/turn/phase/stateVersion/stateHash/result、摘要、玩家公开标识和逐命令 trace。敏感传输/身份字段由服务端 trace 与客户端记录器双重递归剔除。
-- 生命周期：真实对局活跃期间公开投影不包含 action trace；终局投影才包含脱敏 trace。`appliedActionIds` 在所有公开投影中始终为空。
-- 不提供：局内面板、真实房间读取/控制、Trace 导入/恢复、回放码、跨版本回放或第二套规则执行器。
+- 页面：`data/pages/developer-tools.html` 从主菜单进入，Trace 导入/最近记录是主功能，固定 seed 隔离场景是次级工具；`data/pages/replay.html` 是独立只读回放页。存在 `rvb_active_battle` 时两页 fail closed。
+- 隔离 API：`app/api/developer-tools/scenario/route.ts::POST` 校验 uint32 seed、地图 ID 与双方内容阵营，只调用 `createDebugDuel()` 和正式 Runner，返回 `rvb-developer-scenario/v1`；不接受 roomId、不持久化、不发奖励、不写统计。
+- 权威记录：`lib/game/battle-trace.ts` 初始化 `rvb-battle-replay/v2` 归档；`runBattleAction()` 只在成功命令后追加 postState、语义事件、随机流和权威/检查点 hash。当前帧的 preState 是上一检查点，不重复存储。
+- 生命周期：进行中 `PublicBattleSnapshot` 删除 action trace、applied action IDs 和回放归档；只有权威 `terminalResult` 已提交的终局投影保留完整脱敏归档。
+- Trace 导出：`data/pages/js/developer-tools/match-trace.js` 从终局归档生成 `rvb-match-trace/v2`，包含展示内容快照、初始检查点、逐命令帧、终局、摘要和完整性元数据。最近有效记录以 IndexedDB 为主、localStorage 为受限环境回退。
+- 导入合同：只接受 v2；v1 明确拒绝为旧诊断格式。导入器限制 32 MiB、深度/节点/数组/字符串预算，拒绝危险键、敏感字段、非法 URL 和不连续或被篡改的双 hash 链；失败不得覆盖最近有效 Trace。
+- 展示边界：`replay-viewer.js` 复用 `battle-view-model.js`、`battle-renderer-3d.js`、`battle-status-presentation.js` 与 `battle-tactical-geometry.js`，提供时间轴、逐步/播放、速度、红/蓝/全知视角、棋子详情、事件、差异、随机流与 hash。它不复制规则，也不调用当前 Runner 重算历史。
+- 向前降级：Trace 携带棋子/技能的最小展示快照；未知角色、技能和事件用稳定 ID 与通用文本显示。未来破坏性合同必须使用新格式版本，不能静默套用当前规则。
+- 网络边界：开发者中心和回放页不加载 WebSocket、不读取真实房间、不发送动作，也不调用奖励或统计接口。
+- 决策：`docs/decisions/ADR-0016-trace-v2-recorded-state-replay.md`；验收：`docs/qa/RED-94-developer-tools.md`。
 
 ## 10. Electron IPC
 

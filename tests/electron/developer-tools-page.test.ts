@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
 const readPage = (name: string) => readFileSync(resolve(pagesDir, name), 'utf8')
+const readScript = (name: string) => readFileSync(resolve(pagesDir, 'js/developer-tools', name), 'utf8')
 
 describe('out-of-match developer center', () => {
   it('is linked from the public main menu as a separate page', () => {
@@ -16,18 +17,26 @@ describe('out-of-match developer center', () => {
 
   it('fails closed while an active match marker exists and never connects to a room', () => {
     const page = readPage('developer-tools.html')
+    const script = readScript('developer-center.js')
+    const combined = page + '\n' + script
 
-    expect(page).toContain('readActiveBattle')
+    expect(combined).toContain('readActiveBattle')
     expect(page).toContain('activeMatchGate')
     expect(page).toContain('scenarioForm')
-    expect(page).toContain('/api/developer-tools/scenario')
-    expect(page).toContain('developerToolsFetch')
-    expect(page).toContain("window.location.protocol === 'http:'")
+    expect(combined).toContain('/api/developer-tools/scenario')
+    expect(page).toContain('traceFileInput')
+    expect(page).toContain('traceDropZone')
+    expect(page).toContain('导入 Trace')
+    expect(page).toContain('打开回放')
+    expect(page).toContain('developer-center.js')
+    expect(combined).toContain('developerToolsFetch')
+    expect(combined).toContain("window.location.protocol === 'http:'")
     expect(page).toContain('match-trace.js')
-    expect(page).toContain('下载最近一场 Trace')
-    expect(page).not.toContain('RvBWs.connect')
-    expect(page).not.toContain('requestBattleSnapshot')
-    expect(page).not.toContain("type: 'action'")
+    expect(page).toContain('再次下载 Trace')
+    expect(combined).not.toContain('RvBWs.connect')
+    expect(combined).not.toContain('requestBattleSnapshot')
+    expect(combined).not.toContain("type: 'action'")
+    expect(combined).not.toContain('new WebSocket')
   })
 
   it('removes the legacy in-match modifier and only stores trace from terminal handling', () => {

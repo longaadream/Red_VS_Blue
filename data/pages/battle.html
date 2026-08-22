@@ -5062,7 +5062,9 @@
       }
 
       try {
-        RvBDeveloperTools.storeCompletedTrace(completedMatchTraceRecord)
+        Promise.resolve(RvBDeveloperTools.storeCompletedTrace(completedMatchTraceRecord)).catch(function (error) {
+          addLog('[Trace] 本地保存失败，仍可立即下载：' + ((error && error.message) || error), 'err')
+        })
       } catch (error) {
         addLog('[Trace] 本地保存失败，仍可立即下载：' + ((error && error.message) || error), 'err')
       }
@@ -5072,9 +5074,9 @@
       return completedMatchTraceRecord
     }
 
-    function downloadCompletedMatchTrace() {
+    async function downloadCompletedMatchTrace() {
       const record = completedMatchTraceRecord
-        || (window.RvBDeveloperTools && RvBDeveloperTools.readStoredTrace())
+        || (window.RvBDeveloperTools && await RvBDeveloperTools.readStoredTrace())
       if (!record || !window.RvBDeveloperTools) {
         addLog('[Trace] 没有可下载的已结束比赛 Trace', 'err')
         return

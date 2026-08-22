@@ -1,5 +1,5 @@
 import type { BattleState } from './turn'
-import { readSanitizedBattleActionTrace } from './battle-trace'
+import { readSanitizedBattleActionTrace, readSanitizedBattleReplay } from './battle-trace'
 import {
   systemAuthoritativeRuleClock,
   type AuthoritativeRuleClock,
@@ -25,9 +25,14 @@ export function toPublicBattleState(
   const terminalTrace = projected.terminalResult
     ? readSanitizedBattleActionTrace(projected)
     : []
+  const terminalReplay = projected.terminalResult
+    ? readSanitizedBattleReplay(projected)
+    : undefined
   if (debugBattle) {
     debugBattle.appliedActionIds = []
     debugBattle.actionLog = terminalTrace
+    if (terminalReplay) debugBattle.replay = terminalReplay
+    else delete debugBattle.replay
     delete debugBattle.commandLog
   }
 

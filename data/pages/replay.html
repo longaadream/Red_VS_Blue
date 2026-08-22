@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Trace 回放器 · RED vs BLUE</title>
+  <link rel="stylesheet" href="css/battle-tactical-table.css" />
+  <link rel="stylesheet" href="css/developer-tools/replay.css" />
+</head>
+<body>
+  <header class="replay-topbar">
+    <a class="back-link" href="developer-tools.html">← 开发者中心</a>
+    <div>
+      <div class="replay-title">Trace 回放器</div>
+      <div id="replayHeaderMeta" class="replay-subtitle">正在读取本地 Trace v2…</div>
+    </div>
+    <div class="readonly-badge">只读 · 无房间连接</div>
+  </header>
+
+  <main class="replay-shell">
+    <div id="replayError" class="replay-error" role="alert" hidden></div>
+
+    <div id="replayWorkspace" class="replay-workspace" hidden>
+      <section class="stage-column" aria-label="对局回放棋盘">
+        <div class="frame-strip">
+          <div class="frame-primary">
+            <div class="frame-kicker">AUTHORITY FRAME</div>
+            <div id="replayFrameTitle" class="frame-title">初始状态</div>
+          </div>
+          <div id="replayFrameMeta" class="frame-meta">第 0 帧</div>
+        </div>
+
+        <div class="board-frame">
+          <div id="replayBoardStage" class="replay-board-stage" data-battle-layer="three-battlefield">
+            <div id="replayFloatLayer" class="board-float-layer"></div>
+          </div>
+          <div class="board-hint">拖动平移 · 滚轮缩放 · 点击棋子检查详情</div>
+        </div>
+
+        <div class="controls" aria-label="回放控制">
+          <div class="control-row">
+            <button id="replayPreviousButton" class="control-button" type="button">← 上一命令</button>
+            <button id="replayPlayButton" class="control-button primary" type="button">播放</button>
+            <button id="replayNextButton" class="control-button" type="button">下一命令 →</button>
+            <span class="control-spacer"></span>
+            <label>
+              <span class="empty">倍速</span>
+              <select id="replaySpeed" class="control-select" aria-label="回放倍速">
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="2">2×</option>
+                <option value="4">4×</option>
+              </select>
+            </label>
+            <label>
+              <span class="empty">视角</span>
+              <select id="replayPerspective" class="control-select" aria-label="回放视角">
+                <option value="omniscient">全知视角</option>
+                <option value="red">红方视角</option>
+                <option value="blue">蓝方视角</option>
+              </select>
+            </label>
+            <button id="replayResetViewButton" class="control-button" type="button">复位镜头</button>
+          </div>
+          <div class="timeline-row">
+            <label for="replayTimeline">时间轴</label>
+            <input id="replayTimeline" type="range" min="0" max="0" value="0" step="1" />
+            <span id="replayTimelinePosition" class="timeline-position">0 / 0</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="inspector" aria-label="Trace 细节检查器">
+        <section class="panel">
+          <h2>当前命令</h2>
+          <div id="replayCommandDetails" class="detail-grid"></div>
+        </section>
+        <section class="panel">
+          <h2>棋子详情</h2>
+          <p class="panel-subtitle">点击棋盘上的棋子；跳转帧后会读取该帧记录值。</p>
+          <div id="replayPieceDetails" class="empty">尚未选择棋子。</div>
+        </section>
+        <section class="panel">
+          <h2>状态 Hash</h2>
+          <div id="replayHashDetails"></div>
+        </section>
+        <section class="panel">
+          <h2>命令内语义事件</h2>
+          <ul id="replayEventList" class="data-list"></ul>
+        </section>
+        <section class="panel">
+          <h2>关键状态差异</h2>
+          <ul id="replayDiffList" class="data-list"></ul>
+        </section>
+        <section class="panel">
+          <h2>随机流</h2>
+          <ul id="replayRandomStreams" class="data-list"></ul>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script src="js/developer-tools/match-trace.js"></script>
+  <script src="js/three.min.js"></script>
+  <script src="js/battle-ui/battle-view-model.js"></script>
+  <script src="js/battle-ui/battle-status-presentation.js"></script>
+  <script src="js/battle-ui/battle-tactical-geometry.js"></script>
+  <script src="js/battle-renderer-3d.js"></script>
+  <script src="js/developer-tools/replay-viewer.js"></script>
+</body>
+</html>

@@ -26,6 +26,18 @@ describe('debug battle pipeline', () => {
       type: 'initializeBattle',
       playerIds: ['debug-red', 'debug-blue'],
     })
+    expect((duel.state.extensions as any).debugBattle.replay).toMatchObject({
+      format: 'rvb-battle-replay/v2',
+      initialStateHash: expect.any(String),
+      initialCheckpointHash: expect.any(String),
+      initialState: expect.objectContaining({
+        map: expect.any(Object),
+        pieces: expect.any(Array),
+      }),
+      frames: [],
+    })
+    expect(JSON.stringify((duel.state.extensions as any).debugBattle.replay))
+      .not.toContain('debugBattle')
   })
 
   it('allows light/light and dark/dark mirror debug duels', async () => {
@@ -154,6 +166,19 @@ describe('debug battle pipeline', () => {
     expect(duplicate.duplicate).toBe(true)
     expect(duplicate.stateHash).toBe(first.stateHash)
     expect((duplicate.state.extensions as any).debugBattle.appliedActionIds).toContain('debug-action-1')
+    const replay = (duplicate.state.extensions as any).debugBattle.replay
+    expect(replay.frames).toHaveLength(1)
+    expect((duel.state.extensions as any).debugBattle.replay.frames).toHaveLength(0)
+    expect(replay.frames[0]).toMatchObject({
+      index: 0,
+      traceIndex: 1,
+      actionType: 'beginPhase',
+      preStateHash: replay.initialStateHash,
+      postStateHash: first.stateHash,
+      postState: expect.objectContaining({ turn: expect.any(Object) }),
+      events: expect.any(Array),
+      randomStreams: expect.any(Array),
+    })
   })
 
   it('rejects an illegal move without mutating authoritative state or action trace', () => {
@@ -184,6 +209,24 @@ describe('debug battle pipeline', () => {
     expect(state.players[0].actionPoints).toBe(beforeActionPoints)
     expect(state.actions).toEqual(beforeActions)
     expect(state.extensions).toBeUndefined()
+  })
+
+  it('keeps replay checkpoints atomic when a command is rejected', async () => {
+    const duel = await createDebugDuel({ seed: 7300, beginPhase: false })
+    const beforeState = JSON.stringify(duel.state)
+    const beforeReplay = JSON.stringify((duel.state.extensions as any).debugBattle.replay)
+
+    expect(() => runBattleAction(duel.state, {
+      type: 'move',
+      playerId: 'debug-red',
+      pieceId: duel.state.pieces[0].instanceId,
+      toX: -1,
+      toY: -1,
+      clientActionId: 'rejected-replay-command',
+    } as any)).toThrow()
+
+    expect(JSON.stringify(duel.state)).toBe(beforeState)
+    expect(JSON.stringify((duel.state.extensions as any).debugBattle.replay)).toBe(beforeReplay)
   })
 
   it('records the committed normalized command while removing transport secrets', async () => {

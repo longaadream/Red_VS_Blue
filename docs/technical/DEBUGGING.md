@@ -176,16 +176,19 @@ interface GameLogContext {
 
 `lib/game/debug-battle.ts` 可以用固定 seed 创建调试对局并生成状态 hash，测试入口为 `tests/game/debug-battle.test.ts`。
 
-### RED-94 公开局外开发者中心
+### RED-94 公开局外 Trace 回放与规则调试器
 
-- 页面入口：主菜单 `开发者中心` 打开 `data/pages/developer-tools.html`。
-- 局内门禁：页面通过 `RvBDeveloperTools.readActiveBattle()` 检查 `rvb_active_battle`；存在进行中对局标记时禁用场景表单并显示说明。该标记是 UX 门禁，不承担服务端授权。
-- 隔离边界：`POST /api/developer-tools/scenario` 只调用 `createDebugDuel()`，在内存中使用正式 `runBattleAction()` 生成固定种子状态、命令 trace 和 hash；请求不接受 roomId，不读取/创建房间，不写战绩、奖励或统计。
-- 真实对局 trace：进行中的公开快照清空 `extensions.debugBattle.actionLog` 和 `appliedActionIds`。只有权威 `terminalResult` 已提交的公开快照才携带脱敏完整 trace；客户端在 `handleGameOver()` 中生成 `rvb-match-trace/v1`、保存最近一场并提供 JSON 下载。
-- 脱敏：命令 trace 保留规则动作、actor、turn、seed、随机流、动作/前后状态 hash；认证信封、签名、token、账号 ID、公私钥、助记词、密码、session/cookie 和其他 secret/credential 字段递归删除。
-- 兼容范围：Trace 是诊断证据，不是存档或回放协议。MVP 不支持 trace 导入、可视化回放、压缩回放码和跨版本重演。
-- 旧入口：`battle.html` 的反引号局内修改器以及 AP/CP/生命/击杀/冷却直接修改函数已删除；训练营原有受控训练功能不属于真实对局开发者工具。
-
+- 页面入口：主菜单“开发者中心”打开 `data/pages/developer-tools.html`；导入成功后由 `data/pages/replay.html` 提供独立只读回放。
+- 局内门禁：两个页面通过 `RvBDeveloperTools.readActiveBattle()` 检查 `rvb_active_battle` 并 fail closed。该标记是产品门禁，不承担服务端授权；真正的数据边界是进行中公开投影删除完整 action trace、applied action IDs 和 replay archive。
+- 隔离边界：固定 seed 场景仍只调用 `createDebugDuel()` 与正式 `runBattleAction()`，不接受 roomId、不创建/读取房间、不发奖励、不写统计。它是开发者中心的次级工具。
+- Trace v2：`recordBattleInitialization()` 保存脱敏初始检查点；正式 Runner 只在成功动作后追加命令、命令后检查点、语义事件、随机流游标与双 hash 链。重复或拒绝动作不追加。
+- 终局导出：只有权威 `terminalResult` 提交后的公开投影携带完整脱敏回放归档。`battle.html` 在终局生成 `rvb-match-trace/v2`、立即下载并保存最近一场。
+- 记录状态回放：回放器把上一检查点作为当前帧的 preState，把当前帧的 postState 作为结果；不调用当前 `runBattleAction()` 或规则数据重算历史。增加角色/规则后，旧 Trace 依赖展示快照和稳定 ID 降级，而不是产生新的比赛结果。
+- 展示复用：`replay.html` 复用正式 `BattleViewModel`、`BattleRenderer3D`、状态展示和战术几何，提供时间轴、逐步/播放、速度、红/蓝/全知视角、棋子详情、事件、差异、随机流与 hash 检查器。
+- 导入安全：`match-trace.js` 把文件视为不可信输入，限制 32 MiB、深度、节点、数组和字符串预算，拒绝危险键、敏感字段、外部/脚本 URL、版本不符和 hash 链篡改。失败导入不覆盖最近有效记录；导入文本只进入文本节点。
+- 本地存储：最近一场 v2 以 IndexedDB 为主，受限环境才回退 localStorage；回放页不使用 fetch、WebSocket、房间动作、奖励或统计接口。
+- 旧格式：`rvb-match-trace/v1` 没有完整状态检查点，只能作为历史诊断证据，导入时明确提示“旧诊断格式，无法回放”。
+- 详细合同与人工步骤：`docs/qa/RED-94-developer-tools.md`；格式决策：`docs/decisions/ADR-0016-trace-v2-recorded-state-replay.md`。
 
 ## 9. 当前测试缺口
 

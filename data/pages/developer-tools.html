@@ -4,97 +4,91 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>开发者中心 · RED vs BLUE</title>
-  <script src="js/server-utils.js"></script>
-  <script src="js/developer-tools/match-trace.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { margin: 0; min-height: 100vh; background: #08111f; color: #e2e8f0; }
-    button, input, select { font: inherit; }
-    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(96,165,250,.45); outline-offset: 2px; }
-    .topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: rgba(8,17,31,.92); border-bottom: 1px solid #1e293b; backdrop-filter: blur(18px); }
-    .back { color: #94a3b8; text-decoration: none; border: 1px solid #334155; border-radius: 9px; padding: 8px 12px; }
-    .title { font-size: 18px; font-weight: 800; }
-    .subtitle { color: #64748b; font-size: 12px; margin-top: 2px; }
-    main { width: min(980px, calc(100% - 28px)); margin: 24px auto 48px; display: grid; gap: 16px; }
-    .hero { padding: 24px; border-radius: 18px; border: 1px solid #334155; background: linear-gradient(135deg, #111c31, #0d1728); }
-    .hero h1 { margin: 0 0 8px; font-size: clamp(24px, 5vw, 40px); }
-    .hero p { margin: 0; max-width: 740px; color: #94a3b8; line-height: 1.65; }
-    .gate { border: 1px solid #b45309; background: #261507; color: #fbbf24; padding: 16px 18px; border-radius: 14px; line-height: 1.55; }
-    .gate[hidden] { display: none; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-    .card { min-width: 0; border: 1px solid #263449; background: #0f1a2d; border-radius: 16px; padding: 20px; }
-    .card h2 { margin: 0 0 6px; font-size: 17px; }
-    .card > p { margin: 0 0 18px; color: #7f8da3; font-size: 13px; line-height: 1.55; }
-    fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-    fieldset:disabled { opacity: .48; }
-    .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    label { display: grid; gap: 6px; color: #94a3b8; font-size: 12px; }
-    input, select { width: 100%; min-height: 42px; border: 1px solid #334155; border-radius: 9px; background: #08111f; color: #e2e8f0; padding: 9px 11px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-    .button { min-height: 42px; border: 1px solid #334155; border-radius: 9px; background: #17243a; color: #dbeafe; padding: 9px 14px; cursor: pointer; }
-    .button.primary { background: #2563eb; border-color: #3b82f6; color: white; font-weight: 700; }
-    .button.danger { color: #fca5a5; border-color: #7f1d1d; background: #2a1014; }
-    .button:disabled { opacity: .45; cursor: not-allowed; }
-    .status { min-height: 21px; margin-top: 12px; color: #93c5fd; font-size: 13px; }
-    .status.error { color: #fca5a5; }
-    .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
-    .fact { border: 1px solid #263449; background: #0a1424; border-radius: 10px; padding: 10px; }
-    .fact span { display: block; color: #64748b; font-size: 11px; margin-bottom: 4px; }
-    .fact strong { display: block; overflow-wrap: anywhere; font-size: 13px; }
-    pre { display: none; max-height: 360px; overflow: auto; margin: 16px 0 0; padding: 14px; background: #050b14; border: 1px solid #263449; border-radius: 10px; color: #a5f3fc; font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .note { color: #64748b; font-size: 12px; line-height: 1.65; }
-    @media (max-width: 720px) { .grid, .fields { grid-template-columns: 1fr; } .topbar { align-items: flex-start; } }
-  </style>
+  <link rel="stylesheet" href="css/developer-tools/developer-center.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="back" href="index.html">← 返回</a>
+    <a class="back-link" href="index.html">← 返回</a>
     <div>
-      <div class="title">开发者中心</div>
-      <div class="subtitle">公开社区工具 · 仅限局外</div>
+      <div class="topbar-title">开发者中心</div>
+      <div class="topbar-subtitle">公开社区工具 · 严格局外 · 只读回放</div>
     </div>
   </header>
 
   <main>
     <section class="hero">
-      <h1>检查规则，不改写对局</h1>
-      <p>这里运行使用正式规则 Runner 的隔离固定种子场景，并管理已经结束比赛的诊断 Trace。它不会连接、读取或控制正在进行的真实房间。</p>
+      <div class="eyebrow">TRACE REPLAY LAB</div>
+      <h1>读入一场比赛，逐帧看清规则发生了什么</h1>
+      <p>Trace v2 保存权威命令边界的真实状态、语义事件、随机流与 Hash。回放器直接读取记录事实，不连接房间，也不会用当前版本规则重新结算旧对局。</p>
     </section>
 
     <div id="activeMatchGate" class="gate" hidden role="alert">
-      检测到一场尚未结束的对局。开发者工具已锁定；请返回对局并完成或离开后再使用。本页没有清除或绕过此锁定的入口。
-      <div id="activeMatchLabel" style="margin-top:6px;color:#fed7aa"></div>
+      检测到尚未结束的真实对局，开发者中心已锁定。请先完成或离开对局；这里没有清除或绕过锁定的入口。
+      <div id="activeMatchLabel"></div>
     </div>
 
-    <div class="grid">
-      <section class="card">
-        <h2>隔离规则场景</h2>
-        <p>在服务器内存中创建一次私有诊断状态，不创建房间、不写战绩、不发奖励。相同配置与种子应产生相同状态哈希。</p>
+    <div class="workspace">
+      <section class="card primary-card">
+        <div class="badge">核心功能</div>
+        <h2>导入 Trace 并打开回放</h2>
+        <p class="card-description">接受权威终局导出的 <code>rvb-match-trace/v2</code> JSON。导入前会验证大小、结构、敏感字段、危险 URL、完整状态帧和 Hash 链。</p>
+
+        <fieldset id="replayToolFieldset">
+          <input class="visually-hidden" id="traceFileInput" type="file" accept=".json,application/json" />
+          <div id="traceDropZone" class="import-zone" tabindex="0" role="button" aria-controls="traceFileInput">
+            <div class="import-icon" aria-hidden="true">⇩</div>
+            <strong>把 Trace 文件拖到这里</strong>
+            <span>或按 Enter / 点击选择 JSON · 最大 32 MiB</span>
+          </div>
+          <div class="actions">
+            <button id="chooseTraceButton" class="button primary" type="button">导入 Trace</button>
+            <button id="openReplayButton" class="button" type="button" disabled>打开回放</button>
+          </div>
+        </fieldset>
+        <div id="traceStatus" class="status" role="status" aria-live="polite"></div>
+
+        <div class="recent">
+          <div class="recent-heading">
+            <h3>最近一份合法 Trace v2</h3>
+            <span id="traceFormatBadge" class="badge" hidden>v2</span>
+          </div>
+          <p id="traceEmpty" class="note">本机尚未保存可回放的 Trace。</p>
+          <div id="traceFacts" class="facts" hidden>
+            <div class="fact"><span>房间</span><strong id="traceRoom">—</strong></div>
+            <div class="fact"><span>终局</span><strong id="traceResult">—</strong></div>
+            <div class="fact"><span>地图 / 回合</span><strong id="traceMapTurn">—</strong></div>
+            <div class="fact"><span>命令 / 事件</span><strong id="traceCommands">—</strong></div>
+            <div class="fact"><span>最终 Hash</span><strong id="traceHash">—</strong></div>
+            <div class="fact"><span>导出时间</span><strong id="traceTime">—</strong></div>
+          </div>
+          <div class="actions">
+            <button id="downloadStoredTraceButton" class="button" type="button" disabled>再次下载 Trace</button>
+            <button id="clearStoredTraceButton" class="button danger" type="button" disabled>清除本地 Trace</button>
+          </div>
+        </div>
+      </section>
+
+      <details class="card">
+        <summary>固定 Seed 隔离规则场景（次要工具）</summary>
+        <p class="card-description">使用正式规则 Runner 在服务器内存中创建一次私有诊断状态；不创建房间、不写战绩、不发奖励。</p>
         <form id="scenarioForm">
-          <fieldset id="toolFieldset">
+          <fieldset id="scenarioToolFieldset">
             <div class="fields">
               <label>随机种子
-                <input id="scenarioSeed" name="seed" type="number" min="0" max="4294967295" step="1" value="20260821" required />
+                <input id="scenarioSeed" type="number" min="0" max="4294967295" step="1" value="20260821" required />
               </label>
               <label>地图 ID
-                <input id="scenarioMap" name="mapId" type="text" value="large-battlefield" pattern="[a-z0-9][a-z0-9\-]{0,63}" required />
+                <input id="scenarioMap" type="text" value="large-battlefield" pattern="[a-z0-9][a-z0-9\-]{0,63}" required />
               </label>
               <label>红方内容阵营
-                <select id="firstAlignment" name="firstAlignment">
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                </select>
+                <select id="firstAlignment"><option value="dark">Dark</option><option value="light">Light</option></select>
               </label>
               <label>蓝方内容阵营
-                <select id="secondAlignment" name="secondAlignment">
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
+                <select id="secondAlignment"><option value="light">Light</option><option value="dark">Dark</option></select>
               </label>
             </div>
             <div class="actions">
-              <button id="runScenarioButton" class="button primary" type="submit">运行固定种子场景</button>
+              <button id="runScenarioButton" class="button" type="submit">运行隔离场景</button>
             </div>
           </fieldset>
         </form>
@@ -103,150 +97,19 @@
           <div class="fact"><span>地图</span><strong id="factMap">—</strong></div>
           <div class="fact"><span>回合 / 阶段</span><strong id="factTurn">—</strong></div>
           <div class="fact"><span>当前执行者</span><strong id="factActor">—</strong></div>
-          <div class="fact"><span>权威状态哈希</span><strong id="factHash">—</strong></div>
+          <div class="fact"><span>权威状态 Hash</span><strong id="factHash">—</strong></div>
           <div class="fact"><span>种子</span><strong id="factSeed">—</strong></div>
           <div class="fact"><span>命令数</span><strong id="factCommands">—</strong></div>
         </div>
         <pre id="scenarioOutput" aria-label="隔离场景 JSON 输出"></pre>
-      </section>
-
-      <section class="card">
-        <h2>最近一场完整比赛 Trace</h2>
-        <p>真实比赛只有在权威终局提交后才会生成 <code>rvb-match-trace/v1</code>。文件包含命令、执行者、回合、随机流与前后状态哈希，不含认证和账号秘密。</p>
-        <div id="traceEmpty" class="note">本机尚未保存已结束比赛的 Trace。</div>
-        <div id="traceFacts" class="facts" hidden>
-          <div class="fact"><span>房间</span><strong id="traceRoom">—</strong></div>
-          <div class="fact"><span>终局</span><strong id="traceResult">—</strong></div>
-          <div class="fact"><span>地图 / 回合</span><strong id="traceMapTurn">—</strong></div>
-          <div class="fact"><span>命令数</span><strong id="traceCommands">—</strong></div>
-          <div class="fact"><span>最终状态哈希</span><strong id="traceHash">—</strong></div>
-          <div class="fact"><span>导出时间</span><strong id="traceTime">—</strong></div>
-        </div>
-        <div class="actions">
-          <button id="downloadStoredTraceButton" class="button primary" type="button" disabled>下载最近一场 Trace</button>
-          <button id="clearStoredTraceButton" class="button danger" type="button" disabled>清除本地 Trace</button>
-        </div>
-        <div id="traceStatus" class="status" role="status" aria-live="polite"></div>
-      </section>
+      </details>
     </div>
 
-    <p class="note">MVP 不提供回放码、可视化回放、Trace 导入、跨版本重演或任何局内修改能力。Trace 是版本化诊断证据，不承诺未来版本可直接重放。</p>
+    <p class="note">Trace v1 是旧诊断格式，不含状态检查点，因此会被明确拒绝为“不可回放”。MVP 不提供回放码、在线分享、实时观战、从任意帧继续操作或原始鼠标/镜头复刻。</p>
   </main>
 
-  <script>
-    const activeMatchGate = document.getElementById('activeMatchGate')
-    const activeMatchLabel = document.getElementById('activeMatchLabel')
-    const toolFieldset = document.getElementById('toolFieldset')
-    const scenarioForm = document.getElementById('scenarioForm')
-    const scenarioStatus = document.getElementById('scenarioStatus')
-    let storedTrace = null
-
-    function refreshActiveMatchGate() {
-      const activeBattle = RvBDeveloperTools.readActiveBattle()
-      const locked = !!activeBattle
-      activeMatchGate.hidden = !locked
-      toolFieldset.disabled = locked
-      activeMatchLabel.textContent = locked && activeBattle.roomId
-        ? '当前房间：' + activeBattle.roomId
-        : ''
-      return locked
-    }
-
-    function setScenarioStatus(message, isError) {
-      scenarioStatus.textContent = message || ''
-      scenarioStatus.classList.toggle('error', !!isError)
-    }
-
-    function renderScenario(result) {
-      document.getElementById('scenarioFacts').hidden = false
-      document.getElementById('factMap').textContent = result.map.id + ' · ' + result.map.width + '×' + result.map.height
-      document.getElementById('factTurn').textContent = result.turn.number + ' / ' + result.turn.phase
-      document.getElementById('factActor').textContent = result.turn.currentPlayerId
-      document.getElementById('factHash').textContent = result.stateHash
-      document.getElementById('factSeed').textContent = String(result.seed)
-      document.getElementById('factCommands').textContent = String(result.actionTrace.length)
-      const output = document.getElementById('scenarioOutput')
-      output.textContent = JSON.stringify(result, null, 2)
-      output.style.display = 'block'
-    }
-
-    function developerToolsFetch(path, options) {
-      const hasConfiguredServer = RvBUtils.getServerUrl && RvBUtils.getServerUrl()
-      const canUseSameOrigin = window.location.protocol === 'http:' || window.location.protocol === 'https:'
-      if (!hasConfiguredServer && canUseSameOrigin) return fetch(path, options)
-      return RvBUtils.serverFetch(path, options)
-    }
-
-    scenarioForm.addEventListener('submit', async function (event) {
-      event.preventDefault()
-      if (refreshActiveMatchGate()) {
-        setScenarioStatus('正在对局，隔离场景已锁定。', true)
-        return
-      }
-
-      const submitButton = document.getElementById('runScenarioButton')
-      submitButton.disabled = true
-      setScenarioStatus('正在通过正式规则 Runner 运行隔离场景…')
-      try {
-        const response = await developerToolsFetch('/api/developer-tools/scenario', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            seed: Number(document.getElementById('scenarioSeed').value),
-            mapId: document.getElementById('scenarioMap').value.trim(),
-            firstAlignment: document.getElementById('firstAlignment').value,
-            secondAlignment: document.getElementById('secondAlignment').value,
-          }),
-          timeoutMs: 15000,
-        })
-        const result = await response.json().catch(function () { return {} })
-        if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status))
-        renderScenario(result)
-        setScenarioStatus('隔离场景已完成；没有创建真实房间或结算数据。')
-      } catch (error) {
-        setScenarioStatus('运行失败：' + ((error && error.message) || error), true)
-      } finally {
-        submitButton.disabled = false
-      }
-    })
-
-    function refreshStoredTrace() {
-      storedTrace = RvBDeveloperTools.readStoredTrace()
-      const available = !!storedTrace
-      document.getElementById('traceEmpty').hidden = available
-      document.getElementById('traceFacts').hidden = !available
-      document.getElementById('downloadStoredTraceButton').disabled = !available
-      document.getElementById('clearStoredTraceButton').disabled = !available
-      if (!available) return
-
-      document.getElementById('traceRoom').textContent = storedTrace.roomId || '本地对局'
-      document.getElementById('traceResult').textContent = (storedTrace.final.winnerPlayerId || '平局') + ' · ' + storedTrace.final.reason
-      document.getElementById('traceMapTurn').textContent = (storedTrace.final.mapId || '未知地图') + ' · ' + (storedTrace.final.turnNumber || '?') + ' 回合'
-      document.getElementById('traceCommands').textContent = String(storedTrace.summary.commandCount)
-      document.getElementById('traceHash').textContent = storedTrace.final.stateHash || '未提供'
-      document.getElementById('traceTime').textContent = storedTrace.exportedAt || '未知'
-    }
-
-    document.getElementById('downloadStoredTraceButton').addEventListener('click', function () {
-      if (!storedTrace) return
-      const fileName = RvBDeveloperTools.downloadTrace(storedTrace)
-      document.getElementById('traceStatus').textContent = '已下载：' + fileName
-    })
-
-    document.getElementById('clearStoredTraceButton').addEventListener('click', function () {
-      RvBDeveloperTools.clearStoredTrace()
-      storedTrace = null
-      refreshStoredTrace()
-      document.getElementById('traceStatus').textContent = '本地 Trace 已清除。'
-    })
-
-    window.addEventListener('focus', refreshActiveMatchGate)
-    window.addEventListener('storage', function () {
-      refreshActiveMatchGate()
-      refreshStoredTrace()
-    })
-    refreshActiveMatchGate()
-    refreshStoredTrace()
-  </script>
+  <script src="js/server-utils.js"></script>
+  <script src="js/developer-tools/match-trace.js"></script>
+  <script src="js/developer-tools/developer-center.js"></script>
 </body>
 </html>

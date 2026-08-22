@@ -5,6 +5,8 @@ import { Script, createContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 import { toPublicBattleState } from '@/lib/game/deployment'
+import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
+import { createDebugDuel } from '@/lib/game/debug-battle'
 import { makeState } from '../helpers/minimal-state'
 
 function terminalResult() {
@@ -26,6 +28,10 @@ function terminalResult() {
 
 function tracedState(finished: boolean) {
   const state = makeState({ turnNumber: 3 })
+  if (finished) state.terminalResult = terminalResult()
+  const checkpoint = JSON.parse(JSON.stringify(state))
+  delete checkpoint.extensions
+  const checkpointHash = hashBattleState(checkpoint)
   state.extensions = {
     debugBattle: {
       appliedActionIds: ['action-secret-id'],
@@ -37,8 +43,8 @@ function tracedState(finished: boolean) {
         tick: 0,
         turn: 1,
         playerId: 'player-red',
-        preStateHash: 'pre-hash',
-        postStateHash: 'post-hash',
+        preStateHash: checkpointHash,
+        postStateHash: checkpointHash,
         randomStreams: [],
       }],
       commandLog: [{
@@ -46,9 +52,34 @@ function tracedState(finished: boolean) {
         authorization: { token: 'must-not-leak' },
         signature: 'must-not-leak',
       }],
+      replay: {
+        format: 'rvb-battle-replay/v2',
+        initialStateHash: checkpointHash,
+        initialState: checkpoint,
+        frames: [{
+          index: 0,
+          traceIndex: 0,
+          action: { type: 'beginPhase' },
+          actionType: 'beginPhase',
+          playerId: 'player-red',
+          turnBefore: 3,
+          turnAfter: 3,
+          phaseBefore: 'action',
+          phaseAfter: 'action',
+          preStateHash: checkpointHash,
+          postStateHash: checkpointHash,
+          postState: checkpoint,
+          events: [{
+            type: 'futureUnknownEvent',
+            playerId: 'player-red',
+            turn: 3,
+            payload: { message: '仍然可以作为通用事件查看' },
+          }],
+          randomStreams: [],
+        }],
+      },
     },
   }
-  if (finished) state.terminalResult = terminalResult()
   return state
 }
 
@@ -81,7 +112,7 @@ function loadTraceTools() {
 }
 
 describe('developer tools match trace boundary', () => {
-  it('hides the complete command trace from every active public battle snapshot', () => {
+  it('hides the complete command trace and replay checkpoints from every active public battle snapshot', () => {
     const projected = toPublicBattleState(tracedState(false))
 
     expect(projected.extensions?.debugBattle).toEqual({
@@ -97,10 +128,17 @@ describe('developer tools match trace boundary', () => {
     expect(metadata.appliedActionIds).toEqual([])
     expect(metadata.actionLog).toHaveLength(1)
     expect(metadata.actionLog[0].action).toEqual({ type: 'beginPhase' })
+    expect(metadata.replay).toMatchObject({
+      format: 'rvb-battle-replay/v2',
+      initialState: expect.objectContaining({ map: expect.any(Object) }),
+      frames: [expect.objectContaining({
+        postState: expect.any(Object),
+      })],
+    })
     expect(JSON.stringify(metadata)).not.toContain('must-not-leak')
   })
 
-  it('creates and stores a versioned downloadable trace only for completed matches', () => {
+  it('creates and stores a replayable v2 trace only for completed matches', async () => {
     const tools = loadTraceTools()
     const activeState = tracedState(false)
     const finishedState = toPublicBattleState(tracedState(true))
@@ -115,10 +153,10 @@ describe('developer tools match trace boundary', () => {
       authorityVersion: 12,
       exportedAt: '2026-08-21T12:00:00.000Z',
     })
-    tools.storeCompletedTrace(record)
+    await tools.storeCompletedTrace(record)
 
     expect(record).toMatchObject({
-      format: 'rvb-match-trace/v1',
+      format: 'rvb-match-trace/v2',
       roomId: 'room-finished',
       seed: 9876,
       authorityVersion: 12,
@@ -134,10 +172,96 @@ describe('developer tools match trace boundary', () => {
         commandCount: 1,
         playerCount: 2,
       },
+      initialState: expect.objectContaining({ map: expect.any(Object) }),
+      frames: [expect.objectContaining({
+        actionType: 'beginPhase',
+        events: [expect.objectContaining({ type: 'futureUnknownEvent' })],
+        postState: expect.any(Object),
+      })],
     })
-    expect(record.trace).toHaveLength(1)
     expect(JSON.stringify(record)).not.toContain('must-not-leak')
-    expect(toPlainObject(tools.readStoredTrace())).toEqual(toPlainObject(record))
+    expect(toPlainObject(await tools.readStoredTrace())).toEqual(toPlainObject(record))
+  })
+
+  it('accepts a terminal v2 trace produced by the real seeded battle runner', async () => {
+    const tools = loadTraceTools()
+    const duel = await createDebugDuel({ seed: 4242, beginPhase: false })
+    const finished = runBattleAction(duel.state, {
+      type: 'surrender',
+      playerId: 'debug-blue',
+      reason: 'voluntary',
+    }).state
+    const projected = toPublicBattleState(finished)
+    const record = tools.createTraceRecord({
+      state: projected,
+      roomId: 'runner-integration',
+      seed: 4242,
+    })
+
+    expect(finished.terminalResult).toMatchObject({
+      winnerPlayerId: 'debug-red',
+      loserPlayerId: 'debug-blue',
+    })
+    expect(record).toMatchObject({
+      format: 'rvb-match-trace/v2',
+      summary: { commandCount: 1 },
+      frames: [expect.objectContaining({
+        index: 0,
+        traceIndex: 1,
+        actionType: 'surrender',
+        postState: expect.objectContaining({ terminalResult: expect.any(Object) }),
+      })],
+    })
+    expect(record.frames[0]).not.toHaveProperty('preState')
+    expect(() => tools.assertTraceRecord(toPlainObject(record))).not.toThrow()
+  })
+
+  it('rejects legacy, corrupt and dangerous imports without replacing the recent trace', async () => {
+    const tools = loadTraceTools()
+    const valid = tools.createTraceRecord({
+      state: toPublicBattleState(tracedState(true)),
+      roomId: 'safe-room',
+      exportedAt: '2026-08-21T12:00:00.000Z',
+    })
+    await tools.storeCompletedTrace(valid)
+
+    expect(() => tools.assertTraceRecord({ format: 'rvb-match-trace/v1', final: {} }))
+      .toThrow(/v1.*(?:无法|cannot).*回放|legacy.*replay/i)
+    expect(() => tools.assertTraceRecord({ format: 'rvb-match-trace/v99' }))
+      .toThrow(/unsupported|version/i)
+    expect(() => tools.parseTraceText('{ damaged json'))
+      .toThrow(/damaged|invalid/i)
+
+    const missingCheckpoint = toPlainObject(valid)
+    delete missingCheckpoint.frames[0].postState
+    expect(() => tools.assertTraceRecord(missingCheckpoint)).toThrow(/postState/i)
+
+    const corrupt = toPlainObject(valid)
+    corrupt.frames[0].postState.turn.turnNumber = 999
+    expect(() => tools.assertTraceRecord(corrupt)).toThrow(/hash/i)
+
+    const dangerous = toPlainObject(valid)
+    dangerous.content = { pieces: [], skills: [], portraitUrl: 'javascript:alert(1)' }
+    expect(() => tools.assertTraceRecord(dangerous)).toThrow(/dangerous|危险|url/i)
+
+    const sensitive = toPlainObject(valid)
+    sensitive.content.privateToken = 'must-not-be-accepted'
+    expect(() => tools.assertTraceRecord(sensitive)).toThrow(/sensitive|token/i)
+
+    const tooDeep = toPlainObject(valid)
+    let cursor = tooDeep.content
+    for (let index = 0; index < 60; index += 1) {
+      cursor.extra = {}
+      cursor = cursor.extra
+    }
+    expect(() => tools.assertTraceRecord(tooDeep)).toThrow(/depth|nesting/i)
+
+    await expect(tools.importTraceFile({
+      size: tools.MAX_TRACE_BYTES + 1,
+      text: async () => JSON.stringify(valid),
+    })).rejects.toThrow(/size|MiB/i)
+
+    expect(toPlainObject(await tools.readStoredTrace())).toEqual(toPlainObject(valid))
   })
 })
 
