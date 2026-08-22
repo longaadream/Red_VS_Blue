@@ -6,6 +6,7 @@
   <title>对战 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/developer-tools/match-trace.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
   <script src="js/game-engine-runtime.js"></script>
@@ -1469,6 +1470,7 @@
     <div class="result-sub" id="resultSub"></div>
     <div id="recordStatus" style="font-size:13px;color:#64748b;margin-top:12px;min-height:18px"></div>
     <button id="recordDownloadBtn" onclick="downloadGameRecord()" style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;margin-top:8px">下载战报</button>
+    <button id="matchTraceDownloadButton" onclick="downloadCompletedMatchTrace()" style="display:none;background:#0c4a6e;color:#e0f2fe;border:1px solid #0284c7;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;margin-top:8px">下载比赛 Trace</button>
     <button style="background:#3b82f6;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px" onclick="goBack()">← 返回大厅</button>
   </div>
 
@@ -1983,6 +1985,9 @@
     let lastActionSeq = -1     // last processed action log seq
     let isHost = false         // am I the room host?
     let gameSeed = null        // shared PRNG seed (from server action log)
+    let latestAuthorityStateHash = null
+    let latestAuthorityVersion = null
+    let completedMatchTraceRecord = null
     let pressTimer = null      // long-press timer
     let playerNames = {}       // playerId → display name, loaded from room
     let playerAlignments = {}  // playerId → authoritative light/dark content alignment
@@ -3414,6 +3419,10 @@
 
     function applyLegacyBattleSnapshot(msg) {
       const actions = msg && Array.isArray(msg.actions) ? msg.actions : []
+      latestAuthorityStateHash = (msg && msg.stateHash) || latestAuthorityStateHash
+      latestAuthorityVersion = msg && Number.isSafeInteger(msg.authorityVersion)
+        ? msg.authorityVersion
+        : latestAuthorityVersion
       if (typeof msg.seed === 'number' && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
         gameSeed = msg.seed
         GameEngine.setRng(GameEngine.mulberry32(msg.seed))
@@ -3459,6 +3468,10 @@
               createBattlePresentationModel(msg.state)
             )
           }
+          latestAuthorityStateHash = msg.stateHash || latestAuthorityStateHash
+          latestAuthorityVersion = Number.isSafeInteger(msg.authorityVersion)
+            ? msg.authorityVersion
+            : latestAuthorityVersion
           applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer)
         } else if (msg.type === 'battleSnapshot') {
           applyLegacyBattleSnapshot(msg)
@@ -3565,6 +3578,10 @@
               createBattlePresentationModel(data.state)
             )
           }
+          latestAuthorityStateHash = data.stateHash || latestAuthorityStateHash
+          latestAuthorityVersion = Number.isSafeInteger(data.authorityVersion)
+            ? data.authorityVersion
+            : latestAuthorityVersion
           applyServerState(data.state, data.seed || null, false, data.serverNow, data.turnTimer)
           return
         }
@@ -5033,6 +5050,48 @@
       return 'info'
     }
 
+    function storeCompletedMatchTrace() {
+      if (TRAINING_MODE || !G || !G.terminalResult || !window.RvBDeveloperTools) return null
+      try {
+        completedMatchTraceRecord = RvBDeveloperTools.createTraceRecord({
+          state: G,
+          roomId,
+          seed: gameSeed,
+          stateHash: latestAuthorityStateHash,
+          authorityVersion: latestAuthorityVersion,
+        })
+      } catch (error) {
+        addLog('[Trace] 无法生成赛后 Trace：' + ((error && error.message) || error), 'err')
+        return null
+      }
+
+      try {
+        Promise.resolve(RvBDeveloperTools.storeCompletedTrace(completedMatchTraceRecord)).catch(function (error) {
+          addLog('[Trace] 本地保存失败，仍可立即下载：' + ((error && error.message) || error), 'err')
+        })
+      } catch (error) {
+        addLog('[Trace] 本地保存失败，仍可立即下载：' + ((error && error.message) || error), 'err')
+      }
+
+      const button = document.getElementById('matchTraceDownloadButton')
+      if (button) button.style.display = ''
+      return completedMatchTraceRecord
+    }
+
+    async function downloadCompletedMatchTrace() {
+      const record = completedMatchTraceRecord
+        || (window.RvBDeveloperTools && await RvBDeveloperTools.readStoredTrace())
+      if (!record || !window.RvBDeveloperTools) {
+        addLog('[Trace] 没有可下载的已结束比赛 Trace', 'err')
+        return
+      }
+      try {
+        RvBDeveloperTools.downloadTrace(record)
+      } catch (error) {
+        addLog('[Trace] 下载失败：' + ((error && error.message) || error), 'err')
+      }
+    }
+
     function handleGameOver() {
       if (!G || !G.terminalResult) return
       const terminalResult = G.terminalResult
@@ -5041,6 +5100,7 @@
       try { localStorage.removeItem('rvb_active_battle') } catch {}
       if (recordSaved) return
       recordSaved = true
+      storeCompletedMatchTrace()
       if (!TRAINING_MODE && !SPECTATE_MODE) {
       // Save battle record locally
       try {
@@ -5439,7 +5499,7 @@
     window.addEventListener('pagehide', disposeBattlePage)
     window.addEventListener('unload', disposeBattlePage)
 
-    // ── Debug modifier panel (backtick key toggle) ────────────────────────────
+    // Escape closes the existing tile details panel.
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         const tilePanel = document.getElementById('tileStatusPanel')
@@ -5448,67 +5508,9 @@
           closeTileStatus()
         }
       }
-      if (e.key === '`' || e.key === '~') {
-        const p = document.getElementById('debugPanel')
-        if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'
-      }
     })
-    function _debugMyPlayer() {
-      if (!G || !myPlayerId) return null
-      return G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-    }
-    function debugSetAP(n) {
-      const mp = _debugMyPlayer(); if (!mp) return
-      mp.actionPoints = Math.max(0, (mp.actionPoints || 0) + n)
-      render(); addLog('[修改器] AP +' + n, 'info')
-    }
-    function debugSetCP(n) {
-      const mp = _debugMyPlayer(); if (!mp) return
-      mp.chargePoints = Math.max(0, (mp.chargePoints || 0) + n)
-      render(); addLog('[修改器] CP +' + n, 'info')
-    }
-    function debugHealSelected(hp) {
-      if (!G || !selectedPieceId) { addLog('[修改器] 未选中棋子', 'err'); return }
-      const p = G.pieces && G.pieces.find(pc => pc.instanceId === selectedPieceId)
-      if (!p) return
-      const max = p.maxHp || (p.stats && p.stats.maxHp) || 1
-      p.currentHp = Math.min(max, (p.currentHp || 0) + hp)
-      render(); addLog('[修改器] 治疗 ' + (p.name || p.instanceId), 'info')
-    }
-    function debugKillSelected() {
-      if (!G || !selectedPieceId) { addLog('[修改器] 未选中棋子', 'err'); return }
-      const p = G.pieces && G.pieces.find(pc => pc.instanceId === selectedPieceId)
-      if (!p) return
-      p.currentHp = 0
-      render(); addLog('[修改器] 击杀 ' + (p.name || p.instanceId), 'info')
-    }
-    function debugResetCooldowns() {
-      if (!G) return
-      const mp = _debugMyPlayer(); if (!mp) return
-      const myPieces = G.pieces && G.pieces.filter(p => p.ownerPlayerId && p.ownerPlayerId.toLowerCase() === myPlayerId)
-      if (!myPieces) return
-      myPieces.forEach(p => {
-        if (p.skills) p.skills.forEach(sk => { sk.currentCooldown = 0 })
-      })
-      render(); addLog('[修改器] 已重置所有CD', 'info')
-    }
   </script>
 
-  <!-- Debug modifier panel (toggle with ` key) -->
-  <div id="debugPanel" style="display:none;position:fixed;top:56px;right:10px;
-    background:rgba(0,0,0,.88);padding:12px 14px;border-radius:10px;z-index:9999;
-    color:#e2e8f0;border:1px solid #334155;min-width:160px;font-size:13px">
-    <div style="font-weight:700;margin-bottom:10px;color:#94a3b8;font-size:11px;letter-spacing:.08em">局内修改器</div>
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <button onclick="debugSetAP(3)"  style="background:#1e3a8a;border:1px solid #3b82f6;border-radius:6px;color:#bfdbfe;padding:5px 8px;cursor:pointer;font-size:12px">AP +3</button>
-      <button onclick="debugSetAP(-1)" style="background:#1e293b;border:1px solid #475569;border-radius:6px;color:#94a3b8;padding:5px 8px;cursor:pointer;font-size:12px">AP -1</button>
-        <div class="legend-item"><div class="legend-dot" style="background:#3b0764"></div>充能点</div>
-      <button onclick="debugHealSelected(999)" style="background:#052e16;border:1px solid #22c55e;border-radius:6px;color:#4ade80;padding:5px 8px;cursor:pointer;font-size:12px">满血 (选中棋子)</button>
-      <button onclick="debugKillSelected()"    style="background:#450a0a;border:1px solid #991b1b;border-radius:6px;color:#fca5a5;padding:5px 8px;cursor:pointer;font-size:12px">击杀 (选中棋子)</button>
-      <button onclick="debugResetCooldowns()"  style="background:#1a1205;border:1px solid #b45309;border-radius:6px;color:#fbbf24;padding:5px 8px;cursor:pointer;font-size:12px">重置所有 CD</button>
-    </div>
-    <div style="margin-top:8px;font-size:10px;color:#475569">按 ` 切换</div>
-  </div>
 
   <!-- Target selection overlay (pointer-events:none so board stays clickable) -->
   <div id="targetOverlay" role="status" aria-live="polite">
