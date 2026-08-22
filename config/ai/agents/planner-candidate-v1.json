@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "agentId": "planner-candidate-v1",
+  "version": "1.0.0",
+  "kind": "planner",
+  "config": {
+    "version": 1,
+    "nodeBudget": 16,
+    "beamWidth": 2,
+    "maxActions": 6,
+    "candidateLimit": 8,
+    "minActionScore": 0,
+    "weights": {
+      "enemyHp": 3,
+      "ownHp": 3,
+      "enemyRemoved": 30,
+      "ownRemoved": -35,
+      "enemyStatusAdded": 4,
+      "ownStatusRemoved": 4,
+      "ownStatusAdded": -2,
+      "enemyStatusRemoved": -2,
+      "goalDistance": 0.6,
+      "safety": 1.5,
+      "resources": 0.15,
+      "ownSummoned": 8,
+      "enemySummoned": -8,
+      "ownTransformed": 4,
+      "enemyTransformed": -4,
+      "endTurn": -0.05,
+      "goal": 15
+    }
+  }
+}

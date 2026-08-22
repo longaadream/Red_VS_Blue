@@ -33,6 +33,8 @@
     "watch:pages": "node scripts/sync-pages.js --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "ai:self-play": "node scripts/ai/run-self-play.mjs",
+    "ai:self-play:report": "node scripts/ai/report-self-play.mjs",
     "benchmark:skillcode-runtime": "node scripts/benchmark-skillcode-runtime.mjs",
     "smoke:electron:windows": "node tests/electron/windows-smoke.mjs",
     "rvb": "node scripts/rvb.mjs",

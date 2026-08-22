@@ -92,8 +92,8 @@ export interface SelfPlayExecutionModeInput {
 
 export interface SelfPlayExecutionMode {
   inProcessConcurrency: 1
-  processCount: number
-  isolation: 'serial-in-process' | 'process'
+  processCount: 1
+  isolation: 'serial-in-process'
   moduleStatePolicy: string
 }
 
@@ -134,6 +134,7 @@ export interface SelfPlayReproduction {
   action?: BattleAction
   errorCode?: string
   errorMessage?: string
+  errorStack?: string
 }
 
 export interface SelfPlayFailure {
@@ -270,6 +271,7 @@ type Decision = {
   action?: CandidateAction
   nodes: number
   traceHash: string
+  countsTowardTurnBudget: boolean
 }
 
 const compareText = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
@@ -373,6 +375,9 @@ export function validateSeedPartitions(partitions: SelfPlaySeedPartitions): Self
     partitions.publicValidation.map((seed, index) => validateRootSeed(seed, `publicValidation[${index}]`)),
     'publicValidation',
   )
+  if (training.length === 0 || publicValidation.length === 0) {
+    throw new SelfPlayContractError('SELF_PLAY_SEED_TIER_EMPTY', 'training and publicValidation seed tiers must not be empty')
+  }
   const overlap = training.filter(seed => publicValidation.includes(seed))
   if (overlap.length) {
     throw new SelfPlayContractError('SELF_PLAY_SEED_OVERLAP', `training/public seed overlap: ${overlap.join(',')}`)
@@ -402,6 +407,9 @@ export function resolveSelfPlaySeeds(
     externalCandidateSeeds.map((seed, index) => validateRootSeed(seed, `candidateHoldout[${index}]`)),
     'candidateHoldout',
   )
+  if (holdout.length === 0) {
+    throw new SelfPlayContractError('SELF_PLAY_SEED_TIER_EMPTY', 'candidate holdout seeds must not be empty')
+  }
   const admitted = new Set([...partitions.training, ...partitions.publicValidation])
   const overlap = holdout.filter(seed => admitted.has(seed))
   if (overlap.length) {
@@ -452,13 +460,17 @@ export function validateSelfPlayExecutionMode(input: SelfPlayExecutionModeInput 
       'In-process concurrency is unsafe because TriggerSystem, RuleRuntime, and dynamic-code cache state are module scoped',
     )
   }
+  if (processCount !== 1) {
+    throw new SelfPlayContractError(
+      'SELF_PLAY_PROCESS_PARALLELISM_NOT_IMPLEMENTED',
+      'Process-parallel orchestration is not implemented; run matches serially until the isolation blocker is resolved',
+    )
+  }
   return {
     inProcessConcurrency: 1,
-    processCount,
-    isolation: processCount === 1 ? 'serial-in-process' : 'process',
-    moduleStatePolicy: processCount === 1
-      ? 'matches execute serially inside one process'
-      : 'each worker process owns independent TriggerSystem, RuleRuntime, RNG, trace, and dynamic-code modules',
+    processCount: 1,
+    isolation: 'serial-in-process',
+    moduleStatePolicy: 'matches execute serially inside one process; process-parallel orchestration is a tracked blocker',
   }
 }
 
@@ -504,7 +516,8 @@ export function buildPairedMatchSchedule(
 }
 
 function chooseSimpleAction(state: BattleState, playerId: string, legal: CandidateAction[]): CandidateAction | undefined {
-  const preferred = generateBotActions(state, playerId)
+  const preparedState = state.skillsById ? state : { ...state, skillsById: {} }
+  const preferred = generateBotActions(preparedState, playerId)
   for (const draft of preferred) {
     const exact = legal.find(item => stableJson(item.action) === stableJson(draft))
     if (exact) return exact
@@ -531,6 +544,24 @@ function chooseRandomAction(
   return legal[index]
 }
 
+function forcedStructuralAction(legal: CandidateAction[]): CandidateAction | undefined {
+  const deploymentLock = legal.find(item => item.kind === 'deployment-lock')
+  if (deploymentLock) return deploymentLock
+  const structuralKinds = new Set<CandidateAction['kind']>([
+    'phase-advance', 'pending-option', 'pending-target', 'cancel-selection',
+  ])
+  return legal.length === 1 && structuralKinds.has(legal[0].kind) ? legal[0] : undefined
+}
+
+function activeSelfPlayPlayer(state: BattleState): 'player-red' | 'player-blue' {
+  const deploymentPlayer = state.deployment?.status === 'awaiting-locks'
+    ? state.deployment.playerIds.find(playerId => state.deployment?.locks[playerId]?.locked !== true)
+    : undefined
+  return (deploymentPlayer ?? state.pendingOptionSelection?.playerId
+    ?? state.pendingTargetSelection?.ownerPlayerId ?? state.pendingTargetSelection?.playerId
+    ?? state.turn.currentPlayerId) as 'player-red' | 'player-blue'
+}
+
 function chooseAgentAction(
   archive: SelfPlayAgentArchive,
   runtime: AgentRuntime,
@@ -538,6 +569,8 @@ function chooseAgentAction(
   playerId: string,
   rootSeed: number,
   environment: AIEnvironment,
+  actionsUsedThisTurn: number,
+  maxActionsPerTurn: number,
 ): Decision {
   const turnKey = `${state.turn.turnNumber}:${playerId}`
   if (runtime.turnKey !== turnKey) {
@@ -545,22 +578,37 @@ function chooseAgentAction(
     runtime.previousPlan = undefined
   }
   runtime.decisions += 1
+  const legal = environment.listLegalActions(state, playerId)
+  const forced = forcedStructuralAction(legal)
+  if (forced) {
+    return {
+      action: forced, nodes: 0,
+      traceHash: hashStable({ kind: archive.kind, forced: forced.kind, action: forced.action }),
+      countsTowardTurnBudget: false,
+    }
+  }
+  const budgetSafetyEnd = archive.kind !== 'planner' && actionsUsedThisTurn + 1 >= maxActionsPerTurn
+    ? legal.find(item => item.kind === 'end-turn')
+    : undefined
   if (archive.kind === 'planner') {
     const config = archive.config!
     const plan = runtime.previousPlan
       ? planNextAiAction(state, playerId, rootSeed, runtime.previousPlan, { environment, config })
       : planAiTurn(state, playerId, rootSeed, { environment, config })
     runtime.previousPlan = plan
-    return { action: plan.nextAction, nodes: plan.nodesVisited, traceHash: aiPlanTraceHash(plan) }
+    return {
+      action: plan.nextAction, nodes: plan.nodesVisited, traceHash: aiPlanTraceHash(plan),
+      countsTowardTurnBudget: true,
+    }
   }
-  const legal = environment.listLegalActions(state, playerId)
   const action = archive.kind === 'simple'
-    ? chooseSimpleAction(state, playerId, legal)
-    : chooseRandomAction(archive, state, playerId, rootSeed, legal, runtime.decisions - 1)
+    ? budgetSafetyEnd ?? chooseSimpleAction(state, playerId, legal)
+    : budgetSafetyEnd ?? chooseRandomAction(archive, state, playerId, rootSeed, legal, runtime.decisions - 1)
   return {
     action,
     nodes: 0,
     traceHash: hashStable({ kind: archive.kind, decision: runtime.decisions - 1, action: action?.action, legal: legal.map(item => item.id) }),
+    countsTowardTurnBudget: true,
   }
 }
 
@@ -577,7 +625,7 @@ function reproduction(
   actionIndex: number,
   playerId: string,
   agentId: string,
-  extra: Partial<Pick<SelfPlayReproduction, 'action' | 'errorCode' | 'errorMessage'>> = {},
+  extra: Partial<Pick<SelfPlayReproduction, 'action' | 'errorCode' | 'errorMessage' | 'errorStack'>> = {},
 ): SelfPlayReproduction {
   return {
     matchId: scheduled.matchId,
@@ -660,13 +708,13 @@ async function runScheduledMatch(
   let rejectedActions = 0
 
   while (!environment.isTerminal(state)) {
-    const playerId = state.turn.currentPlayerId as 'player-red' | 'player-blue'
+    const playerId = activeSelfPlayPlayer(state)
     const archive = archives[playerId]
     const stateHash = environment.stateKey(state, { kind: 'full' })
     const actionIndex = actions.length
     const makeFailure = (
       kind: SelfPlayFailureKind,
-      extra: Partial<Pick<SelfPlayReproduction, 'action' | 'errorCode' | 'errorMessage'>> = {},
+      extra: Partial<Pick<SelfPlayReproduction, 'action' | 'errorCode' | 'errorMessage' | 'errorStack'>> = {},
     ) => failMatch(
       scheduled, state, environment, archives, startedAt, now, actions, decisionNodes, rejectedActions,
       { kind, reproduction: reproduction(scheduled, stateHash, actionIndex, playerId, archive.agentId, extra) },
@@ -676,16 +724,22 @@ async function runScheduledMatch(
     if (state.turn.turnNumber > manifest.budgets.maxTurns) return makeFailure('turn-budget')
     const turnKey = `${state.turn.turnNumber}:${playerId}`
     const usedThisTurn = turnActions.get(turnKey) ?? 0
-    if (usedThisTurn >= manifest.budgets.maxActionsPerTurn) return makeFailure('turn-action-budget')
 
     let decision: Decision
     try {
-      decision = chooseAgentAction(archive, runtime[playerId], state, playerId, scheduled.rootSeed, environment)
+      decision = chooseAgentAction(
+        archive, runtime[playerId], state, playerId, scheduled.rootSeed, environment,
+        usedThisTurn, manifest.budgets.maxActionsPerTurn,
+      )
     } catch (error) {
       return makeFailure('rule-exception', {
         errorCode: (error as { code?: string }).code ?? (error as Error).name,
         errorMessage: (error as Error).message,
+        errorStack: (error as Error).stack,
       })
+    }
+    if (decision.countsTowardTurnBudget && usedThisTurn >= manifest.budgets.maxActionsPerTurn) {
+      return makeFailure('turn-action-budget', { action: decision.action?.action })
     }
     decisionNodes += decision.nodes
     if (decision.nodes > manifest.budgets.maxDecisionNodesPerAction) {
@@ -701,6 +755,7 @@ async function runScheduledMatch(
         action: decision.action.action,
         errorCode: (error as { code?: string }).code ?? (error as Error).name,
         errorMessage: (error as Error).message,
+        errorStack: (error as Error).stack,
       })
     }
     if (!transition.accepted) {
@@ -726,7 +781,7 @@ async function runScheduledMatch(
       decisionNodes: decision.nodes,
       decisionTraceHash: decision.traceHash,
     })
-    turnActions.set(turnKey, usedThisTurn + 1)
+    turnActions.set(turnKey, usedThisTurn + (decision.countsTowardTurnBudget ? 1 : 0))
     state = transition.state
     const nextStateHash = environment.stateKey(state, { kind: 'full' })
     if (!environment.isTerminal(state) && visited.has(nextStateHash)) {
@@ -735,8 +790,8 @@ async function runScheduledMatch(
         {
           kind: 'state-loop',
           reproduction: reproduction(
-            scheduled, nextStateHash, actions.length, state.turn.currentPlayerId,
-            scheduled.seats[state.turn.currentPlayerId as 'player-red' | 'player-blue'].agentId,
+            scheduled, nextStateHash, actions.length, activeSelfPlayPlayer(state),
+            scheduled.seats[activeSelfPlayPlayer(state)].agentId,
             { action: decision.action.action },
           ),
         },
@@ -952,9 +1007,7 @@ export async function runSelfPlaySuite(input: RunSelfPlaySuiteInput): Promise<Se
       transitionsPerSecond: elapsedMs > 0 ? summary.totalActions / (elapsedMs / 1_000) : null,
       gamesPerMinute: elapsedMs > 0 ? matches.length / (elapsedMs / 60_000) : null,
       slowestFixture: slowest ? { matchId: slowest.matchId, durationMs: slowest.durationMs } : undefined,
-      bottleneck: execution.isolation === 'serial-in-process'
-        ? 'module-scoped TriggerSystem/RuleRuntime/cache require serial matches inside a process'
-        : 'worker startup plus the slowest reported fixture; each process remains serial internally',
+      bottleneck: 'module-scoped TriggerSystem/RuleRuntime/cache require serial matches inside a process',
     },
   }
 }
@@ -967,8 +1020,17 @@ export async function replaySelfPlayMatch(
   if (report.schemaVersion !== SELF_PLAY_SCHEMA_VERSION) {
     throw new SelfPlayContractError('SELF_PLAY_REPORT_SCHEMA_UNSUPPORTED', 'report schemaVersion must be 1')
   }
-  const scheduled = report.matches.find(match => match.matchId === matchId)
-  if (!scheduled) throw new SelfPlayContractError('SELF_PLAY_MATCH_NOT_FOUND', `match ${matchId} is not in report`)
+  const archived = report.matches.find(match => match.matchId === matchId)
+  if (!archived) throw new SelfPlayContractError('SELF_PLAY_MATCH_NOT_FOUND', `match ${matchId} is not in report`)
+  const scheduled: ScheduledSelfPlayMatch = {
+    matchId: archived.matchId,
+    pairId: archived.pairId,
+    suiteId: archived.suiteId,
+    rootSeed: archived.rootSeed,
+    lineupId: archived.lineupId,
+    swapIndex: archived.swapIndex,
+    seats: cloneArchive(archived.seats),
+  }
   const agentsById = new Map(report.agentArchives.map(agent => [agent.agentId, canonicalAgentArchive(agent)]))
   const rostersById = new Map(report.rosterArchives.map(roster => [roster.rosterId, validateRosterArchive(roster)]))
   return runScheduledMatch(

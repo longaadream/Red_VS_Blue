@@ -39,6 +39,12 @@ const planner = (agentId: string, historical = false): SelfPlayAgentArchive => (
 })
 
 const candidate = planner('isolation-candidate-v1')
+const simple: SelfPlayAgentArchive = {
+  schemaVersion: 1,
+  agentId: 'isolation-simple-v1',
+  version: '1.0.0',
+  kind: 'simple',
+}
 const champion = planner('isolation-champion-v1', true)
 const rosters: SelfPlayRosterArchive[] = [
   { schemaVersion: 1, rosterId: 'red-isolation-v1', version: '1.0.0', faction: 'red', pieceIds: ['red-a'] },
@@ -79,6 +85,18 @@ async function createCombatState() {
   return state
 }
 
+async function createExtendedCombatState() {
+  const state = await createCombatState()
+  for (const piece of state.pieces) {
+    piece.attack = 1
+    piece.currentHp = 5
+    piece.maxHp = 5
+  }
+  state.players[0].actionPoints = 3
+  state.players[1].actionPoints = 3
+  return state
+}
+
 beforeEach(() => {
   globalTriggerSystem.clearRules()
   dynamicCodeRuntime.clear()
@@ -92,10 +110,10 @@ describe('self-play runtime isolation', () => {
   it('fails closed for shared in-process concurrency and documents process isolation as the only parallel mode', () => {
     expect(validateSelfPlayExecutionMode({ inProcessConcurrency: 1, processCount: 1 }))
       .toMatchObject({ isolation: 'serial-in-process', processCount: 1 })
-    expect(validateSelfPlayExecutionMode({ inProcessConcurrency: 1, processCount: 2 }))
-      .toMatchObject({ isolation: 'process', processCount: 2 })
     expect(() => validateSelfPlayExecutionMode({ inProcessConcurrency: 2, processCount: 2 }))
       .toThrowError(/in-process concurrency.*unsafe/i)
+    expect(() => validateSelfPlayExecutionMode({ inProcessConcurrency: 1, processCount: 2 }))
+      .toThrowError(/process-parallel orchestration.*not implemented/i)
   })
 
   it('repeats paired formal matches without leaking TriggerSystem state, RNG trace, or compiled cache identity', async () => {
@@ -126,5 +144,25 @@ describe('self-play runtime isolation', () => {
     expect(sentinel.limits).toEqual({ maxUses: 10, uses: 0 })
     expect(dynamicCodeRuntime.stats()).toEqual(cacheAfterFirst)
     expect(first.execution).toMatchObject({ isolation: 'serial-in-process', inProcessConcurrency: 1 })
-  })
+  }, 30_000)
+
+  it('adapts canonical cache-stripped states before every Simple AI decision', async () => {
+    const report = await runSelfPlaySuite({
+      manifest: { ...manifest, candidateAgentId: simple.agentId },
+      seedPartitions,
+      explicitSeeds: [801],
+      agentArchives: [simple, champion],
+      rosterArchives: rosters,
+      createInitialState: createExtendedCombatState,
+      environment: aiEnvironmentV1,
+      now: () => 0,
+    })
+
+    const simpleAsRed = report.matches.find(match => match.seats['player-red'].agentId === simple.agentId)
+    expect(simpleAsRed?.actions.filter(action => action.agentId === simple.agentId).length).toBeGreaterThan(1)
+    expect(report.summary.exceptionFailures).toBe(0)
+    expect(report.summary.failures.every(failure =>
+      failure.reproduction.errorMessage?.includes('basic-attack') !== true,
+    )).toBe(true)
+  }, 30_000)
 })

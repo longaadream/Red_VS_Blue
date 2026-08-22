@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "rosterId": "blue-beta-v1",
+  "version": "1.0.0",
+  "faction": "blue",
+  "pieceIds": [
+    "jaina", "liadrin", "tracer", "tyrande",
+    "uther", "ana", "anduin", "blue-watcher"
+  ]
+}
