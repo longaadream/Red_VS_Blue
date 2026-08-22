@@ -67,9 +67,26 @@ export interface BattleReplayFrame {
   postStateHash: string
   preCheckpointHash: string
   postCheckpointHash: string
-  postState: BattleState
+  /** Unchanged static maps inherit from the previous materialized checkpoint. */
+  inheritsMap?: boolean
+  postState: Omit<BattleState, 'map'> & { map?: BattleState['map'] }
   events: Array<Record<string, unknown>>
   randomStreams: RandomStreamTrace[]
+}
+
+export interface BattleReplaySkillContent {
+  skillId: string
+  name: string
+  description?: string
+  type?: string
+  cooldownTurns: number
+  maxCharges: number
+  chargeCost?: number
+  actionPointCost: number
+}
+
+export interface BattleReplayContentSnapshot {
+  skills: BattleReplaySkillContent[]
 }
 
 export interface BattleReplayArchive {
@@ -77,6 +94,7 @@ export interface BattleReplayArchive {
   initialStateHash: string
   initialCheckpointHash: string
   initialState: BattleState
+  content: BattleReplayContentSnapshot
   frames: BattleReplayFrame[]
 }
 
@@ -187,6 +205,7 @@ export function recordBattleInitialization(
   const metadata = getOrCreateDebugMetadata(state)
   const action = { type: 'initializeBattle', playerIds: [...playerIds] }
   const actionHash = hashStable(action)
+  const content = createBattleReplayContentSnapshot(state)
   const canonicalState = withoutReplayRuntimeCaches(state)
   const postStateHash = hashBattleState(canonicalState)
   const trace: BattleActionTrace = {
@@ -216,6 +235,7 @@ export function recordBattleInitialization(
     initialStateHash: postStateHash,
     initialCheckpointHash: hashStable(initialState),
     initialState,
+    content,
     frames: [],
   }
   return trace
@@ -299,6 +319,7 @@ export function createBattleReplayCheckpoint(state: BattleState): BattleState {
   if (!checkpoint || typeof checkpoint !== 'object' || Array.isArray(checkpoint)) {
     throw new Error('Battle replay checkpoint must be a serializable object')
   }
+  delete (checkpoint as Partial<BattleState>).actions
   return checkpoint as BattleState
 }
 
@@ -313,8 +334,12 @@ export function appendBattleReplayFrame(
   const replay = metadata.replay
   if (!replay || replay.format !== BATTLE_REPLAY_FORMAT) return undefined
 
+  replay.content = mergeBattleReplayContentSnapshot(replay.content, createBattleReplayContentSnapshot(afterState))
   const preState = createBattleReplayCheckpoint(beforeState)
-  const postState = createBattleReplayCheckpoint(afterState)
+  const fullPostState = createBattleReplayCheckpoint(afterState)
+  const inheritsMap = stableJson(preState.map) === stableJson(fullPostState.map)
+  const postState: BattleReplayFrame['postState'] = { ...fullPostState }
+  if (inheritsMap) delete postState.map
   const sanitizedAction = sanitizeBattleTraceValue(action) as Record<string, unknown>
   const events = collectCommittedEvents(beforeState.actions, afterState.actions)
   const frame: BattleReplayFrame = {
@@ -330,13 +355,50 @@ export function appendBattleReplayFrame(
     preStateHash: trace.preStateHash,
     postStateHash: trace.postStateHash,
     preCheckpointHash: hashStable(preState),
-    postCheckpointHash: hashStable(postState),
+    postCheckpointHash: hashStable(fullPostState),
+    inheritsMap: inheritsMap || undefined,
     postState,
     events,
     randomStreams: trace.randomStreams.map(stream => ({ ...stream })),
   }
   replay.frames.push(frame)
   return frame
+}
+
+function createBattleReplayContentSnapshot(state: BattleState): BattleReplayContentSnapshot {
+  const skillIds = new Set<string>()
+  const replayPieces = [...(state.pieces ?? []), ...(state.graveyard ?? [])]
+  for (const piece of replayPieces) {
+    for (const skill of piece.skills ?? []) {
+      if (skill?.skillId) skillIds.add(skill.skillId)
+    }
+  }
+
+  const skills = [...skillIds].sort().flatMap(skillId => {
+    const definition = state.skillsById?.[skillId]
+    if (!definition) return []
+    return [{
+      skillId,
+      name: definition.name || skillId,
+      description: definition.description || undefined,
+      type: definition.type || undefined,
+      cooldownTurns: Number.isFinite(definition.cooldownTurns) ? definition.cooldownTurns : 0,
+      maxCharges: Number.isFinite(definition.maxCharges) ? definition.maxCharges : 0,
+      chargeCost: Number.isFinite(definition.chargeCost) ? definition.chargeCost : undefined,
+      actionPointCost: Number.isFinite(definition.actionPointCost) ? definition.actionPointCost : 0,
+    }]
+  })
+  return { skills }
+}
+
+function mergeBattleReplayContentSnapshot(
+  current: BattleReplayContentSnapshot | undefined,
+  next: BattleReplayContentSnapshot,
+): BattleReplayContentSnapshot {
+  const skillsById = new Map<string, BattleReplaySkillContent>()
+  for (const skill of current?.skills ?? []) skillsById.set(skill.skillId, skill)
+  for (const skill of next.skills) skillsById.set(skill.skillId, skill)
+  return { skills: [...skillsById.values()].sort((left, right) => left.skillId.localeCompare(right.skillId)) }
 }
 
 function collectCommittedEvents(

@@ -181,10 +181,10 @@ interface GameLogContext {
 - 页面入口：主菜单“开发者中心”打开 `data/pages/developer-tools.html`；导入成功后由 `data/pages/replay.html` 提供独立只读回放。
 - 局内门禁：两个页面通过 `RvBDeveloperTools.readActiveBattle()` 检查 `rvb_active_battle` 并 fail closed。该标记是产品门禁，不承担服务端授权；真正的数据边界是进行中公开投影删除完整 action trace、applied action IDs 和 replay archive。
 - 隔离边界：固定 seed 场景仍只调用 `createDebugDuel()` 与正式 `runBattleAction()`，不接受 roomId、不创建/读取房间、不发奖励、不写统计。它是开发者中心的次级工具。
-- Trace v2：`recordBattleInitialization()` 保存脱敏初始检查点；正式 Runner 只在成功动作后追加命令、命令后检查点、语义事件、随机流游标与双 hash 链。重复或拒绝动作不追加。
+- Trace v2：`recordBattleInitialization()` 保存脱敏初始检查点和所用技能的最小展示定义；正式 Runner 只在成功动作后追加命令、可物化的命令后检查点、语义事件、随机流游标与双 hash 链。地图不变时以 `inheritsMap` 继承，累计 actions 不重复进入检查点；重复或拒绝动作不追加。
 - 终局导出：只有权威 `terminalResult` 提交后的公开投影携带完整脱敏回放归档。`battle.html` 在终局生成 `rvb-match-trace/v2`、立即下载并保存最近一场。
-- 记录状态回放：回放器把上一检查点作为当前帧的 preState，把当前帧的 postState 作为结果；不调用当前 `runBattleAction()` 或规则数据重算历史。增加角色/规则后，旧 Trace 依赖展示快照和稳定 ID 降级，而不是产生新的比赛结果。
-- 展示复用：`replay.html` 复用正式 `BattleViewModel`、`BattleRenderer3D`、状态展示和战术几何，提供时间轴、逐步/播放、速度、红/蓝/全知视角、棋子详情、事件、差异、随机流与 hash 检查器。
+- 记录状态回放：回放器先继承上一检查点的不变地图，物化当前帧完整 postState，再验 hash 和展示；不调用当前 `runBattleAction()` 或规则数据重算历史。增加角色/规则后，旧 Trace 依赖展示快照和稳定 ID 降级，而不是产生新的比赛结果。
+- 展示复用：`replay.html` 复用正式 `BattleViewModel`、`BattleRenderer3D`、状态展示和战术几何。棋盘覆盖整个视口；帧摘要、底部时间轴/播放控制和按命令/棋子/事件/变化/完整性分组的可折叠检查器作为浮窗。棋子页展示记录时技能定义和该帧的当前冷却、剩余次数、充能与解锁状态。
 - 导入安全：`match-trace.js` 把文件视为不可信输入，限制 32 MiB、深度、节点、数组和字符串预算，拒绝危险键、敏感字段、外部/脚本 URL、版本不符和 hash 链篡改。失败导入不覆盖最近有效记录；导入文本只进入文本节点。
 - 本地存储：最近一场 v2 以 IndexedDB 为主，受限环境才回退 localStorage；回放页不使用 fetch、WebSocket、房间动作、奖励或统计接口。
 - 旧格式：`rvb-match-trace/v1` 没有完整状态检查点，只能作为历史诊断证据，导入时明确提示“旧诊断格式，无法回放”。

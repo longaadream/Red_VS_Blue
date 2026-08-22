@@ -261,12 +261,12 @@
 
 - 页面：`data/pages/developer-tools.html` 从主菜单进入，Trace 导入/最近记录是主功能，固定 seed 隔离场景是次级工具；`data/pages/replay.html` 是独立只读回放页。存在 `rvb_active_battle` 时两页 fail closed。
 - 隔离 API：`app/api/developer-tools/scenario/route.ts::POST` 校验 uint32 seed、地图 ID 与双方内容阵营，只调用 `createDebugDuel()` 和正式 Runner，返回 `rvb-developer-scenario/v1`；不接受 roomId、不持久化、不发奖励、不写统计。
-- 权威记录：`lib/game/battle-trace.ts` 初始化 `rvb-battle-replay/v2` 归档；`runBattleAction()` 只在成功命令后追加 postState、语义事件、随机流和权威/检查点 hash。当前帧的 preState 是上一检查点，不重复存储。
+- 权威记录：`lib/game/battle-trace.ts` 初始化 `rvb-battle-replay/v2` 归档并抓取所用技能的最小展示定义；`runBattleAction()` 只在成功命令后追加可物化 postState、语义事件、随机流和权威/检查点 hash。当前帧的 preState 是上一检查点；地图不变时以 `inheritsMap` 继承，累计 actions 不重复进入检查点。
 - 生命周期：进行中 `PublicBattleSnapshot` 删除 action trace、applied action IDs 和回放归档；只有权威 `terminalResult` 已提交的终局投影保留完整脱敏归档。
-- Trace 导出：`data/pages/js/developer-tools/match-trace.js` 从终局归档生成 `rvb-match-trace/v2`，包含展示内容快照、初始检查点、逐命令帧、终局、摘要和完整性元数据。最近有效记录以 IndexedDB 为主、localStorage 为受限环境回退。
+- Trace 导出：`data/pages/js/developer-tools/match-trace.js` 从终局归档生成紧凑 JSON `rvb-match-trace/v2`，包含展示内容快照、初始检查点、逐命令帧、终局、摘要和完整性元数据。它先物化帧状态再验证检查点 hash。最近有效记录以 IndexedDB 为主、localStorage 为受限环境回退。
 - 导入合同：只接受 v2；v1 明确拒绝为旧诊断格式。导入器限制 32 MiB、深度/节点/数组/字符串预算，拒绝危险键、敏感字段、非法 URL 和不连续或被篡改的双 hash 链；失败不得覆盖最近有效 Trace。
-- 展示边界：`replay-viewer.js` 复用 `battle-view-model.js`、`battle-renderer-3d.js`、`battle-status-presentation.js` 与 `battle-tactical-geometry.js`，提供时间轴、逐步/播放、速度、红/蓝/全知视角、棋子详情、事件、差异、随机流与 hash。它不复制规则，也不调用当前 Runner 重算历史。
-- 向前降级：Trace 携带棋子/技能的最小展示快照；未知角色、技能和事件用稳定 ID 与通用文本显示。未来破坏性合同必须使用新格式版本，不能静默套用当前规则。
+- 展示边界：`replay-viewer.js` 复用 `battle-view-model.js`、`battle-renderer-3d.js`、`battle-status-presentation.js` 与 `battle-tactical-geometry.js`。棋盘覆盖整个视口；时间轴/播放控制与按命令、棋子、事件、变化、完整性分组的可折叠检查器作为浮窗。棋子页显示技能定义与当前冷却/次数/充能/解锁状态。它不复制规则，也不调用当前 Runner 重算历史。
+- 向前降级：Trace 携带棋子/技能的最小展示快照（名称、描述、类型、基础冷却/充能/消耗，不含执行代码）；未知角色、技能和事件用稳定 ID 与通用文本显示。未来破坏性合同必须使用新格式版本，不能静默套用当前规则。
 - 网络边界：开发者中心和回放页不加载 WebSocket、不读取真实房间、不发送动作，也不调用奖励或统计接口。
 - 决策：`docs/decisions/ADR-0016-trace-v2-recorded-state-replay.md`；验收：`docs/qa/RED-94-developer-tools.md`。
 

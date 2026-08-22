@@ -10,11 +10,14 @@
 <body>
   <header class="replay-topbar">
     <a class="back-link" href="developer-tools.html">← 开发者中心</a>
-    <div>
+    <div class="replay-heading">
       <div class="replay-title">Trace 回放器</div>
       <div id="replayHeaderMeta" class="replay-subtitle">正在读取本地 Trace v2…</div>
     </div>
-    <div class="readonly-badge">只读 · 无房间连接</div>
+    <div class="topbar-actions">
+      <div class="readonly-badge">只读 · 无房间连接</div>
+      <button id="replayInspectorToggle" class="control-button inspector-toggle" type="button" aria-expanded="true" aria-controls="replayInspector">检查器</button>
+    </div>
   </header>
 
   <main class="replay-shell">
@@ -22,6 +25,13 @@
 
     <div id="replayWorkspace" class="replay-workspace" hidden>
       <section class="stage-column" aria-label="对局回放棋盘">
+        <div class="board-frame">
+          <div id="replayBoardStage" class="replay-board-stage" data-battle-layer="three-battlefield">
+            <div id="replayFloatLayer" class="board-float-layer"></div>
+          </div>
+          <div class="board-hint">拖动平移 · 滚轮缩放 · 点击棋子检查详情</div>
+        </div>
+
         <div class="frame-strip">
           <div class="frame-primary">
             <div class="frame-kicker">AUTHORITY FRAME</div>
@@ -30,21 +40,14 @@
           <div id="replayFrameMeta" class="frame-meta">第 0 帧</div>
         </div>
 
-        <div class="board-frame">
-          <div id="replayBoardStage" class="replay-board-stage" data-battle-layer="three-battlefield">
-            <div id="replayFloatLayer" class="board-float-layer"></div>
-          </div>
-          <div class="board-hint">拖动平移 · 滚轮缩放 · 点击棋子检查详情</div>
-        </div>
-
         <div class="controls" aria-label="回放控制">
           <div class="control-row">
             <button id="replayPreviousButton" class="control-button" type="button">← 上一命令</button>
             <button id="replayPlayButton" class="control-button primary" type="button">播放</button>
             <button id="replayNextButton" class="control-button" type="button">下一命令 →</button>
             <span class="control-spacer"></span>
-            <label>
-              <span class="empty">倍速</span>
+            <label class="select-control">
+              <span>倍速</span>
               <select id="replaySpeed" class="control-select" aria-label="回放倍速">
                 <option value="0.5">0.5×</option>
                 <option value="1" selected>1×</option>
@@ -52,8 +55,8 @@
                 <option value="4">4×</option>
               </select>
             </label>
-            <label>
-              <span class="empty">视角</span>
+            <label class="select-control">
+              <span>视角</span>
               <select id="replayPerspective" class="control-select" aria-label="回放视角">
                 <option value="omniscient">全知视角</option>
                 <option value="red">红方视角</option>
@@ -70,32 +73,46 @@
         </div>
       </section>
 
-      <aside class="inspector" aria-label="Trace 细节检查器">
-        <section class="panel">
-          <h2>当前命令</h2>
-          <div id="replayCommandDetails" class="detail-grid"></div>
-        </section>
-        <section class="panel">
-          <h2>棋子详情</h2>
-          <p class="panel-subtitle">点击棋盘上的棋子；跳转帧后会读取该帧记录值。</p>
-          <div id="replayPieceDetails" class="empty">尚未选择棋子。</div>
-        </section>
-        <section class="panel">
-          <h2>状态 Hash</h2>
-          <div id="replayHashDetails"></div>
-        </section>
-        <section class="panel">
-          <h2>命令内语义事件</h2>
-          <ul id="replayEventList" class="data-list"></ul>
-        </section>
-        <section class="panel">
-          <h2>关键状态差异</h2>
-          <ul id="replayDiffList" class="data-list"></ul>
-        </section>
-        <section class="panel">
-          <h2>随机流</h2>
-          <ul id="replayRandomStreams" class="data-list"></ul>
-        </section>
+      <aside id="replayInspector" class="inspector" aria-label="Trace 细节检查器" aria-hidden="false">
+        <div class="inspector-header">
+          <div>
+            <div class="frame-kicker">TRACE INSPECTOR</div>
+            <h2>记录细节</h2>
+          </div>
+          <button id="replayInspectorClose" class="icon-button" type="button" aria-label="关闭检查器">×</button>
+        </div>
+        <div id="replayInspectorTabs" class="inspector-tabs" role="tablist" aria-label="检查器内容">
+          <button type="button" role="tab" data-inspector-tab="command" aria-selected="true">命令</button>
+          <button type="button" role="tab" data-inspector-tab="piece" aria-selected="false">棋子</button>
+          <button type="button" role="tab" data-inspector-tab="events" aria-selected="false">事件</button>
+          <button type="button" role="tab" data-inspector-tab="diff" aria-selected="false">变化</button>
+          <button type="button" role="tab" data-inspector-tab="integrity" aria-selected="false">完整性</button>
+        </div>
+        <div class="inspector-scroll">
+          <section class="panel" data-inspector-panel="command">
+            <h2>当前命令</h2>
+            <div id="replayCommandDetails" class="detail-grid"></div>
+          </section>
+          <section class="panel" data-inspector-panel="piece" hidden>
+            <h2>棋子详情</h2>
+            <p class="panel-subtitle">点击棋盘上的棋子；跳转帧后会读取该帧记录值。</p>
+            <div id="replayPieceDetails" class="empty">尚未选择棋子。</div>
+          </section>
+          <section class="panel" data-inspector-panel="events" hidden>
+            <h2>命令内语义事件</h2>
+            <ul id="replayEventList" class="data-list"></ul>
+            <h2 class="section-heading">随机流</h2>
+            <ul id="replayRandomStreams" class="data-list"></ul>
+          </section>
+          <section class="panel" data-inspector-panel="diff" hidden>
+            <h2>关键状态差异</h2>
+            <ul id="replayDiffList" class="data-list"></ul>
+          </section>
+          <section class="panel" data-inspector-panel="integrity" hidden>
+            <h2>状态 Hash</h2>
+            <div id="replayHashDetails"></div>
+          </section>
+        </div>
       </aside>
     </div>
   </main>

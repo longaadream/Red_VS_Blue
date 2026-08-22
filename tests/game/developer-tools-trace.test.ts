@@ -216,6 +216,62 @@ describe('developer tools match trace boundary', () => {
     expect(() => tools.assertTraceRecord(toPlainObject(record))).not.toThrow()
   })
 
+
+  it('keeps a multi-command Trace compact while preserving skills and materialized states', async () => {
+    const tools = loadTraceTools()
+    const duel = await createDebugDuel({ seed: 20260822, beginPhase: false })
+    let state = runBattleAction(duel.state, {
+      type: 'beginPhase',
+      clientActionId: 'compact-begin-red',
+    } as any).state
+    state = runBattleAction(state, {
+      type: 'endTurn',
+      playerId: 'debug-red',
+      clientActionId: 'compact-end-red',
+    } as any).state
+    state = runBattleAction(state, {
+      type: 'beginPhase',
+      clientActionId: 'compact-begin-blue',
+    } as any).state
+    state = runBattleAction(state, {
+      type: 'surrender',
+      playerId: 'debug-blue',
+      reason: 'voluntary',
+      clientActionId: 'compact-surrender-blue',
+    } as any).state
+
+    const replay = (state.extensions as any).debugBattle.replay
+    expect(replay.frames).toHaveLength(4)
+    expect(replay.frames.every((frame: any) => (
+      frame.inheritsMap === true && !Object.hasOwn(frame.postState, 'map')
+    ))).toBe(true)
+
+    const record = tools.createTraceRecord({
+      state: toPublicBattleState(state),
+      roomId: 'compact-runner-integration',
+      seed: 20260822,
+    })
+    expect(record.content.skills.length).toBeGreaterThan(0)
+    expect(record.content.skills).toContainEqual(expect.objectContaining({
+      skillId: 'watcher-form',
+      name: expect.stringMatching(/形态|form/i),
+      cooldownTurns: expect.any(Number),
+    }))
+
+    const finalState = tools.materializeTraceState(record, record.frames.length)
+    expect(finalState).toMatchObject({
+      map: expect.objectContaining({ tiles: expect.any(Array) }),
+      terminalResult: expect.objectContaining({ reason: 'surrender' }),
+    })
+    const watcher = finalState.pieces.find((piece: any) => piece.templateId === 'blue-watcher')
+    expect(watcher.skills).toContainEqual(expect.objectContaining({
+      skillId: 'watcher-ultimate',
+      currentCooldown: 0,
+      usesRemaining: 1,
+    }))
+    expect(Buffer.byteLength(tools.serializeTrace(record), 'utf8')).toBeLessThan(160_000)
+  })
+
   it('rejects legacy, corrupt and dangerous imports without replacing the recent trace', async () => {
     const tools = loadTraceTools()
     const valid = tools.createTraceRecord({
@@ -239,6 +295,14 @@ describe('developer tools match trace boundary', () => {
     const corrupt = toPlainObject(valid)
     corrupt.frames[0].postState.turn.turnNumber = 999
     expect(() => tools.assertTraceRecord(corrupt)).toThrow(/hash/i)
+
+    const ambiguousMap = toPlainObject(valid)
+    ambiguousMap.frames[0].inheritsMap = true
+    expect(() => tools.assertTraceRecord(ambiguousMap)).toThrow(/inherit.*map|map.*inherit/i)
+
+    const missingMap = toPlainObject(valid)
+    delete missingMap.frames[0].postState.map
+    expect(() => tools.assertTraceRecord(missingMap)).toThrow(/map/i)
 
     const dangerous = toPlainObject(valid)
     dangerous.content = { pieces: [], skills: [], portraitUrl: 'javascript:alert(1)' }

@@ -9,6 +9,7 @@
   var playTimer = null
   var pieceTemplates = {}
   var skillsById = {}
+  var materializedStates = []
 
   var workspace = document.getElementById('replayWorkspace')
   var errorBox = document.getElementById('replayError')
@@ -18,6 +19,10 @@
   var nextButton = document.getElementById('replayNextButton')
   var speedSelect = document.getElementById('replaySpeed')
   var perspectiveSelect = document.getElementById('replayPerspective')
+  var inspector = document.getElementById('replayInspector')
+  var inspectorToggle = document.getElementById('replayInspectorToggle')
+  var inspectorClose = document.getElementById('replayInspectorClose')
+  var inspectorTabs = document.getElementById('replayInspectorTabs')
 
   function showError(message) {
     stopPlayback()
@@ -65,8 +70,7 @@
   }
 
   function stateAt(index) {
-    if (index <= 0) return trace.initialState
-    return trace.frames[index - 1].postState
+    return materializedStates[index] || trace.initialState
   }
 
   function frameAt(index) {
@@ -219,12 +223,26 @@
     addDetail(grid, '移动', valueOr(piece.moveRange || (piece.stats && piece.stats.moveRange), 0))
     container.appendChild(grid)
 
-    var skills = normalizeSkillIds(piece.skills)
+    var skills = normalizeSkillStates(piece.skills)
     var skillList = createElement('ul', 'data-list')
-    skills.forEach(function (skillId) {
+    skills.forEach(function (skillState) {
+      var skillId = skillState.skillId
       var definition = skillsById[skillId] || {}
-      var used = Array.isArray(piece.usedSkills) && piece.usedSkills.indexOf(skillId) !== -1
-      appendDataItem(skillList, definition.name || skillId, (definition.description || '记录技能 ID：' + skillId) + (used ? '\n当前帧：已使用 / 冷却中' : ''))
+      var currentCooldown = numberOr(skillState.currentCooldown, 0)
+      var cooldownTurns = numberOr(definition.cooldownTurns, 0)
+      var usesRemaining = numberOr(skillState.usesRemaining, -1)
+      var lines = []
+      if (definition.description) lines.push(definition.description)
+      lines.push('当前冷却：' + (currentCooldown > 0 ? currentCooldown + ' 回合' : '0（就绪）'))
+      lines.push('基础冷却：' + cooldownTurns + ' 回合')
+      lines.push('剩余次数：' + (usesRemaining < 0 ? '无限' : String(usesRemaining)))
+      if (Number.isFinite(skillState.currentCharges)) {
+        var maxCharges = Number.isFinite(definition.maxCharges) && definition.maxCharges > 0 ? ' / ' + definition.maxCharges : ''
+        lines.push('当前充能：' + skillState.currentCharges + maxCharges)
+      }
+      lines.push('状态：' + (skillState.unlocked === false ? '未解锁' : '已解锁'))
+      lines.push('技能 ID：' + skillId)
+      appendDataItem(skillList, definition.name || skillId, lines.join('\n'))
     })
     if (skills.length) {
       container.appendChild(createElement('h3', 'data-item-title', '技能与冷却'))
@@ -243,10 +261,17 @@
     }
   }
 
-  function normalizeSkillIds(skills) {
+  function normalizeSkillStates(skills) {
     return (Array.isArray(skills) ? skills : []).map(function (skill) {
-      return typeof skill === 'string' ? skill : String(skill && (skill.skillId || skill.id) || '')
+      if (typeof skill === 'string') return { skillId: skill }
+      if (!skill || typeof skill !== 'object') return null
+      var skillId = String(skill.skillId || skill.id || '')
+      return skillId ? Object.assign({}, skill, { skillId: skillId }) : null
     }).filter(Boolean)
+  }
+
+  function numberOr(value, fallback) {
+    return Number.isFinite(value) ? Number(value) : fallback
   }
 
   function valueOr(value, fallback) {
@@ -316,8 +341,8 @@
       appendDataItem(list, '初始状态', '从第 1 个命令开始显示命令前后的关键状态差异。')
       return
     }
-    var beforeState = currentIndex <= 1 ? trace.initialState : trace.frames[currentIndex - 2].postState
-    var diffs = collectKeyDiffs(beforeState, frame.postState)
+    var beforeState = stateAt(currentIndex - 1)
+    var diffs = collectKeyDiffs(beforeState, stateAt(currentIndex))
     if (!diffs.length) {
       appendDataItem(list, '没有关键字段变化', '命令可能只改变了未列出的诊断字段；完整前后状态仍保存在 Trace 中。')
       return
@@ -456,7 +481,41 @@
     scheduleNextFrame()
   }
 
+  function setInspectorOpen(open) {
+    inspector.classList.toggle('is-collapsed', !open)
+    inspector.setAttribute('aria-hidden', String(!open))
+    inspector.inert = !open
+    inspectorToggle.setAttribute('aria-expanded', String(open))
+  }
+
+  function activateInspectorTab(name) {
+    inspectorTabs.querySelectorAll('[data-inspector-tab]').forEach(function (button) {
+      button.setAttribute('aria-selected', String(button.getAttribute('data-inspector-tab') === name))
+    })
+    inspector.querySelectorAll('[data-inspector-panel]').forEach(function (panel) {
+      panel.hidden = panel.getAttribute('data-inspector-panel') !== name
+    })
+  }
+
+  function openPieceInspector() {
+    setInspectorOpen(true)
+    activateInspectorTab('piece')
+  }
   function bindControls() {
+    inspectorToggle.addEventListener('click', function () {
+      setInspectorOpen(inspector.classList.contains('is-collapsed'))
+    })
+    inspectorClose.addEventListener('click', function () {
+      setInspectorOpen(false)
+      inspectorToggle.focus()
+    })
+    inspectorTabs.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-inspector-tab]')
+      if (button) activateInspectorTab(button.getAttribute('data-inspector-tab'))
+    })
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') setInspectorOpen(false)
+    })
     playButton.addEventListener('click', togglePlayback)
     previousButton.addEventListener('click', function () {
       stopPlayback()
@@ -492,6 +551,7 @@
       trace = await RvBDeveloperTools.readStoredTrace()
       if (!trace) throw new Error('没有可回放的 Trace v2。请返回开发者中心导入一份合法文件。')
       RvBDeveloperTools.assertTraceRecord(trace)
+      materializedStates = RvBDeveloperTools.materializeTraceStates(trace)
       buildContentLookup(trace)
 
       document.getElementById('replayHeaderMeta').textContent =
@@ -508,6 +568,7 @@
           if (!intent) return
           if (intent.type === 'inspect-piece' && intent.pieceId) {
             selectedPieceId = intent.pieceId
+            openPieceInspector()
             setFrame(currentIndex, false)
             return
           }
@@ -518,6 +579,7 @@
             })
             if (piece) {
               selectedPieceId = piece.instanceId || piece.id
+              openPieceInspector()
               setFrame(currentIndex, false)
             }
           }

@@ -155,7 +155,7 @@
         stateVersion: integerOrNull(state._v),
         stateHash: finalStateHash,
         checkpointHash: finalFrame
-          ? (finalFrame.postCheckpointHash || hashStable(finalFrame.postState))
+          ? (finalFrame.postCheckpointHash || hashStable(materializeTraceState(replay, frames.length)))
           : (replay.initialCheckpointHash || hashStable(replay.initialState)),
         mapId: stringOrNull(state.map && state.map.id),
         turnNumber: integerOrNull(state.turn && state.turn.turnNumber),
@@ -179,14 +179,63 @@
     return assertTraceRecord(record)
   }
 
+  function materializeReplayFrame(previousState, frame, index) {
+    if (!frame || !frame.postState || typeof frame.postState !== 'object') {
+      throw new Error('Trace frame postState is missing at ' + index)
+    }
+    if (frame.inheritsMap === true) {
+      if (!previousState || !previousState.map) {
+        throw new Error('Trace frame cannot inherit a missing map at ' + index)
+      }
+      return Object.assign({}, frame.postState, { map: previousState.map })
+    }
+    return frame.postState
+  }
+
+  function materializeTraceStates(record) {
+    requireObject(record && record.initialState, 'initialState')
+    if (!Array.isArray(record.frames)) throw new Error('Trace frames must be an array')
+    var states = [record.initialState]
+    var previousState = record.initialState
+    record.frames.forEach(function (frame, index) {
+      previousState = materializeReplayFrame(previousState, frame, index)
+      states.push(previousState)
+    })
+    return states
+  }
+
+  function materializeTraceState(record, index) {
+    if (!Number.isSafeInteger(index) || index < 0 || index > record.frames.length) {
+      throw new Error('Trace state index is out of range')
+    }
+    return materializeTraceStates(record)[index]
+  }
+
   function createContentSnapshot(state, replay) {
     var pieceMap = {}
     var skillMap = {}
-    var states = [replay.initialState]
-    replay.frames.forEach(function (frame) {
-      if (frame && frame.postState) states.push(frame.postState)
-    })
+    var states = materializeTraceStates(replay)
     states.push(state)
+
+    function addSkill(skillId, skill) {
+      if (!skillId || skillMap[skillId]) return
+      skill = skill || {}
+      skillMap[skillId] = {
+        skillId: skillId,
+        name: stringOrNull(skill.name) || skillId,
+        description: stringOrNull(skill.description),
+        type: stringOrNull(skill.type),
+        cost: sanitize(skill.cost || null),
+        cooldownTurns: integerOrNull(skill.cooldownTurns),
+        maxCharges: integerOrNull(skill.maxCharges),
+        chargeCost: integerOrNull(skill.chargeCost),
+        actionPointCost: integerOrNull(skill.actionPointCost),
+      }
+    }
+
+    ;(replay.content && Array.isArray(replay.content.skills) ? replay.content.skills : []).forEach(function (skill) {
+      addSkill(stringOrNull(skill && skill.skillId), skill)
+    })
 
     states.forEach(function (snapshot) {
       ;(Array.isArray(snapshot && snapshot.pieces) ? snapshot.pieces : []).forEach(function (piece) {
@@ -211,15 +260,7 @@
       var skills = snapshot && snapshot.skillsById
       if (skills && typeof skills === 'object') {
         Object.keys(skills).forEach(function (skillId) {
-          if (skillMap[skillId]) return
-          var skill = skills[skillId] || {}
-          skillMap[skillId] = {
-            skillId: skillId,
-            name: stringOrNull(skill.name) || skillId,
-            description: stringOrNull(skill.description),
-            cost: sanitize(skill.cost || null),
-            cooldown: integerOrNull(skill.cooldown),
-          }
+          addSkill(skillId, skills[skillId])
         })
       }
     })
@@ -229,7 +270,6 @@
       skills: Object.keys(skillMap).sort().map(function (key) { return skillMap[key] }),
     }
   }
-
   function safeAssetId(value) {
     if (typeof value !== 'string' || !value) return null
     if (/^\s*(?:https?:|javascript:|vbscript:|data:)/i.test(value)) return null
@@ -279,7 +319,14 @@
         throw new Error('Trace frame actionType is missing at ' + index)
       }
       requireObject(frame.postState, 'frames[' + index + '].postState')
-      requireBattleCheckpoint(frame.postState, 'frames[' + index + '].postState')
+      if (frame.inheritsMap !== undefined && frame.inheritsMap !== true) {
+        throw new Error('Trace frame inheritsMap is invalid at ' + index)
+      }
+      if (frame.inheritsMap === true && Object.prototype.hasOwnProperty.call(frame.postState, 'map')) {
+        throw new Error('Trace frame cannot both inherit and contain a map at ' + index)
+      }
+      var materializedState = materializeReplayFrame(previousState, frame, index)
+      requireBattleCheckpoint(materializedState, 'frames[' + index + '].postState')
       if (!Array.isArray(frame.events)) throw new Error('Trace frame events must be an array at ' + index)
       frame.events.forEach(function (event, eventIndex) {
         requireObject(event, 'frames[' + index + '].events[' + eventIndex + ']')
@@ -313,11 +360,11 @@
       if (preCheckpointHash !== previousCheckpointHash || hashStable(previousState) !== preCheckpointHash) {
         throw new Error('Trace checkpoint chain mismatch at frame ' + index)
       }
-      if (hashStable(frame.postState) !== postCheckpointHash) {
+      if (hashStable(materializedState) !== postCheckpointHash) {
         throw new Error('Trace post-state checkpoint hash mismatch at frame ' + index)
       }
 
-      previousState = frame.postState
+      previousState = materializedState
       previousAuthorityHash = postAuthorityHash
       previousCheckpointHash = postCheckpointHash
     })
@@ -553,9 +600,13 @@
     return 'rvb-trace-v2-' + room + (timestamp ? '-' + timestamp : '') + '.json'
   }
 
+  function serializeTrace(record) {
+    return JSON.stringify(assertTraceRecord(record))
+  }
+
   function downloadTrace(record) {
     var checked = assertTraceRecord(record)
-    var blob = new Blob([JSON.stringify(checked, null, 2)], { type: 'application/json;charset=utf-8' })
+    var blob = new Blob([serializeTrace(checked)], { type: 'application/json;charset=utf-8' })
     var url = URL.createObjectURL(blob)
     var link = document.createElement('a')
     link.href = url
@@ -716,6 +767,9 @@
     hashStable: hashStable,
     createTraceRecord: createTraceRecord,
     assertTraceRecord: assertTraceRecord,
+    materializeTraceStates: materializeTraceStates,
+    materializeTraceState: materializeTraceState,
+    serializeTrace: serializeTrace,
     parseTraceText: parseTraceText,
     importTraceFile: importTraceFile,
     storeCompletedTrace: storeCompletedTrace,
