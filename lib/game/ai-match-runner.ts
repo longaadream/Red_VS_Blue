@@ -60,6 +60,7 @@ export interface SelfPlayLineup {
 export interface SelfPlaySuiteManifest {
   schemaVersion: typeof SELF_PLAY_SCHEMA_VERSION
   suiteId: string
+  evaluationScope?: 'baseline' | 'smoke'
   seedTier: SelfPlaySeedTier
   candidateAgentId: string
   opponentAgentIds: string[]
@@ -92,9 +93,24 @@ export interface SelfPlayExecutionModeInput {
 
 export interface SelfPlayExecutionMode {
   inProcessConcurrency: 1
-  processCount: 1
-  isolation: 'serial-in-process'
+  processCount: number
+  isolation: 'serial-in-process' | 'match-process-isolated'
   moduleStatePolicy: string
+}
+
+export interface SelfPlayProgressEvent {
+  kind: 'match-started' | 'action-completed' | 'match-completed'
+  matchId: string
+  pairId: string
+  rootSeed: number
+  lineupId: string
+  swapIndex: 0 | 1
+  actionCount: number
+  maxActions: number
+  turnNumber: number
+  status?: SelfPlayMatchRecord['status']
+  failureKind?: SelfPlayFailureKind
+  durationMs?: number
 }
 
 export interface SelfPlayActionRecord {
@@ -212,7 +228,7 @@ export interface SelfPlayReport {
   summary: SelfPlaySummary
   promotionGate: {
     hardGatePassed: boolean
-    status: 'eligible-for-human-review' | 'hard-gate-failed'
+    status: 'eligible-for-human-review' | 'smoke-passed' | 'hard-gate-failed'
     competitiveEvidence: string[]
     note: string
   }
@@ -242,6 +258,18 @@ export interface RunSelfPlaySuiteInput {
   environment?: AIEnvironment
   execution?: SelfPlayExecutionModeInput
   now?: () => number
+  hardware?: string
+  onProgress?: (event: SelfPlayProgressEvent) => void
+}
+
+export interface BuildSelfPlayReportInput {
+  manifest: SelfPlaySuiteManifest
+  seeds: number[]
+  agentArchives: SelfPlayAgentArchive[]
+  rosterArchives: SelfPlayRosterArchive[]
+  execution: SelfPlayExecutionMode
+  matches: SelfPlayMatchRecord[]
+  elapsedMs: number
   hardware?: string
 }
 
@@ -426,6 +454,9 @@ function validateManifest(manifest: SelfPlaySuiteManifest) {
     throw new SelfPlayContractError('SELF_PLAY_MANIFEST_SCHEMA_UNSUPPORTED', 'suite schemaVersion must be 1')
   }
   requireString(manifest.suiteId, 'suiteId')
+  if (manifest.evaluationScope !== undefined && !['baseline', 'smoke'].includes(manifest.evaluationScope)) {
+    throw new SelfPlayContractError('SELF_PLAY_EVALUATION_SCOPE_INVALID', 'evaluationScope must be baseline or smoke')
+  }
   requireString(manifest.candidateAgentId, 'candidateAgentId')
   requireString(manifest.rulesHash, 'rulesHash')
   requireString(manifest.contentHash, 'contentHash')
@@ -471,6 +502,18 @@ export function validateSelfPlayExecutionMode(input: SelfPlayExecutionModeInput 
     processCount: 1,
     isolation: 'serial-in-process',
     moduleStatePolicy: 'matches execute serially inside one process; process-parallel orchestration is a tracked blocker',
+  }
+}
+
+export function createSelfPlayProcessExecutionMode(processCount = 1): SelfPlayExecutionMode {
+  requirePositiveInteger(processCount, 'processCount')
+  return {
+    inProcessConcurrency: 1,
+    processCount,
+    isolation: 'match-process-isolated',
+    moduleStatePolicy: processCount === 1
+      ? 'each match executes serially in a fresh child process; the child exits before the next match starts'
+      : `at most ${processCount} fresh child processes execute one serial match each; no process shares mutable rule runtime state`,
   }
 }
 
@@ -686,6 +729,7 @@ async function runScheduledMatch(
   createInitialState: RunSelfPlaySuiteInput['createInitialState'],
   environment: AIEnvironment,
   now: () => number,
+  onProgress?: RunSelfPlaySuiteInput['onProgress'],
 ): Promise<SelfPlayMatchRecord> {
   const startedAt = now()
   const archives = {
@@ -697,6 +741,14 @@ async function runScheduledMatch(
     'player-blue': rostersById.get(scheduled.seats['player-blue'].rosterId)!,
   }
   let state = await createInitialState({ ...scheduled, agents: archives, rosters })
+  onProgress?.({
+    kind: 'match-started',
+    matchId: scheduled.matchId, pairId: scheduled.pairId,
+    rootSeed: scheduled.rootSeed, lineupId: scheduled.lineupId, swapIndex: scheduled.swapIndex,
+    actionCount: 0,
+    maxActions: manifest.budgets.maxActionsPerMatch,
+    turnNumber: state.turn.turnNumber,
+  })
   const runtime: Record<'player-red' | 'player-blue', AgentRuntime> = {
     'player-red': { decisions: 0 },
     'player-blue': { decisions: 0 },
@@ -783,6 +835,14 @@ async function runScheduledMatch(
     })
     turnActions.set(turnKey, usedThisTurn + (decision.countsTowardTurnBudget ? 1 : 0))
     state = transition.state
+    onProgress?.({
+      kind: 'action-completed',
+      matchId: scheduled.matchId, pairId: scheduled.pairId,
+      rootSeed: scheduled.rootSeed, lineupId: scheduled.lineupId, swapIndex: scheduled.swapIndex,
+      actionCount: actions.length,
+      maxActions: manifest.budgets.maxActionsPerMatch,
+      turnNumber: state.turn.turnNumber,
+    })
     const nextStateHash = environment.stateKey(state, { kind: 'full' })
     if (!environment.isTerminal(state) && visited.has(nextStateHash)) {
       return failMatch(
@@ -953,26 +1013,121 @@ function selectedSeeds(input: RunSelfPlaySuiteInput): number[] {
   return explicit
 }
 
-export async function runSelfPlaySuite(input: RunSelfPlaySuiteInput): Promise<SelfPlayReport> {
+function prepareSelfPlayRun(input: RunSelfPlaySuiteInput) {
   validateManifest(input.manifest)
   validateSeedPartitions(input.seedPartitions)
   const execution = validateSelfPlayExecutionMode(input.execution)
   const seeds = selectedSeeds(input)
-  const { canonicalAgents, canonicalRosters, agentsById, rostersById } = validateArchives(
+  const archives = validateArchives(
     input.manifest, input.agentArchives, input.rosterArchives,
   )
+  return { execution, seeds, ...archives }
+}
+
+function emitMatchCompleted(
+  onProgress: RunSelfPlaySuiteInput['onProgress'],
+  match: SelfPlayMatchRecord,
+  maxActions: number,
+) {
+  onProgress?.({
+    kind: 'match-completed',
+    matchId: match.matchId, pairId: match.pairId,
+    rootSeed: match.rootSeed, lineupId: match.lineupId, swapIndex: match.swapIndex,
+    actionCount: match.actionCount,
+    maxActions,
+    turnNumber: match.actions.at(-1)?.turnNumber ?? 0,
+    status: match.status,
+    failureKind: match.failure?.kind,
+    durationMs: match.durationMs,
+  })
+}
+
+export async function runSelfPlayMatch(
+  input: RunSelfPlaySuiteInput,
+  scheduled: ScheduledSelfPlayMatch,
+): Promise<SelfPlayMatchRecord> {
+  const prepared = prepareSelfPlayRun(input)
+  const expected = buildPairedMatchSchedule(input.manifest, prepared.seeds)
+    .find(match => match.matchId === scheduled.matchId)
+  if (!expected || hashStable(expected) !== hashStable(scheduled)) {
+    throw new SelfPlayContractError(
+      'SELF_PLAY_SCHEDULE_MISMATCH',
+      `scheduled match ${scheduled.matchId} is not part of the selected deterministic suite schedule`,
+    )
+  }
   const environment = input.environment ?? aiEnvironmentV1
   const now = input.now ?? (() => performance.now())
-  const suiteStartedAt = now()
-  const matches: SelfPlayMatchRecord[] = []
-  for (const scheduled of buildPairedMatchSchedule(input.manifest, seeds)) {
-    matches.push(await runScheduledMatch(
-      scheduled, input.manifest, agentsById, rostersById, input.createInitialState, environment, now,
-    ))
+  const match = await runScheduledMatch(
+    expected, input.manifest, prepared.agentsById, prepared.rostersById,
+    input.createInitialState, environment, now, input.onProgress,
+  )
+  emitMatchCompleted(input.onProgress, match, input.manifest.budgets.maxActionsPerMatch)
+  return match
+}
+
+function scheduledMatchProjection(match: ScheduledSelfPlayMatch): ScheduledSelfPlayMatch {
+  return {
+    matchId: match.matchId,
+    pairId: match.pairId,
+    suiteId: match.suiteId,
+    rootSeed: match.rootSeed,
+    lineupId: match.lineupId,
+    swapIndex: match.swapIndex,
+    seats: cloneArchive(match.seats),
   }
-  const elapsedMs = Math.max(0, now() - suiteStartedAt)
+}
+
+export function buildSelfPlayReport(input: BuildSelfPlayReportInput): SelfPlayReport {
+  validateManifest(input.manifest)
+  const seeds = unique(
+    input.seeds.map((seed, index) => validateRootSeed(seed, `seeds[${index}]`)),
+    'seeds',
+  )
+  const { canonicalAgents, canonicalRosters } = validateArchives(
+    input.manifest, input.agentArchives, input.rosterArchives,
+  )
+  if (!Number.isFinite(input.elapsedMs) || input.elapsedMs < 0) {
+    throw new SelfPlayContractError('SELF_PLAY_ELAPSED_INVALID', 'elapsedMs must be a finite non-negative number')
+  }
+  if (input.execution.inProcessConcurrency !== 1) {
+    throw new SelfPlayContractError(
+      'SELF_PLAY_IN_PROCESS_CONCURRENCY_UNSAFE',
+      'Report execution must preserve inProcessConcurrency=1',
+    )
+  }
+  requirePositiveInteger(input.execution.processCount, 'execution.processCount')
+  if (!['serial-in-process', 'match-process-isolated'].includes(input.execution.isolation)) {
+    throw new SelfPlayContractError('SELF_PLAY_EXECUTION_MODE_INVALID', 'unsupported report execution isolation')
+  }
+
+  const schedule = buildPairedMatchSchedule(input.manifest, seeds)
+  const matchesById = new Map<string, SelfPlayMatchRecord>()
+  for (const match of input.matches) {
+    if (matchesById.has(match.matchId)) {
+      throw new SelfPlayContractError('SELF_PLAY_MATCH_DUPLICATE', `duplicate match record ${match.matchId}`)
+    }
+    matchesById.set(match.matchId, match)
+  }
+  if (matchesById.size !== schedule.length) {
+    throw new SelfPlayContractError(
+      'SELF_PLAY_MATCH_SET_INCOMPLETE',
+      `report has ${matchesById.size} matches but deterministic schedule requires ${schedule.length}`,
+    )
+  }
+  const matches = schedule.map(scheduled => {
+    const match = matchesById.get(scheduled.matchId)
+    if (!match || hashStable(scheduledMatchProjection(match)) !== hashStable(scheduled)) {
+      throw new SelfPlayContractError(
+        'SELF_PLAY_MATCH_SCHEDULE_MISMATCH',
+        `match record ${scheduled.matchId} does not match the deterministic schedule`,
+      )
+    }
+    return match
+  })
+
   const summary = summarize(matches)
   const hardGatePassed = summary.failures.length === 0 && summary.finishedMatches === summary.totalMatches
+  const smokeOnly = input.manifest.evaluationScope === 'smoke'
   const slowest = [...matches].sort((left, right) => right.durationMs - left.durationMs)[0]
   return {
     schemaVersion: SELF_PLAY_SCHEMA_VERSION,
@@ -986,30 +1141,63 @@ export async function runSelfPlaySuite(input: RunSelfPlaySuiteInput): Promise<Se
     agentArchives: canonicalAgents,
     rosterArchives: canonicalRosters,
     agentConfigHashes: Object.fromEntries(canonicalAgents.map(agent => [agent.agentId, agentConfigHash(agent)])),
-    execution,
+    execution: cloneArchive(input.execution),
     matches,
     summary,
     promotionGate: {
       hardGatePassed,
-      status: hardGatePassed ? 'eligible-for-human-review' : 'hard-gate-failed',
+      status: hardGatePassed
+        ? smokeOnly ? 'smoke-passed' : 'eligible-for-human-review'
+        : 'hard-gate-failed',
       competitiveEvidence: [
         'win-matrix', 'seat-splits', 'roster-splits', 'seed-splits',
         'worst-match', 'illegal-action-rate', 'termination-and-budget-gates', 'decision-node-stats',
       ],
       note: hardGatePassed
-        ? 'Legality and termination gates passed; competitive results require multi-split human review and do not auto-promote by Elo.'
+        ? smokeOnly
+          ? 'Smoke legality and termination gates passed; this paired sample is not a full baseline or promotion evidence.'
+          : 'Legality and termination gates passed; competitive results require multi-split human review and do not auto-promote by Elo.'
         : 'At least one legality, termination, loop, budget, or exception gate failed; competitive comparison is blocked.',
     },
     performance: {
       hardware: input.hardware ?? 'not-recorded',
-      processCount: execution.processCount,
-      elapsedMs,
-      transitionsPerSecond: elapsedMs > 0 ? summary.totalActions / (elapsedMs / 1_000) : null,
-      gamesPerMinute: elapsedMs > 0 ? matches.length / (elapsedMs / 60_000) : null,
+      processCount: input.execution.processCount,
+      elapsedMs: input.elapsedMs,
+      transitionsPerSecond: input.elapsedMs > 0 ? summary.totalActions / (input.elapsedMs / 1_000) : null,
+      gamesPerMinute: input.elapsedMs > 0 ? matches.length / (input.elapsedMs / 60_000) : null,
       slowestFixture: slowest ? { matchId: slowest.matchId, durationMs: slowest.durationMs } : undefined,
-      bottleneck: 'module-scoped TriggerSystem/RuleRuntime/cache require serial matches inside a process',
+      bottleneck: input.execution.isolation === 'match-process-isolated'
+        ? 'each child process runs one match; peak memory and throughput scale with --processes'
+        : 'module-scoped TriggerSystem/RuleRuntime/cache require serial matches inside a process',
     },
   }
+}
+
+export async function runSelfPlaySuite(input: RunSelfPlaySuiteInput): Promise<SelfPlayReport> {
+  const prepared = prepareSelfPlayRun(input)
+  const environment = input.environment ?? aiEnvironmentV1
+  const now = input.now ?? (() => performance.now())
+  const suiteStartedAt = now()
+  const matches: SelfPlayMatchRecord[] = []
+  for (const scheduled of buildPairedMatchSchedule(input.manifest, prepared.seeds)) {
+    const match = await runScheduledMatch(
+      scheduled, input.manifest, prepared.agentsById, prepared.rostersById,
+      input.createInitialState, environment, now, input.onProgress,
+    )
+    matches.push(match)
+    emitMatchCompleted(input.onProgress, match, input.manifest.budgets.maxActionsPerMatch)
+  }
+  const elapsedMs = Math.max(0, now() - suiteStartedAt)
+  return buildSelfPlayReport({
+    manifest: input.manifest,
+    seeds: prepared.seeds,
+    agentArchives: prepared.canonicalAgents,
+    rosterArchives: prepared.canonicalRosters,
+    execution: prepared.execution,
+    matches,
+    elapsedMs,
+    hardware: input.hardware,
+  })
 }
 
 export async function replaySelfPlayMatch(
@@ -1041,5 +1229,6 @@ export async function replaySelfPlayMatch(
     options.createInitialState,
     options.environment ?? aiEnvironmentV1,
     options.now ?? (() => performance.now()),
+    undefined,
   )
 }

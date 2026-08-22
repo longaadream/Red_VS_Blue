@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  createSelfPlayProcessExecutionMode,
   runSelfPlaySuite,
   validateSelfPlayExecutionMode,
   type SelfPlayAgentArchive,
@@ -107,13 +108,15 @@ afterEach(() => {
 })
 
 describe('self-play runtime isolation', () => {
-  it('fails closed for shared in-process concurrency and documents process isolation as the only parallel mode', () => {
+  it('fails closed for shared runtime concurrency and exposes match-process isolation to the CLI orchestrator', () => {
     expect(validateSelfPlayExecutionMode({ inProcessConcurrency: 1, processCount: 1 }))
       .toMatchObject({ isolation: 'serial-in-process', processCount: 1 })
     expect(() => validateSelfPlayExecutionMode({ inProcessConcurrency: 2, processCount: 2 }))
       .toThrowError(/in-process concurrency.*unsafe/i)
     expect(() => validateSelfPlayExecutionMode({ inProcessConcurrency: 1, processCount: 2 }))
       .toThrowError(/process-parallel orchestration.*not implemented/i)
+    expect(createSelfPlayProcessExecutionMode(2))
+      .toMatchObject({ isolation: 'match-process-isolated', inProcessConcurrency: 1, processCount: 2 })
   })
 
   it('repeats paired formal matches without leaking TriggerSystem state, RNG trace, or compiled cache identity', async () => {

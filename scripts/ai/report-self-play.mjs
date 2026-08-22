@@ -28,13 +28,16 @@ function render(report) {
   if (report.schemaVersion !== 1) throw new Error(`Unsupported report schemaVersion ${report.schemaVersion}`)
   const summary = report.summary
   const performance = report.performance
+  const scope = report.manifest?.evaluationScope === 'smoke'
+    ? '- Scope: **paired human smoke only; not full-baseline or promotion evidence**\n'
+    : ''
   const failures = summary.failures.length
     ? summary.failures.map(failure => `- ${failure.kind}: \`${failure.reproduction.matchId}\` seed=${failure.reproduction.rootSeed} action=${failure.reproduction.actionIndex} state=${failure.reproduction.stateHash}`).join('\n')
     : '- None'
   return `# Self-play report: ${report.suiteId}
 
 - Gate: **${report.promotionGate.status}**
-- Schema: ${report.schemaVersion}
+${scope}- Schema: ${report.schemaVersion}
 - Commit: \`${report.codeCommit}\`
 - Rules hash: \`${report.rulesHash}\`
 - Content hash: \`${report.contentHash}\`

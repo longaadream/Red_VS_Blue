@@ -8,8 +8,11 @@ import {
   SELF_PLAY_SCHEMA_VERSION,
   agentConfigHash,
   buildPairedMatchSchedule,
+  buildSelfPlayReport,
+  createSelfPlayProcessExecutionMode,
   replaySelfPlayMatch,
   resolveSelfPlaySeeds,
+  runSelfPlayMatch,
   runSelfPlaySuite,
   validateAgentArchive,
   validateSeedPartitions,
@@ -262,6 +265,7 @@ describe('offline self-play league and evaluation baseline', () => {
   it('loads the committed fixed suite as immutable self-contained archives', () => {
     const read = (path: string) => JSON.parse(readFileSync(resolve(process.cwd(), path), 'utf8'))
     const suite = read('config/ai/suites/fixed-baseline-v1.json')
+    const smoke = read('config/ai/suites/human-smoke-v1.json')
     const partitions = read('config/ai/seeds.v1.json')
     const agents = suite.agentArchiveFiles.map((path: string) => read(path)) as SelfPlayAgentArchive[]
     const rosters = suite.rosterArchiveFiles.map((path: string) => read(path)) as SelfPlayRosterArchive[]
@@ -286,6 +290,13 @@ describe('offline self-play league and evaluation baseline', () => {
       ...suite, rulesHash: 'rules', contentHash: 'content', codeCommit: 'fixture-commit',
     }, partitions.publicValidation)
     expect(schedule).toHaveLength(suite.opponentAgentIds.length * suite.lineups.length * 2)
+    const smokeSchedule = buildPairedMatchSchedule({
+      ...smoke, rulesHash: 'rules', contentHash: 'content', codeCommit: 'fixture-commit',
+    }, partitions.publicValidation)
+    expect(smoke.suiteId).toBe('human-smoke-v1')
+    expect(smoke.evaluationScope).toBe('smoke')
+    expect(smoke.opponentAgentIds).toEqual(['simple-v1'])
+    expect(smokeSchedule).toHaveLength(2)
   })
 
   it('builds paired seat swaps for every seed, lineup, and historical opponent', () => {
@@ -349,6 +360,71 @@ describe('offline self-play league and evaluation baseline', () => {
     })
     expect(recovered.status).toBe('finished')
     expect(recovered.failure).toBeUndefined()
+  })
+
+  it('runs one scheduled match with live progress and deterministically aggregates isolated results', async () => {
+    const fixtureManifest = manifest({ lineups: [manifest().lineups[0]] })
+    const schedule = buildPairedMatchSchedule(fixtureManifest, [201])
+    const events: Array<{ kind: string; actionCount: number }> = []
+    const input = {
+      manifest: fixtureManifest,
+      seedPartitions: SEEDS,
+      explicitSeeds: [201],
+      agentArchives: [CANDIDATE, CHAMPION],
+      rosterArchives: ROSTERS,
+      createInitialState: createFixtureState,
+      environment: decisiveEnvironment(),
+      now: () => 0,
+    }
+    const first = await runSelfPlayMatch({
+      ...input,
+      onProgress: event => events.push({ kind: event.kind, actionCount: event.actionCount }),
+    }, schedule[0])
+    const second = await runSelfPlayMatch(input, schedule[1])
+
+    expect(events[0]).toEqual({ kind: 'match-started', actionCount: 0 })
+    expect(events.some(event => event.kind === 'action-completed' && event.actionCount > 0)).toBe(true)
+    expect(events.at(-1)).toEqual({ kind: 'match-completed', actionCount: first.actionCount })
+
+    const report = buildSelfPlayReport({
+      manifest: fixtureManifest,
+      seeds: [201],
+      agentArchives: [CANDIDATE, CHAMPION],
+      rosterArchives: ROSTERS,
+      execution: createSelfPlayProcessExecutionMode(2),
+      matches: [second, first],
+      elapsedMs: 1_000,
+      hardware: 'fixture',
+    })
+    expect(report.matches.map(match => match.matchId)).toEqual(schedule.map(match => match.matchId))
+    expect(report.execution).toMatchObject({
+      isolation: 'match-process-isolated', inProcessConcurrency: 1, processCount: 2,
+    })
+    expect(report.summary.totalMatches).toBe(2)
+    expect(report.performance.transitionsPerSecond).toBe(report.summary.totalActions)
+    const smokeReport = buildSelfPlayReport({
+      manifest: { ...fixtureManifest, evaluationScope: 'smoke' },
+      seeds: [201],
+      agentArchives: [CANDIDATE, CHAMPION],
+      rosterArchives: ROSTERS,
+      execution: createSelfPlayProcessExecutionMode(1),
+      matches: [first, second],
+      elapsedMs: 1_000,
+    })
+    expect(smokeReport.promotionGate).toMatchObject({
+      hardGatePassed: true,
+      status: 'smoke-passed',
+    })
+    expect(smokeReport.promotionGate.note).toMatch(/not a full baseline or promotion evidence/i)
+    expect(() => buildSelfPlayReport({
+      manifest: fixtureManifest,
+      seeds: [201],
+      agentArchives: [CANDIDATE, CHAMPION],
+      rosterArchives: ROSTERS,
+      execution: createSelfPlayProcessExecutionMode(1),
+      matches: [first],
+      elapsedMs: 1,
+    })).toThrowError(/requires 2/i)
   })
 
   it('excludes forced structural actions and ends legal-random turns before the strategy budget is exhausted', async () => {

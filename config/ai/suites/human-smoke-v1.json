@@ -1,28 +1,19 @@
 {
   "schemaVersion": 1,
-  "suiteId": "fixed-baseline-v1",
-  "evaluationScope": "baseline",
+  "suiteId": "human-smoke-v1",
+  "evaluationScope": "smoke",
   "seedTier": "public-validation",
   "candidateAgentId": "planner-candidate-v1",
-  "opponentAgentIds": ["simple-v1", "planner-champion-v1", "legal-random-v1"],
+  "opponentAgentIds": ["simple-v1"],
   "agentArchiveFiles": [
     "config/ai/agents/planner-candidate-v1.json",
-    "config/ai/agents/simple-v1.json",
-    "config/ai/agents/planner-champion-v1.json",
-    "config/ai/agents/legal-random-v1.json"
+    "config/ai/agents/simple-v1.json"
   ],
   "rosterArchiveFiles": [
-    "config/ai/rosters/red-alpha-v1.json",
-    "config/ai/rosters/blue-alpha-v1.json",
     "config/ai/rosters/red-beta-v1.json",
     "config/ai/rosters/blue-beta-v1.json"
   ],
   "lineups": [
-    {
-      "lineupId": "alpha",
-      "candidateRosterId": "red-alpha-v1",
-      "opponentRosterId": "blue-alpha-v1"
-    },
     {
       "lineupId": "beta",
       "candidateRosterId": "red-beta-v1",

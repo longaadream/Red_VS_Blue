@@ -59,15 +59,31 @@
 
 只有所有比赛合法并终止后，状态才是 `eligible-for-human-review`。这不是自动晋升。竞争证据至少同时包含胜负矩阵、座位/阵容/seed 拆分、最差对局、非法动作率、终止/预算统计和决策节点统计；不得只凭单一 Elo 宣布通过。
 
-## 6. 执行隔离与已知 blocker
+## 6. 逐局进程隔离、进度与恢复
 
 当前 TriggerSystem、RuleRuntime 活跃作用域和动态代码缓存仍是模块级进程状态。RED-84 的同步 `runBattleActionIsolated()` 会在每次 transition 后恢复 TriggerSystem，编译缓存只复用不可变函数；测试证明连续成对比赛的 trace/终局 hash 一致，sentinel Rule 限制不变化，第二次运行不产生新的编译缓存身份。
 
-本任务明确只允许 `inProcessConcurrency=1` 且 `processCount=1`。任何更高值以稳定错误失败关闭。安全多进程分片、汇总与单/多进程吞吐量对照由后续 blocker 实现；在此之前不得用 `Promise.all` 并发完整规则归约，也不得把“计划中的进程隔离”写成已通过。
+CLI 不在同一个运行时中并发规则归约，而是把确定性 schedule 拆成“每个子进程只跑一局”：
+
+- 默认 `--processes 1`，上一局子进程退出并释放模块缓存与动作状态后才启动下一局；
+- `--processes N` 只并发 N 个相互隔离的子进程，每个子进程内部始终 `inProcessConcurrency=1`；
+- 父进程按原 schedule 稳定排序汇总，不按子进程完成顺序改变报告；
+- 每 20 个已接受动作输出局号、动作预算、回合、已用时间和 ETA；
+- 每局完成后覆盖写入 `*.checkpoint.json`。中断后用 `--resume <checkpoint>` 只补未完成局；检查点必须匹配 commit、rules/content hash、seed 和档案 commitment，否则失败关闭。
+
+并行数会近似线性增加峰值内存。16 GiB 开发机人工验收建议保持默认 `--processes 1`；`--processes 2` 仅用于有余量时缩短完整基线时间。
 
 ## 7. 命令与产物
 
-运行固定公开基准：
+人工快速验收（一个固定 opponent/lineup/seed，自动红蓝换边，共 2 局）：
+
+```powershell
+npm.cmd run ai:self-play:smoke
+```
+
+`human-smoke-v1` 的版本化 manifest 标记 `evaluationScope: smoke`；通过时机器报告状态是 `smoke-passed`。它只验收真实规则环境、逐局隔离、进度、检查点和成对报告链路，不能代替 12 局固定基线，也不能作为候选晋升证据。
+
+运行 12 局固定公开基准：
 
 ```powershell
 npm.cmd run ai:self-play
@@ -77,14 +93,17 @@ npm.cmd run ai:self-play
 
 ```powershell
 npm.cmd run ai:self-play -- --suite config/ai/suites/fixed-baseline-v1.json --seeds 2001 --output output/ai-self-play/manual.json
+npm.cmd run ai:self-play -- --processes 2
+npm.cmd run ai:self-play -- --resume output/ai-self-play/manual.checkpoint.json
 npm.cmd run ai:self-play:report -- output/ai-self-play/manual.json --output output/ai-self-play/manual.md
 ```
 
-第一条命令在无 UI、网络和数据库环境中动态打包 Node runner，写出：
+命令在无 UI、网络和数据库环境中动态打包 Node runner，写出：
 
 - 完整版本化 JSON 报告；
 - 每局一行的 `*.matches.ndjson` 原始记录；
 - 只含矩阵、门禁和性能的 `*.summary.json`。
+- 可中断恢复的 `*.checkpoint.json`，其中仅保存已经完整结束的局。
 
 默认输出位于 `output/ai-self-play/`，文件以独占创建方式写入，不覆盖旧报告。大体积报告、私有 seed 和训练产物不得提交仓库。
 
