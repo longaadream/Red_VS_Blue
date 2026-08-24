@@ -391,6 +391,11 @@ function getSourceAvailabilityIssue(
   sourcePiece: PieceInstance,
   actionId: string,
 ): InvalidActionPreparation | undefined {
+  const hasSilenceBlock = sourcePiece.rules?.some(rule => rule.id === 'rule-silenced-block') === true
+  if (hasSilenceBlock && hasStatus(sourcePiece, 'silenced')) {
+    return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Source piece is silenced' }
+  }
+
   if (actionId === 'holy-blast' && !hasStatus(sourcePiece, 'divine-shield')) {
     return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Holy Blast requires divine shield' }
   }
