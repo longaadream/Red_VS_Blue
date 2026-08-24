@@ -1966,6 +1966,11 @@
     let skillsById = {}        // loaded locally from ./data/skills/
     let PIECES_BY_ID = {}      // loaded locally from ./data/pieces/
     let cardsById = {}         // loaded locally from ./data/cards/
+    const cardDisplayMetadataById = Object.create(null)
+    const cardDisplayMetadataRequests = new Map()
+    const cardDisplayMetadataFailures = new Set()
+    const cardDisplayMetadataLoggedErrors = new Set()
+    let battlePageDisposed = false
     let keywordGlossaryByName = {}
     let selectedPieceId = null
     let pendingMove = false
@@ -2970,6 +2975,153 @@
       const res = await RvBUtils.serverFetch(path, { timeoutMs: timeoutMs || 3500 })
       if (!res.ok) throw new Error('HTTP ' + res.status)
       return res.json()
+    }
+
+    function reportCardDisplayMetadataFailure(cardId, error) {
+      const stableCardId = typeof cardId === 'string' && cardId ? cardId : String(cardId || 'unknown')
+      const reason = error && error.message ? error.message : String(error || 'unknown error')
+      const key = stableCardId + ':' + reason
+      if (cardDisplayMetadataLoggedErrors.has(key)) return
+      cardDisplayMetadataLoggedErrors.add(key)
+      console.error('[battle] card display metadata unavailable:', {
+        cardId: stableCardId,
+        reason: reason,
+      })
+    }
+
+    function isStableCardId(cardId) {
+      return typeof cardId === 'string' && /^[a-z0-9][a-z0-9_-]{0,127}$/i.test(cardId)
+    }
+
+    function isTrustedCardArtName(image) {
+      if (typeof image !== 'string' || !image || image.length > 240) return false
+      if (!/\.(?:jpe?g|png|webp)$/i.test(image)) return false
+      if (image.includes('\\') || image.includes('\0') || image.includes(':') || image.includes('?') || image.includes('#')) return false
+      const segments = image.split('/')
+      return segments.every(function(segment) {
+        return !!segment && segment !== '.' && segment !== '..' && /^[a-z0-9][a-z0-9._-]*$/i.test(segment)
+      })
+    }
+
+    function cardArtSource(cardId, image) {
+      if (!image) return null
+      if (!isTrustedCardArtName(image)) {
+        reportCardDisplayMetadataFailure(cardId, new Error('invalid local card art identifier'))
+        return null
+      }
+      return 'images/card-art/' + image
+    }
+
+    function sanitizeCardDisplayMetadata(cardId, raw) {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new Error('invalid card metadata payload')
+      }
+      if (raw.id != null && raw.id !== cardId) {
+        throw new Error('card metadata id mismatch')
+      }
+      if (typeof raw.name !== 'string' || !raw.name.trim()) {
+        throw new Error('card metadata name missing')
+      }
+      if (typeof raw.description !== 'string') {
+        throw new Error('card metadata description missing')
+      }
+      if (typeof raw.actionPointCost !== 'number' || !Number.isFinite(raw.actionPointCost) || raw.actionPointCost < 0) {
+        throw new Error('card metadata cost invalid')
+      }
+      if (!['active', 'reactive', 'passive'].includes(raw.type)) {
+        throw new Error('card metadata type invalid')
+      }
+      if (raw.image && !isTrustedCardArtName(raw.image)) {
+        throw new Error('invalid local card art identifier')
+      }
+
+      const display = {
+        id: cardId,
+        name: raw.name,
+        description: raw.description,
+        actionPointCost: raw.actionPointCost,
+        type: raw.type,
+      }
+      if (raw.image) display.image = raw.image
+      const cooldownTurns = raw.cooldownTurns ?? raw.cooldown
+      if (typeof cooldownTurns === 'number' && Number.isFinite(cooldownTurns) && cooldownTurns >= 0) {
+        display.cooldownTurns = cooldownTurns
+      }
+      return display
+    }
+
+    function getCardDisplayDefinition(cardId) {
+      return cardsById[cardId]
+        || (G && G.customCards && G.customCards[cardId])
+        || cardDisplayMetadataById[cardId]
+        || {}
+    }
+
+    function currentHandHasCard(cardId) {
+      if (!G || !Array.isArray(G.players)) return false
+      const player = G.players.find(function(candidate) {
+        return candidate.playerId && candidate.playerId.toLowerCase() === myPlayerId
+      })
+      return !!(player && Array.isArray(player.hand) && player.hand.some(function(card) {
+        return card && card.cardId === cardId
+      }))
+    }
+
+    async function loadCardDisplayMetadata(cardId) {
+      if (!isStableCardId(cardId)) {
+        reportCardDisplayMetadataFailure(cardId, new Error('invalid stable cardId'))
+        return null
+      }
+      const localDefinition = cardsById[cardId] || (G && G.customCards && G.customCards[cardId])
+      if (localDefinition) return localDefinition
+      if (cardDisplayMetadataById[cardId]) return cardDisplayMetadataById[cardId]
+      if (TRAINING_MODE || wsMode !== 'lan' || battlePageDisposed || cardDisplayMetadataFailures.has(cardId)) return null
+      if (cardDisplayMetadataRequests.has(cardId)) return cardDisplayMetadataRequests.get(cardId)
+
+      let request = null
+      request = (async function() {
+        try {
+          const raw = await fetchServerJson('/api/cards/' + encodeURIComponent(cardId), 3500)
+          const display = sanitizeCardDisplayMetadata(cardId, raw)
+          if (battlePageDisposed) return null
+          cardDisplayMetadataById[cardId] = display
+          if (currentHandHasCard(cardId)) renderHand()
+          return display
+        } catch (error) {
+          if (!battlePageDisposed) {
+            cardDisplayMetadataFailures.add(cardId)
+            reportCardDisplayMetadataFailure(cardId, error)
+          }
+          return null
+        } finally {
+          if (cardDisplayMetadataRequests.get(cardId) === request) {
+            cardDisplayMetadataRequests.delete(cardId)
+          }
+        }
+      })()
+      cardDisplayMetadataRequests.set(cardId, request)
+      return request
+    }
+
+    function ensureHandCardDisplayMetadata(hand) {
+      if (TRAINING_MODE || wsMode !== 'lan' || battlePageDisposed || !Array.isArray(hand)) {
+        return Promise.resolve([])
+      }
+      const seen = new Set()
+      const loads = []
+      hand.forEach(function(card) {
+        const cardId = card && card.cardId
+        if (seen.has(cardId)) return
+        seen.add(cardId)
+        if (!isStableCardId(cardId)) {
+          reportCardDisplayMetadataFailure(cardId, new Error('invalid stable cardId'))
+          return
+        }
+        const existing = getCardDisplayDefinition(cardId)
+        if (existing.id || existing.name) return
+        loads.push(loadCardDisplayMetadata(cardId))
+      })
+      return Promise.all(loads)
     }
 
     async function loadServerBattleDataFallback() {
@@ -4298,6 +4450,7 @@
       if (!G) return
       const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
       const hand = (myMeta && myMeta.hand) || []
+      ensureHandCardDisplayMetadata(hand)
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const ap = myMeta ? myMeta.actionPoints : 0
 
@@ -4324,7 +4477,7 @@
       }
 
       container.innerHTML = hand.map((card, index) => {
-        const def = cardsById[card.cardId] || (G.customCards && G.customCards[card.cardId]) || {}
+        const def = getCardDisplayDefinition(card.cardId)
         const cost = card.actionPointCost ?? def.actionPointCost ?? 0
         const canPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
         const isPending = pendingCardAction && pendingCardAction.cardInstanceId === card.instanceId
@@ -4337,7 +4490,7 @@
         const gemCls = cost === 0 ? 'free' : ''
         const icon = escHtml(String(def.name || card.cardId || '牌').slice(0, 1))
         const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
-        const artSrc = def.image ? `images/card-art/${def.image}` : null
+        const artSrc = cardArtSource(card.cardId, def.image)
         const artContent = artSrc
           ? `<img src="${artSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:8px 8px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:28px;width:100%;height:100%;align-items:center;justify-content:center">${icon}</span>`
           : `<span style="font-size:28px">${icon}</span>`
@@ -5485,6 +5638,8 @@
       }
     })
     function disposeBattlePage() {
+      battlePageDisposed = true
+      cardDisplayMetadataRequests.clear()
       if (pollTimer) clearInterval(pollTimer)
       pollTimer = null
       if (deploymentStatusTimer) clearInterval(deploymentStatusTimer)

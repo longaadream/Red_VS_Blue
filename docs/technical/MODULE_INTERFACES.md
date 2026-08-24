@@ -270,6 +270,16 @@
 - 网络边界：开发者中心和回放页不加载 WebSocket、不读取真实房间、不发送动作，也不调用奖励或统计接口。
 - 决策：`docs/decisions/ADR-0016-trace-v2-recorded-state-replay.md`；验收：`docs/qa/RED-94-developer-tools.md`。
 
+### 9.5 离线 AI 报告到 Trace v2 的适配边界（RED-103）
+
+- 入口：`scripts/ai/export-self-play-replay.mjs`；`--list` 查看报告对局，`--match <1-based index|matchId>` 与 `--output` 只导出一局。
+- 共享初始化：`lib/game/ai-self-play-setup.ts::createSelfPlayInitialState()` 同时供 RED-87 runner 与 RED-103 重放使用，保持 roster、地图、seed、部署与先手合同一致。
+- 权威重放：`lib/game/ai-self-play-replay.ts::replayRecordedSelfPlayMatch()` 逐条执行报告动作，不调用 agent 决策；核对每步 action/state/transition/trace hash、整局 action/state/final hash、agent config 与终局证据。
+- 版本门禁：schema、codeCommit 对应的权威 game code、rulesHash 或 contentHash 不兼容时失败；失败或非终局 match、拒绝动作、未知选择也失败，不产生最终 Trace。
+- Trace 合同：重放成功后的终局状态已经由正式 Runner 记录 `rvb-battle-replay/v2`；CLI 复用 `match-trace.js` 的创建、严格校验与紧凑序列化，不创建第二套回放 schema 或页面。
+- 来源元数据：v2 `source` 仅携带报告/suite/match/seed/seat/agent/roster/原始终局 hash 的安全标识，不携带输入/输出路径或敏感字段。
+- 测试：`tests/game/ai-self-play-replay.test.ts`、`tests/game/developer-tools-trace.test.ts`；人工验收见 `docs/qa/RED-103-ai-self-play-trace.md`。
+
 ## 10. Electron IPC
 
 - 入口：各 `preload.ts` 暴露的 `electronAPI`/`editorAPI`，以及 `ipcMain` handler。
