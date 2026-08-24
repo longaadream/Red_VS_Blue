@@ -21,8 +21,10 @@ import {
   type SelfPlaySeedPartitions,
   type SelfPlaySuiteManifest,
 } from '@/lib/game/ai-match-runner'
+import { aiEnvironmentV1 } from '@/lib/game/ai-environment'
 import { hashStable } from '@/lib/game/battle-trace'
 import type { AIEnvironment, CandidateAction, TransitionResult } from '@/lib/game/ai-types'
+import { loadRuleById } from '@/lib/game/skills'
 import type { BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -65,6 +67,19 @@ const RANDOM: SelfPlayAgentArchive = {
   version: '1.0.0',
   kind: 'legal-random',
   testOnly: true,
+}
+
+const SIMPLE: SelfPlayAgentArchive = {
+  schemaVersion: 1,
+  agentId: 'simple-red-106-v1',
+  version: '1.0.0',
+  kind: 'simple',
+}
+
+const SIMPLE_HISTORY: SelfPlayAgentArchive = {
+  ...SIMPLE,
+  agentId: 'simple-red-106-history-v1',
+  historical: true,
 }
 
 const ROSTERS: SelfPlayRosterArchive[] = [
@@ -234,6 +249,59 @@ function randomBudgetEnvironment(): AIEnvironment {
       return result(next, selected)
     },
   }
+}
+
+function silencedSkillLoopEnvironment(): AIEnvironment {
+  return {
+    ...aiEnvironmentV1,
+    simulate: (state, input, context) => {
+      const selected = 'action' in input ? input : candidate('direct', input, 'phase-advance')
+      const formal = aiEnvironmentV1.simulate(state, selected, context)
+      if (!formal.accepted || selected.action.type === 'useBasicSkill' || selected.action.type === 'useChargeSkill') {
+        return formal
+      }
+      const next = formal.state
+      const winnerPlayerId = state.turn.currentPlayerId
+      const loserPlayerId = winnerPlayerId === 'player-red' ? 'player-blue' : 'player-red'
+      next.terminalResult = {
+        status: 'finished', winnerPlayerId, loserPlayerId, reason: 'core-eliminated',
+        settledAt: {
+          actionIndex: 1, actionType: selected.action.type, actorPlayerId: winnerPlayerId,
+          turnNumber: next.turn.turnNumber, phase: next.turn.phase, completedRound: 0,
+        },
+      }
+      return result(next, selected)
+    },
+  }
+}
+
+async function createSilencedSkillLoopState() {
+  const rule = loadRuleById('rule-silenced-block', true)
+  if (!rule) throw new Error('Expected rule-silenced-block fixture')
+  const red = makePiece({
+    instanceId: 'red-silenced-core', ownerPlayerId: 'player-red', x: 0, y: 0,
+    attack: 100, moveRange: 1, rules: [rule],
+    statusTags: [{ id: 'silenced-red-core', type: 'silenced', relatedRules: ['rule-silenced-block'] }],
+  }) as any
+  const blue = makePiece({
+    instanceId: 'blue-core', ownerPlayerId: 'player-blue', faction: 'blue', x: 1, y: 0, moveRange: 1,
+  }) as any
+  red.isCore = true
+  blue.isCore = true
+  red.skills = [
+    { skillId: 'basic-attack', currentCooldown: 0, usesRemaining: -1 },
+    { skillId: 'illidan-metamorphosis', currentCooldown: 0, usesRemaining: 1 },
+  ]
+  const state = makeState({ pieces: [red, blue], currentPlayerId: 'player-red', width: 2, height: 1 }) as any
+  state.players[0].actionPoints = 10
+  state.players[0].chargePoints = 20
+  state.skillsById['basic-attack'] = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'data/skills/basic-attack.json'), 'utf8'),
+  )
+  state.skillsById['illidan-metamorphosis'] = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'data/skills/illidan-metamorphosis.json'), 'utf8'),
+  )
+  return state
 }
 
 async function createFixtureState() {
@@ -457,6 +525,69 @@ describe('offline self-play league and evaluation baseline', () => {
       expect(match.actions[3].action.type).toBe('endTurn')
       expect(match.actions[4].action.type).toBe('beginPhase')
     }
+  })
+
+  it('finishes a fixed-seed self-play regression without repeating a silenced skill or tripping hard gates', async () => {
+    const fixtureManifest = manifest({
+      evaluationScope: 'smoke',
+      candidateAgentId: SIMPLE.agentId,
+      opponentAgentIds: [SIMPLE_HISTORY.agentId],
+      lineups: [manifest().lineups[0]],
+      budgets: {
+        maxActionsPerMatch: 2,
+        maxActionsPerTurn: 10,
+        maxTurns: 2,
+        maxDecisionNodesPerAction: 8,
+      },
+    })
+    const initial = await createSilencedSkillLoopState()
+    const initialCandidates = aiEnvironmentV1.listLegalActions(initial, 'player-red')
+    const report = await runSelfPlaySuite({
+      manifest: fixtureManifest,
+      seedPartitions: SEEDS,
+      explicitSeeds: [201],
+      agentArchives: [SIMPLE, SIMPLE_HISTORY],
+      rosterArchives: ROSTERS,
+      createInitialState: createSilencedSkillLoopState,
+      environment: silencedSkillLoopEnvironment(),
+      now: () => 0,
+    })
+
+    const leakedSkills = initialCandidates.filter(item => item.kind === 'basic-skill' || item.kind === 'charge-skill')
+    if (leakedSkills.length > 0) {
+      expect(report.summary.failures.map(failure => failure.kind)).toEqual(['action-budget', 'action-budget'])
+      expect(report.matches.flatMap(match => match.actions).map(action => action.action.type)).toEqual([
+        'useBasicSkill', 'useBasicSkill', 'useBasicSkill', 'useBasicSkill',
+      ])
+    }
+    expect(initialCandidates.some(item => item.kind === 'basic-skill' || item.kind === 'charge-skill')).toBe(false)
+    expect(report.summary.failures).toEqual([])
+    expect(report.promotionGate).toMatchObject({ hardGatePassed: true, status: 'smoke-passed' })
+    expect(report.matches.every(match => match.status === 'finished' && !match.failure)).toBe(true)
+    expect(report.matches.every(match => match.rejectedActions === 0 && match.actionCount === 1)).toBe(true)
+    expect(report.matches.flatMap(match => match.actions).every(action => action.action.type === 'endTurn')).toBe(true)
+    expect({
+      rootSeed: report.matches[0].rootSeed,
+      candidateIds: initialCandidates.map(item => item.id),
+      actionTraceHashes: report.matches.map(match => match.actionTraceHash),
+      stateTraceHashes: report.matches.map(match => match.stateTraceHash),
+      terminal: report.matches.map(match => [match.status, match.terminalReason]),
+    }).toEqual({
+      rootSeed: 201,
+      candidateIds: ['candidate-568558ec42b23fcad766ce1d'],
+      actionTraceHashes: [
+        'f857d7516d0bcdb05c1ea32e05157d28e9322c7245b950115f71dc172db6af0d',
+        'f857d7516d0bcdb05c1ea32e05157d28e9322c7245b950115f71dc172db6af0d',
+      ],
+      stateTraceHashes: [
+        '7ac0837cbbf6a8eb858074f12c0fbb0259ec3300ad6511b6851bd4986e739a6a',
+        '7ac0837cbbf6a8eb858074f12c0fbb0259ec3300ad6511b6851bd4986e739a6a',
+      ],
+      terminal: [
+        ['finished', 'core-eliminated'],
+        ['finished', 'core-eliminated'],
+      ],
+    })
   })
 
   it.each([
