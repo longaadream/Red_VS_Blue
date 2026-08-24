@@ -142,6 +142,7 @@
       roomId: stringOrNull(input.roomId),
       seed: seed,
       authorityVersion: integerOrNull(input.authorityVersion),
+      source: sanitize(input.source),
       integrity: {
         algorithm: 'sha256-stable-json',
         checkpointHashFields: true,
@@ -288,6 +289,7 @@
     }
 
     inspectUntrustedValue(record)
+    if (record.source !== undefined) requireObject(record.source, 'source')
     requireObject(record.initialState, 'initialState')
     requireBattleCheckpoint(record.initialState, 'initialState')
     if (!Array.isArray(record.frames)) throw new Error('Trace frames must be an array')
