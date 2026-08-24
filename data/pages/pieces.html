@@ -424,6 +424,237 @@
       font-size:22px;
     }
     .empty p{font-size:14px;font-weight:750;line-height:1.55}
+
+    /* RED-104: handmade paper-doll workbench skin.
+       RED-101 owns the three-column layout and all data/interaction behavior. */
+    :root{
+      --ink:#201b17;
+      --ink-soft:#66594c;
+      --paper:#cdb08a;
+      --paper-light:#dfc7a5;
+      --red:#a64738;
+      --red-dark:#713128;
+      --blue:#315d79;
+      --gold:#8b6b35;
+      --paper-plate:none;
+      --cardboard:#b9966d;
+      --cardboard-dark:#806044;
+      --wood:#18120f;
+      --marker:#211d19;
+      --paper-fiber:
+        radial-gradient(circle at 12% 24%,rgba(255,255,255,.13) 0 1px,transparent 1.5px),
+        radial-gradient(circle at 73% 68%,rgba(58,40,28,.12) 0 1px,transparent 1.5px),
+        repeating-linear-gradient(7deg,transparent 0 11px,rgba(73,51,35,.035) 12px,transparent 13px 22px);
+    }
+    body{
+      background-color:var(--wood);
+      background-image:
+        linear-gradient(90deg,rgba(0,0,0,.18),transparent 18%,rgba(255,255,255,.025) 48%,transparent 72%,rgba(0,0,0,.22)),
+        repeating-linear-gradient(2deg,#1b1410 0 5px,#211812 6px 10px,#17110e 11px 14px);
+      background-size:auto,100% 42px;
+    }
+    body::after{
+      content:"";
+      position:fixed;
+      inset:0;
+      z-index:-1;
+      pointer-events:none;
+      background:radial-gradient(ellipse at center,transparent 48%,rgba(0,0,0,.34) 100%);
+    }
+    .page{padding:13px 18px 17px;gap:12px}
+    .topbar{
+      position:relative;
+      padding:12px 22px 10px;
+      background-color:#c4a57e;
+      background-image:var(--paper-fiber);
+      border:1px solid rgba(55,39,28,.5);
+      box-shadow:0 7px 12px rgba(0,0,0,.42),inset 0 0 0 2px rgba(255,244,218,.13);
+      clip-path:polygon(.5% 6%,7% 1%,15% 4%,24% 1%,34% 5%,45% 2%,56% 5%,67% 1%,78% 4%,89% 1%,99.4% 6%,100% 92%,91% 97%,82% 94%,71% 99%,61% 95%,50% 99%,39% 95%,27% 99%,16% 95%,5% 98%,0 91%);
+    }
+    h1,.zone-title,.character-name,.skills-head h2{
+      color:var(--marker);
+      font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;
+      text-shadow:none;
+    }
+    h1{font-size:clamp(33px,3.5vw,48px);letter-spacing:.08em}
+    .count,.skills-head span{color:#6d382f}
+    .filter-caption{color:var(--marker)}
+    .back,.filter,.ticket{
+      border:2px solid var(--marker);
+      background-color:#d6ba94;
+      background-image:var(--paper-fiber);
+      box-shadow:2px 4px 0 rgba(0,0,0,.25);
+      transition:border-color 140ms ease,box-shadow 140ms ease,transform 140ms cubic-bezier(.23,1,.32,1),background-color 140ms ease;
+    }
+    .back,.filter{
+      clip-path:polygon(3% 4%,16% 1%,31% 5%,48% 1%,67% 4%,84% 1%,98% 6%,100% 89%,86% 96%,70% 93%,53% 98%,35% 94%,18% 98%,1% 91%);
+    }
+    .filter.active{
+      color:#f1dcc0;
+      border-color:#281e18;
+      background-color:var(--red);
+      box-shadow:2px 4px 0 rgba(0,0,0,.29),inset 0 -3px rgba(76,24,20,.28);
+    }
+    .back:active,.filter:active,.ticket:active{transform:scale(.97)}
+    @media(hover:hover) and (pointer:fine){
+      .back:hover,.filter:hover,.ticket:hover{
+        border-color:var(--red-dark);
+        box-shadow:0 0 0 3px rgba(166,71,56,.18),2px 5px 0 rgba(0,0,0,.28);
+        transform:translateY(-1px);
+      }
+    }
+    .theater{padding:0;gap:13px}
+    .roster-zone,.character-zone,.skills-zone{
+      position:relative;
+      background-color:#c4a47c;
+      background-image:var(--paper-fiber);
+      border:1px solid rgba(45,32,24,.58);
+      box-shadow:0 9px 14px rgba(0,0,0,.42),inset 0 0 0 2px rgba(255,241,212,.1);
+    }
+    .roster-zone{
+      padding:23px 15px 12px;
+      clip-path:polygon(1% 1%,12% 0,24% 1.3%,38% .2%,51% 1.5%,65% .3%,79% 1.2%,98% .4%,100% 13%,99% 28%,100% 43%,99% 59%,100% 76%,98% 99%,83% 98%,68% 100%,52% 98.5%,35% 100%,18% 98.5%,1% 100%,0 82%,1% 65%,0 48%,1% 31%,0 15%);
+    }
+    .character-zone{
+      padding:23px 18px 13px;
+      clip-path:polygon(1% 1%,13% 0,25% 1.2%,39% .2%,53% 1.4%,67% .3%,81% 1.2%,99% .4%,100% 17%,99% 34%,100% 51%,99% 68%,100% 84%,98% 99%,83% 98%,68% 100%,51% 98.5%,34% 100%,16% 98.5%,1% 100%,0 83%,1% 64%,0 46%,1% 28%,0 12%);
+    }
+    .skills-zone{
+      padding:23px 18px 13px;
+      clip-path:polygon(.7% 1%,14% 0,28% 1.2%,42% .2%,56% 1.4%,70% .3%,84% 1.2%,99% .4%,100% 19%,99% 37%,100% 55%,99% 73%,100% 89%,98% 99%,83% 98%,68% 100%,51% 98.5%,34% 100%,16% 98.5%,1% 100%,0 84%,1% 66%,0 48%,1% 29%,0 12%);
+    }
+    .zone-title{font-size:21px;text-decoration:underline;text-decoration-color:var(--blue);text-decoration-thickness:3px;text-underline-offset:5px}
+    .roster-list,.skills-scroll{scrollbar-color:var(--cardboard-dark) rgba(58,42,31,.13)}
+    .roster-list::-webkit-scrollbar-track,.skills-scroll::-webkit-scrollbar-track{background:rgba(58,42,31,.12)}
+    .roster-list::-webkit-scrollbar-thumb,.skills-scroll::-webkit-scrollbar-thumb{background:var(--cardboard-dark);border:2px solid #c9aa81}
+    .ticket{
+      grid-template-columns:64px minmax(0,1fr);
+      min-height:78px;
+      padding:6px 11px 6px 7px;
+      background-color:#d7bb94;
+      background-image:var(--paper-fiber);
+      border-color:rgba(39,30,24,.76);
+      box-shadow:2px 4px 0 rgba(57,39,28,.26);
+      clip-path:polygon(1% 6%,10% 1%,24% 4%,39% 1%,53% 4%,67% 1%,82% 4%,98% 1%,100% 18%,98% 36%,100% 55%,98% 74%,100% 93%,87% 98%,72% 95%,57% 99%,42% 96%,27% 99%,12% 95%,1% 99%,0 78%,2% 58%,0 38%);
+    }
+    .ticket:nth-child(even){transform:rotate(.18deg)}
+    .ticket.selected{
+      border-color:#263e52;
+      background-color:#d8bd96;
+      box-shadow:inset 6px 0 0 var(--blue),2px 5px 0 rgba(35,30,26,.29);
+      transform:translateX(3px);
+    }
+    .ticket-art{
+      width:64px;
+      height:66px;
+      padding:2px;
+      background:#ae8d67;
+      border:2px solid var(--marker);
+      box-shadow:2px 3px 0 rgba(0,0,0,.18);
+      clip-path:polygon(4% 3%,18% 0,34% 3%,51% 0,67% 3%,84% 0,98% 5%,100% 91%,87% 98%,70% 95%,53% 100%,36% 96%,18% 99%,1% 93%);
+      filter:saturate(.72) contrast(1.12) sepia(.1);
+    }
+    .ticket-name{color:var(--marker);font-size:18px}
+    .label{
+      background:transparent;
+      border:0;
+      border-bottom:2px solid currentColor;
+      clip-path:none;
+      padding:1px 3px;
+    }
+    .light{color:var(--blue)}.dark{color:#61436e}.neutral{color:#596044}
+    .kicker{color:var(--blue);letter-spacing:.08em}
+    .character-name{color:var(--marker)}
+    .character-stage{grid-template-columns:70px minmax(0,1fr);gap:8px}
+    .stat{
+      padding:5px 3px;
+      border:0;
+      border-bottom:2px solid rgba(55,43,34,.38);
+      background:transparent;
+      box-shadow:none;
+    }
+    .stat:nth-child(odd){border-bottom-color:rgba(49,93,121,.55)}
+    .stat-value{color:var(--marker);font-family:"KaiTi","STKaiti",serif;font-size:21px}
+    .stat-label{color:#493d33;font-size:11px}
+    .standee-wrap::after{
+      content:"";
+      position:absolute;
+      left:13%;
+      right:9%;
+      bottom:14px;
+      height:24px;
+      z-index:1;
+      background-color:var(--cardboard);
+      background-image:repeating-linear-gradient(90deg,transparent 0 10px,rgba(62,42,29,.25) 11px,transparent 12px 18px);
+      border:2px solid #33261d;
+      box-shadow:0 7px 0 rgba(0,0,0,.23),inset 0 -7px rgba(93,62,39,.2);
+      clip-path:polygon(2% 7%,98% 0,100% 78%,95% 100%,4% 94%,0 28%);
+    }
+    .standee-mat{
+      max-height:430px;
+      padding:7px;
+      background-color:#d8bd95;
+      background-image:var(--paper-fiber);
+      border:2px solid var(--marker);
+      filter:drop-shadow(6px 8px 0 rgba(0,0,0,.22));
+      clip-path:polygon(2% 5%,12% 1%,25% 4%,39% 1%,53% 4%,68% 1%,83% 4%,98% 2%,100% 89%,91% 97%,76% 94%,61% 99%,46% 95%,31% 99%,16% 95%,1% 98%,0 14%);
+    }
+    .standee-art{filter:saturate(.73) contrast(1.13) sepia(.08)}
+    .direct-cutout .standee-art{filter:saturate(.76) contrast(1.12) sepia(.06) drop-shadow(7px 9px 0 rgba(0,0,0,.24))}
+    .character-foot{border-top:2px solid var(--marker)}
+    .description{color:#42372e;font-size:13px}
+    .skills-head{border-bottom:3px solid var(--blue)}
+    .skills-head h2{font-size:25px}
+    .skill-card{
+      margin-bottom:9px;
+      padding:11px 14px 10px 16px;
+      border:2px solid rgba(38,29,23,.75);
+      border-left:0;
+      background-color:#d8bd96;
+      background-image:var(--paper-fiber);
+      box-shadow:2px 4px 0 rgba(55,38,27,.24);
+      clip-path:polygon(1% 5%,10% 1%,22% 4%,35% 1%,49% 4%,62% 1%,75% 4%,88% 1%,99% 5%,100% 89%,91% 97%,78% 94%,65% 99%,51% 95%,38% 99%,25% 95%,12% 99%,1% 94%,0 17%);
+    }
+    .skill-card:nth-child(even){transform:rotate(-.12deg)}
+    .skill-card::before{
+      content:"";
+      position:absolute;
+      left:9px;
+      top:11px;
+      bottom:11px;
+      width:4px;
+      background:var(--red);
+      transform:rotate(-1deg);
+      opacity:.78;
+    }
+    .skill-title,.skill-description,.skill-meta,.keyword-list,.related-list{margin-left:8px}
+    .skill-name{color:var(--marker);font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;font-size:18px}
+    .skill-type{
+      color:var(--blue);
+      border:0;
+      border-bottom:2px solid currentColor;
+      clip-path:none;
+      padding:1px 4px;
+    }
+    .skill-description{color:#463a30;line-height:1.4}
+    .meta,.keyword{
+      background:transparent;
+      border:1px solid rgba(54,42,33,.55);
+      border-radius:0;
+      color:#57483b;
+      clip-path:polygon(3% 2%,98% 0,100% 87%,94% 100%,1% 94%);
+    }
+    .keyword{color:#5d4769;border-color:rgba(93,71,105,.62)}
+    .related-card{
+      background:#ceb087;
+      border:2px solid rgba(43,33,26,.65);
+      border-left:4px solid var(--blue);
+      box-shadow:2px 3px 0 rgba(0,0,0,.15);
+    }
+    /* Skill cards are information sheets only: no paper-doll thumbnails on the right. */
+    .skills-zone .paper-puppet,.skills-zone .piece-miniature,.skills-zone .standee-art{display:none!important}
+    .empty{background:#d4b78f;border-color:#4d3a2d;color:#4c3d32}
+    .empty strong{color:var(--marker)}
     @media(max-width:1050px){
       .page{grid-template-rows:94px minmax(0,1fr)}
       .topbar{
