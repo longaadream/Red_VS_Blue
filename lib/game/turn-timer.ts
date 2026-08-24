@@ -116,8 +116,8 @@ export function createRunningTurnTimer(
   now: number,
   noOpStreaks: Record<PlayerId, number> = state.turnTimer?.noOpStreaks ?? {},
 ): TurnTimerState {
-  if (state.turn.phase !== 'action') {
-    throw new Error('A turn timer may only start while the server is waiting in action phase')
+  if (!isTurnTimerWaitingState(state)) {
+    throw new Error('A turn timer may only start in action phase or while a pending input is waiting')
   }
   const turnOwnerPlayerId = state.turn.currentPlayerId
   const ownerPlayerId = getCurrentInputOwnerPlayerId(state)
@@ -207,10 +207,12 @@ export function syncTurnTimerAfterAcceptedAction(
   const previous = state.turnTimer
   const inputWindows = previous ? normalizeInputWindows(previous) : {}
   const currentRemainingMs = previous
-    ? Math.min(
-        previous.remainingMs,
-        Math.max(0, previous.deadlineAt - input.receivedAt),
-      )
+    ? previous.status === 'running'
+      ? Math.min(
+          previous.remainingMs,
+          Math.max(0, previous.deadlineAt - input.receivedAt),
+        )
+      : Math.max(0, previous.remainingMs)
     : 0
   const streaks = normalizeNoOpStreaks(state, previous?.noOpStreaks ?? {})
   const actorMatchesOwner = !!previous
@@ -252,6 +254,11 @@ export function syncTurnTimerAfterAcceptedAction(
     && previous.turnNumber === state.turn.turnNumber
     && normalizePlayerId(previous.turnOwnerPlayerId) === normalizePlayerId(state.turn.currentPlayerId)
   if (!sameTurn) {
+    if (!isTurnTimerWaitingState(state)) {
+      return previous
+        ? createStoppedTurnTimer(state, input, streaks)
+        : undefined
+    }
     return createRunningTurnTimer(state, input.resumedAt, streaks)
   }
 
@@ -350,6 +357,48 @@ function requireRunningTimer(state: BattleState): TurnTimerState {
     throw new Error('Turn timer does not match the current authoritative input owner')
   }
   return timer
+}
+
+function createStoppedTurnTimer(
+  state: BattleState,
+  input: {
+    receivedAt: number
+    resumedAt: number
+  },
+  streaks: Record<PlayerId, number>,
+): TurnTimerState {
+  const turnOwnerPlayerId = state.turn.currentPlayerId
+  const ownerPlayerId = getCurrentInputOwnerPlayerId(state)
+  const inputWindow = createInputWindow(state, ownerPlayerId, streaks)
+  const deadlineAt = input.resumedAt + inputWindow.durationMs
+  return {
+    status: 'stopped',
+    ownerPlayerId,
+    turnOwnerPlayerId,
+    inputOwnerPlayerId: ownerPlayerId,
+    turnNumber: state.turn.turnNumber,
+    fullRound: getFullRoundNumber(state.turn.turnNumber),
+    durationMs: inputWindow.durationMs,
+    remainingMs: inputWindow.remainingMs,
+    startedAt: input.resumedAt,
+    deadlineAt,
+    burnStartsAt: deadlineAt - TURN_BURN_WINDOW_MS,
+    burnPhase: inputWindow.burnPhase,
+    fast: inputWindow.fast,
+    acceptedGameplayAction: false,
+    inputWindows: {
+      [ownerPlayerId]: inputWindow,
+    },
+    noOpStreaks: streaks,
+    lastPausedAt: input.receivedAt,
+    lastResumedAt: input.resumedAt,
+  }
+}
+
+function isTurnTimerWaitingState(state: BattleState): boolean {
+  return state.turn.phase === 'action'
+    || !!state.pendingOptionSelection
+    || !!state.pendingTargetSelection
 }
 
 function createInputWindow(
