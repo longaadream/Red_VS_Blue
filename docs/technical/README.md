@@ -36,6 +36,7 @@
 - `DEBUGGING.md`：日志、调试面板、问题复现和诊断流程。
 - `TEST_HARNESS.md`：自动控制、状态读取、截图和追踪接口。
 - `BUILD_AND_RUN.md`：安装、启动、测试和 Windows 打包命令。
+- [`AI_SELF_PLAY.md`](./AI_SELF_PLAY.md)：离线成对自博弈、历史档案、seed 分层、硬门禁、逐局进程隔离、进度与恢复。
 - `ESLINT_BASELINE.md`：零新增 lint 门禁、历史 suppression 基线和清债流程。
 - [`DEVELOPMENT_WORKFLOW.md`](./DEVELOPMENT_WORKFLOW.md)：任务分支 main 基线、本地预检、PR 新鲜度门禁和同步流程。
 - `MODULE_STATUS.md`：模块现状、负责人、风险和重构进度。

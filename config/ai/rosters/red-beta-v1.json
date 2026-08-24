@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "rosterId": "red-beta-v1",
+  "version": "1.0.0",
+  "faction": "red",
+  "pieceIds": [
+    "red-obito", "reaper", "red-sasuke", "red-shishio",
+    "red-venom", "arthas", "guldan", "kiljaedan"
+  ]
+}

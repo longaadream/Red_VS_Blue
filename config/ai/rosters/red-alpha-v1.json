@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "rosterId": "red-alpha-v1",
+  "version": "1.0.0",
+  "faction": "red",
+  "pieceIds": [
+    "arthas", "guldan", "kiljaedan", "reaper",
+    "red-blackwidow", "red-doomsday-fist", "red-hidan", "red-illidan"
+  ]
+}
