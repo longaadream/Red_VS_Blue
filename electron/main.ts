@@ -13,6 +13,146 @@ let dashboardWin: BrowserWindow | null = null
 let serverRunning = false
 let cleanupInterval: NodeJS.Timeout | null = null
 
+type ChildLogStream = 'stdout' | 'stderr'
+type ChildLogErrorSide = 'source' | 'target' | 'write'
+
+type ChildLogForwardingRecord = {
+  event: 'electron.child-log-forwarding.error'
+  runtime: 'electron-server' | 'electron-client'
+  stream: ChildLogStream
+  side: ChildLogErrorSide
+  code: string
+  message: string
+  recoverable: boolean
+  action: 'stop-forwarding' | 'report-error'
+}
+
+type SafeLogForwarderOptions = {
+  runtime: ChildLogForwardingRecord['runtime']
+  stream: ChildLogStream
+  report: (record: ChildLogForwardingRecord) => void
+  reportUnexpectedError: (error: Error, record: ChildLogForwardingRecord) => void
+}
+
+export function attachSafeLogForwarder(
+  source: NodeJS.ReadableStream,
+  target: NodeJS.WritableStream,
+  options: SafeLogForwarderOptions,
+): () => void {
+  let forwarding = true
+  let disposed = false
+  let errorReported = false
+  let sourceFinished = false
+  let pendingWrites = 0
+  let disposeScheduled = false
+
+  const stopForwarding = (): void => {
+    if (!forwarding) return
+    forwarding = false
+    source.removeListener('data', onData)
+  }
+
+  const handleError = (side: ChildLogErrorSide, value: unknown): void => {
+    const details = value && typeof value === 'object'
+      ? value as { code?: unknown; message?: unknown }
+      : {}
+    const message = typeof details.message === 'string' ? details.message : String(value)
+    const error = value && typeof value === 'object' && typeof details.message === 'string'
+      ? value as Error
+      : new Error(message)
+    const code = typeof details.code === 'string' ? details.code : 'UNKNOWN'
+    const recoverable = code === 'EPIPE'
+
+    if (errorReported) return
+
+    stopForwarding()
+    errorReported = true
+    const record: ChildLogForwardingRecord = {
+      event: 'electron.child-log-forwarding.error',
+      runtime: options.runtime,
+      stream: options.stream,
+      side,
+      code,
+      message,
+      recoverable,
+      action: recoverable ? 'stop-forwarding' : 'report-error',
+    }
+
+    try {
+      options.report(record)
+    } catch {
+      // Diagnostics may use the same broken host pipe. EPIPE must remain contained.
+    }
+    if (!recoverable) options.reportUnexpectedError(error, record)
+  }
+
+  const maybeDispose = (): void => {
+    if (!sourceFinished || pendingWrites > 0 || disposed || disposeScheduled) return
+    disposeScheduled = true
+    setImmediate(() => {
+      disposeScheduled = false
+      if (sourceFinished && pendingWrites === 0) dispose()
+    })
+  }
+
+  const onData = (chunk: string | Uint8Array): void => {
+    if (!forwarding) return
+    pendingWrites += 1
+    let settled = false
+    const onWriteComplete = (error?: Error | null): void => {
+      if (settled) return
+      settled = true
+      pendingWrites -= 1
+      if (error) handleError('write', error)
+      maybeDispose()
+    }
+    try {
+      target.write(chunk, onWriteComplete)
+    } catch (error) {
+      onWriteComplete(
+        error && typeof error === 'object' ? error as Error : new Error(String(error)),
+      )
+    }
+  }
+  const onSourceError = (error: unknown): void => handleError('source', error)
+  const onTargetError = (error: unknown): void => handleError('target', error)
+  const onTargetClose = (): void => stopForwarding()
+  const onSourceFinished = (): void => {
+    if (sourceFinished) return
+    sourceFinished = true
+    stopForwarding()
+    maybeDispose()
+  }
+
+  const dispose = (): void => {
+    if (disposed) return
+    disposed = true
+    stopForwarding()
+    source.removeListener('error', onSourceError)
+    source.removeListener('end', onSourceFinished)
+    source.removeListener('close', onSourceFinished)
+    target.removeListener('error', onTargetError)
+    target.removeListener('close', onTargetClose)
+  }
+
+  source.on('data', onData)
+  source.on('error', onSourceError)
+  source.once('end', onSourceFinished)
+  source.once('close', onSourceFinished)
+  target.on('error', onTargetError)
+  target.once('close', onTargetClose)
+
+  return dispose
+}
+
+function logChildForwardingRecord(record: ChildLogForwardingRecord): void {
+  console.warn('[electron:child-log-forwarding]', JSON.stringify(record))
+}
+
+function logUnexpectedChildStreamError(error: Error, record: ChildLogForwardingRecord): void {
+  console.error('[electron] Unexpected child log stream error:', record, error)
+}
+
 // ─── 路径工具 ────────────────────────────────────────────────────────────────
 
 function getAppRoot(): string {
@@ -237,8 +377,22 @@ function startGameServer(): void {
     return
   }
 
-  spawnedProcess.stdout?.on('data', (d) => process.stdout.write(d))
-  spawnedProcess.stderr?.on('data', (d) => process.stderr.write(d))
+  if (spawnedProcess.stdout) {
+    attachSafeLogForwarder(spawnedProcess.stdout, process.stdout, {
+      runtime: 'electron-server',
+      stream: 'stdout',
+      report: logChildForwardingRecord,
+      reportUnexpectedError: logUnexpectedChildStreamError,
+    })
+  }
+  if (spawnedProcess.stderr) {
+    attachSafeLogForwarder(spawnedProcess.stderr, process.stderr, {
+      runtime: 'electron-server',
+      stream: 'stderr',
+      report: logChildForwardingRecord,
+      reportUnexpectedError: logUnexpectedChildStreamError,
+    })
+  }
 
   spawnedProcess.on('error', (err) => {
     console.error('[electron] Server process error:', err)
