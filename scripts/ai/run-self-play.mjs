@@ -128,44 +128,13 @@ async function buildRuntime() {
   const temporaryDirectory = mkdtempSync(join(tmpdir(), 'rvb-ai-self-play-'))
   const outfile = join(temporaryDirectory, 'runtime.cjs')
   const runnerPath = JSON.stringify(resolveFromRoot('lib/game/ai-match-runner.ts'))
-  const setupPath = JSON.stringify(resolveFromRoot('lib/game/battle-setup.ts'))
-  const piecesPath = JSON.stringify(resolveFromRoot('lib/game/piece-repository.ts'))
+  const selfPlaySetupPath = JSON.stringify(resolveFromRoot('lib/game/ai-self-play-setup.ts'))
   const source = `
     import {
       buildPairedMatchSchedule, buildSelfPlayReport, createSelfPlayProcessExecutionMode,
       runSelfPlayMatch,
     } from ${runnerPath}
-    import { createInitialBattleForPlayers, DEMO_DEPLOYMENT_MAP_ID } from ${setupPath}
-    import { getPieceById } from ${piecesPath}
-
-    async function createInitialState(input: any) {
-      const playerIds = ['player-red', 'player-blue']
-      const playerSelectedPieces = playerIds.map(playerId => {
-        const roster = input.rosters[playerId]
-        const pieces = roster.pieceIds.map((pieceId: string) => {
-          const piece = getPieceById(pieceId)
-          if (!piece) throw new Error('Unknown roster piece ' + pieceId + ' in ' + roster.rosterId)
-          return piece
-        })
-        if (pieces.length !== 8) throw new Error(roster.rosterId + ' must contain exactly eight pieces')
-        return { playerId, faction: roster.faction, pieces }
-      })
-      const selectedPieces = playerSelectedPieces.flatMap(entry => entry.pieces)
-      const state = await createInitialBattleForPlayers(
-        playerIds,
-        selectedPieces,
-        playerSelectedPieces,
-        DEMO_DEPLOYMENT_MAP_ID,
-        {
-          firstPlayerId: 'player-red',
-          rootSeed: input.rootSeed,
-          deploymentEnabled: true,
-          deploymentStartedAt: 0,
-        },
-      )
-      if (!state) throw new Error('Battle setup returned null')
-      return state
-    }
+    import { createSelfPlayInitialState } from ${selfPlaySetupPath}
 
     export async function executeMatch(payload: any, onProgress?: (event: any) => void) {
       const originalLog = console.log
@@ -189,7 +158,7 @@ async function buildRuntime() {
           rosterArchives: payload.rosterArchives,
           execution: { inProcessConcurrency: 1, processCount: 1 },
           hardware: payload.hardware,
-          createInitialState,
+          createInitialState: createSelfPlayInitialState,
           onProgress,
         }, scheduled)
       } finally {

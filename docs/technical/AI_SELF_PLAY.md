@@ -111,6 +111,38 @@ npm.cmd run ai:self-play:report -- output/ai-self-play/manual.json --output outp
 
 报告记录 OS/架构、Node、CPU、内存、真实进程数、总耗时、transition/s、games/min、最慢 fixture 与观察到的瓶颈。不设未经实测确认的性能目标。首次固定基准的原始数值记录在 RED-87 PR 验证证据中，文档只描述口径，避免把某台机器的结果变成跨设备门槛。
 
-## 9. 回退
+## 9. 将指定对局导出为 Trace v2（RED-103）
+
+查看报告内的对局：
+
+```powershell
+npm.cmd run ai:self-play:export -- output/ai-self-play/manual.json --list
+```
+
+按 1-based 序号或精确 `matchId` 导出一局：
+
+```powershell
+npm.cmd run ai:self-play:export -- output/ai-self-play/manual.json --match 1 --output output/ai-self-play/match-1.trace.json
+npm.cmd run ai:self-play:export -- output/ai-self-play/manual.json --match pair-example-seat-1 --output output/ai-self-play/match-seat-1.trace.json
+```
+
+导出器只读取报告中已记录的动作，不调用当前 agent 重新选招。它使用与自博弈相同的 `createSelfPlayInitialState()` 和 `aiEnvironmentV1` 权威 transition，逐步核对 accepted、action/state/transition/trace hash，最后核对 action/state trace、final state 与终局信息。只有全部证据一致时，才调用 RED-94 的共享 `createTraceRecord()`/`assertTraceRecord()` 生成 `rvb-match-trace/v2`。
+
+版本门禁失败关闭：报告 schema 必须是 1；rules/content tree hash 必须与当前工作树一致；报告 Git commit 必须在本仓库可解析，且当前 `lib/game/**` 权威实现相对该提交没有变化。`ai-self-play-replay.ts` 和 `ai-self-play-setup.ts` 是纯离线导出适配层，不计入旧报告的权威代码差异。Git 证据缺失、工作树存在其他未跟踪 game 代码或任一版本/hash 不匹配时不导出。
+
+输出文件使用独占创建，不覆盖已有文件。Trace 的 `source` 只记录报告 hash、suite、matchId、seed、换座、agent/roster ID 与版本、agent config hash 和原始终局 hash；不写入报告路径、环境变量、令牌或其他敏感字段。相同报告和 match 重复导出时，`exportedAt` 可不同，初始状态、帧、事件、内容快照和完整性 hash 必须一致。
+
+真实 human-smoke 验收应同时导出 181 步和 137 步两局，并至少把一局拖入开发者中心：
+
+1. 导入后摘要命令数等于报告动作数；
+2. 打开现有回放页，验证棋盘、上一/下一步、时间轴、0.5×/1×/2×/4× 和红/蓝/全知视角；
+3. 跳到末帧，终局与原报告 winner/reason/finalStateHash 一致；
+4. 再次导出到同一路径应非零退出且原文件保持不变。
+
+## 10. 当前自我迭代边界
+
+当前系统已经具备离线确定性自博弈、换座配对、历史对手档案、胜负矩阵、多维拆分、硬门禁、进度恢复和可视化复盘，因此有“自博弈联赛基础设施”的形态。它不会自动训练或修改 AI：不会自动选择并保存新冠军，不会自动调整 planner 权重，也不会在后台连续生成候选。`eligible-for-human-review` 只表示合法性与终止性门禁通过；历史冠军档案、候选配置和 suite 仍由开发者显式版本化并审核。CMA-ES、进化策略、MAP-Elites、PBT、PPO/MCTS 或其他优化循环属于后续任务。
+
+## 11. 回退
 
 整体 revert `ai-match-runner`、两个 CLI、`config/ai/**`、测试、ADR 和本文档。报告与失败 seed 保留在受控输出位置；没有玩家存档、玩法数据、随机算法、网络协议或客户端迁移需要逆向转换。
