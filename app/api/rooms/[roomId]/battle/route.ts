@@ -54,6 +54,12 @@ function createPreparedActionResponse(
   })
 }
 
+function getClientActionId(action: unknown): string | undefined {
+  if (!action || typeof action !== 'object' || !('clientActionId' in action)) return undefined
+  const clientActionId = (action as { clientActionId?: unknown }).clientActionId
+  return typeof clientActionId === 'string' && clientActionId.trim() ? clientActionId : undefined
+}
+
 // ── POST — apply action authoritatively, broadcast new state via WS ──────────
 
 export async function POST(
@@ -130,6 +136,7 @@ export async function POST(
         error: msg,
         code: errAny.code,
         needsTargetSelection: true,
+        acceptedClientActionId: getClientActionId(action),
         preparation: errAny.preparation,
         targetType: errAny.targetType ?? '',
         range: errAny.range ?? 10,
@@ -144,6 +151,7 @@ export async function POST(
         error: msg,
         code: errAny.code,
         needsOptionSelection: true,
+        acceptedClientActionId: getClientActionId(action),
         preparation: errAny.preparation,
         title: errAny.title ?? '请选择',
         options: errAny.options ?? [],

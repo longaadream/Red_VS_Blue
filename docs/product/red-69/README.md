@@ -17,11 +17,11 @@ The page exposes one pending command through `BattleViewModel.interaction`; the 
 - ESLint could not start because the current dependency tree does not contain the configured `eslint-plugin-import`; no dependency or lint configuration was changed for this UI-only task.
 - Coverage includes one-frame press response, pan cancellation, ten rapid submissions producing one transport admission, duplicate/unrelated snapshot retention, confirm/reject/timeout/disconnect recovery, pending switch blocking, pending lift/outline, movement retargeting from the visible position with the 0.08-height cap, duplicate event suppression, simultaneous target entry, target press during entry with one scale controller, outline retarget continuity, status add/remove, reduced hit/heal/reject/death bounds, no redraw replay, 120ms target exit disposal, piece removal, dispose, and remount cleanup.
 
-## Known authority correlation boundary
+## Authority correlation (resolved by RED-99)
 
-`PublicBattleSnapshot` currently has no accepted `clientActionId`. RED-69 therefore keeps exact duplicate and presentation-unrelated snapshots pending, but treats the next change in a deterministic authoritative presentation projection (pieces/statuses, players/resources/cards, deployment, pending selection, turn/actions, graveyard, or terminal result) as an approximate acceptance signal. A concurrent meaningful authority commit could still advance this projection before the submitted command is explicitly acknowledged.
+`PublicBattleSnapshot` now carries an optional response-envelope `acceptedClientActionId`. Applied and duplicate player commands echo the submitted ID; target/option preparation responses use the same field. Initial snapshots, reconnect snapshots, timer/system commits, and unrelated authority updates omit it.
 
-The public transport fix is tracked by [RED-99](https://linear.app/redvsblue/issue/RED-99/为战斗-stateupdate-增加-clientactionid-权威确认回执). It will add a stable LAN/Relay/HTTP action ACK so this approximation can be removed. RED-69 does not modify the public transport interface outside its allowed paths.
+`battle.html` keeps the single-flight guard until that field exactly matches the pending command, or until a correlated rejection, timeout, disconnect, or page disposal occurs. `stateHash` and `authorityVersion` remain snapshot ordering/deduplication signals and are no longer treated as command acceptance. Relay forwards the ACK transiently without persisting it in the reconnect state blob.
 
 ## Manual visual matrix
 

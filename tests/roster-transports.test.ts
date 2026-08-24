@@ -605,11 +605,53 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(resolved.status).toBe(200)
 
     const actionState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
-      state: { turn: { phase: string }; pendingOptionSelection?: unknown; pendingTargetSelection?: unknown }
+      state: {
+        turn: { phase: string }
+        pieces: Array<{ instanceId: string; templateId: string }>
+        pendingOptionSelection?: unknown
+        pendingTargetSelection?: unknown
+      }
     }).state
     expect(actionState.turn.phase).toBe('action')
     expect(actionState.pendingOptionSelection).toBeUndefined()
     expect(actionState.pendingTargetSelection).toBeUndefined()
+
+    const ana = actionState.pieces.find(piece => piece.templateId === 'ana')
+    const naruto = actionState.pieces.find(piece => piece.templateId === 'blue-naruto')
+    if (!ana || !naruto) throw new Error('Expected Ana and Naruto in the fixed PVE roster')
+
+    const targetAction = {
+      type: 'useBasicSkill',
+      playerId: firstIdentity.id,
+      pieceId: ana.instanceId,
+      skillId: 'sleep-dart',
+      clientActionId: 'alice-pve-target-preparation',
+    }
+    const targetPreparation = await httpBattleAction(
+      roomId, firstIdentity.id, targetAction, firstIdentity.id, firstIdentity,
+    )
+    expect(targetPreparation).toMatchObject({
+      status: 400,
+      body: {
+        needsTargetSelection: true,
+        acceptedClientActionId: targetAction.clientActionId,
+      },
+    })
+
+    const optionAction = {
+      type: 'useBasicSkill',
+      playerId: firstIdentity.id,
+      pieceId: naruto.instanceId,
+      skillId: 'naruto-shadow-clone',
+      clientActionId: 'alice-pve-option-preparation',
+    }
+    const optionPreparation = await wsBattleAction(
+      roomId, firstIdentity.id, optionAction, firstIdentity, 'actionError',
+    )
+    expect(optionPreparation).toMatchObject({
+      needsOptionSelection: true,
+      acceptedClientActionId: optionAction.clientActionId,
+    })
   })
 
   it('returns equivalent stable errors and leaves state untouched', async () => {
@@ -903,7 +945,16 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const http = await httpBattleAction('http-deployment', firstIdentity.id, action, firstIdentity.id, firstIdentity)
     const ws = await wsBattleAction('ws-deployment', firstIdentity.id, action, firstIdentity)
 
+    const httpDuplicate = await httpBattleAction(
+      'http-deployment', firstIdentity.id, action, firstIdentity.id, firstIdentity,
+    )
+    const wsDuplicate = await wsBattleAction('ws-deployment', firstIdentity.id, action, firstIdentity)
+
     expect(http.status).toBe(200)
+    expect(http.body.acceptedClientActionId).toBe(action.clientActionId)
+    expect(ws.acceptedClientActionId).toBe(action.clientActionId)
+    expect(httpDuplicate.body).toMatchObject({ duplicate: true, acceptedClientActionId: action.clientActionId })
+    expect(wsDuplicate).toMatchObject({ duplicate: true, acceptedClientActionId: action.clientActionId })
     expect(ws.authorityVersion).toBe(http.body.authorityVersion)
     expect(ws.stateHash).toBe(http.body.stateHash)
     const httpState = (memoryStore.snapshot('http-deployment')?.battleState as unknown as { state: unknown }).state

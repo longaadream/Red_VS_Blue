@@ -155,6 +155,7 @@ describe('Relay WebSocket signed subscription identity', () => {
       state: { deployment: { status: 'awaiting-locks' } },
       seed: 42,
       stateHash: 'public-state',
+      acceptedClientActionId: 'relay-action-1',
     }))
 
     expect(JSON.parse(room.lastStateBlob ?? '{}')).toMatchObject({
@@ -163,10 +164,13 @@ describe('Relay WebSocket signed subscription identity', () => {
       seed: 42,
       stateHash: 'public-state',
     })
+    expect(JSON.parse(room.lastStateBlob ?? '{}').acceptedClientActionId).toBeUndefined()
     expect(relayStore.setRoom).toHaveBeenCalledWith(room)
     expect(relayStore.broadcastToRoom).toHaveBeenCalledWith(
       room.id,
-      expect.objectContaining({ type: 'stateUpdate', authorityVersion: 2 }),
+      expect.objectContaining({
+        type: 'stateUpdate', authorityVersion: 2, acceptedClientActionId: 'relay-action-1',
+      }),
       ws,
     )
   })
@@ -189,6 +193,7 @@ describe('Relay WebSocket signed subscription identity', () => {
       playerId: guest.id,
       pieceId: 'caster',
       skillId: 'contract-shot',
+      clientActionId: 'relay-target-preparation',
     }
     const preparation = {
       kind: 'needTarget',
@@ -203,6 +208,7 @@ describe('Relay WebSocket signed subscription identity', () => {
       from: outsider.id,
       action,
       error: '需要选择目标',
+      acceptedClientActionId: action.clientActionId,
       code: 'TARGET_REQUIRED',
       preparation,
       needsTargetSelection: true,
@@ -217,6 +223,7 @@ describe('Relay WebSocket signed subscription identity', () => {
       from: host.id,
       action,
       error: '需要选择目标',
+      acceptedClientActionId: action.clientActionId,
       code: 'TARGET_REQUIRED',
       preparation,
       needsTargetSelection: true,
@@ -230,6 +237,7 @@ describe('Relay WebSocket signed subscription identity', () => {
       type: 'playCard',
       playerId: guest.id,
       cardInstanceId: 'choice-card',
+      clientActionId: 'relay-option-preparation',
     }
     const optionPreparation = {
       kind: 'needOption',
@@ -243,6 +251,7 @@ describe('Relay WebSocket signed subscription identity', () => {
       action: optionAction,
       error: '需要选择选项',
       preparation: optionPreparation,
+      acceptedClientActionId: optionAction.clientActionId,
       needsOptionSelection: true,
       title: '选择方向',
       options: ['left', 'right'],
@@ -252,6 +261,7 @@ describe('Relay WebSocket signed subscription identity', () => {
       from: host.id,
       action: optionAction,
       error: '需要选择选项',
+      acceptedClientActionId: optionAction.clientActionId,
       preparation: optionPreparation,
       needsOptionSelection: true,
       title: '选择方向',

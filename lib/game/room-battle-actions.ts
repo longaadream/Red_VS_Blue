@@ -24,6 +24,7 @@ export interface PublicBattleSnapshot {
   seed: number
   stateHash: string
   authorityVersion: number
+  acceptedClientActionId?: string
   serverNow: number
   turnTimer?: TurnTimerProjection
 }
@@ -99,6 +100,7 @@ export function createPublicBattleSnapshot(
   room: Room,
   viewerPlayerId?: string,
   clock: DeploymentRuleClock = systemDeploymentRuleClock,
+  acceptedClientActionId?: string,
 ): PublicBattleSnapshot {
   const storage = getBattleStorage(room)
   if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started')
@@ -109,6 +111,7 @@ export function createPublicBattleSnapshot(
     seed: storage.seed,
     stateHash: hashBattleState(state),
     authorityVersion: typeof room.version === 'number' ? room.version : 0,
+    ...(acceptedClientActionId ? { acceptedClientActionId } : {}),
     serverNow,
     turnTimer: state.terminalResult ? undefined : projectTurnTimer(state.turnTimer, serverNow),
   }
@@ -198,7 +201,9 @@ export async function dispatchRoomBattleAction(
     if (submittedActionResult.duplicate) {
       return {
         kind: 'duplicate',
-        snapshot: createPublicBattleSnapshot(room, viewerPlayerId ?? undefined, clock),
+        snapshot: createPublicBattleSnapshot(
+          room, viewerPlayerId ?? undefined, clock, acceptedClientActionId(actionToApply),
+        ),
         actionResult: submittedActionResult,
       }
     }
@@ -248,7 +253,12 @@ export async function dispatchRoomBattleAction(
     }
     if (!await store.setRoomIfVersion(normalizedRoomId, nextRoom, room.version)) continue
     const committedRoom: Room = { ...nextRoom, version: nextAuthorityVersion }
-    const snapshot = createPublicBattleSnapshot(committedRoom, viewerPlayerId ?? undefined, clock)
+    const snapshot = createPublicBattleSnapshot(
+      committedRoom,
+      viewerPlayerId ?? undefined,
+      clock,
+      deploymentExpired || turnExpired ? undefined : acceptedClientActionId(actionToApply),
+    )
     if (isTerminal) clearRoomBattleTimeout(normalizedRoomId)
     const expired = deploymentExpired || turnExpired
     let delivered = false
@@ -603,6 +613,12 @@ function roomActionContext(
     authorityVersion: room.version,
     seed: storage.seed,
   }
+}
+
+function acceptedClientActionId(action: BattleAction): string | undefined {
+  if (isSystemTimerAction(action)) return undefined
+  if (!('clientActionId' in action) || typeof action.clientActionId !== 'string') return undefined
+  return action.clientActionId.trim() ? action.clientActionId : undefined
 }
 
 function actionIdPart(action: BattleAction): string {

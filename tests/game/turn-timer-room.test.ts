@@ -186,10 +186,13 @@ describe('RED-36 authoritative room timer integration', () => {
     expect(authoritativeState(store).turnTimer?.deadlineAt).toBe(45_000)
     expect(result.snapshot.turnTimer?.remainingMs).toBe(35_000)
     expect(delivered?.turnTimer?.remainingMs).toBe(35_000)
+    expect(result.snapshot.acceptedClientActionId).toBe('persisted-slow-move')
+    expect(delivered?.acceptedClientActionId).toBe('persisted-slow-move')
     expect(createPublicBattleSnapshot(store.room, PLAYERS[0], clock)).toMatchObject({
       serverNow: 10_000,
       turnTimer: { remainingMs: 35_000 },
     })
+    expect(createPublicBattleSnapshot(store.room, PLAYERS[0], clock).acceptedClientActionId).toBeUndefined()
   })
 
   it('retries a conflicting CAS without publishing a speculative authority version', async () => {
@@ -531,6 +534,7 @@ describe('RED-36 authoritative room timer integration', () => {
       expect(authoritativeState(store).turn.turnNumber).toBe(2)
       expect(authoritativeState(store).turnTimer?.ownerPlayerId).toBe(PLAYERS[1])
       expect(committed).toHaveLength(2)
+      expect(committed.every(snapshot => snapshot.acceptedClientActionId === undefined)).toBe(true)
     } finally {
       clearRoomBattleTimeout(store.room.id)
       vi.useRealTimers()

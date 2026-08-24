@@ -2013,6 +2013,17 @@
       return cleared
     }
 
+    function pendingClientActionMatches(clientActionId) {
+      return !!pendingActionFeedback
+        && typeof clientActionId === 'string'
+        && clientActionId === pendingActionFeedback.clientActionId
+    }
+
+    function clearPendingActionFeedbackForClientAction(clientActionId, reason) {
+      if (!pendingClientActionMatches(clientActionId)) return null
+      return clearPendingActionFeedback(reason)
+    }
+
     function beginPendingActionFeedback(action) {
       if (!action || !action.clientActionId) return true
       if (pendingActionFeedback) {
@@ -2025,7 +2036,9 @@
         pieceId: action.pieceId || action.targetPieceId || selectedPieceId || null,
       }
       pendingActionFeedbackTimer = setTimeout(function () {
-        rejectPendingActionFeedback('action-timeout', '指令确认超时，请检查连接后重试')
+        rejectPendingActionFeedbackForClientAction(
+          action.clientActionId, 'action-timeout', '指令确认超时，请检查连接后重试',
+        )
       }, PENDING_ACTION_TIMEOUT_MS)
       renderBoard()
       renderActionBar()
@@ -2050,6 +2063,11 @@
       render()
       if (message) setStatusMsg(message)
       return !!rejected
+    }
+
+    function rejectPendingActionFeedbackForClientAction(clientActionId, reason, message, options) {
+      if (!pendingClientActionMatches(clientActionId)) return false
+      return rejectPendingActionFeedback(reason || 'server-rejected', message, options)
     }
 
     function recordTargetClear(reason) {
@@ -2563,11 +2581,6 @@
         ],
         snapshot.terminalResult || null,
       ])
-    }
-
-    function authorityStateConfirmsPending(previousState, nextState) {
-      if (!previousState || !nextState) return false
-      return battleStateMotionKey(previousState) !== battleStateMotionKey(nextState)
     }
 
     function spawnStateFloaters(oldG, newG, eventKey) {
@@ -3233,10 +3246,13 @@
 
     // ── Server-authoritative state handling ──
 
-    function reconcileBattleInteractionState(previousState, nextState) {
+    function reconcileBattleInteractionState(previousState, nextState, acceptedClientActionId) {
       if (!nextState) return ''
-      const stateAdvanced = authorityStateConfirmsPending(previousState, nextState)
-      const confirmedAction = pendingActionFeedback && stateAdvanced ? clearPendingActionFeedback('authoritative-confirmation') : null
+      const targetConfirmed = !!targetSubmissionPending
+        && targetSubmissionPending.clientActionId === acceptedClientActionId
+      const confirmedAction = clearPendingActionFeedbackForClientAction(
+        acceptedClientActionId, 'authoritative-confirmation',
+      )
       const authoritativeSelectionId = nextState.pendingTargetSelection && nextState.pendingTargetSelection.selectionId
       if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
         locallyCancelledSelectionId = null
@@ -3270,7 +3286,7 @@
         }
       }
 
-      if (targetSubmissionPending && stateAdvanced) {
+      if (targetConfirmed) {
         clearTargetInteraction('authoritative-confirmation')
         return '目标指令已确认'
       }
@@ -3336,7 +3352,7 @@
       }
       authoritativeTurnTimer = turnTimer || null
     }
-    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer) {
+    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer, acceptedClientActionId) {
       if (!state) return
       resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
@@ -3354,7 +3370,7 @@
           if (alignment === 'light' || alignment === 'dark') playerAlignments[playerId.toLowerCase()] = alignment
         })
       }
-      const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+      const interactionFeedback = reconcileBattleInteractionState(oldG, G, acceptedClientActionId)
 
       // Init seeded RNG once
       if (seed && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
@@ -3470,7 +3486,8 @@
           latestAuthorityVersion = Number.isSafeInteger(msg.authorityVersion)
             ? msg.authorityVersion
             : latestAuthorityVersion
-          applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer)
+          // Trace capture must precede applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer).
+          applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer, msg.acceptedClientActionId)
         } else if (msg.type === 'battleSnapshot') {
           applyLegacyBattleSnapshot(msg)
         } else if (msg.type === 'roomUpdate') {
@@ -3497,13 +3514,27 @@
           applyLegacyBattleEntry(msg.entry)
         } else if (msg.type === 'actionError') {
           addLog('[DEBUG actionError] action=' + JSON.stringify(msg.action || null) + ' error=' + (msg.error || 'unknown') + ' needsTarget=' + (!!msg.needsTargetSelection) + ' needsOption=' + (!!msg.needsOptionSelection), 'err')
-          if (msg.needsTargetSelection) clearPendingActionFeedback('authoritative-target-step')
-          if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
-          if (msg.needsOptionSelection) clearPendingActionFeedback('authoritative-option-step')
-          if (msg.needsOptionSelection && msg.action) {
+          if (msg.needsTargetSelection) {
+            if (!clearPendingActionFeedbackForClientAction(msg.acceptedClientActionId, 'authoritative-target-step')) {
+              addLog('已忽略不匹配当前待确认指令的目标准备回执', 'info')
+              return
+            }
+            if (enterActionTargetMode(msg.action, msg.preparation)) return
+            setStatusMsg('权威目标查询未返回候选集合')
+            return
+          }
+          if (msg.needsOptionSelection) {
+            if (!clearPendingActionFeedbackForClientAction(msg.acceptedClientActionId, 'authoritative-option-step')) {
+              addLog('已忽略不匹配当前待确认指令的选项准备回执', 'info')
+              return
+            }
             if (targetSubmissionPending) {
               targetSubmissionPending = null
               recordTargetClear('authoritative-next-option-step')
+            }
+            if (!msg.action) {
+              setStatusMsg('权威选项查询未返回原始指令')
+              return
             }
             var optionAction = Object.assign({}, msg.action)
             if (msg.preparation && msg.preparation.kind === 'needOption') {
@@ -3512,6 +3543,11 @@
             }
             showOptionPicker(msg.title || '请选择', msg.options || [], optionAction)
             renderActionBar()
+            return
+          }
+          const rejectedClientActionId = msg.action && msg.action.clientActionId
+          if (!pendingClientActionMatches(rejectedClientActionId)) {
+            addLog('已忽略不匹配当前待确认指令的拒绝回执', 'info')
             return
           }
           const rejectionMessage = msg.error || 'unknown error'
@@ -3524,17 +3560,19 @@
             targetSubmissionPending = null
             _pendingChoiceShown = null
             addLog('服务端拒绝本次选择：' + rejectionMessage, 'err')
-            rejectPendingActionFeedback(
+            rejectPendingActionFeedbackForClientAction(
+              rejectedClientActionId,
               'server-rejected',
               '选择被拒绝：' + rejectionMessage + '；请重新选择',
               { preserveTargetInteraction: true },
             )
             return
           }
-          rejectPendingActionFeedback('server-rejected', '服务端拒绝：' + rejectionMessage + '；目标选择已清除')
-          addLog('服务端处理动作失败：' + (msg.error || 'unknown error'), 'err')
-          render()
-          setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
+          rejectPendingActionFeedbackForClientAction(
+            rejectedClientActionId, 'server-rejected',
+            '服务端拒绝：' + rejectionMessage + '；目标选择已清除',
+          )
+          addLog('服务端处理动作失败：' + rejectionMessage, 'err')
         } else if (msg.type === 'pendingAction') {
           // Old relay servers delegated authority to the host client. That path is
           // intentionally disabled: network clients only consume server stateUpdate.
@@ -4918,7 +4956,7 @@
         } else if (action.type === 'endTurn' || action.type === 'beginPhase') {
           selectedPieceId = null
         }
-        const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+        const interactionFeedback = reconcileBattleInteractionState(oldG, G, action.clientActionId)
         if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
         restoreSelectedPieceMenu()
         render(); if (G.terminalResult) handleGameOver()
@@ -4926,12 +4964,18 @@
       } catch (e) {
         let rejectionFeedback = ''
         if (e.needsTargetSelection) {
-          clearPendingActionFeedback('authoritative-target-step')
+          if (!clearPendingActionFeedbackForClientAction(action.clientActionId, 'authoritative-target-step')) {
+            addLog('已忽略过期的训练目标准备回执', 'info')
+            return
+          }
           if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
             setStatusMsg('权威目标查询未返回候选集合')
           }
         } else if (e.needsOptionSelection) {
-          clearPendingActionFeedback('authoritative-option-step')
+          if (!clearPendingActionFeedbackForClientAction(action.clientActionId, 'authoritative-option-step')) {
+            addLog('已忽略过期的训练选项准备回执', 'info')
+            return
+          }
           if (targetSubmissionPending) {
             targetSubmissionPending = null
             recordTargetClear('authoritative-next-option-step')
@@ -4943,6 +4987,10 @@
           }
           showOptionPicker(e.title||'请选择', e.options||[], optionRetry)
         } else {
+          if (!pendingClientActionMatches(action.clientActionId)) {
+            addLog('已忽略过期的训练拒绝回执', 'info')
+            return
+          }
           const errMsg = e.message || String(e) || '操作失败'
           red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
           const rejectedPending = (
@@ -4953,14 +5001,17 @@
             targetSubmissionPending = null
             _pendingChoiceShown = null
             rejectionFeedback = '选择被拒绝：' + errMsg + '；请重新选择'
-            rejectPendingActionFeedback(
+            rejectPendingActionFeedbackForClientAction(
+              action.clientActionId,
               'server-rejected',
               rejectionFeedback,
               { preserveTargetInteraction: true },
             )
           } else {
             rejectionFeedback = '操作被拒绝：' + errMsg + '；目标选择已清除'
-            rejectPendingActionFeedback('server-rejected', rejectionFeedback)
+            rejectPendingActionFeedbackForClientAction(
+              action.clientActionId, 'server-rejected', rejectionFeedback,
+            )
           }
           addLog('[ERROR] action=' + action.type + ' error=' + errMsg, 'err')
         }

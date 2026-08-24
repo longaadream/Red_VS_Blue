@@ -64,14 +64,14 @@ describe('RED-69 battle motion contract', () => {
 
     expect(battlePage).toContain('pendingActionFeedback')
     expect(battlePage).toContain('PENDING_ACTION_TIMEOUT_MS')
-    expect(battlePage).toContain("rejectPendingActionFeedback('server-rejected'")
-    expect(battlePage).toContain("rejectPendingActionFeedback('action-timeout'")
+    expect(battlePage).toContain('rejectPendingActionFeedbackForClientAction')
+    expect(battlePage).toMatch(/rejectPendingActionFeedbackForClientAction\([\s\S]*?action\.clientActionId, 'action-timeout'/)
     expect(battlePage).toContain("rejectPendingActionFeedback('disconnect'")
     expect(battlePage).toMatch(/function disposeBattlePage\(\)[\s\S]*?clearPendingActionFeedback\('page-dispose'/)
     expect(battlePage).toMatch(/interaction:\s*\{[\s\S]*?pendingPieceId:/)
   })
 
-  it('keeps one pending command across duplicate snapshots and recovers after confirm, reject, timeout, and disconnect', () => {
+  it('keeps one pending command until a matching authoritative ACK and recovers after reject, timeout, and disconnect', () => {
     const battlePage = readPage('battle.html')
     const statusMessages: string[] = []
     const clearReasons: string[] = []
@@ -108,10 +108,11 @@ describe('RED-69 battle motion contract', () => {
     })
     for (const name of [
       'clearPendingActionFeedback',
+      'pendingClientActionMatches',
+      'clearPendingActionFeedbackForClientAction',
       'beginPendingActionFeedback',
       'rejectPendingActionFeedback',
-      'battleStateMotionKey',
-      'authorityStateConfirmsPending',
+      'rejectPendingActionFeedbackForClientAction',
       'reconcileBattleInteractionState',
     ]) {
       new Script(readNamedFunction(battlePage, name)).runInContext(context)
@@ -132,38 +133,33 @@ describe('RED-69 battle motion contract', () => {
     }
     context.previousState = previousState
     context.duplicateState = structuredClone(previousState)
-    expect(new Script('authorityStateConfirmsPending(previousState, duplicateState)').runInContext(context)).toBe(false)
-    expect(new Script('reconcileBattleInteractionState(previousState, duplicateState)').runInContext(context)).toBe('')
+    expect(new Script('reconcileBattleInteractionState(previousState, duplicateState, undefined)').runInContext(context)).toBe('')
     expect(new Script('pendingActionFeedback.clientActionId').runInContext(context)).toBe('move-1')
     expect(new Script('targetSubmissionPending.clientActionId').runInContext(context)).toBe('move-1')
     expect(clearReasons).toEqual([])
 
-    context.unrelatedState = { ...structuredClone(previousState), transportDiagnostic: { serverNow: 1234 } }
-    expect(new Script('authorityStateConfirmsPending(previousState, unrelatedState)').runInContext(context)).toBe(false)
+    context.concurrentTimerState = { ...structuredClone(previousState), actions: [{ type: 'turnTimerBurn' }] }
+    expect(new Script("reconcileBattleInteractionState(previousState, concurrentTimerState, 'timer-action-B')").runInContext(context)).toBe('')
+    expect(new Script('pendingActionFeedback.clientActionId').runInContext(context)).toBe('move-1')
+    expect(new Script('targetSubmissionPending.clientActionId').runInContext(context)).toBe('move-1')
 
-    context.deploymentPrevious = {
-      ...structuredClone(previousState),
-      deployment: { status: 'awaiting-locks', revision: 1, choices: {}, locks: {} },
-    }
-    context.deploymentConfirmed = structuredClone(context.deploymentPrevious)
-    ;(context.deploymentConfirmed as { deployment: { revision: number } }).deployment.revision = 2
-    expect(new Script('authorityStateConfirmsPending(deploymentPrevious, deploymentConfirmed)').runInContext(context)).toBe(true)
-
-    context.confirmedState = { ...structuredClone(previousState), actions: [{ type: 'move' }] }
-    expect(new Script('authorityStateConfirmsPending(previousState, confirmedState)').runInContext(context)).toBe(true)
-    expect(new Script('reconcileBattleInteractionState(previousState, confirmedState)').runInContext(context)).toBe('目标指令已确认')
+    expect(new Script("reconcileBattleInteractionState(previousState, duplicateState, 'move-1')").runInContext(context)).toBe('目标指令已确认')
     expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
     expect(new Script('targetSubmissionPending').runInContext(context)).toBeNull()
 
     new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clientActionId: 'move-2' })").runInContext(context)
-    new Script("rejectPendingActionFeedback('server-rejected')").runInContext(context)
+    expect(new Script("reconcileBattleInteractionState(previousState, duplicateState, 'move-1')").runInContext(context)).toBe('')
+    expect(new Script('pendingActionFeedback.clientActionId').runInContext(context)).toBe('move-2')
+    expect(new Script("rejectPendingActionFeedbackForClientAction('stale-action')").runInContext(context)).toBe(false)
+    expect(new Script('pendingActionFeedback.clientActionId').runInContext(context)).toBe('move-2')
+    expect(new Script("rejectPendingActionFeedbackForClientAction('move-2')").runInContext(context)).toBe(true)
     expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
     expect(clearReasons).toContain('server-rejected')
 
     const clearCountBeforePreservedRejection = clearReasons.length
     context.targetSubmissionPending = { clientActionId: 'target-1' }
     new Script("beginPendingActionFeedback({ type: 'pendingTargetSelect', pieceId: 'piece-a', clientActionId: 'target-1' })").runInContext(context)
-    new Script("rejectPendingActionFeedback('server-rejected', null, { preserveTargetInteraction: true })").runInContext(context)
+    new Script("rejectPendingActionFeedbackForClientAction('target-1', 'server-rejected', null, { preserveTargetInteraction: true })").runInContext(context)
     expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
     expect(new Script('targetSubmissionPending.clientActionId').runInContext(context)).toBe('target-1')
     expect(clearReasons).toHaveLength(clearCountBeforePreservedRejection)

@@ -305,8 +305,8 @@ RED-82 的目标流程：
 
 - **入口：** `lib/ws-server.ts::startWsServer()`；`app/api/rooms/[roomId]/battle/route.ts::GET()`、`app/api/rooms/[roomId]/battle/route.ts::POST()`。
 - **动作合同：** `dispatchRoomBattleAction()` 读取 Room 和 `ServerBattleState`，校验签名身份与动作玩家，再调用带 room seed 的 Runner。
-- **成功：** 更新 `room.battleState`，用读取到的 `Room.version` 调用 `setRoomIfVersion()`；只有 CAS 成功才广播 `stateUpdate { state, seed, stateHash, duplicate }`。
-- **失败：** WS 向发送者返回 `actionError`；HTTP 返回 JSON。持续版本竞争返回 `ROOM_VERSION_CONFLICT`（HTTP 409）；竞争后读到终局返回 `BATTLE_ALREADY_TERMINAL`；选择与普通错误仍可携带 preparation 和 determinism 上下文。
+- **成功：** 更新 `room.battleState`，用读取到的 `Room.version` 调用 `setRoomIfVersion()`；只有 CAS 成功才广播 `stateUpdate { state, seed, stateHash, authorityVersion, acceptedClientActionId?, duplicate }`。玩家 applied/duplicate 回显原 `clientActionId`，timer/system/初始快照不生成 ACK。
+- **失败：** WS 向发送者返回带原 action 的 `actionError`；HTTP 返回 JSON。持续版本竞争返回 `ROOM_VERSION_CONFLICT`（HTTP 409）；竞争后读到终局返回 `BATTLE_ALREADY_TERMINAL`。target/option preparation 额外携带 `acceptedClientActionId`，表示权威已接受本命令并进入下一选择步骤；普通 reject 不伪装成 ACK。
 - **并发边界：** HTTP、WS 与 Bot 的房间写入都受数据库版本 CAS 保护；失败计算被丢弃，不广播也不覆盖已提交终局。
 - **测试：** `tests/roster-transports.test.ts` 覆盖同房间 HTTP/WS 双投降竞争；`terminal-transport.test.ts` 与 `battle-command.test.ts` 覆盖守卫、CAS 和 Bot 终局持久化。
 
@@ -322,8 +322,8 @@ RED-82 的目标流程：
 
 - **浏览器出口：** `lib/game/engine-browser-entry.ts` 暴露归约器、Runner、hash、普通移动和旧 RNG 适配器；`data/pages/js/game-engine.js` 是构建产物。
 - **战斗页：** 在线 `battle.html::doAction()` 只生成 `clientActionId`、签名并立即提交动作；不在发送前克隆战局、执行 Runner 或生成客户端 trace。
-- **LAN：** 浏览器提交命令并消费权威 `stateUpdate`；需要目标或选项时，由服务端以 `actionError + preparation` 返回候选和选择凭证。
-- **Relay：** 所有浏览器都只向同合同的远端权威房间服务发送 action 并等待完整 `stateUpdate`；旧 `pendingAction`/`hostResume` 权威消息被忽略，客户端禁止上传 `stateUpdate`。
+- **LAN：** 浏览器提交命令并消费权威 `stateUpdate`；applied/duplicate 用 `acceptedClientActionId` 关联原命令。需要目标或选项时，服务端以 `actionError + preparation + acceptedClientActionId` 返回候选和选择凭证。
+- **Relay：** 所有浏览器都只向同合同的远端权威房间服务发送 action 并等待完整 `stateUpdate`；Relay 瞬时透传 `acceptedClientActionId`，但保存的 reconnect blob 明确排除 ACK，避免旧确认在重连时重放。旧 `pendingAction`/`hostResume` 权威消息被忽略，客户端禁止上传 `stateUpdate`。
 - **Training：** `trainingDoAction()` 保留独立训练入口，不属于多人在线传输合同。
 - **Android：** `mobile-server-entry.ts::handleBattleAction()` 仍属于待删除的旧 action-log 框架；在线战斗页不再生成 trace，RED-34 不维护移动端旧 action log。
 - **Android 回放：** `battle.html::applyLegacyBattleEntry()` 按 `seq` 调用浏览器 Runner；缺 root seed 或 Runner 时失败关闭。
@@ -402,8 +402,8 @@ sequenceDiagram
     Runner-->>WS: state/hash/trace
     WS->>Store: setRoom
     Store-->>WS: 保存完成，Room.version + 1
-    WS-->>UI: stateUpdate 完整状态
-    UI->>UI: applyServerState + render
+    WS-->>UI: stateUpdate 完整状态 + acceptedClientActionId
+    UI->>UI: applyServerState；仅匹配 ACK 解锁 pending + render
   end
 ```
 
@@ -411,7 +411,7 @@ sequenceDiagram
 
 - Windows 客户端只提交命令，不计算或上传下一状态；服务端从已保存状态执行唯一一次权威动作。
 - 浏览器不再生成或上传预演 trace；Windows WS/HTTP 的权威 Runner 自行生成并保存 Action Trace。
-- 保存成功后的 `stateUpdate` 是共享状态。规则失败时 WS 只向发送者回 `actionError + preparation`，不会保存或广播失败状态。
+- 保存成功后的 `stateUpdate` 是共享状态，响应 envelope 可用 `acceptedClientActionId` 确认本次玩家命令；该字段不属于持久化权威状态。规则失败时 WS 只向发送者回 `actionError`，不会保存或广播失败状态；进入 target/option 步骤的 preparation 回显同一 ID。
 - 当前常规动作写入没有使用 `setRoomIfVersion()`，所以并发请求仍是已知风险。
 
 ### 5.3 技能、卡牌与触发器结算
@@ -463,7 +463,7 @@ sequenceDiagram
   DB->>DB: 剥离函数/顶层 skillsById 并 JSON 序列化
   DB->>DB: 持久化并递增 Room.version
   DB-->>Room: 保存完成
-  Room->>WS: stateUpdate(state, seed, stateHash, duplicate)
+  Room->>WS: stateUpdate(state, seed, stateHash, authorityVersion, acceptedClientActionId?, duplicate)
   WS-->>Client: 完整权威快照
   Client->>Client: 校验 seed、补展示用 skillsById
   Client->>Client: 对账选择会话、刷新日志和界面
@@ -674,7 +674,7 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 - 生产规则使用单调 `performance` 时钟；房间协调器可注入伪时钟。测试固定状态、seed、时间和命令序列，不使用真实等待。
 - 协调器在异步读取前记录逻辑到达时间，并用每房间串行锁冻结逻辑权威时钟，直到规则、唯一 CAS、快照构造和 WS/HTTP 结果入队完成；恢复只推进进程内排除偏移，不改写 deadline。CAS 冲突重试不广播未提交版本，跨过 15 秒阈值的处理也不能令客户端烧绳状态反转。
 - RED-36 不包含断线/服务重启时钟恢复；当前逻辑时钟偏移以服务进程为生命周期，后续恢复协议必须持久化或重建该偏移。
-- `stateUpdate`/HTTP 快照包含 `serverNow` 和 `turnTimer` 投影。客户端用服务器期限显示倒计时，只提交签名玩法命令。
+- `stateUpdate`/HTTP 快照包含 `serverNow` 和 `turnTimer` 投影。timer/system 提交不带 `acceptedClientActionId`，因此并发烧绳或超时状态不会确认玩家 pending；客户端用服务器期限显示倒计时，只提交签名玩法命令。
 - 45 秒部署保持 RED-31 的独立门禁；双方站位继续公开，尚未提交的个人重投选择不进入公开状态。
 - 超时推进到 `bot` 的 action phase 时，调度器调用统一 bot-turn 队列，PVE 不会等待机器人自己的 deadline。
 

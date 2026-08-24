@@ -138,6 +138,12 @@ function sendActionError(ws: WebSocket, payload: Record<string, unknown>): void 
   })
 }
 
+function getClientActionId(action: unknown): string | undefined {
+  if (!action || typeof action !== 'object' || !('clientActionId' in action)) return undefined
+  const clientActionId = (action as { clientActionId?: unknown }).clientActionId
+  return typeof clientActionId === 'string' && clientActionId.trim() ? clientActionId : undefined
+}
+
 async function broadcastRoom(roomId: string): Promise<void> {
   const room = await roomStore.getRoom(roomId)
   if (room) broadcastToRoom(roomId, { type: 'roomUpdate', room: publicRoom(room) })
@@ -604,6 +610,7 @@ async function restartWsServer(): Promise<void> {
                 sendActionError(sender, {
                   error: terminalSubmissionError.message,
                   code: terminalSubmissionError.code,
+                  action: msg.type === 'action' ? msg.action : undefined,
                 })
                 return
               }
@@ -675,6 +682,9 @@ async function restartWsServer(): Promise<void> {
                     error: message,
                     code: errAny?.code ?? undefined,
                     action: msg.action,
+                    acceptedClientActionId: errAny?.needsTargetSelection || errAny?.needsOptionSelection
+                      ? getClientActionId(msg.action)
+                      : undefined,
                     preparation: errAny?.preparation ?? undefined,
                     needsTargetSelection: errAny?.needsTargetSelection || undefined,
                     targetType: errAny?.targetType ?? undefined,

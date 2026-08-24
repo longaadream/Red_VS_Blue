@@ -56,13 +56,22 @@ export type WsInbound =
       signature: string
     }
   | { type: 'action'; seq: number; action: unknown; auth?: unknown; prevStateHash: string; signature?: string }
-  | { type: 'stateUpdate'; seq: number; authorityVersion?: number; state: unknown; seed?: number; stateHash?: string }
+  | {
+      type: 'stateUpdate'
+      seq: number
+      authorityVersion?: number
+      acceptedClientActionId?: string
+      state: unknown
+      seed?: number
+      stateHash?: string
+    }
   | {
       type: 'actionError'
       to: string
       action: unknown
       error: string
       code?: string
+      acceptedClientActionId?: string
       preparation?: unknown
       needsTargetSelection?: boolean
       targetType?: string
@@ -79,13 +88,22 @@ export type WsInbound =
 export type WsOutbound =
   | { type: 'subscribed'; role: PlayerRole }
   | { type: 'pendingAction'; seq: number; action: unknown; auth?: unknown; from: string }
-  | { type: 'stateUpdate'; seq: number; authorityVersion?: number; state: unknown; seed?: number; stateHash?: string }
+  | {
+      type: 'stateUpdate'
+      seq: number
+      authorityVersion?: number
+      acceptedClientActionId?: string
+      state: unknown
+      seed?: number
+      stateHash?: string
+    }
   | {
       type: 'actionError'
       from: string
       action: unknown
       error: string
       code?: string
+      acceptedClientActionId?: string
       preparation?: unknown
       needsTargetSelection?: boolean
       targetType?: string

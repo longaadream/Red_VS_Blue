@@ -118,7 +118,15 @@ function handleStateUpdate(
   // Relay to all guests
   store.broadcastToRoom(
     roomId,
-    { type: 'stateUpdate', seq: msg.seq, authorityVersion: msg.authorityVersion, state: msg.state, seed: msg.seed, stateHash: msg.stateHash },
+    {
+      type: 'stateUpdate',
+      seq: msg.seq,
+      authorityVersion: msg.authorityVersion,
+      acceptedClientActionId: msg.acceptedClientActionId,
+      state: msg.state,
+      seed: msg.seed,
+      stateHash: msg.stateHash,
+    },
     ws // exclude host
   )
 }
@@ -149,6 +157,7 @@ function handleActionError(
     action: msg.action,
     error: msg.error,
     code: msg.code,
+    acceptedClientActionId: msg.acceptedClientActionId,
     preparation: msg.preparation,
     needsTargetSelection: msg.needsTargetSelection,
     targetType: msg.targetType,
