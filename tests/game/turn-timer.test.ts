@@ -56,6 +56,33 @@ describe('RED-36 growing authoritative turn timer', () => {
     })
   })
 
+  it('starts for pending input before action phase but rejects idle non-action phases', () => {
+    const waitingState = makeState({ turnNumber: 2, phase: 'start' })
+    waitingState.pendingOptionSelection = {
+      playerId: 'player-blue',
+      title: 'Resolve begin-turn effect',
+      options: ['resolve'],
+    }
+
+    expect(createRunningTurnTimer(waitingState, 2_000)).toMatchObject({
+      status: 'running',
+      ownerPlayerId: 'player-blue',
+      inputOwnerPlayerId: 'player-blue',
+      turnOwnerPlayerId: 'player-red',
+      turnNumber: 2,
+      startedAt: 2_000,
+      remainingMs: 45_000,
+      deadlineAt: 47_000,
+    })
+
+    const idleStart = makeState({ phase: 'start' })
+    const idleEnd = makeState({ phase: 'end' })
+    expect(() => createRunningTurnTimer(idleStart, 0))
+      .toThrow(/action phase or for pending input/)
+    expect(() => createRunningTurnTimer(idleEnd, 0))
+      .toThrow(/action phase or for pending input/)
+  })
+
   it('uses a 20-second fast rope only for a player carrying a no-op timeout streak', () => {
     const state = makeState({ turnNumber: 3, phase: 'action' })
     const timer = createRunningTurnTimer(state, 4_000, {
@@ -122,109 +149,6 @@ describe('RED-36 growing authoritative turn timer', () => {
       fast: true,
       acceptedGameplayAction: true,
       noOpStreaks: { 'player-red': 0, 'player-blue': 0 },
-    })
-  })
-
-  it('runs through a start-phase pending input without resetting its budget in action phase', () => {
-    const state = makeState({ turnNumber: 1, phase: 'action' })
-    state.turnTimer = createRunningTurnTimer(state, 0, {
-      'player-red': 0,
-      'player-blue': 1,
-    })
-    state.turn.currentPlayerId = 'player-blue'
-    state.turn.turnNumber = 2
-    state.turn.phase = 'start'
-    state.pendingOptionSelection = {
-      playerId: 'player-blue',
-      title: 'Resolve begin-turn input',
-      options: ['resolve'],
-    }
-
-    const waitingInStart = syncTurnTimerAfterAcceptedAction(state, {
-      receivedAt: 1_000,
-      resumedAt: 1_000,
-    })
-
-    expect(waitingInStart).toMatchObject({
-      status: 'running',
-      ownerPlayerId: 'player-blue',
-      turnOwnerPlayerId: 'player-blue',
-      turnNumber: 2,
-      durationMs: TURN_FAST_DURATION_MS,
-      remainingMs: TURN_FAST_DURATION_MS,
-      startedAt: 1_000,
-      deadlineAt: 21_000,
-    })
-
-    state.turnTimer = waitingInStart
-    state.pendingOptionSelection = undefined
-    state.turn.phase = 'action'
-    const runningInAction = syncTurnTimerAfterAcceptedAction(state, {
-      receivedAt: 5_000,
-      resumedAt: 5_000,
-      actorPlayerId: 'player-blue',
-      acceptedActionType: 'pendingOptionSelect',
-    })
-
-    expect(runningInAction).toMatchObject({
-      status: 'running',
-      ownerPlayerId: 'player-blue',
-      turnOwnerPlayerId: 'player-blue',
-      turnNumber: 2,
-      durationMs: TURN_FAST_DURATION_MS,
-      remainingMs: 16_000,
-      startedAt: 1_000,
-      deadlineAt: 21_000,
-      acceptedGameplayAction: true,
-      noOpStreaks: { 'player-red': 0, 'player-blue': 0 },
-    })
-  })
-
-  it('stops between turns until the next action phase begins', () => {
-    const state = makeState({ turnNumber: 1, phase: 'action' })
-    state.turnTimer = createRunningTurnTimer(state, 0, {
-      'player-red': 0,
-      'player-blue': 1,
-    })
-    state.turn.currentPlayerId = 'player-blue'
-    state.turn.turnNumber = 2
-    state.turn.phase = 'start'
-
-    expect(() => createRunningTurnTimer(state, 1_000)).toThrow(/action phase or while a pending input/)
-    const waitingInStart = syncTurnTimerAfterAcceptedAction(state, {
-      receivedAt: 1_000,
-      resumedAt: 1_000,
-    })
-
-    expect(waitingInStart).toMatchObject({
-      status: 'stopped',
-      ownerPlayerId: 'player-blue',
-      turnOwnerPlayerId: 'player-blue',
-      inputOwnerPlayerId: 'player-blue',
-      turnNumber: 2,
-      durationMs: TURN_FAST_DURATION_MS,
-      remainingMs: TURN_FAST_DURATION_MS,
-      noOpStreaks: { 'player-red': 0, 'player-blue': 1 },
-    })
-
-    state.turnTimer = waitingInStart
-    state.turn.phase = 'action'
-    const runningInAction = syncTurnTimerAfterAcceptedAction(state, {
-      receivedAt: 5_000,
-      resumedAt: 5_000,
-    })
-
-    expect(runningInAction).toMatchObject({
-      status: 'running',
-      ownerPlayerId: 'player-blue',
-      turnOwnerPlayerId: 'player-blue',
-      inputOwnerPlayerId: 'player-blue',
-      turnNumber: 2,
-      durationMs: TURN_FAST_DURATION_MS,
-      remainingMs: TURN_FAST_DURATION_MS,
-      startedAt: 5_000,
-      deadlineAt: 25_000,
-      noOpStreaks: { 'player-red': 0, 'player-blue': 1 },
     })
   })
 })
