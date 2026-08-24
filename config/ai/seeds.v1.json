@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "training": [1001, 1002, 1003, 1004],
+  "publicValidation": [2001],
+  "candidateHoldout": {
+    "source": "external",
+    "commitmentHash": "external-required"
+  }
+}
