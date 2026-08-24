@@ -14,9 +14,10 @@ import {
   simulateAITransition,
 } from '@/lib/game/ai-environment'
 import type { AIEnvironment, CandidateAction } from '@/lib/game/ai-types'
-import { stableJson } from '@/lib/game/battle-trace'
+import { hashStable, stableJson } from '@/lib/game/battle-trace'
+import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import { globalTriggerSystem } from '@/lib/game/triggers'
-import { prepareAction } from '@/lib/game/targeting'
+import { getTargetingStateRevision, prepareAction } from '@/lib/game/targeting'
 import { getLegalNormalMoveTargetsForPlayer } from '@/lib/game/spatial'
 import { loadRuleById } from '@/lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
@@ -40,6 +41,37 @@ function activeSkill(id: string, targeting: any, overrides: Record<string, unkno
     code: "function executeSkill(context) { context.battle.extensions.executed = context.skill.id; return { success: true, message: 'executed' }; }",
     ...overrides,
   }
+}
+
+function makeSilencedActionFixture() {
+  const caster = makePiece({ instanceId: 'silenced-caster', ownerPlayerId: 'player-red', x: 1, y: 1, moveRange: 2 }) as any
+  const enemy = makePiece({ instanceId: 'silenced-enemy', ownerPlayerId: 'player-blue', x: 3, y: 1 }) as any
+  const silencedRule = loadRuleById('rule-silenced-block', true)
+  if (!silencedRule) throw new Error('Expected rule-silenced-block fixture')
+  caster.statusTags = [{
+    id: 'silenced-silenced-caster', type: 'silenced', name: '沉默', visible: true,
+    remainingDuration: 1, remainingUses: -1, intensity: 1, stacks: 1,
+    relatedRules: ['rule-silenced-block'],
+  }]
+  caster.rules = [silencedRule]
+  caster.skills = [
+    { skillId: 'silenced-basic', currentCooldown: 0, usesRemaining: -1 },
+    { skillId: 'silenced-charge', currentCooldown: 0, usesRemaining: 1 },
+  ]
+  const state = makeState({ pieces: [enemy, caster], width: 5, height: 4 }) as any
+  state.players[0].actionPoints = 10
+  state.players[0].chargePoints = 10
+  state.skillsById['silenced-basic'] = activeSkill('silenced-basic', { steps: [] }, {
+    actionPointCost: 2,
+  })
+  state.skillsById['silenced-charge'] = activeSkill('silenced-charge', { steps: [] }, {
+    type: 'ultimate', actionPointCost: 2, chargeCost: 3,
+  })
+  state.players[0].hand = [{
+    ...JSON.parse(readFileSync(resolve(process.cwd(), 'data/cards/lucky-coin.json'), 'utf8')),
+    cardId: 'lucky-coin', instanceId: 'silenced-zero-card', ownerPlayerId: 'player-red',
+  }]
+  return { caster, state }
 }
 
 function loadBrowserEnvironment(): AIEnvironment {
@@ -138,6 +170,83 @@ describe('versioned headless AI environment', () => {
       ).toBe(true)
     }
     expect(new Set(first.map(item => item.id)).size).toBe(first.length)
+  })
+
+  it('excludes silenced basic/charge skills without hiding other legal actions or mutating query inputs', () => {
+    const { caster, state } = makeSilencedActionFixture()
+    const beforeState = stableJson(state)
+    const beforeStateHash = hashStable(state)
+    const beforeRevision = getTargetingStateRevision(state)
+    const beforeRules = [...globalTriggerSystem.getRules()]
+    const beforeRuleLimits = beforeRules.map(rule => stableJson(rule.limits))
+    const runtime = new RuleRuntime({ rootSeed: FIXED_SEED, cursors: { 'red-106-fixture': 7 }, tick: 3 })
+    const beforeRuntime = runtime.snapshot()
+
+    let first: CandidateAction[] = []
+    let second: CandidateAction[] = []
+    withRuleRuntime(runtime, () => {
+      first = listLegalAIActions(state, 'player-red')
+      second = listLegalAIActions(state, 'player-red')
+    })
+
+    expect(second).toEqual(first)
+    expect(stableJson(state)).toBe(beforeState)
+    expect(hashStable(state)).toBe(beforeStateHash)
+    expect(getTargetingStateRevision(state)).toBe(beforeRevision)
+    expect(runtime.snapshot()).toEqual(beforeRuntime)
+    expect(globalTriggerSystem.getRules()).toEqual(beforeRules)
+    expect(globalTriggerSystem.getRules().map(rule => stableJson(rule.limits))).toEqual(beforeRuleLimits)
+
+    const leakedSkills = first.filter(item => item.kind === 'basic-skill' || item.kind === 'charge-skill')
+    if (leakedSkills.length > 0) {
+      const blocked = simulateAITransition(state, leakedSkills[0], { rootSeed: FIXED_SEED })
+      expect(blocked.accepted).toBe(true)
+      expect(stableJson(blocked.trace.actionLog)).toContain('已被沉默，无法使用技能')
+    }
+    expect(leakedSkills).toEqual([])
+    expect(first.some(item => item.kind === 'move')).toBe(true)
+    expect(first.some(item => item.kind === 'card')).toBe(true)
+    expect(first.at(-1)?.kind).toBe('end-turn')
+    for (const item of first.filter(candidate => candidate.kind !== 'basic-skill' && candidate.kind !== 'charge-skill')) {
+      const transition = simulateAITransition(state, item, { rootSeed: FIXED_SEED })
+      expect(transition.accepted, `${item.id}:${stableJson(item.action)}`).toBe(true)
+      expect(stableJson(transition.trace.actionLog)).not.toContain('已被沉默，无法使用技能')
+    }
+
+    caster.statusTags = []
+    expect(listLegalAIActions(state, 'player-red').filter(item => (
+      item.kind === 'basic-skill' || item.kind === 'charge-skill'
+    )).map(item => item.action.type)).toEqual(['useBasicSkill', 'useChargeSkill'])
+
+    caster.statusTags = [{ id: 'silenced-silenced-caster', type: 'silenced' }]
+    caster.rules = []
+    expect(listLegalAIActions(state, 'player-red').filter(item => (
+      item.kind === 'basic-skill' || item.kind === 'charge-skill'
+    )).map(item => item.action.type)).toEqual(['useBasicSkill', 'useChargeSkill'])
+
+    const hasSkill = (skillId: string) => listLegalAIActions(state, 'player-red').some(item => (
+      (item.action.type === 'useBasicSkill' || item.action.type === 'useChargeSkill') &&
+      item.action.skillId === skillId
+    ))
+    caster.statusTags = []
+    caster.skills[0].currentCooldown = 1
+    expect(hasSkill('silenced-basic')).toBe(false)
+    expect(hasSkill('silenced-charge')).toBe(true)
+
+    caster.skills[0].currentCooldown = 0
+    state.players[0].actionPoints = 0
+    expect(hasSkill('silenced-basic')).toBe(false)
+    expect(hasSkill('silenced-charge')).toBe(false)
+
+    state.players[0].actionPoints = 10
+    state.players[0].chargePoints = 0
+    expect(hasSkill('silenced-basic')).toBe(true)
+    expect(hasSkill('silenced-charge')).toBe(false)
+
+    state.players[0].chargePoints = 10
+    caster.skills[1].usesRemaining = 0
+    expect(hasSkill('silenced-basic')).toBe(true)
+    expect(hasSkill('silenced-charge')).toBe(false)
   })
 
   it('fails closed for non-player commands and exposes the admission matrix', () => {
@@ -337,11 +446,13 @@ describe('versioned headless AI environment', () => {
 
   it('matches the generated browser export for candidate order and transition hash', () => {
     const browser = loadBrowserEnvironment()
-    const nodeState = makeState({ pieces: [makePiece({ instanceId: 'mover', x: 1, y: 1, moveRange: 2 })] }) as any
+    const nodeState = makeSilencedActionFixture().state
     const browserState = JSON.parse(JSON.stringify(nodeState))
     const nodeCandidates = aiEnvironmentV1.listLegalActions(nodeState, 'player-red')
     const browserCandidates = browser.listLegalActions(browserState, 'player-red')
     expect(JSON.parse(JSON.stringify(browserCandidates))).toEqual(nodeCandidates)
+    expect(hashStable(browserCandidates)).toBe(hashStable(nodeCandidates))
+    expect(nodeCandidates.some(item => item.kind === 'basic-skill' || item.kind === 'charge-skill')).toBe(false)
 
     const selectMove = (items: CandidateAction[]) => items.find(item => item.kind === 'move')!
     const nodeResult = aiEnvironmentV1.simulate(nodeState, selectMove(nodeCandidates), { rootSeed: FIXED_SEED })

@@ -57,6 +57,52 @@ function targetedSkill(
 }
 
 describe('authoritative target preparation', () => {
+  it('rejects active skills only while the source has both silence status and its blocking rule', () => {
+    const caster = makePiece({
+      instanceId: 'silenced-caster', ownerPlayerId: 'player-red', x: 1, y: 1,
+      statusTags: [{ id: 'silenced-silenced-caster', type: 'silenced' }],
+      rules: [{ id: 'rule-silenced-block' }],
+    })
+    caster.skills = [
+      { skillId: 'silenced-basic', currentCooldown: 0, usesRemaining: -1 },
+      { skillId: 'silenced-charge', currentCooldown: 0, usesRemaining: 1 },
+    ] as never
+    const state = makeState({ pieces: [caster] })
+    state.players[0].actionPoints = 10
+    state.players[0].chargePoints = 10
+    state.skillsById['silenced-basic'] = targetedSkill('silenced-basic', '', {
+      targeting: { steps: [] },
+    }) as never
+    state.skillsById['silenced-charge'] = targetedSkill('silenced-charge', '', {
+      type: 'ultimate', chargeCost: 3, targeting: { steps: [] },
+    }) as never
+    const before = JSON.stringify(state)
+
+    for (const action of [
+      { type: 'useBasicSkill', skillId: 'silenced-basic' },
+      { type: 'useChargeSkill', skillId: 'silenced-charge' },
+    ] as const) {
+      expect(prepareAction(state, {
+        ...action, playerId: 'player-red', pieceId: caster.instanceId,
+      })).toEqual({
+        kind: 'invalid', code: 'ACTION_INVALID', message: 'Source piece is silenced',
+      })
+    }
+    expect(JSON.stringify(state)).toBe(before)
+    expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
+
+    caster.statusTags = [] as never
+    expect(prepareAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: caster.instanceId, skillId: 'silenced-basic',
+    })).toEqual({ kind: 'ready' })
+
+    caster.statusTags = [{ id: 'silenced-silenced-caster', type: 'silenced' }] as never
+    caster.rules = [] as never
+    expect(prepareAction(state, {
+      type: 'useChargeSkill', playerId: 'player-red', pieceId: caster.instanceId, skillId: 'silenced-charge',
+    })).toEqual({ kind: 'ready' })
+  })
+
   it('returns exact living enemy candidates without mutating state, triggers, logs, or RNG', () => {
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 1, y: 1 })
     const enemyNear = makePiece({ instanceId: 'enemy-near', ownerPlayerId: 'player-blue', x: 3, y: 1 })
