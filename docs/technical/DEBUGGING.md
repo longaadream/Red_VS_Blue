@@ -146,6 +146,21 @@ npm run test -- tests/electron/battle-page-runtime.test.ts
 
 因此“没有日志”不能证明流程没有发生，“看到 stateUpdate”也不能证明各端使用了相同资源和相同状态。
 
+### 6.1 Electron 子服务日志转发断管
+
+Electron Server 与 Electron Client 把内置子服务的 stdout/stderr 转发到宿主标准流。宿主
+关闭管道时，主进程输出一条 `[electron:child-log-forwarding]` 结构化诊断，字段包括：
+
+- `event: electron.child-log-forwarding.error`
+- `runtime: electron-server | electron-client`
+- `stream: stdout | stderr`
+- `side: source | target | write`
+- `code`、`message`、`recoverable` 与 `action`
+
+`code: EPIPE` 的唯一恢复动作是 `action: stop-forwarding`：停止对应 stream 的后续转发，
+不重试、不重复报告，也不终止 Electron 主进程。其他错误使用 `action: report-error`，并
+继续进入 unexpected-error 诊断；子进程自身的启动、`error` 与 `exit` 反馈路径保持不变。
+
 ## 7. 统一日志愿景
 
 后续建议所有关键操作使用同一结构：
