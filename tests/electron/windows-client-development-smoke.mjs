@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -12,6 +12,10 @@ const electronCandidates = [
 const electronExecutable = electronCandidates.find(existsSync)
 const mainEntry = path.join(root, 'electron-client', 'dist', 'main.js')
 const smokeRoot = path.join(os.tmpdir(), `rvb-red46-electron-smoke-${process.pid}`)
+const red105ScreenshotPath = path.resolve(
+  process.env.RVB_RED105_SCREENSHOT || path.join(smokeRoot, 'red-105-lan-card-fallback.png'),
+)
+const red105AuthorityUrl = process.env.RVB_RED105_AUTHORITY_URL || ''
 const children = new Set()
 
 function assert(condition, message) {
@@ -75,6 +79,36 @@ async function connectTarget(target) {
         throw new Error(response.result.exceptionDetails.exception?.description || 'Renderer evaluation failed')
       }
       return response.result?.result?.value
+    },
+    async captureScreenshot(options = {}, timeoutMs = 30000) {
+      const id = ++nextId
+      const response = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          socket.removeEventListener('message', onMessage)
+          reject(new Error('CDP screenshot timed out'))
+        }, timeoutMs)
+        const onMessage = (event) => {
+          const message = JSON.parse(String(event.data))
+          if (message.id !== id) return
+          clearTimeout(timer)
+          socket.removeEventListener('message', onMessage)
+          resolve(message)
+        }
+        socket.addEventListener('message', onMessage)
+        socket.send(JSON.stringify({
+          id,
+          method: 'Page.captureScreenshot',
+          params: Object.assign({
+            format: 'png',
+            fromSurface: true,
+            captureBeyondViewport: false,
+          }, options),
+        }))
+      })
+      if (response.error) throw new Error(JSON.stringify(response.error))
+      const data = response.result?.data
+      if (!data) throw new Error('CDP screenshot returned no data')
+      return data
     },
     evaluateFireAndForget(expression) {
       socket.send(JSON.stringify({
@@ -235,6 +269,180 @@ async function readBuiltInPieceResources(target) {
   })()`)
 }
 
+async function readBuiltInLuckyCoinResources(target) {
+  return evaluate(target, `(async () => {
+    const cardResponse = await fetch('./data/cards/lucky-coin.json')
+    const card = cardResponse.ok ? await cardResponse.json() : null
+    const imageResponse = card && card.image
+      ? await fetch('./images/card-art/' + card.image)
+      : null
+    return {
+      cardStatus: cardResponse.status,
+      id: card && card.id,
+      name: card && card.name,
+      description: card && card.description,
+      actionPointCost: card && card.actionPointCost,
+      type: card && card.type,
+      image: card && card.image,
+      imageStatus: imageResponse && imageResponse.status,
+    }
+  })()`)
+}
+
+async function verifyLanLuckyCoinFallback(port, sourceTarget) {
+  const authorityUrl = red105AuthorityUrl || 'http://127.0.0.1:39999'
+  const battleUrl = `rvb-client://app/battle.html?roomId=red-105-room&playerId=player-blue&server=lan&serverUrl=${encodeURIComponent(authorityUrl)}`
+  await evaluateFireAndForget(
+    sourceTarget,
+    `window.location.href = ${JSON.stringify(battleUrl)}`,
+  )
+  const battleTarget = await waitForTarget(
+    port,
+    (target) => target.url.startsWith('rvb-client://app/battle.html'),
+  )
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      const ready = await evaluate(
+        battleTarget,
+        `document.readyState === 'complete'
+          && typeof renderHand === 'function'
+          && typeof ensureHandCardDisplayMetadata === 'function'
+          && Object.keys(cardsById).length > 0`,
+      )
+      if (ready) break
+    } catch {}
+    if (attempt === 99) throw new Error('Battle metadata runtime did not become ready')
+    await delay(100)
+  }
+
+  const runtime = await evaluate(battleTarget, `(async () => {
+    const originalServerFetch = RvBUtils.serverFetch
+    const originalSend = RvBWs.send
+    const requests = []
+    const sentMessages = []
+    const useLiveAuthority = ${JSON.stringify(Boolean(red105AuthorityUrl))}
+    try {
+      RvBUtils.serverFetch = async function (requestPath, options) {
+        requests.push({ path: requestPath, timeoutMs: options && options.timeoutMs })
+        if (requestPath !== '/api/cards/lucky-coin') {
+          throw new Error('unexpected authority request: ' + requestPath)
+        }
+        if (useLiveAuthority) {
+          return originalServerFetch(requestPath, options)
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async function () {
+            return {
+              id: 'lucky-coin',
+              name: '幸运币',
+              description: '获得1点行动点。',
+              actionPointCost: 0,
+              type: 'active',
+              image: 'the-coin.jpg',
+              code: 'throw new Error("authority code must never execute")',
+            }
+          },
+        }
+      }
+      RvBWs.send = function (message) { sentMessages.push(message) }
+      cardsById = {}
+      Object.keys(cardDisplayMetadataById).forEach(function (cardId) {
+        delete cardDisplayMetadataById[cardId]
+      })
+      cardDisplayMetadataRequests.clear()
+      cardDisplayMetadataFailures.clear()
+      cardDisplayMetadataLoggedErrors.clear()
+      battlePageDisposed = false
+      wsMode = 'lan'
+      pendingCardAction = null
+      G = {
+        players: [{
+          playerId: 'player-blue',
+          actionPoints: 2,
+          hand: [{ cardId: 'lucky-coin', instanceId: 'red-105-lucky-coin-instance' }],
+        }],
+        turn: { currentPlayerId: 'player-blue', turnNumber: 1 },
+      }
+      const stateBefore = JSON.stringify(G)
+      renderHand()
+      const pending = cardDisplayMetadataRequests.get('lucky-coin')
+      if (pending) await pending
+      await new Promise(function (resolve) {
+        requestAnimationFrame(function () { requestAnimationFrame(resolve) })
+      })
+      const image = document.querySelector('#handCards .card-art img')
+      if (image && !image.complete) {
+        await Promise.race([
+          new Promise(function (resolve) {
+            image.addEventListener('load', resolve, { once: true })
+            image.addEventListener('error', resolve, { once: true })
+          }),
+          new Promise(function (resolve) { setTimeout(resolve, 3000) }),
+        ])
+      }
+      const overlay = document.getElementById('loadingOverlay')
+      if (overlay) overlay.style.display = 'none'
+      const card = document.querySelector('#handCards .card-item')
+      const fallback = cardDisplayMetadataById['lucky-coin']
+      const cardRect = card && card.getBoundingClientRect()
+      const cardClip = cardRect && {
+        x: Math.max(0, cardRect.x - 48),
+        y: Math.max(0, cardRect.y - 48),
+        width: Math.min(window.innerWidth, cardRect.width + 96),
+        height: Math.min(window.innerHeight, cardRect.height + 96),
+        scale: 2,
+      }
+      return {
+        requestCount: requests.length,
+        requests: requests,
+        authorityMode: useLiveAuthority ? 'live' : 'mocked',
+        cardName: card && card.querySelector('.card-name-banner')?.textContent,
+        description: card && card.querySelector('.card-desc')?.textContent,
+        cost: card && card.querySelector('.card-mana-gem')?.textContent,
+        typeLabel: card && card.querySelector('.card-type-badge')?.textContent,
+        imageSource: image && image.getAttribute('src'),
+        imageLoaded: !!(image && image.complete && image.naturalWidth > 0),
+        pendingCardAction: pendingCardAction,
+        actionMessages: sentMessages.filter(function (message) {
+          return message && (message.type === 'playCard' || (message.action && message.action.type === 'playCard'))
+        }),
+        stateUnchanged: JSON.stringify(G) === stateBefore,
+        fallbackKeys: fallback ? Object.keys(fallback).sort() : [],
+        cardClip: cardClip,
+      }
+    } finally {
+      RvBUtils.serverFetch = originalServerFetch
+      RvBWs.send = originalSend
+    }
+  })()`)
+
+  assert(runtime.requestCount === 1, `LAN card metadata request was not deduplicated: ${JSON.stringify(runtime)}`)
+  assert(runtime.requests[0]?.path === '/api/cards/lucky-coin' && runtime.requests[0]?.timeoutMs === 3500,
+    `LAN card metadata request was not bounded: ${JSON.stringify(runtime)}`)
+  assert(runtime.cardName === '幸运币' && runtime.description === '获得1点行动点。',
+    `LAN lucky coin text did not recover: ${JSON.stringify(runtime)}`)
+  assert(runtime.cost === '0' && runtime.typeLabel === '主动',
+    `LAN lucky coin cost/type did not recover: ${JSON.stringify(runtime)}`)
+  assert(runtime.imageSource === 'images/card-art/the-coin.jpg' && runtime.imageLoaded,
+    `LAN lucky coin art did not load locally: ${JSON.stringify(runtime)}`)
+  assert(runtime.pendingCardAction === null && runtime.actionMessages.length === 0 && runtime.stateUnchanged,
+    `LAN metadata recovery mutated or submitted battle state: ${JSON.stringify(runtime)}`)
+  assert(!runtime.fallbackKeys.includes('code'), `LAN fallback retained executable card code: ${JSON.stringify(runtime)}`)
+
+  const connection = await connectTarget(battleTarget)
+  const screenshot = await connection.captureScreenshot()
+  const detailScreenshot = await connection.captureScreenshot({ clip: runtime.cardClip })
+  connection.close()
+  mkdirSync(path.dirname(red105ScreenshotPath), { recursive: true })
+  writeFileSync(red105ScreenshotPath, Buffer.from(screenshot, 'base64'))
+  const detailPath = red105ScreenshotPath.replace(/\.png$/i, '-detail.png')
+  writeFileSync(detailPath, Buffer.from(detailScreenshot, 'base64'))
+  const { cardClip: _cardClip, ...evidence } = runtime
+  return { ...evidence, screenshotPath: red105ScreenshotPath, screenshotDetailPath: detailPath }
+}
+
 async function verifyIdentityWriteFailures(target) {
   return evaluate(target, `(async () => {
     const storageKey = 'rvb_identity_v2'
@@ -299,6 +507,7 @@ try {
   profileOne = await readIdentity(firstTarget, 'RED46 Player One')
   const firstServer = await waitForServerConfiguration(firstTarget)
   const pieceResources = await readBuiltInPieceResources(firstTarget)
+  const luckyCoinResources = await readBuiltInLuckyCoinResources(firstTarget)
   assert(profileOne.secureContext, 'rvb-client:// is not a secure context')
   assert(profileOne.hasSubtleCrypto, 'window.crypto.subtle is unavailable')
   assert(profileOne.url.startsWith('rvb-client://app/index.html'), `First profile opened the wrong page: ${profileOne.url}`)
@@ -312,6 +521,18 @@ try {
     `Development piece resources did not provide both alignments: ${JSON.stringify(pieceResources)}`)
   assert(pieceResources.imageCount > 0 && pieceResources.loadedImageCount === pieceResources.imageCount,
     `Development piece images were incomplete: ${JSON.stringify(pieceResources)}`)
+  assert(
+    luckyCoinResources.cardStatus === 200
+      && luckyCoinResources.id === 'lucky-coin'
+      && luckyCoinResources.name === '幸运币'
+      && luckyCoinResources.description === '获得1点行动点。'
+      && luckyCoinResources.actionPointCost === 0
+      && luckyCoinResources.type === 'active'
+      && luckyCoinResources.image === 'the-coin.jpg'
+      && luckyCoinResources.imageStatus === 200,
+    `Development lucky coin resources were incomplete: ${JSON.stringify(luckyCoinResources)}`,
+  )
+  const lanLuckyCoinFallback = await verifyLanLuckyCoinFallback(19341, firstTarget)
 
   const second = launch({ port: 19342, profile: 'red46-smoke-two' })
   const secondTarget = await openGame(19342)
@@ -369,6 +590,8 @@ try {
     identityPersistedAfterRestart: true,
     identityWriteFailuresVisible: true,
     pieceResources,
+    luckyCoinResources,
+    lanLuckyCoinFallback,
   }))
 
   stopProcessTree(second)
