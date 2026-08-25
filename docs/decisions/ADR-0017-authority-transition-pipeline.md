@@ -37,7 +37,7 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 7. 重启恢复从不晚于目标版本的最近检查点开始，先验证检查点的 state/public/transition hash，再按版本顺序应用内部 patch 并
    逐条验证 pre/post state/public hash、action hash、previous transition hash 和 transition hash。缺检查点、缺号、损坏或未到目标版本必须显式失败，不能静默使用部分状态。
 8. 热状态只保留确定性随机游标、动作/回放序号和初始化事实；每步 Trace、命令和回放帧追加到
-   Transition journal。终局检查点重新物化 ADR-0016 要求的完整 Trace v2，不降低回放事实完整性。
+   Transition journal。终局在构造 Transition 前重新物化 ADR-0016 要求的完整 Trace v2，使在线 patch/hash、checkpoint 与重启恢复共享同一终局状态，不降低回放事实完整性。
 9. 规则 JSON 和动态代码在服务进程内缓存。普通开发/生产动作不再因为 `NODE_ENV=development`
    每次读取磁盘；内容工具通过显式失效函数刷新。`RVB_FORCE_RULE_RELOAD=1` 仅用于有意逐次重载，
    `RVB_BATTLE_DEBUG_LOGS=1` 才启用同步热路径调试日志。
@@ -46,7 +46,7 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 11. 客户端 patch 应用后复用既有按键增量展示层：地图仅在地图身份或尺寸变化时重建，棋子按 `piece.id`、
     地格效果按坐标签名、候选高亮按坐标集合增删；普通 Transition 不重建 Three.js 场景。
 12. 候选功能 fail closed：只有显式 `RVB_BATTLE_AUTHORITY_V2=1` 才启用 v2 Transition；只有显式
-    `RVB_TURN_TIMER_ENABLED=1` 才安排部署/回合计时权威唤醒。未设置或设置为 `0` 时分别使用旧完整快照链路和无计时器模式。
+    `RVB_TURN_TIMER_ENABLED=1` 才启用 deadline、安排部署/回合计时权威唤醒并显示计时投影。未设置或设置为 `0` 时，晚到玩家动作也不会结算 timeout。
 
 ## 性能合同
 

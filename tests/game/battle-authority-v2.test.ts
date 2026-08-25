@@ -1,12 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { dispatchRoomBattleAction, type DeploymentRoomStore } from '@/lib/game/room-battle-actions'
+import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
+import { recordBattleInitialization } from '@/lib/game/battle-trace'
+import { toPublicBattleState } from '@/lib/game/deployment'
+import {
+  createPublicBattleTransitionUpdate,
+  dispatchRoomBattleAction,
+  type DeploymentRoomStore,
+} from '@/lib/game/room-battle-actions'
 import {
   isBattleAuthorityV2Enabled,
+  replayBattleAuthorityTransitions,
   type BattleAuthorityCheckpointRecord,
   type BattleAuthorityReceipt,
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
+import { RuleRuntime } from '@/lib/game/rule-runtime'
 import type { Room } from '@/lib/game/room-store'
 import type { BattleAction } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
@@ -26,6 +35,7 @@ class AuthorityV2MemoryStore implements DeploymentRoomStore {
   receipts = new Map<string, BattleAuthorityReceipt>()
   transitions: BattleAuthorityTransitionRecord[] = []
   baseCheckpoints: BattleAuthorityCheckpointRecord[] = []
+  checkpoints: BattleAuthorityCheckpointRecord[] = []
 
   constructor(room: Room) {
     this.room = structuredClone(room)
@@ -65,6 +75,7 @@ class AuthorityV2MemoryStore implements DeploymentRoomStore {
     if (this.failCommits || input.roomId !== this.room.id || input.expectedVersion !== this.room.battleAuthorityVersion) return false
     this.commits += 1
     if (input.baseCheckpoint) this.baseCheckpoints.push(structuredClone(input.baseCheckpoint))
+    if (input.checkpoint) this.checkpoints.push(structuredClone(input.checkpoint))
     this.transitions.push(structuredClone(input.transition))
     this.receipts.set(
       `${input.transition.receipt.roomId}:${input.transition.receipt.clientActionId}`,
@@ -76,6 +87,18 @@ class AuthorityV2MemoryStore implements DeploymentRoomStore {
       battleAuthorityTransitionHash: input.transition.transitionHash,
     }
     return true
+  }
+
+  async readBattleAuthorityHistory(): Promise<Array<{
+    trace?: BattleAuthorityTransitionRecord['traces'][number]
+    command?: Record<string, unknown>
+    replayFrame?: BattleAuthorityTransitionRecord['replayFrames'][number]
+  }>> {
+    return this.transitions.flatMap(transition => transition.commands.map((command, index) => ({
+      command: command as unknown as Record<string, unknown>,
+      trace: transition.traces[index],
+      replayFrame: transition.replayFrames[index],
+    })))
   }
 }
 
@@ -190,6 +213,70 @@ describe('RED-109 authority v2 coordinator', () => {
     expect((store.room.battleState as any).state.deployment.revision).toBe(0)
   })
 
+  it('uses one fully materialized terminal state for transition, live update, checkpoint and restore', async () => {
+    const room = makeRoom()
+    room.battleAuthorityVersion = 0
+    delete room.battleAuthorityTransitionHash
+    const store = new AuthorityV2MemoryStore(room)
+    const clock = { now: () => 2_000 }
+
+    await dispatchRoomBattleAction(store, room.id, 'player-red', {
+      type: 'deploymentLock',
+      playerId: 'player-red',
+      clientActionId: 'terminal-history-red-lock',
+    }, { expectedAuthorityVersion: 0, clock })
+    await dispatchRoomBattleAction(store, room.id, 'player-blue', {
+      type: 'deploymentLock',
+      playerId: 'player-blue',
+      clientActionId: 'terminal-history-blue-lock',
+    }, { expectedAuthorityVersion: 1, clock })
+    const terminal = await dispatchRoomBattleAction(store, room.id, 'player-red', {
+      type: 'surrender',
+      playerId: 'player-red',
+      clientActionId: 'terminal-history-surrender',
+    } as BattleAction, { expectedAuthorityVersion: 2, clock })
+
+    expect(terminal.kind).toBe('applied')
+    expect(terminal.nextAuthorityState?.terminalResult).toMatchObject({
+      status: 'finished',
+      reason: 'surrender',
+    })
+    const terminalState = terminal.nextAuthorityState!
+    const actionLog = terminalState.extensions?.debugBattle?.actionLog ?? []
+    expect(actionLog).toHaveLength(4)
+    expect(actionLog.map((entry: unknown) => (entry as { actionId?: string }).actionId)).toEqual([
+      'system-initialize',
+      'terminal-history-red-lock',
+      'terminal-history-blue-lock',
+      'terminal-history-surrender',
+    ])
+
+    const terminalTransition = store.transitions.at(-1)!
+    const terminalCheckpoint = store.checkpoints.at(-1)!
+    const spectatorPublic = toPublicBattleState(terminalState)
+    expect(terminalTransition.postPublicHash).toBe(hashPublicBattleState(spectatorPublic))
+    expect(terminalCheckpoint.publicHash).toBe(terminalTransition.postPublicHash)
+    expect(terminalCheckpoint.storage.state).toEqual(terminalState)
+    expect((store.room.battleState as any).state).toEqual(terminalState)
+
+    const liveUpdate = createPublicBattleTransitionUpdate(terminal, room.id, 'player-red', clock)
+    expect(liveUpdate?.postPublicHash).toBe(hashPublicBattleState(toPublicBattleState(terminalState, 'player-red')))
+    expect(liveUpdate?.patch).toEqual(terminal.transition?.publicPatch)
+
+    const base = store.baseCheckpoints[0]
+    const restored = replayBattleAuthorityTransitions({
+      roomId: room.id,
+      checkpointStorage: base.storage,
+      checkpointVersion: base.authorityVersion,
+      checkpointStateHash: base.stateHash,
+      checkpointPublicHash: base.publicHash,
+      checkpointTransitionHash: base.transitionHash,
+      targetVersion: store.room.battleAuthorityVersion!,
+      targetTransitionHash: store.room.battleAuthorityTransitionHash!,
+      transitions: store.transitions,
+    })
+    expect(restored).toEqual(terminalCheckpoint.storage)
+  })
   it('does not expose an applied transition or mutate the room when the atomic commit never succeeds', async () => {
     const store = new AuthorityV2MemoryStore(makeRoom())
     store.failCommits = true
@@ -240,6 +327,7 @@ function makeRoom(): Room {
       'piece-blue': { x: 8, y: 8 },
     },
   }
+  recordBattleInitialization(state, new RuleRuntime({ rootSeed: 109 }), ['player-red', 'player-blue'])
   return {
     id: 'red109-authority-v2',
     name: 'RED-109 authority v2',

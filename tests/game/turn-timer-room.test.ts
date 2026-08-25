@@ -817,6 +817,33 @@ describe('RED-36 authoritative room timer integration', () => {
     expect(authoritativeState(store).actions?.filter(action => action.type === 'terminalResult')).toHaveLength(1)
   })
 
+  it('accepts a late gameplay action without settling timeout when the timer flag is disabled', async () => {
+    const savedFlag = process.env.RVB_TURN_TIMER_ENABLED
+    const clock = new FakeClock(50_000)
+    const store = new MemoryRoomStore(makeTimedRoom('timer-off-late-action-room'))
+
+    try {
+      delete process.env.RVB_TURN_TIMER_ENABLED
+      const result = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
+        type: 'move',
+        playerId: PLAYERS[0],
+        pieceId: 'red-piece',
+        toX: 1,
+        toY: 0,
+        clientActionId: 'timer-off-late-move',
+      } as any, { clock })
+
+      expect(result.kind).toBe('applied')
+      expect(result.expiredReason).toBeUndefined()
+      expect(authoritativeState(store).pieces.find(piece => piece.instanceId === 'red-piece'))
+        .toMatchObject({ x: 1, y: 0 })
+      expect(authoritativeState(store).actions?.some(action => action.type === 'turnTimeout')).toBe(false)
+      expect(result.snapshot.turnTimer).toBeUndefined()
+    } finally {
+      if (savedFlag === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
+      else process.env.RVB_TURN_TIMER_ENABLED = savedFlag
+    }
+  })
   it('keeps authority wakeups disabled unless the timer flag is explicitly enabled', async () => {
     vi.useFakeTimers()
     const savedFlag = process.env.RVB_TURN_TIMER_ENABLED

@@ -103,6 +103,28 @@ function makeDeploymentRoom(id = 'deployment-room', deadlineAt = 46_000): Room {
 }
 
 describe('RED-31 authoritative deployment room actions', () => {
+  it('accepts a late deployment lock without settling timeout when the timer flag is disabled', async () => {
+    const savedFlag = process.env.RVB_TURN_TIMER_ENABLED
+    const store = new MemoryRoomStore(makeDeploymentRoom('timer-off-late-deployment-room'))
+
+    try {
+      delete process.env.RVB_TURN_TIMER_ENABLED
+      const result = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
+        type: 'deploymentLock',
+        playerId: PLAYERS[0],
+        clientActionId: 'timer-off-late-deployment-lock',
+      }, { clock: { now: () => 50_000 } })
+
+      expect(result.kind).toBe('applied')
+      expect(result.expiredReason).toBeUndefined()
+      const state = (store.room.battleState as any).state
+      expect(state.deployment.locks[PLAYERS[0]]).toMatchObject({ locked: true, reason: 'player' })
+      expect(state.deployment.timedOutPlayerIds ?? []).not.toContain(PLAYERS[0])
+    } finally {
+      if (savedFlag === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
+      else process.env.RVB_TURN_TIMER_ENABLED = savedFlag
+    }
+  })
   it('serializes simultaneous locks with room CAS and resolves final positions exactly once', async () => {
     const store = new MemoryRoomStore(makeDeploymentRoom())
 

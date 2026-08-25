@@ -178,7 +178,7 @@ export function createPublicBattleSnapshot(
     stateHash: hashBattleState(state),
     authorityVersion: roomBattleAuthorityVersion(room),
     serverNow,
-    turnTimer: state.terminalResult ? undefined : projectTurnTimer(state.turnTimer, serverNow),
+    turnTimer: state.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(state.turnTimer, serverNow),
   }
 }
 
@@ -209,7 +209,7 @@ export function createPublicBattleTransitionUpdate(
     seed: result.snapshot.seed,
     stateHash: hashBattleState(next),
     serverNow,
-    turnTimer: next.terminalResult ? undefined : projectTurnTimer(next.turnTimer, serverNow),
+    turnTimer: next.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(next.turnTimer, serverNow),
     timings: result.timings,
   }
 }
@@ -360,10 +360,13 @@ export async function dispatchRoomBattleAction(
         }
       }
 
-      const deploymentExpired = action.type !== 'deploymentTimeout'
+      const timerEnabled = isTurnTimerEnabled()
+      const deploymentExpired = timerEnabled
+        && action.type !== 'deploymentTimeout'
         && state.deployment?.status === 'awaiting-locks'
         && receivedAt >= state.deployment.deadlineAt
-      const turnExpired = !deploymentExpired
+      const turnExpired = timerEnabled
+        && !deploymentExpired
         && action.type !== 'turnTimeout'
         && state.deployment?.status !== 'awaiting-locks'
         && state.turnTimer?.status === 'running'
@@ -423,7 +426,7 @@ export async function dispatchRoomBattleAction(
 
       let actionResult = submittedActionResult
       let syncAction: BattleAction | undefined
-      if (isTurnTimerEnabled() && shouldSyncTurnTimer(state, submittedActionResult.state, actionToApply)) {
+      if (timerEnabled && shouldSyncTurnTimer(state, submittedActionResult.state, actionToApply)) {
         const resumedAt = getRoomAuthorityNow(normalizedRoomId, clock)
         const actorPlayerId = 'playerId' in actionToApply ? actionToApply.playerId : undefined
         const acceptedActionType = isAcceptedGameplayAction(actionToApply)
@@ -462,22 +465,35 @@ export async function dispatchRoomBattleAction(
       const nextAuthorityVersion = authorityV2 ? authorityVersion + 1 : metadataVersion + 1
       stampPendingDeploymentAuthorityVersion(actionResult.state, nextAuthorityVersion)
       const previousAuthorityState = state
-      const nextAuthorityState = actionResult.state
-      const previousPublicState = toPublicBattleState(previousAuthorityState)
-      const nextPublicState = toPublicBattleState(nextAuthorityState)
-      const compactedState = authorityV2
-        ? compactBattleTraceForAuthority(nextAuthorityState)
-        : nextAuthorityState
-      const nextStorage: ServerBattleState = {
-        type: 'server-state',
-        seed: storage.seed,
-        state: compactedState,
-      }
       const commands = syncAction ? [actionToApply, syncAction] : [actionToApply]
       const traces = [submittedActionResult.trace, syncAction ? actionResult.trace : undefined]
         .filter((trace): trace is NonNullable<typeof trace> => !!trace)
       const replayFrames = [submittedActionResult.replayFrame, syncAction ? actionResult.replayFrame : undefined]
         .filter((frame): frame is NonNullable<typeof frame> => !!frame)
+      let nextAuthorityState = actionResult.state
+      const isTerminal = nextAuthorityState.terminalResult?.status === 'finished'
+      if (authorityV2 && isTerminal && store.readBattleAuthorityHistory) {
+        const materializedState = structuredClone(compactBattleTraceForAuthority(nextAuthorityState))
+        const existingHistory = await store.readBattleAuthorityHistory(normalizedRoomId)
+        const currentHistory = commands.map((command, index) => ({
+          command: command as unknown as Record<string, unknown>,
+          trace: traces[index],
+          replayFrame: replayFrames[index],
+        }))
+        materializeBattleTraceForTerminal(materializedState, [...existingHistory, ...currentHistory])
+        nextAuthorityState = materializedState
+        actionResult = { ...actionResult, state: materializedState }
+      }
+      const previousPublicState = toPublicBattleState(previousAuthorityState)
+      const nextPublicState = toPublicBattleState(nextAuthorityState)
+      const committedState = authorityV2 && !isTerminal
+        ? compactBattleTraceForAuthority(nextAuthorityState)
+        : nextAuthorityState
+      const nextStorage: ServerBattleState = {
+        type: 'server-state',
+        seed: storage.seed,
+        state: committedState,
+      }
       const transitionPlayerId = 'playerId' in action
         ? action.playerId
         : viewerPlayerId ?? 'system'
@@ -494,7 +510,7 @@ export async function dispatchRoomBattleAction(
             previousPublicState,
             nextPublicState,
             preStateHash: hashBattleState(state),
-            postStateHash: hashBattleState(compactedState),
+            postStateHash: hashBattleState(committedState),
             traces,
             replayFrames,
             previousTransitionHash: room.battleAuthorityTransitionHash,
@@ -515,7 +531,6 @@ export async function dispatchRoomBattleAction(
         })
       }
 
-      const isTerminal = nextAuthorityState.terminalResult?.status === 'finished'
       const baseCheckpoint: BattleAuthorityCheckpointRecord | undefined = transition && authorityVersion === 0
         ? {
             protocolVersion: 2,
@@ -534,22 +549,7 @@ export async function dispatchRoomBattleAction(
       if (transition) {
         const reason = checkpointReasonForTransition(state, nextAuthorityState, nextAuthorityVersion)
         if (reason) {
-          let checkpointStorage = nextStorage
-          if (reason === 'terminal' && store.readBattleAuthorityHistory) {
-            const materializedState = structuredClone(compactedState)
-            const existingHistory = await store.readBattleAuthorityHistory(normalizedRoomId)
-            const currentHistory = commands.map((command, index) => ({
-              command: command as unknown as Record<string, unknown>,
-              trace: traces[index],
-              replayFrame: replayFrames[index],
-            }))
-            materializeBattleTraceForTerminal(materializedState, [...existingHistory, ...currentHistory])
-            checkpointStorage = {
-              type: 'server-state',
-              seed: storage.seed,
-              state: materializedState,
-            }
-          }
+          const checkpointStorage = nextStorage
           checkpoint = {
             protocolVersion: 2,
             roomId: normalizedRoomId,
