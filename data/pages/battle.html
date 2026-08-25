@@ -1643,6 +1643,9 @@
     const myPlayerName = params.get('playerName') || '玩家'
     const TRAINING_MODE = params.get('mode') === 'training'
     const SPECTATE_MODE = params.get('mode') === 'spectate'
+    function debugBattleLog(...args) {
+      if (params.get('debug') === '1' || TRAINING_MODE) console['log'](...args)
+    }
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
     if (RED43_QA_MODE) document.body.classList.add('red43-qa')
     function shouldUseRelayMode() {
@@ -2155,6 +2158,37 @@
         : null
     }
 
+    function shouldPrepareSkillSelectionLocally(skill) {
+      if (!skill) return false
+      const steps = skill.targeting && skill.targeting.steps
+      if (Array.isArray(steps) && steps.length > 0) return true
+      if (skill.requiresTarget === true) return true
+      if (skill.targetType && skill.targetType !== 'self') return true
+      return /\bselect(?:Target|Option)\s*\(/.test(String(skill.code || ''))
+    }
+
+    function prepareLocalSkillSelection(action, skill) {
+      if (!G || !action || !shouldPrepareSkillSelectionLocally(skill)) return false
+      if (typeof GameEngine === 'undefined' || !GameEngine.validateSkillActionByDryRun) return false
+      try {
+        GameEngine.validateSkillActionByDryRun(G, action)
+      } catch (error) {
+        if (error && error.needsTargetSelection) {
+          return enterActionTargetMode(action, targetPreparationFromError(error))
+        }
+        if (error && error.needsOptionSelection) {
+          const optionAction = Object.assign({}, action)
+          if (error.preparation && error.preparation.kind === 'needOption') {
+            optionAction.selectionId = error.preparation.selectionId
+            optionAction.stateRevision = error.preparation.stateRevision
+          }
+          showOptionPicker(error.title || '请选择', error.options || [], optionAction)
+          renderActionBar()
+          return true
+        }
+      }
+      return false
+    }
     function enterActionTargetMode(action, preparation) {
       if (!action || !preparation || preparation.kind !== 'needTarget') return false
       if (targetSubmissionPending) {
@@ -2357,7 +2391,9 @@
     }
     function skillDefOf(skillId) {
       if (!skillId) return {}
-      const cached = (G && G.skillsById && G.skillsById[skillId]) || skillsById[skillId]
+      const stateDefinition = G && G.skillsById && G.skillsById[skillId]
+      const localDefinition = skillsById[skillId]
+      const cached = stateDefinition || localDefinition ? Object.assign({}, stateDefinition || {}, localDefinition || {}) : null
       if (cached) return cached
       try {
         const xhr = new XMLHttpRequest()
@@ -4090,7 +4126,7 @@
       }
       const pbt = G.pendingTargetSelection
       if (pendingTargetSelectionForMe()) {
-        console.log('[STAGE3] G.pendingTargetSelection: playerId=' + pbt.playerId + ' targetType=' + pbt.targetType + ' hasEffectCode=' + !!pbt.effectCode + ' effectCodeLen=' + (pbt.effectCode ? pbt.effectCode.length : 0))
+        debugBattleLog('[STAGE3] G.pendingTargetSelection: playerId=' + pbt.playerId + ' targetType=' + pbt.targetType + ' hasEffectCode=' + !!pbt.effectCode + ' effectCodeLen=' + (pbt.effectCode ? pbt.effectCode.length : 0))
         const actionType = 'pendingTargetSelect'
         if (serverPendingTargetChanged(pendingSkill, pbt)) {
           pendingSkill = {
@@ -4113,7 +4149,7 @@
             validTargets: new Set(),
           }
           _updatePendingSkillTargets()
-          console.log('[STAGE4] entered target-select mode, validTargets count=' + pendingSkill.validTargets.size)
+          debugBattleLog('[STAGE4] entered target-select mode, validTargets count=' + pendingSkill.validTargets.size)
           setStatusMsg(pbt.title || _targetPromptText() || '请选择目标')
           renderBoard()
           renderTargetOverlay()
@@ -4845,7 +4881,7 @@
         }
         if (turnTargetType === 'piece' && piece) action.targetPieceId = piece.instanceId
         const _pts = G && G.pendingTargetSelection
-        console.log('[STAGE5] submitting ' + action.type + ' targetX=' + x + ' targetY=' + y + ' playerId=' + action.playerId + ' | G.pendingTargetSelection:', _pts ? { hasEffectCode: !!_pts.effectCode, effectCodeLen: _pts.effectCode ? _pts.effectCode.length : 0 } : null)
+        debugBattleLog('[STAGE5] submitting ' + action.type + ' targetX=' + x + ' targetY=' + y + ' playerId=' + action.playerId + ' | G.pendingTargetSelection:', _pts ? { hasEffectCode: !!_pts.effectCode, effectCodeLen: _pts.effectCode ? _pts.effectCode.length : 0 } : null)
         addLog('[DEBUG pendingTargetClick] action=' + JSON.stringify(action) + ' pending=' + JSON.stringify(_pts ? {
           playerId: _pts.playerId,
           title: _pts.title,
@@ -5059,6 +5095,7 @@
 
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
       closePieceContextMenu()
+      if (prepareLocalSkillSelection(draftAction, skData)) return
       await doAction(draftAction)
     }
 
@@ -5127,8 +5164,8 @@
           )
         }
         G = newG
-        console.log('[STAGE2.5] G updated: pendingTargetSelection=', G.pendingTargetSelection ? { playerId: G.pendingTargetSelection.playerId, hasEffectCode: !!G.pendingTargetSelection.effectCode, effectCodeLen: G.pendingTargetSelection.effectCode ? G.pendingTargetSelection.effectCode.length : 0 } : null, '| clientOwns(training-blue)=', clientOwns('training-blue'))
-        console.log('[STAGE2.5b] pendingTargetSelectionForMe()=', pendingTargetSelectionForMe())
+        debugBattleLog('[STAGE2.5] G updated: pendingTargetSelection=', G.pendingTargetSelection ? { playerId: G.pendingTargetSelection.playerId, hasEffectCode: !!G.pendingTargetSelection.effectCode, effectCodeLen: G.pendingTargetSelection.effectCode ? G.pendingTargetSelection.effectCode.length : 0 } : null, '| clientOwns(training-blue)=', clientOwns('training-blue'))
+        debugBattleLog('[STAGE2.5b] pendingTargetSelectionForMe()=', pendingTargetSelectionForMe())
         spawnStateFloaters(oldG, G)
         flushActionLog(oldG, G)
         if (action.type === 'endTurn') {

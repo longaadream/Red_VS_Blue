@@ -1,6 +1,10 @@
 // 当序列化格式出现不兼容变化时递增此值（旧状态会被 applyBattleAction 拒绝）
 export const BATTLE_STATE_VERSION = 1
 
+function debugGameLog(...args: unknown[]): void {
+  if (process.env.NODE_ENV !== 'production') console['log'](...args)
+}
+
 // 从 battle-types 导入类型（避免客户端导入时加载服务器端代码）
 // 简单的日志写入函数
 function writeLog(message: string) {
@@ -1607,7 +1611,7 @@ function applyBattleActionInternal(
         // 确保当前玩家有行动点属性
         const currentPlayerMeta = next.players.find(p => p.playerId === next.turn.currentPlayerId)
         if (currentPlayerMeta) {
-          console.log(`Player ${currentPlayerMeta.playerId} has ${currentPlayerMeta.actionPoints}/${currentPlayerMeta.maxActionPoints} action points for this turn`)
+          debugGameLog(`Player ${currentPlayerMeta.playerId} has ${currentPlayerMeta.actionPoints}/${currentPlayerMeta.maxActionPoints} action points for this turn`)
         }
 
         // 更新当前玩家棋子技能的冷却时间
@@ -2117,7 +2121,7 @@ function applyBattleActionInternal(
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         const pendingTarget = (result as any).pendingTargetSelection
-        console.log('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
+        debugGameLog('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
         if (pendingTarget) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
@@ -2128,7 +2132,7 @@ function applyBattleActionInternal(
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
           }
-          console.log('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
+          debugGameLog('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
         }
 
       }
@@ -2352,10 +2356,10 @@ function applyBattleActionInternal(
       }
 
       // 执行技能
-      console.log('[useChargeSkill] executeSkillFunction imported: ' + typeof executeSkillFunction)
-      console.log('[useChargeSkill] skillDef id: ' + skillDef.id)
-      console.log('[useChargeSkill] skillDef has code: ' + !!skillDef.code)
-      console.log('[useChargeSkill] About to build target info...')
+      debugGameLog('[useChargeSkill] executeSkillFunction imported: ' + typeof executeSkillFunction)
+      debugGameLog('[useChargeSkill] skillDef id: ' + skillDef.id)
+      debugGameLog('[useChargeSkill] skillDef has code: ' + !!skillDef.code)
+      debugGameLog('[useChargeSkill] About to build target info...')
       
       // 构建目标信息（支持 N 次 selectTarget 调用）
       const buildTargetSlot = (pieceId: string | undefined, tx: number | undefined, ty: number | undefined) => {
@@ -2431,7 +2435,7 @@ function applyBattleActionInternal(
       if (result.success) {
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         const pendingTarget = (result as any).pendingTargetSelection
-        console.log('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
+        debugGameLog('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
         if (pendingTarget) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
@@ -2442,7 +2446,7 @@ function applyBattleActionInternal(
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
           }
-          console.log('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
+          debugGameLog('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
         }
 
       }

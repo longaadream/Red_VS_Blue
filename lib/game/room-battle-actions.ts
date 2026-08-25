@@ -140,13 +140,30 @@ export async function dispatchRoomBattleAction(
   const normalizedRoomId = roomId.trim().toLowerCase()
   const clock = options.clock ?? systemDeploymentRuleClock
   const wallArrival = clock.now()
+  const perfEnabled = process.env.RVB_PERF_LOGS === '1'
+  const perfStartedAt = perfEnabled ? performance.now() : 0
+  const perf = {
+    lockAcquiredAt: 0,
+    loadMs: 0,
+    rulesMs: 0,
+    persistMs: 0,
+    projectionMs: 0,
+    deliveryMs: 0,
+    attempts: 0,
+  }
+  let perfOutcome = 'error'
   // Commands queued behind another commit retain their original logical arrival
   // so lock/storage/transport work never becomes player thinking time.
   const receivedAt = projectRoomAuthorityNow(normalizedRoomId, wallArrival)
 
-  return withPausedRoomAuthorityClock(normalizedRoomId, clock, async () => {
+  try {
+    const result = await withPausedRoomAuthorityClock<DispatchRoomBattleActionResult>(normalizedRoomId, clock, async () => {
+    if (perfEnabled) perf.lockAcquiredAt = performance.now()
     for (let attempt = 0; attempt < MAX_ROOM_ACTION_ATTEMPTS; attempt += 1) {
+    if (perfEnabled) perf.attempts += 1
+    let stageStartedAt = perfEnabled ? performance.now() : 0
     const room = await store.getRoom(normalizedRoomId)
+    if (perfEnabled) perf.loadMs += performance.now() - stageStartedAt
     if (!room) throw new RoomBattleActionError('ROOM_NOT_FOUND', 'Room not found', { roomId: normalizedRoomId })
     const storage = getBattleStorage(room)
     if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started', { roomId: normalizedRoomId })
@@ -187,7 +204,9 @@ export async function dispatchRoomBattleAction(
 
     let submittedActionResult: BattleActionResult
     try {
+      stageStartedAt = perfEnabled ? performance.now() : 0
       submittedActionResult = runBattleAction(state, actionToApply, { rootSeed: storage.seed })
+      if (perfEnabled) perf.rulesMs += performance.now() - stageStartedAt
     } catch (error) {
       throw decorateRoomActionError(error, normalizedRoomId, room, storage, actionToApply, viewerPlayerId)
     }
@@ -216,7 +235,9 @@ export async function dispatchRoomBattleAction(
         clientActionId: `system-turn-timer-sync:${normalizedRoomId}:${room.version}:${actionIdPart(actionToApply)}`,
       }
       try {
+        stageStartedAt = perfEnabled ? performance.now() : 0
         actionResult = runBattleAction(submittedActionResult.state, syncAction, { rootSeed: storage.seed })
+        if (perfEnabled) perf.rulesMs += performance.now() - stageStartedAt
       } catch (error) {
         throw decorateRoomActionError(error, normalizedRoomId, room, storage, syncAction, viewerPlayerId)
       }
@@ -243,19 +264,28 @@ export async function dispatchRoomBattleAction(
       battleState: nextStorage as unknown as Room['battleState'],
       ...(isTerminal ? { status: 'finished' as const } : {}),
     }
-    if (!await store.setRoomIfVersion(normalizedRoomId, nextRoom, room.version)) continue
+    stageStartedAt = perfEnabled ? performance.now() : 0
+    if (!await store.setRoomIfVersion(normalizedRoomId, nextRoom, room.version)) {
+      if (perfEnabled) perf.persistMs += performance.now() - stageStartedAt
+      continue
+    }
+    if (perfEnabled) perf.persistMs += performance.now() - stageStartedAt
     const committedRoom: Room = { ...nextRoom, version: nextAuthorityVersion }
+    stageStartedAt = perfEnabled ? performance.now() : 0
     const snapshot = createPublicBattleSnapshot(committedRoom, viewerPlayerId ?? undefined, clock)
+    if (perfEnabled) perf.projectionMs += performance.now() - stageStartedAt
     if (isTerminal) clearRoomBattleTimeout(normalizedRoomId)
     const expired = deploymentExpired || turnExpired
     let delivered = false
     if (options.onCommittedBeforeTimerResume) {
+      stageStartedAt = perfEnabled ? performance.now() : 0
       await options.onCommittedBeforeTimerResume(snapshot, {
         kind: expired ? 'expired' : 'applied',
         ...(deploymentExpired ? { expiredReason: 'deployment' as const } : {}),
         ...(turnExpired ? { expiredReason: 'turn' as const } : {}),
         actionHash: submittedActionResult.actionHash,
       })
+      if (perfEnabled) perf.deliveryMs += performance.now() - stageStartedAt
       delivered = true
     }
     return {
@@ -274,7 +304,28 @@ export async function dispatchRoomBattleAction(
       'Battle action could not commit because the room changed concurrently',
       { roomId: normalizedRoomId },
     )
-  })
+    })
+    perfOutcome = result.kind
+    return result
+  } finally {
+    if (perfEnabled) {
+      const finishedAt = performance.now()
+      console.info('[battle-perf]', JSON.stringify({
+        roomId: normalizedRoomId,
+        actionType: action.type,
+        clientActionId: 'clientActionId' in action ? action.clientActionId : undefined,
+        outcome: perfOutcome,
+        attempts: perf.attempts,
+        queueMs: perf.lockAcquiredAt ? perf.lockAcquiredAt - perfStartedAt : finishedAt - perfStartedAt,
+        loadMs: perf.loadMs,
+        rulesMs: perf.rulesMs,
+        persistMs: perf.persistMs,
+        projectionMs: perf.projectionMs,
+        deliveryMs: perf.deliveryMs,
+        totalMs: finishedAt - perfStartedAt,
+      }))
+    }
+  }
 }
 
 export async function scheduleRoomBattleTimeout(

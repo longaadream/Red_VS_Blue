@@ -20,21 +20,38 @@ export function toPublicBattleState(
   viewerPlayerId?: string,
 ): BattleState {
   void viewerPlayerId
-  const projected = cloneSerializable(state)
-  const debugBattle = projected.extensions?.debugBattle
-  const terminalTrace = projected.terminalResult
-    ? readSanitizedBattleActionTrace(projected)
+  const terminalTrace = state.terminalResult
+    ? readSanitizedBattleActionTrace(state)
     : []
-  const terminalReplay = projected.terminalResult
-    ? readSanitizedBattleReplay(projected)
+  const terminalReplay = state.terminalResult
+    ? readSanitizedBattleReplay(state)
     : undefined
-  if (debugBattle) {
-    debugBattle.appliedActionIds = []
-    debugBattle.actionLog = terminalTrace
-    if (terminalReplay) debugBattle.replay = terminalReplay
-    else delete debugBattle.replay
-    delete debugBattle.commandLog
+
+  // Active matches can accumulate hundreds of kilobytes of server-only trace
+  // data. Remove it before the serializable clone instead of cloning it and
+  // immediately throwing it away for every player and spectator snapshot.
+  const sourceDebugBattle = state.extensions?.debugBattle
+  let cloneInput = state
+  if (sourceDebugBattle) {
+    const publicDebugBattle = {
+      ...sourceDebugBattle,
+      appliedActionIds: [],
+      actionLog: terminalTrace,
+    }
+    delete publicDebugBattle.commandLog
+    if (terminalReplay) publicDebugBattle.replay = terminalReplay
+    else delete publicDebugBattle.replay
+
+    cloneInput = {
+      ...state,
+      extensions: {
+        ...state.extensions,
+        debugBattle: publicDebugBattle,
+      },
+    }
   }
+
+  const projected = cloneSerializable(cloneInput)
 
   if (!projected.deployment) return projected
 

@@ -7,6 +7,7 @@ const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
 // 简单的日志写入函数
 function writeLog(message: string) {
+  if (process.env.NODE_ENV === 'production') return
   try {
     const fs = require('fs')
     const path = require('path')

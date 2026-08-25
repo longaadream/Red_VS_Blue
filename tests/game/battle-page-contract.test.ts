@@ -141,7 +141,7 @@ describe('battle page route contract', () => {
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?aria-expanded[\s\S]*?aria-hidden/)
     expect(battlePage).toMatch(/const active = !!\(pendingSkill \|\| pendingCardAction \|\| targetSubmissionPending\)[\s\S]*?if \(active\) \{\s*closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?if \(next\) closePieceContextMenu\(\)/)
-    expect(battlePage).toMatch(/const draftAction[^\n]+\s*closePieceContextMenu\(\)\s*await doAction\(draftAction\)/)
+    expect(battlePage).toMatch(/const draftAction[^\n]+\s*closePieceContextMenu\(\)\s*if \(prepareLocalSkillSelection\(draftAction, skData\)\) return\s*await doAction\(draftAction\)/)
     expect(battlePage).toMatch(/function closePieceInfo\(\)[\s\S]*?style\.display = 'none'[\s\S]*?renderPieceContextMenu\(selected \|\| null\)/)
     expect(battlePage).toMatch(/dispatchBattleIntent\(\{type:\\?'toggle-move\\?'\}\)/)
     expect(battlePage).toMatch(/const isTargeting = !!pendingMove \|\| !!pendingSkill/)
@@ -707,4 +707,57 @@ describe('battle page route contract', () => {
     expect(battlePage).not.toContain("RvBWs.send({ type: 'stateUpdate'")
     expect(browserEngine).toContain('toPublicBattleState')
   })
+  it('prepares interactive skill candidates locally without sending a targetless action', () => {
+    const battlePage = readPage('battle.html')
+    const definitions = createContext({
+      G: {
+        skillsById: {
+          'interactive-skill': { id: 'interactive-skill', name: 'authority metadata' },
+        },
+      },
+      skillsById: {
+        'interactive-skill': { id: 'interactive-skill', code: "selectTarget({ type: 'cell' })" },
+      },
+      XMLHttpRequest: function XMLHttpRequest() {
+        throw new Error('unexpected synchronous fallback')
+      },
+    })
+    new Script(readNamedFunction(battlePage, 'skillDefOf')).runInContext(definitions)
+    expect(new Script(`skillDefOf('interactive-skill').code`).runInContext(definitions)).toContain('selectTarget')
+    const calls: string[] = []
+    const context = createContext({
+      G: { pieces: [] },
+      GameEngine: {
+        validateSkillActionByDryRun: () => {
+          calls.push('validate')
+          throw {
+            needsTargetSelection: true,
+            preparation: {
+              kind: 'needTarget',
+              selectionId: 'local-selection',
+              stateRevision: 7,
+              candidates: [{ kind: 'cell', x: 2, y: 3 }],
+            },
+          }
+        },
+      },
+      targetPreparationFromError: (error: { preparation: unknown }) => error.preparation,
+      enterActionTargetMode: () => {
+        calls.push('target')
+        return true
+      },
+      showOptionPicker: () => calls.push('option'),
+      renderActionBar: () => undefined,
+    })
+    new Script(readNamedFunction(battlePage, 'shouldPrepareSkillSelectionLocally')).runInContext(context)
+    new Script(readNamedFunction(battlePage, 'prepareLocalSkillSelection')).runInContext(context)
+
+    expect(new Script(`prepareLocalSkillSelection({ type: 'useBasicSkill' }, { code: "selectTarget({ type: 'cell' })" })`).runInContext(context)).toBe(true)
+    expect(calls).toEqual(['validate', 'target'])
+
+    calls.length = 0
+    expect(new Script(`prepareLocalSkillSelection({ type: 'useBasicSkill' }, { code: 'return { success: true }' })`).runInContext(context)).toBe(false)
+    expect(calls).toEqual([])
+  })
+
 })

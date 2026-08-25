@@ -9,6 +9,14 @@ import { dynamicCodeRuntime } from './dynamic-code-runtime'
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
+function debugGameLog(...args: unknown[]): void {
+  if (process.env.NODE_ENV !== 'production') console['log'](...args)
+}
+
+function logRuleLoad(message: string): void {
+  debugGameLog(message)
+}
+
 function checkSynchronousTriggers(battle: BattleState, context: any): TriggerResult {
   const result = globalTriggerSystem.checkTriggers(battle, context)
   if (result.needsOptionSelection || result.needsTargetSelection) {
@@ -23,6 +31,7 @@ function checkSynchronousTriggers(battle: BattleState, context: any): TriggerRes
 
 // 简单的日志写入函数
 function writeLog(message: string) {
+  if (process.env.NODE_ENV === 'production') return
   try {
     const fs = require('fs')
     const path = require('path')
@@ -86,7 +95,7 @@ const ruleCache = new Map<string, TriggerRule>()
 // 清除规则缓存的函数
 export function clearRuleCache(): void {
   ruleCache.clear();
-  console.log('[clearRuleCache] Rule cache cleared');
+  debugGameLog('[clearRuleCache] Rule cache cleared');
 }
 
 /**
@@ -595,25 +604,25 @@ function instantiateRuleForBattle(rule: TriggerRule): TriggerRule {
 }
 
 export function loadRuleById(ruleId: string, forceReload: boolean = false): TriggerRule | null {
-  console.log(`[loadRuleById] Called with ruleId: ${ruleId}, forceReload: ${forceReload}`);
+  logRuleLoad(`[loadRuleById] Called with ruleId: ${ruleId}, forceReload: ${forceReload}`);
   // 命中缓存时返回拷贝（深拷贝 limits，避免跨游戏共享 uses/currentCooldown 计数）
   const cached = ruleCache.get(ruleId)
   if (cached && !forceReload) {
-    console.log(`[loadRuleById] Cache hit for rule: ${ruleId}`);
+    logRuleLoad(`[loadRuleById] Cache hit for rule: ${ruleId}`);
     return instantiateRuleForBattle(cached)
   }
   if (forceReload && cached) {
-    console.log(`[loadRuleById] Force reloading rule: ${ruleId}`);
+    logRuleLoad(`[loadRuleById] Force reloading rule: ${ruleId}`);
   }
   try {
     const fs = require('fs');
     const path = require('path');
     
     const rulePath = path.join(getDataRoot(), 'rules', `${ruleId}.json`);
-    console.log(`[loadRuleById] Looking for rule at: ${rulePath}`);
+    logRuleLoad(`[loadRuleById] Looking for rule at: ${rulePath}`);
     
     if (fs.existsSync(rulePath)) {
-      console.log(`[loadRuleById] Found rule file: ${rulePath}`);
+      logRuleLoad(`[loadRuleById] Found rule file: ${rulePath}`);
       const ruleContent = fs.readFileSync(rulePath, 'utf8');
       const ruleData = JSON.parse(ruleContent);
       
@@ -783,7 +792,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
 
             if (ruleId === 'rule-shishio-combustion') {
               const ctr = (context.rulePiece?.statusTags ?? []).find((t: any) => t.type === 'shishio-dmg-counter');
-              console.log(`[combustion-debug] skillId="${context.skillId ?? 'undefined'}" damage=${context.damage} src=${context.sourcePiece?.name} tgt=${context.targetPiece?.name} counter_before=${ctr?.intensity ?? 0}`);
+              debugGameLog(`[combustion-debug] skillId="${context.skillId ?? 'undefined'}" damage=${context.damage} src=${context.sourcePiece?.name} tgt=${context.targetPiece?.name} counter_before=${ctr?.intensity ?? 0}`);
             }
             const executeRuleCode = dynamicCodeRuntime.compileExpression<any>({
               surface: 'ruleSkillCode', contentId: ruleId, code: codeEnvironment, entry: 'rule skillCode body',
@@ -804,7 +813,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             const skillId = ruleData.effect.skillId;
             writeLog(`[triggerSkill] Triggering skill: ${skillId} for rule: ${ruleId}, context.playerId: ${context.playerId}`);
             if (skillId) {
-              console.log(`Triggering skill: ${skillId} for rule: ${ruleId}`);
+              debugGameLog(`Triggering skill: ${skillId} for rule: ${ruleId}`);
               // 优先从 battle.skillsById 获取（Android 内联数据 / 已缓存），回退到文件系统
               let skillDef = (battle as any).skillsById?.[skillId];
               if (!skillDef) {
@@ -1099,7 +1108,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                   });
                   const result = executeTriggeredSkill(skillEnvironment);
                   writeLog(`[triggerSkill] Skill execution result for ${skillId}: ${JSON.stringify(result)}`);
-                  console.log(`Skill execution result:`, result);
+                  debugGameLog(`Skill execution result:`, result);
                   return result;
                 } catch (error) {
                   console.error('Error executing skill in rule effect:', error);
@@ -1129,7 +1138,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
         limits: ruleData.limits
       };
       
-      console.log(`Loaded rule successfully: ${ruleId}`);
+      logRuleLoad(`Loaded rule successfully: ${ruleId}`);
       // 写入缓存，后续复用时无需再读文件
       ruleCache.set(ruleId, rule)
       return instantiateRuleForBattle(rule);
@@ -1580,7 +1589,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
       canCancel?: boolean;
       cancelValue?: any;
     }) => {
-      console.log('selectOption called, config:', config, 'context.selectedOption:', context && context.selectedOption);
+      debugGameLog('selectOption called, config:', config, 'context.selectedOption:', context && context.selectedOption);
       // 如果已有选项值（用户已选择），直接返回该值
       if (context && context.selectedOption !== undefined) {
         return context.selectedOption;
@@ -2604,15 +2613,15 @@ export function healDamage(healer: PieceInstance, target: PieceInstance | PieceI
 // 执行技能函数
 export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState): SkillExecutionResult {
   try {
-    console.log('=== executeSkillFunction called ===');
-    console.log('Skill ID:', skillDef.id);
-    console.log('Context piece instanceId:', context.piece.instanceId);
-    console.log('Battle pieces count:', battle.pieces.length);
-    console.log('Context target:', context.target);
+    debugGameLog('=== executeSkillFunction called ===');
+    debugGameLog('Skill ID:', skillDef.id);
+    debugGameLog('Context piece instanceId:', context.piece.instanceId);
+    debugGameLog('Battle pieces count:', battle.pieces.length);
+    debugGameLog('Context target:', context.target);
     
     // 找到源棋子
     const pieceIndex = battle.pieces.findIndex(p => p.instanceId === context.piece.instanceId);
-    console.log('Piece index in battle.pieces:', pieceIndex);
+    debugGameLog('Piece index in battle.pieces:', pieceIndex);
     
     if (pieceIndex === -1) {
       throw new Error('Source piece not found')
@@ -2620,9 +2629,9 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     
     // 直接使用battle.pieces中的元素，确保是直接引用
     const sourcePiece = battle.pieces[pieceIndex];
-    console.log('Found source piece:', sourcePiece);
+    debugGameLog('Found source piece:', sourcePiece);
     
-    console.log('Source piece before skill:', {
+    debugGameLog('Source piece before skill:', {
       instanceId: sourcePiece.instanceId,
       attack: sourcePiece.attack,
       maxHp: sourcePiece.maxHp,
@@ -2737,7 +2746,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               if (!hasOtherRelatedStatus && targetPiece.rules) {
                 const ruleIndex = targetPiece.rules.findIndex(rule => rule.id === ruleId);
                 if (ruleIndex !== -1) {
-                  console.log(`Removing rule ${ruleId} because no other status tags are related to it`);
+                  debugGameLog(`Removing rule ${ruleId} because no other status tags are related to it`);
                   targetPiece.rules.splice(ruleIndex, 1);
                 }
               }
@@ -2761,15 +2770,15 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       },
       // 规则管理函数
       addRuleById: (targetPieceId: string, ruleId: string) => {
-        console.log(`[addRuleById] Called with targetPieceId: ${targetPieceId}, ruleId: ${ruleId}`);
+        debugGameLog(`[addRuleById] Called with targetPieceId: ${targetPieceId}, ruleId: ${ruleId}`);
         // 找到目标棋子
         const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
         if (targetPiece) {
-          console.log(`[addRuleById] Found target piece: ${targetPiece.name}`);
+          debugGameLog(`[addRuleById] Found target piece: ${targetPiece.name}`);
           // 从文件中加载规则
           const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD);
           if (rule) {
-            console.log(`[addRuleById] Loaded rule: ${rule.id}, effect is function: ${typeof rule.effect === 'function'}`);
+            debugGameLog(`[addRuleById] Loaded rule: ${rule.id}, effect is function: ${typeof rule.effect === 'function'}`);
             // 创建规则对象的副本并添加关联状态标签数组
             const newRule = {
               ...rule,
@@ -2796,7 +2805,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               targetPiece.rules = [];
             }
             targetPiece.rules.push(newRule);
-            console.log(`[addRuleById] Rule added successfully. Piece now has ${targetPiece.rules.length} rules`);
+            debugGameLog(`[addRuleById] Rule added successfully. Piece now has ${targetPiece.rules.length} rules`);
             return true;
           } else {
             console.error(`[addRuleById] Failed to load rule: ${ruleId}`);
@@ -2888,26 +2897,26 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       
       // 玩家规则管理函数
       addPlayerRuleById: (targetPlayerId: string, ruleId: string) => {
-        console.log(`[addPlayerRuleById] Called with targetPlayerId: ${targetPlayerId}, ruleId: ${ruleId}`);
+        debugGameLog(`[addPlayerRuleById] Called with targetPlayerId: ${targetPlayerId}, ruleId: ${ruleId}`);
         const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
         if (!player) {
-          console.log(`[addPlayerRuleById] Player not found: ${targetPlayerId}`);
+          debugGameLog(`[addPlayerRuleById] Player not found: ${targetPlayerId}`);
           return false;
         }
-        console.log(`[addPlayerRuleById] Found player: ${player.playerId}`);
+        debugGameLog(`[addPlayerRuleById] Found player: ${player.playerId}`);
         const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD);
         if (!rule) {
-          console.log(`[addPlayerRuleById] Rule not found: ${ruleId}`);
+          debugGameLog(`[addPlayerRuleById] Rule not found: ${ruleId}`);
           return false;
         }
-        console.log(`[addPlayerRuleById] Loaded rule: ${(rule as any).id}`);
+        debugGameLog(`[addPlayerRuleById] Loaded rule: ${(rule as any).id}`);
         if (!player.rules) player.rules = [];
         if (player.rules.some((r: any) => r.id === ruleId)) {
-          console.log(`[addPlayerRuleById] Rule already exists: ${ruleId}`);
+          debugGameLog(`[addPlayerRuleById] Rule already exists: ${ruleId}`);
           return false;
         }
         player.rules.push(rule);
-        console.log(`[addPlayerRuleById] Rule added successfully. Player now has ${player.rules.length} rules`);
+        debugGameLog(`[addPlayerRuleById] Rule added successfully. Player now has ${player.rules.length} rules`);
         return true;
       },
       removePlayerRuleById: (targetPlayerId: string, ruleId: string) => {
@@ -2965,8 +2974,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     // 执行技能定义中的代码（所有技能统一走动态代码运行时，不存在硬编码分支）
     if (skillDef.code) {
       try {
-        console.log('Executing skill code via dynamic runtime, skillId:', skillDef.id);
-        console.log('Skill code:', skillDef.code.substring(0, 100) + '...');
+        debugGameLog('Executing skill code via dynamic runtime, skillId:', skillDef.id);
+        debugGameLog('Skill code:', skillDef.code.substring(0, 100) + '...');
         {
           // 所有技能经统一动态代码运行时执行，确保效果完全由 code 字段控制
           const fullSkillCode = `
@@ -3015,7 +3024,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           `;
 
           // 调试：检查 skillEnvironment 中是否包含 addPlayerRuleById
-          console.log('[executeSkillFunction] skillEnvironment.addPlayerRuleById:', typeof skillEnvironment.addPlayerRuleById);
+          debugGameLog('[executeSkillFunction] skillEnvironment.addPlayerRuleById:', typeof skillEnvironment.addPlayerRuleById);
           
           // 执行技能代码
           const executeSkill = dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
@@ -3023,12 +3032,12 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           });
           let result = executeSkill(skillEnvironment);
           
-          console.log('Skill execution result:', result);
-          console.log('result.needsOptionSelection:', result && result.needsOptionSelection);
+          debugGameLog('Skill execution result:', result);
+          debugGameLog('result.needsOptionSelection:', result && result.needsOptionSelection);
           
           // 检查是否需要目标选择
           if (result && result.needsTargetSelection) {
-            console.log('Need target selection:', result);
+            debugGameLog('Need target selection:', result);
             // 直接返回需要目标选择的结果
             // 目标选择完全由selectTarget函数控制
             // 当用户选择目标后，前端会重新发送请求，selectTarget函数会处理目标信息
@@ -3044,9 +3053,9 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           }
 
           // 检查是否需要选项选择
-          console.log('Checking for option selection, result:', result);
+          debugGameLog('Checking for option selection, result:', result);
           if (result && result.needsOptionSelection) {
-            console.log('Need option selection:', result);
+            debugGameLog('Need option selection:', result);
             return {
               message: '需要选择选项',
               success: false,
@@ -3056,7 +3065,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             };
           }
           
-          console.log('Source piece after skill:', {
+          debugGameLog('Source piece after skill:', {
             instanceId: sourcePiece.instanceId,
             attack: sourcePiece.attack,
             maxHp: sourcePiece.maxHp,

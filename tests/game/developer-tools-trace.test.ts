@@ -121,6 +121,26 @@ describe('developer tools match trace boundary', () => {
     })
   })
 
+  it('does not traverse server-only trace history while projecting an active match', () => {
+    const state = tracedState(false)
+    const privateTraceSentinel = new Proxy({}, {
+      ownKeys: () => {
+        throw new Error('active public projection traversed private trace history')
+      },
+    })
+    const metadata = state.extensions?.debugBattle as any
+    metadata.appliedActionIds = [privateTraceSentinel]
+    metadata.actionLog = [privateTraceSentinel]
+    metadata.commandLog = [privateTraceSentinel]
+    metadata.replay = privateTraceSentinel
+
+    expect(() => toPublicBattleState(state)).not.toThrow()
+    expect(toPublicBattleState(state).extensions?.debugBattle).toEqual({
+      appliedActionIds: [],
+      actionLog: [],
+    })
+  })
+
   it('exposes a sanitized complete trace only after the authoritative terminal result', () => {
     const projected = toPublicBattleState(tracedState(true))
     const metadata = projected.extensions?.debugBattle

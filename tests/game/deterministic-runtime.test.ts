@@ -10,6 +10,7 @@ import {
 } from '@/lib/game/rule-runtime'
 import { getBattleRootSeed, replayBattle, runBattleAction, sha256Hex } from '@/lib/game/battle-runner'
 import { loadRuleById } from '@/lib/game/skills'
+import { globalTriggerSystem } from '@/lib/game/triggers'
 import type { BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -59,6 +60,7 @@ const RANDOM_ACTION = {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
 })
 
 describe('deterministic rule runtime', () => {
@@ -71,6 +73,28 @@ describe('deterministic rule runtime', () => {
     if (first?.limits) first.limits.currentCooldown = 9
     expect(loadRuleById('rule-lucky-coin-gamestart')?.limits?.currentCooldown).toBe(0)
   })
+
+  it('does not emit routine rule-loader logs in production', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+
+    expect(loadRuleById('rule-lucky-coin-gamestart', true)).not.toBeNull()
+    expect(loadRuleById('rule-lucky-coin-gamestart')).not.toBeNull()
+    expect(log).not.toHaveBeenCalled()
+  })
+  it('does not synchronously append trigger scan logs in production', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const appendFileSync = vi.spyOn(require('fs'), 'appendFileSync').mockImplementation(() => undefined)
+    const state = makeState({
+      pieces: [],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+    }) as BattleState
+
+    expect(() => globalTriggerSystem.checkTriggers(state, { type: 'whenever', playerId: 'player-red' })).not.toThrow()
+    expect(appendFileSync).not.toHaveBeenCalled()
+  })
+
 
   it('freezes stable named-stream derivation vectors', () => {
     expect(deriveStreamSeed(0x12345678, RANDOM_STREAM_NAMES.deployment)).toBe(1042218019)
