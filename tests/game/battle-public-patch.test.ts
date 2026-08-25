@@ -55,6 +55,10 @@ describe('RED-109 public battle patches', () => {
       .toThrow(/post-public hash/i)
   })
 
+  it('fails closed when a patch value has no JSON representation', () => {
+    expect(() => createBattlePublicPatch({}, { effect: () => true }))
+      .toThrow(BattlePublicPatchError)
+  })
   it('rejects unsafe or malformed patch paths', () => {
     expect(() => applyBattlePublicPatch({}, [{ op: 'set', path: ['__proto__', 'polluted'], value: true }]))
       .toThrow(/unsafe patch path/i)

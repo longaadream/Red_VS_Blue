@@ -1,5 +1,6 @@
 import { createInitialBattleForPlayers, DEMO_FIXED_MAP_ID } from './battle-setup'
 export { DEMO_FIXED_MAP_ID } from './battle-setup'
+import { hashPublicBattleState } from './battle-public-patch'
 import { hashBattleState, runBattleAction } from './battle-runner'
 import { stampPendingDeploymentAuthorityVersion } from './battle-trace'
 import { isBattleAuthorityV2Enabled } from './battle-transition'
@@ -141,7 +142,7 @@ export async function startBattleFromLockedRosters(
         room: committedRoom,
         storage: committedStorage,
         stateHash: hashBattleState(committedStorage.state as typeof initialState),
-        publicHash: initialSnapshot.stateHash,
+        publicHash: hashPublicBattleState(initialSnapshot.state),
       })
     }
     await options.onDeploymentUpdate?.(initialSnapshot)

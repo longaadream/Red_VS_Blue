@@ -183,7 +183,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function cloneJson<T>(value: T): T {
   if (value === undefined) return value
-  return JSON.parse(JSON.stringify(value)) as T
+  const serialized = JSON.stringify(value)
+  if (serialized === undefined) {
+    throw invalidPatch('Battle patch contains a non-JSON value', { valueType: typeof value })
+  }
+  return JSON.parse(serialized) as T
 }
 
 function invalidPatch(message: string, context: Record<string, unknown> = {}): BattlePublicPatchError {

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
+import { startBattleFromLockedRosters } from '@/lib/game/room-battle-start'
 import { recordBattleInitialization } from '@/lib/game/battle-trace'
 import { toPublicBattleState } from '@/lib/game/deployment'
 import {
@@ -16,6 +17,7 @@ import {
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
+import { DEMO_ROSTER_MANIFEST_VERSION, getDefaultDemoRosterSelection } from '@/lib/game/roster-contract'
 import type { Room } from '@/lib/game/room-store'
 import type { BattleAction } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
@@ -111,6 +113,74 @@ describe('RED-109 authority v2 coordinator', () => {
     process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
   })
 
+  it('initializes the version-zero checkpoint with the projected public hash', async () => {
+    let currentRoom: Room = {
+      id: 'red109-initial-checkpoint',
+      name: 'RED-109 initial checkpoint',
+      status: 'ready',
+      players: [
+        {
+          id: 'player-red',
+          name: 'Red',
+          seat: 'red',
+          alignment: 'light',
+          selectedPieces: getDefaultDemoRosterSelection('light'),
+          rosterLocked: true,
+          rosterManifestVersion: DEMO_ROSTER_MANIFEST_VERSION,
+        },
+        {
+          id: 'player-blue',
+          name: 'Blue',
+          seat: 'blue',
+          alignment: 'dark',
+          selectedPieces: getDefaultDemoRosterSelection('dark'),
+          rosterLocked: true,
+          rosterManifestVersion: DEMO_ROSTER_MANIFEST_VERSION,
+        },
+      ],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 3,
+      battleAuthorityVersion: 0,
+    }
+    let checkpoint: {
+      storage: { state: unknown }
+      stateHash: string
+      publicHash: string
+    } | undefined
+    const store = {
+      async getRoom(roomId: string) {
+        return roomId === currentRoom.id ? structuredClone(currentRoom) : undefined
+      },
+      async setRoom(_roomId: string, room: Room) {
+        currentRoom = structuredClone(room)
+      },
+      async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number) {
+        if (roomId !== currentRoom.id || expectedVersion !== currentRoom.version) return false
+        currentRoom = { ...JSON.parse(JSON.stringify(room)) as Room, version: expectedVersion + 1 }
+        return true
+      },
+      async initializeBattleAuthorityCheckpoint(input: {
+        room: Room
+        storage: { state: unknown }
+        stateHash: string
+        publicHash: string
+      }) {
+        checkpoint = structuredClone(input)
+      },
+    }
+
+    const started = await startBattleFromLockedRosters(store, currentRoom.id, {
+      clock: { now: () => 1_000 },
+    })
+
+    expect(started.started).toBe(true)
+    expect(checkpoint).toBeDefined()
+    const captured = checkpoint!
+    expect(captured.publicHash).toBe(hashPublicBattleState(toPublicBattleState(captured.storage.state as any)))
+    expect(captured.publicHash).not.toBe(captured.stateHash)
+  })
   it('commits command, transition and applied receipt once, then deduplicates retries without a write', async () => {
     const store = new AuthorityV2MemoryStore(makeRoom())
     const action = deploymentChoice('command-1')
@@ -177,6 +247,29 @@ describe('RED-109 authority v2 coordinator', () => {
     expect(store.room.battleAuthorityVersion).toBe(1)
   })
 
+  it('strips restored runtime rule effects before the first v2 deployment transition is persisted', async () => {
+    const room = makeRoom()
+    room.battleAuthorityVersion = 0
+    delete room.battleAuthorityTransitionHash
+    const storedState = (room.battleState as unknown as { state: { players: Array<{ rules?: unknown[] }> } }).state
+    storedState.players[1].rules = [{
+      id: 'rule-lucky-coin-gamestart',
+      trigger: { type: 'gameStart' },
+    }]
+    const store = new AuthorityV2MemoryStore(room)
+
+    const result = await dispatchRoomBattleAction(store, store.room.id, 'player-red', deploymentChoice('runtime-rule-effect'), {
+      expectedAuthorityVersion: 0,
+      clock: { now: () => 2_000 },
+    })
+
+    expect(result.kind).toBe('applied')
+    expect(store.commits).toBe(1)
+    expect(store.baseCheckpoints).toHaveLength(1)
+    expect(containsFunction(store.room.battleState)).toBe(false)
+    expect(containsFunction(store.transitions[0])).toBe(false)
+    expect(containsFunction(store.baseCheckpoints[0].storage)).toBe(false)
+  })
   it('ignores unrelated room metadata version changes when the battle version matches', async () => {
     const store = new AuthorityV2MemoryStore(makeRoom())
     store.room.version = 27
@@ -303,6 +396,13 @@ function deploymentChoice(clientActionId: string): BattleAction {
   }
 }
 
+function containsFunction(value: unknown, seen = new WeakSet<object>()): boolean {
+  if (typeof value === 'function') return true
+  if (!value || typeof value !== 'object') return false
+  if (seen.has(value)) return false
+  seen.add(value)
+  return Object.values(value).some(entry => containsFunction(entry, seen))
+}
 function makeRoom(): Room {
   const state = makeState({
     pieces: [

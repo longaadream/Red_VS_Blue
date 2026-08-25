@@ -284,6 +284,9 @@ export async function dispatchRoomBattleAction(
           roomActionContext(normalizedRoomId, room, storage, action, viewerPlayerId),
         )
       }
+      const previousTransitionStorage = authorityV2
+        ? cloneBattleAuthorityJson(storage)
+        : storage
 
       try {
         assertRoomActionViewer(room, viewerPlayerId, action, options.allowSystem === true)
@@ -471,6 +474,10 @@ export async function dispatchRoomBattleAction(
       const replayFrames = [submittedActionResult.replayFrame, syncAction ? actionResult.replayFrame : undefined]
         .filter((frame): frame is NonNullable<typeof frame> => !!frame)
       let nextAuthorityState = actionResult.state
+      if (authorityV2) {
+        nextAuthorityState = cloneBattleAuthorityJson(nextAuthorityState)
+        actionResult = { ...actionResult, state: nextAuthorityState }
+      }
       const isTerminal = nextAuthorityState.terminalResult?.status === 'finished'
       if (authorityV2 && isTerminal && store.readBattleAuthorityHistory) {
         const materializedState = structuredClone(compactBattleTraceForAuthority(nextAuthorityState))
@@ -505,7 +512,7 @@ export async function dispatchRoomBattleAction(
             playerId: transitionPlayerId,
             command: actionToApply,
             commands,
-            previousStorage: storage,
+            previousStorage: previousTransitionStorage,
             nextStorage,
             previousPublicState,
             nextPublicState,
@@ -537,7 +544,7 @@ export async function dispatchRoomBattleAction(
             roomId: normalizedRoomId,
             authorityVersion,
             seed: storage.seed,
-            storage,
+            storage: previousTransitionStorage,
             stateHash: transition.preStateHash,
             publicHash: transition.prePublicHash,
             transitionHash: transition.previousTransitionHash,
@@ -1019,6 +1026,22 @@ function duplicateResult(state: BattleState): BattleActionResult {
 function normalizePlayerId(playerId: unknown): string {
   return typeof playerId === 'string' ? playerId.trim().toLowerCase() : ''
 }
+
+function cloneBattleAuthorityJson<T>(value: T): T {
+  try {
+    const serialized = JSON.stringify(value)
+    if (serialized === undefined) {
+      throw new Error('Battle authority value has no JSON representation')
+    }
+    return JSON.parse(serialized) as T
+  } catch (error) {
+    throw new RoomBattleActionError(
+      'BATTLE_AUTHORITY_SERIALIZATION_FAILED',
+      error instanceof Error ? error.message : 'Battle authority state is not JSON serializable',
+    )
+  }
+}
+
 function monotonicNow(): number {
   return globalThis.performance.now()
 }
