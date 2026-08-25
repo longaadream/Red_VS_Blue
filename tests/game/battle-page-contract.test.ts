@@ -542,6 +542,82 @@ describe('battle page route contract', () => {
     expect(context.latestAuthorityVersion).toBe(13)
   })
 
+  it('auto-advances each authoritative start turn at most once and never competes with deployment or pending input', () => {
+    const battlePage = readPage('battle.html')
+    const sent: string[] = []
+    const context = createContext({
+      G: {
+        deployment: { status: 'complete' },
+        turn: { turnNumber: 2, phase: 'start', currentPlayerId: 'player-blue' },
+      },
+      myPlayerId: 'player-blue',
+      pendingActionFeedback: null,
+      lastAutoBeginPhaseKey: null,
+      addLog: () => undefined,
+      doBeginPhase: () => { sent.push('beginPhase') },
+    })
+    new Script(readNamedFunction(battlePage, 'autoBeginPhaseKey')).runInContext(context)
+    new Script(readNamedFunction(battlePage, 'maybeAutoBeginPhase')).runInContext(context)
+
+    expect(new Script('maybeAutoBeginPhase()').runInContext(context)).toBe(true)
+    expect(new Script('maybeAutoBeginPhase()').runInContext(context)).toBe(false)
+    expect(sent).toEqual(['beginPhase'])
+
+    context.G = {
+      deployment: { status: 'awaiting-locks' },
+      turn: { turnNumber: 3, phase: 'start', currentPlayerId: 'player-blue' },
+    }
+    expect(new Script('maybeAutoBeginPhase()').runInContext(context)).toBe(false)
+
+    context.G = {
+      deployment: { status: 'complete' },
+      turn: { turnNumber: 3, phase: 'start', currentPlayerId: 'player-blue' },
+      pendingOptionSelection: { playerId: 'player-blue' },
+    }
+    expect(new Script('maybeAutoBeginPhase()').runInContext(context)).toBe(false)
+
+    context.G = {
+      deployment: { status: 'complete' },
+      turn: { turnNumber: 3, phase: 'start', currentPlayerId: 'player-blue' },
+      pendingTargetSelection: { playerId: 'player-blue' },
+    }
+    expect(new Script('maybeAutoBeginPhase()').runInContext(context)).toBe(false)
+
+    context.G = {
+      deployment: { status: 'complete' },
+      turn: { turnNumber: 3, phase: 'start', currentPlayerId: 'player-blue' },
+    }
+    context.pendingActionFeedback = { clientActionId: 'real-player-input' }
+    expect(new Script('maybeAutoBeginPhase()').runInContext(context)).toBe(false)
+    expect(sent).toEqual(['beginPhase'])
+  })
+
+  it('refreshes the server target layer when an authoritative snapshot supplies candidates', () => {
+    const battlePage = readPage('battle.html')
+    const context = createContext({})
+    new Script(readNamedFunction(battlePage, 'serverPendingTargetChanged')).runInContext(context)
+
+    const currentCandidates: unknown[] = []
+    const authoritativeCandidates = [{ type: 'cell', x: 10, y: 6 }]
+    context.currentSkill = {
+      turnTargetActionType: 'pendingTargetSelect',
+      preparation: {
+        selectionId: 'pending-1',
+        stateRevision: 8,
+        candidates: currentCandidates,
+      },
+    }
+    context.authoritativePending = {
+      selectionId: 'pending-1',
+      stateRevision: 8,
+      candidates: authoritativeCandidates,
+    }
+
+    expect(new Script('serverPendingTargetChanged(currentSkill, authoritativePending)').runInContext(context)).toBe(true)
+    context.currentSkill.preparation.candidates = authoritativeCandidates
+    expect(new Script('serverPendingTargetChanged(currentSkill, authoritativePending)').runInContext(context)).toBe(false)
+  })
+
 
   it('keeps the nearby piece menu action-only while preserving the existing right-click piece detail', () => {
     const battlePage = readPage('battle.html')

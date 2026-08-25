@@ -2007,6 +2007,7 @@
     const stateFloaterEventOrder = []
     const PENDING_ACTION_TIMEOUT_MS = 8000
     let pendingActionFeedback = null
+    let lastAutoBeginPhaseKey = null
     let pendingActionFeedbackTimer = null
 
     function clearPendingActionFeedback(reason) {
@@ -3510,6 +3511,23 @@
       latestAuthorityVersion = authorityVersion
       return true
     }
+    function autoBeginPhaseKey(state, playerId, commandPending) {
+      if (!state || state.terminalResult || commandPending) return null
+      if (state.deployment && state.deployment.status !== 'complete') return null
+      if (state.pendingOptionSelection || state.pendingTargetSelection) return null
+      const turn = state.turn
+      if (!turn || turn.phase !== 'start' || !turn.currentPlayerId) return null
+      if (String(turn.currentPlayerId).toLowerCase() !== String(playerId || '').toLowerCase()) return null
+      return String(turn.turnNumber) + ':' + String(turn.currentPlayerId).toLowerCase() + ':start'
+    }
+    function maybeAutoBeginPhase() {
+      const key = autoBeginPhaseKey(G, myPlayerId, !!pendingActionFeedback)
+      if (!key || key === lastAutoBeginPhaseKey) return false
+      lastAutoBeginPhaseKey = key
+      addLog('自动初始化回合', 'info')
+      void doBeginPhase()
+      return true
+    }
     function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer) {
       if (!state) return
       resolveAuthoritySeed(state, seed)
@@ -3554,11 +3572,7 @@
 
       if (G.terminalResult) { handleGameOver(); return }
 
-      // Auto-advance start phase (only the current player sends beginPhase)
-      if (G.turn && G.turn.phase === 'start') {
-        var isMyTurn = G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-        if (isMyTurn) { addLog('自动初始化回合', 'info'); doBeginPhase() }
-      }
+      maybeAutoBeginPhase()
     }
 
     function applyLegacyBattleEntry(entry) {
@@ -3965,6 +3979,18 @@
       const pbc = G && G.pendingOptionSelection
       return !!(pbc && pbc.playerId && !clientOwns(pbc.playerId))
     }
+    function serverPendingTargetChanged(currentSkill, authoritativePending) {
+      if (!currentSkill || currentSkill.turnTargetActionType !== 'pendingTargetSelect') return true
+      const preparation = currentSkill.preparation || {}
+      if (preparation.selectionId !== authoritativePending.selectionId) return true
+      if (preparation.stateRevision !== authoritativePending.stateRevision) return true
+      const currentCandidates = preparation.candidates
+      const authoritativeCandidates = authoritativePending.candidates
+      if (!Array.isArray(authoritativeCandidates)) {
+        return Array.isArray(currentCandidates) && currentCandidates.length > 0
+      }
+      return currentCandidates !== authoritativeCandidates
+    }
 
     function battleInteractionMode() {
       if (TRAINING_MODE && placingMode) return 'place'
@@ -4066,7 +4092,7 @@
       if (pendingTargetSelectionForMe()) {
         console.log('[STAGE3] G.pendingTargetSelection: playerId=' + pbt.playerId + ' targetType=' + pbt.targetType + ' hasEffectCode=' + !!pbt.effectCode + ' effectCodeLen=' + (pbt.effectCode ? pbt.effectCode.length : 0))
         const actionType = 'pendingTargetSelect'
-        if (!pendingSkill || pendingSkill.turnTargetActionType !== actionType) {
+        if (serverPendingTargetChanged(pendingSkill, pbt)) {
           pendingSkill = {
             targetType: pbt.targetType,
             range: pbt.range || 99,
@@ -4637,13 +4663,14 @@
       const inStart = phase === 'start'
 
       const _waitingForOther = pendingOptionSelectionForOther()
+      const _waitingForOwn = pendingOptionSelectionForMe() || pendingTargetSelectionForMe()
       const btnEnd = document.getElementById('btnEnd')
       const deploymentPending = G.deployment && G.deployment.status === 'awaiting-locks'
       if (deploymentPending) {
         const lock = G.deployment.locks && G.deployment.locks[myPlayerId]
         const locked = !!(lock && lock.locked)
         if (btnEnd) {
-          btnEnd.disabled = SPECTATE_MODE || locked || !!targetSubmissionPending
+          btnEnd.disabled = SPECTATE_MODE || locked || !!targetSubmissionPending || !!pendingActionFeedback
           btnEnd.textContent = locked ? '部署已锁定' : '确认部署'
           btnEnd.classList.add('is-start')
         }
@@ -4655,8 +4682,12 @@
         return
       }
       if (btnEnd) {
-        btnEnd.disabled = !!targetSubmissionPending || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
-        btnEnd.textContent = inAction ? '结束回合 ->' : '继续 ->'
+        btnEnd.disabled = !!pendingActionFeedback || !!targetSubmissionPending || _waitingForOwn || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
+        btnEnd.textContent = _waitingForOther
+          ? '等待对方选择'
+          : _waitingForOwn
+            ? '请完成选择'
+            : inAction ? '结束回合 ->' : '继续 ->'
         btnEnd.classList.toggle('is-start', inStart || inEnd)
       }
 
@@ -5033,6 +5064,15 @@
 
     async function doTurnControl() {
       if (!G) return
+      if (pendingActionFeedback) {
+        setStatusMsg('上一条指令仍在等待权威确认')
+        return
+      }
+      if (G.pendingOptionSelection || G.pendingTargetSelection) {
+        const pending = G.pendingOptionSelection || G.pendingTargetSelection
+        setStatusMsg(clientOwns(pending.playerId) ? '请先完成当前规则选择' : '等待对方完成规则选择')
+        return
+      }
       if (G.deployment && G.deployment.status === 'awaiting-locks') {
         const lock = G.deployment.locks && G.deployment.locks[myPlayerId]
         if (SPECTATE_MODE || (lock && lock.locked)) return

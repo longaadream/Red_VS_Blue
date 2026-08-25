@@ -415,5 +415,5 @@ interface ServerCore {
 ### 客户端显示边界
 
 - `PublicBattleSnapshot` 增加 `serverNow` 与 `turnTimer?`；后者包含当前输入 owner、活动回合玩家、完整轮次、时长、剩余量、期限及 `burning/fast` 状态。
-- `battle.html` 和 `turn-timer-status.js` 只刷新 HUD。刷新、重连和 HTTP GET 不修改规则状态或期限，浏览器不持有超时授权。
+- `battle.html` 和 `turn-timer-status.js` 只刷新 HUD。刷新、重连和 HTTP GET 不修改规则状态或期限，浏览器不持有超时授权。客户端对每个 `turnNumber + currentPlayerId + start` 仅自动提交一次 `beginPhase`；部署未完成、存在权威 pending 或已有在途命令时禁止自动推进，避免拒绝快照形成重试风暴。权威 pending target 的 `selectionId/stateRevision/candidates` 变化会重建本地候选层。
 - 决策：[ADR-0014](../decisions/ADR-0014-authoritative-growing-turn-timer.md)。
