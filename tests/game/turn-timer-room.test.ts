@@ -229,6 +229,175 @@ describe('RED-36 authoritative room timer integration', () => {
     expect(result.snapshot.turnTimer).toMatchObject({ remainingMs: 15_500, burning: false })
     expect(result.finalSnapshotAlreadyDelivered).toBe(true)
   })
+
+  it('commits a begin-turn pending timer and preserves its budget into action phase', async () => {
+    const clock = new FakeClock(1_000)
+    const room = makeTimedRoom('end-start-action-room')
+    const initialState = (room.battleState as any).state as BattleState
+    initialState.pieces.find(piece => piece.instanceId === 'red-piece')!.statusTags = [{
+      id: 'end-turn-settlement-proof',
+      name: 'End turn settlement proof',
+      type: 'end-turn-settlement-proof',
+      remainingDuration: 2,
+    } as any]
+    const store = new MemoryRoomStore(room)
+    const previousRules = [...globalTriggerSystem.getRules()]
+    globalTriggerSystem.clearRules()
+    globalTriggerSystem.addRules([{
+      id: 'begin-turn-pending-probe',
+      name: 'Begin-turn pending probe',
+      description: 'Suspends the next player in start phase until they choose an option',
+      priority: 1,
+      trigger: { type: 'beginTurn' },
+      effect: (_battle: BattleState, context: any) => (
+        context.turnNumber !== 2 || context.selectedOption === 'resolve'
+      )
+        ? { success: true }
+        : {
+            needsOptionSelection: true,
+            playerId: PLAYERS[1],
+            title: 'Resolve begin-turn effect',
+            options: ['resolve'],
+          },
+    }] as any)
+
+    try {
+      const endResult = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
+        type: 'endTurn',
+        playerId: PLAYERS[0],
+        clientActionId: 'end-before-next-start',
+      } as any, { clock })
+      expect(endResult.kind).toBe('applied')
+      expect(authoritativeState(store).turn).toMatchObject({
+        currentPlayerId: PLAYERS[0],
+        turnNumber: 1,
+        phase: 'end',
+      })
+      expect(authoritativeState(store).pieces.find(piece => piece.instanceId === 'red-piece')?.statusTags)
+        .toContainEqual(expect.objectContaining({ id: 'end-turn-settlement-proof', remainingDuration: 1 }))
+
+      clock.value = 2_000
+      const startResult = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
+        type: 'beginPhase',
+        clientActionId: 'continue-to-next-start',
+      } as any, { clock })
+
+      expect(startResult.kind).toBe('applied')
+      const startState = authoritativeState(store)
+      expect(startState.turn).toMatchObject({
+        currentPlayerId: PLAYERS[1],
+        turnNumber: 2,
+        phase: 'start',
+      })
+      expect(startState.pendingOptionSelection).toMatchObject({
+        playerId: PLAYERS[1],
+        options: ['resolve'],
+      })
+      expect(startState.turnTimer).toMatchObject({
+        status: 'running',
+        ownerPlayerId: PLAYERS[1],
+        turnOwnerPlayerId: PLAYERS[1],
+        inputOwnerPlayerId: PLAYERS[1],
+        turnNumber: 2,
+      })
+      expect(startState.turnTimer).toMatchObject({
+        startedAt: 2_000,
+        deadlineAt: 47_000,
+      })
+      expect(startState.pieces.find(piece => piece.instanceId === 'red-piece')?.statusTags)
+        .toContainEqual(expect.objectContaining({ id: 'end-turn-settlement-proof', remainingDuration: 1 }))
+
+      const timeoutStore = new MemoryRoomStore(store.room)
+      const timeoutClock = new FakeClock(startState.turnTimer!.burnStartsAt)
+      const burnResult = await dispatchRoomBattleAction(timeoutStore, timeoutStore.room.id, undefined, {
+        type: 'turnTimerBurn',
+        now: timeoutClock.value,
+        clientActionId: 'burn-during-next-start-input',
+      } as any, { clock: timeoutClock, allowSystem: true })
+      expect(burnResult.kind).toBe('applied')
+      expect(authoritativeState(timeoutStore).turn).toMatchObject({
+        currentPlayerId: PLAYERS[1],
+        turnNumber: 2,
+        phase: 'start',
+      })
+      expect(authoritativeState(timeoutStore).pendingOptionSelection).toBeDefined()
+      expect(authoritativeState(timeoutStore).turnTimer).toMatchObject({
+        status: 'running',
+        ownerPlayerId: PLAYERS[1],
+        burnPhase: 'burning',
+      })
+
+      timeoutClock.value = startState.turnTimer!.deadlineAt
+      const timeoutResult = await dispatchRoomBattleAction(timeoutStore, timeoutStore.room.id, PLAYERS[1], {
+        type: 'pendingOptionSelect',
+        playerId: PLAYERS[1],
+        selectedOption: 'resolve',
+        selectionId: startState.pendingOptionSelection!.selectionId,
+        stateRevision: startState.pendingOptionSelection!.stateRevision,
+        clientActionId: 'late-next-start-input',
+      } as any, { clock: timeoutClock })
+      expect(timeoutResult).toMatchObject({ kind: 'expired', expiredReason: 'turn' })
+      expect(authoritativeState(timeoutStore).turn).toMatchObject({
+        currentPlayerId: PLAYERS[0],
+        turnNumber: 3,
+        phase: 'action',
+      })
+      expect(authoritativeState(timeoutStore).pendingOptionSelection).toBeUndefined()
+      expect(authoritativeState(timeoutStore).turnTimer).toMatchObject({
+        status: 'running',
+        ownerPlayerId: PLAYERS[0],
+        turnOwnerPlayerId: PLAYERS[0],
+        turnNumber: 3,
+        noOpStreaks: {
+          [PLAYERS[0]]: 0,
+          [PLAYERS[1]]: 1,
+        },
+      })
+
+      const pending = startState.pendingOptionSelection!
+      clock.value = 7_000
+      const actionResult = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[1], {
+        type: 'pendingOptionSelect',
+        playerId: PLAYERS[1],
+        selectedOption: 'resolve',
+        selectionId: pending.selectionId,
+        stateRevision: pending.stateRevision,
+        clientActionId: 'continue-to-next-action',
+      } as any, { clock })
+
+      expect(actionResult.kind).toBe('applied')
+      const actionState = authoritativeState(store)
+      expect(actionState.turn).toMatchObject({
+        currentPlayerId: PLAYERS[1],
+        turnNumber: 2,
+        phase: 'action',
+      })
+      expect(actionState.turnTimer).toMatchObject({
+        status: 'running',
+        ownerPlayerId: PLAYERS[1],
+        turnOwnerPlayerId: PLAYERS[1],
+        inputOwnerPlayerId: PLAYERS[1],
+        turnNumber: 2,
+        startedAt: 2_000,
+        deadlineAt: 47_000,
+        durationMs: 45_000,
+        remainingMs: 40_000,
+        acceptedGameplayAction: true,
+      })
+      expect(actionState.actions?.filter(action =>
+        action.type === 'turnTimerSync'
+        && action.turn === 2
+        && (action as any).payload?.phase === 'action',
+      ))
+        .toHaveLength(1)
+      expect(actionState.pieces.find(piece => piece.instanceId === 'red-piece')?.statusTags)
+        .toContainEqual(expect.objectContaining({ id: 'end-turn-settlement-proof', remainingDuration: 1 }))
+    } finally {
+      globalTriggerSystem.clearRules()
+      globalTriggerSystem.addRules(previousRules)
+    }
+  })
+
   it('keeps fast rope player-local, clears it after a valid action, and restores the growing budget next turn', async () => {
     const clock = new FakeClock(0)
     const store = new MemoryRoomStore(makeTimedRoom('streak-reset-room'))

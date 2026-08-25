@@ -116,8 +116,10 @@ export function createRunningTurnTimer(
   now: number,
   noOpStreaks: Record<PlayerId, number> = state.turnTimer?.noOpStreaks ?? {},
 ): TurnTimerState {
-  if (state.turn.phase !== 'action') {
-    throw new Error('A turn timer may only start while the server is waiting in action phase')
+  const hasPendingInput = !!state.pendingOptionSelection || !!state.pendingTargetSelection
+  if (state.turn.phase !== 'action' && !hasPendingInput) {
+    throw new Error(
+      'A turn timer may only start while the server is waiting in action phase or for pending input')
   }
   const turnOwnerPlayerId = state.turn.currentPlayerId
   const ownerPlayerId = getCurrentInputOwnerPlayerId(state)
