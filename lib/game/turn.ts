@@ -40,6 +40,7 @@ import { getNormalMoveRejection, manhattanDistance } from "./spatial"
 import {
   TargetingRuleError,
   advancePendingTargetSession,
+  finalizePendingTargetSession,
   assertActionTargetingReady,
   assertPendingTargetCancellation,
   stampTargetingRevision,
@@ -345,6 +346,12 @@ export type BattleAction =
       type: "turnTimeout"
       now: number
       clientActionId?: string
+      expectedTurnNumber?: number
+      expectedDeadlineAt?: number
+      expectedInputOwnerPlayerId?: PlayerId
+      expectedPendingOwnerPlayerId?: PlayerId | null
+      expectedPendingSelectionId?: string | null
+      expectedPendingStateRevision?: number | null
     }
   | {
       type: "move"
@@ -1163,6 +1170,171 @@ function applyBattleActionInternal(
 
     return resumeDeferredAction(next, pending, input)
   }
+  const stableTimeoutCandidateKey = (value: unknown): string => {
+    if (value === undefined) return 'undefined'
+    if (value === null || typeof value !== 'object') return JSON.stringify(value)
+    if (Array.isArray(value)) return `[${value.map(stableTimeoutCandidateKey).join(',')}]`
+    const record = value as Record<string, unknown>
+    return `{${Object.keys(record).sort().map(key => (
+      `${JSON.stringify(key)}:${stableTimeoutCandidateKey(record[key])}`
+    )).join(',')}}`
+  }
+
+  const uniqueTimeoutCandidates = <T>(values: T[]): T[] => {
+    const seen = new Set<string>()
+    return values.filter(value => {
+      const key = stableTimeoutCandidateKey(value)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+
+  const finalizeTimedOutPending = (next: BattleState): PendingSession | undefined => {
+    const revision = Number.isSafeInteger(next.targetingRevision) ? next.targetingRevision! : 0
+    if (next.pendingOptionSelection) {
+      next.pendingOptionSelection = finalizePendingOptionSession(next.pendingOptionSelection, revision)
+      return next.pendingOptionSelection
+    }
+    if (next.pendingTargetSelection) {
+      next.pendingTargetSelection = finalizePendingTargetSession(
+        next,
+        next.pendingTargetSelection,
+        revision,
+      )
+      return next.pendingTargetSelection
+    }
+    return undefined
+  }
+
+  const recordPendingTimeoutResolution = (
+    next: BattleState,
+    pending: PendingSession,
+    resolution: 'cancel' | 'candidate' | 'invariant-skip',
+  ): void => {
+    if (!next.actions) next.actions = []
+    next.actions.push({
+      type: 'triggerEffect',
+      playerId: pending.playerId,
+      turn: next.turn.turnNumber,
+      payload: {
+        message: `Pending selection timed out: ${resolution}`,
+        phase: next.turn.phase,
+        selectionId: pending.selectionId,
+        stateRevision: pending.stateRevision,
+        source: pending.source,
+        resolution,
+      },
+    } as any)
+  }
+
+  const skipInvalidTimedOutPending = (
+    next: BattleState,
+    pending: PendingSession,
+  ): BattleState => {
+    const context = {
+      phase: next.turn.phase,
+      callSite: 'applyBattleActionInternal.turnTimeout.resolveTimedOutPending',
+      turnNumber: next.turn.turnNumber,
+      ownerPlayerId: pending.playerId,
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+      source: pending.source,
+    }
+    const message = `Timed-out mandatory pending has no legal candidates: ${JSON.stringify(context)}`
+    const invariant = new BattleRuleError(message, 'PENDING_TIMEOUT_NO_CANDIDATES')
+    if (process.env.NODE_ENV !== 'production') {
+      throw invariant
+    }
+    const productionContext = { ...context, stack: invariant.stack }
+    console.error('[pending-timeout] invariant', productionContext)
+    recordPendingTimeoutResolution(next, pending, 'invariant-skip')
+    next.pendingOptionSelection = undefined
+    next.pendingTargetSelection = undefined
+    return resumePendingInteraction(next, pending, pending.playerId, {}, true)
+  }
+
+  const resolveOneTimedOutPending = (next: BattleState): BattleState => {
+    const pending = finalizeTimedOutPending(next)
+    if (!pending) return next
+
+    if (pending.canCancel !== false) {
+      recordPendingTimeoutResolution(next, pending, 'cancel')
+      return applyBattleActionInternal(next, {
+        type: 'cancelPendingSelection',
+        playerId: pending.playerId,
+        selectionId: pending.selectionId,
+        stateRevision: pending.stateRevision,
+      })
+    }
+
+    const runtime = getActiveRuleRuntime()
+    if (!runtime) {
+      throw new BattleRuleError(
+        'Mandatory pending timeout resolution requires a deterministic rule runtime',
+        'PENDING_TIMEOUT_RUNTIME_REQUIRED',
+      )
+    }
+
+    if ('options' in pending) {
+      const candidates = uniqueTimeoutCandidates((pending.options || []).map(option => {
+        if (!option || typeof option !== 'object') return option
+        if ('value' in option) return option.value
+        if ('id' in option) return option.id
+        return option
+      }))
+      if (candidates.length === 0) return skipInvalidTimedOutPending(next, pending)
+      const selectedOption = candidates[runtime.nextInt(
+        `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
+        candidates.length,
+      )]
+      recordPendingTimeoutResolution(next, pending, 'candidate')
+      return applyBattleActionInternal(next, {
+        type: 'pendingOptionSelect',
+        playerId: pending.playerId,
+        selectedOption,
+        selectionId: pending.selectionId,
+        stateRevision: pending.stateRevision,
+      })
+    }
+
+    const candidates = uniqueTimeoutCandidates(pending.candidates || [])
+    if (candidates.length === 0) return skipInvalidTimedOutPending(next, pending)
+    const target = candidates[runtime.nextInt(
+      `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
+      candidates.length,
+    )]
+    recordPendingTimeoutResolution(next, pending, 'candidate')
+    return applyBattleActionInternal(next, target.type === 'piece'
+      ? {
+          type: 'pendingTargetSelect',
+          playerId: pending.playerId,
+          targetPieceId: target.pieceId,
+          selectionId: pending.selectionId,
+          stateRevision: pending.stateRevision,
+        }
+      : {
+          type: 'pendingTargetSelect',
+          playerId: pending.playerId,
+          targetX: target.x,
+          targetY: target.y,
+          selectionId: pending.selectionId,
+          stateRevision: pending.stateRevision,
+        })
+  }
+
+  const resolveTimedOutPendingChain = (input: BattleState): BattleState => {
+    let resolved = input
+    for (let count = 0; count < 100; count += 1) {
+      if (!resolved.pendingOptionSelection && !resolved.pendingTargetSelection) return resolved
+      resolved = resolveOneTimedOutPending(resolved)
+    }
+    throw new BattleRuleError(
+      'Timed-out pending interaction chain exceeded the safety limit',
+      'PENDING_INTERACTION_TIMEOUT_LOOP',
+    )
+  }
+
 
   if (action.type === 'cancelPendingSelection') {
     const next = safeCloneBattleState(state)
@@ -1270,41 +1442,19 @@ function applyBattleActionInternal(
         return next
       }
 
-      // Timeout owns the transition; pending UI input cannot keep the expired
-      // turn alive. If endTurn already ran and is waiting on an "at end of turn"
-      // input, advance directly so triggers and duration ticks are not applied twice.
-      const endTurnAlreadySettled = next.turn.phase === 'end'
-      next.pendingOptionSelection = undefined
-      next.pendingTargetSelection = undefined
-      if (endTurnAlreadySettled) {
-        return applyBattleActionInternal(next, { type: 'beginPhase' })
+      // Resolve the expired interaction through the same validated reducers used
+      // by a player command. Cancellable sessions cancel; mandatory sessions
+      // consume one deterministic candidate. The expired budget is never reset.
+      let progressed = resolveTimedOutPendingChain(next)
+      const endTurnAlreadySettled = progressed.turn.phase === 'end'
+      if (!endTurnAlreadySettled) {
+        progressed = applyBattleActionInternal(progressed, {
+          type: 'endTurn',
+          playerId: progressed.turn.currentPlayerId,
+        })
+        progressed = resolveTimedOutPendingChain(progressed)
       }
-
-      // Action-phase timeouts still execute end-turn rules exactly once. If
-      // that forced settlement only now creates an end-of-turn interaction,
-      // its budget has already expired: do not open a fresh timer window.
-      let ended = applyBattleActionInternal(next, {
-        type: 'endTurn',
-        playerId: next.turn.currentPlayerId,
-      })
-      // A timeout is an authoritative skip, not a raw state clear. Continue
-      // the remaining end-turn consumers and deferred settlement exactly as a
-      // player cancellation would, while skipping every interaction that was
-      // created inside the already-expired input window.
-      for (let skipped = 0; skipped < 100; skipped += 1) {
-        const expiredPending = (ended.pendingOptionSelection || ended.pendingTargetSelection) as PendingSession | undefined
-        if (!expiredPending) break
-        ended.pendingOptionSelection = undefined
-        ended.pendingTargetSelection = undefined
-        ended = resumePendingInteraction(ended, expiredPending, timeout.playerId, {}, true)
-      }
-      if (ended.pendingOptionSelection || ended.pendingTargetSelection) {
-        throw new BattleRuleError(
-          'Timed-out pending interaction chain exceeded the safety limit',
-          'PENDING_INTERACTION_TIMEOUT_LOOP',
-        )
-      }
-      return applyBattleActionInternal(ended, { type: 'beginPhase' })
+      return applyBattleActionInternal(progressed, { type: 'beginPhase' })
     }
 
     case "deploymentChoice": {
@@ -2738,10 +2888,12 @@ export function applyBattleAction(
     ? state.extensions.debugBattle.actionLog.length
     : 0
   const reduced = applyBattleActionInternal(state, action)
-  let next = isTurnTimerSystemAction(action)
-    ? reduced
-    : stampTargetingRevision(state, reduced)
-  if (!isTurnTimerSystemAction(action) && next.pendingOptionSelection) {
+  const advancesTargetingRevision = !isTurnTimerSystemAction(action)
+    || action.type === 'turnTimeout'
+  let next = advancesTargetingRevision
+    ? stampTargetingRevision(state, reduced)
+    : reduced
+  if (advancesTargetingRevision && next.pendingOptionSelection) {
     const revision = Number.isSafeInteger(next.targetingRevision) ? next.targetingRevision! : 0
     next = { ...next, pendingOptionSelection: finalizePendingOptionSession(next.pendingOptionSelection, revision) }
   }

@@ -408,7 +408,7 @@ interface ServerCore {
 - `lib/game/turn-timer.ts`：定义可注入 `AuthoritativeRuleClock`、成长时长、20 秒快速回合、最终 15 秒烧绳、当前输入所有者、活动回合玩家、同回合各输入 owner 的剩余预算/烧绳状态、玩家独立连续无操作次数和只读投影。
 - `BattleState.turnTimer`：保存规则期限和 streak；`turnTimerSync | turnTimerBurn | turnTimeout` 是内部系统动作，客户端提交会以 `TURN_TIMER_SYSTEM_ACTION_FORBIDDEN` 拒绝且不写房间。
 - `dispatchRoomBattleAction()`：进入异步读取前采样逻辑接收时间；每房间串行冻结逻辑时钟，完成规则、唯一 CAS、快照构造和发送入队后恢复。传输层只获得真实提交版本，CAS 冲突不发布 speculative 快照，且处理跨越 15 秒阈值不会造成烧绳投影反转。进程重启恢复不在 RED-36 范围内。
-- 计时跟随当前输入所有者，并从 action 延续到 end，覆盖 pending 与“回合结束时”输入，直到下一回合真正开始；pending 返回活动玩家时恢复原剩余预算。主动结束回合产生的 pending 继续使用当前预算；action phase 超时若在强制 `endTurn` 时才产生 pending，则取消该输入并推进下一回合，不新增预算。end phase 输入超时也直接推进，不能重复执行 endTurn 触发。只有当前 owner 被接受的玩法动作才清零自己的 streak。
+- 计时跟随当前输入所有者，并从 action 延续到 end，覆盖 pending 与“回合结束时”输入，直到下一回合真正开始；pending 返回活动玩家时恢复原剩余预算。主动结束回合产生的 pending 继续使用当前预算；预算归零后不补发新预算，既存或强制 `endTurn` 新生成的 pending 都按权威 `canCancel` 处理：允许取消则复用正常取消归约，不可取消则从规范化、去重后的当前合法候选中使用确定性规则随机流选择，并复用正常提交归约。续接与剩余 endTurn 消费者完成后才进入下一回合，不能重复执行 endTurn 触发；旧 timeout 回调必须匹配调度时的 owner、selectionId 与 stateRevision，否则无副作用忽略。只有当前 owner 被接受的玩法动作才清零自己的 streak。
 - `scheduleRoomBattleTimeout()`：按部署期限、烧绳阈值和回合期限安排下一次唤醒；系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
 - 第三次连续无操作超时复用 RED-34 `terminalResult(reason = timeout-surrender)`，房间与终局在同一次 CAS 中变为 `finished`。
 

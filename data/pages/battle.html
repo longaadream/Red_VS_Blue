@@ -3393,6 +3393,22 @@
       if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
         locallyCancelledSelectionId = null
       }
+      const serverTargetInteraction = pendingSkill
+        && pendingSkill.turnTargetActionType === 'pendingTargetSelect'
+      if (serverTargetInteraction) {
+        const localSelectionId = pendingSkill.preparation && pendingSkill.preparation.selectionId
+        const localStateRevision = pendingSkill.preparation && pendingSkill.preparation.stateRevision
+        const nextPending = nextState.pendingTargetSelection
+        if (!nextPending
+          || !localSelectionId
+          || nextPending.selectionId !== localSelectionId
+          || nextPending.stateRevision !== localStateRevision) {
+          clearTargetInteraction('authoritative-pending-ended')
+          validMoves = new Set()
+          return '\u6743\u5a01\u76ee\u6807\u9009\u62e9\u5df2\u7ed3\u675f\uff0c\u65e7\u9009\u62e9\u5df2\u6e05\u9664'
+        }
+      }
+
       const selected = selectedPieceId && nextState.pieces
         ? nextState.pieces.find(p => p.instanceId === selectedPieceId && p.currentHp > 0)
         : null
@@ -3488,6 +3504,12 @@
       }
       authoritativeTurnTimer = turnTimer || null
     }
+    function acceptAuthorityVersion(authorityVersion) {
+      if (!Number.isSafeInteger(authorityVersion)) return latestAuthorityVersion === null
+      if (Number.isSafeInteger(latestAuthorityVersion) && authorityVersion < latestAuthorityVersion) return false
+      latestAuthorityVersion = authorityVersion
+      return true
+    }
     function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer) {
       if (!state) return
       resolveAuthoritySeed(state, seed)
@@ -3569,6 +3591,10 @@
 
     function applyLegacyBattleSnapshot(msg) {
       const actions = msg && Array.isArray(msg.actions) ? msg.actions : []
+      if (!acceptAuthorityVersion(msg && msg.authorityVersion)) {
+        addLog('[authority] Ignored an older or unversioned battle snapshot', 'info')
+        return
+      }
       latestAuthorityStateHash = (msg && msg.stateHash) || latestAuthorityStateHash
       latestAuthorityVersion = msg && Number.isSafeInteger(msg.authorityVersion)
         ? msg.authorityVersion
@@ -3610,6 +3636,10 @@
           try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
 
         } else if (msg.type === 'stateUpdate') {
+          if (!acceptAuthorityVersion(msg.authorityVersion)) {
+            addLog('[authority] Ignored an older or unversioned state update', 'info')
+            return
+          }
 
           if (_use3d && battlePresentation && G && msg.state) {
             battlePresentation.animateAction(
@@ -3720,6 +3750,10 @@
         }
         const data = await res.json()
         if (data && data.state) {
+          if (!acceptAuthorityVersion(data.authorityVersion)) {
+            addLog('[authority] Ignored an older or unversioned HTTP snapshot', 'info')
+            return
+          }
           addLog('[HTTP fallback] 已拉取服务端战斗状态 ' + String(data.stateHash || '').slice(0, 12), 'info')
           if (_use3d && battlePresentation && G) {
             battlePresentation.animateAction(

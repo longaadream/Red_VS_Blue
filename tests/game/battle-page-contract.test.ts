@@ -498,6 +498,50 @@ describe('battle page route contract', () => {
     expect(battlePage).toMatch(/pendingSelection && pendingSelection\.canCancel === false[\s\S]*?return/)
     expect(battlePage).toContain('id="optionPickerCancel"')
   })
+  it('clears a server-backed target layer as soon as its authoritative pending session disappears', () => {
+    const battlePage = readPage('battle.html')
+    const cleared: string[] = []
+    const context = createContext({
+      authorityStateConfirmsPending: () => true,
+      pendingActionFeedback: null,
+      clearPendingActionFeedback: () => null,
+      locallyCancelledSelectionId: null,
+      pendingSkill: {
+        turnTargetActionType: 'pendingTargetSelect',
+        preparation: { selectionId: 'expired-selection', stateRevision: 7 },
+      },
+      pendingCardAction: null,
+      targetSubmissionPending: null,
+      selectedPieceId: null,
+      validMoves: new Set(),
+      cleared,
+      clearTargetInteraction: (reason: string) => { cleared.push(reason) },
+    })
+    new Script(readNamedFunction(battlePage, 'reconcileBattleInteractionState')).runInContext(context)
+
+    const feedback = new Script(`reconcileBattleInteractionState(
+      { turn: { currentPlayerId: 'player-red' }, targetingRevision: 7,
+        pendingTargetSelection: { selectionId: 'expired-selection' }, pieces: [] },
+      { turn: { currentPlayerId: 'player-red' }, targetingRevision: 7, pieces: [] }
+    )`).runInContext(context)
+
+    expect(feedback).toContain('\u6743\u5a01\u76ee\u6807\u9009\u62e9\u5df2\u7ed3\u675f')
+    expect(battlePage).toContain('nextPending.stateRevision !== localStateRevision')
+    expect(context.cleared).toContain('authoritative-pending-ended')
+  })
+
+  it('rejects an older authority version so it cannot restore an expired selection layer', () => {
+    const battlePage = readPage('battle.html')
+    const context = createContext({ latestAuthorityVersion: 12 })
+    new Script(readNamedFunction(battlePage, 'acceptAuthorityVersion')).runInContext(context)
+
+    expect(new Script('acceptAuthorityVersion(11)').runInContext(context)).toBe(false)
+    expect(context.latestAuthorityVersion).toBe(12)
+    expect(new Script('acceptAuthorityVersion(12)').runInContext(context)).toBe(true)
+    expect(new Script('acceptAuthorityVersion(13)').runInContext(context)).toBe(true)
+    expect(context.latestAuthorityVersion).toBe(13)
+  })
+
 
   it('keeps the nearby piece menu action-only while preserving the existing right-click piece detail', () => {
     const battlePage = readPage('battle.html')

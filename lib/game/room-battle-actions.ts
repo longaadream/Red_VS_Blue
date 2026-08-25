@@ -66,6 +66,7 @@ export interface ScheduleBattleTimeoutOptions {
 }
 
 export type ScheduleDeploymentTimeoutOptions = ScheduleBattleTimeoutOptions
+type TurnTimeoutAction = Extract<BattleAction, { type: 'turnTimeout' }>
 
 export class RoomBattleActionError extends Error {
   code: string
@@ -181,11 +182,7 @@ export async function dispatchRoomBattleAction(
           clientActionId: `system-deployment-timeout:${normalizedRoomId}:${state.deployment!.deadlineAt}`,
         }
       : turnExpired
-      ? {
-          type: 'turnTimeout',
-          now: receivedAt,
-          clientActionId: `system-turn-timeout:${normalizedRoomId}:${state.turnTimer!.turnNumber}:${state.turnTimer!.deadlineAt}`,
-        }
+      ? createTurnTimeoutAction(state, receivedAt, `system-turn-timeout:${normalizedRoomId}:${state.turnTimer!.turnNumber}:${state.turnTimer!.deadlineAt}`)
       : normalizeSystemActionTime(action, receivedAt)
 
     let submittedActionResult: BattleActionResult
@@ -455,6 +452,67 @@ async function acquireRoomDispatchLock(roomId: string): Promise<() => void> {
   }
 }
 
+function pendingTimeoutIdentity(state: BattleState) {
+  const pending = state.pendingOptionSelection || state.pendingTargetSelection
+  const pendingOwnerPlayerId = pending
+    ? ('ownerPlayerId' in pending && pending.ownerPlayerId
+        ? pending.ownerPlayerId
+        : pending.playerId)
+    : null
+  return {
+    pendingOwnerPlayerId,
+    pendingSelectionId: pending?.selectionId ?? null,
+    pendingStateRevision: pending?.stateRevision ?? null,
+  }
+}
+
+function createTurnTimeoutAction(
+  state: BattleState,
+  now: number,
+  clientActionId: string,
+): TurnTimeoutAction {
+  const timer = state.turnTimer
+  if (!timer) {
+    throw new RoomBattleActionError('TURN_TIMER_MISSING', 'Cannot schedule a turn timeout without a running timer')
+  }
+  const pending = pendingTimeoutIdentity(state)
+  return {
+    type: 'turnTimeout',
+    now,
+    clientActionId,
+    expectedTurnNumber: timer.turnNumber,
+    expectedDeadlineAt: timer.deadlineAt,
+    expectedInputOwnerPlayerId: timer.ownerPlayerId,
+    expectedPendingOwnerPlayerId: pending.pendingOwnerPlayerId,
+    expectedPendingSelectionId: pending.pendingSelectionId,
+    expectedPendingStateRevision: pending.pendingStateRevision,
+  }
+}
+
+function matchesTurnTimeoutExpectation(
+  state: BattleState,
+  action: TurnTimeoutAction,
+): boolean {
+  if (action.expectedTurnNumber === undefined) return true
+  const timer = state.turnTimer
+  if (!timer
+    || timer.turnNumber !== action.expectedTurnNumber
+    || timer.deadlineAt !== action.expectedDeadlineAt
+    || normalizePlayerId(timer.ownerPlayerId) !== normalizePlayerId(action.expectedInputOwnerPlayerId)) {
+    return false
+  }
+  const pending = pendingTimeoutIdentity(state)
+  const expectedPendingOwner = action.expectedPendingOwnerPlayerId
+    ? normalizePlayerId(action.expectedPendingOwnerPlayerId)
+    : null
+  const currentPendingOwner = pending.pendingOwnerPlayerId
+    ? normalizePlayerId(pending.pendingOwnerPlayerId)
+    : null
+  return currentPendingOwner === expectedPendingOwner
+    && pending.pendingSelectionId === action.expectedPendingSelectionId
+    && pending.pendingStateRevision === action.expectedPendingStateRevision
+}
+
 function nextAuthorityWake(state: BattleState): {
   at: number
   action: (now: number) => BattleAction
@@ -484,11 +542,8 @@ function nextAuthorityWake(state: BattleState): {
   }
   return {
     at: timer.deadlineAt,
-    action: now => ({
-      type: 'turnTimeout',
-      now,
-      clientActionId: `system-turn-timeout:scheduled:${timer.turnNumber}:${timer.deadlineAt}`,
-    }),
+    action: now => createTurnTimeoutAction(
+      state, now, `system-turn-timeout:scheduled:${timer.turnNumber}:${timer.deadlineAt}`),
   }
 }
 
@@ -515,7 +570,10 @@ function isAlreadyCommittedSystemAction(state: BattleState, action: BattleAction
     return !state.turnTimer || state.turnTimer.status !== 'running' || state.turnTimer.burnPhase === 'burning'
   }
   if (action.type === 'turnTimeout') {
-    return !!state.terminalResult || !state.turnTimer || state.turnTimer.status !== 'running'
+    return !!state.terminalResult
+      || !state.turnTimer
+      || state.turnTimer.status !== 'running'
+      || !matchesTurnTimeoutExpectation(state, action)
   }
   return false
 }
