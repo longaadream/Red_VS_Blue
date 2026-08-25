@@ -15,21 +15,22 @@ model User {
 }
 
 model Room {
-  id                     String   @id
-  name                   String
-  status                 String   @default("waiting")
-  mapId                  String?
-  hostId                 String?
-  visibility             String?
-  maxPlayers             Int?
-  players                String   @default("[]")
-  spectators             String   @default("[]")
-  battleState            String?
-  inviteCode             String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  version                Int      @default(0)
-  battleAuthorityVersion Int      @default(0)
+  id                            String   @id
+  name                          String
+  status                        String   @default("waiting")
+  mapId                         String?
+  hostId                        String?
+  visibility                    String?
+  maxPlayers                    Int?
+  players                       String   @default("[]")
+  spectators                    String   @default("[]")
+  battleState                   String?
+  inviteCode                    String?
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+  version                       Int      @default(0)
+  battleAuthorityVersion        Int      @default(0)
+  battleAuthorityTransitionHash String   @default("")
 }
 
 model GameRecord {
@@ -48,23 +49,26 @@ model GameRecord {
 }
 
 model BattleAuthorityTransition {
-  roomId          String
-  fromVersion     Int
-  toVersion       Int
-  protocolVersion Int
-  clientActionId  String
-  playerId        String
-  commandJson     String
-  internalPatch   String
-  publicPatch     String
-  preStateHash    String
-  postStateHash   String
-  prePublicHash   String
-  postPublicHash  String
-  pendingJson     String?
-  traceJson       String?
-  replayFrameJson String?
-  createdAt       DateTime @default(now())
+  roomId                 String
+  fromVersion            Int
+  toVersion              Int
+  protocolVersion        Int
+  clientActionId         String
+  playerId               String
+  commandJson            String
+  internalPatch          String
+  publicPatch            String
+  preStateHash           String
+  postStateHash          String
+  prePublicHash          String
+  postPublicHash         String
+  actionHash             String
+  previousTransitionHash String
+  transitionHash         String
+  pendingJson            String?
+  traceJson              String?
+  replayFrameJson        String?
+  createdAt              DateTime @default(now())
 
   @@id([roomId, toVersion])
   @@unique([roomId, clientActionId])
@@ -93,6 +97,7 @@ model BattleAuthorityCheckpoint {
   stateJson        String
   stateHash        String
   publicHash       String
+  transitionHash   String
   reason           String
   createdAt        DateTime @default(now())
 

@@ -7,6 +7,8 @@ import {
 } from '../game/battle-trace'
 import type { ServerBattleState } from '../game/battle-storage'
 import {
+  assertBattleAuthorityRestoreCheckpoint,
+  createBattleAuthorityGenesisHash,
   replayBattleAuthorityTransitions,
   roomBattleAuthorityVersion,
   type BattleAuthorityCheckpointRecord,
@@ -86,17 +88,33 @@ export async function commitBattleAuthorityTransition(input: {
       || input.baseCheckpoint.authorityVersion !== input.expectedVersion
       || input.baseCheckpoint.stateHash !== input.transition.preStateHash
       || input.baseCheckpoint.publicHash !== input.transition.prePublicHash
+      || input.baseCheckpoint.transitionHash !== input.transition.previousTransitionHash
+    ))
+    || (input.checkpoint && (
+      input.checkpoint.roomId !== roomId
+      || input.checkpoint.authorityVersion !== input.transition.toVersion
+      || input.checkpoint.stateHash !== input.transition.postStateHash
+      || input.checkpoint.publicHash !== input.transition.postPublicHash
+      || input.checkpoint.transitionHash !== input.transition.transitionHash
     ))
   ) {
     throw new Error('Battle authority transition metadata does not match the atomic commit boundary')
   }
+  const transition = input.transition
   const committed = await prisma.$transaction(async transaction => {
     const result = await transaction.room.updateMany({
-      where: { id: roomId, battleAuthorityVersion: input.expectedVersion },
+      where: {
+        id: roomId,
+        battleAuthorityVersion: input.expectedVersion,
+        battleAuthorityTransitionHash: input.expectedVersion === 0
+          ? { in: ['', transition.previousTransitionHash] }
+          : transition.previousTransitionHash,
+      },
       data: {
         status: input.nextRoom.status,
         ...(input.checkpoint ? { battleState: JSON.stringify(input.checkpoint.storage) } : {}),
         battleAuthorityVersion: { increment: 1 },
+        battleAuthorityTransitionHash: transition.transitionHash,
       },
     })
     if (result.count === 0) return false
@@ -114,12 +132,12 @@ export async function commitBattleAuthorityTransition(input: {
           stateJson: JSON.stringify(base.storage),
           stateHash: base.stateHash,
           publicHash: base.publicHash,
+          transitionHash: base.transitionHash,
           reason: base.reason,
         },
       })
     }
 
-    const transition = input.transition
     await transaction.battleAuthorityTransition.create({
       data: {
         roomId,
@@ -135,6 +153,9 @@ export async function commitBattleAuthorityTransition(input: {
         postStateHash: transition.postStateHash,
         prePublicHash: transition.prePublicHash,
         postPublicHash: transition.postPublicHash,
+        actionHash: transition.actionHash,
+        previousTransitionHash: transition.previousTransitionHash,
+        transitionHash: transition.transitionHash,
         pendingJson: transition.pending ? JSON.stringify(transition.pending) : null,
         traceJson: transition.traces.length > 0 ? JSON.stringify(transition.traces) : null,
         replayFrameJson: transition.replayFrames.length > 0 ? JSON.stringify(transition.replayFrames) : null,
@@ -161,13 +182,20 @@ export async function commitBattleAuthorityTransition(input: {
           stateJson: JSON.stringify(input.checkpoint.storage),
           stateHash: input.checkpoint.stateHash,
           publicHash: input.checkpoint.publicHash,
+          transitionHash: input.checkpoint.transitionHash,
           reason: input.checkpoint.reason,
         },
       })
     }
     return true
   })
-  if (committed) rememberBattleAuthorityRoom({ ...input.nextRoom, battleAuthorityVersion: input.expectedVersion + 1 })
+  if (committed) {
+    rememberBattleAuthorityRoom({
+      ...input.nextRoom,
+      battleAuthorityVersion: input.expectedVersion + 1,
+      battleAuthorityTransitionHash: input.transition.transitionHash,
+    })
+  }
   return committed
 }
 
@@ -179,6 +207,11 @@ export async function initializeBattleAuthorityCheckpoint(input: {
 }): Promise<void> {
   const roomId = normalizeRoomId(input.room.id)
   const authorityVersion = roomBattleAuthorityVersion(input.room)
+  const transitionHash = createBattleAuthorityGenesisHash({
+    roomId,
+    stateHash: input.stateHash,
+    publicHash: input.publicHash,
+  })
   await prisma.battleAuthorityCheckpoint.upsert({
     where: { roomId_authorityVersion: { roomId, authorityVersion } },
     update: {},
@@ -190,10 +223,11 @@ export async function initializeBattleAuthorityCheckpoint(input: {
       stateJson: JSON.stringify(input.storage),
       stateHash: input.stateHash,
       publicHash: input.publicHash,
+      transitionHash,
       reason: 'initial',
     },
   })
-  rememberBattleAuthorityRoom(input.room)
+  rememberBattleAuthorityRoom({ ...input.room, battleAuthorityTransitionHash: transitionHash })
 }
 
 export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
@@ -202,13 +236,29 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
   const cached = authorityRoomCache.get(roomId)
   if (cached?.version === version) return clone(cached.room)
 
-  const checkpoint = await prisma.battleAuthorityCheckpoint.findFirst({
-    where: { roomId, authorityVersion: { lte: version } },
-    orderBy: { authorityVersion: 'desc' },
-  })
+  const checkpoint = assertBattleAuthorityRestoreCheckpoint(
+    roomId,
+    version,
+    await prisma.battleAuthorityCheckpoint.findFirst({
+      where: { roomId, authorityVersion: { lte: version } },
+      orderBy: { authorityVersion: 'desc' },
+    }) ?? undefined,
+  )
   if (!checkpoint) return room
 
   const checkpointStorage = JSON.parse(checkpoint.stateJson) as ServerBattleState
+  const checkpointTransitionHash = checkpoint.transitionHash || (
+    checkpoint.authorityVersion === 0
+      ? createBattleAuthorityGenesisHash({
+          roomId,
+          stateHash: checkpoint.stateHash,
+          publicHash: checkpoint.publicHash,
+        })
+      : ''
+  )
+  const targetTransitionHash = version === 0
+    ? room.battleAuthorityTransitionHash || checkpointTransitionHash
+    : room.battleAuthorityTransitionHash || ''
   const transitions = await prisma.battleAuthorityTransition.findMany({
     where: {
       roomId,
@@ -221,16 +271,42 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
     checkpointStorage,
     checkpointVersion: checkpoint.authorityVersion,
     checkpointStateHash: checkpoint.stateHash,
+    checkpointPublicHash: checkpoint.publicHash,
+    checkpointTransitionHash,
     targetVersion: version,
+    targetTransitionHash,
     transitions: transitions.map(transition => ({
+      protocolVersion: assertBattleAuthorityProtocolVersion(
+        transition.protocolVersion,
+        roomId,
+        transition.toVersion,
+      ),
+      roomId: transition.roomId,
       fromVersion: transition.fromVersion,
       toVersion: transition.toVersion,
+      clientActionId: transition.clientActionId,
+      playerId: transition.playerId,
+      commands: JSON.parse(transition.commandJson),
       internalPatch: JSON.parse(transition.internalPatch),
+      publicPatch: JSON.parse(transition.publicPatch),
+      preStateHash: transition.preStateHash,
       postStateHash: transition.postStateHash,
+      prePublicHash: transition.prePublicHash,
+      postPublicHash: transition.postPublicHash,
+      actionHash: transition.actionHash,
+      previousTransitionHash: transition.previousTransitionHash,
+      transitionHash: transition.transitionHash,
+      pending: transition.pendingJson ? JSON.parse(transition.pendingJson) : undefined,
+      traces: transition.traceJson ? JSON.parse(transition.traceJson) : [],
+      replayFrames: transition.replayFrameJson ? JSON.parse(transition.replayFrameJson) : [],
     })),
   })
 
-  const restored: Room = { ...room, battleState: storage as unknown as Room['battleState'] }
+  const restored: Room = {
+    ...room,
+    battleState: storage as unknown as Room['battleState'],
+    battleAuthorityTransitionHash: targetTransitionHash,
+  }
   const state = storage.state as BattleState
   if (state.terminalResult) {
     const allTransitions = await prisma.battleAuthorityTransition.findMany({
@@ -300,6 +376,19 @@ function parseJsonArray<T>(value: string | null): T[] {
   if (!value) return []
   const parsed = JSON.parse(value) as T | T[]
   return Array.isArray(parsed) ? parsed : [parsed]
+}
+
+function assertBattleAuthorityProtocolVersion(
+  protocolVersion: number,
+  roomId: string,
+  toVersion: number,
+): 2 {
+  if (protocolVersion !== 2) {
+    throw new Error(
+      `Battle authority protocol version mismatch in ${roomId} at ${toVersion}: ${protocolVersion}`,
+    )
+  }
+  return protocolVersion
 }
 
 function normalizeRoomId(roomId: string): string {

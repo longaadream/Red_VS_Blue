@@ -27,15 +27,15 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 3. `Room.version` 只保护大厅和房间元数据写入；`battleAuthorityVersion` 只由成功的权威战斗
    Transition 推进。重连、身份资料或房间元数据写入不得制造战斗版本空洞，也不得覆盖较新的战斗版本。
 4. 服务端执行正式规则并生成完整合法候选。客户端只显示权威 `pendingOptionSelection` /
-   `pendingTargetSelection` 中的候选并提交选择；联网路径不执行规则 dry-run。训练模式仍可在本地运行引擎。
+   `pendingTargetSelection` 中的候选并提交选择；候选只投影给 pending owner，对手和观者只接收等待会话的公开信封。联网路径不执行规则 dry-run。训练模式仍可在本地运行引擎。
 5. 普通成功命令生成连续的 `fromVersion → toVersion` Transition、内部状态 patch、按接收者重新
-   投影的公开 patch、前后 hash 与精确回执。客户端仅在前版本和前 hash 都匹配时应用 patch；任何
+   投影的公开 patch、前后 hash、精确 action hash 与连续 transition hash 链，并返回精确回执。客户端仅在前版本和前 hash 都匹配时应用 patch；任何
    断层或 hash 不一致都停止增量应用并单飞拉取完整恢复快照。
 6. Transition、回执、可选检查点和 `battleAuthorityVersion + 1` 在一个数据库事务中提交。普通动作
    不再重写完整战斗 JSON；初始、固定间隔、换回合、终局和关闭边界保留检查点。版本 0 的第一条
    Transition 会原子补建基准检查点，支持迁移时已经进行中的对局。
-7. 重启恢复从不晚于目标版本的最近检查点开始，先验证检查点 hash，再按版本顺序应用内部 patch 并
-   逐条验证状态 hash。缺号、损坏或未到目标版本必须显式失败，不能静默使用部分状态。
+7. 重启恢复从不晚于目标版本的最近检查点开始，先验证检查点的 state/public/transition hash，再按版本顺序应用内部 patch 并
+   逐条验证 pre/post state/public hash、action hash、previous transition hash 和 transition hash。缺检查点、缺号、损坏或未到目标版本必须显式失败，不能静默使用部分状态。
 8. 热状态只保留确定性随机游标、动作/回放序号和初始化事实；每步 Trace、命令和回放帧追加到
    Transition journal。终局检查点重新物化 ADR-0016 要求的完整 Trace v2，不降低回放事实完整性。
 9. 规则 JSON 和动态代码在服务进程内缓存。普通开发/生产动作不再因为 `NODE_ENV=development`
@@ -45,6 +45,8 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
     Relay 重连仍从权威服务获取完整恢复快照。
 11. 客户端 patch 应用后复用既有按键增量展示层：地图仅在地图身份或尺寸变化时重建，棋子按 `piece.id`、
     地格效果按坐标签名、候选高亮按坐标集合增删；普通 Transition 不重建 Three.js 场景。
+12. 候选功能 fail closed：只有显式 `RVB_BATTLE_AUTHORITY_V2=1` 才启用 v2 Transition；只有显式
+    `RVB_TURN_TIMER_ENABLED=1` 才安排部署/回合计时权威唤醒。未设置或设置为 `0` 时分别使用旧完整快照链路和无计时器模式。
 
 ## 性能合同
 
@@ -56,7 +58,7 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 
 ## 回退
 
-1. 运行时可设置 `RVB_BATTLE_AUTHORITY_V2=0`，恢复旧完整 Room CAS 与完整 `stateUpdate` 广播；
+1. 候选默认使用旧完整 Room CAS 与完整 `stateUpdate` 广播；仅显式设置 `RVB_BATTLE_AUTHORITY_V2=1` 才启用 v2，删除变量或设置为 `0` 即回退；
    客户端协议信封仍可被入口解析，但不依赖增量 Transition。
 2. 完整代码回退应整体 revert RED-109，不得只撤销客户端 patch 或服务端 journal 其中一侧。
 3. 迁移回退前必须先停止服务并确认不再有 v2 写入；保留/导出需要的 Trace 和对局证据，再删除新增

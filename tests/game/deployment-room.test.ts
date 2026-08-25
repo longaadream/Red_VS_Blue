@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { recordBattleInitialization } from '@/lib/game/battle-trace'
 import {
@@ -14,6 +14,12 @@ import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
+const originalTurnTimerFlag = process.env.RVB_TURN_TIMER_ENABLED
+beforeAll(() => { process.env.RVB_TURN_TIMER_ENABLED = '1' })
+afterAll(() => {
+  if (originalTurnTimerFlag === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
+  else process.env.RVB_TURN_TIMER_ENABLED = originalTurnTimerFlag
+})
 const ROOT_SEED = 2029
 
 class MemoryRoomStore implements DeploymentRoomStore {

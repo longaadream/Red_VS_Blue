@@ -409,7 +409,7 @@ interface ServerCore {
 - `BattleState.turnTimer`：保存规则期限和 streak；`turnTimerSync | turnTimerBurn | turnTimeout` 是内部系统动作，客户端提交会以 `TURN_TIMER_SYSTEM_ACTION_FORBIDDEN` 拒绝且不写房间。
 - `dispatchRoomBattleAction()`：进入异步读取前采样逻辑接收时间；每房间串行冻结逻辑时钟，完成规则、唯一 CAS、快照构造和发送入队后恢复。传输层只获得真实提交版本，CAS 冲突不发布 speculative 快照，且处理跨越 15 秒阈值不会造成烧绳投影反转。进程重启恢复不在 RED-36 范围内。
 - 计时跟随当前输入所有者，并从 action 延续到 end，覆盖 pending 与“回合结束时”输入，直到下一回合真正开始；pending 返回活动玩家时恢复原剩余预算。主动结束回合产生的 pending 继续使用当前预算；action phase 超时若在强制 `endTurn` 时才产生 pending，则取消该输入并推进下一回合，不新增预算。end phase 输入超时也直接推进，不能重复执行 endTurn 触发。只有当前 owner 被接受的玩法动作才清零自己的 streak。
-- `scheduleRoomBattleTimeout()`：按部署期限、烧绳阈值和回合期限安排下一次唤醒；系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
+- `scheduleRoomBattleTimeout()`：仅在显式 `RVB_TURN_TIMER_ENABLED=1` 时按部署期限、烧绳阈值和回合期限安排下一次唤醒；未设置或 `0` 时清除既有任务并 fail closed。系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
 - 第三次连续无操作超时复用 RED-34 `terminalResult(reason = timeout-surrender)`，房间与终局在同一次 CAS 中变为 `finished`。
 
 ### 客户端显示边界
@@ -424,7 +424,7 @@ interface ServerCore {
 - 排队：`lib/game/room-authority-queue.ts` 按 roomId 严格 FIFO，并对等待数量实施背压；房间之间不共享队列。
 - 协议：`lib/game/battle-transition.ts` 定义 v2 command envelope、精确 receipt、公开 pending 投影、Transition 和检查点恢复。
 - 版本：`Room.version` 是房间元数据乐观锁；`Room.battleAuthorityVersion` 是连续战斗版本。传输与 patch 只能使用后者。
-- 持久化：`lib/server/battle-authority-persistence.ts` 在单事务内推进战斗版本并写 Transition、Receipt 和可选 Checkpoint；普通动作不重写完整 Room battleState。
-- 客户端：`data/pages/battle.html` 只应用接收者公开 patch、显示权威候选并发送选择；版本/hash 不匹配时单飞请求完整快照。
-- 功能开关：`RVB_BATTLE_AUTHORITY_V2=0` 回退完整 Room CAS/stateUpdate；`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
-- 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；检查点/Transition 断层或 hash 损坏必须显式失败。
+- 持久化：`lib/server/battle-authority-persistence.ts` 在单事务内推进战斗版本并写 Transition、Receipt 和可选 Checkpoint；每条记录携带 action hash 与连续 transition hash，普通动作不重写完整 Room battleState。
+- 客户端：`data/pages/battle.html` 只应用接收者公开 patch、显示权威候选并发送选择；候选仅投影给 pending owner，对手/观者只看公开等待信封；版本/hash 不匹配时单飞请求完整快照。
+- 功能开关：候选默认 fail closed；只有 `RVB_BATTLE_AUTHORITY_V2=1` 启用 v2，只有 `RVB_TURN_TIMER_ENABLED=1` 安排部署/回合计时唤醒；未设置或 `0` 分别回退完整 Room CAS/stateUpdate 与无计时器模式。`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
+- 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；version > 0 缺检查点、版本断层、pre/post state/public hash、action hash 或 transition hash 链损坏都必须显式失败。

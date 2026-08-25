@@ -24,7 +24,12 @@ import {
 import { roomAuthorityQueue, type RoomAuthorityEventContext } from './room-authority-queue'
 import type { Room } from './room-store'
 import { assertActionPlayer } from './targeting'
-import { isAcceptedGameplayAction, projectTurnTimer, type TurnTimerProjection } from './turn-timer'
+import {
+  isAcceptedGameplayAction,
+  isTurnTimerEnabled,
+  projectTurnTimer,
+  type TurnTimerProjection,
+} from './turn-timer'
 import type { BattleAction, BattleState } from './turn'
 
 const MAX_ROOM_ACTION_ATTEMPTS = 5
@@ -418,7 +423,7 @@ export async function dispatchRoomBattleAction(
 
       let actionResult = submittedActionResult
       let syncAction: BattleAction | undefined
-      if (shouldSyncTurnTimer(state, submittedActionResult.state, actionToApply)) {
+      if (isTurnTimerEnabled() && shouldSyncTurnTimer(state, submittedActionResult.state, actionToApply)) {
         const resumedAt = getRoomAuthorityNow(normalizedRoomId, clock)
         const actorPlayerId = 'playerId' in actionToApply ? actionToApply.playerId : undefined
         const acceptedActionType = isAcceptedGameplayAction(actionToApply)
@@ -492,6 +497,7 @@ export async function dispatchRoomBattleAction(
             postStateHash: hashBattleState(compactedState),
             traces,
             replayFrames,
+            previousTransitionHash: room.battleAuthorityTransitionHash,
             now: receivedAt,
           })
         : undefined
@@ -519,6 +525,7 @@ export async function dispatchRoomBattleAction(
             storage,
             stateHash: transition.preStateHash,
             publicHash: transition.prePublicHash,
+            transitionHash: transition.previousTransitionHash,
             reason: 'initial',
             createdAt: receivedAt,
           }
@@ -551,6 +558,7 @@ export async function dispatchRoomBattleAction(
             storage: checkpointStorage,
             stateHash: hashBattleState(checkpointStorage.state as BattleState),
             publicHash: transition.postPublicHash,
+            transitionHash: transition.transitionHash,
             reason,
             createdAt: receivedAt,
           }
@@ -561,6 +569,7 @@ export async function dispatchRoomBattleAction(
       const nextRoom: Room = {
         ...room,
         battleState: committedStorage as unknown as Room['battleState'],
+        battleAuthorityTransitionHash: transition?.transitionHash ?? room.battleAuthorityTransitionHash,
         ...(isTerminal ? { status: 'finished' as const } : {}),
       }
       const persistenceStartedAt = monotonicNow()
@@ -628,6 +637,7 @@ export async function scheduleRoomBattleTimeout(
 ): Promise<void> {
   const normalizedRoomId = roomId.trim().toLowerCase()
   clearRoomBattleTimeout(normalizedRoomId)
+  if (!isTurnTimerEnabled()) return
 
   const room = await store.getRoom(normalizedRoomId)
   if (!room) return

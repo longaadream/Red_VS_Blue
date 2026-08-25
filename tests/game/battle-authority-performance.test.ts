@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { recordBattleInitialization } from '@/lib/game/battle-trace'
 import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
@@ -23,6 +23,12 @@ import { makePiece, makeState } from '../helpers/minimal-state'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
 const ROOT_SEED = 0x52454431
+const originalAuthorityV2Flag = process.env.RVB_BATTLE_AUTHORITY_V2
+beforeAll(() => { process.env.RVB_BATTLE_AUTHORITY_V2 = '1' })
+afterAll(() => {
+  if (originalAuthorityV2Flag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+  else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthorityV2Flag
+})
 const TRANSITION_COUNT = 100
 
 interface LegacySample {
@@ -136,7 +142,11 @@ class InstrumentedAuthorityV2Store implements DeploymentRoomStore {
       `${input.transition.receipt.roomId}:${input.transition.receipt.clientActionId}`,
       clone(input.transition.receipt),
     )
-    this.room = { ...clone(input.nextRoom), battleAuthorityVersion: input.transition.toVersion }
+    this.room = {
+      ...clone(input.nextRoom),
+      battleAuthorityVersion: input.transition.toVersion,
+      battleAuthorityTransitionHash: input.transition.transitionHash,
+    }
     this.writes += 1
     return true
   }
@@ -345,6 +355,7 @@ function makeDeploymentRoom(id = 'red109-legacy-benchmark'): Room {
     actions: [],
     version: 1,
     battleAuthorityVersion: 1,
+    battleAuthorityTransitionHash: 'a'.repeat(64),
     battleState: {
       type: 'server-state',
       seed: ROOT_SEED,

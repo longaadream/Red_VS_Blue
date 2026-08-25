@@ -19,8 +19,45 @@ export function toPublicBattleState(
   state: BattleState,
   viewerPlayerId?: string,
 ): BattleState {
-  void viewerPlayerId
   const projected = cloneSerializable(state)
+  const viewerId = String(viewerPlayerId ?? '').trim().toLowerCase()
+  const option = projected.pendingOptionSelection
+  if (option) {
+    const owner = String(option.playerId ?? '').trim().toLowerCase() === viewerId
+    projected.pendingOptionSelection = {
+      playerId: option.playerId,
+      title: option.title,
+      options: owner && Array.isArray(option.options) ? option.options : [],
+      source: option.source,
+      selectionId: option.selectionId,
+      stateRevision: option.stateRevision,
+      canCancel: option.canCancel,
+    }
+  }
+  const target = projected.pendingTargetSelection
+  if (target) {
+    const owner = String(target.playerId ?? '').trim().toLowerCase() === viewerId
+    projected.pendingTargetSelection = {
+      playerId: target.playerId,
+      ownerPlayerId: target.ownerPlayerId,
+      title: target.title,
+      targetType: target.targetType,
+      source: target.source,
+      selectionId: target.selectionId,
+      stateRevision: target.stateRevision,
+      step: target.step,
+      canCancel: target.canCancel,
+      ...(owner ? {
+        range: target.range,
+        filter: target.filter,
+        steps: target.steps,
+        min: target.min,
+        max: target.max,
+        selectedTargets: target.selectedTargets,
+        candidates: Array.isArray(target.candidates) ? target.candidates : [],
+      } : { candidates: [] }),
+    }
+  }
   const debugBattle = projected.extensions?.debugBattle
   const terminalTrace = projected.terminalResult
     ? readSanitizedBattleActionTrace(projected)

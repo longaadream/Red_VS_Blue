@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { recordBattleInitialization } from '@/lib/game/battle-trace'
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/lib/game/room-battle-actions'
 import type { Room } from '@/lib/game/room-store'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
-import { createRunningTurnTimer, syncTurnTimerAfterAcceptedAction } from '@/lib/game/turn-timer'
+import { createRunningTurnTimer, isTurnTimerEnabled, syncTurnTimerAfterAcceptedAction } from '@/lib/game/turn-timer'
 import type { BattleState } from '@/lib/game/turn'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { finalizePendingOptionSession } from '@/lib/game/pending-interaction'
@@ -20,6 +20,12 @@ import { makePiece, makeState } from '../helpers/minimal-state'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
 const ROOT_SEED = 3636
+const originalTurnTimerFlag = process.env.RVB_TURN_TIMER_ENABLED
+beforeAll(() => { process.env.RVB_TURN_TIMER_ENABLED = '1' })
+afterAll(() => {
+  if (originalTurnTimerFlag === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
+  else process.env.RVB_TURN_TIMER_ENABLED = originalTurnTimerFlag
+})
 
 class MemoryRoomStore implements DeploymentRoomStore {
   room: Room
@@ -440,7 +446,8 @@ describe('RED-36 authoritative room timer integration', () => {
         candidates: expect.any(Array),
       })
       expect(state.pendingTargetSelection!.candidates!.length).toBeGreaterThan(0)
-      expect(result.snapshot.state.pendingTargetSelection?.candidates)
+      expect(result.snapshot.state.pendingTargetSelection?.candidates).toEqual([])
+      expect(createPublicBattleSnapshot(store.room, PLAYERS[1], clock).state.pendingTargetSelection?.candidates)
         .toEqual(state.pendingTargetSelection!.candidates)
     } finally {
       globalTriggerSystem.clearRules()
@@ -810,6 +817,29 @@ describe('RED-36 authoritative room timer integration', () => {
     expect(authoritativeState(store).actions?.filter(action => action.type === 'terminalResult')).toHaveLength(1)
   })
 
+  it('keeps authority wakeups disabled unless the timer flag is explicitly enabled', async () => {
+    vi.useFakeTimers()
+    const savedFlag = process.env.RVB_TURN_TIMER_ENABLED
+    const clock = new FakeClock(0)
+    const store = new MemoryRoomStore(makeTimedRoom('timer-kill-switch-room'))
+
+    try {
+      delete process.env.RVB_TURN_TIMER_ENABLED
+      expect(isTurnTimerEnabled()).toBe(false)
+
+      await scheduleRoomBattleTimeout(store, store.room.id, { clock })
+
+      expect(vi.getTimerCount()).toBe(0)
+      expect(store.writes).toBe(0)
+      process.env.RVB_TURN_TIMER_ENABLED = '1'
+      expect(isTurnTimerEnabled()).toBe(true)
+    } finally {
+      clearRoomBattleTimeout(store.room.id)
+      if (savedFlag === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
+      else process.env.RVB_TURN_TIMER_ENABLED = savedFlag
+      vi.useRealTimers()
+    }
+  })
   it('commits the burn event once, survives refresh projections, then times out deterministically', async () => {
     vi.useFakeTimers()
     const clock = new FakeClock(0)

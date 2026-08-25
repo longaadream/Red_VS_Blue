@@ -117,6 +117,8 @@ export interface Room {
   version?: number
   /** Monotonic battle-only version; lobby/spectator writes must not advance it. */
   battleAuthorityVersion?: number
+  /** SHA-256 chain head for the committed battleAuthorityVersion. */
+  battleAuthorityTransitionHash?: string
   gameRecord?: GameRecord
 }
 
@@ -136,6 +138,7 @@ function deserializeRoom(row: {
   createdAt: Date
   version: number
   battleAuthorityVersion: number
+  battleAuthorityTransitionHash: string
 }): Room {
   const players: Player[] = JSON.parse(row.players).map((p: Player) => ({
     ...p,
@@ -164,6 +167,7 @@ function deserializeRoom(row: {
     createdAt: row.createdAt.getTime(),
     version: row.version,
     battleAuthorityVersion: row.battleAuthorityVersion,
+    battleAuthorityTransitionHash: row.battleAuthorityTransitionHash,
   }
 }
 
@@ -205,6 +209,7 @@ function serializeRoom(room: Room) {
     spectators,
     battleState,
     battleAuthorityVersion: room.battleAuthorityVersion ?? 0,
+    battleAuthorityTransitionHash: room.battleAuthorityTransitionHash ?? '',
   }
 }
 
@@ -243,7 +248,12 @@ export class RoomStore {
   async setRoom(roomId: string, room: Room): Promise<void> {
     const id = roomId.trim().toLowerCase()
     const data = serializeRoom({ ...room, id })
-    const { id: _id, battleAuthorityVersion: _battleAuthorityVersion, ...updateData } = data
+    const {
+      id: _id,
+      battleAuthorityVersion: _battleAuthorityVersion,
+      battleAuthorityTransitionHash: _battleAuthorityTransitionHash,
+      ...updateData
+    } = data
     await prisma.room.upsert({
       where: { id },
       update: { ...updateData, version: { increment: 1 } },
@@ -257,7 +267,12 @@ export class RoomStore {
   async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
     const id = roomId.trim().toLowerCase()
     const data = serializeRoom({ ...room, id })
-    const { id: _id, battleAuthorityVersion: _battleAuthorityVersion, ...updateData } = data
+    const {
+      id: _id,
+      battleAuthorityVersion: _battleAuthorityVersion,
+      battleAuthorityTransitionHash: _battleAuthorityTransitionHash,
+      ...updateData
+    } = data
     const result = await prisma.room.updateMany({
       where: { id, version: expectedVersion },
       data: { ...updateData, version: { increment: 1 } },

@@ -1,14 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { dispatchRoomBattleAction, type DeploymentRoomStore } from '@/lib/game/room-battle-actions'
-import type {
-  BattleAuthorityCheckpointRecord,
-  BattleAuthorityReceipt,
-  BattleAuthorityTransitionRecord,
+import {
+  isBattleAuthorityV2Enabled,
+  type BattleAuthorityCheckpointRecord,
+  type BattleAuthorityReceipt,
+  type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
 import type { Room } from '@/lib/game/room-store'
 import type { BattleAction } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
+
+const originalAuthorityV2Flag = process.env.RVB_BATTLE_AUTHORITY_V2
+beforeAll(() => { process.env.RVB_BATTLE_AUTHORITY_V2 = '1' })
+afterAll(() => {
+  if (originalAuthorityV2Flag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+  else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthorityV2Flag
+})
 
 class AuthorityV2MemoryStore implements DeploymentRoomStore {
   room: Room
@@ -62,12 +70,24 @@ class AuthorityV2MemoryStore implements DeploymentRoomStore {
       `${input.transition.receipt.roomId}:${input.transition.receipt.clientActionId}`,
       structuredClone(input.transition.receipt),
     )
-    this.room = { ...structuredClone(input.nextRoom), battleAuthorityVersion: input.transition.toVersion }
+    this.room = {
+      ...structuredClone(input.nextRoom),
+      battleAuthorityVersion: input.transition.toVersion,
+      battleAuthorityTransitionHash: input.transition.transitionHash,
+    }
     return true
   }
 }
 
 describe('RED-109 authority v2 coordinator', () => {
+  it('keeps authority v2 disabled unless the candidate flag is explicitly enabled', () => {
+    delete process.env.RVB_BATTLE_AUTHORITY_V2
+    expect(isBattleAuthorityV2Enabled()).toBe(false)
+    process.env.RVB_BATTLE_AUTHORITY_V2 = 'true'
+    expect(isBattleAuthorityV2Enabled()).toBe(true)
+    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
+  })
+
   it('commits command, transition and applied receipt once, then deduplicates retries without a write', async () => {
     const store = new AuthorityV2MemoryStore(makeRoom())
     const action = deploymentChoice('command-1')
@@ -233,6 +253,7 @@ function makeRoom(): Room {
     actions: [],
     version: 9,
     battleAuthorityVersion: 1,
+    battleAuthorityTransitionHash: 'a'.repeat(64),
     battleState: { type: 'server-state', seed: 109, state } as any,
   }
 }
