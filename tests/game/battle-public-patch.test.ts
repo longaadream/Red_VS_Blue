@@ -24,7 +24,8 @@ describe('RED-109 public battle patches', () => {
     const frozenBefore = structuredClone(before)
 
     const patch = createBattlePublicPatch(before, after)
-    const applied = applyBattlePublicPatch(before, patch)
+    const serializedPatch = JSON.parse(JSON.stringify(patch))
+    const applied = applyBattlePublicPatch(before, serializedPatch)
 
     expect(applied).toEqual(after)
     expect(before).toEqual(frozenBefore)
@@ -55,9 +56,36 @@ describe('RED-109 public battle patches', () => {
       .toThrow(/post-public hash/i)
   })
 
-  it('fails closed when a patch value has no JSON representation', () => {
-    expect(() => createBattlePublicPatch({}, { effect: () => true }))
-      .toThrow(BattlePublicPatchError)
+  it('fails closed for every non-JSON patch value, including nested and array values', () => {
+    const nonCanonicalArray = [1, 2] as unknown[] & Record<string, unknown>
+    nonCanonicalArray['01'] = { effect: () => true }
+    const symbolArray = [1]
+    Object.defineProperty(symbolArray, Symbol('hidden'), { value: () => true, enumerable: true })
+    const hiddenObject = {}
+    Object.defineProperty(hiddenObject, 'hidden', { value: undefined, enumerable: false })
+    const symbolObject = {}
+    Object.defineProperty(symbolObject, Symbol('hidden'), { value: () => true, enumerable: true })
+    const accessorObject = {}
+    Object.defineProperty(accessorObject, 'unstable', { enumerable: true, get: () => 1 })
+    const invalidPatches = [
+      () => createBattlePublicPatch({ value: 1 }, undefined),
+      () => createBattlePublicPatch({}, { effect: () => true }),
+      () => createBattlePublicPatch([], [{ effect: () => true }]),
+      () => createBattlePublicPatch([], [{ value: undefined }]),
+      () => createBattlePublicPatch({ value: 1 }, { value: Number.NaN }),
+      () => createBattlePublicPatch({ value: 1 }, { value: BigInt(1) }),
+      () => createBattlePublicPatch({}, { value: Symbol('non-json') }),
+      () => createBattlePublicPatch([1, 2], nonCanonicalArray),
+      () => createBattlePublicPatch([1], symbolArray),
+      () => createBattlePublicPatch({}, hiddenObject),
+      () => createBattlePublicPatch({}, symbolObject),
+      () => createBattlePublicPatch({}, accessorObject),
+      () => createBattlePublicPatch(hiddenObject, {}),
+    ]
+
+    for (const createInvalidPatch of invalidPatches) {
+      expect(createInvalidPatch).toThrow(BattlePublicPatchError)
+    }
   })
   it('rejects unsafe or malformed patch paths', () => {
     expect(() => applyBattlePublicPatch({}, [{ op: 'set', path: ['__proto__', 'polluted'], value: true }]))

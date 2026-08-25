@@ -39,6 +39,8 @@ export function hashPublicBattleState(state: unknown): string {
 }
 
 export function createBattlePublicPatch(before: unknown, after: unknown): BattlePatchOperation[] {
+  assertJsonValue(before, [], new WeakSet<object>())
+  assertJsonValue(after, [], new WeakSet<object>())
   const patch: BattlePatchOperation[] = []
   diffValue(before, after, [], patch)
   return patch
@@ -182,12 +184,67 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function cloneJson<T>(value: T): T {
-  if (value === undefined) return value
-  const serialized = JSON.stringify(value)
-  if (serialized === undefined) {
-    throw invalidPatch('Battle patch contains a non-JSON value', { valueType: typeof value })
+  assertJsonValue(value, [], new WeakSet<object>())
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function assertJsonValue(
+  value: unknown,
+  path: BattlePatchPath,
+  seen: WeakSet<object>,
+): void {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) return
+    throw invalidPatch('Battle patch contains a non-finite number', { path, value })
   }
-  return JSON.parse(serialized) as T
+  if (typeof value !== 'object') {
+    throw invalidPatch('Battle patch contains a non-JSON value', { path, valueType: typeof value })
+  }
+  if (seen.has(value)) throw invalidPatch('Battle patch contains a circular value', { path })
+  seen.add(value)
+  try {
+    if (Array.isArray(value)) {
+      const ownKeys = Reflect.ownKeys(value)
+      const elementKeys = ownKeys.filter(key => key !== 'length')
+      if (elementKeys.length !== value.length) {
+        throw invalidPatch('Battle patch contains a sparse array or extra property', { path })
+      }
+      for (const key of elementKeys) {
+        if (typeof key !== 'string') {
+          throw invalidPatch('Battle patch array contains a symbol-keyed property', { path })
+        }
+        const index = Number(key)
+        if (!Number.isSafeInteger(index) || index < 0 || index >= value.length || String(index) !== key) {
+          throw invalidPatch('Battle patch array contains a non-index property', { path: [...path, key] })
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(value, key)
+        if (!descriptor?.enumerable || !('value' in descriptor)) {
+          throw invalidPatch('Battle patch array contains a hidden or accessor property', { path: [...path, index] })
+        }
+        assertJsonValue(descriptor.value, [...path, index], seen)
+      }
+      return
+    }
+    if (!isPlainObject(value)) {
+      throw invalidPatch('Battle patch contains a non-plain object', {
+        path,
+        valueType: value.constructor?.name ?? 'object',
+      })
+    }
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== 'string') {
+        throw invalidPatch('Battle patch contains a symbol-keyed property', { path })
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key)
+      if (!descriptor?.enumerable || !('value' in descriptor)) {
+        throw invalidPatch('Battle patch contains a hidden or accessor property', { path: [...path, key] })
+      }
+      assertJsonValue(descriptor.value, [...path, key], seen)
+    }
+  } finally {
+    seen.delete(value)
+  }
 }
 
 function invalidPatch(message: string, context: Record<string, unknown> = {}): BattlePublicPatchError {

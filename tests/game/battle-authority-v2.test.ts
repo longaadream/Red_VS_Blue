@@ -335,6 +335,7 @@ describe('RED-109 authority v2 coordinator', () => {
       reason: 'surrender',
     })
     const terminalState = terminal.nextAuthorityState!
+    expect(JSON.parse(JSON.stringify(terminalState))).toEqual(terminalState)
     const actionLog = terminalState.extensions?.debugBattle?.actionLog ?? []
     expect(actionLog).toHaveLength(4)
     expect(actionLog.map((entry: unknown) => (entry as { actionId?: string }).actionId)).toEqual([

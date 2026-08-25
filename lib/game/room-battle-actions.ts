@@ -488,8 +488,9 @@ export async function dispatchRoomBattleAction(
           replayFrame: replayFrames[index],
         }))
         materializeBattleTraceForTerminal(materializedState, [...existingHistory, ...currentHistory])
-        nextAuthorityState = materializedState
-        actionResult = { ...actionResult, state: materializedState }
+        const canonicalMaterializedState = cloneBattleAuthorityJson(materializedState)
+        nextAuthorityState = canonicalMaterializedState
+        actionResult = { ...actionResult, state: canonicalMaterializedState }
       }
       const previousPublicState = toPublicBattleState(previousAuthorityState)
       const nextPublicState = toPublicBattleState(nextAuthorityState)
