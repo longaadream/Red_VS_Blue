@@ -4,7 +4,7 @@
   "faction": "evil",
   "description": "与宿主艾迪·布洛克结合的共生体，以宿主转移重排站位，以共生拖行捕获远处敌人。",
   "rarity": "rare",
-  "image": "venom.png",
+  "image": "venom.jpg",
   "stats": {
     "maxHp": 14,
     "attack": 3,
