@@ -349,3 +349,26 @@ Windows Electron 大厅只会在本地 `rvb_active_battle` 结构完整、服务
 5. 空状态点击：在开发者工具执行 `rejoinBattle()`；预期显示“没有可重新加入的对局”，不得静默无响应。
 
 如果服务器暂时不可达，入口保持隐藏并显示验证失败原因，但不清理本地记录；恢复连接后刷新大厅重新验证。
+
+## RED-109 权威延迟与恢复诊断
+
+候选客户端会把最近 200 条精确回执样本保存在 `window.__RVB_AUTHORITY_PERF__`：
+
+```js
+window.__RVB_AUTHORITY_PERF__.summary()
+window.__RVB_AUTHORITY_PERF__.clear()
+```
+
+每条样本包含客户端发出到精确回执应用的 `totalMs`、`clientApplyMs`，以及服务端提供的 `queueMs`、
+`rulesMs`、`persistenceMs`。先用服务端字段判断瓶颈，再检查网络与客户端渲染；不要用按钮动画或主观等待
+代替精确 ID 样本。
+
+- `queueMs` 高：同房间有慢命令或事件积压；检查队列 active/pending 和 timer/bot 命令。
+- `rulesMs` 高：检查是否误设 `RVB_FORCE_RULE_RELOAD=1`、是否存在未缓存动态规则或异常候选枚举。
+- `persistenceMs` 高：检查 SQLite/磁盘与检查点频率，不要恢复每动作完整 Room JSON 保存。
+- 服务端低而 `totalMs` 高：检查 WS/Relay 传输、patch hash recovery 和客户端渲染。
+- `resyncRequired`：同时记录客户端/服务端 `battleAuthorityVersion`；不要使用 `Room.version` 判断战斗连续性。
+- `BATTLE_PATCH_*_HASH_MISMATCH` 或版本 gap：保留 roomId、from/to version、前后 hash，完整拉取一次；重复失败应停止对局并检查 checkpoint/journal，不得吞错继续。
+
+本地数据热编辑默认不会逐动作读盘。需要验证显式失效时调用内容工具的 reload；只有针对逐次读盘的专项调试才临时设置
+`RVB_FORCE_RULE_RELOAD=1`。同步文件日志默认关闭，专项排错设置 `RVB_BATTLE_DEBUG_LOGS=1`，采证后关闭。

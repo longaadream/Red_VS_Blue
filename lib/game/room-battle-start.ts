@@ -1,8 +1,9 @@
 import { createInitialBattleForPlayers, DEMO_FIXED_MAP_ID } from './battle-setup'
 export { DEMO_FIXED_MAP_ID } from './battle-setup'
-import { runBattleAction } from './battle-runner'
+import { hashBattleState, runBattleAction } from './battle-runner'
 import { stampPendingDeploymentAuthorityVersion } from './battle-trace'
-import { withoutServerSkills } from './battle-storage'
+import { isBattleAuthorityV2Enabled } from './battle-transition'
+import { getBattleStorage, withoutServerSkills, type ServerBattleState } from './battle-storage'
 import { getPieceById } from './piece-repository'
 import { assertDemoRostersReady, type RosterRoomStore } from './roster-contract'
 import { getPlayerSeat, type Room } from './room-store'
@@ -97,9 +98,13 @@ export async function startBattleFromLockedRosters(
       }, { rootSeed: seed }).state
     }
 
-    if (typeof room.version === 'number') {
-      stampPendingDeploymentAuthorityVersion(initialState, room.version + 1)
+    const initialAuthorityVersion = isBattleAuthorityV2Enabled()
+      ? room.battleAuthorityVersion ?? 0
+      : (room.version ?? -1) + 1
+    if (!Number.isSafeInteger(initialAuthorityVersion) || initialAuthorityVersion < 0) {
+      throw new Error(`Invalid initial battle authority version: ${String(initialAuthorityVersion)}`)
     }
+    stampPendingDeploymentAuthorityVersion(initialState, initialAuthorityVersion)
 
     const nextRoom: Room = {
       ...room,
@@ -107,6 +112,7 @@ export async function startBattleFromLockedRosters(
       mapId: DEMO_FIXED_MAP_ID,
       status: 'in-progress',
       currentTurnIndex: 0,
+      battleAuthorityVersion: isBattleAuthorityV2Enabled() ? initialAuthorityVersion : room.battleAuthorityVersion,
       battleState: {
         type: 'server-state',
         seed,
@@ -120,7 +126,25 @@ export async function startBattleFromLockedRosters(
       await store.setRoom(roomId, nextRoom)
     }
     const committedRoom = await store.getRoom(roomId) ?? nextRoom
-    await options.onDeploymentUpdate?.(createPublicBattleSnapshot(committedRoom, undefined, clock))
+    const initialSnapshot = createPublicBattleSnapshot(committedRoom, undefined, clock)
+    const authorityStore = store as RosterRoomStore & {
+      initializeBattleAuthorityCheckpoint?: (input: {
+        room: Room
+        storage: ServerBattleState
+        stateHash: string
+        publicHash: string
+      }) => Promise<void>
+    }
+    const committedStorage = getBattleStorage(committedRoom)
+    if (committedStorage && authorityStore.initializeBattleAuthorityCheckpoint) {
+      await authorityStore.initializeBattleAuthorityCheckpoint({
+        room: committedRoom,
+        storage: committedStorage,
+        stateHash: hashBattleState(committedStorage.state as typeof initialState),
+        publicHash: initialSnapshot.stateHash,
+      })
+    }
+    await options.onDeploymentUpdate?.(initialSnapshot)
     await scheduleRoomDeploymentTimeout(store, roomId, {
       clock,
       onCommitted: options.onDeploymentUpdate,

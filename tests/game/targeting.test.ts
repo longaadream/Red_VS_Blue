@@ -605,13 +605,13 @@ describe('targeting consumers and performance contract', () => {
     const route = readFileSync(resolve(process.cwd(), 'app/api/rooms/[roomId]/battle/route.ts'), 'utf8')
     const coordinator = readFileSync(resolve(process.cwd(), 'lib/game/room-battle-actions.ts'), 'utf8')
     expect(ws).toMatch(
-      /dispatchRoomBattleAction\(\s*roomStore,\s*_roomId,\s*verified\.playerId,\s*msg\.action/,
+      /dispatchRoomBattleAction\(\s*roomStore,\s*_roomId,\s*verified\.playerId,\s*envelope\.command/,
     )
     expect(ws).toContain('preparation: errAny?.preparation')
     expect(route).toMatch(
-      /dispatchRoomBattleAction\(\s*roomStore,\s*roomId,\s*viewerPlayerId,\s*action/,
+      /dispatchRoomBattleAction\(\s*roomStore,\s*roomId,\s*verifiedPlayerId,\s*envelope\.command/,
     )
-    expect(route).toContain('preparation: errAny.preparation')
+    expect(route).toContain('preparation: errAny?.preparation')
     expect(coordinator).toContain('assertActionPlayer(viewerPlayerId, action)')
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
     expect(html).toContain('已忽略旧 Relay 客户端权威动作')

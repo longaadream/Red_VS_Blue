@@ -417,3 +417,14 @@ interface ServerCore {
 - `PublicBattleSnapshot` 增加 `serverNow` 与 `turnTimer?`；后者包含当前输入 owner、活动回合玩家、完整轮次、时长、剩余量、期限及 `burning/fast` 状态。
 - `battle.html` 和 `turn-timer-status.js` 只刷新 HUD。刷新、重连和 HTTP GET 不修改规则状态或期限，浏览器不持有超时授权。
 - 决策：[ADR-0014](../decisions/ADR-0014-authoritative-growing-turn-timer.md)。
+
+## RED-109 权威 Transition 协调器
+
+- 协调入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`；所有 LAN 玩家、pending、计时器和机器人命令必须由此进入。
+- 排队：`lib/game/room-authority-queue.ts` 按 roomId 严格 FIFO，并对等待数量实施背压；房间之间不共享队列。
+- 协议：`lib/game/battle-transition.ts` 定义 v2 command envelope、精确 receipt、公开 pending 投影、Transition 和检查点恢复。
+- 版本：`Room.version` 是房间元数据乐观锁；`Room.battleAuthorityVersion` 是连续战斗版本。传输与 patch 只能使用后者。
+- 持久化：`lib/server/battle-authority-persistence.ts` 在单事务内推进战斗版本并写 Transition、Receipt 和可选 Checkpoint；普通动作不重写完整 Room battleState。
+- 客户端：`data/pages/battle.html` 只应用接收者公开 patch、显示权威候选并发送选择；版本/hash 不匹配时单飞请求完整快照。
+- 功能开关：`RVB_BATTLE_AUTHORITY_V2=0` 回退完整 Room CAS/stateUpdate；`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
+- 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；检查点/Transition 断层或 hash 损坏必须显式失败。

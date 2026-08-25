@@ -933,11 +933,13 @@ describe('Demo roster HTTP/WebSocket integration', () => {
         type: 'surrender',
         playerId: firstIdentity.id,
         reason: 'voluntary',
+        clientActionId: 'terminal-race-http',
       }
       const wsAction = {
         type: 'surrender',
         playerId: secondIdentity.id,
         reason: 'voluntary',
+        clientActionId: 'terminal-race-ws',
       }
       const wsAuth = await signBattleAction(secondIdentity, 'terminal-race', wsAction)
       const httpResultPromise = httpBattleAction(

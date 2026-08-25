@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
-import { broadcastToRoom, queueBotTurnIfReady } from "@/lib/ws-server"
+import {
+  broadcastBattleTransition,
+  broadcastToRoom,
+  queueBotTurnIfReady,
+} from "@/lib/ws-server"
 import {
   createPublicBattleSnapshot,
+  createPublicBattleTransitionUpdate,
   dispatchRoomBattleAction,
   scheduleRoomBattleTimeout,
-  type PreResumeDeliveryContext,
-  type PublicBattleSnapshot,
 } from "@/lib/game/room-battle-actions"
+import { parseBattleAuthorityEnvelope, roomBattleAuthorityVersion } from "@/lib/game/battle-transition"
 import { verifyBattleActionAuth } from "@/lib/game/identity-verify"
 import { getClientTerminalSubmissionError } from "@/lib/server/battle-terminal"
 
-// ── GET — return current authoritative battle state ──────────────────────────
-
+// Full snapshots are recovery/checkpoint responses only. Normal commands return
+// an exact receipt plus an ordered public patch.
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ roomId: string }> },
@@ -32,30 +36,6 @@ export async function GET(
   }
 }
 
-function createPreparedActionResponse(
-  context: PreResumeDeliveryContext,
-  snapshot: PublicBattleSnapshot,
-): NextResponse {
-  if (context.kind === 'expired') {
-    const turnExpired = context.expiredReason === 'turn'
-    return NextResponse.json({
-      error: turnExpired
-        ? 'Turn deadline elapsed; the authoritative timeout was committed instead.'
-        : 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
-      code: turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
-      ...snapshot,
-    }, { status: 409 })
-  }
-  return NextResponse.json({
-    ok: true,
-    ...snapshot,
-    actionHash: context.actionHash,
-    duplicate: false,
-  })
-}
-
-// ── POST — apply action authoritatively, broadcast new state via WS ──────────
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ roomId: string }> },
@@ -63,29 +43,21 @@ export async function POST(
   const { roomId: rawRoomId } = await params
   const roomId = rawRoomId.trim().toLowerCase()
 
-  let body: {
-    type?: string
-    playerId?: string
-    viewerPlayerId?: string
-    action?: unknown
-    auth?: unknown
-    winner?: unknown
-    terminalResult?: unknown
-  } = {}
+  let body: Record<string, any> = {}
   try { body = await req.json() } catch {}
-
   const terminalSubmissionError = getClientTerminalSubmissionError(body)
   if (terminalSubmissionError) {
     return NextResponse.json({ error: terminalSubmissionError.message, code: terminalSubmissionError.code }, { status: 400 })
   }
 
-  // ── regular battle action: apply on server ──
-  const action = body.action
-  if (!action) return NextResponse.json({ error: 'action is required' }, { status: 400 })
+  const command = body.command ?? body.action
+  if (!command) return NextResponse.json({ error: 'command is required' }, { status: 400 })
+  const room = await roomStore.getRoom(roomId)
+  if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
 
   let verifiedPlayerId: string
   try {
-    verifiedPlayerId = (await verifyBattleActionAuth(body.auth, { roomId, action })).playerId
+    verifiedPlayerId = (await verifyBattleActionAuth(body.auth, { roomId, action: command })).playerId
   } catch (error) {
     const authError = error as { code?: string; message?: string }
     return NextResponse.json({
@@ -94,107 +66,108 @@ export async function POST(
     }, { status: 401 })
   }
 
+  let envelope
+  try {
+    envelope = parseBattleAuthorityEnvelope({
+      protocolVersion: body.protocolVersion ?? 2,
+      roomId,
+      clientActionId: body.clientActionId ?? command.clientActionId,
+      expectedAuthorityVersion: Number.isSafeInteger(body.expectedAuthorityVersion)
+        ? body.expectedAuthorityVersion
+        : roomBattleAuthorityVersion(room),
+      playerId: body.playerId ?? body.viewerPlayerId ?? verifiedPlayerId,
+      command,
+      selectionId: body.selectionId ?? command.selectionId,
+      stateRevision: body.stateRevision ?? command.stateRevision,
+    }, roomId)
+  } catch (error) {
+    const envelopeError = error as { code?: string; message?: string }
+    return NextResponse.json({
+      error: envelopeError.message ?? 'Invalid battle command envelope',
+      code: envelopeError.code ?? 'BATTLE_ENVELOPE_INVALID',
+    }, { status: 400 })
+  }
+
   const headerViewer = req.headers.get('x-player-id')?.trim().toLowerCase()
-  const bodyViewer = (body.viewerPlayerId ?? body.playerId)?.trim().toLowerCase()
   if (
-    (headerViewer && headerViewer !== verifiedPlayerId)
-    || (bodyViewer && bodyViewer !== verifiedPlayerId)
+    envelope.playerId !== verifiedPlayerId
+    || (headerViewer && headerViewer !== verifiedPlayerId)
   ) {
     return NextResponse.json({
       error: 'Request player identity does not match the authenticated viewer.',
       code: 'ACTION_PLAYER_MISMATCH',
     }, { status: 403 })
   }
-  const viewerPlayerId = verifiedPlayerId
 
-  let preparedResponse: NextResponse | undefined
-  let result: Awaited<ReturnType<typeof dispatchRoomBattleAction>>
   try {
-    result = await dispatchRoomBattleAction(
+    const result = await dispatchRoomBattleAction(
       roomStore,
       roomId,
-      viewerPlayerId,
-      action as any,
-      {
-        onCommittedBeforeTimerResume: (snapshot, context) => {
-          broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot })
-          preparedResponse = createPreparedActionResponse(context, snapshot)
-        },
-      },
+      verifiedPlayerId,
+      envelope.command,
+      { expectedAuthorityVersion: envelope.expectedAuthorityVersion },
     )
+
+    if (result.transition) broadcastBattleTransition(roomId, result)
+    else if (result.kind === 'applied' || result.kind === 'expired') {
+      broadcastToRoom(roomId, { type: 'stateUpdate', ...result.snapshot })
+    }
+    await scheduleRoomBattleTimeout(roomStore, roomId, {
+      onCommitted: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
+      onTransitionCommitted: timerResult => broadcastBattleTransition(roomId, timerResult),
+      onBotTurnReady: snapshot => { void queueBotTurnIfReady(roomId, snapshot.state) },
+    })
+    queueBotTurnIfReady(roomId, result.actionResult.state)
+
+    if (result.kind === 'resyncRequired') {
+      return NextResponse.json({
+        ok: false,
+        receipt: result.receipt,
+        snapshot: result.snapshot,
+      }, { status: 409 })
+    }
+    const transition = createPublicBattleTransitionUpdate(result, roomId, verifiedPlayerId)
+    if (result.kind === 'expired') {
+      return NextResponse.json({
+        ok: false,
+        receipt: result.receipt,
+        transition,
+        ...(!transition ? { snapshot: result.snapshot } : {}),
+        error: result.receipt?.message,
+        code: result.receipt?.code,
+      }, { status: 409 })
+    }
+    return NextResponse.json({
+      ok: true,
+      receipt: result.receipt,
+      transition,
+      ...(!transition ? result.snapshot : {}),
+      actionHash: result.submittedActionResult?.actionHash ?? result.actionResult.actionHash,
+      duplicate: result.kind === 'duplicate',
+    })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const message = err instanceof Error ? err.message : String(err)
     const errAny = err as any
-    if (errAny?.needsTargetSelection) {
-      return NextResponse.json({
-        error: msg,
-        code: errAny.code,
-        needsTargetSelection: true,
-        preparation: errAny.preparation,
-        targetType: errAny.targetType ?? '',
-        range: errAny.range ?? 10,
-        filter: errAny.filter ?? '',
-        targetIndex: errAny.targetIndex ?? undefined,
-        determinism: errAny.determinism ?? undefined,
-        context: errAny.context ?? undefined,
-      }, { status: 400 })
-    }
-    if (errAny?.needsOptionSelection) {
-      return NextResponse.json({
-        error: msg,
-        code: errAny.code,
-        needsOptionSelection: true,
-        preparation: errAny.preparation,
-        title: errAny.title ?? '请选择',
-        options: errAny.options ?? [],
-        determinism: errAny.determinism ?? undefined,
-        context: errAny.context ?? undefined,
-      }, { status: 400 })
-    }
     const status = errAny?.code === 'VIEWER_FORBIDDEN' || errAny?.code === 'ACTION_PLAYER_MISMATCH'
       ? 403
       : errAny?.code === 'ROOM_VERSION_CONFLICT'
-      ? 409
-      : 400
+        ? 409
+        : 400
     return NextResponse.json({
-      error: msg,
+      error: message,
       code: errAny?.code,
-      determinism: errAny?.determinism ?? undefined,
-      context: errAny?.context ?? undefined,
+      receipt: errAny?.receipt,
+      preparation: errAny?.preparation,
+      needsTargetSelection: errAny?.needsTargetSelection || undefined,
+      targetType: errAny?.targetType,
+      range: errAny?.range,
+      filter: errAny?.filter,
+      targetIndex: errAny?.targetIndex,
+      needsOptionSelection: errAny?.needsOptionSelection || undefined,
+      title: errAny?.title,
+      options: errAny?.options,
+      determinism: errAny?.determinism,
+      context: errAny?.context,
     }, { status })
   }
-
-  const stateUpdate = {
-    type: 'stateUpdate',
-    ...result.snapshot,
-    duplicate: result.kind === 'duplicate',
-  }
-  if (result.kind !== 'duplicate' && !result.finalSnapshotAlreadyDelivered) {
-    broadcastToRoom(roomId, stateUpdate)
-  }
-  await scheduleRoomBattleTimeout(roomStore, roomId, {
-    onCommitted: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
-    onBotTurnReady: snapshot => {
-      queueBotTurnIfReady(roomId, snapshot.state)
-    },
-  })
-  queueBotTurnIfReady(roomId, result.snapshot.state)
-  if (preparedResponse) return preparedResponse
-  if (result.kind === 'expired') {
-    const turnExpired = result.expiredReason === 'turn'
-    return NextResponse.json({
-      error: turnExpired
-        ? 'Turn deadline elapsed; the authoritative timeout was committed instead.'
-        : 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
-      code: turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
-      ...result.snapshot,
-    }, { status: 409 })
-  }
-
-  return NextResponse.json({
-    ok: true,
-    ...result.snapshot,
-    actionHash: result.submittedActionResult?.actionHash ?? result.actionResult.actionHash,
-    duplicate: result.kind === 'duplicate',
-  })
 }

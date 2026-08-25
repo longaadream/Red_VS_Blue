@@ -3,16 +3,17 @@ import type { Duplex } from 'node:stream'
 import { WebSocketServer, WebSocket } from 'ws'
 import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
 import { getBattleStorage, withServerSkills } from './game/battle-storage'
-import { runBattleAction } from './game/battle-runner'
 import {
   createPublicBattleSnapshot,
+  createPublicBattleTransitionUpdate,
   createPublicRoomSnapshot,
   dispatchRoomBattleAction,
-  getRoomBattleAuthorityNow,
-  runWithRoomBattleAuthorityPaused,
   scheduleRoomBattleTimeout,
+  type DispatchRoomBattleActionResult,
   type PublicBattleSnapshot,
 } from './game/room-battle-actions'
+import { parseBattleAuthorityEnvelope, roomBattleAuthorityVersion } from './game/battle-transition'
+import type { BattleAction, BattleState } from './game/turn'
 import {
   BattleActionAuthError,
   derivePlayerId,
@@ -21,7 +22,6 @@ import {
   verifyRecordSignature,
 } from './game/identity-verify'
 import { getClientTerminalSubmissionError } from './server/battle-terminal'
-import { isBattleStateConflict, persistAuthoritativeBattleState } from './server/battle-command'
 import {
   ensureRosterAlignmentMutable,
   getDemoRosterReadiness,
@@ -39,11 +39,13 @@ const _g = globalThis as unknown as {
   __rvbWsLifecycle?: Promise<void>
   __rvbRoomClients?: Map<string, Set<WebSocket>>
   __rvbPlayerWs?: Map<string, WebSocket>
+  __rvbWsIdentities?: WeakMap<WebSocket, { roomId: string; playerId?: string }>
   __rvbWsUpgradeHandler?: (request: IncomingMessage, socket: Duplex, head: Buffer) => void
 }
 
 const roomClients = (_g.__rvbRoomClients ??= new Map<string, Set<WebSocket>>())
 const playerWs = (_g.__rvbPlayerWs ??= new Map<string, WebSocket>())
+const wsIdentities = (_g.__rvbWsIdentities ??= new WeakMap<WebSocket, { roomId: string; playerId?: string }>())
 let _wss: WebSocketServer | null = _g.__rvbWss ?? null
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,7 +58,7 @@ function publicRoom(room: any): unknown {
     hostId: room.hostId,
     mapId: room.mapId,
     maxPlayers: room.maxPlayers || 2,
-    authorityVersion: room.version ?? 0,
+    authorityVersion: roomBattleAuthorityVersion(room),
     visibility: room.visibility || 'public',
     inviteCode: room.inviteCode,
     createdAt: room.createdAt,
@@ -123,6 +125,17 @@ async function broadcastLobby(): Promise<void> {
 
 function broadcastBattleSnapshot(roomId: string, snapshot: PublicBattleSnapshot): void {
   broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot })
+}
+
+export function broadcastBattleTransition(roomId: string, result: DispatchRoomBattleActionResult): void {
+  const clients = roomClients.get(roomId.trim().toLowerCase())
+  if (!clients || !result.transition) return
+  for (const client of clients) {
+    if (client.readyState !== WebSocket.OPEN) continue
+    const identity = wsIdentities.get(client)
+    const update = createPublicBattleTransitionUpdate(result, roomId, identity?.playerId)
+    if (update) sendJson(client, update)
+  }
 }
 
 function startBattleWithDeploymentBroadcast(roomId: string) {
@@ -542,10 +555,12 @@ async function restartWsServer(): Promise<void> {
           if (roomId) {
             roomClients.get(roomId)?.delete(ws)
             if (playerId) playerWs.delete(playerId)
+            wsIdentities.delete(ws)
           }
           const nextRoomId = msg.roomId.toLowerCase()
           roomId = nextRoomId
           playerId = typeof msg.playerId === 'string' ? msg.playerId.trim().toLowerCase() : null
+          wsIdentities.set(ws, { roomId: nextRoomId, ...(playerId ? { playerId } : {}) })
 
           if (!roomClients.has(nextRoomId)) roomClients.set(nextRoomId, new Set())
           roomClients.get(nextRoomId)!.add(ws)
@@ -610,13 +625,26 @@ async function restartWsServer(): Promise<void> {
               const room = await roomStore.getRoom(_roomId)
               if (!room) return
               if (msg.type === 'action') {
-                if (msg.action == null) return
+                const command = msg.command ?? msg.action
+                if (command == null) return
                 try {
+                  const envelope = parseBattleAuthorityEnvelope({
+                    protocolVersion: msg.protocolVersion ?? 2,
+                    roomId: _roomId,
+                    clientActionId: msg.clientActionId ?? command.clientActionId,
+                    expectedAuthorityVersion: Number.isSafeInteger(msg.expectedAuthorityVersion)
+                      ? msg.expectedAuthorityVersion
+                      : roomBattleAuthorityVersion(room),
+                    playerId: msg.playerId ?? playerId,
+                    command,
+                    selectionId: msg.selectionId ?? command.selectionId,
+                    stateRevision: msg.stateRevision ?? command.stateRevision,
+                  }, _roomId)
                   const verified = await verifyBattleActionAuth(msg.auth, {
                     roomId: _roomId,
-                    action: msg.action,
+                    action: envelope.command,
                   })
-                  if (!playerId || playerId !== verified.playerId) {
+                  if (!playerId || playerId !== verified.playerId || envelope.playerId !== verified.playerId) {
                     throw new BattleActionAuthError(
                       'BATTLE_AUTH_INVALID',
                       'Signed battle player does not match the subscribed connection identity',
@@ -626,24 +654,23 @@ async function restartWsServer(): Promise<void> {
                     roomStore,
                     _roomId,
                     verified.playerId,
-                    msg.action as any,
-                    {
-                      onCommittedBeforeTimerResume: snapshot => {
-                        broadcastBattleSnapshot(_roomId, snapshot)
-                      },
-                    },
+                    envelope.command,
+                    { expectedAuthorityVersion: envelope.expectedAuthorityVersion },
                   )
-                  const stateUpdate = {
-                    type: 'stateUpdate',
-                    ...result.snapshot,
-                    duplicate: result.kind === 'duplicate',
+                  if (result.transition) {
+                    broadcastBattleTransition(_roomId, result)
+                  } else if (result.kind === 'applied' || result.kind === 'expired') {
+                    broadcastBattleSnapshot(_roomId, result.snapshot)
+                  } else if (result.receipt) {
+                    sendJson(sender, { type: 'battleReceipt', receipt: result.receipt })
                   }
-                  if (result.kind === 'duplicate') sendJson(sender, stateUpdate)
-                  else if (!result.finalSnapshotAlreadyDelivered) {
-                    broadcastToRoom(_roomId, stateUpdate)
+                  if (result.kind === 'resyncRequired') {
+                    sendJson(sender, { type: 'stateUpdate', ...result.snapshot, reason: 'resync' })
+                    return
                   }
                   await scheduleRoomBattleTimeout(roomStore, _roomId, {
                     onCommitted: snapshot => broadcastBattleSnapshot(_roomId, snapshot),
+                    onTransitionCommitted: timerResult => broadcastBattleTransition(_roomId, timerResult),
                     onBotTurnReady: snapshot => {
                       queueBotTurnIfReady(_roomId, snapshot.state)
                     },
@@ -655,8 +682,8 @@ async function restartWsServer(): Promise<void> {
                         ? 'Turn deadline elapsed; the authoritative timeout was committed instead.'
                         : 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
                       code: turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
-                      action: msg.action,
-                      ...result.snapshot,
+                      action: envelope.command,
+                      receipt: result.receipt,
                     })
                     return
                   }
@@ -666,15 +693,17 @@ async function restartWsServer(): Promise<void> {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const errAny = err as any
                   console.warn(
-                    '[WS] action failed:', _roomId, msg.action?.type,
+                    '[WS] action failed:', _roomId, command?.type,
                     errAny?.needsTargetSelection ? 'needsTargetSelection'
                       : errAny?.needsOptionSelection ? 'needsOptionSelection'
                       : message
                   )
+                  if (errAny?.receipt) sendJson(sender, { type: 'battleReceipt', receipt: errAny.receipt })
                   sendActionError(sender, {
                     error: message,
                     code: errAny?.code ?? undefined,
-                    action: msg.action,
+                    action: command,
+                    receipt: errAny?.receipt ?? undefined,
                     preparation: errAny?.preparation ?? undefined,
                     needsTargetSelection: errAny?.needsTargetSelection || undefined,
                     targetType: errAny?.targetType ?? undefined,
@@ -701,10 +730,12 @@ async function restartWsServer(): Promise<void> {
     ws.on('close', () => {
       if (roomId) roomClients.get(roomId)?.delete(ws)
       if (playerId) playerWs.delete(playerId)
+      wsIdentities.delete(ws)
     })
     ws.on('error', () => {
       if (roomId) roomClients.get(roomId)?.delete(ws)
       if (playerId) playerWs.delete(playerId)
+      wsIdentities.delete(ws)
     })
   })
 
@@ -739,88 +770,92 @@ export function queueBotTurnIfReady(
 }
 
 async function runBotTurn(roomId: string): Promise<void> {
-  return runWithRoomBattleAuthorityPaused(roomId, () => runBotTurnWhilePaused(roomId))
-}
-
-async function runBotTurnWhilePaused(roomId: string): Promise<void> {
   try {
-    const room = await roomStore.getRoom(roomId)
-    if (!room) return
-    const storage = getBattleStorage(room)
-    if (!storage) return
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const st = storage.state as any
-    if (st?.turn?.phase !== 'action' || st?.turn?.currentPlayerId !== 'bot') return
+    const initialRoom = await roomStore.getRoom(roomId)
+    const initialStorage = initialRoom && getBattleStorage(initialRoom)
+    const initialState = initialStorage?.state as BattleState | undefined
+    if (
+      !initialRoom
+      || !initialStorage
+      || initialState?.turn?.phase !== 'action'
+      || initialState.turn.currentPlayerId !== 'bot'
+    ) return
 
     const { generateBotActions, prepareBotAction } = await import('./game/ai')
-    const hydratedState = withServerSkills(storage.state)
-    const receivedAt = getRoomBattleAuthorityNow(roomId)
-    let currentState: any = storage.state
+    const actions = generateBotActions(withServerSkills(initialState) as BattleState, 'bot')
+    let ordinal = 0
 
-    const actions = generateBotActions(hydratedState as any, 'bot')
     for (const action of actions) {
+      const latestRoom = await roomStore.getRoom(roomId)
+      const latestStorage = latestRoom && getBattleStorage(latestRoom)
+      const latestState = latestStorage?.state as BattleState | undefined
+      if (!latestRoom || !latestStorage || !latestState || latestState.terminalResult) break
+      if (latestState.turn.currentPlayerId !== 'bot') break
+
       try {
         const currentAction = action.type === 'useBasicSkill' || action.type === 'useChargeSkill'
-          ? prepareBotAction(currentState, {
+          ? prepareBotAction(withServerSkills(latestState) as BattleState, {
               type: action.type,
               playerId: action.playerId,
               pieceId: action.pieceId,
               skillId: action.skillId,
             }, 'bot')
           : action
-        if (currentAction) currentState = runBattleAction(currentState, currentAction as any, { rootSeed: storage.seed }).state
-      } catch {
-        // Skip invalid bot action
+        if (!currentAction) continue
+        const result = await dispatchBotAuthorityCommand(roomId, roomBattleAuthorityVersion(latestRoom), currentAction as BattleAction, ordinal++)
+        if (result?.actionResult.state.terminalResult) break
+      } catch (error) {
+        console.warn('[WS] skipped invalid bot action', {
+          roomId,
+          actionType: action.type,
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     }
 
-    // After bot endTurn (phase="end"), advance to next player's action phase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((currentState as any)?.turn?.phase === 'end') {
-      try { currentState = runBattleAction(currentState, { type: 'beginPhase' } as any, { rootSeed: storage.seed }).state } catch {}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((currentState as any)?.turn?.phase === 'start') {
-        try { currentState = runBattleAction(currentState, { type: 'beginPhase' } as any, { rootSeed: storage.seed }).state } catch {}
-      }
-    }
-    if (
-      !currentState?.terminalResult
-      && (
-        currentState?.turn?.turnNumber !== st?.turn?.turnNumber
-        || currentState?.turn?.currentPlayerId !== st?.turn?.currentPlayerId
-        || currentState?.turn?.phase !== st?.turn?.phase
+    // Advance the same authoritative state machine used by human clients. A
+    // begin-turn pending interaction remains visible and is never bypassed.
+    for (let step = 0; step < 2; step += 1) {
+      const latestRoom = await roomStore.getRoom(roomId)
+      const latestStorage = latestRoom && getBattleStorage(latestRoom)
+      const latestState = latestStorage?.state as BattleState | undefined
+      if (!latestRoom || !latestState || latestState.terminalResult) break
+      if (latestState.pendingOptionSelection || latestState.pendingTargetSelection) break
+      if (latestState.turn.phase !== 'end' && latestState.turn.phase !== 'start') break
+      await dispatchBotAuthorityCommand(
+        roomId,
+        roomBattleAuthorityVersion(latestRoom),
+        { type: 'beginPhase' },
+        ordinal++,
       )
-    ) {
-      const now = getRoomBattleAuthorityNow(roomId)
-      currentState = runBattleAction(currentState, {
-        type: 'turnTimerSync',
-        receivedAt,
-        now,
-        actorPlayerId: 'bot',
-        acceptedActionType: 'endTurn',
-        clientActionId: `system-bot-turn-timer-sync:${roomId}:${currentState.turn.turnNumber}`,
-      }, { rootSeed: storage.seed }).state
     }
-
-    storage.state = currentState
-    try {
-      const committedRoom = await persistAuthoritativeBattleState({ roomId, room, storage })
-      broadcastBattleSnapshot(roomId, createPublicBattleSnapshot(committedRoom))
-      await scheduleRoomBattleTimeout(roomStore, roomId, {
-        onCommitted: snapshot => broadcastBattleSnapshot(roomId, snapshot),
-        onBotTurnReady: snapshot => {
-          queueBotTurnIfReady(roomId, snapshot.state)
-        },
-      })
-    } catch (error) {
-      // A player command won the room-version race; discard this stale bot turn.
-      if (isBattleStateConflict(error)) return
-      throw error
-    }
-  } catch (e) {
-    console.warn('[WS] runBotTurn error:', e)
+  } catch (error) {
+    console.warn('[WS] runBotTurn error:', error)
+  } finally {
+    await scheduleRoomBattleTimeout(roomStore, roomId, {
+      onCommitted: snapshot => broadcastBattleSnapshot(roomId, snapshot),
+      onTransitionCommitted: result => broadcastBattleTransition(roomId, result),
+      onBotTurnReady: snapshot => { void queueBotTurnIfReady(roomId, snapshot.state) },
+    })
   }
+}
+
+async function dispatchBotAuthorityCommand(
+  roomId: string,
+  expectedAuthorityVersion: number,
+  action: BattleAction,
+  ordinal: number,
+): Promise<DispatchRoomBattleActionResult | undefined> {
+  const command = {
+    ...action,
+    clientActionId: `system-bot:${roomId}:${expectedAuthorityVersion}:${ordinal}:${action.type}`,
+  } as BattleAction
+  const result = await dispatchRoomBattleAction(roomStore, roomId, 'bot', command, {
+    expectedAuthorityVersion,
+  })
+  if (result.transition) broadcastBattleTransition(roomId, result)
+  else if (result.kind !== 'resyncRequired') broadcastBattleSnapshot(roomId, result.snapshot)
+  return result
 }
 
 export function broadcastToRoom(roomId: string, data: unknown): void {

@@ -98,11 +98,19 @@ export interface BattleReplayArchive {
   frames: BattleReplayFrame[]
 }
 
+export interface BattleTraceAuthorityRuntime {
+  rootSeed?: number
+  actionCount: number
+  replayFrameCount: number
+  runtimeCursors: Record<string, number>
+}
+
 export interface DebugBattleMetadata {
   appliedActionIds: string[]
   actionLog: Array<BattleActionTrace | Record<string, unknown>>
   commandLog: Array<Record<string, unknown>>
   replay?: BattleReplayArchive
+  authority?: BattleTraceAuthorityRuntime
 }
 
 export function stableJson(value: unknown): string {
@@ -190,6 +198,8 @@ export function hashBattleState(state: BattleState): string {
 
 export function getBattleRootSeed(state: BattleState): number | undefined {
   const metadata = readDebugMetadata(state)
+  const compactSeed = metadata.authority?.rootSeed
+  if (typeof compactSeed === 'number' && Number.isInteger(compactSeed)) return compactSeed >>> 0
   for (const entry of metadata.actionLog) {
     const rootSeed = (entry as Partial<BattleActionTrace>).rootSeed
     if (typeof rootSeed === 'number' && Number.isInteger(rootSeed)) return rootSeed >>> 0
@@ -229,6 +239,12 @@ export function recordBattleInitialization(
   }
   metadata.actionLog.push(trace)
   metadata.commandLog[trace.index] = sanitizeBattleTraceValue(action) as Record<string, unknown>
+  metadata.authority = {
+    rootSeed: runtime.rootSeed,
+    actionCount: trace.index + 1,
+    replayFrameCount: 0,
+    runtimeCursors: runtimeCursorsFromTrace(trace),
+  }
   const initialState = createBattleReplayCheckpoint(canonicalState)
   metadata.replay = {
     format: BATTLE_REPLAY_FORMAT,
@@ -343,7 +359,7 @@ export function appendBattleReplayFrame(
   const sanitizedAction = sanitizeBattleTraceValue(action) as Record<string, unknown>
   const events = collectCommittedEvents(beforeState.actions, afterState.actions)
   const frame: BattleReplayFrame = {
-    index: replay.frames.length,
+    index: metadata.authority?.replayFrameCount ?? replay.frames.length,
     traceIndex: trace.index,
     action: sanitizedAction,
     actionType: typeof sanitizedAction.type === 'string' ? sanitizedAction.type : 'unknown',
@@ -362,6 +378,7 @@ export function appendBattleReplayFrame(
     randomStreams: trace.randomStreams.map(stream => ({ ...stream })),
   }
   replay.frames.push(frame)
+  if (metadata.authority) metadata.authority.replayFrameCount = frame.index + 1
   return frame
 }
 
@@ -439,6 +456,10 @@ export function readDebugMetadata(state: BattleState): DebugBattleMetadata {
     actionLog: Array.isArray(metadata?.actionLog) ? [...metadata.actionLog] : [],
     commandLog: Array.isArray(metadata?.commandLog) ? [...metadata.commandLog] : [],
     replay: metadata?.replay,
+    authority: metadata?.authority ? {
+      ...metadata.authority,
+      runtimeCursors: { ...metadata.authority.runtimeCursors },
+    } : undefined,
   }
 }
 
@@ -450,12 +471,86 @@ export function getOrCreateDebugMetadata(state: BattleState): DebugBattleMetadat
     actionLog?: Array<BattleActionTrace | Record<string, unknown>>
     commandLog?: Array<Record<string, unknown>>
     replay?: BattleReplayArchive
+    authority?: BattleTraceAuthorityRuntime
   }
   metadata.appliedActionIds ??= []
   metadata.actionLog ??= []
   metadata.commandLog ??= []
   extensions.debugBattle = metadata
   return metadata as DebugBattleMetadata
+}
+
+export function compactBattleTraceForAuthority(state: BattleState): BattleState {
+  const metadata = getOrCreateDebugMetadata(state)
+  const authority = metadata.authority ?? {
+    rootSeed: getBattleRootSeed(state),
+    actionCount: metadata.actionLog.length,
+    replayFrameCount: metadata.replay?.frames.length ?? 0,
+    runtimeCursors: runtimeCursorsFromLog(metadata.actionLog),
+  }
+  const replay = metadata.replay ? { ...metadata.replay, frames: [] } : undefined
+  const initializationTraces = metadata.actionLog.filter(entry => (
+    (entry as Partial<BattleActionTrace>).actionId === 'system-initialize'
+  ))
+  const initializationCommands = initializationTraces.length > 0
+    ? metadata.commandLog.slice(0, initializationTraces.length)
+    : []
+  const extensions = state.extensions ?? {}
+  extensions.debugBattle = {
+    appliedActionIds: [],
+    actionLog: initializationTraces,
+    commandLog: initializationCommands,
+    replay,
+    authority: {
+      ...authority,
+      runtimeCursors: { ...authority.runtimeCursors },
+    },
+  }
+  state.extensions = extensions
+  return state
+}
+
+export function materializeBattleTraceForTerminal(
+  state: BattleState,
+  history: Array<{
+    trace?: BattleActionTrace
+    command?: Record<string, unknown>
+    replayFrame?: BattleReplayFrame
+  }>,
+): BattleState {
+  const metadata = getOrCreateDebugMetadata(state)
+  const initializationTraces = metadata.actionLog.filter(entry => (
+    (entry as Partial<BattleActionTrace>).actionId === 'system-initialize'
+  ))
+  const initializationCommands = initializationTraces.length > 0
+    ? metadata.commandLog.slice(0, initializationTraces.length)
+    : []
+  const traces = history.flatMap(entry => entry.trace ? [entry.trace] : [])
+  const commands = history.flatMap(entry => entry.command ? [entry.command] : [])
+  const frames = history.flatMap(entry => entry.replayFrame ? [entry.replayFrame] : [])
+  metadata.actionLog = [...initializationTraces, ...traces]
+  metadata.commandLog = [...initializationCommands, ...commands]
+  if (metadata.replay) metadata.replay = { ...metadata.replay, frames }
+  metadata.appliedActionIds = traces.map(trace => trace.actionId).filter(Boolean)
+  return state
+}
+
+function runtimeCursorsFromTrace(trace: Pick<BattleActionTrace, 'randomStreams'>): Record<string, number> {
+  const cursors: Record<string, number> = {}
+  for (const stream of trace.randomStreams) {
+    if (!stream || typeof stream.name !== 'string' || !Number.isSafeInteger(stream.endCursor) || stream.endCursor < 0) continue
+    cursors[stream.name] = stream.endCursor
+  }
+  return cursors
+}
+
+function runtimeCursorsFromLog(actionLog: DebugBattleMetadata['actionLog']): Record<string, number> {
+  const cursors: Record<string, number> = {}
+  for (const entry of actionLog) {
+    const streams = (entry as Partial<BattleActionTrace>).randomStreams
+    Object.assign(cursors, runtimeCursorsFromTrace({ randomStreams: Array.isArray(streams) ? streams : [] }))
+  }
+  return cursors
 }
 
 export function stampPendingDeploymentAuthorityVersion(

@@ -71,7 +71,7 @@ describe('RED-69 battle motion contract', () => {
     expect(battlePage).toMatch(/interaction:\s*\{[\s\S]*?pendingPieceId:/)
   })
 
-  it('keeps one pending command across duplicate snapshots and recovers after confirm, reject, timeout, and disconnect', () => {
+  it('keeps one pending command until an exact RED-109 receipt, then recovers after reject, timeout, and disconnect', () => {
     const battlePage = readPage('battle.html')
     const statusMessages: string[] = []
     const clearReasons: string[] = []
@@ -80,6 +80,7 @@ describe('RED-69 battle motion contract', () => {
     context = createContext({
       pendingActionFeedback: null,
       pendingActionFeedbackTimer: null,
+      authorityPerformanceSamples: [],
       targetSubmissionPending: { clientActionId: 'move-1' },
       locallyCancelledSelectionId: null,
       pendingSkill: null,
@@ -111,7 +112,8 @@ describe('RED-69 battle motion contract', () => {
       'beginPendingActionFeedback',
       'rejectPendingActionFeedback',
       'battleStateMotionKey',
-      'authorityStateConfirmsPending',
+      'recordAuthorityPerformance',
+      'applyAuthorityReceipt',
       'reconcileBattleInteractionState',
     ]) {
       new Script(readNamedFunction(battlePage, name)).runInContext(context)
@@ -132,30 +134,24 @@ describe('RED-69 battle motion contract', () => {
     }
     context.previousState = previousState
     context.duplicateState = structuredClone(previousState)
-    expect(new Script('authorityStateConfirmsPending(previousState, duplicateState)').runInContext(context)).toBe(false)
     expect(new Script('reconcileBattleInteractionState(previousState, duplicateState)').runInContext(context)).toBe('')
     expect(new Script('pendingActionFeedback.clientActionId').runInContext(context)).toBe('move-1')
     expect(new Script('targetSubmissionPending.clientActionId').runInContext(context)).toBe('move-1')
     expect(clearReasons).toEqual([])
 
     context.unrelatedState = { ...structuredClone(previousState), transportDiagnostic: { serverNow: 1234 } }
-    expect(new Script('authorityStateConfirmsPending(previousState, unrelatedState)').runInContext(context)).toBe(false)
+    expect(new Script('reconcileBattleInteractionState(previousState, unrelatedState)').runInContext(context)).toBe('')
+    context.unrelatedReceipt = { clientActionId: 'older-action', status: 'applied', authorityVersion: 2 }
+    expect(new Script('applyAuthorityReceipt(unrelatedReceipt)').runInContext(context)).toBe(false)
+    expect(new Script('pendingActionFeedback.clientActionId').runInContext(context)).toBe('move-1')
 
-    context.deploymentPrevious = {
-      ...structuredClone(previousState),
-      deployment: { status: 'awaiting-locks', revision: 1, choices: {}, locks: {} },
-    }
-    context.deploymentConfirmed = structuredClone(context.deploymentPrevious)
-    ;(context.deploymentConfirmed as { deployment: { revision: number } }).deployment.revision = 2
-    expect(new Script('authorityStateConfirmsPending(deploymentPrevious, deploymentConfirmed)').runInContext(context)).toBe(true)
-
-    context.confirmedState = { ...structuredClone(previousState), actions: [{ type: 'move' }] }
-    expect(new Script('authorityStateConfirmsPending(previousState, confirmedState)').runInContext(context)).toBe(true)
-    expect(new Script('reconcileBattleInteractionState(previousState, confirmedState)').runInContext(context)).toBe('目标指令已确认')
+    context.matchingReceipt = { clientActionId: 'move-1', status: 'applied', authorityVersion: 2 }
+    expect(new Script('applyAuthorityReceipt(matchingReceipt)').runInContext(context)).toBe(true)
     expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
     expect(new Script('targetSubmissionPending').runInContext(context)).toBeNull()
-
-    new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clientActionId: 'move-2' })").runInContext(context)
+    expect(clearReasons).toContain('authority-receipt-applied')
+    expect(context.authorityPerformanceSamples).toHaveLength(1)
+new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clientActionId: 'move-2' })").runInContext(context)
     new Script("rejectPendingActionFeedback('server-rejected')").runInContext(context)
     expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
     expect(clearReasons).toContain('server-rejected')

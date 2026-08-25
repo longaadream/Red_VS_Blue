@@ -2,6 +2,15 @@ import { randomInt } from 'node:crypto'
 import type { BattleState } from './turn'
 import { prisma } from '../db'
 import { isPlayerSeat, normalizeContentAlignment, type ContentAlignment, type PlayerSeat } from './match-identity'
+import {
+  commitBattleAuthorityTransition as persistBattleAuthorityTransition,
+  forgetBattleAuthorityRoom,
+  getBattleAuthorityReceipt as loadBattleAuthorityReceipt,
+  initializeBattleAuthorityCheckpoint as persistInitialBattleAuthorityCheckpoint,
+  persistBattleAuthorityReceipt as persistAuthorityReceipt,
+  readBattleAuthorityHistory as loadBattleAuthorityHistory,
+  restoreBattleAuthorityRoom,
+} from '../server/battle-authority-persistence'
 
 export type { PlayerSeat } from './match-identity'
 export type PlayerAlignment = ContentAlignment
@@ -106,6 +115,8 @@ export interface Room {
   visibility?: "private" | "public"
   inviteCode?: string
   version?: number
+  /** Monotonic battle-only version; lobby/spectator writes must not advance it. */
+  battleAuthorityVersion?: number
   gameRecord?: GameRecord
 }
 
@@ -124,6 +135,7 @@ function deserializeRoom(row: {
   battleState: string | null
   createdAt: Date
   version: number
+  battleAuthorityVersion: number
 }): Room {
   const players: Player[] = JSON.parse(row.players).map((p: Player) => ({
     ...p,
@@ -151,6 +163,7 @@ function deserializeRoom(row: {
     battleState: row.battleState ? JSON.parse(row.battleState) : undefined,
     createdAt: row.createdAt.getTime(),
     version: row.version,
+    battleAuthorityVersion: row.battleAuthorityVersion,
   }
 }
 
@@ -191,6 +204,7 @@ function serializeRoom(room: Room) {
     players,
     spectators,
     battleState,
+    battleAuthorityVersion: room.battleAuthorityVersion ?? 0,
   }
 }
 
@@ -216,7 +230,7 @@ export class RoomStore {
     const id = roomId.trim().toLowerCase()
     const row = await prisma.room.findUnique({ where: { id } })
     if (!row) return undefined
-    return deserializeRoom(row)
+    return restoreBattleAuthorityRoom(deserializeRoom(row))
   }
 
   // 获取所有房间
@@ -229,12 +243,13 @@ export class RoomStore {
   async setRoom(roomId: string, room: Room): Promise<void> {
     const id = roomId.trim().toLowerCase()
     const data = serializeRoom({ ...room, id })
-    const { id: _id, ...updateData } = data
+    const { id: _id, battleAuthorityVersion: _battleAuthorityVersion, ...updateData } = data
     await prisma.room.upsert({
       where: { id },
       update: { ...updateData, version: { increment: 1 } },
       create: data,
     })
+    forgetBattleAuthorityRoom(id)
   }
 
   // 带乐观锁的更新：仅当 DB 版本 === expectedVersion 时才写入
@@ -242,11 +257,12 @@ export class RoomStore {
   async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
     const id = roomId.trim().toLowerCase()
     const data = serializeRoom({ ...room, id })
-    const { id: _id, ...updateData } = data
+    const { id: _id, battleAuthorityVersion: _battleAuthorityVersion, ...updateData } = data
     const result = await prisma.room.updateMany({
       where: { id, version: expectedVersion },
       data: { ...updateData, version: { increment: 1 } },
     })
+    if (result.count > 0) forgetBattleAuthorityRoom(id)
     return result.count > 0
   }
 
@@ -254,7 +270,13 @@ export class RoomStore {
   async removeRoom(roomId: string): Promise<boolean> {
     const id = roomId.trim().toLowerCase()
     try {
-      await prisma.room.delete({ where: { id } })
+      await prisma.$transaction([
+        prisma.battleAuthorityReceipt.deleteMany({ where: { roomId: id } }),
+        prisma.battleAuthorityTransition.deleteMany({ where: { roomId: id } }),
+        prisma.battleAuthorityCheckpoint.deleteMany({ where: { roomId: id } }),
+        prisma.room.delete({ where: { id } }),
+      ])
+      forgetBattleAuthorityRoom(id)
       return true
     } catch {
       return false
@@ -327,6 +349,37 @@ export class RoomStore {
     room.spectators = room.spectators.filter(s => s.id !== spectatorId)
     await this.setRoom(roomId, room)
     return true
+  }
+
+  async getBattleAuthorityReceipt(
+    roomId: string,
+    clientActionId: string,
+  ): ReturnType<typeof loadBattleAuthorityReceipt> {
+    return loadBattleAuthorityReceipt(roomId, clientActionId)
+  }
+
+  async persistBattleAuthorityReceipt(
+    receipt: Parameters<typeof persistAuthorityReceipt>[0],
+  ): Promise<void> {
+    await persistAuthorityReceipt(receipt)
+  }
+
+  async commitBattleAuthorityTransition(
+    input: Parameters<typeof persistBattleAuthorityTransition>[0],
+  ): Promise<boolean> {
+    return persistBattleAuthorityTransition(input)
+  }
+
+  async readBattleAuthorityHistory(
+    roomId: string,
+  ): ReturnType<typeof loadBattleAuthorityHistory> {
+    return loadBattleAuthorityHistory(roomId)
+  }
+
+  async initializeBattleAuthorityCheckpoint(
+    input: Parameters<typeof persistInitialBattleAuthorityCheckpoint>[0],
+  ): Promise<void> {
+    await persistInitialBattleAuthorityCheckpoint(input)
   }
 
   // 旧接口兼容（同步包装，返回 Map）

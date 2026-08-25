@@ -8,6 +8,7 @@ import {
   readDebugMetadata,
   sanitizeBattleTraceValue,
   type BattleActionTrace,
+  type BattleReplayFrame,
   type DebugBattleMetadata,
 } from './battle-trace'
 import {
@@ -34,6 +35,7 @@ export interface BattleActionResult {
   actionHash: string
   duplicate?: boolean
   trace?: BattleActionTrace
+  replayFrame?: BattleReplayFrame
 }
 
 export interface RunBattleActionOptions {
@@ -73,14 +75,14 @@ export function runBattleAction(
   }
 
   const actionHash = hashStable(action)
-  const actionIndex = metadata.actionLog.length
+  const actionIndex = metadata.authority?.actionCount ?? metadata.actionLog.length
   const actionId = explicitActionId || `action-${actionIndex}-${actionHash.slice(0, 16)}`
   const tracedRootSeed = getBattleRootSeed(state)
   const providedRootSeed = typeof options.rootSeed === 'number' ? options.rootSeed : undefined
   if (providedRootSeed !== undefined && tracedRootSeed !== undefined && (providedRootSeed >>> 0) !== tracedRootSeed) {
     const mismatchRuntime = new RuleRuntime({
       rootSeed: providedRootSeed,
-      cursors: collectRuntimeCursors(metadata.actionLog),
+      cursors: collectRuntimeCursors(metadata),
       tick: actionIndex,
     })
     throw decorateRuleError(
@@ -96,7 +98,7 @@ export function runBattleAction(
     ? undefined
     : new RuleRuntime({
         rootSeed,
-        cursors: collectRuntimeCursors(metadata.actionLog),
+        cursors: collectRuntimeCursors(metadata),
         tick: actionIndex,
       })
   // Presentation clients hydrate `skillsById` locally for rendering. It is a
@@ -140,7 +142,13 @@ export function runBattleAction(
     }
     nextMetadata.actionLog.push(trace)
     nextMetadata.commandLog[trace.index] = sanitizeBattleTraceValue(action) as Record<string, unknown>
-    appendBattleReplayFrame(
+    nextMetadata.authority = {
+      rootSeed: runtime?.rootSeed ?? metadata.authority?.rootSeed,
+      actionCount: trace.index + 1,
+      replayFrameCount: metadata.authority?.replayFrameCount ?? nextMetadata.replay?.frames.length ?? 0,
+      runtimeCursors: mergeRuntimeCursors(metadata.authority?.runtimeCursors, trace),
+    }
+    const replayFrame = appendBattleReplayFrame(
       next,
       canonicalState,
       next,
@@ -153,13 +161,14 @@ export function runBattleAction(
       stateHash: postStateHash,
       actionHash,
       trace,
+      replayFrame,
     }
   } catch (error) {
     if (!runtime) throw error
     // A rejected command is atomic: its random and clock reads are diagnostic
     // only and must not advance the committed cursor chain.
     runtime.restore({
-      cursors: collectRuntimeCursors(metadata.actionLog),
+      cursors: collectRuntimeCursors(metadata),
       clockCursor: 0,
     })
     throw decorateRuleError(error, runtime, state, action, actionId)
@@ -300,15 +309,27 @@ function getActionId(action: BattleAction): string | undefined {
   return typeof id === 'string' && id.trim() ? id.trim() : undefined
 }
 
-function collectRuntimeCursors(actionLog: DebugBattleMetadata['actionLog']): Record<string, number> {
-  const cursors: Record<string, number> = {}
-  for (const entry of actionLog) {
+function collectRuntimeCursors(metadata: DebugBattleMetadata): Record<string, number> {
+  const cursors: Record<string, number> = { ...(metadata.authority?.runtimeCursors ?? {}) }
+  for (const entry of metadata.actionLog) {
     const streams = (entry as Partial<BattleActionTrace>).randomStreams
     if (!Array.isArray(streams)) continue
     for (const stream of streams) {
       if (!stream || typeof stream.name !== 'string' || !Number.isSafeInteger(stream.endCursor) || stream.endCursor < 0) continue
       cursors[stream.name] = stream.endCursor
     }
+  }
+  return cursors
+}
+
+function mergeRuntimeCursors(
+  previous: Record<string, number> | undefined,
+  trace: Pick<BattleActionTrace, 'randomStreams'>,
+): Record<string, number> {
+  const cursors = { ...(previous ?? {}) }
+  for (const stream of trace.randomStreams) {
+    if (!stream || typeof stream.name !== 'string' || !Number.isSafeInteger(stream.endCursor) || stream.endCursor < 0) continue
+    cursors[stream.name] = stream.endCursor
   }
   return cursors
 }

@@ -3,10 +3,11 @@ import type { PieceInstance } from "./piece"
 import { executeCardFunction, loadCardById, loadRuleById } from './skills'
 import type { PendingReactiveCardRef } from './pending-interaction'
 
-const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
+const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 
 // 简单的日志写入函数
 function writeLog(message: string) {
+  if (process.env.RVB_BATTLE_DEBUG_LOGS !== '1') return
   try {
     const fs = require('fs')
     const path = require('path')

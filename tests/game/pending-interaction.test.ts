@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { listLegalAIActions, observeBattleForAI } from '@/lib/game/ai-environment'
+import { runBattleAction } from '@/lib/game/battle-runner'
 import { loadRuleById } from '@/lib/game/skills'
 import { applyBattleAction } from '@/lib/game/turn'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { prepareAction } from '@/lib/game/targeting'
+import { createRunningTurnTimer } from '@/lib/game/turn-timer'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -85,6 +87,15 @@ function withPreparedTarget(state: BattleState, action: Record<string, any>): Ba
   }
   return { ...action, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision } as BattleAction
 }
+function timeoutPending(state: BattleState, rootSeed = 108): BattleState {
+  state.turnTimer = createRunningTurnTimer(state, 0)
+  return runBattleAction(state, {
+    type: 'turnTimeout',
+    now: state.turnTimer.deadlineAt,
+    clientActionId: `red-108-timeout-${rootSeed}`,
+  }, { rootSeed }).state
+}
+
 
 describe('RED-97 authoritative pending interaction lifecycle', () => {
   it('resolves Minato anchor, then Watcher, before committing begin-turn settlement once', () => {
@@ -572,6 +583,89 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
+    }
+  })
+})
+describe('RED-108 authoritative pending timeout resolution', () => {
+  it('cancels a cancellable target and deterministically resolves the following mandatory option', () => {
+    const first = timeoutPending(beginMinatoSelection(), 108)
+    const second = timeoutPending(beginMinatoSelection(), 108)
+
+    expect(first.pendingTargetSelection).toBeUndefined()
+    expect(first.pendingOptionSelection).toBeUndefined()
+    expect(first.extensions?.minatoAnchors || []).toEqual([])
+    const firstWatcherCards = first.players[0].hand
+      .filter(card => card.cardId === 'watcher-calm' || card.cardId === 'watcher-rage')
+      .map(card => card.cardId)
+    const secondWatcherCards = second.players[0].hand
+      .filter(card => card.cardId === 'watcher-calm' || card.cardId === 'watcher-rage')
+      .map(card => card.cardId)
+    expect(firstWatcherCards).toHaveLength(1)
+    expect(secondWatcherCards).toEqual(firstWatcherCards)
+    expect(first.turn).toMatchObject({ currentPlayerId: 'player-blue', phase: 'action' })
+  })
+
+  it('selects a deterministic legal candidate when the target cannot be cancelled', () => {
+    const firstPending = beginMinatoSelection()
+    firstPending.pendingTargetSelection!.canCancel = false
+    const secondPending = beginMinatoSelection()
+    secondPending.pendingTargetSelection!.canCancel = false
+
+    const first = timeoutPending(firstPending, 109)
+    const second = timeoutPending(secondPending, 109)
+    const firstAnchors = (first.extensions?.minatoAnchors || [])
+      .filter((anchor: any) => anchor.sourceId === 'minato')
+    const secondAnchors = (second.extensions?.minatoAnchors || [])
+      .filter((anchor: any) => anchor.sourceId === 'minato')
+
+    expect(firstAnchors).toHaveLength(1)
+    expect(secondAnchors).toEqual(firstAnchors)
+    expect(first.pendingTargetSelection).toBeUndefined()
+    expect(first.pendingOptionSelection).toBeUndefined()
+  })
+
+  it('fails explicitly when a mandatory target has no authoritative candidate', () => {
+    const pending = beginMinatoSelection()
+    pending.pendingTargetSelection!.canCancel = false
+    pending.map.tiles = []
+    pending.turnTimer = createRunningTurnTimer(pending, 0)
+
+    expect(() => runBattleAction(pending, {
+      type: 'turnTimeout',
+      now: pending.turnTimer!.deadlineAt,
+      clientActionId: 'red-108-zero-candidates',
+    }, { rootSeed: 110 })).toThrow(expect.objectContaining({
+      code: 'PENDING_TIMEOUT_NO_CANDIDATES',
+    }))
+  })
+
+  it('logs context and safely skips an impossible mandatory pending in production', () => {
+    const pending = beginMinatoSelection()
+    pending.pendingTargetSelection!.canCancel = false
+    pending.map.tiles = []
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.stubEnv('NODE_ENV', 'production')
+    try {
+      const resolved = timeoutPending(pending, 111)
+
+      expect(resolved.pendingTargetSelection).toBeUndefined()
+      expect(resolved.pendingOptionSelection).toBeUndefined()
+      expect(resolved.turn).toMatchObject({ currentPlayerId: 'player-blue', phase: 'action' })
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[pending-timeout] invariant',
+        expect.objectContaining({
+          phase: 'start',
+          callSite: 'applyBattleActionInternal.turnTimeout.resolveTimedOutPending',
+          stack: expect.any(String),
+          ownerPlayerId: 'player-red',
+          selectionId: expect.any(String),
+          stateRevision: expect.any(Number),
+        }),
+      )
+    } finally {
+      vi.unstubAllEnvs()
+      errorSpy.mockRestore()
     }
   })
 })
