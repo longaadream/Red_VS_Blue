@@ -155,9 +155,13 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 ## 11. RED-109 低延迟权威管线
 
 RED-109 将 Windows LAN 普通动作从“完整 Room JSON CAS + 完整 stateUpdate”迁移为每房间 FIFO 中的
-`command → authoritative rules → atomic transition/receipt/checkpoint → recipient patch`。大厅元数据继续使用
+`command → authoritative rules → memory authority commit → receipt/recipient patch → async Δ journal`。大厅元数据继续使用
 `Room.version`；战斗连续性使用独立 `battleAuthorityVersion`。完整快照只用于初始化、重连和 patch/hash
 恢复，联网客户端不通过本地规则 dry-run 判断候选。
+
+初始 checkpoint 建立后，在线裁决只读取每房间内存权威。Prisma/SQLite 在单一后台 writer 中按序保存
+Transition Δ、receipt 和周期 checkpoint；其 `durableAuthorityVersion` 可以落后于在线版本，失败时显式
+进入 degraded。候选不承诺断电前尚未 durable 的动作零丢失，但数据库写锁不再阻塞游戏 ACK。
 
 规则/技能 JSON 默认按服务进程缓存；显式内容刷新会清缓存。每步 Trace 进入 append-only journal，热状态
 只保留确定性游标和序号，终局再物化完整 Trace v2。具体协议、恢复、性能门槛和回退见

@@ -16,11 +16,11 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
 
 | 指标 | P50 | P95 | P99 | 最大值 |
 | --- | ---: | ---: | ---: | ---: |
-| 正式规则 transition | 15.778 ms | 33.465 ms | 41.932 ms | 56.220 ms |
-| 完整 dispatch（内存存储） | 40.288 ms | 89.560 ms | 106.717 ms | 108.207 ms |
-| DB JSON 序列化 | 5.299 ms | 14.910 ms | 16.435 ms | 20.634 ms |
-| 公开状态 hash | 0.417 ms | 0.734 ms | 2.776 ms | 7.667 ms |
-| 广播 JSON 序列化 | 0.058 ms | 0.111 ms | 0.162 ms | 0.200 ms |
+| 正式规则 transition | 22.194 ms | 40.077 ms | 47.072 ms | 67.731 ms |
+| 完整 dispatch（内存存储） | 58.922 ms | 102.072 ms | 120.144 ms | 132.590 ms |
+| DB JSON 序列化 | 7.124 ms | 15.008 ms | 17.083 ms | 20.691 ms |
+| 公开状态 hash | 0.489 ms | 1.199 ms | 2.307 ms | 2.613 ms |
+| 广播 JSON 序列化 | 0.066 ms | 0.202 ms | 0.241 ms | 0.744 ms |
 
 ## 载荷与长度增长
 
@@ -28,8 +28,8 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
 - 第 100 次完整 DB 载荷：854,731 bytes，增长约 28.2 倍。
 - 第 1 次公开快照：10,273 bytes。
 - 第 100 次公开快照：10,281 bytes。
-- 前 10 次完整 dispatch 中位数：13.057 ms。
-- 后 10 次完整 dispatch 中位数：86.073 ms，约为前 10 次的 6.59 倍。
+- 前 10 次完整 dispatch 中位数：20.989 ms。
+- 后 10 次完整 dispatch 中位数：100.256 ms，约为前 10 次的 4.78 倍。
 - 旧链路没有增量 diff 阶段；该阶段记为 `not-present-in-legacy-path`。
 
 进行中公开投影会删除完整 Trace，因此快照体积在这个 fixture 中基本稳定；真正持续增长的
@@ -50,17 +50,31 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
 
 | 指标 | P50 | P95 | P99 | 最大值 |
 | --- | ---: | ---: | ---: | ---: |
-| v2 完整 dispatch（内存 journal） | 17.159 ms | 31.225 ms | 40.675 ms | 55.293 ms |
-| v2 持久化模拟 | 0.232 ms | 0.796 ms | 0.922 ms | 1.326 ms |
+| v2 完整 dispatch（内存 journal） | 19.666 ms | 28.626 ms | 31.615 ms | 43.005 ms |
+| v2 持久化模拟 | 0.224 ms | 0.857 ms | 1.157 ms | 1.841 ms |
 | v2 持久化载荷 | 10,290 B | 10,462 B | 32,175 B | 32,175 B |
 | 接收者公开 patch | 288 B | 288 B | 292 B | 322 B |
 
 - 相对旧完整 DB JSON 的 438,334 B 中位数，v2 持久化载荷中位数减少约 97.7%，超过 80% 门槛。
-- 前 10 次 dispatch 中位数为 14.330 ms，后 10 次为 17.246 ms，没有随历史长度显著增长。
+- 前 10 次 dispatch 中位数为 19.739 ms，后 10 次为 18.207 ms，没有随历史长度显著增长。
 - 首条 v2 Transition 的载荷包含版本 0 迁移基准检查点；换回合、固定间隔和终局检查点解释了 P99 的 32,175 B，普通动作仍约 10 KB。
-- 规则文件缓存与同步日志门控后的旧完整快照后备路径，在同一次最终运行中 dispatch 为 P50 40.288 ms、P95 89.560 ms、P99 106.717 ms；它是未设置或 `RVB_BATTLE_AUTHORITY_V2=0` 时的默认回退，不是候选正常链路。
-- 候选构建必须显式设置 `RVB_BATTLE_AUTHORITY_V2=1`；计时器人工场景还须显式设置 `RVB_TURN_TIMER_ENABLED=1`。两个开关默认关闭，不能把默认回退链路误记为 v2 验收。
+- 规则文件缓存与同步日志门控后的旧完整快照后备路径，在同一次最终运行中 dispatch 为 P50 58.922 ms、P95 102.072 ms、P99 120.144 ms；它是未设置或 `RVB_BATTLE_AUTHORITY_V2=0` 时的默认回退，不是候选正常链路。
+- 混合架构回归 `battle-authority-async-dispatch.test.ts` 在 Prisma transaction 故意保持未完成时连续提交
+  20 个完整部署动作；预热后的 `rules + diff/hash + memory commit + receipt` P95、墙钟 P95 和
+  `persistenceMs` P95 都强制 < 100 ms，同时后台只启动第一笔数据库事务，证明同房 FIFO 不再等待写锁。
+- `battle-authority-async-persistence.test.ts` 证明第一笔 DB 尚未 durable 时，同房内存版本可从 0 连续
+  推进到 2，receipt/history/RoomStore 热读不访问 Prisma；排空后 durable 水位按 1、2 顺序追上。
+- 候选构建必须同时显式设置 `RVB_BATTLE_AUTHORITY_V2=1` 与
+- `battle-authority-async-journal.test.ts` 直接断言 `enqueue()` 返回时 durable writer 尚未调用；writer 在
+  下一事件循环才开始 Prisma 与序列化，确保 checkpoint JSON 不会偷跑进 ACK 当前调用栈。
+- `battle-authority-async-sqlite.test.ts` 使用隔离的真实 SQLite schema 连续提交并排空 20 条 Δ，核对
+  20 条 Transition、20 条 receipt 与 2 个有界 checkpoint；清空进程内 Room Actor 后，从数据库恢复到
+  同一版本、state hash 与 transition hash 链头。
+  `RVB_BATTLE_ASYNC_JOURNAL=1`；只设置前者仍使用 ACK 前原子 Prisma 提交。计时器人工场景还须显式
+  设置 `RVB_TURN_TIMER_ENABLED=1`。三个开关默认关闭，不能把回退链路误记为异步候选验收。
 - 这些数字不包含真实 SQLite fsync、WebSocket、Electron 和 Three.js/DOM 应用。P95 ≤ 100 ms 的端到端目标仍必须由候选构建双客户端人工样本验收。
+- 候选明确不承诺断电前 `battleAuthorityVersion - durableAuthorityVersion` 区间零丢失；优雅关闭、终局
+  和房间删除应先排空日志，恢复只重放到数据库已持久化的版本与 hash 链头。
 
 最终原始输出由测试写入 `.tmp-red109/legacy-authority-benchmark.json` 与
 `.tmp-red109/candidate-authority-benchmark.json`；临时原始文件不提交，PR 保留本表与可重复测试。

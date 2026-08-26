@@ -2,13 +2,18 @@ import { randomInt } from 'node:crypto'
 import type { BattleState } from './turn'
 import { prisma } from '../db'
 import { isPlayerSeat, normalizeContentAlignment, type ContentAlignment, type PlayerSeat } from './match-identity'
+import { isBattleAuthorityAsyncJournalEnabled } from './battle-transition'
 import {
   commitBattleAuthorityTransition as persistBattleAuthorityTransition,
+  drainBattleAuthorityPersistence,
   forgetBattleAuthorityRoom,
   getBattleAuthorityReceipt as loadBattleAuthorityReceipt,
+  getRememberedBattleAuthorityRoom,
+  inspectBattleAuthorityPersistence,
   initializeBattleAuthorityCheckpoint as persistInitialBattleAuthorityCheckpoint,
   persistBattleAuthorityReceipt as persistAuthorityReceipt,
   readBattleAuthorityHistory as loadBattleAuthorityHistory,
+  rememberBattleAuthorityRoom,
   restoreBattleAuthorityRoom,
 } from '../server/battle-authority-persistence'
 
@@ -119,6 +124,10 @@ export interface Room {
   battleAuthorityVersion?: number
   /** SHA-256 chain head for the committed battleAuthorityVersion. */
   battleAuthorityTransitionHash?: string
+  /** Runtime-only durable watermark for the asynchronous RED-109 journal. */
+  battleAuthorityDurableVersion?: number
+  /** Runtime-only persistence health; never used to adjudicate game rules. */
+  battleAuthorityPersistenceStatus?: 'durable' | 'pending' | 'degraded'
   gameRecord?: GameRecord
 }
 
@@ -233,6 +242,10 @@ export class RoomStore {
   // 获取房间
   async getRoom(roomId: string): Promise<Room | undefined> {
     const id = roomId.trim().toLowerCase()
+    if (isBattleAuthorityAsyncJournalEnabled()) {
+      const cached = getRememberedBattleAuthorityRoom(id)
+      if (cached) return cached
+    }
     const row = await prisma.room.findUnique({ where: { id } })
     if (!row) return undefined
     return restoreBattleAuthorityRoom(deserializeRoom(row))
@@ -241,25 +254,42 @@ export class RoomStore {
   // 获取所有房间
   async getAllRooms(): Promise<Room[]> {
     const rows = await prisma.room.findMany()
-    return rows.map(deserializeRoom)
+    return rows.map(row => {
+      const room = deserializeRoom(row)
+      return isBattleAuthorityAsyncJournalEnabled()
+        ? getRememberedBattleAuthorityRoom(room.id) ?? room
+        : room
+    })
   }
 
   // 设置房间（upsert）
   async setRoom(roomId: string, room: Room): Promise<void> {
     const id = roomId.trim().toLowerCase()
     const data = serializeRoom({ ...room, id })
+    const cached = isBattleAuthorityAsyncJournalEnabled()
+      ? getRememberedBattleAuthorityRoom(id)
+      : undefined
     const {
       id: _id,
       battleAuthorityVersion: _battleAuthorityVersion,
       battleAuthorityTransitionHash: _battleAuthorityTransitionHash,
       ...updateData
     } = data
+    const { battleState: _cachedBattleState, ...metadataUpdate } = updateData
     await prisma.room.upsert({
       where: { id },
-      update: { ...updateData, version: { increment: 1 } },
+      update: { ...(cached ? metadataUpdate : updateData), version: { increment: 1 } },
       create: data,
     })
-    forgetBattleAuthorityRoom(id)
+    if (cached) {
+      rememberBattleAuthorityRoom(mergeCachedBattleRoom(
+        cached,
+        { ...room, id },
+        (room.version ?? cached.version ?? 0) + 1,
+      ))
+    } else {
+      forgetBattleAuthorityRoom(id)
+    }
   }
 
   // 带乐观锁的更新：仅当 DB 版本 === expectedVersion 时才写入
@@ -267,23 +297,44 @@ export class RoomStore {
   async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
     const id = roomId.trim().toLowerCase()
     const data = serializeRoom({ ...room, id })
+    const cached = isBattleAuthorityAsyncJournalEnabled()
+      ? getRememberedBattleAuthorityRoom(id)
+      : undefined
     const {
       id: _id,
       battleAuthorityVersion: _battleAuthorityVersion,
       battleAuthorityTransitionHash: _battleAuthorityTransitionHash,
       ...updateData
     } = data
+    const { battleState: _cachedBattleState, ...metadataUpdate } = updateData
     const result = await prisma.room.updateMany({
       where: { id, version: expectedVersion },
-      data: { ...updateData, version: { increment: 1 } },
+      data: { ...(cached ? metadataUpdate : updateData), version: { increment: 1 } },
     })
-    if (result.count > 0) forgetBattleAuthorityRoom(id)
+    if (result.count > 0) {
+      if (cached) {
+        rememberBattleAuthorityRoom(mergeCachedBattleRoom(cached, { ...room, id }, expectedVersion + 1))
+      } else {
+        forgetBattleAuthorityRoom(id)
+      }
+    }
     return result.count > 0
   }
 
   // 移除房间
   async removeRoom(roomId: string): Promise<boolean> {
     const id = roomId.trim().toLowerCase()
+    if (isBattleAuthorityAsyncJournalEnabled()) {
+      try {
+        await drainBattleAuthorityPersistence(id)
+      } catch (error) {
+        console.error('[room-store] refusing to delete room with undurable authority journal', {
+          roomId: id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return false
+      }
+    }
     try {
       await prisma.$transaction([
         prisma.battleAuthorityReceipt.deleteMany({ where: { roomId: id } }),
@@ -397,6 +448,14 @@ export class RoomStore {
     await persistInitialBattleAuthorityCheckpoint(input)
   }
 
+  inspectBattleAuthorityPersistence(roomId: string) {
+    return inspectBattleAuthorityPersistence(roomId)
+  }
+
+  async drainBattleAuthorityPersistence(roomId?: string): Promise<void> {
+    await drainBattleAuthorityPersistence(roomId)
+  }
+
   // 旧接口兼容（同步包装，返回 Map）
   getRooms(): Map<string, Room> {
     throw new Error('getRooms() is async now, use getAllRooms()')
@@ -416,4 +475,17 @@ if (process.env.NODE_ENV !== 'production') globalForStore.roomStore = roomStore
 
 export function getRoomStore(): RoomStore {
   return roomStore
+}
+
+function mergeCachedBattleRoom(cached: Room, metadata: Room, version: number): Room {
+  return {
+    ...metadata,
+    version,
+    status: cached.status === 'finished' ? 'finished' : metadata.status,
+    battleState: cached.battleState,
+    battleAuthorityVersion: cached.battleAuthorityVersion,
+    battleAuthorityTransitionHash: cached.battleAuthorityTransitionHash,
+    battleAuthorityDurableVersion: cached.battleAuthorityDurableVersion,
+    battleAuthorityPersistenceStatus: cached.battleAuthorityPersistenceStatus,
+  }
 }

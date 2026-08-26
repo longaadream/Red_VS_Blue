@@ -424,7 +424,13 @@ interface ServerCore {
 - 排队：`lib/game/room-authority-queue.ts` 按 roomId 严格 FIFO，并对等待数量实施背压；房间之间不共享队列。
 - 协议：`lib/game/battle-transition.ts` 定义 v2 command envelope、精确 receipt、公开 pending 投影、Transition 和检查点恢复。
 - 版本：`Room.version` 是房间元数据乐观锁；`Room.battleAuthorityVersion` 是连续战斗版本。传输与 patch 只能使用后者。
-- 持久化：`lib/server/battle-authority-persistence.ts` 在单事务内推进战斗版本并写 Transition、Receipt 和可选 Checkpoint；每条记录携带 action hash 与连续 transition hash，普通动作不重写完整 Room battleState。终局完整 Trace 在 Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
+- 在线权威：显式开启 async journal 后，`RoomStore.getRoom()` 优先读取进程内 Room Actor；
+  `commitBattleAuthorityTransition()` 同步提交内存版本、receipt、Δ 和 hash 链后立即返回。普通动作不读写 Prisma。
+- 后台持久化：`lib/server/battle-authority-async-journal.ts` 提供单 writer、有界队列、有界重试、按房间
+  durable 水位和 degraded 状态；`lib/server/battle-authority-persistence.ts` 在后台原子推进 DB 版本并写
+  Transition、Receipt 和可选 Checkpoint。终局完整 Trace 在 Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
 - 客户端：`data/pages/battle.html` 只应用接收者公开 patch、显示权威候选并发送选择；候选仅投影给 pending owner，对手/观者只看公开等待信封；版本/hash 不匹配时单飞请求完整快照。
-- 功能开关：候选默认 fail closed；只有 `RVB_BATTLE_AUTHORITY_V2=1` 启用 v2，只有 `RVB_TURN_TIMER_ENABLED=1` 安排部署/回合计时唤醒；未设置或 `0` 分别回退完整 Room CAS/stateUpdate 与无计时器模式。`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
+- 功能开关：候选默认 fail closed；`RVB_BATTLE_AUTHORITY_V2=1` 启用 v2，额外设置
+  `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只关 async flag 即回退 ACK 前原子 DB 提交。
+  `RVB_TURN_TIMER_ENABLED=1` 才安排部署/回合计时唤醒。`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
 - 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；version > 0 缺检查点、版本断层、pre/post state/public hash、action hash 或 transition hash 链损坏都必须显式失败。

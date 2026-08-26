@@ -53,6 +53,14 @@ export interface DeploymentRoomStore {
     command?: Record<string, unknown>
     replayFrame?: BattleAuthorityTransitionRecord['replayFrames'][number]
   }>>
+  inspectBattleAuthorityPersistence?(roomId: string): {
+    status: 'durable' | 'pending' | 'degraded'
+    durableAuthorityVersion: number
+    authorityVersion: number
+    pending: number
+    lastError?: string
+  }
+  drainBattleAuthorityPersistence?(roomId?: string): Promise<void>
 }
 
 export interface PublicBattleSnapshot {
@@ -61,6 +69,8 @@ export interface PublicBattleSnapshot {
   stateHash: string
   authorityVersion: number
   serverNow: number
+  durableAuthorityVersion?: number
+  persistenceStatus?: 'durable' | 'pending' | 'degraded'
   turnTimer?: TurnTimerProjection
 }
 
@@ -103,6 +113,8 @@ export interface PublicBattleTransitionUpdate {
   seed: number
   stateHash: string
   serverNow: number
+  durableAuthorityVersion?: number
+  persistenceStatus?: 'durable' | 'pending' | 'degraded'
   turnTimer?: TurnTimerProjection
   timings?: BattleAuthorityTimings
 }
@@ -178,6 +190,8 @@ export function createPublicBattleSnapshot(
     stateHash: hashBattleState(state),
     authorityVersion: roomBattleAuthorityVersion(room),
     serverNow,
+    durableAuthorityVersion: room.battleAuthorityDurableVersion,
+    persistenceStatus: room.battleAuthorityPersistenceStatus,
     turnTimer: state.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(state.turnTimer, serverNow),
   }
 }
@@ -209,6 +223,8 @@ export function createPublicBattleTransitionUpdate(
     seed: result.snapshot.seed,
     stateHash: hashBattleState(next),
     serverNow,
+    durableAuthorityVersion: result.snapshot.durableAuthorityVersion,
+    persistenceStatus: result.snapshot.persistenceStatus,
     turnTimer: next.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(next.turnTimer, serverNow),
     timings: result.timings,
   }
@@ -229,6 +245,8 @@ export function createPublicBattleResyncSnapshot(
     stateHash: hashBattleState(state),
     authorityVersion: result.transition.toVersion,
     serverNow,
+    durableAuthorityVersion: result.snapshot.durableAuthorityVersion,
+    persistenceStatus: result.snapshot.persistenceStatus,
     turnTimer: state.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(state.turnTimer, serverNow),
   }
 }
@@ -583,7 +601,7 @@ export async function dispatchRoomBattleAction(
             authorityVersion: nextAuthorityVersion,
             seed: storage.seed,
             storage: checkpointStorage,
-            stateHash: hashBattleState(checkpointStorage.state as BattleState),
+            stateHash: transition.postStateHash,
             publicHash: transition.postPublicHash,
             transitionHash: transition.transitionHash,
             reason,
@@ -612,9 +630,30 @@ export async function dispatchRoomBattleAction(
         : await store.setRoomIfVersion(normalizedRoomId, nextRoom, metadataVersion)
       persistenceMs += monotonicNow() - persistenceStartedAt
       if (!committed) continue
+      if (isTerminal && transition && store.drainBattleAuthorityPersistence) {
+        try {
+          const terminalDrainStartedAt = monotonicNow()
+          await store.drainBattleAuthorityPersistence(normalizedRoomId)
+          persistenceMs += monotonicNow() - terminalDrainStartedAt
+        } catch (error) {
+          console.error('[battle-authority-persistence] terminal journal drain failed', {
+            roomId: normalizedRoomId,
+            authorityVersion: nextAuthorityVersion,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
 
+      const persistence = transition
+        ? store.inspectBattleAuthorityPersistence?.(normalizedRoomId)
+        : undefined
       const committedRoom: Room = transition
-        ? { ...nextRoom, battleAuthorityVersion: nextAuthorityVersion }
+        ? {
+            ...nextRoom,
+            battleAuthorityVersion: nextAuthorityVersion,
+            battleAuthorityDurableVersion: persistence?.durableAuthorityVersion,
+            battleAuthorityPersistenceStatus: persistence?.status,
+          }
         : { ...nextRoom, version: nextAuthorityVersion }
       const snapshot = createPublicBattleSnapshot(committedRoom, viewerPlayerId ?? undefined, clock)
       if (isTerminal) clearRoomBattleTimeout(normalizedRoomId)
