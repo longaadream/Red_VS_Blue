@@ -24,7 +24,7 @@ export function toPublicBattleState(
   const option = projected.pendingOptionSelection
   if (option) {
     const owner = String(option.playerId ?? '').trim().toLowerCase() === viewerId
-    projected.pendingOptionSelection = {
+    projected.pendingOptionSelection = omitUndefined({
       playerId: option.playerId,
       title: option.title,
       options: owner && Array.isArray(option.options) ? option.options : [],
@@ -32,12 +32,12 @@ export function toPublicBattleState(
       selectionId: option.selectionId,
       stateRevision: option.stateRevision,
       canCancel: option.canCancel,
-    }
+    }) as typeof option
   }
   const target = projected.pendingTargetSelection
   if (target) {
     const owner = String(target.playerId ?? '').trim().toLowerCase() === viewerId
-    projected.pendingTargetSelection = {
+    projected.pendingTargetSelection = omitUndefined({
       playerId: target.playerId,
       ownerPlayerId: target.ownerPlayerId,
       title: target.title,
@@ -56,7 +56,7 @@ export function toPublicBattleState(
         selectedTargets: target.selectedTargets,
         candidates: Array.isArray(target.candidates) ? target.candidates : [],
       } : { candidates: [] }),
-    }
+    }) as typeof target
   }
   const debugBattle = projected.extensions?.debugBattle
   const terminalTrace = projected.terminalResult
@@ -88,6 +88,12 @@ export function toPublicBattleState(
 
 
   return projected
+}
+
+function omitUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined),
+  ) as T
 }
 
 function cloneSerializable<T>(value: T): T {

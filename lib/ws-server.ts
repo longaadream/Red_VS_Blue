@@ -5,6 +5,7 @@ import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } fr
 import { getBattleStorage, withServerSkills } from './game/battle-storage'
 import {
   createPublicBattleSnapshot,
+  createPublicBattleResyncSnapshot,
   createPublicBattleTransitionUpdate,
   createPublicRoomSnapshot,
   dispatchRoomBattleAction,
@@ -127,14 +128,52 @@ function broadcastBattleSnapshot(roomId: string, snapshot: PublicBattleSnapshot)
   broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot })
 }
 
-export function broadcastBattleTransition(roomId: string, result: DispatchRoomBattleActionResult): void {
+export interface BattleTransitionBroadcastDependencies {
+  createTransitionUpdate?: typeof createPublicBattleTransitionUpdate
+  createResyncSnapshot?: typeof createPublicBattleResyncSnapshot
+}
+
+export function broadcastBattleTransition(
+  roomId: string,
+  result: DispatchRoomBattleActionResult,
+  dependencies: BattleTransitionBroadcastDependencies = {},
+): void {
   const clients = roomClients.get(roomId.trim().toLowerCase())
   if (!clients || !result.transition) return
+  const projectTransition = dependencies.createTransitionUpdate ?? createPublicBattleTransitionUpdate
+  const projectResync = dependencies.createResyncSnapshot ?? createPublicBattleResyncSnapshot
   for (const client of clients) {
     if (client.readyState !== WebSocket.OPEN) continue
     const identity = wsIdentities.get(client)
-    const update = createPublicBattleTransitionUpdate(result, roomId, identity?.playerId)
-    if (update) sendJson(client, update)
+    try {
+      const update = projectTransition(result, roomId, identity?.playerId)
+      if (update) sendJson(client, update)
+    } catch (error) {
+      const details = error as { code?: unknown; message?: unknown; context?: unknown }
+      console.error('[WS] battle transition projection failed', JSON.stringify({
+        roomId: roomId.trim().toLowerCase(),
+        playerId: identity?.playerId,
+        fromVersion: result.transition.fromVersion,
+        toVersion: result.transition.toVersion,
+        code: details?.code,
+        message: details?.message ?? String(error),
+        context: details?.context,
+      }))
+      try {
+        if (identity?.playerId === result.transition.playerId && result.receipt) {
+          sendJson(client, { type: 'battleReceipt', receipt: result.receipt })
+        }
+        const snapshot = projectResync(result, roomId, identity?.playerId)
+        if (snapshot) sendJson(client, { type: 'stateUpdate', ...snapshot, reason: 'transition-projection-failed' })
+      } catch (fallbackError) {
+        console.error('[WS] battle transition resync fallback failed', JSON.stringify({
+          roomId: roomId.trim().toLowerCase(),
+          playerId: identity?.playerId,
+          toVersion: result.transition.toVersion,
+          message: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+        }))
+      }
+    }
   }
 }
 

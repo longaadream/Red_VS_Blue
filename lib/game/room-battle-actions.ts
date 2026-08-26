@@ -214,6 +214,25 @@ export function createPublicBattleTransitionUpdate(
   }
 }
 
+export function createPublicBattleResyncSnapshot(
+  result: DispatchRoomBattleActionResult,
+  roomId: string,
+  viewerPlayerId?: string,
+  clock: DeploymentRuleClock = systemDeploymentRuleClock,
+): PublicBattleSnapshot | undefined {
+  if (!result.transition || !result.nextAuthorityState) return undefined
+  const state = toPublicBattleState(result.nextAuthorityState, viewerPlayerId)
+  const serverNow = getRoomAuthorityNow(roomId, clock)
+  return {
+    state,
+    seed: result.snapshot.seed,
+    stateHash: hashBattleState(state),
+    authorityVersion: result.transition.toVersion,
+    serverNow,
+    turnTimer: state.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(state.turnTimer, serverNow),
+  }
+}
+
 export function createPublicRoomSnapshot(room: Room): Room {
   const storage = getBattleStorage(room)
   if (!storage) return room

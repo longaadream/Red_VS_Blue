@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { createBattlePublicPatch } from '@/lib/game/battle-public-patch'
 import { toPublicBattleState } from '@/lib/game/deployment'
 import { makeState } from '../helpers/minimal-state'
 
@@ -18,9 +19,20 @@ describe('battle public pending projection', () => {
       pendingAction: { type: 'beginPhase' },
     } as never
 
-    const owner = toPublicBattleState(state, 'player-red').pendingOptionSelection as any
-    const opponent = toPublicBattleState(state, 'player-blue').pendingOptionSelection as any
-    const spectator = toPublicBattleState(state).pendingOptionSelection as any
+    const ownerState = toPublicBattleState(state, 'player-red')
+    const opponentState = toPublicBattleState(state, 'player-blue')
+    const spectatorState = toPublicBattleState(state)
+    const owner = ownerState.pendingOptionSelection as any
+    const opponent = opponentState.pendingOptionSelection as any
+    const spectator = spectatorState.pendingOptionSelection as any
+
+    for (const projection of [ownerState, opponentState, spectatorState]) {
+      expect(JSON.parse(JSON.stringify(projection))).toEqual(projection)
+    }
+    expect(() => createBattlePublicPatch(
+      toPublicBattleState(makeState(), 'player-red'),
+      ownerState,
+    )).not.toThrow()
 
     expect(owner.options).toEqual(['calm', 'rage'])
     expect(opponent.options).toEqual([])
@@ -57,9 +69,20 @@ describe('battle public pending projection', () => {
       pendingAction: { type: 'beginPhase' },
     } as never
 
-    const owner = toPublicBattleState(state, 'player-red').pendingTargetSelection as any
-    const opponent = toPublicBattleState(state, 'player-blue').pendingTargetSelection as any
-    const spectator = toPublicBattleState(state).pendingTargetSelection as any
+    const ownerState = toPublicBattleState(state, 'player-red')
+    const opponentState = toPublicBattleState(state, 'player-blue')
+    const spectatorState = toPublicBattleState(state)
+    const owner = ownerState.pendingTargetSelection as any
+    const opponent = opponentState.pendingTargetSelection as any
+    const spectator = spectatorState.pendingTargetSelection as any
+
+    for (const projection of [ownerState, opponentState, spectatorState]) {
+      expect(JSON.parse(JSON.stringify(projection))).toEqual(projection)
+    }
+    expect(() => createBattlePublicPatch(
+      toPublicBattleState(makeState(), 'player-red'),
+      ownerState,
+    )).not.toThrow()
 
     expect(owner.candidates).toEqual([{ type: 'cell', x: 2, y: 3 }])
     expect(owner.range).toBe(99)
