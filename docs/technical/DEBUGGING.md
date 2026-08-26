@@ -349,3 +349,32 @@ Windows Electron 大厅只会在本地 `rvb_active_battle` 结构完整、服务
 5. 空状态点击：在开发者工具执行 `rejoinBattle()`；预期显示“没有可重新加入的对局”，不得静默无响应。
 
 如果服务器暂时不可达，入口保持隐藏并显示验证失败原因，但不清理本地记录；恢复连接后刷新大厅重新验证。
+
+## RED-109 权威延迟与恢复诊断
+
+候选客户端会把最近 200 条精确回执样本保存在 `window.__RVB_AUTHORITY_PERF__`：
+
+```js
+window.__RVB_AUTHORITY_PERF__.summary()
+window.__RVB_AUTHORITY_PERF__.clear()
+```
+
+每条样本包含客户端发出到精确回执应用的 `totalMs`、`clientApplyMs`，以及服务端提供的 `queueMs`、
+`rulesMs`、`persistenceMs`。async journal 模式的 `persistenceMs` 只表示内存提交和日志入队，不包含
+后台 Prisma 完成时间。快照/Transition 另带 `durableAuthorityVersion` 与 `persistenceStatus`；先用这些字段判断瓶颈，再检查网络与客户端渲染；不要用按钮动画或主观等待
+代替精确 ID 样本。
+
+- `queueMs` 高：同房间有慢命令或事件积压；检查队列 active/pending 和 timer/bot 命令。
+- `rulesMs` 高：检查是否误设 `RVB_FORCE_RULE_RELOAD=1`、是否存在未缓存动态规则或异常候选枚举。
+- `persistenceMs` 高：检查内存 clone/diff/hash 和日志背压；async 模式不应包含 SQLite 等待。
+- `persistenceStatus=pending`：在线版本已经确认，后台 durable 水位尚未追上；短暂出现正常。
+- `persistenceStatus=degraded`：后台写入超过重试上限或队列溢出。立即保留 roomId、在线/耐久版本、
+  `lastError` 和 Prisma 日志；不要把已应用动作重发成新 ID。当前候选继续以内存状态裁决。
+- Prisma `P2028`：async 模式下属于后台耐久故障，不应让 ACK 延迟 5 秒；若客户端仍卡住，先确认
+  同时设置了 `RVB_BATTLE_AUTHORITY_V2=1` 与 `RVB_BATTLE_ASYNC_JOURNAL=1`。
+- 服务端低而 `totalMs` 高：检查 WS/Relay 传输、patch hash recovery 和客户端渲染。
+- `resyncRequired`：同时记录客户端/服务端 `battleAuthorityVersion`；不要使用 `Room.version` 判断战斗连续性。
+- `BATTLE_PATCH_*_HASH_MISMATCH` 或版本 gap：保留 roomId、from/to version、前后 hash，完整拉取一次；重复失败应停止对局并检查 checkpoint/journal，不得吞错继续。
+
+本地数据热编辑默认不会逐动作读盘。需要验证显式失效时调用内容工具的 reload；只有针对逐次读盘的专项调试才临时设置
+`RVB_FORCE_RULE_RELOAD=1`。同步文件日志默认关闭，专项排错设置 `RVB_BATTLE_DEBUG_LOGS=1`，采证后关闭。

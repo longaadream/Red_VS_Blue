@@ -27,6 +27,11 @@ import {
 const LOCAL_PORT_HINT = 38521  // 首选端口，被占用时自动递增（避开 54300-54400 被 QMUpload 占用的范围）
 let actualLocalPort = LOCAL_PORT_HINT  // 实际绑定成功的端口
 const CLIENT_SCHEME = 'rvb-client'
+const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
+const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
+const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
+let allowAppExit = false
+let appExitPromise: Promise<void> | null = null
 
 type ChildLogStream = 'stdout' | 'stderr'
 type ChildLogErrorSide = 'source' | 'target' | 'write'
@@ -308,12 +313,78 @@ function killProcessTree(proc: ChildProcess): void {
   }
 }
 
-function killServer(): void {
+function requestGracefulServerShutdown(proc: ChildProcess): Promise<boolean> {
+  if (!proc.connected || typeof proc.send !== 'function') return Promise.resolve(false)
+  const requestId = `${process.pid}:${proc.pid ?? 'unknown'}:${Date.now()}`
+  return new Promise(resolve => {
+    let settled = false
+    const finish = (ok: boolean, warning?: string) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      proc.removeListener('message', onMessage)
+      proc.removeListener('exit', onExit)
+      if (warning) console.warn('[client] graceful server shutdown failed:', warning)
+      resolve(ok)
+    }
+    const onMessage = (message: unknown) => {
+      const result = message as { type?: unknown; requestId?: unknown; ok?: unknown; error?: unknown }
+      if (result.type !== BATTLE_AUTHORITY_SHUTDOWN_RESULT || result.requestId !== requestId) return
+      finish(result.ok === true, result.ok === true ? undefined : String(result.error ?? 'journal drain failed'))
+    }
+    const onExit = () => finish(false, 'server exited before durable drain acknowledgement')
+    const timeout = setTimeout(() => {
+      finish(false, `timed out after ${SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS}ms`)
+    }, SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS)
+    timeout.unref?.()
+    proc.on('message', onMessage)
+    proc.once('exit', onExit)
+    try {
+      proc.send({ type: BATTLE_AUTHORITY_SHUTDOWN_REQUEST, requestId }, error => {
+        if (error) finish(false, error.message)
+      })
+    } catch (error) {
+      finish(false, error instanceof Error ? error.message : String(error))
+    }
+  })
+}
+
+async function stopChildProcessGracefully(proc: ChildProcess): Promise<void> {
+  const durable = await requestGracefulServerShutdown(proc)
+  if (!durable) {
+    console.error('[client] forcing server stop with a potentially undurable battle journal')
+  }
+  if (proc.exitCode === null && proc.signalCode === null) killProcessTree(proc)
+}
+
+async function killServer(): Promise<void> {
+  localServerReady = false
+  if (!serverProcess) return
+  const proc = serverProcess
+  serverProcess = null
+  await stopChildProcessGracefully(proc)
+}
+
+function forceKillServer(): void {
   localServerReady = false
   if (!serverProcess) return
   const proc = serverProcess
   serverProcess = null
   killProcessTree(proc)
+}
+
+function requestApplicationExit(): void {
+  if (allowAppExit) {
+    app.exit(0)
+    return
+  }
+  if (appExitPromise) return
+  appExitPromise = killServer()
+    .catch(error => console.error('[client] graceful application shutdown failed:', error))
+    .finally(() => {
+      allowAppExit = true
+      app.exit(0)
+    })
 }
 
 // ─── 本地服务器管理 ───────────────────────────────────────────────────────────
@@ -492,7 +563,7 @@ async function startLocalServer(): Promise<void> {
       USER_DATA_DIR: userData,
       DATABASE_URL: databaseUrl,
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   })
 
   lastServerExitCode = null
@@ -1044,9 +1115,9 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 // 主进程异常退出兜底——保证 Node 子进程不会成为孤儿进程
-process.on('exit', () => { try { killServer() } catch {} })
-process.on('SIGINT', () => { try { killServer() } catch {} ; app.exit(0) })
-process.on('SIGTERM', () => { try { killServer() } catch {} ; app.exit(0) })
+process.on('exit', () => { try { forceKillServer() } catch {} })
+process.on('SIGINT', requestApplicationExit)
+process.on('SIGTERM', requestApplicationExit)
 
 app.whenReady().then(async () => {
   await setupPackProtocol()
@@ -1072,15 +1143,16 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  killServer()
   if (process.platform !== 'darwin') {
-    app.quit()
-    // 兜底：如果 app.quit() 因某种原因没让所有子进程退出，1.5s 后强制 exit。
-    setTimeout(() => app.exit(0), 1500).unref()
+    requestApplicationExit()
   }
 })
 
-app.on('before-quit', () => killServer())
+app.on('before-quit', event => {
+  if (allowAppExit) return
+  event.preventDefault()
+  requestApplicationExit()
+})
 
 // 关键兜底：所有窗口都关闭、quit 完成后强制退出主进程，
 // 杜绝 Electron GPU/renderer/utility 子进程残留。

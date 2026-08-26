@@ -200,7 +200,10 @@ export async function DELETE(
     }
 
     if (adminKey === expectedAdminKey) {
-      await roomStore.removeRoom(roomId)
+      const removed = await roomStore.removeRoom(roomId)
+      if (!removed) {
+        return NextResponse.json({ success: false, error: 'Room could not be deleted' }, { status: 500 })
+      }
       return NextResponse.json({ success: true, deletedBy: 'admin' })
     }
 
@@ -208,13 +211,19 @@ export async function DELETE(
       if (room.status === 'in-progress') {
         return NextResponse.json({ error: 'Cannot delete room while game is in progress' }, { status: 400 })
       }
-      await roomStore.removeRoom(roomId)
+      const removed = await roomStore.removeRoom(roomId)
+      if (!removed) {
+        return NextResponse.json({ success: false, error: 'Room could not be deleted' }, { status: 500 })
+      }
       return NextResponse.json({ success: true, deletedBy: 'host' })
     }
 
     return NextResponse.json({ error: 'Unauthorized - only host can delete room' }, { status: 403 })
   } catch (error) {
     console.error('Unexpected error in DELETE handler:', error)
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    }, { status: 500 })
   }
 }

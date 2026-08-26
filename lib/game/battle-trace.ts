@@ -3,6 +3,26 @@ import type { BattleState } from './turn'
 
 export const BATTLE_REPLAY_FORMAT = 'rvb-battle-replay/v2' as const
 
+export type Sha256HexProvider = (value: string) => string
+
+const SHA256_PROVIDER_STATE_SYMBOL = Symbol.for('rvb.battle.sha256-hex-provider/v1')
+const SHA256_PROVIDER_STATE_VERSION = 1 as const
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/
+const SHA256_PROVIDER_SELF_CHECK_INPUTS = [
+  '',
+  'abc',
+  '红蓝',
+  '🗡️',
+  '\ud800',
+  '\udc00',
+  'a'.repeat(8_193),
+] as const
+
+interface Sha256ProviderState {
+  version: typeof SHA256_PROVIDER_STATE_VERSION
+  provider: Sha256HexProvider
+}
+
 const SHA256_INITIAL_STATE = [
   0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
   0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -98,11 +118,19 @@ export interface BattleReplayArchive {
   frames: BattleReplayFrame[]
 }
 
+export interface BattleTraceAuthorityRuntime {
+  rootSeed?: number
+  actionCount: number
+  replayFrameCount: number
+  runtimeCursors: Record<string, number>
+}
+
 export interface DebugBattleMetadata {
   appliedActionIds: string[]
   actionLog: Array<BattleActionTrace | Record<string, unknown>>
   commandLog: Array<Record<string, unknown>>
   replay?: BattleReplayArchive
+  authority?: BattleTraceAuthorityRuntime
 }
 
 export function stableJson(value: unknown): string {
@@ -180,8 +208,74 @@ export function sha256Hex(value: string): string {
   return hash.map(word => word.toString(16).padStart(8, '0')).join('')
 }
 
+/**
+ * Installs a process-wide SHA-256 implementation after proving it preserves the
+ * frozen browser-safe UTF-8/hash contract. Symbol.for keeps the first verified
+ * provider stable across Next.js module reloads.
+ */
+export function installSha256HexProvider(provider: Sha256HexProvider): boolean {
+  if (typeof provider !== 'function') {
+    throw new TypeError('Battle SHA-256 provider must be a function')
+  }
+
+  const installed = readInstalledSha256HexProvider()
+  if (installed) return false
+
+  assertSha256HexProviderEquivalent(provider)
+  const state = Object.freeze<Sha256ProviderState>({
+    version: SHA256_PROVIDER_STATE_VERSION,
+    provider,
+  })
+  Object.defineProperty(globalThis, SHA256_PROVIDER_STATE_SYMBOL, {
+    value: state,
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  })
+  return true
+}
+
+function readInstalledSha256HexProvider(): Sha256HexProvider | undefined {
+  const state = (globalThis as Record<symbol, unknown>)[SHA256_PROVIDER_STATE_SYMBOL]
+  if (state === undefined) return undefined
+  if (
+    !state
+    || typeof state !== 'object'
+    || (state as Partial<Sha256ProviderState>).version !== SHA256_PROVIDER_STATE_VERSION
+    || typeof (state as Partial<Sha256ProviderState>).provider !== 'function'
+  ) {
+    throw new Error('Battle SHA-256 provider state is invalid')
+  }
+  return (state as Sha256ProviderState).provider
+}
+
+function assertSha256HexProviderEquivalent(provider: Sha256HexProvider): void {
+  for (const input of SHA256_PROVIDER_SELF_CHECK_INPUTS) {
+    const expected = sha256Hex(input)
+    let actual: string
+    try {
+      actual = provider(input)
+    } catch (cause) {
+      throw new Error('Battle SHA-256 provider self-check failed', { cause })
+    }
+    if (!SHA256_HEX_PATTERN.test(actual) || actual !== expected) {
+      throw new Error('Battle SHA-256 provider self-check failed')
+    }
+  }
+}
+
+function assertSha256HexDigest(value: string, context: 'runtime'): string {
+  if (!SHA256_HEX_PATTERN.test(value)) {
+    throw new Error(`Battle SHA-256 provider returned an invalid SHA-256 digest during ${context}`)
+  }
+  return value
+}
+
 export function hashStable(value: unknown): string {
-  return sha256Hex(stableJson(value))
+  const serialized = stableJson(value)
+  const provider = readInstalledSha256HexProvider()
+  if (!provider) return sha256Hex(serialized)
+  return assertSha256HexDigest(provider(serialized), 'runtime')
 }
 
 export function hashBattleState(state: BattleState): string {
@@ -190,6 +284,8 @@ export function hashBattleState(state: BattleState): string {
 
 export function getBattleRootSeed(state: BattleState): number | undefined {
   const metadata = readDebugMetadata(state)
+  const compactSeed = metadata.authority?.rootSeed
+  if (typeof compactSeed === 'number' && Number.isInteger(compactSeed)) return compactSeed >>> 0
   for (const entry of metadata.actionLog) {
     const rootSeed = (entry as Partial<BattleActionTrace>).rootSeed
     if (typeof rootSeed === 'number' && Number.isInteger(rootSeed)) return rootSeed >>> 0
@@ -229,6 +325,12 @@ export function recordBattleInitialization(
   }
   metadata.actionLog.push(trace)
   metadata.commandLog[trace.index] = sanitizeBattleTraceValue(action) as Record<string, unknown>
+  metadata.authority = {
+    rootSeed: runtime.rootSeed,
+    actionCount: trace.index + 1,
+    replayFrameCount: 0,
+    runtimeCursors: runtimeCursorsFromTrace(trace),
+  }
   const initialState = createBattleReplayCheckpoint(canonicalState)
   metadata.replay = {
     format: BATTLE_REPLAY_FORMAT,
@@ -343,7 +445,7 @@ export function appendBattleReplayFrame(
   const sanitizedAction = sanitizeBattleTraceValue(action) as Record<string, unknown>
   const events = collectCommittedEvents(beforeState.actions, afterState.actions)
   const frame: BattleReplayFrame = {
-    index: replay.frames.length,
+    index: metadata.authority?.replayFrameCount ?? replay.frames.length,
     traceIndex: trace.index,
     action: sanitizedAction,
     actionType: typeof sanitizedAction.type === 'string' ? sanitizedAction.type : 'unknown',
@@ -362,6 +464,7 @@ export function appendBattleReplayFrame(
     randomStreams: trace.randomStreams.map(stream => ({ ...stream })),
   }
   replay.frames.push(frame)
+  if (metadata.authority) metadata.authority.replayFrameCount = frame.index + 1
   return frame
 }
 
@@ -439,6 +542,10 @@ export function readDebugMetadata(state: BattleState): DebugBattleMetadata {
     actionLog: Array.isArray(metadata?.actionLog) ? [...metadata.actionLog] : [],
     commandLog: Array.isArray(metadata?.commandLog) ? [...metadata.commandLog] : [],
     replay: metadata?.replay,
+    authority: metadata?.authority ? {
+      ...metadata.authority,
+      runtimeCursors: { ...metadata.authority.runtimeCursors },
+    } : undefined,
   }
 }
 
@@ -450,12 +557,86 @@ export function getOrCreateDebugMetadata(state: BattleState): DebugBattleMetadat
     actionLog?: Array<BattleActionTrace | Record<string, unknown>>
     commandLog?: Array<Record<string, unknown>>
     replay?: BattleReplayArchive
+    authority?: BattleTraceAuthorityRuntime
   }
   metadata.appliedActionIds ??= []
   metadata.actionLog ??= []
   metadata.commandLog ??= []
   extensions.debugBattle = metadata
   return metadata as DebugBattleMetadata
+}
+
+export function compactBattleTraceForAuthority(state: BattleState): BattleState {
+  const metadata = getOrCreateDebugMetadata(state)
+  const authority = metadata.authority ?? {
+    rootSeed: getBattleRootSeed(state),
+    actionCount: metadata.actionLog.length,
+    replayFrameCount: metadata.replay?.frames.length ?? 0,
+    runtimeCursors: runtimeCursorsFromLog(metadata.actionLog),
+  }
+  const replay = metadata.replay ? { ...metadata.replay, frames: [] } : undefined
+  const initializationTraces = metadata.actionLog.filter(entry => (
+    (entry as Partial<BattleActionTrace>).actionId === 'system-initialize'
+  ))
+  const initializationCommands = initializationTraces.length > 0
+    ? metadata.commandLog.slice(0, initializationTraces.length)
+    : []
+  const extensions = state.extensions ?? {}
+  extensions.debugBattle = {
+    appliedActionIds: [],
+    actionLog: initializationTraces,
+    commandLog: initializationCommands,
+    replay,
+    authority: {
+      ...authority,
+      runtimeCursors: { ...authority.runtimeCursors },
+    },
+  }
+  state.extensions = extensions
+  return state
+}
+
+export function materializeBattleTraceForTerminal(
+  state: BattleState,
+  history: Array<{
+    trace?: BattleActionTrace
+    command?: Record<string, unknown>
+    replayFrame?: BattleReplayFrame
+  }>,
+): BattleState {
+  const metadata = getOrCreateDebugMetadata(state)
+  const initializationTraces = metadata.actionLog.filter(entry => (
+    (entry as Partial<BattleActionTrace>).actionId === 'system-initialize'
+  ))
+  const initializationCommands = initializationTraces.length > 0
+    ? metadata.commandLog.slice(0, initializationTraces.length)
+    : []
+  const traces = history.flatMap(entry => entry.trace ? [entry.trace] : [])
+  const commands = history.flatMap(entry => entry.command ? [entry.command] : [])
+  const frames = history.flatMap(entry => entry.replayFrame ? [entry.replayFrame] : [])
+  metadata.actionLog = [...initializationTraces, ...traces]
+  metadata.commandLog = [...initializationCommands, ...commands]
+  if (metadata.replay) metadata.replay = { ...metadata.replay, frames }
+  metadata.appliedActionIds = traces.map(trace => trace.actionId).filter(Boolean)
+  return state
+}
+
+function runtimeCursorsFromTrace(trace: Pick<BattleActionTrace, 'randomStreams'>): Record<string, number> {
+  const cursors: Record<string, number> = {}
+  for (const stream of trace.randomStreams) {
+    if (!stream || typeof stream.name !== 'string' || !Number.isSafeInteger(stream.endCursor) || stream.endCursor < 0) continue
+    cursors[stream.name] = stream.endCursor
+  }
+  return cursors
+}
+
+function runtimeCursorsFromLog(actionLog: DebugBattleMetadata['actionLog']): Record<string, number> {
+  const cursors: Record<string, number> = {}
+  for (const entry of actionLog) {
+    const streams = (entry as Partial<BattleActionTrace>).randomStreams
+    Object.assign(cursors, runtimeCursorsFromTrace({ randomStreams: Array.isArray(streams) ? streams : [] }))
+  }
+  return cursors
 }
 
 export function stampPendingDeploymentAuthorityVersion(

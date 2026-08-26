@@ -409,7 +409,7 @@ interface ServerCore {
 - `BattleState.turnTimer`：保存规则期限和 streak；`turnTimerSync | turnTimerBurn | turnTimeout` 是内部系统动作，客户端提交会以 `TURN_TIMER_SYSTEM_ACTION_FORBIDDEN` 拒绝且不写房间。
 - `dispatchRoomBattleAction()`：进入异步读取前采样逻辑接收时间；每房间串行冻结逻辑时钟，完成规则、唯一 CAS、快照构造和发送入队后恢复。传输层只获得真实提交版本，CAS 冲突不发布 speculative 快照，且处理跨越 15 秒阈值不会造成烧绳投影反转。进程重启恢复不在 RED-36 范围内。
 - 计时跟随当前输入所有者，并从 action 延续到 end，覆盖 pending 与“回合结束时”输入，直到下一回合真正开始；pending 返回活动玩家时恢复原剩余预算。主动结束回合产生的 pending 继续使用当前预算；action phase 超时若在强制 `endTurn` 时才产生 pending，则取消该输入并推进下一回合，不新增预算。end phase 输入超时也直接推进，不能重复执行 endTurn 触发。只有当前 owner 被接受的玩法动作才清零自己的 streak。
-- `scheduleRoomBattleTimeout()`：按部署期限、烧绳阈值和回合期限安排下一次唤醒；系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
+- `scheduleRoomBattleTimeout()`：仅在显式 `RVB_TURN_TIMER_ENABLED=1` 时启用 deadline，并按部署期限、烧绳阈值和回合期限安排下一次唤醒；未设置或 `0` 时清除既有任务、隐藏计时投影，且晚到玩家动作不会被替换成 timeout。系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
 - 第三次连续无操作超时复用 RED-34 `terminalResult(reason = timeout-surrender)`，房间与终局在同一次 CAS 中变为 `finished`。
 
 ### 客户端显示边界
@@ -417,3 +417,32 @@ interface ServerCore {
 - `PublicBattleSnapshot` 增加 `serverNow` 与 `turnTimer?`；后者包含当前输入 owner、活动回合玩家、完整轮次、时长、剩余量、期限及 `burning/fast` 状态。
 - `battle.html` 和 `turn-timer-status.js` 只刷新 HUD。刷新、重连和 HTTP GET 不修改规则状态或期限，浏览器不持有超时授权。
 - 决策：[ADR-0014](../decisions/ADR-0014-authoritative-growing-turn-timer.md)。
+
+## RED-109 权威 Transition 协调器
+
+- 协调入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`；所有 LAN 玩家、pending、计时器和机器人命令必须由此进入。
+- 排队：`lib/game/room-authority-queue.ts` 按 roomId 严格 FIFO，并对等待数量实施背压；房间之间不共享队列。
+- 协议：`lib/game/battle-transition.ts` 定义 v2 command envelope、精确 receipt、公开 pending 投影、Transition 和检查点恢复。
+- 版本：`Room.version` 是房间元数据乐观锁；`Room.battleAuthorityVersion` 是连续战斗版本。传输与 patch 只能使用后者。
+- 在线权威：显式开启 async journal 后，`RoomStore.getRoom()` 优先读取进程内 Room Actor；
+  `commitBattleAuthorityTransition()` 在 ACK 前验证版本、前链、receipt 关联、重算 action/transition hash，
+  并核对缓存前态与 Runner 独立产出的 canonical pre/post hash/trace 证据，再同步提交内存版本、receipt、
+  Δ 和 hash 链。完整内部/公开 Δ 回放与 `nextStorage` 等价比较由同一 journal writer 在落库前严格串行
+  审计一次；审计失败将房间 degraded、丢弃 durable job 并拒绝后续异步提交。普通动作不读写 Prisma。
+- 后台持久化：`lib/server/battle-authority-async-journal.ts` 提供单 writer、有界队列、有界重试、按房间
+  durable 水位和 degraded 状态；`lib/server/battle-authority-persistence.ts` 在后台原子推进 DB 版本并写
+  Transition、Receipt 和可选 Checkpoint。SQLite `busy_timeout=500 ms`、Prisma `maxWait=250 ms` 与
+  transaction `timeout=1250 ms` 先限制底层写，journal 2 秒只作为最终安全线；安全线触发会 degraded/abort，
+  但在旧 adapter 实际结束前绝不开始下一房间，避免 `Promise.race` 造成并发 SQLite writer。终局完整
+  Trace 在 Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
+- 启动/关闭：v2 初始检查点是进入 in-progress 的必要条件；创建失败必须 CAS 回滚，version 0 的半启动
+  房间再次进入启动入口时先补检查点并 hydrate actor。`battle-authority-shutdown.ts` 在关闭 journal ingress、
+  停止 WS 后排空全局 writer，并核对每个 actor 的 durable 水位。Electron 通过子进程 IPC 等待该结果，
+  SIGINT/SIGTERM 使用同一流程；6 秒总上限后才进入强制停止兜底。
+- 删除：`RoomStore.removeRoom()` 在删除前排空该房间；失败返回 false，WS、主 HTTP 与管理员批量清理入口
+  必须返回错误和准确的失败房间，不能广播或响应删除成功。
+- 客户端：`data/pages/battle.html` 只应用接收者公开 patch、显示权威候选并发送选择；候选仅投影给 pending owner，对手/观者只看公开等待信封；版本/hash 不匹配时单飞请求完整快照。
+- 功能开关：候选默认 fail closed；`RVB_BATTLE_AUTHORITY_V2=1` 启用 v2，额外设置
+  `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只关 async flag 即回退 ACK 前原子 DB 提交。
+  `RVB_TURN_TIMER_ENABLED=1` 才安排部署/回合计时唤醒。`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
+- 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；version > 0 缺检查点、版本断层、pre/post state/public hash、action hash 或 transition hash 链损坏都必须显式失败。

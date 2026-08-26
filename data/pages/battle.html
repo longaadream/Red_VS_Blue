@@ -2007,7 +2007,41 @@
     const stateFloaterEventOrder = []
     const PENDING_ACTION_TIMEOUT_MS = 8000
     let pendingActionFeedback = null
+    let lastAutoBeginPhaseKey = null
     let pendingActionFeedbackTimer = null
+    let pendingActionPresentationFrame = null
+    let authorityRecoveryPromise = null
+    const authorityPerformanceSamples = []
+    window.__RVB_AUTHORITY_PERF__ = {
+      samples: authorityPerformanceSamples,
+      summary: function () {
+        const totals = authorityPerformanceSamples.map(function (sample) { return sample.totalMs }).sort(function (a, b) { return a - b })
+        function percentile(quantile) {
+          if (!totals.length) return 0
+          return totals[Math.min(totals.length - 1, Math.ceil(totals.length * quantile) - 1)]
+        }
+        return { count: totals.length, p50: percentile(0.5), p95: percentile(0.95), p99: percentile(0.99), max: totals[totals.length - 1] || 0 }
+      },
+      clear: function () { authorityPerformanceSamples.length = 0 },
+    }
+
+    function recordAuthorityPerformance(receipt, serverTimings, clientApplyMs, trackedFeedback) {
+      const feedback = trackedFeedback || pendingActionFeedback
+      if (!receipt || !feedback || feedback.clientActionId !== receipt.clientActionId) return false
+      const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
+      const sample = {
+        clientActionId: receipt.clientActionId,
+        type: feedback.type,
+        status: receipt.status,
+        authorityVersion: receipt.authorityVersion,
+        totalMs: Math.round((now - feedback.startedAt) * 1000) / 1000,
+        clientApplyMs: Math.round((Number(clientApplyMs) || 0) * 1000) / 1000,
+        server: serverTimings || null,
+      }
+      authorityPerformanceSamples.push(sample)
+      if (authorityPerformanceSamples.length > 200) authorityPerformanceSamples.shift()
+      return true
+    }
 
     function clearPendingActionFeedback(reason) {
       if (pendingActionFeedbackTimer) clearTimeout(pendingActionFeedbackTimer)
@@ -2028,13 +2062,24 @@
         clientActionId: action.clientActionId,
         type: action.type,
         pieceId: action.pieceId || action.targetPieceId || selectedPieceId || null,
+        startedAt: typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(),
       }
       pendingActionFeedbackTimer = setTimeout(function () {
         rejectPendingActionFeedback('action-timeout', '指令确认超时，请检查连接后重试')
       }, PENDING_ACTION_TIMEOUT_MS)
-      renderBoard()
-      renderActionBar()
       return true
+    }
+
+    function schedulePendingActionPresentation() {
+      if (pendingActionPresentationFrame !== null) return
+      const scheduleFrame = typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : function (callback) { return setTimeout(callback, 0) }
+      pendingActionPresentationFrame = scheduleFrame(function () {
+        pendingActionPresentationFrame = null
+        if (!pendingActionFeedback) return
+        renderActionBar()
+      })
     }
 
     function rejectPendingActionFeedback(reason, message, options) {
@@ -2057,6 +2102,49 @@
       return !!rejected
     }
 
+    function requestAuthorityRecovery(reason) {
+      if (authorityRecoveryPromise) return authorityRecoveryPromise
+      addLog('[authority] 请求完整快照：' + (reason || 'unknown'), 'err')
+      authorityRecoveryPromise = Promise.resolve()
+        .then(function () { return recoverBattleStateViaHttp() })
+        .finally(function () { authorityRecoveryPromise = null })
+      return authorityRecoveryPromise
+    }
+
+    function applyAuthorityReceipt(receipt, serverTimings, clientApplyMs, options) {
+      if (!receipt || !receipt.clientActionId) return false
+      var input = options || {}
+      var actionId = String(receipt.clientActionId)
+      var feedbackMatches = !!(pendingActionFeedback && pendingActionFeedback.clientActionId === actionId)
+      var targetMatches = !!(targetSubmissionPending && targetSubmissionPending.clientActionId === actionId)
+      if (feedbackMatches && input.deferPerformance !== true) {
+        recordAuthorityPerformance(receipt, serverTimings, clientApplyMs)
+      }
+      if (!feedbackMatches && !targetMatches) {
+        if (receipt.status === 'resyncRequired') requestAuthorityRecovery(receipt.code || 'resync-required')
+        return false
+      }
+
+      if (receipt.status === 'applied' || receipt.status === 'duplicate') {
+        if (feedbackMatches) clearPendingActionFeedback('authority-receipt-' + receipt.status)
+        if (targetMatches) {
+          clearTargetInteraction(
+            'authority-receipt-' + receipt.status,
+            { deferRender: input.deferRender === true },
+          )
+        }
+        if (input.deferRender !== true) renderActionBar()
+        return true
+      }
+
+      if (feedbackMatches) clearPendingActionFeedback('authority-receipt-' + receipt.status)
+      if (targetMatches) targetSubmissionPending = null
+      if (input.deferRender !== true) renderActionBar()
+      if (receipt.message) setStatusMsg(receipt.message)
+      if (receipt.status === 'resyncRequired') requestAuthorityRecovery(receipt.code || 'resync-required')
+      return true
+    }
+
     function recordTargetClear(reason) {
       red50Evidence.clearEvents.push({ reason: reason || 'unknown', at: Date.now() })
       if (red50Evidence.clearEvents.length > 40) red50Evidence.clearEvents.shift()
@@ -2071,6 +2159,7 @@
       if (input.keepMove !== true) pendingMove = false
       if (hadTarget) recordTargetClear(reason)
       document.body.classList.remove('target-mode-active')
+      if (input.deferRender !== true) renderTargetOverlay()
       if (input.message) setStatusMsg(input.message)
       return hadTarget
     }
@@ -2116,9 +2205,7 @@
         selectionId: stamped.selectionId || null,
       })
       setStatusMsg('目标指令已提交，正在等待权威确认')
-      renderBoard()
       renderTargetOverlay()
-      renderActionBar()
       void doAction(stamped)
       return true
     }
@@ -2209,6 +2296,7 @@
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
     let battlePresentation = null
+    let battleDomUi = null
     let currentBattleViewModel = null
     function red43QaSnapshot() {
       if (!RED43_QA_MODE) return null
@@ -2568,11 +2656,6 @@
         ],
         snapshot.terminalResult || null,
       ])
-    }
-
-    function authorityStateConfirmsPending(previousState, nextState) {
-      if (!previousState || !nextState) return false
-      return battleStateMotionKey(previousState) !== battleStateMotionKey(nextState)
     }
 
     function spawnStateFloaters(oldG, newG, eventKey) {
@@ -3385,20 +3468,34 @@
 
     // ── Server-authoritative state handling ──
 
-    function reconcileBattleInteractionState(previousState, nextState) {
+    function reconcileBattleInteractionState(previousState, nextState, options) {
       if (!nextState) return ''
-      const stateAdvanced = authorityStateConfirmsPending(previousState, nextState)
-      const confirmedAction = pendingActionFeedback && stateAdvanced ? clearPendingActionFeedback('authoritative-confirmation') : null
+      const input = options || {}
       const authoritativeSelectionId = nextState.pendingTargetSelection && nextState.pendingTargetSelection.selectionId
       if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
         locallyCancelledSelectionId = null
+      }
+      const serverTargetInteraction = pendingSkill
+        && pendingSkill.turnTargetActionType === 'pendingTargetSelect'
+      if (serverTargetInteraction) {
+        const localSelectionId = pendingSkill.preparation && pendingSkill.preparation.selectionId
+        const localStateRevision = pendingSkill.preparation && pendingSkill.preparation.stateRevision
+        const nextPending = nextState.pendingTargetSelection
+        if (!nextPending
+          || !localSelectionId
+          || nextPending.selectionId !== localSelectionId
+          || nextPending.stateRevision !== localStateRevision) {
+          clearTargetInteraction('authoritative-pending-ended', { deferRender: input.deferRender === true })
+          validMoves = new Set()
+          return '权威目标选择已结束，旧选择已清除'
+        }
       }
       const selected = selectedPieceId && nextState.pieces
         ? nextState.pieces.find(p => p.instanceId === selectedPieceId && p.currentHp > 0)
         : null
       if (selectedPieceId && !selected) {
         selectedPieceId = null
-        clearTargetInteraction('selected-piece-unavailable')
+        clearTargetInteraction('selected-piece-unavailable', { deferRender: input.deferRender === true })
         validMoves = new Set()
         return '选中棋子已离场，目标选择已清除'
       }
@@ -3406,7 +3503,7 @@
       const previousTurn = previousState && previousState.turn && previousState.turn.currentPlayerId
       const nextTurn = nextState.turn && nextState.turn.currentPlayerId
       if (previousTurn && nextTurn && String(previousTurn).toLowerCase() !== String(nextTurn).toLowerCase()) {
-        clearTargetInteraction('turn-changed')
+        clearTargetInteraction('turn-changed', { deferRender: input.deferRender === true })
         validMoves = new Set()
         return '回合已切换，目标选择已清除'
       }
@@ -3416,17 +3513,13 @@
       if (preparation && Number.isFinite(Number(preparation.stateRevision))) {
         const revision = Number(nextState.targetingRevision || 0)
         if (revision !== Number(preparation.stateRevision)) {
-          clearTargetInteraction('targeting-revision-changed')
+          clearTargetInteraction('targeting-revision-changed', { deferRender: input.deferRender === true })
           validMoves = new Set()
           return '战局状态已更新，请重新选择技能目标'
         }
       }
 
-      if (targetSubmissionPending && stateAdvanced) {
-        clearTargetInteraction('authoritative-confirmation')
-        return '目标指令已确认'
-      }
-      return confirmedAction ? '指令已确认' : ''
+      return ''
     }
 
     // Apply an authoritative state snapshot received from server (WS or GET)
@@ -3488,8 +3581,32 @@
       }
       authoritativeTurnTimer = turnTimer || null
     }
-    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer) {
+    function acceptAuthorityVersion(authorityVersion) {
+      if (!Number.isSafeInteger(authorityVersion)) return latestAuthorityVersion === null
+      if (Number.isSafeInteger(latestAuthorityVersion) && authorityVersion < latestAuthorityVersion) return false
+      latestAuthorityVersion = authorityVersion
+      return true
+    }
+    function autoBeginPhaseKey(state, playerId, commandPending) {
+      if (!state || state.terminalResult || commandPending) return null
+      if (state.deployment && state.deployment.status !== 'complete') return null
+      if (state.pendingOptionSelection || state.pendingTargetSelection) return null
+      var turn = state.turn
+      if (!turn || turn.phase !== 'start' || !turn.currentPlayerId) return null
+      if (String(turn.currentPlayerId).toLowerCase() !== String(playerId || '').toLowerCase()) return null
+      return String(turn.turnNumber) + ':' + String(turn.currentPlayerId).toLowerCase() + ':start'
+    }
+    function maybeAutoBeginPhase() {
+      var key = autoBeginPhaseKey(G, myPlayerId, !!pendingActionFeedback)
+      if (!key || key === lastAutoBeginPhaseKey) return false
+      lastAutoBeginPhaseKey = key
+      addLog('自动初始化回合', 'info')
+      void doBeginPhase()
+      return true
+    }
+    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer, options) {
       if (!state) return
+      const input = options || {}
       resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
@@ -3506,7 +3623,7 @@
           if (alignment === 'light' || alignment === 'dark') playerAlignments[playerId.toLowerCase()] = alignment
         })
       }
-      const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+      const interactionFeedback = reconcileBattleInteractionState(oldG, G, { deferRender: true })
 
       // Init seeded RNG once
       if (seed && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
@@ -3527,16 +3644,17 @@
       }
 
       if (oldG) { flushActionLog(oldG, G); spawnStateFloaters(oldG, G) }
-      render()
+      const renderPolicy = input.deriveRenderPolicy === true
+        ? deriveAuthorityRenderPolicy(oldG, G)
+        : (input.renderPolicy || {})
+      render(Object.assign({}, renderPolicy, {
+        beforeBoardUpdate: input.beforeBoardUpdate,
+      }))
       if (interactionFeedback) setStatusMsg(interactionFeedback)
 
       if (G.terminalResult) { handleGameOver(); return }
 
-      // Auto-advance start phase (only the current player sends beginPhase)
-      if (G.turn && G.turn.phase === 'start') {
-        var isMyTurn = G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
-        if (isMyTurn) { addLog('自动初始化回合', 'info'); doBeginPhase() }
-      }
+      maybeAutoBeginPhase()
     }
 
     function applyLegacyBattleEntry(entry) {
@@ -3568,6 +3686,10 @@
     }
 
     function applyLegacyBattleSnapshot(msg) {
+      if (!acceptAuthorityVersion(msg && msg.authorityVersion)) {
+        addLog('[authority] Ignored an older or unversioned battle snapshot', 'info')
+        return
+      }
       const actions = msg && Array.isArray(msg.actions) ? msg.actions : []
       latestAuthorityStateHash = (msg && msg.stateHash) || latestAuthorityStateHash
       latestAuthorityVersion = msg && Number.isSafeInteger(msg.authorityVersion)
@@ -3579,6 +3701,148 @@
       }
       actions.forEach(applyLegacyBattleEntry)
       if (!actions.length && msg && msg.state) applyServerState(msg.state, msg.seed || null)
+    }
+
+    function authorityPatchBaseState() {
+      if (!G) return null
+      var base = Object.assign({}, G)
+      delete base.skillsById
+      return base
+    }
+
+    function sameBattleRenderValue(left, right) {
+      if (Object.is(left, right)) return true
+      try {
+        return JSON.stringify(left == null ? null : left) === JSON.stringify(right == null ? null : right)
+      } catch {
+        return false
+      }
+    }
+
+    function deriveAuthorityRenderPolicy(previousState, nextState) {
+      if (!previousState || !nextState) {
+        return {
+          board: true,
+          mapChanged: true,
+          piecesChanged: true,
+          tileEffectsChanged: true,
+          pendingTargetChanged: true,
+          localBoardStateChanged: true,
+        }
+      }
+      var previousExtensions = previousState.extensions || {}
+      var nextExtensions = nextState.extensions || {}
+      var mapChanged = !sameBattleRenderValue(previousState.map, nextState.map)
+      var piecesChanged = !sameBattleRenderValue(previousState.pieces, nextState.pieces)
+      var tileEffectsChanged = !sameBattleRenderValue(
+        previousExtensions.tileEffects,
+        nextExtensions.tileEffects,
+      )
+      var pendingTargetChanged = !sameBattleRenderValue(
+        previousState.pendingTargetSelection,
+        nextState.pendingTargetSelection,
+      )
+      var currentSelectionId = currentBattleViewModel && currentBattleViewModel.selection
+        ? currentBattleViewModel.selection.pieceId || null
+        : null
+      var currentPendingCommandId = currentBattleViewModel && currentBattleViewModel.interaction
+        ? currentBattleViewModel.interaction.pendingCommandId || null
+        : null
+      var nextPendingCommandId = pendingActionFeedback ? pendingActionFeedback.clientActionId : null
+      var currentInteractionMode = currentBattleViewModel && currentBattleViewModel.selection
+        ? currentBattleViewModel.selection.mode || 'inspect'
+        : 'inspect'
+      var localBoardStateChanged = currentSelectionId !== (selectedPieceId || null)
+        || currentPendingCommandId !== nextPendingCommandId
+        || currentInteractionMode !== battleInteractionMode()
+      return {
+        board: mapChanged || piecesChanged || tileEffectsChanged || pendingTargetChanged || localBoardStateChanged,
+        mapChanged: mapChanged,
+        piecesChanged: piecesChanged,
+        tileEffectsChanged: tileEffectsChanged,
+        pendingTargetChanged: pendingTargetChanged,
+        localBoardStateChanged: localBoardStateChanged,
+      }
+    }
+
+    function applyBattleTransition(msg) {
+      if (!msg || !Array.isArray(msg.patch)) return false
+      if (!G || !Number.isSafeInteger(latestAuthorityVersion)) {
+        requestAuthorityRecovery('transition-without-base')
+        return false
+      }
+      if (typeof GameEngine === 'undefined' || !GameEngine.applyBattlePublicPatch) {
+        requestAuthorityRecovery('patch-runtime-unavailable')
+        return false
+      }
+      try {
+        var patchStartedAt = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
+        var oldG = G
+        var previousPresentationModel = currentBattleViewModel || createBattlePresentationModel(oldG)
+        var envelope = {
+          protocolVersion: msg.protocolVersion,
+          roomId: msg.roomId,
+          fromVersion: msg.fromVersion,
+          toVersion: msg.toVersion,
+          prePublicHash: msg.prePublicHash,
+          postPublicHash: msg.postPublicHash,
+          patch: msg.patch,
+        }
+        var nextState = GameEngine.applyBattlePublicPatch(
+          authorityPatchBaseState(),
+          envelope,
+          { authorityVersion: latestAuthorityVersion }
+        )
+        var trackedFeedback = msg.receipt
+          && pendingActionFeedback
+          && pendingActionFeedback.clientActionId === String(msg.receipt.clientActionId)
+          ? pendingActionFeedback
+          : null
+        applyAuthorityReceipt(
+          msg.receipt,
+          msg.timings,
+          0,
+          { deferRender: true, deferPerformance: true },
+        )
+        latestAuthorityVersion = msg.toVersion
+        latestAuthorityStateHash = msg.stateHash || latestAuthorityStateHash
+        applyServerState(
+          nextState,
+          msg.seed || null,
+          false,
+          msg.serverNow,
+          msg.turnTimer,
+          {
+            deriveRenderPolicy: true,
+            beforeBoardUpdate: function (nextPresentationModel) {
+              if (!_use3d || !battlePresentation) return
+              battlePresentation.animateAction(
+                {
+                  type: 'battleTransition',
+                  motionEventKey: 'authority:' + msg.toVersion + ':' + ((msg.receipt && msg.receipt.clientActionId) || 'system'),
+                },
+                previousPresentationModel,
+                nextPresentationModel,
+              )
+            },
+          },
+        )
+        var patchFinishedAt = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
+        if (trackedFeedback) {
+          recordAuthorityPerformance(
+            msg.receipt,
+            msg.timings,
+            patchFinishedAt - patchStartedAt,
+            trackedFeedback,
+          )
+        }
+        return true
+      } catch (error) {
+        var message = error && error.message ? error.message : String(error)
+        addLog('[authority] 增量补丁校验失败：' + message, 'err')
+        requestAuthorityRecovery((error && error.code) || 'patch-apply-failed')
+        return false
+      }
     }
 
     // Connect WebSocket for the given mode ('lan' | 'relay')
@@ -3610,6 +3874,10 @@
           try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
 
         } else if (msg.type === 'stateUpdate') {
+          if (!acceptAuthorityVersion(msg.authorityVersion)) {
+            addLog('[authority] Ignored an older or unversioned state update', 'info')
+            return
+          }
 
           if (_use3d && battlePresentation && G && msg.state) {
             battlePresentation.animateAction(
@@ -3623,6 +3891,10 @@
             ? msg.authorityVersion
             : latestAuthorityVersion
           applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer)
+        } else if (msg.type === 'battleTransition') {
+          applyBattleTransition(msg)
+        } else if (msg.type === 'battleReceipt') {
+          applyAuthorityReceipt(msg.receipt)
         } else if (msg.type === 'battleSnapshot') {
           applyLegacyBattleSnapshot(msg)
         } else if (msg.type === 'roomUpdate') {
@@ -3648,7 +3920,12 @@
         } else if (msg.type === 'actionLog') {
           applyLegacyBattleEntry(msg.entry)
         } else if (msg.type === 'actionError') {
-          addLog('[DEBUG actionError] action=' + JSON.stringify(msg.action || null) + ' error=' + (msg.error || 'unknown') + ' needsTarget=' + (!!msg.needsTargetSelection) + ' needsOption=' + (!!msg.needsOptionSelection), 'err')
+          var errorActionId = (msg.receipt && msg.receipt.clientActionId) || (msg.action && msg.action.clientActionId)
+          if (errorActionId && pendingActionFeedback && pendingActionFeedback.clientActionId !== errorActionId) {
+            addLog('[authority] 已忽略过期拒绝：' + errorActionId, 'info')
+            return
+          }
+          if (msg.receipt) applyAuthorityReceipt(msg.receipt)
           if (msg.needsTargetSelection) clearPendingActionFeedback('authoritative-target-step')
           if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
           if (msg.needsOptionSelection) clearPendingActionFeedback('authoritative-option-step')
@@ -3720,6 +3997,10 @@
         }
         const data = await res.json()
         if (data && data.state) {
+          if (!acceptAuthorityVersion(data.authorityVersion)) {
+            addLog('[authority] Ignored an older or unversioned HTTP snapshot', 'info')
+            return
+          }
           addLog('[HTTP fallback] 已拉取服务端战斗状态 ' + String(data.stateHash || '').slice(0, 12), 'info')
           if (_use3d && battlePresentation && G) {
             battlePresentation.animateAction(
@@ -3830,7 +4111,7 @@
     function renderTargetOverlay() {
       const el = document.getElementById('targetOverlay')
       if (!el) return
-      const active = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      const active = !targetSubmissionPending && !!(pendingSkill || pendingCardAction)
       document.body.classList.toggle('target-mode-active', active)
       if (active) {
         closePieceContextMenu()
@@ -3932,6 +4213,19 @@
       return !!(pbc && pbc.playerId && !clientOwns(pbc.playerId))
     }
 
+    function serverPendingTargetChanged(currentSkill, authoritativePending) {
+      if (!currentSkill || currentSkill.turnTargetActionType !== 'pendingTargetSelect') return true
+      const preparation = currentSkill.preparation || {}
+      if (preparation.selectionId !== authoritativePending.selectionId) return true
+      if (preparation.stateRevision !== authoritativePending.stateRevision) return true
+      const currentCandidates = preparation.candidates
+      const authoritativeCandidates = authoritativePending.candidates
+      if (!Array.isArray(authoritativeCandidates)) {
+        return Array.isArray(currentCandidates) && currentCandidates.length > 0
+      }
+      return currentCandidates !== authoritativeCandidates
+    }
+
     function battleInteractionMode() {
       if (TRAINING_MODE && placingMode) return 'place'
       if (pendingSkill || (pendingCardAction && pendingCardAction.type) || targetSubmissionPending) return 'target'
@@ -3998,13 +4292,7 @@
     }
 
     let _pendingChoiceShown = null  // track which pendingOptionSelection we've shown
-    function render() {
-      if (!G) return
-      renderBoard()
-      renderPanels()
-      renderActionBar()
-      renderHand()
-      renderTargetOverlay()
+    function syncAuthoritativePendingPresentation() {
       const pbc = G.pendingOptionSelection
       if (pendingOptionSelectionForMe()) {
         const key = pbc.selectionId || (pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(','))
@@ -4030,9 +4318,8 @@
       }
       const pbt = G.pendingTargetSelection
       if (pendingTargetSelectionForMe()) {
-        console.log('[STAGE3] G.pendingTargetSelection: playerId=' + pbt.playerId + ' targetType=' + pbt.targetType + ' hasEffectCode=' + !!pbt.effectCode + ' effectCodeLen=' + (pbt.effectCode ? pbt.effectCode.length : 0))
         const actionType = 'pendingTargetSelect'
-        if (!pendingSkill || pendingSkill.turnTargetActionType !== actionType) {
+        if (serverPendingTargetChanged(pendingSkill, pbt)) {
           pendingSkill = {
             targetType: pbt.targetType,
             range: pbt.range || 99,
@@ -4053,25 +4340,44 @@
             validTargets: new Set(),
           }
           _updatePendingSkillTargets()
-          console.log('[STAGE4] entered target-select mode, validTargets count=' + pendingSkill.validTargets.size)
           setStatusMsg(pbt.title || _targetPromptText() || '请选择目标')
-          renderBoard()
-          renderTargetOverlay()
         }
       } else if (pendingSkill && pendingSkill.turnTargetActionType === 'pendingTargetSelect') {
         pendingSkill = null
-        renderBoard()
-        renderActionBar()
-        renderTargetOverlay()
       }
+    }
+
+    function render(options) {
+      if (!G) return
+      const input = options || {}
+      syncAuthoritativePendingPresentation()
+      if (input.board === false) renderBattleHud(input.presentationModel, input.beforeBoardUpdate)
+      else renderBoard(input.presentationModel, input.beforeBoardUpdate)
+      renderPanels()
+      renderActionBar()
+      renderHand()
+      renderTargetOverlay()
       updateRed43QaEvidence()
     }
 
-    function renderBoard() {
-      if (!G || !G.map) return
+    function prepareCurrentBattlePresentationModel(preparedModel) {
       refreshBattleLegalActions()
-      currentBattleViewModel = createBattlePresentationModel(G)
+      return preparedModel || createBattlePresentationModel(G)
+    }
+
+    function renderBattleHud(preparedModel, beforeBoardUpdate) {
+      if (!G || !G.map) return
+      currentBattleViewModel = prepareCurrentBattlePresentationModel(preparedModel)
       if (!currentBattleViewModel) return
+      if (typeof beforeBoardUpdate === 'function') beforeBoardUpdate(currentBattleViewModel)
+      if (battleDomUi) battleDomUi.update(currentBattleViewModel)
+    }
+
+    function renderBoard(preparedModel, beforeBoardUpdate) {
+      if (!G || !G.map) return
+      currentBattleViewModel = prepareCurrentBattlePresentationModel(preparedModel)
+      if (!currentBattleViewModel) return
+      if (typeof beforeBoardUpdate === 'function') beforeBoardUpdate(currentBattleViewModel)
       if (battlePresentation) battlePresentation.update(currentBattleViewModel)
       recalcCellSize()
 
@@ -4603,13 +4909,15 @@
       const inStart = phase === 'start'
 
       const _waitingForOther = pendingOptionSelectionForOther()
+        || !!(G.pendingTargetSelection && G.pendingTargetSelection.playerId && !clientOwns(G.pendingTargetSelection.playerId))
+      const _waitingForOwn = pendingOptionSelectionForMe() || pendingTargetSelectionForMe()
       const btnEnd = document.getElementById('btnEnd')
       const deploymentPending = G.deployment && G.deployment.status === 'awaiting-locks'
       if (deploymentPending) {
         const lock = G.deployment.locks && G.deployment.locks[myPlayerId]
         const locked = !!(lock && lock.locked)
         if (btnEnd) {
-          btnEnd.disabled = SPECTATE_MODE || locked || !!targetSubmissionPending
+          btnEnd.disabled = SPECTATE_MODE || locked || !!targetSubmissionPending || !!pendingActionFeedback
           btnEnd.textContent = locked ? '部署已锁定' : '确认部署'
           btnEnd.classList.add('is-start')
         }
@@ -4621,15 +4929,19 @@
         return
       }
       if (btnEnd) {
-        btnEnd.disabled = !!targetSubmissionPending || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
-        btnEnd.textContent = inAction ? '结束回合 ->' : '继续 ->'
+        btnEnd.disabled = !!pendingActionFeedback || !!targetSubmissionPending || _waitingForOwn || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
+        btnEnd.textContent = _waitingForOther
+          ? '等待对方选择'
+          : _waitingForOwn
+            ? '请完成选择'
+            : inAction ? '结束回合 ->' : '继续 ->'
         btnEnd.classList.toggle('is-start', inStart || inEnd)
       }
 
       const _selPiece = G && G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
       const _isOwnSelected = _selPiece && _selPiece.ownerPlayerId && _selPiece.ownerPlayerId.toLowerCase() === myPlayerId
       const _canMoveSelected = canAutoMovePiece(_selPiece)
-      setMoveButtonDisabled(!!targetSubmissionPending || _waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
+      setMoveButtonDisabled(!!pendingActionFeedback || !!targetSubmissionPending || _waitingForOwn || _waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
@@ -4779,17 +5091,6 @@
           stateRevision: pendingSkill.preparation && pendingSkill.preparation.stateRevision,
         }
         if (turnTargetType === 'piece' && piece) action.targetPieceId = piece.instanceId
-        const _pts = G && G.pendingTargetSelection
-        console.log('[STAGE5] submitting ' + action.type + ' targetX=' + x + ' targetY=' + y + ' playerId=' + action.playerId + ' | G.pendingTargetSelection:', _pts ? { hasEffectCode: !!_pts.effectCode, effectCodeLen: _pts.effectCode ? _pts.effectCode.length : 0 } : null)
-        addLog('[DEBUG pendingTargetClick] action=' + JSON.stringify(action) + ' pending=' + JSON.stringify(_pts ? {
-          playerId: _pts.playerId,
-          title: _pts.title,
-          targetType: _pts.targetType,
-          range: _pts.range,
-          filter: _pts.filter,
-          hasEffectCode: !!_pts.effectCode,
-          triggerContext: _pts.triggerContext
-        } : null), 'info')
         const targetLabel = currentTargetSourceName()
         pendingSkill = null
         setStatusMsg('已提交目标选择')
@@ -4999,6 +5300,15 @@
 
     async function doTurnControl() {
       if (!G) return
+      if (pendingActionFeedback) {
+        setStatusMsg('上一条指令仍在等待权威确认')
+        return
+      }
+      if (G.pendingOptionSelection || G.pendingTargetSelection) {
+        const pending = G.pendingOptionSelection || G.pendingTargetSelection
+        setStatusMsg(clientOwns(pending.playerId) ? '请先完成当前规则选择' : '等待对方完成规则选择')
+        return
+      }
       if (G.deployment && G.deployment.status === 'awaiting-locks') {
         const lock = G.deployment.locks && G.deployment.locks[myPlayerId]
         if (SPECTATE_MODE || (lock && lock.locked)) return
@@ -5037,6 +5347,23 @@
       })
     }
 
+    function battleAuthorityCommandMessage(action, auth, extra) {
+      return Object.assign({
+        type: 'action',
+        protocolVersion: 2,
+        roomId: roomId,
+        clientActionId: action.clientActionId,
+        expectedAuthorityVersion: Number.isSafeInteger(latestAuthorityVersion) ? latestAuthorityVersion : 0,
+        playerId: myPlayerId,
+        command: action,
+        // Kept during the Relay protocol transition; both values are identical.
+        action: action,
+        selectionId: action.selectionId,
+        stateRevision: action.stateRevision,
+        auth: auth,
+      }, extra || {})
+    }
+
     async function trainingDoAction(action) {
       if (!G) return
       try {
@@ -5053,8 +5380,6 @@
           )
         }
         G = newG
-        console.log('[STAGE2.5] G updated: pendingTargetSelection=', G.pendingTargetSelection ? { playerId: G.pendingTargetSelection.playerId, hasEffectCode: !!G.pendingTargetSelection.effectCode, effectCodeLen: G.pendingTargetSelection.effectCode ? G.pendingTargetSelection.effectCode.length : 0 } : null, '| clientOwns(training-blue)=', clientOwns('training-blue'))
-        console.log('[STAGE2.5b] pendingTargetSelectionForMe()=', pendingTargetSelectionForMe())
         spawnStateFloaters(oldG, G)
         flushActionLog(oldG, G)
         if (action.type === 'endTurn') {
@@ -5147,7 +5472,8 @@
         if (wsMode === 'relay') {
           relaySeq++
           var relayActionAuth = await createBattleActionAuth(action)
-          RvBWs.send({ type: 'action', seq: relaySeq, action, auth: relayActionAuth, prevStateHash: '' })
+          RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth, { seq: relaySeq, prevStateHash: latestAuthorityStateHash || '' }))
+          schedulePendingActionPresentation()
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -5159,7 +5485,8 @@
         // LAN WS: submit action via WS only.
         if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
           var lanActionAuth = await createBattleActionAuth(action)
-          RvBWs.send({ type: 'action', action, auth: lanActionAuth, playerId: myPlayerId })
+          RvBWs.send(battleAuthorityCommandMessage(action, lanActionAuth))
+          schedulePendingActionPresentation()
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -5565,8 +5892,8 @@
         init() {}, update() {}, resize() {}, resetView() {}, projectCell() { return null },
         screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
-      const domUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
-      battlePresentation = BattlePresentation.create({ renderer, domUi, onIntent: handleBattleIntent })
+      battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
+      battlePresentation = BattlePresentation.create({ renderer, domUi: battleDomUi, onIntent: handleBattleIntent })
       battlePresentation.mount({
         boardContainer: document.getElementById('boardStage3d'),
         floatLayer: document.getElementById('floatLayer'),

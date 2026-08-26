@@ -127,7 +127,8 @@ describe('legacy relay deployment initialization', () => {
     const androidServerUtils = readFileSync(resolve(process.cwd(), 'android-client/www/js/server-utils.js'), 'utf8')
 
     expect(page).toContain('var relayActionAuth = await createBattleActionAuth(action)')
-    expect(page).toContain("RvBWs.send({ type: 'action', seq: relaySeq, action, auth: relayActionAuth")
+    expect(page).toContain('RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth')
+    expect(page).toContain('expectedAuthorityVersion: Number.isSafeInteger(latestAuthorityVersion)')
     expect(page).toContain('已忽略旧 Relay 客户端权威动作')
     expect(page).toContain('已忽略非权威 Relay 恢复状态')
     expect(page).not.toContain('postLocalRelayInitialization')

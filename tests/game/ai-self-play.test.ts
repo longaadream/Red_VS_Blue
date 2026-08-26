@@ -579,9 +579,11 @@ describe('offline self-play league and evaluation baseline', () => {
         'f857d7516d0bcdb05c1ea32e05157d28e9322c7245b950115f71dc172db6af0d',
         'f857d7516d0bcdb05c1ea32e05157d28e9322c7245b950115f71dc172db6af0d',
       ],
+      // RED-109 makes authority action/replay counters and RNG cursors canonical so
+      // compacted checkpoints can resume the same deterministic stream.
       stateTraceHashes: [
-        '7ac0837cbbf6a8eb858074f12c0fbb0259ec3300ad6511b6851bd4986e739a6a',
-        '7ac0837cbbf6a8eb858074f12c0fbb0259ec3300ad6511b6851bd4986e739a6a',
+        'b05386c423e6a8c65609eb4cbb279d70f5d8a0d4456d24ec88a59b69636b8a4b',
+        'b05386c423e6a8c65609eb4cbb279d70f5d8a0d4456d24ec88a59b69636b8a4b',
       ],
       terminal: [
         ['finished', 'core-eliminated'],

@@ -115,7 +115,8 @@ describe('authority determinism audit', () => {
     expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
 
     const browserEntry = read(CROSS_PLATFORM_AUTHORITY_FILES.browserEntry)
-    expect(browserEntry).toContain('getBattleRootSeed, hashBattleState, runBattleAction')
+    expect(browserEntry).toContain('getBattleRootSeed, hashBattleState, hashStable, runBattleAction')
+    expect(browserEntry).toContain('applyBattlePublicPatch')
 
     const gameLogicDoc = read('docs/technical/GAME_LOGIC_SYSTEM.md')
     expect(gameLogicDoc).toContain('不在发送前克隆战局、执行 Runner 或生成客户端 trace')

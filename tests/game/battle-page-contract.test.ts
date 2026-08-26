@@ -139,7 +139,7 @@ describe('battle page route contract', () => {
     expect(responsiveCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?scrollbar-width:\s*none/)
     expect(contextCss).toMatch(/\.training-popover\s*\{[\s\S]*?transform-origin:\s*bottom left/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?aria-expanded[\s\S]*?aria-hidden/)
-    expect(battlePage).toMatch(/const active = !!\(pendingSkill \|\| pendingCardAction \|\| targetSubmissionPending\)[\s\S]*?if \(active\) \{\s*closePieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/const active = !targetSubmissionPending && !!\(pendingSkill \|\| pendingCardAction\)[\s\S]*?if \(active\) \{\s*closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?if \(next\) closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/const draftAction[^\n]+\s*closePieceContextMenu\(\)\s*await doAction\(draftAction\)/)
     expect(battlePage).toMatch(/function closePieceInfo\(\)[\s\S]*?style\.display = 'none'[\s\S]*?renderPieceContextMenu\(selected \|\| null\)/)
@@ -400,8 +400,9 @@ describe('battle page route contract', () => {
   it('submits LAN and Relay actions without executing a local authority preview', async () => {
     const battlePage = readPage('battle.html')
     const sentMessages: unknown[] = []
+    let actionSequence = 0
     const context = createContext({
-      withClientActionId: (action: unknown) => action,
+      withClientActionId: (action: Record<string, unknown>) => ({ ...action, clientActionId: `client-${++actionSequence}` }),
       TRAINING_MODE: false,
       trainingDoAction: () => {
         throw new Error('training path should not run')
@@ -414,6 +415,10 @@ describe('battle page route contract', () => {
       clearTargetInteraction: () => undefined,
       setStatusMsg: () => undefined,
       renderActionBar: () => undefined,
+      rejectPendingActionFeedback: () => undefined,
+      roomId: 'room-red109',
+      latestAuthorityVersion: 7,
+      latestAuthorityStateHash: 'hash-7',
       wsMode: 'lan',
       wsRole: 'guest',
       wsConnected: true,
@@ -437,7 +442,10 @@ describe('battle page route contract', () => {
         throw new Error('local authority preview must not run')
       },
     })
-    new Script(readNamedAsyncFunction(battlePage, 'doAction')).runInContext(context)
+new Script([
+      readNamedFunction(battlePage, 'battleAuthorityCommandMessage'),
+      readNamedAsyncFunction(battlePage, 'doAction'),
+    ].join('\n')).runInContext(context)
 
     await new Script("doAction({ type: 'deploymentLock', playerId: 'player-red' })").runInContext(context)
     await new Script("doAction({ type: 'useBasicSkill', playerId: 'player-red', pieceId: 'caster', skillId: 'shot' })").runInContext(context)
@@ -446,33 +454,25 @@ describe('battle page route contract', () => {
     context.wsRole = 'guest'
     await new Script("doAction({ type: 'playCard', playerId: 'player-red', cardInstanceId: 'choice-card' })").runInContext(context)
 
-    expect(JSON.parse(JSON.stringify(sentMessages))).toEqual([
-      {
+    const messages = JSON.parse(JSON.stringify(sentMessages)) as Array<Record<string, unknown>>
+    expect(messages).toHaveLength(4)
+    for (const [index, message] of messages.entries()) {
+      expect(message).toMatchObject({
         type: 'action',
-        action: { type: 'deploymentLock', playerId: 'player-red' },
-        auth: { signature: 'signed' },
+        protocolVersion: 2,
+        roomId: 'room-red109',
+        clientActionId: `client-${index + 1}`,
+        expectedAuthorityVersion: 7,
         playerId: 'player-red',
-      },
-      {
-        type: 'action',
-        action: { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'caster', skillId: 'shot' },
         auth: { signature: 'signed' },
-        playerId: 'player-red',
-      },
-      {
-        type: 'action',
-        action: { type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 },
-        auth: { signature: 'signed' },
-        playerId: 'player-red',
-      },
-      {
-        type: 'action',
-        seq: 1,
-        action: { type: 'playCard', playerId: 'player-red', cardInstanceId: 'choice-card' },
-        auth: { signature: 'signed' },
-        prevStateHash: '',
-      },
-    ])
+      })
+      expect(message.command).toEqual(message.action)
+    }
+    expect(messages[0].command).toMatchObject({ type: 'deploymentLock', clientActionId: 'client-1' })
+    expect(messages[1].command).toMatchObject({ type: 'useBasicSkill', clientActionId: 'client-2' })
+    expect(messages[2].command).toMatchObject({ type: 'move', clientActionId: 'client-3' })
+    expect(messages[3]).toMatchObject({ seq: 1, prevStateHash: 'hash-7' })
+    expect(messages[3].command).toMatchObject({ type: 'playCard', clientActionId: 'client-4' })
   })
 
   it('keeps target submission single-flight and clears transient targeting on every authoritative exit', () => {
@@ -485,10 +485,10 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('目标指令已提交，正在等待权威确认')
     expect(battlePage).toContain("clearTargetInteraction('user-cancelled')")
     expect(battlePage).toContain("clearTargetInteraction('piece-switched')")
-    expect(battlePage).toContain("clearTargetInteraction('turn-changed')")
-    expect(battlePage).toContain("clearTargetInteraction('selected-piece-unavailable')")
+    expect(battlePage).toContain("clearTargetInteraction('turn-changed', { deferRender: input.deferRender === true })")
+    expect(battlePage).toContain("clearTargetInteraction('selected-piece-unavailable', { deferRender: input.deferRender === true })")
     expect(battlePage).toContain("clearTargetInteraction('server-rejected')")
-    expect(battlePage).toContain('function reconcileBattleInteractionState(previousState, nextState)')
+    expect(battlePage).toContain('function reconcileBattleInteractionState(previousState, nextState, options)')
     expect(battlePage).toContain('selectionId: pbc.selectionId')
     expect(battlePage).toContain('stateRevision: pbc.stateRevision')
     expect(battlePage).toContain("canCancel: pbc.canCancel !== false")
@@ -579,7 +579,7 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('RvBDeploymentStatus.create')
     expect(battlePage).not.toContain('点击“确认部署”后不可更改')
     expect(battlePage).toContain('var relayActionAuth = await createBattleActionAuth(action)')
-    expect(battlePage).toContain("RvBWs.send({ type: 'action', seq: relaySeq, action, auth: relayActionAuth")
+    expect(battlePage).toContain('RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth')
     expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
     expect(battlePage).not.toContain('relayAuthorityState')
     expect(battlePage).not.toContain('runRelayAuthorityAction')

@@ -4,6 +4,11 @@ export const TURN_BURN_WINDOW_MS = 15_000
 export const TURN_FAST_DURATION_MS = 20_000
 export const TURN_TIMEOUT_FORFEIT_STREAK = 3
 
+export function isTurnTimerEnabled(): boolean {
+  const configured = String(process.env.RVB_TURN_TIMER_ENABLED ?? '').trim().toLowerCase()
+  return configured === '1' || configured === 'true' || configured === 'on'
+}
+
 export interface AuthoritativeRuleClock {
   now(): number
 }

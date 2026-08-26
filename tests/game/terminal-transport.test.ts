@@ -46,8 +46,8 @@ describe('authoritative terminal transport contract', () => {
       expect(source.indexOf('getClientTerminalSubmissionError')).toBeLessThan(source.indexOf('dispatchRoomBattleAction'))
     }
     const dispatch = coordinator.slice(coordinator.indexOf('export async function dispatchRoomBattleAction'))
-    expect(dispatch).toContain("const isTerminal = actionResult.state.terminalResult?.status === 'finished'")
-    expect(dispatch.indexOf("status: 'finished' as const")).toBeLessThan(dispatch.indexOf('if (!await store.setRoomIfVersion'))
+    expect(dispatch).toContain("const isTerminal = nextAuthorityState.terminalResult?.status === 'finished'")
+    expect(dispatch.indexOf("status: 'finished' as const")).toBeLessThan(dispatch.indexOf('store.commitBattleAuthorityTransition!'))
     expect(httpPost).not.toContain('roomStore.setRoom(')
     expect(wsActionHandler).not.toContain('roomStore.setRoom(')
     expect(httpPost).not.toContain("body.type === 'gameOver'")
@@ -58,7 +58,8 @@ describe('authoritative terminal transport contract', () => {
     const ws = readFileSync(resolve(process.cwd(), 'lib/ws-server.ts'), 'utf8')
     const botTurn = ws.slice(ws.indexOf('async function runBotTurn'), ws.indexOf('export function broadcastToRoom'))
 
-    expect(botTurn).toContain('persistAuthoritativeBattleState({ roomId, room, storage })')
-    expect(botTurn).toContain('isBattleStateConflict(error)')
+    expect(botTurn).toContain('dispatchBotAuthorityCommand(')
+    expect(botTurn).toContain("dispatchRoomBattleAction(roomStore, roomId, 'bot', command")
+    expect(botTurn).not.toContain('persistAuthoritativeBattleState(')
   })
 })

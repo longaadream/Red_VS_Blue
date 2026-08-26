@@ -76,8 +76,8 @@ function handleAction(
   store.appendAction(roomId, {
     seq: msg.seq,
     playerId,
-    action: msg.action,
-    prevStateHash: msg.prevStateHash,
+    action: msg.command ?? msg.action,
+    prevStateHash: msg.prevStateHash ?? '',
     timestamp: Date.now(),
     signature: msg.signature ?? String((msg.auth as { signature?: unknown } | undefined)?.signature ?? ''),
   })
@@ -86,6 +86,12 @@ function handleAction(
   store.sendToHost(roomId, {
     type: 'pendingAction',
     seq: msg.seq,
+    protocolVersion: msg.protocolVersion,
+    roomId: msg.roomId,
+    clientActionId: msg.clientActionId,
+    expectedAuthorityVersion: msg.expectedAuthorityVersion,
+    playerId: msg.playerId,
+    command: msg.command,
     action: msg.action,
     auth: msg.auth,
     from: playerId,
@@ -123,6 +129,55 @@ function handleStateUpdate(
   )
 }
 
+// ── RED-109 transition/receipt (host authority → relay → clients) ──────────
+
+function handleBattleTransition(
+  ws: ServerWebSocket<WsData>,
+  msg: Extract<WsInbound, { type: 'battleTransition' }>,
+) {
+  const { roomId, role } = ws.data
+  if (!roomId) return err(ws, 'not subscribed')
+  if (role !== 'host') return err(ws, 'only host can push battle transitions', 'BATTLE_TRANSITION_FORBIDDEN')
+  const room = store.getRoom(roomId)
+  if (!room) return err(ws, 'room not found')
+  if (room.status !== 'battle') return err(ws, 'battle not active')
+  if (msg.roomId.trim().toLowerCase() !== roomId.trim().toLowerCase()) {
+    return err(ws, 'battle transition room mismatch', 'BATTLE_TRANSITION_ROOM_MISMATCH')
+  }
+
+  // Transitions are deliberately transient. Only an occasional full
+  // stateUpdate is retained in lastStateBlob for reconnect recovery.
+  store.broadcastToRoom(roomId, msg, ws)
+}
+
+function handleBattleReceipt(
+  ws: ServerWebSocket<WsData>,
+  msg: Extract<WsInbound, { type: 'battleReceipt' }>,
+) {
+  const { roomId, role } = ws.data
+  if (!roomId) return err(ws, 'not subscribed')
+  if (role !== 'host') return err(ws, 'only host can return battle receipts', 'BATTLE_RECEIPT_FORBIDDEN')
+  const room = store.getRoom(roomId)
+  if (!room) return err(ws, 'room not found')
+  if (room.status !== 'battle') return err(ws, 'battle not active')
+
+  const targetId = String(msg.to ?? '').trim().toLowerCase()
+  const target = room.players.find(player => player.id.toLowerCase() === targetId)
+  if (!target || targetId === room.hostId.toLowerCase()) {
+    return err(ws, 'invalid battle receipt recipient', 'BATTLE_RECEIPT_TARGET_INVALID')
+  }
+  for (const candidate of store.getWsClients(roomId)) {
+    if (
+      candidate.data.playerId?.toLowerCase() === targetId
+      && candidate.data.role === 'guest'
+      && candidate.readyState === 1
+    ) {
+      send(candidate, { type: 'battleReceipt', receipt: msg.receipt })
+      return
+    }
+  }
+  return err(ws, 'battle receipt recipient is not connected', 'BATTLE_RECEIPT_TARGET_UNAVAILABLE')
+}
 // ── Action error (host → relay → addressed guest) ─────────────────────────
 
 function handleActionError(
@@ -158,6 +213,7 @@ function handleActionError(
     needsOptionSelection: msg.needsOptionSelection,
     title: msg.title,
     options: msg.options,
+    receipt: msg.receipt,
   }
 
   let delivered = false
@@ -239,6 +295,12 @@ export const wsHandler = {
         break
       case 'stateUpdate':
         handleStateUpdate(ws, msg)
+        break
+      case 'battleTransition':
+        handleBattleTransition(ws, msg)
+        break
+      case 'battleReceipt':
+        handleBattleReceipt(ws, msg)
         break
       case 'actionError':
         handleActionError(ws, msg)

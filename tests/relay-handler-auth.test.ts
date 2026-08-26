@@ -283,4 +283,60 @@ describe('Relay WebSocket signed subscription identity', () => {
     expect(hostSocket.sent.at(-1)).toMatchObject({ type: 'error', code: 'ACTION_ERROR_TARGET_INVALID' })
     expect(guestSocket.sent).toHaveLength(guestMessageCount)
   })
+  it('forwards RED-109 transitions transiently and routes receipts without replacing the reconnect snapshot', async () => {
+    const host = await createTestIdentity()
+    const guest = await createTestIdentity()
+    const room = roomForPair(host, guest)
+    room.lastStateBlob = JSON.stringify({
+      type: 'stateUpdate',
+      authorityVersion: 7,
+      state: { checkpoint: true },
+      stateHash: 'checkpoint-hash',
+    })
+    relayStore.getRoom.mockReturnValue(room)
+    const hostSocket = fakeWebSocket(room.id)
+    const guestSocket = fakeWebSocket(room.id)
+
+    await wsHandler.message(hostSocket.ws, JSON.stringify(await signedSubscribe(host, room.id)))
+    await wsHandler.message(guestSocket.ws, JSON.stringify(await signedSubscribe(guest, room.id)))
+    relayStore.getWsClients.mockReturnValue(new Set([hostSocket.ws, guestSocket.ws]))
+    relayStore.broadcastToRoom.mockClear()
+    relayStore.setRoom.mockClear()
+
+    const transition = {
+      type: 'battleTransition',
+      protocolVersion: 2,
+      roomId: room.id,
+      fromVersion: 7,
+      toVersion: 8,
+      prePublicHash: 'before',
+      postPublicHash: 'after',
+      patch: [{ op: 'set', path: ['turn', 'turnNumber'], value: 2 }],
+      receipt: { clientActionId: 'guest-action-1', status: 'applied', authorityVersion: 8 },
+      seed: 42,
+      stateHash: 'after',
+      serverNow: 2_000,
+    }
+    await wsHandler.message(hostSocket.ws, JSON.stringify(transition))
+
+    expect(relayStore.broadcastToRoom).toHaveBeenCalledWith(room.id, transition, hostSocket.ws)
+    expect(relayStore.setRoom).not.toHaveBeenCalled()
+    expect(JSON.parse(room.lastStateBlob)).toMatchObject({ authorityVersion: 7, stateHash: 'checkpoint-hash' })
+
+    await wsHandler.message(hostSocket.ws, JSON.stringify({
+      type: 'battleReceipt',
+      to: guest.id,
+      receipt: { clientActionId: 'guest-action-2', status: 'rejected', authorityVersion: 8 },
+    }))
+    expect(guestSocket.sent.at(-1)).toEqual({
+      type: 'battleReceipt',
+      receipt: { clientActionId: 'guest-action-2', status: 'rejected', authorityVersion: 8 },
+    })
+
+    await wsHandler.message(guestSocket.ws, JSON.stringify(transition))
+    expect(guestSocket.sent.at(-1)).toMatchObject({
+      type: 'error',
+      code: 'BATTLE_TRANSITION_FORBIDDEN',
+    })
+  })
 })

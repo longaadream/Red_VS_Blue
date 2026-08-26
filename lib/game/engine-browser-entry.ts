@@ -15,7 +15,7 @@
  */
 
 export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } from './turn'
-export { getBattleRootSeed, hashBattleState, runBattleAction } from './battle-runner'
+export { getBattleRootSeed, hashBattleState, hashStable, runBattleAction } from './battle-runner'
 export {
   AI_ENVIRONMENT_CAPABILITIES,
   aiEnvironmentV1,
@@ -47,6 +47,7 @@ export {
 export { setRng, mulberry32 } from './rng'
 export { toPublicBattleState } from './deployment'
 export { stampPendingDeploymentAuthorityVersion } from './battle-trace'
+export { applyBattlePublicPatch } from './battle-public-patch'
 export type { BattleState, BattleAction, BattleActionLog } from './turn'
 
 import { createInitialBattleForPlayers as _createInitialBattleForPlayers } from './battle-setup'
