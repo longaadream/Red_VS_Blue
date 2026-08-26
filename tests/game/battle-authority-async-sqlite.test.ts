@@ -107,6 +107,127 @@ describe('battle authority async SQLite persistence', () => {
     await prisma.$disconnect()
     resetAuthorityGlobals()
   }, 30_000)
+
+  it('contains a real SQLite lock failure to one room without overlapping the next room write', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'rvb-red109-sqlite-lock-'))
+    temporaryDirectories.push(directory)
+    process.env.DATABASE_URL = `file:${join(directory, 'authority.db').replaceAll('\\', '/')}`
+    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
+    process.env.RVB_BATTLE_ASYNC_JOURNAL = '1'
+    vi.resetModules()
+    resetAuthorityGlobals()
+
+    const { PrismaClient } = await import('@prisma/client')
+    const setup = new PrismaClient()
+    await createAuthoritySchema(setup)
+    await setup.$disconnect()
+
+    const [{ prisma }, roomStoreModule, actions, trace, runtime, helpers, persistence] = await Promise.all([
+      import('@/lib/db'),
+      import('@/lib/game/room-store'),
+      import('@/lib/game/room-battle-actions'),
+      import('@/lib/game/battle-trace'),
+      import('@/lib/game/rule-runtime'),
+      import('../helpers/minimal-state'),
+      import('@/lib/server/battle-authority-persistence'),
+    ])
+    const store = new roomStoreModule.RoomStore()
+    activePrismaClients.push(prisma)
+    const roomA = makeRoom(
+      helpers.makeState,
+      helpers.makePiece,
+      trace.recordBattleInitialization,
+      runtime.RuleRuntime,
+      'red109-sqlite-lock-a',
+    )
+    const roomB = makeRoom(
+      helpers.makeState,
+      helpers.makePiece,
+      trace.recordBattleInitialization,
+      runtime.RuleRuntime,
+      'red109-sqlite-lock-b',
+    )
+    for (const room of [roomA, roomB]) {
+      await store.setRoom(room.id, room)
+      const storage = room.battleState as unknown as { type: 'server-state'; seed: number; state: unknown }
+      await store.initializeBattleAuthorityCheckpoint({
+        room,
+        storage: storage as never,
+        stateHash: trace.hashBattleState(storage.state as never),
+        publicHash: hashPublicBattleState(actions.createPublicBattleSnapshot(
+          persistence.getRememberedBattleAuthorityRoom(room.id) ?? room,
+        ).state),
+      })
+    }
+
+    const locker = new PrismaClient()
+    activePrismaClients.push(locker)
+    let releaseLock!: () => void
+    let signalLockReady!: () => void
+    const lockReady = new Promise<void>(resolve => { signalLockReady = resolve })
+    const lockPromise = locker.$transaction(async transaction => {
+      await transaction.room.update({
+        where: { id: roomA.id },
+        data: { name: `${roomA.name}-locked` },
+      })
+      signalLockReady()
+      await new Promise<void>(resolve => { releaseLock = resolve })
+    }, { maxWait: 250, timeout: 10_000 })
+    await lockReady
+
+    for (const room of [roomA, roomB]) {
+      const result = await actions.dispatchRoomBattleAction(
+        store,
+        room.id,
+        'player-red',
+        {
+          type: 'deploymentChoice',
+          playerId: 'player-red',
+          pieceId: 'piece-red',
+          clientActionId: `${room.id}-action-1`,
+        },
+        {
+          expectedAuthorityVersion: 0,
+          clock: { now: () => 2_000 },
+        },
+      )
+      expect(result.kind).toBe('applied')
+    }
+
+    try {
+      await vi.waitFor(() => {
+        expect(persistence.inspectBattleAuthorityPersistence(roomA.id).status).toBe('degraded')
+      }, { timeout: 8_000 })
+      expect(persistence.inspectBattleAuthorityPersistence(roomB.id).status).toBe('pending')
+    } finally {
+      releaseLock()
+      await lockPromise
+    }
+
+    await persistence.drainBattleAuthorityPersistence(roomB.id)
+    const roomAPersistence = persistence.inspectBattleAuthorityPersistence(roomA.id)
+    expect(roomAPersistence).toMatchObject({
+      status: 'degraded',
+      durableAuthorityVersion: 0,
+      authorityVersion: 1,
+      pending: 0,
+    })
+    expect(roomAPersistence.lastError).not.toContain('journal persist timed out')
+    expect(persistence.inspectBattleAuthorityPersistence(roomB.id)).toMatchObject({
+      status: 'durable',
+      durableAuthorityVersion: 1,
+      authorityVersion: 1,
+      pending: 0,
+    })
+    await expect(prisma.room.findUniqueOrThrow({ where: { id: roomA.id } }))
+      .resolves.toMatchObject({ battleAuthorityVersion: 0 })
+    await expect(prisma.room.findUniqueOrThrow({ where: { id: roomB.id } }))
+      .resolves.toMatchObject({ battleAuthorityVersion: 1 })
+
+    await prisma.$disconnect()
+    await locker.$disconnect()
+    resetAuthorityGlobals()
+  }, 20_000)
 })
 
 function makeRoom(
@@ -114,6 +235,7 @@ function makeRoom(
   makePiece: typeof import('../helpers/minimal-state').makePiece,
   recordBattleInitialization: typeof import('@/lib/game/battle-trace').recordBattleInitialization,
   RuleRuntime: typeof import('@/lib/game/rule-runtime').RuleRuntime,
+  roomId = 'red109-real-sqlite',
 ) {
   const state = makeState({
     pieces: [
@@ -146,8 +268,8 @@ function makeRoom(
   }
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: 109 }), ['player-red', 'player-blue'])
   return {
-    id: 'red109-real-sqlite',
-    name: 'RED-109 real SQLite',
+    id: roomId,
+    name: roomId,
     status: 'in-progress' as const,
     players: [
       { id: 'player-red', name: 'Red', seat: 'red' as const, alignment: 'light' as const },

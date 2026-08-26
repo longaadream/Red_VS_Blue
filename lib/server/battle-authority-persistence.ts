@@ -56,6 +56,11 @@ const authorityAsyncJournal = (
     onStateChange: updateCachedPersistenceState,
   })
 )
+const BATTLE_AUTHORITY_SQLITE_BUSY_TIMEOUT_MS = 500
+const BATTLE_AUTHORITY_PRISMA_TRANSACTION_OPTIONS = {
+  maxWait: 250,
+  timeout: 1_250,
+} as const
 
 export interface CommitBattleAuthorityTransitionInput {
   roomId: string
@@ -159,24 +164,27 @@ export async function persistBattleAuthorityReceipt(receipt: BattleAuthorityRece
 }
 
 async function persistBattleAuthorityReceiptAtomic(receipt: BattleAuthorityReceipt): Promise<void> {
-  await prisma.battleAuthorityReceipt.upsert({
-    where: {
-      roomId_clientActionId: {
+  await setBattleAuthoritySqliteBusyTimeout()
+  await prisma.$transaction(async transaction => {
+    await transaction.battleAuthorityReceipt.upsert({
+      where: {
+        roomId_clientActionId: {
+          roomId: normalizeRoomId(receipt.roomId),
+          clientActionId: receipt.clientActionId,
+        },
+      },
+      update: {},
+      create: {
         roomId: normalizeRoomId(receipt.roomId),
         clientActionId: receipt.clientActionId,
+        status: receipt.status,
+        authorityVersion: receipt.authorityVersion,
+        code: receipt.code,
+        message: receipt.message,
+        receiptJson: JSON.stringify(receipt),
       },
-    },
-    update: {},
-    create: {
-      roomId: normalizeRoomId(receipt.roomId),
-      clientActionId: receipt.clientActionId,
-      status: receipt.status,
-      authorityVersion: receipt.authorityVersion,
-      code: receipt.code,
-      message: receipt.message,
-      receiptJson: JSON.stringify(receipt),
-    },
-  })
+    })
+  }, BATTLE_AUTHORITY_PRISMA_TRANSACTION_OPTIONS)
 }
 
 export async function commitBattleAuthorityTransition(
@@ -207,6 +215,7 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
     receiptJson: JSON.stringify(transition.receipt),
     checkpointState: input.checkpoint ? JSON.stringify(input.checkpoint.storage) : undefined,
   }
+  await setBattleAuthoritySqliteBusyTimeout()
   const committed = await prisma.$transaction(async transaction => {
     const result = await transaction.room.updateMany({
       where: {
@@ -294,7 +303,7 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
       })
     }
     return true
-  })
+  }, BATTLE_AUTHORITY_PRISMA_TRANSACTION_OPTIONS)
   if (committed) {
     rememberBattleAuthorityRoom({
       ...input.nextRoom,
@@ -303,6 +312,10 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
     })
   }
   return committed
+}
+
+async function setBattleAuthoritySqliteBusyTimeout(): Promise<void> {
+  await prisma.$queryRawUnsafe(`PRAGMA busy_timeout = ${BATTLE_AUTHORITY_SQLITE_BUSY_TIMEOUT_MS}`)
 }
 
 function assertBattleAuthorityTransitionMetadata(input: CommitBattleAuthorityTransitionInput): string {

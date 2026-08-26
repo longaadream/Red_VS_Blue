@@ -23,21 +23,31 @@ export async function POST(req: NextRequest) {
     })
 
     let deletedCount = 0
+    const roomsDeleted: string[] = []
+    const roomsFailed: string[] = []
     for (const room of roomsToDelete) {
-      await roomStore.removeRoom(room.id)
-      deletedCount++
+      const removed = await roomStore.removeRoom(room.id)
+      if (removed) {
+        deletedCount += 1
+        roomsDeleted.push(room.id)
+      } else {
+        roomsFailed.push(room.id)
+      }
     }
 
+    const success = roomsFailed.length === 0
     return NextResponse.json({
-      success: true,
+      success,
       deletedCount,
-      roomsDeleted: roomsToDelete.map(r => r.id),
+      roomsDeleted,
+      roomsFailed,
+      ...(!success ? { error: 'One or more rooms could not be deleted' } : {}),
       config: {
         thresholdHours: config.thresholdHours,
         statuses: config.statuses,
         cutoffTime: cutoff.toISOString()
       }
-    })
+    }, { status: success ? 200 : 503 })
   } catch (error) {
     console.error('Cleanup error:', error)
     return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 })

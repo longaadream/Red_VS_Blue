@@ -16,6 +16,7 @@ const harness = vi.hoisted(() => {
   return {
     prisma: {
       $transaction: transaction,
+      $queryRawUnsafe: vi.fn(async () => [{ timeout: 500 }]),
       room: {
         findUnique: vi.fn(() => { throw new Error('hot room performed a Prisma read') }),
       },
@@ -84,6 +85,11 @@ describe('battle authority async persistence integration', () => {
     await expect(commitBattleAuthorityTransition(input)).resolves.toBe(true)
     expect(harness.transaction).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(harness.transaction).toHaveBeenCalledTimes(1))
+    expect(harness.prisma.$queryRawUnsafe).toHaveBeenCalledWith('PRAGMA busy_timeout = 500')
+    expect(harness.transaction).toHaveBeenLastCalledWith(expect.any(Function), {
+      maxWait: 250,
+      timeout: 1_250,
+    })
     expect(getRememberedBattleAuthorityRoom(input.roomId)).toMatchObject({
       battleAuthorityVersion: 1,
       battleAuthorityTransitionHash: input.transition.transitionHash,

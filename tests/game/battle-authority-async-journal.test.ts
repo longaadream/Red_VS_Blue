@@ -108,18 +108,33 @@ describe('battle authority async journal', () => {
     await expect(journal.drain('room-a')).rejects.toThrow('pending limit')
   })
 
-  it('times out a stuck write, degrades that room, and continues the global writer', async () => {
-    const never = new Promise<void>(() => undefined)
-    const roomBPersist = vi.fn(async () => undefined)
+  it('aborts a cooperative stuck write before continuing the global writer', async () => {
+    let active = 0
+    let maxActive = 0
     const journal = new BattleAuthorityAsyncJournal({
       retryDelaysMs: [0, 0],
       persistTimeoutMs: 20,
     })
+    const roomAPersist = vi.fn(({ signal }: { signal: AbortSignal }) => new Promise<void>((_resolve, reject) => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      const abort = () => {
+        active -= 1
+        reject(new Error('write aborted'))
+      }
+      signal.addEventListener('abort', abort, { once: true })
+    }))
+    const roomBPersist = vi.fn(async () => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      active -= 1
+    })
 
-    journal.enqueue({ roomId: 'room-a', kind: 'transition', authorityVersion: 1, persist: () => never })
+    journal.enqueue({ roomId: 'room-a', kind: 'transition', authorityVersion: 1, persist: roomAPersist })
     journal.enqueue({ roomId: 'room-b', kind: 'transition', authorityVersion: 1, persist: roomBPersist })
 
     await expect(journal.drain()).rejects.toThrow('persist timed out after 20ms in room-a')
+    expect(maxActive).toBe(1)
     expect(roomBPersist).toHaveBeenCalledTimes(1)
     expect(journal.inspect('room-a')).toMatchObject({
       status: 'degraded',
@@ -131,6 +146,44 @@ describe('battle authority async journal', () => {
       pending: 0,
       durableAuthorityVersion: 1,
     })
+  })
+
+  it('never overlaps another durable write when an adapter ignores cancellation', async () => {
+    let release!: () => void
+    let active = 0
+    let maxActive = 0
+    const stuck = new Promise<void>(resolve => { release = resolve })
+    const journal = new BattleAuthorityAsyncJournal({
+      retryDelaysMs: [],
+      persistTimeoutMs: 20,
+    })
+    const roomBPersist = vi.fn(async () => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      active -= 1
+    })
+
+    journal.enqueue({
+      roomId: 'room-a',
+      kind: 'transition',
+      authorityVersion: 1,
+      persist: async () => {
+        active += 1
+        maxActive = Math.max(maxActive, active)
+        await stuck
+        active -= 1
+      },
+    })
+    journal.enqueue({ roomId: 'room-b', kind: 'transition', authorityVersion: 1, persist: roomBPersist })
+
+    await vi.waitFor(() => expect(journal.inspect('room-a').status).toBe('degraded'))
+    expect(roomBPersist).not.toHaveBeenCalled()
+    expect(maxActive).toBe(1)
+
+    release()
+    await expect(journal.drain()).rejects.toThrow('persist timed out after 20ms in room-a')
+    expect(roomBPersist).toHaveBeenCalledTimes(1)
+    expect(maxActive).toBe(1)
   })
 
   it('closes ingress before a graceful drain without degrading durable rooms', async () => {

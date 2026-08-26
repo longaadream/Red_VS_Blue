@@ -12,7 +12,17 @@ export interface BattleAuthorityJournalJob {
   kind: 'transition' | 'receipt' | 'checkpoint'
   authorityVersion?: number
   clientActionId?: string
-  persist: () => Promise<void>
+  persist: (context: BattleAuthorityJournalPersistContext) => Promise<void>
+}
+
+export interface BattleAuthorityJournalPersistContext {
+  /**
+   * Cooperative cancellation for adapters that can stop their underlying
+   * write. Prisma uses a shorter database-native deadline; this signal is the
+   * final journal safety fence.
+   */
+  signal: AbortSignal
+  safetyTimeoutMs: number
 }
 
 export interface BattleAuthorityAsyncJournalOptions {
@@ -196,10 +206,17 @@ export class BattleAuthorityAsyncJournal {
     let attempt = 0
     while (true) {
       try {
-        await withTimeout(
-          job.persist(),
+        const controller = new AbortController()
+        const message = `Battle authority journal persist timed out after ${this.persistTimeoutMs}ms in ${job.roomId}`
+        await withTimeoutWithoutOverlap(
+          job.persist({ signal: controller.signal, safetyTimeoutMs: this.persistTimeoutMs }),
           this.persistTimeoutMs,
-          `Battle authority journal persist timed out after ${this.persistTimeoutMs}ms in ${job.roomId}`,
+          message,
+          () => {
+            controller.abort()
+            this.degrade(job.roomId, new BattleAuthorityJournalPersistTimeoutError(message))
+            this.dropQueuedJobs(job.roomId)
+          },
         )
         return
       } catch (error) {
@@ -296,21 +313,40 @@ export class BattleAuthorityJournalPersistTimeoutError extends Error {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new BattleAuthorityJournalPersistTimeoutError(message)), timeoutMs)
-    timeout.unref?.()
-    promise.then(
-      value => {
-        clearTimeout(timeout)
-        resolve(value)
-      },
-      error => {
-        clearTimeout(timeout)
-        reject(error)
-      },
-    )
-  })
+async function withTimeoutWithoutOverlap<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+  onTimeout: () => void,
+): Promise<T> {
+  type Outcome =
+    | { kind: 'fulfilled'; value: T }
+    | { kind: 'rejected'; error: unknown }
+  const outcome = promise.then<Outcome, Outcome>(
+    value => ({ kind: 'fulfilled', value }),
+    error => ({ kind: 'rejected', error }),
+  )
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const first = await Promise.race<Outcome | { kind: 'timeout' }>([
+    outcome,
+    new Promise(resolve => {
+      timeout = setTimeout(() => {
+        onTimeout()
+        resolve({ kind: 'timeout' })
+      }, timeoutMs)
+      timeout.unref?.()
+    }),
+  ])
+  if (timeout) clearTimeout(timeout)
+  if (first.kind === 'fulfilled') return first.value
+  if (first.kind === 'rejected') throw first.error
+
+  // Promise.race cannot cancel Prisma. Do not start another room's job until
+  // the old adapter confirms its physical write has stopped. Production
+  // Prisma adapters have a shorter native transaction/busy timeout and should
+  // normally settle before this safety branch.
+  await outcome
+  throw new BattleAuthorityJournalPersistTimeoutError(message)
 }
 
 function sleep(delayMs: number): Promise<void> {

@@ -429,15 +429,16 @@ interface ServerCore {
   state/public hash，再同步提交内存版本、receipt、Δ 和 hash 链。普通动作不读写 Prisma。
 - 后台持久化：`lib/server/battle-authority-async-journal.ts` 提供单 writer、有界队列、有界重试、按房间
   durable 水位和 degraded 状态；`lib/server/battle-authority-persistence.ts` 在后台原子推进 DB 版本并写
-  Transition、Receipt 和可选 Checkpoint。单次写 2 秒未完成即将对应房间标为 degraded，提交结果不明确的
-  超时写不并发重试；writer 继续服务其他房间。终局完整 Trace 在 Transition 构造前物化，在线
-  patch/hash、checkpoint 与恢复使用同一状态。
+  Transition、Receipt 和可选 Checkpoint。SQLite `busy_timeout=500 ms`、Prisma `maxWait=250 ms` 与
+  transaction `timeout=1250 ms` 先限制底层写，journal 2 秒只作为最终安全线；安全线触发会 degraded/abort，
+  但在旧 adapter 实际结束前绝不开始下一房间，避免 `Promise.race` 造成并发 SQLite writer。终局完整
+  Trace 在 Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
 - 启动/关闭：v2 初始检查点是进入 in-progress 的必要条件；创建失败必须 CAS 回滚，version 0 的半启动
   房间再次进入启动入口时先补检查点并 hydrate actor。`battle-authority-shutdown.ts` 在关闭 journal ingress、
   停止 WS 后排空全局 writer，并核对每个 actor 的 durable 水位。Electron 通过子进程 IPC 等待该结果，
   SIGINT/SIGTERM 使用同一流程；6 秒总上限后才进入强制停止兜底。
-- 删除：`RoomStore.removeRoom()` 在删除前排空该房间；失败返回 false，WS 与 HTTP 删除入口必须返回错误，
-  不能广播或响应删除成功。
+- 删除：`RoomStore.removeRoom()` 在删除前排空该房间；失败返回 false，WS、主 HTTP 与管理员批量清理入口
+  必须返回错误和准确的失败房间，不能广播或响应删除成功。
 - 客户端：`data/pages/battle.html` 只应用接收者公开 patch、显示权威候选并发送选择；候选仅投影给 pending owner，对手/观者只看公开等待信封；版本/hash 不匹配时单飞请求完整快照。
 - 功能开关：候选默认 fail closed；`RVB_BATTLE_AUTHORITY_V2=1` 启用 v2，额外设置
   `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只关 async flag 即回退 ACK 前原子 DB 提交。

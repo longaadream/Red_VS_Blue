@@ -36,9 +36,11 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    Transition journal 只保存命令、receipt、内部/公开 Δ 与 hash 证据；一个有界后台 writer 按原顺序
    把这些记录写入现有原子数据库事务，避免多个后台写者自行制造 SQLite 写锁竞争。
 7. 持久化公开 `durableAuthorityVersion` 和 `durable | pending | degraded` 状态。后台写失败按有界次数
-   重试；每次 durable write 有 2 秒上限。普通 reject 可重试，超时写的提交结果不明确，不能并发重放
-   同一写入，而是立刻把房间标为 degraded 并让全局 writer 继续处理其他房间。超过上限后房间继续
-   以内存状态裁决并明确标为 degraded，不把已经应用的动作伪装成失败。
+   重试。每笔 Prisma 写先设置 SQLite 500 ms `busy_timeout`，interactive transaction 的 `maxWait=250 ms`
+   与 `timeout=1250 ms` 均早于 journal 的 2 秒安全线。若安全线仍触发，房间立即标为 degraded 并发出
+   cooperative abort，但 writer 必须等旧 adapter 确认物理写已经结束后才开始下一房间，绝不靠
+   `Promise.race` 制造重叠写；生产 Prisma 原生期限保证它有界结束。超过上限后房间继续以内存状态裁决
+   并明确标为 degraded，不把已经应用的动作伪装成失败。
    队列有每房间上限；房间删除前必须排空，排空失败必须拒绝删除并向调用方返回错误。终局尝试
    排空并记录失败。
 8. 初始检查点仍同步建立，且与从 waiting/ready 切换到 in-progress 共同构成启动不变量：检查点失败时
@@ -95,9 +97,9 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 
 - 协调器：同房间 FIFO、跨房间并行、背压、失败后继续。
 - 协议：精确回执、重复零写、旧版本 resync、patch 前后 hash、危险路径拒绝。
-- 内存/耐久边界：阻塞或失败的 SQLite 不阻塞 applied receipt；durable 水位按序推进；单次写超时进入
-  degraded 且不会永久阻塞其他房间；版本 0 基准检查点、启动失败回滚、检查点/Transition 连续恢复与
-  损坏拒绝。
+- 内存/耐久边界：阻塞或失败的 SQLite 不阻塞 applied receipt；durable 水位按序推进；数据库原生锁等待/
+  事务期限早于 journal 安全线，超时 adapter 未真正结束前不得启动下一写；版本 0 基准检查点、启动失败
+  回滚、检查点/Transition 连续恢复与损坏拒绝。
 - 关闭/删除：关闭 ingress 后新提交失败；SIGTERM 与 Electron IPC 都按“停止接入→排空→逐房间水位核对”
   执行；排空失败的房间删除在 WS/HTTP 明确失败。
 - 规则：部署、水门目标、观者选项、pending 超时、回合计时与机器人均走同一协调器。

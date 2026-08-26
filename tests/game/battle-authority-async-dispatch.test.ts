@@ -13,7 +13,10 @@ const harness = vi.hoisted(() => {
   let releaseTransaction: ((value: boolean) => void) | undefined
   const transaction = vi.fn(() => new Promise<boolean>(resolve => { releaseTransaction = resolve }))
   return {
-    prisma: { $transaction: transaction },
+    prisma: {
+      $transaction: transaction,
+      $queryRawUnsafe: vi.fn(async () => [{ timeout: 500 }]),
+    },
     transaction,
     release(value = true) {
       releaseTransaction?.(value)
