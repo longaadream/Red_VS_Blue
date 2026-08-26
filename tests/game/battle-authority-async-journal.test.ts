@@ -89,6 +89,36 @@ describe('battle authority async journal', () => {
     })).toBe(false)
   })
 
+  it('runs transition audit once before durable persistence and degrades without retrying it', async () => {
+    const journal = new BattleAuthorityAsyncJournal({ retryDelaysMs: [0, 0] })
+    const audit = vi.fn(async () => { throw new Error('delta audit failed') })
+    const persist = vi.fn(async () => undefined)
+
+    expect(journal.enqueue({
+      roomId: 'room-audit',
+      kind: 'transition',
+      authorityVersion: 1,
+      audit,
+      persist,
+    })).toBe(true)
+
+    await expect(journal.drain('room-audit')).rejects.toThrow('delta audit failed')
+    expect(audit).toHaveBeenCalledTimes(1)
+    expect(persist).not.toHaveBeenCalled()
+    expect(journal.inspect('room-audit')).toMatchObject({
+      status: 'degraded',
+      durableAuthorityVersion: 0,
+      pending: 0,
+      lastError: 'delta audit failed',
+    })
+    expect(journal.enqueue({
+      roomId: 'room-audit',
+      kind: 'transition',
+      authorityVersion: 2,
+      persist,
+    })).toBe(false)
+  })
+
   it('fails closed when a room exceeds the bounded pending journal', async () => {
     let release!: () => void
     const blocked = new Promise<void>(resolve => { release = resolve })

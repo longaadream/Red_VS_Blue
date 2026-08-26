@@ -33,6 +33,8 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    断层或 hash 不一致都停止增量应用并单飞拉取完整恢复快照。
 6. 显式 `RVB_BATTLE_ASYNC_JOURNAL=1` 时，每房间 FIFO 内的内存 Room Actor 是在线权威提交点：
    规则、diff/hash、版本、receipt 与内存状态提交完成后立即生成 ACK/patch，不等待 Prisma/SQLite。
+   ACK 前只执行不随完整状态大小增长的提交边界校验；完整内部/公开 Δ 回放由同一个串行 journal
+   writer 在落库前审计一次，不能回到在线 ACK 热路径。
    Transition journal 只保存命令、receipt、内部/公开 Δ 与 hash 证据；一个有界后台 writer 按原顺序
    把这些记录写入现有原子数据库事务，避免多个后台写者自行制造 SQLite 写锁竞争。
 7. 持久化公开 `durableAuthorityVersion` 和 `durable | pending | degraded` 状态。后台写失败按有界次数
@@ -55,7 +57,10 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    Transition journal。终局在构造 Transition 前重新物化 ADR-0016 要求的完整 Trace v2，使在线 patch/hash、checkpoint 与重启恢复共享同一终局状态，不降低回放事实完整性。
 10. 规则 JSON 和动态代码在服务进程内缓存。普通开发/生产动作不再因为 `NODE_ENV=development`
    每次读取磁盘；内容工具通过显式失效函数刷新。`RVB_FORCE_RULE_RELOAD=1` 仅用于有意逐次重载，
-   `RVB_BATTLE_DEBUG_LOGS=1` 才启用同步热路径调试日志。
+   `RVB_BATTLE_DEBUG_LOGS=1` 才启用同步热路径调试日志。Node 服务端的 `hashStable()` 可以安装原生
+   SHA-256 provider，以完全相同的稳定 JSON 字节和 digest 替代纯 JavaScript SHA；安装时必须先与
+   纯 JavaScript 实现做固定向量自检，运行时返回非法 digest 必须 fail closed。浏览器和
+   `sha256Hex()` 公共原语仍使用纯 JavaScript 实现；`RVB_BATTLE_NATIVE_SHA=0` 可显式关闭服务端 provider。
 11. Relay 只瞬时转发 Transition 和精确回执，不把 recipient-specific patch 保存为房间最新完整状态；
     Relay 重连仍从权威服务获取完整恢复快照。
 12. 客户端 patch 应用后复用既有按键增量展示层：地图仅在地图身份或尺寸变化时重建，棋子按 `piece.id`、
@@ -65,9 +70,12 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
     只有显式
     `RVB_TURN_TIMER_ENABLED=1` 才启用 deadline、安排部署/回合计时权威唤醒并显示计时投影。未设置或设置为 `0` 时，晚到玩家动作也不会结算 timeout。
 
-14. 内存 ACK 前必须验证完整提交不变量，不能只比较版本：缓存链头等于 Transition 前链、action hash、
-    transition hash、pre/post state/public hash 与内部 Δ 回放结果都必须匹配；任一不一致都 fail closed，
-    不得先 ACK 再等后台数据库 CAS 暴露错误。
+14. 内存 ACK 前必须验证轻量但独立的提交不变量，不能只比较版本：缓存版本和链头等于 Transition
+    前版本/前链，receipt 与命令/版本相连，action hash 与 transition hash 重算一致，持久化前态 hash
+    与缓存一致，并且 Runner 独立产出的 canonical pre/post hash 与 trace 证据一致。任一不一致都在
+    ACK 前 fail closed。完整内部/公开 Δ 回放、pre/post hash 复核和 `nextStorage` 等价比较由 journal
+    writer 在 Prisma 写入前严格串行审计一次；审计失败将房间标为 degraded、丢弃该 durable job 并
+    拒绝后续异步提交，绝不落库或静默继续。恢复、候选验证和 CI 仍执行完整回放审计。
 15. 优雅关闭按固定顺序执行：先关闭 journal ingress，拒绝新的内存提交；再停止 WS 接入；随后排空
     全局 writer，并逐房间验证 `durableAuthorityVersion == authorityVersion`。Next 服务同时监听
     `SIGINT/SIGTERM` 和父 Electron 的 IPC 请求。Electron server/client 子进程使用 IPC 等待明确成功回执，
@@ -100,6 +108,10 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 - 内存/耐久边界：阻塞或失败的 SQLite 不阻塞 applied receipt；durable 水位按序推进；数据库原生锁等待/
   事务期限早于 journal 安全线，超时 adapter 未真正结束前不得启动下一写；版本 0 基准检查点、启动失败
   回滚、检查点/Transition 连续恢复与损坏拒绝。
+- ACK/audit 边界：篡改版本、链头、action/transition hash 或 Runner pre/post 证据必须在 ACK 前拒绝；
+  篡改但重新封装过的内部 Δ 必须在 journal 完整回放审计中 degraded，且不得进入 Prisma。
+- Hash provider：Node 原生 provider 与纯 JavaScript 实现在固定向量、随机 Unicode 和真实状态上 digest
+  完全相同；`RVB_BATTLE_NATIVE_SHA=0` 回退后协议、hash chain 与恢复结果不变。
 - 关闭/删除：关闭 ingress 后新提交失败；SIGTERM 与 Electron IPC 都按“停止接入→排空→逐房间水位核对”
   执行；排空失败的房间删除在 WS/HTTP 明确失败。
 - 规则：部署、水门目标、观者选项、pending 超时、回合计时与机器人均走同一协调器。

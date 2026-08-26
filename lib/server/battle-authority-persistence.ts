@@ -3,6 +3,7 @@ import {
   BattleAuthorityAsyncJournal,
   type BattleAuthorityJournalInspection,
 } from './battle-authority-async-journal'
+import { installNativeBattleSha256 } from './battle-hash'
 import { hashPublicBattleState } from '../game/battle-public-patch'
 import { getBattleStorage } from '../game/battle-storage'
 import {
@@ -15,6 +16,8 @@ import type { ServerBattleState } from '../game/battle-storage'
 import {
   assertBattleAuthorityRestoreCheckpoint,
   createBattleAuthorityGenesisHash,
+  hashBattleAuthorityAction,
+  hashBattleAuthorityTransition,
   isBattleAuthorityAsyncJournalEnabled,
   replayBattleAuthorityTransitions,
   roomBattleAuthorityVersion,
@@ -24,6 +27,8 @@ import {
 } from '../game/battle-transition'
 import type { Room } from '../game/room-store'
 import type { BattleState } from '../game/turn'
+
+installNativeBattleSha256()
 
 interface CachedAuthorityRoom {
   version: number
@@ -67,6 +72,9 @@ export interface CommitBattleAuthorityTransitionInput {
   expectedVersion: number
   nextRoom: Room
   transition: BattleAuthorityTransitionRecord
+  transitionPreStateHash: string
+  runnerPreStateHash: string
+  runnerPostStateHash: string
   baseCheckpoint?: BattleAuthorityCheckpointRecord
   checkpoint?: BattleAuthorityCheckpointRecord
 }
@@ -386,22 +394,19 @@ function commitBattleAuthorityTransitionInMemory(
   const roomId = normalizeRoomId(input.roomId)
   const cached = authorityRoomCache.get(roomId)
   if (!cached || cached.version !== input.expectedVersion) return false
-  assertInMemoryBattleAuthorityTransition(input, cached)
+  assertInMemoryBattleAuthorityAckBoundary(input, cached)
 
   const committedRoom: Room = {
     ...input.nextRoom,
     battleAuthorityVersion: input.transition.toVersion,
     battleAuthorityTransitionHash: input.transition.transitionHash,
   }
-  rememberAuthorityReceipt(input.transition.receipt)
-  rememberAuthorityTransition(input.transition)
-  rememberBattleAuthorityRoom(committedRoom)
-
   const accepted = authorityAsyncJournal.enqueue({
     roomId,
     kind: 'transition',
     authorityVersion: input.transition.toVersion,
     clientActionId: input.transition.clientActionId,
+    audit: () => auditInMemoryBattleAuthorityTransition(input, cached),
     persist: async () => {
       const durable = await persistBattleAuthorityTransitionAtomic(input)
       if (durable) return
@@ -429,11 +434,15 @@ function commitBattleAuthorityTransitionInMemory(
       clientActionId: input.transition.clientActionId,
       persistence: authorityAsyncJournal.inspect(roomId),
     })
+    return false
   }
+  rememberAuthorityReceipt(input.transition.receipt)
+  rememberAuthorityTransition(input.transition)
+  rememberBattleAuthorityRoom(committedRoom)
   return true
 }
 
-function assertInMemoryBattleAuthorityTransition(
+function assertInMemoryBattleAuthorityAckBoundary(
   input: CommitBattleAuthorityTransitionInput,
   cached: CachedAuthorityRoom,
 ): void {
@@ -454,7 +463,48 @@ function assertInMemoryBattleAuthorityTransition(
       `Battle authority in-memory receipt or next-room metadata mismatch in ${roomId} at ${transition.toVersion}`,
     )
   }
+  const expectedActionHash = hashBattleAuthorityAction(transition)
+  if (transition.actionHash !== expectedActionHash) {
+    throw new Error(`Battle authority action hash mismatch in ${roomId} at ${transition.toVersion}`)
+  }
+  const expectedTransitionHash = hashBattleAuthorityTransition(transition)
+  if (transition.transitionHash !== expectedTransitionHash) {
+    throw new Error(`Battle authority transition hash mismatch in ${roomId} at ${transition.toVersion}`)
+  }
+  if (
+    !input.transitionPreStateHash
+    || !input.runnerPreStateHash
+    || !input.runnerPostStateHash
+    || transition.preStateHash !== input.transitionPreStateHash
+    || transition.postStateHash !== input.runnerPostStateHash
+  ) {
+    throw new Error(`Battle authority state hash evidence mismatch in ${roomId} at ${transition.toVersion}`)
+  }
+  const firstTrace = transition.traces[0]
+  const lastTrace = transition.traces.at(-1)
+  if (
+    (firstTrace && firstTrace.preStateHash !== input.runnerPreStateHash)
+    || (lastTrace && lastTrace.postStateHash !== input.runnerPostStateHash)
+  ) {
+    throw new Error(
+      `Battle authority runner trace boundary mismatch in ${roomId} at ${transition.toVersion}: pre=${firstTrace?.preStateHash ?? 'none'}/${input.runnerPreStateHash} post=${lastTrace?.postStateHash ?? 'none'}/${input.runnerPostStateHash}`,
+    )
+  }
 
+  const previousStorage = getBattleStorage(cached.room)
+  const nextStorage = getBattleStorage(input.nextRoom)
+  if (!previousStorage || !nextStorage) {
+    throw new Error(`Battle authority in-memory state missing in ${roomId} at ${transition.toVersion}`)
+  }
+}
+
+function auditInMemoryBattleAuthorityTransition(
+  input: CommitBattleAuthorityTransitionInput,
+  cached: CachedAuthorityRoom,
+): void {
+  const roomId = normalizeRoomId(input.roomId)
+  const transition = input.transition
+  const cachedTransitionHash = cached.room.battleAuthorityTransitionHash ?? ''
   const previousStorage = getBattleStorage(cached.room)
   const nextStorage = getBattleStorage(input.nextRoom)
   if (!previousStorage || !nextStorage) {

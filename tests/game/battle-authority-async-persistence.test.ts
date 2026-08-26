@@ -72,6 +72,25 @@ describe('battle authority async persistence integration', () => {
     process.env.RVB_BATTLE_ASYNC_JOURNAL = '1'
   })
 
+  it('keeps runner hash evidence out of the async-disabled atomic fallback', async () => {
+    harness.transaction.mockClear()
+    const input = transitionInput('atomic-fallback-room')
+    input.transitionPreStateHash = 'unused-transition-pre-hash'
+    input.runnerPreStateHash = 'unused-runner-pre-hash'
+    input.runnerPostStateHash = 'unused-runner-post-hash'
+    process.env.RVB_BATTLE_ASYNC_JOURNAL = '0'
+    try {
+      const commit = commitBattleAuthorityTransition(input)
+      await vi.waitFor(() => expect(harness.transaction).toHaveBeenCalledTimes(1))
+      harness.release(true)
+      await expect(commit).resolves.toBe(true)
+    } finally {
+      harness.release()
+      process.env.RVB_BATTLE_ASYNC_JOURNAL = '1'
+      harness.transaction.mockClear()
+    }
+  })
+
   it('refuses to commit without a hydrated room actor', async () => {
     const input = transitionInput('missing-room-actor')
     await expect(commitBattleAuthorityTransition(input)).resolves.toBe(false)
@@ -130,17 +149,31 @@ describe('battle authority async persistence integration', () => {
       .resolves.toBeUndefined()
   })
 
-  it('rejects tampered pre-state and action hashes before the in-memory ACK boundary', async () => {
+  it('rejects tampered runner, action, and transition hashes before the in-memory ACK boundary', async () => {
     harness.transaction.mockClear()
     const badPreState = transitionInput('async-bad-pre-state-room')
     badPreState.transition.preStateHash = 'bad-pre-state-hash'
+    badPreState.transition.transitionHash = hashBattleAuthorityTransition(badPreState.transition)
+    badPreState.nextRoom.battleAuthorityTransitionHash = badPreState.transition.transitionHash
     rememberPreTransitionActor(badPreState)
-    await expect(commitBattleAuthorityTransition(badPreState)).rejects.toThrow('checkpoint hash mismatch')
+    await expect(commitBattleAuthorityTransition(badPreState)).rejects.toThrow('state hash evidence mismatch')
+
+    const badPostState = transitionInput('async-bad-post-state-room')
+    badPostState.transition.postStateHash = 'bad-post-state-hash'
+    badPostState.transition.transitionHash = hashBattleAuthorityTransition(badPostState.transition)
+    badPostState.nextRoom.battleAuthorityTransitionHash = badPostState.transition.transitionHash
+    rememberPreTransitionActor(badPostState)
+    await expect(commitBattleAuthorityTransition(badPostState)).rejects.toThrow('state hash evidence mismatch')
 
     const badAction = transitionInput('async-bad-action-room')
     badAction.transition.actionHash = 'bad-action-hash'
     rememberPreTransitionActor(badAction)
     await expect(commitBattleAuthorityTransition(badAction)).rejects.toThrow('action hash mismatch')
+
+    const badTransition = transitionInput('async-bad-transition-room')
+    badTransition.transition.internalPatch = []
+    rememberPreTransitionActor(badTransition)
+    await expect(commitBattleAuthorityTransition(badTransition)).rejects.toThrow('transition hash mismatch')
     expect(harness.transaction).not.toHaveBeenCalled()
   })
 
@@ -154,8 +187,17 @@ describe('battle authority async persistence integration', () => {
     input.nextRoom.battleAuthorityTransitionHash = input.transition.transitionHash
     rememberPreTransitionActor(input)
 
-    await expect(commitBattleAuthorityTransition(input)).rejects.toThrow('transition state hash mismatch')
+    await expect(commitBattleAuthorityTransition(input)).resolves.toBe(true)
     expect(harness.transaction).not.toHaveBeenCalled()
+    await expect(drainBattleAuthorityPersistence(input.roomId))
+      .rejects.toThrow('transition state hash mismatch')
+    expect(harness.transaction).not.toHaveBeenCalled()
+    expect(inspectBattleAuthorityPersistence(input.roomId)).toMatchObject({
+      status: 'degraded',
+      durableAuthorityVersion: 0,
+      authorityVersion: 1,
+      pending: 0,
+    })
   })
 
   it('advances multiple same-room transitions while the first SQLite write is blocked', async () => {
@@ -214,6 +256,9 @@ function transitionInput(
   expectedVersion: number
   nextRoom: Room
   transition: BattleAuthorityTransitionRecord
+  transitionPreStateHash: string
+  runnerPreStateHash: string
+  runnerPostStateHash: string
 } {
   const previous = storageAt(fromVersion)
   const next = storageAt(fromVersion + 1)
@@ -251,6 +296,9 @@ function transitionInput(
     },
     expectedVersion: fromVersion,
     transition,
+    transitionPreStateHash: transition.preStateHash,
+    runnerPreStateHash: transition.preStateHash,
+    runnerPostStateHash: transition.postStateHash,
   }
 }
 

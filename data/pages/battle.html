@@ -2009,6 +2009,7 @@
     let pendingActionFeedback = null
     let lastAutoBeginPhaseKey = null
     let pendingActionFeedbackTimer = null
+    let pendingActionPresentationFrame = null
     let authorityRecoveryPromise = null
     const authorityPerformanceSamples = []
     window.__RVB_AUTHORITY_PERF__ = {
@@ -2024,15 +2025,16 @@
       clear: function () { authorityPerformanceSamples.length = 0 },
     }
 
-    function recordAuthorityPerformance(receipt, serverTimings, clientApplyMs) {
-      if (!receipt || !pendingActionFeedback || pendingActionFeedback.clientActionId !== receipt.clientActionId) return false
+    function recordAuthorityPerformance(receipt, serverTimings, clientApplyMs, trackedFeedback) {
+      const feedback = trackedFeedback || pendingActionFeedback
+      if (!receipt || !feedback || feedback.clientActionId !== receipt.clientActionId) return false
       const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
       const sample = {
         clientActionId: receipt.clientActionId,
-        type: pendingActionFeedback.type,
+        type: feedback.type,
         status: receipt.status,
         authorityVersion: receipt.authorityVersion,
-        totalMs: Math.round((now - pendingActionFeedback.startedAt) * 1000) / 1000,
+        totalMs: Math.round((now - feedback.startedAt) * 1000) / 1000,
         clientApplyMs: Math.round((Number(clientApplyMs) || 0) * 1000) / 1000,
         server: serverTimings || null,
       }
@@ -2065,9 +2067,19 @@
       pendingActionFeedbackTimer = setTimeout(function () {
         rejectPendingActionFeedback('action-timeout', '指令确认超时，请检查连接后重试')
       }, PENDING_ACTION_TIMEOUT_MS)
-      renderBoard()
-      renderActionBar()
       return true
+    }
+
+    function schedulePendingActionPresentation() {
+      if (pendingActionPresentationFrame !== null) return
+      const scheduleFrame = typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : function (callback) { return setTimeout(callback, 0) }
+      pendingActionPresentationFrame = scheduleFrame(function () {
+        pendingActionPresentationFrame = null
+        if (!pendingActionFeedback) return
+        renderActionBar()
+      })
     }
 
     function rejectPendingActionFeedback(reason, message, options) {
@@ -2099,12 +2111,15 @@
       return authorityRecoveryPromise
     }
 
-    function applyAuthorityReceipt(receipt, serverTimings, clientApplyMs) {
+    function applyAuthorityReceipt(receipt, serverTimings, clientApplyMs, options) {
       if (!receipt || !receipt.clientActionId) return false
+      var input = options || {}
       var actionId = String(receipt.clientActionId)
       var feedbackMatches = !!(pendingActionFeedback && pendingActionFeedback.clientActionId === actionId)
       var targetMatches = !!(targetSubmissionPending && targetSubmissionPending.clientActionId === actionId)
-      if (feedbackMatches) recordAuthorityPerformance(receipt, serverTimings, clientApplyMs)
+      if (feedbackMatches && input.deferPerformance !== true) {
+        recordAuthorityPerformance(receipt, serverTimings, clientApplyMs)
+      }
       if (!feedbackMatches && !targetMatches) {
         if (receipt.status === 'resyncRequired') requestAuthorityRecovery(receipt.code || 'resync-required')
         return false
@@ -2112,14 +2127,19 @@
 
       if (receipt.status === 'applied' || receipt.status === 'duplicate') {
         if (feedbackMatches) clearPendingActionFeedback('authority-receipt-' + receipt.status)
-        if (targetMatches) clearTargetInteraction('authority-receipt-' + receipt.status)
-        renderActionBar()
+        if (targetMatches) {
+          clearTargetInteraction(
+            'authority-receipt-' + receipt.status,
+            { deferRender: input.deferRender === true },
+          )
+        }
+        if (input.deferRender !== true) renderActionBar()
         return true
       }
 
       if (feedbackMatches) clearPendingActionFeedback('authority-receipt-' + receipt.status)
       if (targetMatches) targetSubmissionPending = null
-      renderActionBar()
+      if (input.deferRender !== true) renderActionBar()
       if (receipt.message) setStatusMsg(receipt.message)
       if (receipt.status === 'resyncRequired') requestAuthorityRecovery(receipt.code || 'resync-required')
       return true
@@ -2139,6 +2159,7 @@
       if (input.keepMove !== true) pendingMove = false
       if (hadTarget) recordTargetClear(reason)
       document.body.classList.remove('target-mode-active')
+      if (input.deferRender !== true) renderTargetOverlay()
       if (input.message) setStatusMsg(input.message)
       return hadTarget
     }
@@ -2184,9 +2205,7 @@
         selectionId: stamped.selectionId || null,
       })
       setStatusMsg('目标指令已提交，正在等待权威确认')
-      renderBoard()
       renderTargetOverlay()
-      renderActionBar()
       void doAction(stamped)
       return true
     }
@@ -2277,6 +2296,7 @@
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
     let battlePresentation = null
+    let battleDomUi = null
     let currentBattleViewModel = null
     function red43QaSnapshot() {
       if (!RED43_QA_MODE) return null
@@ -3448,8 +3468,9 @@
 
     // ── Server-authoritative state handling ──
 
-    function reconcileBattleInteractionState(previousState, nextState) {
+    function reconcileBattleInteractionState(previousState, nextState, options) {
       if (!nextState) return ''
+      const input = options || {}
       const authoritativeSelectionId = nextState.pendingTargetSelection && nextState.pendingTargetSelection.selectionId
       if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
         locallyCancelledSelectionId = null
@@ -3464,7 +3485,7 @@
           || !localSelectionId
           || nextPending.selectionId !== localSelectionId
           || nextPending.stateRevision !== localStateRevision) {
-          clearTargetInteraction('authoritative-pending-ended')
+          clearTargetInteraction('authoritative-pending-ended', { deferRender: input.deferRender === true })
           validMoves = new Set()
           return '权威目标选择已结束，旧选择已清除'
         }
@@ -3474,7 +3495,7 @@
         : null
       if (selectedPieceId && !selected) {
         selectedPieceId = null
-        clearTargetInteraction('selected-piece-unavailable')
+        clearTargetInteraction('selected-piece-unavailable', { deferRender: input.deferRender === true })
         validMoves = new Set()
         return '选中棋子已离场，目标选择已清除'
       }
@@ -3482,7 +3503,7 @@
       const previousTurn = previousState && previousState.turn && previousState.turn.currentPlayerId
       const nextTurn = nextState.turn && nextState.turn.currentPlayerId
       if (previousTurn && nextTurn && String(previousTurn).toLowerCase() !== String(nextTurn).toLowerCase()) {
-        clearTargetInteraction('turn-changed')
+        clearTargetInteraction('turn-changed', { deferRender: input.deferRender === true })
         validMoves = new Set()
         return '回合已切换，目标选择已清除'
       }
@@ -3492,7 +3513,7 @@
       if (preparation && Number.isFinite(Number(preparation.stateRevision))) {
         const revision = Number(nextState.targetingRevision || 0)
         if (revision !== Number(preparation.stateRevision)) {
-          clearTargetInteraction('targeting-revision-changed')
+          clearTargetInteraction('targeting-revision-changed', { deferRender: input.deferRender === true })
           validMoves = new Set()
           return '战局状态已更新，请重新选择技能目标'
         }
@@ -3583,8 +3604,9 @@
       void doBeginPhase()
       return true
     }
-    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer) {
+    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer, options) {
       if (!state) return
+      const input = options || {}
       resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
@@ -3601,7 +3623,7 @@
           if (alignment === 'light' || alignment === 'dark') playerAlignments[playerId.toLowerCase()] = alignment
         })
       }
-      const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+      const interactionFeedback = reconcileBattleInteractionState(oldG, G, { deferRender: true })
 
       // Init seeded RNG once
       if (seed && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
@@ -3622,7 +3644,12 @@
       }
 
       if (oldG) { flushActionLog(oldG, G); spawnStateFloaters(oldG, G) }
-      render()
+      const renderPolicy = input.deriveRenderPolicy === true
+        ? deriveAuthorityRenderPolicy(oldG, G)
+        : (input.renderPolicy || {})
+      render(Object.assign({}, renderPolicy, {
+        beforeBoardUpdate: input.beforeBoardUpdate,
+      }))
       if (interactionFeedback) setStatusMsg(interactionFeedback)
 
       if (G.terminalResult) { handleGameOver(); return }
@@ -3683,6 +3710,61 @@
       return base
     }
 
+    function sameBattleRenderValue(left, right) {
+      if (Object.is(left, right)) return true
+      try {
+        return JSON.stringify(left == null ? null : left) === JSON.stringify(right == null ? null : right)
+      } catch {
+        return false
+      }
+    }
+
+    function deriveAuthorityRenderPolicy(previousState, nextState) {
+      if (!previousState || !nextState) {
+        return {
+          board: true,
+          mapChanged: true,
+          piecesChanged: true,
+          tileEffectsChanged: true,
+          pendingTargetChanged: true,
+          localBoardStateChanged: true,
+        }
+      }
+      var previousExtensions = previousState.extensions || {}
+      var nextExtensions = nextState.extensions || {}
+      var mapChanged = !sameBattleRenderValue(previousState.map, nextState.map)
+      var piecesChanged = !sameBattleRenderValue(previousState.pieces, nextState.pieces)
+      var tileEffectsChanged = !sameBattleRenderValue(
+        previousExtensions.tileEffects,
+        nextExtensions.tileEffects,
+      )
+      var pendingTargetChanged = !sameBattleRenderValue(
+        previousState.pendingTargetSelection,
+        nextState.pendingTargetSelection,
+      )
+      var currentSelectionId = currentBattleViewModel && currentBattleViewModel.selection
+        ? currentBattleViewModel.selection.pieceId || null
+        : null
+      var currentPendingCommandId = currentBattleViewModel && currentBattleViewModel.interaction
+        ? currentBattleViewModel.interaction.pendingCommandId || null
+        : null
+      var nextPendingCommandId = pendingActionFeedback ? pendingActionFeedback.clientActionId : null
+      var currentInteractionMode = currentBattleViewModel && currentBattleViewModel.selection
+        ? currentBattleViewModel.selection.mode || 'inspect'
+        : 'inspect'
+      var localBoardStateChanged = currentSelectionId !== (selectedPieceId || null)
+        || currentPendingCommandId !== nextPendingCommandId
+        || currentInteractionMode !== battleInteractionMode()
+      return {
+        board: mapChanged || piecesChanged || tileEffectsChanged || pendingTargetChanged || localBoardStateChanged,
+        mapChanged: mapChanged,
+        piecesChanged: piecesChanged,
+        tileEffectsChanged: tileEffectsChanged,
+        pendingTargetChanged: pendingTargetChanged,
+        localBoardStateChanged: localBoardStateChanged,
+      }
+    }
+
     function applyBattleTransition(msg) {
       if (!msg || !Array.isArray(msg.patch)) return false
       if (!G || !Number.isSafeInteger(latestAuthorityVersion)) {
@@ -3696,6 +3778,7 @@
       try {
         var patchStartedAt = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
         var oldG = G
+        var previousPresentationModel = currentBattleViewModel || createBattlePresentationModel(oldG)
         var envelope = {
           protocolVersion: msg.protocolVersion,
           roomId: msg.roomId,
@@ -3710,21 +3793,49 @@
           envelope,
           { authorityVersion: latestAuthorityVersion }
         )
-        if (_use3d && battlePresentation) {
-          battlePresentation.animateAction(
-            {
-              type: 'battleTransition',
-              motionEventKey: 'authority:' + msg.toVersion + ':' + ((msg.receipt && msg.receipt.clientActionId) || 'system'),
-            },
-            createBattlePresentationModel(oldG),
-            createBattlePresentationModel(nextState)
-          )
-        }
+        var trackedFeedback = msg.receipt
+          && pendingActionFeedback
+          && pendingActionFeedback.clientActionId === String(msg.receipt.clientActionId)
+          ? pendingActionFeedback
+          : null
+        applyAuthorityReceipt(
+          msg.receipt,
+          msg.timings,
+          0,
+          { deferRender: true, deferPerformance: true },
+        )
         latestAuthorityVersion = msg.toVersion
         latestAuthorityStateHash = msg.stateHash || latestAuthorityStateHash
-        applyServerState(nextState, msg.seed || null, false, msg.serverNow, msg.turnTimer)
+        applyServerState(
+          nextState,
+          msg.seed || null,
+          false,
+          msg.serverNow,
+          msg.turnTimer,
+          {
+            deriveRenderPolicy: true,
+            beforeBoardUpdate: function (nextPresentationModel) {
+              if (!_use3d || !battlePresentation) return
+              battlePresentation.animateAction(
+                {
+                  type: 'battleTransition',
+                  motionEventKey: 'authority:' + msg.toVersion + ':' + ((msg.receipt && msg.receipt.clientActionId) || 'system'),
+                },
+                previousPresentationModel,
+                nextPresentationModel,
+              )
+            },
+          },
+        )
         var patchFinishedAt = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
-        applyAuthorityReceipt(msg.receipt, msg.timings, patchFinishedAt - patchStartedAt)
+        if (trackedFeedback) {
+          recordAuthorityPerformance(
+            msg.receipt,
+            msg.timings,
+            patchFinishedAt - patchStartedAt,
+            trackedFeedback,
+          )
+        }
         return true
       } catch (error) {
         var message = error && error.message ? error.message : String(error)
@@ -4000,7 +4111,7 @@
     function renderTargetOverlay() {
       const el = document.getElementById('targetOverlay')
       if (!el) return
-      const active = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      const active = !targetSubmissionPending && !!(pendingSkill || pendingCardAction)
       document.body.classList.toggle('target-mode-active', active)
       if (active) {
         closePieceContextMenu()
@@ -4181,13 +4292,7 @@
     }
 
     let _pendingChoiceShown = null  // track which pendingOptionSelection we've shown
-    function render() {
-      if (!G) return
-      renderBoard()
-      renderPanels()
-      renderActionBar()
-      renderHand()
-      renderTargetOverlay()
+    function syncAuthoritativePendingPresentation() {
       const pbc = G.pendingOptionSelection
       if (pendingOptionSelectionForMe()) {
         const key = pbc.selectionId || (pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(','))
@@ -4236,23 +4341,43 @@
           }
           _updatePendingSkillTargets()
           setStatusMsg(pbt.title || _targetPromptText() || '请选择目标')
-          renderBoard()
-          renderTargetOverlay()
         }
       } else if (pendingSkill && pendingSkill.turnTargetActionType === 'pendingTargetSelect') {
         pendingSkill = null
-        renderBoard()
-        renderActionBar()
-        renderTargetOverlay()
       }
+    }
+
+    function render(options) {
+      if (!G) return
+      const input = options || {}
+      syncAuthoritativePendingPresentation()
+      if (input.board === false) renderBattleHud(input.presentationModel, input.beforeBoardUpdate)
+      else renderBoard(input.presentationModel, input.beforeBoardUpdate)
+      renderPanels()
+      renderActionBar()
+      renderHand()
+      renderTargetOverlay()
       updateRed43QaEvidence()
     }
 
-    function renderBoard() {
-      if (!G || !G.map) return
+    function prepareCurrentBattlePresentationModel(preparedModel) {
       refreshBattleLegalActions()
-      currentBattleViewModel = createBattlePresentationModel(G)
+      return preparedModel || createBattlePresentationModel(G)
+    }
+
+    function renderBattleHud(preparedModel, beforeBoardUpdate) {
+      if (!G || !G.map) return
+      currentBattleViewModel = prepareCurrentBattlePresentationModel(preparedModel)
       if (!currentBattleViewModel) return
+      if (typeof beforeBoardUpdate === 'function') beforeBoardUpdate(currentBattleViewModel)
+      if (battleDomUi) battleDomUi.update(currentBattleViewModel)
+    }
+
+    function renderBoard(preparedModel, beforeBoardUpdate) {
+      if (!G || !G.map) return
+      currentBattleViewModel = prepareCurrentBattlePresentationModel(preparedModel)
+      if (!currentBattleViewModel) return
+      if (typeof beforeBoardUpdate === 'function') beforeBoardUpdate(currentBattleViewModel)
       if (battlePresentation) battlePresentation.update(currentBattleViewModel)
       recalcCellSize()
 
@@ -5348,6 +5473,7 @@
           relaySeq++
           var relayActionAuth = await createBattleActionAuth(action)
           RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth, { seq: relaySeq, prevStateHash: latestAuthorityStateHash || '' }))
+          schedulePendingActionPresentation()
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -5360,6 +5486,7 @@
         if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
           var lanActionAuth = await createBattleActionAuth(action)
           RvBWs.send(battleAuthorityCommandMessage(action, lanActionAuth))
+          schedulePendingActionPresentation()
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
@@ -5765,8 +5892,8 @@
         init() {}, update() {}, resize() {}, resetView() {}, projectCell() { return null },
         screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
-      const domUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
-      battlePresentation = BattlePresentation.create({ renderer, domUi, onIntent: handleBattleIntent })
+      battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
+      battlePresentation = BattlePresentation.create({ renderer, domUi: battleDomUi, onIntent: handleBattleIntent })
       battlePresentation.mount({
         boardContainer: document.getElementById('boardStage3d'),
         floatLayer: document.getElementById('floatLayer'),

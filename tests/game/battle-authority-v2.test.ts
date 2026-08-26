@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
+import { hashBattleState } from '@/lib/game/battle-runner'
 import { startBattleFromLockedRosters } from '@/lib/game/room-battle-start'
 import { recordBattleInitialization } from '@/lib/game/battle-trace'
 import { toPublicBattleState } from '@/lib/game/deployment'
@@ -262,6 +263,10 @@ describe('RED-109 authority v2 coordinator', () => {
     expect(first.kind).toBe('applied')
     expect(first.receipt).toMatchObject({ status: 'applied', authorityVersion: 2 })
     expect(first.transition).toMatchObject({ fromVersion: 1, toVersion: 2 })
+    expect(first.transition?.preStateHash).toBe(first.submittedActionResult?.trace?.preStateHash)
+    expect(first.transition?.preStateHash).toBe(hashBattleState(first.previousAuthorityState!))
+    expect(first.transition?.postStateHash).toBe(first.actionResult.stateHash)
+    expect(first.transition?.postStateHash).toBe(hashBattleState(first.nextAuthorityState!))
     expect(duplicate.kind).toBe('duplicate')
     expect(duplicate.receipt).toMatchObject({ status: 'duplicate', authorityVersion: 2 })
     expect(store.commits).toBe(1)
@@ -413,6 +418,10 @@ describe('RED-109 authority v2 coordinator', () => {
     const terminalTransition = store.transitions.at(-1)!
     const terminalCheckpoint = store.checkpoints.at(-1)!
     const spectatorPublic = toPublicBattleState(terminalState)
+    expect(terminalTransition.preStateHash).toBe(terminal.submittedActionResult?.trace?.preStateHash)
+    expect(terminalTransition.preStateHash).toBe(hashBattleState(terminal.previousAuthorityState!))
+    expect(terminalTransition.postStateHash).toBe(terminal.actionResult.stateHash)
+    expect(terminalTransition.postStateHash).toBe(hashBattleState(terminalState))
     expect(terminalTransition.postPublicHash).toBe(hashPublicBattleState(spectatorPublic))
     expect(terminalCheckpoint.publicHash).toBe(terminalTransition.postPublicHash)
     expect(terminalCheckpoint.storage.state).toEqual(terminalState)
@@ -477,6 +486,8 @@ function makeRoom(): Room {
     ],
     phase: 'start',
   }) as any
+  // Server checkpoints exclude the runtime-only skill cache before the runner hydrates it.
+  delete state.skillsById
   state.deployment = {
     status: 'awaiting-locks',
     playerIds: ['player-red', 'player-blue'],

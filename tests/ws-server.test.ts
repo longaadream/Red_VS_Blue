@@ -364,4 +364,82 @@ describe('game WebSocket service', () => {
       await Promise.all(clients.map(client => closeClient(client)))
     }
   })
+
+  test('projects and sends the actor transition first without a standalone successful receipt', async () => {
+    const roomId = 'actor-first-broadcast-' + Date.now()
+    const opponentPair = await openClientPair()
+    const spectatorPair = await openClientPair()
+    const actorPair = await openClientPair()
+    const clients = [opponentPair.client, spectatorPair.client, actorPair.client]
+    const serverClients = [opponentPair.server, spectatorPair.server, actorPair.server]
+    const actorSendSpy = vi.spyOn(actorPair.server, 'send')
+
+    try {
+      const roomClients = globalWithWsServer.__rvbRoomClients
+      const identities = globalWithWsServer.__rvbWsIdentities
+      if (!roomClients || !identities) throw new Error('WebSocket recipient registries are unavailable')
+      roomClients.set(roomId, new Set(serverClients))
+      identities.set(opponentPair.server, { roomId, playerId: 'opponent' })
+      identities.set(spectatorPair.server, { roomId })
+      identities.set(actorPair.server, { roomId, playerId: 'actor' })
+
+      const state = makeState()
+      const result = {
+        kind: 'applied',
+        snapshot: { state, seed: 77, stateHash: 'committed', authorityVersion: 2, serverNow: 100 },
+        actionResult: { state },
+        receipt: { clientActionId: 'actor-action-2', status: 'applied', authorityVersion: 2 },
+        transition: { fromVersion: 1, toVersion: 2, playerId: 'actor' },
+        previousAuthorityState: makeState(),
+        nextAuthorityState: state,
+      } as unknown as DispatchRoomBattleActionResult
+      const projectionOrder: Array<string | undefined> = []
+      const opponentMessagePromise = waitForJsonMessage(opponentPair.client)
+      const spectatorMessagePromise = waitForJsonMessage(spectatorPair.client)
+      const actorMessagePromise = waitForJsonMessage(actorPair.client)
+
+      broadcastBattleTransition(roomId, result, {
+        createTransitionUpdate: (_result, projectedRoomId, viewerPlayerId) => {
+          projectionOrder.push(viewerPlayerId)
+          return {
+            type: 'battleTransition',
+            protocolVersion: 2,
+            roomId: projectedRoomId,
+            fromVersion: 1,
+            toVersion: 2,
+            prePublicHash: 'pre',
+            postPublicHash: 'post',
+            patch: [],
+            receipt: result.receipt,
+            seed: 77,
+            stateHash: 'projected',
+            serverNow: 100,
+          } as never
+        },
+      })
+
+      const [opponentMessage, spectatorMessage, actorMessage] = await Promise.all([
+        opponentMessagePromise,
+        spectatorMessagePromise,
+        actorMessagePromise,
+      ])
+      expect(projectionOrder).toEqual(['actor', 'opponent', undefined])
+      expect(opponentMessage).toMatchObject({ type: 'battleTransition', toVersion: 2 })
+      expect(spectatorMessage).toMatchObject({ type: 'battleTransition', toVersion: 2 })
+      expect(actorMessage).toMatchObject({
+        type: 'battleTransition',
+        toVersion: 2,
+        receipt: result.receipt,
+      })
+      expect(actorMessage.type).not.toBe('battleReceipt')
+      expect(actorSendSpy).toHaveBeenCalledTimes(1)
+      const actorPayload = JSON.parse(String(actorSendSpy.mock.calls[0]?.[0])) as Record<string, unknown>
+      expect(actorPayload).toMatchObject({ type: 'battleTransition', receipt: result.receipt })
+    } finally {
+      actorSendSpy.mockRestore()
+      globalWithWsServer.__rvbRoomClients?.delete(roomId)
+      for (const serverClient of serverClients) globalWithWsServer.__rvbWsIdentities?.delete(serverClient)
+      await Promise.all(clients.map(client => closeClient(client)))
+    }
+  })
 })

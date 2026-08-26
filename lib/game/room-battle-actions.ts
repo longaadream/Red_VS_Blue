@@ -45,6 +45,9 @@ export interface DeploymentRoomStore {
     expectedVersion: number
     nextRoom: Room
     transition: BattleAuthorityTransitionRecord
+    transitionPreStateHash: string
+    runnerPreStateHash: string
+    runnerPostStateHash: string
     baseCheckpoint?: BattleAuthorityCheckpointRecord
     checkpoint?: BattleAuthorityCheckpointRecord
   }): Promise<boolean>
@@ -542,6 +545,14 @@ export async function dispatchRoomBattleAction(
       const transitionPlayerId = 'playerId' in action
         ? action.playerId
         : viewerPlayerId ?? 'system'
+      const runnerPreStateHash = authorityV2
+        ? submittedActionResult.trace?.preStateHash ?? hashBattleState(state)
+        : undefined
+      const transitionPreStateHash = authorityV2
+        ? Object.hasOwn(state, 'skillsById')
+          ? hashBattleState(state)
+          : runnerPreStateHash!
+        : undefined
       const transition = authorityV2
         ? buildBattleAuthorityTransition({
             roomId: normalizedRoomId,
@@ -554,8 +565,8 @@ export async function dispatchRoomBattleAction(
             nextStorage,
             previousPublicState,
             nextPublicState,
-            preStateHash: hashBattleState(state),
-            postStateHash: hashBattleState(committedState),
+            preStateHash: transitionPreStateHash!,
+            postStateHash: actionResult.stateHash,
             traces,
             replayFrames,
             previousTransitionHash: room.battleAuthorityTransitionHash,
@@ -624,6 +635,9 @@ export async function dispatchRoomBattleAction(
             expectedVersion: authorityVersion,
             nextRoom,
             transition,
+            transitionPreStateHash: transitionPreStateHash!,
+            runnerPreStateHash: runnerPreStateHash!,
+            runnerPostStateHash: actionResult.stateHash,
             baseCheckpoint,
             checkpoint,
           })

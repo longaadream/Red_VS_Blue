@@ -144,9 +144,22 @@ export function broadcastBattleTransition(
   if (!clients || !result.transition) return
   const projectTransition = dependencies.createTransitionUpdate ?? createPublicBattleTransitionUpdate
   const projectResync = dependencies.createResyncSnapshot ?? createPublicBattleResyncSnapshot
+  type Recipient = { client: WebSocket; identity?: { roomId: string; playerId?: string } }
+  const actorRecipients: Recipient[] = []
+  const otherRecipients: Recipient[] = []
+  const actorPlayerId = result.transition.playerId
+  const prioritizeActor = !!actorPlayerId && actorPlayerId !== 'system'
   for (const client of clients) {
     if (client.readyState !== WebSocket.OPEN) continue
-    const identity = wsIdentities.get(client)
+    const recipient = { client, identity: wsIdentities.get(client) }
+    if (prioritizeActor && recipient.identity?.playerId === actorPlayerId) {
+      actorRecipients.push(recipient)
+    } else {
+      otherRecipients.push(recipient)
+    }
+  }
+
+  for (const { client, identity } of [...actorRecipients, ...otherRecipients]) {
     try {
       const update = projectTransition(result, roomId, identity?.playerId)
       if (update) sendJson(client, update)

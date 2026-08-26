@@ -425,8 +425,10 @@ interface ServerCore {
 - 协议：`lib/game/battle-transition.ts` 定义 v2 command envelope、精确 receipt、公开 pending 投影、Transition 和检查点恢复。
 - 版本：`Room.version` 是房间元数据乐观锁；`Room.battleAuthorityVersion` 是连续战斗版本。传输与 patch 只能使用后者。
 - 在线权威：显式开启 async journal 后，`RoomStore.getRoom()` 优先读取进程内 Room Actor；
-  `commitBattleAuthorityTransition()` 在 ACK 前验证版本、前链、action/transition hash 与 Δ 回放的 pre/post
-  state/public hash，再同步提交内存版本、receipt、Δ 和 hash 链。普通动作不读写 Prisma。
+  `commitBattleAuthorityTransition()` 在 ACK 前验证版本、前链、receipt 关联、重算 action/transition hash，
+  并核对缓存前态与 Runner 独立产出的 canonical pre/post hash/trace 证据，再同步提交内存版本、receipt、
+  Δ 和 hash 链。完整内部/公开 Δ 回放与 `nextStorage` 等价比较由同一 journal writer 在落库前严格串行
+  审计一次；审计失败将房间 degraded、丢弃 durable job 并拒绝后续异步提交。普通动作不读写 Prisma。
 - 后台持久化：`lib/server/battle-authority-async-journal.ts` 提供单 writer、有界队列、有界重试、按房间
   durable 水位和 degraded 状态；`lib/server/battle-authority-persistence.ts` 在后台原子推进 DB 版本并写
   Transition、Receipt 和可选 Checkpoint。SQLite `busy_timeout=500 ms`、Prisma `maxWait=250 ms` 与

@@ -12,6 +12,12 @@ export interface BattleAuthorityJournalJob {
   kind: 'transition' | 'receipt' | 'checkpoint'
   authorityVersion?: number
   clientActionId?: string
+  /**
+   * Expensive integrity work that must remain serialized with persistence but
+   * must not delay the command ACK. Audits are fail-closed and intentionally
+   * never retried: retrying can only repeat deterministic CPU work.
+   */
+  audit?: () => void | Promise<void>
   persist: (context: BattleAuthorityJournalPersistContext) => Promise<void>
 }
 
@@ -177,6 +183,7 @@ export class BattleAuthorityAsyncJournal {
           continue
         }
         try {
+          await job.audit?.()
           await this.persistWithRetry(job)
           if (job.kind === 'transition' && job.authorityVersion !== undefined) {
             if (!Number.isSafeInteger(job.authorityVersion) || job.authorityVersion < 0) {

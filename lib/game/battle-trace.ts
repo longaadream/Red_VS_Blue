@@ -3,6 +3,26 @@ import type { BattleState } from './turn'
 
 export const BATTLE_REPLAY_FORMAT = 'rvb-battle-replay/v2' as const
 
+export type Sha256HexProvider = (value: string) => string
+
+const SHA256_PROVIDER_STATE_SYMBOL = Symbol.for('rvb.battle.sha256-hex-provider/v1')
+const SHA256_PROVIDER_STATE_VERSION = 1 as const
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/
+const SHA256_PROVIDER_SELF_CHECK_INPUTS = [
+  '',
+  'abc',
+  '红蓝',
+  '🗡️',
+  '\ud800',
+  '\udc00',
+  'a'.repeat(8_193),
+] as const
+
+interface Sha256ProviderState {
+  version: typeof SHA256_PROVIDER_STATE_VERSION
+  provider: Sha256HexProvider
+}
+
 const SHA256_INITIAL_STATE = [
   0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
   0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -188,8 +208,74 @@ export function sha256Hex(value: string): string {
   return hash.map(word => word.toString(16).padStart(8, '0')).join('')
 }
 
+/**
+ * Installs a process-wide SHA-256 implementation after proving it preserves the
+ * frozen browser-safe UTF-8/hash contract. Symbol.for keeps the first verified
+ * provider stable across Next.js module reloads.
+ */
+export function installSha256HexProvider(provider: Sha256HexProvider): boolean {
+  if (typeof provider !== 'function') {
+    throw new TypeError('Battle SHA-256 provider must be a function')
+  }
+
+  const installed = readInstalledSha256HexProvider()
+  if (installed) return false
+
+  assertSha256HexProviderEquivalent(provider)
+  const state = Object.freeze<Sha256ProviderState>({
+    version: SHA256_PROVIDER_STATE_VERSION,
+    provider,
+  })
+  Object.defineProperty(globalThis, SHA256_PROVIDER_STATE_SYMBOL, {
+    value: state,
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  })
+  return true
+}
+
+function readInstalledSha256HexProvider(): Sha256HexProvider | undefined {
+  const state = (globalThis as Record<symbol, unknown>)[SHA256_PROVIDER_STATE_SYMBOL]
+  if (state === undefined) return undefined
+  if (
+    !state
+    || typeof state !== 'object'
+    || (state as Partial<Sha256ProviderState>).version !== SHA256_PROVIDER_STATE_VERSION
+    || typeof (state as Partial<Sha256ProviderState>).provider !== 'function'
+  ) {
+    throw new Error('Battle SHA-256 provider state is invalid')
+  }
+  return (state as Sha256ProviderState).provider
+}
+
+function assertSha256HexProviderEquivalent(provider: Sha256HexProvider): void {
+  for (const input of SHA256_PROVIDER_SELF_CHECK_INPUTS) {
+    const expected = sha256Hex(input)
+    let actual: string
+    try {
+      actual = provider(input)
+    } catch (cause) {
+      throw new Error('Battle SHA-256 provider self-check failed', { cause })
+    }
+    if (!SHA256_HEX_PATTERN.test(actual) || actual !== expected) {
+      throw new Error('Battle SHA-256 provider self-check failed')
+    }
+  }
+}
+
+function assertSha256HexDigest(value: string, context: 'runtime'): string {
+  if (!SHA256_HEX_PATTERN.test(value)) {
+    throw new Error(`Battle SHA-256 provider returned an invalid SHA-256 digest during ${context}`)
+  }
+  return value
+}
+
 export function hashStable(value: unknown): string {
-  return sha256Hex(stableJson(value))
+  const serialized = stableJson(value)
+  const provider = readInstalledSha256HexProvider()
+  if (!provider) return sha256Hex(serialized)
+  return assertSha256HexDigest(provider(serialized), 'runtime')
 }
 
 export function hashBattleState(state: BattleState): string {
