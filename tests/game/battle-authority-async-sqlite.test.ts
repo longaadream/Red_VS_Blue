@@ -4,19 +4,22 @@ import { join } from 'node:path'
 
 import { afterAll, describe, expect, it, vi } from 'vitest'
 
+import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
 const originalDatabaseUrl = process.env.DATABASE_URL
 const originalAsyncFlag = process.env.RVB_BATTLE_ASYNC_JOURNAL
 const originalAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
 const temporaryDirectories: string[] = []
+const activePrismaClients: Array<{ $disconnect: () => Promise<void> }> = []
 
-afterAll(() => {
+afterAll(async () => {
+  await Promise.allSettled(activePrismaClients.map(client => client.$disconnect()))
   if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL
   else process.env.DATABASE_URL = originalDatabaseUrl
   if (originalAsyncFlag === undefined) delete process.env.RVB_BATTLE_ASYNC_JOURNAL
   else process.env.RVB_BATTLE_ASYNC_JOURNAL = originalAsyncFlag
   if (originalAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
   else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthorityFlag
-  for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true })
+  for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 describe('battle authority async SQLite persistence', () => {
@@ -45,6 +48,7 @@ describe('battle authority async SQLite persistence', () => {
       import('@/lib/server/battle-authority-persistence'),
     ])
     const store = new roomStoreModule.RoomStore()
+    activePrismaClients.push(prisma)
     const room = makeRoom(helpers.makeState, helpers.makePiece, trace.recordBattleInitialization, runtime.RuleRuntime)
     await store.setRoom(room.id, room)
     const storage = room.battleState as unknown as { type: 'server-state'; seed: number; state: unknown }
@@ -52,9 +56,9 @@ describe('battle authority async SQLite persistence', () => {
       room,
       storage: storage as never,
       stateHash: trace.hashBattleState(storage.state as never),
-      publicHash: actions.createPublicBattleSnapshot(
+      publicHash: hashPublicBattleState(actions.createPublicBattleSnapshot(
         persistence.getRememberedBattleAuthorityRoom(room.id) ?? room,
-      ).stateHash,
+      ).state),
     })
 
     let lastHash = ''

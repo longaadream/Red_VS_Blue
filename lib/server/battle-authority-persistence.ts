@@ -4,7 +4,9 @@ import {
   type BattleAuthorityJournalInspection,
 } from './battle-authority-async-journal'
 import { hashPublicBattleState } from '../game/battle-public-patch'
+import { getBattleStorage } from '../game/battle-storage'
 import {
+  hashStable,
   materializeBattleTraceForTerminal,
   type BattleActionTrace,
   type BattleReplayFrame,
@@ -87,6 +89,27 @@ export function inspectBattleAuthorityPersistence(
 
 export function drainBattleAuthorityPersistence(roomId?: string): Promise<void> {
   return authorityAsyncJournal.drain(roomId)
+}
+
+export function beginBattleAuthorityPersistenceShutdown(): void {
+  authorityAsyncJournal.closeIngress()
+}
+
+export async function drainBattleAuthorityPersistenceForShutdown(): Promise<void> {
+  authorityAsyncJournal.closeIngress()
+  await authorityAsyncJournal.drain()
+  for (const [roomId, cached] of authorityRoomCache) {
+    const persistence = authorityAsyncJournal.inspect(roomId)
+    if (
+      persistence.status !== 'durable'
+      || persistence.pending !== 0
+      || persistence.durableAuthorityVersion !== cached.version
+    ) {
+      throw new Error(
+        `Battle authority shutdown drain incomplete in ${roomId}: authority=${cached.version} durable=${persistence.durableAuthorityVersion} status=${persistence.status}`,
+      )
+    }
+  }
 }
 
 export async function getBattleAuthorityReceipt(
@@ -313,9 +336,11 @@ function assertBattleAuthorityTransitionMetadata(input: CommitBattleAuthorityTra
 function commitBattleAuthorityTransitionInMemory(
   input: CommitBattleAuthorityTransitionInput,
 ): boolean {
+  if (!authorityAsyncJournal.isAccepting()) return false
   const roomId = normalizeRoomId(input.roomId)
   const cached = authorityRoomCache.get(roomId)
   if (!cached || cached.version !== input.expectedVersion) return false
+  assertInMemoryBattleAuthorityTransition(input, cached)
 
   const committedRoom: Room = {
     ...input.nextRoom,
@@ -362,6 +387,51 @@ function commitBattleAuthorityTransitionInMemory(
   return true
 }
 
+function assertInMemoryBattleAuthorityTransition(
+  input: CommitBattleAuthorityTransitionInput,
+  cached: CachedAuthorityRoom,
+): void {
+  const roomId = normalizeRoomId(input.roomId)
+  const transition = input.transition
+  const cachedTransitionHash = cached.room.battleAuthorityTransitionHash ?? ''
+  if (cachedTransitionHash !== transition.previousTransitionHash) {
+    throw new Error(
+      `Battle authority in-memory chain mismatch in ${roomId} at ${transition.toVersion}: cached=${cachedTransitionHash} transition=${transition.previousTransitionHash}`,
+    )
+  }
+  if (
+    input.nextRoom.battleAuthorityTransitionHash !== transition.transitionHash
+    || transition.receipt.roomId !== roomId
+    || transition.receipt.clientActionId !== transition.clientActionId
+  ) {
+    throw new Error(
+      `Battle authority in-memory receipt or next-room metadata mismatch in ${roomId} at ${transition.toVersion}`,
+    )
+  }
+
+  const previousStorage = getBattleStorage(cached.room)
+  const nextStorage = getBattleStorage(input.nextRoom)
+  if (!previousStorage || !nextStorage) {
+    throw new Error(`Battle authority in-memory state missing in ${roomId} at ${transition.toVersion}`)
+  }
+  const replayedStorage = replayBattleAuthorityTransitions({
+    roomId,
+    checkpointStorage: previousStorage,
+    checkpointVersion: input.expectedVersion,
+    checkpointStateHash: transition.preStateHash,
+    checkpointPublicHash: transition.prePublicHash,
+    checkpointTransitionHash: cachedTransitionHash,
+    targetVersion: transition.toVersion,
+    targetTransitionHash: transition.transitionHash,
+    transitions: [transition],
+  })
+  if (hashStable(replayedStorage) !== hashStable(nextStorage)) {
+    throw new Error(
+      `Battle authority in-memory delta does not reproduce next state in ${roomId} at ${transition.toVersion}`,
+    )
+  }
+}
+
 export async function initializeBattleAuthorityCheckpoint(input: {
   room: Room
   storage: ServerBattleState
@@ -377,7 +447,15 @@ export async function initializeBattleAuthorityCheckpoint(input: {
   })
   await prisma.battleAuthorityCheckpoint.upsert({
     where: { roomId_authorityVersion: { roomId, authorityVersion } },
-    update: {},
+    update: {
+      protocolVersion: 2,
+      seed: input.storage.seed,
+      stateJson: JSON.stringify(input.storage),
+      stateHash: input.stateHash,
+      publicHash: input.publicHash,
+      transitionHash,
+      reason: 'initial',
+    },
     create: {
       roomId,
       authorityVersion,

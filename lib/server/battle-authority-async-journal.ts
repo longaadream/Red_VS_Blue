@@ -18,6 +18,7 @@ export interface BattleAuthorityJournalJob {
 export interface BattleAuthorityAsyncJournalOptions {
   maxPendingPerRoom?: number
   retryDelaysMs?: number[]
+  persistTimeoutMs?: number
   onStateChange?: (roomId: string, state: BattleAuthorityJournalInspection) => void
 }
 
@@ -42,9 +43,11 @@ export class BattleAuthorityAsyncJournal {
   private readonly jobs: Array<BattleAuthorityJournalJob & { roomId: string }> = []
   private readonly maxPendingPerRoom: number
   private readonly retryDelaysMs: number[]
+  private readonly persistTimeoutMs: number
   private readonly onStateChange?: BattleAuthorityAsyncJournalOptions['onStateChange']
   private running = false
   private scheduled = false
+  private accepting = true
   private globalWaiters: Array<{
     resolve: () => void
     reject: (error: Error) => void
@@ -59,13 +62,19 @@ export class BattleAuthorityAsyncJournal {
     if (retryDelaysMs.some(delay => !Number.isFinite(delay) || delay < 0)) {
       throw new Error('retryDelaysMs must contain only non-negative finite values')
     }
+    const persistTimeoutMs = options.persistTimeoutMs ?? 2_000
+    if (!Number.isFinite(persistTimeoutMs) || persistTimeoutMs <= 0) {
+      throw new Error('persistTimeoutMs must be a positive finite number')
+    }
     this.maxPendingPerRoom = maxPendingPerRoom
     this.retryDelaysMs = [...retryDelaysMs]
+    this.persistTimeoutMs = persistTimeoutMs
     this.onStateChange = options.onStateChange
   }
 
   enqueue(job: BattleAuthorityJournalJob): boolean {
     const roomId = normalizeRoomId(job.roomId)
+    if (!this.accepting) return false
     const state = this.roomState(roomId)
     if (state.degradedError) return false
     if (state.pending >= this.maxPendingPerRoom) {
@@ -79,6 +88,14 @@ export class BattleAuthorityAsyncJournal {
     this.emit(roomId)
     this.scheduleRun()
     return true
+  }
+
+  closeIngress(): void {
+    this.accepting = false
+  }
+
+  isAccepting(): boolean {
+    return this.accepting
   }
 
   markDurable(roomId: string, authorityVersion: number): void {
@@ -179,9 +196,16 @@ export class BattleAuthorityAsyncJournal {
     let attempt = 0
     while (true) {
       try {
-        await job.persist()
+        await withTimeout(
+          job.persist(),
+          this.persistTimeoutMs,
+          `Battle authority journal persist timed out after ${this.persistTimeoutMs}ms in ${job.roomId}`,
+        )
         return
       } catch (error) {
+        // A timed-out Prisma call has an ambiguous outcome and cannot be
+        // cancelled safely. Do not manufacture concurrent duplicate writes.
+        if (error instanceof BattleAuthorityJournalPersistTimeoutError) throw error
         if (attempt >= this.retryDelaysMs.length) throw error
         const delay = this.retryDelaysMs[attempt]
         attempt += 1
@@ -263,6 +287,30 @@ function normalizeRoomId(roomId: string): string {
 
 function asError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
+}
+
+export class BattleAuthorityJournalPersistTimeoutError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'BattleAuthorityJournalPersistTimeoutError'
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new BattleAuthorityJournalPersistTimeoutError(message)), timeoutMs)
+    timeout.unref?.()
+    promise.then(
+      value => {
+        clearTimeout(timeout)
+        resolve(value)
+      },
+      error => {
+        clearTimeout(timeout)
+        reject(error)
+      },
+    )
+  })
 }
 
 function sleep(delayMs: number): Promise<void> {

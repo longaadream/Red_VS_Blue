@@ -108,6 +108,46 @@ describe('battle authority async journal', () => {
     await expect(journal.drain('room-a')).rejects.toThrow('pending limit')
   })
 
+  it('times out a stuck write, degrades that room, and continues the global writer', async () => {
+    const never = new Promise<void>(() => undefined)
+    const roomBPersist = vi.fn(async () => undefined)
+    const journal = new BattleAuthorityAsyncJournal({
+      retryDelaysMs: [0, 0],
+      persistTimeoutMs: 20,
+    })
+
+    journal.enqueue({ roomId: 'room-a', kind: 'transition', authorityVersion: 1, persist: () => never })
+    journal.enqueue({ roomId: 'room-b', kind: 'transition', authorityVersion: 1, persist: roomBPersist })
+
+    await expect(journal.drain()).rejects.toThrow('persist timed out after 20ms in room-a')
+    expect(roomBPersist).toHaveBeenCalledTimes(1)
+    expect(journal.inspect('room-a')).toMatchObject({
+      status: 'degraded',
+      pending: 0,
+      durableAuthorityVersion: 0,
+    })
+    expect(journal.inspect('room-b')).toMatchObject({
+      status: 'durable',
+      pending: 0,
+      durableAuthorityVersion: 1,
+    })
+  })
+
+  it('closes ingress before a graceful drain without degrading durable rooms', async () => {
+    const journal = new BattleAuthorityAsyncJournal({ retryDelaysMs: [] })
+    journal.closeIngress()
+
+    expect(journal.isAccepting()).toBe(false)
+    expect(journal.enqueue({
+      roomId: 'room-a',
+      kind: 'transition',
+      authorityVersion: 1,
+      persist: vi.fn(),
+    })).toBe(false)
+    await expect(journal.drain()).resolves.toBeUndefined()
+    expect(journal.inspect('room-a')).toMatchObject({ status: 'durable', pending: 0 })
+  })
+
   it('requires a room to drain before its journal state can be forgotten', async () => {
     let release!: () => void
     const blocked = new Promise<void>(resolve => { release = resolve })

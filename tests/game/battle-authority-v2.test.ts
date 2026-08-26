@@ -180,7 +180,72 @@ describe('RED-109 authority v2 coordinator', () => {
     const captured = checkpoint!
     expect(captured.publicHash).toBe(hashPublicBattleState(toPublicBattleState(captured.storage.state as any)))
     expect(captured.publicHash).not.toBe(captured.stateHash)
+
+    checkpoint = undefined
+    const resumed = await startBattleFromLockedRosters(store, currentRoom.id, {
+      clock: { now: () => 1_000 },
+    })
+    expect(resumed.started).toBe(false)
+    expect(checkpoint).toBeDefined()
   })
+
+  it('rolls the room back when the mandatory initial checkpoint cannot be created', async () => {
+    let currentRoom: Room = {
+      id: 'red109-checkpoint-failure',
+      name: 'RED-109 checkpoint failure',
+      status: 'ready',
+      players: [
+        {
+          id: 'player-red',
+          name: 'Red',
+          seat: 'red',
+          alignment: 'light',
+          selectedPieces: getDefaultDemoRosterSelection('light'),
+          rosterLocked: true,
+          rosterManifestVersion: DEMO_ROSTER_MANIFEST_VERSION,
+        },
+        {
+          id: 'player-blue',
+          name: 'Blue',
+          seat: 'blue',
+          alignment: 'dark',
+          selectedPieces: getDefaultDemoRosterSelection('dark'),
+          rosterLocked: true,
+          rosterManifestVersion: DEMO_ROSTER_MANIFEST_VERSION,
+        },
+      ],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 3,
+      battleAuthorityVersion: 0,
+    }
+    const store = {
+      async getRoom(roomId: string) {
+        return roomId === currentRoom.id ? structuredClone(currentRoom) : undefined
+      },
+      async setRoom(_roomId: string, room: Room) {
+        currentRoom = JSON.parse(JSON.stringify(room)) as Room
+      },
+      async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number) {
+        if (roomId !== currentRoom.id || expectedVersion !== currentRoom.version) return false
+        currentRoom = { ...JSON.parse(JSON.stringify(room)) as Room, version: expectedVersion + 1 }
+        return true
+      },
+      async initializeBattleAuthorityCheckpoint() {
+        throw new Error('checkpoint database unavailable')
+      },
+    }
+
+    await expect(startBattleFromLockedRosters(store, currentRoom.id, {
+      clock: { now: () => 1_000 },
+    })).rejects.toThrow('checkpoint database unavailable')
+
+    expect(currentRoom.status).toBe('ready')
+    expect(currentRoom.battleState).toBeUndefined()
+    expect(currentRoom.version).toBe(5)
+  })
+
   it('commits command, transition and applied receipt once, then deduplicates retries without a write', async () => {
     const store = new AuthorityV2MemoryStore(makeRoom())
     const action = deploymentChoice('command-1')

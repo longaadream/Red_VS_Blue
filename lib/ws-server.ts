@@ -31,6 +31,7 @@ import {
   lockDemoRosterInStore,
 } from './game/roster-contract'
 import { DEMO_FIXED_MAP_ID, startBattleFromLockedRosters } from './game/room-battle-start'
+import { installBattleAuthorityShutdownHandlers } from './server/battle-authority-shutdown'
 
 // HMR-safe: keep server + client maps on globalThis so Next.js hot reloads
 // can tear down the old WebSocketServer (which holds stale handler closures)
@@ -42,6 +43,7 @@ const _g = globalThis as unknown as {
   __rvbPlayerWs?: Map<string, WebSocket>
   __rvbWsIdentities?: WeakMap<WebSocket, { roomId: string; playerId?: string }>
   __rvbWsUpgradeHandler?: (request: IncomingMessage, socket: Duplex, head: Buffer) => void
+  __rvbBattleAuthorityShutdownInstalled?: boolean
 }
 
 const roomClients = (_g.__rvbRoomClients ??= new Map<string, Set<WebSocket>>())
@@ -420,7 +422,7 @@ async function sendBattleSnapshot(ws: WebSocket, roomId: string, viewerPlayerId?
   sendJson(ws, { type: 'battleUnavailable', reason: 'battle-not-started', room: publicRoom(room) })
 }
 
-async function restartWsServer(): Promise<void> {
+async function quiesceWsServer(): Promise<void> {
   const activeServer = _g.__rvbWss ?? _wss
   if (activeServer) {
     // HMR installs a fresh noServer router on the existing HTTP server.
@@ -434,6 +436,10 @@ async function restartWsServer(): Promise<void> {
     roomClients.clear()
     playerWs.clear()
   }
+}
+
+async function restartWsServer(): Promise<void> {
+  await quiesceWsServer()
   if (process.env.DISABLE_WS === '1') {
     console.log('[WS] WebSocket server disabled (DISABLE_WS=1)')
     return
@@ -532,7 +538,8 @@ async function restartWsServer(): Promise<void> {
                 if (!room) throw new Error('Room not found')
                 if (room.status === 'in-progress') throw new Error('Cannot delete room while game is in progress')
                 if (room.hostId && room.hostId.toLowerCase() !== player) throw new Error('Unauthorized - only host can delete room')
-                await roomStore.removeRoom(targetRoomId)
+                const removed = await roomStore.removeRoom(targetRoomId)
+                if (!removed) throw new Error('Room could not be deleted')
                 await broadcastLobby()
                 result = { success: true, deletedBy: 'host' }
               } else if (method === 'rooms.action') {
@@ -781,6 +788,10 @@ async function restartWsServer(): Promise<void> {
 }
 
 export function startWsServer(): Promise<void> {
+  if (!_g.__rvbBattleAuthorityShutdownInstalled) {
+    installBattleAuthorityShutdownHandlers({ quiesce: quiesceWsServer })
+    _g.__rvbBattleAuthorityShutdownInstalled = true
+  }
   const previous = _g.__rvbWsLifecycle ?? Promise.resolve()
   const current = previous
     .catch(() => undefined)

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { hashBattleState } from '@/lib/game/battle-trace'
 import {
   buildBattleAuthorityTransition,
+  hashBattleAuthorityTransition,
   isBattleAuthorityAsyncJournalEnabled,
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
@@ -78,7 +79,7 @@ describe('battle authority async persistence integration', () => {
 
   it('commits the room actor and receipt before Prisma becomes durable', async () => {
     const input = transitionInput('async-persistence-room')
-    rememberBattleAuthorityRoom({ ...input.nextRoom, battleAuthorityVersion: input.expectedVersion })
+    rememberPreTransitionActor(input)
 
     await expect(commitBattleAuthorityTransition(input)).resolves.toBe(true)
     expect(harness.transaction).not.toHaveBeenCalled()
@@ -112,6 +113,45 @@ describe('battle authority async persistence integration', () => {
     })
   })
 
+  it('rejects a drifted in-memory chain head before recording a receipt or scheduling Prisma', async () => {
+    harness.transaction.mockClear()
+    const input = transitionInput('async-chain-drift-room')
+    rememberPreTransitionActor(input, 'tampered-chain-head')
+
+    await expect(commitBattleAuthorityTransition(input)).rejects.toThrow('in-memory chain mismatch')
+    expect(harness.transaction).not.toHaveBeenCalled()
+    await expect(getBattleAuthorityReceipt(input.roomId, input.transition.clientActionId))
+      .resolves.toBeUndefined()
+  })
+
+  it('rejects tampered pre-state and action hashes before the in-memory ACK boundary', async () => {
+    harness.transaction.mockClear()
+    const badPreState = transitionInput('async-bad-pre-state-room')
+    badPreState.transition.preStateHash = 'bad-pre-state-hash'
+    rememberPreTransitionActor(badPreState)
+    await expect(commitBattleAuthorityTransition(badPreState)).rejects.toThrow('checkpoint hash mismatch')
+
+    const badAction = transitionInput('async-bad-action-room')
+    badAction.transition.actionHash = 'bad-action-hash'
+    rememberPreTransitionActor(badAction)
+    await expect(commitBattleAuthorityTransition(badAction)).rejects.toThrow('action hash mismatch')
+    expect(harness.transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects a delta that cannot reproduce next state even when its transition hash is recomputed', async () => {
+    harness.transaction.mockClear()
+    const input = transitionInput('async-bad-delta-room')
+    const setOperation = input.transition.internalPatch.find(operation => operation.op === 'set')
+    if (!setOperation || setOperation.op !== 'set') throw new Error('Expected a set operation')
+    setOperation.value = 999
+    input.transition.transitionHash = hashBattleAuthorityTransition(input.transition)
+    input.nextRoom.battleAuthorityTransitionHash = input.transition.transitionHash
+    rememberPreTransitionActor(input)
+
+    await expect(commitBattleAuthorityTransition(input)).rejects.toThrow('transition state hash mismatch')
+    expect(harness.transaction).not.toHaveBeenCalled()
+  })
+
   it('advances multiple same-room transitions while the first SQLite write is blocked', async () => {
     harness.transaction.mockClear()
     const first = transitionInput('async-sequence-room')
@@ -120,7 +160,7 @@ describe('battle authority async persistence integration', () => {
       1,
       first.transition.transitionHash,
     )
-    rememberBattleAuthorityRoom({ ...first.nextRoom, battleAuthorityVersion: first.expectedVersion })
+    rememberPreTransitionActor(first)
 
     await expect(commitBattleAuthorityTransition(first)).resolves.toBe(true)
     await expect(commitBattleAuthorityTransition(second)).resolves.toBe(true)
@@ -146,6 +186,18 @@ describe('battle authority async persistence integration', () => {
     })
   })
 })
+
+function rememberPreTransitionActor(
+  input: ReturnType<typeof transitionInput>,
+  transitionHash = input.transition.previousTransitionHash,
+): void {
+  rememberBattleAuthorityRoom({
+    ...input.nextRoom,
+    battleAuthorityVersion: input.expectedVersion,
+    battleAuthorityTransitionHash: transitionHash,
+    battleState: storageAt(input.expectedVersion) as unknown as Room['battleState'],
+  })
+}
 
 function transitionInput(
   roomId: string,
@@ -188,7 +240,7 @@ function transitionInput(
       actions: [],
       version: 1,
       battleAuthorityVersion: fromVersion,
-      battleAuthorityTransitionHash: transition.previousTransitionHash,
+      battleAuthorityTransitionHash: transition.transitionHash,
       battleState: next as unknown as Room['battleState'],
     },
     expectedVersion: fromVersion,

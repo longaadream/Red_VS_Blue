@@ -36,10 +36,15 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    Transition journal 只保存命令、receipt、内部/公开 Δ 与 hash 证据；一个有界后台 writer 按原顺序
    把这些记录写入现有原子数据库事务，避免多个后台写者自行制造 SQLite 写锁竞争。
 7. 持久化公开 `durableAuthorityVersion` 和 `durable | pending | degraded` 状态。后台写失败按有界次数
-   重试；超过上限后房间继续以内存状态裁决并明确标为 degraded，不把已经应用的动作伪装成失败。
-   队列有每房间上限，房间删除前必须排空；终局尝试排空并记录失败。关闭进程的调用方必须调用
-   drain 接口后再退出。
-8. 初始检查点仍同步建立；固定间隔、换回合、终局与关闭检查点随 Transition 在后台生成和写入。
+   重试；每次 durable write 有 2 秒上限。普通 reject 可重试，超时写的提交结果不明确，不能并发重放
+   同一写入，而是立刻把房间标为 degraded 并让全局 writer 继续处理其他房间。超过上限后房间继续
+   以内存状态裁决并明确标为 degraded，不把已经应用的动作伪装成失败。
+   队列有每房间上限；房间删除前必须排空，排空失败必须拒绝删除并向调用方返回错误。终局尝试
+   排空并记录失败。
+8. 初始检查点仍同步建立，且与从 waiting/ready 切换到 in-progress 共同构成启动不变量：检查点失败时
+   以 Room CAS 回滚到原房间；已经处于 version 0 的 in-progress 房间再次进入启动入口时，必须先补齐
+   检查点并 hydrate 内存 actor，不能直接广播一个不可行动的半启动房间。固定间隔、换回合、终局与
+   关闭检查点随 Transition 在后台生成和写入。
    重启恢复只承诺恢复到数据库中已持久化的权威水位：从最近检查点开始应用内部 Δ，逐条验证
    pre/post state/public hash、action hash、previous transition hash 和 transition hash。缺检查点、缺号、
    损坏或未到持久化目标版本必须显式失败，不能静默使用部分状态。候选阶段明确不承诺断电前尚未
@@ -57,6 +62,15 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
     `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只开启 v2 仍走旧的数据库原子提交，作为快速回退。
     只有显式
     `RVB_TURN_TIMER_ENABLED=1` 才启用 deadline、安排部署/回合计时权威唤醒并显示计时投影。未设置或设置为 `0` 时，晚到玩家动作也不会结算 timeout。
+
+14. 内存 ACK 前必须验证完整提交不变量，不能只比较版本：缓存链头等于 Transition 前链、action hash、
+    transition hash、pre/post state/public hash 与内部 Δ 回放结果都必须匹配；任一不一致都 fail closed，
+    不得先 ACK 再等后台数据库 CAS 暴露错误。
+15. 优雅关闭按固定顺序执行：先关闭 journal ingress，拒绝新的内存提交；再停止 WS 接入；随后排空
+    全局 writer，并逐房间验证 `durableAuthorityVersion == authorityVersion`。Next 服务同时监听
+    `SIGINT/SIGTERM` 和父 Electron 的 IPC 请求。Electron server/client 子进程使用 IPC 等待明确成功回执，
+    总等待上限 6 秒，随后才允许进程退出；排空失败或超时必须记录“可能不耐久”并以失败回执/退出码
+    暴露，不能伪装成成功。强制杀进程只保留为有界兜底。
 
 ## 性能合同
 
@@ -81,8 +95,11 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 
 - 协调器：同房间 FIFO、跨房间并行、背压、失败后继续。
 - 协议：精确回执、重复零写、旧版本 resync、patch 前后 hash、危险路径拒绝。
-- 内存/耐久边界：阻塞或失败的 SQLite 不阻塞 applied receipt；durable 水位按序推进，失败进入 degraded；
-  版本 0 基准检查点、检查点/Transition 连续恢复与损坏拒绝。
+- 内存/耐久边界：阻塞或失败的 SQLite 不阻塞 applied receipt；durable 水位按序推进；单次写超时进入
+  degraded 且不会永久阻塞其他房间；版本 0 基准检查点、启动失败回滚、检查点/Transition 连续恢复与
+  损坏拒绝。
+- 关闭/删除：关闭 ingress 后新提交失败；SIGTERM 与 Electron IPC 都按“停止接入→排空→逐房间水位核对”
+  执行；排空失败的房间删除在 WS/HTTP 明确失败。
 - 规则：部署、水门目标、观者选项、pending 超时、回合计时与机器人均走同一协调器。
 - 传输：LAN WS、HTTP 后备、Relay 瞬时转发、功能开关完整快照回退。
 - 发布：类型、编码、全量测试、生产 `next build`、主线基线检查和双客户端人工 LAN 验收。

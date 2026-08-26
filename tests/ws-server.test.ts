@@ -8,6 +8,7 @@ import {
   type DispatchRoomBattleActionResult,
 } from '../lib/game/room-battle-actions'
 import { broadcastBattleTransition, startWsServer } from '../lib/ws-server'
+import { getRoomStore, type Room } from '../lib/game/room-store'
 import { makeState } from './helpers/minimal-state'
 
 const globalWithWsServer = globalThis as typeof globalThis & {
@@ -217,6 +218,45 @@ describe('game WebSocket service', () => {
       await closeClient(client)
     }
   })
+  test('reports a failed room deletion instead of acknowledging success', async () => {
+    const client = await openClient()
+    const roomStore = getRoomStore()
+    const room: Room = {
+      id: 'delete-failure-room',
+      name: 'Delete failure room',
+      status: 'waiting',
+      players: [{ id: 'host', name: 'Host' }],
+      spectators: [],
+      hostId: 'host',
+      currentTurnIndex: 0,
+      actions: [],
+    }
+    const getRoom = vi.spyOn(roomStore, 'getRoom').mockResolvedValue(room)
+    const removeRoom = vi.spyOn(roomStore, 'removeRoom').mockResolvedValue(false)
+
+    try {
+      const response = waitForJsonMessage(client)
+      client.send(JSON.stringify({
+        type: 'rpc',
+        requestId: 'delete-failure',
+        method: 'rooms.delete',
+        data: { roomId: room.id, playerId: 'host' },
+      }))
+
+      await expect(response).resolves.toEqual({
+        type: 'rpcResult',
+        requestId: 'delete-failure',
+        ok: false,
+        error: 'Room could not be deleted',
+      })
+      expect(removeRoom).toHaveBeenCalledWith(room.id)
+    } finally {
+      getRoom.mockRestore()
+      removeRoom.mockRestore()
+      await closeClient(client)
+    }
+  })
+
 
   test('isolates a committed transition projection failure per recipient and resyncs privately', async () => {
     const roomId = 'broadcast-isolation-' + Date.now()

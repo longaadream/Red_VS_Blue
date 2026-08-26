@@ -41,11 +41,12 @@ export async function startBattleFromLockedRosters(
     const room = await store.getRoom(roomId)
     if (!room) throw new Error('Room not found')
     if (room.status === 'in-progress' && room.battleState) {
+      const authorityReadyRoom = await ensureInitialAuthorityCheckpoint(store, room, clock)
       await scheduleRoomDeploymentTimeout(store, roomId, {
         clock,
         onCommitted: options.onDeploymentUpdate,
       })
-      return { room, started: false }
+      return { room: authorityReadyRoom, started: false }
     }
 
     resetRoomBattleAuthorityClock(roomId)
@@ -126,8 +127,9 @@ export async function startBattleFromLockedRosters(
     } else {
       await store.setRoom(roomId, nextRoom)
     }
-    const committedRoom = await store.getRoom(roomId) ?? nextRoom
-    const initialSnapshot = createPublicBattleSnapshot(committedRoom, undefined, clock)
+    let committedRoom = await store.getRoom(roomId) ?? nextRoom
+    const committedMetadataVersion = committedRoom.version
+    let initialSnapshot = createPublicBattleSnapshot(committedRoom, undefined, clock)
     const authorityStore = store as RosterRoomStore & {
       initializeBattleAuthorityCheckpoint?: (input: {
         room: Room
@@ -137,13 +139,30 @@ export async function startBattleFromLockedRosters(
       }) => Promise<void>
     }
     const committedStorage = getBattleStorage(committedRoom)
-    if (committedStorage && authorityStore.initializeBattleAuthorityCheckpoint) {
-      await authorityStore.initializeBattleAuthorityCheckpoint({
-        room: committedRoom,
-        storage: committedStorage,
-        stateHash: hashBattleState(committedStorage.state as typeof initialState),
-        publicHash: hashPublicBattleState(initialSnapshot.state),
-      })
+    if (isBattleAuthorityV2Enabled()) {
+      try {
+        if (!committedStorage || !authorityStore.initializeBattleAuthorityCheckpoint) {
+          throw new Error(`Battle authority initial checkpoint is unavailable in ${roomId}`)
+        }
+        await authorityStore.initializeBattleAuthorityCheckpoint({
+          room: committedRoom,
+          storage: committedStorage,
+          stateHash: hashBattleState(committedStorage.state as typeof initialState),
+          publicHash: hashPublicBattleState(initialSnapshot.state),
+        })
+        committedRoom = await store.getRoom(roomId) ?? committedRoom
+        initialSnapshot = createPublicBattleSnapshot(committedRoom, undefined, clock)
+      } catch (checkpointError) {
+        const rolledBack = typeof committedMetadataVersion === 'number'
+          ? await store.setRoomIfVersion(roomId, room, committedMetadataVersion)
+          : (await store.setRoom(roomId, room), true)
+        if (!rolledBack) {
+          throw new Error(
+            `Initial battle checkpoint failed and room rollback conflicted: ${checkpointError instanceof Error ? checkpointError.message : String(checkpointError)}`,
+          )
+        }
+        throw checkpointError
+      }
     }
     await options.onDeploymentUpdate?.(initialSnapshot)
     await scheduleRoomDeploymentTimeout(store, roomId, {
@@ -154,4 +173,35 @@ export async function startBattleFromLockedRosters(
   }
 
   throw new Error('Battle could not start because the room changed concurrently')
+}
+
+async function ensureInitialAuthorityCheckpoint(
+  store: RosterRoomStore,
+  room: Room,
+  clock: DeploymentRuleClock,
+): Promise<Room> {
+  if (!isBattleAuthorityV2Enabled()) return room
+  const authorityVersion = room.battleAuthorityVersion ?? 0
+  if (!Number.isSafeInteger(authorityVersion) || authorityVersion < 0) throw new Error('Invalid battle authority version')
+  if (authorityVersion > 0) return room
+  const authorityStore = store as RosterRoomStore & {
+    initializeBattleAuthorityCheckpoint?: (input: {
+      room: Room
+      storage: ServerBattleState
+      stateHash: string
+      publicHash: string
+    }) => Promise<void>
+  }
+  const storage = getBattleStorage(room)
+  if (!storage || !authorityStore.initializeBattleAuthorityCheckpoint) {
+    throw new Error(`Battle authority initial checkpoint is unavailable in ${room.id}`)
+  }
+  const snapshot = createPublicBattleSnapshot(room, undefined, clock)
+  await authorityStore.initializeBattleAuthorityCheckpoint({
+    room,
+    storage,
+    stateHash: hashBattleState(storage.state as Parameters<typeof hashBattleState>[0]),
+    publicHash: hashPublicBattleState(snapshot.state),
+  })
+  return await store.getRoom(room.id) ?? room
 }

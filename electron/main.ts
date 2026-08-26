@@ -12,6 +12,11 @@ let tray: Tray | null = null
 let dashboardWin: BrowserWindow | null = null
 let serverRunning = false
 let cleanupInterval: NodeJS.Timeout | null = null
+const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
+const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
+const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
+let allowAppExit = false
+let appExitPromise: Promise<void> | null = null
 
 type ChildLogStream = 'stdout' | 'stderr'
 type ChildLogErrorSide = 'source' | 'target' | 'write'
@@ -297,6 +302,64 @@ function killProcessTree(proc: ChildProcess): void {
   }
 }
 
+function requestGracefulServerShutdown(proc: ChildProcess): Promise<boolean> {
+  if (!proc.connected || typeof proc.send !== 'function') return Promise.resolve(false)
+  const requestId = `${process.pid}:${proc.pid ?? 'unknown'}:${Date.now()}`
+  return new Promise(resolve => {
+    let settled = false
+    const finish = (ok: boolean, warning?: string) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      proc.removeListener('message', onMessage)
+      proc.removeListener('exit', onExit)
+      if (warning) console.warn('[electron] graceful server shutdown failed:', warning)
+      resolve(ok)
+    }
+    const onMessage = (message: unknown) => {
+      const result = message as { type?: unknown; requestId?: unknown; ok?: unknown; error?: unknown }
+      if (result.type !== BATTLE_AUTHORITY_SHUTDOWN_RESULT || result.requestId !== requestId) return
+      finish(result.ok === true, result.ok === true ? undefined : String(result.error ?? 'journal drain failed'))
+    }
+    const onExit = () => finish(false, 'server exited before durable drain acknowledgement')
+    const timeout = setTimeout(() => {
+      finish(false, `timed out after ${SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS}ms`)
+    }, SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS)
+    timeout.unref?.()
+    proc.on('message', onMessage)
+    proc.once('exit', onExit)
+    try {
+      proc.send({ type: BATTLE_AUTHORITY_SHUTDOWN_REQUEST, requestId }, error => {
+        if (error) finish(false, error.message)
+      })
+    } catch (error) {
+      finish(false, error instanceof Error ? error.message : String(error))
+    }
+  })
+}
+
+async function stopChildProcessGracefully(proc: ChildProcess): Promise<void> {
+  const durable = await requestGracefulServerShutdown(proc)
+  if (!durable) {
+    console.error('[electron] forcing server stop with a potentially undurable battle journal')
+  }
+  if (proc.exitCode === null && proc.signalCode === null) killProcessTree(proc)
+}
+
+function requestApplicationExit(): void {
+  if (allowAppExit) {
+    app.exit(0)
+    return
+  }
+  if (appExitPromise) return
+  appExitPromise = stopGameServer()
+    .catch(error => console.error('[electron] graceful application shutdown failed:', error))
+    .finally(() => {
+      allowAppExit = true
+      app.exit(0)
+    })
+}
+
 // ─── 游戏服务器进程 ───────────────────────────────────────────────────────────
 
 function findServerEntry(appRoot: string): string | null {
@@ -367,7 +430,7 @@ function startGameServer(): void {
         USER_DATA_DIR: userData,
         DATABASE_URL: databaseUrl,
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     })
     serverProcess = spawnedProcess
   } catch (err) {
@@ -461,25 +524,25 @@ function startRoomCleanup(): void {
   cleanupInterval = setInterval(cleanupRooms, 60 * 60 * 1000)
 }
 
-function stopGameServer(): void {
-  if (serverProcess) {
-    const proc = serverProcess
-    requestedServerStops.add(proc)
-    serverProcess = null
-    serverRunning = false
-    if (cleanupInterval) {
-      clearInterval(cleanupInterval)
-      cleanupInterval = null
-    }
-    killProcessTree(proc)
-    dashboardWin?.webContents.send('server-status', { running: false })
-    updateTrayMenu()
+async function stopGameServer(): Promise<void> {
+  if (!serverProcess) return
+  const proc = serverProcess
+  requestedServerStops.add(proc)
+  serverProcess = null
+  serverRunning = false
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval)
+    cleanupInterval = null
   }
+  dashboardWin?.webContents.send('server-status', { running: false })
+  updateTrayMenu()
+  await stopChildProcessGracefully(proc)
 }
 
-function restartGameServer(): void {
-  stopGameServer()
-  setTimeout(startGameServer, 500)
+async function restartGameServer(): Promise<void> {
+  await stopGameServer()
+  await new Promise(resolve => setTimeout(resolve, 500))
+  startGameServer()
 }
 
 // ─── 管理面板窗口 ─────────────────────────────────────────────────────────────
@@ -537,7 +600,7 @@ function updateTrayMenu(): void {
       click: stopGameServer,
     },
     { type: 'separator' },
-    { label: '退出', click: () => { stopGameServer(); app.exit(0) } },
+    { label: '退出', click: requestApplicationExit },
   ]))
 }
 
@@ -555,8 +618,8 @@ function handleTrusted(channel: string, listener: Parameters<typeof ipcMain.hand
 }
 
 handleTrusted('get-status', () => ({ running: serverRunning, port: 3000 }))
-handleTrusted('restart-server', () => { restartGameServer() })
-handleTrusted('stop-server', () => { stopGameServer() })
+handleTrusted('restart-server', async () => { await restartGameServer() })
+handleTrusted('stop-server', async () => { await stopGameServer() })
 handleTrusted('start-server', () => { startGameServer() })
 handleTrusted('get-lobby', async () => {
   try {
@@ -629,6 +692,10 @@ if (!gotLock) {
   })
 
   app.on('window-all-closed', () => { /* 托盘常驻，不退出 */ })
-  app.on('before-quit', () => stopGameServer())
+  app.on('before-quit', event => {
+    if (allowAppExit) return
+    event.preventDefault()
+    requestApplicationExit()
+  })
   app.on('activate', createDashboardWindow)
 }
