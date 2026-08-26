@@ -76,6 +76,10 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
   20 条 Transition、20 条 receipt 与 2 个有界 checkpoint；清空进程内 Room Actor 后，从数据库恢复到
   同一版本、state hash 与 transition hash 链头；另用第二个真实 Prisma client 持有 SQLite 写锁，验证
   A 房在原生期限内 degraded、B 房随后 durable，且不会因 safety timeout 与 A 的旧写重叠。
+- `BattleAuthorityCheckpoint.seed` 只在 Prisma `Int` 边界使用有符号 32 位二进制编码；规则状态、
+  `stateJson`、协议与随机运行时始终保留原始 uint32 seed。兼容迁移会把候选版本曾写入的
+  `2147483648..4294967295` 规范化为相同 32 位比特的负数，恢复时再还原并与 `stateJson.seed`
+  交叉校验，避免高位 seed 触发 Prisma P2023，且不改变对局随机结果。
 - `battle-authority-async-persistence.test.ts` 在 ACK 前篡改链头、pre state/action hash 或 Δ 后的 post state
   均会 fail closed；不得让后台 Prisma CAS 代替内存提交不变量。
 - `battle-authority-shutdown.test.ts` 验证 IPC 的“关闭 ingress→停止 WS→排空”顺序、失败回执、整体超时，

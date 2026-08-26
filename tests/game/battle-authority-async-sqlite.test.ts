@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -24,6 +24,7 @@ afterAll(async () => {
 
 describe('battle authority async SQLite persistence', () => {
   it('drains ordered deltas and restores the durable state from a real database', async () => {
+    const unsignedSeed = 2_339_259_146
     const directory = mkdtempSync(join(tmpdir(), 'rvb-red109-sqlite-'))
     temporaryDirectories.push(directory)
     process.env.DATABASE_URL = `file:${join(directory, 'authority.db').replaceAll('\\', '/')}`
@@ -49,7 +50,14 @@ describe('battle authority async SQLite persistence', () => {
     ])
     const store = new roomStoreModule.RoomStore()
     activePrismaClients.push(prisma)
-    const room = makeRoom(helpers.makeState, helpers.makePiece, trace.recordBattleInitialization, runtime.RuleRuntime)
+    const room = makeRoom(
+      helpers.makeState,
+      helpers.makePiece,
+      trace.recordBattleInitialization,
+      runtime.RuleRuntime,
+      'red109-real-sqlite',
+      unsignedSeed,
+    )
     await store.setRoom(room.id, room)
     const storage = room.battleState as unknown as { type: 'server-state'; seed: number; state: unknown }
     await store.initializeBattleAuthorityCheckpoint({
@@ -60,6 +68,16 @@ describe('battle authority async SQLite persistence', () => {
         persistence.getRememberedBattleAuthorityRoom(room.id) ?? room,
       ).state),
     })
+    const initialCheckpoint = await prisma.battleAuthorityCheckpoint.findUniqueOrThrow({
+      where: { roomId_authorityVersion: { roomId: room.id, authorityVersion: 0 } },
+    })
+    expect(initialCheckpoint.seed).toBe(unsignedSeed - 0x1_0000_0000)
+    // Force the first transition to exercise the base-checkpoint create path,
+    // instead of merely finding the initial row created above.
+    await prisma.battleAuthorityCheckpoint.delete({
+      where: { roomId_authorityVersion: { roomId: room.id, authorityVersion: 0 } },
+    })
+
 
     let lastHash = ''
     for (let index = 0; index < 20; index += 1) {
@@ -89,10 +107,19 @@ describe('battle authority async SQLite persistence', () => {
     expect(await prisma.battleAuthorityTransition.count({ where: { roomId: room.id } })).toBe(20)
     expect(await prisma.battleAuthorityReceipt.count({ where: { roomId: room.id } })).toBe(20)
     expect(await prisma.battleAuthorityCheckpoint.count({ where: { roomId: room.id } })).toBe(2)
+    const persistedSeeds = await prisma.$queryRawUnsafe<Array<{ seed: number }>>(
+      'SELECT "seed" FROM "BattleAuthorityCheckpoint" WHERE "roomId" = ? ORDER BY "authorityVersion" ASC',
+      room.id,
+    )
+    expect(persistedSeeds).toEqual([
+      { seed: unsignedSeed - 0x1_0000_0000 },
+      { seed: unsignedSeed - 0x1_0000_0000 },
+    ])
 
     persistence.forgetBattleAuthorityRoom(room.id)
     const restored = await store.getRoom(room.id)
     expect(restored?.battleAuthorityVersion).toBe(20)
+    expect((restored?.battleState as unknown as { seed: number }).seed).toBe(unsignedSeed)
     expect(actions.createPublicBattleSnapshot(restored!).stateHash).toBe(lastHash)
     expect(store.inspectBattleAuthorityPersistence(room.id)).toMatchObject({
       status: 'durable',
@@ -106,6 +133,60 @@ describe('battle authority async SQLite persistence', () => {
 
     await prisma.$disconnect()
     resetAuthorityGlobals()
+  }, 30_000)
+
+  it('normalizes pre-fix unsigned checkpoint seeds before Prisma reads them', async () => {
+    const unsignedSeed = 2_339_259_146
+    const directory = mkdtempSync(join(tmpdir(), 'rvb-red109-seed-migration-'))
+    temporaryDirectories.push(directory)
+    process.env.DATABASE_URL = `file:${join(directory, 'authority.db').replaceAll('\\', '/')}`
+    vi.resetModules()
+    resetAuthorityGlobals()
+
+    const { PrismaClient } = await import('@prisma/client')
+    const setup = new PrismaClient()
+    activePrismaClients.push(setup)
+    await createAuthoritySchema(setup)
+    const stateJson = JSON.stringify({ type: 'server-state', seed: unsignedSeed, state: {} })
+    await setup.$executeRawUnsafe(
+      `INSERT INTO "BattleAuthorityCheckpoint" (
+        "roomId",
+        "authorityVersion",
+        "protocolVersion",
+        "seed",
+        "stateJson",
+        "stateHash",
+        "publicHash",
+        "transitionHash",
+        "reason"
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      'red109-pre-fix-seed',
+      0,
+      2,
+      unsignedSeed,
+      stateJson,
+      'state-hash',
+      'public-hash',
+      'transition-hash',
+      'initial',
+    )
+    const migrationSql = readFileSync(
+      join(
+        process.cwd(),
+        'prisma',
+        'migrations',
+        '20260826180000_normalize_battle_authority_checkpoint_seed',
+        'migration.sql',
+      ),
+      'utf8',
+    )
+    await setup.$executeRawUnsafe(migrationSql)
+
+    const checkpoint = await setup.battleAuthorityCheckpoint.findUniqueOrThrow({
+      where: { roomId_authorityVersion: { roomId: 'red109-pre-fix-seed', authorityVersion: 0 } },
+    })
+    expect(checkpoint.seed).toBe(unsignedSeed - 0x1_0000_0000)
+    expect(JSON.parse(checkpoint.stateJson).seed).toBe(unsignedSeed)
   }, 30_000)
 
   it('contains a real SQLite lock failure to one room without overlapping the next room write', async () => {
@@ -236,6 +317,7 @@ function makeRoom(
   recordBattleInitialization: typeof import('@/lib/game/battle-trace').recordBattleInitialization,
   RuleRuntime: typeof import('@/lib/game/rule-runtime').RuleRuntime,
   roomId = 'red109-real-sqlite',
+  seed = 109,
 ) {
   const state = makeState({
     pieces: [
@@ -266,7 +348,7 @@ function makeRoom(
       'piece-blue': { x: 8, y: 8 },
     },
   }
-  recordBattleInitialization(state, new RuleRuntime({ rootSeed: 109 }), ['player-red', 'player-blue'])
+  recordBattleInitialization(state, new RuleRuntime({ rootSeed: seed }), ['player-red', 'player-blue'])
   return {
     id: roomId,
     name: roomId,
@@ -280,7 +362,7 @@ function makeRoom(
     actions: [],
     version: 0,
     battleAuthorityVersion: 0,
-    battleState: { type: 'server-state', seed: 109, state } as unknown as import('@/lib/game/room-store').Room['battleState'],
+    battleState: { type: 'server-state', seed, state } as unknown as import('@/lib/game/room-store').Room['battleState'],
   }
 }
 

@@ -214,6 +214,8 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
     replayFrameJson: transition.replayFrames.length > 0 ? JSON.stringify(transition.replayFrames) : null,
     receiptJson: JSON.stringify(transition.receipt),
     checkpointState: input.checkpoint ? JSON.stringify(input.checkpoint.storage) : undefined,
+    baseCheckpointSeed: input.baseCheckpoint ? encodeBattleAuthorityCheckpointSeed(input.baseCheckpoint.seed) : undefined,
+    checkpointSeed: input.checkpoint ? encodeBattleAuthorityCheckpointSeed(input.checkpoint.seed) : undefined,
   }
   await setBattleAuthoritySqliteBusyTimeout()
   const committed = await prisma.$transaction(async transaction => {
@@ -243,7 +245,7 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
           roomId,
           authorityVersion: base.authorityVersion,
           protocolVersion: base.protocolVersion,
-          seed: base.seed,
+          seed: payload.baseCheckpointSeed!,
           stateJson: payload.baseCheckpointState!,
           stateHash: base.stateHash,
           publicHash: base.publicHash,
@@ -293,7 +295,7 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
           roomId,
           authorityVersion: input.checkpoint.authorityVersion,
           protocolVersion: input.checkpoint.protocolVersion,
-          seed: input.checkpoint.seed,
+          seed: payload.checkpointSeed!,
           stateJson: payload.checkpointState!,
           stateHash: input.checkpoint.stateHash,
           publicHash: input.checkpoint.publicHash,
@@ -316,6 +318,37 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
 
 async function setBattleAuthoritySqliteBusyTimeout(): Promise<void> {
   await prisma.$queryRawUnsafe(`PRAGMA busy_timeout = ${BATTLE_AUTHORITY_SQLITE_BUSY_TIMEOUT_MS}`)
+}
+
+function encodeBattleAuthorityCheckpointSeed(seed: number): number {
+  if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffff_ffff) {
+    throw new Error(`Battle authority checkpoint seed must be an unsigned 32-bit integer, got ${seed}`)
+  }
+  return seed > 0x7fff_ffff ? seed - 0x1_0000_0000 : seed
+}
+
+function decodeBattleAuthorityCheckpointSeed(seed: number): number {
+  if (!Number.isSafeInteger(seed) || seed < -0x8000_0000 || seed > 0x7fff_ffff) {
+    throw new Error(`Stored battle authority checkpoint seed is not a signed 32-bit integer: ${seed}`)
+  }
+  return seed >>> 0
+}
+
+function assertBattleAuthorityCheckpointSeed(
+  roomId: string,
+  authorityVersion: number,
+  persistedSeed: number,
+  storageSeed: number,
+): void {
+  const decodedSeed = decodeBattleAuthorityCheckpointSeed(persistedSeed)
+  if (
+    !Number.isSafeInteger(storageSeed)
+    || storageSeed < 0
+    || storageSeed > 0xffff_ffff
+    || storageSeed !== decodedSeed
+  ) {
+    throw new Error(`Battle authority checkpoint seed mismatch in ${roomId} at ${authorityVersion}`)
+  }
 }
 
 function assertBattleAuthorityTransitionMetadata(input: CommitBattleAuthorityTransitionInput): string {
@@ -458,11 +491,12 @@ export async function initializeBattleAuthorityCheckpoint(input: {
     stateHash: input.stateHash,
     publicHash: input.publicHash,
   })
+  const persistedSeed = encodeBattleAuthorityCheckpointSeed(input.storage.seed)
   await prisma.battleAuthorityCheckpoint.upsert({
     where: { roomId_authorityVersion: { roomId, authorityVersion } },
     update: {
       protocolVersion: 2,
-      seed: input.storage.seed,
+      seed: persistedSeed,
       stateJson: JSON.stringify(input.storage),
       stateHash: input.stateHash,
       publicHash: input.publicHash,
@@ -473,7 +507,7 @@ export async function initializeBattleAuthorityCheckpoint(input: {
       roomId,
       authorityVersion,
       protocolVersion: 2,
-      seed: input.storage.seed,
+      seed: persistedSeed,
       stateJson: JSON.stringify(input.storage),
       stateHash: input.stateHash,
       publicHash: input.publicHash,
@@ -504,6 +538,12 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
   if (!checkpoint) return room
 
   const checkpointStorage = JSON.parse(checkpoint.stateJson) as ServerBattleState
+  assertBattleAuthorityCheckpointSeed(
+    roomId,
+    checkpoint.authorityVersion,
+    checkpoint.seed,
+    checkpointStorage.seed,
+  )
   const checkpointTransitionHash = checkpoint.transitionHash || (
     checkpoint.authorityVersion === 0
       ? createBattleAuthorityGenesisHash({
