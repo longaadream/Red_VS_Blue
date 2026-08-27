@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createInitialBattleForPlayers, DEMO_FIXED_MAP_ID } from "@/lib/game/battle-setup"
+import { createInitialBattleForPlayers } from "@/lib/game/battle-setup"
 import { getPieceById } from "@/lib/game/piece-repository"
 import type { PieceTemplate } from "@/lib/game/piece"
 import { createRootSeed } from "@/lib/game/rule-runtime"
 import { hashBattleState } from "@/lib/game/battle-runner"
 import { stampPendingDeploymentAuthorityVersion } from "@/lib/game/battle-trace"
+import { assertSelectableMapId, isMapSelectionError } from "@/lib/game/map-selection"
 
 /**
  * POST /api/relay-battle-init
@@ -16,9 +17,9 @@ import { stampPendingDeploymentAuthorityVersion } from "@/lib/game/battle-trace"
  * Body:
  * {
  *   players: [
- *     { id: string, faction: 'red'|'blue', pieces: Array<{ templateId: string }> }
+ *     { id: string, faction: 'red'|'blue', alignment?: 'light'|'dark', pieces: Array<{ templateId: string }> }
  *   ],
- *   mapId?: string
+ *   mapId: string
  * }
  */
 export async function POST(req: NextRequest) {
@@ -27,12 +28,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "players array with at least 2 entries required" }, { status: 400 })
   }
 
-  const players: Array<{ id: string; faction: 'red' | 'blue'; pieces: Array<{ templateId: string }> }> =
+  const players: Array<{ id: string; faction: 'red' | 'blue'; alignment?: 'light' | 'dark'; pieces: Array<{ templateId: string }> }> =
     body.players
   const redPlayers = players.filter(player => player.faction === 'red')
   const bluePlayers = players.filter(player => player.faction === 'blue')
   if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
     return NextResponse.json({ error: "players must contain exactly one red and one blue seat" }, { status: 400 })
+  }
+  let mapId: string
+  try {
+    mapId = assertSelectableMapId(body.mapId)
+  } catch (error) {
+    if (!isMapSelectionError(error)) throw error
+    return NextResponse.json(
+      { error: error.message, code: error.code, context: error.context },
+      { status: 400 },
+    )
   }
   const firstPlayerId = redPlayers[0].id
 
@@ -47,7 +58,7 @@ export async function POST(req: NextRequest) {
         return { ...tpl, faction: player.faction } as PieceTemplate
       })
       .filter((p): p is PieceTemplate => p !== null)
-    return { playerId: player.id, pieces }
+    return { playerId: player.id, faction: player.faction, alignment: player.alignment, pieces }
   })
 
   // Flat list for the overloaded first arg
@@ -58,7 +69,7 @@ export async function POST(req: NextRequest) {
     playerIds,
     allPieces,
     playerSelectedPieces,
-    DEMO_FIXED_MAP_ID,
+    mapId,
     {
       firstPlayerId,
       rootSeed: seed,

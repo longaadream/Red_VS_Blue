@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment, type Player } from "@/lib/game/room-store"
 import { ensureRosterAlignmentMutable, getRosterErrorPayload } from "@/lib/game/roster-contract"
+import { assertSelectableMapId, getMapSelectionErrorPayload } from "@/lib/game/map-selection"
 import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
 import { broadcastToRoom } from "@/lib/ws-server"
 import { createPublicRoomSnapshot } from "@/lib/game/room-battle-actions"
@@ -78,14 +79,24 @@ export async function POST(
     }
   }
 
-  let room = await roomStore.getRoom(roomId)
+  const room = await roomStore.getRoom(roomId)
   if (!room) {
-    if (body.action !== "join") {
-      return NextResponse.json({ error: "Room not found" }, { status: 404 })
+    return NextResponse.json({ error: "Room not found" }, { status: 404 })
+  }
+
+  if (
+    (body.action === "join" || body.action === "start")
+    && (room.status !== 'in-progress' || !room.battleState)
+  ) {
+    try {
+      assertSelectableMapId(room.mapId)
+    } catch (error) {
+      const mapError = getMapSelectionErrorPayload(error)
+      if (mapError) {
+        return NextResponse.json({ success: false, error: mapError.message, code: mapError.code, context: mapError.context }, { status: 400 })
+      }
+      throw error
     }
-    console.log('Room not found, creating new room:', roomId)
-    room = await roomStore.createRoom(roomId, `Room ${roomId}`)
-    console.log('New room created:', room.id)
   }
 
   if (body.action === "join") {
@@ -166,6 +177,10 @@ export async function POST(
       const rosterError = getRosterErrorPayload(error)
       if (rosterError) {
         return NextResponse.json({ success: false, error: rosterError.message, code: rosterError.code, context: rosterError.context }, { status: 400 })
+      }
+      const mapError = getMapSelectionErrorPayload(error)
+      if (mapError) {
+        return NextResponse.json({ success: false, error: mapError.message, code: mapError.code, context: mapError.context }, { status: 400 })
       }
       const message = error instanceof Error ? error.message : String(error)
       return NextResponse.json({ success: false, error: message }, { status: 400 })

@@ -1,4 +1,5 @@
-import { getMapAsync, getMap, DEFAULT_MAP_ID, loadMaps } from "@/config/maps"
+import { getMap, DEFAULT_MAP_ID, loadMaps } from "@/config/maps"
+import { assertSelectableMapId } from './map-selection'
 import { rng } from "./rng"
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceTemplate, PieceStats } from "./piece"
@@ -15,8 +16,6 @@ import { recordBattleInitialization } from './battle-trace'
 import { RANDOM_STREAM_NAMES, RuleRuntime, withRuleRuntime } from './rule-runtime'
 
 import { DEPLOYMENT_DURATION_MS } from './deployment'
-
-export const DEMO_FIXED_MAP_ID = 'large-hole-arena'
 
 function assertSetupTriggerIsSynchronous(result: TriggerResult, eventType: string): void {
   if (!result.needsOptionSelection && !result.needsTargetSelection) return
@@ -147,9 +146,6 @@ export function buildInitialPiecesForPlayers(
 
   const deterministicDeployment = options.deterministicDeployment === true
   if (deterministicDeployment) {
-    if (map.id !== DEMO_DEPLOYMENT_MAP_ID) {
-      throw new Error(`Demo deployment requires map ${DEMO_DEPLOYMENT_MAP_ID}; received ${map.id}`)
-    }
     if (!playerSelectedPieces || playerSelectedPieces.length !== 2 || playerSelectedPieces.some(player => player.pieces.length !== 8)) {
       throw new Error('Demo deployment requires exactly two players with eight pieces each')
     }
@@ -535,43 +531,42 @@ export async function createInitialBattleForPlayers(
 
   const orderedIds = [...playerIds]
   const orderedPSP = playerSelectedPieces ? [...playerSelectedPieces] : undefined
+  let resolvedMapId = mapId
 
   if (options?.deploymentEnabled) {
     if (typeof options.rootSeed !== 'number') throw new Error('Demo deployment requires an explicit root seed')
     if (!Number.isSafeInteger(options.deploymentStartedAt) || (options.deploymentStartedAt ?? -1) < 0) {
       throw new Error('Demo deployment requires an explicit non-negative deployment start time')
     }
-    if (mapId !== DEMO_DEPLOYMENT_MAP_ID) {
-      throw new Error(`Demo deployment requires map ${DEMO_DEPLOYMENT_MAP_ID}; received ${String(mapId)}`)
-    }
+    resolvedMapId = assertSelectableMapId(mapId)
     orderedIds.sort(compareStableText)
     orderedPSP?.sort((left, right) => compareStableText(left.playerId, right.playerId))
   }
 
   const [p1, p2] = orderedIds
   
-  writeLog('[createInitialBattleForPlayers] mapId: ' + mapId)
+  writeLog('[createInitialBattleForPlayers] mapId: ' + resolvedMapId)
   writeLog('[createInitialBattleForPlayers] DEFAULT_MAP_ID: ' + DEFAULT_MAP_ID)
   
   // 尝试获取指定地图或默认地图
-  let map = getMap(mapId || DEFAULT_MAP_ID)
+  let map = getMap(resolvedMapId || DEFAULT_MAP_ID)
   writeLog('[createInitialBattleForPlayers] map from getMap: ' + (map ? map.name : 'NOT FOUND'))
   
   // 如果地图没有加载成功，尝试异步加载
   if (!map && !options?.deploymentEnabled) {
-    writeLog('Map ' + (mapId || DEFAULT_MAP_ID) + ' not found in cache, trying to load...')
+    writeLog('Map ' + (resolvedMapId || DEFAULT_MAP_ID) + ' not found in cache, trying to load...')
     await loadMaps()
-    map = getMap(mapId || DEFAULT_MAP_ID)
+    map = getMap(resolvedMapId || DEFAULT_MAP_ID)
     writeLog('[createInitialBattleForPlayers] map after loadMaps: ' + (map ? map.name : 'NOT FOUND'))
   }
   
   if (!map && options?.deploymentEnabled) {
-    throw new Error(`Map ${DEMO_DEPLOYMENT_MAP_ID} not found`)
+    throw new Error(`Map ${String(resolvedMapId)} not found`)
   }
 
   // 如果地图仍然没有加载成功，旧入口使用默认地图
   if (!map) {
-    console.warn(`Map ${mapId || DEFAULT_MAP_ID} not found, using default map`)
+    console.warn(`Map ${resolvedMapId || DEFAULT_MAP_ID} not found, using default map`)
     
     // 创建一个更真实的默认地图，包含墙壁和不同类型的格子
     const defaultMap: BoardMap = {

@@ -2,7 +2,7 @@
   "id": "prototype-encounter-1",
   "name": "路边伏击",
   "type": "battle",
-  "mapId": "large-battlefield",
+  "mapId": "large-hole-arena",
   "enemyTeamId": "prototype-bandits",
   "winCondition": {
     "type": "defeat-all-enemies"

@@ -1,0 +1,48 @@
+{
+  "id": "narrow-corridors",
+  "name": "狭廊要道",
+  "layout": [
+    "####################",
+    "#...C.......C......#",
+    "#.#####.######.###.#",
+    "#.......C#......C..#",
+    "###.##T###.####T#.##",
+    "#....C.......C.....#",
+    "#.T.#.#.#.T.#.#.#..#",
+    "#.#.#.T.#.#.#.#.T..#",
+    "#..C.......C.......#",
+    "##.##T###.##T###.###",
+    "#......C.......C...#",
+    "##T#.##T###.######.#",
+    "#....C.............#",
+    "#.######.#####T##T##",
+    "#.............C....#",
+    "####################"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false
+    },
+    {
+      "char": "T",
+      "type": "hole",
+      "walkable": false,
+      "bulletPassable": true
+    }
+  ]
+}

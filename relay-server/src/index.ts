@@ -6,7 +6,7 @@ import { roomsRouter } from './routes/rooms'
 import { leaderboardRouter } from './routes/leaderboard'
 import { wsHandler } from './ws/handler'
 import { store } from './store'
-import type { WsData } from './types'
+import { STANDALONE_SELECTABLE_MAP_CATALOG, type WsData } from './types'
 
 const app = new Hono()
 
@@ -16,6 +16,7 @@ app.route('/api/ping', pingRouter)
 app.route('/api/lobby', lobbyRouter)
 app.route('/api/rooms', roomsRouter)
 app.route('/api/leaderboard', leaderboardRouter)
+app.get('/api/maps', c => c.json({ maps: STANDALONE_SELECTABLE_MAP_CATALOG }))
 
 app.all('*', c => c.json({ error: 'not found' }, 404))
 

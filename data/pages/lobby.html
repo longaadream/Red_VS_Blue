@@ -127,6 +127,7 @@
       cursor: pointer; margin-top: 20px;
     }
     .btn-primary:active { opacity: .85; }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
     .btn-cancel {
       width: 100%; padding: 12px; background: transparent; color: #64748b;
       border: 1px solid #334155; border-radius: 12px; font-size: 14px;
@@ -284,14 +285,14 @@
     <div class="sheet">
       <div class="sheet-title">创建房间</div>
       <div class="field-label">地图</div>
-      <select id="mapSelect"><option value="arena-8x6">默认地图 (8×6)</option></select>
+      <select id="mapSelect" disabled><option value="">正在加载地图…</option></select>
       <div class="field-label">可见性</div>
       <div class="toggle-row">
         <span>公开房间（所有人可见）</span>
         <input type="checkbox" id="visibilityToggle" checked>
       </div>
       <div id="createErr" class="err-msg"></div>
-      <button class="btn-primary" onclick="doCreateRoom()">创建并加入</button>
+      <button class="btn-primary" id="createRoomBtn" onclick="doCreateRoom()" disabled>创建并加入</button>
       <button class="btn-cancel" onclick="closeCreateSheet()">取消</button>
     </div>
   </div>
@@ -418,6 +419,33 @@
       return RvBWs.request(method, data || {}, timeoutMs || 6000)
     }
 
+    async function relayJson(path, options) {
+      const response = await RvBUtils.serverFetch(path, options)
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        const error = new Error((payload && payload.error) || ('HTTP ' + response.status))
+        if (payload && payload.code) error.code = payload.code
+        throw error
+      }
+      return payload
+    }
+
+    async function lobbyRequest(method, data, timeoutMs) {
+      if (!shouldUseRelayMode()) return wsRequest(method, data, timeoutMs)
+      const input = data || {}
+      if (method === 'rooms.list') return relayJson('/api/lobby')
+      if (method === 'rooms.create') return relayJson('/api/lobby', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+      if (method === 'rooms.get') return relayJson('/api/rooms/' + encodeURIComponent(input.roomId))
+      if (method === 'rooms.action') return relayJson('/api/rooms/' + encodeURIComponent(input.roomId) + '/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+      if (method === 'rooms.spectate') return relayJson('/api/rooms/' + encodeURIComponent(input.roomId) + '/spectate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+      if (method === 'rooms.delete') return relayJson('/api/rooms/' + encodeURIComponent(input.roomId), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'x-player-id': input.playerId },
+        body: JSON.stringify({ playerId: input.playerId }),
+      })
+      throw new Error('Unsupported lobby request: ' + method)
+    }
+
     function updateFloatBar() {
       const saved = RvBUtils.getServerUrl()
       const status = document.getElementById('floatStatus')
@@ -444,7 +472,7 @@
       btn.disabled = true
       statusBar.innerHTML = '<span class="spinner-sm"></span><span>加载中…</span>'
       try {
-        const data = await wsRequest('rooms.list')
+        const data = await lobbyRequest('rooms.list')
         renderRooms(data.rooms || [])
         statusBar.textContent = '上次更新：' + new Date().toLocaleTimeString()
       } catch (e) {
@@ -464,7 +492,9 @@
         (r.status === 'waiting' || r.status === 'open' || !r.status) &&
         (r.visibility === 'public' || r.visibility == null)
       )
-      const inProgress = rooms.filter(r => r.status === 'in-progress')
+      const remote = shouldUseRelayMode()
+      const selecting = remote ? rooms.filter(r => r.status === 'selecting') : []
+      const inProgress = rooms.filter(r => r.status === 'in-progress' || r.status === 'playing' || (remote && (r.status === 'battle' || r.status === 'waiting_host')))
 
       let html = ''
 
@@ -479,10 +509,24 @@
           return `<div class="room-card">
             <div class="room-info">
               <div class="room-name">${escHtml(r.name || r.id)}</div>
-              <div class="room-meta">玩家 ${players}/2 · 地图：${escHtml(r.mapId || '默认')}${inviteInfo}</div>
+              <div class="room-meta">玩家 ${players}/2 · 地图：${escHtml(getMapDisplayName(r.mapId))}${inviteInfo}</div>
             </div>
             ${deleteBtn}
             <button class="btn-join" onclick="showFactionPicker('${escHtml(r.id)}')">加入</button>
+          </div>`
+        }).join('')
+      }
+
+      if (selecting.length) {
+        html += '<div class="section-label" style="margin-top:16px">选人中的房间</div>'
+        html += selecting.map(r => {
+          const players = r.players ? r.players.length : (r.playerCount || 0)
+          return `<div class="room-card">
+            <div class="room-info">
+              <div class="room-name">${escHtml(r.name || r.id)}</div>
+              <div class="room-meta">玩家 ${players}/2 · 地图：${escHtml(getMapDisplayName(r.mapId))} · 正在选人</div>
+            </div>
+            <button class="btn-spectate" disabled>选人中</button>
           </div>`
         }).join('')
       }
@@ -501,7 +545,7 @@
         }).join('')
       }
 
-      if (!waiting.length && !inProgress.length) {
+      if (!waiting.length && !selecting.length && !inProgress.length) {
         list.innerHTML = '<div class="empty-state"><div class="empty-icon">🏠</div>暂无房间<br><span style="font-size:12px">点击"创建房间"开始，或输入邀请码加入私密房间</span></div>'
         return
       }
@@ -514,9 +558,11 @@
     }
 
     let _pendingJoinRoomId = null
-    function showFactionPicker(roomId) {
+    let _pendingJoinAction = 'join'
+    function showFactionPicker(roomId, action) {
       if (!RvBUtils.getServerUrl()) { alert('请先连接服务器'); return }
       _pendingJoinRoomId = roomId
+      _pendingJoinAction = action || 'join'
       document.getElementById('factionBtnRed').classList.remove('selected')
       document.getElementById('factionBtnBlue').classList.remove('selected')
       document.getElementById('factionSheet').style.display = 'flex'
@@ -524,16 +570,19 @@
     function closeFactionSheet() {
       document.getElementById('factionSheet').style.display = 'none'
       _pendingJoinRoomId = null
+      _pendingJoinAction = 'join'
     }
     async function confirmJoin(faction) {
       const roomId = _pendingJoinRoomId
+      const action = _pendingJoinAction
       if (!roomId) return
       document.getElementById('factionSheet').style.display = 'none'
       _pendingJoinRoomId = null
-      await joinRoom(roomId, faction)
+      _pendingJoinAction = 'join'
+      await joinRoom(roomId, faction, action)
     }
 
-    async function joinRoom(roomId, faction) {
+    async function joinRoom(roomId, faction, action) {
       try {
         const identity = RvBIdentity.getIdentity()
         if (!identity) { alert('请先设置账号'); return }
@@ -542,17 +591,19 @@
           ? RvBIdentity.getPublicKey()
           : (identity.publicKey || '')
         const packMd5 = localStorage.getItem('rvb_pack_md5') || ''
-        const payload = { action: 'join', roomId, playerId, timestamp: Date.now() }
+        const requestedAction = action || 'join'
+        const payload = { action: requestedAction, roomId, playerId, timestamp: Date.now() }
         const signature = await RvBIdentity.sign(payload)
-        const body = { action: 'join', roomId, playerId, playerName, publicKey, payload, signature, packMd5 }
+        const body = { action: requestedAction, roomId, playerId, playerName, publicKey, payload, signature, packMd5 }
         if (faction) body.alignment = faction
-        const result = await wsRequest('rooms.action', body)
+        const result = await lobbyRequest('rooms.action', body)
         if (result && result.packMismatch) {
           alert('⚠️ 警告：双方资源包版本不一致，可能导致技能、棋子数据不同步。请确认双方已导入相同版本的资源包后再开始游戏。')
         }
         window.location.href = 'room.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(playerId)
           + '&playerName=' + encodeURIComponent(playerName)
+          + (faction ? '&alignment=' + encodeURIComponent(faction) : '')
           + (shouldUseRelayMode() ? '&relay=1' : '')
       } catch (e) { alert('加入房间失败：' + e.message) }
     }
@@ -560,7 +611,7 @@
     async function spectateRoom(roomId) {
       const { id: spectatorId, displayName: spectatorName } = RvBIdentity.getIdentity()
       try {
-        await wsRequest('rooms.spectate', { roomId, spectatorId, spectatorName })
+        await lobbyRequest('rooms.spectate', { roomId, spectatorId, spectatorName })
         window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(spectatorId)
           + '&mode=spectate'
@@ -573,16 +624,16 @@
       if (!confirm('确定要删除这个房间吗？')) return
       const { id: playerId } = RvBIdentity.getIdentity()
       try {
-        await wsRequest('rooms.delete', { roomId, playerId })
+        await lobbyRequest('rooms.delete', { roomId, playerId })
         loadRooms()
       } catch (e) { alert('删除房间失败：' + e.message) }
     }
 
-    function openCreateSheet() {
+    async function openCreateSheet() {
       if (!RvBUtils.getServerUrl()) { alert('请先连接服务器'); return }
       document.getElementById('createSheet').style.display = 'flex'
       document.getElementById('createErr').style.display = 'none'
-      loadMaps()
+      await loadMaps()
     }
 
     function closeCreateSheet() {
@@ -598,38 +649,82 @@
       return res.json()
     }
 
+    const DEFAULT_SELECTED_MAP_ID = 'large-hole-arena'
+    const MAP_NAMES = Object.create(null)
+    let mapsLoaded = false
+    let mapsLoadPromise = null
+
+    function getMapDisplayName(mapId) {
+      if (!mapId) return '未指定'
+      return MAP_NAMES[mapId] || mapId
+    }
+
     async function loadMaps() {
       const sel = document.getElementById('mapSelect')
-      if (sel.dataset.loaded) return
-      try {
-        const ids = await fetchLocalJson('./data/maps/manifest.json')
-        sel.innerHTML = ''
-        for (const id of ids) {
-          try {
-            const m = await fetchLocalJson('./data/maps/' + id + '.json')
+      const createBtn = document.getElementById('createRoomBtn')
+      if (mapsLoaded) return true
+      if (mapsLoadPromise) return mapsLoadPromise
+
+      sel.disabled = true
+      createBtn.disabled = true
+      sel.innerHTML = '<option value="">正在加载地图…</option>'
+      mapsLoadPromise = (async () => {
+        try {
+          const res = await RvBUtils.serverFetch('/api/maps')
+          if (!res.ok) throw new Error('地图目录 HTTP ' + res.status)
+          const payload = await res.json()
+          const maps = Array.isArray(payload.maps) ? payload.maps : []
+          if (!maps.length) throw new Error('服务器未返回可选地图')
+
+          const previous = sel.value
+          sel.innerHTML = ''
+          for (const map of maps) {
+            if (!map || typeof map.id !== 'string' || !map.id) continue
+            MAP_NAMES[map.id] = map.name || map.id
             const opt = document.createElement('option')
-            // Use the map's actual JSON id (not the filename) so server lookup succeeds
-            opt.value = m.id || id
-            opt.textContent = (m.name || id)
+            opt.value = map.id
+            opt.textContent = MAP_NAMES[map.id]
             sel.appendChild(opt)
-          } catch { /* skip bad map */ }
+          }
+          if (!sel.options.length) throw new Error('服务器地图目录无有效条目')
+
+          const preferred = previous || DEFAULT_SELECTED_MAP_ID
+          if (Array.from(sel.options).some(option => option.value === preferred)) sel.value = preferred
+          mapsLoaded = true
+          sel.disabled = false
+          createBtn.disabled = false
+          return true
+        } catch (error) {
+          mapsLoaded = false
+          sel.innerHTML = '<option value="">地图加载失败</option>'
+          sel.disabled = true
+          createBtn.disabled = true
+          const errEl = document.getElementById('createErr')
+          errEl.textContent = '地图加载失败：' + (error && error.message ? error.message : String(error))
+          errEl.style.display = 'block'
+          return false
+        } finally {
+          mapsLoadPromise = null
         }
-        sel.dataset.loaded = '1'
-      } catch {
-        sel.innerHTML = '<option value="arena-8x6">默认地图 (8×6)</option>'
-      }
+      })()
+      return mapsLoadPromise
     }
 
     async function doCreateRoom() {
-      const { id: hostId, displayName: playerName } = RvBIdentity.getIdentity()
-      const mapId = document.getElementById('mapSelect').value || 'arena-8x6'
+      const identity = RvBIdentity.getIdentity()
+      const { id: hostId, displayName: playerName } = identity
+      const publicKey = typeof RvBIdentity.getPublicKey === 'function'
+        ? RvBIdentity.getPublicKey() : (identity.publicKey || '')
       const visibility = document.getElementById('visibilityToggle').checked ? 'public' : 'private'
       const errEl = document.getElementById('createErr')
       errEl.style.display = 'none'
       try {
+        if (!(await loadMaps())) throw new Error('地图目录尚未就绪')
+        const mapId = document.getElementById('mapSelect').value
+        if (!mapId) throw new Error('请选择地图')
         await reconcileLobbyServerMode()
-        const room = await wsRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, mapId, visibility })
-        if (room.id) { closeCreateSheet(); showFactionPicker(room.id) }
+        const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, hostName: playerName, publicKey, mapId, visibility })
+        if (room.id) { closeCreateSheet(); showFactionPicker(room.id, shouldUseRelayMode() ? 'claim-faction' : 'join') }
         else throw new Error('未返回房间 ID')
       } catch (e) {
         const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || '未设置'
@@ -643,7 +738,7 @@
       if (!raw) return
       const code = raw.toUpperCase()
       try {
-        const data = await wsRequest('rooms.list')
+        const data = await lobbyRequest('rooms.list')
         const rooms = data.rooms || []
         const match = rooms.find(r => r.inviteCode && r.inviteCode.toUpperCase() === code && r.status === 'waiting')
         if (match) { showFactionPicker(match.id) }
@@ -718,7 +813,7 @@
         return
       }
       try {
-        const room = await wsRequest('rooms.get', { roomId: info.roomId })
+        const room = await lobbyRequest('rooms.get', { roomId: info.roomId })
         if (!isActiveBattleRoom(room, info.playerId)) {
           clearInvalidRejoin('保存的对局已失效，已清理')
           return
@@ -759,6 +854,7 @@
       refreshUserUI()
       updateFloatBar()
       await checkRejoin()
+      await loadMaps()
       loadRooms()
     })
     window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })

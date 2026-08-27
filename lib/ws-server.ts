@@ -30,7 +30,8 @@ import {
   lockDefaultBotRosterInStore,
   lockDemoRosterInStore,
 } from './game/roster-contract'
-import { DEMO_FIXED_MAP_ID, startBattleFromLockedRosters } from './game/room-battle-start'
+import { startBattleFromLockedRosters } from './game/room-battle-start'
+import { assertSelectableMapId, getMapSelectionErrorPayload } from './game/map-selection'
 import { installBattleAuthorityShutdownHandlers } from './server/battle-authority-shutdown'
 
 // HMR-safe: keep server + client maps on globalThis so Next.js hot reloads
@@ -224,8 +225,11 @@ function checkPackMismatchWs(players: any[]): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
-  let room = await roomStore.getRoom(roomId)
-  if (!room) room = await roomStore.createRoom(roomId, `Room ${roomId}`)
+  const room = await roomStore.getRoom(roomId)
+  if (!room) throw new Error('Room not found')
+  if (room.status !== 'in-progress' || !room.battleState) {
+    assertSelectableMapId(room.mapId)
+  }
 
   const normalizedPlayerId = String(body.playerId || '').trim().toLowerCase()
   const accountId = String(body.accountId || body.identityId || '').trim().toLowerCase() || undefined
@@ -282,10 +286,10 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
   const action = body.action
   if (action === 'join') return joinRoomViaWs(roomId, body)
 
-  let room = await roomStore.getRoom(roomId)
-  if (!room) {
-    if (action === 'claim-faction') room = await roomStore.createRoom(roomId, `Room ${roomId}`)
-    else throw new Error('Room not found')
+  const room = await roomStore.getRoom(roomId)
+  if (!room) throw new Error('Room not found')
+  if (room.status !== 'in-progress' || !room.battleState) {
+    assertSelectableMapId(room.mapId)
   }
 
   const normalizedPlayerId = String(body.playerId || '').trim().toLowerCase()
@@ -500,6 +504,7 @@ async function restartWsServer(): Promise<void> {
                 const rooms = await roomStore.getAllRooms()
                 result = { rooms: rooms.map(publicRoomList) }
               } else if (method === 'rooms.create' || method === 'lobby.create') {
+                const mapId = assertSelectableMapId(data.mapId)
                 let roomId = makeRoomId()
                 while (await roomStore.getRoom(roomId)) roomId = makeRoomId()
                 const now = Date.now()
@@ -528,7 +533,7 @@ async function restartWsServer(): Promise<void> {
                   maxPlayers: 2,
                   players: initialPlayers,
                   hostId,
-                  mapId: DEMO_FIXED_MAP_ID,
+                  mapId,
                   visibility: data.visibility === 'private' ? 'private' as const : 'public' as const,
                   inviteCode: makeInviteCode(),
                   spectators: [],
@@ -600,13 +605,16 @@ async function restartWsServer(): Promise<void> {
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err)
               const rosterError = getRosterErrorPayload(err)
+              const mapError = getMapSelectionErrorPayload(err)
+              const status = mapError ? 400 : message === 'Room not found' ? 404 : undefined
               sendJson(ws, {
                 type: 'rpcResult',
                 requestId,
                 ok: false,
-                error: rosterError?.message ?? message,
-                code: rosterError?.code,
-                context: rosterError?.context,
+                error: rosterError?.message ?? mapError?.message ?? message,
+                code: rosterError?.code ?? mapError?.code,
+                context: rosterError?.context ?? mapError?.context,
+                status,
               })
             }
           })()
@@ -656,13 +664,16 @@ async function restartWsServer(): Promise<void> {
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err)
               const rosterError = getRosterErrorPayload(err)
+              const mapError = getMapSelectionErrorPayload(err)
+              const status = mapError ? 400 : message === 'Room not found' ? 404 : undefined
               sendJson(sender, {
                 type: 'roomActionResult',
                 action: msg.action,
                 success: false,
-                error: rosterError?.message ?? message,
-                code: rosterError?.code,
-                context: rosterError?.context,
+                error: rosterError?.message ?? mapError?.message ?? message,
+                code: rosterError?.code ?? mapError?.code,
+                context: rosterError?.context ?? mapError?.context,
+                status,
               })
             }
           })()

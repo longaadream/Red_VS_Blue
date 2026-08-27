@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { BattleState } from "@/lib/game/turn"
 import { getRoomStore, type Room } from "@/lib/game/room-store"
 import { prisma } from "@/lib/db"
+import { assertSelectableMapId, getMapSelectionErrorPayload } from "@/lib/game/map-selection"
 
 // 导出 Room 类型供其他文件使用
 export type { Room }
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { name, hostId, mapId, visibility } = (body as { name?: string; hostId?: string; mapId?: string; visibility?: "private" | "public" }) ?? {}
+    const selectedMapId = assertSelectableMapId(mapId)
 
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
     let roomId = ''
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest) {
       maxPlayers: 2,
       players: [],
       hostId: trimmedHostId,
-      mapId: mapId?.trim() || 'large-battlefield',
+      mapId: selectedMapId,
       visibility: visibility || "public",
       inviteCode,
       spectators: [],
@@ -110,6 +112,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(room, { status: 201 })
   } catch (error) {
+    const mapError = getMapSelectionErrorPayload(error)
+    if (mapError) {
+      return NextResponse.json({
+        success: false,
+        error: mapError.message,
+        code: mapError.code,
+        context: mapError.context,
+      }, { status: 400 })
+    }
     console.error('[POST /api/lobby] Error creating room:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

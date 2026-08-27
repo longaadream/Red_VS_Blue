@@ -5,11 +5,55 @@ import { db } from './db/client'
 // In-memory for fast access; DB for persistence
 const rooms = new Map<string, Room>()
 const roomWsClients = new Map<string, Set<ServerWebSocket<WsData>>>()
+const roomMutationTails = new Map<string, Promise<void>>()
 
 // HOST disconnect timers: roomId -> timer handle
 const hostTimeouts = new Map<string, Timer>()
 
 const HOST_TIMEOUT_MS = 30 * 60 * 1000
+function snapshotRoom(room: Room): Room {
+  return structuredClone(room)
+}
+
+function upsertRoom(room: Room) {
+  return db.room.upsert({
+    where: { id: room.id },
+    create: {
+      id: room.id,
+      hostId: room.hostId,
+      name: room.name,
+      mapId: room.mapId ?? null,
+      status: room.status,
+      players: room.players as any,
+      inviteCode: room.inviteCode,
+      lastStateBlob: room.lastStateBlob,
+      actionLog: room.actionLog as any,
+      hostDisconnectedAt: room.hostDisconnectedAt
+        ? new Date(room.hostDisconnectedAt)
+        : null,
+    },
+    update: {
+      status: room.status,
+      mapId: room.mapId ?? null,
+      players: room.players as any,
+      lastStateBlob: room.lastStateBlob,
+      actionLog: room.actionLog as any,
+      hostDisconnectedAt: room.hostDisconnectedAt
+        ? new Date(room.hostDisconnectedAt)
+        : null,
+    },
+  })
+}
+
+function forgetRoom(id: string): void {
+  const key = id.toLowerCase()
+  rooms.delete(key)
+  roomWsClients.delete(key)
+  const timeout = hostTimeouts.get(key)
+  if (timeout) clearTimeout(timeout)
+  hostTimeouts.delete(key)
+}
+
 
 export const store = {
   // ── Room CRUD ──────────────────────────────────────────────────────────────
@@ -26,6 +70,7 @@ export const store = {
         id: room.id,
         hostId: room.hostId,
         name: room.name,
+        mapId: room.mapId ?? null,
         status: room.status,
         players: room.players as any,
         inviteCode: room.inviteCode,
@@ -37,6 +82,7 @@ export const store = {
       },
       update: {
         status: room.status,
+        mapId: room.mapId ?? null,
         players: room.players as any,
         lastStateBlob: room.lastStateBlob,
         actionLog: room.actionLog as any,
@@ -44,7 +90,31 @@ export const store = {
           ? new Date(room.hostDisconnectedAt)
           : null,
       },
-    }).catch(() => {})
+    }).catch(error => console.error(`[store] Failed to persist legacy room update ${room.id}`, error))
+  },
+  async persistRoom(room: Room): Promise<void> {
+    const snapshot = snapshotRoom(room)
+    await upsertRoom(snapshot)
+    rooms.set(snapshot.id.toLowerCase(), snapshot)
+  },
+
+  async withRoomLock<T>(id: string, operation: () => Promise<T>): Promise<T> {
+    const key = id.toLowerCase()
+    const previous = roomMutationTails.get(key) ?? Promise.resolve()
+    let release = () => {}
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+    const tail = previous.then(() => gate)
+    roomMutationTails.set(key, tail)
+
+    await previous
+    try {
+      return await operation()
+    } finally {
+      release()
+      if (roomMutationTails.get(key) === tail) roomMutationTails.delete(key)
+    }
   },
 
   deleteRoom(id: string): void {
@@ -52,8 +122,13 @@ export const store = {
     roomWsClients.delete(id.toLowerCase())
     hostTimeouts.get(id.toLowerCase())?.let?.((t: Timer) => clearTimeout(t))
     hostTimeouts.delete(id.toLowerCase())
-    db.room.delete({ where: { id } }).catch(() => {})
+    db.room.delete({ where: { id } }).catch(error => console.error(`[store] Failed to persist legacy room deletion ${id}`, error))
   },
+  async deleteRoomPersisted(id: string): Promise<void> {
+    await db.room.delete({ where: { id } })
+    forgetRoom(id)
+  },
+
 
   listRooms(): Room[] {
     return [...rooms.values()]
@@ -67,7 +142,7 @@ export const store = {
     db.room.update({
       where: { id: roomId },
       data: { actionLog: room.actionLog as any },
-    }).catch(() => {})
+    }).catch(error => console.error(`[store] Failed to persist action log for ${roomId}`, error))
   },
 
   // ── WebSocket client management ───────────────────────────────────────────
@@ -136,6 +211,7 @@ export const store = {
         id: r.id,
         hostId: r.hostId,
         name: r.name,
+        mapId: r.mapId ?? undefined,
         status: r.status as any,
         players: (r.players as any) ?? [],
         inviteCode: r.inviteCode ?? undefined,

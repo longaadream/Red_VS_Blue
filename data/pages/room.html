@@ -202,29 +202,33 @@
     let roomWsReady = false
     let roomWsConnecting = null
     const MAPS_CACHE = {}
+    let mapsLoadPromise = null
 
     if (!roomId || !playerId) {
       document.getElementById('statusLine').textContent = '参数缺失，请重新进入'
       document.getElementById('statusLine').className = 'status-line warn'
     }
 
-    async function fetchJson(p) {
-      if (window.fetchPackJson && /^\.?\/?data\//.test(p)) return window.fetchPackJson(p)
-      const res = await fetch(p)
-      if (!res.ok) throw new Error(res.status)
-      return res.json()
+    async function loadMapNames() {
+      if (mapsLoadPromise) return mapsLoadPromise
+      mapsLoadPromise = (async () => {
+        const res = await RvBUtils.serverFetch('/api/maps')
+        if (!res.ok) throw new Error('地图目录 HTTP ' + res.status)
+        const payload = await res.json()
+        const maps = Array.isArray(payload.maps) ? payload.maps : []
+        for (const map of maps) {
+          if (map && typeof map.id === 'string' && map.id) MAPS_CACHE[map.id] = map.name || map.id
+        }
+      })().catch(error => {
+        console.warn('[room:maps] 无法加载地图目录', error)
+      })
+      return mapsLoadPromise
     }
 
     async function getMapName(mapId) {
-      if (!mapId) return '默认'
-      if (MAPS_CACHE[mapId]) return MAPS_CACHE[mapId]
-      try {
-        const m = await fetchJson('./data/maps/' + mapId + '.json')
-        MAPS_CACHE[mapId] = m.name || mapId
-        return MAPS_CACHE[mapId]
-      } catch {
-        return mapId
-      }
+      if (!mapId) return '未指定'
+      if (!MAPS_CACHE[mapId]) await loadMapNames()
+      return MAPS_CACHE[mapId] || mapId
     }
 
     function factionIcon(f) { return f === 'red' ? '🔴' : f === 'blue' ? '🔵' : '⚪' }
@@ -234,7 +238,7 @@
 
     function currentPlayerAlignment() {
       const me = _lastRoom && (_lastRoom.players || []).find(p => p.id && p.id.toLowerCase() === playerId)
-      return me && me.alignment ? me.alignment : ''
+      return me && me.alignment ? me.alignment : (params.get('alignment') || '')
     }
 
     function navigateBattle() {
@@ -279,6 +283,7 @@
             _lastRoom = msg.room
             await renderRoom(msg.room)
             if (msg.room.status === 'in-progress' || msg.room.status === 'playing' || msg.room.status === 'battle') navigateBattle()
+            else if (shouldUseRelayMode() && msg.room.status === 'selecting') navigatePieceSelection()
             else if (msg.room.status === 'ready') {
               const me = (msg.room.players || []).find(p => p.id && p.id.toLowerCase() === playerId)
               if (me && me.ready) navigatePieceSelection()
@@ -295,6 +300,22 @@
     async function wsRequest(method, data, timeoutMs) {
       await ensureRoomWs()
       return RvBWs.request(method, data || {}, timeoutMs || 6000)
+    }
+
+    async function roomJson(path, options) {
+      const response = await RvBUtils.serverFetch(path, options)
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error((payload && payload.error) || ('HTTP ' + response.status))
+      return payload
+    }
+
+    async function roomRequest(method, data, timeoutMs) {
+      if (!shouldUseRelayMode()) return wsRequest(method, data, timeoutMs)
+      const input = data || {}
+      if (method === 'rooms.get') return roomJson('/api/rooms/' + encodeURIComponent(input.roomId))
+      if (method === 'rooms.action') return roomJson('/api/rooms/' + encodeURIComponent(input.roomId) + '/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+      if (method === 'rooms.delete') return roomJson('/api/rooms/' + encodeURIComponent(input.roomId), { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'x-player-id': input.playerId }, body: JSON.stringify({ playerId: input.playerId }) })
+      throw new Error('Unsupported room request: ' + method)
     }
 
     function renderSlot(slotLabel, p, myId, hostId, isMySlot) {
@@ -331,9 +352,13 @@
     async function refreshRoom() {
       if (_navigating) return
       try {
-        const room = await wsRequest('rooms.get', { roomId })
+        const room = await roomRequest('rooms.get', { roomId })
         _lastRoom = room
         await renderRoom(room)
+        if (shouldUseRelayMode() && room.status === 'selecting') {
+          navigatePieceSelection()
+          return
+        }
 
         // 战斗已开始（status=in-progress / playing / battle）→ 跳转 battle
         if (room.status === 'in-progress' || room.status === 'playing' || room.status === 'battle') {
@@ -343,12 +368,12 @@
         // 双方都已选完棋子但还没开战，也跳 battle（兼容旧流程）
         const allSelected = (room.players || []).length >= 2 &&
           room.players.every(p => p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
-        if (allSelected) {
+        if (!shouldUseRelayMode() && allSelected) {
           navigateBattle()
           return
         }
       } catch (e) {
-        document.getElementById('statusLine').textContent = 'WebSocket 房间同步失败：' + e.message
+        document.getElementById('statusLine').textContent = '房间同步失败：' + e.message
         document.getElementById('statusLine').className = 'status-line warn'
       }
     }
@@ -394,6 +419,16 @@
         status.className = 'status-line warn'
         return
       }
+      if (shouldUseRelayMode()) {
+        btn.disabled = true
+        btn.textContent = room.status === 'selecting' ? '进入选人' : '等待对手'
+        btn.className = 'btn-ready cancel-ready'
+        status.textContent = room.status === 'selecting'
+          ? '双方已入座，正在进入选人…'
+          : '等待对手加入…（' + players.length + '/' + cap + '）'
+        status.className = room.status === 'selecting' ? 'status-line ok' : 'status-line'
+        return
+      }
       btn.disabled = false
       if (me.ready) {
         btn.textContent = '取消准备'
@@ -428,7 +463,7 @@
       const btn = document.getElementById('readyBtn')
       btn.disabled = true
       try {
-        const room = await wsRequest('rooms.action', { roomId, action: 'toggle-ready', playerId, playerName })
+        const room = await roomRequest('rooms.action', { roomId, action: 'toggle-ready', playerId, playerName })
         await renderRoom(room)
       } catch (e) {
         alert('准备失败：' + e.message)
@@ -441,17 +476,13 @@
     async function dissolveRoom() {
       if (!confirm('确认解散房间？')) return
       try {
-        const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl) ? RvBUtils.getServerUrl() : ''
-        await fetch(serverUrl + '/api/rooms/' + encodeURIComponent(roomId), {
-          method: 'DELETE',
-          headers: { 'content-type': 'application/json', 'x-player-id': playerId },
-          body: JSON.stringify({ playerId })
-        })
+        await roomRequest('rooms.delete', { roomId, playerId })
+        _navigating = true
+        goBackToLobby()
       } catch (e) {
         console.warn('[room] dissolve failed', e)
+        alert('解散房间失败：' + e.message)
       }
-      _navigating = true
-      goBackToLobby()
     }
 
     function leaveAndGoLobby() {

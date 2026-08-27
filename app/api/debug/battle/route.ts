@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
         actions: [],
         hostId: aliceIdentity.playerId,
         firstPlayerId: aliceIdentity.playerId,
-        mapId: 'large-battlefield',
+        mapId: state.map.id,
         visibility: 'private',
         battleState: {
           type: 'server-state',
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
         currentTurnIndex: 0,
         actions: [],
         hostId: firstIdentity.playerId,
-        mapId: body.mapId || 'large-battlefield',
+        mapId: body.mapId || 'large-hole-arena',
         visibility: 'private',
       }
 
@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
         currentTurnIndex: 0,
         actions: [],
         hostId: firstIdentity.playerId,
-        mapId: body.mapId || 'large-battlefield',
+        mapId: body.mapId || 'large-hole-arena',
         visibility: 'private',
         battleState: {
           type: 'server-state',

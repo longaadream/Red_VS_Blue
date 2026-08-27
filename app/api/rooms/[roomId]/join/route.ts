@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { assignNextSeat, normalizePlayerAlignment, roomStore } from "@/lib/game/room-store"
+import { assertSelectableMapId, getMapSelectionErrorPayload } from "@/lib/game/map-selection"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -25,6 +26,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   const room = await roomStore.getRoom(roomId)
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 })
+  }
+
+  if (room.status !== 'in-progress' || !room.battleState) {
+    try {
+      assertSelectableMapId(room.mapId)
+    } catch (error) {
+      const mapError = getMapSelectionErrorPayload(error)
+      if (mapError) {
+        return NextResponse.json({ success: false, error: mapError.message, code: mapError.code, context: mapError.context }, { status: 400 })
+      }
+      throw error
+    }
   }
 
   const normalizedPlayerId = playerId.trim().toLowerCase()

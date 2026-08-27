@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest'
 
-import { buildInitialPiecesForPlayers } from '@/lib/game/battle-setup'
+import { buildInitialPiecesForPlayers, createInitialBattleForPlayers } from '@/lib/game/battle-setup'
 import { DEPLOYMENT_DURATION_MS, toPublicBattleState } from '@/lib/game/deployment'
 import { recordBattleInitialization, runBattleAction } from '@/lib/game/battle-runner'
+import { withoutServerSkills } from '@/lib/game/battle-storage'
+import { stableJson } from '@/lib/game/battle-trace'
 import type { BoardMap } from '@/lib/game/map'
+import { getMapById } from '@/lib/game/map-repository'
+import { SELECTABLE_MAP_IDS } from '@/lib/game/map-selection'
 import type { PieceTemplate } from '@/lib/game/piece'
 import { RANDOM_STREAM_NAMES, RuleRuntime } from '@/lib/game/rule-runtime'
 import { summonPiece } from '@/lib/game/turn'
@@ -43,8 +47,11 @@ function makeTemplates(prefix: string): PieceTemplate[] {
   }))
 }
 
-function buildDeployment(seed: number, reversePlayers = false) {
-  const map = makeDeploymentMap()
+function buildDeploymentOnMap(
+  map: BoardMap,
+  seed: number,
+  reversePlayers = false,
+) {
   const red = makeTemplates('red')
   const blue = makeTemplates('blue')
   const runtime = new RuleRuntime({ rootSeed: seed })
@@ -69,12 +76,20 @@ function buildDeployment(seed: number, reversePlayers = false) {
   return { map, pieces, runtime }
 }
 
+function buildDeployment(seed: number, reversePlayers = false) {
+  return buildDeploymentOnMap(makeDeploymentMap(), seed, reversePlayers)
+}
+
 function positions(pieces: Array<{ instanceId: string; x: number | null; y: number | null }>) {
   return Object.fromEntries(
     [...pieces]
       .sort((left, right) => left.instanceId.localeCompare(right.instanceId))
       .map(piece => [piece.instanceId, [piece.x, piece.y]]),
   )
+}
+
+function persistedInitialStateSnapshot(value: unknown): unknown {
+  return JSON.parse(stableJson(withoutServerSkills(value))) as unknown
 }
 
 function makeDeploymentState(seed = 2029) {
@@ -128,8 +143,72 @@ describe('RED-29 deterministic deployment', () => {
     expect(positions(buildDeployment(77).pieces)).not.toEqual(positions(buildDeployment(78).pieces))
   })
 
-  it('fails closed on the filename-style map ID before consuming deployment random', () => {
-    const map = { ...makeDeploymentMap(), id: 'large-trap-arena' }
+  it.each(SELECTABLE_MAP_IDS)('preserves deterministic sixteen-piece deployment on %s', mapId => {
+    const map = getMapById(mapId)
+    if (!map) throw new Error(`Expected loaded map ${mapId}`)
+
+    const first = buildDeploymentOnMap(map, 0x1190)
+    const reordered = buildDeploymentOnMap(map, 0x1190, true)
+
+    expect(first.pieces).toHaveLength(16)
+    expect(new Set(first.pieces.map(piece => `${piece.x},${piece.y}`)).size).toBe(16)
+    expect(positions(first.pieces)).toEqual(positions(reordered.pieces))
+    expect(first.runtime.getCursor(RANDOM_STREAM_NAMES.deployment)).toBe(16)
+    expect(reordered.runtime.getCursor(RANDOM_STREAM_NAMES.deployment)).toBe(16)
+    expect(first.pieces.every(piece => map.tiles.some(tile => (
+      tile.x === piece.x
+      && tile.y === piece.y
+      && tile.props.walkable === true
+      && tile.props.type === 'floor'
+    )))).toBe(true)
+  })
+
+  it.each(SELECTABLE_MAP_IDS)('creates an identical complete initial state on %s for fixed and reordered inputs', async mapId => {
+    const red = makeTemplates('red')
+    const blue = makeTemplates('blue')
+    const roster = [
+      { playerId: PLAYERS[0], pieces: red, faction: 'red' as const, alignment: 'light' as const },
+      { playerId: PLAYERS[1], pieces: blue, faction: 'blue' as const, alignment: 'dark' as const },
+    ]
+    const selectedPieces = [...red, ...blue]
+    const options = {
+      firstPlayerId: PLAYERS[0],
+      rootSeed: 0x1190cafe,
+      deploymentEnabled: true,
+      deploymentStartedAt: 1_750_000_000_000,
+    }
+    const create = (
+      playerIds: string[],
+      playerSelectedPieces: typeof roster,
+    ) => createInitialBattleForPlayers(
+      playerIds,
+      selectedPieces,
+      playerSelectedPieces,
+      mapId,
+      options,
+    )
+
+    const first = await create([...PLAYERS], roster)
+    const repeated = await create([...PLAYERS], roster)
+    const reordered = await create(
+      [...PLAYERS].reverse(),
+      [...roster].reverse(),
+    )
+
+    expect(first).not.toBeNull()
+    // The room authority persists exactly without `skillsById`; stable JSON also omits the
+    // rehydrated rule-effect functions that cannot cross the storage/transport boundary.
+    const expected = persistedInitialStateSnapshot(first)
+    expect(first).toHaveProperty('skillsById')
+    expect(expected).not.toHaveProperty('skillsById')
+
+    expect(persistedInitialStateSnapshot(repeated)).toEqual(expected)
+    expect(persistedInitialStateSnapshot(reordered)).toEqual(expected)
+  })
+
+  it('fails closed on fewer than sixteen ordinary floors before consuming deployment random', () => {
+    const map = makeDeploymentMap()
+    map.tiles = map.tiles.filter(tile => tile.props.type === 'floor').slice(0, 15)
     const red = makeTemplates('red')
     const blue = makeTemplates('blue')
     const runtime = new RuleRuntime({ rootSeed: 91 })
@@ -144,7 +223,7 @@ describe('RED-29 deterministic deployment', () => {
       ],
       () => runtime.nextRandom(RANDOM_STREAM_NAMES.deployment),
       { deterministicDeployment: true },
-    )).toThrow('large-hole-arena')
+    )).toThrow('sixteen ordinary floor')
     expect(runtime.getCursor(RANDOM_STREAM_NAMES.deployment)).toBe(0)
   })
 

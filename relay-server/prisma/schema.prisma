@@ -11,6 +11,7 @@ model Room {
   id               String   @id
   hostId           String
   name             String
+  mapId            String?
   status           String   @default("waiting")
   // waiting | selecting | battle | waiting_host | finished
   players          Json     @default("[]")

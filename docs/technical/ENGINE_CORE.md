@@ -42,7 +42,7 @@
 - 地图 ID。
 - 可选先手玩家。
 - 可选 `rootSeed`；权威入口必须在初始化前传入。
-- Demo 房间对局传入 `deploymentEnabled: true` 与权威 `deploymentStartedAt`，并固定使用地图状态 ID `large-hole-arena`。
+- Demo 房间对局传入 `deploymentEnabled: true`、权威 `deploymentStartedAt` 与已通过受控目录校验的 `Room.mapId`；正式入口不补默认地图。
 
 调用：地图加载、棋子创建、技能/规则加载、`globalTriggerSystem.clearRules()`、开局触发器。
 

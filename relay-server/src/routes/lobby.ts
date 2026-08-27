@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { store } from '../store'
-import type { Room } from '../types'
+import { validateStandaloneMapId, type Room } from '../types'
 import { createRelayRoomPlayer } from '../room-seats'
 
 export const lobbyRouter = new Hono()
@@ -10,11 +10,11 @@ function publicRoom(room: Room) {
   return pub
 }
 
-// GET /api/lobby — room list (only waiting/selecting rooms)
+// GET /api/lobby — pre-battle and spectatable rooms
 lobbyRouter.get('/', c => {
   const rooms = store
     .listRooms()
-    .filter(r => r.status === 'waiting' || r.status === 'selecting')
+    .filter(r => r.status === 'waiting' || r.status === 'selecting' || r.status === 'battle' || r.status === 'waiting_host')
     .map(publicRoom)
   return c.json({ rooms })
 })
@@ -26,7 +26,12 @@ lobbyRouter.post('/', async c => {
     hostId: string
     hostName: string
     publicKey: string
+    mapId?: unknown
   }>()
+  const mapSelection = validateStandaloneMapId(body.mapId)
+  if (!mapSelection.ok) {
+    return c.json({ error: mapSelection.error, code: mapSelection.code }, 400)
+  }
 
   if (!body.hostId || !body.name || !body.publicKey?.trim()) {
     return c.json({ error: 'missing hostId, name, or publicKey' }, 400)
@@ -39,6 +44,7 @@ lobbyRouter.post('/', async c => {
     id,
     hostId: body.hostId,
     name: body.name,
+    mapId: mapSelection.mapId,
     status: 'waiting',
     players: [createRelayRoomPlayer([], {
       id: body.hostId,
@@ -50,6 +56,11 @@ lobbyRouter.post('/', async c => {
     createdAt: Date.now(),
   }
 
-  store.setRoom(room)
-  return c.json({ id, inviteCode })
+  try {
+    await store.persistRoom(room)
+  } catch (error) {
+    console.error('[lobby] Failed to persist room creation', error)
+    return c.json({ error: 'room persistence failed' }, 500)
+  }
+  return c.json({ id, inviteCode, mapId: mapSelection.mapId })
 })

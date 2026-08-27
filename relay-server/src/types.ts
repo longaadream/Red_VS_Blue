@@ -1,13 +1,50 @@
-export type RoomStatus = 'waiting' | 'selecting' | 'battle' | 'waiting_host' | 'finished'
+export const STANDALONE_SELECTABLE_MAP_IDS = [
+  'large-hole-arena',
+  'open-expanse',
+  'winding-pass',
+  'narrow-corridors',
+] as const
+const STANDALONE_SELECTABLE_MAP_NAMES = [
+  '大型洞穴',
+  '开阔原野',
+  '回风曲径',
+  '狭廊要道',
+] as const
+
+export const STANDALONE_SELECTABLE_MAP_CATALOG = STANDALONE_SELECTABLE_MAP_IDS.map((id, index) => ({
+  id,
+  name: STANDALONE_SELECTABLE_MAP_NAMES[index],
+}))
+
+export type StandaloneSelectableMapId = (typeof STANDALONE_SELECTABLE_MAP_IDS)[number]
+export type StandaloneMapSelectionErrorCode = 'MAP_ID_REQUIRED' | 'MAP_NOT_SELECTABLE'
+
+export type StandaloneMapSelectionResult =
+  | { ok: true; mapId: StandaloneSelectableMapId }
+  | { ok: false; code: StandaloneMapSelectionErrorCode; error: string }
+
+export function validateStandaloneMapId(input: unknown): StandaloneMapSelectionResult {
+  if (typeof input !== 'string' || input.length === 0) {
+    return { ok: false, code: 'MAP_ID_REQUIRED', error: 'A map ID is required' }
+  }
+  if (!(STANDALONE_SELECTABLE_MAP_IDS as readonly string[]).includes(input)) {
+    return { ok: false, code: 'MAP_NOT_SELECTABLE', error: 'The requested map is not selectable' }
+  }
+  return { ok: true, mapId: input as StandaloneSelectableMapId }
+}
+
+export type RoomStatus = 'waiting' | 'selecting' | 'ready' | 'battle' | 'waiting_host' | 'finished'
 export type PlayerRole = 'host' | 'guest' | 'spectator'
 export type RelaySeat = 'red' | 'blue'
+export type StandaloneRosterPiece = string | { templateId: string; faction?: string }
 
 export interface RoomPlayer {
   id: string
   name: string
   publicKey: string
   faction?: RelaySeat
-  pieces?: string[]
+  alignment?: 'light' | 'dark'
+  pieces?: StandaloneRosterPiece[]
   connected: boolean
 }
 
@@ -24,6 +61,7 @@ export interface Room {
   id: string
   hostId: string
   name: string
+  mapId?: string
   status: RoomStatus
   players: RoomPlayer[]
   inviteCode?: string

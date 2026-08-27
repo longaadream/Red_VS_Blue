@@ -44,7 +44,7 @@ async function handleSubscribe(
   send(ws, { type: 'subscribed', role })
 
   // If host reconnects during waiting_host, resume
-  if (role === 'host' && room.status === 'waiting_host') {
+  if (role === 'host' && room.status === 'waiting_host' && room.lastStateBlob) {
     store.cancelHostTimeout(roomId)
     room.status = 'battle'
     store.setRoom(room)
@@ -240,7 +240,7 @@ function handleClose(ws: ServerWebSocket<WsData>) {
   if (role !== 'host') return
 
   const room = store.getRoom(roomId)
-  if (!room || room.status === 'finished') return
+  if (!room || room.status !== 'battle' || !room.lastStateBlob) return
 
   room.status = 'waiting_host'
   room.hostDisconnectedAt = Date.now()

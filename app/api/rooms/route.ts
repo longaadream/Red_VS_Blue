@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { DEMO_FIXED_MAP_ID } from '@/lib/game/room-battle-start'
-import { getPlayerSeat, getRoomStore } from '@/lib/game/room-store'
+import { getPlayerSeat, getRoomStore, type Room } from '@/lib/game/room-store'
+import { assertSelectableMapId, getMapSelectionErrorPayload } from '@/lib/game/map-selection'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
-    const { mode, hostId, playerName } = body
+    const { mode, hostId, playerName, mapId } = body
 
     if (mode !== 'pve') {
       return NextResponse.json({ error: 'Only mode=pve is supported via REST' }, { status: 400 })
@@ -13,10 +13,19 @@ export async function POST(req: NextRequest) {
     if (!hostId) {
       return NextResponse.json({ error: 'hostId is required' }, { status: 400 })
     }
+    const selectedMapId = assertSelectableMapId(mapId)
 
     const roomStore = getRoomStore()
     const roomId = 'pve-' + hostId.slice(0, 8) + '-' + Date.now().toString(36)
-    const room = await roomStore.createRoom(roomId, (playerName || hostId) + ' 的 PVE 练习')
+    const room: Room = {
+      id: roomId,
+      name: (playerName || hostId) + ' 的 PVE 练习',
+      status: 'waiting',
+      players: [],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+    }
 
     // Add human player (red)
     room.players = [{
@@ -47,13 +56,22 @@ export async function POST(req: NextRequest) {
       selectedPieces: [],
     })
     room.hostId = hostId
-    room.mapId = DEMO_FIXED_MAP_ID
+    room.mapId = selectedMapId
     room.visibility = 'private'
     room.maxPlayers = 2
 
     await roomStore.setRoom(roomId, room)
-    return NextResponse.json({ id: roomId, status: room.status })
+    return NextResponse.json({ id: roomId, status: room.status, mapId: selectedMapId })
   } catch (error) {
+    const mapError = getMapSelectionErrorPayload(error)
+    if (mapError) {
+      return NextResponse.json({
+        success: false,
+        error: mapError.message,
+        code: mapError.code,
+        context: mapError.context,
+      }, { status: 400 })
+    }
     console.error('[POST /api/rooms] Error creating PVE room:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

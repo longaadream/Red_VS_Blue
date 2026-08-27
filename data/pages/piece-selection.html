@@ -358,10 +358,34 @@
     playerAlignment = params.get('alignment') || playerAlignment
     let wsReady = false
     let latestRoom = null
+    let battleAuthorityNoticeShown = false
     let pieceLoadError = ''
 
     const LOCAL_PIECE_LOAD_TIMEOUT_MS = 2000
     const SERVER_PIECE_LOAD_TIMEOUT_MS = 2500
+
+    function roomHasCompleteRosters(room) {
+      return !!room
+        && Array.isArray(room.players)
+        && room.players.length === 2
+        && room.players.every(player => Array.isArray(player.pieces) && player.pieces.length === 8)
+    }
+
+    function showBattleAuthorityUnavailable(room) {
+      if (room) latestRoom = room
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+      const overlay = document.getElementById('waitOverlay')
+      if (overlay) overlay.classList.remove('show')
+      const btn = document.getElementById('confirmBtn')
+      if (btn) {
+        btn.disabled = true
+        btn.textContent = '阵容已保存'
+      }
+      if (!battleAuthorityNoticeShown) {
+        battleAuthorityNoticeShown = true
+        alert('阵容已保存；远程 Relay 暂不提供战斗权威。')
+      }
+    }
 
     // Skill cache
     const SKILL_CACHE = {}
@@ -370,7 +394,7 @@
       if (typeof RvBWs === 'undefined' || !roomId || !playerId) return
       RvBWs.on('connect', function() {
         wsReady = true
-        RvBWs.send({ type: 'roomState' })
+        if (!shouldUseRelayMode()) RvBWs.send({ type: 'roomState' })
       })
       RvBWs.on('disconnect', function() { wsReady = false })
       RvBWs.on('message', function(msg) {
@@ -383,7 +407,9 @@
             if (me.alignment && me.alignment !== playerAlignment) { playerAlignment = me.alignment; changed = true }
             if (changed) { updateFactionBadge(); loadPieces() }
           }
-          if (roomLooksBattleReady(msg.room)) {
+          if (shouldUseRelayMode() && roomHasCompleteRosters(msg.room)) {
+            showBattleAuthorityUnavailable(msg.room)
+          } else if (roomLooksBattleReady(msg.room)) {
             navigateBattle()
           }
         } else if (msg.type === 'roomActionResult') {
@@ -586,7 +612,7 @@
 
     async function sendRoomAction(payload) {
       const body = Object.assign({ roomId }, payload)
-      if (typeof RvBWs !== 'undefined' && RvBWs.request) {
+      if (!shouldUseRelayMode() && typeof RvBWs !== 'undefined' && RvBWs.request) {
         try {
           await waitForSelectionWs(2500)
           return await RvBWs.request('rooms.action', body, 7000)
@@ -624,7 +650,7 @@
             return
           }
         } catch (e) {
-          alert('WebSocket connect failed; cannot claim faction via WS: ' + (e && e.message ? e.message : e))
+          alert('无法认领阵营：' + (e && e.message ? e.message : e))
         }
       }
 
@@ -953,6 +979,10 @@
           alignment: playerAlignment,
           pieces: selected.map(p => ({ templateId: p.id, faction: p.faction || 'neutral' }))
         })
+        if (result && result.battleAuthorityUnavailable) {
+          showBattleAuthorityUnavailable(result.room)
+          return
+        }
         if (result && result.room) {
           latestRoom = result.room
           if (roomLooksBattleReady(result.room)) {
@@ -984,7 +1014,9 @@
         if (!res.ok) return
         const room = await res.json()
         latestRoom = room
-        if (roomLooksBattleReady(room)) navigateBattle()
+        if (shouldUseRelayMode() && roomHasCompleteRosters(room)) {
+          showBattleAuthorityUnavailable(room)
+        } else if (roomLooksBattleReady(room)) navigateBattle()
       } catch {}
     }
 
