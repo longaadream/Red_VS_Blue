@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "rvb-pack/v1",
+  "packageId": "community.invalid-unicode",
+  "version": "1.0.0",
+  "displayName": "\uD800",
+  "publisher": {
+    "id": "community.example",
+    "keyId": null
+  },
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": [],
+  "files": [],
+  "kind": "snapshot"
+}

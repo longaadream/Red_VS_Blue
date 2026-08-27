@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "rvb-pve-campaign/v1",
+  "campaignId": "prototype-campaign",
+  "version": "1.0.0",
+  "entryNodeId": "intro",
+  "nodes": [
+    { "nodeId": "intro", "path": "data/pve/campaigns/prototype/nodes/intro.json" },
+    { "nodeId": "intro", "path": "data/pve/campaigns/prototype/nodes/intro-copy.json" }
+  ]
+}

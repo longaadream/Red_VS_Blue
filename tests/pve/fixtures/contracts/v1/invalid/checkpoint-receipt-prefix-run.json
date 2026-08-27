@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "rvb-pve-run/v1",
+  "runId": "run-prototype-001",
+  "authorityContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "campaignId": "prototype-campaign",
+  "rootSeed": 3735928559,
+  "revision": 2,
+  "currentNodeId": "spoils",
+  "party": ["blue-naruto", "blue-sakura"],
+  "deck": ["basic-strike", "basic-strike", "basic-guard"],
+  "relics": ["quick-preparation"],
+  "flags": {},
+  "activeBattle": null,
+  "checkpoint": {
+    "schemaVersion": "rvb-pve-checkpoint/v1",
+    "authorityContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "checkpointId": "run-start",
+    "revision": 0,
+    "currentNodeId": "intro",
+    "party": ["blue-naruto", "blue-sakura"],
+    "deck": ["basic-strike", "basic-strike", "basic-guard"],
+    "relics": [],
+    "flags": {},
+    "activeBattle": null,
+    "receiptCount": 1,
+    "receiptsHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "stateHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "receipts": [
+    {
+      "schemaVersion": "rvb-pve-receipt/v1",
+      "commandId": "command-001",
+      "kind": "effect",
+      "sourceNodeId": "intro",
+      "subjectId": "prototype-intro",
+      "fromRevision": 0,
+      "toRevision": 1,
+      "resultHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "schemaVersion": "rvb-pve-receipt/v1",
+      "commandId": "command-002",
+      "kind": "effect",
+      "sourceNodeId": "choose-roster",
+      "subjectId": "prototype-starter-roster",
+      "fromRevision": 1,
+      "toRevision": 2,
+      "resultHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ]
+}

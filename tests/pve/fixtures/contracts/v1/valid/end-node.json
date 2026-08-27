@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "victory",
+  "type": "end",
+  "endingId": "prototype-victory",
+  "outcome": "completed"
+}

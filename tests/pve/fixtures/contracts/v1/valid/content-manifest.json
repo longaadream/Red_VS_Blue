@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "rvb-pve-content-manifest/v1",
+  "manifestId": "prototype-pve",
+  "documents": [
+    { "kind": "campaign", "contentId": "prototype-campaign", "path": "data/pve/campaigns/prototype/campaign.json" },
+    { "kind": "chapter", "contentId": "prototype-chapter", "path": "data/pve/chapters/prototype-chapter.json" },
+    { "kind": "encounter", "contentId": "prototype-ambush", "path": "data/pve/encounters/prototype-ambush.json" },
+    { "kind": "enemy", "contentId": "prototype-bandits", "path": "data/pve/enemies/prototype-bandits.json" },
+    { "kind": "event", "contentId": "prototype-campfire", "path": "data/pve/events/prototype-campfire.json" },
+    { "kind": "relic", "contentId": "quick-preparation", "path": "data/pve/relics/quick-preparation.json" },
+    { "kind": "reward", "contentId": "prototype-card-choice", "path": "data/pve/rewards/prototype-card-choice.json" }
+  ]
+}

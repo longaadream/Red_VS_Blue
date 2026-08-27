@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "rvb-pve-content-manifest/v1",
+  "manifestId": "prototype-pve",
+  "documents": [
+    {
+      "kind": "campaign",
+      "contentId": "prototype-campaign",
+      "path": "images/pve/node.json"
+    }
+  ]
+}

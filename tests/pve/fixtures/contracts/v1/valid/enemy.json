@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "rvb-pve-enemy-setup/v1",
+  "enemySetupId": "prototype-bandits",
+  "rosterId": "prototype-bandit-roster",
+  "aiProfileId": "basic-aggressive"
+}

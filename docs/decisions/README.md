@@ -114,6 +114,7 @@
 - [`ADR-0016-trace-v2-recorded-state-replay.md`](./ADR-0016-trace-v2-recorded-state-replay.md)：Trace v2 使用记录状态而非重跑当前规则（RED-94，已接受）。
 - [`ADR-0017-offline-self-play-league.md`](./ADR-0017-offline-self-play-league.md)：离线成对自博弈使用不可变历史档案、seed 分层和合法性/终止性硬门禁（RED-87，提议中）。
 - [`ADR-0018-selectable-demo-maps.md`](./ADR-0018-selectable-demo-maps.md)：正式 Demo 使用受控四图目录、房间冻结选择并在所有传输边界失败关闭（RED-119，已接受）。
+- [`ADR-0018-content-pipeline-v1.md`](./ADR-0018-content-pipeline-v1.md)：已接受以统一开放包、确定性 Resolved Profile 与声明式 PVE 合同支撑第一方和社区内容管线（RED-111、RED-113）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

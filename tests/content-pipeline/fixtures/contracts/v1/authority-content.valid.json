@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "rvb-authority-content/v1",
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": [
+    "game-data",
+    "pve-content",
+    "trusted-executable-content"
+  ],
+  "files": [
+    {
+      "path": "data/cards/core.json",
+      "mediaType": "application/json",
+      "size": 64,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "path": "data/pve/campaign.json",
+      "mediaType": "application/json",
+      "size": 128,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}

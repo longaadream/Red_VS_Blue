@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "rvb-pve-event/v1",
+  "eventId": "prototype-campfire",
+  "narrativeId": "prototype-campfire-story",
+  "choices": [
+    {
+      "choiceId": "rest",
+      "labelTextId": "prototype-campfire-rest-label",
+      "effectId": "heal-party-small",
+      "outcomeId": "rested"
+    },
+    {
+      "choiceId": "prepare",
+      "labelTextId": "prototype-campfire-prepare-label",
+      "effectId": "draw-card-choice",
+      "outcomeId": "prepared"
+    }
+  ]
+}

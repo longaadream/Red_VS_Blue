@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "rvb-pack/v1",
+  "packageId": "rvb.core",
+  "version": "1.0.0",
+  "displayName": "RVB Core",
+  "description": "Bundled base content fixture",
+  "publisher": {
+    "id": "rvb.official",
+    "keyId": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": [
+    "game-data",
+    "pve-content",
+    "raster-assets",
+    "trusted-executable-content"
+  ],
+  "files": [
+    {
+      "path": "data/cards/core.json",
+      "mediaType": "application/json",
+      "size": 128,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "path": "images/cards/core.webp",
+      "mediaType": "image/webp",
+      "size": 4096,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "kind": "snapshot"
+}

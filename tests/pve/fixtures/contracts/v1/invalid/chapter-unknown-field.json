@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "rvb-pve-chapter/v1",
+  "chapterId": "prototype-chapter",
+  "titleTextId": "prototype-chapter-title",
+  "descriptionTextId": "prototype-chapter-description",
+  "campaignId": "prototype-campaign",
+  "name": "inline display text is not part of this contract"
+}

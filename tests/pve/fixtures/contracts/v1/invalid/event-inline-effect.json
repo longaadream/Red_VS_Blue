@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "rvb-pve-event/v1",
+  "eventId": "prototype-campfire",
+  "narrativeId": "prototype-campfire-story",
+  "choices": [
+    {
+      "choiceId": "rest",
+      "labelTextId": "prototype-campfire-rest-label",
+      "effectId": "heal-party-small",
+      "outcomeId": "rested",
+      "effect": { "type": "heal-party", "amount": 2 }
+    }
+  ]
+}
