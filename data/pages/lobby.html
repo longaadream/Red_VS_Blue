@@ -284,7 +284,7 @@
     <div class="sheet">
       <div class="sheet-title">创建房间</div>
       <div class="field-label">地图</div>
-      <select id="mapSelect"><option value="arena-8x6">默认地图 (8×6)</option></select>
+      <select id="mapSelect"><option value="large-hole-arena">大型洞穴</option></select>
       <div class="field-label">可见性</div>
       <div class="toggle-row">
         <span>公开房间（所有人可见）</span>
@@ -598,31 +598,30 @@
       return res.json()
     }
 
+    const DEMO_MAP_FILENAME = 'large-trap-arena'
+    const DEMO_MAP_ID = 'large-hole-arena'
+
     async function loadMaps() {
       const sel = document.getElementById('mapSelect')
       if (sel.dataset.loaded) return
       try {
-        const ids = await fetchLocalJson('./data/maps/manifest.json')
+        const m = await fetchLocalJson('./data/maps/' + DEMO_MAP_FILENAME + '.json')
+        const mapId = m.id || DEMO_MAP_FILENAME
+        if (mapId !== DEMO_MAP_ID) throw new Error('Demo map id mismatch')
         sel.innerHTML = ''
-        for (const id of ids) {
-          try {
-            const m = await fetchLocalJson('./data/maps/' + id + '.json')
-            const opt = document.createElement('option')
-            // Use the map's actual JSON id (not the filename) so server lookup succeeds
-            opt.value = m.id || id
-            opt.textContent = (m.name || id)
-            sel.appendChild(opt)
-          } catch { /* skip bad map */ }
-        }
+        const opt = document.createElement('option')
+        opt.value = mapId
+        opt.textContent = m.name || DEMO_MAP_FILENAME
+        sel.appendChild(opt)
         sel.dataset.loaded = '1'
       } catch {
-        sel.innerHTML = '<option value="arena-8x6">默认地图 (8×6)</option>'
+        sel.innerHTML = '<option value="large-hole-arena">大型洞穴</option>'
       }
     }
 
     async function doCreateRoom() {
       const { id: hostId, displayName: playerName } = RvBIdentity.getIdentity()
-      const mapId = document.getElementById('mapSelect').value || 'arena-8x6'
+      const mapId = DEMO_MAP_ID
       const visibility = document.getElementById('visibilityToggle').checked ? 'public' : 'private'
       const errEl = document.getElementById('createErr')
       errEl.style.display = 'none'

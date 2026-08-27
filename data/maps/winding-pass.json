@@ -1,0 +1,48 @@
+{
+  "id": "winding-pass",
+  "name": "回风曲径",
+  "layout": [
+    "####################",
+    "#.......C.##.C..#..#",
+    "#.#...#C...#.......#",
+    "#..........#...T#..#",
+    "#....T#.#TT##....#.#",
+    "#..#T#.C##C..#T....#",
+    "#..#...#.#.#......##",
+    "##..#....#..C.T....#",
+    "#T....C....#.....#.#",
+    "#...#T.........C#..#",
+    "#.#C...T#....T.....#",
+    "#.......T..T#.#....#",
+    "##....#.C......#...#",
+    "#...#...#.#.....TC.#",
+    "#......##...#C.###.#",
+    "####################"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false
+    },
+    {
+      "char": "T",
+      "type": "hole",
+      "walkable": false,
+      "bulletPassable": true
+    }
+  ]
+}
