@@ -10,94 +10,253 @@
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
   <style>
+    :root {
+      --paper: #f3e1bc;
+      --paper-light: #fff0ce;
+      --ink: #19253c;
+      --red: #c9432d;
+      --blue: #1053a6;
+      --muted: #775d45;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      min-height: 100vh;
-      padding: 0 0 calc(56px + env(safe-area-inset-bottom));
+      font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    button, input, textarea { font: inherit; }
+    button { -webkit-user-select: none; user-select: none; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
-    /* ── Header ── */
-    .header {
-      background: linear-gradient(135deg, #1e1b2e 0%, #0f172a 100%);
-      border-bottom: 1px solid #1e293b;
-      padding: 20px 20px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    /* ── Main game menu ── */
+    .game-menu {
+      position: relative;
+      width: 100%;
+      height: 100svh;
+      min-height: 100%;
+      overflow: hidden;
+      background-color: var(--paper);
+      background-image: url('images/menu/main-menu-screenprint-background-v1.png');
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      isolation: isolate;
     }
-    .brand { display: flex; align-items: baseline; gap: 6px; }
-    .brand-red { font-size: 22px; font-weight: 900; color: #ef4444; letter-spacing: 1px; }
-    .brand-vs  { font-size: 14px; font-weight: 700; color: #64748b; }
-    .brand-blue{ font-size: 22px; font-weight: 900; color: #3b82f6; letter-spacing: 1px; }
-    .version   { font-size: 11px; color: #475569; }
+    .account-stamp {
+      position: absolute;
+      z-index: 2;
+      top: clamp(28px, 5vh, 48px);
+      right: clamp(150px, 18vw, 230px);
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr) auto;
+      grid-template-areas: 'avatar name elo' 'avatar setting setting';
+      column-gap: 14px;
+      row-gap: 4px;
+      min-width: 300px;
+      padding: 12px 16px 10px;
+      border: 3px solid var(--red);
+      border-radius: 2px;
+      background: rgba(243, 225, 188, .94);
+      color: var(--ink);
+      box-shadow: 5px 5px 0 rgba(16, 83, 166, .72);
+      transform: rotate(1deg);
+      cursor: pointer;
+      text-align: left;
+    }
+    .account-stamp:hover { transform: rotate(0deg) translate(-2px, -2px); }
+    .account-stamp:active { transform: rotate(0deg) translate(1px, 1px); box-shadow: 2px 2px 0 rgba(16, 83, 166, .72); }
+    .account-stamp:focus-visible,
+    .menu-action:focus-visible,
+    .footer-action:focus-visible,
+    .menu-choice:focus-visible,
+    .menu-close:focus-visible {
+      outline: 4px solid var(--ink);
+      outline-offset: 4px;
+    }
+    .account-avatar {
+      grid-area: avatar;
+      align-self: center;
+      width: 54px;
+      height: 54px;
+      object-fit: contain;
+    }
+    .account-name {
+      grid-area: name;
+      max-width: 124px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+    .account-elo { grid-area: elo; align-self: center; color: var(--blue); font-size: 13px; font-weight: 900; }
+    .account-label { grid-area: setting; color: var(--red); font-size: 12px; font-weight: 900; letter-spacing: .16em; }
+    .user-dot { position: absolute; width: 1px; height: 1px; overflow: hidden; }
 
-    /* ── User pill ── */
-    .user-pill {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 20px;
-      padding: 5px 12px;
-      font-size: 13px;
+    .primary-menu {
+      position: absolute;
+      z-index: 2;
+      top: clamp(350px, 55vh, 450px);
+      left: clamp(250px, 24vw, 320px);
+      display: flex;
+      width: clamp(260px, 27vw, 350px);
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+    .menu-action {
+      position: relative;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      padding: 5px 12px 5px 0;
+      font-size: clamp(21px, 2vw, 29px);
+      font-weight: 900;
+      letter-spacing: .06em;
+      line-height: 1.08;
+      cursor: pointer;
+      text-align: left;
+      text-shadow: 1px 1px 0 rgba(255,255,255,.44);
+    }
+    .menu-action::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 0;
+      height: 4px;
+      background: var(--blue);
+      transform: rotate(-1deg);
+      transition: width 130ms ease;
+    }
+    .menu-action:hover { color: var(--red); transform: translateX(6px); }
+    .menu-action:hover::after,
+    .menu-action:focus-visible::after { width: 78%; }
+    .menu-action.primary {
+      margin-bottom: 6px;
+      padding: 8px 18px 7px;
+      background: var(--red);
+      color: var(--paper-light);
+      font-size: clamp(29px, 2.75vw, 40px);
+      line-height: 1;
+      transform: rotate(-.4deg);
+      text-shadow: none;
+    }
+    .menu-action.primary:hover { background: var(--ink); color: var(--paper-light); transform: rotate(0deg) translateX(6px); }
+    .menu-action.primary::before,
+    .menu-action.primary::after { content: none; }
+    .menu-load-state { display: inline-block; min-width: .8em; color: var(--red); }
+
+    .bottom-nav {
+      position: absolute;
+      z-index: 2;
+      left: clamp(210px, 25vw, 330px);
+      bottom: clamp(18px, 4vh, 34px);
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: clamp(22px, 3vw, 42px);
+    }
+    .footer-action {
+      border: 0;
+      border-bottom: 3px solid transparent;
+      background: transparent;
+      color: var(--ink);
+      padding: 6px 2px 4px;
+      font-size: clamp(13px, 1.35vw, 18px);
+      font-weight: 900;
+      letter-spacing: .12em;
       cursor: pointer;
     }
-    .user-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+    .footer-action:nth-child(2) { color: var(--red); }
+    .footer-action:nth-child(3) { color: var(--blue); }
+    .footer-action:hover { border-color: currentColor; transform: translateY(-2px); }
 
-    /* ── Sections ── */
-    .section { padding: 20px 16px 4px; }
-    .section-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: #475569;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-    }
-
-    /* ── Menu items ── */
-    .menu-item {
-      display: flex;
+    /* ── Screenprint mode chooser ── */
+    .menu-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 90;
       align-items: center;
-      gap: 14px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 14px 16px;
-      margin-bottom: 8px;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(25, 37, 60, .58);
+    }
+    .menu-overlay.show { display: flex; }
+    .menu-dialog {
+      position: relative;
+      width: min(460px, 92vw);
+      border: 5px solid var(--ink);
+      border-radius: 3px;
+      background: var(--paper-light);
+      color: var(--ink);
+      box-shadow: 12px 12px 0 var(--red), -7px -7px 0 var(--blue);
+      padding: 30px 28px 26px;
+      transform: rotate(-.35deg);
+    }
+    .menu-dialog h2 {
+      margin: 0 44px 4px 0;
+      color: var(--red);
+      font-size: 28px;
+      font-weight: 950;
+      letter-spacing: .08em;
+    }
+    .menu-dialog > p { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+    .menu-close {
+      position: absolute;
+      top: 15px;
+      right: 17px;
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--ink);
+      background: transparent;
+      color: var(--ink);
+      font-size: 23px;
+      font-weight: 900;
+      line-height: 28px;
       cursor: pointer;
-      transition: background .15s, border-color .15s;
-      text-decoration: none;
-      color: inherit;
-      -webkit-user-select: none;
     }
-    .menu-item:active { background: #263348; border-color: #475569; }
-    .menu-item.primary { border-color: #ef4444; background: #1e1521; }
-    .menu-item.primary:active { background: #2d1a2a; }
-    .menu-item.online { border-color: #3b82f6; background: #111827; }
-    .menu-item.online:active { background: #1a2540; }
-    .item-icon {
-      width: 40px; height: 40px;
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px;
-      flex-shrink: 0;
+    .menu-choice-list { display: grid; gap: 9px; }
+    .menu-choice {
+      width: 100%;
+      border: 3px solid var(--ink);
+      border-radius: 1px;
+      background: transparent;
+      color: var(--ink);
+      padding: 11px 14px;
+      cursor: pointer;
+      text-align: left;
     }
-    .icon-red  { background: rgba(239,68,68,.15); }
-    .icon-blue { background: rgba(59,130,246,.15); }
-    .icon-gray { background: rgba(100,116,139,.15); }
+    .menu-choice:nth-child(odd) { border-left-color: var(--red); border-left-width: 8px; }
+    .menu-choice:nth-child(even) { border-left-color: var(--blue); border-left-width: 8px; }
+    .menu-choice:hover { background: var(--ink); color: var(--paper-light); transform: translateX(4px); }
+    .choice-title { display: block; font-size: 18px; font-weight: 900; letter-spacing: .04em; }
+    .choice-desc { display: block; margin-top: 2px; font-size: 12px; opacity: .72; }
+    .pack-warning {
+      display: none;
+      margin-top: 12px;
+      border: 2px solid var(--red);
+      background: #f5cf9d;
+      color: #7e251a;
+      padding: 9px 11px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .pack-warning a { color: var(--blue); font-weight: 900; }
 
-    .item-text { flex: 1; }
-    .item-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-    .item-desc  { font-size: 12px; color: #64748b; }
-
-    .item-arrow { color: #475569; font-size: 16px; }
-
-    /* ── Connect overlay ── */
+    /* ── Existing functional sheets ── */
     .overlay {
       display: none;
       position: fixed; inset: 0;
@@ -183,138 +342,160 @@
     .spin { display: inline-block; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg) } }
 
+    @media (max-width: 1050px) {
+      .account-stamp { right: 18vw; min-width: 280px; }
+      .primary-menu { left: 250px; }
+      .bottom-nav { left: 25vw; }
+    }
+    @media (max-height: 700px) {
+      .account-stamp { top: 20px; padding: 9px 13px 8px; }
+      .primary-menu { top: clamp(330px, 55vh, 360px); gap: 1px; }
+      .menu-action { padding-top: 3px; padding-bottom: 3px; font-size: clamp(19px, 2.4vh, 23px); }
+      .menu-action.primary { font-size: clamp(27px, 3.8vh, 32px); margin-bottom: 2px; }
+      .bottom-nav { bottom: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+
   </style>
 </head>
 <body>
 
-  <!-- Header -->
-  <div class="header">
-    <div class="brand">
-      <span class="brand-red">RED</span>
-      <span class="brand-vs">vs</span>
-      <span class="brand-blue">BLUE</span>
-    </div>
-    <div id="userPill" class="user-pill" onclick="openIdentitySheet()" style="cursor:pointer">
-      <div class="user-dot" id="userDot" style="background:#f59e0b"></div>
-      <span id="userName">玩家</span>
-      <span id="userElo" style="font-size:11px;color:#64748b;margin-left:6px"></span>
+  <main class="game-menu" aria-label="RED VS BLUE 主菜单">
+    <h1 class="sr-only">RED VS BLUE</h1>
+
+    <button id="userPill" class="account-stamp" type="button"
+      onclick="rememberOverlayTrigger('identityOverlay', this); openIdentitySheet()"
+      aria-label="打开账号设置">
+      <span class="user-dot" id="userDot" aria-hidden="true"></span>
+      <img class="account-avatar" src="images/menu/account-avatar-screenprint-v1.png" alt="" aria-hidden="true" />
+      <span class="account-name" id="userName">玩家</span>
+      <span class="account-elo" id="userElo">ELO 1200</span>
+      <span class="account-label">账号设置</span>
+    </button>
+
+    <nav class="primary-menu" aria-label="游戏模式">
+      <button id="playMenuBtn" class="menu-action primary" type="button"
+        onclick="openMenuOverlay('playOverlay', this)">开始游戏</button>
+      <button id="localMenuBtn" class="menu-action" type="button"
+        onclick="openMenuOverlay('localPlayOverlay', this)">本地联机</button>
+      <button id="pveBtn" class="menu-action" type="button" onclick="startPve()">
+        单人练习 <span class="menu-load-state" id="pveBtnArrow" aria-hidden="true"></span>
+        <span class="sr-only" id="pveBtnDesc" aria-live="polite">对阵 AI，测试完整对战流程</span>
+      </button>
+      <button class="menu-action" type="button" onclick="goToTraining()">训练营</button>
+    </nav>
+
+    <nav class="bottom-nav" aria-label="次要菜单">
+      <button class="footer-action" type="button"
+        onclick="openMenuOverlay('encyclopediaOverlay', this)">图鉴</button>
+      <button class="footer-action" type="button"
+        onclick="rememberOverlayTrigger('recordsOverlay', this); openRecordsSheet()">
+        战绩 <span class="sr-only" id="recordsSummary">本地对战记录</span>
+      </button>
+      <button class="footer-action" type="button"
+        onclick="openMenuOverlay('moreOverlay', this)">更多</button>
+    </nav>
+  </main>
+
+  <div class="menu-overlay" id="playOverlay" role="dialog" aria-modal="true"
+    aria-labelledby="playOverlayTitle" onclick="closeMenuOverlay('playOverlay')">
+    <div class="menu-dialog" onclick="event.stopPropagation()">
+      <button class="menu-close" type="button" aria-label="关闭"
+        onclick="closeMenuOverlay('playOverlay')">×</button>
+      <h2 id="playOverlayTitle">选择模式</h2>
+      <p>从这里进入一场新的对局。</p>
+      <div class="menu-choice-list">
+        <button class="menu-choice" type="button"
+          onclick="switchMenuOverlay('playOverlay', 'localPlayOverlay')">
+          <span class="choice-title">本地联机</span>
+          <span class="choice-desc">创建主机，或加入同一局域网内的房间</span>
+        </button>
+        <button class="menu-choice" type="button"
+          onclick="openFunctionalOverlayFromMenu('playOverlay', 'connectOverlay', showConnectSheet)">
+          <span class="choice-title">服务器联机</span>
+          <span class="choice-desc" id="serverStatusDesc">输入服务器地址，与更多玩家联机</span>
+        </button>
+        <button class="menu-choice" type="button"
+          onclick="closeMenuOverlay('playOverlay', false); startPve()">
+          <span class="choice-title">单人练习</span>
+          <span class="choice-desc">对阵 AI，体验完整对战流程</span>
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- 本地联机 -->
-  <div class="section">
-    <div class="section-label">本地联机</div>
-    <div class="menu-item" style="border-color:#10b981;background:#0a1a14;cursor:pointer" onclick="showHostSheet()">
-      <div class="item-icon" style="background:rgba(16,185,129,.15)">🏠</div>
-      <div class="item-text">
-        <div class="item-title">我当主机</div>
-        <div class="item-desc">本机启动内置服务器，好友扫描加入</div>
+  <div class="menu-overlay" id="localPlayOverlay" role="dialog" aria-modal="true"
+    aria-labelledby="localPlayOverlayTitle" onclick="closeMenuOverlay('localPlayOverlay')">
+    <div class="menu-dialog" onclick="event.stopPropagation()">
+      <button class="menu-close" type="button" aria-label="关闭"
+        onclick="closeMenuOverlay('localPlayOverlay')">×</button>
+      <h2 id="localPlayOverlayTitle">本地联机</h2>
+      <p>和身边的玩家在同一网络中开局。</p>
+      <div class="menu-choice-list">
+        <button class="menu-choice" type="button"
+          onclick="openFunctionalOverlayFromMenu('localPlayOverlay', 'hostOverlay', showHostSheet)">
+          <span class="choice-title">我当主机</span>
+          <span class="choice-desc">本机启动服务器，好友扫描后加入</span>
+        </button>
+        <button class="menu-choice" type="button"
+          onclick="openFunctionalOverlayFromMenu('localPlayOverlay', 'lanOverlay', showJoinSheet)">
+          <span class="choice-title">连接主机</span>
+          <span class="choice-desc">扫描局域网，连接好友的主机</span>
+        </button>
       </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="border-color:#6366f1;background:#0d0d1a;cursor:pointer" onclick="showJoinSheet()">
-      <div class="item-icon" style="background:rgba(99,102,241,.15)">📡</div>
-      <div class="item-text">
-        <div class="item-title">连接主机</div>
-        <div class="item-desc">扫描局域网，连接好友的主机</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-  </div>
-
-  <!-- 服务器联机 -->
-  <div class="section">
-    <div class="section-label">服务器联机</div>
-    <div class="menu-item online" style="cursor:pointer" onclick="showConnectSheet()">
-      <div class="item-icon icon-blue">🌐</div>
-      <div class="item-text">
-        <div class="item-title">连接游戏服务器</div>
-        <div class="item-desc" id="serverStatusDesc">输入服务器地址，与更多玩家联机</div>
-      </div>
-      <span class="item-arrow">›</span>
     </div>
   </div>
 
-  <!-- 账号 -->
-  <div class="section">
-    <div class="section-label">账号</div>
-    <div class="menu-item" style="cursor:pointer" onclick="openIdentitySheet()">
-      <div class="item-icon icon-gray">👤</div>
-      <div class="item-text">
-        <div class="item-title">账号管理</div>
-        <div class="item-desc">查看 ID、助记词备份、导入账号</div>
+  <div class="menu-overlay" id="encyclopediaOverlay" role="dialog" aria-modal="true"
+    aria-labelledby="encyclopediaOverlayTitle" onclick="closeMenuOverlay('encyclopediaOverlay')">
+    <div class="menu-dialog" onclick="event.stopPropagation()">
+      <button class="menu-close" type="button" aria-label="关闭"
+        onclick="closeMenuOverlay('encyclopediaOverlay')">×</button>
+      <h2 id="encyclopediaOverlayTitle">图鉴</h2>
+      <p>翻阅当前资源包内的棋子与地图。</p>
+      <div class="menu-choice-list">
+        <button class="menu-choice" type="button" onclick="loadPage('pieces.html')">
+          <span class="choice-title">棋子图鉴</span>
+          <span class="choice-desc">查看全部棋子的属性与技能</span>
+        </button>
+        <button class="menu-choice" type="button" onclick="loadPage('maps.html')">
+          <span class="choice-title">地图图鉴</span>
+          <span class="choice-desc">浏览当前可用的游戏地图</span>
+        </button>
       </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="cursor:pointer" onclick="openRecordsSheet()">
-      <div class="item-icon icon-gray">📊</div>
-      <div class="item-text">
-        <div class="item-title">战绩查询</div>
-        <div class="item-desc" id="recordsSummary">本地对战记录</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-  </div>
-
-  <!-- 单机 -->
-  <div class="section">
-    <div class="section-label">单机</div>
-    <div class="menu-item primary" style="cursor:pointer" onclick="goToTraining()">
-      <div class="item-icon icon-red">🏋️</div>
-      <div class="item-text">
-        <div class="item-title">训练营</div>
-        <div class="item-desc">离线对战练习，无需联网</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="border-color:#f59e0b;background:#1a1205;cursor:pointer" id="pveBtn" onclick="startPve()">
-      <div class="item-icon" style="background:rgba(245,158,11,.16)">PVE</div>
-      <div class="item-text">
-        <div class="item-title">单人练习 (PVE)</div>
-        <div class="item-desc" id="pveBtnDesc">对阵 AI，测试完整对战流程</div>
-      </div>
-      <span class="item-arrow" id="pveBtnArrow">›</span>
-    </div>
-    <div class="menu-item" style="cursor:pointer" onclick="loadPage('pieces.html')">
-      <div class="item-icon icon-gray">📖</div>
-      <div class="item-text">
-        <div class="item-title">棋子图鉴</div>
-        <div class="item-desc">查看所有棋子属性与技能</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="cursor:pointer" onclick="loadPage('maps.html')">
-      <div class="item-icon icon-gray">🗺️</div>
-      <div class="item-text">
-        <div class="item-title">地图图鉴</div>
-        <div class="item-desc">浏览所有游戏地图</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="cursor:pointer" onclick="loadPage('pack.html')">
-      <div class="item-icon icon-gray">📦</div>
-      <div class="item-text">
-        <div class="item-title">资源包管理</div>
-        <div class="item-desc" id="packDesc">导入更新包，无需重装应用</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="border-color:#0ea5e9;background:#081923;cursor:pointer" onclick="loadPage('developer-tools.html')">
-      <div class="item-icon" style="background:rgba(14,165,233,.15)">🛠️</div>
-      <div class="item-text">
-        <div class="item-title">开发者中心</div>
-        <div class="item-desc">局外固定种子场景与赛后 Trace</div>
-      </div>
-      <span class="item-arrow">›</span>
     </div>
   </div>
 
-  <!-- Pack mismatch warning -->
-  <div id="packMismatchWarn" style="display:none;margin:0 16px 8px;background:#1a1106;border:1px solid #b45309;border-radius:10px;padding:10px 14px;font-size:13px;color:#fbbf24">
-    ⚠️ 资源包与服务器不匹配，请前往 <a href="pack.html" style="color:#60a5fa;text-decoration:underline">资源包管理</a> 重新导入
+  <div class="menu-overlay" id="moreOverlay" role="dialog" aria-modal="true"
+    aria-labelledby="moreOverlayTitle" onclick="closeMenuOverlay('moreOverlay')">
+    <div class="menu-dialog" onclick="event.stopPropagation()">
+      <button class="menu-close" type="button" aria-label="关闭"
+        onclick="closeMenuOverlay('moreOverlay')">×</button>
+      <h2 id="moreOverlayTitle">更多</h2>
+      <p>连接服务器、管理资源包，或进入局外开发工具。</p>
+      <div class="menu-choice-list">
+        <button class="menu-choice" type="button"
+          onclick="openFunctionalOverlayFromMenu('moreOverlay', 'connectOverlay', showConnectSheet)">
+          <span class="choice-title">服务器设置</span>
+          <span class="choice-desc">查看或更换当前联机服务器</span>
+        </button>
+        <button class="menu-choice" type="button" onclick="loadPage('pack.html')">
+          <span class="choice-title">资源包管理</span>
+          <span class="choice-desc" id="packDesc">导入更新包，无需重装应用</span>
+        </button>
+        <button class="menu-choice" type="button" onclick="loadPage('developer-tools.html')">
+          <span class="choice-title">开发者中心</span>
+          <span class="choice-desc">局外固定种子场景与赛后 Trace</span>
+        </button>
+      </div>
+      <div id="packMismatchWarn" class="pack-warning">
+        <strong>资源提示：</strong>资源包与服务器不匹配，请前往
+        <a href="pack.html">资源包管理</a> 重新导入。
+      </div>
+    </div>
   </div>
-
-  <div style="height:calc(24px + env(safe-area-inset-bottom))"></div>
 
   <!-- ── Connect Sheet ── -->
   <div class="overlay" id="connectOverlay" onclick="closeOverlay('connectOverlay')">
@@ -461,6 +642,54 @@
   </div>
 
   <script>
+    // ── Menu overlay focus management ─────────────────────────────────────────
+    const _menuReturnFocus = new Map()
+    const _overlayReturnFocus = new Map()
+
+    function rememberOverlayTrigger(id, trigger) {
+      const target = trigger || document.activeElement
+      if (target && typeof target.focus === 'function') _overlayReturnFocus.set(id, target)
+    }
+
+    function restoreOverlayFocus(id) {
+      const target = _overlayReturnFocus.get(id)
+      _overlayReturnFocus.delete(id)
+      if (target && typeof target.focus === 'function') setTimeout(() => target.focus(), 0)
+    }
+
+    function openMenuOverlay(id, trigger) {
+      const overlay = document.getElementById(id)
+      if (!overlay) return
+      const target = trigger || document.activeElement
+      if (target && typeof target.focus === 'function') _menuReturnFocus.set(id, target)
+      overlay.classList.add('show')
+      const firstControl = overlay.querySelector('button:not([disabled]), a[href]')
+      if (firstControl) requestAnimationFrame(() => firstControl.focus())
+    }
+
+    function closeMenuOverlay(id, restoreFocus = true) {
+      const overlay = document.getElementById(id)
+      if (!overlay) return
+      const target = _menuReturnFocus.get(id)
+      overlay.classList.remove('show')
+      _menuReturnFocus.delete(id)
+      if (restoreFocus && target && typeof target.focus === 'function') {
+        setTimeout(() => target.focus(), 0)
+      }
+    }
+
+    function switchMenuOverlay(fromId, toId) {
+      const target = _menuReturnFocus.get(fromId)
+      closeMenuOverlay(fromId, false)
+      openMenuOverlay(toId, target)
+    }
+
+    function openFunctionalOverlayFromMenu(menuId, overlayId, openFn) {
+      const target = _menuReturnFocus.get(menuId)
+      rememberOverlayTrigger(overlayId, target)
+      closeMenuOverlay(menuId, false)
+      openFn()
+    }
     // ── 我当主机 ──────────────────────────────────────────────────────────────
     var _hostServerUrl = ''
 
@@ -573,6 +802,7 @@
 
     function closeHostSheet() {
       document.getElementById('hostOverlay').classList.remove('show')
+      restoreOverlayFocus('hostOverlay')
     }
 
     function stopMobileServer() {
@@ -634,6 +864,7 @@
       try { if (_lanScanner) _lanScanner.cancel() } catch {}
       _lanScanner = null
       document.getElementById('lanOverlay').classList.remove('show')
+      restoreOverlayFocus('lanOverlay')
     }
 
     function startQuickScan() {
@@ -741,7 +972,7 @@
       const { id: hostId, displayName: playerName } = identity
       const btn = document.getElementById('pveBtnArrow')
       const desc = document.getElementById('pveBtnDesc')
-      if (btn) btn.textContent = '⏳'
+      if (btn) btn.textContent = '…'
       if (desc) desc.textContent = '创建 PVE 房间中…'
       try {
         const res = await RvBUtils.serverFetch('/api/rooms', {
@@ -754,7 +985,7 @@
         const params = new URLSearchParams({ roomId: room.id, playerId: hostId, playerName })
         window.location.href = 'piece-selection.html?' + params
       } catch (e) {
-        if (btn) btn.textContent = '›'
+        if (btn) btn.textContent = ''
         if (desc) desc.textContent = '对阵 AI，测试完整对战流程'
         alert('创建 PVE 房间失败：' + ((e && e.message) || e))
       }
@@ -837,7 +1068,10 @@
       await checkPackAndGo(cleanUrl, 'remote')
     }
 
-    function closeOverlay(id) { document.getElementById(id).classList.remove('show') }
+    function closeOverlay(id) {
+      document.getElementById(id).classList.remove('show')
+      restoreOverlayFocus(id)
+    }
 
     // ── Identity UI ───────────────────────────────────────────────────────────
     let identityUiError = ''
@@ -886,7 +1120,7 @@
         }
         // Show ELO
         const elo = _calcLocalElo()
-        document.getElementById('userElo').textContent = elo !== null ? ('ELO ' + elo) : ''
+        document.getElementById('userElo').textContent = elo !== null ? ('ELO ' + elo) : 'ELO 1200'
       } catch (e) {
         showIdentityError(e, '读取账号')
       }
@@ -972,6 +1206,7 @@
     function closeIdentitySheet() {
       document.getElementById('identityOverlay').classList.remove('show')
       refreshUserUI()
+      restoreOverlayFocus('identityOverlay')
     }
 
     async function saveIdentityName() {
@@ -1143,6 +1378,7 @@
 
     function closeRecordsSheet() {
       document.getElementById('recordsOverlay').classList.remove('show')
+      restoreOverlayFocus('recordsOverlay')
     }
 
     // ── Pack hash check ───────────────────────────────────────────────────────
@@ -1260,6 +1496,27 @@
     })
 
     document.addEventListener('keydown', e => {
+      const openMenu = Array.from(document.querySelectorAll('.menu-overlay.show')).pop()
+      if (e.key === 'Escape' && openMenu) {
+        e.preventDefault()
+        closeMenuOverlay(openMenu.id)
+        return
+      }
+      if (e.key === 'Tab' && openMenu) {
+        const controls = Array.from(openMenu.querySelectorAll('button:not([disabled]), a[href]'))
+          .filter(control => control.offsetParent !== null)
+        if (controls.length) {
+          const first = controls[0]
+          const last = controls[controls.length - 1]
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault()
+            last.focus()
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault()
+            first.focus()
+          }
+        }
+      }
       if (e.key === 'Enter' && document.activeElement === document.getElementById('urlInput')) doConnect()
     })
   </script>
