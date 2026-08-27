@@ -98,7 +98,7 @@
 
 ### 同步最新 `main` 后复验
 
-当前候选 head 为 `905e9b68d0449300e9eb39340232928e9809c06b`，已包含 `origin/main` 的 `e32b80c802dcf2da936be128d8635a8d23284c73`（RED-113 内容合同与 RED-120 角色内容）。同步后结果如下：
+本轮功能复验针对实现 head `905e9b68d0449300e9eb39340232928e9809c06b`，该 head 已包含 `origin/main` 的 `e32b80c802dcf2da936be128d8635a8d23284c73`（RED-113 内容合同与 RED-120 角色内容）。复验后仅追加本 QA 证据，不改变运行时代码；结果如下：
 
 | 检查 | 结果 |
 | --- | --- |
@@ -112,7 +112,7 @@
 | `npm.cmd run check:encoding` | 通过，检查 708 个文件 |
 | `git diff --check` | 通过 |
 | 生产路径与三份生成物搜索 `large-battlefield` | 0 个命中；地图源目录仅保留四个地图 JSON 与 manifest |
-| GitHub Draft PR #108 | head/base 为 `905e9b6` / `e32b80c`，`main-baseline` 通过，CLEAN / MERGEABLE；仍因 Draft 与下述阻塞项不得落地 |
+| GitHub Draft PR #108 | 复验时 head/base 为 `905e9b6` / `e32b80c`，`main-baseline` 通过，CLEAN / MERGEABLE；后续只追加 QA 证据，仍因 Draft 与下述阻塞项不得落地 |
 
 自动测试另覆盖：非法或已退役 mapId 在 seed/RNG/版本/房间写入之前被拒绝；进行中旧房间以嵌入的 `BattleState.map` 恢复时不被新的目录校验污染；同一固定输入与 seed 的部署结果稳定，反转输入顺序仍保持规定的确定性与不变量。
 
