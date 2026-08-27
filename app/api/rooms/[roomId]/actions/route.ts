@@ -8,6 +8,7 @@ import {
   lockDefaultBotRosterInStore,
   lockDemoRosterInStore,
 } from "@/lib/game/roster-contract"
+import { assertSelectableMapId, getMapSelectionErrorPayload } from "@/lib/game/map-selection"
 import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
 import { broadcastToRoom } from "@/lib/ws-server"
 import { createPublicRoomSnapshot } from "@/lib/game/room-battle-actions"
@@ -36,12 +37,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
 
   const roomStore = getRoomStore()
-  let room = await roomStore.getRoom(roomId)
+  const room = await roomStore.getRoom(roomId)
   if (!room) {
-    if (action === "claim-faction") {
-      room = await roomStore.createRoom(roomId, `Room ${roomId}`)
-    } else {
-      return NextResponse.json({ error: "Room not found" }, { status: 404 })
+    return NextResponse.json({ error: "Room not found" }, { status: 404 })
+  }
+
+  const mutatesPrebattleRoom = action === "join"
+    || action === "claim-faction"
+    || action === "toggle-ready"
+    || action === "leave"
+    || action === "select-pieces"
+    || action === "start-game"
+  if (
+    mutatesPrebattleRoom
+    && (room.status !== 'in-progress' || !room.battleState)
+  ) {
+    try {
+      assertSelectableMapId(room.mapId)
+    } catch (error) {
+      const mapError = getMapSelectionErrorPayload(error)
+      if (mapError) {
+        return NextResponse.json({ success: false, error: mapError.message, code: mapError.code, context: mapError.context }, { status: 400 })
+      }
+      throw error
     }
   }
 
@@ -234,6 +252,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
           onDeploymentUpdate: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
         })
       } catch (error) {
+        const mapError = getMapSelectionErrorPayload(error)
+        if (mapError) {
+          return NextResponse.json({ success: false, error: mapError.message, code: mapError.code, context: mapError.context }, { status: 400 })
+        }
         console.error('Error starting game:', error)
         return NextResponse.json(
           { error: `Failed to start game: ${error instanceof Error ? error.message : 'Unknown error'}` },
@@ -279,6 +301,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       const rosterError = getRosterErrorPayload(error)
       if (rosterError) {
         return NextResponse.json({ success: false, error: rosterError.message, code: rosterError.code, context: rosterError.context }, { status: 400 })
+      }
+      const mapError = getMapSelectionErrorPayload(error)
+      if (mapError) {
+        return NextResponse.json({ success: false, error: mapError.message, code: mapError.code, context: mapError.context }, { status: 400 })
       }
       const message = error instanceof Error ? error.message : String(error)
       return NextResponse.json({ success: false, error: message }, { status: message === 'Room not found' ? 404 : 400 })

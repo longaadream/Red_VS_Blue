@@ -73,7 +73,8 @@ flowchart LR
 | Windows LAN WebSocket | Prisma 房间中的 `server-state` | 服务端 `runBattleAction(state, action, { rootSeed })` | `setRoomIfVersion()` CAS 成功后广播完整 `stateUpdate` |
 | 房间 HTTP `POST` | 与 Windows LAN 相同 | 服务端校验 actor 后调用同一共享命令服务 | CAS 保存后广播；HTTP 同时返回 state/hash |
 | Android 内嵌房间（当前遗留） | 内存 `action-log` | 浏览器 Runner 生成 trace 并按日志确定性回放；移动服务只校验 trace 形状/链 | 追加带 `seq` 的日志并广播 `actionLog`；RED-81 将完整删除该框架 |
-| Relay | 同合同的远端权威房间服务 | 浏览器只发送 action | 只消费服务端 `stateUpdate`；旧 host 权威协议被拒绝 |
+| 桌面/Android 本机 Relay 正式对局 | 同合同的本机权威房间服务 | 浏览器只发送 action | 只消费服务端 `stateUpdate`；旧 host 权威协议被拒绝 |
+| 独立 `relay-server`（RED-119） | 仅赛前 REST 房间状态 | 不执行或恢复战斗；验收止于双方进入选人且 `mapId` 冻结 | 赛前持久化并转发真实房间 `roomUpdate`；不接受浏览器上传 `stateUpdate` |
 | Training / Debug | 各自的训练或调试状态 | 新旧入口并存；部分旧路径可不带 seed | 不等同于房间权威链，不应用来证明跨端一致性 |
 
 > **历史兼容：** `getBattleStorage()` 仍能读取旧 `action-log` 和裸 `BattleState`。这只是恢复兼容，不表示三种格式具有相同的权威语义。
@@ -294,11 +295,11 @@ RED-82 的目标流程：
 ### 4.3 房间开战与初始化
 
 - **入口：** `lib/game/room-battle-start.ts::startBattleFromLockedRosters()`、`lib/game/battle-setup.ts::createInitialBattleForPlayers()`。
-- **房间合同：** 两名玩家 roster 均锁定后，固定地图状态 ID 为 `large-hole-arena`，先生成 root seed，再以 `deploymentEnabled: true` 初始化。
+- **房间合同：** 两名玩家 roster 均锁定后，先验证房间冻结的 `mapId` 属于受控目录且可部署，再生成 root seed 并以 `deploymentEnabled: true` 初始化。
 - **初始化合同：** 玩家数、模板、按玩家选人、地图及 `{ firstPlayerId?, rootSeed?, deploymentEnabled? }`；返回 `Promise<BattleState | null>`。
 - **部署：** 16 枚初始棋子标记 `isCore: true`；稳定玩家顺序与固定随机消费产生初始位置和先手；召唤物强制 `isCore: false`。
 - **提交：** 房间启动使用 `setRoomIfVersion()` 最多重试三次；常规 WS/HTTP 动作与 PVE bot 状态使用同一 CAS 持久化边界。
-- **错误：** 权威部署缺 seed 或固定地图缺失时失败关闭；玩家数不是 2 返回 `null`；数据/效果错误可抛出。
+- **错误：** 权威部署缺 seed，或房间地图缺失、已退役、目录外、不可部署时，在 seed/随机消费/状态写入前失败关闭；玩家数不是 2 返回 `null`；数据/效果错误可抛出。
 - **测试：** `deployment.test.ts` 和房间 roster/identity 相关测试。
 
 ### 4.4 Windows WebSocket 与 HTTP
@@ -323,7 +324,8 @@ RED-82 的目标流程：
 - **浏览器出口：** `lib/game/engine-browser-entry.ts` 暴露归约器、Runner、hash、普通移动和旧 RNG 适配器；`data/pages/js/game-engine.js` 是构建产物。
 - **战斗页：** 在线 `battle.html::doAction()` 只生成 `clientActionId`、签名并立即提交动作；不在发送前克隆战局、执行 Runner 或生成客户端 trace。
 - **LAN：** 浏览器提交命令并消费权威 `stateUpdate`；需要目标或选项时，由服务端以 `actionError + preparation` 返回候选和选择凭证。
-- **Relay：** 所有浏览器都只向同合同的远端权威房间服务发送 action 并等待完整 `stateUpdate`；旧 `pendingAction`/`hostResume` 权威消息被忽略，客户端禁止上传 `stateUpdate`。
+- **桌面/Android 本机 Relay：** 浏览器只向同合同的本机权威服务发送 action 并等待完整 `stateUpdate`；旧 `pendingAction`/`hostResume` 权威消息被忽略，客户端禁止上传 `stateUpdate`。
+- **独立 `relay-server`：** RED-119 只恢复赛前 REST 与真实房间 `roomUpdate`；不接收 battle action 或 `stateUpdate` 上传，不执行或恢复战斗，也不分配 host-authority。
 - **Training：** `trainingDoAction()` 保留独立训练入口，不属于多人在线传输合同。
 - **Android：** `mobile-server-entry.ts::handleBattleAction()` 仍属于待删除的旧 action-log 框架；在线战斗页不再生成 trace，RED-34 不维护移动端旧 action log。
 - **Android 回放：** `battle.html::applyLegacyBattleEntry()` 按 `seq` 调用浏览器 Runner；缺 root seed 或 Runner 时失败关闭。
@@ -341,7 +343,7 @@ flowchart TD
   Start["读取房间并检查两名 roster 已锁定"] --> Ready{"合同满足？"}
   Ready -->|否| Reject["拒绝开战，不写房间"]
   Ready -->|是| Seed["createRootSeed 生成根种子"]
-  Seed --> Setup["createInitialBattleForPlayers<br/>large-hole-arena + deploymentEnabled"]
+  Seed --> Setup["createInitialBattleForPlayers<br/>Room.mapId + deploymentEnabled"]
   Setup --> Runtime["创建 RuleRuntime"]
   Runtime --> Stable["稳定排序玩家与核心棋子"]
   Stable --> Deploy["deployment 流分配 16 个唯一初始位置"]
@@ -369,7 +371,7 @@ flowchart TD
 - 每位玩家只提交一次；`pieceId: null` 表示保留全部。
 - 双方选择的提交先后不改变最终位置；不同玩家使用隔离的重选流。
 - `gameStart` 只触发一次；部署启用时不在初始化函数末尾提前触发。
-- 固定细节由 [ADR-0007](../decisions/ADR-0007-deterministic-deployment.md) 冻结。
+- 部署随机细节由 [ADR-0007](../decisions/ADR-0007-deterministic-deployment.md) 冻结，受控地图选择由 [ADR-0018](../decisions/ADR-0018-selectable-demo-maps.md) 冻结。
 
 ### 5.2 Windows LAN 玩家动作
 
@@ -643,7 +645,7 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 
 ### 同步部署
 
-1. 战斗以固定公开地图和 `deployment.status = awaiting-locks` 开始。
+1. 战斗以房间冻结并通过受控目录校验的公开地图和 `deployment.status = awaiting-locks` 开始。
 2. 双方选择在锁定前保持私有；锁定命令公开该玩家已锁定，但不泄露另一方选择。
 3. 双方均锁定，或服务端 45 秒 `deadlineAt` 到期后，部署一次性结算并进入正式对战。
 4. 所有客户端显示的读秒都从同一个服务端期限推导；本地计时器只负责刷新文本，不拥有规则时间。

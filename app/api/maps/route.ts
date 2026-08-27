@@ -1,17 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { loadJsonFilesServer } from '@/lib/game/file-loader'
+import { NextResponse } from 'next/server'
+import { getSelectableMapCatalog } from '@/lib/game/map-selection'
 
-// 加载地图数据
-async function loadMaps() {
-  return loadJsonFilesServer('data/maps')
-}
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const maps = await loadMaps()
-    return NextResponse.json({ maps: Object.values(maps) }, { status: 200 })
+    const maps = getSelectableMapCatalog()
+    return NextResponse.json({ maps }, { status: 200 })
   } catch (error) {
-    console.error('Error loading maps:', error)
-    return NextResponse.json({ error: 'Failed to load maps' }, { status: 500 })
+    console.error('Error loading selectable maps:', error)
+    return NextResponse.json({ error: 'Failed to load selectable maps' }, { status: 500 })
   }
 }

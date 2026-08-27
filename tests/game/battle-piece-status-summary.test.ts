@@ -17,7 +17,7 @@ function loadBrowserModule(relativePath: string, exportName: string, window: Rec
 
 function fixtureSnapshot(statusTags: Array<Record<string, unknown>>) {
   return {
-    map: { id: 'large-battlefield', width: 20, height: 16, tiles: [] },
+    map: { id: 'large-hole-arena', width: 20, height: 16, tiles: [] },
     pieces: [{
       instanceId: 'piece-red',
       templateId: 'red-warrior',

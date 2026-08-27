@@ -119,6 +119,7 @@ describe('RED-109 authority v2 coordinator', () => {
       id: 'red109-initial-checkpoint',
       name: 'RED-109 initial checkpoint',
       status: 'ready',
+      mapId: 'large-hole-arena',
       players: [
         {
           id: 'player-red',
@@ -195,6 +196,7 @@ describe('RED-109 authority v2 coordinator', () => {
       id: 'red109-checkpoint-failure',
       name: 'RED-109 checkpoint failure',
       status: 'ready',
+      mapId: 'large-hole-arena',
       players: [
         {
           id: 'player-red',

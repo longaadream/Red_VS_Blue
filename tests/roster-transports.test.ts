@@ -4,6 +4,7 @@ import type { Duplex } from 'node:stream'
 import { NextRequest } from 'next/server'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
 import type { Room } from '../lib/game/room-store'
+import { SELECTABLE_MAP_IDS } from '../lib/game/map-selection'
 
 type JsonObject = Record<string, unknown>
 type TestIdentity = { id: string; publicKey: string; privateKey: CryptoKey }
@@ -99,6 +100,7 @@ const memoryStore = vi.hoisted(() => {
         actions: [],
       }
       rooms.set(id, copy(created))
+      writes += 1
       return copy(created)
     },
     async setRoom(roomId: string, room: Room) {
@@ -124,6 +126,7 @@ vi.mock('../lib/game/room-store', async importOriginal => {
 })
 
 import { POST as roomActionPost } from '../app/api/rooms/[roomId]/actions/route'
+import { POST as publicRoomJoinPost } from '../app/api/rooms/[roomId]/join/route'
 import { GET as battleGet, POST as battlePost } from '../app/api/rooms/[roomId]/battle/route'
 import { GET as roomGet, POST as roomPost } from '../app/api/rooms/[roomId]/route'
 import { POST as roomsPost } from '../app/api/rooms/route'
@@ -155,7 +158,11 @@ function pieces(templateIds: string[]) {
   return templateIds.map(templateId => ({ templateId, faction: 'client-value-is-ignored' }))
 }
 
-function room(id: string, secondAlignment: 'light' | 'dark' = 'dark'): Room {
+function room(
+  id: string,
+  secondAlignment: 'light' | 'dark' = 'dark',
+  mapId = 'large-hole-arena',
+): Room {
   return {
     id,
     name: id,
@@ -167,7 +174,7 @@ function room(id: string, secondAlignment: 'light' | 'dark' = 'dark'): Room {
     spectators: [],
     currentTurnIndex: 0,
     actions: [],
-    mapId: 'large-battlefield',
+    mapId,
     version: 1,
   }
 }
@@ -281,7 +288,7 @@ function collectMessages(client: WebSocket) {
   }
 }
 
-async function httpCreate(mapId: string, hostId = 'alice') {
+async function httpCreate(mapId: unknown, hostId = 'alice') {
   const request = new NextRequest('http://localhost/api/rooms', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -291,7 +298,7 @@ async function httpCreate(mapId: string, hostId = 'alice') {
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function wsCreate(mapId: string) {
+async function wsCreate(mapId: unknown) {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -307,21 +314,48 @@ async function wsCreate(mapId: string) {
   }
 }
 
-async function httpSelect(roomId: string, playerId: string, templateIds: string[], alignment: 'light' | 'dark' = 'light') {
+async function httpSelect(roomId: string, playerId: string, templateIds: string[], alignment: 'light' | 'dark' = 'light', payloadMapId?: unknown) {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds) }),
+    body: JSON.stringify({ action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId }),
   })
   const response = await roomActionPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function httpStart(roomId: string, playerId: string) {
+async function httpDynamicRoomAction(roomId: string, action: 'join' | 'claim-faction' | 'toggle-ready' | 'select-pieces', payloadMapId?: unknown) {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'start-game', playerId }),
+    body: JSON.stringify({
+      action,
+      playerId: 'alice',
+      playerName: 'Alice',
+      alignment: 'light',
+      mapId: payloadMapId,
+      ...(action === 'select-pieces' ? { pieces: pieces(lightRoster) } : {}),
+    }),
+  })
+  const response = await roomActionPost(request, { params: Promise.resolve({ roomId }) })
+  return { status: response.status, body: await response.json() as JsonObject }
+}
+
+async function publicHttpJoin(roomId: string, playerId = 'charlie') {
+  const request = new NextRequest(`http://localhost/api/rooms/${roomId}/join`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ playerId, playerName: 'Charlie', alignment: 'light' }),
+  })
+  const response = await publicRoomJoinPost(request, { params: Promise.resolve({ roomId }) })
+  return { status: response.status, body: await response.json() as JsonObject }
+}
+
+async function httpStart(roomId: string, playerId: string, payloadMapId?: unknown) {
+  const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'start-game', playerId, mapId: payloadMapId }),
   })
   const response = await roomActionPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -347,7 +381,7 @@ async function legacyHttpJoin(roomId: string, playerId: string, alignment: 'ligh
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function wsSelect(roomId: string, playerId: string, templateIds: string[], alignment: 'light' | 'dark' = 'light') {
+async function wsSelect(roomId: string, playerId: string, templateIds: string[], alignment: 'light' | 'dark' = 'light', payloadMapId?: unknown) {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -355,7 +389,7 @@ async function wsSelect(roomId: string, playerId: string, templateIds: string[],
       type: 'rpc',
       requestId: `${roomId}-${playerId}`,
       method: 'rooms.action',
-      data: { roomId, action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds) },
+      data: { roomId, action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId },
     }))
     return await response
   } finally {
@@ -379,7 +413,7 @@ async function wsGet(roomId: string) {
   }
 }
 
-async function wsRoomAction(roomId: string, playerId: string, action: string) {
+async function wsRoomAction(roomId: string, playerId: string, action: string, payload: JsonObject = {}) {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -387,7 +421,7 @@ async function wsRoomAction(roomId: string, playerId: string, action: string) {
       type: 'rpc',
       requestId: `${roomId}-${action}`,
       method: 'rooms.action',
-      data: { roomId, playerId, action },
+      data: { ...payload, roomId, playerId, action },
     }))
     return await response
   } finally {
@@ -491,21 +525,292 @@ describe('Demo roster HTTP/WebSocket integration', () => {
 
   beforeEach(() => memoryStore.reset())
 
-  it('forces the Demo map at HTTP and WebSocket room creation boundaries', async () => {
-    const http = await httpCreate('large-battlefield')
+  it.each(SELECTABLE_MAP_IDS)('persists selectable map %s at HTTP and WebSocket room creation boundaries', async mapId => {
+    const http = await httpCreate(mapId)
     expect(http.status).toBe(200)
     const httpRoomId = String(http.body.id)
-    expect(memoryStore.snapshot(httpRoomId)?.mapId).toBe('large-hole-arena')
+    expect(memoryStore.snapshot(httpRoomId)?.mapId).toBe(mapId)
+    expect(memoryStore.writeCount()).toBe(1)
 
     memoryStore.reset()
-    const ws = await wsCreate('large-battlefield')
-    expect(ws).toMatchObject({ ok: true, data: { mapId: 'large-hole-arena' } })
+    const ws = await wsCreate(mapId)
+    expect(ws).toMatchObject({ ok: true, data: { mapId } })
     const wsRoomId = String((ws.data as JsonObject).id)
-    expect(memoryStore.snapshot(wsRoomId)?.mapId).toBe('large-hole-arena')
+    expect(memoryStore.snapshot(wsRoomId)?.mapId).toBe(mapId)
+    expect(memoryStore.writeCount()).toBe(1)
+  })
+
+  it('ignores forged mapId fields throughout the HTTP room flow', async () => {
+    const created = await httpCreate('winding-pass')
+    expect(created.status).toBe(200)
+    const roomId = String(created.body.id)
+    expect(memoryStore.snapshot(roomId)?.mapId).toBe('winding-pass')
+
+    const joined = await httpDynamicRoomAction(roomId, 'join', 'open-expanse')
+    expect(joined.status).toBe(200)
+    expect(memoryStore.snapshot(roomId)?.mapId).toBe('winding-pass')
+
+    const claimed = await httpDynamicRoomAction(roomId, 'claim-faction', 'large-battlefield')
+    expect(claimed.status).toBe(200)
+    expect(memoryStore.snapshot(roomId)?.mapId).toBe('winding-pass')
+
+    const selected = await httpSelect(roomId, 'alice', lightRoster, 'light', 'open-expanse')
+    expect(selected.status).toBe(200)
+    expect(memoryStore.snapshot(roomId)?.mapId).toBe('winding-pass')
+
+    const resumed = await httpStart(roomId, 'alice', 'large-battlefield')
+    expect(resumed).toMatchObject({ status: 200, body: { success: true, started: false } })
+
+    const finalRoom = memoryStore.snapshot(roomId)
+    const finalStorage = finalRoom?.battleState as unknown as { state: { map: { id: string } } }
+    expect(finalRoom?.mapId).toBe('winding-pass')
+    expect(finalRoom?.status).toBe('in-progress')
+    expect(finalStorage.state.map.id).toBe('winding-pass')
+  })
+
+  it('ignores forged mapId fields throughout the LAN WebSocket room flow', async () => {
+    const created = await wsCreate('winding-pass')
+    expect(created).toMatchObject({ ok: true, data: { mapId: 'winding-pass' } })
+    const roomId = String((created.data as JsonObject).id)
+
+    const joined = await wsRoomAction(roomId, 'alice', 'join', {
+      playerName: 'Alice',
+      alignment: 'light',
+      mapId: 'open-expanse',
+    })
+    expect(joined).toMatchObject({ ok: true })
+    expect(memoryStore.snapshot(roomId)?.mapId).toBe('winding-pass')
+
+    const claimed = await wsRoomAction(roomId, 'alice', 'claim-faction', {
+      alignment: 'light',
+      mapId: 'large-battlefield',
+    })
+    expect(claimed).toMatchObject({ ok: true })
+    expect(memoryStore.snapshot(roomId)?.mapId).toBe('winding-pass')
+
+    const bobJoined = await wsRoomAction(roomId, 'bob', 'join', {
+      playerName: 'Bob',
+      alignment: 'dark',
+    })
+    expect(bobJoined).toMatchObject({ ok: true })
+
+    const aliceSelected = await wsSelect(roomId, 'alice', lightRoster, 'light', 'open-expanse')
+    expect(aliceSelected).toMatchObject({ ok: true })
+    expect(memoryStore.snapshot(roomId)?.mapId).toBe('winding-pass')
+
+    const bobSelected = await wsSelect(roomId, 'bob', darkRoster, 'dark', 'large-battlefield')
+    expect(bobSelected).toMatchObject({ ok: true })
+    expect(memoryStore.snapshot(roomId)?.mapId).toBe('winding-pass')
+
+    const resumed = await wsRoomAction(roomId, 'alice', 'start-game', { mapId: 'open-expanse' })
+    expect(resumed).toMatchObject({ ok: true })
+
+    const finalRoom = memoryStore.snapshot(roomId)
+    const finalStorage = finalRoom?.battleState as unknown as { state: { map: { id: string } } }
+    expect(finalRoom?.mapId).toBe('winding-pass')
+    expect(finalRoom?.status).toBe('in-progress')
+    expect(finalStorage.state.map.id).toBe('winding-pass')
+  })
+
+  it.each([
+    [undefined, 'MAP_ID_REQUIRED'],
+    ['large-battlefield', 'MAP_NOT_SELECTABLE'],
+    ['../large-hole-arena', 'MAP_NOT_SELECTABLE'],
+    ['large-trap-arena.json', 'MAP_NOT_SELECTABLE'],
+  ])('rejects invalid map %j before HTTP or WebSocket room writes', async (mapId, code) => {
+    const http = await httpCreate(mapId)
+    expect(http).toMatchObject({ status: 400, body: { success: false, code } })
+    expect(await memoryStore.getAllRooms()).toHaveLength(0)
+    expect(memoryStore.writeCount()).toBe(0)
+
+    memoryStore.reset()
+    const ws = await wsCreate(mapId)
+    expect(ws).toMatchObject({ type: 'rpcResult', ok: false, code })
+    expect(await memoryStore.getAllRooms()).toHaveLength(0)
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it.each(['join', 'claim-faction', 'toggle-ready', 'select-pieces'] as const)('returns 404 for %s against a missing room without creating it', async action => {
+    const roomId = `missing-${action}`
+    const http = await httpDynamicRoomAction(roomId, action)
+
+    expect(http).toMatchObject({ status: 404, body: { error: 'Room not found' } })
+    expect(await memoryStore.getAllRooms()).toHaveLength(0)
+    expect(memoryStore.writeCount()).toBe(0)
+
+    if (action === 'join') {
+      const legacy = await legacyHttpJoin(roomId, 'alice', 'light')
+      const publicJoin = await publicHttpJoin(roomId)
+      expect(legacy).toMatchObject({ status: 404, body: { error: 'Room not found' } })
+      expect(publicJoin).toMatchObject({ status: 404, body: { error: 'Room not found' } })
+      expect(await memoryStore.getAllRooms()).toHaveLength(0)
+      expect(memoryStore.writeCount()).toBe(0)
+    }
+
+    memoryStore.reset()
+    const ws = await wsRoomAction(roomId, 'alice', action)
+
+    expect(ws).toMatchObject({
+      type: 'rpcResult',
+      ok: false,
+      error: 'Room not found',
+      status: 404,
+    })
+    expect(await memoryStore.getAllRooms()).toHaveLength(0)
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it.each([
+    [undefined, 'MAP_ID_REQUIRED', 'join'],
+    [undefined, 'MAP_ID_REQUIRED', 'claim-faction'],
+    [undefined, 'MAP_ID_REQUIRED', 'toggle-ready'],
+    [undefined, 'MAP_ID_REQUIRED', 'select-pieces'],
+    ['large-battlefield', 'MAP_NOT_SELECTABLE', 'join'],
+    ['large-battlefield', 'MAP_NOT_SELECTABLE', 'claim-faction'],
+    ['large-battlefield', 'MAP_NOT_SELECTABLE', 'toggle-ready'],
+    ['large-battlefield', 'MAP_NOT_SELECTABLE', 'select-pieces'],
+  ] as const)('rejects %s before %s can mutate actions HTTP or LAN WebSocket state', async (mapId, code, action) => {
+    const legacyRoom = room(`prebattle-${action}-${code}`)
+    legacyRoom.mapId = mapId
+    memoryStore.seed(legacyRoom)
+    const before = memoryStore.snapshot(legacyRoom.id)
+
+    const http = await httpDynamicRoomAction(legacyRoom.id, action)
+
+    expect(http).toMatchObject({ status: 400, body: { success: false, code } })
+    expect(memoryStore.snapshot(legacyRoom.id)).toEqual(before)
+    expect(memoryStore.writeCount()).toBe(0)
+
+    memoryStore.reset()
+    memoryStore.seed(legacyRoom)
+    const beforeWs = memoryStore.snapshot(legacyRoom.id)
+    const ws = await wsRoomAction(legacyRoom.id, 'alice', action)
+
+    expect(ws).toMatchObject({
+      type: 'rpcResult',
+      ok: false,
+      status: 400,
+      code,
+    })
+    expect(memoryStore.snapshot(legacyRoom.id)).toEqual(beforeWs)
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it.each([
+    [undefined, 'MAP_ID_REQUIRED'],
+    ['large-battlefield', 'MAP_NOT_SELECTABLE'],
+  ] as const)('rejects %s before legacy or public HTTP join state writes', async (mapId, code) => {
+    const legacyRoom = room(`legacy-join-${code}`)
+    legacyRoom.mapId = mapId
+    memoryStore.seed(legacyRoom)
+    const beforeLegacy = memoryStore.snapshot(legacyRoom.id)
+    const legacy = await legacyHttpJoin(legacyRoom.id, 'alice', 'light')
+    expect(legacy).toMatchObject({ status: 400, body: { success: false, code } })
+    expect(memoryStore.snapshot(legacyRoom.id)).toEqual(beforeLegacy)
+    expect(memoryStore.writeCount()).toBe(0)
+
+    memoryStore.reset()
+    const publicRoom = room(`public-join-${code}`)
+    publicRoom.mapId = mapId
+    memoryStore.seed(publicRoom)
+    const beforePublic = memoryStore.snapshot(publicRoom.id)
+    const publicJoin = await publicHttpJoin(publicRoom.id)
+    expect(publicJoin).toMatchObject({ status: 400, body: { success: false, code } })
+    expect(memoryStore.snapshot(publicRoom.id)).toEqual(beforePublic)
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it.each([
+    [undefined, 'MAP_ID_REQUIRED'],
+    ['large-battlefield', 'MAP_NOT_SELECTABLE'],
+  ])('rejects legacy room map %j before battle state or version writes', async (mapId, code) => {
+    const legacyRoom = room('legacy-map-room')
+    legacyRoom.mapId = mapId
+    memoryStore.seed(legacyRoom)
+    const before = memoryStore.snapshot(legacyRoom.id)
+
+    const actionsHttp = await httpStart(legacyRoom.id, 'alice')
+    const legacyHttp = await legacyHttpStart(legacyRoom.id)
+    const ws = await wsRoomAction(legacyRoom.id, 'alice', 'start-game')
+
+    expect(actionsHttp).toMatchObject({ status: 400, body: { success: false, code } })
+    expect(legacyHttp).toMatchObject({ status: 400, body: { success: false, code } })
+    expect(ws).toMatchObject({ ok: false, code })
+    expect(memoryStore.snapshot(legacyRoom.id)).toEqual(before)
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it.each([
+    [undefined, 'missing'],
+    ['large-battlefield', 'retired'],
+  ] as const)('resumes an embedded battle across HTTP and LAN when room map metadata is %s', async (mapId, label) => {
+    const sourceId = `resume-source-${label}`
+    memoryStore.seed(room(sourceId, 'light', 'winding-pass'))
+    await httpSelect(sourceId, 'alice', lightRoster)
+    await wsSelect(sourceId, 'bob', lightRoster)
+
+    const started = memoryStore.snapshot(sourceId)
+    if (!started?.battleState) throw new Error('Expected an embedded battle state')
+    expect(started.status).toBe('in-progress')
+
+    const existingStorage = started.battleState as unknown as {
+      seed: number
+      state: { map: { id: string } }
+    }
+    const resumable: Room = {
+      ...started,
+      id: `resume-http-${label}`,
+      status: 'in-progress',
+      mapId,
+      battleAuthorityVersion: Math.max(started.battleAuthorityVersion ?? 0, 1),
+    }
+
+    memoryStore.reset()
+    memoryStore.seed(resumable)
+    const beforeHttp = memoryStore.snapshot(resumable.id)
+    const actionsHttp = await httpStart(resumable.id, 'alice')
+    const legacyHttp = await legacyHttpStart(resumable.id)
+    const afterHttp = memoryStore.snapshot(resumable.id)
+
+    expect(actionsHttp).toMatchObject({
+      status: 200,
+      body: {
+        success: true,
+        started: false,
+        room: { battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } } },
+      },
+    })
+    expect(legacyHttp).toMatchObject({
+      status: 200,
+      body: { battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } } },
+    })
+    expect(afterHttp).toEqual(beforeHttp)
+    expect(afterHttp?.mapId).toBe(mapId)
+    expect(afterHttp?.version).toBe(beforeHttp?.version)
+    expect(memoryStore.writeCount()).toBe(0)
+
+    memoryStore.reset()
+    const wsRoom = { ...resumable, id: `resume-ws-${label}` }
+    memoryStore.seed(wsRoom)
+    const beforeWs = memoryStore.snapshot(wsRoom.id)
+    const ws = await wsRoomAction(wsRoom.id, 'alice', 'start-game')
+    const afterWs = memoryStore.snapshot(wsRoom.id)
+
+    expect(ws).toMatchObject({
+      ok: true,
+      data: {
+        status: 'in-progress',
+        battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } },
+      },
+    })
+    expect(afterWs).toEqual(beforeWs)
+    expect(afterWs?.mapId).toBe(mapId)
+    expect(afterWs?.version).toBe(beforeWs?.version)
+    expect(memoryStore.writeCount()).toBe(0)
   })
 
   it('locks a deterministic keep-all deployment for the PVE bot', async () => {
-    const created = await httpCreate('large-battlefield', firstIdentity.id)
+    const created = await httpCreate('large-hole-arena', firstIdentity.id)
     const roomId = String(created.body.id)
 
     expect(memoryStore.snapshot(roomId)?.players).toMatchObject([
@@ -667,8 +972,8 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(writesAfterHttpLock).toBe(1)
   })
 
-  it('starts only after both mirror rosters lock and creates one instance per owner', async () => {
-    memoryStore.seed(room('mirror-room', 'light'))
+  it('starts on the persisted non-default map only after both mirror rosters lock', async () => {
+    memoryStore.seed(room('mirror-room', 'light', 'winding-pass'))
 
     const first = await httpSelect('mirror-room', 'alice', lightRoster)
     expect(first.body.success).toBe(true)
@@ -695,7 +1000,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const started = memoryStore.snapshot('mirror-room')
     if (!started) throw new Error('Expected mirror-room to remain in the store')
     expect(started.status).toBe('in-progress')
-    expect(started.mapId).toBe('large-hole-arena')
+    expect(started.mapId).toBe('winding-pass')
     const battleState = started.battleState as unknown as {
       state: {
         map: { id: string }
@@ -707,7 +1012,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
         }
       }
     }
-    expect(battleState.state.map.id).toBe('large-hole-arena')
+    expect(battleState.state.map.id).toBe('winding-pass')
     expect(battleState.state.deployment.status).toBe('awaiting-locks')
     expect(battleState.state.gameStartFired).toBeFalsy()
     const battlePieces = battleState.state.pieces

@@ -6,7 +6,7 @@ import { readSanitizedBattleActionTrace } from '@/lib/game/battle-trace'
 export const dynamic = 'force-dynamic'
 
 const DEFAULT_SCENARIO_SEED = 20260821
-const DEFAULT_MAP_ID = 'large-battlefield'
+const DEFAULT_MAP_ID = 'large-hole-arena'
 const ALIGNMENTS = new Set(['light', 'dark'])
 
 interface ScenarioRequest {

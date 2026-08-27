@@ -92,7 +92,7 @@
 - 服务端按 `demo-v0.1` 读取 `data/pieces/manifest.json`，要求玩家从自己的 `alignment` 中提交正好 8 个不同、已准入且存在的 `templateId`。
 - 成功确认会写入 `rosterLocked` 与 `rosterManifestVersion`。同一组模板的重排提交返回幂等成功；锁定后的不同阵容或阵营修改返回 `ROSTER_LOCKED`。
 - 错误响应包含稳定的 `code`、`message` 与 `context`；HTTP 与 WebSocket 复用同一错误载荷。
-- `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容，并通过房间版本号原子提交战斗状态；只有双方合法锁定时才可通过当前战斗初始化入口。该入口忽略房间请求中的地图覆盖，强制使用并持久化 Demo 固定地图状态 ID `large-hole-arena`（数据文件仍为 `large-trap-arena.json`）。
+- `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容与房间冻结的 `mapId`，并通过房间版本号原子提交战斗状态；只有双方合法锁定且地图属于受控目录、可部署时才进入初始化。校验发生在 seed 与随机消费之前，`BattleState.map.id` 必须等于 `Room.mapId`。
 
 ### 部署房间协调器（RED-31）
 
@@ -102,9 +102,12 @@
 - 并发：玩家同时锁定或玩家锁定与超时竞争时，失败的 CAS 重新读取最新房间；最终位置只提交一次，`authorityVersion` 单调递增。
 - 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 对玩家和观战者公开相同双方坐标与锁定状态，清除选择和 `appliedActionIds`，未完成前同时清除最终位置和完整 action trace；只有权威 `terminalResult` 已提交后才公开脱敏完整 trace。
 - 传输：房间 HTTP、WebSocket 和 Relay 使用 `{ state, seed, stateHash, authorityVersion }`；`viewerPlayerId` 只做提交权限校验，不参与站位隐藏。
-- 身份：玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；HTTP 与 LAN WS 在服务端验证，Relay guest 动作由 host 验证。Relay 订阅另签名 `battle-subscribe` 信封，relay-server 验证派生 ID、有效期及房间登记公钥后才绑定 host/guest 角色。header/body/subscribe 中的同名字符串不能单独授权命令或 host 状态写入。
+- 身份：实际进入权威战斗的玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；HTTP、LAN WS 与桌面/Android 本机权威服务验证后才执行。独立 `relay-server` 在 RED-119 中没有 battle command、host state update 或 host/guest 战斗权威角色。header/body/subscribe 中的同名字符串不能单独授权命令。
 - 房间投影：`createPublicRoomSnapshot()` 覆盖普通 room GET、重复 start 与其他完整房间响应，不能绕过 battle API 读取 pending choice 或进行中对局的 debug trace；终局 trace 只经终局 battle snapshot 暴露。
-- Relay：桌面与 Android 本机初始化入口固定地图并从 authority version 1 开始；host 保留完整权威状态，只把公开状态、签名命令和版本 envelope 经 relay-server 转发/恢复。
+- Relay：持有房间的桌面与 Android 本机权威流程在正式初始化前重新验证已持久化的 `Room.mapId`，从 authority version 1 开始。Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 则是不持有 `Room` 的无状态兼容 bootstrap：只在 seed 前重新校验调用方已经冻结的 ID，不读写房间，当前没有 UI 调用方，也不作为房间冻结证据。独立 Relay 只在赛前持久化该 ID 并转发真实房间的 `roomUpdate`；RED-119 不恢复已被现行架构禁止的 host-authority 完整战斗执行或状态恢复。
+- 独立 Relay 的赛前接口与 LAN RPC 分离：`lobby.html`、`room.html`、`piece-selection.html` 在 remote 模式通过 `/api/maps`、`/api/lobby` 与 `/api/rooms/:id[/actions|/spectate]` 完成目录、创建、读取、加入、阵营确认、选人、观战和删除；不得连接 `__lobby` 或发送 `rooms.*` RPC。赛前 WebSocket 只订阅真实 `roomId` 接收 `roomUpdate`，本任务的 standalone 验收止于双方进入选人且 `mapId` 冻结。
+- 创建者由独立 Relay 建房接口直接登记为 host，随后用 `claim-faction` 固化内容阵营；访客 `join` 同步固化内容阵营。`waiting`/`selecting` 页面切换不得写状态或提前开始战斗。
+- 独立 Relay 的 Prisma/PostgreSQL `Room.mapId` 是兼容旧行的可空列；迁移顺序必须是“不含 `mapId` 的既有三表 baseline”后接“只新增可空 `Room.mapId` 的增量迁移”。全新库依次部署两条；旧 `db push` 库先备份、把 baseline 标记为已应用，再部署增量，禁止生产试跑或重建表。代码回退停止读写该列但保留列；删除列仅允许在备份后另行人工批准。
 - 错误：非法、重复锁定、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
 - 决策：[ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
 

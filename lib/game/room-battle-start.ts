@@ -1,5 +1,5 @@
-import { createInitialBattleForPlayers, DEMO_FIXED_MAP_ID } from './battle-setup'
-export { DEMO_FIXED_MAP_ID } from './battle-setup'
+import { createInitialBattleForPlayers } from './battle-setup'
+import { assertSelectableMapId } from './map-selection'
 import { hashPublicBattleState } from './battle-public-patch'
 import { hashBattleState, runBattleAction } from './battle-runner'
 import { stampPendingDeploymentAuthorityVersion } from './battle-trace'
@@ -49,6 +49,7 @@ export async function startBattleFromLockedRosters(
       return { room: authorityReadyRoom, started: false }
     }
 
+    const mapId = assertSelectableMapId(room.mapId)
     resetRoomBattleAuthorityClock(roomId)
     assertDemoRostersReady(room)
 
@@ -77,7 +78,7 @@ export async function startBattleFromLockedRosters(
       playerIds,
       pieceTemplates,
       playerSelectedPieces,
-      DEMO_FIXED_MAP_ID,
+      mapId,
       {
         firstPlayerId,
         rootSeed: seed,
@@ -111,7 +112,7 @@ export async function startBattleFromLockedRosters(
     const nextRoom: Room = {
       ...room,
       firstPlayerId,
-      mapId: DEMO_FIXED_MAP_ID,
+      mapId,
       status: 'in-progress',
       currentTurnIndex: 0,
       battleAuthorityVersion: isBattleAuthorityV2Enabled() ? initialAuthorityVersion : room.battleAuthorityVersion,

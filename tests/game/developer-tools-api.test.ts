@@ -19,7 +19,6 @@ describe('developer tools isolated scenario API', () => {
       method: 'POST',
       body: JSON.stringify({
         seed: 9401,
-        mapId: 'large-battlefield',
         firstAlignment: 'dark',
         secondAlignment: 'light',
       }),
@@ -37,7 +36,7 @@ describe('developer tools isolated scenario API', () => {
         writesStatistics: false,
       },
       seed: 9401,
-      map: { id: 'large-battlefield' },
+      map: { id: 'large-hole-arena' },
       turn: {
         number: expect.any(Number),
         phase: expect.any(String),

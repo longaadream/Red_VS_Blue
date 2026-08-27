@@ -56,7 +56,7 @@ export async function createDebugDuel(config: DebugDuelConfig = {}): Promise<Deb
         { playerId: firstPlayerId, pieces: firstPieces, faction: config.first?.seat || 'red' },
         { playerId: secondPlayerId, pieces: secondPieces, faction: config.second?.seat || 'blue' },
       ],
-      config.mapId || 'large-battlefield',
+      config.mapId || 'large-hole-arena',
       { firstPlayerId, rootSeed: seed },
     )
 

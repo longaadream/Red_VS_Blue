@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
   try {
     reloadSkills()
 
-    const map = getMap("large-battlefield") || getMap(DEFAULT_MAP_ID)
+    const map = getMap(DEFAULT_MAP_ID)
     if (!map) {
       return NextResponse.json({ error: "Map not found" }, { status: 404 })
     }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (jainaTemplate) {
-      const jaina = createPieceInstance(jainaTemplate, player1, "blue", 2, 3)
+      const jaina = createPieceInstance(jainaTemplate, player1, "blue", 1, 3)
       jaina.currentHp = 6
       tutorialPieces.push(jaina)
     }
@@ -111,13 +111,13 @@ export async function POST(request: NextRequest) {
     const redArcherTemplate = redPieces[1] || redPieces[0]
 
     if (redWarriorTemplate) {
-      const warrior = createPieceInstance(redWarriorTemplate, player2, "red", 6, 4)
+      const warrior = createPieceInstance(redWarriorTemplate, player2, "red", 7, 4)
       warrior.currentHp = 3
       tutorialPieces.push(warrior)
     }
 
     if (redArcherTemplate) {
-      const archer = createPieceInstance(redArcherTemplate, player2, "red", 5, 2)
+      const archer = createPieceInstance(redArcherTemplate, player2, "red", 7, 2)
       archer.currentHp = 2
       tutorialPieces.push(archer)
     }

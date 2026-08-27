@@ -8,6 +8,7 @@ describe('debug battle pipeline', () => {
   it('creates a local duel with eight pieces per player', async () => {
     const duel = await createDebugDuel({ seed: 1234, beginPhase: false })
 
+    expect(duel.state.map.id).toBe('large-hole-arena')
     expect(duel.state.players).toHaveLength(2)
     expect(duel.players[0].templateIds).toHaveLength(8)
     expect(duel.players[1].templateIds).toHaveLength(8)

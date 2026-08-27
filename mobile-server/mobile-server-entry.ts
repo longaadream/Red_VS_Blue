@@ -13,14 +13,15 @@
  */
 
 import { applyBattleAction } from '../lib/game/turn'
-import { createInitialBattleForPlayers, DEMO_FIXED_MAP_ID } from '../lib/game/battle-setup'
-import { hashBattleState, runBattleAction, type BattleActionTrace } from '../lib/game/battle-runner'
+import { createInitialBattleForPlayers } from '../lib/game/battle-setup'
+import { hashBattleState, type BattleActionTrace } from '../lib/game/battle-runner'
 import { stampPendingDeploymentAuthorityVersion } from '../lib/game/battle-trace'
 import { createRootSeed } from '../lib/game/rule-runtime'
 import { loadAllSkillsById, loadRuleById } from '../lib/game/skills'
 import { DEFAULT_PIECES, getAllPieces } from '../lib/game/piece-repository'
 import type { BattleState } from '../lib/game/turn'
 import type { PieceTemplate } from '../lib/game/piece'
+import { SELECTABLE_MAP_IDS, assertSelectableMapId, isMapSelectionError } from '../lib/game/map-selection'
 
 // Rehydrate battle rules so that skill effect functions are available after serialization
 function rehydrateBattleRules(state: BattleState): void {
@@ -45,6 +46,7 @@ interface Player {
   name: string
   publicKey?: string
   faction?: 'red' | 'blue'
+  alignment?: 'light' | 'dark'
   packMd5?: string
   selectedPieces?: Array<{ templateId: string; faction: string }>
   hasSelectedPieces?: boolean
@@ -136,6 +138,28 @@ function ok(data: Record<string, unknown>, status = 200): string {
 function err(msg: string, status = 400): string {
   return JSON.stringify({ error: msg, _status: status })
 }
+function readSelectableMapId(input: unknown):
+  | { ok: true; mapId: string }
+  | { ok: false; response: string } {
+  try {
+    return { ok: true, mapId: assertSelectableMapId(input) }
+  } catch (error) {
+    if (!isMapSelectionError(error)) throw error
+    return {
+      ok: false,
+      response: JSON.stringify({
+        error: error.message,
+        code: error.code,
+        context: error.context,
+        _status: 400,
+      }),
+    }
+  }
+}
+
+function readAlignment(input: unknown): 'light' | 'dark' | null {
+  return input === 'light' || input === 'dark' ? input : null
+}
 
 // ── Identity verification ─────────────────────────────────────────────────────
 
@@ -207,6 +231,7 @@ function handleGetRooms(): string {
       name: p.name,
       faction: p.faction,
       hasSelectedPieces: p.hasSelectedPieces || false,
+      alignment: p.alignment,
     })),
     playerCount: r.players.length,
     playersCount: r.players.length,
@@ -221,6 +246,8 @@ function handleGetRooms(): string {
 }
 
 function handleCreateRoom(body: Record<string, unknown>): string {
+  const mapSelection = readSelectableMapId(body.mapId)
+  if (!mapSelection.ok) return mapSelection.response
   const playerId = (body.hostId as string) || (body.playerId as string) || 'anon-' + genId()
   const playerName = (body.playerName as string) || '玩家'
   const roomId = 'room-' + genId()
@@ -231,7 +258,7 @@ function handleCreateRoom(body: Record<string, unknown>): string {
     players: [{ id: playerId, name: playerName, faction: Math.random() < 0.5 ? 'red' : 'blue', joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] }],
     hostId: playerId,
     maxPlayers: 2,
-    mapId: (body.mapId as string) || 'large-battlefield',
+    mapId: mapSelection.mapId,
     battleState: undefined,
     currentTurnIndex: 0,
     actions: [],
@@ -261,21 +288,29 @@ function handleDeleteRoom(roomId: string, body: Record<string, unknown>): string
 async function handleRoomPost(roomId: string, body: Record<string, unknown>): Promise<string> {
   const room = rooms.get(roomId.toLowerCase())
   if (!room) return err('Room not found', 404)
+  const mapSelection = readSelectableMapId(room.mapId)
+  if (!mapSelection.ok) return mapSelection.response
   const playerId = (body.playerId as string) || ''
   const playerName = (body.playerName as string) || '玩家'
 
   if (body.action === 'join') {
+    const alignment = readAlignment(body.alignment)
+    if (!alignment) return err('alignment must be light or dark', 400)
     const normalizedPlayerId = playerId.trim().toLowerCase()
     const authErr = await verifyJoinAuth(body)
     if (authErr) return err(authErr, 401)
     const packMd5 = (body.packMd5 as string) || undefined
     const existing = room.players.find(p => p.id.toLowerCase() === normalizedPlayerId)
     if (existing) {
+      if (existing.selectedPieces?.length && existing.alignment && existing.alignment !== alignment) {
+        return err('Alignment is locked after roster selection', 409)
+      }
       if (!existing.faction) {
         existing.faction = nextFaction(room)
       }
       if (playerName) existing.name = playerName
       if (packMd5) existing.packMd5 = packMd5
+      existing.alignment = alignment
       room.version++
       _broadcastRoomUpdate(room)
       return ok({ ...room, packMismatch: mobileCheckPackMismatch(room.players) } as unknown as Record<string, unknown>)
@@ -283,7 +318,7 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
     const publicKey = (body.publicKey as string) || undefined
     const faction = nextFaction(room)
-    room.players.push({ id: normalizedPlayerId, name: playerName, publicKey, faction, packMd5, joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] })
+    room.players.push({ id: normalizedPlayerId, name: playerName, publicKey, faction, alignment, packMd5, joinedAt: Date.now(), hasSelectedPieces: false, selectedPieces: [] })
     room.version++
     _broadcastRoomUpdate(room)
     return ok({ ...room, packMismatch: mobileCheckPackMismatch(room.players) } as unknown as Record<string, unknown>)
@@ -314,10 +349,26 @@ async function handleRoomPost(roomId: string, body: Record<string, unknown>): Pr
 
 // ── Shared game-start helper ──────────────────────────────────────────────────
 
-async function _startGame(room: Room): Promise<string> {
+async function _startGame(
+  room: Room,
+  beforePublish?: () => void,
+): Promise<string> {
   try {
+    const mapSelection = readSelectableMapId(room.mapId)
+    if (!mapSelection.ok) return mapSelection.response
     const allPieces = getAllPieces()
     const roomPlayers = room.players.slice(0, 2)
+    const validatedRosters = new Map<string, Array<{ templateId: string; faction: string }>>()
+    for (const player of roomPlayers) {
+      const alignment = readAlignment(player.alignment)
+      const roster = alignment
+        ? readMobileRoster(player.selectedPieces, alignment, allPieces)
+        : null
+      if (!roster) {
+        return err('Each player must submit exactly 8 unique valid pieces matching their alignment', 400)
+      }
+      validatedRosters.set(player.id, roster)
+    }
     const redPlayers = roomPlayers.filter(player => player.faction === 'red')
     const bluePlayers = roomPlayers.filter(player => player.faction === 'blue')
     if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
@@ -329,18 +380,25 @@ async function _startGame(room: Room): Promise<string> {
     const playerSelectedPieces = roomPlayers.map(p => ({
       playerId: p.id,
       faction: p.faction as 'red' | 'blue' | undefined,
-      pieces: (p.selectedPieces || [])
+      pieces: (validatedRosters.get(p.id) ?? [])
         .map(sp => allPieces.find(t => t.id === sp.templateId))
         .filter((t): t is PieceTemplate => !!t),
+      alignment: p.alignment,
     }))
 
     const seed = createRootSeed()
+    const deploymentStartedAt = Date.now()
     const state = await createInitialBattleForPlayers(
       playerIds,
       [],
       playerSelectedPieces,
-      room.mapId,
-      { firstPlayerId, rootSeed: seed },
+      mapSelection.mapId,
+      {
+        firstPlayerId,
+        rootSeed: seed,
+        deploymentEnabled: true,
+        deploymentStartedAt,
+      },
     )
     if (!state) return err('Failed to create battle state', 500)
 
@@ -348,12 +406,7 @@ async function _startGame(room: Room): Promise<string> {
       state.skillsById = loadAllSkillsById() as typeof state.skillsById
     }
 
-    // Apply beginPhase through the deterministic authority runner.
-    const initState = runBattleAction(
-      state,
-      { type: 'beginPhase' } as Parameters<typeof applyBattleAction>[1],
-      { rootSeed: seed },
-    ).state
+    const initState = state
 
     const { skillsById: _sk, ...initPayload } = initState as unknown as Record<string, unknown>
     void _sk
@@ -373,6 +426,7 @@ async function _startGame(room: Room): Promise<string> {
     room.firstPlayerId = initState.turn.currentPlayerId
     room.status = 'in-progress'
     room.version++
+    beforePublish?.()
     _broadcastBattleSnapshot(room)
     return ok({ success: true })
   } catch (e: unknown) {
@@ -445,12 +499,16 @@ function handleLeaveRoom(roomId: string, body: Record<string, unknown>): string 
 function handleClaimFaction(roomId: string, body: Record<string, unknown>): string {
   const room = rooms.get(roomId.toLowerCase())
   if (!room) return err('Room not found', 404)
+  const mapSelection = readSelectableMapId(room.mapId)
+  if (!mapSelection.ok) return mapSelection.response
   const playerId = ((body.playerId as string) || '').trim().toLowerCase()
   const playerName = ((body.playerName as string) || '').trim()
+  const alignment = readAlignment(body.alignment)
   if (!playerId) return err('playerId is required', 400)
-
+  if (!alignment) return err('alignment must be light or dark', 400)
 
   let player = room.players.find(p => p.id.toLowerCase() === playerId)
+  if (player?.selectedPieces?.length && player.alignment && player.alignment !== alignment) return err('Alignment is locked after roster selection', 409)
   if (!player) {
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
     const faction = nextFaction(room)
@@ -458,35 +516,90 @@ function handleClaimFaction(roomId: string, body: Record<string, unknown>): stri
       id: playerId,
       name: playerName || `Player ${playerId.slice(0, 8)}`,
       faction,
+      alignment,
       joinedAt: Date.now(),
       hasSelectedPieces: false,
       selectedPieces: [],
     }
     room.players.push(player)
-    room.version++
   } else if (!player.faction) {
     player.faction = nextFaction(room)
-    room.version++
   }
 
+  player.alignment = alignment
+  room.version++
   _broadcastRoomUpdate(room)
-  return ok({ success: true, faction: player.faction })
+  return ok({ success: true, faction: player.faction, alignment: player.alignment, room } as unknown as Record<string, unknown>)
+}
+
+function readMobileRoster(
+  input: unknown,
+  alignment: 'light' | 'dark',
+  templates = getAllPieces(),
+): Array<{ templateId: string; faction: string }> | null {
+  if (!Array.isArray(input) || input.length !== 8) return null
+  const expectedFaction = alignment === 'light' ? 'good' : 'evil'
+  const byId = new Map(templates.map(template => [template.id, template]))
+  const seen = new Set<string>()
+  const roster: Array<{ templateId: string; faction: string }> = []
+
+  for (const entry of input) {
+    if (!entry || typeof entry !== 'object') return null
+    const templateId = (entry as { templateId?: unknown }).templateId
+    if (typeof templateId !== 'string' || templateId.length === 0 || seen.has(templateId)) return null
+    const template = byId.get(templateId)
+    if (!template || template.faction !== expectedFaction) return null
+    seen.add(templateId)
+    roster.push({ templateId, faction: expectedFaction })
+  }
+
+  return roster
 }
 
 async function handleSelectPieces(roomId: string, body: Record<string, unknown>): Promise<string> {
-  const room = rooms.get(roomId.toLowerCase())
-  if (!room) return err('Room not found', 404)
+  const storedRoom = rooms.get(roomId.toLowerCase())
+  if (!storedRoom) return err('Room not found', 404)
+  const mapSelection = readSelectableMapId(storedRoom.mapId)
+  if (!mapSelection.ok) return mapSelection.response
   const playerId = ((body.playerId as string) || '').trim().toLowerCase()
   const playerName = ((body.playerName as string) || '').trim()
+  const alignment = readAlignment(body.alignment)
   if (!playerId) return err('playerId is required', 400)
+  if (!alignment) return err('alignment must be light or dark', 400)
+  const pieces = readMobileRoster(body.pieces, alignment)
+  if (!pieces) return err('Exactly 8 unique valid pieces matching alignment are required', 400)
+
+  for (const existingPlayer of storedRoom.players) {
+    const hasRosterState = existingPlayer.hasSelectedPieces === true
+      || (existingPlayer.selectedPieces?.length ?? 0) > 0
+    if (!hasRosterState) continue
+    const existingAlignment = readAlignment(existingPlayer.alignment)
+    if (
+      existingPlayer.hasSelectedPieces !== true
+      || !existingAlignment
+      || !readMobileRoster(existingPlayer.selectedPieces, existingAlignment)
+    ) {
+      return err('Stored room contains an invalid selected roster', 400)
+    }
+  }
+  if (storedRoom.players.length === 2) {
+    const redSeats = storedRoom.players.filter(candidate => candidate.faction === 'red').length
+    const blueSeats = storedRoom.players.filter(candidate => candidate.faction === 'blue').length
+    if (redSeats !== 1 || blueSeats !== 1) return err('Stored room contains invalid red/blue seats', 400)
+  }
+  const room = structuredClone(storedRoom)
 
   let player = room.players.find(p => p.id.toLowerCase() === playerId)
+  if (player?.selectedPieces?.length && player.alignment && player.alignment !== alignment) {
+    return err('Alignment is locked after roster selection', 409)
+  }
   if (!player) {
     if (room.players.length >= room.maxPlayers) return err('Room is full', 400)
     player = {
       id: playerId,
       name: playerName || `Player ${playerId.slice(0, 8)}`,
       faction: nextFaction(room),
+      alignment,
       joinedAt: Date.now(),
       hasSelectedPieces: false,
       selectedPieces: [],
@@ -494,25 +607,27 @@ async function handleSelectPieces(roomId: string, body: Record<string, unknown>)
     room.players.push(player)
   }
   if (!player.faction) player.faction = nextFaction(room)
+  player.alignment = alignment
 
-  const pieces = body.pieces as Array<{ templateId: string; faction: string }> | undefined
-  if (!pieces || pieces.length === 0) return err('Please select at least 1 piece', 400)
-  player.selectedPieces = pieces || []
+  player.selectedPieces = pieces
   player.hasSelectedPieces = player.selectedPieces.length > 0
   room.version++
 
   const allPlayersSelected = room.players.length >= 2 &&
-    room.players.slice(0, 2).every(p => p.hasSelectedPieces && p.selectedPieces && p.selectedPieces.length > 0)
+    room.players.slice(0, 2).every(p => p.hasSelectedPieces && p.selectedPieces?.length === 8)
 
   if (allPlayersSelected && room.status !== 'in-progress') {
-    return _startGame(room)
+    return _startGame(room, () => rooms.set(roomId.toLowerCase(), room))
   }
 
+  rooms.set(roomId.toLowerCase(), room)
+  _broadcastRoomUpdate(room)
   return ok({
     success: true,
     message: 'Pieces selected successfully',
     player: {
       id: player.id,
+      alignment: player.alignment,
       hasSelectedPieces: true,
       selectedPiecesCount: player.selectedPieces.length,
     },
@@ -523,6 +638,7 @@ async function handleSelectPieces(roomId: string, body: Record<string, unknown>)
         id: p.id,
         name: p.name,
         faction: p.faction,
+        alignment: p.alignment,
         hasSelectedPieces: p.hasSelectedPieces || false,
       })),
     },
@@ -633,7 +749,13 @@ function handleGetPieces(): string {
 
 function handleGetMaps(): string {
   // Return basic map list; full map JSON available via /api/maps/:id if needed
-  return ok({ maps: [{ id: 'large-battlefield', name: '大战场' }, { id: 'large-trap-arena', name: '陷阱战场' }] })
+  const names: Record<(typeof SELECTABLE_MAP_IDS)[number], string> = {
+    'large-hole-arena': '大型洞穴',
+    'open-expanse': '开阔原野',
+    'winding-pass': '回风曲径',
+    'narrow-corridors': '狭廊要道',
+  }
+  return ok({ maps: SELECTABLE_MAP_IDS.map(id => ({ id, name: names[id] })) })
 }
 
 // ── Training handler ─────────────────────────────────────────────────────────
@@ -642,7 +764,7 @@ async function handleTraining(method: string, body: Record<string, unknown>): Pr
   if (method === 'POST') {
     // Create initial training battle
     try {
-      const mapId = (body.mapId as string) || 'large-battlefield'
+      const mapId = (body.mapId as string) || 'large-hole-arena'
       const allPieces = getAllPieces()
       if (!allPieces.length) return err('No pieces available', 500)
       // Use first half as red, second half as blue
@@ -706,6 +828,7 @@ export async function handleRelayBattleInit(body: Record<string, unknown>): Prom
   const players = body.players as Array<{
     id: string
     faction: 'red' | 'blue'
+    alignment?: 'light' | 'dark'
     pieces: Array<{ templateId: string }>
   }> | undefined
 
@@ -718,6 +841,8 @@ export async function handleRelayBattleInit(body: Record<string, unknown>): Prom
   if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
     return err('players must contain exactly one red and one blue seat', 400)
   }
+  const mapSelection = readSelectableMapId(body.mapId)
+  if (!mapSelection.ok) return mapSelection.response
   const firstPlayerId = redPlayers[0].id
 
   const playerIds = players.map(p => p.id)
@@ -731,7 +856,7 @@ export async function handleRelayBattleInit(body: Record<string, unknown>): Prom
         return { ...tpl, faction: player.faction } as PieceTemplate
       })
       .filter((p): p is PieceTemplate => p !== null)
-    return { playerId: player.id, pieces }
+    return { playerId: player.id, faction: player.faction, alignment: player.alignment, pieces }
   })
 
   const allPieces = playerSelectedPieces.flatMap(p => p.pieces)
@@ -742,7 +867,7 @@ export async function handleRelayBattleInit(body: Record<string, unknown>): Prom
       playerIds,
       allPieces,
       playerSelectedPieces,
-      DEMO_FIXED_MAP_ID,
+      mapSelection.mapId,
       {
         firstPlayerId,
         rootSeed: seed,
@@ -828,6 +953,7 @@ async function route(method: string, rawPath: string, body: Record<string, unkno
 
   return err('Not found', 404)
 }
+export { route as handleMobileServerRequest }
 
 // ── Global interface exposed to Java (via evaluateJavascript) ─────────────────
 

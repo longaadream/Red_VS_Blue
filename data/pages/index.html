@@ -747,7 +747,7 @@
         const res = await RvBUtils.serverFetch('/api/rooms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'pve', hostId, playerName })
+          body: JSON.stringify({ mode: 'pve', hostId, playerName, mapId: 'large-hole-arena' })
         })
         if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + ' ' + t) }
         const room = await res.json()

@@ -6,7 +6,7 @@ loadMaps().catch(error => {
   console.error('Error preloading maps:', error)
 })
 
-export const DEFAULT_MAP_ID = "large-battlefield"
+export const DEFAULT_MAP_ID = "large-hole-arena"
 
 // 获取地图
 export async function getMapAsync(id: string): Promise<BoardMap | undefined> {

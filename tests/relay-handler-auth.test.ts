@@ -20,7 +20,10 @@ const relayStore = vi.hoisted(() => ({
 vi.mock('../relay-server/src/store', () => ({ store: relayStore }))
 
 type RelaySocket = { readyState: number; url?: string; data: WsData; send(raw: string): unknown }
-type RelayHandler = { message(ws: RelaySocket, raw: string | Buffer): void | Promise<void> }
+type RelayHandler = {
+  message(ws: RelaySocket, raw: string | Buffer): void | Promise<void>
+  close(ws: RelaySocket): void
+}
 let wsHandler: RelayHandler
 
 beforeAll(async () => {
@@ -338,5 +341,87 @@ describe('Relay WebSocket signed subscription identity', () => {
       type: 'error',
       code: 'BATTLE_TRANSITION_FORBIDDEN',
     })
+  })
+
+  it.each(['waiting', 'selecting'] as const)(
+    'does not mutate a %s room when its host changes prebattle pages',
+    async status => {
+      const host = await createTestIdentity()
+      const room = roomFor(host)
+      room.status = status
+      room.mapId = 'winding-pass'
+      const original = structuredClone(room)
+      relayStore.getRoom.mockReturnValue(room)
+      const { ws } = fakeWebSocket(room.id)
+      ws.data = { roomId: room.id, playerId: host.id, role: 'host' }
+
+      wsHandler.close(ws)
+
+      expect(relayStore.removeWsClient).toHaveBeenCalledWith(room.id, ws)
+      expect(room).toEqual(original)
+      expect(relayStore.setRoom).not.toHaveBeenCalled()
+      expect(relayStore.startHostTimeout).not.toHaveBeenCalled()
+      expect(relayStore.broadcastToRoom).not.toHaveBeenCalled()
+    },
+  )
+
+  it('does not enter host recovery when a battle has no recoverable snapshot', async () => {
+    const host = await createTestIdentity()
+    const room = roomFor(host)
+    const original = structuredClone(room)
+    relayStore.getRoom.mockReturnValue(room)
+    const { ws } = fakeWebSocket(room.id)
+    ws.data = { roomId: room.id, playerId: host.id, role: 'host' }
+
+    wsHandler.close(ws)
+
+    expect(room).toEqual(original)
+    expect(relayStore.setRoom).not.toHaveBeenCalled()
+    expect(relayStore.startHostTimeout).not.toHaveBeenCalled()
+    expect(relayStore.broadcastToRoom).not.toHaveBeenCalled()
+  })
+
+  it('enters host recovery only for a battle with a recoverable snapshot', async () => {
+    const host = await createTestIdentity()
+    const room = roomFor(host)
+    room.lastStateBlob = JSON.stringify({
+      type: 'stateUpdate',
+      state: { recoverable: true },
+      authorityVersion: 3,
+    })
+    relayStore.getRoom.mockReturnValue(room)
+    const { ws } = fakeWebSocket(room.id)
+    ws.data = { roomId: room.id, playerId: host.id, role: 'host' }
+
+    wsHandler.close(ws)
+
+    expect(room.status).toBe('waiting_host')
+    expect(room.hostDisconnectedAt).toEqual(expect.any(Number))
+    expect(relayStore.setRoom).toHaveBeenCalledWith(room)
+    expect(relayStore.startHostTimeout).toHaveBeenCalledWith(room.id, expect.any(Function))
+    expect(relayStore.broadcastToRoom).toHaveBeenCalledWith(
+      room.id,
+      expect.objectContaining({
+        type: 'roomUpdate',
+        room: expect.objectContaining({ status: 'waiting_host' }),
+      }),
+    )
+  })
+
+  it('does not resume a waiting_host room that has no recoverable snapshot', async () => {
+    const host = await createTestIdentity()
+    const room = roomFor(host)
+    room.status = 'waiting_host'
+    room.lastStateBlob = undefined
+    relayStore.getRoom.mockReturnValue(room)
+    const { ws, sent } = fakeWebSocket(room.id)
+
+    await wsHandler.message(ws, JSON.stringify(await signedSubscribe(host, room.id)))
+
+    expect(sent[0]).toEqual({ type: 'subscribed', role: 'host' })
+    expect(room.status).toBe('waiting_host')
+    expect(relayStore.cancelHostTimeout).not.toHaveBeenCalled()
+    expect(relayStore.setRoom).not.toHaveBeenCalled()
+    expect(relayStore.broadcastToRoom).not.toHaveBeenCalled()
   })
 })

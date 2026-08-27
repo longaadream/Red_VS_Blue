@@ -196,8 +196,8 @@ const analyzeMap = (config: AsciiMapConfig) => {
   }
 }
 
-describe('RED-112 map catalog', () => {
-  it('keeps the two existing maps unchanged and catalogs exactly five map files', () => {
+describe('RED-119 selectable map catalog', () => {
+  it('retires large-battlefield and catalogs exactly four authoritative map files', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(mapsDirectory, 'manifest.json'), 'utf8'),
     ) as string[]
@@ -207,14 +207,12 @@ describe('RED-112 map catalog', () => {
       .sort()
 
     expect(manifest).toEqual([
-      'large-battlefield',
       'large-trap-arena',
       ...newMaps.map(map => map.filename),
     ])
     expect([...manifest].sort()).toEqual(mapFiles)
-    expect(sha256('large-battlefield.json')).toBe(
-      '0c133649595b10345d274fda19a8418e2dddea96739f950605b20de66c0f1a0b',
-    )
+    expect(mapFiles).not.toContain('large-battlefield')
+    expect(loadConfig('large-trap-arena').id).toBe('large-hole-arena')
     expect(sha256('large-trap-arena.json')).toBe(
       '0d942d7660dc52bb67209a15aa863c6ca574a48f61d0bf3d1a3146b2b0d63cdc',
     )
@@ -311,25 +309,58 @@ describe('RED-112 map catalog', () => {
     const repositoryIds = new Set(getAllMaps().map(map => map.id))
     const apiIds = new Set(Object.keys(loadJsonFilesServer<AsciiMapConfig>('data/maps')))
 
-    for (const definition of newMaps) {
-      expect(repositoryIds.has(definition.id)).toBe(true)
-      expect(apiIds.has(definition.id)).toBe(true)
-    }
-    expect(repositoryIds.size).toBe(5)
-    expect(apiIds.size).toBe(5)
+    expect(repositoryIds).toEqual(new Set([
+      'large-hole-arena',
+      ...newMaps.map(map => map.id),
+    ]))
+    expect(apiIds).toEqual(repositoryIds)
   })
 
-  it('keeps the existing lobby selector pinned to the authoritative Demo map', () => {
+  it('loads the authoritative map API and keeps room creation disabled until the catalog succeeds', () => {
     const lobby = readFileSync(resolve(process.cwd(), 'data/pages/lobby.html'), 'utf8')
     const loadMapsBlock = lobby.match(/async function loadMaps\(\) \{[\s\S]*?\n    \}/)?.[0]
     const createRoomBlock = lobby.match(/async function doCreateRoom\(\) \{[\s\S]*?\n    \}/)?.[0]
 
-    expect(lobby).toContain("const DEMO_MAP_ID = 'large-hole-arena'")
-    expect(lobby).toContain("const DEMO_MAP_FILENAME = 'large-trap-arena'")
-    expect(lobby).toContain('<select id="mapSelect"><option value="large-hole-arena">大型洞穴</option></select>')
-    expect(loadMapsBlock).toContain("fetchLocalJson('./data/maps/' + DEMO_MAP_FILENAME + '.json')")
-    expect(loadMapsBlock).not.toContain('manifest.json')
-    expect(createRoomBlock).toContain('const mapId = DEMO_MAP_ID')
-    expect(createRoomBlock).not.toContain("document.getElementById('mapSelect').value")
+    expect(lobby).toMatch(/<select id="mapSelect"[^>]*disabled/)
+    expect(lobby).toMatch(/<button[^>]*id="createRoomBtn"[^>]*disabled/)
+    expect(lobby).not.toContain('DEMO_MAP_ID')
+    expect(lobby).not.toContain('DEMO_MAP_FILENAME')
+    expect(loadMapsBlock).toContain("RvBUtils.serverFetch('/api/maps')")
+    expect(loadMapsBlock).toContain('sel.disabled = false')
+    expect(lobby).toContain("const DEFAULT_SELECTED_MAP_ID = 'large-hole-arena'")
+    expect(loadMapsBlock).toContain('createBtn.disabled = false')
+    expect(loadMapsBlock).toContain('const preferred = previous || DEFAULT_SELECTED_MAP_ID')
+    expect(createRoomBlock).toContain("document.getElementById('mapSelect').value")
+  })
+
+  it('migrates every non-selecting legacy entry point to large-hole-arena', () => {
+    const sourceFiles = [
+      'config/maps.ts',
+      'data/pve/encounters/prototype-encounter-1.json',
+      'app/api/tutorial/route.ts',
+      'app/api/developer-tools/scenario/route.ts',
+      'app/api/debug/battle/route.ts',
+      'lib/game/debug-battle.ts',
+      'data/pages/developer-tools.html',
+      'data/pages/index.html',
+    ]
+    const sources = new Map(sourceFiles.map(filename => [
+      filename,
+      readFileSync(resolve(process.cwd(), filename), 'utf8'),
+    ]))
+
+    for (const [filename, source] of sources) {
+      expect(source, filename).not.toContain('large-battlefield')
+    }
+    expect(sources.get('config/maps.ts')).toContain('DEFAULT_MAP_ID = "large-hole-arena"')
+    expect(JSON.parse(sources.get('data/pve/encounters/prototype-encounter-1.json')!).mapId)
+      .toBe('large-hole-arena')
+    expect(sources.get('app/api/tutorial/route.ts')).toContain('getMap(DEFAULT_MAP_ID)')
+    expect(sources.get('app/api/developer-tools/scenario/route.ts'))
+      .toContain("DEFAULT_MAP_ID = 'large-hole-arena'")
+    expect(sources.get('app/api/debug/battle/route.ts')).toContain("'large-hole-arena'")
+    expect(sources.get('lib/game/debug-battle.ts')).toContain("'large-hole-arena'")
+    expect(sources.get('data/pages/developer-tools.html')).toContain('value="large-hole-arena"')
+    expect(sources.get('data/pages/index.html')).toContain("mapId: 'large-hole-arena'")
   })
 })
