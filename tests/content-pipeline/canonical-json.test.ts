@@ -82,7 +82,7 @@ describe('RVB Canonical JSON v1', () => {
     const value = { '😀': 2, '\uE000': 1, a: -0 }
     const canonical = canonicalizeJsonV1(value)
 
-    expect(canonical).toBe('{"a":0,"":1,"😀":2}')
+    expect(canonical).toBe('{"a":0,"\uE000":1,"😀":2}')
     expect(bytesToLowerHexV1(canonicalJsonBytesV1(value))).toBe(
       '7b2261223a302c22ee8080223a312c22f09f9880223a327d',
     )
