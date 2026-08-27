@@ -8,16 +8,16 @@
     "unsupported": { "mechanics": [], "stateSources": [], "fallback": "skip-action" }
   },
   "manifestHashes": {
-    "pieces": "2ae8cdac23ded9279806c166e91b00d87a8676b846856e63660d7084d598c8ce",
-    "skills": "184b76cd3566dc2e382782d3eeb8426d721291186d0b74155a754bff7a51764e",
+    "pieces": "4585ac498ff24c4e058680e7e139b783cf1e7029c6eff9eef3276237a5a5930f",
+    "skills": "7fc5c51b9c5760898932b07a1e981700734da2ba6d2cdba39d31bc1c89907aa8",
     "cards": "4f15ea0ae15ec28dc71cfa23928a77ce8cc0467d87cc9ad051c9836af41cbf92",
-    "rules": "aaa2ce2c37d4f9bee38b8e1529746316b2772e7becda0508fc68524b881112c5",
+    "rules": "59d11f5c11727c766c0e88aee6c3f31f4bd30fa994a2db6cdf809a6143de3904",
     "status-effects": "ea3b630e48fcacba6a3a7b66deefe0d0c6f78d421fdd96b5327db1837e3e43ec"
   },
   "unsupported": { "skills": ["evil-explosion"] },
   "metadataRequired": {
-    "pieces": ["kiljaedan", "red-illidan", "red-sasuke"],
-    "skills": ["biotic-grenade", "blackwidow-lethal-toxin", "blizzard", "blizzard-damage", "divine-blessing-damage", "divine-shield-defense", "elune-blessing", "frostbolt", "illidan-metamorphosis", "initial-draw", "kenshin-amakakeru", "kenshin-ryutsuisen", "kiljaedan-demonic-pact", "minato-kunai-formula", "minato-rasengan", "minato-spiral-barrage", "nano-boost", "naruto-shadow-clone", "pulse-pistol", "pulse-pistol-move", "rafaam-temporal-distortion", "recall", "recall-endturn-trigger", "recall-move-trigger", "recall-skill-trigger", "sasuke-amaterasu", "sasuke-indra-arrow", "sasuke-susanoo", "shadow-step", "shadow-step-teleport", "shield-of-light", "shishio-flame-spirit", "shishio-infinite-blade", "shishio-infinite-blade-recast", "sleep-dart", "sleep-remove", "sticky-bomb", "sticky-bomb-explode", "sticky-bomb-move"],
+    "pieces": ["blue-ichigo", "kiljaedan", "red-illidan", "red-sasuke"],
+    "skills": ["biotic-grenade", "blackwidow-lethal-toxin", "blizzard", "blizzard-damage", "divine-blessing-damage", "divine-shield-defense", "elune-blessing", "frostbolt", "ichigo-bankai-tensa-zangetsu", "ichigo-black-getsuga-tensho", "illidan-metamorphosis", "initial-draw", "itachi-amaterasu", "kenshin-amakakeru", "kenshin-ryutsuisen", "kiljaedan-demonic-pact", "minato-kunai-formula", "minato-rasengan", "minato-spiral-barrage", "nano-boost", "naruto-shadow-clone", "pulse-pistol", "pulse-pistol-move", "rafaam-temporal-distortion", "recall", "recall-endturn-trigger", "recall-move-trigger", "recall-skill-trigger", "sasuke-amaterasu", "sasuke-indra-arrow", "sasuke-susanoo", "shadow-step", "shadow-step-teleport", "shield-of-light", "shishio-flame-spirit", "shishio-infinite-blade", "shishio-infinite-blade-recast", "sleep-dart", "sleep-remove", "sticky-bomb", "sticky-bomb-explode", "sticky-bomb-move"],
     "cards": ["demon-summon-1", "demon-summon-2", "demon-summon-3", "demon-summon-4", "demon-summon-5"],
     "rules": ["rule-blackwidow-toxin-player", "rule-minato-anchor-begin-turn", "rule-minato-flying-raijin-trigger", "rule-rafaam-curse-end-turn", "rule-rafaam-curse-ward", "rule-sasuke-amaterasu-damage", "rule-sasuke-amaterasu-endturn", "rule-sasuke-amaterasu-move", "rule-sasuke-amaterasu-stack", "rule-shishio-burn-endturn", "rule-shishio-burn-move"]
   },

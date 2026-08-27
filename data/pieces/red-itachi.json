@@ -1,0 +1,21 @@
+{
+  "id": "red-itachi",
+  "name": "宇智波鼬",
+  "faction": "evil",
+  "description": "宇智波一族的幻术天才，以月读压制敌人的技能节奏，以天照留下黑炎地格，并用十拳剑封印对手的反击手段",
+  "rarity": "legendary",
+  "image": "itachi.jpg",
+  "stats": {
+    "maxHp": 10,
+    "attack": 3,
+    "defense": 0,
+    "moveRange": 4
+  },
+  "skills": [
+    { "skillId": "itachi-tsukuyomi", "level": 1 },
+    { "skillId": "itachi-amaterasu", "level": 1 },
+    { "skillId": "itachi-totsuka-blade", "level": 1 }
+  ],
+  "rules": [],
+  "isDefault": false
+}

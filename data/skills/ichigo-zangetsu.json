@@ -1,0 +1,20 @@
+{
+  "id": "ichigo-zangetsu",
+  "name": "斩月",
+  "description": "选择相邻的一个敌人，造成100%攻击力的物理伤害。AP1，CD1。",
+  "keywords": [],
+  "targetText": "相邻的一个敌人",
+  "effectTags": ["damage"],
+  "icon": "⚔️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 1,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "type": "piece", "filter": "enemy", "range": 1 }] },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.round(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'physical', battle, context.skill.id); return { success: true, message: caster.name + '以斩月对' + target.name + '造成' + result.damage + '点物理伤害' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.round((piece.attack || 0) * skillDef.powerMultiplier); return { description: '选择相邻的一个敌人，造成' + damage + '点物理伤害。', expectedValues: { damage: damage } }; }"
+}

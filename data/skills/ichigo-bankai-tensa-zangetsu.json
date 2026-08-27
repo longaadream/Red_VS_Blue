@@ -1,0 +1,19 @@
+{
+  "id": "ichigo-bankai-tensa-zangetsu",
+  "name": "卍解·天锁斩月",
+  "description": "攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。AP0，充能1，每局限用1次。",
+  "keywords": [],
+  "targetText": "自身",
+  "effectTags": ["buff", "skill-change"],
+  "icon": "🖤",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "chargeCost": 1,
+  "powerMultiplier": 1.0,
+  "actionPointCost": 0,
+  "targeting": { "steps": [] },
+  "code": "function executeSkill(context) { var caster = context.piece; var active = caster.statusTags && caster.statusTags.some(function(tag) { return tag.type === 'ichigo-bankai'; }); if (active) return { success: false, message: '卍解·天锁斩月每局只能使用一次' }; caster.attack += 1; caster.moveRange += 2; var player = battle.players && battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); if (player) player.actionPoints += 1; removeSkillById(caster.instanceId, 'ichigo-getsuga-tensho'); removeSkillById(caster.instanceId, 'ichigo-bankai-tensa-zangetsu'); addSkillById(caster.instanceId, 'ichigo-black-getsuga-tensho'); addStatusEffectById(caster.instanceId, { id: 'ichigo-bankai-' + caster.instanceId, name: '卍解·天锁斩月', type: 'ichigo-bankai', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); return { success: true, message: caster.name + '发动卍解·天锁斩月，攻击力+1、移动值+2并获得1点临时行动点' }; }",
+  "previewCode": "function calculatePreview() { return { description: '攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。', expectedValues: { attackBonus: 1, moveBonus: 2, actionPointBonus: 1 } }; }"
+}
