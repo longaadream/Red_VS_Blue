@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "rvb-profile/v1",
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": [
+    "game-data",
+    "pve-content",
+    "raster-assets",
+    "trusted-executable-content"
+  ],
+  "base": {
+    "packageId": "rvb.core",
+    "version": "1.0.0",
+    "packageHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "patches": [
+    {
+      "packageId": "community.balance-one",
+      "version": "1.2.0-beta.1",
+      "packageHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "parentProfileHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "files": [
+    {
+      "descriptor": {
+        "path": "data/cards/core.json",
+        "mediaType": "application/json",
+        "size": 64,
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "provenance": {
+        "packageHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation": "replace",
+        "sourcePath": "data/patch/card-balance.json"
+      }
+    },
+    {
+      "descriptor": {
+        "path": "images/cards/core.webp",
+        "mediaType": "image/webp",
+        "size": 4096,
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "provenance": {
+        "packageHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation": "snapshot",
+        "sourcePath": "images/cards/core.webp"
+      }
+    }
+  ],
+  "resolvedProfileHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "authorityContentHash": "9999999999999999999999999999999999999999999999999999999999999999"
+}

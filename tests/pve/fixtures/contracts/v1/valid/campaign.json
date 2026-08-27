@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "rvb-pve-campaign/v1",
+  "campaignId": "prototype-campaign",
+  "version": "1.0.0",
+  "entryNodeId": "intro",
+  "nodes": [
+    { "nodeId": "ambush", "path": "data/pve/campaigns/prototype/nodes/ambush.json" },
+    { "nodeId": "campfire", "path": "data/pve/campaigns/prototype/nodes/campfire.json" },
+    { "nodeId": "choose-roster", "path": "data/pve/campaigns/prototype/nodes/choose-roster.json" },
+    { "nodeId": "intro", "path": "data/pve/campaigns/prototype/nodes/intro.json" },
+    { "nodeId": "route-choice", "path": "data/pve/campaigns/prototype/nodes/route-choice.json" },
+    { "nodeId": "safe-room", "path": "data/pve/campaigns/prototype/nodes/safe-room.json" },
+    { "nodeId": "spoils", "path": "data/pve/campaigns/prototype/nodes/spoils.json" },
+    { "nodeId": "victory", "path": "data/pve/campaigns/prototype/nodes/victory.json" }
+  ]
+}

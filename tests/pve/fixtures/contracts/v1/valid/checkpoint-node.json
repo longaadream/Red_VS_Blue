@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "safe-room",
+  "type": "checkpoint",
+  "checkpointId": "prototype-safe-room",
+  "nextNodeId": "victory"
+}

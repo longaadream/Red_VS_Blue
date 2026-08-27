@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "rvb-pve-reward/v1",
+  "rewardId": "prototype-card-choice",
+  "rewardTableId": "shared-starter-cards",
+  "grantEffectId": "grant-card-choice"
+}

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "rvb-pack/v1",
+  "packageId": "community.balance-one",
+  "version": "1.2.0-beta.1",
+  "displayName": "Balance One",
+  "publisher": {
+    "id": "community.example",
+    "keyId": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": [
+    "game-data",
+    "raster-assets"
+  ],
+  "files": [
+    {
+      "path": "data/patch/card-balance.json",
+      "mediaType": "application/json",
+      "size": 64,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "path": "images/patch/card-update.png",
+      "mediaType": "image/png",
+      "size": 1024,
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "kind": "patch",
+  "parentProfileHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "operations": [
+    {
+      "op": "replace",
+      "targetPath": "data/cards/core.json",
+      "sourcePath": "data/patch/card-balance.json",
+      "expectedHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "op": "add",
+      "targetPath": "images/cards/update.png",
+      "sourcePath": "images/patch/card-update.png"
+    }
+  ]
+}

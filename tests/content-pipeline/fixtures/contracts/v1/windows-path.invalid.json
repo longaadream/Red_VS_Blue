@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "rvb-pack/v1",
+  "packageId": "community.windows-unsafe",
+  "version": "1.0.0",
+  "displayName": "Windows Unsafe",
+  "publisher": {
+    "id": "community.example",
+    "keyId": null
+  },
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": ["game-data"],
+  "files": [
+    {
+      "path": "data/CON.json",
+      "mediaType": "application/json",
+      "size": 32,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "kind": "snapshot"
+}

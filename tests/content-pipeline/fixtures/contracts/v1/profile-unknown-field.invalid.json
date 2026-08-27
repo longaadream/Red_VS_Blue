@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "rvb-profile/v1",
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": [],
+  "base": {
+    "packageId": "rvb.core",
+    "version": "1.0.0",
+    "packageHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "patches": [],
+  "files": [],
+  "resolvedProfileHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "authorityContentHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "activatedAt": "2026-08-27T00:00:00.000Z"
+}
