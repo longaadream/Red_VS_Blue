@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "unsafe-reward",
+  "type": "reward",
+  "rewardId": "prototype-card-choice",
+  "nextNodeId": "campfire",
+  "code": "state.gold += 100"
+}

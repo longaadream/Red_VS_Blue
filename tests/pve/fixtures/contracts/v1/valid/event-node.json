@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "campfire",
+  "type": "event",
+  "eventId": "prototype-campfire",
+  "outcomes": [
+    { "outcomeId": "prepared", "nextNodeId": "route-choice" },
+    { "outcomeId": "rested", "nextNodeId": "safe-room" }
+  ]
+}

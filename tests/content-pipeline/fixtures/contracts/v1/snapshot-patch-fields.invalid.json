@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "rvb-pack/v1",
+  "packageId": "rvb.core",
+  "version": "1.0.0",
+  "displayName": "RVB Core",
+  "publisher": {
+    "id": "rvb.official",
+    "keyId": null
+  },
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": [],
+  "files": [],
+  "kind": "snapshot",
+  "parentProfileHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "operations": []
+}

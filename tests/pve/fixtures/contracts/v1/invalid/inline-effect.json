@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "unsafe-event",
+  "type": "event",
+  "eventId": "prototype-campfire",
+  "outcomes": [
+    {
+      "outcomeId": "rested",
+      "nextNodeId": "safe-room",
+      "effect": { "type": "heal-party", "amount": 2 }
+    }
+  ]
+}

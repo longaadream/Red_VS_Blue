@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "unsafe-branch",
+  "type": "branch",
+  "expression": "flags.score > 3",
+  "routes": [
+    { "conditionId": "high-score", "nextNodeId": "safe-room" }
+  ],
+  "fallbackNodeId": "campfire"
+}

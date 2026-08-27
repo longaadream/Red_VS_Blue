@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "route-choice",
+  "type": "branch",
+  "routes": [
+    { "conditionId": "took-north-route", "nextNodeId": "safe-room" },
+    { "conditionId": "took-south-route", "nextNodeId": "ambush" }
+  ],
+  "fallbackNodeId": "campfire"
+}

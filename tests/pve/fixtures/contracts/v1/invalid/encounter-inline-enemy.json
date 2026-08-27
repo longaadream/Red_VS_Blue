@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "rvb-pve-encounter/v1",
+  "encounterId": "prototype-ambush",
+  "mapId": "large-battlefield",
+  "enemySetupId": "prototype-bandits",
+  "objectiveId": "defeat-all-enemies",
+  "enemies": [
+    { "templateId": "red-sasuke", "faction": "red" }
+  ]
+}

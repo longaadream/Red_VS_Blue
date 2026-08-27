@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "rvb-pack/v1",
+  "packageId": "community.bad-patch",
+  "version": "1.0.0",
+  "displayName": "Bad Patch",
+  "publisher": {
+    "id": "community.example",
+    "keyId": null
+  },
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": ["game-data"],
+  "files": [
+    {
+      "path": "data/patch/card.json",
+      "mediaType": "application/json",
+      "size": 32,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "kind": "patch",
+  "parentProfileHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "operations": [
+    {
+      "op": "replace",
+      "targetPath": "data/cards/core.json",
+      "sourcePath": "data/patch/card.json",
+      "expectedHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "op": "remove",
+      "targetPath": "data/cards/core.json",
+      "expectedHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ]
+}

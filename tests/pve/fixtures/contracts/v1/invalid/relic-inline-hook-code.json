@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "rvb-pve-relic/v1",
+  "relicId": "quick-preparation",
+  "rarityId": "common",
+  "nameTextId": "quick-preparation-name",
+  "descriptionTextId": "quick-preparation-description",
+  "effectIds": ["draw-one-at-battle-start"],
+  "hooks": ["battle-start"],
+  "code": "state.draw(1)"
+}
