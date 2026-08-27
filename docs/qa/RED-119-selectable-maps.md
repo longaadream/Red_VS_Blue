@@ -79,6 +79,8 @@
 
 ## 自动化与静态验证
 
+以下首轮结果对应同步最新 `main` 前的 RED-119 head `7e96074ec98c35f88ad8d323982bb15d10502710`，保留为历史证据，不用于代表同步后的候选 head：
+
 | 检查 | 结果 |
 | --- | --- |
 | RED-119 定向 Vitest：`map-catalog`、`map-selection`、`deployment`、`lobby-map-selection`、`relay-deployment`、`relay-routes`、`relay-store`、`roster-transports` | 8 个文件、153 个测试通过 |
@@ -92,6 +94,25 @@
 | `git diff --check` | 通过 |
 | standalone Prisma schema `validate` 与从空库 schema diff | 通过；仅是 schema 静态证据 |
 | `npm.cmd run lint` | **失败 / BLOCKED**：现有 ESLint 配置引用 `import/no-anonymous-default-export`，当前共享依赖环境没有加载 `import` 插件；本任务没有擅自更新依赖或规则来掩盖该基线问题 |
+
+
+### 同步最新 `main` 后复验
+
+当前候选 head 为 `905e9b68d0449300e9eb39340232928e9809c06b`，已包含 `origin/main` 的 `e32b80c802dcf2da936be128d8635a8d23284c73`（RED-113 内容合同与 RED-120 角色内容）。同步后结果如下：
+
+| 检查 | 结果 |
+| --- | --- |
+| `npm.cmd run check:main-baseline` | 通过；ahead 5、behind 0 |
+| RED-113 + RED-119 联合定向 Vitest | 10 个文件、269 个测试通过 |
+| 全量 Vitest | 108 个文件、1038 个测试通过；约 142.45 秒 |
+| 独立验证者 RED-119 + RED-120 联合回归 | 14 个文件、219 个测试通过 |
+| `npm.cmd run typecheck` | 通过；首次失败来自旧 `.next/dev` 路由类型缓存，临时隔离该缓存后通过，缓存与 `next-env.d.ts` 已原样恢复 |
+| `npm.cmd run build:game-engine` | 通过；Web 与 Android game-engine 产物重建后零 diff |
+| `npm.cmd run build:mobile-server` | 通过；Android mobile-server 产物重建后零 diff |
+| `npm.cmd run check:encoding` | 通过，检查 708 个文件 |
+| `git diff --check` | 通过 |
+| 生产路径与三份生成物搜索 `large-battlefield` | 0 个命中；地图源目录仅保留四个地图 JSON 与 manifest |
+| GitHub Draft PR #108 | head/base 为 `905e9b6` / `e32b80c`，`main-baseline` 通过，CLEAN / MERGEABLE；仍因 Draft 与下述阻塞项不得落地 |
 
 自动测试另覆盖：非法或已退役 mapId 在 seed/RNG/版本/房间写入之前被拒绝；进行中旧房间以嵌入的 `BattleState.map` 恢复时不被新的目录校验污染；同一固定输入与 seed 的部署结果稳定，反转输入顺序仍保持规定的确定性与不变量。
 
@@ -121,6 +142,7 @@ Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 是无 Room �
    - 既有 `db push` 数据库备份、标记基线已应用、再部署 ALTER；
    - 两条路径的数据保留、回滚和重复部署核对。
 3. lint 仍因现有 ESLint 插件配置缺失而失败，需要单独恢复共享 lint 环境或经批准修复依赖配置后重跑。
-4. High Risk 合并仍需针对届时的精确 PR head 单独批准；本次人工产品验收不是合并授权。
+4. 最新 `main` 已接受并占用内容管线 `ADR-0018`，而本分支的选图 ADR 仍暂用同一编号；在人工批准合同编号修订后，选图 ADR 及其精确引用必须顺延为 `ADR-0019`，不得改写内容管线 ADR。
+5. High Risk 合并仍需针对届时的精确 PR head 单独批准；本次人工产品验收不是合并授权。
 
 建议下一轮在具备 Bun 与一次性 PostgreSQL 实例的候选环境复跑相同四图矩阵，并把原始终端输出、数据库前后 schema/data 摘要及 standalone 浏览器截图附回本文件。当前可报告的状态仅为：**代码级与本地浏览器证据已取得，候选验收仍 BLOCKED**。
