@@ -1,0 +1,24 @@
+{
+  "id": "blue-ichigo",
+  "name": "黑崎一护",
+  "faction": "good",
+  "description": "代理死神，以斩月近身迎敌，以月牙天冲贯穿战线，并在卍解后凭借天锁斩月的速度连续追击",
+  "rarity": "legendary",
+  "image": "ichigo.jpg",
+  "stats": {
+    "maxHp": 12,
+    "attack": 5,
+    "defense": 0,
+    "moveRange": 4
+  },
+  "skills": [
+    { "skillId": "ichigo-zangetsu", "level": 1 },
+    { "skillId": "ichigo-getsuga-tensho", "level": 1 },
+    { "skillId": "ichigo-bankai-tensa-zangetsu", "level": 1 }
+  ],
+  "rules": [],
+  "transformedSkills": [
+    { "skillId": "ichigo-black-getsuga-tensho", "triggeredBy": "ichigo-bankai-tensa-zangetsu" }
+  ],
+  "isDefault": false
+}

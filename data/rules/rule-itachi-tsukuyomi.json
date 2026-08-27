@@ -1,0 +1,7 @@
+{
+  "id": "rule-itachi-tsukuyomi",
+  "name": "月读·冷却延长",
+  "description": "目标下一次实际使用技能后，使该技能额外增加1回合冷却并移除月读。",
+  "trigger": { "type": "afterSkillUsed" },
+  "skillCode": "var target = context.rulePiece; var source = context.sourcePiece; if (!target || !source || source.instanceId !== target.instanceId) return { success: false, message: '' }; var tag = target.statusTags && target.statusTags.find(function(status) { return status.type === 'itachi-tsukuyomi'; }); if (!tag) return { success: false, message: '' }; var skillState = target.skills && target.skills.find(function(skill) { return skill.skillId === context.skillId; }); if (!skillState) return { success: false, message: '' }; skillState.currentCooldown = (skillState.currentCooldown || 0) + 1; removeStatusEffectById(target.instanceId, tag.id); return { success: true, message: target.name + '受到月读影响，' + context.skillId + '额外增加1回合冷却' };"
+}
