@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "runId": "red-110-linear-greedy-v2",
+  "optimizerSeed": 1102026082,
+  "pairCount": 12,
+  "populationSize": 24,
+  "sigma": 0.08,
+  "learningRate": 0.02,
+  "drawScore": -0.25,
+  "adjudicatedFailureKinds": [
+    "turn-budget"
+  ],
+  "seedsPerGeneration": 1,
+  "processCount": 6,
+  "maxCandidatesPerAction": 16,
+  "seedFile": "config/ai/seeds.v1.json",
+  "seedAgentFile": "config/ai/agents/linear-greedy-seed-v2.json",
+  "opponentAgentFiles": [
+    "config/ai/agents/simple-v1.json",
+    "config/ai/agents/planner-champion-v1.json"
+  ],
+  "rosterArchiveFiles": [
+    "config/ai/rosters/red-alpha-v1.json",
+    "config/ai/rosters/blue-alpha-v1.json",
+    "config/ai/rosters/red-beta-v1.json",
+    "config/ai/rosters/blue-beta-v1.json"
+  ],
+  "lineups": [
+    {
+      "lineupId": "alpha",
+      "candidateRosterId": "red-alpha-v1",
+      "opponentRosterId": "blue-alpha-v1"
+    },
+    {
+      "lineupId": "beta",
+      "candidateRosterId": "red-beta-v1",
+      "opponentRosterId": "blue-beta-v1"
+    }
+  ],
+  "budgets": {
+    "maxActionsPerMatch": 500,
+    "maxActionsPerTurn": 12,
+    "maxTurns": 40,
+    "maxDecisionNodesPerAction": 64
+  },
+  "github": {
+    "enabled": true,
+    "requiredBranch": "codex/RED-110-linear-greedy-training",
+    "evidenceDirectory": "docs/qa/evidence/linear-ai/red-110-linear-greedy-v2"
+  }
+}

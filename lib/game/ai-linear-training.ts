@@ -29,6 +29,7 @@ export interface LinearTrainingMatchResult {
   hardGatePassed: boolean
   durationMs?: number
   failureKind?: string
+  adjudication?: 'turn-limit-draw'
 }
 
 export interface LinearAdamState {
@@ -77,13 +78,43 @@ export interface LinearTrainingRun {
     totalMatches: number
     wins: number
     draws: number
+    adjudicatedDraws: number
     losses: number
     durationMs: number
+    drawScore: number
     fitnessByCandidate: Record<string, number>
     gradient: Record<AiLinearFeatureName, number>
     weightsAfter: Record<AiLinearFeatureName, number>
     completedAt: string
   }>
+}
+
+export function classifyLinearTrainingMatch(input: {
+  jobId: string
+  candidateId: string
+  candidateAgentId: string
+  status: 'finished' | 'failed'
+  winnerAgentId: string | null
+  durationMs?: number
+  failureKind?: string
+}, options: { adjudicatedFailureKinds?: readonly string[] } = {}): LinearTrainingMatchResult {
+  const adjudicated = input.status === 'failed'
+    && input.failureKind !== undefined
+    && (options.adjudicatedFailureKinds ?? []).includes(input.failureKind)
+  const normallyFinished = input.status === 'finished' && input.failureKind === undefined
+  return {
+    jobId: input.jobId,
+    candidateId: input.candidateId,
+    outcome: adjudicated
+      ? 'draw'
+      : input.winnerAgentId === input.candidateAgentId
+        ? 'win'
+        : input.winnerAgentId ? 'loss' : 'draw',
+    hardGatePassed: normallyFinished || adjudicated,
+    durationMs: input.durationMs,
+    failureKind: input.failureKind,
+    adjudication: adjudicated ? 'turn-limit-draw' : undefined,
+  }
 }
 
 function uniform(token: unknown) {
@@ -157,6 +188,22 @@ export function buildLinearGenerationSchedule(input: {
     }
   }
   return jobs
+}
+
+export function selectLinearGenerationSeeds(
+  trainingSeeds: readonly number[],
+  generation: number,
+  seedsPerGeneration = 1,
+): number[] {
+  if (trainingSeeds.length === 0) throw new Error('training seed partition must not be empty')
+  if (!Number.isSafeInteger(generation) || generation <= 0) throw new RangeError('generation must be positive')
+  if (!Number.isSafeInteger(seedsPerGeneration) || seedsPerGeneration <= 0) {
+    throw new RangeError('seedsPerGeneration must be positive')
+  }
+  const start = ((generation - 1) * seedsPerGeneration) % trainingSeeds.length
+  return Array.from({ length: seedsPerGeneration }, (_, offset) => (
+    trainingSeeds[(start + offset) % trainingSeeds.length]
+  ))
 }
 
 export function centeredRanks(values: readonly number[]): number[] {
@@ -247,6 +294,7 @@ export function finalizeLinearGeneration(input: {
   sigma: number
   optimizerState?: LinearAdamState
   learningRate?: number
+  drawScore?: number
 }) {
   const expected = new Set(input.schedule.map(job => job.jobId))
   const matchesById = new Map<string, LinearTrainingMatchResult>()
@@ -259,11 +307,15 @@ export function finalizeLinearGeneration(input: {
   if (hardGateFailures.length > 0) {
     throw new Error(`generation has ${hardGateFailures.length} hard-gate failure(s); weights must not update`)
   }
+  const drawScore = input.drawScore ?? 0
+  if (!Number.isFinite(drawScore) || drawScore <= -1 || drawScore >= 1) {
+    throw new RangeError('drawScore must be finite and strictly between -1 and 1')
+  }
   const fitnessByCandidate = Object.fromEntries(input.population.map(candidate => {
     const results = input.schedule.filter(job => job.candidateId === candidate.candidateId)
       .map(job => matchesById.get(job.jobId)!)
     const total = results.reduce((score, match) => score + (!match.hardGatePassed
-      ? -2 : match.outcome === 'win' ? 1 : match.outcome === 'loss' ? -1 : 0), 0)
+      ? -2 : match.outcome === 'win' ? 1 : match.outcome === 'loss' ? -1 : drawScore), 0)
     return [candidate.candidateId, total / results.length]
   }))
   const gradient = estimateMirroredGradient(input.population, fitnessByCandidate, input.sigma)
@@ -393,7 +445,11 @@ export function resumeLinearGeneration(run: LinearTrainingRun): LinearTrainingRu
   }
 }
 
-export function completeLinearGeneration(run: LinearTrainingRun, input: { learningRate?: number; now?: string } = {}): LinearTrainingRun {
+export function completeLinearGeneration(run: LinearTrainingRun, input: {
+  learningRate?: number
+  drawScore?: number
+  now?: string
+} = {}): LinearTrainingRun {
   const active = run.activeGeneration
   if (!active || run.status !== 'running') throw new Error('no running generation')
   const result = finalizeLinearGeneration({
@@ -404,6 +460,7 @@ export function completeLinearGeneration(run: LinearTrainingRun, input: { learni
     sigma: active.sigma,
     optimizerState: run.optimizerState,
     learningRate: input.learningRate,
+    drawScore: input.drawScore,
   })
   return {
     ...run,
@@ -421,8 +478,10 @@ export function completeLinearGeneration(run: LinearTrainingRun, input: { learni
       totalMatches: active.matches.length,
       wins: active.matches.filter(match => match.outcome === 'win').length,
       draws: active.matches.filter(match => match.outcome === 'draw').length,
+      adjudicatedDraws: active.matches.filter(match => match.adjudication === 'turn-limit-draw').length,
       losses: active.matches.filter(match => match.outcome === 'loss').length,
       durationMs: active.matches.reduce((total, match) => total + (match.durationMs ?? 0), 0),
+      drawScore: input.drawScore ?? 0,
       fitnessByCandidate: result.fitnessByCandidate,
       gradient: result.gradient,
       weightsAfter: result.weightsAfter,
@@ -433,19 +492,31 @@ export function completeLinearGeneration(run: LinearTrainingRun, input: { learni
 
 export function linearTrainingProgress(run: LinearTrainingRun) {
   const active = run.activeGeneration
+  const archive = run.archives.at(-1)
   const matches = active?.matches ?? []
   return {
     runId: run.runId,
     status: run.status,
-    generation: active?.generation ?? run.completedGeneration,
-    completed: matches.length,
-    total: active?.schedule.length ?? 0,
-    wins: matches.filter(match => match.hardGatePassed && match.outcome === 'win').length,
-    draws: matches.filter(match => match.hardGatePassed && match.outcome === 'draw').length,
-    losses: matches.filter(match => match.hardGatePassed && match.outcome === 'loss').length,
+    generation: active?.generation ?? archive?.generation ?? run.completedGeneration,
+    completed: active ? matches.length : archive?.totalMatches ?? 0,
+    total: active?.schedule.length ?? archive?.totalMatches ?? 0,
+    wins: active
+      ? matches.filter(match => match.hardGatePassed && match.outcome === 'win').length
+      : archive?.wins ?? 0,
+    draws: active
+      ? matches.filter(match => match.hardGatePassed && match.outcome === 'draw').length
+      : archive?.draws ?? 0,
+    adjudicatedDraws: active
+      ? matches.filter(match => match.adjudication === 'turn-limit-draw').length
+      : archive?.adjudicatedDraws ?? 0,
+    losses: active
+      ? matches.filter(match => match.hardGatePassed && match.outcome === 'loss').length
+      : archive?.losses ?? 0,
     hardGateFailures: matches.filter(match => !match.hardGatePassed).length,
-    completedDurationMs: matches.reduce((total, match) => total + (match.durationMs ?? 0), 0),
-    commitment: active?.commitment,
+    completedDurationMs: active
+      ? matches.reduce((total, match) => total + (match.durationMs ?? 0), 0)
+      : archive?.durationMs ?? 0,
+    commitment: active?.commitment ?? archive?.commitment,
   }
 }
 

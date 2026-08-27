@@ -15,8 +15,8 @@ const scriptPath = fileURLToPath(import.meta.url)
 const root = resolve(dirname(scriptPath), '..', '..')
 const require = createRequire(import.meta.url)
 const INTERNAL_WORKER = '--internal-worker'
-const DEFAULT_CONFIG = 'config/ai/linear-training-v1.json'
-const DEFAULT_RUN = 'output/ai-training/red-110-linear-greedy-v1'
+const DEFAULT_CONFIG = 'config/ai/linear-training-v2.json'
+const DEFAULT_RUN = 'output/ai-training/red-110-linear-greedy-v2'
 const PROGRESS_INTERVAL_MS = 5_000
 
 function usage() {
@@ -34,7 +34,7 @@ Commands:
 Options:
   --run <directory>       Run directory (default: ${DEFAULT_RUN})
   --config <path>         Training config (default: ${DEFAULT_CONFIG})
-  --processes <n>         Isolated match processes (default: config value 3)
+  --processes <n>         Isolated match processes (default: config value 6)
   --github-sync           Enable configured branch commit/push for this command
   --no-github-sync        Keep artifacts local for this command
   --watch                 Refresh status every five seconds
@@ -233,10 +233,9 @@ async function workerMain(inputPath, outputPath) {
   }
 }
 
-function selectGenerationInputs(config, generation, seedPartitions, smoke = false) {
+function selectGenerationInputs(runtime, config, generation, seedPartitions, smoke = false) {
   const seedCount = smoke ? 1 : config.seedsPerGeneration
-  const start = ((generation - 1) * config.seedsPerGeneration) % seedPartitions.training.length
-  const rootSeeds = Array.from({ length: seedCount }, (_, offset) => seedPartitions.training[(start + offset) % seedPartitions.training.length])
+  const rootSeeds = runtime.selectLinearGenerationSeeds(seedPartitions.training, generation, seedCount)
   const lineup = config.lineups[(generation - 1) % config.lineups.length]
   const opponentFiles = smoke ? config.opponentAgentFiles.slice(0, 1) : config.opponentAgentFiles
   return { rootSeeds, lineup, opponentFiles }
@@ -247,11 +246,25 @@ function loadConfig(path) {
   if (config.schemaVersion !== 1 || config.populationSize !== config.pairCount * 2) {
     throw new Error('linear training config must use schema 1 and populationSize=pairCount*2')
   }
-  if (config.seedsPerGeneration !== 2 || config.lineups.length < 1 || config.opponentAgentFiles.length !== 2) {
-    throw new Error('RED-110 requires exactly two seeds, one selected lineup, and two opponents per generation')
+  if (config.seedsPerGeneration !== 1 || config.lineups.length < 1 || config.opponentAgentFiles.length !== 2) {
+    throw new Error('RED-110 v2 requires exactly one seed, one selected lineup, and two opponents per generation')
   }
   if (!Number.isSafeInteger(config.maxCandidatesPerAction) || config.maxCandidatesPerAction <= 0) {
     throw new Error('maxCandidatesPerAction must be a positive integer')
+  }
+  if (!Number.isSafeInteger(config.processCount) || config.processCount <= 0 || config.processCount > cpus().length) {
+    throw new Error(`processCount must be between 1 and ${cpus().length}`)
+  }
+  if (!Number.isFinite(config.drawScore) || config.drawScore <= -1 || config.drawScore >= 0) {
+    throw new Error('drawScore must be finite, negative, and greater than -1')
+  }
+  if (config.budgets.maxTurns !== 40
+    || JSON.stringify(config.adjudicatedFailureKinds) !== JSON.stringify(['turn-budget'])) {
+    throw new Error('RED-110 v2 requires maxTurns=40 and only turn-budget as an adjudicated draw')
+  }
+  if (config.budgets.maxActionsPerMatch
+    <= config.budgets.maxTurns * config.budgets.maxActionsPerTurn) {
+    throw new Error('maxActionsPerMatch must leave room for the turn-budget adjudication to trigger first')
   }
   return config
 }
@@ -279,7 +292,7 @@ function writeProgress(runtime, runDirectory, run, activeWorkers = [], githubSyn
   return progress
 }
 
-function displayProgress(progress, startedAt, processCount = 3) {
+function displayProgress(progress, startedAt, processCount) {
   const elapsed = Math.max(0, Date.now() - startedAt)
   const average = progress.completed > 0 ? progress.completedDurationMs / progress.completed : Number.NaN
   const eta = Number.isFinite(average)
@@ -288,8 +301,9 @@ function displayProgress(progress, startedAt, processCount = 3) {
   const duration = value => !Number.isFinite(value) ? '计算中' : `${Math.floor(value / 3_600_000)}时${Math.floor(value % 3_600_000 / 60_000)}分`
   console.log(
     `[线性训练] 第${progress.generation}代 ${progress.completed}/${progress.total}`
-    + `；运行 ${progress.activeWorkers.length}/3`
+    + `；运行 ${progress.activeWorkers.length}/${processCount}`
     + `；胜/平/负 ${progress.wins}/${progress.draws}/${progress.losses}`
+    + `（裁决平 ${progress.adjudicatedDraws}）`
     + `；硬失败 ${progress.hardGateFailures}`
     + `；已用 ${duration(elapsed)}；预计剩余 ${duration(eta)}`,
   )
@@ -370,7 +384,7 @@ async function runGeneration(runtime, config, runDirectory, run, processCount, v
       process.exit(130)
     }
     pauseRequested = true
-    console.log('[线性训练] 已请求暂停；停止派发新局，等待最多 3 个在途对局结束。')
+    console.log(`[线性训练] 已请求暂停；停止派发新局，等待最多 ${processCount} 个在途对局结束。`)
   }
   process.once('SIGINT', onSignal)
   process.once('SIGTERM', onSignal)
@@ -421,14 +435,15 @@ async function runGeneration(runtime, config, runDirectory, run, processCount, v
           const event = message.event
           activeWorkers.set(slotIndex, { ...workerState, actionCount: event.actionCount, turnNumber: event.turnNumber })
         })
-        const match = {
+        const match = runtime.classifyLinearTrainingMatch({
           jobId: job.jobId,
           candidateId: job.candidateId,
-          outcome: fullMatch.winnerAgentId === candidateAgentId ? 'win' : fullMatch.winnerAgentId ? 'loss' : 'draw',
-          hardGatePassed: fullMatch.status === 'finished' && !fullMatch.failure,
+          candidateAgentId,
+          status: fullMatch.status,
+          winnerAgentId: fullMatch.winnerAgentId,
           durationMs: fullMatch.durationMs,
           failureKind: fullMatch.failure?.kind,
-        }
+        }, { adjudicatedFailureKinds: config.adjudicatedFailureKinds })
         durableRun = runtime.recordLinearTrainingMatch(durableRun, match)
         writeJsonAtomically(runPath, durableRun)
         const generationDirectory = join(runDirectory, `generation-${String(active.generation).padStart(4, '0')}`)
@@ -461,10 +476,13 @@ async function runGeneration(runtime, config, runDirectory, run, processCount, v
       hardGateFailures: hardGateFailures.length,
       failureKinds: [...new Set(hardGateFailures.map(match => match.failureKind ?? 'unknown'))],
     })
-    console.error(`[线性训练] 本代有 ${hardGateFailures.length} 个硬失败；权重未更新。调整预算或排除故障后执行 resume 重跑失败局。`)
+    console.error(`[线性训练] 本代有 ${hardGateFailures.length} 个硬失败；权重未更新。排除故障后执行 resume 重跑失败局。`)
     return { run: durableRun, paused: true }
   }
-  durableRun = runtime.completeLinearGeneration(durableRun, { learningRate: config.learningRate })
+  durableRun = runtime.completeLinearGeneration(durableRun, {
+    learningRate: config.learningRate,
+    drawScore: config.drawScore,
+  })
   writeJsonAtomically(runPath, durableRun)
   writeJsonAtomically(join(runDirectory, `generation-${String(active.generation).padStart(4, '0')}`, 'summary.json'), compactEvidence(durableRun))
   appendEvent(runDirectory, { kind: 'generation-completed', generation: active.generation })
@@ -507,7 +525,7 @@ async function main() {
       }
       console.log(`[线性训练] smoke 目录：${targetDirectory}`)
       const seedPartitions = readJson(fromRoot(config.seedFile))
-      const selected = selectGenerationInputs(config, 1, seedPartitions, true)
+      const selected = selectGenerationInputs(runtime, config, 1, seedPartitions, true)
       run = runtime.beginLinearGeneration(run, {
         rootSeeds: selected.rootSeeds,
         lineupId: selected.lineup.lineupId,
@@ -563,7 +581,7 @@ async function main() {
     }
     if (args.command === 'next') {
       const seedPartitions = readJson(fromRoot(config.seedFile))
-      const selected = selectGenerationInputs(config, run.completedGeneration + 1, seedPartitions)
+      const selected = selectGenerationInputs(runtime, config, run.completedGeneration + 1, seedPartitions)
       run = runtime.beginLinearGeneration(run, {
         rootSeeds: selected.rootSeeds,
         lineupId: selected.lineup.lineupId,
@@ -579,7 +597,7 @@ async function main() {
       writeJsonAtomically(runPath, run)
       appendEvent(runDirectory, { kind: 'generation-resumed', generation: run.activeGeneration.generation })
     }
-    const processCount = Math.min(args.processes ?? config.processCount, 3)
+    const processCount = args.processes ?? config.processCount
     const result = await runGeneration(runtime, config, runDirectory, run, processCount, args.verbose)
     run = result.run
     let sync = { status: 'not-requested' }
@@ -595,7 +613,7 @@ async function main() {
       writeJsonAtomically(runPath, run)
     }
     const progress = writeProgress(runtime, runDirectory, run, [], sync)
-    displayProgress(progress, Date.now())
+    displayProgress(progress, Date.now(), processCount)
     console.log(JSON.stringify({
       status: run.status,
       completedGeneration: run.completedGeneration,

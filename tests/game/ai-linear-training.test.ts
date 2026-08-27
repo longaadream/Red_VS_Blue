@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { AI_LINEAR_FEATURE_NAMES } from '@/lib/game/ai-linear-features'
@@ -8,6 +11,7 @@ import {
   buildLinearGenerationSchedule,
   buildMirroredLinearPopulation,
   centeredRanks,
+  classifyLinearTrainingMatch,
   completeLinearGeneration,
   createLinearTrainingRun,
   estimateMirroredGradient,
@@ -16,12 +20,13 @@ import {
   pauseLinearGeneration,
   recordLinearTrainingMatch,
   resumeLinearGeneration,
+  selectLinearGenerationSeeds,
 } from '@/lib/game/ai-linear-training'
 
 const center = Object.fromEntries(AI_LINEAR_FEATURE_NAMES.map(name => [name, 0]))
 
 describe('linear AI single-generation optimizer', () => {
-  it('builds 24 deterministic mirrored candidates and exactly 192 paired matches', () => {
+  it('builds 24 deterministic mirrored candidates and exactly 96 paired matches', () => {
     const population = buildMirroredLinearPopulation(center, {
       optimizerSeed: 42,
       generation: 1,
@@ -47,13 +52,73 @@ describe('linear AI single-generation optimizer', () => {
     const schedule = buildLinearGenerationSchedule({
       generation: 1,
       candidates: population,
-      rootSeeds: [1001, 1002],
+      rootSeeds: [1001],
       lineupId: 'alpha',
       opponentAgentIds: ['simple-v1', 'planner-champion-v1'],
     })
-    expect(schedule).toHaveLength(192)
-    expect(new Set(schedule.map(job => job.jobId)).size).toBe(192)
-    expect(schedule.filter(job => job.candidateId === population[0].candidateId)).toHaveLength(8)
+    expect(schedule).toHaveLength(96)
+    expect(new Set(schedule.map(job => job.jobId)).size).toBe(96)
+    expect(schedule.filter(job => job.candidateId === population[0].candidateId)).toHaveLength(4)
+  })
+
+  it('starts from signed heuristic priors with a smaller first-generation perturbation', () => {
+    const seed = JSON.parse(readFileSync(resolve(
+      process.cwd(), 'config/ai/agents/linear-greedy-seed-v2.json',
+    ), 'utf8'))
+    const config = JSON.parse(readFileSync(resolve(
+      process.cwd(), 'config/ai/linear-training-v2.json',
+    ), 'utf8'))
+    expect(seed.config.weights.bias).toBe(0)
+    expect(seed.config.weights.actingPlayer).toBe(0)
+    for (const name of AI_LINEAR_FEATURE_NAMES.filter(name => !['bias', 'actingPlayer'].includes(name))) {
+      expect(seed.config.weights[name]).toBeGreaterThan(0)
+    }
+    expect(config.sigma).toBe(0.08)
+    expect(config.seedsPerGeneration).toBe(1)
+    expect(config.processCount).toBe(6)
+    expect(config.budgets.maxTurns).toBe(40)
+    expect(config.budgets.maxActionsPerMatch)
+      .toBeGreaterThan(config.budgets.maxTurns * config.budgets.maxActionsPerTurn)
+    const seeds = [1001, 1002, 1003]
+    expect(selectLinearGenerationSeeds(seeds, 1)).toEqual([1001])
+    expect(selectLinearGenerationSeeds(seeds, 2)).toEqual([1002])
+    expect(selectLinearGenerationSeeds(seeds, 4)).toEqual([1001])
+  })
+
+  it('adjudicates only the configured turn limit and applies a negative draw score', () => {
+    const turnLimit = classifyLinearTrainingMatch({
+      jobId: 'turn-limit', candidateId: 'candidate', candidateAgentId: 'candidate-agent',
+      status: 'failed', winnerAgentId: null, failureKind: 'turn-budget',
+    }, { adjudicatedFailureKinds: ['turn-budget'] })
+    expect(turnLimit).toMatchObject({
+      outcome: 'draw', hardGatePassed: true, failureKind: 'turn-budget',
+      adjudication: 'turn-limit-draw',
+    })
+    const actionLimit = classifyLinearTrainingMatch({
+      jobId: 'action-limit', candidateId: 'candidate', candidateAgentId: 'candidate-agent',
+      status: 'failed', winnerAgentId: null, failureKind: 'action-budget',
+    }, { adjudicatedFailureKinds: ['turn-budget'] })
+    expect(actionLimit).toMatchObject({ outcome: 'draw', hardGatePassed: false, failureKind: 'action-budget' })
+
+    const population = buildMirroredLinearPopulation(center, {
+      optimizerSeed: 31, generation: 1, pairCount: 1, sigma: 0.08,
+    })
+    const schedule = buildLinearGenerationSchedule({
+      generation: 1, candidates: population, rootSeeds: [1001], lineupId: 'alpha',
+      opponentAgentIds: ['simple-v1'],
+    })
+    const matches = schedule.map((job, index) => ({
+      jobId: job.jobId,
+      candidateId: job.candidateId,
+      outcome: index < 2 ? 'draw' : 'loss',
+      hardGatePassed: true,
+      adjudication: index < 2 ? 'turn-limit-draw' : undefined,
+    } as const))
+    const result = finalizeLinearGeneration({
+      center, population, schedule, matches, sigma: 0.08, drawScore: -0.25,
+    })
+    expect(result.fitnessByCandidate[population[0].candidateId]).toBe(-0.25)
+    expect(result.fitnessByCandidate[population[1].candidateId]).toBe(-1)
   })
 
   it('uses tied centered ranks, estimates a mirrored gradient, and updates Adam deterministically', () => {
@@ -112,13 +177,21 @@ describe('linear AI single-generation optimizer', () => {
       active = recordLinearTrainingMatch(active, {
         jobId: job.jobId, candidateId: job.candidateId,
         outcome: index === 0 ? 'win' : index === 1 ? 'loss' : 'draw', hardGatePassed: true,
-        durationMs: 5, failureKind: index === 0 ? 'action-budget' : undefined,
+        durationMs: 5,
+        adjudication: index === 2 ? 'turn-limit-draw' : undefined,
       })
     }
-    const completed = completeLinearGeneration(active, { now: '2026-08-27T00:00:00.000Z' })
+    const completed = completeLinearGeneration(active, {
+      drawScore: -0.25, now: '2026-08-27T00:00:00.000Z',
+    })
     expect(completed.archives[0]).toMatchObject({
       rootSeeds: [1001], lineupId: 'alpha', opponentAgentIds: ['simple-v1'],
-      totalMatches: 4, wins: 1, losses: 1, draws: 2, durationMs: 20,
+      totalMatches: 4, wins: 1, losses: 1, draws: 2, adjudicatedDraws: 1,
+      drawScore: -0.25, durationMs: 20,
+    })
+    expect(linearTrainingProgress(completed)).toMatchObject({
+      status: 'awaiting-user', generation: 1, completed: 4, total: 4,
+      wins: 1, losses: 1, draws: 2, adjudicatedDraws: 1, completedDurationMs: 20,
     })
   })
 
@@ -130,11 +203,11 @@ describe('linear AI single-generation optimizer', () => {
     })
     expect(run.status).toBe('awaiting-user')
     const started = beginLinearGeneration(run, {
-      rootSeeds: [1001, 1002], lineupId: 'alpha', opponentAgentIds: ['simple-v1', 'planner-champion-v1'],
+      rootSeeds: [1001], lineupId: 'alpha', opponentAgentIds: ['simple-v1', 'planner-champion-v1'],
       pairCount: 1, sigma: 0.1,
     })
     expect(started.status).toBe('running')
-    expect(linearTrainingProgress(started)).toMatchObject({ generation: 1, completed: 0, total: 16 })
+    expect(linearTrainingProgress(started)).toMatchObject({ generation: 1, completed: 0, total: 8 })
     const firstJob = started.activeGeneration!.schedule[0]
     const recorded = recordLinearTrainingMatch(started, {
       jobId: firstJob.jobId, candidateId: firstJob.candidateId, outcome: 'draw', hardGatePassed: true,
