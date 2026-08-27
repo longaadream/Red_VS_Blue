@@ -1,6 +1,7 @@
 # ADR-0018：Content Pipeline v1 的开放包、Resolved Profile 与声明式 PVE 合同
 
-- 状态：Proposed（等待 RED-113 PR 审查与项目负责人明确接受）
+- 状态：Accepted（项目负责人于 2026-08-27 明确接受）
+- 接受记录：项目负责人于 2026-08-27 在 RED-113 人工验收中明确回复“接受”
 - 日期：2026-08-27
 - 任务：RED-111、RED-113
 - 风险：High
