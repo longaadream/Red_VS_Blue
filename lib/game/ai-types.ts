@@ -210,6 +210,33 @@ export interface AIEnvironment {
   stateKey(state: BattleState, scope: AIObservationScope): string
 }
 
+export interface AIActionResourceCost {
+  actionPoints: number
+  chargePoints: number
+}
+
+/** A formal candidate revalidated after adding only its exact public resource shortfall. */
+export interface AIPotentialCandidate {
+  candidate: CandidateAction
+  cost: AIActionResourceCost
+  shortfall: AIActionResourceCost
+  costBreakthrough: boolean
+}
+
+export interface AIPotentialTransition extends AIPotentialCandidate {
+  transition: TransitionResult
+}
+
+export interface AIPotentialEnvironment {
+  readonly protocolVersion: AIEnvironmentProtocolVersion
+  listPotentialActions(state: BattleState, playerId: string): AIPotentialCandidate[]
+  simulatePotential(
+    state: BattleState,
+    candidate: AIPotentialCandidate,
+    context?: AISimulationContext,
+  ): AIPotentialTransition
+}
+
 /** Versioned, rule-independent vocabulary consumed by AI observers and planners. */
 export const AI_SEMANTICS_SCHEMA_VERSION = 1 as const
 
@@ -324,4 +351,82 @@ export interface AiTurnPlan {
   stateDuplicates: number
   stopReason: AiPlannerStopReason
   trace: AiPlannerTraceEntry[]
+}
+
+export const ZERO_STAGE_AI_PROFILE_VERSION = 1 as const
+
+export type ZeroStageStaticComponentKey =
+  | 'coreSurvival'
+  | 'survival'
+  | 'graveyard'
+  | 'health'
+  | 'combatPower'
+  | 'shield'
+  | 'resources'
+  | 'actionability'
+  | 'lethalOpportunity'
+  | 'attackPressure'
+  | 'status'
+  | 'formation'
+  | 'mapControl'
+
+export interface ZeroStageConfig {
+  version: typeof ZERO_STAGE_AI_PROFILE_VERSION
+  nodeBudget: number
+  lambda: number
+  topWeights: readonly [number, number, number]
+  terminal: Readonly<{ win: number; loss: number; draw: number }>
+  weights: Readonly<Record<ZeroStageStaticComponentKey, number>>
+}
+
+export interface ZeroStageStaticComponent {
+  raw: number
+  weight: number
+  contribution: number
+}
+
+export interface ZeroStageStaticEvaluation {
+  total: number
+  terminalOutcome?: 'win' | 'loss' | 'draw'
+  components: Readonly<Record<ZeroStageStaticComponentKey, ZeroStageStaticComponent>>
+}
+
+export interface ZeroStageFollowUpTrace {
+  candidateId: string
+  value?: number
+  staticValue?: number
+  costBreakthrough: boolean
+  cost: AIActionResourceCost
+  shortfall: AIActionResourceCost
+  penalty: number
+  compatibility: AiCompatibility
+  pruned?: string
+  rejected?: string
+}
+
+export interface ZeroStageCandidateTrace {
+  candidateId: string
+  action: BattleAction
+  staticValue?: number
+  potentialValue?: number
+  topValues: number[]
+  outerCost: AIActionResourceCost
+  compatibility: AiCompatibility
+  followUps: ZeroStageFollowUpTrace[]
+  pruned?: string
+  rejected?: string
+}
+
+export type ZeroStageStopReason = 'selected' | 'terminal' | 'no-legal-actions' | 'budget-exhausted'
+
+export interface ZeroStageDecision {
+  configVersion: typeof ZERO_STAGE_AI_PROFILE_VERSION
+  playerId: string
+  stateValue: number
+  nextAction?: CandidateAction
+  nodesVisited: number
+  candidatesConsidered: number
+  budgetExhausted: boolean
+  stopReason: ZeroStageStopReason
+  trace: ZeroStageCandidateTrace[]
 }

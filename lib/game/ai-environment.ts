@@ -1,6 +1,7 @@
 import { getBattleRootSeed, hashBattleState, hashStable, stableJson } from './battle-trace'
 import { runBattleActionIsolated } from './battle-runner'
 import { getSkillById } from './skill-repository'
+import { loadCardById } from './skills'
 import { getLegalNormalMoveTargetsForPlayer } from './spatial'
 import {
   prepareAction,
@@ -13,12 +14,16 @@ import type { BattleAction, BattleState } from './turn'
 import {
   AI_ENVIRONMENT_PROTOCOL_VERSION,
   type AIEnvironment,
+  type AIActionResourceCost,
   type AIEnvironmentCapabilities,
   type AIEnvironmentError,
   type AIObservation,
   type AIObservationScope,
   type AIObservedStatusTag,
   type AISimulationContext,
+  type AIPotentialCandidate,
+  type AIPotentialEnvironment,
+  type AIPotentialTransition,
   type AIStateDiffEntry,
   type AITransitionTrace,
   type CandidateAction,
@@ -435,6 +440,152 @@ export function listLegalAIActions(state: BattleState, playerId: string): Candid
   actions.push(candidate('end-turn', { type: 'endTurn', playerId }))
   return sortCandidates(actions)
 }
+
+const ZERO_RESOURCE_COST: AIActionResourceCost = Object.freeze({ actionPoints: 0, chargePoints: 0 })
+
+function nonNegativeCost(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0
+}
+
+/** Reads only the formal resource costs used by the authority runner. */
+export function getAIActionResourceCost(
+  state: BattleState,
+  playerId: string,
+  input: CandidateAction | BattleAction,
+): AIActionResourceCost {
+  const action = 'action' in input ? input.action : input
+  if (action.type === 'move') return { actionPoints: 1, chargePoints: 0 }
+  if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
+    const definition = state.skillsById?.[action.skillId] || getSkillById(action.skillId)
+    if (!definition) return { ...ZERO_RESOURCE_COST }
+    return {
+      actionPoints: nonNegativeCost(definition.actionPointCost),
+      chargePoints: action.type === 'useChargeSkill' ? nonNegativeCost(definition.chargeCost) : 0,
+    }
+  }
+  if (action.type === 'playCard') {
+    const player = state.players.find(item => samePlayer(item.playerId, playerId))
+    const card = player?.hand.find(item => item.instanceId === action.cardInstanceId)
+    const definition = card ? loadCardById(card.cardId) ?? state.customCards?.[card.cardId] : undefined
+    return {
+      actionPoints: nonNegativeCost(card?.actionPointCost ?? definition?.actionPointCost),
+      chargePoints: 0,
+    }
+  }
+  return { ...ZERO_RESOURCE_COST }
+}
+
+function resourceShortfall(
+  state: BattleState,
+  playerId: string,
+  cost: AIActionResourceCost,
+): AIActionResourceCost {
+  const player = state.players.find(item => samePlayer(item.playerId, playerId))
+  return {
+    actionPoints: Math.max(0, cost.actionPoints - (player?.actionPoints ?? 0)),
+    chargePoints: Math.max(0, cost.chargePoints - (player?.chargePoints ?? 0)),
+  }
+}
+
+function withResourceSubsidy(
+  state: BattleState,
+  playerId: string,
+  subsidy: AIActionResourceCost,
+): BattleState {
+  return {
+    ...state,
+    players: state.players.map(player => samePlayer(player.playerId, playerId) ? {
+      ...player,
+      actionPoints: player.actionPoints + subsidy.actionPoints,
+      chargePoints: player.chargePoints + subsidy.chargePoints,
+    } : player),
+  }
+}
+
+function maximumVisibleCosts(state: BattleState, playerId: string): AIActionResourceCost {
+  const player = state.players.find(item => samePlayer(item.playerId, playerId))
+  let actionPoints = 1
+  let chargePoints = 0
+  for (const piece of state.pieces) {
+    if (!samePlayer(piece.ownerPlayerId, playerId) || piece.currentHp <= 0) continue
+    for (const skill of piece.skills || []) {
+      const definition = state.skillsById?.[skill.skillId] || getSkillById(skill.skillId)
+      actionPoints = Math.max(actionPoints, nonNegativeCost(definition?.actionPointCost))
+      chargePoints = Math.max(chargePoints, nonNegativeCost(definition?.chargeCost))
+    }
+  }
+  for (const card of player?.hand || []) {
+    const definition = loadCardById(card.cardId) ?? state.customCards?.[card.cardId]
+    actionPoints = Math.max(actionPoints, nonNegativeCost(card.actionPointCost ?? definition?.actionPointCost))
+  }
+  return { actionPoints, chargePoints }
+}
+
+/**
+ * Enumerates the authority candidates again after a bounded public-resource
+ * subsidy, then revalidates every candidate with only its exact shortfall.
+ */
+export function listPotentialAIActions(state: BattleState, playerId: string): AIPotentialCandidate[] {
+  const player = state.players.find(item => samePlayer(item.playerId, playerId))
+  if (!player || state.terminalResult) return []
+  const maximum = maximumVisibleCosts(state, playerId)
+  const discoverySubsidy = {
+    actionPoints: Math.max(0, maximum.actionPoints - player.actionPoints),
+    chargePoints: Math.max(0, maximum.chargePoints - player.chargePoints),
+  }
+  const discovered = new Map<string, CandidateAction>()
+  for (const item of listLegalAIActions(state, playerId)) discovered.set(item.id, item)
+  for (const item of listLegalAIActions(withResourceSubsidy(state, playerId, discoverySubsidy), playerId)) {
+    discovered.set(item.id, item)
+  }
+
+  const result: AIPotentialCandidate[] = []
+  for (const item of sortCandidates([...discovered.values()])) {
+    const cost = getAIActionResourceCost(state, playerId, item)
+    const shortfall = resourceShortfall(state, playerId, cost)
+    const exactState = withResourceSubsidy(state, playerId, shortfall)
+    const exact = listLegalAIActions(exactState, playerId).find(candidateItem => candidateItem.id === item.id)
+    if (!exact || stableJson(exact.action) !== stableJson(item.action)) continue
+    result.push({
+      candidate: exact,
+      cost,
+      shortfall,
+      costBreakthrough: shortfall.actionPoints > 0 || shortfall.chargePoints > 0,
+    })
+  }
+  return result
+}
+
+export function simulatePotentialAITransition(
+  state: BattleState,
+  input: AIPotentialCandidate,
+  context: AISimulationContext = {},
+): AIPotentialTransition {
+  const current = listPotentialAIActions(state, input.candidate.action.type === 'beginPhase'
+    ? state.turn.currentPlayerId
+    : 'playerId' in input.candidate.action ? input.candidate.action.playerId : state.turn.currentPlayerId)
+    .find(item => item.candidate.id === input.candidate.id && stableJson(item.candidate.action) === stableJson(input.candidate.action))
+  if (!current) {
+    throw new AIEnvironmentContractError(
+      'AI_ENV_POTENTIAL_NOT_COST_ONLY',
+      `Potential candidate ${input.candidate.id} is stale or violates a non-cost rule`,
+    )
+  }
+  const playerId = 'playerId' in current.candidate.action
+    ? current.candidate.action.playerId
+    : state.turn.currentPlayerId
+  const subsidized = withResourceSubsidy(state, playerId, current.shortfall)
+  return {
+    ...current,
+    transition: simulateAITransition(subsidized, current.candidate, context),
+  }
+}
+
+export const aiPotentialEnvironmentV1: AIPotentialEnvironment = Object.freeze({
+  protocolVersion: AI_ENVIRONMENT_PROTOCOL_VERSION,
+  listPotentialActions: listPotentialAIActions,
+  simulatePotential: simulatePotentialAITransition,
+})
 
 function traceState(state: BattleState): Record<string, unknown> {
   const cloned = cloneSerializable(state) as unknown as Record<string, unknown>

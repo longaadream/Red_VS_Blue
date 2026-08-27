@@ -86,6 +86,12 @@ manifest 是内容准入来源而非规划器私有名单，其 hash 继续由 R
 
 这个对照只记录合法性、回合完成和可观察节点，不推导或虚构胜率目标。旧 `generateBotActions()` 继续作为受控回归入口；新规划器没有替换权威提交，也没有第二套规则合法性实现。
 
+## RED-122 零阶段选择器
+
+`ai-planner.ts` 同时重新导出 `planZeroStageAction()` 和 `zeroStageDecisionTraceHash()`。它们复用同一个 player-level 权威边界，但不改变本文件的 RED-86 Beam Search：零阶段选择器对每个严格合法外层动作计算静态估价和同一玩家的前三项费用放宽后续潜力，只返回一个 `nextAction`，并要求权威状态更新后重新调用。
+
+费用放宽只存在于隔离副本，必须再次通过权威候选枚举；它不会进入正式命令。算法、权重、诊断和限制详见 [`AI_ZERO_STAGE.md`](./AI_ZERO_STAGE.md)。
+
 ## 回退
 
 整体 revert planner、evaluator、profile、共享类型、AI environment 的只读 runtime-cache guard、测试和本文档。无需迁移存档、玩法数据、网络协议或随机状态；失败 trace 应保留在验证记录中。
