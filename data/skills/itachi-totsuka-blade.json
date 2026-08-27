@@ -1,0 +1,21 @@
+{
+  "id": "itachi-totsuka-blade",
+  "name": "须佐能乎·十拳剑",
+  "description": "选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。AP2，充能1，CD1。",
+  "keywords": [],
+  "targetText": "3格内的一个敌人",
+  "effectTags": ["damage", "cooldown"],
+  "icon": "🗡️",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "chargeCost": 1,
+  "powerMultiplier": 2.0,
+  "actionPointCost": 2,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "type": "piece", "filter": "enemy", "range": 3 }] },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 3, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.round(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'magical', battle, context.skill.id); if (target.skills) target.skills.forEach(function(skillState) { var definition = battle.skillsById && battle.skillsById[skillState.skillId]; if (!definition || definition.kind === 'active') skillState.currentCooldown = Math.max(skillState.currentCooldown || 0, 2); }); return { success: true, message: caster.name + '以十拳剑对' + target.name + '造成' + result.damage + '点魔法伤害，并使其所有主动技能进入至少2回合冷却' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.round((piece.attack || 0) * skillDef.powerMultiplier); return { description: '选择3格内的一个敌人，造成' + damage + '点魔法伤害，并使其所有主动技能进入2回合冷却。', expectedValues: { damage: damage, cooldown: 2 } }; }"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "ichigo-getsuga-tensho",
+  "name": "月牙天冲",
+  "description": "向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成150%攻击力的魔法伤害。AP2，CD1。",
+  "keywords": ["弹射物"],
+  "targetText": "同一行或同一列的一个方向",
+  "effectTags": ["damage"],
+  "icon": "🌙",
+  "kind": "active",
+  "type": "normal",
+  "form": "projectile",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1.5,
+  "actionPointCost": 2,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "type": "grid", "filter": "all", "range": 99, "sameRowOrColumn": true, "excludeSourceCell": true }] },
+  "code": "function executeSkill(context) { var caster = context.piece; var targetPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos; var dx = targetPos.x - caster.x; var dy = targetPos.y - caster.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '月牙天冲只能向同一行或同一列的方向发射' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var events = traceProjectile({ x: caster.x, y: caster.y }, direction, { excludePieceId: caster.instanceId }); for (var i = 0; i < events.length; i++) { var event = events[i]; if (event.type === 'piece') { if (event.piece.ownerPlayerId !== caster.ownerPlayerId) { var damage = Math.round(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, event.piece, damage, 'magical', battle, context.skill.id); return { success: true, message: caster.name + '的月牙天冲命中' + event.piece.name + '，造成' + result.damage + '点魔法伤害' }; } return { success: true, message: caster.name + '的月牙天冲被友方棋子阻挡' }; } if (event.type === 'terrain' && event.blocksProjectile) return { success: true, message: caster.name + '的月牙天冲被地形阻挡' }; } return { success: true, message: caster.name + '的月牙天冲未命中敌人' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.round((piece.attack || 0) * skillDef.powerMultiplier); return { description: '向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成' + damage + '点魔法伤害。', expectedValues: { damage: damage } }; }"
+}
