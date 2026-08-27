@@ -18,7 +18,7 @@ hash，不签名/验签，不解析 Patch，不安装或激活 Profile，也不�
 | --- | --- |
 | `lib/content-pipeline/contracts/primitives-v1.ts` | ID、SemVer、SHA-256、ABI、路径、JSON 值与确定性字符串排序 |
 | `lib/content-pipeline/contracts/pack-v1.ts` | Snapshot/Patch manifest、文件描述符、operation、capability、detached signature |
-| `lib/content-pipeline/contracts/profile-v1.ts` | Resolved Profile identity、provenance 与 self-hash envelope |
+| `lib/content-pipeline/contracts/profile-v1.ts` | Resolved Profile full/authority identity、provenance 与双 hash envelope |
 | `lib/pve/contracts/content-v1.ts` | PVE content manifest、Campaign 及内容文档 |
 | `lib/pve/contracts/flow-v1.ts` | 八类独立 Flow node |
 | `lib/pve/contracts/run-v1.ts` | PVE Run、checkpoint、receipt 与 active battle reference |
@@ -131,9 +131,10 @@ remove-only Patch 是否没有多余 payload、媒体类型和最终跨文件引
 阶段 2 必须严格实现 ADR-0018 的 canonical JSON；本阶段只冻结输入投影和 domain 常量：
 
 ```text
-PACK_IDENTITY_DOMAIN_V1    = UTF8("RVB_PACK_IDENTITY_V1\0")
-PROFILE_IDENTITY_DOMAIN_V1 = UTF8("RVB_PROFILE_IDENTITY_V1\0")
-PACK_SIGNATURE_DOMAIN_V1   = UTF8("RVB_PACK_SIGNATURE_V1\0")
+PACK_IDENTITY_DOMAIN_V1              = UTF8("RVB_PACK_IDENTITY_V1\0")
+PROFILE_IDENTITY_DOMAIN_V1           = UTF8("RVB_PROFILE_IDENTITY_V1\0")
+AUTHORITY_CONTENT_IDENTITY_DOMAIN_V1 = UTF8("RVB_AUTHORITY_CONTENT_IDENTITY_V1\0")
+PACK_SIGNATURE_DOMAIN_V1             = UTF8("RVB_PACK_SIGNATURE_V1\0")
 ```
 
 ```text
@@ -141,6 +142,10 @@ packageHash = SHA256(PACK_IDENTITY_DOMAIN_V1 || UTF8(canonical(strictManifest)))
 
 resolvedProfileHash = SHA256(
   PROFILE_IDENTITY_DOMAIN_V1 || UTF8(canonical(resolvedProfileIdentity))
+)
+
+authorityContentHash = SHA256(
+  AUTHORITY_CONTENT_IDENTITY_DOMAIN_V1 || UTF8(canonical(authorityContentIdentity))
 )
 
 signatureMessage = PACK_SIGNATURE_DOMAIN_V1 || decodeLowerHex(packageHash)
@@ -199,12 +204,13 @@ signature   = 128 lowercase hex
 
 Schema 只验证结构。阶段 2 必须重新计算 keyId/packageHash 并验证签名。签名不代表信任或内容安全。
 
-## 5. Resolved Profile
+## 5. Resolved Profile 的双 identity
 
-`ResolvedProfileIdentityV1Schema` 是 hash 投影；`ResolvedProfileV1Schema` 在相同字段上增加
-`resolvedProfileHash`，该 self hash 不进入自己的 identity projection。
+`ResolvedProfileIdentityV1Schema` 是 full hash 投影；`ResolvedProfileV1Schema` 在相同字段上增加
+必填的 `resolvedProfileHash` 与 `authorityContentHash`。这里的 Resolved Profile 是解析后的资源内容
+组合，不是玩家 Profile 或存档。
 
-Identity 固定：
+Full identity 固定：
 
 - `schemaVersion = rvb-profile/v1`；
 - engine/content compatibility；
@@ -214,8 +220,32 @@ Identity 固定：
 - 按最终 path 排序的完整文件清单；
 - 每个最终文件的来源 package、`snapshot | add | replace` 和 source path。
 
+`ResolvedProfileIdentityV1Schema` 保持为上述 strict 字段，不包含两个输出 hash。
+
+`AuthorityContentIdentityV1Schema` 是独立 strict 投影：
+
+```text
+schemaVersion = rvb-authority-content/v1
+compatibility = Resolved Profile compatibility
+capabilities  = sorted unique subset of
+                game-data | pve-content | trusted-executable-content
+files         = final sorted unique application/json descriptors
+                { path, mediaType, size, sha256 }
+```
+
+它不含 raster 文件、package/base/patch/provenance/source path、ZIP 元数据或任何 hash 输出。v1 中最终
+树的全部 JSON 都属于权威内容；后续若要出现“不影响规则的 JSON”，必须以新合同明确分类，不能由调用方
+静默排除。
+
 阶段 2 Resolver 负责验证 provenance 闭合、每个 Patch 的真实 parent、操作 precondition、最终文件字节、
-capability 与引用，并在隔离副本上原子产生 Profile。阶段 1 不宣称任何 fixture 是已验证/可激活包。
+capability 与引用，在隔离副本上原子产生 Profile，并重新计算两个 hash。阶段 1 不宣称任何 fixture 是
+已验证/可激活包。
+
+用途边界：
+
+- `resolvedProfileHash`：安装、Patch parent、精确完整树与 provenance 诊断；
+- `authorityContentHash`：规则进程、房间握手、PVE Run、战斗 Trace/Replay；
+- 玩家 Profile/收藏/构筑/设置/永久记录：使用自身存档版本和稳定内容 ID，不保存 full Profile hash。
 
 ## 6. Profile 影响等级
 
@@ -223,12 +253,13 @@ capability 与引用，并在隔离副本上原子产生 Profile。阶段 1 不�
 
 | 内容事实 | 最低影响 |
 | --- | --- |
-| 只有 `raster-assets`，权威 content hash 未变 | `presentation-refresh` |
-| `game-data` 或 `pve-content` | `authority-restart` |
+| `resolvedProfileHash` 改变但 `authorityContentHash` 相同 | `presentation-refresh`；保留当前 PVE Run |
+| `authorityContentHash` 改变 | `authority-restart`；新指针对玩家可见前清当前临时 PVE 状态 |
 | 未知 ABI/capability，或外部 `trusted-executable-content` | `app-update-required` / reject |
 
-是否处于安全刷新点、是否存在房间/PVE Run lease，以及 Server 是否真实加载同一 Profile，属于后续
-安装/激活任务；包自身不能声明更低影响。
+只导入/验证候选而未激活时不清 Run。是否处于安全刷新点、Server 是否真实加载相同权威内容，以及
+删除临时 PVE 状态与活动指针切换如何形成原子边界，属于后续安装/激活任务；包自身不能声明更低影响。
+永久玩家 Profile、收藏、构筑、设置、解锁与完成记录不在清理范围。
 
 ## 7. PVE 内容文档
 
@@ -275,17 +306,17 @@ Branch route 顺序是“第一个满足条件即命中”的规则语义，不�
 `rvb-pve-run/v1` 固定：
 
 - run ID、safe integer revision、uint32 root seed；
-- `resolvedProfileHash`、campaign ID 和 campaign package hash；
+- `authorityContentHash` 和 campaign ID；
 - current node、party、deck、relics、primitive flags；
 - required checkpoint、nullable active battle reference；
 - 有语义顺序的 receipt 列表。
 
-Active battle reference 使用独立 `rvb-pve-active-battle/v1`，固定 battle ID、来源节点、encounter 和
-权威 state hash。客户端不能用它提交 winner/result。
+Active battle reference 使用独立 `rvb-pve-active-battle/v1`，固定 battle ID、来源节点、encounter、
+权威 state hash，并携带与 Run 相同的 `authorityContentHash`。客户端不能用它提交 winner/result。
 
-Checkpoint 使用 `rvb-pve-checkpoint/v1`，保存可恢复 Run state、revision、receipt count/hash 和 state
-hash。Receipt 使用 `rvb-pve-receipt/v1`，固定 command ID、`effect | reward | battle-settlement`、来源
-节点、subject、from/to revision 和 result hash。
+Checkpoint 使用 `rvb-pve-checkpoint/v1`，保存可恢复 Run state、revision、receipt count/hash、state
+hash 和 `authorityContentHash`。Receipt 使用 `rvb-pve-receipt/v1`，固定 command ID、
+`effect | reward | battle-settlement`、来源节点、subject、from/to revision 和 result hash。
 
 局部不变量：
 
@@ -294,10 +325,18 @@ hash。Receipt 使用 `rvb-pve-receipt/v1`，固定 command ID、`effect | rewar
 - receipt/checkpoint 不得比 Run revision 新；checkpoint `receiptCount` 必须精确等于
   `toRevision <= checkpoint.revision` 的有序 receipt 前缀长度；
 - party/relic ID 唯一，deck 顺序与重复均保留为玩法语义；
+- checkpoint 和 Run 的 active battle 必须分别与其父对象的 `authorityContentHash` 相同；
 - Run 不含 wall-clock identity 字段。
 
 Receipt hash、checkpoint hash、CAS、命令去重、恢复和 exactly-once 提交由阶段 5 实现；Schema 不执行
 状态转移。
+
+激活协调器比较新旧 `authorityContentHash`：相同则保留当前 Run；不同则在新活动指针对玩家可见前删除
+临时 Run/checkpoint/active battle。此策略不做 Run 迁移、不保留旧 Profile，也不得删除玩家 Profile、
+收藏、构筑、设置、永久解锁或完成记录。RED-113 只冻结字段与责任，删除逻辑属于后续激活/PVE 阶段。
+
+任何恢复、命令或 battle settlement 的 authority hash 不一致都失败关闭，不推进 revision、不写 receipt、
+不发奖励。旧 `resolvedProfileHash` / `campaignPackageHash` 字段由 strict v1 Run schema 拒绝。
 
 ## 10. 验证职责矩阵
 
@@ -305,17 +344,20 @@ Receipt hash、checkpoint hash、CAS、命令去重、恢复和 exactly-once 提
 | --- | --- | --- | --- |
 | 字段、格式、discriminant、局部唯一/顺序 | 是 | 复用 | 复用 |
 | ZIP 路径、entry、预算、真实 size/hash/media magic | 否 | 是（archive adapter 在安装阶段） | 只消费结果 |
-| canonical package/profile hash、keyId、Ed25519 | 只冻结字节合同 | 是 | 只消费结果 |
+| canonical package/full-profile/authority-content hash、keyId、Ed25519 | 只冻结字节合同 | 是 | 只消费结果 |
 | capability 推导、动态代码字段递归拒绝 | 枚举/边界 | 是 | 不旁路 |
 | Patch parent/precondition/原子解析 | 结构 | 是 | 只消费 Resolved Profile |
 | PVE 文件/ID/图引用闭合与可达性 | 局部字段 | 是 | Runner 不猜测 |
 | Run command/CAS/receipt/checkpoint/战斗终局 | envelope | 否 | 阶段 5 权威实现 |
+| authority hash 变化时清临时 PVE 状态 | 字段/相等性 | 提供新旧 hash | 激活协调器/PVE adapter 原子执行 |
 
 ## 11. 演进与回退
 
 - RED-113 ADR 保持 Proposed，项目负责人接受后 RED-114 才可开始。
 - 阶段 2 若发现合同缺陷，暂停并修订 RED-113；不能在 core 中兼容性猜测。
 - 未产生外部身份前可以整体 revert RED-113；没有运行时或玩家数据需要迁移。
+- 普通资源更新继续使用 v1，通过新 package version、Snapshot/Patch 和 hash 表达，不要求更新游戏本体
+  或玩家存档 schema。
 - 一旦 v1 package/Profile/PVE Run 被对外引用，破坏性变化必须使用新 schema/ABI 或单独迁移任务，
   不得静默重写 v1。
 

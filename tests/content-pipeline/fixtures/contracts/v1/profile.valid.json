@@ -51,5 +51,6 @@
       }
     }
   ],
-  "resolvedProfileHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  "resolvedProfileHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "authorityContentHash": "9999999999999999999999999999999999999999999999999999999999999999"
 }

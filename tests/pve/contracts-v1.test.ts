@@ -6,8 +6,10 @@ import { describe, expect, it } from 'vitest'
 
 import { PackJsonPayloadPathV1Schema } from '@/lib/content-pipeline/contracts'
 import {
+  PveActiveBattleReferenceV1Schema,
   PveCampaignV1Schema,
   PveChapterV1Schema,
+  PveCheckpointV1Schema,
   PveContentManifestV1Schema,
   PveEncounterV1Schema,
   PveEnemySetupV1Schema,
@@ -125,6 +127,12 @@ describe('PVE v1 content contracts', () => {
       PveCampaignV1Schema,
       ['nodes', 0, 'path'],
     ],
+    [
+      'Campaign nested empty JSON basename',
+      'campaign-nested-empty-json-name-path.json',
+      PveCampaignV1Schema,
+      ['nodes', 0, 'path'],
+    ],
   ] as Array<[string, string, ZodTypeAny, Array<string | number>]>) (
     'rejects %s because PVE document paths must match data/**/*.json',
     (_caseName, fixtureName, schema, expectedPath) => {
@@ -196,7 +204,7 @@ describe('PVE v1 content contracts', () => {
 })
 
 describe('PVE v1 run contract', () => {
-  it('accepts an exact-profile run without wall-clock identity fields', () => {
+  it('accepts an authority-pinned run without wall-clock identity fields', () => {
     const fixture = readFixture('valid', 'run.json')
     const result = PveRunV1Schema.safeParse(fixture)
 
@@ -204,6 +212,10 @@ describe('PVE v1 run contract', () => {
     if (result.success) {
       expect(result.data).not.toHaveProperty('createdAt')
       expect(result.data).not.toHaveProperty('updatedAt')
+      expect(result.data.authorityContentHash).toBe('a'.repeat(64))
+      expect(result.data.checkpoint.authorityContentHash).toBe(
+        result.data.authorityContentHash,
+      )
     }
   })
 
@@ -221,20 +233,125 @@ describe('PVE v1 run contract', () => {
     expect(PveRunV1Schema.safeParse(run).success).toBe(true)
   })
 
-  it('accepts a pinned active battle reference', () => {
+  it('accepts active battle references pinned to the same authority content', () => {
     const run = structuredClone(
       readFixture('valid', 'run.json'),
-    ) as Record<string, unknown>
-
-    run.activeBattle = {
+    ) as Record<string, unknown> & { checkpoint: Record<string, unknown> }
+    const activeBattle = {
       schemaVersion: 'rvb-pve-active-battle/v1',
+      authorityContentHash: 'a'.repeat(64),
       battleId: 'battle-001',
       sourceNodeId: 'ambush',
       encounterId: 'prototype-ambush',
       stateHash: '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
     }
 
-    expect(PveRunV1Schema.safeParse(run).success).toBe(true)
+    run.activeBattle = activeBattle
+    run.checkpoint.activeBattle = structuredClone(activeBattle)
+
+    const result = PveRunV1Schema.safeParse(run)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.activeBattle?.authorityContentHash).toBe(
+        result.data.authorityContentHash,
+      )
+      expect(result.data.checkpoint.activeBattle?.authorityContentHash).toBe(
+        result.data.authorityContentHash,
+      )
+    }
+  })
+
+  it('strictly rejects legacy full Profile and campaign package hash fields', () => {
+    const fixture = readFixture('valid', 'run.json') as Record<string, unknown>
+    const result = PveRunV1Schema.safeParse({
+      ...fixture,
+      resolvedProfileHash: 'b'.repeat(64),
+      campaignPackageHash: 'c'.repeat(64),
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const issue = result.error.issues.find(item => item.code === 'unrecognized_keys')
+      expect(issue).toEqual(
+        expect.objectContaining({
+          code: 'unrecognized_keys',
+          keys: expect.arrayContaining(['resolvedProfileHash', 'campaignPackageHash']),
+        }),
+      )
+    }
+  })
+
+  it('requires a valid authorityContentHash on all three state envelopes', () => {
+    const run = readFixture('valid', 'run.json') as Record<string, unknown> & {
+      checkpoint: Record<string, unknown>
+    }
+    const activeBattle: Record<string, unknown> = {
+      schemaVersion: 'rvb-pve-active-battle/v1',
+      authorityContentHash: 'a'.repeat(64),
+      battleId: 'battle-001',
+      sourceNodeId: 'ambush',
+      encounterId: 'prototype-ambush',
+      stateHash: '1'.repeat(64),
+    }
+    const cases: Array<[ZodTypeAny, Record<string, unknown>]> = [
+      [PveRunV1Schema, run],
+      [PveCheckpointV1Schema, run.checkpoint],
+      [PveActiveBattleReferenceV1Schema, activeBattle],
+    ]
+
+    for (const [schema, value] of cases) {
+      const missing = structuredClone(value)
+      delete missing.authorityContentHash
+      const invalid = { ...value, authorityContentHash: 'not-a-sha256' }
+      for (const candidate of [missing, invalid]) {
+        const result = schema.safeParse(candidate)
+        expect(
+          result.success
+            ? []
+            : result.error.issues.map(issue => issue.path.join('.')),
+        ).toContain('authorityContentHash')
+      }
+    }
+  })
+
+  it('rejects authority hash mismatches at stable parent paths', () => {
+    const fixture = readFixture('valid', 'run.json') as Record<string, unknown> & {
+      checkpoint: Record<string, unknown>
+    }
+    const otherAuthorityHash = 'b'.repeat(64)
+    const mismatchedBattle = {
+      schemaVersion: 'rvb-pve-active-battle/v1',
+      authorityContentHash: otherAuthorityHash,
+      battleId: 'battle-001',
+      sourceNodeId: 'ambush',
+      encounterId: 'prototype-ambush',
+      stateHash: '1'.repeat(64),
+    }
+    const checkpointMismatch = structuredClone(fixture)
+    checkpointMismatch.checkpoint.authorityContentHash = otherAuthorityHash
+    const runBattleMismatch = structuredClone(fixture)
+    runBattleMismatch.activeBattle = mismatchedBattle
+    const checkpointBattleMismatch = structuredClone(fixture.checkpoint)
+    checkpointBattleMismatch.activeBattle = mismatchedBattle
+
+    const cases: Array<[ZodTypeAny, unknown, string]> = [
+      [PveRunV1Schema, checkpointMismatch, 'checkpoint.authorityContentHash'],
+      [PveRunV1Schema, runBattleMismatch, 'activeBattle.authorityContentHash'],
+      [
+        PveCheckpointV1Schema,
+        checkpointBattleMismatch,
+        'activeBattle.authorityContentHash',
+      ],
+    ]
+
+    for (const [schema, value, expectedPath] of cases) {
+      const result = schema.safeParse(value)
+      expect(
+        result.success
+          ? []
+          : result.error.issues.map(issue => issue.path.join('.')),
+      ).toContain(expectedPath)
+    }
   })
 
   it('rejects duplicate command receipts for exactly-once replay', () => {

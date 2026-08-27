@@ -14,10 +14,107 @@ import {
 } from './primitives-v1'
 
 export const RESOLVED_PROFILE_SCHEMA_VERSION_V1 = 'rvb-profile/v1' as const
+export const AUTHORITY_CONTENT_SCHEMA_VERSION_V1 = 'rvb-authority-content/v1' as const
 
 // This is the byte-for-byte UTF-8 domain separator consumed by the stage-2
 // canonical hash implementation.
 export const PROFILE_IDENTITY_DOMAIN_V1 = 'RVB_PROFILE_IDENTITY_V1\0' as const
+export const AUTHORITY_CONTENT_IDENTITY_DOMAIN_V1 =
+  'RVB_AUTHORITY_CONTENT_IDENTITY_V1\0' as const
+
+export const AuthorityContentCapabilityV1Schema = z.enum([
+  'game-data',
+  'pve-content',
+  'trusted-executable-content',
+])
+
+export type AuthorityContentCapabilityV1 = z.infer<
+  typeof AuthorityContentCapabilityV1Schema
+>
+
+export const AuthorityContentCapabilitiesV1Schema = z
+  .array(AuthorityContentCapabilityV1Schema)
+  .max(AuthorityContentCapabilityV1Schema.options.length)
+  .superRefine((capabilities, context) => {
+    for (let index = 1; index < capabilities.length; index += 1) {
+      const previous = capabilities[index - 1]
+      const current = capabilities[index]
+      if (previous === current) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate authority capability: ${current}`,
+          path: [index],
+        })
+      } else if (compareUnicodeCodePointsV1(previous, current) > 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'Authority capabilities must be in ascending Unicode code point order',
+          path: [index],
+        })
+      }
+    }
+  })
+
+export type AuthorityContentCapabilitiesV1 = z.infer<
+  typeof AuthorityContentCapabilitiesV1Schema
+>
+
+export const AuthorityContentFileDescriptorV1Schema =
+  PackFileDescriptorV1Schema.refine(
+    (file): file is z.infer<typeof PackFileDescriptorV1Schema> & {
+      mediaType: 'application/json'
+    } => file.mediaType === 'application/json',
+    {
+      message: 'Authority content files must be application/json descriptors',
+      path: ['mediaType'],
+    },
+  )
+
+export type AuthorityContentFileDescriptorV1 = z.infer<
+  typeof AuthorityContentFileDescriptorV1Schema
+>
+
+export const AuthorityContentFileInventoryV1Schema = z
+  .array(AuthorityContentFileDescriptorV1Schema)
+  .max(2048)
+  .superRefine((files, context) => {
+    for (let index = 1; index < files.length; index += 1) {
+      const previous = files[index - 1].path
+      const current = files[index].path
+      if (previous === current) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate authority content file path: ${current}`,
+          path: [index, 'path'],
+        })
+      } else if (compareUnicodeCodePointsV1(previous, current) > 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'Authority content files must be in ascending Unicode code point path order',
+          path: [index, 'path'],
+        })
+      }
+    }
+  })
+
+export type AuthorityContentFileInventoryV1 = z.infer<
+  typeof AuthorityContentFileInventoryV1Schema
+>
+
+export const AuthorityContentIdentityV1Schema = z
+  .object({
+    schemaVersion: z.literal(AUTHORITY_CONTENT_SCHEMA_VERSION_V1),
+    compatibility: PackCompatibilityV1Schema,
+    capabilities: AuthorityContentCapabilitiesV1Schema,
+    files: AuthorityContentFileInventoryV1Schema,
+  })
+  .strict()
+
+export type AuthorityContentIdentityV1 = z.infer<
+  typeof AuthorityContentIdentityV1Schema
+>
 
 export const ResolvedPackageCoordinateV1Schema = z.object({
   packageId: ContentIdV1Schema,
@@ -110,8 +207,9 @@ export type ResolvedProfileIdentityV1 = z.infer<typeof ResolvedProfileIdentityV1
 
 export const ResolvedProfileV1Schema = z.object({
   ...ResolvedProfileIdentityV1Shape,
-  // Excluded from ResolvedProfileIdentityV1Schema to avoid a self-hash cycle.
+  // Both derived hashes are excluded from the full Profile identity projection.
   resolvedProfileHash: Sha256HexV1Schema,
+  authorityContentHash: Sha256HexV1Schema,
 }).strict()
 
 export type ResolvedProfileV1 = z.infer<typeof ResolvedProfileV1Schema>

@@ -82,7 +82,7 @@ export const PackFileMediaTypeV1Schema = z.enum([
 export type PackFileMediaTypeV1 = z.infer<typeof PackFileMediaTypeV1Schema>
 
 export const PackJsonPayloadPathV1Schema = PosixRelativePathV1Schema.refine(
-  path => /^data\/.+\.json$/.test(path),
+  path => /^data\/(?:[^/]+\/)*[^/]+\.json$/.test(path),
   'JSON payload path must match data/**/*.json',
 )
 
@@ -90,9 +90,9 @@ export type PackJsonPayloadPathV1 = z.infer<typeof PackJsonPayloadPathV1Schema>
 
 function expectedMediaType(path: string): PackFileMediaTypeV1 | null {
   if (PackJsonPayloadPathV1Schema.safeParse(path).success) return 'application/json'
-  if (/^images\/.+\.(?:jpg|jpeg)$/.test(path)) return 'image/jpeg'
-  if (/^images\/.+\.png$/.test(path)) return 'image/png'
-  if (/^images\/.+\.webp$/.test(path)) return 'image/webp'
+  if (/^images\/(?:[^/]+\/)*[^/]+\.(?:jpg|jpeg)$/.test(path)) return 'image/jpeg'
+  if (/^images\/(?:[^/]+\/)*[^/]+\.png$/.test(path)) return 'image/png'
+  if (/^images\/(?:[^/]+\/)*[^/]+\.webp$/.test(path)) return 'image/webp'
   return null
 }
 

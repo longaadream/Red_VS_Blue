@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "rvb-authority-content/v1",
+  "compatibility": {
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "capabilities": [],
+  "files": [],
+  "packageId": "rvb.core"
+}

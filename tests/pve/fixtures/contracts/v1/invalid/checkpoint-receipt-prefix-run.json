@@ -1,9 +1,8 @@
 {
   "schemaVersion": "rvb-pve-run/v1",
   "runId": "run-prototype-001",
-  "resolvedProfileHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "authorityContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "campaignId": "prototype-campaign",
-  "campaignPackageHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "rootSeed": 3735928559,
   "revision": 2,
   "currentNodeId": "spoils",
@@ -14,6 +13,7 @@
   "activeBattle": null,
   "checkpoint": {
     "schemaVersion": "rvb-pve-checkpoint/v1",
+    "authorityContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "checkpointId": "run-start",
     "revision": 0,
     "currentNodeId": "intro",

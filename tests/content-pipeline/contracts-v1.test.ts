@@ -4,7 +4,10 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
+  AUTHORITY_CONTENT_IDENTITY_DOMAIN_V1,
+  AUTHORITY_CONTENT_SCHEMA_VERSION_V1,
   AbiVersionV1Schema,
+  AuthorityContentIdentityV1Schema,
   compareUnicodeCodePointsV1,
   ContentIdV1Schema,
   JsonValueV1Schema,
@@ -89,10 +92,14 @@ describe('Content Pipeline v1 primitives', () => {
   })
 
   it('freezes exact UTF-8 domain separator strings without implementing hashing', () => {
+    expect(AUTHORITY_CONTENT_SCHEMA_VERSION_V1).toBe('rvb-authority-content/v1')
+    expect(AUTHORITY_CONTENT_IDENTITY_DOMAIN_V1)
+      .toBe('RVB_AUTHORITY_CONTENT_IDENTITY_V1\0')
     expect(PACK_IDENTITY_DOMAIN_V1).toBe('RVB_PACK_IDENTITY_V1\0')
     expect(PROFILE_IDENTITY_DOMAIN_V1).toBe('RVB_PROFILE_IDENTITY_V1\0')
     expect(PACK_SIGNATURE_DOMAIN_V1).toBe('RVB_PACK_SIGNATURE_V1\0')
     expect([
+      AUTHORITY_CONTENT_IDENTITY_DOMAIN_V1,
       PACK_IDENTITY_DOMAIN_V1,
       PROFILE_IDENTITY_DOMAIN_V1,
       PACK_SIGNATURE_DOMAIN_V1,
@@ -208,6 +215,9 @@ describe('rvb-pack/v1 manifest contract', () => {
     ['images/cards/core.jpeg', true],
     ['images/cards/core.png', true],
     ['images/cards/core.webp', true],
+    ['images/cards/.png', false],
+    ['images/cards/.jpeg', false],
+    ['images/cards/.webp', false],
     ['index.html', false],
     ['scripts/runtime.js', false],
     ['styles/runtime.css', false],
@@ -221,6 +231,7 @@ describe('rvb-pack/v1 manifest contract', () => {
     ['images/pve/node.json', false],
     ['campaign.json', false],
     ['data/.json', false],
+    ['data/pve/.json', false],
   ])('enforces the shared Pack JSON payload path contract for %s', (path, accepted) => {
     expect(PackJsonPayloadPathV1Schema.safeParse(path).success).toBe(accepted)
   })
@@ -247,6 +258,97 @@ describe('detached Ed25519 envelope', () => {
   })
 })
 
+describe('rvb-authority-content/v1 identity projection', () => {
+  it('accepts the strict compatibility, authority capability, and final JSON descriptor projection', () => {
+    const result = AuthorityContentIdentityV1Schema.safeParse(
+      loadFixture('authority-content.valid.json'),
+    )
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.schemaVersion).toBe(AUTHORITY_CONTENT_SCHEMA_VERSION_V1)
+      expect(result.data.capabilities).toEqual([
+        'game-data',
+        'pve-content',
+        'trusted-executable-content',
+      ])
+      expect(result.data.files.every(file => file.mediaType === 'application/json')).toBe(true)
+    }
+  })
+
+  it.each([
+    ['authority-content-unknown-field.invalid.json', ''],
+    ['authority-content-raster-capability.invalid.json', 'capabilities.0'],
+    ['authority-content-raster-file.invalid.json', 'files.0.mediaType'],
+  ])('fails closed for %s at %s', (name, expectedPath) => {
+    const result = AuthorityContentIdentityV1Schema.safeParse(loadFixture(name))
+
+    expect(result.success).toBe(false)
+    expect(result.success ? [] : result.error.issues.map(issue => issue.path.join('.')))
+      .toContain(expectedPath)
+  })
+
+  it('requires authority capabilities to be unique and in Unicode code-point order', () => {
+    const fixture = loadFixture('authority-content.valid.json') as {
+      capabilities: string[]
+    }
+    const unsorted = structuredClone(fixture)
+    const duplicate = structuredClone(fixture)
+    unsorted.capabilities.reverse()
+    duplicate.capabilities = ['game-data', 'game-data']
+
+    const unsortedResult = AuthorityContentIdentityV1Schema.safeParse(unsorted)
+    const duplicateResult = AuthorityContentIdentityV1Schema.safeParse(duplicate)
+
+    expect(unsortedResult.success ? [] : unsortedResult.error.issues.map(issue => issue.path.join('.')))
+      .toContain('capabilities.1')
+    expect(duplicateResult.success ? [] : duplicateResult.error.issues.map(issue => issue.path.join('.')))
+      .toContain('capabilities.1')
+  })
+
+  it('requires final JSON descriptors to be unique and in Unicode code-point path order', () => {
+    const fixture = loadFixture('authority-content.valid.json') as {
+      files: Array<Record<string, unknown>>
+    }
+    const unsorted = structuredClone(fixture)
+    const duplicate = structuredClone(fixture)
+    unsorted.files.reverse()
+    duplicate.files = [structuredClone(duplicate.files[0]), structuredClone(duplicate.files[0])]
+
+    const unsortedResult = AuthorityContentIdentityV1Schema.safeParse(unsorted)
+    const duplicateResult = AuthorityContentIdentityV1Schema.safeParse(duplicate)
+
+    expect(unsortedResult.success ? [] : unsortedResult.error.issues.map(issue => issue.path.join('.')))
+      .toContain('files.1.path')
+    expect(duplicateResult.success ? [] : duplicateResult.error.issues.map(issue => issue.path.join('.')))
+      .toContain('files.1.path')
+  })
+
+  it('excludes package coordinates, provenance, and hash outputs from the strict projection', () => {
+    const fixture = loadFixture('authority-content.valid.json') as Record<string, unknown>
+
+    for (const [field, value] of [
+      ['base', { packageId: 'rvb.core' }],
+      ['patches', []],
+      ['resolvedProfileHash', 'a'.repeat(64)],
+      ['authorityContentHash', 'b'.repeat(64)],
+    ] as const) {
+      expect(AuthorityContentIdentityV1Schema.safeParse({ ...fixture, [field]: value }).success)
+        .toBe(false)
+    }
+
+    const withProvenance = structuredClone(fixture) as {
+      files: Array<Record<string, unknown>>
+    }
+    withProvenance.files[0].provenance = {
+      packageHash: 'c'.repeat(64),
+      operation: 'snapshot',
+      sourcePath: 'data/cards/core.json',
+    }
+    expect(AuthorityContentIdentityV1Schema.safeParse(withProvenance).success).toBe(false)
+  })
+})
+
 describe('rvb-profile/v1 resolved profile contract', () => {
   it('accepts a resolved profile with ordered patches, effective capabilities, and provenance', () => {
     const result = ResolvedProfileV1Schema.safeParse(loadFixture('profile.valid.json'))
@@ -255,17 +357,29 @@ describe('rvb-profile/v1 resolved profile contract', () => {
     if (result.success) {
       expect(result.data.patches.map(patch => patch.packageId)).toEqual(['community.balance-one'])
       expect(result.data.files[0].provenance.operation).toBe('replace')
+      expect(result.data.authorityContentHash).toBe('9'.repeat(64))
     }
   })
 
-  it('uses an explicit identity projection that excludes only resolvedProfileHash', () => {
+  it('keeps both hash outputs outside the full resolved Profile identity projection', () => {
     const profile = ResolvedProfileV1Schema.parse(loadFixture('profile.valid.json'))
     const identity: Record<string, unknown> = { ...profile }
     delete identity.resolvedProfileHash
+    delete identity.authorityContentHash
 
     expect(ResolvedProfileIdentityV1Schema.safeParse(identity).success).toBe(true)
     expect(ResolvedProfileIdentityV1Schema.safeParse(profile).success).toBe(false)
     expect(ResolvedProfileV1Schema.safeParse(identity).success).toBe(false)
+  })
+
+  it('rejects an old resolved Profile envelope that omits authorityContentHash', () => {
+    const result = ResolvedProfileV1Schema.safeParse(
+      loadFixture('profile-missing-authority-hash.invalid.json'),
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.success ? [] : result.error.issues.map(issue => issue.path.join('.')))
+      .toContain('authorityContentHash')
   })
 
   it('fails closed on unknown fields and unsorted final file paths', () => {

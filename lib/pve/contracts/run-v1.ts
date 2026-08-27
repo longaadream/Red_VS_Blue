@@ -18,6 +18,7 @@ const PveFlagsV1Schema = z.record(ContentIdV1Schema, JsonPrimitiveV1Schema)
 export const PveActiveBattleReferenceV1Schema = z
   .object({
     schemaVersion: z.literal(PVE_ACTIVE_BATTLE_SCHEMA_VERSION_V1),
+    authorityContentHash: Sha256HexV1Schema,
     battleId: ContentIdV1Schema,
     sourceNodeId: ContentIdV1Schema,
     encounterId: ContentIdV1Schema,
@@ -42,6 +43,7 @@ function uniqueContentIds(fieldName: string) {
 }
 
 const pveRunStateV1Shape = {
+  authorityContentHash: Sha256HexV1Schema,
   currentNodeId: ContentIdV1Schema,
   party: uniqueContentIds('party'),
   deck: z.array(ContentIdV1Schema),
@@ -62,6 +64,20 @@ export const PveCheckpointV1Schema = z
     stateHash: Sha256HexV1Schema,
   })
   .strict()
+  .superRefine((checkpoint, context) => {
+    if (
+      checkpoint.activeBattle !== null &&
+      checkpoint.activeBattle.authorityContentHash !==
+        checkpoint.authorityContentHash
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Active battle authorityContentHash must match the checkpoint',
+        path: ['activeBattle', 'authorityContentHash'],
+      })
+    }
+  })
 
 export const PveReceiptV1Schema = z
   .object({
@@ -89,9 +105,7 @@ export const PveRunV1Schema = z
   .object({
     schemaVersion: z.literal(PVE_RUN_SCHEMA_VERSION_V1),
     runId: ContentIdV1Schema,
-    resolvedProfileHash: Sha256HexV1Schema,
     campaignId: ContentIdV1Schema,
-    campaignPackageHash: Sha256HexV1Schema,
     rootSeed: Uint32V1Schema,
     revision: RevisionV1Schema,
     ...pveRunStateV1Shape,
@@ -100,6 +114,25 @@ export const PveRunV1Schema = z
   })
   .strict()
   .superRefine((run, context) => {
+    if (run.checkpoint.authorityContentHash !== run.authorityContentHash) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Checkpoint authorityContentHash must match the run',
+        path: ['checkpoint', 'authorityContentHash'],
+      })
+    }
+
+    if (
+      run.activeBattle !== null &&
+      run.activeBattle.authorityContentHash !== run.authorityContentHash
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Active battle authorityContentHash must match the run',
+        path: ['activeBattle', 'authorityContentHash'],
+      })
+    }
+
     const commandIds = new Set<string>()
 
     run.receipts.forEach((receipt, index) => {
