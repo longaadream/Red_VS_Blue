@@ -371,7 +371,7 @@ flowchart TD
 - 每位玩家只提交一次；`pieceId: null` 表示保留全部。
 - 双方选择的提交先后不改变最终位置；不同玩家使用隔离的重选流。
 - `gameStart` 只触发一次；部署启用时不在初始化函数末尾提前触发。
-- 部署随机细节由 [ADR-0007](../decisions/ADR-0007-deterministic-deployment.md) 冻结，受控地图选择由 [ADR-0018](../decisions/ADR-0018-selectable-demo-maps.md) 冻结。
+- 部署随机细节由 [ADR-0007](../decisions/ADR-0007-deterministic-deployment.md) 冻结，受控地图选择由 [ADR-0019](../decisions/ADR-0019-selectable-demo-maps.md) 冻结。
 
 ### 5.2 Windows LAN 玩家动作
 

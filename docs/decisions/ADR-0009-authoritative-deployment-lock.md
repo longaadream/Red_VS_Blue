@@ -1,6 +1,6 @@
 # ADR-0009：部署选择锁定、权威超时与公开同步
 
-- 状态：部分被 ADR-0011 与 ADR-0018 取代。独立 `relay-server` 的 Relay host 验签/战斗角色、浏览器 host-authority、host 状态上传与恢复条款已由 ADR-0018 的赛前 REST 决策取代；HTTP/LAN 的签名边界以及部署锁定、超时、公开投影、房间 CAS 与随机合同继续有效。
+- 状态：部分被 ADR-0011 与 ADR-0019 取代。独立 `relay-server` 的 Relay host 验签/战斗角色、浏览器 host-authority、host 状态上传与恢复条款已由 ADR-0019 的赛前 REST 决策取代；HTTP/LAN 的签名边界以及部署锁定、超时、公开投影、房间 CAS 与随机合同继续有效。
 - 日期：2026-08-17
 - 关联任务：RED-31
 - 风险：Medium
@@ -31,10 +31,10 @@ ADR-0007 冻结了确定性初始部署和玩家独立重投随机流，但其�
 - 公开投影移除 `deployment.choices` 与内部 `debugBattle` 动作记录；未完成前还移除最终坐标，避免通过 HTTP、WebSocket、Relay、观战、动作 hash 或调试扩展提前泄露选择。完整 trace 只保存在服务端权威状态。
 - `viewerPlayerId` 只用于验证谁可以提交玩家命令，不控制站位可见性。
 - 玩家 HTTP/LAN WebSocket 与实际承担战斗权威的桌面/Android 本机服务命令携带 Ed25519 签名信封，签名覆盖房间 ID、玩家 ID、完整动作和 60 秒有效时间；权威服务校验公钥派生 ID、签名、动作和连接玩家一致后才进入协调器。仅声明 `x-player-id`、body player 或 WS subscribe player 不构成认证。
-- 独立 `relay-server` 的战斗订阅、host/guest 战斗权威角色与 host 状态更新条款已被 ADR-0018 取代；RED-119 只保留赛前 REST 与真实房间 `roomUpdate`，不接受浏览器上传战斗状态。
+- 独立 `relay-server` 的战斗订阅、host/guest 战斗权威角色与 host 状态更新条款已被 ADR-0019 取代；RED-119 只保留赛前 REST 与真实房间 `roomUpdate`，不接受浏览器上传战斗状态。
 - `createPublicRoomSnapshot()` 同样投影普通房间 GET、重复 start 和 rejoin/leave 等返回的嵌套 `battleState`，防止绕过 battle 快照入口读取选择或 trace。
 - HTTP 与 LAN WebSocket 共用 `dispatchRoomBattleAction()`；成功快照统一返回 `{ state, seed, stateHash, authorityVersion }`。桌面/Android 本机权威入口只广播公开投影和单调 `authorityVersion`；浏览器不保留权威私有状态。
-- 桌面 Next `/api/relay-battle-init` 与 Android mobile server `handleRelayBattleInit` 按 [ADR-0018](./ADR-0018-selectable-demo-maps.md) 在 seed 前重新校验调用方已经冻结的受控 `mapId`，返回版本 1 的 `{ state, seed, stateHash, authorityVersion }`。这两个兼容入口不持有或写入 `Room`、当前没有 UI 调用方，也不能作为房间地图冻结或独立 `relay-server` 开战、host 接管、状态恢复的证据。
+- 桌面 Next `/api/relay-battle-init` 与 Android mobile server `handleRelayBattleInit` 按 [ADR-0019](./ADR-0019-selectable-demo-maps.md) 在 seed 前重新校验调用方已经冻结的受控 `mapId`，返回版本 1 的 `{ state, seed, stateHash, authorityVersion }`。这两个兼容入口不持有或写入 `Room`、当前没有 UI 调用方，也不能作为房间地图冻结或独立 `relay-server` 开战、host 接管、状态恢复的证据。
 
 ### Trace、日志与版本
 

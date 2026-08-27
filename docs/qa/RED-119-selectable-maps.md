@@ -142,7 +142,6 @@ Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 是无 Room �
    - 既有 `db push` 数据库备份、标记基线已应用、再部署 ALTER；
    - 两条路径的数据保留、回滚和重复部署核对。
 3. lint 仍因现有 ESLint 插件配置缺失而失败，需要单独恢复共享 lint 环境或经批准修复依赖配置后重跑。
-4. 最新 `main` 已接受并占用内容管线 `ADR-0018`，而本分支的选图 ADR 仍暂用同一编号；在人工批准合同编号修订后，选图 ADR 及其精确引用必须顺延为 `ADR-0019`，不得改写内容管线 ADR。
-5. High Risk 合并仍需针对届时的精确 PR head 单独批准；本次人工产品验收不是合并授权。
+4. High Risk 合并仍需针对届时的精确 PR head 单独批准；本次人工产品验收不是合并授权。
 
 建议下一轮在具备 Bun 与一次性 PostgreSQL 实例的候选环境复跑相同四图矩阵，并把原始终端输出、数据库前后 schema/data 摘要及 standalone 浏览器截图附回本文件。当前可报告的状态仅为：**代码级与本地浏览器证据已取得，候选验收仍 BLOCKED**。
