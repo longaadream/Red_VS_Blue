@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "kind": "rvb-linear-training-run-v1",
+  "runId": "red-110-linear-greedy-v2",
+  "status": "paused",
+  "codeCommit": "4924cde55c93c80459cf812a81f3593d1905d7d2",
+  "codeHash": "cb47dee392bd6e1b183d37b1eb7399d0cdd28e5e646810ca1d7582da6226cd57",
+  "rulesHash": "3dc7d18a51503621e63471519168305f9406a29eb68d27385ff7bcd9bde0403f",
+  "contentHash": "7ddfea4a271f76188c8dbec3a49ca4c9d6a822aa17fe44656badb027d1318b61",
+  "featureSchemaHash": "f03f4c8c980e3f6fadae5782d2ca3db8fe3423109b34bc46f136ea590b31eb3e",
+  "trainingConfigHash": "b957584746046afef745fd680d7216c1a7b708e8f0335fc440f54f8172544b44",
+  "completedGeneration": 0,
+  "centerWeights": {
+    "bias": 0,
+    "coreAliveBalance": 1.5,
+    "coreHpBalance": 1,
+    "livingBalance": 0.7,
+    "hpBalance": 0.8,
+    "attackBalance": 0.15,
+    "defenseBalance": 0.1,
+    "shieldBalance": 0.2,
+    "buffBalance": 0.15,
+    "debuffBalance": 0.2,
+    "readySkillBalance": 0.1,
+    "actionPointBalance": 0.05,
+    "chargePointBalance": 0.05,
+    "handBalance": 0.05,
+    "engagementBalance": 0.1,
+    "coreSafetyBalance": 0.2,
+    "actingPlayer": 0
+  },
+  "activeGeneration": {
+    "generation": 1,
+    "status": "paused",
+    "rootSeeds": [
+      1001
+    ],
+    "lineupId": "alpha",
+    "opponentAgentIds": [
+      "simple-v1",
+      "planner-champion-v1"
+    ],
+    "commitment": "48e66b86a3da6a33ad68715753813038ae15560ea221f2ff60a217cc830129dc",
+    "completedMatches": [
+      {
+        "jobId": "linear-job-897364c983fcfcad92122026",
+        "candidateId": "g0001-p00-plus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 106477.80369999999,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-6fc55ad2a379bf91862c2941",
+        "candidateId": "g0001-p00-minus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 106814.1755,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-d6154994747f88b91f7854f3",
+        "candidateId": "g0001-p00-plus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 130310.7748,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-6fccc38c11c490b134628e68",
+        "candidateId": "g0001-p00-plus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 148836.1451,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-980094eab3ff10ce00552904",
+        "candidateId": "g0001-p00-plus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 155364.51799999998,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-f039f355c6aadebda709b721",
+        "candidateId": "g0001-p00-minus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 179672.8869,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-1dc4c641315ada7185ffd270",
+        "candidateId": "g0001-p00-minus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 160974.21779999998,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-a536ae481993b20c64cb8dca",
+        "candidateId": "g0001-p00-minus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 189192.936,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-c28f9ae4e568448aa4a37844",
+        "candidateId": "g0001-p01-minus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 95655.1954,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-50833caa25a1ca092fdcd4fe",
+        "candidateId": "g0001-p01-minus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 137843.951,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-1bbc92a1cb73231df0d7f070",
+        "candidateId": "g0001-p01-plus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 516363.4682,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-e7563b45887db6bf9958a4cd",
+        "candidateId": "g0001-p01-plus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 559846.3738,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-53b7be78507166dac503ca64",
+        "candidateId": "g0001-p01-plus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 590856.8785,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      },
+      {
+        "jobId": "linear-job-0d1ad76db2564cf218408a62",
+        "candidateId": "g0001-p01-plus",
+        "outcome": "draw",
+        "hardGatePassed": true,
+        "durationMs": 704480.7995000001,
+        "failureKind": "turn-budget",
+        "adjudication": "turn-limit-draw"
+      }
+    ],
+    "totalMatches": 96
+  },
+  "archives": []
+}
