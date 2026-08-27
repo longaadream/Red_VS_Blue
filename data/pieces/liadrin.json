@@ -1,9 +1,9 @@
 {
   "id": "liadrin",
-  "name": "莉亚德琳",
+  "name": "\u8389\u4e9a\u5fb7\u7433",
   "faction": "good",
-  "description": "血骑士的领袖，能够萃取圣盾转化为圣光手牌，驾驭纳鲁的力量为团队带来毁灭性的爆发",
-  "rarity": "epic",
+  "description": "\u8840\u9a91\u58eb\u9886\u8896\uff0c\u901a\u8fc7\u62bd\u53d6\u5723\u76fe\u4e0d\u65ad\u79ef\u7d2f\u5723\u5149\u624b\u724c\uff0c\u5e76\u4ee5\u7a46\u9c81\u7684\u633d\u6b4c\u5c06\u79ef\u84c4\u8f6c\u5316\u4e3a\u5168\u573a\u6cbb\u7597\u4e0e\u771f\u5b9e\u4f24\u5bb3\u3002",
+  "rarity": "legendary",
   "image": "liadrin.jpg",
   "stats": {
     "maxHp": 14,

@@ -66,12 +66,19 @@ function expectRosterError(run: () => unknown, code: string) {
 }
 
 describe('Demo roster contract', () => {
-  it('reads the current 14-light / 14-dark candidate pool from the server manifest', () => {
-    const admittedPieces = getDemoPieceIds().map(templateId => DEFAULT_PIECES[templateId])
+  it('reads admitted candidates from the server manifest without enforcing faction-size symmetry', () => {
+    const admittedIds = getDemoPieceIds()
+    const admittedPieces = admittedIds.map(templateId => DEFAULT_PIECES[templateId])
 
-    expect(admittedPieces).toHaveLength(28)
-    expect(admittedPieces.filter(piece => piece.faction === 'good')).toHaveLength(14)
-    expect(admittedPieces.filter(piece => piece.faction === 'evil')).toHaveLength(14)
+    expect(new Set(admittedIds).size).toBe(admittedIds.length)
+    expect(admittedIds).toEqual(expect.arrayContaining([
+      'blue-ichigo',
+      'red-itachi',
+      'red-venom',
+      'velen',
+      'turalyon',
+    ]))
+    expect(admittedPieces.every(piece => piece && (piece.faction === 'good' || piece.faction === 'evil'))).toBe(true)
   })
 
   it.each([

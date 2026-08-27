@@ -2,6 +2,11 @@ import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import { executeCardFunction, loadCardById, loadRuleById } from './skills'
 import type { PendingReactiveCardRef } from './pending-interaction'
+import {
+  getActiveSuspendableActionRuntime,
+  isSuspendableActionPending,
+  type SuspendableInteractionInput,
+} from './suspendable-action-transaction'
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 
@@ -208,6 +213,28 @@ export class TriggerSystem {
   private rules: TriggerRule[] = []
   private nextRootEventId = 0
 
+  snapshotTransactionState(): {
+    nextRootEventId: number
+    ruleLimits: Array<TriggerRule['limits']>
+  } {
+    return {
+      nextRootEventId: this.nextRootEventId,
+      ruleLimits: this.rules.map(rule => rule.limits ? { ...rule.limits } : undefined),
+    }
+  }
+
+  restoreTransactionState(snapshot: {
+    nextRootEventId: number
+    ruleLimits: Array<TriggerRule['limits']>
+  }): void {
+    this.nextRootEventId = snapshot.nextRootEventId
+    this.rules.forEach((rule, index) => {
+      const limits = snapshot.ruleLimits[index]
+      if (limits) rule.limits = { ...limits }
+      else delete rule.limits
+    })
+  }
+
   /**
    * Dispatch a child event while preserving the current synchronous event chain.
    * All skill-code environments use this entry point instead of calling
@@ -333,6 +360,9 @@ export class TriggerSystem {
     }
     const rethrowTriggerError = (error: unknown, consumerKind: string, consumerId: string): never => {
       restoreRuleLimits()
+      if (isSuspendableActionPending(error)) {
+        throw error
+      }
       const cause = error instanceof Error ? error : new Error(String(error))
       const details = {
         eventType: context.type,
@@ -349,6 +379,7 @@ export class TriggerSystem {
     const triggeredEffects: string[] = []
     let success = false
     let blocked = false
+    const transactionRuntime = getActiveSuspendableActionRuntime()
     let needsOptionSelection = false
     let pendingOptions: any[] | undefined
     let pendingTitle: string | undefined
@@ -357,6 +388,10 @@ export class TriggerSystem {
     let pendingCancelValue: any
     let needsTargetSelection = false
     let pendingTargetType: string | undefined
+    const candidateStateSnapshot = () => (
+      JSON.parse(JSON.stringify(battle)) as BattleState
+    )
+
     let pendingRange: number | undefined
     let pendingFilter: string | undefined
     let pendingRuleId: string | undefined
@@ -534,10 +569,61 @@ export class TriggerSystem {
       }
 
       try {
-        const ruleCtx = item.buildCtx(context)
-        const damageBeforeEffect = Number((ruleCtx as any).damage)
-        const ruleOwnerPlayerId = (ruleCtx as any).ruleOwnerPlayerId || (ruleCtx as any).playerId || context.playerId
-        const result = item.rule.effect(battle, ruleCtx)
+        const interactionKey = transactionRuntime?.enterConsumer({
+          consumerKind: 'rule',
+          consumerId: item.ruleId,
+          sourceId: item.sourceId,
+          eventType: context.type,
+        })
+        let transactionInput = interactionKey
+          ? transactionRuntime?.takeAnswer(interactionKey)
+          : undefined
+        if (transactionInput?.cancelled) continue
+        let ruleCtx: TriggerContext
+        let result: any
+        let damageBeforeEffect = 0
+        let ruleOwnerPlayerId: string | undefined
+        while (true) {
+          ruleCtx = item.buildCtx(context)
+          applyTransactionInput(ruleCtx, transactionInput, battle)
+          damageBeforeEffect = Number((ruleCtx as any).damage)
+          ruleOwnerPlayerId = (ruleCtx as any).ruleOwnerPlayerId
+            || (ruleCtx as any).playerId
+            || context.playerId
+          result = item.rule.effect(battle, ruleCtx)
+          if ((ruleCtx as any).damage !== (context as any).damage) {
+            (context as any).damage = (ruleCtx as any).damage
+          }
+          if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
+          if (!transactionRuntime || !interactionKey) break
+          const nextInput = transactionRuntime.takeAnswer(interactionKey)
+          if (nextInput) {
+            transactionInput = nextInput
+            continue
+          }
+          transactionRuntime.suspend(interactionKey, result.needsOptionSelection
+            ? {
+                kind: 'option',
+                playerId: result.playerId || ruleOwnerPlayerId,
+                title: result.title,
+                options: result.options || [],
+                canCancel: result.canCancel,
+                cancelValue: result.cancelValue,
+                suspendedTurn: { ...battle.turn },
+              }
+            : {
+                kind: 'target',
+                playerId: result.playerId || ruleOwnerPlayerId,
+                title: result.title,
+                targetType: result.targetType,
+                range: result.range,
+                filter: result.filter,
+                canCancel: result.canCancel,
+                suspendedTurn: { ...battle.turn },
+                sourcePieceId: (ruleCtx as any).sourcePiece?.instanceId || item.sourceId,
+                candidateState: candidateStateSnapshot(),
+              })
+        }
         // 回写 damage
         if ((ruleCtx as any).damage !== (context as any).damage) {
           (context as any).damage = (ruleCtx as any).damage
@@ -606,7 +692,53 @@ export class TriggerSystem {
         try {
           const cardDef = loadCardById(cardRef.cardId) || (battle as any).customCards?.[cardRef.cardId]
           if (!cardDef || cardDef.type !== 'reactive' || cardDef.trigger?.type !== context.type) continue
-          const result = executeCardFunction(cardDef, player.playerId, battle, context) as any
+          const interactionKey = transactionRuntime?.enterConsumer({
+            consumerKind: 'reactiveCard',
+            consumerId: cardRef.cardId,
+            sourceId: cardRef.cardInstanceId,
+            eventType: context.type,
+          })
+          let transactionInput = interactionKey
+            ? transactionRuntime?.takeAnswer(interactionKey)
+            : undefined
+          if (transactionInput?.cancelled) continue
+          let result: any
+          while (true) {
+            const cardContext = { ...context }
+            applyTransactionInput(cardContext, transactionInput, battle)
+            result = executeCardFunction(cardDef, player.playerId, battle, cardContext) as any
+            if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
+            if (!transactionRuntime || !interactionKey) {
+              throw new Error(`Reactive card ${cardRef.cardId} requested unsupported interaction during ${context.type}`)
+            }
+            const nextInput = transactionRuntime.takeAnswer(interactionKey)
+            if (nextInput) {
+              transactionInput = nextInput
+              continue
+            }
+            transactionRuntime.suspend(interactionKey, result.needsOptionSelection
+              ? {
+                  kind: 'option',
+                  playerId: result.playerId || player.playerId,
+                  title: result.title,
+                  options: result.options || [],
+                  canCancel: result.canCancel,
+                  cancelValue: result.cancelValue,
+                  suspendedTurn: { ...battle.turn },
+                }
+              : {
+                  kind: 'target',
+                  playerId: result.playerId || player.playerId,
+                  title: result.title,
+                  targetType: result.targetType,
+                  range: result.range,
+                  filter: result.filter,
+                  canCancel: result.canCancel,
+                  suspendedTurn: { ...battle.turn },
+                  sourcePieceId: (context as any).sourcePiece?.instanceId,
+                  candidateState: candidateStateSnapshot(),
+                })
+          }
           if (result?.needsOptionSelection || result?.needsTargetSelection) {
             throw new Error(`Reactive card ${cardRef.cardId} requested unsupported interaction during ${context.type}`)
           }
@@ -667,6 +799,23 @@ export class TriggerSystem {
   }
   
   
+}
+
+function applyTransactionInput(
+  context: TriggerContext,
+  input: SuspendableInteractionInput | undefined,
+  battle: BattleState,
+): void {
+  if (!input) return
+  Object.assign(context, input)
+  if (input.targetPieceId) {
+    context.targetPiece = battle.pieces.find(piece => (
+      piece.instanceId === input.targetPieceId && piece.currentHp > 0
+    ))
+  }
+  if (input.targetX !== undefined && input.targetY !== undefined) {
+    context.targetPosition = { x: input.targetX, y: input.targetY }
+  }
 }
 
 // 全局触发系统实例

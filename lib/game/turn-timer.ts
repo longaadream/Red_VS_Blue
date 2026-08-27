@@ -115,6 +115,14 @@ export function getCurrentInputOwnerPlayerId(state: BattleState): PlayerId {
     ?? state.pendingTargetSelection?.playerId
     ?? state.turn.currentPlayerId
 }
+function getEffectiveTurn(state: BattleState): BattleState['turn'] {
+  const suspendedTurn = state.pendingOptionSelection?.suspendedTurn
+    ?? state.pendingTargetSelection?.suspendedTurn
+  return suspendedTurn
+    ? { ...state.turn, ...suspendedTurn } as BattleState['turn']
+    : state.turn
+}
+
 
 export function createRunningTurnTimer(
   state: BattleState,
@@ -126,7 +134,8 @@ export function createRunningTurnTimer(
     throw new Error(
       'A turn timer may only start while the server is waiting in action phase or for pending input')
   }
-  const turnOwnerPlayerId = state.turn.currentPlayerId
+  const effectiveTurn = getEffectiveTurn(state)
+  const turnOwnerPlayerId = effectiveTurn.currentPlayerId
   const ownerPlayerId = getCurrentInputOwnerPlayerId(state)
   const normalizedStreaks = normalizeNoOpStreaks(state, noOpStreaks)
   const inputWindow = createInputWindow(state, ownerPlayerId, normalizedStreaks)
@@ -137,8 +146,8 @@ export function createRunningTurnTimer(
     ownerPlayerId,
     turnOwnerPlayerId,
     inputOwnerPlayerId: ownerPlayerId,
-    turnNumber: state.turn.turnNumber,
-    fullRound: getFullRoundNumber(state.turn.turnNumber),
+    turnNumber: effectiveTurn.turnNumber,
+    fullRound: getFullRoundNumber(effectiveTurn.turnNumber),
     durationMs,
     remainingMs: durationMs,
     startedAt: now,
@@ -254,10 +263,11 @@ export function syncTurnTimerAfterAcceptedAction(
   }
 
   const nextInputOwnerPlayerId = getCurrentInputOwnerPlayerId(state)
+  const effectiveTurn = getEffectiveTurn(state)
   const sameTurn = !!previous
     && previous.status === 'running'
-    && previous.turnNumber === state.turn.turnNumber
-    && normalizePlayerId(previous.turnOwnerPlayerId) === normalizePlayerId(state.turn.currentPlayerId)
+    && previous.turnNumber === effectiveTurn.turnNumber
+    && normalizePlayerId(previous.turnOwnerPlayerId) === normalizePlayerId(effectiveTurn.currentPlayerId)
   if (!sameTurn) {
     return createRunningTurnTimer(state, input.resumedAt, streaks)
   }
@@ -349,9 +359,10 @@ export function recordTurnTimeout(state: BattleState, now: number): TurnTimerSta
 function requireRunningTimer(state: BattleState): TurnTimerState {
   const timer = state.turnTimer
   if (!timer || timer.status !== 'running') throw new Error('No authoritative turn timer is running')
+  const effectiveTurn = getEffectiveTurn(state)
   if (
-    timer.turnNumber !== state.turn.turnNumber
-    || normalizePlayerId(timer.turnOwnerPlayerId) !== normalizePlayerId(state.turn.currentPlayerId)
+    timer.turnNumber !== effectiveTurn.turnNumber
+    || normalizePlayerId(timer.turnOwnerPlayerId) !== normalizePlayerId(effectiveTurn.currentPlayerId)
     || normalizePlayerId(timer.ownerPlayerId) !== normalizePlayerId(getCurrentInputOwnerPlayerId(state))
   ) {
     throw new Error('Turn timer does not match the current authoritative input owner')
@@ -364,9 +375,10 @@ function createInputWindow(
   ownerPlayerId: PlayerId,
   streaks: Record<PlayerId, number>,
 ): TurnTimerInputWindowState {
-  const isTurnOwner = normalizePlayerId(ownerPlayerId) === normalizePlayerId(state.turn.currentPlayerId)
+  const effectiveTurn = getEffectiveTurn(state)
+  const isTurnOwner = normalizePlayerId(ownerPlayerId) === normalizePlayerId(effectiveTurn.currentPlayerId)
   const fast = isTurnOwner && (streaks[ownerPlayerId] ?? 0) > 0
-  const durationMs = fast ? TURN_FAST_DURATION_MS : getNormalTurnDurationMs(state.turn.turnNumber)
+  const durationMs = fast ? TURN_FAST_DURATION_MS : getNormalTurnDurationMs(effectiveTurn.turnNumber)
   return {
     durationMs,
     remainingMs: durationMs,

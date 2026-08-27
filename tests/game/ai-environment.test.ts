@@ -312,9 +312,12 @@ describe('versioned headless AI environment', () => {
     const enteredPending = simulateAITransition(pendingSeed, advance, { rootSeed: FIXED_SEED })
     expect(enteredPending.accepted).toBe(true)
     if (!enteredPending.accepted) throw new Error('Expected Minato begin-turn rule to enter pending target state')
-    expect(enteredPending.state.pendingTargetSelection?.triggerContext).toMatchObject({
-      type: 'beginTurn', pendingRuleId: 'rule-minato-anchor-begin-turn',
+    expect(enteredPending.state.pendingTargetSelection?.transaction?.currentInteraction).toMatchObject({
+      consumerKind: 'rule',
+      consumerId: 'rule-minato-anchor-begin-turn',
+      eventType: 'beginTurn',
     })
+    expect(enteredPending.state.pendingTargetSelection?.triggerContext).toBeUndefined()
     const pending = listLegalAIActions(enteredPending.state, 'player-red')
     expect(pending.some(item => item.kind === 'pending-target')).toBe(true)
     expect(pending.at(-1)?.kind).toBe('cancel-selection')

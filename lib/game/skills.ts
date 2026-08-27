@@ -6,6 +6,7 @@ import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
+import { isSuspendableActionPending } from './suspendable-action-transaction'
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 function battleDebugLog(...args: unknown[]): void {
@@ -326,10 +327,22 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     },
 
     dealDamage: (attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = 'true', _battleState?: BattleState, skillId?: string) => {
+      if (
+        context.cardInstance?.holyProphecyEnhanced &&
+        context.card?.id === 'holy-smite'
+      ) {
+        baseDamage = Math.round(baseDamage * 1.6)
+      }
       return dealDamage(attacker, target, baseDamage, damageType, battle, skillId, false, undefined, context.selectedOption)
     },
 
     healDamage: (healer: PieceInstance, target: PieceInstance | PieceInstance[], baseHeal: number, _battleState?: BattleState, skillId?: string) => {
+      if (
+        context.cardInstance?.holyProphecyEnhanced &&
+        context.card?.id === 'holy-heal'
+      ) {
+        baseHeal = Math.round(baseHeal * 1.5)
+      }
       return healDamage(healer, target, baseHeal, battle, skillId)
     },
 
@@ -362,11 +375,22 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     },
 
     addStatusEffectById: (targetPieceId: string, statusObject: any) => {
+      let resolvedStatusObject = statusObject
+      if (
+        context.cardInstance?.holyProphecyEnhanced &&
+        context.card?.id === 'holy-charge' &&
+        statusObject.type === 'damage-buff'
+      ) {
+        resolvedStatusObject = {
+          ...resolvedStatusObject,
+          intensity: Math.round((statusObject.intensity || 2) * 1.5),
+        }
+      }
       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
       if (targetPiece) {
         if (!targetPiece.statusTags) targetPiece.statusTags = []
         targetPiece.statusTags.push({
-          ...statusObject,
+          ...resolvedStatusObject,
           name: statusObject.name || statusObject.type,
           remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
           remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
@@ -488,7 +512,8 @@ export function executeCardFunction(
   targetPiece?: PieceInstance,
   targetPosition?: { x: number; y: number },
   selectedOption?: any,
-  extraTargets?: Array<{ pieceId?: string; x?: number; y?: number }>
+  extraTargets?: Array<{ pieceId?: string; x?: number; y?: number }>,
+  cardInstance?: any,
 ): SkillExecutionResult {
   try {
     // 卡牌执行上下文：优先使用 triggerContext 作为基础（保持引用），然后添加卡牌相关字段
@@ -514,6 +539,7 @@ export function executeCardFunction(
     ]
     context._selectTargetCallCount = 0
     context.selectedOption = selectedOption
+    context.cardInstance = cardInstance || context.cardInstance || null
 
     const env = createCardEffectFunctions(battle, playerId, context)
 
@@ -550,6 +576,7 @@ export function executeCardFunction(
     const result = executeCard(env)
     return result || { success: false, message: '卡牌效果无返回值' }
   } catch (error: any) {
+    if (isSuspendableActionPending(error)) throw error
     if (error?.needsTargetSelection) return error as SkillExecutionResult
     if (error?.needsOptionSelection) return error as SkillExecutionResult
     console.error(`[executeCardFunction] Error executing card ${cardDef.id}:`, error)
@@ -810,6 +837,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
+            if (isSuspendableActionPending(error)) throw error
             if (error instanceof DamagePipelineError) throw error;
             console.error('[Rule] Error executing skillCode:', error);
             return { success: false, message: '规则执行失败' };
@@ -1120,6 +1148,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                   battleDebugLog(`Skill execution result:`, result);
                   return result;
                 } catch (error) {
+                  if (isSuspendableActionPending(error)) throw error
                   console.error('Error executing skill in rule effect:', error);
                   return { success: false, message: '技能执行失败' };
                 }
@@ -2698,6 +2727,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
 
           // 创建状态对象
           const newStatus = {
+            ...statusObject,
             id: statusObject.id,
             type: statusObject.type,
             name: statusObject.name || statusNameMap[statusObject.type] || statusObject.type,
@@ -3106,6 +3136,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           return result;
         }
       } catch (error) {
+        if (isSuspendableActionPending(error)) throw error
         if ((error as any)?.needsOptionSelection || (error as any)?.needsTargetSelection) {
           return error as SkillExecutionResult
         }

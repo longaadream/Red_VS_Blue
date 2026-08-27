@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- pending sessions serialize data-authored rule continuations. */
 
+import type {
+  SuspendableActionTransaction,
+  SuspendableTurnCheckpoint,
+} from './suspendable-action-transaction'
+
 export const PENDING_INTERACTION_PROTOCOL_VERSION = 1
 
 export interface PendingRuleConsumerRef {
@@ -33,6 +38,8 @@ export interface PendingOptionSelectionSession {
   selectionId?: string
   stateRevision?: number
   canCancel?: boolean
+  transaction?: SuspendableActionTransaction
+  suspendedTurn?: SuspendableTurnCheckpoint
 }
 
 export class PendingInteractionRuleError extends Error {

@@ -1,0 +1,28 @@
+{
+  "id": "turalyon-grand-crusade",
+  "name": "\u5723\u5149\u5927\u8fdc\u5f81",
+  "description": "\u9009\u62e96\u683c\u5185\u76841\u4e2a\u7a7a\u96c6\u7ed3\u70b9\uff0c\u518d\u9009\u62e9\u81f3\u591a3\u4e2a\u53cb\u65b9\u6838\u5fc3\u68cb\u5b50\uff0c\u5c06\u5176\u79fb\u81f3\u96c6\u7ed3\u70b9\u53ca\u5176\u76f8\u90bb\u53ef\u843d\u811a\u7a7a\u683c\uff0c\u5e76\u4f7f\u5176\u83b7\u5f97\u3010\u5723\u76fe\u3011\u3002",
+  "keywords": [
+    "\u4f4d\u79fb",
+    "\u5723\u76fe"
+  ],
+  "targetText": "6\u683c\u5185\u96c6\u7ed3\u70b9\u4e0e\u81f3\u591a3\u4e2a\u53cb\u65b9\u6838\u5fc3\u68cb\u5b50",
+  "effectTags": [
+    "\u4f4d\u79fb",
+    "\u5723\u76fe"
+  ],
+  "icon": "\ud83c\udff3\ufe0f",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 3,
+  "maxCharges": 1,
+  "chargeCost": 1,
+  "powerMultiplier": 1,
+  "actionPointCost": 4,
+  "targeting": {
+    "steps": []
+  },
+  "code": "function executeSkill(context) {\n  var caster = context.piece;\n  var allies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && piece.ownerPlayerId === caster.ownerPlayerId && piece.isCore === true; }).sort(function(a, b) { return a.instanceId < b.instanceId ? -1 : (a.instanceId > b.instanceId ? 1 : 0); });\n  if (allies.length === 0) return { success: false, message: '\u6ca1\u6709\u53ef\u9009\u62e9\u7684\u53cb\u65b9\u6838\u5fc3\u68cb\u5b50' };\n  var groups = [];\n  function collect(start, chosen) { if (chosen.length > 0) groups.push(chosen.slice()); if (chosen.length === 3) return; for (var i = start; i < allies.length; i++) { chosen.push(allies[i]); collect(i + 1, chosen); chosen.pop(); } }\n  collect(0, []);\n  function livingAt(x, y) { return battle.pieces.find(function(piece) { return piece.currentHp > 0 && piece.x === x && piece.y === y; }); }\n  function tileAt(x, y) { return battle.map.tiles.find(function(tile) { return tile.x === x && tile.y === y; }); }\n  function slotsFor(x, y, selectedIds) {\n    var offsets = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1]]; var slots = [];\n    for (var i = 0; i < offsets.length; i++) { var sx = x + offsets[i][0]; var sy = y + offsets[i][1]; var tile = tileAt(sx, sy); if (!tile || !tile.props || !tile.props.walkable) continue; var occupant = livingAt(sx, sy); if (occupant && selectedIds.indexOf(occupant.instanceId) === -1) continue; slots.push({ x: sx, y: sy }); }\n    return slots;\n  }\n  var gatheringCells = battle.map.tiles.filter(function(tile) { return tile.props && tile.props.walkable && !livingAt(tile.x, tile.y) && Math.abs(tile.x - caster.x) + Math.abs(tile.y - caster.y) <= 6; }).sort(function(a, b) { if (a.y !== b.y) return a.y - b.y; return a.x - b.x; });\n  var options = [];\n  for (var gi = 0; gi < groups.length; gi++) { var group = groups[gi]; var ids = group.map(function(piece) { return piece.instanceId; }); for (var ci = 0; ci < gatheringCells.length; ci++) { var cell = gatheringCells[ci]; var slots = slotsFor(cell.x, cell.y, ids); if (slots.length < ids.length) continue; options.push({ label: group.map(function(piece) { return piece.name || piece.templateId; }).join('\u3001') + ' -> (' + cell.x + ',' + cell.y + ')', value: { pieceIds: ids.slice(), x: cell.x, y: cell.y }, placements: slots.slice(0, ids.length) }); } }\n  if (options.length === 0) return { success: false, message: '\u6ca1\u6709\u53ef\u7528\u7684\u5723\u5149\u5927\u8fdc\u5f81\u96c6\u7ed3\u65b9\u6848' };\n  var choice = selectOption({ title: '\u5723\u5149\u5927\u8fdc\u5f81\uff1a\u9009\u62e9\u96c6\u7ed3\u65b9\u6848', options: options });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  var selected = options.find(function(option) { if (!choice || choice.x !== option.value.x || choice.y !== option.value.y) return false; if (!Array.isArray(choice.pieceIds) || choice.pieceIds.length !== option.value.pieceIds.length) return false; for (var i = 0; i < choice.pieceIds.length; i++) if (choice.pieceIds[i] !== option.value.pieceIds[i]) return false; return true; });\n  if (!selected) return { success: false, message: '\u9009\u62e9\u7684\u96c6\u7ed3\u65b9\u6848\u65e0\u6548' };\n  var moved = [];\n  for (var pi = 0; pi < selected.value.pieceIds.length; pi++) { var piece = battle.pieces.find(function(item) { return item.instanceId === selected.value.pieceIds[pi] && item.currentHp > 0; }); if (!piece) return { success: false, message: '\u9009\u4e2d\u7684\u53cb\u65b9\u5df2\u5931\u6548' }; moved.push({ piece: piece, pos: selected.placements[pi] }); }\n  moved.forEach(function(item) { item.piece.x = item.pos.x; item.piece.y = item.pos.y; var shield = item.piece.statusTags && item.piece.statusTags.find(function(tag) { return tag.type === 'divine-shield'; }); if (!shield) { addStatusEffectById(item.piece.instanceId, { id: 'divine-shield', name: '\u5723\u76fe', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); addRuleById(item.piece.instanceId, 'rule-divine-shield'); } });\n  return { success: true, message: caster.name + '\u53d1\u8d77\u5723\u5149\u5927\u8fdc\u5f81\uff0c\u96c6\u7ed3\u4e86' + moved.length + '\u4e2a\u53cb\u65b9\u5e76\u8d4b\u4e88\u5723\u76fe' };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"maxTargets\":3,\"range\":6} }; }",
+  "range": "area"
+}

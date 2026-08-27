@@ -416,7 +416,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
     }
   })
 
-  it('fails closed and preserves the command input when an unsupported after-event asks for interaction', () => {
+  it('suspends a nested after-damage interaction and commits the complete action exactly once', () => {
     const previousRules = [...globalTriggerSystem.getRules()]
     globalTriggerSystem.clearRules()
     globalTriggerSystem.addRule({
@@ -424,7 +424,9 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       name: 'Unsupported after damage option',
       description: '',
       trigger: { type: 'afterDamageDealt' },
-      effect: () => ({
+      effect: (_battle: BattleState, context: any) => context.selectedOption === 'continue'
+        ? { success: true, message: 'continued' }
+        : ({
         needsOptionSelection: true,
         playerId: 'player-red',
         title: 'Unsupported option',
@@ -470,7 +472,6 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         requiresTarget: true,
         code: "function executeSkill(context) { var target = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; dealDamage(context.piece, target, 2, 'true', context.battle, 'atomic-shot'); return { success: true, message: 'shot' }; }",
       }
-      const before = JSON.stringify(state)
       const action = withPreparedTarget(state, {
         type: 'useBasicSkill',
         playerId: 'player-red',
@@ -479,8 +480,70 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         targetPieceId: 'atomic-target',
       })
 
-      expect(() => applyBattleAction(state, action)).toThrow(/interactive option trigger is unsupported/)
-      expect(JSON.stringify(state)).toBe(before)
+      const pending = applyBattleAction(state, action) as any
+      expect(pending.pendingOptionSelection?.source).toMatchObject({
+        type: 'rule',
+        id: 'unsupported-after-damage-option',
+      })
+      expect(pending.players[0].actionPoints).toBe(2)
+      expect(pending.pieces.find((piece: any) => piece.instanceId === 'atomic-target')?.currentHp).toBe(10)
+
+      const resolved = applyBattleAction(pending, {
+        type: 'pendingOptionSelect',
+        playerId: 'player-red',
+        selectedOption: 'continue',
+        selectionId: pending.pendingOptionSelection.selectionId,
+        stateRevision: pending.pendingOptionSelection.stateRevision,
+      } as any) as any
+      expect(resolved.pendingOptionSelection).toBeUndefined()
+      expect(resolved.players[0].actionPoints).toBe(1)
+      expect(resolved.pieces.find((piece: any) => piece.instanceId === 'atomic-target')?.currentHp).toBe(8)
+      expect(resolved.actions.filter((entry: any) => entry.type === 'useBasicSkill')).toHaveLength(1)
+    } finally {
+      globalTriggerSystem.clearRules()
+      globalTriggerSystem.addRules(previousRules)
+    }
+  })
+
+  it('keeps the root action at its pre-state when a resumed consumer throws', () => {
+    const previousRules = [...globalTriggerSystem.getRules()]
+    globalTriggerSystem.clearRules()
+    globalTriggerSystem.addRule({
+      id: 'resume-exception-probe',
+      name: 'Resume exception probe',
+      description: '',
+      trigger: { type: 'beginTurn' },
+      effect: (_battle: BattleState, context: any) => {
+        if (context.selectedOption === 'explode') throw new Error('resume explosion')
+        return {
+          needsOptionSelection: true,
+          playerId: 'player-red',
+          title: 'Choose failure',
+          options: [{ label: 'Explode', value: 'explode' }],
+          canCancel: false,
+        }
+      },
+    } as any)
+
+    try {
+      const state = makeState({
+        currentPlayerId: 'player-red',
+        phase: 'start',
+      }) as any
+      const pending = applyBattleAction(state, { type: 'beginPhase' }) as any
+      expect(pending.turn.phase).toBe('start')
+      expect(pending.pendingOptionSelection?.source?.id).toBe('resume-exception-probe')
+      const pendingSnapshot = JSON.stringify(pending)
+
+      expect(() => applyBattleAction(pending, {
+        type: 'pendingOptionSelect',
+        playerId: 'player-red',
+        selectedOption: 'explode',
+        selectionId: pending.pendingOptionSelection.selectionId,
+        stateRevision: pending.pendingOptionSelection.stateRevision,
+      } as any)).toThrow(/resume explosion/)
+      expect(JSON.stringify(pending)).toBe(pendingSnapshot)
+      expect(pending.turn.phase).toBe('start')
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
@@ -586,6 +649,417 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
     }
   })
 })
+
+describe('RED-121 card execution pending boundaries', () => {
+  it('suspends inside an active card effect and commits payment, damage, and discard exactly once', () => {
+    const previousRules = [...globalTriggerSystem.getRules()]
+    globalTriggerSystem.clearRules()
+    globalTriggerSystem.addRule({
+      id: 'active-card-after-damage-choice',
+      name: 'Active card after-damage choice',
+      description: '',
+      trigger: { type: 'afterDamageDealt' },
+      effect: (battle: BattleState, context: any) => {
+        if (context.selectedOption !== 'continue') {
+          return {
+            needsOptionSelection: true,
+            playerId: 'player-red',
+            title: 'Continue active card',
+            options: [{ label: 'Continue', value: 'continue' }],
+            canCancel: false,
+          }
+        }
+        ;(battle.extensions as any).activeCardChoiceCount = ((battle.extensions as any).activeCardChoiceCount || 0) + 1
+        return { success: true }
+      },
+    } as any)
+
+    try {
+      const attacker = makePiece({ instanceId: 'active-card-source', ownerPlayerId: 'player-red', x: 1, y: 1 })
+      const target = makePiece({
+        instanceId: 'active-card-target',
+        ownerPlayerId: 'player-blue',
+        faction: 'blue',
+        x: 2,
+        y: 1,
+        currentHp: 10,
+        maxHp: 10,
+      })
+      const state = makeState({ pieces: [attacker, target], currentPlayerId: 'player-red', phase: 'action' }) as any
+      state.players[0].actionPoints = 2
+      state.players[0].hand = [{
+        cardId: 'active-card-pending-probe',
+        instanceId: 'active-card-pending-probe-1',
+        ownerPlayerId: 'player-red',
+        actionPointCost: 1,
+      }]
+      state.customCards = {
+        'active-card-pending-probe': {
+          id: 'active-card-pending-probe',
+          name: 'Active pending probe',
+          description: '',
+          type: 'active',
+          actionPointCost: 1,
+          code: "function executeCard(context) { var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'active-card-source'; }); var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'active-card-target'; }); dealDamage(source, target, 2, 'true', context.battle, 'active-card-pending-probe'); context.battle.extensions.activeCardExecutionCount = (context.battle.extensions.activeCardExecutionCount || 0) + 1; return { success: true, message: 'active card complete' }; }",
+        },
+      }
+
+      const pending = applyBattleAction(state, {
+        type: 'playCard',
+        playerId: 'player-red',
+        cardInstanceId: 'active-card-pending-probe-1',
+      }) as any
+      expect(pending.pendingOptionSelection?.source).toMatchObject({
+        type: 'rule',
+        id: 'active-card-after-damage-choice',
+      })
+      expect(pending.players[0].actionPoints).toBe(2)
+      expect(pending.players[0].hand).toHaveLength(1)
+      expect(pending.players[0].discardPile).toEqual([])
+      expect(pending.pieces.find((piece: any) => piece.instanceId === 'active-card-target')?.currentHp).toBe(10)
+
+      const session = pending.pendingOptionSelection
+      const completed = applyBattleAction(pending, {
+        type: 'pendingOptionSelect',
+        playerId: 'player-red',
+        selectedOption: 'continue',
+        selectionId: session.selectionId,
+        stateRevision: session.stateRevision,
+      }) as any
+      expect(completed.pendingOptionSelection).toBeUndefined()
+      expect(completed.players[0].actionPoints).toBe(1)
+      expect(completed.players[0].hand).toHaveLength(0)
+      expect(completed.players[0].discardPile).toEqual(['active-card-pending-probe'])
+      expect(completed.pieces.find((piece: any) => piece.instanceId === 'active-card-target')?.currentHp).toBe(8)
+      expect((completed.extensions as any).activeCardChoiceCount).toBe(1)
+      expect((completed.extensions as any).activeCardExecutionCount).toBe(1)
+      expect(completed.actions.filter((entry: any) => entry.type === 'playCard')).toHaveLength(1)
+    } finally {
+      globalTriggerSystem.clearRules()
+      globalTriggerSystem.addRules(previousRules)
+    }
+  })
+
+  it('keeps an active card at its pre-action state when the nested consumer throws after resume', () => {
+    const previousRules = [...globalTriggerSystem.getRules()]
+    globalTriggerSystem.clearRules()
+    globalTriggerSystem.addRule({
+      id: 'active-card-resume-exception',
+      name: 'Active card resume exception',
+      description: '',
+      trigger: { type: 'afterDamageDealt' },
+      effect: (_battle: BattleState, context: any) => {
+        if (context.selectedOption === 'explode') throw new Error('active card resume explosion')
+        return {
+          needsOptionSelection: true,
+          playerId: 'player-red',
+          title: 'Explode active card',
+          options: [{ label: 'Explode', value: 'explode' }],
+          canCancel: false,
+        }
+      },
+    } as any)
+
+    try {
+      const source = makePiece({ instanceId: 'rollback-card-source', ownerPlayerId: 'player-red', x: 1, y: 1 })
+      const target = makePiece({ instanceId: 'rollback-card-target', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 1, currentHp: 10, maxHp: 10 })
+      const state = makeState({ pieces: [source, target], currentPlayerId: 'player-red', phase: 'action' }) as any
+      state.players[0].actionPoints = 2
+      state.players[0].hand = [{ cardId: 'rollback-card-probe', instanceId: 'rollback-card-probe-1', ownerPlayerId: 'player-red', actionPointCost: 1 }]
+      state.customCards = {
+        'rollback-card-probe': {
+          id: 'rollback-card-probe', name: 'Rollback card probe', description: '', type: 'active', actionPointCost: 1,
+          code: "function executeCard(context) { var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'rollback-card-source'; }); var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'rollback-card-target'; }); dealDamage(source, target, 2, 'true', context.battle, 'rollback-card-probe'); return { success: true }; }",
+        },
+      }
+      const pending = applyBattleAction(state, { type: 'playCard', playerId: 'player-red', cardInstanceId: 'rollback-card-probe-1' }) as any
+      const pendingSnapshot = JSON.stringify(pending)
+      const session = pending.pendingOptionSelection
+
+      expect(() => applyBattleAction(pending, {
+        type: 'pendingOptionSelect',
+        playerId: 'player-red',
+        selectedOption: 'explode',
+        selectionId: session.selectionId,
+        stateRevision: session.stateRevision,
+      } as any)).toThrow(/active card resume explosion/)
+      expect(JSON.stringify(pending)).toBe(pendingSnapshot)
+      expect(pending.players[0].actionPoints).toBe(2)
+      expect(pending.players[0].hand).toHaveLength(1)
+      expect(pending.pieces.find((piece: any) => piece.instanceId === 'rollback-card-target')?.currentHp).toBe(10)
+    } finally {
+      globalTriggerSystem.clearRules()
+      globalTriggerSystem.addRules(previousRules)
+    }
+  })
+
+  it('propagates a nested pending interaction through the reactive-card execution boundary', () => {
+    const previousRules = [...globalTriggerSystem.getRules()]
+    globalTriggerSystem.clearRules()
+    globalTriggerSystem.addRule({
+      id: 'reactive-card-after-damage-choice',
+      name: 'Reactive card after-damage choice',
+      description: '',
+      trigger: { type: 'afterDamageDealt' },
+      effect: (battle: BattleState, context: any) => {
+        if (context.selectedOption !== 'continue') {
+          return { needsOptionSelection: true, playerId: 'player-red', title: 'Continue reactive card', options: [{ label: 'Continue', value: 'continue' }], canCancel: false }
+        }
+        ;(battle.extensions as any).reactiveNestedChoiceCount = ((battle.extensions as any).reactiveNestedChoiceCount || 0) + 1
+        return { success: true }
+      },
+    } as any)
+
+    try {
+      const source = makePiece({ instanceId: 'reactive-card-source', ownerPlayerId: 'player-red', x: 1, y: 1 })
+      const target = makePiece({ instanceId: 'reactive-card-target', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 1, currentHp: 10, maxHp: 10 })
+      const state = makeState({ pieces: [source, target], currentPlayerId: 'player-red', phase: 'start' }) as any
+      state.players[0].hand = [{ cardId: 'reactive-card-pending-probe', instanceId: 'reactive-card-pending-probe-1', ownerPlayerId: 'player-red', actionPointCost: 0 }]
+      state.customCards = {
+        'reactive-card-pending-probe': {
+          id: 'reactive-card-pending-probe', name: 'Reactive pending probe', description: '', type: 'reactive', actionPointCost: 0,
+          trigger: { type: 'beginTurn' },
+          code: "function executeCard(context) { var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'reactive-card-source'; }); var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'reactive-card-target'; }); dealDamage(source, target, 3, 'true', context.battle, 'reactive-card-pending-probe'); context.battle.extensions.reactiveCardExecutionCount = (context.battle.extensions.reactiveCardExecutionCount || 0) + 1; return { success: true, message: 'reactive complete' }; }",
+        },
+      }
+
+      const pending = applyBattleAction(state, { type: 'beginPhase' }) as any
+      expect(pending.turn.phase).toBe('start')
+      expect(pending.pendingOptionSelection?.source?.id).toBe('reactive-card-after-damage-choice')
+      expect(pending.players[0].hand).toHaveLength(1)
+      expect(pending.pieces.find((piece: any) => piece.instanceId === 'reactive-card-target')?.currentHp).toBe(10)
+
+      const session = pending.pendingOptionSelection
+      const completed = applyBattleAction(pending, { type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'continue', selectionId: session.selectionId, stateRevision: session.stateRevision }) as any
+      expect(completed.turn.phase).toBe('action')
+      expect(completed.pendingOptionSelection).toBeUndefined()
+      expect(completed.players[0].hand).toHaveLength(0)
+      expect(completed.players[0].discardPile).toEqual(['reactive-card-pending-probe'])
+      expect(completed.pieces.find((piece: any) => piece.instanceId === 'reactive-card-target')?.currentHp).toBe(7)
+      expect((completed.extensions as any).reactiveNestedChoiceCount).toBe(1)
+      expect((completed.extensions as any).reactiveCardExecutionCount).toBe(1)
+    } finally {
+      globalTriggerSystem.clearRules()
+      globalTriggerSystem.addRules(previousRules)
+    }
+  })
+})
+
+describe('RED-121 suspended candidate checkpoints', () => {
+  it('computes an afterMove target range from the provisional moved position without committing the move', () => {
+    const previousRules = [...globalTriggerSystem.getRules()]
+    globalTriggerSystem.clearRules()
+    globalTriggerSystem.addRule({
+      id: 'after-move-target-probe',
+      name: 'After-move target probe',
+      description: 'Requests a range-one cell after movement',
+      priority: 1,
+      trigger: { type: 'afterMove' },
+      effect: (battle: BattleState, context: any) => {
+        if (context.targetX === undefined || context.targetY === undefined) {
+          return {
+            needsTargetSelection: true,
+            playerId: context.playerId,
+            title: 'Choose a cell beside the moved piece',
+            targetType: 'cell',
+            range: 1,
+            filter: 'all',
+            canCancel: false,
+          }
+        }
+        ;(battle.extensions as any).afterMoveTarget = {
+          x: context.targetX,
+          y: context.targetY,
+        }
+        return { success: true }
+      },
+    } as any)
+
+    try {
+      const mover = makePiece({
+        instanceId: 'after-move-mover',
+        ownerPlayerId: 'player-red',
+        x: 1,
+        y: 1,
+        moveRange: 3,
+      })
+      const state = makeState({
+        pieces: [mover],
+        currentPlayerId: 'player-red',
+        phase: 'action',
+        width: 5,
+        height: 3,
+      })
+      const before = JSON.stringify(state)
+      const pending = applyBattleAction(state, {
+        type: 'move',
+        playerId: 'player-red',
+        pieceId: mover.instanceId,
+        toX: 2,
+        toY: 1,
+      })
+
+      expect(JSON.stringify(state)).toBe(before)
+      expect(pending.pieces.find(piece => piece.instanceId === mover.instanceId)).toMatchObject({ x: 1, y: 1 })
+      expect(pending.players[0].actionPoints).toBe(state.players[0].actionPoints)
+      expect(pending.pendingTargetSelection?.candidates).toContainEqual({ type: 'cell', x: 3, y: 1 })
+      expect(pending.pendingTargetSelection?.candidates).not.toContainEqual({ type: 'cell', x: 0, y: 1 })
+
+      const session = pending.pendingTargetSelection!
+      const completed = applyBattleAction(pending, {
+        type: 'pendingTargetSelect',
+        playerId: 'player-red',
+        targetX: 3,
+        targetY: 1,
+        selectionId: session.selectionId,
+        stateRevision: session.stateRevision,
+      })
+
+      expect(completed.pendingTargetSelection).toBeUndefined()
+      expect(completed.pieces.find(piece => piece.instanceId === mover.instanceId)).toMatchObject({ x: 2, y: 1 })
+      expect(completed.players[0].actionPoints).toBe(state.players[0].actionPoints - 1)
+      expect((completed.extensions as any).afterMoveTarget).toEqual({ x: 3, y: 1 })
+    } finally {
+      globalTriggerSystem.clearRules()
+      globalTriggerSystem.addRules(previousRules)
+    }
+  })
+})
+
+describe('RED-121 legacy direct target transaction adapter', () => {
+  it('keeps a post-effect target pending atomic and resolves its effect once', () => {
+    const caster = makePiece({
+      instanceId: 'legacy-target-caster',
+      ownerPlayerId: 'player-red',
+      x: 1,
+      y: 1,
+    }) as any
+    caster.skills = [{ skillId: 'legacy-direct-target-probe', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({
+      pieces: [caster],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+      width: 5,
+      height: 5,
+    }) as any
+    state.players[0].actionPoints = 2
+    state.skillsById['legacy-direct-target-probe'] = {
+      id: 'legacy-direct-target-probe',
+      name: 'Legacy direct target probe',
+      description: '',
+      kind: 'active',
+      type: 'normal',
+      cooldownTurns: 1,
+      maxCharges: 0,
+      powerMultiplier: 1,
+      actionPointCost: 1,
+      range: 0,
+      requiresTarget: false,
+      code: `function executeSkill(context) {
+        context.battle.extensions.legacyRootExecutionCount = (context.battle.extensions.legacyRootExecutionCount || 0) + 1;
+        return {
+          success: true,
+          message: 'root complete',
+          pendingTargetSelection: {
+            playerId: context.piece.ownerPlayerId,
+            title: 'Choose legacy target',
+            targetType: 'cell',
+            range: 2,
+            filter: 'all',
+            canCancel: false,
+            effectCode: "function(ctx) { ctx.battle.extensions.legacyResolvedTarget = { x: ctx.targetX, y: ctx.targetY }; ctx.battle.extensions.legacyTargetEffectCount = (ctx.battle.extensions.legacyTargetEffectCount || 0) + 1; return { success: true, message: 'target complete' }; }"
+          }
+        };
+      }`,
+    }
+
+    const pending = applyBattleAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: caster.instanceId,
+      skillId: 'legacy-direct-target-probe',
+    }) as any
+    expect(pending.pendingTargetSelection?.source).toMatchObject({
+      type: 'skill',
+      id: 'legacy-direct-target-probe',
+      pieceId: caster.instanceId,
+    })
+    expect(pending.pendingTargetSelection?.candidates).toContainEqual({ type: 'cell', x: 2, y: 1 })
+    expect(pending.players[0].actionPoints).toBe(2)
+    expect((pending.extensions as any).legacyRootExecutionCount).toBeUndefined()
+
+    const session = pending.pendingTargetSelection
+    const completed = applyBattleAction(pending, {
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetX: 2,
+      targetY: 1,
+      selectionId: session.selectionId,
+      stateRevision: session.stateRevision,
+    }) as any
+    expect(completed.pendingTargetSelection).toBeUndefined()
+    expect(completed.players[0].actionPoints).toBe(1)
+    expect((completed.extensions as any).legacyRootExecutionCount).toBe(1)
+    expect((completed.extensions as any).legacyTargetEffectCount).toBe(1)
+    expect((completed.extensions as any).legacyResolvedTarget).toEqual({ x: 2, y: 1 })
+    expect(completed.actions.filter((entry: any) => entry.type === 'useBasicSkill')).toHaveLength(1)
+  })
+
+  it('commits the root effect but skips a cancellable post-effect target consumer', () => {
+    const caster = makePiece({ instanceId: 'legacy-cancel-caster', ownerPlayerId: 'player-red', x: 1, y: 1 }) as any
+    caster.skills = [{ skillId: 'legacy-cancel-target-probe', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action', width: 4, height: 4 }) as any
+    state.players[0].actionPoints = 2
+    state.skillsById['legacy-cancel-target-probe'] = {
+      id: 'legacy-cancel-target-probe',
+      name: 'Legacy cancel target probe',
+      description: '',
+      kind: 'active',
+      type: 'normal',
+      cooldownTurns: 0,
+      maxCharges: 0,
+      powerMultiplier: 1,
+      actionPointCost: 1,
+      range: 0,
+      requiresTarget: false,
+      code: `function executeSkill(context) {
+        context.battle.extensions.legacyCancelledRootCount = (context.battle.extensions.legacyCancelledRootCount || 0) + 1;
+        return {
+          success: true,
+          pendingTargetSelection: {
+            playerId: context.piece.ownerPlayerId,
+            title: 'Optional post-effect target',
+            targetType: 'cell',
+            range: 2,
+            filter: 'all',
+            canCancel: true,
+            effectCode: "function(ctx) { ctx.battle.extensions.legacyCancelledTargetCount = (ctx.battle.extensions.legacyCancelledTargetCount || 0) + 1; return { success: true }; }"
+          }
+        };
+      }`,
+    }
+
+    const pending = applyBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: caster.instanceId, skillId: 'legacy-cancel-target-probe',
+    }) as any
+    expect(pending.players[0].actionPoints).toBe(2)
+    expect((pending.extensions as any).legacyCancelledRootCount).toBeUndefined()
+    const session = pending.pendingTargetSelection
+
+    const completed = applyBattleAction(pending, {
+      type: 'cancelPendingSelection',
+      playerId: 'player-red',
+      selectionId: session.selectionId,
+      stateRevision: session.stateRevision,
+    } as any) as any
+    expect(completed.pendingTargetSelection).toBeUndefined()
+    expect(completed.players[0].actionPoints).toBe(1)
+    expect((completed.extensions as any).legacyCancelledRootCount).toBe(1)
+    expect((completed.extensions as any).legacyCancelledTargetCount).toBeUndefined()
+    expect(completed.actions.filter((entry: any) => entry.type === 'useBasicSkill')).toHaveLength(1)
+  })
+})
+
 describe('RED-108 authoritative pending timeout resolution', () => {
   it('cancels a cancellable target and deterministically resolves the following mandatory option', () => {
     const first = timeoutPending(beginMinatoSelection(), 108)

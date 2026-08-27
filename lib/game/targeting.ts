@@ -5,6 +5,10 @@ import { loadCardById } from './skills'
 import { manhattanDistance, traceProjectile } from './spatial'
 import type { BattleAction, BattleState } from './turn'
 import type { PendingReactiveCardRef } from './pending-interaction'
+import type {
+  SuspendableActionTransaction,
+  SuspendableTurnCheckpoint,
+} from './suspendable-action-transaction'
 
 export const TARGET_SELECTION_PROTOCOL_VERSION = 1
 
@@ -169,6 +173,10 @@ export interface PendingTargetSelectionSession {
   selectedTargets?: TargetRef[]
   candidates?: TargetRef[]
   canCancel?: boolean
+  transaction?: SuspendableActionTransaction
+  suspendedTurn?: SuspendableTurnCheckpoint
+  /** Server-private only; discarded after authoritative candidates are stamped. */
+  candidateState?: BattleState
 }
 
 interface TargetSpec {
@@ -1090,7 +1098,11 @@ export function stampTargetingRevision(previous: BattleState, next: BattleState)
   const revision = getTargetingStateRevision(previous) + 1
   const stamped = { ...next, targetingRevision: revision }
   if (stamped.pendingTargetSelection) {
-    stamped.pendingTargetSelection = finalizePendingTargetSession(stamped, stamped.pendingTargetSelection, revision)
+    const pending = stamped.pendingTargetSelection
+    const candidateState = pending.candidateState || stamped
+    const finalized = finalizePendingTargetSession(candidateState, pending, revision)
+    delete finalized.candidateState
+    stamped.pendingTargetSelection = finalized
   }
   return stamped
 }
@@ -1134,6 +1146,24 @@ export function validatePendingTargetSubmission(
   }
   if ('code' in target) {
     throw new TargetingRuleError({ kind: 'invalid', code: target.code, message: target.message })
+  }
+  if (pending.candidates) {
+    const isStampedCandidate = pending.candidates.some(candidate => (
+      candidate.type === target.type
+      && (candidate.type === 'piece'
+        ? candidate.pieceId === (target.type === 'piece' ? target.pieceId : undefined)
+        : target.type === 'cell' && candidate.x === target.x && candidate.y === target.y)
+    ))
+    if (isStampedCandidate) return target
+    const validation = validateTargetRef(state, pendingConstraint(pending), target)
+    if (validation) {
+      throw new TargetingRuleError({ kind: 'invalid', code: validation.code, message: validation.message })
+    }
+    throw new TargetingRuleError({
+      kind: 'invalid',
+      code: 'TARGET_NOT_FOUND',
+      message: 'Target is not an authoritative candidate for this pending session',
+    })
   }
   const validation = validateTargetRef(state, pendingConstraint(pending), target)
   if (validation) {

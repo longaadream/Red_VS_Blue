@@ -1,0 +1,27 @@
+{
+  "id": "velen-thousand-futures-ultimate",
+  "name": "\u4e07\u5343\u672a\u6765",
+  "description": "\u9009\u62e9\u624b\u4e2d1\u81f33\u5f20\u672a\u5f3a\u5316\u7684\u666e\u901a\u5723\u5149\u624b\u724c\uff0c\u7acb\u5373\u4f7f\u5b83\u4eec\u6c38\u4e45\u5f3a\u5316\u3002\u6bcf\u5c40\u9650\u75281\u6b21\u3002",
+  "keywords": [
+    "\u5723\u5149\u624b\u724c",
+    "\u9650\u7528"
+  ],
+  "targetText": "\u624b\u4e2d1\u81f33\u5f20\u672a\u5f3a\u5316\u7684\u5723\u5149\u624b\u724c",
+  "effectTags": [
+    "\u5f3a\u5316",
+    "\u624b\u724c"
+  ],
+  "icon": "\u221e",
+  "kind": "active",
+  "type": "ultimate",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "targeting": {
+    "steps": []
+  },
+  "code": "function executeSkill(context) {\n  var caster = context.piece; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '\u672a\u627e\u5230\u73a9\u5bb6' };\n  function isOrdinaryHoly(card) {\n  return card && ['holy-smite', 'holy-heal', 'holy-charge'].indexOf(card.cardId) !== -1;\n}\n  var eligible = player.hand.filter(function(card) { return isOrdinaryHoly(card) && !card.holyProphecyEnhanced; });\n  if (eligible.length === 0) return { success: false, message: '\u6ca1\u6709\u53ef\u5f3a\u5316\u7684\u5723\u5149\u624b\u724c' };\n  var combinations = [];\n  function collect(start, chosen) { if (chosen.length > 0) combinations.push(chosen.slice()); if (chosen.length === 3) return; for (var i = start; i < eligible.length; i++) { chosen.push(eligible[i]); collect(i + 1, chosen); chosen.pop(); } }\n  collect(0, []);\n  var options = combinations.map(function(cards) { return { label: cards.map(function(card) { return card.name || card.cardId; }).join('\u3001'), value: cards.map(function(card) { return card.instanceId; }) }; });\n  var choice = selectOption({ title: '\u4e07\u5343\u672a\u6765\uff1a\u9009\u62e9\u7acb\u5373\u5f3a\u5316\u7684\u624b\u724c', options: options });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  if (!Array.isArray(choice) || choice.length < 1 || choice.length > 3) return { success: false, message: '\u4e07\u5343\u672a\u6765\u9009\u62e9\u65e0\u6548' };\n  var unique = [];\n  for (var i = 0; i < choice.length; i++) { if (unique.indexOf(choice[i]) !== -1) return { success: false, message: '\u4e0d\u80fd\u91cd\u590d\u9009\u62e9\u540c\u4e00\u5f20\u624b\u724c' }; unique.push(choice[i]); }\n  var selected = unique.map(function(id) { return eligible.find(function(card) { return card.instanceId === id; }); });\n  if (selected.some(function(card) { return !card; })) return { success: false, message: '\u9009\u62e9\u7684\u624b\u724c\u5df2\u65e0\u6cd5\u5f3a\u5316' };\n  selected.forEach(function(card) { card.holyProphecyEnhanced = true; delete card.holyProphecy; });\n  return { success: true, message: caster.name + '\u4ece' + selected.length + '\u79cd\u5723\u5149\u7684\u53ef\u80fd\u4e2d\u9009\u5b9a\u4e86\u672a\u6765' };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"maxCards\":3} }; }",
+  "range": "self"
+}

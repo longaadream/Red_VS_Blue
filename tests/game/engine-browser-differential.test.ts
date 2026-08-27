@@ -15,6 +15,8 @@ vi.mock('@/lib/game/triggers', () => ({
     clearRules: vi.fn(),
     getRules: vi.fn(() => []),
     removeRule: vi.fn(),
+    snapshotTransactionState: vi.fn(() => ({ nextRootEventId: 0, ruleLimits: [] })),
+    restoreTransactionState: vi.fn(),
     updateCooldowns: vi.fn(),
   },
   TriggerType: {},

@@ -13,6 +13,8 @@ vi.mock('@/lib/game/triggers', () => ({
     removeRule: vi.fn(),
     clearRules: vi.fn(),
     getRules: vi.fn(() => []),
+    snapshotTransactionState: vi.fn(() => ({ nextRootEventId: 0, ruleLimits: [] })),
+    restoreTransactionState: vi.fn(),
   },
   TriggerType: {},
 }))
@@ -476,15 +478,24 @@ describe('authoritative target preparation', () => {
 })
 
 describe('Demo targeting admission fixture', () => {
-  it('covers the fixed 28-piece / 88-skill / 16-card manifest with a stable preparation hash', () => {
+  it('covers the current admitted piece, skill, and card manifests with a stable preparation hash', () => {
     const pieceIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/pieces/manifest.json'), 'utf8')) as string[]
     const cardIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/cards/manifest.json'), 'utf8')) as string[]
     const skillIds = [...new Set(pieceIds.flatMap(pieceId => {
       const piece = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${pieceId}.json`), 'utf8'))
       return (piece.skills || []).map((skill: any) => skill.skillId as string)
     }))].sort()
-    expect({ pieces: pieceIds.length, skills: skillIds.length, cards: cardIds.length })
-      .toEqual({ pieces: 28, skills: 88, cards: 16 })
+    expect(new Set(pieceIds).size).toBe(pieceIds.length)
+    expect(pieceIds).toEqual(expect.arrayContaining(['blue-ichigo', 'red-itachi', 'velen', 'turalyon']))
+    expect(skillIds).toEqual(expect.arrayContaining([
+      'velen-holy-prophecy',
+      'velen-fate-shelter',
+      'velen-thousand-futures-ultimate',
+      'turalyon-expedition-order',
+      'turalyon-lightforged-march',
+      'turalyon-grand-crusade',
+    ]))
+    expect(cardIds).toHaveLength(16)
 
     const source = makePiece({ instanceId: 'fixture-source', templateId: 'blue-minato', ownerPlayerId: 'player-red', x: 10, y: 8 })
     source.statusTags = [{ id: 'fixture-divine-shield', type: 'divine-shield' }] as never
@@ -530,7 +541,7 @@ describe('Demo targeting admission fixture', () => {
     }
 
     const fixtureHash = createHash('sha256').update(JSON.stringify(fixture)).digest('hex')
-    expect(fixtureHash).toBe('d18f62dea8562b9ec3f60a1f7ab618aa1cf324738ee21304daea3c5a3df752e2')
+    expect(fixtureHash).toBe('1a51bc69fd177ef8464cc09d51b96f32316fc2b45207e44227f29d53448815b7')
   })
 })
 

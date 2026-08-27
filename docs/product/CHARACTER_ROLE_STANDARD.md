@@ -75,6 +75,8 @@
 | 安娜 (`ana`) | 光方 | 支援 / 控制 | 无 | 3 | `biotic-grenade` 在区域内治疗友军、禁疗敌军；`sleep-dart` 的直线弹道与睡眠影响敌方行动。 |
 | 波风水门 (`blue-minato`) | 光方 | 机动 / 进攻 | `专属:飞雷神锚点`、`专属:飞雷神标记` | 4 | `minato-*` 管理锚点、标记、反应与传送落点。 |
 | 莉亚德琳 (`liadrin`) | 光方 | 支援 / 进攻 | `体系:圣光手牌` | 4 | `light-extraction`、`blood-echo`、`muru-lament` 形成手牌生成、弃置和阈值转化循环。 |
+| 维伦 (`velen`) | 光方 | 支援 / 保护 | `体系:圣光手牌` | 4 | `velen-holy-prophecy` 与 `velen-fate-shelter` 都需要跨回合记忆；`velen-thousand-futures-ultimate` 管理多张手牌的永久强化。 |
+| 图拉扬 (`turalyon`) | 光方 | 支援 / 机动 | `体系:圣光手牌` | 3 | `turalyon-expedition-order` 降低圣光手牌费用；`turalyon-lightforged-march` 与 `turalyon-grand-crusade` 提供免费移动与多目标空间重构。 |
 | 拉法姆 (`red-rafaam`) | 暗方 | 控制 / 保护 | `专属:诅咒手牌` | 4 | `rafaam-curse-*` 涉及受伤反应、对手手牌、跨回合结算和行动点操控。 |
 
 ## 7. 评审清单与后续使用

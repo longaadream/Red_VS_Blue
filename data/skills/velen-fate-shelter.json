@@ -1,0 +1,35 @@
+{
+  "id": "velen-fate-shelter",
+  "name": "\u547d\u8fd0\u5e87\u62a4",
+  "description": "\u9009\u62e91\u4e2a\u53cb\u65b9\u3002\u4e0b\u4e2a\u5df1\u65b9\u56de\u5408\u5f00\u59cb\u65f6\uff0c\u82e5\u7ef4\u4f26\u4e0e\u76ee\u6807\u5747\u5b58\u6d3b\uff0c\u4f7f\u5176\u6062\u590d8\u70b9\u751f\u547d\u5e76\u83b7\u5f97\u3010\u5723\u76fe\u3011\u3002",
+  "keywords": [
+    "\u9884\u8a00",
+    "\u5723\u76fe"
+  ],
+  "targetText": "1\u4e2a\u53cb\u65b9",
+  "effectTags": [
+    "\u6cbb\u7597",
+    "\u5723\u76fe"
+  ],
+  "icon": "\ud83d\udee1\ufe0f",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "ally",
+        "range": 99,
+        "distanceMetric": "manhattan"
+      }
+    ]
+  },
+  "code": "function executeSkill(context) {\n  var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'ally' });\n  if (!target || target.needsTargetSelection) return target;\n  if (target.currentHp <= 0 || target.ownerPlayerId !== caster.ownerPlayerId) return { success: false, message: '\u547d\u8fd0\u5e87\u62a4\u53ea\u80fd\u9009\u62e9\u5b58\u6d3b\u53cb\u65b9' };\n  var existing = target.statusTags && target.statusTags.find(function(tag) { return tag.type === 'velen-fate-shelter'; });\n  if (existing) return { success: false, message: '\u76ee\u6807\u5df2\u7ecf\u83b7\u5f97\u547d\u8fd0\u5e87\u62a4' };\n  addStatusEffectById(target.instanceId, { id: 'velen-fate-shelter-' + caster.instanceId + '-' + target.instanceId, name: '\u547d\u8fd0\u5e87\u62a4', type: 'velen-fate-shelter', currentDuration: -1, currentUses: -1, intensity: 8, stacks: 1, sourceId: caster.instanceId, createdTurnNumber: battle.turn.turnNumber, relatedRules: ['rule-velen-fate-target'] });\n  addRuleById(target.instanceId, 'rule-velen-fate-target');\n  return { success: true, message: caster.name + '\u4e3a' + target.name + '\u9884\u89c1\u4e86\u547d\u8fd0\u5e87\u62a4' };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"heal\":8} }; }",
+  "range": "single"
+}
