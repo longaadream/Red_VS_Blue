@@ -1,6 +1,6 @@
 # Content Pipeline v1 公共合同
 
-状态：RED-113 Proposed contract
+状态：RED-113 Accepted contract
 
 基线：`main@81c754f247b4f627741fbb953df820fdd82ffee2`
 
@@ -353,7 +353,7 @@ Receipt hash、checkpoint hash、CAS、命令去重、恢复和 exactly-once 提
 
 ## 11. 演进与回退
 
-- RED-113 ADR 保持 Proposed，项目负责人接受后 RED-114 才可开始。
+- RED-113 ADR 状态为 Accepted，项目负责人已接受，RED-114 可开始。
 - 阶段 2 若发现合同缺陷，暂停并修订 RED-113；不能在 core 中兼容性猜测。
 - 未产生外部身份前可以整体 revert RED-113；没有运行时或玩家数据需要迁移。
 - 普通资源更新继续使用 v1，通过新 package version、Snapshot/Patch 和 hash 表达，不要求更新游戏本体
