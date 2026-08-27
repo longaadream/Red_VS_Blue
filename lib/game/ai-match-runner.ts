@@ -1,10 +1,12 @@
 import { generateBotActions } from './ai'
 import { aiEnvironmentV1 } from './ai-environment'
+import { chooseLinearGreedyAction, resolveAiLinearConfig } from './ai-linear-agent'
 import { aiPlanTraceHash, planAiTurn, planNextAiAction } from './ai-planner'
 import { resolveAiPlannerConfig } from './ai-profiles'
 import { hashStable, stableJson } from './battle-trace'
 import type {
   AIEnvironment,
+  AiLinearConfig,
   AiPlannerConfig,
   AiTurnPlan,
   CandidateAction,
@@ -14,7 +16,7 @@ import type { BattleAction, BattleState } from './turn'
 export const SELF_PLAY_SCHEMA_VERSION = 1 as const
 
 export type SelfPlaySeedTier = 'training' | 'public-validation' | 'candidate-holdout'
-export type SelfPlayAgentKind = 'simple' | 'planner' | 'legal-random'
+export type SelfPlayAgentKind = 'simple' | 'planner' | 'linear-greedy' | 'legal-random'
 
 export interface SelfPlayAgentArchive {
   schemaVersion: typeof SELF_PLAY_SCHEMA_VERSION
@@ -23,7 +25,7 @@ export interface SelfPlayAgentArchive {
   kind: SelfPlayAgentKind
   historical?: boolean
   testOnly?: boolean
-  config?: AiPlannerConfig
+  config?: AiPlannerConfig | AiLinearConfig
 }
 
 export interface SelfPlayRosterArchive {
@@ -340,14 +342,20 @@ export function validateAgentArchive(archive: SelfPlayAgentArchive): SelfPlayAge
   }
   requireString(archive.agentId, 'agentId')
   requireString(archive.version, 'agent.version')
-  if (!['simple', 'planner', 'legal-random'].includes(archive.kind)) {
+  if (!['simple', 'planner', 'linear-greedy', 'legal-random'].includes(archive.kind)) {
     throw new SelfPlayContractError('SELF_PLAY_AGENT_KIND_UNSUPPORTED', `unsupported agent kind ${String(archive.kind)}`)
   }
   if (archive.kind === 'planner') {
     if (!archive.config || archive.config.version !== 1) {
       throw new SelfPlayContractError('SELF_PLAY_AGENT_CONFIG_REQUIRED', `planner ${archive.agentId} requires config version 1`)
     }
-    resolveAiPlannerConfig(archive.config)
+    resolveAiPlannerConfig(archive.config as AiPlannerConfig)
+  }
+  if (archive.kind === 'linear-greedy') {
+    if (!archive.config || archive.config.version !== 1 || !('featureSchemaVersion' in archive.config)) {
+      throw new SelfPlayContractError('SELF_PLAY_AGENT_CONFIG_REQUIRED', `linear agent ${archive.agentId} requires config version 1`)
+    }
+    resolveAiLinearConfig(archive.config as AiLinearConfig)
   }
   if (archive.kind === 'legal-random' && archive.testOnly !== true) {
     throw new SelfPlayContractError('SELF_PLAY_RANDOM_AGENT_TEST_ONLY', 'legal-random archives must be marked testOnly')
@@ -358,8 +366,10 @@ export function validateAgentArchive(archive: SelfPlayAgentArchive): SelfPlayAge
 function canonicalAgentArchive(archive: SelfPlayAgentArchive): SelfPlayAgentArchive {
   validateAgentArchive(archive)
   return cloneArchive(archive.kind === 'planner'
-    ? { ...archive, config: resolveAiPlannerConfig(archive.config) }
-    : archive)
+    ? { ...archive, config: resolveAiPlannerConfig(archive.config as AiPlannerConfig) }
+    : archive.kind === 'linear-greedy'
+      ? { ...archive, config: resolveAiLinearConfig(archive.config as AiLinearConfig) }
+      : archive)
 }
 
 export function agentConfigHash(archive: SelfPlayAgentArchive): string {
@@ -634,13 +644,32 @@ function chooseAgentAction(
     ? legal.find(item => item.kind === 'end-turn')
     : undefined
   if (archive.kind === 'planner') {
-    const config = archive.config!
+    const config = archive.config as AiPlannerConfig
     const plan = runtime.previousPlan
       ? planNextAiAction(state, playerId, rootSeed, runtime.previousPlan, { environment, config })
       : planAiTurn(state, playerId, rootSeed, { environment, config })
     runtime.previousPlan = plan
     return {
       action: plan.nextAction, nodes: plan.nodesVisited, traceHash: aiPlanTraceHash(plan),
+      countsTowardTurnBudget: true,
+    }
+  }
+  if (archive.kind === 'linear-greedy') {
+    if (budgetSafetyEnd) {
+      return {
+        action: budgetSafetyEnd,
+        nodes: 0,
+        traceHash: hashStable({ kind: archive.kind, forced: 'turn-budget-end', action: budgetSafetyEnd.action }),
+        countsTowardTurnBudget: true,
+      }
+    }
+    const decision = chooseLinearGreedyAction(
+      state, playerId, rootSeed, archive.config as AiLinearConfig, environment,
+    )
+    return {
+      action: decision.action,
+      nodes: decision.nodes,
+      traceHash: decision.traceHash,
       countsTowardTurnBudget: true,
     }
   }

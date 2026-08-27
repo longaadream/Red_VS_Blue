@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "agentId": "linear-greedy-seed-v1",
+  "version": "1.0.0",
+  "kind": "linear-greedy",
+  "config": {
+    "version": 1,
+    "featureSchemaVersion": 1,
+    "minImprovement": 0,
+    "maxCandidates": 16,
+    "weights": {
+      "bias": 0,
+      "coreAliveBalance": 1.5,
+      "coreHpBalance": 1,
+      "livingBalance": 0.7,
+      "hpBalance": 0.8,
+      "attackBalance": 0.15,
+      "defenseBalance": 0.1,
+      "shieldBalance": 0.2,
+      "buffBalance": 0.15,
+      "debuffBalance": 0.2,
+      "readySkillBalance": 0.1,
+      "actionPointBalance": 0.05,
+      "chargePointBalance": 0.05,
+      "handBalance": 0.05,
+      "engagementBalance": 0.1,
+      "coreSafetyBalance": 0.2,
+      "actingPlayer": 0
+    }
+  }
+}

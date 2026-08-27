@@ -260,6 +260,45 @@ export interface AiPlannerConfig {
   weights: Readonly<Record<string, number>>
 }
 
+export const AI_LINEAR_FEATURE_SCHEMA_VERSION = 1 as const
+
+/** Versioned, public-observation-only configuration for the one-ply linear agent. */
+export interface AiLinearConfig {
+  version: 1
+  featureSchemaVersion: typeof AI_LINEAR_FEATURE_SCHEMA_VERSION
+  weights: Readonly<Record<string, number>>
+  /** A non-structural action must improve by more than this value to beat endTurn. */
+  minImprovement?: number
+  /** Deterministically shortlist this many legal candidates and trace every crop. */
+  maxCandidates?: number
+}
+
+export interface AiLinearFeatureVector {
+  schemaVersion: typeof AI_LINEAR_FEATURE_SCHEMA_VERSION
+  schemaHash: string
+  featureNames: readonly string[]
+  values: readonly number[]
+}
+
+export interface AiLinearDecisionTraceEntry {
+  candidateId: string
+  kind: CandidateActionKind
+  accepted: boolean
+  score?: number
+  terminal?: 'win' | 'draw' | 'loss'
+  stateKey?: string
+  rejected?: string
+  pruned?: string
+  contributions?: Readonly<Record<string, number>>
+}
+
+export interface AiLinearDecision {
+  action?: CandidateAction
+  nodes: number
+  traceHash: string
+  trace: readonly AiLinearDecisionTraceEntry[]
+}
+
 export type AiTurnGoalKind = 'eliminate' | 'protect' | 'control' | 'reposition' | 'conserve'
 
 export interface AiTurnGoal {
