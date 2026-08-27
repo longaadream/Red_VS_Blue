@@ -2,7 +2,8 @@
 
 ## 结论与适用范围
 
-- 状态：**BLOCKED（不得宣称候选版本已经通过）**。
+- 人工产品验收：**通过（2026-08-27）**。
+- 工程候选状态：**BLOCKED（不得宣称候选版本已经通过或可以合并）**。
 - 基线：`base_branch: main`，`base_sha: 81c754f247b4f627741fbb953df820fdd82ffee2`。
 - 已取得的证据覆盖：四图目录、创建房间选图、桌面与 `390x844` 浏览器布局、地图目录失败降级，以及四张地图逐图创建 PVE 房间并进入正式战斗。
 - 尚未取得的候选证据：真实 Bun standalone Relay 浏览器流程、全新与既有真实 PostgreSQL 数据库迁移演练，以及可通过的 lint。上述缺口均为阻塞项，本文的浏览器和 SQLite 结果不能代签。
@@ -40,6 +41,13 @@
 - [大型洞穴战斗页（桌面）](evidence/RED-119-battle-large-hole-arena-desktop.png)
 - [回风曲径战斗页（桌面）](evidence/RED-119-battle-winding-pass-desktop.png)
 - [狭廊要道战斗页（桌面）](evidence/RED-119-battle-narrow-corridors-desktop.png)
+
+## 人工验收记录（2026-08-27）
+
+- 产品负责人确认三张新地图的空旷、弯绕、狭窄视觉差异符合预期，并确认“大型战场”已从正式目录退役。
+- 在隔离的本地候选服务中，负责人亲自完成账号设置、连接 localhost:3000、进入大厅、查看四图下拉、选择“回风曲径”、创建房间，并确认房间页仍显示“回风曲径”。本次临时房间 ID 为 1owwy，验收结束后已删除。
+- 负责人明确表示无需再凑第二位玩家，接受由全量自动测试、HTTP/LAN 篡改冻结回归及下述四图逐图 PVE 开战证据替代双玩家手工流程。
+- 结论仅表示产品视觉与本地选图流程人工验收通过；不等同于 High Risk 合并批准，也不覆盖 Bun standalone Relay、真实 PostgreSQL 迁移或 lint 环境阻塞。
 
 ## 四张地图逐图正式开战
 
@@ -105,7 +113,7 @@ Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 是无 Room �
 
 ## 阻塞项与后续候选验收
 
-以下项目完成前，RED-119 不能标记候选通过、merge-ready 或完成最终人工验收：
+以下工程项目完成前，RED-119 不能标记候选环境通过或 merge-ready；产品视觉与本地选图流程的人工验收已按上述记录通过：
 
 1. 本机没有 Bun，未能启动 standalone Relay 并完成真实浏览器的创建、加入、选图、房间 WS 更新和权威不可用边界验收。
 2. 本机没有 PostgreSQL、Docker 或 `psql`，未执行：
@@ -113,6 +121,6 @@ Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 是无 Room �
    - 既有 `db push` 数据库备份、标记基线已应用、再部署 ALTER；
    - 两条路径的数据保留、回滚和重复部署核对。
 3. lint 仍因现有 ESLint 插件配置缺失而失败，需要单独恢复共享 lint 环境或经批准修复依赖配置后重跑。
-4. High Risk 候选仍需人工根据上述截图和真实环境逐项确认；AI 自动测试与本地浏览器证据不能替代最终产品体验判断。
+4. High Risk 合并仍需针对届时的精确 PR head 单独批准；本次人工产品验收不是合并授权。
 
 建议下一轮在具备 Bun 与一次性 PostgreSQL 实例的候选环境复跑相同四图矩阵，并把原始终端输出、数据库前后 schema/data 摘要及 standalone 浏览器截图附回本文件。当前可报告的状态仅为：**代码级与本地浏览器证据已取得，候选验收仍 BLOCKED**。
