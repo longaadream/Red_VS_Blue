@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 const projectRoot = process.cwd()
 const battlePagePath = path.join(projectRoot, 'data', 'pages', 'battle.html')
+const battlePresentationPath = path.join(projectRoot, 'data', 'pages', 'js', 'battle-ui', 'battle-presentation.js')
 
 function readBattlePage(): string {
   return fs.readFileSync(battlePagePath, 'utf8')
@@ -147,14 +148,45 @@ describe('battle page runtime source', () => {
       .toMatch(/cardDisplayDescription\(cardInstance, def\)/)
   })
 
-  it('keeps a single-card hand selection out of the generic option picker', () => {
+  it('includes template-derived skills in battle piece details without adding them to runtime skills', () => {
+    const context = vm.createContext({
+      PIECES_BY_ID: {
+        'blue-ichigo': {
+          transformedSkills: [{ skillId: 'ichigo-black-getsuga-tensho', triggeredBy: 'ichigo-bankai-tensa-zangetsu' }],
+        },
+      },
+    })
+    new vm.Script([
+      runtimeFunction(readBattlePage(), 'pieceDispSkills'),
+      runtimeFunction(readBattlePage(), 'skillIdOf'),
+      runtimeFunction(readBattlePage(), 'pieceInfoDisplaySkills'),
+    ].join('\n')).runInContext(context)
+
+    const piece = {
+      templateId: 'blue-ichigo',
+      skills: [{ skillId: 'ichigo-zangetsu' }, { skillId: 'ichigo-bankai-tensa-zangetsu' }],
+    }
+    const displayed = (context as any).pieceInfoDisplaySkills(piece)
+
+    expect(displayed.map((skill: any) => skill.skillId)).toEqual([
+      'ichigo-zangetsu', 'ichigo-bankai-tensa-zangetsu', 'ichigo-black-getsuga-tensho',
+    ])
+    expect(displayed[2]).toMatchObject({ derived: true, triggeredBy: 'ichigo-bankai-tensa-zangetsu' })
+    expect(piece.skills).toHaveLength(2)
+    expect((context as any).pieceDispSkills(piece).map((skill: any) => skill.skillId))
+      .not.toContain('ichigo-black-getsuga-tensho')
+  })
+
+  it('keeps a single-card hand selection out of the generic option picker and submits through hand controls', async () => {
     const overlay = { classList: { remove: vi.fn() } }
     const showOptionPicker = vi.fn()
+    const doAction = vi.fn().mockResolvedValue(undefined)
     const context = vm.createContext({
       G: {
         turn: { turnNumber: 2 },
         pendingOptionSelection: {
           playerId: 'player-red', selectionId: 'prophecy-single',
+          stateRevision: 7, canCancel: true,
           selectionMode: 'single', presentation: 'hand',
           options: [{ value: 'holy-card-1' }],
         },
@@ -163,6 +195,12 @@ describe('battle page runtime source', () => {
       pendingOptionSelectionForMe: () => true,
       pendingTargetSelectionForMe: () => false,
       showOptionPicker,
+      doAction,
+      myPlayerId: 'player-red',
+      setStatusMsg: vi.fn(),
+      renderHand: vi.fn(),
+      renderActionBar: vi.fn(),
+      renderPendingHandSelectionControls: vi.fn(),
       document: { getElementById: (id: string) => id === 'optionPickerOverlay' ? overlay : null },
       pendingSkill: null,
     })
@@ -172,6 +210,9 @@ describe('battle page runtime source', () => {
       runtimeFunction(readBattlePage(), 'pendingHandCandidateValues'),
       runtimeFunction(readBattlePage(), 'syncPendingHandSelection'),
       runtimeFunction(readBattlePage(), 'syncAuthoritativePendingPresentation'),
+      runtimeFunction(readBattlePage(), 'togglePendingHandOption'),
+      'async ' + runtimeFunction(readBattlePage(), 'confirmPendingHandOptionSelection'),
+      'async ' + runtimeFunction(readBattlePage(), 'cancelPendingHandOptionSelection'),
     ].join('\n')).runInContext(context)
 
     ;(context as any).syncAuthoritativePendingPresentation()
@@ -179,6 +220,24 @@ describe('battle page runtime source', () => {
     expect(showOptionPicker).not.toHaveBeenCalled()
     expect(overlay.classList.remove).toHaveBeenCalledWith('show')
     expect((context as any).pendingHandOptionSelection.selectionId).toBe('prophecy-single')
+
+    ;(context as any).togglePendingHandOption('holy-card-1')
+    await (context as any).confirmPendingHandOptionSelection()
+    expect(doAction).toHaveBeenNthCalledWith(1, {
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      selectedOption: 'holy-card-1',
+      selectionId: 'prophecy-single',
+      stateRevision: 7,
+    })
+
+    await (context as any).cancelPendingHandOptionSelection()
+    expect(doAction).toHaveBeenNthCalledWith(2, {
+      type: 'cancelPendingSelection',
+      playerId: 'player-red',
+      selectionId: 'prophecy-single',
+      stateRevision: 7,
+    })
   })
 
   it('hides an active target-selection overlay when target interaction is cleared', () => {
@@ -280,7 +339,7 @@ describe('battle page runtime source', () => {
     expect(actionBarRenders).toBe(0)
   })
 
-  it('toggles up to three authoritative board pieces and submits them once on confirmation', () => {
+  it('routes Grand Crusade confirmation through presentation and submits selected pieces once', () => {
     const html = readBattlePage()
     const renderBoard = vi.fn()
     const renderTargetOverlay = vi.fn()
@@ -290,6 +349,7 @@ describe('battle page runtime source', () => {
       instanceId, name: instanceId,
     }))
     const context = vm.createContext({
+      window: {},
       G: { pieces },
       myPlayerId: 'player-red',
       renderBoard,
@@ -301,8 +361,10 @@ describe('battle page runtime source', () => {
       addLog: vi.fn(),
       Date,
     })
+    new vm.Script(fs.readFileSync(battlePresentationPath, 'utf8')).runInContext(context)
 
     vm.runInContext(`
+      let battlePresentation = null
       let pendingSkill = {
         turnTargetActionType: 'pendingTargetSelect',
         turnTargetPlayerId: 'player-red',
@@ -321,16 +383,23 @@ describe('battle page runtime source', () => {
       ${runtimeFunction(html, 'togglePendingBoardTarget')}
       ${runtimeFunction(html, 'submitTargetAction')}
       ${runtimeFunction(html, 'confirmPendingBoardTargetSelection')}
+      ${runtimeFunction(html, 'handleBattleIntent')}
+      ${runtimeFunction(html, 'dispatchBattleIntent')}
+      battlePresentation = window.BattlePresentation.create({
+        renderer: { init: function() {}, dispose: function() {} },
+        domUi: { update: function() {}, dispose: function() {} },
+        onIntent: handleBattleIntent,
+      })
     `, context)
 
-    expect((context as any).confirmPendingBoardTargetSelection()).toBe(false)
+    ;(context as any).dispatchBattleIntent({ type: 'confirm-target-selection' })
     expect(doAction).not.toHaveBeenCalled()
     expect((context as any).togglePendingBoardTarget(pieces[0])).toBe(true)
     expect((context as any).togglePendingBoardTarget(pieces[1])).toBe(true)
     expect((context as any).togglePendingBoardTarget(pieces[2])).toBe(true)
     expect((context as any).togglePendingBoardTarget(pieces[3])).toBe(false)
 
-    expect((context as any).confirmPendingBoardTargetSelection()).toBe(true)
+    ;(context as any).dispatchBattleIntent({ type: 'confirm-target-selection' })
     expect(doAction).toHaveBeenCalledOnce()
     expect(doAction).toHaveBeenCalledWith(expect.objectContaining({
       type: 'pendingTargetSelect',

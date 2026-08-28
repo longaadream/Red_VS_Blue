@@ -1,7 +1,7 @@
 {
   "id": "ichigo-zangetsu",
   "name": "斩月",
-  "description": "选择相邻的一个敌人，造成100%攻击力的物理伤害。AP1，CD1。",
+  "description": "选择相邻的一个敌人，造成100%攻击力的物理伤害。",
   "keywords": [],
   "targetText": "相邻的一个敌人",
   "effectTags": ["damage"],

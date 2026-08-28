@@ -1,7 +1,7 @@
 {
   "id": "ichigo-getsuga-tensho",
   "name": "月牙天冲",
-  "description": "向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成150%攻击力的魔法伤害。AP2，CD1。",
+  "description": "向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成150%攻击力的魔法伤害。",
   "keywords": ["弹射物"],
   "targetText": "同一行或同一列的一个方向",
   "effectTags": ["damage"],

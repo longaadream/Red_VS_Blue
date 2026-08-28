@@ -544,6 +544,33 @@ describe('Velen delayed holy cards', () => {
   })
 
 describe('Turalyon holy-hand mobility', () => {
+  it('publishes Expedition Order as an exact single-card hand selection', () => {
+    const definition = skill('turalyon-expedition-order')
+    const turalyon = makePiece({
+      instanceId: 'turalyon-order-hand', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0,
+    }) as any
+    turalyon.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [turalyon] }) as any
+    state.skillsById[definition.id] = definition
+    state.players[0].hand = [
+      { cardId: 'holy-smite', instanceId: 'order-smite', ownerPlayerId: 'player-red', actionPointCost: 2 },
+      { cardId: 'holy-heal', instanceId: 'order-heal', ownerPlayerId: 'player-red', actionPointCost: 2 },
+      { cardId: 'filler', instanceId: 'order-filler', ownerPlayerId: 'player-red', actionPointCost: 1 },
+    ]
+
+    const pending = applyBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: turalyon.instanceId, skillId: definition.id,
+    } as any) as any
+
+    expect(pending.pendingOptionSelection).toMatchObject({
+      selectionMode: 'single', presentation: 'hand', minSelections: 1, maxSelections: 1,
+      options: [{ value: 'order-smite' }, { value: 'order-heal' }],
+    })
+    expect(pending.pendingTargetSelection).toBeUndefined()
+    expect(pending.players[0].hand.map((card: any) => card.actionPointCost)).toEqual([2, 2, 1])
+    expect(pending.pieces[0].skills[0].currentCooldown).toBe(0)
+  })
+
   it('reduces one holy card to a minimum of 1 AP and restores the cost at end turn', () => {
     const turalyon = makePiece({ instanceId: 'turalyon', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
     const state = makeState({ pieces: [turalyon], turnNumber: 1 }) as any
@@ -769,6 +796,49 @@ describe('Turalyon holy-hand mobility', () => {
     expect(secondResolved.pendingTargetSelection).toBeUndefined()
     expect(secondResolved.players[0].actionPoints).toBe(0)
     expect(secondResolved.players[0].hand).toHaveLength(0)
+  })
+
+  it('uses straight-line normal-move geometry while allies are transparent blockers', () => {
+    const turalyon = makePiece({
+      instanceId: 'turalyon-straight-march', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0,
+    }) as any
+    turalyon.rules = [loadRuleById('rule-turalyon-lightforged-march', true)!]
+    const mover = makePiece({
+      instanceId: 'straight-mover', ownerPlayerId: 'player-red', x: 6, y: 6, moveRange: 3,
+    }) as any
+    const friendlyBlocker = makePiece({
+      instanceId: 'straight-friendly', ownerPlayerId: 'player-red', x: 7, y: 6,
+    }) as any
+    const enemyBlocker = makePiece({
+      instanceId: 'straight-enemy', ownerPlayerId: 'player-blue', faction: 'blue', x: 6, y: 8,
+    }) as any
+    const state = makeState({
+      pieces: [turalyon, mover, friendlyBlocker, enemyBlocker], width: 13, height: 13, turnNumber: 1,
+    }) as any
+    state.map.tiles.find((tile: any) => tile.x === 9 && tile.y === 6).props.walkable = false
+    state.players[0].actionPoints = 2
+    state.players[0].hand = [{
+      cardId: 'holy-charge', instanceId: 'straight-march-card', ownerPlayerId: 'player-red', actionPointCost: 2,
+    }]
+
+    const moverPending = applyBattleAction(state, {
+      type: 'playCard', playerId: 'player-red', cardInstanceId: 'straight-march-card',
+    } as any) as any
+    const destinationPending = applyBattleAction(moverPending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: mover.instanceId,
+      selectionId: moverPending.pendingTargetSelection.selectionId,
+      stateRevision: moverPending.pendingTargetSelection.stateRevision,
+    } as any) as any
+    const candidates = destinationPending.pendingTargetSelection.candidates
+
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 7, y: 6 })
+    expect(candidates).toContainEqual({ type: 'cell', x: 8, y: 6 })
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 10, y: 6 })
+    expect(candidates).toContainEqual({ type: 'cell', x: 6, y: 7 })
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 6, y: 9 })
+    expect(candidates).toContainEqual({ type: 'cell', x: 6, y: 1 })
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 6, y: 0 })
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 5, y: 5 })
   })
 
   it('selects 1-3 friendly core pieces and a gathering cell in two authoritative stages', () => {

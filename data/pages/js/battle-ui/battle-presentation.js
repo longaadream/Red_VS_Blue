@@ -7,6 +7,7 @@
     'select-skill',
     'activate-cell',
     'inspect-piece',
+    'confirm-target-selection',
     'cancel-target',
     'toggle-move',
     'viewport-change',

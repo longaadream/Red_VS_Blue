@@ -2472,6 +2472,27 @@
       if (typeof sk === 'string') return sk
       return sk.skillId || sk.id || sk.definitionId || ''
     }
+    function pieceInfoDisplaySkills(piece) {
+      const displayed = pieceDispSkills(piece).map(sk =>
+        typeof sk === 'string' ? { skillId: sk } : sk
+      )
+      const displayedIds = new Set(displayed.map(skillIdOf).filter(Boolean))
+      const template = PIECES_BY_ID[piece.templateId] || {}
+      for (const transformed of template.transformedSkills || []) {
+        const skillId = skillIdOf(transformed)
+        if (!skillId || displayedIds.has(skillId)) continue
+        displayed.push({
+          skillId,
+          currentCooldown: 0,
+          derived: true,
+          triggeredBy: typeof transformed === 'string'
+            ? ''
+            : (transformed.triggeredBy || transformed.trigger || ''),
+        })
+        displayedIds.add(skillId)
+      }
+      return displayed
+    }
     function skillDefOf(skillId) {
       if (!skillId) return {}
       const cached = (G && G.skillsById && G.skillsById[skillId]) || skillsById[skillId]
@@ -3077,7 +3098,7 @@
       </div>`
 
       // Skills (display* aware)
-      const skills = pieceDispSkills(piece)
+      const skills = pieceInfoDisplaySkills(piece)
       currentPieceKeywords = normalizeKeywordList(skills.flatMap(sk => {
         const sid = skillIdOf(sk)
         const skd = skillDefOf(sid)
@@ -3093,11 +3114,16 @@
         const skName = skd.name || sid
         const desc = skd.description || '暂无描述'
         const isPassive = skd.type === 'passive' || skd.kind === 'passive'
-        const typeLabel = skd.type === 'super' ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
+        const isDerived = sk.derived === true
+        const typeLabel = isDerived ? '可解锁' : skd.type === 'super' ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
         const cooldownTurns = skd.cooldownTurns ?? 0
         const currentCooldown = sk.currentCooldown ?? 0
         const keywords = normalizeKeywordList(skd.keywords)
         const metaParts = []
+        if (isDerived) {
+          const triggerDef = skillDefOf(sk.triggeredBy)
+          metaParts.push('由【' + escHtml(triggerDef.name || sk.triggeredBy || '特定技能') + '】解锁')
+        }
         if (!isPassive) {
           const apCost = skd.actionPointCost ?? 0
           metaParts.push(`行动 ${apCost}`)

@@ -1,7 +1,7 @@
 {
   "id": "itachi-amaterasu",
   "name": "天照",
-  "description": "选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。AP1，CD2。",
+  "description": "选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。",
   "keywords": [],
   "targetText": "5格内的一个敌人",
   "effectTags": ["field", "stack"],
