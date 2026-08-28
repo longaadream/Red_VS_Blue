@@ -18,7 +18,7 @@
     { "from": "public",              "to": "app/public" },
     { "from": "data",                "to": "app/data" },
     { "from": "prisma",              "to": "app/prisma" },
-    { "from": "android-client/www",  "to": "app/www" },
+    { "from": "data/pages",          "to": "app/www" },
     {
       "from": "data",
       "to": "app/www/data",

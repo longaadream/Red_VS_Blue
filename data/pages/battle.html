@@ -2135,7 +2135,7 @@
       if (authorityRecoveryPromise) return authorityRecoveryPromise
       addLog('[authority] 请求完整快照：' + (reason || 'unknown'), 'err')
       authorityRecoveryPromise = Promise.resolve()
-        .then(function () { return recoverBattleStateViaHttp() })
+        .then(function () { return recoverBattleStateViaWs() })
         .finally(function () { authorityRecoveryPromise = null })
       return authorityRecoveryPromise
     }
@@ -2798,7 +2798,9 @@
             return found || ((player.hand || []).find(function(card) { return card.instanceId === cardInstanceId; }))
           }, null)
         : null
-      const cost = def.actionPointCost || 0
+      const cost = cardInstance && Number.isFinite(Number(cardInstance.actionPointCost))
+        ? Number(cardInstance.actionPointCost)
+        : Number(def.actionPointCost) || 0
       currentCardDetail = { cardInstanceId, cardId }
       currentCardKeywords = normalizeKeywordList(def.keywords)
       if (!preserveKeyword || !currentCardKeywords.includes(activeCardKeyword)) {
@@ -3272,12 +3274,14 @@
       return res.json()
     }
 
-    async function fetchServerJson(path, timeoutMs) {
-      const res = await RvBUtils.serverFetch(path, { timeoutMs: timeoutMs || 3500 })
-      if (!res.ok) throw new Error('HTTP ' + res.status)
-      return res.json()
-    }
+    async function fetchServerJson(method, data, timeoutMs) {
+      if (!window.RvBWs) throw new Error('WebSocket client not loaded')
+      if (RvBWs.isConnected && RvBWs.isConnected()) {
+        return RvBWs.request(method, data || {}, timeoutMs || 3500)
+      }
+      return RvBWs.requestAt(getServerUrl(), method, data || {}, timeoutMs || 3500)
 
+    }
     function reportCardDisplayMetadataFailure(cardId, error) {
       const stableCardId = typeof cardId === 'string' && cardId ? cardId : String(cardId || 'unknown')
       const reason = error && error.message ? error.message : String(error || 'unknown error')
@@ -3376,13 +3380,13 @@
       const localDefinition = cardsById[cardId] || (G && G.customCards && G.customCards[cardId])
       if (localDefinition) return localDefinition
       if (cardDisplayMetadataById[cardId]) return cardDisplayMetadataById[cardId]
-      if (TRAINING_MODE || wsMode !== 'lan' || battlePageDisposed || cardDisplayMetadataFailures.has(cardId)) return null
+      if (TRAINING_MODE || battlePageDisposed || cardDisplayMetadataFailures.has(cardId)) return null
       if (cardDisplayMetadataRequests.has(cardId)) return cardDisplayMetadataRequests.get(cardId)
 
       let request = null
       request = (async function() {
         try {
-          const raw = await fetchServerJson('/api/cards/' + encodeURIComponent(cardId), 3500)
+          const raw = await fetchServerJson('catalog.card', { cardId }, 3500)
           const display = sanitizeCardDisplayMetadata(cardId, raw)
           if (battlePageDisposed) return null
           cardDisplayMetadataById[cardId] = display
@@ -3405,7 +3409,7 @@
     }
 
     function ensureHandCardDisplayMetadata(hand) {
-      if (TRAINING_MODE || wsMode !== 'lan' || battlePageDisposed || !Array.isArray(hand)) {
+      if (TRAINING_MODE || battlePageDisposed || !Array.isArray(hand)) {
         return Promise.resolve([])
       }
       const seen = new Set()
@@ -3427,15 +3431,17 @@
 
     async function loadServerBattleDataFallback() {
       const payloads = await Promise.all([
-        fetchServerJson('/api/pieces'),
-        fetchServerJson('/api/skills'),
+        fetchServerJson('catalog.pieces'),
+        fetchServerJson('catalog.skills'),
       ])
       const pieces = payloads[0] && Array.isArray(payloads[0].pieces) ? payloads[0].pieces : []
       pieces.forEach(function(piece) {
         if (piece && piece.id) PIECES_BY_ID[piece.id] = piece
       })
       const serverSkills = payloads[1] && payloads[1].skills
-      if (serverSkills && typeof serverSkills === 'object') {
+      if (Array.isArray(serverSkills)) {
+        serverSkills.forEach(function(skill) { if (skill && skill.id) skillsById[skill.id] = skill })
+      } else if (serverSkills && typeof serverSkills === 'object') {
         Object.assign(skillsById, serverSkills)
       }
       if (!Object.keys(PIECES_BY_ID).length) {
@@ -4195,48 +4201,26 @@
     }
 
     // Initialize a real battle: connect WS (server will push initial stateUpdate on subscribe).
-    // State arrives through WS; HTTP is only used as a recovery fallback.
+    // State arrives through WS; recovery requests another authoritative WS snapshot.
     async function initBattle() {
       connectBattleWs(wsMode)
       setTimeout(function() {
         if (!G) {
           try { if (window.RvBWs && RvBWs.send) RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
-          recoverBattleStateViaHttp()
+          recoverBattleStateViaWs()
         }
       }, 8000)
     }
 
-    async function recoverBattleStateViaHttp() {
+    async function recoverBattleStateViaWs() {
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms/' + encodeURIComponent(roomId) + '/battle', { method: 'GET', timeoutMs: 5000 })
-        if (!res.ok) {
-          const text = await res.text().catch(() => '')
-          throw new Error('HTTP ' + res.status + ' ' + text)
+        if (!window.RvBWs || !RvBWs.isConnected || !RvBWs.isConnected()) {
+          throw new Error('WebSocket not connected')
         }
-        const data = await res.json()
-        if (data && data.state) {
-          if (!acceptAuthorityVersion(data.authorityVersion)) {
-            addLog('[authority] Ignored an older or unversioned HTTP snapshot', 'info')
-            return
-          }
-          addLog('[HTTP fallback] 已拉取服务端战斗状态 ' + String(data.stateHash || '').slice(0, 12), 'info')
-          if (_use3d && battlePresentation && G) {
-            battlePresentation.animateAction(
-              { type: 'stateUpdate', motionEventKey: 'http:' + String(data.stateHash || data.serverNow || battleStateMotionKey(data.state)) },
-              createBattlePresentationModel(G),
-              createBattlePresentationModel(data.state)
-            )
-          }
-          latestAuthorityStateHash = data.stateHash || latestAuthorityStateHash
-          latestAuthorityVersion = Number.isSafeInteger(data.authorityVersion)
-            ? data.authorityVersion
-            : latestAuthorityVersion
-          applyServerState(data.state, data.seed || null, false, data.serverNow, data.turnTimer)
-          return
-        }
-        throw new Error('empty battle state')
+        RvBWs.send({ type: 'requestBattleSnapshot' })
+        addLog('[WS resync] snapshot requested', 'info')
       } catch (e) {
-        showMsg('WebSocket 已发起连接，但尚未收到战斗状态；HTTP 兜底也失败：' + ((e && e.message) || e), 'err')
+        showMsg('尚未收到战斗状态：' + ((e && e.message) || e), 'err')
       }
     }
 
@@ -5203,7 +5187,12 @@
 
       const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
       const def = cardsById[cardId] || (G.customCards && G.customCards[cardId]) || {}
-      const cost = def.actionPointCost || 0
+      const cardInstance = myMeta && Array.isArray(myMeta.hand)
+        ? myMeta.hand.find(card => card.instanceId === cardInstanceId)
+        : null
+      const cost = cardInstance && Number.isFinite(Number(cardInstance.actionPointCost))
+        ? Number(cardInstance.actionPointCost)
+        : Number(def.actionPointCost) || 0
       const ap = myMeta ? myMeta.actionPoints : 0
       if (ap < cost) { setStatusMsg('行动点不足（需要 ' + cost + '，剩余 ' + ap + '）'); return }
 

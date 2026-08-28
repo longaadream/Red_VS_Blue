@@ -60,7 +60,7 @@
 
   function isLocalOrLanUrl(url) {
     return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\b/.test(url) ||
-      /^http:\/\/(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(url)
+      /^http:\/\/(10\.|26\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(url)
   }
 
   function shouldTryHttpsForHttp(url) {
@@ -79,7 +79,7 @@
 
   function getServerModeForUrl(url) {
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\b/.test(url)) return 'local'
-    if (/^http:\/\/(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(url)) return 'lan'
+    if (/^http:\/\/(10\.|26\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(url)) return 'lan'
     return 'remote'
   }
 
@@ -578,7 +578,7 @@
     // 127.x, LAN IPs) always run plain HTTP and must NOT be upgraded.
     var inSecureCtx = typeof window !== 'undefined' && window.isSecureContext
     var isLocalAddr = /localhost|127\.0\.0\.1/.test(baseUrl) ||
-      /^http:\/\/(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(baseUrl)
+      /^http:\/\/(10\.|26\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(baseUrl)
     if (inSecureCtx && !isLocalAddr && baseUrl.startsWith('http://')) {
       baseUrl = baseUrl.replace('http://', 'https://')
       saveServerUrl(baseUrl)

@@ -6,6 +6,7 @@
   <title>RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/ws-client.js"></script>
   <script src="js/lan-discover.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
@@ -710,12 +711,9 @@
       if (window.RvBBridge && (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)) {
         try {
           await (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)(65000)
-          if (RvBUtils.mobileServerFetch) {
-            const probe = await RvBUtils.mobileServerFetch('/api/maps', { method: 'GET' })
-            if (!probe.ok) {
-              const text = await probe.text().catch(() => '')
-              throw new Error('engine probe failed: HTTP ' + probe.status + ' ' + text)
-            }
+          const probe = await RvBWs.requestAt(RvBUtils.getServerUrl(), 'system.health', {}, 5000)
+          if (!probe || !probe.ok) {
+            throw new Error('engine WebSocket probe failed')
           }
         } catch (e) {
           alert('无法启动本地训练营服务：' + ((e && e.message) || e))
@@ -744,13 +742,7 @@
       if (btn) btn.textContent = '⏳'
       if (desc) desc.textContent = '创建 PVE 房间中…'
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'pve', hostId, playerName, mapId: 'large-hole-arena' })
-        })
-        if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + ' ' + t) }
-        const room = await res.json()
+        const room = await RvBWs.requestAt(serverUrl, 'rooms.create', { mode: 'pve', hostId, hostName: playerName, mapId: 'large-hole-arena' }, 7000)
         const params = new URLSearchParams({ roomId: room.id, playerId: hostId, playerName })
         window.location.href = 'piece-selection.html?' + params
       } catch (e) {
@@ -774,11 +766,8 @@
       const candidates = ['http://localhost:3000', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3002', 'http://localhost:7878']
       for (const url of candidates) {
         try {
-          const ctrl = new AbortController()
-          const timer = setTimeout(() => ctrl.abort(), 700)
-          const res = await fetch(url + '/api/ping', { signal: ctrl.signal })
-          clearTimeout(timer)
-          if (res && res.ok) return url
+          const health = await RvBWs.requestAt(url, 'system.health', {}, 700)
+          if (health && health.ok) return url
         } catch {}
       }
       return null
@@ -810,17 +799,25 @@
       if (!raw) { err.textContent = '请输入服务器地址'; err.style.display = 'block'; return }
       const btn = document.querySelector('#connectOverlay .btn-primary')
       if (btn) { btn.textContent = '连接中…'; btn.disabled = true }
-      const result = await RvBUtils.validateAndSaveServer(raw, 10000)
+      let cleanUrl = raw.trim().replace(/\/+$/, '')
+      if (!/^[a-z]+:\/\//i.test(cleanUrl)) cleanUrl = 'http://' + cleanUrl
+      let result
+      try {
+        const health = await RvBWs.requestAt(cleanUrl, 'system.health', {}, 10000)
+        if (!health || health.protocol !== 'rvb-ws') throw new Error('服务器未返回 RED vs BLUE WS 协议')
+        RvBUtils.saveServerConfig({ mode: RvBUtils.getServerModeForUrl(cleanUrl), url: cleanUrl })
+        result = { success: true, url: cleanUrl }
+      } catch (error) {
+        result = { success: false, error }
+      }
       if (result.success) {
         closeOverlay('connectOverlay')
         document.getElementById('serverStatusDesc').textContent = '已连接：' + result.url.replace(/^https?:\/\//, '').slice(0, 30)
         if (btn) { btn.textContent = '校验资源包…'; btn.disabled = true }
         await checkPackAndGo(result.url, 'remote')
       } else {
-        err.textContent = result.isTimeout ? '连接超时（10s），请确认地址可访问' : '无法连接，http 和 https 均失败'
+        err.textContent = '\u65e0\u6cd5\u5efa\u7acb WebSocket \u8fde\u63a5\uff1a' + ((result.error && result.error.message) || '\u8fde\u63a5\u5931\u8d25')
         err.style.display = 'block'
-        let cleanUrl = raw.trim().replace(/\/$/, '')
-        if (!cleanUrl.startsWith('http')) cleanUrl = 'http://' + cleanUrl
         document.getElementById('forceConnectUrl').value = cleanUrl
         document.getElementById('forceConnectArea').style.display = 'block'
       }
@@ -1149,11 +1146,7 @@
     async function checkPackMd5(serverUrl) {
       if (window.RvBBridge && /^http:\/\/(localhost|127\.0\.0\.1):7878\b/.test(serverUrl || '')) return
       try {
-        const res = window.RvBUtils && RvBUtils.serverFetch
-          ? await RvBUtils.serverFetch('/api/admin/resource-pack', { timeoutMs: 3000 })
-          : await fetch(serverUrl + '/api/admin/resource-pack')
-        if (!res.ok) return
-        const data = await res.json()
+        const data = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
         const serverMd5 = data.meta?.md5
         const clientMd5 = localStorage.getItem('rvb_pack_md5')
         const warn = document.getElementById('packMismatchWarn')
@@ -1183,11 +1176,7 @@
         return
       }
       try {
-        const res = window.RvBUtils && RvBUtils.serverFetch
-          ? await RvBUtils.serverFetch('/api/admin/resource-pack', { timeoutMs: 3000 })
-          : await fetch(serverUrl + '/api/admin/resource-pack')
-        if (!res.ok) { goLobby(mode, serverUrl); return }
-        const data = await res.json()
+        const data = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
         const serverMd5 = data.meta?.md5
         const clientMd5 = localStorage.getItem('rvb_pack_md5')
         if (serverMd5 && clientMd5 && serverMd5 !== clientMd5) {

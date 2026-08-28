@@ -13,25 +13,17 @@
   const FULL_LAST_OCTETS = Array.from({ length: 254 }, (_, i) => i + 1)
   const DEFAULT_SUBNETS = ['192.168.1', '192.168.0', '192.168.2', '10.0.0']
 
-  async function fetchJson(url) {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS)
-    try {
-      const response = await fetch(url, { signal: ctrl.signal, cache: 'no-store' })
-      if (!response.ok) return null
-      return await response.json()
-    } catch {
-      return null
-    } finally {
-      clearTimeout(timer)
-    }
-  }
+  // Discovery probes the same-origin WebSocket RPC directly.
 
   async function probeOne(ip, port) {
     const url = 'http://' + ip + ':' + port
-    const ping = await fetchJson(url + '/api/ping')
-    if (!ping || ping.name !== 'RED vs BLUE Server') return null
-    return { url, ip, port }
+    try {
+      const health = await RvBWs.requestAt(url, 'system.health', {}, TIMEOUT_MS)
+      if (!health || health.protocol !== 'rvb-ws') return null
+      return { url, ip, port }
+    } catch {
+      return null
+    }
   }
 
   function buildTasks(subnets, lastOctets) {

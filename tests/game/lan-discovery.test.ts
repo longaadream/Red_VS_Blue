@@ -17,27 +17,22 @@ type LanDiscoverApi = {
   }): { cancel(): void }
 }
 
-function response(ok: boolean, body: unknown) {
-  return { ok, json: async () => body }
-}
-
 describe('LAN single-origin discovery', () => {
-  it('discovers one public server URL and never probes a WebSocket port API', async () => {
-    const requests: string[] = []
-    const fetch = vi.fn(async (input: string) => {
-      requests.push(input)
-      if (input === 'http://192.168.1.100:7878/api/ping') {
-        return response(true, { name: 'RED vs BLUE Server' })
+  it('discovers one public server URL through WebSocket health only', async () => {
+    const requests: { url: string; method: string }[] = []
+    const requestAt = vi.fn(async (url: string, method: string) => {
+      requests.push({ url, method })
+      if (url === 'http://192.168.1.100:7878' && method === 'system.health') {
+        return { protocol: 'rvb-ws' }
       }
-      return response(false, {})
+      throw new Error('unreachable')
     })
     const browserWindow = {
       electronAPI: { getLanIps: async () => ['192.168.1.24'] },
     }
     const context = createContext({
       window: browserWindow,
-      fetch,
-      AbortController,
+      RvBWs: { requestAt },
       setTimeout,
       clearTimeout,
     })
@@ -54,20 +49,23 @@ describe('LAN single-origin discovery', () => {
       ip: '192.168.1.100',
       port: 7878,
     }])
-    expect(requests).toContain('http://192.168.1.100:7878/api/ping')
-    expect(requests.every(url => url.endsWith('/api/ping'))).toBe(true)
-    expect(requests.some(url => url.includes('/api/ws-info'))).toBe(false)
+    expect(requests).toContainEqual({
+      url: 'http://192.168.1.100:7878',
+      method: 'system.health',
+    })
+    expect(requests.every(request => request.method === 'system.health')).toBe(true)
+    expect(requestAt).toHaveBeenCalled()
     expect(found[0]).not.toHaveProperty('wsPort')
   })
 
-  it('keeps desktop and Android discovery logic identical and free of split-port fallbacks', () => {
+  it('keeps Windows discovery free of HTTP and split-port fallbacks', () => {
     const desktop = readFileSync(resolve(process.cwd(), 'data/pages/js/lan-discover.js'), 'utf8')
-    const android = readFileSync(resolve(process.cwd(), 'android-client/www/js/lan-discover.js'), 'utf8')
 
-    expect(android).toBe(desktop)
+    expect(desktop).toContain("RvBWs.requestAt(url, 'system.health'")
     expect(desktop).not.toContain('/api/ws-info')
     expect(desktop).not.toContain('resolveWsPort')
     expect(desktop).not.toContain('3001')
     expect(desktop).not.toContain('wsPort')
+    expect(desktop).not.toContain('fetch(')
   })
 })

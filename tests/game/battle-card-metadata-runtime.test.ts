@@ -208,7 +208,7 @@ describe('LAN battle hand card display metadata', () => {
     expect(runtime.container.innerHTML).toContain('lucky-coin')
     expect(runtime.container.innerHTML).toContain('暂无描述')
     expect(fetchServerJson).toHaveBeenCalledTimes(1)
-    expect(fetchServerJson).toHaveBeenCalledWith('/api/cards/lucky-coin', 3500)
+    expect(fetchServerJson).toHaveBeenCalledWith('catalog.card', { cardId: 'lucky-coin' }, 3500)
 
     response.resolve({
       id: 'lucky-coin',
@@ -265,8 +265,8 @@ describe('LAN battle hand card display metadata', () => {
   })
 
   it('keeps sibling cards visible when one authority lookup fails', async () => {
-    const fetchServerJson = vi.fn(async (path: string) => {
-      if (path.endsWith('/missing-card')) throw new Error('HTTP 404')
+    const fetchServerJson = vi.fn(async (_method: string, data: { cardId: string }) => {
+      if (data.cardId === 'missing-card') throw new Error('WS catalog miss')
       return {
         id: 'lucky-coin',
         name: '幸运币',
@@ -328,8 +328,8 @@ describe('LAN battle hand card display metadata', () => {
   it('does not repaint an old hand or store a response that arrives after page disposal', async () => {
     const oldResponse = deferred<Record<string, unknown>>()
     const disposedResponse = deferred<Record<string, unknown>>()
-    const fetchServerJson = vi.fn((path: string) => {
-      if (path.endsWith('/old-card')) return oldResponse.promise
+    const fetchServerJson = vi.fn((_method: string, data: { cardId: string }) => {
+      if (data.cardId === 'old-card') return oldResponse.promise
       return disposedResponse.promise
     })
     let renderCount = 0
