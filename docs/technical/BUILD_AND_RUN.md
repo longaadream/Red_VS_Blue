@@ -217,29 +217,35 @@ BUILD_EXIT=1
 
 ## 4. 数据库初始化现状
 
-`lib/db.ts#prisma` 从 `DATABASE_URL` 创建 Prisma Client。`electron/main.ts#startGameServer()` 在开发模式直接使用 `prisma/dev.db`，但只有打包模式会调用 `electron/main.ts#initDatabase()`。
+`lib/db.ts#prisma` 从 `DATABASE_URL` 创建 Prisma Client。`electron-client/main.ts#startLocalServer()`
+在开发模式直接使用 `prisma/dev.db`；打包客户端则使用 Electron `userData/game.db`，并在每次启动
+本机服务器前调用 `scripts/init-db.js`。
 
-空环境直接运行服务时：
+打包产物没有可独立加载的 `.prisma/client` 目录，因此初始化脚本使用客户端随包 Node 运行时的
+`node:sqlite` 执行事务化幂等 DDL。Electron 不再因为缺少 Prisma 目录跳过初始化；脚本失败会阻止
+本机服务器以坏数据库继续启动。脚本会建立当前 `prisma/schema.prisma` 所需的 User、Room、GameRecord 及三张
+BattleAuthority 持久化表、索引和 hash/version 列。对于旧客户端直接创建但缺少这些字段的 SQLite，
+脚本只补齐缺失列和结构，不吞掉其他 SQL 错误。它不写入 `_prisma_migrations`，也不能替代独立
+Relay 或生产数据库的正式 migration 流程。
 
-- `GET /api/ping`：200；
-- WebSocket 与 HTTP 共用当前服务端口，并通过 `/ws/rooms/{roomId}` 握手；
-- `GET /api/rooms`：500；
-- 原始 Prisma 错误：`P2021`，`The table main.Room does not exist in the current database.`
-
-RED-14 负责修复开发模式首次启动没有建表的问题。在修复前，可用仓库现有 `scripts/init-db.js` 建立临时调试数据库。该脚本的第二个参数必须是绝对路径：
+可用同一个脚本建立隔离调试数据库，不需要 Prisma CLI 或 moduleRoot：
 
 ```powershell
 $taskDir = Join-Path $env:TEMP 'rvb-debug-db'
 New-Item -ItemType Directory -Force -Path $taskDir | Out-Null
 $dbPath = (Join-Path $taskDir 'game.db').Replace('\', '/')
-$moduleRoot = (Resolve-Path '.next\standalone\node_modules').Path
-node scripts\init-db.js "file:$dbPath" $moduleRoot
+node scripts\init-db.js "file:$dbPath"
 $env:DATABASE_URL = "file:$dbPath"
 ```
 
-实测：`scripts/init-db.js` 退出码 0，生成 32 KB SQLite 文件；随后 Prisma `Room` 查询成功，`GET /api/rooms` 返回 200 和 `{"rooms":[]}`。
+初始化回归测试会对全新库、重复初始化和旧版不完整 Room 表执行真实 SQLite 校验：
 
-当前环境中 Prisma 5.22 的 `prisma db push` 对绝对 URL、正斜杠 URL和临时目录相对 URL都返回退出码 1及空泛的 `Schema engine error`，所以本文不把它列为可靠初始化步骤。
+```powershell
+npx.cmd vitest run tests/electron/client-database-init.test.ts
+```
+
+本机测试数据不需要保留时，应先完全退出客户端，再删除该客户端 Electron `userData` 目录中的
+`game.db`；下次选择“使用本机服务器”会重新初始化。不要在客户端仍运行时替换或删除数据库文件。
 
 ## 5. Next.js / WebSocket 单端口开发模式
 

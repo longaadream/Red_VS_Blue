@@ -43,8 +43,8 @@
       font-size: 13px; cursor: pointer;
     }
     .filter-btn.active-all  { background: #334155; color: #e2e8f0; border-color: #475569; }
-    .filter-btn.active-red  { background: rgba(239,68,68,.2); color: #ef4444; border-color: #ef4444; }
-    .filter-btn.active-blue { background: rgba(59,130,246,.2); color: #60a5fa; border-color: #3b82f6; }
+    .filter-btn.active-light { background: rgba(234,179,8,.2); color: #facc15; border-color: #eab308; }
+    .filter-btn.active-dark  { background: rgba(168,85,247,.2); color: #c084fc; border-color: #a855f7; }
 
     /* Piece list */
     .piece-list { padding: 0 16px 24px; }
@@ -72,15 +72,15 @@
       width: 100%; height: 100%;
       object-fit: cover; border-radius: 10px;
     }
-    .faction-red  { background: rgba(239,68,68,.15); }
-    .faction-blue { background: rgba(59,130,246,.15); }
+    .faction-light { background: rgba(234,179,8,.15); }
+    .faction-dark  { background: rgba(168,85,247,.15); }
     .faction-neutral { background: rgba(100,116,139,.15); }
 
     .piece-info { flex: 1; }
     .piece-name { font-size: 15px; font-weight: 700; }
     .piece-meta { font-size: 12px; color: #64748b; margin-top: 2px; }
-    .faction-label-red  { color: #f87171; }
-    .faction-label-blue { color: #60a5fa; }
+    .faction-label-light { color: #facc15; }
+    .faction-label-dark  { color: #c084fc; }
 
     .expand-icon { color: #475569; font-size: 16px; transition: transform .2s; }
     .expanded .expand-icon { transform: rotate(90deg); }
@@ -164,8 +164,8 @@
   <!-- Filters -->
   <div class="filters">
     <button class="filter-btn active-all" id="btnAll"  onclick="setFilter('all')">全部</button>
-    <button class="filter-btn"           id="btnRed"  onclick="setFilter('red')">红方</button>
-    <button class="filter-btn"           id="btnBlue" onclick="setFilter('blue')">蓝方</button>
+    <button class="filter-btn"           id="btnLight" onclick="setFilter('good')">光方</button>
+    <button class="filter-btn"           id="btnDark"  onclick="setFilter('evil')">暗方</button>
   </div>
 
   <!-- Piece list -->
@@ -253,8 +253,8 @@
     function setFilter(f) {
       currentFilter = f
       document.getElementById('btnAll').className  = 'filter-btn' + (f === 'all'  ? ' active-all'  : '')
-      document.getElementById('btnRed').className  = 'filter-btn' + (f === 'red'  ? ' active-red'  : '')
-      document.getElementById('btnBlue').className = 'filter-btn' + (f === 'blue' ? ' active-blue' : '')
+      document.getElementById('btnLight').className = 'filter-btn' + (f === 'good' ? ' active-light' : '')
+      document.getElementById('btnDark').className  = 'filter-btn' + (f === 'evil' ? ' active-dark'  : '')
       renderList()
     }
 
@@ -275,25 +275,25 @@
     }
 
     function factionClass(f) {
-      if (f === 'red')  return 'faction-red'
-      if (f === 'blue') return 'faction-blue'
+      if (f === 'good') return 'faction-light'
+      if (f === 'evil') return 'faction-dark'
       return 'faction-neutral'
     }
     function factionLabel(f) {
-      if (f === 'red')  return '<span class="faction-label-red">红方</span>'
-      if (f === 'blue') return '<span class="faction-label-blue">蓝方</span>'
+      if (f === 'good') return '<span class="faction-label-light">光方</span>'
+      if (f === 'evil') return '<span class="faction-label-dark">暗方</span>'
       return '<span style="color:#94a3b8">中立</span>'
     }
     function pieceAvatarHtml(p) {
       // 有图片文件（.jpg/.png/.svg）时显示真实头像
       if (p.image && p.image.includes('.')) {
-        const fallback = p.faction === 'red' ? '🔴' : p.faction === 'blue' ? '🔵' : '⚪'
+        const fallback = p.faction === 'good' ? '☀️' : p.faction === 'evil' ? '🌑' : '⚪'
         return `<img src="images/${p.image}" alt="${p.name || p.id}" onerror="this.parentElement.textContent='${fallback}'">`
       }
       // emoji 直接显示
       if (p.image) return p.image
-      if (p.faction === 'red')  return '🔴'
-      if (p.faction === 'blue') return '🔵'
+      if (p.faction === 'good') return '☀️'
+      if (p.faction === 'evil') return '🌑'
       return '⚪'
     }
 

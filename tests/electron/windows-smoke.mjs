@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..', '..')
@@ -266,6 +267,90 @@ async function probeGameWebSocket(url) {
   })
 }
 
+async function verifyPieceGallery(port, target, timeoutMs = 10000) {
+  await evaluate(target, "window.location.href = 'rvb-client://app/pieces.html'; true", false)
+  const galleryTarget = await waitForTargets(
+    port,
+    (candidate) => candidate.url.startsWith('rvb-client://app/pieces.html'),
+    timeoutMs,
+  )
+  const deadline = Date.now() + timeoutMs
+  let observed = null
+  while (Date.now() < deadline) {
+    try {
+      observed = await evaluate(galleryTarget, `({
+        readyState: document.readyState,
+        allCount: document.querySelectorAll('.piece-card').length,
+        countLabel: document.getElementById('countLabel')?.textContent || '',
+      })`)
+      if (observed.readyState === 'complete' && observed.allCount > 0) break
+    } catch {}
+    await delay(100)
+  }
+  assert(observed?.allCount > 0, `Piece gallery did not load packaged pieces: ${JSON.stringify(observed)}`)
+
+  const light = await evaluate(galleryTarget, `(() => {
+    document.getElementById('btnLight').click()
+    return {
+      count: document.querySelectorAll('.piece-card').length,
+      labels: [...document.querySelectorAll('.piece-meta')].map((element) => element.textContent || ''),
+    }
+  })()`)
+  const dark = await evaluate(galleryTarget, `(() => {
+    document.getElementById('btnDark').click()
+    return {
+      count: document.querySelectorAll('.piece-card').length,
+      labels: [...document.querySelectorAll('.piece-meta')].map((element) => element.textContent || ''),
+    }
+  })()`)
+  assert(
+    light.count > 0 && light.labels.every((label) => label.includes('光方') && !label.includes('中立')),
+    `Piece gallery light filter is incorrect: ${JSON.stringify(light)}`,
+  )
+  assert(
+    dark.count > 0 && dark.labels.every((label) => label.includes('暗方') && !label.includes('中立')),
+    `Piece gallery dark filter is incorrect: ${JSON.stringify(dark)}`,
+  )
+  return { target: galleryTarget, all: observed, light, dark }
+}
+
+async function callGameRpc(url, method, data) {
+  const requestId = 'windows-smoke-rpc-' + process.pid + '-' + Date.now()
+  const socket = new WebSocket(url)
+  return new Promise((resolve, reject) => {
+    let finished = false
+    const timer = setTimeout(() => {
+      socket.close()
+      reject(new Error(`Game WebSocket RPC timed out: ${method} ${url}`))
+    }, 5000)
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({ type: 'rpc', requestId, method, data }))
+    }, { once: true })
+    socket.addEventListener('message', (event) => {
+      let message = null
+      try {
+        message = JSON.parse(String(event.data))
+      } catch {
+        return
+      }
+      if (message?.type !== 'rpcResult' || message.requestId !== requestId) return
+      finished = true
+      clearTimeout(timer)
+      socket.close()
+      resolve({ ok: message.ok, data: message.data, error: message.error })
+    })
+    socket.addEventListener('error', () => {
+      clearTimeout(timer)
+      reject(new Error(`Game WebSocket RPC connection failed: ${url}`))
+    }, { once: true })
+    socket.addEventListener('close', () => {
+      if (finished) return
+      clearTimeout(timer)
+      reject(new Error(`Game WebSocket closed before ${method} completed: ${url}`))
+    }, { once: true })
+  })
+}
+
 async function waitForUnreachable(port, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -408,6 +493,12 @@ async function smokeServer() {
 
 async function smokeClient() {
   const application = applications.client
+  const configuredUserDataDir = process.env.RVB_SMOKE_USER_DATA_DIR
+  const userDataDir = configuredUserDataDir
+    ? path.resolve(configuredUserDataDir)
+    : mkdtempSync(path.join(tmpdir(), 'rvb-client-windows-smoke-'))
+  const ownsUserDataDir = !configuredUserDataDir
+  application.launchArguments = [`--user-data-dir=${userDataDir}`]
   try {
     const { target, rendererBoundary } = await launch(application)
     const connection = await connectTarget(target)
@@ -464,7 +555,36 @@ async function smokeClient() {
     assert(mode.ready === true && mode.isLocal === true, `Client local mode is not ready: ${JSON.stringify(mode)}`)
     const localGatewayPort = mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521
     assert(await isReachable(localGatewayPort), 'Client local gateway is not reachable')
-    const battle = await verifyBattleTerminalError(application.debugPort, gameTarget)
+    const localBaseUrl = `http://127.0.0.1:${localGatewayPort}`
+    const roomsBeforeCreate = await getJson(`${localBaseUrl}/api/rooms`)
+    assert(
+      Array.isArray(roomsBeforeCreate.rooms) && roomsBeforeCreate.rooms.length === 0,
+      `Fresh client database did not return an empty room list: ${JSON.stringify(roomsBeforeCreate)}`,
+    )
+    const createdRoom = await callGameRpc(
+      `ws://127.0.0.1:${localGatewayPort}/ws/rooms/__lobby`,
+      'rooms.create',
+      {
+        hostId: 'red125-windows-smoke',
+        name: 'RED-125 Windows smoke room',
+        mapId: 'winding-pass',
+        visibility: 'public',
+      },
+    )
+    assert(
+      createdRoom.ok === true
+        && typeof createdRoom.data?.id === 'string'
+        && createdRoom.data?.mapId === 'winding-pass',
+      `Fresh client database could not create a room: ${JSON.stringify(createdRoom)}`,
+    )
+    const roomsAfterCreate = await getJson(`${localBaseUrl}/api/rooms`)
+    assert(
+      Array.isArray(roomsAfterCreate.rooms)
+        && roomsAfterCreate.rooms.some((room) => room.id === createdRoom.data.id),
+      `Created room was not persisted in the client database: ${JSON.stringify(roomsAfterCreate)}`,
+    )
+    const pieceGallery = await verifyPieceGallery(application.debugPort, gameTarget)
+    const battle = await verifyBattleTerminalError(application.debugPort, pieceGallery.target)
     assert(battle.runtime.readyState === 'complete', `Battle page did not finish loading: ${JSON.stringify(battle.runtime)}`)
     assert(battle.runtime.messageColor === 'rgb(248, 113, 113)', `Battle page did not style its terminal error: ${JSON.stringify(battle.runtime)}`)
     assert(battle.runtime.spinnerDisplay === 'none', `Battle page kept spinning after a terminal error: ${JSON.stringify(battle.runtime)}`)
@@ -477,10 +597,23 @@ async function smokeClient() {
       Object.values(processCountsAfterExit).every((count) => count === 0),
       `Client candidate left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
     )
-    console.log(JSON.stringify({ entry: 'client', rendererBoundary, invalidTlsCertificate: tlsProbe, homepageWindowBoundary, packagedAssets, localMode: mode, battleRuntime: battle.runtime, exitedCleanly: true, processCountsAfterExit }))
+    console.log(JSON.stringify({
+      entry: 'client',
+      rendererBoundary,
+      invalidTlsCertificate: tlsProbe,
+      homepageWindowBoundary,
+      packagedAssets,
+      localMode: mode,
+      databaseProbe: { roomsBeforeCreate, createdRoom, roomsAfterCreate },
+      pieceGallery: { all: pieceGallery.all, light: pieceGallery.light, dark: pieceGallery.dark },
+      battleRuntime: battle.runtime,
+      exitedCleanly: true,
+      processCountsAfterExit,
+    }))
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)
+    if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
   }
 }
 
