@@ -1,7 +1,7 @@
 {
   "id": "sasuke-susanoo",
   "name": "须佐能乎",
-  "description": "激活完全体须佐能乎：攻击力+3，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。",
+  "description": "万花筒。激活完全体须佐能乎：攻击力+3，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。",
   "keywords": ["万花筒"],
   "targetText": "自身",
   "effectTags": ["buff", "skill-change"],

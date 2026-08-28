@@ -1,7 +1,7 @@
 {
   "id": "obito-space-time",
   "name": "神威",
-  "description": "选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不视为死亡。每局限用一次。",
+  "description": "万花筒。选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不视为死亡。每局限用一次。",
   "keywords": ["万花筒"],
   "targetText": "地图上的一名敌方棋子",
   "effectTags": ["remove"],

@@ -94,10 +94,12 @@ describe('RED-124 Mangekyo data contract', () => {
 
     expect(loadJson<any>('skills', 'sasuke-susanoo.json')).toMatchObject({
       chargeCost: 2,
+      description: '万花筒。激活完全体须佐能乎：攻击力+3，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
     })
     expect(loadJson<any>('skills', 'itachi-totsuka-blade.json')).toMatchObject({
       chargeCost: 1,
+      description: '万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
     })
     expect(loadJson<any>('skills', 'obito-space-time.json')).toMatchObject({
@@ -105,6 +107,7 @@ describe('RED-124 Mangekyo data contract', () => {
       type: 'ultimate',
       actionPointCost: 3,
       chargeCost: 3,
+      description: '万花筒。选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不视为死亡。每局限用一次。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
       targeting: { steps: [{ type: 'piece', filter: 'enemy', range: 99 }] },
     })
