@@ -33,6 +33,7 @@ import {
 import { startBattleFromLockedRosters } from './game/room-battle-start'
 import { assertSelectableMapId, getMapSelectionErrorPayload } from './game/map-selection'
 import { installBattleAuthorityShutdownHandlers } from './server/battle-authority-shutdown'
+import { getProfileWsIngressTrackerV1 } from './content-pipeline/runtime/profile-ws-ingress'
 
 // HMR-safe: keep server + client maps on globalThis so Next.js hot reloads
 // can tear down the old WebSocketServer (which holds stale handler closures)
@@ -204,6 +205,36 @@ function sendActionError(ws: WebSocket, payload: Record<string, unknown>): void 
     type: 'actionError',
     ...payload,
   })
+}
+
+function rejectWsMessageDuringProfileActivation(
+  ws: WebSocket,
+  msg: Record<string, unknown>,
+): void {
+  const error = 'Profile activation in progress'
+  if (msg.type === 'rpc' && typeof msg.requestId === 'string') {
+    sendJson(ws, {
+      type: 'rpcResult',
+      requestId: msg.requestId,
+      ok: false,
+      error,
+      status: 503,
+    })
+    return
+  }
+  if (msg.type === 'roomAction') {
+    sendJson(ws, {
+      type: 'roomActionResult',
+      action: msg.action,
+      success: false,
+      error,
+      status: 503,
+    })
+    return
+  }
+  if (['action', 'gameOver'].includes(String(msg.type))) {
+    sendActionError(ws, { error, action: msg.command ?? msg.action, status: 503 })
+  }
 }
 
 async function broadcastRoom(roomId: string): Promise<void> {
@@ -492,12 +523,29 @@ async function restartWsServer(): Promise<void> {
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(raw.toString())
-        if (msg.type === 'rpc' && typeof msg.requestId === 'string') {
+        if (msg.type === 'ping') {
+          sendJson(ws, { type: 'pong' })
+          return
+        }
+        const finishIngress = getProfileWsIngressTrackerV1().tryEnter()
+        if (!finishIngress) {
+          rejectWsMessageDuringProfileActivation(ws, msg)
+          return
+        }
+        let deferred = false
+        const runAsync = (operation: () => Promise<void>) => {
+          deferred = true
+          void operation()
+            .catch(error => console.warn('[WS] message task failed:', error))
+            .finally(finishIngress)
+        }
+        try {
+          if (msg.type === 'rpc' && typeof msg.requestId === 'string') {
           const requestId = msg.requestId
           const method = String(msg.method || '')
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const data = (msg.data || {}) as any
-          ;(async () => {
+          runAsync(async () => {
             try {
               let result: unknown
               if (method === 'rooms.list' || method === 'lobby.list') {
@@ -617,7 +665,7 @@ async function restartWsServer(): Promise<void> {
                 status,
               })
             }
-          })()
+          })
         } else if (msg.type === 'subscribe' && typeof msg.roomId === 'string') {
           if (roomId) {
             roomClients.get(roomId)?.delete(ws)
@@ -636,25 +684,25 @@ async function restartWsServer(): Promise<void> {
           // LAN mode: server is the game engine; all WS clients are guests.
           sendJson(ws, { type: 'subscribed', roomId: nextRoomId, role: 'guest' })
 
-          ;(async () => {
+          runAsync(async () => {
             try {
               const room = await roomStore.getRoom(nextRoomId)
               if (room) sendJson(ws, { type: 'roomUpdate', room: publicRoom(room) })
               await sendBattleSnapshot(ws, nextRoomId, playerId)
             } catch {}
-          })()
+          })
         } else if (msg.type === 'roomState' && roomId) {
-          ;(async () => {
+          runAsync(async () => {
             const room = await roomStore.getRoom(roomId!)
             if (room) sendJson(ws, { type: 'roomUpdate', room: publicRoom(room) })
             await sendBattleSnapshot(ws, roomId!, playerId)
-          })()
+          })
         } else if (msg.type === 'requestBattleSnapshot' && roomId) {
-          ;(async () => { await sendBattleSnapshot(ws, roomId!, playerId) })()
+          runAsync(async () => { await sendBattleSnapshot(ws, roomId!, playerId) })
         } else if (msg.type === 'roomAction' && roomId) {
           const _roomId = roomId
           const sender = ws
-          ;(async () => {
+          runAsync(async () => {
             try {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const body = msg as any
@@ -676,13 +724,11 @@ async function restartWsServer(): Promise<void> {
                 status,
               })
             }
-          })()
-        } else if (msg.type === 'ping') {
-          sendJson(ws, { type: 'pong' })
+          })
         } else if ((msg.type === 'action' || msg.type === 'gameOver') && roomId) {
           const _roomId = roomId
           const sender = ws
-          ;(async () => {
+          runAsync(async () => {
             try {
               const terminalSubmissionError = getClientTerminalSubmissionError(msg)
               if (terminalSubmissionError) {
@@ -792,7 +838,10 @@ async function restartWsServer(): Promise<void> {
             } catch (e) {
               console.warn('[WS] handler error:', _roomId, e)
             }
-          })()
+          })
+          }
+        } finally {
+          if (!deferred) finishIngress()
         }
       } catch {}
     })

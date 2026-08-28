@@ -20,14 +20,22 @@ function createRoots() {
   fs.mkdirSync(path.join(activePackRoot, 'data', 'pieces'), { recursive: true })
   fs.mkdirSync(path.join(activePackRoot, 'images'), { recursive: true })
   fs.mkdirSync(path.join(activePackRoot, 'images', 'tile-effects'), { recursive: true })
+  fs.mkdirSync(path.join(activePackRoot, '.rvb'), { recursive: true })
   fs.writeFileSync(path.join(htmlRoot, 'index.html'), '<html></html>')
   fs.writeFileSync(path.join(appRoot, 'data', 'pieces', 'manifest.json'), '["development"]')
   fs.writeFileSync(path.join(appRoot, 'public', 'ana.jpg'), 'development portrait')
+  fs.writeFileSync(path.join(appRoot, 'public', 'watcher.jpg'), 'application portrait')
   fs.writeFileSync(path.join(appRoot, 'public', 'tile-effects', 'amaterasu.svg'), '<svg>built in</svg>')
   fs.writeFileSync(path.join(htmlRoot, 'data', 'pieces', 'manifest.json'), '["packaged"]')
   fs.writeFileSync(path.join(htmlRoot, 'images', 'terrain', 'floor.webp'), 'page terrain')
   fs.writeFileSync(path.join(activePackRoot, 'data', 'pieces', 'manifest.json'), '["pack"]')
   fs.writeFileSync(path.join(activePackRoot, 'images', 'ana.jpg'), 'pack portrait')
+  fs.writeFileSync(path.join(activePackRoot, '.rvb', 'profile.json'), JSON.stringify({
+    files: [
+      { descriptor: { path: 'data/pieces/manifest.json' } },
+      { descriptor: { path: 'images/ana.jpg' } },
+    ],
+  }))
   fs.writeFileSync(path.join(activePackRoot, 'images', 'tile-effects', 'amaterasu.svg'), '<svg>pack</svg>')
   return { appRoot, htmlRoot, activePackRoot }
 }
@@ -66,6 +74,22 @@ describe('Electron client protocol resource resolution', () => {
     })).toBe(path.join(roots.activePackRoot, 'data', 'pieces', 'manifest.json'))
   })
 
+  test('never mixes bundled data into an incomplete installed Profile', () => {
+    const roots = createRoots()
+    fs.rmSync(path.join(roots.activePackRoot, 'data', 'pieces', 'manifest.json'))
+
+    expect(resolveClientProtocolFile({
+      ...roots,
+      isPackaged: false,
+      relativePath: 'data/pieces/manifest.json',
+    })).toBeNull()
+    expect(resolveClientProtocolFile({
+      ...roots,
+      isPackaged: true,
+      relativePath: 'data/pieces/manifest.json',
+    })).toBeNull()
+  })
+
   test('serves page images first and falls back to public development images', () => {
     const roots = createRoots()
 
@@ -96,6 +120,22 @@ describe('Electron client protocol resource resolution', () => {
       isPackaged: false,
       relativePath: 'images/ana.jpg',
     })).toBe(path.join(roots.activePackRoot, 'images', 'ana.jpg'))
+  })
+
+  test('hard-fails a declared missing raster but keeps undeclared app art outside Profile identity', () => {
+    const roots = createRoots()
+    fs.rmSync(path.join(roots.activePackRoot, 'images', 'ana.jpg'))
+
+    expect(resolveClientProtocolFile({
+      ...roots,
+      isPackaged: false,
+      relativePath: 'images/ana.jpg',
+    })).toBeNull()
+    expect(resolveClientProtocolFile({
+      ...roots,
+      isPackaged: false,
+      relativePath: 'images/watcher.jpg',
+    })).toBe(path.join(roots.appRoot, 'public', 'watcher.jpg'))
   })
 
   test('keeps packaged resources under the staged HTML root', () => {

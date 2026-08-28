@@ -267,7 +267,8 @@ test('keeps existing non-EPIPE child process failure feedback intact', () => {
   expect(server).toContain("'服务器启动失败',")
 
   const client = read('electron-client/main.ts')
-  expect(client).toContain("serverProcess.on('error', (err) => console.error('[client] server error:', err))")
+  expect(client).toContain("spawnedProcess.on('error', (err) => console.error('[client] server error:', err))")
+  expect(client).toContain('if (serverProcess === spawnedProcess)')
   expect(client).toContain('lastServerExitCode = code')
   expect(client).toContain("console.log(`[client] local server exited: ${code}`)")
   expect(client).toContain('Local server exited with code ${lastServerExitCode}')

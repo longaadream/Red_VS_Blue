@@ -29,6 +29,24 @@ function resolveExistingFile(root: string, segments: readonly string[]): string 
   }
 }
 
+function declaredProfilePaths(activePackRoot: string): Set<string> | null {
+  try {
+    const metadata = JSON.parse(fs.readFileSync(
+      path.join(activePackRoot, '.rvb', 'profile.json'),
+      'utf8',
+    )) as { files?: Array<{ descriptor?: { path?: unknown } }> }
+    if (!Array.isArray(metadata.files)) return null
+    const declared = new Set<string>()
+    for (const file of metadata.files) {
+      if (typeof file.descriptor?.path !== 'string') return null
+      declared.add(file.descriptor.path)
+    }
+    return declared
+  } catch {
+    return null
+  }
+}
+
 export function resolveClientProtocolFile({
   relativePath,
   htmlRoot,
@@ -44,8 +62,15 @@ export function resolveClientProtocolFile({
 
   const isPackResource = isActivatableResourcePackPath(relativePath)
   if (isPackResource && activePackRoot) {
-    const activeFile = resolveExistingFile(activePackRoot, segments)
-    if (activeFile) return activeFile
+    // All data JSON is Profile-owned. Raster paths are Profile-owned only when
+    // declared by the immutable inventory; legacy page/public art remains a
+    // versioned application asset outside the Profile identity.
+    if (relativePath.startsWith('data/')) {
+      return resolveExistingFile(activePackRoot, segments)
+    }
+    const declared = declaredProfilePaths(activePackRoot)
+    if (declared === null) return null
+    if (declared.has(relativePath)) return resolveExistingFile(activePackRoot, segments)
   }
 
   if (!isPackaged && relativePath.startsWith('data/')) {

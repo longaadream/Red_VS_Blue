@@ -2,6 +2,9 @@
 
 状态：RED-113 Accepted contract
 
+运行时消费者：RED-115 的安装、激活、崩溃恢复与回退见
+[Content Profile v1 运行时](./CONTENT_PROFILE_V1_RUNTIME.md)。
+
 基线：`main@81c754f247b4f627741fbb953df820fdd82ffee2`
 
 决策：[ADR-0018](../decisions/ADR-0018-content-pipeline-v1.md)

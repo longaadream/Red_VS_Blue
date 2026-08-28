@@ -1,50 +1,67 @@
-/**
- * Centralized app path resolution.
- *
- * Dev mode  : falls back to process.cwd() (existing behaviour, no change).
- * Electron  : Electron main process injects APP_ROOT_DIR and USER_DATA_DIR
- *             via the child-process env before starting the Next.js server.
- * Railway   : APP_ROOT_DIR = /app (auto), USER_DATA_DIR not needed.
- */
-import { getResourcePackDataDir, ensureResourcePackLoaded } from './resource-pack'
+import fs from 'node:fs'
+import path from 'node:path'
 
-/**
- * Root of the application bundle (where data/, public/, .next/ live).
- * Replace all `process.cwd()` calls for reading game assets with this.
- */
+/** Root of the immutable application bundle. */
 export function getAppRoot(): string {
-  return process.env.APP_ROOT_DIR ?? process.cwd()
+  return path.resolve(/* turbopackIgnore: true */ process.env.APP_ROOT_DIR ?? process.cwd())
 }
 
-/**
- * Writable user-data directory (logs, SQLite file, etc.).
- * Replace all `process.cwd()` calls for writing runtime files with this.
- */
+/** Writable runtime state root supplied by Electron or the host. */
 export function getUserDataDir(): string {
-  return process.env.USER_DATA_DIR ?? process.cwd()
+  return path.resolve(/* turbopackIgnore: true */ process.env.USER_DATA_DIR ?? process.cwd())
+}
+
+function installedStableRoot(): string | null {
+  const profileStoreRoot = path.join(getUserDataDir(), 'resource-pack')
+  const pointerPath = path.join(profileStoreRoot, 'active.json')
+  if (!fs.existsSync(pointerPath)) return null
+  let state: unknown
+  try {
+    state = JSON.parse(fs.readFileSync(pointerPath, 'utf8'))
+  } catch {
+    return null
+  }
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return null
+  const candidate = state as {
+    schemaVersion?: unknown
+    stable?: { kind?: unknown; resolvedProfileHash?: unknown }
+  }
+  // Legacy/invalid pointers are never interpreted as active v1 content.
+  if (candidate.schemaVersion !== 'rvb-profile-state/v1') return null
+  if (candidate.stable?.kind === 'bundled-base') return null
+  if (
+    candidate.stable?.kind !== 'installed'
+    || typeof candidate.stable.resolvedProfileHash !== 'string'
+    || !/^[0-9a-f]{64}$/.test(candidate.stable.resolvedProfileHash)
+  ) throw new Error('PROFILE_STATE_INVALID: invalid installed stable pointer')
+  const root = path.join(
+    profileStoreRoot,
+    'profiles',
+    candidate.stable.resolvedProfileHash,
+  )
+  const metadataPath = path.join(root, '.rvb', 'profile.json')
+  const dataPath = path.join(root, 'data')
+  if (!fs.existsSync(metadataPath) || !fs.existsSync(dataPath)) {
+    throw new Error(
+      `PROFILE_SNAPSHOT_INCOMPLETE: ${candidate.stable.resolvedProfileHash}`,
+    )
+  }
+  return root
 }
 
 /**
- * Root of the game data directory (pieces/, skills/, rules/, maps/, cards/).
- *
- * Priority:
- * 1. RESOURCE_PACK_DATA_DIR env (Electron with imported pack)
- * 2. Synced resource pack in user-data (server with imported pack)
- * 3. APP_ROOT_DIR/data (bundled data)
- * 4. cwd/data (dev mode fallback)
+ * Data root is selected once per process from an explicit candidate/stable
+ * Profile. Installed Profile failures never fall through to bundled files.
  */
 export function getDataRoot(): string {
-  if (process.env.RESOURCE_PACK_DATA_DIR) {
-    return process.env.RESOURCE_PACK_DATA_DIR
+  if (process.env.RVB_PROFILE_ROOT) {
+    const root = path.resolve(process.env.RVB_PROFILE_ROOT)
+    const data = path.join(root, 'data')
+    if (!fs.existsSync(data)) {
+      throw new Error(`PROFILE_SNAPSHOT_INCOMPLETE: ${data}`)
+    }
+    return data
   }
-
-  ensureResourcePackLoaded()
-  const packDataDir = getResourcePackDataDir()
-  if (packDataDir) {
-    return packDataDir
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { join } = require('path') as typeof import('path')
-  return join(getAppRoot(), 'data')
+  const installed = installedStableRoot()
+  return installed ? path.join(installed, 'data') : path.join(getAppRoot(), 'data')
 }
