@@ -2,7 +2,7 @@
   "id": "red-obito",
   "name": "宇智波带土",
   "faction": "evil",
-  "description": "晓组织的幕后黑手，以友方的苦难为力量积蓄怨念，神威使其能完全免疫一次伤害并将其反弹",
+  "description": "晓组织的幕后黑手。友方的死亡会逐步唤醒万花筒，神威既能规避并反弹伤害，也能将敌人直接移出战场。",
   "rarity": "legendary",
   "image": "obito.jpg",
   "stats": {
@@ -21,17 +21,10 @@
       "level": 1
     },
     {
-      "skillId": "obito-grudge",
-      "level": 1
-    },
-    {
       "skillId": "hashirama-edo-wood-spike",
       "level": 1
     }
   ],
-  "rules": [
-    "rule-obito-grudge",
-    "rule-obito-grudge-reset"
-  ],
+  "rules": [],
   "isDefault": false
 }

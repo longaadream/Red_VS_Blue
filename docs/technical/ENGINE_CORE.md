@@ -149,7 +149,7 @@ Demo 房间对局在回合阶段前增加部署门禁：
 
 `BattleState.terminalResult` 是唯一权威终局字段，由 `lib/game/terminal.ts::finalizeBattleTerminal()` 在公共动作归约出口提交。结果包含 winner/loser playerId、稳定 reason，以及 action index、turn、phase、completed round 的结算位置。
 
-普通动作必须先完成整条伤害、死亡、复活、触发与 batch；仍有 `pendingOptionSelection` / `pendingTargetSelection` 时不判终局。核心身份来自开局 `isCore: true`，召唤入口强制为 false，敌我按 `ownerPlayerId` 而不是内容阵营判断。核心全灭优先于第 40 个完整轮次平局。
+普通动作必须先完成整条伤害、死亡、复活、触发与 batch；仍有 `pendingOptionSelection` / `pendingTargetSelection` 时不判终局。核心身份来自开局 `isCore: true`，召唤入口强制为 false，敌我按 `ownerPlayerId` 而不是内容阵营判断。RED-124 的强制移除不进入墓地，`extensions.removedPieces` 只保存终局所需的最小身份摘要，终局仍以当前 `pieces` 中的存活核心为准。核心全灭优先于第 40 个完整轮次平局。
 
 `surrender` 不再把己方棋子生命归零或触发 whenever，而是直接提交终局；`reason: "timeout"` 为 RED-36 预留相同权威入口。终局后 `applyBattleAction()` 与 `runBattleAction()` 都以 `BATTLE_ALREADY_TERMINAL` 拒绝命令。HTTP/WS 禁止客户端写 winner/gameOver，并通过 `Room.version` CAS 保证竞争中只提交一次；浏览器只渲染 `terminalResult`。
 

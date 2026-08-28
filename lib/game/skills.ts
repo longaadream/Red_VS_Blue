@@ -7,6 +7,7 @@ import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import { isSuspendableActionPending } from './suspendable-action-transaction'
+import { recordMangekyoDeath } from './mangekyo'
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 function battleDebugLog(...args: unknown[]): void {
@@ -1315,6 +1316,8 @@ export interface SkillDefinition {
   id: SkillId
   name: string
   description: string
+  /** 玩家可见的机制关键词。 */
+  keywords?: string[]
   kind: SkillKind
   /** 技能类型：normal=普通技能, super=充能技能 */
   type: SkillType
@@ -2356,6 +2359,7 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       damageBatchId: batchId,
       damageChainId: chain.chainId,
     })
+    recordMangekyoDeath(battle, entry.target)
 
     // A death consumer may revive the target before graveyard/charge finalization.
     if (entry.target.currentHp > 0) {
@@ -2701,10 +2705,46 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     // 创建效果函数
     const effects = createEffectFunctions(battle, sourcePiece, undefined, context)
 
+    const forceRemoveEnemyPieceById = (targetPieceId: string) => {
+      const targetIndex = battle.pieces.findIndex(piece =>
+        piece.instanceId === targetPieceId &&
+        piece.currentHp > 0 &&
+        piece.ownerPlayerId !== sourcePiece.ownerPlayerId)
+      if (targetIndex === -1) return false
+
+      const [removed] = battle.pieces.splice(targetIndex, 1)
+      battle.extensions ??= {}
+      const removedPieces = Array.isArray(battle.extensions.removedPieces)
+        ? battle.extensions.removedPieces
+        : []
+      battle.extensions.removedPieces = removedPieces
+      removedPieces.push({
+        instanceId: removed.instanceId,
+        templateId: removed.templateId,
+        ownerPlayerId: removed.ownerPlayerId,
+        name: removed.name,
+        isCore: removed.isCore === true,
+        removedBySkillId: skillDef.id,
+      })
+      battle.actions ??= []
+      battle.actions.push({
+        type: 'forceRemovePiece',
+        playerId: sourcePiece.ownerPlayerId,
+        turn: battle.turn?.turnNumber ?? 0,
+        payload: {
+          message: `${sourcePiece.name || sourcePiece.templateId}将${removed.name || removed.templateId}强制移出战场`,
+          pieceId: removed.instanceId,
+          pieceTemplateId: removed.templateId,
+          removedBySkillId: skillDef.id,
+        },
+      })
+      return true
+    }
+
     // 创建技能执行环境，包含辅助函数和效果函数
     const skillEnvironment = {
       // 上下文
-      context,
+      context: { ...context, forceRemoveEnemyPieceById },
       // 源棋子（直接引用，可读写）
       sourcePiece,
       battle,

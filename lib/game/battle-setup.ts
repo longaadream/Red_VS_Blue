@@ -7,6 +7,7 @@ import type { SkillDefinition, SkillState } from "./skills"
 import type { BattleState, PlayerId } from "./turn"
 import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
+import { getSkillById } from './skill-repository'
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { loadRuleById } from './skills'
 import path from 'path'
@@ -119,6 +120,12 @@ export interface InitialPieceBuildOptions {
 }
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
+
+function isUltimateSkill(skillId: string): boolean {
+  return getSkillById(skillId)?.type === 'ultimate' ||
+    skillId.includes('ultimate') ||
+    skillId.includes('ult')
+}
 
 /** 将棋子模板中的 rules 加载到棋子实例上。 */
 function applyInitialRules(piece: PieceInstance, pieceTemplate: PieceTemplate): void {
@@ -274,7 +281,7 @@ export function buildInitialPiecesForPlayers(
           y: position.y,
           skills: pieceTemplate.skills.map(s => {
             // 检查技能是否为限定技
-            const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult');
+            const isUltimate = isUltimateSkill(s.skillId);
             return {
               skillId: s.skillId,
               currentCooldown: 0,
@@ -325,7 +332,7 @@ export function buildInitialPiecesForPlayers(
         x: position.x,
         y: position.y,
         skills: pieceTemplate.skills.map(s => {
-          const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult')
+          const isUltimate = isUltimateSkill(s.skillId)
           return {
             skillId: s.skillId,
             currentCooldown: 0,
@@ -383,7 +390,7 @@ export function buildInitialPiecesForPlayers(
       y: redPosition.y,
       skills: defaultRedPiece.skills.map(s => {
         // 检查技能是否为限定技
-        const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult');
+        const isUltimate = isUltimateSkill(s.skillId);
         return {
           skillId: s.skillId,
           currentCooldown: 0,
@@ -416,7 +423,7 @@ export function buildInitialPiecesForPlayers(
       y: bluePosition.y,
       skills: defaultBluePiece.skills.map(s => {
         // 检查技能是否为限定技
-        const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult');
+        const isUltimate = isUltimateSkill(s.skillId);
         return {
           skillId: s.skillId,
           currentCooldown: 0,
@@ -459,7 +466,7 @@ export function buildInitialPiecesForPlayers(
         y: position.y,
         skills: defaultRedPiece.skills.map(s => {
           // 检查技能是否为限定技
-          const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult');
+          const isUltimate = isUltimateSkill(s.skillId);
           return {
             skillId: s.skillId,
             currentCooldown: 0,
@@ -496,7 +503,7 @@ export function buildInitialPiecesForPlayers(
         y: position.y,
         skills: defaultBluePiece.skills.map(s => {
           // 检查技能是否为限定技
-          const isUltimate = s.skillId.includes('ultimate') || s.skillId.includes('ult');
+          const isUltimate = isUltimateSkill(s.skillId);
           return {
             skillId: s.skillId,
             currentCooldown: 0,

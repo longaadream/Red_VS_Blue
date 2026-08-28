@@ -29,6 +29,7 @@ import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction } from "./skills"
+import { getEffectiveChargeCost } from './mangekyo'
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import type { DamageType } from "./skills"
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
@@ -206,6 +207,8 @@ export interface PlayerTurnMeta {
   playerId: PlayerId
   /** 玩家昵称 */
   name?: string
+  /** 本局该玩家累计发生的友方死亡事件数；同一实例复活后再次死亡会再次计数。 */
+  mangekyoDeathCount?: number
   /** 当前累计的充能点数（用于释放充能技能） */
   chargePoints: number
   /** 当前行动点 */
@@ -580,14 +583,21 @@ function validateSkillActionBasics(
   playerId: PlayerId,
   skillId: string,
   action: { targetPieceId?: string; targetX?: number; targetY?: number },
-  checkChargeCost: boolean,
+  isChargeAction: boolean,
 ): SkillDefinition {
   const skillDef = getSkillDefinitionOrThrow(state, skillId)
   const playerMeta = getPlayerMeta(state, playerId)
+  const isChargeSkill = (skillDef.chargeCost ?? 0) > 0
+  if (isChargeAction !== isChargeSkill) {
+    throw new BattleRuleError(isChargeSkill
+      ? 'Charge skills must use the useChargeSkill action'
+      : 'Basic skills must use the useBasicSkill action')
+  }
   if (playerMeta.actionPoints < (skillDef.actionPointCost || 0)) {
     throw new BattleRuleError(`Not enough action points to use ${skillDef.name}`)
   }
-  if (checkChargeCost && (skillDef.chargeCost ?? 0) > 0 && playerMeta.chargePoints < (skillDef.chargeCost ?? 0)) {
+  const chargeCost = getEffectiveChargeCost(state, playerId, skillDef)
+  if (isChargeAction && playerMeta.chargePoints < chargeCost) {
     throw new BattleRuleError("Not enough charge points to use this skill")
   }
   if (piece.skills) {
@@ -2421,7 +2431,7 @@ function applyBattleActionInternal(
         return next
       }
 
-      const cost = skillDef.chargeCost ?? 0
+      const cost = getEffectiveChargeCost(next, action.playerId, skillDef)
       // 从 next 状态获取 playerMeta，确保修改能正确保存
       const nextPlayerMeta = getPlayerMeta(next, action.playerId)
       if (cost > 0 && nextPlayerMeta.chargePoints < cost) {

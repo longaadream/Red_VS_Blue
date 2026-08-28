@@ -42,6 +42,8 @@ export interface PlayerTurnMeta {
   playerId: PlayerId
   /** 玩家昵称 */
   name?: string
+  /** 本局该玩家累计发生的友方死亡事件数；同一实例复活后再次死亡会再次计数。 */
+  mangekyoDeathCount?: number
   /** 当前累计的充能点数（用于释放充能技能） */
   chargePoints: number
   /** 当前行动点 */

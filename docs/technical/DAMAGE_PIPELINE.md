@@ -49,6 +49,8 @@ context.damageQueue.push({
 
 ## 生命周期与充能
 
-一次 batch 中，每个起始存活且最终为 0 的目标只进入一次生命周期。`onPieceDied` 执行后若目标恢复为正生命，不进墓地也不提供充能；否则敌方击杀者获得 1 充能，显式 `noKillCharge` 目标除外。目标随后按稳定顺序移入墓地。
+一次 batch 中，每个起始存活且最终为 0 的目标只进入一次生命周期。`onPieceDied` 派发完成即记录一次该目标所有者的友方死亡事件，因此召唤物死亡会计算，同一实例复活后再次死亡也会再次计算；本次 `onPieceDied` 若已将目标复活，死亡事件仍保留。`onPieceDied` 执行后若目标恢复为正生命，不进墓地也不提供击杀充能；否则敌方击杀者获得 1 充能，显式 `noKillCharge` 目标除外。目标随后按稳定顺序移入墓地。
+
+玩家级 `mangekyoDeathCount` 是【万花筒】动态充能成本的权威累计值：`max(0, baseChargeCost - mangekyoDeathCount)`。强制移除不经过本管线，不派发死亡事件，也不写入墓地。
 
 动作入口等 damage chain 清空后由 `finalizeBattleTerminal()` 统一检查终局，因此可以同时观察双方核心全灭并判平局；pending 复活/选择未完成时继续延后。

@@ -9,6 +9,7 @@ import type {
   SuspendableActionTransaction,
   SuspendableTurnCheckpoint,
 } from './suspendable-action-transaction'
+import { getEffectiveChargeCost } from './mangekyo'
 
 export const TARGET_SELECTION_PROTOCOL_VERSION = 1
 
@@ -445,13 +446,20 @@ function getSource(state: BattleState, action: any): TargetSource | InvalidActio
     }
     const definition = state.skillsById[action.skillId] || getSkillById(action.skillId)
     if (!definition) return { kind: 'invalid', code: 'ACTION_INVALID', message: `Skill ${action.skillId} not found` }
+    const isChargeSkill = (definition.chargeCost || 0) > 0
+    if (action.type === 'useBasicSkill' && isChargeSkill) {
+      return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Charge skills must use the useChargeSkill action' }
+    }
+    if (action.type === 'useChargeSkill' && !isChargeSkill) {
+      return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Basic skills must use the useBasicSkill action' }
+    }
     const availabilityIssue = getSourceAvailabilityIssue(state, sourcePiece, action.skillId)
     if (availabilityIssue) return availabilityIssue
     const player = state.players.find(meta => normalizePlayerId(meta.playerId) === normalizePlayerId(playerId))
     if (!player || player.actionPoints < (definition.actionPointCost || 0)) {
       return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Not enough action points for this skill' }
     }
-    if (action.type === 'useChargeSkill' && (definition.chargeCost || 0) > player.chargePoints) {
+    if (action.type === 'useChargeSkill' && getEffectiveChargeCost(state, playerId, definition) > player.chargePoints) {
       return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Not enough charge points for this skill' }
     }
     const skillState = sourcePiece.skills?.find(skill => skill.skillId === action.skillId)

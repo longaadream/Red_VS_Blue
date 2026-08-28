@@ -3,6 +3,7 @@ import { getSkillById } from './skill-repository'
 import { prepareAction } from './targeting'
 import type { TargetRef } from './targeting'
 import { getLegalNormalMoveTargets, manhattanDistance } from './spatial'
+import { getEffectiveChargeCost } from './mangekyo'
 
 function getValidMoves(
   state: BattleState,
@@ -104,13 +105,14 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
         const apCost: number = skillDef.actionPointCost ?? 0
         if (ap < apCost) continue
 
-        const chargeCost: number = skillDef.chargeCost ?? 0
+        const baseChargeCost: number = skillDef.chargeCost ?? 0
+        const chargeCost = getEffectiveChargeCost(state, botPlayerId, skillDef)
         if (chargeCost > 0 && botMeta.chargePoints < chargeCost) continue
 
         // Skip skills that need user interaction (pending option/target)
         if (skillDef.needsOptionSelection || skillDef.interactive) continue
 
-        const actionType = chargeCost > 0 ? 'useChargeSkill' : 'useBasicSkill'
+        const actionType = baseChargeCost > 0 ? 'useChargeSkill' : 'useBasicSkill'
         const action = prepareBotSkillAction(state, {
           type: actionType,
           playerId: botPlayerId,

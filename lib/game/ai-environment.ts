@@ -149,6 +149,7 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
     players: state.players.map(player => ({
       playerId: player.playerId,
       name: player.name,
+      mangekyoDeathCount: player.mangekyoDeathCount,
       chargePoints: player.chargePoints,
       actionPoints: player.actionPoints,
       maxActionPoints: player.maxActionPoints,

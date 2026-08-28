@@ -86,5 +86,13 @@
     "shortDescription": "用于释放特定技能的资源。",
     "longDescription": "充能是部分技能释放或强化时需要消耗的专属资源。",
     "highlight": true
+  },
+  {
+    "id": "mangekyo",
+    "name": "万花筒",
+    "category": "resource",
+    "shortDescription": "每次友方角色死亡时，该技能的充能消耗降低1，可降至0。",
+    "longDescription": "每当一个友方角色发生死亡结算，己方所有带有【万花筒】关键词的技能当前充能消耗永久降低1，最低为0。召唤物死亡会计算；同一角色复活后再次死亡也会再次计算。充能消耗降至0后，技能仍属于充能技能，并继续遵守行动点、冷却、目标和每局使用次数限制。",
+    "highlight": true
   }
 ]

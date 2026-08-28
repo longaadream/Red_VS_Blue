@@ -124,7 +124,7 @@ describe('RED-120 character data contract', () => {
       'ichigo-black-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的所有敌人造成175%攻击力的魔法伤害；命中后，可以传送至第一个被命中敌人相邻的一个空格。', 2, 1],
       'itachi-tsukuyomi': ['选择4格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。', 0, 1],
       'itachi-amaterasu': ['选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。', 1, 2],
-      'itachi-totsuka-blade': ['选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。', 2, 1],
+      'itachi-totsuka-blade': ['万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。', 2, 1],
     } as const
     for (const [id, [description, ap, cooldown]] of Object.entries(expected)) {
       const skill = loadSkill(id)
