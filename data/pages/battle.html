@@ -5578,6 +5578,9 @@
           const btn = document.getElementById('btnSwitchPov')
           if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(myPlayerId)
         }
+        if (pendingActionFeedback && pendingActionFeedback.clientActionId === action.clientActionId) {
+          clearPendingActionFeedback('training-applied')
+        }
         if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
           selectedPieceId = action.pieceId
         } else if (action.type === 'endTurn' || action.type === 'beginPhase') {

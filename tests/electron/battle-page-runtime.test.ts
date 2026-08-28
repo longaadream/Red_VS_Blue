@@ -256,6 +256,76 @@ describe('battle page runtime source', () => {
     expect(actionBarRenders).toBe(1)
   })
 
+  it('acknowledges a successful training action before rendering instead of waiting for the timeout', async () => {
+    const html = readBattlePage()
+    let clearedTimers = 0
+    const elements: Record<string, { disabled?: boolean; textContent?: string }> = {
+      btnEnd: { disabled: false },
+      btnSwitchPov: { textContent: '' },
+    }
+    const nextState = {
+      pieces: [{ instanceId: 'liadrin', currentHp: 14 }],
+      players: [{ playerId: 'player-red', actionPoints: 0, hand: [] }],
+      turn: { currentPlayerId: 'player-red', phase: 'action' },
+      terminalResult: null,
+    }
+    const context = vm.createContext({
+      document: { getElementById: (id: string) => elements[id] ?? null },
+      clearTimeout: () => { clearedTimers += 1 },
+      setMoveButtonDisabled: () => undefined,
+      trainingApiFetch: async () => nextState,
+      createBattlePresentationModel: () => ({}),
+      spawnStateFloaters: () => undefined,
+      flushActionLog: () => undefined,
+      getTrainingPlayerFaction: () => 'red',
+      trainingPlayerLabel: () => '红方',
+      reconcileBattleInteractionState: () => '',
+      restoreSelectedPieceMenu: () => undefined,
+      handleGameOver: () => undefined,
+      setStatusMsg: () => undefined,
+      rejectPendingActionFeedback: () => undefined,
+      clearTargetInteraction: () => undefined,
+      addLog: () => undefined,
+    })
+
+    vm.runInContext(`
+      let G = {
+        pieces: [{ instanceId: 'liadrin', currentHp: 14 }],
+        players: [{ playerId: 'player-red', actionPoints: 3, hand: [] }],
+        turn: { currentPlayerId: 'player-red', phase: 'action' },
+      }
+      let pendingActionFeedback = {
+        clientActionId: 'training-action-1',
+        type: 'pendingOptionSelect',
+        startedAt: 0,
+      }
+      let pendingActionFeedbackTimer = 99
+      let targetSubmissionPending = null
+      let pendingSkill = null
+      let pendingCardAction = null
+      let selectedPieceId = null
+      let myPlayerId = 'player-red'
+      let myFaction = 'red'
+      let _use3d = false
+      let battlePresentation = null
+      const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
+      function render() { globalThis.__pendingAtRender = pendingActionFeedback }
+      ${runtimeFunction(html, 'clearPendingActionFeedback')}
+      async ${runtimeFunction(html, 'trainingDoAction')}
+    `, context)
+
+    await vm.runInContext(`trainingDoAction({
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      clientActionId: 'training-action-1',
+    })`, context)
+
+    expect(context.__pendingAtRender).toBeNull()
+    expect(vm.runInContext('pendingActionFeedback', context)).toBeNull()
+    expect(vm.runInContext('pendingActionFeedbackTimer', context)).toBeNull()
+    expect(clearedTimers).toBe(1)
+  })
+
   it('coalesces a pending-option transition and its matching receipt into one lightweight render', () => {
     const html = readBattlePage()
     const counts = { board: 0, hud: 0, panels: 0, actionBar: 0, hand: 0, target: 0, performance: 0 }
