@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, net as electronNet, protocol, session } from 'electron'
-import { spawn, ChildProcess, execSync } from 'child_process'
+import { spawn, ChildProcess, execFileSync, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as zlib from 'zlib'
@@ -471,46 +471,17 @@ function getNodeBin(): string {
   return 'node'
 }
 
-function findStandaloneModules(appRoot: string): string | null {
-  const candidates = [
-    path.join(appRoot, 'standalone', 'node_modules'),
-    path.join(appRoot, '.next', 'standalone', 'node_modules'),
-  ]
-  // Also scan standalone/<name>/node_modules (nested structure from Turbopack)
-  const standaloneDir = path.join(appRoot, 'standalone')
-  if (fs.existsSync(standaloneDir)) {
-    try {
-      for (const e of fs.readdirSync(standaloneDir, { withFileTypes: true })) {
-        if (e.isDirectory()) candidates.push(path.join(standaloneDir, e.name, 'node_modules'))
-      }
-    } catch {}
-  }
-  for (const r of candidates) {
-    if (fs.existsSync(path.join(r, '.prisma', 'client', 'index.js'))) return r
-  }
-  return null
-}
-
 function initDatabase(dbPath: string, appRoot: string): void {
   const initScript = path.join(appRoot, 'init-db.js')
   if (!fs.existsSync(initScript)) {
-    console.error('[client] init-db.js not found — skipping DB init')
-    return
+    throw new Error('[client] init-db.js not found: ' + initScript)
   }
-  const moduleRoot = findStandaloneModules(appRoot)
-  if (!moduleRoot) {
-    console.error('[client] Standalone .prisma/client not found — skipping DB init')
-    return
-  }
-  try {
-    execSync(
-      `"${getNodeBin()}" "${initScript}" "file:${dbPath}" "${moduleRoot}"`,
-      { env: process.env, cwd: appRoot, stdio: 'pipe' }
-    )
-    console.log('[client] Database ready.')
-  } catch (err) {
-    console.error('[client] initDatabase error:', err)
-  }
+  execFileSync(
+    getNodeBin(),
+    [initScript, 'file:' + dbPath],
+    { env: process.env, cwd: appRoot, stdio: 'pipe' },
+  )
+  console.log('[client] Database ready.')
 }
 
 async function startLocalServer(): Promise<void> {
@@ -532,7 +503,7 @@ async function startLocalServer(): Promise<void> {
   if (app.isPackaged) {
     const dbPath = path.join(userData, 'game.db')
     fs.mkdirSync(userData, { recursive: true })
-    try { initDatabase(dbPath, appRoot) } catch {}
+    initDatabase(dbPath, appRoot)
     databaseUrl = `file:${dbPath}`
   } else {
     databaseUrl = `file:${path.join(appRoot, 'prisma', 'dev.db')}`
