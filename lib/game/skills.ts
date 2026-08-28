@@ -1344,6 +1344,8 @@ export interface SkillDefinition {
   icon?: string
   /** Pure, machine-readable option/target declaration (RED-59). */
   targeting?: SelectionContractDefinition
+  /** When true, cancelling any synthetic post-effect target rolls back the entire skill transaction. */
+  rollbackPendingTargetOnCancel?: boolean
 }
 
 /**

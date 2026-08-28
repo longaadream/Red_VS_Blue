@@ -59,7 +59,7 @@ import {
   assertActionTargetingReady,
   assertPendingTargetCancellation,
   stampTargetingRevision,
-  validatePendingTargetSubmission,
+  validatePendingTargetSubmissions,
 } from "./targeting"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 import {
@@ -963,8 +963,8 @@ function applyBattleActionInternal(
   if (action.type !== 'surrender' && !isTimerCommand && !continuation.skipTargetingValidation) {
     assertActionTargetingReady(state, action)
   }
-  const validatedPendingTarget = action.type === 'pendingTargetSelect'
-    ? validatePendingTargetSubmission(state, action)
+  const validatedPendingTargets = action.type === 'pendingTargetSelect'
+    ? validatePendingTargetSubmissions(state, action)
     : undefined
   if (action.type === 'pendingOptionSelect') {
     validatePendingOptionSubmission(state, action)
@@ -1003,6 +1003,7 @@ function applyBattleActionInternal(
     pendingQueue?: PendingRuleConsumerRef[]
     pendingReactiveCards?: PendingReactiveCardRef[]
     pendingAction?: any
+    rollbackOnCancel?: boolean
   }
 
   const appendTriggerMessages = (next: BattleState, result: TriggerResult, playerId: string) => {
@@ -1087,6 +1088,17 @@ function applyBattleActionInternal(
       pendingReactiveCards,
       pendingAction,
       canCancel: result.canCancel,
+      selectionMode: result.selectionMode,
+      minSelections: result.minSelections,
+      maxSelections: result.maxSelections,
+      min: result.minSelections,
+      max: result.maxSelections,
+      candidates: result.targetCandidates as PendingTargetSelectionSession['candidates'],
+      fixedCandidates: Array.isArray(result.targetCandidates),
+      effectCode: result.effectCode,
+      payload: result.payload,
+      resumeOnCancel: result.resumeOnCancel,
+      rollbackOnCancel: result.rollbackOnCancel ?? seed.rollbackOnCancel,
     }
     return true
   }
@@ -1416,7 +1428,7 @@ function applyBattleActionInternal(
         })
       }
       if (
-        pending.transaction.currentInteraction?.consumerOrdinal === -2
+        (pending.transaction.currentInteraction?.consumerOrdinal ?? 0) <= -2
         || pending.transaction.currentInteraction?.consumerKind === 'rule'
         || pending.transaction.currentInteraction?.consumerKind === 'reactiveCard'
       ) {
@@ -2197,12 +2209,24 @@ function applyBattleActionInternal(
         if (pendingTarget) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
+            ownerPlayerId: pendingTarget.playerId || action.playerId,
             title: pendingTarget.title || '请选择目标',
             targetType: pendingTarget.targetType || 'cell',
             range: pendingTarget.range || 99,
             filter: pendingTarget.filter || 'all',
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
+            source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
+            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            selectionMode: pendingTarget.selectionMode,
+            minSelections: pendingTarget.minSelections,
+            maxSelections: pendingTarget.maxSelections,
+            min: pendingTarget.minSelections,
+            max: pendingTarget.maxSelections,
+            canCancel: pendingTarget.canCancel,
+            resumeOnCancel: pendingTarget.resumeOnCancel,
+            rollbackOnCancel: pendingTarget.rollbackOnCancel ?? skillDef.rollbackPendingTargetOnCancel,
           }
           battleDebugLog('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
         }
@@ -2511,12 +2535,24 @@ function applyBattleActionInternal(
         if (pendingTarget) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
+            ownerPlayerId: pendingTarget.playerId || action.playerId,
             title: pendingTarget.title || '请选择目标',
             targetType: pendingTarget.targetType || 'cell',
             range: pendingTarget.range || 99,
             filter: pendingTarget.filter || 'all',
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
+            source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
+            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            selectionMode: pendingTarget.selectionMode,
+            minSelections: pendingTarget.minSelections,
+            maxSelections: pendingTarget.maxSelections,
+            min: pendingTarget.minSelections,
+            max: pendingTarget.maxSelections,
+            canCancel: pendingTarget.canCancel,
+            resumeOnCancel: pendingTarget.resumeOnCancel,
+            rollbackOnCancel: pendingTarget.rollbackOnCancel ?? skillDef.rollbackPendingTargetOnCancel,
           }
           battleDebugLog('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
         }
@@ -2738,19 +2774,22 @@ function applyBattleActionInternal(
       if (!pending) {
         throw new BattleRuleError('[pendingTargetSelect] validated pending session disappeared')
       }
+      const submittedTargets = validatedPendingTargets || []
       if (pending.transaction) {
-        const targetInput: SuspendableInteractionInput = validatedPendingTarget?.type === 'piece'
+        const firstTarget = submittedTargets[0]
+        const targetInput: SuspendableInteractionInput = firstTarget?.type === 'piece'
           ? {
-              targetPieceId: validatedPendingTarget.pieceId,
-              selectedTargets: [validatedPendingTarget],
+              targetPieceId: firstTarget.pieceId,
+              selectedTargets: submittedTargets,
             }
           : {
-              targetX: validatedPendingTarget?.x,
-              targetY: validatedPendingTarget?.y,
-              selectedTargets: validatedPendingTarget ? [validatedPendingTarget] : [],
+              targetX: firstTarget?.type === 'cell' ? firstTarget.x : undefined,
+              targetY: firstTarget?.type === 'cell' ? firstTarget.y : undefined,
+              selectedTargets: submittedTargets,
             }
         return resumeSuspendableActionTransaction(next, pending.transaction, targetInput)
       }
+      const validatedPendingTarget = submittedTargets[0]
       const x = validatedPendingTarget?.type === 'cell'
         ? validatedPendingTarget.x
         : (action as any).targetX
@@ -2765,9 +2804,11 @@ function applyBattleActionInternal(
         : undefined
       const resolvedPending = {
         ...pending,
-        selectedTargets: [...(pending.selectedTargets || []), validatedPendingTarget!],
+        selectedTargets: [...(pending.selectedTargets || []), ...submittedTargets],
       }
-      const advancedPending = advancePendingTargetSession(pending, validatedPendingTarget!)
+      const advancedPending = submittedTargets.length === 1
+        ? advancePendingTargetSession(pending, validatedPendingTarget!)
+        : undefined
       if (advancedPending) {
         next.pendingTargetSelection = advancedPending
         return next
@@ -2821,9 +2862,10 @@ function applyBattleActionInternal(
       if (setPendingInteraction(next, result, pending.triggerContext || {}, {
         continuationContext: pending.continuationContext,
         pendingQueue: pending.pendingQueue,
-        pendingReactiveCards: pending.pendingReactiveCards,
-        pendingAction: pending.pendingAction,
-      })) {
+          pendingReactiveCards: pending.pendingReactiveCards,
+          pendingAction: pending.pendingAction,
+          rollbackOnCancel: pending.rollbackOnCancel,
+        })) {
         return next
       }
       return resumePendingInteraction(next, pending, action.playerId, {}, true)
@@ -3085,7 +3127,13 @@ function setSuspendableTransactionPending(
     filter: pendingError.prompt.filter,
     candidates: pendingError.prompt.candidates as PendingTargetSelectionSession['candidates'],
     fixedCandidates: Array.isArray(pendingError.prompt.candidates),
+    selectionMode: pendingError.prompt.selectionMode,
+    minSelections: pendingError.prompt.minSelections,
+    maxSelections: pendingError.prompt.maxSelections,
+    min: pendingError.prompt.minSelections,
+    max: pendingError.prompt.maxSelections,
     resumeOnCancel: pendingError.prompt.resumeOnCancel,
+    rollbackOnCancel: pendingError.prompt.rollbackOnCancel,
     candidateState: pendingError.prompt.candidateState as BattleState | undefined,
     source,
     canCancel: pendingError.prompt.canCancel,
@@ -3126,6 +3174,22 @@ function mandatoryTimeoutTargetInput(
       'Timed-out mandatory transaction target has no legal candidates',
       'PENDING_TIMEOUT_NO_CANDIDATES',
     )
+  }
+  if (prompt.selectionMode === 'multi') {
+    const minSelections = Number.isSafeInteger(prompt.minSelections)
+      ? Math.max(0, prompt.minSelections!)
+      : 1
+    if (candidates.length < minSelections) {
+      throw new BattleRuleError(
+        'Timed-out mandatory transaction multi-target has too few legal candidates',
+        'PENDING_TIMEOUT_NO_CANDIDATES',
+      )
+    }
+    const selectedTargets = candidates.slice(0, minSelections)
+    const first = selectedTargets[0]
+    return first?.type === 'piece'
+      ? { targetPieceId: first.pieceId, selectedTargets }
+      : { targetX: first?.x, targetY: first?.y, selectedTargets }
   }
   const index = runtime.nextInt(`${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`, candidates.length)
   const target = candidates[index]
@@ -3191,8 +3255,9 @@ function runSuspendableActionTransaction(
         suspendedTurn: { ...reduced.turn },
       })
     }
-    const directTarget = reduced.pendingTargetSelection
-    if (directTarget && !directTarget.transaction) {
+    let directTarget = reduced.pendingTargetSelection
+    let directTargetStage = 0
+    while (directTarget && !directTarget.transaction) {
       const rootAction = transaction.rootAction as BattleAction
       const directSource = directTarget.source
       const key: NonNullable<SuspendableActionTransaction['currentInteraction']> = {
@@ -3202,7 +3267,7 @@ function runSuspendableActionTransaction(
           || ('cardInstanceId' in rootAction ? rootAction.cardInstanceId : undefined)
           || 'direct-target',
         sourceId: directSource?.pieceId || ('pieceId' in rootAction ? rootAction.pieceId : undefined) || undefined,
-        consumerOrdinal: -2,
+        consumerOrdinal: -2 - directTargetStage,
       }
       const input = transactionRuntime.takeAnswer(key)
       if (!input) {
@@ -3213,7 +3278,12 @@ function runSuspendableActionTransaction(
           targetType: directTarget.targetType,
           range: directTarget.range,
           filter: directTarget.filter,
+          candidates: directTarget.candidates,
+          selectionMode: directTarget.selectionMode,
+          minSelections: directTarget.minSelections,
+          maxSelections: directTarget.maxSelections,
           canCancel: directTarget.canCancel !== false,
+          rollbackOnCancel: directTarget.rollbackOnCancel,
           suspendedTurn: { ...reduced.turn },
           sourcePieceId: key.sourceId,
           candidateState: reduced,
@@ -3221,9 +3291,16 @@ function runSuspendableActionTransaction(
       }
       const resolvedInput = input!
       if (resolvedInput.cancelled) {
+        if (directTarget.rollbackOnCancel) {
+          transactionRuntime.assertReplayComplete()
+          return safeCloneBattleState(authorityState)
+        }
         reduced.pendingTargetSelection = undefined
       } else {
-        const selectedTarget = resolvedInput.selectedTargets?.[0] as any
+        const selectedTargets = (resolvedInput.selectedTargets || []) as Array<{
+          type: 'piece' | 'cell'; pieceId?: string; x?: number; y?: number
+        }>
+        const selectedTarget = selectedTargets[0]
         const targetPieceId = resolvedInput.targetPieceId
           || (selectedTarget?.type === 'piece' ? selectedTarget.pieceId : undefined)
         const targetX = resolvedInput.targetX
@@ -3250,8 +3327,13 @@ function runSuspendableActionTransaction(
           targetY,
           selectionId: finalized.selectionId,
           stateRevision: finalized.stateRevision,
+          extraTargets: selectedTargets.slice(1).map(target => target.type === 'piece'
+            ? { pieceId: target.pieceId }
+            : { x: target.x, y: target.y }),
         })
       }
+      directTargetStage += 1
+      directTarget = reduced.pendingTargetSelection
     }
     transactionRuntime.assertReplayComplete()
     return reduced

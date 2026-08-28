@@ -771,7 +771,7 @@ describe('Turalyon holy-hand mobility', () => {
     expect(secondResolved.players[0].hand).toHaveLength(0)
   })
 
-  it('spends 4 AP and 1 charge, grants shields, and remains reusable after cooldown', () => {
+  it('selects 1-3 friendly core pieces and a gathering cell in two authoritative stages', () => {
     const definition = skill('turalyon-grand-crusade')
     const turalyon = makePiece({ instanceId: 'turalyon', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
     turalyon.isCore = true
@@ -789,15 +789,41 @@ describe('Turalyon holy-hand mobility', () => {
     const use = (input: any) => {
       const pending = applyBattleAction(input, { type: 'useChargeSkill', playerId: 'player-red', pieceId: 'turalyon', skillId: definition.id } as any) as any
       expect(pending.players[0]).toMatchObject({ actionPoints: 4, chargePoints: 1 })
-      const choice = pending.pendingOptionSelection.options.find((item: any) => (
-        item.value?.pieceIds?.includes('turalyon') && item.value?.pieceIds?.includes('ally')
-      ))
-      expect(choice).toBeDefined()
-      expect(pending.pendingOptionSelection.options.some((item: any) => item.value?.pieceIds?.includes('non-core'))).toBe(false)
-      return applyBattleAction(pending, {
-        type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: choice.value,
-        selectionId: pending.pendingOptionSelection.selectionId,
-        stateRevision: pending.pendingOptionSelection.stateRevision,
+      expect(pending.pendingOptionSelection).toBeUndefined()
+      expect(pending.pendingTargetSelection).toMatchObject({
+        targetType: 'piece', selectionMode: 'multi', minSelections: 1, maxSelections: 3,
+      })
+      expect(pending.pendingTargetSelection.candidates).toEqual([
+        { type: 'piece', pieceId: 'ally' },
+        { type: 'piece', pieceId: 'turalyon' },
+      ])
+
+      const beforeInvalid = JSON.stringify(pending)
+      expect(() => applyBattleAction(pending, {
+        type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: 'ally',
+        extraTargets: [{ pieceId: 'ally' }],
+        selectionId: pending.pendingTargetSelection.selectionId,
+        stateRevision: pending.pendingTargetSelection.stateRevision,
+      } as any)).toThrow(/duplicate/i)
+      expect(JSON.stringify(pending)).toBe(beforeInvalid)
+
+      const gatheringPending = applyBattleAction(pending, {
+        type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: 'turalyon',
+        extraTargets: [{ pieceId: 'ally' }],
+        selectionId: pending.pendingTargetSelection.selectionId,
+        stateRevision: pending.pendingTargetSelection.stateRevision,
+      } as any) as any
+      expect(gatheringPending.players[0]).toMatchObject({ actionPoints: 4, chargePoints: 1 })
+      expect(gatheringPending.pendingOptionSelection).toBeUndefined()
+      expect(gatheringPending.pendingTargetSelection).toMatchObject({
+        targetType: 'grid', selectionMode: 'single', minSelections: 1, maxSelections: 1,
+      })
+      expect(gatheringPending.pendingTargetSelection.candidates.length).toBeGreaterThan(0)
+      const destination = gatheringPending.pendingTargetSelection.candidates[0]
+      return applyBattleAction(gatheringPending, {
+        type: 'pendingTargetSelect', playerId: 'player-red', targetX: destination.x, targetY: destination.y,
+        selectionId: gatheringPending.pendingTargetSelection.selectionId,
+        stateRevision: gatheringPending.pendingTargetSelection.stateRevision,
       } as any) as any
     }
 
@@ -817,5 +843,45 @@ describe('Turalyon holy-hand mobility', () => {
     first.pieces.find((piece: any) => piece.instanceId === 'turalyon').skills[0].currentCooldown = 0
     const second = use(first)
     expect(second.pieces.find((piece: any) => piece.instanceId === 'turalyon').skills[0].usesRemaining).toBe(-1)
+  })
+
+  it('rolls back AP, charge, cooldown, and movement when either Grand Crusade stage is cancelled', () => {
+    const definition = skill('turalyon-grand-crusade')
+    const turalyon = makePiece({ instanceId: 'cancel-turalyon', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
+    turalyon.isCore = true
+    turalyon.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
+    const ally = makePiece({ instanceId: 'cancel-ally', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
+    ally.isCore = true
+    const state = makeState({ pieces: [turalyon, ally], width: 8, height: 8, turnNumber: 1 }) as any
+    state.skillsById[definition.id] = definition
+    state.players[0].actionPoints = 4
+    state.players[0].chargePoints = 1
+    const start = () => applyBattleAction(state, {
+      type: 'useChargeSkill', playerId: 'player-red', pieceId: 'cancel-turalyon', skillId: definition.id,
+    } as any) as any
+    const cancel = (pendingState: any) => applyBattleAction(pendingState, {
+      type: 'cancelPendingSelection', playerId: 'player-red',
+      selectionId: pendingState.pendingTargetSelection.selectionId,
+      stateRevision: pendingState.pendingTargetSelection.stateRevision,
+    } as any) as any
+    const expectRolledBack = (result: any) => {
+      expect(result.pendingTargetSelection).toBeUndefined()
+      expect(result.players[0]).toMatchObject({ actionPoints: 4, chargePoints: 1 })
+      expect(result.pieces.find((piece: any) => piece.instanceId === 'cancel-turalyon')).toMatchObject({ x: 0, y: 0 })
+      expect(result.pieces.find((piece: any) => piece.instanceId === 'cancel-turalyon').skills[0].currentCooldown).toBe(0)
+      expect(result.pieces.find((piece: any) => piece.instanceId === 'cancel-ally')).toMatchObject({ x: 1, y: 0 })
+    }
+
+    expectRolledBack(cancel(start()))
+
+    const firstStage = start()
+    const secondStage = applyBattleAction(firstStage, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: 'cancel-turalyon',
+      extraTargets: [{ pieceId: 'cancel-ally' }],
+      selectionId: firstStage.pendingTargetSelection.selectionId,
+      stateRevision: firstStage.pendingTargetSelection.stateRevision,
+    } as any) as any
+    expect(secondStage.pendingTargetSelection.targetType).toBe('grid')
+    expectRolledBack(cancel(secondStage))
   })
 })

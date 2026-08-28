@@ -51,6 +51,7 @@ export interface SuspendableInteractionPrompt {
   filter?: string
   candidates?: unknown[]
   resumeOnCancel?: boolean
+  rollbackOnCancel?: boolean
   suspendedTurn?: SuspendableTurnCheckpoint
   sourcePieceId?: string
   /** Server-private, candidate-only snapshot of the suspended provisional state. */

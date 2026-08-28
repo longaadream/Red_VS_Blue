@@ -1087,6 +1087,12 @@
     }
     .target-cancel-btn:active { background:#1e293b; }
     .target-cancel-btn[disabled] { opacity: .5; cursor: wait; }
+    .target-multi-summary { color:#bfdbfe; font-size:12px; font-weight:700; max-width:min(520px,80vw); text-align:center; }
+    .target-confirm-btn {
+      pointer-events:auto; background:rgba(22,101,52,.92); border:1px solid #4ade80;
+      border-radius:8px; color:#dcfce7; padding:7px 20px; font-size:13px; font-weight:800; cursor:pointer;
+    }
+    .target-confirm-btn[disabled] { opacity:.45; cursor:not-allowed; }
     @keyframes targetPulse {
       0%,100% { opacity:.85; }
       50%      { opacity:1; text-shadow:0 0 32px rgba(245,158,11,1), 0 2px 6px rgba(0,0,0,.9); }
@@ -2022,6 +2028,7 @@
     let pendingOptionAction = null  // original action awaiting selectedOption
     let pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
     let targetSubmissionPending = null // one target command waiting for authoritative confirmation
+    let pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
     let locallyCancelledSelectionId = null
     const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
     window.__RVB_RED50_EVIDENCE__ = red50Evidence
@@ -2178,6 +2185,7 @@
       pendingSkill = null
       pendingCardAction = null
       targetSubmissionPending = null
+      pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
       if (input.keepMove !== true) pendingMove = false
       if (hadTarget) recordTargetClear(reason)
       document.body.classList.remove('target-mode-active')
@@ -4254,6 +4262,94 @@
     }
 
     // ── Target overlay ──
+    function isPendingBoardMultiTarget() {
+      const preparation = pendingSkill && pendingSkill.preparation
+      return !!(pendingSkill && pendingSkill.turnTargetActionType === 'pendingTargetSelect' &&
+        preparation && preparation.selectionMode === 'multi' && preparation.targetType === 'piece')
+    }
+
+    function syncPendingBoardTargetSelection(authoritativePending) {
+      const isMulti = !!(authoritativePending && authoritativePending.selectionMode === 'multi' &&
+        authoritativePending.targetType === 'piece')
+      if (!isMulti) {
+        pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
+        return
+      }
+      if (pendingBoardTargetSelection.selectionId !== authoritativePending.selectionId) {
+        pendingBoardTargetSelection = { selectionId: authoritativePending.selectionId, selectedPieceIds: [] }
+        return
+      }
+      const legalIds = new Set((authoritativePending.candidates || [])
+        .filter(ref => ref && ref.type === 'piece')
+        .map(ref => ref.pieceId))
+      pendingBoardTargetSelection.selectedPieceIds = pendingBoardTargetSelection.selectedPieceIds
+        .filter(pieceId => legalIds.has(pieceId))
+    }
+
+    function pendingBoardMultiLimits() {
+      const preparation = pendingSkill && pendingSkill.preparation || {}
+      const min = Number.isInteger(preparation.minSelections) ? Math.max(0, preparation.minSelections) : 1
+      const max = Number.isInteger(preparation.maxSelections) ? Math.max(min, preparation.maxSelections) : 1
+      return { min, max }
+    }
+
+    function pendingBoardMultiSummary() {
+      if (!isPendingBoardMultiTarget()) return ''
+      const ids = pendingBoardTargetSelection.selectedPieceIds
+      if (!ids.length) return '尚未选择棋子'
+      return ids.map(pieceId => {
+        const piece = G && G.pieces.find(item => item.instanceId === pieceId)
+        return piece ? (piece.name || piece.templateId || pieceId) : pieceId
+      }).join('、')
+    }
+
+    function togglePendingBoardTarget(piece) {
+      if (!isPendingBoardMultiTarget() || !piece) return false
+      const candidates = pendingSkill.preparation.candidates || []
+      if (!candidates.some(ref => ref && ref.type === 'piece' && ref.pieceId === piece.instanceId)) {
+        setStatusMsg('该棋子不在权威合法目标集合内')
+        return false
+      }
+      const ids = pendingBoardTargetSelection.selectedPieceIds.slice()
+      const index = ids.indexOf(piece.instanceId)
+      if (index >= 0) ids.splice(index, 1)
+      else {
+        const limits = pendingBoardMultiLimits()
+        if (ids.length >= limits.max) {
+          setStatusMsg('最多选择' + limits.max + '个棋子')
+          return false
+        }
+        ids.push(piece.instanceId)
+      }
+      pendingBoardTargetSelection.selectedPieceIds = ids
+      setStatusMsg('已选择 ' + ids.length + ' / ' + pendingBoardMultiLimits().max)
+      renderBoard()
+      renderTargetOverlay()
+      return true
+    }
+
+    function confirmPendingBoardTargetSelection() {
+      if (!isPendingBoardMultiTarget() || targetSubmissionPending) return false
+      const ids = pendingBoardTargetSelection.selectedPieceIds.slice()
+      const limits = pendingBoardMultiLimits()
+      if (ids.length < limits.min || ids.length > limits.max) {
+        setStatusMsg('请选择' + limits.min + '至' + limits.max + '个棋子')
+        return false
+      }
+      const preparation = pendingSkill.preparation
+      const action = {
+        type: pendingSkill.turnTargetActionType,
+        playerId: pendingSkill.turnTargetPlayerId || myPlayerId,
+        targetPieceId: ids[0],
+        extraTargets: ids.slice(1).map(pieceId => ({ pieceId })),
+        selectionId: preparation.selectionId,
+        stateRevision: preparation.stateRevision,
+      }
+      setStatusMsg('已提交棋子选择')
+      renderTargetOverlay()
+      return submitTargetAction(action, currentTargetSourceName())
+    }
+
     function targetTypeText(targetType, filter) {
       const tt = (targetType || '').toLowerCase()
       const ff = (filter || '').toLowerCase()
@@ -4275,6 +4371,10 @@
       }
       if (!pendingSkill) return ''
       if (pendingSkill.hint) return pendingSkill.hint
+      if (isPendingBoardMultiTarget()) {
+        const limits = pendingBoardMultiLimits()
+        return '选择' + limits.min + '至' + limits.max + '个友方角色（再次点击可取消）'
+      }
       return targetStepPrefix(pendingSkill.pendingTargetIndex) +
         targetTypeText(pendingSkill.targetType, pendingSkill.filter)
     }
@@ -4295,6 +4395,20 @@
         document.getElementById('targetPromptText').textContent = targetSubmissionPending
           ? '指令已提交 · 等待权威确认'
           : _targetPromptText()
+        const multiSummary = document.getElementById('targetMultiSummary')
+        const confirmButton = document.getElementById('targetConfirmButton')
+        const multiActive = isPendingBoardMultiTarget()
+        if (multiSummary) {
+          multiSummary.style.display = multiActive ? '' : 'none'
+          multiSummary.textContent = multiActive ? pendingBoardMultiSummary() : ''
+        }
+        if (confirmButton) {
+          const count = pendingBoardTargetSelection.selectedPieceIds.length
+          const limits = pendingBoardMultiLimits()
+          confirmButton.style.display = multiActive ? '' : 'none'
+          confirmButton.disabled = !multiActive || count < limits.min || count > limits.max || !!targetSubmissionPending
+          confirmButton.textContent = '确认选择（' + count + ' / ' + limits.max + '）'
+        }
         const cancelButton = document.getElementById('targetCancelButton')
         if (cancelButton) {
           cancelButton.disabled = !!targetSubmissionPending
@@ -4450,6 +4564,7 @@
         interaction: {
           pendingPieceId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.pieceId : null,
           pendingCommandId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.clientActionId : null,
+          selectedTargetPieceIds: isCurrentSnapshot ? pendingBoardTargetSelection.selectedPieceIds : [],
         },
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
@@ -4499,10 +4614,12 @@
       }
       const pbt = G.pendingTargetSelection
       if (pendingTargetSelectionForMe()) {
+        syncPendingBoardTargetSelection(pbt)
         const actionType = 'pendingTargetSelect'
         if (serverPendingTargetChanged(pendingSkill, pbt)) {
           pendingSkill = {
             targetType: pbt.targetType,
+            hint: pbt.title,
             range: pbt.range || 99,
             filter: pbt.filter || 'all',
             pendingTargetIndex: Number(pbt.step) || 0,
@@ -4517,6 +4634,9 @@
               filter: pbt.filter || 'all',
               range: pbt.range,
               candidates: Array.isArray(pbt.candidates) ? pbt.candidates : [],
+              selectionMode: pbt.selectionMode,
+              minSelections: pbt.minSelections,
+              maxSelections: pbt.maxSelections,
             },
             validTargets: new Set(),
           }
@@ -4525,6 +4645,7 @@
         }
       } else if (pendingSkill && pendingSkill.turnTargetActionType === 'pendingTargetSelect') {
         pendingSkill = null
+        syncPendingBoardTargetSelection(null)
       }
     }
 
@@ -4589,7 +4710,7 @@
           const tclass = TILE_CLASS[ttype] || 't-floor'
           const key = x + ',' + y
           const piece = cellMap[key]
-          const isSel = piece && piece.id === selectedPieceId
+          const isSel = piece && (piece.id === selectedPieceId || pendingBoardTargetSelection.selectedPieceIds.includes(piece.id))
 
           let cls = 'cell ' + tclass
           if (isSel) cls += ' hl-selected'
@@ -5207,6 +5328,7 @@
       if (intent.type === 'clear-selection') return clearPieceSelection()
       if (intent.type === 'select-skill') return selectSkillCard(intent.skillId)
       if (intent.type === 'cancel-target') return cancelTargetSelection()
+      if (intent.type === 'confirm-target-selection') return confirmPendingBoardTargetSelection()
       if (intent.type === 'toggle-move') return toggleMove()
     }
 
@@ -5290,6 +5412,14 @@
       }
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
+        if (isPendingBoardMultiTarget()) {
+          if (!piece) {
+            setStatusMsg('请选择高亮的友方棋子')
+            return
+          }
+          togglePendingBoardTarget(piece)
+          return
+        }
         const turnTargets = pendingSkill.validTargets
         if (turnTargets && !turnTargets.has(x + ',' + y)) {
           setStatusMsg('目标不在权威合法目标集合内')
@@ -6219,6 +6349,8 @@
     <div class="target-mode-card">
       <div class="target-source-name" id="targetSourceName">当前技能</div>
       <div class="target-prompt" id="targetPromptText">选择目标</div>
+      <div class="target-multi-summary" id="targetMultiSummary" style="display:none"></div>
+      <button type="button" class="target-confirm-btn" id="targetConfirmButton" style="display:none" onclick="dispatchBattleIntent({type:'confirm-target-selection'})">确认选择</button>
       <button type="button" class="target-cancel-btn" id="targetCancelButton" onclick="dispatchBattleIntent({type:'cancel-target'})">取消目标选择</button>
     </div>
   </div>

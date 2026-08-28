@@ -136,6 +136,9 @@ export interface AIObservation {
     candidates: TargetRef[]
     selectedTargets: TargetRef[]
     canCancel: boolean
+    selectionMode?: 'single' | 'multi'
+    minSelections?: number
+    maxSelections?: number
   }
 }
 

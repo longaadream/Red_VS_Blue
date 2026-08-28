@@ -208,7 +208,11 @@ describe('battle page runtime source', () => {
       let pendingSkill = { skillId: 'shadow-step', targetType: 'cell' }
       let pendingCardAction = null
       let targetSubmissionPending = null
+      let pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
       let pendingMove = false
+      ${runtimeFunction(html, 'isPendingBoardMultiTarget')}
+      ${runtimeFunction(html, 'pendingBoardMultiLimits')}
+      ${runtimeFunction(html, 'pendingBoardMultiSummary')}
       ${runtimeFunction(html, 'renderTargetOverlay')}
       ${runtimeFunction(html, 'clearTargetInteraction')}
       renderTargetOverlay()
@@ -256,8 +260,12 @@ describe('battle page runtime source', () => {
       let pendingSkill = { skillId: 'shadow-step', targetType: 'cell' }
       let pendingCardAction = null
       let targetSubmissionPending = null
+      let pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
       let pendingMove = false
       const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
+      ${runtimeFunction(html, 'isPendingBoardMultiTarget')}
+      ${runtimeFunction(html, 'pendingBoardMultiLimits')}
+      ${runtimeFunction(html, 'pendingBoardMultiSummary')}
       ${runtimeFunction(html, 'renderTargetOverlay')}
       ${runtimeFunction(html, 'submitTargetAction')}
       renderTargetOverlay()
@@ -270,6 +278,69 @@ describe('battle page runtime source', () => {
     expect(overlay.classList.contains('show')).toBe(false)
     expect(boardRenders).toBe(0)
     expect(actionBarRenders).toBe(0)
+  })
+
+  it('toggles up to three authoritative board pieces and submits them once on confirmation', () => {
+    const html = readBattlePage()
+    const renderBoard = vi.fn()
+    const renderTargetOverlay = vi.fn()
+    const setStatusMsg = vi.fn()
+    const doAction = vi.fn(() => Promise.resolve())
+    const pieces = ['ally-a', 'ally-b', 'ally-c', 'ally-d'].map(instanceId => ({
+      instanceId, name: instanceId,
+    }))
+    const context = vm.createContext({
+      G: { pieces },
+      myPlayerId: 'player-red',
+      renderBoard,
+      renderTargetOverlay,
+      setStatusMsg,
+      doAction,
+      currentTargetSourceName: () => '圣光大远征',
+      withClientActionId: (action: Record<string, unknown>) => ({ ...action, clientActionId: 'grand-crusade-1' }),
+      addLog: vi.fn(),
+      Date,
+    })
+
+    vm.runInContext(`
+      let pendingSkill = {
+        turnTargetActionType: 'pendingTargetSelect',
+        turnTargetPlayerId: 'player-red',
+        preparation: {
+          targetType: 'piece', selectionMode: 'multi', minSelections: 1, maxSelections: 3,
+          selectionId: 'grand-crusade-pieces', stateRevision: 7,
+          candidates: G.pieces.map(piece => ({ type: 'piece', pieceId: piece.instanceId })),
+        },
+      }
+      let pendingCardAction = null
+      let targetSubmissionPending = null
+      let pendingBoardTargetSelection = { selectionId: 'grand-crusade-pieces', selectedPieceIds: [] }
+      const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
+      ${runtimeFunction(html, 'isPendingBoardMultiTarget')}
+      ${runtimeFunction(html, 'pendingBoardMultiLimits')}
+      ${runtimeFunction(html, 'togglePendingBoardTarget')}
+      ${runtimeFunction(html, 'submitTargetAction')}
+      ${runtimeFunction(html, 'confirmPendingBoardTargetSelection')}
+    `, context)
+
+    expect((context as any).confirmPendingBoardTargetSelection()).toBe(false)
+    expect(doAction).not.toHaveBeenCalled()
+    expect((context as any).togglePendingBoardTarget(pieces[0])).toBe(true)
+    expect((context as any).togglePendingBoardTarget(pieces[1])).toBe(true)
+    expect((context as any).togglePendingBoardTarget(pieces[2])).toBe(true)
+    expect((context as any).togglePendingBoardTarget(pieces[3])).toBe(false)
+
+    expect((context as any).confirmPendingBoardTargetSelection()).toBe(true)
+    expect(doAction).toHaveBeenCalledOnce()
+    expect(doAction).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetPieceId: 'ally-a',
+      extraTargets: [{ pieceId: 'ally-b' }, { pieceId: 'ally-c' }],
+      selectionId: 'grand-crusade-pieces',
+      stateRevision: 7,
+      clientActionId: 'grand-crusade-1',
+    }))
   })
 
   it('defers and coalesces pending-action presentation until the next animation frame', () => {

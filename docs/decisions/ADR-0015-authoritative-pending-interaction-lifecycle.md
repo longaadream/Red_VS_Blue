@@ -25,8 +25,9 @@
 9. AI observation 与候选动作暴露同一 option 会话凭证和取消能力。该字段扩展保持 AI 环境 v1 的向后兼容，候选 ID 仍按完整动作重新计算。
 10. 公开投影只暴露交互所需字段；事务根动作、答案、checkpoint、trigger context 和 continuation 永不下发。
 11. 若交互在移动、伤害或其他暂态变化之后请求目标，合法候选按挂起点的服务端私有暂态快照计算；权威战局仍保持动作前状态。盖章后的候选集用于提交校验，暂态快照与逻辑挂起回合 `suspendedTurn` 不进入公开投影。
-12. 旧技能返回的后置 `pendingTargetSelection` 作为合成 target consumer 接入事务：重放恢复到相同后置选择点，再消费答案并执行一次 `effectCode`；不得先提交技能成本或核心效果。
+12. 旧技能返回的后置 `pendingTargetSelection` 作为合成 target consumer 接入事务：重放恢复到相同选择点，再消费答案并执行一次 `effectCode`。`effectCode` 可以继续产生下一个合成 target consumer；所有阶段完成前不得提交技能成本或核心效果。默认取消语义保持旧合同：跳过后置目标并提交根动作；技能只有显式声明 `rollbackPendingTargetOnCancel` 时，任一合成目标阶段取消才回滚整个根动作。
 13. option 会话可以声明 `selectionMode: 'multi'`、`presentation: 'hand'` 以及权威的 `minSelections` / `maxSelections`。多选提交必须是由不重复候选值组成的数组，凭证、所有者、数量上下限、重复值与失效实例均在重放前校验。`hand` 只决定客户端从既有手牌区收集候选，不创建按组合膨胀的选项列表；普通单选 picker 行为保持不变。
+14. target 会话同样可以声明 `selectionMode: 'multi'` 与权威数量上下限。客户端在棋盘上逐个勾选候选棋子，以主目标加 `extraTargets` 一次提交；不得生成候选组合，也不得生成“棋子组合 × 格子”的笛卡尔积。服务端先校验会话凭证，再校验数量、去重和每个引用是否属于盖章候选。后续地格选择必须建立新的 selection ID、revision 与精确候选集。
 
 ## 备选方案
 
@@ -40,7 +41,7 @@
 - `suspendable-action-transaction.ts` 负责协议、消费者序号、答案消费和暂停信号；`turn.ts` 负责根动作 checkpoint、重放、提交与回滚；`triggers.ts` 负责规则和响应卡的答案注入。
 - `pending-interaction.ts` 集中定义 option 会话和稳定错误码；target 会话继续复用 ADR-0005 的权威候选协议。
 - UI 与 AI 不再自行推断取消能力或省略凭证。
-- 手牌多选 UI 以 `selectionId` 保存本地勾选；提交被拒但权威会话仍存在时保留勾选，权威会话结束或更换时才清理。AI 对多选仅生成线性数量的合法代表动作。
+- 手牌和棋盘多选 UI 均以 `selectionId` 保存本地勾选；提交被拒但权威会话仍存在时保留勾选，权威会话结束或更换时才清理。AI 对多选仅生成线性数量的合法代表动作。
 - `turn-timer.ts` 使用服务端私有 `suspendedTurn` 归属逻辑挂起回合；公开投影通过白名单排除该字段、事务记录及候选暂态。
 - 旧的专用 `cardAfterAfterTrigger` 等 continuation mode 被统一事务取代，不再按调用点扩展。
 - 旧的、未版本化 pending option 存档或内存状态不会被静默接受；Demo 尚未承诺跨版本恢复这类进行中对局。

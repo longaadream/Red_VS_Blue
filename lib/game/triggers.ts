@@ -206,6 +206,11 @@ export interface TriggerResult {
   targetType?: string
   range?: number
   filter?: string
+  targetCandidates?: unknown[]
+  resumeOnCancel?: boolean
+  rollbackOnCancel?: boolean
+  effectCode?: string
+  payload?: any
   pendingRuleId?: string
   pendingRuleSourceId?: string
   pendingQueue?: Array<{ruleId: string, sourceId?: string}>
@@ -633,7 +638,11 @@ export class TriggerSystem {
                 range: result.range,
                 filter: result.filter,
                 candidates: result.targetCandidates,
+                selectionMode: result.selectionMode,
+                minSelections: result.minSelections,
+                maxSelections: result.maxSelections,
                 resumeOnCancel: result.resumeOnCancel,
+                rollbackOnCancel: result.rollbackOnCancel,
                 canCancel: result.canCancel,
                 suspendedTurn: { ...battle.turn },
                 sourcePieceId: (ruleCtx as any).sourcePiece?.instanceId || item.sourceId,
@@ -760,7 +769,11 @@ export class TriggerSystem {
                   range: result.range,
                   filter: result.filter,
                   candidates: result.targetCandidates,
+                  selectionMode: result.selectionMode,
+                  minSelections: result.minSelections,
+                  maxSelections: result.maxSelections,
                   resumeOnCancel: result.resumeOnCancel,
+                  rollbackOnCancel: result.rollbackOnCancel,
                   canCancel: result.canCancel,
                   suspendedTurn: { ...battle.turn },
                   sourcePieceId: (context as any).sourcePiece?.instanceId,

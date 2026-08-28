@@ -366,6 +366,55 @@ describe('authoritative target preparation', () => {
       .toThrow(expect.objectContaining({ code: 'TARGET_SELECTION_ALREADY_RESOLVED' }))
   })
 
+  it('validates authoritative board multi-select count, uniqueness, candidates, and credentials before mutation', () => {
+    const pieces = ['multi-a', 'multi-b', 'multi-c', 'multi-d'].map((instanceId, index) =>
+      makePiece({ instanceId, ownerPlayerId: 'player-red', x: index, y: 0 }))
+    const state = makeState({ pieces, width: 6, height: 4 }) as any
+    state.pendingTargetSelection = finalizePendingTargetSession(state, {
+      playerId: 'player-red',
+      ownerPlayerId: 'player-red',
+      source: { type: 'rule', id: 'pending-board-multi', pieceId: 'multi-a' },
+      targetType: 'piece',
+      filter: 'ally',
+      selectionMode: 'multi',
+      minSelections: 1,
+      maxSelections: 3,
+      candidates: pieces.map(piece => ({ type: 'piece' as const, pieceId: piece.instanceId })),
+      fixedCandidates: true,
+      effectCode: "function(ctx) { ctx.battle.extensions.boardMultiResolved = ctx.pending.selectedTargets; return { success: true }; }",
+    }, 0)
+    const pending = state.pendingTargetSelection
+    const before = JSON.stringify(state)
+    const base = {
+      type: 'pendingTargetSelect' as const,
+      playerId: 'player-red',
+      targetPieceId: 'multi-a',
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+    }
+
+    expect(() => applyBattleAction(state, {
+      ...base, extraTargets: [{ pieceId: 'multi-a' }],
+    } as never)).toThrow(expect.objectContaining({ code: 'TARGET_SELECTION_DUPLICATE' }))
+    expect(() => applyBattleAction(state, {
+      ...base,
+      extraTargets: [{ pieceId: 'multi-b' }, { pieceId: 'multi-c' }, { pieceId: 'multi-d' }],
+    } as never)).toThrow(expect.objectContaining({ code: 'TARGET_SELECTION_COUNT_INVALID' }))
+    expect(() => applyBattleAction(state, { ...base, stateRevision: 1 } as never))
+      .toThrow(expect.objectContaining({ code: 'TARGET_SELECTION_STALE' }))
+    expect(JSON.stringify(state)).toBe(before)
+
+    const resolved = applyBattleAction(state, {
+      ...base, extraTargets: [{ pieceId: 'multi-b' }, { pieceId: 'multi-c' }],
+    } as never) as any
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.extensions.boardMultiResolved).toEqual([
+      { type: 'piece', pieceId: 'multi-a' },
+      { type: 'piece', pieceId: 'multi-b' },
+      { type: 'piece', pieceId: 'multi-c' },
+    ])
+  })
+
   it('advances a versioned multi-step pending session and runs its effect only after the final target', () => {
     const caster = makePiece({ instanceId: 'pending-caster', ownerPlayerId: 'player-red', x: 1, y: 1 })
     const state = makeState({ pieces: [caster], width: 4, height: 4 }) as any
