@@ -1,5 +1,4 @@
-import * as ed25519 from '@noble/ed25519'
-import { sha512 } from '@noble/hashes/sha2.js'
+import { ed25519 } from '@noble/curves/ed25519.js'
 
 import {
   PACK_SIGNATURE_DOMAIN_V1,
@@ -17,21 +16,23 @@ import {
   decodeLowerHexV1,
   sha256HexV1,
 } from './hash'
-
-// Noble v3 intentionally leaves synchronous SHA-512 unconfigured. Keeping the
-// deterministic implementation private to this module makes the exported
-// signing and verification functions synchronous and observationally pure.
-ed25519.hashes.sha512 = sha512
+import { snapshotOrdinaryUint8ArrayV1 } from './source'
 
 const UTF8_ENCODER = new TextEncoder()
 const SECRET_KEY_LENGTH = 32
 const PUBLIC_KEY_LENGTH = 32
 const SIGNATURE_LENGTH = 64
 
-function assertExactBytes(bytes: Uint8Array, length: number, label: string): void {
-  if (!(bytes instanceof Uint8Array) || bytes.length !== length) {
-    throw new TypeError(`${label} must be exactly ${length} bytes`)
+function snapshotExactBytes(
+  bytes: unknown,
+  length: number,
+  label: string,
+): Uint8Array {
+  const snapshot = snapshotOrdinaryUint8ArrayV1(bytes, length)
+  if (!snapshot.ok || snapshot.bytes.byteLength !== length) {
+    throw new TypeError(`${label} must be exactly ${length} bytes from an ordinary Uint8Array`)
   }
+  return snapshot.bytes
 }
 
 export function buildPackageSignatureMessageV1(packageHash: Sha256HexV1): Uint8Array {
@@ -45,8 +46,11 @@ export function buildPackageSignatureMessageV1(packageHash: Sha256HexV1): Uint8A
 }
 
 export function deriveEd25519PublicKeyV1(secretKey: Uint8Array): Uint8Array {
-  assertExactBytes(secretKey, SECRET_KEY_LENGTH, 'Ed25519 secret key')
-  const privateCopy = secretKey.slice()
+  const privateCopy = snapshotExactBytes(
+    secretKey,
+    SECRET_KEY_LENGTH,
+    'Ed25519 secret key',
+  )
   try {
     return new Uint8Array(ed25519.getPublicKey(privateCopy))
   } finally {
@@ -55,35 +59,41 @@ export function deriveEd25519PublicKeyV1(secretKey: Uint8Array): Uint8Array {
 }
 
 export function derivePublisherKeyIdV1(publicKey: Uint8Array): Sha256HexV1 {
-  assertExactBytes(publicKey, PUBLIC_KEY_LENGTH, 'Ed25519 public key')
-  return sha256HexV1(publicKey)
+  const publicCopy = snapshotExactBytes(
+    publicKey,
+    PUBLIC_KEY_LENGTH,
+    'Ed25519 public key',
+  )
+  return sha256HexV1(publicCopy)
 }
 
 export function signPackageHashV1(
   packageHash: Sha256HexV1,
   secretKey: Uint8Array,
 ): PackSignatureEnvelopeV1 {
-  assertExactBytes(secretKey, SECRET_KEY_LENGTH, 'Ed25519 secret key')
-  const parsedHash = Sha256HexV1Schema.parse(packageHash)
-  const publicKey = deriveEd25519PublicKeyV1(secretKey)
-  const privateCopy = secretKey.slice()
-  let signature: Uint8Array
+  const privateCopy = snapshotExactBytes(
+    secretKey,
+    SECRET_KEY_LENGTH,
+    'Ed25519 secret key',
+  )
   try {
-    signature = new Uint8Array(
+    const parsedHash = Sha256HexV1Schema.parse(packageHash)
+    const publicKey = new Uint8Array(ed25519.getPublicKey(privateCopy))
+    const signature = new Uint8Array(
       ed25519.sign(buildPackageSignatureMessageV1(parsedHash), privateCopy),
     )
+
+    return PackSignatureEnvelopeV1Schema.parse({
+      schemaVersion: PACK_SIGNATURE_SCHEMA_VERSION_V1,
+      algorithm: 'Ed25519',
+      keyId: derivePublisherKeyIdV1(publicKey),
+      publicKey: bytesToLowerHexV1(publicKey),
+      packageHash: parsedHash,
+      signature: bytesToLowerHexV1(signature),
+    })
   } finally {
     privateCopy.fill(0)
   }
-
-  return PackSignatureEnvelopeV1Schema.parse({
-    schemaVersion: PACK_SIGNATURE_SCHEMA_VERSION_V1,
-    algorithm: 'Ed25519',
-    keyId: derivePublisherKeyIdV1(publicKey),
-    publicKey: bytesToLowerHexV1(publicKey),
-    packageHash: parsedHash,
-    signature: bytesToLowerHexV1(signature),
-  })
 }
 
 export type PackageSignatureVerificationFailureReasonV1 =
@@ -106,10 +116,32 @@ export interface VerifyPackageSignatureInputV1 {
 export function verifyPackageSignatureV1(
   input: VerifyPackageSignatureInputV1,
 ): PackageSignatureVerificationResultV1 {
-  const envelopeResult = PackSignatureEnvelopeV1Schema.safeParse(input.envelope)
+  if (input === null || typeof input !== 'object') {
+    return { ok: false, reason: 'envelope-invalid' }
+  }
+
+  let rawEnvelope: unknown
+  try {
+    rawEnvelope = input.envelope
+  } catch {
+    return { ok: false, reason: 'envelope-invalid' }
+  }
+
+  let envelopeResult: ReturnType<typeof PackSignatureEnvelopeV1Schema.safeParse>
+  try {
+    envelopeResult = PackSignatureEnvelopeV1Schema.safeParse(rawEnvelope)
+  } catch {
+    return { ok: false, reason: 'envelope-invalid' }
+  }
   if (!envelopeResult.success) return { ok: false, reason: 'envelope-invalid' }
 
-  const expectedHashResult = Sha256HexV1Schema.safeParse(input.expectedPackageHash)
+  let expectedPackageHash: unknown
+  try {
+    expectedPackageHash = input.expectedPackageHash
+  } catch {
+    return { ok: false, reason: 'package-hash-mismatch' }
+  }
+  const expectedHashResult = Sha256HexV1Schema.safeParse(expectedPackageHash)
   if (
     !expectedHashResult.success
     || envelopeResult.data.packageHash !== expectedHashResult.data
@@ -122,7 +154,14 @@ export function verifyPackageSignatureV1(
   if (envelopeResult.data.keyId !== derivedKeyId) {
     return { ok: false, reason: 'key-id-mismatch' }
   }
-  if (input.expectedPublisherKeyId !== derivedKeyId) {
+
+  let expectedPublisherKeyId: unknown
+  try {
+    expectedPublisherKeyId = input.expectedPublisherKeyId
+  } catch {
+    return { ok: false, reason: 'publisher-key-id-mismatch' }
+  }
+  if (expectedPublisherKeyId !== derivedKeyId) {
     return { ok: false, reason: 'publisher-key-id-mismatch' }
   }
 

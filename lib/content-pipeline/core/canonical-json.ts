@@ -11,8 +11,12 @@ export class CanonicalJsonV1Error extends TypeError {
   }
 }
 
+const INTERNAL_CANONICAL_ERRORS_V1 = new WeakSet<object>()
+
 function fail(message: string): never {
-  throw new CanonicalJsonV1Error(message)
+  const error = new CanonicalJsonV1Error(message)
+  INTERNAL_CANONICAL_ERRORS_V1.add(error)
+  throw Object.freeze(error)
 }
 
 function escapeStringV1(value: string): string {
@@ -181,7 +185,18 @@ function serializeValueV1(value: unknown, ancestors: WeakSet<object>): string {
  * Raw UTF-8 syntax and duplicate-key checks belong to the strict JSON parser.
  */
 export function canonicalizeJsonV1(value: unknown): string {
-  return serializeValueV1(value, new WeakSet<object>())
+  try {
+    return serializeValueV1(value, new WeakSet<object>())
+  } catch (error) {
+    if (
+      typeof error === 'object'
+      && error !== null
+      && INTERNAL_CANONICAL_ERRORS_V1.has(error)
+    ) {
+      throw error
+    }
+    throw new CanonicalJsonV1Error('Canonical JSON input inspection failed')
+  }
 }
 
 export function canonicalJsonBytesV1(value: unknown): Uint8Array {

@@ -18,6 +18,7 @@ import type {
 } from '@/lib/content-pipeline/contracts'
 
 import { canonicalJsonBytesV1 } from './canonical-json'
+import { snapshotOrdinaryUint8ArrayV1 } from './source'
 
 const UTF8_ENCODER = new TextEncoder()
 const LOWER_HEX_PATTERN = /^[0-9a-f]+$/
@@ -28,19 +29,25 @@ const AUTHORITY_CAPABILITIES = new Set<AuthorityContentCapabilityV1>([
   'trusted-executable-content',
 ])
 
-function assertBytes(value: Uint8Array): void {
-  if (!(value instanceof Uint8Array)) {
-    throw new TypeError('Expected Uint8Array bytes')
+function snapshotBytesOrThrow(value: unknown): Uint8Array {
+  const snapshot = snapshotOrdinaryUint8ArrayV1(value)
+  if (!snapshot.ok) {
+    throw new TypeError('Expected ordinary ArrayBuffer-backed Uint8Array bytes')
   }
+  return snapshot.bytes
 }
 
-export function bytesToLowerHexV1(bytes: Uint8Array): string {
-  assertBytes(bytes)
+function bytesToLowerHexSnapshotV1(bytes: Uint8Array): string {
   let result = ''
-  for (const byte of bytes) {
+  for (let index = 0; index < bytes.byteLength; index += 1) {
+    const byte = bytes[index]
     result += HEX_DIGITS[byte >>> 4] + HEX_DIGITS[byte & 0x0f]
   }
   return result
+}
+
+export function bytesToLowerHexV1(bytes: Uint8Array): string {
+  return bytesToLowerHexSnapshotV1(snapshotBytesOrThrow(bytes))
 }
 
 export function decodeLowerHexV1(hex: string, expectedByteLength?: number): Uint8Array {
@@ -63,12 +70,13 @@ export function decodeLowerHexV1(hex: string, expectedByteLength?: number): Uint
 }
 
 export function sha256BytesV1(bytes: Uint8Array): Uint8Array {
-  assertBytes(bytes)
-  return new Uint8Array(sha256(bytes))
+  const snapshot = snapshotBytesOrThrow(bytes)
+  return new Uint8Array(sha256(snapshot))
 }
 
 export function sha256HexV1(bytes: Uint8Array): Sha256HexV1 {
-  return bytesToLowerHexV1(sha256BytesV1(bytes))
+  const snapshot = snapshotBytesOrThrow(bytes)
+  return bytesToLowerHexSnapshotV1(new Uint8Array(sha256(snapshot)))
 }
 
 function hashCanonicalIdentityV1(domain: string, identity: unknown): Sha256HexV1 {

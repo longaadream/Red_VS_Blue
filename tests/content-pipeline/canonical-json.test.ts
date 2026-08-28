@@ -1,3 +1,5 @@
+import { runInNewContext } from 'node:vm'
+
 import { describe, expect, it } from 'vitest'
 
 import type {
@@ -5,7 +7,9 @@ import type {
   PackManifestV1,
   ResolvedProfileIdentityV1,
 } from '@/lib/content-pipeline/contracts'
+import * as contentPipelineCore from '@/lib/content-pipeline/core'
 import {
+  CanonicalJsonV1Error,
   canonicalJsonBytesV1,
   canonicalizeJsonV1,
 } from '@/lib/content-pipeline/core/canonical-json'
@@ -17,6 +21,10 @@ import {
   computeResolvedProfileIdentitiesV1,
   projectAuthorityContentIdentityV1,
 } from '@/lib/content-pipeline/core/hash'
+import {
+  JsonSafetyErrorV1,
+  parseStrictJsonBytesV1,
+} from '@/lib/content-pipeline/core/json-safety'
 
 const FILE_SHA256 = '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a'
 const PACKAGE_HASH = 'c5f7186b749342aba2fce56d5ab4583bb25c2071b1d45c7d5562a483e8c63152'
@@ -145,6 +153,102 @@ describe('RVB Canonical JSON v1', () => {
     expect(canonicalizeJsonV1({ left: shared, right: shared })).toBe(
       '{"left":{"value":1},"right":{"value":1}}',
     )
+  })
+
+  it('wraps hostile object inspection failures without leaking their message', () => {
+    const hostile = new Proxy({ safe: true }, {
+      ownKeys() {
+        throw new Error('sensitive proxy details')
+      },
+    })
+
+    let thrown: unknown
+    try {
+      canonicalizeJsonV1(hostile)
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(CanonicalJsonV1Error)
+    expect((thrown as Error).message).not.toContain('sensitive proxy details')
+  })
+
+  it('does not trust an externally constructed CanonicalJsonV1Error', () => {
+    const hostile = new Proxy({ safe: true }, {
+      ownKeys() {
+        throw new CanonicalJsonV1Error('sensitive forged canonical error')
+      },
+    })
+
+    let thrown: unknown
+    try {
+      canonicalizeJsonV1(hostile)
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(CanonicalJsonV1Error)
+    expect((thrown as Error).message).toBe('Canonical JSON input inspection failed')
+  })
+
+  it('does not inspect an untrusted thrown object while wrapping failures', () => {
+    const hostileThrownValue = new Proxy(new Error('untrusted thrown value'), {
+      getPrototypeOf() {
+        throw new Error('sensitive instanceof trap')
+      },
+    })
+    const hostile = new Proxy({ safe: true }, {
+      ownKeys() {
+        throw hostileThrownValue
+      },
+    })
+
+    let thrown: unknown
+    try {
+      canonicalizeJsonV1(hostile)
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(CanonicalJsonV1Error)
+    expect((thrown as Error).message).toBe('Canonical JSON input inspection failed')
+  })
+})
+
+describe('Content Pipeline v1 strict JSON byte boundary', () => {
+  it('accepts a cross-realm ordinary Uint8Array and ignores subclass traps', () => {
+    const foreign = runInNewContext(
+      'Uint8Array.from([123, 34, 111, 107, 34, 58, 116, 114, 117, 101, 125])',
+    ) as Uint8Array
+    const hostile = Uint8Array.from([123, 125])
+    Object.defineProperty(hostile, 'byteLength', {
+      get() {
+        throw new Error('byteLength trap must not run')
+      },
+    })
+    Object.defineProperty(hostile, Symbol.iterator, {
+      value() {
+        throw new Error('iterator trap must not run')
+      },
+    })
+
+    expect(parseStrictJsonBytesV1(foreign)).toEqual({ ok: true })
+    expect(parseStrictJsonBytesV1(hostile)).toEqual({})
+  })
+
+  it('maps proxied and SharedArrayBuffer-backed bytes to JsonSafetyErrorV1', () => {
+    const proxied = new Proxy(Uint8Array.from([123, 125]), {})
+    const shared = new Uint8Array(new SharedArrayBuffer(2))
+    shared.set([123, 125])
+
+    for (const bytes of [proxied, shared]) {
+      expect(() => parseStrictJsonBytesV1(bytes)).toThrow(JsonSafetyErrorV1)
+    }
+  })
+
+  it('keeps internal content-tree constructors out of the public barrel', () => {
+    expect('createReadonlyContentTreeV1' in contentPipelineCore).toBe(false)
+    expect('snapshotOrdinaryUint8ArrayV1' in contentPipelineCore).toBe(false)
   })
 })
 

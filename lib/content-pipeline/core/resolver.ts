@@ -68,6 +68,175 @@ interface ResolutionStateV1 {
   readonly view: ResolvedSnapshotViewV1
 }
 
+// This runtime preflight must stay aligned with the frozen
+// ResolvedPatchChainV1Schema.max(256) contract. It is intentionally not a
+// caller-adjustable option.
+const MAX_PATCH_CHAIN_LENGTH_V1 = 256
+
+function patchInputSchemaError(): ContentPipelineErrorV1 {
+  return new ContentPipelineErrorV1(
+    'PACK_SCHEMA_INVALID',
+    'patch',
+  )
+}
+
+function packInputSchemaError(): ContentPipelineErrorV1 {
+  return new ContentPipelineErrorV1(
+    'PACK_SCHEMA_INVALID',
+    'source',
+  )
+}
+
+function candidateCheckError(): ContentPipelineErrorV1 {
+  return new ContentPipelineErrorV1(
+    'CANDIDATE_CHECK_FAILED',
+    'candidate-check',
+  )
+}
+
+function isNonArrayObject(value: unknown): value is Record<PropertyKey, unknown> {
+  if (value === null || typeof value !== 'object') return false
+  try {
+    return !Array.isArray(value)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Capture the declared array by bounded numeric indices. Array iterators are
+ * mutable JavaScript surface, so spread/for-of/Array.from would let a Proxy or
+ * Array subclass yield more items than the length that passed the budget gate.
+ */
+function snapshotPatchInputsV1(
+  input: ResolveProfileInputV1,
+): readonly unknown[] {
+  let declaredPatches: unknown
+  try {
+    declaredPatches = input.patches
+  } catch {
+    throw patchInputSchemaError()
+  }
+
+  if (declaredPatches === undefined) {
+    return Object.freeze([] as unknown[])
+  }
+
+  let isArray: boolean
+  try {
+    isArray = Array.isArray(declaredPatches)
+  } catch {
+    throw patchInputSchemaError()
+  }
+  if (!isArray) throw patchInputSchemaError()
+
+  let declaredLength: unknown
+  try {
+    declaredLength = (declaredPatches as unknown[]).length
+  } catch {
+    throw patchInputSchemaError()
+  }
+  if (
+    typeof declaredLength !== 'number'
+    || !Number.isSafeInteger(declaredLength)
+    || declaredLength < 0
+  ) {
+    throw patchInputSchemaError()
+  }
+  if (declaredLength > MAX_PATCH_CHAIN_LENGTH_V1) {
+    throw new ContentPipelineErrorV1(
+      'PACK_BUDGET_EXCEEDED',
+      'patch',
+    )
+  }
+
+  const snapshot: unknown[] = []
+  for (let index = 0; index < declaredLength; index += 1) {
+    let hasIndex: boolean
+    try {
+      hasIndex = Object.prototype.hasOwnProperty.call(declaredPatches, index)
+    } catch {
+      throw patchInputSchemaError()
+    }
+    if (!hasIndex) throw patchInputSchemaError()
+
+    let patchInput: unknown
+    try {
+      patchInput = (declaredPatches as unknown[])[index]
+    } catch {
+      throw patchInputSchemaError()
+    }
+    snapshot.push(patchInput)
+  }
+  return Object.freeze(snapshot)
+}
+
+function snapshotPackInputV1(input: unknown): ResolvePackInputV1 {
+  if (!isNonArrayObject(input)) throw packInputSchemaError()
+
+  let source: unknown
+  try {
+    source = input.source
+  } catch {
+    throw packInputSchemaError()
+  }
+  if (!isNonArrayObject(source)) throw packInputSchemaError()
+
+  let policy: unknown
+  try {
+    policy = input.policy
+  } catch {
+    throw packInputSchemaError()
+  }
+  if (!isNonArrayObject(policy)) throw packInputSchemaError()
+
+  return Object.freeze({
+    source: source as unknown as ContentPackSourceV1,
+    policy: policy as unknown as ContentValidationPolicyV1,
+  })
+}
+
+function snapshotBaseInputV1(input: ResolveProfileInputV1): ResolvePackInputV1 {
+  let base: unknown
+  try {
+    base = input.base
+  } catch {
+    throw packInputSchemaError()
+  }
+  return snapshotPackInputV1(base)
+}
+
+function runCandidateCheckV1(
+  input: ResolveProfileInputV1,
+  candidate: ResolvedSnapshotViewV1,
+): void {
+  let candidateCheck: unknown
+  try {
+    candidateCheck = input.candidateCheck
+  } catch {
+    throw candidateCheckError()
+  }
+
+  if (candidateCheck === undefined) return
+  if (typeof candidateCheck !== 'function') throw candidateCheckError()
+
+  let result: unknown
+  try {
+    result = candidateCheck(candidate)
+  } catch {
+    throw candidateCheckError()
+  }
+  if (!isNonArrayObject(result)) throw candidateCheckError()
+
+  let accepted: unknown
+  try {
+    accepted = result.ok
+  } catch {
+    throw candidateCheckError()
+  }
+  if (accepted !== true) throw candidateCheckError()
+}
+
 function cloneCompatibility(
   compatibility: PackCompatibilityV1,
 ): PackCompatibilityV1 {
@@ -418,36 +587,14 @@ function applyPatch(
 export function resolveProfileV1(
   input: ResolveProfileInputV1,
 ): ResolvedSnapshotViewV1 {
-  const patches = input.patches ?? []
-  if (patches.length > 256) {
-    throw new ContentPipelineErrorV1(
-      'PACK_BUDGET_EXCEEDED',
-      'patch',
-    )
+  const patches = snapshotPatchInputsV1(input)
+  const base = snapshotBaseInputV1(input)
+
+  let state = resolveBase(base)
+  for (let index = 0; index < patches.length; index += 1) {
+    state = applyPatch(state, snapshotPackInputV1(patches[index]))
   }
 
-  let state = resolveBase(input.base)
-  for (const patch of patches) {
-    state = applyPatch(state, patch)
-  }
-
-  if (input.candidateCheck) {
-    let result: CandidateCheckResultV1
-    try {
-      result = input.candidateCheck(state.view)
-    } catch {
-      throw new ContentPipelineErrorV1(
-        'CANDIDATE_CHECK_FAILED',
-        'candidate-check',
-      )
-    }
-    if (!result || result.ok !== true) {
-      throw new ContentPipelineErrorV1(
-        'CANDIDATE_CHECK_FAILED',
-        'candidate-check',
-      )
-    }
-  }
-
+  runCandidateCheckV1(input, state.view)
   return state.view
 }

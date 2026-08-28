@@ -10,6 +10,7 @@ import { sha256HexV1 } from '@/lib/content-pipeline/core/hash'
 import {
   resolveProfileV1,
   type ResolvePackInputV1,
+  type ResolveProfileInputV1,
 } from '@/lib/content-pipeline/core/resolver'
 import type { ContentPackSourceV1 } from '@/lib/content-pipeline/core/source'
 import type { ContentValidationPolicyV1 } from '@/lib/content-pipeline/core/validator'
@@ -500,11 +501,249 @@ describe('Content Pipeline v1 resolver', () => {
       base: pack(base),
       patches: Array.from({ length: 256 }, () => notActuallyAPatch),
     }), 'PACK_SCHEMA_INVALID')
-    const error = expectPipelineError(() => resolveProfileV1({
-      base: pack(base),
-      patches: Array.from({ length: 257 }, () => notActuallyAPatch),
-    }), 'PACK_BUDGET_EXCEEDED')
+    let baseReads = 0
+    let patchIndexReads = 0
+    let patchIteratorReads = 0
+    let candidateCheckReads = 0
+    const oversizedPatches = new Proxy(
+      Array.from({ length: 257 }, () => notActuallyAPatch),
+      {
+        get(target, property, receiver) {
+          if (property === Symbol.iterator) patchIteratorReads += 1
+          if (typeof property === 'string' && /^\d+$/.test(property)) {
+            patchIndexReads += 1
+          }
+          return Reflect.get(target, property, receiver)
+        },
+      },
+    )
+    const oversizedInput: ResolveProfileInputV1 = {
+      get base() {
+        baseReads += 1
+        return pack(base)
+      },
+      patches: oversizedPatches,
+      get candidateCheck() {
+        candidateCheckReads += 1
+        return () => ({ ok: true })
+      },
+    }
+
+    const error = expectPipelineError(
+      () => resolveProfileV1(oversizedInput),
+      'PACK_BUDGET_EXCEEDED',
+    )
     expect(error.stage).toBe('patch')
+    expect(baseReads).toBe(0)
+    expect(patchIndexReads).toBe(0)
+    expect(patchIteratorReads).toBe(0)
+    expect(candidateCheckReads).toBe(0)
+  })
+
+  it('snapshots Patch inputs by bounded indices without consulting a replaceable iterator', () => {
+    const base = snapshotSource({
+      files: [{ path: 'images/a.png', mediaType: 'image/png', bytes: png(57) }],
+      capabilities: ['raster-assets'],
+    })
+    const hiddenPatch = pack(base)
+    let iteratorReads = 0
+    let iteratorCalls = 0
+    const patches = new Proxy([] as ResolvePackInputV1[], {
+      get(target, property, receiver) {
+        if (property === Symbol.iterator) {
+          iteratorReads += 1
+          return function* injectedPatches() {
+            iteratorCalls += 1
+            for (let index = 0; index < 257; index += 1) {
+              yield hiddenPatch
+            }
+          }
+        }
+        return Reflect.get(target, property, receiver)
+      },
+    })
+
+    const result = resolveProfileV1({ base: pack(base), patches })
+
+    expect(result.profile.patches).toEqual([])
+    expect(iteratorReads).toBe(0)
+    expect(iteratorCalls).toBe(0)
+  })
+
+  it('reads top-level resolver inputs once and observes candidate-check only after validation', () => {
+    const base = snapshotSource({
+      files: [{ path: 'images/a.png', mediaType: 'image/png', bytes: png(58) }],
+      capabilities: ['raster-assets'],
+    })
+    let baseReads = 0
+    let patchesReads = 0
+    let candidateCheckReads = 0
+    let candidateCheckCalls = 0
+    const input: ResolveProfileInputV1 = {
+      get base() {
+        baseReads += 1
+        return pack(base)
+      },
+      get patches() {
+        patchesReads += 1
+        return []
+      },
+      get candidateCheck() {
+        candidateCheckReads += 1
+        return () => {
+          candidateCheckCalls += 1
+          return { ok: true }
+        }
+      },
+    }
+
+    resolveProfileV1(input)
+
+    expect(patchesReads).toBe(1)
+    expect(baseReads).toBe(1)
+    expect(candidateCheckReads).toBe(1)
+    expect(candidateCheckCalls).toBe(1)
+  })
+
+  it('snapshots Base and Patch source/policy getters exactly once', () => {
+    const base = snapshotSource({
+      files: [{ path: 'images/a.png', mediaType: 'image/png', bytes: png(59) }],
+      capabilities: ['raster-assets'],
+    })
+    const rawBase = pack(base)
+    let baseSourceReads = 0
+    let basePolicyReads = 0
+    const trackedBase: ResolvePackInputV1 = {
+      get source() {
+        baseSourceReads += 1
+        return rawBase.source
+      },
+      get policy() {
+        basePolicyReads += 1
+        return rawBase.policy
+      },
+    }
+    const parent = resolveProfileV1({ base: trackedBase })
+    const added = png(159)
+    const patch = patchSource({
+      parentProfileHash: parent.profile.resolvedProfileHash,
+      files: [{ path: 'images/patch/b.png', mediaType: 'image/png', bytes: added }],
+      capabilities: ['raster-assets'],
+      operations: [{
+        op: 'add',
+        targetPath: 'images/b.png',
+        sourcePath: 'images/patch/b.png',
+      }],
+      packageId: 'local.getter-snapshot',
+    })
+    const rawPatch = pack(patch)
+    let patchSourceReads = 0
+    let patchPolicyReads = 0
+    const trackedPatch: ResolvePackInputV1 = {
+      get source() {
+        patchSourceReads += 1
+        return rawPatch.source
+      },
+      get policy() {
+        patchPolicyReads += 1
+        return rawPatch.policy
+      },
+    }
+
+    const result = resolveProfileV1({
+      base: pack(base),
+      patches: [trackedPatch],
+    })
+
+    expect(parent.profile.patches).toEqual([])
+    expect(result.profile.patches).toHaveLength(1)
+    expect(baseSourceReads).toBe(1)
+    expect(basePolicyReads).toBe(1)
+    expect(patchSourceReads).toBe(1)
+    expect(patchPolicyReads).toBe(1)
+  })
+
+  it('maps malformed pack inputs and source/policy getter traps to schema/source', () => {
+    const base = snapshotSource({
+      files: [{ path: 'images/a.png', mediaType: 'image/png', bytes: png(159) }],
+      capabilities: ['raster-assets'],
+    })
+    const sourceSecret = 'sensitive base source getter'
+    const policySecret = 'sensitive patch policy getter'
+    const sourceTrap: ResolvePackInputV1 = {
+      get source(): never {
+        throw new Error(sourceSecret)
+      },
+      policy: localDevPolicy,
+    }
+    const policyTrap: ResolvePackInputV1 = {
+      source: base,
+      get policy(): never {
+        throw new Error(policySecret)
+      },
+    }
+
+    const malformedBase = expectPipelineError(() => resolveProfileV1({
+      base: null as unknown as ResolvePackInputV1,
+    }), 'PACK_SCHEMA_INVALID')
+    const malformedPatch = expectPipelineError(() => resolveProfileV1({
+      base: pack(base),
+      patches: [null as unknown as ResolvePackInputV1],
+    }), 'PACK_SCHEMA_INVALID')
+    const sourceError = expectPipelineError(
+      () => resolveProfileV1({ base: sourceTrap }),
+      'PACK_SCHEMA_INVALID',
+    )
+    const policyError = expectPipelineError(() => resolveProfileV1({
+      base: pack(base),
+      patches: [policyTrap],
+    }), 'PACK_SCHEMA_INVALID')
+
+    for (const error of [
+      malformedBase,
+      malformedPatch,
+      sourceError,
+      policyError,
+    ]) {
+      expect(error.stage).toBe('source')
+      expect(error.message).not.toContain(sourceSecret)
+      expect(error.message).not.toContain(policySecret)
+    }
+  })
+
+  it('contains candidate-check getter and result.ok getter traps', () => {
+    const base = snapshotSource({
+      files: [{ path: 'images/a.png', mediaType: 'image/png', bytes: png(160) }],
+      capabilities: ['raster-assets'],
+    })
+    const checkSecret = 'sensitive candidate getter'
+    const resultSecret = 'sensitive candidate result getter'
+    const trappedCheckInput: ResolveProfileInputV1 = {
+      base: pack(base),
+      get candidateCheck(): never {
+        throw new Error(checkSecret)
+      },
+    }
+
+    const checkError = expectPipelineError(
+      () => resolveProfileV1(trappedCheckInput),
+      'CANDIDATE_CHECK_FAILED',
+    )
+    const resultError = expectPipelineError(() => resolveProfileV1({
+      base: pack(base),
+      candidateCheck() {
+        return {
+          get ok(): true {
+            throw new Error(resultSecret)
+          },
+        }
+      },
+    }), 'CANDIDATE_CHECK_FAILED')
+
+    expect(checkError.stage).toBe('candidate-check')
+    expect(resultError.stage).toBe('candidate-check')
+    expect(checkError.message).not.toContain(checkSecret)
+    expect(resultError.message).not.toContain(resultSecret)
   })
 
   it('runs the candidate hook once after the complete chain and isolates its view', () => {

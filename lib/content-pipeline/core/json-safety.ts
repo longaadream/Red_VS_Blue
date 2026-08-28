@@ -1,5 +1,6 @@
 import type { JsonValueV1 } from '../contracts'
 import { CONTENT_PIPELINE_LIMITS_V1 } from './error-codes'
+import { snapshotOrdinaryUint8ArrayV1 } from './source'
 
 export type JsonSafetyFailureReasonV1 =
   | 'bom'
@@ -246,18 +247,22 @@ class StrictJsonParserV1 {
 }
 
 export function parseStrictJsonBytesV1(input: Uint8Array): JsonValueV1 {
+  const snapshot = snapshotOrdinaryUint8ArrayV1(input)
+  if (!snapshot.ok) fail('utf8')
+  const bytes = snapshot.bytes
+
   if (
-    input.byteLength >= 3
-    && input[0] === 0xef
-    && input[1] === 0xbb
-    && input[2] === 0xbf
+    bytes.byteLength >= 3
+    && bytes[0] === 0xef
+    && bytes[1] === 0xbb
+    && bytes[2] === 0xbf
   ) {
     fail('bom')
   }
 
   let text: string
   try {
-    text = utf8Decoder.decode(input)
+    text = utf8Decoder.decode(bytes)
   } catch {
     return fail('utf8')
   }

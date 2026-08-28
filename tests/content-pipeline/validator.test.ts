@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it } from 'vitest'
 
@@ -223,6 +224,21 @@ function candidateFiles(
 function jsonArrayBytes(valueCount: number): Uint8Array {
   const values = valueCount === 0 ? '' : `${'0,'.repeat(valueCount - 1)}0`
   return utf8(`[${values}]`)
+}
+
+function proxiedBytesWithPoisonIterator(
+  bytes: Uint8Array,
+  onIterator: () => void,
+): Uint8Array {
+  return new Proxy(bytes, {
+    get(target, property) {
+      if (property === Symbol.iterator) {
+        onIterator()
+        throw new Error('Uint8Array iterator must not be read')
+      }
+      return Reflect.get(target, property, target) as unknown
+    },
+  })
 }
 
 function validPveEntries(nextNodeId = 'finish'): ContentSourceEntryV1[] {
@@ -456,6 +472,359 @@ describe('Content Pipeline v1 source and JSON safety', () => {
   })
 
   it.each([
+    ['manifestBytes', CONTENT_PIPELINE_LIMITS_V1.maxManifestBytes],
+    ['signatureBytes', CONTENT_PIPELINE_LIMITS_V1.maxSignatureBytes],
+  ] as const)(
+    'budgets the first %s snapshot and reads the source field once',
+    (field, maximumBytes) => {
+      const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+      const base = signedSnapshotSource([entry], ['game-data'])
+      const oversized = new Uint8Array(maximumBytes + 1)
+      let reads = 0
+      const source: ContentPackSourceV1 = field === 'manifestBytes'
+        ? {
+            get manifestBytes(): Uint8Array {
+              reads += 1
+              return reads === 1 ? oversized : base.manifestBytes
+            },
+            signatureBytes: base.signatureBytes,
+            entries: base.entries,
+          }
+        : {
+            manifestBytes: base.manifestBytes,
+            get signatureBytes(): Uint8Array {
+              reads += 1
+              return reads === 1 ? oversized : base.signatureBytes!
+            },
+            entries: base.entries,
+          }
+
+      expectPipelineError(
+        () => validatePackSourceV1(source, externalPolicy),
+        'PACK_BUDGET_EXCEEDED',
+        'source',
+      )
+      expect(reads).toBe(1)
+    },
+  )
+
+  it('reads valid manifest and signature byte fields only once', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const base = signedSnapshotSource([entry], ['game-data'])
+    let manifestReads = 0
+    let signatureReads = 0
+    const source: ContentPackSourceV1 = {
+      get manifestBytes(): Uint8Array {
+        manifestReads += 1
+        if (manifestReads > 1) throw new Error('manifestBytes read twice')
+        return base.manifestBytes
+      },
+      get signatureBytes(): Uint8Array {
+        signatureReads += 1
+        if (signatureReads > 1) throw new Error('signatureBytes read twice')
+        return base.signatureBytes!
+      },
+      entries: base.entries,
+    }
+
+    expect(validatePackSourceV1(source, externalPolicy).capabilities).toEqual([
+      'game-data',
+    ])
+    expect({ manifestReads, signatureReads }).toEqual({
+      manifestReads: 1,
+      signatureReads: 1,
+    })
+  })
+
+  it.each(['manifestBytes', 'signatureBytes'] as const)(
+    'maps a throwing %s getter to a stable source error',
+    field => {
+      const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+      const base = snapshotSource([entry], ['game-data'])
+      const source: ContentPackSourceV1 = field === 'manifestBytes'
+        ? {
+            get manifestBytes(): Uint8Array {
+              throw new Error('poison manifest getter')
+            },
+            entries: base.entries,
+          }
+        : {
+            manifestBytes: base.manifestBytes,
+            get signatureBytes(): Uint8Array {
+              throw new Error('poison signature getter')
+            },
+            entries: base.entries,
+          }
+      expectPipelineError(
+        () => validatePackSourceV1(source, localDevPolicy),
+        'PACK_SCHEMA_INVALID',
+        'source',
+      )
+    },
+  )
+
+  it('checks and reads own source entry indices exactly once without iterators', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const base = snapshotSource([entry], ['game-data'])
+    let iteratorReads = 0
+    let indexDescriptorReads = 0
+    let indexValueReads = 0
+    const entries = new Proxy([entry], {
+      get(target, property, receiver) {
+        if (property === Symbol.iterator) {
+          iteratorReads += 1
+          throw new Error('entries iterator must not be read')
+        }
+        if (property === '0') {
+          indexValueReads += 1
+          return Reflect.get(target, property, receiver) as unknown
+        }
+        return Reflect.get(target, property, receiver) as unknown
+      },
+      getOwnPropertyDescriptor(target, property) {
+        if (property === '0') indexDescriptorReads += 1
+        return Reflect.getOwnPropertyDescriptor(target, property)
+      },
+    })
+    expect(validatePackSourceV1({
+      ...base,
+      entries,
+    }, localDevPolicy).capabilities).toEqual(['game-data'])
+    expect(indexDescriptorReads).toBe(1)
+    expect(indexValueReads).toBe(1)
+    expect(iteratorReads).toBe(0)
+  })
+
+  it('rejects unsafe entries lengths and throwing index getters', () => {
+    const base = snapshotSource([], [])
+    for (const invalidLength of [-1, 1.5, Number.NaN]) {
+      const entries = new Proxy([], {
+        get(target, property, receiver) {
+          if (property === 'length') return invalidLength
+          return Reflect.get(target, property, receiver) as unknown
+        },
+      })
+      expectPipelineError(
+        () => validatePackSourceV1({ ...base, entries }, localDevPolicy),
+        'PACK_SCHEMA_INVALID',
+        'source',
+      )
+    }
+
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const oneEntryBase = snapshotSource([entry], ['game-data'])
+    const throwingEntries = new Proxy([entry], {
+      get(target, property, receiver) {
+        if (property === '0') throw new Error('poison entry index')
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    })
+    expectPipelineError(
+      () => validatePackSourceV1({
+        ...oneEntryBase,
+        entries: throwingEntries,
+      }, localDevPolicy),
+      'PACK_SCHEMA_INVALID',
+      'source',
+    )
+  })
+
+  it.each([
+    ['inherited', (
+      entry: ContentSourceEntryV1,
+    ) => {
+      const entries = new Array<ContentSourceEntryV1>(1)
+      const prototype = Object.create(Array.prototype) as Record<
+        PropertyKey,
+        unknown
+      >
+      prototype[0] = entry
+      Object.setPrototypeOf(entries, prototype)
+      return entries
+    }],
+    ['hole', (
+      _entry: ContentSourceEntryV1,
+    ) => {
+      void _entry
+      return new Array<ContentSourceEntryV1>(1)
+    }],
+  ] as const)(
+    'rejects a missing own %s source entry index',
+    (_label, makeEntries) => {
+      const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+      const entries = makeEntries(entry)
+      const base = snapshotSource([entry], ['game-data'])
+      expectPipelineError(
+        () => validatePackSourceV1({ ...base, entries }, localDevPolicy),
+        'PACK_SCHEMA_INVALID',
+        'source',
+      )
+    },
+  )
+
+  it.each([
+    ['accessor', (
+      entry: ContentSourceEntryV1,
+      onAccessor: () => void,
+    ) => {
+      const entries: ContentSourceEntryV1[] = []
+      Object.defineProperty(entries, 0, {
+        configurable: true,
+        enumerable: true,
+        get() {
+          onAccessor()
+          return entry
+        },
+      })
+      return entries
+    }, 1],
+    ['non-enumerable', (
+      entry: ContentSourceEntryV1,
+      onAccessor: () => void,
+    ) => {
+      void onAccessor
+      const entries: ContentSourceEntryV1[] = []
+      Object.defineProperty(entries, 0, {
+        configurable: true,
+        enumerable: false,
+        value: entry,
+        writable: true,
+      })
+      return entries
+    }, 0],
+  ] as const)(
+    'accepts an own %s source entry index',
+    (_label, makeEntries, expectedAccessorReads) => {
+      const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+      let accessorReads = 0
+      const entries = makeEntries(entry, () => { accessorReads += 1 })
+      const base = snapshotSource([entry], ['game-data'])
+      expect(validatePackSourceV1({
+        ...base,
+        entries,
+      }, localDevPolicy).capabilities).toEqual(['game-data'])
+      expect(accessorReads).toBe(expectedAccessorReads)
+    },
+  )
+
+  it('ignores non-index string and symbol properties on source arrays', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const entries = [entry]
+    Object.defineProperty(entries, 'metadata', {
+      configurable: true,
+      enumerable: true,
+      get() { throw new Error('extra string property must not be read') },
+    })
+    Object.defineProperty(entries, Symbol('metadata'), {
+      configurable: true,
+      enumerable: true,
+      get() { throw new Error('extra symbol property must not be read') },
+    })
+    const base = snapshotSource([entry], ['game-data'])
+    expect(validatePackSourceV1({
+      ...base,
+      entries,
+    }, localDevPolicy).capabilities).toEqual(['game-data'])
+  })
+
+  it('rejects proxied source byte views without invoking their iterator', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const local = snapshotSource([entry], ['game-data'])
+    const signed = signedSnapshotSource([entry], ['game-data'])
+    const factories = [
+      () => {
+        let iteratorReads = 0
+        return {
+          source: {
+            ...local,
+            manifestBytes: proxiedBytesWithPoisonIterator(
+              local.manifestBytes,
+              () => { iteratorReads += 1 },
+            ),
+          },
+          iteratorReads: () => iteratorReads,
+          policy: localDevPolicy,
+        }
+      },
+      () => {
+        let iteratorReads = 0
+        return {
+          source: {
+            ...signed,
+            signatureBytes: proxiedBytesWithPoisonIterator(
+              signed.signatureBytes!,
+              () => { iteratorReads += 1 },
+            ),
+          },
+          iteratorReads: () => iteratorReads,
+          policy: externalPolicy,
+        }
+      },
+      () => {
+        let iteratorReads = 0
+        return {
+          source: {
+            ...local,
+            entries: [{
+              ...entry,
+              bytes: proxiedBytesWithPoisonIterator(
+                entry.bytes,
+                () => { iteratorReads += 1 },
+              ),
+            }],
+          },
+          iteratorReads: () => iteratorReads,
+          policy: localDevPolicy,
+        }
+      },
+    ]
+
+    for (const createCase of factories) {
+      const testCase = createCase()
+      expectPipelineError(
+        () => validatePackSourceV1(testCase.source, testCase.policy),
+        'PACK_SCHEMA_INVALID',
+        'source',
+      )
+      expect(testCase.iteratorReads()).toBe(0)
+    }
+  })
+
+  it('accepts cross-realm ordinary Uint8Array bytes at both boundaries', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const crossRealmBytes = runInNewContext(
+      `Uint8Array.from(${JSON.stringify([...entry.bytes])})`,
+    ) as Uint8Array
+    const source = snapshotSource([entry], ['game-data'])
+    expect(validatePackSourceV1({
+      ...source,
+      entries: [{ ...entry, bytes: crossRealmBytes }],
+    }, localDevPolicy).capabilities).toEqual(['game-data'])
+
+    const candidate = candidateFiles([entry])[0]
+    expect(validateResolvedCandidateV1({
+      compatibility,
+      files: [{ ...candidate, bytes: crossRealmBytes }],
+      trustedExecutablePaths: [],
+    }, compatibility).capabilities).toEqual(['game-data'])
+  })
+
+  it('rejects SharedArrayBuffer-backed bytes at the source boundary', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const sharedBytes = new Uint8Array(new SharedArrayBuffer(entry.bytes.byteLength))
+    sharedBytes.set(entry.bytes)
+    const source = snapshotSource([entry], ['game-data'])
+    expectPipelineError(
+      () => validatePackSourceV1({
+        ...source,
+        entries: [{ ...entry, bytes: sharedBytes }],
+      }, localDevPolicy),
+      'PACK_SCHEMA_INVALID',
+      'source',
+    )
+  })
+
+  it.each([
     ['../data/cards.json', 'PACK_PATH_INVALID'],
     ['/data/cards.json', 'PACK_PATH_INVALID'],
     ['C:/data/cards.json', 'PACK_PATH_INVALID'],
@@ -495,6 +864,21 @@ describe('Content Pipeline v1 source and JSON safety', () => {
     ]
     expectPipelineError(
       () => validatePackSourceV1(snapshotSource(entries, ['game-data']), localDevPolicy),
+      'PACK_PATH_COLLISION',
+      'source',
+    )
+  })
+
+  it('rejects the Greek sigma Windows case collision in pack source paths', () => {
+    const entries = [
+      { path: 'data/cards/Σ.json', bytes: utf8('{}') },
+      { path: 'data/cards/ς.json', bytes: utf8('{}') },
+    ]
+    expectPipelineError(
+      () => validatePackSourceV1(
+        snapshotSource(entries, ['game-data']),
+        localDevPolicy,
+      ),
       'PACK_PATH_COLLISION',
       'source',
     )
@@ -591,6 +975,24 @@ describe('Content Pipeline v1 source and JSON safety', () => {
       () => validatePackSourceV1(snapshotSource([over], ['game-data']), localDevPolicy),
       'PACK_BUDGET_EXCEEDED',
       'content',
+    )
+  })
+
+  it('rejects an over-limit entry array before reading or iterating an entry', () => {
+    const backing = new Array<ContentSourceEntryV1>(
+      CONTENT_PIPELINE_LIMITS_V1.maxEntries + 1,
+    )
+    const entries = new Proxy(backing, {
+      get(target, property, receiver) {
+        if (property === 'length') return Reflect.get(target, property, receiver)
+        throw new Error(`Poison entry access: ${String(property)}`)
+      },
+    })
+
+    expectPipelineError(
+      () => validatePackSourceV1(rawBudgetSource(entries), localDevPolicy),
+      'PACK_BUDGET_EXCEEDED',
+      'source',
     )
   })
 
@@ -720,6 +1122,161 @@ describe('Content Pipeline v1 policy and capabilities', () => {
     }
   })
 
+  it.each([
+    ['missing', {
+      kind: 'local-dev',
+      expectedCompatibility: compatibility,
+    }],
+    ['false', {
+      kind: 'local-dev',
+      expectedCompatibility: compatibility,
+      allowUnsigned: false,
+    }],
+  ] as const)(
+    'rejects unsigned Local Dev when allowUnsigned is %s',
+    (_label, runtimePolicy) => {
+      const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+      expectPipelineError(
+        () => validatePackSourceV1(
+          snapshotSource([entry], ['game-data']),
+          runtimePolicy as unknown as ContentValidationPolicyV1,
+        ),
+        'PACK_SIGNATURE_REQUIRED',
+        'signature',
+      )
+    },
+  )
+
+  it.each([
+    ['missing', {
+      kind: 'local-dev',
+      allowUnsigned: true,
+    }],
+    ['null', {
+      kind: 'local-dev',
+      allowUnsigned: true,
+      expectedCompatibility: null,
+    }],
+    ['missing field', {
+      kind: 'local-dev',
+      allowUnsigned: true,
+      expectedCompatibility: { engineAbi: compatibility.engineAbi },
+    }],
+    ['unknown field', {
+      kind: 'local-dev',
+      allowUnsigned: true,
+      expectedCompatibility: { ...compatibility, extraAbi: 'rvb-extra/v1' },
+    }],
+    ['invalid ABI', {
+      kind: 'local-dev',
+      allowUnsigned: true,
+      expectedCompatibility: {
+        ...compatibility,
+        engineAbi: 'RVB-ENGINE/v1',
+      },
+    }],
+  ] as const)(
+    'rejects runtime expectedCompatibility when it is %s',
+    (_label, runtimePolicy) => {
+      const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+      expectPipelineError(
+        () => validatePackSourceV1(
+          snapshotSource([entry], ['game-data']),
+          runtimePolicy as unknown as ContentValidationPolicyV1,
+        ),
+        'PACK_SCHEMA_INVALID',
+        'source',
+      )
+    },
+  )
+
+  it('rejects malformed runtime compatibility before reading manifest bytes', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const validSource = snapshotSource([entry], ['game-data'])
+    const poisonSource: ContentPackSourceV1 = {
+      get manifestBytes(): Uint8Array {
+        throw new Error('Manifest bytes must not be read')
+      },
+      signatureBytes: validSource.signatureBytes,
+      entries: validSource.entries,
+    }
+    const runtimePolicy = {
+      kind: 'local-dev',
+      allowUnsigned: true,
+      expectedCompatibility: { ...compatibility, unexpected: true },
+    } as unknown as ContentValidationPolicyV1
+    expectPipelineError(
+      () => validatePackSourceV1(poisonSource, runtimePolicy),
+      'PACK_SCHEMA_INVALID',
+      'source',
+    )
+  })
+
+  it('keeps a schema-valid ABI mismatch in the compatibility stage', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    expectPipelineError(
+      () => validatePackSourceV1(
+        snapshotSource([entry], ['game-data']),
+        {
+          kind: 'local-dev',
+          allowUnsigned: true,
+          expectedCompatibility: {
+            ...compatibility,
+            engineAbi: 'rvb-engine/v2',
+          },
+        },
+      ),
+      'PACK_ABI_UNSUPPORTED',
+      'compatibility',
+    )
+  })
+
+  it('uses one parsed compatibility copy despite accessor mutation', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const base = snapshotSource([entry], ['game-data'])
+    const mutableCompatibility = { ...compatibility }
+    let compatibilityReads = 0
+    const runtimePolicy = {
+      kind: 'local-dev',
+      allowUnsigned: true,
+      get expectedCompatibility(): PackCompatibilityV1 {
+        compatibilityReads += 1
+        if (compatibilityReads > 1) {
+          throw new Error('expectedCompatibility read twice')
+        }
+        return mutableCompatibility
+      },
+    } as ContentValidationPolicyV1
+    const source: ContentPackSourceV1 = {
+      get manifestBytes(): Uint8Array {
+        mutableCompatibility.engineAbi = 'rvb-engine/v2'
+        return base.manifestBytes
+      },
+      entries: base.entries,
+    }
+
+    expect(validatePackSourceV1(source, runtimePolicy).capabilities).toEqual([
+      'game-data',
+    ])
+    expect(compatibilityReads).toBe(1)
+  })
+
+  it('rejects an unknown runtime policy even for a correctly signed pack', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const runtimePolicy = {
+      kind: 'future-policy',
+      expectedCompatibility: compatibility,
+    } as unknown as ContentValidationPolicyV1
+    expectPipelineError(
+      () => validatePackSourceV1(
+        signedSnapshotSource([entry], ['game-data']),
+        runtimePolicy,
+      ),
+      'PACK_SCHEMA_INVALID',
+      'source',
+    )
+  })
+
   it('rejects a signed Patch under the bundled-base-only Snapshot policy', () => {
     const payload = { path: 'data/patch/new.json', bytes: utf8('{}') }
     const operation: PackPatchOperationV1 = {
@@ -758,6 +1315,96 @@ describe('Content Pipeline v1 policy and capabilities', () => {
       expect(validated.signatureEnvelope?.keyId).toBe(signingKeyId)
       expect(validated.networkEligible).toBe(true)
     }
+  })
+
+  it('rejects schema-valid manifest bytes changed after signing', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const signed = signedSnapshotSource([entry], ['game-data'])
+    const manifest = JSON.parse(
+      decoder.decode(signed.manifestBytes),
+    ) as PackManifestV1
+
+    const error = expectPipelineError(
+      () => validatePackSourceV1({
+        ...signed,
+        manifestBytes: utf8(JSON.stringify({
+          ...manifest,
+          displayName: 'Tampered validator fixture',
+        })),
+      }, externalPolicy),
+      'PACK_SIGNATURE_INVALID',
+      'signature',
+    )
+    expect(error).toMatchObject({ packId: 'tests.validator' })
+  })
+
+  it('rejects same-length entry bytes changed after signing', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const signed = signedSnapshotSource([entry], ['game-data'])
+
+    const error = expectPipelineError(
+      () => validatePackSourceV1({
+        ...signed,
+        entries: [{
+          ...entry,
+          bytes: utf8('[]'),
+        }],
+      }, externalPolicy),
+      'PACK_HASH_MISMATCH',
+      'inventory',
+    )
+    expect(error).toMatchObject({
+      packId: 'tests.validator',
+      path: 'data/cards/basic.json',
+    })
+  })
+
+  it('does not let a self-consistent signed pack bypass PVE references', () => {
+    const entries = validPveEntries('missing-node')
+
+    const error = expectPipelineError(
+      () => validatePackSourceV1(
+        signedSnapshotSource(entries, ['pve-content']),
+        externalPolicy,
+      ),
+      'PACK_REFERENCE_INVALID',
+      'reference',
+    )
+    expect(error).toMatchObject({
+      packId: 'tests.validator',
+      contentId: 'missing-node',
+    })
+  })
+
+  it('lets signature JSON depth 64 reach envelope validation and budgets depth 65', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const signed = signedSnapshotSource([entry], ['game-data'])
+    const signatureText = decoder.decode(signed.signatureBytes!)
+    const withPaddingDepth = (arrayDepth: number): Uint8Array => utf8(
+      `${signatureText.slice(0, -1)},"padding":`
+      + `${'['.repeat(arrayDepth)}null${']'.repeat(arrayDepth)}}`,
+    )
+
+    expectPipelineError(
+      () => validatePackSourceV1({
+        ...signed,
+        signatureBytes: withPaddingDepth(
+          CONTENT_PIPELINE_LIMITS_V1.maxJsonDepth - 2,
+        ),
+      }, externalPolicy),
+      'PACK_SIGNATURE_INVALID',
+      'signature',
+    )
+    expectPipelineError(
+      () => validatePackSourceV1({
+        ...signed,
+        signatureBytes: withPaddingDepth(
+          CONTENT_PIPELINE_LIMITS_V1.maxJsonDepth - 1,
+        ),
+      }, externalPolicy),
+      'PACK_BUDGET_EXCEEDED',
+      'signature',
+    )
   })
 
   it('does not let a valid signature bypass executable, ABI, or capability checks', () => {
@@ -900,9 +1547,819 @@ describe('Content Pipeline v1 policy and capabilities', () => {
       'patch',
     )
   })
+
+  function removeOperation(
+    descriptor: PackFileDescriptorV1,
+  ): PackPatchOperationV1 {
+    return {
+      op: 'remove',
+      targetPath: descriptor.path,
+      expectedHash: descriptor.sha256,
+    }
+  }
+
+  function rawParentTree(
+    descriptors: readonly PackFileDescriptorV1[],
+    readFile: (path: string) => Uint8Array | undefined,
+  ) {
+    return {
+      files: descriptors,
+      readFile,
+      hasExecutableContent: () => false,
+    }
+  }
+
+  it('does not observe context.parent for Snapshot manifests', () => {
+    const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+    let parentReads = 0
+    const context = Object.defineProperty({}, 'parent', {
+      get() {
+        parentReads += 1
+        throw new Error('Snapshot must not observe parent')
+      },
+    })
+
+    expect(validatePackSourceV1(
+      snapshotSource([entry], ['game-data']),
+      localDevPolicy,
+      context as never,
+    ).capabilities).toEqual(['game-data'])
+    expect(parentReads).toBe(0)
+  })
+
+  it('snapshots Patch parent accessors and indexed files exactly once', () => {
+    const entries = sortEntries([
+      { path: 'data/cards/a.json', bytes: utf8('{}') },
+      { path: 'data/cards/b.json', bytes: utf8('[]') },
+    ])
+    const descriptors = entries.map(fileDescriptor)
+    const bytesByPath = new Map(entries.map(entry => [entry.path, entry.bytes]))
+    const indexDescriptorReads = [0, 0]
+    const indexValueReads = [0, 0]
+    let lengthReads = 0
+    let iteratorReads = 0
+    const files = new Proxy([...descriptors], {
+      get(target, property) {
+        if (property === Symbol.iterator) {
+          iteratorReads += 1
+          throw new Error('parent files iterator must not be read')
+        }
+        if (property === 'length') lengthReads += 1
+        if (property === '0' || property === '1') {
+          indexValueReads[Number(property)] += 1
+          return Reflect.get(target, property, target) as unknown
+        }
+        return Reflect.get(target, property, target) as unknown
+      },
+      getOwnPropertyDescriptor(target, property) {
+        if (property === '0' || property === '1') {
+          indexDescriptorReads[Number(property)] += 1
+        }
+        return Reflect.getOwnPropertyDescriptor(target, property)
+      },
+    })
+
+    let parentReads = 0
+    let filesReads = 0
+    let readFileReads = 0
+    let executableMarkerReads = 0
+    const calls = new Map<string, number>()
+    const parent = Object.defineProperties({}, {
+      files: {
+        get() {
+          filesReads += 1
+          if (filesReads > 1) throw new Error('parent files read twice')
+          return files
+        },
+      },
+      readFile: {
+        get() {
+          readFileReads += 1
+          if (readFileReads > 1) throw new Error('parent readFile read twice')
+          return (path: string) => {
+            calls.set(path, (calls.get(path) ?? 0) + 1)
+            return bytesByPath.get(path)
+          }
+        },
+      },
+      hasExecutableContent: {
+        get() {
+          executableMarkerReads += 1
+          throw new Error('external executable marker must not be read')
+        },
+      },
+    })
+    const context = {
+      get parent() {
+        parentReads += 1
+        if (parentReads > 1) throw new Error('context parent read twice')
+        return parent
+      },
+    }
+
+    expect(validatePackSourceV1(
+      patchSource([], ['game-data'], descriptors.map(removeOperation)),
+      localDevPolicy,
+      context as never,
+    ).capabilities).toEqual(['game-data'])
+    expect(parentReads).toBe(1)
+    expect(filesReads).toBe(1)
+    expect(lengthReads).toBe(1)
+    expect(indexDescriptorReads).toEqual([1, 1])
+    expect(indexValueReads).toEqual([1, 1])
+    expect(iteratorReads).toBe(0)
+    expect(readFileReads).toBe(1)
+    expect(calls).toEqual(new Map(entries.map(entry => [entry.path, 1])))
+    expect(executableMarkerReads).toBe(0)
+  })
+
+  it.each([
+    ['null context', null],
+    ['throwing parent getter', Object.defineProperty({}, 'parent', {
+      get() { throw new Error('poison parent getter') },
+    })],
+    ['null parent', { parent: null }],
+    ['throwing files getter', {
+      parent: Object.defineProperty({}, 'files', {
+        get() { throw new Error('poison files getter') },
+      }),
+    }],
+    ['non-array files', {
+      parent: {
+        files: {},
+        readFile: () => utf8('{}'),
+        hasExecutableContent: (): boolean => false,
+      },
+    }],
+    ['throwing readFile getter', {
+      parent: Object.defineProperties({}, {
+        files: { value: [fileDescriptor({
+          path: 'data/cards/base.json',
+          bytes: utf8('{}'),
+        })] },
+        readFile: {
+          get() { throw new Error('poison readFile getter') },
+        },
+      }),
+    }],
+    ['non-function readFile', {
+      parent: {
+        files: [fileDescriptor({
+          path: 'data/cards/base.json',
+          bytes: utf8('{}'),
+        })],
+        readFile: 42,
+        hasExecutableContent: () => false,
+      },
+    }],
+    ['throwing readFile call', {
+      parent: {
+        files: [fileDescriptor({
+          path: 'data/cards/base.json',
+          bytes: utf8('{}'),
+        })],
+        readFile() { throw new Error('poison readFile call') },
+        hasExecutableContent: (): boolean => false,
+      },
+    }],
+  ] as const)(
+    'maps malformed Patch parent boundary: %s',
+    (_label, context) => {
+      const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+      const descriptor = fileDescriptor(entry)
+      expectPipelineError(
+        () => validatePackSourceV1(
+          patchSource([], ['game-data'], [removeOperation(descriptor)]),
+          localDevPolicy,
+          context as never,
+        ),
+        'PACK_SCHEMA_INVALID',
+        'patch',
+      )
+    },
+  )
+
+  it('bounds parent files before indexes and never reads their iterator', () => {
+    let indexReads = 0
+    let iteratorReads = 0
+    const files = new Proxy([], {
+      get(target, property) {
+        if (property === 'length') {
+          return CONTENT_PIPELINE_LIMITS_V1.maxEntries + 1
+        }
+        if (property === Symbol.iterator) {
+          iteratorReads += 1
+          throw new Error('parent files iterator must not be read')
+        }
+        if (typeof property === 'string' && /^\d+$/.test(property)) {
+          indexReads += 1
+          throw new Error('parent file index must not be read')
+        }
+        return Reflect.get(target, property, target) as unknown
+      },
+    })
+    const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+    expectPipelineError(
+      () => validatePackSourceV1(
+        patchSource([], ['game-data'], [removeOperation(fileDescriptor(entry))]),
+        localDevPolicy,
+        {
+          parent: {
+            files,
+            readFile: () => entry.bytes,
+            hasExecutableContent: () => false,
+          },
+        },
+      ),
+      'PACK_BUDGET_EXCEEDED',
+      'source',
+    )
+    expect(indexReads).toBe(0)
+    expect(iteratorReads).toBe(0)
+  })
+
+  it('rejects inherited Patch parent file descriptors', () => {
+    const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+    const descriptor = fileDescriptor(entry)
+    const files = new Array<PackFileDescriptorV1>(1)
+    const prototype = Object.create(Array.prototype) as Record<
+      PropertyKey,
+      unknown
+    >
+    prototype[0] = descriptor
+    Object.setPrototypeOf(files, prototype)
+
+    expectPipelineError(
+      () => validatePackSourceV1(
+        patchSource([], ['game-data'], [removeOperation(descriptor)]),
+        localDevPolicy,
+        { parent: rawParentTree(files, () => entry.bytes) },
+      ),
+      'PACK_SCHEMA_INVALID',
+      'patch',
+    )
+  })
+
+  it.each([Number.NaN, -1, 1.5])(
+    'rejects an invalid parent files length: %s',
+    length => {
+      const files = new Proxy([], {
+        get(target, property) {
+          if (property === 'length') return length
+          return Reflect.get(target, property, target) as unknown
+        },
+      })
+      const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+      expectPipelineError(
+        () => validatePackSourceV1(
+          patchSource(
+            [],
+            ['game-data'],
+            [removeOperation(fileDescriptor(entry))],
+          ),
+          localDevPolicy,
+          {
+            parent: {
+              files,
+              readFile: () => entry.bytes,
+              hasExecutableContent: () => false,
+            },
+          },
+        ),
+        'PACK_SCHEMA_INVALID',
+        'patch',
+      )
+    },
+  )
+
+  it.each([
+    ['unknown descriptor field', (
+      first: PackFileDescriptorV1,
+      second: PackFileDescriptorV1,
+    ) => {
+      void second
+      return [{ ...first, unexpected: true }]
+    }],
+    ['unsorted descriptors', (
+      first: PackFileDescriptorV1,
+      second: PackFileDescriptorV1,
+    ) => [second, first]],
+    ['duplicate descriptor', (
+      first: PackFileDescriptorV1,
+      second: PackFileDescriptorV1,
+    ) => {
+      void second
+      return [first, first]
+    }],
+  ] as const)(
+    'strictly validates parent inventory: %s',
+    (_label, makeDescriptors) => {
+      const entries = sortEntries([
+        { path: 'data/cards/a.json', bytes: utf8('{}') },
+        { path: 'data/cards/b.json', bytes: utf8('[]') },
+      ])
+      const first = fileDescriptor(entries[0])
+      const second = fileDescriptor(entries[1])
+      const descriptors = makeDescriptors(first, second)
+      const bytesByPath = new Map(entries.map(entry => [entry.path, entry.bytes]))
+      expectPipelineError(
+        () => validatePackSourceV1(
+          patchSource([], ['game-data'], [removeOperation(first)]),
+          localDevPolicy,
+          {
+            parent: rawParentTree(
+              descriptors as readonly PackFileDescriptorV1[],
+              path => bytesByPath.get(path),
+            ),
+          },
+        ),
+        'PACK_SCHEMA_INVALID',
+        'patch',
+      )
+    },
+  )
+
+  it('rejects Windows-style parent descriptor path collisions', () => {
+    const entries = [
+      { path: 'data/cards/Σ.json', bytes: utf8('{}') },
+      { path: 'data/cards/ς.json', bytes: utf8('[]') },
+    ]
+    const descriptors = entries.map(fileDescriptor)
+    const bytesByPath = new Map(entries.map(entry => [entry.path, entry.bytes]))
+    expectPipelineError(
+      () => validatePackSourceV1(
+        patchSource([], ['game-data'], [removeOperation(descriptors[0])]),
+        localDevPolicy,
+        { parent: rawParentTree(descriptors, path => bytesByPath.get(path)) },
+      ),
+      'PACK_PATH_COLLISION',
+      'patch',
+    )
+  })
+
+  it.each([
+    ['Proxy', (bytes: Uint8Array) => proxiedBytesWithPoisonIterator(
+      bytes,
+      () => { throw new Error('parent byte iterator must not be read') },
+    )],
+    ['SharedArrayBuffer', (bytes: Uint8Array) => {
+      const shared = new Uint8Array(new SharedArrayBuffer(bytes.byteLength))
+      shared.set(bytes)
+      return shared
+    }],
+    ['detached ArrayBuffer', (bytes: Uint8Array) => {
+      const detached = new Uint8Array(bytes)
+      structuredClone(detached.buffer, { transfer: [detached.buffer] })
+      return detached
+    }],
+  ] as const)(
+    'rejects %s bytes returned by parent.readFile',
+    (_label, makeBytes) => {
+      const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+      const descriptor = fileDescriptor(entry)
+      expectPipelineError(
+        () => validatePackSourceV1(
+          patchSource([], ['game-data'], [removeOperation(descriptor)]),
+          localDevPolicy,
+          {
+            parent: rawParentTree(
+              [descriptor],
+              () => makeBytes(entry.bytes),
+            ),
+          },
+        ),
+        'PACK_SCHEMA_INVALID',
+        'patch',
+      )
+    },
+  )
+
+  it('maps a missing parent file body to a stable Patch error', () => {
+    const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+    const descriptor = fileDescriptor(entry)
+    expectPipelineError(
+      () => validatePackSourceV1(
+        patchSource([], ['game-data'], [removeOperation(descriptor)]),
+        localDevPolicy,
+        { parent: rawParentTree([descriptor], () => undefined) },
+      ),
+      'PACK_FILE_MISSING',
+      'patch',
+    )
+  })
+
+  it('accepts cross-realm ordinary bytes returned by parent.readFile', () => {
+    const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+    const descriptor = fileDescriptor(entry)
+    const crossRealmBytes = runInNewContext(
+      `Uint8Array.from(${JSON.stringify([...entry.bytes])})`,
+    ) as Uint8Array
+    expect(validatePackSourceV1(
+      patchSource([], ['game-data'], [removeOperation(descriptor)]),
+      localDevPolicy,
+      { parent: rawParentTree([descriptor], () => crossRealmBytes) },
+    ).capabilities).toEqual(['game-data'])
+  })
+
+  it.each([
+    [
+      'size',
+      utf8('{"changed":true}'),
+      'PACK_SIZE_MISMATCH',
+    ],
+    [
+      'hash',
+      utf8('[]'),
+      'PACK_HASH_MISMATCH',
+    ],
+  ] as const)(
+    'rechecks parent descriptor %s against returned bytes',
+    (_label, returnedBytes, code) => {
+      const entry = { path: 'data/cards/base.json', bytes: utf8('{}') }
+      const descriptor = fileDescriptor(entry)
+      expectPipelineError(
+        () => validatePackSourceV1(
+          patchSource([], ['game-data'], [removeOperation(descriptor)]),
+          localDevPolicy,
+          { parent: rawParentTree([descriptor], () => returnedBytes) },
+        ),
+        code,
+        'inventory',
+      )
+    },
+  )
+
+  it('checks the parent per-file byte budget before copying', () => {
+    const bytes = new Uint8Array(
+      CONTENT_PIPELINE_LIMITS_V1.maxFileBytes + 1,
+    )
+    bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const entry = { path: 'images/parent/over.png', bytes }
+    const descriptor = fileDescriptor(entry)
+    expectPipelineError(
+      () => validatePackSourceV1(
+        patchSource([], ['raster-assets'], [removeOperation(descriptor)]),
+        localDevPolicy,
+        { parent: rawParentTree([descriptor], () => bytes) },
+      ),
+      'PACK_BUDGET_EXCEEDED',
+      'source',
+    )
+  })
+
+  it('checks the complete parent byte budget, including untouched files', () => {
+    const maximum = new Uint8Array(CONTENT_PIPELINE_LIMITS_V1.maxFileBytes)
+    maximum.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const tiny = Uint8Array.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ])
+    const maximumHash = sha256(maximum)
+    const descriptors = Array.from({ length: 8 }, (_value, index) => ({
+      path: `images/parent/${String(index).padStart(2, '0')}.png`,
+      mediaType: 'image/png' as const,
+      size: maximum.byteLength,
+      sha256: maximumHash,
+    }))
+    descriptors.push({
+      path: 'images/parent/08.png',
+      mediaType: 'image/png',
+      size: tiny.byteLength,
+      sha256: sha256(tiny),
+    })
+
+    expectPipelineError(
+      () => validatePackSourceV1(
+        patchSource([], ['raster-assets'], [removeOperation(descriptors[0])]),
+        localDevPolicy,
+        {
+          parent: rawParentTree(
+            descriptors,
+            path => path.endsWith('/08.png') ? tiny : maximum,
+          ),
+        },
+      ),
+      'PACK_BUDGET_EXCEEDED',
+      'source',
+    )
+  })
+
+  it('derives executable semantics from parent bytes, not external markers', () => {
+    const entry = {
+      path: 'data/cards/trusted.json',
+      bytes: utf8('{"code":"trusted"}'),
+    }
+    const descriptor = fileDescriptor(entry)
+    expectPipelineError(
+      () => validatePackSourceV1(
+        patchSource(
+          [],
+          ['game-data', 'trusted-executable-content'],
+          [removeOperation(descriptor)],
+        ),
+        localDevPolicy,
+        {
+          parent: {
+            files: [descriptor],
+            readFile: () => entry.bytes,
+            hasExecutableContent: () => false,
+          },
+        },
+      ),
+      'PACK_FORBIDDEN_EXECUTABLE_CONTENT',
+      'patch',
+    )
+  })
+
+  it('rejects a self-consistent Patch parent with a dangling PVE graph', () => {
+    const entries = sortEntries(validPveEntries('missing-node'))
+    const descriptors = entries.map(fileDescriptor)
+    const bytesByPath = new Map(entries.map(entry => [entry.path, entry.bytes]))
+    const removed = descriptors.find(
+      descriptor => descriptor.path === 'data/pve/nodes/finish.json',
+    )!
+
+    const error = expectPipelineError(
+      () => validatePackSourceV1(
+        patchSource([], ['pve-content'], [removeOperation(removed)]),
+        localDevPolicy,
+        {
+          parent: rawParentTree(
+            descriptors,
+            path => bytesByPath.get(path),
+          ),
+        },
+      ),
+      'PACK_REFERENCE_INVALID',
+      'reference',
+    )
+    expect(error).toMatchObject({
+      packId: 'tests.patch',
+      path: undefined,
+      contentId: 'missing-node',
+    })
+  })
 })
 
 describe('Content Pipeline v1 resolved candidate and PVE closure', () => {
+  it.each([
+    ['null actual', null, compatibility],
+    ['empty actual and expected', {}, {}],
+    ['unknown actual field', { ...compatibility, extraAbi: true }, compatibility],
+    ['null expected', compatibility, null],
+  ] as const)(
+    'rejects malformed candidate compatibility: %s',
+    (_label, actualCompatibility, expectedCompatibility) => {
+      expectPipelineError(
+        () => validateResolvedCandidateV1({
+          compatibility: actualCompatibility as PackCompatibilityV1,
+          files: [],
+          trustedExecutablePaths: [],
+        }, expectedCompatibility as PackCompatibilityV1),
+        'PACK_SCHEMA_INVALID',
+        'profile',
+      )
+    },
+  )
+
+  it('snapshots candidate compatibility once before reading other input fields', () => {
+    const mutableCompatibility = { ...compatibility }
+    let compatibilityReads = 0
+    const input = {
+      get compatibility(): PackCompatibilityV1 {
+        compatibilityReads += 1
+        if (compatibilityReads > 1) {
+          throw new Error('candidate compatibility read twice')
+        }
+        return mutableCompatibility
+      },
+      get files(): ResolvedCandidateFileInputV1[] {
+        mutableCompatibility.engineAbi = 'rvb-engine/v2'
+        return []
+      },
+      trustedExecutablePaths: [],
+    }
+
+    const validated = validateResolvedCandidateV1(input, compatibility)
+    expect(validated.compatibility).toEqual(compatibility)
+    expect(compatibilityReads).toBe(1)
+  })
+
+  it('keeps a schema-valid candidate ABI mismatch in compatibility stage', () => {
+    expectPipelineError(
+      () => validateResolvedCandidateV1({
+        compatibility,
+        files: [],
+        trustedExecutablePaths: [],
+      }, {
+        ...compatibility,
+        contentAbi: 'rvb-content/v2',
+      }),
+      'PACK_ABI_UNSUPPORTED',
+      'compatibility',
+    )
+  })
+
+  it('uses a bounded candidate file snapshot and reads each index once', () => {
+    const bytes = utf8('{}')
+    const descriptor = fileDescriptor({ path: 'data/cards/0000.json', bytes })
+    let lengthReads = 0
+    const changingLengthFiles = new Proxy(
+      [] as ResolvedCandidateFileInputV1[],
+      {
+        get(target, property, receiver) {
+          if (property === 'length') {
+            lengthReads += 1
+            return lengthReads === 1 ? 0 : CONTENT_PIPELINE_LIMITS_V1.maxEntries + 1
+          }
+          if (typeof property === 'string' && /^\\d+$/.test(property)) {
+            const path = `data/cards/${property.padStart(4, '0')}.json`
+            return {
+              descriptor: { ...descriptor, path },
+              bytes,
+            }
+          }
+          return Reflect.get(target, property, receiver) as unknown
+        },
+      },
+    )
+    const empty = validateResolvedCandidateV1({
+      compatibility,
+      files: changingLengthFiles,
+      trustedExecutablePaths: [],
+    }, compatibility)
+    expect(empty.files).toEqual([])
+    expect(lengthReads).toBe(1)
+
+    const entries = [
+      { path: 'data/cards/a.json', bytes },
+      { path: 'data/cards/b.json', bytes },
+    ]
+    const inputs = candidateFiles(entries)
+    const indexDescriptorReads = [0, 0]
+    const indexValueReads = [0, 0]
+    const indexedFiles = new Proxy(inputs, {
+      get(target, property, receiver) {
+        if (property === '0' || property === '1') {
+          indexValueReads[Number(property)] += 1
+          return Reflect.get(target, property, receiver) as unknown
+        }
+        return Reflect.get(target, property, receiver) as unknown
+      },
+      getOwnPropertyDescriptor(target, property) {
+        if (property === '0' || property === '1') {
+          indexDescriptorReads[Number(property)] += 1
+        }
+        return Reflect.getOwnPropertyDescriptor(target, property)
+      },
+    })
+    expect(validateResolvedCandidateV1({
+      compatibility,
+      files: indexedFiles,
+      trustedExecutablePaths: [],
+    }, compatibility).files).toHaveLength(2)
+    expect(indexDescriptorReads).toEqual([1, 1])
+    expect(indexValueReads).toEqual([1, 1])
+  })
+
+  it('rejects inherited candidate file indices', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const input = candidateFiles([entry])[0]
+    const files = new Array<ResolvedCandidateFileInputV1>(1)
+    const prototype = Object.create(Array.prototype) as Record<
+      PropertyKey,
+      unknown
+    >
+    prototype[0] = input
+    Object.setPrototypeOf(files, prototype)
+
+    expectPipelineError(
+      () => validateResolvedCandidateV1({
+        compatibility,
+        files,
+        trustedExecutablePaths: [],
+      }, compatibility),
+      'PACK_SCHEMA_INVALID',
+      'profile',
+    )
+  })
+
+  it('rejects inherited trusted executable path indices', () => {
+    const trustedExecutablePaths = new Array<string>(1)
+    const prototype = Object.create(Array.prototype) as Record<
+      PropertyKey,
+      unknown
+    >
+    prototype[0] = 'data/cards/missing.json'
+    Object.setPrototypeOf(trustedExecutablePaths, prototype)
+
+    expectPipelineError(
+      () => validateResolvedCandidateV1({
+        compatibility,
+        files: [],
+        trustedExecutablePaths,
+      }, compatibility),
+      'PACK_SCHEMA_INVALID',
+      'profile',
+    )
+  })
+
+  it('bounds trusted executable paths without invoking their iterator', () => {
+    let iteratorReads = 0
+    const trustedPaths = new Proxy([] as string[], {
+      get(target, property, receiver) {
+        if (property === Symbol.iterator) {
+          iteratorReads += 1
+          throw new Error('trusted path iterator must not be read')
+        }
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    })
+    expect(validateResolvedCandidateV1({
+      compatibility,
+      files: [],
+      trustedExecutablePaths: trustedPaths,
+    }, compatibility).files).toEqual([])
+    expect(iteratorReads).toBe(0)
+
+    const executable = {
+      path: 'data/cards/trusted.json',
+      bytes: utf8('{"code":"trusted"}'),
+    }
+    let indexDescriptorReads = 0
+    let indexValueReads = 0
+    const indexedTrustedPaths = new Proxy([executable.path], {
+      get(target, property, receiver) {
+        if (property === '0') {
+          indexValueReads += 1
+          return Reflect.get(target, property, receiver) as unknown
+        }
+        if (property === Symbol.iterator) {
+          iteratorReads += 1
+          throw new Error('trusted path iterator must not be read')
+        }
+        return Reflect.get(target, property, receiver) as unknown
+      },
+      getOwnPropertyDescriptor(target, property) {
+        if (property === '0') indexDescriptorReads += 1
+        return Reflect.getOwnPropertyDescriptor(target, property)
+      },
+    })
+    expect(validateResolvedCandidateV1({
+      compatibility,
+      files: candidateFiles([executable]),
+      trustedExecutablePaths: indexedTrustedPaths,
+    }, compatibility).files).toHaveLength(1)
+    expect(indexDescriptorReads).toBe(1)
+    expect(indexValueReads).toBe(1)
+    expect(iteratorReads).toBe(0)
+
+    expectPipelineError(
+      () => validateResolvedCandidateV1({
+        compatibility,
+        files: [],
+        trustedExecutablePaths: new Array<string>(
+          CONTENT_PIPELINE_LIMITS_V1.maxEntries + 1,
+        ).fill('data/cards/x.json'),
+      }, compatibility),
+      'PACK_BUDGET_EXCEEDED',
+      'source',
+    )
+  })
+
+  it('rejects proxied candidate bytes without invoking their iterator', () => {
+    const entry = { path: 'data/cards/basic.json', bytes: utf8('{}') }
+    const input = candidateFiles([entry])[0]
+    let iteratorReads = 0
+    expectPipelineError(
+      () => validateResolvedCandidateV1({
+        compatibility,
+        files: [{
+          ...input,
+          bytes: proxiedBytesWithPoisonIterator(
+            input.bytes,
+            () => { iteratorReads += 1 },
+          ),
+        }],
+        trustedExecutablePaths: [],
+      }, compatibility),
+      'PACK_SCHEMA_INVALID',
+      'profile',
+    )
+    expect(iteratorReads).toBe(0)
+  })
+
+  it('rejects the Greek sigma Windows case collision in resolved paths', () => {
+    const entries = [
+      { path: 'data/cards/Σ.json', bytes: utf8('{}') },
+      { path: 'data/cards/ς.json', bytes: utf8('{}') },
+    ]
+    expectPipelineError(
+      () => validateCandidate(entries),
+      'PACK_PATH_COLLISION',
+      'profile',
+    )
+  })
+
   it('derives final capabilities and accepts a closed reachable Campaign', () => {
     const validated = validateCandidate(validPveEntries())
     expect(validated.capabilities).toEqual(['pve-content'])

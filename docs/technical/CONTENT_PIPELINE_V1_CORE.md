@@ -29,10 +29,18 @@ PVE Runner。这些 adapter 只能消费核心结果，不能重新解释 schema
 调用方从 `@/lib/content-pipeline/core` 导入。barrel 只重导出 v1 核心模块，不重导出 schema；schema
 仍由 `@/lib/content-pipeline/contracts` 与 `@/lib/pve/contracts` 提供。
 
+barrel 对 source 模块只显式导出公共类型；`createReadonlyContentTreeV1` 及统一字节快照 primitive
+属于核心内部构造能力，不属于公共 barrel API。核心内部模块仍可直接导入这些能力。
+
 ### 2.1 输入与只读树
 
 `ContentPackSourceV1` 包含 canonical manifest 的原始 UTF-8 字节、可选 detached signature envelope
 字节和 payload entries。输入数组顺序不参与身份。
+
+所有 v1 公共字节参数只接受真实的 `Uint8Array` view，且 backing buffer 必须是普通
+`ArrayBuffer`。跨 realm 的普通 `Uint8Array` 按 intrinsic brand 接受；Proxy、detached view 与
+`SharedArrayBuffer`-backed view 必须在 parser、hash、signature 或内容树消费前稳定拒绝。共享内存可
+在复制期间并发改变，无法形成确定性快照，因此 v1 不接受；核心只对一次验证后的有限长度进行复制。
 
 `ReadonlyContentTreeV1` 和 `ResolvedSnapshotViewV1` 不暴露内部字节引用：`readFile(path)` 每次返回
 副本；descriptor、Profile 和 identity 元数据被冻结。调用方不得把“只读”解释为持久化或激活。
@@ -52,11 +60,12 @@ Ed25519 验签接受集合固定为 strict RFC 8032，并显式调用 `zip215:fa
 必须稳定拒绝。`keyId` 永远从原始 32-byte 公钥重新计算；签名字节固定为
 `UTF8("RVB_PACK_SIGNATURE_V1\0") || rawPackageDigest`。
 
-`signature.ts` 的唯一模块初始化配置例外，是按 noble v3 同步 API 的明确要求注入确定性的 SHA-512
-实现。它不读取时间、环境、网络、存储或活动应用状态，也不导出 noble singleton；公开函数对相同输入
-仍然确定。风险是 noble 升级可能改变该 hook，因此依赖升级必须重新跑 RFC 8032/ZIP215-only 固定向量
-并接受独立安全审查。v1 不改用默认 async WebCrypto，以免引入 global crypto/platform capability，
-并迫使 validator/resolver 的同步 API 全面异步化。
+`signature.ts` 使用精确锁定的 `@noble/curves@2.2.0` 预构建 Ed25519 实例。该实例在构造时把
+SHA-512 捕获在私有闭包中；核心不读取或修改 `@noble/ed25519.hashes`、`globalThis.crypto` 或任何其他
+共享可变 hash provider，公开函数对相同输入仍然同步且确定。依赖升级可能改变验签接受集合，因此必须
+重新跑 RFC 8032 golden、ZIP215-only 小阶/非规范点固定向量，并接受独立安全审查。v1 不使用默认
+async/WebCrypto 路径，以免引入 global crypto/platform capability，并迫使 validator/resolver 的同步
+API 全面异步化。
 
 ### 2.3 Validator
 
@@ -72,13 +81,36 @@ Ed25519 验签接受集合固定为 strict RFC 8032，并显式调用 `zip215:fa
 预算、schema、媒体、引用、capability 或执行字段检查。Patch 校验还必须通过 context 提供 parent
 只读树。
 
+Snapshot manifest 校验不会读取 `context.parent`。只有 Patch 分支会读取一次 context 的 parent getter，
+然后把 parent 只读树复制为本地有界快照：`parent.files` 与 `parent.readFile` getter 各读取一次，
+descriptor 通过 strict schema、规范排序、唯一性和大小写碰撞检查；每个 descriptor 只调用一次
+`readFile(path)`，返回值必须是 ordinary-ArrayBuffer-backed `Uint8Array`，并重新执行单文件/总字节
+预算、实际 size/hash、媒体/strict JSON、PVE 引用闭合和递归执行字段检查。Validator 只使用从字节
+重新推导的 executable 事实，永远不读取或信任调用方提供的 `hasExecutableContent` 标记。
+
+Validator 对 `source.entries`、Patch `parent.files`、candidate `files` 与
+`trustedExecutablePaths` 这些运行时数组只读取一次长度，再按 `0..length - 1` 做 own-property
+检查并读取一次对应数值索引；继承索引与 hole 以 `PACK_SCHEMA_INVALID` 拒绝。own accessor 与
+non-enumerable own index 均允许，额外 string/symbol 属性与可覆写 iterator 不被观察；Proxy 的
+own-check/getter trap 也收敛到同一稳定 schema 错误边界。
+
 `validateResolvedCandidateV1` 供 Resolver 对完整候选树再次执行最终验证。它不是公共安装旁路，不能
 把未经 `validatePackSourceV1` 验证的外部包直接变成可激活内容。
 
 ### 2.4 Resolver
 
 `resolveProfileV1({ base, patches, candidateCheck })` 只接受一个 Snapshot Base 和调用方给出的有序
-Patch 列表。每个 `ResolvePackInputV1` 独立携带 source 与 policy。返回的
+Patch 列表。Patch Chain 上限复用已冻结的 `ResolvedPatchChainV1Schema.max(256)`：0–256 项允许；
+257+ 必须在读取/验证 Base 或任一 Patch、读取 candidate-check 前以
+`PACK_BUDGET_EXCEEDED` / stage `patch` 拒绝，调用方不得调大。
+
+Resolver 先按声明的 dense array 长度和 0-based 数字索引复制 Patch 输入到有界普通数组，不使用可覆写的
+iterator、spread、`for-of` 或 `Array.from` 决定链内容。非数组、非法长度、稀疏索引或 Proxy trap
+统一以 `PACK_SCHEMA_INVALID` / stage `patch` 拒绝。每个 `ResolvePackInputV1` 的 `source` 与
+`policy` 在真正解析该包前各读取一次并快照；非对象或 getter trap 统一以
+`PACK_SCHEMA_INVALID` / stage `source` 拒绝。
+
+每个 `ResolvePackInputV1` 独立携带 source 与 policy。返回的
 `ResolvedSnapshotViewV1` 包含：
 
 - 冻结的完整 `profile`，其中同时含 `resolvedProfileHash` 与 `authorityContentHash`；
@@ -86,8 +118,10 @@ Patch 列表。每个 `ResolvePackInputV1` 独立携带 source 与 policy。返�
 - 完整只读内容树；
 - 由整条链合取得到的 `networkEligible`。
 
-可选 `candidateCheck` 只观察已完整解析的候选副本。hook 抛错或返回非成功结果统一映射为
-`CANDIDATE_CHECK_FAILED`，不返回部分候选，也不污染 parent。
+可选 `candidateCheck` 只观察已完整解析的候选副本。Resolver 只读取一次 hook；读取 getter、
+调用 hook、检查返回对象与读取 `result.ok` 都处于受控错误边界。任一 trap、异常、非对象结果或
+`ok !== true` 统一映射为 `CANDIDATE_CHECK_FAILED`，不泄漏原始异常，不返回部分候选，也不污染
+parent。
 
 ## 3. 固定预算
 
@@ -95,6 +129,7 @@ Patch 列表。每个 `ResolvePackInputV1` 独立携带 source 与 policy。返�
 
 | 项目 | 上限 |
 | --- | ---: |
+| Patch Chain 项数 | 256 |
 | payload entries | 2,048 |
 | 单 payload 文件 | 16 MiB |
 | payload 总字节 | 128 MiB |
@@ -104,12 +139,15 @@ Patch 列表。每个 `ResolvePackInputV1` 独立携带 source 与 policy。返�
 | JSON value/key 节点 | 100,000 |
 | 单个解码后 JSON 字符串 | 1 MiB UTF-8 |
 
-边界值允许；任一 `+1` 以 `PACK_BUDGET_EXCEEDED` 失败。JSON parser 还拒绝 BOM、malformed UTF-8、
-语法外字节、重复解码 key、非有限数字和未配对 surrogate。
+边界值允许；任一 `+1` 以 `PACK_BUDGET_EXCEEDED` 失败。Patch Chain 的第 257 项固定为
+stage `patch`，并在观察 Base、任一 Patch 包输入或 candidate-check 前拒绝。JSON parser 还拒绝 BOM、
+malformed UTF-8、语法外字节、重复解码 key、非有限数字和未配对 surrogate。
 
 ## 4. 稳定验证顺序
 
-为了让相同恶意输入在所有调用方得到相同的首个拒绝，`validatePackSourceV1` 固定按以下阶段执行：
+为了让相同恶意输入在所有调用方得到相同的首个拒绝，Resolver 在调用
+`validatePackSourceV1` 前先完成 Patch Chain 有界索引快照与 256 上限检查；只有该 preflight 成功后才
+读取 Base，并按链顺序逐项快照 `source` / `policy`。随后 `validatePackSourceV1` 固定按以下阶段执行：
 
 1. `source`：克隆输入；检查输入形状、entry/字节预算、路径与大小写碰撞；按 Unicode code point
    排序 payload entry；
@@ -120,8 +158,10 @@ Patch 列表。每个 `ResolvePackInputV1` 独立携带 source 与 policy。返�
 5. `inventory` / `content`：检查 missing/undeclared、实际 size/hash、媒体 magic、strict JSON 和任意
    深度执行字段；
 6. 按包类型分支：Snapshot 先在 `reference` 阶段检查 PVE 闭合，再在 `capability` 阶段比对
-   推导集合；Patch 先在 `patch` 阶段检查 parent 视图、target 冲突、add/replace/remove precondition、
-   source 消耗、target media 与外部包对受信执行内容的触碰，再比对 Patch 推导 capability；
+   推导集合；Patch 先完成 parent 的有界快照与完整 descriptor/bytes/budget/size/hash/content 重验，
+   再在 `reference` 阶段检查 parent PVE 闭合。只有 parent 完整 content + reference 验证成功后，才在
+   `patch` 阶段检查 target 冲突、add/replace/remove precondition、source 消耗、target media 与外部包
+   对重新推导出的受信执行内容之触碰，最后比对 Patch 推导 capability；
 7. `profile`：Resolver 在隔离副本上应用 Patch，并按 compatibility、inventory/content、完整
    `reference` 闭合、effective `capability` 的顺序复验整个候选树；
 8. 排序 descriptor/provenance 后计算双 identity；
@@ -174,6 +214,8 @@ Capability 由核心根据最终 target path、media type 和 JSON 语义推导�
 ## 8. Resolver 原子性
 
 - Base 必须是 Snapshot；Patch 必须按调用方给出的显式线性顺序应用；
+- Patch Chain 允许 0–256 项；257+ 在观察 Base/Patch/hook 前以
+  `PACK_BUDGET_EXCEEDED` / `patch` 拒绝；
 - `parentProfileHash` 精确匹配父 `resolvedProfileHash`；不支持依赖图、自动排序或
   last-write-wins；
 - 同一 Patch 的 target 唯一；add 要求不存在，replace/remove 要求当前 hash 等于
