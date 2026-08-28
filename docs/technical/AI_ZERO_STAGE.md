@@ -1,122 +1,123 @@
-# 零阶段启发式双层潜力 AI（RED-122）
+# 零阶段单步估价与位置潜力 AI（RED-122）
 
-协议版本：`ZeroStageConfig.version = 1`
+## 定位
 
-## 目标与边界
+零阶段 AI 的正式 agent/profile ID 为 `rvb-ai-zimse-v1`。它是无需训练、确定且可解释的 player-level 基线，不替代 RED-86 Beam Search，也不注册在线入口或训练联赛，不修改规则、数值、随机、网络或存档。
 
-零阶段 AI 是无需训练的确定性基线。它使用人工权重解释静态局面，并在每个权威合法动作之后考察最多三条高价值后续路线。它只返回一个可以正式提交的 `nextAction`；动作被权威层接受后，调用方必须在新状态上重新调用，不得执行旧的后续动作。
+每次调用先从 `aiEnvironmentV1.listLegalActions()` 读取全部严格合法动作，用 RED-86 的通用机制语义稳定排序，再对至多 2 个准入候选各调用一次 `simulate()`，计算动作后局面的静态估价 `F_p(S')`，最后只返回一个 `nextAction`。权威状态接受动作后，调用方必须在新状态重新规划，并通过 `actionsTakenThisTurn` 回传本回合已经提交的动作数。
 
-本实现不替代 RED-86 Beam Search，也不注册玩家入口、训练联赛或在线自学习。它不修改规则、数值、随机、网络或存档。评分只能读取 `aiEnvironmentV1.observe()` 返回的公开观察；候选和状态变化只能来自 AI 环境对正式规则的枚举与隔离模拟。
+## 接入与调用接口
+
+正式入口是 `lib/game/ai-zero-stage-agent.ts` 导出的 `planZeroStageAction()`：
+
+```ts
+const decision = planZeroStageAction(state, playerId, rootSeed, {
+  actionsTakenThisTurn,
+  // environment: aiEnvironmentV1, // 可选；默认即为正式 AI 环境
+  // config: { weights: { attackPressure: 12_000 } }, // 可选且会严格校验
+})
+
+if (decision.nextAction) {
+  // 正式服务器/房间：只把 action 提交给现有权威命令入口。
+  submitAuthoritativeAction(decision.nextAction.action)
+}
+```
+
+参数与返回值：
+
+- `state: BattleState`：当前权威战斗状态；函数只读，不会写回输入。
+- `playerId: string`：本次决策玩家，估价和隐藏信息过滤均以此玩家视角计算。
+- `rootSeed: number`：固定根种子；相同状态、玩家、种子和 profile 应产生相同决定。
+- `actionsTakenThisTurn: number`：调用方维护的本回合已正式提交动作数；达到护栏前一位时强制收束到合法 `endTurn`。
+- 返回 `ZeroStageDecision`。调用方只能提交 `nextAction.action`；`nextAction` 缺失表示终局或无合法动作，应安全停止。
+- `trace`、`selectionReason`、`nodesVisited` 和 `stateValue` 用于诊断、回放与性能记录，不是第二批待执行动作。
+
+生产调用必须在每次正式 action 被接受、状态版本变化后再次调用 `planZeroStageAction()`，不得缓存并连续提交旧候选。无头测试可用 `aiEnvironmentV1.simulate(state, decision.nextAction, { rootSeed })` 执行隔离 transition；生产环境仍应走现有服务器权威命令入口。
+
+默认 profile 由 `DEFAULT_ZERO_STAGE_CONFIG` 提供，仓库快照位于 `config/ai/agents/rvb-ai-zimse-v1.json`。JSON 用于版本归档、审计和外部调度识别，`agentId` 必须保持 `rvb-ai-zimse-v1`；运行时覆盖通过 `options.config` 传入，并由 `resolveZeroStageConfig()` 校验。节点预算硬上限为 2，不能通过配置开启第二层搜索。
+
+## 单步算法
+
+```text
+legal = listLegalActions(S, p)
+ranked = StableSemanticRank(legal)
+admitted = ReserveStructuralAndEndTurn(
+  PreferCostEnemyTargetAndAttackKind(ranked),
+  limit=2,
+)
+for a in admitted:
+  S' = Simulate(S, a)
+  score(a) = F_p(S')
+a* = argmax score(a)
+```
+
+没有费用补贴、费用不足候选、top-3 聚合或第二层动作。默认且硬性最大候选/节点预算为 2（通常为 `endTurn` 加 1 个常规动作），大于 2 的配置直接拒绝；一个准入候选最多消耗一个节点。唯一结构动作优先保留，`endTurn` 始终保留一个名额。其余候选先保留明确以敌棋为目标的攻击；没有直接攻击时，严格缩短到敌方公开核心（无核心时最近敌棋）距离的移动优先，并以靠近地图中心作为等追击进度的次级排序；随后才按真实费用、攻击/技能种类和原语义名次排序。该排序只读公开几何，不执行额外 transition，也不使用墙钟时间。默认单回合最多提交 8 个动作；调用方传入的计数达到 7 且存在 `endTurn` 时，只模拟并选择 `endTurn`。
+
+同分依次比较：
+
+1. `F_p(S')` 总分降序；
+2. 正式 AP 与充能总费用降序，使等价收益下优先把费用转化为行动；
+3. 费用相同时 `endTurn` 优先，避免零收益、零费用动作循环；
+4. 稳定 action JSON；
+5. 稳定 candidate ID。
+
+终局分固定为 `+1,000,000 / -1,000,000 / 0`。候选比较先按 `胜利 > 非终局 > 平局 > 失败` 分层，再比较总分，因此普通分项即使累计超过一百万也不能覆盖立即胜利。
 
 ## 静态估价 F
 
-`evaluateZeroStageState(observation)` 从显式玩家视角计算：
+所有分项只读取 `aiEnvironmentV1.observe()` 返回的公开观察，并以当前玩家为相对视角：
 
-```text
-F_p(S) = Σ feature_i(S, p) × C_i
-```
-
-所有普通分项都是己方值减敌方值。终局使用不可被普通分项覆盖的固定值：胜利 `+1,000,000`、失败 `-1,000,000`、平局 `0`。
-
-| 分项 | v1 权重 | 含义 |
+| 分项 | v2 权重 | 含义 |
 | --- | ---: | --- |
-| `coreSurvival` | 50,000 | 双方存活核心数量差 |
-| `survival` | 12,000 | 双方存活棋子数量差 |
-| `graveyard` | 8,000 | 敌我墓地数量差 |
-| `health` | 3,000 | 双方标准化生命比例总和差 |
-| `combatPower` | 250 | 标准化公开攻防能力差 |
-| `shield` | 400 | 公开护盾差 |
-| `resources` | 250 | 公开行动点与充能差 |
-| `actionability` | 500 | 当前行动窗口与可行动棋子/资源 |
-| `lethalOpportunity` | 20,000 | 基于公开攻防、生命和移动范围的近似斩杀机会差 |
-| `attackPressure` | 1,500 | 近似攻击覆盖中的有效伤害比例差 |
-| `status` | 500 | 公开 Buff/Debuff 数量净值 |
-| `formation` | 150 | 两格内友军配对形成的支援结构差 |
-| `mapControl` | 100 | 标准化中心接近度差 |
+| `coreSurvival` | 50,000 | 双方存活核心棋子差 |
+| `survival` | 22,000 | 双方存活棋子差 |
+| `graveyard` | 20,000 | 双方墓地棋子差，提高击杀普通敌棋的价值 |
+| `health` | 8,000 | 标准化剩余生命差，直接鼓励有效攻击 |
+| `combatPower` | 300 | 标准化攻防差 |
+| `shield` | 300 | 按最大生命归一化并封顶的公开护盾差，避免重复叠盾让估价无界增长 |
+| `resources` | 800 | 已使用 AP 减未使用充能的相对节奏差；将未转化费用视为机会成本 |
+| `actionability` | 150 | 当前行动窗口和可行动棋子；权重低于费用利用，避免保留 AP 盖过有效行动 |
+| `deploymentReadiness` | 500,000 | 仅在部署阶段生效；压过普通位置收益并优先锁定，避免无费用重复调位 |
+| `turnProgress` | -750 | 把控制权交给对手的节奏惩罚 |
+| `lethalOpportunity` | 45,000 | 下一次通用攻击可斩杀价值差；核心目标按双倍机会计入 |
+| `attackPressure` | 10,000 | 当前移动加一次攻击范围内的伤害压力差，并提高残血与核心目标优先级 |
+| `status` | 400 | 公开 Buff/Debuff 数量差；低于直接伤害和终局推进 |
+| `positionSafety` | 250 | 低血棋子受敌方覆盖的暴露风险差；只保留底线风险约束，不阻止合理接敌 |
+| `strategicPosition` | 4,000 | 按地图尺寸归一化的中心控制与敌方公开核心目标压迫差；无核心时退化为最近敌棋 |
+| `futureAttackPotential` | 9,000 | 逼近敌棋、进入立即攻击覆盖和威胁残血/核心目标的潜力差 |
+| `supportPotential` | 400 | 友军按距离、机动和缺血程度计算的汇合支援潜力差 |
+| `mobilityPotential` | 500 | 考虑墙体和占位后，移动范围内可达空间比例差 |
+| `terrainValue` | 700 | 当前格的治疗、充能、掩体收益与持续伤害风险差 |
 
-`lethalOpportunity` 和 `attackPressure` 只是局面特征，不是合法性判断；最终候选仍完全来自权威环境。代码不按角色、技能、阵容或地图 ID 分支。
+位置分项不读取角色、技能或地图 ID。`strategicPosition` 使用地图宽高得到几何中心，并把棋子到中心及敌方公开核心棋子的曼哈顿距离归一化；敌方没有存活核心时使用最近存活敌棋，因此偏远且不压迫目标的棋子价值更低。未来攻击仅使用公开攻击、防御、生命、移动范围和几何距离；支援是通用汇合能力，不猜测某个角色是否具有治疗技能；移动空间通过公开可行走格与存活棋子占位做有界 BFS；地形只读取格子公开属性。
 
-默认配置同时保存在 `DEFAULT_ZERO_STAGE_CONFIG` 和 `config/ai/agents/zero-stage-v1.json`，测试锁定二者一致。调整权重必须提升配置版本或明确记录配置快照，不能静默改变旧回放的决策含义。
+## 公开信息与规则边界
 
-v1 同时设置确定性 `nodeBudget = 10,000`。节点只统计正式外层或反事实后续 transition，不使用墙钟时间。预算收紧时优先为尚未检查的每个外层合法候选预留一个节点，再按稳定候选顺序裁剪后续并记录 `node-budget`；默认预算下固定基线没有发生裁剪。
+- 对手手牌内容在观察中被隐藏，只保留张数；修改私有手牌不改变评分。
+- `visible:false` 的状态不会进入观察，因此不影响评分或决策。
+- 候选合法性和 transition 只由权威 AI 环境提供；零阶段代码不复制目标、距离、冷却、阶段或胜负规则。
+- 每个准入合法候选最多隔离模拟一次；未准入候选记录 `candidate-budget`，输入 `BattleState` 不被写回。
+- 技能、移动或卡牌被沉默、打坐等 before-action 规则阻止时，权威命令仍可能合法接收。AI 环境把“公开观察完全未变化”规范化为 `trace.blocked=true`；零阶段记录该候选但不计算 `F`、不选择它，从而不会重复触发。
+- RED-85 机制兼容性保留在 trace 中作为诊断，但不会触发第二层估值或生成非法动作。
 
-## 费用放宽的反事实环境
+## Trace 与复现
 
-`aiPotentialEnvironmentV1` 提供：
+`ZeroStageDecision` 记录：
 
-```ts
-listPotentialActions(state, playerId)
-simulatePotential(state, candidate, { rootSeed })
-```
+- 当前 `stateValue`、候选数、节点数、预算状态和停止原因；
+- 每个候选的 action、正式费用、兼容性、完整 `F` 总分与分项；
+- 被权威 transition 拒绝或被节点预算裁剪的明确原因；
+- 唯一 `nextAction`，以及稳定的 `selectionReason`（终局层级、静态分、费用、结束回合、action JSON 或 candidate ID）。
 
-处理步骤：
+`zeroStageDecisionTraceHash()` 覆盖以上稳定字段。相同 state、player、root seed 和 profile 应产生相同动作、候选顺序与 hash。
 
-1. 从当前棋子技能、手牌实例/定义和移动规则读取正式 AP/充能成本。
-2. 在浅层隔离视图中补足发现候选所需的最大公开成本。
-3. 对每个候选重新计算其精确成本和短缺。
-4. 仅补足该候选的精确短缺，再次调用 `listLegalAIActions()`。
-5. 只有稳定 candidate ID 和完整动作均再次出现时，才证明它除费用外仍然合法。
-6. 模拟时重新执行以上校验，再在精确补贴副本上调用正式隔离 transition。
+## 性能与限制
 
-因此费用放宽不会绕过回合、阶段、阵营、存活、目标、距离、冷却、次数、沉默或其他准入条件。补贴不会写入输入或正式状态，模拟后的资源不为负。过期或不能证明只受费用阻挡的候选以 `AI_ENV_POTENTIAL_NOT_COST_ONLY` 失败关闭。
+固定 8v8 纯移动 fixture 要求 P95 小于 1,000ms；真实技能对局要求 P95 小于 3,000ms、单次小于 5,000ms。节点数必须同时不超过 2 和严格合法候选数。性能证据记录机器、样本、候选数、P50/P95/最大耗时和非法动作数。
 
-## 后续潜力 G
+当前 profile 仍有明确限制：
 
-对外层动作后的局面 `X`，每个后续候选得到：
-
-```text
-H_p(X, a) = F_p(SimulatePotential(X, a)) - λ × I(costBreakthrough)
-λ = 3,000
-```
-
-将 H 降序排列并取最多三项：
-
-```text
-G_p(X) = 0.6 × V1 + 0.3 × V2 + 0.1 × V3
-```
-
-只有一项或两项时，对实际存在的前缀权重重新归一化。没有后续候选、已经终局或行动玩家已经切换时，`G_p(X) = F_p(X)`。零阶段 AI 不搜索敌方回合。
-
-最终动作只从外层权威合法集合选择：
-
-```text
-a* = argmax[a in A_legal(S)] G_p(Simulate(S, a))
-```
-
-同分依次比较 `G`、外层 `F`、较低真实资源成本、完整动作 stable JSON 和 candidate ID。终局胜利因为固定终局值天然优先。
-
-## API 与诊断
-
-入口：
-
-```ts
-planZeroStageAction(state, playerId, rootSeed, options?)
-zeroStageDecisionTraceHash(decision)
-```
-
-`ai-planner.ts` 重新导出这两个入口，使其与现有 player-level 规划边界一致。返回值记录：
-
-- 当前 `F`、唯一 `nextAction` 和停止原因；
-- 所有外层合法候选的 `F`、`G`、真实成本与兼容等级；
-- 每个后续候选的成本、短缺、补贴标志、`λ` 惩罚、静态值和 H；
-- `V1/V2/V3`、拒绝码、RED-85 失败关闭原因、节点数和候选数；
-- 是否触及确定性节点预算及每个被预算裁剪的后续候选；
-- 覆盖完整决策证据的稳定 trace hash。
-
-`unsupported`、`metadata-required` 和 `evaluator-required` 内容均不会由零阶段 AI 猜测估值或正式选择。无动作和终局返回 `nextAction: undefined`，不发明 fallback。
-
-## 验证与已知限制
-
-`tests/game/ai-zero-stage.test.ts` 覆盖玩家镜像视角、隐藏信息隔离、终局优先、0/1/2/3+ 后续聚合、费用精确补贴、冷却/所有权约束、正式核心击杀、合法外层动作、确定性 trace 和安全停止。
-
-已知限制：
-
-- v1 在默认节点预算内完整枚举外层和后续候选，主要成本是正式隔离 transition；只有显式收紧或异常高分支触及预算时才进行稳定失败可见的后续裁剪。
-- 斩杀和压力分项是公开静态近似，不替代技能范围或伤害规则。
-- 费用突破使用布尔惩罚，同时在 trace 中保留实际短缺；后续可用数据决定是否改为按短缺量惩罚。
-- 不搜索敌方应对，因此它是双层己方潜力基线，不是 minimax。
-- profile 尚未注册到 self-play archive、在线 PVE 或 UI；这些路径不在 RED-122 合同内，需要独立任务。
-
-## 回退
-
-移除零阶段 evaluator、agent、profile、AI 环境费用适配、测试和本文档即可恢复现有 simple/planner 行为。没有玩家存档、玩法数据、网络协议或随机状态需要迁移。
+- 不搜索敌方回合，也不预判未来随机结果；
+- 支援潜力是通用位置启发式，不理解未进入公开机制语义的角色组合；
+- 曼哈顿距离用于远期攻击接近度，复杂射线与具体技能范围仍以动作后的权威状态为准；
+- 权重由人工设定，必须通过真实 PvE 对局和后续训练继续校准。

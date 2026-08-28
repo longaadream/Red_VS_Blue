@@ -153,6 +153,8 @@ export interface AITransitionTrace {
   actionTrace?: BattleActionTrace
   actionLog: BattleActionLog[]
   stateChanges: AIStateDiffEntry[]
+  /** Authority accepted the command, but a public before-action rule blocked its core effect. */
+  blocked?: boolean
 }
 
 export interface AIEnvironmentError {
@@ -213,28 +215,6 @@ export interface AIEnvironment {
 export interface AIActionResourceCost {
   actionPoints: number
   chargePoints: number
-}
-
-/** A formal candidate revalidated after adding only its exact public resource shortfall. */
-export interface AIPotentialCandidate {
-  candidate: CandidateAction
-  cost: AIActionResourceCost
-  shortfall: AIActionResourceCost
-  costBreakthrough: boolean
-}
-
-export interface AIPotentialTransition extends AIPotentialCandidate {
-  transition: TransitionResult
-}
-
-export interface AIPotentialEnvironment {
-  readonly protocolVersion: AIEnvironmentProtocolVersion
-  listPotentialActions(state: BattleState, playerId: string): AIPotentialCandidate[]
-  simulatePotential(
-    state: BattleState,
-    candidate: AIPotentialCandidate,
-    context?: AISimulationContext,
-  ): AIPotentialTransition
 }
 
 /** Versioned, rule-independent vocabulary consumed by AI observers and planners. */
@@ -353,7 +333,7 @@ export interface AiTurnPlan {
   trace: AiPlannerTraceEntry[]
 }
 
-export const ZERO_STAGE_AI_PROFILE_VERSION = 1 as const
+export const ZERO_STAGE_AI_PROFILE_VERSION = 2 as const
 
 export type ZeroStageStaticComponentKey =
   | 'coreSurvival'
@@ -364,17 +344,22 @@ export type ZeroStageStaticComponentKey =
   | 'shield'
   | 'resources'
   | 'actionability'
+  | 'deploymentReadiness'
+  | 'turnProgress'
   | 'lethalOpportunity'
   | 'attackPressure'
   | 'status'
-  | 'formation'
-  | 'mapControl'
+  | 'positionSafety'
+  | 'strategicPosition'
+  | 'futureAttackPotential'
+  | 'supportPotential'
+  | 'mobilityPotential'
+  | 'terrainValue'
 
 export interface ZeroStageConfig {
   version: typeof ZERO_STAGE_AI_PROFILE_VERSION
   nodeBudget: number
-  lambda: number
-  topWeights: readonly [number, number, number]
+  maxActionsPerTurn: number
   terminal: Readonly<{ win: number; loss: number; draw: number }>
   weights: Readonly<Record<ZeroStageStaticComponentKey, number>>
 }
@@ -391,33 +376,27 @@ export interface ZeroStageStaticEvaluation {
   components: Readonly<Record<ZeroStageStaticComponentKey, ZeroStageStaticComponent>>
 }
 
-export interface ZeroStageFollowUpTrace {
-  candidateId: string
-  value?: number
-  staticValue?: number
-  costBreakthrough: boolean
-  cost: AIActionResourceCost
-  shortfall: AIActionResourceCost
-  penalty: number
-  compatibility: AiCompatibility
-  pruned?: string
-  rejected?: string
-}
-
 export interface ZeroStageCandidateTrace {
   candidateId: string
   action: BattleAction
   staticValue?: number
-  potentialValue?: number
-  topValues: number[]
-  outerCost: AIActionResourceCost
+  evaluation?: ZeroStageStaticEvaluation
+  actionCost: AIActionResourceCost
   compatibility: AiCompatibility
-  followUps: ZeroStageFollowUpTrace[]
+  blocked?: boolean
   pruned?: string
   rejected?: string
 }
 
 export type ZeroStageStopReason = 'selected' | 'terminal' | 'no-legal-actions' | 'budget-exhausted'
+export type ZeroStageSelectionReason =
+  | 'only-scored-candidate'
+  | 'terminal-outcome'
+  | 'static-value'
+  | 'resource-cost'
+  | 'end-turn'
+  | 'stable-action'
+  | 'candidate-id'
 
 export interface ZeroStageDecision {
   configVersion: typeof ZERO_STAGE_AI_PROFILE_VERSION
@@ -428,5 +407,6 @@ export interface ZeroStageDecision {
   candidatesConsidered: number
   budgetExhausted: boolean
   stopReason: ZeroStageStopReason
+  selectionReason?: ZeroStageSelectionReason
   trace: ZeroStageCandidateTrace[]
 }
