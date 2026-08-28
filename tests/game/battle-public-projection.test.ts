@@ -15,6 +15,10 @@ describe('battle public pending projection', () => {
       selectionId: 'pending-option-1',
       stateRevision: 8,
       canCancel: false,
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
       continuationContext: { private: 'continuation' },
       pendingAction: { type: 'beginPhase' },
       transaction: {
@@ -46,6 +50,16 @@ describe('battle public pending projection', () => {
     expect(owner.options).toEqual(['calm', 'rage'])
     expect(opponent.options).toEqual([])
     expect(spectator.options).toEqual([])
+    expect(owner).toMatchObject({
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
+    })
+    for (const projection of [opponent, spectator]) {
+      expect(projection.selectionMode).toBeUndefined()
+      expect(projection.presentation).toBeUndefined()
+    }
     for (const projection of [owner, opponent, spectator]) {
       expect(projection).toMatchObject({
         playerId: 'player-red',

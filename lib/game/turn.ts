@@ -1062,6 +1062,10 @@ function applyBattleActionInternal(
         pendingAction,
         canCancel: result.canCancel,
         cancelValue: result.cancelValue,
+        selectionMode: result.selectionMode,
+        presentation: result.presentation,
+        minSelections: result.minSelections,
+        maxSelections: result.maxSelections,
       }
       return true
     }
@@ -1092,17 +1096,22 @@ function applyBattleActionInternal(
     result: Pick<TriggerResult,
       'needsOptionSelection' | 'options' | 'title' | 'playerId'
       | 'canCancel' | 'cancelValue' | 'pendingRuleId' | 'pendingRuleSourceId'
+      | 'selectionMode' | 'presentation' | 'minSelections' | 'maxSelections'
     >,
     pendingAction: BattleAction,
     fallbackSource: { type: 'skill' | 'card'; id: string; pieceId?: string },
     continuationMode: 'skillReleaseOption' | 'cardReleaseOption',
   ): BattleState => {
-    const canResolveCancellation = result.canCancel === true && result.cancelValue !== undefined
+    const canResolveCancellation = result.canCancel === true
     next.pendingTargetSelection = undefined
     next.pendingOptionSelection = {
       playerId: result.playerId || ('playerId' in pendingAction ? pendingAction.playerId : next.turn.currentPlayerId),
       title: result.title || '请选择',
       options: result.options || [],
+      selectionMode: result.selectionMode,
+      presentation: result.presentation,
+      minSelections: result.minSelections,
+      maxSelections: result.maxSelections,
       source: result.pendingRuleId
         ? {
             type: 'rule',
@@ -1321,10 +1330,19 @@ function applyBattleActionInternal(
         return option
       }))
       if (candidates.length === 0) return skipInvalidTimedOutPending(next, pending)
-      const selectedOption = candidates[runtime.nextInt(
-        `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
-        candidates.length,
-      )]
+      let selectedOption: unknown
+      if (pending.selectionMode === 'multi') {
+        const minSelections = Number.isSafeInteger(pending.minSelections)
+          ? Math.max(0, pending.minSelections!)
+          : 1
+        if (candidates.length < minSelections) return skipInvalidTimedOutPending(next, pending)
+        selectedOption = candidates.slice(0, minSelections)
+      } else {
+        selectedOption = candidates[runtime.nextInt(
+          `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
+          candidates.length,
+        )]
+      }
       recordPendingTimeoutResolution(next, pending, 'candidate')
       return applyBattleActionInternal(next, {
         type: 'pendingOptionSelect',
@@ -3043,6 +3061,10 @@ function setSuspendableTransactionPending(
       source,
       canCancel: pendingError.prompt.canCancel,
       cancelValue: pendingError.prompt.cancelValue,
+      selectionMode: pendingError.prompt.selectionMode,
+      presentation: pendingError.prompt.presentation,
+      minSelections: pendingError.prompt.minSelections,
+      maxSelections: pendingError.prompt.maxSelections,
       transaction: pendingTransaction,
       suspendedTurn: pendingError.prompt.suspendedTurn,
     }
@@ -3153,6 +3175,10 @@ function runSuspendableActionTransaction(
         options: directPending.options,
         canCancel: directPending.canCancel,
         cancelValue: directPending.cancelValue,
+        selectionMode: directPending.selectionMode,
+        presentation: directPending.presentation,
+        minSelections: directPending.minSelections,
+        maxSelections: directPending.maxSelections,
         suspendedTurn: { ...reduced.turn },
       })
     }
@@ -3257,11 +3283,24 @@ function runSuspendableActionTransaction(
               'PENDING_TIMEOUT_NO_CANDIDATES',
             )
           }
-          const index = replayRuleRuntime.nextInt(
-            `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
-            candidates.length,
-          )
-          input = { selectedOption: candidates[index], timeoutRandomBound: candidates.length }
+          if (error.prompt.selectionMode === 'multi') {
+            const minSelections = Number.isSafeInteger(error.prompt.minSelections)
+              ? Math.max(0, error.prompt.minSelections!)
+              : 1
+            if (candidates.length < minSelections) {
+              throw new BattleRuleError(
+                'Timed-out mandatory transaction multi-select has too few legal candidates',
+                'PENDING_TIMEOUT_NO_CANDIDATES',
+              )
+            }
+            input = { selectedOption: candidates.slice(0, minSelections) }
+          } else {
+            const index = replayRuleRuntime.nextInt(
+              `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
+              candidates.length,
+            )
+            input = { selectedOption: candidates[index], timeoutRandomBound: candidates.length }
+          }
         } else {
           input = mandatoryTimeoutTargetInput(authorityState, transaction, error.key, error.prompt, replayRuleRuntime)
         }

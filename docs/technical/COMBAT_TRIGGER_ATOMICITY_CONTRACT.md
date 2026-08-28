@@ -1,6 +1,6 @@
 # Combat trigger atomicity and `after*` contract (RED-72 / RED-121)
 
-Status: extended and approved for implementation by RED-121 on 2026-08-27. Risk: High.
+Status: extended and approved for implementation by RED-121 on 2026-08-28. Risk: High.
 
 This contract applies to one logical root action across one or more `runBattleAction` / `applyBattleAction` commands. RED-121 extends the atomic boundary to every synchronous trigger point without changing trigger ordering, numeric balance, random algorithms, or the damage pipeline.
 
@@ -27,6 +27,8 @@ A target prompt may be raised after the provisional action has moved a source, r
 Legacy skill results that return a post-effect `pendingTargetSelection` are adapted into a synthetic target consumer. Replay first reconstructs the provisional skill result, then consumes the recorded target and executes the serialized target effect once. Cancellation skips only that post-effect target when allowed; costs and the root effect still commit together.
 
 Public battle projection exposes only owner, candidates, source, cancellation policy, selection ID, and revision. It must never expose the root action, answer transcript, runtime checkpoint, trigger context, or continuation data.
+Option sessions may declare `selectionMode: 'multi'`, `presentation: 'hand'`, and authoritative `minSelections` / `maxSelections` bounds. Multi-select submissions are arrays of unique candidate values; cardinality, duplicates, stale instances, credentials, and ownership are validated before replay. The owner projection receives these presentation fields and the linear per-item candidate list, while opponents and spectators receive neither candidates nor owner-only presentation metadata.
+
 
 Cancelling a rule or reactive-card prompt records a skip for that consumer and continues deterministic replay. Cancelling a direct skill/card release prompt without a declared fallback cancels the root action. Timeout resolution submits through the same validated reducers; it does not bypass the transaction.
 

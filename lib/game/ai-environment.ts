@@ -180,6 +180,10 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
       selectionId: pendingOption.selectionId,
       stateRevision: pendingOption.stateRevision,
       canCancel: pendingOption.canCancel !== false,
+      selectionMode: pendingOption.selectionMode,
+      presentation: pendingOption.presentation,
+      minSelections: pendingOption.minSelections,
+      maxSelections: pendingOption.maxSelections,
     } : undefined,
     pendingTargetSelection: pendingTarget && samePlayer(
       pendingTarget.ownerPlayerId || pendingTarget.playerId,
@@ -273,13 +277,33 @@ function pendingCandidates(state: BattleState, playerId: string): CandidateActio
   const pendingOption = state.pendingOptionSelection
   if (pendingOption) {
     if (!samePlayer(pendingOption.playerId, playerId)) return []
-    const options = pendingOption.options.map(option => (
+    const values = pendingOption.options.map(option => (
       option && typeof option === 'object' && 'value' in option
         ? (option as { value: unknown }).value
         : option
     ))
       .sort((left, right) => compareStableText(stableJson(left), stableJson(right)))
-      .map(selectedOption => candidate('pending-option', {
+    const selections: unknown[] = pendingOption.selectionMode === 'multi'
+      ? (() => {
+          const minSelections = Number.isSafeInteger(pendingOption.minSelections)
+            ? Math.max(0, pendingOption.minSelections!)
+            : 1
+          const maxSelections = Math.min(
+            values.length,
+            Number.isSafeInteger(pendingOption.maxSelections)
+              ? Math.max(minSelections, pendingOption.maxSelections!)
+              : values.length,
+          )
+          if (minSelections > maxSelections) return []
+          const legal: unknown[] = minSelections === 0 ? [[]] : []
+          if (minSelections <= 1) legal.push(...values.map(value => [value]))
+          for (let count = Math.max(2, minSelections); count <= maxSelections; count += 1) {
+            legal.push(values.slice(0, count))
+          }
+          return legal
+        })()
+      : values
+    const options = selections.map(selectedOption => candidate('pending-option', {
         type: 'pendingOptionSelect',
         playerId,
         selectedOption,

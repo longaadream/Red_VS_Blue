@@ -302,6 +302,23 @@ describe('versioned headless AI environment', () => {
     expect(optionCandidates.slice(0, 3).map(item => (
       item.action.type === 'pendingOptionSelect' ? item.action.selectedOption : undefined
     ))).toEqual(['z', 'ä', '中'])
+    state.pendingOptionSelection = {
+      playerId: 'player-red',
+      title: 'choose holy cards',
+      options: Array.from({ length: 10 }, (_, index) => ({ value: `holy-${index}` })),
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
+      canCancel: false,
+    }
+    const multiCandidates = listLegalAIActions(state, 'player-red')
+    const multiOptions = multiCandidates.map(item => item.action.type === 'pendingOptionSelect' ? item.action.selectedOption : undefined)
+    expect(multiCandidates).toHaveLength(13)
+    expect(multiOptions.every(option => Array.isArray(option))).toBe(true)
+    expect(Math.max(...multiOptions.map(option => Array.isArray(option) ? option.length : 0))).toBe(4)
+    expect(observeBattleForAI(state, 'player-red').pendingOptionSelection)
+      .toMatchObject({ selectionMode: 'multi', presentation: 'hand', minSelections: 1, maxSelections: 4 })
 
     const minato = makePiece({
       instanceId: 'minato', templateId: 'blue-minato', ownerPlayerId: 'player-red', x: 1, y: 1,

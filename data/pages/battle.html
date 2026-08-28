@@ -435,6 +435,10 @@
     .card-item.card-disabled { opacity: .45; cursor: default; }
     .card-item.card-disabled:hover { transform: none; box-shadow: 0 4px 12px rgba(0,0,0,.6); }
     .card-item.card-reactive { border-color: #818cf8; box-shadow: 0 0 12px rgba(99,102,241,.35); }
+    .card-item.card-choice-selectable { border-color: #22c55e; box-shadow: 0 0 14px rgba(34,197,94,.32); }
+    .card-item.card-choice-selected { border-color: #86efac; transform: translateY(-14px) scale(1.06); box-shadow: 0 0 0 3px rgba(34,197,94,.35), 0 16px 30px rgba(0,0,0,.78); }
+    .card-item.card-choice-disabled { opacity: .3; cursor: not-allowed; filter: saturate(.55); }
+    .card-item.card-choice-disabled:hover { transform: none; box-shadow: 0 4px 12px rgba(0,0,0,.6); }
 
     /* Mana gem */
     .card-mana-gem {
@@ -1623,6 +1627,14 @@
       </div>
 
       <!-- The cards themselves are the hand; no panel, header, or visual section. -->
+      <div id="handMultiSelectControls" role="group" aria-label="手牌多选" hidden
+        style="position:fixed;left:50%;bottom:calc(var(--battle-hand-height,138px) + 10px);z-index:126;transform:translateX(-50%);align-items:center;gap:8px;padding:7px 9px;border:1px solid rgba(74,222,128,.5);border-radius:999px;background:rgba(5,18,14,.94);color:#dcfce7">
+        <span id="handMultiSelectCount" aria-live="polite" style="min-width:92px;font-size:12px;font-weight:850;text-align:center">已选择 0 / 4</span>
+        <button type="button" id="handMultiSelectCancel" onclick="cancelPendingHandOptionSelection()"
+          style="border:1px solid #64748b;border-radius:999px;padding:6px 11px;background:#1e293b;color:#cbd5e1">取消</button>
+        <button type="button" id="handMultiSelectConfirm" onclick="confirmPendingHandOptionSelection()" disabled
+          style="border:1px solid #86efac;border-radius:999px;padding:6px 11px;background:#166534;color:#dcfce7">确认弃置</button>
+      </div>
       <div class="hand-scroll" id="handCards" data-battle-ui-region="hand" role="region" aria-label="手牌列表" tabindex="0"></div>
     </div>
 
@@ -1999,6 +2011,7 @@
       playerAlignments[myPlayerId] = initialAlignment
     }
     let pendingOptionAction = null  // original action awaiting selectedOption
+    let pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
     let targetSubmissionPending = null // one target command waiting for authoritative confirmation
     let locallyCancelledSelectionId = null
     const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
@@ -2782,6 +2795,136 @@
     // Option picker
     // Stored option values avoid inline JSON breaking HTML attributes.
     let _pickerOptions = []
+
+    function isPendingHandMultiSelect(pending) {
+      return !!(pending && pendingOptionSelectionForMe()
+        && pending.selectionMode === 'multi' && pending.presentation === 'hand')
+    }
+
+    function pendingHandCandidateValues(pending) {
+      return ((pending && pending.options) || []).map(function(option) {
+        return option && typeof option === 'object' && option.value !== undefined ? option.value : option
+      })
+    }
+
+    function syncPendingHandMultiSelect(pending) {
+      if (!isPendingHandMultiSelect(pending)) {
+        pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
+        return
+      }
+      const candidates = pendingHandCandidateValues(pending)
+      if (pendingHandOptionSelection.selectionId !== pending.selectionId) {
+        pendingHandOptionSelection = { selectionId: pending.selectionId, selectedValues: [], submitting: false }
+        return
+      }
+      pendingHandOptionSelection.selectedValues = pendingHandOptionSelection.selectedValues.filter(function(value) {
+        return candidates.some(function(candidate) { return candidate === value })
+      })
+    }
+
+    function renderPendingHandSelectionControls() {
+      const controls = document.getElementById('handMultiSelectControls')
+      if (!controls) return
+      const pending = G && G.pendingOptionSelection
+      const active = isPendingHandMultiSelect(pending)
+      controls.hidden = !active
+      if (controls.style) controls.style.display = active ? 'flex' : 'none'
+      if (!active) return
+      syncPendingHandMultiSelect(pending)
+      const minSelections = Number.isSafeInteger(pending.minSelections) ? Math.max(0, pending.minSelections) : 1
+      const maxSelections = Number.isSafeInteger(pending.maxSelections) ? Math.max(minSelections, pending.maxSelections) : pendingHandCandidateValues(pending).length
+      const count = pendingHandOptionSelection.selectedValues.length
+      const inFlight = pendingHandOptionSelection.submitting || (typeof pendingActionFeedback !== 'undefined' && !!pendingActionFeedback)
+      const countLabel = document.getElementById('handMultiSelectCount')
+      const confirmButton = document.getElementById('handMultiSelectConfirm')
+      const cancelButton = document.getElementById('handMultiSelectCancel')
+      if (countLabel) countLabel.textContent = '已选择 ' + count + ' / ' + maxSelections
+      if (confirmButton) {
+        confirmButton.disabled = inFlight || count < minSelections || count > maxSelections
+        confirmButton.textContent = inFlight ? '提交中…' : '确认弃置 ' + count + ' 张'
+      }
+      if (cancelButton) {
+        cancelButton.hidden = pending.canCancel === false
+        cancelButton.disabled = inFlight
+      }
+    }
+
+    function togglePendingHandOption(cardInstanceId) {
+      const pending = G && G.pendingOptionSelection
+      if (!isPendingHandMultiSelect(pending)) return
+      syncPendingHandMultiSelect(pending)
+      const candidates = pendingHandCandidateValues(pending)
+      if (!candidates.some(function(value) { return value === cardInstanceId })) {
+        setStatusMsg('这张手牌不在当前可弃置候选中')
+        return
+      }
+      const selectedIndex = pendingHandOptionSelection.selectedValues.indexOf(cardInstanceId)
+      if (selectedIndex !== -1) pendingHandOptionSelection.selectedValues.splice(selectedIndex, 1)
+      else {
+        const maxSelections = Number.isSafeInteger(pending.maxSelections) ? pending.maxSelections : candidates.length
+        if (pendingHandOptionSelection.selectedValues.length >= maxSelections) {
+          setStatusMsg('最多选择' + maxSelections + '张手牌')
+          return
+        }
+        pendingHandOptionSelection.selectedValues.push(cardInstanceId)
+      }
+      pendingCardAction = null
+      renderHand()
+      renderActionBar()
+    }
+
+    async function confirmPendingHandOptionSelection() {
+      const pending = G && G.pendingOptionSelection
+      if (!isPendingHandMultiSelect(pending) || pendingHandOptionSelection.submitting) return
+      syncPendingHandMultiSelect(pending)
+      const minSelections = Number.isSafeInteger(pending.minSelections) ? Math.max(0, pending.minSelections) : 1
+      const maxSelections = Number.isSafeInteger(pending.maxSelections) ? Math.max(minSelections, pending.maxSelections) : pendingHandCandidateValues(pending).length
+      const selectedValues = pendingHandOptionSelection.selectedValues.slice()
+      if (selectedValues.length < minSelections || selectedValues.length > maxSelections) {
+        setStatusMsg('请选择' + minSelections + '至' + maxSelections + '张手牌')
+        renderPendingHandSelectionControls()
+        return
+      }
+      pendingHandOptionSelection.submitting = true
+      renderHand()
+      renderActionBar()
+      try {
+        await doAction({
+          type: 'pendingOptionSelect',
+          playerId: pending.playerId || myPlayerId,
+          selectedOption: selectedValues,
+          selectionId: pending.selectionId,
+          stateRevision: pending.stateRevision,
+        })
+      } finally {
+        const current = G && G.pendingOptionSelection
+        if (current && current.selectionId === pending.selectionId) pendingHandOptionSelection.submitting = false
+        else syncPendingHandMultiSelect(null)
+        renderHand()
+        renderActionBar()
+      }
+    }
+
+    async function cancelPendingHandOptionSelection() {
+      const pending = G && G.pendingOptionSelection
+      if (!isPendingHandMultiSelect(pending) || pending.canCancel === false || pendingHandOptionSelection.submitting) return
+      pendingHandOptionSelection.submitting = true
+      renderPendingHandSelectionControls()
+      try {
+        await doAction({
+          type: 'cancelPendingSelection',
+          playerId: pending.playerId || myPlayerId,
+          selectionId: pending.selectionId,
+          stateRevision: pending.stateRevision,
+        })
+      } finally {
+        const current = G && G.pendingOptionSelection
+        if (current && current.selectionId === pending.selectionId) pendingHandOptionSelection.submitting = false
+        else syncPendingHandMultiSelect(null)
+        renderHand()
+        renderActionBar()
+      }
+    }
 
     function showOptionPicker(title, options, originalAction) {
       pendingOptionAction = originalAction
@@ -4296,7 +4439,17 @@
       const pbc = G.pendingOptionSelection
       if (pendingOptionSelectionForMe()) {
         const key = pbc.selectionId || (pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(','))
-        if (_pendingChoiceShown !== key) {
+        if (isPendingHandMultiSelect(pbc)) {
+          _pendingChoiceShown = key
+          syncPendingHandMultiSelect(pbc)
+          if (pendingOptionAction && pendingOptionAction.type === 'pendingOptionSelect') {
+            pendingOptionAction = null
+            _pickerOptions = []
+          }
+          const overlay = document.getElementById('optionPickerOverlay')
+          if (overlay) overlay.classList.remove('show')
+        } else if (_pendingChoiceShown !== key) {
+          syncPendingHandMultiSelect(null)
           _pendingChoiceShown = key
           showOptionPicker(pbc.title || '请选择', pbc.options || [], {
             type: 'pendingOptionSelect',
@@ -4308,6 +4461,7 @@
           })
         }
       } else {
+        syncPendingHandMultiSelect(null)
         _pendingChoiceShown = null
         if (pendingOptionAction && pendingOptionAction.type === 'pendingOptionSelect') {
           pendingOptionAction = null
@@ -4759,6 +4913,10 @@
       ensureHandCardDisplayMetadata(hand)
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const ap = myMeta ? myMeta.actionPoints : 0
+      const pendingHandSelection = G.pendingOptionSelection
+      const isHandMultiSelect = isPendingHandMultiSelect(pendingHandSelection)
+      if (isHandMultiSelect) syncPendingHandMultiSelect(pendingHandSelection)
+      const handChoiceCandidates = isHandMultiSelect ? pendingHandCandidateValues(pendingHandSelection) : []
 
       let hudHand = document.getElementById('hudHandCount')
       if (!hudHand) {
@@ -4779,18 +4937,25 @@
       container.setAttribute('aria-hidden', String(!hand.length))
       if (!hand.length) {
         container.replaceChildren()
+        renderPendingHandSelectionControls()
         return
       }
 
       container.innerHTML = hand.map((card, index) => {
         const def = getCardDisplayDefinition(card.cardId)
         const cost = card.actionPointCost ?? def.actionPointCost ?? 0
-        const canPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
+        const canNormallyPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
+        const isHandChoiceCandidate = isHandMultiSelect && handChoiceCandidates.some(function(value) { return value === card.instanceId })
+        const isHandChoiceSelected = isHandMultiSelect && pendingHandOptionSelection.selectedValues.some(function(value) { return value === card.instanceId })
+        const canInteract = isHandMultiSelect ? isHandChoiceCandidate : canNormallyPlay
         const isPending = pendingCardAction && pendingCardAction.cardInstanceId === card.instanceId
         const isReactive = def.type === 'reactive'
         let cls = 'card-item'
-        if (isPending) cls += ' card-pending'
-        else if (!canPlay) cls += ' card-disabled'
+        if (isHandChoiceSelected) cls += ' card-choice-selected'
+        else if (isHandChoiceCandidate) cls += ' card-choice-selectable'
+        else if (isHandMultiSelect) cls += ' card-choice-disabled'
+        else if (isPending) cls += ' card-pending'
+        else if (!canNormallyPlay) cls += ' card-disabled'
         if (isReactive) cls += ' card-reactive'
 
         const gemCls = cost === 0 ? 'free' : ''
@@ -4808,9 +4973,12 @@
         const cid = escHtml(card.instanceId)
         const cdid = escHtml(card.cardId)
         const cardName = def.name || card.cardId
+        const cardAriaLabel = isHandMultiSelect
+          ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择弃置' : '，可选择弃置') : '，不可弃置')
+          : cardName + '，行动点 ' + cost
         const arc = window.BattleContextLayout.handArc(index, hand.length)
         return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
-          aria-label="${escHtml(cardName)}，行动点 ${cost}" aria-pressed="${isPending}" aria-disabled="${!canPlay}"
+          aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandMultiSelect ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"
           onclick="onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
@@ -4824,10 +4992,20 @@
           </div>
         </button>`
       }).join('')
+      renderPendingHandSelectionControls()
     }
 
     function onCardClick(cardInstanceId, cardId) {
       if (!G) return
+      if (isPendingHandMultiSelect(G.pendingOptionSelection)) {
+        togglePendingHandOption(cardInstanceId)
+        return
+      }
+      if (G.pendingOptionSelection || G.pendingTargetSelection) {
+        const pending = G.pendingOptionSelection || G.pendingTargetSelection
+        setStatusMsg(clientOwns(pending.playerId) ? '请先完成当前规则选择' : '等待对方完成规则选择')
+        return
+      }
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       if (!isMyTurn) return
 
@@ -4954,7 +5132,12 @@
         setMoveButtonClass(false)
         renderPieceContextMenu(_selPiece || null)
       } else if (pendingOptionSelectionForMe() || pendingTargetSelectionForMe()) {
-        setStatusMsg('等待你的选择')
+        if (isPendingHandMultiSelect(G.pendingOptionSelection)) {
+          syncPendingHandMultiSelect(G.pendingOptionSelection)
+          const count = pendingHandOptionSelection.selectedValues.length
+          const maxSelections = Number.isSafeInteger(G.pendingOptionSelection.maxSelections) ? G.pendingOptionSelection.maxSelections : pendingHandCandidateValues(G.pendingOptionSelection).length
+          setStatusMsg((G.pendingOptionSelection.title || '请选择手牌') + '（已选 ' + count + ' / ' + maxSelections + '）')
+        } else setStatusMsg('等待你的选择')
       } else if (!isMyTurn) {
         setStatusMsg('等待对方操作 [' + (PHASE_LABELS[phase] || phase) + ']')
         pendingMove = false
@@ -5302,6 +5485,10 @@
       if (!G) return
       if (pendingActionFeedback) {
         setStatusMsg('上一条指令仍在等待权威确认')
+        return
+      }
+      if (isPendingHandMultiSelect(G.pendingOptionSelection)) {
+        await confirmPendingHandOptionSelection()
         return
       }
       if (G.pendingOptionSelection || G.pendingTargetSelection) {

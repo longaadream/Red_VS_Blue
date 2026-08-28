@@ -239,4 +239,59 @@ describe('game engine Node/browser differential fixture', () => {
     expect(candidates).not.toContain('4,2')
     expect(candidates).not.toContain('5,2')
   })
+
+  it('keeps the tracked browser bundle in sync with Muru hand multi-select pending metadata', () => {
+    const browser = loadBrowserEngine()
+    const caster = makePiece({
+      instanceId: 'browser-liadrin', templateId: 'liadrin', ownerPlayerId: 'player-red', x: 0, y: 0,
+    }) as any
+    const enemy = makePiece({
+      instanceId: 'browser-enemy', ownerPlayerId: 'player-blue', x: 2, y: 0, currentHp: 20, maxHp: 20,
+    })
+    const state = makeState({
+      pieces: [caster, enemy], currentPlayerId: 'player-red', phase: 'action', width: 4, height: 1,
+    }) as any
+    const skill = loadSkill('muru-lament')
+    state.skillsById[skill.id] = skill
+    caster.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
+    state.players[0].actionPoints = 3
+    state.players[0].chargePoints = 3
+    state.players[0].hand = ['holy-charge', 'holy-smite', 'holy-heal'].map((cardId, index) => ({
+      cardId,
+      instanceId: `browser-holy-${index}`,
+      ownerPlayerId: 'player-red',
+    }))
+
+    const pending = browser.applyBattleAction(state, {
+      type: 'useChargeSkill',
+      playerId: 'player-red',
+      pieceId: caster.instanceId,
+      skillId: skill.id,
+    } as BattleAction) as any
+
+    expect(pending.pendingOptionSelection).toMatchObject({
+      canCancel: true,
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 3,
+    })
+    expect(pending.pendingOptionSelection.options.map((option: any) => option.value))
+      .toEqual(['browser-holy-0', 'browser-holy-1', 'browser-holy-2'])
+    expect(pending.pendingOptionSelection.options.every((option: any) => !Array.isArray(option.value))).toBe(true)
+
+    const resolved = browser.applyBattleAction(pending, {
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      selectedOption: ['browser-holy-1'],
+      selectionId: pending.pendingOptionSelection.selectionId,
+      stateRevision: pending.pendingOptionSelection.stateRevision,
+    } as BattleAction) as any
+
+    expect(resolved.pendingOptionSelection).toBeUndefined()
+    expect(resolved.players[0]).toMatchObject({ actionPoints: 0, chargePoints: 0 })
+    expect(resolved.players[0].hand.map((card: any) => card.instanceId))
+      .toEqual(['browser-holy-0', 'browser-holy-2'])
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === enemy.instanceId).currentHp).toBe(18)
+  })
 })

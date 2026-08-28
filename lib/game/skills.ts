@@ -323,6 +323,10 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
         playerId: config.playerId,
         canCancel: config.canCancel,
         cancelValue: config.cancelValue,
+        selectionMode: config.selectionMode,
+        presentation: config.presentation,
+        minSelections: config.minSelections,
+        maxSelections: config.maxSelections,
       }
     },
 
@@ -813,6 +817,10 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                 playerId: config.playerId,
                 canCancel: config.canCancel,
                 cancelValue: config.cancelValue,
+                selectionMode: config.selectionMode,
+                presentation: config.presentation,
+                minSelections: config.minSelections,
+                maxSelections: config.maxSelections,
               };
             };
 
@@ -1286,6 +1294,10 @@ export interface SkillExecutionResult {
   playerId?: string
   canCancel?: boolean
   cancelValue?: any
+  selectionMode?: 'single' | 'multi'
+  presentation?: 'picker' | 'hand'
+  minSelections?: number
+  maxSelections?: number
   pendingRuleId?: string
   pendingRuleSourceId?: string
 }
@@ -1626,6 +1638,10 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
       playerId?: string;
       canCancel?: boolean;
       cancelValue?: any;
+      selectionMode?: 'single' | 'multi';
+      presentation?: 'picker' | 'hand';
+      minSelections?: number;
+      maxSelections?: number;
     }) => {
       battleDebugLog('selectOption called, config:', config, 'context.selectedOption:', context && context.selectedOption);
       // 如果已有选项值（用户已选择），直接返回该值
@@ -1640,6 +1656,10 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         playerId: config.playerId,
         canCancel: config.canCancel,
         cancelValue: config.cancelValue,
+        selectionMode: config.selectionMode,
+        presentation: config.presentation,
+        minSelections: config.minSelections,
+        maxSelections: config.maxSelections,
       };
     },
 
@@ -3100,7 +3120,14 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               success: false,
               needsOptionSelection: true,
               options: result.options || [],
-              title: result.title || '请选择'
+              title: result.title || '请选择',
+              playerId: result.playerId,
+              canCancel: result.canCancel,
+              cancelValue: result.cancelValue,
+              selectionMode: result.selectionMode,
+              presentation: result.presentation,
+              minSelections: result.minSelections,
+              maxSelections: result.maxSelections,
             };
           }
           

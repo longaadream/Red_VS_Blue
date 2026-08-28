@@ -41,6 +41,10 @@ export interface SuspendableInteractionPrompt {
   options?: unknown[]
   canCancel?: boolean
   cancelValue?: unknown
+  selectionMode?: 'single' | 'multi'
+  presentation?: 'picker' | 'hand'
+  minSelections?: number
+  maxSelections?: number
   targetType?: string
   range?: number
   filter?: string

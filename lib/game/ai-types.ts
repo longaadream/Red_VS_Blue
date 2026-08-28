@@ -121,6 +121,10 @@ export interface AIObservation {
     selectionId?: string
     stateRevision?: number
     canCancel: boolean
+    selectionMode?: 'single' | 'multi'
+    presentation?: 'picker' | 'hand'
+    minSelections?: number
+    maxSelections?: number
   }
   pendingTargetSelection?: {
     playerId: string

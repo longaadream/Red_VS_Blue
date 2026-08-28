@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { executeCardFunction, executeSkillFunction, loadCardById, loadRuleById } from '@/lib/game/skills'
 import { applyBattleAction, type BattleState } from '@/lib/game/turn'
-import { hashStable } from '@/lib/game/battle-runner'
+import { hashStable, runBattleAction } from '@/lib/game/battle-runner'
 import { globalTriggerSystem, TriggerSystem } from '@/lib/game/triggers'
 import { getPieceById } from '@/lib/game/piece-repository'
 import { prepareAction } from '@/lib/game/targeting'
@@ -141,6 +141,99 @@ describe('Liadrin holy-hand engine', () => {
     expect(ally.statusTags.some((tag: any) => tag.type === 'divine-shield')).toBe(true)
   })
 
+  it('offers a linear authoritative hand multi-select and resolves four cards exactly once', () => {
+    const lament = skill('muru-lament')
+    const liadrin = makePiece({
+      instanceId: 'liadrin-linear-options', templateId: 'liadrin', ownerPlayerId: 'player-red', x: 0, y: 0,
+    }) as any
+    liadrin.skills = [{ skillId: lament.id, currentCooldown: 0, usesRemaining: -1 }]
+    const enemy = makePiece({
+      instanceId: 'linear-options-enemy', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 0,
+      currentHp: 30, maxHp: 30,
+    }) as any
+    const state = makeState({ pieces: [liadrin, enemy], currentPlayerId: 'player-red', phase: 'action' }) as any
+    state.skillsById[lament.id] = lament
+    state.players[0].actionPoints = 3
+    state.players[0].chargePoints = 3
+    state.players[0].hand = Array.from({ length: 10 }, (_, index) => ({
+      cardId: ['holy-smite', 'holy-heal', 'holy-charge'][index % 3],
+      instanceId: `linear-holy-${index}`,
+      ownerPlayerId: 'player-red',
+    }))
+    const runnerPending = runBattleAction(JSON.parse(JSON.stringify(state)), {
+      type: 'useChargeSkill', playerId: 'player-red', pieceId: liadrin.instanceId, skillId: lament.id,
+    } as any).state as any
+    expect(runnerPending.pendingOptionSelection).toMatchObject({
+      canCancel: true,
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
+    })
+
+    const pending = applyBattleAction(state, {
+      type: 'useChargeSkill', playerId: 'player-red', pieceId: liadrin.instanceId, skillId: lament.id,
+    } as any) as any
+
+    expect(pending.pendingOptionSelection).toMatchObject({
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
+    })
+    expect(pending.pendingOptionSelection.options).toHaveLength(10)
+    expect(pending.pendingOptionSelection.options.map((option: any) => option.value))
+      .toEqual(state.players[0].hand.map((card: any) => card.instanceId))
+    expect(pending.pendingOptionSelection.options.every((option: any) => !Array.isArray(option.value))).toBe(true)
+    expect(pending.players[0]).toMatchObject({ actionPoints: 3, chargePoints: 3 })
+
+    const beforeInvalid = hashStable(pending)
+    expect(() => applyBattleAction(pending, {
+      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: [],
+      selectionId: pending.pendingOptionSelection.selectionId,
+      stateRevision: pending.pendingOptionSelection.stateRevision,
+    } as any)).toThrow(/selection|option|candidate/i)
+    expect(hashStable(pending)).toBe(beforeInvalid)
+
+    for (const selectedOption of [
+      ['linear-holy-0', 'linear-holy-0'],
+      pending.pendingOptionSelection.options.slice(0, 5).map((option: any) => option.value),
+      ['not-in-current-hand'],
+    ]) {
+      expect(() => applyBattleAction(pending, {
+        type: 'pendingOptionSelect', playerId: 'player-red', selectedOption,
+        selectionId: pending.pendingOptionSelection.selectionId,
+        stateRevision: pending.pendingOptionSelection.stateRevision,
+      } as any)).toThrow(/selection|option|candidate|duplicate/i)
+      expect(hashStable(pending)).toBe(beforeInvalid)
+    }
+
+    const cancelled = applyBattleAction(pending, {
+      type: 'cancelPendingSelection', playerId: 'player-red',
+      selectionId: pending.pendingOptionSelection.selectionId,
+      stateRevision: pending.pendingOptionSelection.stateRevision,
+    } as any) as any
+    expect(cancelled.pendingOptionSelection).toBeUndefined()
+    expect(cancelled.players[0]).toMatchObject({ actionPoints: 3, chargePoints: 3 })
+    expect(cancelled.players[0].hand.map((card: any) => card.instanceId))
+      .toEqual(state.players[0].hand.map((card: any) => card.instanceId))
+    expect(pending.pendingOptionSelection).toBeDefined()
+
+    const selected = pending.pendingOptionSelection.options.slice(0, 4).map((option: any) => option.value)
+    const resolved = applyBattleAction(pending, {
+      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: selected,
+      selectionId: pending.pendingOptionSelection.selectionId,
+      stateRevision: pending.pendingOptionSelection.stateRevision,
+    } as any) as any
+
+    expect(resolved.pendingOptionSelection).toBeUndefined()
+    expect(resolved.players[0]).toMatchObject({ actionPoints: 0, chargePoints: 0 })
+    expect(resolved.players[0].hand.map((card: any) => card.instanceId))
+      .toEqual(state.players[0].hand.slice(4).map((card: any) => card.instanceId))
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === enemy.instanceId).currentHp).toBe(22)
+    expect(resolved.actions.filter((action: any) => action.type === 'useChargeSkill')).toHaveLength(1)
+  })
+
   it('uses the reset 0 AP extraction in the same turn to rebuild all three holy components', () => {
     const lament = skill('muru-lament')
     const extraction = skill('light-extraction')
@@ -169,12 +262,12 @@ describe('Liadrin holy-hand engine', () => {
     const lamentPending = applyBattleAction(state, {
       type: 'useChargeSkill', playerId: 'player-red', pieceId: liadrin.instanceId, skillId: lament.id,
     } as any) as any
-    const discardAll = lamentPending.pendingOptionSelection.options.find((option: any) => option.value?.length === 3)
-    expect(discardAll).toBeDefined()
+    const discardAll = lamentPending.pendingOptionSelection.options.map((option: any) => option.value)
+    expect(discardAll).toHaveLength(3)
     expect(lamentPending.players[0]).toMatchObject({ actionPoints: 3, chargePoints: 3 })
 
     const afterLament = applyBattleAction(lamentPending, {
-      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: discardAll.value,
+      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: discardAll,
       selectionId: lamentPending.pendingOptionSelection.selectionId,
       stateRevision: lamentPending.pendingOptionSelection.stateRevision,
     } as any) as any

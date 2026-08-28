@@ -24,6 +24,9 @@ export interface PendingInteractionSource {
   pieceId?: string
 }
 
+export type PendingOptionSelectionMode = 'single' | 'multi'
+export type PendingOptionPresentation = 'picker' | 'hand'
+
 export interface PendingOptionSelectionSession {
   playerId: string
   title: string
@@ -38,6 +41,10 @@ export interface PendingOptionSelectionSession {
   selectionId?: string
   stateRevision?: number
   canCancel?: boolean
+  selectionMode?: PendingOptionSelectionMode
+  presentation?: PendingOptionPresentation
+  minSelections?: number
+  maxSelections?: number
   transaction?: SuspendableActionTransaction
   suspendedTurn?: SuspendableTurnCheckpoint
 }
@@ -115,6 +122,12 @@ export function finalizePendingOptionSession(
     source.id,
     source.pieceId || '',
     stableJson(pending.options),
+    stableJson({
+      selectionMode: pending.selectionMode || 'single',
+      presentation: pending.presentation || 'picker',
+      minSelections: pending.minSelections,
+      maxSelections: pending.maxSelections,
+    }),
   ].join('|')
   normalized.selectionId = `option-${PENDING_INTERACTION_PROTOCOL_VERSION}-${revision.toString(36)}-${fnv1a(identity)}`
   return normalized
@@ -140,6 +153,32 @@ export function validatePendingOptionSubmission(
   }
   if (!pending.selectionId || action.selectionId !== pending.selectionId) {
     throw new PendingInteractionRuleError('PENDING_OPTION_ID_MISMATCH', 'Option selection ID does not match the pending session')
+  }
+  if (pending.selectionMode === 'multi') {
+    if (!Array.isArray(action.selectedOption)) {
+      throw new PendingInteractionRuleError('PENDING_OPTION_MULTI_VALUE_REQUIRED', 'Multi-select option submission must be an array')
+    }
+    const minSelections = Number.isSafeInteger(pending.minSelections) ? Math.max(0, pending.minSelections!) : 1
+    const maxSelections = Number.isSafeInteger(pending.maxSelections)
+      ? Math.max(minSelections, pending.maxSelections!)
+      : pending.options.length
+    if (action.selectedOption.length < minSelections || action.selectedOption.length > maxSelections) {
+      throw new PendingInteractionRuleError(
+        'PENDING_OPTION_SELECTION_COUNT_INVALID',
+        `Multi-select option submission requires ${minSelections}-${maxSelections} selections`,
+      )
+    }
+    for (let index = 0; index < action.selectedOption.length; index += 1) {
+      const selected = action.selectedOption[index]
+      if (action.selectedOption.slice(0, index).some(previous => sameOptionValue(previous, selected))) {
+        throw new PendingInteractionRuleError('PENDING_OPTION_VALUE_DUPLICATE', 'Multi-select option submission contains a duplicate candidate')
+      }
+      const allowed = pending.options.some(option => optionValues(option).some(value => sameOptionValue(value, selected)))
+      if (!allowed) {
+        throw new PendingInteractionRuleError('PENDING_OPTION_VALUE_INVALID', 'Selected option is not a candidate in the pending session')
+      }
+    }
+    return
   }
   const allowed = pending.options.some(option => optionValues(option).some(value => sameOptionValue(value, action.selectedOption)))
   if (!allowed) {

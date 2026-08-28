@@ -198,6 +198,10 @@ export interface TriggerResult {
   playerId?: string
   canCancel?: boolean
   cancelValue?: any
+  selectionMode?: 'single' | 'multi'
+  presentation?: 'picker' | 'hand'
+  minSelections?: number
+  maxSelections?: number
   needsTargetSelection?: boolean
   targetType?: string
   range?: number
@@ -386,6 +390,10 @@ export class TriggerSystem {
     let pendingPlayerId: string | undefined
     let pendingCanCancel: boolean | undefined
     let pendingCancelValue: any
+    let pendingSelectionMode: 'single' | 'multi' | undefined
+    let pendingPresentation: 'picker' | 'hand' | undefined
+    let pendingMinSelections: number | undefined
+    let pendingMaxSelections: number | undefined
     let needsTargetSelection = false
     let pendingTargetType: string | undefined
     const candidateStateSnapshot = () => (
@@ -609,6 +617,10 @@ export class TriggerSystem {
                 options: result.options || [],
                 canCancel: result.canCancel,
                 cancelValue: result.cancelValue,
+                selectionMode: result.selectionMode,
+                presentation: result.presentation,
+                minSelections: result.minSelections,
+                maxSelections: result.maxSelections,
                 suspendedTurn: { ...battle.turn },
               }
             : {
@@ -641,6 +653,10 @@ export class TriggerSystem {
           pendingPlayerId = result.playerId || ruleOwnerPlayerId
           pendingCanCancel = result.canCancel
           pendingCancelValue = result.cancelValue
+          pendingSelectionMode = result.selectionMode
+          pendingPresentation = result.presentation
+          pendingMinSelections = result.minSelections
+          pendingMaxSelections = result.maxSelections
           pendingRuleId = item.ruleId
           pendingRuleSourceId = item.sourceId
           // 收集后续未执行的规则作为队列
@@ -679,7 +695,7 @@ export class TriggerSystem {
 
     // 只在没有挂起交互时才执行响应卡（避免乱序）
     if (interactionNeeded) {
-      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards } as any, context)
+      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, selectionMode: pendingSelectionMode, presentation: pendingPresentation, minSelections: pendingMinSelections, maxSelections: pendingMaxSelections, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards } as any, context)
     }
 
     // 4. 按事件开始时冻结的快照执行 reactive 卡牌，恢复规则队列时不得重复扫描。
@@ -724,6 +740,10 @@ export class TriggerSystem {
                   options: result.options || [],
                   canCancel: result.canCancel,
                   cancelValue: result.cancelValue,
+                  selectionMode: result.selectionMode,
+                  presentation: result.presentation,
+                  minSelections: result.minSelections,
+                  maxSelections: result.maxSelections,
                   suspendedTurn: { ...battle.turn },
                 }
               : {
