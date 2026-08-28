@@ -9,6 +9,7 @@ import { applyBattlePublicPatch, createBattlePublicPatch } from '@/lib/game/batt
 import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
 import { buildInitialPiecesForPlayers } from '@/lib/game/battle-setup'
 import { toPublicBattleState } from '@/lib/game/deployment'
+import type { BoardMap } from '@/lib/game/map'
 import {
   getEffectiveChargeCost,
   getMangekyoDeathCount,
@@ -26,6 +27,23 @@ const ROOT_SEED = 124
 
 function loadJson<T>(...segments: string[]): T {
   return JSON.parse(readFileSync(join(DATA_ROOT, ...segments), 'utf8')) as T
+}
+
+function makeBoardMap(): BoardMap {
+  const map = makeMap()
+  return {
+    ...map,
+    tiles: map.tiles.map(tile => ({
+      id: `${map.id}-${tile.x}-${tile.y}`,
+      x: tile.x,
+      y: tile.y,
+      props: {
+        type: 'floor',
+        walkable: tile.props.walkable,
+        bulletPassable: true,
+      },
+    })),
+  }
 }
 
 function activeSkill(id: string, overrides: Record<string, unknown> = {}): SkillDefinition {
@@ -123,7 +141,7 @@ describe('RED-124 Mangekyo data contract', () => {
     const mirror = { ...obito, id: 'obito-mirror', skills: [] }
     const randomValues = [0, 0.5]
     const pieces = buildInitialPiecesForPlayers(
-      makeMap(),
+      makeBoardMap(),
       ['player-red', 'player-blue'],
       [obito, mirror],
       [
