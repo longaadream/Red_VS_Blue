@@ -335,7 +335,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
         context.cardInstance?.holyProphecyEnhanced &&
         context.card?.id === 'holy-smite'
       ) {
-        baseDamage = Math.round(baseDamage * 1.6)
+        baseDamage = Math.floor(baseDamage * 1.5)
       }
       return dealDamage(attacker, target, baseDamage, damageType, battle, skillId, false, undefined, context.selectedOption)
     },
@@ -345,7 +345,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
         context.cardInstance?.holyProphecyEnhanced &&
         context.card?.id === 'holy-heal'
       ) {
-        baseHeal = Math.round(baseHeal * 1.5)
+        baseHeal = Math.floor(baseHeal * 1.5)
       }
       return healDamage(healer, target, baseHeal, battle, skillId)
     },
@@ -387,7 +387,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       ) {
         resolvedStatusObject = {
           ...resolvedStatusObject,
-          intensity: Math.round((statusObject.intensity || 2) * 1.5),
+          intensity: Math.floor((statusObject.intensity || 2) * 1.5),
         }
       }
       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)

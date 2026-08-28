@@ -586,14 +586,15 @@ export class TriggerSystem {
         let transactionInput = interactionKey
           ? transactionRuntime?.takeAnswer(interactionKey)
           : undefined
-        if (transactionInput?.cancelled) continue
+        if (transactionInput?.cancelled && !transactionInput.resumeConsumerOnCancel) continue
+        const transactionInputs = transactionInput ? [transactionInput] : []
         let ruleCtx: TriggerContext
         let result: any
         let damageBeforeEffect = 0
         let ruleOwnerPlayerId: string | undefined
         while (true) {
           ruleCtx = item.buildCtx(context)
-          applyTransactionInput(ruleCtx, transactionInput, battle)
+          applyTransactionInputs(ruleCtx, transactionInputs, battle)
           damageBeforeEffect = Number((ruleCtx as any).damage)
           ruleOwnerPlayerId = (ruleCtx as any).ruleOwnerPlayerId
             || (ruleCtx as any).playerId
@@ -607,6 +608,7 @@ export class TriggerSystem {
           const nextInput = transactionRuntime.takeAnswer(interactionKey)
           if (nextInput) {
             transactionInput = nextInput
+            transactionInputs.push(nextInput)
             continue
           }
           transactionRuntime.suspend(interactionKey, result.needsOptionSelection
@@ -630,6 +632,8 @@ export class TriggerSystem {
                 targetType: result.targetType,
                 range: result.range,
                 filter: result.filter,
+                candidates: result.targetCandidates,
+                resumeOnCancel: result.resumeOnCancel,
                 canCancel: result.canCancel,
                 suspendedTurn: { ...battle.turn },
                 sourcePieceId: (ruleCtx as any).sourcePiece?.instanceId || item.sourceId,
@@ -717,11 +721,12 @@ export class TriggerSystem {
           let transactionInput = interactionKey
             ? transactionRuntime?.takeAnswer(interactionKey)
             : undefined
-          if (transactionInput?.cancelled) continue
+          if (transactionInput?.cancelled && !transactionInput.resumeConsumerOnCancel) continue
+          const transactionInputs = transactionInput ? [transactionInput] : []
           let result: any
           while (true) {
             const cardContext = { ...context }
-            applyTransactionInput(cardContext, transactionInput, battle)
+            applyTransactionInputs(cardContext, transactionInputs, battle)
             result = executeCardFunction(cardDef, player.playerId, battle, cardContext) as any
             if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
             if (!transactionRuntime || !interactionKey) {
@@ -730,6 +735,7 @@ export class TriggerSystem {
             const nextInput = transactionRuntime.takeAnswer(interactionKey)
             if (nextInput) {
               transactionInput = nextInput
+              transactionInputs.push(nextInput)
               continue
             }
             transactionRuntime.suspend(interactionKey, result.needsOptionSelection
@@ -753,6 +759,8 @@ export class TriggerSystem {
                   targetType: result.targetType,
                   range: result.range,
                   filter: result.filter,
+                  candidates: result.targetCandidates,
+                  resumeOnCancel: result.resumeOnCancel,
                   canCancel: result.canCancel,
                   suspendedTurn: { ...battle.turn },
                   sourcePieceId: (context as any).sourcePiece?.instanceId,
@@ -821,20 +829,26 @@ export class TriggerSystem {
   
 }
 
-function applyTransactionInput(
+function applyTransactionInputs(
   context: TriggerContext,
-  input: SuspendableInteractionInput | undefined,
+  inputs: SuspendableInteractionInput[],
   battle: BattleState,
 ): void {
-  if (!input) return
-  Object.assign(context, input)
-  if (input.targetPieceId) {
+  if (inputs.length === 0) return
+  for (const input of inputs) Object.assign(context, input)
+  const selectedTargets = inputs.flatMap(input => input.selectedTargets || [])
+  if (selectedTargets.length > 0) (context as any).selectedTargets = selectedTargets
+  const latestPieceInput = [...inputs].reverse().find(input => input.targetPieceId)
+  if (latestPieceInput?.targetPieceId) {
     context.targetPiece = battle.pieces.find(piece => (
-      piece.instanceId === input.targetPieceId && piece.currentHp > 0
+      piece.instanceId === latestPieceInput.targetPieceId && piece.currentHp > 0
     ))
   }
-  if (input.targetX !== undefined && input.targetY !== undefined) {
-    context.targetPosition = { x: input.targetX, y: input.targetY }
+  const latestCellInput = [...inputs].reverse().find(input => (
+    input.targetX !== undefined && input.targetY !== undefined
+  ))
+  if (latestCellInput?.targetX !== undefined && latestCellInput.targetY !== undefined) {
+    context.targetPosition = { x: latestCellInput.targetX, y: latestCellInput.targetY }
   }
 }
 

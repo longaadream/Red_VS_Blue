@@ -1404,6 +1404,12 @@ function applyBattleActionInternal(
       payload: { message: 'Selection cancelled' },
     } as any)
     if (pending.transaction) {
+      if ('resumeOnCancel' in pending && pending.resumeOnCancel) {
+        return resumeSuspendableActionTransaction(next, pending.transaction, {
+          cancelled: true,
+          resumeConsumerOnCancel: true,
+        })
+      }
       if ('options' in pending && pending.cancelValue !== undefined) {
         return resumeSuspendableActionTransaction(next, pending.transaction, {
           selectedOption: pending.cancelValue,
@@ -3077,6 +3083,9 @@ function setSuspendableTransactionPending(
     targetType: (pendingError.prompt.targetType || 'piece') as 'piece' | 'cell' | 'grid',
     range: pendingError.prompt.range,
     filter: pendingError.prompt.filter,
+    candidates: pendingError.prompt.candidates as PendingTargetSelectionSession['candidates'],
+    fixedCandidates: Array.isArray(pendingError.prompt.candidates),
+    resumeOnCancel: pendingError.prompt.resumeOnCancel,
     candidateState: pendingError.prompt.candidateState as BattleState | undefined,
     source,
     canCancel: pendingError.prompt.canCancel,

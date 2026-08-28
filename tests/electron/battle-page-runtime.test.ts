@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const projectRoot = process.cwd()
 const battlePagePath = path.join(projectRoot, 'data', 'pages', 'battle.html')
@@ -108,6 +108,77 @@ describe('battle page runtime source', () => {
     const duplicates = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))]
 
     expect(duplicates).toEqual([])
+  })
+
+  it('marks every initial training roster piece as core', async () => {
+    const html = readBattlePage()
+    const createInitialBattleForPlayers = vi.fn(async () => ({
+      pieces: [
+        { instanceId: 'training-red-core' },
+        { instanceId: 'training-blue-core', isCore: false },
+      ],
+      players: [
+        { playerId: 'training-red', faction: 'red', actionPoints: 0 },
+        { playerId: 'training-blue', faction: 'blue', actionPoints: 0 },
+      ],
+      turn: { currentPlayerId: 'training-red' },
+      skillsById: {},
+    }))
+    const context = vm.createContext({
+      window: { RvBGameEngine: { ensure: async () => ({ createInitialBattleForPlayers }) } },
+      skillsById: {},
+      resolveTrainingInitialPieces: (alignment: string) => [{ id: `${alignment}-piece` }],
+    })
+    new vm.Script(`async ${runtimeFunction(html, 'trainingApiFetch')}`).runInContext(context)
+
+    const state = await (context as any).trainingApiFetch('POST', {
+      firstPlayerId: 'training-red', firstFaction: 'red', secondFaction: 'blue',
+    })
+
+    expect(createInitialBattleForPlayers).toHaveBeenCalledOnce()
+    expect(state.pieces).toEqual([
+      { instanceId: 'training-red-core', isCore: true },
+      { instanceId: 'training-blue-core', isCore: true },
+    ])
+  })
+
+  it('uses the instance-aware display description in the card detail modal', () => {
+    expect(runtimeFunction(readBattlePage(), 'showCardDetail'))
+      .toMatch(/cardDisplayDescription\(cardInstance, def\)/)
+  })
+
+  it('keeps a single-card hand selection out of the generic option picker', () => {
+    const overlay = { classList: { remove: vi.fn() } }
+    const showOptionPicker = vi.fn()
+    const context = vm.createContext({
+      G: {
+        turn: { turnNumber: 2 },
+        pendingOptionSelection: {
+          playerId: 'player-red', selectionId: 'prophecy-single',
+          selectionMode: 'single', presentation: 'hand',
+          options: [{ value: 'holy-card-1' }],
+        },
+      },
+      pendingHandOptionSelection: { selectionId: null, selectedValues: [], submitting: false },
+      pendingOptionSelectionForMe: () => true,
+      pendingTargetSelectionForMe: () => false,
+      showOptionPicker,
+      document: { getElementById: (id: string) => id === 'optionPickerOverlay' ? overlay : null },
+      pendingSkill: null,
+    })
+    vm.runInContext('let _pendingChoiceShown = null; let pendingOptionAction = null; let _pickerOptions = [];', context)
+    new vm.Script([
+      runtimeFunction(readBattlePage(), 'isPendingHandSelection'),
+      runtimeFunction(readBattlePage(), 'pendingHandCandidateValues'),
+      runtimeFunction(readBattlePage(), 'syncPendingHandSelection'),
+      runtimeFunction(readBattlePage(), 'syncAuthoritativePendingPresentation'),
+    ].join('\n')).runInContext(context)
+
+    ;(context as any).syncAuthoritativePendingPresentation()
+
+    expect(showOptionPicker).not.toHaveBeenCalled()
+    expect(overlay.classList.remove).toHaveBeenCalledWith('show')
+    expect((context as any).pendingHandOptionSelection.selectionId).toBe('prophecy-single')
   })
 
   it('hides an active target-selection overlay when target interaction is cleared', () => {

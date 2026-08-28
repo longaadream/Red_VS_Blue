@@ -19,6 +19,7 @@ export interface SuspendableInteractionInput {
   targetX?: number
   targetY?: number
   selectedTargets?: unknown[]
+  resumeConsumerOnCancel?: boolean
   /** Internal deterministic-stream bound used by timeout auto-resolution replay. */
   timeoutRandomBound?: number
 }
@@ -48,6 +49,8 @@ export interface SuspendableInteractionPrompt {
   targetType?: string
   range?: number
   filter?: string
+  candidates?: unknown[]
+  resumeOnCancel?: boolean
   suspendedTurn?: SuspendableTurnCheckpoint
   sourcePieceId?: string
   /** Server-private, candidate-only snapshot of the suspended provisional state. */

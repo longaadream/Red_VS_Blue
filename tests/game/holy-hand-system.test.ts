@@ -333,7 +333,7 @@ describe('Liadrin holy-hand engine', () => {
   })
 
 describe('Velen delayed holy cards', () => {
-  it('completes prophecy next own turn and multiplies after Tyrande, producing 16 true damage', () => {
+  it('completes prophecy next own turn and multiplies after Tyrande, producing 15 true damage', () => {
     const velen = makePiece({ instanceId: 'velen', templateId: 'velen', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
     velen.rules = [loadRuleById('rule-velen-delayed-effects', true)!, loadRuleById('rule-velen-death-cleanup', true)!]
     const tyrande = makePiece({ instanceId: 'tyrande', templateId: 'tyrande', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
@@ -353,7 +353,7 @@ describe('Velen delayed holy cards', () => {
     state.players[0].buffs = { 'elune-blessing-buff': { multiplier: 2, uses: 1 } }
     const result = executeCardFunction(loadCardById('holy-smite', true)!, 'player-red', state, undefined, undefined, undefined, undefined, undefined, card)
     expect(result.success).toBe(true)
-    expect(enemy.currentHp).toBe(4)
+    expect(enemy.currentHp).toBe(5)
   })
   it('enhances holy healing from 8 to 12 and holy charge from 2 to 3', () => {
     const source = makePiece({ instanceId: 'source', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20 }) as any
@@ -472,6 +472,28 @@ describe('Velen delayed holy cards', () => {
     expect(afterPlay.players[0].hand[0].holyProphecy).toBeUndefined()
     expect(afterPlay.players[0].hand[0].holyProphecyEnhanced).toBeUndefined()
   })
+
+  it('publishes holy prophecy as an exact single-card hand selection', () => {
+    const definition = skill('velen-holy-prophecy')
+    const velen = makePiece({ instanceId: 'velen-prophecy-hand', templateId: 'velen', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
+    velen.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [velen] }) as any
+    state.skillsById[definition.id] = definition
+    state.players[0].hand = [
+      { cardId: 'holy-smite', instanceId: 'prophecy-choice', ownerPlayerId: 'player-red' },
+      { cardId: 'holy-heal', instanceId: 'already-enhanced', ownerPlayerId: 'player-red', holyProphecyEnhanced: true },
+      { cardId: 'filler', instanceId: 'not-holy', ownerPlayerId: 'player-red' },
+    ]
+
+    const pending = applyBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: velen.instanceId, skillId: definition.id,
+    } as any) as any
+
+    expect(pending.pendingOptionSelection).toMatchObject({
+      selectionMode: 'single', presentation: 'hand', minSelections: 1, maxSelections: 1,
+      options: [{ value: 'prophecy-choice' }],
+    })
+  })
 })
   it('commits one to three immediate futures once and rejects a second ultimate use', () => {
     const definition = skill('velen-thousand-futures-ultimate')
@@ -494,13 +516,16 @@ describe('Velen delayed holy cards', () => {
     } as any) as any
     expect(pending.players[0].actionPoints).toBe(2)
     expect(pending.pendingOptionSelection?.source).toMatchObject({ type: 'skill', id: definition.id })
-    const allThree = pending.pendingOptionSelection.options.find((option: any) => option.value?.length === 3)
-    expect(allThree).toBeDefined()
+    expect(pending.pendingOptionSelection).toMatchObject({
+      selectionMode: 'multi', presentation: 'hand', minSelections: 1, maxSelections: 3,
+    })
+    expect(pending.pendingOptionSelection.options.map((option: any) => option.value))
+      .toEqual(['future-0', 'future-1', 'future-2'])
 
     const resolved = applyBattleAction(pending, {
       type: 'pendingOptionSelect',
       playerId: 'player-red',
-      selectedOption: allThree.value,
+      selectedOption: ['future-0', 'future-1', 'future-2'],
       selectionId: pending.pendingOptionSelection.selectionId,
       stateRevision: pending.pendingOptionSelection.stateRevision,
     } as any) as any
@@ -532,7 +557,7 @@ describe('Turalyon holy-hand mobility', () => {
     expect(ended.players[0].hand[0].temporaryCostReductionTurnNumber).toBeUndefined()
   })
 
-  it('keeps the card action uncommitted while choosing the free move, then commits it exactly once', () => {
+  it('keeps the card action uncommitted through piece then cell selection, then commits exactly once', () => {
     const turalyon = makePiece({ instanceId: 'turalyon', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
     turalyon.rules = [loadRuleById('rule-turalyon-lightforged-march', true)!]
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 1, moveRange: 3, currentHp: 5, maxHp: 10 }) as any
@@ -541,20 +566,42 @@ describe('Turalyon holy-hand mobility', () => {
     state.players[0].hand = [{ cardId: 'holy-heal', instanceId: 'heal', ownerPlayerId: 'player-red', actionPointCost: 2 }]
 
     const pending = applyBattleAction(state, { type: 'playCard', playerId: 'player-red', cardInstanceId: 'heal' } as any) as any
-    expect(pending.pendingOptionSelection?.source).toMatchObject({ type: 'rule', id: 'rule-turalyon-lightforged-march', pieceId: 'turalyon' })
+    expect(pending.pendingTargetSelection?.source).toMatchObject({ type: 'rule', id: 'rule-turalyon-lightforged-march', pieceId: 'turalyon' })
+    expect(pending.pendingTargetSelection).toMatchObject({
+      targetType: 'piece', candidates: expect.arrayContaining([{ type: 'piece', pieceId: 'ally' }]),
+    })
     expect(pending.players[0].actionPoints).toBe(3)
     expect(pending.players[0].hand).toHaveLength(1)
     expect(pending.players[0].discardPile).toEqual([])
-    const option = pending.pendingOptionSelection.options.find((item: any) => item.value?.pieceId === 'ally' && item.value?.x === 2 && item.value?.y === 1)
-    expect(option).toBeDefined()
 
-    const resolved = applyBattleAction(pending, {
-      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: option.value,
-      selectionId: pending.pendingOptionSelection.selectionId,
-      stateRevision: pending.pendingOptionSelection.stateRevision,
+    const cancelled = applyBattleAction(pending, {
+      type: 'cancelPendingSelection', playerId: 'player-red',
+      selectionId: pending.pendingTargetSelection.selectionId,
+      stateRevision: pending.pendingTargetSelection.stateRevision,
     } as any) as any
-    expect(resolved.pendingOptionSelection).toBeUndefined()
-    expect(resolved.pieces.find((piece: any) => piece.instanceId === 'ally')).toMatchObject({ x: option.value.x, y: option.value.y })
+    expect(cancelled.pendingTargetSelection).toBeUndefined()
+    expect(cancelled.players[0]).toMatchObject({ actionPoints: 1, hand: [], discardPile: ['holy-heal'] })
+    expect(cancelled.pieces.find((piece: any) => piece.instanceId === 'ally')).toMatchObject({ x: 1, y: 1 })
+    expect((cancelled.extensions as any).turalyonLightforgedTurns).toMatchObject({ turalyon: 1 })
+
+    const destinationPending = applyBattleAction(pending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: 'ally',
+      selectionId: pending.pendingTargetSelection.selectionId,
+      stateRevision: pending.pendingTargetSelection.stateRevision,
+    } as any) as any
+    expect(destinationPending.pendingTargetSelection).toMatchObject({
+      targetType: 'grid', candidates: expect.arrayContaining([{ type: 'cell', x: 2, y: 1 }]),
+    })
+    expect(destinationPending.players[0].actionPoints).toBe(3)
+    expect(destinationPending.players[0].hand).toHaveLength(1)
+
+    const resolved = applyBattleAction(destinationPending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetX: 2, targetY: 1,
+      selectionId: destinationPending.pendingTargetSelection.selectionId,
+      stateRevision: destinationPending.pendingTargetSelection.stateRevision,
+    } as any) as any
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === 'ally')).toMatchObject({ x: 2, y: 1 })
     expect(resolved.players[0].actionPoints).toBe(1)
     expect(resolved.players[0].discardPile).toEqual(['holy-heal'])
     expect(resolved.actions.filter((action: any) => action.type === 'playCard')).toHaveLength(1)
@@ -599,7 +646,7 @@ describe('Turalyon holy-hand mobility', () => {
     const pending = applyBattleAction(state, {
       type: 'playCard', playerId: 'player-red', cardInstanceId: 'turalyon-rollback-heal',
     } as any) as any
-    expect(pending.pendingOptionSelection?.source).toMatchObject({
+    expect(pending.pendingTargetSelection?.source).toMatchObject({
       type: 'rule', id: marchRule.id, pieceId: turalyon.instanceId,
     })
     expect(pending.players[0]).toMatchObject({ actionPoints: 2 })
@@ -610,15 +657,17 @@ describe('Turalyon holy-hand mobility', () => {
     expect((pending.extensions as any).laterAfterCardConsumerTouched).toBeUndefined()
     expect(pending.actions.filter((action: any) => action.type === 'playCard')).toHaveLength(0)
     const pendingHash = hashStable(pending)
-    const move = pending.pendingOptionSelection.options.find((option: any) => (
-      option.value?.pieceId === ally.instanceId && option.value?.x === 2 && option.value?.y === 1
-    ))
-    expect(move).toBeDefined()
+    const destinationPending = applyBattleAction(pending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: ally.instanceId,
+      selectionId: pending.pendingTargetSelection.selectionId,
+      stateRevision: pending.pendingTargetSelection.stateRevision,
+    } as any) as any
+    expect(destinationPending.pendingTargetSelection.candidates).toContainEqual({ type: 'cell', x: 2, y: 1 })
 
-    expect(() => applyBattleAction(pending, {
-      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: move.value,
-      selectionId: pending.pendingOptionSelection.selectionId,
-      stateRevision: pending.pendingOptionSelection.stateRevision,
+    expect(() => applyBattleAction(destinationPending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetX: 2, targetY: 1,
+      selectionId: destinationPending.pendingTargetSelection.selectionId,
+      stateRevision: destinationPending.pendingTargetSelection.stateRevision,
     } as any)).toThrow(/turalyon afterCardPlay resume explosion/)
     expect(hashStable(pending)).toBe(pendingHash)
     expect(pending.players[0]).toMatchObject({ actionPoints: 2 })
@@ -651,14 +700,18 @@ describe('Turalyon holy-hand mobility', () => {
       const pending = applyBattleAction(state, {
         type: 'playCard', playerId: 'player-red', cardInstanceId: 'turalyon-deterministic-heal',
       } as any) as any
-      const move = pending.pendingOptionSelection.options.find((option: any) => (
-        option.value?.pieceId === ally.instanceId && option.value?.x === 2 && option.value?.y === 1
-      ))
-      if (!move) throw new Error('Expected deterministic holy march move')
-      return applyBattleAction(pending, {
-        type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: move.value,
-        selectionId: pending.pendingOptionSelection.selectionId,
-        stateRevision: pending.pendingOptionSelection.stateRevision,
+      const destinationPending = applyBattleAction(pending, {
+        type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: ally.instanceId,
+        selectionId: pending.pendingTargetSelection.selectionId,
+        stateRevision: pending.pendingTargetSelection.stateRevision,
+      } as any) as any
+      if (!destinationPending.pendingTargetSelection.candidates.some((target: any) => target.type === 'cell' && target.x === 2 && target.y === 1)) {
+        throw new Error('Expected deterministic holy march destination')
+      }
+      return applyBattleAction(destinationPending, {
+        type: 'pendingTargetSelect', playerId: 'player-red', targetX: 2, targetY: 1,
+        selectionId: destinationPending.pendingTargetSelection.selectionId,
+        stateRevision: destinationPending.pendingTargetSelection.stateRevision,
       } as any) as any
     }
 
@@ -693,22 +746,27 @@ describe('Turalyon holy-hand mobility', () => {
     }))
 
     const firstPending = applyBattleAction(state, { type: 'playCard', playerId: 'player-red', cardInstanceId: 'march-card-1' } as any) as any
-    const options = firstPending.pendingOptionSelection.options.map((option: any) => option.value)
-    expect(options).toContainEqual({ pieceId: 'ally-lane-mover', x: 2, y: 1 })
-    expect(options).not.toContainEqual({ pieceId: 'ally-lane-mover', x: 4, y: 1 })
-    expect(options).toContainEqual({ pieceId: 'terrain-lane-mover', x: 2, y: 3 })
-    expect(options).not.toContainEqual({ pieceId: 'terrain-lane-mover', x: 4, y: 3 })
-
-    const firstSession = firstPending.pendingOptionSelection
-    const firstResolved = applyBattleAction(firstPending, {
-      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'skip',
-      selectionId: firstSession.selectionId, stateRevision: firstSession.stateRevision,
+    expect(firstPending.pendingTargetSelection.candidates).toEqual(expect.arrayContaining([
+      { type: 'piece', pieceId: 'ally-lane-mover' },
+      { type: 'piece', pieceId: 'terrain-lane-mover' },
+    ]))
+    const laneDestinationPending = applyBattleAction(firstPending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: 'ally-lane-mover',
+      selectionId: firstPending.pendingTargetSelection.selectionId,
+      stateRevision: firstPending.pendingTargetSelection.stateRevision,
+    } as any) as any
+    expect(laneDestinationPending.pendingTargetSelection.candidates).toContainEqual({ type: 'cell', x: 2, y: 1 })
+    expect(laneDestinationPending.pendingTargetSelection.candidates).not.toContainEqual({ type: 'cell', x: 4, y: 1 })
+    const firstResolved = applyBattleAction(laneDestinationPending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetX: 2, targetY: 1,
+      selectionId: laneDestinationPending.pendingTargetSelection.selectionId,
+      stateRevision: laneDestinationPending.pendingTargetSelection.stateRevision,
     } as any) as any
     expect(firstResolved.players[0].actionPoints).toBe(2)
     const secondResolved = applyBattleAction(firstResolved, {
       type: 'playCard', playerId: 'player-red', cardInstanceId: 'march-card-2',
     } as any) as any
-    expect(secondResolved.pendingOptionSelection).toBeUndefined()
+    expect(secondResolved.pendingTargetSelection).toBeUndefined()
     expect(secondResolved.players[0].actionPoints).toBe(0)
     expect(secondResolved.players[0].hand).toHaveLength(0)
   })
@@ -720,6 +778,7 @@ describe('Turalyon holy-hand mobility', () => {
     turalyon.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
     ally.isCore = true
+    ally.statusTags = [{ id: 'existing-grand-crusade-shield', type: 'divine-shield' }]
     const nonCore = makePiece({ instanceId: 'non-core', ownerPlayerId: 'player-red', x: 2, y: 0 }) as any
     nonCore.isCore = false
     const state = makeState({ pieces: [turalyon, ally, nonCore], width: 8, height: 8, turnNumber: 1 }) as any
@@ -730,7 +789,9 @@ describe('Turalyon holy-hand mobility', () => {
     const use = (input: any) => {
       const pending = applyBattleAction(input, { type: 'useChargeSkill', playerId: 'player-red', pieceId: 'turalyon', skillId: definition.id } as any) as any
       expect(pending.players[0]).toMatchObject({ actionPoints: 4, chargePoints: 1 })
-      const choice = pending.pendingOptionSelection.options.find((item: any) => item.value?.pieceIds?.includes('turalyon'))
+      const choice = pending.pendingOptionSelection.options.find((item: any) => (
+        item.value?.pieceIds?.includes('turalyon') && item.value?.pieceIds?.includes('ally')
+      ))
       expect(choice).toBeDefined()
       expect(pending.pendingOptionSelection.options.some((item: any) => item.value?.pieceIds?.includes('non-core'))).toBe(false)
       return applyBattleAction(pending, {
@@ -745,6 +806,7 @@ describe('Turalyon holy-hand mobility', () => {
     expect(first.pieces.find((piece: any) => piece.instanceId === 'turalyon').skills[0]).toMatchObject({ currentCooldown: 3, usesRemaining: -1 })
     expect(first.pieces.find((piece: any) => piece.instanceId === 'turalyon').statusTags.some((tag: any) => tag.type === 'divine-shield')).toBe(true)
     expect(first.pieces.find((piece: any) => piece.instanceId === 'ally').statusTags.some((tag: any) => tag.type === 'divine-shield')).toBe(true)
+    expect(first.pieces.find((piece: any) => piece.instanceId === 'ally').statusTags.filter((tag: any) => tag.type === 'divine-shield')).toHaveLength(1)
     expect(first.pieces.find((piece: any) => piece.instanceId === 'non-core').statusTags.some((tag: any) => tag.type === 'divine-shield')).toBe(false)
 
     first.turn.turnNumber = 2

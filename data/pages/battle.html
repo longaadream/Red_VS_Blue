@@ -439,6 +439,14 @@
     .card-item.card-choice-selected { border-color: #86efac; transform: translateY(-14px) scale(1.06); box-shadow: 0 0 0 3px rgba(34,197,94,.35), 0 16px 30px rgba(0,0,0,.78); }
     .card-item.card-choice-disabled { opacity: .3; cursor: not-allowed; filter: saturate(.55); }
     .card-item.card-choice-disabled:hover { transform: none; box-shadow: 0 4px 12px rgba(0,0,0,.6); }
+    .card-item.card-prophecy-enhanced { border-color: #fde68a; box-shadow: 0 0 0 2px rgba(250,204,21,.26), 0 0 20px rgba(251,191,36,.45), 0 4px 12px rgba(0,0,0,.6); }
+    .card-prophecy-badge {
+      position: absolute; top: 5px; right: 5px; z-index: 2;
+      border: 1px solid rgba(254,240,138,.9); border-radius: 999px;
+      padding: 2px 5px; background: rgba(120,53,15,.9); color: #fef9c3;
+      font-size: 8px; font-weight: 900; letter-spacing: .04em;
+      box-shadow: 0 0 10px rgba(250,204,21,.55);
+    }
 
     /* Mana gem */
     .card-mana-gem {
@@ -1627,13 +1635,13 @@
       </div>
 
       <!-- The cards themselves are the hand; no panel, header, or visual section. -->
-      <div id="handMultiSelectControls" role="group" aria-label="手牌多选" hidden
+      <div id="handMultiSelectControls" role="group" aria-label="手牌选择" hidden
         style="position:fixed;left:50%;bottom:calc(var(--battle-hand-height,138px) + 10px);z-index:126;transform:translateX(-50%);align-items:center;gap:8px;padding:7px 9px;border:1px solid rgba(74,222,128,.5);border-radius:999px;background:rgba(5,18,14,.94);color:#dcfce7">
         <span id="handMultiSelectCount" aria-live="polite" style="min-width:92px;font-size:12px;font-weight:850;text-align:center">已选择 0 / 4</span>
         <button type="button" id="handMultiSelectCancel" onclick="cancelPendingHandOptionSelection()"
           style="border:1px solid #64748b;border-radius:999px;padding:6px 11px;background:#1e293b;color:#cbd5e1">取消</button>
         <button type="button" id="handMultiSelectConfirm" onclick="confirmPendingHandOptionSelection()" disabled
-          style="border:1px solid #86efac;border-radius:999px;padding:6px 11px;background:#166534;color:#dcfce7">确认弃置</button>
+          style="border:1px solid #86efac;border-radius:999px;padding:6px 11px;background:#166534;color:#dcfce7">确认选择</button>
       </div>
       <div class="hand-scroll" id="handCards" data-battle-ui-region="hand" role="region" aria-label="手牌列表" tabindex="0"></div>
     </div>
@@ -1849,6 +1857,7 @@
           { firstPlayerId }
         )
         if (!state) throw new Error('Failed to create training battle state')
+        state.pieces.forEach(function(piece) { piece.isCore = true })
         state.skillsById = Object.assign({}, skillsById || {}, state.skillsById || {})
         state.players = state.players.map(function(player) {
           return Object.assign({}, player, {
@@ -2729,8 +2738,22 @@
     }
 
     // ── Card detail modal ──
+    function cardDisplayDescription(card, def) {
+      const baseDescription = def && def.description ? def.description : '暂无描述'
+      if (!card || card.holyProphecyEnhanced !== true) return baseDescription
+      if (card.cardId === 'holy-smite') return '预言强化：对敌方生命值最低的棋子造成7点真实伤害。'
+      if (card.cardId === 'holy-heal') return '预言强化：治疗己方生命值最低的棋子12点生命。'
+      if (card.cardId === 'holy-charge') return '预言强化：使己方所有棋子下次造成的伤害提高3点。'
+      return baseDescription
+    }
+
     function showCardDetail(cardInstanceId, cardId, preserveKeyword) {
       const def = cardsById[cardId] || (G && G.customCards && G.customCards[cardId]) || {}
+      const cardInstance = G && Array.isArray(G.players)
+        ? G.players.reduce(function(found, player) {
+            return found || ((player.hand || []).find(function(card) { return card.instanceId === cardInstanceId; }))
+          }, null)
+        : null
       const cost = def.actionPointCost || 0
       currentCardDetail = { cardInstanceId, cardId }
       currentCardKeywords = normalizeKeywordList(def.keywords)
@@ -2744,7 +2767,7 @@
       document.getElementById('cdType').textContent = typeLabel
       document.getElementById('cdCost').innerHTML =
         `<div style="text-align:center;margin-bottom:8px"><span class="cd-cost ${cost===0?'free':''}">${cost===0?'费用: 免费':'费用: '+cost+' AP'}</span></div>`
-      document.getElementById('cdDesc').textContent = def.description || '暂无描述'
+      document.getElementById('cdDesc').textContent = cardDisplayDescription(cardInstance, def)
 
       const isPassiveCard = def.type === 'passive'
       const meta = []
@@ -2796,9 +2819,10 @@
     // Stored option values avoid inline JSON breaking HTML attributes.
     let _pickerOptions = []
 
-    function isPendingHandMultiSelect(pending) {
+    function isPendingHandSelection(pending) {
       return !!(pending && pendingOptionSelectionForMe()
-        && pending.selectionMode === 'multi' && pending.presentation === 'hand')
+        && pending.presentation === 'hand'
+        && (pending.selectionMode === 'single' || pending.selectionMode === 'multi'))
     }
 
     function pendingHandCandidateValues(pending) {
@@ -2807,8 +2831,8 @@
       })
     }
 
-    function syncPendingHandMultiSelect(pending) {
-      if (!isPendingHandMultiSelect(pending)) {
+    function syncPendingHandSelection(pending) {
+      if (!isPendingHandSelection(pending)) {
         pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
         return
       }
@@ -2826,13 +2850,14 @@
       const controls = document.getElementById('handMultiSelectControls')
       if (!controls) return
       const pending = G && G.pendingOptionSelection
-      const active = isPendingHandMultiSelect(pending)
+      const active = isPendingHandSelection(pending)
       controls.hidden = !active
       if (controls.style) controls.style.display = active ? 'flex' : 'none'
       if (!active) return
-      syncPendingHandMultiSelect(pending)
-      const minSelections = Number.isSafeInteger(pending.minSelections) ? Math.max(0, pending.minSelections) : 1
-      const maxSelections = Number.isSafeInteger(pending.maxSelections) ? Math.max(minSelections, pending.maxSelections) : pendingHandCandidateValues(pending).length
+      syncPendingHandSelection(pending)
+      const isSingle = pending.selectionMode === 'single'
+      const minSelections = isSingle ? 1 : (Number.isSafeInteger(pending.minSelections) ? Math.max(0, pending.minSelections) : 1)
+      const maxSelections = isSingle ? 1 : (Number.isSafeInteger(pending.maxSelections) ? Math.max(minSelections, pending.maxSelections) : pendingHandCandidateValues(pending).length)
       const count = pendingHandOptionSelection.selectedValues.length
       const inFlight = pendingHandOptionSelection.submitting || (typeof pendingActionFeedback !== 'undefined' && !!pendingActionFeedback)
       const countLabel = document.getElementById('handMultiSelectCount')
@@ -2841,7 +2866,7 @@
       if (countLabel) countLabel.textContent = '已选择 ' + count + ' / ' + maxSelections
       if (confirmButton) {
         confirmButton.disabled = inFlight || count < minSelections || count > maxSelections
-        confirmButton.textContent = inFlight ? '提交中…' : '确认弃置 ' + count + ' 张'
+        confirmButton.textContent = inFlight ? '提交中…' : '确认选择 ' + count + ' 张'
       }
       if (cancelButton) {
         cancelButton.hidden = pending.canCancel === false
@@ -2851,15 +2876,16 @@
 
     function togglePendingHandOption(cardInstanceId) {
       const pending = G && G.pendingOptionSelection
-      if (!isPendingHandMultiSelect(pending)) return
-      syncPendingHandMultiSelect(pending)
+      if (!isPendingHandSelection(pending)) return
+      syncPendingHandSelection(pending)
       const candidates = pendingHandCandidateValues(pending)
       if (!candidates.some(function(value) { return value === cardInstanceId })) {
-        setStatusMsg('这张手牌不在当前可弃置候选中')
+        setStatusMsg('这张手牌不在当前可选候选中')
         return
       }
       const selectedIndex = pendingHandOptionSelection.selectedValues.indexOf(cardInstanceId)
       if (selectedIndex !== -1) pendingHandOptionSelection.selectedValues.splice(selectedIndex, 1)
+      else if (pending.selectionMode === 'single') pendingHandOptionSelection.selectedValues = [cardInstanceId]
       else {
         const maxSelections = Number.isSafeInteger(pending.maxSelections) ? pending.maxSelections : candidates.length
         if (pendingHandOptionSelection.selectedValues.length >= maxSelections) {
@@ -2875,10 +2901,11 @@
 
     async function confirmPendingHandOptionSelection() {
       const pending = G && G.pendingOptionSelection
-      if (!isPendingHandMultiSelect(pending) || pendingHandOptionSelection.submitting) return
-      syncPendingHandMultiSelect(pending)
-      const minSelections = Number.isSafeInteger(pending.minSelections) ? Math.max(0, pending.minSelections) : 1
-      const maxSelections = Number.isSafeInteger(pending.maxSelections) ? Math.max(minSelections, pending.maxSelections) : pendingHandCandidateValues(pending).length
+      if (!isPendingHandSelection(pending) || pendingHandOptionSelection.submitting) return
+      syncPendingHandSelection(pending)
+      const isSingle = pending.selectionMode === 'single'
+      const minSelections = isSingle ? 1 : (Number.isSafeInteger(pending.minSelections) ? Math.max(0, pending.minSelections) : 1)
+      const maxSelections = isSingle ? 1 : (Number.isSafeInteger(pending.maxSelections) ? Math.max(minSelections, pending.maxSelections) : pendingHandCandidateValues(pending).length)
       const selectedValues = pendingHandOptionSelection.selectedValues.slice()
       if (selectedValues.length < minSelections || selectedValues.length > maxSelections) {
         setStatusMsg('请选择' + minSelections + '至' + maxSelections + '张手牌')
@@ -2892,14 +2919,14 @@
         await doAction({
           type: 'pendingOptionSelect',
           playerId: pending.playerId || myPlayerId,
-          selectedOption: selectedValues,
+          selectedOption: isSingle ? selectedValues[0] : selectedValues,
           selectionId: pending.selectionId,
           stateRevision: pending.stateRevision,
         })
       } finally {
         const current = G && G.pendingOptionSelection
         if (current && current.selectionId === pending.selectionId) pendingHandOptionSelection.submitting = false
-        else syncPendingHandMultiSelect(null)
+        else syncPendingHandSelection(null)
         renderHand()
         renderActionBar()
       }
@@ -2907,7 +2934,7 @@
 
     async function cancelPendingHandOptionSelection() {
       const pending = G && G.pendingOptionSelection
-      if (!isPendingHandMultiSelect(pending) || pending.canCancel === false || pendingHandOptionSelection.submitting) return
+      if (!isPendingHandSelection(pending) || pending.canCancel === false || pendingHandOptionSelection.submitting) return
       pendingHandOptionSelection.submitting = true
       renderPendingHandSelectionControls()
       try {
@@ -2920,7 +2947,7 @@
       } finally {
         const current = G && G.pendingOptionSelection
         if (current && current.selectionId === pending.selectionId) pendingHandOptionSelection.submitting = false
-        else syncPendingHandMultiSelect(null)
+        else syncPendingHandSelection(null)
         renderHand()
         renderActionBar()
       }
@@ -4439,9 +4466,9 @@
       const pbc = G.pendingOptionSelection
       if (pendingOptionSelectionForMe()) {
         const key = pbc.selectionId || (pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(','))
-        if (isPendingHandMultiSelect(pbc)) {
+        if (isPendingHandSelection(pbc)) {
           _pendingChoiceShown = key
-          syncPendingHandMultiSelect(pbc)
+          syncPendingHandSelection(pbc)
           if (pendingOptionAction && pendingOptionAction.type === 'pendingOptionSelect') {
             pendingOptionAction = null
             _pickerOptions = []
@@ -4449,7 +4476,7 @@
           const overlay = document.getElementById('optionPickerOverlay')
           if (overlay) overlay.classList.remove('show')
         } else if (_pendingChoiceShown !== key) {
-          syncPendingHandMultiSelect(null)
+          syncPendingHandSelection(null)
           _pendingChoiceShown = key
           showOptionPicker(pbc.title || '请选择', pbc.options || [], {
             type: 'pendingOptionSelect',
@@ -4461,7 +4488,7 @@
           })
         }
       } else {
-        syncPendingHandMultiSelect(null)
+        syncPendingHandSelection(null)
         _pendingChoiceShown = null
         if (pendingOptionAction && pendingOptionAction.type === 'pendingOptionSelect') {
           pendingOptionAction = null
@@ -4914,9 +4941,9 @@
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const ap = myMeta ? myMeta.actionPoints : 0
       const pendingHandSelection = G.pendingOptionSelection
-      const isHandMultiSelect = isPendingHandMultiSelect(pendingHandSelection)
-      if (isHandMultiSelect) syncPendingHandMultiSelect(pendingHandSelection)
-      const handChoiceCandidates = isHandMultiSelect ? pendingHandCandidateValues(pendingHandSelection) : []
+      const isHandSelection = isPendingHandSelection(pendingHandSelection)
+      if (isHandSelection) syncPendingHandSelection(pendingHandSelection)
+      const handChoiceCandidates = isHandSelection ? pendingHandCandidateValues(pendingHandSelection) : []
 
       let hudHand = document.getElementById('hudHandCount')
       if (!hudHand) {
@@ -4943,20 +4970,23 @@
 
       container.innerHTML = hand.map((card, index) => {
         const def = getCardDisplayDefinition(card.cardId)
+        const description = cardDisplayDescription(card, def)
+        const isProphecyEnhanced = card.holyProphecyEnhanced === true
         const cost = card.actionPointCost ?? def.actionPointCost ?? 0
         const canNormallyPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
-        const isHandChoiceCandidate = isHandMultiSelect && handChoiceCandidates.some(function(value) { return value === card.instanceId })
-        const isHandChoiceSelected = isHandMultiSelect && pendingHandOptionSelection.selectedValues.some(function(value) { return value === card.instanceId })
-        const canInteract = isHandMultiSelect ? isHandChoiceCandidate : canNormallyPlay
+        const isHandChoiceCandidate = isHandSelection && handChoiceCandidates.some(function(value) { return value === card.instanceId })
+        const isHandChoiceSelected = isHandSelection && pendingHandOptionSelection.selectedValues.some(function(value) { return value === card.instanceId })
+        const canInteract = isHandSelection ? isHandChoiceCandidate : canNormallyPlay
         const isPending = pendingCardAction && pendingCardAction.cardInstanceId === card.instanceId
         const isReactive = def.type === 'reactive'
         let cls = 'card-item'
         if (isHandChoiceSelected) cls += ' card-choice-selected'
         else if (isHandChoiceCandidate) cls += ' card-choice-selectable'
-        else if (isHandMultiSelect) cls += ' card-choice-disabled'
+        else if (isHandSelection) cls += ' card-choice-disabled'
         else if (isPending) cls += ' card-pending'
         else if (!canNormallyPlay) cls += ' card-disabled'
         if (isReactive) cls += ' card-reactive'
+        if (isProphecyEnhanced) cls += ' card-prophecy-enhanced'
 
         const gemCls = cost === 0 ? 'free' : ''
         const icon = escHtml(String(def.name || card.cardId || '牌').slice(0, 1))
@@ -4965,6 +4995,7 @@
         const artContent = artSrc
           ? `<img src="${artSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:8px 8px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:28px;width:100%;height:100%;align-items:center;justify-content:center">${icon}</span>`
           : `<span style="font-size:28px">${icon}</span>`
+        const prophecyBadge = isProphecyEnhanced ? '<span class="card-prophecy-badge">预言强化</span>' : ''
 
         const cdTurnsCard = def.cooldownTurns ?? def.cooldown ?? 0
         const cdHtml = cdTurnsCard > 0
@@ -4973,21 +5004,21 @@
         const cid = escHtml(card.instanceId)
         const cdid = escHtml(card.cardId)
         const cardName = def.name || card.cardId
-        const cardAriaLabel = isHandMultiSelect
-          ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择弃置' : '，可选择弃置') : '，不可弃置')
-          : cardName + '，行动点 ' + cost
+        const cardAriaLabel = isHandSelection
+          ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择' : '，可选择') : '，不可选择')
+          : cardName + (isProphecyEnhanced ? '，预言强化' : '') + '，行动点 ' + cost
         const arc = window.BattleContextLayout.handArc(index, hand.length)
         return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
-          aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandMultiSelect ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"
+          aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"
           onclick="onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
           oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
           <div class="card-mana-gem ${gemCls}">${cost}</div>
-          <div class="card-art">${artContent}</div>
+          <div class="card-art">${artContent}${prophecyBadge}</div>
           <div class="card-name-banner">${escHtml(def.name || card.cardId)}</div>
           <div class="card-body">
-            <div class="card-desc">${escHtml(def.description || '暂无描述')}</div>
+            <div class="card-desc">${escHtml(description)}</div>
             <div class="card-type-badge">${typeLabel}${cdHtml}</div>
           </div>
         </button>`
@@ -4997,7 +5028,7 @@
 
     function onCardClick(cardInstanceId, cardId) {
       if (!G) return
-      if (isPendingHandMultiSelect(G.pendingOptionSelection)) {
+      if (isPendingHandSelection(G.pendingOptionSelection)) {
         togglePendingHandOption(cardInstanceId)
         return
       }
@@ -5132,8 +5163,8 @@
         setMoveButtonClass(false)
         renderPieceContextMenu(_selPiece || null)
       } else if (pendingOptionSelectionForMe() || pendingTargetSelectionForMe()) {
-        if (isPendingHandMultiSelect(G.pendingOptionSelection)) {
-          syncPendingHandMultiSelect(G.pendingOptionSelection)
+        if (isPendingHandSelection(G.pendingOptionSelection)) {
+          syncPendingHandSelection(G.pendingOptionSelection)
           const count = pendingHandOptionSelection.selectedValues.length
           const maxSelections = Number.isSafeInteger(G.pendingOptionSelection.maxSelections) ? G.pendingOptionSelection.maxSelections : pendingHandCandidateValues(G.pendingOptionSelection).length
           setStatusMsg((G.pendingOptionSelection.title || '请选择手牌') + '（已选 ' + count + ' / ' + maxSelections + '）')
@@ -5487,7 +5518,7 @@
         setStatusMsg('上一条指令仍在等待权威确认')
         return
       }
-      if (isPendingHandMultiSelect(G.pendingOptionSelection)) {
+      if (isPendingHandSelection(G.pendingOptionSelection)) {
         await confirmPendingHandOptionSelection()
         return
       }

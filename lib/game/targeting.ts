@@ -172,6 +172,8 @@ export interface PendingTargetSelectionSession {
   max?: number
   selectedTargets?: TargetRef[]
   candidates?: TargetRef[]
+  fixedCandidates?: boolean
+  resumeOnCancel?: boolean
   canCancel?: boolean
   transaction?: SuspendableActionTransaction
   suspendedTurn?: SuspendableTurnCheckpoint
@@ -1065,7 +1067,9 @@ export function finalizePendingTargetSession(
     stateRevision: revision,
   }
   normalized.selectionId = pendingSelectionId(revision, normalized)
-  normalized.candidates = enumerateCandidates(state, pendingConstraint(normalized)).candidates
+  normalized.candidates = pending.fixedCandidates && Array.isArray(pending.candidates)
+    ? pending.candidates.map(candidate => ({ ...candidate }))
+    : enumerateCandidates(state, pendingConstraint(normalized)).candidates
   return normalized
 }
 
