@@ -212,9 +212,7 @@
     async function loadMapNames() {
       if (mapsLoadPromise) return mapsLoadPromise
       mapsLoadPromise = (async () => {
-        const res = await RvBUtils.serverFetch('/api/maps')
-        if (!res.ok) throw new Error('地图目录 HTTP ' + res.status)
-        const payload = await res.json()
+        const payload = await roomRequest('catalog.maps')
         const maps = Array.isArray(payload.maps) ? payload.maps : []
         for (const map of maps) {
           if (map && typeof map.id === 'string' && map.id) MAPS_CACHE[map.id] = map.name || map.id
@@ -283,7 +281,7 @@
             _lastRoom = msg.room
             await renderRoom(msg.room)
             if (msg.room.status === 'in-progress' || msg.room.status === 'playing' || msg.room.status === 'battle') navigateBattle()
-            else if (shouldUseRelayMode() && msg.room.status === 'selecting') navigatePieceSelection()
+            else if (msg.room.status === 'selecting') navigatePieceSelection()
             else if (msg.room.status === 'ready') {
               const me = (msg.room.players || []).find(p => p.id && p.id.toLowerCase() === playerId)
               if (me && me.ready) navigatePieceSelection()
@@ -302,20 +300,8 @@
       return RvBWs.request(method, data || {}, timeoutMs || 6000)
     }
 
-    async function roomJson(path, options) {
-      const response = await RvBUtils.serverFetch(path, options)
-      const payload = await response.json().catch(() => null)
-      if (!response.ok) throw new Error((payload && payload.error) || ('HTTP ' + response.status))
-      return payload
-    }
-
     async function roomRequest(method, data, timeoutMs) {
-      if (!shouldUseRelayMode()) return wsRequest(method, data, timeoutMs)
-      const input = data || {}
-      if (method === 'rooms.get') return roomJson('/api/rooms/' + encodeURIComponent(input.roomId))
-      if (method === 'rooms.action') return roomJson('/api/rooms/' + encodeURIComponent(input.roomId) + '/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
-      if (method === 'rooms.delete') return roomJson('/api/rooms/' + encodeURIComponent(input.roomId), { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'x-player-id': input.playerId }, body: JSON.stringify({ playerId: input.playerId }) })
-      throw new Error('Unsupported room request: ' + method)
+      return wsRequest(method, data, timeoutMs)
     }
 
     function renderSlot(slotLabel, p, myId, hostId, isMySlot) {
@@ -355,7 +341,7 @@
         const room = await roomRequest('rooms.get', { roomId })
         _lastRoom = room
         await renderRoom(room)
-        if (shouldUseRelayMode() && room.status === 'selecting') {
+        if (room.status === 'selecting') {
           navigatePieceSelection()
           return
         }
@@ -368,7 +354,7 @@
         // 双方都已选完棋子但还没开战，也跳 battle（兼容旧流程）
         const allSelected = (room.players || []).length >= 2 &&
           room.players.every(p => p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
-        if (!shouldUseRelayMode() && allSelected) {
+        if (allSelected) {
           navigateBattle()
           return
         }
@@ -419,7 +405,7 @@
         status.className = 'status-line warn'
         return
       }
-      if (shouldUseRelayMode()) {
+      if (room.status === 'selecting') {
         btn.disabled = true
         btn.textContent = room.status === 'selecting' ? '进入选人' : '等待对手'
         btn.className = 'btn-ready cancel-ready'
@@ -467,9 +453,9 @@
         await renderRoom(room)
       } catch (e) {
         alert('准备失败：' + e.message)
+        btn.disabled = false
       } finally {
         _busy = false
-        document.getElementById('readyBtn').disabled = false
       }
     }
 

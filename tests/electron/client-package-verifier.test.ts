@@ -52,7 +52,7 @@ afterEach(() => {
 })
 
 describe('Electron client package verifier', () => {
-  it('reports missing standalone Next.js and WebSocket runtime modules', () => {
+  it('reports every missing standalone and Electron runtime dependency', () => {
     const fixture = createFixture()
     const issues = findClientPackageIssues(
       fixture.packageRoot,
@@ -66,6 +66,18 @@ describe('Electron client package verifier', () => {
     )
     expect(issues).toContain(
       'missing required file: resources/app/standalone/node_modules/ws/package.json',
+    )
+    expect(issues).toContain(
+      'missing required file: resources/app/standalone/ws-same-port-server.cjs',
+    )
+    expect(issues).toContain(
+      'missing required file: resources/app/standalone/node_modules/@prisma/client/package.json',
+    )
+    expect(issues).toContain(
+      'missing required file: resources/app/standalone/node_modules/.prisma/client/index.js',
+    )
+    expect(issues).toContain(
+      'missing required file: resources/app/node_modules/adm-zip/package.json',
     )
   })
 })

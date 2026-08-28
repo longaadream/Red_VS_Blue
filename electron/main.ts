@@ -425,7 +425,11 @@ function startGameServer(): void {
       env: {
         ...process.env,
         PORT: '3000',
+        HOSTNAME: '0.0.0.0',
         NODE_ENV: 'production',
+        RVB_BATTLE_AUTHORITY_V2: '1',
+        RVB_BATTLE_ASYNC_JOURNAL: '1',
+        RVB_TURN_TIMER_ENABLED: '1',
         APP_ROOT_DIR: appRoot,
         USER_DATA_DIR: userData,
         DATABASE_URL: databaseUrl,

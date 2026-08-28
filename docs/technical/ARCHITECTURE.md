@@ -24,7 +24,7 @@
 | 层          | 当前入口                                                            | 当前职责                                  | 已知边界问题                         |
 | ---------- | --------------------------------------------------------------- | ------------------------------------- | ------------------------------ |
 | 表现层        | `data/pages/battle.html`、`data/pages/js/battle-ui/**`、`battle-renderer-3d.js` | 页面控制器、统一展示模型、DOM HUD、Three.js 战场和用户意图 | 页面仍包含网络与训练预演；联网终局只展示服务端结果 |
-| Next 服务层   | `app/`、`instrumentation.ts`                                     | HTTP API、状态页、训练/PVE/房间接口、启动 WebSocket | API 与 WS 共享规则，但错误协议不统一         |
+| Next 服务层   | `app/`、`instrumentation.ts`                                     | 静态/Admin HTTP、状态页、训练/PVE、玩家 WebSocket | 玩家大厅/房间/目录/战斗统一 WS；旧玩家 REST 返回 410 |
 | 游戏规则层      | `lib/game/`                                                     | 状态创建、动作执行、技能、触发器、地图和回放                | 类型重复、模块级缓存和全局触发器               |
 | 房间/持久化层    | `lib/game/room-store.ts`、`lib/game/battle-storage.ts`、`prisma/` | 房间状态序列化、SQLite 存取、旧格式兼容               | 外层存档无正式格式版本和迁移链                |
 | Electron 层 | `electron/`、`electron-client/`、`electron-editor/`               | 进程、窗口、本地服务器和 IPC                      | IPC 是字符串协议，没有共享类型              |
@@ -53,7 +53,7 @@
 6. `dispatchRoomBattleAction()` 用 `RoomStore.setRoomIfVersion()` CAS 保存房间，成功后才广播 `stateUpdate`；终局状态与房间 `finished` 在同一次写入中提交。
 7. 客户端 `applyServerState()` 替换本地状态并重新渲染。
 
-HTTP 后备入口为 `app/api/rooms/[roomId]/battle/route.ts::POST`，与 WS 共用同一动作归约与 CAS 提交服务。
+RED-127 起不再提供玩家 HTTP 后备入口。大厅、目录、房间、选将、战斗与恢复全部走同源 WebSocket；旧玩家 REST 在实际服务边界返回 410，静态资源和 `/api/admin/**` 继续使用 HTTP。决策见 [ADR-0020](../decisions/ADR-0020-unified-player-websocket-transport.md)。
 
 ### 3.3 Android 开服：当前遗留与迁移目标
 

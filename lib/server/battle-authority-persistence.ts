@@ -19,6 +19,7 @@ import {
   hashBattleAuthorityAction,
   hashBattleAuthorityTransition,
   isBattleAuthorityAsyncJournalEnabled,
+  isBattleAuthorityV2Enabled,
   replayBattleAuthorityTransitions,
   roomBattleAuthorityVersion,
   type BattleAuthorityCheckpointRecord,
@@ -572,6 +573,8 @@ export async function initializeBattleAuthorityCheckpoint(input: {
 }
 
 export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
+  if (!isBattleAuthorityV2Enabled()) return room
+
   const version = roomBattleAuthorityVersion(room)
   const roomId = normalizeRoomId(room.id)
   const cached = authorityRoomCache.get(roomId)

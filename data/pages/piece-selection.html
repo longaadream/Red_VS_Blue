@@ -358,34 +358,11 @@
     playerAlignment = params.get('alignment') || playerAlignment
     let wsReady = false
     let latestRoom = null
-    let battleAuthorityNoticeShown = false
     let pieceLoadError = ''
 
     const LOCAL_PIECE_LOAD_TIMEOUT_MS = 2000
     const SERVER_PIECE_LOAD_TIMEOUT_MS = 2500
 
-    function roomHasCompleteRosters(room) {
-      return !!room
-        && Array.isArray(room.players)
-        && room.players.length === 2
-        && room.players.every(player => Array.isArray(player.pieces) && player.pieces.length === 8)
-    }
-
-    function showBattleAuthorityUnavailable(room) {
-      if (room) latestRoom = room
-      if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-      const overlay = document.getElementById('waitOverlay')
-      if (overlay) overlay.classList.remove('show')
-      const btn = document.getElementById('confirmBtn')
-      if (btn) {
-        btn.disabled = true
-        btn.textContent = '阵容已保存'
-      }
-      if (!battleAuthorityNoticeShown) {
-        battleAuthorityNoticeShown = true
-        alert('阵容已保存；远程 Relay 暂不提供战斗权威。')
-      }
-    }
 
     // Skill cache
     const SKILL_CACHE = {}
@@ -394,7 +371,7 @@
       if (typeof RvBWs === 'undefined' || !roomId || !playerId) return
       RvBWs.on('connect', function() {
         wsReady = true
-        if (!shouldUseRelayMode()) RvBWs.send({ type: 'roomState' })
+        RvBWs.send({ type: 'roomState' })
       })
       RvBWs.on('disconnect', function() { wsReady = false })
       RvBWs.on('message', function(msg) {
@@ -407,9 +384,7 @@
             if (me.alignment && me.alignment !== playerAlignment) { playerAlignment = me.alignment; changed = true }
             if (changed) { updateFactionBadge(); loadPieces() }
           }
-          if (shouldUseRelayMode() && roomHasCompleteRosters(msg.room)) {
-            showBattleAuthorityUnavailable(msg.room)
-          } else if (roomLooksBattleReady(msg.room)) {
+          if (roomLooksBattleReady(msg.room)) {
             navigateBattle()
           }
         } else if (msg.type === 'roomActionResult') {
@@ -554,21 +529,11 @@
     }
 
     async function loadServerPieceTemplates() {
-      if (!window.RvBUtils || !RvBUtils.serverFetch) {
+      if (!window.RvBWs || !RvBWs.request) {
         throw new Error('当前页面没有可用的服务器连接')
       }
-      const response = await RvBUtils.serverFetch('/api/pieces', {
-        timeoutMs: SERVER_PIECE_LOAD_TIMEOUT_MS
-      })
-      let data = null
-      try {
-        data = await response.json()
-      } catch (error) {
-        throw new Error('响应不是有效 JSON: ' + errorReason(error))
-      }
-      if (!response.ok) {
-        throw new Error((data && data.error) || ('HTTP ' + response.status))
-      }
+      await waitForSelectionWs(SERVER_PIECE_LOAD_TIMEOUT_MS)
+      const data = await RvBWs.request('catalog.pieces', {}, SERVER_PIECE_LOAD_TIMEOUT_MS)
       if (!data || !Array.isArray(data.pieces) || data.pieces.length === 0) {
         throw new Error('响应缺少非空 pieces 数组')
       }
@@ -612,26 +577,8 @@
 
     async function sendRoomAction(payload) {
       const body = Object.assign({ roomId }, payload)
-      if (!shouldUseRelayMode() && typeof RvBWs !== 'undefined' && RvBWs.request) {
-        try {
-          await waitForSelectionWs(2500)
-          return await RvBWs.request('rooms.action', body, 7000)
-        } catch (e) {
-          console.warn('[piece-selection] WS room action failed; falling back to HTTP:', e)
-        }
-      }
-      if (!window.RvBUtils || !RvBUtils.serverFetch) {
-        throw new Error('No room action transport available')
-      }
-      const res = await RvBUtils.serverFetch('/api/rooms/' + encodeURIComponent(roomId) + '/actions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      let data = null
-      try { data = await res.json() } catch {}
-      if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status))
-      return data
+      await waitForSelectionWs(5000)
+      return RvBWs.request('rooms.action', body, 7000)
     }
 
     // Fetch player's faction from room data, then load matching pieces
@@ -707,11 +654,11 @@
             loaded = await withTimeout(
               loadServerPieceTemplates(),
               SERVER_PIECE_LOAD_TIMEOUT_MS,
-              '服务器 /api/pieces'
+              '服务器 WS catalog.pieces'
             )
           } catch (serverError) {
             pieceLoadError = '棋子资源加载失败。本地资源：' + errorReason(localError)
-              + '；服务器 /api/pieces：' + errorReason(serverError)
+              + '；服务器 WS catalog.pieces：' + errorReason(serverError)
             console.error('[piece-selection] piece resources unavailable:', {
               local: errorReason(localError),
               server: errorReason(serverError)
@@ -979,10 +926,6 @@
           alignment: playerAlignment,
           pieces: selected.map(p => ({ templateId: p.id, faction: p.faction || 'neutral' }))
         })
-        if (result && result.battleAuthorityUnavailable) {
-          showBattleAuthorityUnavailable(result.room)
-          return
-        }
         if (result && result.room) {
           latestRoom = result.room
           if (roomLooksBattleReady(result.room)) {
@@ -1008,15 +951,12 @@
     }
 
     async function pollRoomStatus() {
-      if (!roomId || !window.RvBUtils || !RvBUtils.serverFetch) return
+      if (!roomId) return
       try {
-        const res = await RvBUtils.serverFetch('/api/rooms/' + encodeURIComponent(roomId))
-        if (!res.ok) return
-        const room = await res.json()
+        await waitForSelectionWs(2500)
+        const room = await RvBWs.request('rooms.get', { roomId }, 5000)
         latestRoom = room
-        if (shouldUseRelayMode() && roomHasCompleteRosters(room)) {
-          showBattleAuthorityUnavailable(room)
-        } else if (roomLooksBattleReady(room)) navigateBattle()
+        if (roomLooksBattleReady(room)) navigateBattle()
       } catch {}
     }
 

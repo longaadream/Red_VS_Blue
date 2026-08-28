@@ -91,6 +91,7 @@
 - 如果方向发生变化，应创建新的 ADR，并将旧 ADR 标记为“已取代”。
 - 相关模块文档应链接到对应 ADR。
 - Linear 高风险任务应引用相关决策记录。
+- [`ADR-0020-unified-player-websocket-transport.md`](./ADR-0020-unified-player-websocket-transport.md)：Windows 玩家业务统一使用 WebSocket，旧玩家 REST 运行时返回 410（RED-127，已接受）。
 - 无法确定的事项应保持“提议中”，不得描述为已经确认。
 
 ## 当前已确定的基础决策

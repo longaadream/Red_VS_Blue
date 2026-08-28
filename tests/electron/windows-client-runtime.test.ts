@@ -143,4 +143,25 @@ describe('Windows Electron client runtime', () => {
     expect(page).toContain("showIdentityError(e, '初始化账号')")
     expect(page).toContain("showIdentityError(e, '保存名称')")
   })
+  test('starts the packaged host on every interface with candidate authority features enabled', () => {
+    const clientMain = read('electron-client/main.ts')
+    const serverMain = read('electron/main.ts')
+
+    for (const source of [clientMain, serverMain]) {
+      expect(source).toContain("HOSTNAME: '0.0.0.0'")
+      expect(source).toContain("RVB_BATTLE_AUTHORITY_V2: '1'")
+      expect(source).toContain("RVB_BATTLE_ASYNC_JOURNAL: '1'")
+      expect(source).toContain("RVB_TURN_TIMER_ENABLED: '1'")
+    }
+    expect(clientMain).not.toContain("HOSTNAME: '127.0.0.1'")
+  })
+
+  test('classifies Radmin 26/8 addresses as LAN without HTTPS upgrade', () => {
+    const utilities = read('data/pages/js/server-utils.js')
+    const websocket = read('data/pages/js/ws-client.js')
+
+    expect(utilities).toMatch(/26\\\./)
+    expect(websocket).toMatch(/26\\\./)
+  })
+
 })

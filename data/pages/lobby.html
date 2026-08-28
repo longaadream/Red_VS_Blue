@@ -419,31 +419,8 @@
       return RvBWs.request(method, data || {}, timeoutMs || 6000)
     }
 
-    async function relayJson(path, options) {
-      const response = await RvBUtils.serverFetch(path, options)
-      const payload = await response.json().catch(() => null)
-      if (!response.ok) {
-        const error = new Error((payload && payload.error) || ('HTTP ' + response.status))
-        if (payload && payload.code) error.code = payload.code
-        throw error
-      }
-      return payload
-    }
-
     async function lobbyRequest(method, data, timeoutMs) {
-      if (!shouldUseRelayMode()) return wsRequest(method, data, timeoutMs)
-      const input = data || {}
-      if (method === 'rooms.list') return relayJson('/api/lobby')
-      if (method === 'rooms.create') return relayJson('/api/lobby', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
-      if (method === 'rooms.get') return relayJson('/api/rooms/' + encodeURIComponent(input.roomId))
-      if (method === 'rooms.action') return relayJson('/api/rooms/' + encodeURIComponent(input.roomId) + '/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
-      if (method === 'rooms.spectate') return relayJson('/api/rooms/' + encodeURIComponent(input.roomId) + '/spectate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
-      if (method === 'rooms.delete') return relayJson('/api/rooms/' + encodeURIComponent(input.roomId), {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', 'x-player-id': input.playerId },
-        body: JSON.stringify({ playerId: input.playerId }),
-      })
-      throw new Error('Unsupported lobby request: ' + method)
+      return wsRequest(method, data, timeoutMs)
     }
 
     function updateFloatBar() {
@@ -670,9 +647,7 @@
       sel.innerHTML = '<option value="">正在加载地图…</option>'
       mapsLoadPromise = (async () => {
         try {
-          const res = await RvBUtils.serverFetch('/api/maps')
-          if (!res.ok) throw new Error('地图目录 HTTP ' + res.status)
-          const payload = await res.json()
+          const payload = await lobbyRequest('catalog.maps')
           const maps = Array.isArray(payload.maps) ? payload.maps : []
           if (!maps.length) throw new Error('服务器未返回可选地图')
 
@@ -724,7 +699,7 @@
         if (!mapId) throw new Error('请选择地图')
         await reconcileLobbyServerMode()
         const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, hostName: playerName, publicKey, mapId, visibility })
-        if (room.id) { closeCreateSheet(); showFactionPicker(room.id, shouldUseRelayMode() ? 'claim-faction' : 'join') }
+        if (room.id) { closeCreateSheet(); showFactionPicker(room.id, 'join') }
         else throw new Error('未返回房间 ID')
       } catch (e) {
         const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || '未设置'

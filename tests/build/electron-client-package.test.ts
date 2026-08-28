@@ -19,6 +19,12 @@ function createFixture() {
     'resources/app/electron-client/dist/main.js',
     'resources/app/standalone/server.js',
     'resources/app/init-db.js',
+    'resources/app/standalone/node_modules/next/package.json',
+    'resources/app/standalone/node_modules/ws/package.json',
+    'resources/app/standalone/ws-same-port-server.cjs',
+    'resources/app/standalone/node_modules/@prisma/client/package.json',
+    'resources/app/standalone/node_modules/.prisma/client/index.js',
+    'resources/app/node_modules/adm-zip/package.json',
     'resources/node.exe',
   ]
   const requiredDirectories = [

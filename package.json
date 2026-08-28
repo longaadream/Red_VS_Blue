@@ -13,7 +13,7 @@
     "lint:prune": "eslint . --max-warnings 0 --prune-suppressions",
     "build:electron": "npm run build:electron:client",
     "build:electron:server": "npm run build && node scripts/stage-client-resources.js && npx tsc -p electron/tsconfig.json && electron-builder --config electron-builder.server.json && node scripts/verify-electron-server-package.js && node scripts/cleanup-client-resources.js",
-    "build:electron:client": "npm run build && npm run sync:pages && node scripts/stage-client-resources.js && npx tsc -p electron-client/tsconfig.json && electron-builder --config electron-builder.client.json && node scripts/verify-electron-client-package.js && node scripts/cleanup-client-resources.js",
+    "build:electron:client": "npm run build && node scripts/stage-client-resources.js && npx tsc -p electron-client/tsconfig.json && electron-builder --config electron-builder.client.json && node scripts/verify-electron-client-package.js && node scripts/cleanup-client-resources.js",
     "preflight:electron:server": "node scripts/check-worktree-environment.mjs electron-server",
     "preflight:electron:client": "node scripts/check-worktree-environment.mjs electron-client",
     "preflight:electron:editor": "node scripts/check-worktree-environment.mjs electron-editor",
