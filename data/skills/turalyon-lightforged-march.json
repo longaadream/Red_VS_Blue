@@ -1,0 +1,21 @@
+{
+  "id": "turalyon-lightforged-march",
+  "name": "\u5723\u94f8\u8fdb\u519b",
+  "description": "\u6bcf\u4e2a\u5df1\u65b9\u56de\u5408\u9996\u6b21\u6210\u529f\u4f7f\u7528\u666e\u901a\u5723\u5149\u624b\u724c\u540e\uff0c\u9009\u62e91\u4e2a\u53cb\u65b9\u514d\u8d39\u8fdb\u884c\u4e00\u6b21\u8fdc\u5f81\u79fb\u52a8\uff0c\u8303\u56f4\u4e3a\u5176\u79fb\u52a8\u503c+2\u3002\u53ef\u7ecf\u8fc7\u53cb\u65b9\uff0c\u4e0d\u53ef\u7ecf\u8fc7\u654c\u65b9\u6216\u4e0d\u53ef\u884c\u8d70\u683c\u3002",
+  "keywords": [
+    "\u5723\u5149\u624b\u724c",
+    "\u79fb\u52a8"
+  ],
+  "targetText": "\u81ea\u52a8\u89e6\u53d1",
+  "effectTags": [
+    "\u79fb\u52a8"
+  ],
+  "icon": "\u2694\ufe0f",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { return { success: true }; }"
+}

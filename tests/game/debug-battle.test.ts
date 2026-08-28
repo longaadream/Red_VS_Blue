@@ -136,7 +136,12 @@ describe('debug battle pipeline', () => {
     state = runBattleAction(state, { type: 'endTurn', playerId: 'debug-red' } as any).state
     state = runBattleAction(state, { type: 'beginPhase' }).state
 
-    expect(state.turn.currentPlayerId).toBe('debug-blue')
+    expect(state.turn).toMatchObject({ currentPlayerId: 'debug-red', phase: 'end' })
+    expect(state.pendingOptionSelection?.suspendedTurn).toMatchObject({
+      currentPlayerId: 'debug-blue',
+      turnNumber: 2,
+      phase: 'start',
+    })
     expect(state.pendingOptionSelection?.playerId).toBe('debug-blue')
     expect(state.pendingOptionSelection?.options.map((option: any) => option.id)).toEqual(['calm', 'rage'])
   })

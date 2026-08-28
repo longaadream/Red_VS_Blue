@@ -62,6 +62,10 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
     },
   }
   const hudHandCount = { textContent: '' }
+  const handMultiSelectControls = { hidden: true }
+  const handMultiSelectCount = { textContent: '' }
+  const handMultiSelectConfirm = { disabled: true, textContent: '' }
+  const handMultiSelectCancel = { disabled: false, hidden: false }
   const submittedActions: unknown[] = []
   const errors: unknown[][] = []
   const fetchServerJson = vi.fn(async () => {
@@ -86,6 +90,7 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
     cardDisplayMetadataLoggedErrors: new Set(),
     battlePageDisposed: false,
     pendingCardAction: null,
+    pendingHandOptionSelection: { selectionId: null, selectedValues: [], submitting: false },
     fetchServerJson,
     renderHand: undefined,
     doAction: (action: unknown) => submittedActions.push(action),
@@ -97,6 +102,10 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
       getElementById: (id: string) => {
         if (id === 'hudHandCount') return hudHandCount
         if (id === 'handCards') return container
+        if (id === 'handMultiSelectControls') return handMultiSelectControls
+        if (id === 'handMultiSelectCount') return handMultiSelectCount
+        if (id === 'handMultiSelectConfirm') return handMultiSelectConfirm
+        if (id === 'handMultiSelectCancel') return handMultiSelectCancel
         return null
       },
       querySelector: () => null,
@@ -133,7 +142,14 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
 }
 
 function installRenderHand(context: Context) {
-  new Script(readNamedFunction('renderHand')).runInContext(context)
+  new Script([
+    readNamedFunction('isPendingHandSelection'),
+    readNamedFunction('pendingHandCandidateValues'),
+    readNamedFunction('syncPendingHandSelection'),
+    readNamedFunction('renderPendingHandSelectionControls'),
+    readNamedFunction('cardDisplayDescription'),
+    readNamedFunction('renderHand'),
+  ].join('\n')).runInContext(context)
 }
 
 describe('LAN battle hand card display metadata', () => {
@@ -355,5 +371,181 @@ describe('LAN battle hand card display metadata', () => {
 
   it('marks the page disposed before clearing in-flight card metadata requests', () => {
     expect(battlePage).toMatch(/function disposeBattlePage\(\) \{\s*battlePageDisposed = true\s*cardDisplayMetadataRequests\.clear\(\)/)
+  })
+})
+
+describe('RED-121 authoritative hand selection presentation', () => {
+  it('selects pending card instances in the hand, enforces four, and submits once', async () => {
+    const statusMessages: string[] = []
+    const hand = Array.from({ length: 5 }, (_, index) => ({
+      cardId: ['holy-smite', 'holy-heal', 'holy-charge'][index % 3],
+      instanceId: `holy-${index + 1}`,
+    })).concat([{ cardId: 'filler', instanceId: 'filler-1' }])
+    const pendingOptionSelection = {
+      playerId: 'player-blue',
+      title: '穆鲁的挽歌：选择要丢弃的圣光手牌',
+      options: hand.slice(0, 5).map(card => ({ label: card.cardId, value: card.instanceId })),
+      selectionId: 'muru-hand-selection',
+      stateRevision: 7,
+      canCancel: true,
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
+    }
+    const runtime = createRuntime({
+      G: {
+        players: [{ playerId: 'player-blue', actionPoints: 3, hand }],
+        turn: { currentPlayerId: 'player-blue' },
+        pendingOptionSelection,
+      },
+      cardsById: {
+        'holy-smite': { name: '圣光惩击', actionPointCost: 2, type: 'active' },
+        'holy-heal': { name: '圣光治疗', actionPointCost: 2, type: 'active' },
+        'holy-charge': { name: '圣光充能', actionPointCost: 2, type: 'active' },
+        filler: { name: '填充牌', actionPointCost: 1, type: 'active' },
+      },
+      pendingOptionSelectionForMe: () => true,
+      renderActionBar: vi.fn(),
+      renderPieceContextMenu: vi.fn(),
+      setMoveButtonClass: vi.fn(),
+      setStatusMsg: (message: string) => statusMessages.push(message),
+    })
+
+    new Script([
+      readNamedFunction('isPendingHandSelection'),
+      readNamedFunction('pendingHandCandidateValues'),
+      readNamedFunction('syncPendingHandSelection'),
+      readNamedFunction('renderPendingHandSelectionControls'),
+      readNamedFunction('togglePendingHandOption'),
+      readNamedFunction('confirmPendingHandOptionSelection', true),
+      readNamedFunction('cancelPendingHandOptionSelection', true),
+      readNamedFunction('onCardClick'),
+    ].join('\n')).runInContext(runtime.context)
+    installRenderHand(runtime.context)
+
+    new Script('syncPendingHandSelection(G.pendingOptionSelection); renderHand()').runInContext(runtime.context)
+    expect(runtime.container.innerHTML).toContain('card-choice-selectable')
+    expect(runtime.container.innerHTML).toContain('card-choice-disabled')
+    expect(new Script("document.getElementById('handMultiSelectCount').textContent").runInContext(runtime.context))
+      .toBe('已选择 0 / 4')
+
+    for (const id of ['holy-1', 'holy-2', 'holy-3', 'holy-4']) {
+      new Script(`onCardClick('${id}', 'holy-smite')`).runInContext(runtime.context)
+    }
+    expect(new Script('pendingHandOptionSelection.selectedValues.length').runInContext(runtime.context)).toBe(4)
+    expect(runtime.container.innerHTML).toContain('card-choice-selected')
+
+    new Script("onCardClick('holy-5', 'holy-heal')").runInContext(runtime.context)
+    expect(new Script('pendingHandOptionSelection.selectedValues.length').runInContext(runtime.context)).toBe(4)
+    expect(statusMessages.at(-1)).toContain('最多选择4张')
+
+    new Script("onCardClick('holy-2', 'holy-heal')").runInContext(runtime.context)
+    await new Script('confirmPendingHandOptionSelection()').runInContext(runtime.context)
+    expect(runtime.submittedActions).toEqual([{
+      type: 'pendingOptionSelect',
+      playerId: 'player-blue',
+      selectedOption: ['holy-1', 'holy-3', 'holy-4'],
+      selectionId: 'muru-hand-selection',
+      stateRevision: 7,
+    }])
+    expect(new Script('pendingHandOptionSelection.selectedValues').runInContext(runtime.context))
+      .toEqual(['holy-1', 'holy-3', 'holy-4'])
+  })
+
+  it('selects prophecy cards in the hand and submits a scalar value without opening the picker', async () => {
+    const pendingOptionSelection = {
+      playerId: 'player-blue',
+      title: '圣光预言：选择一张圣光手牌',
+      options: [{ label: '圣光惩击', value: 'prophecy-card' }],
+      selectionId: 'prophecy-hand-selection',
+      stateRevision: 9,
+      canCancel: true,
+      selectionMode: 'single',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 1,
+    }
+    const runtime = createRuntime({
+      G: {
+        players: [{
+          playerId: 'player-blue', actionPoints: 3,
+          hand: [
+            { cardId: 'holy-smite', instanceId: 'prophecy-card' },
+            { cardId: 'filler', instanceId: 'filler-card' },
+          ],
+        }],
+        turn: { currentPlayerId: 'player-blue' },
+        pendingOptionSelection,
+      },
+      cardsById: {
+        'holy-smite': { name: '圣光惩击', description: '基础描述', actionPointCost: 2, type: 'active' },
+        filler: { name: '填充牌', description: '填充描述', actionPointCost: 1, type: 'active' },
+      },
+      pendingOptionSelectionForMe: () => true,
+      renderActionBar: vi.fn(),
+      renderPieceContextMenu: vi.fn(),
+      setMoveButtonClass: vi.fn(),
+      setStatusMsg: vi.fn(),
+    })
+
+    new Script([
+      readNamedFunction('isPendingHandSelection'),
+      readNamedFunction('pendingHandCandidateValues'),
+      readNamedFunction('syncPendingHandSelection'),
+      readNamedFunction('renderPendingHandSelectionControls'),
+      readNamedFunction('togglePendingHandOption'),
+      readNamedFunction('confirmPendingHandOptionSelection', true),
+      readNamedFunction('onCardClick'),
+    ].join('\n')).runInContext(runtime.context)
+    installRenderHand(runtime.context)
+
+    new Script('syncPendingHandSelection(G.pendingOptionSelection); renderHand()').runInContext(runtime.context)
+    expect(runtime.container.innerHTML).toContain('card-choice-selectable')
+    expect(runtime.container.innerHTML).toContain('card-choice-disabled')
+    new Script("onCardClick('prophecy-card', 'holy-smite')").runInContext(runtime.context)
+    await new Script('confirmPendingHandOptionSelection()').runInContext(runtime.context)
+
+    expect(runtime.submittedActions).toEqual([{
+      type: 'pendingOptionSelect',
+      playerId: 'player-blue',
+      selectedOption: 'prophecy-card',
+      selectionId: 'prophecy-hand-selection',
+      stateRevision: 9,
+    }])
+  })
+
+  it('renders prophecy-enhanced holy cards with visible state and their actual enhanced values', () => {
+    const runtime = createRuntime({
+      TRAINING_MODE: true,
+      G: {
+        players: [{
+          playerId: 'player-blue', actionPoints: 10,
+          hand: [
+            { cardId: 'holy-smite', instanceId: 'enhanced-smite', holyProphecyEnhanced: true },
+            { cardId: 'holy-heal', instanceId: 'enhanced-heal', holyProphecyEnhanced: true },
+            { cardId: 'holy-charge', instanceId: 'enhanced-charge', holyProphecyEnhanced: true },
+            { cardId: 'holy-smite', instanceId: 'pending-prophecy', holyProphecy: { sourcePieceId: 'velen' } },
+          ],
+        }],
+        turn: { currentPlayerId: 'player-blue' },
+      },
+      cardsById: {
+        'holy-smite': { name: '圣光惩击', description: '对敌方生命值最低的棋子造成5点真实伤害。', actionPointCost: 2, type: 'active' },
+        'holy-heal': { name: '圣光治疗', description: '治疗己方生命值最低的棋子8点生命。', actionPointCost: 2, type: 'active' },
+        'holy-charge': { name: '圣光充能', description: '使己方所有棋子下次造成的伤害提高2点。', actionPointCost: 2, type: 'active' },
+      },
+      pendingOptionSelectionForMe: () => false,
+    })
+    installRenderHand(runtime.context)
+
+    new Script('renderHand()').runInContext(runtime.context)
+
+    expect(runtime.container.innerHTML.match(/card-prophecy-enhanced/g)).toHaveLength(3)
+    expect(runtime.container.innerHTML.match(/预言强化/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(runtime.container.innerHTML).toContain('造成7点真实伤害')
+    expect(runtime.container.innerHTML).toContain('12点生命')
+    expect(runtime.container.innerHTML).toContain('提高3点')
+    expect(runtime.container.innerHTML).toContain('造成5点真实伤害')
   })
 })

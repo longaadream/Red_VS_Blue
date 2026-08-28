@@ -1,7 +1,13 @@
 {
   "id": "rule-blood-echo",
-  "name": "血之回响规则",
-  "description": "当友方单位失去圣盾时，为己方添加圣光充能手牌",
-  "trigger": { "type": "afterStatusRemoved" },
-  "effect": { "type": "triggerSkill", "skillId": "blood-echo-trigger", "message": "" }
+  "name": "\u8840\u8272\u56de\u54cd\u89e6\u53d1",
+  "description": "\u4efb\u610f\u53cb\u65b9\u5931\u53bb\u5723\u76fe\u540e\uff0c\u89e6\u53d1\u5723\u5149\u5145\u80fd\u624b\u724c\u751f\u6210\u3002",
+  "trigger": {
+    "type": "afterStatusRemoved"
+  },
+  "effect": {
+    "type": "triggerSkill",
+    "skillId": "blood-echo-trigger",
+    "message": ""
+  }
 }

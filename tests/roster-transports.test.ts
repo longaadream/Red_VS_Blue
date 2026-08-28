@@ -858,17 +858,25 @@ describe('Demo roster HTTP/WebSocket integration', () => {
           selectionId: string
           stateRevision: number
           source?: { id?: string }
+          suspendedTurn?: { currentPlayerId: string; turnNumber: number; phase: string }
+          transaction?: { currentInteraction?: { consumerId?: string; eventType?: string } }
         }
+        extensions?: { playerAlignments?: Record<string, 'light' | 'dark'> }
       }
     }).state
-    expect(completedState.deployment.status).toBe('complete')
-    expect(completedState.gameStartFired).toBe(true)
+    expect(completedState.deployment.status).toBe('awaiting-locks')
+    expect(completedState.gameStartFired).toBeFalsy()
     expect(completedState.turn.phase).toBe('start')
     expect(completedState.pendingTargetSelection).toMatchObject({
       playerId: firstIdentity.id,
       source: { id: 'rule-minato-anchor-begin-turn' },
     })
 
+    expect(completedState.pendingTargetSelection?.suspendedTurn).toMatchObject({
+      currentPlayerId: firstIdentity.id,
+      turnNumber: 1,
+      phase: 'start',
+    })
     const minato = completedState.pendingTargetSelection!
     const cancelled = await httpBattleAction(roomId, firstIdentity.id, {
       type: 'cancelPendingSelection',
@@ -882,16 +890,21 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const watcherState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
       state: {
         turn: { phase: string }
+        deployment: { status: string }
+        gameStartFired?: boolean
         pendingOptionSelection?: {
           playerId: string
           selectionId: string
           stateRevision: number
           canCancel?: boolean
           source?: { id?: string }
+          suspendedTurn?: { currentPlayerId: string; turnNumber: number; phase: string }
         }
       }
     }).state
     expect(watcherState.turn.phase).toBe('start')
+    expect(watcherState.deployment.status).toBe('awaiting-locks')
+    expect(watcherState.gameStartFired).toBeFalsy()
     expect(watcherState.pendingOptionSelection).toMatchObject({
       playerId: firstIdentity.id,
       canCancel: false,
@@ -899,6 +912,11 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     })
 
     const watcher = watcherState.pendingOptionSelection!
+    expect(watcherState.pendingOptionSelection?.suspendedTurn).toMatchObject({
+      currentPlayerId: firstIdentity.id,
+      turnNumber: 1,
+      phase: 'start',
+    })
     const resolved = await httpBattleAction(roomId, firstIdentity.id, {
       type: 'pendingOptionSelect',
       playerId: firstIdentity.id,
@@ -910,9 +928,17 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(resolved.status).toBe(200)
 
     const actionState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
-      state: { turn: { phase: string }; pendingOptionSelection?: unknown; pendingTargetSelection?: unknown }
+      state: {
+        turn: { phase: string }
+        deployment: { status: string }
+        gameStartFired?: boolean
+        pendingOptionSelection?: unknown
+        pendingTargetSelection?: unknown
+      }
     }).state
     expect(actionState.turn.phase).toBe('action')
+    expect(actionState.deployment.status).toBe('complete')
+    expect(actionState.gameStartFired).toBe(true)
     expect(actionState.pendingOptionSelection).toBeUndefined()
     expect(actionState.pendingTargetSelection).toBeUndefined()
   })

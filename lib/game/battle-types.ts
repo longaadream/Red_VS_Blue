@@ -23,6 +23,19 @@ export interface CardInstance {
   ownerPlayerId: string
   /** 卡牌显示名称（从 CardDefinition.name 复制，避免前端重新加载定义文件） */
   name?: string
+  /** Per-instance cost after runtime character effects. */
+  actionPointCost?: number
+  /** Original cost restored when a temporary reduction expires. */
+  baseActionPointCost?: number
+  /** Turn number in which the temporary reduction applies. */
+  temporaryCostReductionTurnNumber?: number
+  /** Pending Velen prophecy on this specific card instance. */
+  holyProphecy?: {
+    sourcePieceId: string
+    createdTurnNumber: number
+  }
+  /** Whether this card instance already completed a Velen prophecy. */
+  holyProphecyEnhanced?: boolean
 }
 
 export interface PlayerTurnMeta {

@@ -1282,13 +1282,20 @@
 
   function _syncPendingFeedback(interaction) {
     const pendingId = interaction && interaction.pendingPieceId
+    const selectedTargetIds = new Set(interaction && Array.isArray(interaction.selectedTargetPieceIds)
+      ? interaction.selectedTargetPieceIds
+      : [])
     _pieceObjects.forEach(function (obj, pieceId) {
       const pending = pieceId === pendingId
-      if (obj.pending === pending) return
+      const targetSelected = selectedTargetIds.has(pieceId)
+      const feedbackState = pending ? 'pending' : (targetSelected ? 'target-selected' : 'none')
+      if (obj.pendingFeedbackState === feedbackState) return
+      obj.pendingFeedbackState = feedbackState
       obj.pending = pending
-      if (pending) {
-        obj.feedbackRing.material.color.setHex(0xf59e0b)
-        obj.feedbackRing.material.opacity = 0.38
+      obj.targetSelected = targetSelected
+      if (pending || targetSelected) {
+        obj.feedbackRing.material.color.setHex(pending ? 0xf59e0b : 0x60a5fa)
+        obj.feedbackRing.material.opacity = pending ? 0.38 : 0.58
         if (!_reducedMotion && !_anims.has(obj.motionId + ':position')) obj.group.position.y = obj.baseY + 0.04
       } else {
         obj.feedbackRing.material.opacity = 0

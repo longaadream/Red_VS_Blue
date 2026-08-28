@@ -121,6 +121,10 @@ export interface AIObservation {
     selectionId?: string
     stateRevision?: number
     canCancel: boolean
+    selectionMode?: 'single' | 'multi'
+    presentation?: 'picker' | 'hand'
+    minSelections?: number
+    maxSelections?: number
   }
   pendingTargetSelection?: {
     playerId: string
@@ -132,6 +136,9 @@ export interface AIObservation {
     candidates: TargetRef[]
     selectedTargets: TargetRef[]
     canCancel: boolean
+    selectionMode?: 'single' | 'multi'
+    minSelections?: number
+    maxSelections?: number
   }
 }
 

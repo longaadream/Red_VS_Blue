@@ -1,7 +1,7 @@
 {
   "id": "itachi-tsukuyomi",
   "name": "月读",
-  "description": "选择4格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。AP0，CD1。",
+  "description": "选择4格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。",
   "keywords": [],
   "targetText": "4格内的一个敌人",
   "effectTags": ["control", "cooldown"],

@@ -291,13 +291,18 @@ describe('RED-36 authoritative room timer integration', () => {
       expect(startResult.kind).toBe('applied')
       const startState = authoritativeState(store)
       expect(startState.turn).toMatchObject({
-        currentPlayerId: PLAYERS[1],
-        turnNumber: 2,
-        phase: 'start',
+        currentPlayerId: PLAYERS[0],
+        turnNumber: 1,
+        phase: 'end',
       })
       expect(startState.pendingOptionSelection).toMatchObject({
         playerId: PLAYERS[1],
         options: ['resolve'],
+      })
+      expect(startState.pendingOptionSelection?.suspendedTurn).toMatchObject({
+        currentPlayerId: PLAYERS[1],
+        turnNumber: 2,
+        phase: 'start',
       })
       expect(startState.turnTimer).toMatchObject({
         status: 'running',
@@ -322,9 +327,9 @@ describe('RED-36 authoritative room timer integration', () => {
       } as any, { clock: timeoutClock, allowSystem: true })
       expect(burnResult.kind).toBe('applied')
       expect(authoritativeState(timeoutStore).turn).toMatchObject({
-        currentPlayerId: PLAYERS[1],
-        turnNumber: 2,
-        phase: 'start',
+        currentPlayerId: PLAYERS[0],
+        turnNumber: 1,
+        phase: 'end',
       })
       expect(authoritativeState(timeoutStore).pendingOptionSelection).toBeDefined()
       expect(authoritativeState(timeoutStore).turnTimer).toMatchObject({
@@ -434,9 +439,9 @@ describe('RED-36 authoritative room timer integration', () => {
 
       expect(result).toMatchObject({ kind: 'expired', expiredReason: 'turn' })
       expect(state.turn).toMatchObject({
-        currentPlayerId: PLAYERS[1],
-        turnNumber: 2,
-        phase: 'start',
+        currentPlayerId: PLAYERS[0],
+        turnNumber: 1,
+        phase: 'action',
       })
       expect(state.pendingTargetSelection).toMatchObject({
         playerId: PLAYERS[1],
@@ -444,6 +449,11 @@ describe('RED-36 authoritative room timer integration', () => {
         selectionId: expect.any(String),
         stateRevision: state.targetingRevision,
         candidates: expect.any(Array),
+      })
+      expect(state.pendingTargetSelection?.suspendedTurn).toMatchObject({
+        currentPlayerId: PLAYERS[1],
+        turnNumber: 2,
+        phase: 'start',
       })
       expect(state.pendingTargetSelection!.candidates!.length).toBeGreaterThan(0)
       expect(result.snapshot.state.pendingTargetSelection?.candidates).toEqual([])

@@ -13,6 +13,8 @@ vi.mock('@/lib/game/triggers', () => ({
     removeRule: vi.fn(),
     clearRules: vi.fn(),
     getRules: vi.fn(() => []),
+    snapshotTransactionState: vi.fn(() => ({ nextRootEventId: 0, ruleLimits: [] })),
+    restoreTransactionState: vi.fn(),
   },
   TriggerType: {},
 }))
@@ -364,6 +366,55 @@ describe('authoritative target preparation', () => {
       .toThrow(expect.objectContaining({ code: 'TARGET_SELECTION_ALREADY_RESOLVED' }))
   })
 
+  it('validates authoritative board multi-select count, uniqueness, candidates, and credentials before mutation', () => {
+    const pieces = ['multi-a', 'multi-b', 'multi-c', 'multi-d'].map((instanceId, index) =>
+      makePiece({ instanceId, ownerPlayerId: 'player-red', x: index, y: 0 }))
+    const state = makeState({ pieces, width: 6, height: 4 }) as any
+    state.pendingTargetSelection = finalizePendingTargetSession(state, {
+      playerId: 'player-red',
+      ownerPlayerId: 'player-red',
+      source: { type: 'rule', id: 'pending-board-multi', pieceId: 'multi-a' },
+      targetType: 'piece',
+      filter: 'ally',
+      selectionMode: 'multi',
+      minSelections: 1,
+      maxSelections: 3,
+      candidates: pieces.map(piece => ({ type: 'piece' as const, pieceId: piece.instanceId })),
+      fixedCandidates: true,
+      effectCode: "function(ctx) { ctx.battle.extensions.boardMultiResolved = ctx.pending.selectedTargets; return { success: true }; }",
+    }, 0)
+    const pending = state.pendingTargetSelection
+    const before = JSON.stringify(state)
+    const base = {
+      type: 'pendingTargetSelect' as const,
+      playerId: 'player-red',
+      targetPieceId: 'multi-a',
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+    }
+
+    expect(() => applyBattleAction(state, {
+      ...base, extraTargets: [{ pieceId: 'multi-a' }],
+    } as never)).toThrow(expect.objectContaining({ code: 'TARGET_SELECTION_DUPLICATE' }))
+    expect(() => applyBattleAction(state, {
+      ...base,
+      extraTargets: [{ pieceId: 'multi-b' }, { pieceId: 'multi-c' }, { pieceId: 'multi-d' }],
+    } as never)).toThrow(expect.objectContaining({ code: 'TARGET_SELECTION_COUNT_INVALID' }))
+    expect(() => applyBattleAction(state, { ...base, stateRevision: 1 } as never))
+      .toThrow(expect.objectContaining({ code: 'TARGET_SELECTION_STALE' }))
+    expect(JSON.stringify(state)).toBe(before)
+
+    const resolved = applyBattleAction(state, {
+      ...base, extraTargets: [{ pieceId: 'multi-b' }, { pieceId: 'multi-c' }],
+    } as never) as any
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.extensions.boardMultiResolved).toEqual([
+      { type: 'piece', pieceId: 'multi-a' },
+      { type: 'piece', pieceId: 'multi-b' },
+      { type: 'piece', pieceId: 'multi-c' },
+    ])
+  })
+
   it('advances a versioned multi-step pending session and runs its effect only after the final target', () => {
     const caster = makePiece({ instanceId: 'pending-caster', ownerPlayerId: 'player-red', x: 1, y: 1 })
     const state = makeState({ pieces: [caster], width: 4, height: 4 }) as any
@@ -476,15 +527,24 @@ describe('authoritative target preparation', () => {
 })
 
 describe('Demo targeting admission fixture', () => {
-  it('covers the fixed 28-piece / 88-skill / 16-card manifest with a stable preparation hash', () => {
+  it('covers the current admitted piece, skill, and card manifests with a stable preparation hash', () => {
     const pieceIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/pieces/manifest.json'), 'utf8')) as string[]
     const cardIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/cards/manifest.json'), 'utf8')) as string[]
     const skillIds = [...new Set(pieceIds.flatMap(pieceId => {
       const piece = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${pieceId}.json`), 'utf8'))
       return (piece.skills || []).map((skill: any) => skill.skillId as string)
     }))].sort()
-    expect({ pieces: pieceIds.length, skills: skillIds.length, cards: cardIds.length })
-      .toEqual({ pieces: 28, skills: 88, cards: 16 })
+    expect(new Set(pieceIds).size).toBe(pieceIds.length)
+    expect(pieceIds).toEqual(expect.arrayContaining(['blue-ichigo', 'red-itachi', 'velen', 'turalyon']))
+    expect(skillIds).toEqual(expect.arrayContaining([
+      'velen-holy-prophecy',
+      'velen-fate-shelter',
+      'velen-thousand-futures-ultimate',
+      'turalyon-expedition-order',
+      'turalyon-lightforged-march',
+      'turalyon-grand-crusade',
+    ]))
+    expect(cardIds).toHaveLength(16)
 
     const source = makePiece({ instanceId: 'fixture-source', templateId: 'blue-minato', ownerPlayerId: 'player-red', x: 10, y: 8 })
     source.statusTags = [{ id: 'fixture-divine-shield', type: 'divine-shield' }] as never
@@ -530,7 +590,7 @@ describe('Demo targeting admission fixture', () => {
     }
 
     const fixtureHash = createHash('sha256').update(JSON.stringify(fixture)).digest('hex')
-    expect(fixtureHash).toBe('d18f62dea8562b9ec3f60a1f7ab618aa1cf324738ee21304daea3c5a3df752e2')
+    expect(fixtureHash).toBe('1a51bc69fd177ef8464cc09d51b96f32316fc2b45207e44227f29d53448815b7')
   })
 })
 

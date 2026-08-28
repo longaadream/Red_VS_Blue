@@ -118,17 +118,18 @@ describe('RED-120 character data contract', () => {
     })
 
     const expected = {
-      'ichigo-zangetsu': ['选择相邻的一个敌人，造成100%攻击力的物理伤害。AP1，CD1。', 1, 1],
-      'ichigo-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成150%攻击力的魔法伤害。AP2，CD1。', 2, 1],
-      'ichigo-bankai-tensa-zangetsu': ['攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。AP0，充能1，每局限用1次。', 0, 0],
-      'ichigo-black-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的所有敌人造成175%攻击力的魔法伤害；命中后，可以传送至第一个被命中敌人相邻的一个空格。AP2，CD1。', 2, 1],
-      'itachi-tsukuyomi': ['选择4格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。AP0，CD1。', 0, 1],
-      'itachi-amaterasu': ['选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。AP1，CD2。', 1, 2],
-      'itachi-totsuka-blade': ['选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。AP2，充能1，CD1。', 2, 1],
+      'ichigo-zangetsu': ['选择相邻的一个敌人，造成100%攻击力的物理伤害。', 1, 1],
+      'ichigo-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成150%攻击力的魔法伤害。', 2, 1],
+      'ichigo-bankai-tensa-zangetsu': ['攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。', 0, 0],
+      'ichigo-black-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的所有敌人造成175%攻击力的魔法伤害；命中后，可以传送至第一个被命中敌人相邻的一个空格。', 2, 1],
+      'itachi-tsukuyomi': ['选择4格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。', 0, 1],
+      'itachi-amaterasu': ['选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。', 1, 2],
+      'itachi-totsuka-blade': ['选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。', 2, 1],
     } as const
     for (const [id, [description, ap, cooldown]] of Object.entries(expected)) {
       const skill = loadSkill(id)
       expect(skill).toMatchObject({ id, description, actionPointCost: ap, cooldownTurns: cooldown })
+      expect(skill.description).not.toMatch(/(?:AP|CD)\d|充能\d|每局限用\d次/)
     }
     expect(loadJson<{ keywords?: string[] }>('skills', 'ichigo-getsuga-tensho.json').keywords).toContain('弹射物')
     expect(loadJson<{ keywords?: string[] }>('skills', 'ichigo-black-getsuga-tensho.json').keywords).toContain('弹射物')

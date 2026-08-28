@@ -5,6 +5,10 @@ import { loadCardById } from './skills'
 import { manhattanDistance, traceProjectile } from './spatial'
 import type { BattleAction, BattleState } from './turn'
 import type { PendingReactiveCardRef } from './pending-interaction'
+import type {
+  SuspendableActionTransaction,
+  SuspendableTurnCheckpoint,
+} from './suspendable-action-transaction'
 
 export const TARGET_SELECTION_PROTOCOL_VERSION = 1
 
@@ -68,6 +72,8 @@ export type TargetingErrorCode =
   | 'TARGET_SELECTION_ID_MISMATCH'
   | 'TARGET_SELECTION_PLAYER_MISMATCH'
   | 'TARGET_SELECTION_ALREADY_RESOLVED'
+  | 'TARGET_SELECTION_COUNT_INVALID'
+  | 'TARGET_SELECTION_DUPLICATE'
   | 'PENDING_SELECTION_ACTIVE'
   | 'PENDING_TARGET_SELECTION_NOT_FOUND'
   | 'PENDING_TARGET_CANCEL_FORBIDDEN'
@@ -166,9 +172,19 @@ export interface PendingTargetSelectionSession {
   step?: number
   min?: number
   max?: number
+  selectionMode?: 'single' | 'multi'
+  minSelections?: number
+  maxSelections?: number
   selectedTargets?: TargetRef[]
   candidates?: TargetRef[]
+  fixedCandidates?: boolean
+  resumeOnCancel?: boolean
+  rollbackOnCancel?: boolean
   canCancel?: boolean
+  transaction?: SuspendableActionTransaction
+  suspendedTurn?: SuspendableTurnCheckpoint
+  /** Server-private only; discarded after authoritative candidates are stamped. */
+  candidateState?: BattleState
 }
 
 interface TargetSpec {
@@ -1052,12 +1068,17 @@ export function finalizePendingTargetSession(
     step: pending.step || 0,
     min: pending.min ?? 1,
     max: pending.max ?? 1,
+    selectionMode: pending.selectionMode || ((pending.maxSelections ?? pending.max ?? 1) > 1 ? 'multi' : 'single'),
+    minSelections: pending.minSelections ?? pending.min ?? 1,
+    maxSelections: pending.maxSelections ?? pending.max ?? 1,
     selectedTargets: pending.selectedTargets || [],
     canCancel: activeStep?.canCancel ?? pending.canCancel !== false,
     stateRevision: revision,
   }
   normalized.selectionId = pendingSelectionId(revision, normalized)
-  normalized.candidates = enumerateCandidates(state, pendingConstraint(normalized)).candidates
+  normalized.candidates = pending.fixedCandidates && Array.isArray(pending.candidates)
+    ? pending.candidates.map(candidate => ({ ...candidate }))
+    : enumerateCandidates(state, pendingConstraint(normalized)).candidates
   return normalized
 }
 
@@ -1090,12 +1111,16 @@ export function stampTargetingRevision(previous: BattleState, next: BattleState)
   const revision = getTargetingStateRevision(previous) + 1
   const stamped = { ...next, targetingRevision: revision }
   if (stamped.pendingTargetSelection) {
-    stamped.pendingTargetSelection = finalizePendingTargetSession(stamped, stamped.pendingTargetSelection, revision)
+    const pending = stamped.pendingTargetSelection
+    const candidateState = pending.candidateState || stamped
+    const finalized = finalizePendingTargetSession(candidateState, pending, revision)
+    delete finalized.candidateState
+    stamped.pendingTargetSelection = finalized
   }
   return stamped
 }
 
-export function validatePendingTargetSubmission(
+export function validatePendingTargetSubmissions(
   state: BattleState,
   action: {
     playerId: string
@@ -1104,8 +1129,9 @@ export function validatePendingTargetSubmission(
     targetPieceId?: string
     targetX?: number
     targetY?: number
+    extraTargets?: Array<{ pieceId?: string; x?: number; y?: number }>
   },
-): TargetRef {
+): TargetRef[] {
   const pending = state.pendingTargetSelection
   if (!pending) {
     throw new TargetingRuleError({
@@ -1124,22 +1150,68 @@ export function validatePendingTargetSubmission(
   if (!pending.selectionId || action.selectionId !== pending.selectionId) {
     throw new TargetingRuleError({ kind: 'invalid', code: 'TARGET_SELECTION_ID_MISMATCH', message: 'Target selection ID does not match the pending session' })
   }
-  const target = targetFromFields(state, {
-    pieceId: action.targetPieceId,
-    x: action.targetX,
-    y: action.targetY,
-  })
-  if (!target) {
+  const selected = getSelectedTargets(state, action)
+  if ('code' in selected) {
+    throw new TargetingRuleError({ kind: 'invalid', code: selected.code, message: selected.message })
+  }
+  const selectionMode = pending.selectionMode || ((pending.maxSelections ?? pending.max ?? 1) > 1 ? 'multi' : 'single')
+  const minSelections = selectionMode === 'multi'
+    ? Math.max(0, pending.minSelections ?? pending.min ?? 1)
+    : 1
+  const maxSelections = selectionMode === 'multi'
+    ? Math.max(minSelections, pending.maxSelections ?? pending.max ?? 1)
+    : 1
+  if (selected.length < minSelections || selected.length > maxSelections) {
+    throw new TargetingRuleError({
+      kind: 'invalid',
+      code: 'TARGET_SELECTION_COUNT_INVALID',
+      message: `Target selection requires ${minSelections}-${maxSelections} targets`,
+    })
+  }
+  if (selected.length === 0) {
     throw new TargetingRuleError({ kind: 'invalid', code: 'TARGET_NOT_FOUND', message: 'Target reference is missing' })
   }
-  if ('code' in target) {
-    throw new TargetingRuleError({ kind: 'invalid', code: target.code, message: target.message })
+  const keys = selected.map(targetRefKey)
+  if (new Set(keys).size !== keys.length) {
+    throw new TargetingRuleError({
+      kind: 'invalid',
+      code: 'TARGET_SELECTION_DUPLICATE',
+      message: 'Target selection contains duplicate targets',
+    })
   }
-  const validation = validateTargetRef(state, pendingConstraint(pending), target)
-  if (validation) {
-    throw new TargetingRuleError({ kind: 'invalid', code: validation.code, message: validation.message })
+  for (const target of selected) {
+    if (pending.candidates) {
+      const isStampedCandidate = pending.candidates.some(candidate => targetRefKey(candidate) === targetRefKey(target))
+      if (isStampedCandidate) continue
+      const validation = validateTargetRef(state, pendingConstraint(pending), target)
+      if (validation) {
+        throw new TargetingRuleError({ kind: 'invalid', code: validation.code, message: validation.message })
+      }
+      throw new TargetingRuleError({
+        kind: 'invalid',
+        code: 'TARGET_NOT_FOUND',
+        message: 'Target is not an authoritative candidate for this pending session',
+      })
+    }
+    const validation = validateTargetRef(state, pendingConstraint(pending), target)
+    if (validation) {
+      throw new TargetingRuleError({ kind: 'invalid', code: validation.code, message: validation.message })
+    }
   }
-  return target
+  return selected
+}
+
+export function validatePendingTargetSubmission(
+  state: BattleState,
+  action: Parameters<typeof validatePendingTargetSubmissions>[1],
+): TargetRef {
+  const selected = validatePendingTargetSubmissions(state, action)
+  if (selected.length !== 1) {
+    throw new TargetingRuleError({
+      kind: 'invalid', code: 'TARGET_SELECTION_COUNT_INVALID', message: 'Expected exactly one target',
+    })
+  }
+  return selected[0]
 }
 
 export function assertPendingTargetCancellation(

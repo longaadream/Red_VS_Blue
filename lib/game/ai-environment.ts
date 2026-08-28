@@ -5,7 +5,7 @@ import { getLegalNormalMoveTargetsForPlayer } from './spatial'
 import {
   prepareAction,
   targetRefKey,
-  validatePendingTargetSubmission,
+  validatePendingTargetSubmissions,
   type ActionPreparation,
   type TargetRef,
 } from './targeting'
@@ -180,6 +180,10 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
       selectionId: pendingOption.selectionId,
       stateRevision: pendingOption.stateRevision,
       canCancel: pendingOption.canCancel !== false,
+      selectionMode: pendingOption.selectionMode,
+      presentation: pendingOption.presentation,
+      minSelections: pendingOption.minSelections,
+      maxSelections: pendingOption.maxSelections,
     } : undefined,
     pendingTargetSelection: pendingTarget && samePlayer(
       pendingTarget.ownerPlayerId || pendingTarget.playerId,
@@ -194,6 +198,9 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
       candidates: cloneSerializable(pendingTarget.candidates || []),
       selectedTargets: cloneSerializable(pendingTarget.selectedTargets || []),
       canCancel: pendingTarget.canCancel !== false,
+      selectionMode: pendingTarget.selectionMode,
+      minSelections: pendingTarget.minSelections,
+      maxSelections: pendingTarget.maxSelections,
     } : undefined,
   }
 }
@@ -273,13 +280,33 @@ function pendingCandidates(state: BattleState, playerId: string): CandidateActio
   const pendingOption = state.pendingOptionSelection
   if (pendingOption) {
     if (!samePlayer(pendingOption.playerId, playerId)) return []
-    const options = pendingOption.options.map(option => (
+    const values = pendingOption.options.map(option => (
       option && typeof option === 'object' && 'value' in option
         ? (option as { value: unknown }).value
         : option
     ))
       .sort((left, right) => compareStableText(stableJson(left), stableJson(right)))
-      .map(selectedOption => candidate('pending-option', {
+    const selections: unknown[] = pendingOption.selectionMode === 'multi'
+      ? (() => {
+          const minSelections = Number.isSafeInteger(pendingOption.minSelections)
+            ? Math.max(0, pendingOption.minSelections!)
+            : 1
+          const maxSelections = Math.min(
+            values.length,
+            Number.isSafeInteger(pendingOption.maxSelections)
+              ? Math.max(minSelections, pendingOption.maxSelections!)
+              : values.length,
+          )
+          if (minSelections > maxSelections) return []
+          const legal: unknown[] = minSelections === 0 ? [[]] : []
+          if (minSelections <= 1) legal.push(...values.map(value => [value]))
+          for (let count = Math.max(2, minSelections); count <= maxSelections; count += 1) {
+            legal.push(values.slice(0, count))
+          }
+          return legal
+        })()
+      : values
+    const options = selections.map(selectedOption => candidate('pending-option', {
         type: 'pendingOptionSelect',
         playerId,
         selectedOption,
@@ -300,16 +327,36 @@ function pendingCandidates(state: BattleState, playerId: string): CandidateActio
   const pendingTarget = state.pendingTargetSelection
   if (!pendingTarget) return undefined
   if (!samePlayer(pendingTarget.ownerPlayerId || pendingTarget.playerId, playerId)) return []
-  const candidates = [...(pendingTarget.candidates || [])]
+  const targetRefs = [...(pendingTarget.candidates || [])]
     .sort((left, right) => compareStableText(targetRefKey(left), targetRefKey(right)))
-    .map(target => {
-      const action = appendTarget({
+  const selections: TargetRef[][] = pendingTarget.selectionMode === 'multi'
+    ? (() => {
+        const minSelections = Number.isSafeInteger(pendingTarget.minSelections)
+          ? Math.max(0, pendingTarget.minSelections!)
+          : 1
+        const maxSelections = Math.min(
+          targetRefs.length,
+          Number.isSafeInteger(pendingTarget.maxSelections)
+            ? Math.max(minSelections, pendingTarget.maxSelections!)
+            : targetRefs.length,
+        )
+        if (minSelections > maxSelections) return []
+        const legal: TargetRef[][] = []
+        if (minSelections <= 1) legal.push(...targetRefs.map(target => [target]))
+        for (let count = Math.max(2, minSelections); count <= maxSelections; count += 1) {
+          legal.push(targetRefs.slice(0, count))
+        }
+        return legal
+      })()
+    : targetRefs.map(target => [target])
+  const candidates = selections.map(selection => {
+      const action = selection.reduce((draft, target) => appendTarget(draft, target), {
         type: 'pendingTargetSelect',
         playerId,
         selectionId: pendingTarget.selectionId,
         stateRevision: pendingTarget.stateRevision,
-      }, target)
-      validatePendingTargetSubmission(state, action as Extract<BattleAction, { type: 'pendingTargetSelect' }>)
+      } as BattleAction)
+      validatePendingTargetSubmissions(state, action as Extract<BattleAction, { type: 'pendingTargetSelect' }>)
       return candidate('pending-target', action)
     })
   if (pendingTarget.canCancel !== false) {

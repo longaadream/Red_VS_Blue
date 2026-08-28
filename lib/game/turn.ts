@@ -35,11 +35,22 @@ import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { getSkillById } from "./skill-repository"
 import {
   RANDOM_STREAM_NAMES,
+  RuleRuntime,
   getActiveRuleRuntime,
   getRuleDate,
   getRuleMath,
+  withRuleRuntime,
   withRuleRuntimeCheckpoint,
 } from "./rule-runtime"
+import {
+  SUSPENDABLE_ACTION_TRANSACTION_PROTOCOL_VERSION,
+  SuspendableActionRuntime,
+  isSuspendableActionPending,
+  withSuspendableActionRuntime,
+  type SuspendableActionTransaction,
+  type SuspendableInteractionInput,
+  type SuspendableInteractionPrompt,
+} from './suspendable-action-transaction'
 import { getNormalMoveRejection, manhattanDistance } from "./spatial"
 import {
   TargetingRuleError,
@@ -48,7 +59,7 @@ import {
   assertActionTargetingReady,
   assertPendingTargetCancellation,
   stampTargetingRevision,
-  validatePendingTargetSubmission,
+  validatePendingTargetSubmissions,
 } from "./targeting"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 import {
@@ -207,6 +218,13 @@ export interface PlayerTurnMeta {
     instanceId: string
     ownerPlayerId: string
     actionPointCost?: number
+    baseActionPointCost?: number
+    temporaryCostReductionTurnNumber?: number
+    holyProphecy?: {
+      sourcePieceId: string
+      createdTurnNumber: number
+    }
+    holyProphecyEnhanced?: boolean
     name?: string
     description?: string
     icon?: string
@@ -709,6 +727,9 @@ function dryRunCardAction(
   withRuleRuntimeCheckpoint(() => {
     const dryState = safeCloneBattleState(state)
     const { targetPiece, targetPosition } = getCardTargetArgs(dryState, action)
+    const cardInstance = dryState.players
+      .find(player => player.playerId === action.playerId)
+      ?.hand.find(card => card.instanceId === action.cardInstanceId)
     const result = executeCardFunction(
       cardDef,
       action.playerId,
@@ -718,6 +739,7 @@ function dryRunCardAction(
       targetPosition,
       action.selectedOption,
       action.extraTargets,
+      cardInstance,
     )
     assertCardDryRunResult(result)
   })
@@ -782,7 +804,10 @@ function buildSkillExecutionContext(
   }
 }
 
-function assertSkillDryRunResult(result: any): void {
+function assertSkillDryRunResult(
+  result: any,
+  allowOptionSelection = false,
+): void {
   if (result.needsTargetSelection) {
     const err = new BattleRuleError('需要选择目标') as any
     err.needsTargetSelection = true
@@ -793,6 +818,7 @@ function assertSkillDryRunResult(result: any): void {
     throw err
   }
   if (result.needsOptionSelection) {
+    if (allowOptionSelection) return
     const err = new BattleRuleError('需要选择选项') as any
     err.needsOptionSelection = true
     err.options = result.options || []
@@ -823,7 +849,10 @@ function dryRunSkillAction(
       buildSkillExecutionContext(dryState, dryPiece, action, drySkillDef),
       dryState,
     )
-    assertSkillDryRunResult(result)
+    assertSkillDryRunResult(
+      result,
+      action.selectedOption === undefined,
+    )
   })
 }
 export function validateSkillActionByDryRun(state: BattleState, action: any, skipTargetingValidation = false): void {
@@ -917,10 +946,14 @@ function applyBattleActionInternal(
     || action.type === 'deploymentLock'
     || action.type === 'deploymentTimeout'
   const isTimerCommand = isTurnTimerSystemAction(action)
+  const isPendingInteractionCommand = action.type === 'pendingOptionSelect'
+    || action.type === 'pendingTargetSelect'
+    || action.type === 'cancelPendingSelection'
   if (
     state.deployment?.status === 'awaiting-locks'
     && !isDeploymentCommand
     && action.type !== 'surrender'
+    && !isPendingInteractionCommand
   ) {
     throw new BattleRuleError('Battle actions are unavailable until deployment is complete')
   }
@@ -930,8 +963,8 @@ function applyBattleActionInternal(
   if (action.type !== 'surrender' && !isTimerCommand && !continuation.skipTargetingValidation) {
     assertActionTargetingReady(state, action)
   }
-  const validatedPendingTarget = action.type === 'pendingTargetSelect'
-    ? validatePendingTargetSubmission(state, action)
+  const validatedPendingTargets = action.type === 'pendingTargetSelect'
+    ? validatePendingTargetSubmissions(state, action)
     : undefined
   if (action.type === 'pendingOptionSelect') {
     validatePendingOptionSubmission(state, action)
@@ -970,6 +1003,7 @@ function applyBattleActionInternal(
     pendingQueue?: PendingRuleConsumerRef[]
     pendingReactiveCards?: PendingReactiveCardRef[]
     pendingAction?: any
+    rollbackOnCancel?: boolean
   }
 
   const appendTriggerMessages = (next: BattleState, result: TriggerResult, playerId: string) => {
@@ -1029,6 +1063,10 @@ function applyBattleActionInternal(
         pendingAction,
         canCancel: result.canCancel,
         cancelValue: result.cancelValue,
+        selectionMode: result.selectionMode,
+        presentation: result.presentation,
+        minSelections: result.minSelections,
+        maxSelections: result.maxSelections,
       }
       return true
     }
@@ -1050,6 +1088,17 @@ function applyBattleActionInternal(
       pendingReactiveCards,
       pendingAction,
       canCancel: result.canCancel,
+      selectionMode: result.selectionMode,
+      minSelections: result.minSelections,
+      maxSelections: result.maxSelections,
+      min: result.minSelections,
+      max: result.maxSelections,
+      candidates: result.targetCandidates as PendingTargetSelectionSession['candidates'],
+      fixedCandidates: Array.isArray(result.targetCandidates),
+      effectCode: result.effectCode,
+      payload: result.payload,
+      resumeOnCancel: result.resumeOnCancel,
+      rollbackOnCancel: result.rollbackOnCancel ?? seed.rollbackOnCancel,
     }
     return true
   }
@@ -1059,17 +1108,22 @@ function applyBattleActionInternal(
     result: Pick<TriggerResult,
       'needsOptionSelection' | 'options' | 'title' | 'playerId'
       | 'canCancel' | 'cancelValue' | 'pendingRuleId' | 'pendingRuleSourceId'
+      | 'selectionMode' | 'presentation' | 'minSelections' | 'maxSelections'
     >,
     pendingAction: BattleAction,
     fallbackSource: { type: 'skill' | 'card'; id: string; pieceId?: string },
     continuationMode: 'skillReleaseOption' | 'cardReleaseOption',
   ): BattleState => {
-    const canResolveCancellation = result.canCancel === true && result.cancelValue !== undefined
+    const canResolveCancellation = result.canCancel === true
     next.pendingTargetSelection = undefined
     next.pendingOptionSelection = {
       playerId: result.playerId || ('playerId' in pendingAction ? pendingAction.playerId : next.turn.currentPlayerId),
       title: result.title || '请选择',
       options: result.options || [],
+      selectionMode: result.selectionMode,
+      presentation: result.presentation,
+      minSelections: result.minSelections,
+      maxSelections: result.maxSelections,
       source: result.pendingRuleId
         ? {
             type: 'rule',
@@ -1288,10 +1342,19 @@ function applyBattleActionInternal(
         return option
       }))
       if (candidates.length === 0) return skipInvalidTimedOutPending(next, pending)
-      const selectedOption = candidates[runtime.nextInt(
-        `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
-        candidates.length,
-      )]
+      let selectedOption: unknown
+      if (pending.selectionMode === 'multi') {
+        const minSelections = Number.isSafeInteger(pending.minSelections)
+          ? Math.max(0, pending.minSelections!)
+          : 1
+        if (candidates.length < minSelections) return skipInvalidTimedOutPending(next, pending)
+        selectedOption = candidates.slice(0, minSelections)
+      } else {
+        selectedOption = candidates[runtime.nextInt(
+          `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
+          candidates.length,
+        )]
+      }
       recordPendingTimeoutResolution(next, pending, 'candidate')
       return applyBattleActionInternal(next, {
         type: 'pendingOptionSelect',
@@ -1352,6 +1415,27 @@ function applyBattleActionInternal(
       turn: next.turn.turnNumber,
       payload: { message: 'Selection cancelled' },
     } as any)
+    if (pending.transaction) {
+      if ('resumeOnCancel' in pending && pending.resumeOnCancel) {
+        return resumeSuspendableActionTransaction(next, pending.transaction, {
+          cancelled: true,
+          resumeConsumerOnCancel: true,
+        })
+      }
+      if ('options' in pending && pending.cancelValue !== undefined) {
+        return resumeSuspendableActionTransaction(next, pending.transaction, {
+          selectedOption: pending.cancelValue,
+        })
+      }
+      if (
+        (pending.transaction.currentInteraction?.consumerOrdinal ?? 0) <= -2
+        || pending.transaction.currentInteraction?.consumerKind === 'rule'
+        || pending.transaction.currentInteraction?.consumerKind === 'reactiveCard'
+      ) {
+        return resumeSuspendableActionTransaction(next, pending.transaction, { cancelled: true })
+      }
+      return next
+    }
     if ('options' in pending && pending.cancelValue !== undefined) {
       return resumePendingInteraction(next, pending, action.playerId, {
         selectedOption: pending.cancelValue,
@@ -2125,12 +2209,24 @@ function applyBattleActionInternal(
         if (pendingTarget) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
+            ownerPlayerId: pendingTarget.playerId || action.playerId,
             title: pendingTarget.title || '请选择目标',
             targetType: pendingTarget.targetType || 'cell',
             range: pendingTarget.range || 99,
             filter: pendingTarget.filter || 'all',
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
+            source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
+            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            selectionMode: pendingTarget.selectionMode,
+            minSelections: pendingTarget.minSelections,
+            maxSelections: pendingTarget.maxSelections,
+            min: pendingTarget.minSelections,
+            max: pendingTarget.maxSelections,
+            canCancel: pendingTarget.canCancel,
+            resumeOnCancel: pendingTarget.resumeOnCancel,
+            rollbackOnCancel: pendingTarget.rollbackOnCancel ?? skillDef.rollbackPendingTargetOnCancel,
           }
           battleDebugLog('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
         }
@@ -2439,12 +2535,24 @@ function applyBattleActionInternal(
         if (pendingTarget) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
+            ownerPlayerId: pendingTarget.playerId || action.playerId,
             title: pendingTarget.title || '请选择目标',
             targetType: pendingTarget.targetType || 'cell',
             range: pendingTarget.range || 99,
             filter: pendingTarget.filter || 'all',
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
+            source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
+            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            selectionMode: pendingTarget.selectionMode,
+            minSelections: pendingTarget.minSelections,
+            maxSelections: pendingTarget.maxSelections,
+            min: pendingTarget.minSelections,
+            max: pendingTarget.maxSelections,
+            canCancel: pendingTarget.canCancel,
+            resumeOnCancel: pendingTarget.resumeOnCancel,
+            rollbackOnCancel: pendingTarget.rollbackOnCancel ?? skillDef.rollbackPendingTargetOnCancel,
           }
           battleDebugLog('[STAGE2] next.pendingTargetSelection stored:', { playerId: next.pendingTargetSelection.playerId, hasEffectCode: !!next.pendingTargetSelection.effectCode, effectCodeLen: next.pendingTargetSelection.effectCode ? next.pendingTargetSelection.effectCode.length : 0 })
         }
@@ -2621,6 +2729,17 @@ function applyBattleActionInternal(
         }
       });
 
+      const endingPlayer = next.players.find(
+        player => isSamePlayer(player.playerId, action.playerId),
+      )
+      for (const card of endingPlayer?.hand || []) {
+        if (card.temporaryCostReductionTurnNumber !== next.turn.turnNumber) continue
+        if (card.baseActionPointCost !== undefined) {
+          card.actionPointCost = card.baseActionPointCost
+        }
+        delete card.baseActionPointCost
+        delete card.temporaryCostReductionTurnNumber
+      }
       next.turn.phase = "end"
       return next
     }
@@ -2638,6 +2757,11 @@ function applyBattleActionInternal(
       const next = safeCloneBattleState(state)
       const pending = next.pendingOptionSelection
       if (!pending) throw new BattleRuleError('[pendingOptionSelect] validated pending session disappeared')
+      if (pending.transaction) {
+        return resumeSuspendableActionTransaction(next, pending.transaction, {
+          selectedOption: action.selectedOption,
+        })
+      }
       next.pendingOptionSelection = undefined
       return resumePendingInteraction(next, pending, action.playerId, {
         selectedOption: action.selectedOption,
@@ -2650,6 +2774,22 @@ function applyBattleActionInternal(
       if (!pending) {
         throw new BattleRuleError('[pendingTargetSelect] validated pending session disappeared')
       }
+      const submittedTargets = validatedPendingTargets || []
+      if (pending.transaction) {
+        const firstTarget = submittedTargets[0]
+        const targetInput: SuspendableInteractionInput = firstTarget?.type === 'piece'
+          ? {
+              targetPieceId: firstTarget.pieceId,
+              selectedTargets: submittedTargets,
+            }
+          : {
+              targetX: firstTarget?.type === 'cell' ? firstTarget.x : undefined,
+              targetY: firstTarget?.type === 'cell' ? firstTarget.y : undefined,
+              selectedTargets: submittedTargets,
+            }
+        return resumeSuspendableActionTransaction(next, pending.transaction, targetInput)
+      }
+      const validatedPendingTarget = submittedTargets[0]
       const x = validatedPendingTarget?.type === 'cell'
         ? validatedPendingTarget.x
         : (action as any).targetX
@@ -2664,9 +2804,11 @@ function applyBattleActionInternal(
         : undefined
       const resolvedPending = {
         ...pending,
-        selectedTargets: [...(pending.selectedTargets || []), validatedPendingTarget!],
+        selectedTargets: [...(pending.selectedTargets || []), ...submittedTargets],
       }
-      const advancedPending = advancePendingTargetSession(pending, validatedPendingTarget!)
+      const advancedPending = submittedTargets.length === 1
+        ? advancePendingTargetSession(pending, validatedPendingTarget!)
+        : undefined
       if (advancedPending) {
         next.pendingTargetSelection = advancedPending
         return next
@@ -2720,9 +2862,10 @@ function applyBattleActionInternal(
       if (setPendingInteraction(next, result, pending.triggerContext || {}, {
         continuationContext: pending.continuationContext,
         pendingQueue: pending.pendingQueue,
-        pendingReactiveCards: pending.pendingReactiveCards,
-        pendingAction: pending.pendingAction,
-      })) {
+          pendingReactiveCards: pending.pendingReactiveCards,
+          pendingAction: pending.pendingAction,
+          rollbackOnCancel: pending.rollbackOnCancel,
+        })) {
         return next
       }
       return resumePendingInteraction(next, pending, action.playerId, {}, true)
@@ -2795,7 +2938,17 @@ function applyBattleActionInternal(
       }
 
       // 执行卡牌
-      const result = executeCardFunction(cardDef, action.playerId, next, undefined, targetPiece, targetPosition, action.selectedOption, (action as any).extraTargets)
+      const result = executeCardFunction(
+        cardDef,
+        action.playerId,
+        next,
+        undefined,
+        targetPiece,
+        targetPosition,
+        action.selectedOption,
+        (action as any).extraTargets,
+        paidCardInstance,
+      )
 
       // 处理目标选择
       if (result.needsTargetSelection) {
@@ -2838,12 +2991,13 @@ function applyBattleActionInternal(
       })
 
       // 触发手牌使用后规则
-      const afterCardPlayResult = globalTriggerSystem.checkTriggers(next, {
-        type: "afterCardPlay",
+      const afterCardPlayContext = {
+        type: "afterCardPlay" as const,
         playerId: action.playerId,
         cardId: cardInstance.cardId,
-        cardInstanceId: cardInstance.instanceId
-      });
+        cardInstanceId: cardInstance.instanceId,
+      }
+      const afterCardPlayResult = globalTriggerSystem.checkTriggers(next, afterCardPlayContext)
       assertNoUnhandledInteraction(afterCardPlayResult, 'afterCardPlay')
 
       // 处理触发效果的消息
@@ -2870,6 +3024,422 @@ function applyBattleActionInternal(
   }
 }
 
+function cloneActionEnvelope(action: BattleAction): BattleAction {
+  return JSON.parse(JSON.stringify(action)) as BattleAction
+}
+
+function createSuspendableActionTransaction(
+  state: BattleState,
+  action: BattleAction,
+): SuspendableActionTransaction {
+  const runtime = getActiveRuleRuntime()
+  return {
+    protocolVersion: SUSPENDABLE_ACTION_TRANSACTION_PROTOCOL_VERSION,
+    rootAction: cloneActionEnvelope(action),
+    baseTargetingRevision: Number.isSafeInteger(state.targetingRevision)
+      ? state.targetingRevision!
+      : 0,
+    answers: [],
+    runtimeCheckpoint: runtime
+      ? {
+          rootSeed: runtime.rootSeed,
+          tick: runtime.clock.tick,
+          snapshot: runtime.snapshot(),
+        }
+      : undefined,
+  }
+}
+
+function transactionReplayState(
+  state: BattleState,
+  transaction: SuspendableActionTransaction,
+): BattleState {
+  const replay = safeCloneBattleState(state)
+  replay.pendingOptionSelection = undefined
+  replay.pendingTargetSelection = undefined
+  replay.targetingRevision = transaction.baseTargetingRevision
+  return replay
+}
+
+function replayActionEnvelope(transaction: SuspendableActionTransaction): BattleAction {
+  const action = cloneActionEnvelope(transaction.rootAction as BattleAction)
+  for (const answer of transaction.answers) {
+    if (answer.key.consumerOrdinal !== -1) continue
+    if (answer.input.selectedOption !== undefined) {
+      ;(action as any).selectedOption = answer.input.selectedOption
+    }
+  }
+  return action
+}
+
+function setSuspendableTransactionPending(
+  authorityState: BattleState,
+  transaction: SuspendableActionTransaction,
+  pendingError: {
+    key: SuspendableActionTransaction['currentInteraction']
+    prompt: SuspendableInteractionPrompt
+  },
+): BattleState {
+  if (!pendingError.key) {
+    throw new BattleRuleError(
+      'Suspendable transaction did not provide an interaction key',
+      'SUSPENDABLE_ACTION_KEY_MISSING',
+    )
+  }
+  const next = safeCloneBattleState(authorityState)
+  next.pendingOptionSelection = undefined
+  next.pendingTargetSelection = undefined
+  const pendingTransaction: SuspendableActionTransaction = {
+    ...transaction,
+    currentInteraction: pendingError.key,
+  }
+  const sourceType = pendingError.key.consumerKind === 'reactiveCard'
+    ? 'card'
+    : pendingError.key.consumerKind
+  const source = {
+    type: sourceType as 'skill' | 'card' | 'rule',
+    id: pendingError.key.consumerId,
+    pieceId: pendingError.prompt.sourcePieceId || pendingError.key.sourceId,
+  }
+  if (pendingError.prompt.kind === 'option') {
+    next.pendingOptionSelection = {
+      playerId: pendingError.prompt.playerId || next.turn.currentPlayerId,
+      title: pendingError.prompt.title || 'Choose an option',
+      options: pendingError.prompt.options || [],
+      source,
+      canCancel: pendingError.prompt.canCancel,
+      cancelValue: pendingError.prompt.cancelValue,
+      selectionMode: pendingError.prompt.selectionMode,
+      presentation: pendingError.prompt.presentation,
+      minSelections: pendingError.prompt.minSelections,
+      maxSelections: pendingError.prompt.maxSelections,
+      transaction: pendingTransaction,
+      suspendedTurn: pendingError.prompt.suspendedTurn,
+    }
+    return next
+  }
+  next.pendingTargetSelection = {
+    playerId: pendingError.prompt.playerId || next.turn.currentPlayerId,
+    ownerPlayerId: pendingError.prompt.playerId || next.turn.currentPlayerId,
+    title: pendingError.prompt.title || 'Choose a target',
+    targetType: (pendingError.prompt.targetType || 'piece') as 'piece' | 'cell' | 'grid',
+    range: pendingError.prompt.range,
+    filter: pendingError.prompt.filter,
+    candidates: pendingError.prompt.candidates as PendingTargetSelectionSession['candidates'],
+    fixedCandidates: Array.isArray(pendingError.prompt.candidates),
+    selectionMode: pendingError.prompt.selectionMode,
+    minSelections: pendingError.prompt.minSelections,
+    maxSelections: pendingError.prompt.maxSelections,
+    min: pendingError.prompt.minSelections,
+    max: pendingError.prompt.maxSelections,
+    resumeOnCancel: pendingError.prompt.resumeOnCancel,
+    rollbackOnCancel: pendingError.prompt.rollbackOnCancel,
+    candidateState: pendingError.prompt.candidateState as BattleState | undefined,
+    source,
+    canCancel: pendingError.prompt.canCancel,
+    transaction: pendingTransaction,
+    suspendedTurn: pendingError.prompt.suspendedTurn,
+  }
+  return next
+}
+
+function uniqueSuspendableTimeoutCandidates<T>(values: T[]): T[] {
+  const seen = new Set<string>()
+  return values.filter(value => {
+    const key = JSON.stringify(value)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function mandatoryTimeoutTargetInput(
+  authorityState: BattleState,
+  transaction: SuspendableActionTransaction,
+  key: NonNullable<SuspendableActionTransaction['currentInteraction']>,
+  prompt: SuspendableInteractionPrompt,
+  runtime: RuleRuntime,
+): SuspendableInteractionInput {
+  const pendingState = setSuspendableTransactionPending(authorityState, transaction, { key, prompt })
+  const pending = pendingState.pendingTargetSelection
+  if (!pending) throw new BattleRuleError('Timed-out target interaction did not produce a target session')
+  const finalized = finalizePendingTargetSession(
+    pending.candidateState || pendingState,
+    pending,
+    transaction.baseTargetingRevision,
+  )
+  const candidates = uniqueSuspendableTimeoutCandidates(finalized.candidates || [])
+  if (candidates.length === 0) {
+    throw new BattleRuleError(
+      'Timed-out mandatory transaction target has no legal candidates',
+      'PENDING_TIMEOUT_NO_CANDIDATES',
+    )
+  }
+  if (prompt.selectionMode === 'multi') {
+    const minSelections = Number.isSafeInteger(prompt.minSelections)
+      ? Math.max(0, prompt.minSelections!)
+      : 1
+    if (candidates.length < minSelections) {
+      throw new BattleRuleError(
+        'Timed-out mandatory transaction multi-target has too few legal candidates',
+        'PENDING_TIMEOUT_NO_CANDIDATES',
+      )
+    }
+    const selectedTargets = candidates.slice(0, minSelections)
+    const first = selectedTargets[0]
+    return first?.type === 'piece'
+      ? { targetPieceId: first.pieceId, selectedTargets }
+      : { targetX: first?.x, targetY: first?.y, selectedTargets }
+  }
+  const index = runtime.nextInt(`${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`, candidates.length)
+  const target = candidates[index]
+  return target.type === 'piece'
+    ? { targetPieceId: target.pieceId, selectedTargets: [target], timeoutRandomBound: candidates.length }
+    : { targetX: target.x, targetY: target.y, selectedTargets: [target], timeoutRandomBound: candidates.length }
+}
+
+function runSuspendableActionTransaction(
+  authorityState: BattleState,
+  replayState: BattleState,
+  transaction: SuspendableActionTransaction,
+): BattleState {
+  if (transaction.protocolVersion !== SUSPENDABLE_ACTION_TRANSACTION_PROTOCOL_VERSION) {
+    throw new BattleRuleError(
+      'Suspendable action transaction protocol mismatch',
+      'SUSPENDABLE_ACTION_PROTOCOL_MISMATCH',
+    )
+  }
+  const runtimeAnswers = transaction.answers.filter(answer => answer.key.consumerOrdinal !== -1)
+  const transactionRuntime = new SuspendableActionRuntime(runtimeAnswers)
+  const outerRuleRuntime = getActiveRuleRuntime()
+  const outerRuntimeSnapshot = outerRuleRuntime?.snapshot()
+  const triggerSnapshot = globalTriggerSystem.snapshotTransactionState()
+  let replayRuleRuntime = outerRuleRuntime
+  if (transaction.runtimeCheckpoint) {
+    replayRuleRuntime = new RuleRuntime({
+      rootSeed: transaction.runtimeCheckpoint.rootSeed,
+      cursors: transaction.runtimeCheckpoint.snapshot.cursors,
+      tick: transaction.runtimeCheckpoint.tick,
+    })
+    replayRuleRuntime.restore(transaction.runtimeCheckpoint.snapshot)
+  }
+  for (const answer of transaction.answers) {
+    const bound = answer.input.timeoutRandomBound
+    if (!replayRuleRuntime || !Number.isSafeInteger(bound) || Number(bound) <= 0) continue
+    replayRuleRuntime.nextInt(
+      `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
+      Number(bound),
+    )
+  }
+  const execute = () => withSuspendableActionRuntime(transactionRuntime, () => {
+    let reduced = applyBattleActionInternal(replayState, replayActionEnvelope(transaction))
+    const directPending = reduced.pendingOptionSelection
+    if (directPending?.pendingAction && !directPending.transaction) {
+      const directSource = directPending.source
+      transactionRuntime.suspend({
+        consumerKind: directSource?.type === 'card' ? 'card' : 'skill',
+        consumerId: directSource?.id || 'direct-option',
+        sourceId: directSource?.pieceId,
+        consumerOrdinal: -1,
+      }, {
+        kind: 'option',
+        playerId: directPending.playerId,
+        title: directPending.title,
+        options: directPending.options,
+        canCancel: directPending.canCancel,
+        cancelValue: directPending.cancelValue,
+        selectionMode: directPending.selectionMode,
+        presentation: directPending.presentation,
+        minSelections: directPending.minSelections,
+        maxSelections: directPending.maxSelections,
+        suspendedTurn: { ...reduced.turn },
+      })
+    }
+    let directTarget = reduced.pendingTargetSelection
+    let directTargetStage = 0
+    while (directTarget && !directTarget.transaction) {
+      const rootAction = transaction.rootAction as BattleAction
+      const directSource = directTarget.source
+      const key: NonNullable<SuspendableActionTransaction['currentInteraction']> = {
+        consumerKind: (rootAction.type === 'playCard' ? 'card' : 'skill') as 'card' | 'skill',
+        consumerId: directSource?.id
+          || ('skillId' in rootAction ? rootAction.skillId : undefined)
+          || ('cardInstanceId' in rootAction ? rootAction.cardInstanceId : undefined)
+          || 'direct-target',
+        sourceId: directSource?.pieceId || ('pieceId' in rootAction ? rootAction.pieceId : undefined) || undefined,
+        consumerOrdinal: -2 - directTargetStage,
+      }
+      const input = transactionRuntime.takeAnswer(key)
+      if (!input) {
+        transactionRuntime.suspend(key, {
+          kind: 'target',
+          playerId: directTarget.playerId,
+          title: directTarget.title,
+          targetType: directTarget.targetType,
+          range: directTarget.range,
+          filter: directTarget.filter,
+          candidates: directTarget.candidates,
+          selectionMode: directTarget.selectionMode,
+          minSelections: directTarget.minSelections,
+          maxSelections: directTarget.maxSelections,
+          canCancel: directTarget.canCancel !== false,
+          rollbackOnCancel: directTarget.rollbackOnCancel,
+          suspendedTurn: { ...reduced.turn },
+          sourcePieceId: key.sourceId,
+          candidateState: reduced,
+        })
+      }
+      const resolvedInput = input!
+      if (resolvedInput.cancelled) {
+        if (directTarget.rollbackOnCancel) {
+          transactionRuntime.assertReplayComplete()
+          return safeCloneBattleState(authorityState)
+        }
+        reduced.pendingTargetSelection = undefined
+      } else {
+        const selectedTargets = (resolvedInput.selectedTargets || []) as Array<{
+          type: 'piece' | 'cell'; pieceId?: string; x?: number; y?: number
+        }>
+        const selectedTarget = selectedTargets[0]
+        const targetPieceId = resolvedInput.targetPieceId
+          || (selectedTarget?.type === 'piece' ? selectedTarget.pieceId : undefined)
+        const targetX = resolvedInput.targetX
+          ?? (selectedTarget?.type === 'cell' ? selectedTarget.x : undefined)
+        const targetY = resolvedInput.targetY
+          ?? (selectedTarget?.type === 'cell' ? selectedTarget.y : undefined)
+        if (!targetPieceId && (!Number.isInteger(targetX) || !Number.isInteger(targetY))) {
+          throw new BattleRuleError(
+            'Suspendable direct target replay is missing its selected target',
+            'SUSPENDABLE_ACTION_REPLAY_MISMATCH',
+          )
+        }
+        const finalized = finalizePendingTargetSession(
+          reduced,
+          directTarget,
+          transaction.baseTargetingRevision,
+        )
+        reduced.pendingTargetSelection = finalized
+        reduced = applyBattleActionInternal(reduced, {
+          type: 'pendingTargetSelect',
+          playerId: directTarget.playerId,
+          targetPieceId,
+          targetX,
+          targetY,
+          selectionId: finalized.selectionId,
+          stateRevision: finalized.stateRevision,
+          extraTargets: selectedTargets.slice(1).map(target => target.type === 'piece'
+            ? { pieceId: target.pieceId }
+            : { x: target.x, y: target.y }),
+        })
+      }
+      directTargetStage += 1
+      directTarget = reduced.pendingTargetSelection
+    }
+    transactionRuntime.assertReplayComplete()
+    return reduced
+  })
+  try {
+    const reduced = replayRuleRuntime && replayRuleRuntime !== outerRuleRuntime
+      ? withRuleRuntime(replayRuleRuntime, execute)
+      : execute()
+    if (outerRuleRuntime && replayRuleRuntime && replayRuleRuntime !== outerRuleRuntime) {
+      outerRuleRuntime.restore(replayRuleRuntime.snapshot())
+    }
+    return reduced
+  } catch (error) {
+    if (outerRuleRuntime && outerRuntimeSnapshot) outerRuleRuntime.restore(outerRuntimeSnapshot)
+    globalTriggerSystem.restoreTransactionState(triggerSnapshot)
+    if (!isSuspendableActionPending(error)) throw error
+    const rootActionType = (transaction.rootAction as { type?: string } | undefined)?.type
+    const shouldAutoResolveTimeout = rootActionType === 'turnTimeout'
+      && error.key.eventType === 'endTurn'
+    if (shouldAutoResolveTimeout) {
+      let input: SuspendableInteractionInput
+      if (error.prompt.canCancel !== false) {
+        input = error.prompt.kind === 'option' && error.prompt.cancelValue !== undefined
+          ? { selectedOption: error.prompt.cancelValue }
+          : { cancelled: true }
+      } else {
+        if (!replayRuleRuntime) {
+          throw new BattleRuleError(
+            'Mandatory timeout transaction requires a deterministic rule runtime',
+            'PENDING_TIMEOUT_RUNTIME_REQUIRED',
+          )
+        }
+        if (error.prompt.kind === 'option') {
+          const candidates = uniqueSuspendableTimeoutCandidates(error.prompt.options || [])
+          if (candidates.length === 0) {
+            throw new BattleRuleError(
+              'Timed-out mandatory transaction option has no legal candidates',
+              'PENDING_TIMEOUT_NO_CANDIDATES',
+            )
+          }
+          if (error.prompt.selectionMode === 'multi') {
+            const minSelections = Number.isSafeInteger(error.prompt.minSelections)
+              ? Math.max(0, error.prompt.minSelections!)
+              : 1
+            if (candidates.length < minSelections) {
+              throw new BattleRuleError(
+                'Timed-out mandatory transaction multi-select has too few legal candidates',
+                'PENDING_TIMEOUT_NO_CANDIDATES',
+              )
+            }
+            input = { selectedOption: candidates.slice(0, minSelections) }
+          } else {
+            const index = replayRuleRuntime.nextInt(
+              `${RANDOM_STREAM_NAMES.skillEffect}/pending-timeout`,
+              candidates.length,
+            )
+            input = { selectedOption: candidates[index], timeoutRandomBound: candidates.length }
+          }
+        } else {
+          input = mandatoryTimeoutTargetInput(authorityState, transaction, error.key, error.prompt, replayRuleRuntime)
+        }
+      }
+      const resumed = {
+        ...transaction,
+        answers: [...transaction.answers, { key: error.key, input }],
+        currentInteraction: undefined,
+      }
+      return runSuspendableActionTransaction(
+        authorityState,
+        transactionReplayState(authorityState, resumed),
+        resumed,
+      )
+    }
+    return setSuspendableTransactionPending(authorityState, transaction, {
+      key: error.key,
+      prompt: error.prompt,
+    })
+  }
+}
+
+function resumeSuspendableActionTransaction(
+  state: BattleState,
+  transaction: SuspendableActionTransaction,
+  input: SuspendableInteractionInput,
+): BattleState {
+  if (!transaction.currentInteraction) {
+    throw new BattleRuleError(
+      'Suspendable action has no current interaction',
+      'SUSPENDABLE_ACTION_KEY_MISSING',
+    )
+  }
+  const resumed: SuspendableActionTransaction = {
+    ...transaction,
+    answers: [
+      ...transaction.answers,
+      { key: transaction.currentInteraction, input: { ...input } },
+    ],
+    currentInteraction: undefined,
+  }
+  return runSuspendableActionTransaction(
+    state,
+    transactionReplayState(state, resumed),
+    resumed,
+  )
+}
+
 export function assertBattleNotTerminal(state: BattleState): void {
   if (state.terminalResult) {
     throw new BattleRuleError(
@@ -2891,7 +3461,14 @@ export function applyBattleAction(
   const actionIndex = Array.isArray(state.extensions?.debugBattle?.actionLog)
     ? state.extensions.debugBattle.actionLog.length
     : 0
-  const reduced = applyBattleActionInternal(state, action)
+  const hasPending = !!state.pendingOptionSelection || !!state.pendingTargetSelection
+  const reduced = hasPending
+    ? applyBattleActionInternal(state, action)
+    : runSuspendableActionTransaction(
+        state,
+        state,
+        createSuspendableActionTransaction(state, action),
+      )
   const advancesTargetingRevision = !isTurnTimerSystemAction(action)
     || action.type === 'turnTimeout'
   let next = advancesTargetingRevision

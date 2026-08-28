@@ -10,6 +10,8 @@ vi.mock('@/lib/game/triggers', () => ({
     removeRule:      vi.fn(),
     clearRules:      vi.fn(),
     getRules:        vi.fn(() => []),
+    snapshotTransactionState: vi.fn(() => ({ nextRootEventId: 0, ruleLimits: [] })),
+    restoreTransactionState: vi.fn(),
   },
   TriggerType: {},
 }))
@@ -466,7 +468,7 @@ describe('interrupted skill release', () => {
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((battle: any, context: any) => {
       if (context.type === 'beforeSkillUse') {
         beforeCalls.push(context)
-        if (!context.pendingRuleId) return { success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'], title: 'Choose', pendingRuleId: 'pending-rule', pendingRuleSourceId: 'pending-caster' } as any
+        if (context.selectedOption === undefined) return { success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'], title: 'Choose', pendingRuleId: 'pending-rule', pendingRuleSourceId: 'pending-caster' } as any
       }
       return { success: true, messages: [], blocked: false } as any
     })

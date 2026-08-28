@@ -2,10 +2,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const projectRoot = process.cwd()
 const battlePagePath = path.join(projectRoot, 'data', 'pages', 'battle.html')
+const battlePresentationPath = path.join(projectRoot, 'data', 'pages', 'js', 'battle-ui', 'battle-presentation.js')
 
 function readBattlePage(): string {
   return fs.readFileSync(battlePagePath, 'utf8')
@@ -110,6 +111,135 @@ describe('battle page runtime source', () => {
     expect(duplicates).toEqual([])
   })
 
+  it('marks every initial training roster piece as core', async () => {
+    const html = readBattlePage()
+    const createInitialBattleForPlayers = vi.fn(async () => ({
+      pieces: [
+        { instanceId: 'training-red-core' },
+        { instanceId: 'training-blue-core', isCore: false },
+      ],
+      players: [
+        { playerId: 'training-red', faction: 'red', actionPoints: 0 },
+        { playerId: 'training-blue', faction: 'blue', actionPoints: 0 },
+      ],
+      turn: { currentPlayerId: 'training-red' },
+      skillsById: {},
+    }))
+    const context = vm.createContext({
+      window: { RvBGameEngine: { ensure: async () => ({ createInitialBattleForPlayers }) } },
+      skillsById: {},
+      resolveTrainingInitialPieces: (alignment: string) => [{ id: `${alignment}-piece` }],
+    })
+    new vm.Script(`async ${runtimeFunction(html, 'trainingApiFetch')}`).runInContext(context)
+
+    const state = await (context as any).trainingApiFetch('POST', {
+      firstPlayerId: 'training-red', firstFaction: 'red', secondFaction: 'blue',
+    })
+
+    expect(createInitialBattleForPlayers).toHaveBeenCalledOnce()
+    expect(state.pieces).toEqual([
+      { instanceId: 'training-red-core', isCore: true },
+      { instanceId: 'training-blue-core', isCore: true },
+    ])
+  })
+
+  it('uses the instance-aware display description in the card detail modal', () => {
+    expect(runtimeFunction(readBattlePage(), 'showCardDetail'))
+      .toMatch(/cardDisplayDescription\(cardInstance, def\)/)
+  })
+
+  it('includes template-derived skills in battle piece details without adding them to runtime skills', () => {
+    const context = vm.createContext({
+      PIECES_BY_ID: {
+        'blue-ichigo': {
+          transformedSkills: [{ skillId: 'ichigo-black-getsuga-tensho', triggeredBy: 'ichigo-bankai-tensa-zangetsu' }],
+        },
+      },
+    })
+    new vm.Script([
+      runtimeFunction(readBattlePage(), 'pieceDispSkills'),
+      runtimeFunction(readBattlePage(), 'skillIdOf'),
+      runtimeFunction(readBattlePage(), 'pieceInfoDisplaySkills'),
+    ].join('\n')).runInContext(context)
+
+    const piece = {
+      templateId: 'blue-ichigo',
+      skills: [{ skillId: 'ichigo-zangetsu' }, { skillId: 'ichigo-bankai-tensa-zangetsu' }],
+    }
+    const displayed = (context as any).pieceInfoDisplaySkills(piece)
+
+    expect(displayed.map((skill: any) => skill.skillId)).toEqual([
+      'ichigo-zangetsu', 'ichigo-bankai-tensa-zangetsu', 'ichigo-black-getsuga-tensho',
+    ])
+    expect(displayed[2]).toMatchObject({ derived: true, triggeredBy: 'ichigo-bankai-tensa-zangetsu' })
+    expect(piece.skills).toHaveLength(2)
+    expect((context as any).pieceDispSkills(piece).map((skill: any) => skill.skillId))
+      .not.toContain('ichigo-black-getsuga-tensho')
+  })
+
+  it('keeps a single-card hand selection out of the generic option picker and submits through hand controls', async () => {
+    const overlay = { classList: { remove: vi.fn() } }
+    const showOptionPicker = vi.fn()
+    const doAction = vi.fn().mockResolvedValue(undefined)
+    const context = vm.createContext({
+      G: {
+        turn: { turnNumber: 2 },
+        pendingOptionSelection: {
+          playerId: 'player-red', selectionId: 'prophecy-single',
+          stateRevision: 7, canCancel: true,
+          selectionMode: 'single', presentation: 'hand',
+          options: [{ value: 'holy-card-1' }],
+        },
+      },
+      pendingHandOptionSelection: { selectionId: null, selectedValues: [], submitting: false },
+      pendingOptionSelectionForMe: () => true,
+      pendingTargetSelectionForMe: () => false,
+      showOptionPicker,
+      doAction,
+      myPlayerId: 'player-red',
+      setStatusMsg: vi.fn(),
+      renderHand: vi.fn(),
+      renderActionBar: vi.fn(),
+      renderPendingHandSelectionControls: vi.fn(),
+      document: { getElementById: (id: string) => id === 'optionPickerOverlay' ? overlay : null },
+      pendingSkill: null,
+    })
+    vm.runInContext('let _pendingChoiceShown = null; let pendingOptionAction = null; let _pickerOptions = [];', context)
+    new vm.Script([
+      runtimeFunction(readBattlePage(), 'isPendingHandSelection'),
+      runtimeFunction(readBattlePage(), 'pendingHandCandidateValues'),
+      runtimeFunction(readBattlePage(), 'syncPendingHandSelection'),
+      runtimeFunction(readBattlePage(), 'syncAuthoritativePendingPresentation'),
+      runtimeFunction(readBattlePage(), 'togglePendingHandOption'),
+      'async ' + runtimeFunction(readBattlePage(), 'confirmPendingHandOptionSelection'),
+      'async ' + runtimeFunction(readBattlePage(), 'cancelPendingHandOptionSelection'),
+    ].join('\n')).runInContext(context)
+
+    ;(context as any).syncAuthoritativePendingPresentation()
+
+    expect(showOptionPicker).not.toHaveBeenCalled()
+    expect(overlay.classList.remove).toHaveBeenCalledWith('show')
+    expect((context as any).pendingHandOptionSelection.selectionId).toBe('prophecy-single')
+
+    ;(context as any).togglePendingHandOption('holy-card-1')
+    await (context as any).confirmPendingHandOptionSelection()
+    expect(doAction).toHaveBeenNthCalledWith(1, {
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      selectedOption: 'holy-card-1',
+      selectionId: 'prophecy-single',
+      stateRevision: 7,
+    })
+
+    await (context as any).cancelPendingHandOptionSelection()
+    expect(doAction).toHaveBeenNthCalledWith(2, {
+      type: 'cancelPendingSelection',
+      playerId: 'player-red',
+      selectionId: 'prophecy-single',
+      stateRevision: 7,
+    })
+  })
+
   it('hides an active target-selection overlay when target interaction is cleared', () => {
     const html = readBattlePage()
     const overlay = { classList: createClassList() }
@@ -137,7 +267,11 @@ describe('battle page runtime source', () => {
       let pendingSkill = { skillId: 'shadow-step', targetType: 'cell' }
       let pendingCardAction = null
       let targetSubmissionPending = null
+      let pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
       let pendingMove = false
+      ${runtimeFunction(html, 'isPendingBoardMultiTarget')}
+      ${runtimeFunction(html, 'pendingBoardMultiLimits')}
+      ${runtimeFunction(html, 'pendingBoardMultiSummary')}
       ${runtimeFunction(html, 'renderTargetOverlay')}
       ${runtimeFunction(html, 'clearTargetInteraction')}
       renderTargetOverlay()
@@ -185,8 +319,12 @@ describe('battle page runtime source', () => {
       let pendingSkill = { skillId: 'shadow-step', targetType: 'cell' }
       let pendingCardAction = null
       let targetSubmissionPending = null
+      let pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
       let pendingMove = false
       const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
+      ${runtimeFunction(html, 'isPendingBoardMultiTarget')}
+      ${runtimeFunction(html, 'pendingBoardMultiLimits')}
+      ${runtimeFunction(html, 'pendingBoardMultiSummary')}
       ${runtimeFunction(html, 'renderTargetOverlay')}
       ${runtimeFunction(html, 'submitTargetAction')}
       renderTargetOverlay()
@@ -199,6 +337,79 @@ describe('battle page runtime source', () => {
     expect(overlay.classList.contains('show')).toBe(false)
     expect(boardRenders).toBe(0)
     expect(actionBarRenders).toBe(0)
+  })
+
+  it('routes Grand Crusade confirmation through presentation and submits selected pieces once', () => {
+    const html = readBattlePage()
+    const renderBoard = vi.fn()
+    const renderTargetOverlay = vi.fn()
+    const setStatusMsg = vi.fn()
+    const doAction = vi.fn(() => Promise.resolve())
+    const pieces = ['ally-a', 'ally-b', 'ally-c', 'ally-d'].map(instanceId => ({
+      instanceId, name: instanceId,
+    }))
+    const context = vm.createContext({
+      window: {},
+      G: { pieces },
+      myPlayerId: 'player-red',
+      renderBoard,
+      renderTargetOverlay,
+      setStatusMsg,
+      doAction,
+      currentTargetSourceName: () => '圣光大远征',
+      withClientActionId: (action: Record<string, unknown>) => ({ ...action, clientActionId: 'grand-crusade-1' }),
+      addLog: vi.fn(),
+      Date,
+    })
+    new vm.Script(fs.readFileSync(battlePresentationPath, 'utf8')).runInContext(context)
+
+    vm.runInContext(`
+      let battlePresentation = null
+      let pendingSkill = {
+        turnTargetActionType: 'pendingTargetSelect',
+        turnTargetPlayerId: 'player-red',
+        preparation: {
+          targetType: 'piece', selectionMode: 'multi', minSelections: 1, maxSelections: 3,
+          selectionId: 'grand-crusade-pieces', stateRevision: 7,
+          candidates: G.pieces.map(piece => ({ type: 'piece', pieceId: piece.instanceId })),
+        },
+      }
+      let pendingCardAction = null
+      let targetSubmissionPending = null
+      let pendingBoardTargetSelection = { selectionId: 'grand-crusade-pieces', selectedPieceIds: [] }
+      const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
+      ${runtimeFunction(html, 'isPendingBoardMultiTarget')}
+      ${runtimeFunction(html, 'pendingBoardMultiLimits')}
+      ${runtimeFunction(html, 'togglePendingBoardTarget')}
+      ${runtimeFunction(html, 'submitTargetAction')}
+      ${runtimeFunction(html, 'confirmPendingBoardTargetSelection')}
+      ${runtimeFunction(html, 'handleBattleIntent')}
+      ${runtimeFunction(html, 'dispatchBattleIntent')}
+      battlePresentation = window.BattlePresentation.create({
+        renderer: { init: function() {}, dispose: function() {} },
+        domUi: { update: function() {}, dispose: function() {} },
+        onIntent: handleBattleIntent,
+      })
+    `, context)
+
+    ;(context as any).dispatchBattleIntent({ type: 'confirm-target-selection' })
+    expect(doAction).not.toHaveBeenCalled()
+    expect((context as any).togglePendingBoardTarget(pieces[0])).toBe(true)
+    expect((context as any).togglePendingBoardTarget(pieces[1])).toBe(true)
+    expect((context as any).togglePendingBoardTarget(pieces[2])).toBe(true)
+    expect((context as any).togglePendingBoardTarget(pieces[3])).toBe(false)
+
+    ;(context as any).dispatchBattleIntent({ type: 'confirm-target-selection' })
+    expect(doAction).toHaveBeenCalledOnce()
+    expect(doAction).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetPieceId: 'ally-a',
+      extraTargets: [{ pieceId: 'ally-b' }, { pieceId: 'ally-c' }],
+      selectionId: 'grand-crusade-pieces',
+      stateRevision: 7,
+      clientActionId: 'grand-crusade-1',
+    }))
   })
 
   it('defers and coalesces pending-action presentation until the next animation frame', () => {
@@ -254,6 +465,95 @@ describe('battle page runtime source', () => {
     frames.shift()?.()
     expect(boardRenders).toBe(0)
     expect(actionBarRenders).toBe(1)
+  })
+
+  it('applies the successful training authority receipt before rendering', async () => {
+    const html = readBattlePage()
+    let clearedTimers = 0
+    const elements: Record<string, { disabled?: boolean; textContent?: string }> = {
+      btnEnd: { disabled: false },
+      btnSwitchPov: { textContent: '' },
+    }
+    const nextState = {
+      pieces: [{ instanceId: 'liadrin', currentHp: 14 }],
+      players: [{ playerId: 'player-red', actionPoints: 0, hand: [] }],
+      turn: { currentPlayerId: 'player-red', phase: 'action' },
+      terminalResult: null,
+    }
+    const context = vm.createContext({
+      document: { getElementById: (id: string) => elements[id] ?? null },
+      clearTimeout: () => { clearedTimers += 1 },
+      setMoveButtonDisabled: () => undefined,
+      trainingApiFetch: async () => nextState,
+      createBattlePresentationModel: () => ({}),
+      spawnStateFloaters: () => undefined,
+      flushActionLog: () => undefined,
+      getTrainingPlayerFaction: () => 'red',
+      trainingPlayerLabel: () => '红方',
+      reconcileBattleInteractionState: () => '',
+      restoreSelectedPieceMenu: () => undefined,
+      handleGameOver: () => undefined,
+      setStatusMsg: () => undefined,
+      rejectPendingActionFeedback: () => undefined,
+      recordAuthorityPerformance: () => undefined,
+      requestAuthorityRecovery: () => undefined,
+      renderActionBar: () => undefined,
+      addLog: () => undefined,
+    })
+
+    vm.runInContext(`
+      let G = {
+        pieces: [{ instanceId: 'liadrin', currentHp: 14 }],
+        players: [{ playerId: 'player-red', actionPoints: 3, hand: [] }],
+        turn: { currentPlayerId: 'player-red', phase: 'action' },
+      }
+      let pendingActionFeedback = {
+        clientActionId: 'training-action-1',
+        type: 'playCard',
+        startedAt: 0,
+      }
+      let pendingActionFeedbackTimer = 99
+      let targetSubmissionPending = {
+        clientActionId: 'training-action-1',
+        type: 'playCard',
+        label: '圣光盾',
+      }
+      let pendingSkill = null
+      let pendingCardAction = null
+      let selectedPieceId = null
+      let myPlayerId = 'player-red'
+      let myFaction = 'red'
+      let _use3d = false
+      let battlePresentation = null
+      const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
+      function clearTargetInteraction() {
+        pendingSkill = null
+        pendingCardAction = null
+        targetSubmissionPending = null
+        return true
+      }
+      function render() {
+        globalThis.__pendingAtRender = pendingActionFeedback
+        globalThis.__targetPendingAtRender = targetSubmissionPending
+      }
+      ${runtimeFunction(html, 'clearPendingActionFeedback')}
+      ${runtimeFunction(html, 'applyAuthorityReceipt')}
+      async ${runtimeFunction(html, 'trainingDoAction')}
+    `, context)
+
+    await vm.runInContext(`trainingDoAction({
+      type: 'playCard',
+      playerId: 'player-red',
+      clientActionId: 'training-action-1',
+      targetPieceId: 'liadrin',
+    })`, context)
+
+    expect(context.__pendingAtRender).toBeNull()
+    expect(context.__targetPendingAtRender).toBeNull()
+    expect(vm.runInContext('pendingActionFeedback', context)).toBeNull()
+    expect(vm.runInContext('targetSubmissionPending', context)).toBeNull()
+    expect(vm.runInContext('pendingActionFeedbackTimer', context)).toBeNull()
+    expect(clearedTimers).toBe(1)
   })
 
   it('coalesces a pending-option transition and its matching receipt into one lightweight render', () => {

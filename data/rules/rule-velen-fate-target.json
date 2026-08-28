@@ -1,0 +1,9 @@
+{
+  "id": "rule-velen-fate-target",
+  "name": "\u547d\u8fd0\u5e87\u62a4\u76ee\u6807",
+  "description": "\u547d\u8fd0\u5e87\u62a4\u7684\u76ee\u6807\u6b7b\u4ea1\u65f6\u79fb\u9664\u672a\u5b8c\u7684\u5e87\u62a4\u3002",
+  "trigger": {
+    "type": "onPieceDied"
+  },
+  "skillCode": "var piece = context.rulePiece; var dead = context.sourcePiece;\nif (!piece || !dead || dead.instanceId !== piece.instanceId) return { success: false, message: '' };\nvar before = piece.statusTags ? piece.statusTags.length : 0; piece.statusTags = (piece.statusTags || []).filter(function(tag) { return tag.type !== 'velen-fate-shelter'; }); removeRuleById(piece.instanceId, 'rule-velen-fate-target');\nreturn { success: piece.statusTags.length !== before, message: piece.statusTags.length !== before ? piece.name + '\u6b7b\u4ea1\uff0c\u547d\u8fd0\u5e87\u62a4\u672a\u80fd\u5b8c\u6210' : '' };"
+}

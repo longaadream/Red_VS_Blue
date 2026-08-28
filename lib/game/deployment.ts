@@ -32,6 +32,12 @@ export function toPublicBattleState(
       selectionId: option.selectionId,
       stateRevision: option.stateRevision,
       canCancel: option.canCancel,
+      ...(owner ? {
+        selectionMode: option.selectionMode,
+        presentation: option.presentation,
+        minSelections: option.minSelections,
+        maxSelections: option.maxSelections,
+      } : {}),
     }) as typeof option
   }
   const target = projected.pendingTargetSelection
@@ -53,6 +59,9 @@ export function toPublicBattleState(
         steps: target.steps,
         min: target.min,
         max: target.max,
+        selectionMode: target.selectionMode,
+        minSelections: target.minSelections,
+        maxSelections: target.maxSelections,
         selectedTargets: target.selectedTargets,
         candidates: Array.isArray(target.candidates) ? target.candidates : [],
       } : { candidates: [] }),

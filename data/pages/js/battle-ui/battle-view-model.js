@@ -217,6 +217,9 @@
       interaction: {
         pendingPieceId: interaction.pendingPieceId || null,
         pendingCommandId: interaction.pendingCommandId || null,
+        selectedTargetPieceIds: Array.isArray(interaction.selectedTargetPieceIds)
+          ? interaction.selectedTargetPieceIds.map(String)
+          : [],
       },
       legal: {
         moveCells: normalizeCells(legal.moveCells),

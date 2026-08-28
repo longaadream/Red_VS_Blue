@@ -1,16 +1,23 @@
 {
   "id": "blood-echo-trigger",
-  "name": "血之回响触发",
-  "description": "友军失去圣盾时，添加1张圣光充能手牌。",
-  "keywords": ["圣盾", "充能"],
-  "targetText": "失去圣盾的友军",
-  "effectTags": ["圣盾", "充能", "手牌"],
-  "icon": "🩣",
+  "name": "\u8840\u8272\u56de\u54cd\u00b7\u89e6\u53d1",
+  "description": "\u53cb\u65b9\u5931\u53bb\u3010\u5723\u76fe\u3011\u65f6\u83b7\u5f971\u5f20\u3010\u5723\u5149\u5145\u80fd\u3011\u3002",
+  "keywords": [
+    "\u5723\u5149",
+    "\u624b\u724c"
+  ],
+  "targetText": "\u5931\u53bb\u5723\u76fe\u7684\u53cb\u65b9",
+  "effectTags": [
+    "\u5723\u5149",
+    "\u624b\u724c",
+    "\u89e6\u53d1"
+  ],
+  "icon": "\ud83e\ude78",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { console.log('[blood-echo-trigger] context:', JSON.stringify({ statusId: context.statusId, hasSourcePiece: !!context.sourcePiece, hasPiece: !!context.piece, playerId: context.playerId })); if (context.statusId !== 'divine-shield') return { success: false, message: '不是圣盾状态' }; const sourcePiece = context.sourcePiece || context.piece; if (!sourcePiece) return { success: false, message: '没有sourcePiece' }; console.log('[blood-echo-trigger] sourcePiece:', sourcePiece.name, 'ownerPlayerId:', sourcePiece.ownerPlayerId); const liadrin = battle.pieces.find(function(p) { return p.templateId === 'liadrin' && p.ownerPlayerId === sourcePiece.ownerPlayerId && p.currentHp > 0; }); if (!liadrin) return { success: false, message: '没有找到莉亚德琳' }; console.log('[blood-echo-trigger] found liadrin:', liadrin.name); const player = battle.players.find(function(p) { return p.playerId === sourcePiece.ownerPlayerId; }); if (player) { console.log('[blood-echo-trigger] adding holy-charge to player:', player.playerId); addCardToHand('holy-charge', player.playerId); return { success: true, message: '血之回响：获得1张圣光充能' }; } return { success: false, message: '没有找到玩家' }; }"
+  "code": "function executeSkill(context) {\n  if (context.statusId !== 'divine-shield') return { success: false, message: '' };\n  var sourcePiece = context.sourcePiece || context.piece;\n  if (!sourcePiece) return { success: false, message: '' };\n  var liadrin = battle.pieces.find(function(piece) { return piece.templateId === 'liadrin' && piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0; });\n  if (!liadrin) return { success: false, message: '' };\n  var player = battle.players.find(function(item) { return item.playerId === sourcePiece.ownerPlayerId; });\n  if (!player) return { success: false, message: '' };\n  var added = addCardToHand('holy-charge', player.playerId);\n  return { success: added, message: added ? '\u8840\u8272\u56de\u54cd\u751f\u6210\u4e861\u5f20\u5723\u5149\u5145\u80fd' : '' };\n}"
 }

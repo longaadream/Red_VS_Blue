@@ -1,7 +1,7 @@
 {
   "id": "ichigo-bankai-tensa-zangetsu",
   "name": "卍解·天锁斩月",
-  "description": "攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。AP0，充能1，每局限用1次。",
+  "description": "攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。",
   "keywords": [],
   "targetText": "自身",
   "effectTags": ["buff", "skill-change"],

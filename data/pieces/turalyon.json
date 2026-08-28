@@ -1,0 +1,37 @@
+{
+  "id": "turalyon",
+  "name": "\u56fe\u62c9\u626c",
+  "faction": "good",
+  "description": "\u5723\u5149\u519b\u56e2\u7684\u5927\u9886\u4e3b\uff0c\u4ee5\u5f81\u8ba8\u53f7\u4ee4\u964d\u4f4e\u5723\u5149\u624b\u724c\u7684\u4f7f\u7528\u95e8\u69db\uff0c\u5e76\u5728\u961f\u53cb\u65bd\u653e\u5723\u5149\u540e\u7ec4\u7ec7\u514d\u8d39\u8fdc\u5f81\u79fb\u52a8\u3002",
+  "rarity": "legendary",
+  "image": "turalyon.jpg",
+  "stats": {
+    "maxHp": 15,
+    "attack": 4,
+    "defense": 2,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "turalyon-expedition-order",
+      "level": 1
+    },
+    {
+      "skillId": "turalyon-lightforged-march",
+      "level": 1
+    },
+    {
+      "skillId": "turalyon-grand-crusade",
+      "level": 1
+    }
+  ],
+  "rules": [
+    "rule-turalyon-lightforged-march"
+  ],
+  "relatedCards": [
+    "holy-smite",
+    "holy-heal",
+    "holy-charge"
+  ],
+  "isDefault": false
+}

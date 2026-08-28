@@ -1,11 +1,18 @@
 {
   "id": "muru-lament",
-  "name": "穆鲁的哀鸣",
-  "description": "自动弃置所有圣光手牌。每弃置1张，对所有敌人造成3点真实伤害并为友方治疗2点生命，最多分别结算到6点和6点。若弃置3张以上，所有友方获得圣盾。",
-  "keywords": ["真实伤害", "圣盾"],
-  "targetText": "全体敌人 / 全体友方",
-  "effectTags": ["真实伤害", "治疗", "圣盾"],
-  "icon": "💮",
+  "name": "\u7a46\u9c81\u7684\u633d\u6b4c",
+  "description": "\u9009\u62e9\u5e76\u4e22\u5f031\u81f34\u5f20\u5723\u5149\u624b\u724c\u3002\u6bcf\u4e22\u5f031\u5f20\uff0c\u5bf9\u6240\u6709\u654c\u4eba\u9020\u62102\u70b9\u771f\u5b9e\u4f24\u5bb3\uff0c\u5e76\u4f7f\u6240\u6709\u53cb\u65b9\u6062\u590d2\u70b9\u751f\u547d\u3002\u82e5\u4e22\u5f03\u81f3\u5c113\u5f20\uff0c\u6240\u6709\u53cb\u65b9\u83b7\u5f97\u3010\u5723\u76fe\u3011\uff0c\u5e76\u91cd\u7f6e\u3010\u5723\u5149\u6c72\u53d6\u3011\u7684\u51b7\u5374\u3002",
+  "keywords": [
+    "\u771f\u5b9e\u4f24\u5bb3",
+    "\u5723\u5149"
+  ],
+  "targetText": "\u4e22\u5f031\u81f34\u5f20\u5723\u5149\u624b\u724c / \u6240\u6709\u53cb\u519b\u4e0e\u654c\u519b",
+  "effectTags": [
+    "\u771f\u5b9e\u4f24\u5bb3",
+    "\u6cbb\u7597",
+    "\u5723\u76fe"
+  ],
+  "icon": "\ud83c\udf11",
   "kind": "active",
   "type": "super",
   "cooldownTurns": 2,
@@ -13,7 +20,10 @@
   "chargeCost": 3,
   "powerMultiplier": 1,
   "actionPointCost": 3,
-  "code": "function executeSkill(context) { const caster = context.piece; const battle = context.battle; const player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); const holyCards = player.hand.filter(function(c) { return c.cardId && c.cardId.startsWith('holy-'); }); const cardCount = holyCards.length; if (cardCount === 0) { return { success: false, message: '没有圣光手牌' }; } holyCards.forEach(function(card) { discardCard(card.instanceId); }); const enemies = battle.pieces.filter(function(p) { return p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0; }); const allies = battle.pieces.filter(function(p) { return p.ownerPlayerId === caster.ownerPlayerId && p.currentHp > 0; }); const dmgPerTarget = Math.min(3 * cardCount, 6); const dmgResult = dealDamage(caster, enemies, dmgPerTarget, 'true', battle, 'muru-lament'); const totalDamage = dmgResult.totalDamage || 0; const hlResult = healDamage(caster, allies, 2 * cardCount, battle, 'muru-lament'); const totalHeal = hlResult.totalHeal || 0; if (cardCount >= 3) { allies.forEach(function(ally) { addStatusEffectById(ally.instanceId, { id: 'divine-shield', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); addRuleById(ally.instanceId, 'rule-divine-shield'); }); } return { message: caster.name + '释放穆鲁的哀鸣！弃置' + cardCount + '张圣光手牌，对所有敌人造成' + totalDamage + '点伤害，友方恢复' + totalHeal + '生命' + (cardCount >= 3 ? '，全体获得圣盾！' : ''), success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '自动弃置所有圣光手牌。每弃置1张，对所有敌人造成3点真实伤害并为友方治疗2点生命，最多分别结算到6点和6点。若弃置3张以上，所有友方获得圣盾。', expectedValues: {} }; }",
+  "targeting": {
+    "steps": []
+  },
+  "code": "function executeSkill(context) {\n  var caster = context.piece;\n  var player = battle.players.find(function(item) { return item.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '\u672a\u627e\u5230\u73a9\u5bb6' };\n  var holyCards = player.hand.filter(function(card) { return ['holy-smite', 'holy-heal', 'holy-charge'].indexOf(card.cardId) !== -1; });\n  if (holyCards.length === 0) return { success: false, message: '\u6ca1\u6709\u5723\u5149\u624b\u724c' };\n  var options = holyCards.map(function(card) { return { label: card.name || card.cardId, value: card.instanceId }; });\n  var choice = selectOption({ title: '\u7a46\u9c81\u7684\u633d\u6b4c\uff1a\u9009\u62e9\u8981\u4e22\u5f03\u7684\u5723\u5149\u624b\u724c', options: options, selectionMode: 'multi', presentation: 'hand', minSelections: 1, maxSelections: Math.min(4, holyCards.length), canCancel: true });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  if (!Array.isArray(choice) || choice.length < 1 || choice.length > 4) return { success: false, message: '\u7a46\u9c81\u7684\u633d\u6b4c\u9009\u62e9\u65e0\u6548' };\n  var unique = [];\n  for (var i = 0; i < choice.length; i++) { if (unique.indexOf(choice[i]) !== -1) return { success: false, message: '\u4e0d\u80fd\u91cd\u590d\u9009\u62e9\u540c\u4e00\u5f20\u624b\u724c' }; unique.push(choice[i]); }\n  var selected = unique.map(function(id) { return holyCards.find(function(card) { return card.instanceId === id; }); });\n  if (selected.some(function(card) { return !card; })) return { success: false, message: '\u9009\u62e9\u7684\u5723\u5149\u624b\u724c\u5df2\u5931\u6548' };\n  selected.forEach(function(card) { discardCard(card.instanceId); });\n  var totalDamage = 0; var totalHeal = 0;\n  for (var step = 0; step < selected.length; step++) {\n    var enemies = battle.pieces.filter(function(piece) { return piece.ownerPlayerId !== caster.ownerPlayerId && piece.currentHp > 0; });\n    var allies = battle.pieces.filter(function(piece) { return piece.ownerPlayerId === caster.ownerPlayerId && piece.currentHp > 0; });\n    if (enemies.length > 0) { var damageResult = dealDamage(caster, enemies, 2, 'true', battle, 'muru-lament'); totalDamage += damageResult.totalDamage || 0; }\n    if (allies.length > 0) { var healResult = healDamage(caster, allies, 2, battle, 'muru-lament'); totalHeal += healResult.totalHeal || 0; }\n  }\n  if (selected.length >= 3) {\n    battle.pieces.filter(function(piece) { return piece.ownerPlayerId === caster.ownerPlayerId && piece.currentHp > 0; }).forEach(function(ally) {\n      var shield = ally.statusTags && ally.statusTags.find(function(tag) { return tag.type === 'divine-shield'; });\n      if (!shield) { addStatusEffectById(ally.instanceId, { id: 'divine-shield', name: '\u5723\u76fe', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); addRuleById(ally.instanceId, 'rule-divine-shield'); }\n    });\n    var extractionState = caster.skills && caster.skills.find(function(skill) { return skill.skillId === 'light-extraction'; });\n    if (extractionState) extractionState.currentCooldown = 0;\n  }\n  return { success: true, message: caster.name + '\u53d1\u52a8\u7a46\u9c81\u7684\u633d\u6b4c\uff0c\u4e22\u5f03' + selected.length + '\u5f20\u5723\u5149\u624b\u724c\uff0c\u9020\u6210' + totalDamage + '\u70b9\u4f24\u5bb3\u5e76\u6062\u590d' + totalHeal + '\u70b9\u751f\u547d' };\n}",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"damagePerCard\":2,\"healPerCard\":2,\"maxCards\":4} }; }",
   "range": "all-enemies"
 }

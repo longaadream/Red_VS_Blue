@@ -302,6 +302,23 @@ describe('versioned headless AI environment', () => {
     expect(optionCandidates.slice(0, 3).map(item => (
       item.action.type === 'pendingOptionSelect' ? item.action.selectedOption : undefined
     ))).toEqual(['z', 'ä', '中'])
+    state.pendingOptionSelection = {
+      playerId: 'player-red',
+      title: 'choose holy cards',
+      options: Array.from({ length: 10 }, (_, index) => ({ value: `holy-${index}` })),
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
+      canCancel: false,
+    }
+    const multiCandidates = listLegalAIActions(state, 'player-red')
+    const multiOptions = multiCandidates.map(item => item.action.type === 'pendingOptionSelect' ? item.action.selectedOption : undefined)
+    expect(multiCandidates).toHaveLength(13)
+    expect(multiOptions.every(option => Array.isArray(option))).toBe(true)
+    expect(Math.max(...multiOptions.map(option => Array.isArray(option) ? option.length : 0))).toBe(4)
+    expect(observeBattleForAI(state, 'player-red').pendingOptionSelection)
+      .toMatchObject({ selectionMode: 'multi', presentation: 'hand', minSelections: 1, maxSelections: 4 })
 
     const minato = makePiece({
       instanceId: 'minato', templateId: 'blue-minato', ownerPlayerId: 'player-red', x: 1, y: 1,
@@ -312,9 +329,12 @@ describe('versioned headless AI environment', () => {
     const enteredPending = simulateAITransition(pendingSeed, advance, { rootSeed: FIXED_SEED })
     expect(enteredPending.accepted).toBe(true)
     if (!enteredPending.accepted) throw new Error('Expected Minato begin-turn rule to enter pending target state')
-    expect(enteredPending.state.pendingTargetSelection?.triggerContext).toMatchObject({
-      type: 'beginTurn', pendingRuleId: 'rule-minato-anchor-begin-turn',
+    expect(enteredPending.state.pendingTargetSelection?.transaction?.currentInteraction).toMatchObject({
+      consumerKind: 'rule',
+      consumerId: 'rule-minato-anchor-begin-turn',
+      eventType: 'beginTurn',
     })
+    expect(enteredPending.state.pendingTargetSelection?.triggerContext).toBeUndefined()
     const pending = listLegalAIActions(enteredPending.state, 'player-red')
     expect(pending.some(item => item.kind === 'pending-target')).toBe(true)
     expect(pending.at(-1)?.kind).toBe('cancel-selection')

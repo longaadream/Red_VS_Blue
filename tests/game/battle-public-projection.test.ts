@@ -15,8 +15,21 @@ describe('battle public pending projection', () => {
       selectionId: 'pending-option-1',
       stateRevision: 8,
       canCancel: false,
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
       continuationContext: { private: 'continuation' },
       pendingAction: { type: 'beginPhase' },
+      transaction: {
+        protocolVersion: 1,
+        rootAction: { type: 'playCard', cardInstanceId: 'private-card' },
+        baseTargetingRevision: 7,
+        answers: [{ key: { consumerKind: 'rule', consumerId: 'private-rule', consumerOrdinal: 0 }, input: { selectedOption: 'secret' } }],
+        currentInteraction: { consumerKind: 'rule', consumerId: 'private-rule', consumerOrdinal: 1 },
+        runtimeCheckpoint: { rootSeed: 42, tick: 3, snapshot: { cursors: { secret: 2 }, clockCursor: 1 } },
+      },
+      suspendedTurn: { currentPlayerId: 'player-red', turnNumber: 3, phase: 'end' },
     } as never
 
     const ownerState = toPublicBattleState(state, 'player-red')
@@ -37,6 +50,16 @@ describe('battle public pending projection', () => {
     expect(owner.options).toEqual(['calm', 'rage'])
     expect(opponent.options).toEqual([])
     expect(spectator.options).toEqual([])
+    expect(owner).toMatchObject({
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
+    })
+    for (const projection of [opponent, spectator]) {
+      expect(projection.selectionMode).toBeUndefined()
+      expect(projection.presentation).toBeUndefined()
+    }
     for (const projection of [owner, opponent, spectator]) {
       expect(projection).toMatchObject({
         playerId: 'player-red',
@@ -45,6 +68,8 @@ describe('battle public pending projection', () => {
       })
       expect(projection.continuationContext).toBeUndefined()
       expect(projection.pendingAction).toBeUndefined()
+      expect(projection.transaction).toBeUndefined()
+      expect(projection.suspendedTurn).toBeUndefined()
     }
   })
 
@@ -67,6 +92,16 @@ describe('battle public pending projection', () => {
       effectCode: 'private-effect-code',
       continuationContext: { private: 'continuation' },
       pendingAction: { type: 'beginPhase' },
+      transaction: {
+        protocolVersion: 1,
+        rootAction: { type: 'useBasicSkill', skillId: 'private-skill' },
+        baseTargetingRevision: 8,
+        answers: [],
+        currentInteraction: { consumerKind: 'rule', consumerId: 'private-target-rule', consumerOrdinal: 0 },
+        runtimeCheckpoint: { rootSeed: 7, tick: 4, snapshot: { cursors: {}, clockCursor: 0 } },
+      },
+      suspendedTurn: { currentPlayerId: 'player-red', turnNumber: 4, phase: 'action' },
+      candidateState: { private: 'candidate-checkpoint' },
     } as never
 
     const ownerState = toPublicBattleState(state, 'player-red')
@@ -102,6 +137,9 @@ describe('battle public pending projection', () => {
       expect(projection.effectCode).toBeUndefined()
       expect(projection.continuationContext).toBeUndefined()
       expect(projection.pendingAction).toBeUndefined()
+      expect(projection.transaction).toBeUndefined()
+      expect(projection.suspendedTurn).toBeUndefined()
+      expect(projection.candidateState).toBeUndefined()
     }
   })
 })
