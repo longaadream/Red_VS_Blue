@@ -395,6 +395,11 @@ Windows 输出目录：
 独立映射复制 `_client-stage/node_modules`；缺少该映射时，顶层 standalone 文件仍可能
 存在，但 Next 运行依赖会被漏掉，验证器会拒绝该候选。
 
+Client 构建同样必须把 `_client-stage/node_modules` 独立映射到
+`resources/app/standalone/node_modules`。不能只依赖 `_client-stage` 的整体映射；
+Electron Builder 会漏掉其中嵌套的 `node_modules`。客户端验证器至少要求成品包含
+`next/package.json` 与 `ws/package.json`，否则即使 `standalone/server.js` 存在也会拒绝候选。
+
 成功构建会在 `dist/server-build/server-candidate-manifest.json` 写入内部候选标记、
 基线 commit、工具链版本、完整资源路径/大小/SHA-256，以及 Server EXE 和 Node 运行时
 证据。`_client-stage` 与 `_client-node` 清理后，可独立重放验证：
@@ -461,9 +466,11 @@ npm.cmd run smoke:electron:windows
 ```
 
 脚本只清理与上述产物绝对路径、启动 PID 进程树和专用调试端口相匹配的测试进程。
-服务端会验证 3000 端口的启动/停止；客户端会验证本机模式、无效 TLS 证书拒绝和退出
-清理；编辑器会直接启动最终 portable EXE，在最长 300 秒内等待 renderer，并记录实际
-启动耗时、正式构建中的数据文件列表和退出清理结果。
+服务端会验证 3000 端口的启动/停止；客户端会先把完整 `win-unpacked` 复制到系统临时
+目录中的隔离路径，再从仓库外启动并验证本机模式、数据库、真实 WebSocket 建房、无效
+TLS 证书拒绝和退出清理。这样 Node 无法沿父目录借用源码 `node_modules`，可防止缺包候选
+在工作树内假通过。编辑器会直接启动最终 portable EXE，在最长 300 秒内等待 renderer，
+并记录实际启动耗时、正式构建中的数据文件列表和退出清理结果。
 
 RED-54 的开发态 Electron 棋子选择页使用聚焦冒烟。它启动真实 Electron Client 和内嵌
 本机服务器，创建两名真实 PVP 玩家，强制两个阵营的本地棋子读取失败，验证服务器回退在

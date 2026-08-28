@@ -261,4 +261,15 @@ describe('Electron desktop security boundary', () => {
       to: 'app/www/data',
     })
   })
+
+  test('client explicitly packages the standalone runtime dependencies', () => {
+    const config = JSON.parse(read('electron-builder.client.json')) as {
+      extraResources?: { from?: string; to?: string }[]
+    }
+
+    expect(config.extraResources).toContainEqual({
+      from: '_client-stage/node_modules',
+      to: 'app/standalone/node_modules',
+    })
+  })
 })
