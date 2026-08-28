@@ -7,6 +7,8 @@ const path = require('path')
 const REQUIRED_FILES = [
   'resources/app/electron-client/dist/main.js',
   'resources/app/standalone/server.js',
+  'resources/app/standalone/node_modules/next/package.json',
+  'resources/app/standalone/node_modules/ws/package.json',
   'resources/app/www/index.html',
   'resources/app/init-db.js',
   'resources/node.exe',

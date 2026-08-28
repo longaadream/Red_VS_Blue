@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -493,6 +493,18 @@ async function smokeServer() {
 
 async function smokeClient() {
   const application = applications.client
+  const sourcePackageRoot = path.dirname(application.executable)
+  const isolatedPackageBase = mkdtempSync(path.join(tmpdir(), 'rvb-client-package-smoke-'))
+  const isolatedPackageRoot = path.join(isolatedPackageBase, 'win-unpacked')
+  const relativePackageBaseToTemp = path.relative(path.resolve(tmpdir()), path.resolve(isolatedPackageBase))
+  assert(
+    relativePackageBaseToTemp.length > 0
+      && !relativePackageBaseToTemp.startsWith('..' + path.sep)
+      && !path.isAbsolute(relativePackageBaseToTemp),
+    `Client smoke package base must be owned under the system temp directory: ${isolatedPackageBase}`,
+  )
+  const originalExecutable = application.executable
+  const originalHelperExecutables = application.helperExecutables
   const configuredUserDataDir = process.env.RVB_SMOKE_USER_DATA_DIR
   const userDataDir = configuredUserDataDir
     ? path.resolve(configuredUserDataDir)
@@ -500,6 +512,23 @@ async function smokeClient() {
   const ownsUserDataDir = !configuredUserDataDir
   application.launchArguments = [`--user-data-dir=${userDataDir}`]
   try {
+    assert(existsSync(sourcePackageRoot), `Missing source client package: ${sourcePackageRoot}`)
+    cpSync(sourcePackageRoot, isolatedPackageRoot, { recursive: true })
+    const relativeToRepository = path.relative(root, isolatedPackageRoot)
+    assert(
+      relativeToRepository.startsWith('..' + path.sep) || path.isAbsolute(relativeToRepository),
+      `Client smoke package must be outside the repository: ${isolatedPackageRoot}`,
+    )
+    application.executable = path.join(isolatedPackageRoot, 'RED vs BLUE.exe')
+    application.helperExecutables = [path.join(isolatedPackageRoot, 'resources', 'node.exe')]
+    assert(
+      existsSync(path.join(isolatedPackageRoot, 'resources', 'app', 'standalone', 'node_modules', 'next', 'package.json')),
+      'Isolated client package is missing the standalone Next.js runtime',
+    )
+    assert(
+      existsSync(path.join(isolatedPackageRoot, 'resources', 'app', 'standalone', 'node_modules', 'ws', 'package.json')),
+      'Isolated client package is missing the standalone WebSocket runtime',
+    )
     const { target, rendererBoundary } = await launch(application)
     const connection = await connectTarget(target)
     const tlsProbe = await connection.evaluate(`new Promise((resolve) => {
@@ -565,8 +594,8 @@ async function smokeClient() {
       `ws://127.0.0.1:${localGatewayPort}/ws/rooms/__lobby`,
       'rooms.create',
       {
-        hostId: 'red125-windows-smoke',
-        name: 'RED-125 Windows smoke room',
+        hostId: 'red126-windows-smoke',
+        name: 'RED-126 Windows smoke room',
         mapId: 'winding-pass',
         visibility: 'public',
       },
@@ -599,6 +628,7 @@ async function smokeClient() {
     )
     console.log(JSON.stringify({
       entry: 'client',
+      isolatedPackageRoot,
       rendererBoundary,
       invalidTlsCertificate: tlsProbe,
       homepageWindowBoundary,
@@ -613,7 +643,10 @@ async function smokeClient() {
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)
+    application.executable = originalExecutable
+    application.helperExecutables = originalHelperExecutables
     if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
+    rmSync(isolatedPackageBase, { recursive: true, force: true })
   }
 }
 

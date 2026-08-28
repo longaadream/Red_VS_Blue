@@ -14,6 +14,7 @@
   ],
   "extraResources": [
     { "from": "_client-stage",       "to": "app/standalone" },
+    { "from": "_client-stage/node_modules", "to": "app/standalone/node_modules" },
     { "from": "public",              "to": "app/public" },
     { "from": "data",                "to": "app/data" },
     { "from": "prisma",              "to": "app/prisma" },
