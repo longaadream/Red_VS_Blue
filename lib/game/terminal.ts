@@ -85,8 +85,11 @@ function coreEliminationResult(
 ): TerminalResult | null {
   if (state.players.length !== 2) return null
 
+  const removedPieces = Array.isArray(state.extensions?.removedPieces)
+    ? state.extensions.removedPieces
+    : []
   const coreOwners = new Set(
-    [...state.pieces, ...state.graveyard]
+    [...state.pieces, ...state.graveyard, ...removedPieces]
       .filter(piece => piece.isCore === true)
       .map(piece => normalizePlayerId(piece.ownerPlayerId)),
   )

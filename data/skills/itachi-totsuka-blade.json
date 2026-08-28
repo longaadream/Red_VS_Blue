@@ -2,7 +2,7 @@
   "id": "itachi-totsuka-blade",
   "name": "须佐能乎·十拳剑",
   "description": "选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。",
-  "keywords": [],
+  "keywords": ["万花筒"],
   "targetText": "3格内的一个敌人",
   "effectTags": ["damage", "cooldown"],
   "icon": "🗡️",

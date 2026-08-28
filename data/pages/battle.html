@@ -2510,6 +2510,21 @@
       } catch (_) {}
       return {}
     }
+    function skillUsesCharge(skillData) {
+      return (skillData && (skillData.chargeCost || 0) > 0) || false
+    }
+    function effectiveSkillChargeCost(piece, skillData) {
+      const baseCost = Math.max(0, Number(skillData && skillData.chargeCost || 0))
+      if (!G || !piece || !window.GameEngine || typeof GameEngine.getEffectiveChargeCost !== 'function') {
+        return baseCost
+      }
+      return GameEngine.getEffectiveChargeCost(G, piece.ownerPlayerId, skillData)
+    }
+    function skillChargeCostLabel(piece, skillData) {
+      const baseCost = Math.max(0, Number(skillData && skillData.chargeCost || 0))
+      const currentCost = effectiveSkillChargeCost(piece, skillData)
+      return currentCost === baseCost ? String(currentCost) : currentCost + '/' + baseCost
+    }
     function pieceDispTags(p) {
       // Shadow clones keep a summon-time display snapshot only; real rules still read statusTags.
       return p.displayStatusTags !== undefined ? p.displayStatusTags : (p.statusTags || [])
@@ -3115,7 +3130,7 @@
         const desc = skd.description || '暂无描述'
         const isPassive = skd.type === 'passive' || skd.kind === 'passive'
         const isDerived = sk.derived === true
-        const typeLabel = isDerived ? '可解锁' : skd.type === 'super' ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
+        const typeLabel = isDerived ? '可解锁' : skd.type === 'ultimate' ? '限定' : skillUsesCharge(skd) ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
         const cooldownTurns = skd.cooldownTurns ?? 0
         const currentCooldown = sk.currentCooldown ?? 0
         const keywords = normalizeKeywordList(skd.keywords)
@@ -3127,9 +3142,8 @@
         if (!isPassive) {
           const apCost = skd.actionPointCost ?? 0
           metaParts.push(`行动 ${apCost}`)
-          if (skd.type === 'super') {
-            const cc = skd.chargeCost ?? 0
-            metaParts.push(`充能 ${cc}`)
+          if (skillUsesCharge(skd)) {
+            metaParts.push(`充能 ${skillChargeCostLabel(piece, skd)}`)
           }
           if (cooldownTurns > 0 || currentCooldown > 0) {
             const cdColor = currentCooldown > 0 ? 'color:#f87171' : 'color:#4ade80'
@@ -4906,14 +4920,14 @@
         ? pieceDispSkills(piece).find(candidate => skillIdOf(candidate) === sid)
         : skillOrId
       const skillData = skillDefOf(sid)
-      const isCharge = skillData.type === 'super'
+      const isCharge = skillUsesCharge(skillData)
       const myMeta = G && G.players && G.players.find(player =>
         player.playerId && player.playerId.toLowerCase() === myPlayerId
       )
       const actionPoints = myMeta ? (myMeta.actionPoints || 0) : 0
       const chargePoints = myMeta ? (myMeta.chargePoints || 0) : 0
       const actionCost = skillData.actionPointCost || 0
-      const chargeCost = isCharge ? (skillData.chargeCost ?? 1) : (skillData.chargeCost || 0)
+      const chargeCost = isCharge ? effectiveSkillChargeCost(piece, skillData) : 0
       const ownerId = String(piece && piece.ownerPlayerId || '').toLowerCase()
       const viewerId = String(myPlayerId || '').toLowerCase()
       const isOwned = !!ownerId && ownerId === viewerId
@@ -5059,7 +5073,7 @@
         const titleParts = [rawName]
         if (rawDesc) titleParts.push(rawDesc)
         titleParts.push('行动点消耗：' + apCost)
-        if (cpCost) titleParts.push('充能点消耗：' + cpCost)
+        if (isCharge) titleParts.push('充能点消耗：' + skillChargeCostLabel(piece, skData))
         if (availability.unavailableReason) titleParts.push('不可用：' + availability.unavailableReason)
 
         return '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
@@ -5070,7 +5084,7 @@
           '<span class="piece-context-skill-icon">' + escHtml(String(icon)) + '</span>' +
           '<span class="piece-context-skill-name">' + escHtml(rawName) + '</span>' +
           '<span class="piece-context-skill-cost">' +
-            (status || ('行动 ' + apCost + (cpCost ? ' · 充能 ' + cpCost : ''))) +
+            (status || ('行动 ' + apCost + (isCharge ? ' · 充能 ' + skillChargeCostLabel(piece, skData) : ''))) +
           '</span></button>'
       }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
       skillsContainer.innerHTML = moveButton + skillButtons
@@ -5499,7 +5513,7 @@
         }
         // Build action from baseAction when available, or create a fresh action.
         const skData = skillDefOf(pendingSkill.skillId)
-        const isCharge = skData.type === 'super' || pendingSkill.skillType === 'super'
+        const isCharge = skillUsesCharge(skData) || pendingSkill.skillType === 'super' || pendingSkill.skillType === 'ultimate'
         const action = pendingSkill.baseAction
           ? Object.assign({}, pendingSkill.baseAction)
           : {
@@ -5641,7 +5655,7 @@
       const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
       if (!sp) return
       const skData = skillDefOf(skId)
-      const isCharge = skData.type === 'super'
+      const isCharge = skillUsesCharge(skData)
       const actionType = isCharge ? 'useChargeSkill' : 'useBasicSkill'
 
       // Toggle off: clicking the active skill again cancels selection

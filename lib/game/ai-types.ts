@@ -46,6 +46,7 @@ export interface AIEnvironmentCapabilities {
 export interface AIObservedPlayer {
   playerId: string
   name?: string
+  mangekyoDeathCount?: number
   chargePoints: number
   actionPoints: number
   maxActionPoints: number
