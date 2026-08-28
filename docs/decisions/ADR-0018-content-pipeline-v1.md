@@ -295,5 +295,6 @@ Run。后续阶段已经消费合同后，必须先按依赖逆序回退消费�
 - Linear：RED-111、RED-113
 - `docs/technical/CONTENT_PIPELINE_V1_CONTRACT.md`
 - `docs/technical/DYNAMIC_CODE_RUNTIME.md`
+- `docs/technical/CONTENT_PROFILE_V1_RUNTIME.md`
 - `docs/decisions/ADR-0002-electron-resource-pack-ipc-trust.md`
 - `docs/decisions/ADR-0016-trace-v2-recorded-state-replay.md`

@@ -1,22 +1,29 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { cpSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+
+import { ed25519 } from '@noble/curves/ed25519.js'
+import AdmZip from 'adm-zip'
 
 const root = path.resolve(import.meta.dirname, '..', '..')
 const applications = {
   server: {
     executable: path.join(root, 'dist', 'server-build', 'win-unpacked', 'RED vs BLUE Server.exe'),
     helperExecutables: [path.join(root, 'dist', 'server-build', 'win-unpacked', 'resources', 'node.exe')],
+    userDataDir: process.env.RVB_SMOKE_USER_DATA_DIR
+      ? path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)
+      : null,
     title: 'RED vs BLUE Server',
     debugPort: 19221,
   },
   client: {
     executable: path.join(root, 'dist', 'client-build', 'win-unpacked', 'RED vs BLUE.exe'),
     helperExecutables: [path.join(root, 'dist', 'client-build', 'win-unpacked', 'resources', 'node.exe')],
-    launchArguments: process.env.RVB_SMOKE_USER_DATA_DIR
-      ? [`--user-data-dir=${path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)}`]
-      : [],
+    userDataDir: process.env.RVB_SMOKE_USER_DATA_DIR
+      ? path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)
+      : null,
     title: '连接服务器',
     debugPort: 19222,
   },
@@ -36,6 +43,76 @@ const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mil
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
+}
+
+function sha256Hex(bytes) {
+  return createHash('sha256').update(bytes).digest('hex')
+}
+
+function canonicalJson(value) {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+    return JSON.stringify(value)
+  }
+  if (typeof value === 'number') {
+    assert(Number.isFinite(value), 'Canonical JSON fixture numbers must be finite')
+    return Object.is(value, -0) ? '0' : String(value)
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  assert(value && typeof value === 'object', `Unsupported canonical JSON value: ${typeof value}`)
+  return `{${Object.keys(value).sort().map((key) => (
+    `${JSON.stringify(key)}:${canonicalJson(value[key])}`
+  )).join(',')}}`
+}
+
+function createSignedAuthorityPatchArchive(parentProfileHash) {
+  const payloadPath = 'data/rules/red-115-windows-smoke.json'
+  const payload = Buffer.from(JSON.stringify({
+    schemaVersion: 'rvb-red-115-windows-smoke/v1',
+    marker: 'profile-b',
+  }))
+  const secretKey = Uint8Array.from({ length: 32 }, (_value, index) => index + 1)
+  const publicKey = Buffer.from(ed25519.getPublicKey(secretKey))
+  const keyId = sha256Hex(publicKey)
+  const manifest = {
+    schemaVersion: 'rvb-pack/v1',
+    packageId: 'red-115-windows-smoke',
+    version: '1.0.0',
+    displayName: 'RED-115 Windows smoke Profile B',
+    publisher: { id: 'red-115-smoke', keyId },
+    compatibility: { engineAbi: 'rvb-engine/v1', contentAbi: 'rvb-content/v1' },
+    capabilities: ['game-data'],
+    files: [{
+      path: payloadPath,
+      mediaType: 'application/json',
+      size: payload.byteLength,
+      sha256: sha256Hex(payload),
+    }],
+    kind: 'patch',
+    parentProfileHash,
+    operations: [{ op: 'add', targetPath: payloadPath, sourcePath: payloadPath }],
+  }
+  const packageHash = sha256Hex(Buffer.concat([
+    Buffer.from('RVB_PACK_IDENTITY_V1\0'),
+    Buffer.from(canonicalJson(manifest)),
+  ]))
+  const signatureMessage = Buffer.concat([
+    Buffer.from('RVB_PACK_SIGNATURE_V1\0'),
+    Buffer.from(packageHash, 'hex'),
+  ])
+  const signature = Buffer.from(ed25519.sign(signatureMessage, secretKey)).toString('hex')
+  const envelope = {
+    schemaVersion: 'rvb-pack-signature/v1',
+    algorithm: 'Ed25519',
+    keyId,
+    publicKey: publicKey.toString('hex'),
+    packageHash,
+    signature,
+  }
+  const zip = new AdmZip()
+  zip.addFile('manifest.json', Buffer.from(JSON.stringify(manifest)))
+  zip.addFile('signature.json', Buffer.from(JSON.stringify(envelope)))
+  zip.addFile(payloadPath, payload)
+  return { archive: zip.toBuffer(), payloadPath, packageHash }
 }
 
 async function getJson(url) {
@@ -105,13 +182,44 @@ async function connectTarget(target) {
   }
 }
 
-async function evaluate(target, expression, awaitPromise = true) {
+async function evaluate(target, expression, awaitPromise = true, timeoutMs = 30000) {
   const connection = await connectTarget(target)
   try {
-    return await connection.evaluate(expression, awaitPromise)
+    return await connection.evaluate(expression, awaitPromise, timeoutMs)
   } finally {
     connection.close()
   }
+}
+
+async function waitForPackStatus(application, predicate, timeoutMs = 120000) {
+  const deadline = Date.now() + timeoutMs
+  let observed = null
+  while (Date.now() < deadline) {
+    try {
+      const targets = await getJson(`http://127.0.0.1:${application.debugPort}/json`)
+      const target = targets.find((candidate) => candidate.url.startsWith('rvb-client://app/index.html'))
+      if (target) {
+        const status = await evaluate(target, 'window.electronAPI.packList()', true, 10000)
+        observed = status
+        if (predicate(status)) return { target, status }
+      }
+    } catch {}
+    await delay(250)
+  }
+  throw new Error(`Profile status did not converge: ${JSON.stringify(observed)}`)
+}
+
+async function waitForActivationTransaction(activePath, targetProfileHash, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs
+  let observed = null
+  while (Date.now() < deadline) {
+    try {
+      observed = JSON.parse(readFileSync(activePath, 'utf8'))
+      if (observed.activation?.targetProfileHash === targetProfileHash) return observed.activation
+    } catch {}
+    await delay(2)
+  }
+  throw new Error(`Activation transaction did not appear for ${targetProfileHash}: ${JSON.stringify(observed)}`)
 }
 
 async function verifyBattleTerminalError(port, target, timeoutMs = 5000) {
@@ -391,6 +499,9 @@ async function launch(application, timeoutMs = 30000) {
     detached: true,
     stdio: process.env.RVB_SMOKE_CHILD_STDIO === 'inherit' ? 'inherit' : 'ignore',
     windowsHide: true,
+    env: application.userDataDir
+      ? { ...process.env, RVB_ELECTRON_USER_DATA_DIR: path.resolve(application.userDataDir) }
+      : process.env,
   })
   child.unref()
   const launchedPid = child.pid
@@ -469,7 +580,6 @@ async function smokeServer() {
         rooms,
       },
       publicWebSocket,
-      internalWebSocket,
       rejectedNavigation,
       stopped: true,
       port3000Reachable: false,
@@ -505,12 +615,13 @@ async function smokeClient() {
   )
   const originalExecutable = application.executable
   const originalHelperExecutables = application.helperExecutables
+  const originalUserDataDir = application.userDataDir
   const configuredUserDataDir = process.env.RVB_SMOKE_USER_DATA_DIR
   const userDataDir = configuredUserDataDir
     ? path.resolve(configuredUserDataDir)
     : mkdtempSync(path.join(tmpdir(), 'rvb-client-windows-smoke-'))
   const ownsUserDataDir = !configuredUserDataDir
-  application.launchArguments = [`--user-data-dir=${userDataDir}`]
+  application.userDataDir = userDataDir
   try {
     assert(existsSync(sourcePackageRoot), `Missing source client package: ${sourcePackageRoot}`)
     cpSync(sourcePackageRoot, isolatedPackageRoot, { recursive: true })
@@ -645,7 +756,203 @@ async function smokeClient() {
     stopDebugTarget(application.debugPort)
     application.executable = originalExecutable
     application.helperExecutables = originalHelperExecutables
+    application.userDataDir = originalUserDataDir
     if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
+    rmSync(isolatedPackageBase, { recursive: true, force: true })
+  }
+}
+
+async function smokeProfileActivation() {
+  const application = applications.client
+  const sourcePackageRoot = path.dirname(application.executable)
+  const isolatedPackageBase = mkdtempSync(path.join(tmpdir(), 'rvb-red115-profile-package-'))
+  const isolatedPackageRoot = path.join(isolatedPackageBase, 'win-unpacked')
+  const userDataDir = mkdtempSync(path.join(tmpdir(), 'rvb-red115-profile-user-'))
+  const originalExecutable = application.executable
+  const originalHelperExecutables = application.helperExecutables
+  const originalUserDataDir = application.userDataDir
+  let faultedPayloadPath = null
+  let faultedPayloadBytes = null
+  try {
+    cpSync(sourcePackageRoot, isolatedPackageRoot, { recursive: true })
+    application.executable = path.join(isolatedPackageRoot, 'RED vs BLUE.exe')
+    application.helperExecutables = [path.join(isolatedPackageRoot, 'resources', 'node.exe')]
+    application.userDataDir = userDataDir
+
+    const { target: connectTargetDescriptor, rendererBoundary } = await launch(application, 45000)
+    await evaluate(connectTargetDescriptor, 'window.electronAPI.openLocalGame(); true', false)
+    const initialGameTarget = await waitForTargets(
+      application.debugPort,
+      (candidate) => candidate.url.startsWith('rvb-client://app/index.html'),
+      30000,
+    )
+
+    const initial = await waitForPackStatus(application, (status) => (
+      status?.ok === true
+      && status.server?.healthy === true
+      && status.state?.activation === null
+      && status.state?.stable?.resolvedProfileHash === status.server?.profile?.resolvedProfileHash
+    ))
+    const profileAHash = initial.status.state.stable.resolvedProfileHash
+    assert(initial.status.state.stable.kind === 'bundled-base', 'Profile A must start as Bundled Base')
+
+    const fixture = createSignedAuthorityPatchArchive(profileAHash)
+    const installed = await evaluate(
+      initialGameTarget,
+      `window.electronAPI.packImportData(${JSON.stringify(fixture.archive.toString('base64'))}, 'red-115-profile-b.zip')`,
+      true,
+      60000,
+    )
+    assert(installed?.ok === true, `Profile B installation failed: ${JSON.stringify(installed)}`)
+    assert(installed.reloadMode === 'authority-restart', `Profile B did not require authority restart: ${JSON.stringify(installed)}`)
+    const profileBHash = installed.profile?.resolvedProfileHash
+    assert(typeof profileBHash === 'string' && profileBHash !== profileAHash, 'Profile B hash must differ from A')
+
+    const installedStatus = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === profileAHash
+      && status.state?.candidate?.resolvedProfileHash === profileBHash
+    ))
+    const activePath = path.join(userDataDir, 'resource-pack', 'active.json')
+    const faultedRelativePath = 'data/cards/lucky-coin.json'
+    faultedPayloadPath = path.join(
+      userDataDir,
+      'resource-pack',
+      'profiles',
+      profileBHash,
+      ...faultedRelativePath.split('/'),
+    )
+    faultedPayloadBytes = readFileSync(faultedPayloadPath)
+
+    await evaluate(
+      installedStatus.target,
+      `window.electronAPI.packActivate(${JSON.stringify(profileBHash)}); true`,
+      false,
+    )
+    const interruptedActivation = await waitForActivationTransaction(activePath, profileBHash)
+    stopApplication(application)
+    stopDebugTarget(application.debugPort)
+    const processCountsAfterInterrupt = await waitForExecutableCleanup([
+      application.executable,
+      ...(application.helperExecutables ?? []),
+    ])
+    assert(
+      Object.values(processCountsAfterInterrupt).every((count) => count === 0),
+      `Interrupted candidate left residual processes: ${JSON.stringify(processCountsAfterInterrupt)}`,
+    )
+
+    const { target: recoveryConnectTarget } = await launch(application, 45000)
+    await evaluate(recoveryConnectTarget, 'window.electronAPI.openLocalGame(); true', false)
+    await waitForTargets(
+      application.debugPort,
+      (candidate) => candidate.url.startsWith('rvb-client://app/index.html'),
+      30000,
+    )
+    const recovered = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === profileAHash
+      && status.state?.candidate?.resolvedProfileHash === profileBHash
+      && status.state?.activation === null
+      && status.state?.lastFailure?.code === 'ACTIVATION_INTERRUPTED'
+      && status.state?.lastFailure?.stage === 'startup-recovery'
+      && status.state?.lastFailure?.targetProfileHash === profileBHash
+      && status.server?.healthy === true
+      && status.server?.profile?.resolvedProfileHash === profileAHash
+    ))
+
+    await evaluate(
+      recovered.target,
+      `window.electronAPI.packActivate(${JSON.stringify(profileBHash)}); true`,
+      false,
+    )
+    const failedActivation = await waitForActivationTransaction(activePath, profileBHash)
+    unlinkSync(faultedPayloadPath)
+
+    const failed = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === profileAHash
+      && status.state?.candidate?.resolvedProfileHash === profileBHash
+      && status.state?.activation === null
+      && status.state?.lastFailure?.targetProfileHash === profileBHash
+      && status.server?.healthy === true
+      && status.server?.profile?.resolvedProfileHash === profileAHash
+    ))
+    assert(
+      failed.status.state.lastFailure.stage === 'candidate-server-health',
+      `Injected B failure happened at an unexpected stage: ${JSON.stringify(failed.status.state.lastFailure)}`,
+    )
+    assert(
+      failed.status.state.lastFailure.message === 'CANDIDATE_SERVER_IDENTITY_OR_HEALTH_MISMATCH',
+      `Injected B failure had an unexpected cause: ${JSON.stringify(failed.status.state.lastFailure)}`,
+    )
+
+    writeFileSync(faultedPayloadPath, faultedPayloadBytes)
+    faultedPayloadPath = null
+    faultedPayloadBytes = null
+
+    await evaluate(
+      failed.target,
+      `window.electronAPI.packActivate(${JSON.stringify(profileBHash)}); true`,
+      false,
+    )
+    const activated = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === profileBHash
+      && status.state?.previousStable?.resolvedProfileHash === profileAHash
+      && status.state?.candidate === null
+      && status.state?.activation === null
+      && status.server?.healthy === true
+      && status.server?.profile?.resolvedProfileHash === profileBHash
+    ))
+
+    await evaluate(
+      activated.target,
+      "window.electronAPI.packRollback('previous-stable'); true",
+      false,
+    )
+    const rolledBack = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === profileAHash
+      && status.state?.previousStable?.resolvedProfileHash === profileBHash
+      && status.state?.candidate === null
+      && status.state?.activation === null
+      && status.server?.healthy === true
+      && status.server?.profile?.resolvedProfileHash === profileAHash
+    ))
+
+    await evaluate(rolledBack.target, 'window.close(); true', false)
+    const processCountsAfterExit = await waitForExecutableCleanup([
+      application.executable,
+      ...(application.helperExecutables ?? []),
+    ])
+    assert(
+      Object.values(processCountsAfterExit).every((count) => count === 0),
+      `Profile activation candidate left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
+    )
+    console.log(JSON.stringify({
+      entry: 'profile',
+      rendererBoundary,
+      profileAHash,
+      profileBHash,
+      packageHash: fixture.packageHash,
+      interruptedActivationId: interruptedActivation.activationId,
+      stableAfterInterruptRecovery: recovered.status.state.stable.resolvedProfileHash,
+      serverAfterInterruptRecovery: recovered.status.server.profile.resolvedProfileHash,
+      processCountsAfterInterrupt,
+      failedActivationId: failedActivation.activationId,
+      failedStage: failed.status.state.lastFailure.stage,
+      stableAfterFailure: failed.status.state.stable.resolvedProfileHash,
+      stableAfterSuccess: activated.status.state.stable.resolvedProfileHash,
+      stableAfterRollback: rolledBack.status.state.stable.resolvedProfileHash,
+      serverAfterRollback: rolledBack.status.server.profile.resolvedProfileHash,
+      exitedCleanly: true,
+      processCountsAfterExit,
+    }))
+  } finally {
+    if (faultedPayloadPath && faultedPayloadBytes && !existsSync(faultedPayloadPath)) {
+      writeFileSync(faultedPayloadPath, faultedPayloadBytes)
+    }
+    stopApplication(application)
+    stopDebugTarget(application.debugPort)
+    application.executable = originalExecutable
+    application.helperExecutables = originalHelperExecutables
+    application.userDataDir = originalUserDataDir
+    rmSync(userDataDir, { recursive: true, force: true })
     rmSync(isolatedPackageBase, { recursive: true, force: true })
   }
 }
@@ -672,6 +979,7 @@ const entries = requested.length > 0 ? requested : ['server', 'client', 'editor'
 for (const entry of entries) {
   if (entry === 'server') await smokeServer()
   else if (entry === 'client') await smokeClient()
+  else if (entry === 'profile') await smokeProfileActivation()
   else if (entry === 'editor') await smokeEditor()
   else throw new Error(`Unknown entry: ${entry}`)
 }

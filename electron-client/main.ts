@@ -2,23 +2,24 @@ import { app, BrowserWindow, ipcMain, net as electronNet, protocol, session } fr
 import { spawn, ChildProcess, execFileSync, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
-import * as zlib from 'zlib'
 import * as os from 'os'
 import * as dgram from 'dgram'
 import * as http from 'http'
+import { randomBytes } from 'crypto'
 import { pathToFileURL } from 'url'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { resolveDevelopmentProfile } from './development-profile'
 import { findFreePort } from './local-port'
 import { resolveClientProtocolFile } from './client-protocol-resource'
 import {
-  RESOURCE_PACK_LIMITS,
-  clearActiveResourcePack,
+  type DesktopProfileReference,
   getActiveResourcePackMeta,
-  importResourcePackArchive,
-  importResourcePackFromPath,
+  isHealthyCommittedProfileObservation,
+  recoverUncertainProfileCommit,
   isActivatableResourcePackPath,
   listActiveResourcePackFiles,
+  readDesktopProfileState,
+  reconcileProfileRendererCommit,
   resolveActiveResourcePackRoot,
 } from './resource-pack-store'
 
@@ -30,6 +31,8 @@ const CLIENT_SCHEME = 'rvb-client'
 const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
 const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
 const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
+const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
+const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
 
@@ -178,6 +181,26 @@ protocol.registerSchemesAsPrivileged([{
   privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
 }])
 
+function applyExplicitUserDataOverride(): void {
+  const prefix = '--rvb-user-data-dir='
+  const argument = process.argv.find(value => value.startsWith(prefix))
+  const environmentPath = process.env.RVB_ELECTRON_USER_DATA_DIR
+  if (environmentPath === undefined && !argument) return
+  const rawPath = environmentPath ?? argument!.slice(prefix.length)
+  const resolvedPath = path.resolve(rawPath)
+  if (!rawPath || path.dirname(resolvedPath) === resolvedPath) {
+    throw new Error('Invalid --rvb-user-data-dir path')
+  }
+  fs.mkdirSync(resolvedPath, { recursive: true })
+  app.setPath('userData', resolvedPath)
+  app.setPath('sessionData', resolvedPath)
+}
+
+// Keep Electron storage and ProcessSingleton aligned with the explicit
+// candidate profile. This must run before either development-profile handling
+// or requestSingleInstanceLock().
+applyExplicitUserDataOverride()
+
 // Development-only named profiles isolate Chromium storage, local identity,
 // client configuration, and the ProcessSingleton lock. Electron keys
 // requestSingleInstanceLock() by the current userData path, so this must run
@@ -216,6 +239,15 @@ function getUserData(): string {
 
 function getPackRoot(): string {
   return path.join(getUserData(), 'resource-pack')
+}
+
+function profileRootForReference(reference: DesktopProfileReference): string {
+  if (reference.kind === 'bundled-base') return getAppRoot()
+  const profileRoot = path.join(getPackRoot(), 'profiles', reference.resolvedProfileHash)
+  if (!fs.existsSync(path.join(profileRoot, '.rvb', 'profile.json'))) {
+    throw new Error(`PROFILE_SNAPSHOT_INCOMPLETE: ${reference.resolvedProfileHash}`)
+  }
+  return profileRoot
 }
 
 function getConfigPath(): string {
@@ -349,20 +381,24 @@ function requestGracefulServerShutdown(proc: ChildProcess): Promise<boolean> {
   })
 }
 
-async function stopChildProcessGracefully(proc: ChildProcess): Promise<void> {
+async function stopChildProcessGracefully(
+  proc: ChildProcess,
+  requireDurable = false,
+): Promise<void> {
   const durable = await requestGracefulServerShutdown(proc)
   if (!durable) {
+    if (requireDurable) throw new Error('PROFILE_DURABLE_DRAIN_FAILED')
     console.error('[client] forcing server stop with a potentially undurable battle journal')
   }
   if (proc.exitCode === null && proc.signalCode === null) killProcessTree(proc)
 }
 
-async function killServer(): Promise<void> {
-  localServerReady = false
+async function killServer(requireDurable = false): Promise<void> {
   if (!serverProcess) return
   const proc = serverProcess
+  await stopChildProcessGracefully(proc, requireDurable)
+  localServerReady = false
   serverProcess = null
-  await stopChildProcessGracefully(proc)
 }
 
 function forceKillServer(): void {
@@ -393,6 +429,28 @@ let serverProcess: ChildProcess | null = null
 let localServerReady = false
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
+type ProfileProcessBinding = {
+  reference?: DesktopProfileReference
+  profileRoot: string
+  activationId?: string
+}
+
+function stableProfileBinding(): ProfileProcessBinding {
+  try {
+    const stable = readDesktopProfileState(getPackRoot())?.stable
+    if (!stable) return { profileRoot: getAppRoot() }
+    return {
+      reference: stable,
+      profileRoot: profileRootForReference(stable),
+    }
+  } catch (error) {
+    console.error('[profile] stable binding is invalid; server will recover through Bundled Base:', error)
+    // Never let getDataRoot() fall back to the still-corrupt active.json.
+    // The gated bootstrap process reads only bundled files until the central
+    // Store repairs the pointer and confirms whether a fresh process is needed.
+    return { profileRoot: getAppRoot() }
+  }
+}
 function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   let settled = false
@@ -484,7 +542,7 @@ function initDatabase(dbPath: string, appRoot: string): void {
   console.log('[client] Database ready.')
 }
 
-async function startLocalServer(): Promise<void> {
+async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise<void> {
   if (serverProcess) {
     if (!localServerReady) {
       localServerReady = await waitForLocalServerReady(actualLocalPort, 5000)
@@ -523,6 +581,7 @@ async function startLocalServer(): Promise<void> {
   }
 
 
+  const binding = profileBinding ?? stableProfileBinding()
   serverProcess = spawn(getNodeBin(), ['--require', samePortPreload, serverEntry], {
     cwd: path.dirname(serverEntry),
     env: {
@@ -533,6 +592,15 @@ async function startLocalServer(): Promise<void> {
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
       DATABASE_URL: databaseUrl,
+      RVB_PROFILE_ADMIN_KEY: PROFILE_ADMIN_KEY,
+      RVB_ALLOW_LOCAL_DEV_PROFILES: app.isPackaged ? '0' : '1',
+      RVB_PROFILE_ADMISSION_PAUSED: binding?.activationId ?? 'startup-recovery',
+      RVB_PROFILE_ROOT: binding.profileRoot,
+      RVB_RESOLVED_PROFILE_HASH: binding.reference?.resolvedProfileHash,
+      RVB_AUTHORITY_CONTENT_HASH: binding.reference?.authorityContentHash,
+      RVB_PROFILE_ENGINE_ABI: binding.reference?.compatibility.engineAbi,
+      RVB_PROFILE_CONTENT_ABI: binding.reference?.compatibility.contentAbi,
+      RVB_PROFILE_ACTIVATION_ID: binding.activationId,
     },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   })
@@ -560,11 +628,14 @@ async function startLocalServer(): Promise<void> {
     })
   }
 
-  serverProcess.on('error', (err) => console.error('[client] server error:', err))
-  serverProcess.on('exit', (code) => {
+  const spawnedProcess = serverProcess
+  spawnedProcess.on('error', (err) => console.error('[client] server error:', err))
+  spawnedProcess.on('exit', (code) => {
     lastServerExitCode = code
-    serverProcess = null
-    localServerReady = false
+    if (serverProcess === spawnedProcess) {
+      serverProcess = null
+      localServerReady = false
+    }
     console.log(`[client] local server exited: ${code}`)
     if (lastServerStderr) console.error('[client] last stderr:', lastServerStderr.slice(-500))
   })
@@ -575,42 +646,702 @@ async function startLocalServer(): Promise<void> {
   }
 }
 
+// ─── Profile 安装、激活与回退 ─────────────────────────────────────────────────
+
+// Electron/Next JSON replies are validated at each authority boundary below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type JsonObject = Record<string, any>
+
+type ProfileApiRequestOptions = {
+  method?: 'GET' | 'POST'
+  json?: JsonObject
+  archive?: Buffer
+}
+
+let profileMutationTail: Promise<unknown> = Promise.resolve()
+
+function enqueueProfileMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const next = profileMutationTail.then(operation, operation)
+  profileMutationTail = next.then(() => undefined, () => undefined)
+  return next
+}
+
+function profileApiRequest<T extends JsonObject = JsonObject>(
+  route: string,
+  options: ProfileApiRequestOptions = {},
+): Promise<T> {
+  const body = options.archive
+    ?? (options.json ? Buffer.from(JSON.stringify(options.json), 'utf8') : null)
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port: actualLocalPort,
+      path: route,
+      method: options.method ?? 'GET',
+      headers: {
+        'x-rvb-profile-admin-key': PROFILE_ADMIN_KEY,
+        ...(options.archive ? { 'content-type': 'application/zip' } : {}),
+        ...(options.json ? { 'content-type': 'application/json' } : {}),
+        ...(body ? { 'content-length': body.byteLength } : {}),
+        ...(!app.isPackaged ? { 'x-rvb-local-dev-profile': '1' } : {}),
+      },
+    }, response => {
+      const chunks: Buffer[] = []
+      let total = 0
+      response.on('data', (chunk: Buffer) => {
+        total += chunk.byteLength
+        if (total > 2 * 1024 * 1024) {
+          request.destroy(new Error('PROFILE_API_RESPONSE_TOO_LARGE'))
+          return
+        }
+        chunks.push(chunk)
+      })
+      response.on('end', () => {
+        let parsed: JsonObject
+        try {
+          parsed = JSON.parse(Buffer.concat(chunks).toString('utf8')) as JsonObject
+        } catch {
+          reject(new Error(`PROFILE_API_INVALID_RESPONSE: ${response.statusCode ?? 0}`))
+          return
+        }
+        if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+          const error = new Error(String(parsed.message ?? parsed.error ?? `HTTP ${response.statusCode}`)) as Error & { code?: string }
+          error.code = typeof parsed.error === 'string' ? parsed.error : 'PROFILE_API_FAILED'
+          reject(error)
+          return
+        }
+        resolve(parsed as T)
+      })
+    })
+    request.on('error', reject)
+    request.setTimeout(30_000, () => request.destroy(new Error('PROFILE_API_TIMEOUT')))
+    if (body) request.write(body)
+    request.end()
+  })
+}
+
+function decodeProfileArchive(base64Data: string): Buffer {
+  const maxBase64Length = Math.ceil(PROFILE_ARCHIVE_MAX_BYTES / 3) * 4 + 4
+  if (
+    typeof base64Data !== 'string'
+    || base64Data.length === 0
+    || base64Data.length > maxBase64Length
+    || base64Data.length % 4 !== 0
+    || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data)
+  ) throw new Error('Resource-pack archive is not valid bounded base64')
+  const archive = Buffer.from(base64Data, 'base64')
+  if (archive.byteLength === 0 || archive.byteLength > PROFILE_ARCHIVE_MAX_BYTES) {
+    throw new Error('Resource-pack compressed archive is empty or exceeds 32 MiB')
+  }
+  return archive
+}
+
+async function readProfileArchive(filePath: string): Promise<Buffer> {
+  const stat = await fs.promises.stat(filePath)
+  if (!stat.isFile() || stat.size <= 0 || stat.size > PROFILE_ARCHIVE_MAX_BYTES) {
+    throw new Error('Resource-pack compressed archive is empty or exceeds 32 MiB')
+  }
+  return fs.promises.readFile(filePath)
+}
+
+async function installProfileArchive(archive: Buffer): Promise<JsonObject> {
+  if (!localServerReady) throw new Error('PROFILE_SERVER_NOT_READY')
+  const result = await profileApiRequest('/api/content-profile/install', {
+    method: 'POST',
+    archive,
+  })
+  return {
+    ok: true,
+    ...result,
+    count: Array.isArray(result.profile?.files) ? result.profile.files.length : 0,
+    meta: result.reference ?? null,
+  }
+}
+
+function probeProfileWebSocket(timeoutMs = 5_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const modulePath = app.isPackaged
+      ? path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')
+      : 'ws'
+    const WebSocketClient = require(modulePath) as typeof import('ws')
+    const socket = new WebSocketClient(`ws://127.0.0.1:${actualLocalPort}/ws/rooms/__profile-health__`)
+    const finish = (error?: Error): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      try { socket.close() } catch {}
+      if (error) reject(error)
+      else resolve()
+    }
+    const timeout = setTimeout(() => finish(new Error('PROFILE_WEBSOCKET_TIMEOUT')), timeoutMs)
+    socket.once('open', () => finish())
+    socket.once('error', error => finish(error instanceof Error ? error : new Error(String(error))))
+    socket.once('unexpected-response', (_request, response) => {
+      finish(new Error(`PROFILE_WEBSOCKET_HTTP_${response.statusCode}`))
+    })
+  })
+}
+
+async function verifyRendererCandidate(
+  reference: DesktopProfileReference,
+  profileRoot: string,
+  activationId: string,
+): Promise<void> {
+  const required = [
+    'data/pieces/manifest.json',
+    'data/skills/manifest.json',
+    'data/cards/manifest.json',
+    'data/cards/lucky-coin.json',
+    'data/skills/basic-attack.json',
+  ]
+  const activePackRoot = reference.kind === 'installed' ? profileRoot : null
+  for (const relativePath of required) {
+    const resolved = resolveClientProtocolFile({
+      relativePath,
+      htmlRoot: getHtmlRoot(),
+      appRoot: getAppRoot(),
+      activePackRoot,
+      isPackaged: app.isPackaged,
+    })
+    if (!resolved) throw new Error(`PROFILE_RENDERER_RESOURCE_MISSING: ${relativePath}`)
+    JSON.parse(fs.readFileSync(resolved, 'utf8'))
+  }
+
+  const smokeSession = session.fromPartition(`rvb-profile-smoke-${activationId}`, { cache: false })
+  const serverUrl = `http://127.0.0.1:${actualLocalPort}`
+  await smokeSession.protocol.handle(CLIENT_SCHEME, request => (
+    serveClientProtocolRequest(request, activePackRoot, serverUrl)
+  ))
+  const smokeWindow = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      session: smokeSession,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  })
+  restrictWindowNavigation(smokeWindow, isGameClientUrl)
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false
+      const finish = (error?: Error): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        if (error) reject(error)
+        else resolve()
+      }
+      const timeout = setTimeout(
+        () => finish(new Error('PROFILE_RENDERER_SMOKE_TIMEOUT')),
+        15_000,
+      )
+      smokeWindow.webContents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
+        if (isMainFrame) finish(new Error(`PROFILE_RENDERER_LOAD_FAILED: ${code} ${description}`))
+      })
+      smokeWindow.webContents.once('render-process-gone', (_event, details) => {
+        finish(new Error(`PROFILE_RENDERER_GONE: ${details.reason}`))
+      })
+      smokeWindow.once('unresponsive', () => finish(new Error('PROFILE_RENDERER_UNRESPONSIVE')))
+      smokeWindow.webContents.on('did-finish-load', () => {
+        void (async () => {
+          const current = new URL(smokeWindow.webContents.getURL())
+          if (current.pathname !== '/index.html') return
+          const requiredLiteral = JSON.stringify(required)
+          const serverLiteral = JSON.stringify(serverUrl)
+          const ready = await smokeWindow.webContents.executeJavaScript(`(async () => {
+            const required = ${requiredLiteral}
+            const parsed = []
+            for (const relativePath of required) {
+              const response = await fetch('${CLIENT_SCHEME}://app/' + relativePath, { cache: 'no-store' })
+              if (!response.ok) throw new Error('renderer resource HTTP ' + response.status + ': ' + relativePath)
+              parsed.push(await response.json())
+            }
+            const ping = await fetch(${serverLiteral} + '/api/ping', { cache: 'no-store' })
+            if (!ping.ok) throw new Error('renderer server ping HTTP ' + ping.status)
+            return {
+              readyState: document.readyState,
+              bodyChildren: document.body ? document.body.children.length : 0,
+              title: document.title,
+              parsedProfileResources: parsed.length,
+              serverPing: await ping.json()
+            }
+          })()`)
+          if (
+            ready?.readyState !== 'complete'
+            || ready?.bodyChildren < 1
+            || ready?.parsedProfileResources !== required.length
+            || !ready?.serverPing
+          ) {
+            finish(new Error('PROFILE_RENDERER_DOCUMENT_INVALID'))
+            return
+          }
+          finish()
+        })().catch(error => finish(error instanceof Error ? error : new Error(String(error))))
+      })
+      void smokeWindow.loadURL(`${CLIENT_SCHEME}://app/__profile-smoke__.html`)
+        .catch(error => finish(error instanceof Error ? error : new Error(String(error))))
+    })
+  } finally {
+    if (!smokeWindow.isDestroyed()) smokeWindow.destroy()
+    await smokeSession.protocol.unhandle(CLIENT_SCHEME)
+    await smokeSession.clearStorageData()
+  }
+}
+
+async function recordProfileActivationFailure(
+  activationId: string,
+  stage: string,
+  error: unknown,
+  keepAdmissionPaused = false,
+): Promise<void> {
+  await profileApiRequest('/api/content-profile/activation/failure', {
+    method: 'POST',
+    json: {
+      activationId,
+      code: 'CANDIDATE_ACTIVATION_FAILED',
+      stage,
+      message: error instanceof Error ? error.message : String(error),
+      keepAdmissionPaused,
+    },
+  })
+}
+
+async function recordProfileRendererEvidence(
+  kind: 'postcommit-renderer-failure' | 'postcommit-renderer-rollback',
+  evidence: Readonly<{
+    code: string
+    stage: string
+    message: string
+    targetProfileHash: string
+    rollbackTarget: 'previous-stable' | null
+    rollbackSucceeded?: boolean
+  }>,
+): Promise<void> {
+  const record = {
+    event: 'content-profile',
+    kind,
+    ...evidence,
+    rollbackSucceeded: evidence.rollbackSucceeded ?? null,
+  }
+  console.info(JSON.stringify(record))
+  await profileApiRequest('/api/content-profile/activation/failure', {
+    method: 'POST',
+    json: {
+      evidenceKind: kind,
+      ...evidence,
+      rollbackSucceeded: evidence.rollbackSucceeded ?? null,
+    },
+  })
+}
+
+function reloadMainRendererAndWait(
+  expectedProfileHash: string,
+  timeoutMs = 15_000,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const win = mainWin
+    if (!win || win.isDestroyed()) return reject(new Error('PROFILE_RENDERER_WINDOW_MISSING'))
+    let settled = false
+    const cleanup = (): void => {
+      clearTimeout(timeout)
+      win.webContents.removeListener('did-finish-load', onFinish)
+      win.webContents.removeListener('did-fail-load', onFail)
+      win.webContents.removeListener('render-process-gone', onGone)
+      win.removeListener('unresponsive', onUnresponsive)
+    }
+    const finish = (error?: Error): void => {
+      if (settled) return
+      settled = true
+      cleanup()
+      if (error) reject(error)
+      else resolve()
+    }
+    const onFinish = (): void => {
+      void win.webContents.executeJavaScript(`(async () => {
+        const bridge = window.electronAPI
+        if (!bridge || typeof bridge.packList !== 'function') {
+          throw new Error('PROFILE_RENDERER_BRIDGE_MISSING')
+        }
+        const status = await bridge.packList()
+        return {
+          readyState: document.readyState,
+          bodyChildren: document.body ? document.body.children.length : 0,
+          stableProfileHash: status && status.state && status.state.stable && status.state.stable.resolvedProfileHash,
+          serverProfileHash: status && status.server && status.server.profile && status.server.profile.resolvedProfileHash,
+          serverHealthy: status && status.server && status.server.healthy,
+        }
+      })()`).then(ready => {
+        if (
+          ready?.readyState !== 'complete'
+          || ready?.bodyChildren < 1
+          || ready?.stableProfileHash !== expectedProfileHash
+          || ready?.serverProfileHash !== expectedProfileHash
+          || ready?.serverHealthy !== true
+        ) {
+          finish(new Error('PROFILE_RENDERER_RELOAD_READINESS_MISMATCH'))
+          return
+        }
+        finish()
+      }, error => finish(error instanceof Error ? error : new Error(String(error))))
+    }
+    const onFail = (
+      _event: Electron.Event,
+      code: number,
+      description: string,
+      _url: string,
+      isMainFrame: boolean,
+    ): void => {
+      if (isMainFrame) finish(new Error(`PROFILE_RENDERER_RELOAD_FAILED: ${code} ${description}`))
+    }
+    const onGone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails): void => {
+      finish(new Error(`PROFILE_RENDERER_RELOAD_GONE: ${details.reason}`))
+    }
+    const onUnresponsive = (): void => finish(new Error('PROFILE_RENDERER_RELOAD_UNRESPONSIVE'))
+    const timeout = setTimeout(
+      () => finish(new Error('PROFILE_RENDERER_RELOAD_TIMEOUT')),
+      timeoutMs,
+    )
+    win.webContents.once('did-finish-load', onFinish)
+    win.webContents.on('did-fail-load', onFail)
+    win.webContents.once('render-process-gone', onGone)
+    win.once('unresponsive', onUnresponsive)
+    win.webContents.reloadIgnoringCache()
+  })
+}
+
+async function reconcileMainRendererAfterCommit(
+  targetProfileHash: string,
+  stage: string,
+  success: JsonObject,
+  allowRendererRollback: boolean,
+): Promise<JsonObject> {
+  return await reconcileProfileRendererCommit({
+    expectedProfileHash: targetProfileHash,
+    stage,
+    success,
+    allowRollback: allowRendererRollback,
+    reloadAndVerify: reloadMainRendererAndWait,
+    releaseAdmission: async expectedProfileHash => {
+      await profileApiRequest('/api/content-profile/activation/release', {
+        method: 'POST',
+        json: { targetProfileHash: expectedProfileHash },
+      })
+    },
+    rollbackPreviousStable: () => selectAndActivateRollback('previous-stable', false),
+    recordFailureEvidence: evidence => recordProfileRendererEvidence(
+      'postcommit-renderer-failure',
+      evidence,
+    ),
+    recordRollbackEvidence: evidence => recordProfileRendererEvidence(
+      'postcommit-renderer-rollback',
+      evidence,
+    ),
+    enterFailClosed: async () => {
+      await killServer()
+    },
+  }) as JsonObject
+}
+
+async function observeCommittedProfileAfterRecovery(): Promise<JsonObject | null> {
+  if (!localServerReady) return null
+  try {
+    const recovery = await profileApiRequest(
+      '/api/content-profile/recovery?keepAdmissionPaused=1',
+      { method: 'POST' },
+    )
+    if (recovery.requiresProcessRestart === true) return null
+    return await profileApiRequest('/api/content-profile')
+  } catch {
+    return null
+  }
+}
+
+async function activateProfileHash(
+  targetProfileHash: string,
+  allowRendererRollback = true,
+): Promise<JsonObject> {
+  if (!localServerReady) throw new Error('PROFILE_SERVER_NOT_READY')
+  const before = await profileApiRequest('/api/content-profile')
+  if (before.state?.stable?.resolvedProfileHash === targetProfileHash) {
+    if (
+      before.server?.healthy !== true
+      || before.server?.activationId !== null
+      || before.server?.profile?.resolvedProfileHash !== targetProfileHash
+    ) throw new Error('ACTIVE_PROFILE_IDENTITY_OR_HEALTH_MISMATCH')
+    return await reconcileMainRendererAfterCommit(
+      targetProfileHash,
+      'renderer-already-active-reload',
+      { alreadyActive: true, state: before.state, server: before.server },
+      allowRendererRollback,
+    )
+  }
+
+  let stage = 'activation-plan'
+  let plan: JsonObject | null = null
+  try {
+    plan = await profileApiRequest('/api/content-profile/activation/plan', {
+      method: 'POST',
+      json: { targetProfileHash },
+    })
+    const targetReference = plan.target as DesktopProfileReference
+    const targetBinding: ProfileProcessBinding = {
+      reference: targetReference,
+      profileRoot: String(plan.profileRoot),
+      activationId: String(plan.activationId),
+    }
+
+    if (plan.reloadMode === 'authority-restart') {
+      stage = 'candidate-server-start'
+      await killServer(true)
+      await startLocalServer(targetBinding)
+      if (!localServerReady) throw new Error('CANDIDATE_SERVER_START_FAILED')
+    } else if (plan.reloadMode === 'presentation-refresh') {
+      stage = 'candidate-server-rebind'
+      await profileApiRequest('/api/content-profile/activation/rebind', {
+        method: 'POST',
+        json: { activationId: plan.activationId, targetProfileHash },
+      })
+    } else {
+      throw new Error(`UNSUPPORTED_PROFILE_RELOAD_MODE: ${String(plan.reloadMode)}`)
+    }
+
+    stage = 'candidate-server-health'
+    const candidate = await profileApiRequest('/api/content-profile')
+    const report = candidate.server
+    if (
+      !report?.healthy
+      || report.activationId !== plan.activationId
+      || report.profile?.resolvedProfileHash !== targetProfileHash
+      || report.profile?.authorityContentHash !== plan.target.authorityContentHash
+      || report.profile?.compatibility?.engineAbi !== plan.target.compatibility.engineAbi
+      || report.profile?.compatibility?.contentAbi !== plan.target.compatibility.contentAbi
+    ) throw new Error('CANDIDATE_SERVER_IDENTITY_OR_HEALTH_MISMATCH')
+
+    stage = 'candidate-websocket-health'
+    await probeProfileWebSocket()
+
+    stage = 'candidate-renderer-preflight'
+    await verifyRendererCandidate(
+      targetReference,
+      targetBinding.profileRoot,
+      String(plan.activationId),
+    )
+
+    stage = 'activation-commit'
+    const committed = await profileApiRequest('/api/content-profile/activation/commit', {
+      method: 'POST',
+      json: {
+        activationId: plan.activationId,
+        targetProfileHash,
+        keepAdmissionPaused: true,
+      },
+    })
+    stage = 'renderer-commit-reload'
+    return await reconcileMainRendererAfterCommit(
+      targetProfileHash,
+      stage,
+      committed,
+      allowRendererRollback,
+    )
+  } catch (error) {
+    if (plan) {
+      const durableDrainFailed = error instanceof Error && error.message === 'PROFILE_DURABLE_DRAIN_FAILED'
+      const keepAdmissionPaused = durableDrainFailed || !allowRendererRollback
+      if (stage === 'activation-commit') {
+        let readOnlyObserved: JsonObject | null = null
+        if (localServerReady) {
+          try {
+            readOnlyObserved = await profileApiRequest('/api/content-profile')
+          } catch {}
+        }
+        if (isHealthyCommittedProfileObservation(readOnlyObserved, targetProfileHash)) {
+          stage = 'renderer-commit-recovery-reload'
+          return await reconcileMainRendererAfterCommit(
+            targetProfileHash,
+            stage,
+            {
+              commitRecovered: true,
+              state: readOnlyObserved!.state,
+              server: readOnlyObserved!.server,
+            },
+            allowRendererRollback,
+          )
+        }
+        const code = (error as Error & { code?: string }).code
+        const commitIsUncertain = !code || code === 'PROFILE_COMMIT_RESPONSE_UNCERTAIN'
+        if (commitIsUncertain) {
+        try {
+          const observed = await recoverUncertainProfileCommit(
+            targetProfileHash,
+            observeCommittedProfileAfterRecovery,
+            async () => {
+              await killServer()
+              await startLocalServer(stableProfileBinding())
+              if (!localServerReady) throw new Error('PROFILE_COMMIT_RECOVERY_RESTART_FAILED')
+            },
+          )
+          if (observed) {
+            stage = 'renderer-commit-recovery-reload'
+            return await reconcileMainRendererAfterCommit(
+              targetProfileHash,
+              stage,
+              { commitRecovered: true, state: observed.state, server: observed.server },
+              allowRendererRollback,
+            )
+          }
+        } catch {}
+        }
+      }
+      let failureRecorded = false
+      if (localServerReady) {
+        try {
+          await recordProfileActivationFailure(
+            String(plan.activationId),
+            stage,
+            error,
+            keepAdmissionPaused,
+          )
+          failureRecorded = true
+        } catch (recordError) {
+          console.error('[profile] activation failure evidence write failed', {
+            activationId: String(plan.activationId),
+            stage,
+            error: recordError instanceof Error ? recordError.message : String(recordError),
+          })
+        }
+      }
+      if (!keepAdmissionPaused) {
+        await killServer()
+        await startStableLocalServerAndRecover()
+      }
+      if (!failureRecorded && localServerReady) {
+        try {
+          await recordProfileActivationFailure(
+            String(plan.activationId),
+            stage,
+            error,
+            keepAdmissionPaused,
+          )
+        } catch (recordError) {
+          console.error('[profile] activation failure evidence retry failed', {
+            activationId: String(plan.activationId),
+            stage,
+            error: recordError instanceof Error ? recordError.message : String(recordError),
+          })
+        }
+      }
+    }
+    const typed = error as Error & { code?: string }
+    return {
+      ok: false,
+      error: typed.message,
+      code: typed.code ?? 'PROFILE_ACTIVATION_FAILED',
+      stage,
+      ...(typed.message === 'PROFILE_DURABLE_DRAIN_FAILED' || !allowRendererRollback
+        ? { admissionPaused: true, requiresApplicationRestart: true }
+        : {}),
+    }
+  }
+}
+
+async function selectAndActivateRollback(
+  target: 'previous-stable' | 'bundled-base',
+  allowRendererRollback = true,
+): Promise<JsonObject> {
+  const selected = await profileApiRequest('/api/content-profile/rollback', {
+    method: 'POST',
+    json: { target },
+  })
+  const targetHash = selected.targetProfileHash
+    ?? selected.state?.candidate?.resolvedProfileHash
+  if (typeof targetHash !== 'string') throw new Error('PROFILE_ROLLBACK_TARGET_MISSING')
+  return activateProfileHash(targetHash, allowRendererRollback)
+}
+
+async function recoverProfileOnStartup(): Promise<void> {
+  if (!localServerReady) throw new Error('PROFILE_SERVER_NOT_READY')
+  let recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
+  if (recovered.requiresProcessRestart === true) {
+    await killServer()
+    await startLocalServer(stableProfileBinding())
+    if (!localServerReady) throw new Error('PROFILE_STARTUP_RECOVERY_RESTART_FAILED')
+    recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
+    if (recovered.requiresProcessRestart === true) {
+      throw new Error('PROFILE_STARTUP_RECOVERY_DID_NOT_CONVERGE')
+    }
+  }
+  const report = await profileApiRequest('/api/content-profile')
+  const stableProfileHash = recovered.state?.stable?.resolvedProfileHash
+  if (
+    typeof stableProfileHash !== 'string'
+    || report.state?.stable?.resolvedProfileHash !== stableProfileHash
+    || report.server?.profile?.resolvedProfileHash !== stableProfileHash
+    || report.server?.healthy !== true
+  ) throw new Error('PROFILE_STARTUP_RECOVERY_HEALTH_MISMATCH')
+}
+
+async function startStableLocalServerAndRecover(): Promise<void> {
+  await startLocalServer(stableProfileBinding())
+  await recoverProfileOnStartup()
+}
+
 // ─── 资源包管理（Electron IPC，替代 Android 端的 Service Worker 方案）────────
 
-async function setupPackProtocol(): Promise<void> {
-  await session.defaultSession.protocol.handle(CLIENT_SCHEME, async (request) => {
-    try {
-      const requestUrl = new URL(request.url)
-      if (requestUrl.hostname !== 'app') return new Response('Not found', { status: 404 })
-      const decodedPath = decodeURIComponent(requestUrl.pathname)
-      if (decodedPath.includes('\\') || decodedPath.includes('\0')) return new Response('Not found', { status: 404 })
-      const segments = decodedPath.replace(/^\/+/, '').split('/')
-      if (segments.length === 0 || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
-        return new Response('Not found', { status: 404 })
-      }
-      const relativePath = segments.join('/')
-      const target = resolveClientProtocolFile({
-        relativePath,
-        htmlRoot: getHtmlRoot(),
-        appRoot: getAppRoot(),
-        activePackRoot: isActivatableResourcePackPath(relativePath)
-          ? resolveActiveResourcePackRoot(getPackRoot())
-          : null,
-        isPackaged: app.isPackaged,
-      })
-      if (!target) return new Response('Not found', { status: 404 })
-      return electronNet.fetch(pathToFileURL(target).toString())
-    } catch {
+async function serveClientProtocolRequest(
+  request: GlobalRequest,
+  fixedActivePackRoot?: string | null,
+  smokeServerUrl?: string,
+): Promise<Response> {
+  try {
+    const requestUrl = new URL(request.url)
+    if (requestUrl.hostname !== 'app') return new Response('Not found', { status: 404 })
+    const decodedPath = decodeURIComponent(requestUrl.pathname)
+    if (decodedPath.includes('\\') || decodedPath.includes('\0')) return new Response('Not found', { status: 404 })
+    const segments = decodedPath.replace(/^\/+/, '').split('/')
+    if (segments.length === 0 || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
       return new Response('Not found', { status: 404 })
     }
-  })
+    const relativePath = segments.join('/')
+    if (relativePath === '__profile-smoke__.html' && smokeServerUrl) {
+      const serverLiteral = JSON.stringify(smokeServerUrl)
+      return new Response(
+        `<script>localStorage.setItem('rvb_server_url', ${serverLiteral});location.replace('${CLIENT_SCHEME}://app/index.html?profile-smoke=1')</script>`,
+        { headers: { 'content-type': 'text/html; charset=utf-8' } },
+      )
+    }
+    const activePackRoot = fixedActivePackRoot === undefined
+      ? (isActivatableResourcePackPath(relativePath)
+          ? resolveActiveResourcePackRoot(getPackRoot())
+          : null)
+      : fixedActivePackRoot
+    const target = resolveClientProtocolFile({
+      relativePath,
+      htmlRoot: getHtmlRoot(),
+      appRoot: getAppRoot(),
+      activePackRoot,
+      isPackaged: app.isPackaged,
+    })
+    if (!target) return new Response('Not found', { status: 404 })
+    return electronNet.fetch(pathToFileURL(target).toString())
+  } catch {
+    return new Response('Not found', { status: 404 })
+  }
+}
+
+async function setupPackProtocol(): Promise<void> {
+  await session.defaultSession.protocol.handle(CLIENT_SCHEME, request => (
+    serveClientProtocolRequest(request)
+  ))
 }
 
 /** IPC: import one complete archive into an isolated immutable version. */
 handleTrusted('pack-import-from-path', ['game'], async (_e, zipPath: string) => {
   try {
-    const result = importResourcePackFromPath(getPackRoot(), zipPath)
-    return { ok: true, count: result.count, meta: result.meta }
+    return await enqueueProfileMutation(async () => installProfileArchive(await readProfileArchive(zipPath)))
   } catch (e) {
     console.error('[pack-import] Failed:', e)
     return { ok: false, error: String(e) }
@@ -619,30 +1350,49 @@ handleTrusted('pack-import-from-path', ['game'], async (_e, zipPath: string) => 
 
 handleTrusted('pack-import-data', ['game'], async (_e, base64Data: string) => {
   try {
-    const maxBase64Length = Math.ceil(RESOURCE_PACK_LIMITS.maxArchiveBytes / 3) * 4 + 4
-    if (typeof base64Data !== 'string' || base64Data.length > maxBase64Length) {
-      throw new Error('Resource-pack compressed archive exceeds the 32 MiB limit')
-    }
-    const result = importResourcePackArchive(getPackRoot(), Buffer.from(base64Data, 'base64'))
-    return { ok: true, count: result.count, meta: result.meta }
+    return await enqueueProfileMutation(() => installProfileArchive(decodeProfileArchive(base64Data)))
   } catch (e) {
     console.error('[pack-import] Failed:', e)
     return { ok: false, error: String(e) }
   }
 })
 
-/** IPC: reset activation to built-in assets while retaining immutable versions. */
+handleTrusted('pack-activate', ['game', 'admin'], async (_event, targetProfileHash: string) => {
+  return enqueueProfileMutation(() => activateProfileHash(targetProfileHash))
+})
+
+handleTrusted('pack-rollback', ['game', 'admin'], async (_event, target: 'previous-stable' | 'bundled-base') => {
+  try {
+    if (target !== 'previous-stable' && target !== 'bundled-base') {
+      throw new Error('Invalid profile rollback target')
+    }
+    return await enqueueProfileMutation(() => selectAndActivateRollback(target))
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+/** IPC compatibility: clear means an explicit, verified rollback to bundled Base. */
 handleTrusted('pack-clear', ['game'], async () => {
-  clearActiveResourcePack(getPackRoot())
-  return { ok: true }
+  try {
+    return await enqueueProfileMutation(() => selectAndActivateRollback('bundled-base'))
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
 })
 
 /** IPC: 列出当前资源包中的所有文件路径 */
 handleTrusted('pack-list', ['game'], async () => {
-  return {
-    ok: true,
-    files: listActiveResourcePackFiles(getPackRoot()),
-    meta: getActiveResourcePackMeta(getPackRoot()),
+  try {
+    const status = await profileApiRequest('/api/content-profile')
+    return {
+      ok: true,
+      files: listActiveResourcePackFiles(getPackRoot()),
+      meta: getActiveResourcePackMeta(getPackRoot()),
+      ...status,
+    }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 
@@ -680,6 +1430,8 @@ function createGameWindow(): BrowserWindow {
 
 let adminWin: BrowserWindow | null = null
 
+// Retained for the existing admin window entry point wired by packaged shells.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function openAdminWindow(): void {
   if (adminWin && !adminWin.isDestroyed()) {
     adminWin.focus()
@@ -815,7 +1567,7 @@ handleTrusted('go-offline', ['connect', 'game'], () => {
 
 handleTrusted('open-local-game', ['connect'], async () => {
   clearOnlineServerUrl()
-  await startLocalServer()
+  await startStableLocalServerAndRecover()
   if (!localServerReady) {
     const exitMsg = lastServerExitCode !== null
       ? `Local server exited with code ${lastServerExitCode}`
@@ -840,9 +1592,9 @@ handleTrusted('get-mode', ['game'], () => ({
 
 // 重启本地服务器
 handleTrusted('restart-server', ['admin'], async () => {
-  killServer()
+  await killServer()
   await new Promise(resolve => setTimeout(resolve, 1000))
-  await startLocalServer()
+  await startStableLocalServerAndRecover()
   return { ok: true }
 })
 
@@ -957,110 +1709,32 @@ handleTrusted('start-discover-hosts', ['game'], (event, timeoutMs: number) => {
 // 资源包状态
 handleTrusted('get-resource-pack-status', ['admin'], async () => {
   try {
-    return new Promise((resolve) => {
-      const req = http.get(`http://localhost:${actualLocalPort}/api/admin/resource-pack`, (res) => {
-        let data = ''
-        res.on('data', (chunk: Buffer) => data += chunk)
-        res.on('end', () => {
-          try { resolve(JSON.parse(data)) } catch { resolve({ error: 'Parse error' }) }
-        })
-      })
-      req.on('error', () => resolve({ error: 'Server not running' }))
-      req.setTimeout(3000, () => { req.destroy(); resolve({ error: 'Timeout' }) })
-    })
-  } catch { return { error: 'Failed' } }
+    return await profileApiRequest('/api/content-profile')
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) }
+  }
 })
 
 // 资源包上传（文件路径）
 handleTrusted('upload-resource-pack', ['admin'], async (_event, filePath: string) => {
   try {
-    const boundary = '----FormBoundary' + Date.now()
-    const stat = fs.statSync(filePath)
-    if (!stat.isFile() || stat.size <= 0 || stat.size > RESOURCE_PACK_LIMITS.maxArchiveBytes) {
-      throw new Error('Resource-pack compressed archive is empty or exceeds 32 MiB')
-    }
-    const fileContent = fs.readFileSync(filePath)
-    const filename = (filePath.split(/[\\/]/).pop() || 'resource-pack.zip').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
-
-    const header = Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/zip\r\n\r\n`
-    )
-    const footer = Buffer.from(`\r\n--${boundary}--\r\n`)
-    const body = Buffer.concat([header, fileContent, footer])
-
-    return new Promise((resolve) => {
-      const req = http.request({
-        hostname: 'localhost',
-        port: actualLocalPort,
-        path: '/api/admin/resource-pack/upload',
-        method: 'POST',
-        headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'x-admin-key': 'admin-secret-key',
-          'Content-Length': body.length,
-        }
-      }, (res) => {
-        let data = ''
-        res.on('data', (chunk: Buffer) => data += chunk)
-        res.on('end', () => {
-          try { resolve(JSON.parse(data)) } catch { resolve({ success: false, message: 'Parse error' }) }
-        })
-      })
-      req.on('error', (e: Error) => resolve({ success: false, message: e.message }))
-      req.write(body)
-      req.end()
-    })
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return { success: false, message }
+    const result = await enqueueProfileMutation(async () => installProfileArchive(await readProfileArchive(filePath)))
+    return { success: result.ok === true, message: result.ok === true ? 'Profile installed as candidate' : result.error, ...result }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { success: false, message, error: message }
   }
 })
 
 // 资源包上传（base64 数据）
 handleTrusted('upload-resource-pack-data', ['admin'], async (_event, base64: string, filename: string) => {
   try {
-    const maxBase64Length = Math.ceil(RESOURCE_PACK_LIMITS.maxArchiveBytes / 3) * 4 + 4
-    if (typeof base64 !== 'string' || base64.length > maxBase64Length) {
-      throw new Error('Resource-pack compressed archive exceeds the 32 MiB limit')
-    }
-    const buffer = Buffer.from(base64, 'base64')
-    if (buffer.length === 0 || buffer.length > RESOURCE_PACK_LIMITS.maxArchiveBytes) {
-      throw new Error('Resource-pack compressed archive is empty or exceeds 32 MiB')
-    }
-    const safeFilename = String(filename || 'resource-pack.zip').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
-    const boundary = '----FormBoundary' + Date.now()
-
-    const header = Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${safeFilename}"\r\nContent-Type: application/zip\r\n\r\n`
-    )
-    const footer = Buffer.from(`\r\n--${boundary}--\r\n`)
-    const body = Buffer.concat([header, buffer, footer])
-
-    return new Promise((resolve) => {
-      const req = http.request({
-        hostname: 'localhost',
-        port: actualLocalPort,
-        path: '/api/admin/resource-pack/upload',
-        method: 'POST',
-        headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'x-admin-key': 'admin-secret-key',
-          'Content-Length': body.length,
-        }
-      }, (res) => {
-        let data = ''
-        res.on('data', (chunk: Buffer) => data += chunk)
-        res.on('end', () => {
-          try { resolve(JSON.parse(data)) } catch { resolve({ success: false, message: 'Parse error' }) }
-        })
-      })
-      req.on('error', (e: Error) => resolve({ success: false, message: e.message }))
-      req.write(body)
-      req.end()
-    })
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return { success: false, message }
+    void filename
+    const result = await enqueueProfileMutation(() => installProfileArchive(decodeProfileArchive(base64)))
+    return { success: result.ok === true, message: result.ok === true ? 'Profile installed as candidate' : result.error, ...result }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { success: false, message, error: message }
   }
 })
 
@@ -1102,7 +1776,12 @@ app.whenReady().then(async () => {
     console.warn('[client] Failed to clear SW/cache storage:', e)
   }
 
-  await startLocalServer()
+  try {
+    await startStableLocalServerAndRecover()
+  } catch (error) {
+    console.error('[profile] startup recovery failed; admission remains closed:', error)
+    return
+  }
   // 暂时强制使用本地服务器，跳过在线服务器
   openConnectWindow()
   // const savedUrl = getOnlineServerUrl()

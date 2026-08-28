@@ -64,6 +64,7 @@
       transition: opacity 0.15s;
     }
     .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-primary { background: #3b82f6; color: #fff; }
     .btn-warning { background: #f59e0b; color: #000; }
     .btn-danger  { background: #ef4444; color: #fff; }
@@ -112,6 +113,10 @@
     .room-actions { display: flex; gap: 6px; margin-top: 6px; justify-content: flex-end; }
 
     .copy-hint { font-size: 10px; color: #22c55e; margin-top: 4px; display: none; }
+    .profile-line { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+    .profile-line:last-child { margin-bottom: 0; }
+    .profile-label { color: #64748b; }
+    .profile-value { color: #cbd5e1; text-align: right; overflow-wrap: anywhere; }
   </style>
 </head>
 <body>
@@ -135,8 +140,13 @@
   <div class="input-row" style="flex-direction:column;gap:8px">
     <input type="file" id="packFile" accept=".zip" style="background:#1e293b;border:1px dashed #334155;border-radius:6px;padding:10px;color:#94a3b8" />
     <div style="display:flex;gap:8px">
-      <button class="btn btn-primary" onclick="uploadPack()" style="flex:1">上传并更新资源包</button>
+      <button class="btn btn-primary" onclick="uploadPack()" style="flex:1">安装为候选 Profile</button>
       <button class="btn btn-ghost" onclick="checkPackStatus()">刷新状态</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="btnActivateCandidate" onclick="activateCandidate()" disabled>激活候选</button>
+      <button class="btn btn-warning" id="btnRollbackPrevious" onclick="rollbackProfile('previous-stable')" disabled>回退上一稳定版</button>
+      <button class="btn btn-ghost" id="btnRollbackBase" onclick="rollbackProfile('bundled-base')">切换内置 Base</button>
     </div>
     <div id="packStatus" style="font-size:12px;color:#64748b;background:#0f172a;border-radius:6px;padding:8px 10px"></div>
     <div id="packProgress" style="display:none">
@@ -161,6 +171,7 @@
 
   <script>
     const api = window.electronAPI
+    let currentProfileState = null
 
     function updateUI(running) {
       document.getElementById('dot').classList.toggle('running', running)
@@ -225,24 +236,83 @@
     function stop()    { api.stopServer() }
     function start()   { api.startServer() }
 
+    function shortHash(value) {
+      return typeof value === 'string' && value ? value.slice(0, 12) : '-'
+    }
+
+    function profileName(reference) {
+      if (!reference) return '无'
+      return `${reference.packageId || '未知包'}@${reference.version || '未知版本'} (${shortHash(reference.resolvedProfileHash)})`
+    }
+
+    function setProfileActionState(state) {
+      currentProfileState = state || null
+      document.getElementById('btnActivateCandidate').disabled = !state?.candidate
+      document.getElementById('btnRollbackPrevious').disabled = !state?.previousStable
+    }
+
     async function checkPackStatus() {
       const statusEl = document.getElementById('packStatus')
       statusEl.textContent = '加载中...'
       try {
         const data = await api.getResourcePackStatus()
-        if (data.loaded) {
-          statusEl.innerHTML = `✅ 已加载 | 版本: ${data.meta?.version || '未知'} | MD5: ${(data.meta?.md5 || '-').slice(0, 16)}...`
-          statusEl.style.color = '#22c55e'
-        } else if (data.error) {
-          statusEl.textContent = '⚠️ ' + data.error
-          statusEl.style.color = '#fbbf24'
-        } else {
-          statusEl.textContent = '⚠️ 未加载（使用内置数据）'
-          statusEl.style.color = '#fbbf24'
-        }
+        if (data.error || !data.state) throw new Error(data.error || 'PROFILE_STATE_UNAVAILABLE')
+        const state = data.state
+        setProfileActionState(state)
+        const stableServerHash = data.server?.profile?.resolvedProfileHash
+        const serverAligned = stableServerHash === state.stable?.resolvedProfileHash
+        const failure = state.lastFailure
+          ? `${state.lastFailure.stage}: ${state.lastFailure.message}`
+          : '无'
+        statusEl.innerHTML = [
+          `<div class="profile-line"><span class="profile-label">稳定</span><span class="profile-value">${escHtml(profileName(state.stable))}</span></div>`,
+          `<div class="profile-line"><span class="profile-label">候选</span><span class="profile-value">${escHtml(profileName(state.candidate))}</span></div>`,
+          `<div class="profile-line"><span class="profile-label">上一稳定版</span><span class="profile-value">${escHtml(profileName(state.previousStable))}</span></div>`,
+          `<div class="profile-line"><span class="profile-label">服务端</span><span class="profile-value">${serverAligned ? '✅ 与 stable 一致' : '❌ 未与 stable 对齐'}</span></div>`,
+          `<div class="profile-line"><span class="profile-label">最近失败</span><span class="profile-value">${escHtml(failure)}</span></div>`,
+        ].join('')
+        statusEl.style.color = serverAligned ? '#22c55e' : '#fbbf24'
       } catch (e) {
-        statusEl.textContent = '❌ 无法获取状态'
+        setProfileActionState(null)
+        statusEl.textContent = '❌ 无法获取 Profile 状态: ' + (e.message || String(e))
         statusEl.style.color = '#ef4444'
+      }
+    }
+
+    async function activateCandidate() {
+      const candidate = currentProfileState?.candidate
+      if (!candidate) return
+      await runProfileAction(
+        '正在激活候选 Profile...',
+        () => api.activateResourcePack(candidate.resolvedProfileHash),
+      )
+    }
+
+    async function rollbackProfile(target) {
+      const label = target === 'previous-stable' ? '上一稳定版' : '内置 Base'
+      if (!confirm(`确定切换到${label}吗？`)) return
+      await runProfileAction(
+        `正在切换到${label}...`,
+        () => api.rollbackResourcePack(target),
+      )
+    }
+
+    async function runProfileAction(progressMessage, action) {
+      const statusEl = document.getElementById('packStatus')
+      statusEl.textContent = progressMessage
+      statusEl.style.color = '#fbbf24'
+      try {
+        const result = await action()
+        if (!result?.ok) throw new Error(result?.error || 'PROFILE_ACTIVATION_FAILED')
+        statusEl.textContent = result.commitRecovered
+          ? '✅ Profile 已激活（已从原子 stable 指针确认提交）'
+          : '✅ Profile 已激活'
+        statusEl.style.color = '#22c55e'
+      } catch (e) {
+        statusEl.textContent = '❌ Profile 操作失败: ' + (e.message || String(e))
+        statusEl.style.color = '#ef4444'
+      } finally {
+        setTimeout(checkPackStatus, 500)
       }
     }
 
@@ -264,7 +334,10 @@
       statusEl.textContent = ''
 
       try {
-        const file = fileInput.files[0]
+        if (file.size > 32 * 1024 * 1024) {
+          fileInput.value = ''
+          throw new Error('资源包超过 32 MiB 上限')
+        }
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader()
           reader.onload = () => resolve(reader.result.split(',')[1])
@@ -276,13 +349,10 @@
 
         if (result.success) {
           barEl.style.width = '100%'
-          textEl.textContent = '上传完成！正在重启服务器...'
-          statusEl.textContent = '✅ 资源包上传成功，服务器即将重启'
+          textEl.textContent = '安装完成，等待显式激活'
+          statusEl.textContent = '✅ 已安装为候选 Profile；stable 与服务器尚未改变'
           statusEl.style.color = '#22c55e'
-          setTimeout(() => {
-            restart()
-            setTimeout(checkPackStatus, 3000)
-          }, 2000)
+          setTimeout(checkPackStatus, 500)
         } else {
           statusEl.textContent = '❌ 上传失败: ' + (result.message || '未知错误')
           statusEl.style.color = '#ef4444'
@@ -302,6 +372,7 @@
 
     updateUI(false)
     refreshRooms()
+    checkPackStatus()
     setInterval(refreshRooms, 8000)
   </script>
 </body>

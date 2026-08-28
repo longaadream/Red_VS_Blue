@@ -2,9 +2,17 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } from 'el
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
+import * as http from 'http'
+import { randomBytes } from 'crypto'
 import { shouldReportServerStartupFailure } from './server-process-lifecycle'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
-import { RESOURCE_PACK_LIMITS, importResourcePackArchive } from './resource-pack-store'
+import {
+  type ServerProfileReference,
+  isHealthyCommittedServerObservation,
+  readServerProfileState,
+  recoverUncertainServerCommit,
+  resolveServerProfileRoot,
+} from './resource-pack-store'
 
 let serverProcess: ChildProcess | null = null
 const requestedServerStops = new WeakSet<ChildProcess>()
@@ -15,6 +23,8 @@ let cleanupInterval: NodeJS.Timeout | null = null
 const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
 const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
 const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
+const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
+const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
 
@@ -158,6 +168,25 @@ function logUnexpectedChildStreamError(error: Error, record: ChildLogForwardingR
   console.error('[electron] Unexpected child log stream error:', record, error)
 }
 
+function applyExplicitUserDataOverride(): void {
+  const prefix = '--rvb-user-data-dir='
+  const argument = process.argv.find(value => value.startsWith(prefix))
+  const environmentPath = process.env.RVB_ELECTRON_USER_DATA_DIR
+  if (environmentPath === undefined && !argument) return
+  const rawPath = environmentPath ?? argument!.slice(prefix.length)
+  const resolvedPath = path.resolve(rawPath)
+  if (!rawPath || path.dirname(resolvedPath) === resolvedPath) {
+    throw new Error('Invalid --rvb-user-data-dir path')
+  }
+  fs.mkdirSync(resolvedPath, { recursive: true })
+  app.setPath('userData', resolvedPath)
+  app.setPath('sessionData', resolvedPath)
+}
+
+// Apply the explicit candidate-only path before requestSingleInstanceLock()
+// so Electron storage and ProcessSingleton are truly isolated.
+applyExplicitUserDataOverride()
+
 // ─── 路径工具 ────────────────────────────────────────────────────────────────
 
 function getAppRoot(): string {
@@ -171,6 +200,14 @@ function getAppRoot(): string {
 
 function getUserData(): string {
   return app.getPath('userData')
+}
+
+function getPackRoot(): string {
+  return path.join(getUserData(), 'resource-pack')
+}
+
+function profileRootForReference(reference: ServerProfileReference): string {
+  return resolveServerProfileRoot(getPackRoot(), reference) ?? getAppRoot()
 }
 
 function getDashboardRoot(): string {
@@ -338,9 +375,13 @@ function requestGracefulServerShutdown(proc: ChildProcess): Promise<boolean> {
   })
 }
 
-async function stopChildProcessGracefully(proc: ChildProcess): Promise<void> {
+async function stopChildProcessGracefully(
+  proc: ChildProcess,
+  requireDurable = false,
+): Promise<void> {
   const durable = await requestGracefulServerShutdown(proc)
   if (!durable) {
+    if (requireDurable) throw new Error('PROFILE_DURABLE_DRAIN_FAILED')
     console.error('[electron] forcing server stop with a potentially undurable battle journal')
   }
   if (proc.exitCode === null && proc.signalCode === null) killProcessTree(proc)
@@ -377,7 +418,42 @@ function findSamePortPreload(appRoot: string, serverEntry: string): string | nul
   ].find(candidate => fs.existsSync(candidate)) ?? null
 }
 
-function startGameServer(): void {
+type ProfileProcessBinding = {
+  reference?: ServerProfileReference
+  profileRoot: string
+  activationId?: string
+}
+
+function stableProfileBinding(): ProfileProcessBinding {
+  try {
+    const stable = readServerProfileState(getPackRoot())?.stable
+    if (!stable) return { profileRoot: getAppRoot() }
+    return { reference: stable, profileRoot: profileRootForReference(stable) }
+  } catch (error) {
+    console.error('[profile] stable binding is invalid; server will recover through Bundled Base:', error)
+    return { profileRoot: getAppRoot() }
+  }
+}
+
+function waitForServerReady(timeoutMs = 20_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  return new Promise(resolve => {
+    const probe = (): void => {
+      if (!serverProcess) return resolve(false)
+      if (Date.now() >= deadline) return resolve(false)
+      const request = http.get('http://127.0.0.1:3000/api/ping', response => {
+        response.resume()
+        if (response.statusCode && response.statusCode >= 200 && response.statusCode < 500) resolve(true)
+        else setTimeout(probe, 250)
+      })
+      request.once('error', () => setTimeout(probe, 250))
+      request.setTimeout(1_000, () => request.destroy())
+    }
+    probe()
+  })
+}
+
+async function startGameServer(profileBinding?: ProfileProcessBinding): Promise<void> {
   if (serverProcess) return
 
   const appRoot = getAppRoot()
@@ -418,6 +494,7 @@ function startGameServer(): void {
   // 确保 CSS / JS / 图片等 static 资源在 standalone 目录下
   ensureStandaloneAssets(appRoot, serverEntry)
 
+  const binding = profileBinding ?? stableProfileBinding()
   let spawnedProcess: ChildProcess
   try {
     spawnedProcess = spawn(getNodeBin(), ['--require', samePortPreload, serverEntry], {
@@ -428,7 +505,16 @@ function startGameServer(): void {
         NODE_ENV: 'production',
         APP_ROOT_DIR: appRoot,
         USER_DATA_DIR: userData,
-        DATABASE_URL: databaseUrl,
+          DATABASE_URL: databaseUrl,
+          RVB_PROFILE_ADMIN_KEY: PROFILE_ADMIN_KEY,
+          RVB_ALLOW_LOCAL_DEV_PROFILES: app.isPackaged ? '0' : '1',
+          RVB_PROFILE_ADMISSION_PAUSED: binding?.activationId ?? 'startup-recovery',
+        RVB_PROFILE_ROOT: binding.profileRoot,
+        RVB_RESOLVED_PROFILE_HASH: binding.reference?.resolvedProfileHash,
+        RVB_AUTHORITY_CONTENT_HASH: binding.reference?.authorityContentHash,
+        RVB_PROFILE_ENGINE_ABI: binding.reference?.compatibility.engineAbi,
+        RVB_PROFILE_CONTENT_ABI: binding.reference?.compatibility.contentAbi,
+        RVB_PROFILE_ACTIVATION_ID: binding.activationId,
       },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     })
@@ -488,15 +574,12 @@ function startGameServer(): void {
     }
   })
 
-  // 给服务器一点时间启动后再标记为 running
-  setTimeout(() => {
-    if (serverProcess === spawnedProcess) {
-      serverRunning = true
-      dashboardWin?.webContents.send('server-status', { running: true })
-      updateTrayMenu()
-      startRoomCleanup()
-    }
-  }, 2500)
+  serverRunning = await waitForServerReady()
+  if (serverProcess === spawnedProcess && serverRunning) {
+    dashboardWin?.webContents.send('server-status', { running: true })
+    updateTrayMenu()
+    startRoomCleanup()
+  }
 }
 
 function startRoomCleanup(): void {
@@ -524,9 +607,10 @@ function startRoomCleanup(): void {
   cleanupInterval = setInterval(cleanupRooms, 60 * 60 * 1000)
 }
 
-async function stopGameServer(): Promise<void> {
+async function stopGameServer(requireDurable = false): Promise<void> {
   if (!serverProcess) return
   const proc = serverProcess
+  await stopChildProcessGracefully(proc, requireDurable)
   requestedServerStops.add(proc)
   serverProcess = null
   serverRunning = false
@@ -536,13 +620,15 @@ async function stopGameServer(): Promise<void> {
   }
   dashboardWin?.webContents.send('server-status', { running: false })
   updateTrayMenu()
-  await stopChildProcessGracefully(proc)
 }
 
-async function restartGameServer(): Promise<void> {
-  await stopGameServer()
+async function restartGameServer(
+  profileBinding?: ProfileProcessBinding,
+  requireDurable = false,
+): Promise<void> {
+  await stopGameServer(requireDurable)
   await new Promise(resolve => setTimeout(resolve, 500))
-  startGameServer()
+  await startGameServer(profileBinding)
 }
 
 // ─── 管理面板窗口 ─────────────────────────────────────────────────────────────
@@ -592,16 +678,339 @@ function updateTrayMenu(): void {
     { type: 'separator' },
     {
       label: serverRunning ? '重启服务器' : '启动服务器',
-      click: serverRunning ? restartGameServer : startGameServer,
+      click: () => {
+        void (serverRunning
+          ? restartStableGameServerAndRecover()
+          : startStableGameServerAndRecover())
+      },
     },
     {
       label: '停止服务器',
       enabled: serverRunning,
-      click: stopGameServer,
+      click: () => { void stopGameServer() },
     },
     { type: 'separator' },
     { label: '退出', click: requestApplicationExit },
   ]))
+}
+
+// Electron/Next JSON replies are validated at each authority boundary below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type JsonObject = Record<string, any>
+
+let profileMutationTail: Promise<unknown> = Promise.resolve()
+
+function enqueueProfileMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const next = profileMutationTail.then(operation, operation)
+  profileMutationTail = next.then(() => undefined, () => undefined)
+  return next
+}
+
+function profileApiRequest<T extends JsonObject = JsonObject>(
+  route: string,
+  options: { method?: 'GET' | 'POST'; json?: JsonObject; archive?: Buffer } = {},
+): Promise<T> {
+  const body = options.archive
+    ?? (options.json ? Buffer.from(JSON.stringify(options.json), 'utf8') : null)
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port: 3000,
+      path: route,
+      method: options.method ?? 'GET',
+      headers: {
+        'x-rvb-profile-admin-key': PROFILE_ADMIN_KEY,
+        ...(options.archive ? { 'content-type': 'application/zip' } : {}),
+        ...(options.json ? { 'content-type': 'application/json' } : {}),
+        ...(body ? { 'content-length': body.byteLength } : {}),
+        ...(!app.isPackaged ? { 'x-rvb-local-dev-profile': '1' } : {}),
+      },
+    }, response => {
+      const chunks: Buffer[] = []
+      let total = 0
+      response.on('data', (chunk: Buffer) => {
+        total += chunk.byteLength
+        if (total > 2 * 1024 * 1024) {
+          request.destroy(new Error('PROFILE_API_RESPONSE_TOO_LARGE'))
+          return
+        }
+        chunks.push(chunk)
+      })
+      response.on('end', () => {
+        let parsed: JsonObject
+        try {
+          parsed = JSON.parse(Buffer.concat(chunks).toString('utf8')) as JsonObject
+        } catch {
+          reject(new Error(`PROFILE_API_INVALID_RESPONSE: ${response.statusCode ?? 0}`))
+          return
+        }
+        if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+          const error = new Error(String(parsed.message ?? parsed.error ?? `HTTP ${response.statusCode}`)) as Error & { code?: string }
+          error.code = typeof parsed.error === 'string' ? parsed.error : 'PROFILE_API_FAILED'
+          reject(error)
+          return
+        }
+        resolve(parsed as T)
+      })
+    })
+    request.once('error', reject)
+    request.setTimeout(30_000, () => request.destroy(new Error('PROFILE_API_TIMEOUT')))
+    if (body) request.write(body)
+    request.end()
+  })
+}
+
+function decodeProfileArchive(base64Data: string): Buffer {
+  const maxBase64Length = Math.ceil(PROFILE_ARCHIVE_MAX_BYTES / 3) * 4 + 4
+  if (
+    typeof base64Data !== 'string'
+    || base64Data.length === 0
+    || base64Data.length > maxBase64Length
+    || base64Data.length % 4 !== 0
+    || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data)
+  ) throw new Error('Resource-pack archive is not valid bounded base64')
+  const archive = Buffer.from(base64Data, 'base64')
+  if (archive.byteLength === 0 || archive.byteLength > PROFILE_ARCHIVE_MAX_BYTES) {
+    throw new Error('Resource-pack compressed archive is empty or exceeds 32 MiB')
+  }
+  return archive
+}
+
+function probeProfileWebSocket(timeoutMs = 5_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const modulePath = app.isPackaged
+      ? path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')
+      : 'ws'
+    const WebSocketClient = require(modulePath) as typeof import('ws')
+    const socket = new WebSocketClient('ws://127.0.0.1:3000/ws/rooms/__profile-health__')
+    const finish = (error?: Error): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      try { socket.close() } catch {}
+      if (error) reject(error)
+      else resolve()
+    }
+    const timeout = setTimeout(() => finish(new Error('PROFILE_WEBSOCKET_TIMEOUT')), timeoutMs)
+    socket.once('open', () => finish())
+    socket.once('error', error => finish(error instanceof Error ? error : new Error(String(error))))
+    socket.once('unexpected-response', (_request, response) => finish(new Error(`PROFILE_WEBSOCKET_HTTP_${response.statusCode}`)))
+  })
+}
+
+async function recordProfileActivationFailure(
+  activationId: string,
+  stage: string,
+  error: unknown,
+  keepAdmissionPaused = false,
+): Promise<void> {
+  await profileApiRequest('/api/content-profile/activation/failure', {
+    method: 'POST',
+    json: {
+      activationId,
+      code: 'CANDIDATE_ACTIVATION_FAILED',
+      stage,
+      message: error instanceof Error ? error.message : String(error),
+      keepAdmissionPaused,
+    },
+  })
+}
+
+async function observeCommittedProfileAfterRecovery(): Promise<JsonObject | null> {
+  if (!serverRunning) return null
+  try {
+    const recovery = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
+    if (recovery.requiresProcessRestart === true) return null
+    return await profileApiRequest('/api/content-profile')
+  } catch {
+    return null
+  }
+}
+
+async function activateProfileHash(targetProfileHash: string): Promise<JsonObject> {
+  if (!serverRunning) throw new Error('PROFILE_SERVER_NOT_READY')
+  const before = await profileApiRequest('/api/content-profile')
+  if (before.state?.stable?.resolvedProfileHash === targetProfileHash) {
+    if (
+      before.server?.healthy !== true
+      || before.server?.activationId !== null
+      || before.server?.profile?.resolvedProfileHash !== targetProfileHash
+    ) throw new Error('ACTIVE_PROFILE_IDENTITY_OR_HEALTH_MISMATCH')
+    return { ok: true, alreadyActive: true, state: before.state, server: before.server }
+  }
+  let stage = 'activation-plan'
+  let plan: JsonObject | null = null
+  try {
+    plan = await profileApiRequest('/api/content-profile/activation/plan', {
+      method: 'POST',
+      json: { targetProfileHash },
+    })
+    if (plan.reloadMode === 'authority-restart') {
+      stage = 'candidate-server-start'
+      await restartGameServer({
+        reference: plan.target as ServerProfileReference,
+        profileRoot: String(plan.profileRoot),
+        activationId: String(plan.activationId),
+      }, true)
+      if (!serverRunning) throw new Error('CANDIDATE_SERVER_START_FAILED')
+    } else if (plan.reloadMode === 'presentation-refresh') {
+      stage = 'candidate-server-rebind'
+      await profileApiRequest('/api/content-profile/activation/rebind', {
+        method: 'POST',
+        json: { activationId: plan.activationId, targetProfileHash },
+      })
+    } else {
+      throw new Error(`UNSUPPORTED_PROFILE_RELOAD_MODE: ${String(plan.reloadMode)}`)
+    }
+
+    stage = 'candidate-server-health'
+    const candidate = await profileApiRequest('/api/content-profile')
+    const report = candidate.server
+    if (
+      !report?.healthy
+      || report.activationId !== plan.activationId
+      || report.profile?.resolvedProfileHash !== targetProfileHash
+      || report.profile?.authorityContentHash !== plan.target.authorityContentHash
+      || report.profile?.compatibility?.engineAbi !== plan.target.compatibility.engineAbi
+      || report.profile?.compatibility?.contentAbi !== plan.target.compatibility.contentAbi
+    ) throw new Error('CANDIDATE_SERVER_IDENTITY_OR_HEALTH_MISMATCH')
+
+    stage = 'candidate-websocket-health'
+    await probeProfileWebSocket()
+
+    stage = 'activation-commit'
+    const committed = await profileApiRequest('/api/content-profile/activation/commit', {
+      method: 'POST',
+      json: { activationId: plan.activationId, targetProfileHash },
+    })
+    return { ok: true, ...committed }
+  } catch (error) {
+    if (plan) {
+      const durableDrainFailed = error instanceof Error && error.message === 'PROFILE_DURABLE_DRAIN_FAILED'
+      if (stage === 'activation-commit') {
+        let readOnlyObserved: JsonObject | null = null
+        if (serverRunning) {
+          try {
+            readOnlyObserved = await profileApiRequest('/api/content-profile')
+          } catch {}
+        }
+        if (isHealthyCommittedServerObservation(readOnlyObserved, targetProfileHash)) {
+          return {
+            ok: true,
+            commitRecovered: true,
+            state: readOnlyObserved!.state,
+            server: readOnlyObserved!.server,
+          }
+        }
+        const code = (error as Error & { code?: string }).code
+        const commitIsUncertain = !code || code === 'PROFILE_COMMIT_RESPONSE_UNCERTAIN'
+        if (commitIsUncertain) {
+        try {
+          const observed = await recoverUncertainServerCommit(
+            targetProfileHash,
+            observeCommittedProfileAfterRecovery,
+            async () => {
+              await restartGameServer(stableProfileBinding())
+              if (!serverRunning) throw new Error('PROFILE_COMMIT_RECOVERY_RESTART_FAILED')
+            },
+          )
+          if (observed) {
+            return { ok: true, commitRecovered: true, state: observed.state, server: observed.server }
+          }
+        } catch {}
+        }
+      }
+      let failureRecorded = false
+      if (serverRunning) {
+        try {
+          await recordProfileActivationFailure(
+            String(plan.activationId),
+            stage,
+            error,
+            durableDrainFailed,
+          )
+          failureRecorded = true
+        } catch (recordError) {
+          console.error('[profile] activation failure evidence write failed', {
+            activationId: String(plan.activationId),
+            stage,
+            error: recordError instanceof Error ? recordError.message : String(recordError),
+          })
+        }
+      }
+      if (!durableDrainFailed) await restartStableGameServerAndRecover()
+      if (!failureRecorded && serverRunning) {
+        try {
+          await recordProfileActivationFailure(
+            String(plan.activationId),
+            stage,
+            error,
+            durableDrainFailed,
+          )
+        } catch (recordError) {
+          console.error('[profile] activation failure evidence retry failed', {
+            activationId: String(plan.activationId),
+            stage,
+            error: recordError instanceof Error ? recordError.message : String(recordError),
+          })
+        }
+      }
+    }
+    const typed = error as Error & { code?: string }
+    return {
+      ok: false,
+      error: typed.message,
+      code: typed.code ?? 'PROFILE_ACTIVATION_FAILED',
+      stage,
+      ...(typed.message === 'PROFILE_DURABLE_DRAIN_FAILED'
+        ? { admissionPaused: true, requiresApplicationRestart: true }
+        : {}),
+    }
+  }
+}
+
+async function selectAndActivateRollback(target: 'previous-stable' | 'bundled-base'): Promise<JsonObject> {
+  const selected = await profileApiRequest('/api/content-profile/rollback', {
+    method: 'POST',
+    json: { target },
+  })
+  const targetHash = selected.targetProfileHash
+    ?? selected.state?.candidate?.resolvedProfileHash
+  if (typeof targetHash !== 'string') throw new Error('PROFILE_ROLLBACK_TARGET_MISSING')
+  return activateProfileHash(targetHash)
+}
+
+async function recoverProfileOnStartup(): Promise<void> {
+  if (!serverRunning) throw new Error('PROFILE_SERVER_NOT_READY')
+  let recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
+  if (recovered.requiresProcessRestart === true) {
+    await restartGameServer(stableProfileBinding())
+    if (!serverRunning) throw new Error('PROFILE_STARTUP_RECOVERY_RESTART_FAILED')
+    recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
+    if (recovered.requiresProcessRestart === true) {
+      throw new Error('PROFILE_STARTUP_RECOVERY_DID_NOT_CONVERGE')
+    }
+  }
+  const report = await profileApiRequest('/api/content-profile')
+  const stableProfileHash = recovered.state?.stable?.resolvedProfileHash
+  if (
+    typeof stableProfileHash !== 'string'
+    || report.state?.stable?.resolvedProfileHash !== stableProfileHash
+    || report.server?.profile?.resolvedProfileHash !== stableProfileHash
+    || report.server?.healthy !== true
+  ) throw new Error('PROFILE_STARTUP_RECOVERY_HEALTH_MISMATCH')
+}
+
+async function startStableGameServerAndRecover(): Promise<void> {
+  await startGameServer(stableProfileBinding())
+  await recoverProfileOnStartup()
+}
+
+async function restartStableGameServerAndRecover(): Promise<void> {
+  await stopGameServer()
+  await new Promise(resolve => setTimeout(resolve, 500))
+  await startStableGameServerAndRecover()
 }
 
 // ─── IPC 处理器 ───────────────────────────────────────────────────────────────
@@ -618,9 +1027,9 @@ function handleTrusted(channel: string, listener: Parameters<typeof ipcMain.hand
 }
 
 handleTrusted('get-status', () => ({ running: serverRunning, port: 3000 }))
-handleTrusted('restart-server', async () => { await restartGameServer() })
+handleTrusted('restart-server', async () => { await restartStableGameServerAndRecover() })
 handleTrusted('stop-server', async () => { await stopGameServer() })
-handleTrusted('start-server', () => { startGameServer() })
+handleTrusted('start-server', async () => { await startStableGameServerAndRecover() })
 handleTrusted('get-lobby', async () => {
   try {
     const res = await fetch('http://localhost:3000/api/lobby')
@@ -651,25 +1060,39 @@ handleTrusted('delete-room', async (_event, roomId: string) => {
 })
 handleTrusted('get-resource-pack-status', async () => {
   try {
-    const res = await fetch('http://localhost:3000/api/admin/resource-pack')
-    if (!res.ok) return { error: `HTTP ${res.status}` }
-    return await res.json()
+    return await profileApiRequest('/api/content-profile')
   } catch (e) {
     return { error: String(e) }
   }
 })
 handleTrusted('upload-resource-pack-data', async (_event, base64Data: string, _fileName: string) => {
   try {
-    const maxBase64Length = Math.ceil(RESOURCE_PACK_LIMITS.maxArchiveBytes / 3) * 4 + 4
-    if (typeof base64Data !== 'string' || base64Data.length > maxBase64Length) {
-      throw new Error('Resource-pack compressed archive exceeds the 32 MiB limit')
-    }
-    const buffer = Buffer.from(base64Data, 'base64')
-    const result = importResourcePackArchive(path.join(getUserData(), 'resource-pack'), buffer)
-    return { success: true, message: '上传成功', meta: result.meta, count: result.count }
+    const result: JsonObject = await enqueueProfileMutation(async (): Promise<JsonObject> => {
+      const archive = decodeProfileArchive(base64Data)
+      const installed: JsonObject = await profileApiRequest('/api/content-profile/install', {
+        method: 'POST',
+        archive,
+      })
+      return {
+        ...installed,
+        count: Array.isArray(installed.profile?.files) ? installed.profile.files.length : 0,
+      }
+    })
+    return { success: true, message: 'Profile 已安装为 candidate，等待显式激活', meta: result.reference, ...result }
   } catch (e) {
     console.error('[electron] upload-resource-pack-data error:', e)
     return { success: false, message: String(e) }
+  }
+})
+handleTrusted('activate-resource-pack', async (_event, targetProfileHash: string) => {
+  return enqueueProfileMutation(() => activateProfileHash(targetProfileHash))
+})
+handleTrusted('rollback-resource-pack', async (_event, target: 'previous-stable' | 'bundled-base') => {
+  try {
+    if (target !== 'previous-stable' && target !== 'bundled-base') throw new Error('Invalid profile rollback target')
+    return await enqueueProfileMutation(() => selectAndActivateRollback(target))
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 
@@ -685,8 +1108,17 @@ if (!gotLock) {
     createDashboardWindow()
   })
 
-  app.whenReady().then(() => {
-    startGameServer()
+  app.whenReady().then(async () => {
+    try {
+      await startStableGameServerAndRecover()
+    } catch (error) {
+      console.error('[profile] startup recovery failed; admission remains closed:', error)
+      dialog.showErrorBox(
+        '内容配置恢复失败',
+        '服务器未开放连接。请查看日志并重启应用；仍失败时请回退到 Bundled Base。',
+      )
+      return
+    }
     createDashboardWindow()
     createTray()
   })

@@ -1,5 +1,8 @@
 # Content Pipeline v1 核心库
 
+RED-115 的 immutable 安装、candidate/stable 两阶段激活与回退见
+[Content Profile v1 运行时](./CONTENT_PROFILE_V1_RUNTIME.md)。Core 仍不拥有 Electron/Server 生命周期。
+
 - 状态：RED-114 实现合同
 - 风险：High
 - 上游合同：`ADR-0018-content-pipeline-v1.md`、`CONTENT_PIPELINE_V1_CONTRACT.md`

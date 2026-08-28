@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   packGetFilePath: (file: File) => webUtils.getPathForFile(file),
   packImportFromPath: (zipPath: string) => ipcRenderer.invoke('pack-import-from-path', zipPath),
   packImportData: (base64: string, filename: string) => ipcRenderer.invoke('pack-import-data', base64, filename),
+  packActivate: (targetProfileHash: string) => ipcRenderer.invoke('pack-activate', targetProfileHash),
+  packRollback: (target: 'previous-stable' | 'bundled-base') => ipcRenderer.invoke('pack-rollback', target),
   packClear: () => ipcRenderer.invoke('pack-clear'),
   packList: () => ipcRenderer.invoke('pack-list'),
   // 获取本机局域网 IP（供 LAN 自动发现）

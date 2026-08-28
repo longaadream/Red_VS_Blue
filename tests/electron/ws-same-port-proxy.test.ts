@@ -117,6 +117,15 @@ describe('standalone same-origin WebSocket upgrade', () => {
     }
   })
 
+  it('loads Profile health clients from the staged standalone runtime', () => {
+    for (const entry of ['electron/main.ts', 'electron-client/main.ts']) {
+      const electronSource = fs.readFileSync(path.join(root, ...entry.split('/')), 'utf8')
+      expect(electronSource).not.toContain("import WebSocket from 'ws'")
+      expect(electronSource).toContain("path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')")
+      expect(electronSource).toContain('require(modulePath)')
+    }
+  })
+
   it('serves HTTP and every supported game WebSocket path on one port', async () => {
     const publicPort = await reservePort()
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-ws-same-port-'))

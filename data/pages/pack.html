@@ -166,6 +166,8 @@
         <div class="file-list" id="fileList"></div>
       </div>
     </div>
+    <button class="btn-primary" id="btnActivate" onclick="activateCandidate()" style="display:none">✅ 激活候选 Profile</button>
+    <button class="btn-secondary" id="btnPrevious" onclick="rollbackPrevious()" style="display:none">↩ 回退到上一个稳定版本</button>
     <button class="btn-danger" id="btnClear" onclick="clearPack()" style="display:none">🗑 清除资源包（恢复内置资源）</button>
   </div>
 
@@ -233,6 +235,7 @@
     // ── IndexedDB helpers（Android/浏览器路径，替代 postMessage）────────────────
     const IDB_NAME = 'rvb-pack'
     const IDB_STORE = 'files'
+    const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 
     function openPackIDB() {
       return new Promise((resolve, reject) => {
@@ -343,20 +346,11 @@
             showToast('❌ 导入失败：' + (result.error || '未知错误'))
             return
           }
-          const m = result.meta || {}
-          const packMeta = {
-            name: m.name || sourceName || '未命名包',
-            version: m.version || '—',
-            description: m.description || '',
-            fileCount: result.count,
-            importedAt: new Date().toISOString(),
-          }
-          localStorage.setItem('rvb_pack_meta', JSON.stringify(packMeta))
           setProgress(100, '完成！')
           setTimeout(() => {
             hideProgress()
             refreshPackStatus()
-            showToast('✅ 资源包已导入，共 ' + result.count + ' 个文件')
+            showToast('✅ Profile 已安装为候选，共 ' + result.count + ' 个文件；请确认后激活')
           }, 500)
         } catch (e) {
           console.error('[pack] packImportFromPath error:', e)
@@ -373,6 +367,9 @@
         try {
           if (!window.electronAPI.packImportData) throw new Error('当前客户端不支持原子资源包导入')
           const blob = zipData instanceof Blob ? zipData : new Blob([zipData])
+          if (blob.size > PROFILE_ARCHIVE_MAX_BYTES) {
+            throw new Error('资源包超过 32 MiB 上限')
+          }
           const dataUrl = await new Promise((resolve, reject) => {
             const reader = new FileReader()
             reader.onload = () => resolve(reader.result)
@@ -382,19 +379,11 @@
           const base64 = String(dataUrl).split(',', 2)[1] || ''
           const result = await window.electronAPI.packImportData(base64, sourceName || 'resource-pack.zip')
           if (!result.ok) throw new Error(result.error || '资源包导入失败')
-          const m = result.meta || {}
-          localStorage.setItem('rvb_pack_meta', JSON.stringify({
-            name: m.name || sourceName || '未命名包',
-            version: m.version || '—',
-            description: m.description || '',
-            fileCount: result.count,
-            importedAt: m.importedAt || new Date().toISOString(),
-          }))
           setProgress(100, '完成！')
           setTimeout(() => {
             hideProgress()
             refreshPackStatus()
-            showToast('✅ 资源包已导入，共 ' + result.count + ' 个文件')
+            showToast('✅ Profile 已安装为候选，共 ' + result.count + ' 个文件；请确认后激活')
           }, 500)
         } catch (e) {
           console.error('[pack] packImportData error:', e)
@@ -551,14 +540,22 @@
         const res = await fetch(url)
         if (!res.ok) throw new Error('HTTP ' + res.status)
         const total = parseInt(res.headers.get('content-length') || '0')
+        if (Number.isFinite(total) && total > PROFILE_ARCHIVE_MAX_BYTES) {
+          throw new Error('资源包超过 32 MiB 上限')
+        }
+        if (!res.body) throw new Error('下载响应没有可读取内容')
         const reader = res.body.getReader()
         const chunks = []
         let loaded = 0
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          chunks.push(value)
           loaded += value.length
+          if (loaded > PROFILE_ARCHIVE_MAX_BYTES) {
+            await reader.cancel('PROFILE_ARCHIVE_TOO_LARGE')
+            throw new Error('资源包超过 32 MiB 上限')
+          }
+          chunks.push(value)
           if (total) setProgress(Math.round(loaded / total * 35), '下载中 ' + Math.round(loaded / total * 100) + '%…')
         }
         const blob = new Blob(chunks)
@@ -576,7 +573,8 @@
       if (!confirm('确定清除资源包？将恢复内置资源，下次打开各页面生效。')) return
       try {
         if (isElectron) {
-          await window.electronAPI.packClear()
+          const result = await window.electronAPI.packClear()
+          if (!result || !result.ok) throw new Error((result && result.error) || '回退 Base 失败')
         } else if (isAndroidNativePack) {
           const result = parseBridgeJson(window.RvBBridge.packClear())
           if (!result.ok) throw new Error(result.error || 'packClear failed')
@@ -598,41 +596,107 @@
       }
     }
 
+    async function activateCandidate() {
+      const button = document.getElementById('btnActivate')
+      const targetProfileHash = button.dataset.profileHash
+      if (!targetProfileHash || !window.electronAPI || !window.electronAPI.packActivate) return
+      if (!confirm('激活候选 Profile？权威内容变化时本地服务器会安全重启。')) return
+      button.disabled = true
+      try {
+        const result = await window.electronAPI.packActivate(targetProfileHash)
+        if (!result || !result.ok) throw new Error((result && result.error) || '激活失败')
+        await refreshPackStatus()
+        showToast('✅ Profile 已原子激活')
+      } catch (e) {
+        showToast('❌ 激活失败，已保留原稳定版本：' + e.message, 5000)
+      } finally {
+        button.disabled = false
+      }
+    }
+
+    async function rollbackPrevious() {
+      if (!window.electronAPI || !window.electronAPI.packRollback) return
+      if (!confirm('回退并激活上一个稳定 Profile？')) return
+      try {
+        const result = await window.electronAPI.packRollback('previous-stable')
+        if (!result || !result.ok) throw new Error((result && result.error) || '回退失败')
+        await refreshPackStatus()
+        showToast('✅ 已回退到上一个稳定版本')
+      } catch (e) {
+        showToast('❌ 回退失败：' + e.message, 5000)
+      }
+    }
+
     // ── Status display ────────────────────────────────────────────────────────
 
     async function refreshPackStatus() {
-      const rawMeta = localStorage.getItem('rvb_pack_meta')
-      const meta = rawMeta ? JSON.parse(rawMeta) : null
+      if (isElectron) {
+        const res = await window.electronAPI.packList()
+        if (!res || !res.ok) throw new Error((res && res.error) || '无法读取 Profile 状态')
+        const stable = res.state && res.state.stable
+        const candidate = res.state && res.state.candidate
+        const previous = res.state && res.state.previousStable
+        const files = Array.isArray(res.files) ? res.files : []
+        const isBase = !stable || stable.kind === 'bundled-base'
 
-      if (meta) {
+        document.getElementById('noPackMsg').style.display = stable ? 'none' : 'block'
+        document.getElementById('packMeta').style.display = stable ? 'block' : 'none'
+        document.getElementById('metaName').textContent = stable ? (stable.packageId || (isBase ? 'Bundled Base' : 'Installed Profile')) : '—'
+        document.getElementById('metaVersion').textContent = stable ? (stable.version || '—') : '—'
+        document.getElementById('metaCount').textContent = files.length + ' 个覆盖文件'
+        document.getElementById('metaDesc').textContent = stable
+          ? 'stable ' + stable.resolvedProfileHash.slice(0, 12)
+            + (candidate ? '；candidate ' + candidate.resolvedProfileHash.slice(0, 12) + ' 等待激活' : '')
+          : '—'
+        document.getElementById('btnClear').style.display = isBase ? 'none' : 'block'
+        const activateButton = document.getElementById('btnActivate')
+        const hasCandidate = !!(candidate && (!stable || candidate.resolvedProfileHash !== stable.resolvedProfileHash))
+        activateButton.style.display = hasCandidate ? 'block' : 'none'
+        activateButton.dataset.profileHash = hasCandidate ? candidate.resolvedProfileHash : ''
+        document.getElementById('btnPrevious').style.display = previous && (!stable || previous.resolvedProfileHash !== stable.resolvedProfileHash) ? 'block' : 'none'
+        const list = document.getElementById('fileList')
+        list.textContent = ''
+        for (const file of files) {
+          const row = document.createElement('div')
+          row.textContent = String(file)
+          list.appendChild(row)
+        }
+        return
+      }
+      let files = []
+      try {
+        if (isAndroidNativePack) {
+          const result = parseBridgeJson(window.RvBBridge.packList())
+          files = Array.isArray(result.files) ? result.files : []
+        } else if (!isFileProtocol) {
+          const db = await openPackIDB()
+          files = await idbKeys(db)
+          db.close()
+        }
+      } catch {}
+      let meta = null
+      if (files.length > 0) {
+        try {
+          const rawMeta = localStorage.getItem('rvb_pack_meta')
+          meta = rawMeta ? JSON.parse(rawMeta) : null
+        } catch {}
+      }
+
+      if (files.length > 0) {
         document.getElementById('noPackMsg').style.display = 'none'
         document.getElementById('packMeta').style.display = 'block'
-        document.getElementById('metaName').textContent = meta.name || '—'
-        document.getElementById('metaVersion').textContent = meta.version || '—'
-        document.getElementById('metaCount').textContent = (meta.fileCount || '?') + ' 个文件'
-        document.getElementById('metaDesc').textContent = meta.description || '—'
+        document.getElementById('metaName').textContent = (meta && meta.name) || '已安装资源'
+        document.getElementById('metaVersion').textContent = (meta && meta.version) || '—'
+        document.getElementById('metaCount').textContent = files.length + ' 个文件'
+        document.getElementById('metaDesc').textContent = (meta && meta.description) || '—'
         document.getElementById('btnClear').style.display = 'block'
-
-        // Fetch actual file list from SW / IPC
-        try {
-          let res
-          if (isElectron) {
-            res = await window.electronAPI.packList()
-          } else if (isAndroidNativePack) {
-            res = parseBridgeJson(window.RvBBridge.packList())
-          } else if (isFileProtocol) {
-            res = { files: [] }
-          } else {
-            const db = await openPackIDB()
-            const keys = await idbKeys(db)
-            db.close()
-            res = { files: keys }
-          }
-          const list = document.getElementById('fileList')
-          list.innerHTML = res.files
-            .map(f => '<div>' + decodeURIComponent(typeof f === 'string' ? f : f.replace(location.origin, '')) + '</div>')
-            .join('')
-        } catch {}
+        const list = document.getElementById('fileList')
+        list.textContent = ''
+        for (const file of files) {
+          const row = document.createElement('div')
+          row.textContent = String(file)
+          list.appendChild(row)
+        }
       } else {
         document.getElementById('noPackMsg').style.display = 'block'
         document.getElementById('packMeta').style.display = 'none'
