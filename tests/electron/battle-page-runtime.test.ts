@@ -256,7 +256,7 @@ describe('battle page runtime source', () => {
     expect(actionBarRenders).toBe(1)
   })
 
-  it('acknowledges a successful training action before rendering instead of waiting for the timeout', async () => {
+  it('applies the successful training authority receipt before rendering', async () => {
     const html = readBattlePage()
     let clearedTimers = 0
     const elements: Record<string, { disabled?: boolean; textContent?: string }> = {
@@ -284,7 +284,9 @@ describe('battle page runtime source', () => {
       handleGameOver: () => undefined,
       setStatusMsg: () => undefined,
       rejectPendingActionFeedback: () => undefined,
-      clearTargetInteraction: () => undefined,
+      recordAuthorityPerformance: () => undefined,
+      requestAuthorityRecovery: () => undefined,
+      renderActionBar: () => undefined,
       addLog: () => undefined,
     })
 
@@ -296,11 +298,15 @@ describe('battle page runtime source', () => {
       }
       let pendingActionFeedback = {
         clientActionId: 'training-action-1',
-        type: 'pendingOptionSelect',
+        type: 'playCard',
         startedAt: 0,
       }
       let pendingActionFeedbackTimer = 99
-      let targetSubmissionPending = null
+      let targetSubmissionPending = {
+        clientActionId: 'training-action-1',
+        type: 'playCard',
+        label: '圣光盾',
+      }
       let pendingSkill = null
       let pendingCardAction = null
       let selectedPieceId = null
@@ -309,19 +315,32 @@ describe('battle page runtime source', () => {
       let _use3d = false
       let battlePresentation = null
       const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
-      function render() { globalThis.__pendingAtRender = pendingActionFeedback }
+      function clearTargetInteraction() {
+        pendingSkill = null
+        pendingCardAction = null
+        targetSubmissionPending = null
+        return true
+      }
+      function render() {
+        globalThis.__pendingAtRender = pendingActionFeedback
+        globalThis.__targetPendingAtRender = targetSubmissionPending
+      }
       ${runtimeFunction(html, 'clearPendingActionFeedback')}
+      ${runtimeFunction(html, 'applyAuthorityReceipt')}
       async ${runtimeFunction(html, 'trainingDoAction')}
     `, context)
 
     await vm.runInContext(`trainingDoAction({
-      type: 'pendingOptionSelect',
+      type: 'playCard',
       playerId: 'player-red',
       clientActionId: 'training-action-1',
+      targetPieceId: 'liadrin',
     })`, context)
 
     expect(context.__pendingAtRender).toBeNull()
+    expect(context.__targetPendingAtRender).toBeNull()
     expect(vm.runInContext('pendingActionFeedback', context)).toBeNull()
+    expect(vm.runInContext('targetSubmissionPending', context)).toBeNull()
     expect(vm.runInContext('pendingActionFeedbackTimer', context)).toBeNull()
     expect(clearedTimers).toBe(1)
   })
