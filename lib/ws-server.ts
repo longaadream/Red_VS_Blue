@@ -265,6 +265,9 @@ async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
   const profileIdentity = assertGameProfileCompatibleV1(body.profileIdentity)
   const room = await roomStore.getRoom(roomId)
   if (!room) throw new Error('Room not found')
+  for (const participant of room.players) {
+    assertGameProfileCompatibleV1(participant.profileIdentity)
+  }
   if (room.status !== 'in-progress' || !room.battleState) {
     assertSelectableMapId(room.mapId)
   }
@@ -760,6 +763,7 @@ async function restartWsServer(): Promise<void> {
                 ? undefined
                 : await roomStore.getRoom(nextRoomId)
               if (nextRoomId !== '__lobby') {
+                assertGameProfileCompatibleV1(msg.profileIdentity)
                 if (!nextRoom) throw new Error('Room not found')
                 if (!requestedPlayerId) assertGameProfileCompatibleV1(undefined)
                 const participant = nextRoom.players.find(item => item.id.toLowerCase() === requestedPlayerId)
@@ -913,6 +917,7 @@ async function restartWsServer(): Promise<void> {
                   queueBotTurnIfReady(_roomId, result.actionResult.state)
                 } catch (err) {
                   const message = err instanceof Error ? err.message : String(err)
+                  const profileError = getGameProfileErrorPayloadV1(err)
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const errAny = err as any
                   console.warn(
@@ -923,8 +928,9 @@ async function restartWsServer(): Promise<void> {
                   )
                   if (errAny?.receipt) sendJson(sender, { type: 'battleReceipt', receipt: errAny.receipt })
                   sendActionError(sender, {
-                    error: message,
-                    code: errAny?.code ?? undefined,
+                    error: profileError?.message ?? message,
+                    code: profileError?.code ?? errAny?.code ?? undefined,
+                    status: profileError?.status,
                     action: command,
                     receipt: errAny?.receipt ?? undefined,
                     preparation: errAny?.preparation ?? undefined,
@@ -937,7 +943,7 @@ async function restartWsServer(): Promise<void> {
                     title: errAny?.title ?? undefined,
                     options: errAny?.options ?? undefined,
                     determinism: errAny?.determinism ?? undefined,
-                    context: errAny?.context ?? undefined,
+                    context: profileError?.context ?? errAny?.context ?? undefined,
                   })
                 }
                 return

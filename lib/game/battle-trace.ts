@@ -552,6 +552,31 @@ export function readSanitizedBattleReplay(state: BattleState): BattleReplayArchi
   return sanitizeBattleTraceValue(replay) as BattleReplayArchive
 }
 
+export function assertBattleTraceProfilePinV1(state: BattleState): void {
+  const profilePin = readBattleProfilePinV1(state)
+  const metadata = state.extensions?.debugBattle as Partial<DebugBattleMetadata> | undefined
+  if (
+    !profilePin
+    || !metadata
+    || !Array.isArray(metadata.actionLog)
+    || metadata.actionLog.length === 0
+    || !metadata.authority
+    || !metadata.replay
+  ) {
+    throw pinnedProfileError('Battle Trace, Replay, or authority header is missing its pinned profile')
+  }
+  if (
+    metadata.authority.rootSeed !== profilePin.rootSeed
+    || stableJson(metadata.authority.profileIdentity) !== stableJson(profilePin.profileIdentity)
+  ) {
+    throw pinnedProfileError('Battle authority header profile pin does not match the battle state')
+  }
+  readSanitizedBattleActionTrace(state)
+  if (!readSanitizedBattleReplay(state)) {
+    throw pinnedProfileError('Battle Replay is missing its pinned profile')
+  }
+}
+
 export function createBattleReplayCheckpoint(state: BattleState): BattleState {
   const checkpoint = sanitizeBattleTraceValue(withoutDebugMetadata(state))
   if (!checkpoint || typeof checkpoint !== 'object' || Array.isArray(checkpoint)) {

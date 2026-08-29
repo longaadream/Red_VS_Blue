@@ -515,7 +515,7 @@ async function httpRoomSnapshot(roomId: string) {
 async function wsBattleAction(roomId: string, playerId: string, action: JsonObject, identity?: TestIdentity, responseType = 'stateUpdate') {
   const client = await openClient()
   try {
-    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId }))
+    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId, profileIdentity }))
     await receiveType(client, 'subscribed')
     await receiveType(client, 'stateUpdate')
     const auth = identity ? await signBattleAction(identity, roomId, action) : undefined
@@ -542,7 +542,7 @@ async function wsBattleSnapshot(roomId: string, viewerPlayerId: string) {
     }))
     const registration = await receiveJson(client)
     if (registration.ok !== true) throw new Error(`Spectator registration failed: ${JSON.stringify(registration)}`)
-    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: viewerPlayerId }))
+    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: viewerPlayerId, profileIdentity }))
     await receiveType(client, 'subscribed')
     return await receiveType(client, 'stateUpdate')
   } finally {
@@ -598,6 +598,21 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       status: 409,
       code: 'PROFILE_REQUIRED',
     })
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it('rejects WebSocket join when an existing player has no confirmed profile', async () => {
+    const legacyRoom = room('profile-ws-legacy-join')
+    legacyRoom.status = 'waiting'
+    legacyRoom.players = [legacyRoom.players[0]]
+    delete legacyRoom.players[0].profileIdentity
+    memoryStore.seed(legacyRoom)
+    const before = memoryStore.snapshot(legacyRoom.id)
+
+    const result = await wsRoomAction(legacyRoom.id, 'charlie', 'join', { playerName: 'Charlie' })
+
+    expect(result).toMatchObject({ ok: false, status: 409, code: 'PROFILE_REQUIRED' })
+    expect(memoryStore.snapshot(legacyRoom.id)).toEqual(before)
     expect(memoryStore.writeCount()).toBe(0)
   })
 
@@ -1390,12 +1405,30 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(memoryStore.snapshot('public-deployment')).toEqual(beforeRejectedSpectator)
     expect(memoryStore.writeCount()).toBe(writesBeforeRejectedSpectator)
 
+    const impersonatingClient = await openClient()
+    try {
+      impersonatingClient.send(JSON.stringify({
+        type: 'subscribe',
+        roomId: 'public-deployment',
+        playerId: 'alice',
+        profileIdentity: wrongProfile,
+      }))
+      const subscriptionError = await receiveType(impersonatingClient, 'subscriptionError')
+      expect(subscriptionError).toMatchObject({
+        status: 409,
+        code: 'PROFILE_HASH_MISMATCH',
+      })
+    } finally {
+      impersonatingClient.close()
+    }
+
     const unregisteredClient = await openClient()
     try {
       unregisteredClient.send(JSON.stringify({
         type: 'subscribe',
         roomId: 'public-deployment',
         playerId: 'unregistered-spectator',
+        profileIdentity,
       }))
       const subscriptionError = await receiveType(unregisteredClient, 'subscriptionError')
       expect(subscriptionError).toMatchObject({
@@ -1406,6 +1439,86 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       unregisteredClient.close()
     }
 
+  })
+
+  it('reports pinned battle corruption consistently across HTTP and WebSocket transports', async () => {
+    const roomId = 'pinned-transport'
+    memoryStore.seed(signedRoom(roomId, 'light'))
+    await httpSelect(roomId, firstIdentity.id, lightRoster)
+    await wsSelect(roomId, secondIdentity.id, lightRoster)
+    const validRoom = memoryStore.snapshot(roomId)
+    if (!validRoom?.battleState) throw new Error('Expected a started battle')
+
+    const withoutTrace = (input: Room): Room => {
+      const next = JSON.parse(JSON.stringify(input)) as Room
+      const storage = next.battleState as unknown as {
+        state: { extensions?: { debugBattle?: unknown } }
+      }
+      if (storage.state.extensions) delete storage.state.extensions.debugBattle
+      return next
+    }
+
+    memoryStore.reset()
+    memoryStore.seed(withoutTrace(validRoom))
+    const command = {
+      type: 'deploymentLock',
+      playerId: firstIdentity.id,
+      clientActionId: 'pinned-http-action',
+    }
+    const httpSnapshot = await httpBattleSnapshot(roomId, firstIdentity.id)
+    const httpAction = await httpBattleAction(
+      roomId,
+      firstIdentity.id,
+      command,
+      firstIdentity.id,
+      firstIdentity,
+    )
+    expect(httpSnapshot).toMatchObject({
+      status: 409,
+      body: { code: 'PINNED_PROFILE_UNAVAILABLE', context: expect.any(Object) },
+    })
+    expect(httpAction).toMatchObject({
+      status: 409,
+      body: { code: 'PINNED_PROFILE_UNAVAILABLE', context: expect.any(Object) },
+    })
+
+    const snapshotClient = await openClient()
+    try {
+      snapshotClient.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: firstIdentity.id,
+        profileIdentity,
+      }))
+      expect(await receiveType(snapshotClient, 'subscriptionError')).toMatchObject({
+        status: 409,
+        code: 'PINNED_PROFILE_UNAVAILABLE',
+        context: expect.any(Object),
+      })
+    } finally {
+      snapshotClient.close()
+    }
+    expect(memoryStore.writeCount()).toBe(0)
+
+    memoryStore.reset()
+    memoryStore.seed(validRoom)
+    const actionClient = await openClient()
+    try {
+      actionClient.send(JSON.stringify({ type: 'subscribe', roomId, playerId: firstIdentity.id, profileIdentity }))
+      await receiveType(actionClient, 'subscribed')
+      await receiveType(actionClient, 'stateUpdate')
+      memoryStore.seed(withoutTrace(validRoom))
+      const auth = await signBattleAction(firstIdentity, roomId, command)
+      actionClient.send(JSON.stringify({ type: 'action', action: command, auth }))
+      expect(await receiveType(actionClient, 'actionError')).toMatchObject({
+        status: 409,
+        code: 'PINNED_PROFILE_UNAVAILABLE',
+        context: expect.any(Object),
+      })
+    } finally {
+      actionClient.close()
+    }
+    expect(memoryStore.writeCount()).toBe(0)
   })
 
   it('rejects same-ID HTTP and WebSocket impersonation without changing room state or version', async () => {
@@ -1514,7 +1627,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const client = await openClient()
     const messages = collectMessages(client)
     try {
-      client.send(JSON.stringify({ type: 'subscribe', roomId: 'terminal-race', playerId: secondIdentity.id }))
+      client.send(JSON.stringify({ type: 'subscribe', roomId: 'terminal-race', playerId: secondIdentity.id, profileIdentity }))
       await messages.waitFor('subscribed')
       await messages.waitFor('stateUpdate')
 

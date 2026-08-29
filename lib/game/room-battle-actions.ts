@@ -2,6 +2,7 @@ import type { GameProfileIdentityV1 } from '../content-pipeline/runtime/profile-
 import {
   createServerBattleStateV1,
   getBattleStorage,
+  SERVER_BATTLE_STORAGE_SCHEMA_V1,
   type ServerBattleState,
 } from './battle-storage'
 import { createBattlePublicPatch, hashPublicBattleState } from './battle-public-patch'
@@ -270,11 +271,13 @@ export function createPublicRoomSnapshot(room: Room): Room {
   const storage = getBattleStorage(room)
   if (!storage) return room
   const snapshot = createPublicBattleSnapshot(room)
-  const publicStorage = createServerBattleStateV1(
-    storage.profileIdentity,
-    storage.rootSeed,
-    snapshot.state,
-  )
+  const publicStorage: ServerBattleState = {
+    type: 'server-state',
+    storageSchemaVersion: SERVER_BATTLE_STORAGE_SCHEMA_V1,
+    profileIdentity: storage.profileIdentity,
+    rootSeed: storage.rootSeed,
+    state: snapshot.state,
+  }
   return {
     ...room,
     battleState: publicStorage as unknown as Room['battleState'],

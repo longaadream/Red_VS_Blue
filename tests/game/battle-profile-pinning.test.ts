@@ -141,6 +141,20 @@ describe('RED-116 battle profile pinning', () => {
     expectPinnedUnavailable(() => validateServerBattleStateV1(replayTampered))
   })
 
+  it('rejects missing debug evidence and tampered authority headers', () => {
+    const { storage } = createInitializedStorage()
+    const missingDebug = clone(storage)
+    const extensions = (missingDebug.state as BattleState).extensions
+    if (extensions) delete extensions.debugBattle
+
+    const authorityTampered = clone(storage)
+    const authority = debugMetadata(authorityTampered.state as BattleState).authority as { rootSeed: number }
+    authority.rootSeed += 1
+
+    expectPinnedUnavailable(() => validateServerBattleStateV1(missingDebug))
+    expectPinnedUnavailable(() => validateServerBattleStateV1(authorityTampered))
+  })
+
   it('restores an internally consistent provenance-only profile difference', () => {
     const active = getServerGameProfileIdentityV1()
     const provenanceOnly = {

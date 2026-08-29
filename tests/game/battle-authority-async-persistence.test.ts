@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { hashBattleState } from '@/lib/game/battle-trace'
+import { toPublicBattleState } from '@/lib/game/deployment'
 import {
   buildBattleAuthorityTransition,
   hashBattleAuthorityTransition,
@@ -273,8 +274,8 @@ function transitionInput(
     command,
     previousStorage: previous,
     nextStorage: next,
-    previousPublicState: previous.state as BattleState,
-    nextPublicState: next.state as BattleState,
+    previousPublicState: toPublicBattleState(previous.state as BattleState),
+    nextPublicState: toPublicBattleState(next.state as BattleState),
     preStateHash: hashBattleState(previous.state as BattleState),
     postStateHash: hashBattleState(next.state as BattleState),
     previousTransitionHash,

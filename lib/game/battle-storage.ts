@@ -5,9 +5,8 @@ import {
   type GameProfileIdentityV1,
 } from '../content-pipeline/runtime/profile-game-identity'
 import {
+  assertBattleTraceProfilePinV1,
   assertBattleProfilePinV1,
-  readSanitizedBattleActionTrace,
-  readSanitizedBattleReplay,
 } from './battle-trace'
 import { loadAllSkillsById } from './skills'
 import type { BattleState } from './turn'
@@ -59,8 +58,7 @@ export function validateServerBattleStateV1(value: unknown): ServerBattleState {
     const profileIdentity = assertPinnedProfileAvailableV1(storage.profileIdentity)
     const rootSeed = Number(storage.rootSeed) >>> 0
     assertBattleProfilePinV1(storage.state as BattleState, profileIdentity, rootSeed)
-    readSanitizedBattleActionTrace(storage.state as BattleState)
-    readSanitizedBattleReplay(storage.state as BattleState)
+    assertBattleTraceProfilePinV1(storage.state as BattleState)
     return {
       type: 'server-state',
       storageSchemaVersion: SERVER_BATTLE_STORAGE_SCHEMA_V1,

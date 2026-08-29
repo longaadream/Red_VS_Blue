@@ -30,7 +30,20 @@
   async function buildSubscribeMessage() {
     var roomId = String(_roomId || '').trim().toLowerCase()
     var playerId = String(_playerId || '').trim().toLowerCase()
-    var message = { type: 'subscribe', roomId: roomId, playerId: playerId }
+    var storedProfile = null
+    var profileIdentity = null
+    if (roomId !== '__lobby') {
+      storedProfile = localStorage.getItem('rvb_game_profile_identity')
+      try {
+        profileIdentity = storedProfile ? JSON.parse(storedProfile) : null
+      } catch (e) {
+        throw new Error('Stored game profile identity is malformed')
+      }
+      if (!profileIdentity || typeof profileIdentity !== 'object' || Array.isArray(profileIdentity)) {
+        throw new Error('Game profile identity is required for battle subscriptions')
+      }
+    }
+    var message = { type: 'subscribe', roomId: roomId, playerId: playerId, profileIdentity: profileIdentity }
     if (_mode !== 'relay') return message
 
     if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') {
@@ -53,6 +66,7 @@
       type: 'subscribe',
       roomId: roomId,
       playerId: playerId,
+      profileIdentity: profileIdentity,
       publicKey: publicKey,
       payload: payload,
       signature: await window.RvBIdentity.sign(payload),
