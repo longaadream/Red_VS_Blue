@@ -793,11 +793,13 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
               if (targetPiece?.statusTags) {
                 const idx = targetPiece.statusTags.findIndex((t: any) => t.id === statusId);
                 if (idx !== -1) {
+                  const removedStatus = targetPiece.statusTags[idx];
                   targetPiece.statusTags.splice(idx, 1);
                   checkSynchronousTriggers(battle, {
                     type: "afterStatusRemoved",
                     sourcePiece: targetPiece,
                     statusId: statusId,
+                    statusType: removedStatus.type,
                     playerId: targetPiece.ownerPlayerId
                   });
                   return true;
@@ -1018,12 +1020,14 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                       if (targetPiece && targetPiece.statusTags) {
                         const statusTagIndex = targetPiece.statusTags.findIndex(tag => tag.id === statusId);
                         if (statusTagIndex !== -1) {
+                          const removedStatus = targetPiece.statusTags[statusTagIndex];
                           targetPiece.statusTags.splice(statusTagIndex, 1);
                           // 触发状态移除后事件
                           checkSynchronousTriggers(battle, {
                             type: "afterStatusRemoved",
                             sourcePiece: targetPiece,
                             statusId: statusId,
+                            statusType: removedStatus.type,
                             playerId: targetPiece.ownerPlayerId
                           });
                           return true;
@@ -2916,6 +2920,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             type: "afterStatusRemoved",
             sourcePiece: targetPiece,
             statusId: statusId,
+            statusType: statusTag.type,
             playerId: targetPiece.ownerPlayerId
           });
           writeLog('[removeStatusEffectById] afterStatusRemoved trigger result: ' + JSON.stringify(triggerResult));

@@ -1,8 +1,9 @@
 {
   "id": "rule-rafaam-temporal-distortion",
-  "name": "时空扭曲规则",
-  "description": "处理时空扭曲的效果：在玩家回合开始时检查并应用效果",
-  "trigger": { "type": "beginTurn" },
-  "effect": { "type": "triggerSkill", "skillId": "rafaam-temporal-distortion-trigger", "message": "" },
-  "limits": { "maxUses": 2 }
+  "name": "时空扭曲归还",
+  "description": "被偷取攻击力一方的下回合结束时归还攻击力。",
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "var playerId = context.playerId; if (battle.turn.currentPlayerId !== playerId) return { success: false, message: '' }; var player = battle.players.find(function(item) { return item.playerId === playerId; }); if (!player || !player.statusTags) return { success: false, message: '' }; var records = player.statusTags.filter(function(tag) { return tag.type === 'rafaam-temporal-distortion'; }); if (!records.length) { removePlayerRuleById(playerId, 'rule-rafaam-temporal-distortion'); return { success: false, message: '' }; } var allPieces = battle.pieces.concat(battle.graveyard || []); var returned = 0; records.forEach(function(record) { var amount = Math.max(0, record.intensity || 0); var target = allPieces.find(function(piece) { return piece.instanceId === record.targetId; }); var rafaam = allPieces.find(function(piece) { return piece.instanceId === record.sourceId; }); if (target) target.attack = (target.attack || 0) + amount; if (rafaam) rafaam.attack = Math.max(0, (rafaam.attack || 0) - amount); returned += amount; }); player.statusTags = player.statusTags.filter(function(tag) { return tag.type !== 'rafaam-temporal-distortion'; }); removePlayerRuleById(playerId, 'rule-rafaam-temporal-distortion'); return { success: true, message: '时空扭曲归还了' + returned + '点攻击力' };"
 }

@@ -121,10 +121,10 @@ describe('RED-120 character data contract', () => {
       'ichigo-zangetsu': ['选择相邻的一个敌人，造成100%攻击力的物理伤害。', 1, 1],
       'ichigo-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成150%攻击力的魔法伤害。', 2, 1],
       'ichigo-bankai-tensa-zangetsu': ['攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。', 0, 0],
-      'ichigo-black-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的所有敌人造成175%攻击力的魔法伤害；命中后，可以传送至第一个被命中敌人相邻的一个空格。', 2, 1],
-      'itachi-tsukuyomi': ['选择4格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。', 0, 1],
+      'ichigo-black-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的所有敌人造成200%攻击力的魔法伤害；命中后，可以传送至第一个被命中敌人相邻的一个空格。', 2, 1],
+      'itachi-tsukuyomi': ['选择6格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。', 0, 1],
       'itachi-amaterasu': ['选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。', 1, 2],
-      'itachi-totsuka-blade': ['万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。', 2, 1],
+      'itachi-totsuka-blade': ['万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入1回合冷却。', 2, 2],
     } as const
     for (const [id, [description, ap, cooldown]] of Object.entries(expected)) {
       const skill = loadSkill(id)
@@ -133,7 +133,7 @@ describe('RED-120 character data contract', () => {
     }
     expect(loadJson<{ keywords?: string[] }>('skills', 'ichigo-getsuga-tensho.json').keywords).toContain('弹射物')
     expect(loadJson<{ keywords?: string[] }>('skills', 'ichigo-black-getsuga-tensho.json').keywords).toContain('弹射物')
-    expect(loadSkill('itachi-totsuka-blade')).toMatchObject({ type: 'super', chargeCost: 1 })
+    expect(loadSkill('itachi-totsuka-blade')).toMatchObject({ type: 'super', chargeCost: 3, cooldownTurns: 2 })
 
     expect(getPieceById('blue-ichigo')?.id).toBe('blue-ichigo')
     expect(getPieceById('red-itachi')?.id).toBe('red-itachi')
@@ -150,7 +150,7 @@ describe('RED-120 character data contract', () => {
 })
 
 describe('RED-120 authoritative targeting', () => {
-  it('limits Zangetsu to adjacent enemies and Tsukuyomi to enemies within four cells', () => {
+  it('limits Zangetsu to adjacent enemies and Tsukuyomi to enemies within six cells', () => {
     const ichigo = namedPiece({ instanceId: 'ichigo', ownerPlayerId: 'player-red', x: 2, y: 2 })
     const adjacent = namedPiece({ instanceId: 'adjacent', ownerPlayerId: 'player-blue', x: 3, y: 2 })
     const diagonal = namedPiece({ instanceId: 'diagonal', ownerPlayerId: 'player-blue', x: 3, y: 3 })
@@ -177,40 +177,42 @@ describe('RED-120 authoritative targeting', () => {
     expect(candidates.has('piece:far-burning')).toBe(false)
   })
 
-  it('asks only whether to teleport after an actual hit and never requests a landing cell', () => {
+  it('deals damage first, then exposes exact adjacent landing cells as a cancellable post-effect', () => {
     const ichigo = namedPiece({ instanceId: 'ichigo', ownerPlayerId: 'player-red', x: 1, y: 1 })
     ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
     const enemy = namedPiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 1, currentHp: 30, maxHp: 30 })
     const state = makeState({ pieces: [ichigo, enemy], width: 6, height: 4 })
-    const base = {
+    const actionPointsBefore = state.players[0].actionPoints
+    const prompted = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
-    }
-    const action = selectedAction(state, base, { x: 5, y: 1 })
-    const actionPointsBeforePrompt = state.players[0].actionPoints
-    const prompted = runBattleAction(state, action, { rootSeed: ROOT_SEED }).state
-    expect(prompted.pendingOptionSelection).toMatchObject({
-      title: '命中后是否传送？',
-      options: [
-        { label: '传送', value: 'teleport' },
-        { label: '不传送', value: 'stay' },
-      ],
-    })
-    expect(prompted.pendingTargetSelection).toBeUndefined()
+    }, { x: 5, y: 1 }), { rootSeed: ROOT_SEED }).state
+
+    expect(prompted.pendingOptionSelection).toBeUndefined()
     expect(prompted.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(30)
-    expect(prompted.players[0].actionPoints).toBe(actionPointsBeforePrompt)
-    const choice = prompted.pendingOptionSelection!
+    expect(prompted.players[0].actionPoints).toBe(actionPointsBefore)
+    expect(prompted.pendingTargetSelection).toMatchObject({
+      title: '选择黑色月牙天冲的传送落点',
+      targetType: 'cell',
+      canCancel: true,
+      fixedCandidates: true,
+    })
+    expect((prompted.pendingTargetSelection?.candidates ?? []).map(targetRefKey).sort()).toEqual([
+      'cell:2,1', 'cell:3,0', 'cell:3,2', 'cell:4,1',
+    ])
+
+    const landing = prompted.pendingTargetSelection!
     const resolved = runBattleAction(prompted, {
-      type: 'pendingOptionSelect',
+      type: 'pendingTargetSelect',
       playerId: 'player-red',
-      selectedOption: 'stay',
-      selectionId: choice.selectionId,
-      stateRevision: choice.stateRevision,
+      targetX: 3,
+      targetY: 0,
+      selectionId: landing.selectionId,
+      stateRevision: landing.stateRevision,
     } as BattleAction, { rootSeed: ROOT_SEED }).state
-    expect(resolved.pendingOptionSelection).toBeUndefined()
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.pieces.find(piece => piece.instanceId === 'ichigo')).toMatchObject({ x: 3, y: 0 })
     expect(resolved.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBeLessThan(30)
-    expect(resolved.players[0].actionPoints).toBe(actionPointsBeforePrompt - 2)
-
-
+    expect(resolved.players[0].actionPoints).toBe(actionPointsBefore - 2)
 
     const missIchigo = namedPiece({ instanceId: 'miss-ichigo', ownerPlayerId: 'player-red', x: 1, y: 1 })
     missIchigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
@@ -222,6 +224,85 @@ describe('RED-120 authoritative targeting', () => {
     expect(missed.pendingOptionSelection).toBeUndefined()
     expect(missed.pendingTargetSelection).toBeUndefined()
     expect(missed.players[0].actionPoints).toBe(missActionPoints - 2)
+  })
+
+  it('consumes only the landed-on toxin and preserves the rule for remaining traps', () => {
+    const ichigo = namedPiece({
+      instanceId: 'toxin-ichigo',
+      ownerPlayerId: 'player-red',
+      x: 1,
+      y: 1,
+      currentHp: 12,
+      maxHp: 12,
+    })
+    ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
+    const enemy = namedPiece({
+      instanceId: 'toxin-owner',
+      ownerPlayerId: 'player-blue',
+      x: 3,
+      y: 1,
+      currentHp: 30,
+      maxHp: 30,
+    })
+    const state = makeState({ pieces: [ichigo, enemy], width: 6, height: 4 }) as any
+    const blue = state.players.find((player: any) => player.playerId === 'player-blue')
+    blue.statusTags = [
+      {
+        id: 'toxin-a',
+        type: 'lethal-toxin',
+        name: '致命毒素',
+        currentDuration: -1,
+        intensity: 4,
+        value: 3,
+        extraValue: 0,
+        sourceId: 'toxin-owner',
+      },
+      {
+        id: 'toxin-b',
+        type: 'lethal-toxin',
+        name: '致命毒素',
+        currentDuration: -1,
+        intensity: 4,
+        value: 5,
+        extraValue: 3,
+        sourceId: 'toxin-owner',
+      },
+    ]
+    blue.rules = [loadRuleById('rule-blackwidow-toxin-player', true)]
+    state.extensions.tileEffects = [
+      { sourceId: 'toxin-a', tileType: 'lethal-toxin', x: 3, y: 0, ownerPlayerId: 'player-blue' },
+      { sourceId: 'toxin-b', tileType: 'lethal-toxin', x: 5, y: 3, ownerPlayerId: 'player-blue' },
+    ]
+
+    const prompted = runBattleAction(state, selectedAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'toxin-ichigo',
+      skillId: 'ichigo-black-getsuga-tensho',
+    }, { x: 5, y: 1 }), { rootSeed: ROOT_SEED }).state
+    const pending = prompted.pendingTargetSelection!
+    const resolved = runBattleAction(prompted, {
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetX: 3,
+      targetY: 0,
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+    } as BattleAction, { rootSeed: ROOT_SEED }).state
+    const resolvedBlue = resolved.players.find((player: any) => player.playerId === 'player-blue') as any
+
+    expect(resolved.pieces.find(piece => piece.instanceId === 'toxin-ichigo')).toMatchObject({
+      x: 3,
+      y: 0,
+      currentHp: 8,
+    })
+    expect(resolvedBlue.statusTags.filter((tag: any) => tag.type === 'lethal-toxin')).toEqual([
+      expect.objectContaining({ id: 'toxin-b', value: 5, extraValue: 3 }),
+    ])
+    expect(resolvedBlue.rules).toContainEqual(expect.objectContaining({ id: 'rule-blackwidow-toxin-player' }))
+    expect((resolved.extensions?.tileEffects ?? []).filter((effect: any) => effect.tileType === 'lethal-toxin')).toEqual([
+      expect.objectContaining({ sourceId: 'toxin-b', x: 5, y: 3 }),
+    ])
   })
 })
 
@@ -269,65 +350,91 @@ describe('RED-120 Ichigo combat behavior', () => {
 
     state = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
-    }, { x: 5, y: 1 }, 'stay'), { rootSeed: ROOT_SEED }).state
-    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(31)
-    expect(state.players[0].actionPoints).toBe(0)
+    }, { x: 5, y: 1 }), { rootSeed: ROOT_SEED }).state
+    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(42)
+    expect(state.players[0].actionPoints).toBe(2)
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0]).toMatchObject({
-      skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 1,
+      skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0,
     })
+    const pending = state.pendingTargetSelection!
+    state = runBattleAction(state, {
+      type: 'cancelPendingSelection',
+      playerId: 'player-red',
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+    } as BattleAction, { rootSeed: ROOT_SEED }).state
+    expect(state.pendingTargetSelection).toBeUndefined()
+    expect(state.pieces.find(piece => piece.instanceId === 'ichigo')).toMatchObject({ x: 0, y: 1 })
+    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(30)
+    expect(state.players[0].actionPoints).toBe(0)
+    expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(1)
   })
 
-  it('penetrates enemies up to blocking terrain and chooses a reproducible random adjacent landing', () => {
-    const run = () => {
-      const ichigo = namedPiece({ instanceId: 'ichigo', templateId: 'blue-ichigo', ownerPlayerId: 'player-red', x: 0, y: 1, attack: 6 })
-      ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
-      const first = namedPiece({ instanceId: 'first', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 40, maxHp: 40 })
-      const second = namedPiece({ instanceId: 'second', ownerPlayerId: 'player-blue', x: 4, y: 1, currentHp: 40, maxHp: 40 })
-      const blocked = namedPiece({ instanceId: 'blocked', ownerPlayerId: 'player-blue', x: 6, y: 1, currentHp: 40, maxHp: 40 })
-      const state = makeState({ pieces: [ichigo, first, second, blocked], width: 8, height: 3 })
-      const wall = state.map.tiles.find(tile => tile.x === 5 && tile.y === 1)!
-      wall.props = { ...wall.props, type: 'wall', walkable: false, bulletPassable: false } as any
-      const action = selectedAction(state, {
-        type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
-      }, { x: 7, y: 1 }, 'teleport')
-      return runBattleAction(state, action, { rootSeed: ROOT_SEED }).state
-    }
+  it('penetrates enemies up to blocking terrain and uses the selected adjacent landing', () => {
+    const ichigo = namedPiece({ instanceId: 'ichigo', templateId: 'blue-ichigo', ownerPlayerId: 'player-red', x: 0, y: 1, attack: 6 })
+    ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
+    const first = namedPiece({ instanceId: 'first', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 40, maxHp: 40 })
+    const second = namedPiece({ instanceId: 'second', ownerPlayerId: 'player-blue', x: 4, y: 1, currentHp: 40, maxHp: 40 })
+    const blocked = namedPiece({ instanceId: 'blocked', ownerPlayerId: 'player-blue', x: 6, y: 1, currentHp: 40, maxHp: 40 })
+    let state = makeState({ pieces: [ichigo, first, second, blocked], width: 8, height: 3 })
+    const wall = state.map.tiles.find(tile => tile.x === 5 && tile.y === 1)!
+    wall.props = { ...wall.props, type: 'wall', walkable: false, bulletPassable: false } as any
+    state = runBattleAction(state, selectedAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
+    }, { x: 7, y: 1 }), { rootSeed: ROOT_SEED }).state
+    const pending = state.pendingTargetSelection!
+    state = runBattleAction(state, {
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetX: 2,
+      targetY: 0,
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+    } as BattleAction, { rootSeed: ROOT_SEED }).state
 
-    const firstRun = run()
-    const secondRun = run()
-    expect(firstRun.pieces.find(piece => piece.instanceId === 'first')?.currentHp).toBe(29)
-    expect(firstRun.pieces.find(piece => piece.instanceId === 'second')?.currentHp).toBe(29)
-    expect(firstRun.pieces.find(piece => piece.instanceId === 'blocked')?.currentHp).toBe(40)
-    const landing = firstRun.pieces.find(piece => piece.instanceId === 'ichigo')!
-    expect(Math.abs(landing.x! - 2) + Math.abs(landing.y! - 1)).toBe(1)
-    expect(secondRun.pieces.find(piece => piece.instanceId === 'ichigo')).toMatchObject({ x: landing.x, y: landing.y })
+    expect(state.pieces.find(piece => piece.instanceId === 'first')?.currentHp).toBe(28)
+    expect(state.pieces.find(piece => piece.instanceId === 'second')?.currentHp).toBe(28)
+    expect(state.pieces.find(piece => piece.instanceId === 'blocked')?.currentHp).toBe(40)
+    expect(state.pieces.find(piece => piece.instanceId === 'ichigo')).toMatchObject({ x: 2, y: 0 })
   })
 
   it('applies landing tile effects without applying effects from cells crossed by the teleport', () => {
     const run = (amaterasuCells: Array<{ x: number; y: number }>) => {
       const ichigo = namedPiece({ instanceId: 'ichigo', ownerPlayerId: 'player-red', x: 0, y: 1, attack: 6 })
+      ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
       const first = namedPiece({ instanceId: 'first', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 40, maxHp: 40 })
       const pathBlocker = namedPiece({ instanceId: 'path-ally', ownerPlayerId: 'player-red', x: 1, y: 1 })
       const rightBlocker = namedPiece({ instanceId: 'right-ally', ownerPlayerId: 'player-red', x: 3, y: 1 })
       const downBlocker = namedPiece({ instanceId: 'down-ally', ownerPlayerId: 'player-red', x: 2, y: 2 })
-      const state = makeState({
+      let state = makeState({
         pieces: [ichigo, first, pathBlocker, rightBlocker, downBlocker],
         width: 5,
         height: 3,
       })
       state.extensions = state.extensions || {}
       state.extensions.amaterasuCells = amaterasuCells
-      executeDirect(loadSkill('ichigo-black-getsuga-tensho'), state, ichigo, null, { x: 4, y: 1 }, 'teleport')
-      return { state, ichigo }
+      state = runBattleAction(state, selectedAction(state, {
+        type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
+      }, { x: 4, y: 1 }), { rootSeed: ROOT_SEED }).state
+      const pending = state.pendingTargetSelection!
+      state = runBattleAction(state, {
+        type: 'pendingTargetSelect',
+        playerId: 'player-red',
+        targetX: 2,
+        targetY: 0,
+        selectionId: pending.selectionId,
+        stateRevision: pending.stateRevision,
+      } as BattleAction, { rootSeed: ROOT_SEED }).state
+      return state.pieces.find(piece => piece.instanceId === 'ichigo')!
     }
 
     const crossedOnly = run([{ x: 1, y: 1 }])
-    expect(crossedOnly.ichigo).toMatchObject({ x: 2, y: 0 })
-    expect(crossedOnly.ichigo.statusTags.some((tag: any) => tag.type === 'amaterasu-burn')).toBe(false)
+    expect(crossedOnly).toMatchObject({ x: 2, y: 0 })
+    expect(crossedOnly.statusTags.some((tag: any) => tag.type === 'amaterasu-burn')).toBe(false)
 
     const landing = run([{ x: 2, y: 0 }])
-    expect(landing.ichigo).toMatchObject({ x: 2, y: 0 })
-    expect(landing.ichigo.statusTags).toContainEqual(expect.objectContaining({
+    expect(landing).toMatchObject({ x: 2, y: 0 })
+    expect(landing.statusTags).toContainEqual(expect.objectContaining({
       type: 'amaterasu-burn',
       stacks: 1,
     }))
@@ -346,7 +453,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     const result = executeDirect(loadSkill('ichigo-black-getsuga-tensho'), state, ichigo, null, { x: 4, y: 1 }, 'teleport')
     expect(result.success).toBe(true)
     expect(ichigo).toMatchObject({ x: 1, y: 1 })
-    expect(target.currentHp).toBe(29)
+    expect(target.currentHp).toBe(28)
   })
 })
 
@@ -405,10 +512,10 @@ describe('RED-120 Itachi combat behavior', () => {
 
     executeDirect(loadSkill('sasuke-kagutsuchi'), state, itachi, target)
     expect(state.extensions?.amaterasuCells).toEqual([])
-    expect(target.statusTags.find((tag: any) => tag.type === 'amaterasu-burn')?.stacks).toBe(3)
+    expect(target.statusTags.find((tag: any) => tag.type === 'amaterasu-burn')?.stacks).toBe(4)
   })
 
-  it('pays for Totsuka Blade, deals 200% magical damage, and floors all active cooldowns at two', () => {
+  it('pays for Totsuka Blade, deals 200% magical damage, and floors idle active skills at one', () => {
     const itachi = namedPiece({ instanceId: 'itachi', templateId: 'red-itachi', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 3 })
     itachi.skills = [{ skillId: 'itachi-totsuka-blade', currentCooldown: 0, usesRemaining: -1 }]
     const target = namedPiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 2, y: 0, currentHp: 30, maxHp: 30 })
@@ -417,17 +524,17 @@ describe('RED-120 Itachi combat behavior', () => {
       { skillId: 'sleep-dart', currentCooldown: 3, usesRemaining: -1 },
     ]
     let state = makeState({ pieces: [itachi, target], width: 5, height: 2 })
-    state.players[0].chargePoints = 1
+    state.players[0].chargePoints = 3
     state = runBattleAction(state, selectedAction(state, {
       type: 'useChargeSkill', playerId: 'player-red', pieceId: 'itachi', skillId: 'itachi-totsuka-blade',
     }, { pieceId: 'target' }), { rootSeed: ROOT_SEED }).state
 
     const sealed = state.pieces.find(piece => piece.instanceId === 'target')!
     expect(sealed.currentHp).toBe(24)
-    expect(sealed.skills.map(skill => skill.currentCooldown)).toEqual([2, 3])
+    expect(sealed.skills.map(skill => skill.currentCooldown)).toEqual([1, 3])
     expect(state.players[0]).toMatchObject({ actionPoints: 0, chargePoints: 0 })
     expect(state.pieces.find(piece => piece.instanceId === 'itachi')?.skills[0]).toMatchObject({
-      currentCooldown: 1,
+      currentCooldown: 2,
       usesRemaining: -1,
     })
   })

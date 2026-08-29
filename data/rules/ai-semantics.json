@@ -48,9 +48,9 @@
   },
   "manifestHashes": {
     "pieces": "db76808fa13c56a9f9e1acc466319d9506e0c7b5cddda4e674310faeefb1979e",
-    "skills": "4de2e99d03c16f66cf0d35c644ed435c7e331972570dca1d5a8e5a13e4631546",
+    "skills": "6012c11c223bfddfe859c431892d4f71f79f8ba940c6f20ec4d4239f53390ae8",
     "cards": "4f15ea0ae15ec28dc71cfa23928a77ce8cc0467d87cc9ad051c9836af41cbf92",
-    "rules": "562c638219841270f016b1dcc1f43b8a9c5587bfb8897180c4cc2d42e12eda40",
+    "rules": "4dd4e04dc0fef42915ff1c6f75f74264b07424e458893580c6d86a17eb68e3c7",
     "status-effects": "ea3b630e48fcacba6a3a7b66deefe0d0c6f78d421fdd96b5327db1837e3e43ec"
   },
   "unsupported": {
@@ -89,6 +89,7 @@
       "naruto-shadow-clone",
       "pulse-pistol",
       "pulse-pistol-move",
+      "rafaam-curse-amplify",
       "rafaam-temporal-distortion",
       "recall",
       "recall-endturn-trigger",
@@ -102,12 +103,8 @@
       "shield-of-light",
       "shishio-flame-spirit",
       "shishio-infinite-blade",
-      "shishio-infinite-blade-recast",
       "sleep-dart",
-      "sleep-remove",
-      "sticky-bomb",
-      "sticky-bomb-explode",
-      "sticky-bomb-move"
+      "sleep-remove"
     ],
     "cards": [
       "demon-summon-1",
@@ -119,7 +116,7 @@
     "rules": [
       "rule-blackwidow-toxin-player",
       "rule-mangekyo-friendly-death",
-      "rule-minato-anchor-begin-turn",
+      "rule-minato-anchor-end-turn",
       "rule-minato-flying-raijin-trigger",
       "rule-rafaam-curse-end-turn",
       "rule-rafaam-curse-ward",

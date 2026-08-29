@@ -1,0 +1,20 @@
+{
+  "id": "venom-corrosion",
+  "name": "腐蚀",
+  "description": "毒液每次更改敌方位置时，使其定身1回合。",
+  "keywords": [
+    "定身"
+  ],
+  "targetText": "被动",
+  "effectTags": [
+    "控制"
+  ],
+  "icon": "🧪",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill() { return { success: false, message: '' }; }"
+}

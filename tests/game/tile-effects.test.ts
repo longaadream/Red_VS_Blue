@@ -65,6 +65,7 @@ describe('persistent tile-effect presentation lifecycle', () => {
     const placed = executeGridSkill(state, widow, 'blackwidow-lethal-toxin', 2, 1)
 
     expect(placed.success).toBe(true)
+    expect(widow).toMatchObject({ x: 2, y: 1 })
     const toxin = state.players
       .find((player: any) => player.playerId === 'player-red')
       .statusTags.find((tag: any) => tag.type === 'lethal-toxin')
@@ -87,68 +88,54 @@ describe('persistent tile-effect presentation lifecycle', () => {
     ])
   })
 
-  it('creates a ground sticky-bomb presentation and removes it on explosion', () => {
-    const tracer = makePiece({
-      instanceId: 'tracer',
-      templateId: 'tracer',
+  it('keeps the player rule until the final toxin is consumed', () => {
+    const widow = makePiece({
+      instanceId: 'widow',
+      templateId: 'red-blackwidow',
       ownerPlayerId: 'player-red',
       x: 1,
       y: 1,
     })
-    const state = makeState({ pieces: [tracer] }) as any
-    state.extensions.tileEffects = [
-      { x: 0, y: 0, sourceId: 'unrelated', tileType: 'shadow-step' },
-    ]
-
-    const placed = executeGridSkill(state, tracer, 'sticky-bomb', 2, 1)
-
-    expect(placed.success).toBe(true)
-    const bomb = state.extensions.stickyBombs[0]
-    expect(bomb.id).toMatch(/^sticky-bomb-/)
-    expect(state.extensions.tileEffects).toContainEqual(expect.objectContaining({
-      x: 2,
-      y: 1,
-      sourceId: bomb.id,
-      tileType: 'sticky-bomb',
-    }))
-
-    const explode = loadSkill('sticky-bomb-explode')
-    const exploded = executeSkillFunction(explode, {
-      piece: tracer,
-      playerId: 'player-blue',
-      skill: explode,
-    } as any, state)
-
-    expect(exploded.success).toBe(true)
-    expect(state.extensions.stickyBombs).toHaveLength(0)
-    expect(state.extensions.tileEffects).toEqual([
-      { x: 0, y: 0, sourceId: 'unrelated', tileType: 'shadow-step' },
-    ])
-  })
-
-  it('does not create a tile effect when sticky bomb attaches to a piece', () => {
-    const tracer = makePiece({
-      instanceId: 'tracer',
-      templateId: 'tracer',
-      ownerPlayerId: 'player-red',
-      x: 1,
-      y: 1,
-    })
-    const target = makePiece({
-      instanceId: 'target',
+    const mover = makePiece({
+      instanceId: 'mover',
       ownerPlayerId: 'player-blue',
       faction: 'blue',
+      x: 5,
+      y: 1,
+      currentHp: 12,
+      maxHp: 12,
+    })
+    const state = makeState({ pieces: [widow, mover], width: 6, height: 3 }) as any
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100)
+
+    expect(executeGridSkill(state, widow, 'blackwidow-lethal-toxin', 2, 1).success).toBe(true)
+    now.mockReturnValue(200)
+    expect(executeGridSkill(state, widow, 'blackwidow-lethal-toxin', 3, 1).success).toBe(true)
+
+    const red = state.players.find((player: any) => player.playerId === 'player-red')
+    const rule = loadRuleById('rule-blackwidow-toxin-player', true) as any
+    expect(red.statusTags.filter((tag: any) => tag.type === 'lethal-toxin')).toHaveLength(2)
+
+    mover.x = 1
+    mover.y = 1
+    expect(rule.effect(state, { sourcePiece: mover, playerId: 'player-red' }).success).toBe(true)
+    expect(mover.currentHp).toBe(8)
+    expect(red.statusTags.filter((tag: any) => tag.type === 'lethal-toxin')).toEqual([
+      expect.objectContaining({ value: 2, extraValue: 1 }),
+    ])
+    expect(red.rules).toContainEqual(expect.objectContaining({ id: 'rule-blackwidow-toxin-player' }))
+    expect(state.extensions.tileEffects).toContainEqual(expect.objectContaining({
+      tileType: 'lethal-toxin',
       x: 2,
       y: 1,
-    })
-    const state = makeState({ pieces: [tracer, target] }) as any
+    }))
 
-    const placed = executeGridSkill(state, tracer, 'sticky-bomb', 2, 1)
-
-    expect(placed.success).toBe(true)
-    expect(state.extensions.stickyBombs[0].attachedPieceId).toBe('target')
-    expect(state.extensions.tileEffects ?? []).not.toContainEqual(
-      expect.objectContaining({ tileType: 'sticky-bomb' }),
-    )
+    mover.x = 2
+    mover.y = 1
+    expect(rule.effect(state, { sourcePiece: mover, playerId: 'player-red' }).success).toBe(true)
+    expect(mover.currentHp).toBe(4)
+    expect(red.statusTags.filter((tag: any) => tag.type === 'lethal-toxin')).toHaveLength(0)
+    expect(red.rules || []).not.toContainEqual(expect.objectContaining({ id: 'rule-blackwidow-toxin-player' }))
+    expect(state.extensions.tileEffects.filter((effect: any) => effect.tileType === 'lethal-toxin')).toHaveLength(0)
   })
 })

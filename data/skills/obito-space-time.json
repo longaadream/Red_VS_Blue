@@ -20,7 +20,7 @@
     }
   ],
   "powerMultiplier": 1.0,
-  "actionPointCost": 3,
+  "actionPointCost": 5,
   "range": "single",
   "requiresTarget": true,
   "targeting": { "steps": [{ "type": "piece", "filter": "enemy", "range": 99 }] },

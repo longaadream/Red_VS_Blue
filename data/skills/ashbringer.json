@@ -11,7 +11,7 @@
   "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 2,
+  "actionPointCost": 1,
   "code": "function executeSkill(context) { const caster = context.piece; const target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) { return target; } const damage = caster.attack; const damageResult = dealDamage(caster, target, damage, 'true', context.battle, context.skill.id); return { message: caster.name + '使用灰烬使者对' + target.name + '造成' + damageResult.damage + '点真实伤害', success: true }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: '对1格内1个敌人造成' + damage + '点真实伤害。', expectedValues: { damage: damage } }; }",
   "range": "single"

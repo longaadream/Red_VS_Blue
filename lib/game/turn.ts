@@ -2863,8 +2863,10 @@ function applyBattleActionInternal(
             targetY: y,
             pending: resolvedPending,
             payload: pending.payload,
+            dealDamage: (attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType, skillId?: string, skipBeforeTrigger = false) => dealDamage(attacker, target, baseDamage, damageType, next, skillId, skipBeforeTrigger),
           }) || { success: true }
         } catch (execErr) {
+          if (isSuspendableActionPending(execErr)) throw execErr
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))
         }
       }

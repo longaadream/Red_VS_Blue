@@ -135,19 +135,19 @@ describe('RED-124 Mangekyo data contract', () => {
     expect(loadJson<any>('skills', 'sasuke-susanoo.json')).toMatchObject({
       chargeCost: 2,
       chargeCostModifiers: modifier,
-      description: '万花筒。激活完全体须佐能乎：攻击力+3，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。',
+      description: '万花筒。激活完全体须佐能乎：防御力+1，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
     })
     expect(loadJson<any>('skills', 'itachi-totsuka-blade.json')).toMatchObject({
-      chargeCost: 1,
+      chargeCost: 3,
       chargeCostModifiers: modifier,
-      description: '万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。',
+      description: '万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入1回合冷却。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
     })
     expect(loadJson<any>('skills', 'obito-space-time.json')).toMatchObject({
       name: '神威',
       type: 'ultimate',
-      actionPointCost: 3,
+      actionPointCost: 5,
       chargeCost: 3,
       chargeCostModifiers: modifier,
       description: '万花筒。选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不视为死亡。每局限用一次。',
@@ -224,13 +224,13 @@ describe('RED-124 friendly death events', () => {
     const nonMangekyo = activeSkill('ordinary-charge', { type: 'super', chargeCost: 3 })
     const costs = () => mangekyoSkills.map(skill =>
       getEffectiveChargeCost(state, 'player-red', skill))
-    expect(costs()).toEqual([2, 1, 3])
+    expect(costs()).toEqual([2, 3, 3])
     expect(getEffectiveChargeCost(state, 'player-red', nonMangekyo)).toBe(3)
 
     dealDamage(blueAttacker, redSummon, 5, 'true', state, 'first-death')
     expect(getMangekyoDeathCount(state, 'player-red')).toBe(1)
     expect(getMangekyoDeathCount(state, 'player-blue')).toBe(0)
-    expect(costs()).toEqual([1, 0, 2])
+    expect(costs()).toEqual([1, 2, 2])
     expect(getEffectiveChargeCost(state, 'player-red', nonMangekyo)).toBe(3)
 
     const revived = state.graveyard.pop()
@@ -240,7 +240,7 @@ describe('RED-124 friendly death events', () => {
     dealDamage(blueAttacker, revived!, 5, 'true', state, 'second-death')
 
     expect(getMangekyoDeathCount(state, 'player-red')).toBe(2)
-    expect(costs()).toEqual([0, 0, 1])
+    expect(costs()).toEqual([0, 1, 1])
 
     const revivedAgain = state.graveyard.pop()
     Object.assign(revivedAgain!, { currentHp: 5, x: 1, y: 0 })
@@ -375,7 +375,7 @@ describe('RED-124 Obito Kamui', () => {
     }) as any
     blueCore.isCore = true
     const state = makeState({ pieces: [redCore, obito, blueCore] }) as any
-    state.players[0].actionPoints = 3
+    state.players[0].actionPoints = 5
     state.players[0].chargePoints = 3
     state.skillsById['obito-space-time'] = loadJson<SkillDefinition>('skills', 'obito-space-time.json')
 

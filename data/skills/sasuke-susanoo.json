@@ -1,10 +1,15 @@
 {
   "id": "sasuke-susanoo",
   "name": "须佐能乎",
-  "description": "万花筒。激活完全体须佐能乎：攻击力+3，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。",
-  "keywords": ["万花筒"],
+  "description": "万花筒。激活完全体须佐能乎：防御力+1，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。",
+  "keywords": [
+    "万花筒"
+  ],
   "targetText": "自身",
-  "effectTags": ["buff", "skill-change"],
+  "effectTags": [
+    "buff",
+    "skill-change"
+  ],
   "icon": "🔭",
   "kind": "active",
   "type": "super",
@@ -19,8 +24,8 @@
       "minimum": 0
     }
   ],
-  "powerMultiplier": 1.0,
+  "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { var caster = context.piece; caster.attack += 3; removeSkillById(caster.instanceId, 'sasuke-chidori'); addSkillById(caster.instanceId, 'sasuke-kagutsuchi'); addSkillById(caster.instanceId, 'sasuke-indra-arrow'); addStatusEffectById(caster.instanceId, { id: 'susanoo-active', name: '须佐能乎', type: 'susanoo-active', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); return { success: true, message: caster.name + '激活须佐能乎！攻击力提升至' + caster.attack + '，千鸟消退，获得加具土命与因陀罗之矢！' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '激活完全体须佐能乎：攻击力+3，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。', expectedValues: { attackBonus: 3 } }; }"
+  "code": "function executeSkill(context) { var caster = context.piece; caster.defense += 1; removeSkillById(caster.instanceId, 'sasuke-chidori'); addSkillById(caster.instanceId, 'sasuke-kagutsuchi'); addSkillById(caster.instanceId, 'sasuke-indra-arrow'); addStatusEffectById(caster.instanceId, { id: 'susanoo-active', name: '须佐能乎', type: 'susanoo-active', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); return { success: true, message: caster.name + '激活完全体须佐能乎，防御力+1，失去千鸟并获得加具土命与因陀罗之矢' }; }",
+  "previewCode": "function calculatePreview() { return { description: '激活完全体须佐能乎：防御力+1，失去千鸟，获得加具土命与因陀罗之矢。', expectedValues: { defenseBonus: 1 } }; }"
 }

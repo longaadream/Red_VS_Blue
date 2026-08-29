@@ -9,7 +9,7 @@
     "maxHp": 16,
     "attack": 2,
     "defense": 1,
-    "moveRange": 3
+    "moveRange": 4
   },
   "skills": [
     {

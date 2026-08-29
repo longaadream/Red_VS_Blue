@@ -9,7 +9,7 @@
   "kind": "active",
   "type": "normal",
   "form": "projectile",
-  "cooldownTurns": 2,
+  "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 2,

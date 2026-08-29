@@ -8,7 +8,7 @@
     "治疗"
   ],
   "type": "active",
-  "actionPointCost": 1,
+  "actionPointCost": 0,
   "cardType": "fel",
   "icon": "🃏",
   "code": "function executeCard(context) { const battle = context.battle; const playerId = context.playerId; const target = selectTarget({ filter: 'ally', range: 99 }); if (!target || target.needsTargetSelection) { return target || { success: false, message: '请选择一个友方棋子' }; } const result = healDamage(target, target, 2, battle, 'soul-fragment'); return { success: true, message: '灵魂残片使' + target.name + '恢复' + result.heal + '点生命' }; }",
