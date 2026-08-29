@@ -358,6 +358,9 @@
     playerAlignment = params.get('alignment') || playerAlignment
     let wsReady = false
     let latestRoom = null
+    let factionClaimPromise = null
+    let factionClaimed = false
+    let initialFactionClaimFinished = false
     let pieceLoadError = ''
 
     const LOCAL_PIECE_LOAD_TIMEOUT_MS = 2000
@@ -371,14 +374,22 @@
       if (typeof RvBWs === 'undefined' || !roomId || !playerId) return
       RvBWs.on('connect', function() {
         wsReady = true
+        updateServerRow()
         RvBWs.send({ type: 'roomState' })
+        if (initialFactionClaimFinished && !factionClaimed) {
+          return ensureFactionClaimed().catch(reportFactionClaimFailure)
+        }
       })
-      RvBWs.on('disconnect', function() { wsReady = false })
+      RvBWs.on('disconnect', function() {
+        wsReady = false
+        updateServerRow()
+      })
       RvBWs.on('message', function(msg) {
         if (msg.type === 'roomUpdate' && msg.room) {
           latestRoom = msg.room
           const me = (msg.room.players || []).find(p => p.id && p.id.toLowerCase() === playerId.toLowerCase())
           if (me) {
+            factionClaimed = true
             let changed = false
             if (me.faction && me.faction !== playerFaction) { playerFaction = me.faction; changed = true }
             if (me.alignment && me.alignment !== playerAlignment) { playerAlignment = me.alignment; changed = true }
@@ -437,6 +448,34 @@
           }
         }, 100)
       })
+    }
+
+    function isTransientSelectionWsError(error) {
+      const message = error && error.message ? error.message : String(error || '')
+      return /WebSocket (?:connect timeout|not connected|connection failed|closed before response)/i.test(message)
+    }
+
+    function reportFactionClaimFailure(error) {
+      const message = error && error.message ? error.message : String(error)
+      if (isTransientSelectionWsError(error)) {
+        console.warn('[Selection] Waiting to retry faction claim after WebSocket reconnect:', message)
+        return
+      }
+      alert('无法认领阵营：' + message)
+    }
+
+    function ensureFactionClaimed() {
+      if (!roomId || factionClaimed) return Promise.resolve(latestRoom ? { room: latestRoom } : null)
+      if (factionClaimPromise) return factionClaimPromise
+      factionClaimPromise = claimFactionViaWs()
+        .then(result => {
+          factionClaimed = true
+          return result
+        })
+        .finally(() => {
+          factionClaimPromise = null
+        })
+      return factionClaimPromise
     }
 
     async function claimFactionViaWs() {
@@ -591,13 +630,15 @@
 
       if (roomId) {
         try {
-          const result = await claimFactionViaWs()
+          const result = await ensureFactionClaimed()
           if (result && result.room && roomLooksBattleReady(result.room)) {
             navigateBattle()
             return
           }
         } catch (e) {
-          alert('无法认领阵营：' + (e && e.message ? e.message : e))
+          reportFactionClaimFailure(e)
+        } finally {
+          initialFactionClaimFinished = true
         }
       }
 
@@ -973,8 +1014,12 @@
       const btn = document.getElementById('disconnectBtn')
       if (!label) return
       if (url) {
-        label.textContent = '已连接 ' + url.replace(/^https?:\/\//, '').slice(0, 30)
-        label.style.color = '#22c55e'
+        const connected = typeof RvBWs !== 'undefined'
+          && RvBWs.isConnected
+          && RvBWs.isConnected()
+        const address = url.replace(/^(?:https?|wss?):\/\//, '').slice(0, 30)
+        label.textContent = (connected ? '已连接 ' : '正在连接 ') + address
+        label.style.color = connected ? '#22c55e' : '#f59e0b'
         if (btn) btn.style.display = 'block'
       } else {
         label.textContent = '未连接服务器'

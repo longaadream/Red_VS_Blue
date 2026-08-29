@@ -15,11 +15,13 @@ type Piece = {
 
 type PageContract = {
   confirmSelection: () => Promise<void>
+  init: () => Promise<void>
   getPieces: () => Piece[]
   loadPieces: () => Promise<void>
   pollRoomStatus: () => Promise<void>
   setSelectedIds: (ids: string[]) => void
   updateFactionBadge: () => void
+  updateServerRow: () => void
 }
 
 type MockElement = {
@@ -71,6 +73,8 @@ function createElement(): MockElement {
 function createHarness(options: {
   fetchPackJson: (path: string) => Promise<unknown>
   wsRequest: (method: string, data?: Record<string, unknown>, timeoutMs?: number) => Promise<unknown>
+  useIntervals?: boolean
+  wsConnected?: () => boolean
 }) {
   const page = fs.readFileSync(path.join(root, 'data/pages/piece-selection.html'), 'utf8')
   const inlineScripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)]
@@ -88,10 +92,11 @@ function createHarness(options: {
     search: '?roomId=room-54&playerId=alice&playerName=Alice&alignment=light',
   }
   const wsRequest = vi.fn(options.wsRequest)
+  const wsHandlers = new Map<string, (...args: unknown[]) => unknown>()
   const RvBWs = {
     connect: vi.fn(),
-    isConnected: () => true,
-    on: vi.fn(),
+    isConnected: options.wsConnected || (() => true),
+    on: vi.fn((event: string, handler: (...args: unknown[]) => unknown) => { wsHandlers.set(event, handler) }),
     request: wsRequest,
     send: vi.fn(),
   }
@@ -108,15 +113,16 @@ function createHarness(options: {
   }
   const context = vm.createContext({
     AbortController,
+    Date,
     URLSearchParams,
     alert: (message: string) => { alerts.push(message) },
-    clearInterval: () => {},
+    clearInterval: options.useIntervals ? clearInterval : () => {},
     clearTimeout,
     console,
     document: { getElementById: element },
     fetch: vi.fn(),
     location,
-    setInterval: () => 1,
+    setInterval: options.useIntervals ? setInterval : () => 1,
     setTimeout,
     window,
     RvBUtils: window.RvBUtils,
@@ -127,9 +133,11 @@ function createHarness(options: {
     confirmSelection,
     getPieces: () => PIECE_TEMPLATES,
     loadPieces,
+    init,
     pollRoomStatus,
     setSelectedIds: (ids) => { selectedIds = new Set(ids) },
     updateFactionBadge,
+    updateServerRow,
   }`, context)
 
   return {
@@ -138,6 +146,10 @@ function createHarness(options: {
     element,
     location,
     wsRequest,
+    emitWs: async (event: string, ...args: unknown[]) => {
+      const handler = wsHandlers.get(event)
+      if (handler) await handler(...args)
+    },
   }
 }
 
@@ -155,6 +167,40 @@ describe('Electron piece-selection resource contract', () => {
   const lightPieces = makePieces('good', 10)
   const darkPieces = makePieces('evil', 9)
   const allPieces = [...lightPieces, ...darkPieces]
+
+  test('does not report a saved URL as connected and retries the faction claim after a transient WS timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      let connected = false
+      const harness = createHarness({
+        fetchPackJson: localPack(allPieces),
+        useIntervals: true,
+        wsConnected: () => connected,
+        wsRequest: async method => {
+          expect(method).toBe('rooms.action')
+          return { faction: 'red', alignment: 'light', room: { status: 'selecting' } }
+        },
+      })
+
+      const initializing = harness.contract.init()
+      await vi.advanceTimersByTimeAsync(6000)
+      await initializing
+
+      expect(harness.alerts).toEqual([])
+      expect(harness.element('serverLabel').textContent).toContain('正在连接')
+      expect(harness.wsRequest).not.toHaveBeenCalled()
+
+      connected = true
+      await harness.emitWs('connect')
+
+      expect(harness.wsRequest).toHaveBeenCalledWith('rooms.action', expect.objectContaining({
+        action: 'claim-faction', roomId: 'room-54', playerId: 'alice', alignment: 'light',
+      }), 7000)
+      expect(harness.element('serverLabel').textContent).toContain('已连接')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 
   test('keeps versioned local resources first and avoids the server when they load', async () => {
     const harness = createHarness({
