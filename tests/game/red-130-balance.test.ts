@@ -53,7 +53,9 @@ describe('RED-130 data contract', () => {
     const amaterasu = loadSkill('itachi-amaterasu')
 
     expect(curseRule.description).toContain('50%')
+    expect(curseRule.description).toContain('向下取整')
     expect(curseSkill.description).toContain('50%')
+    expect(curseSkill.description).toContain('向下取整')
     expect(amaterasu).toMatchObject({ actionPointCost: 2 })
   })
 
@@ -63,7 +65,7 @@ describe('RED-130 data contract', () => {
 })
 
 describe('RED-130 curse ward coefficient', () => {
-  it('rounds half of odd current attack and freezes the curse without changing Rafaam', () => {
+  it('floors half of odd current attack and freezes the curse without changing Rafaam', () => {
     const rafaam = makePiece({
       instanceId: 'rafaam', templateId: 'red-rafaam', ownerPlayerId: 'player-red', x: 0, y: 0,
       currentHp: 15, maxHp: 15, attack: 3,
@@ -85,10 +87,10 @@ describe('RED-130 curse ward coefficient', () => {
     const curse = blue.hand[0]
     const cardDef = state.customCards[curse.cardId]
     expect(rafaam).toMatchObject({ attack: 3, currentHp: 15 })
-    expect(cardDef).toMatchObject({ damageAmount: 7, sourcePieceId: 'rafaam' })
+    expect(cardDef).toMatchObject({ damageAmount: 6, sourcePieceId: 'rafaam' })
 
     rafaam.attack = 9
-    expect(cardDef.damageAmount).toBe(7)
+    expect(cardDef.damageAmount).toBe(6)
   })
 })
 
