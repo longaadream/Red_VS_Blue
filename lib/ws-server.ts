@@ -63,7 +63,7 @@ function publicRoom(room: any): unknown {
   return {
     id: room.id,
     name: room.name,
-    status: room.status,
+    status: authoritativeRoomStatus(room),
     hostId: room.hostId,
     mapId: room.mapId,
     maxPlayers: room.maxPlayers || 2,
@@ -92,7 +92,7 @@ function publicRoomList(room: any): unknown {
   return {
     id: room.id,
     name: room.name,
-    status: room.status,
+    status: authoritativeRoomStatus(room),
     players: (room.players || []).map((p: any) => ({
       id: p.id,
       accountId: p.accountId,
@@ -113,6 +113,37 @@ function publicRoomList(room: any): unknown {
   }
 }
 
+function authoritativeRoomStatus(room: any): string {
+  const terminal = (getBattleStorage(room)?.state as BattleState | undefined)?.terminalResult
+  return terminal?.status === 'finished' ? 'finished' : room.status
+}
+
+function hasConnectedBattlePlayer(room: any): boolean {
+  const players = new Set(
+    (room.players || [])
+      .map((player: any) => String(player.id || '').trim().toLowerCase())
+      .filter(Boolean),
+  )
+  const clients = roomClients.get(String(room.id || '').trim().toLowerCase())
+  if (!clients || players.size === 0) return false
+  for (const client of clients) {
+    if (client.readyState !== WebSocket.OPEN) continue
+    const identity = wsIdentities.get(client)
+    if (identity?.playerId && players.has(identity.playerId)) return true
+  }
+  return false
+}
+
+function publicLobbyRoomList(rooms: any[]): unknown[] {
+  return rooms
+    .filter(room => {
+      const status = authoritativeRoomStatus(room)
+      if (status === 'finished') return false
+      return status !== 'in-progress' || hasConnectedBattlePlayer(room)
+    })
+    .map(publicRoomList)
+}
+
 function makeRoomId(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
   let roomId = ''
@@ -129,7 +160,7 @@ function makeInviteCode(): string {
 
 async function broadcastLobby(): Promise<void> {
   const rooms = await roomStore.getAllRooms()
-  broadcastToRoom('__lobby', { type: 'lobbyUpdate', rooms: rooms.map(publicRoomList) })
+  broadcastToRoom('__lobby', { type: 'lobbyUpdate', rooms: publicLobbyRoomList(rooms) })
 }
 
 function broadcastBattleSnapshot(roomId: string, snapshot: PublicBattleSnapshot): void {
@@ -598,7 +629,7 @@ async function restartWsServer(): Promise<void> {
                 result = card
               } else if (method === 'rooms.list' || method === 'lobby.list') {
                 const rooms = await roomStore.getAllRooms()
-                result = { rooms: rooms.map(publicRoomList) }
+                result = { rooms: publicLobbyRoomList(rooms) }
               } else if (method === 'rooms.create' || method === 'lobby.create') {
                 const mapId = assertSelectableMapId(data.mapId)
                 let roomId = makeRoomId()
@@ -650,7 +681,7 @@ async function restartWsServer(): Promise<void> {
                 const player = String(data.playerId || '').trim().toLowerCase()
                 const room = await roomStore.getRoom(targetRoomId)
                 if (!room) throw new Error('Room not found')
-                if (room.status === 'in-progress') throw new Error('Cannot delete room while game is in progress')
+                if (authoritativeRoomStatus(room) === 'in-progress') throw new Error('Cannot delete room while game is in progress')
                 if (room.hostId && room.hostId.toLowerCase() !== player) throw new Error('Unauthorized - only host can delete room')
                 const removed = await roomStore.removeRoom(targetRoomId)
                 if (!removed) throw new Error('Room could not be deleted')
@@ -667,7 +698,7 @@ async function restartWsServer(): Promise<void> {
                 if (!targetRoomId || !spectatorId) throw new Error('roomId and spectatorId are required')
                 const room = await roomStore.getRoom(targetRoomId)
                 if (!room) throw new Error('Room not found')
-                if (room.status !== 'in-progress') throw new Error('只有正在进行中的房间才能观战')
+                if (authoritativeRoomStatus(room) !== 'in-progress') throw new Error('只有正在进行中的房间才能观战')
                 if (room.players.some(p => p.id === spectatorId)) throw new Error('你已经是该房间的参战玩家')
                 await roomStore.addSpectator(targetRoomId, { id: spectatorId, name: spectatorName, joinedAt: Date.now() })
                 const updated = await roomStore.getRoom(targetRoomId)
@@ -717,7 +748,7 @@ async function restartWsServer(): Promise<void> {
         } else if (msg.type === 'subscribe' && typeof msg.roomId === 'string') {
           if (roomId) {
             roomClients.get(roomId)?.delete(ws)
-            if (playerId) playerWs.delete(playerId)
+            if (playerId && playerWs.get(playerId) === ws) playerWs.delete(playerId)
             wsIdentities.delete(ws)
           }
           const nextRoomId = msg.roomId.toLowerCase()
@@ -896,13 +927,19 @@ async function restartWsServer(): Promise<void> {
 
     ws.on('close', () => {
       if (roomId) roomClients.get(roomId)?.delete(ws)
-      if (playerId) playerWs.delete(playerId)
+      if (playerId && playerWs.get(playerId) === ws) playerWs.delete(playerId)
       wsIdentities.delete(ws)
+      void broadcastLobby().catch(error => {
+        console.warn('[WS] lobby refresh after disconnect failed:', error)
+      })
     })
     ws.on('error', () => {
       if (roomId) roomClients.get(roomId)?.delete(ws)
-      if (playerId) playerWs.delete(playerId)
+      if (playerId && playerWs.get(playerId) === ws) playerWs.delete(playerId)
       wsIdentities.delete(ws)
+      void broadcastLobby().catch(error => {
+        console.warn('[WS] lobby refresh after socket error failed:', error)
+      })
     })
   })
 

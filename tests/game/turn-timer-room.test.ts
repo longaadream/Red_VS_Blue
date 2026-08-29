@@ -12,6 +12,7 @@ import {
 } from '@/lib/game/room-battle-actions'
 import type { Room } from '@/lib/game/room-store'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
+import { loadRuleById } from '@/lib/game/skills'
 import { createRunningTurnTimer, isTurnTimerEnabled, syncTurnTimerAfterAcceptedAction } from '@/lib/game/turn-timer'
 import type { BattleState } from '@/lib/game/turn'
 import { globalTriggerSystem } from '@/lib/game/triggers'
@@ -441,7 +442,7 @@ describe('RED-36 authoritative room timer integration', () => {
       expect(state.turn).toMatchObject({
         currentPlayerId: PLAYERS[0],
         turnNumber: 1,
-        phase: 'action',
+        phase: 'end',
       })
       expect(state.pendingTargetSelection).toMatchObject({
         playerId: PLAYERS[1],
@@ -772,6 +773,61 @@ describe('RED-36 authoritative room timer integration', () => {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
     }
+  })
+
+  it('resumes a Watcher begin-turn option created after an authoritative turn timeout', async () => {
+    const clock = new FakeClock(0)
+    const room = makeTimedRoom('turn-timeout-watcher-pending-room')
+    const state = (room.battleState as any).state as BattleState
+    const watcher = state.pieces.find(piece => piece.instanceId === 'blue-piece') as any
+    const watcherRule = loadRuleById('rule-watcher-form', true)
+    if (!watcher || !watcherRule) throw new Error('Watcher timeout fixture could not load')
+    watcher.templateId = 'blue-watcher'
+    watcher.name = '观者'
+    watcher.rules = [watcherRule]
+    const store = new MemoryRoomStore(room)
+
+    const timeout = await expireCurrentTurn(store, clock)
+    const pendingState = authoritativeState(store)
+    const pending = pendingState.pendingOptionSelection!
+
+    expect(timeout).toMatchObject({ kind: 'expired', expiredReason: 'turn' })
+    expect(pending).toMatchObject({
+      playerId: PLAYERS[1],
+      source: { type: 'rule', id: 'rule-watcher-form', pieceId: 'blue-piece' },
+      suspendedTurn: { currentPlayerId: PLAYERS[1], turnNumber: 2, phase: 'start' },
+    })
+    expect(pending.transaction?.rootAction).toMatchObject({ type: 'beginPhase' })
+    expect(pendingState.turnTimer).toMatchObject({
+      ownerPlayerId: PLAYERS[1],
+      turnOwnerPlayerId: PLAYERS[1],
+      turnNumber: 2,
+      deadlineAt: 90_000,
+    })
+
+    clock.value = 46_000
+    const resolved = await dispatchRoomBattleAction(store, room.id, PLAYERS[1], {
+      type: 'pendingOptionSelect',
+      playerId: PLAYERS[1],
+      selectedOption: 'calm',
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+      clientActionId: 'watcher-calm-after-turn-timeout',
+    } as any, { clock })
+    const completed = authoritativeState(store)
+
+    expect(resolved.kind).toBe('applied')
+    expect(completed.pendingOptionSelection).toBeUndefined()
+    expect(completed.turn).toMatchObject({ currentPlayerId: PLAYERS[1], turnNumber: 2, phase: 'action' })
+    expect(completed.turnTimer).toMatchObject({
+      ownerPlayerId: PLAYERS[1],
+      turnOwnerPlayerId: PLAYERS[1],
+      turnNumber: 2,
+      deadlineAt: 90_000,
+    })
+    expect(completed.players.find(player => player.playerId === PLAYERS[1])?.hand)
+      .toContainEqual(expect.objectContaining({ cardId: 'watcher-calm' }))
+    expect(completed.actions?.filter(action => action.type === 'turnTimeout')).toHaveLength(1)
   })
 
   it('does not let an illegal action clear or evade the no-op streak', async () => {

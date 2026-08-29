@@ -15,6 +15,7 @@ const globalWithWsServer = globalThis as typeof globalThis & {
   __rvbWss?: WebSocketServer | null
   __rvbWsUpgradeHandler?: (request: IncomingMessage, socket: Duplex, head: Buffer) => void
   __rvbRoomClients?: Map<string, Set<WebSocket>>
+  __rvbPlayerWs?: Map<string, WebSocket>
   __rvbWsIdentities?: WeakMap<WebSocket, { roomId: string; playerId?: string }>
 }
 
@@ -188,6 +189,95 @@ describe('game WebSocket service', () => {
       await expect(response).resolves.toEqual({ type: 'pong' })
     } finally {
       await expect(closeClient(client)).resolves.toBe(1000)
+    }
+  })
+
+  test('keeps the replacement player socket registered when the stale socket closes', async () => {
+    const roomId = 'reconnect-player-map-' + Date.now()
+    const first = await openClientPair()
+    const replacement = await openClientPair()
+    try {
+      const firstSubscribed = waitForJsonMessage(first.client)
+      first.client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: 'same-player' }))
+      await expect(firstSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
+
+      const replacementSubscribed = waitForJsonMessage(replacement.client)
+      replacement.client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: 'same-player' }))
+      await expect(replacementSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
+      expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
+
+      const staleServerClosed = new Promise(resolve => first.server.once('close', resolve))
+      await closeClient(first.client)
+      await staleServerClosed
+      expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
+    } finally {
+      if (replacement.client.readyState !== WebSocket.CLOSED) await closeClient(replacement.client)
+    }
+  })
+
+  test('lists only live public battles while keeping dormant battles available for rejoin', async () => {
+    const active = await openClientPair()
+    const lobby = await openClient()
+    const store = getRoomStore()
+    const activeRoomId = 'active-public-' + Date.now()
+    const dormantRoomId = 'dormant-rejoin-' + Date.now()
+    const waitingRoomId = 'waiting-public-' + Date.now()
+    const terminalRoomId = 'terminal-stale-status-' + Date.now()
+    const room = (id: string, status: Room['status'], playerId: string): Room => ({
+      id,
+      name: id,
+      status,
+      players: [{ id: playerId, name: playerId }],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 1,
+    })
+    const activeRoom = room(activeRoomId, 'in-progress', 'active-player')
+    const dormantRoom = room(dormantRoomId, 'in-progress', 'dormant-player')
+    const waitingRoom = room(waitingRoomId, 'waiting', 'waiting-player')
+    const terminalRoom = room(terminalRoomId, 'in-progress', 'terminal-player')
+    terminalRoom.battleState = {
+      type: 'server-state',
+      seed: 1,
+      state: {
+        ...makeState(),
+        terminalResult: { status: 'finished', winnerPlayerId: null, loserPlayerId: null, reason: 'round-limit' },
+      },
+    } as any
+    const rooms = [activeRoom, dormantRoom, waitingRoom, terminalRoom]
+    const getAllRooms = vi.spyOn(store, 'getAllRooms').mockResolvedValue(rooms)
+    const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
+      rooms.find(candidate => candidate.id === id))
+
+    try {
+      globalWithWsServer.__rvbRoomClients?.set(activeRoomId, new Set([active.server]))
+      globalWithWsServer.__rvbWsIdentities?.set(active.server, {
+        roomId: activeRoomId,
+        playerId: 'active-player',
+      })
+
+      const listed = await rpc(lobby, 'live-room-list', 'rooms.list')
+      const listedRooms = (listed.data as { rooms: Array<{ id: string }> }).rooms
+      expect(listedRooms.map(candidate => candidate.id)).toEqual([activeRoomId, waitingRoomId])
+
+      const rejoin = await rpc(lobby, 'dormant-room-get', 'rooms.get', { roomId: dormantRoomId })
+      expect(rejoin).toMatchObject({
+        ok: true,
+        data: { id: dormantRoomId, status: 'in-progress' },
+      })
+
+      const terminal = await rpc(lobby, 'terminal-room-get', 'rooms.get', { roomId: terminalRoomId })
+      expect(terminal).toMatchObject({
+        ok: true,
+        data: { id: terminalRoomId, status: 'finished' },
+      })
+    } finally {
+      await Promise.all([closeClient(active.client), closeClient(lobby)])
+      getAllRooms.mockRestore()
+      getRoom.mockRestore()
+      globalWithWsServer.__rvbRoomClients?.delete(activeRoomId)
+      globalWithWsServer.__rvbWsIdentities?.delete(active.server)
     }
   })
 

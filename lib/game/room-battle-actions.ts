@@ -265,6 +265,7 @@ export function createPublicRoomSnapshot(room: Room): Room {
   }
   return {
     ...room,
+    status: snapshot.state.terminalResult?.status === 'finished' ? 'finished' : room.status,
     battleState: publicStorage as unknown as Room['battleState'],
   }
 }
@@ -404,8 +405,14 @@ export async function dispatchRoomBattleAction(
       }
 
       const timerEnabled = isTurnTimerEnabled()
+      const continuesPendingInteraction =
+        (action.type === 'pendingOptionSelect' && !!state.pendingOptionSelection)
+        || (action.type === 'pendingTargetSelect' && !!state.pendingTargetSelection)
+        || (action.type === 'cancelPendingSelection'
+          && (!!state.pendingOptionSelection || !!state.pendingTargetSelection))
       const deploymentExpired = timerEnabled
         && action.type !== 'deploymentTimeout'
+        && !continuesPendingInteraction
         && state.deployment?.status === 'awaiting-locks'
         && receivedAt >= state.deployment.deadlineAt
       const turnExpired = timerEnabled

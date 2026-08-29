@@ -10,6 +10,7 @@
   var _reqSeq = 1
   var _reconnectTimer = null
   var _shouldReconnect = false
+  var _subscribed = false
 
   function getServerUrl() {
     if (window.RvBUtils && window.RvBUtils.getConnectionConfig) {
@@ -64,31 +65,38 @@
     var url = buildWsUrl()
     if (!url) return
 
+    var socket
     try {
-      _ws = new WebSocket(url)
+      socket = new WebSocket(url)
+      _ws = socket
+      _subscribed = false
     } catch (e) {
       _scheduleReconnect(roomId)
       return
     }
 
-    _ws.onopen = async function () {
+    socket.onopen = async function () {
       if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
       try {
         var subscribeMessage = await buildSubscribeMessage()
-        if (!_ws || _ws.readyState !== 1) return
-        _ws.send(JSON.stringify(subscribeMessage))
-        _emit('connect')
+        if (_ws !== socket || socket.readyState !== 1) return
+        socket.send(JSON.stringify(subscribeMessage))
       } catch (e) {
         console.error('[WS] subscribe failed', e)
         _emit('error', e)
         _shouldReconnect = false
-        if (_ws) _ws.close()
+        if (_ws === socket) socket.close()
       }
     }
 
-    _ws.onmessage = function (e) {
+    socket.onmessage = function (e) {
+      if (_ws !== socket) return
       try {
         var msg = JSON.parse(e.data)
+        if (msg && msg.type === 'subscribed' && !_subscribed) {
+          _subscribed = true
+          _emit('connect')
+        }
         if (msg && msg.type === 'rpcResult' && msg.requestId && _pending[msg.requestId]) {
           var pending = _pending[msg.requestId]
           delete _pending[msg.requestId]
@@ -101,13 +109,15 @@
       } catch {}
     }
 
-    _ws.onclose = function () {
+    socket.onclose = function () {
+      if (_ws !== socket) return
       _ws = null
+      _subscribed = false
       _emit('disconnect')
       if (_shouldReconnect) _scheduleReconnect(_roomId)
     }
 
-    _ws.onerror = function () {}
+    socket.onerror = function () {}
   }
 
   function _scheduleReconnect(roomId) {
@@ -159,11 +169,14 @@
   function disconnect() {
     _shouldReconnect = false
     if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
-    if (_ws) { try { _ws.close() } catch {} _ws = null }
+    var socket = _ws
+    _ws = null
+    _subscribed = false
+    if (socket) { try { socket.close() } catch {} }
   }
 
   function send(msg) {
-    if (_ws && _ws.readyState === 1) {
+    if (_subscribed && _ws && _ws.readyState === 1) {
       try { _ws.send(JSON.stringify(msg)) } catch {}
     }
   }
@@ -171,7 +184,7 @@
   function request(method, data, timeoutMs) {
     timeoutMs = timeoutMs || 5000
     return new Promise(function (resolve, reject) {
-      if (!_ws || _ws.readyState !== 1) {
+      if (!_subscribed || !_ws || _ws.readyState !== 1) {
         reject(new Error('WebSocket not connected'))
         return
       }
@@ -258,7 +271,7 @@
   }
 
   function isConnected() {
-    return _ws !== null && _ws.readyState === 1
+    return _subscribed && _ws !== null && _ws.readyState === 1
   }
 
   window.RvBWs = { connect: connect, disconnect: disconnect, send: send, request: request, requestAt: requestAt, on: on, isConnected: isConnected }
