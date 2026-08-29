@@ -543,6 +543,132 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
     expect((pending.actions ?? []).filter(entry => entry.type === 'useBasicSkill')).toHaveLength(0)
   })
 
+  it('offers Flying Raijin when Minato uses Rasengan on an enemy marked by an earlier Rasengan', () => {
+    const minato = makePiece({
+      instanceId: 'double-rasengan-minato',
+      templateId: 'blue-minato',
+      ownerPlayerId: 'player-red',
+      x: 1,
+      y: 1,
+      attack: 3,
+    }) as any
+    minato.name = '波风水门'
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    minato.skills = [{ skillId: 'minato-rasengan', currentCooldown: 0, usesRemaining: -1 }]
+    const target = makePiece({
+      instanceId: 'double-rasengan-target',
+      ownerPlayerId: 'player-blue',
+      faction: 'blue',
+      x: 2,
+      y: 1,
+      currentHp: 20,
+      maxHp: 20,
+    }) as any
+    const initial = makeState({
+      pieces: [minato, target],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+    }) as any
+    initial.skillsById = {}
+    initial.players.find((player: any) => player.playerId === 'player-red').actionPoints = 3
+    const rootSeed = 131027
+
+    const first = runBattleAction(initial, withPreparedTarget(initial, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: minato.instanceId,
+      skillId: 'minato-rasengan',
+      targetPieceId: target.instanceId,
+    }), { rootSeed }).state
+    const firstMinato = first.pieces.find(piece => piece.instanceId === minato.instanceId)!
+    const firstTarget = first.pieces.find(piece => piece.instanceId === target.instanceId)!
+
+    expect(first.pendingOptionSelection).toBeUndefined()
+    expect(first.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(2)
+    expect(firstMinato).toMatchObject({ attack: 4, x: 1, y: 1 })
+    expect(firstMinato.skills?.[0]?.currentCooldown).toBe(1)
+    expect(firstTarget.currentHp).toBe(17)
+    expect(firstTarget.statusTags).toContainEqual(expect.objectContaining({
+      type: 'flying-raijin-mark',
+      sourceId: minato.instanceId,
+      stacks: 1,
+    }))
+
+    firstMinato.skills![0].currentCooldown = 0
+    first.skillsById = {}
+    const secondAction = withPreparedTarget(first, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: minato.instanceId,
+      skillId: 'minato-rasengan',
+      targetPieceId: target.instanceId,
+    })
+    const pending = runBattleAction(first, secondAction, { rootSeed }).state
+    const pendingMinato = pending.pieces.find(piece => piece.instanceId === minato.instanceId)!
+    const pendingTarget = pending.pieces.find(piece => piece.instanceId === target.instanceId)!
+
+    expect(pending.pendingOptionSelection).toMatchObject({
+      playerId: 'player-red',
+      source: { type: 'rule', id: 'rule-minato-flying-raijin-trigger', pieceId: minato.instanceId },
+      canCancel: true,
+      cancelValue: 'no',
+      options: [{ value: 'yes' }, { value: 'no' }],
+    })
+    expect(pending.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(2)
+    expect(pendingMinato).toMatchObject({ attack: 4, x: 1, y: 1 })
+    expect(pendingMinato.skills?.[0]?.currentCooldown).toBe(0)
+    expect(pendingTarget.currentHp).toBe(17)
+    expect(pendingTarget.statusTags).toContainEqual(expect.objectContaining({
+      type: 'flying-raijin-mark',
+      sourceId: minato.instanceId,
+      stacks: 1,
+    }))
+
+    const choice = pending.pendingOptionSelection!
+    const declined = runBattleAction(pending, {
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      selectedOption: 'no',
+      selectionId: choice.selectionId,
+      stateRevision: choice.stateRevision,
+    }, { rootSeed }).state
+    const declinedMinato = declined.pieces.find(piece => piece.instanceId === minato.instanceId)!
+    const declinedTarget = declined.pieces.find(piece => piece.instanceId === target.instanceId)!
+    expect(declined.pendingOptionSelection).toBeUndefined()
+    expect(declined.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(1)
+    expect(declinedMinato).toMatchObject({ attack: 5, x: 1, y: 1 })
+    expect(declinedMinato.skills?.[0]?.currentCooldown).toBe(1)
+    expect(declinedTarget.currentHp).toBe(13)
+    expect(declinedTarget.statusTags).toContainEqual(expect.objectContaining({
+      type: 'flying-raijin-mark',
+      sourceId: minato.instanceId,
+      stacks: 2,
+    }))
+    expect((declined.actions ?? []).filter(entry => entry.type === 'useBasicSkill')).toHaveLength(2)
+
+    const triggered = runBattleAction(pending, {
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      selectedOption: 'yes',
+      selectionId: choice.selectionId,
+      stateRevision: choice.stateRevision,
+    }, { rootSeed }).state
+    const triggeredMinato = triggered.pieces.find(piece => piece.instanceId === minato.instanceId)!
+    const triggeredTarget = triggered.pieces.find(piece => piece.instanceId === target.instanceId)!
+    expect(triggered.pendingOptionSelection).toBeUndefined()
+    expect(triggered.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(1)
+    expect(triggeredMinato.attack).toBe(6)
+    expect(triggeredMinato.skills?.[0]?.currentCooldown).toBe(1)
+    expect(Math.abs(triggeredMinato.x! - triggeredTarget.x!) + Math.abs(triggeredMinato.y! - triggeredTarget.y!)).toBe(1)
+    expect(triggeredTarget.currentHp).toBe(8)
+    expect(triggeredTarget.statusTags).toContainEqual(expect.objectContaining({
+      type: 'flying-raijin-mark',
+      sourceId: minato.instanceId,
+      stacks: 1,
+    }))
+    expect((triggered.actions ?? []).filter(entry => entry.type === 'useBasicSkill')).toHaveLength(2)
+  })
+
   it('uses the enemy caster as the Rasengan target when an enemy targets a marked ally', () => {
     const minato = makePiece({
       instanceId: 'ally-branch-minato',
