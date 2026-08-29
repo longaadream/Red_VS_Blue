@@ -50,7 +50,7 @@
     "pieces": "db76808fa13c56a9f9e1acc466319d9506e0c7b5cddda4e674310faeefb1979e",
     "skills": "6012c11c223bfddfe859c431892d4f71f79f8ba940c6f20ec4d4239f53390ae8",
     "cards": "4f15ea0ae15ec28dc71cfa23928a77ce8cc0467d87cc9ad051c9836af41cbf92",
-    "rules": "4dd4e04dc0fef42915ff1c6f75f74264b07424e458893580c6d86a17eb68e3c7",
+    "rules": "d242b792df3860b2ac3e5a4a667efc052daab1a63da1305d9ccd9fc8a499a58e",
     "status-effects": "ea3b630e48fcacba6a3a7b66deefe0d0c6f78d421fdd96b5327db1837e3e43ec"
   },
   "unsupported": {
@@ -115,6 +115,7 @@
     ],
     "rules": [
       "rule-blackwidow-toxin-player",
+      "rule-ichigo-black-getsuga-teleport",
       "rule-mangekyo-friendly-death",
       "rule-minato-anchor-end-turn",
       "rule-minato-flying-raijin-trigger",
@@ -126,6 +127,7 @@
       "rule-sasuke-amaterasu-stack",
       "rule-shishio-burn-endturn",
       "rule-shishio-burn-move",
+      "rule-shishio-infinite-blade-recast",
       "rule-turalyon-lightforged-march"
     ]
   },

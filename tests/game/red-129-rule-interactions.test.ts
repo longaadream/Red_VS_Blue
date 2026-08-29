@@ -111,6 +111,7 @@ describe('RED-129 无限刃 pending 二段', () => {
     }) as any
     state.players[0].actionPoints = 2
     installSkill(state, shishio, 'shishio-infinite-blade')
+    shishio.rules = [rule('rule-shishio-infinite-blade-recast')]
     return { state, shishio, first, second }
   }
 
@@ -126,7 +127,7 @@ describe('RED-129 无限刃 pending 二段', () => {
 
     expect(pending.pendingTargetSelection).toMatchObject({
       playerId: 'player-red',
-      source: { type: 'skill', id: 'shishio-infinite-blade', pieceId: 'shishio' },
+      source: { type: 'rule', id: 'rule-shishio-infinite-blade-recast', pieceId: 'shishio' },
       canCancel: true,
     })
     expect(pending.players[0].actionPoints).toBe(2)
@@ -155,7 +156,7 @@ describe('RED-129 无限刃 pending 二段', () => {
 
   it('recalculates the second strike after a first-strike kill increases the multiplier', () => {
     const { state, shishio } = shishioState(4)
-    shishio.rules = [rule('rule-shishio-kill-track')]
+    shishio.rules.push(rule('rule-shishio-kill-track'))
     const action = selectedPieceAction(state, {
       type: 'useBasicSkill',
       playerId: 'player-red',

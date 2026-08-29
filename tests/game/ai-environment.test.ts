@@ -778,6 +778,7 @@ describe('AI Environment v2 real roster interactions', () => {
       x: 1, y: 1, attack: 6,
     }) as any
     ichigo.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
+    ichigo.rules = [loadRuleById('rule-ichigo-black-getsuga-teleport', true)]
     const enemy = makePiece({
       instanceId: 'v2-ichigo-enemy', ownerPlayerId: 'player-blue', faction: 'blue',
       x: 3, y: 1, currentHp: 30, maxHp: 30,

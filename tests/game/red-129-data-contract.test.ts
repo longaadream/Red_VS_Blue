@@ -130,6 +130,7 @@ describe('RED-129 complete data contract', () => {
     const tracer = loadJson<any>('pieces', 'tracer.json')
     const venom = loadJson<any>('pieces', 'red-venom.json')
     const rafaam = loadJson<any>('pieces', 'red-rafaam.json')
+    const shishio = loadJson<any>('pieces', 'red-shishio.json')
 
     expect(tirion.skills.map((entry: any) => entry.skillId)).toEqual([
       'tirion-divine-glory',
@@ -161,6 +162,7 @@ describe('RED-129 complete data contract', () => {
       'rule-tirion-divine-glory',
     ])
     expect(rafaam.rules).toEqual(['rule-rafaam-curse-ward'])
+    expect(shishio.rules).toContain('rule-shishio-infinite-blade-recast')
 
     const removedSkills = [
       'holy-blast',

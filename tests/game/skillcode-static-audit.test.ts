@@ -111,7 +111,7 @@ describe('RED-45 data parse and production loader smoke', () => {
     }
 
     expect(definitions.skills.map(entry => entry.definition.id)).toHaveLength(122)
-    expect(definitions.rules.map(entry => entry.definition.id)).toHaveLength(84)
+    expect(definitions.rules.map(entry => entry.definition.id)).toHaveLength(86)
     expect(definitions.cards.map(entry => entry.definition.id)).toHaveLength(16)
     expect(definitions.skills.every(entry => basename(entry.file, extname(entry.file)) === entry.definition.id)).toBe(true)
   })

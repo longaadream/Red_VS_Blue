@@ -40,6 +40,12 @@ function installSkill(state: BattleState, piece: any, skillId: string) {
   return skill
 }
 
+function attachRule(piece: any, ruleId: string) {
+  const loaded = loadRuleById(ruleId, true)
+  if (!loaded) throw new Error(`Missing rule fixture: ${ruleId}`)
+  piece.rules = [...(piece.rules ?? []).filter((rule: any) => rule.id !== ruleId), loaded]
+}
+
 function selectedAction(
   state: BattleState,
   base: Record<string, any>,
@@ -106,6 +112,7 @@ describe('RED-120 character data contract', () => {
         { skillId: 'ichigo-getsuga-tensho', level: 1 },
         { skillId: 'ichigo-bankai-tensa-zangetsu', level: 1 },
       ],
+      rules: ['rule-ichigo-black-getsuga-teleport'],
     })
     expect(itachi).toMatchObject({
       id: 'red-itachi', name: '宇智波鼬', faction: 'evil', image: 'itachi.jpg',
@@ -146,6 +153,7 @@ describe('RED-120 character data contract', () => {
     expect(pieceManifest.filter(id => id === 'red-itachi')).toHaveLength(1)
     for (const id of Object.keys(expected)) expect(skillManifest.filter(item => item === id)).toHaveLength(1)
     expect(ruleManifest.filter(id => id === 'rule-itachi-tsukuyomi')).toHaveLength(1)
+    expect(ruleManifest.filter(id => id === 'rule-ichigo-black-getsuga-teleport')).toHaveLength(1)
   })
 })
 
@@ -180,6 +188,7 @@ describe('RED-120 authoritative targeting', () => {
   it('deals damage first, then exposes exact adjacent landing cells as a cancellable post-effect', () => {
     const ichigo = namedPiece({ instanceId: 'ichigo', ownerPlayerId: 'player-red', x: 1, y: 1 })
     ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
+    attachRule(ichigo, 'rule-ichigo-black-getsuga-teleport')
     const enemy = namedPiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 1, currentHp: 30, maxHp: 30 })
     const state = makeState({ pieces: [ichigo, enemy], width: 6, height: 4 })
     const actionPointsBefore = state.players[0].actionPoints
@@ -195,6 +204,11 @@ describe('RED-120 authoritative targeting', () => {
       targetType: 'cell',
       canCancel: true,
       fixedCandidates: true,
+      source: {
+        type: 'rule',
+        id: 'rule-ichigo-black-getsuga-teleport',
+        pieceId: 'ichigo',
+      },
     })
     expect((prompted.pendingTargetSelection?.candidates ?? []).map(targetRefKey).sort()).toEqual([
       'cell:2,1', 'cell:3,0', 'cell:3,2', 'cell:4,1',
@@ -236,6 +250,7 @@ describe('RED-120 authoritative targeting', () => {
       maxHp: 12,
     })
     ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
+    attachRule(ichigo, 'rule-ichigo-black-getsuga-teleport')
     const enemy = namedPiece({
       instanceId: 'toxin-owner',
       ownerPlayerId: 'player-blue',
@@ -327,6 +342,7 @@ describe('RED-120 Ichigo combat behavior', () => {
       { skillId: 'ichigo-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 },
       { skillId: 'ichigo-bankai-tensa-zangetsu', currentCooldown: 0, usesRemaining: -1 },
     ]
+    attachRule(ichigo, 'rule-ichigo-black-getsuga-teleport')
     const enemy = namedPiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 50, maxHp: 50 })
     let state = makeState({ pieces: [ichigo, enemy], width: 6, height: 3 })
     state.players[0].actionPoints = 3
@@ -368,11 +384,13 @@ describe('RED-120 Ichigo combat behavior', () => {
     expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(30)
     expect(state.players[0].actionPoints).toBe(0)
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(1)
+    expect(state.extensions?.ichigoBlackGetsugaTeleportByCaster).toBeUndefined()
   })
 
   it('penetrates enemies up to blocking terrain and uses the selected adjacent landing', () => {
     const ichigo = namedPiece({ instanceId: 'ichigo', templateId: 'blue-ichigo', ownerPlayerId: 'player-red', x: 0, y: 1, attack: 6 })
     ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
+    attachRule(ichigo, 'rule-ichigo-black-getsuga-teleport')
     const first = namedPiece({ instanceId: 'first', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 40, maxHp: 40 })
     const second = namedPiece({ instanceId: 'second', ownerPlayerId: 'player-blue', x: 4, y: 1, currentHp: 40, maxHp: 40 })
     const blocked = namedPiece({ instanceId: 'blocked', ownerPlayerId: 'player-blue', x: 6, y: 1, currentHp: 40, maxHp: 40 })
@@ -402,6 +420,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     const run = (amaterasuCells: Array<{ x: number; y: number }>) => {
       const ichigo = namedPiece({ instanceId: 'ichigo', ownerPlayerId: 'player-red', x: 0, y: 1, attack: 6 })
       ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
+      attachRule(ichigo, 'rule-ichigo-black-getsuga-teleport')
       const first = namedPiece({ instanceId: 'first', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 40, maxHp: 40 })
       const pathBlocker = namedPiece({ instanceId: 'path-ally', ownerPlayerId: 'player-red', x: 1, y: 1 })
       const rightBlocker = namedPiece({ instanceId: 'right-ally', ownerPlayerId: 'player-red', x: 3, y: 1 })

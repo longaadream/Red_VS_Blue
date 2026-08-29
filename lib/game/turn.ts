@@ -30,7 +30,6 @@ import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost } from "./skills"
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
-import type { DamageType } from "./skills"
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { getSkillById } from "./skill-repository"
 import {
@@ -2863,7 +2862,6 @@ function applyBattleActionInternal(
             targetY: y,
             pending: resolvedPending,
             payload: pending.payload,
-            dealDamage: (attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType, skillId?: string, skipBeforeTrigger = false) => dealDamage(attacker, target, baseDamage, damageType, next, skillId, skipBeforeTrigger),
           }) || { success: true }
         } catch (execErr) {
           if (isSuspendableActionPending(execErr)) throw execErr
