@@ -310,11 +310,6 @@
     </div>
   </div>
 
-  <!-- Pack mismatch warning -->
-  <div id="packMismatchWarn" style="display:none;margin:0 16px 8px;background:#1a1106;border:1px solid #b45309;border-radius:10px;padding:10px 14px;font-size:13px;color:#fbbf24">
-    ⚠️ 资源包与服务器不匹配，请前往 <a href="pack.html" style="color:#60a5fa;text-decoration:underline">资源包管理</a> 重新导入
-  </div>
-
   <div style="height:calc(24px + env(safe-area-inset-bottom))"></div>
 
   <!-- ── Connect Sheet ── -->
@@ -591,7 +586,7 @@
       if (!_hostServerUrl) return
       RvBUtils.saveServerConfig({ mode: 'local', url: _hostServerUrl })
       closeHostSheet()
-      await checkPackAndGo(_hostServerUrl, 'local')
+      await checkProfileAndGo(_hostServerUrl, 'local')
     }
 
     // ── 加入游戏 (LAN scan) ───────────────────────────────────────────────────
@@ -696,7 +691,7 @@
     async function connectLanServer(url) {
       RvBUtils.saveServerConfig({ mode: 'lan', url: url })
       closeLanSheet()
-      await checkPackAndGo(url, 'lan')
+      await checkProfileAndGo(url, 'lan')
     }
 
     // ── Page loading ──────────────────────────────────────────────────────────
@@ -742,7 +737,8 @@
       if (btn) btn.textContent = '⏳'
       if (desc) desc.textContent = '创建 PVE 房间中…'
       try {
-        const room = await RvBWs.requestAt(serverUrl, 'rooms.create', { mode: 'pve', hostId, hostName: playerName, mapId: 'large-hole-arena' }, 7000)
+        const profileIdentity = await getLocalGameProfileIdentity(serverUrl)
+        const room = await RvBWs.requestAt(serverUrl, 'rooms.create', { mode: 'pve', hostId, hostName: playerName, mapId: 'large-hole-arena', profileIdentity }, 7000)
         const params = new URLSearchParams({ roomId: room.id, playerId: hostId, playerName })
         window.location.href = 'piece-selection.html?' + params
       } catch (e) {
@@ -814,7 +810,7 @@
         closeOverlay('connectOverlay')
         document.getElementById('serverStatusDesc').textContent = '已连接：' + result.url.replace(/^https?:\/\//, '').slice(0, 30)
         if (btn) { btn.textContent = '校验资源包…'; btn.disabled = true }
-        await checkPackAndGo(result.url, 'remote')
+        await checkProfileAndGo(result.url, 'remote')
       } else {
         err.textContent = '\u65e0\u6cd5\u5efa\u7acb WebSocket \u8fde\u63a5\uff1a' + ((result.error && result.error.message) || '\u8fde\u63a5\u5931\u8d25')
         err.style.display = 'block'
@@ -831,7 +827,7 @@
       RvBUtils.saveServerConfig({ mode: 'remote', url: cleanUrl })
       closeOverlay('connectOverlay')
       document.getElementById('serverStatusDesc').textContent = '已连接：' + cleanUrl.replace(/^https?:\/\//, '').slice(0, 30)
-      await checkPackAndGo(cleanUrl, 'remote')
+      await checkProfileAndGo(cleanUrl, 'remote')
     }
 
     function closeOverlay(id) { document.getElementById(id).classList.remove('show') }
@@ -1142,22 +1138,6 @@
       document.getElementById('recordsOverlay').classList.remove('show')
     }
 
-    // ── Pack hash check ───────────────────────────────────────────────────────
-    async function checkPackMd5(serverUrl) {
-      if (window.RvBBridge && /^http:\/\/(localhost|127\.0\.0\.1):7878\b/.test(serverUrl || '')) return
-      try {
-        const data = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
-        const serverMd5 = data.meta?.md5
-        const clientMd5 = localStorage.getItem('rvb_pack_md5')
-        const warn = document.getElementById('packMismatchWarn')
-        if (warn && serverMd5 && clientMd5 && serverMd5 !== clientMd5) {
-          warn.style.display = 'block'
-        } else if (warn) {
-          warn.style.display = 'none'
-        }
-      } catch {}
-    }
-
     function goLobby(mode, serverUrl) {
       if (!mode) {
         window.location.href = 'lobby.html?v=' + Date.now()
@@ -1169,25 +1149,55 @@
       params.set('v', Date.now().toString())
       window.location.href = 'lobby.html?' + params.toString()
     }
-
-    async function checkPackAndGo(serverUrl, mode) {
-      if (window.RvBBridge && /^http:\/\/(localhost|127\.0\.0\.1):7878\b/.test(serverUrl || '')) {
-        goLobby(mode, serverUrl)
-        return
+    async function getLocalGameProfileIdentity(serverUrl) {
+      let identity
+      if (
+        window.electronAPI
+        && typeof window.electronAPI.getResourcePackStatus === 'function'
+      ) {
+        const report = await window.electronAPI.getResourcePackStatus()
+        const stable = report && report.state && report.state.stable
+        if (!stable || !stable.compatibility) {
+          throw new Error('本地资源包状态不可用，请打开“资源包管理”检查安装状态')
+        }
+        identity = {
+          schemaVersion: 'rvb-game-profile-identity/v1',
+          engineAbi: stable.compatibility.engineAbi,
+          runnerRevision: 'rvb-battle-runner/v1',
+          resolvedProfileHash: stable.resolvedProfileHash,
+          authorityContentHash: stable.authorityContentHash,
+        }
+      } else {
+        const catalog = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
+        identity = catalog && catalog.profileIdentity
       }
+
+      const keys = identity && typeof identity === 'object' && !Array.isArray(identity)
+        ? Object.keys(identity).sort().join(',')
+        : ''
+      if (
+        keys !== 'authorityContentHash,engineAbi,resolvedProfileHash,runnerRevision,schemaVersion'
+        || identity.schemaVersion !== 'rvb-game-profile-identity/v1'
+        || typeof identity.engineAbi !== 'string'
+        || typeof identity.runnerRevision !== 'string'
+        || !/^[a-f0-9]{64}$/.test(identity.resolvedProfileHash)
+        || !/^[a-f0-9]{64}$/.test(identity.authorityContentHash)
+      ) {
+        throw new Error('本地 Profile Identity 无效，请打开“资源包管理”检查安装状态')
+      }
+      try { localStorage.setItem('rvb_game_profile_identity', JSON.stringify(identity)) } catch {}
+      return identity
+    }
+
+
+    async function checkProfileAndGo(serverUrl, mode) {
       try {
         const data = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
-        const serverMd5 = data.meta?.md5
-        const clientMd5 = localStorage.getItem('rvb_pack_md5')
-        if (serverMd5 && clientMd5 && serverMd5 !== clientMd5) {
-          try { localStorage.setItem('rvb_pack_mismatch', '1') } catch {}
-        } else {
-          try { localStorage.removeItem('rvb_pack_mismatch') } catch {}
+        if (data && data.profileIdentity) {
+          try { localStorage.setItem('rvb_server_profile_identity', JSON.stringify(data.profileIdentity)) } catch {}
         }
-        goLobby(mode, serverUrl)
-      } catch {
-        goLobby(mode, serverUrl)
-      }
+      } catch {}
+      goLobby(mode, serverUrl)
     }
 
     function updatePackBadge() {

@@ -8,6 +8,7 @@ import { toPublicBattleState } from '@/lib/game/deployment'
 import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
 import { createDebugDuel } from '@/lib/game/debug-battle'
 import { makeState } from '../helpers/minimal-state'
+import { pinTestBattleState } from './profile-test-identity'
 
 function terminalResult() {
   return {
@@ -80,6 +81,7 @@ function tracedState(finished: boolean) {
       },
     },
   }
+  pinTestBattleState(state as unknown as Record<string, unknown>, 9876)
   return state
 }
 

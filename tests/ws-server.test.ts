@@ -9,6 +9,7 @@ import {
 } from '../lib/game/room-battle-actions'
 import { broadcastBattleTransition, startWsServer } from '../lib/ws-server'
 import { getRoomStore, type Room } from '../lib/game/room-store'
+import { getServerGameProfileIdentityV1 } from '../lib/content-pipeline/runtime/profile-game-identity'
 import { makeState } from './helpers/minimal-state'
 
 const globalWithWsServer = globalThis as typeof globalThis & {
@@ -274,6 +275,7 @@ describe('game WebSocket service', () => {
           hostId: 'host',
           hostName: 'Host',
           mapId: 'large-hole-arena',
+          profileIdentity: getServerGameProfileIdentityV1(),
         },
       })
       client.send(payload)

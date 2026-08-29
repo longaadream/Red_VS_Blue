@@ -11,6 +11,7 @@ import {
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
 import type { ServerBattleState } from '@/lib/game/battle-storage'
+import { createTestServerBattleState } from './profile-test-identity'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 
 describe('RED-109 battle authority recovery', () => {
@@ -175,16 +176,12 @@ function checkpointInput(roomId: string, storage: ServerBattleState) {
 }
 
 function storageAt(revision: number): ServerBattleState {
-  return {
-    type: 'server-state',
-    seed: 109,
-    state: {
-      pieces: [],
-      players: [],
-      turn: { turnNumber: 1, phase: 'action', currentPlayerId: 'player-red' },
-      authorityTestRevision: revision,
-    },
-  }
+  return createTestServerBattleState({
+    pieces: [],
+    players: [],
+    turn: { turnNumber: 1, phase: 'action', currentPlayerId: 'player-red' },
+    authorityTestRevision: revision,
+  })
 }
 
 function transition(

@@ -12,6 +12,22 @@ import { assertSelectableMapId, getMapSelectionErrorPayload } from "@/lib/game/m
 import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
 import { broadcastToRoom } from "@/lib/ws-server"
 import { createPublicRoomSnapshot } from "@/lib/game/room-battle-actions"
+import {
+  assertGameProfileCompatibleV1,
+  getGameProfileErrorPayloadV1,
+  type GameProfileIdentityV1,
+} from "@/lib/content-pipeline/runtime/profile-game-identity"
+
+function profileErrorResponse(error: unknown): NextResponse {
+  const profileError = getGameProfileErrorPayloadV1(error)
+  if (!profileError) throw error
+  return NextResponse.json({
+    success: false,
+    error: profileError.message,
+    code: profileError.code,
+    context: profileError.context,
+  }, { status: profileError.status })
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   let body: unknown
@@ -31,6 +47,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }) ?? {}
   const accountId = String((body as { accountId?: unknown; identityId?: unknown })?.accountId || (body as { accountId?: unknown; identityId?: unknown })?.identityId || '').trim().toLowerCase() || undefined
   const requestedAlignment = normalizePlayerAlignment((body as { alignment?: unknown })?.alignment)
+  let profileIdentity: GameProfileIdentityV1 | undefined
+  if (action && action !== "leave") {
+    try {
+      profileIdentity = assertGameProfileCompatibleV1(
+        (body as { profileIdentity?: unknown })?.profileIdentity,
+      )
+    } catch (error) {
+      return profileErrorResponse(error)
+    }
+  }
 
   if (!playerId?.trim()) {
     return NextResponse.json({ error: "playerId is required" }, { status: 400 })
@@ -40,6 +66,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   const room = await roomStore.getRoom(roomId)
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 })
+  }
+  if (profileIdentity) {
+    try {
+      for (const participant of room.players) {
+        assertGameProfileCompatibleV1(participant.profileIdentity)
+      }
+    } catch (error) {
+      return profileErrorResponse(error)
+    }
   }
 
   const mutatesPrebattleRoom = action === "join"
@@ -84,6 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     )
 
     if (existing) {
+      existing.profileIdentity = profileIdentity!
       if (!getPlayerSeat(existing)) {
         const seat = assignNextSeat(latestRoom.players, normalizedPlayerId)
         existing.seat = seat
@@ -123,6 +159,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       joinedAt: Date.now(),
       seat,
       faction: seat,
+      profileIdentity: profileIdentity!,
     }
     if (requestedAlignment) player.alignment = requestedAlignment
     if (accountId) player.accountId = accountId
@@ -157,12 +194,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
         accountId,
         name: playerName?.trim() || `Player ${normalizedPlayerId.slice(0, 8)}`,
         joinedAt: Date.now(),
+        profileIdentity: profileIdentity!,
       }
       latestRoom.players.push(newPlayer)
       existingPlayer = newPlayer
     }
 
     if (accountId) existingPlayer.accountId = accountId
+    existingPlayer.profileIdentity = profileIdentity!
     try {
       ensureRosterAlignmentMutable(existingPlayer, requestedAlignment)
     } catch (error) {
@@ -252,6 +291,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
           onDeploymentUpdate: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
         })
       } catch (error) {
+        if (getGameProfileErrorPayloadV1(error)) {
+          return profileErrorResponse(error)
+        }
         const mapError = getMapSelectionErrorPayload(error)
         if (mapError) {
           return NextResponse.json({ success: false, error: mapError.message, code: mapError.code, context: mapError.context }, { status: 400 })
@@ -298,6 +340,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
       })
       return NextResponse.json({ success: true, started: result.started, message: "Game started", room: createPublicRoomSnapshot(result.room) })
     } catch (error) {
+      if (getGameProfileErrorPayloadV1(error)) {
+        return profileErrorResponse(error)
+      }
       const rosterError = getRosterErrorPayload(error)
       if (rosterError) {
         return NextResponse.json({ success: false, error: rosterError.message, code: rosterError.code, context: rosterError.context }, { status: 400 })

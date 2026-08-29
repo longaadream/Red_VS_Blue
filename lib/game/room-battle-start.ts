@@ -1,10 +1,19 @@
+import {
+  assertGameProfileCompatibleV1,
+  getServerGameProfileIdentityV1,
+} from '../content-pipeline/runtime/profile-game-identity'
 import { createInitialBattleForPlayers } from './battle-setup'
 import { assertSelectableMapId } from './map-selection'
 import { hashPublicBattleState } from './battle-public-patch'
 import { hashBattleState, runBattleAction } from './battle-runner'
-import { stampPendingDeploymentAuthorityVersion } from './battle-trace'
+import { pinBattleProfileIdentityV1, stampPendingDeploymentAuthorityVersion } from './battle-trace'
 import { isBattleAuthorityV2Enabled } from './battle-transition'
-import { getBattleStorage, withoutServerSkills, type ServerBattleState } from './battle-storage'
+import {
+  createServerBattleStateV1,
+  getBattleStorage,
+  withoutServerSkills,
+  type ServerBattleState,
+} from './battle-storage'
 import { getPieceById } from './piece-repository'
 import { assertDemoRostersReady, type RosterRoomStore } from './roster-contract'
 import { getPlayerSeat, type Room } from './room-store'
@@ -73,6 +82,17 @@ export async function startBattleFromLockedRosters(
       alignment: player.alignment,
     }))
     const pieceTemplates = playerSelectedPieces.flatMap(player => player.pieces)
+    const profileIdentity = getServerGameProfileIdentityV1()
+    for (const player of roomPlayers) {
+      if (player.isBot === true || player.id === 'bot') {
+        player.profileIdentity = profileIdentity
+      } else {
+        player.profileIdentity = assertGameProfileCompatibleV1(
+          player.profileIdentity,
+          profileIdentity,
+        )
+      }
+    }
     const seed = createRootSeed()
     const battle = await createInitialBattleForPlayers(
       playerIds,
@@ -82,6 +102,7 @@ export async function startBattleFromLockedRosters(
       {
         firstPlayerId,
         rootSeed: seed,
+        profileIdentity,
         deploymentEnabled: true,
         deploymentStartedAt: clock.now(),
       },
@@ -99,6 +120,11 @@ export async function startBattleFromLockedRosters(
         playerId: bot.id,
         clientActionId: `system-deployment-keep:${bot.id}`,
       }, { rootSeed: seed }).state
+      pinBattleProfileIdentityV1(
+        initialState,
+        profileIdentity,
+        seed,
+      )
     }
 
     const initialAuthorityVersion = isBattleAuthorityV2Enabled()
@@ -116,11 +142,11 @@ export async function startBattleFromLockedRosters(
       status: 'in-progress',
       currentTurnIndex: 0,
       battleAuthorityVersion: isBattleAuthorityV2Enabled() ? initialAuthorityVersion : room.battleAuthorityVersion,
-      battleState: {
-        type: 'server-state',
+      battleState: createServerBattleStateV1(
+        profileIdentity,
         seed,
-        state: withoutServerSkills(initialState),
-      } as unknown as Room['battleState'],
+        withoutServerSkills(initialState) as typeof initialState,
+      ) as unknown as Room['battleState'],
     }
 
     if (typeof room.version === 'number') {

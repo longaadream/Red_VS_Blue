@@ -3,8 +3,9 @@ import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { NextRequest } from 'next/server'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
-import type { Room } from '../lib/game/room-store'
+import type { Room, Spectator } from '../lib/game/room-store'
 import { SELECTABLE_MAP_IDS } from '../lib/game/map-selection'
+import { getServerGameProfileIdentityV1 } from '../lib/content-pipeline/runtime/profile-game-identity'
 
 type JsonObject = Record<string, unknown>
 type TestIdentity = { id: string; publicKey: string; privateKey: CryptoKey }
@@ -117,6 +118,15 @@ const memoryStore = vi.hoisted(() => {
       writes += 1
       return true
     },
+    async addSpectator(roomId: string, spectator: Spectator) {
+      const id = normalize(roomId)
+      const current = rooms.get(id)
+      if (!current) return
+      const spectators = (current.spectators ?? []).filter(item => item.id !== spectator.id)
+      spectators.push(copy(spectator))
+      rooms.set(id, { ...current, spectators })
+      writes += 1
+    },
   }
 })
 
@@ -129,8 +139,10 @@ import { POST as roomActionPost } from '../app/api/rooms/[roomId]/actions/route'
 import { POST as publicRoomJoinPost } from '../app/api/rooms/[roomId]/join/route'
 import { GET as battleGet, POST as battlePost } from '../app/api/rooms/[roomId]/battle/route'
 import { GET as roomGet, POST as roomPost } from '../app/api/rooms/[roomId]/route'
-import { POST as roomsPost } from '../app/api/rooms/route'
+import { GET as roomsGet, POST as roomsPost } from '../app/api/rooms/route'
 import { startWsServer } from '../lib/ws-server'
+
+const profileIdentity = getServerGameProfileIdentityV1()
 
 const lightRoster = [
   'ana',
@@ -168,8 +180,8 @@ function room(
     name: id,
     status: 'ready',
     players: [
-      { id: 'alice', name: 'Alice', seat: 'red', faction: 'red', alignment: 'light' },
-      { id: 'bob', name: 'Bob', seat: 'blue', faction: 'blue', alignment: secondAlignment },
+      { id: 'alice', name: 'Alice', seat: 'red', faction: 'red', alignment: 'light', profileIdentity },
+      { id: 'bob', name: 'Bob', seat: 'blue', faction: 'blue', alignment: secondAlignment, profileIdentity },
     ],
     spectators: [],
     currentTurnIndex: 0,
@@ -182,8 +194,8 @@ function room(
 function signedRoom(id: string, secondAlignment: 'light' | 'dark' = 'dark'): Room {
   const next = room(id, secondAlignment)
   next.players = [
-    { id: firstIdentity.id, name: 'Signed Alice', seat: 'red', faction: 'red', alignment: 'light' },
-    { id: secondIdentity.id, name: 'Signed Bob', seat: 'blue', faction: 'blue', alignment: secondAlignment },
+    { id: firstIdentity.id, name: 'Signed Alice', seat: 'red', faction: 'red', alignment: 'light', profileIdentity },
+    { id: secondIdentity.id, name: 'Signed Bob', seat: 'blue', faction: 'blue', alignment: secondAlignment, profileIdentity },
   ]
   return next
 }
@@ -292,13 +304,13 @@ async function httpCreate(mapId: unknown, hostId = 'alice') {
   const request = new NextRequest('http://localhost/api/rooms', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ mode: 'pve', hostId, playerName: 'Alice', mapId }),
+    body: JSON.stringify({ mode: 'pve', hostId, playerName: 'Alice', mapId, profileIdentity }),
   })
   const response = await roomsPost(request)
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function wsCreate(mapId: unknown) {
+async function wsCreate(mapId: unknown, submittedProfile: unknown = profileIdentity) {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -306,7 +318,7 @@ async function wsCreate(mapId: unknown) {
       type: 'rpc',
       requestId: 'create-fixed-map',
       method: 'rooms.create',
-      data: { hostId: 'alice', name: 'Fixed map room', mapId },
+      data: { hostId: 'alice', name: 'Fixed map room', mapId, profileIdentity: submittedProfile },
     }))
     return await response
   } finally {
@@ -318,13 +330,18 @@ async function httpSelect(roomId: string, playerId: string, templateIds: string[
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId }),
+    body: JSON.stringify({ action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId, profileIdentity }),
   })
   const response = await roomActionPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function httpDynamicRoomAction(roomId: string, action: 'join' | 'claim-faction' | 'toggle-ready' | 'select-pieces', payloadMapId?: unknown) {
+async function httpDynamicRoomAction(
+  roomId: string,
+  action: 'join' | 'claim-faction' | 'toggle-ready' | 'select-pieces',
+  payloadMapId?: unknown,
+  submittedProfile: unknown = profileIdentity,
+) {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -334,6 +351,7 @@ async function httpDynamicRoomAction(roomId: string, action: 'join' | 'claim-fac
       playerName: 'Alice',
       alignment: 'light',
       mapId: payloadMapId,
+      profileIdentity: submittedProfile,
       ...(action === 'select-pieces' ? { pieces: pieces(lightRoster) } : {}),
     }),
   })
@@ -345,7 +363,7 @@ async function publicHttpJoin(roomId: string, playerId = 'charlie') {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/join`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ playerId, playerName: 'Charlie', alignment: 'light' }),
+    body: JSON.stringify({ playerId, playerName: 'Charlie', alignment: 'light', profileIdentity }),
   })
   const response = await publicRoomJoinPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -355,7 +373,7 @@ async function httpStart(roomId: string, playerId: string, payloadMapId?: unknow
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'start-game', playerId, mapId: payloadMapId }),
+    body: JSON.stringify({ action: 'start-game', playerId, mapId: payloadMapId, profileIdentity }),
   })
   const response = await roomActionPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -365,7 +383,7 @@ async function legacyHttpStart(roomId: string) {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'start' }),
+    body: JSON.stringify({ action: 'start', profileIdentity }),
   })
   const response = await roomPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -375,7 +393,7 @@ async function legacyHttpJoin(roomId: string, playerId: string, alignment: 'ligh
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'join', playerId, alignment }),
+    body: JSON.stringify({ action: 'join', playerId, alignment, profileIdentity }),
   })
   const response = await roomPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -389,7 +407,7 @@ async function wsSelect(roomId: string, playerId: string, templateIds: string[],
       type: 'rpc',
       requestId: `${roomId}-${playerId}`,
       method: 'rooms.action',
-      data: { roomId, action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId },
+      data: { roomId, action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId, profileIdentity },
     }))
     return await response
   } finally {
@@ -413,7 +431,41 @@ async function wsGet(roomId: string) {
   }
 }
 
-async function wsRoomAction(roomId: string, playerId: string, action: string, payload: JsonObject = {}) {
+async function httpRoomDetail(roomId: string) {
+  const request = new NextRequest(`http://localhost/api/rooms/${roomId}`)
+  const response = await roomGet(request, { params: Promise.resolve({ roomId }) })
+  return { status: response.status, body: await response.json() as JsonObject }
+}
+
+async function httpRoomsList() {
+  const request = new NextRequest('http://localhost/api/rooms')
+  const response = await roomsGet(request)
+  return { status: response.status, body: await response.json() as JsonObject }
+}
+
+async function wsRpc(method: string, data: JsonObject = {}) {
+  const client = await openClient()
+  try {
+    const response = receiveJson(client)
+    client.send(JSON.stringify({
+      type: 'rpc',
+      requestId: `public-${method}`,
+      method,
+      data,
+    }))
+    return await response
+  } finally {
+    client.close()
+  }
+}
+
+async function wsRoomAction(
+  roomId: string,
+  playerId: string,
+  action: string,
+  payload: JsonObject = {},
+  submittedProfile: unknown = profileIdentity,
+) {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -421,7 +473,7 @@ async function wsRoomAction(roomId: string, playerId: string, action: string, pa
       type: 'rpc',
       requestId: `${roomId}-${action}`,
       method: 'rooms.action',
-      data: { ...payload, roomId, playerId, action },
+      data: { ...payload, roomId, playerId, action, profileIdentity: submittedProfile },
     }))
     return await response
   } finally {
@@ -477,6 +529,19 @@ async function wsBattleAction(roomId: string, playerId: string, action: JsonObje
 async function wsBattleSnapshot(roomId: string, viewerPlayerId: string) {
   const client = await openClient()
   try {
+    client.send(JSON.stringify({
+      type: 'rpc',
+      requestId: `${roomId}-${viewerPlayerId}-spectate`,
+      method: 'rooms.spectate',
+      data: {
+        roomId,
+        spectatorId: viewerPlayerId,
+        spectatorName: 'Spectator',
+        profileIdentity,
+      },
+    }))
+    const registration = await receiveJson(client)
+    if (registration.ok !== true) throw new Error(`Spectator registration failed: ${JSON.stringify(registration)}`)
     client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: viewerPlayerId }))
     await receiveType(client, 'subscribed')
     return await receiveType(client, 'stateUpdate')
@@ -524,6 +589,107 @@ describe('Demo roster HTTP/WebSocket integration', () => {
   })
 
   beforeEach(() => memoryStore.reset())
+
+  it('rejects WebSocket room creation without a profile before store mutation', async () => {
+    const result = await wsCreate('winding-pass', null)
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: 409,
+      code: 'PROFILE_REQUIRED',
+    })
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it('reports one server identity across HTTP room list/detail and WebSocket catalog/list/detail', async () => {
+    memoryStore.seed(room('profile-public'))
+
+    const httpList = await httpRoomsList()
+    const httpDetail = await httpRoomDetail('profile-public')
+    const wsCatalog = await wsRpc('catalog.identity')
+    const wsList = await wsRpc('rooms.list')
+    const wsDetail = await wsGet('profile-public')
+
+    expect(httpList).toMatchObject({
+      status: 200,
+      body: { profileIdentity },
+    })
+    expect((httpList.body.rooms as JsonObject[]).find(item => item.id === 'profile-public')).toMatchObject({
+      profileIdentity,
+    })
+    expect(httpDetail).toMatchObject({
+      status: 200,
+      body: { profileIdentity },
+    })
+    expect(wsCatalog).toMatchObject({
+      ok: true,
+      data: { profileIdentity },
+    })
+    expect(((wsList.data as JsonObject).rooms as JsonObject[]).find(item => item.id === 'profile-public')).toMatchObject({
+      profileIdentity,
+    })
+    expect(wsDetail).toMatchObject({
+      ok: true,
+      data: { profileIdentity },
+    })
+  })
+
+  it.each([
+    ['missing', null, 'PROFILE_REQUIRED'],
+    ['malformed', 'invalid', 'PROFILE_INVALID'],
+    ['engine', { ...profileIdentity, engineAbi: `${profileIdentity.engineAbi}-other` }, 'ENGINE_ABI_MISMATCH'],
+    ['runner', { ...profileIdentity, runnerRevision: `${profileIdentity.runnerRevision}-other` }, 'RUNNER_REVISION_MISMATCH'],
+    [
+      'authority-content',
+      {
+        ...profileIdentity,
+        authorityContentHash: `${profileIdentity.authorityContentHash[0] === '0' ? '1' : '0'}${profileIdentity.authorityContentHash.slice(1)}`,
+      },
+      'PROFILE_HASH_MISMATCH',
+    ],
+  ] as const)('rejects %s profile identity consistently before HTTP or WebSocket mutation', async (
+    label,
+    submittedProfile,
+    expectedCode,
+  ) => {
+    const httpRoomId = `profile-http-${label}`
+    memoryStore.seed(room(httpRoomId))
+    const beforeHttp = memoryStore.snapshot(httpRoomId)
+    const http = await httpDynamicRoomAction(
+      httpRoomId,
+      'toggle-ready',
+      undefined,
+      submittedProfile,
+    )
+
+    expect(http).toMatchObject({
+      status: 409,
+      body: { success: false, code: expectedCode },
+    })
+    expect(memoryStore.snapshot(httpRoomId)).toEqual(beforeHttp)
+    expect(memoryStore.writeCount()).toBe(0)
+
+    memoryStore.reset()
+    const wsRoomId = `profile-ws-${label}`
+    memoryStore.seed(room(wsRoomId))
+    const beforeWs = memoryStore.snapshot(wsRoomId)
+    const ws = await wsRoomAction(
+      wsRoomId,
+      'alice',
+      'toggle-ready',
+      {},
+      submittedProfile,
+    )
+
+    expect(ws).toMatchObject({
+      ok: false,
+      status: 409,
+      code: expectedCode,
+    })
+    expect(ws.context).toEqual(http.body.context)
+    expect(memoryStore.snapshot(wsRoomId)).toEqual(beforeWs)
+    expect(memoryStore.writeCount()).toBe(0)
+  })
 
   it.each(SELECTABLE_MAP_IDS)('persists selectable map %s at HTTP and WebSocket room creation boundaries', async mapId => {
     const http = await httpCreate(mapId)
@@ -754,7 +920,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(started.status).toBe('in-progress')
 
     const existingStorage = started.battleState as unknown as {
-      seed: number
+      rootSeed: number
       state: { map: { id: string } }
     }
     const resumable: Room = {
@@ -777,12 +943,12 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       body: {
         success: true,
         started: false,
-        room: { battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } } },
+        room: { battleState: { rootSeed: existingStorage.rootSeed, state: { map: { id: 'winding-pass' } } } },
       },
     })
     expect(legacyHttp).toMatchObject({
       status: 200,
-      body: { battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } } },
+      body: { battleState: { rootSeed: existingStorage.rootSeed, state: { map: { id: 'winding-pass' } } } },
     })
     expect(afterHttp).toEqual(beforeHttp)
     expect(afterHttp?.mapId).toBe(mapId)
@@ -800,7 +966,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       ok: true,
       data: {
         status: 'in-progress',
-        battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } },
+        battleState: { rootSeed: existingStorage.rootSeed, state: { map: { id: 'winding-pass' } } },
       },
     })
     expect(afterWs).toEqual(beforeWs)
@@ -1203,6 +1369,43 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       locks: { alice: { locked: false }, bob: { locked: false } },
     })
     expect(state.extensions?.debugBattle?.actionLog?.every(entry => entry.deployment?.choices === undefined)).toBe(true)
+    const wrongProfile = {
+      ...profileIdentity,
+      authorityContentHash: `${profileIdentity.authorityContentHash[0] === '0' ? '1' : '0'}${profileIdentity.authorityContentHash.slice(1)}`,
+    }
+    const beforeRejectedSpectator = memoryStore.snapshot('public-deployment')
+    const writesBeforeRejectedSpectator = memoryStore.writeCount()
+    const rejectedSpectator = await wsRpc('rooms.spectate', {
+      roomId: 'public-deployment',
+      spectatorId: 'wrong-profile-spectator',
+      spectatorName: 'Wrong profile',
+      profileIdentity: wrongProfile,
+    })
+
+    expect(rejectedSpectator).toMatchObject({
+      ok: false,
+      status: 409,
+      code: 'PROFILE_HASH_MISMATCH',
+    })
+    expect(memoryStore.snapshot('public-deployment')).toEqual(beforeRejectedSpectator)
+    expect(memoryStore.writeCount()).toBe(writesBeforeRejectedSpectator)
+
+    const unregisteredClient = await openClient()
+    try {
+      unregisteredClient.send(JSON.stringify({
+        type: 'subscribe',
+        roomId: 'public-deployment',
+        playerId: 'unregistered-spectator',
+      }))
+      const subscriptionError = await receiveType(unregisteredClient, 'subscriptionError')
+      expect(subscriptionError).toMatchObject({
+        status: 409,
+        code: 'PROFILE_REQUIRED',
+      })
+    } finally {
+      unregisteredClient.close()
+    }
+
   })
 
   it('rejects same-ID HTTP and WebSocket impersonation without changing room state or version', async () => {

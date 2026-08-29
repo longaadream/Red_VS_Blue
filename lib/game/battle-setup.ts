@@ -1,4 +1,8 @@
 import { getMap, DEFAULT_MAP_ID, loadMaps } from "@/config/maps"
+import {
+  getServerGameProfileIdentityV1,
+  type GameProfileIdentityV1,
+} from '../content-pipeline/runtime/profile-game-identity'
 import { assertSelectableMapId } from './map-selection'
 import { rng } from "./rng"
 import type { BoardMap } from "./map"
@@ -13,7 +17,7 @@ import { loadRuleById } from './skills'
 import path from 'path'
 import fs from 'fs'
 import { getUserDataDir } from '@/lib/app-paths'
-import { recordBattleInitialization } from './battle-trace'
+import { pinBattleProfileIdentityV1, recordBattleInitialization } from './battle-trace'
 import { RANDOM_STREAM_NAMES, RuleRuntime, withRuleRuntime } from './rule-runtime'
 
 import { DEPLOYMENT_DURATION_MS } from './deployment'
@@ -537,7 +541,13 @@ export async function createInitialBattleForPlayers(
   selectedPieces: PieceTemplate[],
   playerSelectedPieces?: PlayerSelectedPieces[],
   mapId?: string,
-  options?: { firstPlayerId?: PlayerId; rootSeed?: number; deploymentEnabled?: boolean; deploymentStartedAt?: number },
+  options?: {
+    firstPlayerId?: PlayerId
+    rootSeed?: number
+    deploymentEnabled?: boolean
+    deploymentStartedAt?: number
+    profileIdentity?: GameProfileIdentityV1
+  },
 ): Promise<BattleState | null> {
   if (playerIds.length !== 2) return null
 
@@ -694,6 +704,10 @@ export async function createInitialBattleForPlayers(
       revision: 0,
     } : undefined,
     ...(Object.keys(playerAlignments).length > 0 ? { extensions: { playerAlignments } } : {}),
+  }
+
+  if (runtime) {
+    pinBattleProfileIdentityV1(state, options?.profileIdentity ?? getServerGameProfileIdentityV1(), runtime.rootSeed)
   }
 
   // 为每个棋子加载模板 rules。

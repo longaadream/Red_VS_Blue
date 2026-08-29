@@ -17,6 +17,7 @@ import type { BattleState } from '@/lib/game/turn'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { finalizePendingOptionSession } from '@/lib/game/pending-interaction'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
 const ROOT_SEED = 3636
@@ -93,6 +94,7 @@ function makeTimedRoom(id = 'turn-timer-room', now = 0): Room {
   }
   const state = makeState({ pieces: [redPiece as any, bluePiece as any], phase: 'action' })
   state.turnTimer = createRunningTurnTimer(state, now)
+  pinTestBattleState(state as unknown as Record<string, unknown>, ROOT_SEED)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: ROOT_SEED }), [...PLAYERS])
   return {
     id,
@@ -106,7 +108,7 @@ function makeTimedRoom(id = 'turn-timer-room', now = 0): Room {
     currentTurnIndex: 0,
     actions: [],
     version: 1,
-    battleState: { type: 'server-state', seed: ROOT_SEED, state } as any,
+    battleState: createTestServerBattleState(state as unknown as Record<string, unknown>, ROOT_SEED),
   }
 }
 

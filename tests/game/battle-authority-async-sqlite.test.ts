@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 
 import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
+import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 const originalDatabaseUrl = process.env.DATABASE_URL
 const originalAsyncFlag = process.env.RVB_BATTLE_ASYNC_JOURNAL
 const originalAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
@@ -119,7 +120,7 @@ describe('battle authority async SQLite persistence', () => {
     persistence.forgetBattleAuthorityRoom(room.id)
     const restored = await store.getRoom(room.id)
     expect(restored?.battleAuthorityVersion).toBe(20)
-    expect((restored?.battleState as unknown as { seed: number }).seed).toBe(unsignedSeed)
+    expect((restored?.battleState as unknown as { rootSeed: number }).rootSeed).toBe(unsignedSeed)
     expect(actions.createPublicBattleSnapshot(restored!).stateHash).toBe(lastHash)
     expect(store.inspectBattleAuthorityPersistence(room.id)).toMatchObject({
       status: 'durable',
@@ -348,6 +349,7 @@ function makeRoom(
       'piece-blue': { x: 8, y: 8 },
     },
   }
+  pinTestBattleState(state as unknown as Record<string, unknown>, seed)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: seed }), ['player-red', 'player-blue'])
   return {
     id: roomId,
@@ -362,7 +364,7 @@ function makeRoom(
     actions: [],
     version: 0,
     battleAuthorityVersion: 0,
-    battleState: { type: 'server-state', seed, state } as unknown as import('@/lib/game/room-store').Room['battleState'],
+    battleState: createTestServerBattleState(state as unknown as Record<string, unknown>, seed),
   }
 }
 

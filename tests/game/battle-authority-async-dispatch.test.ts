@@ -8,6 +8,7 @@ import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { RoomStore, type Room } from '@/lib/game/room-store'
 import type { BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 
 const harness = vi.hoisted(() => {
   let releaseTransaction: ((value: boolean) => void) | undefined
@@ -129,6 +130,7 @@ function makeDispatchRoom(roomId: string): Room {
       'piece-blue': { x: 8, y: 8 },
     },
   }
+  pinTestBattleState(state as unknown as Record<string, unknown>, 109)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: 109 }), ['player-red', 'player-blue'])
   return {
     id: roomId,
@@ -144,7 +146,7 @@ function makeDispatchRoom(roomId: string): Room {
     version: 9,
     battleAuthorityVersion: 1,
     battleAuthorityTransitionHash: 'a'.repeat(64),
-    battleState: { type: 'server-state', seed: 109, state } as unknown as Room['battleState'],
+    battleState: createTestServerBattleState(state as unknown as Record<string, unknown>, 109),
   }
 }
 

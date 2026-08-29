@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, test, vi } from 'vitest'
+import { getServerGameProfileIdentityV1 } from '../../lib/content-pipeline/runtime/profile-game-identity'
 
 const root = path.resolve(__dirname, '..', '..')
 
@@ -87,6 +88,15 @@ function createHarness(options: {
     return elements.get(id)!
   }
   const alerts: string[] = []
+  const storage = new Map<string, string>([[
+    'rvb_game_profile_identity',
+    JSON.stringify(getServerGameProfileIdentityV1()),
+  ]])
+  const localStorage = {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, String(value)),
+    removeItem: (key: string) => storage.delete(key),
+  }
   const location = {
     href: 'piece-selection.html',
     search: '?roomId=room-54&playerId=alice&playerName=Alice&alignment=light',
@@ -104,6 +114,7 @@ function createHarness(options: {
     addEventListener: () => {},
     fetchPackJson: options.fetchPackJson,
     location,
+    localStorage,
     RvBUtils: {
       appendServerParams: (params: URLSearchParams) => params,
       getActiveServerMode: () => 'lan',
@@ -122,6 +133,7 @@ function createHarness(options: {
     document: { getElementById: element },
     fetch: vi.fn(),
     location,
+    localStorage,
     setInterval: options.useIntervals ? setInterval : () => 1,
     setTimeout,
     window,
