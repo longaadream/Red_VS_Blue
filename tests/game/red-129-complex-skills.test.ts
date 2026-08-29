@@ -602,4 +602,36 @@ describe('RED-129 authoritative complex skill behavior', () => {
       expect.objectContaining({ x: 9, y: 3, tileType: 'amaterasu' }),
     ])
   })
+
+  it('caps Kagutsuchi final Amaterasu stacks at four when the target already has stacks', () => {
+    const sasuke = namedPiece({ instanceId: 'sasuke', templateId: 'red-sasuke', ownerPlayerId: 'player-red', x: 0, y: 0 }, '宇智波佐助')
+    const target = namedPiece({ instanceId: 'target', ownerPlayerId: 'player-blue', faction: 'blue', x: 3, y: 3 }, '目标')
+    target.statusTags.push({
+      id: 'existing-amaterasu',
+      name: '天照灼烧',
+      type: 'amaterasu-burn',
+      currentDuration: -1,
+      currentUses: -1,
+      intensity: 2,
+      stacks: 3,
+    } as any)
+    const state = makeState({ pieces: [sasuke, target], currentPlayerId: 'player-red', phase: 'action', width: 10, height: 8 }) as any
+    state.players[0].actionPoints = 1
+    state.extensions.amaterasuCells = []
+    installSkill(state, sasuke, 'sasuke-kagutsuchi')
+    const action = selectedPieceAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'sasuke',
+      skillId: 'sasuke-kagutsuchi',
+    }, 'target')
+
+    const result = runBattleAction(state, action, { rootSeed: ROOT_SEED }).state
+    const resultTarget = result.pieces.find(piece => piece.instanceId === 'target')!
+
+    expect(resultTarget.statusTags).toContainEqual(expect.objectContaining({
+      type: 'amaterasu-burn',
+      stacks: 4,
+    }))
+  })
 })
