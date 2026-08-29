@@ -556,7 +556,7 @@ describe('Turalyon holy-hand mobility', () => {
     const state = makeState({ pieces: [turalyon] }) as any
     state.skillsById[definition.id] = definition
     state.players[0].hand = [
-      { cardId: 'holy-smite', instanceId: 'existing-smite', ownerPlayerId: 'player-red', actionPointCost: 2 },
+      { cardId: 'holy-smite', instanceId: 'existing-smite', ownerPlayerId: 'player-red', actionPointCost: 1 },
     ]
     const base = {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: turalyon.instanceId, skillId: definition.id,
@@ -581,7 +581,7 @@ describe('Turalyon holy-hand mobility', () => {
     } as any) as any
     expect(resolved.players[0].actionPoints).toBe(1)
     expect(resolved.players[0].hand.map((card: any) => card.cardId)).toEqual(['holy-smite', 'holy-heal'])
-    expect(resolved.players[0].hand[0].actionPointCost).toBe(2)
+    expect(resolved.players[0].hand.every((card: any) => card.actionPointCost === 1)).toBe(true)
     expect(resolved.pieces[0].skills[0].currentCooldown).toBe(2)
   })
 

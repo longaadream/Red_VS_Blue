@@ -590,7 +590,7 @@ describe('RED-129 拉法姆规则与资源', () => {
     )
   })
 
-  it('immunizes only the first own-turn hit and creates a curse with damage plus current attack', () => {
+  it('immunizes only the first own-turn hit and creates a curse with damage plus half current attack', () => {
     const rafaam = namedPiece({
       instanceId: 'rafaam',
       templateId: 'red-rafaam',
@@ -629,7 +629,7 @@ describe('RED-129 拉法姆规则与资源', () => {
     expect((state as any).customCards[curse.cardId]).toMatchObject({
       id: curse.cardId,
       actionPointCost: 1,
-      damageAmount: 7,
+      damageAmount: 6,
     })
   })
 
@@ -681,7 +681,7 @@ describe('RED-129 拉法姆规则与资源', () => {
     const blue = blueTurn.players.find(player => player.playerId === 'player-blue')!
     const curse = blue.hand[0]
     const cardDef = (blueTurn as any).customCards[curse.cardId]
-    expect(cardDef).toMatchObject({ damageAmount: 7, sourcePieceId: 'curse-rafaam' })
+    expect(cardDef).toMatchObject({ damageAmount: 6, sourcePieceId: 'curse-rafaam' })
 
     const first = runBattleAction(blueTurn, {
       type: 'endTurn',
@@ -697,7 +697,7 @@ describe('RED-129 拉法姆规则与资源', () => {
     const losses = firstHp.map(hp => 20 - hp)
 
     expect(firstHp).toEqual(secondHp)
-    expect(losses.reduce((sum, loss) => sum + loss, 0)).toBe(7)
+    expect(losses.reduce((sum, loss) => sum + loss, 0)).toBe(6)
     expect(losses.filter(loss => loss > 0)).toHaveLength(1)
     expect(first.players.find(player => player.playerId === 'player-blue')!.hand)
       .toContainEqual(expect.objectContaining({ instanceId: curse.instanceId }))

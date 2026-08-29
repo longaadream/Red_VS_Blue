@@ -14,7 +14,7 @@
   "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 1,
+  "actionPointCost": 2,
   "range": "single",
   "requiresTarget": true,
   "targeting": {
