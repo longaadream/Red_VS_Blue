@@ -122,9 +122,14 @@ export interface InitialPieceBuildOptions {
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
 
 function isUltimateSkill(skillId: string): boolean {
-  return getSkillById(skillId)?.type === 'ultimate' ||
-    skillId.includes('ultimate') ||
-    skillId.includes('ult')
+  return getSkillById(skillId)?.type === 'ultimate'
+}
+
+function cloneInitialStatusTags(pieceTemplate: PieceTemplate): PieceInstance['statusTags'] {
+  return (pieceTemplate.initialStatusTags || []).map(tag => ({
+    ...tag,
+    relatedRules: tag.relatedRules ? [...tag.relatedRules] : undefined,
+  }))
 }
 
 /** 将棋子模板中的 rules 加载到棋子实例上。 */
@@ -294,7 +299,7 @@ export function buildInitialPiecesForPlayers(
           buffs: [],
           debuffs: [],
           ruleTags: [],
-          statusTags: [],
+          statusTags: cloneInitialStatusTags(pieceTemplate),
         })
         pieceIndex++
         
@@ -345,7 +350,7 @@ export function buildInitialPiecesForPlayers(
         buffs: [],
         debuffs: [],
         ruleTags: [],
-        statusTags: [],
+        statusTags: cloneInitialStatusTags(pieceTemplate),
       })
 
       if (isRedPlayer) redPieceIndex++
@@ -403,7 +408,7 @@ export function buildInitialPiecesForPlayers(
       buffs: [],
       debuffs: [],
       ruleTags: [],
-      statusTags: [],
+      statusTags: cloneInitialStatusTags(defaultRedPiece),
     })
     
     // 添加默认蓝方棋子
@@ -436,7 +441,7 @@ export function buildInitialPiecesForPlayers(
       buffs: [],
       debuffs: [],
       ruleTags: [],
-      statusTags: [],
+      statusTags: cloneInitialStatusTags(defaultBluePiece),
     })
   } else {
     // 检查是否每个玩家至少有一个棋子
@@ -479,7 +484,7 @@ export function buildInitialPiecesForPlayers(
         buffs: [],
         debuffs: [],
         ruleTags: [],
-        statusTags: [],
+        statusTags: cloneInitialStatusTags(defaultRedPiece),
       })
     }
 
@@ -516,7 +521,7 @@ export function buildInitialPiecesForPlayers(
         buffs: [],
         debuffs: [],
         ruleTags: [],
-        statusTags: [],
+        statusTags: cloneInitialStatusTags(defaultBluePiece),
       })
     }
   }

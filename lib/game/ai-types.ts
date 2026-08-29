@@ -46,7 +46,6 @@ export interface AIEnvironmentCapabilities {
 export interface AIObservedPlayer {
   playerId: string
   name?: string
-  mangekyoDeathCount?: number
   chargePoints: number
   actionPoints: number
   maxActionPoints: number
@@ -104,6 +103,7 @@ export interface AIObservation {
   pieces: AIObservedPiece[]
   graveyard: AIObservedPiece[]
   players: AIObservedPlayer[]
+  extensions?: BattleState['extensions']
   turn: TurnState
   terminalResult?: TerminalResult
   deployment?: {

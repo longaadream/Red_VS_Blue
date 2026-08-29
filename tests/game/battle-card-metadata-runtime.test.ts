@@ -522,10 +522,10 @@ describe('RED-121 authoritative hand selection presentation', () => {
         players: [{
           playerId: 'player-blue', actionPoints: 10,
           hand: [
-            { cardId: 'holy-smite', instanceId: 'enhanced-smite', holyProphecyEnhanced: true },
-            { cardId: 'holy-heal', instanceId: 'enhanced-heal', holyProphecyEnhanced: true },
-            { cardId: 'holy-charge', instanceId: 'enhanced-charge', holyProphecyEnhanced: true },
-            { cardId: 'holy-smite', instanceId: 'pending-prophecy', holyProphecy: { sourcePieceId: 'velen' } },
+            { cardId: 'holy-smite', instanceId: 'enhanced-smite', presentation: { variant: 'enhanced', badge: '预言强化', description: '预言强化：对敌方生命值最低的棋子造成7点真实伤害。' } },
+            { cardId: 'holy-heal', instanceId: 'enhanced-heal', presentation: { variant: 'enhanced', badge: '预言强化', description: '预言强化：治疗己方生命值最低的棋子12点生命。' } },
+            { cardId: 'holy-charge', instanceId: 'enhanced-charge', presentation: { variant: 'enhanced', badge: '预言强化', description: '预言强化：使己方所有棋子下次造成的伤害提高3点。' } },
+            { cardId: 'holy-smite', instanceId: 'pending-prophecy', contentState: { velenHolyProphecy: { sourcePieceId: 'velen' } } },
           ],
         }],
         turn: { currentPlayerId: 'player-blue' },
@@ -541,7 +541,7 @@ describe('RED-121 authoritative hand selection presentation', () => {
 
     new Script('renderHand()').runInContext(runtime.context)
 
-    expect(runtime.container.innerHTML.match(/card-prophecy-enhanced/g)).toHaveLength(3)
+    expect(runtime.container.innerHTML.match(/card-content-enhanced/g)).toHaveLength(3)
     expect(runtime.container.innerHTML.match(/预言强化/g)?.length).toBeGreaterThanOrEqual(3)
     expect(runtime.container.innerHTML).toContain('造成7点真实伤害')
     expect(runtime.container.innerHTML).toContain('12点生命')

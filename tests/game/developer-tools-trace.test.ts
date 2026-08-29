@@ -267,7 +267,7 @@ describe('developer tools match trace boundary', () => {
     expect(watcher.skills).toContainEqual(expect.objectContaining({
       skillId: 'watcher-ultimate',
       currentCooldown: 0,
-      usesRemaining: 1,
+      usesRemaining: -1,
     }))
     expect(Buffer.byteLength(tools.serializeTrace(record), 'utf8')).toBeLessThan(160_000)
   })

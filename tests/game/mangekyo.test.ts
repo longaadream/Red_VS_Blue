@@ -10,12 +10,7 @@ import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
 import { buildInitialPiecesForPlayers } from '@/lib/game/battle-setup'
 import { toPublicBattleState } from '@/lib/game/deployment'
 import type { BoardMap } from '@/lib/game/map'
-import {
-  getEffectiveChargeCost,
-  getMangekyoDeathCount,
-  MANGEKYO_KEYWORD,
-} from '@/lib/game/mangekyo'
-import { dealDamage, type SkillDefinition } from '@/lib/game/skills'
+import { dealDamage, getEffectiveChargeCost, loadRuleById, type SkillDefinition } from '@/lib/game/skills'
 import { finalizeBattleTerminal } from '@/lib/game/terminal'
 import { prepareAction } from '@/lib/game/targeting'
 import { globalTriggerSystem } from '@/lib/game/triggers'
@@ -24,6 +19,7 @@ import { makeMap, makePiece, makeState } from '../helpers/minimal-state'
 
 const DATA_ROOT = join(process.cwd(), 'data')
 const ROOT_SEED = 124
+const MANGEKYO_KEYWORD = '万花筒'
 
 function loadJson<T>(...segments: string[]): T {
   return JSON.parse(readFileSync(join(DATA_ROOT, ...segments), 'utf8')) as T
@@ -63,6 +59,26 @@ function activeSkill(id: string, overrides: Record<string, unknown> = {}): Skill
     code: "function executeSkill(context) { context.battle.extensions.executed = context.skill.id; return { success: true, message: 'executed' }; }",
     ...overrides,
   } as SkillDefinition
+}
+
+function getMangekyoDeathCount(state: BattleState, playerId: string): number {
+  const counts = (state.extensions as any)?.contentCounters?.mangekyoDeaths
+  const entry = counts && Object.entries(counts)
+    .find(([key]) => key.toLowerCase() === playerId.toLowerCase())
+  return Number(entry?.[1]) || 0
+}
+
+function mangekyoWitness(instanceId = 'red-witness') {
+  const rule = loadRuleById('rule-mangekyo-friendly-death', true)
+  if (!rule) throw new Error('Expected rule-mangekyo-friendly-death fixture')
+  return makePiece({
+    instanceId,
+    ownerPlayerId: 'player-red',
+    x: 0,
+    y: 1,
+    rules: [rule],
+    statusTags: [{ id: 'mangekyo-witness', type: 'mangekyo-witness', visible: false }],
+  }) as any
 }
 
 function selectedAction(
@@ -110,13 +126,21 @@ describe('RED-124 Mangekyo data contract', () => {
       }),
     ])
 
+    const modifier = [{
+      source: 'battleExtensionPlayerNumber',
+      path: 'contentCounters.mangekyoDeaths',
+      operation: 'subtract',
+      minimum: 0,
+    }]
     expect(loadJson<any>('skills', 'sasuke-susanoo.json')).toMatchObject({
       chargeCost: 2,
+      chargeCostModifiers: modifier,
       description: '万花筒。激活完全体须佐能乎：攻击力+3，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
     })
     expect(loadJson<any>('skills', 'itachi-totsuka-blade.json')).toMatchObject({
       chargeCost: 1,
+      chargeCostModifiers: modifier,
       description: '万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入2回合冷却。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
     })
@@ -125,6 +149,7 @@ describe('RED-124 Mangekyo data contract', () => {
       type: 'ultimate',
       actionPointCost: 3,
       chargeCost: 3,
+      chargeCostModifiers: modifier,
       description: '万花筒。选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不视为死亡。每局限用一次。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
       targeting: { steps: [{ type: 'piece', filter: 'enemy', range: 99 }] },
@@ -136,7 +161,10 @@ describe('RED-124 Mangekyo data contract', () => {
       'obito-space-time',
       'hashirama-edo-wood-spike',
     ])
-    expect(obito.rules).toEqual([])
+    expect(obito.rules).toEqual(['rule-mangekyo-friendly-death'])
+    expect(obito.initialStatusTags).toContainEqual(expect.objectContaining({
+      type: 'mangekyo-witness', relatedRules: ['rule-mangekyo-friendly-death'],
+    }))
 
     const mirror = { ...obito, id: 'obito-mirror', skills: [] }
     const randomValues = [0, 0.5]
@@ -152,6 +180,8 @@ describe('RED-124 Mangekyo data contract', () => {
     )
     expect(pieces.find(piece => piece.templateId === 'red-obito')?.skills)
       .toContainEqual(expect.objectContaining({ skillId: 'obito-space-time', usesRemaining: 1 }))
+    expect(pieces.find(piece => piece.templateId === 'red-obito')?.statusTags)
+      .toContainEqual(expect.objectContaining({ type: 'mangekyo-witness' }))
 
     const battlePage = readFileSync(join(DATA_ROOT, 'pages', 'battle.html'), 'utf8')
     expect(battlePage).toContain("GameEngine.getEffectiveChargeCost(G, piece.ownerPlayerId, skillData)")
@@ -161,6 +191,21 @@ describe('RED-124 Mangekyo data contract', () => {
 })
 
 describe('RED-124 friendly death events', () => {
+  it('does not listen to deaths when no eligible statusTag/rule holder is present', () => {
+    const attacker = makePiece({
+      instanceId: 'blue-attacker', ownerPlayerId: 'player-blue', x: 0, y: 0,
+    }) as any
+    const ally = makePiece({
+      instanceId: 'red-ally', ownerPlayerId: 'player-red', x: 1, y: 0, currentHp: 1, maxHp: 1,
+    }) as any
+    const state = makeState({ pieces: [attacker, ally] }) as any
+
+    dealDamage(attacker, ally, 1, 'true', state, 'no-witness-death')
+
+    expect(getMangekyoDeathCount(state, 'player-red')).toBe(0)
+    expect(state.actions.some((action: any) => action.type === 'mangekyoDeath')).toBe(false)
+  })
+
   it('counts summons and the same revived instance every time it dies', () => {
     const blueAttacker = makePiece({
       instanceId: 'blue-attacker', ownerPlayerId: 'player-blue', x: 0, y: 0,
@@ -169,7 +214,8 @@ describe('RED-124 friendly death events', () => {
       instanceId: 'red-summon', ownerPlayerId: 'player-red', x: 1, y: 0, currentHp: 5, maxHp: 5,
     }) as any
     redSummon.isCore = false
-    const state = makeState({ pieces: [blueAttacker, redSummon] }) as any
+    const witness = mangekyoWitness()
+    const state = makeState({ pieces: [blueAttacker, redSummon, witness] }) as any
     const mangekyoSkills = [
       loadJson<SkillDefinition>('skills', 'sasuke-susanoo.json'),
       loadJson<SkillDefinition>('skills', 'itachi-totsuka-blade.json'),
@@ -211,7 +257,8 @@ describe('RED-124 friendly death events', () => {
     const ally = makePiece({
       instanceId: 'red-ally', ownerPlayerId: 'player-red', x: 1, y: 0, currentHp: 5, maxHp: 20,
     }) as any
-    const state = makeState({ pieces: [attacker, ally] }) as any
+    const witness = mangekyoWitness()
+    const state = makeState({ pieces: [attacker, ally, witness] }) as any
     globalTriggerSystem.addRule(eventRule('revive-red-ally', 'onPieceDied', (_battle, context) => {
       context.sourcePiece.currentHp = 7
     }) as any)
@@ -232,7 +279,8 @@ describe('RED-124 friendly death events', () => {
         instanceId: 'red-summon', ownerPlayerId: 'player-red', x: 1, y: 0, currentHp: 1, maxHp: 1,
       }) as any
       summon.isCore = false
-      const state = makeState({ pieces: [attacker, summon] }) as any
+      const witness = mangekyoWitness()
+      const state = makeState({ pieces: [attacker, summon, witness] }) as any
       const publicBefore = toPublicBattleState(state, 'player-red')
       const hashBefore = hashBattleState(state)
       dealDamage(attacker, summon, 1, 'true', state, 'observable-death')
@@ -244,8 +292,9 @@ describe('RED-124 friendly death events', () => {
     const publicAfter = toPublicBattleState(first.state, 'player-red')
     const patch = createBattlePublicPatch(first.publicBefore, publicAfter)
 
-    expect(publicAfter.players[0].mangekyoDeathCount).toBe(1)
-    expect(observeBattleForAI(first.state, 'player-red').players[0].mangekyoDeathCount).toBe(1)
+    expect((publicAfter.extensions as any)?.contentCounters?.mangekyoDeaths?.['player-red']).toBe(1)
+    expect((observeBattleForAI(first.state, 'player-red').extensions as any)
+      ?.contentCounters?.mangekyoDeaths?.['player-red']).toBe(1)
     expect(applyBattlePublicPatch(first.publicBefore, JSON.parse(JSON.stringify(patch))))
       .toEqual(publicAfter)
     expect(hashBattleState(first.state)).not.toBe(first.hashBefore)
@@ -268,12 +317,15 @@ describe('RED-124 dynamic charge execution', () => {
     }) as any
     caster.skills = [{ skillId: 'zero-mangekyo', currentCooldown: 0, usesRemaining: -1 }]
     const state = makeState({ pieces: [caster] }) as any
-    state.players[0].mangekyoDeathCount = 2
+    state.extensions.contentCounters = { mangekyoDeaths: { 'player-red': 2 } }
     state.players[0].chargePoints = 0
     state.skillsById['zero-mangekyo'] = activeSkill('zero-mangekyo', {
       type: 'super',
       chargeCost: 2,
       keywords: [MANGEKYO_KEYWORD],
+      chargeCostModifiers: [{
+        source: 'battleExtensionPlayerNumber', path: 'contentCounters.mangekyoDeaths', operation: 'subtract', minimum: 0,
+      }],
     })
 
     expect(getEffectiveChargeCost(state, 'player-red', state.skillsById['zero-mangekyo'])).toBe(0)
@@ -338,7 +390,7 @@ describe('RED-124 Obito Kamui', () => {
 
     expect(next.pieces.some(piece => piece.instanceId === blueCore.instanceId)).toBe(false)
     expect(next.graveyard).toEqual([])
-    expect(getMangekyoDeathCount(next, 'player-blue')).toBe(0)
+    expect((next.extensions as any)?.contentCounters?.mangekyoDeaths?.['player-blue']).toBeUndefined()
     expect(next.extensions?.removedPieces).toEqual([
       expect.objectContaining({
         instanceId: blueCore.instanceId,

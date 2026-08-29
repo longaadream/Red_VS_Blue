@@ -28,6 +28,8 @@ import { loadRuleById } from '@/lib/game/skills'
 import type { BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
+const SILENCED_SKILL_ID = 'ashbringer'
+
 const CANDIDATE: SelfPlayAgentArchive = {
   schemaVersion: 1,
   agentId: 'planner-candidate-v1',
@@ -165,9 +167,8 @@ function decisiveEnvironment(mode: 'finish' | 'reject' | 'loop' | 'progress' | '
       const target = state.pieces.find(piece => piece.ownerPlayerId !== playerId && piece.currentHp > 0)!
       return [
         candidate('finish', {
-          type: 'useBasicSkill', playerId, pieceId: actor.instanceId,
-          skillId: 'basic-attack', targetPieceId: target.instanceId,
-        }, 'basic-skill'),
+          type: 'move', playerId, pieceId: actor.instanceId, toX: target.x!, toY: target.y!,
+        }, 'move'),
         candidate('end', { type: 'endTurn', playerId }, 'end-turn'),
       ]
     },
@@ -181,12 +182,13 @@ function decisiveEnvironment(mode: 'finish' | 'reject' | 'loop' | 'progress' | '
         next.fixtureRevision = (next.fixtureRevision ?? 0) + 1
         return result(next, selected)
       }
-      const action = selected.action as Extract<CandidateAction['action'], { type: 'useBasicSkill' | 'endTurn' }>
+      const action = selected.action as Extract<CandidateAction['action'], { type: 'move' | 'endTurn' }>
       if (action.type === 'endTurn') {
         next.turn.phase = 'end'
         return result(next, selected)
       }
-      const defeated = next.pieces.find(piece => piece.instanceId === action.targetPieceId)!
+      const defeated = next.pieces.find(piece =>
+        piece.ownerPlayerId !== action.playerId && piece.currentHp > 0)!
       defeated.currentHp = 0
       next.pieces = next.pieces.filter(piece => piece.instanceId !== defeated.instanceId)
       next.graveyard.push(defeated)
@@ -281,7 +283,13 @@ async function createSilencedSkillLoopState() {
   const red = makePiece({
     instanceId: 'red-silenced-core', ownerPlayerId: 'player-red', x: 0, y: 0,
     attack: 100, moveRange: 1, rules: [rule],
-    statusTags: [{ id: 'silenced-red-core', type: 'silenced', relatedRules: ['rule-silenced-block'] }],
+    statusTags: [{
+      id: 'silenced-red-core',
+      type: 'silenced',
+      relatedRules: ['rule-silenced-block'],
+      blocksSkillUse: true,
+      skillBlockMessage: 'Source piece is silenced',
+    }],
   }) as any
   const blue = makePiece({
     instanceId: 'blue-core', ownerPlayerId: 'player-blue', faction: 'blue', x: 1, y: 0, moveRange: 1,
@@ -289,14 +297,14 @@ async function createSilencedSkillLoopState() {
   red.isCore = true
   blue.isCore = true
   red.skills = [
-    { skillId: 'basic-attack', currentCooldown: 0, usesRemaining: -1 },
+    { skillId: SILENCED_SKILL_ID, currentCooldown: 0, usesRemaining: -1 },
     { skillId: 'illidan-metamorphosis', currentCooldown: 0, usesRemaining: 1 },
   ]
   const state = makeState({ pieces: [red, blue], currentPlayerId: 'player-red', width: 2, height: 1 }) as any
   state.players[0].actionPoints = 10
   state.players[0].chargePoints = 20
-  state.skillsById['basic-attack'] = JSON.parse(
-    readFileSync(resolve(process.cwd(), 'data/skills/basic-attack.json'), 'utf8'),
+  state.skillsById[SILENCED_SKILL_ID] = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'data/skills/ashbringer.json'), 'utf8'),
   )
   state.skillsById['illidan-metamorphosis'] = JSON.parse(
     readFileSync(resolve(process.cwd(), 'data/skills/illidan-metamorphosis.json'), 'utf8'),
@@ -582,8 +590,8 @@ describe('offline self-play league and evaluation baseline', () => {
       // RED-109 makes authority action/replay counters and RNG cursors canonical so
       // compacted checkpoints can resume the same deterministic stream.
       stateTraceHashes: [
-        'b05386c423e6a8c65609eb4cbb279d70f5d8a0d4456d24ec88a59b69636b8a4b',
-        'b05386c423e6a8c65609eb4cbb279d70f5d8a0d4456d24ec88a59b69636b8a4b',
+        '93a36163ed078aee8def7d90f00c6aa37aadf5822f80472e6c16712eeb8730c6',
+        '93a36163ed078aee8def7d90f00c6aa37aadf5822f80472e6c16712eeb8730c6',
       ],
       terminal: [
         ['finished', 'core-eliminated'],

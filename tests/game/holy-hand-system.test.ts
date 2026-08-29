@@ -343,12 +343,16 @@ describe('Velen delayed holy cards', () => {
     state.players[0].hand = [card]
 
     expect(executeSkill('velen-holy-prophecy', state, 'velen', { selectedOption: card.instanceId }).success).toBe(true)
-    expect(card.holyProphecy).toMatchObject({ sourcePieceId: 'velen', createdTurnNumber: 1 })
+    expect(card.contentState?.velenHolyProphecy).toMatchObject({ sourcePieceId: 'velen', createdTurnNumber: 1 })
     state.turn.turnNumber = 2
     const trigger = new TriggerSystem().checkTriggers(state, { type: 'beginTurn', playerId: 'player-red' } as any)
     expect(trigger.success).toBe(true)
-    expect(card.holyProphecy).toBeUndefined()
-    expect(card.holyProphecyEnhanced).toBe(true)
+    expect(card.contentState?.velenHolyProphecy).toBeUndefined()
+    expect(card.contentState?.velenHolyProphecyEnhanced).toBe(true)
+    expect(card.presentation).toMatchObject({
+      variant: 'enhanced', badge: '预言强化',
+      description: '预言强化：对敌方生命值最低的棋子造成7点真实伤害。',
+    })
 
     state.players[0].buffs = { 'elune-blessing-buff': { multiplier: 2, uses: 1 } }
     const result = executeCardFunction(loadCardById('holy-smite', true)!, 'player-red', state, undefined, undefined, undefined, undefined, undefined, card)
@@ -359,8 +363,8 @@ describe('Velen delayed holy cards', () => {
     const source = makePiece({ instanceId: 'source', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20 }) as any
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 0, currentHp: 1, maxHp: 20 }) as any
     const state = makeState({ pieces: [source, ally] }) as any
-    const healCard = { cardId: 'holy-heal', instanceId: 'enhanced-heal', ownerPlayerId: 'player-red', holyProphecyEnhanced: true }
-    const chargeCard = { cardId: 'holy-charge', instanceId: 'enhanced-charge', ownerPlayerId: 'player-red', holyProphecyEnhanced: true }
+    const healCard = { cardId: 'holy-heal', instanceId: 'enhanced-heal', ownerPlayerId: 'player-red', contentState: { velenHolyProphecyEnhanced: true }, effectModifiers: [{ effect: 'heal', operation: 'multiply', value: 1.5 }] }
+    const chargeCard = { cardId: 'holy-charge', instanceId: 'enhanced-charge', ownerPlayerId: 'player-red', contentState: { velenHolyProphecyEnhanced: true }, effectModifiers: [{ effect: 'statusIntensity', operation: 'multiply', value: 1.5, statusType: 'damage-buff' }] }
 
     const heal = executeCardFunction(loadCardById('holy-heal', true)!, 'player-red', state, undefined, undefined, undefined, undefined, undefined, healCard)
     expect(heal.success).toBe(true)
@@ -387,11 +391,11 @@ describe('Velen delayed holy cards', () => {
 
     state.players[0].hand = [{
       cardId: 'holy-heal', instanceId: 'unfinished', ownerPlayerId: 'player-red',
-      holyProphecy: { sourcePieceId: 'velen', createdTurnNumber: 2 },
+      contentState: { velenHolyProphecy: { sourcePieceId: 'velen', createdTurnNumber: 2 } },
     }]
     velen.currentHp = 0
     new TriggerSystem().checkTriggers(state, { type: 'onPieceDied', playerId: 'player-red', sourcePiece: velen } as any)
-    expect(state.players[0].hand[0].holyProphecy).toBeUndefined()
+    expect(state.players[0].hand[0].contentState?.velenHolyProphecy).toBeUndefined()
   })
 
   it('cancels fate shelter when its target dies before the next own turn', () => {
@@ -438,15 +442,15 @@ describe('Velen delayed holy cards', () => {
     expect(executeSkill('velen-holy-prophecy', state, velen.instanceId, {
       selectedOption: 'prophecy-played',
     }).success).toBe(true)
-    expect(state.players[0].hand.find((card: any) => card.instanceId === 'prophecy-played').holyProphecy)
+    expect(state.players[0].hand.find((card: any) => card.instanceId === 'prophecy-played').contentState?.velenHolyProphecy)
       .toMatchObject({ sourcePieceId: velen.instanceId, createdTurnNumber: 1 })
-    expect(state.players[0].hand.filter((card: any) => card.holyProphecy)).toHaveLength(1)
+    expect(state.players[0].hand.filter((card: any) => card.contentState?.velenHolyProphecy)).toHaveLength(1)
 
     const repeated = executeSkill('velen-holy-prophecy', state, velen.instanceId, {
       selectedOption: 'prophecy-played',
     })
     expect(repeated.success).toBe(false)
-    expect(state.players[0].hand.filter((card: any) => card.holyProphecy)).toHaveLength(1)
+    expect(state.players[0].hand.filter((card: any) => card.contentState?.velenHolyProphecy)).toHaveLength(1)
 
     const afterPlay = applyBattleAction(state, {
       type: 'playCard', playerId: 'player-red', cardInstanceId: 'prophecy-played',
@@ -454,7 +458,7 @@ describe('Velen delayed holy cards', () => {
     expect(afterPlay.players[0].discardPile).toContain('holy-smite')
     expect(afterPlay.players[0].hand.map((card: any) => card.instanceId).sort())
       .toEqual(['prophecy-discarded', 'prophecy-survivor'])
-    expect(afterPlay.players[0].hand.some((card: any) => card.holyProphecyEnhanced)).toBe(false)
+    expect(afterPlay.players[0].hand.some((card: any) => card.contentState?.velenHolyProphecyEnhanced)).toBe(false)
 
     expect(executeSkill('velen-holy-prophecy', afterPlay, velen.instanceId, {
       selectedOption: 'prophecy-discarded',
@@ -469,8 +473,8 @@ describe('Velen delayed holy cards', () => {
       type: 'beginTurn', playerId: 'player-red',
     } as any).success).toBe(false)
     expect(afterPlay.players[0].hand[0]).toMatchObject({ instanceId: 'prophecy-survivor' })
-    expect(afterPlay.players[0].hand[0].holyProphecy).toBeUndefined()
-    expect(afterPlay.players[0].hand[0].holyProphecyEnhanced).toBeUndefined()
+    expect(afterPlay.players[0].hand[0].contentState?.velenHolyProphecy).toBeUndefined()
+    expect(afterPlay.players[0].hand[0].contentState?.velenHolyProphecyEnhanced).toBeUndefined()
   })
 
   it('publishes holy prophecy as an exact single-card hand selection', () => {
@@ -481,7 +485,7 @@ describe('Velen delayed holy cards', () => {
     state.skillsById[definition.id] = definition
     state.players[0].hand = [
       { cardId: 'holy-smite', instanceId: 'prophecy-choice', ownerPlayerId: 'player-red' },
-      { cardId: 'holy-heal', instanceId: 'already-enhanced', ownerPlayerId: 'player-red', holyProphecyEnhanced: true },
+      { cardId: 'holy-heal', instanceId: 'already-enhanced', ownerPlayerId: 'player-red', contentState: { velenHolyProphecyEnhanced: true } },
       { cardId: 'filler', instanceId: 'not-holy', ownerPlayerId: 'player-red' },
     ]
 
@@ -530,7 +534,7 @@ describe('Velen delayed holy cards', () => {
       stateRevision: pending.pendingOptionSelection.stateRevision,
     } as any) as any
     expect(resolved.players[0].actionPoints).toBe(0)
-    expect(resolved.players[0].hand.every((card: any) => card.holyProphecyEnhanced === true)).toBe(true)
+    expect(resolved.players[0].hand.every((card: any) => card.contentState?.velenHolyProphecyEnhanced === true)).toBe(true)
     expect(resolved.pieces[0].skills[0].usesRemaining).toBe(0)
 
     resolved.players[0].actionPoints = 2

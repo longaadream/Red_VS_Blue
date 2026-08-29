@@ -4,7 +4,9 @@
   "description": "对6格外1个敌人造成等同攻击力200%的物理伤害。",
   "keywords": [],
   "targetText": "6格外1个敌人",
-  "effectTags": ["物理伤害"],
+  "effectTags": [
+    "物理伤害"
+  ],
   "icon": "🕗",
   "kind": "active",
   "type": "super",
@@ -14,5 +16,16 @@
   "powerMultiplier": 2,
   "actionPointCost": 3,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var distance = Math.abs(target.x - caster.x) + Math.abs(target.y - caster.y); if (distance <= 6) { return { success: false, message: '目标距离太近，必须选择6格外的敌人' }; }; var damage = Math.round(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '发动致命视线，对' + target.name + '造成' + result.damage + '点伤害（距离' + distance + '格）' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对6格外1个敌人造成' + Math.round(piece.attack * 2) + '点物理伤害。', expectedValues: { damage: Math.round(piece.attack * 2) } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对6格外1个敌人造成' + Math.round(piece.attack * 2) + '点物理伤害。', expectedValues: { damage: Math.round(piece.attack * 2) } }; }",
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 99,
+        "minRange": 7
+      }
+    ]
+  }
 }

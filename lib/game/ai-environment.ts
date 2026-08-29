@@ -101,6 +101,16 @@ function cloneSerializable<T>(value: T): T {
   return serialized === undefined ? value : JSON.parse(serialized) as T
 }
 
+function observedExtensions(extensions: BattleState['extensions']): BattleState['extensions'] | undefined {
+  if (!extensions) return undefined
+  const projected = cloneSerializable(extensions) as Record<string, unknown>
+  delete projected.debugBattle
+  for (const key of Object.keys(projected)) {
+    if (key.startsWith('__')) delete projected[key]
+  }
+  return Object.keys(projected).length > 0 ? projected : undefined
+}
+
 function samePlayer(left: unknown, right: unknown): boolean {
   return String(left ?? '').toLowerCase() === String(right ?? '').toLowerCase()
 }
@@ -168,7 +178,6 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
     players: state.players.map(player => ({
       playerId: player.playerId,
       name: player.name,
-      mangekyoDeathCount: player.mangekyoDeathCount,
       chargePoints: player.chargePoints,
       actionPoints: player.actionPoints,
       maxActionPoints: player.maxActionPoints,
@@ -178,6 +187,7 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
       statusTags: (player.statusTags || []).map(observedStatusTag).filter(tag => tag !== undefined),
       skills: cloneSerializable(player.skills || []),
     })),
+    extensions: observedExtensions(state.extensions),
     turn: cloneSerializable(state.turn),
     terminalResult: cloneSerializable(state.terminalResult),
     deployment: state.deployment ? {

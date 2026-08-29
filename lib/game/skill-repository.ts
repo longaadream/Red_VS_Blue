@@ -1,29 +1,13 @@
 import { clearSkillDefinitionCache, type SkillDefinition } from "./skills"
 import { loadJsonFilesServer } from './file-loader'
 
-// 默认技能数据（作为后备）
 function battleDebugLog(...args: unknown[]): void {
   if (typeof process === 'undefined' || process.env?.RVB_BATTLE_DEBUG_LOGS !== '1') return
   console.log(...args)
 }
-const defaultSkillsData: Record<string, SkillDefinition> = {
-  "basic-attack": {
-    id: "basic-attack",
-    name: "基础攻击",
-    description: "对目标造成基础伤害",
-    kind: "active",
-    type: "normal",
-    cooldownTurns: 0,
-    maxCharges: 0,
-    powerMultiplier: 1,
-    code: "function executeSkill(context) { const targetEnemy = context.targetPiece; if (!targetEnemy) { return { message: sourcePiece.templateId + '需要选择一个目标', success: false }; } const damageValue = sourcePiece.attack * context.skill.powerMultiplier; const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'physical', context.battle, context.skill.id); return { message: sourcePiece.templateId + '对' + targetEnemy.templateId + '造成' + damageResult.damage + '点伤害', success: true }; }",
-    range: "single",
-    actionPointCost: 1
-  }
-}
 
-// 客户端版本：初始为默认技能数据，通过API获取数据
-export let DEFAULT_SKILLS: Record<string, SkillDefinition> = { ...defaultSkillsData }
+// 技能必须来自资源数据；核心层不提供任何内容技能兜底。
+export let DEFAULT_SKILLS: Record<string, SkillDefinition> = {}
 
 // 从API加载技能数据
 export async function loadSkills(): Promise<void> {
@@ -45,9 +29,8 @@ export async function loadSkills(): Promise<void> {
             skillsObject[skill.id] = skill
           })
         }
-        
-        // 合并API返回的数据和默认数据，确保默认数据总是可用
-        DEFAULT_SKILLS = { ...defaultSkillsData, ...skillsObject }
+
+        DEFAULT_SKILLS = skillsObject
         battleDebugLog('Loaded skills from API:', Object.keys(DEFAULT_SKILLS))
       }
     }
@@ -61,14 +44,12 @@ if (typeof window === 'undefined') {
   // 只在服务器端执行
   try {
     const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
-    // 合并加载的数据和默认数据，确保默认数据总是可用
-    DEFAULT_SKILLS = { ...defaultSkillsData, ...loadedSkills }
-    
+    DEFAULT_SKILLS = loadedSkills
+
     battleDebugLog('Loaded skills:', Object.keys(DEFAULT_SKILLS))
   } catch (error) {
     console.error('Error loading skills from files:', error)
-    // 加载失败，使用默认数据
-    DEFAULT_SKILLS = { ...defaultSkillsData }
+    DEFAULT_SKILLS = {}
   }
 }
 
@@ -89,7 +70,7 @@ export function reloadSkills(): void {
   if (typeof window === 'undefined') {
     try {
       const loadedSkills = loadJsonFilesServer<SkillDefinition>('data/skills')
-      DEFAULT_SKILLS = { ...defaultSkillsData, ...loadedSkills }
+      DEFAULT_SKILLS = loadedSkills
       clearSkillDefinitionCache()
       battleDebugLog('[reloadSkills] Reloaded skills:', Object.keys(DEFAULT_SKILLS))
     } catch (error) {

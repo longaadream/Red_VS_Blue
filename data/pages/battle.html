@@ -439,8 +439,8 @@
     .card-item.card-choice-selected { border-color: #86efac; transform: translateY(-14px) scale(1.06); box-shadow: 0 0 0 3px rgba(34,197,94,.35), 0 16px 30px rgba(0,0,0,.78); }
     .card-item.card-choice-disabled { opacity: .3; cursor: not-allowed; filter: saturate(.55); }
     .card-item.card-choice-disabled:hover { transform: none; box-shadow: 0 4px 12px rgba(0,0,0,.6); }
-    .card-item.card-prophecy-enhanced { border-color: #fde68a; box-shadow: 0 0 0 2px rgba(250,204,21,.26), 0 0 20px rgba(251,191,36,.45), 0 4px 12px rgba(0,0,0,.6); }
-    .card-prophecy-badge {
+    .card-item.card-content-enhanced { border-color: #fde68a; box-shadow: 0 0 0 2px rgba(250,204,21,.26), 0 0 20px rgba(251,191,36,.45), 0 4px 12px rgba(0,0,0,.6); }
+    .card-content-badge {
       position: absolute; top: 5px; right: 5px; z-index: 2;
       border: 1px solid rgba(254,240,138,.9); border-radius: 999px;
       padding: 2px 5px; background: rgba(120,53,15,.9); color: #fef9c3;
@@ -2220,7 +2220,7 @@
         return false
       }
 
-      const stamped = withClientActionId(action)
+      const stamped = withClientActionId(prepareFreshSelectionAction(action))
       targetSubmissionPending = {
         clientActionId: stamped.clientActionId,
         type: stamped.type,
@@ -2784,11 +2784,12 @@
     // ── Card detail modal ──
     function cardDisplayDescription(card, def) {
       const baseDescription = def && def.description ? def.description : '暂无描述'
-      if (!card || card.holyProphecyEnhanced !== true) return baseDescription
-      if (card.cardId === 'holy-smite') return '预言强化：对敌方生命值最低的棋子造成7点真实伤害。'
-      if (card.cardId === 'holy-heal') return '预言强化：治疗己方生命值最低的棋子12点生命。'
-      if (card.cardId === 'holy-charge') return '预言强化：使己方所有棋子下次造成的伤害提高3点。'
-      return baseDescription
+      const presentation = card && card.presentation && typeof card.presentation === 'object'
+        ? card.presentation
+        : null
+      return presentation && typeof presentation.description === 'string'
+        ? presentation.description
+        : baseDescription
     }
 
     function showCardDetail(cardInstanceId, cardId, preserveKeyword) {
@@ -2999,6 +3000,13 @@
       }
     }
 
+    function prepareFreshSelectionAction(action) {
+      const next = Object.assign({}, action || {})
+      delete next.clientActionId
+      delete next.requestId
+      return next
+    }
+
     function showOptionPicker(title, options, originalAction) {
       pendingOptionAction = originalAction
       _pickerOptions = options
@@ -3031,7 +3039,10 @@
       if (!pendingOptionAction) return
       const opt = _pickerOptions[index]
       if (!opt) return
-      const action = Object.assign({}, pendingOptionAction, { selectedOption: opt.value !== undefined ? opt.value : opt })
+      const action = Object.assign(
+        prepareFreshSelectionAction(pendingOptionAction),
+        { selectedOption: opt.value !== undefined ? opt.value : opt },
+      )
       pendingOptionAction = null
       _pickerOptions = []
       doAction(action)
@@ -3049,7 +3060,7 @@
       pendingSkill = null
       if (action && action.type === 'pendingOptionSelect' && action.cancelValue !== undefined) {
         const cancelValue = action.cancelValue
-        const retry = Object.assign({}, action, { selectedOption: cancelValue })
+        const retry = Object.assign(prepareFreshSelectionAction(action), { selectedOption: cancelValue })
         delete retry.cancelValue
         doAction(retry)
         return
@@ -5116,7 +5127,8 @@
       container.innerHTML = hand.map((card, index) => {
         const def = getCardDisplayDefinition(card.cardId)
         const description = cardDisplayDescription(card, def)
-        const isProphecyEnhanced = card.holyProphecyEnhanced === true
+        const cardPresentation = card.presentation && typeof card.presentation === 'object' ? card.presentation : {}
+        const isContentEnhanced = cardPresentation.variant === 'enhanced'
         const cost = card.actionPointCost ?? def.actionPointCost ?? 0
         const canNormallyPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
         const isHandChoiceCandidate = isHandSelection && handChoiceCandidates.some(function(value) { return value === card.instanceId })
@@ -5131,7 +5143,7 @@
         else if (isPending) cls += ' card-pending'
         else if (!canNormallyPlay) cls += ' card-disabled'
         if (isReactive) cls += ' card-reactive'
-        if (isProphecyEnhanced) cls += ' card-prophecy-enhanced'
+        if (isContentEnhanced) cls += ' card-content-enhanced'
 
         const gemCls = cost === 0 ? 'free' : ''
         const icon = escHtml(String(def.name || card.cardId || '牌').slice(0, 1))
@@ -5140,7 +5152,9 @@
         const artContent = artSrc
           ? `<img src="${artSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:8px 8px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:28px;width:100%;height:100%;align-items:center;justify-content:center">${icon}</span>`
           : `<span style="font-size:28px">${icon}</span>`
-        const prophecyBadge = isProphecyEnhanced ? '<span class="card-prophecy-badge">预言强化</span>' : ''
+        const contentBadge = typeof cardPresentation.badge === 'string' && cardPresentation.badge
+          ? '<span class="card-content-badge">' + escHtml(cardPresentation.badge) + '</span>'
+          : ''
 
         const cdTurnsCard = def.cooldownTurns ?? def.cooldown ?? 0
         const cdHtml = cdTurnsCard > 0
@@ -5151,7 +5165,7 @@
         const cardName = def.name || card.cardId
         const cardAriaLabel = isHandSelection
           ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择' : '，可选择') : '，不可选择')
-          : cardName + (isProphecyEnhanced ? '，预言强化' : '') + '，行动点 ' + cost
+          : cardName + (cardPresentation.badge ? '，' + cardPresentation.badge : '') + '，行动点 ' + cost
         const arc = window.BattleContextLayout.handArc(index, hand.length)
         return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
           aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"
@@ -5160,7 +5174,7 @@
           ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
           oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
           <div class="card-mana-gem ${gemCls}">${cost}</div>
-          <div class="card-art">${artContent}${prophecyBadge}</div>
+          <div class="card-art">${artContent}${contentBadge}</div>
           <div class="card-name-banner">${escHtml(def.name || card.cardId)}</div>
           <div class="card-body">
             <div class="card-desc">${escHtml(description)}</div>

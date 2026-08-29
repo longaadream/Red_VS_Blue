@@ -4,7 +4,9 @@
   "description": "使10格内1个其他友军防御力+3，且其造成的所有伤害+1。",
   "keywords": [],
   "targetText": "10格内1个其他友军",
-  "effectTags": ["强化"],
+  "effectTags": [
+    "强化"
+  ],
   "icon": "⚙️",
   "kind": "active",
   "type": "super",
@@ -17,5 +19,16 @@
   "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetAlly = selectTarget({ type: 'piece', range: 10, filter: 'ally' }); if (!targetAlly || targetAlly.needsTargetSelection) { return targetAlly; } if (targetAlly.instanceId === sourcePiece.instanceId) { return { message: '不能对自己使用纳米激素', success: false }; } targetAlly.defense = targetAlly.defense + 3; const statusId = 'nano-boost-' + Date.now(); addStatusEffectById(targetAlly.instanceId, { id: statusId, type: 'nano-boost', currentDuration: -1, intensity: 1, value: 3, relatedRules: ['rule-nano-boost-damage'] }); addRuleById(targetAlly.instanceId, 'rule-nano-boost-damage'); addSkillById(targetAlly.instanceId, 'nano-boost-damage'); return { message: sourcePiece.name + '对' + targetAlly.name + '使用纳米激素，防御力+3，伤害+1', success: true }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: '使10格内1个其他友军防御力+3，且其造成的所有伤害+1。', expectedValues: { buff: 3 } }; }",
   "range": "single",
-  "requiresTarget": true
+  "requiresTarget": true,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "ally",
+        "range": 10,
+        "excludeSourcePiece": true
+      }
+    ]
+  }
 }

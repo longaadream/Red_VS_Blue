@@ -1,0 +1,7 @@
+{
+  "id": "rule-mangekyo-friendly-death",
+  "name": "万花筒·见证死亡",
+  "description": "己方拥有万花筒见证者时，每次友方棋子死亡都会记录一次充能减免。",
+  "trigger": { "type": "onPieceDied" },
+  "skillCode": "var witness = context.rulePiece; var dead = context.sourcePiece; if (!witness || !dead || witness.ownerPlayerId !== dead.ownerPlayerId) return { success: false, message: '' }; var witnesses = (battle.pieces || []).filter(function(piece) { return piece.ownerPlayerId === witness.ownerPlayerId && (piece.statusTags || []).some(function(tag) { return tag.type === 'mangekyo-witness'; }); }).sort(function(a, b) { return String(a.instanceId).localeCompare(String(b.instanceId)); }); if (!witnesses.length || witnesses[0].instanceId !== witness.instanceId) return { success: false, message: '' }; if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.contentCounters) battle.extensions.contentCounters = {}; if (!battle.extensions.contentCounters.mangekyoDeaths) battle.extensions.contentCounters.mangekyoDeaths = {}; var counts = battle.extensions.contentCounters.mangekyoDeaths; var next = (Number(counts[witness.ownerPlayerId]) || 0) + 1; counts[witness.ownerPlayerId] = next; if (!battle.actions) battle.actions = []; var message = (dead.name || dead.templateId) + '的死亡令【万花筒】充能消耗降低1'; battle.actions.push({ type: 'mangekyoDeath', playerId: witness.ownerPlayerId, turn: battle.turn ? battle.turn.turnNumber : 0, payload: { message: message, pieceId: dead.instanceId, pieceTemplateId: dead.templateId, mangekyoDeathCount: next } }); return { success: true, message: message };"
+}
