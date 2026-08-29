@@ -35,6 +35,7 @@ class AuthorityV2MemoryStore implements DeploymentRoomStore {
   commits = 0
   receiptWrites = 0
   failCommits = false
+  persistenceStatus: 'durable' | 'pending' | 'degraded' = 'durable'
   receipts = new Map<string, BattleAuthorityReceipt>()
   transitions: BattleAuthorityTransitionRecord[] = []
   baseCheckpoints: BattleAuthorityCheckpointRecord[] = []
@@ -102,6 +103,17 @@ class AuthorityV2MemoryStore implements DeploymentRoomStore {
       trace: transition.traces[index],
       replayFrame: transition.replayFrames[index],
     })))
+  }
+
+  inspectBattleAuthorityPersistence() {
+    const authorityVersion = Number(this.room.battleAuthorityVersion ?? 0)
+    return {
+      status: this.persistenceStatus,
+      durableAuthorityVersion: this.persistenceStatus === 'degraded' ? Math.max(0, authorityVersion - 1) : authorityVersion,
+      authorityVersion,
+      pending: this.persistenceStatus === 'durable' ? 0 : 1,
+      ...(this.persistenceStatus === 'degraded' ? { lastError: 'simulated journal failure' } : {}),
+    }
   }
 }
 
@@ -460,6 +472,30 @@ describe('RED-109 authority v2 coordinator', () => {
     expect(store.transitions).toHaveLength(0)
     expect(store.receipts).toHaveLength(0)
     expect(store.room.version).toBe(9)
+    expect(store.room.battleAuthorityVersion).toBe(1)
+  })
+
+  it('classifies a degraded authority journal separately from a concurrent room conflict', async () => {
+    const store = new AuthorityV2MemoryStore(makeRoom())
+    store.failCommits = true
+    store.persistenceStatus = 'degraded'
+
+    await expect(dispatchRoomBattleAction(store, store.room.id, 'player-red', deploymentChoice('degraded-1'), {
+      expectedAuthorityVersion: 1,
+      clock: { now: () => 2_000 },
+    })).rejects.toMatchObject({
+      code: 'BATTLE_AUTHORITY_PERSISTENCE_DEGRADED',
+      context: {
+        roomId: store.room.id,
+        persistenceStatus: 'degraded',
+        authorityVersion: 1,
+        durableAuthorityVersion: 0,
+      },
+    })
+
+    expect(store.commits).toBe(0)
+    expect(store.transitions).toHaveLength(0)
+    expect(store.receipts).toHaveLength(0)
     expect(store.room.battleAuthorityVersion).toBe(1)
   })
 })

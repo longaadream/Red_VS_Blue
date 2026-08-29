@@ -11,6 +11,10 @@
   var _reconnectTimer = null
   var _shouldReconnect = false
   var _subscribed = false
+  var _authoritySyncing = false
+  var _authoritySyncTimer = null
+  var _authoritySyncRequestId = null
+  var AUTHORITY_SYNC_TIMEOUT_MS = 8000
 
   function getServerUrl() {
     if (window.RvBUtils && window.RvBUtils.getConnectionConfig) {
@@ -105,7 +109,16 @@
           else pending.reject(makeRpcError(msg))
           return
         }
+        if (msg && msg.type === 'actionError' && msg.code === 'ROOM_VERSION_CONFLICT') {
+          requestAuthoritySync('room-version-conflict')
+        }
+        var completesAuthoritySync = _authoritySyncing
+          && msg
+          && (msg.type === 'stateUpdate' || msg.type === 'battleSnapshot')
+          && msg.requestId === _authoritySyncRequestId
+        if (completesAuthoritySync) _releaseAuthoritySync()
         _emit('message', msg)
+        if (completesAuthoritySync) _emit('authoritySyncComplete', msg)
       } catch {}
     }
 
@@ -113,6 +126,7 @@
       if (_ws !== socket) return
       _ws = null
       _subscribed = false
+      _releaseAuthoritySync()
       _emit('disconnect')
       if (_shouldReconnect) _scheduleReconnect(_roomId)
     }
@@ -132,6 +146,37 @@
     if (_handlers[event]) {
       try { _handlers[event](data) } catch (e) { console.error('[WS]', event, e) }
     }
+  }
+
+  function _releaseAuthoritySync() {
+    if (!_authoritySyncing) return false
+    _authoritySyncing = false
+    if (_authoritySyncTimer) clearTimeout(_authoritySyncTimer)
+    _authoritySyncTimer = null
+    _authoritySyncRequestId = null
+    return true
+  }
+
+  function requestAuthoritySync(reason) {
+    if (_authoritySyncing) return false
+    if (!_subscribed || !_ws || _ws.readyState !== 1) return false
+    _authoritySyncing = true
+    _authoritySyncRequestId = 'authority-sync-' + (_reqSeq++) + '-' + Date.now()
+    try {
+      _ws.send(JSON.stringify({
+        type: 'requestBattleSnapshot',
+        requestId: _authoritySyncRequestId,
+      }))
+    } catch (error) {
+      _releaseAuthoritySync()
+      return false
+    }
+    _authoritySyncTimer = setTimeout(function () {
+      if (!_releaseAuthoritySync()) return
+      _emit('authoritySyncTimeout', { reason: reason || 'unknown' })
+    }, AUTHORITY_SYNC_TIMEOUT_MS)
+    _emit('authoritySyncStart', { reason: reason || 'unknown' })
+    return true
   }
 
   function makeRpcError(message) {
@@ -172,13 +217,22 @@
     var socket = _ws
     _ws = null
     _subscribed = false
+    _releaseAuthoritySync()
     if (socket) { try { socket.close() } catch {} }
   }
 
   function send(msg) {
-    if (_subscribed && _ws && _ws.readyState === 1) {
-      try { _ws.send(JSON.stringify(msg)) } catch {}
+    if (_authoritySyncing && msg && (msg.type === 'action' || msg.type === 'gameOver')) {
+      _emit('authoritySyncBlocked', msg)
+      return false
     }
+    if (_subscribed && _ws && _ws.readyState === 1) {
+      try {
+        _ws.send(JSON.stringify(msg))
+        return true
+      } catch {}
+    }
+    return false
   }
 
   function request(method, data, timeoutMs) {
@@ -274,5 +328,19 @@
     return _subscribed && _ws !== null && _ws.readyState === 1
   }
 
-  window.RvBWs = { connect: connect, disconnect: disconnect, send: send, request: request, requestAt: requestAt, on: on, isConnected: isConnected }
+  function isAuthoritySyncing() {
+    return _authoritySyncing
+  }
+
+  window.RvBWs = {
+    connect: connect,
+    disconnect: disconnect,
+    send: send,
+    request: request,
+    requestAt: requestAt,
+    requestAuthoritySync: requestAuthoritySync,
+    on: on,
+    isConnected: isConnected,
+    isAuthoritySyncing: isAuthoritySyncing,
+  }
 })()

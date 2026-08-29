@@ -164,6 +164,44 @@ export class RoomBattleActionError extends Error {
   }
 }
 
+type BattleAuthorityPersistenceInspection = ReturnType<
+  NonNullable<DeploymentRoomStore['inspectBattleAuthorityPersistence']>
+>
+
+function battleAuthorityPersistenceDegradedError(
+  roomId: string,
+  persistence: BattleAuthorityPersistenceInspection,
+): RoomBattleActionError {
+  console.error('[battle-authority-persistence] action rejected while the journal is degraded', {
+    roomId,
+    authorityVersion: persistence.authorityVersion,
+    durableAuthorityVersion: persistence.durableAuthorityVersion,
+    pending: persistence.pending,
+    lastError: persistence.lastError,
+  })
+  return new RoomBattleActionError(
+    'BATTLE_AUTHORITY_PERSISTENCE_DEGRADED',
+    'Battle authority persistence is degraded; the room is paused until the server recovers',
+    {
+      roomId,
+      persistenceStatus: persistence.status,
+      authorityVersion: persistence.authorityVersion,
+      durableAuthorityVersion: persistence.durableAuthorityVersion,
+      pendingPersistenceJobs: persistence.pending,
+    },
+  )
+}
+
+function assertBattleAuthorityPersistenceAvailable(
+  store: DeploymentRoomStore,
+  roomId: string,
+): void {
+  const persistence = store.inspectBattleAuthorityPersistence?.(roomId)
+  if (persistence?.status === 'degraded') {
+    throw battleAuthorityPersistenceDegradedError(roomId, persistence)
+  }
+}
+
 type AuthorityTimer = ReturnType<typeof setTimeout>
 interface RoomAuthorityClockState {
   excludedMs: number
@@ -366,6 +404,7 @@ export async function dispatchRoomBattleAction(
             receipt,
           }
         }
+        assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
         if (
           options.expectedAuthorityVersion !== undefined
           && options.expectedAuthorityVersion !== authorityVersion
@@ -650,7 +689,10 @@ export async function dispatchRoomBattleAction(
           })
         : await store.setRoomIfVersion(normalizedRoomId, nextRoom, metadataVersion)
       persistenceMs += monotonicNow() - persistenceStartedAt
-      if (!committed) continue
+      if (!committed) {
+        if (authorityV2) assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
+        continue
+      }
       if (isTerminal && transition && store.drainBattleAuthorityPersistence) {
         try {
           const terminalDrainStartedAt = monotonicNow()
@@ -709,6 +751,7 @@ export async function dispatchRoomBattleAction(
       }
     }
 
+    assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
     throw new RoomBattleActionError(
       'ROOM_VERSION_CONFLICT',
       'Battle action could not commit because the room changed concurrently',

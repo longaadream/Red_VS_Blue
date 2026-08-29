@@ -71,7 +71,9 @@ function loadClient() {
     connect(roomId: string, playerId: string, mode: string): void
     disconnect(): void
     isConnected(): boolean
-    on(event: string, handler: () => void): void
+    isAuthoritySyncing(): boolean
+    send(message: Record<string, unknown>): boolean
+    on(event: string, handler: (data?: any) => void): void
   }
 }
 
@@ -145,5 +147,88 @@ describe('battle WebSocket reconnect state machine', () => {
     expect(disconnects).toBe(0)
     await vi.advanceTimersByTimeAsync(3_000)
     expect(FakeWebSocket.instances).toHaveLength(2)
+  })
+
+  it('requests one authoritative snapshot on a room version conflict and gates actions until it arrives', async () => {
+    vi.useFakeTimers()
+    const client = loadClient()
+    let syncStarts = 0
+    let syncCompletes = 0
+    client.on('authoritySyncStart', () => { syncStarts += 1 })
+    client.on('authoritySyncComplete', () => { syncCompletes += 1 })
+
+    client.connect('room-a', 'player-red', 'lan')
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+    await Promise.resolve()
+    socket.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
+
+    socket.receive({
+      type: 'actionError',
+      code: 'ROOM_VERSION_CONFLICT',
+      error: 'room changed concurrently',
+    })
+    socket.receive({
+      type: 'actionError',
+      code: 'ROOM_VERSION_CONFLICT',
+      error: 'same conflict delivered twice',
+    })
+
+    expect(client.isAuthoritySyncing()).toBe(true)
+    expect(syncStarts).toBe(1)
+    const snapshotRequests = socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'requestBattleSnapshot')
+    expect(snapshotRequests).toHaveLength(1)
+    expect(snapshotRequests[0].requestId).toMatch(/^authority-sync-/)
+    expect(client.send({ type: 'action', command: { type: 'move' } })).toBe(false)
+    expect(socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'action')).toHaveLength(0)
+
+    socket.receive({ type: 'stateUpdate', authorityVersion: 3, state: { turn: { turnNumber: 1 } } })
+    expect(client.isAuthoritySyncing()).toBe(true)
+    expect(syncCompletes).toBe(0)
+
+    socket.receive({
+      type: 'stateUpdate',
+      requestId: snapshotRequests[0].requestId,
+      authorityVersion: 4,
+      state: { turn: { turnNumber: 1 } },
+    })
+
+    expect(client.isAuthoritySyncing()).toBe(false)
+    expect(syncCompletes).toBe(1)
+    expect(client.send({ type: 'action', command: { type: 'move' } })).toBe(true)
+    expect(socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'action')).toHaveLength(1)
+  })
+
+  it('releases the authority sync gate on timeout or disconnect without treating persistence degradation as a conflict', async () => {
+    vi.useFakeTimers()
+    const client = loadClient()
+    let syncTimeouts = 0
+    client.on('authoritySyncTimeout', () => { syncTimeouts += 1 })
+
+    client.connect('room-a', 'player-red', 'lan')
+    const first = FakeWebSocket.instances[0]
+    first.open()
+    await Promise.resolve()
+    first.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
+    first.receive({ type: 'actionError', code: 'ROOM_VERSION_CONFLICT' })
+
+    await vi.advanceTimersByTimeAsync(8_000)
+    expect(client.isAuthoritySyncing()).toBe(false)
+    expect(syncTimeouts).toBe(1)
+
+    first.receive({ type: 'actionError', code: 'ROOM_VERSION_CONFLICT' })
+    expect(client.isAuthoritySyncing()).toBe(true)
+    first.closeFromPeer()
+    expect(client.isAuthoritySyncing()).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(3_000)
+    const replacement = FakeWebSocket.instances[1]
+    replacement.open()
+    await Promise.resolve()
+    replacement.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
+    replacement.receive({ type: 'actionError', code: 'BATTLE_AUTHORITY_PERSISTENCE_DEGRADED' })
+
+    expect(client.isAuthoritySyncing()).toBe(false)
+    expect(replacement.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'requestBattleSnapshot')).toHaveLength(0)
   })
 })

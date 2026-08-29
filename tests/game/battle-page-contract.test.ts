@@ -517,6 +517,31 @@ new Script([
     expect(messages[3].command).toMatchObject({ type: 'playCard', clientActionId: 'client-4' })
   })
 
+  it('does not stamp or submit an action while the authoritative conflict resync gate is active', async () => {
+    const battlePage = readPage('battle.html')
+    const statusMessages: string[] = []
+    let stamped = false
+    let sent = false
+    const context = createContext({
+      RvBWs: {
+        isAuthoritySyncing: () => true,
+        send: () => { sent = true },
+      },
+      withClientActionId: () => {
+        stamped = true
+        return { type: 'move', clientActionId: 'should-not-exist' }
+      },
+      setStatusMsg: (message: string) => statusMessages.push(message),
+    })
+    new Script(readNamedAsyncFunction(battlePage, 'doAction')).runInContext(context)
+
+    await new Script("doAction({ type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 })").runInContext(context)
+
+    expect(stamped).toBe(false)
+    expect(sent).toBe(false)
+    expect(statusMessages.at(-1)).toBe('正在同步服务端状态，请等待完成后重新操作')
+  })
+
   it('keeps target submission single-flight and clears transient targeting on every authoritative exit', () => {
     const battlePage = readPage('battle.html')
 

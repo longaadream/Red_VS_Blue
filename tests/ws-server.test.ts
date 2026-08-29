@@ -70,6 +70,35 @@ function waitForJsonMessage(client: WebSocket): Promise<Record<string, unknown>>
     })
   })
 }
+
+function waitForJsonType(client: WebSocket, type: string): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const timeout = rejectAfterTimeout(reject, type)
+    const onError = (error: Error) => {
+      clearTimeout(timeout)
+      client.off('message', onMessage)
+      reject(error)
+    }
+    const onMessage = (raw: RawData) => {
+      try {
+        const message = JSON.parse(raw.toString()) as Record<string, unknown>
+        if (message.type !== type) return
+        clearTimeout(timeout)
+        client.off('message', onMessage)
+        client.off('error', onError)
+        resolve(message)
+      } catch (error) {
+        clearTimeout(timeout)
+        client.off('message', onMessage)
+        client.off('error', onError)
+        reject(error)
+      }
+    }
+    client.on('message', onMessage)
+    client.once('error', onError)
+  })
+}
+
 function waitForJsonMessages(client: WebSocket, count: number): Promise<Array<Record<string, unknown>>> {
   return new Promise((resolve, reject) => {
     const messages: Array<Record<string, unknown>> = []
@@ -212,6 +241,56 @@ describe('game WebSocket service', () => {
       expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
     } finally {
       if (replacement.client.readyState !== WebSocket.CLOSED) await closeClient(replacement.client)
+    }
+  })
+
+  test('echoes the snapshot request id on the authoritative resync response', async () => {
+    const roomId = 'correlated-resync-' + Date.now()
+    const room: Room = {
+      id: roomId,
+      name: roomId,
+      status: 'in-progress',
+      players: [
+        { id: 'player-red', name: 'Red' },
+        { id: 'player-blue', name: 'Blue' },
+      ],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 4,
+      battleAuthorityVersion: 4,
+      battleState: {
+        type: 'server-state',
+        seed: 77,
+        state: makeState(),
+      } as unknown as Room['battleState'],
+    }
+    const store = getRoomStore()
+    const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
+      id === roomId ? room : undefined)
+    const client = await openClient()
+
+    try {
+      const initialSnapshot = waitForJsonType(client, 'stateUpdate')
+      client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: 'player-red' }))
+      await expect(initialSnapshot).resolves.toMatchObject({
+        type: 'stateUpdate',
+        authorityVersion: 4,
+      })
+
+      const correlatedSnapshot = waitForJsonType(client, 'stateUpdate')
+      client.send(JSON.stringify({
+        type: 'requestBattleSnapshot',
+        requestId: 'authority-sync-test-1',
+      }))
+      await expect(correlatedSnapshot).resolves.toMatchObject({
+        type: 'stateUpdate',
+        requestId: 'authority-sync-test-1',
+        authorityVersion: 4,
+      })
+    } finally {
+      await closeClient(client)
+      getRoom.mockRestore()
     }
   })
 

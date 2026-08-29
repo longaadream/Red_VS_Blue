@@ -480,10 +480,16 @@ async function ensureBattleReady(roomId: string): Promise<any | null> {
   return room
 }
 
-async function sendBattleSnapshot(ws: WebSocket, roomId: string, viewerPlayerId?: string | null): Promise<void> {
+async function sendBattleSnapshot(
+  ws: WebSocket,
+  roomId: string,
+  viewerPlayerId?: string | null,
+  requestId?: string,
+): Promise<void> {
+  const requestContext = requestId ? { requestId } : {}
   const room = await ensureBattleReady(roomId)
   if (!room) {
-    sendJson(ws, { type: 'battleUnavailable', reason: 'room-not-found', roomId })
+    sendJson(ws, { type: 'battleUnavailable', reason: 'room-not-found', roomId, ...requestContext })
     return
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -494,15 +500,25 @@ async function sendBattleSnapshot(ws: WebSocket, roomId: string, viewerPlayerId?
       actions: rawBattleState.actions,
       total: rawBattleState.actions.length,
       seed: rawBattleState.seed ?? 0,
+      ...requestContext,
     })
     return
   }
   const storage = getBattleStorage(room)
   if (storage) {
-    sendJson(ws, { type: 'stateUpdate', ...createPublicBattleSnapshot(room, viewerPlayerId ?? undefined) })
+    sendJson(ws, {
+      type: 'stateUpdate',
+      ...createPublicBattleSnapshot(room, viewerPlayerId ?? undefined),
+      ...requestContext,
+    })
     return
   }
-  sendJson(ws, { type: 'battleUnavailable', reason: 'battle-not-started', room: publicRoom(room) })
+  sendJson(ws, {
+    type: 'battleUnavailable',
+    reason: 'battle-not-started',
+    room: publicRoom(room),
+    ...requestContext,
+  })
 }
 
 async function quiesceWsServer(): Promise<void> {
@@ -777,7 +793,8 @@ async function restartWsServer(): Promise<void> {
             await sendBattleSnapshot(ws, roomId!, playerId)
           })
         } else if (msg.type === 'requestBattleSnapshot' && roomId) {
-          runAsync(async () => { await sendBattleSnapshot(ws, roomId!, playerId) })
+          const snapshotRequestId = typeof msg.requestId === 'string' ? msg.requestId : undefined
+          runAsync(async () => { await sendBattleSnapshot(ws, roomId!, playerId, snapshotRequestId) })
         } else if (msg.type === 'roomAction' && roomId) {
           const _roomId = roomId
           const sender = ws
