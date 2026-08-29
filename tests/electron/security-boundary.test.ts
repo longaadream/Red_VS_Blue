@@ -277,7 +277,6 @@ describe('Electron desktop security boundary', () => {
       'data/skills/manifest.json',
       'data/cards/manifest.json',
       'data/cards/lucky-coin.json',
-      'data/skills/basic-attack.json',
     ]
     for (const relativePath of requiredProfileResources) {
       expect(source).toContain(`'${relativePath}'`)

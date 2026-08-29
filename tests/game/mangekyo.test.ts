@@ -270,7 +270,7 @@ describe('RED-124 friendly death events', () => {
     expect(state.graveyard).toEqual([])
   })
 
-  it('projects, patches, hashes, and logs the player death count deterministically', () => {
+  it('projects public state, patches, hashes, and logs the player death count deterministically', () => {
     const run = () => {
       const attacker = makePiece({
         instanceId: 'blue-attacker', ownerPlayerId: 'player-blue', x: 0, y: 0,
@@ -293,8 +293,7 @@ describe('RED-124 friendly death events', () => {
     const patch = createBattlePublicPatch(first.publicBefore, publicAfter)
 
     expect((publicAfter.extensions as any)?.contentCounters?.mangekyoDeaths?.['player-red']).toBe(1)
-    expect((observeBattleForAI(first.state, 'player-red').extensions as any)
-      ?.contentCounters?.mangekyoDeaths?.['player-red']).toBe(1)
+    expect(observeBattleForAI(first.state, 'player-red')).not.toHaveProperty('extensions')
     expect(applyBattlePublicPatch(first.publicBefore, JSON.parse(JSON.stringify(patch))))
       .toEqual(publicAfter)
     expect(hashBattleState(first.state)).not.toBe(first.hashBefore)

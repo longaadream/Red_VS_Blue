@@ -103,7 +103,6 @@ export interface AIObservation {
   pieces: AIObservedPiece[]
   graveyard: AIObservedPiece[]
   players: AIObservedPlayer[]
-  extensions?: BattleState['extensions']
   turn: TurnState
   terminalResult?: TerminalResult
   deployment?: {

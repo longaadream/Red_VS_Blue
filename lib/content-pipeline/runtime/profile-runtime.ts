@@ -215,7 +215,6 @@ function hasMenuResources(
     'data/skills/manifest.json',
     'data/cards/manifest.json',
     'data/cards/lucky-coin.json',
-    'data/skills/basic-attack.json',
   ]
   return required.every(relative =>
     existsSync(absoluteProfileFile(context, reference, relative)))

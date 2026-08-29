@@ -3,6 +3,7 @@ import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as http from 'http'
+import type WebSocket from 'ws'
 import { randomBytes } from 'crypto'
 import { shouldReportServerStartupFailure } from './server-process-lifecycle'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
@@ -786,7 +787,7 @@ function probeProfileWebSocket(timeoutMs = 5_000): Promise<void> {
     const modulePath = app.isPackaged
       ? path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')
       : 'ws'
-    const WebSocketClient = require(modulePath) as typeof import('ws')
+    const WebSocketClient = require(modulePath) as new (address: string) => WebSocket
     const socket = new WebSocketClient('ws://127.0.0.1:3000/ws/rooms/__profile-health__')
     const finish = (error?: Error): void => {
       if (settled) return
