@@ -1,0 +1,23 @@
+{
+  "id": "tirion-holy-recall",
+  "name": "圣光重召",
+  "description": "获得圣盾。",
+  "keywords": [
+    "圣盾"
+  ],
+  "targetText": "自身",
+  "effectTags": [
+    "圣盾"
+  ],
+  "icon": "✨",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "self",
+  "requiresTarget": false,
+  "code": "function executeSkill(context) { var caster = context.piece; var existing = caster.statusTags && caster.statusTags.find(function(tag) { return tag.type === 'divine-shield'; }); if (existing) return { success: false, message: '已经拥有圣盾' }; addStatusEffectById(caster.instanceId, { id: 'divine-shield', name: '圣盾', type: 'divine-shield', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-divine-shield'] }); addRuleById(caster.instanceId, 'rule-divine-shield'); return { success: true, message: caster.name + '以圣光重召获得圣盾' }; }",
+  "previewCode": "function calculatePreview() { return { description: '获得圣盾。', expectedValues: { shield: 1 } }; }"
+}

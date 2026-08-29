@@ -21,12 +21,13 @@
       "level": 1
     },
     {
-      "skillId": "holy-blast",
+      "skillId": "tirion-holy-recall",
       "level": 1
     }
   ],
   "rules": [
-    "rule-tirion-divine-shield-start"
+    "rule-tirion-divine-shield-start",
+    "rule-tirion-divine-glory"
   ],
   "isDefault": false
 }

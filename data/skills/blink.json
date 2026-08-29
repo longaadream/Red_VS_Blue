@@ -8,10 +8,10 @@
   "icon": "✨",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 1,
+  "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 0,
+  "actionPointCost": 1,
   "targeting": {
     "steps": [
       { "kind": "target", "type": "grid", "filter": "all", "range": 2, "distanceMetric": "chebyshev", "requireWalkable": true, "requireUnoccupied": true }

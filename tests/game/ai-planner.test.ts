@@ -509,7 +509,7 @@ describe('representative real transition fixtures', () => {
     const goalTargets: Array<string | undefined> = []
     let complete = false
 
-    for (let guard = 0; guard < 6; guard += 1) {
+    for (let guard = 0; guard <= DEFAULT_AI_PLANNER_CONFIG.maxActions; guard += 1) {
       const plan = previous
         ? planNextAiAction(state, 'player-red', seed, previous, {
             config: { nodeBudget: 48, beamWidth: 3, candidateLimit: 8 },

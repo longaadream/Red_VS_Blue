@@ -18,9 +18,6 @@
       "skillId": "recall"
     },
     {
-      "skillId": "sticky-bomb"
-    },
-    {
       "skillId": "pulse-pistol"
     }
   ],
@@ -29,8 +26,6 @@
     "rule-pulse-pistol-move",
     "rule-recall-skill",
     "rule-recall-move",
-    "rule-recall-endturn",
-    "rule-sticky-bomb-move",
-    "rule-sticky-bomb-endturn"
+    "rule-recall-endturn"
   ]
 }

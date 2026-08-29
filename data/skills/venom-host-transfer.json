@@ -18,9 +18,14 @@
   "requiresTarget": true,
   "targeting": {
     "steps": [
-      { "kind": "target", "type": "piece", "filter": "all", "range": 7 }
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "all",
+        "range": 7
+      }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 7, filter: 'all' }); if (!target || target.needsTargetSelection) return target; if (target.instanceId === caster.instanceId) return { success: false, message: '宿主转移不能选择毒液自身' }; if (target.currentHp <= 0 || target.x == null || target.y == null) return { success: false, message: '宿主转移只能选择场上的存活角色' }; if (caster.x == null || caster.y == null) return { success: false, message: '毒液当前不在战场上' }; var distance = Math.abs(caster.x - target.x) + Math.abs(caster.y - target.y); if (distance > 7) return { success: false, message: '目标距离超过7格' }; var casterX = caster.x; var casterY = caster.y; caster.x = target.x; caster.y = target.y; target.x = casterX; target.y = casterY; return { success: true, message: caster.name + '发动宿主转移，与' + target.name + '交换位置' }; }",
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 7, filter: 'all' }); if (!target || target.needsTargetSelection) return target; if (target.instanceId === caster.instanceId) return { success: false, message: '宿主转移不能选择毒液自身' }; if (target.currentHp <= 0 || target.x == null || target.y == null || caster.x == null || caster.y == null) return { success: false, message: '宿主转移只能选择场上的存活角色' }; if (Math.abs(caster.x - target.x) + Math.abs(caster.y - target.y) > 7) return { success: false, message: '目标距离超过7格' }; var x = caster.x; var y = caster.y; caster.x = target.x; caster.y = target.y; target.x = x; target.y = y; if (target.ownerPlayerId !== caster.ownerPlayerId) { if (!target.statusTags) target.statusTags = []; var tag = target.statusTags.find(function(item) { return item.type === 'venom-corrosion-immobile' && item.sourceId === caster.instanceId; }); if (tag) { tag.currentDuration = 1; tag.remainingDuration = 1; } else { addStatusEffectById(target.instanceId, { id: 'venom-corrosion-' + caster.instanceId + '-' + target.instanceId, name: '腐蚀', type: 'venom-corrosion-immobile', currentDuration: 1, remainingDuration: 1, currentUses: -1, intensity: 1, stacks: 1, sourceId: caster.instanceId, relatedRules: ['rule-venom-corrosion-immobile'] }); addRuleById(target.instanceId, 'rule-venom-corrosion-immobile'); } } return { success: true, message: caster.name + '发动宿主转移，与' + target.name + '交换位置' + (target.ownerPlayerId !== caster.ownerPlayerId ? '并使其定身1回合' : '') }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: '与7格内任意另一名存活角色交换位置，不造成伤害。', expectedValues: { range: 7 } }; }"
 }

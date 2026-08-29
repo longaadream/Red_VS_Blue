@@ -10,7 +10,7 @@ import { createRunningTurnTimer } from '@/lib/game/turn-timer'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
-function minatoWatcherState(): BattleState {
+function minatoWatcherState(phase: 'start' | 'action' = 'action'): BattleState {
   const minato = makePiece({
     instanceId: 'minato',
     templateId: 'blue-minato',
@@ -19,7 +19,7 @@ function minatoWatcherState(): BattleState {
     y: 1,
   }) as any
   minato.name = '波风水门'
-  minato.rules = [loadRuleById('rule-minato-anchor-begin-turn', true)]
+  minato.rules = [loadRuleById('rule-minato-anchor-end-turn', true)]
 
   const watcher = makePiece({
     instanceId: 'watcher',
@@ -34,19 +34,37 @@ function minatoWatcherState(): BattleState {
   return makeState({
     pieces: [minato, watcher],
     currentPlayerId: 'player-red',
-    phase: 'start',
+    phase,
   })
 }
 
-function beginMinatoSelection(): BattleState {
-  const pending = applyBattleAction(minatoWatcherState(), { type: 'beginPhase' })
-  expect(pending.turn.phase).toBe('start')
+function endMinatoSelection(): BattleState {
+  const pending = applyBattleAction(minatoWatcherState(), {
+    type: 'endTurn',
+    playerId: 'player-red',
+  })
+  expect(pending.turn.phase).toBe('action')
   expect(pending.pendingTargetSelection).toMatchObject({
     playerId: 'player-red',
-    source: { type: 'rule', id: 'rule-minato-anchor-begin-turn', pieceId: 'minato' },
-    canCancel: true,
+    source: { type: 'rule', id: 'rule-minato-anchor-end-turn', pieceId: 'minato' },
+    canCancel: false,
+  })
+  expect(pending.pendingTargetSelection?.transaction?.currentInteraction).toMatchObject({
+    eventType: 'endTurn',
   })
   expect(pending.pendingOptionSelection).toBeUndefined()
+  return pending
+}
+
+function beginWatcherSelection(): BattleState {
+  const pending = applyBattleAction(minatoWatcherState('start'), { type: 'beginPhase' })
+  expect(pending.turn.phase).toBe('start')
+  expect(pending.pendingTargetSelection).toBeUndefined()
+  expect(pending.pendingOptionSelection).toMatchObject({
+    playerId: 'player-red',
+    source: { type: 'rule', id: 'rule-watcher-form', pieceId: 'watcher' },
+    canCancel: false,
+  })
   return pending
 }
 
@@ -98,43 +116,32 @@ function timeoutPending(state: BattleState, rootSeed = 108): BattleState {
 
 
 describe('RED-97 authoritative pending interaction lifecycle', () => {
-  it('resolves Minato anchor, then Watcher, before committing begin-turn settlement once', () => {
-    const targetPending = beginMinatoSelection()
-    const optionPending = applyBattleAction(targetPending, pendingTargetAction(targetPending))
+  it('resolves the mandatory Minato anchor before committing end-turn settlement once', () => {
+    const targetPending = endMinatoSelection()
+    const completed = applyBattleAction(targetPending, pendingTargetAction(targetPending))
 
-    expect(optionPending.turn.phase).toBe('start')
-    expect(optionPending.pendingTargetSelection).toBeUndefined()
-    expect(optionPending.pendingOptionSelection).toMatchObject({
-      playerId: 'player-red',
-      source: { type: 'rule', id: 'rule-watcher-form', pieceId: 'watcher' },
-      canCancel: false,
-    })
-    expect(optionPending.pendingOptionSelection?.selectionId).toEqual(expect.any(String))
-
-    const completed = chooseWatcher(optionPending, 'calm')
-    const red = completed.players.find(player => player.playerId === 'player-red')!
+    expect(completed.turn.phase).toBe('end')
+    expect(completed.pendingTargetSelection).toBeUndefined()
     expect(completed.pendingOptionSelection).toBeUndefined()
-    expect(completed.turn.phase).toBe('action')
-    expect(red.hand.filter(card => card.cardId === 'watcher-calm')).toHaveLength(1)
     expect((completed.extensions?.minatoAnchors || []).filter((anchor: any) => anchor.sourceId === 'minato')).toHaveLength(1)
   })
 
-  it('cancels only Minato and continues to the non-cancellable Watcher choice', () => {
-    const targetPending = beginMinatoSelection()
+  it('forbids cancelling mandatory Minato and keeps the Watcher begin-turn choice non-cancellable', () => {
+    const targetPending = endMinatoSelection()
     const pending = targetPending.pendingTargetSelection!
-    const optionPending = applyBattleAction(targetPending, {
+    const before = JSON.stringify(targetPending)
+    expect(() => applyBattleAction(targetPending, {
       type: 'cancelPendingSelection',
       playerId: 'player-red',
       selectionId: pending.selectionId,
       stateRevision: pending.stateRevision,
-    })
+    })).toThrow(expect.objectContaining({ code: 'PENDING_TARGET_CANCEL_FORBIDDEN' }))
+    expect(JSON.stringify(targetPending)).toBe(before)
 
-    expect(optionPending.turn.phase).toBe('start')
-    expect(optionPending.pendingTargetSelection).toBeUndefined()
-    expect(optionPending.pendingOptionSelection).toMatchObject({
-      source: { id: 'rule-watcher-form', pieceId: 'watcher' },
-      canCancel: false,
-    })
+    const completedAnchor = applyBattleAction(targetPending, pendingTargetAction(targetPending))
+    expect(completedAnchor.turn.phase).toBe('end')
+
+    const optionPending = beginWatcherSelection()
     expect(() => applyBattleAction(optionPending, {
       type: 'cancelPendingSelection',
       playerId: 'player-red',
@@ -149,7 +156,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
   })
 
   it('keeps Minato pending unchanged after stale or invalid submissions and accepts a legal retry', () => {
-    const targetPending = beginMinatoSelection()
+    const targetPending = endMinatoSelection()
     const before = JSON.stringify(targetPending)
 
     expect(() => applyBattleAction(targetPending, pendingTargetAction(targetPending, {
@@ -165,12 +172,12 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
 
     const retried = applyBattleAction(targetPending, pendingTargetAction(targetPending))
     expect(retried.pendingTargetSelection).toBeUndefined()
-    expect(retried.pendingOptionSelection?.source?.id).toBe('rule-watcher-form')
+    expect(retried.pendingOptionSelection).toBeUndefined()
+    expect(retried.turn.phase).toBe('end')
   })
 
   it('versions option sessions, validates values, and exposes the same credentials to AI', () => {
-    const targetPending = beginMinatoSelection()
-    const optionPending = applyBattleAction(targetPending, pendingTargetAction(targetPending))
+    const optionPending = beginWatcherSelection()
     const pending = optionPending.pendingOptionSelection!
     const before = JSON.stringify(optionPending)
 
@@ -273,7 +280,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
     expect(resolved.graveyard.some(piece => piece.instanceId === 'execute-target')).toBe(true)
   })
 
-  it('resumes a targeted skill after Flying Raijin without rejecting its now-stale target credentials', () => {
+  it('lets Minato choose whether to trigger Flying Raijin before the original targeted skill', () => {
     const minato = makePiece({
       instanceId: 'raijin-minato',
       templateId: 'blue-minato',
@@ -291,7 +298,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       y: 1,
       attack: 2,
     }) as any
-    attacker.skills = [{ skillId: 'marked-shot', currentCooldown: 0, usesRemaining: -1 }]
+    attacker.skills = [{ skillId: 'fireball', currentCooldown: 0, usesRemaining: -1 }]
     const target = makePiece({
       instanceId: 'raijin-target',
       ownerPlayerId: 'player-blue',
@@ -315,9 +322,274 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       phase: 'action',
     }) as any
     state.players.find((player: any) => player.playerId === 'player-red').actionPoints = 2
-    state.skillsById['marked-shot'] = {
-      id: 'marked-shot',
-      name: '标记射击',
+    const rootAction = withPreparedTarget(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'raijin-attacker',
+      skillId: 'fireball',
+      targetPieceId: 'raijin-target',
+      __pendingContinuationMode: 'skillAfterBeforeTrigger',
+    })
+    const rootSeed = 129001
+    const pending = runBattleAction(state, rootAction, { rootSeed }).state
+
+    expect(pending.pendingOptionSelection).toMatchObject({
+      source: { type: 'rule', id: 'rule-minato-flying-raijin-trigger', pieceId: 'raijin-minato' },
+      canCancel: true,
+      cancelValue: 'no',
+      options: [{ value: 'yes' }, { value: 'no' }],
+    })
+    expect(pending.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(2)
+    expect(pending.pieces.find(piece => piece.instanceId === 'raijin-attacker')?.skills[0]?.currentCooldown).toBe(0)
+    expect(pending.pieces.find(piece => piece.instanceId === 'raijin-target')?.currentHp).toBe(10)
+    expect(pending.pieces.find(piece => piece.instanceId === 'raijin-minato')).toMatchObject({ x: 0, y: 0, attack: 3 })
+
+    const choice = pending.pendingOptionSelection!
+    const declined = runBattleAction(pending, {
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      selectedOption: 'no',
+      selectionId: choice.selectionId,
+      stateRevision: choice.stateRevision,
+    }, { rootSeed }).state
+    expect(declined.pendingOptionSelection).toBeUndefined()
+    expect(declined.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(1)
+    expect(declined.pieces.find(piece => piece.instanceId === 'raijin-attacker')?.skills[0]?.currentCooldown).toBe(2)
+    expect(declined.pieces.find(piece => piece.instanceId === 'raijin-target')?.currentHp).toBe(7)
+    expect(declined.pieces.find(piece => piece.instanceId === 'raijin-target')?.statusTags.some(tag => tag.type === 'flying-raijin-mark')).toBe(true)
+    expect(declined.pieces.find(piece => piece.instanceId === 'raijin-minato')).toMatchObject({ x: 0, y: 0, attack: 3 })
+    expect((declined.actions ?? []).filter(action => action.type === 'useBasicSkill')).toHaveLength(1)
+
+    const cancelled = runBattleAction(pending, {
+      type: 'cancelPendingSelection',
+      playerId: 'player-red',
+      selectionId: choice.selectionId,
+      stateRevision: choice.stateRevision,
+    }, { rootSeed }).state
+    expect(cancelled.pendingOptionSelection).toBeUndefined()
+    expect(cancelled.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(1)
+    expect(cancelled.pieces.find(piece => piece.instanceId === 'raijin-attacker')?.skills[0]?.currentCooldown).toBe(2)
+    expect(cancelled.pieces.find(piece => piece.instanceId === 'raijin-target')?.currentHp).toBe(7)
+    expect(cancelled.pieces.find(piece => piece.instanceId === 'raijin-target')?.statusTags.some(tag => tag.type === 'flying-raijin-mark')).toBe(true)
+    expect(cancelled.pieces.find(piece => piece.instanceId === 'raijin-minato')).toMatchObject({ x: 0, y: 0, attack: 3 })
+    expect((cancelled.actions ?? []).filter(action => action.type === 'useBasicSkill')).toHaveLength(1)
+
+    const triggeredAction: BattleAction = {
+      type: 'pendingOptionSelect',
+      playerId: 'player-red',
+      selectedOption: 'yes',
+      selectionId: choice.selectionId,
+      stateRevision: choice.stateRevision,
+    }
+    const triggered = runBattleAction(pending, triggeredAction, { rootSeed }).state
+    const triggeredReplay = runBattleAction(pending, triggeredAction, { rootSeed }).state
+    expect(triggered.pendingOptionSelection).toBeUndefined()
+    expect(triggered.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(1)
+    expect(triggered.pieces.find(piece => piece.instanceId === 'raijin-attacker')?.skills[0]?.currentCooldown).toBe(2)
+    const triggeredMinato = triggered.pieces.find(piece => piece.instanceId === 'raijin-minato')!
+    const triggeredTarget = triggered.pieces.find(piece => piece.instanceId === 'raijin-target')!
+    const replayedMinato = triggeredReplay.pieces.find(piece => piece.instanceId === 'raijin-minato')!
+    expect(triggeredTarget.currentHp).toBe(4)
+    expect(triggeredTarget.statusTags.some(tag => tag.type === 'flying-raijin-mark')).toBe(false)
+    expect(triggeredMinato.attack).toBe(4)
+    expect(Math.abs(triggeredMinato.x! - triggeredTarget.x!) + Math.abs(triggeredMinato.y! - triggeredTarget.y!)).toBe(1)
+    expect({ x: replayedMinato.x, y: replayedMinato.y }).toEqual({ x: triggeredMinato.x, y: triggeredMinato.y })
+    expect((triggered.actions ?? []).filter(action => action.type === 'useBasicSkill')).toHaveLength(1)
+  })
+
+  it('continues the original skill exactly once when Flying Raijin has no legal landing', () => {
+    const minato = makePiece({
+      instanceId: 'blocked-raijin-minato',
+      templateId: 'blue-minato',
+      ownerPlayerId: 'player-red',
+      x: 5,
+      y: 4,
+      attack: 3,
+    }) as any
+    minato.name = '波风水门'
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    const attacker = makePiece({
+      instanceId: 'blocked-raijin-attacker',
+      ownerPlayerId: 'player-red',
+      x: 0,
+      y: 0,
+      attack: 2,
+    }) as any
+    attacker.skills = [{ skillId: 'fireball', currentCooldown: 0, usesRemaining: -1 }]
+    const target = makePiece({
+      instanceId: 'blocked-raijin-target',
+      ownerPlayerId: 'player-blue',
+      faction: 'blue',
+      x: 3,
+      y: 2,
+      currentHp: 10,
+      maxHp: 10,
+    }) as any
+    target.statusTags = [{
+      id: 'blocked-raijin-mark',
+      type: 'flying-raijin-mark',
+      name: '飞雷神',
+      sourceId: minato.instanceId,
+      stacks: 1,
+      visible: true,
+    }]
+    const blockers = [
+      [2, 2],
+      [4, 2],
+      [3, 1],
+      [3, 3],
+    ].map(([x, y], index) => makePiece({
+      instanceId: `raijin-landing-blocker-${index}`,
+      ownerPlayerId: 'player-red',
+      x,
+      y,
+    }))
+    const state = makeState({
+      pieces: [minato, attacker, target, ...blockers],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+    }) as any
+    state.players.find((player: any) => player.playerId === 'player-red').actionPoints = 2
+    const action = withPreparedTarget(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: attacker.instanceId,
+      skillId: 'fireball',
+      targetPieceId: target.instanceId,
+    })
+
+    const completed = runBattleAction(state, action, { rootSeed: 129010 }).state
+    const completedAttacker = completed.pieces.find(piece => piece.instanceId === attacker.instanceId)!
+    const completedTarget = completed.pieces.find(piece => piece.instanceId === target.instanceId)!
+    const completedMinato = completed.pieces.find(piece => piece.instanceId === minato.instanceId)!
+
+    expect(completed.pendingOptionSelection).toBeUndefined()
+    expect(completed.pendingTargetSelection).toBeUndefined()
+    expect(completed.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(1)
+    expect(completedAttacker.skills?.[0]?.currentCooldown).toBe(2)
+    expect(completedTarget.currentHp).toBe(7)
+    expect(completedTarget.statusTags).toContainEqual(expect.objectContaining({
+      type: 'flying-raijin-mark',
+      sourceId: minato.instanceId,
+      stacks: 1,
+    }))
+    expect(completedMinato).toMatchObject({ x: 5, y: 4, attack: 3 })
+    expect((completed.actions ?? []).filter(entry => entry.type === 'useBasicSkill')).toHaveLength(1)
+  })
+
+  it('offers Flying Raijin before Minato pays for his own ordinary targeted skill', () => {
+    const minato = makePiece({
+      instanceId: 'self-caster-minato',
+      templateId: 'blue-minato',
+      ownerPlayerId: 'player-red',
+      x: 0,
+      y: 0,
+      attack: 3,
+    }) as any
+    minato.name = '波风水门'
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    minato.skills = [{ skillId: 'fireball', currentCooldown: 0, usesRemaining: -1 }]
+    const target = makePiece({
+      instanceId: 'self-caster-marked-target',
+      ownerPlayerId: 'player-blue',
+      faction: 'blue',
+      x: 2,
+      y: 1,
+      currentHp: 10,
+      maxHp: 10,
+    }) as any
+    target.statusTags = [{
+      id: 'self-caster-raijin-mark',
+      type: 'flying-raijin-mark',
+      name: '飞雷神',
+      sourceId: minato.instanceId,
+      stacks: 1,
+      visible: true,
+    }]
+    const state = makeState({
+      pieces: [minato, target],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+    }) as any
+    state.players.find((player: any) => player.playerId === 'player-red').actionPoints = 2
+    const action = withPreparedTarget(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: minato.instanceId,
+      skillId: 'fireball',
+      targetPieceId: target.instanceId,
+    })
+
+    const pending = runBattleAction(state, action, { rootSeed: 129011 }).state
+    const pendingMinato = pending.pieces.find(piece => piece.instanceId === minato.instanceId)!
+    const pendingTarget = pending.pieces.find(piece => piece.instanceId === target.instanceId)!
+
+    expect(pending.pendingOptionSelection).toMatchObject({
+      playerId: 'player-red',
+      source: { type: 'rule', id: 'rule-minato-flying-raijin-trigger', pieceId: minato.instanceId },
+      canCancel: true,
+      cancelValue: 'no',
+      options: [{ value: 'yes' }, { value: 'no' }],
+    })
+    expect(pending.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(2)
+    expect(pendingMinato.skills?.[0]?.currentCooldown).toBe(0)
+    expect(pendingMinato).toMatchObject({ x: 0, y: 0, attack: 3 })
+    expect(pendingTarget.currentHp).toBe(10)
+    expect(pendingTarget.statusTags).toContainEqual(expect.objectContaining({
+      type: 'flying-raijin-mark',
+      sourceId: minato.instanceId,
+      stacks: 1,
+    }))
+    expect((pending.actions ?? []).filter(entry => entry.type === 'useBasicSkill')).toHaveLength(0)
+  })
+
+  it('uses the enemy caster as the Rasengan target when an enemy targets a marked ally', () => {
+    const minato = makePiece({
+      instanceId: 'ally-branch-minato',
+      templateId: 'blue-minato',
+      ownerPlayerId: 'player-red',
+      x: 0,
+      y: 0,
+      attack: 3,
+    }) as any
+    minato.name = '波风水门'
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    const ally = makePiece({
+      instanceId: 'marked-ally',
+      ownerPlayerId: 'player-red',
+      x: 2,
+      y: 1,
+      currentHp: 10,
+      maxHp: 10,
+    }) as any
+    ally.statusTags = [{
+      id: 'ally-raijin-mark',
+      type: 'flying-raijin-mark',
+      name: '飞雷神',
+      sourceId: minato.instanceId,
+      stacks: 1,
+      visible: true,
+    }]
+    const enemyCaster = makePiece({
+      instanceId: 'enemy-caster',
+      ownerPlayerId: 'player-blue',
+      faction: 'blue',
+      x: 1,
+      y: 1,
+      attack: 2,
+      currentHp: 10,
+      maxHp: 10,
+    }) as any
+    enemyCaster.skills = [{ skillId: 'enemy-marked-shot', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({
+      pieces: [minato, ally, enemyCaster],
+      currentPlayerId: 'player-blue',
+      phase: 'action',
+    }) as any
+    state.players.find((player: any) => player.playerId === 'player-blue').actionPoints = 2
+    state.skillsById['enemy-marked-shot'] = {
+      id: 'enemy-marked-shot',
+      name: '敌方标记射击',
       description: '',
       kind: 'active',
       type: 'normal',
@@ -327,35 +599,46 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       actionPointCost: 1,
       range: 'single',
       requiresTarget: true,
-      code: "function executeSkill(context) { var target = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; dealDamage(context.piece, target, 2, 'true', context.battle, 'marked-shot'); return { success: true, message: 'shot' }; }",
+      code: "function executeSkill(context) { var target = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; dealDamage(context.piece, target, 2, 'true', context.battle, 'enemy-marked-shot'); return { success: true, message: 'shot' }; }",
     }
-
-    const pending = applyBattleAction(state, withPreparedTarget(state, {
+    const rootAction = withPreparedTarget(state, {
       type: 'useBasicSkill',
-      playerId: 'player-red',
-      pieceId: 'raijin-attacker',
-      skillId: 'marked-shot',
-      targetPieceId: 'raijin-target',
+      playerId: 'player-blue',
+      pieceId: 'enemy-caster',
+      skillId: 'enemy-marked-shot',
+      targetPieceId: 'marked-ally',
       __pendingContinuationMode: 'skillAfterBeforeTrigger',
-    }))
-    expect(pending.pendingOptionSelection).toMatchObject({
-      source: { type: 'rule', id: 'rule-minato-flying-raijin-trigger', pieceId: 'raijin-minato' },
-      canCancel: true,
-      cancelValue: 'no',
     })
-    expect(pending.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(2)
+    const pending = applyBattleAction(state, rootAction)
 
+    expect(pending.pendingOptionSelection).toMatchObject({
+      playerId: 'player-red',
+      source: { type: 'rule', id: 'rule-minato-flying-raijin-trigger', pieceId: 'ally-branch-minato' },
+    })
     const choice = pending.pendingOptionSelection!
-    const resolved = applyBattleAction(pending, {
+    const triggered = applyBattleAction(pending, {
       type: 'pendingOptionSelect',
       playerId: 'player-red',
-      selectedOption: 'no',
+      selectedOption: 'yes',
       selectionId: choice.selectionId,
       stateRevision: choice.stateRevision,
     })
-    expect(resolved.pendingOptionSelection).toBeUndefined()
-    expect(resolved.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(1)
-    expect(resolved.pieces.find(piece => piece.instanceId === 'raijin-target')?.currentHp).toBe(8)
+    const resolvedMinato = triggered.pieces.find(piece => piece.instanceId === 'ally-branch-minato')!
+    const resolvedAlly = triggered.pieces.find(piece => piece.instanceId === 'marked-ally')!
+    const resolvedCaster = triggered.pieces.find(piece => piece.instanceId === 'enemy-caster')!
+
+    expect(triggered.pendingOptionSelection).toBeUndefined()
+    expect(triggered.players.find(player => player.playerId === 'player-blue')?.actionPoints).toBe(1)
+    expect(resolvedCaster.currentHp).toBe(7)
+    expect(resolvedCaster.statusTags).toContainEqual(expect.objectContaining({
+      type: 'flying-raijin-mark',
+      sourceId: 'ally-branch-minato',
+      stacks: 1,
+    }))
+    expect(resolvedAlly.currentHp).toBe(8)
+    expect(resolvedAlly.statusTags.some(tag => tag.type === 'flying-raijin-mark')).toBe(false)
+    expect(resolvedMinato.attack).toBe(4)
+    expect(Math.abs(resolvedMinato.x! - resolvedCaster.x!) + Math.abs(resolvedMinato.y! - resolvedCaster.y!)).toBe(1)
   })
 
   it('settles the turn phase after an interactive begin-turn consumer blocks the remaining event', () => {
@@ -1061,29 +1344,24 @@ describe('RED-121 legacy direct target transaction adapter', () => {
 })
 
 describe('RED-108 authoritative pending timeout resolution', () => {
-  it('cancels a cancellable target and deterministically resolves the following mandatory option', () => {
-    const first = timeoutPending(beginMinatoSelection(), 108)
-    const second = timeoutPending(beginMinatoSelection(), 108)
+  it('resolves the mandatory Minato end-turn target instead of cancelling it on timeout', () => {
+    const resolved = timeoutPending(endMinatoSelection(), 108)
 
-    expect(first.pendingTargetSelection).toBeUndefined()
-    expect(first.pendingOptionSelection).toBeUndefined()
-    expect(first.extensions?.minatoAnchors || []).toEqual([])
-    const firstWatcherCards = first.players[0].hand
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.pendingOptionSelection).toBeUndefined()
+    expect((resolved.extensions?.minatoAnchors || []).filter((anchor: any) => anchor.sourceId === 'minato')).toHaveLength(1)
+    const watcherCards = resolved.players[0].hand
       .filter(card => card.cardId === 'watcher-calm' || card.cardId === 'watcher-rage')
       .map(card => card.cardId)
-    const secondWatcherCards = second.players[0].hand
-      .filter(card => card.cardId === 'watcher-calm' || card.cardId === 'watcher-rage')
-      .map(card => card.cardId)
-    expect(firstWatcherCards).toHaveLength(1)
-    expect(secondWatcherCards).toEqual(firstWatcherCards)
-    expect(first.turn).toMatchObject({ currentPlayerId: 'player-blue', phase: 'action' })
+    expect(watcherCards).toEqual([])
+    expect(resolved.turn).toMatchObject({ currentPlayerId: 'player-blue', phase: 'action' })
   })
 
-  it('selects a deterministic legal candidate when the target cannot be cancelled', () => {
-    const firstPending = beginMinatoSelection()
-    firstPending.pendingTargetSelection!.canCancel = false
-    const secondPending = beginMinatoSelection()
-    secondPending.pendingTargetSelection!.canCancel = false
+  it('selects the same legal anchor for the same seed when the target cannot be cancelled', () => {
+    const firstPending = endMinatoSelection()
+    const secondPending = endMinatoSelection()
+    expect(firstPending.pendingTargetSelection?.canCancel).toBe(false)
+    expect(secondPending.pendingTargetSelection?.canCancel).toBe(false)
 
     const first = timeoutPending(firstPending, 109)
     const second = timeoutPending(secondPending, 109)
@@ -1099,9 +1377,9 @@ describe('RED-108 authoritative pending timeout resolution', () => {
   })
 
   it('fails explicitly when a mandatory target has no authoritative candidate', () => {
-    const pending = beginMinatoSelection()
-    pending.pendingTargetSelection!.canCancel = false
+    const pending = endMinatoSelection()
     pending.map.tiles = []
+    pending.pendingTargetSelection!.candidates = []
     pending.turnTimer = createRunningTurnTimer(pending, 0)
 
     expect(() => runBattleAction(pending, {
@@ -1114,9 +1392,9 @@ describe('RED-108 authoritative pending timeout resolution', () => {
   })
 
   it('logs context and safely skips an impossible mandatory pending in production', () => {
-    const pending = beginMinatoSelection()
-    pending.pendingTargetSelection!.canCancel = false
+    const pending = endMinatoSelection()
     pending.map.tiles = []
+    pending.pendingTargetSelection!.candidates = []
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.stubEnv('NODE_ENV', 'production')
@@ -1129,7 +1407,7 @@ describe('RED-108 authoritative pending timeout resolution', () => {
       expect(errorSpy).toHaveBeenCalledWith(
         '[pending-timeout] invariant',
         expect.objectContaining({
-          phase: 'start',
+          phase: 'action',
           callSite: 'applyBattleActionInternal.turnTimeout.resolveTimedOutPending',
           stack: expect.any(String),
           ownerPlayerId: 'player-red',

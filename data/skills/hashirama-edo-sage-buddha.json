@@ -10,9 +10,9 @@
   "type": "super",
   "cooldownTurns": 3,
   "maxCharges": 0,
-  "chargeCost": 3,
+  "chargeCost": 1,
   "powerMultiplier": 1.0,
-  "actionPointCost": 4,
+  "actionPointCost": 0,
   "targeting": {
     "steps": [
       { "kind": "target", "type": "grid", "filter": "all", "range": 2, "distanceMetric": "manhattan", "requireWalkable": true, "requireUnoccupied": true, "allowSourceOccupant": true }

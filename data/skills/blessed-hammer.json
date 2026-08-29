@@ -11,7 +11,7 @@
   "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 2,
+  "actionPointCost": 1,
   "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetEnemy = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const damage = sourcePiece.attack; const damageResult = dealDamage(sourcePiece, targetEnemy, damage, 'physical', context.battle, context.skill.id); return { message: sourcePiece.name + '的祝福之锤对' + targetEnemy.name + '造成' + damageResult.damage + '点物理伤害', success: true }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: '对2格内1个敌人造成' + damage + '点物理伤害。', expectedValues: { damage: damage } }; }",
   "range": "single"

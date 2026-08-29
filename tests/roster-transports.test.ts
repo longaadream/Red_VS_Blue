@@ -867,25 +867,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(completedState.deployment.status).toBe('awaiting-locks')
     expect(completedState.gameStartFired).toBeFalsy()
     expect(completedState.turn.phase).toBe('start')
-    expect(completedState.pendingTargetSelection).toMatchObject({
-      playerId: firstIdentity.id,
-      source: { id: 'rule-minato-anchor-begin-turn' },
-    })
-
-    expect(completedState.pendingTargetSelection?.suspendedTurn).toMatchObject({
-      currentPlayerId: firstIdentity.id,
-      turnNumber: 1,
-      phase: 'start',
-    })
-    const minato = completedState.pendingTargetSelection!
-    const cancelled = await httpBattleAction(roomId, firstIdentity.id, {
-      type: 'cancelPendingSelection',
-      playerId: firstIdentity.id,
-      selectionId: minato.selectionId,
-      stateRevision: minato.stateRevision,
-      clientActionId: 'alice-pve-cancel-minato',
-    }, firstIdentity.id, firstIdentity)
-    expect(cancelled.status).toBe(200)
+    expect(completedState.pendingTargetSelection).toBeUndefined()
 
     const watcherState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
       state: {
@@ -941,6 +923,83 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(actionState.gameStartFired).toBe(true)
     expect(actionState.pendingOptionSelection).toBeUndefined()
     expect(actionState.pendingTargetSelection).toBeUndefined()
+
+    const ended = await httpBattleAction(roomId, firstIdentity.id, {
+      type: 'endTurn',
+      playerId: firstIdentity.id,
+      clientActionId: 'alice-pve-end-turn',
+    }, firstIdentity.id, firstIdentity)
+    expect(ended.status).toBe(200)
+
+    const anchorState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
+      state: {
+        turn: { currentPlayerId: string; turnNumber: number; phase: string }
+        pendingTargetSelection?: {
+          playerId: string
+          selectionId: string
+          stateRevision: number
+          canCancel?: boolean
+          candidates?: Array<{ type: string; x?: number; y?: number }>
+          source?: { id?: string }
+          suspendedTurn?: { currentPlayerId: string; turnNumber: number; phase: string }
+          transaction?: { currentInteraction?: { eventType?: string } }
+        }
+        extensions?: {
+          minatoAnchors?: Array<{ sourceId: string; ownerPlayerId?: string; x: number; y: number }>
+        }
+      }
+    }).state
+    expect(anchorState.pendingTargetSelection).toMatchObject({
+      playerId: firstIdentity.id,
+      canCancel: false,
+      source: { id: 'rule-minato-anchor-end-turn' },
+    })
+    expect(anchorState.pendingTargetSelection?.suspendedTurn).toMatchObject({
+      currentPlayerId: firstIdentity.id,
+      turnNumber: 1,
+      phase: 'action',
+    })
+    expect(anchorState.pendingTargetSelection?.transaction?.currentInteraction).toMatchObject({
+      eventType: 'endTurn',
+    })
+    expect(anchorState.extensions?.minatoAnchors || []).toEqual([])
+
+    const anchor = anchorState.pendingTargetSelection!
+    const anchorCell = anchor.candidates?.find(candidate => candidate.type === 'cell')
+    if (!anchorCell || typeof anchorCell.x !== 'number' || typeof anchorCell.y !== 'number') {
+      throw new Error('Expected a legal Minato anchor cell after the owning player ends their turn')
+    }
+    const anchored = await httpBattleAction(roomId, firstIdentity.id, {
+      type: 'pendingTargetSelect',
+      playerId: firstIdentity.id,
+      targetX: anchorCell.x,
+      targetY: anchorCell.y,
+      selectionId: anchor.selectionId,
+      stateRevision: anchor.stateRevision,
+      clientActionId: 'alice-pve-place-minato-anchor',
+    }, firstIdentity.id, firstIdentity)
+    expect(anchored.status).toBe(200)
+
+    const anchoredState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
+      state: {
+        turn: { currentPlayerId: string; turnNumber: number; phase: string }
+        pendingTargetSelection?: unknown
+        extensions?: {
+          minatoAnchors?: Array<{ sourceId: string; ownerPlayerId?: string; x: number; y: number }>
+        }
+      }
+    }).state
+    expect(anchoredState.turn).toMatchObject({
+      currentPlayerId: firstIdentity.id,
+      turnNumber: 1,
+      phase: 'end',
+    })
+    expect(anchoredState.pendingTargetSelection).toBeUndefined()
+    expect(anchoredState.extensions?.minatoAnchors).toContainEqual(expect.objectContaining({
+      ownerPlayerId: firstIdentity.id,
+      x: anchorCell.x,
+      y: anchorCell.y,
+    }))
   })
 
   it('returns equivalent stable errors and leaves state untouched', async () => {

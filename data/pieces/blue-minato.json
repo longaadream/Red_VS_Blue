@@ -31,7 +31,7 @@
     }
   ],
   "rules": [
-    "rule-minato-anchor-begin-turn",
+    "rule-minato-anchor-end-turn",
     "rule-minato-flying-raijin-trigger"
   ],
   "isDefault": false

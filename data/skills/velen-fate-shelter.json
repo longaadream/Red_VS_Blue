@@ -14,7 +14,7 @@
   "icon": "\ud83d\udee1\ufe0f",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 2,
+  "cooldownTurns": 3,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 1,

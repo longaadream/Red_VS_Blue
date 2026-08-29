@@ -1,7 +1,7 @@
 {
   "id": "rocket-punch",
   "name": "火箭重拳",
-  "description": "向同一行或同一列冲刺最多3格，对路径上的敌人造成等同攻击力200%的物理伤害，并停在第一个敌人或障碍前。",
+  "description": "向同一行或同一列冲刺最多5格，对路径上的敌人造成等同攻击力200%的物理伤害，并停在第一个敌人或障碍前。",
   "keywords": [],
   "targetText": "同一行或同一列的1个地格",
   "effectTags": [
@@ -11,12 +11,12 @@
   "icon": "👊",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 2,
+  "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 2,
   "actionPointCost": 2,
-  "code": "function executeSkill(context) { const targetPosition = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) { return targetPosition; } if (sourcePiece.x !== targetPosition.x && sourcePiece.y !== targetPosition.y) { return { message: '目标格子必须与当前位置在同一行或同一列', success: false }; } let direction = ''; if (sourcePiece.x === targetPosition.x) { direction = targetPosition.y < sourcePiece.y ? 'up' : 'down'; } else { direction = targetPosition.x < sourcePiece.x ? 'left' : 'right'; } let hitEnemies = []; const damageValue = Math.floor(sourcePiece.attack * context.skill.powerMultiplier); for (let i = 1; i <= 3; i++) { let checkX = sourcePiece.x; let checkY = sourcePiece.y; switch (direction) { case 'up': checkY -= i; break; case 'down': checkY += i; break; case 'left': checkX -= i; break; case 'right': checkX += i; break; } const enemyAtCheck = battle.pieces.find(p => p.x === checkX && p.y === checkY && p.currentHp > 0 && p.ownerPlayerId !== sourcePiece.ownerPlayerId); if (enemyAtCheck) { hitEnemies.push(enemyAtCheck); } } let finalX = sourcePiece.x; let finalY = sourcePiece.y; for (let step = 1; step <= 3; step++) { let nextX = finalX; let nextY = finalY; switch (direction) { case 'up': nextY--; break; case 'down': nextY++; break; case 'left': nextX--; break; case 'right': nextX++; break; } const hasEnemy = battle.pieces.some(p => p.x === nextX && p.y === nextY && p.currentHp > 0); const isOutOfBounds = nextX < 0 || nextX >= battle.map.width || nextY < 0 || nextY >= battle.map.height; if (hasEnemy || isOutOfBounds) { break; } const tile = battle.map.tiles.find(t => t.x === nextX && t.y === nextY); if (!tile || !tile.props.walkable) { break; } finalX = nextX; finalY = nextY; } sourcePiece.x = finalX; sourcePiece.y = finalY; dealDamage(sourcePiece, hitEnemies, damageValue, 'physical', battle, context.skill.id); return { message: sourcePiece.name + '使用了火箭重拳，对路径上的敌人造成了伤害', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.floor(piece.attack * skillDef.powerMultiplier); return { description: '向同一行或同一列冲刺最多3格，对路径上的敌人造成' + damageValue + '点物理伤害。', expectedValues: { damage: damageValue, range: 5 } }; }",
+  "code": "function executeSkill(context) { var source = context.piece; var pos = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '目标必须与末日铁拳在同一行或同一列' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var finalX = source.x; var finalY = source.y; var hit = null; for (var step = 1; step <= 5; step++) { var x = source.x + direction.x * step; var y = source.y + direction.y * step; var tile = battle.map.tiles.find(function(item) { return item.x === x && item.y === y; }); if (!tile || !tile.props || !tile.props.walkable) break; var occupant = battle.pieces.find(function(piece) { return piece.currentHp > 0 && piece.instanceId !== source.instanceId && piece.x === x && piece.y === y; }); if (occupant) { if (occupant.ownerPlayerId !== source.ownerPlayerId) hit = occupant; break; } finalX = x; finalY = y; } source.x = finalX; source.y = finalY; var message = source.name + '使用火箭重拳冲刺至(' + finalX + ',' + finalY + ')'; if (hit) { var damage = Math.round(source.attack * context.skill.powerMultiplier); var result = dealDamage(source, hit, damage, 'physical', battle, context.skill.id); message += '，对' + hit.name + '造成' + result.damage + '点物理伤害'; } return { success: true, message: message }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '向直线方向冲刺最多5格，对首个路径敌人造成' + damage + '点物理伤害。', expectedValues: { damage: damage, range: 5 } }; }",
   "range": "single",
   "targeting": {
     "steps": [

@@ -328,21 +328,23 @@ describe('versioned headless AI environment', () => {
     const minato = makePiece({
       instanceId: 'minato', templateId: 'blue-minato', ownerPlayerId: 'player-red', x: 1, y: 1,
     }) as any
-    minato.rules = [loadRuleById('rule-minato-anchor-begin-turn', true)]
-    const pendingSeed = makeState({ pieces: [minato], phase: 'start' }) as any
-    const advance = listLegalAIActions(pendingSeed, 'player-red')[0]
+    minato.rules = [loadRuleById('rule-minato-anchor-end-turn', true)]
+    const pendingSeed = makeState({ pieces: [minato], phase: 'action' }) as any
+    const advance = listLegalAIActions(pendingSeed, 'player-red').find(item => item.kind === 'end-turn')
+    if (!advance) throw new Error('Expected an authoritative end-turn action for Minato')
     const enteredPending = simulateAITransition(pendingSeed, advance, { rootSeed: FIXED_SEED })
     expect(enteredPending.accepted).toBe(true)
-    if (!enteredPending.accepted) throw new Error('Expected Minato begin-turn rule to enter pending target state')
+    if (!enteredPending.accepted) throw new Error('Expected Minato end-turn rule to enter pending target state')
     expect(enteredPending.state.pendingTargetSelection?.transaction?.currentInteraction).toMatchObject({
       consumerKind: 'rule',
-      consumerId: 'rule-minato-anchor-begin-turn',
-      eventType: 'beginTurn',
+      consumerId: 'rule-minato-anchor-end-turn',
+      eventType: 'endTurn',
     })
+    expect(enteredPending.state.pendingTargetSelection?.canCancel).toBe(false)
     expect(enteredPending.state.pendingTargetSelection?.triggerContext).toBeUndefined()
     const pending = listLegalAIActions(enteredPending.state, 'player-red')
     expect(pending.some(item => item.kind === 'pending-target')).toBe(true)
-    expect(pending.at(-1)?.kind).toBe('cancel-selection')
+    expect(pending.some(item => item.kind === 'cancel-selection')).toBe(false)
     for (const item of pending) {
       expect(
         simulateAITransition(enteredPending.state, item, { rootSeed: FIXED_SEED }).accepted,
@@ -769,13 +771,14 @@ describe('AI Environment v2 real roster interactions', () => {
     expect(cancelled.state.players[0].actionPoints).toBe(state.players[0].actionPoints)
   })
 
-  it('resumes Ichigo target-to-option execution through the v2 decision contract', () => {
+  it('resumes Ichigo direction-to-landing execution through the v2 decision contract', () => {
     const skill = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/ichigo-black-getsuga-tensho.json'), 'utf8'))
     const ichigo = makePiece({
       instanceId: 'v2-ichigo', templateId: 'blue-ichigo', ownerPlayerId: 'player-red',
       x: 1, y: 1, attack: 6,
     }) as any
     ichigo.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
+    ichigo.rules = [loadRuleById('rule-ichigo-black-getsuga-teleport', true)]
     const enemy = makePiece({
       instanceId: 'v2-ichigo-enemy', ownerPlayerId: 'player-blue', faction: 'blue',
       x: 3, y: 1, currentHp: 30, maxHp: 30,
@@ -797,20 +800,29 @@ describe('AI Environment v2 real roster interactions', () => {
 
     const prompted = aiEnvironmentV2.simulate(state, targeted!, { rootSeed: FIXED_SEED })
     expect(prompted.accepted).toBe(true)
-    if (!prompted.accepted) throw new Error('Expected Ichigo hit to enter pending option selection')
-    const space = aiEnvironmentV2.decisionSpace(prompted.state, 'player-red') as AIPendingOptionDecisionSpaceV2
-    expect(space.options.map(option => option.value)).toEqual(['stay', 'teleport'])
-    const stay = aiEnvironmentV2.materialize(prompted.state, 'player-red', {
-      kind: 'pending-option',
+    if (!prompted.accepted) throw new Error('Expected Ichigo hit to enter pending landing selection')
+    expect(prompted.state.pieces.find(piece => piece.instanceId === enemy.instanceId)?.currentHp).toBe(30)
+    const space = aiEnvironmentV2.decisionSpace(prompted.state, 'player-red') as AIPendingTargetDecisionSpaceV2
+    expect(space.kind).toBe('pending-target')
+    expect(space.candidates.map(candidate => candidate.ref)).toEqual(expect.arrayContaining([
+      { type: 'cell', x: 2, y: 1 },
+      { type: 'cell', x: 3, y: 0 },
+      { type: 'cell', x: 3, y: 2 },
+      { type: 'cell', x: 4, y: 1 },
+    ]))
+    const landingRef = space.candidates.find(candidate => candidate.ref.type === 'cell' && candidate.ref.x === 3 && candidate.ref.y === 0)!.ref
+    const landing = aiEnvironmentV2.materialize(prompted.state, 'player-red', {
+      kind: 'pending-target',
       selectionId: space.selectionId,
       stateRevision: space.stateRevision,
-      selected: ['stay'],
+      selected: [landingRef],
     })
-    const resolved = aiEnvironmentV2.simulate(prompted.state, stay, { rootSeed: FIXED_SEED })
+    const resolved = aiEnvironmentV2.simulate(prompted.state, landing, { rootSeed: FIXED_SEED })
     expect(resolved.accepted).toBe(true)
-    if (!resolved.accepted) throw new Error('Expected Ichigo pending option to resolve')
-    expect(resolved.state.pendingOptionSelection).toBeUndefined()
-    expect(resolved.state.pieces.find(piece => piece.instanceId === enemy.instanceId)?.currentHp).toBeLessThan(30)
+    if (!resolved.accepted) throw new Error('Expected Ichigo pending landing to resolve')
+    expect(resolved.state.pendingTargetSelection).toBeUndefined()
+    expect(resolved.state.pieces.find(piece => piece.instanceId === ichigo.instanceId)).toMatchObject({ x: 3, y: 0 })
+    expect(resolved.state.pieces.find(piece => piece.instanceId === enemy.instanceId)?.currentHp).toBe(18)
   })
 })
 

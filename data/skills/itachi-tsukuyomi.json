@@ -1,20 +1,32 @@
 {
   "id": "itachi-tsukuyomi",
   "name": "月读",
-  "description": "选择4格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。",
+  "description": "选择6格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。",
   "keywords": [],
-  "targetText": "4格内的一个敌人",
-  "effectTags": ["control", "cooldown"],
+  "targetText": "6格内的一个敌人",
+  "effectTags": [
+    "control",
+    "cooldown"
+  ],
   "icon": "👁️",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 1,
   "maxCharges": 0,
-  "powerMultiplier": 1.0,
+  "powerMultiplier": 1,
   "actionPointCost": 0,
   "range": "single",
   "requiresTarget": true,
-  "targeting": { "steps": [{ "type": "piece", "filter": "enemy", "range": 4 }] },
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; if (!target.statusTags) target.statusTags = []; var existing = target.statusTags.find(function(tag) { return tag.type === 'itachi-tsukuyomi'; }); if (!existing) { addStatusEffectById(target.instanceId, { id: 'itachi-tsukuyomi-' + target.instanceId, name: '月读', type: 'itachi-tsukuyomi', currentDuration: -1, currentUses: 1, intensity: 1, stacks: 1, relatedRules: ['rule-itachi-tsukuyomi'] }); if (!target.rules || !target.rules.some(function(rule) { return rule.id === 'rule-itachi-tsukuyomi'; })) addRuleById(target.instanceId, 'rule-itachi-tsukuyomi'); } return { success: true, message: caster.name + '对' + target.name + '施加月读，其下一个使用的技能额外增加1回合冷却' }; }",
-  "previewCode": "function calculatePreview() { return { description: '选择4格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。', expectedValues: { cooldownIncrease: 1 } }; }"
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 6
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 6, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; if (!target.statusTags) target.statusTags = []; var existing = target.statusTags.find(function(tag) { return tag.type === 'itachi-tsukuyomi'; }); if (!existing) { addStatusEffectById(target.instanceId, { id: 'itachi-tsukuyomi-' + target.instanceId, name: '月读', type: 'itachi-tsukuyomi', currentDuration: -1, currentUses: 1, intensity: 1, stacks: 1, relatedRules: ['rule-itachi-tsukuyomi'] }); if (!target.rules || !target.rules.some(function(rule) { return rule.id === 'rule-itachi-tsukuyomi'; })) addRuleById(target.instanceId, 'rule-itachi-tsukuyomi'); } return { success: true, message: caster.name + '对' + target.name + '施加月读，其下一个使用的技能额外增加1回合冷却' }; }",
+  "previewCode": "function calculatePreview() { return { description: '选择6格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。', expectedValues: { cooldownIncrease: 1 } }; }"
 }

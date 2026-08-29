@@ -8,7 +8,7 @@
   "icon": "👥",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 2,
+  "cooldownTurns": 3,
   "maxCharges": 0,
   "powerMultiplier": 1.0,
   "actionPointCost": 1,

@@ -30,7 +30,6 @@ import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
 import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost } from "./skills"
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
-import type { DamageType } from "./skills"
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { getSkillById } from "./skill-repository"
 import {
@@ -2865,6 +2864,7 @@ function applyBattleActionInternal(
             payload: pending.payload,
           }) || { success: true }
         } catch (execErr) {
+          if (isSuspendableActionPending(execErr)) throw execErr
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))
         }
       }

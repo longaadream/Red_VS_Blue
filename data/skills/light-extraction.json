@@ -1,7 +1,7 @@
 {
   "id": "light-extraction",
   "name": "圣光汲取",
-  "description": "选择1个拥有【圣盾】的友方，移除其【圣盾】，获得1张【圣光惩戒】和1张【圣光治疗】。执行前手牌必须至少有3个空位。",
+  "description": "选择1个拥有【圣盾】的友方，移除其【圣盾】，获得1张【圣光惩戒】和1张【圣光治疗】。",
   "keywords": [
     "圣光"
   ],
@@ -13,7 +13,7 @@
   "icon": "✨",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 1,
+  "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
@@ -31,7 +31,7 @@
       }
     ]
   },
-  "code": "function executeSkill(context) {\n  var caster = context.piece;\n  var player = battle.players.find(function(item) { return item.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '未找到玩家' };\n  if (!player.hand) player.hand = [];\n  if (player.hand.length > 7) return { success: false, message: '手牌需要至少3个空位才能发动圣光汲取' };\n  var target = selectTarget({ type: 'piece', range: 99, filter: 'ally' });\n  if (!target || target.needsTargetSelection) return target;\n  var shield = target.statusTags && target.statusTags.find(function(tag) { return tag.type === 'divine-shield'; });\n  if (!shield) return { success: false, message: '目标没有圣盾' };\n  removeStatusEffectById(target.instanceId, shield.id);\n  removeRuleById(target.instanceId, 'rule-divine-shield');\n  var smiteAdded = addCardToHand('holy-smite', player.playerId);\n  var healAdded = addCardToHand('holy-heal', player.playerId);\n  if (!smiteAdded || !healAdded) return { success: false, message: '圣光汲取生成手牌失败' };\n  return { success: true, message: caster.name + '汲取了' + target.name + '的圣盾，获得圣光惩戒和圣光治疗' };\n}",
+  "code": "function executeSkill(context) { var caster = context.piece; var player = battle.players.find(function(item) { return item.playerId === caster.ownerPlayerId; }); if (!player) return { success: false, message: '未找到玩家' }; if (!player.hand) player.hand = []; var target = selectTarget({ type: 'piece', range: 99, filter: 'ally' }); if (!target || target.needsTargetSelection) return target; var shield = target.statusTags && target.statusTags.find(function(tag) { return tag.type === 'divine-shield'; }); if (!shield) return { success: false, message: '目标没有圣盾' }; removeStatusEffectById(target.instanceId, shield.id); removeRuleById(target.instanceId, 'rule-divine-shield'); addCardToHand('holy-smite', player.playerId); addCardToHand('holy-heal', player.playerId); return { success: true, message: caster.name + '汲取了' + target.name + '的圣盾，生成圣光惩戒和圣光治疗' }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"generatedCards\":2} }; }",
   "range": "single"
 }

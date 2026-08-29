@@ -121,6 +121,8 @@ export interface TriggerContext {
   amount?: number
   /** 状态 ID（用于 afterStatusApplied / afterStatusRemoved 事件） */
   statusId?: string
+  /** Removed status type when a tag ID differs from its semantic type. */
+  statusType?: string
   /** 目标位置X坐标，可以在 beforeMove/beforePieceSummoned 中被修改 */
   targetX?: number
   /** 目标位置Y坐标，可以在 beforeMove/beforePieceSummoned 中被修改 */
