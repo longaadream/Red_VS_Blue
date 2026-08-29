@@ -108,22 +108,23 @@ npm.cmd test -- tests/game/ai-zero-stage-pve-evaluation.test.ts
 通过：
 
 - `npm.cmd test -- tests/game/ai-zero-stage.test.ts`：1 file / 26 tests。
-- `npm.cmd test -- tests/game/ai-environment.test.ts tests/game/ai-planner.test.ts tests/game/ai-isolation.test.ts`：3 files / 30 tests。
-- rebase 到 `origin/main@0a09899` 后运行零阶段与相邻 AI 回归；最新合计 4 files / 56 tests，全部通过。
-- `npm.cmd run check:encoding`：通过，773 个文本文件。
+- 合并 `origin/main@44d7296` 后运行零阶段、AI environment v2、planner 与状态隔离回归；最新合计 4 files / 64 tests，全部通过。
+- `npm.cmd run typecheck`：同步 lockfile 已声明的依赖后通过。
+- `npm.cmd run check:encoding`：通过，776 个文本文件。
+- `npm.cmd run check:main-baseline`：通过，Ahead 5 / Behind 0。
 - `git diff --check`：通过（仅换行转换提示）。
-- 固定 seed `1001` 镜像自对弈：1 file / 1 test，通过；25 回合正常终局，非法动作 0，两次优化运行的动作与终态 hash 一致。
+- 固定 seed `1001` 镜像自对弈：1 file / 1 test，通过；25 回合正常终局，非法动作 0；在最新 main 上重复运行的动作与终态 hash 一致。
+- `npm.cmd test -- --maxWorkers=1`：同步 lockfile 已声明的依赖后，133 files / 1,386 tests 通过，1 test 按环境开关跳过；完整 suite 退出码 0。首次运行暴露的 11 个 `@noble/curves` 导入失败在依赖同步后消失。
 
 schema v3 全枚举边界曾完成独立 AI 复核；本次 evaluation transition 性能优化已完成新的独立 AI 复核。复核首次发现压缩 action log 会改变立即终局的 `settledAt.actionIndex`；修正为等长轻量占位并增加终局回归测试后，复核结论为通过，无剩余阻塞项。
 
 未通过/环境阻塞：
 
-- `npm.cmd run typecheck`：本任务新增代码无类型错误；当前 `origin/main` 在 `electron-client/main.ts` 与 `electron/main.ts` 有 `ws` 构造/隐式 any 共 8 处错误，内容签名模块另有 2 处缺失 `@noble/curves/ed25519.js` 的 `TS2307`。这些文件与依赖不在 RED-122 范围，未越界修改。
 - `npm.cmd run lint`：ESLint 配置加载失败，规则 `import/no-anonymous-default-export` 未注册 `import` 插件；未进入源文件检查。配置与依赖不在 RED-122 allowed paths。
 
 ## 风险与人工验证
 
-- schema v3 已能完成固定 seed 真实自战，但 P95 `2.70s`、最大 `8.51s`；高候选局面仍可能让玩家明显等待。
+- schema v3 已能完成固定 seed 真实自战，但 P95 `2.84s`、最大 `8.69s`；高候选局面仍可能让玩家明显等待。
 - schema v2 对内置 `simple-v1` 的 3 个固定 seed 全部在 40 回合上限平局；schema v3 尚未重跑三局评测，不能宣称已解决跨策略平局。
 - “公开观察完全不变”会把无公开收益的合法非结构动作也视为 blocked；对零阶段 AI 而言这是防循环策略，但新型零公开变化技能接入时需要补机制语义。
 - Medium Risk 的 evaluation transition 优化已通过独立 AI 复核；实现者与复核者均不代替最终人工体验验收。
