@@ -45,6 +45,7 @@
 | 水门旧入口迁移定向测试 | 通过：3 files / 43 tests |
 | pending + 方向弹射物源码冒烟 | 通过：3 files / 57 tests |
 | 独立审查后加具土命层数上限回归 | 通过：5 files / 40 tests |
+| 独立新候选复验 | 通过：1 file / 10 tests；最小重放 finalStacks=4 |
 | `npm.cmd test` | 通过：134 files / 1387 tests |
 | `npm.cmd run typecheck` | 通过；Next route types 与 `tsc --noEmit` 退出码 0 |
 | `npm.cmd run check:encoding` | 通过：766 text files |
@@ -58,7 +59,7 @@
 
 ## 范围与风险检查
 
-- 提交候选差分 103 个文件、2912 insertions / 769 deletions，全部位于 Linear allowed paths。
+- 规则与 QA 候选差分 104 个文件、3019 insertions / 769 deletions，全部位于 Linear allowed paths。
 - 无依赖、package scripts、存档、经济、数据库、发布或生成 bundle 变更。
 - 水门 begin-turn、提里奥 Holy Blast、猎空 Sticky Bomb 旧入口及相应 runtime/manifest 引用已清理；静态审计和全量测试无悬空引用。
 - lint 配置问题不在 RED-129 allowed paths，未通过更新依赖或配置绕过。
@@ -66,7 +67,7 @@
 
 ## 独立审查与人工验收
 
-- 独立 Medium-risk AI 初审发现加具土命对已有天照可能超过最终 4 层；已改为 Math.min(4, ...) 并新增已有 3 层回归测试，等待新候选复验。
+- 独立 Medium-risk AI 初审发现加具土命已有层数可能超过 4；修复并新增回归后，新候选复验 Verdict 为通过、无 blocking findings。
 - 人工建议重点验证：水门回合末 mandatory anchor UI、飞雷神“否/取消”继续原技能、志志雄二段不扣 AP，以及导入更新角色 JSON 后新建战斗即可生效。
 - 本文不代替产品负责人验收、合并或发布。
 
