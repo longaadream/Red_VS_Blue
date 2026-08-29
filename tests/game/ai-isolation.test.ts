@@ -69,6 +69,20 @@ const manifest: SelfPlaySuiteManifest = {
   codeCommit: '0123456789abcdef0123456789abcdef01234567',
 }
 
+const FIXTURE_SKILL_ID = 'fixture-strike'
+const fixtureStrike = {
+  id: FIXTURE_SKILL_ID,
+  name: 'Fixture Strike',
+  description: 'Test-only adjacent attack.',
+  kind: 'active',
+  type: 'normal',
+  cooldownTurns: 0,
+  maxCharges: 0,
+  powerMultiplier: 1,
+  actionPointCost: 1,
+  code: "function executeSkill(context) { const target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; const result = dealDamage(sourcePiece, target, sourcePiece.attack, 'physical', context.battle, context.skill.id); return { success: true, message: 'fixture strike ' + result.damage }; }",
+}
+
 async function createCombatState() {
   const red = makePiece({
     instanceId: 'red-core', ownerPlayerId: 'player-red', x: 1, y: 1, currentHp: 5, attack: 10,
@@ -78,9 +92,10 @@ async function createCombatState() {
   }) as any
   red.isCore = true
   blue.isCore = true
-  red.skills = [{ skillId: 'basic-attack', currentCooldown: 0, usesRemaining: -1 }]
-  blue.skills = [{ skillId: 'basic-attack', currentCooldown: 0, usesRemaining: -1 }]
+  red.skills = [{ skillId: FIXTURE_SKILL_ID, currentCooldown: 0, usesRemaining: -1 }]
+  blue.skills = [{ skillId: FIXTURE_SKILL_ID, currentCooldown: 0, usesRemaining: -1 }]
   const state = makeState({ pieces: [red, blue], currentPlayerId: 'player-red' }) as any
+  state.skillsById[FIXTURE_SKILL_ID] = fixtureStrike
   state.players[0].actionPoints = 2
   state.players[1].actionPoints = 2
   return state
@@ -165,7 +180,7 @@ describe('self-play runtime isolation', () => {
     expect(simpleAsRed?.actions.filter(action => action.agentId === simple.agentId).length).toBeGreaterThan(1)
     expect(report.summary.exceptionFailures).toBe(0)
     expect(report.summary.failures.every(failure =>
-      failure.reproduction.errorMessage?.includes('basic-attack') !== true,
+      failure.reproduction.errorMessage?.includes(FIXTURE_SKILL_ID) !== true,
     )).toBe(true)
   }, 30_000)
 })

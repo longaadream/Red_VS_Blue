@@ -16,6 +16,15 @@
     { "skillId": "itachi-amaterasu", "level": 1 },
     { "skillId": "itachi-totsuka-blade", "level": 1 }
   ],
-  "rules": [],
+  "rules": ["rule-mangekyo-friendly-death"],
+  "initialStatusTags": [
+    {
+      "id": "mangekyo-witness",
+      "type": "mangekyo-witness",
+      "name": "万花筒",
+      "visible": false,
+      "relatedRules": ["rule-mangekyo-friendly-death"]
+    }
+  ],
   "isDefault": false
 }

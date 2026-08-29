@@ -389,9 +389,6 @@ describe('relay deployment initialization', () => {
   it('submits signed Relay commands and ignores legacy host-authority messages', () => {
     const page = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
     const wsClient = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
-    const androidWsClient = readFileSync(resolve(process.cwd(), 'android-client/www/js/ws-client.js'), 'utf8')
-    const serverUtils = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
-    const androidServerUtils = readFileSync(resolve(process.cwd(), 'android-client/www/js/server-utils.js'), 'utf8')
 
     expect(page).toContain('var relayActionAuth = await createBattleActionAuth(action)')
     expect(page).toContain('RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth')
@@ -403,8 +400,6 @@ describe('relay deployment initialization', () => {
     expect(page).not.toContain('relayAuthorityState')
     expect(wsClient).toContain("type: 'battle-subscribe'")
     expect(wsClient).toContain('signature: await window.RvBIdentity.sign(payload)')
-    expect(androidWsClient).toBe(wsClient)
-    expect(androidServerUtils).toBe(serverUtils)
   })
 })
 

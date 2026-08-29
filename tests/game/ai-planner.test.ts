@@ -542,13 +542,13 @@ describe('representative real transition fixtures', () => {
   }, 60_000)
 
   it('selects simple lethal damage and wounded-ally healing through the formal environment', () => {
-    const attack = skill('basic-attack')
+    const attack = skill('ashbringer')
     const attacker = makePiece({ instanceId: 'attacker', ownerPlayerId: 'player-red', x: 1, y: 1, attack: 10 }) as any
     const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 5 }) as any
     const damageState = stateWithSkills({ pieces: [attacker, target], skills: [{ pieceId: 'attacker', definition: attack }] })
     const damagePlan = planAiTurn(damageState, 'player-red', seed)
     expect(damagePlan.nextAction?.action).toMatchObject({
-      type: 'useBasicSkill', pieceId: 'attacker', skillId: 'basic-attack', targetPieceId: 'target',
+      type: 'useBasicSkill', pieceId: 'attacker', skillId: 'ashbringer', targetPieceId: 'target',
     })
 
     const heal = skill('light-of-the-light')
@@ -567,7 +567,7 @@ describe('representative real transition fixtures', () => {
   }, 30_000)
 
   it('plans movement before casting and retreats a critically injured piece from danger', () => {
-    const attack = skill('basic-attack')
+    const attack = skill('ashbringer')
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 1, y: 1, attack: 10, moveRange: 1 }) as any
     const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 3, y: 1, currentHp: 5 }) as any
     const state = stateWithSkills({ pieces: [caster, target], skills: [{ pieceId: 'caster', definition: attack }] })

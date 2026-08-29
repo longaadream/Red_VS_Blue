@@ -22,6 +22,7 @@ import {
   verifyJoinAuth,
   verifyRecordSignature,
 } from './game/identity-verify'
+import { loadCardById } from './game/skills'
 import { getClientTerminalSubmissionError } from './server/battle-terminal'
 import {
   ensureRosterAlignmentMutable,
@@ -31,9 +32,12 @@ import {
   lockDemoRosterInStore,
 } from './game/roster-contract'
 import { startBattleFromLockedRosters } from './game/room-battle-start'
-import { assertSelectableMapId, getMapSelectionErrorPayload } from './game/map-selection'
+import { assertSelectableMapId, getMapSelectionErrorPayload, getSelectableMapCatalog } from './game/map-selection'
+import { getAllPieces } from './game/piece-repository'
+import { getAllSkills } from './game/skill-repository'
 import { installBattleAuthorityShutdownHandlers } from './server/battle-authority-shutdown'
 import { getProfileWsIngressTrackerV1 } from './content-pipeline/runtime/profile-ws-ingress'
+import { getResourcePackMeta } from './resource-pack'
 
 // HMR-safe: keep server + client maps on globalThis so Next.js hot reloads
 // can tear down the old WebSocketServer (which holds stale handler closures)
@@ -519,6 +523,7 @@ async function restartWsServer(): Promise<void> {
   server.on('connection', (ws: WebSocket) => {
     let roomId: string | null = null
     let playerId: string | null = null
+    const rpcRequests = new Map<string, { fingerprint: string; response?: Record<string, unknown>; waiters: number }>()
 
     ws.on('message', (raw) => {
       try {
@@ -541,14 +546,57 @@ async function restartWsServer(): Promise<void> {
         }
         try {
           if (msg.type === 'rpc' && typeof msg.requestId === 'string') {
-          const requestId = msg.requestId
-          const method = String(msg.method || '')
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const data = (msg.data || {}) as any
-          runAsync(async () => {
+            const requestId = msg.requestId
+            const method = String(msg.method || '')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const data = (msg.data || {}) as any
+            const fingerprint = JSON.stringify([method, data])
+            const existing = rpcRequests.get(requestId)
+            if (existing) {
+              if (existing.fingerprint !== fingerprint) {
+                sendJson(ws, {
+                  type: 'rpcResult', requestId, ok: false,
+                  error: 'requestId was already used for a different RPC payload',
+                  code: 'RPC_REQUEST_ID_CONFLICT', status: 409,
+                })
+              } else if (existing.response) {
+                sendJson(ws, existing.response)
+              } else {
+                existing.waiters += 1
+              }
+              return
+            }
+            if (rpcRequests.size >= 256) {
+              const oldestRequestId = rpcRequests.keys().next().value
+              if (oldestRequestId) rpcRequests.delete(oldestRequestId)
+            }
+            const rpcRecord = { fingerprint, waiters: 0 } as { fingerprint: string; response?: Record<string, unknown>; waiters: number }
+            rpcRequests.set(requestId, rpcRecord)
+            const sendRpcResponse = (response: Record<string, unknown>) => {
+              rpcRecord.response = response
+              sendJson(ws, response)
+              while (rpcRecord.waiters > 0) { sendJson(ws, response); rpcRecord.waiters -= 1 }
+            }
+            runAsync(async () => {
             try {
               let result: unknown
-              if (method === 'rooms.list' || method === 'lobby.list') {
+              if (method === 'system.health') {
+                result = { ok: true, protocol: 'rvb-ws', protocolVersion: 2 }
+              } else if (method === 'catalog.identity') {
+                result = { meta: getResourcePackMeta() }
+              } else if (method === 'catalog.maps') {
+                result = { maps: getSelectableMapCatalog() }
+              } else if (method === 'catalog.pieces') {
+                result = { pieces: getAllPieces() }
+              } else if (method === 'catalog.skills') {
+                result = { skills: getAllSkills() }
+              } else if (method === 'catalog.card') {
+                const cardId = String(data.cardId || '')
+                if (!/^[a-z0-9][a-z0-9_-]{0,127}$/i.test(cardId)) throw new Error('Invalid cardId')
+                const card = loadCardById(cardId)
+                if (!card) throw new Error('Card not found')
+                result = card
+              } else if (method === 'rooms.list' || method === 'lobby.list') {
                 const rooms = await roomStore.getAllRooms()
                 result = { rooms: rooms.map(publicRoomList) }
               } else if (method === 'rooms.create' || method === 'lobby.create') {
@@ -649,13 +697,13 @@ async function restartWsServer(): Promise<void> {
               } else {
                 throw new Error('Unsupported RPC method: ' + method)
               }
-              sendJson(ws, { type: 'rpcResult', requestId, ok: true, data: result })
+              sendRpcResponse({ type: 'rpcResult', requestId, ok: true, data: result })
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err)
               const rosterError = getRosterErrorPayload(err)
               const mapError = getMapSelectionErrorPayload(err)
               const status = mapError ? 400 : message === 'Room not found' ? 404 : undefined
-              sendJson(ws, {
+              sendRpcResponse({
                 type: 'rpcResult',
                 requestId,
                 ok: false,

@@ -94,7 +94,7 @@
           delete _pending[msg.requestId]
           clearTimeout(pending.timer)
           if (msg.ok) pending.resolve(msg.data)
-          else pending.reject(new Error(msg.error || 'WebSocket RPC failed'))
+          else pending.reject(makeRpcError(msg))
           return
         }
         _emit('message', msg)
@@ -124,6 +124,14 @@
     }
   }
 
+  function makeRpcError(message) {
+    var error = new Error(message && message.error ? message.error : 'WebSocket RPC failed')
+    if (message && message.code) error.code = message.code
+    if (message && message.context) error.context = message.context
+    if (message && message.status) error.status = message.status
+    return error
+  }
+
   // Relay subscriptions require signed identity. A local/private URL entered
   // through the remote connector is still a LAN authority unless relay=1 was
   // explicitly requested for local Relay development.
@@ -136,7 +144,7 @@
     var base = getServerUrl()
     var withoutScheme = String(base || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
     var isLocalOrLan = /^(localhost|127\.0\.0\.1)(:\d+)?\b/.test(withoutScheme) ||
-      /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
+      /^(10\.|26\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
     return isLocalOrLan ? 'lan' : 'relay'
   }
 
@@ -185,6 +193,66 @@
     })
   }
 
+  function requestAt(baseUrl, method, data, timeoutMs) {
+    timeoutMs = timeoutMs || 5000
+    return new Promise(function (resolve, reject) {
+      var base = String(baseUrl || '').trim().replace(/\/+$/, '')
+      if (base && !/^[a-z]+:\/\//i.test(base)) base = 'http://' + base
+      var url = base.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:') + '/ws/rooms/__lobby'
+      var requestId = 'probe-' + (_reqSeq++) + '-' + Date.now()
+      var socket = null
+      var settled = false
+      var timer = setTimeout(function () {
+        finish(new Error('WebSocket request timeout: ' + method))
+      }, timeoutMs)
+
+      function finish(error, value) {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        if (socket) {
+          try { socket.close() } catch {}
+        }
+        if (error) reject(error)
+        else resolve(value)
+      }
+
+      if (!base) {
+        finish(new Error('Server URL is required'))
+        return
+      }
+      try {
+        socket = new WebSocket(url)
+      } catch (error) {
+        finish(error)
+        return
+      }
+      socket.onopen = function () {
+        try {
+          socket.send(JSON.stringify({ type: 'rpc', requestId: requestId, method: method, data: data || {} }))
+        } catch (error) {
+          finish(error)
+        }
+      }
+      socket.onmessage = function (event) {
+        try {
+          var message = JSON.parse(event.data)
+          if (!message || message.type !== 'rpcResult' || message.requestId !== requestId) return
+          if (message.ok) finish(null, message.data)
+          else finish(makeRpcError(message))
+        } catch (error) {
+          finish(error)
+        }
+      }
+      socket.onerror = function () { finish(new Error('WebSocket connection failed')) }
+      socket.onclose = function () {
+        if (!settled) finish(new Error('WebSocket closed before response'))
+      }
+    })
+  }
+
+  // Event handlers are registered once per page.
+
   function on(event, handler) {
     _handlers[event] = handler
   }
@@ -193,5 +261,5 @@
     return _ws !== null && _ws.readyState === 1
   }
 
-  window.RvBWs = { connect: connect, disconnect: disconnect, send: send, request: request, on: on, isConnected: isConnected }
+  window.RvBWs = { connect: connect, disconnect: disconnect, send: send, request: request, requestAt: requestAt, on: on, isConnected: isConnected }
 })()

@@ -4,7 +4,9 @@
   "description": "选择一个数字。对方回合结束时，当下回合敌人达到该操作次数 或者 回合结束时 将自身状态与位置重置为回溯前",
   "keywords": [],
   "targetText": "自身",
-  "effectTags": ["回溯"],
+  "effectTags": [
+    "回溯"
+  ],
   "icon": "⏪",
   "kind": "active",
   "type": "normal",
@@ -18,14 +20,49 @@
         "kind": "option",
         "title": "选择回溯触发操作数",
         "options": [
-          { "label": "1", "value": 1 }, { "label": "2", "value": 2 },
-          { "label": "3", "value": 3 }, { "label": "4", "value": 4 },
-          { "label": "5", "value": 5 }, { "label": "6", "value": 6 },
-          { "label": "7", "value": 7 }, { "label": "8", "value": 8 },
-          { "label": "9", "value": 9 }, { "label": "10", "value": 10 }
+          {
+            "label": "1",
+            "value": 1
+          },
+          {
+            "label": "2",
+            "value": 2
+          },
+          {
+            "label": "3",
+            "value": 3
+          },
+          {
+            "label": "4",
+            "value": 4
+          },
+          {
+            "label": "5",
+            "value": 5
+          },
+          {
+            "label": "6",
+            "value": 6
+          },
+          {
+            "label": "7",
+            "value": 7
+          },
+          {
+            "label": "8",
+            "value": 8
+          },
+          {
+            "label": "9",
+            "value": 9
+          },
+          {
+            "label": "10",
+            "value": 10
+          }
         ]
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var result = selectOption({ title: '选择回溯触发操作数', options: [{ label: '1', value: 1 }, { label: '2', value: 2 }, { label: '3', value: 3 }, { label: '4', value: 4 }, { label: '5', value: 5 }, { label: '6', value: 6 }, { label: '7', value: 7 }, { label: '8', value: 8 }, { label: '9', value: 9 }, { label: '10', value: 10 }] }); if (result === null || result === undefined || result.needsOptionSelection) { return result; } if (!battle.extensions) { battle.extensions = {}; } if (!battle.extensions.recallData) { battle.extensions.recallData = []; } var data = battle.extensions.recallData; data = data.filter(function(r) { return r.pieceId !== caster.instanceId; }); data.push({ pieceId: caster.instanceId, ownerPlayerId: caster.ownerPlayerId, targetCount: result, actionCount: 0, snapshot: { x: caster.x, y: caster.y, hp: caster.currentHp, shield: caster.shield, statusTags: caster.statusTags ? JSON.parse(JSON.stringify(caster.statusTags)) : [], buffs: caster.buffs ? JSON.parse(JSON.stringify(caster.buffs)) : [], debuffs: caster.debuffs ? JSON.parse(JSON.stringify(caster.debuffs)) : [] } }); battle.extensions.recallData = data; return { success: true, message: '' }; }"
+  "code": "function executeSkill(context) { var caster = context.piece; var result = Number(context.selectedOption); if (!Number.isInteger(result) || result < 1 || result > 10) { return { success: false, message: 'Invalid Recall action count' }; } if (!battle.extensions) { battle.extensions = {}; } if (!battle.extensions.recallData) { battle.extensions.recallData = []; } var data = battle.extensions.recallData; data = data.filter(function(r) { return r.pieceId !== caster.instanceId; }); data.push({ pieceId: caster.instanceId, ownerPlayerId: caster.ownerPlayerId, targetCount: result, actionCount: 0, snapshot: { x: caster.x, y: caster.y, hp: caster.currentHp, shield: caster.shield, statusTags: caster.statusTags ? JSON.parse(JSON.stringify(caster.statusTags)) : [], buffs: caster.buffs ? JSON.parse(JSON.stringify(caster.buffs)) : [], debuffs: caster.debuffs ? JSON.parse(JSON.stringify(caster.debuffs)) : [] } }); battle.extensions.recallData = data; return { success: true, message: caster.name + ' configured Recall for ' + result + ' enemy actions' }; }"
 }

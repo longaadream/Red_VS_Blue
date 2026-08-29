@@ -13,19 +13,15 @@ type Piece = {
   skills: never[]
 }
 
-type MockResponse = {
-  ok: boolean
-  status: number
-  json: () => Promise<unknown>
-}
-
 type PageContract = {
   confirmSelection: () => Promise<void>
+  init: () => Promise<void>
   getPieces: () => Piece[]
   loadPieces: () => Promise<void>
   pollRoomStatus: () => Promise<void>
   setSelectedIds: (ids: string[]) => void
   updateFactionBadge: () => void
+  updateServerRow: () => void
 }
 
 type MockElement = {
@@ -52,14 +48,6 @@ function makePieces(faction: 'good' | 'evil', count: number): Piece[] {
   }))
 }
 
-function response(body: unknown, status = 200): MockResponse {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  }
-}
-
 function createElement(): MockElement {
   const classes = new Set<string>()
   return {
@@ -84,7 +72,9 @@ function createElement(): MockElement {
 
 function createHarness(options: {
   fetchPackJson: (path: string) => Promise<unknown>
-  serverFetch: (path: string, init?: Record<string, unknown>) => Promise<MockResponse>
+  wsRequest: (method: string, data?: Record<string, unknown>, timeoutMs?: number) => Promise<unknown>
+  useIntervals?: boolean
+  wsConnected?: () => boolean
 }) {
   const page = fs.readFileSync(path.join(root, 'data/pages/piece-selection.html'), 'utf8')
   const inlineScripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)]
@@ -101,7 +91,15 @@ function createHarness(options: {
     href: 'piece-selection.html',
     search: '?roomId=room-54&playerId=alice&playerName=Alice&alignment=light',
   }
-  const serverFetch = vi.fn(options.serverFetch)
+  const wsRequest = vi.fn(options.wsRequest)
+  const wsHandlers = new Map<string, (...args: unknown[]) => unknown>()
+  const RvBWs = {
+    connect: vi.fn(),
+    isConnected: options.wsConnected || (() => true),
+    on: vi.fn((event: string, handler: (...args: unknown[]) => unknown) => { wsHandlers.set(event, handler) }),
+    request: wsRequest,
+    send: vi.fn(),
+  }
   const window = {
     addEventListener: () => {},
     fetchPackJson: options.fetchPackJson,
@@ -110,32 +108,36 @@ function createHarness(options: {
       appendServerParams: (params: URLSearchParams) => params,
       getActiveServerMode: () => 'lan',
       getServerUrl: () => 'http://127.0.0.1:3000',
-      serverFetch,
     },
+    RvBWs,
   }
   const context = vm.createContext({
     AbortController,
+    Date,
     URLSearchParams,
     alert: (message: string) => { alerts.push(message) },
-    clearInterval: () => {},
+    clearInterval: options.useIntervals ? clearInterval : () => {},
     clearTimeout,
     console,
     document: { getElementById: element },
     fetch: vi.fn(),
     location,
-    setInterval: () => 1,
+    setInterval: options.useIntervals ? setInterval : () => 1,
     setTimeout,
     window,
     RvBUtils: window.RvBUtils,
+    RvBWs,
   })
 
   vm.runInContext(`${script}\n;globalThis.__pieceSelectionContract = {
     confirmSelection,
     getPieces: () => PIECE_TEMPLATES,
     loadPieces,
+    init,
     pollRoomStatus,
     setSelectedIds: (ids) => { selectedIds = new Set(ids) },
     updateFactionBadge,
+    updateServerRow,
   }`, context)
 
   return {
@@ -143,7 +145,11 @@ function createHarness(options: {
     contract: context.__pieceSelectionContract as PageContract,
     element,
     location,
-    serverFetch,
+    wsRequest,
+    emitWs: async (event: string, ...args: unknown[]) => {
+      const handler = wsHandlers.get(event)
+      if (handler) await handler(...args)
+    },
   }
 }
 
@@ -162,16 +168,50 @@ describe('Electron piece-selection resource contract', () => {
   const darkPieces = makePieces('evil', 9)
   const allPieces = [...lightPieces, ...darkPieces]
 
+  test('does not report a saved URL as connected and retries the faction claim after a transient WS timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      let connected = false
+      const harness = createHarness({
+        fetchPackJson: localPack(allPieces),
+        useIntervals: true,
+        wsConnected: () => connected,
+        wsRequest: async method => {
+          expect(method).toBe('rooms.action')
+          return { faction: 'red', alignment: 'light', room: { status: 'selecting' } }
+        },
+      })
+
+      const initializing = harness.contract.init()
+      await vi.advanceTimersByTimeAsync(6000)
+      await initializing
+
+      expect(harness.alerts).toEqual([])
+      expect(harness.element('serverLabel').textContent).toContain('正在连接')
+      expect(harness.wsRequest).not.toHaveBeenCalled()
+
+      connected = true
+      await harness.emitWs('connect')
+
+      expect(harness.wsRequest).toHaveBeenCalledWith('rooms.action', expect.objectContaining({
+        action: 'claim-faction', roomId: 'room-54', playerId: 'alice', alignment: 'light',
+      }), 7000)
+      expect(harness.element('serverLabel').textContent).toContain('已连接')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   test('keeps versioned local resources first and avoids the server when they load', async () => {
     const harness = createHarness({
       fetchPackJson: localPack(allPieces),
-      serverFetch: async () => { throw new Error('server must not be used') },
+      wsRequest: async () => { throw new Error('server must not be used') },
     })
 
     await harness.contract.loadPieces()
 
     expect(harness.contract.getPieces().map(piece => piece.id)).toEqual(lightPieces.map(piece => piece.id))
-    expect(harness.serverFetch).not.toHaveBeenCalled()
+    expect(harness.wsRequest).not.toHaveBeenCalled()
   })
 
   test('falls back to current server pieces without allowing a locked alignment switch', async () => {
@@ -180,9 +220,9 @@ describe('Electron piece-selection resource contract', () => {
         if (resourcePath.endsWith('/manifest.json')) return allPieces.map(piece => piece.id)
         throw new Error(`pack file unavailable: ${resourcePath}`)
       },
-      serverFetch: async resourcePath => {
-        expect(resourcePath).toBe('/api/pieces')
-        return response({ pieces: allPieces })
+      wsRequest: async method => {
+        expect(method).toBe('catalog.pieces')
+        return { pieces: allPieces }
       },
     })
 
@@ -191,7 +231,7 @@ describe('Electron piece-selection resource contract', () => {
     expect(harness.contract.getPieces().every(piece => piece.faction === 'good')).toBe(true)
     expect(harness.element('alignmentLightBtn').disabled).toBe(true)
     expect(harness.element('alignmentDarkBtn').disabled).toBe(true)
-    expect(harness.serverFetch).toHaveBeenCalledWith('/api/pieces', { timeoutMs: expect.any(Number) })
+    expect(harness.wsRequest).toHaveBeenCalledWith('catalog.pieces', {}, expect.any(Number))
   })
 
   test('leaves enough of the five-second budget for server fallback when local loading hangs', async () => {
@@ -199,7 +239,7 @@ describe('Electron piece-selection resource contract', () => {
     try {
       const harness = createHarness({
         fetchPackJson: async () => new Promise(() => {}),
-        serverFetch: async () => response({ pieces: allPieces }),
+        wsRequest: async () => ({ pieces: allPieces }),
       })
 
       const loading = harness.contract.loadPieces()
@@ -207,7 +247,7 @@ describe('Electron piece-selection resource contract', () => {
       await loading
 
       expect(harness.contract.getPieces()).toHaveLength(lightPieces.length)
-      expect(harness.serverFetch).toHaveBeenCalledWith('/api/pieces', { timeoutMs: 2500 })
+      expect(harness.wsRequest).toHaveBeenCalledWith('catalog.pieces', {}, 2500)
     } finally {
       vi.useRealTimers()
     }
@@ -216,7 +256,7 @@ describe('Electron piece-selection resource contract', () => {
   test('shows both source failures instead of a silent empty roster', async () => {
     const harness = createHarness({
       fetchPackJson: async () => { throw new Error('local pack read failed') },
-      serverFetch: async () => { throw new Error('server unavailable') },
+      wsRequest: async () => { throw new Error('server unavailable') },
     })
 
     await harness.contract.loadPieces()
@@ -234,11 +274,7 @@ describe('Electron piece-selection resource contract', () => {
     try {
       const harness = createHarness({
         fetchPackJson: async () => { throw new Error('local unavailable') },
-        serverFetch: async () => ({
-          ok: true,
-          status: 200,
-          json: async () => new Promise(() => {}),
-        }),
+        wsRequest: async () => new Promise(() => {}),
       })
 
       const loading = harness.contract.loadPieces()
@@ -246,7 +282,7 @@ describe('Electron piece-selection resource contract', () => {
       await loading
 
       expect(harness.contract.getPieces()).toEqual([])
-      expect(harness.element('pieceGrid').innerHTML).toContain('服务器 /api/pieces timeout after 2500ms')
+      expect(harness.element('pieceGrid').innerHTML).toContain('服务器 WS catalog.pieces timeout after 2500ms')
       expect(harness.element('pieceGrid').innerHTML).not.toContain('加载棋子数据')
     } finally {
       vi.useRealTimers()
@@ -259,13 +295,13 @@ describe('Electron piece-selection resource contract', () => {
   ])('diagnoses unusable server piece data: %s', async (serverBody, expectedError) => {
     const harness = createHarness({
       fetchPackJson: async () => { throw new Error('local unavailable') },
-      serverFetch: async () => response(serverBody),
+      wsRequest: async () => serverBody,
     })
 
     await harness.contract.loadPieces()
 
     expect(harness.contract.getPieces()).toEqual([])
-    expect(harness.element('pieceGrid').innerHTML).toContain('服务器 /api/pieces')
+    expect(harness.element('pieceGrid').innerHTML).toContain('服务器 WS catalog.pieces')
     expect(harness.element('pieceGrid').innerHTML).toContain(expectedError)
   })
 
@@ -273,14 +309,14 @@ describe('Electron piece-selection resource contract', () => {
     let roomReady = false
     const harness = createHarness({
       fetchPackJson: localPack(allPieces),
-      serverFetch: async (resourcePath, init) => {
-        if (resourcePath.endsWith('/actions')) {
-          const body = JSON.parse(String(init?.body)) as { pieces: Piece[] }
-          expect(body.pieces).toHaveLength(8)
-          return response({ room: { status: 'selecting' } })
+      wsRequest: async (method, data) => {
+        if (method === 'rooms.action') {
+          expect((data as { pieces: Piece[] }).pieces).toHaveLength(8)
+          return { room: { status: 'selecting' } }
         }
-        expect(resourcePath).toBe('/api/rooms/room-54')
-        return response({ status: roomReady ? 'in-progress' : 'selecting' })
+        expect(method).toBe('rooms.get')
+        expect(data).toEqual({ roomId: 'room-54' })
+        return { status: roomReady ? 'in-progress' : 'selecting' }
       },
     })
     await harness.contract.loadPieces()
@@ -290,7 +326,7 @@ describe('Electron piece-selection resource contract', () => {
     harness.contract.setSelectedIds(lightPieces.slice(0, 9).map(piece => piece.id))
     await harness.contract.confirmSelection()
     expect(harness.alerts).toEqual(['请选择正好 8 个棋子', '请选择正好 8 个棋子'])
-    expect(harness.serverFetch).not.toHaveBeenCalled()
+    expect(harness.wsRequest).not.toHaveBeenCalled()
 
     harness.contract.setSelectedIds(lightPieces.slice(0, 8).map(piece => piece.id))
     await harness.contract.confirmSelection()

@@ -55,6 +55,8 @@ function makeSilencedActionFixture() {
     id: 'silenced-silenced-caster', type: 'silenced', name: '沉默', visible: true,
     remainingDuration: 1, remainingUses: -1, intensity: 1, stacks: 1,
     relatedRules: ['rule-silenced-block'],
+    blocksSkillUse: true,
+    skillBlockMessage: 'Source piece is silenced',
   }]
   caster.rules = [silencedRule]
   caster.skills = [
@@ -221,7 +223,7 @@ describe('versioned headless AI environment', () => {
       item.kind === 'basic-skill' || item.kind === 'charge-skill'
     )).map(item => item.action.type)).toEqual(['useBasicSkill', 'useChargeSkill'])
 
-    caster.statusTags = [{ id: 'silenced-silenced-caster', type: 'silenced' }]
+    caster.statusTags = [{ id: 'plain-status', type: 'plain-status' }]
     caster.rules = []
     expect(listLegalAIActions(state, 'player-red').filter(item => (
       item.kind === 'basic-skill' || item.kind === 'charge-skill'

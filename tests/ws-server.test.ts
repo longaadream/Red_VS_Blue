@@ -98,6 +98,12 @@ function waitForJsonMessages(client: WebSocket, count: number): Promise<Array<Re
   })
 }
 
+async function rpc(client: WebSocket, requestId: string, method: string, data: Record<string, unknown> = {}) {
+  const response = waitForJsonMessage(client)
+  client.send(JSON.stringify({ type: 'rpc', requestId, method, data }))
+  return response
+}
+
 function closeClient(client: WebSocket): Promise<number> {
   if (client.readyState === WebSocket.CLOSED) return Promise.resolve(1000)
 
@@ -218,6 +224,74 @@ describe('game WebSocket service', () => {
       await closeClient(client)
     }
   })
+  test('serves health and multiplayer catalogs over WebSocket RPC', async () => {
+    const client = await openClient()
+    try {
+      await expect(rpc(client, 'health', 'system.health')).resolves.toMatchObject({
+        type: 'rpcResult',
+        requestId: 'health',
+        ok: true,
+        data: { ok: true, protocol: 'rvb-ws', protocolVersion: 2 },
+      })
+      const maps = await rpc(client, 'maps', 'catalog.maps')
+      expect(maps).toMatchObject({ type: 'rpcResult', requestId: 'maps', ok: true })
+      expect((maps.data as { maps: Array<{ id: string }> }).maps.map(map => map.id)).toEqual([
+        'large-hole-arena',
+        'open-expanse',
+        'winding-pass',
+        'narrow-corridors',
+      ])
+      const pieces = await rpc(client, 'pieces', 'catalog.pieces')
+      expect((pieces.data as { pieces: unknown[] }).pieces.length).toBeGreaterThanOrEqual(16)
+      const skills = await rpc(client, 'skills', 'catalog.skills')
+      expect((skills.data as { skills: unknown[] }).skills.length).toBeGreaterThan(0)
+      const card = await rpc(client, 'card', 'catalog.card', { cardId: 'holy-charge' })
+      expect(card).toMatchObject({ type: 'rpcResult', requestId: 'card', ok: true })
+      expect(card.data).toMatchObject({ id: 'holy-charge' })
+      const getAllRooms = vi.spyOn(getRoomStore(), 'getAllRooms').mockResolvedValue([])
+      const rooms = await rpc(client, 'rooms-list', 'rooms.list')
+      expect(rooms).toMatchObject({ type: 'rpcResult', requestId: 'rooms-list', ok: true })
+      expect(Array.isArray((rooms.data as { rooms: unknown[] }).rooms)).toBe(true)
+      getAllRooms.mockRestore()
+    } finally {
+      await closeClient(client)
+    }
+  })
+
+  test('replays duplicate RPC request ids without applying the mutation twice', async () => {
+    const client = await openClient()
+    const store = getRoomStore()
+    const getRoom = vi.spyOn(store, 'getRoom').mockResolvedValue(undefined)
+    const setRoom = vi.spyOn(store, 'setRoom').mockResolvedValue(undefined)
+    const getAllRooms = vi.spyOn(store, 'getAllRooms').mockResolvedValue([])
+    try {
+      const responses = waitForJsonMessages(client, 2)
+      const payload = JSON.stringify({
+        type: 'rpc',
+        requestId: 'duplicate-create',
+        method: 'rooms.create',
+        data: {
+          hostId: 'host',
+          hostName: 'Host',
+          mapId: 'large-hole-arena',
+        },
+      })
+      client.send(payload)
+      client.send(payload)
+
+      const received = await responses
+      expect(received).toHaveLength(2)
+      expect(received.every(message => message.ok === true)).toBe(true)
+      expect(received[0].data).toEqual(received[1].data)
+      expect(setRoom).toHaveBeenCalledTimes(1)
+    } finally {
+      getRoom.mockRestore()
+      setRoom.mockRestore()
+      getAllRooms.mockRestore()
+      await closeClient(client)
+    }
+  })
+
   test('reports a failed room deletion instead of acknowledging success', async () => {
     const client = await openClient()
     const roomStore = getRoomStore()

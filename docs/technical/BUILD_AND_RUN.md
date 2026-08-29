@@ -260,15 +260,15 @@ npm.cmd run dev -- --port 3000
 1. `package.json#scripts.dev` 先通过 Node `--require` 加载 `scripts/ws-same-port-server.cjs`，再启动 `next dev`。
 2. 预加载器在 Next 创建 HTTP(S) server 时保留 `/ws`、`/ws/` 和 `/ws/rooms/**` Upgrade；Next 自己的 HMR Upgrade 不受影响。
 3. `instrumentation.ts#register()` 在 Node runtime 调用 `lib/ws-server.ts#startWsServer()`，创建 `noServer` WebSocket 服务并注册 Upgrade handler。
-4. HTTP 与游戏 WebSocket 始终监听同一个公开端口；HMR 重载会串行替换 handler 与旧连接，不会重新绑定第二个 TCP 端口。
+4. 静态/Admin HTTP 与游戏 WebSocket 始终监听同一个公开端口；玩家业务只使用 WS，HMR 重载会串行替换 handler 与旧连接，不会重新绑定第二个 TCP 端口。
 
-最小 HTTP 探测：
+旧玩家 REST 禁用探测：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:3000/api/ping
 Invoke-WebRequest http://127.0.0.1:3000/api/rooms -UseBasicParsing
-Invoke-RestMethod http://127.0.0.1:3000/api/ws-info
 ```
+
+预期返回 HTTP 410 与 `PLAYER_REST_DISABLED`；静态资源、`/api/admin/**` 和 WebSocket Upgrade 不受影响。
 
 最小 WebSocket/RPC 探测（服务正在运行时）：
 
@@ -276,7 +276,7 @@ Invoke-RestMethod http://127.0.0.1:3000/api/ws-info
 node -e "const WebSocket=require('ws');const ws=new WebSocket('ws://127.0.0.1:3000/ws/rooms/__lobby');ws.on('open',()=>ws.send(JSON.stringify({type:'rpc',requestId:'probe',method:'rooms.list',data:{}})));ws.on('message',raw=>{const msg=JSON.parse(String(raw));if(msg.requestId==='probe'){console.log(msg);ws.close();process.exit(msg.ok?0:1)}});ws.on('error',e=>{console.error(e);process.exit(1)})"
 ```
 
-预期 `/api/ws-info` 只返回 `transport: "same-origin"` 与路径模板，不返回端口。客户端只保存 `serverUrl`，并把上述 HTTP origin 同源转换成 WebSocket origin。
+客户端只保存 `serverUrl`，并把该 HTTP origin 同源转换成 WebSocket origin；连接探测使用 `system.health`，不得回退到玩家 HTTP API。Radmin `26.0.0.0/8` 地址按 LAN 处理，内置服务绑定 `0.0.0.0`。
 
 ## 6. Windows Electron 服务端
 

@@ -139,6 +139,23 @@ if (fs.existsSync(nmSrc)) {
   copyDir(nmSrc, nmDst, [/\.tmp/])
 }
 
+function copyRuntimeModule(moduleId) {
+  const segments = moduleId.split('/')
+  const source = path.join(__dirname, '..', 'node_modules', ...segments)
+  const target = path.join(nmDst, ...segments)
+  if (!fs.existsSync(source) || !fs.statSync(source).isDirectory()) {
+    console.error('[stage-client] ERROR: required runtime module missing:', moduleId)
+    process.exit(1)
+  }
+  copyDir(source, target, [/\.tmp/])
+}
+
+// Next standalone tracing can omit instrumentation-only dependencies. Stage
+// these explicitly so the packaged server cannot borrow them from the repo.
+copyRuntimeModule('ws')
+copyRuntimeModule('@prisma/client')
+copyRuntimeModule('.prisma/client')
+
 console.log('[stage-client] Copying public/static assets...')
 const publicSrc = path.join(__dirname, '..', 'public')
 const publicDst = path.join(dstRoot, 'public')

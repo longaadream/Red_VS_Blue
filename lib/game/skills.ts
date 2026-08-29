@@ -7,12 +7,51 @@ import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import { isSuspendableActionPending } from './suspendable-action-transaction'
-import { recordMangekyoDeath } from './mangekyo'
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 function battleDebugLog(...args: unknown[]): void {
   if (typeof process === 'undefined' || process.env?.RVB_BATTLE_DEBUG_LOGS !== '1') return
   console.log(...args)
+}
+
+export interface ChargeCostModifierDefinition {
+  source: 'battleExtensionPlayerNumber'
+  path: string
+  operation: 'add' | 'subtract'
+  minimum?: number
+}
+
+function readExtensionPath(extensions: Record<string, unknown> | undefined, path: string): unknown {
+  if (!extensions || !path) return undefined
+  let value: unknown = extensions
+  for (const segment of path.split('.')) {
+    if (!segment || !value || typeof value !== 'object') return undefined
+    value = (value as Record<string, unknown>)[segment]
+  }
+  return value
+}
+
+function readPlayerNumber(value: unknown, playerId: string): number {
+  if (!value || typeof value !== 'object') return 0
+  const match = Object.entries(value as Record<string, unknown>)
+    .find(([key]) => key.toLowerCase() === playerId.toLowerCase())
+  const number = Number(match?.[1])
+  return Number.isFinite(number) ? number : 0
+}
+
+export function getEffectiveChargeCost(
+  state: BattleState,
+  playerId: string,
+  skill: Pick<SkillDefinition, 'chargeCost' | 'chargeCostModifiers'> | undefined,
+): number {
+  let cost = Math.max(0, Number.isFinite(skill?.chargeCost) ? Number(skill?.chargeCost) : 0)
+  for (const modifier of skill?.chargeCostModifiers || []) {
+    if (modifier.source !== 'battleExtensionPlayerNumber') continue
+    const value = readPlayerNumber(readExtensionPath(state.extensions, modifier.path), playerId)
+    cost = modifier.operation === 'add' ? cost + value : cost - value
+    cost = Math.max(Number.isFinite(modifier.minimum) ? Number(modifier.minimum) : 0, cost)
+  }
+  return Math.max(0, cost)
 }
 
 function checkSynchronousTriggers(battle: BattleState, context: any): TriggerResult {
@@ -193,6 +232,31 @@ export interface SelectionOptionDefinition {
   description?: string
 }
 
+export type ActionAvailabilityDefinition =
+  | {
+      kind: 'sourceStatus'
+      statusType: string
+      present: boolean
+      message?: string
+    }
+  | {
+      kind: 'battleExtensionArray'
+      path: string
+      minLength: number
+      message?: string
+    }
+  | {
+      kind: 'livingPieceAbsent'
+      templateId: string
+      unlessExtensionPath?: string
+      message?: string
+    }
+
+export interface ExtensionCellRequirementDefinition {
+  path: string
+  sourceIdField?: string
+}
+
 export type SelectionStepDefinition =
   | {
       kind: 'option'
@@ -205,6 +269,7 @@ export type SelectionStepDefinition =
       type: 'piece' | 'grid' | 'cell'
       filter?: 'enemy' | 'ally' | 'all' | 'self'
       range?: number
+      minRange?: number
       distanceMetric?: 'manhattan' | 'chebyshev'
       requireWalkable?: boolean
       requireUnoccupied?: boolean
@@ -212,6 +277,15 @@ export type SelectionStepDefinition =
       allowSourceOccupantOptions?: unknown[]
       sameRowOrColumn?: boolean
       excludeSourceCell?: boolean
+      excludeSourcePiece?: boolean
+      forbiddenColumns?: number[]
+      forbiddenTargetStatuses?: string[]
+      requiredTargetStatuses?: string[]
+      requireOpenCardinalLanding?: boolean
+      requireTraversableFirstStep?: boolean
+      requireExtensionCell?: ExtensionCellRequirementDefinition
+      ignoreOccupantSelectedTargetIndex?: number
+      requireEnemyWithinRange?: number
       projectile?: { requiredCollision: 'piece-before-blocker' }
     }
 
@@ -220,6 +294,7 @@ export interface SelectionContractDefinition {
     templateId?: string
     boundInstanceField?: string
   }
+  availability?: ActionAvailabilityDefinition[]
   steps: SelectionStepDefinition[]
 }
 
@@ -267,6 +342,23 @@ export function loadCardById(cardId: string, forceReload = false): CardDefinitio
     return null
   }
 }
+function applyCardEffectModifiers(
+  cardInstance: any,
+  effect: 'damage' | 'heal' | 'statusIntensity',
+  baseValue: number,
+  statusType?: string,
+): number {
+  let value = baseValue
+  for (const modifier of cardInstance?.effectModifiers || []) {
+    if (modifier?.effect !== effect) continue
+    if (modifier.statusType && modifier.statusType !== statusType) continue
+    const operand = Number(modifier.value)
+    if (!Number.isFinite(operand)) continue
+    value = modifier.operation === 'add' ? value + operand : value * operand
+  }
+  return Math.floor(value)
+}
+
 
 /** 为卡牌效果构建执行环境（没有 sourcePiece，用 playerId 判断阵营） */
 function createCardEffectFunctions(battle: BattleState, playerId: string, context: any) {
@@ -332,22 +424,12 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     },
 
     dealDamage: (attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = 'true', _battleState?: BattleState, skillId?: string) => {
-      if (
-        context.cardInstance?.holyProphecyEnhanced &&
-        context.card?.id === 'holy-smite'
-      ) {
-        baseDamage = Math.floor(baseDamage * 1.5)
-      }
+      baseDamage = applyCardEffectModifiers(context.cardInstance, 'damage', baseDamage)
       return dealDamage(attacker, target, baseDamage, damageType, battle, skillId, false, undefined, context.selectedOption)
     },
 
     healDamage: (healer: PieceInstance, target: PieceInstance | PieceInstance[], baseHeal: number, _battleState?: BattleState, skillId?: string) => {
-      if (
-        context.cardInstance?.holyProphecyEnhanced &&
-        context.card?.id === 'holy-heal'
-      ) {
-        baseHeal = Math.floor(baseHeal * 1.5)
-      }
+      baseHeal = applyCardEffectModifiers(context.cardInstance, 'heal', baseHeal)
       return healDamage(healer, target, baseHeal, battle, skillId)
     },
 
@@ -380,16 +462,14 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     },
 
     addStatusEffectById: (targetPieceId: string, statusObject: any) => {
-      let resolvedStatusObject = statusObject
-      if (
-        context.cardInstance?.holyProphecyEnhanced &&
-        context.card?.id === 'holy-charge' &&
-        statusObject.type === 'damage-buff'
-      ) {
-        resolvedStatusObject = {
-          ...resolvedStatusObject,
-          intensity: Math.floor((statusObject.intensity || 2) * 1.5),
-        }
+      const resolvedStatusObject = {
+        ...statusObject,
+        intensity: applyCardEffectModifiers(
+          context.cardInstance,
+          'statusIntensity',
+          Number(statusObject.intensity || 0),
+          statusObject.type,
+        ),
       }
       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
       if (targetPiece) {
@@ -834,11 +914,6 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                 ${ruleData.skillCode}
               })
             `;
-
-            if (ruleId === 'rule-shishio-combustion') {
-              const ctr = (context.rulePiece?.statusTags ?? []).find((t: any) => t.type === 'shishio-dmg-counter');
-              battleDebugLog(`[combustion-debug] skillId="${context.skillId ?? 'undefined'}" damage=${context.damage} src=${context.sourcePiece?.name} tgt=${context.targetPiece?.name} counter_before=${ctr?.intensity ?? 0}`);
-            }
             const executeRuleCode = dynamicCodeRuntime.compileExpression<any>({
               surface: 'ruleSkillCode', contentId: ruleId, code: codeEnvironment, entry: 'rule skillCode body',
             });
@@ -926,20 +1001,9 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                           targetPiece.statusTags = [];
                         }
                         // 状态名称映射表
-                        const statusNameMap: Record<string, string> = {
-                          'anti-heal': '禁疗',
-                          'sleep': '睡眠',
-                          'freeze': '冰冻',
-                          'bleeding': '流血',
-                          'divine-shield': '圣盾',
-                          'nano-boost': '纳米强化',
-                          'immobilize': '定身',
-                          'hardy-block': '悍猛格挡',
-                          'bone-storm': '白骨风暴',
-                        };
                         const newStatus = {
                           ...statusObject,
-                          name: statusObject.name || statusNameMap[statusObject.type] || statusObject.type,
+                          name: statusObject.name || statusObject.type,
                           remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
                           remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
                           relatedRules: statusObject.relatedRules || []
@@ -1329,6 +1393,8 @@ export interface SkillDefinition {
   maxCharges: number
   /** 释放一次需要的充能点数，仅对super技能生效 */
   chargeCost?: number
+  /** 数据声明的通用充能消耗修正；核心只解释来源和算术，不识别内容关键词。 */
+  chargeCostModifiers?: ChargeCostModifierDefinition[]
   /** 技能基础威力系数，和攻击力等组合使用 */
   powerMultiplier: number
   /** 技能函数代码（字符串形式存储） */
@@ -2359,7 +2425,6 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       damageBatchId: batchId,
       damageChainId: chain.chainId,
     })
-    recordMangekyoDeath(battle, entry.target)
 
     // A death consumer may revive the target before graveyard/charge finalization.
     if (entry.target.currentHp > 0) {
@@ -2775,24 +2840,13 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           }
 
           // 状态名称映射表
-          const statusNameMap: Record<string, string> = {
-            'anti-heal': '禁疗',
-            'sleep': '睡眠',
-            'freeze': '冰冻',
-            'bleeding': '流血',
-            'divine-shield': '圣盾',
-            'nano-boost': '纳米强化',
-            'immobilize': '定身',
-            'hardy-block': '悍猛格挡',
-            'bone-storm': '白骨风暴',
-          };
 
           // 创建状态对象
           const newStatus = {
             ...statusObject,
             id: statusObject.id,
             type: statusObject.type,
-            name: statusObject.name || statusNameMap[statusObject.type] || statusObject.type,
+            name: statusObject.name || statusObject.type,
             remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
             remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
             intensity: statusObject.intensity,
@@ -3227,7 +3281,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
 // 检查技能执行后是否造成伤害或击杀
 function checkForDamageAndKill(_battle: BattleState, _beforeState: any, _sourcePiece: PieceInstance, _skillId: string) {
   // afterDamageDealt and afterPieceKilled are already fired inside dealDamage() for each hit.
-  // Firing them again here would cause double-counting in rules like rule-shishio-combustion.
+  // Firing them again here would cause double-counting in content-authored damage rules.
   // This function is intentionally left as a no-op.
 }
 

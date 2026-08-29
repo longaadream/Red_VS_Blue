@@ -240,6 +240,46 @@ describe('battle page runtime source', () => {
     })
   })
 
+  it('submits a declarative option choice as a fresh authority action', () => {
+    const html = readBattlePage()
+    const doAction = vi.fn()
+    const overlay = { classList: { remove: vi.fn() } }
+    const context = vm.createContext({
+      document: { getElementById: () => overlay },
+      doAction,
+    })
+    vm.runInContext(`
+      let pendingOptionAction = {
+        type: 'useBasicSkill',
+        playerId: 'player-red',
+        pieceId: 'tracer',
+        skillId: 'recall',
+        clientActionId: 'rejected-option-action',
+        requestId: 'rejected-option-request',
+        selectionId: 'recall-option',
+        stateRevision: 4,
+      }
+      let _pickerOptions = [{ label: '2', value: 2 }]
+      ${runtimeFunction(html, 'prepareFreshSelectionAction')}
+      ${runtimeFunction(html, 'selectOptionChoice')}
+    `, context)
+
+    ;(context as any).selectOptionChoice(0)
+
+    const submitted = doAction.mock.calls[0]?.[0]
+    expect(submitted).toEqual({
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'tracer',
+      skillId: 'recall',
+      selectedOption: 2,
+      selectionId: 'recall-option',
+      stateRevision: 4,
+    })
+    expect(submitted).not.toHaveProperty('clientActionId')
+    expect(submitted).not.toHaveProperty('requestId')
+  })
+
   it('hides an active target-selection overlay when target interaction is cleared', () => {
     const html = readBattlePage()
     const overlay = { classList: createClassList() }
@@ -282,7 +322,7 @@ describe('battle page runtime source', () => {
     expect(overlay.classList.contains('show')).toBe(false)
   })
 
-  it('shows target selection but hides the blocking overlay as soon as its command is submitted', () => {
+  it('submits a completed target step with a fresh authority action id', () => {
     const html = readBattlePage()
     const overlay = { classList: createClassList() }
     const body = { classList: createClassList() }
@@ -306,7 +346,9 @@ describe('battle page runtime source', () => {
       _targetPromptText: () => '选择一个地格',
       recordTargetClear: () => undefined,
       setStatusMsg: () => undefined,
-      withClientActionId: (action: Record<string, unknown>) => ({ ...action, clientActionId: 'action-1' }),
+      withClientActionId: (action: Record<string, unknown>) => action.clientActionId
+        ? action
+        : { ...action, clientActionId: 'fresh-target-action' },
       renderBoard: () => { boardRenders += 1 },
       renderActionBar: () => { actionBarRenders += 1 },
       doAction: (action: Record<string, unknown>) => {
@@ -326,14 +368,21 @@ describe('battle page runtime source', () => {
       ${runtimeFunction(html, 'pendingBoardMultiLimits')}
       ${runtimeFunction(html, 'pendingBoardMultiSummary')}
       ${runtimeFunction(html, 'renderTargetOverlay')}
+      ${runtimeFunction(html, 'prepareFreshSelectionAction')}
       ${runtimeFunction(html, 'submitTargetAction')}
       renderTargetOverlay()
     `, context)
 
     expect(overlay.classList.contains('show')).toBe(true)
-    vm.runInContext("submitTargetAction({ type: 'useBasicSkill', pieceId: 'piece-1' }, '暗影步')", context)
+    vm.runInContext(`submitTargetAction({
+      type: 'useBasicSkill',
+      pieceId: 'piece-1',
+      clientActionId: 'rejected-target-action',
+      requestId: 'rejected-target-request',
+    }, '暗影步')`, context)
 
-    expect(submittedAction).toMatchObject({ clientActionId: 'action-1' })
+    expect(submittedAction).toMatchObject({ clientActionId: 'fresh-target-action' })
+    expect(submittedAction).not.toHaveProperty('requestId')
     expect(overlay.classList.contains('show')).toBe(false)
     expect(boardRenders).toBe(0)
     expect(actionBarRenders).toBe(0)
@@ -381,6 +430,7 @@ describe('battle page runtime source', () => {
       ${runtimeFunction(html, 'isPendingBoardMultiTarget')}
       ${runtimeFunction(html, 'pendingBoardMultiLimits')}
       ${runtimeFunction(html, 'togglePendingBoardTarget')}
+      ${runtimeFunction(html, 'prepareFreshSelectionAction')}
       ${runtimeFunction(html, 'submitTargetAction')}
       ${runtimeFunction(html, 'confirmPendingBoardTargetSelection')}
       ${runtimeFunction(html, 'handleBattleIntent')}

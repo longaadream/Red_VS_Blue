@@ -355,8 +355,10 @@ describe('RED-120 Itachi combat behavior', () => {
     const itachi = namedPiece({ instanceId: 'itachi', templateId: 'red-itachi', ownerPlayerId: 'player-red', x: 1, y: 1, attack: 3 })
     itachi.skills = [{ skillId: 'itachi-tsukuyomi', currentCooldown: 0, usesRemaining: -1 }]
     const target = namedPiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 2, y: 1, attack: 2 })
-    target.skills = [{ skillId: 'basic-attack', currentCooldown: 0, usesRemaining: -1 }]
+    target.skills = [{ skillId: 'ashbringer', currentCooldown: 0, usesRemaining: -1 }]
     let state = makeState({ pieces: [itachi, target], width: 5, height: 3 })
+    state.skillsById.ashbringer = loadSkill('ashbringer')
+    state.skillsById['itachi-tsukuyomi'] = loadSkill('itachi-tsukuyomi')
 
     state = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'itachi', skillId: 'itachi-tsukuyomi',
@@ -370,10 +372,10 @@ describe('RED-120 Itachi combat behavior', () => {
     state.turn.currentPlayerId = 'player-blue'
     state.players[1].actionPoints = 2
     state = runBattleAction(state, selectedAction(state, {
-      type: 'useBasicSkill', playerId: 'player-blue', pieceId: 'target', skillId: 'basic-attack',
+      type: 'useBasicSkill', playerId: 'player-blue', pieceId: 'target', skillId: 'ashbringer',
     }, { pieceId: 'itachi' }), { rootSeed: ROOT_SEED }).state
     const consumed = state.pieces.find(piece => piece.instanceId === 'target')!
-    expect(consumed.skills.find(skill => skill.skillId === 'basic-attack')?.currentCooldown).toBe(1)
+    expect(consumed.skills.find(skill => skill.skillId === 'ashbringer')?.currentCooldown).toBe(2)
     expect(consumed.statusTags.some(tag => tag.type === 'itachi-tsukuyomi')).toBe(false)
   })
 
@@ -411,7 +413,7 @@ describe('RED-120 Itachi combat behavior', () => {
     itachi.skills = [{ skillId: 'itachi-totsuka-blade', currentCooldown: 0, usesRemaining: -1 }]
     const target = namedPiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 2, y: 0, currentHp: 30, maxHp: 30 })
     target.skills = [
-      { skillId: 'basic-attack', currentCooldown: 0, usesRemaining: -1 },
+      { skillId: 'ashbringer', currentCooldown: 0, usesRemaining: -1 },
       { skillId: 'sleep-dart', currentCooldown: 3, usesRemaining: -1 },
     ]
     let state = makeState({ pieces: [itachi, target], width: 5, height: 2 })

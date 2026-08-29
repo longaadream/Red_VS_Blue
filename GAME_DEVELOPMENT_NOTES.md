@@ -120,7 +120,6 @@
 │   ├── skills/
 │   │   ├── arcane-burst.json          # 奥术爆发技能
 │   │   ├── arcane-combination.json    # 奥术连击技能
-│   │   ├── basic-attack.json          # 普通攻击技能
 │   │   ├── buff-attack.json           # 攻击增益技能
 │   │   ├── fireball.json              # 火球术技能
 │   │   ├── shield.json                # 护盾技能
@@ -585,10 +584,6 @@ function executeSkill(context) {
 4. **在棋子JSON中添加技能**：
    ```json
    "skills": [
-     {
-       "skillId": "basic-attack",
-       "level": 1
-     },
      {
        "skillId": "soul-harvest",
        "level": 1
@@ -1572,7 +1567,7 @@ function calculatePreview(piece, skillDef) {
 43. **技能系统去硬编码化 + tutorial.md 全面重写**：
     - **去硬编码化（`lib/game/skills.ts`）**：
       - 移除 `buff-attack` 技能的硬编码执行分支（原 `if (skillDef.id === 'buff-attack') { ... } else { ... }` 结构），所有技能统一走 `eval()` 路径
-      - 移除 5 个技能（basic-attack、fireball、buff-attack、arcane-burst、arcane-combination）的硬编码预览计算分支，替换为通用 fallback（仅返回 `description` 和静态字段，不包含任何技能特定逻辑）
+      - 移除 4 个技能（fireball、buff-attack、arcane-burst、arcane-combination）的硬编码预览计算分支，替换为通用 fallback（仅返回 `description` 和静态字段，不包含任何技能特定逻辑）
       - 原则：所有技能效果必须在 JSON 的 `code` 字段中实现，不得在引擎代码中为特定技能 ID 添加特殊分支
     - **tutorial.md 全面重写**：
       - 旧版：约 2469 行，内容分散、风格不一致，AI 实现新角色时容易出错

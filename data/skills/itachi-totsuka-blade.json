@@ -11,6 +11,14 @@
   "cooldownTurns": 1,
   "maxCharges": 0,
   "chargeCost": 1,
+  "chargeCostModifiers": [
+    {
+      "source": "battleExtensionPlayerNumber",
+      "path": "contentCounters.mangekyoDeaths",
+      "operation": "subtract",
+      "minimum": 0
+    }
+  ],
   "powerMultiplier": 2.0,
   "actionPointCost": 2,
   "range": "single",

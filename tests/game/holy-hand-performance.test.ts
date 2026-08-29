@@ -127,9 +127,11 @@ describe('RED-121 synchronous interaction performance', () => {
     const turnStartState = JSON.parse(JSON.stringify(state)) as any
     turnStartState.turn.phase = 'start'
     turnStartState.gameStartFired = true
-    turnStartState.players[0].hand[0].holyProphecy = {
-      sourcePieceId: velen.instanceId,
-      createdTurnNumber: 1,
+    turnStartState.players[0].hand[0].contentState = {
+      velenHolyProphecy: {
+        sourcePieceId: velen.instanceId,
+        createdTurnNumber: 1,
+      },
     }
     const turnStartHash = hashStable(turnStartState)
     const turnStartTiming = sampleHotAction(() => applyBattleAction(turnStartState, {

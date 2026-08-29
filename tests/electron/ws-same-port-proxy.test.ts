@@ -109,6 +109,9 @@ describe('standalone same-origin WebSocket upgrade', () => {
     const stageSource = fs.readFileSync(path.join(root, 'scripts', 'stage-client-resources.js'), 'utf8')
     expect(stageSource).toContain("require('./ws-same-port-server.cjs')")
     expect(stageSource).toContain("copyFile(path.join(__dirname, 'ws-same-port-server.cjs')")
+    expect(stageSource).toContain("copyRuntimeModule('ws')")
+    expect(stageSource).toContain("copyRuntimeModule('@prisma/client')")
+    expect(stageSource).toContain("copyRuntimeModule('.prisma/client')")
     for (const entry of ['electron/main.ts', 'electron-client/main.ts']) {
       const electronSource = fs.readFileSync(path.join(root, ...entry.split('/')), 'utf8')
       expect(electronSource).toContain('findSamePortPreload(appRoot, serverEntry)')
@@ -181,6 +184,12 @@ publicServer.listen(Number(process.env.PUBLIC_PORT), '127.0.0.1', function() {
         getUpgradeStatus(`ws://127.0.0.1:${publicPort}${pathname}`),
       ).resolves.toBe(418)
     }
+
+    const legacyPlayerApi = await fetch(`http://127.0.0.1:${publicPort}/api/rooms`)
+    expect(legacyPlayerApi.status).toBe(410)
+    await expect(legacyPlayerApi.json()).resolves.toMatchObject({ code: 'PLAYER_REST_DISABLED' })
+    const trustedAdminBoundary = await fetch(`http://127.0.0.1:${publicPort}/api/admin/rooms/cleanup`)
+    expect(trustedAdminBoundary.status).toBe(200)
 
     const httpResponse = await fetch(`http://127.0.0.1:${publicPort}/ws/rooms/__lobby`)
     await expect(httpResponse.text()).resolves.toBe('ok')

@@ -28,8 +28,7 @@ function writeLog(message: string) {
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction } from "./skills"
-import { getEffectiveChargeCost } from './mangekyo'
+import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost } from "./skills"
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import type { DamageType } from "./skills"
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
@@ -207,8 +206,6 @@ export interface PlayerTurnMeta {
   playerId: PlayerId
   /** 玩家昵称 */
   name?: string
-  /** 本局该玩家累计发生的友方死亡事件数；同一实例复活后再次死亡会再次计数。 */
-  mangekyoDeathCount?: number
   /** 当前累计的充能点数（用于释放充能技能） */
   chargePoints: number
   /** 当前行动点 */
@@ -223,11 +220,18 @@ export interface PlayerTurnMeta {
     actionPointCost?: number
     baseActionPointCost?: number
     temporaryCostReductionTurnNumber?: number
-    holyProphecy?: {
-      sourcePieceId: string
-      createdTurnNumber: number
+    contentState?: Record<string, unknown>
+    presentation?: {
+      variant?: string
+      badge?: string
+      description?: string
     }
-    holyProphecyEnhanced?: boolean
+    effectModifiers?: Array<{
+      effect: 'damage' | 'heal' | 'statusIntensity'
+      operation: 'add' | 'multiply'
+      value: number
+      statusType?: string
+    }>
     name?: string
     description?: string
     icon?: string

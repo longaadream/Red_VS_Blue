@@ -208,7 +208,7 @@ describe('LAN battle hand card display metadata', () => {
     expect(runtime.container.innerHTML).toContain('lucky-coin')
     expect(runtime.container.innerHTML).toContain('暂无描述')
     expect(fetchServerJson).toHaveBeenCalledTimes(1)
-    expect(fetchServerJson).toHaveBeenCalledWith('/api/cards/lucky-coin', 3500)
+    expect(fetchServerJson).toHaveBeenCalledWith('catalog.card', { cardId: 'lucky-coin' }, 3500)
 
     response.resolve({
       id: 'lucky-coin',
@@ -265,8 +265,8 @@ describe('LAN battle hand card display metadata', () => {
   })
 
   it('keeps sibling cards visible when one authority lookup fails', async () => {
-    const fetchServerJson = vi.fn(async (path: string) => {
-      if (path.endsWith('/missing-card')) throw new Error('HTTP 404')
+    const fetchServerJson = vi.fn(async (_method: string, data: { cardId: string }) => {
+      if (data.cardId === 'missing-card') throw new Error('WS catalog miss')
       return {
         id: 'lucky-coin',
         name: '幸运币',
@@ -328,8 +328,8 @@ describe('LAN battle hand card display metadata', () => {
   it('does not repaint an old hand or store a response that arrives after page disposal', async () => {
     const oldResponse = deferred<Record<string, unknown>>()
     const disposedResponse = deferred<Record<string, unknown>>()
-    const fetchServerJson = vi.fn((path: string) => {
-      if (path.endsWith('/old-card')) return oldResponse.promise
+    const fetchServerJson = vi.fn((_method: string, data: { cardId: string }) => {
+      if (data.cardId === 'old-card') return oldResponse.promise
       return disposedResponse.promise
     })
     let renderCount = 0
@@ -522,10 +522,10 @@ describe('RED-121 authoritative hand selection presentation', () => {
         players: [{
           playerId: 'player-blue', actionPoints: 10,
           hand: [
-            { cardId: 'holy-smite', instanceId: 'enhanced-smite', holyProphecyEnhanced: true },
-            { cardId: 'holy-heal', instanceId: 'enhanced-heal', holyProphecyEnhanced: true },
-            { cardId: 'holy-charge', instanceId: 'enhanced-charge', holyProphecyEnhanced: true },
-            { cardId: 'holy-smite', instanceId: 'pending-prophecy', holyProphecy: { sourcePieceId: 'velen' } },
+            { cardId: 'holy-smite', instanceId: 'enhanced-smite', presentation: { variant: 'enhanced', badge: '预言强化', description: '预言强化：对敌方生命值最低的棋子造成7点真实伤害。' } },
+            { cardId: 'holy-heal', instanceId: 'enhanced-heal', presentation: { variant: 'enhanced', badge: '预言强化', description: '预言强化：治疗己方生命值最低的棋子12点生命。' } },
+            { cardId: 'holy-charge', instanceId: 'enhanced-charge', presentation: { variant: 'enhanced', badge: '预言强化', description: '预言强化：使己方所有棋子下次造成的伤害提高3点。' } },
+            { cardId: 'holy-smite', instanceId: 'pending-prophecy', contentState: { velenHolyProphecy: { sourcePieceId: 'velen' } } },
           ],
         }],
         turn: { currentPlayerId: 'player-blue' },
@@ -541,7 +541,7 @@ describe('RED-121 authoritative hand selection presentation', () => {
 
     new Script('renderHand()').runInContext(runtime.context)
 
-    expect(runtime.container.innerHTML.match(/card-prophecy-enhanced/g)).toHaveLength(3)
+    expect(runtime.container.innerHTML.match(/card-content-enhanced/g)).toHaveLength(3)
     expect(runtime.container.innerHTML.match(/预言强化/g)?.length).toBeGreaterThanOrEqual(3)
     expect(runtime.container.innerHTML).toContain('造成7点真实伤害')
     expect(runtime.container.innerHTML).toContain('12点生命')

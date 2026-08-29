@@ -277,7 +277,6 @@ describe('Electron desktop security boundary', () => {
       'data/skills/manifest.json',
       'data/cards/manifest.json',
       'data/cards/lucky-coin.json',
-      'data/skills/basic-attack.json',
     ]
     for (const relativePath of requiredProfileResources) {
       expect(source).toContain(`'${relativePath}'`)
@@ -427,14 +426,14 @@ describe('Electron desktop security boundary', () => {
     }
   })
 
-  test('client generates tracked pages and exposes only allowlisted offline data', () => {
+  test('client packages canonical pages directly and exposes only allowlisted offline data', () => {
     const packageJson = JSON.parse(read('package.json')) as { scripts?: Record<string, string> }
     const config = JSON.parse(read('electron-builder.client.json')) as {
       extraResources?: { from?: string; to?: string; filter?: string[] }[]
     }
-    expect(packageJson.scripts?.['build:electron:client']).toContain('npm run sync:pages')
+    expect(packageJson.scripts?.['build:electron:client']).not.toContain('npm run sync:pages')
     expect(config.extraResources).toContainEqual({
-      from: 'android-client/www',
+      from: 'data/pages',
       to: 'app/www',
     })
     expect(config.extraResources).toContainEqual({
