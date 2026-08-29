@@ -333,7 +333,7 @@ export interface AiTurnPlan {
   trace: AiPlannerTraceEntry[]
 }
 
-export const ZERO_STAGE_AI_PROFILE_VERSION = 2 as const
+export const ZERO_STAGE_AI_PROFILE_VERSION = 3 as const
 
 export type ZeroStageStaticComponentKey =
   | 'coreSurvival'
@@ -358,7 +358,7 @@ export type ZeroStageStaticComponentKey =
 
 export interface ZeroStageConfig {
   version: typeof ZERO_STAGE_AI_PROFILE_VERSION
-  nodeBudget: number
+  candidateMode: 'all-legal'
   maxActionsPerTurn: number
   terminal: Readonly<{ win: number; loss: number; draw: number }>
   weights: Readonly<Record<ZeroStageStaticComponentKey, number>>

@@ -15,11 +15,16 @@ import {
 import { createSelfPlayInitialState } from '@/lib/game/ai-self-play-setup'
 import type { AIEnvironment } from '@/lib/game/ai-types'
 import { planZeroStageAction } from '@/lib/game/ai-zero-stage-agent'
+import { installNativeBattleSha256 } from '@/lib/server/battle-hash'
 
 const ZERO_AGENT_ID = 'rvb-ai-zimse-v1'
 const PVE_AGENT_ID = 'simple-v1'
 const SELF_PLAY_SEED = 1001
 const PVE_SEEDS = [1001, 1002, 1003] as const
+
+// Headless PvE mirrors the Node authority runtime instead of falling back to
+// the deliberately portable pure-JS digest implementation for every transition.
+installNativeBattleSha256()
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(join(process.cwd(), path), 'utf8')) as T

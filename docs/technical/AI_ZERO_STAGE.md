@@ -4,7 +4,7 @@
 
 零阶段 AI 的正式 agent/profile ID 为 `rvb-ai-zimse-v1`。它是无需训练、确定且可解释的 player-level 基线，不替代 RED-86 Beam Search，也不注册在线入口或训练联赛，不修改规则、数值、随机、网络或存档。
 
-每次调用先从 `aiEnvironmentV1.listLegalActions()` 读取全部严格合法动作，用 RED-86 的通用机制语义稳定排序，再对至多 2 个准入候选各调用一次 `simulate()`，计算动作后局面的静态估价 `F_p(S')`，最后只返回一个 `nextAction`。权威状态接受动作后，调用方必须在新状态重新规划，并通过 `actionsTakenThisTurn` 回传本回合已经提交的动作数。
+每次调用先从 `aiEnvironmentV1.listLegalActions()` 读取全部严格合法动作，用 RED-86 的通用机制语义稳定排序，再对每个候选各调用一次 `simulate()`，计算动作后局面的静态估价 `F_p(S')`，最后只返回一个 `nextAction`。权威状态接受动作后，调用方必须在新状态重新规划，并通过 `actionsTakenThisTurn` 回传本回合已经提交的动作数。
 
 ## 接入与调用接口
 
@@ -34,24 +34,23 @@ if (decision.nextAction) {
 
 生产调用必须在每次正式 action 被接受、状态版本变化后再次调用 `planZeroStageAction()`，不得缓存并连续提交旧候选。无头测试可用 `aiEnvironmentV1.simulate(state, decision.nextAction, { rootSeed })` 执行隔离 transition；生产环境仍应走现有服务器权威命令入口。
 
-默认 profile 由 `DEFAULT_ZERO_STAGE_CONFIG` 提供，仓库快照位于 `config/ai/agents/rvb-ai-zimse-v1.json`。JSON 用于版本归档、审计和外部调度识别，`agentId` 必须保持 `rvb-ai-zimse-v1`；运行时覆盖通过 `options.config` 传入，并由 `resolveZeroStageConfig()` 校验。节点预算硬上限为 2，不能通过配置开启第二层搜索。
+默认 profile 由 `DEFAULT_ZERO_STAGE_CONFIG` 提供，仓库快照位于 `config/ai/agents/rvb-ai-zimse-v1.json`。JSON 用于版本归档、审计和外部调度识别，`agentId` 必须保持 `rvb-ai-zimse-v1`；运行时覆盖通过 `options.config` 传入，并由 `resolveZeroStageConfig()` 校验。`candidateMode` 固定为 `all-legal`，不能配置候选数量、按类型裁剪或开启第二层搜索。
 
 ## 单步算法
 
 ```text
 legal = listLegalActions(S, p)
 ranked = StableSemanticRank(legal)
-admitted = ReserveStructuralAndEndTurn(
-  PreferCostEnemyTargetAndAttackKind(ranked),
-  limit=2,
-)
-for a in admitted:
+for a in ranked:
   S' = Simulate(S, a)
-  score(a) = F_p(S')
+  if S' is blocked or rejected:
+    record and exclude a
+  else:
+    score(a) = F_p(S')
 a* = argmax score(a)
 ```
 
-没有费用补贴、费用不足候选、top-3 聚合或第二层动作。默认且硬性最大候选/节点预算为 2（通常为 `endTurn` 加 1 个常规动作），大于 2 的配置直接拒绝；一个准入候选最多消耗一个节点。唯一结构动作优先保留，`endTurn` 始终保留一个名额。其余候选先保留明确以敌棋为目标的攻击；没有直接攻击时，严格缩短到敌方公开核心（无核心时最近敌棋）距离的移动优先，并以靠近地图中心作为等追击进度的次级排序；随后才按真实费用、攻击/技能种类和原语义名次排序。该排序只读公开几何，不执行额外 transition，也不使用墙钟时间。默认单回合最多提交 8 个动作；调用方传入的计数达到 7 且存在 `endTurn` 时，只模拟并选择 `endTurn`。
+没有费用补贴、费用不足候选、top-3 聚合或第二层动作。除回合动作护栏外，全部严格合法候选都会各消耗一个节点并完整参与估价；稳定语义排序只固定 trace 和最终同分顺序，不承担候选裁剪。不会按候选数量、动作类型、费用、目标或墙钟时间提前停止。默认单回合最多提交 8 个动作；调用方传入的计数达到 7 且存在 `endTurn` 时，只模拟并选择 `endTurn`。
 
 同分依次比较：
 
@@ -67,7 +66,7 @@ a* = argmax score(a)
 
 所有分项只读取 `aiEnvironmentV1.observe()` 返回的公开观察，并以当前玩家为相对视角：
 
-| 分项 | v2 权重 | 含义 |
+| 分项 | v3 权重 | 含义 |
 | --- | ---: | --- |
 | `coreSurvival` | 50,000 | 双方存活核心棋子差 |
 | `survival` | 22,000 | 双方存活棋子差 |
@@ -96,7 +95,7 @@ a* = argmax score(a)
 - 对手手牌内容在观察中被隐藏，只保留张数；修改私有手牌不改变评分。
 - `visible:false` 的状态不会进入观察，因此不影响评分或决策。
 - 候选合法性和 transition 只由权威 AI 环境提供；零阶段代码不复制目标、距离、冷却、阶段或胜负规则。
-- 每个准入合法候选最多隔离模拟一次；未准入候选记录 `candidate-budget`，输入 `BattleState` 不被写回。
+- 每个严格合法候选恰好隔离模拟一次，输入 `BattleState` 不被写回；只有回合动作护栏会把候选收束为 `endTurn`。
 - 技能、移动或卡牌被沉默、打坐等 before-action 规则阻止时，权威命令仍可能合法接收。AI 环境把“公开观察完全未变化”规范化为 `trace.blocked=true`；零阶段记录该候选但不计算 `F`、不选择它，从而不会重复触发。
 - RED-85 机制兼容性保留在 trace 中作为诊断，但不会触发第二层估值或生成非法动作。
 
@@ -106,14 +105,14 @@ a* = argmax score(a)
 
 - 当前 `stateValue`、候选数、节点数、预算状态和停止原因；
 - 每个候选的 action、正式费用、兼容性、完整 `F` 总分与分项；
-- 被权威 transition 拒绝或被节点预算裁剪的明确原因；
+- 被权威 transition 拒绝、阻止或被回合动作护栏裁剪的明确原因；
 - 唯一 `nextAction`，以及稳定的 `selectionReason`（终局层级、静态分、费用、结束回合、action JSON 或 candidate ID）。
 
 `zeroStageDecisionTraceHash()` 覆盖以上稳定字段。相同 state、player、root seed 和 profile 应产生相同动作、候选顺序与 hash。
 
 ## 性能与限制
 
-固定 8v8 纯移动 fixture 要求 P95 小于 1,000ms；真实技能对局要求 P95 小于 3,000ms、单次小于 5,000ms。节点数必须同时不超过 2 和严格合法候选数。性能证据记录机器、样本、候选数、P50/P95/最大耗时和非法动作数。
+固定 fixture 必须证明在未触发回合动作护栏时 `nodesVisited === candidatesConsidered === legal.length`，普通候选不得出现 `candidate-budget`。性能证据记录机器、样本、候选数、P50/P95/最大耗时和非法动作数，但不能为了满足延迟阈值裁剪合法策略。完整枚举的耗时随严格合法候选数量近似线性增长，候选很多的真实技能局面可能明显慢于旧 2 节点版本。
 
 当前 profile 仍有明确限制：
 

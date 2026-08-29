@@ -44,7 +44,7 @@ export const DEFAULT_AI_PLANNER_CONFIG: AiPlannerConfig = Object.freeze({
  */
 export const DEFAULT_ZERO_STAGE_CONFIG: ZeroStageConfig = Object.freeze({
   version: ZERO_STAGE_AI_PROFILE_VERSION,
-  nodeBudget: 2,
+  candidateMode: 'all-legal',
   maxActionsPerTurn: 8,
   terminal: Object.freeze({ win: 1_000_000, loss: -1_000_000, draw: 0 }),
   weights: Object.freeze({
@@ -109,14 +109,13 @@ export function resolveZeroStageConfig(overrides: Partial<Omit<ZeroStageConfig, 
   if (!(terminal.win > terminal.draw && terminal.draw > terminal.loss)) {
     throw new RangeError('Zero-stage terminal scores must satisfy win > draw > loss')
   }
-  const nodeBudget = positiveInteger(
-    overrides.nodeBudget ?? DEFAULT_ZERO_STAGE_CONFIG.nodeBudget,
-    'zeroStage.nodeBudget',
-  )
-  if (nodeBudget > 2) throw new RangeError('Zero-stage node budget cannot exceed 2')
+  const candidateMode = overrides.candidateMode ?? DEFAULT_ZERO_STAGE_CONFIG.candidateMode
+  if (candidateMode !== 'all-legal') {
+    throw new RangeError('Zero-stage candidate mode must be all-legal')
+  }
   return {
     version: ZERO_STAGE_AI_PROFILE_VERSION,
-    nodeBudget,
+    candidateMode,
     maxActionsPerTurn: positiveInteger(
       overrides.maxActionsPerTurn ?? DEFAULT_ZERO_STAGE_CONFIG.maxActionsPerTurn,
       'zeroStage.maxActionsPerTurn',

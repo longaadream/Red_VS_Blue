@@ -36,85 +36,6 @@ type ScoredCandidate = {
 }
 
 const compareText = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
-const samePlayer = (left: unknown, right: unknown) => (
-  String(left ?? '').trim().toLowerCase() === String(right ?? '').trim().toLowerCase()
-)
-const MANDATORY_KINDS = new Set<CandidateAction['kind']>([
-  'pending-option',
-  'pending-target',
-  'cancel-selection',
-  'deployment-lock',
-  'phase-advance',
-])
-const AGGRESSIVE_KIND_PRIORITY: Readonly<Record<CandidateAction['kind'], number>> = Object.freeze({
-  'charge-skill': 4,
-  'basic-skill': 4,
-  card: 3,
-  move: 2,
-  'deployment-choice': 1,
-  'deployment-lock': 0,
-  'phase-advance': 0,
-  'pending-option': 0,
-  'pending-target': 0,
-  'cancel-selection': 0,
-  'end-turn': 0,
-})
-
-function enemyTargetPriority(state: BattleState, playerId: string, candidate: CandidateAction) {
-  const action = candidate.action
-  const targetPieceId = 'targetPieceId' in action && typeof action.targetPieceId === 'string'
-    ? action.targetPieceId
-    : undefined
-  const target = targetPieceId
-    ? state.pieces.find(piece => piece.instanceId === targetPieceId)
-    : undefined
-  if (target && target.currentHp > 0 && !samePlayer(target.ownerPlayerId, playerId)) return 2
-  const targetX = 'targetX' in action && typeof action.targetX === 'number' ? action.targetX : undefined
-  const targetY = 'targetY' in action && typeof action.targetY === 'number' ? action.targetY : undefined
-  if (targetX === undefined || targetY === undefined) return 0
-  return state.pieces.some(piece => (
-    piece.currentHp > 0
-    && !samePlayer(piece.ownerPlayerId, playerId)
-    && piece.x === targetX
-    && piece.y === targetY
-  )) ? 1 : 0
-}
-
-const gridDistance = (left: { x: number; y: number }, right: { x: number; y: number }) => (
-  Math.abs(left.x - right.x) + Math.abs(left.y - right.y)
-)
-
-function offensiveMoveProgress(state: BattleState, playerId: string, candidate: CandidateAction) {
-  const action = candidate.action
-  if (action.type !== 'move') return { pursuit: 0, center: 0 }
-  const mover = state.pieces.find(piece => (
-    piece.instanceId === action.pieceId
-    && piece.currentHp > 0
-    && piece.x != null
-    && piece.y != null
-  ))
-  if (!mover) return { pursuit: 0, center: 0 }
-  const hostile = state.pieces.filter(piece => (
-    piece.currentHp > 0
-    && !samePlayer(piece.ownerPlayerId, playerId)
-    && piece.x != null
-    && piece.y != null
-  ))
-  const hostileObjectives = hostile.filter(piece => piece.isCore)
-  const targets = hostileObjectives.length > 0 ? hostileObjectives : hostile
-  if (targets.length === 0) return { pursuit: 0, center: 0 }
-
-  const start = { x: mover.x!, y: mover.y! }
-  const destination = { x: action.toX, y: action.toY }
-  const nearest = (point: { x: number; y: number }) => Math.min(
-    ...targets.map(target => gridDistance(point, { x: target.x!, y: target.y! })),
-  )
-  const pursuit = Math.max(0, nearest(start) - nearest(destination))
-  if (pursuit === 0) return { pursuit, center: 0 }
-  const mapCenter = { x: (state.map.width - 1) / 2, y: (state.map.height - 1) / 2 }
-  const center = Math.max(0, gridDistance(start, mapCenter) - gridDistance(destination, mapCenter))
-  return { pursuit, center }
-}
 
 const terminalRank = (evaluation: ZeroStageStaticEvaluation) => {
   if (evaluation.terminalOutcome === 'win') return 3
@@ -164,7 +85,7 @@ function emptyDecision(
 }
 
 /**
- * Scores every admitted formal action after exactly one isolated transition and
+ * Scores every strict legal formal action after exactly one isolated transition and
  * returns only the best current action. Callers replan after authority accepts it.
  */
 export function planZeroStageAction(
@@ -187,43 +108,11 @@ export function planZeroStageAction(
     candidate,
     ...describeAiCandidate(state, playerId, goal, candidate),
   })).sort(compareAiCandidateDescriptions)
-  const admissionRanked = ranked.map((item, semanticRank) => {
-    const cost = getAIActionResourceCost(state, playerId, item.candidate)
-    const moveProgress = offensiveMoveProgress(state, playerId, item.candidate)
-    return {
-      item,
-      semanticRank,
-      costTotal: cost.actionPoints + cost.chargePoints,
-      enemyTarget: enemyTargetPriority(state, playerId, item.candidate),
-      pursuitProgress: moveProgress.pursuit,
-      centerProgress: moveProgress.center,
-      aggressiveKind: AGGRESSIVE_KIND_PRIORITY[item.candidate.kind],
-    }
-  }).sort((left, right) => (
-    right.enemyTarget - left.enemyTarget
-    || right.pursuitProgress - left.pursuitProgress
-    || right.centerProgress - left.centerProgress
-    || right.costTotal - left.costTotal
-    || right.aggressiveKind - left.aggressiveKind
-    || left.semanticRank - right.semanticRank
-  )).map(entry => entry.item)
-  const required = ranked.filter(item => MANDATORY_KINDS.has(item.candidate.kind))
   const endTurn = ranked.find(item => item.candidate.kind === 'end-turn')
-  const admitted = new Set<string>()
   const forceEndTurn = endTurn !== undefined
     && (options.actionsTakenThisTurn ?? 0) >= config.maxActionsPerTurn - 1
-  if (forceEndTurn) {
-    admitted.add(endTurn.candidate.id)
-  } else {
-    for (const item of required.slice(0, config.nodeBudget)) admitted.add(item.candidate.id)
-    if (endTurn && admitted.size < config.nodeBudget) admitted.add(endTurn.candidate.id)
-    for (const item of admissionRanked) {
-      if (admitted.size >= config.nodeBudget) break
-      admitted.add(item.candidate.id)
-    }
-  }
   let nodesVisited = 0
-  const budgetExhausted = admitted.size < ranked.length
+  const budgetExhausted = forceEndTurn && ranked.length > 1
 
   for (const described of ranked) {
     const { candidate } = described
@@ -234,8 +123,8 @@ export function planZeroStageAction(
       actionCost,
       compatibility: described.features.compatibility,
     }
-    if (!admitted.has(candidate.id)) {
-      trace.pruned = forceEndTurn ? 'turn-action-budget' : 'candidate-budget'
+    if (forceEndTurn && candidate.id !== endTurn.candidate.id) {
+      trace.pruned = 'turn-action-budget'
       traces.push(trace)
       continue
     }
