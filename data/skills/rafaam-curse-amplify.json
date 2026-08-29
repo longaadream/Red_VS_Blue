@@ -1,7 +1,7 @@
 {
   "id": "rafaam-curse-amplify",
   "name": "诅咒增幅",
-  "description": "复制对方手牌里所有的诅咒。",
+  "description": "复制对方手牌里所有的诅咒，并将复制品加入对方手牌。",
   "keywords": [],
   "targetText": "对方手牌里的所有诅咒",
   "effectTags": [
@@ -15,6 +15,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "chargeCost": 1,
-  "code": "function executeSkill(context) { var caster = context.piece; var opponent = battle.players.find(function(player) { return player.playerId !== caster.ownerPlayerId; }); if (!opponent || !opponent.hand) return { success: false, message: '对手没有手牌' }; var curses = opponent.hand.filter(function(card) { return (card.name && card.name.indexOf('诅咒') >= 0) || (card.cardId && card.cardId.indexOf('rafaam-curse') === 0); }); if (!curses.length) return { success: false, message: '对手手牌中没有诅咒' }; if (!battle.customCards) battle.customCards = {}; for (var i = 0; i < curses.length; i++) { var card = curses[i]; var cardId = card.cardId; var custom = battle.customCards[cardId]; if (custom) { var copyId = 'rafaam-curse-copy-' + Date.now() + '-' + i; var copy = JSON.parse(JSON.stringify(custom)); copy.id = copyId; battle.customCards[copyId] = copy; cardId = copyId; } addCardToHand(cardId, caster.ownerPlayerId); } return { success: true, message: caster.name + '复制了对方手牌中的' + curses.length + '张诅咒' }; }",
-  "previewCode": "function calculatePreview() { return { description: '复制对方手牌里的所有诅咒。', expectedValues: {} }; }"
+  "code": "function executeSkill(context) { var caster = context.piece; var opponent = battle.players.find(function(player) { return player.playerId !== caster.ownerPlayerId; }); if (!opponent || !opponent.hand) return { success: false, message: '对手没有手牌' }; var curses = opponent.hand.filter(function(card) { return (card.name && card.name.indexOf('诅咒') >= 0) || (card.cardId && card.cardId.indexOf('rafaam-curse') === 0); }); if (!curses.length) return { success: false, message: '对手手牌中没有诅咒' }; if (!battle.customCards) battle.customCards = {}; for (var i = 0; i < curses.length; i++) { var card = curses[i]; var cardId = card.cardId; var custom = battle.customCards[cardId]; if (custom) { var copyId = 'rafaam-curse-copy-' + Date.now() + '-' + i; var copy = JSON.parse(JSON.stringify(custom)); copy.id = copyId; battle.customCards[copyId] = copy; cardId = copyId; } addCardToHand(cardId, opponent.playerId); } return { success: true, message: caster.name + '给对方复制了' + curses.length + '张诅咒' }; }",
+  "previewCode": "function calculatePreview() { return { description: '复制对方手牌里所有的诅咒，并将复制品加入对方手牌。', expectedValues: {} }; }"
 }

@@ -703,7 +703,7 @@ describe('RED-129 拉法姆规则与资源', () => {
       .toContainEqual(expect.objectContaining({ instanceId: curse.instanceId }))
   })
 
-  it('copies every opponent curse definition for 0 AP and 1 CP without changing their hand', () => {
+  it('copies every opponent curse into the opponent hand for 0 AP and 1 CP', () => {
     const rafaam = namedPiece({
       instanceId: 'rafaam',
       templateId: 'red-rafaam',
@@ -744,7 +744,8 @@ describe('RED-129 拉法姆规则与资源', () => {
       },
     }
     installSkill(state, rafaam, 'rafaam-curse-amplify')
-    const beforeBlueHand = JSON.stringify(blue.hand)
+    const beforeBlueHand = JSON.parse(JSON.stringify(blue.hand))
+    const originalBlueInstanceIds = new Set(blue.hand.map((card: any) => card.instanceId))
     const result = runBattleAction(state, {
       type: 'useChargeSkill',
       playerId: 'player-red',
@@ -752,16 +753,60 @@ describe('RED-129 拉法姆规则与资源', () => {
       skillId: 'rafaam-curse-amplify',
     }, { rootSeed: ROOT_SEED }).state
     const red = result.players.find(player => player.playerId === 'player-red') as any
-    const copiedIds = red.hand.map((card: any) => card.cardId)
+    const resultBlue = result.players.find(player => player.playerId === 'player-blue') as any
+    const copies = resultBlue.hand.filter((card: any) => !originalBlueInstanceIds.has(card.instanceId))
+    const copiedIds = copies.map((card: any) => card.cardId)
     const copiedDamage = copiedIds
       .map((id: string) => (result as any).customCards[id]?.damageAmount)
       .sort((a: number, b: number) => a - b)
 
     expect(red.actionPoints).toBe(2)
     expect(red.chargePoints).toBe(0)
-    expect(red.hand).toHaveLength(2)
+    expect(red.hand).toHaveLength(0)
+    expect(resultBlue.hand.slice(0, beforeBlueHand.length)).toEqual(beforeBlueHand)
+    expect(resultBlue.hand).toHaveLength(beforeBlueHand.length + 2)
+    expect(copies).toHaveLength(2)
     expect(new Set(copiedIds).size).toBe(2)
     expect(copiedDamage).toEqual([3, 8])
-    expect(JSON.stringify(result.players[1].hand)).toBe(beforeBlueHand)
+  })
+
+  it('does not spend charge or change either hand when the opponent has no curse', () => {
+    const rafaam = namedPiece({
+      instanceId: 'rafaam',
+      templateId: 'red-rafaam',
+      ownerPlayerId: 'player-red',
+      x: 1,
+      y: 1,
+      attack: 0,
+    }, '拉法姆')
+    const state = makeState({
+      pieces: [rafaam],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+    }) as any
+    const red = state.players.find((player: any) => player.playerId === 'player-red')
+    const blue = state.players.find((player: any) => player.playerId === 'player-blue')
+    red.chargePoints = 1
+    blue.hand = [
+      { cardId: 'holy-heal', instanceId: 'ordinary', name: '圣光治疗', actionPointCost: 1 },
+    ]
+    installSkill(state, rafaam, 'rafaam-curse-amplify')
+    const beforeHash = hashBattleState(state)
+
+    expect(() => runBattleAction(state, {
+      type: 'useChargeSkill',
+      playerId: 'player-red',
+      pieceId: 'rafaam',
+      skillId: 'rafaam-curse-amplify',
+    }, { rootSeed: ROOT_SEED })).toThrow('对手手牌中没有诅咒')
+
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(red).toMatchObject({
+      chargePoints: 1,
+      hand: [],
+    })
+    expect(blue.hand).toEqual([
+      { cardId: 'holy-heal', instanceId: 'ordinary', name: '圣光治疗', actionPointCost: 1 },
+    ])
   })
 })
