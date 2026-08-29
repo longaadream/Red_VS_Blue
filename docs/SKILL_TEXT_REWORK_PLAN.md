@@ -267,7 +267,6 @@
 
 建议先处理最能体现规范价值的一批：
 
-- `basic-attack`
 - `fireball`
 - `frostbolt`
 - `blink`

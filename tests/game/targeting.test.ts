@@ -59,10 +59,15 @@ function targetedSkill(
 }
 
 describe('authoritative target preparation', () => {
-  it('rejects active skills only while the source has both silence status and its blocking rule', () => {
+  it('rejects active skills only while the source has a blocking status tag', () => {
     const caster = makePiece({
       instanceId: 'silenced-caster', ownerPlayerId: 'player-red', x: 1, y: 1,
-      statusTags: [{ id: 'silenced-silenced-caster', type: 'silenced' }],
+      statusTags: [{
+        id: 'silenced-silenced-caster',
+        type: 'silenced',
+        blocksSkillUse: true,
+        skillBlockMessage: 'Source piece is silenced',
+      }],
       rules: [{ id: 'rule-silenced-block' }],
     })
     caster.skills = [
@@ -98,8 +103,7 @@ describe('authoritative target preparation', () => {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: caster.instanceId, skillId: 'silenced-basic',
     })).toEqual({ kind: 'ready' })
 
-    caster.statusTags = [{ id: 'silenced-silenced-caster', type: 'silenced' }] as never
-    caster.rules = [] as never
+    caster.statusTags = [{ id: 'plain-status', type: 'plain-status' }] as never
     expect(prepareAction(state, {
       type: 'useChargeSkill', playerId: 'player-red', pieceId: caster.instanceId, skillId: 'silenced-charge',
     })).toEqual({ kind: 'ready' })

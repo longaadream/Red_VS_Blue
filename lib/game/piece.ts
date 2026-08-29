@@ -21,6 +21,21 @@ export interface PieceSkill {
   usesRemaining?: number
 }
 
+export interface PieceStatusTag {
+  id: string
+  type: string
+  name?: string
+  currentDuration?: number
+  remainingDuration?: number
+  currentUses?: number
+  intensity?: number
+  stacks?: number
+  value?: number
+  relatedRules?: string[]
+  visible?: boolean
+  [key: string]: unknown
+}
+
 export interface PieceTemplate {
   id: PieceId
   name: string
@@ -31,6 +46,7 @@ export interface PieceTemplate {
   stats: PieceStats
   skills: PieceSkill[]
   rules?: string[]
+  initialStatusTags?: PieceStatusTag[]
   isDefault?: boolean
   relatedCards?: string[]
 }
@@ -56,18 +72,7 @@ export interface PieceInstance {
   debuffs: PieceDebuff[]
   shield?: number
   ruleTags: string[] // 存储相关的规则ID数组
-  statusTags: Array<{
-    id: string
-    type: string
-    currentDuration?: number
-    remainingDuration?: number
-    currentUses?: number
-    intensity?: number
-    stacks?: number
-    value?: number
-    relatedRules?: string[]
-    visible?: boolean
-  }> // 存储状态变量的标签数组，如"bleeding-duration"
+  statusTags: PieceStatusTag[] // 存储状态变量的标签数组，如"bleeding-duration"
   rules: any[] // 对该棋子生效的可执行规则；显示状态由 statusTags 表达
 }
 

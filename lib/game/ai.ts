@@ -3,7 +3,7 @@ import { getSkillById } from './skill-repository'
 import { prepareAction } from './targeting'
 import type { TargetRef } from './targeting'
 import { getLegalNormalMoveTargets, manhattanDistance } from './spatial'
-import { getEffectiveChargeCost } from './mangekyo'
+import { getEffectiveChargeCost } from './skills'
 
 function getValidMoves(
   state: BattleState,

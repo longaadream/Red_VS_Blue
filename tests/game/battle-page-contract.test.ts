@@ -234,7 +234,10 @@ describe('battle page route contract', () => {
     const battlePage = readPage('battle.html')
 
     expect(battlePage).toContain('async function loadServerBattleDataFallback()')
-    expect(battlePage).toContain('RvBUtils.serverFetch(path, { timeoutMs: timeoutMs || 3500 })')
+    expect(battlePage).toContain('RvBWs.request(method, data || {}, timeoutMs || 3500)')
+    expect(battlePage).toContain('RvBWs.requestAt(getServerUrl(), method, data || {}, timeoutMs || 3500)')
+    expect(battlePage).toContain("fetchServerJson('catalog.pieces')")
+    expect(battlePage).toContain("fetchServerJson('catalog.skills')")
     expect(battlePage).toMatch(
       /if \(!Object\.keys\(PIECES_BY_ID\)\.length\) \{\s*try \{\s*await loadServerBattleDataFallback\(\)/,
     )
@@ -370,6 +373,45 @@ describe('battle page route contract', () => {
     expect(JSON.parse(JSON.stringify(submittedActions))).toEqual([])
     expect(new Script('pendingCardAction.type').runInContext(context)).toBe('playCard')
     expect(statusMessages.at(-1)).toBe('目标不在权威候选集合内')
+  })
+
+  it('uses the current hand-instance AP cost for card click validation', () => {
+    const battlePage = readPage('battle.html')
+    const submittedActions: unknown[] = []
+    const statusMessages: string[] = []
+    const context = createContext({
+      G: {
+        turn: { currentPlayerId: 'player-red' },
+        players: [{
+          playerId: 'player-red',
+          actionPoints: 1,
+          hand: [{ cardId: 'holy-charge', instanceId: 'discounted-charge', actionPointCost: 1 }],
+        }],
+        customCards: {},
+      },
+      myPlayerId: 'player-red',
+      cardsById: { 'holy-charge': { id: 'holy-charge', type: 'active', actionPointCost: 2 } },
+      pendingCardAction: { cardInstanceId: 'discounted-charge', cardId: 'holy-charge' },
+      pendingSkill: null,
+      pendingMove: false,
+      selectedPieceId: null,
+      isPendingHandSelection: () => false,
+      setStatusMsg: (message: string) => statusMessages.push(message),
+      setMoveButtonClass: () => undefined,
+      renderPieceContextMenu: () => undefined,
+      renderHand: () => undefined,
+      doAction: (action: unknown) => submittedActions.push(action),
+    })
+    new Script(readNamedFunction(battlePage, 'onCardClick')).runInContext(context)
+
+    new Script("onCardClick('discounted-charge', 'holy-charge')").runInContext(context)
+
+    expect(JSON.parse(JSON.stringify(submittedActions))).toEqual([{
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'discounted-charge',
+    }])
+    expect(statusMessages).not.toContain('行动点不足（需要 2，剩余 1）')
   })
 
   it('fails closed before transport when a target action has no type', () => {

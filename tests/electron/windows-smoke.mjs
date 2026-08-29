@@ -302,8 +302,12 @@ function stopApplication(application) {
 
 async function isReachable(port) {
   try {
-    await getJson(`http://127.0.0.1:${port}/api/ping`)
-    return true
+    const result = await callGameRpc(
+      `ws://127.0.0.1:${port}/ws/rooms/__lobby`,
+      'system.health',
+      {},
+    )
+    return result.ok === true && result.data?.protocol === 'rvb-ws'
   } catch {
     return false
   }
@@ -531,10 +535,26 @@ async function smokeServer() {
       await delay(250)
     }
     assert(initial?.running === true && initial.port === 3000 && await isReachable(3000), `Server did not become ready on port 3000: ${JSON.stringify(initial)}`)
-    const ping = await getJson('http://127.0.0.1:3000/api/ping')
-    const rooms = await getJson('http://127.0.0.1:3000/api/rooms')
+    const health = await callGameRpc(
+      'ws://127.0.0.1:3000/ws/rooms/__lobby',
+      'system.health',
+      {},
+    )
+    const rooms = await callGameRpc(
+      'ws://127.0.0.1:3000/ws/rooms/__lobby',
+      'rooms.list',
+      {},
+    )
     const publicWebSocket = await probeGameWebSocket(
       'ws://127.0.0.1:3000/ws/rooms/__lobby',
+    )
+    assert(
+      health.ok === true && health.data?.protocol === 'rvb-ws',
+      'Public same-port WebSocket system.health failed: ' + JSON.stringify(health),
+    )
+    assert(
+      rooms.ok === true && Array.isArray(rooms.data?.rooms),
+      'Public same-port WebSocket rooms.list failed: ' + JSON.stringify(rooms),
     )
     assert(
       publicWebSocket.roomsResult.ok === true &&
@@ -575,8 +595,8 @@ async function smokeServer() {
     result = {
       entry: 'server',
       rendererBoundary,
-      http: {
-        ping,
+      websocketRpc: {
+        health,
         rooms,
       },
       publicWebSocket,
@@ -696,9 +716,24 @@ async function smokeClient() {
     const localGatewayPort = mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521
     assert(await isReachable(localGatewayPort), 'Client local gateway is not reachable')
     const localBaseUrl = `http://127.0.0.1:${localGatewayPort}`
-    const roomsBeforeCreate = await getJson(`${localBaseUrl}/api/rooms`)
+    const legacyPlayerRestResponse = await fetch(`${localBaseUrl}/api/rooms`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const legacyPlayerRestBody = await legacyPlayerRestResponse.json()
     assert(
-      Array.isArray(roomsBeforeCreate.rooms) && roomsBeforeCreate.rooms.length === 0,
+      legacyPlayerRestResponse.status === 410 && legacyPlayerRestBody.code === 'PLAYER_REST_DISABLED',
+      `Legacy player REST boundary was not disabled: ${legacyPlayerRestResponse.status} ${JSON.stringify(legacyPlayerRestBody)}`,
+    )
+    const roomWsUrl = `ws://127.0.0.1:${localGatewayPort}/ws/rooms/__lobby`
+    const roomsBeforeCreate = await callGameRpc(
+      roomWsUrl,
+      'rooms.list',
+      {},
+    )
+    assert(
+      roomsBeforeCreate.ok === true
+        && Array.isArray(roomsBeforeCreate.data?.rooms)
+        && roomsBeforeCreate.data.rooms.length === 0,
       `Fresh client database did not return an empty room list: ${JSON.stringify(roomsBeforeCreate)}`,
     )
     const createdRoom = await callGameRpc(
@@ -717,10 +752,15 @@ async function smokeClient() {
         && createdRoom.data?.mapId === 'winding-pass',
       `Fresh client database could not create a room: ${JSON.stringify(createdRoom)}`,
     )
-    const roomsAfterCreate = await getJson(`${localBaseUrl}/api/rooms`)
+    const roomsAfterCreate = await callGameRpc(
+      roomWsUrl,
+      'rooms.list',
+      {},
+    )
     assert(
-      Array.isArray(roomsAfterCreate.rooms)
-        && roomsAfterCreate.rooms.some((room) => room.id === createdRoom.data.id),
+      roomsAfterCreate.ok === true
+        && Array.isArray(roomsAfterCreate.data?.rooms)
+        && roomsAfterCreate.data.rooms.some((room) => room.id === createdRoom.data.id),
       `Created room was not persisted in the client database: ${JSON.stringify(roomsAfterCreate)}`,
     )
     const pieceGallery = await verifyPieceGallery(application.debugPort, gameTarget)
@@ -746,6 +786,7 @@ async function smokeClient() {
       packagedAssets,
       localMode: mode,
       databaseProbe: { roomsBeforeCreate, createdRoom, roomsAfterCreate },
+      legacyPlayerRest: { status: legacyPlayerRestResponse.status, body: legacyPlayerRestBody },
       pieceGallery: { all: pieceGallery.all, light: pieceGallery.light, dark: pieceGallery.dark },
       battleRuntime: battle.runtime,
       exitedCleanly: true,

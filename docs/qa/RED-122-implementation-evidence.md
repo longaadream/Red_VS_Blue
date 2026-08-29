@@ -2,11 +2,11 @@
 
 任务：实现零阶段单步贪心估价与位置潜力 AI 基线
 
-角色：实现者（Codex），schema v3 全枚举与轻量推演优化等待独立 AI 复核和人工验收
+角色：实现者（Codex），schema v3 全枚举与轻量推演优化已通过独立 AI 复核，等待人工验收
 
 分支：`codex/RED-122-zero-stage-ai`
 
-基线：`origin/main@0a09899b8e269b9b8bdcbffbea7b2171782572d3`（2026-08-29 提交前刷新并 rebase）
+基线：`origin/main@44d72960496a0da1068cd6d58b0eb0286188ca82`（2026-08-29 提交前刷新并 merge）
 
 ## 实现范围
 
@@ -38,26 +38,26 @@
 
 结果：`26/26` 通过。未触发回合护栏的样本均满足 `nodesVisited === candidatesConsidered === legal.length`，普通候选没有 `candidate-budget` 裁剪。
 
-AI 环境、RED-86 planner 与状态隔离相邻回归：`3 files / 30 tests` 全部通过。新增对照证明完整/轻量 transition 的 accepted、blocked、rejected、公开观察、`F`、gameplay state hash 和 RNG authority 一致，evaluation 重复 hash 稳定，输入 replay 不被污染；另覆盖“已有历史后立即终局”，验证 `settledAt.actionIndex` 与完整 gameplay state hash 一致。
+AI 环境（含合并后的 RED-128 v2 合同）、RED-86 planner、状态隔离与零阶决策回归：`4 files / 64 tests` 全部通过。新增对照证明完整/轻量 transition 的 accepted、blocked、rejected、公开观察、`F`、gameplay state hash 和 RNG authority 一致，evaluation 重复 hash 稳定，输入 replay 不被污染；另覆盖“已有历史后立即终局”，验证 `settledAt.actionIndex` 与完整 gameplay state hash 一致。
 
 ## schema v3 全枚举性能验证
 
-2026-08-29 运行固定 seed `1001` 镜像自对弈。优化前便携式哈希与原生 SHA-256 两次均超过 20 分钟未完成。压缩候选推演的历史 replay/action log 后，第一轮在 `518.84s` 完成；进一步省略 evaluation state diff 和重复 pre-state hash 后，在加入终局 action-index 等长占位修正的最终轮于 `365.08s` 完成。各优化轮 action trace hash 与 final state hash 完全一致，证明性能优化与终局一致性修正没有改变策略或终态。
+2026-08-29 运行固定 seed `1001` 镜像自对弈。优化前便携式哈希与原生 SHA-256 两次均超过 20 分钟未完成。压缩候选推演的历史 replay/action log 后，旧基线第一轮在 `518.84s` 完成；进一步省略 evaluation state diff 和重复 pre-state hash 后，在加入终局 action-index 等长占位修正的旧基线最终轮于 `365.08s` 完成，且各优化轮 action/final hash 完全一致。合并最新 `origin/main@44d7296` 后重新运行，因上游内容与 AI environment v2 变更，候选与 hash 按预期变化；新基线在 `398.90s` 完成，胜负、回合数、正式动作数和动作类型分布保持一致。
 
-结果：红方在第 25 个完整回合以 `core-eliminated` 获胜，红方剩余 3 枚棋子；正式动作 `371`，非法/拒绝动作 `0`，失败 `0`。全局候选 `31,626`、实际模拟节点 `30,849`；差额来自第 8 动作护栏，普通候选没有预算裁剪。
+结果：红方在第 25 个完整回合以 `core-eliminated` 获胜，红方剩余 3 枚棋子；正式动作 `371`，非法/拒绝动作 `0`，失败 `0`。全局候选 `33,068`、实际模拟节点 `32,112`；差额来自第 8 动作护栏，普通候选没有预算裁剪。
 
 | 指标 | 结果 |
 | --- | ---: |
 | 决策数 | 371 |
-| P50 | 326.64ms |
-| P95 | 2,606.00ms |
-| 最大 | 8,467.96ms |
+| P50 | 335.59ms |
+| P95 | 2,843.66ms |
+| 最大 | 8,687.96ms |
 | 红方 AP / 充能 | 188 / 6 |
 | 蓝方 AP / 充能 | 128 / 1 |
 
-确定性证据：action trace hash `bc59b43cea8b8e5d08af135e485df6c1e1fc4a7fb1851f51ac87c3e4626d8608`；final state hash `a3ccdc6b8141f881c55709add59cab68d9f87fc6015bda6e26619a752158f5fa`。
+新基线确定性证据：action trace hash `15d674f66158bcc757798266a15c5ecd647219e0e78d3013c6893d87638fa3b7`；final state hash `b8f9ab10d4097fd5980cc3ef04584453d782448286fcc5a05af1e75dbb813267`。
 
-结论：完整枚举现已能完成真实 8v8 自战，并把中位决策时间降到约三分之一秒；P95 约 2.7 秒、峰值约 8.5 秒仍是明确体验风险。为遵守“测试全部可能策略”，没有使用候选数量、动作类型、费用、目标或墙钟时间裁剪。
+结论：完整枚举现已能完成真实 8v8 自战，并把中位决策时间降到约三分之一秒；P95 约 2.8 秒、峰值约 8.7 秒仍是明确体验风险。为遵守“测试全部可能策略”，没有使用候选数量、动作类型、费用、目标或墙钟时间裁剪。
 
 ## 历史证据：schema v2 镜像自对弈
 

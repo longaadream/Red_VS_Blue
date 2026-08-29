@@ -17,5 +17,31 @@
   "cardType": "fel",
   "icon": "🔥",
   "code": "function executeCard(context) { var battle = context.battle; var playerId = context.playerId; var anchor = selectTarget({ type: 'piece', filter: 'ally', range: 99 }); if (!anchor || anchor.needsTargetSelection) return anchor || { needsTargetSelection: true, targetType: 'piece', range: 99, filter: 'ally' }; var targetPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos || { needsTargetSelection: true, targetType: 'grid', range: 99, filter: 'all' }; var tile = battle.map && battle.map.tiles && battle.map.tiles.find(function(t) { return t.x === targetPos.x && t.y === targetPos.y; }); if (!tile || !tile.props || !tile.props.walkable) return { success: false, message: '召唤位置必须是可行走地格' }; var occupied = battle.pieces.find(function(p) { return p.currentHp > 0 && p.x === targetPos.x && p.y === targetPos.y; }); if (occupied) return { success: false, message: '召唤位置已被占用' }; if (!battle.extensions) battle.extensions = {}; var kj = battle.extensions.kiljaedanPiece; if (!kj) { var already = battle.pieces.find(function(p) { return p.currentHp > 0 && (p.templateId === 'kiljaedan' || p.instanceId === 'kiljaedan'); }); if (already) return { success: false, message: '基尔加丹已经在场上' }; kj = { instanceId: 'kiljaedan-' + playerId + '-' + Date.now(), templateId: 'kiljaedan', name: '基尔加丹', ownerPlayerId: playerId, faction: anchor.faction || 'red', maxHp: 17, currentHp: 17, attack: 4, defense: 3, moveRange: 4, skills: [{ skillId: 'kiljaedan-demonic-pact', level: 1, currentCooldown: 0 }, { skillId: 'kiljaedan-fel-fire', level: 1, currentCooldown: 0 }, { skillId: 'kiljaedan-soul-drain', level: 1, currentCooldown: 0 }], displaySkills: [{ skillId: 'kiljaedan-demonic-pact', level: 1, currentCooldown: 0 }, { skillId: 'kiljaedan-fel-fire', level: 1, currentCooldown: 0 }, { skillId: 'kiljaedan-soul-drain', level: 1, currentCooldown: 0 }], rules: [], statusTags: [] }; } var ritual5 = { instanceId: 'demon-ritual', name: null, ownerPlayerId: playerId, attack: 0, defense: 0 }; dealDamage(ritual5, anchor, 6, 'true', battle, 'demon-summon-5'); anchor.attack += 1; kj.x = targetPos.x; kj.y = targetPos.y; kj.ownerPlayerId = playerId; kj.faction = kj.faction || anchor.faction || 'red'; kj.currentHp = kj.maxHp || 17; battle.pieces.push(kj); delete battle.extensions.kiljaedanPiece; return { success: true, message: anchor.name + '以血肉完成最终仪式（攻击力+1），基尔加丹从虚空降临并被召唤到(' + targetPos.x + ',' + targetPos.y + ')' }; }",
-  "image": "summon-demon.jpg"
+  "image": "summon-demon.jpg",
+  "targeting": {
+    "availability": [
+      {
+        "type": "livingPieceAbsent",
+        "templateId": "kiljaedan",
+        "unlessExtensionPath": "kiljaedanPiece",
+        "message": "Kiljaedan is already on the board"
+      }
+    ],
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "ally",
+        "range": 99
+      },
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 99,
+        "requireWalkable": true,
+        "requireUnoccupied": true
+      }
+    ]
+  }
 }

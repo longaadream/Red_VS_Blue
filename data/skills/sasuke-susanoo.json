@@ -11,6 +11,14 @@
   "cooldownTurns": 10,
   "maxCharges": 0,
   "chargeCost": 2,
+  "chargeCostModifiers": [
+    {
+      "source": "battleExtensionPlayerNumber",
+      "path": "contentCounters.mangekyoDeaths",
+      "operation": "subtract",
+      "minimum": 0
+    }
+  ],
   "powerMultiplier": 1.0,
   "actionPointCost": 0,
   "code": "function executeSkill(context) { var caster = context.piece; caster.attack += 3; removeSkillById(caster.instanceId, 'sasuke-chidori'); addSkillById(caster.instanceId, 'sasuke-kagutsuchi'); addSkillById(caster.instanceId, 'sasuke-indra-arrow'); addStatusEffectById(caster.instanceId, { id: 'susanoo-active', name: '须佐能乎', type: 'susanoo-active', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); return { success: true, message: caster.name + '激活须佐能乎！攻击力提升至' + caster.attack + '，千鸟消退，获得加具土命与因陀罗之矢！' }; }",

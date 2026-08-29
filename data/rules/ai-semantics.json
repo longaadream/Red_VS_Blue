@@ -2,24 +2,141 @@
   "schemaVersion": 1,
   "observationScope": "public-state",
   "profiles": {
-    "automatic": { "mechanics": ["damage", "heal", "status", "resource"], "stateSources": ["transition-diff"], "fallback": "derive" },
-    "metadata-required": { "mechanics": ["status", "delayed", "combo"], "stateSources": ["statusTags", "rules", "extensions"], "fallback": "skip-action" },
-    "evaluator-required": { "mechanics": ["protect", "transform", "delayed"], "stateSources": ["transition-diff", "statusTags", "rules"], "fallback": "neutral-value" },
-    "unsupported": { "mechanics": [], "stateSources": [], "fallback": "skip-action" }
+    "automatic": {
+      "mechanics": [
+        "damage",
+        "heal",
+        "status",
+        "resource"
+      ],
+      "stateSources": [
+        "transition-diff"
+      ],
+      "fallback": "derive"
+    },
+    "metadata-required": {
+      "mechanics": [
+        "status",
+        "delayed",
+        "combo"
+      ],
+      "stateSources": [
+        "statusTags",
+        "rules",
+        "extensions"
+      ],
+      "fallback": "skip-action"
+    },
+    "evaluator-required": {
+      "mechanics": [
+        "protect",
+        "transform",
+        "delayed"
+      ],
+      "stateSources": [
+        "transition-diff",
+        "statusTags",
+        "rules"
+      ],
+      "fallback": "neutral-value"
+    },
+    "unsupported": {
+      "mechanics": [],
+      "stateSources": [],
+      "fallback": "skip-action"
+    }
   },
   "manifestHashes": {
     "pieces": "db76808fa13c56a9f9e1acc466319d9506e0c7b5cddda4e674310faeefb1979e",
-    "skills": "805e29295afe62f038b86309dd9351ee7d7cf3601e50953dd7ff61ff790d094a",
+    "skills": "4de2e99d03c16f66cf0d35c644ed435c7e331972570dca1d5a8e5a13e4631546",
     "cards": "4f15ea0ae15ec28dc71cfa23928a77ce8cc0467d87cc9ad051c9836af41cbf92",
-    "rules": "aea49137e30dc18bb2bac0e93abeb838994937452d4da5c8b1cb6555519287ee",
+    "rules": "562c638219841270f016b1dcc1f43b8a9c5587bfb8897180c4cc2d42e12eda40",
     "status-effects": "ea3b630e48fcacba6a3a7b66deefe0d0c6f78d421fdd96b5327db1837e3e43ec"
   },
-  "unsupported": { "skills": ["evil-explosion"] },
-  "metadataRequired": {
-    "pieces": ["blue-ichigo", "kiljaedan", "red-illidan", "red-sasuke"],
-    "skills": ["biotic-grenade", "blackwidow-lethal-toxin", "blizzard", "blizzard-damage", "divine-blessing-damage", "divine-shield-defense", "elune-blessing", "frostbolt", "ichigo-bankai-tensa-zangetsu", "ichigo-black-getsuga-tensho", "illidan-metamorphosis", "initial-draw", "itachi-amaterasu", "kenshin-amakakeru", "kenshin-ryutsuisen", "kiljaedan-demonic-pact", "minato-kunai-formula", "minato-rasengan", "minato-spiral-barrage", "nano-boost", "naruto-shadow-clone", "pulse-pistol", "pulse-pistol-move", "rafaam-temporal-distortion", "recall", "recall-endturn-trigger", "recall-move-trigger", "recall-skill-trigger", "sasuke-amaterasu", "sasuke-indra-arrow", "sasuke-susanoo", "shadow-step", "shadow-step-teleport", "shield-of-light", "shishio-flame-spirit", "shishio-infinite-blade", "shishio-infinite-blade-recast", "sleep-dart", "sleep-remove", "sticky-bomb", "sticky-bomb-explode", "sticky-bomb-move"],
-    "cards": ["demon-summon-1", "demon-summon-2", "demon-summon-3", "demon-summon-4", "demon-summon-5"],
-    "rules": ["rule-blackwidow-toxin-player", "rule-minato-anchor-begin-turn", "rule-minato-flying-raijin-trigger", "rule-rafaam-curse-end-turn", "rule-rafaam-curse-ward", "rule-sasuke-amaterasu-damage", "rule-sasuke-amaterasu-endturn", "rule-sasuke-amaterasu-move", "rule-sasuke-amaterasu-stack", "rule-shishio-burn-endturn", "rule-shishio-burn-move", "rule-turalyon-lightforged-march"]
+  "unsupported": {
+    "skills": [
+      "evil-explosion"
+    ]
   },
-  "evaluatorRequired": { "skills": ["arthas-lich-covenant", "hidan-undying", "sasuke-kagutsuchi"] }
+  "metadataRequired": {
+    "pieces": [
+      "blue-ichigo",
+      "kiljaedan",
+      "red-illidan",
+      "red-sasuke"
+    ],
+    "skills": [
+      "biotic-grenade",
+      "blackwidow-lethal-toxin",
+      "blizzard",
+      "blizzard-damage",
+      "divine-blessing-damage",
+      "divine-shield-defense",
+      "elune-blessing",
+      "frostbolt",
+      "ichigo-bankai-tensa-zangetsu",
+      "ichigo-black-getsuga-tensho",
+      "illidan-metamorphosis",
+      "initial-draw",
+      "itachi-amaterasu",
+      "kenshin-amakakeru",
+      "kenshin-ryutsuisen",
+      "kiljaedan-demonic-pact",
+      "minato-kunai-formula",
+      "minato-rasengan",
+      "minato-spiral-barrage",
+      "nano-boost",
+      "naruto-shadow-clone",
+      "pulse-pistol",
+      "pulse-pistol-move",
+      "rafaam-temporal-distortion",
+      "recall",
+      "recall-endturn-trigger",
+      "recall-move-trigger",
+      "recall-skill-trigger",
+      "sasuke-amaterasu",
+      "sasuke-indra-arrow",
+      "sasuke-susanoo",
+      "shadow-step",
+      "shadow-step-teleport",
+      "shield-of-light",
+      "shishio-flame-spirit",
+      "shishio-infinite-blade",
+      "shishio-infinite-blade-recast",
+      "sleep-dart",
+      "sleep-remove",
+      "sticky-bomb",
+      "sticky-bomb-explode",
+      "sticky-bomb-move"
+    ],
+    "cards": [
+      "demon-summon-1",
+      "demon-summon-2",
+      "demon-summon-3",
+      "demon-summon-4",
+      "demon-summon-5"
+    ],
+    "rules": [
+      "rule-blackwidow-toxin-player",
+      "rule-mangekyo-friendly-death",
+      "rule-minato-anchor-begin-turn",
+      "rule-minato-flying-raijin-trigger",
+      "rule-rafaam-curse-end-turn",
+      "rule-rafaam-curse-ward",
+      "rule-sasuke-amaterasu-damage",
+      "rule-sasuke-amaterasu-endturn",
+      "rule-sasuke-amaterasu-move",
+      "rule-sasuke-amaterasu-stack",
+      "rule-shishio-burn-endturn",
+      "rule-shishio-burn-move",
+      "rule-turalyon-lightforged-march"
+    ]
+  },
+  "evaluatorRequired": {
+    "skills": [
+      "arthas-lich-covenant",
+      "hidan-undying",
+      "sasuke-kagutsuchi"
+    ]
+  }
 }

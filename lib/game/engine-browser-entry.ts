@@ -16,12 +16,7 @@
 
 export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } from './turn'
 export { getBattleRootSeed, hashBattleState, hashStable, runBattleAction } from './battle-runner'
-export {
-  getEffectiveChargeCost,
-  getMangekyoDeathCount,
-  isMangekyoSkill,
-  MANGEKYO_KEYWORD,
-} from './mangekyo'
+export { getEffectiveChargeCost } from './skills'
 export {
   AI_ENVIRONMENT_CAPABILITIES,
   aiEnvironmentV1,

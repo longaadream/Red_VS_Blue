@@ -8,10 +8,12 @@ import {
   stableJson,
 } from './battle-trace'
 import { runBattleActionIsolated } from './battle-runner'
+import { assertPendingOptionCancellation, validatePendingOptionSubmission } from './pending-interaction'
 import { getSkillById } from './skill-repository'
 import { loadCardById } from './skills'
 import { getLegalNormalMoveTargetsForPlayer } from './spatial'
 import {
+  assertPendingTargetCancellation,
   prepareAction,
   targetRefKey,
   validatePendingTargetSubmissions,
@@ -21,19 +23,28 @@ import {
 import type { BattleAction, BattleState } from './turn'
 import {
   AI_ENVIRONMENT_PROTOCOL_VERSION,
+  AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+  type AIDecisionSpaceV2,
   type AIEnvironment,
   type AIActionResourceCost,
   type AIEnvironmentCapabilities,
   type AIEnvironmentError,
+  type AIEnvironmentV2,
+  type AIEnvironmentV2Capabilities,
+  type AIMaterializationChoiceV2,
   type AIObservation,
+  type AIObservationV2,
   type AIObservationScope,
+  type AIObservedBoardEffect,
   type AIObservedStatusTag,
   type AISimulationContext,
   type AIStateDiffEntry,
   type AITransitionTrace,
   type CandidateAction,
+  type CandidateActionV2,
   type CandidateActionKind,
   type TransitionResult,
+  type TransitionResultV2,
 } from './ai-types'
 
 const MAX_SELECTION_STEPS = 16
@@ -72,6 +83,14 @@ export const AI_ENVIRONMENT_CAPABILITIES: AIEnvironmentCapabilities = {
     { type: 'grantChargePoints', reason: 'Administrative/debug command; not Demo player admission.' },
     { type: 'surrender', reason: 'Match-control command; excluded from tactical candidate search.' },
   ],
+}
+
+export const AI_ENVIRONMENT_V2_CAPABILITIES: AIEnvironmentV2Capabilities = {
+  protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+  supportedActionTypes: AI_ENVIRONMENT_CAPABILITIES.supportedActionTypes,
+  unsupportedActionTypes: AI_ENVIRONMENT_CAPABILITIES.unsupportedActionTypes,
+  structuredPendingDecisionSpace: true,
+  publicBoardEffects: true,
 }
 
 export class AIEnvironmentContractError extends Error {
@@ -159,7 +178,6 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
     players: state.players.map(player => ({
       playerId: player.playerId,
       name: player.name,
-      mangekyoDeathCount: player.mangekyoDeathCount,
       chargePoints: player.chargePoints,
       actionPoints: player.actionPoints,
       maxActionPoints: player.maxActionPoints,
@@ -680,4 +698,383 @@ export const aiEnvironmentV1: AIEnvironment = Object.freeze({
   simulate: simulateAITransition,
   isTerminal: isAITerminal,
   stateKey: aiStateKey,
+})
+
+function v2Candidate(kind: CandidateActionKind, action: BattleAction): CandidateActionV2 {
+  return {
+    protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+    id: `candidate-${hashStable({ protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION, action }).slice(0, 24)}`,
+    kind,
+    action,
+  }
+}
+
+function cloneDecisionValue<T>(value: T): T {
+  let serialized: string | undefined
+  try {
+    serialized = JSON.stringify(value, (_key, candidate) => {
+      if (
+        candidate === undefined ||
+        typeof candidate === 'function' ||
+        typeof candidate === 'symbol' ||
+        typeof candidate === 'bigint' ||
+        (typeof candidate === 'number' && !Number.isFinite(candidate))
+      ) throw new Error('unsupported value')
+      return candidate
+    })
+  } catch {
+    throw new AIEnvironmentContractError(
+      'AI_ENV_DECISION_VALUE_NOT_SERIALIZABLE',
+      'Decision values must be fully JSON serializable',
+    )
+  }
+  if (serialized === undefined) {
+    throw new AIEnvironmentContractError(
+      'AI_ENV_DECISION_VALUE_NOT_SERIALIZABLE',
+      'Decision values must be fully JSON serializable',
+    )
+  }
+  return JSON.parse(serialized) as T
+}
+
+function observedBoardEffect(value: unknown, index: number): AIObservedBoardEffect | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const source = value as Record<string, unknown>
+  if (
+    source.visible === false ||
+    typeof source.x !== 'number' ||
+    !Number.isFinite(source.x) ||
+    typeof source.y !== 'number' ||
+    !Number.isFinite(source.y)
+  ) return undefined
+  const firstString = (...values: unknown[]) => values.find(candidate => (
+    typeof candidate === 'string' && candidate.length > 0
+  )) as string | undefined
+  const projected: AIObservedBoardEffect = {
+    id: firstString(source.id, source.instanceId, source.effectId) || `effect-${index}`,
+    type: firstString(source.tileType, source.type) || 'effect',
+    x: source.x,
+    y: source.y,
+  }
+  const icon = firstString(source.icon)
+  if (icon) projected.icon = icon
+  return projected
+}
+
+function observedBoardEffects(state: BattleState): AIObservedBoardEffect[] {
+  const extensions = state.extensions as Record<string, unknown> | undefined
+  const tileEffects = Array.isArray(extensions?.tileEffects) ? extensions.tileEffects : []
+  return tileEffects
+    .map(observedBoardEffect)
+    .filter((effect): effect is AIObservedBoardEffect => effect !== undefined)
+    .sort((left, right) => compareStableText(stableJson(left), stableJson(right)))
+}
+
+function observedPendingOptionV2(option: unknown): unknown {
+  if (!option || typeof option !== 'object') return cloneDecisionValue(option)
+  const source = option as Record<string, unknown>
+  const projected: Record<string, unknown> = {}
+  if ('value' in source) projected.value = cloneDecisionValue(source.value)
+  else if ('id' in source) projected.id = cloneDecisionValue(source.id)
+  if (typeof source.label === 'string') projected.label = source.label
+  if (typeof source.description === 'string') projected.description = source.description
+  return projected
+}
+
+export function observeBattleForAIV2(state: BattleState, playerId: string): AIObservationV2 {
+  const observation = observeBattleForAI(state, playerId)
+  return {
+    ...observation,
+    protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+    boardEffects: observedBoardEffects(state),
+    pendingOptionSelection: observation.pendingOptionSelection ? {
+      ...observation.pendingOptionSelection,
+      options: observation.pendingOptionSelection.options.map(observedPendingOptionV2),
+    } : undefined,
+  }
+}
+
+function requirePendingCredentials(
+  selectionId: string | undefined,
+  stateRevision: number | undefined,
+): { selectionId: string; stateRevision: number } {
+  if (!selectionId || !Number.isSafeInteger(stateRevision)) {
+    throw new AIEnvironmentContractError(
+      'AI_ENV_PENDING_CREDENTIALS_REQUIRED',
+      'Pending decision space requires an authoritative selection ID and state revision',
+    )
+  }
+  return { selectionId, stateRevision: stateRevision! }
+}
+
+function decisionId(payload: Record<string, unknown>): string {
+  return `decision-${hashStable({ protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION, ...payload }).slice(0, 24)}`
+}
+
+function optionAtomPayload(option: unknown): { value: unknown; label?: string; description?: string } {
+  if (!option || typeof option !== 'object') return { value: cloneDecisionValue(option) }
+  const source = option as Record<string, unknown>
+  if (!('value' in source) && !('id' in source)) {
+    throw new AIEnvironmentContractError(
+      'AI_ENV_OPTION_ATOM_VALUE_REQUIRED',
+      'Structured option objects require a public value or ID',
+    )
+  }
+  const projected: { value: unknown; label?: string; description?: string } = {
+    value: cloneDecisionValue('value' in source ? source.value : source.id),
+  }
+  if (typeof source.label === 'string') projected.label = source.label
+  if (typeof source.description === 'string') projected.description = source.description
+  return projected
+}
+
+export function getAIDecisionSpaceV2(state: BattleState, playerId: string): AIDecisionSpaceV2 {
+  const observation = observeBattleForAIV2(state, playerId)
+  if (state.terminalResult) {
+    const payload = {
+      kind: 'actions' as const,
+      playerId,
+      stateRevision: observation.stateRevision,
+      candidates: [],
+    }
+    return {
+      protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+      id: decisionId(payload),
+      ...payload,
+    }
+  }
+
+  const pendingOption = state.pendingOptionSelection
+  if (pendingOption && samePlayer(pendingOption.playerId, playerId)) {
+    const credentials = requirePendingCredentials(pendingOption.selectionId, pendingOption.stateRevision)
+    const optionPayloads = pendingOption.options
+      .map(optionAtomPayload)
+      .sort((left, right) => compareStableText(stableJson(left.value), stableJson(right.value)))
+    const options = optionPayloads.map((option, index) => ({
+      ...option,
+      id: `option-${hashStable({
+        protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+        selectionId: credentials.selectionId,
+        index,
+        value: option.value,
+      }).slice(0, 24)}`,
+    }))
+    const selectionMode: 'single' | 'multi' = pendingOption.selectionMode === 'multi'
+      ? 'multi' : 'single'
+    const minSelections = selectionMode === 'multi'
+      ? (Number.isSafeInteger(pendingOption.minSelections) ? Math.max(0, pendingOption.minSelections!) : 1)
+      : 1
+    const maxSelections = selectionMode === 'multi'
+      ? Math.min(
+          options.length,
+          Number.isSafeInteger(pendingOption.maxSelections)
+            ? Math.max(minSelections, pendingOption.maxSelections!)
+            : options.length,
+        )
+      : 1
+    const payload = {
+      kind: 'pending-option' as const,
+      playerId,
+      stateRevision: credentials.stateRevision,
+      selectionId: credentials.selectionId,
+      title: pendingOption.title,
+      selectionMode,
+      presentation: pendingOption.presentation === 'hand' ? 'hand' as const : 'picker' as const,
+      minSelections,
+      maxSelections,
+      canCancel: pendingOption.canCancel !== false,
+      options,
+    }
+    return {
+      protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+      id: decisionId(payload),
+      ...payload,
+    }
+  }
+
+  const pendingTarget = state.pendingTargetSelection
+  if (pendingTarget && samePlayer(pendingTarget.ownerPlayerId || pendingTarget.playerId, playerId)) {
+    const credentials = requirePendingCredentials(pendingTarget.selectionId, pendingTarget.stateRevision)
+    const refs = [...(pendingTarget.candidates || [])]
+      .sort((left, right) => compareStableText(targetRefKey(left), targetRefKey(right)))
+      .map(ref => cloneSerializable(ref))
+    const candidates = refs.map((ref, index) => ({
+      id: `target-${hashStable({
+        protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+        selectionId: credentials.selectionId,
+        index,
+        ref,
+      }).slice(0, 24)}`,
+      ref,
+    }))
+    const selectionMode: 'single' | 'multi' = pendingTarget.selectionMode === 'multi'
+      ? 'multi' : 'single'
+    const minSelections = selectionMode === 'multi'
+      ? Math.max(0, pendingTarget.minSelections ?? pendingTarget.min ?? 1)
+      : 1
+    const maxSelections = selectionMode === 'multi'
+      ? Math.min(
+          candidates.length,
+          Math.max(minSelections, pendingTarget.maxSelections ?? pendingTarget.max ?? 1),
+        )
+      : 1
+    const payload = {
+      kind: 'pending-target' as const,
+      playerId,
+      stateRevision: credentials.stateRevision,
+      selectionId: credentials.selectionId,
+      title: pendingTarget.title,
+      targetType: pendingTarget.targetType,
+      range: typeof pendingTarget.range === 'number' ? pendingTarget.range : undefined,
+      filter: typeof pendingTarget.filter === 'string' ? pendingTarget.filter : undefined,
+      selectionMode,
+      minSelections,
+      maxSelections,
+      selectedTargets: cloneSerializable(pendingTarget.selectedTargets || []),
+      canCancel: pendingTarget.canCancel !== false,
+      candidates,
+    }
+    return {
+      protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+      id: decisionId(payload),
+      ...payload,
+    }
+  }
+
+  const candidates = state.pendingOptionSelection || state.pendingTargetSelection
+    ? []
+    : listLegalAIActions(state, playerId).map(item => v2Candidate(item.kind, item.action))
+  const payload = {
+    kind: 'actions' as const,
+    playerId,
+    stateRevision: observation.stateRevision,
+    candidates,
+  }
+  return {
+    protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+    id: decisionId(payload),
+    ...payload,
+  }
+}
+
+export function materializeAIDecisionV2(
+  state: BattleState,
+  playerId: string,
+  choice: AIMaterializationChoiceV2,
+): CandidateActionV2 {
+  if (choice.kind === 'pending-option') {
+    const pending = state.pendingOptionSelection
+    const selectionMode = pending?.selectionMode === 'multi' ? 'multi' : 'single'
+    if (selectionMode === 'single' && choice.selected.length !== 1) {
+      throw new AIEnvironmentContractError(
+        'AI_ENV_SINGLE_OPTION_COUNT_INVALID',
+        'Single-select option materialization requires exactly one selected value',
+      )
+    }
+    const action: Extract<BattleAction, { type: 'pendingOptionSelect' }> = {
+      type: 'pendingOptionSelect',
+      playerId,
+      selectedOption: selectionMode === 'multi'
+        ? cloneDecisionValue(choice.selected)
+        : cloneDecisionValue(choice.selected[0]),
+      selectionId: choice.selectionId,
+      stateRevision: choice.stateRevision,
+    }
+    validatePendingOptionSubmission(state, action)
+    return v2Candidate('pending-option', action)
+  }
+
+  if (choice.kind === 'pending-target') {
+    const action = cloneSerializable(choice.selected).reduce((draft, target) => appendTarget(draft, target), {
+      type: 'pendingTargetSelect',
+      playerId,
+      selectionId: choice.selectionId,
+      stateRevision: choice.stateRevision,
+    } as BattleAction)
+    validatePendingTargetSubmissions(state, action as Extract<BattleAction, { type: 'pendingTargetSelect' }>)
+    return v2Candidate('pending-target', action)
+  }
+
+  const action: Extract<BattleAction, { type: 'cancelPendingSelection' }> = {
+    type: 'cancelPendingSelection',
+    playerId,
+    selectionId: choice.selectionId,
+    stateRevision: choice.stateRevision,
+  }
+  if (state.pendingTargetSelection) assertPendingTargetCancellation(state, action)
+  else assertPendingOptionCancellation(state, action)
+  return v2Candidate('cancel-selection', action)
+}
+
+export function simulateAITransitionV2(
+  state: BattleState,
+  input: CandidateActionV2 | BattleAction,
+  context: AISimulationContext = {},
+): TransitionResultV2 {
+  const action = 'action' in input ? input.action : input
+  const rootSeed = context.rootSeed ?? getBattleRootSeed(state)
+  const preStateHash = hashBattleState(state)
+  try {
+    if (rootSeed === undefined) {
+      throw new AIEnvironmentContractError(
+        'AI_ENV_ROOT_SEED_REQUIRED',
+        'A root seed or initialized battle trace is required for deterministic simulation',
+      )
+    }
+    const result = runBattleActionIsolated(state, action, { rootSeed })
+    const trace = transitionTrace(state, result.state, result.trace)
+    const transitionHash = hashStable({
+      protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+      accepted: true,
+      action,
+      preStateHash,
+      stateHash: result.stateHash,
+      trace,
+    })
+    return {
+      protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+      accepted: true,
+      state: result.state,
+      stateHash: result.stateHash,
+      transitionHash,
+      trace,
+    }
+  } catch (caught) {
+    const error = stableError(caught)
+    const trace = transitionTrace(state, state)
+    const transitionHash = hashStable({
+      protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+      accepted: false,
+      action,
+      preStateHash,
+      error,
+      trace,
+    })
+    return {
+      protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+      accepted: false,
+      state,
+      stateHash: preStateHash,
+      transitionHash,
+      error,
+      trace,
+    }
+  }
+}
+
+export function aiStateKeyV2(state: BattleState, scope: AIObservationScope): string {
+  return scope.kind === 'player'
+    ? hashStable(observeBattleForAIV2(state, scope.playerId))
+    : hashBattleState(state)
+}
+
+export const aiEnvironmentV2: AIEnvironmentV2 = Object.freeze({
+  protocolVersion: AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
+  capabilities: AI_ENVIRONMENT_V2_CAPABILITIES,
+  observe: observeBattleForAIV2,
+  decisionSpace: getAIDecisionSpaceV2,
+  materialize: materializeAIDecisionV2,
+  simulate: simulateAITransitionV2,
+  isTerminal: isAITerminal,
+  stateKey: aiStateKeyV2,
 })

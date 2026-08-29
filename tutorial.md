@@ -967,12 +967,12 @@ return {
 
 如果返回 `{ success: false, message: '...' }`，技能不消耗行动点和冷却（视为未执行）。
 
-### 示例：基础攻击技能
+### 示例：自定义近战技能
 
 ```json
 {
-  "id": "basic-attack",
-  "name": "基础攻击",
+  "id": "example-adjacent-strike",
+  "name": "示例斩击",
   "description": "对1格内的敌人造成100%攻击力的物理伤害",
   "icon": "⚔️",
   "kind": "active",
@@ -2189,7 +2189,7 @@ removeRuleById(piece.instanceId, 'rule-bleeding-tick')
     "moveRange": 4
   },
   "skills": [
-    { "skillId": "assassin-basic-attack", "initialCharges": 0 },
+    { "skillId": "assassin-strike", "initialCharges": 0 },
     { "skillId": "shadow-step-simple", "initialCharges": 0 },
     { "skillId": "bloodthirst-passive", "initialCharges": 0 }
   ],
@@ -2201,11 +2201,11 @@ removeRuleById(piece.instanceId, 'rule-bleeding-tick')
 
 ### 第二步：创建普通攻击技能
 
-**文件：`data/skills/assassin-basic-attack.json`**
+**文件：`data/skills/assassin-strike.json`**
 
 ```json
 {
-  "id": "assassin-basic-attack",
+  "id": "assassin-strike",
   "name": "刺击",
   "description": "对1格内的敌人造成120%攻击力的物理伤害",
   "icon": "🗡️",
@@ -2307,7 +2307,7 @@ removeRuleById(piece.instanceId, 'rule-bleeding-tick')
 
 ```
 data/pieces/shadow-assassin.json          ← 角色定义
-data/skills/assassin-basic-attack.json   ← 主动：刺击
+data/skills/assassin-strike.json   ← 主动：刺击
 data/skills/shadow-step-simple.json      ← 主动：暗影步
 data/rules/rule-bloodthirst-init.json    ← 被动初始化规则
 data/skills/bloodthirst-init.json        ← 被动初始化检查
@@ -2768,7 +2768,7 @@ UI 中手牌按钮会自动显示 AP 消耗标签（黄色正常，红色表示 
   "name": "卡牌连携",
   "description": "使用攻击牌后抽一张牌",
   "trigger": { "type": "afterCardPlay" },
-  "skillCode": "if (context.cardId && context.cardId.startsWith('attack-')) { addCardToHand('basic-attack', context.playerId); return { success: true, message: '卡牌连携：抽一张攻击牌' }; } return { success: false };"
+  "skillCode": "if (context.cardId && context.cardId.startsWith('attack-')) { addCardToHand('example-adjacent-strike', context.playerId); return { success: true, message: '卡牌连携：抽一张攻击牌' }; } return { success: false };"
 }
 ```
 

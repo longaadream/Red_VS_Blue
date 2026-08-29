@@ -6,6 +6,7 @@ import * as os from 'os'
 import * as dgram from 'dgram'
 import * as http from 'http'
 import { randomBytes } from 'crypto'
+import type WebSocket from 'ws'
 import { pathToFileURL } from 'url'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { resolveDevelopmentProfile } from './development-profile'
@@ -587,8 +588,11 @@ async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise
     env: {
       ...process.env,
       PORT: String(actualLocalPort),
-      HOSTNAME: '127.0.0.1',
+      HOSTNAME: '0.0.0.0',
       NODE_ENV: 'production',
+      RVB_BATTLE_AUTHORITY_V2: '1',
+      RVB_BATTLE_ASYNC_JOURNAL: '1',
+      RVB_TURN_TIMER_ENABLED: '1',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
       DATABASE_URL: databaseUrl,
@@ -764,7 +768,7 @@ function probeProfileWebSocket(timeoutMs = 5_000): Promise<void> {
     const modulePath = app.isPackaged
       ? path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')
       : 'ws'
-    const WebSocketClient = require(modulePath) as typeof import('ws')
+    const WebSocketClient = require(modulePath) as new (address: string) => WebSocket
     const socket = new WebSocketClient(`ws://127.0.0.1:${actualLocalPort}/ws/rooms/__profile-health__`)
     const finish = (error?: Error): void => {
       if (settled) return
@@ -793,7 +797,6 @@ async function verifyRendererCandidate(
     'data/skills/manifest.json',
     'data/cards/manifest.json',
     'data/cards/lucky-coin.json',
-    'data/skills/basic-attack.json',
   ]
   const activePackRoot = reference.kind === 'installed' ? profileRoot : null
   for (const relativePath of required) {

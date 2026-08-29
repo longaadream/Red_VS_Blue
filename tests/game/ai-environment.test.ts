@@ -8,13 +8,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   AI_ENVIRONMENT_CAPABILITIES,
+  AI_ENVIRONMENT_V2_CAPABILITIES,
   aiEnvironmentV1,
+  aiEnvironmentV2,
   listLegalAIActions,
   observeBattleForAI,
   simulateAITransition,
 } from '@/lib/game/ai-environment'
 import { evaluateZeroStageState } from '@/lib/game/ai-zero-stage-evaluator'
-import type { AIEnvironment, CandidateAction } from '@/lib/game/ai-types'
+import type {
+  AIEnvironment,
+  AIPendingOptionDecisionSpaceV2,
+  AIPendingTargetDecisionSpaceV2,
+  CandidateAction,
+} from '@/lib/game/ai-types'
 import {
   hashBattleState,
   hashStable,
@@ -22,9 +29,10 @@ import {
   recordBattleInitialization,
   stableJson,
 } from '@/lib/game/battle-trace'
+import { finalizePendingOptionSession } from '@/lib/game/pending-interaction'
 import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import { globalTriggerSystem } from '@/lib/game/triggers'
-import { getTargetingStateRevision, prepareAction } from '@/lib/game/targeting'
+import { finalizePendingTargetSession, getTargetingStateRevision, prepareAction } from '@/lib/game/targeting'
 import { getLegalNormalMoveTargetsForPlayer } from '@/lib/game/spatial'
 import { loadRuleById } from '@/lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
@@ -59,6 +67,8 @@ function makeSilencedActionFixture() {
     id: 'silenced-silenced-caster', type: 'silenced', name: '沉默', visible: true,
     remainingDuration: 1, remainingUses: -1, intensity: 1, stacks: 1,
     relatedRules: ['rule-silenced-block'],
+    blocksSkillUse: true,
+    skillBlockMessage: 'Source piece is silenced',
   }]
   caster.rules = [silencedRule]
   caster.skills = [
@@ -225,7 +235,7 @@ describe('versioned headless AI environment', () => {
       item.kind === 'basic-skill' || item.kind === 'charge-skill'
     )).map(item => item.action.type)).toEqual(['useBasicSkill', 'useChargeSkill'])
 
-    caster.statusTags = [{ id: 'silenced-silenced-caster', type: 'silenced' }]
+    caster.statusTags = [{ id: 'plain-status', type: 'plain-status' }]
     caster.rules = []
     expect(listLegalAIActions(state, 'player-red').filter(item => (
       item.kind === 'basic-skill' || item.kind === 'charge-skill'
@@ -625,5 +635,366 @@ describe('versioned headless AI environment', () => {
     const nodeResult = aiEnvironmentV1.simulate(nodeState, selectMove(nodeCandidates), { rootSeed: FIXED_SEED })
     const browserResult = browser.simulate(browserState, selectMove(browserCandidates), { rootSeed: FIXED_SEED })
     expect(browserResult.transitionHash).toBe(nodeResult.transitionHash)
+  })
+})
+
+describe('AI Environment v2', () => {
+  it('preserves v1 while advertising the additive v2 contract', () => {
+    expect(AI_ENVIRONMENT_CAPABILITIES.protocolVersion).toBe(1)
+    expect(aiEnvironmentV1.protocolVersion).toBe(1)
+    expect(AI_ENVIRONMENT_V2_CAPABILITIES).toMatchObject({
+      protocolVersion: 2,
+      structuredPendingDecisionSpace: true,
+      publicBoardEffects: true,
+    })
+    expect(aiEnvironmentV2.protocolVersion).toBe(2)
+  })
+
+  it('keeps multi-option decision space linear and materializes any legal non-prefix choice', () => {
+    const state = makeState({}) as any
+    state.targetingRevision = 7
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: 'player-red',
+      title: 'choose holy cards',
+      options: Array.from({ length: 10 }, (_, index) => ({
+        value: `holy-${index}`,
+        label: `Holy ${index}`,
+        privateDebug: `hidden-${index}`,
+      })),
+      selectionMode: 'multi',
+      presentation: 'hand',
+      minSelections: 1,
+      maxSelections: 4,
+      canCancel: false,
+    }, state.targetingRevision)
+
+    const snapshot = stableJson(state)
+    const space = aiEnvironmentV2.decisionSpace(state, 'player-red') as AIPendingOptionDecisionSpaceV2
+    expect(space.kind).toBe('pending-option')
+    expect(space.options).toHaveLength(10)
+    expect(space.options.map(option => option.value)).toEqual(Array.from({ length: 10 }, (_, index) => `holy-${index}`))
+    const observation = aiEnvironmentV2.observe(state, 'player-red')
+    expect(stableJson(space)).not.toContain('privateDebug')
+    expect(stableJson(observation)).not.toContain('privateDebug')
+    expect(observation.pendingOptionSelection?.options[0]).toEqual({ value: 'holy-0', label: 'Holy 0' })
+
+    const selected = ['holy-1', 'holy-4', 'holy-9']
+    const candidate = aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected,
+    })
+    expect(candidate).toMatchObject({
+      protocolVersion: 2,
+      kind: 'pending-option',
+      action: { type: 'pendingOptionSelect', selectedOption: selected },
+    })
+    expect(stableJson(state)).toBe(snapshot)
+
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: ['holy-1', 'holy-1'],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision + 1,
+      selected: ['holy-1'],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: [],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: ['holy-0', 'holy-1', 'holy-2', 'holy-3', 'holy-4'],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: ['unknown'],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-blue', {
+      kind: 'pending-option',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: ['holy-1'],
+    })).toThrow()
+    expect(stableJson(state)).toBe(snapshot)
+  })
+
+  it('materializes a legal non-prefix multi-target choice through the authority validator', () => {
+    const chooser = makePiece({
+      instanceId: 'v2-target-chooser', ownerPlayerId: 'player-red', x: 1, y: 1,
+    }) as any
+    const state = makeState({ pieces: [chooser] }) as any
+    state.targetingRevision = 11
+    state.pendingTargetSelection = finalizePendingTargetSession(state, {
+      playerId: 'player-red',
+      ownerPlayerId: 'player-red',
+      title: 'choose targets',
+      targetType: 'cell',
+      source: { type: 'pending', id: 'v2-target-fixture', pieceId: chooser.instanceId },
+      range: 5,
+      filter: 'all',
+      min: 1,
+      max: 3,
+      selectionMode: 'multi',
+      minSelections: 1,
+      maxSelections: 3,
+      canCancel: false,
+      fixedCandidates: true,
+      candidates: [
+        { type: 'cell', x: 0, y: 0 },
+        { type: 'cell', x: 1, y: 0 },
+        { type: 'cell', x: 2, y: 0 },
+      ],
+    } as any, state.targetingRevision)
+
+    const snapshot = stableJson(state)
+    const space = aiEnvironmentV2.decisionSpace(state, 'player-red') as AIPendingTargetDecisionSpaceV2
+    expect(space.kind).toBe('pending-target')
+    expect(space.candidates).toHaveLength(3)
+    expect(space).toMatchObject({ range: 5, filter: 'all' })
+    const selected = [space.candidates[0].ref, space.candidates[2].ref]
+    const candidate = aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-target',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected,
+    })
+    expect(candidate).toMatchObject({
+      protocolVersion: 2,
+      kind: 'pending-target',
+      action: {
+        type: 'pendingTargetSelect',
+        targetX: 0,
+        targetY: 0,
+        extraTargets: [{ x: 2, y: 0 }],
+      },
+    })
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-target',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: [],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-target',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: [space.candidates[0].ref, space.candidates[0].ref],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-target',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: [{ type: 'cell', x: 99, y: 99 }],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-red', {
+      kind: 'pending-target',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision + 1,
+      selected: [space.candidates[0].ref],
+    })).toThrow()
+    expect(() => aiEnvironmentV2.materialize(state, 'player-blue', {
+      kind: 'pending-target',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: [space.candidates[0].ref],
+    })).toThrow()
+    expect(stableJson(state)).toBe(snapshot)
+  })
+
+  it('projects only whitelisted visible public board effects into observation and state keys', () => {
+    const state = makeState({}) as any
+    state.extensions = {
+      privateDebug: { secret: 'do-not-leak' },
+      tileEffects: [
+        { id: 'visible', type: 'holy-zone', icon: 'sun', x: 2, y: 3 },
+        { id: 'hidden', type: 'ambush', x: 4, y: 5, visible: false, privatePayload: 'secret' },
+        { sourceId: 'amaterasu', tileType: 'amaterasu', icon: 'moon', x: 1, y: 2, bgColor: 'private-style' },
+      ],
+    }
+
+    const observation = aiEnvironmentV2.observe(state, 'player-red')
+    expect(observation.boardEffects).toHaveLength(2)
+    expect(observation.boardEffects).toContainEqual(
+      { id: 'visible', type: 'holy-zone', icon: 'sun', x: 2, y: 3 },
+    )
+    expect(observation.boardEffects).toContainEqual(
+      { id: 'effect-2', type: 'amaterasu', icon: 'moon', x: 1, y: 2 },
+    )
+    expect(stableJson(observation)).not.toContain('privateDebug')
+    expect(stableJson(observation)).not.toContain('privatePayload')
+    expect(stableJson(observation)).not.toContain('private-style')
+
+    const changed = JSON.parse(JSON.stringify(state))
+    changed.extensions.tileEffects[0].type = 'changed-zone'
+    const scope = { kind: 'player' as const, playerId: 'player-red' }
+    expect(aiEnvironmentV2.stateKey(state, scope))
+      .not.toBe(aiEnvironmentV2.stateKey(changed, scope))
+  })
+})
+
+describe('AI Environment v2 real roster interactions', () => {
+  it('materializes a non-prefix Muru holy-hand selection without combinatorial candidates', () => {
+    const lament = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/muru-lament.json'), 'utf8'))
+    const liadrin = makePiece({
+      instanceId: 'v2-liadrin', templateId: 'liadrin', ownerPlayerId: 'player-red', x: 0, y: 0,
+    }) as any
+    liadrin.skills = [{ skillId: lament.id, currentCooldown: 0, usesRemaining: -1 }]
+    const enemy = makePiece({
+      instanceId: 'v2-enemy', ownerPlayerId: 'player-blue', faction: 'blue',
+      x: 4, y: 0, currentHp: 40, maxHp: 40,
+    }) as any
+    const state = makeState({
+      pieces: [liadrin, enemy], currentPlayerId: 'player-red', phase: 'action',
+    }) as any
+    state.skillsById[lament.id] = lament
+    state.players[0].actionPoints = 6
+    state.players[0].chargePoints = 6
+    const holyIds = ['holy-smite', 'holy-heal', 'holy-charge']
+    state.players[0].hand = Array.from({ length: 10 }, (_, index) => ({
+      cardId: holyIds[index % holyIds.length],
+      instanceId: `v2-holy-${index}`,
+      ownerPlayerId: 'player-red',
+    }))
+
+    const actions = aiEnvironmentV2.decisionSpace(state, 'player-red')
+    expect(actions.kind).toBe('actions')
+    const lamentAction = actions.kind === 'actions'
+      ? actions.candidates.find(item => item.action.type === 'useChargeSkill' && item.action.skillId === lament.id)
+      : undefined
+    expect(lamentAction).toBeDefined()
+
+    const prompted = aiEnvironmentV2.simulate(state, lamentAction!, { rootSeed: FIXED_SEED })
+    expect(prompted.accepted).toBe(true)
+    if (!prompted.accepted) throw new Error('Expected Muru to enter pending option selection')
+    const firstSpace = aiEnvironmentV2.decisionSpace(prompted.state, 'player-red') as AIPendingOptionDecisionSpaceV2
+    const secondSpace = aiEnvironmentV2.decisionSpace(prompted.state, 'player-red') as AIPendingOptionDecisionSpaceV2
+    expect(firstSpace).toEqual(secondSpace)
+    expect(firstSpace.options).toHaveLength(10)
+    expect(firstSpace.maxSelections).toBe(4)
+
+    const selected = [firstSpace.options[1].value, firstSpace.options[4].value, firstSpace.options[9].value]
+    const materialized = aiEnvironmentV2.materialize(prompted.state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: firstSpace.selectionId,
+      stateRevision: firstSpace.stateRevision,
+      selected,
+    })
+    expect(materialized.id).toBe(aiEnvironmentV2.materialize(prompted.state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: firstSpace.selectionId,
+      stateRevision: firstSpace.stateRevision,
+      selected,
+    }).id)
+
+    const resolvedA = aiEnvironmentV2.simulate(prompted.state, materialized, { rootSeed: FIXED_SEED })
+    const resolvedB = aiEnvironmentV2.simulate(prompted.state, materialized, { rootSeed: FIXED_SEED })
+    expect(resolvedA.transitionHash).toBe(resolvedB.transitionHash)
+    expect(resolvedA.accepted).toBe(true)
+    if (!resolvedA.accepted) throw new Error('Expected Muru pending selection to resolve')
+    console.info(`[RED-128 deterministic] descriptorId=${firstSpace.id} candidateId=${materialized.id} stateHash=${resolvedA.stateHash} transitionHash=${resolvedA.transitionHash}`)
+    expect(resolvedA.state.pendingOptionSelection).toBeUndefined()
+    expect(resolvedA.state.players[0].hand).toHaveLength(7)
+
+    const cancel = aiEnvironmentV2.materialize(prompted.state, 'player-red', {
+      kind: 'cancel-selection',
+      selectionId: firstSpace.selectionId,
+      stateRevision: firstSpace.stateRevision,
+    })
+    const cancelled = aiEnvironmentV2.simulate(prompted.state, cancel, { rootSeed: FIXED_SEED })
+    expect(cancelled.accepted).toBe(true)
+    if (!cancelled.accepted) throw new Error('Expected Muru pending selection cancellation to resolve')
+    expect(cancelled.state.pendingOptionSelection).toBeUndefined()
+    expect(cancelled.state.players[0].hand).toHaveLength(10)
+    expect(cancelled.state.players[0].actionPoints).toBe(state.players[0].actionPoints)
+  })
+
+  it('resumes Ichigo target-to-option execution through the v2 decision contract', () => {
+    const skill = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/ichigo-black-getsuga-tensho.json'), 'utf8'))
+    const ichigo = makePiece({
+      instanceId: 'v2-ichigo', templateId: 'blue-ichigo', ownerPlayerId: 'player-red',
+      x: 1, y: 1, attack: 6,
+    }) as any
+    ichigo.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
+    const enemy = makePiece({
+      instanceId: 'v2-ichigo-enemy', ownerPlayerId: 'player-blue', faction: 'blue',
+      x: 3, y: 1, currentHp: 30, maxHp: 30,
+    }) as any
+    const state = makeState({
+      pieces: [ichigo, enemy], width: 6, height: 4, currentPlayerId: 'player-red', phase: 'action',
+    }) as any
+    state.skillsById[skill.id] = skill
+    state.players[0].actionPoints = 6
+
+    const actions = aiEnvironmentV2.decisionSpace(state, 'player-red')
+    const targeted = actions.kind === 'actions' ? actions.candidates.find(item => (
+      item.action.type === 'useBasicSkill' &&
+      item.action.skillId === skill.id &&
+      item.action.targetX === 5 &&
+      item.action.targetY === 1
+    )) : undefined
+    expect(targeted).toBeDefined()
+
+    const prompted = aiEnvironmentV2.simulate(state, targeted!, { rootSeed: FIXED_SEED })
+    expect(prompted.accepted).toBe(true)
+    if (!prompted.accepted) throw new Error('Expected Ichigo hit to enter pending option selection')
+    const space = aiEnvironmentV2.decisionSpace(prompted.state, 'player-red') as AIPendingOptionDecisionSpaceV2
+    expect(space.options.map(option => option.value)).toEqual(['stay', 'teleport'])
+    const stay = aiEnvironmentV2.materialize(prompted.state, 'player-red', {
+      kind: 'pending-option',
+      selectionId: space.selectionId,
+      stateRevision: space.stateRevision,
+      selected: ['stay'],
+    })
+    const resolved = aiEnvironmentV2.simulate(prompted.state, stay, { rootSeed: FIXED_SEED })
+    expect(resolved.accepted).toBe(true)
+    if (!resolved.accepted) throw new Error('Expected Ichigo pending option to resolve')
+    expect(resolved.state.pendingOptionSelection).toBeUndefined()
+    expect(resolved.state.pieces.find(piece => piece.instanceId === enemy.instanceId)?.currentHp).toBeLessThan(30)
+  })
+})
+
+describe('AI Environment v2 decision-space performance', () => {
+  it('keeps a 320-target multi-select descriptor linear and deterministic', () => {
+    const state = makeState({ width: 20, height: 16 }) as any
+    state.targetingRevision = 19
+    const refs = Array.from({ length: 320 }, (_, index) => ({
+      type: 'cell' as const,
+      x: index % 20,
+      y: Math.floor(index / 20),
+    }))
+    state.pendingTargetSelection = finalizePendingTargetSession(state, {
+      playerId: 'player-red',
+      ownerPlayerId: 'player-red',
+      title: 'large target set',
+      targetType: 'cell',
+      selectionMode: 'multi',
+      minSelections: 1,
+      maxSelections: 4,
+      fixedCandidates: true,
+      candidates: refs,
+    } as any, state.targetingRevision)
+
+    const startedAt = performance.now()
+    const first = aiEnvironmentV2.decisionSpace(state, 'player-red') as AIPendingTargetDecisionSpaceV2
+    const elapsedMs = performance.now() - startedAt
+    const second = aiEnvironmentV2.decisionSpace(state, 'player-red') as AIPendingTargetDecisionSpaceV2
+    expect(first.candidates).toHaveLength(320)
+    expect(first.candidates.map(candidate => candidate.id)).toEqual(second.candidates.map(candidate => candidate.id))
+    expect(first.id).toBe(second.id)
+    expect(elapsedMs).toBeLessThan(100)
+    console.info(`[RED-128 performance] targets=320 descriptorAtoms=${first.candidates.length} elapsedMs=${elapsedMs.toFixed(2)} descriptorId=${first.id}`)
   })
 })

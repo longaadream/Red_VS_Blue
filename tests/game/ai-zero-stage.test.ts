@@ -234,17 +234,17 @@ describe('zero-stage static evaluator', () => {
 
 describe('zero-stage deterministic one-step selection', () => {
   it('takes an immediate formal core elimination ahead of movement or ending the turn', () => {
-    const attack = skill('basic-attack')
+    const attack = skill('hand-cannon')
     const state = combatState() as any
     state.pieces[1].x = 2
-    state.pieces[1].currentHp = 5
+    state.pieces[1].currentHp = 1
     state.pieces[0].attack = 20
     state.pieces[0].skills = [{ skillId: attack.id, currentCooldown: 0, usesRemaining: -1 }]
     state.skillsById[attack.id] = attack
 
     const decision = planZeroStageAction(state, 'player-red', ROOT_SEED)
     expect(decision.nextAction?.action).toMatchObject({
-      type: 'useBasicSkill', pieceId: 'red-core', skillId: 'basic-attack', targetPieceId: 'blue-core',
+      type: 'useBasicSkill', pieceId: 'red-core', skillId: 'hand-cannon', targetPieceId: 'blue-core',
     })
     expect(decision.trace.find(item => item.candidateId === decision.nextAction?.id)?.staticValue)
       .toBe(DEFAULT_ZERO_STAGE_CONFIG.terminal.win)
@@ -557,7 +557,7 @@ describe('zero-stage deterministic one-step selection', () => {
 
   it('scores every fallback after an authority-blocked skill instead of ending early', () => {
     const state = combatState() as any
-    const attack = skill('basic-attack')
+    const attack = skill('hand-cannon')
     state.pieces[0].skills = [{ skillId: attack.id, currentCooldown: 0, usesRemaining: -1 }]
     state.skillsById[attack.id] = attack
     state.pieces[1].x = 2

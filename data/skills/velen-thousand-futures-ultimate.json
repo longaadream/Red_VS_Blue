@@ -1,17 +1,17 @@
 {
   "id": "velen-thousand-futures-ultimate",
-  "name": "\u4e07\u5343\u672a\u6765",
-  "description": "\u9009\u62e9\u624b\u4e2d1\u81f33\u5f20\u672a\u5f3a\u5316\u7684\u666e\u901a\u5723\u5149\u624b\u724c\uff0c\u7acb\u5373\u4f7f\u5b83\u4eec\u6c38\u4e45\u5f3a\u5316\u3002\u6bcf\u5c40\u9650\u75281\u6b21\u3002",
+  "name": "万千未来",
+  "description": "选择手中1至3张未强化的普通圣光手牌，立即使它们永久强化。每局限用1次。",
   "keywords": [
-    "\u5723\u5149\u624b\u724c",
-    "\u9650\u7528"
+    "圣光手牌",
+    "限用"
   ],
-  "targetText": "\u624b\u4e2d1\u81f33\u5f20\u672a\u5f3a\u5316\u7684\u5723\u5149\u624b\u724c",
+  "targetText": "手中1至3张未强化的圣光手牌",
   "effectTags": [
-    "\u5f3a\u5316",
-    "\u624b\u724c"
+    "强化",
+    "手牌"
   ],
-  "icon": "\u221e",
+  "icon": "∞",
   "kind": "active",
   "type": "ultimate",
   "cooldownTurns": 0,
@@ -21,7 +21,7 @@
   "targeting": {
     "steps": []
   },
-  "code": "function executeSkill(context) {\n  var caster = context.piece; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '\u672a\u627e\u5230\u73a9\u5bb6' };\n  function isOrdinaryHoly(card) {\n  return card && ['holy-smite', 'holy-heal', 'holy-charge'].indexOf(card.cardId) !== -1;\n}\n  var eligible = player.hand.filter(function(card) { return isOrdinaryHoly(card) && !card.holyProphecyEnhanced; });\n  if (eligible.length === 0) return { success: false, message: '\u6ca1\u6709\u53ef\u5f3a\u5316\u7684\u5723\u5149\u624b\u724c' };\n  var options = eligible.map(function(card) { return { label: (card.name || card.cardId) + '\uff08' + card.instanceId + '\uff09', value: card.instanceId }; });\n  var choice = selectOption({ title: '\u4e07\u5343\u672a\u6765\uff1a\u9009\u62e9\u7acb\u5373\u5f3a\u5316\u7684\u624b\u724c', options: options, selectionMode: 'multi', presentation: 'hand', minSelections: 1, maxSelections: 3 });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  if (!Array.isArray(choice) || choice.length < 1 || choice.length > 3) return { success: false, message: '\u4e07\u5343\u672a\u6765\u9009\u62e9\u65e0\u6548' };\n  var unique = [];\n  for (var i = 0; i < choice.length; i++) { if (unique.indexOf(choice[i]) !== -1) return { success: false, message: '\u4e0d\u80fd\u91cd\u590d\u9009\u62e9\u540c\u4e00\u5f20\u624b\u724c' }; unique.push(choice[i]); }\n  var selected = unique.map(function(id) { return eligible.find(function(card) { return card.instanceId === id; }); });\n  if (selected.some(function(card) { return !card; })) return { success: false, message: '\u9009\u62e9\u7684\u624b\u724c\u5df2\u65e0\u6cd5\u5f3a\u5316' };\n  selected.forEach(function(card) { card.holyProphecyEnhanced = true; delete card.holyProphecy; });\n  return { success: true, message: caster.name + '\u4ece' + selected.length + '\u79cd\u5723\u5149\u7684\u53ef\u80fd\u4e2d\u9009\u5b9a\u4e86\u672a\u6765' };\n}",
+  "code": "function executeSkill(context) {\n  var caster = context.piece; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '未找到玩家' };\nfunction enhanceHolyCard(card) {\n  if (!card.contentState) card.contentState = {}; card.contentState.velenHolyProphecyEnhanced = true; delete card.contentState.velenHolyProphecy;\n  if (card.cardId === 'holy-smite') { card.effectModifiers = [{ effect: 'damage', operation: 'multiply', value: 1.5 }]; card.presentation = { variant: 'enhanced', badge: '预言强化', description: '预言强化：对敌方生命值最低的棋子造成7点真实伤害。' }; }\n  else if (card.cardId === 'holy-heal') { card.effectModifiers = [{ effect: 'heal', operation: 'multiply', value: 1.5 }]; card.presentation = { variant: 'enhanced', badge: '预言强化', description: '预言强化：治疗己方生命值最低的棋子12点生命。' }; }\n  else if (card.cardId === 'holy-charge') { card.effectModifiers = [{ effect: 'statusIntensity', operation: 'multiply', value: 1.5, statusType: 'damage-buff' }]; card.presentation = { variant: 'enhanced', badge: '预言强化', description: '预言强化：使己方所有棋子下次造成的伤害提高3点。' }; }\n}\n  function isOrdinaryHoly(card) {\n  return card && ['holy-smite', 'holy-heal', 'holy-charge'].indexOf(card.cardId) !== -1;\n}\n  var eligible = player.hand.filter(function(card) { return isOrdinaryHoly(card) && !(card.contentState && card.contentState.velenHolyProphecyEnhanced); });\n  if (eligible.length === 0) return { success: false, message: '没有可强化的圣光手牌' };\n  var options = eligible.map(function(card) { return { label: (card.name || card.cardId) + '（' + card.instanceId + '）', value: card.instanceId }; });\n  var choice = selectOption({ title: '万千未来：选择立即强化的手牌', options: options, selectionMode: 'multi', presentation: 'hand', minSelections: 1, maxSelections: 3 });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  if (!Array.isArray(choice) || choice.length < 1 || choice.length > 3) return { success: false, message: '万千未来选择无效' };\n  var unique = [];\n  for (var i = 0; i < choice.length; i++) { if (unique.indexOf(choice[i]) !== -1) return { success: false, message: '不能重复选择同一张手牌' }; unique.push(choice[i]); }\n  var selected = unique.map(function(id) { return eligible.find(function(card) { return card.instanceId === id; }); });\n  if (selected.some(function(card) { return !card; })) return { success: false, message: '选择的手牌已无法强化' };\n  selected.forEach(function(card) { enhanceHolyCard(card); });\n  return { success: true, message: caster.name + '从' + selected.length + '种圣光的可能中选定了未来' };\n}",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"maxCards\":3} }; }",
   "range": "self"
 }

@@ -46,7 +46,6 @@ export interface AIEnvironmentCapabilities {
 export interface AIObservedPlayer {
   playerId: string
   name?: string
-  mangekyoDeathCount?: number
   chargePoints: number
   actionPoints: number
   maxActionPoints: number
@@ -220,6 +219,147 @@ export interface AIEnvironment {
 export interface AIActionResourceCost {
   actionPoints: number
   chargePoints: number
+}
+
+export const AI_ENVIRONMENT_V2_PROTOCOL_VERSION = 2 as const
+
+export type AIEnvironmentV2ProtocolVersion = typeof AI_ENVIRONMENT_V2_PROTOCOL_VERSION
+
+export interface CandidateActionV2 {
+  protocolVersion: AIEnvironmentV2ProtocolVersion
+  id: string
+  kind: CandidateActionKind
+  action: BattleAction
+}
+
+export interface AIObservedBoardEffect {
+  id: string
+  type: string
+  icon?: string
+  x: number
+  y: number
+}
+
+export interface AIObservationV2 extends Omit<AIObservation, 'protocolVersion'> {
+  protocolVersion: AIEnvironmentV2ProtocolVersion
+  boardEffects: AIObservedBoardEffect[]
+}
+
+export interface AIEnvironmentV2Capabilities {
+  protocolVersion: AIEnvironmentV2ProtocolVersion
+  supportedActionTypes: readonly BattleAction['type'][]
+  unsupportedActionTypes: AIEnvironmentCapabilities['unsupportedActionTypes']
+  structuredPendingDecisionSpace: true
+  publicBoardEffects: true
+}
+
+export interface AIDecisionSpaceBaseV2 {
+  protocolVersion: AIEnvironmentV2ProtocolVersion
+  id: string
+  playerId: string
+  stateRevision: number
+}
+
+export interface AIActionDecisionSpaceV2 extends AIDecisionSpaceBaseV2 {
+  kind: 'actions'
+  candidates: CandidateActionV2[]
+}
+
+export interface AIPendingOptionAtomV2 {
+  id: string
+  value: unknown
+  label?: string
+  description?: string
+}
+
+export interface AIPendingOptionDecisionSpaceV2 extends AIDecisionSpaceBaseV2 {
+  kind: 'pending-option'
+  selectionId: string
+  title: string
+  selectionMode: 'single' | 'multi'
+  presentation: 'picker' | 'hand'
+  minSelections: number
+  maxSelections: number
+  canCancel: boolean
+  options: AIPendingOptionAtomV2[]
+}
+
+export interface AIPendingTargetAtomV2 {
+  id: string
+  ref: TargetRef
+}
+
+export interface AIPendingTargetDecisionSpaceV2 extends AIDecisionSpaceBaseV2 {
+  kind: 'pending-target'
+  selectionId: string
+  title?: string
+  targetType: 'piece' | 'cell' | 'grid'
+  range?: number
+  filter?: string
+  selectionMode: 'single' | 'multi'
+  minSelections: number
+  maxSelections: number
+  selectedTargets: TargetRef[]
+  canCancel: boolean
+  candidates: AIPendingTargetAtomV2[]
+}
+
+export type AIDecisionSpaceV2 =
+  | AIActionDecisionSpaceV2
+  | AIPendingOptionDecisionSpaceV2
+  | AIPendingTargetDecisionSpaceV2
+
+export type AIMaterializationChoiceV2 =
+  | {
+      kind: 'pending-option'
+      selectionId: string
+      stateRevision: number
+      selected: unknown[]
+    }
+  | {
+      kind: 'pending-target'
+      selectionId: string
+      stateRevision: number
+      selected: TargetRef[]
+    }
+  | {
+      kind: 'cancel-selection'
+      selectionId: string
+      stateRevision: number
+    }
+
+export type TransitionResultV2 =
+  | {
+      protocolVersion: AIEnvironmentV2ProtocolVersion
+      accepted: true
+      state: BattleState
+      stateHash: string
+      transitionHash: string
+      trace: AITransitionTrace
+    }
+  | {
+      protocolVersion: AIEnvironmentV2ProtocolVersion
+      accepted: false
+      state: BattleState
+      stateHash: string
+      transitionHash: string
+      error: AIEnvironmentError
+      trace: AITransitionTrace
+    }
+
+export interface AIEnvironmentV2 {
+  readonly protocolVersion: AIEnvironmentV2ProtocolVersion
+  readonly capabilities: AIEnvironmentV2Capabilities
+  observe(state: BattleState, playerId: string): AIObservationV2
+  decisionSpace(state: BattleState, playerId: string): AIDecisionSpaceV2
+  materialize(state: BattleState, playerId: string, choice: AIMaterializationChoiceV2): CandidateActionV2
+  simulate(
+    state: BattleState,
+    action: CandidateActionV2 | BattleAction,
+    context?: AISimulationContext,
+  ): TransitionResultV2
+  isTerminal(state: BattleState): boolean
+  stateKey(state: BattleState, scope: AIObservationScope): string
 }
 
 /** Versioned, rule-independent vocabulary consumed by AI observers and planners. */

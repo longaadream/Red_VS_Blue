@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RED-59 validates legacy data-authored definitions and action envelopes at runtime. */
 import type { PieceInstance } from './piece'
 import { getSkillById } from './skill-repository'
-import { loadCardById } from './skills'
+import { getEffectiveChargeCost, loadCardById } from './skills'
 import { manhattanDistance, traceProjectile } from './spatial'
 import type { BattleAction, BattleState } from './turn'
 import type { PendingReactiveCardRef } from './pending-interaction'
@@ -9,7 +9,6 @@ import type {
   SuspendableActionTransaction,
   SuspendableTurnCheckpoint,
 } from './suspendable-action-transaction'
-import { getEffectiveChargeCost } from './mangekyo'
 
 export const TARGET_SELECTION_PROTOCOL_VERSION = 1
 
@@ -27,6 +26,7 @@ export interface TargetConstraint {
   type: 'piece' | 'cell'
   filter: TargetFilter
   range?: number
+  minRange?: number
   ownerPlayerId: string
   sourcePieceId?: string
   sourceActionId?: string
@@ -39,6 +39,15 @@ export interface TargetConstraint {
   excludeSourceCell?: boolean
   distanceMetric?: 'manhattan' | 'chebyshev'
   allowSourceOccupant?: boolean
+  excludeSourcePiece?: boolean
+  forbiddenColumns?: number[]
+  forbiddenTargetStatuses?: string[]
+  requiredTargetStatuses?: string[]
+  requireOpenCardinalLanding?: boolean
+  requireTraversableFirstStep?: boolean
+  requireExtensionCell?: { path: string; sourceIdField?: string }
+  ignoreOccupantSelectedTargetIndex?: number
+  requireEnemyWithinRange?: number
   projectile?: ProjectileTargetingRequirement
 }
 
@@ -138,6 +147,7 @@ export interface PendingTargetStep {
   type: 'piece' | 'cell' | 'grid'
   filter?: TargetFilter
   range?: number
+  minRange?: number
   distanceMetric?: 'manhattan' | 'chebyshev'
   requireWalkable?: boolean
   requireUnoccupied?: boolean
@@ -145,6 +155,15 @@ export interface PendingTargetStep {
   canCancel?: boolean
   sameRowOrColumn?: boolean
   excludeSourceCell?: boolean
+  excludeSourcePiece?: boolean
+  forbiddenColumns?: number[]
+  forbiddenTargetStatuses?: string[]
+  requiredTargetStatuses?: string[]
+  requireOpenCardinalLanding?: boolean
+  requireTraversableFirstStep?: boolean
+  requireExtensionCell?: { path: string; sourceIdField?: string }
+  ignoreOccupantSelectedTargetIndex?: number
+  requireEnemyWithinRange?: number
   projectile?: ProjectileTargetingRequirement
 }
 
@@ -194,6 +213,7 @@ interface TargetSpec {
   filter: TargetFilter
   range?: number
   distanceMetric?: 'manhattan' | 'chebyshev'
+  minRange?: number
   requireWalkable?: boolean
   requireUnoccupied?: boolean
   allowSourceOccupant?: boolean
@@ -201,6 +221,15 @@ interface TargetSpec {
   sameRowOrColumn?: boolean
   excludeSourceCell?: boolean
   projectile?: ProjectileTargetingRequirement
+  excludeSourcePiece?: boolean
+  forbiddenColumns?: number[]
+  forbiddenTargetStatuses?: string[]
+  requiredTargetStatuses?: string[]
+  requireOpenCardinalLanding?: boolean
+  requireTraversableFirstStep?: boolean
+  requireExtensionCell?: { path: string; sourceIdField?: string }
+  ignoreOccupantSelectedTargetIndex?: number
+  requireEnemyWithinRange?: number
 }
 
 interface OptionSpec {
@@ -218,45 +247,6 @@ interface TargetSource {
   sourcePieceId?: string
   steps: SelectionStepSpec[]
 }
-
-const EMPTY_DESTINATION_ACTIONS = new Set([
-  'blackwidow-lethal-toxin',
-  'blink',
-  'earthshatter',
-  'hashirama-edo-sage-buddha',
-  'naruto-shadow-clone',
-  'obito-space-time',
-  'sasuke-chidori',
-  'shadow-step',
-])
-
-const WALKABLE_TARGET_ACTIONS = new Set([
-  'blackwidow-lethal-toxin',
-  'blink',
-  'hashirama-edo-sage-buddha',
-  'minato-kunai-formula',
-  'minato-spiral-barrage',
-  'naruto-shadow-clone',
-  'obito-space-time',
-  'shadow-step',
-  'demon-summon-5',
-])
-
-const ORTHOGONAL_ACTIONS = new Set([
-  'illidan-blade-dash',
-  'rocket-punch',
-  'sasuke-chidori',
-  'sasuke-indra-arrow',
-  'shadow-bolt',
-])
-
-const SOURCE_CELL_FORBIDDEN_ACTIONS = new Set([
-  'illidan-blade-dash',
-  'rocket-punch',
-  'sasuke-chidori',
-  'sasuke-indra-arrow',
-  'shadow-bolt',
-])
 
 function issue(code: TargetValidationCode, message: string): TargetValidationIssue {
   return { code, message }
@@ -338,6 +328,7 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
         type,
         filter: normalizeFilter(raw.filter, raw.type),
         range: typeof raw.range === 'number' ? raw.range : undefined,
+        minRange: typeof raw.minRange === 'number' ? raw.minRange : undefined,
         distanceMetric: raw.distanceMetric === 'chebyshev' ? 'chebyshev' : 'manhattan',
         requireWalkable: raw.requireWalkable,
         requireUnoccupied: raw.requireUnoccupied,
@@ -347,6 +338,17 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
           : undefined,
         sameRowOrColumn: raw.sameRowOrColumn === true,
         excludeSourceCell: raw.excludeSourceCell === true,
+        excludeSourcePiece: raw.excludeSourcePiece === true,
+        forbiddenColumns: Array.isArray(raw.forbiddenColumns) ? raw.forbiddenColumns : undefined,
+        forbiddenTargetStatuses: Array.isArray(raw.forbiddenTargetStatuses) ? raw.forbiddenTargetStatuses : undefined,
+        requiredTargetStatuses: Array.isArray(raw.requiredTargetStatuses) ? raw.requiredTargetStatuses : undefined,
+        requireOpenCardinalLanding: raw.requireOpenCardinalLanding === true,
+        requireTraversableFirstStep: raw.requireTraversableFirstStep === true,
+        requireExtensionCell: raw.requireExtensionCell?.path
+          ? { path: String(raw.requireExtensionCell.path), sourceIdField: raw.requireExtensionCell.sourceIdField == null ? undefined : String(raw.requireExtensionCell.sourceIdField) }
+          : undefined,
+        ignoreOccupantSelectedTargetIndex: Number.isInteger(raw.ignoreOccupantSelectedTargetIndex) ? raw.ignoreOccupantSelectedTargetIndex : undefined,
+        requireEnemyWithinRange: typeof raw.requireEnemyWithinRange === 'number' ? raw.requireEnemyWithinRange : undefined,
         projectile: raw.projectile?.requiredCollision === 'piece-before-blocker'
           ? { requiredCollision: 'piece-before-blocker' }
           : undefined,
@@ -403,24 +405,53 @@ function hasStatus(piece: PieceInstance, type: string): boolean {
   return !!piece.statusTags?.some(tag => tag.type === type || tag.id === type)
 }
 
+function readPath(root: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((value, segment) => {
+    if (!value || typeof value !== 'object') return undefined
+    return (value as Record<string, unknown>)[segment]
+  }, root)
+}
+
 function getSourceAvailabilityIssue(
   state: BattleState,
-  sourcePiece: PieceInstance,
-  actionId: string,
+  sourcePiece: PieceInstance | undefined,
+  definition: any,
 ): InvalidActionPreparation | undefined {
-  const hasSilenceBlock = sourcePiece.rules?.some(rule => rule.id === 'rule-silenced-block') === true
-  if (hasSilenceBlock && hasStatus(sourcePiece, 'silenced')) {
-    return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Source piece is silenced' }
+  const blockingStatus = sourcePiece?.statusTags?.find(tag => tag.blocksSkillUse === true)
+  if (blockingStatus) {
+    return {
+      kind: 'invalid',
+      code: 'ACTION_INVALID',
+      message: typeof blockingStatus.skillBlockMessage === 'string'
+        ? blockingStatus.skillBlockMessage
+        : 'Source piece cannot use skills',
+    }
   }
 
-  if (actionId === 'holy-blast' && !hasStatus(sourcePiece, 'divine-shield')) {
-    return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Holy Blast requires divine shield' }
-  }
-  if (actionId === 'sasuke-kagutsuchi' && !Array.isArray(state.extensions?.amaterasuCells)) {
-    return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Kagutsuchi requires an Amaterasu cell' }
-  }
-  if (actionId === 'sasuke-kagutsuchi' && state.extensions!.amaterasuCells.length === 0) {
-    return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Kagutsuchi requires an Amaterasu cell' }
+  for (const requirement of definition?.targeting?.availability || []) {
+    if (requirement?.type === 'sourceStatus') {
+      const present = sourcePiece ? hasStatus(sourcePiece, String(requirement.statusType || '')) : false
+      if (present !== (requirement.present !== false)) {
+        return { kind: 'invalid', code: 'ACTION_INVALID', message: requirement.message || 'Source status requirement failed' }
+      }
+    }
+    if (requirement?.type === 'battleExtensionArray') {
+      const value = readPath(state.extensions, String(requirement.path || ''))
+      if (!Array.isArray(value) || value.length < Number(requirement.minLength ?? 1)) {
+        return { kind: 'invalid', code: 'ACTION_INVALID', message: requirement.message || 'Battle extension requirement failed' }
+      }
+    }
+    if (requirement?.type === 'livingPieceAbsent') {
+      const bypassed = requirement.unlessExtensionPath
+        ? Boolean(readPath(state.extensions, String(requirement.unlessExtensionPath)))
+        : false
+      const exists = !bypassed && state.pieces.some(piece =>
+        piece.currentHp > 0 && piece.templateId === requirement.templateId,
+      )
+      if (exists) {
+        return { kind: 'invalid', code: 'ACTION_INVALID', message: requirement.message || 'Required piece availability check failed' }
+      }
+    }
   }
   return undefined
 }
@@ -453,7 +484,7 @@ function getSource(state: BattleState, action: any): TargetSource | InvalidActio
     if (action.type === 'useChargeSkill' && !isChargeSkill) {
       return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Basic skills must use the useBasicSkill action' }
     }
-    const availabilityIssue = getSourceAvailabilityIssue(state, sourcePiece, action.skillId)
+    const availabilityIssue = getSourceAvailabilityIssue(state, sourcePiece, definition)
     if (availabilityIssue) return availabilityIssue
     const player = state.players.find(meta => normalizePlayerId(meta.playerId) === normalizePlayerId(playerId))
     if (!player || player.actionPoints < (definition.actionPointCost || 0)) {
@@ -498,14 +529,8 @@ function getSource(state: BattleState, action: any): TargetSource | InvalidActio
     }
     const sourcePiece = getDeclaredCardSourcePiece(state, playerId, card, definition)
     if (sourcePiece && 'kind' in sourcePiece) return sourcePiece
-    if (card.cardId === 'demon-summon-5' && !state.extensions?.kiljaedanPiece) {
-      const alreadySummoned = state.pieces.some(piece =>
-        piece.currentHp > 0 && (piece.templateId === 'kiljaedan' || piece.instanceId === 'kiljaedan'),
-      )
-      if (alreadySummoned) {
-        return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Kiljaedan is already on the board' }
-      }
-    }
+    const availabilityIssue = getSourceAvailabilityIssue(state, sourcePiece, definition)
+    if (availabilityIssue) return availabilityIssue
     // A player-owned card with no declared piece source has no coordinate
     // origin. Its target type/filter remain authoritative; range is global.
     const steps = sourcePiece
@@ -590,21 +615,18 @@ function constraintFor(
   selectedTargets: TargetRef[],
   selectedOption: unknown,
 ): TargetConstraint {
-  const sourceId = source.actionId
   const constraint: TargetConstraint = {
     ...spec,
     ownerPlayerId: source.ownerPlayerId,
     sourcePieceId: source.sourcePieceId,
-    sourceActionId: sourceId,
+    sourceActionId: source.actionId,
     step,
     selectedTargets,
     selectedOption,
-    requireWalkable: spec.requireWalkable ?? (spec.type === 'cell' && WALKABLE_TARGET_ACTIONS.has(sourceId)),
-    requireUnoccupied:
-      spec.type === 'cell' && (spec.requireUnoccupied ??
-      (EMPTY_DESTINATION_ACTIONS.has(sourceId) || (sourceId === 'demon-summon-5' && step === 1))),
-    sameRowOrColumn: spec.sameRowOrColumn ?? ORTHOGONAL_ACTIONS.has(sourceId),
-    excludeSourceCell: spec.type === 'cell' && (spec.excludeSourceCell ?? SOURCE_CELL_FORBIDDEN_ACTIONS.has(sourceId)),
+    requireWalkable: spec.requireWalkable,
+    requireUnoccupied: spec.requireUnoccupied,
+    sameRowOrColumn: spec.sameRowOrColumn,
+    excludeSourceCell: spec.type === 'cell' && spec.excludeSourceCell,
     distanceMetric: spec.distanceMetric || 'manhattan',
     allowSourceOccupant: spec.allowSourceOccupant || spec.allowSourceOccupantOptions?.some(
       option => Object.is(option, selectedOption),
@@ -625,16 +647,13 @@ function validateSourceSpecificCell(
   constraint: TargetConstraint,
   ref: Extract<TargetRef, { type: 'cell' }>,
 ): TargetValidationIssue | undefined {
-  const sourceId = constraint.sourceActionId
-  if (!sourceId) return undefined
-
   const sourcePiece = getSourcePiece(state, constraint)
 
-  if (sourceId === 'shadow-bolt' && ref.x === 0) {
-    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Shadow Bolt cannot use the zero-column direction reference')
+  if (constraint.forbiddenColumns?.includes(ref.x)) {
+    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target column is forbidden by the selection contract')
   }
 
-  if (sourceId === 'illidan-blade-dash' && sourcePiece?.x != null && sourcePiece.y != null) {
+  if (constraint.requireTraversableFirstStep && sourcePiece?.x != null && sourcePiece.y != null) {
     const dx = Math.sign(ref.x - sourcePiece.x)
     const dy = Math.sign(ref.y - sourcePiece.y)
     const nextX = sourcePiece.x + dx
@@ -647,36 +666,33 @@ function validateSourceSpecificCell(
       normalizePlayerId(piece.ownerPlayerId) === normalizePlayerId(sourcePiece.ownerPlayerId),
     )
     if (!tile?.props?.walkable || blockingAlly) {
-      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Blade Dash is blocked before it can leave the source cell')
+      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'The first movement step is blocked')
     }
   }
 
-  if (sourceId === 'minato-kunai-formula' && constraint.step === 1) {
-    const anchorExists = Array.isArray(state.extensions?.minatoAnchors) && state.extensions!.minatoAnchors.some(
-      (anchor: any) => anchor.sourceId === constraint.sourcePieceId && anchor.x === ref.x && anchor.y === ref.y,
+  if (constraint.requireExtensionCell) {
+    const entries = readPath(state.extensions, constraint.requireExtensionCell.path)
+    const matches = Array.isArray(entries) && entries.some((entry: any) =>
+      entry?.x === ref.x &&
+      entry?.y === ref.y &&
+      (!constraint.requireExtensionCell?.sourceIdField ||
+        entry?.[constraint.requireExtensionCell.sourceIdField] === constraint.sourcePieceId),
     )
-    if (!anchorExists) return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target cell is not a source Flying Raijin anchor')
-    const selectedPieceId = constraint.selectedTargets?.[0]?.type === 'piece'
-      ? constraint.selectedTargets[0].pieceId
-      : undefined
-    const occupant = state.pieces.find(piece =>
-      piece.currentHp > 0 && piece.x === ref.x && piece.y === ref.y && piece.instanceId !== selectedPieceId,
-    )
-    if (occupant) return issue('TARGET_OCCUPIED', 'Target cell is occupied')
+    if (!matches) {
+      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target cell is not present in the required battle extension')
+    }
   }
 
-  if (sourceId === 'minato-spiral-barrage') {
-    const anchorExists = Array.isArray(state.extensions?.minatoAnchors) && state.extensions!.minatoAnchors.some(
-      (anchor: any) => anchor.sourceId === constraint.sourcePieceId && anchor.x === ref.x && anchor.y === ref.y,
-    )
-    if (!anchorExists) return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target cell is not a source Flying Raijin anchor')
+  if (constraint.requireEnemyWithinRange !== undefined) {
     const hasEnemy = sourcePiece && state.pieces.some(piece =>
       piece.currentHp > 0 &&
-      piece.ownerPlayerId !== sourcePiece.ownerPlayerId &&
+      normalizePlayerId(piece.ownerPlayerId) !== normalizePlayerId(sourcePiece.ownerPlayerId) &&
       piece.x != null && piece.y != null &&
-      manhattanDistance(piece, ref) <= 3,
+      manhattanDistance(piece, ref) <= constraint.requireEnemyWithinRange!,
     )
-    if (!hasEnemy) return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'No living enemy is within three cells of the anchor')
+    if (!hasEnemy) {
+      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'No living enemy is within the required range of the target cell')
+    }
   }
 
   return undefined
@@ -702,26 +718,16 @@ function validateSourceSpecificPiece(
   constraint: TargetConstraint,
   target: PieceInstance,
 ): TargetValidationIssue | undefined {
-  const sourceId = constraint.sourceActionId
-  const sourcePiece = getSourcePiece(state, constraint)
-  if (!sourceId) return undefined
-
-  if (sourceId === 'blackwidow-deadly-gaze' && sourcePiece && manhattanDistance(sourcePiece, target) <= 6) {
-    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Deadly Gaze requires an enemy more than six cells away')
+  if (constraint.excludeSourcePiece && target.instanceId === constraint.sourcePieceId) {
+    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'The source piece cannot be targeted')
   }
-  if (sourceId === 'nano-boost' && target.instanceId === constraint.sourcePieceId) {
-    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Nano Boost cannot target its source')
+  if (constraint.forbiddenTargetStatuses?.some(status => hasStatus(target, status))) {
+    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target has a forbidden status')
   }
-  if (sourceId === 'arthas-lich-covenant' && hasStatus(target, 'lich-covenant')) {
-    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target already has Lich Covenant')
+  if (constraint.requiredTargetStatuses?.some(status => !hasStatus(target, status))) {
+    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target is missing a required status')
   }
-  if (sourceId === 'hidan-blood-oath' && hasStatus(target, 'blood-oath')) {
-    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target already has Blood Oath')
-  }
-  if (sourceId === 'light-extraction' && !hasStatus(target, 'divine-shield')) {
-    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target must have divine shield')
-  }
-  if (sourceId === 'kenshin-ryutsuisen' && !hasOpenCardinalLanding(state, target, constraint.sourcePieceId)) {
+  if (constraint.requireOpenCardinalLanding && !hasOpenCardinalLanding(state, target, constraint.sourcePieceId)) {
     return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target has no open cardinal landing cell')
   }
   return undefined
@@ -779,15 +785,18 @@ export function validateTargetRef(
     if (constraint.filter === 'self' && target.instanceId !== constraint.sourcePieceId) {
       return issue('TARGET_FILTER_MISMATCH', 'Target must be the source piece')
     }
-    if (constraint.range !== undefined) {
+    if (constraint.range !== undefined || constraint.minRange !== undefined) {
       if (!sourcePiece || sourcePiece.x == null || sourcePiece.y == null) {
         return issue('TARGET_SOURCE_MISSING', 'A positioned source is required for ranged targeting')
       }
       const distance = constraint.distanceMetric === 'chebyshev'
         ? Math.max(Math.abs(sourcePiece.x - target.x), Math.abs(sourcePiece.y - target.y))
         : manhattanDistance(sourcePiece, target)
-      if (distance > constraint.range) {
+      if (constraint.range !== undefined && distance > constraint.range) {
         return issue('TARGET_OUT_OF_RANGE', 'Target is out of range')
+      }
+      if (constraint.minRange !== undefined && distance < constraint.minRange) {
+        return issue('TARGET_OUT_OF_RANGE', 'Target is inside the minimum range')
       }
     }
     if (constraint.sameRowOrColumn && sourcePiece && sourcePiece.x !== target.x && sourcePiece.y !== target.y) {
@@ -819,11 +828,16 @@ export function validateTargetRef(
     return issue('TARGET_SOURCE_CELL_FORBIDDEN', 'The source cell cannot be targeted')
   }
   if (constraint.requireUnoccupied) {
+    const ignoredTarget = constraint.ignoreOccupantSelectedTargetIndex === undefined
+      ? undefined
+      : constraint.selectedTargets?.[constraint.ignoreOccupantSelectedTargetIndex]
+    const ignoredPieceId = ignoredTarget?.type === 'piece' ? ignoredTarget.pieceId : undefined
     const occupied = state.pieces.some(piece =>
       piece.currentHp > 0 &&
       piece.x === ref.x &&
       piece.y === ref.y &&
-      (!constraint.allowSourceOccupant || piece.instanceId !== constraint.sourcePieceId),
+      (!constraint.allowSourceOccupant || piece.instanceId !== constraint.sourcePieceId) &&
+      piece.instanceId !== ignoredPieceId,
     )
     if (occupied) return issue('TARGET_OCCUPIED', `Cell (${ref.x},${ref.y}) is occupied`)
   }
@@ -1023,6 +1037,7 @@ function pendingConstraint(pending: PendingTargetSelectionSession): TargetConstr
     type,
     filter: normalizeFilter(activeStep?.filter ?? pending.filter, declaredType),
     range: activeStep?.range ?? pending.range,
+    minRange: activeStep?.minRange,
     ownerPlayerId: pending.ownerPlayerId || pending.playerId,
     sourcePieceId: pendingSourcePieceId(pending),
     sourceActionId: pendingSourceId(pending),
@@ -1034,6 +1049,15 @@ function pendingConstraint(pending: PendingTargetSelectionSession): TargetConstr
     allowSourceOccupant: activeStep?.allowSourceOccupant,
     sameRowOrColumn: activeStep?.sameRowOrColumn,
     excludeSourceCell: type === 'cell' && activeStep?.excludeSourceCell,
+    excludeSourcePiece: activeStep?.excludeSourcePiece,
+    forbiddenColumns: activeStep?.forbiddenColumns,
+    forbiddenTargetStatuses: activeStep?.forbiddenTargetStatuses,
+    requiredTargetStatuses: activeStep?.requiredTargetStatuses,
+    requireOpenCardinalLanding: activeStep?.requireOpenCardinalLanding,
+    requireTraversableFirstStep: activeStep?.requireTraversableFirstStep,
+    requireExtensionCell: activeStep?.requireExtensionCell,
+    ignoreOccupantSelectedTargetIndex: activeStep?.ignoreOccupantSelectedTargetIndex,
+    requireEnemyWithinRange: activeStep?.requireEnemyWithinRange,
     projectile: activeStep?.projectile,
   }
 }
