@@ -2,7 +2,7 @@
 
 任务：实现零阶段单步贪心估价与位置潜力 AI 基线
 
-角色：实现者（Codex），schema v3 全枚举修改等待独立 AI 复核和人工验收
+角色：实现者（Codex），schema v3 全枚举与轻量推演优化等待独立 AI 复核和人工验收
 
 分支：`codex/RED-122-zero-stage-ai`
 
@@ -16,6 +16,7 @@
 - `resources` 将未使用费用视为当前回合机会成本；攻击、追敌移动、技能、结构动作与 `endTurn` 全部经过实际 transition 后再按估价比较。
 - 第 8 个动作仍通过护栏强制结束，避免无界长回合。
 - AI transition 对合法接收但公开观察完全不变的技能、移动或卡牌标记 `blocked=true`；零阶段记录但不估价、不选择，防止沉默或打坐动作重复触发。
+- 候选估价使用不含历史 replay/action-log 载荷和完整 state diff 的 evaluation transition；仅保留与权威 `actionCount` 等长的轻量日志占位，从而维持终局 action index。它仍调用原 `runBattleActionIsolated()`，完整保留 gameplay state 与 RNG authority。最终正式动作继续走完整 transition。
 - 未修改技能、卡牌、玩法数值、胜负、随机、UI、网络、存档或 PvE 奖励。
 
 ## 固定局面证据
@@ -37,13 +38,26 @@
 
 结果：`26/26` 通过。未触发回合护栏的样本均满足 `nodesVisited === candidatesConsidered === legal.length`，普通候选没有 `candidate-budget` 裁剪。
 
-AI 环境、RED-86 planner 与状态隔离相邻回归：`3 files / 29 tests` 全部通过。
+AI 环境、RED-86 planner 与状态隔离相邻回归：`3 files / 30 tests` 全部通过。新增对照证明完整/轻量 transition 的 accepted、blocked、rejected、公开观察、`F`、gameplay state hash 和 RNG authority 一致，evaluation 重复 hash 稳定，输入 replay 不被污染；另覆盖“已有历史后立即终局”，验证 `settledAt.actionIndex` 与完整 gameplay state hash 一致。
 
 ## schema v3 全枚举性能验证
 
-2026-08-29 运行固定 seed `1001` 镜像自对弈。首次便携式哈希运行和第二次安装正式 Node 权威使用的原生 SHA-256 后，均在持续占用 CPU、无异常输出的情况下超过 20 分钟仍未完成，达到测试合同的单局上限后人工终止，不能报告终局、胜者或回放 hash。这说明原生哈希不是主要瓶颈，完整 transition 的状态复制、规则执行、状态 diff、回放与候选后估价共同构成主要成本。
+2026-08-29 运行固定 seed `1001` 镜像自对弈。优化前便携式哈希与原生 SHA-256 两次均超过 20 分钟未完成。压缩候选推演的历史 replay/action log 后，第一轮在 `518.84s` 完成；进一步省略 evaluation state diff 和重复 pre-state hash 后，在加入终局 action-index 等长占位修正的最终轮于 `365.08s` 完成。各优化轮 action trace hash 与 final state hash 完全一致，证明性能优化与终局一致性修正没有改变策略或终态。
 
-结论：完整候选枚举的行为合同与固定 fixture 已通过，但真实技能局面的实时性能未通过。与 schema v2 同 seed 的 101 次决策、12,007 个候选相比，旧版只模拟 180 个节点，而 v3 要求模拟全部候选；主要成本是上万次权威隔离 transition，不是静态估价或排序。为遵守“测试全部可能策略”的明确要求，本次没有用候选数量、动作类型、费用、目标或墙钟时间重新裁剪。
+结果：红方在第 25 个完整回合以 `core-eliminated` 获胜，红方剩余 3 枚棋子；正式动作 `371`，非法/拒绝动作 `0`，失败 `0`。全局候选 `31,626`、实际模拟节点 `30,849`；差额来自第 8 动作护栏，普通候选没有预算裁剪。
+
+| 指标 | 结果 |
+| --- | ---: |
+| 决策数 | 371 |
+| P50 | 326.64ms |
+| P95 | 2,606.00ms |
+| 最大 | 8,467.96ms |
+| 红方 AP / 充能 | 188 / 6 |
+| 蓝方 AP / 充能 | 128 / 1 |
+
+确定性证据：action trace hash `bc59b43cea8b8e5d08af135e485df6c1e1fc4a7fb1851f51ac87c3e4626d8608`；final state hash `a3ccdc6b8141f881c55709add59cab68d9f87fc6015bda6e26619a752158f5fa`。
+
+结论：完整枚举现已能完成真实 8v8 自战，并把中位决策时间降到约三分之一秒；P95 约 2.7 秒、峰值约 8.5 秒仍是明确体验风险。为遵守“测试全部可能策略”，没有使用候选数量、动作类型、费用、目标或墙钟时间裁剪。
 
 ## 历史证据：schema v2 镜像自对弈
 
@@ -94,13 +108,13 @@ npm.cmd test -- tests/game/ai-zero-stage-pve-evaluation.test.ts
 通过：
 
 - `npm.cmd test -- tests/game/ai-zero-stage.test.ts`：1 file / 26 tests。
-- `npm.cmd test -- tests/game/ai-environment.test.ts tests/game/ai-planner.test.ts tests/game/ai-isolation.test.ts`：3 files / 29 tests。
-- rebase 到 `origin/main@0a09899` 后运行零阶段与相邻 AI 回归；最新合计 4 files / 55 tests，全部通过。
+- `npm.cmd test -- tests/game/ai-environment.test.ts tests/game/ai-planner.test.ts tests/game/ai-isolation.test.ts`：3 files / 30 tests。
+- rebase 到 `origin/main@0a09899` 后运行零阶段与相邻 AI 回归；最新合计 4 files / 56 tests，全部通过。
 - `npm.cmd run check:encoding`：通过，773 个文本文件。
 - `git diff --check`：通过（仅换行转换提示）。
-- 固定 seed `1001` 镜像自对弈：超过 20 分钟未完成，人工终止；真实对局性能未通过。
+- 固定 seed `1001` 镜像自对弈：1 file / 1 test，通过；25 回合正常终局，非法动作 0，两次优化运行的动作与终态 hash 一致。
 
-schema v3 已完成独立 AI 复核：审查确认全合法候选单层枚举、turn guard 唯一裁剪入口以及 blocked/rejected 只淘汰自身的源码行为。审查提出的 rejected 回归与第二组阵容 fixture 已补齐；固定 seed 完整自战仍因超过 20 分钟未完成而阻止进入人工验收。
+schema v3 全枚举边界曾完成独立 AI 复核；本次 evaluation transition 性能优化已完成新的独立 AI 复核。复核首次发现压缩 action log 会改变立即终局的 `settledAt.actionIndex`；修正为等长轻量占位并增加终局回归测试后，复核结论为通过，无剩余阻塞项。
 
 未通过/环境阻塞：
 
@@ -109,10 +123,10 @@ schema v3 已完成独立 AI 复核：审查确认全合法候选单层枚举、
 
 ## 风险与人工验证
 
-- schema v3 会测试低语义排名的严格合法策略，但固定 seed 真实自战超过 20 分钟仍未完成，当前不适合作为实时 PvE 默认对手。
-- schema v2 对内置 `simple-v1` 的 3 个固定 seed 全部在 40 回合上限平局；schema v3 因单局性能未完成三局复测，不能宣称已解决平局。
+- schema v3 已能完成固定 seed 真实自战，但 P95 `2.70s`、最大 `8.51s`；高候选局面仍可能让玩家明显等待。
+- schema v2 对内置 `simple-v1` 的 3 个固定 seed 全部在 40 回合上限平局；schema v3 尚未重跑三局评测，不能宣称已解决跨策略平局。
 - “公开观察完全不变”会把无公开收益的合法非结构动作也视为 blocked；对零阶段 AI 而言这是防循环策略，但新型零公开变化技能接入时需要补机制语义。
-- Medium Risk 独立 AI 复核结论为“功能边界正确、真实性能验收未通过”；实现者与复核者均不代替最终人工体验验收。
+- Medium Risk 的 evaluation transition 优化已通过独立 AI 复核；实现者与复核者均不代替最终人工体验验收。
 
 建议人工复核沉默、鸣人打坐、攻击残血敌棋、向敌方核心逼近、费用即将溢出的回合，以及第 8 动作强制结束。
 

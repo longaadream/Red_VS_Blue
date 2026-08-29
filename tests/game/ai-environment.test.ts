@@ -13,8 +13,15 @@ import {
   observeBattleForAI,
   simulateAITransition,
 } from '@/lib/game/ai-environment'
+import { evaluateZeroStageState } from '@/lib/game/ai-zero-stage-evaluator'
 import type { AIEnvironment, CandidateAction } from '@/lib/game/ai-types'
-import { hashStable, stableJson } from '@/lib/game/battle-trace'
+import {
+  hashBattleState,
+  hashStable,
+  readDebugMetadata,
+  recordBattleInitialization,
+  stableJson,
+} from '@/lib/game/battle-trace'
 import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { getTargetingStateRevision, prepareAction } from '@/lib/game/targeting'
@@ -370,6 +377,146 @@ describe('versioned headless AI environment', () => {
       expect(first.trace.actionTrace?.preStateHash).toMatch(/^[0-9a-f]{64}$/)
       expect(first.trace.stateChanges.some(change => change.path.endsWith('.y'))).toBe(true)
     }
+  })
+
+  it('keeps evaluation-mode gameplay, blocking, rejection, and RNG identical without cloning replay history', () => {
+    const mover = makePiece({ instanceId: 'evaluation-mover', ownerPlayerId: 'player-red', x: 1, y: 1, moveRange: 2 }) as any
+    const state = makeState({ pieces: [mover] }) as any
+    recordBattleInitialization(
+      state,
+      new RuleRuntime({ rootSeed: FIXED_SEED }),
+      ['player-red', 'player-blue'],
+    )
+    const firstMove = listLegalAIActions(state, 'player-red').find(item => item.kind === 'move')!
+    const committed = simulateAITransition(state, firstMove, { rootSeed: FIXED_SEED })
+    expect(committed.accepted).toBe(true)
+    if (!committed.accepted) throw new Error('Expected fixture setup move to succeed')
+    const input = committed.state
+    const before = stableJson(input)
+    const replayFramesBefore = readDebugMetadata(input).replay?.frames.length
+    const endTurn = listLegalAIActions(input, 'player-red').find(item => item.kind === 'end-turn')!
+
+    const full = simulateAITransition(input, endTurn, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'full',
+    })
+    const evaluation = simulateAITransition(input, endTurn, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'evaluation',
+    })
+    const repeatedEvaluation = simulateAITransition(input, endTurn, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'evaluation',
+    })
+
+    expect(full.accepted).toBe(true)
+    expect(evaluation.accepted).toBe(true)
+    expect(full.trace.blocked).toBe(evaluation.trace.blocked)
+    expect(repeatedEvaluation.transitionHash).toBe(evaluation.transitionHash)
+    expect(hashBattleState(full.state)).toBe(hashBattleState(evaluation.state))
+    expect(observeBattleForAI(full.state, 'player-red'))
+      .toEqual(observeBattleForAI(evaluation.state, 'player-red'))
+    expect(evaluateZeroStageState(observeBattleForAI(full.state, 'player-red')))
+      .toEqual(evaluateZeroStageState(observeBattleForAI(evaluation.state, 'player-red')))
+    expect(readDebugMetadata(full.state).replay?.frames.length).toBe((replayFramesBefore ?? 0) + 1)
+    expect(readDebugMetadata(evaluation.state).replay).toBeUndefined()
+    expect(readDebugMetadata(evaluation.state).authority).toMatchObject({
+      rootSeed: readDebugMetadata(full.state).authority?.rootSeed,
+      actionCount: readDebugMetadata(full.state).authority?.actionCount,
+      runtimeCursors: readDebugMetadata(full.state).authority?.runtimeCursors,
+    })
+    expect(readDebugMetadata(input).replay?.frames.length).toBe(replayFramesBefore)
+    expect(stableJson(input)).toBe(before)
+
+    const blockedMover = makePiece({
+      instanceId: 'evaluation-blocked-mover', ownerPlayerId: 'player-red', x: 1, y: 1,
+    }) as any
+    const blockedState = makeState({ pieces: [blockedMover] }) as any
+    const triggerSpy = vi.spyOn(globalTriggerSystem, 'checkTriggers').mockImplementation((_, context: any) => (
+      context.type === 'beforeMove'
+        ? { success: true, messages: ['blocked'], blocked: true }
+        : { success: true, messages: [], blocked: false }
+    ) as any)
+    const blockedAction = {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: blockedMover.instanceId,
+      toX: 2,
+      toY: 1,
+    } as const
+    const blockedFull = simulateAITransition(blockedState, blockedAction, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'full',
+    })
+    const blockedEvaluation = simulateAITransition(blockedState, blockedAction, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'evaluation',
+    })
+    expect(blockedFull.accepted).toBe(true)
+    expect(blockedEvaluation.accepted).toBe(true)
+    expect(observeBattleForAI(blockedFull.state, 'player-red').pieces)
+      .toEqual(observeBattleForAI(blockedState, 'player-red').pieces)
+    expect(observeBattleForAI(blockedFull.state, 'player-red').stateRevision)
+      .not.toBe(observeBattleForAI(blockedState, 'player-red').stateRevision)
+    expect(blockedFull.trace.blocked).toBe(true)
+    expect(blockedEvaluation.trace.blocked).toBe(true)
+    expect(hashBattleState(blockedFull.state)).toBe(hashBattleState(blockedEvaluation.state))
+    triggerSpy.mockRestore()
+
+    const rejectedAction = {
+      type: 'move', playerId: 'player-red', pieceId: 'evaluation-mover', toX: 99, toY: 99,
+    } as const
+    const rejectedFull = simulateAITransition(input, rejectedAction, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'full',
+    })
+    const rejectedEvaluation = simulateAITransition(input, rejectedAction, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'evaluation',
+    })
+    expect(rejectedFull.accepted).toBe(false)
+    expect(rejectedEvaluation.accepted).toBe(false)
+    if (!rejectedFull.accepted && !rejectedEvaluation.accepted) {
+      expect(rejectedEvaluation.error.code).toBe(rejectedFull.error.code)
+    }
+
+    const redCore = makePiece({
+      instanceId: 'evaluation-red-core', ownerPlayerId: 'player-red', x: 0, y: 0,
+    }) as any
+    redCore.isCore = true
+    const blueCore = makePiece({
+      instanceId: 'evaluation-blue-core', ownerPlayerId: 'player-blue', x: 4, y: 0,
+    }) as any
+    blueCore.isCore = true
+    const terminalSeed = makeState({ pieces: [redCore, blueCore] }) as any
+    recordBattleInitialization(
+      terminalSeed,
+      new RuleRuntime({ rootSeed: FIXED_SEED }),
+      ['player-red', 'player-blue'],
+    )
+    const historyMove = listLegalAIActions(terminalSeed, 'player-red').find(item => item.kind === 'move')!
+    const afterHistory = simulateAITransition(terminalSeed, historyMove, { rootSeed: FIXED_SEED })
+    expect(afterHistory.accepted).toBe(true)
+    if (!afterHistory.accepted) throw new Error('Expected terminal fixture history move to succeed')
+    const terminalInput = afterHistory.state
+    const blueCoreIndex = terminalInput.pieces.findIndex(piece => piece.instanceId === blueCore.instanceId)
+    const [eliminatedBlueCore] = terminalInput.pieces.splice(blueCoreIndex, 1)
+    eliminatedBlueCore.currentHp = 0
+    terminalInput.graveyard.push(eliminatedBlueCore)
+    const terminalAction = listLegalAIActions(terminalInput, 'player-red').find(item => item.kind === 'end-turn')!
+    const terminalFull = simulateAITransition(terminalInput, terminalAction, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'full',
+    })
+    const terminalEvaluation = simulateAITransition(terminalInput, terminalAction, {
+      rootSeed: FIXED_SEED,
+      simulationMode: 'evaluation',
+    })
+    expect(terminalFull.accepted).toBe(true)
+    expect(terminalEvaluation.accepted).toBe(true)
+    expect(terminalEvaluation.state.terminalResult?.settledAt.actionIndex)
+      .toBe(terminalFull.state.terminalResult?.settledAt.actionIndex)
+    expect(hashBattleState(terminalEvaluation.state)).toBe(hashBattleState(terminalFull.state))
   })
 
   it('restores nested trigger-rule runtime state after accepted and rejected simulations', () => {

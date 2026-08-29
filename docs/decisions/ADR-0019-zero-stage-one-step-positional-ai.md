@@ -30,6 +30,9 @@ RED-122 最初采用“合法外层动作 + 费用放宽后续动作”的双层
 13. 部署阶段的锁定进度权重为 `500,000`，确保战斗位置权重增强后仍能一次性收束部署，不形成免费重复调位。
 14. 未触发回合动作护栏时，节点数必须与严格合法候选数相等；候选选择先按 `胜利 > 非终局 > 平局 > 失败` 排序，再比较普通估价和 tie-break，防止可累加位置/攻击分覆盖立即胜利。
 15. 最终 decision trace 记录稳定 `selectionReason`，使终局、静态分、费用、`endTurn` 与稳定 ID 的决胜层级可直接审计。
+16. 候选估价通过 AI 环境的 `simulationMode: evaluation` 执行。该模式构造不含历史 replay/action-log 载荷的推演视图，只保留与 `actionCount` 等长的轻量日志占位，并保留 gameplay state、去重 action ID、root seed 与 RNG cursors；它继续调用同一个 `runBattleActionIsolated()`，不修改规则 runner 或正式提交路径。等长占位确保终局 `settledAt.actionIndex` 与完整模式一致。
+17. evaluation transition 不生成完整 state diff 与第二份完整 pre-state hash；其最小 transition hash 在相同输入下仍确定。完整/轻量模式必须得到相同 accepted/rejected、blocked、公开观察、静态估价与 gameplay state hash。
+18. blocked 比较忽略纯 `targetingRevision` 变化；若棋子、资源、状态、回合或其他公开观察发生变化，候选仍视为有效结果而不是 blocked。
 
 ## 不采用的方案
 
@@ -57,9 +60,10 @@ RED-122 最初采用“合法外层动作 + 费用放宽后续动作”的双层
 - 单步贪心不能识别必须先牺牲即时分数的多步组合，也不搜索敌方应对。
 - 激进权重可能让棋子过度追击或为利用费用承担不必要风险，需用固定局面与镜像自对弈继续校准。
 - 完整候选枚举会比旧 2 节点版本更慢，真实耗时取决于合法候选数和单次权威 transition 成本。
+- 推演视图不携带历史 replay，不能被调用方当作正式可持久化状态；最终选择仍必须提交原权威状态并生成完整审计记录。
 
 ## 验证与回退
 
-固定 fixture 验证公开视角镜像、隐藏信息不变、终局/斩杀、防守、中心与敌方目标推进、未来攻击、暴露风险、支援、机动、地形、每个严格合法候选恰好一次模拟、合法最终动作和确定性 hash。性能样本记录候选数、节点数、P50/P95/最大耗时与非法动作；不得通过候选裁剪满足延迟目标。
+固定 fixture 验证公开视角镜像、隐藏信息不变、终局/斩杀、防守、中心与敌方目标推进、未来攻击、暴露风险、支援、机动、地形、每个严格合法候选恰好一次模拟、合法最终动作和确定性 hash。完整/轻量 transition 对照覆盖 accepted、blocked、rejected、公开观察、估价、gameplay hash、RNG authority 与输入 replay 不污染。性能样本记录候选数、节点数、P50/P95/最大耗时与非法动作；不得通过候选裁剪满足延迟目标。
 
 回退整体移除零阶段模块、profile、测试和文档；现有 simple/planner 保持不变，无需迁移数据。旧双层实现不作为回退目标，因为它已证明不满足实时 PvE 性能。

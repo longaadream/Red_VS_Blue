@@ -192,6 +192,11 @@ export type TransitionResult =
 
 export interface AISimulationContext {
   rootSeed?: number
+  /**
+   * Evaluation mode preserves gameplay/RNG semantics while omitting historical
+   * replay diagnostics from the isolated input used for speculative scoring.
+   */
+  simulationMode?: 'full' | 'evaluation'
 }
 
 export type AIObservationScope =

@@ -334,6 +334,7 @@ describe('zero-stage deterministic one-step selection', () => {
     const outerA = candidate('outer-a', 'fixture-a')
     const outerB = candidate('outer-b', 'fixture-b')
     const simulationCounts = new Map<string, number>()
+    const simulationModes: Array<string | undefined> = []
     let legalCalls = 0
     const environment: AIEnvironment = {
       ...aiEnvironmentV1,
@@ -341,8 +342,9 @@ describe('zero-stage deterministic one-step selection', () => {
         legalCalls += 1
         return [outerB, outerA]
       },
-      simulate: (current, input) => {
+      simulate: (current, input, context) => {
         const selected = 'action' in input ? input : candidate('raw', input.type)
+        simulationModes.push(context?.simulationMode)
         simulationCounts.set(selected.id, (simulationCounts.get(selected.id) ?? 0) + 1)
         const next = structuredClone(current) as any
         if (selected.id === 'outer-b') next.pieces.find((piece: any) => piece.instanceId === 'blue-core').currentHp -= 20
@@ -357,9 +359,11 @@ describe('zero-stage deterministic one-step selection', () => {
     expect(first.candidatesConsidered).toBe(2)
     expect(legalCalls).toBe(1)
     expect(Object.fromEntries(simulationCounts)).toEqual({ 'outer-b': 1, 'outer-a': 1 })
+    expect(simulationModes).toEqual(['evaluation', 'evaluation'])
     expect(first.trace.every(item => item.evaluation !== undefined)).toBe(true)
 
     simulationCounts.clear()
+    simulationModes.length = 0
     legalCalls = 0
     const second = planZeroStageAction(state, 'player-red', ROOT_SEED, { environment })
     expect(zeroStageDecisionTraceHash(second)).toBe(zeroStageDecisionTraceHash(first))

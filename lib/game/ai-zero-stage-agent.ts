@@ -130,7 +130,10 @@ export function planZeroStageAction(
     }
 
     nodesVisited += 1
-    const transition = environment.simulate(state, candidate, { rootSeed })
+    const transition = environment.simulate(state, candidate, {
+      rootSeed,
+      simulationMode: 'evaluation',
+    })
     if (!transition.accepted) {
       trace.rejected = transition.error.code
       traces.push(trace)

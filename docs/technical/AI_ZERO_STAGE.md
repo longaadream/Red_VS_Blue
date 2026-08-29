@@ -32,7 +32,7 @@ if (decision.nextAction) {
 - 返回 `ZeroStageDecision`。调用方只能提交 `nextAction.action`；`nextAction` 缺失表示终局或无合法动作，应安全停止。
 - `trace`、`selectionReason`、`nodesVisited` 和 `stateValue` 用于诊断、回放与性能记录，不是第二批待执行动作。
 
-生产调用必须在每次正式 action 被接受、状态版本变化后再次调用 `planZeroStageAction()`，不得缓存并连续提交旧候选。无头测试可用 `aiEnvironmentV1.simulate(state, decision.nextAction, { rootSeed })` 执行隔离 transition；生产环境仍应走现有服务器权威命令入口。
+生产调用必须在每次正式 action 被接受、状态版本变化后再次调用 `planZeroStageAction()`，不得缓存并连续提交旧候选。候选估价内部使用 `simulationMode: 'evaluation'`；最终选中的动作不携带该模式，仍由调用方走完整 AI transition 或服务器权威命令入口。
 
 默认 profile 由 `DEFAULT_ZERO_STAGE_CONFIG` 提供，仓库快照位于 `config/ai/agents/rvb-ai-zimse-v1.json`。JSON 用于版本归档、审计和外部调度识别，`agentId` 必须保持 `rvb-ai-zimse-v1`；运行时覆盖通过 `options.config` 传入，并由 `resolveZeroStageConfig()` 校验。`candidateMode` 固定为 `all-legal`，不能配置候选数量、按类型裁剪或开启第二层搜索。
 
@@ -96,7 +96,9 @@ a* = argmax score(a)
 - `visible:false` 的状态不会进入观察，因此不影响评分或决策。
 - 候选合法性和 transition 只由权威 AI 环境提供；零阶段代码不复制目标、距离、冷却、阶段或胜负规则。
 - 每个严格合法候选恰好隔离模拟一次，输入 `BattleState` 不被写回；只有回合动作护栏会把候选收束为 `endTurn`。
-- 技能、移动或卡牌被沉默、打坐等 before-action 规则阻止时，权威命令仍可能合法接收。AI 环境把“公开观察完全未变化”规范化为 `trace.blocked=true`；零阶段记录该候选但不计算 `F`、不选择它，从而不会重复触发。
+- 候选估价仍调用原有 `runBattleActionIsolated()`，但 AI 环境先构造不含历史 replay/action-log 载荷的浅层推演视图；它保留 gameplay state、已应用 action ID、root seed、action count、RNG runtime cursors，以及与 action count 等长的空对象日志占位。该占位只用于维持终局 action index，正式状态、规则 runner、随机算法与最终正式 replay 均不改变。
+- evaluation transition 不生成完整 state diff，只保留估价所需的 accepted/rejected、blocked、后继状态与确定性最小 trace；重复 evaluation 仍产生稳定 transition hash。
+- 技能、移动或卡牌被沉默、打坐等 before-action 规则阻止时，权威命令仍可能合法接收。AI 环境比较公开观察时忽略纯 `targetingRevision` 变化，把没有其他公开效果的动作规范化为 `trace.blocked=true`；零阶段记录该候选但不计算 `F`、不选择它，从而不会重复触发。
 - RED-85 机制兼容性保留在 trace 中作为诊断，但不会触发第二层估值或生成非法动作。
 
 ## Trace 与复现
@@ -112,7 +114,9 @@ a* = argmax score(a)
 
 ## 性能与限制
 
-固定 fixture 必须证明在未触发回合动作护栏时 `nodesVisited === candidatesConsidered === legal.length`，普通候选不得出现 `candidate-budget`。性能证据记录机器、样本、候选数、P50/P95/最大耗时和非法动作数，但不能为了满足延迟阈值裁剪合法策略。完整枚举的耗时随严格合法候选数量近似线性增长，候选很多的真实技能局面可能明显慢于旧 2 节点版本。
+固定 fixture 必须证明在未触发回合动作护栏时 `nodesVisited === candidatesConsidered === legal.length`，普通候选不得出现 `candidate-budget`。性能证据记录机器、样本、候选数、P50/P95/最大耗时和非法动作数，但不能为了满足延迟阈值裁剪合法策略。
+
+固定 seed `1001` 的 8v8 镜像自战完整枚举 30,849 个节点、31,626 个候选，在 25 回合、371 个正式动作后结束；P50 `326.64ms`、P95 `2,606.00ms`、最大 `8,467.96ms`，总运行 `365.08s`，非法动作 `0`。相比未压缩诊断历史时超过 20 分钟未完成，推演视图压缩已恢复可完成性；但候选很多的峰值决策仍可能达到数秒，后续优化不得以裁剪候选掩盖。
 
 当前 profile 仍有明确限制：
 
