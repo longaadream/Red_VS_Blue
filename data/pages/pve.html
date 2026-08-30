@@ -4,44 +4,143 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>PVE 冒险模式 - RED vs BLUE</title>
-  <script src="js/pack-fetch.js"></script>
   <script src="js/pve-api.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
+      color: #e2e8f0;
       background:
         radial-gradient(circle at 18% 10%, rgba(245, 158, 11, .18), transparent 34%),
         radial-gradient(circle at 82% 4%, rgba(239, 68, 68, .12), transparent 28%),
         linear-gradient(180deg, #110d08 0%, #0f172a 48%, #09090b 100%);
-      color: #e2e8f0;
-      padding-bottom: env(safe-area-inset-bottom);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .topbar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(148, 163, 184, .16); background: rgba(15, 23, 42, .82); backdrop-filter: blur(14px); position: sticky; top: 0; z-index: 10; }
-    .back-btn { background: rgba(30, 41, 59, .9); border: 1px solid #334155; border-radius: 8px; color: #cbd5e1; padding: 7px 12px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+    button { font: inherit; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(148, 163, 184, .16);
+      background: rgba(15, 23, 42, .86);
+      backdrop-filter: blur(14px);
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      color: #cbd5e1;
+      text-decoration: none;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, .9);
+    }
     .topbar h1 { font-size: 17px; font-weight: 800; }
-    .hero { padding: 22px 16px 12px; }
-    .eyebrow { color: #fbbf24; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; font-weight: 800; }
-    .title { margin-top: 8px; font-size: 30px; line-height: 1.05; font-weight: 900; }
-    .desc { margin-top: 10px; color: #94a3b8; font-size: 14px; line-height: 1.6; max-width: 560px; }
-    .actions { display: flex; gap: 10px; padding: 12px 16px 6px; }
-    .btn { flex: 1; border: none; border-radius: 12px; padding: 13px 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
-    .btn-primary { background: linear-gradient(135deg, #f59e0b, #ef4444); color: white; }
-    .btn-ghost { background: rgba(15, 23, 42, .74); color: #cbd5e1; border: 1px solid #334155; }
+    main { width: min(760px, 100%); margin: 0 auto; }
+    .hero { padding: 24px 16px 12px; }
+    .eyebrow {
+      color: #fbbf24;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .title { margin-top: 8px; font-size: 30px; line-height: 1.08; font-weight: 900; }
+    .desc { max-width: 620px; margin-top: 10px; color: #94a3b8; font-size: 14px; line-height: 1.6; }
+    .notice {
+      margin: 12px 16px 0;
+      padding: 12px 14px;
+      color: #fde68a;
+      border: 1px solid rgba(245, 158, 11, .42);
+      border-radius: 12px;
+      background: rgba(120, 53, 15, .28);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding: 12px 16px 4px;
+    }
+    .btn {
+      min-height: 44px;
+      padding: 10px 12px;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, .8);
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-primary { color: white; border: none; background: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
     .section { padding: 14px 16px; }
-    .section-title { font-size: 13px; color: #64748b; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
+    .section-title {
+      margin-bottom: 10px;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
     .grid { display: grid; gap: 12px; }
-    .card { background: rgba(15, 23, 42, .82); border: 1px solid rgba(148, 163, 184, .18); border-radius: 16px; padding: 15px; box-shadow: 0 12px 28px rgba(0, 0, 0, .24); }
-    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .card-name { font-size: 17px; font-weight: 900; }
-    .badge { color: #fbbf24; background: rgba(245, 158, 11, .12); border: 1px solid rgba(245, 158, 11, .26); border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 800; }
-    .card-desc { color: #94a3b8; font-size: 13px; line-height: 1.55; margin-top: 8px; }
-    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    .pill { color: #cbd5e1; background: #111827; border: 1px solid #334155; border-radius: 999px; padding: 5px 8px; font-size: 12px; }
-    .empty { color: #64748b; text-align: center; padding: 32px 18px; border: 1px dashed #334155; border-radius: 16px; }
-    .devbox { margin-top: 12px; background: rgba(2, 6, 23, .7); border: 1px solid #334155; border-radius: 12px; padding: 12px; color: #94a3b8; font-size: 12px; line-height: 1.6; }
-    code { color: #fbbf24; }
+    .card {
+      padding: 15px;
+      border: 1px solid rgba(148, 163, 184, .18);
+      border-radius: 16px;
+      background: rgba(15, 23, 42, .82);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .24);
+    }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .card-name { font-size: 17px; font-weight: 900; overflow-wrap: anywhere; }
+    .badge {
+      flex: none;
+      padding: 4px 8px;
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, .26);
+      border-radius: 999px;
+      background: rgba(245, 158, 11, .12);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .muted { margin-top: 7px; color: #94a3b8; font-size: 13px; line-height: 1.5; }
+    .status {
+      min-height: 42px;
+      padding: 12px 14px;
+      color: #94a3b8;
+      border: 1px dashed #334155;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .status.error { color: #fecaca; border-color: rgba(239, 68, 68, .48); }
+    .meta { display: grid; gap: 5px; margin-top: 10px; color: #94a3b8; font-size: 12px; }
+    .meta span { overflow-wrap: anywhere; }
+    .payload {
+      max-height: 330px;
+      margin-top: 12px;
+      padding: 12px;
+      overflow: auto;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      background: rgba(2, 6, 23, .78);
+      font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .command-list { display: grid; gap: 8px; margin-top: 14px; }
+    .command-list .btn { width: 100%; text-align: left; }
+    @media (max-width: 520px) {
+      .toolbar { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -50,88 +149,297 @@
     <h1>PVE 冒险模式</h1>
   </div>
 
-  <section class="hero">
-    <div class="eyebrow">Roguelike Prototype</div>
-    <div class="title">单人冒险的开发入口</div>
-    <p class="desc">
-      这里是 PVE 协作者的独立工作区。PVE 可以复用棋子、技能、卡牌和地图，但新增关卡、事件、遗物、奖励和成长系统应优先放在 <code>data/pve/</code>。
-    </p>
-  </section>
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Server-authoritative prototype</div>
+      <div class="title">声明式单人冒险</div>
+      <p class="desc">
+        Campaign、随机根、战斗结果与 Run 推进均由服务器负责。本页只展示公开状态，并提交服务器返回的合法命令。
+      </p>
+    </section>
 
-  <div class="actions">
-    <button class="btn btn-primary" onclick="startPrototypeRun()">开始原型冒险</button>
-    <button class="btn btn-ghost" onclick="reloadPve()">刷新数据</button>
-  </div>
-
-  <section class="section">
-    <div class="section-title">章节</div>
-    <div id="chapterList" class="grid"><div class="empty">正在加载 PVE 数据...</div></div>
-  </section>
-
-  <section class="section">
-    <div class="section-title">接口说明</div>
-    <div class="devbox">
-      页面接口：<code>window.RvBPve</code><br>
-      数据入口：<code>data/pve/manifest.json</code><br>
-      推荐开发目录：<code>data/pve/</code>、<code>components/pve/</code>、<code>lib/pve/</code><br>
-      当前阶段不要接入账号、联机、房间、WebSocket。
+    <div id="legacyNotice" class="notice" hidden>
+      检测到旧版浏览器 Run。该格式与权威 Run 不兼容，本页不会迁移、读取或删除它；请创建新的服务器 Run。
     </div>
-  </section>
+
+    <div class="toolbar">
+      <button id="startButton" class="btn btn-primary" type="button" disabled>创建 Prototype Run</button>
+      <button id="resumeButton" class="btn" type="button" disabled>恢复上次 Run</button>
+      <button id="refreshButton" class="btn" type="button" disabled>刷新当前 Run</button>
+    </div>
+
+    <section class="section">
+      <div class="section-title">连接状态</div>
+      <div id="status" class="status">正在读取服务器 Campaign...</div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">Campaign</div>
+      <div id="campaignList" class="grid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">当前 Run</div>
+      <div id="runCard" class="card" hidden>
+        <div class="card-head">
+          <div>
+            <div id="nodeTitle" class="card-name"></div>
+            <div id="nodeSubtitle" class="muted"></div>
+          </div>
+          <div id="revisionBadge" class="badge"></div>
+        </div>
+        <div id="runMeta" class="meta"></div>
+        <pre id="publicPayload" class="payload"></pre>
+        <div id="commandList" class="command-list"></div>
+      </div>
+    </section>
+  </main>
 
   <script>
-    let chapters = []
-
-    function escHtml(s) {
-      return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
+    const pageState = {
+      campaigns: [],
+      view: null,
+      transition: null,
+      busy: false,
     }
 
-    async function reloadPve() {
-      const list = document.getElementById('chapterList')
-      list.innerHTML = '<div class="empty">正在加载 PVE 数据...</div>'
-      try {
-        chapters = await RvBPve.loadChapters()
-        renderChapters()
-      } catch (e) {
-        list.innerHTML = '<div class="empty">PVE 数据加载失败：' + escHtml(e.message) + '</div>'
-      }
+    const elements = {
+      legacyNotice: document.getElementById('legacyNotice'),
+      startButton: document.getElementById('startButton'),
+      resumeButton: document.getElementById('resumeButton'),
+      refreshButton: document.getElementById('refreshButton'),
+      status: document.getElementById('status'),
+      campaignList: document.getElementById('campaignList'),
+      runCard: document.getElementById('runCard'),
+      nodeTitle: document.getElementById('nodeTitle'),
+      nodeSubtitle: document.getElementById('nodeSubtitle'),
+      revisionBadge: document.getElementById('revisionBadge'),
+      runMeta: document.getElementById('runMeta'),
+      publicPayload: document.getElementById('publicPayload'),
+      commandList: document.getElementById('commandList'),
     }
 
-    function renderChapters() {
-      const list = document.getElementById('chapterList')
-      if (!chapters.length) {
-        list.innerHTML = '<div class="empty">还没有章节。请在 data/pve/chapters/ 添加 JSON，并登记到 data/pve/manifest.json。</div>'
+    function setStatus(message, isError) {
+      elements.status.textContent = message
+      elements.status.classList.toggle('error', Boolean(isError))
+    }
+
+    function setBusy(busy) {
+      pageState.busy = busy
+      elements.startButton.disabled = busy || pageState.campaigns.length === 0
+      elements.resumeButton.disabled = busy || !RvBPve.getLastRunId()
+      elements.refreshButton.disabled = busy || !pageState.view
+      elements.commandList.querySelectorAll('button').forEach(function (button) {
+        button.disabled = busy
+      })
+    }
+
+    function campaignLabel(campaign) {
+      return campaign.title || campaign.titleTextId || campaign.campaignId || '未命名 Campaign'
+    }
+
+    function renderCampaigns() {
+      elements.campaignList.replaceChildren()
+      if (!pageState.campaigns.length) {
+        const empty = document.createElement('div')
+        empty.className = 'status'
+        empty.textContent = '服务器没有公开可创建的 Campaign。'
+        elements.campaignList.appendChild(empty)
         return
       }
-      list.innerHTML = chapters.map(ch => {
-        const encounters = Array.isArray(ch.encounters) ? ch.encounters.length : 0
-        const events = Array.isArray(ch.events) ? ch.events.length : 0
-        return `<div class="card">
-          <div class="card-head">
-            <div class="card-name">${escHtml(ch.name || ch.id)}</div>
-            <div class="badge">${escHtml(ch.status || 'prototype')}</div>
-          </div>
-          <div class="card-desc">${escHtml(ch.description || '暂无描述')}</div>
-          <div class="meta">
-            <span class="pill">遭遇：${encounters}</span>
-            <span class="pill">事件：${events}</span>
-            <span class="pill">推荐队伍：${escHtml(ch.recommendedPartySize || 3)}</span>
-          </div>
-        </div>`
-      }).join('')
+
+      pageState.campaigns.forEach(function (campaign) {
+        const card = document.createElement('article')
+        card.className = 'card'
+        const head = document.createElement('div')
+        head.className = 'card-head'
+        const name = document.createElement('div')
+        name.className = 'card-name'
+        name.textContent = campaignLabel(campaign)
+        const badge = document.createElement('div')
+        badge.className = 'badge'
+        badge.textContent = campaign.version || 'available'
+        head.append(name, badge)
+
+        const description = document.createElement('div')
+        description.className = 'muted'
+        description.textContent = campaign.description
+          || campaign.descriptionTextId
+          || campaign.campaignId
+
+        const button = document.createElement('button')
+        button.className = 'btn'
+        button.type = 'button'
+        button.textContent = '从此 Campaign 创建 Run'
+        button.addEventListener('click', function () {
+          createRun(campaign.campaignId)
+        })
+
+        card.append(head, description, button)
+        elements.campaignList.appendChild(card)
+      })
     }
 
-    function startPrototypeRun() {
-      const first = chapters[0]
-      const run = RvBPve.createRunState({ chapterId: first && first.id })
-      localStorage.setItem('rvb_pve_run', JSON.stringify(run))
-      alert('已创建 PVE 原型 run：' + run.id + '\n下一步可由 PVE 开发者接入路线、事件、奖励和战斗 adapter。')
+    function addMeta(label, value) {
+      const row = document.createElement('span')
+      row.textContent = label + '：' + (value == null ? '—' : String(value))
+      elements.runMeta.appendChild(row)
     }
 
-    window.addEventListener('load', reloadPve)
+    function renderRun() {
+      const view = pageState.view
+      elements.runCard.hidden = !view
+      if (!view) return
+
+      const node = view.node && typeof view.node === 'object' ? view.node : {}
+      elements.nodeTitle.textContent = node.title || node.titleTextId || node.nodeId || '公开节点'
+      elements.nodeSubtitle.textContent = node.type
+        ? '节点类型：' + node.type
+        : '服务器公开视图'
+      elements.revisionBadge.textContent = 'revision ' + view.revision
+
+      elements.runMeta.replaceChildren()
+      addMeta('Run ID', view.runId)
+      addMeta('Campaign', view.campaignId)
+      addMeta('Authority', view.authorityContentHash)
+
+      elements.publicPayload.textContent = JSON.stringify({
+        node: view.node || null,
+        battle: view.battle || null,
+        transition: pageState.transition || null,
+      }, null, 2)
+
+      elements.commandList.replaceChildren()
+      const commands = Array.isArray(view.legalCommands) ? view.legalCommands : []
+      if (!commands.length) {
+        const empty = document.createElement('div')
+        empty.className = 'status'
+        empty.textContent = '服务器当前没有返回可提交的命令。'
+        elements.commandList.appendChild(empty)
+      } else {
+        commands.forEach(function (command) {
+          const button = document.createElement('button')
+          button.className = command.primary ? 'btn btn-primary' : 'btn'
+          button.type = 'button'
+          button.textContent = command.label || command.type
+          button.disabled = pageState.busy
+          button.addEventListener('click', function () {
+            executeCommand(command)
+          })
+          elements.commandList.appendChild(button)
+        })
+      }
+      setBusy(pageState.busy)
+    }
+
+    function setRunLocation(runId) {
+      const url = new URL(window.location.href)
+      url.searchParams.set('runId', runId)
+      history.replaceState(null, '', url)
+    }
+
+    function acceptResponse(response, message) {
+      pageState.view = response.view
+      pageState.transition = response.transition || null
+      RvBPve.rememberRunId(response.view.runId)
+      setRunLocation(response.view.runId)
+      renderRun()
+      setStatus(message, false)
+    }
+
+    function describeError(error) {
+      const code = error && error.code ? '[' + error.code + '] ' : ''
+      return code + (error && error.message ? error.message : String(error))
+    }
+
+    async function createRun(campaignId) {
+      if (pageState.busy || !campaignId) return
+      setBusy(true)
+      setStatus('正在创建服务器 Run...', false)
+      try {
+        const response = await RvBPve.createRun(campaignId)
+        acceptResponse(response, '服务器 Run 已创建。')
+      } catch (error) {
+        setStatus('创建失败：' + describeError(error), true)
+      } finally {
+        setBusy(false)
+      }
+    }
+
+    async function loadRun(runId, message) {
+      if (pageState.busy || !runId) return
+      setBusy(true)
+      setStatus('正在读取服务器 Run...', false)
+      try {
+        const response = await RvBPve.loadRun(runId)
+        acceptResponse(response, message || '服务器 Run 已恢复。')
+      } catch (error) {
+        setStatus('恢复失败：' + describeError(error), true)
+      } finally {
+        setBusy(false)
+      }
+    }
+
+    async function executeCommand(command) {
+      if (pageState.busy || !pageState.view) return
+      const runId = pageState.view.runId
+      setBusy(true)
+      setStatus('正在提交服务器返回的合法命令...', false)
+      try {
+        const response = await RvBPve.submitLegalCommand(pageState.view, command)
+        acceptResponse(response, '命令已由服务器结算。')
+      } catch (error) {
+        setStatus('命令结果未确认，正在重新读取 Run：' + describeError(error), true)
+        try {
+          const response = await RvBPve.loadRun(runId)
+          acceptResponse(response, '已重新读取服务器 Run；请按最新合法命令继续。')
+        } catch {
+          // Keep the original uncertainty visible and allow an explicit refresh.
+        }
+      } finally {
+        setBusy(false)
+      }
+    }
+
+    async function loadCatalog() {
+      try {
+        const catalog = await RvBPve.loadCatalog()
+        pageState.campaigns = Array.isArray(catalog && catalog.campaigns)
+          ? catalog.campaigns
+          : []
+        renderCampaigns()
+        setStatus('服务器 Campaign 已就绪。', false)
+      } catch (error) {
+        pageState.campaigns = []
+        renderCampaigns()
+        setStatus('Campaign 加载失败：' + describeError(error), true)
+      } finally {
+        setBusy(false)
+      }
+    }
+
+    async function initialize() {
+      elements.legacyNotice.hidden = !RvBPve.hasLegacyRun()
+      await loadCatalog()
+
+      const runId = new URL(window.location.href).searchParams.get('runId')
+      if (runId) {
+        await loadRun(runId, '已从 URL 恢复服务器 Run。')
+      }
+    }
+
+    elements.startButton.addEventListener('click', function () {
+      const campaign = pageState.campaigns[0]
+      if (campaign) createRun(campaign.campaignId)
+    })
+    elements.resumeButton.addEventListener('click', function () {
+      loadRun(RvBPve.getLastRunId(), '已恢复上次服务器 Run。')
+    })
+    elements.refreshButton.addEventListener('click', function () {
+      if (pageState.view) loadRun(pageState.view.runId, '当前服务器 Run 已刷新。')
+    })
+
+    window.addEventListener('load', initialize)
   </script>
 </body>
 </html>

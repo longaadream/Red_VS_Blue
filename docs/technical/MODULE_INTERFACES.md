@@ -457,3 +457,14 @@ interface ServerCore {
   `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只关 async flag 即回退 ACK 前原子 DB 提交。
   `RVB_TURN_TIMER_ENABLED=1` 才安排部署/回合计时唤醒。`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
 - 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；version > 0 缺检查点、版本断层、pre/post state/public hash、action hash 或 transition hash 链损坏都必须显式失败。
+
+## RED-117 PVE Flow 接口
+
+- `openRuntimeVerifiedSnapshotV1()`：打开 active Profile 的精确 verified `ResolvedSnapshotViewV1`；PVE create/read/command 不得直接读取当前 data root。
+- `createPveContentSnapshotV1(view, registry)`：从一个 verified Snapshot 构建 strict PVE content graph，并对外部 runtime ID 做封闭 registry 校验。
+- `createInitialPveRunV1()`、`stabilizePveRunV1()`、`runPveFlowV1()`：唯一的声明式 Run 状态转换入口；Run 只固定 `authorityContentHash`，自动 branch/checkpoint 有界且失败原子。
+- `createPveBattleV1()`、`applyPveBattleActionV1()`、`settlePveBattleV1()`：复用正式 Battle setup/Runner；终局只读取 `BattleState.terminalResult`，客户端终局字段一律拒绝。
+- `PveRunStoreV1`：保存 versioned Run aggregate，按 Run revision CAS；authority 改变时先归档完整 battle evidence 和 tombstone，再清理临时 Run。
+- `PveServiceV1`：组合 active Snapshot、Runner、Adapter 与 Store，向 `/api/pve/**` 返回最小公开投影。浏览器只提交 server legal commands。
+- Profile activation：active PVE battle 纳入 lease；commit/release/recovery 在 admission 关闭时完成 PVE authority reconciliation，失败保持 fail closed。
+- 完整协议、Prototype 路径与回退见 [PVE_FLOW.md](./PVE_FLOW.md)。

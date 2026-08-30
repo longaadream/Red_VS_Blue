@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "choose-roster",
+  "type": "roster",
+  "rosterId": "prototype-player-roster",
+  "nextNodeId": "intro"
+}
