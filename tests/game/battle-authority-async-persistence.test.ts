@@ -42,6 +42,7 @@ import {
   getBattleAuthorityReceipt,
   getRememberedBattleAuthorityRoom,
   inspectBattleAuthorityPersistence,
+  isRetryableBattleAuthorityPersistenceError,
   readBattleAuthorityHistory,
   rememberBattleAuthorityRoom,
 } from '@/lib/server/battle-authority-persistence'
@@ -63,6 +64,17 @@ afterAll(() => {
 })
 
 describe('battle authority async persistence integration', () => {
+  it('retries only transient SQLite and Prisma persistence failures', () => {
+    expect(isRetryableBattleAuthorityPersistenceError({ code: 'SQLITE_BUSY' })).toBe(true)
+    expect(isRetryableBattleAuthorityPersistenceError({ code: 'P2028', message: 'Transaction already closed' }))
+      .toBe(true)
+    expect(isRetryableBattleAuthorityPersistenceError(new Error('database is locked'))).toBe(true)
+    expect(isRetryableBattleAuthorityPersistenceError({ code: 'P2002', message: 'Unique constraint failed' }))
+      .toBe(false)
+    expect(isRetryableBattleAuthorityPersistenceError({ code: 'SQLITE_CORRUPT' })).toBe(false)
+    expect(isRetryableBattleAuthorityPersistenceError(new Error('disk I/O error'))).toBe(false)
+  })
+
   it('is fail-closed unless explicitly enabled', () => {
     delete process.env.RVB_BATTLE_ASYNC_JOURNAL
     expect(isBattleAuthorityAsyncJournalEnabled()).toBe(false)
@@ -106,6 +118,7 @@ describe('battle authority async persistence integration', () => {
     await expect(commitBattleAuthorityTransition(input)).resolves.toBe(true)
     expect(harness.transaction).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(harness.transaction).toHaveBeenCalledTimes(1))
+    expect(harness.prisma.$queryRawUnsafe).toHaveBeenCalledWith('PRAGMA journal_mode = WAL')
     expect(harness.prisma.$queryRawUnsafe).toHaveBeenCalledWith('PRAGMA busy_timeout = 500')
     expect(harness.transaction).toHaveBeenLastCalledWith(expect.any(Function), {
       maxWait: 250,

@@ -84,11 +84,15 @@ export type WsInbound =
       type: 'subscribe'
       roomId?: string
       playerId: string
+      protocolVersion: number
+      authorityBuildId: string
       publicKey: string
       payload: {
         type: 'battle-subscribe'
         roomId: string
         playerId: string
+        protocolVersion: number
+        authorityBuildId: string
         timestamp: number
       }
       signature: string
@@ -96,7 +100,8 @@ export type WsInbound =
   | {
       type: 'action'
       seq: number
-      protocolVersion?: number
+      protocolVersion: number
+      authorityBuildId: string
       roomId?: string
       clientActionId?: string
       expectedAuthorityVersion?: number
@@ -111,6 +116,7 @@ export type WsInbound =
   | {
       type: 'battleTransition'
       protocolVersion: number
+      authorityBuildId: string
       roomId: string
       fromVersion: number
       toVersion: number
@@ -147,11 +153,12 @@ export type WsInbound =
 
 // Outbound WS messages to clients
 export type WsOutbound =
-  | { type: 'subscribed'; role: PlayerRole }
+  | { type: 'subscribed'; role: PlayerRole; protocolVersion: number; authorityBuildId: string }
   | {
       type: 'pendingAction'
       seq: number
-      protocolVersion?: number
+      protocolVersion: number
+      authorityBuildId: string
       roomId?: string
       clientActionId?: string
       expectedAuthorityVersion?: number
@@ -165,6 +172,7 @@ export type WsOutbound =
   | {
       type: 'battleTransition'
       protocolVersion: number
+      authorityBuildId: string
       roomId: string
       fromVersion: number
       toVersion: number

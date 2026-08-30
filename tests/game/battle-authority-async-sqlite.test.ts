@@ -190,7 +190,7 @@ describe('battle authority async SQLite persistence', () => {
     expect(JSON.parse(checkpoint.stateJson).seed).toBe(unsignedSeed)
   }, 30_000)
 
-  it('contains a real SQLite lock failure to one room without overlapping the next room write', async () => {
+  it('keeps locked writes queued under WAL and drains every room after SQLite recovers', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'rvb-red109-sqlite-lock-'))
     temporaryDirectories.push(directory)
     process.env.DATABASE_URL = `file:${join(directory, 'authority.db').replaceAll('\\', '/')}`
@@ -241,6 +241,10 @@ describe('battle authority async SQLite persistence', () => {
         ).state),
       })
     }
+    const journalMode = await prisma.$queryRawUnsafe<Array<{ journal_mode: string }>>(
+      'PRAGMA journal_mode',
+    )
+    expect(journalMode[0]?.journal_mode.toLowerCase()).toBe('wal')
 
     const locker = new PrismaClient()
     activePrismaClients.push(locker)
@@ -278,7 +282,10 @@ describe('battle authority async SQLite persistence', () => {
 
     try {
       await vi.waitFor(() => {
-        expect(persistence.inspectBattleAuthorityPersistence(roomA.id).status).toBe('degraded')
+        expect(persistence.inspectBattleAuthorityPersistence(roomA.id)).toMatchObject({
+          status: 'pending',
+          pending: 1,
+        })
       }, { timeout: 8_000 })
       expect(persistence.inspectBattleAuthorityPersistence(roomB.id).status).toBe('pending')
     } finally {
@@ -286,15 +293,14 @@ describe('battle authority async SQLite persistence', () => {
       await lockPromise
     }
 
-    await persistence.drainBattleAuthorityPersistence(roomB.id)
+    await persistence.drainBattleAuthorityPersistence()
     const roomAPersistence = persistence.inspectBattleAuthorityPersistence(roomA.id)
     expect(roomAPersistence).toMatchObject({
-      status: 'degraded',
-      durableAuthorityVersion: 0,
+      status: 'durable',
+      durableAuthorityVersion: 1,
       authorityVersion: 1,
       pending: 0,
     })
-    expect(roomAPersistence.lastError).not.toContain('journal persist timed out')
     expect(persistence.inspectBattleAuthorityPersistence(roomB.id)).toMatchObject({
       status: 'durable',
       durableAuthorityVersion: 1,
@@ -302,7 +308,7 @@ describe('battle authority async SQLite persistence', () => {
       pending: 0,
     })
     await expect(prisma.room.findUniqueOrThrow({ where: { id: roomA.id } }))
-      .resolves.toMatchObject({ battleAuthorityVersion: 0 })
+      .resolves.toMatchObject({ battleAuthorityVersion: 1 })
     await expect(prisma.room.findUniqueOrThrow({ where: { id: roomB.id } }))
       .resolves.toMatchObject({ battleAuthorityVersion: 1 })
 
@@ -444,4 +450,5 @@ function resetAuthorityGlobals(): void {
   delete globals.__rvbAuthorityReceiptCacheV2
   delete globals.__rvbAuthorityHistoryCacheV2
   delete globals.__rvbAuthorityAsyncJournalV2
+  delete globals.__rvbAuthoritySqliteWalPromiseV2
 }
