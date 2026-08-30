@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { BATTLE_STATE_CONFLICT, persistAuthoritativeBattleState } from '@/lib/server/battle-command'
 import type { Room } from '@/lib/game/room-store'
+import { createTestServerBattleState } from './profile-test-identity'
 
 function room(): Room {
   return {
@@ -16,11 +17,10 @@ function room(): Room {
   }
 }
 
-const terminalStorage = {
-  type: 'server-state' as const,
-  seed: 9,
-  state: { terminalResult: { status: 'finished', reason: 'core-eliminated' } },
-}
+const terminalStorage = createTestServerBattleState(
+  { terminalResult: { status: 'finished', reason: 'core-eliminated' } },
+  9,
+)
 
 describe('authoritative battle command persistence', () => {
   it('marks a bot-produced terminal room finished in the CAS write', async () => {

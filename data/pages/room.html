@@ -195,6 +195,20 @@
       return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
     }
 
+    function requireGameProfileIdentity() {
+      const stored = localStorage.getItem('rvb_game_profile_identity')
+      if (!stored) {
+        throw new Error('Resolved Profile identity is unavailable. Return to the lobby and reconnect the resource pack.')
+      }
+      try {
+        const identity = JSON.parse(stored)
+        if (!identity || typeof identity !== 'object' || Array.isArray(identity)) throw new Error('invalid')
+        return identity
+      } catch {
+        throw new Error('Resolved Profile identity is invalid. Return to the lobby and reconnect the resource pack.')
+      }
+    }
+
     let pollTimer = null
     let _lastRoom = null
     let _navigating = false
@@ -449,7 +463,13 @@
       const btn = document.getElementById('readyBtn')
       btn.disabled = true
       try {
-        const room = await roomRequest('rooms.action', { roomId, action: 'toggle-ready', playerId, playerName })
+        const room = await roomRequest('rooms.action', {
+          roomId,
+          action: 'toggle-ready',
+          playerId,
+          playerName,
+          profileIdentity: requireGameProfileIdentity(),
+        })
         await renderRoom(room)
       } catch (e) {
         alert('准备失败：' + e.message)

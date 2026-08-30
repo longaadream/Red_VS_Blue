@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
+import { toPublicBattleState } from '@/lib/game/deployment'
 import { hashBattleState } from '@/lib/game/battle-trace'
 import {
   assertBattleAuthorityRestoreCheckpoint,
@@ -11,6 +12,7 @@ import {
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
 import type { ServerBattleState } from '@/lib/game/battle-storage'
+import { createTestServerBattleState } from './profile-test-identity'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 
 describe('RED-109 battle authority recovery', () => {
@@ -159,7 +161,7 @@ describe('RED-109 battle authority recovery', () => {
 
 function checkpointInput(roomId: string, storage: ServerBattleState) {
   const checkpointStateHash = hashBattleState(storage.state as BattleState)
-  const checkpointPublicHash = hashPublicBattleState(storage.state as BattleState)
+  const checkpointPublicHash = hashPublicBattleState(toPublicBattleState(storage.state as BattleState))
   return {
     roomId,
     checkpointStorage: storage,
@@ -175,16 +177,12 @@ function checkpointInput(roomId: string, storage: ServerBattleState) {
 }
 
 function storageAt(revision: number): ServerBattleState {
-  return {
-    type: 'server-state',
-    seed: 109,
-    state: {
-      pieces: [],
-      players: [],
-      turn: { turnNumber: 1, phase: 'action', currentPlayerId: 'player-red' },
-      authorityTestRevision: revision,
-    },
-  }
+  return createTestServerBattleState({
+    pieces: [],
+    players: [],
+    turn: { turnNumber: 1, phase: 'action', currentPlayerId: 'player-red' },
+    authorityTestRevision: revision,
+  })
 }
 
 function transition(
@@ -204,8 +202,8 @@ function transition(
     command,
     previousStorage: previous,
     nextStorage: next,
-    previousPublicState: previous.state as BattleState,
-    nextPublicState: next.state as BattleState,
+    previousPublicState: toPublicBattleState(previous.state as BattleState),
+    nextPublicState: toPublicBattleState(next.state as BattleState),
     preStateHash: hashBattleState(previous.state as BattleState),
     postStateHash: hashBattleState(next.state as BattleState),
     previousTransitionHash,
