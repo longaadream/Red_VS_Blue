@@ -57,7 +57,7 @@ describe('battle authority async journal', () => {
     expect(journal.inspect('room-b').durableAuthorityVersion).toBe(1)
   })
 
-  it('retries a failed write only within the configured bound and degrades the room', async () => {
+  it('degrades a room immediately for a non-retryable write failure', async () => {
     const onStateChange = vi.fn()
     const journal = new BattleAuthorityAsyncJournal({
       retryDelaysMs: [0, 0],
@@ -74,7 +74,7 @@ describe('battle authority async journal', () => {
     })
     await expect(journal.drain('room-a')).rejects.toThrow('database locked')
 
-    expect(persist).toHaveBeenCalledTimes(3)
+    expect(persist).toHaveBeenCalledTimes(1)
     expect(journal.inspect('room-a')).toMatchObject({
       status: 'degraded',
       durableAuthorityVersion: 0,
@@ -87,6 +87,52 @@ describe('battle authority async journal', () => {
       kind: 'receipt',
       persist: vi.fn(),
     })).toBe(false)
+  })
+
+  it('keeps a retryable write at the queue head until storage recovers', async () => {
+    let storageAvailable = false
+    const journal = new BattleAuthorityAsyncJournal({
+      retryDelaysMs: [1],
+      isRetryablePersistError: error => (
+        error instanceof Error && error.message.includes('database is locked')
+      ),
+    })
+    const firstPersist = vi.fn(async () => {
+      if (!storageAvailable) throw new Error('database is locked')
+    })
+    const secondPersist = vi.fn(async () => undefined)
+
+    journal.enqueue({
+      roomId: 'room-recovering',
+      kind: 'transition',
+      authorityVersion: 1,
+      persist: firstPersist,
+    })
+    journal.enqueue({
+      roomId: 'room-recovering',
+      kind: 'transition',
+      authorityVersion: 2,
+      persist: secondPersist,
+    })
+
+    await vi.waitFor(() => expect(firstPersist.mock.calls.length).toBeGreaterThanOrEqual(2))
+    expect(secondPersist).not.toHaveBeenCalled()
+    expect(journal.inspect('room-recovering')).toMatchObject({
+      status: 'pending',
+      durableAuthorityVersion: 0,
+      pending: 2,
+      lastError: 'database is locked',
+    })
+
+    storageAvailable = true
+    await journal.drain('room-recovering')
+
+    expect(secondPersist).toHaveBeenCalledTimes(1)
+    expect(journal.inspect('room-recovering')).toEqual({
+      status: 'durable',
+      durableAuthorityVersion: 2,
+      pending: 0,
+    })
   })
 
   it('runs transition audit once before durable persistence and degrades without retrying it', async () => {
@@ -178,6 +224,39 @@ describe('battle authority async journal', () => {
     })
   })
 
+  it('retries a cooperative safety timeout when the adapter becomes healthy', async () => {
+    let attempt = 0
+    const journal = new BattleAuthorityAsyncJournal({
+      retryDelaysMs: [1],
+      persistTimeoutMs: 20,
+      isRetryablePersistError: error => (
+        error instanceof Error && error.name === 'BattleAuthorityJournalPersistTimeoutError'
+      ),
+    })
+    const persist = vi.fn(({ signal }: { signal: AbortSignal }) => {
+      attempt += 1
+      if (attempt > 1) return Promise.resolve()
+      return new Promise<void>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('write aborted')), { once: true })
+      })
+    })
+
+    journal.enqueue({
+      roomId: 'room-timeout-recovery',
+      kind: 'transition',
+      authorityVersion: 1,
+      persist,
+    })
+
+    await journal.drain('room-timeout-recovery')
+    expect(persist).toHaveBeenCalledTimes(2)
+    expect(journal.inspect('room-timeout-recovery')).toEqual({
+      status: 'durable',
+      durableAuthorityVersion: 1,
+      pending: 0,
+    })
+  })
+
   it('never overlaps another durable write when an adapter ignores cancellation', async () => {
     let release!: () => void
     let active = 0
@@ -206,14 +285,20 @@ describe('battle authority async journal', () => {
     })
     journal.enqueue({ roomId: 'room-b', kind: 'transition', authorityVersion: 1, persist: roomBPersist })
 
-    await vi.waitFor(() => expect(journal.inspect('room-a').status).toBe('degraded'))
+    await new Promise(resolve => setTimeout(resolve, 30))
+    expect(journal.inspect('room-a')).toMatchObject({ status: 'pending', pending: 1 })
     expect(roomBPersist).not.toHaveBeenCalled()
     expect(maxActive).toBe(1)
 
     release()
-    await expect(journal.drain()).rejects.toThrow('persist timed out after 20ms in room-a')
+    await expect(journal.drain()).resolves.toBeUndefined()
     expect(roomBPersist).toHaveBeenCalledTimes(1)
     expect(maxActive).toBe(1)
+    expect(journal.inspect('room-a')).toMatchObject({
+      status: 'durable',
+      pending: 0,
+      durableAuthorityVersion: 1,
+    })
   })
 
   it('closes ingress before a graceful drain without degrading durable rooms', async () => {

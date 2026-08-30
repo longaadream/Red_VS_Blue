@@ -35,6 +35,7 @@ export interface BattleAuthorityAsyncJournalOptions {
   maxPendingPerRoom?: number
   retryDelaysMs?: number[]
   persistTimeoutMs?: number
+  isRetryablePersistError?: (error: unknown) => boolean
   onStateChange?: (roomId: string, state: BattleAuthorityJournalInspection) => void
 }
 
@@ -42,6 +43,7 @@ interface RoomJournalState {
   durableAuthorityVersion: number
   pending: number
   degradedError?: Error
+  transientError?: Error
   waiters: Array<{
     resolve: () => void
     reject: (error: Error) => void
@@ -60,6 +62,7 @@ export class BattleAuthorityAsyncJournal {
   private readonly maxPendingPerRoom: number
   private readonly retryDelaysMs: number[]
   private readonly persistTimeoutMs: number
+  private readonly isRetryablePersistError: NonNullable<BattleAuthorityAsyncJournalOptions['isRetryablePersistError']>
   private readonly onStateChange?: BattleAuthorityAsyncJournalOptions['onStateChange']
   private running = false
   private scheduled = false
@@ -85,6 +88,7 @@ export class BattleAuthorityAsyncJournal {
     this.maxPendingPerRoom = maxPendingPerRoom
     this.retryDelaysMs = [...retryDelaysMs]
     this.persistTimeoutMs = persistTimeoutMs
+    this.isRetryablePersistError = options.isRetryablePersistError ?? (() => false)
     this.onStateChange = options.onStateChange
   }
 
@@ -185,6 +189,7 @@ export class BattleAuthorityAsyncJournal {
         try {
           await job.audit?.()
           await this.persistWithRetry(job)
+          state.transientError = undefined
           if (job.kind === 'transition' && job.authorityVersion !== undefined) {
             if (!Number.isSafeInteger(job.authorityVersion) || job.authorityVersion < 0) {
               throw new Error(`Invalid durable authority version for ${job.roomId}`)
@@ -219,19 +224,18 @@ export class BattleAuthorityAsyncJournal {
           job.persist({ signal: controller.signal, safetyTimeoutMs: this.persistTimeoutMs }),
           this.persistTimeoutMs,
           message,
-          () => {
-            controller.abort()
-            this.degrade(job.roomId, new BattleAuthorityJournalPersistTimeoutError(message))
-            this.dropQueuedJobs(job.roomId)
-          },
+          () => controller.abort(),
         )
         return
       } catch (error) {
-        // A timed-out Prisma call has an ambiguous outcome and cannot be
-        // cancelled safely. Do not manufacture concurrent duplicate writes.
-        if (error instanceof BattleAuthorityJournalPersistTimeoutError) throw error
-        if (attempt >= this.retryDelaysMs.length) throw error
-        const delay = this.retryDelaysMs[attempt]
+        const failure = asError(error)
+        if (!this.accepting || !this.isRetryablePersistError(failure)) throw failure
+        const state = this.roomState(job.roomId)
+        state.transientError = failure
+        this.emit(job.roomId)
+        const delay = this.retryDelaysMs.length > 0
+          ? this.retryDelaysMs[Math.min(attempt, this.retryDelaysMs.length - 1)]
+          : 25
         attempt += 1
         if (delay > 0) await sleep(delay)
       }
@@ -300,6 +304,9 @@ function inspectionOf(state: RoomJournalState): BattleAuthorityJournalInspection
     durableAuthorityVersion: state.durableAuthorityVersion,
     pending: state.pending,
     ...(state.degradedError ? { lastError: state.degradedError.message } : {}),
+    ...(!state.degradedError && state.transientError
+      ? { lastError: state.transientError.message }
+      : {}),
   }
 }
 
@@ -352,7 +359,8 @@ async function withTimeoutWithoutOverlap<T>(
   // the old adapter confirms its physical write has stopped. Production
   // Prisma adapters have a shorter native transaction/busy timeout and should
   // normally settle before this safety branch.
-  await outcome
+  const settled = await outcome
+  if (settled.kind === 'fulfilled') return settled.value
   throw new BattleAuthorityJournalPersistTimeoutError(message)
 }
 

@@ -46,6 +46,7 @@ const persistenceGlobal = globalThis as typeof globalThis & {
   __rvbAuthorityReceiptCacheV2?: Map<string, Map<string, BattleAuthorityReceipt>>
   __rvbAuthorityHistoryCacheV2?: Map<string, CachedAuthorityHistory>
   __rvbAuthorityAsyncJournalV2?: BattleAuthorityAsyncJournal
+  __rvbAuthoritySqliteWalPromiseV2?: Promise<void>
 }
 
 const authorityRoomCache = (
@@ -59,6 +60,7 @@ const authorityHistoryCache = (
 )
 const authorityAsyncJournal = (
   persistenceGlobal.__rvbAuthorityAsyncJournalV2 ??= new BattleAuthorityAsyncJournal({
+    isRetryablePersistError: isRetryableBattleAuthorityPersistenceError,
     onStateChange: updateCachedPersistenceState,
   })
 )
@@ -326,7 +328,38 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
 }
 
 async function setBattleAuthoritySqliteBusyTimeout(): Promise<void> {
+  await ensureBattleAuthoritySqliteWal()
   await prisma.$queryRawUnsafe(`PRAGMA busy_timeout = ${BATTLE_AUTHORITY_SQLITE_BUSY_TIMEOUT_MS}`)
+}
+
+async function ensureBattleAuthoritySqliteWal(): Promise<void> {
+  const existing = persistenceGlobal.__rvbAuthoritySqliteWalPromiseV2
+  if (existing) return existing
+  const configuring = (async () => {
+    await prisma.$queryRawUnsafe('PRAGMA journal_mode = WAL')
+  })()
+  persistenceGlobal.__rvbAuthoritySqliteWalPromiseV2 = configuring
+  try {
+    await configuring
+  } catch (error) {
+    if (persistenceGlobal.__rvbAuthoritySqliteWalPromiseV2 === configuring) {
+      delete persistenceGlobal.__rvbAuthoritySqliteWalPromiseV2
+    }
+    throw error
+  }
+}
+
+export function isRetryableBattleAuthorityPersistenceError(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'BattleAuthorityJournalPersistTimeoutError') {
+    return true
+  }
+  const candidate = error as { code?: unknown; message?: unknown }
+  const code = typeof candidate?.code === 'string' ? candidate.code.toUpperCase() : ''
+  if (['P1008', 'P2024', 'P2028', 'P2034', 'SQLITE_BUSY', 'SQLITE_LOCKED'].includes(code)) {
+    return true
+  }
+  const message = typeof candidate?.message === 'string' ? candidate.message : String(error ?? '')
+  return /\b(?:SQLITE_BUSY|SQLITE_LOCKED)\b|database (?:is )?(?:busy|locked)|timed?\s*out|transaction already closed|write conflict|deadlock/i.test(message)
 }
 
 function encodeBattleAuthorityCheckpointSeed(seed: number): number {
@@ -535,6 +568,7 @@ export async function initializeBattleAuthorityCheckpoint(input: {
   stateHash: string
   publicHash: string
 }): Promise<void> {
+  await setBattleAuthoritySqliteBusyTimeout()
   const roomId = normalizeRoomId(input.room.id)
   const authorityVersion = roomBattleAuthorityVersion(input.room)
   const transitionHash = createBattleAuthorityGenesisHash({

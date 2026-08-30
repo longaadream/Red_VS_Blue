@@ -100,12 +100,15 @@ function diffValue(
 ): void {
   if (Object.is(before, after)) return
   if (Array.isArray(before) && Array.isArray(after)) {
-    if (before.length !== after.length) {
-      patch.push({ op: 'set', path, value: cloneJson(after) })
-      return
-    }
-    for (let index = 0; index < after.length; index += 1) {
+    const sharedLength = Math.min(before.length, after.length)
+    for (let index = 0; index < sharedLength; index += 1) {
       diffValue(before[index], after[index], [...path, index], patch)
+    }
+    for (let index = sharedLength; index < after.length; index += 1) {
+      patch.push({ op: 'set', path: [...path, index], value: cloneJson(after[index]) })
+    }
+    for (let index = before.length - 1; index >= after.length; index -= 1) {
+      patch.push({ op: 'remove', path: [...path, index] })
     }
     return
   }
@@ -152,11 +155,14 @@ function applyOperation(root: unknown, operation: BattlePatchOperation): unknown
   }
   const key = operation.path.at(-1)!
   if (Array.isArray(parent)) {
-    if (!Number.isSafeInteger(key) || Number(key) < 0 || Number(key) >= parent.length) {
+    const arrayIndex = Number(key)
+    const highestAllowedIndex = operation.op === 'set' ? parent.length : parent.length - 1
+    if (!Number.isSafeInteger(key) || arrayIndex < 0 || arrayIndex > highestAllowedIndex) {
       throw invalidPatch('Battle patch array index is invalid', { path: operation.path })
     }
-    if (operation.op === 'remove') parent.splice(Number(key), 1)
-    else parent[Number(key)] = cloneJson(operation.value)
+    if (operation.op === 'remove') parent.splice(arrayIndex, 1)
+    else if (arrayIndex === parent.length) parent.push(cloneJson(operation.value))
+    else parent[arrayIndex] = cloneJson(operation.value)
     return root
   }
   if (typeof key !== 'string') throw invalidPatch('Battle patch object key must be a string', { path: operation.path })

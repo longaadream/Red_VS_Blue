@@ -432,12 +432,16 @@ interface ServerCore {
   并核对缓存前态与 Runner 独立产出的 canonical pre/post hash/trace 证据，再同步提交内存版本、receipt、
   Δ 和 hash 链。完整内部/公开 Δ 回放与 `nextStorage` 等价比较由同一 journal writer 在落库前严格串行
   审计一次；审计失败将房间 degraded、丢弃 durable job 并拒绝后续异步提交。普通动作不读写 Prisma。
-- 后台持久化：`lib/server/battle-authority-async-journal.ts` 提供单 writer、有界队列、有界重试、按房间
+- 后台持久化：`lib/server/battle-authority-async-journal.ts` 提供单 writer、有界队列、可恢复错误分类、按房间
   durable 水位和 degraded 状态；`lib/server/battle-authority-persistence.ts` 在后台原子推进 DB 版本并写
-  Transition、Receipt 和可选 Checkpoint。SQLite `busy_timeout=500 ms`、Prisma `maxWait=250 ms` 与
-  transaction `timeout=1250 ms` 先限制底层写，journal 2 秒只作为最终安全线；安全线触发会 degraded/abort，
-  但在旧 adapter 实际结束前绝不开始下一房间，避免 `Promise.race` 造成并发 SQLite writer。终局完整
-  Trace 在 Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
+  Transition、Receipt 和可选 Checkpoint。SQLite 首次写前设置 WAL，每笔写设置 `busy_timeout=500 ms`；
+  Prisma `maxWait=250 ms`、transaction `timeout=1250 ms` 和 journal 2 秒安全线限制底层写。锁、等待和
+  timeout 保留当前 job，按 25/100/250 ms 后以 250 ms 封顶退避；旧 adapter 实际结束前绝不重试或开始
+  下一房间。审计/hash/版本、约束、损坏、I/O 和队列溢出才 degraded 并暂停新动作。终局完整 Trace 在
+  Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
+- 补丁：`lib/game/battle-public-patch.ts` 对数组共同前缀递归 diff，尾部逐项 `set` 追加、逆序 `remove`；
+  应用器只允许 `set` 到 `index === length`，拒绝稀疏索引，继续兼容旧整数组 `set`。普通回执不携带回放
+  帧或完整快照；checkpoint 仍只在换回合、终局和每 20 个权威版本建立。
 - 启动/关闭：v2 初始检查点是进入 in-progress 的必要条件；创建失败必须 CAS 回滚，version 0 的半启动
   房间再次进入启动入口时先补检查点并 hydrate actor。`battle-authority-shutdown.ts` 在关闭 journal ingress、
   停止 WS 后排空全局 writer，并核对每个 actor 的 durable 水位。Electron 通过子进程 IPC 等待该结果，

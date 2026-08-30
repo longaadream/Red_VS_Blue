@@ -161,7 +161,12 @@ RED-109 将 Windows LAN 普通动作从“完整 Room JSON CAS + 完整 stateUpd
 
 初始 checkpoint 建立后，在线裁决只读取每房间内存权威。Prisma/SQLite 在单一后台 writer 中按序保存
 Transition Δ、receipt 和周期 checkpoint；其 `durableAuthorityVersion` 可以落后于在线版本，失败时显式
-进入 degraded。候选不承诺断电前尚未 durable 的动作零丢失，但数据库写锁不再阻塞游戏 ACK。
+区分瞬时恢复和永久 degraded。SQLite 使用 WAL；锁/事务超时保留队首 job 并退避重试，审计、hash、
+约束、损坏、I/O 或队列溢出才暂停房间。WAL 不是应用层持久化队列，因此仍不承诺强杀/断电前尚未
+durable 的动作零丢失，但数据库写锁不再阻塞游戏 ACK。
+
+内部和公开数组 patch 对尾部做逐项追加/逆序删除，避免累计 `actions` 每次整体复制；客户端完整快照
+仍只用于初始化、重连和 hash 恢复。checkpoint 节奏保持换回合、终局和每 20 个权威版本。
 
 规则/技能 JSON 默认按服务进程缓存；显式内容刷新会清缓存。每步 Trace 进入 append-only journal，热状态
 只保留确定性游标和序号，终局再物化完整 Trace v2。具体协议、恢复、性能门槛和回退见

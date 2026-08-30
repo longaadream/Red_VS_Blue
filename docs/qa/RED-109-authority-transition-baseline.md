@@ -69,13 +69,16 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
   设置 `RVB_TURN_TIMER_ENABLED=1`。三个开关默认关闭，不能把回退链路误记为异步候选验收。
 - `battle-authority-async-journal.test.ts` 直接断言 `enqueue()` 返回时 durable writer 尚未调用；writer 在
   下一事件循环才开始 Prisma 与序列化，确保 checkpoint JSON 不会偷跑进 ACK 当前调用栈。
-  cooperative 写在 2 秒安全线 abort 后进入 degraded 并继续后续房间；不响应取消的 adapter 在真正结束前
-  不会启动下一笔，防止 Promise timeout 制造物理并发。生产 Prisma 写另有更短的 SQLite 500 ms
-  `busy_timeout`、250 ms `maxWait` 与 1250 ms transaction timeout。
+  cooperative 写在安全线 abort 后可作为瞬时错误保留并重试；不响应取消但最终成功的 adapter 保持
+  pending，真正结束前不会启动下一笔，防止 Promise timeout 制造物理并发。确定性 audit/不可恢复写错误
+  仍立即 degraded。生产 Prisma 写另有更短的 SQLite 500 ms `busy_timeout`、250 ms `maxWait` 与 1250 ms
+  transaction timeout。
 - `battle-authority-async-sqlite.test.ts` 使用隔离的真实 SQLite schema 连续提交并排空 20 条 Δ，核对
   20 条 Transition、20 条 receipt 与 2 个有界 checkpoint；清空进程内 Room Actor 后，从数据库恢复到
-  同一版本、state hash 与 transition hash 链头；另用第二个真实 Prisma client 持有 SQLite 写锁，验证
-  A 房在原生期限内 degraded、B 房随后 durable，且不会因 safety timeout 与 A 的旧写重叠。
+  同一版本、state hash 与 transition hash 链头；数据库报告 `journal_mode=wal`。另用第二个真实 Prisma
+  client 持有 SQLite 写锁，验证 A/B 两房保持 pending、不重叠写，并在锁释放后按序全部 durable。
+- `battle-public-patch.test.ts` 使用 150 条既有战斗日志验证新增一条只生成一个末尾索引 `set`，补丁小于
+  200 B；同时覆盖逆序尾删、既有元素修改、旧整数组 patch 兼容、稀疏索引拒绝和 post-public hash 一致。
 - `BattleAuthorityCheckpoint.seed` 只在 Prisma `Int` 边界使用有符号 32 位二进制编码；规则状态、
   `stateJson`、协议与随机运行时始终保留原始 uint32 seed。兼容迁移会把候选版本曾写入的
   `2147483648..4294967295` 规范化为相同 32 位比特的负数，恢复时再还原并与 `stateJson.seed`
@@ -91,7 +94,8 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
 - 候选明确不承诺断电前 `battleAuthorityVersion - durableAuthorityVersion` 区间零丢失；优雅关闭、终局
   和房间删除应先排空日志，恢复只重放到数据库已持久化的版本与 hash 链头。
 - 真实 Electron 人工验收还须覆盖：有 pending 动作时正常关闭/重启服务端，确认日志出现 durable drain
-  成功且恢复版本等于关闭前版本；再用受控故障令 journal degraded，确认关闭明确失败而不是伪成功。
+  成功且恢复版本等于关闭前版本；再用受控瞬时锁确认 pending 自动追平，并用不可恢复故障确认 degraded
+  会暂停房间且关闭明确失败，而不是伪成功。
 
 最终原始输出由测试写入 `.tmp-red109/legacy-authority-benchmark.json` 与
 `.tmp-red109/candidate-authority-benchmark.json`；临时原始文件不提交，PR 保留本表与可重复测试。

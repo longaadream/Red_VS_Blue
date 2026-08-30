@@ -36,13 +36,15 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    ACK 前只执行不随完整状态大小增长的提交边界校验；完整内部/公开 Δ 回放由同一个串行 journal
    writer 在落库前审计一次，不能回到在线 ACK 热路径。
    Transition journal 只保存命令、receipt、内部/公开 Δ 与 hash 证据；一个有界后台 writer 按原顺序
-   把这些记录写入现有原子数据库事务，避免多个后台写者自行制造 SQLite 写锁竞争。
-7. 持久化公开 `durableAuthorityVersion` 和 `durable | pending | degraded` 状态。后台写失败按有界次数
-   重试。每笔 Prisma 写先设置 SQLite 500 ms `busy_timeout`，interactive transaction 的 `maxWait=250 ms`
-   与 `timeout=1250 ms` 均早于 journal 的 2 秒安全线。若安全线仍触发，房间立即标为 degraded 并发出
-   cooperative abort，但 writer 必须等旧 adapter 确认物理写已经结束后才开始下一房间，绝不靠
-   `Promise.race` 制造重叠写；生产 Prisma 原生期限保证它有界结束。超过上限后房间继续以内存状态裁决
-   并明确标为 degraded，不把已经应用的动作伪装成失败。
+   把这些记录写入现有原子数据库事务，避免多个后台写者自行制造 SQLite 写锁竞争。数组 Δ 对共同前缀
+   逐项比较、对尾部逐项追加或逆序删除，不能因为 `actions` 增加一条就替换整段历史。
+7. 持久化公开 `durableAuthorityVersion` 和 `durable | pending | degraded` 状态。SQLite 首次权威写前切换为
+   WAL；每笔 Prisma 写仍设置 500 ms `busy_timeout`，interactive transaction 的 `maxWait=250 ms` 与
+   `timeout=1250 ms` 均早于 journal 的 2 秒安全线。`SQLITE_BUSY/LOCKED`、Prisma 等待/事务超时和
+   journal safety timeout 属于瞬时故障：当前 job 保留在队首，状态保持 pending 并携带 `lastError`，按
+   `25/100/250 ms` 后以 250 ms 封顶退避，直到数据库恢复；同一 writer 在旧 adapter 确认物理结束前
+   绝不开始重试或下一房间，避免 `Promise.race` 制造重叠写。确定性审计/hash/版本错误、约束/损坏/
+   I/O 等不可恢复错误和队列上限溢出才进入 degraded、丢弃该房间后续 durable job 并拒绝新动作。
    队列有每房间上限；房间删除前必须排空，排空失败必须拒绝删除并向调用方返回错误。终局尝试
    排空并记录失败。
 8. 初始检查点仍同步建立，且与从 waiting/ready 切换到 in-progress 共同构成启动不变量：检查点失败时
@@ -51,7 +53,8 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    关闭检查点随 Transition 在后台生成和写入。
    重启恢复只承诺恢复到数据库中已持久化的权威水位：从最近检查点开始应用内部 Δ，逐条验证
    pre/post state/public hash、action hash、previous transition hash 和 transition hash。缺检查点、缺号、
-   损坏或未到持久化目标版本必须显式失败，不能静默使用部分状态。候选阶段明确不承诺断电前尚未
+   损坏或未到持久化目标版本必须显式失败，不能静默使用部分状态。SQLite WAL 只改善已进入 SQLite
+   事务后的读写并发和崩溃恢复，不是应用层 durable ingress；候选阶段仍不承诺进程被强杀或断电前尚未
    durable 的内存动作零丢失。
 9. 热状态只保留确定性随机游标、动作/回放序号和初始化事实；每步 Trace、命令和回放帧追加到
    Transition journal。终局在构造 Transition 前重新物化 ADR-0016 要求的完整 Trace v2，使在线 patch/hash、checkpoint 与重启恢复共享同一终局状态，不降低回放事实完整性。
@@ -89,6 +92,8 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 - 本机 LAN 候选构建端到端目标：P50 ≤ 50 ms、P95 ≤ 100 ms、P99 ≤ 150 ms；正常动作 < 250 ms。
 - 阻塞后台数据库事务时，预热后的完整 `dispatch → receipt` P95 仍必须 < 100 ms；后台 durable 水位
   可以滞后，但不能阻塞同房间下一条规则命令。
+- 100 条以上 `actions` 增加一条记录时，公开/内部 patch 只携带新增索引和值，载荷不得随既有日志总量
+  线性增长；桌面与 Android 浏览器引擎必须从同一源码生成并支持该追加操作。
 - 服务端基准不能代签端到端指标；人工验收必须使用 `window.__RVB_AUTHORITY_PERF__.summary()` 的
   精确回执样本，并分别覆盖部署、普通动作、回合开始目标与选项、计时器插队和断线恢复。
 
@@ -97,6 +102,7 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 1. 先删除 `RVB_BATTLE_ASYNC_JOURNAL` 或设为 `0`，即可保留 v2 协议并恢复 ACK 前数据库原子提交；
    再删除 `RVB_BATTLE_AUTHORITY_V2` 或设为 `0`，回退完整 Room CAS 与 `stateUpdate`。客户端协议信封仍可被入口解析，但不依赖增量 Transition。
 2. 完整代码回退应整体 revert RED-109，不得只撤销客户端 patch 或服务端 journal 其中一侧。
+   RED-131 的 WAL/数组补丁扩展同样必须同时回退服务端源码与两个客户端生成 bundle。
 3. 迁移回退前必须先停止服务并确认不再有 v2 写入；保留/导出需要的 Trace 和对局证据，再删除新增
    Transition、Receipt、Checkpoint 表和 `battleAuthorityVersion` 列。不得在运行中直接降 schema。
 4. RED-107 的 `start + pending` 计时器合法等待态修复不属于本 ADR 的回退范围。
@@ -106,8 +112,8 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 - 协调器：同房间 FIFO、跨房间并行、背压、失败后继续。
 - 协议：精确回执、重复零写、旧版本 resync、patch 前后 hash、危险路径拒绝。
 - 内存/耐久边界：阻塞或失败的 SQLite 不阻塞 applied receipt；durable 水位按序推进；数据库原生锁等待/
-  事务期限早于 journal 安全线，超时 adapter 未真正结束前不得启动下一写；版本 0 基准检查点、启动失败
-  回滚、检查点/Transition 连续恢复与损坏拒绝。
+  事务期限早于 journal 安全线，瞬时失败保留并按序恢复，超时 adapter 未真正结束前不得启动下一写；
+  版本 0 基准检查点、启动失败回滚、检查点/Transition 连续恢复与损坏拒绝。
 - ACK/audit 边界：篡改版本、链头、action/transition hash 或 Runner pre/post 证据必须在 ACK 前拒绝；
   篡改但重新封装过的内部 Δ 必须在 journal 完整回放审计中 degraded，且不得进入 Prisma。
 - Hash provider：Node 原生 provider 与纯 JavaScript 实现在固定向量、随机 Unicode 和真实状态上 digest
