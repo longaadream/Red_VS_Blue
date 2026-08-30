@@ -117,6 +117,7 @@
 - [`ADR-0018-content-pipeline-v1.md`](./ADR-0018-content-pipeline-v1.md)：已接受以统一开放包、确定性 Resolved Profile 与声明式 PVE 合同支撑第一方和社区内容管线（RED-111、RED-113）。
 - [`ADR-0019-selectable-demo-maps.md`](./ADR-0019-selectable-demo-maps.md)：正式 Demo 使用受控四图目录、房间冻结选择并在所有传输边界失败关闭（RED-119，已接受）。
 - [`ADR-0021-autonomous-server-operations.md`](./ADR-0021-autonomous-server-operations.md)：Windows 自治 Server 的公开发行、受信本地运维、备份更新与回退边界（RED-140，已接受；取代 ADR-0003）。
+- [`ADR-0021-deterministic-effect-batch-queues.md`](./ADR-0021-deterministic-effect-batch-queues.md)：提议只允许 Damage、Heal、Summon、Death 使用确定性 Batch，并以动作级共享 FIFO 调度后续效果（RED-139，提议中）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 
