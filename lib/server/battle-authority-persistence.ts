@@ -4,7 +4,12 @@ import {
   type BattleAuthorityJournalInspection,
 } from './battle-authority-async-journal'
 import { installNativeBattleSha256 } from './battle-hash'
-import { hashPublicBattleState } from '../game/battle-public-patch'
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+  hashPublicBattleState,
+  type BattleAuthorityProtocolVersion,
+} from '../game/battle-public-patch'
 import {
   getBattleStorage,
   validateServerBattleStateV1,
@@ -48,7 +53,9 @@ const persistenceGlobal = globalThis as typeof globalThis & {
   __rvbAuthorityRoomCacheV2?: Map<string, CachedAuthorityRoom>
   __rvbAuthorityReceiptCacheV2?: Map<string, Map<string, BattleAuthorityReceipt>>
   __rvbAuthorityHistoryCacheV2?: Map<string, CachedAuthorityHistory>
+  __rvbAuthorityProtocolCacheV3?: Map<string, BattleAuthorityProtocolVersion>
   __rvbAuthorityAsyncJournalV2?: BattleAuthorityAsyncJournal
+  __rvbAuthoritySqliteWalPromiseV2?: Promise<void>
 }
 
 const authorityRoomCache = (
@@ -60,8 +67,13 @@ const authorityReceiptCache = (
 const authorityHistoryCache = (
   persistenceGlobal.__rvbAuthorityHistoryCacheV2 ??= new Map<string, CachedAuthorityHistory>()
 )
+const authorityProtocolCache = (
+  persistenceGlobal.__rvbAuthorityProtocolCacheV3
+    ??= new Map<string, BattleAuthorityProtocolVersion>()
+)
 const authorityAsyncJournal = (
   persistenceGlobal.__rvbAuthorityAsyncJournalV2 ??= new BattleAuthorityAsyncJournal({
+    isRetryablePersistError: isRetryableBattleAuthorityPersistenceError,
     onStateChange: updateCachedPersistenceState,
   })
 )
@@ -319,6 +331,7 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
     return true
   }, BATTLE_AUTHORITY_PRISMA_TRANSACTION_OPTIONS)
   if (committed) {
+    authorityProtocolCache.set(roomId, input.transition.protocolVersion)
     rememberBattleAuthorityRoom({
       ...input.nextRoom,
       battleAuthorityVersion: input.expectedVersion + 1,
@@ -329,7 +342,38 @@ async function persistBattleAuthorityTransitionAtomic(input: CommitBattleAuthori
 }
 
 async function setBattleAuthoritySqliteBusyTimeout(): Promise<void> {
+  await ensureBattleAuthoritySqliteWal()
   await prisma.$queryRawUnsafe(`PRAGMA busy_timeout = ${BATTLE_AUTHORITY_SQLITE_BUSY_TIMEOUT_MS}`)
+}
+
+async function ensureBattleAuthoritySqliteWal(): Promise<void> {
+  const existing = persistenceGlobal.__rvbAuthoritySqliteWalPromiseV2
+  if (existing) return existing
+  const configuring = (async () => {
+    await prisma.$queryRawUnsafe('PRAGMA journal_mode = WAL')
+  })()
+  persistenceGlobal.__rvbAuthoritySqliteWalPromiseV2 = configuring
+  try {
+    await configuring
+  } catch (error) {
+    if (persistenceGlobal.__rvbAuthoritySqliteWalPromiseV2 === configuring) {
+      delete persistenceGlobal.__rvbAuthoritySqliteWalPromiseV2
+    }
+    throw error
+  }
+}
+
+export function isRetryableBattleAuthorityPersistenceError(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'BattleAuthorityJournalPersistTimeoutError') {
+    return true
+  }
+  const candidate = error as { code?: unknown; message?: unknown }
+  const code = typeof candidate?.code === 'string' ? candidate.code.toUpperCase() : ''
+  if (['P1008', 'P2024', 'P2028', 'P2034', 'SQLITE_BUSY', 'SQLITE_LOCKED'].includes(code)) {
+    return true
+  }
+  const message = typeof candidate?.message === 'string' ? candidate.message : String(error ?? '')
+  return /\b(?:SQLITE_BUSY|SQLITE_LOCKED)\b|database (?:is )?(?:busy|locked)|timed?\s*out|transaction already closed|write conflict|deadlock/i.test(message)
 }
 
 function encodeBattleAuthorityCheckpointSeed(seed: number): number {
@@ -410,6 +454,7 @@ function pinnedAuthorityError(message: string): Error {
 
 function assertBattleAuthorityTransitionMetadata(input: CommitBattleAuthorityTransitionInput): string {
   const roomId = normalizeRoomId(input.roomId)
+  const existingProtocolVersion = authorityProtocolCache.get(roomId)
   const nextStorage = getBattleStorage(input.nextRoom)
   if (!nextStorage) {
     throw pinnedAuthorityError(`Battle authority next state is missing in ${roomId}`)
@@ -426,12 +471,20 @@ function assertBattleAuthorityTransitionMetadata(input: CommitBattleAuthorityTra
     || input.transition.fromVersion !== input.expectedVersion
     || input.transition.toVersion !== input.expectedVersion + 1
     || input.transition.receipt.authorityVersion !== input.transition.toVersion
+    || input.transition.protocolVersion !== BATTLE_AUTHORITY_PROTOCOL_VERSION
+    || input.transition.authorityBuildId !== BATTLE_AUTHORITY_BUILD_ID
+    || input.transition.receipt.protocolVersion !== input.transition.protocolVersion
+    || input.transition.receipt.authorityBuildId !== input.transition.authorityBuildId
+    || (existingProtocolVersion !== undefined
+      && existingProtocolVersion !== input.transition.protocolVersion)
     || (input.baseCheckpoint && (
       input.baseCheckpoint.roomId !== roomId
       || input.baseCheckpoint.authorityVersion !== input.expectedVersion
       || input.baseCheckpoint.stateHash !== input.transition.preStateHash
       || input.baseCheckpoint.publicHash !== input.transition.prePublicHash
       || input.baseCheckpoint.transitionHash !== input.transition.previousTransitionHash
+      || input.baseCheckpoint.protocolVersion !== input.transition.protocolVersion
+      || input.baseCheckpoint.authorityBuildId !== input.transition.authorityBuildId
     ))
     || (input.checkpoint && (
       input.checkpoint.roomId !== roomId
@@ -439,8 +492,18 @@ function assertBattleAuthorityTransitionMetadata(input: CommitBattleAuthorityTra
       || input.checkpoint.stateHash !== input.transition.postStateHash
       || input.checkpoint.publicHash !== input.transition.postPublicHash
       || input.checkpoint.transitionHash !== input.transition.transitionHash
+      || input.checkpoint.protocolVersion !== input.transition.protocolVersion
+      || input.checkpoint.authorityBuildId !== input.transition.authorityBuildId
     ))
   ) {
+    if (
+      existingProtocolVersion !== undefined
+      && existingProtocolVersion !== input.transition.protocolVersion
+    ) {
+      throw new Error(
+        `Battle authority protocol upgrade required in ${roomId}: room uses v${existingProtocolVersion}, server writes v${input.transition.protocolVersion}`,
+      )
+    }
     throw new Error('Battle authority transition metadata does not match the atomic commit boundary')
   }
   return roomId
@@ -497,6 +560,7 @@ function commitBattleAuthorityTransitionInMemory(
   }
   rememberAuthorityReceipt(input.transition.receipt)
   rememberAuthorityTransition(input.transition)
+  authorityProtocolCache.set(roomId, input.transition.protocolVersion)
   rememberBattleAuthorityRoom(committedRoom)
   return true
 }
@@ -572,6 +636,8 @@ function auditInMemoryBattleAuthorityTransition(
   const replayedStorage = replayBattleAuthorityTransitions({
     roomId,
     checkpointStorage: previousStorage,
+    checkpointProtocolVersion: transition.protocolVersion,
+    checkpointAuthorityBuildId: transition.authorityBuildId,
     checkpointVersion: input.expectedVersion,
     checkpointStateHash: transition.preStateHash,
     checkpointPublicHash: transition.prePublicHash,
@@ -593,6 +659,7 @@ export async function initializeBattleAuthorityCheckpoint(input: {
   stateHash: string
   publicHash: string
 }): Promise<void> {
+  await setBattleAuthoritySqliteBusyTimeout()
   const storage = validateServerBattleStateV1(input.storage)
   const roomId = normalizeRoomId(input.room.id)
   const authorityVersion = roomBattleAuthorityVersion(input.room)
@@ -605,7 +672,7 @@ export async function initializeBattleAuthorityCheckpoint(input: {
   await prisma.battleAuthorityCheckpoint.upsert({
     where: { roomId_authorityVersion: { roomId, authorityVersion } },
     update: {
-      protocolVersion: 2,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
       seed: persistedSeed,
       stateJson: JSON.stringify(storage),
       stateHash: input.stateHash,
@@ -616,7 +683,7 @@ export async function initializeBattleAuthorityCheckpoint(input: {
     create: {
       roomId,
       authorityVersion,
-      protocolVersion: 2,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
       seed: persistedSeed,
       stateJson: JSON.stringify(storage),
       stateHash: input.stateHash,
@@ -628,6 +695,7 @@ export async function initializeBattleAuthorityCheckpoint(input: {
   authorityAsyncJournal.markDurable(roomId, authorityVersion)
   authorityReceiptCache.set(roomId, new Map())
   authorityHistoryCache.set(roomId, { hydrated: true, transitions: [] })
+  authorityProtocolCache.set(roomId, BATTLE_AUTHORITY_PROTOCOL_VERSION)
   rememberBattleAuthorityRoom({ ...input.room, battleAuthorityTransitionHash: transitionHash })
 }
 
@@ -650,6 +718,11 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
   if (!checkpoint) return room
 
   const checkpointStorage = validateServerBattleStateV1(JSON.parse(checkpoint.stateJson))
+  const checkpointProtocolVersion = assertBattleAuthorityProtocolVersion(
+    checkpoint.protocolVersion,
+    roomId,
+    checkpoint.authorityVersion,
+  )
   assertBattleAuthorityCheckpointSeed(
     roomId,
     checkpoint.authorityVersion,
@@ -662,6 +735,7 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
           roomId,
           stateHash: checkpoint.stateHash,
           publicHash: checkpoint.publicHash,
+          protocolVersion: checkpointProtocolVersion,
         })
       : ''
   )
@@ -686,6 +760,8 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
   const storage = validateServerBattleStateV1(replayBattleAuthorityTransitions({
     roomId,
     checkpointStorage,
+    checkpointProtocolVersion,
+    checkpointAuthorityBuildId: authorityBuildIdForProtocol(checkpointProtocolVersion),
     checkpointVersion: checkpoint.authorityVersion,
     checkpointStateHash: checkpoint.stateHash,
     checkpointPublicHash: checkpoint.publicHash,
@@ -698,6 +774,11 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
         roomId,
         transition.toVersion,
       ),
+      authorityBuildId: authorityBuildIdForProtocol(assertBattleAuthorityProtocolVersion(
+        transition.protocolVersion,
+        roomId,
+        transition.toVersion,
+      )),
       roomId: transition.roomId,
       fromVersion: transition.fromVersion,
       toVersion: transition.toVersion,
@@ -724,6 +805,7 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
     battleState: storage as unknown as Room['battleState'],
     battleAuthorityTransitionHash: targetTransitionHash,
   }
+  authorityProtocolCache.set(roomId, checkpointProtocolVersion)
   const state = storage.state as BattleState
   if (state.terminalResult) {
     materializeBattleTraceForTerminal(state, allTransitions.flatMap(transition => transitionHistoryEntries(
@@ -796,6 +878,7 @@ export function forgetBattleAuthorityRoom(roomId: string): void {
   authorityRoomCache.delete(normalizedRoomId)
   authorityReceiptCache.delete(normalizedRoomId)
   authorityHistoryCache.delete(normalizedRoomId)
+  authorityProtocolCache.delete(normalizedRoomId)
   authorityAsyncJournal.forgetRoom(normalizedRoomId)
 }
 
@@ -833,13 +916,21 @@ function assertBattleAuthorityProtocolVersion(
   protocolVersion: number,
   roomId: string,
   toVersion: number,
-): 2 {
-  if (protocolVersion !== 2) {
+): BattleAuthorityProtocolVersion {
+  if (protocolVersion !== 2 && protocolVersion !== BATTLE_AUTHORITY_PROTOCOL_VERSION) {
     throw new Error(
       `Battle authority protocol version mismatch in ${roomId} at ${toVersion}: ${protocolVersion}`,
     )
   }
   return protocolVersion
+}
+
+function authorityBuildIdForProtocol(
+  protocolVersion: BattleAuthorityProtocolVersion,
+): typeof BATTLE_AUTHORITY_BUILD_ID | undefined {
+  return protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+    ? BATTLE_AUTHORITY_BUILD_ID
+    : undefined
 }
 
 function rememberAuthorityReceipt(receipt: BattleAuthorityReceipt): void {
@@ -909,12 +1000,26 @@ function parseTransitionRow(transition: {
   return {
     ...transition,
     protocolVersion: assertBattleAuthorityProtocolVersion(transition.protocolVersion, transition.roomId, transition.toVersion),
+    authorityBuildId: authorityBuildIdForProtocol(
+      assertBattleAuthorityProtocolVersion(transition.protocolVersion, transition.roomId, transition.toVersion),
+    ),
     command: commands[0],
     commands,
     internalPatch: JSON.parse(transition.internalPatch),
     publicPatch: JSON.parse(transition.publicPatch),
     receipt: authorityReceiptCache.get(transition.roomId)?.get(transition.clientActionId) ?? {
-      protocolVersion: 2,
+      protocolVersion: assertBattleAuthorityProtocolVersion(
+        transition.protocolVersion,
+        transition.roomId,
+        transition.toVersion,
+      ),
+      authorityBuildId: authorityBuildIdForProtocol(
+        assertBattleAuthorityProtocolVersion(
+          transition.protocolVersion,
+          transition.roomId,
+          transition.toVersion,
+        ),
+      ),
       roomId: transition.roomId,
       clientActionId: transition.clientActionId,
       status: 'applied',

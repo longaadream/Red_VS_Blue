@@ -1555,7 +1555,7 @@ function applyBattleActionInternal(
         })
         progressed = resolveTimedOutPendingChain(progressed)
       }
-      return applyBattleActionInternal(progressed, { type: 'beginPhase' })
+      return applySuspendableChildAction(progressed, { type: 'beginPhase' })
     }
 
     case "deploymentChoice": {
@@ -3062,6 +3062,14 @@ function createSuspendableActionTransaction(
         }
       : undefined,
   }
+}
+
+function applySuspendableChildAction(state: BattleState, action: BattleAction): BattleState {
+  return runSuspendableActionTransaction(
+    state,
+    state,
+    createSuspendableActionTransaction(state, action),
+  )
 }
 
 function transactionReplayState(

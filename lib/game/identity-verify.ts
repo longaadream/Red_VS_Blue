@@ -44,6 +44,8 @@ export interface BattleSubscribeAuthEnvelope {
     type: 'battle-subscribe'
     roomId: string
     playerId: string
+    protocolVersion: number
+    authorityBuildId: string
     timestamp: number
   }
   signature: string

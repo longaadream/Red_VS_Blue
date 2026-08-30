@@ -367,14 +367,24 @@ window.__RVB_AUTHORITY_PERF__.clear()
 - `queueMs` 高：同房间有慢命令或事件积压；检查队列 active/pending 和 timer/bot 命令。
 - `rulesMs` 高：检查是否误设 `RVB_FORCE_RULE_RELOAD=1`、是否存在未缓存动态规则或异常候选枚举。
 - `persistenceMs` 高：检查内存 clone/diff/hash 和日志背压；async 模式不应包含 SQLite 等待。
-- `persistenceStatus=pending`：在线版本已经确认，后台 durable 水位尚未追上；短暂出现正常。
-- `persistenceStatus=degraded`：后台写入超过重试上限或队列溢出。立即保留 roomId、在线/耐久版本、
-  `lastError` 和 Prisma 日志；不要把已应用动作重发成新 ID。当前候选继续以内存状态裁决。
-- Prisma `P2028`：async 模式下属于后台耐久故障，不应让 ACK 延迟 5 秒；若客户端仍卡住，先确认
+- `persistenceStatus=pending`：在线版本已经确认，后台 durable 水位尚未追上；若带 `lastError`，表示
+  writer 正在保留队首 job 并从 SQLite/Prisma 瞬时锁或超时中恢复。每个 job 最多 5 次或 10 秒；记录
+  版本差值、attempt 和错误，但不要重发动作。
+- `persistenceStatus=degraded`：确定性审计/hash/版本错误、约束/损坏/I/O 或队列溢出。立即保留 roomId、
+  在线/耐久版本、`lastError` 和 Prisma 日志；不要把已应用动作重发成新 ID，房间会暂停新动作。
+- Prisma `P2028`：async 模式下属于可恢复的后台耐久故障，会保持 pending 并退避重试，不应让 ACK 延迟
+  5 秒；若客户端仍卡住，先确认
   同时设置了 `RVB_BATTLE_AUTHORITY_V2=1` 与 `RVB_BATTLE_ASYNC_JOURNAL=1`。
+- 长局 patch 变大：检查 Transition 的 `internalPatch` / `publicPatch` 是否出现路径仅为 `actions` 的整数组
+  `set`。正常尾部日志追加应是 `actions,<末尾索引>`；若客户端反复 hash recovery，确认桌面和 Android
+  `game-engine.js` 已由当前源码重建。
 - 服务端低而 `totalMs` 高：检查 WS/Relay 传输、patch hash recovery 和客户端渲染。
 - `resyncRequired`：同时记录客户端/服务端 `battleAuthorityVersion`；不要使用 `Room.version` 判断战斗连续性。
 - `BATTLE_PATCH_*_HASH_MISMATCH` 或版本 gap：保留 roomId、from/to version、前后 hash，完整拉取一次；重复失败应停止对局并检查 checkpoint/journal，不得吞错继续。
+- `BATTLE_PROTOCOL_UNSUPPORTED`：桌面/Android bundle 与服务端不是同一个 v3 authority build；停止重连，
+  同步客户端版本后重新进入，不要降级成 v2 或在同一持久化链混写。
+- `incremental hash mismatch ... fields=...`：分块根与全量重算不一致，字段列表就是首要排查范围；房间必须
+  fail closed。保留 roomId、authorityVersion、build、字段列表与相邻 Transition，禁止跳过审计继续。
 
 本地数据热编辑默认不会逐动作读盘。需要验证显式失效时调用内容工具的 reload；只有针对逐次读盘的专项调试才临时设置
 `RVB_FORCE_RULE_RELOAD=1`。同步文件日志默认关闭，专项排错设置 `RVB_BATTLE_DEBUG_LOGS=1`，采证后关闭。

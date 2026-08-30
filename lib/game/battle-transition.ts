@@ -1,11 +1,23 @@
 import {
   BATTLE_AUTHORITY_PROTOCOL_VERSION,
+  BATTLE_AUTHORITY_BUILD_ID,
   applyBattlePublicPatch,
   createBattlePublicPatch,
   hashPublicBattleState,
+  type BattleAuthorityProtocolVersion,
   type BattlePatchOperation,
 } from './battle-public-patch'
-import { hashBattleState, hashStable, type BattleActionTrace, type BattleReplayFrame } from './battle-trace'
+import {
+  hashBattleStateForProtocol,
+  hashStable,
+  type BattleActionTrace,
+  type BattleReplayFrame,
+} from './battle-trace'
+import {
+  buildBattleStateHashIndex,
+  updateBattleStateHashIndex,
+  type BattleStateHashIndex,
+} from './battle-state-hash'
 import type { ServerBattleState } from './battle-storage'
 import { toPublicBattleState } from './deployment'
 import type { BattleAction, BattleState } from './turn'
@@ -14,6 +26,7 @@ export type BattleAuthorityReceiptStatus = 'applied' | 'duplicate' | 'rejected' 
 
 export interface BattleAuthorityCommandEnvelope {
   protocolVersion: typeof BATTLE_AUTHORITY_PROTOCOL_VERSION
+  authorityBuildId: typeof BATTLE_AUTHORITY_BUILD_ID
   roomId: string
   clientActionId: string
   expectedAuthorityVersion: number
@@ -24,7 +37,8 @@ export interface BattleAuthorityCommandEnvelope {
 }
 
 export interface BattleAuthorityReceipt {
-  protocolVersion: typeof BATTLE_AUTHORITY_PROTOCOL_VERSION
+  protocolVersion: BattleAuthorityProtocolVersion
+  authorityBuildId?: typeof BATTLE_AUTHORITY_BUILD_ID
   roomId: string
   clientActionId: string
   status: BattleAuthorityReceiptStatus
@@ -45,7 +59,8 @@ export interface PublicPendingInteraction {
 }
 
 export interface BattleAuthorityTransitionRecord {
-  protocolVersion: typeof BATTLE_AUTHORITY_PROTOCOL_VERSION
+  protocolVersion: BattleAuthorityProtocolVersion
+  authorityBuildId?: typeof BATTLE_AUTHORITY_BUILD_ID
   roomId: string
   fromVersion: number
   toVersion: number
@@ -70,7 +85,8 @@ export interface BattleAuthorityTransitionRecord {
 }
 
 export interface BattleAuthorityCheckpointRecord {
-  protocolVersion: typeof BATTLE_AUTHORITY_PROTOCOL_VERSION
+  protocolVersion: BattleAuthorityProtocolVersion
+  authorityBuildId?: typeof BATTLE_AUTHORITY_BUILD_ID
   roomId: string
   authorityVersion: number
   seed: number
@@ -122,6 +138,9 @@ export function parseBattleAuthorityEnvelope(
   if (value.protocolVersion !== BATTLE_AUTHORITY_PROTOCOL_VERSION) {
     throw authorityEnvelopeError('BATTLE_PROTOCOL_UNSUPPORTED', 'Unsupported battle authority protocol version')
   }
+  if (value.authorityBuildId !== BATTLE_AUTHORITY_BUILD_ID) {
+    throw authorityEnvelopeError('BATTLE_BUILD_UNSUPPORTED', 'Unsupported battle authority build')
+  }
   const roomId = normalizedString(value.roomId)
   const playerId = normalizedString(value.playerId)
   const clientActionId = normalizedString(value.clientActionId, false)
@@ -139,6 +158,7 @@ export function parseBattleAuthorityEnvelope(
   const command = { ...(value.command as Record<string, unknown>), clientActionId } as unknown as BattleAction
   return {
     protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     roomId,
     clientActionId,
     expectedAuthorityVersion: Number(value.expectedAuthorityVersion),
@@ -165,11 +185,21 @@ export function buildBattleAuthorityTransition(input: {
   traces?: BattleActionTrace[]
   replayFrames?: BattleReplayFrame[]
   previousTransitionHash?: string
+  previousPublicHashIndex?: BattleStateHashIndex
   now: number
 }): BattleAuthorityTransitionRecord {
   const toVersion = input.fromVersion + 1
-  const prePublicHash = hashPublicBattleState(input.previousPublicState)
-  const postPublicHash = hashPublicBattleState(input.nextPublicState)
+  const publicPatch = createBattlePublicPatch(input.previousPublicState, input.nextPublicState)
+  const previousPublicHashIndex = input.previousPublicHashIndex
+    ?? buildBattleStateHashIndex(input.previousPublicState, hashStable)
+  const nextPublicHashIndex = updateBattleStateHashIndex(
+    previousPublicHashIndex,
+    input.nextPublicState,
+    publicPatch,
+    hashStable,
+  ).index
+  const prePublicHash = previousPublicHashIndex.rootHash
+  const postPublicHash = nextPublicHashIndex.rootHash
   const commands = input.commands ?? [input.command]
   const actionHash = hashBattleAuthorityAction({
     roomId: input.roomId,
@@ -189,6 +219,7 @@ export function buildBattleAuthorityTransition(input: {
       )
   const receipt: BattleAuthorityReceipt = {
     protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     roomId: input.roomId,
     clientActionId: input.clientActionId,
     status: 'applied',
@@ -196,6 +227,7 @@ export function buildBattleAuthorityTransition(input: {
   }
   const transition = {
     protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     roomId: input.roomId,
     fromVersion: input.fromVersion,
     toVersion,
@@ -204,7 +236,7 @@ export function buildBattleAuthorityTransition(input: {
     command: input.command,
     commands,
     internalPatch: createBattlePublicPatch(input.previousStorage, input.nextStorage),
-    publicPatch: createBattlePublicPatch(input.previousPublicState, input.nextPublicState),
+    publicPatch,
     preStateHash: input.preStateHash,
     postStateHash: input.postStateHash,
     prePublicHash,
@@ -217,10 +249,12 @@ export function buildBattleAuthorityTransition(input: {
     replayFrames: input.replayFrames ?? [],
     createdAt: input.now,
   }
-  return {
+  const record: BattleAuthorityTransitionRecord = {
     ...transition,
     transitionHash: hashBattleAuthorityTransition(transition),
   }
+  transitionPublicHashIndexes.set(record, nextPublicHashIndex)
+  return record
 }
 
 export function createBattleAuthorityReceipt(input: {
@@ -233,6 +267,7 @@ export function createBattleAuthorityReceipt(input: {
 }): BattleAuthorityReceipt {
   return {
     protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     ...input,
   }
 }
@@ -241,10 +276,15 @@ export function createBattleAuthorityGenesisHash(input: {
   roomId: string
   stateHash: string
   publicHash: string
+  protocolVersion?: BattleAuthorityProtocolVersion
 }): string {
+  const protocolVersion = input.protocolVersion ?? BATTLE_AUTHORITY_PROTOCOL_VERSION
   return hashStable({
     kind: 'battle-authority-genesis',
-    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    protocolVersion,
+    ...(protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+      ? { authorityBuildId: BATTLE_AUTHORITY_BUILD_ID }
+      : {}),
     roomId: input.roomId,
     authorityVersion: 0,
     stateHash: input.stateHash,
@@ -253,13 +293,18 @@ export function createBattleAuthorityGenesisHash(input: {
 }
 
 export function hashBattleAuthorityAction(input: {
+  protocolVersion?: BattleAuthorityProtocolVersion
   roomId: string
   clientActionId: string
   playerId: string
   commands: BattleAction[]
 }): string {
+  const protocolVersion = input.protocolVersion ?? BATTLE_AUTHORITY_PROTOCOL_VERSION
   return hashStable({
-    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    protocolVersion,
+    ...(protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+      ? { authorityBuildId: BATTLE_AUTHORITY_BUILD_ID }
+      : {}),
     roomId: input.roomId,
     clientActionId: input.clientActionId,
     playerId: input.playerId,
@@ -269,6 +314,7 @@ export function hashBattleAuthorityAction(input: {
 
 export function hashBattleAuthorityTransition(input: {
   protocolVersion: number
+  authorityBuildId?: string
   roomId: string
   fromVersion: number
   toVersion: number
@@ -289,6 +335,9 @@ export function hashBattleAuthorityTransition(input: {
   return hashStable({
     kind: 'battle-authority-transition',
     protocolVersion: input.protocolVersion,
+    ...(input.protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+      ? { authorityBuildId: input.authorityBuildId }
+      : {}),
     roomId: input.roomId,
     fromVersion: input.fromVersion,
     toVersion: input.toVersion,
@@ -321,6 +370,8 @@ export function assertBattleAuthorityRestoreCheckpoint<T>(
 export function replayBattleAuthorityTransitions(input: {
   roomId: string
   checkpointStorage: ServerBattleState
+  checkpointProtocolVersion?: BattleAuthorityProtocolVersion
+  checkpointAuthorityBuildId?: string
   checkpointVersion: number
   checkpointStateHash: string
   checkpointPublicHash: string
@@ -330,6 +381,7 @@ export function replayBattleAuthorityTransitions(input: {
   transitions: Array<Pick<
     BattleAuthorityTransitionRecord,
     | 'protocolVersion'
+    | 'authorityBuildId'
     | 'roomId'
     | 'fromVersion'
     | 'toVersion'
@@ -350,13 +402,21 @@ export function replayBattleAuthorityTransitions(input: {
     | 'replayFrames'
   >>
 }): ServerBattleState {
+  const checkpointProtocolVersion = input.checkpointProtocolVersion
+    ?? BATTLE_AUTHORITY_PROTOCOL_VERSION
+  const checkpointAuthorityBuildId = input.checkpointAuthorityBuildId
+    ?? (input.checkpointProtocolVersion === undefined ? BATTLE_AUTHORITY_BUILD_ID : undefined)
   let storage = structuredClone(input.checkpointStorage)
-  const actualCheckpointHash = hashBattleState(storage.state as BattleState)
+  assertAuthorityBuild(checkpointProtocolVersion, checkpointAuthorityBuildId, input.roomId)
+  const actualCheckpointHash = hashBattleStateForProtocol(
+    storage.state as BattleState,
+    checkpointProtocolVersion,
+  )
   if (actualCheckpointHash !== input.checkpointStateHash) {
     throw new Error(`Battle authority checkpoint hash mismatch in ${input.roomId} at ${input.checkpointVersion}`)
   }
   let publicState = toPublicBattleState(storage.state as BattleState)
-  const actualCheckpointPublicHash = hashPublicBattleState(publicState)
+  const actualCheckpointPublicHash = hashPublicBattleState(publicState, checkpointProtocolVersion)
   if (actualCheckpointPublicHash !== input.checkpointPublicHash) {
     throw new Error(`Battle authority checkpoint public hash mismatch in ${input.roomId} at ${input.checkpointVersion}`)
   }
@@ -369,7 +429,7 @@ export function replayBattleAuthorityTransitions(input: {
   )
   for (const transition of input.transitions) {
     if (
-      transition.protocolVersion !== BATTLE_AUTHORITY_PROTOCOL_VERSION
+      transition.protocolVersion !== checkpointProtocolVersion
       || transition.roomId !== input.roomId
       || transition.fromVersion !== expectedVersion
       || transition.toVersion !== expectedVersion + 1
@@ -378,6 +438,12 @@ export function replayBattleAuthorityTransitions(input: {
         `Battle authority transition gap in ${input.roomId}: expected ${expectedVersion + 1}, got ${transition.toVersion}`,
       )
     }
+    assertAuthorityBuild(
+      transition.protocolVersion,
+      transition.authorityBuildId,
+      input.roomId,
+      transition.toVersion,
+    )
     if (transition.preStateHash !== expectedStateHash) {
       throw new Error(`Battle authority transition pre-state hash mismatch in ${input.roomId} at ${transition.toVersion}`)
     }
@@ -396,12 +462,12 @@ export function replayBattleAuthorityTransitions(input: {
       throw new Error(`Battle authority transition hash mismatch in ${input.roomId} at ${transition.toVersion}`)
     }
     storage = applyBattlePublicPatch(storage, transition.internalPatch)
-    const actualHash = hashBattleState(storage.state as BattleState)
+    const actualHash = hashBattleStateForProtocol(storage.state as BattleState, transition.protocolVersion)
     if (actualHash !== transition.postStateHash) {
       throw new Error(`Battle authority transition state hash mismatch in ${input.roomId} at ${transition.toVersion}`)
     }
     publicState = applyBattlePublicPatch(publicState, transition.publicPatch)
-    const actualPublicHash = hashPublicBattleState(publicState)
+    const actualPublicHash = hashPublicBattleState(publicState, transition.protocolVersion)
     if (actualPublicHash !== transition.postPublicHash) {
       throw new Error(`Battle authority transition public hash mismatch in ${input.roomId} at ${transition.toVersion}`)
     }
@@ -417,6 +483,14 @@ export function replayBattleAuthorityTransitions(input: {
     throw new Error(`Battle authority room chain head mismatch in ${input.roomId} at ${input.targetVersion}`)
   }
   return storage
+}
+
+const transitionPublicHashIndexes = new WeakMap<BattleAuthorityTransitionRecord, BattleStateHashIndex>()
+
+export function readBattleAuthorityTransitionPublicHashIndex(
+  transition: BattleAuthorityTransitionRecord,
+): BattleStateHashIndex | undefined {
+  return transitionPublicHashIndexes.get(transition)
 }
 export function checkpointReasonForTransition(
   previousState: BattleState,
@@ -474,4 +548,20 @@ function normalizedString(value: unknown, lowerCase = true): string {
 
 function authorityEnvelopeError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code })
+}
+
+function assertAuthorityBuild(
+  protocolVersion: BattleAuthorityProtocolVersion,
+  authorityBuildId: unknown,
+  roomId: string,
+  authorityVersion = 0,
+): void {
+  if (
+    protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+    && authorityBuildId !== BATTLE_AUTHORITY_BUILD_ID
+  ) {
+    throw new Error(
+      `Battle authority build mismatch in ${roomId} at ${authorityVersion}: ${String(authorityBuildId)}`,
+    )
+  }
 }

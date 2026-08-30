@@ -11,11 +11,13 @@ import { broadcastBattleTransition, startWsServer } from '../lib/ws-server'
 import { getRoomStore, type Room } from '../lib/game/room-store'
 import { getServerGameProfileIdentityV1 } from '../lib/content-pipeline/runtime/profile-game-identity'
 import { makeState } from './helpers/minimal-state'
+import { createTestServerBattleState } from './game/profile-test-identity'
 
 const globalWithWsServer = globalThis as typeof globalThis & {
   __rvbWss?: WebSocketServer | null
   __rvbWsUpgradeHandler?: (request: IncomingMessage, socket: Duplex, head: Buffer) => void
   __rvbRoomClients?: Map<string, Set<WebSocket>>
+  __rvbPlayerWs?: Map<string, WebSocket>
   __rvbWsIdentities?: WeakMap<WebSocket, { roomId: string; playerId?: string }>
 }
 
@@ -70,6 +72,35 @@ function waitForJsonMessage(client: WebSocket): Promise<Record<string, unknown>>
     })
   })
 }
+
+function waitForJsonType(client: WebSocket, type: string): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const timeout = rejectAfterTimeout(reject, type)
+    const onError = (error: Error) => {
+      clearTimeout(timeout)
+      client.off('message', onMessage)
+      reject(error)
+    }
+    const onMessage = (raw: RawData) => {
+      try {
+        const message = JSON.parse(raw.toString()) as Record<string, unknown>
+        if (message.type !== type) return
+        clearTimeout(timeout)
+        client.off('message', onMessage)
+        client.off('error', onError)
+        resolve(message)
+      } catch (error) {
+        clearTimeout(timeout)
+        client.off('message', onMessage)
+        client.off('error', onError)
+        reject(error)
+      }
+    }
+    client.on('message', onMessage)
+    client.once('error', onError)
+  })
+}
+
 function waitForJsonMessages(client: WebSocket, count: number): Promise<Array<Record<string, unknown>>> {
   return new Promise((resolve, reject) => {
     const messages: Array<Record<string, unknown>> = []
@@ -192,6 +223,219 @@ describe('game WebSocket service', () => {
     }
   })
 
+  test('rejects an incompatible battle protocol before registering the subscription', async () => {
+    const client = await openClient()
+    const roomId = 'legacy-client-' + Date.now()
+    try {
+      const response = waitForJsonMessage(client)
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'legacy-player',
+        protocolVersion: 2,
+      }))
+
+      await expect(response).resolves.toMatchObject({
+        type: 'battleProtocolUnsupported',
+        code: 'BATTLE_PROTOCOL_UNSUPPORTED',
+        expectedProtocolVersion: 3,
+        expectedAuthorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        receivedProtocolVersion: 2,
+      })
+      expect(globalWithWsServer.__rvbPlayerWs?.has('legacy-player')).toBe(false)
+
+      const buildResponse = waitForJsonMessage(client)
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'wrong-build-player',
+        protocolVersion: 3,
+        authorityBuildId: 'old-build',
+      }))
+      await expect(buildResponse).resolves.toMatchObject({
+        type: 'battleProtocolUnsupported',
+        expectedProtocolVersion: 3,
+        receivedProtocolVersion: 3,
+        receivedAuthorityBuildId: 'old-build',
+      })
+      expect(globalWithWsServer.__rvbPlayerWs?.has('wrong-build-player')).toBe(false)
+    } finally {
+      await expect(closeClient(client)).resolves.toBe(1000)
+    }
+  })
+
+  test('keeps the replacement player socket registered when the stale socket closes', async () => {
+    const roomId = 'reconnect-player-map-' + Date.now()
+    const profileIdentity = getServerGameProfileIdentityV1()
+    const room: Room = {
+      id: roomId,
+      name: roomId,
+      status: 'waiting',
+      players: [{ id: 'same-player', name: 'Same player', profileIdentity }],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 1,
+    }
+    const store = getRoomStore()
+    const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
+      id === roomId ? room : undefined)
+    const first = await openClientPair()
+    const replacement = await openClientPair()
+    try {
+      const firstSubscribed = waitForJsonMessage(first.client)
+      first.client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'same-player',
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        profileIdentity,
+      }))
+      await expect(firstSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
+
+      const replacementSubscribed = waitForJsonMessage(replacement.client)
+      replacement.client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'same-player',
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        profileIdentity,
+      }))
+      await expect(replacementSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
+      expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
+
+      const staleServerClosed = new Promise(resolve => first.server.once('close', resolve))
+      await closeClient(first.client)
+      await staleServerClosed
+      expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
+    } finally {
+      if (replacement.client.readyState !== WebSocket.CLOSED) await closeClient(replacement.client)
+      getRoom.mockRestore()
+    }
+  })
+
+  test('echoes the snapshot request id on the authoritative resync response', async () => {
+    const roomId = 'correlated-resync-' + Date.now()
+    const profileIdentity = getServerGameProfileIdentityV1()
+    const room: Room = {
+      id: roomId,
+      name: roomId,
+      status: 'in-progress',
+      players: [
+        { id: 'player-red', name: 'Red', profileIdentity },
+        { id: 'player-blue', name: 'Blue', profileIdentity },
+      ],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 4,
+      battleAuthorityVersion: 4,
+      battleState: createTestServerBattleState(
+        makeState() as unknown as Record<string, unknown>,
+        77,
+      ),
+    }
+    const store = getRoomStore()
+    const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
+      id === roomId ? room : undefined)
+    const client = await openClient()
+
+    try {
+      const initialSnapshot = waitForJsonType(client, 'stateUpdate')
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'player-red',
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        profileIdentity,
+      }))
+      await expect(initialSnapshot).resolves.toMatchObject({
+        type: 'stateUpdate',
+        authorityVersion: 4,
+      })
+
+      const correlatedSnapshot = waitForJsonType(client, 'stateUpdate')
+      client.send(JSON.stringify({
+        type: 'requestBattleSnapshot',
+        requestId: 'authority-sync-test-1',
+      }))
+      await expect(correlatedSnapshot).resolves.toMatchObject({
+        type: 'stateUpdate',
+        requestId: 'authority-sync-test-1',
+        authorityVersion: 4,
+      })
+    } finally {
+      await closeClient(client)
+      getRoom.mockRestore()
+    }
+  })
+
+  test('lists only live public battles while keeping dormant battles available for rejoin', async () => {
+    const active = await openClientPair()
+    const lobby = await openClient()
+    const store = getRoomStore()
+    const activeRoomId = 'active-public-' + Date.now()
+    const dormantRoomId = 'dormant-rejoin-' + Date.now()
+    const waitingRoomId = 'waiting-public-' + Date.now()
+    const terminalRoomId = 'terminal-stale-status-' + Date.now()
+    const profileIdentity = getServerGameProfileIdentityV1()
+    const room = (id: string, status: Room['status'], playerId: string): Room => ({
+      id,
+      name: id,
+      status,
+      players: [{ id: playerId, name: playerId, profileIdentity }],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 1,
+    })
+    const activeRoom = room(activeRoomId, 'in-progress', 'active-player')
+    const dormantRoom = room(dormantRoomId, 'in-progress', 'dormant-player')
+    const waitingRoom = room(waitingRoomId, 'waiting', 'waiting-player')
+    const terminalRoom = room(terminalRoomId, 'in-progress', 'terminal-player')
+    terminalRoom.battleState = createTestServerBattleState({
+        ...makeState(),
+        terminalResult: { status: 'finished', winnerPlayerId: null, loserPlayerId: null, reason: 'round-limit' },
+      }, 1)
+    const rooms = [activeRoom, dormantRoom, waitingRoom, terminalRoom]
+    const getAllRooms = vi.spyOn(store, 'getAllRooms').mockResolvedValue(rooms)
+    const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
+      rooms.find(candidate => candidate.id === id))
+
+    try {
+      globalWithWsServer.__rvbRoomClients?.set(activeRoomId, new Set([active.server]))
+      globalWithWsServer.__rvbWsIdentities?.set(active.server, {
+        roomId: activeRoomId,
+        playerId: 'active-player',
+      })
+
+      const listed = await rpc(lobby, 'live-room-list', 'rooms.list')
+      const listedRooms = (listed.data as { rooms: Array<{ id: string }> }).rooms
+      expect(listedRooms.map(candidate => candidate.id)).toEqual([activeRoomId, waitingRoomId])
+
+      const rejoin = await rpc(lobby, 'dormant-room-get', 'rooms.get', { roomId: dormantRoomId })
+      expect(rejoin).toMatchObject({
+        ok: true,
+        data: { id: dormantRoomId, status: 'in-progress' },
+      })
+
+      const terminal = await rpc(lobby, 'terminal-room-get', 'rooms.get', { roomId: terminalRoomId })
+      expect(terminal).toMatchObject({
+        ok: true,
+        data: { id: terminalRoomId, status: 'finished' },
+      })
+    } finally {
+      await Promise.all([closeClient(active.client), closeClient(lobby)])
+      getAllRooms.mockRestore()
+      getRoom.mockRestore()
+      globalWithWsServer.__rvbRoomClients?.delete(activeRoomId)
+      globalWithWsServer.__rvbWsIdentities?.delete(active.server)
+    }
+  })
+
   test('keeps the connection usable after malformed JSON', async () => {
     const client = await openClient()
     try {
@@ -232,7 +476,12 @@ describe('game WebSocket service', () => {
         type: 'rpcResult',
         requestId: 'health',
         ok: true,
-        data: { ok: true, protocol: 'rvb-ws', protocolVersion: 2 },
+        data: {
+          ok: true,
+          protocol: 'rvb-ws',
+          protocolVersion: 3,
+          authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        },
       })
       const maps = await rpc(client, 'maps', 'catalog.maps')
       expect(maps).toMatchObject({ type: 'rpcResult', requestId: 'maps', ok: true })
@@ -383,7 +632,8 @@ describe('game WebSocket service', () => {
           if (viewerPlayerId !== 'opponent') throw new Error('forced recipient projection failure')
           return {
             type: 'battleTransition',
-            protocolVersion: 2,
+            protocolVersion: 3,
+            authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
             roomId: projectedRoomId,
             fromVersion: 1,
             toVersion: 2,
@@ -479,7 +729,8 @@ describe('game WebSocket service', () => {
           projectionOrder.push(viewerPlayerId)
           return {
             type: 'battleTransition',
-            protocolVersion: 2,
+            protocolVersion: 3,
+            authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
             roomId: projectedRoomId,
             fromVersion: 1,
             toVersion: 2,

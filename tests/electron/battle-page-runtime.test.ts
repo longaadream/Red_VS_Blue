@@ -667,7 +667,8 @@ describe('battle page runtime source', () => {
       ${runtimeFunction(html, 'render')}
       ${runtimeFunction(html, 'applyBattleTransition')}
       globalThis.__applied = applyBattleTransition({
-        protocolVersion: 2,
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
         roomId: 'room-1',
         fromVersion: 1,
         toVersion: 2,
@@ -738,7 +739,8 @@ describe('battle page runtime source', () => {
       ${runtimeFunction(html, 'render')}
       ${runtimeFunction(html, 'applyBattleTransition')}
       globalThis.__applied = applyBattleTransition({
-        protocolVersion: 2,
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
         roomId: 'room-1',
         fromVersion: 1,
         toVersion: 2,

@@ -5,6 +5,10 @@ import { NextRequest } from 'next/server'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
 import type { Room, Spectator } from '../lib/game/room-store'
 import { SELECTABLE_MAP_IDS } from '../lib/game/map-selection'
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+} from '../lib/game/battle-public-patch'
 import { getServerGameProfileIdentityV1 } from '../lib/content-pipeline/runtime/profile-game-identity'
 
 type JsonObject = Record<string, unknown>
@@ -515,11 +519,24 @@ async function httpRoomSnapshot(roomId: string) {
 async function wsBattleAction(roomId: string, playerId: string, action: JsonObject, identity?: TestIdentity, responseType = 'stateUpdate') {
   const client = await openClient()
   try {
-    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId, profileIdentity }))
+    client.send(JSON.stringify({
+      type: 'subscribe',
+      roomId,
+      playerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      profileIdentity,
+    }))
     await receiveType(client, 'subscribed')
     await receiveType(client, 'stateUpdate')
     const auth = identity ? await signBattleAction(identity, roomId, action) : undefined
-    client.send(JSON.stringify({ type: 'action', action, auth }))
+    client.send(JSON.stringify({
+      type: 'action',
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      action,
+      auth,
+    }))
     return await receiveType(client, responseType)
   } finally {
     client.close()
@@ -542,7 +559,14 @@ async function wsBattleSnapshot(roomId: string, viewerPlayerId: string) {
     }))
     const registration = await receiveJson(client)
     if (registration.ok !== true) throw new Error(`Spectator registration failed: ${JSON.stringify(registration)}`)
-    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: viewerPlayerId, profileIdentity }))
+    client.send(JSON.stringify({
+      type: 'subscribe',
+      roomId,
+      playerId: viewerPlayerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      profileIdentity,
+    }))
     await receiveType(client, 'subscribed')
     return await receiveType(client, 'stateUpdate')
   } finally {
@@ -1411,6 +1435,8 @@ describe('Demo roster HTTP/WebSocket integration', () => {
         type: 'subscribe',
         roomId: 'public-deployment',
         playerId: 'alice',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
         profileIdentity: wrongProfile,
       }))
       const subscriptionError = await receiveType(impersonatingClient, 'subscriptionError')
@@ -1428,6 +1454,8 @@ describe('Demo roster HTTP/WebSocket integration', () => {
         type: 'subscribe',
         roomId: 'public-deployment',
         playerId: 'unregistered-spectator',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
         profileIdentity,
       }))
       const subscriptionError = await receiveType(unregisteredClient, 'subscriptionError')
@@ -1488,6 +1516,8 @@ describe('Demo roster HTTP/WebSocket integration', () => {
         type: 'subscribe',
         roomId,
         playerId: firstIdentity.id,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
         profileIdentity,
       }))
       expect(await receiveType(snapshotClient, 'subscriptionError')).toMatchObject({
@@ -1504,12 +1534,25 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     memoryStore.seed(validRoom)
     const actionClient = await openClient()
     try {
-      actionClient.send(JSON.stringify({ type: 'subscribe', roomId, playerId: firstIdentity.id, profileIdentity }))
+      actionClient.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: firstIdentity.id,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        profileIdentity,
+      }))
       await receiveType(actionClient, 'subscribed')
       await receiveType(actionClient, 'stateUpdate')
       memoryStore.seed(withoutTrace(validRoom))
       const auth = await signBattleAction(firstIdentity, roomId, command)
-      actionClient.send(JSON.stringify({ type: 'action', action: command, auth }))
+      actionClient.send(JSON.stringify({
+        type: 'action',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        action: command,
+        auth,
+      }))
       expect(await receiveType(actionClient, 'actionError')).toMatchObject({
         status: 409,
         code: 'PINNED_PROFILE_UNAVAILABLE',
@@ -1627,7 +1670,14 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const client = await openClient()
     const messages = collectMessages(client)
     try {
-      client.send(JSON.stringify({ type: 'subscribe', roomId: 'terminal-race', playerId: secondIdentity.id, profileIdentity }))
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId: 'terminal-race',
+        playerId: secondIdentity.id,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        profileIdentity,
+      }))
       await messages.waitFor('subscribed')
       await messages.waitFor('stateUpdate')
 
@@ -1655,7 +1705,13 @@ describe('Demo roster HTTP/WebSocket integration', () => {
         firstIdentity.id,
         firstIdentity,
       )
-      client.send(JSON.stringify({ type: 'action', action: wsAction, auth: wsAuth }))
+      client.send(JSON.stringify({
+        type: 'action',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        action: wsAction,
+        auth: wsAuth,
+      }))
 
       const [httpResult, update] = await Promise.all([httpResultPromise, terminalUpdate])
       expect([200, 400]).toContain(httpResult.status)

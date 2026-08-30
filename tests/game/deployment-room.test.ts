@@ -12,6 +12,7 @@ import {
 import type { Room } from '@/lib/game/room-store'
 import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
+import { loadRuleById } from '@/lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
@@ -98,6 +99,18 @@ function makeDeploymentRoom(id = 'deployment-room', deadlineAt = 46_000): Room {
     version: 1,
     battleState: createTestServerBattleState(state, ROOT_SEED) as any,
   }
+}
+
+function makeWatcherDeploymentRoom(id = 'watcher-deployment-room', deadlineAt = 5_000): Room {
+  const room = makeDeploymentRoom(id, deadlineAt)
+  const state = (room.battleState as any).state
+  const watcher = state.pieces.find((piece: any) => piece.instanceId === 'piece-1')
+  const watcherRule = loadRuleById('rule-watcher-form', true)
+  if (!watcher || !watcherRule) throw new Error('Watcher deployment fixture could not load')
+  watcher.templateId = 'blue-watcher'
+  watcher.name = '观者'
+  watcher.rules = [watcherRule]
+  return room
 }
 
 describe('RED-31 authoritative deployment room actions', () => {
@@ -241,6 +254,50 @@ describe('RED-31 authoritative deployment room actions', () => {
       [PLAYERS[0]]: { pieceId: null },
       [PLAYERS[1]]: { pieceId: null },
     })
+  })
+
+  it('accepts the authoritative Watcher option created by deployment timeout after the deadline', async () => {
+    const room = makeWatcherDeploymentRoom()
+    const store = new MemoryRoomStore(room)
+
+    await dispatchRoomBattleAction(store, room.id, PLAYERS[1], {
+      type: 'deploymentLock',
+      playerId: PLAYERS[1],
+      clientActionId: 'blue-lock-before-watcher-timeout',
+    }, { clock: { now: () => 2_000 } })
+    await dispatchRoomBattleAction(store, room.id, undefined, {
+      type: 'deploymentTimeout',
+      now: 5_000,
+      clientActionId: 'watcher-deployment-timeout',
+    }, {
+      allowSystem: true,
+      clock: { now: () => 5_000 },
+    })
+
+    const timedOutState = (store.room.battleState as any).state
+    const pending = timedOutState.pendingOptionSelection
+    expect(pending).toMatchObject({
+      playerId: PLAYERS[0],
+      source: { type: 'rule', id: 'rule-watcher-form', pieceId: 'piece-1' },
+    })
+    expect(pending.transaction.rootAction).toMatchObject({ type: 'deploymentTimeout' })
+
+    const result = await dispatchRoomBattleAction(store, room.id, PLAYERS[0], {
+      type: 'pendingOptionSelect',
+      playerId: PLAYERS[0],
+      selectedOption: 'calm',
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+      clientActionId: 'watcher-calm-after-deployment-timeout',
+    } as any, { clock: { now: () => 5_001 } })
+    const completed = (store.room.battleState as any).state
+
+    expect(result.kind).toBe('applied')
+    expect(completed.pendingOptionSelection).toBeUndefined()
+    expect(completed.deployment.status).toBe('complete')
+    expect(completed.turn).toMatchObject({ currentPlayerId: PLAYERS[0], phase: 'action' })
+    expect(completed.players.find((player: any) => player.playerId === PLAYERS[0])?.hand)
+      .toContainEqual(expect.objectContaining({ cardId: 'watcher-calm' }))
   })
 
 
