@@ -132,6 +132,14 @@ function referenceForRuntime(context: ProfileRuntimeContextV1): ProfileReference
   )
 }
 
+export function getRuntimeProfileReferenceV1(): ProfileReferenceV1 {
+  const context = getProfileRuntimeContextV1()
+  const reference = referenceForRuntime(context)
+  const root = getRuntimeProfileRootV1(context, reference)
+  assertRuntimeEnvironment(context, reference, root)
+  return reference
+}
+
 export function getRuntimeProfileRootV1(
   context: ProfileRuntimeContextV1,
   reference: ProfileReferenceV1,
@@ -224,7 +232,10 @@ export async function getProfileLeaseReportV1(): Promise<ProfileLeaseReportV1> {
   const { getRoomStore } = await import('@/lib/game/room-store')
   const rooms = await getRoomStore().getAllRooms()
   const roomIds = rooms
-    .filter(room => room.status === 'in-progress')
+    .filter(room => (
+      room.status === 'in-progress'
+      || ((room.status === 'waiting' || room.status === 'ready') && (room.players?.length ?? 0) > 0)
+    ))
     .map(room => room.id)
     .sort()
   return { active: roomIds.length > 0, roomIds }

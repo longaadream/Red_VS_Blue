@@ -1,4 +1,11 @@
-import { getBattleStorage, withoutServerSkills, type ServerBattleState } from './battle-storage'
+import type { GameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
+import {
+  createServerBattleStateV1,
+  getBattleStorage,
+  SERVER_BATTLE_STORAGE_SCHEMA_V1,
+  withoutServerSkills,
+  type ServerBattleState,
+} from './battle-storage'
 import {
   BATTLE_AUTHORITY_BUILD_ID,
   BATTLE_AUTHORITY_PROTOCOL_VERSION,
@@ -16,6 +23,7 @@ import {
   createBattleStateHashIndex,
   hashStable,
   materializeBattleTraceForTerminal,
+  pinBattleProfileIdentityV1,
   stampPendingDeploymentAuthorityVersion,
 } from './battle-trace'
 import {
@@ -93,6 +101,8 @@ export interface PublicBattleSnapshot {
   authorityBuildId: typeof BATTLE_AUTHORITY_BUILD_ID
   state: BattleState
   seed: number
+  rootSeed: number
+  profileIdentity: GameProfileIdentityV1
   stateHash: string
   authorityVersion: number
   serverNow: number
@@ -261,7 +271,9 @@ export function createPublicBattleSnapshot(
     protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
     authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     state,
-    seed: storage.seed,
+    seed: storage.rootSeed,
+    rootSeed: storage.rootSeed,
+    profileIdentity: storage.profileIdentity,
     stateHash: publicIndex.rootHash,
     authorityVersion,
     serverNow,
@@ -338,6 +350,8 @@ export function createPublicBattleResyncSnapshot(
     authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     state,
     seed: result.snapshot.seed,
+    rootSeed: result.snapshot.rootSeed,
+    profileIdentity: result.snapshot.profileIdentity,
     stateHash: publicIndex.rootHash,
     authorityVersion: result.transition.toVersion,
     serverNow,
@@ -353,7 +367,9 @@ export function createPublicRoomSnapshot(room: Room): Room {
   const snapshot = createPublicBattleSnapshot(room)
   const publicStorage: ServerBattleState = {
     type: 'server-state',
-    seed: snapshot.seed,
+    storageSchemaVersion: SERVER_BATTLE_STORAGE_SCHEMA_V1,
+    profileIdentity: storage.profileIdentity,
+    rootSeed: storage.rootSeed,
     state: snapshot.state,
   }
   return {
@@ -534,13 +550,18 @@ export async function dispatchRoomBattleAction(
       try {
         const rulesStartedAt = monotonicNow()
         submittedActionResult = runBattleAction(state, actionToApply, {
-          rootSeed: storage.seed,
+          rootSeed: storage.rootSeed,
           stateHashIndex: getAuthorityStateHashIndex(
             normalizedRoomId,
             authorityVersion,
             state,
           ),
         })
+        pinBattleProfileIdentityV1(
+          submittedActionResult.state,
+          storage.profileIdentity,
+          storage.rootSeed,
+        )
         rulesMs += monotonicNow() - rulesStartedAt
       } catch (error) {
         const decorated = decorateRoomActionError(error, normalizedRoomId, room, storage, actionToApply, viewerPlayerId)
@@ -593,10 +614,15 @@ export async function dispatchRoomBattleAction(
         }
         try {
           const syncRulesStartedAt = monotonicNow()
-          actionResult = runBattleAction(submittedActionResult.state, syncAction, {
-            rootSeed: storage.seed,
-            stateHashIndex: submittedActionResult.stateHashIndex,
-          })
+        actionResult = runBattleAction(submittedActionResult.state, syncAction, {
+          rootSeed: storage.rootSeed,
+          stateHashIndex: submittedActionResult.stateHashIndex,
+        })
+        pinBattleProfileIdentityV1(
+          actionResult.state,
+          storage.profileIdentity,
+          storage.rootSeed,
+        )
           rulesMs += monotonicNow() - syncRulesStartedAt
         } catch (error) {
           const decorated = decorateRoomActionError(error, normalizedRoomId, room, storage, syncAction, viewerPlayerId)
@@ -648,11 +674,11 @@ export async function dispatchRoomBattleAction(
       const committedState = authorityV2 && !isTerminal
         ? compactBattleTraceForAuthority(nextAuthorityState)
         : nextAuthorityState
-      const nextStorage: ServerBattleState = {
-        type: 'server-state',
-        seed: storage.seed,
-        state: committedState,
-      }
+      const nextStorage = createServerBattleStateV1(
+        storage.profileIdentity,
+        storage.rootSeed,
+        committedState,
+      )
       const transitionPlayerId = 'playerId' in action
         ? action.playerId
         : viewerPlayerId ?? 'system'
@@ -710,7 +736,7 @@ export async function dispatchRoomBattleAction(
             authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
             roomId: normalizedRoomId,
             authorityVersion,
-            seed: storage.seed,
+            seed: storage.rootSeed,
             storage: previousTransitionStorage,
             stateHash: transition.preStateHash,
             publicHash: transition.prePublicHash,
@@ -729,7 +755,7 @@ export async function dispatchRoomBattleAction(
             authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
             roomId: normalizedRoomId,
             authorityVersion: nextAuthorityVersion,
-            seed: storage.seed,
+            seed: storage.rootSeed,
             storage: checkpointStorage,
             stateHash: transition.postStateHash,
             publicHash: transition.postPublicHash,
@@ -1232,7 +1258,7 @@ function roomActionContext(
     noOpStreak: timer?.noOpStreaks[timer.ownerPlayerId],
     actionId: 'clientActionId' in action ? action.clientActionId : undefined,
     authorityVersion: roomBattleAuthorityVersion(room),
-    seed: storage.seed,
+    seed: storage.rootSeed,
   }
 }
 

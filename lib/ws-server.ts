@@ -41,7 +41,12 @@ import { getAllPieces } from './game/piece-repository'
 import { getAllSkills } from './game/skill-repository'
 import { installBattleAuthorityShutdownHandlers } from './server/battle-authority-shutdown'
 import { getProfileWsIngressTrackerV1 } from './content-pipeline/runtime/profile-ws-ingress'
-import { getResourcePackMeta } from './resource-pack'
+import {
+  assertGameProfileCompatibleV1,
+  getGameProfileErrorPayloadV1,
+  getServerGameProfileIdentityV1,
+  type GameProfileIdentityV1,
+} from './content-pipeline/runtime/profile-game-identity'
 
 // HMR-safe: keep server + client maps on globalThis so Next.js hot reloads
 // can tear down the old WebSocketServer (which holds stale handler closures)
@@ -65,6 +70,7 @@ let _wss: WebSocketServer | null = _g.__rvbWss ?? null
 function publicRoom(room: any): unknown {
   if (!room) return null
   return {
+    profileIdentity: getServerGameProfileIdentityV1(),
     id: room.id,
     name: room.name,
     status: authoritativeRoomStatus(room),
@@ -94,6 +100,7 @@ function publicRoom(room: any): unknown {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function publicRoomList(room: any): unknown {
   return {
+    profileIdentity: getServerGameProfileIdentityV1(),
     id: room.id,
     name: room.name,
     status: authoritativeRoomStatus(room),
@@ -288,15 +295,14 @@ function nextFaction(room: any, playerId?: string): 'red' | 'blue' {
   return assignNextSeat(room.players || [], playerId)
 }
 
-function checkPackMismatchWs(players: any[]): boolean {
-  const hashes = players.map((p: any) => p.packMd5).filter(Boolean)
-  return hashes.length === 2 && hashes[0] !== hashes[1]
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
+  const profileIdentity = assertGameProfileCompatibleV1(body.profileIdentity)
   const room = await roomStore.getRoom(roomId)
   if (!room) throw new Error('Room not found')
+  for (const participant of room.players) {
+    assertGameProfileCompatibleV1(participant.profileIdentity)
+  }
   if (room.status !== 'in-progress' || !room.battleState) {
     assertSelectableMapId(room.mapId)
   }
@@ -304,7 +310,6 @@ async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
   const normalizedPlayerId = String(body.playerId || '').trim().toLowerCase()
   const accountId = String(body.accountId || body.identityId || '').trim().toLowerCase() || undefined
   const playerName = String(body.playerName || '').trim()
-  const packMd5 = String(body.packMd5 || '').trim() || undefined
   if (!normalizedPlayerId) throw new Error('playerId is required')
 
   if (body.payload || body.signature || body.publicKey) {
@@ -316,6 +321,7 @@ async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
 
   let player = room.players.find(p => p.id.toLowerCase() === normalizedPlayerId)
   if (player) {
+    assertGameProfileCompatibleV1(player.profileIdentity)
     if (accountId) player.accountId = accountId
     if (playerName) player.name = playerName
     if (!getPlayerSeat(player)) {
@@ -325,10 +331,10 @@ async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
     }
     ensureRosterAlignmentMutable(player, requestedAlignment)
     if (requestedAlignment) player.alignment = requestedAlignment
-    if (packMd5) player.packMd5 = packMd5
+    player.profileIdentity = profileIdentity
     await roomStore.setRoom(roomId, room)
     await broadcastRoom(roomId)
-    return { ...createPublicRoomSnapshot(room), packMismatch: checkPackMismatchWs(room.players) }
+    return createPublicRoomSnapshot(room)
   }
 
   if (room.status !== 'waiting') throw new Error('Cannot join a game that has already started or finished')
@@ -341,25 +347,34 @@ async function joinRoomViaWs(roomId: string, body: any): Promise<any> {
     joinedAt: Date.now(),
     seat: nextFaction(room, normalizedPlayerId),
     ...(requestedAlignment ? { alignment: requestedAlignment } : {}),
-    packMd5,
+    profileIdentity,
   }
   player.faction = player.seat
   room.players.push(player)
   if (!room.hostId) room.hostId = normalizedPlayerId
   await roomStore.setRoom(roomId, room)
   await broadcastRoom(roomId)
-  return { ...createPublicRoomSnapshot(room), packMismatch: checkPackMismatchWs(room.players) }
+  return createPublicRoomSnapshot(room)
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function applyRoomAction(roomId: string, body: any): Promise<any> {
   const action = body.action
   if (action === 'join') return joinRoomViaWs(roomId, body)
+  const profileIdentity: GameProfileIdentityV1 | undefined = action === 'leave'
+    ? undefined
+    : assertGameProfileCompatibleV1(body.profileIdentity)
 
   const room = await roomStore.getRoom(roomId)
   if (!room) throw new Error('Room not found')
   if (room.status !== 'in-progress' || !room.battleState) {
     assertSelectableMapId(room.mapId)
+  }
+
+  if (profileIdentity) {
+    for (const participant of room.players) {
+      assertGameProfileCompatibleV1(participant.profileIdentity)
+    }
   }
 
   const normalizedPlayerId = String(body.playerId || '').trim().toLowerCase()
@@ -400,6 +415,9 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
 
   let player = room.players.find(p => p.id.toLowerCase() === normalizedPlayerId)
   if (!player && action === 'claim-faction') {
+    if (!profileIdentity) {
+      throw new Error('Profile identity is required to claim a room seat')
+    }
     if (room.players.length >= (room.maxPlayers ?? 2)) throw new Error('Room is full')
     player = {
       id: normalizedPlayerId,
@@ -407,12 +425,14 @@ async function applyRoomAction(roomId: string, body: any): Promise<any> {
       name: playerName || `Player ${normalizedPlayerId.slice(0, 8)}`,
       joinedAt: Date.now(),
       seat: nextFaction(room, normalizedPlayerId),
+      profileIdentity,
     }
     player.faction = player.seat
     room.players.push(player)
     if (!room.hostId) room.hostId = normalizedPlayerId
   }
   if (!player) throw new Error('Player not in room')
+  if (profileIdentity) player.profileIdentity = profileIdentity
   if (accountId) player.accountId = accountId
   if (playerName) player.name = playerName
   if (!getPlayerSeat(player)) {
@@ -639,7 +659,7 @@ async function restartWsServer(): Promise<void> {
                   authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
                 }
               } else if (method === 'catalog.identity') {
-                result = { meta: getResourcePackMeta() }
+                result = { profileIdentity: getServerGameProfileIdentityV1() }
               } else if (method === 'catalog.maps') {
                 result = { maps: getSelectableMapCatalog() }
               } else if (method === 'catalog.pieces') {
@@ -656,6 +676,7 @@ async function restartWsServer(): Promise<void> {
                 const rooms = await roomStore.getAllRooms()
                 result = { rooms: publicLobbyRoomList(rooms) }
               } else if (method === 'rooms.create' || method === 'lobby.create') {
+                assertGameProfileCompatibleV1(data.profileIdentity)
                 const mapId = assertSelectableMapId(data.mapId)
                 let roomId = makeRoomId()
                 while (await roomStore.getRoom(roomId)) roomId = makeRoomId()
@@ -672,6 +693,7 @@ async function restartWsServer(): Promise<void> {
                     faction: 'blue' as const,
                     alignment: 'dark' as const,
                     isBot: true,
+                    profileIdentity: getServerGameProfileIdentityV1(),
                     hasSelectedPieces: false,
                     selectedPieces: [],
                     ready: true,
@@ -700,7 +722,10 @@ async function restartWsServer(): Promise<void> {
                 const targetRoomId = String(data.roomId || '').trim().toLowerCase()
                 const room = await ensureBattleReady(targetRoomId)
                 if (!room) throw new Error('Room not found')
-                result = createPublicRoomSnapshot(room)
+                result = {
+                  ...createPublicRoomSnapshot(room),
+                  profileIdentity: getServerGameProfileIdentityV1(),
+                }
               } else if (method === 'rooms.delete') {
                 const targetRoomId = String(data.roomId || '').trim().toLowerCase()
                 const player = String(data.playerId || '').trim().toLowerCase()
@@ -717,15 +742,27 @@ async function restartWsServer(): Promise<void> {
                 if (!targetRoomId) throw new Error('roomId is required')
                 result = await applyRoomAction(targetRoomId, data)
               } else if (method === 'rooms.spectate') {
+                const profileIdentity = assertGameProfileCompatibleV1(data.profileIdentity)
                 const targetRoomId = String(data.roomId || '').trim().toLowerCase()
                 const spectatorId = String(data.spectatorId || '').trim().toLowerCase()
                 const spectatorName = String(data.spectatorName || spectatorId.slice(0, 8)).trim()
                 if (!targetRoomId || !spectatorId) throw new Error('roomId and spectatorId are required')
                 const room = await roomStore.getRoom(targetRoomId)
                 if (!room) throw new Error('Room not found')
+                for (const participant of room.players) {
+                  assertGameProfileCompatibleV1(participant.profileIdentity)
+                }
+                for (const existingSpectator of room.spectators ?? []) {
+                  assertGameProfileCompatibleV1(existingSpectator.profileIdentity)
+                }
                 if (authoritativeRoomStatus(room) !== 'in-progress') throw new Error('只有正在进行中的房间才能观战')
                 if (room.players.some(p => p.id === spectatorId)) throw new Error('你已经是该房间的参战玩家')
-                await roomStore.addSpectator(targetRoomId, { id: spectatorId, name: spectatorName, joinedAt: Date.now() })
+                await roomStore.addSpectator(targetRoomId, {
+                  id: spectatorId,
+                  name: spectatorName,
+                  joinedAt: Date.now(),
+                  profileIdentity,
+                })
                 const updated = await roomStore.getRoom(targetRoomId)
                 result = { success: true, spectators: updated?.spectators ?? [] }
               } else if (method === 'gameRecord.get') {
@@ -756,16 +793,17 @@ async function restartWsServer(): Promise<void> {
               sendRpcResponse({ type: 'rpcResult', requestId, ok: true, data: result })
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err)
+              const profileError = getGameProfileErrorPayloadV1(err)
               const rosterError = getRosterErrorPayload(err)
               const mapError = getMapSelectionErrorPayload(err)
-              const status = mapError ? 400 : message === 'Room not found' ? 404 : undefined
+              const status = profileError?.status ?? (mapError ? 400 : message === 'Room not found' ? 404 : undefined)
               sendRpcResponse({
                 type: 'rpcResult',
                 requestId,
                 ok: false,
-                error: rosterError?.message ?? mapError?.message ?? message,
-                code: rosterError?.code ?? mapError?.code,
-                context: rosterError?.context ?? mapError?.context,
+                error: profileError?.message ?? rosterError?.message ?? mapError?.message ?? message,
+                code: profileError?.code ?? rosterError?.code ?? mapError?.code,
+                context: profileError?.context ?? rosterError?.context ?? mapError?.context,
                 status,
               })
             }
@@ -785,35 +823,59 @@ async function restartWsServer(): Promise<void> {
             })
             return
           }
-          if (roomId) {
-            roomClients.get(roomId)?.delete(ws)
-            if (playerId && playerWs.get(playerId) === ws) playerWs.delete(playerId)
-            wsIdentities.delete(ws)
-          }
           const nextRoomId = msg.roomId.toLowerCase()
-          roomId = nextRoomId
-          playerId = typeof msg.playerId === 'string' ? msg.playerId.trim().toLowerCase() : null
-          wsIdentities.set(ws, { roomId: nextRoomId, ...(playerId ? { playerId } : {}) })
-
-          if (!roomClients.has(nextRoomId)) roomClients.set(nextRoomId, new Set())
-          roomClients.get(nextRoomId)!.add(ws)
-          if (playerId) playerWs.set(playerId, ws)
-
-          // LAN mode: server is the game engine; all WS clients are guests.
-          sendJson(ws, {
-            type: 'subscribed',
-            roomId: nextRoomId,
-            role: 'guest',
-            protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
-            authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
-          })
-
+          const requestedPlayerId = typeof msg.playerId === 'string'
+            ? msg.playerId.trim().toLowerCase()
+            : null
           runAsync(async () => {
             try {
-              const room = await roomStore.getRoom(nextRoomId)
-              if (room) sendJson(ws, { type: 'roomUpdate', room: publicRoom(room) })
-              await sendBattleSnapshot(ws, nextRoomId, playerId)
-            } catch {}
+              const nextRoom = nextRoomId === '__lobby'
+                ? undefined
+                : await roomStore.getRoom(nextRoomId)
+              if (nextRoomId !== '__lobby') {
+                assertGameProfileCompatibleV1(msg.profileIdentity)
+                if (!nextRoom) throw new Error('Room not found')
+                if (!requestedPlayerId) assertGameProfileCompatibleV1(undefined)
+                const participant = nextRoom.players.find(item => item.id.toLowerCase() === requestedPlayerId)
+                  ?? nextRoom.spectators.find(item => item.id.toLowerCase() === requestedPlayerId)
+                assertGameProfileCompatibleV1(participant?.profileIdentity)
+                if (nextRoom.battleState) getBattleStorage(nextRoom)
+              }
+
+              if (roomId) {
+                roomClients.get(roomId)?.delete(ws)
+                if (playerId && playerWs.get(playerId) === ws) playerWs.delete(playerId)
+                wsIdentities.delete(ws)
+              }
+              roomId = nextRoomId
+              playerId = requestedPlayerId
+              wsIdentities.set(ws, { roomId: nextRoomId, ...(playerId ? { playerId } : {}) })
+              if (!roomClients.has(nextRoomId)) roomClients.set(nextRoomId, new Set())
+              roomClients.get(nextRoomId)!.add(ws)
+              if (playerId) playerWs.set(playerId, ws)
+
+              sendJson(ws, {
+                type: 'subscribed',
+                roomId: nextRoomId,
+                role: 'guest',
+                protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+                authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+              })
+              if (nextRoom) {
+                sendJson(ws, { type: 'roomUpdate', room: publicRoom(nextRoom) })
+                await sendBattleSnapshot(ws, nextRoomId, playerId)
+              }
+            } catch (error) {
+              const profileError = getGameProfileErrorPayloadV1(error)
+              sendJson(ws, {
+                type: 'subscriptionError',
+                roomId: nextRoomId,
+                error: profileError?.message ?? (error instanceof Error ? error.message : String(error)),
+                code: profileError?.code,
+                context: profileError?.context,
+                status: profileError?.status,
+              })
+            }
           })
         } else if (msg.type === 'roomState' && roomId) {
           runAsync(async () => {
@@ -836,16 +898,17 @@ async function restartWsServer(): Promise<void> {
               sendJson(sender, { type: 'roomActionResult', action, success: true, ...(typeof result === 'object' && result ? result : { result }) })
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err)
+              const profileError = getGameProfileErrorPayloadV1(err)
               const rosterError = getRosterErrorPayload(err)
               const mapError = getMapSelectionErrorPayload(err)
-              const status = mapError ? 400 : message === 'Room not found' ? 404 : undefined
+              const status = profileError?.status ?? (mapError ? 400 : message === 'Room not found' ? 404 : undefined)
               sendJson(sender, {
                 type: 'roomActionResult',
                 action: msg.action,
                 success: false,
-                error: rosterError?.message ?? mapError?.message ?? message,
-                code: rosterError?.code ?? mapError?.code,
-                context: rosterError?.context ?? mapError?.context,
+                error: profileError?.message ?? rosterError?.message ?? mapError?.message ?? message,
+                code: profileError?.code ?? rosterError?.code ?? mapError?.code,
+                context: profileError?.context ?? rosterError?.context ?? mapError?.context,
                 status,
               })
             }
@@ -932,6 +995,7 @@ async function restartWsServer(): Promise<void> {
                   queueBotTurnIfReady(_roomId, result.actionResult.state)
                 } catch (err) {
                   const message = err instanceof Error ? err.message : String(err)
+                  const profileError = getGameProfileErrorPayloadV1(err)
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const errAny = err as any
                   console.warn(
@@ -942,8 +1006,9 @@ async function restartWsServer(): Promise<void> {
                   )
                   if (errAny?.receipt) sendJson(sender, { type: 'battleReceipt', receipt: errAny.receipt })
                   sendActionError(sender, {
-                    error: message,
-                    code: errAny?.code ?? undefined,
+                    error: profileError?.message ?? message,
+                    code: profileError?.code ?? errAny?.code ?? undefined,
+                    status: profileError?.status,
                     action: command,
                     receipt: errAny?.receipt ?? undefined,
                     preparation: errAny?.preparation ?? undefined,
@@ -956,7 +1021,7 @@ async function restartWsServer(): Promise<void> {
                     title: errAny?.title ?? undefined,
                     options: errAny?.options ?? undefined,
                     determinism: errAny?.determinism ?? undefined,
-                    context: errAny?.context ?? undefined,
+                    context: profileError?.context ?? errAny?.context ?? undefined,
                   })
                 }
                 return

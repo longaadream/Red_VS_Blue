@@ -854,30 +854,30 @@ async function verifyRendererCandidate(
           const current = new URL(smokeWindow.webContents.getURL())
           if (current.pathname !== '/index.html') return
           const requiredLiteral = JSON.stringify(required)
-          const serverLiteral = JSON.stringify(serverUrl)
           const ready = await smokeWindow.webContents.executeJavaScript(`(async () => {
             const required = ${requiredLiteral}
             const parsed = []
             for (const relativePath of required) {
-              const response = await fetch('${CLIENT_SCHEME}://app/' + relativePath, { cache: 'no-store' })
+              let response
+              try {
+                response = await fetch('${CLIENT_SCHEME}://app/' + relativePath, { cache: 'no-store' })
+              } catch (error) {
+                throw new Error('PROFILE_RENDERER_RESOURCE_FETCH_FAILED: ' + relativePath + ': ' + String(error))
+              }
               if (!response.ok) throw new Error('renderer resource HTTP ' + response.status + ': ' + relativePath)
               parsed.push(await response.json())
             }
-            const ping = await fetch(${serverLiteral} + '/api/ping', { cache: 'no-store' })
-            if (!ping.ok) throw new Error('renderer server ping HTTP ' + ping.status)
             return {
               readyState: document.readyState,
               bodyChildren: document.body ? document.body.children.length : 0,
               title: document.title,
-              parsedProfileResources: parsed.length,
-              serverPing: await ping.json()
+              parsedProfileResources: parsed.length
             }
           })()`)
           if (
             ready?.readyState !== 'complete'
             || ready?.bodyChildren < 1
             || ready?.parsedProfileResources !== required.length
-            || !ready?.serverPing
           ) {
             finish(new Error('PROFILE_RENDERER_DOCUMENT_INVALID'))
             return

@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getRoomStore } from "@/lib/game/room-store"
+import {
+  assertGameProfileCompatibleV1,
+  getGameProfileErrorPayloadV1,
+  getServerGameProfileIdentityV1,
+} from "@/lib/content-pipeline/runtime/profile-game-identity"
+
+function profileErrorResponse(error: unknown): NextResponse {
+  const profileError = getGameProfileErrorPayloadV1(error)
+  if (!profileError) throw error
+  return NextResponse.json({
+    success: false,
+    error: profileError.message,
+    code: profileError.code,
+    context: profileError.context,
+  }, { status: profileError.status })
+}
 
 // POST /api/rooms/[roomId]/spectate — 加入观战
 export async function POST(
@@ -22,11 +38,24 @@ export async function POST(
     )
   }
 
-  let body: { spectatorId: string; spectatorName?: string }
+  let body: { spectatorId: string; spectatorName?: string; profileIdentity?: unknown }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+
+  let profileIdentity
+  try {
+    profileIdentity = assertGameProfileCompatibleV1(body.profileIdentity)
+    for (const participant of room.players) {
+      assertGameProfileCompatibleV1(participant.profileIdentity)
+    }
+    for (const spectator of room.spectators ?? []) {
+      assertGameProfileCompatibleV1(spectator.profileIdentity)
+    }
+  } catch (error) {
+    return profileErrorResponse(error)
   }
 
   const spectatorId = body.spectatorId?.trim().toLowerCase()
@@ -44,10 +73,15 @@ export async function POST(
     id: spectatorId,
     name: body.spectatorName?.trim() || spectatorId.slice(0, 8),
     joinedAt: Date.now(),
+    profileIdentity,
   })
 
   const updated = await roomStore.getRoom(roomId)
-  return NextResponse.json({ success: true, spectators: updated?.spectators ?? [] })
+  return NextResponse.json({
+    success: true,
+    spectators: updated?.spectators ?? [],
+    profileIdentity: getServerGameProfileIdentityV1(),
+  })
 }
 
 // DELETE /api/rooms/[roomId]/spectate — 离开观战

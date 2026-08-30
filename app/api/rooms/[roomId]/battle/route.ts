@@ -18,6 +18,17 @@ import {
 import { parseBattleAuthorityEnvelope, roomBattleAuthorityVersion } from "@/lib/game/battle-transition"
 import { verifyBattleActionAuth } from "@/lib/game/identity-verify"
 import { getClientTerminalSubmissionError } from "@/lib/server/battle-terminal"
+import { getGameProfileErrorPayloadV1 } from "@/lib/content-pipeline/runtime/profile-game-identity"
+
+function profileErrorResponse(error: unknown): NextResponse | undefined {
+  const profileError = getGameProfileErrorPayloadV1(error)
+  if (!profileError) return undefined
+  return NextResponse.json({
+    error: profileError.message,
+    code: profileError.code,
+    context: profileError.context,
+  }, { status: profileError.status })
+}
 
 // Full snapshots are recovery/checkpoint responses only. Normal commands return
 // an exact receipt plus an ordered public patch.
@@ -36,6 +47,8 @@ export async function GET(
   try {
     return NextResponse.json(createPublicBattleSnapshot(room, viewerPlayerId))
   } catch (err) {
+    const profileResponse = profileErrorResponse(err)
+    if (profileResponse) return profileResponse
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 400 })
   }
 }
@@ -151,6 +164,8 @@ export async function POST(
       duplicate: result.kind === 'duplicate',
     })
   } catch (err) {
+    const profileResponse = profileErrorResponse(err)
+    if (profileResponse) return profileResponse
     const message = err instanceof Error ? err.message : String(err)
     const errAny = err as any
     const status = errAny?.code === 'VIEWER_FORBIDDEN' || errAny?.code === 'ACTION_PLAYER_MISMATCH'

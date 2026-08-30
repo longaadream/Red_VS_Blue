@@ -4,6 +4,8 @@ import { Script, createContext } from 'node:vm'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { getServerGameProfileIdentityV1 } from '../../lib/content-pipeline/runtime/profile-game-identity'
+
 type BrowserHandler = ((event?: any) => void) | null
 
 class FakeWebSocket {
@@ -48,6 +50,7 @@ class FakeWebSocket {
 
 function loadClient() {
   FakeWebSocket.instances = []
+  const profileIdentity = getServerGameProfileIdentityV1()
   const browserWindow: Record<string, any> = {
     location: { search: '' },
     RvBUtils: {
@@ -56,7 +59,11 @@ function loadClient() {
   }
   const context = createContext({
     window: browserWindow,
-    localStorage: { getItem: () => null },
+    localStorage: {
+      getItem: (key: string) => key === 'rvb_game_profile_identity'
+        ? JSON.stringify(profileIdentity)
+        : null,
+    },
     URLSearchParams,
     WebSocket: FakeWebSocket,
     setTimeout,
@@ -111,6 +118,7 @@ describe('battle WebSocket reconnect state machine', () => {
       playerId: 'player-red',
       protocolVersion: 3,
       authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+      profileIdentity: getServerGameProfileIdentityV1(),
     })
 
     first.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })

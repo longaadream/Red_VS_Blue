@@ -43,7 +43,22 @@
       playerId: playerId,
       protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
       authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      profileIdentity: null,
     }
+    var storedProfile = null
+    var profileIdentity = null
+    if (roomId !== '__lobby') {
+      storedProfile = localStorage.getItem('rvb_game_profile_identity')
+      try {
+        profileIdentity = storedProfile ? JSON.parse(storedProfile) : null
+      } catch (e) {
+        throw new Error('Stored game profile identity is malformed')
+      }
+      if (!profileIdentity || typeof profileIdentity !== 'object' || Array.isArray(profileIdentity)) {
+        throw new Error('Game profile identity is required for battle subscriptions')
+      }
+    }
+    message.profileIdentity = profileIdentity
     if (_mode !== 'relay') return message
 
     if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') {
@@ -70,6 +85,7 @@
       playerId: playerId,
       protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
       authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      profileIdentity: profileIdentity,
       publicKey: publicKey,
       payload: payload,
       signature: await window.RvBIdentity.sign(payload),
@@ -339,6 +355,72 @@
     })
   }
 
+  function catalogIdentityErrorMessage(error) {
+    return error && error.message ? String(error.message) : String(error || 'Unknown error')
+  }
+
+  function isTransientCatalogIdentityError(error) {
+    var message = catalogIdentityErrorMessage(error)
+    return message === 'WebSocket request timeout: catalog.identity' ||
+      message === 'WebSocket connection failed' ||
+      message === 'WebSocket closed before response'
+  }
+
+  function serverOriginForDiagnostics(baseUrl) {
+    try {
+      var normalized = String(baseUrl || '').trim()
+      if (normalized && !/^[a-z]+:\/\//i.test(normalized)) normalized = 'http://' + normalized
+      return new URL(normalized).origin
+    } catch {
+      return '[invalid server URL]'
+    }
+  }
+
+  async function requestCatalogIdentityAt(baseUrl, scope) {
+    var maxAttempts = 2
+    var timeoutMs = 5000
+    var retryDelayMs = 250
+    var label = String(scope || 'server')
+    var origin = serverOriginForDiagnostics(baseUrl)
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await requestAt(baseUrl, 'catalog.identity', {}, timeoutMs)
+      } catch (error) {
+        var transient = isTransientCatalogIdentityError(error)
+        var reason = catalogIdentityErrorMessage(error)
+        if (transient && attempt < maxAttempts) {
+          console.warn('[profile] retrying catalog.identity', {
+            scope: label,
+            origin: origin,
+            attempt: attempt,
+            maxAttempts: maxAttempts,
+            reason: reason,
+          })
+          await new Promise(function (resolve) { setTimeout(resolve, retryDelayMs) })
+          continue
+        }
+
+        var wrapped = new Error(
+          'Profile Identity request failed [' + label + '] ' + origin +
+          ' (attempt ' + attempt + '/' + maxAttempts + '): ' + reason,
+        )
+        wrapped.code = error && error.code
+          ? error.code
+          : (transient ? 'PROFILE_IDENTITY_TRANSPORT_FAILED' : 'PROFILE_IDENTITY_REQUEST_FAILED')
+        wrapped.context = {
+          scope: label,
+          origin: origin,
+          attempt: attempt,
+          maxAttempts: maxAttempts,
+          reason: reason,
+        }
+        throw wrapped
+      }
+    }
+    throw new Error('Profile Identity request failed without an attempt')
+  }
+
   // Event handlers are registered once per page.
 
   function on(event, handler) {
@@ -360,6 +442,7 @@
     request: request,
     requestAt: requestAt,
     requestAuthoritySync: requestAuthoritySync,
+    requestCatalogIdentityAt: requestCatalogIdentityAt,
     on: on,
     isConnected: isConnected,
     isAuthoritySyncing: isAuthoritySyncing,

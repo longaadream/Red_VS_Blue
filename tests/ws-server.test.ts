@@ -9,7 +9,9 @@ import {
 } from '../lib/game/room-battle-actions'
 import { broadcastBattleTransition, startWsServer } from '../lib/ws-server'
 import { getRoomStore, type Room } from '../lib/game/room-store'
+import { getServerGameProfileIdentityV1 } from '../lib/content-pipeline/runtime/profile-game-identity'
 import { makeState } from './helpers/minimal-state'
+import { createTestServerBattleState } from './game/profile-test-identity'
 
 const globalWithWsServer = globalThis as typeof globalThis & {
   __rvbWss?: WebSocketServer | null
@@ -264,6 +266,20 @@ describe('game WebSocket service', () => {
 
   test('keeps the replacement player socket registered when the stale socket closes', async () => {
     const roomId = 'reconnect-player-map-' + Date.now()
+    const profileIdentity = getServerGameProfileIdentityV1()
+    const room: Room = {
+      id: roomId,
+      name: roomId,
+      status: 'waiting',
+      players: [{ id: 'same-player', name: 'Same player', profileIdentity }],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 1,
+    }
+    const store = getRoomStore()
+    const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
+      id === roomId ? room : undefined)
     const first = await openClientPair()
     const replacement = await openClientPair()
     try {
@@ -274,6 +290,7 @@ describe('game WebSocket service', () => {
         playerId: 'same-player',
         protocolVersion: 3,
         authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        profileIdentity,
       }))
       await expect(firstSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
 
@@ -284,6 +301,7 @@ describe('game WebSocket service', () => {
         playerId: 'same-player',
         protocolVersion: 3,
         authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        profileIdentity,
       }))
       await expect(replacementSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
       expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
@@ -294,29 +312,30 @@ describe('game WebSocket service', () => {
       expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
     } finally {
       if (replacement.client.readyState !== WebSocket.CLOSED) await closeClient(replacement.client)
+      getRoom.mockRestore()
     }
   })
 
   test('echoes the snapshot request id on the authoritative resync response', async () => {
     const roomId = 'correlated-resync-' + Date.now()
+    const profileIdentity = getServerGameProfileIdentityV1()
     const room: Room = {
       id: roomId,
       name: roomId,
       status: 'in-progress',
       players: [
-        { id: 'player-red', name: 'Red' },
-        { id: 'player-blue', name: 'Blue' },
+        { id: 'player-red', name: 'Red', profileIdentity },
+        { id: 'player-blue', name: 'Blue', profileIdentity },
       ],
       spectators: [],
       currentTurnIndex: 0,
       actions: [],
       version: 4,
       battleAuthorityVersion: 4,
-      battleState: {
-        type: 'server-state',
-        seed: 77,
-        state: makeState(),
-      } as unknown as Room['battleState'],
+      battleState: createTestServerBattleState(
+        makeState() as unknown as Record<string, unknown>,
+        77,
+      ),
     }
     const store = getRoomStore()
     const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
@@ -331,6 +350,7 @@ describe('game WebSocket service', () => {
         playerId: 'player-red',
         protocolVersion: 3,
         authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        profileIdentity,
       }))
       await expect(initialSnapshot).resolves.toMatchObject({
         type: 'stateUpdate',
@@ -361,11 +381,12 @@ describe('game WebSocket service', () => {
     const dormantRoomId = 'dormant-rejoin-' + Date.now()
     const waitingRoomId = 'waiting-public-' + Date.now()
     const terminalRoomId = 'terminal-stale-status-' + Date.now()
+    const profileIdentity = getServerGameProfileIdentityV1()
     const room = (id: string, status: Room['status'], playerId: string): Room => ({
       id,
       name: id,
       status,
-      players: [{ id: playerId, name: playerId }],
+      players: [{ id: playerId, name: playerId, profileIdentity }],
       spectators: [],
       currentTurnIndex: 0,
       actions: [],
@@ -375,14 +396,10 @@ describe('game WebSocket service', () => {
     const dormantRoom = room(dormantRoomId, 'in-progress', 'dormant-player')
     const waitingRoom = room(waitingRoomId, 'waiting', 'waiting-player')
     const terminalRoom = room(terminalRoomId, 'in-progress', 'terminal-player')
-    terminalRoom.battleState = {
-      type: 'server-state',
-      seed: 1,
-      state: {
+    terminalRoom.battleState = createTestServerBattleState({
         ...makeState(),
         terminalResult: { status: 'finished', winnerPlayerId: null, loserPlayerId: null, reason: 'round-limit' },
-      },
-    } as any
+      }, 1)
     const rooms = [activeRoom, dormantRoom, waitingRoom, terminalRoom]
     const getAllRooms = vi.spyOn(store, 'getAllRooms').mockResolvedValue(rooms)
     const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
@@ -507,6 +524,7 @@ describe('game WebSocket service', () => {
           hostId: 'host',
           hostName: 'Host',
           mapId: 'large-hole-arena',
+          profileIdentity: getServerGameProfileIdentityV1(),
         },
       })
       client.send(payload)

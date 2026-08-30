@@ -1487,6 +1487,7 @@
     <div id="recordStatus" style="font-size:13px;color:#64748b;margin-top:12px;min-height:18px"></div>
     <button id="recordDownloadBtn" onclick="downloadGameRecord()" style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;margin-top:8px">下载战报</button>
     <button id="matchTraceDownloadButton" onclick="downloadCompletedMatchTrace()" style="display:none;background:#0c4a6e;color:#e0f2fe;border:1px solid #0284c7;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;margin-top:8px">下载比赛 Trace</button>
+    <div id="matchTraceStatus" style="font-size:13px;color:#f87171;margin-top:8px;min-height:18px"></div>
     <button style="background:#3b82f6;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px" onclick="goBack()">← 返回大厅</button>
   </div>
 
@@ -5991,18 +5992,30 @@
       return 'info'
     }
 
+    function setCompletedMatchTraceStatus(message) {
+      const status = document.getElementById('matchTraceStatus')
+      if (status) status.textContent = message || ''
+    }
+
     function storeCompletedMatchTrace() {
-      if (TRAINING_MODE || !G || !G.terminalResult || !window.RvBDeveloperTools) return null
+      if (TRAINING_MODE || !G || !G.terminalResult) return null
+      if (!window.RvBDeveloperTools) {
+        const message = 'Trace 生成失败：比赛 Trace 导出器未加载'
+        setCompletedMatchTraceStatus(message)
+        addLog('[Trace] ' + message, 'err')
+        return null
+      }
       try {
         completedMatchTraceRecord = RvBDeveloperTools.createTraceRecord({
           state: G,
           roomId,
           seed: gameSeed,
-          stateHash: latestAuthorityStateHash,
           authorityVersion: latestAuthorityVersion,
         })
       } catch (error) {
-        addLog('[Trace] 无法生成赛后 Trace：' + ((error && error.message) || error), 'err')
+        const message = (error && error.message) || error
+        setCompletedMatchTraceStatus('Trace 生成失败：' + message)
+        addLog('[Trace] 无法生成赛后 Trace：' + message, 'err')
         return null
       }
 
@@ -6014,6 +6027,7 @@
         addLog('[Trace] 本地保存失败，仍可立即下载：' + ((error && error.message) || error), 'err')
       }
 
+      setCompletedMatchTraceStatus('')
       const button = document.getElementById('matchTraceDownloadButton')
       if (button) button.style.display = ''
       return completedMatchTraceRecord
@@ -6037,11 +6051,11 @@
       if (!G || !G.terminalResult) return
       const terminalResult = G.terminalResult
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-      if (typeof RvBWs !== 'undefined') RvBWs.disconnect()
       try { localStorage.removeItem('rvb_active_battle') } catch {}
+      if (!completedMatchTraceRecord) storeCompletedMatchTrace()
+      if (completedMatchTraceRecord && typeof RvBWs !== 'undefined') RvBWs.disconnect()
       if (recordSaved) return
       recordSaved = true
-      storeCompletedMatchTrace()
       if (!TRAINING_MODE && !SPECTATE_MODE) {
       // Save battle record locally
       try {

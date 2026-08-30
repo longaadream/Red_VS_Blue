@@ -21,9 +21,12 @@ import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { DEMO_ROSTER_MANIFEST_VERSION, getDefaultDemoRosterSelection } from '@/lib/game/roster-contract'
 import type { Room } from '@/lib/game/room-store'
 import type { BattleAction } from '@/lib/game/turn'
+import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 
 const originalAuthorityV2Flag = process.env.RVB_BATTLE_AUTHORITY_V2
+const TEST_PROFILE_IDENTITY = getServerGameProfileIdentityV1()
 beforeAll(() => { process.env.RVB_BATTLE_AUTHORITY_V2 = '1' })
 afterAll(() => {
   if (originalAuthorityV2Flag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
@@ -141,6 +144,7 @@ describe('RED-109 authority v2 coordinator', () => {
           selectedPieces: getDefaultDemoRosterSelection('light'),
           rosterLocked: true,
           rosterManifestVersion: DEMO_ROSTER_MANIFEST_VERSION,
+          profileIdentity: TEST_PROFILE_IDENTITY,
         },
         {
           id: 'player-blue',
@@ -150,6 +154,7 @@ describe('RED-109 authority v2 coordinator', () => {
           selectedPieces: getDefaultDemoRosterSelection('dark'),
           rosterLocked: true,
           rosterManifestVersion: DEMO_ROSTER_MANIFEST_VERSION,
+          profileIdentity: TEST_PROFILE_IDENTITY,
         },
       ],
       spectators: [],
@@ -218,6 +223,7 @@ describe('RED-109 authority v2 coordinator', () => {
           selectedPieces: getDefaultDemoRosterSelection('light'),
           rosterLocked: true,
           rosterManifestVersion: DEMO_ROSTER_MANIFEST_VERSION,
+          profileIdentity: TEST_PROFILE_IDENTITY,
         },
         {
           id: 'player-blue',
@@ -227,6 +233,7 @@ describe('RED-109 authority v2 coordinator', () => {
           selectedPieces: getDefaultDemoRosterSelection('dark'),
           rosterLocked: true,
           rosterManifestVersion: DEMO_ROSTER_MANIFEST_VERSION,
+          profileIdentity: TEST_PROFILE_IDENTITY,
         },
       ],
       spectators: [],
@@ -542,6 +549,7 @@ function makeRoom(): Room {
       'piece-blue': { x: 8, y: 8 },
     },
   }
+  pinTestBattleState(state, 109)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: 109 }), ['player-red', 'player-blue'])
   return {
     id: 'red109-authority-v2',
@@ -557,6 +565,6 @@ function makeRoom(): Room {
     version: 9,
     battleAuthorityVersion: 1,
     battleAuthorityTransitionHash: 'a'.repeat(64),
-    battleState: { type: 'server-state', seed: 109, state } as any,
+    battleState: createTestServerBattleState(state, 109),
   }
 }

@@ -10,14 +10,17 @@ import {
   hashPublicBattleState,
   type BattleAuthorityProtocolVersion,
 } from '../game/battle-public-patch'
-import { getBattleStorage } from '../game/battle-storage'
+import {
+  getBattleStorage,
+  validateServerBattleStateV1,
+  type ServerBattleState,
+} from '../game/battle-storage'
 import {
   hashStable,
   materializeBattleTraceForTerminal,
   type BattleActionTrace,
   type BattleReplayFrame,
 } from '../game/battle-trace'
-import type { ServerBattleState } from '../game/battle-storage'
 import {
   assertBattleAuthorityRestoreCheckpoint,
   createBattleAuthorityGenesisHash,
@@ -404,9 +407,64 @@ function assertBattleAuthorityCheckpointSeed(
   }
 }
 
+function assertSameBattleStorageProfile(
+  actual: ServerBattleState,
+  expected: ServerBattleState,
+  context: string,
+): void {
+  if (
+    actual.rootSeed !== expected.rootSeed
+    || hashStable(actual.profileIdentity) !== hashStable(expected.profileIdentity)
+  ) {
+    throw pinnedAuthorityError(`Battle authority profile pin changed in ${context}`)
+  }
+}
+
+function assertBattleAuthorityTraceProfile(
+  storage: ServerBattleState,
+  traces: readonly BattleActionTrace[],
+  context: string,
+): void {
+  for (const trace of traces) {
+    if (
+      trace.rootSeed !== storage.rootSeed
+      || hashStable(trace.profileIdentity) !== hashStable(storage.profileIdentity)
+    ) {
+      throw pinnedAuthorityError(`Battle authority trace profile pin mismatch in ${context}`)
+    }
+  }
+}
+
+function assertSerializedBattleAuthorityTraceProfile(
+  storage: ServerBattleState,
+  traceJson: string | null,
+  context: string,
+): void {
+  try {
+    assertBattleAuthorityTraceProfile(storage, parseJsonArray<BattleActionTrace>(traceJson), context)
+  } catch (error) {
+    if ((error as { code?: unknown })?.code === 'PINNED_PROFILE_UNAVAILABLE') throw error
+    throw pinnedAuthorityError(`Battle authority trace profile pin is unreadable in ${context}`)
+  }
+}
+
+function pinnedAuthorityError(message: string): Error {
+  return Object.assign(new Error(message), { code: 'PINNED_PROFILE_UNAVAILABLE' })
+}
+
 function assertBattleAuthorityTransitionMetadata(input: CommitBattleAuthorityTransitionInput): string {
   const roomId = normalizeRoomId(input.roomId)
   const existingProtocolVersion = authorityProtocolCache.get(roomId)
+  const nextStorage = getBattleStorage(input.nextRoom)
+  if (!nextStorage) {
+    throw pinnedAuthorityError(`Battle authority next state is missing in ${roomId}`)
+  }
+  for (const checkpoint of [input.baseCheckpoint, input.checkpoint]) {
+    if (!checkpoint) continue
+    const checkpointStorage = validateServerBattleStateV1(checkpoint.storage)
+    assertSameBattleStorageProfile(checkpointStorage, nextStorage, `${roomId} checkpoint`)
+  }
+  assertBattleAuthorityTraceProfile(nextStorage, input.transition.traces, `${roomId} transition`)
   if (
     input.nextRoom.id.trim().toLowerCase() !== roomId
     || input.transition.roomId !== roomId
@@ -602,6 +660,7 @@ export async function initializeBattleAuthorityCheckpoint(input: {
   publicHash: string
 }): Promise<void> {
   await setBattleAuthoritySqliteBusyTimeout()
+  const storage = validateServerBattleStateV1(input.storage)
   const roomId = normalizeRoomId(input.room.id)
   const authorityVersion = roomBattleAuthorityVersion(input.room)
   const transitionHash = createBattleAuthorityGenesisHash({
@@ -609,13 +668,13 @@ export async function initializeBattleAuthorityCheckpoint(input: {
     stateHash: input.stateHash,
     publicHash: input.publicHash,
   })
-  const persistedSeed = encodeBattleAuthorityCheckpointSeed(input.storage.seed)
+  const persistedSeed = encodeBattleAuthorityCheckpointSeed(storage.rootSeed)
   await prisma.battleAuthorityCheckpoint.upsert({
     where: { roomId_authorityVersion: { roomId, authorityVersion } },
     update: {
       protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
       seed: persistedSeed,
-      stateJson: JSON.stringify(input.storage),
+      stateJson: JSON.stringify(storage),
       stateHash: input.stateHash,
       publicHash: input.publicHash,
       transitionHash,
@@ -626,7 +685,7 @@ export async function initializeBattleAuthorityCheckpoint(input: {
       authorityVersion,
       protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
       seed: persistedSeed,
-      stateJson: JSON.stringify(input.storage),
+      stateJson: JSON.stringify(storage),
       stateHash: input.stateHash,
       publicHash: input.publicHash,
       transitionHash,
@@ -658,7 +717,7 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
   )
   if (!checkpoint) return room
 
-  const checkpointStorage = JSON.parse(checkpoint.stateJson) as ServerBattleState
+  const checkpointStorage = validateServerBattleStateV1(JSON.parse(checkpoint.stateJson))
   const checkpointProtocolVersion = assertBattleAuthorityProtocolVersion(
     checkpoint.protocolVersion,
     roomId,
@@ -668,7 +727,7 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
     roomId,
     checkpoint.authorityVersion,
     checkpoint.seed,
-    checkpointStorage.seed,
+    checkpointStorage.rootSeed,
   )
   const checkpointTransitionHash = checkpoint.transitionHash || (
     checkpoint.authorityVersion === 0
@@ -690,8 +749,15 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
     },
     orderBy: { toVersion: 'asc' },
   })
+  for (const transition of allTransitions) {
+    assertSerializedBattleAuthorityTraceProfile(
+      checkpointStorage,
+      transition.traceJson,
+      `${roomId}@${transition.toVersion}`,
+    )
+  }
   const transitions = allTransitions.filter(transition => transition.toVersion > checkpoint.authorityVersion)
-  const storage = replayBattleAuthorityTransitions({
+  const storage = validateServerBattleStateV1(replayBattleAuthorityTransitions({
     roomId,
     checkpointStorage,
     checkpointProtocolVersion,
@@ -732,7 +798,7 @@ export async function restoreBattleAuthorityRoom(room: Room): Promise<Room> {
       traces: transition.traceJson ? JSON.parse(transition.traceJson) : [],
       replayFrames: transition.replayFrameJson ? JSON.parse(transition.replayFrameJson) : [],
     })),
-  })
+  }))
 
   const restored: Room = {
     ...room,

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { hashBattleState } from '@/lib/game/battle-trace'
+import { toPublicBattleState } from '@/lib/game/deployment'
 import {
   buildBattleAuthorityTransition,
   hashBattleAuthorityTransition,
@@ -7,6 +8,7 @@ import {
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
 import type { ServerBattleState } from '@/lib/game/battle-storage'
+import { createTestServerBattleState } from './profile-test-identity'
 import { RoomStore, type Room } from '@/lib/game/room-store'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 
@@ -285,8 +287,8 @@ function transitionInput(
     command,
     previousStorage: previous,
     nextStorage: next,
-    previousPublicState: previous.state as BattleState,
-    nextPublicState: next.state as BattleState,
+    previousPublicState: toPublicBattleState(previous.state as BattleState),
+    nextPublicState: toPublicBattleState(next.state as BattleState),
     preStateHash: hashBattleState(previous.state as BattleState),
     postStateHash: hashBattleState(next.state as BattleState),
     previousTransitionHash,
@@ -316,14 +318,10 @@ function transitionInput(
 }
 
 function storageAt(revision: number): ServerBattleState {
-  return {
-    type: 'server-state',
-    seed: 109,
-    state: {
-      pieces: [],
-      players: [],
-      turn: { turnNumber: 1, phase: 'action', currentPlayerId: 'player-red' },
-      authorityTestRevision: revision,
-    },
-  }
+  return createTestServerBattleState({
+    pieces: [],
+    players: [],
+    turn: { turnNumber: 1, phase: 'action', currentPlayerId: 'player-red' },
+    authorityTestRevision: revision,
+  })
 }
