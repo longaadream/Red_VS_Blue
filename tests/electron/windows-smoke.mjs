@@ -344,6 +344,8 @@ async function probeGameWebSocket(url) {
         type: 'subscribe',
         roomId: '__lobby',
         playerId: 'red53-windows-smoke',
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
       }))
       socket.send(JSON.stringify({
         type: 'rpc',

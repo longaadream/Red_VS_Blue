@@ -2133,12 +2133,30 @@
     }
 
     function requestAuthorityRecovery(reason) {
+      if (window.RvBWs && typeof RvBWs.requestAuthoritySync === 'function') {
+        RvBWs.requestAuthoritySync(reason || 'unknown')
+        return Promise.resolve()
+      }
       if (authorityRecoveryPromise) return authorityRecoveryPromise
       addLog('[authority] 请求完整快照：' + (reason || 'unknown'), 'err')
       authorityRecoveryPromise = Promise.resolve()
         .then(function () { return recoverBattleStateViaWs() })
         .finally(function () { authorityRecoveryPromise = null })
       return authorityRecoveryPromise
+    }
+
+    function clearAuthorityConflictInteraction() {
+      pendingOptionAction = null
+      pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
+      locallyCancelledSelectionId = null
+      _pickerOptions = []
+      _pendingChoiceShown = null
+      const optionOverlay = document.getElementById('optionPickerOverlay')
+      if (optionOverlay) optionOverlay.classList.remove('show')
+      rejectPendingActionFeedback(
+        'authority-conflict',
+        '权威版本冲突，正在同步服务端状态；本次操作不会自动重放',
+      )
     }
 
     function applyAuthorityReceipt(receipt, serverTimings, clientApplyMs, options) {
@@ -4017,6 +4035,7 @@
         var previousPresentationModel = currentBattleViewModel || createBattlePresentationModel(oldG)
         var envelope = {
           protocolVersion: msg.protocolVersion,
+          authorityBuildId: msg.authorityBuildId,
           roomId: msg.roomId,
           fromVersion: msg.fromVersion,
           toVersion: msg.toVersion,
@@ -4102,6 +4121,27 @@
         rejectPendingActionFeedback('disconnect', '连接已断开；待确认指令已取消')
       })
 
+      RvBWs.on('authoritySyncStart', function() {
+        clearAuthorityConflictInteraction()
+        addLog('[authority] 检测到版本冲突，正在请求服务端完整快照', 'err')
+      })
+
+      RvBWs.on('authoritySyncComplete', function() {
+        addLog('[authority] 已同步服务端状态；请重新确认操作', 'info')
+        renderActionBar()
+        setStatusMsg('已同步服务端状态，请重新确认操作')
+      })
+
+      RvBWs.on('authoritySyncTimeout', function() {
+        addLog('[authority] 服务端状态同步超时；未确认恢复', 'err')
+        renderActionBar()
+        setStatusMsg('服务端状态同步超时，未确认恢复；请重连后再操作')
+      })
+
+      RvBWs.on('authoritySyncBlocked', function() {
+        setStatusMsg('正在同步服务端状态，请等待完成后重新操作')
+      })
+
       RvBWs.on('message', function(msg) {
         if (msg.to && String(msg.to).toLowerCase() !== myPlayerId) return
         if (msg.type === 'subscribed') {
@@ -4181,6 +4221,17 @@
           }
           const rejectionMessage = msg.error || 'unknown error'
           red50Evidence.rejections.push({ code: msg.code || '', message: rejectionMessage, at: Date.now() })
+          if (msg.code === 'ROOM_VERSION_CONFLICT') {
+            addLog('权威版本冲突：本次操作已取消，正在同步服务端状态', 'err')
+            setStatusMsg('权威版本冲突，正在同步服务端状态；本次操作不会自动重放')
+            return
+          }
+          if (msg.code === 'BATTLE_AUTHORITY_PERSISTENCE_DEGRADED') {
+            clearAuthorityConflictInteraction()
+            addLog('服务端权威持久化已降级；房间暂停，不能继续提交动作', 'err')
+            setStatusMsg('服务端持久化异常，房间已暂停；请保留日志并重启服务端')
+            return
+          }
           const rejectedPending = msg.action && (
             (msg.action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
             || (msg.action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
@@ -5742,7 +5793,8 @@
     function battleAuthorityCommandMessage(action, auth, extra) {
       return Object.assign({
         type: 'action',
-        protocolVersion: 2,
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
         roomId: roomId,
         clientActionId: action.clientActionId,
         expectedAuthorityVersion: Number.isSafeInteger(latestAuthorityVersion) ? latestAuthorityVersion : 0,
@@ -5846,6 +5898,14 @@
     }
 
     async function doAction(action) {
+      if (
+        typeof RvBWs !== 'undefined'
+        && RvBWs.isAuthoritySyncing
+        && RvBWs.isAuthoritySyncing()
+      ) {
+        setStatusMsg('正在同步服务端状态，请等待完成后重新操作')
+        return
+      }
       action = withClientActionId(action)
       if (typeof beginPendingActionFeedback === 'function' && !beginPendingActionFeedback(action)) return
       if (TRAINING_MODE) { await trainingDoAction(action); return }
@@ -5870,7 +5930,11 @@
         if (wsMode === 'relay') {
           relaySeq++
           var relayActionAuth = await createBattleActionAuth(action)
-          RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth, { seq: relaySeq, prevStateHash: latestAuthorityStateHash || '' }))
+          var relaySubmitted = RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth, { seq: relaySeq, prevStateHash: latestAuthorityStateHash || '' }))
+          if (relaySubmitted === false) {
+            rejectPendingActionFeedback('authority-syncing', '正在同步服务端状态；本次操作未发送')
+            return
+          }
           schedulePendingActionPresentation()
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
@@ -5883,7 +5947,11 @@
         // LAN WS: submit action via WS only.
         if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
           var lanActionAuth = await createBattleActionAuth(action)
-          RvBWs.send(battleAuthorityCommandMessage(action, lanActionAuth))
+          var lanSubmitted = RvBWs.send(battleAuthorityCommandMessage(action, lanActionAuth))
+          if (lanSubmitted === false) {
+            rejectPendingActionFeedback('authority-syncing', '正在同步服务端状态；本次操作未发送')
+            return
+          }
           schedulePendingActionPresentation()
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
