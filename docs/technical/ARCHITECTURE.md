@@ -4,6 +4,7 @@
 
 基线：`594977b`（2026-08-12）
 架构约定更新：2026-08-18（RED-34）
+自治服务器约定更新：2026-08-31（RED-140，基线 `f51a5eed2a37be6491841a19393b0725ad188554`）
 
 首要公开测试模式：先完成 LAN Windows/Electron；Android 后续按 RED-81 迁移到同一权威状态标准
 
@@ -42,6 +43,12 @@
 5. `electron/main.ts` 加载服务管理界面。
 
 失败行为：子进程、端口、standalone 资源或注入代理失败均可能导致应用不能进入可用状态。目前没有覆盖整条链的自动冒烟测试。
+
+当前 `win-unpacked` 仍只是内部 QA 候选。RED-140 已接受把独立 Windows Server 扩展为公开自治
+Server 的目标架构，但安装器、签名、监督器、备份、更新和候选验证尚未实现；在 RED-148 完成并经
+人工发布批准前，不得把现有目录产物称为公开发行物。目标发行与运维边界见
+[ADR-0021](../decisions/ADR-0021-autonomous-server-operations.md) 和
+[Server Operations v1](./SERVER_OPERATIONS_V1.md)。
 
 ### 3.2 Windows/Electron 玩家客户端标准流程
 
@@ -116,6 +123,11 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 - 不兼容公开测试前的旧存档；兼容承诺从新版本化存档格式开始。
 - 先恢复稳定运行和可观察性，再做模块拆分。
 - 动态代码由一个受信任内容运行时集中编译并按 `{surface,id,version,codeHash}` 缓存、精准失效；编译函数只存内存。若未来运行不受信任脚本，必须另建独立隔离方案。
+- 独立 Windows 自治 Server 的整体生命周期、进程、文件、备份和应用更新只有 Electron main 一个
+  写权威；renderer 只通过受信 preload IPC 消费版本化状态，Next/RoomRuntime 只提供准入、健康、
+  durable 水位和房间观察值。
+- 自治 Server 的本地管理面与玩家 WebSocket 分离：只允许 loopback transport 加每进程随机
+  capability，不信任 Host、Origin、X-Forwarded-For，也不复用静态 `admin-secret-key`。
 
 ## 8. 延期愿景索引
 
@@ -124,12 +136,14 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 | 模块 | 已确认方向 | 当前处理 |
 | --- | --- | --- |
 | 存档与恢复 | 掉线暂停；参与者持有记录；不兼容公开测试前旧存档 | 延期，先恢复运行基线 |
-| 身份与签名 | 玩家命令和服务端结果分别签名；服务器身份可备份、迁移和撤销 | High Risk，另建威胁模型 |
+| 身份与签名 | RED-140 已冻结本服 UUID、release manifest 签名与备份迁移；跨服证明、账号恢复和撤销网络仍延期 | 本服最小闭环见 ADR-0021；跨服能力仍需独立 High Risk 威胁模型 |
 | 加密与随机 | 存档/传输加密；隐藏信息隔离；随机过程最终可审计 | High Risk，暂不选算法 |
 | 服务器规则 | 服务器规则自治；规则/数据 hash 一致才开局；规则脚本需沙箱 | High Risk，先验证现有规则引擎 |
 | 回放与账号 | 正常终局自动匿名回放；账号私钥可加密备份 | 长期产品模块 |
 
-详细字段、密码算法、密钥生命周期、沙箱 ABI 和托管方式都不是当前承诺。需要处理某模块时，再从已确认方向开始做不超过 1～3 天的小任务。
+ADR-0021 已固定 Windows Server 发行清单的 Ed25519 签名、Authenticode、密钥轮换和本服 UUID；
+它不批准玩家账号密钥、跨服信任、撤销网络、端到端加密或规则脚本沙箱。后者的详细字段、算法和
+托管方式仍不是当前承诺，必须另建 High Risk 任务。
 
 ## 9. Demo 边界
 
@@ -151,6 +165,8 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 - `GAME_LOGIC_SYSTEM.md`：权威边界、接口、流程图、Android 迁移和动态代码执行说明。
 - `DEBUGGING.md`：故障基线、日志、测试和复现流程。
 - `MODULE_STATUS.md`：当前状态、风险和后续任务优先级。
+- `SERVER_OPERATIONS_V1.md`：自治 Server 生命周期、管理 API、发行身份、备份和更新合同。
+- `ADR-0021-autonomous-server-operations.md`：公开自治 Server 的产品、发行与安全决策。
 
 ## 11. RED-109 低延迟权威管线
 
@@ -174,3 +190,20 @@ v2 持久化链只允许完整恢复，不允许与 v3 继续混写；客户端�
 规则/技能 JSON 默认按服务进程缓存；显式内容刷新会清缓存。每步 Trace 进入 append-only journal，热状态
 只保留确定性游标和序号，终局再物化完整 Trace v2。具体协议、恢复、性能门槛和回退见
 `docs/decisions/ADR-0017-authority-transition-pipeline.md`。
+
+## 12. RED-140 Windows 自治 Server 合同
+
+RED-140 只冻结跨模块合同，不改变当前运行时。获准的 v1 目标同时支持 Windows 10 22H2 x64 与
+Windows 11 x64；Windows 10 的应用兼容承诺不表示微软仍为其提供常规系统安全支持。公开形态包含
+per-user assisted NSIS、update ZIP 与 signed runtime catalog；`win-unpacked` 继续只供内部 QA，
+不提供公开 Portable、Windows Service、开机自启或静默更新。
+
+整体生命周期使用 `stopped | starting | ready | maintenance | draining | stopping | degraded |
+failed | updating | rollback-required`。`ready` 不是“进程存在”，而是 process、HTTP/WS、DB schema、
+管理 API、持久化、RoomRuntime、Profile 与 release tuple 全部通过；单个房间 durable 失败保持房间级
+degraded，不应拖死其他房间或自动把全服改成 degraded。
+
+应用更新固定走 maintenance、blocker/drain、verified backup、side-by-side stage/migrate/health、原子
+commit 和 reopen。Profile 激活仍由 RED-115 的独立状态机负责；房间身份复用 RED-116，玩家协议复用
+RED-127，FIFO/WAL/有限重试和 durable 水位复用 RED-131。具体 schema、转换、错误、超时、数据根、
+威胁与故障矩阵以 [Server Operations v1](./SERVER_OPERATIONS_V1.md) 为唯一合同。

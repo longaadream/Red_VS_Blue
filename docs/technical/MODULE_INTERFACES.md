@@ -4,6 +4,8 @@
 
 基线：`594977b`
 
+接口约定更新：2026-08-31（RED-140，基线 `f51a5eed2a37be6491841a19393b0725ad188554`）
+
 本文件记录当前真实接口。标为“愿景”的内容尚未实现。
 
 本文面向开发和调试，按模块查阅即可；人工审查入口统一放在 `MODULE_STATUS.md`。
@@ -160,32 +162,30 @@
 ## 6. WebSocket 服务
 
 - 入口：`lib/ws-server.ts::startWsServer()`。
-- 职责：房间连接、玩家消息、开始游戏、执行动作和广播状态。
-- 输入：字符串 JSON 消息，如 `action`、房间/选择消息。
-- 输出：`stateUpdate`、房间状态或错误消息。
+- 职责：统一承载玩家健康探测、目录、大厅/房间、选择、战斗命令、权威回执、patch、快照与恢复。
+- 输入：`/ws/rooms/{roomId}` 上的版本化 RPC 或战斗命令；RPC 使用 `requestId`，战斗写入另用
+  `clientActionId` 保证权威幂等。
+- 输出：结构化 RPC 结果、权威 receipt、recipient-specific patch、完整恢复快照或结构化错误。
 - 调用方：`instrumentation.ts`；客户端 `RvBWs`。
-- 调用：`RoomStore`、战斗初始化、`runBattleAction()`。
+- 调用：`RoomStore`、战斗初始化、`dispatchRoomBattleAction()`。
 - 状态变化：内存连接表、房间、Prisma 状态和广播序列。
-- 错误：解析、房间不存在、规则异常、数据库异常；错误 envelope 不统一。
+- 错误：协议/build/Profile、房间、规则、版本或持久化错误使用稳定 code；同一连接内相同
+  `requestId` 与相同 payload 重放原结果，不同 payload 返回 `RPC_REQUEST_ID_CONFLICT`。
 - 日志：控制台和局部捕获。
-- 测试：没有确认到 WS 集成测试。
-- 已知问题：部分空 catch；协议无公共版本；种子生成与初始化顺序不统一。
+- 测试：`tests/ws-server.test.ts` 及权威 transition/transport 套件。
+- 管理边界：玩家 WS 不承载 Server 运维命令、备份、更新或管理 capability。RED-140 的管理面必须
+  使用独立 loopback transport。
 - 最小调试：记录 roomId、connection/player、message type、action ID、seed、前后 hash。
 
-## 7. 房间 HTTP 动作 API
+## 7. 旧玩家 HTTP 动作 API
 
-- 入口：`app/api/rooms/[roomId]/battle/route.ts::POST`。
-- 职责：WebSocket 之外执行房间动作并广播。
-- 输入：URL roomId 和请求 JSON 动作。
-- 输出：新状态或 HTTP 错误响应。
-- 调用方：浏览器/客户端 HTTP 后备路径。
-- 调用：`dispatchRoomBattleAction()`、`RoomStore.setRoomIfVersion()`、WS 广播。
-- 状态变化：房间战斗状态和数据库修订号。
-- 错误：无效 JSON、房间不存在、规则/数据库错误；持续 CAS 竞争返回 `ROOM_VERSION_CONFLICT`（409），终局后的竞争动作返回 `BATTLE_ALREADY_TERMINAL`（400）。
-- 日志：API 控制台输出。
-- 测试：`tests/roster-transports.test.ts` 覆盖 HTTP/WS 同状态与并发双投降；终局守卫另见 `tests/game/terminal-transport.test.ts`。
-- 已知问题：HTTP 与 WS 的选择错误 envelope 仍不完全相同；真实 Prisma 多实例竞争尚无 E2E。
-- 最小调试：使用同一房间快照分别走 WS/HTTP，比较状态 hash。
+- 旧 `/api/ping`、目录和 `/api/rooms/**` 玩家入口由 ADR-0020/RED-127 在实际同端口运行边界
+  统一返回 HTTP 410 与 `PLAYER_REST_DISABLED`；不存在玩家 HTTP fallback。
+- `app/api/rooms/**` 中仍保留的历史 route 不能作为新客户端或管理功能的调用依据。
+- 静态资源、WebSocket Upgrade 与管理 HTTP 是不同边界。RED-140 批准的
+  `rvb-server-operations/v1` 不得挂到公开玩家端口、复用这些 route 或信任静态
+  `admin-secret-key`。
+- 回退玩家传输时必须整体回退 ADR-0020，不能只恢复页面 fallback。
 
 ## 8. RoomStore 和战斗存储
 
@@ -301,20 +301,20 @@
   很小的 sender 判定模块，语义由同一测试矩阵锁定。
 - 最小调试：记录 channel、请求 ID、参数摘要、结果类型和异常栈，禁止记录密钥。
 
-### 10.1 Electron 资源包存储
+### 10.1 Electron Content Profile 存储
 
-- 入口：客户端 `pack-import-from-path`/`pack-import-data`，服务端 dashboard 资源包导入，
-  以及 `lib/resource-pack.ts::syncResourcePack()`。
-- 存储：`userData/resource-pack/versions/<sha256>/` 为不可变版本，`active.json` 是唯一活动
-  指针；旧版固定 `resource-pack/data` 只在尚不存在指针时作为读取兼容回退。
-- 激活类型：仅 `data/**/*.json` 与 `images/**/*.{jpg,jpeg,png,webp}`；内置 HTML/JS/CSS/SVG
-  不接受热更新。
-- 事务边界：ZIP 中央目录、预算、entry 类型、manifest 和内容全部验证成功后，staging 才
-  重命名为版本目录并原子切换指针。失败不改变当前活动版本。
-- 测试：`tests/electron/resource-pack-security.test.ts` 覆盖路径穿越、绝对/盘符/反斜杠路径、
-  大小写冲突、符号链接、非法 JSON、预算、活动内容隔离、失败不切换和清除回退。
-- 回退：优先把 `active.json.version` 切回 `previousVersion`；代码回退使用 RED-24 PR revert，
-  不删除已有版本目录。
+- 唯一当前合同是 RED-115 的 `<userData>/resource-pack` Profile store：
+  `packages/<packageHash>` 保存验证过的包，`profiles/<resolvedProfileHash>` 保存不可变完整
+  snapshot，`active.json` 使用 `rvb-profile-state/v1` 记录 stable/candidate/previousStable、
+  activation、失败与 revision。
+- Electron 只协调生命周期；manifest/schema/signature/resolution 统一由 Content Pipeline core
+  处理。安装、激活、previous-stable 和 Bundled Base 回退不得由应用 updater 直接修改指针。
+- authority restart 复用 admission fence、Profile lease、durable drain、candidate health、原子
+  commit 与崩溃恢复。应用二进制更新与 Profile 激活是两个状态机，只共享 RED-140 的全局
+  operation coordinator。
+- 身份和房间 pin 复用 RED-116 的 `engineAbi + runnerRevision + authorityContentHash` 硬门禁；
+  `resolvedProfileHash` 用于完整资源/provenance/诊断。
+- 完整边界见 `CONTENT_PROFILE_V1_RUNTIME.md` 与 `RESOLVED_PROFILE_ROOM_HANDSHAKE.md`。
 
 ## 11. Android 资源构建
 
@@ -457,3 +457,33 @@ interface ServerCore {
   `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只关 async flag 即回退 ACK 前原子 DB 提交。
   `RVB_TURN_TIMER_ENABLED=1` 才安排部署/回合计时唤醒。`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
 - 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；version > 0 缺检查点、版本断层、pre/post state/public hash、action hash 或 transition hash 链损坏都必须显式失败。
+
+## RED-140 自治 Server 运维与发行接口
+
+RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯一详细规范为
+[`SERVER_OPERATIONS_V1.md`](./SERVER_OPERATIONS_V1.md)；后续实现不得在各模块自行发明字段。
+
+- **Owner**：Electron main 独占 OS、process、file、backup、restore、application update 和整体
+  lifecycle 写能力；Next child 只提供 admission、ingress drain、Profile health 与 RoomRuntime
+  inspect；renderer 只通过受信 preload IPC 读状态和提交命令。
+- **IPC**：固定 `rvb-server-operations:v1:*` channel，经现有 trusted sender 包装；preload 只暴露
+  `getState / execute / cancel / getOperation / listRooms / getRoom` 与
+  `listBackups / checkUpdates / planCleanup / approve / subscribe`，不暴露 raw IPC、管理 key、PID
+  或文件路径。
+- **管理 transport**：独立 `127.0.0.1:<ephemeral>` listener；先按真实 socket peer 判 loopback，再
+  constant-time 校验每次 child spawn 新生成的 256-bit capability。它不使用玩家 WS、公开
+  `/api/*`、CORS、Host/Origin/X-Forwarded-For 或静态 admin key。
+- **命令**：所有 mutation 带 `requestId`、durable `operationId` 和
+  `expectedStateRevision`；全局 single-flight，同 ID/同 canonical payload 重放结果，同 ID/不同
+  payload 拒绝，renderer 超时不取消 operation。
+- **房间观察**：只能适配 RED-131 的 room FIFO、journal、WAL、有限重试、restore/drain 与 durable
+  水位。单房 degraded 只形成房间 warning；只有全局准入或安全条件受损才进入顶层 `degraded`。
+- **终局屏障**：只有 `terminalBarrier=durable` 且
+  `durableAuthorityVersion >= terminalAuthorityVersion` 的终局才能交给本服竞技账本。
+- **发行身份**：`rvb-release-identity/v1` 固定 app、commit、NSIS/update ZIP/runtime catalog、
+  runtime inventory、platform/arch、battle protocol/build、engine/runner、bundled Profile、DB
+  schema、management API 与签名身份；
+  mutable active Profile 另列，不能改变 release identity。
+- **竞技命名空间**：serverId 是备份保留的本机随机 UUID，seasonId 是其子命名空间；它不提供
+  跨服密码学证明。恢复同一 serverId 视为迁移，本机 data-root lock 只阻止同 root 双写；跨主机
+  split-brain 不在 v1 保证内，平行副本不受支持，克隆必须显式重置身份。

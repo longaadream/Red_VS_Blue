@@ -98,7 +98,7 @@
 
 - [`ADR-0001-deployment-visibility.md`](./ADR-0001-deployment-visibility.md)：部署重投阶段公开双方站位。
 - [`ADR-0002-match-identity-model.md`](./ADR-0002-match-identity-model.md)：分离对局座位、内容阵营、所有权与先后手。
-- [`ADR-0003-electron-server-packaging.md`](./ADR-0003-electron-server-packaging.md)：保留 Electron Server 内部候选打包入口，但不作为公开发行物（RED-23，已接受）。
+- [`ADR-0003-electron-server-packaging.md`](./ADR-0003-electron-server-packaging.md)：保留 Electron Server 内部候选打包入口的历史边界（RED-23，已由 ADR-0021 取代）。
 - [`ADR-0004-deterministic-rule-runtime.md`](./ADR-0004-deterministic-rule-runtime.md)：权威规则使用根种子、命名随机流、确定性实例 ID 与逻辑时钟（RED-28，已接受）。
 - [`ADR-0004-battle-presentation-boundary.md`](./ADR-0004-battle-presentation-boundary.md)：定义战场 Three.js、DOM HUD、展示模型与用户意图的单向边界（RED-48，提议中）。
 - [`ADR-0005-authoritative-target-selection.md`](./ADR-0005-authoritative-target-selection.md)：提议以纯查询、精确候选和版本凭证统一 UI、AI 与服务端目标语义（RED-59）。
@@ -116,6 +116,7 @@
 - [`ADR-0017-offline-self-play-league.md`](./ADR-0017-offline-self-play-league.md)：离线成对自博弈使用不可变历史档案、seed 分层和合法性/终止性硬门禁（RED-87，提议中）。
 - [`ADR-0018-content-pipeline-v1.md`](./ADR-0018-content-pipeline-v1.md)：已接受以统一开放包、确定性 Resolved Profile 与声明式 PVE 合同支撑第一方和社区内容管线（RED-111、RED-113）。
 - [`ADR-0019-selectable-demo-maps.md`](./ADR-0019-selectable-demo-maps.md)：正式 Demo 使用受控四图目录、房间冻结选择并在所有传输边界失败关闭（RED-119，已接受）。
+- [`ADR-0021-autonomous-server-operations.md`](./ADR-0021-autonomous-server-operations.md)：Windows 自治 Server 的公开发行、受信本地运维、备份更新与回退边界（RED-140，已接受；取代 ADR-0003）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 
@@ -128,4 +129,4 @@
 - 核心规则应逐步与 UI 和 Electron 系统能力解耦。
 - 游戏随机行为应逐步支持固定种子和重放。
 - 存档格式应带版本号并具备迁移测试。
-- 当前发布目标是持续生成内部候选版本，正式对外发布保留人工批准。
+- 当前 Electron Server `win-unpacked` 仍只作为内部候选；面向服主的 Windows 公开发行方向已由 ADR-0021 批准，但须等待 RED-148 实现并验证 NSIS、update ZIP、signed runtime catalog、签名、更新与回退门禁，正式发布仍保留人工批准。
