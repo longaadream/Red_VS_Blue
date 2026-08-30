@@ -1162,13 +1162,13 @@
         if (!localRuntimeUrl) {
           throw new Error('本地 Profile 运行时不可用，请重启客户端后重试')
         }
-        const catalog = await RvBWs.requestAt(localRuntimeUrl, 'catalog.identity', {}, 3000)
+        const catalog = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
         identity = catalog && catalog.profileIdentity
       } else {
         const localRuntimeUrl = /^https?:$/.test(window.location.protocol)
           ? window.location.origin
           : serverUrl
-        const catalog = await RvBWs.requestAt(localRuntimeUrl, 'catalog.identity', {}, 3000)
+        const catalog = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
         identity = catalog && catalog.profileIdentity
       }
 
@@ -1198,11 +1198,13 @@
         return false
       }
       try {
-        const data = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
+        const data = await RvBWs.requestCatalogIdentityAt(serverUrl, 'remote-server')
         if (data && data.profileIdentity) {
           try { localStorage.setItem('rvb_server_profile_identity', JSON.stringify(data.profileIdentity)) } catch {}
         }
-      } catch {}
+      } catch (error) {
+        console.warn('[profile] remote catalog identity preflight failed', error)
+      }
       goLobby(mode, serverUrl)
       return true
     }

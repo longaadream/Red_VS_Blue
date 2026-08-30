@@ -474,14 +474,14 @@
         if (!localRuntimeUrl) {
           throw new Error('本地 Profile 运行时不可用，请重启客户端后重试')
         }
-        const catalogIdentity = await RvBWs.requestAt(localRuntimeUrl, 'catalog.identity', {}, 3000)
+        const catalogIdentity = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
         profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
       } else if (!profileIdentity) {
         const localRuntimeUrl = /^https?:$/.test(window.location.protocol)
           ? window.location.origin
           : ''
         const catalogIdentity = localRuntimeUrl
-          ? await RvBWs.requestAt(localRuntimeUrl, 'catalog.identity', {}, 3000)
+          ? await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
           : await lobbyRequest('catalog.identity')
         profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
       }

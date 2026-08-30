@@ -30,6 +30,10 @@ HTTP 房间列表/详情、WebSocket `catalog.identity`、`rooms.list` 与 `room
 Server identity。真人在 join、claim-faction、toggle-ready、select-pieces、显式 start 与自动 start
 路径提交本地 stable identity。
 
+客户端读取本地 stable identity 的 `catalog.identity` 是只读探测：单次等待 5 秒，只有超时、连接失败
+或响应前关闭时允许延迟 250ms 后重试一次。RPC/Profile 错误不得重试；第二次仍失败时必须失败关闭，
+并记录本地/远端阶段、脱敏后的 Server origin 与尝试次数，不得记录 URL 凭据、查询参数或 hash fragment。
+
 校验必须发生在 player、ready、roster、Room version、BattleState 或 checkpoint 变化之前。失败使用
 HTTP 409；WebSocket 使用相同 code、status 与公共 context：
 
