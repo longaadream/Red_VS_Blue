@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto'
+import type { GameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
 import type { BattleState } from './turn'
 import { prisma } from '../db'
 import { isPlayerSeat, normalizeContentAlignment, type ContentAlignment, type PlayerSeat } from './match-identity'
@@ -64,7 +65,7 @@ export interface Player {
   alignment?: PlayerAlignment
   /** Public key used by the decentralized identity/signature flow. */
   publicKey?: string
-  packMd5?: string
+  profileIdentity?: GameProfileIdentityV1
   selectedPieces?: Array<{ templateId: string; faction: string }>
   hasSelectedPieces?: boolean
   /** A confirmed Demo roster. Once true, only an equivalent resubmission is accepted. */
@@ -80,6 +81,7 @@ export interface Spectator {
   id: string
   name: string
   joinedAt: number
+  profileIdentity?: GameProfileIdentityV1
 }
 
 // 房间状态类型

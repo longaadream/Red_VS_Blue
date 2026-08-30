@@ -399,6 +399,8 @@ describe('relay deployment initialization', () => {
     expect(page).not.toContain('verifyRelayBattleActionAuth')
     expect(page).not.toContain('relayAuthorityState')
     expect(wsClient).toContain("type: 'battle-subscribe'")
+    expect(wsClient).toContain("localStorage.getItem('rvb_game_profile_identity')")
+    expect(wsClient).toContain('profileIdentity: profileIdentity')
     expect(wsClient).toContain('signature: await window.RvBIdentity.sign(payload)')
   })
 })

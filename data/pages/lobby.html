@@ -422,6 +422,103 @@
     async function lobbyRequest(method, data, timeoutMs) {
       return wsRequest(method, data, timeoutMs)
     }
+    const GAME_PROFILE_IDENTITY_SCHEMA = 'rvb-game-profile-identity/v1'
+    const BATTLE_RUNNER_REVISION = 'rvb-battle-runner/v1'
+    const SHA256_HEX = /^[a-f0-9]{64}$/
+    const GAME_PROFILE_KEYS = [
+      'schemaVersion',
+      'engineAbi',
+      'runnerRevision',
+      'resolvedProfileHash',
+      'authorityContentHash',
+    ]
+
+    function isGameProfileIdentity(value) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+      const keys = Object.keys(value).sort()
+      const expectedKeys = GAME_PROFILE_KEYS.slice().sort()
+      return keys.length === expectedKeys.length
+        && keys.every((key, index) => key === expectedKeys[index])
+        && value.schemaVersion === GAME_PROFILE_IDENTITY_SCHEMA
+        && typeof value.engineAbi === 'string'
+        && value.engineAbi.length > 0
+        && typeof value.runnerRevision === 'string'
+        && value.runnerRevision.length > 0
+        && SHA256_HEX.test(value.resolvedProfileHash)
+        && SHA256_HEX.test(value.authorityContentHash)
+    }
+
+    function readStoredGameProfileIdentity() {
+      try {
+        const stored = localStorage.getItem('rvb_game_profile_identity')
+        if (!stored) return null
+        const parsed = JSON.parse(stored)
+        return isGameProfileIdentity(parsed) ? parsed : null
+      } catch {
+        return null
+      }
+    }
+
+    async function getLocalGameProfileIdentity() {
+      let profileIdentity = readStoredGameProfileIdentity()
+      if (
+        !profileIdentity
+        &&
+        window.electronAPI
+        && typeof window.electronAPI.getMode === 'function'
+      ) {
+        const mode = await window.electronAPI.getMode()
+        const localRuntimeUrl = mode && typeof mode.localUrl === 'string'
+          ? mode.localUrl.trim()
+          : ''
+        if (!localRuntimeUrl) {
+          throw new Error('本地 Profile 运行时不可用，请重启客户端后重试')
+        }
+        const catalogIdentity = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
+        profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
+      } else if (!profileIdentity) {
+        const localRuntimeUrl = /^https?:$/.test(window.location.protocol)
+          ? window.location.origin
+          : ''
+        const catalogIdentity = localRuntimeUrl
+          ? await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
+          : await lobbyRequest('catalog.identity')
+        profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
+      }
+
+      if (!isGameProfileIdentity(profileIdentity)) {
+        throw new Error('本地 Profile Identity 无效，请返回首页打开“资源包管理”检查安装状态')
+      }
+      try {
+        localStorage.setItem('rvb_game_profile_identity', JSON.stringify(profileIdentity))
+      } catch {}
+      return profileIdentity
+    }
+
+    function summarizeGameProfileIdentity(identity) {
+      if (!identity || typeof identity !== 'object') return '未知'
+      const shortHash = value => typeof value === 'string' ? value.slice(0, 12) : '未知'
+      return [
+        identity.engineAbi || '未知 ABI',
+        identity.runnerRevision || '未知 Runner',
+        'authority=' + shortHash(identity.authorityContentHash),
+        'profile=' + shortHash(identity.resolvedProfileHash),
+      ].join(' · ')
+    }
+
+    function formatProfileError(error) {
+      const code = error && error.code
+      if (!code || !/^(PROFILE_|ENGINE_ABI_|RUNNER_REVISION_|PINNED_PROFILE_)/.test(code)) {
+        return error && error.message ? error.message : String(error)
+      }
+      const context = error.context || {}
+      return [
+        '兼容性检查失败（' + code + '）',
+        '服务器：' + summarizeGameProfileIdentity(context.expected || context.active),
+        '本地：' + summarizeGameProfileIdentity(context.actual || context.pinned),
+        '请留在大厅，返回首页打开“资源包管理”安装或激活匹配版本。',
+      ].join('\n')
+    }
 
     function updateFloatBar() {
       const saved = RvBUtils.getServerUrl()
@@ -567,33 +664,31 @@
         const publicKey = typeof RvBIdentity.getPublicKey === 'function'
           ? RvBIdentity.getPublicKey()
           : (identity.publicKey || '')
-        const packMd5 = localStorage.getItem('rvb_pack_md5') || ''
+        const profileIdentity = await getLocalGameProfileIdentity()
         const requestedAction = action || 'join'
         const payload = { action: requestedAction, roomId, playerId, timestamp: Date.now() }
         const signature = await RvBIdentity.sign(payload)
-        const body = { action: requestedAction, roomId, playerId, playerName, publicKey, payload, signature, packMd5 }
+        const body = { action: requestedAction, roomId, playerId, playerName, publicKey, payload, signature, profileIdentity }
         if (faction) body.alignment = faction
-        const result = await lobbyRequest('rooms.action', body)
-        if (result && result.packMismatch) {
-          alert('⚠️ 警告：双方资源包版本不一致，可能导致技能、棋子数据不同步。请确认双方已导入相同版本的资源包后再开始游戏。')
-        }
+        await lobbyRequest('rooms.action', body)
         window.location.href = 'room.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(playerId)
           + '&playerName=' + encodeURIComponent(playerName)
           + (faction ? '&alignment=' + encodeURIComponent(faction) : '')
           + (shouldUseRelayMode() ? '&relay=1' : '')
-      } catch (e) { alert('加入房间失败：' + e.message) }
+      } catch (e) { alert('加入房间失败：' + formatProfileError(e)) }
     }
 
     async function spectateRoom(roomId) {
       const { id: spectatorId, displayName: spectatorName } = RvBIdentity.getIdentity()
       try {
-        await lobbyRequest('rooms.spectate', { roomId, spectatorId, spectatorName })
+        const profileIdentity = await getLocalGameProfileIdentity()
+        await lobbyRequest('rooms.spectate', { roomId, spectatorId, spectatorName, profileIdentity })
         window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(spectatorId)
           + '&mode=spectate'
           + (shouldUseRelayMode() ? '&relay=1' : '')
-      } catch (e) { alert('观战失败：' + e.message) }
+      } catch (e) { alert('观战失败：' + formatProfileError(e)) }
     }
 
     async function deleteRoom(roomId, event) {
@@ -698,12 +793,13 @@
         const mapId = document.getElementById('mapSelect').value
         if (!mapId) throw new Error('请选择地图')
         await reconcileLobbyServerMode()
-        const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, hostName: playerName, publicKey, mapId, visibility })
+        const profileIdentity = await getLocalGameProfileIdentity()
+        const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, hostName: playerName, publicKey, mapId, visibility, profileIdentity })
         if (room.id) { closeCreateSheet(); showFactionPicker(room.id, 'join') }
         else throw new Error('未返回房间 ID')
       } catch (e) {
         const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || '未设置'
-        errEl.textContent = '创建失败：' + e.message + '（服务器：' + serverUrl + '）'
+        errEl.textContent = '创建失败：' + formatProfileError(e) + '（服务器：' + serverUrl + '）'
         errEl.style.display = 'block'
       }
     }

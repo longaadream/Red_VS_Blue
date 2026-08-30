@@ -10,6 +10,7 @@ import {
   scheduleRoomDeploymentTimeout,
 } from '@/lib/game/room-battle-actions'
 import type { Room } from '@/lib/game/room-store'
+import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -80,6 +81,7 @@ function makeDeploymentRoom(id = 'deployment-room', deadlineAt = 46_000): Room {
       { x: piece.x, y: piece.y },
     ])),
   }
+  pinTestBattleState(state, ROOT_SEED)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: ROOT_SEED }), [...PLAYERS])
 
   return {
@@ -94,11 +96,7 @@ function makeDeploymentRoom(id = 'deployment-room', deadlineAt = 46_000): Room {
     currentTurnIndex: 0,
     actions: [],
     version: 1,
-    battleState: {
-      type: 'server-state',
-      seed: ROOT_SEED,
-      state,
-    } as any,
+    battleState: createTestServerBattleState(state, ROOT_SEED) as any,
   }
 }
 

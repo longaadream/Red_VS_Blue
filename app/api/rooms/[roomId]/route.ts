@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
-import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment, type Player } from "@/lib/game/room-store"
+import { assignNextSeat, getPlayerSeat, getRoomStore, normalizePlayerAlignment } from "@/lib/game/room-store"
 import { ensureRosterAlignmentMutable, getRosterErrorPayload } from "@/lib/game/roster-contract"
 import { assertSelectableMapId, getMapSelectionErrorPayload } from "@/lib/game/map-selection"
 import { startBattleFromLockedRosters } from "@/lib/game/room-battle-start"
 import { broadcastToRoom } from "@/lib/ws-server"
 import { createPublicRoomSnapshot } from "@/lib/game/room-battle-actions"
+import {
+  assertGameProfileCompatibleV1,
+  getGameProfileErrorPayloadV1,
+  getServerGameProfileIdentityV1,
+  type GameProfileIdentityV1,
+} from "@/lib/content-pipeline/runtime/profile-game-identity"
 
-function checkPackMismatch(players: Player[]): boolean {
-  const hashes = players.map(p => p.packMd5).filter(Boolean)
-  return hashes.length === 2 && hashes[0] !== hashes[1]
+function profileErrorResponse(error: unknown): NextResponse {
+  const profileError = getGameProfileErrorPayloadV1(error)
+  if (!profileError) throw error
+  return NextResponse.json({
+    success: false,
+    error: profileError.message,
+    code: profileError.code,
+    context: profileError.context,
+  }, { status: profileError.status })
 }
 
 export async function GET(
@@ -35,18 +47,22 @@ export async function GET(
       selectedPiecesCount: p.selectedPieces?.length || 0
     }))
   })
-  return NextResponse.json(createPublicRoomSnapshot(room))
+  return NextResponse.json({
+    ...createPublicRoomSnapshot(room),
+    profileIdentity: getServerGameProfileIdentityV1(),
+  })
 }
 
 type StartBody = {
   action: "start"
+  profileIdentity: unknown
 }
 
 type JoinBody = {
   action: "join"
   playerId: string
   playerName?: string
-  packMd5?: string
+  profileIdentity: unknown
   alignment?: 'light' | 'dark' | 'good' | 'evil'
 }
 
@@ -69,6 +85,13 @@ export async function POST(
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
+  let profileIdentity: GameProfileIdentityV1
+  try {
+    profileIdentity = assertGameProfileCompatibleV1(body.profileIdentity)
+  } catch (error) {
+    return profileErrorResponse(error)
+  }
+
   // Reject malformed joins before reading or creating persistent room state.
   if (body.action === "join") {
     if (!body.playerId?.trim()) {
@@ -82,6 +105,13 @@ export async function POST(
   const room = await roomStore.getRoom(roomId)
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 })
+  }
+  try {
+    for (const participant of room.players) {
+      assertGameProfileCompatibleV1(participant.profileIdentity)
+    }
+  } catch (error) {
+    return profileErrorResponse(error)
   }
 
   if (
@@ -102,7 +132,6 @@ export async function POST(
   if (body.action === "join") {
     const normalizedPlayerId = body.playerId?.trim().toLowerCase()
     const playerName = body.playerName?.trim()
-    const packMd5 = body.packMd5?.trim() || undefined
     if (!normalizedPlayerId) {
       return NextResponse.json({ error: "playerId is required" }, { status: 400 })
     }
@@ -128,10 +157,9 @@ export async function POST(
       }
       if (requestedAlignment) existing.alignment = requestedAlignment
       if (playerName) existing.name = playerName
-      if (packMd5) existing.packMd5 = packMd5
+      existing.profileIdentity = profileIdentity
       await roomStore.setRoom(room.id.trim(), room)
-      const packMismatch = checkPackMismatch(room.players)
-      return NextResponse.json({ ...createPublicRoomSnapshot(room), packMismatch })
+      return NextResponse.json({ ...createPublicRoomSnapshot(room), profileIdentity: getServerGameProfileIdentityV1() })
     }
 
     if (room.status !== "waiting") {
@@ -154,7 +182,7 @@ export async function POST(
       seat,
       faction: seat,
       alignment: requestedAlignment,
-      packMd5,
+      profileIdentity,
     }
     room.players.push(player)
 
@@ -163,8 +191,7 @@ export async function POST(
     }
 
     await roomStore.setRoom(room.id.trim(), room)
-    const packMismatch = checkPackMismatch(room.players)
-    return NextResponse.json({ ...createPublicRoomSnapshot(room), packMismatch })
+    return NextResponse.json({ ...createPublicRoomSnapshot(room), profileIdentity: getServerGameProfileIdentityV1() })
   }
 
   if (body.action === "start") {
@@ -172,8 +199,11 @@ export async function POST(
       const result = await startBattleFromLockedRosters(roomStore, roomId, {
         onDeploymentUpdate: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
       })
-      return NextResponse.json(createPublicRoomSnapshot(result.room))
+      return NextResponse.json({ ...createPublicRoomSnapshot(result.room), profileIdentity: getServerGameProfileIdentityV1() })
     } catch (error) {
+      if (getGameProfileErrorPayloadV1(error)) {
+        return profileErrorResponse(error)
+      }
       const rosterError = getRosterErrorPayload(error)
       if (rosterError) {
         return NextResponse.json({ success: false, error: rosterError.message, code: rosterError.code, context: rosterError.context }, { status: 400 })
@@ -189,6 +219,9 @@ export async function POST(
 
   return NextResponse.json({ error: "Unsupported action" }, { status: 400 })
   } catch (error) {
+    if (getGameProfileErrorPayloadV1(error)) {
+      return profileErrorResponse(error)
+    }
     console.error('[POST /api/rooms/:roomId] Unhandled error:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

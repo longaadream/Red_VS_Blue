@@ -12,6 +12,7 @@ import { SELECTABLE_MAP_IDS } from '@/lib/game/map-selection'
 import type { PieceTemplate } from '@/lib/game/piece'
 import { RANDOM_STREAM_NAMES, RuleRuntime } from '@/lib/game/rule-runtime'
 import { summonPiece } from '@/lib/game/turn'
+import { pinTestBattleState } from './profile-test-identity'
 import { makeState } from '../helpers/minimal-state'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
@@ -110,6 +111,7 @@ function makeDeploymentState(seed = 2029) {
       { x: piece.x, y: piece.y },
     ])),
   }
+  pinTestBattleState(state, seed)
   recordBattleInitialization(state, runtime, [...PLAYERS].sort())
   return state
 }
