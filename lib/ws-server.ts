@@ -14,6 +14,10 @@ import {
   type PublicBattleSnapshot,
 } from './game/room-battle-actions'
 import { parseBattleAuthorityEnvelope, roomBattleAuthorityVersion } from './game/battle-transition'
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+} from './game/battle-public-patch'
 import type { BattleAction, BattleState } from './game/turn'
 import {
   BattleActionAuthError,
@@ -628,7 +632,12 @@ async function restartWsServer(): Promise<void> {
             try {
               let result: unknown
               if (method === 'system.health') {
-                result = { ok: true, protocol: 'rvb-ws', protocolVersion: 2 }
+                result = {
+                  ok: true,
+                  protocol: 'rvb-ws',
+                  protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+                  authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+                }
               } else if (method === 'catalog.identity') {
                 result = { meta: getResourcePackMeta() }
               } else if (method === 'catalog.maps') {
@@ -762,6 +771,20 @@ async function restartWsServer(): Promise<void> {
             }
           })
         } else if (msg.type === 'subscribe' && typeof msg.roomId === 'string') {
+          if (
+            msg.protocolVersion !== BATTLE_AUTHORITY_PROTOCOL_VERSION
+            || msg.authorityBuildId !== BATTLE_AUTHORITY_BUILD_ID
+          ) {
+            sendJson(ws, {
+              type: 'battleProtocolUnsupported',
+              code: 'BATTLE_PROTOCOL_UNSUPPORTED',
+              expectedProtocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+              expectedAuthorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+              receivedProtocolVersion: msg.protocolVersion,
+              receivedAuthorityBuildId: msg.authorityBuildId,
+            })
+            return
+          }
           if (roomId) {
             roomClients.get(roomId)?.delete(ws)
             if (playerId && playerWs.get(playerId) === ws) playerWs.delete(playerId)
@@ -777,7 +800,13 @@ async function restartWsServer(): Promise<void> {
           if (playerId) playerWs.set(playerId, ws)
 
           // LAN mode: server is the game engine; all WS clients are guests.
-          sendJson(ws, { type: 'subscribed', roomId: nextRoomId, role: 'guest' })
+          sendJson(ws, {
+            type: 'subscribed',
+            roomId: nextRoomId,
+            role: 'guest',
+            protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+            authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+          })
 
           runAsync(async () => {
             try {
@@ -841,7 +870,8 @@ async function restartWsServer(): Promise<void> {
                 if (command == null) return
                 try {
                   const envelope = parseBattleAuthorityEnvelope({
-                    protocolVersion: msg.protocolVersion ?? 2,
+                    protocolVersion: msg.protocolVersion,
+                    authorityBuildId: msg.authorityBuildId,
                     roomId: _roomId,
                     clientActionId: msg.clientActionId ?? command.clientActionId,
                     expectedAuthorityVersion: Number.isSafeInteger(msg.expectedAuthorityVersion)

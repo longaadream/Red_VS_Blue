@@ -1,6 +1,8 @@
 import { getBattleStorage, withServerSkills, withoutServerSkills } from './battle-storage'
 import {
   appendBattleReplayFrame,
+  canonicalBattleStateForHash,
+  createBattleStateHashIndex,
   getOrCreateDebugMetadata,
   getBattleRootSeed,
   hashBattleState,
@@ -11,6 +13,11 @@ import {
   type BattleReplayFrame,
   type DebugBattleMetadata,
 } from './battle-trace'
+import {
+  createBattleStateHashPatch,
+  updateBattleStateHashIndex,
+  type BattleStateHashIndex,
+} from './battle-state-hash'
 import {
   RuleRuntime,
   withRuleRuntime,
@@ -36,10 +43,12 @@ export interface BattleActionResult {
   duplicate?: boolean
   trace?: BattleActionTrace
   replayFrame?: BattleReplayFrame
+  stateHashIndex?: BattleStateHashIndex
 }
 
 export interface RunBattleActionOptions {
   rootSeed?: number
+  stateHashIndex?: BattleStateHashIndex
 }
 
 export interface BattleReplayInput {
@@ -68,9 +77,10 @@ export function runBattleAction(
   if (explicitActionId && metadata.appliedActionIds.includes(explicitActionId)) {
     return {
       state,
-      stateHash: hashBattleState(state),
+      stateHash: options.stateHashIndex?.rootHash ?? hashBattleState(state),
       actionHash: hashStable(action),
       duplicate: true,
+      stateHashIndex: options.stateHashIndex,
     }
   }
 
@@ -105,7 +115,9 @@ export function runBattleAction(
   // runtime cache, not authoritative battle state, so it must not alter the
   // cross-platform pre-action hash.
   const canonicalState = withoutServerSkills(state) as BattleState
-  const preStateHash = hashBattleState(canonicalState)
+  const canonicalHashState = canonicalBattleStateForHash(canonicalState)
+  const preStateHashIndex = options.stateHashIndex ?? createBattleStateHashIndex(canonicalState)
+  const preStateHash = preStateHashIndex.rootHash
 
   try {
     const clonedState = cloneBattleStateForAction(state, metadata)
@@ -113,7 +125,14 @@ export function runBattleAction(
     const apply = () => applyBattleAction(hydratedState, action)
     const applied = runtime ? withRuleRuntime(runtime, apply) : apply()
     const next = withoutServerSkills(applied) as BattleState
-    const postStateHash = hashBattleState(next)
+    const canonicalNextHashState = canonicalBattleStateForHash(next)
+    const stateHashIndex = updateBattleStateHashIndex(
+      preStateHashIndex,
+      canonicalNextHashState,
+      createBattleStateHashPatch(canonicalHashState, canonicalNextHashState),
+      hashStable,
+    ).index
+    const postStateHash = stateHashIndex.rootHash
     const nextMetadata = getOrCreateDebugMetadata(next)
     if (explicitActionId) nextMetadata.appliedActionIds.push(explicitActionId)
 
@@ -162,6 +181,7 @@ export function runBattleAction(
       actionHash,
       trace,
       replayFrame,
+      stateHashIndex,
     }
   } catch (error) {
     if (!runtime) throw error

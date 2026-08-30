@@ -6,6 +6,8 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
   BattlePublicPatchError,
   applyBattlePublicPatch,
   createBattlePublicPatch,
@@ -108,7 +110,8 @@ describe('RED-109 public battle patches', () => {
     const before = { actions: [{ id: 'existing' }], turn: 1 }
     const after = { actions: [{ id: 'existing' }, { id: 'appended' }], turn: 1 }
     const envelope: BattlePublicPatchEnvelope = {
-      protocolVersion: 2,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
       roomId: 'bundle-patch-room',
       fromVersion: 7,
       toVersion: 8,
@@ -137,7 +140,8 @@ describe('RED-109 public battle patches', () => {
     const after = { value: 2, nested: { stable: true } }
     const patch = createBattlePublicPatch(before, after)
     const envelope: BattlePublicPatchEnvelope = {
-      protocolVersion: 2,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
       roomId: 'room-a',
       fromVersion: 4,
       toVersion: 5,
@@ -153,6 +157,10 @@ describe('RED-109 public battle patches', () => {
       .toThrow(/pre-public hash/i)
     expect(() => applyBattlePublicPatch(before, { ...envelope, postPublicHash: 'bad' }, { authorityVersion: 4 }))
       .toThrow(/post-public hash/i)
+    expect(() => applyBattlePublicPatch(before, {
+      ...envelope,
+      authorityBuildId: 'old-build' as typeof BATTLE_AUTHORITY_BUILD_ID,
+    }, { authorityVersion: 4 })).toThrow(/build/i)
   })
 
   it('fails closed for every non-JSON patch value, including nested and array values', () => {

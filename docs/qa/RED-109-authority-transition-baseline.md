@@ -50,14 +50,14 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
 
 | 指标 | P50 | P95 | P99 | 最大值 |
 | --- | ---: | ---: | ---: | ---: |
-| v2 完整 dispatch（内存 journal） | 13.509 ms | 16.889 ms | 18.039 ms | 22.890 ms |
-| v2 持久化模拟 | 0.149 ms | 0.446 ms | 0.640 ms | 0.642 ms |
-| v2 持久化载荷 | 10,290 B | 10,462 B | 32,175 B | 32,175 B |
+| v3 分块哈希 dispatch（内存 journal） | 12.196 ms | 15.878 ms | 17.286 ms | 18.806 ms |
+| v3 持久化模拟 | 0.161 ms | 0.408 ms | 0.620 ms | 0.915 ms |
+| v3 持久化载荷 | 10,455 B | 10,627 B | 32,395 B | 32,395 B |
 | 接收者公开 patch | 288 B | 288 B | 292 B | 322 B |
 
-- 相对旧完整 DB JSON 的 438,334 B 中位数，v2 持久化载荷中位数减少约 97.7%，超过 80% 门槛。
-- 前 10 次与后 10 次 dispatch 中位数的倍率断言继续低于 2，没有随历史长度显著增长。
-- 首条 v2 Transition 的载荷包含版本 0 迁移基准检查点；换回合、固定间隔和终局检查点解释了 P99 的 32,175 B，普通动作仍约 10 KB。
+- 相对旧完整 DB JSON 的 438,334 B 中位数，v3 持久化载荷中位数减少约 97.6%，超过 80% 门槛。
+- 前 10 次与后 10 次 dispatch 中位数分别为 13.827 ms 与 13.624 ms，倍率低于 1，没有随历史长度增长。
+- 首条 v3 Transition 的载荷包含版本 0 迁移基准检查点；换回合、固定间隔和终局检查点解释了 P99 的 32,395 B，普通动作仍约 10 KB。
 - 规则文件缓存与同步日志门控后的旧完整快照后备路径，在同一次最终运行中 dispatch 为 P50 41.998 ms、P95 64.961 ms、P99 69.074 ms；它是未设置或 `RVB_BATTLE_AUTHORITY_V2=0` 时的默认回退，不是候选正常链路。
 - 混合架构回归 `battle-authority-async-dispatch.test.ts` 在 Prisma transaction 故意保持未完成时连续提交
   20 个完整部署动作；预热后的 `rules + diff/hash + memory commit + receipt` P95、墙钟 P95 和
@@ -71,7 +71,8 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
   下一事件循环才开始 Prisma 与序列化，确保 checkpoint JSON 不会偷跑进 ACK 当前调用栈。
   cooperative 写在安全线 abort 后可作为瞬时错误保留并重试；不响应取消但最终成功的 adapter 保持
   pending，真正结束前不会启动下一笔，防止 Promise timeout 制造物理并发。确定性 audit/不可恢复写错误
-  仍立即 degraded。生产 Prisma 写另有更短的 SQLite 500 ms `busy_timeout`、250 ms `maxWait` 与 1250 ms
+  仍立即 degraded；瞬时错误最多尝试 5 次或 10 秒，耗尽后只 degraded 当前房间并继续其他房间。
+  生产 Prisma 写另有更短的 SQLite 500 ms `busy_timeout`、250 ms `maxWait` 与 1250 ms
   transaction timeout。
 - `battle-authority-async-sqlite.test.ts` 使用隔离的真实 SQLite schema 连续提交并排空 20 条 Δ，核对
   20 条 Transition、20 条 receipt 与 2 个有界 checkpoint；清空进程内 Room Actor 后，从数据库恢复到
@@ -79,6 +80,11 @@ RoomStore 复现同一完整 JSON 序列化边界；它不包含真实 SQLite fs
   client 持有 SQLite 写锁，验证 A/B 两房保持 pending、不重叠写，并在锁释放后按序全部 durable。
 - `battle-public-patch.test.ts` 使用 150 条既有战斗日志验证新增一条只生成一个末尾索引 `set`，补丁小于
   200 B；同时覆盖逆序尾删、既有元素修改、旧整数组 patch 兼容、稀疏索引拒绝和 post-public hash 一致。
+- `battle-state-hash.test.ts` 验证 32 项固定块的嵌套编辑、尾增/尾删、跨块更新和根替换；100/500/1000
+  条历史尾增都只重算 1 块，并用同一冻结 Unicode 向量核对 Node、桌面与 Android bundle。检查点、
+  换回合、每 20 个版本和终局继续以全量重算审计增量根。
+- v3 信封携带固定 `authorityBuildId`。旧 v2 checkpoint/Transition 只允许完整恢复；v2/v3 混链、旧 WS
+  订阅和错误 build 在运行规则或写数据库前拒绝。
 - `BattleAuthorityCheckpoint.seed` 只在 Prisma `Int` 边界使用有符号 32 位二进制编码；规则状态、
   `stateJson`、协议与随机运行时始终保留原始 uint32 seed。兼容迁移会把候选版本曾写入的
   `2147483648..4294967295` 规范化为相同 32 位比特的负数，恢复时再还原并与 `stateJson.seed`

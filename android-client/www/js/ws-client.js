@@ -10,6 +10,13 @@
   var _reqSeq = 1
   var _reconnectTimer = null
   var _shouldReconnect = false
+  var _subscribed = false
+  var _authoritySyncing = false
+  var _authoritySyncTimer = null
+  var _authoritySyncRequestId = null
+  var AUTHORITY_SYNC_TIMEOUT_MS = 8000
+  var BATTLE_AUTHORITY_PROTOCOL_VERSION = 3
+  var BATTLE_AUTHORITY_BUILD_ID = 'rvb-authority-v3-chunked-sha256-1'
 
   function getServerUrl() {
     if (window.RvBUtils && window.RvBUtils.getConnectionConfig) {
@@ -30,7 +37,13 @@
   async function buildSubscribeMessage() {
     var roomId = String(_roomId || '').trim().toLowerCase()
     var playerId = String(_playerId || '').trim().toLowerCase()
-    var message = { type: 'subscribe', roomId: roomId, playerId: playerId }
+    var message = {
+      type: 'subscribe',
+      roomId: roomId,
+      playerId: playerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    }
     if (_mode !== 'relay') return message
 
     if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') {
@@ -47,12 +60,16 @@
       type: 'battle-subscribe',
       roomId: roomId,
       playerId: playerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
       timestamp: Date.now(),
     }
     return {
       type: 'subscribe',
       roomId: roomId,
       playerId: playerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
       publicKey: publicKey,
       payload: payload,
       signature: await window.RvBIdentity.sign(payload),
@@ -64,50 +81,78 @@
     var url = buildWsUrl()
     if (!url) return
 
+    var socket
     try {
-      _ws = new WebSocket(url)
+      socket = new WebSocket(url)
+      _ws = socket
+      _subscribed = false
     } catch (e) {
       _scheduleReconnect(roomId)
       return
     }
 
-    _ws.onopen = async function () {
+    socket.onopen = async function () {
       if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
       try {
         var subscribeMessage = await buildSubscribeMessage()
-        if (!_ws || _ws.readyState !== 1) return
-        _ws.send(JSON.stringify(subscribeMessage))
-        _emit('connect')
+        if (_ws !== socket || socket.readyState !== 1) return
+        socket.send(JSON.stringify(subscribeMessage))
       } catch (e) {
         console.error('[WS] subscribe failed', e)
         _emit('error', e)
         _shouldReconnect = false
-        if (_ws) _ws.close()
+        if (_ws === socket) socket.close()
       }
     }
 
-    _ws.onmessage = function (e) {
+    socket.onmessage = function (e) {
+      if (_ws !== socket) return
       try {
         var msg = JSON.parse(e.data)
+        if (msg && msg.type === 'battleProtocolUnsupported') {
+          _shouldReconnect = false
+          var protocolError = new Error('客户端与服务端对局协议不兼容，请双方更新到同一验收版本')
+          protocolError.code = msg.code || 'BATTLE_PROTOCOL_UNSUPPORTED'
+          protocolError.context = msg
+          _emit('error', protocolError)
+          socket.close()
+          return
+        }
+        if (msg && msg.type === 'subscribed' && !_subscribed) {
+          _subscribed = true
+          _emit('connect')
+        }
         if (msg && msg.type === 'rpcResult' && msg.requestId && _pending[msg.requestId]) {
           var pending = _pending[msg.requestId]
           delete _pending[msg.requestId]
           clearTimeout(pending.timer)
           if (msg.ok) pending.resolve(msg.data)
-          else pending.reject(new Error(msg.error || 'WebSocket RPC failed'))
+          else pending.reject(makeRpcError(msg))
           return
         }
+        if (msg && msg.type === 'actionError' && msg.code === 'ROOM_VERSION_CONFLICT') {
+          requestAuthoritySync('room-version-conflict')
+        }
+        var completesAuthoritySync = _authoritySyncing
+          && msg
+          && (msg.type === 'stateUpdate' || msg.type === 'battleSnapshot')
+          && msg.requestId === _authoritySyncRequestId
+        if (completesAuthoritySync) _releaseAuthoritySync()
         _emit('message', msg)
+        if (completesAuthoritySync) _emit('authoritySyncComplete', msg)
       } catch {}
     }
 
-    _ws.onclose = function () {
+    socket.onclose = function () {
+      if (_ws !== socket) return
       _ws = null
+      _subscribed = false
+      _releaseAuthoritySync()
       _emit('disconnect')
       if (_shouldReconnect) _scheduleReconnect(_roomId)
     }
 
-    _ws.onerror = function () {}
+    socket.onerror = function () {}
   }
 
   function _scheduleReconnect(roomId) {
@@ -124,6 +169,45 @@
     }
   }
 
+  function _releaseAuthoritySync() {
+    if (!_authoritySyncing) return false
+    _authoritySyncing = false
+    if (_authoritySyncTimer) clearTimeout(_authoritySyncTimer)
+    _authoritySyncTimer = null
+    _authoritySyncRequestId = null
+    return true
+  }
+
+  function requestAuthoritySync(reason) {
+    if (_authoritySyncing) return false
+    if (!_subscribed || !_ws || _ws.readyState !== 1) return false
+    _authoritySyncing = true
+    _authoritySyncRequestId = 'authority-sync-' + (_reqSeq++) + '-' + Date.now()
+    try {
+      _ws.send(JSON.stringify({
+        type: 'requestBattleSnapshot',
+        requestId: _authoritySyncRequestId,
+      }))
+    } catch (error) {
+      _releaseAuthoritySync()
+      return false
+    }
+    _authoritySyncTimer = setTimeout(function () {
+      if (!_releaseAuthoritySync()) return
+      _emit('authoritySyncTimeout', { reason: reason || 'unknown' })
+    }, AUTHORITY_SYNC_TIMEOUT_MS)
+    _emit('authoritySyncStart', { reason: reason || 'unknown' })
+    return true
+  }
+
+  function makeRpcError(message) {
+    var error = new Error(message && message.error ? message.error : 'WebSocket RPC failed')
+    if (message && message.code) error.code = message.code
+    if (message && message.context) error.context = message.context
+    if (message && message.status) error.status = message.status
+    return error
+  }
+
   // Relay subscriptions require signed identity. A local/private URL entered
   // through the remote connector is still a LAN authority unless relay=1 was
   // explicitly requested for local Relay development.
@@ -136,7 +220,7 @@
     var base = getServerUrl()
     var withoutScheme = String(base || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
     var isLocalOrLan = /^(localhost|127\.0\.0\.1)(:\d+)?\b/.test(withoutScheme) ||
-      /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
+      /^(10\.|26\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
     return isLocalOrLan ? 'lan' : 'relay'
   }
 
@@ -151,19 +235,31 @@
   function disconnect() {
     _shouldReconnect = false
     if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
-    if (_ws) { try { _ws.close() } catch {} _ws = null }
+    var socket = _ws
+    _ws = null
+    _subscribed = false
+    _releaseAuthoritySync()
+    if (socket) { try { socket.close() } catch {} }
   }
 
   function send(msg) {
-    if (_ws && _ws.readyState === 1) {
-      try { _ws.send(JSON.stringify(msg)) } catch {}
+    if (_authoritySyncing && msg && (msg.type === 'action' || msg.type === 'gameOver')) {
+      _emit('authoritySyncBlocked', msg)
+      return false
     }
+    if (_subscribed && _ws && _ws.readyState === 1) {
+      try {
+        _ws.send(JSON.stringify(msg))
+        return true
+      } catch {}
+    }
+    return false
   }
 
   function request(method, data, timeoutMs) {
     timeoutMs = timeoutMs || 5000
     return new Promise(function (resolve, reject) {
-      if (!_ws || _ws.readyState !== 1) {
+      if (!_subscribed || !_ws || _ws.readyState !== 1) {
         reject(new Error('WebSocket not connected'))
         return
       }
@@ -185,13 +281,87 @@
     })
   }
 
+  function requestAt(baseUrl, method, data, timeoutMs) {
+    timeoutMs = timeoutMs || 5000
+    return new Promise(function (resolve, reject) {
+      var base = String(baseUrl || '').trim().replace(/\/+$/, '')
+      if (base && !/^[a-z]+:\/\//i.test(base)) base = 'http://' + base
+      var url = base.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:') + '/ws/rooms/__lobby'
+      var requestId = 'probe-' + (_reqSeq++) + '-' + Date.now()
+      var socket = null
+      var settled = false
+      var timer = setTimeout(function () {
+        finish(new Error('WebSocket request timeout: ' + method))
+      }, timeoutMs)
+
+      function finish(error, value) {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        if (socket) {
+          try { socket.close() } catch {}
+        }
+        if (error) reject(error)
+        else resolve(value)
+      }
+
+      if (!base) {
+        finish(new Error('Server URL is required'))
+        return
+      }
+      try {
+        socket = new WebSocket(url)
+      } catch (error) {
+        finish(error)
+        return
+      }
+      socket.onopen = function () {
+        try {
+          socket.send(JSON.stringify({ type: 'rpc', requestId: requestId, method: method, data: data || {} }))
+        } catch (error) {
+          finish(error)
+        }
+      }
+      socket.onmessage = function (event) {
+        try {
+          var message = JSON.parse(event.data)
+          if (!message || message.type !== 'rpcResult' || message.requestId !== requestId) return
+          if (message.ok) finish(null, message.data)
+          else finish(makeRpcError(message))
+        } catch (error) {
+          finish(error)
+        }
+      }
+      socket.onerror = function () { finish(new Error('WebSocket connection failed')) }
+      socket.onclose = function () {
+        if (!settled) finish(new Error('WebSocket closed before response'))
+      }
+    })
+  }
+
+  // Event handlers are registered once per page.
+
   function on(event, handler) {
     _handlers[event] = handler
   }
 
   function isConnected() {
-    return _ws !== null && _ws.readyState === 1
+    return _subscribed && _ws !== null && _ws.readyState === 1
   }
 
-  window.RvBWs = { connect: connect, disconnect: disconnect, send: send, request: request, on: on, isConnected: isConnected }
+  function isAuthoritySyncing() {
+    return _authoritySyncing
+  }
+
+  window.RvBWs = {
+    connect: connect,
+    disconnect: disconnect,
+    send: send,
+    request: request,
+    requestAt: requestAt,
+    requestAuthoritySync: requestAuthoritySync,
+    on: on,
+    isConnected: isConnected,
+    isAuthoritySyncing: isAuthoritySyncing,
+  }
 })()

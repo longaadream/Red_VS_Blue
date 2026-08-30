@@ -15,6 +15,8 @@
   var _authoritySyncTimer = null
   var _authoritySyncRequestId = null
   var AUTHORITY_SYNC_TIMEOUT_MS = 8000
+  var BATTLE_AUTHORITY_PROTOCOL_VERSION = 3
+  var BATTLE_AUTHORITY_BUILD_ID = 'rvb-authority-v3-chunked-sha256-1'
 
   function getServerUrl() {
     if (window.RvBUtils && window.RvBUtils.getConnectionConfig) {
@@ -35,7 +37,13 @@
   async function buildSubscribeMessage() {
     var roomId = String(_roomId || '').trim().toLowerCase()
     var playerId = String(_playerId || '').trim().toLowerCase()
-    var message = { type: 'subscribe', roomId: roomId, playerId: playerId }
+    var message = {
+      type: 'subscribe',
+      roomId: roomId,
+      playerId: playerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    }
     if (_mode !== 'relay') return message
 
     if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') {
@@ -52,12 +60,16 @@
       type: 'battle-subscribe',
       roomId: roomId,
       playerId: playerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
       timestamp: Date.now(),
     }
     return {
       type: 'subscribe',
       roomId: roomId,
       playerId: playerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
       publicKey: publicKey,
       payload: payload,
       signature: await window.RvBIdentity.sign(payload),
@@ -97,6 +109,15 @@
       if (_ws !== socket) return
       try {
         var msg = JSON.parse(e.data)
+        if (msg && msg.type === 'battleProtocolUnsupported') {
+          _shouldReconnect = false
+          var protocolError = new Error('客户端与服务端对局协议不兼容，请双方更新到同一验收版本')
+          protocolError.code = msg.code || 'BATTLE_PROTOCOL_UNSUPPORTED'
+          protocolError.context = msg
+          _emit('error', protocolError)
+          socket.close()
+          return
+        }
         if (msg && msg.type === 'subscribed' && !_subscribed) {
           _subscribed = true
           _emit('connect')

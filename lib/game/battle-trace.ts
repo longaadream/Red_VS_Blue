@@ -1,5 +1,9 @@
 import type { RuleRuntime, RandomStreamTrace } from './rule-runtime'
 import type { BattleState } from './turn'
+import {
+  buildBattleStateHashIndex as buildChunkedBattleStateHashIndex,
+  type BattleStateHashIndex,
+} from './battle-state-hash'
 
 export const BATTLE_REPLAY_FORMAT = 'rvb-battle-replay/v2' as const
 
@@ -279,7 +283,23 @@ export function hashStable(value: unknown): string {
 }
 
 export function hashBattleState(state: BattleState): string {
-  return hashStable(withoutDebugMetadata(state))
+  return createBattleStateHashIndex(state).rootHash
+}
+
+export function hashLegacyBattleState(state: BattleState): string {
+  return hashStable(canonicalBattleStateForHash(state))
+}
+
+export function hashBattleStateForProtocol(state: BattleState, protocolVersion: 2 | 3): string {
+  return protocolVersion === 2 ? hashLegacyBattleState(state) : hashBattleState(state)
+}
+
+export function createBattleStateHashIndex(state: BattleState): BattleStateHashIndex {
+  return buildChunkedBattleStateHashIndex(canonicalBattleStateForHash(state), hashStable)
+}
+
+export function canonicalBattleStateForHash(state: BattleState): BattleState {
+  return withoutDebugMetadata(state)
 }
 
 export function getBattleRootSeed(state: BattleState): number | undefined {

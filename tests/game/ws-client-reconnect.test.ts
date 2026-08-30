@@ -83,6 +83,13 @@ afterEach(() => {
 })
 
 describe('battle WebSocket reconnect state machine', () => {
+  it('ships the same authority protocol client to desktop and Android', () => {
+    const desktopClient = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    const androidClient = readFileSync(resolve(process.cwd(), 'android-client/www/js/ws-client.js'), 'utf8')
+
+    expect(androidClient).toBe(desktopClient)
+  })
+
   it('becomes connected only after subscription and resubscribes after a disconnect', async () => {
     vi.useFakeTimers()
     const client = loadClient()
@@ -102,6 +109,8 @@ describe('battle WebSocket reconnect state machine', () => {
       type: 'subscribe',
       roomId: 'room-a',
       playerId: 'player-red',
+      protocolVersion: 3,
+      authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
     })
 
     first.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
@@ -147,6 +156,30 @@ describe('battle WebSocket reconnect state machine', () => {
     expect(disconnects).toBe(0)
     await vi.advanceTimersByTimeAsync(3_000)
     expect(FakeWebSocket.instances).toHaveLength(2)
+  })
+
+  it('stops reconnecting when the server rejects the authority protocol build', async () => {
+    vi.useFakeTimers()
+    const client = loadClient()
+    const errors: Array<{ code?: string }> = []
+    client.on('error', error => { errors.push(error) })
+
+    client.connect('room-a', 'player-red', 'lan')
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+    await Promise.resolve()
+    socket.receive({
+      type: 'battleProtocolUnsupported',
+      code: 'BATTLE_PROTOCOL_UNSUPPORTED',
+      expectedProtocolVersion: 3,
+      expectedAuthorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+    })
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0].code).toBe('BATTLE_PROTOCOL_UNSUPPORTED')
+    expect(client.isConnected()).toBe(false)
+    await vi.advanceTimersByTimeAsync(6_000)
+    expect(FakeWebSocket.instances).toHaveLength(1)
   })
 
   it('requests one authoritative snapshot on a room version conflict and gates actions until it arrives', async () => {

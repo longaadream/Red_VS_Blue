@@ -93,6 +93,7 @@ describe('battle authority async journal', () => {
     let storageAvailable = false
     const journal = new BattleAuthorityAsyncJournal({
       retryDelaysMs: [1],
+      maxRetryAttempts: 100,
       isRetryablePersistError: error => (
         error instanceof Error && error.message.includes('database is locked')
       ),
@@ -133,6 +134,69 @@ describe('battle authority async journal', () => {
       durableAuthorityVersion: 2,
       pending: 0,
     })
+  })
+
+  it('degrades only the failing room after five retryable attempts and continues other rooms', async () => {
+    const journal = new BattleAuthorityAsyncJournal({
+      retryDelaysMs: [0],
+      maxRetryAttempts: 5,
+      maxRetryElapsedMs: 10_000,
+      isRetryablePersistError: error => (
+        error instanceof Error && error.message === 'database is locked'
+      ),
+    })
+    const roomAPersist = vi.fn(async () => { throw new Error('database is locked') })
+    const roomBPersist = vi.fn(async () => undefined)
+
+    journal.enqueue({
+      roomId: 'room-retry-limit',
+      kind: 'transition',
+      authorityVersion: 1,
+      persist: roomAPersist,
+    })
+    journal.enqueue({
+      roomId: 'room-healthy',
+      kind: 'transition',
+      authorityVersion: 1,
+      persist: roomBPersist,
+    })
+
+    await expect(journal.drain()).rejects.toThrow(/retry limit/i)
+    expect(roomAPersist).toHaveBeenCalledTimes(5)
+    expect(roomBPersist).toHaveBeenCalledTimes(1)
+    expect(journal.inspect('room-retry-limit')).toMatchObject({
+      status: 'degraded',
+      durableAuthorityVersion: 0,
+      pending: 0,
+    })
+    expect(journal.inspect('room-healthy')).toMatchObject({
+      status: 'durable',
+      durableAuthorityVersion: 1,
+      pending: 0,
+    })
+  })
+
+  it('degrades only the failing room when the retry elapsed-time limit is reached', async () => {
+    const journal = new BattleAuthorityAsyncJournal({
+      retryDelaysMs: [10],
+      maxRetryAttempts: 100,
+      maxRetryElapsedMs: 5,
+      isRetryablePersistError: error => (
+        error instanceof Error && error.message === 'database is locked'
+      ),
+    })
+    const roomAPersist = vi.fn(async () => { throw new Error('database is locked') })
+    const roomBPersist = vi.fn(async () => undefined)
+
+    journal.enqueue({ roomId: 'room-elapsed-limit', kind: 'transition', authorityVersion: 1, persist: roomAPersist })
+    journal.enqueue({ roomId: 'room-after-elapsed-limit', kind: 'transition', authorityVersion: 1, persist: roomBPersist })
+
+    await expect(journal.drain()).rejects.toThrow(/retry limit/i)
+    expect(roomAPersist.mock.calls.length).toBeGreaterThan(1)
+    expect(roomAPersist.mock.calls.length).toBeLessThan(5)
+    expect(roomBPersist).toHaveBeenCalledTimes(1)
+    expect(journal.inspect('room-elapsed-limit').status).toBe('degraded')
+    expect(journal.inspect('room-after-elapsed-limit').status).toBe('durable')
   })
 
   it('runs transition audit once before durable persistence and degrades without retrying it', async () => {

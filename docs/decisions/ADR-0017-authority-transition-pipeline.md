@@ -3,8 +3,10 @@
 - 状态：Proposed（等待 RED-109 候选构建与人工 LAN 验收）
 - 日期：2026-08-25
 - 任务：RED-109
+- 扩展任务：RED-131
 - 风险：High
 - 基线：`main@a7c1d57da7b025fb69c9c24a3a04d3c5797d6132`
+- RED-131 扩展基线：`main@5752f36f78254cc3d9b284bd295943e4ed796f5e`
 
 ## 背景
 
@@ -21,9 +23,11 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 
 1. 每个房间只有一个有界 FIFO 权威队列。玩家、pending、计时器与机器人命令都进入同一串行提交
    边界；不同房间可以并行。队列等待、规则执行、持久化和总耗时分别记录。
-2. 联网命令使用协议 v2 信封：`roomId`、精确 `clientActionId`、`playerId`、
-   `expectedAuthorityVersion`、可选选择会话凭证和命令体。服务端返回与该 ID 对应的
-   `applied | duplicate | rejected | resyncRequired` 回执。
+2. 联网命令使用协议 v3 信封：`protocolVersion=3`、固定 `authorityBuildId`、`roomId`、精确
+   `clientActionId`、`playerId`、`expectedAuthorityVersion`、可选选择会话凭证和命令体。WS 订阅、
+   WS 动作和 HTTP 后备入口必须同时校验协议与 build；不兼容客户端在登记订阅或运行规则前拒绝。
+   服务端返回与该 ID 对应的 `applied | duplicate | rejected | resyncRequired` 回执。数据库中完整的
+   v2 链仍可恢复，但恢复后不得向同一链追加 v3 Transition；新对局只写 v3。
 3. `Room.version` 只保护大厅和房间元数据写入；`battleAuthorityVersion` 只由成功的权威战斗
    Transition 推进。重连、身份资料或房间元数据写入不得制造战斗版本空洞，也不得覆盖较新的战斗版本。
 4. 服务端执行正式规则并生成完整合法候选。客户端只显示权威 `pendingOptionSelection` /
@@ -33,7 +37,7 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    断层或 hash 不一致都停止增量应用并单飞拉取完整恢复快照。
 6. 显式 `RVB_BATTLE_ASYNC_JOURNAL=1` 时，每房间 FIFO 内的内存 Room Actor 是在线权威提交点：
    规则、diff/hash、版本、receipt 与内存状态提交完成后立即生成 ACK/patch，不等待 Prisma/SQLite。
-   ACK 前只执行不随完整状态大小增长的提交边界校验；完整内部/公开 Δ 回放由同一个串行 journal
+   ACK 前使用每房间缓存的分块状态哈希索引校验提交边界；完整内部/公开 Δ 回放由同一个串行 journal
    writer 在落库前审计一次，不能回到在线 ACK 热路径。
    Transition journal 只保存命令、receipt、内部/公开 Δ 与 hash 证据；一个有界后台 writer 按原顺序
    把这些记录写入现有原子数据库事务，避免多个后台写者自行制造 SQLite 写锁竞争。数组 Δ 对共同前缀
@@ -42,9 +46,11 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    WAL；每笔 Prisma 写仍设置 500 ms `busy_timeout`，interactive transaction 的 `maxWait=250 ms` 与
    `timeout=1250 ms` 均早于 journal 的 2 秒安全线。`SQLITE_BUSY/LOCKED`、Prisma 等待/事务超时和
    journal safety timeout 属于瞬时故障：当前 job 保留在队首，状态保持 pending 并携带 `lastError`，按
-   `25/100/250 ms` 后以 250 ms 封顶退避，直到数据库恢复；同一 writer 在旧 adapter 确认物理结束前
-   绝不开始重试或下一房间，避免 `Promise.race` 制造重叠写。确定性审计/hash/版本错误、约束/损坏/
-   I/O 等不可恢复错误和队列上限溢出才进入 degraded、丢弃该房间后续 durable job 并拒绝新动作。
+   `25/100/250 ms` 后以 250 ms 封顶退避，但每个 job 最多尝试 5 次且从首次失败起最多等待 10 秒；任一
+   上限到达即只把该房间标为 degraded，丢弃其后续 durable job，writer 继续处理其他房间。同一 writer
+   在旧 adapter 确认物理结束前绝不开始重试或下一房间，避免 `Promise.race` 制造重叠写；不响应取消的
+   adapter 仍必须先物理结束。确定性审计/hash/版本错误、约束/损坏/I/O 等不可恢复错误和队列上限
+   溢出同样立即进入 degraded 并拒绝该房间新动作。
    队列有每房间上限；房间删除前必须排空，排空失败必须拒绝删除并向调用方返回错误。终局尝试
    排空并记录失败。
 8. 初始检查点仍同步建立，且与从 waiting/ready 切换到 in-progress 共同构成启动不变量：检查点失败时
@@ -58,28 +64,34 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
    durable 的内存动作零丢失。
 9. 热状态只保留确定性随机游标、动作/回放序号和初始化事实；每步 Trace、命令和回放帧追加到
    Transition journal。终局在构造 Transition 前重新物化 ADR-0016 要求的完整 Trace v2，使在线 patch/hash、checkpoint 与重启恢复共享同一终局状态，不降低回放事实完整性。
-10. 规则 JSON 和动态代码在服务进程内缓存。普通开发/生产动作不再因为 `NODE_ENV=development`
+10. 协议 v3 的内部状态和每个接收者公开状态使用确定性分块哈希：顶层字段组成根；顶层数组按固定
+   32 项切块；根同时绑定算法版本、字段名、数组长度、chunk size 和各块 hash。普通动作根据 Δ 只重算
+   受影响字段/块及根；数组尾部追加不随已有 `actions` 长度线性重哈希。完整重算仍在初始化/恢复、
+   checkpoint、换回合、每 20 个权威版本和终局执行，并与增量根不一致时 fail closed。哈希固定向量
+   必须在 Node、桌面 bundle 和 Android bundle 完全一致；算法或稳定序列化发生不兼容变化必须提升
+   `protocolVersion` 或 `authorityBuildId`，禁止同链混写。
+11. 规则 JSON 和动态代码在服务进程内缓存。普通开发/生产动作不再因为 `NODE_ENV=development`
    每次读取磁盘；内容工具通过显式失效函数刷新。`RVB_FORCE_RULE_RELOAD=1` 仅用于有意逐次重载，
    `RVB_BATTLE_DEBUG_LOGS=1` 才启用同步热路径调试日志。Node 服务端的 `hashStable()` 可以安装原生
    SHA-256 provider，以完全相同的稳定 JSON 字节和 digest 替代纯 JavaScript SHA；安装时必须先与
    纯 JavaScript 实现做固定向量自检，运行时返回非法 digest 必须 fail closed。浏览器和
    `sha256Hex()` 公共原语仍使用纯 JavaScript 实现；`RVB_BATTLE_NATIVE_SHA=0` 可显式关闭服务端 provider。
-11. Relay 只瞬时转发 Transition 和精确回执，不把 recipient-specific patch 保存为房间最新完整状态；
+12. Relay 只瞬时转发 Transition 和精确回执，不把 recipient-specific patch 保存为房间最新完整状态；
     Relay 重连仍从权威服务获取完整恢复快照。
-12. 客户端 patch 应用后复用既有按键增量展示层：地图仅在地图身份或尺寸变化时重建，棋子按 `piece.id`、
+13. 客户端 patch 应用后复用既有按键增量展示层：地图仅在地图身份或尺寸变化时重建，棋子按 `piece.id`、
     地格效果按坐标签名、候选高亮按坐标集合增删；普通 Transition 不重建 Three.js 场景。
-13. 候选功能 fail closed：只有同时显式 `RVB_BATTLE_AUTHORITY_V2=1` 与
+14. 候选功能 fail closed：只有同时显式 `RVB_BATTLE_AUTHORITY_V2=1` 与
     `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只开启 v2 仍走旧的数据库原子提交，作为快速回退。
-    只有显式
+    `RVB_BATTLE_AUTHORITY_V2` 是保留的历史功能开关名称，不表示传输仍是 v2。只有显式
     `RVB_TURN_TIMER_ENABLED=1` 才启用 deadline、安排部署/回合计时权威唤醒并显示计时投影。未设置或设置为 `0` 时，晚到玩家动作也不会结算 timeout。
 
-14. 内存 ACK 前必须验证轻量但独立的提交不变量，不能只比较版本：缓存版本和链头等于 Transition
+15. 内存 ACK 前必须验证轻量但独立的提交不变量，不能只比较版本：缓存版本和链头等于 Transition
     前版本/前链，receipt 与命令/版本相连，action hash 与 transition hash 重算一致，持久化前态 hash
     与缓存一致，并且 Runner 独立产出的 canonical pre/post hash 与 trace 证据一致。任一不一致都在
     ACK 前 fail closed。完整内部/公开 Δ 回放、pre/post hash 复核和 `nextStorage` 等价比较由 journal
     writer 在 Prisma 写入前严格串行审计一次；审计失败将房间标为 degraded、丢弃该 durable job 并
     拒绝后续异步提交，绝不落库或静默继续。恢复、候选验证和 CI 仍执行完整回放审计。
-15. 优雅关闭按固定顺序执行：先关闭 journal ingress，拒绝新的内存提交；再停止 WS 接入；随后排空
+16. 优雅关闭按固定顺序执行：先关闭 journal ingress，拒绝新的内存提交；再停止 WS 接入；随后排空
     全局 writer，并逐房间验证 `durableAuthorityVersion == authorityVersion`。Next 服务同时监听
     `SIGINT/SIGTERM` 和父 Electron 的 IPC 请求。Electron server/client 子进程使用 IPC 等待明确成功回执，
     总等待上限 6 秒，随后才允许进程退出；排空失败或超时必须记录“可能不耐久”并以失败回执/退出码
@@ -99,11 +111,12 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 
 ## 回退
 
-1. 先删除 `RVB_BATTLE_ASYNC_JOURNAL` 或设为 `0`，即可保留 v2 协议并恢复 ACK 前数据库原子提交；
+1. 先删除 `RVB_BATTLE_ASYNC_JOURNAL` 或设为 `0`，即可保留 v3 协议并恢复 ACK 前数据库原子提交；
    再删除 `RVB_BATTLE_AUTHORITY_V2` 或设为 `0`，回退完整 Room CAS 与 `stateUpdate`。客户端协议信封仍可被入口解析，但不依赖增量 Transition。
-2. 完整代码回退应整体 revert RED-109，不得只撤销客户端 patch 或服务端 journal 其中一侧。
-   RED-131 的 WAL/数组补丁扩展同样必须同时回退服务端源码与两个客户端生成 bundle。
-3. 迁移回退前必须先停止服务并确认不再有 v2 写入；保留/导出需要的 Trace 和对局证据，再删除新增
+2. 只回退本次扩展时应整体 revert RED-131；若连基础权威管线一并回退，则再整体 revert RED-109。
+   两种情况都不得只撤销客户端 patch 或服务端 journal 其中一侧，服务端源码与桌面、Android 两个
+   客户端 bundle 必须保持同一协议版本。
+3. 迁移回退前必须先停止服务并确认不再有 v3 写入；保留/导出需要的 Trace 和对局证据，再删除新增
    Transition、Receipt、Checkpoint 表和 `battleAuthorityVersion` 列。不得在运行中直接降 schema。
 4. RED-107 的 `start + pending` 计时器合法等待态修复不属于本 ADR 的回退范围。
 
@@ -118,6 +131,10 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
   篡改但重新封装过的内部 Δ 必须在 journal 完整回放审计中 degraded，且不得进入 Prisma。
 - Hash provider：Node 原生 provider 与纯 JavaScript 实现在固定向量、随机 Unicode 和真实状态上 digest
   完全相同；`RVB_BATTLE_NATIVE_SHA=0` 回退后协议、hash chain 与恢复结果不变。
+- 分块 hash：覆盖嵌套修改、数组尾增/尾删、跨块修改、根替换、100/500/1000 条日志追加、运行时函数
+  过滤、全量审计不一致诊断，以及 Node/桌面/Android 固定 Unicode 向量。
+- 兼容：完整 v2 checkpoint + Transition 可恢复；v2/v3 混链、错误 build、旧 WS 订阅和动作在运行规则
+  或写数据库前显式拒绝。
 - 关闭/删除：关闭 ingress 后新提交失败；SIGTERM 与 Electron IPC 都按“停止接入→排空→逐房间水位核对”
   执行；排空失败的房间删除在 WS/HTTP 明确失败。
 - 规则：部署、水门目标、观者选项、pending 超时、回合计时与机器人均走同一协调器。

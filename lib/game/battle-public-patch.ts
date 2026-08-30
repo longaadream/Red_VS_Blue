@@ -1,6 +1,16 @@
 import { hashStable } from './battle-trace'
+import {
+  buildBattleStateHashIndex,
+  updateBattleStateHashIndex,
+  type BattleStateHashIndex,
+} from './battle-state-hash'
 
-export const BATTLE_AUTHORITY_PROTOCOL_VERSION = 2 as const
+export const LEGACY_BATTLE_AUTHORITY_PROTOCOL_VERSION = 2 as const
+export const BATTLE_AUTHORITY_PROTOCOL_VERSION = 3 as const
+export const BATTLE_AUTHORITY_BUILD_ID = 'rvb-authority-v3-chunked-sha256-1' as const
+export type BattleAuthorityProtocolVersion =
+  | typeof LEGACY_BATTLE_AUTHORITY_PROTOCOL_VERSION
+  | typeof BATTLE_AUTHORITY_PROTOCOL_VERSION
 
 export type BattlePatchPath = Array<string | number>
 
@@ -9,7 +19,8 @@ export type BattlePatchOperation =
   | { op: 'remove'; path: BattlePatchPath }
 
 export interface BattlePublicPatchEnvelope {
-  protocolVersion: typeof BATTLE_AUTHORITY_PROTOCOL_VERSION
+  protocolVersion: BattleAuthorityProtocolVersion
+  authorityBuildId?: typeof BATTLE_AUTHORITY_BUILD_ID
   roomId: string
   fromVersion: number
   toVersion: number
@@ -34,8 +45,14 @@ export class BattlePublicPatchError extends Error {
   }
 }
 
-export function hashPublicBattleState(state: unknown): string {
-  return hashStable(state)
+const publicHashIndexes = new WeakMap<object, BattleStateHashIndex>()
+
+export function hashPublicBattleState(
+  state: unknown,
+  protocolVersion: BattleAuthorityProtocolVersion = BATTLE_AUTHORITY_PROTOCOL_VERSION,
+): string {
+  if (protocolVersion === LEGACY_BATTLE_AUTHORITY_PROTOCOL_VERSION) return hashStable(state)
+  return getOrBuildPublicHashIndex(state).rootHash
 }
 
 export function createBattlePublicPatch(before: unknown, after: unknown): BattlePatchOperation[] {
@@ -54,9 +71,20 @@ export function applyBattlePublicPatch<T>(
   const envelope = Array.isArray(patchOrEnvelope) ? undefined : patchOrEnvelope as BattlePublicPatchEnvelope
   const patch: BattlePatchOperation[] = envelope ? envelope.patch : patchOrEnvelope as BattlePatchOperation[]
   if (envelope) {
-    if (envelope.protocolVersion !== BATTLE_AUTHORITY_PROTOCOL_VERSION) {
+    if (
+      envelope.protocolVersion !== LEGACY_BATTLE_AUTHORITY_PROTOCOL_VERSION
+      && envelope.protocolVersion !== BATTLE_AUTHORITY_PROTOCOL_VERSION
+    ) {
       throw invalidPatch('Unsupported battle authority protocol version', {
         protocolVersion: envelope.protocolVersion,
+      })
+    }
+    if (
+      envelope.protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+      && envelope.authorityBuildId !== BATTLE_AUTHORITY_BUILD_ID
+    ) {
+      throw invalidPatch('Unsupported battle authority build', {
+        authorityBuildId: envelope.authorityBuildId,
       })
     }
     if (options.authorityVersion !== undefined && options.authorityVersion !== envelope.fromVersion) {
@@ -66,7 +94,7 @@ export function applyBattlePublicPatch<T>(
         { authorityVersion: options.authorityVersion, fromVersion: envelope.fromVersion, toVersion: envelope.toVersion },
       )
     }
-    const actualPreHash = hashPublicBattleState(source)
+    const actualPreHash = hashPublicBattleState(source, envelope.protocolVersion)
     if (actualPreHash !== envelope.prePublicHash) {
       throw new BattlePublicPatchError(
         'BATTLE_PATCH_PRE_HASH_MISMATCH',
@@ -80,7 +108,16 @@ export function applyBattlePublicPatch<T>(
   for (const operation of patch) target = applyOperation(target, operation)
 
   if (envelope) {
-    const actualPostHash = hashPublicBattleState(target)
+    const incrementalPostIndex = envelope.protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+      ? updateBattleStateHashIndex(
+          getOrBuildPublicHashIndex(source),
+          target,
+          patch,
+          hashStable,
+        ).index
+      : undefined
+    const actualPostHash = incrementalPostIndex?.rootHash
+      ?? hashPublicBattleState(target, envelope.protocolVersion)
     if (actualPostHash !== envelope.postPublicHash) {
       throw new BattlePublicPatchError(
         'BATTLE_PATCH_POST_HASH_MISMATCH',
@@ -88,8 +125,26 @@ export function applyBattlePublicPatch<T>(
         { expected: envelope.postPublicHash, actual: actualPostHash },
       )
     }
+    if (
+      envelope.protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+      && target
+      && typeof target === 'object'
+    ) {
+      publicHashIndexes.set(target as object, incrementalPostIndex!)
+    }
   }
   return target as T
+}
+
+function getOrBuildPublicHashIndex(state: unknown): BattleStateHashIndex {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    throw invalidPatch('Battle public state hash root must be an object')
+  }
+  const cached = publicHashIndexes.get(state)
+  if (cached) return cached
+  const index = buildBattleStateHashIndex(state, hashStable)
+  publicHashIndexes.set(state, index)
+  return index
 }
 
 function diffValue(

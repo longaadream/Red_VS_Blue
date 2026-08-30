@@ -5,7 +5,7 @@ import { Script, createContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 import { toPublicBattleState } from '@/lib/game/deployment'
-import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
+import { hashBattleState, hashStable, runBattleAction } from '@/lib/game/battle-runner'
 import { createDebugDuel } from '@/lib/game/debug-battle'
 import { makeState } from '../helpers/minimal-state'
 
@@ -31,7 +31,8 @@ function tracedState(finished: boolean) {
   if (finished) state.terminalResult = terminalResult()
   const checkpoint = JSON.parse(JSON.stringify(state))
   delete checkpoint.extensions
-  const checkpointHash = hashBattleState(checkpoint)
+  const authorityHash = hashBattleState(checkpoint)
+  const checkpointHash = hashStable(checkpoint)
   state.extensions = {
     debugBattle: {
       appliedActionIds: ['action-secret-id'],
@@ -43,8 +44,8 @@ function tracedState(finished: boolean) {
         tick: 0,
         turn: 1,
         playerId: 'player-red',
-        preStateHash: checkpointHash,
-        postStateHash: checkpointHash,
+        preStateHash: authorityHash,
+        postStateHash: authorityHash,
         randomStreams: [],
       }],
       commandLog: [{
@@ -54,7 +55,8 @@ function tracedState(finished: boolean) {
       }],
       replay: {
         format: 'rvb-battle-replay/v2',
-        initialStateHash: checkpointHash,
+        initialStateHash: authorityHash,
+        initialCheckpointHash: checkpointHash,
         initialState: checkpoint,
         frames: [{
           index: 0,
@@ -66,8 +68,10 @@ function tracedState(finished: boolean) {
           turnAfter: 3,
           phaseBefore: 'action',
           phaseAfter: 'action',
-          preStateHash: checkpointHash,
-          postStateHash: checkpointHash,
+          preStateHash: authorityHash,
+          postStateHash: authorityHash,
+          preCheckpointHash: checkpointHash,
+          postCheckpointHash: checkpointHash,
           postState: checkpoint,
           events: [{
             type: 'futureUnknownEvent',

@@ -221,17 +221,70 @@ describe('game WebSocket service', () => {
     }
   })
 
+  test('rejects an incompatible battle protocol before registering the subscription', async () => {
+    const client = await openClient()
+    const roomId = 'legacy-client-' + Date.now()
+    try {
+      const response = waitForJsonMessage(client)
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'legacy-player',
+        protocolVersion: 2,
+      }))
+
+      await expect(response).resolves.toMatchObject({
+        type: 'battleProtocolUnsupported',
+        code: 'BATTLE_PROTOCOL_UNSUPPORTED',
+        expectedProtocolVersion: 3,
+        expectedAuthorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        receivedProtocolVersion: 2,
+      })
+      expect(globalWithWsServer.__rvbPlayerWs?.has('legacy-player')).toBe(false)
+
+      const buildResponse = waitForJsonMessage(client)
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'wrong-build-player',
+        protocolVersion: 3,
+        authorityBuildId: 'old-build',
+      }))
+      await expect(buildResponse).resolves.toMatchObject({
+        type: 'battleProtocolUnsupported',
+        expectedProtocolVersion: 3,
+        receivedProtocolVersion: 3,
+        receivedAuthorityBuildId: 'old-build',
+      })
+      expect(globalWithWsServer.__rvbPlayerWs?.has('wrong-build-player')).toBe(false)
+    } finally {
+      await expect(closeClient(client)).resolves.toBe(1000)
+    }
+  })
+
   test('keeps the replacement player socket registered when the stale socket closes', async () => {
     const roomId = 'reconnect-player-map-' + Date.now()
     const first = await openClientPair()
     const replacement = await openClientPair()
     try {
       const firstSubscribed = waitForJsonMessage(first.client)
-      first.client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: 'same-player' }))
+      first.client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'same-player',
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+      }))
       await expect(firstSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
 
       const replacementSubscribed = waitForJsonMessage(replacement.client)
-      replacement.client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: 'same-player' }))
+      replacement.client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'same-player',
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+      }))
       await expect(replacementSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
       expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
 
@@ -272,7 +325,13 @@ describe('game WebSocket service', () => {
 
     try {
       const initialSnapshot = waitForJsonType(client, 'stateUpdate')
-      client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: 'player-red' }))
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'player-red',
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+      }))
       await expect(initialSnapshot).resolves.toMatchObject({
         type: 'stateUpdate',
         authorityVersion: 4,
@@ -400,7 +459,12 @@ describe('game WebSocket service', () => {
         type: 'rpcResult',
         requestId: 'health',
         ok: true,
-        data: { ok: true, protocol: 'rvb-ws', protocolVersion: 2 },
+        data: {
+          ok: true,
+          protocol: 'rvb-ws',
+          protocolVersion: 3,
+          authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        },
       })
       const maps = await rpc(client, 'maps', 'catalog.maps')
       expect(maps).toMatchObject({ type: 'rpcResult', requestId: 'maps', ok: true })
@@ -550,7 +614,8 @@ describe('game WebSocket service', () => {
           if (viewerPlayerId !== 'opponent') throw new Error('forced recipient projection failure')
           return {
             type: 'battleTransition',
-            protocolVersion: 2,
+            protocolVersion: 3,
+            authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
             roomId: projectedRoomId,
             fromVersion: 1,
             toVersion: 2,
@@ -646,7 +711,8 @@ describe('game WebSocket service', () => {
           projectionOrder.push(viewerPlayerId)
           return {
             type: 'battleTransition',
-            protocolVersion: 2,
+            protocolVersion: 3,
+            authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
             roomId: projectedRoomId,
             fromVersion: 1,
             toVersion: 2,

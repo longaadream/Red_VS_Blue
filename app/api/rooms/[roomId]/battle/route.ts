@@ -11,6 +11,10 @@ import {
   dispatchRoomBattleAction,
   scheduleRoomBattleTimeout,
 } from "@/lib/game/room-battle-actions"
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+} from "@/lib/game/battle-public-patch"
 import { parseBattleAuthorityEnvelope, roomBattleAuthorityVersion } from "@/lib/game/battle-transition"
 import { verifyBattleActionAuth } from "@/lib/game/identity-verify"
 import { getClientTerminalSubmissionError } from "@/lib/server/battle-terminal"
@@ -69,7 +73,8 @@ export async function POST(
   let envelope
   try {
     envelope = parseBattleAuthorityEnvelope({
-      protocolVersion: body.protocolVersion ?? 2,
+      protocolVersion: body.protocolVersion ?? BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: body.authorityBuildId ?? BATTLE_AUTHORITY_BUILD_ID,
       roomId,
       clientActionId: body.clientActionId ?? command.clientActionId,
       expectedAuthorityVersion: Number.isSafeInteger(body.expectedAuthorityVersion)

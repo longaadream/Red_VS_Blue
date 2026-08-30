@@ -425,7 +425,7 @@ interface ServerCore {
 
 - 协调入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`；所有 LAN 玩家、pending、计时器和机器人命令必须由此进入。
 - 排队：`lib/game/room-authority-queue.ts` 按 roomId 严格 FIFO，并对等待数量实施背压；房间之间不共享队列。
-- 协议：`lib/game/battle-transition.ts` 定义 v2 command envelope、精确 receipt、公开 pending 投影、Transition 和检查点恢复。
+- 协议：`lib/game/battle-transition.ts` 定义 v3 command envelope、固定 authority build、精确 receipt、公开 pending 投影、Transition 和检查点恢复；完整 v2 链仅作恢复兼容，禁止与 v3 追加混写。
 - 版本：`Room.version` 是房间元数据乐观锁；`Room.battleAuthorityVersion` 是连续战斗版本。传输与 patch 只能使用后者。
 - 在线权威：显式开启 async journal 后，`RoomStore.getRoom()` 优先读取进程内 Room Actor；
   `commitBattleAuthorityTransition()` 在 ACK 前验证版本、前链、receipt 关联、重算 action/transition hash，
@@ -436,20 +436,24 @@ interface ServerCore {
   durable 水位和 degraded 状态；`lib/server/battle-authority-persistence.ts` 在后台原子推进 DB 版本并写
   Transition、Receipt 和可选 Checkpoint。SQLite 首次写前设置 WAL，每笔写设置 `busy_timeout=500 ms`；
   Prisma `maxWait=250 ms`、transaction `timeout=1250 ms` 和 journal 2 秒安全线限制底层写。锁、等待和
-  timeout 保留当前 job，按 25/100/250 ms 后以 250 ms 封顶退避；旧 adapter 实际结束前绝不重试或开始
-  下一房间。审计/hash/版本、约束、损坏、I/O 和队列溢出才 degraded 并暂停新动作。终局完整 Trace 在
+  timeout 保留当前 job，按 25/100/250 ms 后以 250 ms 封顶退避，最多尝试 5 次或等待 10 秒；达到上限
+  只 degraded 该房间并继续其他房间。旧 adapter 实际结束前绝不重试或开始下一写。审计/hash/版本、
+  约束、损坏、I/O 和队列溢出立即 degraded 并暂停该房间新动作。终局完整 Trace 在
   Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
 - 补丁：`lib/game/battle-public-patch.ts` 对数组共同前缀递归 diff，尾部逐项 `set` 追加、逆序 `remove`；
   应用器只允许 `set` 到 `index === length`，拒绝稀疏索引，继续兼容旧整数组 `set`。普通回执不携带回放
   帧或完整快照；checkpoint 仍只在换回合、终局和每 20 个权威版本建立。
-- 启动/关闭：v2 初始检查点是进入 in-progress 的必要条件；创建失败必须 CAS 回滚，version 0 的半启动
+- 哈希：`lib/game/battle-state-hash.ts` 把顶层数组固定切成 32 项块，根绑定算法版本、字段名、数组长度、
+  chunk size 与块 hash；Coordinator 缓存内部/接收者公开索引，普通 Δ 只更新受影响块。初始化、恢复、
+  checkpoint、换回合、每 20 个版本与终局执行全量重算，偏差报告字段并 fail closed。
+- 启动/关闭：v3 初始检查点是进入 in-progress 的必要条件；创建失败必须 CAS 回滚，version 0 的半启动
   房间再次进入启动入口时先补检查点并 hydrate actor。`battle-authority-shutdown.ts` 在关闭 journal ingress、
   停止 WS 后排空全局 writer，并核对每个 actor 的 durable 水位。Electron 通过子进程 IPC 等待该结果，
   SIGINT/SIGTERM 使用同一流程；6 秒总上限后才进入强制停止兜底。
 - 删除：`RoomStore.removeRoom()` 在删除前排空该房间；失败返回 false，WS、主 HTTP 与管理员批量清理入口
   必须返回错误和准确的失败房间，不能广播或响应删除成功。
 - 客户端：`data/pages/battle.html` 只应用接收者公开 patch、显示权威候选并发送选择；候选仅投影给 pending owner，对手/观者只看公开等待信封；版本/hash 不匹配时单飞请求完整快照。
-- 功能开关：候选默认 fail closed；`RVB_BATTLE_AUTHORITY_V2=1` 启用 v2，额外设置
+- 功能开关：候选默认 fail closed；历史命名的 `RVB_BATTLE_AUTHORITY_V2=1` 启用当前 v3 authority，额外设置
   `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只关 async flag 即回退 ACK 前原子 DB 提交。
   `RVB_TURN_TIMER_ENABLED=1` 才安排部署/回合计时唤醒。`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
 - 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；version > 0 缺检查点、版本断层、pre/post state/public hash、action hash 或 transition hash 链损坏都必须显式失败。

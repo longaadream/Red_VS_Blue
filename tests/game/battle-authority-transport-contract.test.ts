@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('RED-109 authority transport rollback contract', () => {
-  it('broadcasts v2 transitions normally and full snapshots when the coordinator uses the legacy fallback', () => {
+  it('broadcasts v3 transitions normally and full snapshots when the coordinator uses the legacy fallback', () => {
     const ws = readFileSync(resolve(process.cwd(), 'lib/ws-server.ts'), 'utf8')
     const handler = ws.slice(
       ws.indexOf("msg.type === 'action' || msg.type === 'gameOver'"),
@@ -27,5 +27,7 @@ describe('RED-109 authority transport rollback contract', () => {
     expect(post).toContain("broadcastToRoom(roomId, { type: 'stateUpdate', ...result.snapshot })")
     expect(post).toContain('...(!transition ? result.snapshot : {})')
     expect(post).toContain("...(!transition ? { snapshot: result.snapshot } : {})")
+    expect(post).toContain('body.protocolVersion ?? BATTLE_AUTHORITY_PROTOCOL_VERSION')
+    expect(post).toContain('body.authorityBuildId ?? BATTLE_AUTHORITY_BUILD_ID')
   })
 })

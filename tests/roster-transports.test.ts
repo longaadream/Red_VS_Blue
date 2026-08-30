@@ -5,6 +5,10 @@ import { NextRequest } from 'next/server'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
 import type { Room } from '../lib/game/room-store'
 import { SELECTABLE_MAP_IDS } from '../lib/game/map-selection'
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+} from '../lib/game/battle-public-patch'
 
 type JsonObject = Record<string, unknown>
 type TestIdentity = { id: string; publicKey: string; privateKey: CryptoKey }
@@ -463,11 +467,23 @@ async function httpRoomSnapshot(roomId: string) {
 async function wsBattleAction(roomId: string, playerId: string, action: JsonObject, identity?: TestIdentity, responseType = 'stateUpdate') {
   const client = await openClient()
   try {
-    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId }))
+    client.send(JSON.stringify({
+      type: 'subscribe',
+      roomId,
+      playerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    }))
     await receiveType(client, 'subscribed')
     await receiveType(client, 'stateUpdate')
     const auth = identity ? await signBattleAction(identity, roomId, action) : undefined
-    client.send(JSON.stringify({ type: 'action', action, auth }))
+    client.send(JSON.stringify({
+      type: 'action',
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      action,
+      auth,
+    }))
     return await receiveType(client, responseType)
   } finally {
     client.close()
@@ -477,7 +493,13 @@ async function wsBattleAction(roomId: string, playerId: string, action: JsonObje
 async function wsBattleSnapshot(roomId: string, viewerPlayerId: string) {
   const client = await openClient()
   try {
-    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: viewerPlayerId }))
+    client.send(JSON.stringify({
+      type: 'subscribe',
+      roomId,
+      playerId: viewerPlayerId,
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    }))
     await receiveType(client, 'subscribed')
     return await receiveType(client, 'stateUpdate')
   } finally {
@@ -1311,7 +1333,13 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const client = await openClient()
     const messages = collectMessages(client)
     try {
-      client.send(JSON.stringify({ type: 'subscribe', roomId: 'terminal-race', playerId: secondIdentity.id }))
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId: 'terminal-race',
+        playerId: secondIdentity.id,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      }))
       await messages.waitFor('subscribed')
       await messages.waitFor('stateUpdate')
 
@@ -1339,7 +1367,13 @@ describe('Demo roster HTTP/WebSocket integration', () => {
         firstIdentity.id,
         firstIdentity,
       )
-      client.send(JSON.stringify({ type: 'action', action: wsAction, auth: wsAuth }))
+      client.send(JSON.stringify({
+        type: 'action',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        action: wsAction,
+        auth: wsAuth,
+      }))
 
       const [httpResult, update] = await Promise.all([httpResultPromise, terminalUpdate])
       expect([200, 400]).toContain(httpResult.status)

@@ -34,6 +34,8 @@ export interface BattleAuthorityJournalPersistContext {
 export interface BattleAuthorityAsyncJournalOptions {
   maxPendingPerRoom?: number
   retryDelaysMs?: number[]
+  maxRetryAttempts?: number
+  maxRetryElapsedMs?: number
   persistTimeoutMs?: number
   isRetryablePersistError?: (error: unknown) => boolean
   onStateChange?: (roomId: string, state: BattleAuthorityJournalInspection) => void
@@ -61,6 +63,8 @@ export class BattleAuthorityAsyncJournal {
   private readonly jobs: Array<BattleAuthorityJournalJob & { roomId: string }> = []
   private readonly maxPendingPerRoom: number
   private readonly retryDelaysMs: number[]
+  private readonly maxRetryAttempts: number
+  private readonly maxRetryElapsedMs: number
   private readonly persistTimeoutMs: number
   private readonly isRetryablePersistError: NonNullable<BattleAuthorityAsyncJournalOptions['isRetryablePersistError']>
   private readonly onStateChange?: BattleAuthorityAsyncJournalOptions['onStateChange']
@@ -85,8 +89,18 @@ export class BattleAuthorityAsyncJournal {
     if (!Number.isFinite(persistTimeoutMs) || persistTimeoutMs <= 0) {
       throw new Error('persistTimeoutMs must be a positive finite number')
     }
+    const maxRetryAttempts = options.maxRetryAttempts ?? 5
+    if (!Number.isSafeInteger(maxRetryAttempts) || maxRetryAttempts < 1) {
+      throw new Error('maxRetryAttempts must be a positive safe integer')
+    }
+    const maxRetryElapsedMs = options.maxRetryElapsedMs ?? 10_000
+    if (!Number.isFinite(maxRetryElapsedMs) || maxRetryElapsedMs <= 0) {
+      throw new Error('maxRetryElapsedMs must be a positive finite number')
+    }
     this.maxPendingPerRoom = maxPendingPerRoom
     this.retryDelaysMs = [...retryDelaysMs]
+    this.maxRetryAttempts = maxRetryAttempts
+    this.maxRetryElapsedMs = maxRetryElapsedMs
     this.persistTimeoutMs = persistTimeoutMs
     this.isRetryablePersistError = options.isRetryablePersistError ?? (() => false)
     this.onStateChange = options.onStateChange
@@ -215,9 +229,11 @@ export class BattleAuthorityAsyncJournal {
   }
 
   private async persistWithRetry(job: BattleAuthorityJournalJob & { roomId: string }): Promise<void> {
-    let attempt = 0
+    let attempts = 0
+    let firstFailureAt: number | undefined
     while (true) {
       try {
+        attempts += 1
         const controller = new AbortController()
         const message = `Battle authority journal persist timed out after ${this.persistTimeoutMs}ms in ${job.roomId}`
         await withTimeoutWithoutOverlap(
@@ -230,14 +246,23 @@ export class BattleAuthorityAsyncJournal {
       } catch (error) {
         const failure = asError(error)
         if (!this.accepting || !this.isRetryablePersistError(failure)) throw failure
+        const now = Date.now()
+        firstFailureAt ??= now
+        const retryElapsedMs = now - firstFailureAt
+        if (attempts >= this.maxRetryAttempts || retryElapsedMs >= this.maxRetryElapsedMs) {
+          throw new Error(
+            `Battle authority journal retry limit exceeded in ${job.roomId} after ${attempts} attempt(s) and ${retryElapsedMs}ms`,
+            { cause: failure },
+          )
+        }
         const state = this.roomState(job.roomId)
         state.transientError = failure
         this.emit(job.roomId)
         const delay = this.retryDelaysMs.length > 0
-          ? this.retryDelaysMs[Math.min(attempt, this.retryDelaysMs.length - 1)]
+          ? this.retryDelaysMs[Math.min(attempts - 1, this.retryDelaysMs.length - 1)]
           : 25
-        attempt += 1
-        if (delay > 0) await sleep(delay)
+        const remainingRetryMs = this.maxRetryElapsedMs - retryElapsedMs
+        if (delay > 0) await sleep(Math.min(delay, remainingRetryMs))
       }
     }
   }

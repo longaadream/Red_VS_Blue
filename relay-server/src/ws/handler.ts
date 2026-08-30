@@ -2,6 +2,10 @@ import type { ServerWebSocket } from 'bun'
 import type { WsData, WsInbound } from '../types'
 import { store } from '../store'
 import { BattleSubscribeAuthError, verifyBattleSubscribeAuth } from '../../../lib/game/identity-verify'
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+} from '../../../lib/game/battle-public-patch'
 
 function send(ws: ServerWebSocket<WsData>, msg: object) {
   if (ws.readyState === 1) ws.send(JSON.stringify(msg))
@@ -11,6 +15,26 @@ function err(ws: ServerWebSocket<WsData>, message: string, code?: string) {
   send(ws, { type: 'error', message, ...(code ? { code } : {}) })
 }
 
+function protocolUnsupported(
+  ws: ServerWebSocket<WsData>,
+  receivedProtocolVersion: unknown,
+  receivedAuthorityBuildId: unknown,
+) {
+  send(ws, {
+    type: 'battleProtocolUnsupported',
+    code: 'BATTLE_PROTOCOL_UNSUPPORTED',
+    expectedProtocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    expectedAuthorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    receivedProtocolVersion,
+    receivedAuthorityBuildId,
+  })
+}
+
+function hasCompatibleProtocol(value: { protocolVersion?: unknown; authorityBuildId?: unknown }): boolean {
+  return value.protocolVersion === BATTLE_AUTHORITY_PROTOCOL_VERSION
+    && value.authorityBuildId === BATTLE_AUTHORITY_BUILD_ID
+}
+
 // ── Subscribe ──────────────────────────────────────────────────────────────
 
 async function handleSubscribe(
@@ -18,6 +42,9 @@ async function handleSubscribe(
   roomId: string,
   msg: Extract<WsInbound, { type: 'subscribe' }>
 ) {
+  if (!hasCompatibleProtocol(msg) || !hasCompatibleProtocol(msg.payload)) {
+    return protocolUnsupported(ws, msg.protocolVersion, msg.authorityBuildId)
+  }
   const room = store.getRoom(roomId)
   if (!room) return err(ws, 'room not found')
 
@@ -41,7 +68,12 @@ async function handleSubscribe(
   ws.data.role = role
 
   store.addWsClient(roomId, ws)
-  send(ws, { type: 'subscribed', role })
+  send(ws, {
+    type: 'subscribed',
+    role,
+    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+  })
 
   // If host reconnects during waiting_host, resume
   if (role === 'host' && room.status === 'waiting_host' && room.lastStateBlob) {
@@ -71,6 +103,9 @@ function handleAction(
   if (!room) return err(ws, 'room not found')
   if (room.status !== 'battle') return err(ws, 'battle not active')
   if (ws.data.role === 'host') return err(ws, 'host should not submit actions here')
+  if (!hasCompatibleProtocol(msg)) {
+    return protocolUnsupported(ws, msg.protocolVersion, msg.authorityBuildId)
+  }
 
   // Persist action entry for later verification
   store.appendAction(roomId, {
@@ -87,6 +122,7 @@ function handleAction(
     type: 'pendingAction',
     seq: msg.seq,
     protocolVersion: msg.protocolVersion,
+    authorityBuildId: msg.authorityBuildId,
     roomId: msg.roomId,
     clientActionId: msg.clientActionId,
     expectedAuthorityVersion: msg.expectedAuthorityVersion,
@@ -141,6 +177,9 @@ function handleBattleTransition(
   const room = store.getRoom(roomId)
   if (!room) return err(ws, 'room not found')
   if (room.status !== 'battle') return err(ws, 'battle not active')
+  if (!hasCompatibleProtocol(msg)) {
+    return protocolUnsupported(ws, msg.protocolVersion, msg.authorityBuildId)
+  }
   if (msg.roomId.trim().toLowerCase() !== roomId.trim().toLowerCase()) {
     return err(ws, 'battle transition room mismatch', 'BATTLE_TRANSITION_ROOM_MISMATCH')
   }

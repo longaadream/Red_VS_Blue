@@ -4034,6 +4034,7 @@
         var previousPresentationModel = currentBattleViewModel || createBattlePresentationModel(oldG)
         var envelope = {
           protocolVersion: msg.protocolVersion,
+          authorityBuildId: msg.authorityBuildId,
           roomId: msg.roomId,
           fromVersion: msg.fromVersion,
           toVersion: msg.toVersion,
@@ -5791,7 +5792,8 @@
     function battleAuthorityCommandMessage(action, auth, extra) {
       return Object.assign({
         type: 'action',
-        protocolVersion: 2,
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
         roomId: roomId,
         clientActionId: action.clientActionId,
         expectedAuthorityVersion: Number.isSafeInteger(latestAuthorityVersion) ? latestAuthorityVersion : 0,

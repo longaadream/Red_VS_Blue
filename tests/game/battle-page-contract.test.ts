@@ -501,7 +501,8 @@ new Script([
     for (const [index, message] of messages.entries()) {
       expect(message).toMatchObject({
         type: 'action',
-        protocolVersion: 2,
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
         roomId: 'room-red109',
         clientActionId: `client-${index + 1}`,
         expectedAuthorityVersion: 7,
