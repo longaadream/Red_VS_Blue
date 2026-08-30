@@ -329,6 +329,31 @@ describe('developer tools match trace boundary', () => {
 
     expect(toPlainObject(await tools.readStoredTrace())).toEqual(toPlainObject(valid))
   })
+
+  it('retries terminal Trace creation before the completed-record guard', () => {
+    const battlePage = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
+    const start = battlePage.indexOf('function handleGameOver()')
+    const end = battlePage.indexOf('var _signedRecord', start)
+    const handler = battlePage.slice(start, end)
+
+    expect(start).toBeGreaterThanOrEqual(0)
+    expect(handler.indexOf('storeCompletedMatchTrace()'))
+      .toBeLessThan(handler.indexOf('if (recordSaved) return'))
+    expect(handler.indexOf('storeCompletedMatchTrace()'))
+      .toBeLessThan(handler.indexOf('RvBWs.disconnect()'))
+    expect(battlePage).toContain('id="matchTraceStatus"')
+    expect(battlePage).toContain('Trace 生成失败：')
+  })
+
+  it('uses the replay final authority hash instead of the viewer-specific public snapshot hash', () => {
+    const battlePage = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
+    const start = battlePage.indexOf('function storeCompletedMatchTrace()')
+    const end = battlePage.indexOf('async function downloadCompletedMatchTrace()', start)
+    const storeHandler = battlePage.slice(start, end)
+
+    expect(start).toBeGreaterThanOrEqual(0)
+    expect(storeHandler).not.toContain('stateHash: latestAuthorityStateHash')
+  })
 })
 
 function toPlainObject(value: unknown) {

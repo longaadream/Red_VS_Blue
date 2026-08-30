@@ -1153,22 +1153,22 @@
       let identity
       if (
         window.electronAPI
-        && typeof window.electronAPI.getResourcePackStatus === 'function'
+        && typeof window.electronAPI.getMode === 'function'
       ) {
-        const report = await window.electronAPI.getResourcePackStatus()
-        const stable = report && report.state && report.state.stable
-        if (!stable || !stable.compatibility) {
-          throw new Error('本地资源包状态不可用，请打开“资源包管理”检查安装状态')
+        const mode = await window.electronAPI.getMode()
+        const localRuntimeUrl = mode && typeof mode.localUrl === 'string'
+          ? mode.localUrl.trim()
+          : ''
+        if (!localRuntimeUrl) {
+          throw new Error('本地 Profile 运行时不可用，请重启客户端后重试')
         }
-        identity = {
-          schemaVersion: 'rvb-game-profile-identity/v1',
-          engineAbi: stable.compatibility.engineAbi,
-          runnerRevision: 'rvb-battle-runner/v1',
-          resolvedProfileHash: stable.resolvedProfileHash,
-          authorityContentHash: stable.authorityContentHash,
-        }
+        const catalog = await RvBWs.requestAt(localRuntimeUrl, 'catalog.identity', {}, 3000)
+        identity = catalog && catalog.profileIdentity
       } else {
-        const catalog = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
+        const localRuntimeUrl = /^https?:$/.test(window.location.protocol)
+          ? window.location.origin
+          : serverUrl
+        const catalog = await RvBWs.requestAt(localRuntimeUrl, 'catalog.identity', {}, 3000)
         identity = catalog && catalog.profileIdentity
       }
 
@@ -1192,12 +1192,19 @@
 
     async function checkProfileAndGo(serverUrl, mode) {
       try {
+        await getLocalGameProfileIdentity(serverUrl)
+      } catch (error) {
+        alert('无法进入大厅：' + ((error && error.message) || error))
+        return false
+      }
+      try {
         const data = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
         if (data && data.profileIdentity) {
           try { localStorage.setItem('rvb_server_profile_identity', JSON.stringify(data.profileIdentity)) } catch {}
         }
       } catch {}
       goLobby(mode, serverUrl)
+      return true
     }
 
     function updatePackBadge() {

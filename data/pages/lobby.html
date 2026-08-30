@@ -448,26 +448,41 @@
         && SHA256_HEX.test(value.authorityContentHash)
     }
 
+    function readStoredGameProfileIdentity() {
+      try {
+        const stored = localStorage.getItem('rvb_game_profile_identity')
+        if (!stored) return null
+        const parsed = JSON.parse(stored)
+        return isGameProfileIdentity(parsed) ? parsed : null
+      } catch {
+        return null
+      }
+    }
+
     async function getLocalGameProfileIdentity() {
-      let profileIdentity
+      let profileIdentity = readStoredGameProfileIdentity()
       if (
+        !profileIdentity
+        &&
         window.electronAPI
-        && typeof window.electronAPI.getResourcePackStatus === 'function'
+        && typeof window.electronAPI.getMode === 'function'
       ) {
-        const report = await window.electronAPI.getResourcePackStatus()
-        const stable = report && report.state && report.state.stable
-        if (!stable || !stable.compatibility) {
-          throw new Error('本地资源包状态不可用，请返回首页打开“资源包管理”检查安装状态')
+        const mode = await window.electronAPI.getMode()
+        const localRuntimeUrl = mode && typeof mode.localUrl === 'string'
+          ? mode.localUrl.trim()
+          : ''
+        if (!localRuntimeUrl) {
+          throw new Error('本地 Profile 运行时不可用，请重启客户端后重试')
         }
-        profileIdentity = {
-          schemaVersion: GAME_PROFILE_IDENTITY_SCHEMA,
-          engineAbi: stable.compatibility.engineAbi,
-          runnerRevision: BATTLE_RUNNER_REVISION,
-          resolvedProfileHash: stable.resolvedProfileHash,
-          authorityContentHash: stable.authorityContentHash,
-        }
-      } else {
-        const catalogIdentity = await lobbyRequest('catalog.identity')
+        const catalogIdentity = await RvBWs.requestAt(localRuntimeUrl, 'catalog.identity', {}, 3000)
+        profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
+      } else if (!profileIdentity) {
+        const localRuntimeUrl = /^https?:$/.test(window.location.protocol)
+          ? window.location.origin
+          : ''
+        const catalogIdentity = localRuntimeUrl
+          ? await RvBWs.requestAt(localRuntimeUrl, 'catalog.identity', {}, 3000)
+          : await lobbyRequest('catalog.identity')
         profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
       }
 
