@@ -1,9 +1,9 @@
 {
   "id": "blackwidow-lethal-toxin",
   "name": "致命毒素",
-  "description": "在当前地格放置1个毒素，并移动到3格内1个空地格。敌人触发毒素时会受到4点伤害。",
+  "description": "在当前地格放置1个毒素，并移动到5格内1个空地格。敌人经过毒素地格时会受到4点伤害。",
   "keywords": [],
-  "targetText": "3格内1个空地格",
+  "targetText": "5格内1个空地格",
   "effectTags": [
     "陷阱",
     "位移"
@@ -14,16 +14,17 @@
   "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 2,
-  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var targetPos = selectTarget({ type: 'grid', range: 3, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos; var newX = targetPos.x; var newY = targetPos.y; var tile = battle.map.tiles.find(function(t) { return t.x === newX && t.y === newY; }); if (!tile || !tile.props.walkable) return { success: false, message: '目标位置不可行走' }; var occupied = battle.pieces.some(function(p) { return p.x === newX && p.y === newY && p.currentHp > 0; }); if (occupied) return { success: false, message: '目标位置已被占用' }; var toxinX = caster.x; var toxinY = caster.y; var toxinId = 'lethal-toxin-' + Date.now(); addPlayerStatusEffectById(caster.ownerPlayerId, { id: toxinId, type: 'lethal-toxin', name: '致命毒素', currentDuration: -1, intensity: 4, value: toxinX, extraValue: toxinY }); addPlayerRuleById(caster.ownerPlayerId, 'rule-blackwidow-toxin-player'); if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; battle.extensions.tileEffects.push({ id: toxinId, sourceId: toxinId, tileType: 'lethal-toxin', x: toxinX, y: toxinY, ownerPlayerId: caster.ownerPlayerId }); caster.x = newX; caster.y = newY; return { success: true, message: caster.name + '在(' + toxinX + ',' + toxinY + ')放置了致命毒素，并移动到(' + newX + ',' + newY + ')' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '在当前地格放置1个毒素，并移动到3格内1个空地格。敌人触发毒素时会受到4点伤害。', expectedValues: { damage: 4 } }; }",
+  "actionPointCost": 1,
+  "code": "function executeSkill(context) { var caster = context.piece; var targetPos = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos; var tile = battle.map.tiles.find(function(item) { return item.x === targetPos.x && item.y === targetPos.y; }); if (!tile || !tile.props.walkable) return { success: false, message: '目标位置不可行走' }; var occupied = battle.pieces.some(function(piece) { return piece.x === targetPos.x && piece.y === targetPos.y && piece.currentHp > 0; }); if (occupied) return { success: false, message: '目标位置已被占用' }; var toxinX = caster.x; var toxinY = caster.y; var toxinId = 'lethal-toxin-' + Date.now(); addPlayerStatusEffectById(caster.ownerPlayerId, { id: toxinId, type: 'lethal-toxin', name: '致命毒素', currentDuration: -1, intensity: 4, value: toxinX, extraValue: toxinY, sourceId: caster.instanceId }); addPlayerRuleById(caster.ownerPlayerId, 'rule-blackwidow-toxin-player'); if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; battle.extensions.tileEffects.push({ id: toxinId, sourceId: toxinId, tileType: 'lethal-toxin', x: toxinX, y: toxinY, ownerPlayerId: caster.ownerPlayerId }); caster.x = targetPos.x; caster.y = targetPos.y; return { success: true, message: caster.name + '放置致命毒素并移动到(' + targetPos.x + ',' + targetPos.y + ')' }; }",
+  "previewCode": "function calculatePreview() { return { description: '在当前格放置毒素并移动到5格内空地，敌人触发时受到4点伤害。', expectedValues: { damage: 4, range: 5 } }; }",
   "targeting": {
     "steps": [
       {
         "kind": "target",
         "type": "grid",
         "filter": "all",
-        "range": 3,
+        "range": 5,
+        "distanceMetric": "manhattan",
         "requireWalkable": true,
         "requireUnoccupied": true
       }

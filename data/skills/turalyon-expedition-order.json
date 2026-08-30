@@ -1,26 +1,44 @@
 {
   "id": "turalyon-expedition-order",
-  "name": "\u5f81\u8ba8\u53f7\u4ee4",
-  "description": "\u9009\u62e91\u5f20\u666e\u901a\u5723\u5149\u624b\u724c\uff0c\u4f7f\u5176\u672c\u56de\u5408AP\u6d88\u8017-1\uff0c\u6700\u4f4e\u4e3a1\u3002",
+  "name": "征讨号令",
+  "description": "选择一种圣光手牌获得。",
   "keywords": [
-    "\u5723\u5149\u624b\u724c"
+    "圣光手牌"
   ],
-  "targetText": "\u624b\u4e2d1\u5f20\u5723\u5149\u624b\u724c",
+  "targetText": "一种圣光手牌",
   "effectTags": [
-    "\u964d\u8d39",
-    "\u624b\u724c"
+    "手牌"
   ],
-  "icon": "\ud83d\udcef",
+  "icon": "📯",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 1,
+  "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 0,
+  "actionPointCost": 1,
   "targeting": {
-    "steps": []
+    "steps": [
+      {
+        "kind": "option",
+        "title": "征讨号令：选择一种圣光手牌",
+        "options": [
+          {
+            "label": "圣光惩戒",
+            "value": "holy-smite"
+          },
+          {
+            "label": "圣光治疗",
+            "value": "holy-heal"
+          },
+          {
+            "label": "圣光冲锋",
+            "value": "holy-charge"
+          }
+        ]
+      }
+    ]
   },
-  "code": "function executeSkill(context) {\n  var caster = context.piece; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '\u672a\u627e\u5230\u73a9\u5bb6' };\n  function isOrdinaryHoly(card) {\n  return card && ['holy-smite', 'holy-heal', 'holy-charge'].indexOf(card.cardId) !== -1;\n}\n  var eligible = player.hand.filter(function(card) { return isOrdinaryHoly(card) && card.temporaryCostReductionTurnNumber !== battle.turn.turnNumber; });\n  if (eligible.length === 0) return { success: false, message: '\u6ca1\u6709\u53ef\u964d\u8d39\u7684\u5723\u5149\u624b\u724c' };\n  var options = eligible.map(function(card) { return { label: (card.name || card.cardId) + '\uff08' + card.instanceId + '\uff09', value: card.instanceId }; });\n  var choice = selectOption({ title: '\u5f81\u8ba8\u53f7\u4ee4\uff1a\u9009\u62e9\u4e00\u5f20\u5723\u5149\u624b\u724c', options: options, selectionMode: 'single', presentation: 'hand', minSelections: 1, maxSelections: 1 });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  var card = eligible.find(function(item) { return item.instanceId === choice; });\n  if (!card) return { success: false, message: '\u9009\u62e9\u7684\u624b\u724c\u5df2\u65e0\u6cd5\u964d\u8d39' };\n  var currentCost = card.actionPointCost === undefined ? 2 : card.actionPointCost;\n  card.baseActionPointCost = currentCost; card.actionPointCost = Math.max(1, currentCost - 1); card.temporaryCostReductionTurnNumber = battle.turn.turnNumber;\n  return { success: true, message: caster.name + '\u53d1\u5e03\u5f81\u8ba8\u53f7\u4ee4\uff0c' + (card.name || card.cardId) + '\u7684AP\u6d88\u8017\u964d\u81f3' + card.actionPointCost };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"reduction\":1} }; }",
+  "code": "function executeSkill(context) { var caster = context.piece; var choice = selectOption({ title: '征讨号令：选择一种圣光手牌', options: [{ label: '圣光惩戒', value: 'holy-smite' }, { label: '圣光治疗', value: 'holy-heal' }, { label: '圣光冲锋', value: 'holy-charge' }] }); if (choice === undefined || choice === null || choice.needsOptionSelection) return choice; if (['holy-smite','holy-heal','holy-charge'].indexOf(choice) === -1) return { success: false, message: '无效的圣光手牌选择' }; addCardToHand(choice, caster.ownerPlayerId); return { success: true, message: caster.name + '发布征讨号令，获得1张圣光手牌' }; }",
+  "previewCode": "function calculatePreview() { return { description: '选择【圣光惩戒】【圣光治疗】或【圣光冲锋】中的一种获得。', expectedValues: { generatedCards: 1 } }; }",
   "range": "self"
 }

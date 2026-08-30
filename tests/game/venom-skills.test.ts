@@ -43,6 +43,7 @@ function loadJson<T>(...segments: string[]): T {
   return JSON.parse(readFileSync(join(DATA_ROOT, ...segments), 'utf8')) as T
 }
 
+const corrosion = () => loadJson<SkillDefinition>('skills', 'venom-corrosion.json')
 const hostTransfer = () => loadJson<SkillDefinition>('skills', 'venom-host-transfer.json')
 const symbioteDrag = () => loadJson<SkillDefinition>('skills', 'venom-symbiote-drag.json')
 const clawRend = () => loadJson<SkillDefinition>('skills', 'venom-claw-rend.json')
@@ -110,6 +111,7 @@ describe('Venom data contract', () => {
       faction: 'evil',
       stats: { maxHp: 14, attack: 3, defense: 1, moveRange: 4 },
       skills: [
+        { skillId: 'venom-corrosion', level: 1 },
         { skillId: 'venom-host-transfer', level: 1 },
         { skillId: 'venom-symbiote-drag', level: 1 },
         { skillId: 'venom-claw-rend', level: 1 },
@@ -118,27 +120,31 @@ describe('Venom data contract', () => {
 
     expect(getPieceById('red-venom')).toMatchObject({ id: 'red-venom', faction: 'evil' })
     expect([
+      getSkillById('venom-corrosion')?.id,
       getSkillById('venom-host-transfer')?.id,
       getSkillById('venom-symbiote-drag')?.id,
       getSkillById('venom-claw-rend')?.id,
-    ]).toEqual(['venom-host-transfer', 'venom-symbiote-drag', 'venom-claw-rend'])
+    ]).toEqual(['venom-corrosion', 'venom-host-transfer', 'venom-symbiote-drag', 'venom-claw-rend'])
 
   })
-  it('registers the piece and all three skills exactly once', () => {
+  it('registers the piece and all four skills exactly once', () => {
     const pieceManifest = loadJson<string[]>('pieces', 'manifest.json')
     const skillManifest = loadJson<string[]>('skills', 'manifest.json')
-    const ids = ['venom-host-transfer', 'venom-symbiote-drag', 'venom-claw-rend']
+    const ruleManifest = loadJson<string[]>('rules', 'manifest.json')
+    const ids = ['venom-corrosion', 'venom-host-transfer', 'venom-symbiote-drag', 'venom-claw-rend']
 
     expect(pieceManifest.filter(id => id === 'red-venom')).toHaveLength(1)
     for (const id of ids) expect(skillManifest.filter(candidate => candidate === id)).toHaveLength(1)
     expect(new Set(pieceManifest).size).toBe(pieceManifest.length)
     expect(new Set(skillManifest).size).toBe(skillManifest.length)
+    expect(ruleManifest.filter(id => id === 'rule-venom-corrosion-immobile')).toHaveLength(1)
   })
 
   it('exposes the approved costs, cooldowns, ranges and descriptions', () => {
+    expect(corrosion()).toMatchObject({ kind: 'passive', actionPointCost: 0, cooldownTurns: 0 })
     expect(hostTransfer()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, targetText: '7格内任意另一名存活角色', keywords: [], effectTags: [] })
-    expect(symbioteDrag()).toMatchObject({ actionPointCost: 0, cooldownTurns: 1, form: 'projectile', keywords: ['弹射物'], effectTags: ['弹射物'] })
-    expect(clawRend()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, powerMultiplier: 1, keywords: [], effectTags: [] })
+    expect(symbioteDrag()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, form: 'projectile', keywords: ['弹射物'], effectTags: ['弹射物'] })
+    expect(clawRend()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, powerMultiplier: 2, keywords: [], effectTags: [] })
   })
 
   it('uses the full Minato display name and exposes no Minato skill keywords', () => {
@@ -211,6 +217,43 @@ describe('宿主转移', () => {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'venom', skillId: skill.id, targetPieceId: 'venom',
     }) as any)).toThrow()
     expect(JSON.stringify(invalid)).toBe(before)
+  })
+})
+
+describe('腐蚀', () => {
+  it('只在毒液实际改变敌方位置时附加一个1回合定身状态和规则', () => {
+    const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 3 })
+    const state = makeState({ pieces: [venom, enemy], width: 10, height: 10 })
+
+    expect(executeSkill(hostTransfer(), state, 'venom', { pieceId: 'enemy' }).success).toBe(true)
+    expect(enemy.statusTags).toContainEqual(expect.objectContaining({
+      type: 'venom-corrosion-immobile',
+      sourceId: 'venom',
+      currentDuration: 1,
+      remainingDuration: 1,
+    }))
+    expect(enemy.rules?.filter(rule => rule.id === 'rule-venom-corrosion-immobile')).toHaveLength(1)
+
+    expect(executeSkill(hostTransfer(), state, 'venom', { pieceId: 'enemy' }).success).toBe(true)
+    expect(enemy.statusTags.filter(tag => tag.type === 'venom-corrosion-immobile')).toHaveLength(1)
+    expect(enemy.rules?.filter(rule => rule.id === 'rule-venom-corrosion-immobile')).toHaveLength(1)
+
+    const allyVenom = makePiece({ instanceId: 'ally-venom', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 0 })
+    const allyState = makeState({ pieces: [allyVenom, ally] })
+    expect(executeSkill(hostTransfer(), allyState, 'ally-venom', { pieceId: 'ally' }).success).toBe(true)
+    expect(ally.statusTags.some(tag => tag.type === 'venom-corrosion-immobile')).toBe(false)
+  })
+
+  it('共生拖行成功后对被拖动敌人附加腐蚀', () => {
+    const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
+    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 1 })
+    const state = makeState({ pieces: [venom, enemy], width: 6, height: 3 })
+
+    expect(executeSkill(symbioteDrag(), state, 'venom', { x: 5, y: 1 }).success).toBe(true)
+    expect(enemy).toMatchObject({ x: 1, y: 1 })
+    expect(enemy.statusTags.filter(tag => tag.type === 'venom-corrosion-immobile')).toHaveLength(1)
   })
 })
 
@@ -289,7 +332,7 @@ describe('共生拖行', () => {
     expect(JSON.stringify(state)).toBe(before)
   })
 
-  it('成功时消耗0 AP并进入1回合冷却，非法目标不结算资源', () => {
+  it('成功时消耗1 AP并进入1回合冷却，非法目标不结算资源', () => {
     const skill = symbioteDrag()
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 }) as any
     venom.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
@@ -301,7 +344,7 @@ describe('共生拖行', () => {
     const next = applyBattleAction(state, withTargetCredentials(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'venom', skillId: skill.id, targetX: 5, targetY: 1,
     }) as any) as any
-    expect(next.players[0].actionPoints).toBe(2)
+    expect(next.players[0].actionPoints).toBe(1)
     expect(next.pieces.find((piece: any) => piece.instanceId === 'venom').skills[0].currentCooldown).toBe(1)
 
     const adjacent = makeState({ pieces: [venom, makePiece({ instanceId: 'adjacent', ownerPlayerId: 'player-blue', x: 1, y: 1 })], width: 6, height: 3 }) as any
@@ -316,7 +359,7 @@ describe('共生拖行', () => {
 })
 
 describe('利爪撕裂', () => {
-  it('对1格内敌人造成100%攻击力的物理伤害', () => {
+  it('对1格内敌人造成200%攻击力的物理伤害', () => {
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 1, y: 1, attack: 3 })
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 10, maxHp: 10 })
     const state = makeState({ pieces: [venom, enemy] })
@@ -324,7 +367,7 @@ describe('利爪撕裂', () => {
     const result = executeSkill(clawRend(), state, 'venom', { pieceId: 'enemy' })
 
     expect(result.success).toBe(true)
-    expect(enemy.currentHp).toBe(7)
+    expect(enemy.currentHp).toBe(4)
   })
 
   it('成功时消耗1 AP并进入1回合冷却，超出1格不结算资源', () => {

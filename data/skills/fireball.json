@@ -8,10 +8,10 @@
   "icon": "🔥",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 1,
+  "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1.5,
-  "actionPointCost": 2,
+  "actionPointCost": 1,
   "range": "single",
   "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetEnemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' });\n  if (!targetEnemy || targetEnemy.needsTargetSelection) {\n    return targetEnemy;\n  }\n  const damageValue = sourcePiece.attack * context.skill.powerMultiplier;\n  const damageResult = dealDamage(sourcePiece, targetEnemy, damageValue, 'magical', context.battle, context.skill.id);\n  return {\n    message: sourcePiece.name + '使用了火球术，对' + targetEnemy.name + '造成' + damageResult.damage + '点伤害',\n    success: true\n  };\n}",
   "previewCode": "function calculatePreview(piece, skillDef) {\n  const damageValue = Math.round(piece.attack * skillDef.powerMultiplier);\n  return {\n    description: '对5格内1个敌人造成' + damageValue + '点法术伤害。',\n    expectedValues: { damage: damageValue }\n  };\n}"

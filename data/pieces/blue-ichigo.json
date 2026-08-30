@@ -16,7 +16,9 @@
     { "skillId": "ichigo-getsuga-tensho", "level": 1 },
     { "skillId": "ichigo-bankai-tensa-zangetsu", "level": 1 }
   ],
-  "rules": [],
+  "rules": [
+    "rule-ichigo-black-getsuga-teleport"
+  ],
   "transformedSkills": [
     { "skillId": "ichigo-black-getsuga-tensho", "triggeredBy": "ichigo-bankai-tensa-zangetsu" }
   ],

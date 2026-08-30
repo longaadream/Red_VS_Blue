@@ -1,18 +1,24 @@
 {
   "id": "shishio-infinite-blade",
   "name": "无限刃",
-  "description": "对2格内1个敌人造成真实伤害。你可以改为失去1点生命，再次发动此技能。伤害倍率为100%/150%/200%攻击力，每击杀1名角色提升1级；再次发动时会重新选择目标。",
-  "keywords": ["真实伤害"],
+  "description": "对2格内1个敌人造成真实伤害。结算后进入二段选择，可失去1点生命并再次发动，无需额外行动点。伤害倍率为100%/150%/200%攻击力，每击杀1名角色提升1级。",
+  "keywords": [
+    "真实伤害"
+  ],
   "targetText": "2格内1个敌人",
-  "effectTags": ["damage", "recast", "growth"],
+  "effectTags": [
+    "damage",
+    "recast",
+    "growth"
+  ],
   "icon": "⚔️",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 1,
-  "actionPointCost": 0,
+  "actionPointCost": 1,
   "requiresTarget": true,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { var source = context.piece; var killTag = source.statusTags && source.statusTags.find(function(t) { return t.type === 'shishio-kills'; }); var kills = killTag ? (killTag.intensity || 0) : 0; var mult = kills >= 2 ? 2.0 : kills >= 1 ? 1.5 : 1.0; var target = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var dist = Math.abs(target.x - source.x) + Math.abs(target.y - source.y); if (dist > 2) return { success: false, message: '目标超出无限刃范围（2格内）' }; if (target.currentHp <= 0) return { success: false, message: '目标已出局' }; var dmg = Math.floor(source.attack * mult); dealDamage(source, target, dmg, 'true'); addSkillById(source.instanceId, 'shishio-infinite-blade-recast'); return { success: true, message: source.name + ' 发动无限刃，对' + target.name + ' 造成 ' + dmg + ' 点真实伤害（' + Math.floor(mult * 100) + '%），可再次发动无限刃' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { var killTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'shishio-kills'; }); var kills = killTag ? (killTag.intensity || 0) : 0; var mult = kills >= 2 ? 2.0 : kills >= 1 ? 1.5 : 1.0; var dmg = Math.floor((piece.attack || 0) * mult); return { description: '对2格内1个敌人造成' + dmg + '点真实伤害。你可以改为失去1点生命，再次发动此技能。', expectedValues: { damage: dmg } }; }"
+  "code": "function executeSkill(context) { var source = context.piece; var killTag = source.statusTags && source.statusTags.find(function(tag) { return tag.type === 'shishio-kills'; }); var kills = killTag ? (killTag.intensity || 0) : 0; var multiplier = kills >= 2 ? 2 : (kills >= 1 ? 1.5 : 1); var target = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.floor(source.attack * multiplier); var first = dealDamage(source, target, damage, 'true', battle, context.skill.id); return { success: true, message: source.name + '发动无限刃，对' + target.name + '造成' + (first.damage !== undefined ? first.damage : damage) + '点真实伤害' }; }",
+  "previewCode": "function calculatePreview(piece) { var tag = piece.statusTags && piece.statusTags.find(function(item) { return item.type === 'shishio-kills'; }); var kills = tag ? (tag.intensity || 0) : 0; var multiplier = kills >= 2 ? 2 : (kills >= 1 ? 1.5 : 1); var damage = Math.floor((piece.attack || 0) * multiplier); return { description: '造成' + damage + '点真实伤害，随后可失去1点生命进行无需AP的二段。', expectedValues: { damage: damage, recastActionPointCost: 0 } }; }"
 }

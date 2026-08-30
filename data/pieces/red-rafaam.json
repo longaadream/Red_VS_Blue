@@ -7,7 +7,7 @@
   "image": "rafaam.jpg",
   "stats": {
     "maxHp": 15,
-    "attack": 2,
+    "attack": 0,
     "defense": 0,
     "moveRange": 2
   },

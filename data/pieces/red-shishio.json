@@ -28,6 +28,7 @@
   "rules": [
     "rule-shishio-cooldown-once",
     "rule-shishio-combustion",
+    "rule-shishio-infinite-blade-recast",
     "rule-shishio-kill-track",
     "rule-shishio-no-heal"
   ],

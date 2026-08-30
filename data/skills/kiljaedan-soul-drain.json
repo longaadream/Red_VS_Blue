@@ -8,7 +8,7 @@
   "icon": "💏",
   "kind": "active",
   "type": "normal",
-  "actionPointCost": 6,
+  "actionPointCost": 4,
   "cooldownTurns": 2,
   "range": "global",
   "powerMultiplier": 1.0,

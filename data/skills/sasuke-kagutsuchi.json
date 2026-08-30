@@ -1,7 +1,7 @@
 {
   "id": "sasuke-kagutsuchi",
   "name": "加具土命",
-  "description": "消耗距离目标最近的1个天照地格，为任意1个棋子附加2层天照效果。",
+  "description": "为任意1个棋子附加2层天照效果，然后移除其周围4格内所有的天照地格效果，每消耗一个地格，多附加一层天照，共计最多附加4层。",
   "keywords": [],
   "targetText": "任意1个棋子",
   "effectTags": [
@@ -14,18 +14,10 @@
   "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 2,
-  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var amaterasuCells = (battle.extensions && battle.extensions.amaterasuCells) || []; if (amaterasuCells.length === 0) return { success: false, message: '场上尚无天照格子' }; var target = selectTarget({ type: 'piece', range: 99, filter: 'all' }); if (!target || target.needsTargetSelection) return target; var nearestIdx = 0; var nearestDist = Math.abs(amaterasuCells[0].x - target.x) + Math.abs(amaterasuCells[0].y - target.y); for (var i = 1; i < amaterasuCells.length; i++) { var dist = Math.abs(amaterasuCells[i].x - target.x) + Math.abs(amaterasuCells[i].y - target.y); if (dist < nearestDist) { nearestDist = dist; nearestIdx = i; } } var removedCell = amaterasuCells[nearestIdx]; battle.extensions.amaterasuCells.splice(nearestIdx, 1); var teIdx = (battle.extensions.tileEffects || []).findIndex(function(t) { return t.tileType === 'amaterasu' && t.x === removedCell.x && t.y === removedCell.y; }); if (teIdx !== -1) battle.extensions.tileEffects.splice(teIdx, 1); var existingTag = target.statusTags && target.statusTags.find(function(t) { return t.type === 'amaterasu-burn'; }); if (existingTag) { existingTag.stacks = (existingTag.stacks || 1) + 2; } else { addStatusEffectById(target.instanceId, { id: 'amaterasu-burn-' + target.instanceId, name: '天照灼烧', type: 'amaterasu-burn', currentDuration: -1, currentUses: -1, intensity: 2, stacks: 2 }); existingTag = { stacks: 2 }; } return { success: true, message: caster.name + '使用加具土命，消耗距离' + target.name + '最近的天照格(' + removedCell.x + ',' + removedCell.y + ')，为' + target.name + '附加2层天照效果（当前' + existingTag.stacks + '层）' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '消耗距离目标最近的1个天照地格，为任意1个棋子附加2层天照效果。', expectedValues: {} }; }",
+  "actionPointCost": 1,
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'all' }); if (!target || target.needsTargetSelection) return target; if (!battle.extensions) battle.extensions = {}; var cells = battle.extensions.amaterasuCells || []; var removed = cells.filter(function(cell) { return Math.abs(cell.x - target.x) + Math.abs(cell.y - target.y) <= 4; }); battle.extensions.amaterasuCells = cells.filter(function(cell) { return removed.indexOf(cell) === -1; }); if (battle.extensions.tileEffects) battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(effect) { if (effect.tileType !== 'amaterasu') return true; return !removed.some(function(cell) { return cell.x === effect.x && cell.y === effect.y; }); }); var layers = 2 + Math.min(2, removed.length); var existing = target.statusTags && target.statusTags.find(function(tag) { return tag.type === 'amaterasu-burn'; }); if (existing) { existing.stacks = Math.min(4, (existing.stacks || 0) + layers); } else { addStatusEffectById(target.instanceId, { id: 'amaterasu-burn-' + target.instanceId, name: '天照灼烧', type: 'amaterasu-burn', currentDuration: -1, currentUses: -1, intensity: 2, stacks: layers }); } return { success: true, message: caster.name + '使用加具土命，移除目标周围' + removed.length + '个天照地格，为' + target.name + '附加' + layers + '层天照' }; }",
+  "previewCode": "function calculatePreview() { return { description: '附加2层天照，并消耗目标周围4格内天照地格；本次最多附加4层。', expectedValues: { baseStacks: 2, maxStacks: 4 } }; }",
   "targeting": {
-    "availability": [
-      {
-        "type": "battleExtensionArray",
-        "path": "amaterasuCells",
-        "minLength": 1,
-        "message": "Kagutsuchi requires an Amaterasu cell"
-      }
-    ],
     "steps": [
       {
         "kind": "target",

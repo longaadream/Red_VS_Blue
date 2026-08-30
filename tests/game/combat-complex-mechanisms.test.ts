@@ -109,7 +109,7 @@ describe('RED-45 complex combat mechanisms', () => {
     const result = executeSkillFunction(skill, { piece: caster, target: null, playerId: 'player-red', battle: state } as any, state)
 
     expect(result.success).toBe(true)
-    expect(caster.attack).toBe(13)
+    expect(caster).toMatchObject({ attack: 10, defense: 1 })
     expect(caster.skills.map((entry: any) => entry.skillId)).toEqual([
       'sasuke-kagutsuchi',
       'sasuke-indra-arrow',

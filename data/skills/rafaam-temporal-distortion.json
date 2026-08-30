@@ -1,17 +1,32 @@
 {
   "id": "rafaam-temporal-distortion",
   "name": "时空扭曲",
-  "description": "对自身造成4点法术伤害。下一回合敌方行动点-1，你的下一回合行动点+1。",
+  "description": "选择一名5格内的敌方角色，偷取其攻击力，并在对方下回合结束时归还。",
   "keywords": [],
-  "targetText": "自身",
-  "effectTags": ["self-damage", "resource"],
+  "targetText": "5格内1名敌方角色",
+  "effectTags": [
+    "攻击力",
+    "延迟"
+  ],
   "icon": "⏰",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 1,
+  "cooldownTurns": 2,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 4,
-  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var damageResult = dealDamage(caster, caster, 4, 'magical', battle, context.skill.id); var casterOwnerId = caster.ownerPlayerId; var enemyPlayerId = battle.players.find(function(p) { return p.playerId !== casterOwnerId; })?.playerId; if (!enemyPlayerId) return { success: true, message: caster.name + '使用时空扭曲，对自身造成' + damageResult.damage + '点伤害' }; var selfPlayer = battle.players.find(function(p) { return p.playerId === casterOwnerId; }); var enemyPlayer = battle.players.find(function(p) { return p.playerId === enemyPlayerId; }); if (selfPlayer) { if (!selfPlayer.statusTags) selfPlayer.statusTags = []; selfPlayer.statusTags.push({ id: 'temporal-distortion-self-' + Date.now(), type: 'temporal-distortion-self', name: '时空扭曲-自身加AP', remainingDuration: 2 }); addPlayerRuleById(casterOwnerId, 'rule-rafaam-temporal-distortion-self'); } if (enemyPlayer) { if (!enemyPlayer.statusTags) enemyPlayer.statusTags = []; enemyPlayer.statusTags.push({ id: 'temporal-distortion-enemy-' + Date.now(), type: 'temporal-distortion-enemy', name: '时空扭曲-敌方减AP', remainingDuration: 2 }); addPlayerRuleById(enemyPlayerId, 'rule-rafaam-temporal-distortion-enemy'); } return { success: true, message: caster.name + '使用时空扭曲，对自身造成' + damageResult.damage + '点伤害，下一回合敌方行动点-1，自己下一回合行动点+1' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对自身造成4点伤害。下一回合敌方行动点-1，你的下一回合行动点+1。', expectedValues: { selfDamage: 4 } }; }"
+  "actionPointCost": 1,
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var stolen = Math.max(0, target.attack || 0); target.attack -= stolen; caster.attack += stolen; addPlayerStatusEffectById(target.ownerPlayerId, { id: 'rafaam-temporal-distortion-' + caster.instanceId + '-' + target.instanceId + '-' + Date.now(), name: '时空扭曲', type: 'rafaam-temporal-distortion', currentDuration: -1, currentUses: -1, intensity: stolen, sourceId: caster.instanceId, targetId: target.instanceId }); addPlayerRuleById(target.ownerPlayerId, 'rule-rafaam-temporal-distortion'); return { success: true, message: caster.name + '从' + target.name + '偷取' + stolen + '点攻击力，将在对方下回合结束时归还' }; }",
+  "previewCode": "function calculatePreview() { return { description: '偷取5格内1名敌人的全部当前攻击力，并在其玩家下回合结束时归还。', expectedValues: {} }; }",
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 5
+      }
+    ]
+  }
 }

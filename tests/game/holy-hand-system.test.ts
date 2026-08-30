@@ -83,12 +83,12 @@ describe('RED-121 holy-hand roster contracts', () => {
   })
 
   it('exposes the approved AP, cooldown, and charge costs', () => {
-    expect(skill('light-extraction')).toMatchObject({ actionPointCost: 0, cooldownTurns: 1 })
+    expect(skill('light-extraction')).toMatchObject({ actionPointCost: 0, cooldownTurns: 2 })
     expect(skill('muru-lament')).toMatchObject({ actionPointCost: 3, cooldownTurns: 2, chargeCost: 3 })
-    expect(skill('velen-holy-prophecy')).toMatchObject({ actionPointCost: 0, cooldownTurns: 1 })
-    expect(skill('velen-fate-shelter')).toMatchObject({ actionPointCost: 1, cooldownTurns: 2 })
+    expect(skill('velen-holy-prophecy')).toMatchObject({ actionPointCost: 0, cooldownTurns: 2 })
+    expect(skill('velen-fate-shelter')).toMatchObject({ actionPointCost: 1, cooldownTurns: 3 })
     expect(skill('velen-thousand-futures-ultimate')).toMatchObject({ actionPointCost: 2, type: 'ultimate' })
-    expect(skill('turalyon-expedition-order')).toMatchObject({ actionPointCost: 0, cooldownTurns: 1 })
+    expect(skill('turalyon-expedition-order')).toMatchObject({ actionPointCost: 1, cooldownTurns: 2 })
     expect(skill('turalyon-grand-crusade')).toMatchObject({
       actionPointCost: 4, chargeCost: 1, cooldownTurns: 3, maxCharges: 1, type: 'super',
     })
@@ -96,29 +96,28 @@ describe('RED-121 holy-hand roster contracts', () => {
 })
 
 describe('Liadrin holy-hand engine', () => {
-  it('requires three open hand slots, then consumes a shield and produces all three holy cards', () => {
+  it('consumes a shield and creates Smite plus Heal without an empty-slot precondition', () => {
     const liadrin = makePiece({ instanceId: 'liadrin', templateId: 'liadrin', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
     liadrin.rules = [loadRuleById('rule-blood-echo', true)!]
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
     ally.statusTags = [{ id: 'divine-shield', type: 'divine-shield' }]
-    const blocked = makeState({ pieces: [liadrin, ally] }) as any
-    blocked.players[0].hand = Array.from({ length: 8 }, (_, index) => ({ cardId: 'filler', instanceId: `f-${index}`, ownerPlayerId: 'player-red' }))
+    const state = makeState({ pieces: [liadrin, ally] }) as any
+    state.players[0].hand = Array.from({ length: 8 }, (_, index) => ({
+      cardId: 'holy-smite',
+      instanceId: `f-${index}`,
+      ownerPlayerId: 'player-red',
+    }))
 
-    expect(executeSkill('light-extraction', blocked, 'liadrin', { targetId: 'ally' }).success).toBe(false)
-    expect(ally.statusTags).toHaveLength(1)
-    expect(blocked.players[0].hand).toHaveLength(8)
-
-    const readyLiadrin = makePiece({ instanceId: 'liadrin-ready', templateId: 'liadrin', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
-    readyLiadrin.rules = [loadRuleById('rule-blood-echo', true)!]
-    const readyAlly = makePiece({ instanceId: 'ally-ready', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
-    readyAlly.statusTags = [{ id: 'divine-shield', type: 'divine-shield' }]
-    const ready = makeState({ pieces: [readyLiadrin, readyAlly] }) as any
-    ready.players[0].hand = Array.from({ length: 7 }, (_, index) => ({ cardId: 'filler', instanceId: `r-${index}`, ownerPlayerId: 'player-red' }))
-
-    expect(executeSkill('light-extraction', ready, 'liadrin-ready', { targetId: 'ally-ready' }).success).toBe(true)
-    expect(readyAlly.statusTags).toHaveLength(0)
-    expect(ready.players[0].hand.map((card: any) => card.cardId)).toEqual(expect.arrayContaining(['holy-smite', 'holy-heal', 'holy-charge']))
-    expect(ready.players[0].hand).toHaveLength(10)
+    expect(executeSkill('light-extraction', state, 'liadrin', { targetId: 'ally' }).success).toBe(true)
+    expect(ally.statusTags).toHaveLength(0)
+    expect(state.players[0].hand).toHaveLength(10)
+    expect(state.players[0].hand.filter((card: any) => card.cardId === 'holy-smite')).toHaveLength(9)
+    expect(state.players[0].hand.filter((card: any) => card.cardId === 'holy-charge')).toHaveLength(1)
+    expect(state.players[0].discardPile).toContain('holy-heal')
+    expect(state.actions).toContainEqual(expect.objectContaining({
+      type: 'cardOverflow',
+      payload: expect.objectContaining({ message: expect.stringContaining('圣光治疗') }),
+    }))
   })
 
   it('turns one to four discarded holy cards into repeated true damage/healing and restores shields at three', () => {
@@ -548,44 +547,42 @@ describe('Velen delayed holy cards', () => {
   })
 
 describe('Turalyon holy-hand mobility', () => {
-  it('publishes Expedition Order as an exact single-card hand selection', () => {
+  it('publishes a three-card option and creates exactly the selected holy card', () => {
     const definition = skill('turalyon-expedition-order')
     const turalyon = makePiece({
-      instanceId: 'turalyon-order-hand', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0,
+      instanceId: 'turalyon-order', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0,
     }) as any
     turalyon.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
     const state = makeState({ pieces: [turalyon] }) as any
     state.skillsById[definition.id] = definition
     state.players[0].hand = [
-      { cardId: 'holy-smite', instanceId: 'order-smite', ownerPlayerId: 'player-red', actionPointCost: 2 },
-      { cardId: 'holy-heal', instanceId: 'order-heal', ownerPlayerId: 'player-red', actionPointCost: 2 },
-      { cardId: 'filler', instanceId: 'order-filler', ownerPlayerId: 'player-red', actionPointCost: 1 },
+      { cardId: 'holy-smite', instanceId: 'existing-smite', ownerPlayerId: 'player-red', actionPointCost: 1 },
     ]
-
-    const pending = applyBattleAction(state, {
+    const base = {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: turalyon.instanceId, skillId: definition.id,
+    } as any
+    const prepared = prepareAction(state, base)
+    expect(prepared.kind).toBe('needOption')
+    if (prepared.kind !== 'needOption') throw new Error('Expected Expedition Order option selection')
+    expect(prepared.options).toEqual([
+      { label: '圣光惩戒', value: 'holy-smite' },
+      { label: '圣光治疗', value: 'holy-heal' },
+      { label: '圣光冲锋', value: 'holy-charge' },
+    ])
+    expect(state.players[0]).toMatchObject({ actionPoints: 2 })
+    expect(state.players[0].hand).toHaveLength(1)
+    expect(turalyon.skills[0].currentCooldown).toBe(0)
+
+    const resolved = applyBattleAction(state, {
+      ...base,
+      selectedOption: 'holy-heal',
+      selectionId: prepared.selectionId,
+      stateRevision: prepared.stateRevision,
     } as any) as any
-
-    expect(pending.pendingOptionSelection).toMatchObject({
-      selectionMode: 'single', presentation: 'hand', minSelections: 1, maxSelections: 1,
-      options: [{ value: 'order-smite' }, { value: 'order-heal' }],
-    })
-    expect(pending.pendingTargetSelection).toBeUndefined()
-    expect(pending.players[0].hand.map((card: any) => card.actionPointCost)).toEqual([2, 2, 1])
-    expect(pending.pieces[0].skills[0].currentCooldown).toBe(0)
-  })
-
-  it('reduces one holy card to a minimum of 1 AP and restores the cost at end turn', () => {
-    const turalyon = makePiece({ instanceId: 'turalyon', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
-    const state = makeState({ pieces: [turalyon], turnNumber: 1 }) as any
-    state.players[0].hand = [{ cardId: 'holy-smite', instanceId: 'smite', ownerPlayerId: 'player-red', actionPointCost: 2 }]
-    expect(executeSkill('turalyon-expedition-order', state, 'turalyon', { selectedOption: 'smite' }).success).toBe(true)
-    expect(state.players[0].hand[0].actionPointCost).toBe(1)
-
-    const ended = applyBattleAction(state, { type: 'endTurn', playerId: 'player-red' } as any) as any
-    expect(ended.players[0].hand[0]).toMatchObject({ actionPointCost: 2 })
-    expect(ended.players[0].hand[0].baseActionPointCost).toBeUndefined()
-    expect(ended.players[0].hand[0].temporaryCostReductionTurnNumber).toBeUndefined()
+    expect(resolved.players[0].actionPoints).toBe(1)
+    expect(resolved.players[0].hand.map((card: any) => card.cardId)).toEqual(['holy-smite', 'holy-heal'])
+    expect(resolved.players[0].hand.every((card: any) => card.actionPointCost === 1)).toBe(true)
+    expect(resolved.pieces[0].skills[0].currentCooldown).toBe(2)
   })
 
   it('keeps the card action uncommitted through piece then cell selection, then commits exactly once', () => {

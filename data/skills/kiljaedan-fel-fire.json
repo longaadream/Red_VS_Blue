@@ -1,17 +1,20 @@
 {
   "id": "kiljaedan-fel-fire",
   "name": "恒星之火",
-  "description": "对4格内1个敌人造成等同攻击力200%的法术伤害。若击杀目标，则对其周围3x3范围内其他敌人造成等量法术伤害。",
+  "description": "对4格内1个敌人造成等同攻击力200%的法术伤害，并对其周围3x3范围内其他敌人造成等量法术伤害。",
   "keywords": [],
   "targetText": "4格内1个敌人",
-  "effectTags": ["法术伤害", "范围伤害"],
+  "effectTags": [
+    "法术伤害",
+    "范围伤害"
+  ],
   "icon": "🔥",
   "kind": "active",
   "type": "normal",
   "actionPointCost": 2,
   "cooldownTurns": 1,
   "range": "single",
-  "powerMultiplier": 2.0,
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.round(caster.attack * 2.0); var result = dealDamage(caster, target, damage, 'magical', battle, 'kiljaedan-fel-fire'); var actualDamage = result && result.damage !== undefined ? result.damage : damage; var msg = caster.name + '的恒星之火命中' + target.name + '，造成' + actualDamage + '点法术伤害'; if (result && result.isKilled) { var tx = target.x; var ty = target.y; var chainTargets = battle.pieces.filter(function(p) { return p.instanceId !== caster.instanceId && p.ownerPlayerId !== caster.ownerPlayerId && p.currentHp > 0 && Math.abs(p.x - tx) <= 1 && Math.abs(p.y - ty) <= 1; }); if (chainTargets.length > 0) { dealDamage(caster, chainTargets, damage, 'magical', battle, 'kiljaedan-fel-fire'); msg += '，并触发连环爆炸，对周围' + chainTargets.length + '个敌人各造成' + damage + '点法术伤害'; } else { msg += '，但周围没有其他敌人'; } } return { success: true, message: msg }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内1个敌人造成' + (piece.attack * 2) + '点法术伤害；若击杀目标，则对其周围其他敌人造成等量法术伤害。', expectedValues: { damage: piece.attack * 2 } }; }"
+  "powerMultiplier": 2,
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var targetX = target.x; var targetY = target.y; var targetId = target.instanceId; var damage = Math.round(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'magical', battle, context.skill.id); var others = battle.pieces.filter(function(piece) { return piece.instanceId !== targetId && piece.ownerPlayerId !== caster.ownerPlayerId && piece.currentHp > 0 && Math.abs(piece.x - targetX) <= 1 && Math.abs(piece.y - targetY) <= 1; }); if (others.length) dealDamage(caster, others, damage, 'magical', battle, context.skill.id); return { success: true, message: caster.name + '的恒星之火对' + target.name + '造成' + (result.damage || damage) + '点法术伤害，并波及周围' + others.length + '名敌人' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '对4格内1个敌人及其周围3x3范围内其他敌人造成' + damage + '点法术伤害。', expectedValues: { damage: damage } }; }"
 }

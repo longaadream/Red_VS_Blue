@@ -1,0 +1,9 @@
+{
+  "id": "rule-venom-corrosion-immobile",
+  "name": "腐蚀定身",
+  "description": "受到毒液腐蚀的角色在持续期间无法移动。",
+  "trigger": {
+    "type": "beforeMove"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0 || !context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(item) { return item.type === 'venom-corrosion-immobile'; }); if (!tag) { removeRuleById(piece.instanceId, 'rule-venom-corrosion-immobile'); return { success: false, message: '' }; } return { success: true, blocked: true, message: piece.name + '受到腐蚀，本回合无法移动' };"
+}

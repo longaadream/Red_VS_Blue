@@ -1,30 +1,31 @@
 {
   "id": "shadow-step",
   "name": "暗影步",
-  "description": "标记地图上1个空地格，下回合开始时传送到该位置。",
+  "description": "标记7格内1个空地格，下回合开始时传送到该位置。",
   "keywords": [],
-  "targetText": "地图上1个空地格",
+  "targetText": "7格内1个空地格",
   "effectTags": [
     "位移"
   ],
   "icon": "👁",
   "kind": "active",
   "type": "normal",
-  "cooldownTurns": 2,
+  "cooldownTurns": 3,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "range": "single",
   "requiresTarget": true,
-  "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetPosition = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) { return targetPosition; } const tile = battle.map.tiles.find(t => t.x === targetPosition.x && t.y === targetPosition.y); if (!tile || !tile.props.walkable) { return { message: '目标位置不可行走', success: false }; } const pieceAtPos = battle.pieces.find(p => p.x === targetPosition.x && p.y === targetPosition.y && p.currentHp > 0); if (pieceAtPos) { return { message: '目标位置已被占用', success: false }; } if (!sourcePiece.statusTags) { sourcePiece.statusTags = []; } if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; const shadowStepSourceId = 'shadow-step-' + sourcePiece.instanceId; const existingShadowStep = sourcePiece.statusTags.find(tag => tag.type === 'shadow-step'); if (existingShadowStep) { battle.extensions.tileEffects = battle.extensions.tileEffects.filter(te => !(te.tileType === 'shadow-step' && te.sourceId === shadowStepSourceId)); existingShadowStep.value = targetPosition.x; existingShadowStep.intensity = targetPosition.y; existingShadowStep.remainingDuration = 2; } else { sourcePiece.statusTags.push({ id: 'shadow-step-' + Date.now(), type: 'shadow-step', name: '暗影步', remainingDuration: 2, value: targetPosition.x, intensity: targetPosition.y, relatedRules: ['rule-shadow-step'] }); } battle.extensions.tileEffects.push({ x: targetPosition.x, y: targetPosition.y, sourceId: shadowStepSourceId, tileType: 'shadow-step', icon: '👁', bgColor: 'rgba(147, 51, 234, 0.12)', boxShadow: 'inset 0 0 0 2px rgba(168, 85, 247, 0.65)', iconPosition: 'top-left' }); if (!sourcePiece.rules) { sourcePiece.rules = []; } const hasRule = sourcePiece.rules.some(r => r.id === 'rule-shadow-step'); if (!hasRule) { addRuleById(sourcePiece.instanceId, 'rule-shadow-step'); } return { message: sourcePiece.name + '标记了暗影步位置，将在下回合开始时传送到(' + targetPosition.x + ',' + targetPosition.y + ')', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '标记地图上1个空地格，下回合开始时传送到该位置。', expectedValues: {} }; }",
+  "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetPosition = selectTarget({ type: 'grid', range: 7, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) return targetPosition; const tile = battle.map.tiles.find(function(item) { return item.x === targetPosition.x && item.y === targetPosition.y; }); if (!tile || !tile.props.walkable) return { message: '目标位置不可行走', success: false }; const occupied = battle.pieces.some(function(piece) { return piece.x === targetPosition.x && piece.y === targetPosition.y && piece.currentHp > 0; }); if (occupied) return { message: '目标位置已被占用', success: false }; if (!sourcePiece.statusTags) sourcePiece.statusTags = []; if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; const sourceId = 'shadow-step-' + sourcePiece.instanceId; const existing = sourcePiece.statusTags.find(function(tag) { return tag.type === 'shadow-step'; }); if (existing) { battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(effect) { return !(effect.tileType === 'shadow-step' && effect.sourceId === sourceId); }); existing.value = targetPosition.x; existing.intensity = targetPosition.y; existing.remainingDuration = 2; } else { sourcePiece.statusTags.push({ id: 'shadow-step-' + Date.now(), type: 'shadow-step', name: '暗影步', remainingDuration: 2, value: targetPosition.x, intensity: targetPosition.y, relatedRules: ['rule-shadow-step'] }); } battle.extensions.tileEffects.push({ x: targetPosition.x, y: targetPosition.y, sourceId: sourceId, tileType: 'shadow-step', icon: '👁', bgColor: 'rgba(147, 51, 234, 0.12)', boxShadow: 'inset 0 0 0 2px rgba(168, 85, 247, 0.65)', iconPosition: 'top-left' }); if (!sourcePiece.rules || !sourcePiece.rules.some(function(rule) { return rule.id === 'rule-shadow-step'; })) addRuleById(sourcePiece.instanceId, 'rule-shadow-step'); return { success: true, message: sourcePiece.name + '标记了暗影步位置，将在下回合开始时传送到(' + targetPosition.x + ',' + targetPosition.y + ')' }; }",
+  "previewCode": "function calculatePreview() { return { description: '标记7格内1个空地格，下回合开始时传送到该位置。', expectedValues: { range: 7 } }; }",
   "targeting": {
     "steps": [
       {
         "kind": "target",
         "type": "grid",
         "filter": "all",
-        "range": 99,
+        "range": 7,
+        "distanceMetric": "manhattan",
         "requireWalkable": true,
         "requireUnoccupied": true
       }

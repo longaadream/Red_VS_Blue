@@ -1,20 +1,31 @@
 {
   "id": "itachi-amaterasu",
-  "name": "天照",
+  "name": "天照之缚",
   "description": "选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。",
   "keywords": [],
   "targetText": "5格内的一个敌人",
-  "effectTags": ["field", "stack"],
+  "effectTags": [
+    "field",
+    "stack"
+  ],
   "icon": "🔥",
   "kind": "active",
   "type": "normal",
   "cooldownTurns": 2,
   "maxCharges": 0,
-  "powerMultiplier": 1.0,
-  "actionPointCost": 1,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
   "range": "single",
   "requiresTarget": true,
-  "targeting": { "steps": [{ "type": "piece", "filter": "enemy", "range": 5 }] },
+  "targeting": {
+    "steps": [
+      {
+        "type": "piece",
+        "filter": "enemy",
+        "range": 5
+      }
+    ]
+  },
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; if (!battle.extensions.amaterasuCells) battle.extensions.amaterasuCells = []; var x = target.x; var y = target.y; if (!battle.extensions.amaterasuCells.some(function(cell) { return cell.x === x && cell.y === y; })) battle.extensions.amaterasuCells.push({ x: x, y: y }); if (!battle.extensions.tileEffects.some(function(effect) { return effect.tileType === 'amaterasu' && effect.x === x && effect.y === y; })) battle.extensions.tileEffects.push({ x: x, y: y, sourceId: 'amaterasu', tileType: 'amaterasu', icon: '🌑', iconPosition: 'bottom-right' }); battle.extensions.amaterasuOwnerPlayerId = caster.ownerPlayerId; var tag = target.statusTags && target.statusTags.find(function(status) { return status.type === 'amaterasu-burn'; }); if (tag) tag.stacks = (tag.stacks || 1) + 1; else addStatusEffectById(target.instanceId, { id: 'amaterasu-burn-' + target.instanceId, name: '天照灼烧', type: 'amaterasu-burn', currentDuration: -1, currentUses: -1, intensity: 2, stacks: 1 }); addPlayerRuleById(caster.ownerPlayerId, 'rule-sasuke-amaterasu-move'); addPlayerRuleById(caster.ownerPlayerId, 'rule-sasuke-amaterasu-stack'); addPlayerRuleById(caster.ownerPlayerId, 'rule-sasuke-amaterasu-damage'); return { success: true, message: caster.name + '以天照点燃' + target.name + '所在格，并使其获得1层天照' }; }",
   "previewCode": "function calculatePreview() { return { description: '选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。', expectedValues: { stacks: 1 } }; }"
 }

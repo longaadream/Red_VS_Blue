@@ -1,0 +1,9 @@
+{
+  "id": "rule-tirion-divine-glory",
+  "name": "圣骑士的荣耀",
+  "description": "提里奥失去圣盾时永久获得1点攻击力。",
+  "trigger": {
+    "type": "afterStatusRemoved"
+  },
+  "skillCode": "var tirion = context.rulePiece; if (!tirion || tirion.currentHp <= 0 || !context.sourcePiece || context.sourcePiece.instanceId !== tirion.instanceId || (context.statusType !== 'divine-shield' && context.statusId !== 'divine-shield')) return { success: false, message: '' }; tirion.attack += 1; return { success: true, message: tirion.name + '失去圣盾，攻击力+1' };"
+}

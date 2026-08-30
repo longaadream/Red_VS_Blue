@@ -1,7 +1,7 @@
 {
   "id": "venom-claw-rend",
   "name": "利爪撕裂",
-  "description": "对1格内1名敌人造成等同攻击力的物理伤害。",
+  "description": "对1格内1名敌人造成等同攻击力200%的物理伤害。",
   "keywords": [],
   "targetText": "1格内1名敌人",
   "effectTags": [],
@@ -11,7 +11,7 @@
   "form": "melee",
   "cooldownTurns": 1,
   "maxCharges": 0,
-  "powerMultiplier": 1,
+  "powerMultiplier": 2,
   "actionPointCost": 1,
   "range": "single",
   "targetType": "piece",
@@ -19,7 +19,12 @@
   "requiresTarget": true,
   "targeting": {
     "steps": [
-      { "kind": "target", "type": "piece", "filter": "enemy", "range": 1 }
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 1
+      }
     ]
   },
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.round(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'physical', battle, context.skill.id); return { success: result.success, message: caster.name + '使用利爪撕裂对' + target.name + '造成' + result.damage + '点物理伤害' }; }",

@@ -594,7 +594,7 @@ describe('Demo targeting admission fixture', () => {
     }
 
     const fixtureHash = createHash('sha256').update(JSON.stringify(fixture)).digest('hex')
-    expect(fixtureHash).toBe('e45da4aaefa10d6664e57a3cc3afefe357f91c050e18fbe14061b5abd2c61fb2')
+    expect(fixtureHash).toBe('3fa44e70ad464c6e2141cdf3ab2ca53ad6ceca015c81a503397cec98b0862f12')
   })
 })
 
