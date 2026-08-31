@@ -4,7 +4,7 @@
 - 风险：High
 - 基线：`origin/main@dc9bca46c06e2852621620180e8869a924e29bfa`
 - 分支：`codex/red-160-colyseus-postgresql-vertical-slice`
-- 状态：候选纵切代码已实现；真实 PostgreSQL 门与独立审查尚未完成，不满足合并/发布条件
+- 状态：负责人已确认人工产品验收通过；真实 PostgreSQL 门与独立审查尚未完成，不满足合并/发布条件
 
 ## 实现边界
 
@@ -79,6 +79,21 @@ npm run dev:colyseus
 | --- | ---: | ---: |
 | 服务端 queue → rules → memory commit → receipt | 15.809 ms | 22.711 ms |
 | 本机 SDK send → receipt | 19.963 ms | 34.480 ms |
+
+### 人工验收（2026-08-31）
+
+项目负责人确认本候选纵切的可观察行为通过人工验收，并接受以下产品取舍：
+
+- 普通 action 的 APPLIED 表示 Room 内存权威已提交，不表示 PostgreSQL 已 durable；服务器在
+  DURABLE 前异常退出时允许存在短暂 RPO。终局仍必须等待 durable barrier。
+- 性能同时区分冷启动和预热后热路径，不用冷启动样本替代稳定动作延迟，也不隐藏冷启动体验。
+  本机复测的热缓存样本为服务端 P95 18.237 ms、SDK 往返 P95 31.799 ms。
+
+负责人选择不在当前 Windows 主机安装 Docker。该决定只结束本轮本机人工操作，不把真实
+PostgreSQL integration 的未执行状态改写为通过，也不豁免 High 风险独立审查。
+
+验收过程中发现当前双客户端性能测试尚未显式执行预热动作，且客户端断言阈值仍为 1000 ms；
+后续性能门应把冷启动单独报告，并在预热后样本上真正强制客户端 P95 < 100 ms。
 
 ## 真实 PostgreSQL 门
 
