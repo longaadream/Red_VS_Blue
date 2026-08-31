@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "spoils",
+  "type": "reward",
+  "rewardId": "prototype-card-choice",
+  "nextNodeId": "safe-room"
+}

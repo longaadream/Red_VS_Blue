@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "rvb-pve-campaign/v1",
+  "campaignId": "prototype-campaign",
+  "version": "1.0.0",
+  "entryNodeId": "choose-roster",
+  "nodes": [
+    {
+      "nodeId": "ambush",
+      "path": "data/pve/campaigns/prototype/nodes/ambush.json"
+    },
+    {
+      "nodeId": "campfire",
+      "path": "data/pve/campaigns/prototype/nodes/campfire.json"
+    },
+    {
+      "nodeId": "choose-roster",
+      "path": "data/pve/campaigns/prototype/nodes/choose-roster.json"
+    },
+    {
+      "nodeId": "defeat-ending",
+      "path": "data/pve/campaigns/prototype/nodes/defeat-ending.json"
+    },
+    {
+      "nodeId": "draw-ending",
+      "path": "data/pve/campaigns/prototype/nodes/draw-ending.json"
+    },
+    {
+      "nodeId": "intro",
+      "path": "data/pve/campaigns/prototype/nodes/intro.json"
+    },
+    {
+      "nodeId": "safe-room",
+      "path": "data/pve/campaigns/prototype/nodes/safe-room.json"
+    },
+    {
+      "nodeId": "spoils",
+      "path": "data/pve/campaigns/prototype/nodes/spoils.json"
+    },
+    {
+      "nodeId": "victory-ending",
+      "path": "data/pve/campaigns/prototype/nodes/victory-ending.json"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "campfire",
+  "type": "event",
+  "eventId": "prototype-campfire",
+  "outcomes": [
+    {
+      "outcomeId": "prepared",
+      "nextNodeId": "ambush"
+    },
+    {
+      "outcomeId": "rested",
+      "nextNodeId": "ambush"
+    }
+  ]
+}

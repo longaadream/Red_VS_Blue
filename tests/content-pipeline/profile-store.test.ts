@@ -109,6 +109,24 @@ function createStore(root: string, base: ResolvedSnapshotViewV1): ProfileStoreV1
 }
 
 describe('RED-115 Profile store and activation state', () => {
+  it('opens an installed Profile only through the canonical verified immutable Snapshot seam', () => {
+    const root = temporaryRoot()
+    const base = resolvedSnapshot({ packageId: 'rvb.base', marker: 40, jsonValue: 40 })
+    const candidate = resolvedSnapshot({ packageId: 'rvb.snapshot-open', marker: 41, jsonValue: 41 })
+    const store = createStore(root, base)
+    const installed = store.installCandidate(candidate)
+
+    const opened = store.openVerifiedSnapshot(installed)
+    expect(opened.profile.resolvedProfileHash).toBe(installed.resolvedProfileHash)
+    expect(opened.profile.authorityContentHash).toBe(installed.authorityContentHash)
+    const first = opened.readFile('data/rules/profile.json')!
+    first[0] = 0
+    expect(new TextDecoder().decode(opened.readFile('data/rules/profile.json'))).toContain('"value":41')
+
+    writeFileSync(path.join(root, 'profiles', installed.resolvedProfileHash, 'data/rules/profile.json'), '{}')
+    expect(() => store.openVerifiedSnapshot(installed)).toThrow(/PROFILE_HASH_MISMATCH/)
+  })
+
   it('installs an immutable candidate without changing stable, then commits atomically', () => {
     const root = temporaryRoot()
     const base = resolvedSnapshot({ packageId: 'rvb.base', marker: 1, jsonValue: 1 })

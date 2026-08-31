@@ -4,9 +4,14 @@ import { getPveServiceV1 } from '@/lib/pve/service'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ runId: string }> },
+) {
   try {
-    return Response.json(getPveServiceV1().catalog(), {
+    const { runId } = await context.params
+    const result = getPveServiceV1().getRun(runId)
+    return Response.json(result.view, {
       headers: { 'Cache-Control': 'no-store' },
     })
   } catch (error) {

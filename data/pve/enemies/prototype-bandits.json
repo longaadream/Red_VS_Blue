@@ -1,9 +1,6 @@
 {
-  "id": "prototype-bandits",
-  "name": "试炼敌队",
-  "aiProfile": "basic-aggressive",
-  "pieces": [
-    { "templateId": "red-sasuke", "faction": "red" },
-    { "templateId": "red-hidan", "faction": "red" }
-  ]
+  "schemaVersion": "rvb-pve-enemy-setup/v1",
+  "enemySetupId": "prototype-bandits",
+  "rosterId": "prototype-enemy-roster",
+  "aiProfileId": "prototype-basic-ai"
 }
