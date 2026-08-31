@@ -2,10 +2,18 @@ import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { rng } from "./rng"
-import { getActiveRuleRuntime, getRuleDate, getRuleMath } from './rule-runtime'
+import {
+  getActiveRuleExecutionContext,
+  getActiveRuleRuntime,
+  getRuleExecutionTriggerSystem,
+  getRuleDate,
+  getRuleMath,
+} from './rule-runtime'
+
+const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
-import { dynamicCodeRuntime } from './dynamic-code-runtime'
+import { DynamicCodeRuntime, dynamicCodeRuntime as globalDynamicCodeRuntime } from './dynamic-code-runtime'
 import { isSuspendableActionPending } from './suspendable-action-transaction'
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
@@ -55,7 +63,7 @@ export function getEffectiveChargeCost(
 }
 
 function checkSynchronousTriggers(battle: BattleState, context: any): TriggerResult {
-  const result = globalTriggerSystem.checkTriggers(battle, context)
+  const result = getActiveTriggerSystem().checkTriggers(battle, context)
   if (result.needsOptionSelection || result.needsTargetSelection) {
     const kind = result.needsOptionSelection ? 'option' : 'target'
     const error = new Error(`[${String(context?.type || 'unknown')}] interactive ${kind} trigger is unsupported at this call site`) as Error & { code?: string }
@@ -125,15 +133,42 @@ interface TriggerRule {
   }
 }
 
-// 规则加载缓存：同一个规则文件在服务器生命周期内只读一次磁盘
-// 每次复用时返回浅拷贝，保持 effect 函数引用一致
-const ruleCache = new Map<string, TriggerRule>()
-const skillDefinitionCache = new Map<string, SkillDefinition>()
-let allSkillDefinitionsCache: Record<string, SkillDefinition> | null = null
+interface SkillExecutionCaches {
+  ruleCache: Map<string, TriggerRule>
+  skillDefinitionCache: Map<string, SkillDefinition>
+  allSkillDefinitionsCache: Record<string, SkillDefinition> | null
+  cardCache: Map<string, CardDefinition>
+  dynamicCodeRuntime: DynamicCodeRuntime
+}
+
+const SKILL_EXECUTION_CACHES = Symbol.for('rvb.rule-execution.skill-caches.v1')
+const globalSkillExecutionCaches: SkillExecutionCaches = {
+  ruleCache: new Map(),
+  skillDefinitionCache: new Map(),
+  allSkillDefinitionsCache: null,
+  cardCache: new Map(),
+  dynamicCodeRuntime: globalDynamicCodeRuntime,
+}
+
+function getSkillExecutionCaches(): SkillExecutionCaches {
+  const context = getActiveRuleExecutionContext()
+  if (!context) return globalSkillExecutionCaches
+  const existing = context.cache.get(SKILL_EXECUTION_CACHES)
+  if (existing) return existing as SkillExecutionCaches
+  const caches: SkillExecutionCaches = {
+    ruleCache: new Map(),
+    skillDefinitionCache: new Map(),
+    allSkillDefinitionsCache: null,
+    cardCache: new Map(),
+    dynamicCodeRuntime: new DynamicCodeRuntime(),
+  }
+  context.cache.set(SKILL_EXECUTION_CACHES, caches)
+  return caches
+}
 
 // 清除规则缓存的函数
 export function clearRuleCache(): void {
-  ruleCache.clear()
+  getSkillExecutionCaches().ruleCache.clear()
   clearSkillDefinitionCache()
 }
 
@@ -314,16 +349,14 @@ export interface CardDefinition {
   targeting?: SelectionContractDefinition
 }
 
-// 卡牌定义缓存
-const cardCache = new Map<string, CardDefinition>()
-
 /** 清除卡牌缓存（服务器热重载后调用） */
 export function clearCardCache() {
-  cardCache.clear()
+  getSkillExecutionCaches().cardCache.clear()
 }
 
 /** 从 data/cards/{cardId}.json 加载卡牌定义（带缓存） */
 export function loadCardById(cardId: string, forceReload = false): CardDefinition | null {
+  const cardCache = getSkillExecutionCaches().cardCache
   const cached = cardCache.get(cardId)
   if (cached && !forceReload) return { ...cached }
   try {
@@ -655,7 +688,7 @@ export function executeCardFunction(
         return executeCard(context);
       })
     `
-    const executeCard = dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
+    const executeCard = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
       surface: 'cardCode', contentId: cardDef.id, code: fullCode, entry: 'executeCard(context)',
     })
     const result = executeCard(env)
@@ -671,6 +704,7 @@ export function executeCardFunction(
 
 // 从文件中加载技能定义（用于 addSkillById 同步到 battle.skillsById）
 function loadSkillById(skillId: string): SkillDefinition | null {
+  const skillDefinitionCache = getSkillExecutionCaches().skillDefinitionCache
   const cached = skillDefinitionCache.get(skillId)
   if (cached && !FORCE_RULE_RELOAD) return cached
   try {
@@ -688,13 +722,15 @@ function loadSkillById(skillId: string): SkillDefinition | null {
 }
 
 export function clearSkillDefinitionCache(): void {
-  skillDefinitionCache.clear()
-  allSkillDefinitionsCache = null
+  const caches = getSkillExecutionCaches()
+  caches.skillDefinitionCache.clear()
+  caches.allSkillDefinitionsCache = null
 }
 
 // 加载所有技能定义（服务端用，用于重新填充 battle.skillsById）
 export function loadAllSkillsById(): Record<string, SkillDefinition> {
-  if (allSkillDefinitionsCache && !FORCE_RULE_RELOAD) return allSkillDefinitionsCache
+  const caches = getSkillExecutionCaches()
+  if (caches.allSkillDefinitionsCache && !FORCE_RULE_RELOAD) return caches.allSkillDefinitionsCache
   try {
     const fs = require('fs')
     const path = require('path')
@@ -706,7 +742,7 @@ export function loadAllSkillsById(): Record<string, SkillDefinition> {
       const skill = loadSkillById(skillId)
       if (skill) result[skillId] = skill
     }
-    allSkillDefinitionsCache = result
+    caches.allSkillDefinitionsCache = result
     return result
   } catch (e) {
     console.warn('[loadAllSkillsById] Failed to load skills', e)
@@ -725,6 +761,7 @@ function instantiateRuleForBattle(rule: TriggerRule): TriggerRule {
 }
 
 export function loadRuleById(ruleId: string, forceReload: boolean = false): TriggerRule | null {
+  const ruleCache = getSkillExecutionCaches().ruleCache
   battleDebugLog(`[loadRuleById] Called with ruleId: ${ruleId}, forceReload: ${forceReload}`);
   // 命中缓存时返回拷贝（深拷贝 limits，避免跨游戏共享 uses/currentCooldown 计数）
   const cached = ruleCache.get(ruleId)
@@ -908,7 +945,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             };
 
             const fireEvent = (eventName: string, ctx: any) => {
-              return globalTriggerSystem.fireEvent(battle, context, eventName, ctx);
+              return getActiveTriggerSystem().fireEvent(battle, context, eventName, ctx);
             };
 
             const codeEnvironment = `
@@ -916,7 +953,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                 ${ruleData.skillCode}
               })
             `;
-            const executeRuleCode = dynamicCodeRuntime.compileExpression<any>({
+            const executeRuleCode = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<any>({
               surface: 'ruleSkillCode', contentId: ruleId, code: codeEnvironment, entry: 'rule skillCode body',
             });
             const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate());
@@ -1217,7 +1254,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                   
                   // 执行技能代码
                   writeLog(`[triggerSkill] Executing skill code for ${skillId}...`);
-                  const executeTriggeredSkill = dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
+                  const executeTriggeredSkill = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
                     surface: 'ruleTriggerSkill', contentId: skillId, code: fullSkillCode, entry: 'executeSkill(context)',
                   });
                   const result = executeTriggeredSkill(skillEnvironment);
@@ -2149,7 +2186,7 @@ function prepareTargetDamage(
   }
   const beforeTaken: TriggerResult = sourceBlocked
     ? { success: false, blocked: true, messages: [] }
-    : globalTriggerSystem.checkTriggers(battle, beforeTakenContext)
+    : getActiveTriggerSystem().checkTriggers(battle, beforeTakenContext)
   if (beforeTaken.needsOptionSelection) throw beforeTaken
   if (beforeTaken.needsTargetSelection) throw beforeTaken
   appendDamageMessages(battle, request.attacker.ownerPlayerId, beforeTaken.messages || [])
@@ -2195,7 +2232,7 @@ function prepareTargetDamage(
       defenseApplied: defense,
       damageQueue: shieldQueue,
     }
-    const shieldResult = globalTriggerSystem.checkTriggers(battle, shieldContext)
+    const shieldResult = getActiveTriggerSystem().checkTriggers(battle, shieldContext)
     if (shieldResult.needsOptionSelection) throw shieldResult
     if (shieldResult.needsTargetSelection) throw shieldResult
     appendDamageMessages(battle, request.attacker.ownerPlayerId, shieldResult.messages)
@@ -2236,7 +2273,7 @@ function prepareTargetDamage(
       shieldAbsorbed,
       damageQueue: appliedQueue,
     }
-    const appliedResult = globalTriggerSystem.checkTriggers(battle, appliedContext)
+    const appliedResult = getActiveTriggerSystem().checkTriggers(battle, appliedContext)
     if (appliedResult.needsOptionSelection) throw appliedResult
     if (appliedResult.needsTargetSelection) throw appliedResult
     appendDamageMessages(battle, request.attacker.ownerPlayerId, appliedResult.messages)
@@ -2325,7 +2362,7 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       rawDamage: request.baseDamage,
       damageQueue: sourceQueue,
     }
-    const sourceResult = globalTriggerSystem.checkTriggers(battle, sourceContext)
+    const sourceResult = getActiveTriggerSystem().checkTriggers(battle, sourceContext)
     if (sourceResult.needsOptionSelection) throw sourceResult
     if (sourceResult.needsTargetSelection) throw sourceResult
     appendDamageMessages(battle, request.attacker.ownerPlayerId, sourceResult.messages)
@@ -2987,7 +3024,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       },
       /** 触发任意字符串名称的事件（包括自定义事件，其他效果可通过 "on" 字段监听） */
       fireEvent: (eventName: string, ctx: any) => {
-        return globalTriggerSystem.fireEvent(battle, context as any, eventName, ctx)
+        return getActiveTriggerSystem().fireEvent(battle, context as any, eventName, ctx)
       },
       // 技能管理函数
       addSkillById: (targetPieceId: string, skillId: string) => {
@@ -3187,7 +3224,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           battleDebugLog('[executeSkillFunction] skillEnvironment.addPlayerRuleById:', typeof skillEnvironment.addPlayerRuleById);
           
           // 执行技能代码
-          const executeSkill = dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
+          const executeSkill = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
             surface: 'skillCode', contentId: skillDef.id, code: fullSkillCode, entry: 'executeSkill(context)',
           });
           let result = executeSkill(skillEnvironment);
@@ -3329,7 +3366,7 @@ export function calculateSkillPreview(skillDef: SkillDefinition, piece: PieceIns
       `
 
       // 执行预览函数
-      const calculatePreview = dynamicCodeRuntime.compileExpression<(environment: typeof previewEnvironment) => any>({
+      const calculatePreview = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof previewEnvironment) => any>({
         surface: 'previewCode', contentId: skillDef.id, code: previewCode, entry: 'calculatePreview(piece, skillDef, currentCooldown)',
       })
       const result = calculatePreview(previewEnvironment)
