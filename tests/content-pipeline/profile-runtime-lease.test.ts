@@ -3,9 +3,18 @@ import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 const rooms = vi.hoisted(() => [] as Array<{ id: string; status: string }>)
+const pveLease = vi.hoisted(() => ({
+  active: false,
+  runIds: [] as string[],
+  battleIds: [] as string[],
+}))
 
 vi.mock('@/lib/game/room-store', () => ({
   getRoomStore: () => ({ getAllRooms: async () => rooms }),
+}))
+
+vi.mock('@/lib/pve/profile-lifecycle', () => ({
+  getPveActiveBattleLeaseReportV1: () => ({ ...pveLease }),
 }))
 
 vi.mock('@/lib/game/debug-battle', () => ({
@@ -48,6 +57,9 @@ function reference(hashMarker: string, authorityMarker: string): ProfileReferenc
 
 afterEach(() => {
   rooms.splice(0)
+  pveLease.active = false
+  pveLease.runIds.splice(0)
+  pveLease.battleIds.splice(0)
   delete globalThis.__rvbProfileRuntimeContextV1
   if (originalAppRoot === undefined) delete process.env.APP_ROOT_DIR
   else process.env.APP_ROOT_DIR = originalAppRoot
@@ -144,6 +156,19 @@ describe('RED-115 active-game Profile lease', () => {
     })
   })
 
+  test('includes an active PVE battle in the authority lease', async () => {
+    pveLease.active = true
+    pveLease.runIds.push('run-active')
+    pveLease.battleIds.push('battle-active')
+
+    await expect(getProfileLeaseReportV1()).resolves.toEqual({
+      active: true,
+      roomIds: [],
+      pveRunIds: ['run-active'],
+      pveBattleIds: ['battle-active'],
+    })
+  })
+
   test('rejects authority reload with PROFILE_IN_USE before creating a transaction', async () => {
     const stable = reference('a', 'c')
     const candidate = reference('b', 'd')
@@ -163,10 +188,12 @@ describe('RED-115 active-game Profile lease', () => {
         beginActivation,
       } as unknown as ProfileStoreV1,
     }
-    rooms.push({ id: 'pve-active', status: 'in-progress' })
+    pveLease.active = true
+    pveLease.runIds.push('pve-run-active')
+    pveLease.battleIds.push('pve-battle-active')
 
     await expect(beginProfileActivationV1(candidate.resolvedProfileHash))
-      .rejects.toThrow('PROFILE_IN_USE: pve-active')
+      .rejects.toThrow('PROFILE_IN_USE: pve-run-active')
     expect(beginActivation).not.toHaveBeenCalled()
   })
 

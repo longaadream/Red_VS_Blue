@@ -1,10 +1,19 @@
 {
-  "id": "prototype-campfire",
-  "name": "临时营火",
-  "type": "event",
-  "description": "在下一场战斗前选择一种整备效果。",
+  "schemaVersion": "rvb-pve-event/v1",
+  "eventId": "prototype-campfire",
+  "narrativeId": "prototype-campfire-story",
   "choices": [
-    { "id": "heal", "label": "治疗队伍", "effect": { "type": "heal-party", "amount": 2 } },
-    { "id": "draw", "label": "整理手牌", "effect": { "type": "add-card-choice", "count": 1 } }
+    {
+      "choiceId": "rest",
+      "labelTextId": "prototype-campfire-rest-label",
+      "effectId": "prototype-heal-party-small",
+      "outcomeId": "rested"
+    },
+    {
+      "choiceId": "prepare",
+      "labelTextId": "prototype-campfire-prepare-label",
+      "effectId": "prototype-prepare-party",
+      "outcomeId": "prepared"
+    }
   ]
 }

@@ -18,6 +18,7 @@ import {
 } from '../contracts'
 import { computeResolvedProfileIdentitiesV1, sha256HexV1 } from '../core/hash'
 import type { ResolvedSnapshotViewV1 } from '../core/resolver'
+import { createReadonlyContentTreeV1 } from '../core/source'
 
 export const PROFILE_STATE_SCHEMA_VERSION_V1 = 'rvb-profile-state/v1' as const
 export const PROFILE_REFERENCE_SCHEMA_VERSION_V1 = 'rvb-profile-reference/v1' as const
@@ -138,6 +139,16 @@ function cloneReference(reference: ProfileReferenceV1): ProfileReferenceV1 {
     compatibility: { ...reference.compatibility },
     capabilities: [...reference.capabilities],
   }
+}
+
+function deepFreezeProfileValue<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value as Record<string, unknown>)) {
+      deepFreezeProfileValue(child)
+    }
+    Object.freeze(value)
+  }
+  return value
 }
 
 function referenceMatchesProfile(
@@ -562,6 +573,54 @@ export class ProfileStoreV1 {
         throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', file.descriptor.path)
       }
     }
+  }
+
+  /** Opens exactly one already-installed, integrity-verified immutable Snapshot. */
+  openVerifiedSnapshot(reference: ProfileReferenceV1): ResolvedSnapshotViewV1 {
+    if (reference.kind === 'bundled-base') {
+      this.verifyReference(reference)
+      return this.bundledBase
+    }
+
+    const root = this.profileRoot(reference)!
+    const profile = ResolvedProfileV1Schema.parse(JSON.parse(
+      readFileSync(path.join(root, PROFILE_METADATA_FILE_V1), 'utf8'),
+    ))
+    const identity = computeResolvedProfileIdentitiesV1({
+      schemaVersion: profile.schemaVersion,
+      compatibility: profile.compatibility,
+      capabilities: profile.capabilities,
+      base: profile.base,
+      patches: profile.patches,
+      files: profile.files,
+    })
+    if (
+      !referenceMatchesProfile(reference, profile)
+      || identity.resolvedProfileHash !== profile.resolvedProfileHash
+      || identity.authorityContentHash !== profile.authorityContentHash
+    ) throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', reference.resolvedProfileHash)
+    // The canonical verifier also rejects links and undeclared entries.
+    this.verifyReference(reference)
+    const tree = createReadonlyContentTreeV1(profile.files.map(file => {
+      const bytes = new Uint8Array(readFileSync(path.join(root, ...file.descriptor.path.split('/'))))
+      if (bytes.byteLength !== file.descriptor.size || sha256HexV1(bytes) !== file.descriptor.sha256) {
+        throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', file.descriptor.path)
+      }
+      return {
+        descriptor: file.descriptor,
+        bytes,
+        // Executable trust is deliberately not reconstructed from disk metadata.
+        // Runtime PVE consumes data only; false is the fail-closed answer.
+        hasExecutableContent: false,
+      }
+    }))
+    const frozenProfile = deepFreezeProfileValue(profile)
+    return Object.freeze({
+      ...tree,
+      profile: frozenProfile,
+      authorityContentIdentity: identity.authorityContentIdentity,
+      networkEligible: false,
+    })
   }
 
   recordAuditEvidence(

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "ambush",
+  "type": "battle",
+  "encounterId": "prototype-encounter-1",
+  "victoryNodeId": "spoils",
+  "defeatNodeId": "defeat-ending",
+  "drawNodeId": "draw-ending"
+}
