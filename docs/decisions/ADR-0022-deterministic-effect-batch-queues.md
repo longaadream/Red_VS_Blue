@@ -1,4 +1,4 @@
-# ADR-0021：四类确定性 EffectBatch / Queue 与“同时”语义白名单
+# ADR-0022：四类确定性 EffectBatch / Queue 与“同时”语义白名单
 
 ## 状态
 
@@ -137,11 +137,10 @@ queue push 不返回未来 `healResult`，也不接受结果 callback。Reap 的
 
 `SummonRequest` 是无 callback、不可携带任意 `PieceInstance` 的封闭联合：
 
-- `template`：只含 templateId、owner/faction、位置和现有 index 参数，由 repository/template pipeline 创建。
-- `naruto-shadow-clone`：只允许 `naruto-shadow-clone` 技能绑定的 writer 提交 casterId、clone position 和模式；handler 按固定字段复制展示状态，添加固定三条 clone rule。
-- `kiljaedan-restore`：只允许 `demon-summon-5` 卡牌绑定的 writer 提交 ownerPlayerId、anchorId 和位置；handler 验证并恢复 `extensions.kiljaedanPiece`，或按现役固定 recipe 创建基尔加丹。
+- `template`：只含 templateId、owner/faction、位置和现有 index 参数，由 repository/template pipeline 创建；仅内部 template writer 可创建。
+- `declared-content`：技能或卡牌定义可携带版本化 `summonCapability` 声明；运行时只接受 `source-mirror` 与 `stored-or-declared-piece` 两种封闭 schema。鸣人影分身使用前者声明固定复制字段、三条 clone rule、冷却重置与插入/RNG 策略；恶魔召唤使用后者声明固定 extension key、模板、fallback 棋子和技能。
 
-writer 在构造时绑定当前 contentId；recipe 与 contentId 不匹配即在修改前失败。不得把任意对象、任意 extension path、任意规则列表或函数注入 handler。
+声明必须是普通对象，所有层级只接受列出的键和值域；解析后递归复制、深冻结，并由 `effect-batch` 模块私有 `WeakSet` 品牌认证。writer 在构造时绑定当前 contentId 与已认证声明，调用方只能提交 `sourceId`、坐标和可选变体；contentId/声明/品牌不匹配或出现额外字段时，在修改权威状态前 fatal。不得把任意对象、任意 extension path、任意规则列表、`PieceInstance` 或函数从 writer 请求注入 handler。当前数据中只有两个批准迁移点声明该能力；新增声明属于新的合同审查，而不是内容作者自动获得的 surface。
 
 Prepare 固定执行：
 
@@ -338,6 +337,19 @@ RED-139 只申请迁移：
 11. 重建两个 `game-engine.js`，同 fixture 比较 Node/browser 轨迹、结果、错误和 hash。
 12. 聚焦 Vitest、受影响模块、完整 `npm.cmd test`、`npm.cmd run typecheck`、`npm.cmd run lint`、`npm.cmd run check:encoding`、`git diff --check`、`npm.cmd run check:main-baseline`。
 13. 未参与实现的独立 AI/人工依据原始合同审查；必要的双玩家 Electron 候选版本人工验收。
+
+### 实现证据（2026-08-31）
+
+`tests/game/red-139-hash-evidence.test.ts` 在精确基线 `6e6ae8dd88928dc285c0cbb7a5be7e3c121ae9a2` 与当前实现上使用同一固定 seed `9109817`、同一 pre-state 和同一 action。四个场景的 authority/peer state、action 与 trace hash 在各自引擎内全部相等；不同引擎之间的 `preStateHash` 和 `actionHash` 也保持一致，因此下表差异来自本 ADR 批准的结算语义，而不是输入漂移。
+
+| 场景 | 相同输入 | 基线 `stateHash` / `traceHash` | 当前 `stateHash` / `traceHash` | 有意变化 |
+| --- | --- | --- | --- | --- |
+| Reap lethal | pre `b155cf72ec5aa2682aef30026d983b5ac6b3c3f664f7506295f77e36786b9f96`；action `86b6621cc98591ba867d4dcc1369552cee3f6dd57a72382f90976f555f0aafd9` | `ff38c18f7e32e83e9bec611c7709efef5ca25788bb595faaaab691b7c751141f` / `e3f87df112121f626c274921199ddc2ca2413c3adb69aff90605f9bb96b36bd3` | `a6aacd9ee1bd2e2420c7b563519e05f2b075b2a27ae52900f4bfc79cce84893a` / `50cdde08b5f5fe8f38bc593e40fcabdbeac5e5b5e4bdfc5337d5a2907f667a44` | `beforeHealTaken → killed → died` 改为 `killed → died → queued Heal`；治疗窗口可见 victim 已入墓、charge 已提交；消息改为“触发了收割”。recorder hash：`6228f583…7ad0e` → `530515d5…aa278`。 |
+| Naruto clone | pre `38bc773b9c6f99f4bc3d8359d649748631922f3d6545aabd51b433d286b59a97`；action `a1387b7c5d6904324b3e16006fafbec7eeafff7e6fb3ffbda6f749a27cb922cb` | `1e29a07a450ed647d1fc1284a333a6276bc8f97f430a19ee8a480866c19ce509` / `30322decda9e0aa1cae6812f8d850300013a52f39d42c8381b31c2913d432ad5` | `0fb2654310e49088653c271a8ab5ce3ec426c12bd3a848851e5d07e92e58dcf9` / `160c3da5b1de37072eda282d174b79f693dbb885c4c8defa9b43f326e129f210` | 新增 Summon before/after（Commit 前后 off-board/on-board）；clone ID、随机相对插入与 RNG cursor 保持；展示技能冷却从旧脚本复制出的 `3` 规范化为 `0`，relatedRules 去除重复。transition：`93bb07fb…8053` → `b9a3c5f8…6d7c`。 |
+| Demon stored restore | pre `42d32c426d61e7a12fd89c81bf7646ff83ebb9a29f6548d75ad98c05d1597c34`；action `696762c7b3113fb7c65dce2b5711a92803223d2dd3fb12d54bbefed0cbfa5061` | `45e8c15e0618f0dd1304c98dd99a2ef60663356bc09f626182e4b39d648f8c15` / `f284f3462e2d7f393478ce8b1a7f71dfd4eade570b737c254056bf096bad3c58` | `3b801c4a1540501fdbe313866f9bfd626325290e782c80450f6573cf8fe5d047` / `aa70e28c131ca62a3c06dc33a59721c076ec515b5eca2f03b683c95d3b35652e` | 最终 KJ identity/HP/skills/status、anchor HP/attack、AP/hand/discard 不变；extension 在 before 仍存在，统一 Commit 删除，after 才能观察 on-board。 |
+| Demon fallback create | pre `cf21fcd2b4db666812f04218ae615191899d9c961a528fb1345f5dfd457fb99c`；action `14a8b69077d6c13972431bbbe852ca72d180d430af0f4f3a2c0a1decdd91705f` | `b88e743b946f0b332cd0180bab2f590c67bc35d318606b9498fa16bc2cc65132` / `39192ec19b28605d8a7fc3f21618b10682223f94cdd04bf6584254c258116809` | `a23fb6e99fb52c52c53c67a87959afa83e6370ba7c227468e167dff8e332a2d1` / `06a7f0412391b3f9628524de56690a9cb4c417da0f6d516d8c1c9768706026ce` | 生成 ID `kiljaedan-player-red-1000000`、最终棋子投影和 damage → attack +1 → summon 顺序不变；新增 sealed Summon lifecycle 与 batch 元数据。 |
+
+Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5ff1fe3ac6dbf343e16a` 变为 `365b5933c52697d60fc3e7395da1d5ef8261e97a3879b93ad0d594d76fca38df`；Naruto 与两个 Demon 场景的 action-message hash 不变。重建的两个浏览器 bundle 字节相同，SHA-256 均为 `FAB4BAEDAB3D47DE1D36C63A58CC796722D29AD684000C921BFCF28C5FF4B5BE`。
 
 ## 回退方式
 

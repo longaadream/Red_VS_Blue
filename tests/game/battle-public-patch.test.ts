@@ -101,6 +101,8 @@ describe('RED-109 public battle patches', () => {
       process,
       require: createRequire(import.meta.url),
       setTimeout,
+      TextDecoder,
+      TextEncoder,
     }
     runInNewContext(desktopBundle.toString('utf8'), context, { filename: desktopBundlePath })
     const browserEngine = context.GameEngine as {

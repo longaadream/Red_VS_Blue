@@ -89,6 +89,8 @@ function loadBrowserEnvironment(): AIEnvironment {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
   runInNewContext(source, context, { filename: bundlePath })
   return (context.GameEngine as { aiEnvironmentV1: AIEnvironment }).aiEnvironmentV1

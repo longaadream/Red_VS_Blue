@@ -27,7 +27,9 @@ vi.mock('@/lib/game/skill-repository', () => ({
 }))
 
 import { mulberry32, setRng } from '@/lib/game/rng'
+import { runBattleAction } from '@/lib/game/battle-runner'
 import type { SkillDefinition } from '@/lib/game/skills'
+import { prepareAction } from '@/lib/game/targeting'
 import type { TargetRef } from '@/lib/game/targeting'
 import { applyBattleAction } from '@/lib/game/turn'
 import type { BattleAction } from '@/lib/game/turn'
@@ -38,6 +40,7 @@ const FIXTURE_SEED = 0x5eed64
 
 type BrowserEngine = {
   applyBattleAction: typeof applyBattleAction
+  runBattleAction: typeof runBattleAction
   globalTriggerSystem: {
     addRules: (rules: any[]) => void
     checkTriggers: (state: any, context: any) => { success: boolean }
@@ -66,6 +69,8 @@ function loadBrowserEngine(): BrowserEngine {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
 
   runInNewContext(bundleSource, context, { filename: bundlePath })
@@ -81,6 +86,75 @@ function makeFixture() {
     action: { type: 'move' as const, playerId: 'player-red', pieceId: 'mover', toX: 2, toY: 1 },
     state,
   }
+}
+
+function makeDemonSummonFixture() {
+  const anchor = makePiece({
+    instanceId: 'differential-demon-anchor',
+    templateId: 'red-anchor',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    x: 0,
+    y: 0,
+    currentHp: 20,
+    maxHp: 20,
+    attack: 3,
+  })
+  Object.assign(anchor, { name: '献祭者' })
+  const state = makeState({
+    pieces: [anchor],
+    currentPlayerId: 'player-red',
+    phase: 'action',
+    width: 4,
+    height: 4,
+  }) as any
+  const red = state.players.find((player: any) => player.playerId === 'player-red')
+  red.hand = [{
+    cardId: 'demon-summon-5',
+    instanceId: 'differential-demon-card',
+    actionPointCost: 3,
+  }]
+  red.discardPile = []
+  red.actionPoints = 3
+  state.extensions.kiljaedanPiece = {
+    instanceId: 'differential-kiljaedan-hidden',
+    templateId: 'kiljaedan',
+    name: '基尔加丹',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    currentHp: 1,
+    maxHp: 17,
+    attack: 4,
+    defense: 3,
+    moveRange: 4,
+    x: 0,
+    y: 0,
+    skills: [],
+    rules: [],
+    statusTags: [],
+  }
+
+  const draft = {
+    type: 'playCard' as const,
+    playerId: 'player-red',
+    cardInstanceId: 'differential-demon-card',
+    clientActionId: 'red139-browser-demon-damage-summon',
+  }
+  const prepared = prepareAction(state, draft)
+  if (prepared.kind !== 'needTarget') {
+    throw new Error(`Expected demon-summon-5 target preparation, received ${prepared.kind}`)
+  }
+  const action: BattleAction = {
+    ...draft,
+    targetPieceId: anchor.instanceId,
+    targetX: anchor.x,
+    targetY: anchor.y,
+    extraTargets: [{ x: 2, y: 2 }],
+    selectionId: prepared.selectionId,
+    stateRevision: prepared.stateRevision,
+  }
+
+  return { action, state }
 }
 
 describe('game engine Node/browser differential fixture', () => {
@@ -104,6 +178,26 @@ describe('game engine Node/browser differential fixture', () => {
       seed: FIXTURE_SEED,
       result: nodeResult,
     })
+  })
+
+  it('keeps the real demon-summon-5 damage→summon EffectChain identical in Node and browser', () => {
+    const nodeFixture = makeDemonSummonFixture()
+    const browserFixture = structuredClone(nodeFixture)
+    const browser = loadBrowserEngine()
+
+    const nodeResult = runBattleAction(nodeFixture.state, nodeFixture.action, { rootSeed: FIXTURE_SEED })
+    const browserResult = browser.runBattleAction(browserFixture.state, browserFixture.action, {
+      rootSeed: FIXTURE_SEED,
+    })
+
+    expect(browserResult).toEqual(nodeResult)
+    expect(browserResult.state.pieces.find((piece: any) => piece.instanceId === 'differential-demon-anchor'))
+      .toMatchObject({ currentHp: 14, attack: 4 })
+    expect(browserResult.state.pieces.find((piece: any) => piece.instanceId === 'differential-kiljaedan-hidden'))
+      .toMatchObject({ templateId: 'kiljaedan', currentHp: 17, x: 2, y: 2 })
+    expect(browserResult.state.extensions?.kiljaedanPiece).toBeUndefined()
+    expect(browserResult.state.players.find((player: any) => player.playerId === 'player-red'))
+      .toMatchObject({ actionPoints: 0, discardPile: ['demon-summon-5'] })
   })
 
   it('executes all four trigger consumer categories in the approved order', () => {
