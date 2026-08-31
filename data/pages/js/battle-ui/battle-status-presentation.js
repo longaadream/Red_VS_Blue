@@ -91,7 +91,9 @@
     const parts = []
     const stacks = Number(status && status.stacks)
     const duration = durationValue(status)
-    const uses = Number(status && status.uses)
+    const uses = Number(status && (status.uses !== undefined
+      ? status.uses
+      : (status.remainingUses !== undefined ? status.remainingUses : status.currentUses)))
     const intensity = Number(status && status.intensity)
     if (Number.isFinite(stacks) && stacks > 0) parts.push(stacks + '层')
     if (duration < 0) parts.push('持续：永久')

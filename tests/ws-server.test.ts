@@ -3,11 +3,21 @@ import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
 import { hashBattleState } from '../lib/game/battle-runner'
+import { planBotActions } from '../lib/game/ai'
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+} from '../lib/game/battle-public-patch'
 import {
   createPublicBattleResyncSnapshot,
   type DispatchRoomBattleActionResult,
 } from '../lib/game/room-battle-actions'
-import { broadcastBattleTransition, startWsServer } from '../lib/ws-server'
+import {
+  broadcastBattleTransition,
+  isBotInputReady,
+  queueBotTurnIfReady,
+  startWsServer,
+} from '../lib/ws-server'
 import { getRoomStore, type Room } from '../lib/game/room-store'
 import { getServerGameProfileIdentityV1 } from '../lib/content-pipeline/runtime/profile-game-identity'
 import { makeState } from './helpers/minimal-state'
@@ -19,12 +29,48 @@ const globalWithWsServer = globalThis as typeof globalThis & {
   __rvbRoomClients?: Map<string, Set<WebSocket>>
   __rvbPlayerWs?: Map<string, WebSocket>
   __rvbWsIdentities?: WeakMap<WebSocket, { roomId: string; playerId?: string }>
+  __rvbBotTurnTimers?: Map<string, ReturnType<typeof setTimeout>>
+  __rvbBotTurnsRunning?: Set<string>
 }
 
 let httpServer: Server
 let serverUrl: string
 const activeClients = new Set<WebSocket>()
 const eventTimeoutMs = 2_000
+type TestIdentity = { id: string; publicKey: string; privateKey: CryptoKey }
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes).map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function createTestIdentity(): Promise<TestIdentity> {
+  const pair = await globalThis.crypto.subtle.generateKey(
+    { name: 'Ed25519' },
+    true,
+    ['sign', 'verify'],
+  ) as CryptoKeyPair
+  const publicBytes = new Uint8Array(await globalThis.crypto.subtle.exportKey('raw', pair.publicKey))
+  const publicKey = bytesToHex(publicBytes)
+  const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', publicBytes))
+  return { id: bytesToHex(digest).slice(0, 8), publicKey, privateKey: pair.privateKey }
+}
+
+async function signBattleSubscribe(identity: TestIdentity, roomId: string) {
+  const payload = {
+    type: 'battle-subscribe' as const,
+    roomId,
+    playerId: identity.id,
+    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    timestamp: Date.now(),
+  }
+  const signature = await globalThis.crypto.subtle.sign(
+    'Ed25519',
+    identity.privateKey,
+    new TextEncoder().encode(JSON.stringify(payload)),
+  )
+  return { publicKey: identity.publicKey, payload, signature: bytesToHex(new Uint8Array(signature)) }
+}
 
 function rejectAfterTimeout(reject: (error: Error) => void, event: string): ReturnType<typeof setTimeout> {
   return setTimeout(() => reject(new Error(`Timed out waiting for WebSocket ${event}`)), eventTimeoutMs)
@@ -223,6 +269,56 @@ describe('game WebSocket service', () => {
     }
   })
 
+  test('queues one bot job per room for action, deployment, or pending input ownership', () => {
+    vi.useFakeTimers()
+    try {
+      const humanState = makeState({ currentPlayerId: 'player-red', phase: 'action' })
+      const actionState = makeState({ currentPlayerId: 'bot', phase: 'action' })
+      const deploymentState = makeState({ currentPlayerId: 'player-red', phase: 'start' })
+      deploymentState.deployment = {
+        mode: 'progressive-reserve-v1',
+        status: 'awaiting-reserve-deploy',
+        activePlayerId: 'bot',
+        playerIds: ['player-red', 'bot'],
+      } as never
+      const pendingState = makeState({ currentPlayerId: 'player-red', phase: 'action' })
+      pendingState.players[1].playerId = 'bot'
+      pendingState.deployment = {
+        mode: 'progressive-reserve-v1',
+        status: 'awaiting-reserve-deploy',
+        activePlayerId: 'player-red',
+        playerIds: ['player-red', 'bot'],
+      } as never
+      pendingState.pendingOptionSelection = { playerId: 'bot' } as never
+
+      expect(isBotInputReady(humanState)).toBe(false)
+      expect(isBotInputReady(actionState)).toBe(true)
+      expect(isBotInputReady(deploymentState)).toBe(true)
+      expect(isBotInputReady(pendingState)).toBe(true)
+      pendingState.pendingOptionSelection = {
+        playerId: 'bot',
+        title: 'Bot reaction',
+        options: ['accept'],
+        canCancel: false,
+      }
+      expect(planBotActions(pendingState, 'bot')).toMatchObject({
+        kind: 'structural',
+        actions: [{ type: 'pendingOptionSelect', playerId: 'bot', selectedOption: 'accept' }],
+      })
+
+      const timerCount = vi.getTimerCount()
+      expect(queueBotTurnIfReady('BOT-DEDUPE-ROOM', deploymentState, 60_000)).toBe(true)
+      expect(queueBotTurnIfReady('bot-dedupe-room', deploymentState, 60_000)).toBe(false)
+      expect(queueBotTurnIfReady('human-room', humanState, 60_000)).toBe(false)
+      expect(vi.getTimerCount()).toBe(timerCount + 1)
+    } finally {
+      for (const timer of globalWithWsServer.__rvbBotTurnTimers?.values() ?? []) clearTimeout(timer)
+      globalWithWsServer.__rvbBotTurnTimers?.clear()
+      globalWithWsServer.__rvbBotTurnsRunning?.clear()
+      vi.useRealTimers()
+    }
+  })
+
   test('rejects an incompatible battle protocol before registering the subscription', async () => {
     const client = await openClient()
     const roomId = 'legacy-client-' + Date.now()
@@ -264,14 +360,56 @@ describe('game WebSocket service', () => {
     }
   })
 
-  test('keeps the replacement player socket registered when the stale socket closes', async () => {
-    const roomId = 'reconnect-player-map-' + Date.now()
+  test('requires a signed identity for a non-lobby battle subscription', async () => {
+    const roomId = 'unsigned-subscribe-' + Date.now()
     const profileIdentity = getServerGameProfileIdentityV1()
     const room: Room = {
       id: roomId,
       name: roomId,
       status: 'waiting',
-      players: [{ id: 'same-player', name: 'Same player', profileIdentity }],
+      players: [{ id: 'unsigned-player', name: 'Unsigned player', profileIdentity }],
+      spectators: [],
+      currentTurnIndex: 0,
+      actions: [],
+      version: 1,
+    }
+    const getRoom = vi.spyOn(getRoomStore(), 'getRoom').mockImplementation(async id =>
+      id === roomId ? room : undefined)
+    const client = await openClient()
+
+    try {
+      const response = waitForJsonMessage(client)
+      client.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: 'unsigned-player',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        profileIdentity,
+      }))
+
+      await expect(response).resolves.toMatchObject({
+        type: 'subscriptionError',
+        roomId,
+        status: 401,
+        code: 'SUBSCRIBE_AUTH_REQUIRED',
+      })
+      expect(globalWithWsServer.__rvbPlayerWs?.has('unsigned-player')).toBe(false)
+    } finally {
+      await closeClient(client)
+      getRoom.mockRestore()
+    }
+  })
+
+  test('keeps the replacement player socket registered when the stale socket closes', async () => {
+    const roomId = 'reconnect-player-map-' + Date.now()
+    const profileIdentity = getServerGameProfileIdentityV1()
+    const identity = await createTestIdentity()
+    const room: Room = {
+      id: roomId,
+      name: roomId,
+      status: 'waiting',
+      players: [{ id: identity.id, name: 'Same player', profileIdentity }],
       spectators: [],
       currentTurnIndex: 0,
       actions: [],
@@ -283,33 +421,37 @@ describe('game WebSocket service', () => {
     const first = await openClientPair()
     const replacement = await openClientPair()
     try {
+      const firstAuth = await signBattleSubscribe(identity, roomId)
       const firstSubscribed = waitForJsonMessage(first.client)
       first.client.send(JSON.stringify({
         type: 'subscribe',
         roomId,
-        playerId: 'same-player',
-        protocolVersion: 3,
-        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        playerId: identity.id,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
         profileIdentity,
+        ...firstAuth,
       }))
       await expect(firstSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
 
+      const replacementAuth = await signBattleSubscribe(identity, roomId)
       const replacementSubscribed = waitForJsonMessage(replacement.client)
       replacement.client.send(JSON.stringify({
         type: 'subscribe',
         roomId,
-        playerId: 'same-player',
-        protocolVersion: 3,
-        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        playerId: identity.id,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
         profileIdentity,
+        ...replacementAuth,
       }))
       await expect(replacementSubscribed).resolves.toMatchObject({ type: 'subscribed', roomId })
-      expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
+      expect(globalWithWsServer.__rvbPlayerWs?.get(identity.id)).toBe(replacement.server)
 
       const staleServerClosed = new Promise(resolve => first.server.once('close', resolve))
       await closeClient(first.client)
       await staleServerClosed
-      expect(globalWithWsServer.__rvbPlayerWs?.get('same-player')).toBe(replacement.server)
+      expect(globalWithWsServer.__rvbPlayerWs?.get(identity.id)).toBe(replacement.server)
     } finally {
       if (replacement.client.readyState !== WebSocket.CLOSED) await closeClient(replacement.client)
       getRoom.mockRestore()
@@ -319,12 +461,13 @@ describe('game WebSocket service', () => {
   test('echoes the snapshot request id on the authoritative resync response', async () => {
     const roomId = 'correlated-resync-' + Date.now()
     const profileIdentity = getServerGameProfileIdentityV1()
+    const identity = await createTestIdentity()
     const room: Room = {
       id: roomId,
       name: roomId,
       status: 'in-progress',
       players: [
-        { id: 'player-red', name: 'Red', profileIdentity },
+        { id: identity.id, name: 'Red', profileIdentity },
         { id: 'player-blue', name: 'Blue', profileIdentity },
       ],
       spectators: [],
@@ -343,14 +486,16 @@ describe('game WebSocket service', () => {
     const client = await openClient()
 
     try {
+      const auth = await signBattleSubscribe(identity, roomId)
       const initialSnapshot = waitForJsonType(client, 'stateUpdate')
       client.send(JSON.stringify({
         type: 'subscribe',
         roomId,
-        playerId: 'player-red',
-        protocolVersion: 3,
-        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+        playerId: identity.id,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
         profileIdentity,
+        ...auth,
       }))
       await expect(initialSnapshot).resolves.toMatchObject({
         type: 'stateUpdate',

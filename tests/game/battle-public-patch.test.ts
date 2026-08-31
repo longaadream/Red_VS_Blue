@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { TextDecoder, TextEncoder } from 'node:util'
 import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it } from 'vitest'
@@ -101,6 +102,8 @@ describe('RED-109 public battle patches', () => {
       process,
       require: createRequire(import.meta.url),
       setTimeout,
+      TextDecoder,
+      TextEncoder,
     }
     runInNewContext(desktopBundle.toString('utf8'), context, { filename: desktopBundlePath })
     const browserEngine = context.GameEngine as {

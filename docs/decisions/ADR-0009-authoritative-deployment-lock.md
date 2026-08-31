@@ -1,5 +1,7 @@
 # ADR-0009：部署选择锁定、权威超时与公开同步
 
+> RED-138 取代说明：本文的公开初始站位、重投选择/锁定、独立 45 秒部署时钟与对应超时只适用于 `legacy-reroll-v1` 和缺少 mode 的历史状态；新建对局默认使用 [ADR-0022](./ADR-0022-progressive-reserve-deployment.md) 的私有候选与回合内渐进式部署。房间 CAS、签名边界和通用权威传输条款不受影响。
+
 - 状态：部分被 ADR-0011 与 ADR-0019 取代。独立 `relay-server` 的 Relay host 验签/战斗角色、浏览器 host-authority、host 状态上传与恢复条款已由 ADR-0019 的赛前 REST 决策取代；HTTP/LAN 的签名边界以及部署锁定、超时、公开投影、房间 CAS 与随机合同继续有效。
 - 日期：2026-08-17
 - 关联任务：RED-31

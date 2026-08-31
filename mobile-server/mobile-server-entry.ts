@@ -397,6 +397,7 @@ async function _startGame(
         firstPlayerId,
         rootSeed: seed,
         deploymentEnabled: true,
+        deploymentMode: 'legacy-reroll-v1',
         deploymentStartedAt,
       },
     )
@@ -872,6 +873,7 @@ export async function handleRelayBattleInit(body: Record<string, unknown>): Prom
         firstPlayerId,
         rootSeed: seed,
         deploymentEnabled: true,
+        deploymentMode: 'legacy-reroll-v1',
         deploymentStartedAt: Date.now(),
       },
     )

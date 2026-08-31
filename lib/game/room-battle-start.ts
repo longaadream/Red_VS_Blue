@@ -22,6 +22,7 @@ import {
   systemDeploymentRuleClock,
   type DeploymentRuleClock,
 } from './deployment'
+import { isTurnTimerEnabled } from './turn-timer'
 import {
   scheduleRoomDeploymentTimeout,
   createPublicBattleSnapshot,
@@ -64,6 +65,9 @@ async function startBattleFromLockedRostersQueued(
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const room = await store.getRoom(roomId)
     if (!room) throw new Error('Room not found')
+    if (room.status === 'finished' && room.battleState) {
+      return { room, started: false }
+    }
     const roomRuleRuntime = room.status === 'in-progress'
       ? restoreRoomRuleRuntime(roomId)
       : createRoomRuleRuntime(roomId)
@@ -122,14 +126,13 @@ async function startBattleFromLockedRostersQueued(
         rootSeed: seed,
         profileIdentity,
         deploymentEnabled: true,
+        deploymentMode: 'progressive-reserve-v1',
         deploymentStartedAt: clock.now(),
         ruleExecutionContext: roomRuleRuntime.executionContext,
       },
     )
     if (!battle) throw new Error('Failed to initialize battle state')
 
-    // Bots have no deployment UI. Lock the default keep-all choice through the
-    // same authoritative deployment state machine used by human clients.
     let initialState = battle
     for (const bot of roomPlayers
       .filter(player => player.isBot === true || player.id === 'bot')
@@ -148,7 +151,22 @@ async function startBattleFromLockedRostersQueued(
         seed,
       )
     }
-
+    if (
+      !initialState.terminalResult
+      && initialState.deployment?.mode === 'progressive-reserve-v1'
+      && isTurnTimerEnabled()
+    ) {
+      const timerStartedAt = clock.now()
+      initialState = runBattleAction(initialState, {
+        type: 'turnTimerSync',
+        receivedAt: timerStartedAt,
+        now: timerStartedAt,
+      }, {
+        rootSeed: seed,
+        ruleExecutionContext: roomRuleRuntime.executionContext,
+      }).state
+      pinBattleProfileIdentityV1(initialState, profileIdentity, seed)
+    }
     const initialAuthorityVersion = isBattleAuthorityV2Enabled()
       ? room.battleAuthorityVersion ?? 0
       : (room.version ?? -1) + 1
@@ -161,7 +179,7 @@ async function startBattleFromLockedRostersQueued(
       ...room,
       firstPlayerId,
       mapId,
-      status: 'in-progress',
+      status: initialState.terminalResult ? 'finished' : 'in-progress',
       currentTurnIndex: 0,
       battleAuthorityVersion: isBattleAuthorityV2Enabled() ? initialAuthorityVersion : room.battleAuthorityVersion,
       battleState: createServerBattleStateV1(
@@ -214,10 +232,12 @@ async function startBattleFromLockedRostersQueued(
       }
     }
     await options.onDeploymentUpdate?.(initialSnapshot)
-    await scheduleRoomDeploymentTimeout(store, roomId, {
-      clock,
-      onCommitted: options.onDeploymentUpdate,
-    })
+    if (committedRoom.status === 'in-progress') {
+      await scheduleRoomDeploymentTimeout(store, roomId, {
+        clock,
+        onCommitted: options.onDeploymentUpdate,
+      })
+    }
     return { room: committedRoom, started: true }
   }
 

@@ -15,6 +15,7 @@ const CONTENT_EXTENSION_KEYS = [
   'amaterasuCells',
   'amaterasuOwnerPlayerId',
   'kiljaedanPiece',
+  'kiljaedanPiecesByPlayerId',
   'minatoAnchors',
   'recallData',
   'shishioBurnTiles',

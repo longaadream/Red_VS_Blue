@@ -36,6 +36,42 @@ function fixtureSnapshot(statusTags: Array<Record<string, unknown>>) {
 }
 
 describe('battle piece health and negative-status summary', () => {
+  it('shows the authoritative deployment first-move tag through the generic status UI', () => {
+    const window: Record<string, unknown> = {}
+    const statusPresentation = loadBrowserModule(
+      'js/battle-ui/battle-status-presentation.js',
+      'BattleStatusPresentation',
+      window,
+    )
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel', window)
+    const firstMoveTag = {
+      id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
+      name: '本回合首次移动免费',
+      grantedTurnNumber: 2,
+      currentDuration: 1,
+      currentUses: 1,
+      visible: true,
+    }
+
+    const model = viewModel.create({
+      snapshot: fixtureSnapshot([firstMoveTag]),
+      viewerId: 'player-red',
+      selectedPieceId: 'piece-red',
+    })
+
+    expect(model.selection.piece.statusSummary).toEqual([{
+      id: 'deployment-first-move-free',
+      label: '本回合首次移动免费',
+      description: '',
+      stacks: 0,
+      duration: 1,
+      uses: 1,
+      intensity: 0,
+    }])
+    expect(statusPresentation.detailText(firstMoveTag)).toBe('剩余：1回合 · 剩余：1次')
+  })
+
   it('keeps every authoritative status in detail while selecting at most two negative summaries', () => {
     const window: Record<string, unknown> = {}
     const statusPresentation = loadBrowserModule(

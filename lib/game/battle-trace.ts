@@ -68,7 +68,11 @@ export interface BattleActionTrace {
 }
 
 export interface DeploymentTraceEvidence {
-  command?: 'initialize' | 'select' | 'lock' | 'timeout'
+  command?: 'initialize' | 'select' | 'lock' | 'timeout' | 'deploy'
+  mode?: 'legacy-reroll-v1' | 'progressive-reserve-v1'
+  status?: BattleState['deployment'] extends infer _Deployment
+    ? NonNullable<BattleState['deployment']>['status']
+    : never
   initialPositions?: Record<string, { x: number; y: number }>
   choices?: Record<string, { pieceId: string | null }>
   locks?: Record<string, { locked: boolean; reason?: 'player' | 'timeout' }>
@@ -76,6 +80,13 @@ export interface DeploymentTraceEvidence {
   finalPositions?: Record<string, { x: number; y: number }>
   deadlineAt?: number
   revision?: number
+  openingVanguardsInitialized?: boolean
+  activePlayerId?: string
+  offerPieceIds?: string[]
+  reserveCounts?: Record<string, number>
+  lastDeployedPieceId?: string
+  /** Actual committed landing cell after before-summon redirection. */
+  deployedPosition?: { x: number; y: number }
   authorityVersion?: number
 }
 
@@ -455,10 +466,17 @@ export function recordBattleInitialization(
     randomStreams: runtime.randomTrace(true),
     deployment: state.deployment ? {
       command: 'initialize',
+      mode: state.deployment.mode,
+      status: state.deployment.status,
       initialPositions: copyPositions(state.deployment.initialPositions),
       locks: copyLocks(state.deployment.locks),
       deadlineAt: state.deployment.deadlineAt,
       revision: state.deployment.revision,
+      openingVanguardsInitialized: state.deployment.openingVanguardsInitialized,
+      activePlayerId: state.deployment.activePlayerId,
+      offerPieceIds: state.deployment.offerPieceIds ? [...state.deployment.offerPieceIds] : undefined,
+      reserveCounts: state.deployment.reserveCounts ? { ...state.deployment.reserveCounts } : undefined,
+      lastDeployedPieceId: state.deployment.lastDeployedPieceId,
     } : undefined,
   }
   metadata.actionLog.push(trace)
@@ -664,7 +682,8 @@ export function appendBattleReplayFrame(
 
 function createBattleReplayContentSnapshot(state: BattleState): BattleReplayContentSnapshot {
   const skillIds = new Set<string>()
-  const replayPieces = [...(state.pieces ?? []), ...(state.graveyard ?? [])]
+  const reservePieces = Object.values(state.deployment?.reserves ?? {}).flat()
+  const replayPieces = [...(state.pieces ?? []), ...reservePieces, ...(state.graveyard ?? [])]
   for (const piece of replayPieces) {
     for (const skill of piece.skills ?? []) {
       if (skill?.skillId) skillIds.add(skill.skillId)

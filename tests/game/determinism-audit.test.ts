@@ -89,6 +89,10 @@ describe('authority determinism audit', () => {
     expect(mobileServer).toContain('authorityVersion = 1')
     expect(mobileServer).toContain('stateHash: hashBattleState(state)')
     expect(mobileServer).toContain('deploymentEnabled: true')
+    expect(
+      mobileServer.match(/deploymentMode:\s*'legacy-reroll-v1'/g)?.length,
+      'Android authority entrypoints pinned to legacy deployment',
+    ).toBe(2)
     expect(mobileServer).not.toMatch(/seed\s*=\s*Math\.floor\(Math\.random\(/)
     expect(mobileServer).toContain('room.firstPlayerId = initState.turn.currentPlayerId')
     expect(mobileServer).toContain('Invalid deterministic action trace')

@@ -396,6 +396,79 @@ function applyCardEffectModifiers(
   return Math.floor(value)
 }
 
+export function summonExistingPieceWithTriggers(
+  battle: BattleState,
+  piece: PieceInstance,
+  position: { x: number; y: number },
+): SkillExecutionResult {
+  if (!piece?.instanceId || battle.pieces.some(candidate => candidate.instanceId === piece.instanceId)) {
+    return { success: false, message: '召唤实例不存在或已经在场' }
+  }
+  const tile = battle.map?.tiles?.find(candidate =>
+    candidate.x === position.x && candidate.y === position.y)
+  if (!tile?.props?.walkable) return { success: false, message: '召唤位置必须是可行走地格' }
+  if (battle.pieces.some(candidate =>
+    candidate.currentHp > 0 && candidate.x === position.x && candidate.y === position.y)) {
+    return { success: false, message: '召唤位置已被占用' }
+  }
+
+  const beforeContext = {
+    type: 'beforePieceSummoned',
+    playerId: piece.ownerPlayerId,
+    targetPosition: { ...position },
+    pieceTemplateId: piece.templateId,
+    faction: piece.faction,
+  }
+  const beforeResult = checkSynchronousTriggers(battle, beforeContext)
+  if (beforeResult.blocked) {
+    appendDamageMessages(battle, piece.ownerPlayerId, beforeResult.messages)
+    return { success: false, message: beforeResult.messages.join('；') || '召唤被阻止' }
+  }
+  const finalPosition = beforeContext.targetPosition
+  if (!finalPosition
+    || !Number.isSafeInteger(finalPosition.x)
+    || !Number.isSafeInteger(finalPosition.y)) {
+    return { success: false, message: '召唤触发器给出了无效位置' }
+  }
+  const finalTile = battle.map?.tiles?.find(candidate =>
+    candidate.x === finalPosition.x && candidate.y === finalPosition.y)
+  if (!finalTile?.props?.walkable) {
+    return { success: false, message: '召唤触发器将位置改为了不可行走地格' }
+  }
+  if (battle.pieces.some(candidate =>
+    candidate.currentHp > 0
+    && candidate.x === finalPosition.x
+    && candidate.y === finalPosition.y)) {
+    return { success: false, message: '召唤触发器将位置改为了已占用地格' }
+  }
+
+  piece.rules = (piece.rules || []).flatMap((rule: any) => {
+    if (!rule?.id) return [rule]
+    const loaded = loadRuleById(rule.id, FORCE_RULE_RELOAD)
+    return loaded ? [loaded] : [rule]
+  })
+  piece.x = finalPosition.x
+  piece.y = finalPosition.y
+  piece.currentHp = piece.maxHp
+  battle.pieces.push(piece)
+
+  const afterResult = checkSynchronousTriggers(battle, {
+    type: 'afterPieceSummoned',
+    playerId: piece.ownerPlayerId,
+    sourcePiece: piece,
+    pieceTemplateId: piece.templateId,
+    faction: piece.faction,
+  })
+  appendDamageMessages(battle, piece.ownerPlayerId, [
+    ...beforeResult.messages,
+    ...afterResult.messages,
+  ])
+  return {
+    success: true,
+    message: `${piece.name || piece.templateId} 被召唤到(${finalPosition.x},${finalPosition.y})`,
+  }
+}
+
 
 /** 为卡牌效果构建执行环境（没有 sourcePiece，用 playerId 判断阵营） */
 function createCardEffectFunctions(battle: BattleState, playerId: string, context: any) {
@@ -475,6 +548,9 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       const pid = targetPlayerId || playerId
       return addCardToHandWithTriggers(battle, cardId, pid)
     },
+
+    summonExistingPiece: (piece: PieceInstance, x: number, y: number) =>
+      summonExistingPieceWithTriggers(battle, piece, { x, y }),
 
     /** 按 instanceId 从手牌移除并加入弃牌堆 */
     discardCard: (instanceId: string) => {
@@ -664,39 +740,52 @@ export function executeCardFunction(
     context.cardInstance = cardInstance || context.cardInstance || null
 
     const env = createCardEffectFunctions(battle, playerId, context)
-
-    const fullCode = `
-      (function(env) {
-        const context = env.context;
-        const battle = env.battle;
-        const playerId = env.playerId;
-        const selectTarget = env.selectTarget;
-        const selectOption = env.selectOption;
-        const dealDamage = env.dealDamage;
-        const healDamage = env.healDamage;
-        const addCardToHand = env.addCardToHand;
-        const discardCard = env.discardCard;
-        const getHand = env.getHand;
-        const addStatusEffectById = env.addStatusEffectById;
-        const removeStatusEffectById = env.removeStatusEffectById;
-        const addRuleById = env.addRuleById;
-        const removeRuleById = env.removeRuleById;
-        const addPlayerRuleById = env.addPlayerRuleById;
-        const removePlayerRuleById = env.removePlayerRuleById;
-        const Math = env.Math;
-        const Date = env.Date;
-        const console = env.console;
-
-        ${cardDef.code}
-
-        return executeCard(context);
-      })
-    `
-    const executeCard = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
-      surface: 'cardCode', contentId: cardDef.id, code: fullCode, entry: 'executeCard(context)',
+    const previousSummonCapability = Object.getOwnPropertyDescriptor(context, 'summonExistingPiece')
+    Object.defineProperty(context, 'summonExistingPiece', {
+      configurable: true,
+      enumerable: false,
+      value: env.summonExistingPiece,
     })
-    const result = executeCard(env)
-    return result || { success: false, message: '卡牌效果无返回值' }
+    try {
+      const fullCode = `
+        (function(env) {
+          const context = env.context;
+          const battle = env.battle;
+          const playerId = env.playerId;
+          const selectTarget = env.selectTarget;
+          const selectOption = env.selectOption;
+          const dealDamage = env.dealDamage;
+          const healDamage = env.healDamage;
+          const addCardToHand = env.addCardToHand;
+          const discardCard = env.discardCard;
+          const getHand = env.getHand;
+          const addStatusEffectById = env.addStatusEffectById;
+          const removeStatusEffectById = env.removeStatusEffectById;
+          const addRuleById = env.addRuleById;
+          const removeRuleById = env.removeRuleById;
+          const addPlayerRuleById = env.addPlayerRuleById;
+          const removePlayerRuleById = env.removePlayerRuleById;
+          const Math = env.Math;
+          const Date = env.Date;
+          const console = env.console;
+
+          ${cardDef.code}
+
+          return executeCard(context);
+        })
+      `
+      const executeCard = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
+        surface: 'cardCode', contentId: cardDef.id, code: fullCode, entry: 'executeCard(context)',
+      })
+      const result = executeCard(env)
+      return result || { success: false, message: '卡牌效果无返回值' }
+    } finally {
+      if (previousSummonCapability) {
+        Object.defineProperty(context, 'summonExistingPiece', previousSummonCapability)
+      } else {
+        delete context.summonExistingPiece
+      }
+    }
   } catch (error: any) {
     if (isSuspendableActionPending(error)) throw error
     if (error?.needsTargetSelection) return error as SkillExecutionResult

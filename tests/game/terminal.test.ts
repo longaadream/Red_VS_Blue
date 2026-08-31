@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { hashBattleState, replayBattle } from '@/lib/game/battle-runner'
+import type { PieceInstance } from '@/lib/game/piece'
 import { dealDamage } from '@/lib/game/skills'
 import { finalizeBattleTerminal } from '@/lib/game/terminal'
 import {
@@ -24,6 +25,19 @@ function core(instanceId: string, ownerPlayerId: string, x: number): TestPiece {
   return { ...makePiece({ instanceId, ownerPlayerId, x, currentHp: 5, maxHp: 5 }), isCore: true }
 }
 
+function reserveCore(instanceId: string, ownerPlayerId: string): PieceInstance {
+  return {
+    ...core(instanceId, ownerPlayerId, 0),
+    name: instanceId,
+    x: null,
+    y: null,
+    skills: [],
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+  }
+}
+
 function trackedState(phase: 'start' | 'action' | 'end' = 'action', turnNumber = 1) {
   return makeState({
     pieces: [core('core-red', 'player-red', 0), core('core-blue', 'player-blue', 1)],
@@ -39,6 +53,42 @@ function eliminate(state: BattleState, instanceId: string) {
   if (!piece) throw new Error('Missing core ' + instanceId)
   piece.currentHp = 0
   state.graveyard.push(piece)
+}
+
+function progressiveState(options: {
+  redOnBoard?: boolean
+  blueOnBoard?: boolean
+  redReserve?: boolean
+  blueReserve?: boolean
+} = {}): BattleState {
+  const {
+    redOnBoard = true,
+    blueOnBoard = true,
+    redReserve = false,
+    blueReserve = false,
+  } = options
+  const pieces = [
+    ...(redOnBoard ? [core('core-red', 'player-red', 0)] : []),
+    ...(blueOnBoard ? [core('core-blue', 'player-blue', 1)] : []),
+  ]
+  const state = makeState({ pieces })
+  state.deployment = {
+    mode: 'progressive-reserve-v1',
+    status: 'turn-ready',
+    playerIds: ['player-red', 'player-blue'],
+    choices: {},
+    locks: {},
+    startedAt: 0,
+    deadlineAt: 0,
+    revision: 0,
+    initialPositions: {},
+    openingVanguardsInitialized: true,
+    reserves: {
+      'player-red': redReserve ? [reserveCore('reserve-red', 'player-red')] : [],
+      'player-blue': blueReserve ? [reserveCore('reserve-blue', 'player-blue')] : [],
+    },
+  }
+  return state
 }
 
 describe('authoritative battle terminal settlement', () => {
@@ -111,6 +161,79 @@ describe('authoritative battle terminal settlement', () => {
   it('does not infer core identity for legacy states without markers', () => {
     const state = makeState({ pieces: [makePiece({ ownerPlayerId: 'player-red' })] })
     expect(finalizeBattleTerminal(state, harmlessAction(), { actionIndex: 0 })).toBeNull()
+  })
+
+  it('does not settle progressive core elimination before opening setup completes', () => {
+    const state = progressiveState({
+      redOnBoard: false,
+      blueOnBoard: false,
+      redReserve: true,
+      blueReserve: true,
+    })
+    state.gameStartFired = false
+    state.deployment!.openingVanguardsInitialized = false
+
+    const next = applyBattleAction(state, harmlessAction())
+
+    expect(next.terminalResult).toBeUndefined()
+  })
+
+  it('does not count a living but unplaced progressive core after the opening barrier', () => {
+    const state = progressiveState({ redOnBoard: false })
+    state.pieces.push(reserveCore('unplaced-red-core', 'player-red'))
+
+    expect(applyBattleAction(state, harmlessAction()).terminalResult).toMatchObject({
+      winnerPlayerId: 'player-blue',
+      loserPlayerId: 'player-red',
+      reason: 'core-eliminated',
+    })
+  })
+
+  it('immediately defeats a side with no living board core even when its reserve is non-empty', () => {
+    const state = progressiveState({ redOnBoard: false, redReserve: true })
+
+    expect(applyBattleAction(state, harmlessAction()).terminalResult).toMatchObject({
+      winnerPlayerId: 'player-blue',
+      loserPlayerId: 'player-red',
+      reason: 'core-eliminated',
+    })
+  })
+
+  it('draws when neither side has a living board core even though both have reserves', () => {
+    const state = progressiveState({
+      redOnBoard: false,
+      blueOnBoard: false,
+      redReserve: true,
+      blueReserve: true,
+    })
+
+    expect(applyBattleAction(state, harmlessAction()).terminalResult).toMatchObject({
+      winnerPlayerId: null,
+      loserPlayerId: null,
+      reason: 'mutual-core-elimination',
+    })
+  })
+
+  it('does not let hidden Kiljaedan prevent board-core elimination', () => {
+    const state = progressiveState({ redOnBoard: false })
+    state.extensions = {
+      ...state.extensions,
+      kiljaedanPiece: reserveCore('hidden-kiljaedan', 'player-red'),
+    }
+
+    expect(applyBattleAction(state, harmlessAction()).terminalResult).toMatchObject({
+      winnerPlayerId: 'player-blue',
+      loserPlayerId: 'player-red',
+      reason: 'core-eliminated',
+    })
+  })
+
+  it('continues while both sides have one living board core', () => {
+    const state = progressiveState({ redReserve: true, blueReserve: true })
+
+    const next = applyBattleAction(state, harmlessAction())
+
+    expect(next.terminalResult).toBeUndefined()
   })
 
   it.each([

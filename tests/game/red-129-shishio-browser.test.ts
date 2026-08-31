@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { TextDecoder, TextEncoder } from 'node:util'
 import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it, vi } from 'vitest'
@@ -17,6 +18,8 @@ function loadBrowserEngine() {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
   runInNewContext(readFileSync(bundlePath, 'utf8'), context, { filename: bundlePath })
   return context.GameEngine as any

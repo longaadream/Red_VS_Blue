@@ -108,8 +108,9 @@ export async function createPveBattleV1(
       firstPlayerId: PVE_PLAYER_ID_V1,
       rootSeed: battleSeed,
       deploymentEnabled: true,
+      deploymentMode: 'legacy-reroll-v1',
       // PVE has no wall-clock deployment choice. Zero is deterministic and
-      // both registered rosters are locked immediately below.
+      // both registered full-board rosters are locked immediately below.
       deploymentStartedAt: 0,
       profileIdentity,
     },

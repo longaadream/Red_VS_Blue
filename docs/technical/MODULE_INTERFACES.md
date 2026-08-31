@@ -79,7 +79,7 @@
 
 - 入口：`lib/game/rule-runtime.ts::RuleRuntime`、`withRuleRuntime()`、`withRuleRuntimeCheckpoint()`。
 - 职责：根种子规范化、命名流派生与 cursor、规则时钟、实例 ID、动态规则 `Math`/`Date` 能力。
-- 稳定流：`deployment`、`deployment-reroll`、`turn-order`、`skill/effect`；实例 ID 为 `instance-id/<namespace>`。
+- 稳定流：legacy 的 `deployment`、`deployment-reroll`，渐进部署的 `progressive-deployment/opening-piece/<normalizedPlayerId>`、`progressive-deployment/opening-cell/<normalizedPlayerId>`、`progressive-deployment/offer/<normalizedPlayerId>`、`progressive-deployment/fallback/<normalizedPlayerId>`，以及 `turn-order`、`skill/effect`；四条渐进流都使用规范化 playerId 后缀并隔离双方 cursor，实例 ID 为 `instance-id/<namespace>`。
 - 约束：规则执行保持同步；预检必须使用 checkpoint；视觉随机不得进入权威 seed、状态或 hash。
 - 兼容：`rng()` 在 runtime 激活时路由至 `skill/effect`，未激活时保留旧适配器。
 - 决策：[ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md)。
@@ -96,22 +96,23 @@
 - 错误响应包含稳定的 `code`、`message` 与 `context`；HTTP 与 WebSocket 复用同一错误载荷。
 - `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容与房间冻结的 `mapId`，并通过房间版本号原子提交战斗状态；只有双方合法锁定且地图属于受控目录、可部署时才进入初始化。校验发生在 seed 与随机消费之前，`BattleState.map.id` 必须等于 `Room.mapId`。
 
-### 部署房间协调器（RED-31）
+### 渐进部署房间协调器（RED-138）
 
-- 入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`、`scheduleRoomDeploymentTimeout()` 与 `createPublicBattleSnapshot()`。
-- 职责：验证 viewer/动作玩家、在 45 秒期限前后选择实际命令、调用唯一规则 Runner、通过 `Room.version` CAS 提交并生成公开快照。
-- 状态命令：`deploymentChoice` 可在锁定前替换/取消；`deploymentLock` 不可撤销；`deploymentTimeout` 仅允许权威服务端时钟发出。
-- 并发：玩家同时锁定或玩家锁定与超时竞争时，失败的 CAS 重新读取最新房间；最终位置只提交一次，`authorityVersion` 单调递增。
-- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 对玩家和观战者公开相同双方坐标与锁定状态，清除选择和 `appliedActionIds`，未完成前同时清除最终位置和完整 action trace；只有权威 `terminalResult` 已提交后才公开脱敏完整 trace。
-- 传输：房间 HTTP、WebSocket 和 Relay 使用 `{ state, seed, stateHash, authorityVersion }`；`viewerPlayerId` 只做提交权限校验，不参与站位隐藏。
-- 身份：实际进入权威战斗的玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；HTTP、LAN WS 与桌面/Android 本机权威服务验证后才执行。独立 `relay-server` 在 RED-119 中没有 battle command、host state update 或 host/guest 战斗权威角色。header/body/subscribe 中的同名字符串不能单独授权命令。
-- 房间投影：`createPublicRoomSnapshot()` 覆盖普通 room GET、重复 start 与其他完整房间响应，不能绕过 battle API 读取 pending choice 或进行中对局的 debug trace；终局 trace 只经终局 battle snapshot 暴露。
-- Relay：持有房间的桌面与 Android 本机权威流程在正式初始化前重新验证已持久化的 `Room.mapId`，从 authority version 1 开始。Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 则是不持有 `Room` 的无状态兼容 bootstrap：只在 seed 前重新校验调用方已经冻结的 ID，不读写房间，当前没有 UI 调用方，也不作为房间冻结证据。独立 Relay 只在赛前持久化该 ID 并转发真实房间的 `roomUpdate`；RED-119 不恢复已被现行架构禁止的 host-authority 完整战斗执行或状态恢复。
+- 入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`、`scheduleRoomBattleTimeout()` 与 `createPublicBattleSnapshot()`。
+- 职责：验证 viewer/动作玩家，调用唯一规则 Runner，通过 `Room.version` CAS 提交 `deployReservePiece`、普通战斗动作与系统 `turnTimeout`，并生成接收者公开快照。
+- 状态命令：自己的回合由权威端生成至多 3 枚候选；`deployReservePiece` 必须携带精确的 `expectedDeploymentRevision`，并在克隆、随机和修改前校验。`deployReservePiece` 原子确认候选与合法格，after-summon 队列后先判终局；未终局时给本次核心添加仅部署当前回合有效的 `deployment-first-move-free` statusTag，并直接进入正常行动。第一次成功普通 `move` 由权威 reducer 以 0 AP 提交并原子消费标签，未使用标签在 `endTurn` 交接前清除。没有安全格时服务端确定性随机落到空可行走格；没有空格则失败关闭。
+- 并发：玩家动作与超时竞争时，失败的 CAS 重新读取最新房间；同一候选只提交一次，`authorityVersion` 与部署 revision 单调递增。缺失、非安全整数或旧 revision 以 `PROGRESSIVE_DEPLOYMENT_STALE_REVISION` 在零状态/hash/cursor 污染下拒绝，不复制或丢失核心实例。
+- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 只向 `activePlayerId` 投影 offer 与合法落点；对手和观战者只得到公开状态及每方预备区数量。实际部署后，`visible=true` 的免费首移 statusTag 作为普通棋子公开状态展示。正式 WebSocket 的重连、开战和超时完整快照必须按每个接收者分别投影，不能复用动作发起者的单一快照；内部直接调用 Next Battle GET 时也必须复用同一投影函数。
+- 传输：正式玩家命令、完整快照与重连恢复只走房间 WebSocket，并使用 `{ state, seed, stateHash, authorityVersion }`。Next Battle GET 仅是内部兼容/测试处理器，实际运行时玩家 `/api/rooms/**` 返回 410，不能作为 HTTP 后备；内部直接调用 GET 时，只有 `x-battle-subscribe-auth` 中通过 `verifyBattleSubscribeAuth` 的 battle-subscribe Ed25519 JSON 信封才能建立 owner 投影。无信封、仅 `x-player-id` / `viewerPlayerId` 声明或签名玩家同时伪造 query/header 都不能提升权限，前两者按观战者投影，畸形或坏签名稳定返回 401。WebSocket 订阅遵守同一签名身份语义。
+- 身份：实际进入权威战斗的玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；LAN WS 与桌面本机权威服务验证后才执行，内部直接调用的 Next Battle POST 也复用该校验但不是玩家后备入口。独立 `relay-server` 在 RED-119 中没有 battle command、host state update 或 host/guest 战斗权威角色。header/body/subscribe 中的同名字符串不能单独授权命令。
+- 房间投影：`createPublicRoomSnapshot()` 覆盖内部直接调用的 room GET、重复 start 与其他完整房间响应，不能绕过 battle 投影读取私有 offer、合法格或进行中对局的 debug trace；正式玩家房间读取仍只走 WebSocket，终局 trace 只经终局 battle snapshot 暴露。
+- Relay：持有房间的桌面本机权威流程在正式初始化前重新验证已持久化的 `Room.mapId`，从 authority version 1 开始。Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 则是不持有 `Room` 的无状态兼容 bootstrap：只在 seed 前重新校验调用方已经冻结的 ID，不读写房间，当前没有 UI 调用方，也不作为房间冻结证据。独立 Relay 只在赛前持久化该 ID 并转发真实房间的 `roomUpdate`；RED-119 不恢复已被现行架构禁止的 host-authority 完整战斗执行或状态恢复。
+- Android：当前内嵌房间仍广播 legacy `action-log`，没有 RED-138 所需的签名 viewer 私有投影。RED-81 完成前只保留 legacy 状态解释能力；`progressive-reserve-v1` 属于 unsupported，不得作为 RED-138 发布、跨端一致性或隐私验收路径。
 - 独立 Relay 的赛前接口与 LAN RPC 分离：`lobby.html`、`room.html`、`piece-selection.html` 在 remote 模式通过 `/api/maps`、`/api/lobby` 与 `/api/rooms/:id[/actions|/spectate]` 完成目录、创建、读取、加入、阵营确认、选人、观战和删除；不得连接 `__lobby` 或发送 `rooms.*` RPC。赛前 WebSocket 只订阅真实 `roomId` 接收 `roomUpdate`，本任务的 standalone 验收止于双方进入选人且 `mapId` 冻结。
 - 创建者由独立 Relay 建房接口直接登记为 host，随后用 `claim-faction` 固化内容阵营；访客 `join` 同步固化内容阵营。`waiting`/`selecting` 页面切换不得写状态或提前开始战斗。
 - 独立 Relay 的 Prisma/PostgreSQL `Room.mapId` 是兼容旧行的可空列；迁移顺序必须是“不含 `mapId` 的既有三表 baseline”后接“只新增可空 `Room.mapId` 的增量迁移”。全新库依次部署两条；旧 `db push` 库先备份、把 baseline 标记为已应用，再部署增量，禁止生产试跑或重建表。代码回退停止读写该列但保留列；删除列仅允许在备份后另行人工批准。
-- 错误：非法、重复锁定、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
-- 决策：[ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
+- 错误：非法、重复、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
+- 决策：[ADR-0022](../decisions/ADR-0022-progressive-reserve-deployment.md)。旧 `deploymentChoice` / `deploymentLock` 协议仅保留给 `legacy-reroll-v1`，见 [ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
 
 ### PVP alignment lock (RED-56)
 
@@ -177,16 +178,21 @@
 - 错误：协议/build/Profile、房间、规则、版本或持久化错误使用稳定 code；同一连接内相同
   `requestId` 与相同 payload 重放原结果，不同 payload 返回 `RPC_REQUEST_ID_CONFLICT`。
 - 日志：控制台和局部捕获。
-- 测试：`tests/ws-server.test.ts` 及权威 transition/transport 套件。
+- 测试：`tests/ws-server.test.ts` 及权威 transition/transport 套件；`tests/roster-transports.test.ts` 另覆盖签名身份、按接收者的部署隐私投影及 HTTP/WS 协调器一致性。
 - 管理边界：玩家 WS 不承载 Server 运维命令、备份、更新或管理 capability。RED-140 的管理面必须
   使用独立 loopback transport。
 - 最小调试：记录 roomId、connection/player、message type、action ID、seed、前后 hash。
 
-## 7. 旧玩家 HTTP 动作 API
+## 7. 旧玩家 HTTP 动作 API（仅内部兼容/测试实现）
 
+- 入口：`app/api/rooms/[roomId]/battle/route.ts::GET/POST`。
+- 职责：供路由级测试和受控内部调用直接复用房间动作、签名 viewer 投影与广播逻辑；不构成正式玩家传输。
 - 旧 `/api/ping`、目录和 `/api/rooms/**` 玩家入口由 ADR-0020/RED-127 在实际同端口运行边界
   统一返回 HTTP 410 与 `PLAYER_REST_DISABLED`；不存在玩家 HTTP fallback。
-- `app/api/rooms/**` 中仍保留的历史 route 不能作为新客户端或管理功能的调用依据。
+- 调用：`dispatchRoomBattleAction()`、`RoomStore.setRoomIfVersion()`、WS 广播。
+- 错误：持续 CAS 竞争返回 `ROOM_VERSION_CONFLICT`（409），终局后的竞争动作返回 `BATTLE_ALREADY_TERMINAL`（400）。
+- 测试：`tests/roster-transports.test.ts` 覆盖 HTTP/WS 同状态、部署隐私投影与并发双投降；终局守卫另见 `tests/game/terminal-transport.test.ts`。
+- `app/api/rooms/**` 中仍保留的历史 route 不能作为新客户端、玩家 fallback 或管理功能的调用依据。
 - 静态资源、WebSocket Upgrade 与管理 HTTP 是不同边界。RED-140 批准的
   `rvb-server-operations/v1` 不得挂到公开玩家端口、复用这些 route 或信任静态
   `admin-secret-key`。
@@ -425,9 +431,9 @@ interface ServerCore {
 
 ### 部署状态展示
 
-- 权威阶段为 `deployment.status = awaiting-locks`。
-- 客户端只依据服务端下发的 `deployment.deadlineAt` 计算剩余秒数，不自行延长或重置期限。
-- 未锁定玩家的选择继续保持私有；公开快照只包含锁定状态和可公开结果。
+- RED-31 的 `deployment.status = awaiting-locks`、独立 45 秒期限与私有重投选择只适用于 `legacy-reroll-v1`。
+- 新建对局使用 `turn-ready → awaiting-reserve-deploy → turn-ready/complete`；部署和召唤交互完成后直接进入正常行动，不存在独立免费移动子状态或动作。客户端只依据当前成长回合的服务端 deadline 显示剩余时间，不自行延长或重置。
+- offer 和合法落点只对当前输入玩家可见；公开快照包含阶段、预备区数量、已实际上场的公开结果及该棋子 `visible=true` 的免费首移 statusTag。
 
 ### 单端口网络传输
 
@@ -455,7 +461,7 @@ interface ServerCore {
 - `BattleState.turnTimer`：保存规则期限和 streak；`turnTimerSync | turnTimerBurn | turnTimeout` 是内部系统动作，客户端提交会以 `TURN_TIMER_SYSTEM_ACTION_FORBIDDEN` 拒绝且不写房间。
 - `dispatchRoomBattleAction()`：进入异步读取前采样逻辑接收时间；每房间串行冻结逻辑时钟，完成规则、唯一 CAS、快照构造和发送入队后恢复。传输层只获得真实提交版本，CAS 冲突不发布 speculative 快照，且处理跨越 15 秒阈值不会造成烧绳投影反转。进程重启恢复不在 RED-36 范围内。
 - 计时跟随当前输入所有者，并从 action 延续到 end，覆盖 pending 与“回合结束时”输入，直到下一回合真正开始；pending 返回活动玩家时恢复原剩余预算。主动结束回合产生的 pending 继续使用当前预算；action phase 超时若在强制 `endTurn` 时才产生 pending，则取消该输入并推进下一回合，不新增预算。end phase 输入超时也直接推进，不能重复执行 endTurn 触发。只有当前 owner 被接受的玩法动作才清零自己的 streak。
-- `scheduleRoomBattleTimeout()`：仅在显式 `RVB_TURN_TIMER_ENABLED=1` 时启用 deadline，并按部署期限、烧绳阈值和回合期限安排下一次唤醒；未设置或 `0` 时清除既有任务、隐藏计时投影，且晚到玩家动作不会被替换成 timeout。系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
+- `scheduleRoomBattleTimeout()`：仅在显式 `RVB_TURN_TIMER_ENABLED=1` 时启用 deadline，并按烧绳阈值和当前成长回合期限安排下一次唤醒；渐进候选与部署共用该期限，超时自动完成必要部署并直接继续既有超时流程。未设置或 `0` 时清除既有任务、隐藏计时投影，且晚到玩家动作不会被替换成 timeout。系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
 - 第三次连续无操作超时复用 RED-34 `terminalResult(reason = timeout-surrender)`，房间与终局在同一次 CAS 中变为 `finished`。
 
 ### 客户端显示边界
