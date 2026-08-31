@@ -6,6 +6,7 @@ import { getSelectableMapCatalog } from '@/lib/game/map-selection'
 import { getAllPieces } from '@/lib/game/piece-repository'
 import { loadCardById } from '@/lib/game/skills'
 import { getAllSkills } from '@/lib/game/skill-repository'
+import { installNativeBattleSha256 } from '@/lib/server/battle-hash'
 import type { PostgresAuthorityBatchWriter } from '@/lib/server/postgres/authority-types'
 import {
   PostgresAuthorityJournal,
@@ -66,6 +67,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   process.env.RVB_BATTLE_AUTHORITY_V2 ??= '1'
   process.env.RVB_BATTLE_ASYNC_JOURNAL ??= '1'
   process.env.RVB_TURN_TIMER_ENABLED ??= '1'
+  installNativeBattleSha256()
   const ownsRepository = !options.repository
   const repository = options.repository ?? createRepository(options)
   const journal = options.journal ?? new PostgresAuthorityJournal(repository, options.journalOptions)

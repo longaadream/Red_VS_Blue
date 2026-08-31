@@ -6168,6 +6168,22 @@
 
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
       closePieceContextMenu()
+      const localTargetProbe = window.BattleLegalActions && typeof GameEngine !== 'undefined'
+        ? BattleLegalActions.probeSkillTarget({
+            snapshot: G,
+            playerId: myPlayerId,
+            pieceId: selectedPieceId,
+            skillId: skId,
+            skillsById: skillsById,
+            engine: GameEngine,
+          })
+        : null
+      // This is presentation-only prediction: the final targeted command is
+      // still validated by the Colyseus authority. The structured rejection
+      // fallback handles any client/server content drift.
+      if (localTargetProbe && localTargetProbe.needsTarget && localTargetProbe.preparation) {
+        if (enterActionTargetMode(draftAction, localTargetProbe.preparation)) return
+      }
       await doAction(draftAction)
     }
 

@@ -97,6 +97,7 @@ describe('RED-161 Colyseus product room', () => {
         durableAuthorityVersion: 0,
         persistenceStatus: 'durable',
         state: { deployment: { mode: 'progressive-reserve-v1' } },
+        turnTimer: { status: 'running' },
       })
       expect(blueInitial).toMatchObject({
         type: 'stateUpdate', authorityVersion: 0, durableAuthorityVersion: 0,
@@ -202,6 +203,7 @@ interface TestProtocolMessage {
   receipt?: { clientActionId?: string; status?: string }
   requestId?: string
   room?: { status?: string }
+  turnTimer?: { status?: string; remainingSeconds?: number }
   state: {
     deployment: {
       legalPositions?: Array<{ x: number; y: number }>

@@ -33,9 +33,25 @@ npm.cmd run qa:colyseus-pages
 Trace 按合同未验证。既有内容数据仍缺少 `evil-explosion.json`，毒液配置引用 `venom.png` 而资源为
 `venom.jpg`；两项均不在 RED-161 范围。
 
+后续人工验收发现目标准备被 Colyseus `battleReceipt` 压平成普通失败、QA 计时器被脚本关闭，以及
+目标技能需要一次额外的准备往返。修复后：拒绝协议保留 target/option continuation；兼容层转入既有
+`actionError` 交互；QA 与产品均启用计时器；技能目标可由本地规则适配器即时展示，最终带目标命令
+仍由服务端权威校验。Colyseus 启动也显式安装 Node 原生 SHA-256 provider。
+
+阻塞 writer 的双 SDK 客户端样本会单独报告前 5 次冷路径，并以之后 15 次作为热路径门禁。本机复测：
+
+| 度量 | 冷路径最大值 | 热路径 P50 | 热路径 P95 |
+| --- | ---: | ---: | ---: |
+| 服务端 queue → rules → memory commit → receipt | 75.195 ms | 21.184 ms | 32.203 ms |
+| 本机 SDK send → APPLIED | 85.444 ms | 28.229 ms | 46.399 ms |
+
+热路径分解 P95：queue 0.046 ms、rules 19.409 ms、memory persistence 2.182 ms、其余投影/哈希
+10.723 ms。数据库 writer 在采样期间保持阻塞，因此这些数字不包含 PostgreSQL 等待。
+
 ## 自动验证
 
-- RED-161/受影响 Colyseus 与 Electron 回归：5 files / 12 tests，通过。
+- 目标 continuation、计时器、即时目标展示及受影响 UI/Colyseus 回归：8 files / 50 tests，通过。
+- Colyseus 双客户端阻塞 writer 延迟门：热路径 server/client P95 均强制 `< 100 ms`，通过。
 - RED-138 渐进部署与 SkillCode 相邻回归：7 files / 85 tests，通过。
 - RED-160 原始套件与相邻回归此前合计 42 tests 通过；本次新增 product action 后以以上 12 项为
   当前切换门禁。
@@ -51,7 +67,7 @@ Trace 按合同未验证。既有内容数据仍缺少 `evil-explosion.json`，�
 - 在真实 PostgreSQL 上运行 `npm.cmd run test:postgres`。
 - 构建 Electron 候选包，并从候选包完成双端动作、重连、普通 APPLIED 与终局 DURABLE 验收。
 - 完成 High 风险独立审查。
-- 执行 `check:main-baseline`、diff/编码检查并创建 Draft PR。
+- 在本轮修复后重新执行 `check:main-baseline`、diff/编码检查并更新 Draft PR。
 
 ## 回退
 

@@ -70,6 +70,9 @@ describe('RED-160 Colyseus BattleRoom', () => {
     try {
       const latencies: number[] = []
       const serverTotals: number[] = []
+      const serverQueues: number[] = []
+      const serverRules: number[] = []
+      const serverPersistence: number[] = []
       for (let index = 0; index < 20; index += 1) {
         const room = Math.floor(index / 2) % 2 === 0 ? redRoom : blueRoom
         const playerId = room === redRoom ? 'player-red' : 'player-blue'
@@ -89,6 +92,9 @@ describe('RED-160 Colyseus BattleRoom', () => {
         const receipt = await receiptPromise
         latencies.push(performance.now() - startedAt)
         serverTotals.push(receipt.timings?.totalMs ?? Number.POSITIVE_INFINITY)
+        serverQueues.push(receipt.timings?.queueMs ?? Number.POSITIVE_INFINITY)
+        serverRules.push(receipt.timings?.rulesMs ?? Number.POSITIVE_INFINITY)
+        serverPersistence.push(receipt.timings?.persistenceMs ?? Number.POSITIVE_INFINITY)
         expect(receipt).toMatchObject({
           kind: 'applied',
           authorityVersion: index + 1,
@@ -110,15 +116,29 @@ describe('RED-160 Colyseus BattleRoom', () => {
         duplicates.push(await duplicateReceipt)
       }
       expect(duplicates.every(receipt => receipt.kind === 'duplicate')).toBe(true)
+      const warmOffset = 5
+      const warmServerTotals = serverTotals.slice(warmOffset)
+      const warmQueues = serverQueues.slice(warmOffset)
+      const warmRules = serverRules.slice(warmOffset)
+      const warmPersistence = serverPersistence.slice(warmOffset)
+      const warmLatencies = latencies.slice(warmOffset)
       const metrics = {
-        serverP50Ms: percentile(serverTotals, 0.5),
-        serverP95Ms: percentile(serverTotals, 0.95),
-        clientP50Ms: percentile(latencies, 0.5),
-        clientP95Ms: percentile(latencies, 0.95),
+        coldServerMaxMs: Math.max(...serverTotals.slice(0, warmOffset)),
+        coldClientMaxMs: Math.max(...latencies.slice(0, warmOffset)),
+        serverP50Ms: percentile(warmServerTotals, 0.5),
+        serverP95Ms: percentile(warmServerTotals, 0.95),
+        queueP95Ms: percentile(warmQueues, 0.95),
+        rulesP95Ms: percentile(warmRules, 0.95),
+        persistenceP95Ms: percentile(warmPersistence, 0.95),
+        unclassifiedP95Ms: percentile(warmServerTotals.map((total, index) => (
+          total - warmQueues[index] - warmRules[index] - warmPersistence[index]
+        )), 0.95),
+        clientP50Ms: percentile(warmLatencies, 0.5),
+        clientP95Ms: percentile(warmLatencies, 0.95),
       }
       console.info('[RED-160 applied-latency]', metrics)
       expect(metrics.serverP95Ms).toBeLessThan(100)
-      expect(metrics.clientP95Ms).toBeLessThan(1_000)
+      expect(metrics.clientP95Ms).toBeLessThan(100)
       expect(repository.batches).toHaveLength(0)
 
       releaseWriter()
@@ -157,7 +177,7 @@ interface BattleReceiptMessage {
   authorityVersion?: number
   durability?: string
   receipt?: { clientActionId?: string }
-  timings?: { totalMs?: number }
+  timings?: { queueMs?: number; rulesMs?: number; persistenceMs?: number; totalMs?: number }
 }
 
 function nextReceipt(room: ColyseusClientRoom, clientActionId: string): Promise<BattleReceiptMessage> {

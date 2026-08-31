@@ -8,9 +8,8 @@ const PostgresAuthorityJournal = journalModule.PostgresAuthorityJournal
   ?? journalModule.default?.PostgresAuthorityJournal
 const FakeAuthorityRepository = fakeRepositoryModule.FakeAuthorityRepository
   ?? fakeRepositoryModule.default?.FakeAuthorityRepository
-// Manual UI acceptance can take minutes between clicks while bugs are inspected.
-// Product builds keep the turn timer enabled; only this volatile QA process disables it.
-process.env.RVB_TURN_TIMER_ENABLED = '0'
+// Manual acceptance must exercise the same timer path as the packaged player runtime.
+process.env.RVB_TURN_TIMER_ENABLED = '1'
 const repository = new FakeAuthorityRepository()
 const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })
 const { server } = createColyseusBattleServer({

@@ -47,6 +47,7 @@ import {
   PRODUCT_ROOM_RPC_RESULT_MESSAGE,
   PRODUCT_ROOM_UPDATE_MESSAGE,
   createColyseusAppliedReceipt,
+  createColyseusRejectedReceipt,
 } from './battle-room-protocol'
 import { BattleRoomState } from './battle-room-state'
 import { ProductBattleStore } from './product-battle-store'
@@ -388,8 +389,10 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         client.send(BATTLE_RECEIPT_MESSAGE, rejectedReceipt('BATTLE_NOT_STARTED', 'Battle has not started', clientActionId))
         return
       }
+      let submittedAction: unknown
       try {
         const envelope = parseBattleAuthorityEnvelope(message, this.roomId)
+        submittedAction = envelope.command
         if (envelope.playerId !== seatedPlayerId) {
           throw Object.assign(new Error('Command player does not match the connected seat'), {
             code: 'BATTLE_PLAYER_MISMATCH',
@@ -413,13 +416,14 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         }
         if (this.productMode) await this.broadcastProductRoom()
       } catch (error) {
-        const failure = error as Error & { code?: string; receipt?: unknown }
-        client.send(BATTLE_RECEIPT_MESSAGE, {
-          ...rejectedReceipt(failure.code ?? 'BATTLE_COMMAND_REJECTED', failure.message, clientActionId),
-          receipt: failure.receipt ?? rejectedAuthorityReceipt(clientActionId, failure.code, failure.message),
+        const failure = error instanceof Error ? error : new Error(String(error))
+        client.send(BATTLE_RECEIPT_MESSAGE, createColyseusRejectedReceipt({
+          failure,
+          clientActionId,
+          action: submittedAction,
           authorityVersion: this.state.authorityVersion,
           durableAuthorityVersion: this.state.durableAuthorityVersion,
-        })
+        }))
       }
     }
 
@@ -574,10 +578,6 @@ function nextSeat(players: Player[], playerId: string): PlayerSeat {
   if (taken.includes('red') && !taken.includes('blue')) return 'blue'
   if (taken.includes('blue') && !taken.includes('red')) return 'red'
   return randomInt(2) === 0 ? 'red' : 'blue'
-}
-
-function rejectedAuthorityReceipt(clientActionId: string, code?: string, message?: string) {
-  return { clientActionId, status: 'rejected', code, message }
 }
 
 function rejectedReceipt(code: string, message: string, clientActionId = '') {

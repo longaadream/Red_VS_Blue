@@ -118,7 +118,9 @@
       if (generation === _generation) emitRoomMessage('battleTransition', message)
     })
     room.onMessage('battleReceipt', function (message) {
-      if (generation === _generation) emitRoomMessage('battleReceipt', message)
+      if (generation === _generation) {
+        emitRoomMessage(message && message.kind === 'rejected' ? 'actionError' : 'battleReceipt', message)
+      }
     })
     room.onMessage('battleDurable', function (message) {
       if (generation === _generation) emitRoomMessage('battleDurable', message)

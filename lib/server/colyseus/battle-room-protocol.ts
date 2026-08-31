@@ -28,3 +28,51 @@ export function createColyseusAppliedReceipt(result: DispatchRoomBattleActionRes
     timings: result.timings,
   }
 }
+
+interface ColyseusRejectedReceiptInput {
+  failure: Error & {
+    code?: string
+    receipt?: unknown
+    preparation?: unknown
+    needsTargetSelection?: true
+    needsOptionSelection?: true
+    targetType?: 'piece' | 'cell'
+    range?: number
+    filter?: unknown
+    targetIndex?: number
+    title?: string
+    options?: unknown[]
+  }
+  clientActionId: string
+  action?: unknown
+  authorityVersion: number
+  durableAuthorityVersion: number
+}
+
+export function createColyseusRejectedReceipt(input: ColyseusRejectedReceiptInput) {
+  const { failure, clientActionId } = input
+  const code = failure.code ?? 'BATTLE_COMMAND_REJECTED'
+  const message = failure.message || 'Battle command was rejected'
+  return {
+    kind: 'rejected' as const,
+    code,
+    message,
+    // battle.html's established actionError path reads `error`, while the
+    // authority receipt contract calls the same field `message`.
+    error: message,
+    clientActionId,
+    action: input.action,
+    receipt: failure.receipt ?? { clientActionId, status: 'rejected', code, message },
+    authorityVersion: input.authorityVersion,
+    durableAuthorityVersion: input.durableAuthorityVersion,
+    preparation: failure.preparation,
+    needsTargetSelection: failure.needsTargetSelection,
+    needsOptionSelection: failure.needsOptionSelection,
+    targetType: failure.targetType,
+    range: failure.range,
+    filter: failure.filter,
+    targetIndex: failure.targetIndex,
+    title: failure.title,
+    options: failure.options,
+  }
+}
