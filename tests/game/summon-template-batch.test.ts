@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hashBattleState } from '@/lib/game/battle-trace'
 import {
   createEffectChain,
+  EffectChainFatalError,
   withEffectChain,
   type EffectChain,
   type SummonRequest,
@@ -64,6 +65,7 @@ function executeTemplateBatch(
   summons: readonly TemplateSummonSpec[],
   templates: Record<string, TemplateFixture>,
   chainId = 'red139-template-chain',
+  factory: TemplateSummonBatchDependencies<TemplateFixture>['createPieceInstance'] = createPiece,
 ): { result: TemplateSummonBatchResult; chain: EffectChain } {
   const chain = createEffectChain({
     actionId: 'red139-template-action',
@@ -78,7 +80,7 @@ function executeTemplateBatch(
   }
   const dependencies: TemplateSummonBatchDependencies<TemplateFixture> = {
     getPieceById: id => templates[id],
-    createPieceInstance: createPiece,
+    createPieceInstance: factory,
   }
   chain.enqueue(request)
   const executions = withEffectChain(state, chain, () => chain.drain({
@@ -241,6 +243,50 @@ describe('RED-139 internal template SummonBatch handler', () => {
     }
   })
 
+  it('fails closed before commit when a template factory returns an active skill without executable code', () => {
+    const state = makeState({ pieces: [] }) as any
+    const skillId = 'red139-template-active-without-code'
+    state.skillsById[skillId] = {
+      id: skillId,
+      name: 'Missing executable code',
+      description: '',
+      kind: 'active',
+      type: 'normal',
+    }
+    const beforeHash = hashBattleState(state)
+    const factory: TemplateSummonBatchDependencies<TemplateFixture>['createPieceInstance'] = (...args) => {
+      const piece = createPiece(...args)
+      piece.skills = [{ skillId, level: 1, currentCooldown: 0 }]
+      return piece
+    }
+
+    let caught: unknown
+    try {
+      executeTemplateBatch(state, [{
+        recipe: 'template',
+        templateId: 'summon-alpha',
+        ownerPlayerId: 'player-red',
+        faction: 'red',
+        x: 1,
+        y: 1,
+        index: 1,
+      }], {
+        'summon-alpha': { id: 'summon-alpha', name: 'Alpha', rules: [] },
+      }, 'red139-template-missing-code-chain', factory)
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      chainId: 'red139-template-missing-code-chain',
+      kind: 'summon',
+    })
+    expect((caught as EffectChainFatalError).message).toContain(skillId)
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(state.pieces).toEqual([])
+  })
+
   it.each([
     {
       name: 'same-cell reservation',
@@ -349,6 +395,64 @@ describe('RED-139 internal template SummonBatch handler', () => {
     expect(hashBattleState(state)).toBe(beforeHash)
     expect(state.pieces).toEqual([])
     expect(state.actions).toEqual([])
+  })
+
+  it.each([
+    {
+      name: 'null targetPosition',
+      mutate: (context: any) => { context.targetPosition = null },
+    },
+    {
+      name: 'missing targetX',
+      mutate: (context: any) => { delete context.targetX },
+    },
+  ])('rejects template redirect with $name and restores state, triggers, and runtime', ({ name, mutate }) => {
+    const state = makeState({ pieces: [] }) as any
+    const beforeHash = hashBattleState(state)
+    const runtime = new RuleRuntime({ rootSeed: 139, tick: 3 })
+    const runtimeBefore = runtime.snapshot()
+    const rule = eventRule(
+      'red139-template-malformed-' + name,
+      'beforePieceSummoned',
+      (_battle, context) => {
+        getRuleMath().random()
+        getRuleDate().now()
+        mutate(context)
+      },
+    ) as any
+    rule.limits = { maxUses: 3, uses: 0 }
+    globalTriggerSystem.addRule(rule)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+    let thrown: any
+
+    try {
+      withRuleRuntime(runtime, () => executeTemplateBatch(state, [{
+        recipe: 'template',
+        templateId: 'summon-alpha',
+        ownerPlayerId: 'player-red',
+        faction: 'red',
+        x: 1,
+        y: 1,
+      }], {
+        'summon-alpha': { id: 'summon-alpha', name: 'Alpha', rules: [] },
+      }))
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_STATE_INVALID',
+      context: { kind: 'summon', rootSeed: 139 },
+    })
+    expect(thrown.message).toContain('Summon redirect')
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    const runtimeAfter = runtime.snapshot()
+    expect(runtimeAfter.clockCursor).toBe(runtimeBefore.clockCursor)
+    expect(Object.values(runtimeAfter.cursors).every(cursor => cursor === 0)).toBe(true)
+    expect(runtimeAfter.lastRandomAccess).toBe(runtimeBefore.lastRandomAccess)
+    expect(rule.limits).toEqual({ maxUses: 3, uses: 0 })
   })
 
   it('returns a blocked result from an authoritative idle summon facade instead of failing the root action', () => {

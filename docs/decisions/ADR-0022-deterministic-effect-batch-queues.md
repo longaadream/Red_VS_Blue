@@ -12,7 +12,8 @@
 
 - Linear：RED-139。
 - `base_branch`：`main`。
-- `base_sha`：`6e6ae8dd88928dc285c0cbb7a5be7e3c121ae9a2`（2026-08-31 再次执行 `git fetch origin --prune` 并 rebase 到最新 `origin/main` 后记录）。
+- 合同立项 `base_sha`：`6e6ae8dd88928dc285c0cbb7a5be7e3c121ae9a2`（RED-139 开始生产实现时记录）。
+- PostgreSQL + Colyseus 集成基线：`8902c0da94957fdb52d142363c2c45a2ebda7a7f`（2026-08-31 再次执行 `git fetch origin --prune`，并将实现分支 rebase 到已包含 RED-160 的最新 `origin/main` 后记录）。
 - 继承决策：ADR-0004、ADR-0006、ADR-0008、ADR-0010、ADR-0011、ADR-0015、ADR-0016。
 
 ## 背景
@@ -26,6 +27,8 @@ ADR-0010 已为 Damage 建立稳定目标排序、统一 HP 提交和动作内 `
 5. 动态 card/skill surface 可能包装或吞掉规则错误；正常 `runBattleAction` 失败也未完整恢复全局 TriggerSystem 的事件 ID 与 rule limits。
 
 RED-139 的产品语义已经批准：只有 Damage、Heal、Summon、Death 可以具有逻辑同时性，其他效果必须顺序结算。本 ADR 只决定技术阶段、兼容迁移和回滚边界。
+
+实现期间，RED-160 已在 `main` 落地 PostgreSQL + Colyseus 最小权威纵切。RED-139 因此还必须与真实的 `BattleRoom → dispatchRoomBattleAction → runBattleAction → CandidateBattleStore/PostgresAuthorityJournal` 路径兼容，而不是只证明单进程 helper 可用。该兼容补充不授权 RED-139 修改数据库 schema、Colyseus 协议或 RED-160 的普通动作异步 durability 取舍。
 
 ## 决策
 
@@ -140,12 +143,12 @@ queue push 不返回未来 `healResult`，也不接受结果 callback。Reap 的
 - `template`：只含 templateId、owner/faction、位置和现有 index 参数，由 repository/template pipeline 创建；仅内部 template writer 可创建。
 - `declared-content`：技能或卡牌定义可携带版本化 `summonCapability` 声明；运行时只接受 `source-mirror` 与 `stored-or-declared-piece` 两种封闭 schema。鸣人影分身使用前者声明固定复制字段、三条 clone rule、冷却重置与插入/RNG 策略；恶魔召唤使用后者声明固定 extension key、模板、fallback 棋子和技能。
 
-声明必须是普通对象，所有层级只接受列出的键和值域；解析后递归复制、深冻结，并由 `effect-batch` 模块私有 `WeakSet` 品牌认证。writer 在构造时绑定当前 contentId 与已认证声明，调用方只能提交 `sourceId`、坐标和可选变体；contentId/声明/品牌不匹配或出现额外字段时，在修改权威状态前 fatal。不得把任意对象、任意 extension path、任意规则列表、`PieceInstance` 或函数从 writer 请求注入 handler。当前数据中只有两个批准迁移点声明该能力；新增声明属于新的合同审查，而不是内容作者自动获得的 surface。
+声明必须是普通对象，所有层级只接受列出的键和值域；解析后递归复制、深冻结，并由 `effect-batch` 模块私有 `WeakSet` 品牌认证。writer 同时通过私有 content-binding 映射绑定当前 contentId、已认证声明和允许的 predicate；调用方只能提交 `sourceId`、坐标和可选变体。contentId/声明/品牌/绑定不匹配或出现额外字段时，在修改权威状态前 fatal。不得把任意对象、任意 extension path、任意规则列表、`PieceInstance` 或函数从 writer 请求注入 handler。当前数据中只有两个批准迁移点声明该能力；新增声明属于新的合同审查，而不是内容作者自动获得的 surface。
 
 Prepare 固定执行：
 
 - 验证模板/recipe、owner/faction、规范请求键、地图边界、walkable、已有活单位占位、批内 reservation、重复请求与内容唯一性；
-- 现役没有独立数字型“召唤容量”。本 ADR 的 capacity 定义为：所有请求必须各自拥有合法且互异的保留地格，并满足既有内容唯一性（例如场上只能有一个基尔加丹）；新增全局数量上限必须另立规则/任务；
+- 现役没有全局数字型“召唤容量”。本 ADR 的 capacity 定义为：所有请求必须各自拥有合法且互异的保留地格，并满足声明中的内容唯一性；`stored-or-declared-piece` 的现役能力固定 `maxSummons=1`，并按 owner/faction 兼容约束拒绝跨阵营恢复。新增全局数量上限必须另立规则/任务；
 - 按规范键准备完整实例、全部 Rule/Status、运行时注册计划和数组插入计划；
 - 按稳定顺序发送 `beforePieceSummoned`；若它修改位置，重新验证全部 reservation。
 
@@ -179,6 +182,8 @@ candidate membership 是 Freeze 时的事实：A 的生命周期若提前复活 
 
 charge 归属继续使用 `killerPlayerId ?? attacker.ownerPlayerId`；死亡事件 source/target 保持现有合同。`afterChargeGained` 将观察到未复活死者已经统一入墓，这也不同于现役“充能时死者仍在场”，属于批准项。
 
+Finalization 后必须再次检查死亡候选不变量：未复活者只能存在于 graveyard、复活者只能存在于 battlefield，二者不能同时出现；候选 ID、owner/source、HP/maxHp 等参与路由的数值必须有限且与 Freeze 记录兼容。生命周期消费者若在 Commit 后制造重复实体、非法 HP 或把已确认死者重新放回 battlefield，attached 权威 chain 必须 fatal 并回滚，不能把污染状态交给持久化层。
+
 `kiljaedan-demonic-pact.json` 的强制移除继续写 `extensions.removedPieces`，不发送死亡事件、不入 graveyard、不迁移到 DeathQueue。
 
 ### 9. 共享预算、fatal error 与诊断
@@ -191,7 +196,9 @@ charge 归属继续使用 `killerPlayerId ?? attacker.ownerPlayerId`；死亡事
 
 `fireEvent` 现有局部 depth 20 / dispatch 100 防线保留。处于权威 EffectChain 时，命中局部上限或动作级 1000 上限均抛 `EffectChainFatalError` 并回滚；detached/无 EffectChain 的旧调用仍保留现有 blocked `TriggerResult` 兼容。预算不因切换 kind、facade、事件 root 或同次 pending replay 的中间阶段重置。
 
-`EffectChainFatalError` 是可识别的 `BattleRuleError` 子类/错误码族。所有 rule/card/skill dynamic runtime catch 必须原样重抛此错误和 pending 信号；不得包装成普通“执行失败”、返回失败结果或吞掉。TriggerSystem 可以附加 event consumer 诊断，但保留原始 code/cause。
+`EffectChainFatalError` 是可识别的 `BattleRuleError` 子类/错误码族。所有 rule/card/skill dynamic runtime catch 必须原样重抛此错误和 pending 信号；不得包装成普通“执行失败”、返回失败结果或吞掉。EffectChain 锁存本次尝试遇到的首个 fatal 与 pending：即使作者代码用 `try/catch` 截获，root dynamic frame 退出前也会原样再次抛出。TriggerSystem 可以附加 event consumer 诊断，但保留原始 code/cause。
+
+动态定义加载在 `chain && !chain.detached` 时是权威路径，不依赖当前是否正在处理 Batch。rule/skill/reactive card 的缺失、读取失败、JSON 解析失败、空引用或 RuleCode 编译失败都必须结构化 fail closed；合法 `battle.customCards` fallback 与已从手牌移除的 stale consumer 继续兼容。detached 或没有 chain 的旧 helper 仍保留 nullable/skip/soft-result 行为。这样可防止 PostgreSQL 恢复出的 JSON 状态在 profile 定义损坏时继续提交一条与其他房间不同的权威历史。
 
 错误至少包含：
 
@@ -214,9 +221,26 @@ Validate、Prepare、Commit、Emit、queue drain、fatal budget 或动态 surfac
 
 挂起时不得提交或序列化半个 Batch/queue。pending 继续只保存现有 root action、答案序列和 RuleRuntime checkpoint；恢复从根 pre-state 重放，创建新 chain 并确定性重建相同 sequence/ID/计数。取消或恢复异常同样恢复 TriggerSystem 与 runtime 快照。
 
+首个 pending 信号是本次执行尝试内的进程控制流，只存在于 EffectChain snapshot，不进入 BattleState 或 pending transaction。TriggerSystem 在 attached chain 中捕获到 pending 时立即向 chain 锁存；`runSuspendableActionTransaction` 在把结果视为成功前调用 chain health gate。成功转换成现有 pending state 后再确认并清除该信号。这样 SkillCode 或 RuleCode 即使 catch 了嵌套 `dealDamage` / `fireEvent` 的 pending，根动作仍回到 authority pre-state，并在 resume 时 exactly-once 重建 FIFO。
+
 EffectChain 不加入 BattleState、存档、公共 patch 或网络协议。
 
-### 11. 可观察性、兼容例外、旧回放与 hash
+### 11. PostgreSQL + Colyseus 适配边界
+
+RED-139 的引擎层不直接依赖 `pg`、Colyseus Schema 或 Room API。正式适配边界冻结为：
+
+1. `BattleState` 输入和成功输出保持普通 JSON 数据；runner 成功出口只剥离 hydrate 期间注入的 `rules[].effect` 函数，必须原样保留可序列化的同名 descriptor。EffectChain、sealed capability 品牌、pending/fatal Error 与 TriggerSystem runtime 都是进程内对象，不可序列化到 checkpoint、transition 或网络 patch。
+2. 每个 Colyseus `BattleRoom` 通过 `restoreRoomRuleRuntime(roomId)` 持有独立 `RuleExecutionContext`。TriggerSystem、runtime cache、EffectChain 和预算不得跨房间共享；全局 fallback 只供 legacy/offline surface，不能作为 Room authority。
+3. `dispatchRoomBattleAction` 只能在 `runBattleAction` 成功且 authority JSON clone/hash 检查通过后提交 `BattleState` 与 transition。fatal 时不推进 Room state/version、不写 transition、不广播 APPLIED；适配器可持久化不含 provisional state 的 rejected receipt。
+4. 普通动作继续遵守 RED-160 已批准的 memory/journal commit 后 APPLIED、PostgreSQL 异步 durable 语义；终局继续等待 durable barrier。RED-139 不增加第二条 FIFO、同步数据库写或 EffectChain-aware journal。
+5. pending 是一次成功的根动作结果，但持久化的是 authority pre-state 加现有 pending selection/transaction；任何 Batch ledger、已 Commit 一半的 HP/实体或进程内 Error 都不得进入存储。resume/timeout/cancel 继续作为新 Room command 从根 action 重放。
+6. 从 PostgreSQL checkpoint 解析出的 JSON state，与同一进程内 state 或 `structuredClone` state 在相同 pinned profile、root seed、命令和独立 Room context 下必须得到相同结果、规范轨迹和后续动作状态；执行完成后所有输入/输出都不得残留 active EffectChain 或运行时函数，且连续第二个 action 仍须一致。
+
+本节不修改 RED-160 数据库 schema、网络 envelope、公共投影、authority/durable version 或拒绝 receipt 结构。如果未来需要把 Batch 诊断放入协议或数据库，必须另立合同和迁移。
+
+边界限制必须明确：RED-160 的 terminal durable barrier 发生在规则与内存 authority commit 成功之后；其 PostgreSQL drain 若随后失败，不属于 EffectChain fatal，也不能由 RED-139 回滚为根 pre-state。当前 RED-160 还由 Room lifecycle 负责最终关闭 room runtime。首次失败响应/duplicate retry 与同进程 Room 重建的生命周期收敛若要改变，需修改 `lib/server/colyseus/**`，超出 RED-139 `allowed_paths`；本任务只保证规则 fatal 在 commit 前拒绝、pending 不携带半 Batch，并把该上游限制作为候选验证已知风险报告。
+
+### 12. 可观察性、兼容例外、旧回放与 hash
 
 不新增 BattleState、`battle.actions`、BattleActionTrace、存档或玩家网络协议字段。成功路径的 chain/batch/parent/depth 只通过：
 
@@ -239,7 +263,7 @@ Linear 当前验收项 2 写作“单目标行为保持兼容”。批准本 ADR
 
 实现 PR 必须给这些固定 fixture 的旧/新轨迹和 state hash 对照，逐项解释差异。现有 `extensions.debugBattle` 仍按原合同排除在权威 state hash 外，但本任务不新增其 schema；不得关闭 hash、放宽比较或无证据更新快照。
 
-### 12. 唯一数据迁移清单
+### 13. 唯一数据迁移清单
 
 RED-139 只申请迁移：
 
@@ -265,7 +289,7 @@ RED-139 只申请迁移：
 - `lib/game/turn.ts`；
 - `lib/game/battle-runner.ts`；
 - `lib/game/engine-browser-entry.ts`（仅 parity 导出）；
-- 第 12 节三个 JSON；
+- 第 13 节三个 JSON；
 - `tests/game/**` 中 RED-139 新增/直接相关回归；
 - 本 ADR 与 `docs/decisions/README.md`；
 - `docs/technical/DAMAGE_PIPELINE.md`；
@@ -318,6 +342,7 @@ RED-139 只申请迁移：
 - 封闭 summon recipe 若遗漏现役字段、ID/RNG 消耗或 extension 所有权会改变 hash；
 - TriggerSystem 状态若未纳入事务会在失败后漂移；
 - fatal error 若被动态 surface 吞掉会留下半提交；
+- Room runtime 若复用全局 TriggerSystem/cache，会造成跨房间顺序依赖；非 JSON 瞬态对象若泄漏到 BattleState，会破坏 PostgreSQL 恢复；
 - bundle 未重建会造成 Node/browser ABI 漂移。
 
 ## 验证方式
@@ -332,11 +357,12 @@ RED-139 只申请迁移：
 6. Summon：同格/现役占位/越界/不可走/唯一性、before 改位再验证、整批失败原子性、sealed recipe 能力拒绝、鸣人 ID/RNG/插入、恶魔 extension Commit。
 7. Death：冻结候选、A 复活 B、单体复活、亡语、统一墓地/charge、`afterChargeGained` 观察状态和固定 seed。
 8. damage↔heal、summon↔death 跨类循环共享 20/100/1000，上限错误含全部诊断。
-9. rule/card/skill surface 原样重抛 fatal；失败后 state hash、TriggerSystem event ID/rule limits、runtime cursor、日志均恢复。
-10. pending 挂起/恢复/取消/异常：不保存 queue，同一重放 attempt 不重置预算，轨迹/hash 不重复不丢失。
-11. 重建两个 `game-engine.js`，同 fixture 比较 Node/browser 轨迹、结果、错误和 hash。
-12. 聚焦 Vitest、受影响模块、完整 `npm.cmd test`、`npm.cmd run typecheck`、`npm.cmd run lint`、`npm.cmd run check:encoding`、`git diff --check`、`npm.cmd run check:main-baseline`。
-13. 未参与实现的独立 AI/人工依据原始合同审查；必要的双玩家 Electron 候选版本人工验收。
+9. rule/card/skill surface 原样重抛 fatal；attached batch 与 idle chain 的 rule/skill/reactive-card 缺失、解析和编译失败均 fail closed；detached nullable 兼容；失败后 state hash、TriggerSystem event ID/rule limits、runtime cursor、日志均恢复。
+10. pending 挂起/恢复/取消/异常：不保存 queue；SkillCode catch `dealDamage` 和 RuleCode catch nested `fireEvent` 都不能吞掉 pending；resume 恰好结算一次，同一重放 attempt 不重置预算，轨迹/hash 不重复不丢失。
+11. PostgreSQL/Colyseus 边界：两个独立 Room context 不共享 rules/cache/chain；direct、`structuredClone`、JSON round-trip 后相同 action/seed 的结果、轨迹和第二个连续动作一致；真实 `dispatchRoomBattleAction` 和实际 Colyseus `BattleRoom` 中 attached EffectChain fatal 只保存 rejected receipt，不推进 authority version、不提交 transition，随后正常 action 仍可提交；pending 不持久化 ledger。
+12. 重建两个 `game-engine.js`，同 fixture 比较 Node/browser 轨迹、结果、错误和 hash。
+13. 聚焦 Vitest、RED-160 authority/Colyseus 回归、受影响模块、完整 `npm.cmd test`、`npm.cmd run typecheck`、`npm.cmd run lint`、`npm.cmd run check:encoding`、`git diff --check`、`npm.cmd run check:main-baseline`。
+14. 未参与实现的独立 AI/人工依据原始合同审查；必要的双玩家 Electron 候选版本人工验收。
 
 ### 实现证据（2026-08-31）
 
@@ -349,7 +375,7 @@ RED-139 只申请迁移：
 | Demon stored restore | pre `42d32c426d61e7a12fd89c81bf7646ff83ebb9a29f6548d75ad98c05d1597c34`；action `696762c7b3113fb7c65dce2b5711a92803223d2dd3fb12d54bbefed0cbfa5061` | `45e8c15e0618f0dd1304c98dd99a2ef60663356bc09f626182e4b39d648f8c15` / `f284f3462e2d7f393478ce8b1a7f71dfd4eade570b737c254056bf096bad3c58` | `3b801c4a1540501fdbe313866f9bfd626325290e782c80450f6573cf8fe5d047` / `aa70e28c131ca62a3c06dc33a59721c076ec515b5eca2f03b683c95d3b35652e` | 最终 KJ identity/HP/skills/status、anchor HP/attack、AP/hand/discard 不变；extension 在 before 仍存在，统一 Commit 删除，after 才能观察 on-board。 |
 | Demon fallback create | pre `cf21fcd2b4db666812f04218ae615191899d9c961a528fb1345f5dfd457fb99c`；action `14a8b69077d6c13972431bbbe852ca72d180d430af0f4f3a2c0a1decdd91705f` | `b88e743b946f0b332cd0180bab2f590c67bc35d318606b9498fa16bc2cc65132` / `39192ec19b28605d8a7fc3f21618b10682223f94cdd04bf6584254c258116809` | `a23fb6e99fb52c52c53c67a87959afa83e6370ba7c227468e167dff8e332a2d1` / `06a7f0412391b3f9628524de56690a9cb4c417da0f6d516d8c1c9768706026ce` | 生成 ID `kiljaedan-player-red-1000000`、最终棋子投影和 damage → attack +1 → summon 顺序不变；新增 sealed Summon lifecycle 与 batch 元数据。 |
 
-Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5ff1fe3ac6dbf343e16a` 变为 `365b5933c52697d60fc3e7395da1d5ef8261e97a3879b93ad0d594d76fca38df`；Naruto 与两个 Demon 场景的 action-message hash 不变。重建的两个浏览器 bundle 字节相同，SHA-256 均为 `AF29311776B2F51D284E7DB09FA6438E98554DF0AFFC42977F8D49760F500652`。
+Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5ff1fe3ac6dbf343e16a` 变为 `365b5933c52697d60fc3e7395da1d5ef8261e97a3879b93ad0d594d76fca38df`；Naruto 与两个 Demon 场景的 action-message hash 不变。基于 RED-160 集成基线重建的两个浏览器 bundle 字节相同，SHA-256 均为 `D44062396B5D380852D3DD31171AA30BEE0633BD81F8B54210909AE6903D70E2`。
 
 ## 回退方式
 
@@ -364,10 +390,10 @@ Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5f
 
 ## 人工批准记录
 
-项目负责人于 2026-08-31 明确批准以下完整方案；批准后已先同步更新 RED-139 Linear 验收项 2、`base_sha` 与 `allowed_paths`：
+项目负责人于 2026-08-31 明确批准以下完整方案；批准后已先同步更新 RED-139 Linear 验收项 2、初始 `base_sha` 与 `allowed_paths`：
 
 1. 只有 Damage、Heal、Summon、Death 可声明 Batch；
-2. 接受第 11 节的单目标兼容限定，并授权批准后先同步更新 RED-139 Linear 验收项 2；
+2. 接受第 12 节的单目标兼容限定，并授权批准后先同步更新 RED-139 Linear 验收项 2；
 3. 根动作唯一 chain 的 `idle`/`processing` 重入边界和跨类型共享 FIFO；
 4. Damage/Heal 生命周期同时拥有 damage/heal writer，以及 content-bound summon 能力矩阵；
 5. Heal blocked/Commit/after 顺序；
@@ -378,9 +404,10 @@ Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5f
 10. attached invalid 与 queued Summon blocked 导致根动作完整回滚；
 11. 动作级 20 depth / 100 batches / 1000 dispatches 与 fatal error 穿透；
 12. pending 重放、TriggerSystem 事务快照、进程外测试 recorder 与无协议字段变化；
-13. 三个且仅三个数据迁移点、排除项、允许路径，以及旧回放/日志/state hash 证据方式。
+13. 三个且仅三个数据迁移点、排除项、允许路径，以及旧回放/日志/state hash 证据方式；
+14. 在 RED-139 当前任务内直接兼容 PostgreSQL + Colyseus：不另开任务、不引入引擎依赖、不改 DB schema/网络协议；采用每房间 `RuleExecutionContext`、普通 JSON BattleState、成功规则归约后才提交 authority transition，pending 从根 pre-state 重放且不序列化 EffectChain。该补充已同步 Linear，并在 RED-160 合入后 rebase 到集成基线 `8902c0da94957fdb52d142363c2c45a2ebda7a7f`。
 
-未收到明确批准且未同步 Linear 兼容限定前，RED-139 停留在 ADR 阶段。
+上述技术方案与 PostgreSQL + Colyseus 兼容补充均已获得明确批准并同步 Linear；实现完成后仍需独立审查与人工验收，不得自行合并或发布。
 
 ## 相关资料
 
@@ -392,6 +419,7 @@ Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5f
 - `docs/decisions/ADR-0011-authoritative-terminal-settlement.md`。
 - `docs/decisions/ADR-0015-authoritative-pending-interaction-lifecycle.md`。
 - `docs/decisions/ADR-0016-trace-v2-recorded-state-replay.md`。
+- `docs/qa/RED-160-colyseus-postgresql-vertical-slice.md`。
 - `docs/technical/DAMAGE_PIPELINE.md`。
 - `docs/technical/COMBAT_EVENT_PIPELINE_AUDIT.md`。
 - `docs/technical/COMBAT_TRIGGER_ATOMICITY_CONTRACT.md`。

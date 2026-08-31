@@ -1,6 +1,9 @@
 import { BattleRuleError } from './battle-types'
 import type { Faction, PieceInstance } from './piece'
-import { isSuspendableActionPending } from './suspendable-action-transaction'
+import {
+  isSuspendableActionPending,
+  type SuspendableActionPending,
+} from './suspendable-action-transaction'
 
 export const EFFECT_BATCH_KINDS = ['damage', 'heal', 'summon', 'death'] as const
 
@@ -186,6 +189,35 @@ export const DEFAULT_EFFECT_CHAIN_LIMITS: Readonly<EffectChainLimits> = Object.f
   maxDispatches: 1000,
 })
 
+export function resolveSummonRedirectPosition(
+  context: {
+    readonly targetPosition?: unknown
+    readonly targetX?: unknown
+    readonly targetY?: unknown
+  },
+  reject: (message: string) => never,
+): { x: number; y: number } {
+  const position = context.targetPosition
+  if (!position || typeof position !== 'object' || Array.isArray(position)) {
+    reject('Summon redirect targetPosition must be a coordinate pair')
+  }
+  const positionX = (position as { x?: unknown }).x
+  const positionY = (position as { y?: unknown }).y
+  if (!Number.isSafeInteger(positionX) || !Number.isSafeInteger(positionY)) {
+    reject('Summon redirect targetPosition must contain safe integer x/y coordinates')
+  }
+
+  const targetX = context.targetX
+  const targetY = context.targetY
+  if (!Number.isSafeInteger(targetX) || !Number.isSafeInteger(targetY)) {
+    reject('Summon redirect targetX/targetY must both be safe integers')
+  }
+  if (positionX !== targetX || positionY !== targetY) {
+    reject('Summon redirect targetPosition and targetX/targetY must agree')
+  }
+  return { x: positionX as number, y: positionY as number }
+}
+
 export interface EffectBatchIdInput {
   readonly actionId: string
   readonly chainId: string
@@ -306,14 +338,26 @@ export class EffectChainFatalError extends BattleRuleError {
 }
 
 export function isEffectChainFatalError(error: unknown): error is EffectChainFatalError {
-  if (error instanceof EffectChainFatalError) return true
-  if (!error || typeof error !== 'object') return false
-  const candidate = error as { name?: unknown; code?: unknown; context?: unknown }
-  return candidate.name === 'EffectChainFatalError'
-    && typeof candidate.code === 'string'
-    && candidate.code.startsWith('RVB_EFFECT_CHAIN_')
-    && !!candidate.context
-    && typeof candidate.context === 'object'
+  try {
+    if (error instanceof EffectChainFatalError) return true
+    if (!error || typeof error !== 'object') return false
+    const candidate = error as { name?: unknown; code?: unknown; context?: unknown }
+    return candidate.name === 'EffectChainFatalError'
+      && typeof candidate.code === 'string'
+      && candidate.code.startsWith('RVB_EFFECT_CHAIN_')
+      && !!candidate.context
+      && typeof candidate.context === 'object'
+  } catch {
+    return false
+  }
+}
+
+export function isEffectChainPendingSignal(error: unknown): error is SuspendableActionPending {
+  try {
+    return isSuspendableActionPending(error)
+  } catch {
+    return false
+  }
 }
 
 
@@ -374,6 +418,8 @@ export interface EffectChainSnapshot {
   readonly nextBatchSequence: number
   readonly batchStack: readonly EffectBatchContext[]
   readonly records: readonly EffectChainRecord[]
+  /** Process-local control flow only; never persisted as BattleState. */
+  readonly pendingSignal?: SuspendableActionPending
 }
 
 export interface EffectHandlerResultMap {
@@ -530,6 +576,7 @@ export class EffectChain {
   private dispatchCount = 0
   private currentState: EffectChainState = 'idle'
   private firstFatal?: EffectChainFatalError
+  private firstPending?: SuspendableActionPending
 
   constructor(input: EffectChainOptions) {
     const options = normalizeOptions(input)
@@ -573,8 +620,25 @@ export class EffectChain {
     return this.firstFatal
   }
 
+  latchPending(error: SuspendableActionPending): SuspendableActionPending {
+    this.firstPending ??= error
+    return this.firstPending
+  }
+
   assertHealthy(): void {
     if (this.firstFatal) throw this.firstFatal
+    if (this.firstPending) throw this.firstPending
+  }
+
+  /**
+   * Marks the exact latched suspension as handled by the root transaction.
+   * A different pending signal cannot supersede the first one observed by the
+   * chain, preserving deterministic replay order.
+   */
+  acknowledgePending(error: SuspendableActionPending): void {
+    if (!this.firstPending) return
+    if (this.firstPending !== error) throw this.firstPending
+    this.firstPending = undefined
   }
 
   captureWriterBinding(): EffectWriterBinding {
@@ -688,9 +752,12 @@ export class EffectChain {
       const failedBatch = [...failedRecords]
         .reverse()
         .find(record => record.type === 'batch:start')
+      const pendingFailure = !this.detached && isEffectChainPendingSignal(error)
+        ? error
+        : undefined
       const failure = isEffectChainFatalError(error)
         ? this.latchFatal(error)
-        : this.detached || isSuspendableActionPending(error)
+        : this.detached || isEffectChainPendingSignal(error)
           ? error
           : this.fatal(
               'RVB_EFFECT_CHAIN_BATCH_REJECTED',
@@ -702,6 +769,7 @@ export class EffectChain {
               error,
             )
       this.restore(checkpoint)
+      if (pendingFailure) this.latchPending(pendingFailure)
       this.recordLog = failedRecords
       throw failure
     } finally {
@@ -789,6 +857,7 @@ export class EffectChain {
       nextBatchSequence: this.nextBatchSequence,
       batchStack: Object.freeze(this.batchStack.slice()),
       records: Object.freeze(this.recordLog.slice()),
+      pendingSignal: this.firstPending,
     })
   }
 
@@ -800,6 +869,7 @@ export class EffectChain {
       || snapshot.chainId !== this.chainId
       || snapshot.detached !== this.detached
       || (snapshot.state !== 'idle' && snapshot.state !== 'processing')
+      || (snapshot.pendingSignal !== undefined && !isEffectChainPendingSignal(snapshot.pendingSignal))
     ) {
       throw this.fatal(
         'RVB_EFFECT_CHAIN_SNAPSHOT_INVALID',
@@ -820,6 +890,7 @@ export class EffectChain {
     this.batchStack = [...snapshot.batchStack]
     this.recordLog = [...snapshot.records]
     this.currentState = snapshot.state
+    this.firstPending = snapshot.pendingSignal
   }
 
   private executeQueued<TResult extends EffectHandlerResultMap>(
@@ -949,7 +1020,7 @@ export class EffectChain {
       return execute(context)
     } catch (error) {
       if (isEffectChainFatalError(error)) throw this.latchFatal(error)
-      if (this.detached || isSuspendableActionPending(error)) throw error
+      if (this.detached || isEffectChainPendingSignal(error)) throw error
       throw rejectEffectBatch(
         this,
         context,
@@ -1094,8 +1165,9 @@ function bindWriter<TInput, TRequest extends EffectRequest>(
         chain.enqueueMany(requests, binding)
         return chain.pendingCount
       } catch (error) {
-        if (isEffectChainFatalError(error)) throw error
+        const fatal = isEffectChainFatalError(error)
         chain.restore(checkpoint)
+        if (fatal) throw chain.latchFatal(error as EffectChainFatalError)
         throw effectWriterFatal(
           chain,
           binding,
@@ -1421,8 +1493,8 @@ function parseStoredPieceCapability(
     'stored-or-declared-piece maxSummons',
     { integer: true, minimum: 1 },
   )
-  if (maxSummons > 16) {
-    capabilityError('stored-or-declared-piece maxSummons exceeds the sealed collection limit')
+  if (maxSummons !== 1) {
+    capabilityError('stored-or-declared-piece maxSummons must be exactly 1')
   }
   return Object.freeze({
     version: 1 as const,
@@ -1435,9 +1507,11 @@ function parseStoredPieceCapability(
 }
 
 const TRUSTED_DECLARED_SUMMON_CAPABILITIES = new WeakSet<object>()
+const DECLARED_SUMMON_CAPABILITY_CONTENT_IDS = new WeakMap<object, string>()
 
 function parseSummonCapability(
   value: unknown,
+  contentId: string,
 ): DeclaredSummonCapability {
   if (!isRuntimeRecord(value)) {
     capabilityError('summonCapability must be a plain object')
@@ -1448,6 +1522,7 @@ function parseSummonCapability(
     : value.recipe === 'stored-or-declared-piece'
       ? parseStoredPieceCapability(value)
       : capabilityError('summonCapability.recipe is not supported')
+  DECLARED_SUMMON_CAPABILITY_CONTENT_IDS.set(capability, contentId)
   TRUSTED_DECLARED_SUMMON_CAPABILITIES.add(capability)
   return capability
 }
@@ -1456,6 +1531,14 @@ export function isTrustedDeclaredSummonCapability(
   value: unknown,
 ): value is DeclaredSummonCapability {
   return isRuntimeRecord(value) && TRUSTED_DECLARED_SUMMON_CAPABILITIES.has(value)
+}
+
+export function isDeclaredSummonCapabilityBoundToContent(
+  value: unknown,
+  contentId: string,
+): value is DeclaredSummonCapability {
+  return isTrustedDeclaredSummonCapability(value)
+    && DECLARED_SUMMON_CAPABILITY_CONTENT_IDS.get(value) === contentId
 }
 
 function templateSummonSpecError(value: unknown): string | undefined {
@@ -1549,8 +1632,9 @@ export function createSummonQueueWriter(
         chain.enqueueMany(requests, binding)
         return chain.pendingCount
       } catch (error) {
-        if (isEffectChainFatalError(error)) throw error
+        const fatal = isEffectChainFatalError(error)
         chain.restore(checkpoint)
+        if (fatal) throw chain.latchFatal(error as EffectChainFatalError)
         throw effectWriterFatal(
           chain,
           binding,
@@ -1612,7 +1696,7 @@ export function createDeclaredSummonQueueWriter(
   let capability: DeclaredSummonCapability
   try {
     if (!contentId) capabilityError('Declared summon contentId must be non-empty')
-    capability = parseSummonCapability(declaration)
+    capability = parseSummonCapability(declaration, contentId)
   } catch (error) {
     throw effectWriterFatal(
       chain,
@@ -1661,8 +1745,9 @@ export function createDeclaredSummonQueueWriter(
         chain.enqueueMany(requests, binding)
         return chain.pendingCount
       } catch (error) {
-        if (isEffectChainFatalError(error)) throw error
+        const fatal = isEffectChainFatalError(error)
         chain.restore(checkpoint)
+        if (fatal) throw chain.latchFatal(error as EffectChainFatalError)
         throw effectWriterFatal(
           chain,
           binding,

@@ -51,6 +51,25 @@ const SOURCE_MIRROR_CAPABILITY = {
   },
 } as const
 
+const STORED_PIECE_CAPABILITY = {
+  version: 1,
+  recipe: 'stored-or-declared-piece',
+  maxSummons: 1,
+  storageExtensionKey: 'storedUniquePiece',
+  uniqueTemplateId: 'unique-piece',
+  fallback: {
+    instanceIdPrefix: 'unique-piece-',
+    templateId: 'unique-piece',
+    name: 'Unique Piece',
+    faction: 'red',
+    maxHp: 10,
+    attack: 2,
+    defense: 1,
+    moveRange: 3,
+    skills: [{ skillId: 'unique-piece-skill', level: 1, currentCooldown: 0 }],
+  },
+} as const
+
 // @ts-expect-error ADR-0022 intentionally rejects non-whitelisted effect kinds.
 const forbiddenKind: EffectRequest = { kind: 'move' }
 void forbiddenKind
@@ -141,6 +160,29 @@ describe('RED-139 EffectChain core scheduler', () => {
     expect(() => chain({ limits: { maxDispatches: 1001 } })).toThrow(BattleRuleError)
   })
 
+
+  it('rejects a stored unique-piece capability that declares more than one summon', () => {
+    const effectChain = chain()
+    const before = effectChain.snapshot()
+    let caught: any
+
+    try {
+      createDeclaredSummonQueueWriter(effectChain, 'stored-unique-probe', {
+        ...STORED_PIECE_CAPABILITY,
+        maxSummons: 2,
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_SUMMON_CAPABILITY',
+      context: expect.objectContaining({ kind: 'summon', skillId: 'stored-unique-probe' }),
+    })
+    expect(caught.cause?.message).toContain('maxSummons must be exactly 1')
+    expect(effectChain.snapshot()).toEqual(before)
+  })
   it('rejects an unknown kind before ID allocation or scheduler mutation', () => {
     const createBatchId = vi.fn(() => 'should-not-run')
     const effectChain = chain({ createBatchId })

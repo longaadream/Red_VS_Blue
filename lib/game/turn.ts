@@ -28,7 +28,7 @@ function writeLog(message: string) {
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats, PieceStatusTag } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, drainBattleEffectChain, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
+import { dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
 import { globalTriggerSystem, type TriggerContext, type TriggerResult, type TriggerRule } from "./triggers"
 import {
   EffectChainFatalError,
@@ -39,6 +39,8 @@ import {
   getActiveEffectChain,
   installEffectChain,
   isEffectChainFatalError,
+  isEffectChainPendingSignal,
+  resolveSummonRedirectPosition,
   uninstallEffectChain,
   type EffectBatchContext,
   type EffectChain,
@@ -61,7 +63,6 @@ const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTrigger
 import {
   SUSPENDABLE_ACTION_TRANSACTION_PROTOCOL_VERSION,
   SuspendableActionRuntime,
-  isSuspendableActionPending,
   withSuspendableActionRuntime,
   type SuspendableActionTransaction,
   type SuspendableInteractionInput,
@@ -98,6 +99,63 @@ import {
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 
+function restorePersistedRuleRuntime(
+  state: BattleState,
+  reloadedRule: TriggerRule,
+  persistedRule: any,
+  sourceId: string,
+): TriggerRule {
+  const persistedLimits = persistedRule?.limits
+  if (persistedLimits === undefined) return reloadedRule
+  if (!persistedLimits || typeof persistedLimits !== 'object' || Array.isArray(persistedLimits)) {
+    rethrowAttachedEffectContentError(
+      state,
+      new Error(`Rule ${reloadedRule.id} has invalid persisted limits`),
+      `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+      { sourceId, skillId: reloadedRule.id },
+    )
+    return reloadedRule
+  }
+
+  const runtimeKeys = ['uses', 'currentCooldown', 'remainingDuration'] as const
+  const values: Partial<Record<(typeof runtimeKeys)[number], number | undefined>> = {}
+  for (const key of runtimeKeys) {
+    if (!Object.prototype.hasOwnProperty.call(persistedLimits, key)) continue
+    const value = persistedLimits[key]
+    const minimum = key === 'remainingDuration' ? -1 : 0
+    if (
+      value !== undefined
+      && (!Number.isSafeInteger(value) || Number(value) < minimum)
+    ) {
+      rethrowAttachedEffectContentError(
+        state,
+        new Error(`Rule ${reloadedRule.id} has invalid persisted ${key}`),
+        `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+        { sourceId, skillId: reloadedRule.id },
+      )
+      return reloadedRule
+    }
+    values[key] = value
+  }
+  if (Object.keys(values).length === 0) return reloadedRule
+  if (!reloadedRule.limits) {
+    rethrowAttachedEffectContentError(
+      state,
+      new Error(`Rule ${reloadedRule.id} persisted runtime has no profile limits`),
+      `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+      { sourceId, skillId: reloadedRule.id },
+    )
+    return reloadedRule
+  }
+  return {
+    ...reloadedRule,
+    limits: {
+      ...reloadedRule.limits,
+      ...values,
+    },
+  }
+}
+
 // ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
 function restorePieceRules(state: BattleState): void {
   state.pieces.forEach(piece => {
@@ -109,15 +167,17 @@ function restorePieceRules(state: BattleState): void {
     // 1. 恢复现有规则（全量替换，确保 trigger/effect 都是最新版本）
     if (piece.rules.length > 0) {
       piece.rules = piece.rules.map((rule: any) => {
-        if (rule.id) {
-          try {
-            const reloadedRule = loadRuleById(rule.id, FORCE_RULE_RELOAD)
-            if (reloadedRule && typeof reloadedRule.effect === 'function') {
-              return reloadedRule
-            }
-          } catch {
-            // 忽略规则重载错误
-          }
+        const ruleId = typeof rule?.id === 'string' ? rule.id : ''
+        const reloadedRule = loadRuleForBattle(state, ruleId, {
+          sourceId: piece.instanceId,
+        })
+        if (reloadedRule && typeof reloadedRule.effect === 'function') {
+          return restorePersistedRuleRuntime(
+            state,
+            reloadedRule,
+            rule,
+            piece.instanceId,
+          )
         }
         return rule
       })
@@ -127,19 +187,28 @@ function restorePieceRules(state: BattleState): void {
     if (piece.statusTags && piece.statusTags.length > 0) {
       piece.statusTags.forEach((statusTag: any) => {
         // 检查状态标签是否有关联的规则
-        if (statusTag.relatedRules && statusTag.relatedRules.length > 0) {
-          statusTag.relatedRules.forEach((ruleId: string) => {
+        const relatedRules = statusTag.relatedRules
+        if (relatedRules !== undefined && !Array.isArray(relatedRules)) {
+          rethrowAttachedEffectContentError(
+            state,
+            new Error(`Status ${String(statusTag?.id || '<unknown>')} has invalid relatedRules`),
+            'Status relatedRules could not hydrate during an EffectChain',
+            { sourceId: piece.instanceId },
+          )
+          return
+        }
+        if (Array.isArray(relatedRules) && relatedRules.length > 0) {
+          relatedRules.forEach((rawRuleId: unknown) => {
+            const ruleId = typeof rawRuleId === 'string' ? rawRuleId : ''
             // 检查规则是否已存在
             const existingRule = piece.rules!.find((r: any) => r.id === ruleId)
             if (!existingRule) {
               // 规则不存在，重新添加
-              try {
-                const reloadedRule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
-                if (reloadedRule && typeof reloadedRule.effect === 'function') {
-                  piece.rules!.push(reloadedRule)
-                }
-              } catch {
-                // 忽略规则重载错误
+              const reloadedRule = loadRuleForBattle(state, ruleId, {
+                sourceId: piece.instanceId,
+              })
+              if (reloadedRule && typeof reloadedRule.effect === 'function') {
+                piece.rules!.push(reloadedRule)
               }
             }
           })
@@ -164,18 +233,43 @@ function restorePlayerRules(state: BattleState): void {
     // 恢复现有规则（全量替换，确保 trigger/effect 都是最新版本）
     if (player.rules.length > 0) {
       player.rules = player.rules.map((rule: any) => {
-        if (rule.id) {
-          try {
-            const reloadedRule = loadRuleById(rule.id, FORCE_RULE_RELOAD)
-            if (reloadedRule && typeof reloadedRule.effect === 'function') {
-              return reloadedRule
-            }
-          } catch {
-            // 忽略规则重载错误
-          }
+        const ruleId = typeof rule?.id === 'string' ? rule.id : ''
+        const reloadedRule = loadRuleForBattle(state, ruleId, {
+          sourceId: player.playerId,
+        })
+        if (reloadedRule && typeof reloadedRule.effect === 'function') {
+          return restorePersistedRuleRuntime(
+            state,
+            reloadedRule,
+            rule,
+            player.playerId,
+          )
         }
         return rule
       })
+    }
+
+    for (const statusTag of (player as any).statusTags || []) {
+      const relatedRules = statusTag?.relatedRules
+      if (relatedRules !== undefined && !Array.isArray(relatedRules)) {
+        rethrowAttachedEffectContentError(
+          state,
+          new Error(`Player status ${String(statusTag?.id || '<unknown>')} has invalid relatedRules`),
+          'Player status relatedRules could not hydrate during an EffectChain',
+          { sourceId: player.playerId },
+        )
+        continue
+      }
+      for (const rawRuleId of relatedRules || []) {
+        const ruleId = typeof rawRuleId === 'string' ? rawRuleId : ''
+        if (player.rules.some((rule: any) => rule.id === ruleId)) continue
+        const reloadedRule = loadRuleForBattle(state, ruleId, {
+          sourceId: player.playerId,
+        })
+        if (reloadedRule && typeof reloadedRule.effect === 'function') {
+          player.rules.push(reloadedRule)
+        }
+      }
     }
   })
 }
@@ -550,10 +644,23 @@ function validateMove(
   if (rejection) throw new BattleRuleError(rejection.message)
 }
 
-function getSkillDefinitionOrThrow(state: BattleState, skillId: string): SkillDefinition {
-  const skillDef = state.skillsById[skillId] || getSkillById(skillId)
+function getSkillDefinitionOrThrow(
+  state: BattleState,
+  skillId: string,
+  sourceId?: string,
+): SkillDefinition {
+  const requestedSkillId = typeof skillId === 'string' ? skillId : ''
+  const activeChain = getActiveEffectChain(state)
+  const candidate = requestedSkillId
+    ? state.skillsById?.[requestedSkillId]
+      || ((!activeChain || activeChain.detached) ? getSkillById(requestedSkillId) : undefined)
+    : undefined
+  const skillDef = loadSkillForBattle(state, requestedSkillId, candidate, {
+    requireExecutable: true,
+    metadata: { sourceId, skillId: requestedSkillId },
+  })
   if (!skillDef) {
-    throw new BattleRuleError(`Skill ${skillId} not found`)
+    throw new BattleRuleError(`Skill ${requestedSkillId || '<empty>'} not found`)
   }
   return skillDef
 }
@@ -612,7 +719,7 @@ function validateSkillActionBasics(
   action: { targetPieceId?: string; targetX?: number; targetY?: number },
   isChargeAction: boolean,
 ): SkillDefinition {
-  const skillDef = getSkillDefinitionOrThrow(state, skillId)
+  const skillDef = getSkillDefinitionOrThrow(state, skillId, piece.instanceId)
   const playerMeta = getPlayerMeta(state, playerId)
   const isChargeSkill = (skillDef.chargeCost ?? 0) > 0
   if (isChargeAction !== isChargeSkill) {
@@ -966,6 +1073,44 @@ type InternalContinuation = {
   skipBeforeCardPlay?: boolean
 }
 
+function assertAttachedActionDefinitionBeforeTargeting(
+  state: BattleState,
+  action: BattleAction,
+): void {
+  const chain = getActiveEffectChain(state)
+  if (!chain || chain.detached) return
+  if (
+    action.type !== 'useBasicSkill'
+    && action.type !== 'useChargeSkill'
+    && action.type !== 'playCard'
+  ) return
+  if (typeof action.playerId !== 'string' || action.playerId.length === 0) return
+  if (state.turn.phase !== 'action' || !isCurrentPlayer(state, action.playerId)) return
+
+  if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
+    const piece = state.pieces.find(candidate => (
+      candidate.instanceId === action.pieceId
+      && candidate.currentHp > 0
+      && isSamePlayer(candidate.ownerPlayerId, action.playerId)
+    ))
+    if (!piece) return
+    getSkillDefinitionOrThrow(state, action.skillId, piece.instanceId)
+    return
+  }
+
+  if (action.type !== 'playCard') return
+  const player = state.players.find(candidate => isSamePlayer(candidate.playerId, action.playerId))
+  const card = player?.hand?.find(candidate => candidate.instanceId === action.cardInstanceId)
+  if (!card) return
+  loadCardForBattle(state, card.cardId, {
+    forceReload: true,
+    metadata: {
+      sourceId: card.instanceId,
+      skillId: card.cardId,
+    },
+  })
+}
+
 function applyBattleActionInternal(
   state: BattleState,
   action: BattleAction,
@@ -998,6 +1143,7 @@ function applyBattleActionInternal(
   // RED-59: all target discovery and final target validation happen before
   // cloning, triggers, payment, logging, or effect execution.
   if (action.type !== 'surrender' && !isTimerCommand && !continuation.skipTargetingValidation) {
+    assertAttachedActionDefinitionBeforeTargeting(state, action)
     assertActionTargetingReady(state, action)
   }
   const validatedPendingTargets = action.type === 'pendingTargetSelect'
@@ -2122,7 +2268,7 @@ function applyBattleActionInternal(
 
       // 优先使用战局中已加载的技能定义，回退到模块缓存
       // 使用触发器可能修改后的技能ID
-      let skillDef = next.skillsById[finalSkillId] || getSkillById(finalSkillId)
+      const skillDef = getSkillDefinitionOrThrow(next, finalSkillId, piece.instanceId)
 
       // 检查行动点是否足够
       const playerMeta = getPlayerMeta(state, action.playerId)
@@ -2386,26 +2532,7 @@ function applyBattleActionInternal(
       // 触发器可能修改了技能ID，使用修改后的值
       const finalSkillId = skillUseContext.skillId;
 
-      let skillDef = next.skillsById[finalSkillId]
-
-      // 如果技能定义找不到，使用默认技能定义
-      if (!skillDef) {
-        skillDef = {
-          id: finalSkillId,
-          name: finalSkillId,
-          description: "Default skill",
-          kind: "active",
-          type: "super",
-          cooldownTurns: 0,
-          maxCharges: 0,
-          chargeCost: 1,
-          powerMultiplier: 1,
-          code: "function executeSkill(context) { return { message: 'Skill executed', success: true } }",
-          range: "self",
-          requiresTarget: false,
-          actionPointCost: 2
-        }
-      }
+      const skillDef = getSkillDefinitionOrThrow(next, finalSkillId, piece.instanceId)
 
       // 检查行动点是否足够
       const playerMeta = getPlayerMeta(state, action.playerId)
@@ -2888,7 +3015,7 @@ function applyBattleActionInternal(
             payload: pending.payload,
           }) || { success: true }
         } catch (execErr) {
-          if (isSuspendableActionPending(execErr)) throw execErr
+          if (isEffectChainPendingSignal(execErr)) throw execErr
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))
         }
       }
@@ -2924,8 +3051,14 @@ function applyBattleActionInternal(
       if (cardIdx === -1) throw new BattleRuleError("手牌中找不到该卡牌")
       const cardInstance = playerMeta.hand[cardIdx]
 
-      // 加载卡牌定义（先查文件，再查战局自定义卡）
-      const cardDef = loadCardById(cardInstance.cardId, true) ?? next.customCards?.[cardInstance.cardId] ?? null
+      // 权威链会对静态或自定义定义执行结构校验；detached 调用仍保留 soft-null。
+      const cardDef = loadCardForBattle(next, cardInstance.cardId, {
+        forceReload: true,
+        metadata: {
+          sourceId: cardInstance.instanceId,
+          skillId: cardInstance.cardId,
+        },
+      })
       if (!cardDef) throw new BattleRuleError(`卡牌定义找不到: ${cardInstance.cardId}`)
       if (cardDef.type !== 'active' && cardDef.type !== 'reactive') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
 
@@ -3387,6 +3520,11 @@ function runSuspendableActionTransaction(
       directTargetStage += 1
       directTarget = reduced.pendingTargetSelection
     }
+    // A content-authored catch block must not turn a suspended nested
+    // EffectBatch into a successful authoritative action. Re-raise any
+    // process-local chain signal while the suspendable transaction can still
+    // convert it into a root-prestate pending session.
+    activeEffectChain?.assertHealthy()
     transactionRuntime.assertReplayComplete()
     return reduced
   })
@@ -3413,7 +3551,8 @@ function runSuspendableActionTransaction(
       replayRuleRuntime.restore(replayRuleRuntimeSnapshot)
     }
     triggerSystem.restoreTransactionState(triggerSnapshot)
-    if (!isSuspendableActionPending(error)) throw error
+    if (!isEffectChainPendingSignal(error)) throw error
+    activeEffectChain?.acknowledgePending(error)
     const rootActionType = (transaction.rootAction as { type?: string } | undefined)?.type
     const shouldAutoResolveTimeout = rootActionType === 'turnTimeout'
       && error.key.eventType === 'endTurn'
@@ -3824,6 +3963,7 @@ function cloneTemplateStatus(status: TemplateSummonStatus): PieceStatusTag {
 }
 
 function prepareTemplatePiece<TTemplate extends TemplateSummonSource>(
+  battle: BattleState,
   entry: IndexedTemplateSummon<TTemplate>,
   dependencies: TemplateSummonBatchDependencies<TTemplate>,
   fatal: (message: string, cause?: unknown) => never,
@@ -3892,6 +4032,8 @@ function prepareTemplatePiece<TTemplate extends TemplateSummonSource>(
     else piece.rules.push(loadedRule)
   }
 
+  hydratePreparedPieceDefinitions(battle, piece, fatal)
+
   return {
     ...entry,
     piece,
@@ -3932,21 +4074,6 @@ function summonTriggerContext(
     effectDepth: context.depth,
     effectEnqueueSequence: context.enqueueSequence,
     originStage: context.originStage,
-  }
-}
-
-function resolvedPosition(
-  triggerContext: TriggerContext,
-  initialX: number,
-  initialY: number,
-): { x: number; y: number } {
-  const position = triggerContext.targetPosition
-  const positionChanged = position
-    && (position.x !== initialX || position.y !== initialY)
-  if (positionChanged) return { x: position.x, y: position.y }
-  return {
-    x: triggerContext.targetX ?? initialX,
-    y: triggerContext.targetY ?? initialY,
   }
 }
 
@@ -4018,7 +4145,7 @@ export function resolveTemplateSummonBatch<TTemplate extends TemplateSummonSourc
       return { ...entry, template: resolvedTemplate }
     })
 
-    const prepared = validated.map(entry => prepareTemplatePiece(entry, dependencies, fatal))
+    const prepared = validated.map(entry => prepareTemplatePiece(battle, entry, dependencies, fatal))
     const existingIds = new Set([
       ...battle.pieces.map(piece => piece.instanceId),
       ...(battle.graveyard ?? []).map(piece => piece.instanceId),
@@ -4063,7 +4190,10 @@ export function resolveTemplateSummonBatch<TTemplate extends TemplateSummonSourc
         fatal('Queued template summon was blocked: ' + message)
       }
 
-      const finalPosition = resolvedPosition(beforePieceSummonedContext, entry.finalX, entry.finalY)
+      const finalPosition = resolveSummonRedirectPosition(
+        beforePieceSummonedContext,
+        fatal,
+      )
       entry.finalX = finalPosition.x
       entry.finalY = finalPosition.y
       entry.piece.x = finalPosition.x
@@ -4135,6 +4265,7 @@ export function resolveTemplateSummonBatch<TTemplate extends TemplateSummonSourc
     }
   } catch (error) {
     restoreTransaction()
+    if (isEffectChainPendingSignal(error)) throw error
     if (isEffectChainFatalError(error)) throw error
     throw templateSummonFatal(
       chain,

@@ -239,6 +239,13 @@ function makeNarutoState(): BattleState {
   const state = makeState({ pieces: [sentinelBefore, naruto, sentinelAfter], width: 6, height: 5 })
   player(state, 'player-red').actionPoints = 10
   state.skillsById['naruto-shadow-clone'] = loadProfileJson<SkillDefinition>('skills', 'naruto-shadow-clone')
+  state.skillsById['display-only-skill'] = {
+    id: 'display-only-skill',
+    name: 'Display-only passive fixture',
+    description: '',
+    kind: 'passive',
+    type: 'normal',
+  } as SkillDefinition
   return state
 }
 

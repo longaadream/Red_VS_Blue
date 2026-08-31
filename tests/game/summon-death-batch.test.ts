@@ -1,15 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RED-139 exercises data-driven rule and content surfaces */
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { runBattleAction } from '@/lib/game/battle-runner'
 import { hashBattleState } from '@/lib/game/battle-trace'
 import {
   createEffectChain,
+  createDeclaredSummonQueueWriter,
   createInternalDeathQueueWriter,
   createSummonQueueWriter,
+  getActiveEffectChain,
   withEffectChain,
 } from '@/lib/game/effect-batch'
-import { dealDamage, drainBattleEffectChain } from '@/lib/game/skills'
+import {
+  clearCardCache,
+  clearRuleCache,
+  clearSkillDefinitionCache,
+  dealDamage,
+  drainBattleEffectChain,
+  loadRuleById,
+} from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { summonPiece } from '@/lib/game/turn'
@@ -42,6 +54,37 @@ function eventRule(
     description: '',
     trigger: { type },
     effect: (battle: any, context: any) => ({ success: true, ...(effect(battle, context) ?? {}) }),
+  }
+}
+
+function withTemporaryRuleProfile<T>(ruleId: string, execute: () => T): T {
+  const root = mkdtempSync(join(tmpdir(), 'rvb-red139-summon-rule-'))
+  cpSync(resolve(process.cwd(), 'data'), join(root, 'data'), { recursive: true })
+  writeFileSync(
+    join(root, 'data', 'rules', `${ruleId}.json`),
+    JSON.stringify({
+      id: ruleId,
+      name: ruleId,
+      description: '',
+      trigger: { type: 'beforePieceSummoned' },
+      skillCode: "context.targetPosition = { x: 3, y: 2 }; return { success: true };",
+    }),
+    'utf8',
+  )
+  const previousProfileRoot = process.env.RVB_PROFILE_ROOT
+  process.env.RVB_PROFILE_ROOT = root
+  clearRuleCache()
+  clearCardCache()
+  clearSkillDefinitionCache()
+  try {
+    return execute()
+  } finally {
+    clearRuleCache()
+    clearCardCache()
+    clearSkillDefinitionCache()
+    if (previousProfileRoot === undefined) delete process.env.RVB_PROFILE_ROOT
+    else process.env.RVB_PROFILE_ROOT = previousProfileRoot
+    rmSync(root, { recursive: true, force: true })
   }
 }
 
@@ -404,6 +447,321 @@ describe('RED-139 SummonBatch', () => {
       expect(state.actions).toEqual([])
     },
   )
+
+  it.each(['owner-global', 'piece', 'player', 'reactive'] as const)(
+    'preserves a valid declared-summon redirect from a cloned %s rule context',
+    consumer => {
+      const ruleId = 'red139-valid-redirect-' + consumer
+      const run = () => {
+        const { state, anchor, red } = makeDemonSummonState()
+        if (consumer === 'reactive') {
+          red.hand.push({
+            cardId: 'red139-redirect-reactive',
+            instanceId: 'red139-redirect-reactive-1',
+            ownerPlayerId: 'player-red',
+          })
+          state.customCards = {
+            'red139-redirect-reactive': {
+              id: 'red139-redirect-reactive',
+              name: 'RED-139 redirect reactive',
+              description: '',
+              type: 'reactive',
+              actionPointCost: 0,
+              trigger: { type: 'beforePieceSummoned' },
+              code: "function executeCard(context) { context.targetPosition = { x: 3, y: 2 }; return { success: true, keepInHand: true }; }",
+            },
+          }
+        } else {
+          const rule = loadRuleById(ruleId, true)
+          expect(rule).toBeDefined()
+          if (consumer === 'owner-global') {
+            anchor.rules = [rule]
+            globalTriggerSystem.addRule(rule! as any)
+          } else if (consumer === 'piece') {
+            anchor.rules = [rule]
+          } else {
+            red.rules = [rule]
+          }
+        }
+
+        const result = runBattleAction(
+          state,
+          prepareDemonSummonAction(state, ruleId) as any,
+          { rootSeed: 13906 },
+        )
+        const summoned = result.state.pieces.find(piece => piece.templateId === 'kiljaedan')
+
+        expect(summoned).toMatchObject({ x: 3, y: 2 })
+        expect(result.state.graveyard).toEqual([])
+      }
+      if (consumer === 'reactive') run()
+      else withTemporaryRuleProfile(ruleId, run)
+    },
+  )
+
+  it('applies position aliases chronologically across successive consumers', () => {
+    const { state } = makeDemonSummonState()
+    const earlyPosition = eventRule(
+      'red139-alias-position-first',
+      'beforePieceSummoned',
+      (_battle, context) => {
+        context.targetPosition = { x: 3, y: 2 }
+      },
+    ) as any
+    earlyPosition.priority = 2
+    const lateCoordinates = eventRule(
+      'red139-alias-coordinates-last',
+      'beforePieceSummoned',
+      (_battle, context) => {
+        context.targetX = 4
+        context.targetY = 2
+      },
+    ) as any
+    lateCoordinates.priority = 1
+    globalTriggerSystem.addRules([earlyPosition, lateCoordinates])
+
+    const result = runBattleAction(
+      state,
+      prepareDemonSummonAction(state, 'red139-alias-order') as any,
+      { rootSeed: 13908 },
+    )
+    const summoned = result.state.pieces.find(piece => piece.templateId === 'kiljaedan')
+
+    expect(summoned).toMatchObject({ x: 4, y: 2 })
+  })
+
+  it('replays a real pending beforePieceSummoned redirect deterministically from the root action', () => {
+    const rootSeed = 13909
+    const observedBatchIds: string[] = []
+    const redirectRule = {
+      id: 'red139-pending-summon-redirect',
+      name: 'red139-pending-summon-redirect',
+      description: '',
+      trigger: { type: 'beforePieceSummoned' },
+      limits: { maxUses: 4, uses: 0 },
+      effect: (_battle: any, context: any) => {
+        observedBatchIds.push(context.effectBatchId)
+        const selected = context.selectedTargets?.find((target: any) => target.type === 'cell')
+        if (!selected) {
+          return {
+            success: false,
+            needsTargetSelection: true,
+            playerId: 'player-red',
+            title: 'Choose the redirected summon cell',
+            targetType: 'cell',
+            range: 99,
+            filter: 'all',
+            targetCandidates: [{ type: 'cell', x: 4, y: 2 }],
+          }
+        }
+        context.targetPosition = { x: selected.x, y: selected.y }
+        return { success: true }
+      },
+    } as any
+    globalTriggerSystem.addRule(redirectRule)
+    const contractStart = globalTriggerSystem.snapshotTransactionState()
+
+    const runContract = () => {
+      const { state } = makeDemonSummonState()
+      const action = prepareDemonSummonAction(state, 'red139-pending-summon-root')
+      const pendingResult = runBattleAction(state, action as any, { rootSeed })
+      const pending = pendingResult.state.pendingTargetSelection
+      expect(pendingResult.state.pieces.some(piece => piece.templateId === 'kiljaedan')).toBe(false)
+      expect(pendingResult.state.pieces.find(piece => piece.instanceId === 'demon-anchor'))
+        .toMatchObject({ currentHp: 20, attack: 3 })
+      expect(pendingResult.state.players.find(player => player.playerId === 'player-red'))
+        .toMatchObject({
+          actionPoints: 3,
+          hand: [{ cardId: 'demon-summon-5', instanceId: 'red139-card-5' }],
+          discardPile: [],
+        })
+      expect(pending).toMatchObject({
+        playerId: 'player-red',
+        source: { type: 'rule', id: redirectRule.id },
+        candidates: [{ type: 'cell', x: 4, y: 2 }],
+        transaction: { rootAction: { clientActionId: 'red139-pending-summon-root' } },
+      })
+
+      const completed = runBattleAction(pendingResult.state, {
+        type: 'pendingTargetSelect',
+        playerId: 'player-red',
+        targetX: 4,
+        targetY: 2,
+        selectionId: pending!.selectionId,
+        stateRevision: pending!.stateRevision,
+        clientActionId: 'red139-pending-summon-answer',
+      } as any, { rootSeed })
+      const summoned = completed.state.pieces.find(piece => piece.templateId === 'kiljaedan')
+
+      expect(completed.state.pieces.find(piece => piece.instanceId === 'demon-anchor'))
+        .toMatchObject({ currentHp: 14, attack: 4 })
+      expect(completed.state.players.find(player => player.playerId === 'player-red'))
+        .toMatchObject({ actionPoints: 0, hand: [], discardPile: ['demon-summon-5'] })
+      expect(completed.state.extensions?.kiljaedanPiece).toBeUndefined()
+
+      expect(completed.state.pendingTargetSelection).toBeUndefined()
+      expect(summoned).toMatchObject({ x: 4, y: 2 })
+      expect(redirectRule.limits).toEqual({ maxUses: 4, uses: 1 })
+      expect(getActiveEffectChain(completed.state)).toBeUndefined()
+      return {
+        stateHash: completed.stateHash,
+        randomStreams: completed.trace?.randomStreams,
+        selectionId: pending!.selectionId,
+      }
+    }
+
+    const first = runContract()
+    const firstBatchIds = observedBatchIds.splice(0)
+    globalTriggerSystem.restoreTransactionState(contractStart)
+    const control = runContract()
+    const controlBatchIds = observedBatchIds.splice(0)
+
+    expect(firstBatchIds).toHaveLength(2)
+    expect(new Set(firstBatchIds).size).toBe(1)
+    expect(controlBatchIds).toEqual(firstBatchIds)
+    expect(control).toEqual(first)
+  })
+
+  it.each([
+    {
+      name: 'malformed targetPosition',
+      mutate: (context: any) => { context.targetPosition = { x: '3', y: 2 } },
+    },
+    {
+      name: 'partial targetPosition',
+      mutate: (context: any) => { context.targetPosition = { x: 3 } },
+    },
+    {
+      name: 'string targetX',
+      mutate: (context: any) => { context.targetX = '3' },
+    },
+    {
+      name: 'NaN targetY',
+      mutate: (context: any) => { context.targetY = Number.NaN },
+    },
+  ])('rejects $name and rolls back state plus TriggerSystem cursors', ({ name, mutate }) => {
+    const { state } = makeDemonSummonState()
+    const action = prepareDemonSummonAction(state, 'red139-malformed-redirect-' + name)
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+    const rule = eventRule(
+      'red139-malformed-redirect-' + name,
+      'beforePieceSummoned',
+      (_battle, context) => mutate(context),
+    ) as any
+    rule.limits = { maxUses: 4, uses: 0, cooldownTurns: 2, currentCooldown: 0 }
+    globalTriggerSystem.addRule(rule)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+    let thrown: any
+
+    try {
+      runBattleAction(state, action as any, { rootSeed: 13907 })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+      context: {
+        actionId: 'red139-malformed-redirect-' + name,
+        kind: 'summon',
+        rootSeed: 13907,
+      },
+    })
+    expect(thrown.message).toContain('Summon redirect')
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    expect(rule.limits).toEqual({ maxUses: 4, uses: 0, cooldownTurns: 2, currentCooldown: 0 })
+  })
+
+  it('rejects a trusted declared capability replayed under a different contentId', () => {
+    const originChain = createEffectChain({
+      actionId: 'red139-capability-origin-action',
+      chainId: 'red139-capability-origin-chain',
+      turn: 1,
+      rootSeed: 139,
+    })
+    const writer = createDeclaredSummonQueueWriter(
+      originChain,
+      'red139-bound-content',
+      {
+        version: 1,
+        recipe: 'source-mirror',
+        maxSummons: 1,
+        allowedVariants: ['summon'],
+        instanceIdPrefix: 'bound-mirror-',
+        maxHp: 1,
+        attack: 0,
+        defense: 0,
+        moveRange: 0,
+        noKillCharge: true,
+        resetBoundSkillCooldown: false,
+        rules: ['rule-naruto-clone-immobile'],
+        status: {
+          idPrefix: 'bound-status-',
+          name: 'Bound',
+          type: 'bound',
+          visible: false,
+          remainingDuration: -1,
+          remainingUses: -1,
+          intensity: 1,
+          stacks: 1,
+          relatedRules: ['rule-naruto-clone-immobile'],
+        },
+      },
+    )
+    writer.push({
+      sourceId: 'red139-capability-source',
+      summons: [{ x: 1, y: 1, variant: 'summon' }],
+    })
+    let trustedRequest: any
+    originChain.drain({
+      damage: () => undefined,
+      heal: () => undefined,
+      summon: request => {
+        trustedRequest = request
+      },
+      death: () => undefined,
+    })
+    expect(trustedRequest).toBeDefined()
+
+    const state = makeState({ pieces: [] }) as any
+    const beforeHash = hashBattleState(state)
+    const forgedChain = createEffectChain({
+      actionId: 'red139-capability-forged-action',
+      chainId: 'red139-capability-forged-chain',
+      turn: state.turn.turnNumber,
+      rootSeed: 139,
+    })
+    forgedChain.enqueue({
+      ...trustedRequest,
+      contentId: 'red139-forged-content',
+      skillId: 'red139-forged-content',
+    })
+    let caught: any
+
+    try {
+      withEffectChain(state, forgedChain, () => drainBattleEffectChain(state, forgedChain))
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+      context: expect.objectContaining({
+        actionId: 'red139-capability-forged-action',
+        chainId: 'red139-capability-forged-chain',
+        kind: 'summon',
+        sourceId: 'red139-capability-source',
+        skillId: 'red139-forged-content',
+      }),
+    })
+    expect(caught.message).toContain('not bound to its declaring content')
+    expect(hashBattleState(state)).toBe(beforeHash)
+  })
 })
 
 describe('RED-139 DeathBatch', () => {
@@ -546,9 +904,13 @@ describe('RED-139 DeathBatch', () => {
   it.each([
     { kind: 'empty', message: 'at least one candidate' },
     { kind: 'duplicate', message: 'duplicate candidate' },
-    { kind: 'missing', message: 'not in battle.pieces' },
+    { kind: 'missing', message: 'must appear exactly once in battle.pieces' },
     { kind: 'alive', message: 'HP must equal zero' },
-  ])('rejects an invalid $kind DeathRequest before lifecycle or state writes', ({ kind, message }) => {
+    { kind: 'NaN maxHp', message: 'maxHp must be finite and positive', maxHp: Number.NaN },
+    { kind: 'infinite maxHp', message: 'maxHp must be finite and positive', maxHp: Number.POSITIVE_INFINITY },
+    { kind: 'zero maxHp', message: 'maxHp must be finite and positive', maxHp: 0 },
+    { kind: 'negative maxHp', message: 'maxHp must be finite and positive', maxHp: -1 },
+  ])('rejects an invalid $kind DeathRequest before lifecycle or state writes', ({ kind, message, maxHp }) => {
     const source = makePiece({ instanceId: 'invalid-death-source', ownerPlayerId: 'player-red' }) as any
     const dead = makePiece({
       instanceId: 'invalid-death-dead', ownerPlayerId: 'player-blue', currentHp: 0, maxHp: 10,
@@ -559,10 +921,15 @@ describe('RED-139 DeathBatch', () => {
     const missing = makePiece({
       instanceId: 'invalid-death-missing', ownerPlayerId: 'player-blue', currentHp: 0, maxHp: 10,
     }) as any
-    const state = makeState({ pieces: [source, dead, alive], turnNumber: 12 }) as any
+    const invalidMaxHp = makePiece({
+      instanceId: 'invalid-death-max-hp', ownerPlayerId: 'player-blue', currentHp: 0, maxHp,
+    }) as any
+    const state = makeState({ pieces: [source, dead, alive, invalidMaxHp], turnNumber: 12 }) as any
     const beforeHash = hashBattleState(state)
     const candidate = (piece: any) => ({ piece, attacker: source, skillId: `invalid-death-${kind}` })
-    const candidates = kind === 'empty'
+    const candidates = maxHp !== undefined
+      ? [candidate(invalidMaxHp)]
+      : kind === 'empty'
       ? []
       : kind === 'duplicate'
         ? [candidate(dead), candidate(dead)]

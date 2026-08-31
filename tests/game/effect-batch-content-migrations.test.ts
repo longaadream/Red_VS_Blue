@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { aiEnvironmentV1, listLegalAIActions } from '@/lib/game/ai-environment'
-import { runBattleAction } from '@/lib/game/battle-runner'
+import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
 import { dealDamage, loadRuleById } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
 import { globalTriggerSystem } from '@/lib/game/triggers'
@@ -78,6 +78,13 @@ function makeNarutoState() {
   const state = makeState({ pieces: [sentinelBefore, naruto, sentinelAfter], width: 6, height: 5 }) as any
   state.players[0].actionPoints = 10
   state.skillsById['naruto-shadow-clone'] = loadJson('data/skills/naruto-shadow-clone.json')
+  state.skillsById['display-only-skill'] = {
+    id: 'display-only-skill',
+    name: 'Display-only passive fixture',
+    description: '',
+    kind: 'passive',
+    type: 'normal',
+  }
   return { naruto, state }
 }
 
@@ -253,6 +260,41 @@ describe('RED-139 approved content migrations', () => {
     expect(Math.abs(casterIndex - cloneIndex)).toBe(1)
   })
 
+  it('accepts both declared summon recipes when PlayerTurnMeta omits the non-schema faction field', () => {
+    const narutoFixture = makeNarutoState()
+    for (const player of narutoFixture.state.players as any[]) delete player.faction
+    const candidate = listLegalAIActions(narutoFixture.state, 'player-red').find(item => (
+      item.kind === 'basic-skill'
+      && item.action.type === 'useBasicSkill'
+      && item.action.skillId === 'naruto-shadow-clone'
+      && item.action.selectedOption === 'summon'
+      && item.action.targetX === 2
+      && item.action.targetY === 1
+    ))
+    expect(candidate).toBeDefined()
+    if (!candidate) return
+
+    const narutoResult = aiEnvironmentV1.simulate(
+      narutoFixture.state,
+      candidate,
+      { rootSeed: ROOT_SEED },
+    )
+    expect(narutoResult.accepted).toBe(true)
+    if (!narutoResult.accepted) return
+    expect(narutoResult.state.pieces.some(piece => piece.instanceId.startsWith('naruto-clone-'))).toBe(true)
+
+    const demonFixture = makeDemonState(false)
+    for (const player of demonFixture.state.players as any[]) delete player.faction
+    const demonResult = runBattleAction(
+      demonFixture.state,
+      demonFixture.action as any,
+      { rootSeed: ROOT_SEED },
+    )
+    expect(demonResult.state.pieces.find(piece => piece.templateId === 'kiljaedan')).toMatchObject({
+      ownerPlayerId: 'player-red', faction: 'red', x: 2, y: 2,
+    })
+  })
+
   it('runs real demon-summon-5 as damage then attack gain then SummonBatch and deletes storage only at commit', () => {
     const firstFixture = makeDemonState(true)
     const peerState = structuredClone(firstFixture.state)
@@ -389,6 +431,226 @@ describe('RED-139 approved content migrations', () => {
     expect(JSON.stringify(fixture.state)).toBe(before)
   })
 
+
+  it.each([
+    {
+      name: 'NaN HP',
+      mutateCode: 'caster.currentHp = 0 / 0;',
+      message: 'not an active living piece',
+    },
+    {
+      name: 'infinite HP',
+      mutateCode: 'caster.currentHp = 1 / 0;',
+      message: 'not an active living piece',
+    },
+    {
+      name: 'undefined HP',
+      mutateCode: 'delete caster.currentHp;',
+      message: 'not an active living piece',
+    },
+    {
+      name: 'duplicate canonical source',
+      mutateCode: 'context.battle.graveyard.push(Object.assign({}, caster, { currentHp: 0 }));',
+      message: 'one canonical piece',
+    },
+    {
+      name: 'missing owner',
+      mutateCode: 'context.battle.players = context.battle.players.filter(function(player) { return player.playerId !== caster.ownerPlayerId; });',
+      message: 'owner player was not found',
+    },
+    {
+      name: 'invalid optional owner faction',
+      mutateCode: "context.battle.players.find(function(player) { return player.playerId === caster.ownerPlayerId; }).faction = 'green';",
+      message: 'owner faction must be red or blue when present',
+    },
+    {
+      name: 'invalid faction',
+      mutateCode: "caster.faction = 'green';",
+      message: 'source faction must be red or blue',
+    },
+    {
+      name: 'owner faction mismatch',
+      mutateCode: "caster.faction = 'blue';",
+      message: 'source faction does not match its owner player',
+    },
+  ])('rejects source-mirror $name inside the authoritative root and rolls back', ({
+    name,
+    mutateCode,
+    message,
+  }) => {
+    const fixture = makeNarutoState()
+    const candidate = listLegalAIActions(fixture.state, 'player-red').find(item => (
+      item.kind === 'basic-skill'
+      && item.action.type === 'useBasicSkill'
+      && item.action.skillId === 'naruto-shadow-clone'
+      && item.action.selectedOption === 'summon'
+      && item.action.targetX === 2
+      && item.action.targetY === 1
+    ))
+    expect(candidate).toBeDefined()
+    if (!candidate) return
+    const definition = fixture.state.skillsById['naruto-shadow-clone'] as any
+    definition.code = "function executeSkill(context) { var caster = context.piece; "
+      + mutateCode
+      + " context.summonQueue.push({ summons: [{ x: 2, y: 1, variant: 'summon' }], sourceId: caster.instanceId });"
+      + " return { success: true, message: 'corrupt source probe' }; }"
+    const beforeHash = hashBattleState(fixture.state)
+    const beforeJson = JSON.stringify(fixture.state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+    const actionId = 'red139-source-mirror-' + name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+    let caught: unknown
+
+    try {
+      runBattleAction(
+        fixture.state,
+        { ...candidate.action, clientActionId: actionId } as any,
+        { rootSeed: ROOT_SEED },
+      )
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+      context: expect.objectContaining({
+        actionId,
+        kind: 'summon',
+        sourceId: 'naruto',
+        skillId: 'naruto-shadow-clone',
+        detached: false,
+      }),
+    })
+    expect((caught as Error).message).toContain(message)
+    expect(hashBattleState(fixture.state)).toBe(beforeHash)
+    expect(JSON.stringify(fixture.state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    expect(fixture.naruto).toMatchObject({ currentHp: 67, faction: 'red', x: 1, y: 1 })
+    expect(fixture.state.pieces.some((piece: any) => piece.instanceId.startsWith('naruto-clone-'))).toBe(false)
+    expect(fixture.state.players[0].actionPoints).toBe(10)
+  })
+
+  it.each([
+    {
+      name: 'NaN HP',
+      message: 'neither active living nor finalized in graveyard',
+      mutate: (battle: any, anchor: any) => { anchor.currentHp = Number.NaN },
+    },
+    {
+      name: 'infinite HP',
+      message: 'neither active living nor finalized in graveyard',
+      mutate: (battle: any, anchor: any) => { anchor.currentHp = Number.POSITIVE_INFINITY },
+    },
+    {
+      name: 'invalid faction',
+      message: 'source faction must be red or blue',
+      mutate: (battle: any, anchor: any) => { anchor.faction = 'green' },
+    },
+    {
+      name: 'fallback faction mismatch',
+      message: 'fallback faction does not match its source',
+      mutate: (battle: any, anchor: any) => {
+        anchor.faction = 'blue'
+        battle.players.find((player: any) => player.playerId === 'player-red').faction = 'blue'
+      },
+    },
+  ])('rejects stored-recipe board source $name and restores damage, resources, and rule limits', ({
+    name,
+    message,
+    mutate,
+  }) => {
+    const fixture = makeDemonState(true)
+    const mutationRule = eventRule(
+      'red139-stored-source-' + name,
+      'afterDamageDealt',
+      (battle, context) => {
+        if (context.skillId !== 'demon-summon-5') return
+        const anchor = battle.pieces.find((piece: any) => piece.instanceId === 'demon-anchor')
+        mutate(battle, anchor)
+      },
+    ) as any
+    mutationRule.limits = { maxUses: 3, uses: 0, cooldownTurns: 2, currentCooldown: 0 }
+    globalTriggerSystem.addRule(mutationRule)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+    const beforeHash = hashBattleState(fixture.state)
+    const beforeJson = JSON.stringify(fixture.state)
+    let caught: unknown
+
+    try {
+      runBattleAction(fixture.state, fixture.action as any, { rootSeed: ROOT_SEED })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+      context: expect.objectContaining({
+        kind: 'summon',
+        sourceId: 'demon-anchor',
+        skillId: 'demon-summon-5',
+        detached: false,
+      }),
+    })
+    expect((caught as Error).message).toContain(message)
+    expect(hashBattleState(fixture.state)).toBe(beforeHash)
+    expect(JSON.stringify(fixture.state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    expect(mutationRule.limits).toEqual({
+      maxUses: 3,
+      uses: 0,
+      cooldownTurns: 2,
+      currentCooldown: 0,
+    })
+    expect(fixture.anchor).toMatchObject({ currentHp: 20, attack: 3, faction: 'red' })
+    expect(fixture.state.players[0]).toMatchObject({
+      faction: 'red',
+      actionPoints: 3,
+      hand: [{ cardId: 'demon-summon-5' }],
+      discardPile: [],
+    })
+  })
+
+  it.each([
+    { name: 'invalid', faction: 'green' },
+    { name: 'source-mismatched', faction: 'blue' },
+  ])('rejects $name stored-piece faction before Summon commit and rolls back the root action', ({
+    faction,
+  }) => {
+    const fixture = makeDemonState(true)
+    ;(fixture.state.extensions.kiljaedanPiece as any).faction = faction
+    const beforeHash = hashBattleState(fixture.state)
+    const beforeJson = JSON.stringify(fixture.state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+    let caught: unknown
+
+    try {
+      runBattleAction(fixture.state, fixture.action as any, { rootSeed: ROOT_SEED })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+      context: expect.objectContaining({
+        kind: 'summon',
+        sourceId: 'demon-anchor',
+        skillId: 'demon-summon-5',
+        detached: false,
+      }),
+    })
+    expect((caught as Error).message).toContain('stable Piece schema')
+    expect(hashBattleState(fixture.state)).toBe(beforeHash)
+    expect(JSON.stringify(fixture.state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    expect(fixture.anchor).toMatchObject({ currentHp: 20, attack: 3, faction: 'red' })
+    expect(fixture.state.players[0]).toMatchObject({
+      actionPoints: 3,
+      hand: [{ cardId: 'demon-summon-5' }],
+      discardPile: [],
+    })
+  })
 
   it('fails a malformed stored-piece capability value closed before commit', () => {
     const { action, anchor, state } = makeDemonState(true)

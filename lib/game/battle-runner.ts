@@ -131,8 +131,8 @@ export function runBattleAction(
 
   try {
     const clonedState = cloneBattleStateForAction(state, metadata)
+    const serializedRuleEffects = captureSerializableRuleEffects(clonedState)
     const apply = () => {
-      const hydratedState = withServerSkills(clonedState) as BattleState
       const effectChain = createEffectChain({
         actionId,
         chainId: `effect-chain:${actionId}`,
@@ -145,12 +145,15 @@ export function runBattleAction(
         },
       })
       return withEffectChain(
-        hydratedState,
+        clonedState,
         effectChain,
         () => {
-          const nextState = applyBattleAction(hydratedState, action)
-          effectChain.assertHealthy()
-          return nextState
+          const hydratedState = withServerSkills(clonedState) as BattleState
+          return withEffectChain(hydratedState, effectChain, () => {
+            const nextState = applyBattleAction(hydratedState, action)
+            effectChain.assertHealthy()
+            return nextState
+          })
         },
       )
     }
@@ -158,7 +161,10 @@ export function runBattleAction(
     const applied = options.ruleExecutionContext
       ? withRuleExecutionContext(options.ruleExecutionContext, applyWithDeterminism)
       : applyWithDeterminism()
-    const next = withoutServerSkills(applied) as BattleState
+    const next = withoutRuntimeRuleEffects(
+      withoutServerSkills(applied) as BattleState,
+      serializedRuleEffects,
+    )
     const canonicalNextHashState = canonicalBattleStateForHash(next)
     const stateHashIndex = updateBattleStateHashIndex(
       preStateHashIndex,
@@ -228,6 +234,102 @@ export function runBattleAction(
     })
     throw decorateRuleError(error, runtime, state, action, actionId)
   }
+}
+
+/**
+ * Rule definitions are hydrated with executable callbacks only while an action
+ * is running. Keep those callbacks out of the authoritative result so direct
+ * engine consumers and JSON-backed room stores observe the same state shape.
+ */
+type SerializableRuleEffectSnapshot = Map<string, Map<string, unknown>>
+
+function ruleEntityKey(kind: 'piece' | 'player', entity: any, index: number): string {
+  const stableId = kind === 'piece' ? entity?.instanceId : entity?.playerId
+  return `${kind}:${typeof stableId === 'string' && stableId ? stableId : `index:${index}`}`
+}
+
+function ruleOccurrenceKey(rule: any, index: number, occurrences: Map<string, number>): string {
+  const base = typeof rule?.id === 'string' && rule.id
+    ? `id:${rule.id}`
+    : `index:${index}`
+  const occurrence = occurrences.get(base) ?? 0
+  occurrences.set(base, occurrence + 1)
+  return `${base}:occurrence:${occurrence}`
+}
+
+function captureSerializableRuleEffects(state: BattleState): SerializableRuleEffectSnapshot {
+  const snapshot: SerializableRuleEffectSnapshot = new Map()
+  const captureEntities = (entities: readonly any[], kind: 'piece' | 'player') => {
+    entities.forEach((entity, entityIndex) => {
+      if (!Array.isArray(entity?.rules)) return
+      const descriptors = new Map<string, unknown>()
+      const occurrences = new Map<string, number>()
+      entity.rules.forEach((rule: any, ruleIndex: number) => {
+        const ruleKey = ruleOccurrenceKey(rule, ruleIndex, occurrences)
+        if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return
+        if (!Object.prototype.hasOwnProperty.call(rule, 'effect')) return
+        const effect = rule.effect
+        if (effect === undefined || typeof effect === 'function') return
+        descriptors.set(ruleKey, cloneRuntimeValue(effect))
+      })
+      if (descriptors.size > 0) {
+        snapshot.set(ruleEntityKey(kind, entity, entityIndex), descriptors)
+      }
+    })
+  }
+  captureEntities(state.pieces, 'piece')
+  captureEntities(state.graveyard, 'piece')
+  captureEntities(state.players, 'player')
+  return snapshot
+}
+
+function withoutRuntimeRuleEffects(
+  state: BattleState,
+  serializedRuleEffects: SerializableRuleEffectSnapshot,
+): BattleState {
+  const stripRules = (rules: unknown, entityKey: string): unknown => {
+    if (!Array.isArray(rules)) return rules
+    let changed = false
+    const occurrences = new Map<string, number>()
+    const descriptors = serializedRuleEffects.get(entityKey)
+    const stripped = rules.map((rule, ruleIndex) => {
+      const ruleKey = ruleOccurrenceKey(rule, ruleIndex, occurrences)
+      if (
+        !rule
+        || typeof rule !== 'object'
+        || Array.isArray(rule)
+        || typeof (rule as Record<string, unknown>).effect !== 'function'
+      ) {
+        return rule
+      }
+      const serializableRule = { ...(rule as Record<string, unknown>) }
+      if (descriptors?.has(ruleKey)) {
+        serializableRule.effect = cloneRuntimeValue(descriptors.get(ruleKey))
+      } else {
+        delete serializableRule.effect
+      }
+      changed = true
+      return serializableRule
+    })
+    return changed ? stripped : rules
+  }
+
+  const stripEntityRules = <T extends { rules?: unknown }>(
+    entity: T,
+    kind: 'piece' | 'player',
+    index: number,
+  ): T => {
+    const rules = stripRules(entity.rules, ruleEntityKey(kind, entity, index))
+    return rules === entity.rules ? entity : { ...entity, rules }
+  }
+  const pieces = state.pieces.map((piece, index) => stripEntityRules(piece, 'piece', index))
+  const graveyard = state.graveyard.map((piece, index) => stripEntityRules(piece, 'piece', index))
+  const players = state.players.map((player, index) => stripEntityRules(player, 'player', index))
+  const changed = pieces.some((piece, index) => piece !== state.pieces[index])
+    || graveyard.some((piece, index) => piece !== state.graveyard[index])
+    || players.some((player, index) => player !== state.players[index])
+
+  return changed ? { ...state, pieces, graveyard, players } : state
 }
 
 /**
