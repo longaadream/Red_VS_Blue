@@ -91,7 +91,7 @@
 - 如果方向发生变化，应创建新的 ADR，并将旧 ADR 标记为“已取代”。
 - 相关模块文档应链接到对应 ADR。
 - Linear 高风险任务应引用相关决策记录。
-- [`ADR-0020-unified-player-websocket-transport.md`](./ADR-0020-unified-player-websocket-transport.md)：Windows 玩家业务统一使用 WebSocket，旧玩家 REST 运行时返回 410（RED-127，已接受）。
+- [`ADR-0020-unified-player-websocket-transport.md`](./ADR-0020-unified-player-websocket-transport.md)：Windows 玩家业务统一使用 legacy WebSocket（RED-127，已由 ADR-0023 取代）。
 - 无法确定的事项应保持“提议中”，不得描述为已经确认。
 
 ## 当前已确定的基础决策
@@ -118,6 +118,7 @@
 - [`ADR-0019-selectable-demo-maps.md`](./ADR-0019-selectable-demo-maps.md)：正式 Demo 使用受控四图目录、房间冻结选择并在所有传输边界失败关闭（RED-119，已接受）。
 - [`ADR-0021-autonomous-server-operations.md`](./ADR-0021-autonomous-server-operations.md)：Windows 自治 Server 的公开发行、受信本地运维、备份更新与回退边界（RED-140，已接受；取代 ADR-0003）。
 - [`ADR-0022-progressive-reserve-deployment.md`](./ADR-0022-progressive-reserve-deployment.md)：新建对局默认使用 seeded 三选一预备区部署、安全落位与部署当回合首次普通移动免费（RED-138，已接受，等待实现验收）。
+- [`ADR-0023-colyseus-postgresql-player-authority.md`](./ADR-0023-colyseus-postgresql-player-authority.md)：默认玩家房间与战斗权威迁移到 Colyseus，PostgreSQL 使用有界微批与关键边界耐久化（RED-160、RED-161，已接受，等待候选门禁）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

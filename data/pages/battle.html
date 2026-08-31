@@ -11,6 +11,7 @@
   <script src="js/identity.js"></script>
   <script src="js/game-engine-runtime.js"></script>
   <script src="js/game-engine.js"></script>
+  <script src="js/colyseus-sdk.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
@@ -1747,7 +1748,9 @@
   <script>
     // ── URL params ──
     const params = new URLSearchParams(location.search)
-    const roomId = (params.get('roomId') || '').trim().toLowerCase()
+    // Colyseus room IDs are opaque and case-sensitive. Only player identity is
+    // normalized; changing the room ID makes joinById target another room.
+    const roomId = (params.get('roomId') || '').trim()
     let myPlayerId = (params.get('playerId') || '').trim().toLowerCase()
     const myAccountId = (params.get('accountId') || params.get('account') || '').trim().toLowerCase()
     const myPlayerName = params.get('playerName') || '玩家'

@@ -5,6 +5,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as dgram from 'dgram'
 import * as http from 'http'
+import { createRequire } from 'module'
 import { randomBytes } from 'crypto'
 import type WebSocket from 'ws'
 import { pathToFileURL } from 'url'
@@ -28,6 +29,8 @@ import {
 
 const LOCAL_PORT_HINT = 38521  // 首选端口，被占用时自动递增（避开 54300-54400 被 QMUpload 占用的范围）
 let actualLocalPort = LOCAL_PORT_HINT  // 实际绑定成功的端口
+const GAME_PORT_HINT = 38621
+let actualGamePort = GAME_PORT_HINT
 const CLIENT_SCHEME = 'rvb-client'
 const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
 const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
@@ -395,6 +398,12 @@ async function stopChildProcessGracefully(
 }
 
 async function killServer(requireDurable = false): Promise<void> {
+  if (gameServerProcess) {
+    const gameProc = gameServerProcess
+    await stopChildProcessGracefully(gameProc, requireDurable)
+    localGameReady = false
+    gameServerProcess = null
+  }
   if (!serverProcess) return
   const proc = serverProcess
   await stopChildProcessGracefully(proc, requireDurable)
@@ -403,6 +412,12 @@ async function killServer(requireDurable = false): Promise<void> {
 }
 
 function forceKillServer(): void {
+  localGameReady = false
+  if (gameServerProcess) {
+    const gameProc = gameServerProcess
+    gameServerProcess = null
+    killProcessTree(gameProc)
+  }
   localServerReady = false
   if (!serverProcess) return
   const proc = serverProcess
@@ -428,6 +443,8 @@ function requestApplicationExit(): void {
 
 let serverProcess: ChildProcess | null = null
 let localServerReady = false
+let gameServerProcess: ChildProcess | null = null
+let localGameReady = false
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
 type ProfileProcessBinding = {
@@ -496,6 +513,116 @@ function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boole
 
     probe()
   })
+}
+
+function waitForGameAuthorityReady(port: number, timeoutMs = 20000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  return new Promise(resolve => {
+    const probe = () => {
+      if (!gameServerProcess) {
+        resolve(false)
+        return
+      }
+      if (Date.now() >= deadline) {
+        resolve(false)
+        return
+      }
+      const request = http.get(`http://127.0.0.1:${port}/healthz`, response => {
+        response.resume()
+        if (response.statusCode === 200) resolve(true)
+        else setTimeout(probe, 250)
+      })
+      request.on('error', () => setTimeout(probe, 250))
+      request.setTimeout(1000, () => request.destroy())
+    }
+    probe()
+  })
+}
+
+function findColyseusEntry(appRoot: string): string | null {
+  const candidates = app.isPackaged
+    ? [path.join(appRoot, 'colyseus', 'colyseus-server.mjs')]
+    : [path.join(appRoot, '_client-colyseus', 'colyseus-server.mjs')]
+  return candidates.find(candidate => fs.existsSync(candidate)) ?? null
+}
+
+async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): Promise<void> {
+  if (gameServerProcess) {
+    if (!localGameReady) localGameReady = await waitForGameAuthorityReady(actualGamePort, 5000)
+    return
+  }
+
+  localGameReady = false
+  actualGamePort = await findFreePort(GAME_PORT_HINT)
+  const appRoot = getAppRoot()
+  const entry = findColyseusEntry(appRoot)
+  if (!entry) {
+    console.error('[client] packaged Colyseus authority is missing; run npm run build:colyseus')
+    return
+  }
+  const binding = profileBinding ?? stableProfileBinding()
+  const databaseUrl = process.env.RVB_POSTGRES_URL
+    ?? process.env.DATABASE_URL
+    ?? 'postgresql://rvb:rvb@127.0.0.1:5433/rvb_colyseus'
+  console.log(`[client] Colyseus/PostgreSQL game port: ${actualGamePort}`)
+  gameServerProcess = spawn(getNodeBin(), [entry], {
+    cwd: appRoot,
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      RVB_COLYSEUS_PORT: String(actualGamePort),
+      RVB_COLYSEUS_HOST: '0.0.0.0',
+      RVB_POSTGRES_URL: databaseUrl,
+      RVB_BATTLE_AUTHORITY_V2: '1',
+      RVB_BATTLE_ASYNC_JOURNAL: '1',
+      RVB_TURN_TIMER_ENABLED: '1',
+      APP_ROOT_DIR: appRoot,
+      USER_DATA_DIR: getUserData(),
+      RVB_PROFILE_ROOT: binding.profileRoot,
+      RVB_RESOLVED_PROFILE_HASH: binding.reference?.resolvedProfileHash,
+      RVB_AUTHORITY_CONTENT_HASH: binding.reference?.authorityContentHash,
+      RVB_PROFILE_ENGINE_ABI: binding.reference?.compatibility.engineAbi,
+      RVB_PROFILE_CONTENT_ABI: binding.reference?.compatibility.contentAbi,
+    },
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  })
+
+  lastServerExitCode = null
+  lastServerStderr = ''
+  if (gameServerProcess.stdout) {
+    attachSafeLogForwarder(gameServerProcess.stdout, process.stdout, {
+      runtime: 'electron-client',
+      stream: 'stdout',
+      report: logChildForwardingRecord,
+      reportUnexpectedError: logUnexpectedChildStreamError,
+    })
+  }
+  if (gameServerProcess.stderr) {
+    gameServerProcess.stderr.on('data', data => {
+      lastServerStderr = (lastServerStderr + data.toString()).slice(-3000)
+    })
+    attachSafeLogForwarder(gameServerProcess.stderr, process.stderr, {
+      runtime: 'electron-client',
+      stream: 'stderr',
+      report: logChildForwardingRecord,
+      reportUnexpectedError: logUnexpectedChildStreamError,
+    })
+  }
+  const spawned = gameServerProcess
+  spawned.on('error', error => console.error('[client] Colyseus authority error:', error))
+  spawned.on('exit', code => {
+    lastServerExitCode = code
+    if (gameServerProcess === spawned) {
+      gameServerProcess = null
+      localGameReady = false
+    }
+    console.log(`[client] Colyseus authority exited: ${code}`)
+    if (lastServerStderr) console.error('[client] last Colyseus stderr:', lastServerStderr.slice(-500))
+  })
+  localGameReady = await waitForGameAuthorityReady(actualGamePort)
+  if (!localGameReady) {
+    console.error(`[client] Colyseus/PostgreSQL authority did not become ready on port ${actualGamePort}`)
+  }
 }
 
 function findServerEntry(appRoot: string): string | null {
@@ -768,7 +895,7 @@ function probeProfileWebSocket(timeoutMs = 5_000): Promise<void> {
     const modulePath = app.isPackaged
       ? path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')
       : 'ws'
-    const WebSocketClient = require(modulePath) as new (address: string) => WebSocket
+    const WebSocketClient = createRequire(__filename)(modulePath) as new (address: string) => WebSocket
     const socket = new WebSocketClient(`ws://127.0.0.1:${actualLocalPort}/ws/rooms/__profile-health__`)
     const finish = (error?: Error): void => {
       if (settled) return
@@ -1143,6 +1270,9 @@ async function activateProfileHash(
         keepAdmissionPaused: true,
       },
     })
+    stage = 'colyseus-authority-start'
+    await startLocalGameAuthority(targetBinding)
+    if (!localGameReady) throw new Error('COLYSEUS_POSTGRES_AUTHORITY_START_FAILED')
     stage = 'renderer-commit-reload'
     return await reconcileMainRendererAfterCommit(
       targetProfileHash,
@@ -1290,6 +1420,7 @@ async function recoverProfileOnStartup(): Promise<void> {
 async function startStableLocalServerAndRecover(): Promise<void> {
   await startLocalServer(stableProfileBinding())
   await recoverProfileOnStartup()
+  await startLocalGameAuthority(stableProfileBinding())
 }
 
 // ─── 资源包管理（Electron IPC，替代 Android 端的 Service Worker 方案）────────
@@ -1467,10 +1598,10 @@ function loadLocalGame(): void {
 
   // 仅当本地服务器实际启动后，才注入默认服务器 URL（once：只注入一次，不影响后续页面导航）
   win.webContents.once('did-finish-load', () => {
-    if (!serverProcess || !localServerReady) return
+    if (!gameServerProcess || !localGameReady) return
     win.webContents.executeJavaScript(`
       (function() {
-        var url = 'http://localhost:${actualLocalPort}';
+        var url = 'http://localhost:${actualGamePort}';
         if (window.RvBUtils && RvBUtils.saveServerConfig) {
           RvBUtils.saveServerConfig({ mode: 'local', url: url });
         } else {
@@ -1571,10 +1702,10 @@ handleTrusted('go-offline', ['connect', 'game'], () => {
 handleTrusted('open-local-game', ['connect'], async () => {
   clearOnlineServerUrl()
   await startStableLocalServerAndRecover()
-  if (!localServerReady) {
+  if (!localGameReady) {
     const exitMsg = lastServerExitCode !== null
-      ? `Local server exited with code ${lastServerExitCode}`
-      : 'Local server did not become ready'
+      ? `Colyseus/PostgreSQL authority exited with code ${lastServerExitCode}`
+      : 'Colyseus/PostgreSQL authority did not become ready'
     const detail = lastServerStderr ? '\n' + lastServerStderr.slice(-500) : ''
     return { ok: false, error: exitMsg + detail }
   }
@@ -1588,9 +1719,10 @@ handleTrusted('open-local-game', ['connect'], async () => {
 
 // 查询当前模式
 handleTrusted('get-mode', ['game'], () => ({
-  isLocal: localServerReady,
-  localUrl: `http://localhost:${actualLocalPort}`,
-  ready: localServerReady,
+  isLocal: localGameReady,
+  localUrl: `http://localhost:${actualGamePort}`,
+  profileRuntimeUrl: `http://localhost:${actualLocalPort}`,
+  ready: localGameReady,
 }))
 
 // 重启本地服务器
@@ -1598,7 +1730,7 @@ handleTrusted('restart-server', ['admin'], async () => {
   await killServer()
   await new Promise(resolve => setTimeout(resolve, 1000))
   await startStableLocalServerAndRecover()
-  return { ok: true }
+  return { ok: localGameReady }
 })
 
 // 获取本机局域网 IPv4 地址列表（供 LAN 扫描定位子网）
@@ -1620,7 +1752,7 @@ handleTrusted('get-host-info', ['game'], () => {
       if (iface.family === 'IPv4' && !iface.internal) ips.push(iface.address)
     }
   }
-  return { port: actualLocalPort, ips, running: serverProcess !== null && localServerReady, ready: localServerReady }
+  return { port: actualGamePort, ips, running: gameServerProcess !== null && localGameReady, ready: localGameReady }
 })
 
 // ─── UDP LAN 主机广播与发现 ───────────────────────────────────────────────────
@@ -1647,7 +1779,7 @@ handleTrusted('start-host-broadcast', ['game'], () => {
 
   const myIps = getLanIpList()
   const hostname = os.hostname()
-  const port = actualLocalPort
+  const port = actualGamePort
 
   const send = () => {
     for (const ip of myIps) {

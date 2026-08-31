@@ -1,6 +1,11 @@
-import { defineRoom, defineServer } from 'colyseus'
+import { defineRoom, defineServer, matchMaker } from 'colyseus'
 import { Pool } from 'pg'
 
+import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
+import { getSelectableMapCatalog } from '@/lib/game/map-selection'
+import { getAllPieces } from '@/lib/game/piece-repository'
+import { loadCardById } from '@/lib/game/skills'
+import { getAllSkills } from '@/lib/game/skill-repository'
 import type { PostgresAuthorityBatchWriter } from '@/lib/server/postgres/authority-types'
 import {
   PostgresAuthorityJournal,
@@ -30,17 +35,44 @@ export interface CreateColyseusBattleServerOptions {
   journalOptions?: PostgresAuthorityJournalOptions
   fixtureFactory?: BattleRoomFixtureFactory
   poolMax?: number
+  healthIdentity?: {
+    runtime: string
+    database: string
+  }
 }
 
 interface HealthResponse {
   status(code: number): HealthResponse
-  json(body: Record<string, unknown>): void
+  json(body: unknown): void
+}
+
+interface JsonRequest {
+  params?: Record<string, string | undefined>
+}
+
+interface ExpressLikeApp {
+  use(handler: (
+    request: { method?: string },
+    response: { setHeader(name: string, value: string): void; sendStatus(code: number): void },
+    next: () => void,
+  ) => void): void
+  get(path: string, handler: (request: JsonRequest, response: HealthResponse) => void | Promise<void>): void
 }
 
 export function createColyseusBattleServer(options: CreateColyseusBattleServerOptions = {}) {
+  // This runtime is the authority-v2 product boundary. Keep the flags local to
+  // the process so callers cannot accidentally start Colyseus on the legacy
+  // synchronous persistence path.
+  process.env.RVB_BATTLE_AUTHORITY_V2 ??= '1'
+  process.env.RVB_BATTLE_ASYNC_JOURNAL ??= '1'
+  process.env.RVB_TURN_TIMER_ENABLED ??= '1'
   const ownsRepository = !options.repository
   const repository = options.repository ?? createRepository(options)
   const journal = options.journal ?? new PostgresAuthorityJournal(repository, options.journalOptions)
+  const healthIdentity = options.healthIdentity ?? {
+    runtime: 'colyseus-postgresql',
+    database: 'postgresql',
+  }
   const BattleRoom = createBattleRoomClass({
     repository,
     journal,
@@ -65,24 +97,61 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
         throw error
       }
     },
-    express: app => {
+    express: rawApp => {
+      const app = rawApp as unknown as ExpressLikeApp
+      app.use((_request, response, next) => {
+        response.setHeader('Access-Control-Allow-Origin', '*')
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+        response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        if (_request.method === 'OPTIONS') {
+          response.sendStatus(204)
+          return
+        }
+        next()
+      })
       app.get('/healthz', async (_request: unknown, response: HealthResponse) => {
         try {
           await repository.healthCheck()
           response.status(ready ? 200 : 503).json({
             ok: ready,
-            runtime: 'colyseus-postgresql',
-            database: 'postgresql',
+            protocol: 'rvb-colyseus',
+            ...healthIdentity,
             ...(healthError ? { error: healthError } : {}),
           })
         } catch (error) {
           response.status(503).json({
             ok: false,
-            runtime: 'colyseus-postgresql',
-            database: 'postgresql',
+            protocol: 'rvb-colyseus',
+            ...healthIdentity,
             error: error instanceof Error ? error.message : String(error),
           })
         }
+      })
+      app.get('/api/ping', (_request, response) => response.status(200).json({
+        ok: true,
+        protocol: 'rvb-colyseus',
+        ...healthIdentity,
+      }))
+      app.get('/catalog/identity', (_request, response) => response.status(200).json({
+        profileIdentity: getServerGameProfileIdentityV1(),
+      }))
+      app.get('/catalog/maps', (_request, response) => response.status(200).json({
+        maps: getSelectableMapCatalog(),
+      }))
+      app.get('/catalog/pieces', (_request, response) => response.status(200).json({ pieces: getAllPieces() }))
+      app.get('/catalog/skills', (_request, response) => response.status(200).json({ skills: getAllSkills() }))
+      app.get('/rooms', async (_request, response) => {
+        const listings = await matchMaker.query({ name: BATTLE_ROOM_TYPE })
+        const rooms = listings
+          .map(listing => listing.metadata as { product?: boolean; room?: unknown; visibility?: string } | undefined)
+          .filter(metadata => metadata?.product === true && metadata.visibility !== 'private')
+          .map(metadata => metadata?.room)
+          .filter(Boolean)
+        response.status(200).json({ rooms })
+      })
+      app.get('/catalog/cards/:cardId', (request, response) => {
+        const card = loadCardById(String(request.params?.cardId ?? ''))
+        response.status(card ? 200 : 404).json(card ?? { error: 'Card not found', code: 'CARD_NOT_FOUND' })
       })
     },
   })
