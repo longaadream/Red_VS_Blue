@@ -1,6 +1,6 @@
 # Combat trigger atomicity and `after*` contract (RED-72 / RED-121 / RED-139)
 
-Status: extended by RED-139 under accepted ADR-0021 on 2026-08-31. Risk: High.
+Status: extended by RED-139 under accepted ADR-0022 on 2026-08-31. Risk: High.
 
 This contract applies to one logical root action across one or more `runBattleAction` / `applyBattleAction` commands. RED-121 extended the boundary to every synchronous trigger point. RED-139 includes the transient four-kind `EffectChain`, its typed FIFO ledger and budgets in that same transaction without adding BattleState, save, trace, or network fields.
 
@@ -14,7 +14,7 @@ This contract applies to one logical root action across one or more `runBattleAc
 
 `after*` includes `afterMove`, `afterSkillUsed`, `afterCardPlay`, damage/heal after-events, card-added events, summon events, and status-change events at their existing call sites. Each committed effect is visible at most once. A prompt from any of these consumers suspends the logical action instead of exposing a half-completed state.
 
-Exceptions include event type/id, consumer kind/id, root/depth, turn, player, action, seed, and random cursor where available. `EffectChainFatalError` additionally carries action/chain/batch/parent IDs, effect kind, enqueue sequence or endogenous origin stage, processed/limit counters, source/skill/targets where applicable, and preserves the original cause. The implementation preserves RED-61 ordering, the RED-62 local event limits, and ADR-0021's action-wide 20 depth / 100 Batch / 1000 dispatch limits.
+Exceptions include event type/id, consumer kind/id, root/depth, turn, player, action, seed, and random cursor where available. `EffectChainFatalError` additionally carries action/chain/batch/parent IDs, effect kind, enqueue sequence or endogenous origin stage, processed/limit counters, source/skill/targets where applicable, and preserves the original cause. The implementation preserves RED-61 ordering, the RED-62 local event limits, and ADR-0022's action-wide 20 depth / 100 Batch / 1000 dispatch limits.
 
 ## EffectChain transaction boundary
 

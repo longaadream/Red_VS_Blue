@@ -3279,7 +3279,7 @@ function prepareSourceMirrorSummon(
   contentId: string,
   fatal: (message: string, cause?: unknown) => never,
 ): PreparedDeclaredSummon {
-  // ADR-0021 freezes this exact deterministic consumption order.
+  // ADR-0022 freezes this exact deterministic consumption order.
   const createdAt = getRuleDate().now()
   const insertBeforeSource = getRuleMath().random() < 0.5
   const instanceId = entry.capability.instanceIdPrefix + String(createdAt)

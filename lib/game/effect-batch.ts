@@ -202,7 +202,7 @@ export interface EffectChainOptions {
   readonly turn: number
   readonly rootSeed: number | null
   readonly detached?: boolean
-  /** Tests may lower a budget, but production callers cannot raise ADR-0021 limits. */
+  /** Tests may lower a budget, but production callers cannot raise ADR-0022 limits. */
   readonly limits?: Partial<EffectChainLimits>
   /** Authoritative callers bind this to RuleRuntime; its state is snapshotted separately. */
   readonly createBatchId?: (input: EffectBatchIdInput) => string
@@ -318,7 +318,7 @@ export function isEffectChainFatalError(error: unknown): error is EffectChainFat
 
 /**
  * Converts an invalid or blocked batch into the structured fatal diagnostic
- * required by ADR-0021. Existing fatal errors are returned unchanged so their
+ * required by ADR-0022. Existing fatal errors are returned unchanged so their
  * original code, context, and cause remain observable at the action boundary.
  */
 export function rejectEffectBatch(
@@ -941,7 +941,7 @@ export class EffectChain {
     const rawKind = typeof kind === 'string' ? kind : null
     throw this.fatal(
       'RVB_EFFECT_CHAIN_UNKNOWN_KIND',
-      'Effect request kind ' + String(kind) + ' is not in the ADR-0021 whitelist',
+      'Effect request kind ' + String(kind) + ' is not in the ADR-0022 whitelist',
       'kind',
       this.batchCount,
       EFFECT_BATCH_KINDS.length,

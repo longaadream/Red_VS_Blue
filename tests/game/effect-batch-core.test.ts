@@ -51,7 +51,7 @@ const SOURCE_MIRROR_CAPABILITY = {
   },
 } as const
 
-// @ts-expect-error ADR-0021 intentionally rejects non-whitelisted effect kinds.
+// @ts-expect-error ADR-0022 intentionally rejects non-whitelisted effect kinds.
 const forbiddenKind: EffectRequest = { kind: 'move' }
 void forbiddenKind
 
