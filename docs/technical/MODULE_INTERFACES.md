@@ -4,7 +4,7 @@
 
 基线：`594977b`
 
-接口约定更新：2026-08-31（RED-140，基线 `f51a5eed2a37be6491841a19393b0725ad188554`）
+接口约定更新：2026-08-31（RED-141，基线 `4bca9fd3b4c903ee275eac5dfa6175f467dd53b0`）
 
 本文件记录当前真实接口。标为“愿景”的内容尚未实现。
 
@@ -146,18 +146,23 @@
 
 ## 5. 触发器系统
 
-- 入口：`lib/game/triggers.ts::TriggerSystem`、`globalTriggerSystem`。
+- 入口：`lib/game/triggers.ts::TriggerSystem`、`lib/game/room-rule-runtime.ts::RoomRuleRuntimeRegistry`。
 - 职责：注册规则并在游戏事件上执行触发器。
 - 输入：触发事件、战斗状态和上下文。
 - 输出：触发结果/修改后的状态。
 - 调用方：技能、战斗初始化、回合规则。
 - 调用：具体规则和技能效果。
-- 状态变化：可间接修改任意规则状态；注册表是进程级状态。
-- 错误：触发器异常可能向上抛，也可能被调用层记录后忽略。
+- 状态变化：在线路径的规则注册表、限制计数和缓存按 roomId 隔离；同步 `RuleExecutionContext` 把同一
+  房间实例传入 Runner、战斗初始化、回合与技能深层调用。`globalTriggerSystem` 仅为离线/浏览器兼容后备。
+- 恢复/关闭：新房间创建空运行时；旧房间首次 restore 只复制一次历史全局规则快照。相同 roomId 的
+  create/restore 幂等返回同一实例；close 清空规则和缓存、关闭房间 FIFO，之后拒绝隐式复活。RED-141
+  提供该原语；终局/删除生产编排、durable 屏障和竞态收口属于 RED-143。
+- 错误：触发器异常向权威调用边界抛出；失败房间的规则计数、pending 和缓存不得污染其他房间。
 - 日志：`triggers.ts` 本地日志。
-- 测试：`debug-battle.test.ts` 有部分所有权场景。
-- 已知问题：跨房间隔离待确认。
-- 最小调试：在单个触发事件前后导出注册规则 ID、房间 ID 和状态 hash。
+- 测试：`room-runtime-isolation.test.ts` 覆盖 100 次双房交错、异常/计数/pending/缓存隔离、FIFO、背压、
+  inspect 与 close；`turn.test.ts`、`turn-timer-room.test.ts` 覆盖兼容路径。
+- 最小调试：`inspectRoomRuleRuntime(roomId)` 只读返回 generation、active event、queue/pending depth 和
+  closed reason；再结合规则 ID、roomId、seed 与前后 state hash 定位。
 
 ## 6. WebSocket 服务
 
@@ -432,6 +437,9 @@ interface ServerCore {
 
 - 协调入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`；所有 LAN 玩家、pending、计时器和机器人命令必须由此进入。
 - 排队：`lib/game/room-authority-queue.ts` 按 roomId 严格 FIFO，并对等待数量实施背压；房间之间不共享队列。
+- 规则运行时：`lib/game/room-rule-runtime.ts` 把 `TriggerSystem`、规则/技能/动态代码缓存与 roomId 绑定。
+  `room-battle-start.ts` 在同房间 FIFO 内 create/restore，`room-battle-actions.ts` 在读取已有房间后 restore；
+  两者向 Battle Runner 显式注入同一 `RuleExecutionContext`。单房错误或 pending 不影响其他房间，跨房可并行。
 - 协议：`lib/game/battle-transition.ts` 定义 v3 command envelope、固定 authority build、精确 receipt、公开 pending 投影、Transition 和检查点恢复；完整 v2 链仅作恢复兼容，禁止与 v3 追加混写。
 - 版本：`Room.version` 是房间元数据乐观锁；`Room.battleAuthorityVersion` 是连续战斗版本。传输与 patch 只能使用后者。
 - 在线权威：显式开启 async journal 后，`RoomStore.getRoom()` 优先读取进程内 Room Actor；
@@ -508,7 +516,8 @@ RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯
 - **房间观察**：只能适配 RED-131 的 room FIFO、journal、WAL、有限重试、restore/drain 与 durable
   水位。单房 degraded 只形成房间 warning；全局 DB/PVE transient unavailable 只有在 integrity 与
   唯一 writer 仍可证明时进入顶层 `degraded`，corrupt/集合不完整/未知 schema/无可信 writer 进入
-  `failed`。
+  `failed`。RED-141 的 runtime inspect 是只读适配层：由现有 FIFO 的 running/pending/active event/
+  closed reason 映射冻结的 `queue` 字段，不为管理面复制或持久化第二份运行时状态。
 - **PVE 观察**：`ready` 只从 RED-117 `rvb-pve-run-aggregate/v1` active aggregate、archived evidence
   与 tombstone 计算 Run/active battle/aggregate-set 状态；unavailable/migrating/incompatible/corrupt
   使用 closed branch 且 counts/IDs/hash 全为 null，不得回显 stale 集合。active PVE battle 是独立
