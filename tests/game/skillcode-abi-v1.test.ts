@@ -7,11 +7,17 @@ import { describe, expect, it } from 'vitest'
 import {
   SKILLCODE_ABI_V1,
   SKILLCODE_ABI_V1_BUDGETS,
+  SKILLCODE_ABI_V1_COMMAND_KINDS,
   SKILLCODE_ABI_V1_COMMAND_SCHEMAS,
+  SKILLCODE_ABI_V1_DATA_SCHEMAS,
   SKILLCODE_ABI_V1_ERROR_CODES,
+  SKILLCODE_ABI_V1_INPUT_SCHEMAS,
+  SKILLCODE_ABI_V1_SNAPSHOT_VERSIONS,
+  SKILLCODE_ABI_V1_SURFACE_NAMES,
   SKILLCODE_ABI_V1_SURFACES,
   SkillCodeAbiV1Error,
   type SkillCodeAbiV1Budget,
+  type SkillCodeAbiV1AnswerAuthority,
   type SkillCodeAbiV1Invocation,
   budgetForSkillCodeAbiV1,
   negotiateSkillCodeAbiV1,
@@ -43,8 +49,8 @@ function trustedIdentity(value: unknown) {
   return { content: record.content, trace: record.trace }
 }
 
-function parseInvocation(value: unknown): SkillCodeAbiV1Invocation {
-  return parseSkillCodeAbiV1Invocation(value, trustedIdentity(value))
+function parseInvocation(value: unknown, answers?: readonly SkillCodeAbiV1AnswerAuthority[]): SkillCodeAbiV1Invocation {
+  return parseSkillCodeAbiV1Invocation(value, trustedIdentity(value), answers)
 }
 
 function measuredResult(
@@ -57,6 +63,10 @@ function measuredResult(
     replayId: string
     cursor: number
     selectionId: string
+    kind: 'target' | 'option'
+    choices: readonly string[]
+    min: number
+    max: number
   },
 ) {
   const value = structuredClone(raw) as Record<string, unknown>
@@ -127,7 +137,27 @@ describe('RED-151 SkillCode ABI v1 version and capability contract', () => {
     expect(SKILLCODE_ABI_V1_SURFACES.ruleTriggerSkill.interaction).toBe('none')
     expect(SKILLCODE_ABI_V1_SURFACES.pendingEffectCode.capabilities).toEqual(['Math', 'Date'])
     expect(SKILLCODE_ABI_V1_SURFACES.previewCode.authority).toBe(false)
+    expect(SKILLCODE_ABI_V1_INPUT_SCHEMAS.previewCode.currentCooldown).toEqual({ kind: 'non-negative-integer' })
+    expect(SKILLCODE_ABI_V1_SNAPSHOT_VERSIONS.battle).toBe('rvb-battle-snapshot/v1')
+    expect(SKILLCODE_ABI_V1_SURFACES.skillCode.statusSemantics).toEqual({
+      pieceAdd: 'append', playerAdd: 'append', cardIntensityModifier: false,
+      pieceAfterStatusApplied: true, pieceAfterStatusRemoved: true,
+      playerAfterStatusApplied: false, playerAfterStatusRemoved: false,
+      pieceRelatedRuleCleanup: true,
+      pieceMissingDurationAndUses: 'preserve', playerMissingDurationAndUses: 'preserve',
+    })
+    expect(SKILLCODE_ABI_V1_SURFACES.ruleSkillCode.statusSemantics.pieceAdd).toBe('replace-same-id')
+    expect(SKILLCODE_ABI_V1_SURFACES.ruleSkillCode.statusSemantics.pieceMissingDurationAndUses).toBe('default-minus-one')
+    expect(SKILLCODE_ABI_V1_SURFACES.ruleSkillCode.statusSemantics.playerMissingDurationAndUses).toBe('preserve')
+    expect(SKILLCODE_ABI_V1_SURFACES.cardCode.statusSemantics.cardIntensityModifier).toBe(true)
+    expect(SKILLCODE_ABI_V1_DATA_SCHEMAS.battle.required).toEqual([
+      'stateHash', 'turnNumber', 'phase', 'pieceHandles', 'playerHandles',
+    ])
+    expect(Object.isFrozen(SKILLCODE_ABI_V1_SURFACE_NAMES)).toBe(true)
+    expect(Object.isFrozen(SKILLCODE_ABI_V1_ERROR_CODES)).toBe(true)
+    expect(Object.isFrozen(SKILLCODE_ABI_V1_COMMAND_KINDS)).toBe(true)
     for (const contract of Object.values(SKILLCODE_ABI_V1_SURFACES)) {
+      expect(Object.isFrozen(contract.commandKinds)).toBe(true)
       expect(contract.capabilities).not.toContain('console')
       expect(contract.runtimeEvidence.length).toBeGreaterThan(0)
       expect(contract.runtimeEvidence.every(evidence => evidence.file.length > 0)).toBe(true)
@@ -145,6 +175,7 @@ describe('RED-151 SkillCode ABI v1 structured boundary', () => {
     expect(measuredResult(fixture('valid', 'skill-code-result.json'), invocation).status).toBe('ok')
     expect(measuredResult(fixture('valid', 'pending-result.json'), invocation, {}, {
       ownerHandle: 'player-1', authorityRevision: 7, replayId: 'replay-skill-0', cursor: 0, selectionId: 'target-0',
+      kind: 'target', choices: ['piece-2'], min: 1, max: 1,
     }).status).toBe('pending')
   })
 
@@ -177,6 +208,102 @@ describe('RED-151 SkillCode ABI v1 structured boundary', () => {
     expectCode(() => parseInvocation({ ...base, input: { pieceSnapshot: {}, skillSnapshot: {}, currentCooldown: 0, battle: {} } }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
   })
 
+  it('rejects accessors before executing them across invocation and result boundaries', () => {
+    let getterRuns = 0
+    const topLevel = fixture('valid', 'skill-code-request.json') as Record<string, unknown>
+    Object.defineProperty(topLevel, 'abiVersion', {
+      enumerable: true,
+      get() { getterRuns += 1; return SKILLCODE_ABI_V1 },
+    })
+    expectCode(() => parseSkillCodeAbiV1Invocation(topLevel), 'SKILLCODE_HOST_REFERENCE_FORBIDDEN')
+
+    const nested = fixture('valid', 'skill-code-request.json') as Record<string, unknown>
+    Object.defineProperty(nested.content as object, 'id', {
+      enumerable: true,
+      get() { getterRuns += 1; return 'skill-fixture' },
+    })
+    expectCode(() => parseSkillCodeAbiV1Invocation(nested), 'SKILLCODE_HOST_REFERENCE_FORBIDDEN')
+
+    const capability = fixture('valid', 'skill-code-request.json') as Record<string, unknown>
+    Object.defineProperty(capability.requestedCapabilities as string[], '0', {
+      enumerable: true,
+      get() { getterRuns += 1; return 'selectTarget' },
+    })
+    expectCode(() => parseSkillCodeAbiV1Invocation(capability), 'SKILLCODE_HOST_REFERENCE_FORBIDDEN')
+
+    const result: Record<string, unknown> = {}
+    Object.defineProperty(result, 'status', {
+      enumerable: true,
+      get() { getterRuns += 1; return 'ok' },
+    })
+    expectCode(() => parseSkillCodeAbiV1Result(result), 'SKILLCODE_HOST_REFERENCE_FORBIDDEN')
+
+    const coercion = { toString() { getterRuns += 1; return SKILLCODE_ABI_V1 } }
+    expectCode(() => negotiateSkillCodeAbiV1(coercion), 'SKILLCODE_ABI_UNSUPPORTED')
+    expect(getterRuns).toBe(0)
+  })
+
+  it('enforces typed handles, versioned snapshots, cooldowns, payloads, and replay answers', () => {
+    const skill = fixture('valid', 'skill-code-request.json') as Record<string, unknown>
+    const skillInput = skill.input as Record<string, unknown>
+    expectCode(() => parseInvocation({ ...skill, input: { ...skillInput, sourcePieceHandle: {} } }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    expectCode(() => parseInvocation({
+      ...skill,
+      input: { ...skillInput, battleSnapshot: { schemaVersion: 'rvb-battle-snapshot/v2', revision: 7, data: {} } },
+    }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    expectCode(() => parseInvocation({
+      ...skill,
+      input: { ...skillInput, context: { schemaVersion: 'rvb-context-snapshot/v1', revision: 7 } },
+    }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    const tooManyAnswers = Array.from({ length: 9 }, (_, cursor) => ({
+      cursor, kind: 'target', replayId: `replay-${cursor}`, selectionId: `selection-${cursor}`, values: ['piece-2'],
+    }))
+    expectCode(() => parseInvocation({ ...skill, input: { ...skillInput, answers: tooManyAnswers } }), 'SKILLCODE_BUDGET_PENDING_REPLAY_EXCEEDED')
+    expectCode(() => parseInvocation({
+      ...skill,
+      input: { ...skillInput, answers: [{ cursor: 0, kind: 'target', replayId: 'r', selectionId: 's', values: ['x', 'x'] }] },
+    }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+
+    const preview = fixture('valid', 'preview-code-request.json') as Record<string, unknown>
+    const previewInput = preview.input as Record<string, unknown>
+    expectCode(() => parseInvocation({ ...preview, input: { ...previewInput, currentCooldown: '0' } }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+
+    const pending = fixture('valid', 'pending-effect-code-request.json') as Record<string, unknown>
+    const pendingInput = pending.input as Record<string, unknown>
+    expectCode(() => parseInvocation({ ...pending, input: { ...pendingInput, targetHandles: [] } }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    expectCode(() => parseInvocation({
+      ...pending,
+      input: { ...pendingInput, payload: { schemaVersion: 'rvb-pending-payload/v2', data: {} } },
+    }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    expectCode(() => parseInvocation({
+      ...pending,
+      input: { ...pendingInput, payload: { schemaVersion: 'rvb-pending-payload/v1', data: { completelyUnknown: true } } },
+    }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    expectCode(() => parseInvocation({
+      ...pending,
+      input: {
+        ...pendingInput,
+        battleSnapshot: { schemaVersion: 'rvb-battle-snapshot/v1', revision: 7, data: { completelyUnknown: true } },
+      },
+    }), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+  })
+
+  it('binds replay answers to host identity, candidates, and selection bounds', () => {
+    const raw = fixture('valid', 'skill-code-request.json') as Record<string, unknown>
+    const input = raw.input as Record<string, unknown>
+    const answer = { cursor: 0, kind: 'target', replayId: 'replay-1', selectionId: 'selection-1', values: ['piece-2'] }
+    const authority: SkillCodeAbiV1AnswerAuthority = {
+      cursor: 0, kind: 'target', replayId: 'replay-1', selectionId: 'selection-1',
+      choices: ['piece-2', 'piece-3'], min: 1, max: 1,
+    }
+    const replay = { ...raw, input: { ...input, answers: [answer] } }
+    expect(parseInvocation(replay, [authority]).surface).toBe('skillCode')
+    expectCode(() => parseInvocation(replay), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    expectCode(() => parseInvocation(replay, [{ ...authority, choices: ['piece-3'] }]), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    expectCode(() => parseInvocation(replay, [{ ...authority, cursor: 1 }]), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+    expectCode(() => parseInvocation(replay, [{ ...authority, min: 2, max: 2 }]), 'SKILLCODE_INPUT_SCHEMA_INVALID')
+  })
+
   it('denies mutation commands and pending on non-authority surfaces', () => {
     const previewInvocation = parseInvocation(fixture('valid', 'preview-code-request.json'))
     const preview = {
@@ -207,6 +334,7 @@ describe('RED-151 SkillCode ABI v1 structured boundary', () => {
     const commands = (fixture('valid', 'skill-code-result.json') as Record<string, unknown>).commands
     const authority = {
       ownerHandle: 'player-1', authorityRevision: 7, replayId: 'replay-skill-0', cursor: 0, selectionId: 'target-0',
+      kind: 'target' as const, choices: ['piece-2'], min: 1, max: 1,
     }
     expectCode(() => measuredResult({ ...base, commands }, invocation, {}, authority), 'SKILLCODE_OUTPUT_SCHEMA_INVALID')
     expectCode(() => measuredResult({ ...base, commands: [], status: 'ok' }, invocation, {}, authority), 'SKILLCODE_OUTPUT_SCHEMA_INVALID')
@@ -223,6 +351,21 @@ describe('RED-151 SkillCode ABI v1 structured boundary', () => {
     expectCode(() => measuredResult({ ...result, commands }, authorized), 'SKILLCODE_OUTPUT_SCHEMA_INVALID')
     expect(SKILLCODE_ABI_V1_COMMAND_SCHEMAS['piece.force-remove'].capability)
       .toBe('context.forceRemoveEnemyPieceById')
+    expect(SKILLCODE_ABI_V1_COMMAND_SCHEMAS['card.discard'].required).toEqual(['cardInstanceHandle'])
+
+    const statusInvocation = parseInvocation({ ...raw, requestedCapabilities: ['addStatusEffectById'] })
+    const statusCommand = {
+      kind: 'status.add',
+      payload: {
+        ownerHandle: 'piece-1',
+        status: { id: 'frozen-1', type: 'freeze', currentDuration: 1, intensity: 1, relatedRules: ['rule-freeze'] },
+      },
+    }
+    expect(measuredResult({ ...result, commands: [statusCommand] }, statusInvocation).status).toBe('ok')
+    expectCode(() => measuredResult({
+      ...result,
+      commands: [{ ...statusCommand, payload: { ...statusCommand.payload, status: { id: 'x', type: 'freeze', extension: true } } }],
+    }, statusInvocation), 'SKILLCODE_OUTPUT_SCHEMA_INVALID')
   })
 
   it('requires host-derived identity, trusted complete metering, and matching result identity', () => {
@@ -251,9 +394,19 @@ describe('RED-151 SkillCode ABI v1 structured boundary', () => {
   it('requires pending replay identity and rejected rollback diagnostics', () => {
     const invocation = parseInvocation(fixture('valid', 'skill-code-request.json'))
     const pending = fixture('valid', 'pending-result.json')
+    const authority = {
+      ownerHandle: 'player-1', authorityRevision: 7, replayId: 'replay-skill-0', cursor: 0, selectionId: 'target-0',
+      kind: 'target' as const, choices: ['piece-2'], min: 1, max: 1,
+    }
     expectCode(() => measuredResult(pending, invocation, {}, {
       ownerHandle: 'other-player', authorityRevision: 7, replayId: 'replay-skill-0', cursor: 0, selectionId: 'target-0',
+      kind: 'target', choices: ['piece-2'], min: 1, max: 1,
     }), 'SKILLCODE_OUTPUT_SCHEMA_INVALID')
+    expectCode(() => measuredResult(pending, invocation, {}, { ...authority, cursor: 1 }), 'SKILLCODE_OUTPUT_SCHEMA_INVALID')
+    expectCode(() => measuredResult(pending, invocation, {}, { ...authority, choices: ['piece-3'] }), 'SKILLCODE_OUTPUT_SCHEMA_INVALID')
+    const limitedRaw = fixture('valid', 'skill-code-request.json') as Record<string, unknown>
+    const limited = parseInvocation({ ...limitedRaw, requestedCapabilities: ['Math'] })
+    expectCode(() => measuredResult(pending, limited, {}, authority), 'SKILLCODE_CAPABILITY_DENIED')
 
     const rejected = {
       abiVersion: SKILLCODE_ABI_V1,

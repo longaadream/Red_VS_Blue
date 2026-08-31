@@ -21,8 +21,9 @@ SkillCode 进入 Content Pipeline。当前 `dynamic-code-runtime.ts` 仍只执�
 `SKILLCODE_ABI_MISSING`；任何其他值返回 `SKILLCODE_ABI_UNSUPPORTED`。不存在 v0、best-effort、旧
 `eval`/`new Function` 或完全信任回退。
 
-边界只接受 JSON 可表达的 plain object、数组、有限数值、字符串、布尔值和 `null`。函数、Promise、
-Symbol、BigInt、循环引用、自定义原型、Date、Map、Set、宿主对象及可变 `BattleState` 都不得穿越边界。
+边界只接受 JSON 可表达的 plain object、数组、有限数值、字符串、布尔值和 `null`。解析器在读取任何不可信
+属性前检查完整 invocation/result 的 descriptor；getter/setter、函数、Promise、Symbol、BigInt、循环引用、
+自定义原型、Date、Map、Set、宿主对象及可变 `BattleState` 都不得穿越边界。
 输入是版本化快照和 ID/handle；输出是 schema 验证后的命令、pending 请求、显示值与诊断。
 
 一次调用的身份由 `content.{id,version,sourceHash}` 和
@@ -41,9 +42,22 @@ ID、seed 与 logicalTime；解析器将调用字段与这份宿主身份逐项�
   content: { id: string; version: string; sourceHash: string }
   trace: { id: string; seed: string; logicalTime: number }
   requestedCapabilities: string[]
-  input: Record<string, JsonValue>
+  input: SkillCodeAbiV1SurfaceInput
 }
 ```
+
+`input` 不是开放字典。`SKILLCODE_ABI_V1_INPUT_SCHEMAS` 为六类 surface 分别冻结必填字段及字段类型，未知或
+缺失字段均拒绝。所有 snapshot 使用精确的 `{ schemaVersion, revision, data }` 包络；context、battle、
+trigger、pending、piece、skill 的版本分别是 `rvb-*-snapshot/v1`，版本未知、revision 非安全非负整数或包络
+多字段都会 fail closed。`data` 不是开放 JSON：`SKILLCODE_ABI_V1_DATA_SCHEMAS` 可执行地冻结 skill/card/rule
+context、battle、trigger、pending、piece、skill 与 pending payload 的 required/optional 字段和逐字段类型。
+battle v1 精确包含 state hash、turn number、phase、piece/player handle 数组；各 context/trigger/pending/preview
+schema 精确包含对应 handle、event、selection 或坐标/范围字段。pending payload 只允许 `handles`、`numbers`、
+`enums` 三个 typed record，因此不能藏入任意对象；扩展字段或语义必须发布新版本。handle 必须是无首尾空白的
+非空字符串，handle 数组达到各 schema 的 minItems 且去重；cooldown 是安全非负整数；answers 使用精确
+`{ cursor, kind, replayId, selectionId, values }`，最多 8 个且 value 去重，并逐项匹配宿主传入的
+`SkillCodeAbiV1AnswerAuthority`：数量、身份、kind、候选集合与 min/max 任一不符都拒绝。机器版本常量位于
+`SKILLCODE_ABI_V1_SNAPSHOT_VERSIONS`。
 
 返回对象只允许：`abiVersion`、`surface`、`traceId`、`status`、`value`、`commands`、
 `pending`、`diagnostics`、`budgetUsed`。`status` 为 `ok | pending | rejected`。`budgetUsed` 七项均为必填，且必须
@@ -52,8 +66,10 @@ kind 的 capability 和精确 payload schema 由 `SKILLCODE_ABI_V1_COMMAND_SCHEM
 或诊断码全部 fail closed。
 
 pending 还必须携带 `ownerHandle`、`authorityRevision`、`rootTraceId`、`replayId`、`replayDepth` 和完整 content
-身份。宿主将它们与权威 owner/revision、根调用和可信 replay ID 对比；target/option payload 分别使用精确的
-候选 handle/option ID 与 min/max schema。调用者不能靠自报 cursor 或 revision 绕过 stale/重复/串线检查。
+身份。宿主将它们与权威 owner/revision、根调用和可信 replay ID 对比；target pending 必须实际请求
+`selectTarget`，option pending 必须实际请求 `selectOption`。kind、候选 handle/option ID 的有序数组、min/max、
+cursor 与 selection ID 都必须逐项等于宿主为本次调用生成的 `pendingAuthority`。调用者不能靠自报候选、cursor
+或 revision 绕过 stale/重复/串线检查。
 
 ## 3. 六类作者入口
 
@@ -68,6 +84,14 @@ pending 还必须携带 `ownerHandle`、`authorityRevision`、`rootTraceId`、`r
 | `ruleTriggerSkill` | 适配 trigger 后的 `executeSkill(context)` | trigger 快照、rule/source handles | 已知事件目标上的同步命令 | v1 不允许 pending；失败回滚整个事件候选 |
 | `pendingEffectCode` | `function(ctx)` | pending 快照、handles、序列化 payload | 仅 `Math`、`Date`；无权威命令 | 不允许嵌套 pending；闭包和 `ctx.dealDamage` 不存在 |
 | `previewCode` | `calculatePreview(piece, skillDef, currentCooldown)` | 单位/技能显示快照、冷却 | 仅显示值、`calculateDistance` 与不含宿主随机的确定性 `Math` | 非权威、无命令、无 pending；失败只产生诊断 |
+
+状态命令只接受 `SKILLCODE_ABI_V1_STATUS_FIELDS` 中冻结的 canonical 字段；任意临时扩展字段都需新 ABI 合同。
+`SKILLCODE_ABI_V1_SURFACES[surface].statusSemantics` 同时机器冻结现役入口差异，并把 piece/player 事件明确拆开：
+技能对同 ID 单位/玩家状态均追加，仅单位状态派发 apply/remove 事件并在适用时清关联规则；卡牌单位状态追加且
+应用卡牌强度修正，不支持玩家状态，不保证状态事件或关联清理；规则 `skillCode` 替换同 ID 单位状态、追加玩家
+状态，仅单位 remove 事件为 true，且仅单位状态缺失 duration/uses 时规范化为 `-1`，玩家状态保持现值；规则 trigger 对单位/玩家状态均追加，
+也仅单位 remove 事件为 true。所有 surface 的玩家状态 apply/remove 事件均为 false；pending effect 与 preview
+不支持状态命令。
 
 ## 4. capability/helper 白名单
 
@@ -143,8 +167,8 @@ v1 只兼容精确版本和精确字段。新增可选字段、helper、命令�
 [`tests/fixtures/skillcode/v1/valid`](../../tests/fixtures/skillcode/v1/valid) 覆盖六类输入、权威命令与 pending；
 [`invalid`](../../tests/fixtures/skillcode/v1/invalid) 覆盖缺失/未知版本、未知 capability 和未知字段。
 [`tests/game/skillcode-abi-v1.test.ts`](../../tests/game/skillcode-abi-v1.test.ts) 另用运行时对象验证函数、Promise/thenable、自定义
-原型、循环、伪造身份/计量、capability-command 绕过、逐 kind payload、pending replay 身份、回滚诊断、预算
-边界加一、命令与输出放大。
+原型、循环、伪造身份/计量、六类输入字段类型与 snapshot 版本、capability-command 绕过、逐 kind payload、
+pending capability/候选/replay 身份、状态语义、回滚诊断、预算边界加一、命令与输出放大。
 
 回退方式是整体撤销本文、威胁模型、`abi-v1.ts`、fixtures、测试及索引引用。由于本任务没有接入生产执行
 路径，无数据、存档或 runtime 迁移；不得以启用旧可信 eval 作为失败回退。
@@ -155,5 +179,11 @@ v1 只兼容精确版本和精确字段。新增可选字段、helper、命令�
 replay 身份、force-remove helper 漏列、Rule 交互文档冲突、拒绝结果缺回滚事实、错误优先级冲突、console
 输出旁路、身份无可信来源以及 thenable 错误码不稳定。冻结稿已分别通过命令 schema 与 capability 绑定、宿主
 身份/完整 meter、pending owner/revision/root/replay 字段、helper 显式支持/禁止、文档修正、拒绝诊断不变量、
-版本优先解析、禁用 console 和 thenable 检测修复，并新增对应负例。沙箱隔离与强制终止仍是 RED-153/154 的
-后续门禁，不属于本合同实现。
+版本优先解析、禁用 console 和 thenable 检测修复，并新增对应负例。最终门禁还补齐六类机器输入 schema、
+snapshot/payload 版本、pending capability 与宿主候选绑定，以及逐 surface 状态语义。沙箱隔离与强制终止仍是
+RED-153/154 的后续门禁，不属于本合同实现。
+
+同日最终只读复验进一步发现并阻断 getter/coercion 边界、入站 answers 权威绑定、nested data schema、运行时
+数组冻结以及单位/玩家状态事件与默认值混淆。冻结稿已通过读取前完整 descriptor 校验、
+`SkillCodeAbiV1AnswerAuthority`、`SKILLCODE_ABI_V1_DATA_SCHEMAS`、运行时 `Object.freeze` 和拆分的 piece/player
+状态语义逐项关闭；最终独立安全复核结论为无剩余 blocker、批准通过。

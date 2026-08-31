@@ -26,7 +26,9 @@
 
 - 不可信代码无法获得文件、网络、进程、环境变量、DOM、真实时间、宿主随机、模块加载或宿主引用。
 - `globalThis`、`Function`、`eval`、动态 import、构造器链和原型链不能扩大权限。
-- 输入、输出和能力参数只包含无原型、可序列化数据；函数与可变 `BattleState` 永不穿越边界。
+- 输入、输出和能力参数只包含无原型、可序列化数据；完整边界在读取属性前拒绝 accessor；六类输入各有精确
+  字段类型，snapshot/payload 由独立 schemaVersion、revision 包络和可执行 data schema 约束；函数与可变
+  `BattleState` 永不穿越边界。
 - content hash/version 与 trace/seed/clock 由宿主产生并逐项匹配；攻击者自报身份不能取得授权。
 - 同一 ABI/content/state/seed/input 得到相同输出、预算计数与 trace hash；七项预算来自沙箱外 meter。
 - 所有代码同步、有限、可终止；返回后任务不能产生副作用。
@@ -52,9 +54,10 @@
 | 输出放大 | 巨型 JSON、命令洪泛 | 64/16 KiB UTF-8；256/0 commands | output/commands 错误 |
 | 日志旁路/泄漏 | `console` 洪泛、打印宿主或私有数据 | v1 不提供 console；诊断计入结构化输出预算 | capability denied；无旁路日志 |
 | 事件链放大 | helper 互相 fireEvent | 深度 32、稳定队列、事务候选 | event-chain 错误；状态 hash 不变 |
-| pending 放大/重放 | 嵌套选择、stale/重复答案 | 深度 8、owner/cursor/revision/root trace/content/replay ID | pending-depth 或 conflict 拒绝；只结算一次 |
+| pending 放大/重放 | 嵌套选择、stale/重复答案、伪造候选 | 深度 8；outbound pending 与 inbound answers 都绑定宿主生成的 cursor/kind/有序 choices/min/max/selection/replay 身份；owner/revision/root trace/content；所请求 select capability | pending-depth、capability 或 conflict 拒绝；只结算一次 |
 | capability 升级 | 声明未知 helper、跨 surface 复用、只申请 Math 却返回伤害 | surface 与本次请求双重白名单；逐 kind 参数/命令 schema | capability denied |
 | 身份伪造 | 自报 sourceHash、seed、trace、revision | 宿主重算/生成身份并逐项匹配 | input/output schema 拒绝 |
+| 输入类型/版本混淆 | 用任意对象或 getter 冒充 battle、handle、answers 或 payload | 读取前 descriptor 检查；surface 输入 schema；精确 snapshot/payload 版本包络与 data schema；handle、权威答案与 cooldown 类型约束 | input schema 或 host-reference 拒绝 |
 | 预算伪报 | 省略/伪造 fuel、memory 或 chain 深度 | 沙箱外 meter 七项必填；与结果、实际 commands/bytes 对照 | schema 或对应 budget 错误 |
 | 输出类型混淆 | 函数、Date、Map、宿主对象 | 递归 plain-data 校验和精确字段 | input/output schema 或 host-reference 错误 |
 | 非原子失败 | helper 已改状态后抛错 | 只生成候选命令；全部验证后单点提交 | transaction rollback；前后 hash 相同 |
@@ -66,7 +69,8 @@
 - `cardCode`：不得假设 `sourcePiece`；支付、弃牌和 effect 同事务。
 - `ruleSkillCode`：只允许 option pending；触发计数和剩余队列失败时恢复。
 - `ruleTriggerSkill`：事件目标已给定，不允许选择或递归模拟 UI；不得把适配 context 变成宿主引用。
-- `pendingEffectCode`：无闭包、无 mutation helper、无嵌套 pending；payload 仅 ID/数值/枚举。
+- `pendingEffectCode`：无闭包、无 mutation helper、无嵌套 pending；payload 仅含 `handles`、`numbers`、`enums`
+  typed records。
 - `previewCode`：非权威、0 command；`Math` 只提供确定性数值运算而不暴露宿主随机；即使输出看似合法，也不能决定正式伤害、成本或合法性。
 
 ## 5. 可信模式边界
