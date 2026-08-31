@@ -324,7 +324,7 @@ export class TriggerSystem {
       const eventChain = chain.dispatches.map(entry => ({ ...entry }))
       if (effectChain && !effectChain.detached) {
         const current = effectChain.currentBatch
-        throw new EffectChainFatalError(
+        throw effectChain.latchFatal(new EffectChainFatalError(
           'RVB_EFFECT_CHAIN_DISPATCH_LIMIT',
           limit.message,
           {
@@ -346,7 +346,7 @@ export class TriggerSystem {
             detached: false,
             budget: 'dispatches',
           },
-        )
+        ))
       }
       writeLog(`[checkTriggers] ${limit.code}: ${limit.message}; chain=${JSON.stringify(eventChain)}`)
       return { success: false, messages: [limit.message], blocked: true, error: { ...limit, eventChain }, eventChain }

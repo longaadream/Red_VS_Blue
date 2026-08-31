@@ -81,10 +81,10 @@ function makeNarutoState() {
   return { naruto, state }
 }
 
-function makeDemonState(withStoredKiljaedan: boolean) {
+function makeDemonState(withStoredKiljaedan: boolean, anchorHp = 20) {
   const anchor = makePiece({
     instanceId: 'demon-anchor', templateId: 'red-anchor', ownerPlayerId: 'player-red', faction: 'red',
-    x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3,
+    x: 0, y: 0, currentHp: anchorHp, maxHp: 20, attack: 3,
   }) as any
   anchor.name = '献祭者'
   const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
@@ -308,6 +308,87 @@ describe('RED-139 approved content migrations', () => {
       statusTags: [{ id: 'stored-status', type: 'stored-status', visible: true }],
     })
   })
+  it.each([true, false])(
+    'preserves demon-summon-5 when lethal ritual damage finalizes its source (stored=%s)',
+    withStoredKiljaedan => {
+      const fixture = makeDemonState(withStoredKiljaedan, 6)
+      const result = runBattleAction(fixture.state, fixture.action as any, { rootSeed: ROOT_SEED })
+      const red = result.state.players.find(player => player.playerId === 'player-red') as any
+      const sacrificed = result.state.graveyard.find(piece => piece.instanceId === 'demon-anchor') as any
+      const summoned = result.state.pieces.find(piece => piece.templateId === 'kiljaedan') as any
+
+      expect(result.state.pieces.some(piece => piece.instanceId === 'demon-anchor')).toBe(false)
+      expect(sacrificed).toMatchObject({ currentHp: 0, attack: 4, ownerPlayerId: 'player-red' })
+      expect(summoned).toMatchObject({ ownerPlayerId: 'player-red', currentHp: 17, x: 2, y: 2 })
+      expect((result.state as any).extensions.kiljaedanPiece).toBeUndefined()
+      expect(red).toMatchObject({ actionPoints: 0, hand: [], discardPile: ['demon-summon-5'] })
+    },
+  )
+
+  it('isolates the declared before-summon view while still accepting target-position redirects', () => {
+    const fixture = makeDemonState(true)
+    globalTriggerSystem.addRule(eventRule(
+      'attempt-to-forge-sealed-demon-summon',
+      'beforePieceSummoned',
+      (_battle, context) => {
+        if (context.sourcePiece?.templateId !== 'kiljaedan') return
+        context.sourcePiece.instanceId = 'forged-by-before-rule'
+        context.sourcePiece.ownerPlayerId = 'player-blue'
+        context.sourcePiece.attack = 999
+        context.sourcePiece.rules = [{ id: 'arbitrary-injected-rule' }]
+        context.targetPosition = { x: 3, y: 2 }
+      },
+    ) as any)
+
+    const result = runBattleAction(fixture.state, fixture.action as any, { rootSeed: ROOT_SEED })
+    const summoned = result.state.pieces.find(piece => piece.instanceId === 'kiljaedan-hidden') as any
+
+    expect(result.state.pieces.some(piece => piece.instanceId === 'forged-by-before-rule')).toBe(false)
+    expect(summoned).toMatchObject({
+      ownerPlayerId: 'player-red',
+      attack: 4,
+      x: 3,
+      y: 2,
+      rules: [],
+    })
+    expect(summoned.rules.some((rule: any) => rule.id === 'arbitrary-injected-rule')).toBe(false)
+  })
+
+  it('rejects a redirected summon outside explicit map bounds even when a stray tile exists', () => {
+    const fixture = makeDemonState(true)
+    fixture.state.map.width = 3
+    fixture.state.map.height = 3
+    fixture.state.map.tiles.push({
+      x: 99,
+      y: 99,
+      props: { type: 'floor', walkable: true, isSpawn: false, isHole: false, isCover: false },
+    })
+    globalTriggerSystem.addRule(eventRule(
+      'redirect-sealed-demon-outside-map',
+      'beforePieceSummoned',
+      (_battle, context) => {
+        if (context.sourcePiece?.templateId === 'kiljaedan') {
+          context.targetPosition = { x: 99, y: 99 }
+        }
+      },
+    ) as any)
+    const before = JSON.stringify(fixture.state)
+
+    let caught: unknown
+    try {
+      runBattleAction(fixture.state, fixture.action as any, { rootSeed: ROOT_SEED })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+      context: expect.objectContaining({ kind: 'summon', detached: false }),
+    })
+    expect(JSON.stringify(fixture.state)).toBe(before)
+  })
+
 
   it('fails a malformed stored-piece capability value closed before commit', () => {
     const { action, anchor, state } = makeDemonState(true)

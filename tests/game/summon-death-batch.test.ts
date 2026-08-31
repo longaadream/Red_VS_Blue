@@ -9,7 +9,7 @@ import {
   createSummonQueueWriter,
   withEffectChain,
 } from '@/lib/game/effect-batch'
-import { dealDamage } from '@/lib/game/skills'
+import { dealDamage, drainBattleEffectChain } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { summonPiece } from '@/lib/game/turn'
@@ -541,6 +541,67 @@ describe('RED-139 DeathBatch', () => {
         charge: 2,
       },
     ])
+  })
+
+  it.each([
+    { kind: 'empty', message: 'at least one candidate' },
+    { kind: 'duplicate', message: 'duplicate candidate' },
+    { kind: 'missing', message: 'not in battle.pieces' },
+    { kind: 'alive', message: 'HP must equal zero' },
+  ])('rejects an invalid $kind DeathRequest before lifecycle or state writes', ({ kind, message }) => {
+    const source = makePiece({ instanceId: 'invalid-death-source', ownerPlayerId: 'player-red' }) as any
+    const dead = makePiece({
+      instanceId: 'invalid-death-dead', ownerPlayerId: 'player-blue', currentHp: 0, maxHp: 10,
+    }) as any
+    const alive = makePiece({
+      instanceId: 'invalid-death-alive', ownerPlayerId: 'player-blue', currentHp: 10, maxHp: 10,
+    }) as any
+    const missing = makePiece({
+      instanceId: 'invalid-death-missing', ownerPlayerId: 'player-blue', currentHp: 0, maxHp: 10,
+    }) as any
+    const state = makeState({ pieces: [source, dead, alive], turnNumber: 12 }) as any
+    const beforeHash = hashBattleState(state)
+    const candidate = (piece: any) => ({ piece, attacker: source, skillId: `invalid-death-${kind}` })
+    const candidates = kind === 'empty'
+      ? []
+      : kind === 'duplicate'
+        ? [candidate(dead), candidate(dead)]
+        : kind === 'missing'
+          ? [candidate(missing)]
+          : [candidate(alive)]
+    const chain = createEffectChain({
+      actionId: `invalid-death-${kind}-action`,
+      chainId: `invalid-death-${kind}-chain`,
+      turn: 12,
+      rootSeed: 0x139,
+    })
+
+    let thrown: any
+    try {
+      withEffectChain(state, chain, () => {
+        createInternalDeathQueueWriter(chain).push({ candidates })
+        drainBattleEffectChain(state, chain)
+      })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+      context: {
+        actionId: `invalid-death-${kind}-action`,
+        chainId: `invalid-death-${kind}-chain`,
+        kind: 'death',
+        depth: 0,
+        turn: 12,
+        rootSeed: 0x139,
+        detached: false,
+      },
+    })
+    expect(thrown.message).toContain(message)
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(chain.state).toBe('idle')
   })
 
   it('counts endogenous death against the shared batch budget with parent/depth diagnostics', () => {

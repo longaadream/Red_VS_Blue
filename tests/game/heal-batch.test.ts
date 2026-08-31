@@ -129,6 +129,65 @@ describe('RED-139 deterministic HealBatch', () => {
     ))).toBe(true)
   })
 
+  it.each([
+    { blockZeta: false, expectedHp: 60, expectedHeal: 10 },
+    { blockZeta: true, expectedHp: 99, expectedHeal: 0 },
+  ])(
+    'uses batch-start HP across Prepare side effects and skips blocked Commit (blocked=$blockZeta)',
+    ({ blockZeta, expectedHp, expectedHeal }) => {
+      const healer = makePiece({ instanceId: 'snapshot-source', ownerPlayerId: 'player-red' }) as any
+      const alpha = makePiece({ instanceId: 'snapshot-alpha', ownerPlayerId: 'player-red', currentHp: 40, maxHp: 100 }) as any
+      const zeta = makePiece({ instanceId: 'snapshot-zeta', ownerPlayerId: 'player-red', currentHp: 50, maxHp: 100 }) as any
+      const state = makeState({ pieces: [healer, zeta, alpha] }) as any
+      globalTriggerSystem.addRule(eventRule('mutate-later-heal-target', 'beforeHealTaken', (_battle, context) => {
+        if (context.sourcePiece.instanceId === alpha.instanceId) zeta.currentHp = 99
+        if (blockZeta && context.sourcePiece.instanceId === zeta.instanceId) {
+          return { success: true, blocked: true }
+        }
+      }) as any)
+
+      const result = healDamage(healer, [zeta, alpha], 10, state, 'snapshot-heal')
+
+      expect(alpha.currentHp).toBe(50)
+      expect(zeta.currentHp).toBe(expectedHp)
+      expect(result.results[0]).toMatchObject({
+        targetId: zeta.instanceId,
+        heal: expectedHeal,
+        blocked: blockZeta,
+        targetHp: expectedHp,
+      })
+      expect(result.results[1]).toMatchObject({ targetId: alpha.instanceId, heal: 10, targetHp: 50 })
+    },
+  )
+
+
+  it('reports the final HP when a later Prepare mutates an earlier blocked target', () => {
+    const healer = makePiece({ instanceId: 'blocked-result-source', ownerPlayerId: 'player-red' }) as any
+    const alpha = makePiece({
+      instanceId: 'blocked-result-alpha',
+      ownerPlayerId: 'player-red',
+      currentHp: 40,
+      maxHp: 100,
+    }) as any
+    const zeta = makePiece({
+      instanceId: 'blocked-result-zeta',
+      ownerPlayerId: 'player-red',
+      currentHp: 50,
+      maxHp: 100,
+    }) as any
+    const state = makeState({ pieces: [healer, zeta, alpha] }) as any
+    globalTriggerSystem.addRule(eventRule('mutate-earlier-blocked-target', 'beforeHealTaken', (_battle, context) => {
+      if (context.sourcePiece.instanceId === alpha.instanceId) return { success: true, blocked: true }
+      if (context.sourcePiece.instanceId === zeta.instanceId) alpha.currentHp = 91
+    }) as any)
+
+    const result = healDamage(healer, [alpha, zeta], 10, state, 'blocked-result-heal')
+
+    expect(alpha.currentHp).toBe(91)
+    expect(result.results[0]).toMatchObject({
+      targetId: alpha.instanceId, heal: 0, blocked: true, targetHp: 91,
+    })
+  })
   it('source-wide blocking skips all per-target before/after events and HP commit', () => {
     const healer = makePiece({ instanceId: 'blocked-source', ownerPlayerId: 'player-red' }) as any
     const alpha = makePiece({ instanceId: 'blocked-alpha', ownerPlayerId: 'player-red', currentHp: 20, maxHp: 100 }) as any

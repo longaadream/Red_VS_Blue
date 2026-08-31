@@ -32,6 +32,7 @@ import {
   type DeclaredSummonCapability,
   type DeclaredSummonSpec,
   type EffectBatchContext,
+  type EffectDispatchMetadata,
   type EffectExecution,
   type SourceMirrorSummonCapabilityDeclaration,
   type StoredOrDeclaredPieceSummonCapabilityDeclaration,
@@ -95,6 +96,20 @@ function checkSynchronousTriggers(battle: BattleState, context: any): TriggerRes
     throw error
   }
   return result
+}
+
+function rethrowAttachedEffectContentError(
+  battle: BattleState,
+  error: unknown,
+  message: string,
+  metadata: EffectDispatchMetadata = {},
+): void {
+  if (isSuspendableActionPending(error)) throw error
+  if (isEffectChainFatalError(error)) throw error
+  const chain = getActiveEffectChain(battle)
+  const context = chain?.currentBatch
+  if (!chain || chain.detached || !context) return
+  throw rejectEffectBatch(chain, context, message, error, metadata)
 }
 
 // 简单的日志写入函数
@@ -732,9 +747,19 @@ export function executeCardFunction(
     return result || { success: false, message: '卡牌效果无返回值' }
   } catch (error: any) {
     if (isSuspendableActionPending(error)) throw error
+    if (isEffectChainFatalError(error)) throw error
     if (error?.needsTargetSelection) return error as SkillExecutionResult
     if (error?.needsOptionSelection) return error as SkillExecutionResult
-    if (isEffectChainFatalError(error)) throw error
+    rethrowAttachedEffectContentError(
+      battle,
+      error,
+      `CardCode ${cardDef.id} failed during an EffectBatch`,
+      {
+        sourceId: triggerContext?.sourcePiece?.instanceId,
+        skillId: cardDef.id,
+        targetId: triggerContext?.targetPiece?.instanceId,
+      },
+    )
     console.error(`[executeCardFunction] Error executing card ${cardDef.id}:`, error)
     return { success: false, message: `卡牌执行失败: ${error?.message || error}` }
   } finally {
@@ -1004,6 +1029,16 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             if (isSuspendableActionPending(error)) throw error
             if (isEffectChainFatalError(error)) throw error
             if (error instanceof DamagePipelineError) throw error;
+            rethrowAttachedEffectContentError(
+              battle,
+              error,
+              `Rule SkillCode ${ruleId} failed during an EffectBatch`,
+              {
+                sourceId: context?.sourcePiece?.instanceId || context?.piece?.instanceId,
+                skillId: ruleId,
+                targetId: context?.targetPiece?.instanceId,
+              },
+            )
             console.error('[Rule] Error executing skillCode:', error);
             return { success: false, message: '规则执行失败' };
           }
@@ -1311,6 +1346,16 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                   if (isSuspendableActionPending(error)) throw error
                   if (isEffectChainFatalError(error)) throw error
                   console.error('Error executing skill in rule effect:', error);
+                  rethrowAttachedEffectContentError(
+                    battle,
+                    error,
+                    `Rule triggerSkill ${skillId} failed during an EffectBatch`,
+                    {
+                      sourceId: context?.sourcePiece?.instanceId || context?.piece?.instanceId,
+                      skillId,
+                      targetId: context?.targetPiece?.instanceId,
+                    },
+                  )
                   return { success: false, message: '技能执行失败' };
                 } finally {
                   restoreSummonQueueContext?.()
@@ -2564,17 +2609,33 @@ function resolveDeathBatch(
   chain: EffectChain,
   battle: BattleState,
 ): DeathBatchResolution {
+  const rejection = (message: string, cause?: unknown): never => {
+    const targetIds = Array.isArray(request.candidates)
+      ? request.candidates.map(candidate => candidate?.piece?.instanceId).filter(Boolean) as string[]
+      : []
+    const first = Array.isArray(request.candidates) ? request.candidates[0] : undefined
+    throw rejectEffectBatch(chain, context, message, cause, {
+      sourceId: first?.attacker?.instanceId,
+      skillId: first?.skillId,
+      targetId: targetIds[0],
+      targetIds,
+    })
+  }
+  if (!Array.isArray(request.candidates) || request.candidates.length === 0) {
+    rejection('DeathBatch requires at least one candidate')
+  }
   const seen = new Set<string>()
   const frozen = request.candidates
     .map(candidate => {
       const targetId = candidate.piece?.instanceId
-      if (!targetId || seen.has(targetId)) return undefined
+      if (!targetId) rejection('DeathBatch candidate requires a stable instanceId')
+      if (seen.has(targetId)) rejection('DeathBatch contains a duplicate candidate')
       seen.add(targetId)
       const canonical = battle.pieces.find(piece => piece.instanceId === targetId)
-      if (!canonical || canonical.currentHp > 0) return undefined
+        ?? rejection('DeathBatch candidate is not in battle.pieces')
+      if (canonical.currentHp !== 0) rejection('DeathBatch candidate HP must equal zero')
       return { ...candidate, piece: canonical }
     })
-    .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate))
     .sort((left, right) => compareEffectTarget(left.piece, right.piece))
   const queues = queueContext(chain, context)
   const legacy = damageMetadata(context)
@@ -2888,6 +2949,7 @@ function resolveHealBatch(
       message: '没有目标',
     }
   }
+  const hpAtBatchStart = new Map(stableTargets.map(target => [target.instanceId, target.currentHp]))
 
   const queues = queueContext(chain, context)
   const beforeHealDealtContext = {
@@ -2964,7 +3026,9 @@ function resolveHealBatch(
       target.instanceId,
     )
     const blocked = Boolean(beforeTaken.blocked)
-    const hpBefore = target.currentHp
+    const hpBefore = blocked
+      ? target.currentHp
+      : hpAtBatchStart.get(target.instanceId)!
     const requestedHeal = blocked ? 0 : Math.max(0, Math.floor(modifiedHeal))
     const nextHp = blocked ? hpBefore : Math.min(target.maxHp, hpBefore + requestedHeal)
     const actualHeal = nextHp - hpBefore
@@ -2996,7 +3060,10 @@ function resolveHealBatch(
     }
   })
 
-  for (const entry of prepared) entry.target.currentHp = entry.nextHp
+  for (const entry of prepared) {
+    if (!entry.result.blocked) entry.target.currentHp = entry.nextHp
+    entry.result.targetHp = entry.target.currentHp
+  }
   for (const entry of prepared) {
     if (entry.result.blocked) {
       appendHealBlockedMessage(
@@ -3134,18 +3201,25 @@ function declaredSummonRequestKey(spec: DeclaredSummonSpec): string {
   return [String(spec.x), String(spec.y), spec.variant ?? ''].join(':')
 }
 
+function compareDeclaredSummonText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
 function compareIndexedDeclaredSummons(
   left: IndexedDeclaredSummon,
   right: IndexedDeclaredSummon,
 ): number {
-  return declaredSummonRequestKey(left.spec).localeCompare(declaredSummonRequestKey(right.spec))
+  return compareDeclaredSummonText(
+    declaredSummonRequestKey(left.spec),
+    declaredSummonRequestKey(right.spec),
+  )
 }
 
 function comparePreparedDeclaredSummons(
   left: PreparedDeclaredSummon,
   right: PreparedDeclaredSummon,
 ): number {
-  return left.piece.instanceId.localeCompare(right.piece.instanceId)
+  return compareDeclaredSummonText(left.piece.instanceId, right.piece.instanceId)
 }
 
 function validateDeclaredSummonPosition(
@@ -3158,7 +3232,19 @@ function validateDeclaredSummonPosition(
   if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) {
     fatal('Summon position must use integer coordinates')
   }
-  const tile = battle.map?.tiles?.find(candidate => candidate.x === x && candidate.y === y)
+  const map = battle.map
+  if (
+    !map
+    || !Number.isSafeInteger(map.width)
+    || !Number.isSafeInteger(map.height)
+    || x < 0
+    || y < 0
+    || x >= map.width
+    || y >= map.height
+  ) {
+    fatal('Summon position is outside the map')
+  }
+  const tile = map.tiles?.find(candidate => candidate.x === x && candidate.y === y)
   if (!tile) fatal('Summon position is outside the map')
   if (!tile.props?.walkable) fatal('Summon position must be walkable')
   if (battle.pieces.some(piece => (
@@ -3215,6 +3301,33 @@ function validateSourceMirrorSummon(
     source,
     capability,
   }
+}
+
+function resolveDeclaredSummonSource(
+  battle: BattleState,
+  sourceId: string,
+  capability: DeclaredSummonCapability,
+  fatal: (message: string, cause?: unknown) => never,
+): PieceInstance {
+  const boardMatches = battle.pieces.filter(piece => piece.instanceId === sourceId)
+  const graveyardMatches = (battle.graveyard || []).filter(piece => piece.instanceId === sourceId)
+  if (boardMatches.length + graveyardMatches.length !== 1) {
+    fatal('Declared summon source must resolve to one canonical piece')
+  }
+  const source = boardMatches[0] ?? graveyardMatches[0]
+  if (capability.recipe === 'source-mirror') {
+    if (!boardMatches[0] || source.currentHp <= 0) {
+      fatal('Source-mirror summon source is not an active living piece')
+    }
+    return source
+  }
+  if (
+    (boardMatches[0] && source.currentHp <= 0)
+    || (graveyardMatches[0] && source.currentHp > 0)
+  ) {
+    fatal('Stored-piece summon source is neither active living nor finalized in graveyard')
+  }
+  return source
 }
 
 function validateStoredPieceSummon(
@@ -3430,13 +3543,16 @@ function declaredSummonTriggerContext(
   entry: PreparedDeclaredSummon,
   type: 'beforePieceSummoned' | 'afterPieceSummoned',
 ): Record<string, unknown> {
+  const triggerPiece = type === 'beforePieceSummoned'
+    ? cloneEffectTransactionValue(entry.piece)
+    : entry.piece
   return {
     type,
-    piece: entry.piece,
+    piece: triggerPiece,
     playerId: entry.ownerPlayerId,
-    sourcePiece: entry.piece,
-    targetPiece: entry.piece,
-    target: entry.piece,
+    sourcePiece: triggerPiece,
+    targetPiece: triggerPiece,
+    target: triggerPiece,
     skillId: request.skillId,
     targetPosition: type === 'beforePieceSummoned'
       ? { x: entry.finalX, y: entry.finalY }
@@ -3538,12 +3654,15 @@ export function resolveDeclaredContentSummonBatch(
     ) {
       fatal('Declared SummonBatch exceeds its bound batch size')
     }
-    if (typeof request.sourceId !== 'string' || request.sourceId.length === 0) {
-      fatal('Declared SummonBatch requires a bound source')
-    }
-    const source = battle.pieces.find(piece => (
-      piece.instanceId === request.sourceId && piece.currentHp > 0
-    )) ?? fatal('Declared summon source is not an active living piece')
+    const sourceId = typeof request.sourceId === 'string' && request.sourceId.length > 0
+      ? request.sourceId
+      : fatal('Declared SummonBatch requires a bound source')
+    const source = resolveDeclaredSummonSource(
+      battle,
+      sourceId,
+      capability,
+      fatal,
+    )
     if (!battle.players.some(player => player.playerId === source.ownerPlayerId)) {
       fatal('Declared summon source owner player was not found')
     }
@@ -3903,6 +4022,14 @@ export function dealDamage(
   selectedOption?: any,
 ): any {
   const targets = Array.isArray(target) ? target : [target]
+  const active = getActiveEffectChain(battle)
+  if (active?.state === 'processing' && !active.detached) {
+    active.assertFacadeAllowed('damage', {
+      sourceId: attacker?.instanceId,
+      skillId,
+      targetIds: targets.map(entry => entry?.instanceId),
+    })
+  }
   if (targets.length === 0) {
     return {
       success: false,
@@ -3913,7 +4040,6 @@ export function dealDamage(
     } as DamageBatchResult
   }
 
-  const active = getActiveEffectChain(battle)
   if (active?.state === 'processing') {
     const current = active.currentBatch
     throw new DamagePipelineError(
@@ -3967,6 +4093,14 @@ export function healDamage(
   skillId?: string,
 ): any {
   const targets = Array.isArray(target) ? target : [target]
+  const active = getActiveEffectChain(battle)
+  if (active?.state === 'processing' && !active.detached) {
+    active.assertFacadeAllowed('heal', {
+      sourceId: healer?.instanceId,
+      skillId,
+      targetIds: targets.map(entry => entry?.instanceId),
+    })
+  }
   if (targets.length === 0) {
     return {
       success: false,
@@ -3977,7 +4111,6 @@ export function healDamage(
     } as HealBatchResult
   }
 
-  const active = getActiveEffectChain(battle)
   const chain = active ?? createDetachedEffectChain(battle, 'heal')
   chain.assertFacadeAllowed('heal', {
     sourceId: healer?.instanceId,

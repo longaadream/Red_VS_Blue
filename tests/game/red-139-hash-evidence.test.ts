@@ -49,6 +49,7 @@ type SummonEvent = Meta & {
   sourceId: string | null
   sourceOnBoard: boolean
   extensionPresent: boolean
+  anchorInGraveyard: boolean
   anchorHp: number | null
   anchorAttack: number | null
   x: number | null
@@ -142,6 +143,7 @@ function hasExtension(state: BattleState, key: string): boolean {
 
 function piece(state: BattleState, instanceId: string): EvidencePiece {
   const found = state.pieces.find(candidate => candidate.instanceId === instanceId)
+    ?? state.graveyard.find(candidate => candidate.instanceId === instanceId)
   if (!found) throw new Error(`Missing RED-139 evidence piece: ${instanceId}`)
   return found as EvidencePiece
 }
@@ -279,7 +281,7 @@ function narutoProjection(state: BattleState) {
 function makeDemonState(stored: boolean): { action: CardAction; state: BattleState } {
   const anchor = makeFixturePiece({
     instanceId: 'demon-anchor', templateId: 'red-anchor', ownerPlayerId: 'player-red', faction: 'red',
-    x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3,
+    x: 0, y: 0, currentHp: 6, maxHp: 20, attack: 3,
   }, { name: '献祭者' })
   const state = makeState({ pieces: [anchor], turnNumber: 7 })
   const red = player(state, 'player-red')
@@ -358,6 +360,7 @@ function kiljaedanProjection(state: BattleState) {
     rules: ruleIds(found),
     anchorHp: anchor.currentHp,
     anchorAttack: anchor.attack,
+    anchorInGraveyard: state.graveyard.some(candidate => candidate.instanceId === anchor.instanceId),
     extensionPresent: hasExtension(state, 'kiljaedanPiece'),
     actionPoints: red.actionPoints,
     hand: red.hand.map(card => card.instanceId),
@@ -373,12 +376,14 @@ function summonEvent(
 ): SummonEvent {
   const source = context.sourcePiece as EvidencePiece | undefined
   const anchor = battle.pieces.find(candidate => candidate.instanceId === 'demon-anchor')
+    ?? battle.graveyard.find(candidate => candidate.instanceId === 'demon-anchor')
   return {
     stage,
     sourceId: source?.instanceId ?? null,
     sourceOnBoard: !!source && battle.pieces.some(candidate => candidate.instanceId === source.instanceId),
     extensionPresent: hasExtension(battle, extensionKey),
     anchorHp: anchor?.currentHp ?? null,
+    anchorInGraveyard: battle.graveyard.some(candidate => candidate.instanceId === 'demon-anchor'),
     anchorAttack: anchor?.attack ?? null,
     x: source?.x ?? null,
     y: source?.y ?? null,
@@ -403,10 +408,11 @@ function assertSummonEvents(
       stage: event.stage,
       anchorHp: event.anchorHp,
       anchorAttack: event.anchorAttack,
+      anchorInGraveyard: event.anchorInGraveyard,
       extensionPresent: event.extensionPresent,
     }))).toEqual([
-      { stage: 'before', anchorHp: 14, anchorAttack: 4, extensionPresent: extensionPresentBefore },
-      { stage: 'after', anchorHp: 14, anchorAttack: 4, extensionPresent: false },
+      { stage: 'before', anchorHp: 0, anchorAttack: 4, anchorInGraveyard: true, extensionPresent: extensionPresentBefore },
+      { stage: 'after', anchorHp: 0, anchorAttack: 4, anchorInGraveyard: true, extensionPresent: false },
     ])
   }
 }
@@ -436,7 +442,8 @@ function runDemonEvidence(name: 'demonRestore' | 'demonCreate', stored: boolean)
   const final = kiljaedanProjection(authority.state)
   expect(kiljaedanProjection(peer.state)).toEqual(final)
   expect(final).toMatchObject({
-    x: 2, y: 2, currentHp: 17, maxHp: 17, anchorHp: 14, anchorAttack: 4,
+    x: 2, y: 2, currentHp: 17, maxHp: 17, anchorHp: 0, anchorAttack: 4,
+    anchorInGraveyard: true,
     extensionPresent: false, actionPoints: 0, hand: [], discardPile: ['demon-summon-5'],
   })
   if (stored) {

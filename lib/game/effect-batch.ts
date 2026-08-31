@@ -1,5 +1,6 @@
 import { BattleRuleError } from './battle-types'
 import type { Faction, PieceInstance } from './piece'
+import { isSuspendableActionPending } from './suspendable-action-transaction'
 
 export const EFFECT_BATCH_KINDS = ['damage', 'heal', 'summon', 'death'] as const
 
@@ -328,8 +329,8 @@ export function rejectEffectBatch(
   cause?: unknown,
   metadata: EffectDispatchMetadata = {},
 ): EffectChainFatalError {
-  if (isEffectChainFatalError(cause)) return cause
-  return new EffectChainFatalError(
+  if (isEffectChainFatalError(cause)) return chain.latchFatal(cause)
+  return chain.latchFatal(new EffectChainFatalError(
     'RVB_EFFECT_CHAIN_BATCH_REJECTED',
     message,
     {
@@ -353,7 +354,7 @@ export function rejectEffectBatch(
       budget: 'state',
     },
     cause,
-  )
+  ))
 }
 export type EffectChainRecord =
   | ({ readonly type: 'enqueue' } & EffectLedgerEntry)
@@ -528,6 +529,7 @@ export class EffectChain {
   private batchCount = 0
   private dispatchCount = 0
   private currentState: EffectChainState = 'idle'
+  private firstFatal?: EffectChainFatalError
 
   constructor(input: EffectChainOptions) {
     const options = normalizeOptions(input)
@@ -566,7 +568,17 @@ export class EffectChain {
     return this.recordLog.slice()
   }
 
+  latchFatal(error: EffectChainFatalError): EffectChainFatalError {
+    this.firstFatal ??= error
+    return this.firstFatal
+  }
+
+  assertHealthy(): void {
+    if (this.firstFatal) throw this.firstFatal
+  }
+
   captureWriterBinding(): EffectWriterBinding {
+    this.assertHealthy()
     const current = this.currentBatch
     return Object.freeze(current
       ? { parentBatchId: current.batchId, depth: current.depth + 1 }
@@ -574,6 +586,7 @@ export class EffectChain {
   }
 
   assertFacadeAllowed(kind: EffectBatchKind, metadata: EffectDispatchMetadata = {}): void {
+    this.assertHealthy()
     this.assertKnownKind(kind, metadata)
     if (this.currentState === 'processing') {
       throw this.fatal(
@@ -591,6 +604,7 @@ export class EffectChain {
     unsafeRequest: TRequest,
     options: Partial<EffectWriterBinding> = {},
   ): EffectLedgerEntry<TRequest> {
+    this.assertHealthy()
     this.assertRequestKind(unsafeRequest)
     const current = this.currentBatch
     const parentBatchId = options.parentBatchId ?? current?.batchId
@@ -631,6 +645,7 @@ export class EffectChain {
     requests: readonly TRequest[],
     options: Partial<EffectWriterBinding> = {},
   ): readonly EffectLedgerEntry<TRequest>[] {
+    this.assertHealthy()
     const checkpoint = this.snapshot()
     try {
       return requests.map(request => this.enqueue(request, options))
@@ -643,6 +658,7 @@ export class EffectChain {
   drain<TResult extends EffectHandlerResultMap>(
     handlers: EffectHandlers<TResult>,
   ): readonly EffectExecution<TResult[EffectBatchKind]>[] {
+    this.assertHealthy()
     if (this.currentState === 'processing') {
       throw this.fatal(
         'RVB_EFFECT_CHAIN_REENTRANT',
@@ -669,9 +685,25 @@ export class EffectChain {
       return executions
     } catch (error) {
       const failedRecords = this.recordLog.slice()
+      const failedBatch = [...failedRecords]
+        .reverse()
+        .find(record => record.type === 'batch:start')
+      const failure = isEffectChainFatalError(error)
+        ? this.latchFatal(error)
+        : this.detached || isSuspendableActionPending(error)
+          ? error
+          : this.fatal(
+              'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+              'Attached EffectChain batch execution failed',
+              'state',
+              this.batchCount,
+              this.limits.maxBatches,
+              failedBatch ?? {},
+              error,
+            )
       this.restore(checkpoint)
       this.recordLog = failedRecords
-      throw error
+      throw failure
     } finally {
       this.currentState = 'idle'
       this.batchStack = []
@@ -683,6 +715,7 @@ export class EffectChain {
     originStage: 'damage:death',
     handler: (request: DeathRequest, context: EffectBatchContext<'death'>, chain: EffectChain) => TResult,
   ): TResult {
+    this.assertHealthy()
     this.assertRequestKind(unsafeRequest)
     if (this.currentState !== 'processing' || !this.currentBatch) {
       throw this.fatal(
@@ -708,6 +741,7 @@ export class EffectChain {
   }
 
   recordDispatch(metadata: EffectDispatchMetadata = {}, count = 1): void {
+    this.assertHealthy()
     if (metadata.kind !== undefined) this.assertKnownKind(metadata.kind, metadata)
     if (!Number.isSafeInteger(count) || count <= 0) {
       throw this.fatal(
@@ -913,6 +947,16 @@ export class EffectChain {
     this.recordLog.push(Object.freeze({ type: 'batch:start', ...context }))
     try {
       return execute(context)
+    } catch (error) {
+      if (isEffectChainFatalError(error)) throw this.latchFatal(error)
+      if (this.detached || isSuspendableActionPending(error)) throw error
+      throw rejectEffectBatch(
+        this,
+        context,
+        'Effect ' + input.request.kind + ' batch handler failed',
+        error,
+        requestDiagnostics(input.request),
+      )
     } finally {
       const popped = this.batchStack.pop()
       if (popped !== context) {
@@ -972,7 +1016,7 @@ export class EffectChain {
     cause?: unknown,
   ): EffectChainFatalError {
     const current = this.currentBatch
-    return new EffectChainFatalError(code, message, {
+    return this.latchFatal(new EffectChainFatalError(code, message, {
       actionId: this.actionId,
       chainId: this.chainId,
       batchId: metadata.batchId ?? current?.batchId,
@@ -991,7 +1035,7 @@ export class EffectChain {
       targetIds: metadata.targetIds,
       detached: this.detached,
       budget,
-    }, cause)
+    }, cause))
   }
 }
 
@@ -1007,8 +1051,8 @@ function effectWriterFatal(
   cause: unknown,
   metadata: EffectDispatchMetadata = {},
 ): EffectChainFatalError {
-  if (isEffectChainFatalError(cause)) return cause
-  return new EffectChainFatalError(
+  if (isEffectChainFatalError(cause)) return chain.latchFatal(cause)
+  return chain.latchFatal(new EffectChainFatalError(
     kind === 'summon'
       ? 'RVB_EFFECT_CHAIN_SUMMON_CAPABILITY'
       : 'RVB_EFFECT_CHAIN_STATE_INVALID',
@@ -1033,7 +1077,7 @@ function effectWriterFatal(
       budget: 'binding',
     },
     cause,
-  )
+  ))
 }
 
 function bindWriter<TInput, TRequest extends EffectRequest>(

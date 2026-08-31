@@ -466,7 +466,9 @@ describe('RED-139 EffectChain core scheduler', () => {
     )
     const before = effectChain.snapshot()
 
-    expect(() => writer.push({
+    let caught: unknown
+    try {
+      writer.push({
       sourceId: 'source',
       summons: [{
         x: 1,
@@ -474,17 +476,37 @@ describe('RED-139 EffectChain core scheduler', () => {
         variant: 'summon',
         recipe: 'injected',
       }],
-    } as never)).toThrow(expect.objectContaining({
-      code: 'RVB_EFFECT_CHAIN_SUMMON_CAPABILITY',
-    }))
+      } as never)
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toMatchObject({ code: 'RVB_EFFECT_CHAIN_SUMMON_CAPABILITY' })
     expect(effectChain.snapshot()).toEqual(before)
 
-    writer.push({
+
+    let repeated: unknown
+    try {
+      writer.push({
+        sourceId: 'source',
+        summons: [{ x: 1, y: 2, variant: 'summon' }],
+      })
+    } catch (error) {
+      repeated = error
+    }
+    expect(repeated).toBe(caught)
+
+    const freshChain = chain()
+    const freshWriter = createDeclaredSummonQueueWriter(
+      freshChain,
+      'fixture-summon',
+      SOURCE_MIRROR_CAPABILITY,
+    )
+    freshWriter.push({
       sourceId: 'source',
       summons: [{ x: 1, y: 2, variant: 'summon' }],
     })
     let captured: SummonRequest | undefined
-    effectChain.drain({
+    freshChain.drain({
       damage: () => undefined,
       heal: () => undefined,
       summon: request => {

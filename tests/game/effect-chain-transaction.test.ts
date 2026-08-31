@@ -5,13 +5,14 @@ import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
 import {
   EffectChainFatalError,
   createEffectChain,
+  createInternalDeathQueueWriter,
   withEffectChain,
   getActiveEffectChain,
   isEffectChainFatalError,
   type EffectChain,
 } from '@/lib/game/effect-batch'
-import { dealDamage, type SkillDefinition } from '@/lib/game/skills'
-import { RANDOM_STREAM_NAMES, getActiveRuleRuntime, type RuleRuntime } from '@/lib/game/rule-runtime'
+import { dealDamage, healDamage, loadRuleById, type SkillDefinition } from '@/lib/game/skills'
+import { RANDOM_STREAM_NAMES, RuleRuntime, getActiveRuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import { DEFAULT_SKILLS } from '@/lib/game/skill-repository'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import type { BattleState } from '@/lib/game/turn'
@@ -285,6 +286,537 @@ describe('RED-139 authoritative EffectChain transactions', () => {
     expect(hashBattleState(state)).toBe(beforeHash)
     expect(JSON.stringify(state)).toBe(beforeJson)
     expect(getActiveEffectChain(failedScope!)).toBeUndefined()
+  })
+
+
+  it('keeps authoritative batch IDs unique across actions and peer cursor sequences identical', () => {
+    const skillId = 'transaction-batch-id-cursor'
+    const code = `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      dealDamage(source, target, 2, 'true', context.battle, 'batch-id-cursor-root');
+      return { success: true };
+    }`
+    const authorityState = skillState(skillId, code, 50)
+    const peerState = structuredClone(authorityState)
+    const observedIds: string[] = []
+    addRule('observe-batch-id-cursor', 'afterDamageDealt', (_battle, context) => {
+      if (context.skillId === 'batch-id-cursor-root') observedIds.push(context.effectBatchId)
+    })
+    const runTwo = (initial: BattleState) => {
+      const first = runBattleAction(
+        initial,
+        skillAction(skillId, 'transaction-batch-id-action-1'),
+        { rootSeed: ROOT_SEED },
+      )
+      const second = runBattleAction(
+        first.state,
+        skillAction(skillId, 'transaction-batch-id-action-2'),
+        { rootSeed: ROOT_SEED },
+      )
+      return { first, second }
+    }
+
+    const authority = runTwo(authorityState)
+    const peer = runTwo(peerState)
+    const firstId = observedIds[0]
+    const secondId = observedIds[1]
+
+    expect(observedIds).toEqual([firstId, secondId, firstId, secondId])
+    expect(firstId).not.toBe(secondId)
+    expect(authority.first.stateHash).toBe(peer.first.stateHash)
+    expect(authority.second.stateHash).toBe(peer.second.stateHash)
+    expect(authority.first.trace?.randomStreams.find(stream => stream.name === 'instance-id/damage-batch'))
+      .toMatchObject({ startCursor: 0, endCursor: 1 })
+    expect(authority.second.trace?.randomStreams.find(stream => stream.name === 'instance-id/damage-batch'))
+      .toMatchObject({ startCursor: 1, endCursor: 2 })
+    expect(peer.first.trace?.randomStreams.find(stream => stream.name === 'instance-id/damage-batch'))
+      .toMatchObject({ startCursor: 0, endCursor: 1 })
+    expect(peer.second.trace?.randomStreams.find(stream => stream.name === 'instance-id/damage-batch'))
+      .toMatchObject({ startCursor: 1, endCursor: 2 })
+  })
+
+  it('keeps legacy fallback batch IDs independent from an ambient RuleRuntime', () => {
+    const skillId = 'transaction-ambient-runtime-guard'
+    const code = `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      dealDamage(source, target, 1, 'true', context.battle, 'ambient-runtime-root');
+      return { success: true };
+    }`
+    const baselineState = skillState(skillId, code)
+    const ambientState = structuredClone(baselineState)
+    const observedIds: string[] = []
+    addRule('observe-ambient-runtime-batch-id', 'afterDamageDealt', (_battle, context) => {
+      if (context.skillId === 'ambient-runtime-root') observedIds.push(context.effectBatchId)
+    })
+
+    const baseline = runBattleAction(
+      baselineState,
+      skillAction(skillId, 'transaction-ambient-runtime-action'),
+    )
+    const ambientRuntime = new RuleRuntime({ rootSeed: 0x5151, tick: 9 })
+    const beforeAmbient = ambientRuntime.snapshot()
+    const ambient = withRuleRuntime(ambientRuntime, () => runBattleAction(
+      ambientState,
+      skillAction(skillId, 'transaction-ambient-runtime-action'),
+    ))
+
+    expect(observedIds).toEqual(['damage-batch-0-0', 'damage-batch-0-0'])
+    expect(ambient.stateHash).toBe(baseline.stateHash)
+    expect(ambient.trace?.randomStreams).toEqual([])
+    expect(ambientRuntime.snapshot()).toEqual(beforeAmbient)
+  })
+
+  it.each(['damage', 'heal'] as const)(
+    'rejects an attached %s facade reentry even when its target array is empty',
+    kind => {
+      const skillId = `transaction-empty-${kind}-reentry`
+      const state = skillState(skillId, `function executeSkill(context) {
+        var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+        var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+        dealDamage(source, target, 2, 'true', context.battle, 'empty-reentry-root');
+        return { success: true };
+      }`)
+      let attempted = false
+      addRule(`empty-${kind}-reentry-rule`, 'afterDamageDealt', (battle, context) => {
+        if (context.skillId !== 'empty-reentry-root' || attempted) return
+        attempted = true
+        if (kind === 'damage') {
+          dealDamage(context.sourcePiece, [], 1, 'true', battle, 'empty-damage-reentry')
+        } else {
+          healDamage(context.sourcePiece, [], 1, battle, 'empty-heal-reentry')
+        }
+      })
+      const beforeHash = hashBattleState(state)
+      const beforeJson = JSON.stringify(state)
+
+      let caught: unknown
+      try {
+        runBattleAction(
+          state,
+          skillAction(skillId, `transaction-empty-${kind}-action`),
+          { rootSeed: ROOT_SEED },
+        )
+      } catch (error) {
+        caught = error
+      }
+
+      expect(caught).toBeInstanceOf(EffectChainFatalError)
+      expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_REENTRANT')
+      expect((caught as EffectChainFatalError).context).toMatchObject({
+        kind,
+        targetIds: [],
+        detached: false,
+      })
+      expect(hashBattleState(state)).toBe(beforeHash)
+      expect(JSON.stringify(state)).toBe(beforeJson)
+    },
+  )
+
+  it('rethrows a SkillCode handler fatal even when the script catches it and returns success', () => {
+    const skillId = 'transaction-swallowed-skill-fatal'
+    const state = skillState(skillId, `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      try {
+        dealDamage(source, [target, target], 1, 'true', context.battle, 'swallowed-skill-duplicate');
+      } catch (error) {}
+      context.battle.extensions.swallowedSkillFatalLeak = true;
+      return { success: true };
+    }`)
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+    let caught: unknown
+    try {
+      runBattleAction(
+        state,
+        skillAction(skillId, 'transaction-swallowed-skill-action'),
+        { rootSeed: ROOT_SEED },
+      )
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      kind: 'damage',
+      skillId: 'swallowed-skill-duplicate',
+      detached: false,
+    })
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+  })
+
+  it('rethrows an ordinary lifecycle error after SkillCode catches the facade failure', () => {
+    let attemptedRuntime: RuleRuntime | undefined
+    let attemptedScope: BattleState | undefined
+    const throwingRule = addRule(
+      'transaction-ordinary-lifecycle-rule',
+      'afterDamageDealt',
+      (battle, context) => {
+        if (context.skillId !== 'swallowed-ordinary-rule-root') return
+        attemptedRuntime = getActiveRuleRuntime()
+        attemptedScope = battle
+        attemptedRuntime!.nextRandom(RANDOM_STREAM_NAMES.skillEffect)
+        ;(battle.extensions as any).ordinaryRuleLeak = true
+        throw new Error('ordinary lifecycle failure')
+      },
+      { maxUses: 10, uses: 0 },
+    )
+    const skillId = 'transaction-swallowed-ordinary-rule'
+    const state = skillState(skillId, `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      try {
+        dealDamage(source, target, 2, 'true', context.battle, 'swallowed-ordinary-rule-root');
+      } catch (error) {}
+      context.battle.extensions.swallowedOrdinaryRuleLeak = true;
+      return { success: true };
+    }`)
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+    let caught: unknown
+    try {
+      runBattleAction(
+        state,
+        skillAction(skillId, 'transaction-swallowed-ordinary-rule-action'),
+        { rootSeed: ROOT_SEED },
+      )
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_BATCH_REJECTED')
+    expect((caught as EffectChainFatalError).cause).toBeInstanceOf(Error)
+    expect(((caught as EffectChainFatalError).cause as Error).message)
+      .toContain('ordinary lifecycle failure')
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      kind: 'damage',
+      skillId: 'swallowed-ordinary-rule-root',
+      sourceId: 'transaction-source',
+      targetId: 'transaction-target',
+      detached: false,
+    })
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    expect(throwingRule.limits).toEqual({ maxUses: 10, uses: 0 })
+    expectRuntimeReset(attemptedRuntime)
+    expect(getActiveEffectChain(attemptedScope!)).toBeUndefined()
+  })
+
+
+  it('fails a real authored Rule skillCode closed instead of returning a soft failure', () => {
+    const skillId = 'transaction-authored-rule-ordinary-error'
+    const state = skillState(skillId, `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      try {
+        dealDamage(source, target, 2, 'true', context.battle, 'authored-rule-ordinary-root');
+      } catch (error) {}
+      context.battle.extensions.authoredRuleOrdinaryLeak = true;
+      return { success: true };
+    }`)
+    const target = state.pieces.find(piece => piece.instanceId === 'transaction-target') as any
+    const authoredRule = loadRuleById('rule-watcher-rage-taken', true)
+    expect(authoredRule).toBeDefined()
+    if (!authoredRule) return
+    target.rules = [authoredRule]
+    target.statusTags = { invalidSerializedShape: true }
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+    let caught: unknown
+    try {
+      runBattleAction(
+        state,
+        skillAction(skillId, 'transaction-authored-rule-ordinary-action'),
+        { rootSeed: ROOT_SEED },
+      )
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_BATCH_REJECTED')
+    expect((caught as EffectChainFatalError).cause).toBeInstanceOf(Error)
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      kind: 'damage',
+      skillId: 'rule-watcher-rage-taken',
+      sourceId: 'transaction-target',
+      targetId: 'transaction-source',
+      detached: false,
+    })
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+  })
+  it('rethrows an ordinary reactive CardCode error after root SkillCode catches it', () => {
+    let attemptedRuntime: RuleRuntime | undefined
+    const probeRule = addRule(
+      'transaction-ordinary-card-runtime-probe',
+      'afterDamageDealt',
+      (battle, context) => {
+        if (context.skillId !== 'swallowed-ordinary-card-root') return
+        attemptedRuntime = getActiveRuleRuntime()
+        attemptedRuntime!.nextRandom(RANDOM_STREAM_NAMES.skillEffect)
+        ;(battle.extensions as any).ordinaryCardProbeLeak = true
+      },
+      { maxUses: 10, uses: 0 },
+    )
+    const skillId = 'transaction-swallowed-ordinary-card'
+    const state = skillState(skillId, `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      try {
+        dealDamage(source, target, 2, 'true', context.battle, 'swallowed-ordinary-card-root');
+      } catch (error) {}
+      context.battle.extensions.swallowedOrdinaryCardLeak = true;
+      return { success: true };
+    }`)
+    state.players[0].hand = [{
+      cardId: 'transaction-ordinary-card',
+      instanceId: 'transaction-ordinary-card-1',
+      ownerPlayerId: 'player-red',
+    }] as any
+    ;(state as any).customCards = {
+      'transaction-ordinary-card': {
+        id: 'transaction-ordinary-card',
+        name: 'Ordinary CardCode failure probe',
+        description: '',
+        type: 'reactive',
+        actionPointCost: 0,
+        trigger: { type: 'afterDamageDealt' },
+        code: `function executeCard(context) {
+          context.battle.extensions.ordinaryCardCodeLeak = true;
+          throw new Error('ordinary reactive CardCode failure');
+        }`,
+      },
+    }
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+    let caught: unknown
+    try {
+      runBattleAction(
+        state,
+        skillAction(skillId, 'transaction-swallowed-ordinary-card-action'),
+        { rootSeed: ROOT_SEED },
+      )
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_BATCH_REJECTED')
+    expect((caught as EffectChainFatalError).cause).toBeInstanceOf(Error)
+    expect(((caught as EffectChainFatalError).cause as Error).message)
+      .toContain('ordinary reactive CardCode failure')
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      kind: 'damage',
+      skillId: 'transaction-ordinary-card',
+      sourceId: 'transaction-source',
+      targetId: 'transaction-target',
+      detached: false,
+    })
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    expect(probeRule.limits).toEqual({ maxUses: 10, uses: 0 })
+    expectRuntimeReset(attemptedRuntime)
+  })
+
+  it('rethrows a reactive CardCode reentry fatal even when the card catches it and returns success', () => {
+    const skillId = 'transaction-swallowed-card-fatal'
+    const state = skillState(skillId, `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      dealDamage(source, target, 2, 'true', context.battle, 'swallowed-card-root');
+      return { success: true };
+    }`)
+    state.players[0].hand = [{
+      cardId: 'transaction-swallowed-card',
+      instanceId: 'transaction-swallowed-card-1',
+      ownerPlayerId: 'player-red',
+    }] as any
+    ;(state as any).customCards = {
+      'transaction-swallowed-card': {
+        id: 'transaction-swallowed-card',
+        name: 'Swallowed fatal probe',
+        description: '',
+        type: 'reactive',
+        actionPointCost: 0,
+        trigger: { type: 'afterDamageDealt' },
+        code: `function executeCard(context) {
+          try {
+            dealDamage(context.sourcePiece, [context.targetPiece], 1, 'true', context.battle, 'swallowed-card-reentry');
+          } catch (error) {}
+          context.battle.extensions.swallowedCardFatalLeak = true;
+          return { success: true };
+        }`,
+      },
+    }
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+    let caught: unknown
+    try {
+      runBattleAction(
+        state,
+        skillAction(skillId, 'transaction-swallowed-card-action'),
+        { rootSeed: ROOT_SEED },
+      )
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_REENTRANT')
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      kind: 'damage',
+      skillId: 'swallowed-card-reentry',
+      detached: false,
+    })
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+  })
+  it('makes reactive CardCode direct damage reentry fatal and rolls back the root action', () => {
+    const skillId = 'transaction-reactive-direct-damage'
+    const state = skillState(skillId, `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      dealDamage(source, target, 2, 'true', context.battle, 'reactive-root-damage');
+      return { success: true };
+    }`)
+    state.players[0].hand = [{
+      cardId: 'transaction-reactive-card',
+      instanceId: 'transaction-reactive-card-1',
+      ownerPlayerId: 'player-red',
+    }] as any
+    ;(state as any).customCards = {
+      'transaction-reactive-card': {
+        id: 'transaction-reactive-card',
+        name: 'Reactive direct damage probe',
+        description: '',
+        type: 'reactive',
+        actionPointCost: 0,
+        trigger: { type: 'afterDamageDealt' },
+        code: `function executeCard(context) {
+          context.battle.extensions.reactiveDirectDamageLeak = true;
+          try {
+            dealDamage(context.sourcePiece, context.targetPiece, 1, 'true', context.battle, 'reactive-direct-damage');
+          } catch (error) {
+            error.needsTargetSelection = true;
+            throw error;
+          }
+          return { success: true };
+        }`,
+      },
+    }
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+
+    let caught: unknown
+    try {
+      runBattleAction(state, skillAction(skillId, 'transaction-reactive-action'), { rootSeed: ROOT_SEED })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_REENTRANT')
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      actionId: 'transaction-reactive-action',
+      chainId: 'effect-chain:transaction-reactive-action',
+      batchId: expect.any(String),
+      kind: 'damage',
+      depth: 0,
+      turn: 7,
+      rootSeed: ROOT_SEED,
+      sourceId: 'transaction-source',
+      skillId: 'reactive-direct-damage',
+      targetIds: ['transaction-target'],
+      detached: false,
+      budget: 'state',
+    })
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+  })
+
+  it('rejects an invalid queued DeathBatch and rolls back the root transaction', () => {
+    let attemptedRuntime: RuleRuntime | undefined
+    let attemptedScope: BattleState | undefined
+    const invalidDeathRule = addRule(
+      'enqueue-invalid-death',
+      'afterDamageDealt',
+      (battle, context) => {
+        if (context.skillId !== 'invalid-death-root') return
+        attemptedScope = battle
+        attemptedRuntime = getActiveRuleRuntime()
+        attemptedRuntime!.nextRandom(RANDOM_STREAM_NAMES.skillEffect)
+        ;(battle.extensions as any).invalidDeathLeak = true
+        createInternalDeathQueueWriter(getActiveEffectChain(battle)!).push({
+          candidates: [{
+            piece: context.targetPiece,
+            attacker: context.sourcePiece,
+            skillId: 'invalid-death-child',
+          }],
+        })
+      },
+      { maxUses: 10, uses: 0 },
+    )
+    const skillId = 'transaction-invalid-death'
+    const state = skillState(skillId, `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      dealDamage(source, target, 2, 'true', context.battle, 'invalid-death-root');
+      return { success: true };
+    }`)
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+    let caught: unknown
+    try {
+      runBattleAction(state, skillAction(skillId, 'transaction-invalid-death-action'), { rootSeed: ROOT_SEED })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_BATCH_REJECTED')
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      actionId: 'transaction-invalid-death-action',
+      chainId: 'effect-chain:transaction-invalid-death-action',
+      batchId: expect.any(String),
+      parentBatchId: expect.any(String),
+      kind: 'death',
+      depth: 1,
+      turn: 7,
+      rootSeed: ROOT_SEED,
+      sourceId: 'transaction-source',
+      skillId: 'invalid-death-child',
+      targetId: 'transaction-target',
+      targetIds: ['transaction-target'],
+      detached: false,
+    })
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    expect(invalidDeathRule.limits).toEqual({ maxUses: 10, uses: 0 })
+    expectRuntimeReset(attemptedRuntime)
+    expect(getActiveEffectChain(attemptedScope!)).toBeUndefined()
   })
 
   it('rolls back state, runtime cursor/clock, event IDs, and rule limits for an invalid queued request', () => {

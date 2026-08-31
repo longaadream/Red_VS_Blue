@@ -23,6 +23,7 @@ import {
   getRuleExecutionTriggerSystem,
   RuleRuntime,
   withRuleExecutionContext,
+  getActiveRuleRuntime,
   withRuleRuntime,
   type RuleExecutionContext,
 } from './rule-runtime'
@@ -137,14 +138,20 @@ export function runBattleAction(
         chainId: `effect-chain:${actionId}`,
         turn: state.turn?.turnNumber ?? 0,
         rootSeed: runtime?.rootSeed ?? null,
-        createBatchId: ({ kind, batchSequence }) => runtime
-          ? runtime.nextInstanceId(`${kind}-batch`, `${kind}-batch`)
-          : `${kind}-batch-${actionIndex}-${batchSequence}`,
+        createBatchId: ({ kind, batchSequence }) => {
+          if (!runtime) return `${kind}-batch-${actionIndex}-${batchSequence}`
+          const batchRuntime = getActiveRuleRuntime() ?? runtime
+          return batchRuntime.nextInstanceId(`${kind}-batch`, `${kind}-batch`)
+        },
       })
       return withEffectChain(
         hydratedState,
         effectChain,
-        () => applyBattleAction(hydratedState, action),
+        () => {
+          const nextState = applyBattleAction(hydratedState, action)
+          effectChain.assertHealthy()
+          return nextState
+        },
       )
     }
     const applyWithDeterminism = () => runtime ? withRuleRuntime(runtime, apply) : apply()
