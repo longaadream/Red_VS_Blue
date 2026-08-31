@@ -26,6 +26,8 @@
 
 - [`GAME_LOGIC_SYSTEM.md`](./GAME_LOGIC_SYSTEM.md)：当前游戏逻辑接口、状态流转、运行模式差异和执行流程示意图。
 - [`SKILLCODE_AUTHORING_STANDARD.md`](./SKILLCODE_AUTHORING_STANDARD.md)：SkillCode 六类入口、现役 Helper、pending 重放、确定性与安全编写标准。
+- [`SKILLCODE_ABI_V1.md`](./SKILLCODE_ABI_V1.md)：冻结的 SkillCode ABI v1、六类 surface、能力白名单、资源预算、错误与事务语义。
+- [`SKILLCODE_THREAT_MODEL.md`](./SKILLCODE_THREAT_MODEL.md)：不可信 SkillCode 的威胁、可信边界、安全不变量和验证门禁。
 - `ARCHITECTURE.md`：整体架构和模块依赖关系。
 - `ENGINE_CORE.md`：游戏引擎核心、状态变化和执行流程。
 - `DAMAGE_PIPELINE.md`：RED-33 确定性单体/多目标伤害阶段、日志、连锁保护和生命周期合同。
