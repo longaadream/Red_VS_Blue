@@ -5,6 +5,7 @@ import path from 'node:path'
 import { getAppRoot, getUserDataDir } from '@/lib/app-paths'
 
 import { getBundledBaseProfileV1 } from './bundled-base'
+import type { ResolvedSnapshotViewV1 } from '../core/resolver'
 import { getProfileWsIngressTrackerV1 } from './profile-ws-ingress'
 import {
   classifyProfileReloadV1,
@@ -28,6 +29,8 @@ export interface ProfileRuntimeContextV1 {
 export interface ProfileLeaseReportV1 {
   readonly active: boolean
   readonly roomIds: readonly string[]
+  readonly pveRunIds?: readonly string[]
+  readonly pveBattleIds?: readonly string[]
 }
 
 export interface ProfileServerReportV1 {
@@ -140,6 +143,14 @@ export function getRuntimeProfileReferenceV1(): ProfileReferenceV1 {
   return reference
 }
 
+export function openRuntimeVerifiedSnapshotV1(): ResolvedSnapshotViewV1 {
+  const context = getProfileRuntimeContextV1()
+  const reference = referenceForRuntime(context)
+  const root = getRuntimeProfileRootV1(context, reference)
+  assertRuntimeEnvironment(context, reference, root)
+  return context.store.openVerifiedSnapshot(reference)
+}
+
 export function getRuntimeProfileRootV1(
   context: ProfileRuntimeContextV1,
   reference: ProfileReferenceV1,
@@ -230,7 +241,11 @@ function hasMenuResources(
 
 export async function getProfileLeaseReportV1(): Promise<ProfileLeaseReportV1> {
   const { getRoomStore } = await import('@/lib/game/room-store')
-  const rooms = await getRoomStore().getAllRooms()
+  const { getPveActiveBattleLeaseReportV1 } = await import('@/lib/pve/profile-lifecycle')
+  const [rooms, pve] = await Promise.all([
+    getRoomStore().getAllRooms(),
+    Promise.resolve(getPveActiveBattleLeaseReportV1()),
+  ])
   const roomIds = rooms
     .filter(room => (
       room.status === 'in-progress'
@@ -238,7 +253,20 @@ export async function getProfileLeaseReportV1(): Promise<ProfileLeaseReportV1> {
     ))
     .map(room => room.id)
     .sort()
-  return { active: roomIds.length > 0, roomIds }
+  return {
+    active: roomIds.length > 0 || pve.active,
+    roomIds,
+    ...(pve.runIds.length > 0 ? { pveRunIds: pve.runIds } : {}),
+    ...(pve.battleIds.length > 0 ? { pveBattleIds: pve.battleIds } : {}),
+  }
+}
+
+export async function reconcileRuntimePveAuthorityV1(
+  authorityContentHash: string,
+  reason: 'activation-commit' | 'admission-release' | 'startup-recovery',
+) {
+  const { reconcilePveAuthorityV1 } = await import('@/lib/pve/profile-lifecycle')
+  return reconcilePveAuthorityV1(authorityContentHash, reason)
 }
 
 export async function getProfileServerReportV1(): Promise<ProfileServerReportV1> {
@@ -300,6 +328,8 @@ export async function getProfileServerReportV1(): Promise<ProfileServerReportV1>
     seed: PROFILE_HEALTH_SEED_V1,
     stateHash,
     activeRoomIds: lease.roomIds,
+    activePveRunIds: lease.pveRunIds ?? [],
+    activePveBattleIds: lease.pveBattleIds ?? [],
   })
   return report
 }
@@ -379,7 +409,10 @@ export async function beginProfileActivationV1(targetProfileHash: string): Promi
         throw new ProfileStoreErrorV1('PROFILE_STORE_BUSY', 'activation planning fence lost')
       }
       if (lease.active) {
-        throw new Error(`PROFILE_IN_USE: ${lease.roomIds.join(',')}`)
+        throw new Error(`PROFILE_IN_USE: ${[
+          ...lease.roomIds,
+          ...(lease.pveRunIds ?? []),
+        ].join(',')}`)
       }
     } catch (error) {
       if (process.env.RVB_PROFILE_ADMISSION_PAUSED === planningFence) {

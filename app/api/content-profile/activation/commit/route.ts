@@ -4,6 +4,7 @@ import {
   getProfileRuntimeContextV1,
   getProfileServerReportV1,
   logProfileEventV1,
+  reconcileRuntimePveAuthorityV1,
 } from '@/lib/content-pipeline/runtime/profile-runtime'
 import { classifyProfileReloadV1 } from '@/lib/content-pipeline/runtime/profile-store'
 
@@ -23,10 +24,33 @@ export async function POST(request: Request) {
     }
     const context = getProfileRuntimeContextV1()
     const state = context.store.readState()
-    if (!state.candidate) throw new Error('PROFILE_CANDIDATE_MISSING')
+    if (!state.candidate) {
+      if (state.activation !== null || state.stable.resolvedProfileHash !== body.targetProfileHash) {
+        throw new Error('PROFILE_CANDIDATE_MISSING')
+      }
+      process.env.RVB_PROFILE_ADMISSION_PAUSED ||= `postcommit:${body.activationId}`
+      const report = await getProfileServerReportV1()
+      if (
+        !report.healthy
+        || report.activationId !== null
+        || report.profile.resolvedProfileHash !== state.stable.resolvedProfileHash
+        || report.profile.authorityContentHash !== state.stable.authorityContentHash
+      ) throw new Error('COMMITTED_PROFILE_HEALTH_FAILED')
+      await reconcileRuntimePveAuthorityV1(state.stable.authorityContentHash, 'activation-commit')
+      const admissionPaused = body.keepAdmissionPaused === true
+      bindStableRuntimeProfileV1({ admissionPaused: admissionPaused ? `postcommit:${body.activationId}` : undefined })
+      return Response.json({ state, report, reloadMode: null, admissionPaused, alreadyCommitted: true })
+    }
     const reloadMode = classifyProfileReloadV1(state.stable, state.candidate)
-    if (reloadMode === 'authority-restart' && (await getProfileLeaseReportV1()).active) {
-      throw new Error('PROFILE_IN_USE')
+    if (reloadMode === 'authority-restart') {
+      const lease = await getProfileLeaseReportV1()
+      if (lease.active) {
+        throw new Error(`PROFILE_IN_USE: ${[
+          ...lease.roomIds,
+          ...(lease.pveRunIds ?? []),
+          ...(lease.pveBattleIds ?? []),
+        ].join(',')}`)
+      }
     }
     const report = await getProfileServerReportV1()
     if (
@@ -37,6 +61,7 @@ export async function POST(request: Request) {
     ) throw new Error('CANDIDATE_HEALTH_FAILED')
     const committed = context.store.commitActivation(body.activationId, body.targetProfileHash)
     commitCompleted = true
+    await reconcileRuntimePveAuthorityV1(committed.stable.authorityContentHash, 'activation-commit')
     const admissionPaused = body.keepAdmissionPaused === true
     bindStableRuntimeProfileV1({
       admissionPaused: admissionPaused ? `postcommit:${body.activationId}` : undefined,
@@ -53,6 +78,8 @@ export async function POST(request: Request) {
     return Response.json({ state: committed, report, reloadMode, admissionPaused })
   } catch (error) {
     if (commitCompleted) {
+      process.env.RVB_PROFILE_ADMISSION_PAUSED ||= 'postcommit:pve-cleanup-failed'
+      try { bindStableRuntimeProfileV1({ admissionPaused: process.env.RVB_PROFILE_ADMISSION_PAUSED }) } catch { /* keep the existing fail-closed fence */ }
       return Response.json({
         error: 'PROFILE_COMMIT_RESPONSE_UNCERTAIN',
         message: error instanceof Error ? error.message : String(error),

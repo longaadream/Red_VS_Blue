@@ -1,7 +1,6 @@
 {
-  "id": "prototype-card-choice",
-  "name": "选择一张手牌",
-  "type": "card-choice",
-  "count": 3,
-  "pools": ["shared-starter"]
+  "schemaVersion": "rvb-pve-reward/v1",
+  "rewardId": "prototype-card-choice",
+  "rewardTableId": "prototype-card-reward-table",
+  "grantEffectId": "prototype-grant-card-reward"
 }

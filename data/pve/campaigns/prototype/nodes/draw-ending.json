@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "rvb-pve-node/v1",
+  "nodeId": "draw-ending",
+  "type": "end",
+  "endingId": "prototype-draw",
+  "outcome": "failed"
+}

@@ -3,6 +3,7 @@ import {
   getProfileRuntimeContextV1,
   getProfileServerReportV1,
   logProfileEventV1,
+  reconcileRuntimePveAuthorityV1,
 } from '@/lib/content-pipeline/runtime/profile-runtime'
 
 import { profileApiError, readJsonObject, requireProfileAdmin } from '../../_shared'
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
     ) throw new Error('PROFILE_ADMISSION_RELEASE_MISMATCH')
 
     const wasPaused = Boolean(process.env.RVB_PROFILE_ADMISSION_PAUSED)
+    process.env.RVB_PROFILE_ADMISSION_PAUSED ||= 'admission-release'
+    await reconcileRuntimePveAuthorityV1(state.stable.authorityContentHash, 'admission-release')
     bindStableRuntimeProfileV1()
     logProfileEventV1('activation-admission-release', {
       resolvedProfileHash: state.stable.resolvedProfileHash,
@@ -41,6 +44,7 @@ export async function POST(request: Request) {
     })
     return Response.json({ state, report, admissionPaused: false, wasPaused })
   } catch (error) {
+    process.env.RVB_PROFILE_ADMISSION_PAUSED ||= 'pve-cleanup-failed'
     return profileApiError(error)
   }
 }
