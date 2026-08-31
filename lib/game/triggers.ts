@@ -7,6 +7,7 @@ import {
   isSuspendableActionPending,
   type SuspendableInteractionInput,
 } from './suspendable-action-transaction'
+import { getRuleExecutionTriggerSystem } from './rule-runtime'
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 
@@ -869,3 +870,12 @@ function applyTransactionInputs(
 
 // 全局触发系统实例
 export const globalTriggerSystem = new TriggerSystem()
+
+/**
+ * Offline/browser callers retain the historical singleton fallback. Online
+ * room execution always installs an explicit RuleExecutionContext, making the
+ * room-owned TriggerSystem the only mutable truth for that transition.
+ */
+export function getActiveTriggerSystem(): TriggerSystem {
+  return getRuleExecutionTriggerSystem(globalTriggerSystem)
+}

@@ -18,7 +18,16 @@ import path from 'path'
 import fs from 'fs'
 import { getUserDataDir } from '@/lib/app-paths'
 import { pinBattleProfileIdentityV1, recordBattleInitialization } from './battle-trace'
-import { RANDOM_STREAM_NAMES, RuleRuntime, withRuleRuntime } from './rule-runtime'
+import {
+  RANDOM_STREAM_NAMES,
+  RuleRuntime,
+  getRuleExecutionTriggerSystem,
+  withRuleExecutionContext,
+  withRuleRuntime,
+  type RuleExecutionContext,
+} from './rule-runtime'
+
+const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 
 import { DEPLOYMENT_DURATION_MS } from './deployment'
 
@@ -36,7 +45,7 @@ function fireInitialGameStart(state: BattleState): void {
   state.gameStartFired = true
 
   for (const piece of [...state.pieces]) {
-    const result = globalTriggerSystem.checkTriggers(state, {
+    const result = getActiveTriggerSystem().checkTriggers(state, {
       type: "afterPieceSummoned",
       playerId: piece.ownerPlayerId,
       sourcePiece: piece,
@@ -46,7 +55,7 @@ function fireInitialGameStart(state: BattleState): void {
     assertSetupTriggerIsSynchronous(result, 'afterPieceSummoned')
   }
 
-  const result = globalTriggerSystem.checkTriggers(state, {
+  const result = getActiveTriggerSystem().checkTriggers(state, {
     type: "gameStart",
     playerId: state.turn.currentPlayerId,
     turnNumber: state.turn.turnNumber,
@@ -547,6 +556,7 @@ export async function createInitialBattleForPlayers(
     deploymentEnabled?: boolean
     deploymentStartedAt?: number
     profileIdentity?: GameProfileIdentityV1
+    ruleExecutionContext?: RuleExecutionContext
   },
 ): Promise<BattleState | null> {
   if (playerIds.length !== 2) return null
@@ -665,7 +675,8 @@ export async function createInitialBattleForPlayers(
   console.log('Teleport in skills:', 'teleport' in skills)
 
   // 重置全局规则注册表，避免上一场战斗残留规则。
-  globalTriggerSystem.clearRules()
+  const triggerSystem = options?.ruleExecutionContext?.triggerSystem ?? getActiveTriggerSystem()
+  triggerSystem.clearRules()
 
   const playerAlignments = Object.fromEntries(
     (playerSelectedPieces ?? [])
@@ -739,12 +750,16 @@ export async function createInitialBattleForPlayers(
     if (!options?.deploymentEnabled) fireInitialGameStart(state)
   }
 
-  if (runtime) {
-    withRuleRuntime(runtime, initializeRules)
-    recordBattleInitialization(state, runtime, orderedIds)
-  } else {
-    initializeRules()
+  const initializeWithDeterminism = () => {
+    if (runtime) withRuleRuntime(runtime, initializeRules)
+    else initializeRules()
   }
+  if (options?.ruleExecutionContext) {
+    withRuleExecutionContext(options.ruleExecutionContext, initializeWithDeterminism)
+  } else {
+    initializeWithDeterminism()
+  }
+  if (runtime) recordBattleInitialization(state, runtime, orderedIds)
 
   writeLog('[createInitialBattle] Battle state created, pieces count: ' + state.pieces.length)
   return state

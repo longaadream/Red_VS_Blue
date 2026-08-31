@@ -11,5 +11,5 @@
     "resolveJsonModule": true
   },
   "include": ["./**/*.ts"],
-  "exclude": ["dist", "node_modules", "ui"]
+  "exclude": ["dist", "node_modules", "ui", "content-pipeline-worker.ts"]
 }

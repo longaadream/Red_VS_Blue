@@ -1,8 +1,13 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { spawn } from 'child_process'
+import { app, BrowserWindow, ipcMain, shell, utilityProcess } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
+import {
+  EditorContentOperationQueueV1,
+  normalizeEditorContentOperationRequestV1,
+  resolveEditorDataDirectoryV1,
+  resolveEditorDataFilePathV1,
+} from './content-pipeline-ipc'
 
 // ─── 路径工具 ─────────────────────────────────────────────────────────────────
 
@@ -15,7 +20,28 @@ function getProjectRoot(): string {
 }
 
 function getDataRoot(): string {
-  return path.join(getProjectRoot(), 'data')
+  return path.join(ensureAuthoringWorkspace(), 'data')
+}
+
+function getAuthoringRoot(): string {
+  return path.join(app.getPath('userData'), 'content-authoring')
+}
+
+function ensureAuthoringWorkspace(): string {
+  const workspace = getAuthoringRoot()
+  const data = path.join(workspace, 'data')
+  if (!fs.existsSync(data)) {
+    fs.mkdirSync(workspace, { recursive: true })
+    fs.cpSync(path.join(getProjectRoot(), 'data'), data, {
+      recursive: true,
+      errorOnExist: false,
+      force: false,
+    })
+  }
+  for (const directory of ['archives', 'keys', 'reports', 'sources']) {
+    fs.mkdirSync(path.join(workspace, directory), { recursive: true })
+  }
+  return workspace
 }
 
 function getEditorUiRoot(): string {
@@ -36,17 +62,12 @@ function restrictWindowNavigation(browserWindow: BrowserWindow, allowedRoot: str
 
 // ─── 安全校验 ─────────────────────────────────────────────────────────────────
 
-const SAFE_NAME = /^[a-zA-Z0-9_\-]+\.json$/
-
-function safePath(subdir: string, filename: string): string {
-  if (!SAFE_NAME.test(filename)) throw new Error('Invalid filename: ' + filename)
-  if (!/^[a-zA-Z0-9_\-/]+$/.test(subdir)) throw new Error('Invalid subdir: ' + subdir)
-  const full = path.resolve(path.join(getDataRoot(), subdir, filename))
-  const root = path.resolve(getDataRoot())
-  if (!full.startsWith(root + path.sep) && !full.startsWith(root)) {
-    throw new Error('Path traversal denied')
-  }
-  return full
+function safePath(
+  subdir: string,
+  filename: string,
+  intent: 'read' | 'write' = 'read',
+): string {
+  return resolveEditorDataFilePathV1(getDataRoot(), subdir, filename, intent)
 }
 
 // ─── 窗口 ─────────────────────────────────────────────────────────────────────
@@ -76,7 +97,10 @@ function createWindow(): void {
   // win.webContents.openDevTools()
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  ensureAuthoringWorkspace()
+  createWindow()
+})
 app.on('window-all-closed', () => app.quit())
 app.on('activate', () => { if (!win || win.isDestroyed()) createWindow() })
 
@@ -94,9 +118,12 @@ function handleTrusted(channel: string, listener: Parameters<typeof ipcMain.hand
 // ─── IPC: 文件列表 ─────────────────────────────────────────────────────────────
 
 handleTrusted('list-files', (_e, subdir: string) => {
-  if (!/^[a-zA-Z0-9_\-/]+$/.test(subdir)) return []
-  const dir = path.join(getDataRoot(), subdir)
-  if (!fs.existsSync(dir)) return []
+  let dir: string
+  try {
+    dir = resolveEditorDataDirectoryV1(getDataRoot(), subdir)
+  } catch {
+    return []
+  }
   return fs.readdirSync(dir)
     .filter(f => f.endsWith('.json'))
     .sort()
@@ -114,7 +141,7 @@ handleTrusted('read-file', (_e, subdir: string, filename: string) => {
 // ─── IPC: 写入文件 ─────────────────────────────────────────────────────────────
 
 handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown) => {
-  const file = safePath(subdir, filename)
+  const file = safePath(subdir, filename, 'write')
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf-8')
   return { ok: true }
 })
@@ -126,42 +153,48 @@ handleTrusted('open-in-editor', (_e, subdir: string, filename: string) => {
   return shell.openPath(file)
 })
 
-// ─── IPC: 运行构建脚本（流式输出） ─────────────────────────────────────────────
+// ─── IPC: 规范化内容操作 → 自包含 worker ─────────────────────────────────────
 
-handleTrusted('run-build', (event, args: { name: string; version: string; desc: string }) => {
-  const projectRoot = getProjectRoot()
-  const scriptPath = path.join(projectRoot, 'scripts', 'build-resource-pack.js')
+function runContentWorker(request: unknown): Promise<unknown> {
+  const workerPath = path.join(__dirname, 'content-pipeline-worker.cjs')
+  return new Promise((resolve, reject) => {
+    const child = utilityProcess.fork(workerPath, [], {
+      serviceName: 'RVB Content Pipeline',
+    })
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      child.kill()
+      reject(new Error('CONTENT_WORKER_TIMEOUT'))
+    }, 10 * 60 * 1000)
+    child.once('message', (message: unknown) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      child.kill()
+      const envelope = message as { ok?: boolean; result?: unknown; error?: string }
+      if (envelope?.ok === true) resolve(envelope.result)
+      else reject(new Error(envelope?.error || 'CONTENT_WORKER_FAILED'))
+    })
+    child.once('exit', (code) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      reject(new Error(`CONTENT_WORKER_EXIT_${code}`))
+    })
+    child.postMessage(request)
+  })
+}
 
-  const push = (line: string) => event.sender.send('build-output', { line })
+const contentOperationQueue = new EditorContentOperationQueueV1()
 
-  if (!fs.existsSync(scriptPath)) {
-    push(`[错误] 找不到构建脚本: ${scriptPath}`)
-    event.sender.send('build-output', { done: true, exitCode: 1 })
-    return
-  }
-
-  // Validate args (only alphanum + hyphen, limited length)
-  const safeName    = (args.name    || 'editor-build').replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 50) || 'editor-build'
-  const safeVersion = (args.version || '').replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 50)
-  const safeDesc    = (args.desc    || '').replace(/[^a-zA-Z0-9_\- ]/g, '').slice(0, 200)
-
-  const child = spawn(
-    'node',
-    [scriptPath, '--name', safeName, '--version', safeVersion, '--desc', safeDesc],
-    { cwd: projectRoot, stdio: ['ignore', 'pipe', 'pipe'] }
+handleTrusted('content-operation', (_event, rawRequest: unknown) => {
+  const workspace = ensureAuthoringWorkspace()
+  const request = normalizeEditorContentOperationRequestV1(
+    workspace,
+    getProjectRoot(),
+    rawRequest,
   )
-
-  child.stdout.on('data', (d: Buffer) => {
-    d.toString().split('\n').forEach(l => l.trim() && push(l))
-  })
-  child.stderr.on('data', (d: Buffer) => {
-    d.toString().split('\n').forEach(l => l.trim() && push('[stderr] ' + l))
-  })
-  child.on('close', (code: number | null) => {
-    event.sender.send('build-output', { done: true, exitCode: code ?? -1 })
-  })
-  child.on('error', (err: Error) => {
-    push(`[错误] ${err.message}`)
-    event.sender.send('build-output', { done: true, exitCode: -1 })
-  })
+  return contentOperationQueue.enqueue(() => runContentWorker(request))
 })

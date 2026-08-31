@@ -44,6 +44,7 @@ import {
   type BattleStateHashIndex,
 } from './battle-state-hash'
 import { roomAuthorityQueue, type RoomAuthorityEventContext } from './room-authority-queue'
+import { restoreRoomRuleRuntime, type RoomRuleRuntime } from './room-rule-runtime'
 import type { Room } from './room-store'
 import { assertActionPlayer } from './targeting'
 import {
@@ -398,7 +399,7 @@ export async function dispatchRoomBattleAction(
   const receivedAt = projectRoomAuthorityNow(normalizedRoomId, wallArrival)
   const requestedClientActionId = actionClientActionId(action)
   const eventContext: RoomAuthorityEventContext = {
-    kind: isSystemTimerAction(action) ? 'timer' : 'player',
+    kind: roomAuthorityEventKind(action, viewerPlayerId, options.allowSystem === true),
     actionId: requestedClientActionId,
     playerId: 'playerId' in action ? action.playerId : viewerPlayerId ?? undefined,
     authorityVersion: options.expectedAuthorityVersion,
@@ -406,11 +407,13 @@ export async function dispatchRoomBattleAction(
 
   return withPausedRoomAuthorityClock(normalizedRoomId, clock, async () => {
     queueMs = monotonicNow() - performanceStartedAt
+    let roomRuleRuntime: RoomRuleRuntime | undefined
     for (let attempt = 0; attempt < MAX_ROOM_ACTION_ATTEMPTS; attempt += 1) {
       const room = await store.getRoom(normalizedRoomId)
       if (!room) throw new RoomBattleActionError('ROOM_NOT_FOUND', 'Room not found', { roomId: normalizedRoomId })
       const storage = getBattleStorage(room)
       if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started', { roomId: normalizedRoomId })
+      roomRuleRuntime ??= restoreRoomRuleRuntime(normalizedRoomId)
       const state = storage.state as BattleState
       if (!Number.isSafeInteger(room.version) || Number(room.version) < 0) {
         throw new RoomBattleActionError(
@@ -556,6 +559,7 @@ export async function dispatchRoomBattleAction(
             authorityVersion,
             state,
           ),
+          ruleExecutionContext: roomRuleRuntime.executionContext,
         })
         pinBattleProfileIdentityV1(
           submittedActionResult.state,
@@ -617,6 +621,7 @@ export async function dispatchRoomBattleAction(
         actionResult = runBattleAction(submittedActionResult.state, syncAction, {
           rootSeed: storage.rootSeed,
           stateHashIndex: submittedActionResult.stateHashIndex,
+          ruleExecutionContext: roomRuleRuntime.executionContext,
         })
         pinBattleProfileIdentityV1(
           actionResult.state,
@@ -1211,6 +1216,23 @@ function isSystemTimerAction(action: BattleAction): boolean {
     || action.type === 'turnTimerSync'
     || action.type === 'turnTimerBurn'
     || action.type === 'turnTimeout'
+}
+
+function roomAuthorityEventKind(
+  action: BattleAction,
+  viewerPlayerId: string | null | undefined,
+  allowSystem: boolean,
+): RoomAuthorityEventContext['kind'] {
+  if (isSystemTimerAction(action)) return 'timer'
+  if (
+    action.type === 'pendingOptionSelect'
+    || action.type === 'pendingTargetSelect'
+    || action.type === 'cancelPendingSelection'
+  ) return 'pending'
+  const actorPlayerId = 'playerId' in action ? action.playerId : viewerPlayerId
+  if (typeof actorPlayerId === 'string' && actorPlayerId.trim().toLowerCase() === 'bot') return 'bot'
+  if (allowSystem && !viewerPlayerId) return 'system'
+  return 'player'
 }
 
 function decorateRoomActionError(

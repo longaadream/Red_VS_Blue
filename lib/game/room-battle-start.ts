@@ -28,6 +28,8 @@ import {
   resetRoomBattleAuthorityClock,
   type PublicBattleSnapshot,
 } from './room-battle-actions'
+import { roomAuthorityQueue } from './room-authority-queue'
+import { createRoomRuleRuntime, restoreRoomRuleRuntime } from './room-rule-runtime'
 
 export interface StartLockedRosterBattleResult {
   room: Room
@@ -44,11 +46,27 @@ export async function startBattleFromLockedRosters(
   roomId: string,
   options: StartLockedRosterBattleOptions = {},
 ): Promise<StartLockedRosterBattleResult> {
+  const normalizedRoomId = roomId.trim().toLowerCase()
+  return roomAuthorityQueue.enqueue(
+    normalizedRoomId,
+    { kind: 'system', actionId: `battle-start:${normalizedRoomId}` },
+    () => startBattleFromLockedRostersQueued(store, normalizedRoomId, options),
+  )
+}
+
+async function startBattleFromLockedRostersQueued(
+  store: RosterRoomStore,
+  roomId: string,
+  options: StartLockedRosterBattleOptions,
+): Promise<StartLockedRosterBattleResult> {
   const clock = options.clock ?? systemDeploymentRuleClock
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const room = await store.getRoom(roomId)
     if (!room) throw new Error('Room not found')
+    const roomRuleRuntime = room.status === 'in-progress'
+      ? restoreRoomRuleRuntime(roomId)
+      : createRoomRuleRuntime(roomId)
     if (room.status === 'in-progress' && room.battleState) {
       const authorityReadyRoom = await ensureInitialAuthorityCheckpoint(store, room, clock)
       await scheduleRoomDeploymentTimeout(store, roomId, {
@@ -105,6 +123,7 @@ export async function startBattleFromLockedRosters(
         profileIdentity,
         deploymentEnabled: true,
         deploymentStartedAt: clock.now(),
+        ruleExecutionContext: roomRuleRuntime.executionContext,
       },
     )
     if (!battle) throw new Error('Failed to initialize battle state')
@@ -119,7 +138,10 @@ export async function startBattleFromLockedRosters(
         type: 'deploymentLock',
         playerId: bot.id,
         clientActionId: `system-deployment-keep:${bot.id}`,
-      }, { rootSeed: seed }).state
+      }, {
+        rootSeed: seed,
+        ruleExecutionContext: roomRuleRuntime.executionContext,
+      }).state
       pinBattleProfileIdentityV1(
         initialState,
         profileIdentity,
