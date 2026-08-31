@@ -327,6 +327,37 @@
   `resolvedProfileHash` 用于完整资源/provenance/诊断。
 - 完整边界见 `CONTENT_PROFILE_V1_RUNTIME.md` 与 `RESOLVED_PROFILE_ROOM_HANDSHAKE.md`。
 
+### 10.2 RED-118 内容工具与 Editor 边界
+
+- 共享入口：`lib/content-pipeline/tooling/operation.ts::runContentPipelineOperationV1()`；CLI、Editor worker
+  和候选脚本都只适配参数、路径和展示，不复制 frozen manifest/hash/schema 或 Profile resolver。
+- 协议：`rvb-content-operation/v1` 的操作集合为 build、validate、resolve、sign、smoke。
+  返回 `ContentToolingResultV1`，包含稳定退出码、结构化 refusal、身份 hash、capabilities、
+  signature/key ID、seed、报告路径和可选输出归档。
+- CLI：`scripts/rvb.mjs` 解析结构化 argv 后调用同一入口；禁止通过字符串拼接 shell 命令执行
+  内容操作。旧 `scripts/build-resource-pack.js` 仅转换历史参数并打印 deprecated 警告。
+- Editor：preload 只暴露 `contentOperation(request)`。main process 在读取业务字段前验证精确
+  Editor sender，再用 closed-key request normalizer 拒绝 executable、script、argv、未知字段和
+  authoring workspace 外路径。路径先做 lexical confinement，再对已存在的每级组件做
+  `lstat`/`realpath` 校验并拒绝 symlink/junction；不存在的写入目标从最近的真实父目录验证。
+- 进程：通过 Electron `utilityProcess.fork()` 启动随 Editor 打包的
+  `content-pipeline-worker.cjs`；worker 不接受通用命令，也不启动系统 Node 或读取源码 checkout。
+- 并发：main process 使用最大 16 个待处理请求的串行队列；队列满时 fail closed，避免并发操作
+  覆盖同一 archive、report 或 authoring source。
+- 工作区：Editor 只写 `userData/content-authoring/{sources,archives,keys,reports}`。源数据首次从
+  内置 `data/` 复制，运行时产物与安装目录分离。
+- 签名：Local Dev 可 unsigned/dev-only；QA/Stable/Community 只接受外部密钥，并要求调用方显式
+  提供 trusted publisher key ID allow-list。Stable 还需要显式人工确认；两个条件分别 fail closed。
+  私钥文件只在 sign 操作期间读取；解码后的可变字节在 `finally` 中清零。JavaScript 的不可变
+  `keyText` 字符串不能证明原地清零，因此实现承诺是不把私钥正文、原始 argv 或 key path 写入报告，
+  并在 candidate 退出时删除隔离临时密钥文件，而不是声称字符串已清零。
+- 验证：Patch validate 必须携带 Base 和完整前置 Patch 链。相同 fixture 的 CLI/Editor build 必须
+  得到相同 package hash；打包 Windows smoke 要由 Editor 执行 build/sign/validate/resolve/smoke
+  全链，并显示 resolved Profile/authority hash、engine/content ABI、capabilities、signature、seed、
+  stage、refusal path/content ID 和报告位置。
+- 回退：先把 Client/Server active Profile 切回 `previousStable`，再回退适配层、Editor worker
+  和 CLI 变更；冻结的 manifest/hash/schema 核心和已验证版本不随该回退删除。
+
 ## 11. Android 资源构建
 
 - 入口：`scripts/build-game-engine.js`、`sync-pages.js`、`sync-android-assets.js` 和根 `package.json` Android scripts。

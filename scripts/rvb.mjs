@@ -1,8 +1,19 @@
 #!/usr/bin/env node
 
-import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  createWriteStream,
+  existsSync,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
@@ -12,6 +23,8 @@ const REPO_ROOT = process.env.RVB_REPO_ROOT
 const DEFAULT_CONFIG_PATH = path.join(REPO_ROOT, 'config', 'validation-profiles.json')
 const DEFAULT_OUTPUT_ROOT = path.join(REPO_ROOT, 'output', 'validation')
 const TASK_ID_PATTERN = /^RED-\d+$/i
+const CONTENT_COMMANDS = new Set(['build', 'validate', 'resolve', 'sign', 'smoke'])
+const localRequire = createRequire(import.meta.url)
 
 const USAGE = `RVB project workflow
 
@@ -20,7 +33,64 @@ Usage:
   npm run rvb -- doctor
   npm run rvb -- verify RED-123 [--profile quick|standard|candidate] [--dry-run]
   npm run rvb -- package RED-123 [--dry-run]
+  npm run rvb -- build RED-123 snapshot --source <dir> --output <file> [...]
+  npm run rvb -- validate RED-123 --archive <file> [--channel <channel>]
+  npm run rvb -- resolve RED-123 --base bundled [--patch <file> ...]
+  npm run rvb -- sign RED-123 --input <file> --key-file <file> --output <file> --channel qa
+  npm run rvb -- smoke RED-123 --base bundled [--patch <file> ...] [--seed <uint32>]
 `
+
+function prepareFrozenGameEngineMirror() {
+  const source = path.join(REPO_ROOT, 'data', 'pages', 'js', 'game-engine.js')
+  const destination = path.join(REPO_ROOT, 'android-client', 'www', 'js', 'game-engine.js')
+  if (!existsSync(source)) throw new Error(`Missing frozen desktop game-engine bundle: ${source}`)
+  mkdirSync(path.dirname(destination), { recursive: true })
+  copyFileSync(source, destination)
+  console.log(`[RVB] Prepared byte-identical Android game-engine test mirror from the frozen desktop bundle.`)
+  return 0
+}
+
+async function buildEditorWorker() {
+  const { build } = await import('esbuild')
+  const output = path.join(REPO_ROOT, 'electron-editor', 'dist', 'content-pipeline-worker.cjs')
+  mkdirSync(path.dirname(output), { recursive: true })
+  await build({
+    absWorkingDir: REPO_ROOT,
+    entryPoints: [path.join(REPO_ROOT, 'electron-editor', 'content-pipeline-worker.ts')],
+    outfile: output,
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    target: 'node20',
+    sourcemap: false,
+    logLevel: 'info',
+  })
+  return 0
+}
+
+async function runContentCandidate(taskId) {
+  if (taskId !== 'RED-118') return usageError('content-candidate currently requires RED-118.').exitCode
+  const temporary = mkdtempSync(path.join(tmpdir(), 'rvb-content-candidate-'))
+  const bundlePath = path.join(temporary, 'content-candidate.cjs')
+  try {
+    const { build } = await import('esbuild')
+    await build({
+      absWorkingDir: REPO_ROOT,
+      entryPoints: [path.join(REPO_ROOT, 'lib', 'content-pipeline', 'tooling', 'candidate.ts')],
+      outfile: bundlePath,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      target: 'node20',
+      sourcemap: false,
+      logLevel: 'silent',
+    })
+    const candidate = localRequire(bundlePath)
+    return candidate.runContentCandidateV1(REPO_ROOT, DEFAULT_OUTPUT_ROOT)
+  } finally {
+    rmSync(temporary, { recursive: true, force: true })
+  }
+}
 
 function usageError(message) {
   console.error(`[RVB] ${message}\n`)
@@ -43,6 +113,10 @@ function parseArgs(argv) {
   if (command === 'dev' || command === 'doctor') {
     if (rest.length) return usageError(`${command} does not accept additional arguments.`)
     return { kind: command }
+  }
+
+  if (CONTENT_COMMANDS.has(command)) {
+    return { kind: 'content', argv: [command, ...rest] }
   }
 
   if (command !== 'verify' && command !== 'package') {
@@ -74,6 +148,32 @@ function parseArgs(argv) {
   }
 
   return { kind: command, taskId, profile, dryRun }
+}
+
+async function runContentPipeline(argv) {
+  const temporary = mkdtempSync(path.join(tmpdir(), 'rvb-content-cli-'))
+  const bundlePath = path.join(temporary, 'content-cli.cjs')
+  try {
+    const { build } = await import('esbuild')
+    await build({
+      absWorkingDir: REPO_ROOT,
+      entryPoints: [path.join(REPO_ROOT, 'lib', 'content-pipeline', 'tooling', 'cli.ts')],
+      outfile: bundlePath,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      target: 'node20',
+      sourcemap: false,
+      logLevel: 'silent',
+    })
+    const tooling = localRequire(bundlePath)
+    return tooling.runContentPipelineCliV1(argv, {
+      appRoot: REPO_ROOT,
+      evidenceRoot: DEFAULT_OUTPUT_ROOT,
+    })
+  } finally {
+    rmSync(temporary, { recursive: true, force: true })
+  }
 }
 
 function loadConfig() {
@@ -451,12 +551,26 @@ async function runEvidenceMode(parsed, config) {
 }
 
 async function main() {
-  const parsed = parseArgs(process.argv.slice(2))
+  const rawArgv = process.argv.slice(2)
+  if (rawArgv[0] === 'bundle-editor-worker') {
+    if (rawArgv.length !== 1) return usageError('bundle-editor-worker does not accept arguments.').exitCode
+    return buildEditorWorker()
+  }
+  if (rawArgv[0] === 'prepare-game-engine-mirror') {
+    if (rawArgv.length !== 1) return usageError('prepare-game-engine-mirror does not accept arguments.').exitCode
+    return prepareFrozenGameEngineMirror()
+  }
+  if (rawArgv[0] === 'content-candidate') {
+    if (rawArgv.length !== 2) return usageError('content-candidate requires exactly one task ID.').exitCode
+    return runContentCandidate(rawArgv[1]?.toUpperCase())
+  }
+  const parsed = parseArgs(rawArgv)
   if (parsed.kind === 'help') {
     console.log(USAGE)
     return 0
   }
   if (parsed.kind === 'error') return parsed.exitCode
+  if (parsed.kind === 'content') return runContentPipeline(parsed.argv)
 
   let loaded
   try {

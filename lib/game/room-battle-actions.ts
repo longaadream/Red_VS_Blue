@@ -168,6 +168,8 @@ export interface PreResumeDeliveryContext {
 export interface DispatchRoomBattleActionOptions {
   allowSystem?: boolean
   expectedAuthorityVersion?: number
+  /** Candidate persistence checkpoint cadence; legacy callers retain the existing default. */
+  checkpointInterval?: number
   clock?: DeploymentRuleClock
   /**
    * Runs after the single authoritative commit while the room clock is frozen.
@@ -553,6 +555,9 @@ export async function dispatchRoomBattleAction(
           )
         : normalizeSystemActionTime(action, receivedAt)
 
+      const runtimeTransactionSnapshot = roomRuleRuntime.snapshotTransactionState()
+      let retainRuntimeTransaction = false
+      try {
       let submittedActionResult: BattleActionResult
       try {
         const rulesStartedAt = monotonicNow()
@@ -756,7 +761,12 @@ export async function dispatchRoomBattleAction(
         : undefined
       let checkpoint: BattleAuthorityCheckpointRecord | undefined
       if (transition) {
-        const reason = checkpointReasonForTransition(state, nextAuthorityState, nextAuthorityVersion)
+        const reason = checkpointReasonForTransition(
+          state,
+          nextAuthorityState,
+          nextAuthorityVersion,
+          options.checkpointInterval,
+        )
         if (reason) {
           const checkpointStorage = nextStorage
           checkpoint = {
@@ -824,6 +834,7 @@ export async function dispatchRoomBattleAction(
         if (authorityV2) assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
         continue
       }
+      retainRuntimeTransaction = true
       if (transition && actionResult.stateHashIndex) {
         authorityStateHashIndexes.set(normalizedRoomId, {
           authorityVersion: nextAuthorityVersion,
@@ -838,17 +849,9 @@ export async function dispatchRoomBattleAction(
         }
       }
       if (isTerminal && transition && store.drainBattleAuthorityPersistence) {
-        try {
-          const terminalDrainStartedAt = monotonicNow()
-          await store.drainBattleAuthorityPersistence(normalizedRoomId)
-          persistenceMs += monotonicNow() - terminalDrainStartedAt
-        } catch (error) {
-          console.error('[battle-authority-persistence] terminal journal drain failed', {
-            roomId: normalizedRoomId,
-            authorityVersion: nextAuthorityVersion,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
+        const terminalDrainStartedAt = monotonicNow()
+        await store.drainBattleAuthorityPersistence(normalizedRoomId)
+        persistenceMs += monotonicNow() - terminalDrainStartedAt
       }
 
       const persistence = transition
@@ -892,6 +895,11 @@ export async function dispatchRoomBattleAction(
           persistenceMs: roundTiming(persistenceMs),
           totalMs: roundTiming(monotonicNow() - performanceStartedAt),
         },
+      }
+      } finally {
+        if (!retainRuntimeTransaction) {
+          roomRuleRuntime.restoreTransactionState(runtimeTransactionSnapshot)
+        }
       }
     }
 

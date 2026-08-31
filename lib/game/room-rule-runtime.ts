@@ -32,6 +32,11 @@ export interface RoomRuleRuntimeInspection {
   pendingDepth: number
 }
 
+export interface RoomRuleRuntimeTransactionSnapshot {
+  triggerSystem: ReturnType<TriggerSystem['snapshotTransactionState']>
+  cacheEntries: Array<[symbol, unknown]>
+}
+
 export class RoomRuleRuntime {
   readonly executionContext: RuleExecutionContext
   private closedReason: string | null = null
@@ -48,6 +53,21 @@ export class RoomRuleRuntime {
   run<T>(operation: () => T): T {
     this.assertOpen()
     return withRuleExecutionContext(this.executionContext, operation)
+  }
+
+  snapshotTransactionState(): RoomRuleRuntimeTransactionSnapshot {
+    this.assertOpen()
+    return {
+      triggerSystem: this.executionContext.triggerSystem.snapshotTransactionState(),
+      cacheEntries: [...this.executionContext.cache.entries()],
+    }
+  }
+
+  restoreTransactionState(snapshot: RoomRuleRuntimeTransactionSnapshot): void {
+    this.assertOpen()
+    this.executionContext.triggerSystem.restoreTransactionState(snapshot.triggerSystem)
+    this.executionContext.cache.clear()
+    for (const [key, value] of snapshot.cacheEntries) this.executionContext.cache.set(key, value)
   }
 
   close(reason = 'closed'): void {
