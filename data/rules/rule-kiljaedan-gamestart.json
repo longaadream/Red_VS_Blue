@@ -1,8 +1,9 @@
 {
   "id": "rule-kiljaedan-gamestart",
-  "name": "恶魔仪式启动",
-  "description": "游戏开始时，基尔加丹从棋盘消失，向红方手牌中加入「恶魔召唤（1）」",
+  "name": "恶魔仪式启动（旧版兼容）",
+  "description": "旧部署或无部署入口在 gameStart 时将基尔加丹移入虚空；渐进式战斗会在 gameStart 前由初始化流程处理同一稳定实例",
   "trigger": { "type": "gameStart" },
   "effect": { "type": "triggerSkill", "skillId": "kiljaedan-demonic-pact" },
-  "limits": { "maxUses": 1 }
+  "limits": { "maxUses": 1 },
+  "legacy": true
 }

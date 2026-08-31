@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { TextDecoder, TextEncoder } from 'node:util'
 import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it, vi } from 'vitest'
@@ -78,6 +79,8 @@ describe('UI/server normal movement contract', () => {
       process,
       require: createRequire(import.meta.url),
       setTimeout,
+      TextDecoder,
+      TextEncoder,
     }
     runInNewContext(bundleSource, context, { filename: bundlePath })
 
@@ -100,6 +103,48 @@ describe('UI/server normal movement contract', () => {
     expect(engine.getLegalNormalMoveTargetsForPlayer!(state, 'player-red', 'mover').map(key).sort()).toEqual([
       '0,2', '1,2', '2,0', '2,1', '2,3', '2,4',
     ])
+
+    const taggedMover = makePiece({
+      instanceId: 'browser-tagged',
+      ownerPlayerId: 'player-red',
+      x: 2,
+      y: 2,
+      moveRange: 3,
+    })
+    const taggedState = makeState({
+      pieces: [taggedMover],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+      width: 6,
+      height: 5,
+    })
+    taggedState.players.find(player => player.playerId === 'player-red')!.actionPoints = 0
+    taggedMover.statusTags = [{
+      id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
+      name: '本回合首次移动免费',
+      visible: true,
+      grantedTurnNumber: taggedState.turn.turnNumber,
+      currentDuration: 1,
+      currentUses: 1,
+    }]
+    const browserTaggedTargets = engine.getLegalNormalMoveTargetsForPlayer!(
+      taggedState,
+      'player-red',
+      'browser-tagged',
+    )
+    expect(browserTaggedTargets.length).toBeGreaterThan(0)
+    const browserTaggedMoved = engine.applyBattleAction!(taggedState, {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: 'browser-tagged',
+      toX: browserTaggedTargets[0].x,
+      toY: browserTaggedTargets[0].y,
+    })
+    expect(browserTaggedMoved.players.find(player => player.playerId === 'player-red')?.actionPoints)
+      .toBe(0)
+    expect(browserTaggedMoved.pieces.find(piece => piece.instanceId === 'browser-tagged')?.statusTags)
+      .not.toContainEqual(expect.objectContaining({ type: 'deployment-first-move-free' }))
 
     mover.skills = [{ skillId: 'bundle-target-contract', currentCooldown: 0, usesRemaining: -1 }] as never
     state.skillsById['bundle-target-contract'] = {
@@ -140,6 +185,75 @@ describe('UI/server normal movement contract', () => {
     expect(() => applyBattleAction(state, {
       type: 'move', playerId: 'player-red', pieceId: 'mover', toX: 2, toY: 1,
     })).toThrow(/action points/i)
+  })
+
+  it('0 AP 时只为持有当前回合部署首移标签的棋子枚举普通移动', () => {
+    const tagged = makePiece({
+      instanceId: 'tagged',
+      ownerPlayerId: 'player-red',
+      x: 2,
+      y: 2,
+      moveRange: 3,
+    })
+    const untagged = makePiece({
+      instanceId: 'untagged',
+      ownerPlayerId: 'player-red',
+      x: 4,
+      y: 4,
+      moveRange: 2,
+    })
+    const state = makeState({
+      pieces: [tagged, untagged],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+      width: 7,
+      height: 7,
+    })
+    state.players.find(player => player.playerId === 'player-red')!.actionPoints = 0
+    tagged.statusTags = [{
+      id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
+      name: '本回合首次移动免费',
+      visible: true,
+      grantedTurnNumber: state.turn.turnNumber,
+      currentDuration: 1,
+      currentUses: 1,
+    }]
+
+    const taggedTargets = getLegalNormalMoveTargetsForPlayer(state, 'player-red', 'tagged')
+    expect(taggedTargets.length).toBeGreaterThan(0)
+    expect(getLegalNormalMoveTargetsForPlayer(state, 'player-red', 'untagged')).toEqual([])
+
+    const moved = applyBattleAction(state, {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: 'tagged',
+      toX: taggedTargets[0].x,
+      toY: taggedTargets[0].y,
+    })
+    expect(moved.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(0)
+    expect(moved.pieces.find(piece => piece.instanceId === 'tagged')?.statusTags)
+      .not.toContainEqual(expect.objectContaining({ type: 'deployment-first-move-free' }))
+
+    const stale = makeState({
+      pieces: [makePiece({
+        instanceId: 'stale',
+        ownerPlayerId: 'player-red',
+        x: 2,
+        y: 2,
+        moveRange: 3,
+      })],
+      currentPlayerId: 'player-red',
+      phase: 'action',
+    })
+    stale.players.find(player => player.playerId === 'player-red')!.actionPoints = 0
+    stale.pieces[0].statusTags = [{
+      id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
+      grantedTurnNumber: stale.turn.turnNumber - 1,
+      currentUses: 1,
+    }]
+    expect(getLegalNormalMoveTargetsForPlayer(stale, 'player-red', 'stale')).toEqual([])
   })
 
   it('格子目标默认使用曼哈顿距离，range=1 拒绝斜角', () => {

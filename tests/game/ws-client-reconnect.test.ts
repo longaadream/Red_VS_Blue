@@ -8,6 +8,33 @@ import { getServerGameProfileIdentityV1 } from '../../lib/content-pipeline/runti
 
 type BrowserHandler = ((event?: any) => void) | null
 
+const TEST_PLAYER_ID = 'player-red'
+const TEST_PUBLIC_KEY = 'test-public-key-player-red'
+const TEST_SUBSCRIBE_TIMESTAMP = 1_750_000_000_000
+
+function deterministicSignature(payload: unknown): string {
+  return `test-signature:${JSON.stringify(payload)}`
+}
+
+function normalizeSource(source: string): string {
+  return source.replace(/\r\n/g, '\n')
+}
+
+function readSection(source: string, startMarker: string, endMarker: string): string {
+  const start = source.indexOf(startMarker)
+  const end = source.indexOf(endMarker, start + startMarker.length)
+  if (start < 0 || end < 0) {
+    throw new Error(`Missing client contract section: ${startMarker} -> ${endMarker}`)
+  }
+  return source.slice(start, end)
+}
+
+function readConstant(source: string, name: string): string {
+  const match = source.match(new RegExp(`var ${name} = ([^\\n]+)`))
+  if (!match) throw new Error(`Missing client contract constant: ${name}`)
+  return match[1].trim()
+}
+
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
   readyState = 0
@@ -53,6 +80,14 @@ function loadClient() {
   const profileIdentity = getServerGameProfileIdentityV1()
   const browserWindow: Record<string, any> = {
     location: { search: '' },
+    RvBIdentity: {
+      getIdentity: () => ({ id: TEST_PLAYER_ID, displayName: 'Test Red' }),
+      getPublicKey: () => TEST_PUBLIC_KEY,
+      sign: async (payload: unknown) => {
+        await Promise.resolve()
+        return deterministicSignature(payload)
+      },
+    },
     RvBUtils: {
       getConnectionConfig: () => ({ url: 'http://127.0.0.1:38521' }),
     },
@@ -66,6 +101,7 @@ function loadClient() {
     },
     URLSearchParams,
     WebSocket: FakeWebSocket,
+    Date: { now: () => TEST_SUBSCRIBE_TIMESTAMP },
     setTimeout,
     clearTimeout,
     console,
@@ -84,17 +120,91 @@ function loadClient() {
   }
 }
 
+async function openWithSignedSubscribe(socket: FakeWebSocket) {
+  socket.open()
+  expect(socket.sent).toEqual([])
+  for (let turn = 0; turn < 6 && socket.sent.length === 0; turn += 1) {
+    await Promise.resolve()
+  }
+
+  expect(socket.sent).toHaveLength(1)
+  const message = JSON.parse(socket.sent[0])
+  const payload = {
+    type: 'battle-subscribe',
+    roomId: 'room-a',
+    playerId: TEST_PLAYER_ID,
+    protocolVersion: 3,
+    authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+    timestamp: TEST_SUBSCRIBE_TIMESTAMP,
+  }
+  expect(message).toEqual({
+    type: 'subscribe',
+    roomId: 'room-a',
+    playerId: TEST_PLAYER_ID,
+    protocolVersion: 3,
+    authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+    profileIdentity: getServerGameProfileIdentityV1(),
+    publicKey: TEST_PUBLIC_KEY,
+    payload,
+    signature: deterministicSignature(payload),
+  })
+  return message
+}
+
 afterEach(() => {
   vi.useRealTimers()
   FakeWebSocket.instances = []
 })
 
 describe('battle WebSocket reconnect state machine', () => {
-  it('ships the same authority protocol client to desktop and Android', () => {
-    const desktopClient = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
-    const androidClient = readFileSync(resolve(process.cwd(), 'android-client/www/js/ws-client.js'), 'utf8')
+  it('shares protocol and reconnect contracts while keeping desktop signed and Android LAN legacy', () => {
+    const desktopClient = normalizeSource(
+      readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8'),
+    )
+    const androidClient = normalizeSource(
+      readFileSync(resolve(process.cwd(), 'android-client/www/js/ws-client.js'), 'utf8'),
+    )
+    const androidAuthority = normalizeSource(
+      readFileSync(resolve(process.cwd(), 'mobile-server/mobile-server-entry.ts'), 'utf8'),
+    )
 
-    expect(androidClient).toBe(desktopClient)
+    for (const name of ['BATTLE_AUTHORITY_PROTOCOL_VERSION', 'BATTLE_AUTHORITY_BUILD_ID']) {
+      expect(readConstant(androidClient, name)).toBe(readConstant(desktopClient, name))
+    }
+    expect(readConstant(desktopClient, 'BATTLE_AUTHORITY_PROTOCOL_VERSION')).toBe('3')
+    expect(readConstant(desktopClient, 'BATTLE_AUTHORITY_BUILD_ID'))
+      .toBe("'rvb-authority-v3-chunked-sha256-1'")
+
+    for (const [start, end] of [
+      ['function _scheduleReconnect(roomId)', 'function _emit(event, data)'],
+      ['function requestAuthoritySync(reason)', 'function makeRpcError(message)'],
+      ['function connect(roomId, playerId, mode)', 'function disconnect()'],
+    ]) {
+      expect(readSection(androidClient, start, end))
+        .toBe(readSection(desktopClient, start, end))
+    }
+
+    const desktopSubscribe = readSection(
+      desktopClient,
+      'async function buildSubscribeMessage()',
+      'function _doConnect(roomId)',
+    )
+    expect(desktopSubscribe).toContain("if (roomId === '__lobby') return message")
+    expect(desktopSubscribe).toContain('signature: await window.RvBIdentity.sign(payload)')
+    expect(desktopSubscribe).not.toContain("if (_mode !== 'relay') return message")
+
+    const androidSubscribe = readSection(
+      androidClient,
+      'async function buildSubscribeMessage()',
+      'function _doConnect(roomId)',
+    )
+    expect(androidSubscribe).toContain("if (_mode !== 'relay') return message")
+    expect(androidSubscribe).toContain('Signed identity is required for Relay WebSocket subscriptions')
+    expect(androidClient).toContain("msg.type === 'battleProtocolUnsupported'")
+    expect(androidClient).toContain("'BATTLE_PROTOCOL_UNSUPPORTED'")
+    expect(androidAuthority.match(/deploymentMode:\s*'legacy-reroll-v1'/g)).toHaveLength(2)
+    expect(androidAuthority).not.toContain("deploymentMode: 'progressive-reserve-v1'")
+    expect(androidClient).not.toContain('progressive-reserve-v1')
   })
 
   it('becomes connected only after subscription and resubscribes after a disconnect', async () => {
@@ -107,19 +217,10 @@ describe('battle WebSocket reconnect state machine', () => {
 
     client.connect('room-a', 'player-red', 'lan')
     const first = FakeWebSocket.instances[0]
-    first.open()
-    await Promise.resolve()
+    await openWithSignedSubscribe(first)
 
     expect(client.isConnected()).toBe(false)
     expect(connects).toBe(0)
-    expect(JSON.parse(first.sent[0])).toEqual({
-      type: 'subscribe',
-      roomId: 'room-a',
-      playerId: 'player-red',
-      protocolVersion: 3,
-      authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
-      profileIdentity: getServerGameProfileIdentityV1(),
-    })
 
     first.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
     expect(client.isConnected()).toBe(true)
@@ -131,8 +232,7 @@ describe('battle WebSocket reconnect state machine', () => {
     await vi.advanceTimersByTimeAsync(3_000)
 
     const second = FakeWebSocket.instances[1]
-    second.open()
-    await Promise.resolve()
+    await openWithSignedSubscribe(second)
     second.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
     expect(client.isConnected()).toBe(true)
     expect(connects).toBe(2)
@@ -147,15 +247,13 @@ describe('battle WebSocket reconnect state machine', () => {
 
     client.connect('room-a', 'player-red', 'lan')
     const stale = FakeWebSocket.instances[0]
-    stale.open()
-    await Promise.resolve()
+    await openWithSignedSubscribe(stale)
     stale.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
     stale.beginClosing()
 
     client.connect('room-a', 'player-red', 'lan')
     const replacement = FakeWebSocket.instances[1]
-    replacement.open()
-    await Promise.resolve()
+    await openWithSignedSubscribe(replacement)
     replacement.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
     expect(client.isConnected()).toBe(true)
 
@@ -174,8 +272,7 @@ describe('battle WebSocket reconnect state machine', () => {
 
     client.connect('room-a', 'player-red', 'lan')
     const socket = FakeWebSocket.instances[0]
-    socket.open()
-    await Promise.resolve()
+    await openWithSignedSubscribe(socket)
     socket.receive({
       type: 'battleProtocolUnsupported',
       code: 'BATTLE_PROTOCOL_UNSUPPORTED',
@@ -200,8 +297,7 @@ describe('battle WebSocket reconnect state machine', () => {
 
     client.connect('room-a', 'player-red', 'lan')
     const socket = FakeWebSocket.instances[0]
-    socket.open()
-    await Promise.resolve()
+    await openWithSignedSubscribe(socket)
     socket.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
 
     socket.receive({
@@ -248,8 +344,7 @@ describe('battle WebSocket reconnect state machine', () => {
 
     client.connect('room-a', 'player-red', 'lan')
     const first = FakeWebSocket.instances[0]
-    first.open()
-    await Promise.resolve()
+    await openWithSignedSubscribe(first)
     first.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
     first.receive({ type: 'actionError', code: 'ROOM_VERSION_CONFLICT' })
 
@@ -264,8 +359,7 @@ describe('battle WebSocket reconnect state machine', () => {
 
     await vi.advanceTimersByTimeAsync(3_000)
     const replacement = FakeWebSocket.instances[1]
-    replacement.open()
-    await Promise.resolve()
+    await openWithSignedSubscribe(replacement)
     replacement.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
     replacement.receive({ type: 'actionError', code: 'BATTLE_AUTHORITY_PERSISTENCE_DEGRADED' })
 

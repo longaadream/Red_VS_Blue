@@ -47,6 +47,7 @@ import { roomAuthorityQueue, type RoomAuthorityEventContext } from './room-autho
 import type { Room } from './room-store'
 import { assertActionPlayer } from './targeting'
 import {
+  getCurrentInputOwnerPlayerId,
   isAcceptedGameplayAction,
   isTurnTimerEnabled,
   projectTurnTimer,
@@ -181,7 +182,10 @@ export interface ScheduleBattleTimeoutOptions {
   clock?: DeploymentRuleClock
   onCommitted?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
   onTransitionCommitted?: (result: DispatchRoomBattleActionResult) => void | Promise<void>
-  onBotTurnReady?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
+  onBotTurnReady?: (
+    snapshot: PublicBattleSnapshot,
+    authorityState: BattleState,
+  ) => void | Promise<void>
 }
 
 export type ScheduleDeploymentTimeoutOptions = ScheduleBattleTimeoutOptions
@@ -939,11 +943,8 @@ export async function scheduleRoomBattleTimeout(
         if (!result.finalSnapshotAlreadyDelivered && !result.transition) {
           await options.onCommitted?.(result.snapshot)
         }
-        if (
-          result.snapshot.state.turn.phase === 'action'
-          && result.snapshot.state.turn.currentPlayerId === 'bot'
-        ) {
-          await options.onBotTurnReady?.(result.snapshot)
+        if (getCurrentInputOwnerPlayerId(result.actionResult.state).trim().toLowerCase() === 'bot') {
+          await options.onBotTurnReady?.(result.snapshot, result.actionResult.state)
         }
       }
       await scheduleRoomBattleTimeout(store, normalizedRoomId, options)

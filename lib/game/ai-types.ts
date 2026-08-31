@@ -12,6 +12,7 @@ export type AIEnvironmentProtocolVersion = typeof AI_ENVIRONMENT_PROTOCOL_VERSIO
 export type CandidateActionKind =
   | 'deployment-choice'
   | 'deployment-lock'
+  | 'reserve-deployment'
   | 'phase-advance'
   | 'pending-option'
   | 'pending-target'
@@ -106,13 +107,22 @@ export interface AIObservation {
   turn: TurnState
   terminalResult?: TerminalResult
   deployment?: {
-    status: 'awaiting-locks' | 'complete'
+    mode?: NonNullable<BattleState['deployment']>['mode']
+    status: NonNullable<BattleState['deployment']>['status']
     playerIds: string[]
     locks: Record<string, { locked: boolean }>
     deadlineAt: number
     revision: number
+    openingVanguardsInitialized?: boolean
     initialPositions: Record<string, { x: number; y: number }>
     finalPositions?: Record<string, { x: number; y: number }>
+    reserveCounts?: Record<string, number>
+    activePlayerId?: string
+    offerTurnNumber?: number
+    /** Private to the active player; absent from every other player observation. */
+    offerPieces?: Array<{ instanceId: string; templateId: string; name: string }>
+    /** Private authoritative safe cells for the active player's reserve deployment. */
+    legalPositions?: Array<{ x: number; y: number }>
   }
   pendingOptionSelection?: {
     playerId: string

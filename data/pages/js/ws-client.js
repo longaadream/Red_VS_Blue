@@ -59,17 +59,17 @@
       }
     }
     message.profileIdentity = profileIdentity
-    if (_mode !== 'relay') return message
+    if (roomId === '__lobby') return message
 
     if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') {
-      throw new Error('Signed identity is required for Relay WebSocket subscriptions')
+      throw new Error('Signed identity is required for battle WebSocket subscriptions')
     }
     var identity = window.RvBIdentity.getIdentity && window.RvBIdentity.getIdentity()
     if (!identity || String(identity.id || '').toLowerCase() !== playerId) {
-      throw new Error('Active identity does not match the Relay WebSocket player')
+      throw new Error('Active identity does not match the battle WebSocket player')
     }
     var publicKey = window.RvBIdentity.getPublicKey && window.RvBIdentity.getPublicKey()
-    if (!publicKey) throw new Error('Relay WebSocket identity has no public key')
+    if (!publicKey) throw new Error('Battle WebSocket identity has no public key')
 
     var payload = {
       type: 'battle-subscribe',

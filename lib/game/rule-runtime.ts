@@ -1,6 +1,10 @@
 export const RANDOM_STREAM_NAMES = {
   deployment: 'deployment',
   deploymentReroll: 'deployment-reroll',
+  progressiveDeploymentOpeningPiece: 'progressive-deployment/opening-piece',
+  progressiveDeploymentOpeningCell: 'progressive-deployment/opening-cell',
+  progressiveDeploymentOffer: 'progressive-deployment/offer',
+  progressiveDeploymentFallback: 'progressive-deployment/fallback',
   skillEffect: 'skill/effect',
   turnOrder: 'turn-order',
 } as const

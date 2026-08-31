@@ -10,6 +10,7 @@ import type { BoardMap } from '@/lib/game/map'
 import { getMapById } from '@/lib/game/map-repository'
 import { SELECTABLE_MAP_IDS } from '@/lib/game/map-selection'
 import type { PieceTemplate } from '@/lib/game/piece'
+import { getPieceById } from '@/lib/game/piece-repository'
 import { RANDOM_STREAM_NAMES, RuleRuntime } from '@/lib/game/rule-runtime'
 import { summonPiece } from '@/lib/game/turn'
 import { pinTestBattleState } from './profile-test-identity'
@@ -177,6 +178,7 @@ describe('RED-29 deterministic deployment', () => {
       firstPlayerId: PLAYERS[0],
       rootSeed: 0x1190cafe,
       deploymentEnabled: true,
+      deploymentMode: 'legacy-reroll-v1' as const,
       deploymentStartedAt: 1_750_000_000_000,
     }
     const create = (
@@ -206,6 +208,54 @@ describe('RED-29 deterministic deployment', () => {
 
     expect(persistedInitialStateSnapshot(repeated)).toEqual(expected)
     expect(persistedInitialStateSnapshot(reordered)).toEqual(expected)
+  })
+
+  it('keeps the legacy Kiljaedan gameStart ritual bound outside progressive setup', async () => {
+    const kiljaedan = getPieceById('kiljaedan')
+    if (!kiljaedan) throw new Error('Expected Kiljaedan template')
+    expect(kiljaedan.rules).toContain('rule-kiljaedan-gamestart')
+    const red = [kiljaedan, ...makeTemplates('red').slice(0, 7)]
+    const blue = makeTemplates('blue')
+    const seed = 0x1381e9ac
+    const legacy = await createInitialBattleForPlayers(
+      [...PLAYERS],
+      [...red, ...blue],
+      [
+        { playerId: PLAYERS[0], pieces: red, faction: 'red', alignment: 'dark' },
+        { playerId: PLAYERS[1], pieces: blue, faction: 'blue', alignment: 'light' },
+      ],
+      'large-hole-arena',
+      {
+        firstPlayerId: PLAYERS[0],
+        rootSeed: seed,
+        deploymentEnabled: true,
+        deploymentMode: 'legacy-reroll-v1',
+        deploymentStartedAt: 1_750_000_000_000,
+      },
+    )
+    if (!legacy) throw new Error('Expected legacy battle')
+    expect(legacy.pieces.some(piece => piece.templateId === 'kiljaedan')).toBe(true)
+
+    const redLocked = runBattleAction(legacy, {
+      type: 'deploymentLock',
+      playerId: PLAYERS[0],
+      clientActionId: 'legacy-kj-red-lock',
+    }, { rootSeed: seed }).state
+    const completed = runBattleAction(redLocked, {
+      type: 'deploymentLock',
+      playerId: PLAYERS[1],
+      clientActionId: 'legacy-kj-blue-lock',
+    }, { rootSeed: seed }).state
+
+    expect(completed.gameStartFired).toBe(true)
+    expect(completed.pieces.some(piece => piece.templateId === 'kiljaedan')).toBe(false)
+    expect(completed.extensions?.kiljaedanPiece).toMatchObject({
+      templateId: 'kiljaedan',
+      ownerPlayerId: PLAYERS[0],
+      isCore: true,
+    })
+    expect(completed.players.find(player => player.playerId === PLAYERS[0])?.hand)
+      .toContainEqual(expect.objectContaining({ cardId: 'demon-summon-1' }))
   })
 
   it('fails closed on fewer than sixteen ordinary floors before consuming deployment random', () => {

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { TextDecoder, TextEncoder } from 'node:util'
 import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it } from 'vitest'
@@ -61,6 +62,8 @@ describe('battle state chunked hash v1', () => {
         process,
         require: createRequire(import.meta.url),
         setTimeout,
+        TextDecoder,
+        TextEncoder,
       }
       runInNewContext(readFileSync(bundlePath, 'utf8'), context, { filename: bundlePath })
       const engine = context.GameEngine as { hashBattleState: typeof hashBattleState }
