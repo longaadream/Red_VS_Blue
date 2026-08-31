@@ -19,12 +19,16 @@ import {
   type BattleStateHashIndex,
 } from './battle-state-hash'
 import {
+  createRuleExecutionContext,
+  getRuleExecutionTriggerSystem,
   RuleRuntime,
+  withRuleExecutionContext,
   withRuleRuntime,
+  type RuleExecutionContext,
 } from './rule-runtime'
 import type { BattleAction, BattleState } from './turn'
 import { applyBattleAction, assertBattleNotTerminal, safeCloneBattleState } from './turn'
-import { globalTriggerSystem } from './triggers'
+import { globalTriggerSystem, TriggerSystem } from './triggers'
 
 export {
   hashBattleState,
@@ -49,6 +53,7 @@ export interface BattleActionResult {
 export interface RunBattleActionOptions {
   rootSeed?: number
   stateHashIndex?: BattleStateHashIndex
+  ruleExecutionContext?: RuleExecutionContext
 }
 
 export interface BattleReplayInput {
@@ -123,7 +128,10 @@ export function runBattleAction(
     const clonedState = cloneBattleStateForAction(state, metadata)
     const hydratedState = withServerSkills(clonedState) as BattleState
     const apply = () => applyBattleAction(hydratedState, action)
-    const applied = runtime ? withRuleRuntime(runtime, apply) : apply()
+    const applyWithDeterminism = () => runtime ? withRuleRuntime(runtime, apply) : apply()
+    const applied = options.ruleExecutionContext
+      ? withRuleExecutionContext(options.ruleExecutionContext, applyWithDeterminism)
+      : applyWithDeterminism()
     const next = withoutServerSkills(applied) as BattleState
     const canonicalNextHashState = canonicalBattleStateForHash(next)
     const stateHashIndex = updateBattleStateHashIndex(
@@ -214,27 +222,27 @@ export function runBattleActionIsolated(
   action: BattleAction,
   options: RunBattleActionOptions = {},
 ): BattleActionResult {
-  const ruleRegistry = globalTriggerSystem.getRules()
-  const rules = [...ruleRegistry]
-  const ruleSnapshots = rules.map(rule => ({
+  const sourceTriggerSystem = options.ruleExecutionContext?.triggerSystem
+    ?? getRuleExecutionTriggerSystem(globalTriggerSystem)
+  const sourceRules = [...sourceTriggerSystem.getRules()]
+  const sourceRuleSnapshots = sourceRules.map(rule => ({
     rule,
     snapshot: cloneRuntimeValue(rule),
   }))
-  const triggerInternals = globalTriggerSystem as unknown as {
-    rules?: typeof ruleRegistry
-    nextRootEventId?: number
-  }
-  const nextRootEventId = triggerInternals.nextRootEventId
+  const isolatedTriggerSystem = new TriggerSystem()
+  isolatedTriggerSystem.addRules(sourceRules.map(rule => cloneRuntimeValue(rule)))
   try {
-    return runBattleAction(state, action, options)
+    return runBattleAction(state, action, {
+      ...options,
+      ruleExecutionContext: createRuleExecutionContext(isolatedTriggerSystem),
+    })
   } finally {
-    for (const { rule, snapshot } of ruleSnapshots) {
+    // Dynamic effects can close over their source rule object. Restore those
+    // objects without mutating the owning TriggerSystem registry or event IDs.
+    for (const { rule, snapshot } of sourceRuleSnapshots) {
       for (const key of Object.keys(rule)) delete (rule as unknown as Record<string, unknown>)[key]
       Object.assign(rule, cloneRuntimeValue(snapshot))
     }
-    ruleRegistry.splice(0, ruleRegistry.length, ...rules)
-    triggerInternals.rules = ruleRegistry
-    if (nextRootEventId !== undefined) triggerInternals.nextRootEventId = nextRootEventId
   }
 }
 

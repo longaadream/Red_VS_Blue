@@ -9,7 +9,7 @@ import {
   getDefaultDemoRosterSelection,
   type RosterRoomStore,
 } from '@/lib/game/roster-contract'
-import { globalTriggerSystem } from '@/lib/game/triggers'
+import { TriggerSystem } from '@/lib/game/triggers'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
 
@@ -87,9 +87,13 @@ describe('RED-138 opening terminal room settlement', () => {
     const originalTimerFlag = process.env.RVB_TURN_TIMER_ENABLED
     const originalAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
     let openingSummonQueueCount = 0
-    const checkTriggers = globalTriggerSystem.checkTriggers.bind(globalTriggerSystem)
-    const triggerSpy = vi.spyOn(globalTriggerSystem, 'checkTriggers').mockImplementation((state, context) => {
-      const result = checkTriggers(state, context)
+    const checkTriggers = TriggerSystem.prototype.checkTriggers
+    const triggerSpy = vi.spyOn(TriggerSystem.prototype, 'checkTriggers').mockImplementation(function (
+      this: TriggerSystem,
+      state,
+      context,
+    ) {
+      const result = checkTriggers.call(this, state, context)
       if (context.type === 'afterPieceSummoned' && context.sourcePiece?.isCore === true) {
         openingSummonQueueCount += 1
         const index = state.pieces.findIndex(piece =>

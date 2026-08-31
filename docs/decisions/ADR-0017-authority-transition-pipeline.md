@@ -3,10 +3,11 @@
 - 状态：Proposed（等待 RED-109 候选构建与人工 LAN 验收）
 - 日期：2026-08-25
 - 任务：RED-109
-- 扩展任务：RED-131
+- 扩展任务：RED-131、RED-141
 - 风险：High
 - 基线：`main@a7c1d57da7b025fb69c9c24a3a04d3c5797d6132`
 - RED-131 扩展基线：`main@5752f36f78254cc3d9b284bd295943e4ed796f5e`
+- RED-141 扩展基线：`main@4bca9fd3b4c903ee275eac5dfa6175f467dd53b0`
 
 ## 背景
 
@@ -96,6 +97,15 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
     `SIGINT/SIGTERM` 和父 Electron 的 IPC 请求。Electron server/client 子进程使用 IPC 等待明确成功回执，
     总等待上限 6 秒，随后才允许进程退出；排空失败或超时必须记录“可能不耐久”并以失败回执/退出码
     暴露，不能伪装成成功。强制杀进程只保留为有界兜底。
+17. 在线规则执行上下文归每个房间所有，并与该房间 FIFO 生命周期绑定。`room-rule-runtime.ts` 为每个
+    roomId 只创建一个 `TriggerSystem`、规则/技能/动态代码缓存和不透明执行上下文；房间启动使用空的
+    新运行时，已有房间首次恢复时只把历史全局规则快照复制一次，后续规则注册、限制计数、pending、
+    缓存与异常均不得回读或写入其他房间。Runner、初始化、回合和技能深层调用必须在显式同步上下文中
+    解析该房间实例；`globalTriggerSystem` 只保留给离线/浏览器兼容调用。重复 create/restore 返回同一实例；
+    close 幂等地清空规则与缓存、关闭 ingress，并拒绝隐式复活。inspect 只聚合运行时和现有 FIFO 状态，
+    不创建第二份可变真相，并映射到 RED-140 冻结的 `queue.running/pending/activeKind/closedReason`。
+    RED-141 冻结并验证该生命周期原语；终局 durable 屏障、删除竞态以及 terminal/delete 调用 close 的生产
+    编排由其下游 RED-143 负责，不在此扩展中提前改变终局/删除语义。
 
 ## 性能合同
 
@@ -113,7 +123,8 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 
 1. 先删除 `RVB_BATTLE_ASYNC_JOURNAL` 或设为 `0`，即可保留 v3 协议并恢复 ACK 前数据库原子提交；
    再删除 `RVB_BATTLE_AUTHORITY_V2` 或设为 `0`，回退完整 Room CAS 与 `stateUpdate`。客户端协议信封仍可被入口解析，但不依赖增量 Transition。
-2. 只回退本次扩展时应整体 revert RED-131；若连基础权威管线一并回退，则再整体 revert RED-109。
+2. 只回退房间规则隔离时应整体 revert RED-141；只回退异步权威扩展时应整体 revert RED-131；若连基础
+   权威管线一并回退，则再整体 revert RED-109。
    两种情况都不得只撤销客户端 patch 或服务端 journal 其中一侧，服务端源码与桌面、Android 两个
    客户端 bundle 必须保持同一协议版本。
 3. 迁移回退前必须先停止服务并确认不再有 v3 写入；保留/导出需要的 Trace 和对局证据，再删除新增
@@ -138,5 +149,7 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
 - 关闭/删除：关闭 ingress 后新提交失败；SIGTERM 与 Electron IPC 都按“停止接入→排空→逐房间水位核对”
   执行；排空失败的房间删除在 WS/HTTP 明确失败。
 - 规则：部署、水门目标、观者选项、pending 超时、回合计时与机器人均走同一协调器。
+- 房间运行时：两个不同阵容/规则/seed 的房间各执行 100 次交错 Transition，最终 hash、随机游标、
+  pending 与规则限制必须分别等于各自单房串行结果；异常、缓存、close 和背压不得跨房间泄漏。
 - 传输：LAN WS、HTTP 后备、Relay 瞬时转发、功能开关完整快照回退。
 - 发布：类型、编码、全量测试、生产 `next build`、主线基线检查和双客户端人工 LAN 验收。

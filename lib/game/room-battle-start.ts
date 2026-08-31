@@ -29,6 +29,8 @@ import {
   resetRoomBattleAuthorityClock,
   type PublicBattleSnapshot,
 } from './room-battle-actions'
+import { roomAuthorityQueue } from './room-authority-queue'
+import { createRoomRuleRuntime, restoreRoomRuleRuntime } from './room-rule-runtime'
 
 export interface StartLockedRosterBattleResult {
   room: Room
@@ -45,6 +47,19 @@ export async function startBattleFromLockedRosters(
   roomId: string,
   options: StartLockedRosterBattleOptions = {},
 ): Promise<StartLockedRosterBattleResult> {
+  const normalizedRoomId = roomId.trim().toLowerCase()
+  return roomAuthorityQueue.enqueue(
+    normalizedRoomId,
+    { kind: 'system', actionId: `battle-start:${normalizedRoomId}` },
+    () => startBattleFromLockedRostersQueued(store, normalizedRoomId, options),
+  )
+}
+
+async function startBattleFromLockedRostersQueued(
+  store: RosterRoomStore,
+  roomId: string,
+  options: StartLockedRosterBattleOptions,
+): Promise<StartLockedRosterBattleResult> {
   const clock = options.clock ?? systemDeploymentRuleClock
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -53,6 +68,9 @@ export async function startBattleFromLockedRosters(
     if (room.status === 'finished' && room.battleState) {
       return { room, started: false }
     }
+    const roomRuleRuntime = room.status === 'in-progress'
+      ? restoreRoomRuleRuntime(roomId)
+      : createRoomRuleRuntime(roomId)
     if (room.status === 'in-progress' && room.battleState) {
       const authorityReadyRoom = await ensureInitialAuthorityCheckpoint(store, room, clock)
       await scheduleRoomDeploymentTimeout(store, roomId, {
@@ -110,6 +128,7 @@ export async function startBattleFromLockedRosters(
         deploymentEnabled: true,
         deploymentMode: 'progressive-reserve-v1',
         deploymentStartedAt: clock.now(),
+        ruleExecutionContext: roomRuleRuntime.executionContext,
       },
     )
     if (!battle) throw new Error('Failed to initialize battle state')
@@ -125,8 +144,15 @@ export async function startBattleFromLockedRosters(
         type: 'turnTimerSync',
         receivedAt: timerStartedAt,
         now: timerStartedAt,
-      }, { rootSeed: seed }).state
-      pinBattleProfileIdentityV1(initialState, profileIdentity, seed)
+      }, {
+        rootSeed: seed,
+        ruleExecutionContext: roomRuleRuntime.executionContext,
+      }).state
+      pinBattleProfileIdentityV1(
+        initialState,
+        profileIdentity,
+        seed,
+      )
     }
     const initialAuthorityVersion = isBattleAuthorityV2Enabled()
       ? room.battleAuthorityVersion ?? 0

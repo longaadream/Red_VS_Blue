@@ -33,19 +33,21 @@ import {
   type PieceStatusTag,
 } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost } from "./skills"
-import { dynamicCodeRuntime } from './dynamic-code-runtime'
+import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { getSkillById } from "./skill-repository"
 import {
   RANDOM_STREAM_NAMES,
   RuleRuntime,
   getActiveRuleRuntime,
+  getRuleExecutionTriggerSystem,
   getRuleDate,
   getRuleMath,
   withRuleRuntime,
   withRuleRuntimeCheckpoint,
 } from "./rule-runtime"
+
+const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 import {
   SUSPENDABLE_ACTION_TRANSACTION_PROTOCOL_VERSION,
   SuspendableActionRuntime,
@@ -761,7 +763,7 @@ function commitReservePieceSummon(
     pieceTemplateId: piece.templateId,
     faction: piece.faction,
   }
-  const beforeResult = globalTriggerSystem.checkTriggers(state, beforeContext)
+  const beforeResult = getActiveTriggerSystem().checkTriggers(state, beforeContext)
   assertSynchronousSummonTrigger(beforeResult, 'beforePieceSummoned')
   appendTriggerMessages(state, playerId, beforeResult)
   if (beforeResult.blocked) {
@@ -792,7 +794,7 @@ function commitReservePieceSummon(
   state.pieces.push(piece)
   updateProgressiveReserveCounts(deployment)
 
-  const afterResult = globalTriggerSystem.checkTriggers(state, {
+  const afterResult = getActiveTriggerSystem().checkTriggers(state, {
     type: 'afterPieceSummoned',
     playerId,
     sourcePiece: piece,
@@ -1533,7 +1535,7 @@ function applyBattleActionInternal(
         __deferReactiveCards: true,
         __pendingReactiveCards: pending.pendingReactiveCards,
       }
-      const result = globalTriggerSystem.checkTriggers(next, currentContext)
+      const result = getActiveTriggerSystem().checkTriggers(next, currentContext)
       appendTriggerMessages(next, result, actorPlayerId)
       if (result.blocked) return resumeDeferredAction(next, pending, input, true)
       if (setPendingInteraction(next, result, currentContext, {
@@ -1554,7 +1556,7 @@ function applyBattleActionInternal(
         __deferReactiveCards: true,
         __pendingReactiveCards: pending.pendingReactiveCards,
       }
-      const result = globalTriggerSystem.checkTriggers(next, currentContext)
+      const result = getActiveTriggerSystem().checkTriggers(next, currentContext)
       appendTriggerMessages(next, result, actorPlayerId)
       if (result.blocked) return resumeDeferredAction(next, pending, input, true)
       if (setPendingInteraction(next, result, currentContext, {
@@ -1566,7 +1568,7 @@ function applyBattleActionInternal(
     }
 
     if (pending.pendingReactiveCards?.length) {
-      const reactiveResult = globalTriggerSystem.checkTriggers(next, {
+      const reactiveResult = getActiveTriggerSystem().checkTriggers(next, {
         ...continuationContext,
         __reactiveCardsOnly: true,
         __pendingReactiveCards: pending.pendingReactiveCards,
@@ -2093,7 +2095,7 @@ function applyBattleActionInternal(
           // Progressive reserve pieces emit this event only when actually entering play.
           if (!isProgressiveDeployment(next)) {
             for (const piece of next.pieces) {
-              const initialSummonResult = globalTriggerSystem.checkTriggers(next, {
+              const initialSummonResult = getActiveTriggerSystem().checkTriggers(next, {
                 type: "afterPieceSummoned",
                 playerId: piece.ownerPlayerId,
                 sourcePiece: piece,
@@ -2103,7 +2105,7 @@ function applyBattleActionInternal(
               assertNoUnhandledInteraction(initialSummonResult, 'afterPieceSummoned')
             }
           }
-          const gameStartResult = globalTriggerSystem.checkTriggers(next, {
+          const gameStartResult = getActiveTriggerSystem().checkTriggers(next, {
             type: "gameStart",
             playerId: next.turn.currentPlayerId,
             turnNumber: 1
@@ -2133,7 +2135,7 @@ function applyBattleActionInternal(
           turnNumber: next.turn.turnNumber,
           playerId: next.turn.currentPlayerId
         }
-        const beginTurnResult = globalTriggerSystem.checkTriggers(next, beginTurnContext);
+        const beginTurnResult = getActiveTriggerSystem().checkTriggers(next, beginTurnContext);
 
         // 处理触发效果的消息
         if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
@@ -2159,7 +2161,7 @@ function applyBattleActionInternal(
         }
 
         // 更新冷却
-        globalTriggerSystem.updateCooldowns();
+        getActiveTriggerSystem().updateCooldowns();
 
         // 行动点已经在回合切换时设置，这里不再重复增加
         // 确保当前玩家有行动点属性
@@ -2181,7 +2183,7 @@ function applyBattleActionInternal(
         })
 
         // 触发whenever规则（每一步行动后检测）
-        const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+        const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
           type: "whenever",
           playerId: next.turn.currentPlayerId,
           turnNumber: next.turn.turnNumber
@@ -2292,7 +2294,7 @@ function applyBattleActionInternal(
       meta.chargePoints += action.amount
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         playerId: action.playerId
       });
@@ -2363,7 +2365,7 @@ function applyBattleActionInternal(
         targetX: action.toX,
         targetY: action.toY
       };
-      const beforeMoveResult = globalTriggerSystem.checkTriggers(next, moveContext);
+      const beforeMoveResult = getActiveTriggerSystem().checkTriggers(next, moveContext);
       assertNoUnhandledInteraction(beforeMoveResult, 'beforeMove')
 
       // 检查是否有规则触发了效果
@@ -2448,7 +2450,7 @@ function applyBattleActionInternal(
       })
 
       // 触发移动后的规则
-      const moveResult = globalTriggerSystem.checkTriggers(next, {
+      const moveResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "afterMove",
         sourcePiece: piece,
         playerId: action.playerId
@@ -2473,7 +2475,7 @@ function applyBattleActionInternal(
       }
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         sourcePiece: piece,
         playerId: action.playerId
@@ -2543,7 +2545,7 @@ function applyBattleActionInternal(
       };
       const beforeSkillUseResult = continuation.skipBeforeSkillUse
         ? { success: true, messages: [], blocked: false } as any
-        : globalTriggerSystem.checkTriggers(next, skillUseContext);
+        : getActiveTriggerSystem().checkTriggers(next, skillUseContext);
 
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
@@ -2769,7 +2771,7 @@ function applyBattleActionInternal(
       // 不再设置 hasUsedBasicSkill，允许一回合使用多个技能
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         sourcePiece: piece,
         playerId: action.playerId,
@@ -2840,7 +2842,7 @@ function applyBattleActionInternal(
       };
       const beforeSkillUseResult = continuation.skipBeforeSkillUse
         ? { success: true, messages: [], blocked: false } as any
-        : globalTriggerSystem.checkTriggers(next, skillUseContext);
+        : getActiveTriggerSystem().checkTriggers(next, skillUseContext);
 
       // 触发器可能修改了技能ID，使用修改后的值
       const finalSkillId = skillUseContext.skillId;
@@ -3096,7 +3098,7 @@ function applyBattleActionInternal(
       // 不再设置 hasUsedChargeSkill，允许一回合使用多个技能
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         sourcePiece: piece,
         playerId: action.playerId,
@@ -3139,7 +3141,7 @@ function applyBattleActionInternal(
         turnNumber: next.turn.turnNumber,
         playerId: action.playerId
       }
-      const endTurnResult = globalTriggerSystem.checkTriggers(next, endTurnContext);
+      const endTurnResult = getActiveTriggerSystem().checkTriggers(next, endTurnContext);
 
       appendTriggerMessages(next, endTurnResult, action.playerId)
       if (setPendingInteraction(next, endTurnResult, endTurnContext, {
@@ -3149,7 +3151,7 @@ function applyBattleActionInternal(
       }
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         playerId: action.playerId,
         turnNumber: next.turn.turnNumber
@@ -3328,7 +3330,7 @@ function applyBattleActionInternal(
       if (pending.effectCode) {
         let fn: any
         try {
-          const compileEffect = dynamicCodeRuntime.compileExpression<(math: Math, date: DateConstructor) => unknown>({
+          const compileEffect = getRuleDynamicCodeRuntime().compileExpression<(math: Math, date: DateConstructor) => unknown>({
             surface: 'pendingEffectCode', contentId: pending.selectionId || 'pending-target',
             contentVersion: String(pending.stateRevision ?? 0),
             code: '(function(Math, Date) { return (' + pending.effectCode + '); })', entry: 'serialized function(ctx)',
@@ -3408,7 +3410,7 @@ function applyBattleActionInternal(
       }
       const beforeCardPlayResult = continuation.skipBeforeCardPlay
         ? { success: true, messages: [], blocked: false } as TriggerResult
-        : globalTriggerSystem.checkTriggers(next, beforeCardPlayContext);
+        : getActiveTriggerSystem().checkTriggers(next, beforeCardPlayContext);
       assertNoUnhandledInteraction(beforeCardPlayResult, 'beforeCardPlay')
 
       // 检查是否有规则阻止了卡牌使用
@@ -3498,7 +3500,7 @@ function applyBattleActionInternal(
         cardId: cardInstance.cardId,
         cardInstanceId: cardInstance.instanceId,
       }
-      const afterCardPlayResult = globalTriggerSystem.checkTriggers(next, afterCardPlayContext)
+      const afterCardPlayResult = getActiveTriggerSystem().checkTriggers(next, afterCardPlayContext)
       assertNoUnhandledInteraction(afterCardPlayResult, 'afterCardPlay')
 
       // 处理触发效果的消息
@@ -3514,7 +3516,7 @@ function applyBattleActionInternal(
       }
 
       // 触发 whenever
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, { type: "whenever", playerId: action.playerId })
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, { type: "whenever", playerId: action.playerId })
       assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
       return next
@@ -3722,7 +3724,7 @@ function runSuspendableActionTransaction(
   const transactionRuntime = new SuspendableActionRuntime(runtimeAnswers)
   const outerRuleRuntime = getActiveRuleRuntime()
   const outerRuntimeSnapshot = outerRuleRuntime?.snapshot()
-  const triggerSnapshot = globalTriggerSystem.snapshotTransactionState()
+  const triggerSnapshot = getActiveTriggerSystem().snapshotTransactionState()
   let replayRuleRuntime = outerRuleRuntime
   if (transaction.runtimeCheckpoint) {
     replayRuleRuntime = new RuleRuntime({
@@ -3857,7 +3859,7 @@ function runSuspendableActionTransaction(
     return reduced
   } catch (error) {
     if (outerRuleRuntime && outerRuntimeSnapshot) outerRuleRuntime.restore(outerRuntimeSnapshot)
-    globalTriggerSystem.restoreTransactionState(triggerSnapshot)
+    getActiveTriggerSystem().restoreTransactionState(triggerSnapshot)
     if (!isSuspendableActionPending(error)) throw error
     const rootActionType = (transaction.rootAction as { type?: string } | undefined)?.type
     // A timeout owns the complete forced progression, including deployment,
@@ -4037,7 +4039,7 @@ export function summonPiece(
   }
 
   // 触发召唤前触发器
-  const beforeSummonResult = globalTriggerSystem.checkTriggers(battle, {
+  const beforeSummonResult = getActiveTriggerSystem().checkTriggers(battle, {
     type: "beforePieceSummoned",
     playerId: ownerPlayerId,
     targetPosition: { x, y },
@@ -4073,7 +4075,7 @@ export function summonPiece(
   }
 
   // 触发召唤后触发器
-  const afterSummonResult = globalTriggerSystem.checkTriggers(battle, {
+  const afterSummonResult = getActiveTriggerSystem().checkTriggers(battle, {
     type: "afterPieceSummoned",
     playerId: ownerPlayerId,
     sourcePiece: newPiece,
