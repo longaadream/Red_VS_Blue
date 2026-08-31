@@ -1,6 +1,10 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
-import { globalTriggerSystem, type TriggerResult } from "./triggers"
+import {
+  globalTriggerSystem,
+  type TriggerResult,
+  type TriggerRule as RuntimeTriggerRule,
+} from "./triggers"
 import { rng } from "./rng"
 import {
   getActiveRuleExecutionContext,
@@ -137,6 +141,82 @@ export function rethrowAttachedEffectContentError(
     },
     error,
   ))
+}
+
+export function restorePersistedRuleRuntime(
+  state: BattleState,
+  reloadedRule: RuntimeTriggerRule,
+  persistedRule: unknown,
+  sourceId: string,
+): RuntimeTriggerRule {
+  const persistedLimits = (persistedRule as any)?.limits
+  if (persistedLimits === undefined) return reloadedRule
+  if (!persistedLimits || typeof persistedLimits !== 'object' || Array.isArray(persistedLimits)) {
+    rethrowAttachedEffectContentError(
+      state,
+      new Error(`Rule ${reloadedRule.id} has invalid persisted limits`),
+      `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+      { sourceId, skillId: reloadedRule.id },
+    )
+    return reloadedRule
+  }
+
+  const runtimeKeys = ['uses', 'currentCooldown', 'remainingDuration'] as const
+  const values: Partial<Record<(typeof runtimeKeys)[number], number | undefined>> = {}
+  for (const key of runtimeKeys) {
+    if (!Object.prototype.hasOwnProperty.call(persistedLimits, key)) continue
+    const value = (persistedLimits as Record<string, unknown>)[key]
+    const minimum = key === 'remainingDuration' ? -1 : 0
+    if (
+      value !== undefined
+      && (!Number.isSafeInteger(value) || Number(value) < minimum)
+    ) {
+      rethrowAttachedEffectContentError(
+        state,
+        new Error(`Rule ${reloadedRule.id} has invalid persisted ${key}`),
+        `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+        { sourceId, skillId: reloadedRule.id },
+      )
+      return reloadedRule
+    }
+    values[key] = value as number | undefined
+  }
+  if (Object.keys(values).length === 0) return reloadedRule
+  if (!reloadedRule.limits) {
+    rethrowAttachedEffectContentError(
+      state,
+      new Error(`Rule ${reloadedRule.id} persisted runtime has no profile limits`),
+      `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+      { sourceId, skillId: reloadedRule.id },
+    )
+    return reloadedRule
+  }
+  return {
+    ...reloadedRule,
+    limits: {
+      ...reloadedRule.limits,
+      ...values,
+    },
+  }
+}
+
+function isThrownInteractionSignal(value: unknown): value is SkillExecutionResult {
+  try {
+    return Boolean(
+      (value as any)?.needsTargetSelection || (value as any)?.needsOptionSelection,
+    )
+  } catch {
+    return false
+  }
+}
+
+function safeThrownValueMessage(value: unknown): string {
+  try {
+    if (value instanceof Error && typeof value.message === 'string') return value.message
+    return String(value)
+  } catch {
+    return 'uninspectable thrown value'
+  }
 }
 
 // 简单的日志写入函数
@@ -542,9 +622,9 @@ export function loadCardForBattle(
     }
   }
 
-  const error = definitionError instanceof Error
-    ? definitionError
-    : new Error(`Card definition ${cardId || '<empty>'} is unavailable`)
+  const error = definitionError === undefined
+    ? new Error(`Card definition ${cardId || '<empty>'} is unavailable`)
+    : definitionError
   rethrowAttachedEffectContentError(
     battle,
     error,
@@ -951,8 +1031,7 @@ export function executeCardFunction(
   } catch (error: any) {
     if (isEffectChainPendingSignal(error)) throw error
     if (isEffectChainFatalError(error)) throw error
-    if (error?.needsTargetSelection) return error as SkillExecutionResult
-    if (error?.needsOptionSelection) return error as SkillExecutionResult
+    if (isThrownInteractionSignal(error)) return error
     rethrowAttachedEffectContentError(
       battle,
       error,
@@ -963,8 +1042,9 @@ export function executeCardFunction(
         targetId: triggerContext?.targetPiece?.instanceId,
       },
     )
-    console.error(`[executeCardFunction] Error executing card ${cardDef.id}:`, error)
-    return { success: false, message: `卡牌执行失败: ${error?.message || error}` }
+    const failureMessage = safeThrownValueMessage(error)
+    console.error(`[executeCardFunction] Error executing card ${cardDef.id}: ${failureMessage}`)
+    return { success: false, message: `卡牌执行失败: ${failureMessage}` }
   } finally {
     restoreSummonQueueContext?.()
     sealedContent.cleanup?.()
@@ -1048,9 +1128,9 @@ export function loadSkillForBattle(
     definitionError = error
   }
 
-  const error = definitionError instanceof Error
-    ? definitionError
-    : new Error(`Skill definition ${skillId || '<empty>'} is unavailable`)
+  const error = definitionError === undefined
+    ? new Error(`Skill definition ${skillId || '<empty>'} is unavailable`)
+    : definitionError
   rethrowAttachedEffectContentError(
     battle,
     error,
@@ -1402,7 +1482,13 @@ export function loadRuleById(
           } catch (error) {
             if (isEffectChainPendingSignal(error)) throw error
             if (isEffectChainFatalError(error)) throw error
-            if (error instanceof DamagePipelineError) throw error;
+            let isDamagePipelineFailure = false
+            try {
+              isDamagePipelineFailure = error instanceof DamagePipelineError
+            } catch {
+              // Hostile thrown values are ordinary content failures, not pipeline errors.
+            }
+            if (isDamagePipelineFailure) throw error;
             rethrowAttachedEffectContentError(
               battle,
               error,
@@ -1413,7 +1499,7 @@ export function loadRuleById(
                 targetId: context?.targetPiece?.instanceId,
               },
             )
-            console.error('[Rule] Error executing skillCode:', error);
+            console.error('[Rule] Error executing skillCode: ' + safeThrownValueMessage(error));
             return { success: false, message: '规则执行失败' };
           }
         };
@@ -1822,9 +1908,9 @@ export function loadRuleForBattle(
   }
   if (rule) return rule
 
-  const error = definitionError instanceof Error
-    ? definitionError
-    : new Error(`Rule definition ${ruleId || '<empty>'} is unavailable`)
+  const error = definitionError === undefined
+    ? new Error(`Rule definition ${ruleId || '<empty>'} is unavailable`)
+    : definitionError
   rethrowAttachedEffectContentError(
     battle,
     error,
@@ -4094,7 +4180,7 @@ export function hydratePreparedPieceDefinitions(
   fatal: (message: string, cause?: unknown) => never,
 ): void {
   const rulesById = new Map<string, TriggerRule>()
-  const hydrateRule = (rawRuleId: unknown): TriggerRule => {
+  const hydrateRule = (rawRuleId: unknown, persistedRule?: unknown): TriggerRule => {
     const ruleId = typeof rawRuleId === 'string' ? rawRuleId : ''
     if (!ruleId) fatal(`Summoned piece ${piece.instanceId} has an invalid rule reference`)
     let rule: TriggerRule | null = null
@@ -4105,12 +4191,15 @@ export function hydratePreparedPieceDefinitions(
       fatal(`Summoned piece ${piece.instanceId} rule ${ruleId} failed to load`, error)
     }
     if (!rule) fatal(`Summoned piece ${piece.instanceId} rule ${ruleId} was not found`)
-    rulesById.set(ruleId, rule)
-    return rule
+    const hydrated = persistedRule === undefined
+      ? rule
+      : restorePersistedRuleRuntime(battle, rule, persistedRule, piece.instanceId)
+    rulesById.set(ruleId, hydrated)
+    return hydrated
   }
 
   for (const descriptor of piece.rules || []) {
-    hydrateRule((descriptor as any)?.id)
+    hydrateRule((descriptor as any)?.id, descriptor)
   }
   for (const status of piece.statusTags || []) {
     const relatedRules = (status as any)?.relatedRules

@@ -11,6 +11,7 @@ import {
   createDeclaredSummonQueueWriter,
   createInternalDeathQueueWriter,
   createSummonQueueWriter,
+  EffectChainFatalError,
   getActiveEffectChain,
   withEffectChain,
 } from '@/lib/game/effect-batch'
@@ -498,6 +499,88 @@ describe('RED-139 SummonBatch', () => {
       else withTemporaryRuleProfile(ruleId, run)
     },
   )
+
+  it.each([
+    ['direct', (state: any) => state],
+    ['structuredClone', (state: any) => structuredClone(state)],
+    ['JSON round-trip', (state: any) => JSON.parse(JSON.stringify(state))],
+  ])('preserves stored-piece rule runtime counters across %s state transport', (_name, transport) => {
+    const fixture = makeDemonSummonState()
+    fixture.state.extensions.kiljaedanPiece.rules = [{
+      id: 'rule-kiljaedan-gamestart',
+      name: 'persisted stale definition',
+      description: 'must be replaced by the pinned profile definition',
+      trigger: { type: 'wrong-trigger' },
+      limits: {
+        maxUses: 999,
+        uses: 1,
+        cooldownTurns: 999,
+        currentCooldown: 0,
+        duration: 999,
+        remainingDuration: -1,
+      },
+    }]
+    const state = transport(fixture.state)
+    const persistedLimits = structuredClone(state.extensions.kiljaedanPiece.rules[0].limits)
+    const beforeHash = hashBattleState(state)
+
+    const result = runBattleAction(
+      state,
+      prepareDemonSummonAction(state, 'red139-stored-rule-runtime') as any,
+      { rootSeed: 13910 },
+    )
+    const summoned = result.state.pieces.find(piece => piece.templateId === 'kiljaedan') as any
+    const rule = summoned.rules.find((candidate: any) => candidate.id === 'rule-kiljaedan-gamestart')
+
+    expect(rule).toMatchObject({
+      id: 'rule-kiljaedan-gamestart',
+      trigger: { type: 'gameStart' },
+      limits: {
+        maxUses: 1,
+        uses: 1,
+        currentCooldown: 0,
+        remainingDuration: -1,
+      },
+    })
+    expect(rule.limits).not.toHaveProperty('cooldownTurns')
+    expect(rule.limits).not.toHaveProperty('duration')
+    expect(rule.effect).toBeUndefined()
+    expect(result.state.extensions?.kiljaedanPiece).toBeUndefined()
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(state.extensions.kiljaedanPiece.rules[0].limits).toEqual(persistedLimits)
+  })
+
+  it('rejects invalid stored-piece rule runtime before root commit', () => {
+    const fixture = makeDemonSummonState()
+    fixture.state.extensions.kiljaedanPiece.rules = [{
+      id: 'rule-kiljaedan-gamestart',
+      limits: { maxUses: 1, uses: -1 },
+    }]
+    const state = JSON.parse(JSON.stringify(fixture.state))
+    const beforeHash = hashBattleState(state)
+    let caught: unknown
+
+    try {
+      runBattleAction(
+        state,
+        prepareDemonSummonAction(state, 'red139-invalid-stored-rule-runtime') as any,
+        { rootSeed: 13911 },
+      )
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      actionId: 'red139-invalid-stored-rule-runtime',
+      kind: 'summon',
+      sourceId: 'red139-kiljaedan-hidden',
+      skillId: 'rule-kiljaedan-gamestart',
+    })
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(state.pieces.some((piece: any) => piece.templateId === 'kiljaedan')).toBe(false)
+    expect(state.extensions.kiljaedanPiece.rules[0].limits.uses).toBe(-1)
+  })
 
   it('applies position aliases chronologically across successive consumers', () => {
     const { state } = makeDemonSummonState()

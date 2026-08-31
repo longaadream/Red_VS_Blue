@@ -28,7 +28,7 @@ function writeLog(message: string) {
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats, PieceStatusTag } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
+import { dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, restorePersistedRuleRuntime, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
 import { globalTriggerSystem, type TriggerContext, type TriggerResult, type TriggerRule } from "./triggers"
 import {
   EffectChainFatalError,
@@ -98,63 +98,6 @@ import {
 } from "./turn-timer"
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
-
-function restorePersistedRuleRuntime(
-  state: BattleState,
-  reloadedRule: TriggerRule,
-  persistedRule: any,
-  sourceId: string,
-): TriggerRule {
-  const persistedLimits = persistedRule?.limits
-  if (persistedLimits === undefined) return reloadedRule
-  if (!persistedLimits || typeof persistedLimits !== 'object' || Array.isArray(persistedLimits)) {
-    rethrowAttachedEffectContentError(
-      state,
-      new Error(`Rule ${reloadedRule.id} has invalid persisted limits`),
-      `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
-      { sourceId, skillId: reloadedRule.id },
-    )
-    return reloadedRule
-  }
-
-  const runtimeKeys = ['uses', 'currentCooldown', 'remainingDuration'] as const
-  const values: Partial<Record<(typeof runtimeKeys)[number], number | undefined>> = {}
-  for (const key of runtimeKeys) {
-    if (!Object.prototype.hasOwnProperty.call(persistedLimits, key)) continue
-    const value = persistedLimits[key]
-    const minimum = key === 'remainingDuration' ? -1 : 0
-    if (
-      value !== undefined
-      && (!Number.isSafeInteger(value) || Number(value) < minimum)
-    ) {
-      rethrowAttachedEffectContentError(
-        state,
-        new Error(`Rule ${reloadedRule.id} has invalid persisted ${key}`),
-        `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
-        { sourceId, skillId: reloadedRule.id },
-      )
-      return reloadedRule
-    }
-    values[key] = value
-  }
-  if (Object.keys(values).length === 0) return reloadedRule
-  if (!reloadedRule.limits) {
-    rethrowAttachedEffectContentError(
-      state,
-      new Error(`Rule ${reloadedRule.id} persisted runtime has no profile limits`),
-      `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
-      { sourceId, skillId: reloadedRule.id },
-    )
-    return reloadedRule
-  }
-  return {
-    ...reloadedRule,
-    limits: {
-      ...reloadedRule.limits,
-      ...values,
-    },
-  }
-}
 
 // ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
 function restorePieceRules(state: BattleState): void {

@@ -13,7 +13,8 @@
 - Linear：RED-139。
 - `base_branch`：`main`。
 - 合同立项 `base_sha`：`6e6ae8dd88928dc285c0cbb7a5be7e3c121ae9a2`（RED-139 开始生产实现时记录）。
-- PostgreSQL + Colyseus 集成基线：`8902c0da94957fdb52d142363c2c45a2ebda7a7f`（2026-08-31 再次执行 `git fetch origin --prune`，并将实现分支 rebase 到已包含 RED-160 的最新 `origin/main` 后记录）。
+- 当前开发 `base_sha`：`b0a5c3fb99b68b2a7e174c03b2b0c0a4b30b6926`（2026-08-31 执行 `git fetch origin --prune`，并将实现分支 rebase 到当时最新 `origin/main` 后记录）。
+- PostgreSQL + Colyseus 首次集成基线：`8902c0da94957fdb52d142363c2c45a2ebda7a7f`（包含已合入的 RED-160）。
 - 继承决策：ADR-0004、ADR-0006、ADR-0008、ADR-0010、ADR-0011、ADR-0015、ADR-0016。
 
 ## 背景
@@ -234,7 +235,7 @@ RED-139 的引擎层不直接依赖 `pg`、Colyseus Schema 或 Room API。正式
 3. `dispatchRoomBattleAction` 只能在 `runBattleAction` 成功且 authority JSON clone/hash 检查通过后提交 `BattleState` 与 transition。fatal 时不推进 Room state/version、不写 transition、不广播 APPLIED；适配器可持久化不含 provisional state 的 rejected receipt。
 4. 普通动作继续遵守 RED-160 已批准的 memory/journal commit 后 APPLIED、PostgreSQL 异步 durable 语义；终局继续等待 durable barrier。RED-139 不增加第二条 FIFO、同步数据库写或 EffectChain-aware journal。
 5. pending 是一次成功的根动作结果，但持久化的是 authority pre-state 加现有 pending selection/transaction；任何 Batch ledger、已 Commit 一半的 HP/实体或进程内 Error 都不得进入存储。resume/timeout/cancel 继续作为新 Room command 从根 action 重放。
-6. 从 PostgreSQL checkpoint 解析出的 JSON state，与同一进程内 state 或 `structuredClone` state 在相同 pinned profile、root seed、命令和独立 Room context 下必须得到相同结果、规范轨迹和后续动作状态；执行完成后所有输入/输出都不得残留 active EffectChain 或运行时函数，且连续第二个 action 仍须一致。
+6. 从 PostgreSQL checkpoint 解析出的 JSON state，与同一进程内 state 或 `structuredClone` state 在相同 pinned profile、root seed、命令和独立 Room context 下必须得到相同结果、规范轨迹和后续动作状态；执行完成后所有输入/输出都不得残留 active EffectChain 或运行时函数，且连续第二个 action 仍须一致。stored-piece 规则水合时，代码及 `maxUses/cooldownTurns/duration` 等静态限制来自 pinned profile，只有 `uses/currentCooldown/remainingDuration` 三个已校验的运行时计数从持久化 descriptor 恢复；非法计数必须在 Commit 前 fatal。
 
 本节不修改 RED-160 数据库 schema、网络 envelope、公共投影、authority/durable version 或拒绝 receipt 结构。如果未来需要把 Batch 诊断放入协议或数据库，必须另立合同和迁移。
 
@@ -375,7 +376,7 @@ RED-139 只申请迁移：
 | Demon stored restore | pre `42d32c426d61e7a12fd89c81bf7646ff83ebb9a29f6548d75ad98c05d1597c34`；action `696762c7b3113fb7c65dce2b5711a92803223d2dd3fb12d54bbefed0cbfa5061` | `45e8c15e0618f0dd1304c98dd99a2ef60663356bc09f626182e4b39d648f8c15` / `f284f3462e2d7f393478ce8b1a7f71dfd4eade570b737c254056bf096bad3c58` | `3b801c4a1540501fdbe313866f9bfd626325290e782c80450f6573cf8fe5d047` / `aa70e28c131ca62a3c06dc33a59721c076ec515b5eca2f03b683c95d3b35652e` | 最终 KJ identity/HP/skills/status、anchor HP/attack、AP/hand/discard 不变；extension 在 before 仍存在，统一 Commit 删除，after 才能观察 on-board。 |
 | Demon fallback create | pre `cf21fcd2b4db666812f04218ae615191899d9c961a528fb1345f5dfd457fb99c`；action `14a8b69077d6c13972431bbbe852ca72d180d430af0f4f3a2c0a1decdd91705f` | `b88e743b946f0b332cd0180bab2f590c67bc35d318606b9498fa16bc2cc65132` / `39192ec19b28605d8a7fc3f21618b10682223f94cdd04bf6584254c258116809` | `a23fb6e99fb52c52c53c67a87959afa83e6370ba7c227468e167dff8e332a2d1` / `06a7f0412391b3f9628524de56690a9cb4c417da0f6d516d8c1c9768706026ce` | 生成 ID `kiljaedan-player-red-1000000`、最终棋子投影和 damage → attack +1 → summon 顺序不变；新增 sealed Summon lifecycle 与 batch 元数据。 |
 
-Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5ff1fe3ac6dbf343e16a` 变为 `365b5933c52697d60fc3e7395da1d5ef8261e97a3879b93ad0d594d76fca38df`；Naruto 与两个 Demon 场景的 action-message hash 不变。基于 RED-160 集成基线重建的两个浏览器 bundle 字节相同，SHA-256 均为 `D44062396B5D380852D3DD31171AA30BEE0633BD81F8B54210909AE6903D70E2`。
+Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5ff1fe3ac6dbf343e16a` 变为 `365b5933c52697d60fc3e7395da1d5ef8261e97a3879b93ad0d594d76fca38df`；Naruto 与两个 Demon 场景的 action-message hash 不变。基于当前 RED-160 兼容实现重建的两个浏览器 bundle 字节相同，SHA-256 均为 `5EF4696F672B19F6B60BB7D88674D50F4A4B43E8DA8992F3D39C308E38B63F37`。
 
 ## 回退方式
 
@@ -405,7 +406,7 @@ Reap 的 action-message hash 从 `477c3a2a5ec90c152c614985f3bc591d86fc0a6faa5d5f
 11. 动作级 20 depth / 100 batches / 1000 dispatches 与 fatal error 穿透；
 12. pending 重放、TriggerSystem 事务快照、进程外测试 recorder 与无协议字段变化；
 13. 三个且仅三个数据迁移点、排除项、允许路径，以及旧回放/日志/state hash 证据方式；
-14. 在 RED-139 当前任务内直接兼容 PostgreSQL + Colyseus：不另开任务、不引入引擎依赖、不改 DB schema/网络协议；采用每房间 `RuleExecutionContext`、普通 JSON BattleState、成功规则归约后才提交 authority transition，pending 从根 pre-state 重放且不序列化 EffectChain。该补充已同步 Linear，并在 RED-160 合入后 rebase 到集成基线 `8902c0da94957fdb52d142363c2c45a2ebda7a7f`。
+14. 在 RED-139 当前任务内直接兼容 PostgreSQL + Colyseus：不另开任务、不引入引擎依赖、不改 DB schema/网络协议；采用每房间 `RuleExecutionContext`、普通 JSON BattleState、成功规则归约后才提交 authority transition，pending 从根 pre-state 重放且不序列化 EffectChain。该补充已同步 Linear；首次在 RED-160 集成基线 `8902c0da94957fdb52d142363c2c45a2ebda7a7f` 上完成，并在提交候选前继续 rebase 到 `b0a5c3fb99b68b2a7e174c03b2b0c0a4b30b6926`。
 
 上述技术方案与 PostgreSQL + Colyseus 兼容补充均已获得明确批准并同步 Linear；实现完成后仍需独立审查与人工验收，不得自行合并或发布。
 

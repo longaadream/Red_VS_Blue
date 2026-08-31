@@ -1750,6 +1750,149 @@ describe('RED-139 authoritative EffectChain transactions', () => {
     },
   )
 
+  it('classifies a hostile thrown CardCode Proxy as one latched fatal and rolls back payment', () => {
+    const cardId = 'transaction-hostile-thrown-card-proxy'
+    const cardInstanceId = `${cardId}-instance`
+    const actionId = `${cardId}-action`
+    const code = `function executeCard(context) {
+      context.battle.extensions.hostileThrownCardLeak = true;
+      throw new Proxy({}, {
+        get: function() { throw new Error('hostile thrown card get trap'); },
+        getPrototypeOf: function() { throw new Error('hostile thrown card prototype trap'); }
+      });
+    }`
+
+    withTemporaryProfile({
+      cards: {
+        [cardId]: {
+          id: cardId,
+          name: cardId,
+          description: '',
+          keywords: [],
+          type: 'active',
+          actionPointCost: 2,
+          code,
+          targeting: { steps: [] },
+        },
+      },
+    }, () => {
+      const source = makePiece({
+        instanceId: 'transaction-source',
+        ownerPlayerId: 'player-red',
+        x: 0,
+        y: 0,
+        currentHp: 100,
+        maxHp: 100,
+      }) as any
+      const state = makeState({
+        pieces: [source],
+        currentPlayerId: 'player-red',
+        phase: 'action',
+        turnNumber: 7,
+      }) as any
+      state.players[0].actionPoints = 20
+      state.players[0].hand = [{
+        cardId,
+        instanceId: cardInstanceId,
+        ownerPlayerId: 'player-red',
+        actionPointCost: 2,
+      }]
+      let observedChain: EffectChain | undefined
+      addRule('observe-hostile-thrown-card-chain', 'beforeCardPlay', battle => {
+        observedChain = getActiveEffectChain(battle)
+      })
+      const beforeHash = hashBattleState(state)
+      const beforeJson = JSON.stringify(state)
+
+      let caught: unknown
+      try {
+        runBattleAction(state, {
+          type: 'playCard',
+          playerId: 'player-red',
+          cardInstanceId,
+          clientActionId: actionId,
+        } as any, { rootSeed: ROOT_SEED })
+      } catch (error) {
+        caught = error
+      }
+
+      expect(caught).toBeInstanceOf(EffectChainFatalError)
+      expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_STATE_INVALID')
+      expect((caught as EffectChainFatalError).context).toMatchObject({
+        actionId,
+        chainId: `effect-chain:${actionId}`,
+        kind: null,
+        skillId: cardId,
+        detached: false,
+      })
+      expect((caught as EffectChainFatalError).cause).toBeDefined()
+      expect(observedChain).toBeDefined()
+      let latched: unknown
+      try {
+        observedChain!.assertHealthy()
+      } catch (error) {
+        latched = error
+      }
+      expect(latched).toBe(caught)
+      expect(hashBattleState(state)).toBe(beforeHash)
+      expect(JSON.stringify(state)).toBe(beforeJson)
+      expect(state.players[0]).toMatchObject({ actionPoints: 20 })
+      expect(state.players[0].hand).toHaveLength(1)
+      expect(state.players[0].discardPile ?? []).toEqual([])
+      expect((state.extensions as any).hostileThrownCardLeak).toBeUndefined()
+      expect(getActiveEffectChain(state)).toBeUndefined()
+    })
+  })
+
+  it('classifies a hostile thrown Rule SkillCode Proxy as fatal and rolls back the root action', () => {
+    const ruleId = 'transaction-hostile-thrown-rule-proxy'
+    const skillId = 'transaction-hostile-rule-proxy-root'
+    const actionId = `${ruleId}-action`
+    const rootCode = `function executeSkill() { return { success: true }; }`
+    withTemporaryProfile({
+      rules: {
+        [ruleId]: {
+          id: ruleId,
+          name: ruleId,
+          description: '',
+          trigger: { type: 'beforeSkillUse' },
+          skillCode: `throw new Proxy({}, {
+            get: function() { throw new Error('hostile thrown rule get trap'); },
+            getPrototypeOf: function() { throw new Error('hostile thrown rule prototype trap'); }
+          });`,
+        },
+      },
+      skills: { [skillId]: skillDefinition(skillId, rootCode) },
+    }, () => {
+      const state = skillState(skillId, rootCode)
+      state.pieces[0].rules = [{ id: ruleId }] as any
+      const beforeHash = hashBattleState(state)
+      const beforeJson = JSON.stringify(state)
+
+      let caught: unknown
+      try {
+        runBattleAction(state, skillAction(skillId, actionId), { rootSeed: ROOT_SEED })
+      } catch (error) {
+        caught = error
+      }
+
+      expect(caught).toBeInstanceOf(EffectChainFatalError)
+      expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_STATE_INVALID')
+      expect((caught as EffectChainFatalError).context).toMatchObject({
+        actionId,
+        chainId: `effect-chain:${actionId}`,
+        kind: null,
+        sourceId: 'transaction-source',
+        skillId: ruleId,
+        detached: false,
+      })
+      expect((caught as EffectChainFatalError).cause).toBeDefined()
+      expect(hashBattleState(state)).toBe(beforeHash)
+      expect(JSON.stringify(state)).toBe(beforeJson)
+      expect(getActiveEffectChain(state)).toBeUndefined()
+    })
+  })
+
   it.each(['damage', 'heal'] as const)(
     'latches CardCode %s after authored code replaces the authoritative card instance',
     kind => {
