@@ -483,6 +483,14 @@ describe('game WebSocket service', () => {
     const store = getRoomStore()
     const getRoom = vi.spyOn(store, 'getRoom').mockImplementation(async id =>
       id === roomId ? room : undefined)
+    const getReceipt = vi.spyOn(store, 'getBattleAuthorityReceipt').mockResolvedValue({
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      roomId,
+      clientActionId: 'timed-out-action-1',
+      status: 'applied',
+      authorityVersion: 4,
+    })
     const client = await openClient()
 
     try {
@@ -506,14 +514,22 @@ describe('game WebSocket service', () => {
       client.send(JSON.stringify({
         type: 'requestBattleSnapshot',
         requestId: 'authority-sync-test-1',
+        clientActionId: 'timed-out-action-1',
       }))
       await expect(correlatedSnapshot).resolves.toMatchObject({
         type: 'stateUpdate',
         requestId: 'authority-sync-test-1',
         authorityVersion: 4,
+        receipt: {
+          clientActionId: 'timed-out-action-1',
+          status: 'applied',
+          authorityVersion: 4,
+        },
       })
+      expect(getReceipt).toHaveBeenCalledWith(roomId, 'timed-out-action-1')
     } finally {
       await closeClient(client)
+      getReceipt.mockRestore()
       getRoom.mockRestore()
     }
   })

@@ -1352,15 +1352,24 @@
       scrollbar-width: thin;
     }
     .deployment-choice-strip[hidden] { display: none !important; }
-    .deployment-choice {
-      min-width: 112px;
-      min-height: 48px;
-      padding: 7px 10px;
+    .deployment-candidate {
+      min-width: 154px;
+      display: grid;
+      grid-template-rows: 1fr auto;
       flex: 1 0 auto;
-      border: 1px solid rgba(148,163,184,.34);
-      border-radius: 9px;
+      border: 1px solid rgba(148,163,184,.24);
+      border-radius: 10px;
+      overflow: hidden;
+      background: rgba(15,23,42,.72);
+    }
+    .deployment-choice {
+      min-width: 0;
+      min-height: 54px;
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 0;
       color: #cbd5e1;
-      background: rgba(30,41,59,.72);
+      background: rgba(30,41,59,.56);
       font-size: 12px;
       font-weight: 800;
       cursor: pointer;
@@ -1373,6 +1382,27 @@
       background: rgba(3,105,161,.42);
       box-shadow: inset 0 0 0 1px rgba(125,211,252,.3);
     }
+    .deployment-choice-name { display: block; color: inherit; }
+    .deployment-choice-stats {
+      display: block;
+      margin-top: 4px;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .deployment-choice-info {
+      min-height: 30px;
+      border: 0;
+      border-top: 1px solid rgba(148,163,184,.2);
+      color: #7dd3fc;
+      background: rgba(2,6,23,.52);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .deployment-choice-info:hover { color: #e0f2fe; background: rgba(3,105,161,.24); }
+    .deployment-choice-info:focus-visible { outline: 2px solid #38bdf8; outline-offset: -2px; }
     .deployment-status-footer {
       grid-column: 1 / -1;
       display: flex;
@@ -1457,12 +1487,12 @@
   </div>
 
   <!-- Piece Info Modal -->
-  <div id="pieceInfoModal" role="dialog" aria-modal="true" aria-label="棋子详情" onclick="if(event.target===this)closePieceInfo()">
+  <div id="pieceInfoModal" role="dialog" aria-modal="true" aria-labelledby="pieceInfoName" onclick="if(event.target===this)closePieceInfo()">
     <div class="pi-layout">
       <div class="pi-sheet">
       <div class="pi-header">
         <div class="pi-name" id="pieceInfoName"></div>
-        <button class="pi-close" onclick="closePieceInfo()">✕</button>
+        <button class="pi-close" type="button" aria-label="关闭棋子详情" onclick="closePieceInfo()">✕</button>
       </div>
         <div id="pieceInfoContent"></div>
       </div>
@@ -2148,7 +2178,12 @@
         startedAt: typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(),
       }
       pendingActionFeedbackTimer = setTimeout(function () {
-        rejectPendingActionFeedback('action-timeout', '指令确认超时，请检查连接后重试')
+        if (!pendingActionFeedback || pendingActionFeedback.clientActionId !== action.clientActionId) return
+        pendingActionFeedback.timedOut = true
+        pendingActionFeedbackTimer = null
+        renderActionBar()
+        setStatusMsg('指令回执延迟，正在同步服务端状态，请勿重复操作')
+        requestAuthorityRecovery('action-timeout', action.clientActionId)
       }, PENDING_ACTION_TIMEOUT_MS)
       return true
     }
@@ -2186,9 +2221,12 @@
     }
 
     function requestAuthorityRecovery(reason) {
+      var clientActionId = arguments[1]
       if (window.RvBWs && typeof RvBWs.requestAuthoritySync === 'function') {
-        RvBWs.requestAuthoritySync(reason || 'unknown')
-        return Promise.resolve()
+        var requested = clientActionId && typeof RvBWs.requestAuthorityReceiptSync === 'function'
+          ? RvBWs.requestAuthorityReceiptSync(reason || 'unknown', clientActionId)
+          : RvBWs.requestAuthoritySync(reason || 'unknown')
+        return Promise.resolve(requested)
       }
       if (authorityRecoveryPromise) return authorityRecoveryPromise
       addLog('[authority] 请求完整快照：' + (reason || 'unknown'), 'err')
@@ -2388,6 +2426,9 @@
     let currentCardKeywords = []
     let activeCardKeyword = ''
     let currentPieceInfoId = null
+    let currentPieceInfoSource = ''
+    let currentPieceInfoDeploymentRevision = null
+    let pieceInfoReturnFocus = null
     let currentPieceKeywords = []
     let activePieceKeyword = ''
     let wsConnected = false     // WebSocket live
@@ -2650,7 +2691,9 @@
     }
     function selectPieceKeyword(keyword) {
       activePieceKeyword = keyword
-      if (currentPieceInfoId) showPieceInfo(currentPieceInfoId, true)
+      if (!currentPieceInfoId) return
+      if (currentPieceInfoSource === 'deployment') showDeploymentPieceInfo(currentPieceInfoId, null, true)
+      else showPieceInfo(currentPieceInfoId, true)
     }
 
     // State diff -> detailed log entries
@@ -3158,12 +3201,8 @@
     }
 
     // ── Piece info modal ──
-    function showPieceInfo(instanceId, preserveKeyword) {
-      if (!G) return
-      closePieceContextMenu()
-      const piece = G.pieces.find(p => p.instanceId === instanceId)
+    function renderPieceInfoRecord(piece, preserveKeyword) {
       if (!piece) return
-      currentPieceInfoId = instanceId
       const tmpl = PIECES_BY_ID[piece.templateId] || {}
       const stats = piece.stats || {}
       const mhp = pieceMaxHp(piece)
@@ -3285,15 +3324,133 @@
         '这个棋子的技能没有需要额外解释的关键词。'
       )
       bindKeywordBadges('piece')
-      document.getElementById('pieceInfoModal').style.display = 'flex'
+      const modal = document.getElementById('pieceInfoModal')
+      modal.style.display = 'flex'
+      const closeButton = modal.querySelector('.pi-close')
+      if (!preserveKeyword && closeButton) closeButton.focus()
+    }
+    function showPieceInfo(instanceId, preserveKeyword) {
+      if (!G) return
+      closePieceContextMenu()
+      const piece = G.pieces.find(p => p.instanceId === instanceId)
+      if (!piece) return
+      if (!preserveKeyword) pieceInfoReturnFocus = document.activeElement
+      currentPieceInfoId = instanceId
+      currentPieceInfoSource = 'board'
+      currentPieceInfoDeploymentRevision = null
+      renderPieceInfoRecord(piece, preserveKeyword)
+    }
+    function resolveDeploymentOfferPiece(pieceId) {
+      const deployment = G && G.deployment
+      if (
+        !deployment
+        || deployment.mode !== 'progressive-reserve-v1'
+        || deployment.status !== 'awaiting-reserve-deploy'
+        || !progressiveDeploymentOwned(G)
+        || G.terminalResult
+      ) return null
+      const offer = (deployment.offerPieces || []).find(function(piece) { return piece.instanceId === pieceId })
+      if (!offer) return null
+      const template = PIECES_BY_ID[offer.templateId]
+      const authoritativeStats = G.pieceStatsByTemplateId && G.pieceStatsByTemplateId[offer.templateId]
+      const stats = authoritativeStats || (template && template.stats)
+      if (!template || !stats) {
+        return { error: true, instanceId: offer.instanceId, templateId: offer.templateId, name: offer.name || offer.templateId || '未知棋子' }
+      }
+      const maxHp = Number(stats.maxHp)
+      return {
+        instanceId: offer.instanceId,
+        templateId: offer.templateId,
+        name: offer.name || template.name || offer.templateId,
+        stats: {
+          maxHp: Number.isFinite(maxHp) ? maxHp : 1,
+          attack: stats.attack,
+          defense: stats.defense,
+          moveRange: stats.moveRange,
+        },
+        maxHp: Number.isFinite(maxHp) ? maxHp : 1,
+        currentHp: Number.isFinite(maxHp) ? maxHp : 1,
+        skills: (template.skills || []).map(function(skill) {
+          const skillId = skillIdOf(skill)
+          return { skillId: skillId, currentCooldown: 0, currentCharges: 0, unlocked: true }
+        }).filter(function(skill) { return !!skill.skillId }),
+        statusTags: [],
+        buffs: [],
+        debuffs: [],
+      }
+    }
+    function renderDeploymentPieceInfoError(piece) {
+      document.getElementById('pieceInfoName').textContent = piece.name || '候选棋子'
+      document.getElementById('pieceInfoContent').innerHTML = '<div class="pi-status-none">棋子资料暂时不可用。候选仍可正常选择，请等待资料同步后再查看。</div>'
+      document.getElementById('pieceKeywordPanel').innerHTML = ''
+      currentPieceKeywords = []
+      activePieceKeyword = ''
+      const modal = document.getElementById('pieceInfoModal')
+      modal.style.display = 'flex'
+      const closeButton = modal.querySelector('.pi-close')
+      if (closeButton) closeButton.focus()
+    }
+    function showDeploymentPieceInfo(pieceId, trigger, preserveKeyword) {
+      const piece = resolveDeploymentOfferPiece(pieceId)
+      if (!piece) {
+        reconcileDeploymentPieceInfo()
+        return
+      }
+      if (!preserveKeyword) pieceInfoReturnFocus = trigger || document.activeElement
+      currentPieceInfoId = pieceId
+      currentPieceInfoSource = 'deployment'
+      currentPieceInfoDeploymentRevision = G.deployment.revision
+      if (piece.error) renderDeploymentPieceInfoError(piece)
+      else renderPieceInfoRecord(piece, preserveKeyword)
+    }
+    function reconcileDeploymentPieceInfo() {
+      if (currentPieceInfoSource !== 'deployment' || !currentPieceInfoId) return
+      const deployment = G && G.deployment
+      if (
+        !deployment
+        || deployment.mode !== 'progressive-reserve-v1'
+        || deployment.status !== 'awaiting-reserve-deploy'
+        || !progressiveDeploymentOwned(G)
+        || G.terminalResult
+        || deployment.revision !== currentPieceInfoDeploymentRevision
+        || !(deployment.offerPieces || []).some(function(piece) { return piece.instanceId === currentPieceInfoId })
+      ) closePieceInfo({ restoreFocus: false })
+    }
+    function handlePieceInfoModalKeydown(event) {
+      const modal = document.getElementById('pieceInfoModal')
+      if (!modal || modal.style.display === 'none' || modal.style.display === '') return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closePieceInfo()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = Array.from(modal.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'))
+        .filter(function(element) { return element.offsetParent !== null })
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     function closePieceInfo() {
+      const input = arguments[0] || {}
+      const returnFocus = pieceInfoReturnFocus
       currentPieceInfoId = null
+      currentPieceInfoSource = ''
+      currentPieceInfoDeploymentRevision = null
+      pieceInfoReturnFocus = null
       currentPieceKeywords = []
       activePieceKeyword = ''
       document.getElementById('pieceInfoModal').style.display = 'none'
       const selected = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       renderPieceContextMenu(selected || null)
+      if (input.restoreFocus !== false && returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus()
     }
 
     function showTileStatus(x, y) {
@@ -3931,6 +4088,7 @@
 
       const oldG = G
       G = state
+      reconcileDeploymentPieceInfo()
       if (!G.deployment || G.deployment.status === 'complete') {
         localDeploymentChoiceId = null
       } else if (G.deployment.mode === 'progressive-reserve-v1') {
@@ -4191,24 +4349,41 @@
         var el = document.getElementById('wsStatus')
         if (el) el.style.display = 'none'
         addLog('WebSocket 断开，等待重连', 'info')
-        rejectPendingActionFeedback('disconnect', '连接已断开；待确认指令已取消')
+        if (pendingActionFeedback) {
+          setStatusMsg('连接已断开；原指令仍待确认，重连后将自动同步，请勿重复操作')
+          renderActionBar()
+        }
       })
 
-      RvBWs.on('authoritySyncStart', function() {
+      RvBWs.on('authoritySyncStart', function(sync) {
+        if (sync && sync.clientActionId && pendingActionFeedback && sync.clientActionId === pendingActionFeedback.clientActionId) {
+          addLog('[authority] 正在按原指令编号查询服务端回执', 'info')
+          setStatusMsg('正在同步服务端状态，请勿重复操作')
+          renderActionBar()
+          return
+        }
         clearAuthorityConflictInteraction()
         addLog('[authority] 检测到版本冲突，正在请求服务端完整快照', 'err')
       })
 
       RvBWs.on('authoritySyncComplete', function() {
-        addLog('[authority] 已同步服务端状态；请重新确认操作', 'info')
+        if (pendingActionFeedback && pendingActionFeedback.timedOut) {
+          addLog('[authority] 已同步服务端状态，仍在等待原指令的权威结果', 'info')
+          renderActionBar()
+          setStatusMsg('已同步服务端状态；原指令仍待确认，请勿重复操作')
+          return
+        }
+        addLog('[authority] 已同步服务端状态', 'info')
         renderActionBar()
-        setStatusMsg('已同步服务端状态，请重新确认操作')
+        setStatusMsg('已同步服务端状态')
       })
 
       RvBWs.on('authoritySyncTimeout', function() {
         addLog('[authority] 服务端状态同步超时；未确认恢复', 'err')
         renderActionBar()
-        setStatusMsg('服务端状态同步超时，未确认恢复；请重连后再操作')
+        setStatusMsg(pendingActionFeedback
+          ? '服务端状态同步超时；原指令仍待确认，请勿重复操作'
+          : '服务端状态同步超时，未确认恢复；请重连后再操作')
       })
 
       RvBWs.on('authoritySyncBlocked', function() {
@@ -4220,9 +4395,14 @@
         if (msg.type === 'subscribed') {
           wsRole = msg.role || 'guest'
           addLog('[WS] 角色：' + wsRole, 'info')
-          try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
+          if (pendingActionFeedback) {
+            requestAuthorityRecovery('pending-action-reconnect', pendingActionFeedback.clientActionId)
+          } else {
+            try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
+          }
 
         } else if (msg.type === 'stateUpdate') {
+          if (msg.receipt) applyAuthorityReceipt(msg.receipt)
           if (!acceptAuthorityVersion(msg.authorityVersion)) {
             addLog('[authority] Ignored an older or unversioned state update', 'info')
             return
@@ -5481,10 +5661,18 @@
         choices.innerHTML = view.showCandidates
           ? view.offerPieces.map(function(piece) {
               const selected = piece.instanceId === localDeploymentChoiceId
-              return '<button type="button" class="deployment-choice" role="radio" aria-checked="' + selected
-                + '" data-piece-id="' + escHtml(piece.instanceId)
-                + '" onclick="selectReserveDeploymentPiece(this.dataset.pieceId)">'
-                + escHtml(piece.name) + '</button>'
+              const resolved = resolveDeploymentOfferPiece(piece.instanceId)
+              const stats = resolved && !resolved.error ? resolved.stats : null
+              const summary = stats
+                ? 'HP ' + stats.maxHp + ' · 攻击 ' + stats.attack + ' · 防御 ' + stats.defense + ' · 移动 ' + stats.moveRange
+                : '资料同步中'
+              return '<div class="deployment-candidate"><button type="button" class="deployment-choice" role="radio" aria-checked="' + selected
+                 + '" data-piece-id="' + escHtml(piece.instanceId)
+                 + '" onclick="selectReserveDeploymentPiece(this.dataset.pieceId)">'
+                 + '<span class="deployment-choice-name">' + escHtml(piece.name) + '</span>'
+                 + '<span class="deployment-choice-stats" aria-label="HP / 攻击 / 防御 / 移动">' + escHtml(summary) + '</span></button>'
+                 + '<button type="button" class="deployment-choice-info" aria-label="查看候选棋子的属性与技能" data-piece-id="' + escHtml(piece.instanceId)
+                 + '" onclick="event.stopPropagation();showDeploymentPieceInfo(this.dataset.pieceId,this)">属性与技能</button></div>'
             }).join('')
           : ''
       }
@@ -6710,6 +6898,8 @@
     }
     window.addEventListener('pagehide', disposeBattlePage)
     window.addEventListener('unload', disposeBattlePage)
+
+    document.addEventListener('keydown', handlePieceInfoModalKeydown)
 
     // Escape closes the existing tile details panel.
     document.addEventListener('keydown', e => {
