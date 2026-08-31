@@ -29,6 +29,7 @@ import {
 import type { BattleAction, BattleState } from './turn'
 import { applyBattleAction, assertBattleNotTerminal, safeCloneBattleState } from './turn'
 import { globalTriggerSystem, TriggerSystem } from './triggers'
+import { createEffectChain, withEffectChain } from './effect-batch'
 
 export {
   hashBattleState,
@@ -123,11 +124,29 @@ export function runBattleAction(
   const canonicalHashState = canonicalBattleStateForHash(canonicalState)
   const preStateHashIndex = options.stateHashIndex ?? createBattleStateHashIndex(canonicalState)
   const preStateHash = preStateHashIndex.rootHash
+  const triggerSystem = options.ruleExecutionContext?.triggerSystem
+    ?? getRuleExecutionTriggerSystem(globalTriggerSystem)
+  const triggerSnapshot = triggerSystem.snapshotTransactionState()
 
   try {
     const clonedState = cloneBattleStateForAction(state, metadata)
-    const hydratedState = withServerSkills(clonedState) as BattleState
-    const apply = () => applyBattleAction(hydratedState, action)
+    const apply = () => {
+      const hydratedState = withServerSkills(clonedState) as BattleState
+      const effectChain = createEffectChain({
+        actionId,
+        chainId: `effect-chain:${actionId}`,
+        turn: state.turn?.turnNumber ?? 0,
+        rootSeed: runtime?.rootSeed ?? null,
+        createBatchId: ({ kind, batchSequence }) => runtime
+          ? runtime.nextInstanceId(`${kind}-batch`, `${kind}-batch`)
+          : `${kind}-batch-${actionIndex}-${batchSequence}`,
+      })
+      return withEffectChain(
+        hydratedState,
+        effectChain,
+        () => applyBattleAction(hydratedState, action),
+      )
+    }
     const applyWithDeterminism = () => runtime ? withRuleRuntime(runtime, apply) : apply()
     const applied = options.ruleExecutionContext
       ? withRuleExecutionContext(options.ruleExecutionContext, applyWithDeterminism)
@@ -192,6 +211,7 @@ export function runBattleAction(
       stateHashIndex,
     }
   } catch (error) {
+    triggerSystem.restoreTransactionState(triggerSnapshot)
     if (!runtime) throw error
     // A rejected command is atomic: its random and clock reads are diagnostic
     // only and must not advance the committed cursor chain.

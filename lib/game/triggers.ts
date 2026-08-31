@@ -8,6 +8,30 @@ import {
   type SuspendableInteractionInput,
 } from './suspendable-action-transaction'
 import { getRuleExecutionTriggerSystem } from './rule-runtime'
+import {
+  EffectChainFatalError,
+  getActiveEffectChain,
+  isEffectChainFatalError,
+  type DamageQueueWriter,
+  type HealQueueWriter,
+} from './effect-batch'
+
+export type {
+  DamageQueueRequest,
+  EffectQueueWriter,
+  HealQueueRequest,
+} from './effect-batch'
+
+function isFatalEffectChainError(error: unknown): boolean {
+  if (isEffectChainFatalError(error)) return true
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as {
+    fatal?: unknown
+    isFatal?: unknown
+  }
+  return candidate.fatal === true
+    || candidate.isFatal === true
+}
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 
@@ -141,14 +165,15 @@ export interface TriggerContext {
   defenseApplied?: number
   shieldAbsorbed?: number
   /** Follow-up damage drained after the parent batch has committed. */
-  damageQueue?: Array<{
-    attacker: PieceInstance
-    target: PieceInstance | PieceInstance[]
-    damage: number
-    damageType: 'physical' | 'magical' | 'true' | 'toxin'
-    skillId?: string
-    killerPlayerId?: string
-  }>
+  damageQueue?: DamageQueueWriter
+  healQueue?: HealQueueWriter
+  effectChainId?: string
+  effectBatchId?: string
+  parentEffectBatchId?: string
+  effectBatchKind?: 'damage' | 'heal' | 'summon' | 'death'
+  effectDepth?: number
+  effectEnqueueSequence?: number
+  originStage?: string
   /** 
    * 当前执行规则的棋子（规则绑定者）
    * 在全场扫描规则时，这个字段表示当前正在执行哪个棋子的规则
@@ -263,7 +288,7 @@ export class TriggerSystem {
     })
   }
 
-  private prepareEventContext(context: TriggerContext): TriggerResult | undefined {
+  private prepareEventContext(battle: BattleState, context: TriggerContext): TriggerResult | undefined {
     const chain = context.eventChain ?? {
       rootEventId: `event-${++this.nextRootEventId}`,
       dispatches: [],
@@ -281,9 +306,48 @@ export class TriggerSystem {
       : chain.dispatches.length >= MAX_EVENT_CHAIN_DISPATCHES
         ? { code: 'EVENT_CHAIN_BUDGET_EXCEEDED' as const, message: `Event chain dispatch budget exceeded ${MAX_EVENT_CHAIN_DISPATCHES}` }
         : undefined
+    const effectChain = getActiveEffectChain(battle)
+    effectChain?.recordDispatch({
+      kind: context.effectBatchKind,
+      batchId: context.effectBatchId,
+      parentBatchId: context.parentEffectBatchId,
+      depth: context.effectDepth,
+      enqueueSequence: context.effectEnqueueSequence,
+      originStage: context.originStage,
+      sourceId: context.sourcePiece?.instanceId || context.piece?.instanceId,
+      skillId: context.skillId,
+      targetId: context.targetPiece?.instanceId,
+    })
+
 
     if (limit) {
       const eventChain = chain.dispatches.map(entry => ({ ...entry }))
+      if (effectChain && !effectChain.detached) {
+        const current = effectChain.currentBatch
+        throw new EffectChainFatalError(
+          'RVB_EFFECT_CHAIN_DISPATCH_LIMIT',
+          limit.message,
+          {
+            actionId: effectChain.actionId,
+            chainId: effectChain.chainId,
+            batchId: current?.batchId,
+            parentBatchId: current?.parentBatchId,
+            kind: current?.kind ?? context.effectBatchKind ?? null,
+            depth: current?.depth ?? context.effectDepth ?? null,
+            enqueueSequence: current?.enqueueSequence ?? context.effectEnqueueSequence,
+            originStage: current?.originStage ?? context.originStage,
+            processed: depth >= MAX_EVENT_CHAIN_DEPTH ? depth : chain.dispatches.length + 1,
+            limit: depth >= MAX_EVENT_CHAIN_DEPTH ? MAX_EVENT_CHAIN_DEPTH : MAX_EVENT_CHAIN_DISPATCHES,
+            turn: effectChain.turn,
+            rootSeed: effectChain.rootSeed,
+            sourceId: context.sourcePiece?.instanceId || context.piece?.instanceId,
+            skillId: context.skillId,
+            targetId: context.targetPiece?.instanceId,
+            detached: false,
+            budget: 'dispatches',
+          },
+        )
+      }
       writeLog(`[checkTriggers] ${limit.code}: ${limit.message}; chain=${JSON.stringify(eventChain)}`)
       return { success: false, messages: [limit.message], blocked: true, error: { ...limit, eventChain }, eventChain }
     }
@@ -323,6 +387,7 @@ export class TriggerSystem {
       
       writeLog('[loadSpecificRules] Loaded ' + this.rules.length + ' specific rules: ' + JSON.stringify(ruleIds))
     } catch (error) {
+      if (isFatalEffectChainError(error)) throw error
       writeLog('Error loading specific rules: ' + error)
     }
   }
@@ -375,6 +440,7 @@ export class TriggerSystem {
       if (isSuspendableActionPending(error)) {
         throw error
       }
+      if (isFatalEffectChainError(error)) throw error
       const cause = error instanceof Error ? error : new Error(String(error))
       const details = {
         eventType: context.type,
@@ -418,7 +484,7 @@ export class TriggerSystem {
       return { success: false, messages: [], blocked: false } as any
     }
 
-    const rejectedEvent = this.prepareEventContext(context)
+    const rejectedEvent = this.prepareEventContext(battle, context)
     if (rejectedEvent) return rejectedEvent
 
     // 从 context 中读取恢复状态（用于从 pendingTargetSelect/pendingOptionSelect 恢复执行）
@@ -457,7 +523,9 @@ export class TriggerSystem {
             rule.effect = reloaded.effect
             return true
           }
-        } catch { }
+        } catch (error) {
+          if (isFatalEffectChainError(error)) throw error
+        }
         return false
       }
       return true
@@ -611,6 +679,9 @@ export class TriggerSystem {
           if ((ruleCtx as any).damage !== (context as any).damage) {
             (context as any).damage = (ruleCtx as any).damage
           }
+          if (ruleCtx.heal !== context.heal) {
+            context.heal = ruleCtx.heal
+          }
           if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
           if (!transactionRuntime || !interactionKey) break
           const nextInput = transactionRuntime.takeAnswer(interactionKey)
@@ -655,6 +726,9 @@ export class TriggerSystem {
         // 回写 damage
         if ((ruleCtx as any).damage !== (context as any).damage) {
           (context as any).damage = (ruleCtx as any).damage
+        }
+        if (ruleCtx.heal !== context.heal) {
+          context.heal = ruleCtx.heal
         }
         if (Number.isFinite(damageBeforeEffect)
           && damageBeforeEffect > 0

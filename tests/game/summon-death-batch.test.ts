@@ -1,0 +1,667 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- RED-139 exercises data-driven rule and content surfaces */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { runBattleAction } from '@/lib/game/battle-runner'
+import { hashBattleState } from '@/lib/game/battle-trace'
+import {
+  createEffectChain,
+  createInternalDeathQueueWriter,
+  createSummonQueueWriter,
+  withEffectChain,
+} from '@/lib/game/effect-batch'
+import { dealDamage } from '@/lib/game/skills'
+import { prepareAction } from '@/lib/game/targeting'
+import { globalTriggerSystem } from '@/lib/game/triggers'
+import { summonPiece } from '@/lib/game/turn'
+import { makePiece, makeState, makeTile } from '../helpers/minimal-state'
+
+type SummonOptions = {
+  templateId: string
+  faction: 'red' | 'blue'
+  ownerPlayerId: string
+  x: number
+  y: number
+  index?: number
+}
+
+type TemplateFixture = {
+  id: string
+  name: string
+  rules: string[]
+  statusTags?: any[]
+}
+
+function eventRule(
+  id: string,
+  type: string,
+  effect: (battle: any, context: any) => { success?: boolean; message?: string; blocked?: boolean } | void,
+) {
+  return {
+    id,
+    name: id,
+    description: '',
+    trigger: { type },
+    effect: (battle: any, context: any) => ({ success: true, ...(effect(battle, context) ?? {}) }),
+  }
+}
+
+function template(id: string, rules: string[] = [], statusTags: any[] = []): TemplateFixture {
+  return { id, name: id, rules, statusTags }
+}
+
+function createFixturePiece(
+  definition: TemplateFixture,
+  ownerPlayerId: string,
+  faction: 'red' | 'blue',
+  x: number,
+  y: number,
+  index: number,
+) {
+  return {
+    ...makePiece({
+      instanceId: definition.id + '-instance-' + index,
+      templateId: definition.id,
+      ownerPlayerId: ownerPlayerId as any,
+      faction,
+      x,
+      y,
+      rules: [],
+      statusTags: structuredClone(definition.statusTags ?? []),
+    }),
+    name: definition.name,
+    skills: [],
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+  } as any
+}
+
+function runTemplateSummon(
+  state: any,
+  options: SummonOptions[],
+  templates: Record<string, TemplateFixture>,
+  createPieceInstance: typeof createFixturePiece = createFixturePiece,
+) {
+  return (summonPiece as any)(
+    state,
+    options,
+    (id: string) => templates[id] ?? null,
+    createPieceInstance,
+  ) as any
+}
+
+function deathSubjectId(context: any): string {
+  return context.type === 'afterPieceKilled'
+    ? context.targetPiece.instanceId
+    : context.sourcePiece.instanceId
+}
+
+function makeDemonSummonState() {
+  const anchor = makePiece({
+    instanceId: 'demon-anchor',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    x: 0,
+    y: 0,
+    currentHp: 20,
+    maxHp: 20,
+    attack: 3,
+  }) as any
+  const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
+  const red = state.players.find((player: any) => player.playerId === 'player-red')
+  red.hand = [{ cardId: 'demon-summon-5', instanceId: 'red139-card-5', actionPointCost: 3 }]
+  red.discardPile = []
+  red.actionPoints = 3
+  state.extensions.kiljaedanPiece = {
+    ...makePiece({
+      instanceId: 'red139-kiljaedan-hidden',
+      templateId: 'kiljaedan',
+      ownerPlayerId: 'player-red',
+      faction: 'red',
+      currentHp: 1,
+      maxHp: 17,
+      attack: 4,
+      x: 0,
+      y: 0,
+    }),
+    name: 'Kiljaedan',
+    defense: 3,
+    moveRange: 4,
+    skills: [
+      { skillId: 'kiljaedan-demonic-pact', level: 1, currentCooldown: 0 },
+      { skillId: 'kiljaedan-fel-fire', level: 1, currentCooldown: 0 },
+      { skillId: 'kiljaedan-soul-drain', level: 1, currentCooldown: 0 },
+    ],
+    displaySkills: [],
+    rules: [],
+    statusTags: [],
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+  }
+  return { state, anchor, red }
+}
+
+function prepareDemonSummonAction(state: any, clientActionId: string) {
+  const draft = {
+    type: 'playCard' as const,
+    playerId: 'player-red',
+    cardInstanceId: 'red139-card-5',
+    clientActionId,
+  }
+  const prepared = prepareAction(state, draft as any)
+  if (prepared.kind !== 'needTarget') {
+    throw new Error('Expected demon summon target preparation, received ' + prepared.kind)
+  }
+  return {
+    ...draft,
+    targetPieceId: 'demon-anchor',
+    targetX: 0,
+    targetY: 0,
+    extraTargets: [{ x: 2, y: 2 }],
+    selectionId: prepared.selectionId,
+    stateRevision: prepared.stateRevision,
+  }
+}
+
+describe('RED-139 SummonBatch', () => {
+  beforeEach(() => globalTriggerSystem.clearRules())
+  afterEach(() => globalTriggerSystem.clearRules())
+
+  it.each([
+    {
+      name: 'same-cell reservation',
+      options: [
+        { templateId: 'summon-alpha', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 },
+        { templateId: 'summon-beta', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 },
+      ],
+      message: /reserved|same cell|occupied|保留|同一|占用/i,
+    },
+    {
+      name: 'active-piece occupancy',
+      options: [
+        { templateId: 'summon-alpha', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 },
+        { templateId: 'summon-beta', faction: 'red', ownerPlayerId: 'player-red', x: 0, y: 0 },
+      ],
+      message: /occupied|占用/i,
+    },
+    {
+      name: 'unwalkable terrain',
+      options: [
+        { templateId: 'summon-alpha', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 },
+        { templateId: 'summon-beta', faction: 'red', ownerPlayerId: 'player-red', x: 2, y: 2 },
+      ],
+      message: /walkable|terrain|不可行走/i,
+    },
+    {
+      name: 'out-of-bounds position',
+      options: [
+        { templateId: 'summon-alpha', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 },
+        { templateId: 'summon-beta', faction: 'red', ownerPlayerId: 'player-red', x: 99, y: 99 },
+      ],
+      message: /bounds|outside|map|越界|地图|不存在/i,
+    },
+    {
+      name: 'duplicate request',
+      options: [
+        { templateId: 'summon-alpha', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 },
+        { templateId: 'summon-alpha', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 },
+      ],
+      message: /duplicate|重复/i,
+    },
+  ] as const)('rejects $name before prepare and leaves the whole batch untouched', ({ options, message }) => {
+    const occupant = makePiece({ instanceId: 'occupied-piece', x: 0, y: 0 }) as any
+    const state = makeState({ pieces: [occupant], width: 3, height: 3 }) as any
+    state.map.tiles = state.map.tiles.map((tile: any) => (
+      tile.x === 2 && tile.y === 2 ? makeTile(2, 2, false) : tile
+    ))
+    const beforeHash = hashBattleState(state)
+    const beforeEvents: string[] = []
+    const createPieceInstance = vi.fn(createFixturePiece)
+    globalTriggerSystem.addRule(eventRule('red139-observe-invalid-before', 'beforePieceSummoned', () => {
+      beforeEvents.push('before')
+    }) as any)
+
+    const result = runTemplateSummon(state, [...options], {
+      'summon-alpha': template('summon-alpha'),
+      'summon-beta': template('summon-beta'),
+    }, createPieceInstance)
+
+    expect(result).toMatchObject({ success: false })
+    expect(result.message).toMatch(message)
+    expect(result.results).toHaveLength(options.length)
+    expect(createPieceInstance).not.toHaveBeenCalled()
+    expect(beforeEvents).toEqual([])
+    expect(hashBattleState(state)).toBe(beforeHash)
+  })
+
+  it('commits every complete instance before any stable afterPieceSummoned event', () => {
+    const state = makeState({ pieces: [] }) as any
+    const afterSnapshots: any[] = []
+    globalTriggerSystem.addRule(eventRule('red139-observe-summon-commit', 'afterPieceSummoned', (battle, context) => {
+      afterSnapshots.push({
+        subject: context.sourcePiece.instanceId,
+        pieces: battle.pieces.map((piece: any) => ({
+          id: piece.instanceId,
+          rules: (piece.rules ?? []).map((rule: any) => rule.id).sort(),
+          statuses: (piece.statusTags ?? []).map((status: any) => status.id).sort(),
+        })).sort((left: any, right: any) => left.id.localeCompare(right.id)),
+      })
+    }) as any)
+
+    const result = runTemplateSummon(state, [
+      { templateId: 'summon-beta', faction: 'red', ownerPlayerId: 'player-red', x: 2, y: 1, index: 1 },
+      { templateId: 'summon-alpha', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1, index: 1 },
+    ], {
+      'summon-alpha': template(
+        'summon-alpha',
+        ['rule-naruto-clone-immobile'],
+        [{ id: 'alpha-ready', type: 'ready', intensity: 1 }],
+      ),
+      'summon-beta': template(
+        'summon-beta',
+        ['rule-naruto-clone-one-hit'],
+        [{ id: 'beta-ready', type: 'ready', intensity: 1 }],
+      ),
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.results.map((entry: any) => entry.piece.instanceId)).toEqual([
+      'summon-beta-instance-1',
+      'summon-alpha-instance-1',
+    ])
+    expect(afterSnapshots.map(snapshot => snapshot.subject)).toEqual([
+      'summon-alpha-instance-1',
+      'summon-beta-instance-1',
+    ])
+    expect(afterSnapshots).toHaveLength(2)
+    for (const snapshot of afterSnapshots) {
+      expect(snapshot.pieces).toEqual([
+        {
+          id: 'summon-alpha-instance-1',
+          rules: ['rule-naruto-clone-immobile'],
+          statuses: ['alpha-ready'],
+        },
+        {
+          id: 'summon-beta-instance-1',
+          rules: ['rule-naruto-clone-one-hit'],
+          statuses: ['beta-ready'],
+        },
+      ])
+    }
+  })
+
+  it('maps results to input order while canonical state and batch IDs ignore input permutation', () => {
+    const run = (reverse: boolean) => {
+      const state = makeState({ pieces: [] }) as any
+      const options = [
+        { templateId: 'summon-alpha', faction: 'red' as const, ownerPlayerId: 'player-red', x: 1, y: 1, index: 1 },
+        { templateId: 'summon-beta', faction: 'red' as const, ownerPlayerId: 'player-red', x: 2, y: 1, index: 1 },
+      ]
+      const ordered = reverse ? [...options].reverse() : options
+      const result = runTemplateSummon(state, ordered, {
+        'summon-alpha': template('summon-alpha'),
+        'summon-beta': template('summon-beta'),
+      })
+      return { state, result, hash: hashBattleState(state) }
+    }
+
+    const forward = run(false)
+    const reverse = run(true)
+
+    expect(forward.result.results.map((entry: any) => entry.piece.instanceId)).toEqual([
+      'summon-alpha-instance-1',
+      'summon-beta-instance-1',
+    ])
+    expect(reverse.result.results.map((entry: any) => entry.piece.instanceId)).toEqual([
+      'summon-beta-instance-1',
+      'summon-alpha-instance-1',
+    ])
+    expect(reverse.result.batchId).toBe(forward.result.batchId)
+    expect(reverse.result.chainId).toBe(forward.result.chainId)
+    expect(reverse.hash).toBe(forward.hash)
+    expect(reverse.state).toEqual(forward.state)
+  })
+
+  it('throws a structured fatal error for an invalid batch attached to an authoritative chain', () => {
+    const state = makeState({ pieces: [], width: 3, height: 3 }) as any
+    const beforeHash = hashBattleState(state)
+    const chain = createEffectChain({
+      actionId: 'red139-attached-invalid',
+      chainId: 'red139-attached-chain',
+      turn: 1,
+      rootSeed: 139,
+    })
+    let thrown: any
+
+    try {
+      withEffectChain(state, chain, () => runTemplateSummon(state, [
+        { templateId: 'summon-alpha', faction: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 },
+        { templateId: 'summon-beta', faction: 'red', ownerPlayerId: 'player-red', x: 99, y: 99 },
+      ], {
+        'summon-alpha': template('summon-alpha'),
+        'summon-beta': template('summon-beta'),
+      }))
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown?.name).toBe('EffectChainFatalError')
+    expect(thrown?.code).toMatch(/^RVB_EFFECT_CHAIN_/)
+    expect(thrown?.context).toMatchObject({
+      actionId: 'red139-attached-invalid',
+      chainId: 'red139-attached-chain',
+      kind: 'summon',
+      depth: 0,
+      turn: 1,
+      rootSeed: 139,
+    })
+    expect(thrown.context.batchId).toEqual(expect.any(String))
+    expect(thrown.context).toHaveProperty('parentBatchId')
+    expect(hashBattleState(state)).toBe(beforeHash)
+  })
+
+  it.each(['blocked', 'invalid-position'] as const)(
+    'fails queued %s summons closed and rolls back the real demon card root action',
+    mode => {
+      const { state, anchor, red } = makeDemonSummonState()
+      const action = prepareDemonSummonAction(state, 'red139-queued-' + mode)
+      const beforeHash = hashBattleState(state)
+      const events: string[] = []
+      globalTriggerSystem.addRule(eventRule('red139-' + mode, 'beforePieceSummoned', (_battle, context) => {
+        events.push(context.type)
+        if (mode === 'blocked') return { blocked: true, message: 'RED-139 blocked summon' }
+        context.targetPosition = { x: 99, y: 99 }
+        context.targetX = 99
+        context.targetY = 99
+      }) as any)
+      let thrown: any
+
+      try {
+        runBattleAction(state, action as any, { rootSeed: 13905 })
+      } catch (error) {
+        thrown = error
+      }
+
+      expect(thrown?.name).toBe('EffectChainFatalError')
+      expect(thrown?.code).toMatch(/^RVB_EFFECT_CHAIN_/)
+      expect(thrown?.context).toMatchObject({
+        actionId: 'red139-queued-' + mode,
+        kind: 'summon',
+        depth: 0,
+        turn: 1,
+        rootSeed: 13905,
+      })
+      expect(thrown.context.chainId).toEqual(expect.any(String))
+      expect(thrown.context.batchId).toEqual(expect.any(String))
+      expect(thrown.context.enqueueSequence).toEqual(expect.any(Number))
+      expect(events).toEqual(['beforePieceSummoned'])
+      expect(hashBattleState(state)).toBe(beforeHash)
+      expect(anchor).toMatchObject({ currentHp: 20, attack: 3 })
+      expect(red).toMatchObject({ actionPoints: 3, discardPile: [] })
+      expect(red.hand.map((card: any) => card.cardId)).toEqual(['demon-summon-5'])
+      expect(state.extensions.kiljaedanPiece.instanceId).toBe('red139-kiljaedan-hidden')
+      expect(state.actions).toEqual([])
+    },
+  )
+})
+
+describe('RED-139 DeathBatch', () => {
+  beforeEach(() => globalTriggerSystem.clearRules())
+  afterEach(() => globalTriggerSystem.clearRules())
+
+  it('freezes simultaneous candidates so A can revive B without suppressing B lifecycle', () => {
+    const attacker = makePiece({ instanceId: 'death-attacker', ownerPlayerId: 'player-red' }) as any
+    const alpha = makePiece({
+      instanceId: 'death-alpha',
+      ownerPlayerId: 'player-blue',
+      currentHp: 5,
+      maxHp: 10,
+    }) as any
+    const beta = makePiece({
+      instanceId: 'death-beta',
+      ownerPlayerId: 'player-blue',
+      currentHp: 5,
+      maxHp: 10,
+    }) as any
+    const state = makeState({ pieces: [attacker, alpha, beta] }) as any
+    const lifecycle: any[] = []
+
+    for (const type of ['beforePieceKilled', 'afterPieceKilled', 'onPieceDied']) {
+      globalTriggerSystem.addRule(eventRule('red139-freeze-' + type, type, (battle, context) => {
+        const subject = deathSubjectId(context)
+        lifecycle.push({
+          event: type,
+          subject,
+          activeCandidates: battle.pieces
+            .filter((piece: any) => piece.instanceId.startsWith('death-') && piece.instanceId !== 'death-attacker')
+            .map((piece: any) => piece.instanceId)
+            .sort(),
+          metadata: {
+            chainId: context.effectChainId,
+            batchId: context.effectBatchId,
+            parentBatchId: context.parentEffectBatchId,
+            kind: context.effectBatchKind,
+            depth: context.effectDepth,
+            originStage: context.originStage,
+          },
+        })
+        if (type === 'onPieceDied' && subject === alpha.instanceId) beta.currentHp = 6
+      }) as any)
+    }
+
+    const result = dealDamage(attacker, [beta, alpha], 5, 'true', state, 'red139-freeze') as any
+
+    expect(lifecycle.map(entry => entry.event + ':' + entry.subject)).toEqual([
+      'beforePieceKilled:death-alpha',
+      'afterPieceKilled:death-alpha',
+      'onPieceDied:death-alpha',
+      'beforePieceKilled:death-beta',
+      'afterPieceKilled:death-beta',
+      'onPieceDied:death-beta',
+    ])
+    for (const entry of lifecycle) {
+      expect(entry.activeCandidates).toEqual(['death-alpha', 'death-beta'])
+      expect(entry.metadata).toMatchObject({
+        chainId: result.chainId,
+        parentBatchId: result.batchId,
+        kind: 'death',
+        depth: 1,
+        originStage: 'damage:death',
+      })
+      expect(entry.metadata.batchId).toEqual(expect.any(String))
+      expect(entry.metadata.batchId).not.toBe(result.batchId)
+    }
+    expect(new Set(lifecycle.map(entry => entry.metadata.batchId)).size).toBe(1)
+    expect(result.results.map((entry: any) => ({
+      targetId: entry.targetId,
+      killed: entry.isKilled,
+      hp: entry.targetHp,
+    }))).toEqual([
+      { targetId: 'death-beta', killed: false, hp: 6 },
+      { targetId: 'death-alpha', killed: true, hp: 0 },
+    ])
+    expect(state.pieces.map((piece: any) => piece.instanceId)).toEqual(['death-attacker', 'death-beta'])
+    expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['death-alpha'])
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+  })
+
+  it('commits the whole graveyard and all charge before stable afterChargeGained events', () => {
+    const attacker = makePiece({ instanceId: 'finalize-attacker', ownerPlayerId: 'player-red' }) as any
+    const alpha = makePiece({
+      instanceId: 'finalize-alpha',
+      ownerPlayerId: 'player-blue',
+      currentHp: 4,
+      maxHp: 4,
+    }) as any
+    const beta = makePiece({
+      instanceId: 'finalize-beta',
+      ownerPlayerId: 'player-blue',
+      currentHp: 4,
+      maxHp: 4,
+    }) as any
+    const state = makeState({ pieces: [attacker, alpha, beta] }) as any
+    const lifecycleSnapshots: any[] = []
+    const chargeSnapshots: any[] = []
+
+    for (const type of ['beforePieceKilled', 'afterPieceKilled', 'onPieceDied']) {
+      globalTriggerSystem.addRule(eventRule('red139-finalize-' + type, type, battle => {
+        lifecycleSnapshots.push({
+          type,
+          active: battle.pieces.map((piece: any) => piece.instanceId).sort(),
+          graveyard: battle.graveyard.map((piece: any) => piece.instanceId),
+        })
+      }) as any)
+    }
+    globalTriggerSystem.addRule(eventRule('red139-observe-finalized-charge', 'afterChargeGained', battle => {
+      chargeSnapshots.push({
+        active: battle.pieces.map((piece: any) => piece.instanceId).sort(),
+        graveyard: battle.graveyard.map((piece: any) => piece.instanceId),
+        charge: battle.players.find((player: any) => player.playerId === 'player-red').chargePoints,
+      })
+    }) as any)
+
+    const result = dealDamage(attacker, [beta, alpha], 4, 'true', state, 'red139-finalize') as any
+
+    expect(result.results.map((entry: any) => entry.targetId)).toEqual(['finalize-beta', 'finalize-alpha'])
+    expect(lifecycleSnapshots).toHaveLength(6)
+    for (const snapshot of lifecycleSnapshots) {
+      expect(snapshot.active).toEqual(['finalize-alpha', 'finalize-attacker', 'finalize-beta'])
+      expect(snapshot.graveyard).toEqual([])
+    }
+    expect(chargeSnapshots).toEqual([
+      {
+        active: ['finalize-attacker'],
+        graveyard: ['finalize-alpha', 'finalize-beta'],
+        charge: 2,
+      },
+      {
+        active: ['finalize-attacker'],
+        graveyard: ['finalize-alpha', 'finalize-beta'],
+        charge: 2,
+      },
+    ])
+  })
+
+  it('counts endogenous death against the shared batch budget with parent/depth diagnostics', () => {
+    const attacker = makePiece({ instanceId: 'budget-attacker', ownerPlayerId: 'player-red' }) as any
+    const target = makePiece({
+      instanceId: 'budget-target',
+      ownerPlayerId: 'player-blue',
+      currentHp: 1,
+      maxHp: 1,
+    }) as any
+    const state = makeState({ pieces: [attacker, target], turnNumber: 9 }) as any
+    const chain = createEffectChain({
+      actionId: 'red139-death-budget',
+      chainId: 'red139-death-budget-chain',
+      turn: 9,
+      rootSeed: 0x139,
+      limits: { maxBatches: 1 },
+    })
+    let thrown: any
+
+    try {
+      withEffectChain(state, chain, () => {
+        dealDamage(attacker, target, 1, 'true', state, 'red139-budget-lethal')
+      })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_LIMIT',
+      context: {
+        actionId: 'red139-death-budget',
+        chainId: 'red139-death-budget-chain',
+        kind: 'death',
+        depth: 1,
+        originStage: 'damage:death',
+        processed: 2,
+        limit: 1,
+        turn: 9,
+        rootSeed: 0x139,
+        sourceId: 'budget-attacker',
+        targetId: 'budget-target',
+      },
+    })
+    expect(thrown.context.batchId).toEqual(expect.any(String))
+    expect(thrown.context.parentBatchId).toEqual(expect.any(String))
+    expect(thrown.context.batchId).not.toBe(thrown.context.parentBatchId)
+  })
+
+  it('stops an internal sealed summon/death loop with complete deterministic diagnostics', () => {
+    const source = makePiece({ instanceId: 'loop-source', ownerPlayerId: 'player-red' }) as any
+    const dead = makePiece({
+      instanceId: 'loop-dead',
+      ownerPlayerId: 'player-blue',
+      currentHp: 0,
+      maxHp: 1,
+    }) as any
+    const chain = createEffectChain({
+      actionId: 'red139-summon-death-loop',
+      chainId: 'red139-summon-death-chain',
+      turn: 7,
+      rootSeed: 0x5139,
+      limits: { maxBatches: 3 },
+    })
+    const summonSpec = {
+      recipe: 'template' as const,
+      templateId: 'loop-template',
+      ownerPlayerId: 'player-red',
+      faction: 'red' as const,
+      x: 1,
+      y: 1,
+    }
+    createSummonQueueWriter(chain, 'internal:template').push({
+      summons: [summonSpec],
+      sourceId: source.instanceId,
+      skillId: 'red139-loop',
+    })
+    let thrown: any
+
+    try {
+      chain.drain({
+        damage: () => undefined,
+        heal: () => undefined,
+        summon: (_request, _context, activeChain) => {
+          createInternalDeathQueueWriter(activeChain).push({
+            candidates: [{ piece: dead, attacker: source, skillId: 'red139-loop' }],
+          })
+        },
+        death: (_request, _context, activeChain) => {
+          createSummonQueueWriter(activeChain, 'internal:template').push({
+            summons: [summonSpec],
+            sourceId: source.instanceId,
+            skillId: 'red139-loop',
+          })
+        },
+      })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_BATCH_LIMIT',
+      context: {
+        actionId: 'red139-summon-death-loop',
+        chainId: 'red139-summon-death-chain',
+        kind: 'death',
+        depth: 3,
+        enqueueSequence: 3,
+        processed: 4,
+        limit: 3,
+        turn: 7,
+        rootSeed: 0x5139,
+        sourceId: 'loop-source',
+        skillId: 'red139-loop',
+        targetId: 'loop-dead',
+      },
+    })
+    expect(thrown.context.batchId).toEqual(expect.any(String))
+    expect(thrown.context.parentBatchId).toEqual(expect.any(String))
+    expect(thrown.context.batchId).not.toBe(thrown.context.parentBatchId)
+  })
+})
