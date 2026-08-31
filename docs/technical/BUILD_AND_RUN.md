@@ -386,8 +386,24 @@ Windows 输出目录：
 
 服务端 `win-unpacked` 当前仅用于内部候选、打包态安全检查和生命周期烟测，不是公开
 发行物；它不进入 `build:electron` 或 `build:all`，也没有安装器、签名或自动更新承诺。
-普通 Windows 玩家开服仍由客户端内嵌本地服务承担。完整决策边界见
-[`ADR-0003`](../decisions/ADR-0003-electron-server-packaging.md)。
+普通 Windows 玩家开服仍由客户端内嵌本地服务承担。当前 internal-only 候选的历史边界见
+[`ADR-0003`](../decisions/ADR-0003-electron-server-packaging.md)；取代后的公开发行方向见下节。
+
+#### RED-140 设计边界：尚无公开 Server 产物
+
+[RED-140](https://linear.app/redvsblue/issue/RED-140/冻结自治服务器发行边界运行状态与本地管理-api-v1)
+已经在设计层接受由
+[`ADR-0021`](../decisions/ADR-0021-autonomous-server-operations.md) 取代 ADR-0003 的
+internal-only 产品方向。未来公开 Server 的支持矩阵为 Windows 10 22H2 x64 与
+Windows 11 x64；对 Windows 10 的应用兼容支持不代表微软继续提供常规系统安全支持。
+
+公开候选必须由 [RED-148](https://linear.app/redvsblue/issue/RED-148/实现-windows-自治服务器安装签名更新与二进制回退流水线)
+实现并验证按用户 NSIS 安装器、update ZIP、Authenticode-signed runtime catalog、签名 release
+manifest、受控更新、备份和
+二进制回退门禁。在 RED-148 完成这些门禁前，现有 `build:electron:server`、
+`win-unpacked`、包验证器和 smoke 仍只产生内部证据，不得作为公开下载、安装或更新证据。
+公开构建、签名、安装、更新和回退的精确命令及候选记录也由 RED-148 在真实实现后补充；
+本设计章节不预先虚构命令，也不表示公开产物已经存在。
 
 `build:electron:server` 会在清理 staging 前自动运行 Server 产物验证器，逐 SHA-256
 核对 Electron main、管理面板、Next standalone 与静态资源、`public`、`data`、
