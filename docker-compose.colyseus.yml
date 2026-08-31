@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: rvb_colyseus
+      POSTGRES_USER: rvb
+      POSTGRES_PASSWORD: rvb
+    ports:
+      - '127.0.0.1:5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U rvb -d rvb_colyseus']
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    volumes:
+      - rvb_colyseus_pg:/var/lib/postgresql/data
+
+volumes:
+  rvb_colyseus_pg:
