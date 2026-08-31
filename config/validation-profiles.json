@@ -20,6 +20,16 @@
       "executable": "npm",
       "args": ["run", "lint"]
     },
+    "content-pipeline-lint": {
+      "label": "RED-118 content pipeline ESLint",
+      "executable": "npm",
+      "args": ["run", "lint:content-pipeline"]
+    },
+    "game-engine-mirror": {
+      "label": "Frozen Android game-engine test mirror",
+      "executable": "node",
+      "args": ["scripts/rvb.mjs", "prepare-game-engine-mirror"]
+    },
     "typecheck": {
       "label": "TypeScript type check",
       "executable": "npm",
@@ -30,6 +40,11 @@
       "executable": "npm",
       "args": ["test"]
     },
+    "candidate-test": {
+      "label": "Vitest suite (candidate low-contention)",
+      "executable": "npm",
+      "args": ["test", "--", "--maxWorkers=2"]
+    },
     "build": {
       "label": "Next standalone build",
       "executable": "npm",
@@ -39,11 +54,42 @@
       "label": "Electron client package",
       "executable": "npm",
       "args": ["run", "build:electron:client"]
+    },
+    "package-electron-server": {
+      "label": "Electron server package",
+      "executable": "npm",
+      "args": ["run", "build:electron:server"]
+    },
+    "package-electron-editor": {
+      "label": "Electron editor package",
+      "executable": "npm",
+      "args": ["run", "build:electron:editor"]
+    },
+    "content-candidate": {
+      "label": "RED-118 content pipeline candidate",
+      "executable": "npm",
+      "args": ["run", "candidate:content-pipeline"]
+    },
+    "windows-candidate-smoke": {
+      "label": "Windows Server Client Editor and Profile smoke",
+      "executable": "npm",
+      "args": ["run", "smoke:electron:windows", "--", "server", "client", "editor", "profile"]
     }
   },
   "profiles": {
     "quick": ["encoding", "test"],
     "standard": ["encoding", "typecheck", "lint", "test", "build"],
-    "candidate": ["encoding", "typecheck", "lint", "test", "package-electron-client"]
+    "candidate": [
+      "encoding",
+      "typecheck",
+      "content-pipeline-lint",
+      "game-engine-mirror",
+      "candidate-test",
+      "content-candidate",
+      "package-electron-server",
+      "package-electron-client",
+      "package-electron-editor",
+      "windows-candidate-smoke"
+    ]
   }
 }
