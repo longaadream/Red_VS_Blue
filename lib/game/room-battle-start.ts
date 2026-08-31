@@ -6,7 +6,11 @@ import { createInitialBattleForPlayers } from './battle-setup'
 import { assertSelectableMapId } from './map-selection'
 import { hashPublicBattleState } from './battle-public-patch'
 import { hashBattleState, runBattleAction } from './battle-runner'
-import { pinBattleProfileIdentityV1, stampPendingDeploymentAuthorityVersion } from './battle-trace'
+import {
+  pinBattleProfileIdentityV1,
+  rebaseBattleReplayForAuthorityCheckpoint,
+  stampPendingDeploymentAuthorityVersion,
+} from './battle-trace'
 import { isBattleAuthorityV2Enabled } from './battle-transition'
 import {
   createServerBattleStateV1,
@@ -161,6 +165,7 @@ async function startBattleFromLockedRostersQueued(
       throw new Error(`Invalid initial battle authority version: ${String(initialAuthorityVersion)}`)
     }
     stampPendingDeploymentAuthorityVersion(initialState, initialAuthorityVersion)
+    rebaseBattleReplayForAuthorityCheckpoint(initialState)
 
     const nextRoom: Room = {
       ...room,

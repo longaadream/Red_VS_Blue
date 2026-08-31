@@ -502,6 +502,41 @@ export function recordBattleInitialization(
   return trace
 }
 
+/**
+ * Internal setup actions (for example the initial turn-timer sync) run before
+ * the room owns an authority checkpoint. They must become part of that
+ * checkpoint rather than appearing as replay frame 0. Rebase only the replay
+ * baseline; initialization/action trace history remains available for audits.
+ */
+export function rebaseBattleReplayForAuthorityCheckpoint(state: BattleState): void {
+  const metadata = getOrCreateDebugMetadata(state)
+  const profilePin = readBattleProfilePinV1(state)
+  if (!profilePin || !metadata.replay || !metadata.authority) {
+    throw pinnedProfileError('Battle authority checkpoint requires initialized replay metadata')
+  }
+  const canonicalState = withoutReplayRuntimeCaches(state)
+  const initialState = createBattleReplayCheckpoint(canonicalState)
+  metadata.replay = {
+    ...metadata.replay,
+    profileIdentity: profilePin.profileIdentity,
+    rootSeed: profilePin.rootSeed,
+    initialStateHash: hashBattleState(canonicalState),
+    initialCheckpointHash: hashStable(initialState),
+    initialState,
+    content: mergeBattleReplayContentSnapshot(
+      metadata.replay.content,
+      createBattleReplayContentSnapshot(state),
+    ),
+    frames: [],
+  }
+  metadata.authority = {
+    ...metadata.authority,
+    profileIdentity: profilePin.profileIdentity,
+    rootSeed: profilePin.rootSeed,
+    replayFrameCount: 0,
+  }
+}
+
 
 export function sanitizeBattleTraceValue(value: unknown): unknown {
   return sanitizeTraceValue(value, new WeakSet<object>())
@@ -827,9 +862,24 @@ export function materializeBattleTraceForTerminal(
   const traces = history.flatMap(entry => entry.trace ? [entry.trace] : [])
   const commands = history.flatMap(entry => entry.command ? [entry.command] : [])
   const frames = history.flatMap(entry => entry.replayFrame ? [entry.replayFrame] : [])
+  if (metadata.replay) {
+    for (let index = 0; index < frames.length; index += 1) {
+      const frame = frames[index]
+      if (frame.index !== index) {
+        throw new Error(`Trace frame index is not contiguous at ${index}`)
+      }
+      const expectedPreStateHash = index === 0
+        ? metadata.replay.initialStateHash
+        : frames[index - 1].postStateHash
+      if (frame.preStateHash !== expectedPreStateHash) {
+        throw new Error(`Trace frame state hash chain is not contiguous at ${index}`)
+      }
+    }
+  }
   metadata.actionLog = [...initializationTraces, ...traces]
   metadata.commandLog = [...initializationCommands, ...commands]
   if (metadata.replay) metadata.replay = { ...metadata.replay, frames }
+  if (metadata.authority) metadata.authority.replayFrameCount = frames.length
   metadata.appliedActionIds = traces.map(trace => trace.actionId).filter(Boolean)
   return state
 }

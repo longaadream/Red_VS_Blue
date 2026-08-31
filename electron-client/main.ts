@@ -559,7 +559,7 @@ async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise
   const userData = getUserData()
 
   let databaseUrl: string
-  if (app.isPackaged) {
+  if (app.isPackaged || developmentProfile) {
     const dbPath = path.join(userData, 'game.db')
     fs.mkdirSync(userData, { recursive: true })
     initDatabase(dbPath, appRoot)

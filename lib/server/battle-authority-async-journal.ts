@@ -5,6 +5,19 @@ export interface BattleAuthorityJournalInspection {
   durableAuthorityVersion: number
   pending: number
   lastError?: string
+  lastErrorContext?: BattleAuthorityJournalErrorContext
+}
+
+export interface BattleAuthorityJournalErrorContext extends Record<string, unknown> {
+  name: string
+  code?: string
+  message: string
+  cause?: string
+  attempt: number
+  elapsedMs: number
+  roomId: string
+  authorityVersion?: number
+  clientActionId?: string
 }
 
 export interface BattleAuthorityJournalJob {
@@ -46,6 +59,7 @@ interface RoomJournalState {
   pending: number
   degradedError?: Error
   transientError?: Error
+  lastErrorContext?: BattleAuthorityJournalErrorContext
   waiters: Array<{
     resolve: () => void
     reject: (error: Error) => void
@@ -204,6 +218,7 @@ export class BattleAuthorityAsyncJournal {
           await job.audit?.()
           await this.persistWithRetry(job)
           state.transientError = undefined
+          state.lastErrorContext = undefined
           if (job.kind === 'transition' && job.authorityVersion !== undefined) {
             if (!Number.isSafeInteger(job.authorityVersion) || job.authorityVersion < 0) {
               throw new Error(`Invalid durable authority version for ${job.roomId}`)
@@ -214,7 +229,9 @@ export class BattleAuthorityAsyncJournal {
             )
           }
         } catch (error) {
-          this.degrade(job.roomId, asError(error))
+          const failure = asError(error)
+          state.lastErrorContext ??= journalErrorContext(failure, job, 1, 0)
+          this.degrade(job.roomId, failure)
           this.dropQueuedJobs(job.roomId)
         } finally {
           state.pending = Math.max(0, state.pending - 1)
@@ -245,17 +262,18 @@ export class BattleAuthorityAsyncJournal {
         return
       } catch (error) {
         const failure = asError(error)
-        if (!this.accepting || !this.isRetryablePersistError(failure)) throw failure
         const now = Date.now()
         firstFailureAt ??= now
         const retryElapsedMs = now - firstFailureAt
+        const state = this.roomState(job.roomId)
+        state.lastErrorContext = journalErrorContext(failure, job, attempts, retryElapsedMs)
+        if (!this.accepting || !this.isRetryablePersistError(failure)) throw failure
         if (attempts >= this.maxRetryAttempts || retryElapsedMs >= this.maxRetryElapsedMs) {
           throw new Error(
             `Battle authority journal retry limit exceeded in ${job.roomId} after ${attempts} attempt(s) and ${retryElapsedMs}ms`,
             { cause: failure },
           )
         }
-        const state = this.roomState(job.roomId)
         state.transientError = failure
         this.emit(job.roomId)
         const delay = this.retryDelaysMs.length > 0
@@ -332,6 +350,30 @@ function inspectionOf(state: RoomJournalState): BattleAuthorityJournalInspection
     ...(!state.degradedError && state.transientError
       ? { lastError: state.transientError.message }
       : {}),
+    ...(state.lastErrorContext ? { lastErrorContext: { ...state.lastErrorContext } } : {}),
+  }
+}
+
+function journalErrorContext(
+  error: Error,
+  job: Pick<BattleAuthorityJournalJob, 'roomId' | 'authorityVersion' | 'clientActionId'>,
+  attempt: number,
+  elapsedMs: number,
+): BattleAuthorityJournalErrorContext {
+  const details = error as Error & { code?: unknown; cause?: unknown }
+  const cause = details.cause
+  return {
+    name: error.name || 'Error',
+    ...(typeof details.code === 'string' && details.code ? { code: details.code } : {}),
+    message: error.message,
+    ...(cause !== undefined
+      ? { cause: cause instanceof Error ? cause.message : String(cause) }
+      : {}),
+    attempt,
+    elapsedMs,
+    roomId: job.roomId,
+    ...(job.authorityVersion !== undefined ? { authorityVersion: job.authorityVersion } : {}),
+    ...(job.clientActionId ? { clientActionId: job.clientActionId } : {}),
   }
 }
 

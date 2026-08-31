@@ -6,7 +6,7 @@ import { dispatchRoomBattleAction } from '@/lib/game/room-battle-actions'
 import { recordBattleInitialization } from '@/lib/game/battle-trace'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { RoomStore, type Room } from '@/lib/game/room-store'
-import type { BattleState } from '@/lib/game/turn'
+import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 
@@ -19,6 +19,9 @@ const harness = vi.hoisted(() => {
       $queryRawUnsafe: vi.fn(async () => [{ timeout: 500 }]),
     },
     transaction,
+    block() {
+      transaction.mockImplementation(() => new Promise<boolean>(resolve => { releaseTransaction = resolve }))
+    },
     release(value = true) {
       releaseTransaction?.(value)
       releaseTransaction = undefined
@@ -51,6 +54,7 @@ afterAll(() => {
 
 describe('battle authority async dispatch', () => {
   it('keeps warm authoritative actions below 100ms while SQLite remains blocked', async () => {
+    harness.block()
     const room = makeDispatchRoom('async-dispatch-room')
     const store = new RoomStore()
     const samples: Array<{ totalMs: number; wallMs: number; persistenceMs: number }> = []
@@ -97,6 +101,52 @@ describe('battle authority async dispatch', () => {
     harness.transaction.mockImplementation(async () => true)
     harness.release(true)
     await drainBattleAuthorityPersistence(room.id)
+  })
+
+  it('returns a terminal applied receipt without waiting for the durable backlog', async () => {
+    const room = makeDispatchRoom('async-terminal-room')
+    const store = new RoomStore()
+    rememberBattleAuthorityRoom(room)
+    harness.block()
+
+    const startedAt = performance.now()
+    const terminalPromise = dispatchRoomBattleAction(
+      store,
+      room.id,
+      'player-red',
+      {
+        type: 'surrender',
+        playerId: 'player-red',
+        clientActionId: 'async-terminal-surrender',
+      } as BattleAction,
+      {
+        expectedAuthorityVersion: room.battleAuthorityVersion,
+        clock: { now: () => 2_000 },
+      },
+    )
+
+    try {
+      const terminal = await terminalPromise
+      const wallMs = performance.now() - startedAt
+      expect(terminal.kind).toBe('applied')
+      expect(terminal.receipt).toMatchObject({
+        clientActionId: 'async-terminal-surrender',
+        status: 'applied',
+      })
+      expect(terminal.snapshot).toMatchObject({
+        persistenceStatus: 'pending',
+        durableAuthorityVersion: 0,
+      })
+      expect(terminal.timings?.persistenceMs).toBeLessThan(100)
+      expect(terminal.timings?.totalMs).toBeLessThan(100)
+      expect(wallMs).toBeLessThan(100)
+      expect(harness.transaction).toHaveBeenCalled()
+    } finally {
+      harness.transaction.mockImplementation(async () => true)
+      harness.release(true)
+      await terminalPromise
+      await drainBattleAuthorityPersistence(room.id)
+    }
   })
 })
 

@@ -565,6 +565,7 @@ async function sendBattleSnapshot(
   roomId: string,
   viewerPlayerId?: string | null,
   requestId?: string,
+  clientActionId?: string,
 ): Promise<void> {
   const requestContext = requestId ? { requestId } : {}
   const room = await ensureBattleReady(roomId)
@@ -586,10 +587,14 @@ async function sendBattleSnapshot(
   }
   const storage = getBattleStorage(room)
   if (storage) {
+    const receipt = clientActionId && roomStore.getBattleAuthorityReceipt
+      ? await roomStore.getBattleAuthorityReceipt(roomId, clientActionId)
+      : undefined
     sendJson(ws, {
       type: 'stateUpdate',
       ...createPublicBattleSnapshot(room, viewerPlayerId ?? undefined),
       ...requestContext,
+      ...(receipt ? { receipt } : {}),
     })
     return
   }
@@ -957,7 +962,10 @@ async function restartWsServer(): Promise<void> {
           })
         } else if (msg.type === 'requestBattleSnapshot' && roomId) {
           const snapshotRequestId = typeof msg.requestId === 'string' ? msg.requestId : undefined
-          runAsync(async () => { await sendBattleSnapshot(ws, roomId!, playerId, snapshotRequestId) })
+          const receiptClientActionId = typeof msg.clientActionId === 'string' ? msg.clientActionId : undefined
+          runAsync(async () => {
+            await sendBattleSnapshot(ws, roomId!, playerId, snapshotRequestId, receiptClientActionId)
+          })
         } else if (msg.type === 'roomAction' && roomId) {
           const _roomId = roomId
           const sender = ws

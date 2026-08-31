@@ -115,6 +115,7 @@ function loadClient() {
     disconnect(): void
     isConnected(): boolean
     isAuthoritySyncing(): boolean
+    requestAuthorityReceiptSync(reason: string, clientActionId: string): boolean
     send(message: Record<string, unknown>): boolean
     on(event: string, handler: (data?: any) => void): void
   }
@@ -334,6 +335,34 @@ describe('battle WebSocket reconnect state machine', () => {
     expect(syncCompletes).toBe(1)
     expect(client.send({ type: 'action', command: { type: 'move' } })).toBe(true)
     expect(socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'action')).toHaveLength(1)
+  })
+
+  it('requests one snapshot correlated to the original timed-out action id', async () => {
+    vi.useFakeTimers()
+    const client = loadClient()
+    const syncCompletes: unknown[] = []
+    client.on('authoritySyncComplete', message => { syncCompletes.push(message) })
+
+    client.connect('room-a', 'player-red', 'lan')
+    const socket = FakeWebSocket.instances[0]
+    await openWithSignedSubscribe(socket)
+    socket.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
+
+    expect(client.requestAuthorityReceiptSync('action-timeout', 'action-original-1')).toBe(true)
+    expect(client.requestAuthorityReceiptSync('action-timeout', 'action-duplicate')).toBe(false)
+    const requests = socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'requestBattleSnapshot')
+    expect(requests).toHaveLength(1)
+    expect(requests[0]).toMatchObject({ clientActionId: 'action-original-1' })
+
+    socket.receive({
+      type: 'stateUpdate',
+      requestId: requests[0].requestId,
+      authorityVersion: 3,
+      state: { turn: { turnNumber: 1 } },
+      receipt: { clientActionId: 'action-original-1', status: 'applied', authorityVersion: 3 },
+    })
+    expect(client.isAuthoritySyncing()).toBe(false)
+    expect(syncCompletes).toHaveLength(1)
   })
 
   it('releases the authority sync gate on timeout or disconnect without treating persistence degradation as a conflict', async () => {

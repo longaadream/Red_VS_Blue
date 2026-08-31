@@ -718,4 +718,28 @@ new Script([
     expect(battlePage).toContain("pieceHasVisibleStatusTag(piece, 'deployment-first-move-free')")
     expect(battlePage).toContain('本回合首移 0 AP')
   })
+
+  it('shows authoritative reserve-candidate stats and opens read-only accessible details', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('function showDeploymentPieceInfo(pieceId, trigger, preserveKeyword)')
+    expect(battlePage).toContain('function resolveDeploymentOfferPiece(pieceId)')
+    expect(battlePage).toContain("G.pieceStatsByTemplateId[offer.templateId]")
+    expect(battlePage).toContain('HP / 攻击 / 防御 / 移动')
+    expect(battlePage).toContain('属性与技能')
+    expect(battlePage).toContain('aria-label="查看候选棋子的属性与技能"')
+    expect(battlePage).toContain('aria-labelledby="pieceInfoName"')
+    expect(battlePage).toContain('aria-label="关闭棋子详情"')
+    expect(battlePage).toContain('function handlePieceInfoModalKeydown(event)')
+    expect(battlePage).toMatch(/handlePieceInfoModalKeydown[\s\S]*?event\.key === 'Escape'/)
+    expect(battlePage).toMatch(/handlePieceInfoModalKeydown[\s\S]*?event\.key !== 'Tab'/)
+
+    const inspectSource = readNamedFunction(battlePage, 'showDeploymentPieceInfo')
+    expect(inspectSource).not.toContain('localDeploymentChoiceId =')
+    expect(inspectSource).not.toContain('doAction(')
+    expect(inspectSource).not.toContain('expectedDeploymentRevision')
+    expect(battlePage).toMatch(
+      /function reconcileDeploymentPieceInfo[\s\S]*?deployment\.revision !== currentPieceInfoDeploymentRevision[\s\S]*?closePieceInfo/,
+    )
+  })
 })

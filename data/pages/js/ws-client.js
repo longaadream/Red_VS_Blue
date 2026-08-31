@@ -224,6 +224,30 @@
     return error
   }
 
+  function requestAuthorityReceiptSync(reason, clientActionId) {
+    if (_authoritySyncing) return false
+    if (!_subscribed || !_ws || _ws.readyState !== 1) return false
+    if (!clientActionId) return requestAuthoritySync(reason)
+    _authoritySyncing = true
+    _authoritySyncRequestId = 'authority-sync-' + (_reqSeq++) + '-' + Date.now()
+    try {
+      _ws.send(JSON.stringify({
+        type: 'requestBattleSnapshot',
+        requestId: _authoritySyncRequestId,
+        clientActionId: String(clientActionId),
+      }))
+    } catch {
+      _releaseAuthoritySync()
+      return false
+    }
+    _authoritySyncTimer = setTimeout(function () {
+      if (!_releaseAuthoritySync()) return
+      _emit('authoritySyncTimeout', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
+    }, AUTHORITY_SYNC_TIMEOUT_MS)
+    _emit('authoritySyncStart', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
+    return true
+  }
+
   // Relay subscriptions require signed identity. A local/private URL entered
   // through the remote connector is still a LAN authority unless relay=1 was
   // explicitly requested for local Relay development.
@@ -442,6 +466,7 @@
     request: request,
     requestAt: requestAt,
     requestAuthoritySync: requestAuthoritySync,
+    requestAuthorityReceiptSync: requestAuthorityReceiptSync,
     requestCatalogIdentityAt: requestCatalogIdentityAt,
     on: on,
     isConnected: isConnected,

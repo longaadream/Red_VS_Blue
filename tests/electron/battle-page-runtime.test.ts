@@ -517,6 +517,86 @@ describe('battle page runtime source', () => {
     expect(actionBarRenders).toBe(1)
   })
 
+  it('keeps the original action pending and requests a correlated resync after feedback timeout', () => {
+    const html = readBattlePage()
+    let timeoutCallback: (() => void) | undefined
+    const recover = vi.fn()
+    const status = vi.fn()
+    const context = vm.createContext({
+      performance: { now: () => 10 },
+      setTimeout: (callback: () => void) => { timeoutCallback = callback; return 9 },
+      clearTimeout: () => undefined,
+      setStatusMsg: status,
+      renderActionBar: () => undefined,
+      requestAuthorityRecovery: recover,
+    })
+
+    vm.runInContext(`
+      const PENDING_ACTION_TIMEOUT_MS = 8000
+      let selectedPieceId = 'piece-1'
+      let pendingActionFeedback = null
+      let pendingActionFeedbackTimer = null
+      ${runtimeFunction(html, 'beginPendingActionFeedback')}
+    `, context)
+
+    expect(vm.runInContext("beginPendingActionFeedback({ type: 'move', clientActionId: 'action-timeout-1' })", context)).toBe(true)
+    timeoutCallback?.()
+
+    expect(vm.runInContext('pendingActionFeedback.clientActionId', context)).toBe('action-timeout-1')
+    expect(vm.runInContext('pendingActionFeedback.timedOut', context)).toBe(true)
+    expect(vm.runInContext('pendingActionFeedbackTimer', context)).toBeNull()
+    expect(recover).toHaveBeenCalledWith('action-timeout', 'action-timeout-1')
+    expect(status).toHaveBeenCalledWith(expect.stringContaining('请勿重复操作'))
+    expect(vm.runInContext("beginPendingActionFeedback({ type: 'move', clientActionId: 'action-timeout-2' })", context)).toBe(false)
+  })
+
+  it('settles a timed-out pending action from every matching late receipt status without replaying it', () => {
+    const html = readBattlePage()
+    const recover = vi.fn()
+    const context = vm.createContext({
+      clearTimeout: () => undefined,
+      recordAuthorityPerformance: () => undefined,
+      clearTargetInteraction: () => true,
+      renderActionBar: () => undefined,
+      setStatusMsg: () => undefined,
+      requestAuthorityRecovery: recover,
+    })
+
+    vm.runInContext(`
+      let pendingActionFeedback = null
+      let pendingActionFeedbackTimer = null
+      let targetSubmissionPending = null
+      ${runtimeFunction(html, 'clearPendingActionFeedback')}
+      ${runtimeFunction(html, 'applyAuthorityReceipt')}
+    `, context)
+
+    for (const status of ['applied', 'duplicate', 'rejected', 'resyncRequired']) {
+      const clientActionId = `late-${status}`
+      context.__receipt = {
+        clientActionId,
+        status,
+        authorityVersion: 4,
+        code: status === 'resyncRequired' ? 'ROOM_VERSION_CONFLICT' : undefined,
+        message: status === 'rejected' ? '服务端拒绝了原指令' : undefined,
+      }
+      vm.runInContext(`
+        pendingActionFeedback = {
+          clientActionId: ${JSON.stringify(clientActionId)},
+          type: 'move',
+          startedAt: 0,
+          timedOut: true,
+        }
+        pendingActionFeedbackTimer = null
+      `, context)
+
+      expect(vm.runInContext('applyAuthorityReceipt(__receipt)', context)).toBe(true)
+      expect(vm.runInContext('pendingActionFeedback', context)).toBeNull()
+    }
+
+    expect(recover).toHaveBeenCalledTimes(1)
+    expect(recover).toHaveBeenCalledWith('ROOM_VERSION_CONFLICT')
+  })
+
   it('applies the successful training authority receipt before rendering', async () => {
     const html = readBattlePage()
     let clearedTimers = 0

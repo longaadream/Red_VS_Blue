@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { Script, createContext } from 'node:vm'
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
 import { hashBattleState } from '@/lib/game/battle-runner'
+import type { BattleState } from '@/lib/game/battle-types'
 import { startBattleFromLockedRosters } from '@/lib/game/room-battle-start'
-import { recordBattleInitialization } from '@/lib/game/battle-trace'
+import { recordBattleInitialization, type BattleReplayFrame } from '@/lib/game/battle-trace'
 import { toPublicBattleState } from '@/lib/game/deployment'
 import {
   createPublicBattleTransitionUpdate,
@@ -27,6 +32,39 @@ import { createTestServerBattleState, pinTestBattleState } from './profile-test-
 
 const originalAuthorityV2Flag = process.env.RVB_BATTLE_AUTHORITY_V2
 const TEST_PROFILE_IDENTITY = getServerGameProfileIdentityV1()
+
+interface BrowserTraceTools {
+  createTraceRecord(input: Record<string, unknown>): unknown
+  assertTraceRecord(record: unknown): unknown
+}
+
+function loadBrowserTraceTools(): BrowserTraceTools {
+  const source = readFileSync(
+    resolve(process.cwd(), 'data/pages/js/developer-tools/match-trace.js'),
+    'utf8',
+  )
+  const context = createContext({
+    window: {},
+    localStorage: {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    },
+    Blob,
+    URL: {
+      createObjectURL: () => 'blob:trace',
+      revokeObjectURL: () => undefined,
+    },
+    document: {
+      createElement: () => ({ click: () => undefined, remove: () => undefined }),
+      body: { appendChild: () => undefined },
+    },
+    setTimeout: (callback: () => void) => callback(),
+  })
+  new Script(source, { filename: 'match-trace.js' }).runInContext(context)
+  return (context.window as { RvBDeveloperTools: BrowserTraceTools }).RvBDeveloperTools
+}
+
 beforeAll(() => { process.env.RVB_BATTLE_AUTHORITY_V2 = '1' })
 afterAll(() => {
   if (originalAuthorityV2Flag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
@@ -106,6 +144,27 @@ class AuthorityV2MemoryStore implements DeploymentRoomStore {
       trace: transition.traces[index],
       replayFrame: transition.replayFrames[index],
     })))
+  }
+
+  async initializeBattleAuthorityCheckpoint(input: {
+    room: Room
+    storage: BattleAuthorityCheckpointRecord['storage']
+    stateHash: string
+    publicHash: string
+  }): Promise<void> {
+    this.baseCheckpoints.push({
+      protocolVersion: 3,
+      authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+      roomId: input.room.id,
+      authorityVersion: input.room.battleAuthorityVersion ?? 0,
+      seed: input.storage.rootSeed,
+      storage: structuredClone(input.storage),
+      stateHash: input.stateHash,
+      publicHash: input.publicHash,
+      transitionHash: input.room.battleAuthorityTransitionHash ?? '',
+      reason: 'initial',
+      createdAt: 1_000,
+    })
   }
 
   inspectBattleAuthorityPersistence() {
@@ -190,22 +249,70 @@ describe('RED-109 authority v2 coordinator', () => {
       },
     }
 
-    const started = await startBattleFromLockedRosters(store, currentRoom.id, {
-      clock: { now: () => 1_000 },
-    })
+    const originalTimerFlag = process.env.RVB_TURN_TIMER_ENABLED
+    process.env.RVB_TURN_TIMER_ENABLED = '1'
+    try {
+      const started = await startBattleFromLockedRosters(store, currentRoom.id, {
+        clock: { now: () => 1_000 },
+      })
 
-    expect(started.started).toBe(true)
-    expect(checkpoint).toBeDefined()
-    const captured = checkpoint!
-    expect(captured.publicHash).toBe(hashPublicBattleState(toPublicBattleState(captured.storage.state as any)))
-    expect(captured.publicHash).not.toBe(captured.stateHash)
+      expect(started.started).toBe(true)
+      expect(checkpoint).toBeDefined()
+      const captured = checkpoint!
+      const capturedState = captured.storage.state as BattleState
+      expect(captured.publicHash).toBe(hashPublicBattleState(toPublicBattleState(capturedState)))
+      expect(captured.publicHash).not.toBe(captured.stateHash)
+      const debugBattle = capturedState.extensions?.debugBattle
+      expect(debugBattle?.replay?.frames).toEqual([])
+      expect(debugBattle?.authority?.replayFrameCount).toBe(0)
+      expect(debugBattle?.replay?.initialStateHash).toBe(captured.stateHash)
 
-    checkpoint = undefined
-    const resumed = await startBattleFromLockedRosters(store, currentRoom.id, {
-      clock: { now: () => 1_000 },
-    })
-    expect(resumed.started).toBe(false)
-    expect(checkpoint).toBeDefined()
+      const terminalStore = new AuthorityV2MemoryStore(currentRoom)
+      const deployment = capturedState.deployment!
+      const activePlayerId = deployment.activePlayerId!
+      const offeredPieceId = deployment.offerPieceIds![0]
+      const legalPosition = deployment.legalPositions![0]
+      const nonTerminal = await dispatchRoomBattleAction(terminalStore, currentRoom.id, activePlayerId, {
+        type: 'deployReservePiece',
+        playerId: activePlayerId,
+        expectedDeploymentRevision: deployment.revision,
+        pieceId: offeredPieceId,
+        toX: legalPosition.x,
+        toY: legalPosition.y,
+        clientActionId: 'initial-checkpoint-deploy',
+      } as BattleAction, { expectedAuthorityVersion: 0, clock: { now: () => 1_001 } })
+      expect(nonTerminal.nextAuthorityState?.terminalResult).toBeUndefined()
+
+      const terminal = await dispatchRoomBattleAction(terminalStore, currentRoom.id, 'player-red', {
+        type: 'surrender',
+        playerId: 'player-red',
+        clientActionId: 'initial-checkpoint-surrender',
+      } as BattleAction, { expectedAuthorityVersion: 1, clock: { now: () => 1_002 } })
+      const terminalReplay = terminal.nextAuthorityState?.extensions?.debugBattle?.replay
+      expect(terminalReplay?.frames.length).toBeGreaterThanOrEqual(2)
+      expect(terminalReplay?.frames.map((frame: BattleReplayFrame) => frame.index))
+        .toEqual(terminalReplay?.frames.map((_: BattleReplayFrame, index: number) => index))
+      expect(terminalReplay?.frames[0].preStateHash).toBe(terminalReplay?.initialStateHash)
+      const traceTools = loadBrowserTraceTools()
+      const publicTerminalState = toPublicBattleState(terminal.nextAuthorityState!)
+      const traceRecord = traceTools.createTraceRecord({
+        state: publicTerminalState,
+        roomId: currentRoom.id,
+        seed: terminal.snapshot.seed,
+        authorityVersion: terminal.snapshot.authorityVersion,
+      })
+      expect(() => traceTools.assertTraceRecord(traceRecord)).not.toThrow()
+
+      checkpoint = undefined
+      const resumed = await startBattleFromLockedRosters(store, currentRoom.id, {
+        clock: { now: () => 1_000 },
+      })
+      expect(resumed.started).toBe(false)
+      expect(checkpoint).toBeDefined()
+    } finally {
+      if (originalTimerFlag === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
+      else process.env.RVB_TURN_TIMER_ENABLED = originalTimerFlag
+    }
   })
 
   it('rolls the room back when the mandatory initial checkpoint cannot be created', async () => {
