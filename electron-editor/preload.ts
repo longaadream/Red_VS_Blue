@@ -9,11 +9,6 @@ contextBridge.exposeInMainWorld('editorAPI', {
     ipcRenderer.invoke('write-file', subdir, filename, data),
   openInEditor: (subdir: string, filename: string) =>
     ipcRenderer.invoke('open-in-editor', subdir, filename),
-  runBuild:     (args: { name: string; version: string; desc: string }) =>
-    ipcRenderer.invoke('run-build', args),
-  onBuildOutput: (cb: (payload: { line?: string; done?: boolean; exitCode?: number }) => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, payload: unknown) => cb(payload as any)
-    ipcRenderer.on('build-output', handler)
-    return () => ipcRenderer.removeListener('build-output', handler)
-  },
+  contentOperation: (request: unknown) =>
+    ipcRenderer.invoke('content-operation', request),
 })
