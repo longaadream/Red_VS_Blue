@@ -23,6 +23,7 @@ import {
   type SummonRequest,
 } from '@/lib/game/effect-batch'
 import type { PieceInstance } from '@/lib/game/piece'
+import { SuspendableActionPending } from '@/lib/game/suspendable-action-transaction'
 import { makePiece } from '../helpers/minimal-state'
 
 const SOURCE_MIRROR_CAPABILITY = {
@@ -146,6 +147,43 @@ function chain(overrides: Partial<EffectChainOptions> = {}) {
   })
 }
 
+function fatalSignal(): EffectChainFatalError {
+  return new EffectChainFatalError(
+    'RVB_EFFECT_CHAIN_STATE_INVALID',
+    'first-signal probe',
+    {
+      actionId: 'action-red-139',
+      chainId: 'chain-red-139',
+      kind: null,
+      depth: null,
+      processed: 0,
+      limit: 100,
+      turn: 7,
+      rootSeed: 139,
+      detached: false,
+      budget: 'state',
+    },
+  )
+}
+
+function pendingSignal(consumerId = 'first-signal-probe'): SuspendableActionPending {
+  return new SuspendableActionPending(
+    {
+      consumerKind: 'rule',
+      consumerId,
+      eventType: 'red139FirstSignalProbe',
+      consumerOrdinal: 0,
+    },
+    {
+      kind: 'option',
+      playerId: 'player-red',
+      title: 'Continue?',
+      options: ['continue'],
+      canCancel: false,
+    },
+  )
+}
+
 describe('RED-139 EffectChain core scheduler', () => {
   it('freezes the whitelist and default action budgets', () => {
     expect(EFFECT_BATCH_KINDS).toEqual(['damage', 'heal', 'summon', 'death'])
@@ -158,6 +196,166 @@ describe('RED-139 EffectChain core scheduler', () => {
     expect(() => chain({ limits: { maxDepth: 21 } })).toThrow(BattleRuleError)
     expect(() => chain({ limits: { maxBatches: 101 } })).toThrow(BattleRuleError)
     expect(() => chain({ limits: { maxDispatches: 1001 } })).toThrow(BattleRuleError)
+  })
+
+  it('keeps the first control signal across fatal and pending kinds', () => {
+    const pendingFirst = chain()
+    const pending = pendingSignal()
+    expect(pendingFirst.latchPending(pending)).toBe(pending)
+    expect(() => pendingFirst.latchFatal(fatalSignal())).toThrow(pending)
+    expect(() => pendingFirst.assertHealthy()).toThrow(pending)
+
+    const fatalFirst = chain()
+    const fatal = fatalSignal()
+    expect(fatalFirst.latchFatal(fatal)).toBe(fatal)
+    expect(() => fatalFirst.latchPending(pendingSignal())).toThrow(fatal)
+    expect(() => fatalFirst.assertHealthy()).toThrow(fatal)
+  })
+
+  it('restores enqueueMany before relatching an exact pending signal', () => {
+    const effectChain = chain()
+    const pending = pendingSignal('enqueue-many-pending')
+    const checkpoint = effectChain.snapshot()
+    const request = new Proxy(damage(piece('attacker'), piece('target')), {
+      get: (target, key, receiver) => {
+        if (key === 'kind') {
+          effectChain.latchPending(pending)
+          throw new Error('enqueueMany getter failed after pending')
+        }
+        return Reflect.get(target, key, receiver)
+      },
+    })
+
+    let caught: unknown
+    try {
+      effectChain.enqueueMany([request])
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBe(pending)
+    expect(() => effectChain.assertHealthy()).toThrow(pending)
+    expect(effectChain.pendingCount).toBe(0)
+    expect(effectChain.processedBatches).toBe(0)
+    expect(effectChain.processedDispatches).toBe(0)
+    effectChain.acknowledgePending(pending)
+    expect(effectChain.snapshot()).toEqual(checkpoint)
+  })
+
+  it('restores a writer checkpoint before relatching an exact pending signal', () => {
+    const effectChain = chain()
+    const writer = createDamageQueueWriter(effectChain)
+    const pending = pendingSignal('writer-pending')
+    const checkpoint = effectChain.snapshot()
+    const attacker = piece('attacker')
+    const target = piece('target')
+    const input = new Proxy({
+      attacker,
+      target,
+      damage: 1,
+      damageType: 'true' as const,
+      skillId: 'writer-pending-probe',
+    }, {
+      get: (value, key, receiver) => {
+        if (key === 'target') {
+          effectChain.latchPending(pending)
+          throw new Error('writer getter failed after pending')
+        }
+        return Reflect.get(value, key, receiver)
+      },
+    })
+
+    let caught: unknown
+    try {
+      writer.push(input)
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBe(pending)
+    expect(() => effectChain.assertHealthy()).toThrow(pending)
+    expect(effectChain.pendingCount).toBe(0)
+    expect(effectChain.processedBatches).toBe(0)
+    expect(effectChain.processedDispatches).toBe(0)
+    effectChain.acknowledgePending(pending)
+    expect(effectChain.snapshot()).toEqual(checkpoint)
+  })
+
+  it('restores FIFO and counters before relatching a drain-time pending signal', () => {
+    const attacker = piece('attacker')
+    const target = piece('target')
+    const pending = pendingSignal('drain-pending')
+    const effectChain = chain({
+      createBatchId: metadata => {
+        if (metadata.batchSequence === 1) {
+          throw new Error('second batch ID failed after pending')
+        }
+        return `${metadata.chainId}:${metadata.kind}:${metadata.batchSequence}`
+      },
+    })
+    effectChain.enqueue(damage(attacker, target))
+    effectChain.enqueue(heal(attacker, target))
+
+    let caught: unknown
+    try {
+      effectChain.drain({
+        ...noOpHandlers(),
+        damage: (_request, context, active) => {
+          active.latchPending(pending)
+          return context.batchId
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBe(pending)
+    expect(() => effectChain.assertHealthy()).toThrow(pending)
+    expect(effectChain.state).toBe('idle')
+    expect(effectChain.pendingCount).toBe(2)
+    expect(effectChain.processedBatches).toBe(0)
+    expect(effectChain.processedDispatches).toBe(0)
+    expect(effectChain.snapshot()).toMatchObject({
+      nextEnqueueSequence: 2,
+      nextBatchSequence: 0,
+      ledger: [{ kind: 'damage' }, { kind: 'heal' }],
+      pendingSignal: pending,
+    })
+    expect(effectChain.records.map(record => record.type)).toEqual([
+      'enqueue',
+      'enqueue',
+      'batch:start',
+      'batch:finish',
+    ])
+  })
+
+  it('keeps a handler pending ahead of a later batch-finally failure', () => {
+    const attacker = piece('attacker')
+    const target = piece('target')
+    const pending = pendingSignal('batch-finally-pending')
+    const effectChain = chain()
+    effectChain.enqueue(damage(attacker, target))
+
+    let caught: unknown
+    try {
+      effectChain.drain({
+        ...noOpHandlers(),
+        damage: (_request, _context, active) => {
+          active.latchPending(pending)
+          ;(active as any).batchStack = []
+          throw pending
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBe(pending)
+    expect(() => effectChain.assertHealthy()).toThrow(pending)
+    expect(effectChain.state).toBe('idle')
+    expect(effectChain.pendingCount).toBe(1)
+    expect(effectChain.processedBatches).toBe(0)
+    expect(effectChain.processedDispatches).toBe(0)
   })
 
 

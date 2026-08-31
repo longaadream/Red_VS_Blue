@@ -2041,6 +2041,59 @@ describe('RED-139 authoritative EffectChain transactions', () => {
     expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
   })
 
+  it('rethrows the first latched fatal when authored SkillCode catches it and throws a mask', () => {
+    const skillId = 'transaction-masked-skill-fatal'
+    const actionId = 'transaction-masked-skill-fatal-action'
+    const state = skillState(skillId, `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      try {
+        dealDamage(source, [target, target], 1, 'true', context.battle, 'masked-skill-duplicate');
+      } catch (error) {
+        throw new Proxy({}, {
+          get: function() { throw new Error('authored fatal mask get trap'); },
+          getPrototypeOf: function() { throw new Error('authored fatal mask prototype trap'); }
+        });
+      }
+      return { success: true };
+    }`)
+    let observedChain: EffectChain | undefined
+    addRule('observe-masked-fatal-chain', 'beforeSkillUse', battle => {
+      observedChain = getActiveEffectChain(battle)
+    })
+    const beforeHash = hashBattleState(state)
+    const beforeJson = JSON.stringify(state)
+    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+    let caught: unknown
+    try {
+      runBattleAction(state, skillAction(skillId, actionId), { rootSeed: ROOT_SEED })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(EffectChainFatalError)
+    expect((caught as EffectChainFatalError).context).toMatchObject({
+      actionId,
+      chainId: `effect-chain:${actionId}`,
+      kind: 'damage',
+      skillId: 'masked-skill-duplicate',
+      detached: false,
+    })
+    expect(observedChain).toBeDefined()
+    let latched: unknown
+    try {
+      observedChain!.assertHealthy()
+    } catch (error) {
+      latched = error
+    }
+    expect(latched).toBe(caught)
+    expect(hashBattleState(state)).toBe(beforeHash)
+    expect(JSON.stringify(state)).toBe(beforeJson)
+    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+    expect(getActiveEffectChain(state)).toBeUndefined()
+  })
+
   it('latches an idle fireEvent hostile Proxy even when root SkillCode catches the thrown value', () => {
     const trapError = new Error('hostile idle fireEvent trap')
     const hostile = new Proxy(Object.create(null), {
@@ -3453,6 +3506,185 @@ describe('RED-139 authoritative EffectChain transactions', () => {
     })
   })
 
+  it('converts the first latched pending when authored SkillCode throws a hostile mask', () => {
+    const pendingRule = addRule(
+      'pending-masked-by-skill-code',
+      'afterDamageDealt',
+      (battle, context) => {
+        if (context.skillId !== 'pending-masked-root-damage') return
+        ;(battle.extensions as any).pendingMaskAttempts =
+          ((battle.extensions as any).pendingMaskAttempts || 0) + 1
+        if (context.selectedOption === undefined) {
+          return {
+            needsOptionSelection: true,
+            playerId: 'player-red',
+            title: 'Continue masked pending?',
+            options: [{ label: 'Continue', value: 'continue' }],
+            canCancel: false,
+          }
+        }
+        ;(battle.extensions as any).pendingMaskCommits =
+          ((battle.extensions as any).pendingMaskCommits || 0) + 1
+      },
+      { maxUses: 10, uses: 0 },
+    )
+    const skillId = 'transaction-mask-pending'
+    const code = `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      try {
+        dealDamage(source, target, 4, 'true', context.battle, 'pending-masked-root-damage');
+      } catch (error) {
+        throw new Proxy({}, {
+          get: function() { throw new Error('authored pending mask get trap'); },
+          getPrototypeOf: function() { throw new Error('authored pending mask prototype trap'); }
+        });
+      }
+      return { success: true };
+    }`
+    withTemporarySkill(skillId, code, () => {
+      const state = skillState(skillId, code)
+      const beforeHash = hashBattleState(state)
+      const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+      const pending = runBattleAction(
+        state,
+        skillAction(skillId, 'transaction-mask-pending-root'),
+        { rootSeed: ROOT_SEED },
+      ).state
+
+      expect(pending.pendingOptionSelection).toMatchObject({
+        source: { type: 'rule', id: 'pending-masked-by-skill-code' },
+        title: 'Continue masked pending?',
+      })
+      expect(hp(pending)).toBe(30)
+      expect((pending.extensions as any).pendingMaskAttempts).toBeUndefined()
+      expect(hashBattleState(state)).toBe(beforeHash)
+      expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+      expect(pendingRule.limits).toEqual({ maxUses: 10, uses: 0 })
+      expect(getActiveEffectChain(pending)).toBeUndefined()
+
+      const session = pending.pendingOptionSelection!
+      const completed = runBattleAction(pending, {
+        type: 'pendingOptionSelect',
+        playerId: 'player-red',
+        selectedOption: 'continue',
+        selectionId: session.selectionId,
+        stateRevision: session.stateRevision,
+        clientActionId: 'transaction-mask-pending-resume',
+      } as any, { rootSeed: ROOT_SEED }).state
+
+      expect(completed.pendingOptionSelection).toBeUndefined()
+      expect(hp(completed)).toBe(26)
+      expect((completed.extensions as any).pendingMaskAttempts).toBe(1)
+      expect((completed.extensions as any).pendingMaskCommits).toBe(1)
+      expect(pendingRule.limits).toEqual({ maxUses: 10, uses: 1 })
+      expect((completed.actions ?? []).filter(action => action.type === 'damage')).toHaveLength(1)
+      expect((completed.actions ?? []).filter(action => action.type === 'useBasicSkill')).toHaveLength(1)
+      expect(getActiveEffectChain(completed)).toBeUndefined()
+    })
+  })
+
+  it('preserves the first fatal when a JSON legacy pending consumer throws a later mask', () => {
+    const ruleId = 'transaction-legacy-pending-fatal-mask-rule'
+    const rootDamageId = 'transaction-legacy-pending-root-damage'
+    const nestedDamageId = 'transaction-legacy-pending-nested-duplicate'
+    let observedChain: EffectChain | undefined
+    let observedScope: BattleState | undefined
+    const pendingRule = addRule(
+      ruleId,
+      'afterDamageDealt',
+      (battle, context) => {
+        if (context.skillId !== rootDamageId) return
+        if (context.selectedOption === undefined) {
+          return {
+            needsOptionSelection: true,
+            playerId: 'player-red',
+            title: 'Continue legacy pending fatal probe?',
+            options: [{ label: 'Continue', value: 'continue' }],
+            canCancel: false,
+          }
+        }
+        observedChain = getActiveEffectChain(battle)
+        observedScope = battle
+        const source = battle.pieces.find(piece => piece.instanceId === 'transaction-source')!
+        const target = battle.pieces.find(piece => piece.instanceId === 'transaction-target')!
+        try {
+          dealDamage(source, [target, target], 1, 'true', battle, nestedDamageId)
+        } catch {
+          throw new Error('legacy authored mask after fatal')
+        }
+      },
+      { maxUses: 10, uses: 0 },
+    )
+    const skillId = 'transaction-legacy-pending-fatal-mask'
+    const code = `function executeSkill(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      dealDamage(source, target, 4, 'true', context.battle, '${rootDamageId}');
+      return { success: true };
+    }`
+    withTemporarySkill(skillId, code, () => {
+      const state = skillState(skillId, code)
+      const pending = runBattleAction(
+        state,
+        skillAction(skillId, 'transaction-legacy-pending-create'),
+        { rootSeed: ROOT_SEED },
+      ).state
+      expect(pending.pendingOptionSelection?.transaction).toBeDefined()
+
+      const legacy = JSON.parse(JSON.stringify(pending)) as BattleState
+      const session = legacy.pendingOptionSelection!
+      delete (session as any).transaction
+      ;(session as any).triggerContext = {
+        type: 'afterDamageDealt',
+        skillId: rootDamageId,
+        pendingRuleId: ruleId,
+      }
+      const beforeJson = JSON.stringify(legacy)
+      const beforeHash = hashBattleState(legacy)
+      const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+      const actionId = 'transaction-legacy-pending-resume'
+
+      let caught: unknown
+      try {
+        runBattleAction(legacy, {
+          type: 'pendingOptionSelect',
+          playerId: 'player-red',
+          selectedOption: 'continue',
+          selectionId: session.selectionId,
+          stateRevision: session.stateRevision,
+          clientActionId: actionId,
+        } as any, { rootSeed: ROOT_SEED })
+      } catch (error) {
+        caught = error
+      }
+
+      let latched: unknown
+      try {
+        observedChain!.assertHealthy()
+      } catch (error) {
+        latched = error
+      }
+      expect(caught).toBeInstanceOf(EffectChainFatalError)
+      expect(caught).toBe(latched)
+      expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_STATE_INVALID')
+      expect((caught as EffectChainFatalError).context).toMatchObject({
+        actionId,
+        chainId: `effect-chain:${actionId}`,
+        skillId: nestedDamageId,
+        targetIds: ['transaction-target', 'transaction-target'],
+      })
+      expect(observedChain).toBeDefined()
+      expect(hashBattleState(legacy)).toBe(beforeHash)
+      expect(JSON.stringify(legacy)).toBe(beforeJson)
+      expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+      expect(pendingRule.limits).toEqual({ maxUses: 10, uses: 0 })
+      expect(getActiveEffectChain(observedScope!)).toBeUndefined()
+      expect(getActiveEffectChain(legacy)).toBeUndefined()
+    })
+  })
+
   it('does not let authored Rule SkillCode swallow a nested fireEvent pending signal', () => {
     const skillId = 'transaction-rule-catch-pending'
     withTemporaryProfile({
@@ -3527,6 +3759,215 @@ describe('RED-139 authoritative EffectChain transactions', () => {
       expect(innerRule.limits).toEqual({ maxUses: 10, uses: 1 })
       expect((completed.actions ?? []).filter(action => action.type === 'damage')).toHaveLength(1)
       expect((completed.actions ?? []).filter(action => action.type === 'useBasicSkill')).toHaveLength(1)
+      expect(getActiveEffectChain(completed)).toBeUndefined()
+    })
+  })
+
+  it('keeps a nested Rule SkillCode pending ahead of a later wrapper fatal', () => {
+    const skillId = 'transaction-rule-mask-after-pending'
+    const outerRuleId = 'rule-red139-mask-after-nested-pending'
+    const innerRuleId = 'red139-mask-after-pending-choice'
+    withTemporaryProfile({
+      skills: {
+        [skillId]: skillDefinition(skillId, definitionFailureCode(skillId)),
+      },
+      rules: {
+        [outerRuleId]: {
+          id: outerRuleId,
+          name: 'Mask after nested pending',
+          description: '',
+          trigger: { type: 'afterDamageDealt' },
+          skillCode: "try { fireEvent('red139NestedPendingMask', { sourcePiece: context.sourcePiece, playerId: 'player-red' }); } catch (error) { throw new Error('rule mask after pending'); } battle.extensions.ruleMaskAfterPending = (battle.extensions.ruleMaskAfterPending || 0) + 1; return { success: true };",
+        },
+      },
+    }, () => {
+      const innerRule = addRule(
+        innerRuleId,
+        'red139NestedPendingMask',
+        (_battle, context) => {
+          if (context.selectedOption === undefined) {
+            return {
+              needsOptionSelection: true,
+              playerId: 'player-red',
+              title: 'Continue masked RuleCode pending?',
+              options: [{ label: 'Continue', value: 'continue' }],
+              canCancel: false,
+            }
+          }
+          return { success: true }
+        },
+        { maxUses: 10, uses: 0 },
+      )
+      const outerRule = loadRuleById(outerRuleId, true)
+      expect(outerRule).toBeDefined()
+      globalTriggerSystem.addRule(outerRule!)
+      const state = definitionFailureState(skillId)
+      const beforeJson = JSON.stringify(state)
+      const beforeHash = hashBattleState(state)
+      const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+      const pending = runBattleAction(
+        state,
+        skillAction(skillId, 'transaction-rule-mask-after-pending-root'),
+        { rootSeed: ROOT_SEED },
+      ).state
+
+      expect(pending.pendingOptionSelection).toMatchObject({
+        source: { type: 'rule', id: innerRuleId },
+        title: 'Continue masked RuleCode pending?',
+      })
+      expect(hp(pending)).toBe(30)
+      expect((pending.extensions as any).ruleMaskAfterPending).toBeUndefined()
+      expect(JSON.stringify(state)).toBe(beforeJson)
+      expect(hashBattleState(state)).toBe(beforeHash)
+      expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+      expect(innerRule.limits).toEqual({ maxUses: 10, uses: 0 })
+      expect(getActiveEffectChain(state)).toBeUndefined()
+      expect(getActiveEffectChain(pending)).toBeUndefined()
+
+      const session = pending.pendingOptionSelection!
+      const completed = runBattleAction(pending, {
+        type: 'pendingOptionSelect',
+        playerId: 'player-red',
+        selectedOption: 'continue',
+        selectionId: session.selectionId,
+        stateRevision: session.stateRevision,
+        clientActionId: 'transaction-rule-mask-after-pending-resume',
+      } as any, { rootSeed: ROOT_SEED }).state
+
+      expect(completed.pendingOptionSelection).toBeUndefined()
+      expect(hp(completed)).toBe(26)
+      expect((completed.extensions as any).ruleMaskAfterPending).toBe(1)
+      expect(innerRule.limits).toEqual({ maxUses: 10, uses: 1 })
+      expect((completed.actions ?? []).filter(action => action.type === 'damage')).toHaveLength(1)
+      expect((completed.actions ?? []).filter(action => action.type === 'useBasicSkill')).toHaveLength(1)
+      expect(getActiveEffectChain(completed)).toBeUndefined()
+    })
+  })
+
+  it('keeps a nested CardCode pending ahead of a later wrapper fatal', () => {
+    const cardId = 'transaction-card-mask-after-pending'
+    const cardInstanceId = `${cardId}-instance`
+    const innerRuleId = 'red139-card-mask-after-pending-choice'
+    const rootDamageId = 'transaction-card-mask-after-pending-damage'
+    const code = `function executeCard(context) {
+      var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
+      var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
+      try {
+        dealDamage(source, target, 4, 'true', context.battle, '${rootDamageId}');
+      } catch (error) {
+        throw new Error('card mask after pending');
+      }
+      context.battle.extensions.cardMaskAfterPending =
+        (context.battle.extensions.cardMaskAfterPending || 0) + 1;
+      return { success: true };
+    }`
+    withTemporaryProfile({
+      cards: {
+        [cardId]: {
+          id: cardId,
+          name: cardId,
+          description: '',
+          keywords: [],
+          type: 'active',
+          actionPointCost: 2,
+          code,
+          targeting: { steps: [] },
+        },
+      },
+    }, () => {
+      const innerRule = addRule(
+        innerRuleId,
+        'afterDamageDealt',
+        (_battle, context) => {
+          if (context.skillId !== rootDamageId) return
+          if (context.selectedOption === undefined) {
+            return {
+              needsOptionSelection: true,
+              playerId: 'player-red',
+              title: 'Continue masked CardCode pending?',
+              options: [{ label: 'Continue', value: 'continue' }],
+              canCancel: false,
+            }
+          }
+          return { success: true }
+        },
+        { maxUses: 10, uses: 0 },
+      )
+      const source = makePiece({
+        instanceId: 'transaction-source',
+        ownerPlayerId: 'player-red',
+        x: 0,
+        y: 0,
+        currentHp: 100,
+        maxHp: 100,
+      }) as any
+      const target = makePiece({
+        instanceId: 'transaction-target',
+        ownerPlayerId: 'player-blue',
+        faction: 'blue',
+        x: 1,
+        y: 0,
+        currentHp: 30,
+        maxHp: 100,
+      }) as any
+      const state = makeState({
+        pieces: [source, target],
+        currentPlayerId: 'player-red',
+        phase: 'action',
+        turnNumber: 7,
+      }) as any
+      state.players[0].actionPoints = 20
+      state.players[0].hand = [{
+        cardId,
+        instanceId: cardInstanceId,
+        ownerPlayerId: 'player-red',
+        actionPointCost: 2,
+      }]
+      const beforeJson = JSON.stringify(state)
+      const beforeHash = hashBattleState(state)
+      const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+
+      const pending = runBattleAction(state, {
+        type: 'playCard',
+        playerId: 'player-red',
+        cardInstanceId,
+        clientActionId: 'transaction-card-mask-after-pending-root',
+      } as any, { rootSeed: ROOT_SEED }).state
+
+      expect(pending.pendingOptionSelection).toMatchObject({
+        source: { type: 'rule', id: innerRuleId },
+        title: 'Continue masked CardCode pending?',
+      })
+      expect(hp(pending)).toBe(30)
+      expect(pending.players[0].actionPoints).toBe(20)
+      expect(pending.players[0].hand).toHaveLength(1)
+      expect(pending.players[0].discardPile ?? []).toEqual([])
+      expect((pending.extensions as any).cardMaskAfterPending).toBeUndefined()
+      expect(JSON.stringify(state)).toBe(beforeJson)
+      expect(hashBattleState(state)).toBe(beforeHash)
+      expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
+      expect(innerRule.limits).toEqual({ maxUses: 10, uses: 0 })
+
+      const session = pending.pendingOptionSelection!
+      const completed = runBattleAction(pending, {
+        type: 'pendingOptionSelect',
+        playerId: 'player-red',
+        selectedOption: 'continue',
+        selectionId: session.selectionId,
+        stateRevision: session.stateRevision,
+        clientActionId: 'transaction-card-mask-after-pending-resume',
+      } as any, { rootSeed: ROOT_SEED }).state
+
+      expect(completed.pendingOptionSelection).toBeUndefined()
+      expect(hp(completed)).toBe(26)
+      expect(completed.players[0].actionPoints).toBe(18)
+      expect(completed.players[0].hand).toHaveLength(0)
+      expect(completed.players[0].discardPile).toEqual([cardId])
+      expect((completed.extensions as any).cardMaskAfterPending).toBe(1)
+      expect(innerRule.limits).toEqual({ maxUses: 10, uses: 1 })
+      expect((completed.actions ?? []).filter(action => action.type === 'damage')).toHaveLength(1)
+      expect((completed.actions ?? []).filter(action => action.type === 'playCard')).toHaveLength(1)
       expect(getActiveEffectChain(completed)).toBeUndefined()
     })
   })

@@ -3494,17 +3494,26 @@ function runSuspendableActionTransaction(
       replayRuleRuntime.restore(replayRuleRuntimeSnapshot)
     }
     triggerSystem.restoreTransactionState(triggerSnapshot)
-    if (!isEffectChainPendingSignal(error)) throw error
-    activeEffectChain?.acknowledgePending(error)
+    let authoritativeError = error
+    try {
+      activeEffectChain?.assertHealthy()
+    } catch (chainSignal) {
+      // The first latched fatal/pending signal outranks any later value thrown
+      // by authored catch/finally code.
+      authoritativeError = chainSignal
+    }
+    if (!isEffectChainPendingSignal(authoritativeError)) throw authoritativeError
+    const pendingError = authoritativeError
+    activeEffectChain?.acknowledgePending(pendingError)
     const rootActionType = (transaction.rootAction as { type?: string } | undefined)?.type
     const shouldAutoResolveTimeout = rootActionType === 'turnTimeout'
-      && error.key.eventType === 'endTurn'
+      && pendingError.key.eventType === 'endTurn'
     if (shouldAutoResolveTimeout) {
       if (activeEffectChain && effectChainSnapshot) activeEffectChain.restore(effectChainSnapshot)
       let input: SuspendableInteractionInput
-      if (error.prompt.canCancel !== false) {
-        input = error.prompt.kind === 'option' && error.prompt.cancelValue !== undefined
-          ? { selectedOption: error.prompt.cancelValue }
+      if (pendingError.prompt.canCancel !== false) {
+        input = pendingError.prompt.kind === 'option' && pendingError.prompt.cancelValue !== undefined
+          ? { selectedOption: pendingError.prompt.cancelValue }
           : { cancelled: true }
       } else {
         if (!replayRuleRuntime) {
@@ -3513,17 +3522,17 @@ function runSuspendableActionTransaction(
             'PENDING_TIMEOUT_RUNTIME_REQUIRED',
           )
         }
-        if (error.prompt.kind === 'option') {
-          const candidates = uniqueSuspendableTimeoutCandidates(error.prompt.options || [])
+        if (pendingError.prompt.kind === 'option') {
+          const candidates = uniqueSuspendableTimeoutCandidates(pendingError.prompt.options || [])
           if (candidates.length === 0) {
             throw new BattleRuleError(
               'Timed-out mandatory transaction option has no legal candidates',
               'PENDING_TIMEOUT_NO_CANDIDATES',
             )
           }
-          if (error.prompt.selectionMode === 'multi') {
-            const minSelections = Number.isSafeInteger(error.prompt.minSelections)
-              ? Math.max(0, error.prompt.minSelections!)
+          if (pendingError.prompt.selectionMode === 'multi') {
+            const minSelections = Number.isSafeInteger(pendingError.prompt.minSelections)
+              ? Math.max(0, pendingError.prompt.minSelections!)
               : 1
             if (candidates.length < minSelections) {
               throw new BattleRuleError(
@@ -3540,12 +3549,18 @@ function runSuspendableActionTransaction(
             input = { selectedOption: candidates[index], timeoutRandomBound: candidates.length }
           }
         } else {
-          input = mandatoryTimeoutTargetInput(authorityState, transaction, error.key, error.prompt, replayRuleRuntime)
+          input = mandatoryTimeoutTargetInput(
+            authorityState,
+            transaction,
+            pendingError.key,
+            pendingError.prompt,
+            replayRuleRuntime,
+          )
         }
       }
       const resumed = {
         ...transaction,
-        answers: [...transaction.answers, { key: error.key, input }],
+        answers: [...transaction.answers, { key: pendingError.key, input }],
         currentInteraction: undefined,
       }
       return runSuspendableActionTransaction(
@@ -3555,8 +3570,8 @@ function runSuspendableActionTransaction(
       )
     }
     return setSuspendableTransactionPending(authorityState, transaction, {
-      key: error.key,
-      prompt: error.prompt,
+      key: pendingError.key,
+      prompt: pendingError.prompt,
     })
   }
 }
@@ -3610,13 +3625,27 @@ export function applyBattleAction(
     ? state.extensions.debugBattle.actionLog.length
     : 0
   const hasPending = !!state.pendingOptionSelection || !!state.pendingTargetSelection
-  const reduced = hasPending
-    ? applyBattleActionInternal(state, action)
-    : runSuspendableActionTransaction(
-        state,
-        state,
-        createSuspendableActionTransaction(state, action),
-      )
+  let reduced: BattleState
+  try {
+    reduced = hasPending
+      ? applyBattleActionInternal(state, action)
+      : runSuspendableActionTransaction(
+          state,
+          state,
+          createSuspendableActionTransaction(state, action),
+        )
+  } catch (error) {
+    let authoritativeError = error
+    try {
+      activeEffectChain?.assertHealthy()
+    } catch (chainSignal) {
+      // Legacy/JSON pending sessions bypass the suspendable transaction
+      // catch. Preserve the same first-signal-wins rule at their shared
+      // reducer boundary so authored catch/finally code cannot mask it.
+      authoritativeError = chainSignal
+    }
+    throw authoritativeError
+  }
   const advancesTargetingRevision = !isTurnTimerSystemAction(action)
     || action.type === 'turnTimeout'
   let next = advancesTargetingRevision

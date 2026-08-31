@@ -615,12 +615,16 @@ export class EffectChain {
     return this.recordLog.slice()
   }
 
+  // Fatal and pending share one control-flow order. Once either kind is
+  // observed, a later wrapper/content error cannot replace that first signal.
   latchFatal(error: EffectChainFatalError): EffectChainFatalError {
+    if (this.firstPending) throw this.firstPending
     this.firstFatal ??= error
     return this.firstFatal
   }
 
   latchPending(error: SuspendableActionPending): SuspendableActionPending {
+    if (this.firstFatal) throw this.firstFatal
     this.firstPending ??= error
     return this.firstPending
   }
@@ -714,8 +718,13 @@ export class EffectChain {
     try {
       return requests.map(request => this.enqueue(request, options))
     } catch (error) {
+      const failure = authoritativeEffectChainFailure(this, error)
       this.restore(checkpoint)
-      throw error
+      if (!this.detached && isEffectChainPendingSignal(failure)) {
+        throw this.latchPending(failure)
+      }
+      if (isEffectChainFatalError(failure)) throw this.latchFatal(failure)
+      throw failure
     }
   }
 
@@ -752,26 +761,23 @@ export class EffectChain {
       const failedBatch = [...failedRecords]
         .reverse()
         .find(record => record.type === 'batch:start')
-      const pendingFailure = !this.detached && isEffectChainPendingSignal(error)
-        ? error
-        : undefined
-      const failure = isEffectChainFatalError(error)
-        ? this.latchFatal(error)
-        : this.detached || isEffectChainPendingSignal(error)
-          ? error
-          : this.fatal(
-              'RVB_EFFECT_CHAIN_BATCH_REJECTED',
-              'Attached EffectChain batch execution failed',
-              'state',
-              this.batchCount,
-              this.limits.maxBatches,
-              failedBatch ?? {},
-              error,
-            )
+      const failure = authoritativeEffectChainFailure(this, error)
       this.restore(checkpoint)
-      if (pendingFailure) this.latchPending(pendingFailure)
       this.recordLog = failedRecords
-      throw failure
+      if (!this.detached && isEffectChainPendingSignal(failure)) {
+        throw this.latchPending(failure)
+      }
+      if (isEffectChainFatalError(failure)) throw this.latchFatal(failure)
+      if (this.detached || isEffectChainPendingSignal(failure)) throw failure
+      throw this.fatal(
+        'RVB_EFFECT_CHAIN_BATCH_REJECTED',
+        'Attached EffectChain batch execution failed',
+        'state',
+        this.batchCount,
+        this.limits.maxBatches,
+        failedBatch ?? {},
+        failure,
+      )
     } finally {
       this.currentState = 'idle'
       this.batchStack = []
@@ -1020,6 +1026,9 @@ export class EffectChain {
       return execute(context)
     } catch (error) {
       if (isEffectChainFatalError(error)) throw this.latchFatal(error)
+      if (!this.detached && isEffectChainPendingSignal(error)) {
+        throw this.latchPending(error)
+      }
       if (this.detached || isEffectChainPendingSignal(error)) throw error
       throw rejectEffectBatch(
         this,
@@ -1114,6 +1123,31 @@ export function createEffectChain(options: EffectChainOptions): EffectChain {
   return new EffectChain(options)
 }
 
+function authoritativeEffectChainFailure(chain: EffectChain, error: unknown): unknown {
+  try {
+    chain.assertHealthy()
+  } catch (signal) {
+    return signal
+  }
+  return error
+}
+
+function restoreWriterCheckpointAndThrow(
+  chain: EffectChain,
+  checkpoint: EffectChainSnapshot,
+  error: unknown,
+  createFatal: (cause: unknown) => EffectChainFatalError,
+): never {
+  const failure = authoritativeEffectChainFailure(chain, error)
+  chain.restore(checkpoint)
+  if (!chain.detached && isEffectChainPendingSignal(failure)) {
+    throw chain.latchPending(failure)
+  }
+  if (isEffectChainFatalError(failure)) throw chain.latchFatal(failure)
+  if (isEffectChainPendingSignal(failure)) throw failure
+  throw createFatal(failure)
+}
+
 function effectWriterFatal(
   chain: EffectChain,
   binding: EffectWriterBinding,
@@ -1165,15 +1199,17 @@ function bindWriter<TInput, TRequest extends EffectRequest>(
         chain.enqueueMany(requests, binding)
         return chain.pendingCount
       } catch (error) {
-        const fatal = isEffectChainFatalError(error)
-        chain.restore(checkpoint)
-        if (fatal) throw chain.latchFatal(error as EffectChainFatalError)
-        throw effectWriterFatal(
+        restoreWriterCheckpointAndThrow(
           chain,
-          binding,
-          kind,
-          'Malformed ' + kind + ' queue request',
+          checkpoint,
           error,
+          cause => effectWriterFatal(
+            chain,
+            binding,
+            kind,
+            'Malformed ' + kind + ' queue request',
+            cause,
+          ),
         )
       }
     },
@@ -1632,15 +1668,17 @@ export function createSummonQueueWriter(
         chain.enqueueMany(requests, binding)
         return chain.pendingCount
       } catch (error) {
-        const fatal = isEffectChainFatalError(error)
-        chain.restore(checkpoint)
-        if (fatal) throw chain.latchFatal(error as EffectChainFatalError)
-        throw effectWriterFatal(
+        restoreWriterCheckpointAndThrow(
           chain,
-          binding,
-          'summon',
-          'Malformed template summon queue request',
+          checkpoint,
           error,
+          cause => effectWriterFatal(
+            chain,
+            binding,
+            'summon',
+            'Malformed template summon queue request',
+            cause,
+          ),
         )
       }
     },
@@ -1745,16 +1783,18 @@ export function createDeclaredSummonQueueWriter(
         chain.enqueueMany(requests, binding)
         return chain.pendingCount
       } catch (error) {
-        const fatal = isEffectChainFatalError(error)
-        chain.restore(checkpoint)
-        if (fatal) throw chain.latchFatal(error as EffectChainFatalError)
-        throw effectWriterFatal(
+        restoreWriterCheckpointAndThrow(
           chain,
-          binding,
-          'summon',
-          'Malformed declared summon queue request',
+          checkpoint,
           error,
-          { skillId: contentId },
+          cause => effectWriterFatal(
+            chain,
+            binding,
+            'summon',
+            'Malformed declared summon queue request',
+            cause,
+            { skillId: contentId },
+          ),
         )
       }
     },
