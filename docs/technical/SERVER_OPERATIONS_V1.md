@@ -2102,7 +2102,8 @@ operation evidence。
 | downgrade/old installer | sequence/epoch/DB policy | downgrade forbidden；新 DB/缺 backup |
 | update/restore 任 phase 断电 | journal + one pointer | 按 power-loss matrix 确定恢复 |
 | disk full（precommit） | reserve + phase journal + bounded partial cleanup | pointer/source generation 不变；已 durable cleanup receipt 不回滚且必须有 verified backup；按 source intent 恢复 |
-| disk full（postcommit） | protected rollback reserve + exact previous set | 有完整空间/bytes 时恢复同一 previous config+DB+PVE generation 与 Profile；写入或验证补偿不确定 -> rollback-required |
+| disk full（postcommit：app-update.apply / existing-root restore） | protected rollback reserve + exact previous set | 有完整空间/bytes 时恢复同一 previous config+DB+PVE generation 与 Profile；写入或验证补偿不确定 -> rollback-required |
+| disk full（postcommit：app-update.rollback / empty-root restore） | 无可承诺的第二次补偿或 previous generation | 固定 rollback-required/closed/no-writer；保留 target/source/identity/continuity/Profile evidence，不猜测切 pointer |
 | traversal/symlink/reparse | bounded strict walker | drive/../case/junction/bomb 拒绝 |
 | secrets in logs | central redactor + rescan | capability/env/path/URL/stack canary 不泄漏 |
 | force-stop approval 缺失/过期/取消或 tail-loss=false | native approval + exact true literal | 零副作用拒绝；原 process tree 保持，不得报告 absent |
