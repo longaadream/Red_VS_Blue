@@ -19,6 +19,10 @@ const samePlayer = (left: unknown, right: unknown) => (
 
 const alive = (piece: AIObservedPiece) => piece.currentHp > 0
 const ratio = (value: number, maximum: number) => maximum > 0 ? value / maximum : 0
+const healthValue = (piece: AIObservedPiece) => {
+  const remaining = ratio(piece.currentHp, piece.maxHp)
+  return piece.isCore ? Math.sqrt(remaining) * 6 : remaining * 0.25
+}
 const position = (piece: AIObservedPiece) => piece.x == null || piece.y == null ? undefined : { x: piece.x, y: piece.y }
 const pointDistance = (left: { x: number; y: number }, right: { x: number; y: number }) => (
   Math.abs(left.x - right.x) + Math.abs(left.y - right.y)
@@ -28,27 +32,89 @@ const distance = (left: AIObservedPiece, right: AIObservedPiece) => {
   const b = position(right)
   return a && b ? pointDistance(a, b) : Number.POSITIVE_INFINITY
 }
+const cellKey = (x: number, y: number) => `${x},${y}`
+
+interface WalkableDistanceCache {
+  walkable: Set<string>
+  fields: Map<string, Map<string, number>>
+}
+
+const MAX_WALKABLE_TOPOLOGIES = 8
+const walkableTopologyCache = new Map<string, WalkableDistanceCache>()
+
+function walkableTopology(observation: AIObservation): WalkableDistanceCache {
+  const walkableCells = observation.map.tiles
+    .filter(tile => tile.props.walkable)
+    .map(tile => cellKey(tile.x, tile.y))
+    .sort()
+  const topologyKey = `${observation.map.width}x${observation.map.height}|${walkableCells.join(';')}`
+  const cached = walkableTopologyCache.get(topologyKey)
+  if (cached) {
+    // Refresh insertion order so a long-running evaluator keeps active maps.
+    walkableTopologyCache.delete(topologyKey)
+    walkableTopologyCache.set(topologyKey, cached)
+    return cached
+  }
+
+  const created = { walkable: new Set(walkableCells), fields: new Map<string, Map<string, number>>() }
+  walkableTopologyCache.set(topologyKey, created)
+  if (walkableTopologyCache.size > MAX_WALKABLE_TOPOLOGIES) {
+    const oldest = walkableTopologyCache.keys().next().value
+    if (oldest !== undefined) walkableTopologyCache.delete(oldest)
+  }
+  return created
+}
+
+function createWalkableDistance(observation: AIObservation) {
+  const { walkable, fields } = walkableTopology(observation)
+  return (source: AIObservedPiece, target: AIObservedPiece) => {
+    const start = position(source)
+    const goal = position(target)
+    if (!start || !goal) return Number.POSITIVE_INFINITY
+    const goalKey = cellKey(goal.x, goal.y)
+    let distances = fields.get(goalKey)
+    if (!distances) {
+      distances = new Map([[goalKey, 0]])
+      const queue = [goal]
+      for (let index = 0; index < queue.length; index += 1) {
+        const current = queue[index]
+        const steps = distances.get(cellKey(current.x, current.y)) ?? 0
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const next = { x: current.x + dx, y: current.y + dy }
+          const key = cellKey(next.x, next.y)
+          if (!walkable.has(key) || distances.has(key)) continue
+          distances.set(key, steps + 1)
+          queue.push(next)
+        }
+      }
+      fields.set(goalKey, distances)
+    }
+    return distances.get(cellKey(start.x, start.y)) ?? Number.POSITIVE_INFINITY
+  }
+}
 
 function engagement(source: AIObservedPiece, target: AIObservedPiece) {
   return distance(source, target) <= Math.max(1, source.moveRange + 1)
 }
 
 function lethalOpportunities(sources: AIObservedPiece[], targets: AIObservedPiece[]) {
-  return sources.reduce((total, source) => total + targets.reduce((subtotal, target) => {
-    if (!engagement(source, target)) return subtotal
-    if (Math.max(1, source.attack - target.defense) < target.currentHp) return subtotal
-    return subtotal + (target.isCore ? 2 : 1)
-  }, 0), 0)
+  return targets.reduce((total, target) => {
+    const threatened = sources.some(source => (
+      engagement(source, target)
+      && Math.max(1, source.attack - target.defense) >= target.currentHp
+    ))
+    return threatened ? total + (target.isCore ? 3 : 0.5) : total
+  }, 0)
 }
 
 function attackPressure(sources: AIObservedPiece[], targets: AIObservedPiece[]) {
-  return sources.reduce((total, source) => total + targets.reduce((subtotal, target) => {
-    if (!engagement(source, target)) return subtotal
+  return targets.reduce((total, target) => total + Math.max(0, ...sources.map(source => {
+    if (!engagement(source, target)) return 0
     const damage = Math.max(1, source.attack - target.defense) / Math.max(1, target.maxHp)
     const finishPriority = 1 + (1 - ratio(target.currentHp, target.maxHp))
-    const targetPriority = target.isCore ? 1.5 : 1
-    return subtotal + damage * finishPriority * targetPriority
-  }, 0), 0)
+    const targetPriority = target.isCore ? 3 : 0.5
+    return damage * finishPriority * targetPriority
+  })), 0)
 }
 
 function dangerExposure(targets: AIObservedPiece[], sources: AIObservedPiece[]) {
@@ -92,20 +158,77 @@ function strategicPosition(
 }
 
 function futureAttackPotential(sources: AIObservedPiece[], targets: AIObservedPiece[]) {
-  return sources.reduce((total, source) => total + targets.reduce((subtotal, target) => {
+  return targets.reduce((total, target) => total + Math.max(0, ...sources.map(source => {
     const steps = distance(source, target)
-    if (!Number.isFinite(steps)) return subtotal
+    if (!Number.isFinite(steps)) return 0
     const projectedRange = Math.max(1, source.moveRange + 1)
     const proximity = projectedRange / Math.max(projectedRange, steps)
     const damage = Math.max(1, source.attack - target.defense) / Math.max(1, target.maxHp)
     const immediateCoverage = steps <= 1 ? 1 : 0
     const finishPriority = 1 + (1 - ratio(target.currentHp, target.maxHp)) * 0.5
-    const targetPriority = target.isCore ? 1.5 : 1
-    return subtotal + targetPriority * finishPriority * (
+    const targetPriority = target.isCore ? 3 : 0.5
+    return targetPriority * finishPriority * (
       proximity * (0.5 + damage)
       + immediateCoverage * (1 + damage)
     )
-  }, 0), 0)
+  })), 0)
+}
+
+function enemyProximityPotential(
+  sources: AIObservedPiece[],
+  hostile: AIObservedPiece[],
+  walkableDistance: ReturnType<typeof createWalkableDistance>,
+  distanceScale: number,
+) {
+  const pursuers = sources.some(piece => piece.isCore) ? sources.filter(piece => piece.isCore) : sources
+  const hostileCores = hostile.filter(piece => piece.isCore)
+  const objectives = hostileCores.length > 0 ? hostileCores : hostile
+  if (sources.length === 0 || objectives.length === 0) return 0
+  const nearestSum = sources.reduce((total, source) => {
+    const steps = Math.min(...objectives.map(target => walkableDistance(source, target)))
+    if (!Number.isFinite(steps)) return total
+    return total + 1 - Math.min(1, steps / Math.max(1, distanceScale))
+  }, 0)
+  const assignmentWeight = hostileCores.length > 0 && pursuers.length > objectives.length
+    ? Math.min(0.5, objectives.length / pursuers.length)
+    : 0
+  if (assignmentWeight === 0) return nearestSum
+
+  // Match the smaller side one-to-one against the larger side. A nearest-only
+  // sum lets the whole team crowd one nearby core while ignoring survivors on
+  // the other side of the map. Matching preserves the smooth distance signal
+  // while assigning distinct pursuers whenever enough core pieces remain.
+  const rows = pursuers.length <= objectives.length ? pursuers : objectives
+  const columns = pursuers.length <= objectives.length ? objectives : pursuers
+  const proximity = rows.map(row => columns.map(column => {
+    const source = pursuers.length <= objectives.length ? row : column
+    const target = pursuers.length <= objectives.length ? column : row
+    const steps = walkableDistance(source, target)
+    if (!Number.isFinite(steps)) return 0
+    return 1 - Math.min(1, steps / Math.max(1, distanceScale))
+  }))
+  const memo = new Map<number, number>()
+  const bestAssignment = (rowIndex: number, usedColumns: number): number => {
+    if (rowIndex >= rows.length) return 0
+    const memoKey = rowIndex * (2 ** columns.length) + usedColumns
+    const cached = memo.get(memoKey)
+    if (cached !== undefined) return cached
+    let best = 0
+    for (let columnIndex = 0; columnIndex < columns.length; columnIndex += 1) {
+      const bit = 2 ** columnIndex
+      if (Math.floor(usedColumns / bit) % 2 === 1) continue
+      best = Math.max(
+        best,
+        proximity[rowIndex][columnIndex] + bestAssignment(rowIndex + 1, usedColumns + bit),
+      )
+    }
+    memo.set(memoKey, best)
+    return best
+  }
+  // Keep the component magnitude comparable to the former per-pursuer sum
+  // when there are more pursuers than objectives.
+  const assigned = bestAssignment(0, 0) * pursuers.length / rows.length
+  return nearestSum * (1 - assignmentWeight) + assigned * assignmentWeight
 }
 
 function supportPotential(pieces: AIObservedPiece[]) {
@@ -125,8 +248,6 @@ function supportPotential(pieces: AIObservedPiece[]) {
   }
   return total
 }
-
-const cellKey = (x: number, y: number) => `${x},${y}`
 
 function mobilityPotential(pieces: AIObservedPiece[], observation: AIObservation) {
   const walkable = new Set(observation.map.tiles
@@ -199,8 +320,6 @@ export function evaluateZeroStageState(
   const enemy = observation.pieces.filter(piece => alive(piece) && !samePlayer(piece.ownerPlayerId, observation.playerId))
   const ownGraveyard = observation.graveyard.filter(piece => samePlayer(piece.ownerPlayerId, observation.playerId)).length
   const enemyGraveyard = observation.graveyard.length - ownGraveyard
-  const ownPlayer = observation.players.find(player => samePlayer(player.playerId, observation.playerId))
-  const enemyPlayers = observation.players.filter(player => !samePlayer(player.playerId, observation.playerId))
   const activeOwn = observation.turn.phase === 'action'
     && samePlayer(observation.turn.currentPlayerId, observation.playerId)
   const activeEnemy = observation.turn.phase === 'action' && !activeOwn
@@ -209,12 +328,14 @@ export function evaluateZeroStageState(
     !samePlayer(playerId, observation.playerId)
     && observation.deployment?.locks[playerId]?.locked === true
   )).length ?? 0
+  const walkableDistance = createWalkableDistance(observation)
+  const distanceScale = Math.max(1, observation.map.tiles.filter(tile => tile.props.walkable).length - 1)
   const raw: Record<ZeroStageStaticComponentKey, number> = {
     coreSurvival: own.filter(piece => piece.isCore).length - enemy.filter(piece => piece.isCore).length,
     survival: own.length - enemy.length,
     graveyard: enemyGraveyard - ownGraveyard,
-    health: own.reduce((total, piece) => total + ratio(piece.currentHp, piece.maxHp), 0)
-      - enemy.reduce((total, piece) => total + ratio(piece.currentHp, piece.maxHp), 0),
+    health: own.reduce((total, piece) => total + healthValue(piece), 0)
+      - enemy.reduce((total, piece) => total + healthValue(piece), 0),
     combatPower: own.reduce((total, piece) => total + ratio(piece.attack + piece.defense, piece.maxHp), 0)
       - enemy.reduce((total, piece) => total + ratio(piece.attack + piece.defense, piece.maxHp), 0),
     shield: own.reduce((total, piece) => (
@@ -222,13 +343,10 @@ export function evaluateZeroStageState(
     ), 0) - enemy.reduce((total, piece) => (
       total + ratio(Math.min(piece.maxHp, Math.max(0, piece.shield ?? 0)), piece.maxHp)
     ), 0),
-    resources: Math.max(0, (ownPlayer?.maxActionPoints ?? 0) - (ownPlayer?.actionPoints ?? 0))
-      - (ownPlayer?.chargePoints ?? 0)
-      - enemyPlayers.reduce((total, player) => (
-        total + Math.max(0, player.maxActionPoints - player.actionPoints) - player.chargePoints
-      ), 0),
-    actionability: own.length + Math.min(3, ownPlayer?.actionPoints ?? 0)
-      - enemy.length - Math.min(3, enemyPlayers.reduce((total, player) => total + player.actionPoints, 0)),
+    // AP and charge are means, not outcomes. Their value is represented by the
+    // health, material, pressure, safety, and position created after spending them.
+    resources: 0,
+    actionability: own.length - enemy.length,
     deploymentReadiness: observation.deployment?.status === 'awaiting-locks'
       ? Number(ownDeploymentLocked) - enemyDeploymentLocks
       : 0,
@@ -238,9 +356,15 @@ export function evaluateZeroStageState(
     lethalOpportunity: lethalOpportunities(own, enemy) - lethalOpportunities(enemy, own),
     attackPressure: attackPressure(own, enemy) - attackPressure(enemy, own),
     status: statusBalance(own) - statusBalance(enemy),
-    positionSafety: dangerExposure(enemy, own) - dangerExposure(own, enemy),
+    positionSafety: -dangerExposure(own, enemy),
     strategicPosition: strategicPosition(own, enemy, observation)
       - strategicPosition(enemy, own, observation),
+    // Initiative is player-relative rather than zero-sum: when the active side
+    // closes one step, the geometrically mirrored enemy distance changes too.
+    // Subtracting both directions would cancel the exact pursuit signal.
+    enemyProximity: observation.deployment?.status === 'awaiting-locks'
+      ? 0
+      : enemyProximityPotential(own, enemy, walkableDistance, distanceScale),
     futureAttackPotential: futureAttackPotential(own, enemy) - futureAttackPotential(enemy, own),
     supportPotential: supportPotential(own) - supportPotential(enemy),
     mobilityPotential: mobilityPotential(own, observation) - mobilityPotential(enemy, observation),

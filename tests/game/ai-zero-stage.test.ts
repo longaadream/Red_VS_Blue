@@ -81,6 +81,8 @@ describe('zero-stage static evaluator', () => {
     expect(red.components.coreSurvival.contribution).toBeCloseTo(-blue.components.coreSurvival.contribution)
     expect(red.components.strategicPosition.contribution)
       .toBeCloseTo(-blue.components.strategicPosition.contribution)
+    expect(red.components.enemyProximity.contribution)
+      .toBeCloseTo(blue.components.enemyProximity.contribution)
 
     const won = structuredClone(state) as any
     won.terminalResult = {
@@ -190,7 +192,61 @@ describe('zero-stage static evaluator', () => {
 
     expect(advancedValue.components.strategicPosition.raw)
       .toBeGreaterThan(remoteValue.components.strategicPosition.raw)
+    expect(advancedValue.components.enemyProximity.raw)
+      .toBeGreaterThan(remoteValue.components.enemyProximity.raw)
     expect(advancedValue.total).toBeGreaterThan(remoteValue.total)
+  })
+
+  it('rewards a non-core attacker for every step toward the nearest enemy core', () => {
+    const remote = makeState({
+      width: 13,
+      height: 5,
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({ instanceId: 'red-attacker', ownerPlayerId: 'player-red', x: 1, y: 2, moveRange: 2 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 11, y: 2 }),
+      ],
+    }) as any
+    remote.pieces[0].isCore = true
+    remote.pieces[2].isCore = true
+    const oneStep = structuredClone(remote) as any
+    oneStep.pieces[1].x = 2
+    const twoSteps = structuredClone(remote) as any
+    twoSteps.pieces[1].x = 3
+
+    const remoteValue = evaluateZeroStageState(aiEnvironmentV1.observe(remote, 'player-red'))
+    const oneStepValue = evaluateZeroStageState(aiEnvironmentV1.observe(oneStep, 'player-red'))
+    const twoStepsValue = evaluateZeroStageState(aiEnvironmentV1.observe(twoSteps, 'player-red'))
+
+    expect(oneStepValue.components.enemyProximity.raw)
+      .toBeGreaterThan(remoteValue.components.enemyProximity.raw)
+    expect(twoStepsValue.components.enemyProximity.raw)
+      .toBeGreaterThan(oneStepValue.components.enemyProximity.raw)
+    expect(twoStepsValue.total).toBeGreaterThan(oneStepValue.total)
+  })
+
+  it('rewards assigning an extra pursuer to a remote core during cleanup', () => {
+    const clustered = makeState({
+      width: 21,
+      height: 7,
+      pieces: [
+        makePiece({ instanceId: 'red-left', ownerPlayerId: 'player-red', x: 9, y: 5 }),
+        makePiece({ instanceId: 'red-middle', ownerPlayerId: 'player-red', x: 10, y: 5 }),
+        makePiece({ instanceId: 'red-right', ownerPlayerId: 'player-red', x: 11, y: 5 }),
+        makePiece({ instanceId: 'red-extra', ownerPlayerId: 'player-red', x: 12, y: 5 }),
+        makePiece({ instanceId: 'blue-near', ownerPlayerId: 'player-blue', x: 10, y: 0 }),
+        makePiece({ instanceId: 'blue-right', ownerPlayerId: 'player-blue', x: 20, y: 0 }),
+      ],
+    }) as any
+    clustered.pieces.forEach((piece: any) => { piece.isCore = true })
+    const spread = structuredClone(clustered) as any
+    spread.pieces[3].x = 13
+
+    const clusteredValue = evaluateZeroStageState(aiEnvironmentV1.observe(clustered, 'player-red'))
+    const spreadValue = evaluateZeroStageState(aiEnvironmentV1.observe(spread, 'player-red'))
+
+    expect(spreadValue.components.enemyProximity.raw)
+      .toBeGreaterThan(clusteredValue.components.enemyProximity.raw)
   })
 
   it('penalizes exposed low-health positions and rewards deployment lock readiness', () => {
@@ -213,7 +269,93 @@ describe('zero-stage static evaluator', () => {
     expect(evaluateZeroStageState(aiEnvironmentV1.observe(safe, 'player-red')).components.deploymentReadiness.raw).toBe(1)
   })
 
-  it('treats unspent AP and charge as an opportunity cost during the active turn', () => {
+  it('values damage to a core more than equal normalized damage to a non-core piece', () => {
+    const base = makeState({
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 2, y: 0, maxHp: 10, currentHp: 10 }),
+        makePiece({ instanceId: 'blue-summon', ownerPlayerId: 'player-blue', x: 3, y: 0, maxHp: 10, currentHp: 10 }),
+      ],
+    }) as any
+    base.pieces[0].isCore = true
+    base.pieces[1].isCore = true
+    const baseline = evaluateZeroStageState(aiEnvironmentV1.observe(base, 'player-red'))
+    const coreDamaged = structuredClone(base) as any
+    coreDamaged.pieces[1].currentHp -= 1
+    const summonDamaged = structuredClone(base) as any
+    summonDamaged.pieces[2].currentHp -= 1
+    const coreGain = evaluateZeroStageState(aiEnvironmentV1.observe(coreDamaged, 'player-red'))
+      .components.health.raw - baseline.components.health.raw
+    const summonGain = evaluateZeroStageState(aiEnvironmentV1.observe(summonDamaged, 'player-red'))
+      .components.health.raw - baseline.components.health.raw
+
+    expect(coreGain).toBeGreaterThan(summonGain * 10)
+  })
+
+
+  it('values finishing damage on a wounded core above equal damage spread to a full core', () => {
+    const base = makeState({
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({ instanceId: 'blue-wounded', ownerPlayerId: 'player-blue', x: 2, y: 0, maxHp: 10, currentHp: 5 }),
+        makePiece({ instanceId: 'blue-full', ownerPlayerId: 'player-blue', x: 3, y: 0, maxHp: 10, currentHp: 10 }),
+      ],
+    }) as any
+    base.pieces.forEach((piece: any) => { piece.isCore = true })
+    const baseline = evaluateZeroStageState(aiEnvironmentV1.observe(base, 'player-red'))
+    const woundedHit = structuredClone(base) as any
+    woundedHit.pieces[1].currentHp -= 1
+    const fullHit = structuredClone(base) as any
+    fullHit.pieces[2].currentHp -= 1
+    const woundedGain = evaluateZeroStageState(aiEnvironmentV1.observe(woundedHit, 'player-red'))
+      .components.health.raw - baseline.components.health.raw
+    const fullGain = evaluateZeroStageState(aiEnvironmentV1.observe(fullHit, 'player-red'))
+      .components.health.raw - baseline.components.health.raw
+
+    expect(woundedGain).toBeGreaterThan(fullGain)
+  })
+
+  it('gives substantial value to realized enemy core damage', () => {
+    const base = makeState({
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 2, y: 0, maxHp: 100, currentHp: 100 }),
+      ],
+    }) as any
+    base.pieces.forEach((piece: any) => { piece.isCore = true })
+    const damaged = structuredClone(base) as any
+    damaged.pieces[1].currentHp = 80
+    const baseline = evaluateZeroStageState(aiEnvironmentV1.observe(base, 'player-red'))
+    const result = evaluateZeroStageState(aiEnvironmentV1.observe(damaged, 'player-red'))
+
+    expect(result.components.health.contribution - baseline.components.health.contribution)
+      .toBeGreaterThan(40_000)
+  })
+
+  it('values breaking enemy shields while keeping real core damage more valuable', () => {
+    const base = makeState({
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 2, y: 0, maxHp: 100, currentHp: 100 }),
+      ],
+    }) as any
+    base.pieces.forEach((piece: any) => { piece.isCore = true })
+    base.pieces[1].shield = 10
+    const shieldDamaged = structuredClone(base) as any
+    shieldDamaged.pieces[1].shield = 5
+    const healthDamaged = structuredClone(base) as any
+    healthDamaged.pieces[1].currentHp = 95
+    const baseline = evaluateZeroStageState(aiEnvironmentV1.observe(base, 'player-red'))
+    const shieldResult = evaluateZeroStageState(aiEnvironmentV1.observe(shieldDamaged, 'player-red'))
+    const healthResult = evaluateZeroStageState(aiEnvironmentV1.observe(healthDamaged, 'player-red'))
+    const shieldGain = shieldResult.components.shield.contribution - baseline.components.shield.contribution
+    const healthGain = healthResult.components.health.contribution - baseline.components.health.contribution
+
+    expect(shieldGain).toBeGreaterThan(1_000)
+    expect(healthGain).toBeGreaterThan(shieldGain)
+  })
+
+  it('does not reward resource consumption when the resulting public position is unchanged', () => {
     const unspent = combatState() as any
     const redPlayer = unspent.players.find((player: any) => player.playerId === 'player-red')
     redPlayer.maxActionPoints = 2
@@ -227,8 +369,9 @@ describe('zero-stage static evaluator', () => {
     spentPlayer.chargePoints = 1
     const converted = evaluateZeroStageState(aiEnvironmentV1.observe(spent, 'player-red'))
 
-    expect(converted.components.resources.raw - baseline.components.resources.raw).toBe(2)
-    expect(converted.total).toBeGreaterThan(baseline.total)
+    expect(converted.components.resources.raw).toBe(baseline.components.resources.raw)
+    expect(converted.components.actionability.raw).toBe(baseline.components.actionability.raw)
+    expect(converted.total).toBe(baseline.total)
   })
 })
 
@@ -325,8 +468,10 @@ describe('zero-stage deterministic one-step selection', () => {
       },
     }
 
-    expect(planZeroStageAction(state, 'player-red', ROOT_SEED, { environment }).nextAction?.id)
-      .toBe(lock.id)
+    const decision = planZeroStageAction(state, 'player-red', ROOT_SEED, { environment })
+    expect(decision.trace.find(item => item.candidateId === choose.id)
+      ?.evaluation?.components.enemyProximity.raw).toBe(0)
+    expect(decision.nextAction?.id).toBe(lock.id)
   })
 
   it('simulates each legal candidate exactly once, selects max F, and repeats deterministically', () => {
@@ -335,6 +480,7 @@ describe('zero-stage deterministic one-step selection', () => {
     const outerB = candidate('outer-b', 'fixture-b')
     const simulationCounts = new Map<string, number>()
     const simulationModes: Array<string | undefined> = []
+    const simulationIndexes: Array<NonNullable<Parameters<AIEnvironment['simulate']>[2]>['stateHashIndex']> = []
     let legalCalls = 0
     const environment: AIEnvironment = {
       ...aiEnvironmentV1,
@@ -345,6 +491,7 @@ describe('zero-stage deterministic one-step selection', () => {
       simulate: (current, input, context) => {
         const selected = 'action' in input ? input : candidate('raw', input.type)
         simulationModes.push(context?.simulationMode)
+        simulationIndexes.push(context?.stateHashIndex)
         simulationCounts.set(selected.id, (simulationCounts.get(selected.id) ?? 0) + 1)
         const next = structuredClone(current) as any
         if (selected.id === 'outer-b') next.pieces.find((piece: any) => piece.instanceId === 'blue-core').currentHp -= 20
@@ -360,6 +507,8 @@ describe('zero-stage deterministic one-step selection', () => {
     expect(legalCalls).toBe(1)
     expect(Object.fromEntries(simulationCounts)).toEqual({ 'outer-b': 1, 'outer-a': 1 })
     expect(simulationModes).toEqual(['evaluation', 'evaluation'])
+    expect(simulationIndexes[0]?.rootHash).toBe(hashBattleState(state))
+    expect(simulationIndexes[1]).toBe(simulationIndexes[0])
     expect(first.trace.every(item => item.evaluation !== undefined)).toBe(true)
 
     simulationCounts.clear()
@@ -376,7 +525,7 @@ describe('zero-stage deterministic one-step selection', () => {
       .toThrow(/candidate mode must be all-legal/)
   })
 
-  it('uses higher formal resource cost to break equal-F ties and avoid skipping usable fees', () => {
+  it('ends the turn instead of spending resources when successor evaluations are equal', () => {
     const state = combatState()
     const move = {
       protocolVersion: 1, id: 'move-costs-one', kind: 'move',
@@ -389,8 +538,203 @@ describe('zero-stage deterministic one-step selection', () => {
       simulate: (current, input) => accepted(structuredClone(current), 'action' in input ? input : end),
     }
     const decision = planZeroStageAction(state, 'player-red', ROOT_SEED, { environment })
-    expect(decision.nextAction?.id).toBe('move-costs-one')
-    expect(decision.selectionReason).toBe('resource-cost')
+    expect(decision.nextAction?.id).toBe('end-costs-zero')
+    expect(decision.selectionReason).toBe('end-turn')
+  })
+
+  it('ends the turn instead of spending AP to retreat from a better pursuit position', () => {
+    const state = makeState({
+      width: 20,
+      height: 16,
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 3, y: 11, moveRange: 3 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 17, y: 7, moveRange: 3 }),
+      ],
+    }) as any
+    state.pieces[0].isCore = true
+    state.pieces[1].isCore = true
+    state.players[0].maxActionPoints = 8
+    state.players[0].actionPoints = 8
+    const retreat = {
+      protocolVersion: 1, id: 'retreat-and-spend', kind: 'move',
+      action: { type: 'move', playerId: 'player-red', pieceId: 'red-core', toX: 3, toY: 12 },
+    } satisfies CandidateAction
+    const end = candidate('end-from-better-position', 'endTurn')
+    const environment: AIEnvironment = {
+      ...aiEnvironmentV1,
+      listLegalActions: () => [retreat, end],
+      simulate: (current, input) => {
+        const selected = 'action' in input ? input : end
+        const next = structuredClone(current) as any
+        if (selected.action.type === 'move') {
+          next.pieces[0].x = selected.action.toX
+          next.pieces[0].y = selected.action.toY
+          next.players[0].actionPoints -= 1
+        } else {
+          next.turn.currentPlayerId = 'player-blue'
+        }
+        return accepted(next, selected)
+      },
+    }
+
+    const decision = planZeroStageAction(state, 'player-red', ROOT_SEED, { environment })
+    const retreatEvaluation = decision.trace.find(item => item.candidateId === retreat.id)?.evaluation
+    const endEvaluation = decision.trace.find(item => item.candidateId === end.id)?.evaluation
+    expect(endEvaluation?.components.strategicPosition.raw)
+      .toBeGreaterThan(retreatEvaluation?.components.strategicPosition.raw ?? Number.NEGATIVE_INFINITY)
+    expect(decision.nextAction?.id).toBe(end.id)
+  })
+
+  it('pursues enemy cores instead of a larger cluster of expendable summons', () => {
+    const summons = Array.from({ length: 7 }, (_, index) => makePiece({
+      instanceId: `blue-summon-${index}`,
+      ownerPlayerId: 'player-blue',
+      x: index % 2,
+      y: 2 + index,
+      moveRange: 1,
+      attack: 2,
+      maxHp: 99,
+      currentHp: 99,
+    }))
+    const state = makeState({
+      width: 21,
+      height: 11,
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 10, y: 5, moveRange: 3 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 20, y: 5, moveRange: 3 }),
+        ...summons,
+      ],
+    }) as any
+    state.pieces[0].isCore = true
+    state.pieces[1].isCore = true
+    const pursueCore = {
+      protocolVersion: 1, id: 'pursue-core', kind: 'move',
+      action: { type: 'move', playerId: 'player-red', pieceId: 'red-core', toX: 13, toY: 5 },
+    } satisfies CandidateAction
+    const pursueSummons = {
+      protocolVersion: 1, id: 'pursue-summons', kind: 'move',
+      action: { type: 'move', playerId: 'player-red', pieceId: 'red-core', toX: 7, toY: 5 },
+    } satisfies CandidateAction
+    const environment: AIEnvironment = {
+      ...aiEnvironmentV1,
+      listLegalActions: () => [pursueSummons, pursueCore],
+      simulate: (current, input) => {
+        const selected = 'action' in input ? input : pursueCore
+        const next = structuredClone(current) as any
+        if (selected.action.type === 'move') {
+          next.pieces[0].x = selected.action.toX
+          next.pieces[0].y = selected.action.toY
+          next.players[0].actionPoints -= 1
+        }
+        return accepted(next, selected)
+      },
+    }
+
+    const decision = planZeroStageAction(state, 'player-red', ROOT_SEED, { environment })
+    expect(decision.nextAction?.id).toBe(pursueCore.id)
+  })
+
+  it('continues pursuing an equal enemy after reaching the map center', () => {
+    const state = makeState({
+      width: 21,
+      height: 11,
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 10, y: 5, moveRange: 1 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 20, y: 5, moveRange: 1 }),
+      ],
+    }) as any
+    state.pieces.forEach((piece: any) => { piece.isCore = true })
+
+    const decision = planZeroStageAction(state, 'player-red', ROOT_SEED)
+    expect(decision.nextAction?.action).toMatchObject({ type: 'move', toX: 11, toY: 5 })
+  })
+
+  it('keeps closing to attack distance instead of saturating at move-plus-attack reach', () => {
+    const state = makeState({
+      width: 11,
+      height: 5,
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 5, y: 2, moveRange: 3 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 8, y: 2, moveRange: 3 }),
+      ],
+    }) as any
+    state.pieces.forEach((piece: any) => { piece.isCore = true })
+
+    const decision = planZeroStageAction(state, 'player-red', ROOT_SEED)
+    expect(decision.nextAction?.action).toMatchObject({ type: 'move', toX: 7, toY: 2 })
+  })
+
+  it('focuses damage on an enemy core instead of clearing a disposable non-core piece', () => {
+    const state = makeState({
+      width: 7,
+      height: 5,
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 2, y: 2, attack: 6 }),
+        makePiece({ instanceId: 'blue-core', ownerPlayerId: 'player-blue', x: 3, y: 2, maxHp: 12, currentHp: 12 }),
+        makePiece({ instanceId: 'blue-summon', ownerPlayerId: 'player-blue', x: 2, y: 3, maxHp: 1, currentHp: 1 }),
+      ],
+    }) as any
+    state.pieces[0].isCore = true
+    state.pieces[1].isCore = true
+    const damageCore = candidate('damage-core', 'fixture-damage-core')
+    const clearSummon = candidate('clear-summon', 'fixture-clear-summon')
+    const environment: AIEnvironment = {
+      ...aiEnvironmentV1,
+      listLegalActions: () => [clearSummon, damageCore],
+      simulate: (current, input) => {
+        const selected = 'action' in input ? input : damageCore
+        const next = structuredClone(current) as any
+        if (selected.id === damageCore.id) {
+          next.pieces.find((piece: any) => piece.instanceId === 'blue-core').currentHp -= 3
+        } else {
+          const index = next.pieces.findIndex((piece: any) => piece.instanceId === 'blue-summon')
+          const [removed] = next.pieces.splice(index, 1)
+          removed.currentHp = 0
+          next.graveyard.push(removed)
+        }
+        return accepted(next, selected)
+      },
+    }
+
+    expect(planZeroStageAction(state, 'player-red', ROOT_SEED, { environment }).nextAction?.id)
+      .toBe(damageCore.id)
+  })
+
+  it('executes a nonterminal core kill instead of preserving duplicated lethal opportunities', () => {
+    const state = makeState({
+      width: 7,
+      height: 5,
+      pieces: [
+        makePiece({ instanceId: 'red-core', ownerPlayerId: 'player-red', x: 1, y: 2, attack: 20 }),
+        makePiece({ instanceId: 'red-attacker-1', ownerPlayerId: 'player-red', x: 1, y: 1, attack: 20 }),
+        makePiece({ instanceId: 'red-attacker-2', ownerPlayerId: 'player-red', x: 1, y: 3, attack: 20 }),
+        makePiece({ instanceId: 'blue-wounded-core', ownerPlayerId: 'player-blue', x: 2, y: 2, maxHp: 10, currentHp: 1 }),
+        makePiece({ instanceId: 'blue-healthy-core', ownerPlayerId: 'player-blue', x: 5, y: 2, maxHp: 30, currentHp: 30 }),
+      ],
+    }) as any
+    state.pieces[0].isCore = true
+    state.pieces[3].isCore = true
+    state.pieces[4].isCore = true
+    const kill = candidate('kill-wounded-core', 'fixture-kill')
+    const end = candidate('preserve-lethal-and-end', 'endTurn')
+    const environment: AIEnvironment = {
+      ...aiEnvironmentV1,
+      listLegalActions: () => [end, kill],
+      simulate: (current, input) => {
+        const selected = 'action' in input ? input : end
+        const next = structuredClone(current) as any
+        if (selected.id === kill.id) {
+          const index = next.pieces.findIndex((piece: any) => piece.instanceId === 'blue-wounded-core')
+          const [removed] = next.pieces.splice(index, 1)
+          removed.currentHp = 0
+          next.graveyard.push(removed)
+        }
+        return accepted(next, selected)
+      },
+    }
+
+    expect(planZeroStageAction(state, 'player-red', ROOT_SEED, { environment }).nextAction?.id)
+      .toBe(kill.id)
   })
 
   it('prefers moving toward immediate enemy coverage over an equally costly retreat', () => {
@@ -735,7 +1079,8 @@ describe('zero-stage deterministic one-step selection', () => {
     expect(decision.nodesVisited).toBe(21)
     expect(decision.budgetExhausted).toBe(false)
     expect(decision.trace.every(item => item.pruned === undefined)).toBe(true)
-    expect(decision.nextAction?.id).toBe('repeat-0')
+    expect(decision.nextAction?.id).toBe(end.id)
+    expect(decision.selectionReason).toBe('end-turn')
   })
 
   it('returns explicit terminal and no-action outcomes without inventing a fallback', () => {

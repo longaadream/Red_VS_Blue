@@ -36,6 +36,7 @@ import { finalizePendingTargetSession, getTargetingStateRevision, prepareAction 
 import { getLegalNormalMoveTargetsForPlayer } from '@/lib/game/spatial'
 import { loadRuleById } from '@/lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { pinTestBattleState } from './profile-test-identity'
 
 const FIXED_SEED = 0x84c0ffee
 
@@ -394,6 +395,7 @@ describe('versioned headless AI environment', () => {
   it('keeps evaluation-mode gameplay, blocking, rejection, and RNG identical without cloning replay history', () => {
     const mover = makePiece({ instanceId: 'evaluation-mover', ownerPlayerId: 'player-red', x: 1, y: 1, moveRange: 2 }) as any
     const state = makeState({ pieces: [mover] }) as any
+    pinTestBattleState(state, FIXED_SEED)
     recordBattleInitialization(
       state,
       new RuleRuntime({ rootSeed: FIXED_SEED }),
@@ -432,6 +434,7 @@ describe('versioned headless AI environment', () => {
       .toEqual(evaluateZeroStageState(observeBattleForAI(evaluation.state, 'player-red')))
     expect(readDebugMetadata(full.state).replay?.frames.length).toBe((replayFramesBefore ?? 0) + 1)
     expect(readDebugMetadata(evaluation.state).replay).toBeUndefined()
+    expect(readDebugMetadata(evaluation.state).actionLog).toHaveLength(2)
     expect(readDebugMetadata(evaluation.state).authority).toMatchObject({
       rootSeed: readDebugMetadata(full.state).authority?.rootSeed,
       actionCount: readDebugMetadata(full.state).authority?.actionCount,
@@ -501,6 +504,7 @@ describe('versioned headless AI environment', () => {
     }) as any
     blueCore.isCore = true
     const terminalSeed = makeState({ pieces: [redCore, blueCore] }) as any
+    pinTestBattleState(terminalSeed, FIXED_SEED)
     recordBattleInitialization(
       terminalSeed,
       new RuleRuntime({ rootSeed: FIXED_SEED }),

@@ -5,7 +5,7 @@ import {
   describeAiCandidate,
 } from './ai-evaluator'
 import { resolveZeroStageConfig } from './ai-profiles'
-import { hashStable, stableJson } from './battle-trace'
+import { createBattleStateHashIndex, hashStable, stableJson } from './battle-trace'
 import { evaluateZeroStageState } from './ai-zero-stage-evaluator'
 import type {
   AIEnvironment,
@@ -47,8 +47,8 @@ const terminalRank = (evaluation: ZeroStageStaticEvaluation) => {
 function compareScored(left: ScoredCandidate, right: ScoredCandidate) {
   return terminalRank(right.evaluation) - terminalRank(left.evaluation)
     || right.evaluation.total - left.evaluation.total
-    || right.costTotal - left.costTotal
     || Number(right.candidate.kind === 'end-turn') - Number(left.candidate.kind === 'end-turn')
+    || left.costTotal - right.costTotal
     || compareText(stableJson(left.candidate.action), stableJson(right.candidate.action))
     || compareText(left.candidate.id, right.candidate.id)
 }
@@ -57,9 +57,9 @@ function selectionReason(selected: ScoredCandidate, runnerUp?: ScoredCandidate):
   if (!runnerUp) return 'only-scored-candidate'
   if (terminalRank(selected.evaluation) !== terminalRank(runnerUp.evaluation)) return 'terminal-outcome'
   if (selected.evaluation.total !== runnerUp.evaluation.total) return 'static-value'
-  if (selected.costTotal !== runnerUp.costTotal) return 'resource-cost'
   if (selected.candidate.kind !== runnerUp.candidate.kind
     && (selected.candidate.kind === 'end-turn' || runnerUp.candidate.kind === 'end-turn')) return 'end-turn'
+  if (selected.costTotal !== runnerUp.costTotal) return 'resource-cost'
   if (stableJson(selected.candidate.action) !== stableJson(runnerUp.candidate.action)) return 'stable-action'
   return 'candidate-id'
 }
@@ -101,6 +101,7 @@ export function planZeroStageAction(
   if (legal.length === 0) return emptyDecision(state, playerId, environment, config, 'no-legal-actions')
 
   const stateValue = evaluateZeroStageState(environment.observe(state, playerId), config).total
+  const stateHashIndex = createBattleStateHashIndex(state)
   const traces: ZeroStageCandidateTrace[] = []
   const scored: ScoredCandidate[] = []
   const goal = chooseAiTurnGoal(state, playerId)
@@ -133,6 +134,7 @@ export function planZeroStageAction(
     const transition = environment.simulate(state, candidate, {
       rootSeed,
       simulationMode: 'evaluation',
+      stateHashIndex,
     })
     if (!transition.accepted) {
       trace.rejected = transition.error.code

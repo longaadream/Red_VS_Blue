@@ -4,6 +4,7 @@ import type { BattleAction, BattleActionLog, BattleState, TurnState } from './tu
 import type { TerminalResult } from './terminal'
 import type { TargetRef } from './targeting'
 import type { BattleActionTrace } from './battle-trace'
+import type { BattleStateHashIndex } from './battle-state-hash'
 
 export const AI_ENVIRONMENT_PROTOCOL_VERSION = 1 as const
 
@@ -191,6 +192,8 @@ export type TransitionResult =
 
 export interface AISimulationContext {
   rootSeed?: number
+  /** Reusable canonical pre-state index shared by every candidate in one decision. */
+  stateHashIndex?: BattleStateHashIndex
   /**
    * Evaluation mode preserves gameplay/RNG semantics while omitting historical
    * replay diagnostics from the isolated input used for speculative scoring.
@@ -478,7 +481,7 @@ export interface AiTurnPlan {
   trace: AiPlannerTraceEntry[]
 }
 
-export const ZERO_STAGE_AI_PROFILE_VERSION = 3 as const
+export const ZERO_STAGE_AI_PROFILE_VERSION = 5 as const
 
 export type ZeroStageStaticComponentKey =
   | 'coreSurvival'
@@ -496,6 +499,7 @@ export type ZeroStageStaticComponentKey =
   | 'status'
   | 'positionSafety'
   | 'strategicPosition'
+  | 'enemyProximity'
   | 'futureAttackPotential'
   | 'supportPotential'
   | 'mobilityPotential'

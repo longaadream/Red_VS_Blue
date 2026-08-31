@@ -20,7 +20,25 @@ import { installNativeBattleSha256 } from '@/lib/server/battle-hash'
 const ZERO_AGENT_ID = 'rvb-ai-zimse-v1'
 const PVE_AGENT_ID = 'simple-v1'
 const SELF_PLAY_SEED = 1001
-const PVE_SEEDS = [1001, 1002, 1003] as const
+const DEFAULT_PVE_CASES = [
+  { game: 1, rootSeed: 1001 },
+  { game: 2, rootSeed: 1002 },
+  { game: 3, rootSeed: 1003 },
+] as const
+
+function resolvePveCases() {
+  const input = process.env.RED122_PVE_CASES?.trim()
+  if (!input) return [...DEFAULT_PVE_CASES]
+  return input.split(',').map((entry, index) => {
+    const [gameText, seedText] = entry.split(':')
+    const game = Number(gameText)
+    const rootSeed = Number(seedText)
+    if (!Number.isSafeInteger(game) || game < 1 || game > 3 || !Number.isSafeInteger(rootSeed)) {
+      throw new RangeError(`RED122_PVE_CASES[${index}] must use game:seed with game 1..3`)
+    }
+    return { game, rootSeed }
+  })
+}
 
 // Headless PvE mirrors the Node authority runtime instead of falling back to
 // the deliberately portable pure-JS digest implementation for every transition.
@@ -159,6 +177,18 @@ function zeroStageEnvironment(
   let nodes = 0
   let candidates = 0
   let lastDecision: ReturnType<typeof planZeroStageAction> | undefined
+  let lastActionableEndDecision: ReturnType<typeof planZeroStageAction> | undefined
+  let lastActionableEndPieces: Array<{
+    instanceId: string
+    ownerPlayerId: string
+    x: number | null
+    y: number | null
+    currentHp: number
+    shield: number
+    buffs: string[]
+    debuffs: string[]
+  }> | undefined
+  let lastEndOnlyContext: Record<string, unknown> | undefined
   let activeTurnKey = ''
   let actionsTakenThisTurn = 0
   let lastAcceptedState: Parameters<AIEnvironment['simulate']>[0] | undefined
@@ -166,10 +196,31 @@ function zeroStageEnvironment(
     'player-red': { actionPoints: 0, chargePoints: 0, decisions: 0, endTurns: 0 },
     'player-blue': { actionPoints: 0, chargePoints: 0, decisions: 0, endTurns: 0 },
   }
+  const visitedPositions = new Map<string, Set<string>>()
+  const lastMoves = new Map<string, { from: string; to: string }>()
+  const movement = { moves: 0, repeatedDestinations: 0, immediateReversals: 0 }
+  const requestedOpponentGuard = Number(process.env.RED122_PVE_OPPONENT_ACTION_GUARD ?? 0)
+  if (!Number.isSafeInteger(requestedOpponentGuard) || requestedOpponentGuard < 0) {
+    throw new RangeError('RED122_PVE_OPPONENT_ACTION_GUARD must be a non-negative safe integer')
+  }
+  let opponentTurnKey = ''
+  let opponentActionsThisTurn = 0
   const environment: AIEnvironment = {
     ...aiEnvironmentV1,
     listLegalActions(state, playerId) {
-      if (!zeroSeats.has(playerId)) return aiEnvironmentV1.listLegalActions(state, playerId)
+      if (!zeroSeats.has(playerId)) {
+        const legal = aiEnvironmentV1.listLegalActions(state, playerId)
+        const turnKey = `${state.turn.turnNumber}:${state.turn.currentPlayerId}`
+        if (turnKey !== opponentTurnKey) {
+          opponentTurnKey = turnKey
+          opponentActionsThisTurn = 0
+        }
+        if (requestedOpponentGuard > 0 && opponentActionsThisTurn >= requestedOpponentGuard) {
+          const endTurn = legal.find(candidate => candidate.kind === 'end-turn')
+          if (endTurn) return [endTurn]
+        }
+        return legal
+      }
       const turnKey = `${state.turn.turnNumber}:${state.turn.currentPlayerId}`
       if (turnKey !== activeTurnKey) {
         activeTurnKey = turnKey
@@ -186,7 +237,74 @@ function zeroStageEnvironment(
         playerMetrics.chargePoints += selectedTrace.actionCost.chargePoints
         playerMetrics.endTurns += Number(decision.nextAction?.kind === 'end-turn')
       }
+      const selectedAction = decision.nextAction?.action
+      if (selectedAction?.type === 'move') {
+        const piece = state.pieces.find(item => item.instanceId === selectedAction.pieceId)
+        if (piece?.x != null && piece.y != null) {
+          const from = `${piece.x},${piece.y}`
+          const to = `${selectedAction.toX},${selectedAction.toY}`
+          const visited = visitedPositions.get(piece.instanceId) ?? new Set([from])
+          movement.moves += 1
+          movement.repeatedDestinations += Number(visited.has(to))
+          const previous = lastMoves.get(piece.instanceId)
+          movement.immediateReversals += Number(previous?.from === to && previous.to === from)
+          visited.add(to)
+          visitedPositions.set(piece.instanceId, visited)
+          lastMoves.set(piece.instanceId, { from, to })
+        }
+      }
       lastDecision = decision
+      if (decision.nextAction?.kind === 'end-turn' && decision.trace.some(item => (
+        item.evaluation !== undefined
+        && !['beginPhase', 'endTurn', 'deploymentLock'].includes(item.action.type)
+      ))) {
+        lastActionableEndDecision = decision
+        if (process.env.RED122_PVE_DEBUG_LAST_END === '1') {
+          lastActionableEndPieces = state.pieces.filter(piece => piece.currentHp > 0).map(piece => ({
+            instanceId: piece.instanceId,
+            ownerPlayerId: piece.ownerPlayerId,
+            x: piece.x,
+            y: piece.y,
+            currentHp: piece.currentHp,
+            shield: piece.shield ?? 0,
+            buffs: (piece.buffs ?? []).map(item => item.type),
+            debuffs: (piece.debuffs ?? []).map(item => item.type),
+          }))
+        }
+      }
+      if (process.env.RED122_PVE_DEBUG_LAST_END === '1'
+        && decision.nextAction?.kind === 'end-turn'
+        && !decision.trace.some(item => item.evaluation !== undefined && item.action.type !== 'endTurn')) {
+        const player = state.players.find(item => item.playerId === playerId)
+        lastEndOnlyContext = {
+          turn: structuredClone(state.turn),
+          player: player ? {
+            playerId: player.playerId,
+            actionPoints: player.actionPoints,
+            maxActionPoints: player.maxActionPoints,
+            chargePoints: player.chargePoints,
+            handSize: player.hand.length,
+          } : null,
+          pendingOptionPlayerId: state.pendingOptionSelection?.playerId ?? null,
+          pendingTargetPlayerId: state.pendingTargetSelection?.ownerPlayerId
+            ?? state.pendingTargetSelection?.playerId
+            ?? null,
+          candidates: decision.trace.map(item => item.action),
+          pieces: state.pieces.filter(piece => piece.currentHp > 0 && piece.ownerPlayerId === playerId)
+            .map(piece => ({
+              instanceId: piece.instanceId,
+              x: piece.x,
+              y: piece.y,
+              currentHp: piece.currentHp,
+              moveRange: piece.moveRange,
+              skills: (piece.skills ?? []).map(skill => ({
+                skillId: skill.skillId,
+                currentCooldown: skill.currentCooldown ?? 0,
+                usesRemaining: skill.usesRemaining ?? null,
+              })),
+            })),
+        }
+      }
       durations.push(performance.now() - started)
       nodes += decision.nodesVisited
       candidates += decision.candidatesConsidered
@@ -194,7 +312,14 @@ function zeroStageEnvironment(
     },
     simulate(state, action, context) {
       const transition = aiEnvironmentV1.simulate(state, action, context)
-      if (transition.accepted) lastAcceptedState = transition.state
+      if (transition.accepted) {
+        lastAcceptedState = transition.state
+        const submitted = 'action' in action ? action.action : action
+        const submittedPlayerId = 'playerId' in submitted
+          ? submitted.playerId
+          : state.turn.currentPlayerId
+        if (!zeroSeats.has(submittedPlayerId)) opponentActionsThisTurn += 1
+      }
       return transition
     },
   }
@@ -213,11 +338,54 @@ function zeroStageEnvironment(
       lastEndScore: lastDecision?.trace.find(item => item.action.type === 'endTurn')?.staticValue ?? null,
       lastStateValue: lastDecision?.stateValue ?? null,
       resourceUse,
+      movement,
+      debugLastEndOnly: process.env.RED122_PVE_DEBUG_LAST_END === '1'
+        ? lastEndOnlyContext
+        : undefined,
+      debugLastActionableEnd: process.env.RED122_PVE_DEBUG_LAST_END === '1' && lastActionableEndDecision
+        ? (() => {
+            const decision = lastActionableEndDecision!
+            const summarize = (item: typeof decision.trace[number] | undefined) => item ? ({
+              action: item.action,
+              staticValue: item.staticValue ?? null,
+              components: item.evaluation ? Object.fromEntries(Object.entries(item.evaluation.components)
+                .map(([key, component]) => [key, component.contribution])) : null,
+            }) : null
+            const selected = decision.trace.find(item => (
+              item.candidateId === decision.nextAction?.id
+            ))
+            const bestAction = decision.trace
+              .filter(item => item.evaluation !== undefined && item.action.type !== 'endTurn')
+              .sort((left, right) => (right.staticValue ?? Number.NEGATIVE_INFINITY)
+                - (left.staticValue ?? Number.NEGATIVE_INFINITY))[0]
+            const bestByType = Object.values(decision.trace.reduce((groups, item) => {
+              if (item.evaluation === undefined) return groups
+              const current = groups[item.action.type]
+              if (!current || (item.staticValue ?? Number.NEGATIVE_INFINITY)
+                > (current.staticValue ?? Number.NEGATIVE_INFINITY)) groups[item.action.type] = item
+              return groups
+            }, {} as Record<string, typeof decision.trace[number]>)).map(summarize)
+            return {
+              selected: summarize(selected),
+              bestAction: summarize(bestAction),
+              bestByType,
+              pieces: lastActionableEndPieces,
+            }
+          })()
+        : undefined,
     }),
   }
 }
 
 function manifestFor(opponentAgentId = ZERO_AGENT_ID): SelfPlaySuiteManifest {
+  const requestedTurnBudget = Number(process.env.RED122_PVE_MAX_ACTIONS_PER_TURN ?? 12)
+  const requestedMatchTurns = Number(process.env.RED122_PVE_MAX_TURNS ?? 80)
+  if (!Number.isSafeInteger(requestedTurnBudget) || requestedTurnBudget < 1) {
+    throw new RangeError('RED122_PVE_MAX_ACTIONS_PER_TURN must be a positive safe integer')
+  }
+  if (!Number.isSafeInteger(requestedMatchTurns) || requestedMatchTurns < 1) {
+    throw new RangeError('RED122_PVE_MAX_TURNS must be a positive safe integer')
+  }
   return {
     schemaVersion: 1,
     suiteId: opponentAgentId === ZERO_AGENT_ID
@@ -234,8 +402,8 @@ function manifestFor(opponentAgentId = ZERO_AGENT_ID): SelfPlaySuiteManifest {
     }],
     budgets: {
       maxActionsPerMatch: 640,
-      maxActionsPerTurn: 12,
-      maxTurns: 80,
+      maxActionsPerTurn: opponentAgentId === PVE_AGENT_ID ? requestedTurnBudget : 12,
+      maxTurns: opponentAgentId === PVE_AGENT_ID ? requestedMatchTurns : 80,
       maxDecisionNodesPerAction: 16,
     },
     rulesHash: 'working-tree-authoritative-rules',
@@ -339,10 +507,15 @@ describe('RED-122 rvb-ai-zimse-v1 mirror self-play evaluation', () => {
   const pveThreeGameTest = process.env.RED122_RUN_PVE_3_GAME === '1' ? it : it.skip
   pveThreeGameTest('plays three fixed-seed games against the built-in PvE simple-v1 agent', async () => {
     const manifest = manifestFor(PVE_AGENT_ID)
+    const pveCases = resolvePveCases()
+    const pveSeedPartitions = {
+      ...seedPartitions,
+      training: [...new Set([...seedPartitions.training, ...pveCases.map(item => item.rootSeed)])],
+    }
     const results = []
-    for (let gameIndex = 0; gameIndex < PVE_SEEDS.length; gameIndex += 1) {
-      const rootSeed = PVE_SEEDS[gameIndex]
-      const swapIndex = gameIndex % 2 as 0 | 1
+    for (const pveCase of pveCases) {
+      const { game, rootSeed } = pveCase
+      const swapIndex = (game - 1) % 2 as 0 | 1
       const scheduled = buildPairedMatchSchedule(manifest, [rootSeed])[swapIndex]
       const zeroSeat = scheduled.seats['player-red'].agentId === ZERO_AGENT_ID
         ? 'player-red'
@@ -356,7 +529,7 @@ describe('RED-122 rvb-ai-zimse-v1 mirror self-play evaluation', () => {
       try {
         match = await runSelfPlayMatch({
           manifest,
-          seedPartitions,
+          seedPartitions: pveSeedPartitions,
           explicitSeeds: [rootSeed],
           agentArchives: [zeroAdapter, simple],
           rosterArchives: [red, blue],
@@ -367,8 +540,28 @@ describe('RED-122 rvb-ai-zimse-v1 mirror self-play evaluation', () => {
         console.log = originalLog
         console.info = originalInfo
       }
+      const finalState = zero.finalState()
+      const actionTypes = match.actions.reduce((counts, action) => {
+        const player = counts[action.playerId as keyof typeof counts]
+        if (player) player[action.action.type] = (player[action.action.type] ?? 0) + 1
+        return counts
+      }, {
+        'player-red': {} as Record<string, number>,
+        'player-blue': {} as Record<string, number>,
+      })
+      const skillUses = match.actions.reduce((counts, action) => {
+        const submitted = action.action
+        if ((submitted.type === 'useBasicSkill' || submitted.type === 'useChargeSkill')) {
+          const player = counts[action.playerId as keyof typeof counts]
+          if (player) player[submitted.skillId] = (player[submitted.skillId] ?? 0) + 1
+        }
+        return counts
+      }, {
+        'player-red': {} as Record<string, number>,
+        'player-blue': {} as Record<string, number>,
+      })
       results.push({
-        game: gameIndex + 1,
+        game,
         rootSeed,
         zeroSeat,
         status: match.status,
@@ -378,6 +571,25 @@ describe('RED-122 rvb-ai-zimse-v1 mirror self-play evaluation', () => {
         actionCount: match.actionCount,
         rejectedActions: match.rejectedActions,
         failure: match.failure?.kind ?? null,
+        failureAgentId: match.failure?.reproduction.agentId ?? null,
+        failureAction: match.failure?.reproduction.action ?? null,
+        actionTypes,
+        skillUses,
+        livingPieces: finalState?.pieces.filter(piece => piece.currentHp > 0).reduce((counts, piece) => {
+          counts[piece.ownerPlayerId] = (counts[piece.ownerPlayerId] ?? 0) + 1
+          return counts
+        }, {} as Record<string, number>) ?? {},
+        livingCores: finalState?.pieces.filter(piece => piece.currentHp > 0 && piece.isCore).reduce((counts, piece) => {
+          counts[piece.ownerPlayerId] = (counts[piece.ownerPlayerId] ?? 0) + 1
+          return counts
+        }, {} as Record<string, number>) ?? {},
+        coreHealth: finalState?.pieces.filter(piece => piece.currentHp > 0 && piece.isCore).reduce((counts, piece) => {
+          const current = counts[piece.ownerPlayerId] ?? { current: 0, maximum: 0 }
+          current.current += piece.currentHp
+          current.maximum += piece.maxHp
+          counts[piece.ownerPlayerId] = current
+          return counts
+        }, {} as Record<string, { current: number; maximum: number }>) ?? {},
         zeroDecisionMetrics: zero.metrics(),
         actionTraceHash: match.actionTraceHash,
         finalStateHash: match.finalStateHash,
@@ -392,8 +604,12 @@ describe('RED-122 rvb-ai-zimse-v1 mirror self-play evaluation', () => {
       rejectedActions: results.reduce((total, result) => total + result.rejectedActions, 0),
     }
     process.stderr.write(`RED122_PVE_3_GAME_RESULT ${JSON.stringify({ summary, results })}\n`)
-    expect(results).toHaveLength(3)
-    expect(summary.failures).toBe(0)
+    expect(results).toHaveLength(pveCases.length)
+    if (Number(process.env.RED122_PVE_MAX_TURNS ?? 80) < 80) {
+      expect(results.every(result => result.failure === 'turn-budget')).toBe(true)
+    } else {
+      expect(summary.failures).toBe(0)
+    }
     expect(summary.rejectedActions).toBe(0)
   }, 30 * 60 * 1000)
 })

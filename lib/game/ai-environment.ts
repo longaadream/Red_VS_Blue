@@ -589,19 +589,23 @@ function evaluationSimulationState(state: BattleState): BattleState {
   }
   const compacted = compactBattleTraceForAuthority({ ...state, extensions })
   const compactedMetadata = getOrCreateDebugMetadata(compacted)
-  const actionCount = compactedMetadata.authority?.actionCount ?? metadata.actionLog.length
-  const retainedInitializationTraces = [...compactedMetadata.actionLog]
-  compactedMetadata.actionLog = Array.from({ length: actionCount }, (_, index) => (
-    retainedInitializationTraces[index] ?? {}
-  ))
   // Authority compaction normally clears duplicate-command history because
   // persisted commands are independently versioned. Speculative evaluation
   // must retain it so explicit action IDs behave exactly like the full path.
-  // The rule reducer also uses actionLog.length when stamping terminal results,
-  // so lightweight placeholders preserve the authoritative action index without
-  // retaining the expensive historical trace payloads.
   compactedMetadata.appliedActionIds = [...metadata.appliedActionIds]
   return compacted
+}
+
+function restoreEvaluationTerminalActionIndex(result: ReturnType<typeof runBattleActionIsolated>): void {
+  const settledAt = result.state.terminalResult?.settledAt
+  const actionIndex = result.trace?.index
+  if (!settledAt || actionIndex === undefined || settledAt.actionIndex === actionIndex) return
+
+  // finalizeBattleTerminal stores this same result object in the observable
+  // terminal event payload, so update the shared settlement in place.
+  settledAt.actionIndex = actionIndex
+  result.stateHash = hashBattleState(result.state)
+  if (result.trace) result.trace.postStateHash = result.stateHash
 }
 
 export function simulateAITransition(
@@ -623,7 +627,11 @@ export function simulateAITransition(
         'A root seed or initialized battle trace is required for deterministic simulation',
       )
     }
-    const result = runBattleActionIsolated(simulationState, action, { rootSeed })
+    const result = runBattleActionIsolated(simulationState, action, {
+      rootSeed,
+      stateHashIndex: context.stateHashIndex,
+    })
+    if (evaluationMode) restoreEvaluationTerminalActionIndex(result)
     preStateHash ??= result.trace?.preStateHash ?? hashBattleState(simulationState)
     const trace: AITransitionTrace = evaluationMode
       ? { actionTrace: result.trace, actionLog: [], stateChanges: [] }
