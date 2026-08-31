@@ -28,8 +28,7 @@ function writeLog(message: string) {
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceStats } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost } from "./skills"
-import { dynamicCodeRuntime } from './dynamic-code-runtime'
+import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
 import { getSkillById } from "./skill-repository"
 import {
@@ -2844,7 +2843,7 @@ function applyBattleActionInternal(
       if (pending.effectCode) {
         let fn: any
         try {
-          const compileEffect = dynamicCodeRuntime.compileExpression<(math: Math, date: DateConstructor) => unknown>({
+          const compileEffect = getRuleDynamicCodeRuntime().compileExpression<(math: Math, date: DateConstructor) => unknown>({
             surface: 'pendingEffectCode', contentId: pending.selectionId || 'pending-target',
             contentVersion: String(pending.stateRevision ?? 0),
             code: '(function(Math, Date) { return (' + pending.effectCode + '); })', entry: 'serialized function(ctx)',

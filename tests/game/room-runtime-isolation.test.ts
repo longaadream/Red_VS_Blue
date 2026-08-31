@@ -4,22 +4,135 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
+import {
+  dispatchRoomBattleAction,
+  type DeploymentRoomStore,
+} from '@/lib/game/room-battle-actions'
 import { RoomAuthorityQueue } from '@/lib/game/room-authority-queue'
 import {
   RoomRuleRuntimeError,
   RoomRuleRuntimeRegistry,
+  restoreRoomRuleRuntime,
   type RoomRuleRuntime,
 } from '@/lib/game/room-rule-runtime'
 import { getRuleMath } from '@/lib/game/rule-runtime'
+import type {
+  BattleAuthorityCheckpointRecord,
+  BattleAuthorityReceipt,
+  BattleAuthorityTransitionRecord,
+} from '@/lib/game/battle-transition'
+import type { Room } from '@/lib/game/room-store'
+import { getBattleStorage } from '@/lib/game/battle-storage'
 import type { TriggerRule } from '@/lib/game/triggers'
 import type { BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { createTestServerBattleState } from './profile-test-identity'
 
 interface RuntimeSnapshot {
   stateHash: string
   runtimeCursors: Record<string, number>
   pending: { option: unknown; target: unknown }
   triggerUses: number
+}
+
+interface OnlineRuntimeSnapshot extends RuntimeSnapshot {
+  authorityVersion: number
+  receipts: Array<{ status: string; authorityVersion: number; clientActionId: string }>
+}
+
+class MultiRoomAuthorityStore implements DeploymentRoomStore {
+  readonly rooms = new Map<string, Room>()
+  readonly receipts = new Map<string, BattleAuthorityReceipt>()
+  readonly transitions = new Map<string, BattleAuthorityTransitionRecord[]>()
+  private readonly commitBlocks = new Map<string, {
+    gate: Promise<void>
+    markStarted: () => void
+  }>()
+
+  constructor(rooms: Room[]) {
+    for (const room of rooms) this.rooms.set(room.id, structuredClone(room))
+  }
+
+  async getRoom(roomId: string): Promise<Room | undefined> {
+    const room = this.rooms.get(roomId)
+    return room ? structuredClone(room) : undefined
+  }
+
+  async setRoom(roomId: string, room: Room): Promise<void> {
+    this.rooms.set(roomId, structuredClone(room))
+  }
+
+  async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
+    const current = this.rooms.get(roomId)
+    if (!current || current.version !== expectedVersion) return false
+    this.rooms.set(roomId, { ...structuredClone(room), version: expectedVersion + 1 })
+    return true
+  }
+
+  async getBattleAuthorityReceipt(roomId: string, clientActionId: string): Promise<BattleAuthorityReceipt | undefined> {
+    const receipt = this.receipts.get(`${roomId}:${clientActionId}`)
+    return receipt ? structuredClone(receipt) : undefined
+  }
+
+  async persistBattleAuthorityReceipt(receipt: BattleAuthorityReceipt): Promise<void> {
+    this.receipts.set(`${receipt.roomId}:${receipt.clientActionId}`, structuredClone(receipt))
+  }
+
+  async commitBattleAuthorityTransition(input: {
+    roomId: string
+    expectedVersion: number
+    nextRoom: Room
+    transition: BattleAuthorityTransitionRecord
+    baseCheckpoint?: BattleAuthorityCheckpointRecord
+    checkpoint?: BattleAuthorityCheckpointRecord
+  }): Promise<boolean> {
+    const current = this.rooms.get(input.roomId)
+    if (!current || current.battleAuthorityVersion !== input.expectedVersion) return false
+    const block = this.commitBlocks.get(input.roomId)
+    if (block) {
+      block.markStarted()
+      await block.gate
+      this.commitBlocks.delete(input.roomId)
+    }
+    const roomTransitions = this.transitions.get(input.roomId) ?? []
+    roomTransitions.push(structuredClone(input.transition))
+    this.transitions.set(input.roomId, roomTransitions)
+    this.receipts.set(
+      `${input.roomId}:${input.transition.receipt.clientActionId}`,
+      structuredClone(input.transition.receipt),
+    )
+    this.rooms.set(input.roomId, {
+      ...structuredClone(input.nextRoom),
+      battleAuthorityVersion: input.transition.toVersion,
+      battleAuthorityTransitionHash: input.transition.transitionHash,
+    })
+    return true
+  }
+
+  inspectBattleAuthorityPersistence(roomId: string) {
+    const authorityVersion = Number(this.rooms.get(roomId)?.battleAuthorityVersion ?? 0)
+    return {
+      status: 'durable' as const,
+      durableAuthorityVersion: authorityVersion,
+      authorityVersion,
+      pending: 0,
+    }
+  }
+
+  state(roomId: string): BattleState {
+    const storage = getBattleStorage(this.rooms.get(roomId)!)
+    if (!storage) throw new Error(`Missing battle storage for ${roomId}`)
+    return storage.state as BattleState
+  }
+
+  blockNextCommit(roomId: string): { started: Promise<void>; release: () => void } {
+    let release!: () => void
+    let markStarted!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const started = new Promise<void>(resolve => { markStarted = resolve })
+    this.commitBlocks.set(roomId, { gate, markStarted })
+    return { started, release }
+  }
 }
 
 function markerRule(
@@ -188,6 +301,99 @@ function randomSkillState(roomId: string): BattleState {
   return state
 }
 
+function pendingTargetState(roomId: string): BattleState {
+  const state = rosterState(roomId)
+  state.targetingRevision = 0
+  state.pendingTargetSelection = {
+    playerId: 'player-red',
+    ownerPlayerId: 'player-red',
+    selectionId: 'shared-pending-selection',
+    stateRevision: 0,
+    title: 'Choose a cell',
+    targetType: 'cell',
+    filter: 'all',
+    effectCode: `function(ctx) { ctx.battle.extensions.pendingRuntimeRoom = '${roomId}'; return { success: true, message: '${roomId}' }; }`,
+  }
+  return state
+}
+
+function onlineRoom(runtimeRoomId: string, stateRoomId: string, rootSeed: number): Room {
+  const state = rosterState(stateRoomId)
+  return {
+    id: runtimeRoomId,
+    name: runtimeRoomId,
+    status: 'in-progress',
+    players: [
+      { id: 'player-red', name: 'Red', seat: 'red', alignment: 'light' },
+      { id: 'player-blue', name: 'Blue', seat: 'blue', alignment: 'dark' },
+    ],
+    spectators: [],
+    currentTurnIndex: 0,
+    actions: [],
+    version: 1,
+    battleAuthorityVersion: 0,
+    battleState: createTestServerBattleState(state as unknown as Record<string, unknown>, rootSeed),
+  }
+}
+
+async function dispatchTransitionAt(
+  store: MultiRoomAuthorityStore,
+  runtime: RoomRuleRuntime,
+  stateRoomId: string,
+  index: number,
+): Promise<{ stateHash: string; receipt: OnlineRuntimeSnapshot['receipts'][number] }> {
+  const state = store.state(runtime.roomId)
+  const action = index % 2 === 0
+    ? {
+        type: 'endTurn',
+        playerId: state.turn.currentPlayerId,
+        clientActionId: `${stateRoomId}:end:${index}`,
+      }
+    : {
+        type: 'beginPhase',
+        clientActionId: `${stateRoomId}:begin:${index}`,
+      }
+  const result = await dispatchRoomBattleAction(
+    store,
+    runtime.roomId,
+    'playerId' in action ? action.playerId : state.turn.currentPlayerId,
+    action as never,
+    { expectedAuthorityVersion: index, clock: { now: () => 50_000 + index } },
+  )
+  expect(result.kind).toBe('applied')
+  expect(result.receipt).toMatchObject({ status: 'applied', authorityVersion: index + 1 })
+  return {
+    stateHash: result.actionResult.stateHash,
+    receipt: {
+      status: result.receipt!.status,
+      authorityVersion: result.receipt!.authorityVersion,
+      clientActionId: result.receipt!.clientActionId,
+    },
+  }
+}
+
+async function runOnlineSolo(
+  runtimeRoomId: string,
+  stateRoomId: string,
+  rootSeed: number,
+): Promise<OnlineRuntimeSnapshot> {
+  const store = new MultiRoomAuthorityStore([onlineRoom(runtimeRoomId, stateRoomId, rootSeed)])
+  const runtime = restoreRoomRuleRuntime(runtimeRoomId)
+  runtime.executionContext.triggerSystem.addRule(markerRule(stateRoomId))
+  const receipts: OnlineRuntimeSnapshot['receipts'] = []
+  let stateHash = hashBattleState(store.state(runtimeRoomId))
+  for (let index = 0; index < 100; index += 1) {
+    const result = await dispatchTransitionAt(store, runtime, stateRoomId, index)
+    stateHash = result.stateHash
+    receipts.push(result.receipt)
+  }
+  return {
+    ...snapshot(runtime, store.state(runtimeRoomId), stateHash),
+    authorityVersion: Number(store.rooms.get(runtimeRoomId)?.battleAuthorityVersion ?? -1),
+    receipts,
+  }
+}
+
 describe('RED-141 room rule runtime isolation', () => {
   it('matches two interleaved 100-transition rooms with their solo hashes, RNG cursors, pending state, and limits', () => {
     const soloA = runSolo('room-a', 1401)
@@ -215,6 +421,98 @@ describe('RED-141 room rule runtime isolation', () => {
     expect(snapshot(runtimeB, stateB, hashB)).toEqual(soloB)
     expect(stateA.extensions?.roomMarker).toBe('room-a')
     expect(stateB.extensions?.roomMarker).toBe('room-b')
+  }, 20_000)
+
+  it('matches real online dispatch receipts and states for two interleaved 100-transition rooms', async () => {
+    const previousAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
+    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
+    try {
+      const soloA = await runOnlineSolo('dispatch-solo-a', 'dispatch-state-a', 1441)
+      const soloB = await runOnlineSolo('dispatch-solo-b', 'dispatch-state-b', 1442)
+
+      const store = new MultiRoomAuthorityStore([
+        onlineRoom('dispatch-interleaved-a', 'dispatch-state-a', 1441),
+        onlineRoom('dispatch-interleaved-b', 'dispatch-state-b', 1442),
+      ])
+      const runtimeA = restoreRoomRuleRuntime('dispatch-interleaved-a')
+      const runtimeB = restoreRoomRuleRuntime('dispatch-interleaved-b')
+      runtimeA.executionContext.triggerSystem.addRule(markerRule('dispatch-state-a'))
+      runtimeB.executionContext.triggerSystem.addRule(markerRule('dispatch-state-b'))
+      const receiptsA: OnlineRuntimeSnapshot['receipts'] = []
+      const receiptsB: OnlineRuntimeSnapshot['receipts'] = []
+      let hashA = hashBattleState(store.state(runtimeA.roomId))
+      let hashB = hashBattleState(store.state(runtimeB.roomId))
+
+      for (let index = 0; index < 100; index += 1) {
+        const resultA = await dispatchTransitionAt(store, runtimeA, 'dispatch-state-a', index)
+        hashA = resultA.stateHash
+        receiptsA.push(resultA.receipt)
+        const resultB = await dispatchTransitionAt(store, runtimeB, 'dispatch-state-b', index)
+        hashB = resultB.stateHash
+        receiptsB.push(resultB.receipt)
+      }
+
+      const interleavedA: OnlineRuntimeSnapshot = {
+        ...snapshot(runtimeA, store.state(runtimeA.roomId), hashA),
+        authorityVersion: Number(store.rooms.get(runtimeA.roomId)?.battleAuthorityVersion ?? -1),
+        receipts: receiptsA,
+      }
+      const interleavedB: OnlineRuntimeSnapshot = {
+        ...snapshot(runtimeB, store.state(runtimeB.roomId), hashB),
+        authorityVersion: Number(store.rooms.get(runtimeB.roomId)?.battleAuthorityVersion ?? -1),
+        receipts: receiptsB,
+      }
+      expect(interleavedA).toEqual(soloA)
+      expect(interleavedB).toEqual(soloB)
+      expect(interleavedA.authorityVersion).toBe(100)
+      expect(interleavedB.authorityVersion).toBe(100)
+    } finally {
+      if (previousAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityFlag
+    }
+  }, 120_000)
+
+  it('keeps real online failures and stalled commits inside the owning room while peers ACK', async () => {
+    const previousAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
+    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
+    try {
+      const faultStore = new MultiRoomAuthorityStore([
+        onlineRoom('dispatch-fault-a', 'dispatch-fault-state-a', 1451),
+        onlineRoom('dispatch-healthy-b', 'dispatch-healthy-state-b', 1452),
+      ])
+      const faultRuntime = restoreRoomRuleRuntime('dispatch-fault-a')
+      const healthyRuntime = restoreRoomRuleRuntime('dispatch-healthy-b')
+      faultRuntime.executionContext.triggerSystem.addRule(markerRule('dispatch-fault-state-a', { throwOnRun: true }))
+      healthyRuntime.executionContext.triggerSystem.addRule(markerRule('dispatch-healthy-state-b'))
+
+      await expect(dispatchTransitionAt(faultStore, faultRuntime, 'dispatch-fault-state-a', 0))
+        .rejects.toThrow('expected dispatch-fault-state-a rule failure')
+      const healthy = await dispatchTransitionAt(faultStore, healthyRuntime, 'dispatch-healthy-state-b', 0)
+      expect(healthy.receipt).toMatchObject({ status: 'applied', authorityVersion: 1 })
+      expect(faultStore.rooms.get(faultRuntime.roomId)?.battleAuthorityVersion).toBe(0)
+      expect(faultStore.rooms.get(healthyRuntime.roomId)?.battleAuthorityVersion).toBe(1)
+      expect(faultStore.state(healthyRuntime.roomId).extensions?.roomMarker).toBe('dispatch-healthy-state-b')
+
+      const concurrentStore = new MultiRoomAuthorityStore([
+        onlineRoom('dispatch-stalled-a', 'dispatch-stalled-state-a', 1461),
+        onlineRoom('dispatch-peer-b', 'dispatch-peer-state-b', 1462),
+      ])
+      const stalledRuntime = restoreRoomRuleRuntime('dispatch-stalled-a')
+      const peerRuntime = restoreRoomRuleRuntime('dispatch-peer-b')
+      stalledRuntime.executionContext.triggerSystem.addRule(markerRule('dispatch-stalled-state-a', { spinIterations: 250_000 }))
+      peerRuntime.executionContext.triggerSystem.addRule(markerRule('dispatch-peer-state-b'))
+      const commitBlock = concurrentStore.blockNextCommit(stalledRuntime.roomId)
+      const stalled = dispatchTransitionAt(concurrentStore, stalledRuntime, 'dispatch-stalled-state-a', 0)
+      await commitBlock.started
+      const peer = await dispatchTransitionAt(concurrentStore, peerRuntime, 'dispatch-peer-state-b', 0)
+      expect(peer.receipt).toMatchObject({ status: 'applied', authorityVersion: 1 })
+      expect(concurrentStore.rooms.get(stalledRuntime.roomId)?.battleAuthorityVersion).toBe(0)
+      commitBlock.release()
+      await expect(stalled).resolves.toMatchObject({ receipt: { status: 'applied', authorityVersion: 1 } })
+    } finally {
+      if (previousAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityFlag
+    }
   }, 20_000)
 
   it('contains throw, limits, pending, and compiled caches inside the owning room', () => {
@@ -263,6 +561,29 @@ describe('RED-141 room rule runtime isolation', () => {
     expect(cacheA).not.toBe(cacheB)
     expect(cacheA.dynamicCodeRuntime.stats().compiled).toBe(1)
     expect(cacheB.dynamicCodeRuntime.stats().compiled).toBe(1)
+
+    const pendingA = runBattleAction(pendingTargetState('fault-a'), {
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetX: 0,
+      targetY: 0,
+      selectionId: 'shared-pending-selection',
+      stateRevision: 0,
+      clientActionId: 'fault-a:pending-cache',
+    } as never, { rootSeed: 1421, ruleExecutionContext: runtimeA.executionContext })
+    const pendingB = runBattleAction(pendingTargetState('healthy-b'), {
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetX: 0,
+      targetY: 0,
+      selectionId: 'shared-pending-selection',
+      stateRevision: 0,
+      clientActionId: 'healthy-b:pending-cache',
+    } as never, { rootSeed: 1422, ruleExecutionContext: runtimeB.executionContext })
+    expect(pendingA.state.extensions?.pendingRuntimeRoom).toBe('fault-a')
+    expect(pendingB.state.extensions?.pendingRuntimeRoom).toBe('healthy-b')
+    expect(cacheA.dynamicCodeRuntime.stats().compiled).toBe(2)
+    expect(cacheB.dynamicCodeRuntime.stats().compiled).toBe(2)
 
     registry.close('fault-a', 'fault-injected')
     expect(runtimeA.executionContext.cache.size).toBe(0)
@@ -322,5 +643,7 @@ describe('RED-141 room rule runtime isolation', () => {
     expect(setup).toContain('getRuleExecutionTriggerSystem(globalTriggerSystem)')
     expect(turn).toContain('getRuleExecutionTriggerSystem(globalTriggerSystem)')
     expect(skills).toContain('getRuleExecutionTriggerSystem(globalTriggerSystem)')
+    expect(turn).toContain('getRuleDynamicCodeRuntime().compileExpression')
+    expect(turn).not.toContain("from './dynamic-code-runtime'")
   })
 })

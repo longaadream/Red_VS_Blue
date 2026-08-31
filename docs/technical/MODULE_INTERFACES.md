@@ -155,7 +155,8 @@
 - 状态变化：在线路径的规则注册表、限制计数和缓存按 roomId 隔离；同步 `RuleExecutionContext` 把同一
   房间实例传入 Runner、战斗初始化、回合与技能深层调用。`globalTriggerSystem` 仅为离线/浏览器兼容后备。
 - 恢复/关闭：新房间创建空运行时；旧房间首次 restore 只复制一次历史全局规则快照。相同 roomId 的
-  create/restore 幂等返回同一实例；close 清空规则和缓存、关闭房间 FIFO，之后拒绝隐式复活。
+  create/restore 幂等返回同一实例；close 清空规则和缓存、关闭房间 FIFO，之后拒绝隐式复活。RED-141
+  提供该原语；终局/删除生产编排、durable 屏障和竞态收口属于 RED-143。
 - 错误：触发器异常向权威调用边界抛出；失败房间的规则计数、pending 和缓存不得污染其他房间。
 - 日志：`triggers.ts` 本地日志。
 - 测试：`room-runtime-isolation.test.ts` 覆盖 100 次双房交错、异常/计数/pending/缓存隔离、FIFO、背压、

@@ -104,6 +104,8 @@ RED-99 的精确 `clientActionId` 回执只解决“哪个命令得到确认”�
     解析该房间实例；`globalTriggerSystem` 只保留给离线/浏览器兼容调用。重复 create/restore 返回同一实例；
     close 幂等地清空规则与缓存、关闭 ingress，并拒绝隐式复活。inspect 只聚合运行时和现有 FIFO 状态，
     不创建第二份可变真相，并映射到 RED-140 冻结的 `queue.running/pending/activeKind/closedReason`。
+    RED-141 冻结并验证该生命周期原语；终局 durable 屏障、删除竞态以及 terminal/delete 调用 close 的生产
+    编排由其下游 RED-143 负责，不在此扩展中提前改变终局/删除语义。
 
 ## 性能合同
 

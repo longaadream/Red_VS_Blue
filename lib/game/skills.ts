@@ -166,6 +166,10 @@ function getSkillExecutionCaches(): SkillExecutionCaches {
   return caches
 }
 
+export function getRuleDynamicCodeRuntime(): DynamicCodeRuntime {
+  return getSkillExecutionCaches().dynamicCodeRuntime
+}
+
 // 清除规则缓存的函数
 export function clearRuleCache(): void {
   getSkillExecutionCaches().ruleCache.clear()
