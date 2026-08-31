@@ -1,0 +1,1 @@
+{"abiVersion":"rvb-skillcode/v1","surface":"ruleSkillCode","content":{"id":"rule-fixture","version":"1","sourceHash":"sha256:rule"},"trace":{"id":"trace-rule","seed":"750001","logicalTime":42},"requestedCapabilities":["selectOption","fireEvent","Math","Date"],"input":{"context":{"event":"beforeDamageDealt"},"battleSnapshot":{"revision":7},"ruleHandle":"rule-1","answers":[]}}

@@ -1,0 +1,1 @@
+{"abiVersion":"rvb-skillcode/v1","surface":"previewCode","content":{"id":"preview-fixture","version":"1","sourceHash":"sha256:preview"},"trace":{"id":"trace-preview","seed":"0","logicalTime":42},"requestedCapabilities":["calculateDistance","Math"],"input":{"pieceSnapshot":{"id":"piece-1","x":1,"y":2},"skillSnapshot":{"id":"skill-1","range":3},"currentCooldown":0}}

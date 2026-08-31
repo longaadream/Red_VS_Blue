@@ -1,0 +1,1 @@
+{"abiVersion":"rvb-skillcode/v1","surface":"skillCode","content":{"id":"skill-fixture","version":"1","sourceHash":"sha256:skill"},"trace":{"id":"trace-skill","seed":"750003","logicalTime":42},"requestedCapabilities":["selectTarget","dealDamage","Math","Date"],"input":{"context":{"pieceId":"piece-1"},"sourcePieceHandle":"piece-1","battleSnapshot":{"revision":7},"answers":[]}}

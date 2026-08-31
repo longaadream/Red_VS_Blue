@@ -1,0 +1,1 @@
+{"abiVersion":"rvb-skillcode/v1","surface":"previewCode","content":{"id":"preview-fixture","version":"1","sourceHash":"sha256:preview"},"trace":{"id":"trace","seed":"1","logicalTime":0},"requestedCapabilities":["dealDamage"],"input":{"pieceSnapshot":{},"skillSnapshot":{},"currentCooldown":0}}

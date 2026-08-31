@@ -4,6 +4,10 @@
 > 适用范围：当前仓库内受信任的技能、卡牌、规则和延迟效果代码
 > 依据：以本仓库运行时代码和兼容审计脚本为准；文档与实现冲突时应停止导入并修正文档或实现
 
+> ABI v1：未来受限 Runtime 的冻结边界见 [`SKILLCODE_ABI_V1.md`](./SKILLCODE_ABI_V1.md) 与
+> [`SKILLCODE_THREAT_MODEL.md`](./SKILLCODE_THREAT_MODEL.md)。现役运行时仍不是安全沙箱；本手册中的
+> 宿主 helper 对象不得直接穿越 ABI v1 边界。
+
 ## 1. 先记住两件事
 
 第一，当前的 SkillCode 是“项目内部脚本”，不是安全沙箱。它最终会由 JavaScript 动态编译执行，因此只能运行随项目审查、测试并发布的受信任代码。来自社区服务器、关卡包或玩家文件的代码，在 RED-135 的沙箱和权限模型落地前不得直接执行。现有 Content Pipeline 会拒绝含可执行代码字段的外部内容，这是有意的安全边界。
@@ -30,7 +34,7 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | 技能 `code` | `data/skills/*.json` | 主动技能和单位能力 | 可以选目标、选项 | 最完整的 Helper 环境 |
 | 卡牌 `code` | `data/cards/*.json` | 手牌效果 | 可以选目标、选项 | 没有保证存在的 `sourcePiece` |
-| 规则 `skillCode` | `data/rules/*.json` | 规则附带的主动能力 | 可以选目标、选项 | 状态 Helper 的细节与技能入口不同 |
+| 规则 `skillCode` | `data/rules/*.json` | 规则附带的主动能力 | 只可选选项 | 现役 wrapper 不注入 `selectTarget`；状态 Helper 的细节与技能入口不同 |
 | 规则 `triggerSkill` | 规则触发器 | 响应事件 | 当前应视为不可交互 | 选择、传送、范围查询能力受限 |
 | `pendingEffectCode` | 延迟目标效果 | 选定目标后执行小段效果 | 不可再次发起选择 | 只有序列化 `ctx`，没有外层 Helper 闭包 |
 | `previewCode` | 技能预览 | UI 展示冷却、伤害等预估 | 不可以 | 不是权威规则，不能改变战局 |
@@ -124,7 +128,9 @@ flowchart LR
 
 ### 4.3 规则 `skillCode`
 
-这是规则提供的主动技能，可使用选择、伤害、治疗、状态、规则、玩家规则、技能和事件 Helper。它的状态添加/移除细节与普通技能并不完全相同，见“状态与规则”一节。
+这是规则提供的主动技能，可使用 `selectOption`、伤害、治疗、状态、规则、玩家规则、技能和事件 Helper；现役
+wrapper 不注入 `selectTarget`，需要目标选择时必须另建运行时扩展，不能假定技能入口的选择能力可复用。它的
+状态添加/移除细节与普通技能并不完全相同，见“状态与规则”一节。
 
 ### 4.4 规则 `triggerSkill`
 
@@ -537,20 +543,24 @@ function calculatePreview(piece, skillDef, currentCooldown) {
 
 ## 15. 实现依据
 
+ABI v1 的机器可读 capability、预算、输入输出与稳定错误码位于
+[`lib/game/skillcode-runtime/abi-v1.ts`](../../lib/game/skillcode-runtime/abi-v1.ts)。它目前未接入生产执行器；作者不得因为 ABI 文件存在，就将外部
+SkillCode 放入 Content Pipeline 或声称现役 `eval` 路径具备沙箱隔离。
+
 本文基于以下现役源码和技术合同整理：
 
-- `lib/game/dynamic-code-runtime.ts`
-- `lib/game/skills.ts`
-- `lib/game/triggers.ts`
-- `lib/game/turn.ts`
-- `lib/game/targeting.ts`
-- `lib/game/spatial.ts`
-- `lib/game/rule-loader.ts`
-- `scripts/audit-skillcode-compat.mjs`
-- `docs/technical/DYNAMIC_CODE_RUNTIME.md`
-- `docs/technical/SKILLCODE_COMPATIBILITY_MATRIX.md`
-- `docs/technical/DAMAGE_PIPELINE.md`
-- `docs/technical/COMBAT_TRIGGER_ATOMICITY_CONTRACT.md`
+- [`lib/game/dynamic-code-runtime.ts`](../../lib/game/dynamic-code-runtime.ts)
+- [`lib/game/skills.ts`](../../lib/game/skills.ts)
+- [`lib/game/triggers.ts`](../../lib/game/triggers.ts)
+- [`lib/game/turn.ts`](../../lib/game/turn.ts)
+- [`lib/game/targeting.ts`](../../lib/game/targeting.ts)
+- [`lib/game/spatial.ts`](../../lib/game/spatial.ts)
+- [`lib/game/rule-loader.ts`](../../lib/game/rule-loader.ts)
+- [`scripts/audit-skillcode-compat.mjs`](../../scripts/audit-skillcode-compat.mjs)
+- [`DYNAMIC_CODE_RUNTIME.md`](./DYNAMIC_CODE_RUNTIME.md)
+- [`SKILLCODE_COMPATIBILITY_MATRIX.md`](./SKILLCODE_COMPATIBILITY_MATRIX.md)
+- [`DAMAGE_PIPELINE.md`](./DAMAGE_PIPELINE.md)
+- [`COMBAT_TRIGGER_ATOMICITY_CONTRACT.md`](./COMBAT_TRIGGER_ATOMICITY_CONTRACT.md)
 - ADR-0004、ADR-0006、ADR-0010、ADR-0015、ADR-0017
 
 每次 Runtime 或 Helper 语义变化，都必须在同一个 PR 中更新本手册和兼容矩阵。
