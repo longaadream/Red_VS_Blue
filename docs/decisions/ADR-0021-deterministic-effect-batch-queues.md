@@ -12,7 +12,7 @@
 
 - Linear：RED-139。
 - `base_branch`：`main`。
-- `base_sha`：`f51a5eed2a37be6491841a19393b0725ad188554`（执行 `git fetch origin --prune` 后记录）。
+- `base_sha`：`6e6ae8dd88928dc285c0cbb7a5be7e3c121ae9a2`（2026-08-31 再次执行 `git fetch origin --prune` 并 rebase 到最新 `origin/main` 后记录）。
 - 继承决策：ADR-0004、ADR-0006、ADR-0008、ADR-0010、ADR-0011、ADR-0015、ADR-0016。
 
 ## 背景
