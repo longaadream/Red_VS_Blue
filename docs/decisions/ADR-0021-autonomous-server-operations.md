@@ -6,6 +6,7 @@
 - 关联任务：RED-140
 - 父路线：RED-134
 - 设计基线：`main@f51a5eed2a37be6491841a19393b0725ad188554`
+- 收尾同步基线：`main@6e6ae8dd88928dc285c0cbb7a5be7e3c121ae9a2`
 - 取代：[ADR-0003](./ADR-0003-electron-server-packaging.md)
 - 规范合同：[Server Operations v1](../technical/SERVER_OPERATIONS_V1.md)
 
@@ -21,6 +22,8 @@ Server 拥有本服身份、赛季和竞技数据。现有主线已提供必须�
 - RED-115 的 Resolved Profile 安装、原子激活、stable/candidate/previousStable、健康与回退；
 - RED-116 的 engineAbi + runnerRevision + authorityContentHash 房间硬门禁及 resolvedProfileHash
   诊断身份；
+- RED-117 的 strict PVE Run aggregate、revision CAS、活动战斗 Profile lease 与 authority
+  reconciliation archive/tombstone/evidence；
 - RED-127 的 Windows standalone Server 和玩家 WebSocket-only 传输；
 - RED-131 的 battle protocol/build 门禁、房间持久化有限重试、degraded 与 durable drain；
 - ADR-0002 的 Electron trusted window、main-frame 与 preload IPC sender 边界。
@@ -98,8 +101,9 @@ Authenticode，解压使用固定路径/预算规则；catalog、installer clean
 现有 `dir/win-unpacked` 只是生成 tree inventory 前的 QA 输入，不是 release artifact。
 
 此外使用独立 Ed25519 release manifest，冻结 app version、commit/tree、artifact bytes/hash、
-platform/arch、battle protocol/build、engine ABI/runner、bundled Profile、DB schema/migration、
-management API、channel、sequence、security epoch 与 signing identity。HTTPS 只是 transport。
+platform/arch、battle protocol/build、engine ABI/runner、bundled Profile、DB 与 PVE Run Store
+schema/migration、management API、channel、sequence、security epoch 与 signing identity。HTTPS
+只是 transport。
 
 密钥层级固定为：
 
@@ -117,8 +121,8 @@ management API、channel、sequence、security epoch 与 signing identity。HTTP
 ### 4. 唯一运维写权威和本地管理边界
 
 Electron main 独占 OS、process、file、backup、restore、app update 和整体 lifecycle 写能力；renderer
-只能经受信 preload IPC 读状态/提交命令；Next child 只提供 admission、drain、Profile adapter、
-RoomRuntime inspect/cleanup 与健康。
+只能经受信 preload IPC 读状态/提交命令；Next child 只提供 room/PVE admission 与 drain、Profile
+adapter、delegated PVE authority reconciliation、RoomRuntime inspect/cleanup、PVE observation 与健康。
 
 每个 child spawn 生成新的 256-bit random capability，仅在 main/child 内存。child 另开
 `127.0.0.1:<ephemeral>` listener；先验证真实 TCP peer 是 loopback，再 constant-time 比较
@@ -127,6 +131,17 @@ cookie/player token 或静态 admin key。renderer 不知道 listener URL/key，
 
 因此“本地管理 API”分两层：受信 renderer 到 Electron main 的版本化 IPC 是唯一 operator mutation
 入口；main 到 child 的 loopback HTTP 只是最小内部 adapter。它不是远程管理产品。
+
+RED-115 的 Profile Store、lock、plan、rebind、commit、release 与 recovery 仍是唯一行为/状态真源。
+自治 Server v1 adapter 迁移完成后，本 ADR 只取代 RED-115 与旧模块地图中的 standalone transport/
+probe 句子：trusted IPC -> loopback `/v1/profile/**` 直接调用同一个 RED-115 core，不代理到公开
+`/api/content-profile/**`，也不新增 static key。玩家 listener 不注册这些旧 routes；旧玩家 REST
+和 `/api/ping` 继续按 RED-127/ADR-0020 返回 410。玩家 HTTP health 用真实 WS 路径的 101 Upgrade，
+WS health 再用 `system.health` 校验 protocol/build/Profile；依赖旧 ping 的候选必须迁移后才合规。
+ADR-0020/RED-127 曾把 standalone `/api/admin/**` 留在玩家传输任务范围外；自治 Server v1
+明确取代这项历史留白：现有 `/api/admin/rooms/cleanup` 不得注册到玩家 listener，也不是兼容旁路。
+cleanup 只能从 trusted IPC 进入同一 main coordinator，再委托独立 loopback
+`POST /v1/rooms/cleanup`；静态资源继续使用 HTTP 不代表允许公开管理 route。
 
 ### 5. 状态、幂等与故障关闭
 
@@ -137,12 +152,13 @@ stopped | starting | ready | maintenance | draining | stopping |
 degraded | failed | updating | rollback-required
 ```
 
-`ready` 必须同时通过 process、玩家 HTTP/WS、management、DB、persistence、RoomRuntime、Profile、
-release tuple 与 admission；PID 或端口响应不等于 ready。单房 degraded 只形成房间 warning，不自动
+`ready` 必须同时通过 process、玩家 HTTP/WS、management、DB、persistence、RoomRuntime、PVE Run
+Store、Profile、release tuple 与 admission；PID 或端口响应不等于 ready。单房 degraded 只形成房间 warning，不自动
 拖成全服 degraded；只有全局安全/准入条件受损才进入顶层 degraded。
 
 所有 mutation 带 requestId、durable operationId、expectedStateRevision。coordinator 在副作用前写
-accept record，全局 single-flight；相同 ID/相同 canonical payload replay 原结果，不同 payload 拒绝；
+accept record，并把 lifecycle 映射后的 sourceServiceIntent 同次 durable；全局 single-flight；相同 ID/
+相同 canonical payload replay 原结果，不同 payload 拒绝；
 旧 revision 零副作用。renderer timeout 不取消 operation。force-stop、room cleanup、restore、Profile
 rollback、app apply/rollback 等破坏性或有数据损失风险的命令使用 Electron native one-use approval；
 main 必须 strict 解析完整 unsigned command、自算 hash 并显示目标与数据损失，不能让用户批准
@@ -153,17 +169,20 @@ renderer 提供的不透明 hash。
 
 ### 6. Maintenance、durable terminal 与竞技入口
 
-maintenance 先 `existing-only`，等 fence 前 accepted ingress，再检查 Profile lease/room blocker；
-drain 在无 lease 后关 admission/authority/persistence ingress，等待每房间 FIFO 与 RED-131 journal，
-只有 pending=0 且 durableAuthorityVersion 达到 authorityVersion 才发 drainRevision。timeout 不强杀
-或伪造终局。
+maintenance 先 `existing-only`，同时 fence room 与 PVE create/command，等 fence 前两类 accepted
+ingress，再检查 room 和 active PVE battle 的 Profile lease/blocker；drain 在两类 lease 为零后关
+admission/authority/persistence/PVE ingress，等待每房间 FIFO、RED-131 journal 与 RED-117 Run Store。
+只有 room pending=0、durableAuthorityVersion 达到 authorityVersion、PVE accepted pending=0、
+active battle=0 且完整 aggregate/audit set strict 验证通过，才签发绑定两类 watermarks 的
+drainRevision。timeout 不强杀或伪造终局。
 
 terminal result 立即隐藏/关闭房间，但只有 terminal transition/checkpoint/hash 已落盘且
 `durableAuthorityVersion >= terminalAuthorityVersion` 时，terminalBarrier 才为 durable。本服竞技
 只消费 durable terminal，以 serverId + seasonId + settlementKey 幂等；pending/degraded 不排名。
 
-单房持久化/chain/Profile pin 故障只 quarantine 该房，其他房间可继续；全局 DB schema/integrity
-不可读必须 failed/closed。
+单房持久化/chain/Profile pin 故障只 quarantine 该房，其他房间可继续。全局 DB/PVE Store 的
+transient unavailable 只有在 integrity、唯一 writer 与 committed generation 仍可证明时才
+degraded/closed；corrupt、integrity/schema/集合失败或无可信唯一 writer 必须 failed/closed。
 
 ### 7. 固定数据根、identity、backup 与 restore
 
@@ -174,10 +193,13 @@ terminal result 立即隐藏/关闭房间，但只有 terminal transition/checkp
 %LOCALAPPDATA%/RedVsBlue/Server/
 ```
 
-data root 分离 immutable release、control identity/operation/deployment、versioned data generation、
-RED-115 Profile Store、backup、download/staging、diagnostics 与 log。正式包不接受任意 userData
+data root 分离 immutable runnable release、不可执行 verified rollback artifact-set、control
+identity/operation/deployment、versioned data generation（其中 `pve-runs` 是 RED-117 唯一 live
+root）、RED-115 Profile Store、backup、download/staging、diagnostics 与 log。正式包不接受任意 userData
 override；renderer/child 不提供 raw path。atomic deployment pointer 同时选择 release + DB/config
-generation + immutable cumulative continuity generation，但不替代 RED-115 的 Profile active pointer。
+PVE generation + immutable cumulative continuity generation，并以 artifact-set hash 绑定
+current/previous release，但不替代 RED-115 的 Profile active pointer。RED-117 当前
+`<userData>/pve-runs` 只作为一次性 migration input，不得与 generation root 双写。
 
 首次建立空 control root 生成本机 UUIDv4 serverId。原机 restore、app/Profile update 和 backup
 migration 保持它；空新主机可从 verified backup 采用它，已有 identity 只能 restore 同 ID。同一
@@ -185,9 +207,11 @@ data root 由本机 lock 保证一个 writer；backup 迁移要求服主确认�
 不能证明跨主机退役，v1 不承诺 split-brain 防护。clone 必须重置 identity 与赛季命名空间；
 serverId 不是密码学跨服证明。
 
-Verified backup 只在 maintenance、RoomRuntime blocker=0、durable drain/barrier 后执行：停止唯一 DB
-writer，以 SQLite Online Backup API 得一致 snapshot，包含 DB、config、被引用 Profile、赛季/竞技
-durable data；逐文件 hash、SQLite integrity、Profile identity 全部独立二验，在 staging 内最后写
+Verified backup 只在 maintenance、room/PVE blocker=0、durable drain/barrier 后执行：停止唯一 DB
+writer，以 SQLite Online Backup API 得一致 snapshot，包含 DB、config、与 active identity 对应且
+能由 RED-115 strict 安装的 immutable Profile package、赛季/竞技 durable data 及完整 PVE active
+aggregate、archived evidence、tombstone；`active.json`/activation journal/lock 不作为可恢复文件。
+逐文件 hash、SQLite integrity、PVE aggregate set、Profile package/identity 全部独立二验，在 staging 内最后写
 durable COMPLETED marker 后才 atomic rename 为 immutable backup。活动 WAL 下只复制 `game.db`
 不合规。
 
@@ -198,10 +222,17 @@ durable COMPLETED marker 后才 atomic rename 为 immutable backup。活动 WAL 
 deployment pointer 对 release/data/continuity 三个 generation 的一次替换，不声称 NTFS 能事务写多个
 目录。
 
-Restore 先重验 marker/manifest/identity/season watermark/schema/Profile/bytes/path；已有 committed
-generation 时先创建 verified pre-restore backup，真正空 root 则走上述 no-prior receipt。在新
-generation 上解包、forward migrate、closed-admission health，成功才 atomic commit。precommit 失败
-旧数据不变；已有 root postcommit 失败自动回切。真正空 root 没有 pre-restore generation，postcommit
+Restore 对 maintenance 源先 normal drain/stop；所有来源在 stage/Profile/pointer mutation 前必须证明
+process tree、player/management ports、DB/PVE writer/ingress absent，并取得唯一 data-root lock，否则
+零副作用失败。随后重验 marker/manifest/identity/season watermark/DB/PVE aggregate+tombstone
+schema/Profile/bytes/path；已有 committed generation 时先创建 verified pre-restore backup，真正空
+root 则走上述 no-prior receipt。在新 generation 上解包、只按 manifest 声明 forward migrate、exact
+restore PVE active/audit tree；空 root 先复用 RED-115 explicit Bundled Base bootstrap/recovery，
+Profile package 再只能进入 RED-115 candidate 并走 plan/health/commit/recovery，禁止复制
+`active.json`。closed-admission health 成功才 atomic commit；不得 merge 或从
+checkpoint/receipt 重算 Run。precommit 失败旧 generation/stable 不变；已有 root postcommit 失败必须
+回切同一 pre-restore config+DB+PVE generation 并经 RED-115 恢复 pre-restore stable。真正空 root
+没有 pre-restore generation，postcommit
 失败只能 rollback-required/closed/no-writer，并保留已采用 identity/continuity 与 evidence，不能声称
 自动回切。无法证明唯一 committed generation 时 rollback-required。未知 schema、错 serverId、排名
 水位倒退、截断、hash/integrity mismatch 或包内不一致都 fail closed。
@@ -226,24 +257,30 @@ activation pipeline，不能手改 pointer。
 
 App update 顺序固定为：
 
-1. 隔离 check/download，验证 size/type/channel/root/keyset/signature/hash/sequence/epoch/OS/arch；
-2. maintenance fence；
-3. RoomRuntime blocker + persistence durable drain；
+1. 隔离 check/download，验证 size/type/channel/root/keyset/signature/hash/sequence/epoch/OS/arch，
+   最后形成不可执行 immutable verified artifact-set；
+2. maintenance room + PVE fence；
+3. RoomRuntime/PVE blocker + persistence/PVE durable drain；
 4. verified pre-update backup；
 5. 只按已批准且被 backup 覆盖的 cleanup plan 清理；
-6. immutable side-by-side release 与新 DB generation；
-7. staging forward migration；
-8. closed-admission candidate health，包含真实玩家 WS handshake 与 fixed-seed smoke；
+6. 从 verified artifact-set 建 immutable side-by-side release 与新 DB/PVE generation；
+7. staging DB/PVE forward migration；
+8. closed-admission candidate health，包含真实玩家 101 Upgrade、WS `system.health`、PVE Store 与
+   fixed-seed smoke；
 9. durable commit intent；
 10. 一次 atomic pointer commit；
 11. 从 committed pointer 启动唯一 writer 并完整 rehealth；
-12. 按 source service intent reopen/hold，保留 previous bundle/catalog/data/backup/Profile requirement。
+12. 按 source service intent reopen/hold，保留由 artifact-set hash 绑定的 previous
+    manifest/signatures/keyset/bundle/catalog、data（含 PVE）、backup/Profile requirement。
 
-commit 前失败回安全 source state；commit 后失败自动 exact previous rollback。旧 binary 不得打开新
+apply commit 前失败按 durable source intent 回安全状态；apply commit 后失败自动 exact previous
+config+DB+PVE generation rollback。旧 binary 不得打开新
 schema，不做原地反向 SQL migration。若新版 reopen 后已有写入，rollback 前必须向服主展示 backup
-cutoff 与会丢失的数据；不得称为“无损回退”。previous bundle/catalog、matching backup 或 retained
-Profile requirement 不完整，
+cutoff 与会丢失的数据；不得称为“无损回退”。previous verified artifact-set、matching
+backup/generation 或 retained Profile requirement 不完整，
 或 pointer/ledger/generation 不确定时，进入 rollback-required、admission closed 并保留全部证据。
+显式 `app-update.rollback` 自身在 pointer commit 后 health 失败同样进入 rollback-required，不猜测
+再次切回 rollback 前 source deployment。
 
 download、maintenance、backup、stage、migration、candidate health、commit、reopen 与 rollback 每个
 phase 的 kill/power-loss 唯一恢复行为由 Server Operations v1 固定。startup 只认 atomic pointer、
@@ -251,7 +288,10 @@ operation ledger 和 byte verification，不按 mtime、SemVer 或“最新下�
 
 ### 9. 数据、日志和删除边界
 
-- release slot 不进 backup；current/previous 至少保留 90 天且被引用时继续保留；
+- runnable release slot 与 verified artifact-set 不进 backup；current/prepared/previous set 按 durable
+  reference graph 保留，previous 至少 90 天且被引用时继续保留；set 内文件不可单删；
+- PVE active aggregate/audit evidence/tombstone 完整入 backup；generic GC/room cleanup 不得删，只有
+  RED-117 reconciliation 可按 archive -> tombstone -> remove active Run 顺序处理；
 - operation full record 保留 90 天或 1000 条（取更多），compact idempotency receipt 随 identity 永久；
 - log 最多 14 天/256 MiB；diagnostics 单包 100 MiB、总计 512 MiB、最多 7 天；
 - capability、cookie/Auth、private/signing key、URL credential、玩家秘密/PII、raw DB/archive、隐藏
@@ -281,7 +321,7 @@ release tuple、DB/API compatibility、sequence 和 downgrade。独立 Ed25519 m
 
 ### Electron autoUpdater 原地覆盖
 
-不采用。原地覆盖无法同时证明 previous binary、Profile、config 和 DB generation，也不能在
+不采用。原地覆盖无法同时证明 previous binary、Profile、config、DB 与 PVE Store generation，也不能在
 migration/health/commit 断电后确定唯一 writer。v1 使用 launcher、side-by-side slot 与原子 pointer。
 
 ### 静态 admin key、远程 Dashboard 或玩家 socket 管理
@@ -331,10 +371,12 @@ git diff --check
 2. signtool、canonical manifest、key rotation/revocation、wrong key/channel/replay/downgrade/tamper tests；
 3. non-loopback + valid capability、malicious renderer/iframe IPC、capability redaction tests；
 4. 所有 lifecycle/command 的合法/非法转换、single-flight、重复 ID 和 response loss；
-5. room blocker、DB busy/retry exhaustion、durable drain/terminal、backup corruption/hash mismatch
-   与 restore rollback；不得声称 unsigned backup 防篡改；
+5. room/PVE blocker、active PVE lease、两类 accepted ingress、DB busy/retry exhaustion、durable
+   drain/terminal、PVE aggregate/audit corruption、backup hash mismatch 与 exact restore rollback；
+   不得声称 unsigned backup 防篡改；
 6. update/restore 每个 phase 强杀/断电，证明始终只有一个 writer；
-7. Profile A -> B -> A 仍只走 RED-115，old/new tuple mismatch 在 mutation 前拒绝；
+7. Profile A -> B -> A 仍只走 RED-115；active PVE battle 阻断，authority reconciliation 证据完整，
+   old/new engine ABI 或 runner revision mismatch 使用 RED-116 exact code 且在 mutation 前拒绝；
 8. Stable N update、N-1 90 天 previous rollback、data cutoff 提示与 securityEpoch 撤销；
 9. 进程/端口、artifact/manifest/backup hash、截图和脱敏 log 证据经人工验收后才手动 publish。
 

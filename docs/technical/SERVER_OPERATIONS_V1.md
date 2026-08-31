@@ -3,7 +3,8 @@
 - 状态：RED-140 Phase 0 已批准规范；不表示运行时已经实现
 - 风险：High
 - 日期：2026-08-31
-- 基线：`main@f51a5eed2a37be6491841a19393b0725ad188554`
+- 设计基线：`main@f51a5eed2a37be6491841a19393b0725ad188554`
+- 收尾同步基线：`main@6e6ae8dd88928dc285c0cbb7a5be7e3c121ae9a2`
 - 规范：`rvb-server-operations/v1`、`rvb-release-identity/v1`
 - 决策权威：[ADR-0021](../decisions/ADR-0021-autonomous-server-operations.md)
 
@@ -30,8 +31,9 @@ v1 支持 Windows 10 22H2 x64（build 19045）与 Windows 11 x64。Windows 10 22
 | 组件 | 唯一职责 | 明确禁止 |
 | --- | --- | --- |
 | Electron main / Supervisor | OS 文件、进程、端口、固定路径、operation ledger、备份、应用更新、全局生命周期、受信 IPC | 复制游戏规则、把 capability 暴露给 renderer |
-| Next child adapter | admission、accepted-ingress drain、Profile adapter、RoomRuntime inspect/cleanup、健康报告 | 启停宿主、替换 binary、访问任意路径 |
+| Next child adapter | room/PVE admission 与 accepted-ingress drain、Profile adapter、PVE authority reconciliation、RoomRuntime inspect/cleanup、健康报告 | 启停宿主、替换 binary、访问任意路径 |
 | Room authority / persistence | 房间命令、FIFO、authority version、transition/checkpoint、SQLite journal/restore | 全局生命周期或发行更新 |
+| PVE Run Store / authority reconciliation | RED-117 strict Run aggregate、revision CAS、活动战斗 Profile lease、archive/tombstone/evidence | 第二份 PVE 真源、与 DB/room cleanup 合并或重算 Run |
 | Content Pipeline / Profile Store | Profile install/verify/lease/activation/rollback/recovery | binary update、release pointer |
 | Dashboard renderer | 展示、人工意图、受信 preload 调用 | 文件、进程、capability、直接管理 HTTP |
 | 玩家 WebSocket | 玩家目录、房间、战斗、回执、patch、snapshot、recovery | 运维、备份、Profile 管理、进程或更新 |
@@ -46,6 +48,10 @@ Electron main 是所有 management mutation 的唯一入口和 single-flight coo
 - **RED-116**：原样复用 `rvb-game-profile-identity/v1`。硬门禁仍是
   `engineAbi + runnerRevision + authorityContentHash`；`resolvedProfileHash` 只用于 provenance 与
   diagnostic。
+- **RED-117**：原样复用 `rvb-pve-run-aggregate/v1`、revision CAS、active PVE battle Profile
+  lease 以及 authority reconciliation 的 archive -> tombstone -> active Run removal 顺序。目标
+  live root 归入 committed data generation；当前 `<userData>/pve-runs` 只作为一次性 migration
+  input，不得与目标 root 同时写入或成为第二真源。
 - **RED-127**：玩家同源 WS、玩家 `requestId` cache、规则 `clientActionId` 保持独立；管理面
   不复用玩家 socket、公开 `/api/*` 或静态 `admin-secret-key`。
 - **RED-131**：原样复用每房间 FIFO、不同房间隔离、single writer、WAL、restore/drain 及
@@ -54,6 +60,18 @@ Electron main 是所有 management mutation 的唯一入口和 single-flight coo
 
 Profile activation/rollback 与 app update 是两个状态机，只共享 coordinator、maintenance 和日志；
 彼此不得写对方 pointer。
+
+RED-115 继续独占 Profile Store、lock、plan、rebind、commit、release 与 recovery 行为；ADR-0021
+只在自治 Server v1 adapter 完成迁移后，取代 RED-115 和旧模块地图中关于 standalone 管理 transport
+与探针的句子。受信 preload IPC 经独立 loopback `/v1/profile/**` 直接调用同一个 RED-115 core，
+不得转发到公开 `/api/content-profile/**`，不得增加第二 pointer、lease 或 static key。玩家 listener
+不注册这些旧 Profile routes；旧玩家 REST 与 `/api/ping` 按 RED-127/ADR-0020 返回 410，尚依赖它们
+的候选不合规。本文的 `player-http` health 是真实玩家 WS 路径的 HTTP Upgrade 得到 101；
+`player-websocket` health 是 Upgrade 后完成 `system.health`，并校验 protocol/build/Profile。
+同一迁移也取代 ADR-0020/RED-127 对 standalone `/api/admin/**` 的历史“不在范围”结论：
+`/api/admin/rooms/cleanup` 不得注册到玩家 listener，也不是 v1 合规 fallback；room cleanup 只能由
+trusted IPC 进入同一 main coordinator，再委托 capability-protected loopback
+`POST /v1/rooms/cleanup`。静态资源仍可由玩家 HTTP origin 提供，但不能因此携带 management route。
 
 ## 3. Server、赛季与发行身份
 
@@ -168,6 +186,15 @@ interface ReleaseIdentityV1 {
     readableSchemaVersions: string[]; migratableFromSchemaVersions: string[]
     rollbackMode: 'binary-only' | 'restore-backup' | 'forbidden'
   }
+  pve: {
+    runAggregateSchemaVersion: 'rvb-pve-run-aggregate/v1'
+    authorityTombstoneSchemaVersion: 'rvb-pve-authority-tombstone/v1'
+    readableRunAggregateSchemaVersions: string[]
+    migratableFromRunAggregateSchemaVersions: string[]
+    readableAuthorityTombstoneSchemaVersions: string[]
+    migratableFromAuthorityTombstoneSchemaVersions: string[]
+    migrationSetHash: `sha256:${string}`
+  }
   managementApiVersion: 'rvb-server-operations/v1'
   supportedPlatform: {
     os: 'windows'; productType: 'workstation'; arch: 'x64'
@@ -179,6 +206,15 @@ interface ReleaseIdentityV1 {
     keysetVersion: number
     signatures: Array<{ keyId: string; signature: string }>
   }
+}
+
+interface ReleaseSignaturesV1 {
+  schemaVersion: 'rvb-release-signatures/v1'
+  releaseId: `sha256:${string}`; releaseSequence: number
+  channel: 'stable' | 'candidate'
+  manifestPayloadSha256: `sha256:${string}`
+  signatureAlgorithm: 'Ed25519'
+  signatures: Array<{ keyId: string; signature: string }>
 }
 
 interface ReleaseKeysetV1 {
@@ -218,6 +254,15 @@ interface ReleaseTrustHighWaterV1 {
 }
 ```
 
+`pve.readableRunAggregateSchemaVersions` 与
+`pve.readableAuthorityTombstoneSchemaVersions` 必须分别包含 current aggregate/tombstone version；
+迁移只能从对应 `migratableFrom*SchemaVersions` 明列版本运行由同一 `migrationSetHash` 绑定的确定性
+migration。active aggregate、archived evidence 与 tombstone 必须作为一个闭合集合通过兼容判断；未知
+aggregate/tombstone schema 在任何 live/staging mutation 前返回
+`PVE_SCHEMA_INCOMPATIBLE`，不得忽略 entry 或假定与 DB schema 同步。
+四个 version list 都必须去重并按 UTF-8 bytes 排序；同一 source version 不得同时声明为 readable 与
+migratable，避免不同实现选择“直接读”或“先迁移”的不同路径。
+
 所有 `sha256:${string}` 值固定为 `sha256:` + 64 个 lowercase hex；UUID 使用 lowercase canonical
 8-4-4-4-12；时间使用 UTC RFC 3339 `YYYY-MM-DDTHH:mm:ss[.sss]Z`。Ed25519 public key 是 RFC 4648
 unpadded base64url 的 32 raw bytes，signature 是同编码的 64 raw bytes；其他长度或非 canonical
@@ -250,6 +295,14 @@ RFC 3161 校验，并命中该 channel root-signed `publisherPolicyId` 的 subje
 allowlist；leaf-signed release manifest 不能扩大 publisher policy。Publisher active/next/retired/
 revoked 的新发行与 exact previous 语义和 leaf 相同。第三方 PE 只接受 release inventory 固定的上游
 签名身份与 hash，不套用项目 publisher。
+
+Detached `ReleaseSignaturesV1` 只是不含 manifest payload 的发布传输副本，不是第二签名真源。
+`releaseId` 与 `manifestPayloadSha256` 必须都等于 `ReleaseIdentityV1.releaseId`，
+`releaseSequence/channel/signatureAlgorithm` 必须逐字匹配，且
+`JCS(ReleaseSignaturesV1.signatures) === JCS(ReleaseIdentityV1.manifest.signatures)`（含数组顺序）。
+main 必须 strict 解析两份 record 后才验证 leaf；任何 duplicate/unknown field、缺少/增加/重排/
+替换 signature 或 payload hash drift 都返回 `UPDATE_SIGNATURE_INVALID`，零 trust/high-water/
+artifact-set 写入。后续 ledger 和兼容判断仍只使用完整 immutable `ReleaseIdentityV1`。
 
 Stable 必须同时发布 assisted per-user NSIS installer、ZIP update bundle 与 Windows Authenticode
 catalog；candidate 至少发布隔离 update bundle + candidate catalog，候选 installer 可为空。三者都由
@@ -308,6 +361,21 @@ type StateReasonCodeV1 =
   | 'OPERATOR_REQUEST' | 'STARTUP_RECOVERY' | 'NORMAL_STOP'
   | 'MAINTENANCE_REQUEST' | 'APP_UPDATE' | 'BACKUP_RESTORE'
   | 'HEALTH_DEGRADED' | 'ROOM_WARNING'
+type PveOperationsStateV1 =
+  | {
+      state: 'ready'; observedAt: string; reasonCode: null
+      source: 'rvb-pve-run-aggregate/v1'
+      totalRuns: number; activeBattleCount: number
+      activeBattleRunIds: string[]; activeBattleIds: string[]
+      aggregateSetSha256: `sha256:${string}`
+    }
+  | {
+      state: 'unavailable' | 'migrating' | 'incompatible' | 'corrupt'
+      observedAt: string; reasonCode: StateReasonCodeV1
+      source: null; totalRuns: null; activeBattleCount: null
+      activeBattleRunIds: null; activeBattleIds: null
+      aggregateSetSha256: null
+    }
 
 interface ServerOperationsStateV1 {
   schemaVersion: 'rvb-server-operations/v1'
@@ -331,6 +399,9 @@ interface ServerOperationsStateV1 {
   deployment: {
     currentRelease: ReleaseIdentityV1; previousRelease: ReleaseIdentityV1 | null
     preparedRelease: ReleaseIdentityV1 | null
+    currentArtifactSetSha256: `sha256:${string}`
+    previousArtifactSetSha256: `sha256:${string}` | null
+    preparedArtifactSetSha256: `sha256:${string}` | null
   }
   profile: {
     source: 'rvb-profile-state/v1'; stateRevision: number
@@ -350,6 +421,7 @@ interface ServerOperationsStateV1 {
     total: number; listed: number; activeLeases: number
     cleanupEpoch: number; blockers: MaintenanceBlockerV1[]
   }
+  pve: PveOperationsStateV1
   season: {
     seasonId: string | null; status: 'none' | 'preseason' | 'active' | 'closed'
     rankingWatermark: number
@@ -364,6 +436,7 @@ interface ServerOperationsStateV1 {
     lastCheckedAt: string | null
     availableRelease: ReleaseIdentityV1 | null
     preparedRelease: ReleaseIdentityV1 | null
+    preparedArtifactSetSha256: `sha256:${string}` | null
     activeOperationId: string | null
     phase:
       | OperationPhaseNameByKindV1[
@@ -380,7 +453,7 @@ interface HealthCheckV1 {
   name:
     | 'process' | 'management-http' | 'player-http' | 'player-websocket'
     | 'release-identity' | 'profile-identity' | 'database-schema'
-    | 'database-integrity' | 'persistence-writer' | 'disk-space'
+    | 'database-integrity' | 'persistence-writer' | 'pve-run-store' | 'disk-space'
   status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
   observedAt: string; code: OperationErrorCodeV1 | 'LOG_SINK_FAILED' | null
   message: string
@@ -389,11 +462,13 @@ interface HealthCheckV1 {
 interface MaintenanceBlockerDetailsV1 {
   authorityEpoch?: number; authorityVersion?: number
   durableAuthorityVersion?: number; pendingJobs?: number; leaseCount?: number
+  runId?: string; battleId?: string; runRevision?: number
   deadlineAt?: string; requiredBytes?: number; availableBytes?: number
 }
 interface MaintenanceBlockerV1 {
   kind:
     | 'active-room' | 'accepted-ingress' | 'profile-lease' | 'persistence-pending'
+    | 'active-pve-battle' | 'pve-ingress-pending' | 'pve-run-store-invalid'
     | 'room-degraded' | 'ranking-pending' | 'disk-space' | 'operation'
   blockerId: string; roomId: string | null; since: string
   code: OperationErrorCodeV1; retryable: boolean; details: MaintenanceBlockerDetailsV1
@@ -404,6 +479,7 @@ interface BackupRecordSummaryV1 {
   serverId: string; releaseId: `sha256:${string}`; databaseSchemaVersion: string
   activeProfileIdentity: GameProfileIdentityV1
   seasonId: string | null; rankingWatermark: number
+  pveAggregateSetSha256: `sha256:${string}`
   byteLength: number; manifestSha256: `sha256:${string}`
   kind: 'manual' | 'daily' | 'weekly' | 'pre-update' | 'pre-restore'
   pinnedReason: string | null
@@ -413,9 +489,32 @@ interface BackupRecordSummaryV1 {
 `state.profile` 只是一次 strict 读取 RED-115 `resource-pack/active.json` 的只读投影，不另行持久化；
 `deployment` 不复制 Profile identity/revision。App update journal 可记录 observed Profile
 revision/hash 作前置与证据，但 commit/reopen 前必须重新读取 RED-115 真源，不能把观察值当 pointer。
+`deployment.*ArtifactSetSha256` 只投影 committed deployment pointer 与 verified marker；
+`update.preparedRelease/preparedArtifactSetSha256` 只投影同一 prepared ledger/marker。两处 prepared
+identity/hash 必须逐字相同，任何 drift 都是 `RELEASE_IDENTITY_MISMATCH`，不得另存第二份值。
+
+`state.pve.state=ready` 的值只从 RED-117 `PveRunStoreV1` 的 strict active aggregate、immutable archived evidence
+和 tombstone 计算；active battle/lease 只认 RED-117
+`getPveActiveBattleLeaseReportV1()`，不得从 UI/room 数量推断。`state.pve` 不另行持久化，也不计入
+`rooms.activeLeases`。实现对每个 active aggregate、archived evidence 和 tombstone 先生成
+`canonicalBytes = RFC 8785 JCS UTF-8 bytes(complete strict-parsed record)`，不得省略 null/默认字段或
+hash raw pretty-JSON bytes，再生成
+`{recordKind,runId,recordSha256='sha256:'+lowerhex(SHA256(canonicalBytes))}`。Archived evidence
+必须先通过 RED-117 `readArchivedEvidence(tombstone)`，即以其既有
+``${JSON.stringify(record, null, 2)}\n`` serialization 验证 tombstone 中无前缀
+`evidenceHash`，之后才对 strict-parsed complete record 做上述 JCS digest。records 按
+recordKind + runId + recordSha256 的 UTF-8 bytes 排序，再以
+`'sha256:'+lowerhex(SHA256(JCS(sorted records)))` 得到 `aggregateSetSha256`；
+`activeBattleRunIds` 与 `activeBattleIds` 也按 UTF-8 bytes 排序。任何缺失、重复、hash 不匹配或
+parse 失败都使 `pve-run-store` unhealthy 且 admission closed，禁止跳过损坏项后重算“健康”集合。
+strict observation 失败时 read 仍返回 closed abnormal branch，所有 count/ID/hash 固定为 null，不得
+回显 stale/last-known 集合冒充现场值。`unavailable` 只允许表示 integrity、唯一 writer 与 committed
+generation 仍有 durable 证据的 transient timeout/unavailable，映射 lifecycle `degraded`/closed；
+`migrating` 只允许 active update/restore operation，映射 `updating`/closed；`incompatible`、`corrupt`
+以及无法证明唯一 writer/完整集合的 observation 固定映射 `failed`/closed。
 
 Health check 名称固定为 process、management-http、player-http、player-websocket、release-identity、
-profile-identity、database-schema、database-integrity、persistence-writer、disk-space；每项含
+profile-identity、database-schema、database-integrity、persistence-writer、pve-run-store、disk-space；每项含
 status、observedAt、稳定 code 与脱敏 message。
 
 `stateRevision` 是 durable monotonic safe integer；语义变化先 durable 再 broadcast，restart 后大于
@@ -424,29 +523,41 @@ cancel、diagnostics 外，依赖 child 的 mutation 在 stale 时返回 `STATE_
 v1 新增可选字段；command strict 拒绝 unknown field/enum、duplicate JSON key 和不同 schemaVersion。
 
 `ready` 必须同时满足 process、玩家 HTTP/WS、management adapter、DB、persistence、RoomRuntime、
-Profile、release tuple 和 admission open；PID 或端口响应不能单独证明 ready。单房 degraded 只进入
-房间 warning/aggregate，顶层可保持 ready；只有全局 DB/writer/identity/process/admission fault 才
-进入顶层 degraded。
+PVE Run Store、Profile、release tuple 和 admission open；PID 或端口响应不能单独证明 ready。单房 degraded 只进入
+房间 warning/aggregate，顶层可保持 ready。全局 DB/PVE Store 的 transient unavailable/timeout 只有在
+integrity、唯一 writer ownership 与 committed generation 都仍可证明时才进入 `degraded`/closed；corrupt、
+integrity failure、集合不完整、未知 schema、writer ownership 歧义或没有 trustworthy writer 一律进入
+`failed`/closed。identity/process ownership 不确定同样是 `failed`，不能笼统归为 degraded。
 
 Operator 触发的转换都要求 trusted IPC，并继承第 5 节 operation 幂等；内部 fault/recovery 转换只能由
 表中 owner 根据 durable evidence 产生，renderer 不能直接 set state。
 
 | State | Owner 与进入前置 | 接受的操作 / 合法下一状态 | Timeout / staleness 与可观察结果 | 失败状态与回退 |
 | --- | --- | --- | --- | --- |
-| `stopped` | Supervisor；无 child、port、writer | start -> starting；maintenance.enter -> maintenance；restore/update -> updating；只读 | durable state 无自动 timeout；process absent、admission closed | start fail -> failed；不确定 commit -> rollback-required；data 不变 |
-| `starting` | Supervisor；data lock 唯一、child spawning、closed | stop -> stopping；只读；gates pass -> ready | 20 秒 readiness；可见 childInstanceId/heartbeat/checks | timeout/exit/identity mismatch -> failed，清理候选 |
-| `ready` | Supervisor；全部 global gate healthy、admission open | maintenance.enter -> maintenance；stop/restart -> maintenance/draining/stopping；read/update-check | heartbeat staleAfter 10 秒；完整 ready tuple | global fault -> degraded；process exit -> failed；单房 fault 不改变顶层 |
-| `maintenance` | Electron main；durable fence，admission existing-only/closed | 可在 closed 下 start child；drain -> draining；backup/restore/profile/update/cleanup；exit -> ready；stop | fence 10 秒可见；blockers/drainRevision 可见 | blocker -> maintenance/existing-only；durability fault -> degraded/closed；不部分 reopen |
-| `draining` | RoomRuntime + persistence；maintenance 已建立 | 当前 drain/stop orchestration 与只读；barrier pass -> maintenance/stopping/updating | 默认 60 秒、可 1–600 秒；逐 room blocker/pending/watermark | active blocker -> maintenance；durable fail -> degraded/closed；不强杀 |
-| `stopping` | Supervisor；正常路径已有 durable drain | 只读；process tree absent -> stopped | final ACK 6.5 秒 + tree exit 5 秒；PID/port/writer absent | ACK 未证实不得 kill；exit timeout -> failed |
-| `degraded` | Supervisor；进程可能存活但全局 gate 失败 | maintenance/stop/restart/diagnostics；全 gate reconcile -> ready | 每 heartbeat 重评但不自动开 admission；failure code/checks 可见 | 未恢复保持 degraded/closed；unknown write -> rollback-required |
-| `failed` | Supervisor；无可信 writer 或启动/恢复不收敛 | 只有 reconcile 证明 process tree、ports、writer 全 absent 并取得 data lock 后才可 start -> starting；也可 stop -> stopped、verified restore -> updating、rollback/只读 | 无自动 timeout；admission 永远 closed；absence evidence 可见 | orphan/untrusted process 未收口则拒绝 start；重复失败仍 failed；restore 不确定 -> rollback-required；保留原数据 |
-| `updating` | Electron main；active update/restore operation 与 closed admission | 当前 operation、只读、紧急 force-stop；成功按 source intent -> ready/maintenance/stopped | forward deadline 最多 45 分钟；postcommit safety recovery 另有 20 分钟；phase/commitBoundary 可见 | precommit 回原安全态；postcommit exact rollback；不确定 -> rollback-required |
-| `rollback-required` | Electron main；pointer/generation/commit 无法证明或 rollback 失败 | verified app rollback/backup restore -> updating/maintenance；stop/diagnostics/read | 无自动离开；显示完整 evidence 与 closed admission | 失败保持本状态、无 writer；不得猜版本或自动 reopen |
+| `stopped` | Supervisor；无 child、port、writer，admission closed | start -> starting；maintenance.enter -> maintenance；backup.restore/app-update.apply/app-update.rollback -> updating，成功按 source intent 回 stopped；app-update.prepare 保持 stopped；只读；若 startup/heartbeat observation 才发现 residual tree，force-stop 成功仍 stopped | durable state 无自动 timeout；absence evidence 可见 | start fail -> failed；force-stop/deployment commit 不确定 -> rollback-required；data 不变 |
+| `starting` | Supervisor；data lock 唯一、child spawning、closed；保存 source intent | stop -> stopping；force-stop；全部 gate 通过 -> ready，若 source intent 是 maintenance 则 -> maintenance | 20 秒 readiness；可见 childInstanceId/heartbeat/checks | timeout/exit/identity mismatch -> failed；force-stop 仅在 process absent 且 deployment unambiguous 时 -> stopped，否则 failed/rollback-required |
+| `ready` | Supervisor；全部 global gate healthy、admission open | maintenance.enter -> maintenance；stop/restart -> maintenance/draining/stopping；profile.install 保持 ready；profile.activate/rollback 先 fence -> maintenance，成功 -> ready；app-update.prepare 保持 ready；app-update.apply -> updating -> ready；update-check/只读 | heartbeat staleAfter 10 秒；完整 ready tuple | 可证明 integrity/唯一 writer 的 transient global unavailable -> degraded/closed；corrupt、integrity failure、无可信/唯一 writer 或 process ownership 不确定 -> failed/closed；Profile drain fail 保持 maintenance/closed；force-stop 仅在 absence 与 deployment 确定时 -> stopped，否则 failed/rollback-required |
+| `maintenance` | Electron main；durable room + PVE fence，admission existing-only/closed | child absent 时 start -> starting -> maintenance；restart 经 draining/stopping/starting -> maintenance；drain、backup.create、room.cleanup、profile.install 保持 maintenance；profile.activate/rollback 成功保持 maintenance；app-update.prepare 保持 maintenance；backup.restore/app-update.apply/rollback -> updating -> maintenance；exit -> ready；stop | fence 10 秒；blockers、room/PVE watermarks 与 drainRevision 可见 | blocker -> maintenance/existing-only；可证明 integrity/唯一 writer 的 transient durability fault -> degraded/closed；corrupt/集合不完整/无可信 writer -> failed/closed；Profile 失败保持 maintenance 或 degraded/closed；force-stop 仅在 absence 与 deployment 确定时 -> stopped，否则 failed/rollback-required |
+| `draining` | RoomRuntime + persistence + PVE Run Store；maintenance 已建立 | 仅当前 drain/stop/restart/update orchestration、force-stop 与只读；barrier pass -> maintenance/stopping/updating | 默认 60 秒、可 1–600 秒；逐 room/PVE blocker、pending 与 watermark | active blocker -> maintenance；可证明 integrity/唯一 writer 的 transient durable fail -> degraded/closed；corrupt/集合不完整/无可信 writer -> failed/closed；force-stop 成功只有在 commit/deployment 确定时 -> stopped，否则 rollback-required；absence 失败 -> failed |
+| `stopping` | Supervisor；正常路径已有 durable room + PVE drain | 当前 stop、force-stop 与只读；process tree/ports/writer absent -> stopped | final ACK 6.5 秒 + tree exit 5 秒；PID/port/writer absence 可见 | ACK 未证实不得自动 kill；force-stop 成功只有在 commit/deployment 确定时 -> stopped，否则 rollback-required；absence 失败 -> failed |
+| `degraded` | Supervisor；进程可能存活但全局 gate 失败，admission closed | maintenance.enter、stop、restart、diagnostics；app-update.prepare 保持 degraded；app-update.apply -> updating -> maintenance；恢复只能经 maintenance.enter/exit，或 restart -> maintenance 后再 exit，不直接跳 ready | 每 heartbeat 重评但不自动开 admission；failure code/checks 可见 | 未恢复保持 degraded/closed；unknown write -> rollback-required；force-stop 仅在 absence 与 deployment 确定时 -> stopped，否则 failed/rollback-required |
+| `failed` | Supervisor；无可信 writer 或启动/恢复不收敛 | server.stop 只有在证明 process tree、ports、writer absent 后 -> stopped；verified backup.restore -> updating；force-stop residual tree 后仅在 absence 已证明时 -> stopped；只读 | 无自动 timeout；admission 永远 closed；absence evidence 可见 | orphan/untrusted process 未收口则保持 failed；restore 不确定 -> rollback-required；保留原数据 |
+| `updating` | Electron main；active update/restore operation 与 closed admission | 仅当前 operation、force-stop 与只读；成功按 source intent -> ready/maintenance/stopped | forward deadline 最多 45 分钟；postcommit safety recovery 另有 20 分钟；phase/commitBoundary 可见 | precommit 且旧 pointer 明确时 force-stop -> stopped；postcommit/commit 不确定时 force-stop -> rollback-required；app-update.apply/existing-root restore 的确定 postcommit fail 走 exact rollback，empty-root restore 或 app-update.rollback 的 postcommit fail -> rollback-required |
+| `rollback-required` | Electron main；pointer/generation/commit 无法证明或 rollback 失败 | verified app-update.rollback/backup.restore -> updating；force-stop 可移除 process 但状态仍 rollback-required；diagnostics/read | 无自动离开；显示完整 evidence 与 closed admission | 任何恢复失败保持本状态、无 writer；不得猜版本、改成 stopped 或自动 reopen |
 
-未列转换返回 `INVALID_STATE_TRANSITION` 且零副作用。app update、restore 与 Profile operation 都保存
+不改变 lifecycle 的通用操作也必须明确：`app-update.check` 可在除 rollback-required 外的任意 state
+执行，`diagnostics.export` 和只读 query 可在全部 state 执行；它们不得改变 admission/service
+intent。未列转换返回 `INVALID_STATE_TRANSITION` 且零副作用。app update、restore 与 Profile operation 都保存
 source service intent：原 ready 且全部 gate 通过才 reopen；原 maintenance/stopped 返回原状态；原
-degraded 成功后仍回 maintenance 等人工核对。
+degraded 固定映射为 maintenance/closed 等人工核对；failed/rollback-required 发起 restore 固定映射为
+maintenance/closed，不自动 ready。该映射作为 accept record 的 `sourceServiceIntent` 在任何副作用前
+durable，restart 必须逐字使用，不能根据当时 process/lifecycle 重新推断。
+
+本文中的 `reconcile`、`reconcile-absence` 与 `commit-reconcile` 只表示 Supervisor 在 startup/
+heartbeat 或一个已 durable 接受 operation 内按 ledger/pointer/process evidence 执行的内部 phase，
+不是 `OperationKindV1`、不是 renderer/operator command，也不能绕过 single-flight/幂等。
+degraded 不存在“人工 reconcile -> ready”旁路；failed 只能用现有 `server.stop` durable 提交 absence
+后进入 stopped，再单独 start。
 
 ## 5. Operation、幂等与错误合同
 
@@ -493,7 +604,7 @@ interface OperationArgumentsByKindV1 {
   'backup.create': BackupCreateArgumentsV1
   'backup.restore': { backupId: string }
   'profile.install': { importToken: string }
-  'profile.activate': { targetResolvedProfileHash: `sha256:${string}` }
+  'profile.activate': { targetResolvedProfileHash: Sha256HexV1 }
   'profile.rollback': { target: 'previous-stable' | 'bundled-base' }
   'app-update.check': EmptyOperationArgumentsV1
   'app-update.prepare': { releaseId: `sha256:${string}` }
@@ -559,7 +670,7 @@ interface OperationResultByKindV1 {
     serviceIntent: ServiceIntentV1
   }
   'server.stop': {
-    drainRevision: string | null; durable: true; processAbsent: true
+    drainRevision: `sha256:${string}` | null; durable: true; processAbsent: true
     exitCode: number | null; stoppedAt: string
   }
   'server.force-stop': {
@@ -568,18 +679,19 @@ interface OperationResultByKindV1 {
   }
   'server.restart': {
     oldChildInstanceId: string | null; newChildInstanceId: string
-    drainRevision: string | null; durableAt: string
+    drainRevision: `sha256:${string}` | null; durableAt: string
   }
   'maintenance.enter': {
     admissionMode: 'existing-only' | 'closed'
     fenceId: string | null; blockers: MaintenanceBlockerV1[]
   }
   'maintenance.drain': {
-    drainRevision: string; roomCount: number; pendingJobs: 0; durableAt: string
+    drainRevision: `sha256:${string}`; rooms: RoomDrainReceiptV1[]
+    pendingJobs: 0; pve: PveDrainReceiptV1; durableAt: string
   }
   'maintenance.exit': {
     releaseId: `sha256:${string}`; activeProfileIdentity: GameProfileIdentityV1
-    admissionMode: 'open'
+    pveAggregateSetSha256: `sha256:${string}`; admissionMode: 'open'
   }
   'room.cleanup': {
     deletedRoomIds: string[]; alreadyAbsentRoomIds: string[]
@@ -587,6 +699,7 @@ interface OperationResultByKindV1 {
   }
   'backup.create': {
     backupId: string; manifestSha256: `sha256:${string}`
+    pveAggregateSetSha256: `sha256:${string}`
     byteLength: number; verifiedAt: string
     cleanupCoverage: {
       planId: string; planHash: `sha256:${string}`
@@ -595,7 +708,8 @@ interface OperationResultByKindV1 {
   }
   'backup.restore': {
     serverId: string; preRestoreBackupId: string | null
-    dataGenerationId: string; serviceIntent: ServiceIntentV1
+    dataGenerationId: string; activeProfileIdentity: GameProfileIdentityV1
+    profileActivationId: string | null; serviceIntent: ServiceIntentV1
   }
   'profile.install': {
     candidateIdentity: GameProfileIdentityV1; stableIdentity: GameProfileIdentityV1
@@ -605,22 +719,36 @@ interface OperationResultByKindV1 {
     activationId: string; stableIdentity: GameProfileIdentityV1
     previousStableIdentity: GameProfileIdentityV1
     profileStateRevision: number
+    pveReconciliation: {
+      aggregateSetSha256: `sha256:${string}`
+      preservedRunIds: string[]; clearedRunIds: string[]; tombstoneCount: number
+    }
   }
   'profile.rollback': {
     activationId: string; rollbackTarget: 'previous-stable' | 'bundled-base'
     stableIdentity: GameProfileIdentityV1
     previousStableIdentity: GameProfileIdentityV1
     profileStateRevision: number
+    pveReconciliation: {
+      aggregateSetSha256: `sha256:${string}`
+      preservedRunIds: string[]; clearedRunIds: string[]; tombstoneCount: number
+    }
   }
   'app-update.check': UpdateCheckResultV1
   'app-update.prepare': {
     preparedReleaseId: `sha256:${string}`
     updateBundle: VerifiedArtifactResultV1
     runtimeCatalog: VerifiedArtifactResultV1
+    releaseRecordSha256: `sha256:${string}`
+    signatureRecordSha256: `sha256:${string}`
+    keysetRecordSha256: `sha256:${string}`
+    artifactSetSha256: `sha256:${string}`
+    verifiedMarkerSha256: `sha256:${string}`
   }
   'app-update.apply': {
     releaseId: `sha256:${string}`; previousReleaseId: `sha256:${string}`
     preUpdateBackupId: string
+    previousArtifactSetSha256: `sha256:${string}`
     dataGenerationId: string; serviceIntent: ServiceIntentV1
   }
   'app-update.rollback': {
@@ -656,11 +784,12 @@ interface OperationPhaseNameByKindV1 {
     | 'health-gates' | 'commit-state'
   'maintenance.enter':
     | 'accepted' | 'set-existing-only' | 'drain-accepted-ingress'
-    | 'collect-blockers' | 'commit-state'
+    | 'drain-accepted-pve-ingress' | 'collect-blockers' | 'commit-state'
   'maintenance.drain':
-    | 'accepted' | 'wait-room-leases' | 'set-closed'
-    | 'drain-accepted-ingress' | 'close-authority-ingress'
-    | 'drain-journal' | 'verify-watermarks' | 'commit-state'
+    | 'accepted' | 'wait-room-leases' | 'wait-pve-battles' | 'set-closed'
+    | 'drain-accepted-ingress' | 'drain-accepted-pve-ingress'
+    | 'close-authority-ingress' | 'close-pve-ingress'
+    | 'drain-journal' | 'verify-watermarks' | 'verify-pve-store' | 'commit-state'
   'maintenance.exit':
     | 'accepted' | 'validate-drain-revision' | 'health-gates'
     | 'durable-open-intent' | 'open-admission' | 'commit-state'
@@ -669,28 +798,32 @@ interface OperationPhaseNameByKindV1 {
     | 'delete-rooms' | 'verify-durable-receipts' | 'commit-result'
   'backup.create':
     | 'accepted' | 'preflight' | 'stop-writer' | 'sqlite-online-backup'
-    | 'write-partial' | 'verify' | 'write-completed-marker'
+    | 'snapshot-pve-store' | 'write-partial' | 'verify' | 'verify-pve-store'
+    | 'write-completed-marker'
     | 'commit-final' | 'retention'
   'backup.restore':
-    | 'accepted' | 'preflight' | 'create-pre-restore-backup'
-    | 'bootstrap-identity' | 'stage-generation' | 'verify-continuity'
-    | 'migrate' | 'candidate-health' | 'commit-intent' | 'atomic-commit'
-    | 'committed-health' | 'reopen-or-hold' | 'automatic-rollback'
-    | 'reconcile'
+    | 'accepted' | 'enter-maintenance' | 'drain' | 'shutdown-ack'
+    | 'verify-absence' | 'acquire-data-root-lock' | 'preflight'
+    | 'create-pre-restore-backup' | 'bootstrap-identity' | 'bootstrap-profile'
+    | 'stage-generation' | 'verify-continuity' | 'migrate'
+    | 'install-profile-candidate' | 'profile-activation-plan'
+    | 'candidate-health' | 'commit-intent' | 'atomic-commit'
+    | 'profile-activation-commit' | 'committed-health'
+    | 'reopen-or-hold' | 'automatic-rollback' | 'reconcile'
   'profile.install':
     | 'accepted' | 'resolve-import-token' | 'read-archive'
     | 'install-candidate' | 'verify-candidate' | 'commit-result'
   'profile.activate':
     | 'accepted' | 'activation-plan' | 'presentation-refresh'
     | 'authority-restart' | 'candidate-server-health'
-    | 'candidate-websocket-health' | 'activation-commit'
+    | 'candidate-websocket-health' | 'activation-commit' | 'pve-authority-reconcile'
     | 'renderer-reload' | 'activation-release'
     | 'commit-reconcile' | 'profile-rollback'
   'profile.rollback':
     | 'accepted' | 'select-rollback-candidate' | 'activation-plan'
     | 'presentation-refresh' | 'authority-restart'
     | 'candidate-server-health' | 'candidate-websocket-health'
-    | 'activation-commit' | 'renderer-reload' | 'activation-release'
+    | 'activation-commit' | 'pve-authority-reconcile' | 'renderer-reload' | 'activation-release'
     | 'commit-reconcile' | 'profile-rollback'
   'app-update.check':
     | 'accepted' | 'resolve-keyset' | 'verify-keyset'
@@ -698,7 +831,8 @@ interface OperationPhaseNameByKindV1 {
     | 'commit-trust-high-water' | 'commit-result'
   'app-update.prepare':
     | 'accepted' | 'preflight' | 'download-bundle' | 'verify-bundle'
-    | 'download-catalog' | 'verify-catalog' | 'commit-prepared'
+    | 'download-catalog' | 'verify-catalog' | 'stage-artifact-set'
+    | 'verify-artifact-set' | 'commit-prepared'
   'app-update.apply':
     | 'accepted' | 'preflight' | 'maintenance' | 'drain' | 'backup'
     | 'cleanup' | 'stage-release' | 'stage-data' | 'migrate'
@@ -743,9 +877,12 @@ type OperationErrorCodeV1 =
   | 'PROCESS_NOT_RUNNING' | 'PROCESS_SPAWN_FAILED' | 'PROCESS_START_TIMEOUT'
   | 'PROCESS_EXIT_TIMEOUT' | 'HEALTH_CHECK_FAILED' | 'RELEASE_IDENTITY_MISMATCH'
   | 'PROCESS_TREE_NOT_ABSENT' | 'PORT_NOT_RELEASED' | 'WRITER_ALREADY_ACTIVE'
-  | 'DATA_ROOT_LOCKED' | 'DB_SCHEMA_INCOMPATIBLE' | 'ROLLBACK_REQUIRED'
+  | 'DATA_ROOT_LOCKED' | 'DB_SCHEMA_INCOMPATIBLE'
+  | 'ENGINE_ABI_MISMATCH' | 'RUNNER_REVISION_MISMATCH' | 'ROLLBACK_REQUIRED'
   | 'ADMISSION_FENCE_TIMEOUT' | 'ACTIVE_ROOM_BLOCKERS' | 'DRAIN_TIMEOUT'
   | 'DURABLE_DRAIN_FAILED' | 'ROOM_PERSISTENCE_DEGRADED'
+  | 'ACTIVE_PVE_BATTLE_BLOCKERS' | 'PVE_DURABLE_DRAIN_FAILED'
+  | 'PVE_RUN_STORE_INVALID' | 'PVE_SCHEMA_INCOMPATIBLE'
   | 'ROOM_CLEANUP_PLAN_STALE' | 'ROOM_CLEANUP_NOT_DURABLE'
   | 'BACKUP_NOT_FOUND' | 'BACKUP_VERIFICATION_FAILED'
   | 'BACKUP_SERVER_ID_MISMATCH' | 'BACKUP_SEASON_CONFLICT'
@@ -769,10 +906,12 @@ type OperationErrorCodeV1 =
 
 interface OperationErrorDetailsV1 {
   serverId?: string; roomId?: string; roomIds?: string[]
+  runId?: string; runIds?: string[]; battleId?: string
   operationId?: string; releaseId?: `sha256:${string}`; backupId?: string
   expectedStateRevision?: number; actualStateRevision?: number
   expectedChildInstanceId?: string; actualChildInstanceId?: string
-  expectedHash?: `sha256:${string}`; actualHash?: `sha256:${string}`
+  expectedHash?: `sha256:${string}` | Sha256HexV1
+  actualHash?: `sha256:${string}` | Sha256HexV1
   blockerCount?: number; blockers?: MaintenanceBlockerV1[]
   deadlineAt?: string; version?: string; count?: number; limit?: number
 }
@@ -788,7 +927,7 @@ interface OperationSnapshotBaseV1 {
   compensationDeadlineAt: string | null; heartbeatAt: string
   progress: OperationProgressV1 | null
   cancellable: boolean; commitBoundary: 'not-reached' | 'committed' | 'uncertain'
-  sourceStateRevision: number
+  sourceStateRevision: number; sourceServiceIntent: ServiceIntentV1
   rollback: {
     required: boolean; attempted: boolean; succeeded: boolean | null
     backupId: string | null; previousReleaseId: string | null
@@ -827,6 +966,11 @@ interface CancelOperationRequestV1 {
   requestId: string; operationId: string; expectedStateRevision: number
 }
 ```
+
+`sourceServiceIntent` 对每个 accepted operation 都必填：source lifecycle ready/stopped 分别映射
+ready/stopped，maintenance/degraded/failed/rollback-required 映射 maintenance；starting/draining/
+stopping/updating 中接受的控制 operation 继承当前 active operation 已 durable 的值。lifecycle-neutral
+operation 也记录但不消费该值。它与 `sourceStateRevision` 在 accept record 同次 durable 写入。
 
 Arguments、result、phase、error details 与 nested branch 全部
 `additionalProperties:false`；`result.kind`、`phase.kind` 和 `error.phase.kind` 必须与
@@ -883,7 +1027,8 @@ strict reject。Restore/update apply 的 45 分钟 forward cap 包含其所有 m
   `DATA_ROOT_LOCKED`、`DB_SCHEMA_INCOMPATIBLE`、`ROLLBACK_REQUIRED`；
 - maintenance：`ADMISSION_FENCE_TIMEOUT`、`ACTIVE_ROOM_BLOCKERS`、`DRAIN_TIMEOUT`、
   `DURABLE_DRAIN_FAILED`、`ROOM_PERSISTENCE_DEGRADED`、`ROOM_CLEANUP_PLAN_STALE`、
-  `ROOM_CLEANUP_NOT_DURABLE`；
+  `ROOM_CLEANUP_NOT_DURABLE`、`ACTIVE_PVE_BATTLE_BLOCKERS`、
+  `PVE_DURABLE_DRAIN_FAILED`、`PVE_RUN_STORE_INVALID`、`PVE_SCHEMA_INCOMPATIBLE`；
 - backup：`BACKUP_NOT_FOUND`、`BACKUP_VERIFICATION_FAILED`、`BACKUP_SERVER_ID_MISMATCH`、
   `BACKUP_SEASON_CONFLICT`、`BACKUP_SCHEMA_INCOMPATIBLE`、
   `BACKUP_CONTROL_CONTINUITY_MISSING`、`BACKUP_OPERATION_RECEIPT_CONFLICT`、
@@ -893,11 +1038,16 @@ strict reject。Restore/update apply 的 45 分钟 forward cap 包含其所有 m
   `UPDATE_INCOMPATIBLE`、`UPDATE_DOWNGRADE_FORBIDDEN`、`UPDATE_DISK_SPACE_INSUFFICIENT`、
   `UPDATE_STAGE_FAILED`、`UPDATE_MIGRATION_FAILED`、`UPDATE_HEALTH_FAILED`、
   `UPDATE_COMMIT_UNCERTAIN`、`UPDATE_ROLLBACK_FAILED`、`APP_UPDATE_PROFILE_INCOMPATIBLE`；
-- exact reuse：RED-115/116 的 `PROFILE_STORE_BUSY`、`PROFILE_STATE_INVALID`、
+- exact reuse：RED-115/116 的 `ENGINE_ABI_MISMATCH`、`RUNNER_REVISION_MISMATCH`、
+  `PROFILE_STORE_BUSY`、`PROFILE_STATE_INVALID`、
   `PROFILE_CANDIDATE_MISSING`、`PROFILE_ACTIVATION_MISMATCH`、`PROFILE_SNAPSHOT_INCOMPLETE`、
   `PROFILE_HASH_MISMATCH`、`PROFILE_ROLLBACK_UNAVAILABLE`、`PROFILE_IN_USE`、
   `PROFILE_DURABLE_DRAIN_FAILED`、`PINNED_PROFILE_UNAVAILABLE`、`PROFILE_REQUIRED` 与
   `PROFILE_INVALID`；fallback：`INTERNAL_ERROR`。
+
+`ENGINE_ABI_MISMATCH` 与 `RUNNER_REVISION_MISMATCH` 必须逐字复用 RED-116，HTTP/IPC status
+固定 409，且在任何 Profile、PVE、release、pointer、operation phase 或 data 写入前返回，保证零副作用；
+不得折叠为 `UPDATE_INCOMPATIBLE`、`PROFILE_INVALID` 或 message-only 失败。
 
 `LOG_SINK_FAILED` 是稳定 warning code，不把原业务错误改写为成功或替换其 error code。
 
@@ -913,23 +1063,23 @@ approval”的 operation 由 Electron main native dialog 签发 one-use challeng
 
 | Command | Owner / 授权 | 前置条件 | Timeout 与成功结果 | 失败状态与回退 |
 | --- | --- | --- | --- | --- |
-| `server.start {}` | Electron main / trusted IPC | stopped，或已 reconcile 的 failed/maintenance；必须证明完整 process tree、player/management ports 与 DB writer absent，并取得唯一 data-root lock；非 rollback-required | 20 秒；childInstanceId/releaseId/serviceIntent；stopped -> ready，maintenance 保持 closed | 任一 absence/lock 证明失败零 spawn；清理失败 child；failed/maintenance；data/release 不变 |
-| `server.stop {drainTimeoutMs?}` | main + persistence / trusted IPC | 非 stopped；active op 先合法 cancel | drain + 6.5 秒 ACK + 5 秒退出；durable/exitCode；stopped | drain/ACK 未确认不强杀，degraded/closed；残余 tree -> failed |
-| `server.force-stop {acknowledgeUndurableTailLoss:true}` | main / native approval | process present；可中断 operation | 5 秒；processAbsent/undurableTailLossPossible | 残余 tree -> failed；中断 commit -> rollback-required；无 data rollback |
-| `server.restart {drainTimeoutMs?:1000..120000}` | main / trusted IPC | ready/degraded/maintenance；非 rollback-required；failed 必须先 reconcile 后单独 start | 180 秒 overall；old/new child ID + durable receipt | durable stop 失败不启动；start 失败 -> failed；不切 release/Profile |
-| `maintenance.enter {reason}` | main + child fence / trusted IPC | ready/degraded/stopped | 10 秒；admission/fenceId/blockers | fence write 失败零转换；ingress timeout 保持 maintenance + blocker |
-| `maintenance.drain {timeoutMs?}` | main + RoomRuntime/persistence / trusted IPC | maintenance | 默认 60 秒；drainRevision/rooms/pendingJobs/durable receipt | room timeout -> maintenance/existing-only；journal fail -> degraded/closed |
-| `maintenance.exit {}` | all health owners / trusted IPC | maintenance + running + valid drainRevision + no blocker | 10 秒；release/Profile；ready/open | 任 gate 失败保持 maintenance/closed，不部分开放 |
+| `server.start {}` | Electron main / trusted IPC | stopped，或 child absent 的 maintenance；failed 必须先用 server.stop durable 证明 absence 并进入 stopped；必须证明完整 process tree、player/management ports 与 DB writer absent，并取得唯一 data-root lock；非 rollback-required | 20 秒；childInstanceId/releaseId/serviceIntent；stopped -> ready，maintenance -> starting -> maintenance 并保持 closed | 任一 absence/lock 证明失败零 spawn；清理失败 child；failed/maintenance；data/release 不变 |
+| `server.stop {drainTimeoutMs?}` | main + persistence / trusted IPC | starting/ready/maintenance/degraded，或已证明 absence 的 failed；rollback-required/updating 与已有 drain/stop operation 不接受新 stop；active op 先合法 cancel | drain + 6.5 秒 ACK + 5 秒退出；durable/exitCode；stopped | drain/ACK 未确认不强杀，degraded/closed；残余 tree -> failed |
+| `server.force-stop {acknowledgeUndurableTailLoss:true}` | main / native approval | process present；可中断 operation | 5 秒；processAbsent/undurableTailLossPossible；commit/deployment 确定且非 rollback-required 时 -> stopped；rollback-required 保持原状态 | 残余 tree -> failed；中断或 deployment commit 不确定 -> rollback-required；无 data rollback |
+| `server.restart {drainTimeoutMs?:1000..120000}` | main / trusted IPC | ready/degraded/maintenance；非 rollback-required；failed 必须先用 server.stop 进入 stopped 后单独 start | 180 秒 overall；old/new child ID + durable receipt | durable stop 失败不启动；start 失败 -> failed；不切 release/Profile |
+| `maintenance.enter {reason}` | main + child fence / trusted IPC | ready/degraded/stopped | 10 秒；admission/fenceId，room/PVE accepted ingress 与 blockers | fence write 失败零转换；任一 ingress timeout 保持 maintenance + blocker |
+| `maintenance.drain {timeoutMs?}` | main + RoomRuntime/persistence/PVE Run Store / trusted IPC | maintenance | 默认 60 秒；drainRevision、room watermarks、PVE receipt、两类 pending=0 | room/PVE timeout -> maintenance/existing-only；可证明 integrity/唯一 writer 的 transient journal/PVE unavailable -> degraded/closed；corrupt/集合不完整/无可信 writer -> failed/closed |
+| `maintenance.exit {}` | all health owners / trusted IPC | maintenance + running + valid room/PVE drainRevision + no blocker | 10 秒；release/Profile/PVE aggregate set；ready/open | 任 gate 失败保持 maintenance/closed，不部分开放 |
 | `room.cleanup {planId,planHash,backupId,acknowledgeIrreversible:true}` | child 执行、main 协调 / native approval | maintenance + valid drain；cleanupEpoch/fingerprint 未变；verified backup manifest 覆盖 exact plan | 5 分钟；deleted/alreadyAbsent IDs + receipts | 已 commit 项保留，未提交不动；maintenance；只能 restore 回退 |
-| `backup.create {label?,cleanupPlanId?,cleanupPlanHash?}` | main backup adapter / trusted IPC | maintenance + valid drain；DB/Profile/season 可读；coverage 两字段同时出现并指向有效 plan | 10 分钟；backupId/manifestHash/bytes/verifiedAt/cleanupCoverage | 删除 partial；live 与 lastVerified 不变 |
-| `backup.restore {backupId}` | main restore / native approval | stopped/maintenance/failed/rollback-required；child absent；identity/season/schema compatible | 45 分钟 forward；preRestoreBackupId|null/generation/serviceIntent | existing-root postcommit 自动回切；empty-root postcommit -> rollback-required/closed；不确定保留 evidence |
+| `backup.create {label?,cleanupPlanId?,cleanupPlanHash?}` | main backup adapter / trusted IPC | maintenance + valid room/PVE drain；DB/Profile/PVE/season 可 strict 读；coverage 两字段同时出现并指向有效 plan | 10 分钟；backupId/manifestHash/bytes/verifiedAt/cleanupCoverage/PVE aggregate set | 删除 partial；live 与 lastVerified 不变 |
+| `backup.restore {backupId}` | main restore / native approval | stopped/maintenance/failed/rollback-required；maintenance 源先在同 operation normal drain/stop；任何 restore stage/Profile/pointer mutation 前逐字证明 process tree、player/management ports、DB writer、PVE writer/ingress 全 absent/quiesced，并取得唯一 data-root lock；identity/season/DB/PVE schema compatible | 45 分钟 forward；preRestoreBackupId|null/generation/active Profile/serviceIntent | absence/lock 失败返回 `PROCESS_TREE_NOT_ABSENT`/`PORT_NOT_RELEASED`/`WRITER_ALREADY_ACTIVE`/`DATA_ROOT_LOCKED` 且零 stage/Profile/pointer mutation；existing-root postcommit 自动回切；empty-root postcommit -> rollback-required/closed；不确定保留 evidence |
 | `profile.install {importToken}` | RED-115 core / trusted IPC | ready/maintenance；无 activation；native picker one-use token | 5 分钟；candidate identity；stable unchanged | 按 RED-115 原子失败；不改 app/DB pointer |
-| `profile.activate {targetResolvedProfileHash}` | RED-115 core / trusted IPC | ready/maintenance；fence 后无 lease；candidate verified | 2 分钟；activationId/stable/previousStable | RED-115 recovery/rollback；durable drain fail 保持 closed |
+| `profile.activate {targetResolvedProfileHash}` | RED-115 core / trusted IPC | ready/maintenance；fence 后无 room 或 active PVE battle lease；candidate verified；RED-117 reconciliation 可执行 | 2 分钟；activationId/stable/previousStable/PVE reconciliation evidence | RED-115 recovery/rollback；durable room/PVE drain 或 reconciliation fail 保持 closed |
 | `profile.rollback {target}` | RED-115 core / native approval | target 仅 previous-stable/bundled-base；其余同 activate | 2 分钟；activation receipt | 必须走 RED-115 candidate/health/commit，禁止手改 pointer |
 | `app-update.check {}` | main release verifier + coordinator / trusted IPC | 任意非 rollback-required state；fixed channel；只在更新页打开或服主点击时提交 | 30 秒；verified metadata/no-update + continuity trust high-water/stateRevision | 签名/channel/replay 错误零 trust 写；不下载 artifact、不改 lifecycle/admission |
-| `app-update.prepare {releaseId}` | main + provider / trusted IPC | fixed channel；不低于 current；签名/platform/API/Profile/DB 初始 gate | 30 分钟且 60 秒 stall；bundle+catalog 各自 verified marker/hash/verifiedAt | 只删 incomplete cache；任一不完整则两者均不可 apply；不 maintenance、不执行 |
-| `app-update.apply {preparedReleaseId,cleanupPlanId?,cleanupPlanHash?}` | main updater / native approval | ready/maintenance/degraded/stopped；非 rollback-required；bytes reverify；disk budget；current Profile 同时兼容 target 和 exact previous；cleanup 字段同时有/无，有则 maintenance + valid plan | 45 分钟 forward；release/previous/backup/generation/serviceIntent | precommit 回原安全态；postcommit 20 分钟 exact rollback；不确定 -> rollback-required |
-| `app-update.rollback {targetReleaseId}` | main updater / native approval | ledger exact previous；artifact/backup/profileRequirement reverify；maintenance/stopped/rollback-required | 30 分钟；release/restoredBackup/generation/activatedProfile | Profile 激活或 binary precommit 失败不切 deployment；不确定保持 rollback-required；旧 binary 不开新 DB |
+| `app-update.prepare {releaseId}` | main + provider / trusted IPC | 仅 stopped/ready/maintenance/degraded；无 active operation；fixed channel；不低于 current；签名/platform/API/Profile/DB/PVE schema 初始 gate | 30 分钟且 60 秒 stall；完整 verified artifact-set marker/hash/verifiedAt；lifecycle 不变 | 只删 incomplete cache；任一不完整则整个 set 不可 apply；不 maintenance、不执行 |
+| `app-update.apply {preparedReleaseId,cleanupPlanId?,cleanupPlanHash?}` | main updater / native approval | ready/maintenance/degraded/stopped；非 rollback-required；完整 artifact-set/bytes reverify；disk budget；current Profile 与 DB/PVE schema 同时兼容 target 和 exact previous；cleanup 字段同时有/无，有则 maintenance + valid plan | 45 分钟 forward；release/previous artifact-set hash/backup/generation/serviceIntent | precommit 回原安全态；postcommit 20 分钟 exact rollback；不确定 -> rollback-required |
+| `app-update.rollback {targetReleaseId}` | main updater / native approval | ledger exact previous；artifact-set hash/backup/generation/profileRequirement/DB/PVE schema reverify；maintenance/stopped/rollback-required | 30 分钟；release/restoredBackup/generation/activatedProfile | Profile 激活或 binary/data precommit 失败不切 deployment；atomic pointer 后 committed-health 失败明确进入 rollback-required/closed/no-writer，不猜测切回 rollback 前 source deployment；其他不确定同样保持 rollback-required；旧 binary 不开新 DB/PVE Store |
 | `diagnostics.export {exportToken,includeRoomIds?}` | main diagnostics / trusted IPC | 任意状态；native save one-use token | 5 分钟/100 MiB；artifactId/displayName/bytes/hash | 删除 partial；不改 lifecycle；严格脱敏 |
 
 正常 stop 不自动 fallback force-stop；tail-loss acknowledgement 不得由 config、CLI 或默认 key 代替。
@@ -954,6 +1104,7 @@ previousStable 恢复 rollback 前 Profile，恢复也失败时保持 maintenanc
 Preload 只暴露 `serverOperationsV1`：
 
 ```ts
+interface ServerOperationsPreloadV1 {
 getState(): Promise<ServerOperationsStateV1>
 execute(command: OperationCommandV1): Promise<OperationResponseV1>
 cancel(request: CancelOperationRequestV1): Promise<OperationResponseV1>
@@ -967,6 +1118,7 @@ checkUpdates(
 planCleanup(query: CleanupPlanQueryV1): Promise<CleanupPlanV1>
 approve(challenge: ApprovalChallengeRequestV1): Promise<ApprovalChallengeV1>
 subscribe(listener: (stateRevision: number) => void): () => void
+}
 ```
 
 查询、计划和批准对象固定为：
@@ -1144,7 +1296,7 @@ type ChildMutationResponseV1<K extends OperationKindV1, T> = {
 
 interface ChildAdmissionStateV1 {
   mode: AdmissionModeV1; fenceId: string | null; reasonCode: StateReasonCodeV1 | null
-  since: string; acceptedIngressPending: number
+  since: string; acceptedIngressPending: number; acceptedPveIngressPending: number
 }
 interface ChildHealthReportV1 {
   schemaVersion: 'rvb-server-operations/v1'
@@ -1164,6 +1316,12 @@ interface ChildRuntimeObservationV1 {
   rooms: {
     total: number; activeLeases: number; blockers: MaintenanceBlockerV1[]
   }
+  pve: {
+    source: 'rvb-pve-run-aggregate/v1'
+    totalRuns: number; activeBattleCount: number
+    activeBattleRunIds: string[]; activeBattleIds: string[]
+    aggregateSetSha256: `sha256:${string}`
+  }
   activeDelegation: {
     operationId: string; operationKind: OperationKindV1
     commandHash: `sha256:${string}`; phase: OperationPhaseV1
@@ -1180,7 +1338,8 @@ interface ChildAdmissionArgumentsV1 {
   waitForAcceptedIngress: boolean
 }
 interface ChildAdmissionResultV1 {
-  admission: ChildAdmissionStateV1; activeProfileLeaseRoomIds: string[]
+  admission: ChildAdmissionStateV1
+  activeProfileLeaseRoomIds: string[]; activeProfileLeasePveRunIds: string[]
 }
 interface RoomDrainReceiptV1 {
   roomId: string; authorityEpoch: number; authorityVersion: number
@@ -1191,12 +1350,21 @@ interface RoomDrainReceiptV1 {
 interface ChildDrainArgumentsV1 {
   expectedFenceId: string; deadlineAt: string
 }
+interface PveRunWatermarkV1 {
+  runId: string; runRevision: number; authorityContentHash: Sha256HexV1
+  activeBattleId: null; aggregateSha256: `sha256:${string}`
+}
+interface PveDrainReceiptV1 {
+  source: 'rvb-pve-run-aggregate/v1'
+  acceptedPveIngressPending: 0; activeBattleCount: 0
+  runs: PveRunWatermarkV1[]; aggregateSetSha256: `sha256:${string}`
+}
 interface ChildDrainResultV1 {
-  drainRevision: string; durableAt: string
-  rooms: RoomDrainReceiptV1[]; pendingJobs: 0
+  drainRevision: `sha256:${string}`; durableAt: string
+  rooms: RoomDrainReceiptV1[]; pendingJobs: 0; pve: PveDrainReceiptV1
 }
 interface ChildRoomCleanupArgumentsV1 {
-  drainRevision: string; planId: string; planHash: `sha256:${string}`
+  drainRevision: `sha256:${string}`; planId: string; planHash: `sha256:${string}`
   backupId: string; roomIds: string[]; acknowledgeIrreversible: true
 }
 
@@ -1212,26 +1380,35 @@ type ChildDrainOperationKindV1 =
 type ChildProfileRecoveryOperationKindV1 =
   | 'server.start' | 'server.restart' | 'profile.activate' | 'profile.rollback'
   | 'backup.restore' | 'app-update.apply' | 'app-update.rollback'
+type ChildProfileInstallOperationKindV1 = 'profile.install' | 'backup.restore'
+type ChildProfileActivateOperationKindV1 =
+  | 'profile.activate' | 'profile.rollback' | 'backup.restore' | 'app-update.rollback'
 
-interface ChildProfileInstallBinaryMetadataV1 {
-  contentLength: number; contentSha256: `sha256:${string}`
-}
+type ChildProfileInstallBinaryMetadataV1 =
+  | {
+      source: 'native-import'; contentLength: number
+      contentSha256: `sha256:${string}`; expectedIdentity?: never
+    }
+  | {
+      source: 'verified-backup'; contentLength: number
+      contentSha256: `sha256:${string}`; expectedIdentity: GameProfileIdentityV1
+    }
 interface ChildProfileInstallResultV1 {
   state: ProfileStateV1; candidate: ProfileReferenceV1
 }
 type ChildProfileActivateArgumentsV1 =
-  | { action: 'plan'; targetResolvedProfileHash: `sha256:${string}` }
+  | { action: 'plan'; targetResolvedProfileHash: Sha256HexV1 }
   | {
       action: 'rebind'; activationId: string
-      targetResolvedProfileHash: `sha256:${string}`
+      targetResolvedProfileHash: Sha256HexV1
     }
   | {
       action: 'commit'; activationId: string
-      targetResolvedProfileHash: `sha256:${string}`
+      targetResolvedProfileHash: Sha256HexV1
     }
   | {
       action: 'release'; activationId: string
-      targetResolvedProfileHash: `sha256:${string}`
+      targetResolvedProfileHash: Sha256HexV1
     }
   | {
       action: 'record-failure'; activationId: string
@@ -1239,6 +1416,7 @@ type ChildProfileActivateArgumentsV1 =
       stage:
         | OperationPhaseNameByKindV1['profile.activate']
         | OperationPhaseNameByKindV1['profile.rollback']
+        | OperationPhaseNameByKindV1['backup.restore']
         | OperationPhaseNameByKindV1['app-update.rollback']
       message: string; keepAdmissionPaused: boolean
     }
@@ -1262,6 +1440,18 @@ interface ChildProfileObservationV1 {
 }
 ```
 
+`ChildRuntimeObservationV1.pve` 与 `activeProfileLeasePveRunIds` 必须在同一次 strict
+`PveRunStoreV1` observation 中由 `getPveActiveBattleLeaseReportV1()` 产生，不能读取 state cache
+或 UI 投影。`ChildDrainResultV1.rooms` 按 roomId、`pve.runs` 按 runId 的 UTF-8 bytes 排序并完整
+覆盖 drain 时所有 room/active Run；count、watermark、aggregate hash 任一不匹配即
+`PVE_DURABLE_DRAIN_FAILED`/对应 room drain error。外层 `maintenance.drain` operation result
+必须原样包含这两份 receipt，不能只保留 count。
+`PveRunWatermarkV1.authorityContentHash` 和全部
+`targetResolvedProfileHash` 逐字复用 RED-115/116/117 Content Pipeline 的
+`Sha256HexV1Schema` / `Sha256HexV1`：恰好 64 个 lowercase hex、无 `sha256:` 前缀。不得为了
+运维 schema 转换格式；只有 RED-140 新计算的 release/artifact/operation/aggregate/file/manifest
+digest 使用 prefixed `sha256:${string}`。
+
 所有 child request/response branch 也是 `additionalProperties:false`。每个请求先要求
 `x-rvb-management-capability`、`x-rvb-api-version: rvb-server-operations/v1`、
 `x-rvb-request-id` 与 `x-rvb-child-instance-id`；header 与 body/query 中重复的值必须全等。
@@ -1273,8 +1463,10 @@ Content-Length 与实际 bytes 都不得超过 64 KiB；wrong method/media/versi
 `POST /v1/profile/install` 是唯一 binary route：Content-Type 必须
 `application/octet-stream`，Content-Length 1..32 MiB，拒绝 chunked；
 `x-rvb-operation-envelope` 是最多 8 KiB 的 unpadded-base64url JCS
-`ChildMutationEnvelopeV1<'profile.install', ChildProfileInstallBinaryMetadataV1>`，body length/hash
-必须匹配。importToken 只由 Electron main 解析为 native picker 选定的 bytes，绝不传给 child。
+`ChildMutationEnvelopeV1<ChildProfileInstallOperationKindV1, ChildProfileInstallBinaryMetadataV1>`，body
+length/hash 必须匹配。`profile.install` 只接受 `source=native-import`，importToken 只由 Electron main
+解析为 native picker 选定的 bytes，绝不传给 child；`backup.restore` 只接受
+`source=verified-backup`，其 expected identity 与 bytes 必须逐字匹配已重验 backup manifest。
 
 Child phase 幂等 key 是 `(operationId, phaseSequence)`，phase payload hash 为
 `SHA256(JCS({schemaVersion,operationId,operationKind,commandHash,phase,phaseSequence,
@@ -1299,8 +1491,8 @@ active delegation，不把 childRevision 当第二个全局 revision。
 | `GET /v1/rooms/{roomId}` | roomId 单次 percent-decode；exact `expectedStateRevision` | 200 `ChildReadResponseV1<RoomRuntimeInspectionV1>` | 404 `ROOM_NOT_FOUND`；503 stale |
 | `POST /v1/rooms/cleanup` | kind 只能 room.cleanup + `ChildRoomCleanupArgumentsV1` | 200/202，`OperationResultForV1<'room.cleanup'>` | 409/412 stale plan；423 blocker；503 durability；504 timeout |
 | `GET /v1/profile` | 无 query/body | 200 `ChildReadResponseV1<ChildProfileObservationV1>` | 503 report failed |
-| `POST /v1/profile/install` | kind 只能 profile.install + binary contract | 201/202，`ChildProfileInstallResultV1` | 400 invalid archive；413 size；415 media；423 busy；503/504 |
-| `POST /v1/profile/activate` | kind 只能 profile.activate/profile.rollback/app-update.rollback + action union | 200/202，`ChildProfileActivateResultV1` | 404 candidate；409 lease；412 activation；423 busy；503/504 |
+| `POST /v1/profile/install` | kind 属于 `ChildProfileInstallOperationKindV1` + 对应 source binary contract | 201/202，`ChildProfileInstallResultV1` | 400 invalid archive；413 size；415 media；423 busy；503/504 |
+| `POST /v1/profile/activate` | kind 属于 `ChildProfileActivateOperationKindV1` + action union | 200/202，`ChildProfileActivateResultV1` | 404 candidate；409 lease；412 activation；423 busy；503/504 |
 | `POST /v1/profile/rollback` | kind 只能 profile.rollback + `ChildProfileRollbackArgumentsV1` | 200/202，`ProfileReferenceV1` | 404 unavailable；409/423 |
 | `POST /v1/profile/recover` | kind 属于 `ChildProfileRecoveryOperationKindV1` + `ChildProfileRecoveryArgumentsV1` | 200/202，`ProfileStartupRecoveryV1` | 409 conflicting activation；503/504 |
 
@@ -1323,25 +1515,42 @@ update/backup。Electron main 的 OS/backup/update 能力只可由受信 preload
 
 `maintenance.enter` 固定顺序：
 
-1. admission `open -> existing-only`；拒绝新 connection/create/join/claim/ready/select/start，允许
-   已 in-progress 玩家走到 terminal，也允许 leave；
-2. 等 fence 前已 accepted create/join handler 完成；
-3. 重读 Profile lease、RoomRuntime 与 stateRevision；
+1. admission `open -> existing-only`；拒绝新 connection、room create/join/claim/ready/select/start
+   与 PVE Run create/command；允许已 in-progress room/PVE battle 走到 terminal，也允许 leave；
+2. 等 fence 前已 accepted room 与 PVE create/command handler 完成，使两类 pending 计数都可观察；
+3. 从 RED-115/117 真源重读 room 与 active PVE battle 的 Profile lease、RoomRuntime、PVE
+   `aggregateSetSha256` 与 stateRevision；
 4. 发布 blockers，进入 maintenance。
 
 `maintenance.drain` 固定顺序：
 
-1. deadline 内等 in-progress 自然终局、waiting/ready occupants 释放；期间 existing-only；
-2. 无 lease 后 admission -> closed，拒绝全部新 gameplay mutation；
-3. 等 fence 前 accepted player handler 完成；
-4. close room-authority ingress 与 persistence ingress；
+1. deadline 内等 in-progress room 与 active PVE battle 自然终局、waiting/ready occupants 释放；
+   期间 existing-only；
+2. room 与 active PVE battle Profile lease 都为零后 admission -> closed，拒绝全部新 gameplay
+   mutation；
+3. 等 fence 前 accepted room/player 与 PVE handler 完成，确认 `acceptedIngressPending=0` 和
+   `acceptedPveIngressPending=0`；
+4. close room-authority、persistence 与 PVE Run mutation ingress；
 5. 等每房间 authority queue 与 RED-131 journal drain；
-6. 每 room 确认 pending=0 且 `durableAuthorityVersion >= authorityVersion`；
-7. 输出绑定当前 stateRevision 的 drainRevision。
+6. strict 重开 RED-117 Run Store，确认 `activeBattleCount=0`，为每个 active Run 记录
+   revision/authority hash/aggregate hash，并重算包含 active aggregate、archived evidence 与
+   tombstone 的 `aggregateSetSha256`；
+7. 每 room 确认 pending=0 且 `durableAuthorityVersion >= authorityVersion`；
+8. 输出绑定当前 stateRevision、fenceId、childInstanceId、排序后的 room watermarks 与完整
+   `PveDrainReceiptV1` 的 drainRevision。
 
-新 mutation、child restart、Profile/release/data generation 变化都会使旧 drainRevision 失效。timeout
+固定计算为
+`drainRevision = SHA256(JCS({stateRevision,fenceId,childInstanceId,rooms,pve,profileStateRevision}))`；
+`rooms` 按 roomId UTF-8 bytes 排序，`pve.runs` 按 runId 排序。任何 room/PVE mutation、child
+restart、Profile/release/data generation 变化都会使旧 drainRevision 失效。timeout
 不杀 room 或伪造终局，而是返回 blockers 并保持 maintenance/existing-only。journal degraded 使
 admission closed 并进入 maintenance/degraded，要求 recover/restart，不忽略 undurable tail。
+
+`room.cleanup`、普通 retention/GC 和 app cleanup 都不得删除 PVE Run、archived evidence 或
+tombstone。只有 RED-117 authority reconciliation 在 admission closed、两类 accepted ingress 均为
+零且 active PVE battle 为零时，才能按“先 immutable archive 完整 aggregate、再 durable tombstone、
+最后删除 active Run”执行；任一步失败都保留原 active Run 并 fail closed。evidence/tombstone 进入
+generation、backup 与 restore 完整性闭环，不得按 downloads/tmp 日志策略删除或重算。
 
 ```ts
 interface RoomRuntimeInspectionV1 {
@@ -1424,10 +1633,20 @@ startup 先 restore 全部 waiting/ready/in-progress/recovering 和 terminal pen
     game.db-wal                         # live generation transient companion
     game.db-shm                         # live generation transient companion
     config/
+    pve-runs/                           # RED-117 PveRunStoreV1 唯一 live root
+      runs/
+      audit/evidence/
+      audit/tombstones/
   resource-pack/                       # RED-115 Profile Store 真源
   backups/<backupId>/
   updates/downloads/<operationId>/
   updates/releases/<releaseId>/
+    release.json
+    release.signatures.json
+    keyset.json
+    update-bundle.zip
+    runtime-catalog.cat
+    VERIFIED.json
   diagnostics/
   logs/
   tmp/
@@ -1448,19 +1667,31 @@ exact previous tuple。它不记录或拥有 mutable active Profile revision，�
 `resource-pack/active.json`。Launcher 只启动签名、hash、channel、schema 与 committed pointer 全
 匹配的 release slot。
 
+install root 的 `releases/<releaseId>` 只包含由 deployment pointer 选择、允许 Launcher 执行的
+runnable release slot。`<serverDataRoot>/updates/releases/<releaseId>` 是永不执行的 immutable
+verified rollback artifact-set：保存 exact signed release JSON、detached signatures、当时验证过的
+root-signed keyset record、update ZIP、runtime catalog 与绑定全部 bytes/hash/verifiedAt 的
+`VERIFIED.json`。两类 root 不得互当来源；数据 root 中的 set 只用于重新验证、重建 release slot 与
+exact rollback。
+
 control root（server identity、operation ledger、update journal）不随 restore 回卷，否则会重用 opId、
-回退 serverId 或丢 uncertain evidence。现有 `game.db`/`resource-pack` 是未来 migration 输入；本文
-不声称已经迁移。
+回退 serverId 或丢 uncertain evidence。现有 `game.db`/`resource-pack` 与 RED-117 当前
+`<userData>/pve-runs` 都只是未来 migration 输入；导入器必须在 maintenance/closed 下 strict
+验证并原样复制到一个新 generation，原子切换 pointer 后停用旧路径，不得同时写两个 root、merge
+或从 checkpoint/receipt 重算 Run。本文不声称已经迁移。
 
 | 数据类 | Backup | 保留/删除 |
 | --- | --- | --- |
 | launcher/release slots | 否，由签名 artifact 重建 | current、previous 至少 90 天；被引用继续保留；只删无引用 slot |
 | control identity/ledger | migration continuity capsule 包含 identity、compact receipts 与 trust high-water；full ledger 不进 payload | existing root 只做 receipt union 与 high-water max，绝不回卷；identity 永久，receipt 永久 |
 | config/DB/season/ranking/rooms | 是 | 通过 SQLite consistent snapshot；不把 live WAL/SHM 原样入包，不原地降级或 merge |
-| `resource-pack/**` | 是 | stable、previousStable、DB/backup 与 exact app rollback set 引用内容不得 GC；激活只走 RED-115 |
+| `data/generations/*/pve-runs/**` | 是 | active aggregate、archived evidence 与 tombstone 成对完整入包并 exact-generation restore；generic GC/room.cleanup 不得删。只在 generation/backup/rollback 均无引用、至少保留 90 天并经 native irreversible approval 后，才可删除整个 retired generation；不得删单项或重算 |
+| `resource-pack/**` immutable Profile package closure | 是 | 只包含 manifest `activeProfileIdentity` 对应、可由 RED-115 install route strict 重开的 package bytes；stable、previousStable、DB/backup 与 exact app rollback set 引用内容不得 GC |
+| `resource-pack/active.json`、activation journal/lock | 不作为可恢复文件 | backup manifest 只把 active identity 当 assertion；restore 必须走 RED-115 plan/health/commit/recovery，禁止复制 pointer、journal 或 lock |
 | logs | 否 | 14 天且总计 256 MiB，先删最旧完整轮转段 |
 | backups | 不递归 | 7 daily、4 weekly、至少 2 个 pre-update 且不少于 90 天；manual 直到人工删除；不删最后一个 compatible verified backup |
 | downloads/staging | 否 | 成功后删；失败候选最多 72 小时；不得含唯一数据 |
+| `updates/releases/<releaseId>/**` verified artifact-set | 否 | current、prepared、previous pointer 引用 set 均保留；previous 至少 90 天且被 security/rollback 引用继续保留。只依据 durable reference graph 删除完全无引用 set，不走普通 download cleanup；set 内文件不可单删 |
 | diagnostics | 否 | 单包 100 MiB，7 天且总计 512 MiB；默认无 DB/secret |
 | tmp/locks | 否 | 确认 owner 不存活后按 token/operation ownership 清理，不用 glob |
 
@@ -1468,6 +1699,10 @@ control root（server identity、operation ledger、update journal）不随 rest
 interface ServerBackupManifestV1 {
   schemaVersion: 'rvb-server-backup/v1'; backupId: string; createdAt: string; serverId: string
   sourceRelease: ReleaseIdentityV1; activeProfileIdentity: GameProfileIdentityV1
+  activeProfilePackage: {
+    path: string; byteLength: number; sha256: `sha256:${string}`
+    identity: GameProfileIdentityV1
+  }
   databaseSchemaVersion: string; migrationSetHash: `sha256:${string}`
   seasonId: string | null; rankingWatermark: number
   controlContinuity: {
@@ -1480,6 +1715,12 @@ interface ServerBackupManifestV1 {
     roomId: string; authorityEpoch: number; authorityVersion: number
     terminalSettlementKey: string | null
   }>
+  pveRunStore: {
+    source: 'rvb-pve-run-aggregate/v1'
+    aggregateSetSha256: `sha256:${string}`
+    activeBattleCount: 0; runWatermarks: PveRunWatermarkV1[]
+    archivedEvidenceCount: number; tombstoneCount: number
+  }
   cleanupCoverage: {
     planId: string; planHash: `sha256:${string}`
     cleanupEpoch: number; roomSelectionFingerprint: `sha256:${string}`
@@ -1516,10 +1757,12 @@ interface DeploymentPointerV1 {
   schemaVersion: 'rvb-server-deployment/v1'
   pointerRevision: number; writtenAt: string
   releaseId: `sha256:${string}`; dataGenerationId: string
+  releaseArtifactSetSha256: `sha256:${string}`
   continuityGenerationId: string; continuityPayloadSha256: `sha256:${string}`
   configRevision: number
   previous: {
     releaseId: `sha256:${string}`; dataGenerationId: string; backupId: string
+    releaseArtifactSetSha256: `sha256:${string}`
     retentionUntil: string
     profileRequirement: {
       identity: GameProfileIdentityV1; profileStoreRevisionAtCapture: number
@@ -1538,18 +1781,25 @@ manifest path 必须用 `/`、normalized/sorted，无 duplicate/case collision�
 backslash、NUL、symlink、junction、reparse 和 non-regular file。
 
 `files` 排除 manifest 本身与 `COMPLETED` marker，按 normalized path 的 UTF-8 bytes 排序。
+`activeProfilePackage.path` 必须是 `files` 中恰好一项，其 length/hash/identity 必须逐字匹配
+`activeProfileIdentity` 与 RED-115 strict reopen 结果；它是 immutable install package，不是
+`resource-pack/active.json`、activation journal 或 lock 的副本。
 `fileSetSha256 = SHA256(u32be(fileCount) || records)`，每条 record 为
 `u32be(pathByteLength) || pathBytes || u64be(byteLength) || raw32(fileSha256)`。
 `operationReceiptSetSha256` 对按 operationId UTF-8 bytes 排序的
 `CompactOperationReceiptV1` JCS bytes 计算
 `SHA256(u32be(receiptCount) || repeated(u32be(receiptByteLength) || receiptBytes))`；count 必须与
 `operationReceiptCount` 相等。
+`roomDurableWatermarks` 按 roomId、`pveRunStore.runWatermarks` 按 runId 的 UTF-8 bytes 排序，
+并分别完整覆盖 snapshot 中所有 room 与 active PVE Run；PVE archived evidence/tombstone 必须一一
+配对，两个 count 与 file inventory 相等。manifest 的 `aggregateSetSha256` 必须同时等于 drain
+receipt 和从 backup bytes strict reopen 后的重算值，否则整个 backup 不得写 COMPLETED。
 
 Full manifest payload 是 `ServerBackupManifestV1` 除 `manifestSha256` 外全部命名字段的 RFC 8785
 JCS UTF-8 bytes；`manifestSha256 = SHA256(payload)`，因此 serverId、release/Profile、DB schema、
-season/ranking watermarks、continuity high-water、room watermarks、file inventory、fileSetSha256 与
-verifiedAt 全部进入完整性闭环。严格解析拒绝 unknown/duplicate fields、非 canonical scalar 与乱序/
-重复 collection。
+season/ranking watermarks、continuity high-water、room watermarks、PVE Run watermarks 与
+aggregate set、file inventory、fileSetSha256 与 verifiedAt 全部进入完整性闭环。严格解析拒绝
+unknown/duplicate fields、非 canonical scalar 与乱序/重复 collection。
 
 Continuity generation 是 immutable cumulative snapshot，而不是可变 receipt 目录。其 canonical
 payload 是
@@ -1569,7 +1819,8 @@ pointer replacement。pointer 前失败留下未引用 staging/generation，按 
 rollback-required。Full operation ledger 与 update journal 不回卷；startup 用它们 reconcile
 accepted/running operation 与新 pointer。
 
-Verified backup 只在 maintenance、blocker=0、durable drain/barrier 后执行。file set 额外包含
+Verified backup 只在 maintenance、blocker=0、room + PVE durable drain/barrier 后执行。file set
+包含当前 generation 的完整 `pve-runs/runs/**`、`audit/evidence/**`、`audit/tombstones/**`，并额外包含
 `control-continuity/manifest.json`、`operation-receipts/*.json` 的当前 cumulative compact tombstones
 与 release trust high-water；
 不包含可执行 operation detail、capability 或 update download。continuity files 必须进入 inventory 与
@@ -1581,10 +1832,15 @@ backup。Standalone backup 的 coverage 为 null。App update 只有在可选 pl
 pre-update backup；没有 plan 时 cleanup phase 是 no-op，绝不自行选择房间。Cleanup 执行时要求
 backup coverage、当前 epoch/fingerprint、planId/hash 四者全等。
 
-1. 记录 identity、release tuple、Profile revision、DB schema、durable watermarks、data-loss cutoff；
-2. 停止唯一 DB writer，以 SQLite Online Backup API 产生自包含 snapshot；不能活动 WAL 下只复制 DB；
-3. 写 `<backupId>.partial`，包含 generation data、Profile payload 与 manifest input；
-4. 运行 `PRAGMA integrity_check`，复验 Profile 与逐文件 size/SHA-256；
+1. 记录 identity、release tuple、Profile revision、DB schema、room/PVE durable watermarks、
+   `aggregateSetSha256` 与 data-loss cutoff；
+2. 保持 PVE mutation ingress closed 并停止唯一 DB writer，以 SQLite Online Backup API 产生自包含
+   snapshot；不能活动 WAL 下只复制 DB；
+3. 写 `<backupId>.partial`，包含 generation data（含完整 PVE active/audit tree）、与
+   `activeProfileIdentity` 对应且由 RED-115 strict 导出的 immutable install package，以及 manifest
+   input；不得复制 `resource-pack/active.json`、activation journal 或 lock 作为恢复权威；
+4. 运行 `PRAGMA integrity_check`，strict 重开每个 PVE aggregate/evidence/tombstone，重算
+   `aggregateSetSha256`，并经 RED-115 package verifier 复验 Profile identity 与逐文件 size/SHA-256；
 5. 写 canonical manifest 后独立 reopen，重算 full manifest/file set；在 staging 内把 strict
    `BackupCompletedMarkerV1` 作为最后一个 durable file 写入并 flush，再同卷 rename 为 final
    immutable directory；
@@ -1605,14 +1861,28 @@ v1 没有 backup signature/MAC。UI、文档和测试不得把 verified backup �
 
 Restore 固定流程：
 
-1. reverify path/marker/manifest/bytes/serverId/season watermark/DB/Profile/release/space，以及 continuity
-   receipt set/hash 与 keyset/sequence/epoch high-water；
-2. 已有 committed generation 时必须先建 verified pre-restore backup，失败即停；真正空 root 必须
+1. 先 durable 保存 source service intent。maintenance 源在同一 operation 内完成 normal fence/drain/
+   stop；所有来源在读取/写入 restore stage、Profile 或 pointer 前，都必须证明完整 process tree、
+   player/management ports、DB writer、PVE writer/ingress absent/quiesced，并取得唯一 data-root lock。
+   任一证明失败返回 `PROCESS_TREE_NOT_ABSENT`、`PORT_NOT_RELEASED`、`WRITER_ALREADY_ACTIVE` 或
+   `DATA_ROOT_LOCKED`，零 stage/Profile/pointer mutation；
+2. reverify path/marker/manifest/bytes/serverId/season watermark/DB/Profile/PVE schema、PVE
+   aggregate set/release/space，以及 continuity receipt set/hash 与 keyset/sequence/epoch high-water；
+3. 已有 committed generation 时必须先建 verified pre-restore backup，失败即停；真正空 root 必须
    证明无 identity、deployment、generation、receipt 后，在临时 bootstrap journal 写 durable
    `no-prior-generation` receipt，不能伪装成已有 backup；
-3. 解到随机 generation staging，拒 path/node attack，不原地覆盖；
-4. staging DB 只做声明允许的 forward migration，restore rooms 并验证 pinned Profile；
-5. 计算 control continuity merge：已有同 serverId root 对 compact receipt 做 set union，同 operationId
+4. 解到随机 generation staging，拒 path/node attack，不原地覆盖；
+5. staging DB 与 PVE Run Store 只做 release identity 明确声明允许的 forward migration；PVE 必须从
+   backup 的 active/audit tree exact-generation restore，不得与本机 Run merge、从 checkpoint/
+   receipt 重算或丢弃 unknown/corrupt entry；随后 restore rooms；
+6. 空 root 先只用 RED-115 既有 explicit Bundled Base bootstrap/recovery 在 closed 状态建立可验证
+   stable；随后 strict 重验 `activeProfilePackage` 的 bytes/identity，经受 capability 保护且绑定本
+   `backup.restore` operation 的 `/v1/profile/install` 写成 RED-115 candidate，再走同一 RED-115
+   plan/rebind/candidate-health/commit/release/recovery；不得 raw 写或复制 `resource-pack/active.json`。
+   若现有 stable 已逐字等于 manifest identity，可把 `profileActivationId` 记为 null 并只 strict
+   reverify；否则 package 缺失、identity/hash drift 在 pointer mutation 前返回
+   `PROFILE_REQUIRED`/`PROFILE_INVALID`；空 root 同样只能走这个 candidate 路径；
+7. 计算 control continuity merge：已有同 serverId root 对 compact receipt 做 set union，同 operationId
    不同 commandHash/resultHash 返回 `BACKUP_OPERATION_RECEIPT_CONFLICT`；keysetVersion 取
    `max(local, backup, launcherEmbeddedMinimum, freshlyVerifiedKeyset)`，并携带提供该最大 version 的
    keysetRecordSha256；多个来源提供相同最大 version 时 digest 必须一致，否则
@@ -1622,14 +1892,19 @@ Restore 固定流程：
    的 release identity；后续每份 manifest 仍须作为完整 tuple 同时通过。空 root 采用 backup
    identity/capsule，把 no-prior receipt 加入集合，并在任何 update check/admission 前验证当前 signed
    keyset；backup 不能降低 launcher 或网络已验证的 security floor；
-6. candidate 以 closed admission、ephemeral ports 做完整 health；
-7. 先完成 immutable continuity generation，再用唯一 deployment pointer replacement 一次选择新的
-   release/data/continuity generation；不声称对多个文件做事务；
-8. 从 committed pointer restart/rehealth；
-9. 保留原 stopped/maintenance intent；原 degraded 不自动 reopen。
+8. candidate 以 RED-115 activation plan 指定的 Profile、closed admission、ephemeral ports 做完整
+   health，strict 验证同一 PVE Run Store 与 `aggregateSetSha256`；
+9. 先完成 immutable continuity generation；commit intent 必须绑定 activationId/null、target Profile
+   identity 与 previousStable assertion，再用唯一 deployment pointer replacement 一次选择新的
+   release/data/continuity generation。pointer durable 后才允许 RED-115 activation commit；两次原子
+   pointer 之间崩溃只能按同一 operation ledger 与 RED-115 recovery 完成或补偿，不声称跨文件事务；
+10. 从 committed deployment + RED-115 stable pointer restart/rehealth；
+11. 按 durable source intent 映射 reopen/hold。
 
-precommit fail 删除 stage，旧 generation 不变。已有 root 的 postcommit health fail 自动切回
-pre-restore generation；真正空 root 没有可回切 generation，postcommit fail 的唯一结果是
+precommit fail 删除 stage；若 RED-115 candidate plan 已建立则按其 recovery/release 保持旧 stable，旧
+generation 不变。已有 root 的 postcommit health/Profile commit fail 必须同时切回同一个
+pre-restore config+DB+PVE generation，并经 RED-115 recovery/rollback 恢复 pre-restore stable；两者
+都 verified 后才恢复 source intent。真正空 root 没有可回切 generation，postcommit fail 的唯一结果是
 rollback-required/closed/no-writer，保留已采用 identity、continuity、staged generation 与全部 evidence，
 只允许再次 verified restore/recovery，不能伪造自动回切。pointer/generation/ledger/continuity 无法
 证明唯一 committed version 时同样 rollback-required。existing root restore 永不删除本地新 receipts
@@ -1640,6 +1915,17 @@ rollback-required/closed/no-writer，保留已采用 identity、continuity、sta
 ## 10. App update、签名与 rollback
 
 ```ts
+interface VerifiedReleaseArtifactSetMarkerV1 {
+  schemaVersion: 'rvb-release-artifact-set/v1'
+  releaseId: `sha256:${string}`
+  releaseRecord: VerifiedArtifactResultV1
+  signatureRecord: VerifiedArtifactResultV1
+  keysetRecord: VerifiedArtifactResultV1
+  updateBundle: VerifiedArtifactResultV1
+  runtimeCatalog: VerifiedArtifactResultV1
+  artifactSetSha256: `sha256:${string}`; verifiedAt: string
+}
+
 interface AppUpdateProviderV1 {
   resolveKeyset(
     channel: 'stable' | 'candidate'
@@ -1647,7 +1933,10 @@ interface AppUpdateProviderV1 {
   resolveRelease(
     channel: 'stable' | 'candidate',
     currentReleaseId: `sha256:${string}`
-  ): Promise<Uint8Array>
+  ): Promise<{
+    releaseRecord: Uint8Array
+    signatureRecord: Uint8Array
+  }>
   download(
     release: ReleaseIdentityV1,
     artifact: UpdateBundleArtifactV1 | RuntimeCatalogArtifactV1,
@@ -1658,11 +1947,20 @@ interface AppUpdateProviderV1 {
 }
 ```
 
-provider 的 resolveKeyset/resolveRelease 只返回 raw signed keyset/manifest，download 只返回不可信
-bytes；provider 没有“已验证”权力。它只能写 main 签发的 destinationToken，不能选 path、execute、
+`artifactSetSha256 = SHA256(JCS({releaseId,releaseRecord,signatureRecord,keysetRecord,
+updateBundle,runtimeCatalog}))`；上述六个字段使用 strict
+`VerifiedReleaseArtifactSetMarkerV1` 值，排除 `artifactSetSha256` 与 `verifiedAt`，避免自引用。
+main 必须先将五类已验证 bytes 写入同卷 staging，逐项 reopen/reverify，再把 strict `VERIFIED.json`
+作为最后一个 durable file 写入并 rename 到 immutable set root。首次安装也必须先 seed 完整 set 并
+把该 hash 写入 deployment pointer，不能只凭 runnable slot 建立 current/previous rollback 关系。
+
+provider 的 resolveKeyset 只返回 raw root-signed keyset bytes；resolveRelease 返回 raw complete
+release JSON 与 raw detached `ReleaseSignaturesV1` bytes；download 只返回不可信 bytes。provider
+没有“已验证”权力。它只能写 main 签发的 destinationToken，不能选 path、execute、
 切 pointer、删 backup 或开 admission。Keyset/release endpoint 与 redirect 都只允许第 3 节 fixed
 GitHub host；artifact redirect destination 还必须在 signed manifest allowlist。Prepare 只 download +
-verify cache；apply 再逐 byte 验证，不信内存对象或 mtime。
+verify 完整不可执行 artifact-set；apply 再逐 byte 验证 set hash、marker 与各文件，不信内存对象或
+mtime，也不从 runnable slot 反向生成 set。
 
 公开 assets 包括 setup EXE（candidate 可省略）、update ZIP、Windows runtime catalog、release JSON、
 detached signatures、keyset JSON 与 keyset signature。
@@ -1688,36 +1986,43 @@ CI 执行等价于 `signtool verify /pa /all /tw`，任何失败或 warning exit
 
 App update 固定 phase：
 
-1. `preflight`：release/current Profile/DB/platform/disk/approval；
-2. `maintenance`：existing-only；
-3. `drain`：无 lease 后 close ingress，queue/journal durable；
+1. `preflight`：release/current Profile/DB/PVE schema/platform/disk/approval，并重验 target 与
+   exact previous artifact-set hash；
+2. `maintenance`：room 与 PVE admission existing-only；
+3. `drain`：无 room/active PVE battle lease 后 close 两类 ingress，queue/journal/PVE receipt
+   durable；
 4. `backup`：verified pre-update；
 5. `cleanup`：只按绑定 cleanupPlanHash，不删唯一 rollback set；
 6. `stage-release`：immutable side-by-side，重验 manifest/ZIP/catalog/逐文件 inventory/Authenticode；
-7. `stage-data`：复制 live data 到新 generation；
-8. `migrate`：只改 staging DB，再验 integrity/Profile/room restore；
+7. `stage-data`：复制 live DB/config 与 PVE active/audit tree 到新 generation；
+8. `migrate`：只改 staging DB/PVE Store，且仅运行 ReleaseIdentity 声明的 migration；再验
+   integrity/Profile/room restore/PVE aggregate set；
 9. `candidate-health`：isolated data view + ephemeral ports + closed admission，验证 process、
-   management、玩家 HTTP/WS、release/Profile/DB 与 fixed-seed smoke；
-10. `commit-intent`：durable target release/generation/previous rollback set；
+   management、玩家 HTTP 101 Upgrade、WS `system.health`、release/Profile/DB/PVE Run Store 与
+   fixed-seed smoke；
+10. `commit-intent`：durable target release/generation 与 previous
+    `{releaseId,artifactSetSha256,generation,backup,Profile requirement}` rollback set；
 11. `atomic-commit`：一次原子替换 deployment pointer，同时选择 release + generation；
 12. `committed-health`：从 durable pointer restart，不复用 candidate module cache；
 13. `reopen-or-hold`：保持 source service intent；
 14. `retain-rollback`：保留 previous release/generation/verified backup。
 
-precommit（pointer 未换）失败删除 stage 并恢复 source intent。postcommit 失败先 exact previous 自动
-rollback；previous release、generation、backup、Profile 全部 verified/healthy 才算成功，否则
-rollback-required。
+precommit（pointer 未换）失败删除 stage 并按 durable mapping 恢复 source intent。`app-update.apply`
+postcommit 失败先 exact previous 自动 rollback；必须恢复同一 previous config+DB+PVE Store generation，
+并验证 previous release artifact-set hash、重建后的 runnable slot、backup 与经 RED-115 恢复的
+Profile，全部 healthy 才算成功，否则 rollback-required。`app-update.rollback` 自身在 atomic pointer
+后的 committed-health 失败不再猜测第二次补偿，固定进入 rollback-required/closed/no-writer。
 
-| 当前 -> 目标 | 条件 | 决策 | DB/Profile 行为 |
+| 当前 -> 目标 | 条件 | 决策 | Config/DB/PVE Store/Profile 行为 |
 | --- | --- | --- | --- |
-| N-1 -> N 或 N -> N+1 | stable manifest 的 supportedUpgradeFrom 列出；签名/epoch/OS 通过 | 允许 | staging 副本 forward migration；Profile 单独 health |
-| N-2 或更旧 -> N | 未列 supportedUpgradeFrom | `UPDATE_INCOMPATIBLE` | 逐版升级或安装兼容版后 restore |
-| N -> exact previous N-1 | 90 天内；previous update bundle/catalog/manifest/pre-update backup/Profile requirement 完整；未被 securityEpoch 撤销 | 显式 rollback | 恢复匹配 binary/config/DB；Profile 只经 RED-115 |
+| N-1 -> N 或 N -> N+1 | stable manifest 的 supportedUpgradeFrom 列出；签名/epoch/OS 通过 | 允许 | 同一 staging generation 内复制 config、forward migrate DB/PVE Store；Profile 单独 health |
+| N-2 或更旧 -> N | 未列 supportedUpgradeFrom | `UPDATE_INCOMPATIBLE` | 不改 config/DB/PVE Store/Profile；逐版升级或安装兼容版后 restore |
+| N -> exact previous N-1 | 90 天内；previous verified artifact-set hash、pre-update backup/generation/Profile requirement 完整；未被 securityEpoch 撤销 | 显式 rollback | 从 set 重建并复验 binary，exact 恢复同一个 previous generation 的 config+DB+PVE Store；Profile 只经 RED-115 |
 | N -> 任意更旧/非 previous | 即使签名有效 | `UPDATE_DOWNGRADE_FORBIDDEN` | 不改 pointer/data |
 | stable <-> candidate | appId/data root/key 不同 | `UPDATE_CHANNEL_MISMATCH` | 独立安装，不共享 data |
 | 相同版本、较低 sequence/epoch | replay/撤销 | `UPDATE_MANIFEST_INVALID` | 不停服、不写 live data |
-| reopen 后已写入 -> previous | 服主确认 backup cutoff 与数据损失 | 允许完整 rollback | maintenance/drain 后恢复 pre-update DB/config；Profile 只走 RED-115 |
-| previous update bundle/catalog/backup/Profile requirement 不完整 | 无完整 tuple | rollback-required | closed，保留全部证据 |
+| reopen 后已写入 -> previous | 服主确认 backup cutoff 与数据损失 | 允许完整 rollback | maintenance/drain 后 exact 恢复同一个 pre-update generation 的 config+DB+PVE Store；Profile 只走 RED-115 |
+| previous artifact-set/backup/generation/Profile requirement 任一不完整或 hash 不匹配 | 无完整 tuple | rollback-required | closed，保留全部证据 |
 | Profile A -> B -> A | app tuple 未变 | 不走 app update | 完全复用 RED-115 |
 
 Stable N 获得当前支持；N-1 只作为 previous rollback target 保留 90 个自然日，不接收功能修复，也
@@ -1725,17 +2030,24 @@ Stable N 获得当前支持；N-1 只作为 previous rollback target 保留 90 �
 
 ### 10.1 Power-loss / kill 矩阵
 
+下表中的“恢复 source intent”是唯一 durable 映射：原 ready 保持 closed，完整 rehealth 后才 -> ready；
+原 stopped -> stopped；原 maintenance -> maintenance/closed；原 degraded、failed 或 rollback-required
+发起的恢复 -> maintenance/closed。restart 不得按当前 process、mtime 或猜测重算该映射。
+
 | 故障点 | 唯一恢复处理 |
 | --- | --- |
 | manifest/download incomplete | 无 verified marker，删 partial，current 不变 |
 | verified prepare、apply 未开始 | current 继续，可按原 operation/release 重试 |
-| maintenance/drain | 无 commit intent，保持 closed，恢复 old release 并重算 blockers |
-| backup/stage-release | 无 verified marker，删 incomplete，old deployment 不变 |
-| stage-data/migration | pointer 仍 old，隔离/删 stage，绝不作为 live DB 打开 |
-| candidate-health | pointer old，终止可识别 candidate，old release 回 maintenance |
-| commit-intent 已写、pointer old | precommit failure，old maintenance |
-| pointer candidate、success 未写 | committed-health；pass 补 success，fail exact rollback |
-| pointer/ledger/generation 矛盾 | rollback-required，player admission 不启动 |
+| maintenance/drain | 无 commit intent；保持 closed、重算 blockers，按 durable mapping 恢复 source intent |
+| backup/stage-release | 无 verified marker，删 incomplete；pointer/source generation 不变，按 durable mapping 恢复 source intent |
+| stage-data/migration | pointer 仍 source，隔离/删 stage，绝不作为 live DB/PVE Store 打开；按 durable mapping 恢复 source intent |
+| candidate-health | pointer source，终止可识别 candidate；按 durable mapping 恢复 source intent |
+| commit-intent 已写、pointer source | precommit failure；按 durable mapping 恢复 source intent |
+| empty-root restore 的 bootstrap-identity/bootstrap-profile/verify-continuity、deployment pointer 尚不存在 | 只在 bootstrap intent、已采用 identity、RED-115 Bundled Base bootstrap/activation evidence、continuity stage 与同一 operationId/backupId/manifest hash 唯一一致且 backup bytes 仍 verified 时续跑同一 restore；任何缺失/冲突 -> rollback-required/closed/no-writer，不能生成新 identity、手写 Profile pointer 或改用其他 backup |
+| app-update.apply 或 existing-root restore 的 pointer 已选 target、success 未写 | committed-health；pass 补 terminal success 后按 source intent，fail 自动 exact 恢复同一 previous config+DB+PVE generation 与 RED-115 Profile；任一补偿不确定 -> rollback-required |
+| empty-root restore 的 pointer 已选 target、success 未写 | committed-health；pass 补 terminal success 后按 durable `sourceServiceIntent`；fail -> rollback-required/closed/no-writer；没有 previous generation，禁止声称 exact rollback |
+| app-update.rollback 的 pointer 已选 rollback target、success 未写 | committed-health；pass 补 terminal success 后按 source intent，fail -> rollback-required/closed/no-writer；不猜测二次切回 rollback 前 source deployment |
+| pointer/ledger/generation/continuity/Profile activation 矛盾 | rollback-required，player admission 不启动 |
 | committed-health 后、reopen 前 | closed；reverify 后按 source intent |
 | rollback pointer 切换中 | 只选唯一完整一致 deployment；仍歧义则 rollback-required |
 | success 后、cleanup 前 | candidate 继续，previous rollback set 保留 |
@@ -1779,7 +2091,8 @@ operation evidence。
 | Profile/update 并发 | global single-flight | start/stop/Profile/update 组合 |
 | SQLite busy | RED-131 5 次/10 秒、500ms busy | 仅 room A degraded，room B 可 durable |
 | 单 room chain/Profile pin 坏 | quarantine only | hidden room；其他 ready；restart 多房 |
-| global DB 坏 | fail closed | failed + stable error |
+| global DB/PVE Store transient unavailable/timeout，但 integrity、唯一 writer 与 committed generation 仍可证明 | fail closed | degraded + stable error；不得自动 reopen |
+| global DB/PVE Store corrupt、integrity failure、集合不完整、未知 schema 或无可信/唯一 writer | fail closed | failed + stable error；无 writer |
 | terminal persist fail | durable terminal barrier | hidden/degraded/no ranking |
 | drain hang | deadline/no implicit kill | blockers + maintenance/degraded |
 | child crash/port occupied | child heartbeat + exact identity | failed closed |
@@ -1788,10 +2101,14 @@ operation evidence。
 | wrong channel/platform | metadata + native workstation gate | candidate/x86/ARM64/低 build/Windows Server 拒绝 |
 | downgrade/old installer | sequence/epoch/DB policy | downgrade forbidden；新 DB/缺 backup |
 | update/restore 任 phase 断电 | journal + one pointer | 按 power-loss matrix 确定恢复 |
-| disk full | budget + partial cleanup + retain rollback | old deployment unchanged |
+| disk full（precommit） | reserve + phase journal + bounded partial cleanup | pointer/source generation 不变；已 durable cleanup receipt 不回滚且必须有 verified backup；按 source intent 恢复 |
+| disk full（postcommit） | protected rollback reserve + exact previous set | 有完整空间/bytes 时恢复同一 previous config+DB+PVE generation 与 Profile；写入或验证补偿不确定 -> rollback-required |
 | traversal/symlink/reparse | bounded strict walker | drive/../case/junction/bomb 拒绝 |
 | secrets in logs | central redactor + rescan | capability/env/path/URL/stack canary 不泄漏 |
-| accidental force stop | native approval + tail-loss bool | missing/expired/false 全拒绝；无残余 process |
+| force-stop approval 缺失/过期/取消或 tail-loss=false | native approval + exact true literal | 零副作用拒绝；原 process tree 保持，不得报告 absent |
+| approved force-stop 执行 | process-tree termination + absence proof | 只有 tree/ports/writers 全 absent 才成功；否则 failed/rollback-required |
+| failed/maintenance restore 遇残余 process/port/DB/PVE writer | pre-stage absence gate + unique data-root lock | 稳定 absence/lock error；零 stage/Profile/pointer mutation |
+| backup Profile pointer 注入 | immutable package + RED-115 install/activate/recovery | raw `active.json`/journal/lock 不入恢复路径；manifest identity mismatch fail closed |
 | restore other server/old season | serverId + watermark | mismatch/conflict fail closed |
 | 同一 backup 复制为两个活跃服 | local data-root lock only；不承诺跨主机 fencing | clone 必须重置 identity/season；测试与文档不得宣称 split-brain 防护 |
 
@@ -1809,25 +2126,30 @@ v1 不声称防御已控制当前 Windows 用户/管理员、可替换 launcher/
 4. IPC sender/native approval/loopback/key rotation/public route isolation/secret canary；全部固定 child
    route 的 method/media/schema/status，分钟级工作 202 replay 不重复副作用；
 5. RED-115 activation/rollback/uncertain commit/durable drain，经 outer operation；
-6. RED-116 identity/pin/lease/app-update Profile compatibility；
-7. RED-131 same-room serial/different-room isolation/5-or-10 busy/one-room degraded/restart restore；
-8. maintenance existing-only/lease timeout/full ingress fence/drainRevision invalidation；
-9. terminal pending/durable/degraded/ranking settlement idempotency/public closure；
-10. backup bytes/DB/Profile、identity adopt/match、season watermark、pre-restore rollback、path attacks；
-11. update keyset/leaf revoke/catalog/runtime inventory/channel/native workstation gate/installer/DB/
-    downgrade/全部 power phase/previous rollback set；
-12. Windows 10 22H2 x64 与 Windows 11 x64 clean install/start/stop/restart/update/rollback/
+6. RED-116 bare `Sha256HexV1` identity/pin/lease/app-update Profile compatibility 与 exact mismatch code；
+7. RED-117 active battle lease、两类 ingress、Run/audit/tombstone aggregate-set JCS、backup/exact restore、
+   authority reconciliation 与旧 `<userData>/pve-runs` 单次迁移；
+8. RED-131 same-room serial/different-room isolation/5-or-10 busy/one-room degraded/restart restore；
+9. maintenance existing-only/lease timeout/full room + PVE ingress fence/drainRevision invalidation；
+10. terminal pending/durable/degraded/ranking settlement idempotency/public closure；
+11. backup bytes/DB/Profile/PVE、identity adopt/match、season watermark、pre-restore rollback、path attacks；
+12. update keyset/leaf revoke/detached signature strict binding/artifact-set/catalog/runtime inventory/channel/
+    native workstation gate/installer/DB/PVE downgrade/全部 power phase/previous rollback set；
+13. Windows 10 22H2 x64 与 Windows 11 x64 clean install/start/stop/restart/update/rollback/
     uninstall-preserve-data/residual process/port，Win10 evidence 明示 OS EOL；
-13. log rotation/disk-full/diagnostics/capability/path/URL/player-data redaction；
-14. 独立 AI review、人工 High Risk candidate approval、命令/exit code/artifact hash 证据。
+14. log rotation/disk-full/diagnostics/capability/path/URL/player-data redaction；
+15. 独立 AI review、人工 High Risk candidate approval、命令/exit code/artifact hash 证据。
 
 这些测试扩展而不是替换既有 Electron IPC/security、Profile admission/lease、room queue、async
 journal/SQLite 和 battle shutdown suites。
 
 ## 14. 本合同回退
 
-本阶段只有文档。撤销 RED-140 时 revert 本文与 ADR-0021，恢复 ADR-0003 为当前 internal-only
-边界；不得删除 RED-115/116/127/131 已有 data、Profile、journal 或 tests。
+本阶段只有文档。撤销 RED-140 时应 revert PR #126 最终 merge/squash commit 所带来的全部 7 个
+allowed-path 文档净变更，包括 ADR-0003/ADR-0021/decisions README、ARCHITECTURE、
+MODULE_INTERFACES、BUILD_AND_RUN 与本文，并恢复 ADR-0003 为当前 internal-only 边界；不能只 revert
+源 feature commit `2f6565b2de9468b701dc6063c7b227a8d831fd11` 或当前含 main-sync 的 PR head。
+不得删除 RED-115/116/117/127/131 已有 runtime、data、Profile、PVE evidence、journal 或 tests。
 
 后续 runtime PR 必须分别提供 old release/data retention、verified backup、candidate validation、
 power-loss evidence 与独立 rollback。实现若不能满足 fail-closed、single-flight、durable terminal、

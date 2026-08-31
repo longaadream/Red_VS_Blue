@@ -395,13 +395,20 @@ interface ServerCore {
 
 ### 单端口网络传输
 
+本段中 RED-31 早期 `/api/ping` 探针描述已被 ADR-0020/RED-127 与 RED-140 的实际同端口边界
+取代；保留的同 origin/同 port 约束继续有效。
+
 - 客户端只配置并持久化一个规范化的 `serverUrl`；HTTP 与 WebSocket 始终使用该地址的同一协议主机和端口。
-- HTTP 健康检查使用 `/api/ping`，WebSocket 地址由客户端直接派生为 `/ws/rooms/{roomId}`；不得保存、探测或猜测 `wsPort`、`wsBaseUrl`。
+- HTTP 层健康检查对真实玩家 `/ws` 路径发起 Upgrade 并要求 101；Upgrade 后发送
+  `system.health`，校验 protocol/build/Profile 才算玩家 WebSocket healthy。地址仍由
+  `serverUrl` 派生；不得保存、探测或猜测 `wsPort`、`wsBaseUrl`。
 - 旧版 `rvb_ws_port` 及其 URL/来源缓存会被清除，且不能影响连接目标；不再兼容双端口客户端或配置。
 - Next.js 开发与 standalone 服务在创建 HTTP(S) server 前加载 `scripts/ws-same-port-server.cjs`，把游戏 `/ws` Upgrade 交给 `noServer` WebSocket 服务，同时保留 Next HMR Upgrade。
 - Electron 主机直接在一个公开端口运行 standalone，不再创建内部 HTTP/WS 端口或公开代理；Android 与 Relay 也在各自唯一的 HTTP 服务端口处理 WebSocket Upgrade。
-- `/api/ws-info` 仅作为诊断接口返回 `{ transport: 'same-origin', path: '/ws/rooms/{roomId}' }`，不得暴露或参与选择内部端口。
-- LAN/UDP/快速扫描只发现可通过 `/api/ping` 访问的完整 HTTP origin，加入后 WebSocket 必须连接该 origin，而不是第二个地址。
+- `/api/ws-info` 是历史诊断 route，不参与健康、发现或地址选择；合规玩家客户端不调用它，实际
+  player REST disable 边界可返回 410。
+- LAN/UDP/快速扫描只发现完整 origin；候选 origin 必须通过同 origin 的真实 WS 101 Upgrade 与
+  `system.health` 才可加入，不能调用 `/api/ping` 或尝试第二个地址。
 - 传输模式按服务器地址判定：本机与私网地址走 LAN 权威主机；公网地址走 Relay，显式 `relay=1` 仅用于本机 Relay 调试，二者都遵守同端口 URL 规则。
 
 ## RED-36 2026-08-20 接口修订
@@ -475,26 +482,49 @@ RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯
 [`SERVER_OPERATIONS_V1.md`](./SERVER_OPERATIONS_V1.md)；后续实现不得在各模块自行发明字段。
 
 - **Owner**：Electron main 独占 OS、process、file、backup、restore、application update 和整体
-  lifecycle 写能力；Next child 只提供 admission、ingress drain、Profile health 与 RoomRuntime
-  inspect；renderer 只通过受信 preload IPC 读状态和提交命令。
+  lifecycle 写能力；Next child 只提供 admission、room/PVE ingress drain、Profile health、
+  RoomRuntime、RED-117 PVE Run Store 只读观察与 main 委托的 authority reconciliation；renderer
+  只通过受信 preload IPC 读状态和提交命令。
 - **IPC**：固定 `rvb-server-operations:v1:*` channel，经现有 trusted sender 包装；preload 只暴露
   `getState / execute / cancel / getOperation / listRooms / getRoom` 与
-  `listBackups / checkUpdates / planCleanup / approve / subscribe`，不暴露 raw IPC、管理 key、PID
-  或文件路径。
+  `listBackups / checkUpdates / planCleanup / approve / subscribe`，不暴露 raw IPC、管理 key、
+  process handle/control primitive 或文件路径。`getState().process.pid` 可以作为只读诊断字段返回，
+  但永远不是 command target，也不能用于跳过 childInstanceId/absence 验证。
 - **管理 transport**：独立 `127.0.0.1:<ephemeral>` listener；先按真实 socket peer 判 loopback，再
   constant-time 校验每次 child spawn 新生成的 256-bit capability。它不使用玩家 WS、公开
   `/api/*`、CORS、Host/Origin/X-Forwarded-For 或静态 admin key。
+- **旧 Profile transport 迁移**：RED-115 的 Store/lock/plan/rebind/commit/release/recovery 保持唯一
+  实现；受信 IPC 经 loopback `/v1/profile/**` 直接调用同一 core，不代理公开
+  `/api/content-profile/**` 或创建第二状态/static key。旧 routes 和 `/api/ping` 不在玩家 listener
+  注册，按 RED-127 返回 410；尚依赖它们的 standalone 候选不符合 RED-140。
+- **旧 cleanup transport 迁移**：ADR-0020/RED-127 对 `/api/admin/**` 的历史范围说明不适用于
+  RED-140 自治发行；`/api/admin/rooms/cleanup` 不得注册到玩家 listener。唯一写路径是 trusted
+  IPC -> main coordinator -> capability-protected loopback `POST /v1/rooms/cleanup`，不得保留公开
+  REST/static-key 旁路。
 - **命令**：所有 mutation 带 `requestId`、durable `operationId` 和
-  `expectedStateRevision`；全局 single-flight，同 ID/同 canonical payload 重放结果，同 ID/不同
+  `expectedStateRevision`；accept record 在副作用前同时冻结 `sourceStateRevision` 与映射后的
+  `sourceServiceIntent`；全局 single-flight，同 ID/同 canonical payload 重放结果，同 ID/不同
   payload 拒绝，renderer 超时不取消 operation。
 - **房间观察**：只能适配 RED-131 的 room FIFO、journal、WAL、有限重试、restore/drain 与 durable
-  水位。单房 degraded 只形成房间 warning；只有全局准入或安全条件受损才进入顶层 `degraded`。
+  水位。单房 degraded 只形成房间 warning；全局 DB/PVE transient unavailable 只有在 integrity 与
+  唯一 writer 仍可证明时进入顶层 `degraded`，corrupt/集合不完整/未知 schema/无可信 writer 进入
+  `failed`。
+- **PVE 观察**：`ready` 只从 RED-117 `rvb-pve-run-aggregate/v1` active aggregate、archived evidence
+  与 tombstone 计算 Run/active battle/aggregate-set 状态；unavailable/migrating/incompatible/corrupt
+  使用 closed branch 且 counts/IDs/hash 全为 null，不得回显 stale 集合。active PVE battle 是独立
+  Profile lease 和 maintenance blocker，不计入 room lease。room cleanup/普通 GC 不得删除 PVE 数据。
 - **终局屏障**：只有 `terminalBarrier=durable` 且
   `durableAuthorityVersion >= terminalAuthorityVersion` 的终局才能交给本服竞技账本。
 - **发行身份**：`rvb-release-identity/v1` 固定 app、commit、NSIS/update ZIP/runtime catalog、
   runtime inventory、platform/arch、battle protocol/build、engine/runner、bundled Profile、DB
-  schema、management API 与签名身份；
+  schema、PVE aggregate 与 authority tombstone 的 readable/migratable schema、同一 migration set、
+  management API 与签名身份；
   mutable active Profile 另列，不能改变 release identity。
+- **Restore 安全门禁**：maintenance 源先 normal drain/stop；所有来源在任何 stage/Profile/pointer
+  mutation 前证明 process tree、player/management ports、DB/PVE writer/ingress absent，并取得唯一
+  data-root lock。backup 只携带与 manifest identity 对应的 immutable Profile package；恢复只能经
+  RED-115 Bundled Base bootstrap（空 root）及 install/plan/health/commit/recovery，禁止复制
+  `resource-pack/active.json`。
 - **竞技命名空间**：serverId 是备份保留的本机随机 UUID，seasonId 是其子命名空间；它不提供
   跨服密码学证明。恢复同一 serverId 视为迁移，本机 data-root lock 只阻止同 root 双写；跨主机
   split-brain 不在 v1 保证内，平行副本不受支持，克隆必须显式重置身份。
