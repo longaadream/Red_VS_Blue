@@ -128,6 +128,7 @@ PR 中根据风险提供以下证据：
 
 - [RED-43 同阵营对局客户端 UI 验收](RED-43-same-alignment-ui.md)
 - [RED-36 权威成长型回合计时验证](RED-36-authoritative-turn-timer.md)
+- [RED-159 Colyseus / PostgreSQL Phase 0 合同验收](RED-159-colyseus-postgresql-contract.md)
 
 ## 不稳定测试
 
