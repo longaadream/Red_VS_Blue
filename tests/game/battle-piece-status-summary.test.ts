@@ -153,6 +153,8 @@ describe('battle piece health and negative-status summary', () => {
     const battlePage = readFileSync(resolve(pagesDir, 'battle.html'), 'utf8')
     const renderer = readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8')
     const domUi = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-dom-ui.js'), 'utf8')
+    const tacticalCss = readFileSync(resolve(pagesDir, 'css/battle-tactical-table.css'), 'utf8')
+    const popoverCss = tacticalCss.match(/\.piece-board-status-popover\s*\{[\s\S]*?\}/)?.[0] || ''
 
     expect(battlePage).toContain('js/battle-ui/battle-status-presentation.js')
     expect(battlePage).toContain('BattleStatusPresentation.boardSummary')
@@ -168,6 +170,9 @@ describe('battle piece health and negative-status summary', () => {
     expect(renderer).toContain('obj.portraitLoading = true')
     expect(renderer).toMatch(/loadTexture\(portraitSrc,[\s\S]*?obj\.portraitLoaded = true/)
     expect(renderer).toContain("console.error('[battle-renderer] Failed to load piece portrait'")
+    expect(popoverCss).toContain('border: 0')
+    expect(popoverCss).toContain('background: transparent')
+    expect(popoverCss).toContain('box-shadow: none')
     expect(renderer).not.toContain('texture stays default')
     expect(renderer).toContain('loadCallbacks: [onLoad]')
     expect(renderer).toContain('entry.loadCallbacks.push(onLoad)')
