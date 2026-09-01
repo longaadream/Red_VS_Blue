@@ -403,14 +403,18 @@ async function killServer(requireDurable = false): Promise<void> {
     const gameProc = gameServerProcess
     await stopChildProcessGracefully(gameProc, requireDurable)
     localGameReady = false
-    gameServerProcess = null
+    if (gameServerProcess === gameProc) gameServerProcess = null
   }
   if (embeddedPostgres) await embeddedPostgres.stop()
   if (!serverProcess) return
-  const proc = serverProcess
-  await stopChildProcessGracefully(proc, requireDurable)
+  // The Profile/Next process does not own the battle journal and therefore does
+  // not implement the Colyseus durable-drain IPC contract. Waiting for that ACK
+  // here falsely reports a database shutdown failure after the real authority
+  // and PostgreSQL have already stopped.
+  const profileProc = serverProcess
   localServerReady = false
   serverProcess = null
+  killProcessTree(profileProc)
 }
 
 function forceKillServer(): void {
@@ -480,6 +484,19 @@ function stableProfileBinding(): ProfileProcessBinding {
     // The gated bootstrap process reads only bundled files until the central
     // Store repairs the pointer and confirms whether a fresh process is needed.
     return { profileRoot: getAppRoot() }
+  }
+}
+
+function getLocalGameProfileIdentity(): Record<string, string> | null {
+  if (!localServerReady) return null
+  const reference = readDesktopProfileState(getPackRoot())?.stable
+  if (!reference) return null
+  return {
+    schemaVersion: 'rvb-game-profile-identity/v1',
+    engineAbi: reference.compatibility.engineAbi,
+    runnerRevision: 'rvb-battle-runner/v1',
+    resolvedProfileHash: reference.resolvedProfileHash,
+    authorityContentHash: reference.authorityContentHash,
   }
 }
 function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boolean> {
@@ -1685,7 +1702,7 @@ function loadLocalGame(): void {
     if (!gameServerProcess || !localGameReady) return
     win.webContents.executeJavaScript(`
       (function() {
-        var url = 'http://localhost:${actualGamePort}';
+        var url = 'http://127.0.0.1:${actualGamePort}';
         if (window.RvBUtils && RvBUtils.saveServerConfig) {
           RvBUtils.saveServerConfig({ mode: 'local', url: url });
         } else {
@@ -1809,8 +1826,9 @@ handleTrusted('open-local-game', ['connect'], async () => {
 // 查询当前模式
 handleTrusted('get-mode', ['game'], () => ({
   isLocal: localGameReady,
-  localUrl: `http://localhost:${actualGamePort}`,
-  profileRuntimeUrl: `http://localhost:${actualLocalPort}`,
+  localUrl: `http://127.0.0.1:${actualGamePort}`,
+  profileRuntimeUrl: `http://127.0.0.1:${actualLocalPort}`,
+  profileIdentity: getLocalGameProfileIdentity(),
   ready: localGameReady,
 }))
 

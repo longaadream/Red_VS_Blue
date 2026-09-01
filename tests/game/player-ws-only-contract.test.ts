@@ -87,12 +87,9 @@ describe('RED-116 Electron lobby profile bridge', () => {
       const getter = source.slice(start, end)
 
       expect(getter).toContain('window.electronAPI.getMode')
-      expect(getter).toContain('mode.profileRuntimeUrl')
-      expect(getter).toContain('RvBWs.requestCatalogIdentityAt')
-      expect(getter).toContain("'local-profile-runtime'")
+      expect(getter).toContain('mode.profileIdentity')
+      expect(getter).not.toContain('mode.profileRuntimeUrl')
       expect(getter).not.toContain('getResourcePackStatus')
-      expect(getter.indexOf('mode.profileRuntimeUrl'))
-        .toBeLessThan(getter.indexOf('RvBWs.requestCatalogIdentityAt'))
     }
   })
 })

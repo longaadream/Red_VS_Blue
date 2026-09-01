@@ -768,6 +768,21 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     }))`)
     assert(packagedAssets.every(([, ok, size]) => ok && size > 0), `Client packaged assets are incomplete: ${JSON.stringify(packagedAssets)}`)
     assert(mode.ready === true && mode.isLocal === true, `Client local mode is not ready: ${JSON.stringify(mode)}`)
+    assert(
+      mode.profileIdentity
+        && mode.profileIdentity.schemaVersion === 'rvb-game-profile-identity/v1'
+        && typeof mode.profileIdentity.resolvedProfileHash === 'string'
+        && typeof mode.profileIdentity.authorityContentHash === 'string',
+      `Client did not publish its recovered Profile identity through trusted IPC: ${JSON.stringify(mode)}`,
+    )
+    const rendererProfileIdentity = await evaluate(
+      gameTarget,
+      `getLocalGameProfileIdentity(${JSON.stringify(mode.localUrl)})`,
+    )
+    assert(
+      JSON.stringify(rendererProfileIdentity) === JSON.stringify(mode.profileIdentity),
+      `Client renderer did not consume the trusted local Profile identity: ${JSON.stringify({ rendererProfileIdentity, modeProfileIdentity: mode.profileIdentity })}`,
+    )
     const localGatewayPort = mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521
     assert(await isReachable(localGatewayPort), 'Client local gateway is not reachable')
     const localBaseUrl = `http://127.0.0.1:${localGatewayPort}`

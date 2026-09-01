@@ -1159,14 +1159,7 @@
         && typeof window.electronAPI.getMode === 'function'
       ) {
         const mode = await window.electronAPI.getMode()
-        const localRuntimeUrl = mode && typeof mode.profileRuntimeUrl === 'string'
-          ? mode.profileRuntimeUrl.trim()
-          : ''
-        if (!localRuntimeUrl) {
-          throw new Error('本地 Profile 运行时不可用，请重启客户端后重试')
-        }
-        const catalog = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
-        identity = catalog && catalog.profileIdentity
+        identity = mode && mode.profileIdentity
       } else {
         // A standalone browser build has no separate installed-profile runtime.
         // Its playable content is served by the selected Colyseus authority.

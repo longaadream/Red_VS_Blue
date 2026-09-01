@@ -105,6 +105,12 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
   `postgres.exe` 的精确路径进程计数均为 0。冒烟同时确认 legacy `/api/rooms` 返回 404。
 - Profile-only Next 进程会显式声明不期待 legacy WebSocket；健康报告只在旧 WS 确实未启动时通过，
   避免既关闭旧权威又被旧健康检查误判为不可用。
+- 人工候选发现“我当主机”会向已关闭玩家协议的 Profile-only 进程请求 `/catalog/identity`，以及正常退出
+  错把 Profile-only 进程也纳入 battle durable ACK 门禁。修复后，已恢复并校验的本地 Profile Identity
+  通过受信任 Electron IPC 提供给页面，loopback URL 统一使用 `127.0.0.1`；只有 Colyseus authority
+  必须在退出前回 journal durable ACK，随后 PostgreSQL fast shutdown，Profile-only 进程不再制造虚假的
+  “数据库尚未关闭”错误。精确候选冒烟验证 renderer Identity 与 authority Identity 一致，退出后 Electron、
+  内置 Node 与 `postgres.exe` 进程计数均为 0。
 - `npm.cmd run check:main-baseline`：通过；HEAD 不落后上述 `origin/main`。
 - `npm.cmd run check:encoding` 与 `git diff --check`：通过。
 - `npm.cmd run test:postgres`：随包 PostgreSQL wrapper 启动真实实例并驱动原有 integration，通过；原有

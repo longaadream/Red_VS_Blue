@@ -55,8 +55,8 @@ describe('RED-161 default player transport', () => {
     expect(main).toContain("path.join(process.resourcesPath, 'postgres', 'pgsql')")
     expect(main).toContain('safeStorage.encryptString(plaintext)')
     expect(main).toContain('await embeddedPostgres.stop()')
-    expect(main).toContain("localUrl: `http://localhost:${actualGamePort}`")
-    expect(main).toContain("var url = 'http://localhost:${actualGamePort}';")
+    expect(main).toContain("localUrl: `http://127.0.0.1:${actualGamePort}`")
+    expect(main).toContain("var url = 'http://127.0.0.1:${actualGamePort}';")
     expect(packageJson.scripts['build:electron:client']).toContain('npm run build:colyseus')
     expect(packageJson.scripts['build:electron:client']).toContain('npm run prepare:embedded-postgres')
     expect(colyseusBuild).toContain("'@prisma/client'")
@@ -95,12 +95,35 @@ describe('RED-161 default player transport', () => {
   it('requires a durable authority acknowledgement before normal application exit', async () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
     const exitHandler = main.slice(main.indexOf('function requestApplicationExit()'), main.indexOf('// ─── 本地服务器管理'))
+    const stopHandler = main.slice(main.indexOf('async function killServer('), main.indexOf('function forceKillServer()'))
     const runner = await readFile(path.join(ROOT, 'scripts', 'run-colyseus-server.mjs'), 'utf8')
 
     expect(exitHandler).toContain('killServer(true)')
     expect(exitHandler).toContain('processes remain fail-closed')
+    expect(stopHandler).toContain('await stopChildProcessGracefully(gameProc, requireDurable)')
+    expect(stopHandler).toContain('killProcessTree(profileProc)')
+    expect(stopHandler).not.toContain('stopChildProcessGracefully(profileProc')
     expect(runner.indexOf('await journal.close()')).toBeLessThan(runner.indexOf('await server.gracefullyShutdown(false)'))
     expect(runner.indexOf('await server.gracefullyShutdown(false)')).toBeLessThan(runner.indexOf('ok: true'))
+  })
+
+  it('publishes the recovered local Profile identity through trusted Electron IPC', async () => {
+    const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
+    const index = await readFile(path.join(ROOT, 'data', 'pages', 'index.html'), 'utf8')
+    const lobby = await readFile(path.join(ROOT, 'data', 'pages', 'lobby.html'), 'utf8')
+
+    expect(main).toContain('profileIdentity: getLocalGameProfileIdentity()')
+    expect(main).toContain("runnerRevision: 'rvb-battle-runner/v1'")
+    for (const source of [index, lobby]) {
+      const start = source.indexOf('async function getLocalGameProfileIdentity')
+      const end = source.indexOf(
+        source === index ? 'async function checkProfileAndGo' : 'function summarizeGameProfileIdentity',
+        start,
+      )
+      const getter = source.slice(start, end)
+      expect(getter).toContain('mode.profileIdentity')
+      expect(getter).not.toContain('mode.profileRuntimeUrl')
+    }
   })
 
   it('keeps SQLite and Prisma out of the new Colyseus authority modules', async () => {
