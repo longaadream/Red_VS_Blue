@@ -565,7 +565,11 @@ function chooseSimpleAction(state: BattleState, playerId: string, legal: Candida
     const exact = legal.find(item => stableJson(item.action) === stableJson(draft))
     if (exact) return exact
   }
-  return legal.find(item => item.kind === 'phase-advance' || item.kind === 'pending-option' || item.kind === 'pending-target')
+  return legal.find(item =>
+    item.kind === 'reserve-deployment'
+    || item.kind === 'phase-advance'
+    || item.kind === 'pending-option'
+    || item.kind === 'pending-target')
     ?? legal.find(item => item.kind === 'end-turn')
     ?? legal[0]
 }
@@ -591,17 +595,22 @@ function forcedStructuralAction(legal: CandidateAction[]): CandidateAction | und
   const deploymentLock = legal.find(item => item.kind === 'deployment-lock')
   if (deploymentLock) return deploymentLock
   const structuralKinds = new Set<CandidateAction['kind']>([
-    'phase-advance', 'pending-option', 'pending-target', 'cancel-selection',
+    'reserve-deployment', 'phase-advance', 'pending-option', 'pending-target', 'cancel-selection',
   ])
   return legal.length === 1 && structuralKinds.has(legal[0].kind) ? legal[0] : undefined
 }
 
 function activeSelfPlayPlayer(state: BattleState): 'player-red' | 'player-blue' {
+  const pendingPlayer = state.pendingOptionSelection?.playerId
+    ?? state.pendingTargetSelection?.ownerPlayerId
+    ?? state.pendingTargetSelection?.playerId
   const deploymentPlayer = state.deployment?.status === 'awaiting-locks'
     ? state.deployment.playerIds.find(playerId => state.deployment?.locks[playerId]?.locked !== true)
+    : state.deployment?.mode === 'progressive-reserve-v1'
+      && state.deployment.status === 'awaiting-reserve-deploy'
+      ? state.deployment.activePlayerId
     : undefined
-  return (deploymentPlayer ?? state.pendingOptionSelection?.playerId
-    ?? state.pendingTargetSelection?.ownerPlayerId ?? state.pendingTargetSelection?.playerId
+  return (pendingPlayer ?? deploymentPlayer
     ?? state.turn.currentPlayerId) as 'player-red' | 'player-blue'
 }
 
@@ -641,7 +650,7 @@ function chooseAgentAction(
     runtime.previousPlan = plan
     return {
       action: plan.nextAction, nodes: plan.nodesVisited, traceHash: aiPlanTraceHash(plan),
-      countsTowardTurnBudget: true,
+      countsTowardTurnBudget: plan.nextAction?.kind !== 'reserve-deployment',
     }
   }
   const action = archive.kind === 'simple'
@@ -651,7 +660,7 @@ function chooseAgentAction(
     action,
     nodes: 0,
     traceHash: hashStable({ kind: archive.kind, decision: runtime.decisions - 1, action: action?.action, legal: legal.map(item => item.id) }),
-    countsTowardTurnBudget: true,
+    countsTowardTurnBudget: action?.kind !== 'reserve-deployment',
   }
 }
 

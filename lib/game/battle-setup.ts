@@ -8,12 +8,17 @@ import { rng } from "./rng"
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceTemplate, PieceStats } from "./piece"
 import type { SkillDefinition, SkillState } from "./skills"
-import type { BattleState, PlayerId } from "./turn"
+import {
+  applyBattleAction,
+  type BattleState,
+  type DeploymentMode,
+  type PlayerId,
+} from "./turn"
 import { loadJsonFilesServer } from "./file-loader"
 import { DEFAULT_PIECES } from "./piece-repository"
 import { getSkillById } from './skill-repository'
 import { globalTriggerSystem, type TriggerResult } from "./triggers"
-import { loadRuleById } from './skills'
+import { executeSkillFunction, loadRuleById } from './skills'
 import path from 'path'
 import fs from 'fs'
 import { getUserDataDir } from '@/lib/app-paths'
@@ -26,6 +31,7 @@ import {
   withRuleRuntime,
   type RuleExecutionContext,
 } from './rule-runtime'
+import { finalizeBattleTerminal } from './terminal'
 
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 
@@ -74,6 +80,183 @@ function fireInitialGameStart(state: BattleState): void {
       })
     })
   }
+}
+
+function initializeProgressiveReserveEffects(
+  state: BattleState,
+  templatesById: ReadonlyMap<string, PieceTemplate>,
+): void {
+  const deployment = state.deployment
+  if (deployment?.mode !== 'progressive-reserve-v1' || !deployment.reserves) return
+
+  for (const playerId of deployment.playerIds) {
+    const reserveKey = Object.keys(deployment.reserves).find(
+      candidate => candidate.toLowerCase() === playerId.toLowerCase(),
+    )
+    const reserve = reserveKey ? deployment.reserves[reserveKey] : undefined
+    if (!reserve) continue
+
+    const setupPieces = reserve
+      .filter(piece => templatesById.get(piece.templateId)?.progressiveDeployment?.reserveInitializationSkillId)
+      .sort((left, right) => compareStableText(left.instanceId, right.instanceId))
+    for (const setupPiece of setupPieces) {
+      const setupSkillId = templatesById
+        .get(setupPiece.templateId)
+        ?.progressiveDeployment
+        ?.reserveInitializationSkillId
+      if (!setupSkillId) continue
+      const setupSkill = state.skillsById[setupSkillId]
+      if (!setupSkill) {
+        throw new Error(`Progressive reserve initialization skill is missing: ${setupSkillId}`)
+      }
+      const reserveIndex = reserve.findIndex(piece => piece.instanceId === setupPiece.instanceId)
+      if (reserveIndex < 0) {
+        throw new Error(`Progressive reserve setup piece disappeared: ${setupPiece.instanceId}`)
+      }
+
+      const [piece] = reserve.splice(reserveIndex, 1)
+      piece.x = null
+      piece.y = null
+      state.pieces.push(piece)
+      const result = executeSkillFunction(setupSkill, {
+        piece,
+        target: null,
+        targetPosition: null,
+        battle: state,
+        skill: {
+          id: setupSkill.id,
+          name: setupSkill.name,
+          type: setupSkill.type,
+          powerMultiplier: setupSkill.powerMultiplier,
+          targeting: setupSkill.targeting,
+        },
+      }, state)
+      if (!result.success || state.pieces.some(candidate => candidate.instanceId === piece.instanceId)) {
+        throw new Error(result.message || `Progressive reserve initialization failed: ${setupSkillId}`)
+      }
+    }
+  }
+
+  deployment.reserveCounts = Object.fromEntries(
+    deployment.playerIds.map(playerId => {
+      const reserveKey = Object.keys(deployment.reserves ?? {}).find(
+        candidate => candidate.toLowerCase() === playerId.toLowerCase(),
+      )
+      return [playerId, reserveKey ? deployment.reserves?.[reserveKey]?.length ?? 0 : 0]
+    }),
+  )
+}
+
+function normalizeProgressiveStreamPlayerId(playerId: string): string {
+  return playerId.trim().toLowerCase()
+}
+
+function appendSetupTriggerMessages(
+  state: BattleState,
+  playerId: string,
+  result: TriggerResult,
+): void {
+  if (!result.success || result.messages.length === 0) return
+  if (!state.actions) state.actions = []
+  result.messages.forEach(message => {
+    state.actions!.push({
+      type: 'triggerEffect',
+      playerId,
+      turn: state.turn.turnNumber,
+      payload: { message },
+    })
+  })
+}
+
+function initializeProgressiveOpeningVanguards(
+  state: BattleState,
+  runtime: RuleRuntime,
+): void {
+  const deployment = state.deployment
+  if (deployment?.mode !== 'progressive-reserve-v1' || !deployment.reserves) return
+
+  for (const playerId of deployment.playerIds) {
+    const reserveKey = Object.keys(deployment.reserves).find(
+      candidate => candidate.toLowerCase() === playerId.toLowerCase(),
+    )
+    const reserve = reserveKey ? deployment.reserves[reserveKey] : undefined
+    if (!reserve) throw new Error(`Progressive reserve is missing for ${playerId}`)
+
+    const eligible = reserve
+      .filter(piece => piece.isCore === true && piece.currentHp > 0)
+      .sort((left, right) => compareStableText(left.instanceId, right.instanceId))
+    if (eligible.length === 0) {
+      throw new Error(`Progressive opening vanguard is unavailable for ${playerId}`)
+    }
+
+    const streamPlayerId = normalizeProgressiveStreamPlayerId(playerId)
+    const piece = eligible[runtime.nextInt(
+      `${RANDOM_STREAM_NAMES.progressiveDeploymentOpeningPiece}/${streamPlayerId}`,
+      eligible.length,
+    )]
+    const emptyWalkableTiles = state.map.tiles
+      .filter(tile => tile.props.walkable && !state.pieces.some(candidate =>
+        candidate.x === tile.x && candidate.y === tile.y))
+      .sort((left, right) => left.y - right.y || left.x - right.x)
+    if (emptyWalkableTiles.length === 0) {
+      throw new Error(`Progressive opening vanguard has no empty walkable position for ${playerId}`)
+    }
+    const selectedTile = emptyWalkableTiles[runtime.nextInt(
+      `${RANDOM_STREAM_NAMES.progressiveDeploymentOpeningCell}/${streamPlayerId}`,
+      emptyWalkableTiles.length,
+    )]
+
+    const beforeContext = {
+      type: 'beforePieceSummoned' as const,
+      playerId,
+      targetPosition: { x: selectedTile.x, y: selectedTile.y },
+      pieceTemplateId: piece.templateId,
+      faction: piece.faction,
+    }
+    const beforeResult = getActiveTriggerSystem().checkTriggers(state, beforeContext)
+    assertSetupTriggerIsSynchronous(beforeResult, 'beforePieceSummoned')
+    appendSetupTriggerMessages(state, playerId, beforeResult)
+    if (beforeResult.blocked) {
+      throw new Error(beforeResult.messages.join('；') || `Progressive opening summon was blocked for ${playerId}`)
+    }
+
+    const finalPosition = beforeContext.targetPosition
+    const finalTile = finalPosition && state.map.tiles.find(tile =>
+      tile.x === finalPosition.x && tile.y === finalPosition.y)
+    const finalPositionOccupied = finalPosition && state.pieces.some(candidate =>
+      candidate.x === finalPosition.x && candidate.y === finalPosition.y)
+    if (!finalPosition || !finalTile?.props.walkable || finalPositionOccupied) {
+      throw new Error(`Progressive opening summon resolved to an invalid position for ${playerId}`)
+    }
+
+    const reserveIndex = reserve.findIndex(candidate => candidate.instanceId === piece.instanceId)
+    if (reserveIndex < 0) throw new Error(`Progressive opening vanguard disappeared for ${playerId}`)
+    reserve.splice(reserveIndex, 1)
+    piece.x = finalPosition.x
+    piece.y = finalPosition.y
+    state.pieces.push(piece)
+
+    const afterResult = getActiveTriggerSystem().checkTriggers(state, {
+      type: 'afterPieceSummoned',
+      playerId,
+      sourcePiece: piece,
+      pieceTemplateId: piece.templateId,
+      faction: piece.faction,
+    })
+    assertSetupTriggerIsSynchronous(afterResult, 'afterPieceSummoned')
+    appendSetupTriggerMessages(state, playerId, afterResult)
+  }
+
+  deployment.reserveCounts = Object.fromEntries(
+    deployment.playerIds.map(playerId => {
+      const reserveKey = Object.keys(deployment.reserves ?? {}).find(
+        candidate => candidate.toLowerCase() === playerId.toLowerCase(),
+      )
+      return [playerId, reserveKey ? deployment.reserves?.[reserveKey]?.length ?? 0 : 0]
+    }),
+  )
+  deployment.initialPositions = collectCorePositions(state.pieces)
+  deployment.openingVanguardsInitialized = true
 }
 
 function writeLog(message: string) {
@@ -130,6 +313,7 @@ export const DEMO_DEPLOYMENT_MAP_ID = 'large-hole-arena'
 
 export interface InitialPieceBuildOptions {
   deterministicDeployment?: boolean
+  progressiveDeployment?: boolean
 }
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
@@ -170,12 +354,24 @@ export function buildInitialPiecesForPlayers(
   if (players.length !== 2) return []
 
   const deterministicDeployment = options.deterministicDeployment === true
+  const progressiveDeployment = options.progressiveDeployment === true
   if (deterministicDeployment) {
     if (!playerSelectedPieces || playerSelectedPieces.length !== 2 || playerSelectedPieces.some(player => player.pieces.length !== 8)) {
       throw new Error('Demo deployment requires exactly two players with eight pieces each')
     }
-    players = [...players].sort(compareStableText)
-    playerSelectedPieces = [...playerSelectedPieces].sort((left, right) => compareStableText(left.playerId, right.playerId))
+    const comparePlayerIds = progressiveDeployment
+      ? compareStableProgressivePlayerIds
+      : compareStableText
+    players = [...players].sort(comparePlayerIds)
+    playerSelectedPieces = [...playerSelectedPieces]
+      .sort((left, right) => comparePlayerIds(left.playerId, right.playerId))
+      .map(playerInfo => progressiveDeployment
+        ? {
+            ...playerInfo,
+            pieces: [...playerInfo.pieces]
+              .sort((left, right) => compareStableText(left.id, right.id)),
+          }
+        : playerInfo)
   }
 
   const [p1, p2] = players
@@ -204,7 +400,7 @@ export function buildInitialPiecesForPlayers(
     .slice()
     .sort((left, right) => left.y - right.y || left.x - right.x)
   const deploymentPositions: Array<{ x: number; y: number }> = []
-  if (deterministicDeployment) {
+  if (deterministicDeployment && !progressiveDeployment) {
     if (availableTiles.length < 16) throw new Error('Demo deployment map does not contain sixteen ordinary floor tiles')
     for (let index = 0; index < 16; index += 1) {
       const swapIndex = index + Math.floor(randomFloat() * (availableTiles.length - index))
@@ -217,6 +413,7 @@ export function buildInitialPiecesForPlayers(
   
   // 随机选择位置的函数，确保位置不重叠
   const getRandomPosition = () => {
+    if (progressiveDeployment) return { x: null, y: null }
     if (deterministicDeployment) {
       const position = deploymentPositions[pieces.length]
       if (!position) throw new Error('Demo deployment exhausted its precomputed positions')
@@ -554,6 +751,8 @@ export async function createInitialBattleForPlayers(
     firstPlayerId?: PlayerId
     rootSeed?: number
     deploymentEnabled?: boolean
+    /** New matches default to progressive-reserve-v1; legacy is replay/test compatibility only. */
+    deploymentMode?: DeploymentMode
     deploymentStartedAt?: number
     profileIdentity?: GameProfileIdentityV1
     ruleExecutionContext?: RuleExecutionContext
@@ -561,6 +760,10 @@ export async function createInitialBattleForPlayers(
 ): Promise<BattleState | null> {
   if (playerIds.length !== 2) return null
 
+  const deploymentMode: DeploymentMode | undefined = options?.deploymentEnabled
+    ? options.deploymentMode ?? 'progressive-reserve-v1'
+    : undefined
+  const progressiveDeployment = deploymentMode === 'progressive-reserve-v1'
   const orderedIds = [...playerIds]
   const orderedPSP = playerSelectedPieces ? [...playerSelectedPieces] : undefined
   let resolvedMapId = mapId
@@ -571,8 +774,11 @@ export async function createInitialBattleForPlayers(
       throw new Error('Demo deployment requires an explicit non-negative deployment start time')
     }
     resolvedMapId = assertSelectableMapId(mapId)
-    orderedIds.sort(compareStableText)
-    orderedPSP?.sort((left, right) => compareStableText(left.playerId, right.playerId))
+    const comparePlayerIds = progressiveDeployment
+      ? compareStableProgressivePlayerIds
+      : compareStableText
+    orderedIds.sort(comparePlayerIds)
+    orderedPSP?.sort((left, right) => comparePlayerIds(left.playerId, right.playerId))
   }
 
   const [p1, p2] = orderedIds
@@ -659,8 +865,19 @@ export async function createInitialBattleForPlayers(
     selectedPieces,
     pspForBuild,
     deploymentRandom,
-    { deterministicDeployment: options?.deploymentEnabled === true },
+    {
+      deterministicDeployment: options?.deploymentEnabled === true,
+      progressiveDeployment,
+    },
   )
+  const progressiveReserves = progressiveDeployment
+    ? Object.fromEntries(orderedIds.map(playerId => [
+        playerId,
+        pieces
+          .filter(piece => piece.ownerPlayerId.toLowerCase() === playerId.toLowerCase()),
+      ]))
+    : undefined
+  const boardPieces = progressiveDeployment ? [] : pieces
 
   // 先后手：由 battle-setup 统一决定（不在调用方重复随机）
   const firstPlayer = options?.firstPlayerId && orderedIds.includes(options.firstPlayerId)
@@ -684,9 +901,9 @@ export async function createInitialBattleForPlayers(
       .map(player => [player.playerId.toLowerCase(), player.alignment]),
   )
 
-  const state: BattleState = {
+  let state: BattleState = {
     map,
-    pieces,
+    pieces: boardPieces,
     graveyard: [],
     pieceStatsByTemplateId: buildDefaultPieceStats(),
     skillsById: skills,
@@ -705,14 +922,22 @@ export async function createInitialBattleForPlayers(
       },
     },
     deployment: options?.deploymentEnabled ? {
-      status: 'awaiting-locks',
+      mode: deploymentMode,
+      status: progressiveDeployment ? 'turn-ready' : 'awaiting-locks',
       playerIds: [...orderedIds],
       choices: {},
-      initialPositions: collectCorePositions(pieces),
+      initialPositions: collectCorePositions(boardPieces),
       locks: Object.fromEntries(orderedIds.map(playerId => [playerId, { locked: false }])),
       startedAt: options.deploymentStartedAt!,
       deadlineAt: options.deploymentStartedAt! + DEPLOYMENT_DURATION_MS,
       revision: 0,
+      ...(progressiveReserves ? {
+        reserves: progressiveReserves,
+        reserveCounts: Object.fromEntries(orderedIds.map(playerId => [
+          playerId,
+          progressiveReserves[playerId]?.length ?? 0,
+        ])),
+      } : {}),
     } : undefined,
     ...(Object.keys(playerAlignments).length > 0 ? { extensions: { playerAlignments } } : {}),
   }
@@ -730,7 +955,7 @@ export async function createInitialBattleForPlayers(
   }
 
   const initializeRules = () => {
-    state.pieces.forEach(piece => {
+    pieces.forEach(piece => {
       const template = allSelectedPieces.find(t => t.id === piece.templateId)
       if (template) {
         applyInitialRules(piece, template)
@@ -744,6 +969,19 @@ export async function createInitialBattleForPlayers(
       if (!secondPlayerState.rules) secondPlayerState.rules = []
       secondPlayerState.rules.push(luckyRule)
       writeLog('[createInitialBattle] First player: ' + firstPlayer + ', rule-lucky-coin-gamestart → second player: ' + secondPlayer)
+    }
+
+    if (progressiveDeployment) {
+      initializeProgressiveReserveEffects(
+        state,
+        new Map(allSelectedPieces.map(template => [template.id, template])),
+      )
+      if (!runtime) throw new Error('Progressive opening deployment requires a deterministic rule runtime')
+      initializeProgressiveOpeningVanguards(state, runtime)
+      // The first board-only core settlement boundary is after both opening
+      // summon queues, but before gameStart and the first reserve offer.
+      finalizeBattleTerminal(state, { type: 'beginPhase' })
+      if (!state.terminalResult) state = applyBattleAction(state, { type: 'beginPhase' })
     }
 
     // 部署完成后由首个 beginPhase 触发 gameStart；旧入口保持立即触发。
@@ -767,6 +1005,14 @@ export async function createInitialBattleForPlayers(
 
 function compareStableText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
+}
+
+function compareStableProgressivePlayerIds(left: string, right: string): number {
+  const normalized = compareStableText(
+    normalizeProgressiveStreamPlayerId(left),
+    normalizeProgressiveStreamPlayerId(right),
+  )
+  return normalized || compareStableText(left, right)
 }
 
 function collectCorePositions(pieces: PieceInstance[]): Record<string, { x: number; y: number }> {

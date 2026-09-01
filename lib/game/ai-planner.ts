@@ -46,6 +46,7 @@ const STRUCTURAL_KINDS = new Set<CandidateAction['kind']>([
   'cancel-selection',
   'deployment-choice',
   'deployment-lock',
+  'reserve-deployment',
   'phase-advance',
 ])
 

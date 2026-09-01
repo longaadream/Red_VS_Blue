@@ -8,6 +8,12 @@ import {
   stableJson,
 } from './battle-trace'
 import { runBattleActionIsolated } from './battle-runner'
+import {
+  getEmptyWalkableDeploymentPositions,
+  PROGRESSIVE_DEPLOYMENT_MODE,
+  reservePiecesForPlayer,
+  toPublicBattleState,
+} from './deployment'
 import { assertPendingOptionCancellation, validatePendingOptionSubmission } from './pending-interaction'
 import { getSkillById } from './skill-repository'
 import { loadCardById } from './skills'
@@ -55,6 +61,7 @@ const CANDIDATE_KIND_RANK: Record<CandidateActionKind, number> = {
   'cancel-selection': 2,
   'deployment-choice': 10,
   'deployment-lock': 11,
+  'reserve-deployment': 12,
   'phase-advance': 20,
   move: 30,
   'basic-skill': 40,
@@ -68,6 +75,7 @@ export const AI_ENVIRONMENT_CAPABILITIES: AIEnvironmentCapabilities = {
   supportedActionTypes: [
     'deploymentChoice',
     'deploymentLock',
+    'deployReservePiece',
     'beginPhase',
     'move',
     'useBasicSkill',
@@ -168,6 +176,11 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
 
   const pendingOption = state.pendingOptionSelection
   const pendingTarget = state.pendingTargetSelection
+  const projectedDeployment = state.deployment
+    ? toPublicBattleState(state, playerId).deployment
+    : undefined
+  const ownsProgressiveDeploymentInput = projectedDeployment?.mode === PROGRESSIVE_DEPLOYMENT_MODE
+    && samePlayer(projectedDeployment.activePlayerId, playerId)
   return {
     protocolVersion: AI_ENVIRONMENT_PROTOCOL_VERSION,
     playerId,
@@ -189,18 +202,27 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
     })),
     turn: cloneSerializable(state.turn),
     terminalResult: cloneSerializable(state.terminalResult),
-    deployment: state.deployment ? {
-      status: state.deployment.status,
-      playerIds: [...state.deployment.playerIds],
-      locks: Object.fromEntries(state.deployment.playerIds.map(id => [id, {
-        locked: state.deployment?.locks[id]?.locked === true,
+    deployment: projectedDeployment ? {
+      mode: projectedDeployment.mode,
+      status: projectedDeployment.status,
+      playerIds: [...projectedDeployment.playerIds],
+      locks: Object.fromEntries(projectedDeployment.playerIds.map(id => [id, {
+        locked: projectedDeployment.locks[id]?.locked === true,
       }])),
-      deadlineAt: state.deployment.deadlineAt,
-      revision: state.deployment.revision,
-      initialPositions: cloneSerializable(state.deployment.initialPositions),
-      finalPositions: state.deployment.status === 'complete'
-        ? cloneSerializable(state.deployment.finalPositions)
+      deadlineAt: projectedDeployment.deadlineAt,
+      revision: projectedDeployment.revision,
+      openingVanguardsInitialized: projectedDeployment.openingVanguardsInitialized,
+      initialPositions: cloneSerializable(projectedDeployment.initialPositions),
+      finalPositions: projectedDeployment.status === 'complete'
+        ? cloneSerializable(projectedDeployment.finalPositions)
         : undefined,
+      reserveCounts: cloneSerializable(projectedDeployment.reserveCounts),
+      activePlayerId: projectedDeployment.activePlayerId,
+      offerTurnNumber: projectedDeployment.offerTurnNumber,
+      ...(ownsProgressiveDeploymentInput ? {
+        offerPieces: cloneSerializable(projectedDeployment.offerPieces ?? []),
+        legalPositions: cloneSerializable(projectedDeployment.legalPositions ?? []),
+      } : {}),
     } : undefined,
     pendingOptionSelection: pendingOption && samePlayer(pendingOption.playerId, playerId) ? {
       playerId: pendingOption.playerId,
@@ -399,6 +421,54 @@ function pendingCandidates(state: BattleState, playerId: string): CandidateActio
   return sortCandidates(candidates)
 }
 
+function progressiveDeploymentCandidates(
+  state: BattleState,
+  playerId: string,
+): CandidateAction[] | undefined {
+  const deployment = state.deployment
+  if (deployment?.mode !== PROGRESSIVE_DEPLOYMENT_MODE) return undefined
+  if (deployment.status !== 'awaiting-reserve-deploy') {
+    return undefined
+  }
+  if (
+    !Number.isSafeInteger(deployment.revision)
+    || !samePlayer(state.turn.currentPlayerId, playerId)
+    || !samePlayer(deployment.activePlayerId, playerId)
+  ) return []
+
+  if (deployment.offerTurnNumber !== state.turn.turnNumber || !Array.isArray(deployment.legalPositions)) {
+    return []
+  }
+  const reserveIds = new Set(
+    reservePiecesForPlayer(state, playerId)
+      .filter(piece => piece.isCore === true && piece.currentHp > 0)
+      .map(piece => piece.instanceId),
+  )
+  const offeredIds = [...new Set(deployment.offerPieceIds ?? [])]
+    .filter(pieceId => reserveIds.has(pieceId))
+  if (offeredIds.length === 0) return []
+
+  if (deployment.legalPositions.length > 0) {
+    return sortCandidates(offeredIds.flatMap(pieceId =>
+      deployment.legalPositions!.map(position => candidate('reserve-deployment', {
+        type: 'deployReservePiece',
+        playerId,
+        expectedDeploymentRevision: deployment.revision,
+        pieceId,
+        toX: position.x,
+        toY: position.y,
+      }))))
+  }
+
+  if (getEmptyWalkableDeploymentPositions(state).length === 0) return []
+  return sortCandidates(offeredIds.map(pieceId => candidate('reserve-deployment', {
+    type: 'deployReservePiece',
+    playerId,
+    expectedDeploymentRevision: deployment.revision,
+    pieceId,
+  })))
+}
+
 export function listLegalAIActions(state: BattleState, playerId: string): CandidateAction[] {
   // Some terminal settlement snapshots omit the runtime skill cache. Restore only
   // the empty repository-fallback shape for read-only candidate preparation.
@@ -410,6 +480,9 @@ export function listLegalAIActions(state: BattleState, playerId: string): Candid
 
   const pending = pendingCandidates(state, playerId)
   if (pending) return pending
+
+  const progressiveDeployment = progressiveDeploymentCandidates(state, playerId)
+  if (progressiveDeployment) return progressiveDeployment
 
   if (state.deployment?.status === 'awaiting-locks') {
     const stableId = state.deployment.playerIds.find(id => samePlayer(id, playerId))

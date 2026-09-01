@@ -59,17 +59,17 @@
       }
     }
     message.profileIdentity = profileIdentity
-    if (_mode !== 'relay') return message
+    if (roomId === '__lobby') return message
 
     if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') {
-      throw new Error('Signed identity is required for Relay WebSocket subscriptions')
+      throw new Error('Signed identity is required for battle WebSocket subscriptions')
     }
     var identity = window.RvBIdentity.getIdentity && window.RvBIdentity.getIdentity()
     if (!identity || String(identity.id || '').toLowerCase() !== playerId) {
-      throw new Error('Active identity does not match the Relay WebSocket player')
+      throw new Error('Active identity does not match the battle WebSocket player')
     }
     var publicKey = window.RvBIdentity.getPublicKey && window.RvBIdentity.getPublicKey()
-    if (!publicKey) throw new Error('Relay WebSocket identity has no public key')
+    if (!publicKey) throw new Error('Battle WebSocket identity has no public key')
 
     var payload = {
       type: 'battle-subscribe',
@@ -222,6 +222,30 @@
     if (message && message.context) error.context = message.context
     if (message && message.status) error.status = message.status
     return error
+  }
+
+  function requestAuthorityReceiptSync(reason, clientActionId) {
+    if (_authoritySyncing) return false
+    if (!_subscribed || !_ws || _ws.readyState !== 1) return false
+    if (!clientActionId) return requestAuthoritySync(reason)
+    _authoritySyncing = true
+    _authoritySyncRequestId = 'authority-sync-' + (_reqSeq++) + '-' + Date.now()
+    try {
+      _ws.send(JSON.stringify({
+        type: 'requestBattleSnapshot',
+        requestId: _authoritySyncRequestId,
+        clientActionId: String(clientActionId),
+      }))
+    } catch {
+      _releaseAuthoritySync()
+      return false
+    }
+    _authoritySyncTimer = setTimeout(function () {
+      if (!_releaseAuthoritySync()) return
+      _emit('authoritySyncTimeout', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
+    }, AUTHORITY_SYNC_TIMEOUT_MS)
+    _emit('authoritySyncStart', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
+    return true
   }
 
   // Relay subscriptions require signed identity. A local/private URL entered
@@ -442,6 +466,7 @@
     request: request,
     requestAt: requestAt,
     requestAuthoritySync: requestAuthoritySync,
+    requestAuthorityReceiptSync: requestAuthorityReceiptSync,
     requestCatalogIdentityAt: requestCatalogIdentityAt,
     on: on,
     isConnected: isConnected,

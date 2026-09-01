@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { TextDecoder, TextEncoder } from 'node:util'
 import { runInNewContext } from 'node:vm'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -15,6 +16,7 @@ import {
   observeBattleForAI,
   simulateAITransition,
 } from '@/lib/game/ai-environment'
+import { generateBotActions, planBotActions, prepareLegalBotAction } from '@/lib/game/ai'
 import { evaluateZeroStageState } from '@/lib/game/ai-zero-stage-evaluator'
 import type {
   AIEnvironment,
@@ -57,6 +59,84 @@ function activeSkill(id: string, targeting: any, overrides: Record<string, unkno
     code: "function executeSkill(context) { context.battle.extensions.executed = context.skill.id; return { success: true, message: 'executed' }; }",
     ...overrides,
   }
+}
+
+function reserveCore(instanceId: string, ownerPlayerId: 'player-red' | 'player-blue') {
+  const piece = makePiece({
+    instanceId,
+    templateId: `template-${instanceId}`,
+    ownerPlayerId,
+    faction: ownerPlayerId === 'player-red' ? 'red' : 'blue',
+    moveRange: 2,
+  }) as any
+  piece.name = instanceId
+  piece.isCore = true
+  piece.x = null
+  piece.y = null
+  return piece
+}
+
+function progressiveDeploymentFixture(options: {
+  width?: number
+  height?: number
+  redPosition?: { x: number; y: number }
+  bluePosition?: { x: number; y: number }
+  legalPositions?: Array<{ x: number; y: number }>
+} = {}) {
+  const redPosition = options.redPosition ?? { x: 0, y: 0 }
+  const bluePosition = options.bluePosition ?? { x: 1, y: 0 }
+  const red = makePiece({
+    instanceId: 'red-vanguard',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    x: redPosition.x,
+    y: redPosition.y,
+  }) as any
+  const blue = makePiece({
+    instanceId: 'blue-vanguard',
+    ownerPlayerId: 'player-blue',
+    faction: 'blue',
+    x: bluePosition.x,
+    y: bluePosition.y,
+  }) as any
+  red.name = 'red-vanguard'
+  red.isCore = true
+  blue.name = 'blue-vanguard'
+  blue.isCore = true
+  const redOffers = [reserveCore('red-reserve-a', 'player-red'), reserveCore('red-reserve-b', 'player-red')]
+  const blueReserve = reserveCore('blue-secret-reserve', 'player-blue')
+  const state = makeState({
+    pieces: [red, blue],
+    currentPlayerId: 'player-red',
+    phase: 'start',
+    width: options.width ?? 8,
+    height: options.height ?? 3,
+  }) as any
+  state.deployment = {
+    mode: 'progressive-reserve-v1',
+    status: 'awaiting-reserve-deploy',
+    playerIds: ['player-red', 'player-blue'],
+    choices: {},
+    locks: {},
+    startedAt: 0,
+    deadlineAt: 0,
+    revision: 7,
+    openingVanguardsInitialized: true,
+    initialPositions: {
+      [red.instanceId]: redPosition,
+      [blue.instanceId]: bluePosition,
+    },
+    reserves: {
+      'player-red': redOffers,
+      'player-blue': [blueReserve],
+    },
+    reserveCounts: { 'player-red': redOffers.length, 'player-blue': 1 },
+    activePlayerId: 'player-red',
+    offerTurnNumber: state.turn.turnNumber,
+    offerPieceIds: redOffers.map(piece => piece.instanceId),
+    legalPositions: options.legalPositions ?? [{ x: 6, y: 2 }, { x: 7, y: 2 }],
+  }
+  return state
 }
 
 function makeSilencedActionFixture() {
@@ -102,6 +182,8 @@ function loadBrowserEnvironment(): AIEnvironment {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
   runInNewContext(source, context, { filename: bundlePath })
   return (context.GameEngine as { aiEnvironmentV1: AIEnvironment }).aiEnvironmentV1
@@ -271,6 +353,9 @@ describe('versioned headless AI environment', () => {
     expect(AI_ENVIRONMENT_CAPABILITIES.unsupportedActionTypes.map(entry => entry.type))
       .toEqual(['deploymentTimeout', 'grantChargePoints', 'surrender'])
     expect(AI_ENVIRONMENT_CAPABILITIES.supportedActionTypes).toContain('pendingTargetSelect')
+    expect(AI_ENVIRONMENT_CAPABILITIES.supportedActionTypes).toContain('deployReservePiece')
+    expect(AI_ENVIRONMENT_CAPABILITIES.supportedActionTypes).not.toContain('deploymentFreeMove')
+    expect(AI_ENVIRONMENT_CAPABILITIES.supportedActionTypes).not.toContain('deploymentSkipFreeMove')
   })
 
   it('records a large-board complete-candidate performance baseline without imposing a synthetic target', () => {
@@ -364,6 +449,225 @@ describe('versioned headless AI environment', () => {
         `${item.kind}:${stableJson(item.action)}`,
       ).toBe(true)
     }
+  })
+
+  it('projects only the active player progressive offer and enumerates stable offer-by-safe-cell actions in v1/v2', () => {
+    const state = progressiveDeploymentFixture()
+    const before = stableJson(state)
+
+    const redObservation = aiEnvironmentV1.observe(state, 'player-red')
+    const blueObservation = aiEnvironmentV1.observe(state, 'player-blue')
+    expect(redObservation.deployment).toMatchObject({
+      mode: 'progressive-reserve-v1',
+      status: 'awaiting-reserve-deploy',
+      revision: 7,
+      activePlayerId: 'player-red',
+      reserveCounts: { 'player-red': 2, 'player-blue': 1 },
+      offerPieces: [
+        { instanceId: 'red-reserve-a', templateId: 'template-red-reserve-a', name: 'red-reserve-a' },
+        { instanceId: 'red-reserve-b', templateId: 'template-red-reserve-b', name: 'red-reserve-b' },
+      ],
+      legalPositions: [{ x: 6, y: 2 }, { x: 7, y: 2 }],
+    })
+    expect(blueObservation.deployment).toMatchObject({
+      mode: 'progressive-reserve-v1',
+      status: 'awaiting-reserve-deploy',
+      revision: 7,
+      reserveCounts: { 'player-red': 2, 'player-blue': 1 },
+    })
+    expect(blueObservation.deployment).not.toHaveProperty('offerPieces')
+    expect(blueObservation.deployment).not.toHaveProperty('legalPositions')
+    expect(blueObservation.deployment).not.toHaveProperty('freeMovePieceId')
+    expect(blueObservation.deployment).not.toHaveProperty('freeMovePositions')
+    expect(stableJson(blueObservation)).not.toMatch(/red-reserve-[ab]|blue-secret-reserve/)
+
+    const first = aiEnvironmentV1.listLegalActions(state, 'player-red')
+    const second = aiEnvironmentV1.listLegalActions(state, 'player-red')
+    expect(second).toEqual(first)
+    expect(first).toHaveLength(4)
+    expect(first.every(item => item.kind === 'reserve-deployment')).toBe(true)
+    expect(first.map(item => item.action)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'deployReservePiece',
+        playerId: 'player-red',
+        expectedDeploymentRevision: 7,
+        pieceId: 'red-reserve-a',
+        toX: 6,
+        toY: 2,
+      }),
+      expect.objectContaining({
+        type: 'deployReservePiece',
+        playerId: 'player-red',
+        expectedDeploymentRevision: 7,
+        pieceId: 'red-reserve-b',
+        toX: 7,
+        toY: 2,
+      }),
+    ]))
+    expect(aiEnvironmentV1.listLegalActions(state, 'player-blue')).toEqual([])
+    expect(new Set(first.map(item => item.id)).size).toBe(first.length)
+    expect(stableJson(state)).toBe(before)
+    for (const item of first) {
+      expect(aiEnvironmentV1.simulate(state, item, { rootSeed: FIXED_SEED }).accepted, item.id).toBe(true)
+    }
+
+    expect(aiEnvironmentV2.observe(state, 'player-red').deployment?.offerPieces)
+      .toEqual(redObservation.deployment?.offerPieces)
+    expect(aiEnvironmentV2.observe(state, 'player-blue').deployment).not.toHaveProperty('offerPieces')
+    const v2 = aiEnvironmentV2.decisionSpace(state, 'player-red')
+    expect(v2.kind).toBe('actions')
+    if (v2.kind !== 'actions') throw new Error('Expected flat progressive action candidates')
+    expect(v2.candidates.map(item => item.kind)).toEqual(first.map(item => item.kind))
+    expect(v2.candidates.map(item => item.action)).toEqual(first.map(item => item.action))
+  })
+
+  it('keeps fallback authority-only, emits no action without an empty cell, and rejects stale revisions without pollution', () => {
+    const fallback = progressiveDeploymentFixture({
+      width: 3,
+      height: 1,
+      redPosition: { x: 0, y: 0 },
+      bluePosition: { x: 2, y: 0 },
+      legalPositions: [],
+    })
+    fallback.deployment.offerPieceIds = ['red-reserve-a']
+    const runtime = new RuleRuntime({
+      rootSeed: FIXED_SEED,
+      cursors: { 'progressive-deployment/fallback/player-red': 4 },
+      tick: 9,
+    })
+    const runtimeBefore = runtime.snapshot()
+    let first: CandidateAction[] = []
+    let second: CandidateAction[] = []
+    withRuleRuntime(runtime, () => {
+      first = listLegalAIActions(fallback, 'player-red')
+      second = listLegalAIActions(fallback, 'player-red')
+    })
+    expect(runtime.snapshot()).toEqual(runtimeBefore)
+    expect(second).toEqual(first)
+    expect(fallback.deployment.legalPositions).toEqual([])
+    expect(observeBattleForAI(fallback, 'player-red').deployment?.legalPositions).toEqual([])
+    expect(first).toHaveLength(1)
+    expect(first[0]).toMatchObject({
+      kind: 'reserve-deployment',
+      action: {
+        type: 'deployReservePiece',
+        playerId: 'player-red',
+        expectedDeploymentRevision: 7,
+        pieceId: 'red-reserve-a',
+      },
+    })
+    expect(first[0].action).not.toHaveProperty('toX')
+    expect(first[0].action).not.toHaveProperty('toY')
+    const resolvedA = simulateAITransition(fallback, first[0], { rootSeed: FIXED_SEED })
+    const resolvedB = simulateAITransition(fallback, first[0], { rootSeed: FIXED_SEED })
+    expect(resolvedA.accepted).toBe(true)
+    expect(resolvedB.accepted).toBe(true)
+    if (!resolvedA.accepted || !resolvedB.accepted) throw new Error('Expected deterministic fallback deployment')
+    expect(resolvedA.stateHash).toBe(resolvedB.stateHash)
+    expect(resolvedA.state.pieces.find(piece => piece.instanceId === 'red-reserve-a'))
+      .toMatchObject({ x: 1, y: 0 })
+
+    const noEmpty = progressiveDeploymentFixture({
+      width: 2,
+      height: 1,
+      redPosition: { x: 0, y: 0 },
+      bluePosition: { x: 1, y: 0 },
+      legalPositions: [],
+    })
+    noEmpty.deployment.offerPieceIds = ['red-reserve-a']
+    expect(listLegalAIActions(noEmpty, 'player-red')).toEqual([])
+
+    const safe = progressiveDeploymentFixture()
+    const stale = listLegalAIActions(safe, 'player-red')[0]
+    safe.deployment.revision += 1
+    const safeBefore = stableJson(safe)
+    const rejected = simulateAITransition(safe, stale, { rootSeed: FIXED_SEED })
+    expect(rejected.accepted).toBe(false)
+    if (rejected.accepted) throw new Error('Expected stale deployment rejection')
+    expect(rejected.error.code).toBe('PROGRESSIVE_DEPLOYMENT_STALE_REVISION')
+    expect(rejected.state).toBe(safe)
+    expect(stableJson(safe)).toBe(safeBefore)
+  })
+
+  it('enters ordinary action enumeration immediately after deployment with no dedicated free-move interface', () => {
+    const initial = progressiveDeploymentFixture()
+    const apBefore = initial.players.find((player: any) => player.playerId === 'player-red')!.actionPoints
+    const deployed = simulateAITransition(
+      initial,
+      listLegalAIActions(initial, 'player-red')[0],
+      { rootSeed: FIXED_SEED },
+    )
+    expect(deployed.accepted).toBe(true)
+    if (!deployed.accepted) throw new Error('Expected reserve deployment to succeed')
+    expect(deployed.state.deployment).toMatchObject({
+      mode: 'progressive-reserve-v1',
+      status: 'turn-ready',
+    })
+    expect(deployed.state.turn.phase).toBe('action')
+    expect(deployed.state.players.find(player => player.playerId === 'player-red')!.actionPoints).toBe(apBefore)
+
+    const observation = observeBattleForAI(deployed.state, 'player-red')
+    expect(observation.deployment).not.toHaveProperty('freeMovePieceId')
+    expect(observation.deployment).not.toHaveProperty('freeMovePositions')
+    const blueDeployment = observeBattleForAI(deployed.state, 'player-blue').deployment
+    expect(blueDeployment).not.toHaveProperty('offerPieces')
+    expect(blueDeployment).not.toHaveProperty('legalPositions')
+    expect(blueDeployment).not.toHaveProperty('freeMovePieceId')
+    expect(blueDeployment).not.toHaveProperty('freeMovePositions')
+
+    const candidates = listLegalAIActions(deployed.state, 'player-red')
+    expect(candidates.some(item => item.kind === 'move' || item.kind === 'end-turn')).toBe(true)
+    expect(candidates.map(item => item.action.type)).not.toContain('deploymentFreeMove')
+    expect(candidates.map(item => item.action.type)).not.toContain('deploymentSkipFreeMove')
+    expect(listLegalAIActions(deployed.state, 'player-blue')).toEqual([])
+  })
+
+  it('enumerates and plans only the tagged piece normal move at zero AP', () => {
+    const tagged = makePiece({
+      instanceId: 'tagged-free-mover', ownerPlayerId: 'player-red', x: 1, y: 1, moveRange: 2,
+      statusTags: [{
+        id: 'deployment-first-move-free',
+        type: 'deployment-first-move-free',
+        name: '本回合首次移动免费',
+        visible: true,
+        grantedTurnNumber: 1,
+        currentDuration: 1,
+        currentUses: 1,
+      }],
+    }) as any
+    const ordinary = makePiece({
+      instanceId: 'ordinary-no-ap', ownerPlayerId: 'player-red', x: 1, y: 3, moveRange: 2,
+    }) as any
+    const enemy = makePiece({
+      instanceId: 'enemy-anchor', ownerPlayerId: 'player-blue', x: 5, y: 1,
+    }) as any
+    const state = makeState({ pieces: [tagged, ordinary, enemy], width: 6, height: 5 }) as any
+    state.players.find((player: any) => player.playerId === 'player-red').actionPoints = 0
+
+    const legalMoves = listLegalAIActions(state, 'player-red')
+      .filter(candidate => candidate.action.type === 'move')
+    expect(legalMoves.length).toBeGreaterThan(0)
+    expect(new Set(legalMoves.map(candidate => (
+      candidate.action.type === 'move' ? candidate.action.pieceId : undefined
+    )))).toEqual(new Set(['tagged-free-mover']))
+
+    const generated = generateBotActions(state, 'player-red')
+    expect(generated.some(action => action.type === 'move' && action.pieceId === 'tagged-free-mover')).toBe(true)
+    expect(generated.some(action => action.type === 'move' && action.pieceId === 'ordinary-no-ap')).toBe(false)
+    const plan = planBotActions(state, 'player-red')
+    expect(plan?.kind).toBe('action')
+    const draft = plan?.actions.find(action => action.type === 'move')
+    expect(draft).toMatchObject({ type: 'move', pieceId: 'tagged-free-mover' })
+    const action = prepareLegalBotAction(state, draft!, 'player-red')
+    expect(action).toBeDefined()
+
+    const moved = simulateAITransition(state, action!, { rootSeed: FIXED_SEED })
+    expect(moved.accepted).toBe(true)
+    if (!moved.accepted) throw new Error('Expected tagged AP-zero move to succeed')
+    expect(moved.state.players.find(player => player.playerId === 'player-red')!.actionPoints).toBe(0)
+    expect(moved.state.pieces.find(piece => piece.instanceId === 'tagged-free-mover')?.statusTags)
+      .not.toEqual(expect.arrayContaining([expect.objectContaining({ type: 'deployment-first-move-free' })]))
+    expect(listLegalAIActions(moved.state, 'player-red').some(candidate => candidate.action.type === 'move')).toBe(false)
   })
 
   it('simulates on an isolated copy, returns structured diff/trace, and replays deterministically', () => {
@@ -598,6 +902,15 @@ describe('versioned headless AI environment', () => {
     }) as any
     transformed.skills = [{ skillId: 'illidan-metamorphosis', currentCooldown: 0, usesRemaining: -1 }]
     const state = makeState({ pieces: [naruto, transformed], width: 6, height: 5 }) as any
+    transformed.statusTags = [{
+      id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
+      name: '本回合首次移动免费',
+      visible: true,
+      grantedTurnNumber: state.turn.turnNumber,
+      currentDuration: 1,
+      currentUses: 1,
+    }]
     state.players[0].actionPoints = 20
     state.players[0].chargePoints = 20
     state.skillsById['naruto-shadow-clone'] = JSON.parse(
@@ -614,7 +927,11 @@ describe('versioned headless AI environment', () => {
     const result = aiEnvironmentV1.simulate(state, summon!, { rootSeed: FIXED_SEED })
     expect(result.accepted).toBe(true)
     if (result.accepted) {
-      expect(result.state.pieces.some(piece => piece.instanceId.startsWith('naruto-clone-'))).toBe(true)
+      const summonedClone = result.state.pieces.find(piece => piece.instanceId.startsWith('naruto-clone-'))
+      expect(summonedClone).toBeDefined()
+      expect(summonedClone?.statusTags).not.toContainEqual(expect.objectContaining({
+        type: 'deployment-first-move-free',
+      }))
     }
     const transform = listLegalAIActions(state, 'player-red').find(item =>
       item.kind === 'charge-skill' && item.action.type === 'useChargeSkill' &&
@@ -626,6 +943,12 @@ describe('versioned headless AI environment', () => {
     if (transformedResult.accepted) {
       expect(transformedResult.state.pieces.find(piece => piece.instanceId === 'transformed')?.statusTags)
         .toContainEqual(expect.objectContaining({ type: 'demon-strike-charges' }))
+      expect(transformedResult.state.pieces.find(piece => piece.instanceId === 'transformed')?.statusTags)
+        .toContainEqual(expect.objectContaining({
+          type: 'deployment-first-move-free',
+          grantedTurnNumber: state.turn.turnNumber,
+          currentUses: 1,
+        }))
     }
   })
 

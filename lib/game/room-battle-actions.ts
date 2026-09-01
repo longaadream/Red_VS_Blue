@@ -48,6 +48,7 @@ import { restoreRoomRuleRuntime, type RoomRuleRuntime } from './room-rule-runtim
 import type { Room } from './room-store'
 import { assertActionPlayer } from './targeting'
 import {
+  getCurrentInputOwnerPlayerId,
   isAcceptedGameplayAction,
   isTurnTimerEnabled,
   projectTurnTimer,
@@ -93,7 +94,9 @@ export interface DeploymentRoomStore {
     authorityVersion: number
     pending: number
     lastError?: string
+    lastErrorContext?: Record<string, unknown>
   }
+  terminalAuthorityPersistencePolicy?: 'background' | 'durable-barrier'
   drainBattleAuthorityPersistence?(roomId?: string): Promise<void>
 }
 
@@ -167,6 +170,8 @@ export interface PreResumeDeliveryContext {
 export interface DispatchRoomBattleActionOptions {
   allowSystem?: boolean
   expectedAuthorityVersion?: number
+  /** Candidate persistence checkpoint cadence; legacy callers retain the existing default. */
+  checkpointInterval?: number
   clock?: DeploymentRuleClock
   /**
    * Runs after the single authoritative commit while the room clock is frozen.
@@ -182,7 +187,10 @@ export interface ScheduleBattleTimeoutOptions {
   clock?: DeploymentRuleClock
   onCommitted?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
   onTransitionCommitted?: (result: DispatchRoomBattleActionResult) => void | Promise<void>
-  onBotTurnReady?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
+  onBotTurnReady?: (
+    snapshot: PublicBattleSnapshot,
+    authorityState: BattleState,
+  ) => void | Promise<void>
 }
 
 export type ScheduleDeploymentTimeoutOptions = ScheduleBattleTimeoutOptions
@@ -214,6 +222,7 @@ function battleAuthorityPersistenceDegradedError(
     durableAuthorityVersion: persistence.durableAuthorityVersion,
     pending: persistence.pending,
     lastError: persistence.lastError,
+    lastErrorContext: persistence.lastErrorContext,
   })
   return new RoomBattleActionError(
     'BATTLE_AUTHORITY_PERSISTENCE_DEGRADED',
@@ -226,6 +235,56 @@ function battleAuthorityPersistenceDegradedError(
       pendingPersistenceJobs: persistence.pending,
     },
   )
+}
+
+function startTerminalBattleAuthorityDrain(
+  store: DeploymentRoomStore,
+  roomId: string,
+  authorityVersion: number,
+  clientActionId?: string,
+): void {
+  if (!store.drainBattleAuthorityPersistence) return
+  let drain: Promise<void>
+  try {
+    drain = store.drainBattleAuthorityPersistence(roomId)
+  } catch (error) {
+    drain = Promise.reject(error)
+  }
+  void drain.catch(error => {
+    console.error('[battle-authority-persistence] terminal background drain failed', {
+      roomId,
+      authorityVersion,
+      clientActionId,
+      errorName: error instanceof Error ? error.name : 'Error',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorCause: error instanceof Error && error.cause
+        ? (error.cause instanceof Error ? error.cause.message : String(error.cause))
+        : undefined,
+    })
+  })
+}
+
+async function settleTerminalBattleAuthorityPersistence(
+  store: DeploymentRoomStore,
+  roomId: string,
+  authorityVersion: number,
+  clientActionId?: string,
+): Promise<{ waitedForDurability: boolean; waitedMs: number }> {
+  if (!store.drainBattleAuthorityPersistence) {
+    return { waitedForDurability: false, waitedMs: 0 }
+  }
+
+  if (store.terminalAuthorityPersistencePolicy === 'durable-barrier') {
+    const startedAt = monotonicNow()
+    await store.drainBattleAuthorityPersistence(roomId)
+    return {
+      waitedForDurability: true,
+      waitedMs: monotonicNow() - startedAt,
+    }
+  }
+
+  startTerminalBattleAuthorityDrain(store, roomId, authorityVersion, clientActionId)
+  return { waitedForDurability: false, waitedMs: 0 }
 }
 
 function assertBattleAuthorityPersistenceAvailable(
@@ -549,6 +608,9 @@ export async function dispatchRoomBattleAction(
           )
         : normalizeSystemActionTime(action, receivedAt)
 
+      const runtimeTransactionSnapshot = roomRuleRuntime.snapshotTransactionState()
+      let retainRuntimeTransaction = false
+      try {
       let submittedActionResult: BattleActionResult
       try {
         const rulesStartedAt = monotonicNow()
@@ -752,7 +814,12 @@ export async function dispatchRoomBattleAction(
         : undefined
       let checkpoint: BattleAuthorityCheckpointRecord | undefined
       if (transition) {
-        const reason = checkpointReasonForTransition(state, nextAuthorityState, nextAuthorityVersion)
+        const reason = checkpointReasonForTransition(
+          state,
+          nextAuthorityState,
+          nextAuthorityVersion,
+          options.checkpointInterval,
+        )
         if (reason) {
           const checkpointStorage = nextStorage
           checkpoint = {
@@ -820,6 +887,7 @@ export async function dispatchRoomBattleAction(
         if (authorityV2) assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
         continue
       }
+      retainRuntimeTransaction = true
       if (transition && actionResult.stateHashIndex) {
         authorityStateHashIndexes.set(normalizedRoomId, {
           authorityVersion: nextAuthorityVersion,
@@ -833,20 +901,6 @@ export async function dispatchRoomBattleAction(
           })
         }
       }
-      if (isTerminal && transition && store.drainBattleAuthorityPersistence) {
-        try {
-          const terminalDrainStartedAt = monotonicNow()
-          await store.drainBattleAuthorityPersistence(normalizedRoomId)
-          persistenceMs += monotonicNow() - terminalDrainStartedAt
-        } catch (error) {
-          console.error('[battle-authority-persistence] terminal journal drain failed', {
-            roomId: normalizedRoomId,
-            authorityVersion: nextAuthorityVersion,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
-
       const persistence = transition
         ? store.inspectBattleAuthorityPersistence?.(normalizedRoomId)
         : undefined
@@ -858,7 +912,20 @@ export async function dispatchRoomBattleAction(
             battleAuthorityPersistenceStatus: persistence?.status,
           }
         : { ...nextRoom, version: nextAuthorityVersion }
-      const snapshot = createPublicBattleSnapshot(committedRoom, viewerPlayerId ?? undefined, clock)
+      let snapshotRoom = committedRoom
+      if (isTerminal && transition) {
+        const terminalPersistence = await settleTerminalBattleAuthorityPersistence(
+          store,
+          normalizedRoomId,
+          nextAuthorityVersion,
+          requestedClientActionId,
+        )
+        persistenceMs += terminalPersistence.waitedMs
+        if (terminalPersistence.waitedForDurability) {
+          snapshotRoom = await store.getRoom(normalizedRoomId) ?? committedRoom
+        }
+      }
+      const snapshot = createPublicBattleSnapshot(snapshotRoom, viewerPlayerId ?? undefined, clock)
       if (isTerminal) clearRoomBattleTimeout(normalizedRoomId)
       let delivered = false
       if (options.onCommittedBeforeTimerResume) {
@@ -888,6 +955,11 @@ export async function dispatchRoomBattleAction(
           persistenceMs: roundTiming(persistenceMs),
           totalMs: roundTiming(monotonicNow() - performanceStartedAt),
         },
+      }
+      } finally {
+        if (!retainRuntimeTransaction) {
+          roomRuleRuntime.restoreTransactionState(runtimeTransactionSnapshot)
+        }
       }
     }
 
@@ -944,11 +1016,8 @@ export async function scheduleRoomBattleTimeout(
         if (!result.finalSnapshotAlreadyDelivered && !result.transition) {
           await options.onCommitted?.(result.snapshot)
         }
-        if (
-          result.snapshot.state.turn.phase === 'action'
-          && result.snapshot.state.turn.currentPlayerId === 'bot'
-        ) {
-          await options.onBotTurnReady?.(result.snapshot)
+        if (getCurrentInputOwnerPlayerId(result.actionResult.state).trim().toLowerCase() === 'bot') {
+          await options.onBotTurnReady?.(result.snapshot, result.actionResult.state)
         }
       }
       await scheduleRoomBattleTimeout(store, normalizedRoomId, options)

@@ -2,6 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { hashBattleState } from '@/lib/game/battle-trace'
+import { runBattleAction } from '@/lib/game/battle-runner'
+import { createEffectChain, withEffectChain } from '@/lib/game/effect-batch'
 import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import { dealDamage, loadRuleById } from '@/lib/game/skills'
 import { globalTriggerSystem } from '@/lib/game/triggers'
@@ -342,6 +344,101 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(dealDamage(attacker, defender, 1, 'true', state, 'after-reentrant-error')).toMatchObject({ damage: 1 })
   })
 
+  it('binds a real Rule skillCode facade to the root battle and rejects its context.battle alias during processing', () => {
+    const attacker = makePiece({
+      instanceId: 'hidan-reentry-attacker', ownerPlayerId: 'player-red',
+    }) as any
+    const hidan = makePiece({
+      instanceId: 'hidan-reentry-target', ownerPlayerId: 'player-red', currentHp: 10, maxHp: 10,
+    }) as any
+    const defender = makePiece({
+      instanceId: 'hidan-reentry-defender', ownerPlayerId: 'player-blue', currentHp: 10, maxHp: 10,
+    }) as any
+    hidan.statusTags = [{ id: 'hidan-dying', type: 'hidan-dying', remainingTurns: 1 }]
+    hidan.rules = [requiredRule('rule-hidan-undying-tick')]
+    const skillId = 'hidan-reentry-root'
+    attacker.skills = [{ skillId, currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [attacker, hidan, defender], currentPlayerId: 'player-red' }) as any
+    globalTriggerSystem.addRule(eventRule(
+      'hidan-end-turn-forwarder',
+      'beforeDamageTaken',
+      battle => {
+        globalTriggerSystem.checkTriggers(battle, { type: 'endTurn', playerId: 'player-red' } as any)
+      },
+    ) as any)
+    state.skillsById[skillId] = {
+      id: skillId,
+      name: skillId,
+      description: '',
+      kind: 'active',
+      type: 'normal',
+      cooldownTurns: 0,
+      maxCharges: 0,
+      powerMultiplier: 1,
+      actionPointCost: 0,
+      range: 'self',
+      requiresTarget: false,
+      code: "function executeSkill(context) { var attacker = context.battle.pieces.find(function(piece) { return piece.instanceId === 'hidan-reentry-attacker'; }); var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'hidan-reentry-defender'; }); dealDamage(attacker, target, 1, 'true', context.battle, 'hidan-reentry-root'); return { success: true }; }",
+    }
+    const before = hashBattleState(state)
+    let caught: any
+
+    try {
+      runBattleAction(state, {
+        type: 'useBasicSkill',
+        playerId: 'player-red',
+        pieceId: attacker.instanceId,
+        skillId,
+        clientActionId: 'hidan-reentry-action',
+      } as any, { rootSeed: 139 })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({
+      name: 'EffectChainFatalError',
+      code: 'RVB_EFFECT_CHAIN_REENTRANT',
+      context: expect.objectContaining({
+        chainId: 'effect-chain:hidan-reentry-action',
+        sourceId: 'hidan-reentry-target',
+        skillId: 'undying-expire',
+      }),
+    })
+    expect(hashBattleState(state)).toBe(before)
+  })
+
+  it('keeps the real Hidan context.battle facade on an idle root chain through DeathBatch finalization', () => {
+    const hidan = makePiece({
+      instanceId: 'hidan-root-chain', ownerPlayerId: 'player-red', currentHp: 1, maxHp: 10,
+    }) as any
+    hidan.statusTags = [{ id: 'hidan-dying', type: 'hidan-dying', remainingTurns: 1 }]
+    hidan.rules = [requiredRule('rule-hidan-undying-tick')]
+    const state = makeState({ pieces: [hidan], currentPlayerId: 'player-red' }) as any
+    const chain = createEffectChain({
+      actionId: 'hidan-end-turn-action',
+      chainId: 'hidan-end-turn-chain',
+      turn: state.turn.turnNumber,
+      rootSeed: 139,
+    })
+
+    const triggerResult = withEffectChain(state, chain, () => globalTriggerSystem.checkTriggers(
+      state,
+      { type: 'endTurn', playerId: 'player-red' } as any,
+    ))
+
+    expect(triggerResult.success).toBe(true)
+    expect(chain.processedBatches).toBe(2)
+    expect(chain.pendingCount).toBe(0)
+    expect(chain.state).toBe('idle')
+    expect(state.pieces.some((piece: any) => piece.instanceId === hidan.instanceId)).toBe(false)
+    expect(state.graveyard.find((piece: any) => piece.instanceId === hidan.instanceId)).toMatchObject({
+      currentHp: 0,
+    })
+    expect(damageLogs(state)).toEqual([
+      expect.objectContaining({ chainId: 'hidan-end-turn-chain', skillId: 'undying-expire' }),
+    ])
+  })
+
   it('keeps lethal interception out of death, graveyard, and kill-charge processing', () => {
     const attacker = makePiece({ instanceId: 'lich-attacker', ownerPlayerId: 'player-red' }) as any
     const defender = makePiece({ instanceId: 'lich-defender', ownerPlayerId: 'player-blue', currentHp: 5, maxHp: 40, attack: 10 }) as any
@@ -362,6 +459,15 @@ describe('RED-33 deterministic damage pipeline', () => {
     const attacker = makePiece({ instanceId: 'revive-attacker', ownerPlayerId: 'player-red' }) as any
     const defender = makePiece({ instanceId: 'revive-defender', ownerPlayerId: 'player-blue', currentHp: 5, maxHp: 20 }) as any
     const state = makeState({ pieces: [attacker, defender] }) as any
+    defender.statusTags = [{
+      id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
+      name: '本回合首次移动免费',
+      visible: true,
+      grantedTurnNumber: state.turn.turnNumber,
+      currentDuration: 1,
+      currentUses: 1,
+    }]
     state.extensions.lifecycle = []
     globalTriggerSystem.addRules([
       eventRule('observe-revive-kill', 'afterPieceKilled', battle => {
@@ -385,6 +491,11 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(state.pieces.map((piece: any) => piece.instanceId)).toContain(defender.instanceId)
     expect(state.graveyard).toEqual([])
     expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
+    expect(defender.statusTags).toContainEqual(expect.objectContaining({
+      type: 'deployment-first-move-free',
+      grantedTurnNumber: state.turn.turnNumber,
+      currentUses: 1,
+    }))
   })
 
   it('stops a reflected damage cycle with deterministic chain context', () => {

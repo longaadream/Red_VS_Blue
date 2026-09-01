@@ -176,6 +176,41 @@ describe('battle authority async journal', () => {
     })
   })
 
+  it('retains the original writer error context when retry exhaustion degrades a room', async () => {
+    const original = Object.assign(new Error('database is locked'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2034',
+      cause: new Error('SQLITE_BUSY: database is locked'),
+    })
+    const journal = new BattleAuthorityAsyncJournal({
+      retryDelaysMs: [0],
+      maxRetryAttempts: 2,
+      isRetryablePersistError: () => true,
+    })
+
+    journal.enqueue({
+      roomId: 'room-error-context',
+      kind: 'transition',
+      authorityVersion: 7,
+      clientActionId: 'context-action',
+      persist: vi.fn(async () => { throw original }),
+    })
+
+    await expect(journal.drain('room-error-context')).rejects.toThrow(/retry limit/i)
+    expect(journal.inspect('room-error-context')).toMatchObject({
+      status: 'degraded',
+      lastErrorContext: {
+        name: 'PrismaClientKnownRequestError',
+        code: 'P2034',
+        message: 'database is locked',
+        cause: 'SQLITE_BUSY: database is locked',
+        attempt: 2,
+        roomId: 'room-error-context',
+        authorityVersion: 7,
+      },
+    })
+  })
+
   it('degrades only the failing room when the retry elapsed-time limit is reached', async () => {
     const journal = new BattleAuthorityAsyncJournal({
       retryDelaysMs: [10],

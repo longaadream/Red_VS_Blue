@@ -13,7 +13,12 @@ import {
 import type { Room } from '@/lib/game/room-store'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { loadRuleById } from '@/lib/game/skills'
-import { createRunningTurnTimer, isTurnTimerEnabled, syncTurnTimerAfterAcceptedAction } from '@/lib/game/turn-timer'
+import {
+  createRunningTurnTimer,
+  getCurrentInputOwnerPlayerId,
+  isTurnTimerEnabled,
+  syncTurnTimerAfterAcceptedAction,
+} from '@/lib/game/turn-timer'
 import type { BattleState } from '@/lib/game/turn'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { finalizePendingOptionSession } from '@/lib/game/pending-interaction'
@@ -1004,6 +1009,75 @@ describe('RED-36 authoritative room timer integration', () => {
       })
       expect(botTurnReady).toHaveBeenCalledTimes(1)
       expect(botTurnReady.mock.calls[0][0].state.turn.currentPlayerId).toBe('bot')
+    } finally {
+      clearRoomBattleTimeout(store.room.id)
+      vi.useRealTimers()
+    }
+  })
+
+  it('wakes the bot callback when timeout hands off to progressive reserve deployment', async () => {
+    vi.useFakeTimers()
+    const clock = new FakeClock(0)
+    const room = makeTimedRoom('bot-progressive-timeout-room')
+    const state = (room.battleState as any).state as BattleState
+    state.players[1].playerId = 'bot'
+    const botVanguard = state.pieces.find(piece => piece.ownerPlayerId === PLAYERS[1])!
+    botVanguard.ownerPlayerId = 'bot'
+    const botReserve = {
+      ...clone(botVanguard),
+      instanceId: 'bot-reserve',
+      templateId: 'bot-reserve',
+      name: 'Bot Reserve',
+      x: null,
+      y: null,
+    }
+    state.deployment = {
+      mode: 'progressive-reserve-v1',
+      status: 'turn-ready',
+      playerIds: [PLAYERS[0], 'bot'],
+      choices: {},
+      locks: {},
+      startedAt: 0,
+      deadlineAt: 0,
+      revision: 1,
+      initialPositions: Object.fromEntries(state.pieces.map(piece => [
+        piece.instanceId,
+        { x: piece.x, y: piece.y },
+      ])),
+      openingVanguardsInitialized: true,
+      reserves: { [PLAYERS[0]]: [], bot: [botReserve] },
+      reserveCounts: { [PLAYERS[0]]: 0, bot: 1 },
+    } as any
+    state.turnTimer!.noOpStreaks = { [PLAYERS[0]]: 0, bot: 0 }
+    room.players[1] = { ...room.players[1], id: 'bot', isBot: true }
+    const store = new MemoryRoomStore(room)
+    const botTurnReady = vi.fn()
+
+    try {
+      await scheduleRoomBattleTimeout(store, store.room.id, {
+        clock,
+        onBotTurnReady: botTurnReady,
+      })
+      clock.value = 30_000
+      await vi.advanceTimersByTimeAsync(30_000)
+      clock.value = 45_000
+      await vi.advanceTimersByTimeAsync(15_000)
+
+      expect(authoritativeState(store).turn).toMatchObject({
+        currentPlayerId: 'bot',
+        phase: 'start',
+      })
+      expect(authoritativeState(store).deployment).toMatchObject({
+        mode: 'progressive-reserve-v1',
+        status: 'awaiting-reserve-deploy',
+        activePlayerId: 'bot',
+      })
+      expect(botTurnReady).toHaveBeenCalledTimes(1)
+      expect(botTurnReady.mock.calls[0][0].state.deployment).toMatchObject({
+        status: 'awaiting-reserve-deploy',
+        activePlayerId: 'bot',
+      })
+      expect(getCurrentInputOwnerPlayerId(botTurnReady.mock.calls[0][1])).toBe('bot')
     } finally {
       clearRoomBattleTimeout(store.room.id)
       vi.useRealTimers()

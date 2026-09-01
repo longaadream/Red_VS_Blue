@@ -309,6 +309,29 @@ describe('roster-independent multi-action AI turn planner', () => {
     expect(plan.trace.some(entry => entry.candidateId === 'noise' && entry.pruned === 'non-positive-action')).toBe(true)
   })
 
+  it('keeps reserve-deployment as a required structural action even when its immediate score is neutral', () => {
+    const kind = 'reserve-deployment' as const
+    const environment = baseEnvironment({
+      stateKey: state => String((state as any).fixtureRevision ?? 0),
+      listLegalActions: state => (state as any).fixtureRevision === 1
+        ? [candidate('end', 'endTurn')]
+        : [candidate('progressive-structure', `fixture-${kind}`, 'red-a', kind)],
+      simulate: (state, input) => {
+        const action = 'action' in input ? input : candidate('fixture', input.type)
+        const next = structuredClone(state) as any
+        if (action.kind === 'end-turn') next.turn.phase = 'end'
+        else next.fixtureRevision = 1
+        return accepted(next, action)
+      },
+    })
+    const initial = fixtureState() as any
+    initial.fixtureRevision = 0
+    const plan = planAiTurn(initial, 'player-red', seed, { environment })
+
+    expect(plan.nextAction?.kind).toBe(kind)
+    expect(plan.trace.find(entry => entry.candidateId === 'progressive-structure')?.pruned).toBeUndefined()
+  })
+
   it('carries state history across authoritative replans and ends instead of cycling', () => {
     const environment = baseEnvironment({
       stateKey: state => String((state as any).fixtureRevision ?? 0),

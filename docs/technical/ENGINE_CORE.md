@@ -48,7 +48,7 @@
 
 输出：`Promise<BattleState | null>`；玩家数不是两个时返回 `null`。
 
-状态变化：创建初始棋子、卡牌/资源/回合状态并注册规则。Demo 房间对局的 16 枚初始棋子标记为核心棋子并进入 `deployment.status = "awaiting-locks"`；PVE 机器人通过同一 `deploymentLock` 权威命令锁定保留全部，部署完成前不触发 `gameStart`。由于使用模块级触发器系统，该过程也会修改进程级状态。
+状态变化：创建稳定核心实例、卡牌/资源/回合状态并注册规则。新建 Demo 房间默认使用 `progressive-reserve-v1`：普通核心先进入各自预备区；具有 `progressiveDeployment.reserveInitializationSkillId` 的模板由内容技能执行预备区例外（当前基尔加丹按 owner 移入仪式扩展）；随后双方各通过独立 seeded 流随机抽取并随机召唤 1 枚先锋；其余核心在自己的回合进入 `awaiting-reserve-deploy`。旧的 16 枚全图出生与 `awaiting-locks` 仅保留给显式 `legacy-reroll-v1` 或缺少 mode 的历史状态。由于使用模块级触发器系统，该过程也会修改进程级状态。
 
 待确认：同一 Node 进程并行初始化多个房间时，清理全局触发器是否会影响其他房间。
 
@@ -74,15 +74,16 @@
 
 ## 4. 回合与阶段
 
-Demo 房间对局在回合阶段前增加部署门禁：
+新建 Demo 房间在每个自己的回合行动阶段前增加渐进部署门禁：
 
-- `deploymentChoice` 在锁定前可选择、替换或以空 `pieceId` 取消一枚己方核心棋子的重投；选择不移动棋子或消费随机流。
-- `deploymentLock` 不可撤销；双方锁定后才按稳定玩家顺序解析，继续使用 `deployment-reroll/<playerId>` 独立流。
-- 权威 45 秒期限到达后，未锁定玩家按保留全部自动锁定；玩家命令与超时通过房间版本 CAS 串行化。
-- 部署完成前所有普通战斗动作均失败且不推进随机 cursor；完成时触发 `gameStart` 并进入首回合行动阶段。
-- 初始位置、锁定、超时、最终位置、authority version 与流 cursor 记录在 Action Trace；公开快照隐藏未完成选择但始终公开双方坐标。
+- 初始化先按稳定玩家顺序完成双方随机先锋的 `beforePieceSummoned`、入场与 `afterPieceSummoned`；两方都完成后设置 `openingVanguardsInitialized` 并在 `gameStart`、offer 与计时器前第一次判终局，先锋不获得免费首移 statusTag。`gameStart` 完整队列后再次判终局，仍未结束才生成首个 offer。
+- 普通预备区非空时，`beginPhase` 生成至多 3 枚私有候选和权威合法落点，状态进入 `awaiting-reserve-deploy`；`deployReservePiece` 先精确校验必需 revision，过期输入不克隆、不消费随机也不改状态。
+- 成功部署的 after-summon 队列后先判终局；未终局才为该枚新核心授予公开 `deployment-first-move-free` statusTag，并直接继续正常 `beginTurn`/action，不创建独立免费移动或 skip 阶段。该棋子在被放置的当前回合第一次成功普通移动由同一权威 reducer 以 0 AP 提交并消费标签，第二次恢复既有费用；非法或 before-move 阻止不消费，未使用标签在 `endTurn` 交接前清除。
+- 没有距离大于 5 的安全格时，服务端从全部空可行走格确定性随机选择；连空格也没有时失败关闭，不移出预备棋子。召唤触发产生交互时，整条部署事务挂起到触发队列完成。
+- 候选与合法落点只投影给当前输入玩家；对手和观战者只看预备区数量与公开阶段。棋子实际上场后，`visible=true` 的免费首移 statusTag 按普通棋子状态公开。Windows/Electron 权威房间的完整快照必须按接收者分别投影。
+- 渐进部署使用当前成长回合期限；超时由服务端完成必要部署并直接继续既有回合流程。玩家命令与超时通过房间版本 CAS 串行化。
 - 传输层在调用规则前验证 Ed25519 命令信封；签名覆盖 room/player/完整 action/timestamp，同名 header、body 或 WS subscribe 声明不能替代验证。
-- 随机冻结细节见 [`ADR-0007`](../decisions/ADR-0007-deterministic-deployment.md)，锁定与同步协议见 [`ADR-0009`](../decisions/ADR-0009-authoritative-deployment-lock.md)。
+- 当前规则见 [`ADR-0024`](../decisions/ADR-0024-progressive-reserve-deployment.md)；旧 `deploymentChoice` / `deploymentLock` / 45 秒门禁只属于 [`ADR-0007`](../decisions/ADR-0007-deterministic-deployment.md) 与 [`ADR-0009`](../decisions/ADR-0009-authoritative-deployment-lock.md) 的 legacy 模式。
 
 `TurnState`、`TurnPhase` 和 `PlayerTurnMeta` 位于 `lib/game/turn.ts`。动作包括：
 
@@ -147,23 +148,25 @@ Demo 房间对局在回合阶段前增加部署门禁：
 
 ## 7. 胜负状态
 
-`BattleState.terminalResult` 是唯一权威终局字段，由 `lib/game/terminal.ts::finalizeBattleTerminal()` 在公共动作归约出口提交。结果包含 winner/loser playerId、稳定 reason，以及 action index、turn、phase、completed round 的结算位置。
+`BattleState.terminalResult` 是唯一权威终局字段，由 `lib/game/terminal.ts::finalizeBattleTerminal()` 在公共动作归约出口，以及双先锋初始化、部署 after-summon 等必须阻止下一步推进的内部结算边界提交；普通移动完成后继续使用公共动作归约出口。结果包含 winner/loser playerId、稳定 reason，以及 action index、turn、phase、completed round 的结算位置。
 
-普通动作必须先完成整条伤害、死亡、复活、触发与 batch；仍有 `pendingOptionSelection` / `pendingTargetSelection` 时不判终局。核心身份来自开局 `isCore: true`，召唤入口强制为 false，敌我按 `ownerPlayerId` 而不是内容阵营判断。RED-124 的强制移除不进入墓地，`extensions.removedPieces` 只保存终局所需的最小身份摘要，终局仍以当前 `pieces` 中的存活核心为准。核心全灭优先于第 40 个完整轮次平局。
+普通动作必须先完成整条伤害、死亡、复活、触发与 batch；仍有 `pendingOptionSelection` / `pendingTargetSelection` 时不判终局。核心身份来自开局 `isCore: true`，召唤入口强制为 false，敌我按 `ownerPlayerId` 而不是内容阵营判断；渐进式核心还必须存活且具有数值 `x/y` 才算场上核心，预备区和仪式扩展都不计。双先锋全部完成前由 `deployment.openingVanguardsInitialized` 暂停检查。RED-124 的强制移除不进入墓地，`extensions.removedPieces` 只保存终局所需的最小身份摘要，终局仍以当前 `pieces` 中的存活核心为准。核心全灭优先于第 40 个完整轮次平局。
 
 `surrender` 不再把己方棋子生命归零或触发 whenever，而是直接提交终局；`reason: "timeout"` 为 RED-36 预留相同权威入口。终局后 `applyBattleAction()` 与 `runBattleAction()` 都以 `BATTLE_ALREADY_TERMINAL` 拒绝命令。HTTP/WS 禁止客户端写 winner/gameOver，并通过 `Room.version` CAS 保证竞争中只提交一次；浏览器只渲染 `terminalResult`。
 
 ## 8. 随机和确定性
 
-`lib/game/rule-runtime.ts` 定义根种子、稳定命名流、确定性规则时钟和实例 ID。命名流当前至少包括 `deployment`、`deployment-reroll`、`turn-order` 与 `skill/effect`；实例 ID 使用独立的 `instance-id/<namespace>` 流。流 seed 和 Mulberry32/cursor 算法由 [ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md) 冻结。
+`lib/game/rule-runtime.ts` 定义根种子、稳定命名流、确定性规则时钟和实例 ID。命名流当前至少包括 legacy 的 `deployment`、`deployment-reroll`，渐进部署的 `progressive-deployment/opening-piece/<normalizedPlayerId>`、`progressive-deployment/opening-cell/<normalizedPlayerId>`、`progressive-deployment/offer/<normalizedPlayerId>`、`progressive-deployment/fallback/<normalizedPlayerId>`，以及 `turn-order` 与 `skill/effect`；四条渐进流都以规范化 playerId 为后缀，双方互不推进 cursor。实例 ID 使用独立的 `instance-id/<namespace>` 流。流 seed 和 Mulberry32/cursor 算法由 [ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md) 冻结。
 
-WebSocket、房间开战与 Battle API 等权威入口必须先生成根种子，再初始化状态，并在每次 `runBattleAction(..., { rootSeed })` 时沿用同一 seed。联网 Relay 浏览器不承担规则权威，只提交已认证的玩家命令并消费服务端 `{ state, seed, stateHash, authorityVersion }` 快照；移动端正在重塑框架，本任务不把旧 action-log 作为权威或兼容路径。初始化的随机消耗记录为 `system-initialize` trace；动作 runner 从 trace 恢复 seed/cursor。`replayBattle()` 返回逐动作 `stateHashes`。
+WebSocket 与房间开战等正式权威入口，以及内部直接调用的 Next Battle API 兼容/测试处理器，都必须先生成根种子，再初始化状态，并在每次 `runBattleAction(..., { rootSeed })` 时沿用同一 seed。正式玩家命令、完整快照和重连恢复只走房间 WebSocket；实际运行时的玩家 `/api/rooms/**` 返回 410，Next Battle API 不是 HTTP 后备。联网 Relay 浏览器不承担规则权威，只提交已认证的玩家命令并消费服务端 `{ state, seed, stateHash, authorityVersion }` 快照；移动端正在重塑框架，本任务不把旧 action-log 作为权威或兼容路径。初始化的随机消耗记录为 `system-initialize` trace；动作 runner 从 trace 恢复 seed/cursor。`replayBattle()` 返回逐动作 `stateHashes`。
 
 Action Trace 的稳定 JSON 与 SHA-256 位于 browser-safe 的 `lib/game/battle-trace.ts`，不依赖 Node `crypto`。数据驱动技能、规则和 pending target 脚本在执行边界获得确定性的 `Math.random()` 与 `Date.now()`；规则定义缓存始终返回独立且规范化的 limits，避免 cache miss/hit 改变状态 hash。没有 runtime 的训练与非权威预检路径仍可经 `lib/game/rng.ts` 旧适配器运行，便于按模块回退。
 
 跨端候选验证中，表现层水合的 `skillsById` 缓存不属于权威规则状态。`runBattleAction()` 计算动作前状态哈希时会排除该缓存；规则执行仍保留完整状态，以兼容以数据形式加载的技能。
 
 Android mobile server 当前负责转发并记录 browser runner 生成的 action trace。它会将 trace 格式、根种子或前置哈希不一致记录为 `traceValidationError`，但不会因此拒绝动作，避免尚无重试协议的 WebSocket 客户端被冻结。候选验收要求该诊断字段为空；服务端完全权威地重放规则属于后续工作。
+
+该 Android action-log 路径不验证 RED-138 所需的 viewer 私有投影，也不能把包含预备区与候选的 init 日志作为受支持的渐进部署快照。RED-81 完成前，Android 只保留 legacy 状态解释能力；`progressive-reserve-v1` 必须视为 unsupported，不能用于 RED-138 发布或隐私验收。
 
 非规则豁免：房间 ID/邀请码、鉴权过期、连接和清理时间、日志、game record 时间及纯视觉随机。它们不得影响权威规则状态。
 
