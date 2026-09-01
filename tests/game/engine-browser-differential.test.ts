@@ -27,7 +27,9 @@ vi.mock('@/lib/game/skill-repository', () => ({
 }))
 
 import { mulberry32, setRng } from '@/lib/game/rng'
+import { runBattleAction } from '@/lib/game/battle-runner'
 import type { SkillDefinition } from '@/lib/game/skills'
+import { prepareAction } from '@/lib/game/targeting'
 import type { TargetRef } from '@/lib/game/targeting'
 import { applyBattleAction } from '@/lib/game/turn'
 import type { BattleAction } from '@/lib/game/turn'
@@ -38,6 +40,7 @@ const FIXTURE_SEED = 0x5eed64
 
 type BrowserEngine = {
   applyBattleAction: typeof applyBattleAction
+  runBattleAction: typeof runBattleAction
   globalTriggerSystem: {
     addRules: (rules: any[]) => void
     checkTriggers: (state: any, context: any) => { success: boolean }
@@ -66,6 +69,8 @@ function loadBrowserEngine(): BrowserEngine {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
 
   runInNewContext(bundleSource, context, { filename: bundlePath })
@@ -79,6 +84,147 @@ function makeFixture() {
 
   return {
     action: { type: 'move' as const, playerId: 'player-red', pieceId: 'mover', toX: 2, toY: 1 },
+    state,
+  }
+}
+
+function makeDemonSummonFixture() {
+  const anchor = makePiece({
+    instanceId: 'differential-demon-anchor',
+    templateId: 'red-anchor',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    x: 0,
+    y: 0,
+    currentHp: 6,
+    maxHp: 20,
+    attack: 3,
+  })
+  Object.assign(anchor, { name: '献祭者' })
+  const state = makeState({
+    pieces: [anchor],
+    currentPlayerId: 'player-red',
+    phase: 'action',
+    width: 4,
+    height: 4,
+  }) as any
+  const red = state.players.find((player: any) => player.playerId === 'player-red')
+  red.hand = [{
+    cardId: 'demon-summon-5',
+    instanceId: 'differential-demon-card',
+    actionPointCost: 3,
+  }]
+  red.discardPile = []
+  red.actionPoints = 3
+  state.extensions.kiljaedanPiece = {
+    instanceId: 'differential-kiljaedan-hidden',
+    templateId: 'kiljaedan',
+    name: '基尔加丹',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    currentHp: 1,
+    maxHp: 17,
+    attack: 4,
+    defense: 3,
+    moveRange: 4,
+    x: 0,
+    y: 0,
+    skills: [],
+    rules: [],
+    statusTags: [],
+  }
+
+  const draft = {
+    type: 'playCard' as const,
+    playerId: 'player-red',
+    cardInstanceId: 'differential-demon-card',
+    clientActionId: 'red139-browser-demon-damage-summon',
+  }
+  const prepared = prepareAction(state, draft)
+  if (prepared.kind !== 'needTarget') {
+    throw new Error(`Expected demon-summon-5 target preparation, received ${prepared.kind}`)
+  }
+  const action: BattleAction = {
+    ...draft,
+    targetPieceId: anchor.instanceId,
+    targetX: anchor.x,
+    targetY: anchor.y,
+    extraTargets: [{ x: 2, y: 2 }],
+    selectionId: prepared.selectionId,
+    stateRevision: prepared.stateRevision,
+  }
+
+  return { action, state }
+}
+
+function makeMultiSummonOrderingFixture() {
+  const caster = makePiece({
+    instanceId: 'differential-multi-summoner',
+    templateId: 'red139-multi-summoner',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    x: 0,
+    y: 0,
+  }) as any
+  caster.name = '多重召唤者'
+  caster.skills = [{
+    skillId: 'red139-multi-summon-order',
+    currentCooldown: 0,
+    usesRemaining: -1,
+  }]
+  const state = makeState({
+    pieces: [caster],
+    currentPlayerId: 'player-red',
+    phase: 'action',
+    width: 11,
+    height: 11,
+  }) as any
+  state.players[0].actionPoints = 1
+  state.skillsById['red139-multi-summon-order'] = {
+    id: 'red139-multi-summon-order',
+    name: 'RED-139 多重召唤排序夹具',
+    description: '验证 sealed declared SummonBatch 的跨运行时稳定排序。',
+    kind: 'active',
+    type: 'normal',
+    cooldownTurns: 0,
+    maxCharges: 0,
+    powerMultiplier: 1,
+    actionPointCost: 1,
+    summonCapability: {
+      version: 1,
+      recipe: 'source-mirror',
+      maxSummons: 2,
+      allowedVariants: ['summon'],
+      instanceIdPrefix: 'red139-multi-clone-',
+      maxHp: 1,
+      attack: 0,
+      defense: 0,
+      moveRange: 0,
+      noKillCharge: true,
+      resetBoundSkillCooldown: true,
+      rules: ['rule-naruto-clone-immobile'],
+      status: {
+        idPrefix: 'red139-multi-clone-tag-',
+        name: '多重召唤夹具',
+        type: 'red139-multi-clone',
+        visible: false,
+        remainingDuration: -1,
+        remainingUses: -1,
+        intensity: 1,
+        stacks: 1,
+        relatedRules: ['rule-naruto-clone-immobile'],
+      },
+    },
+    code: "function executeSkill(context) { context.summonQueue.push({ sourceId: context.piece.instanceId, summons: [{ x: 1, y: 10, variant: 'summon' }, { x: 10, y: 0, variant: 'summon' }] }); return { success: true, message: 'multi summon fixture' }; }",
+    previewCode: 'function calculatePreview() { return { description: \'fixture\', expectedValues: {} }; }',
+  }
+  return {
+    action: {
+      type: 'useBasicSkill' as const,
+      playerId: 'player-red',
+      pieceId: caster.instanceId,
+      skillId: 'red139-multi-summon-order',
+    },
     state,
   }
 }
@@ -104,6 +250,65 @@ describe('game engine Node/browser differential fixture', () => {
       seed: FIXTURE_SEED,
       result: nodeResult,
     })
+  })
+
+  it('keeps the real demon-summon-5 damage→summon EffectChain identical in Node and browser', () => {
+    const nodeFixture = makeDemonSummonFixture()
+    const browserFixture = structuredClone(nodeFixture)
+    const browser = loadBrowserEngine()
+
+    const nodeResult = runBattleAction(nodeFixture.state, nodeFixture.action, { rootSeed: FIXTURE_SEED })
+    const browserResult = browser.runBattleAction(browserFixture.state, browserFixture.action, {
+      rootSeed: FIXTURE_SEED,
+    })
+
+    expect(browserResult).toEqual(nodeResult)
+    expect(browserResult.state.pieces.some((piece: any) => piece.instanceId === 'differential-demon-anchor'))
+      .toBe(false)
+    expect(browserResult.state.graveyard.find((piece: any) => piece.instanceId === 'differential-demon-anchor'))
+      .toMatchObject({ currentHp: 0, attack: 4 })
+    expect(browserResult.state.pieces.find((piece: any) => piece.instanceId === 'differential-kiljaedan-hidden'))
+      .toMatchObject({ templateId: 'kiljaedan', currentHp: 17, x: 2, y: 2 })
+    expect(browserResult.state.extensions?.kiljaedanPiece).toBeUndefined()
+    expect(browserResult.state.players.find((player: any) => player.playerId === 'player-red'))
+      .toMatchObject({ actionPoints: 0, discardPile: ['demon-summon-5'] })
+  })
+
+  it('keeps an intentionally unsorted multi-request declared SummonBatch identical in Node and browser', () => {
+    const nodeFixture = makeMultiSummonOrderingFixture()
+    const browserFixture = structuredClone(nodeFixture)
+    const browser = loadBrowserEngine()
+
+    const nodeResult = runBattleAction(nodeFixture.state, nodeFixture.action, { rootSeed: FIXTURE_SEED })
+    const browserResult = browser.runBattleAction(browserFixture.state, browserFixture.action, {
+      rootSeed: FIXTURE_SEED,
+    })
+
+    expect({
+      stateHash: browserResult.stateHash,
+      actionHash: browserResult.actionHash,
+      trace: browserResult.trace,
+    }).toEqual({
+      stateHash: nodeResult.stateHash,
+      actionHash: nodeResult.actionHash,
+      trace: nodeResult.trace,
+    })
+    expect(browserResult.state.pieces.map((piece: any) => ({
+      instanceId: piece.instanceId,
+      x: piece.x,
+      y: piece.y,
+      ruleIds: (piece.rules || []).map((rule: any) => rule.id),
+    }))).toEqual(nodeResult.state.pieces.map(piece => ({
+      instanceId: piece.instanceId,
+      x: piece.x,
+      y: piece.y,
+      ruleIds: (piece.rules || []).map(rule => rule.id),
+    })))
+    const clones = nodeResult.state.pieces
+      .filter(piece => piece.instanceId.startsWith('red139-multi-clone-'))
+      .sort((left, right) => left.instanceId < right.instanceId ? -1 : left.instanceId > right.instanceId ? 1 : 0)
+    expect(clones).toHaveLength(2)
+    expect(clones.map(piece => [piece.x, piece.y])).toEqual([[10, 0], [1, 10]])
   })
 
   it('executes all four trigger consumer categories in the approved order', () => {

@@ -78,6 +78,8 @@ describe('UI/server normal movement contract', () => {
       process,
       require: createRequire(import.meta.url),
       setTimeout,
+      TextDecoder,
+      TextEncoder,
     }
     runInNewContext(bundleSource, context, { filename: bundlePath })
 

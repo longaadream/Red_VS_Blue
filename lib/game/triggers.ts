@@ -1,15 +1,101 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
-import { executeCardFunction, loadCardById, loadRuleById } from './skills'
+import { executeCardFunction, loadCardForBattle, loadRuleForBattle } from './skills'
 import type { PendingReactiveCardRef } from './pending-interaction'
 import {
   getActiveSuspendableActionRuntime,
-  isSuspendableActionPending,
   type SuspendableInteractionInput,
 } from './suspendable-action-transaction'
 import { getRuleExecutionTriggerSystem } from './rule-runtime'
+import {
+  EffectChainFatalError,
+  getActiveEffectChain,
+  isEffectChainFatalError,
+  isEffectChainPendingSignal,
+  rejectEffectBatch,
+  type DamageQueueWriter,
+  type HealQueueWriter,
+} from './effect-batch'
 
-const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
+export type {
+  DamageQueueRequest,
+  EffectQueueWriter,
+  HealQueueRequest,
+} from './effect-batch'
+
+function isFatalEffectChainError(error: unknown): boolean {
+  if (isEffectChainFatalError(error)) return true
+  try {
+    if (!error || typeof error !== 'object') return false
+    const candidate = error as {
+      fatal?: unknown
+      isFatal?: unknown
+    }
+    return candidate.fatal === true
+      || candidate.isFatal === true
+  } catch {
+    return false
+  }
+}
+
+function throwAttachedTriggerBoundaryFailure(
+  battle: BattleState,
+  error: unknown,
+  message: string,
+  metadata: { sourceId?: string; skillId?: string } = {},
+): never {
+  const chain = getActiveEffectChain(battle)
+  if (isEffectChainPendingSignal(error)) {
+    throw chain && !chain.detached ? chain.latchPending(error) : error
+  }
+  if (isFatalEffectChainError(error)) {
+    if (!chain || chain.detached) throw error
+    if (isEffectChainFatalError(error)) throw chain.latchFatal(error)
+    throw chain.latchFatal(new EffectChainFatalError(
+      'RVB_EFFECT_CHAIN_STATE_INVALID',
+      message + ' reported a fatal marker',
+      {
+        actionId: chain.actionId,
+        chainId: chain.chainId,
+        kind: null,
+        depth: null,
+        processed: chain.processedBatches,
+        limit: chain.limits.maxBatches,
+        turn: chain.turn,
+        rootSeed: chain.rootSeed,
+        sourceId: metadata.sourceId,
+        skillId: metadata.skillId,
+        detached: false,
+        budget: 'state',
+      },
+      error,
+    ))
+  }
+  if (!chain || chain.detached) throw error
+  const batch = chain.currentBatch
+  if (batch) {
+    throw rejectEffectBatch(chain, batch, message, error, metadata)
+  }
+  throw chain.latchFatal(new EffectChainFatalError(
+    'RVB_EFFECT_CHAIN_STATE_INVALID',
+    message,
+    {
+      actionId: chain.actionId,
+      chainId: chain.chainId,
+      kind: null,
+      depth: null,
+      processed: chain.processedBatches,
+      limit: chain.limits.maxBatches,
+      turn: chain.turn,
+      rootSeed: chain.rootSeed,
+      sourceId: metadata.sourceId,
+      skillId: metadata.skillId,
+      detached: false,
+      budget: 'state',
+    },
+    error,
+  ))
+}
 
 // 简单的日志写入函数
 function writeLog(message: string) {
@@ -141,14 +227,15 @@ export interface TriggerContext {
   defenseApplied?: number
   shieldAbsorbed?: number
   /** Follow-up damage drained after the parent batch has committed. */
-  damageQueue?: Array<{
-    attacker: PieceInstance
-    target: PieceInstance | PieceInstance[]
-    damage: number
-    damageType: 'physical' | 'magical' | 'true' | 'toxin'
-    skillId?: string
-    killerPlayerId?: string
-  }>
+  damageQueue?: DamageQueueWriter
+  healQueue?: HealQueueWriter
+  effectChainId?: string
+  effectBatchId?: string
+  parentEffectBatchId?: string
+  effectBatchKind?: 'damage' | 'heal' | 'summon' | 'death'
+  effectDepth?: number
+  effectEnqueueSequence?: number
+  originStage?: string
   /** 
    * 当前执行规则的棋子（规则绑定者）
    * 在全场扫描规则时，这个字段表示当前正在执行哪个棋子的规则
@@ -168,6 +255,61 @@ export interface TriggerContext {
   /** Internal chain state, returned as an immutable snapshot in TriggerResult. */
   eventChain?: EventChainState
   [key: string]: any
+}
+
+interface MutableTriggerContextSnapshot {
+  damage: unknown
+  heal: unknown
+  targetPosition: unknown
+  targetPositionX: unknown
+  targetPositionY: unknown
+  targetX: unknown
+  targetY: unknown
+}
+
+function mutableTriggerContextSnapshot(context: TriggerContext): MutableTriggerContextSnapshot {
+  const position = context.targetPosition as { x?: unknown; y?: unknown } | null | undefined
+  return {
+    damage: context.damage,
+    heal: context.heal,
+    targetPosition: position,
+    targetPositionX: position && typeof position === 'object' ? position.x : undefined,
+    targetPositionY: position && typeof position === 'object' ? position.y : undefined,
+    targetX: context.targetX,
+    targetY: context.targetY,
+  }
+}
+
+function writeBackMutableTriggerContext(
+  source: TriggerContext,
+  target: TriggerContext,
+  before: MutableTriggerContextSnapshot,
+): void {
+  if (source.damage !== before.damage) target.damage = source.damage
+  if (source.heal !== before.heal) target.heal = source.heal
+  const position = source.targetPosition as { x?: unknown; y?: unknown } | null | undefined
+  const positionX = position && typeof position === 'object' ? position.x : undefined
+  const positionY = position && typeof position === 'object' ? position.y : undefined
+  const positionChanged = position !== before.targetPosition
+    || positionX !== before.targetPositionX
+    || positionY !== before.targetPositionY
+  const targetXChanged = source.targetX !== before.targetX
+  const targetYChanged = source.targetY !== before.targetY
+
+  if (positionChanged) {
+    target.targetPosition = source.targetPosition
+    if (Number.isSafeInteger(positionX) && Number.isSafeInteger(positionY)) {
+      if (!targetXChanged) target.targetX = positionX as number
+      if (!targetYChanged) target.targetY = positionY as number
+    }
+  }
+  if (targetXChanged) target.targetX = source.targetX
+  if (targetYChanged) target.targetY = source.targetY
+  if (!positionChanged && (targetXChanged || targetYChanged)) {
+    if (Number.isSafeInteger(target.targetX) && Number.isSafeInteger(target.targetY)) {
+      target.targetPosition = { x: target.targetX as number, y: target.targetY as number }
+    }
+  }
 }
 
 export const MAX_EVENT_CHAIN_DEPTH = 20
@@ -227,20 +369,24 @@ export class TriggerSystem {
 
   snapshotTransactionState(): {
     nextRootEventId: number
+    rules: TriggerRule[]
     ruleLimits: Array<TriggerRule['limits']>
   } {
     return {
       nextRootEventId: this.nextRootEventId,
+      rules: [...this.rules],
       ruleLimits: this.rules.map(rule => rule.limits ? { ...rule.limits } : undefined),
     }
   }
 
   restoreTransactionState(snapshot: {
     nextRootEventId: number
+    rules: TriggerRule[]
     ruleLimits: Array<TriggerRule['limits']>
   }): void {
     this.nextRootEventId = snapshot.nextRootEventId
-    this.rules.forEach((rule, index) => {
+    this.rules = [...snapshot.rules]
+    snapshot.rules.forEach((rule, index) => {
       const limits = snapshot.ruleLimits[index]
       if (limits) rule.limits = { ...limits }
       else delete rule.limits
@@ -253,17 +399,25 @@ export class TriggerSystem {
    * checkTriggers directly so recursive fireEvent calls cannot lose ancestry.
    */
   fireEvent(battle: BattleState, parentContext: TriggerContext, eventName: string, childContext: any = {}): TriggerResult {
-    return this.checkTriggers(battle, {
-      ...childContext,
-      type: eventName,
-      parentEventId: parentContext.eventId,
-      rootEventId: parentContext.rootEventId,
-      eventDepth: (parentContext.eventDepth ?? 0) + 1,
-      eventChain: parentContext.eventChain,
-    })
+    try {
+      return this.checkTriggers(battle, {
+        ...childContext,
+        type: eventName,
+        parentEventId: parentContext.eventId,
+        rootEventId: parentContext.rootEventId,
+        eventDepth: (parentContext.eventDepth ?? 0) + 1,
+        eventChain: parentContext.eventChain,
+      })
+    } catch (error) {
+      throwAttachedTriggerBoundaryFailure(
+        battle,
+        error,
+        'Attached EffectChain fireEvent boundary failed',
+      )
+    }
   }
 
-  private prepareEventContext(context: TriggerContext): TriggerResult | undefined {
+  private prepareEventContext(battle: BattleState, context: TriggerContext): TriggerResult | undefined {
     const chain = context.eventChain ?? {
       rootEventId: `event-${++this.nextRootEventId}`,
       dispatches: [],
@@ -281,9 +435,48 @@ export class TriggerSystem {
       : chain.dispatches.length >= MAX_EVENT_CHAIN_DISPATCHES
         ? { code: 'EVENT_CHAIN_BUDGET_EXCEEDED' as const, message: `Event chain dispatch budget exceeded ${MAX_EVENT_CHAIN_DISPATCHES}` }
         : undefined
+    const effectChain = getActiveEffectChain(battle)
+    effectChain?.recordDispatch({
+      kind: context.effectBatchKind,
+      batchId: context.effectBatchId,
+      parentBatchId: context.parentEffectBatchId,
+      depth: context.effectDepth,
+      enqueueSequence: context.effectEnqueueSequence,
+      originStage: context.originStage,
+      sourceId: context.sourcePiece?.instanceId || context.piece?.instanceId,
+      skillId: context.skillId,
+      targetId: context.targetPiece?.instanceId,
+    })
+
 
     if (limit) {
       const eventChain = chain.dispatches.map(entry => ({ ...entry }))
+      if (effectChain && !effectChain.detached) {
+        const current = effectChain.currentBatch
+        throw effectChain.latchFatal(new EffectChainFatalError(
+          'RVB_EFFECT_CHAIN_DISPATCH_LIMIT',
+          limit.message,
+          {
+            actionId: effectChain.actionId,
+            chainId: effectChain.chainId,
+            batchId: current?.batchId,
+            parentBatchId: current?.parentBatchId,
+            kind: current?.kind ?? context.effectBatchKind ?? null,
+            depth: current?.depth ?? context.effectDepth ?? null,
+            enqueueSequence: current?.enqueueSequence ?? context.effectEnqueueSequence,
+            originStage: current?.originStage ?? context.originStage,
+            processed: depth >= MAX_EVENT_CHAIN_DEPTH ? depth : chain.dispatches.length + 1,
+            limit: depth >= MAX_EVENT_CHAIN_DEPTH ? MAX_EVENT_CHAIN_DEPTH : MAX_EVENT_CHAIN_DISPATCHES,
+            turn: effectChain.turn,
+            rootSeed: effectChain.rootSeed,
+            sourceId: context.sourcePiece?.instanceId || context.piece?.instanceId,
+            skillId: context.skillId,
+            targetId: context.targetPiece?.instanceId,
+            detached: false,
+            budget: 'dispatches',
+          },
+        ))
+      }
       writeLog(`[checkTriggers] ${limit.code}: ${limit.message}; chain=${JSON.stringify(eventChain)}`)
       return { success: false, messages: [limit.message], blocked: true, error: { ...limit, eventChain }, eventChain }
     }
@@ -323,6 +516,7 @@ export class TriggerSystem {
       
       writeLog('[loadSpecificRules] Loaded ' + this.rules.length + ' specific rules: ' + JSON.stringify(ruleIds))
     } catch (error) {
+      if (isFatalEffectChainError(error)) throw error
       writeLog('Error loading specific rules: ' + error)
     }
   }
@@ -372,10 +566,16 @@ export class TriggerSystem {
     }
     const rethrowTriggerError = (error: unknown, consumerKind: string, consumerId: string): never => {
       restoreRuleLimits()
-      if (isSuspendableActionPending(error)) {
-        throw error
+      if (isEffectChainPendingSignal(error) || isFatalEffectChainError(error)) {
+        throwAttachedTriggerBoundaryFailure(
+          battle,
+          error,
+          `Attached EffectChain ${consumerKind} consumer ${consumerId} failed`,
+          { sourceId: consumerId, skillId: consumerId },
+        )
       }
-      const cause = error instanceof Error ? error : new Error(String(error))
+      const chain = getActiveEffectChain(battle)
+      if (chain?.detached) throw error
       const details = {
         eventType: context.type,
         eventId: context.eventId,
@@ -384,9 +584,77 @@ export class TriggerSystem {
         rootEventId: context.rootEventId,
         eventDepth: context.eventDepth,
       }
-      Object.assign(cause, { triggerContext: details })
-      cause.message = `${cause.message} [event=${context.type} eventId=${context.eventId ?? 'unknown'} consumer=${consumerKind}:${consumerId}]`
+      let originalMessage = 'Trigger consumer threw a non-Error value'
+      try {
+        if (error instanceof Error && typeof error.message === 'string') {
+          originalMessage = error.message
+        }
+      } catch {
+        // Hostile thrown values must not interrupt rollback/latching.
+      }
+      const cause = Object.assign(new Error(
+        `${originalMessage} [event=${context.type} eventId=${context.eventId ?? 'unknown'} consumer=${consumerKind}:${consumerId}]`,
+      ), { triggerContext: details })
       throw cause
+    }
+    const failClosedDefinitionLoad = (
+      consumerKind: 'rule' | 'reactiveCard',
+      consumerId: string,
+      cause?: unknown,
+      sourceId?: string,
+    ): void => {
+      const chain = getActiveEffectChain(battle)
+      const batch = chain?.currentBatch
+      if (!chain || chain.detached) return
+      const definitionError = cause instanceof Error
+        ? cause
+        : new Error(`${consumerKind} definition ${consumerId} is unavailable`)
+      if (batch) {
+        throw rejectEffectBatch(
+          chain,
+          batch,
+          `Attached EffectChain could not load ${consumerKind} definition ${consumerId}`,
+          definitionError,
+          {
+            sourceId,
+            skillId: consumerId,
+          },
+        )
+      }
+      throw chain.latchFatal(new EffectChainFatalError(
+        'RVB_EFFECT_CHAIN_STATE_INVALID',
+        `Attached EffectChain could not load ${consumerKind} definition ${consumerId}`,
+        {
+          actionId: chain.actionId,
+          chainId: chain.chainId,
+          kind: null,
+          depth: null,
+          processed: chain.processedBatches,
+          limit: chain.limits.maxBatches,
+          turn: chain.turn,
+          rootSeed: chain.rootSeed,
+          sourceId,
+          skillId: consumerId,
+          detached: false,
+          budget: 'state',
+        },
+        definitionError,
+      ))
+    }
+    const resolveCardDefinition = (
+      cardId: string,
+      sourceId?: string,
+    ): { cardDef: any; loadError?: unknown } => {
+      try {
+        return {
+          cardDef: loadCardForBattle(battle, cardId, {
+            metadata: { sourceId, skillId: cardId },
+          }),
+        }
+      } catch (error) {
+        if (isFatalEffectChainError(error)) throw error
+        return { cardDef: null, loadError: error }
+      }
     }
     const triggeredEffects: string[] = []
     let success = false
@@ -418,7 +686,7 @@ export class TriggerSystem {
       return { success: false, messages: [], blocked: false } as any
     }
 
-    const rejectedEvent = this.prepareEventContext(context)
+    const rejectedEvent = this.prepareEventContext(battle, context)
     if (rejectedEvent) return rejectedEvent
 
     // 从 context 中读取恢复状态（用于从 pendingTargetSelect/pendingOptionSelect 恢复执行）
@@ -430,9 +698,15 @@ export class TriggerSystem {
     const pendingReactiveCards: PendingReactiveCardRef[] = suppliedReactiveCards
       ? suppliedReactiveCards.map(card => ({ ...card }))
       : (battle.players || []).flatMap(player => (player.hand || []).flatMap(cardInstance => {
-          const cardDef = loadCardById(cardInstance.cardId)
-            || (battle as any).customCards?.[cardInstance.cardId]
-          if (!cardDef || cardDef.type !== 'reactive' || cardDef.trigger?.type !== context.type) return []
+          const { cardDef, loadError } = resolveCardDefinition(
+            cardInstance.cardId,
+            cardInstance.instanceId,
+          )
+          if (!cardDef) {
+            failClosedDefinitionLoad('reactiveCard', cardInstance.cardId, loadError, cardInstance.instanceId)
+            return []
+          }
+          if (cardDef.type !== 'reactive' || cardDef.trigger?.type !== context.type) return []
           return [{
             playerId: player.playerId,
             cardInstanceId: cardInstance.instanceId,
@@ -452,12 +726,18 @@ export class TriggerSystem {
         !rule.effect.toString().includes('checkToxin')
       if (typeof rule.effect !== 'function' || isDefaultEffect) {
         try {
-          const reloaded = loadRuleById(rule.id, FORCE_RULE_RELOAD)
+          const reloaded = loadRuleForBattle(battle, String(rule?.id || ''), {
+            sourceId: String((rule as any)?.sourceId || ''),
+          })
           if (reloaded && typeof reloaded.effect === 'function') {
             rule.effect = reloaded.effect
             return true
           }
-        } catch { }
+        } catch (error) {
+          if (isFatalEffectChainError(error)) throw error
+          failClosedDefinitionLoad('rule', String(rule?.id || 'unknown'), error)
+        }
+        failClosedDefinitionLoad('rule', String(rule?.id || 'unknown'))
         return false
       }
       return true
@@ -602,15 +882,14 @@ export class TriggerSystem {
         let ruleOwnerPlayerId: string | undefined
         while (true) {
           ruleCtx = item.buildCtx(context)
+          const mutableBeforeEffect = mutableTriggerContextSnapshot(ruleCtx)
           applyTransactionInputs(ruleCtx, transactionInputs, battle)
           damageBeforeEffect = Number((ruleCtx as any).damage)
           ruleOwnerPlayerId = (ruleCtx as any).ruleOwnerPlayerId
             || (ruleCtx as any).playerId
             || context.playerId
           result = item.rule.effect(battle, ruleCtx)
-          if ((ruleCtx as any).damage !== (context as any).damage) {
-            (context as any).damage = (ruleCtx as any).damage
-          }
+          writeBackMutableTriggerContext(ruleCtx, context, mutableBeforeEffect)
           if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
           if (!transactionRuntime || !interactionKey) break
           const nextInput = transactionRuntime.takeAnswer(interactionKey)
@@ -651,10 +930,6 @@ export class TriggerSystem {
                 sourcePieceId: (ruleCtx as any).sourcePiece?.instanceId || item.sourceId,
                 candidateState: candidateStateSnapshot(),
               })
-        }
-        // 回写 damage
-        if ((ruleCtx as any).damage !== (context as any).damage) {
-          (context as any).damage = (ruleCtx as any).damage
         }
         if (Number.isFinite(damageBeforeEffect)
           && damageBeforeEffect > 0
@@ -704,7 +979,7 @@ export class TriggerSystem {
           }
         }
       } catch (error) {
-        writeLog('Error executing rule ' + item.ruleId + ': ' + error)
+        writeLog('Error executing rule ' + item.ruleId)
         rethrowTriggerError(error, 'rule', item.ruleId)
       }
     }
@@ -722,8 +997,23 @@ export class TriggerSystem {
         const cardInstance = player?.hand?.find(card => card.instanceId === cardRef.cardInstanceId)
         if (!player || !cardInstance || cardInstance.cardId !== cardRef.cardId) continue
         try {
-          const cardDef = loadCardById(cardRef.cardId) || (battle as any).customCards?.[cardRef.cardId]
-          if (!cardDef || cardDef.type !== 'reactive' || cardDef.trigger?.type !== context.type) continue
+          const { cardDef, loadError } = resolveCardDefinition(
+            cardRef.cardId,
+            cardRef.cardInstanceId,
+          )
+          if (!cardDef) {
+            failClosedDefinitionLoad('reactiveCard', cardRef.cardId, loadError, cardRef.cardInstanceId)
+            continue
+          }
+          if (cardDef.type !== 'reactive' || cardDef.trigger?.type !== context.type) {
+            failClosedDefinitionLoad(
+              'reactiveCard',
+              cardRef.cardId,
+              new Error(`Frozen reactive-card definition ${cardRef.cardId} changed before ${context.type}`),
+              cardRef.cardInstanceId,
+            )
+            continue
+          }
           const interactionKey = transactionRuntime?.enterConsumer({
             consumerKind: 'reactiveCard',
             consumerId: cardRef.cardId,
@@ -736,10 +1026,13 @@ export class TriggerSystem {
           if (transactionInput?.cancelled && !transactionInput.resumeConsumerOnCancel) continue
           const transactionInputs = transactionInput ? [transactionInput] : []
           let result: any
+          let cardContext: TriggerContext
           while (true) {
-            const cardContext = { ...context }
+            cardContext = { ...context }
+            const mutableBeforeEffect = mutableTriggerContextSnapshot(cardContext)
             applyTransactionInputs(cardContext, transactionInputs, battle)
             result = executeCardFunction(cardDef, player.playerId, battle, cardContext) as any
+            writeBackMutableTriggerContext(cardContext, context, mutableBeforeEffect)
             if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
             if (!transactionRuntime || !interactionKey) {
               throw new Error(`Reactive card ${cardRef.cardId} requested unsupported interaction during ${context.type}`)
@@ -800,7 +1093,7 @@ export class TriggerSystem {
             }
           }
         } catch (error) {
-          writeLog('Error executing reactive card ' + cardRef.cardId + ': ' + error)
+          writeLog('Error executing reactive card ' + cardRef.cardId)
           rethrowTriggerError(error, 'reactiveCard', cardRef.cardId)
         }
       }

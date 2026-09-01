@@ -43,6 +43,8 @@ function loadBrowserRuntime(): Runtime {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
 
   runInNewContext(bundleSource, context, { filename: bundlePath })

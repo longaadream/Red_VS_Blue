@@ -61,6 +61,8 @@ describe('battle state chunked hash v1', () => {
         process,
         require: createRequire(import.meta.url),
         setTimeout,
+        TextDecoder,
+        TextEncoder,
       }
       runInNewContext(readFileSync(bundlePath, 'utf8'), context, { filename: bundlePath })
       const engine = context.GameEngine as { hashBattleState: typeof hashBattleState }

@@ -17,6 +17,8 @@ function loadBrowserEngine() {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
   runInNewContext(readFileSync(bundlePath, 'utf8'), context, { filename: bundlePath })
   return context.GameEngine as any
