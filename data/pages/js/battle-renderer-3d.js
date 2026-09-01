@@ -976,12 +976,16 @@
         const rows = overview.all.map(function (entry) {
           const row = document.createElement('span')
           row.className = 'piece-board-status-list-item'
+          const statusLabel = entry.status.label || entry.status.id || '未知状态'
+          row.setAttribute('role', 'img')
+          row.setAttribute('aria-label', statusLabel)
+          row.title = statusLabel
           const iconSlot = document.createElement('span')
           iconSlot.className = 'piece-board-status-list-icon'
           _renderStatusIcon(iconSlot, entry, false)
           const label = document.createElement('span')
           label.className = 'piece-board-status-list-label'
-          label.textContent = entry.status.label || entry.status.id || '未知状态'
+          label.textContent = statusLabel
           row.appendChild(iconSlot)
           row.appendChild(label)
           return row

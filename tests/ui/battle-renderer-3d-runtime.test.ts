@@ -816,6 +816,8 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(overflow.textContent).toBe('+2')
     expect(overflow.attributes['aria-label']).toBe('查看全部 4 个状态')
     expect(popover.children).toHaveLength(4)
+    expect(popover.children[0].attributes['aria-label']).toBe('睡眠')
+    expect(popover.children[0].title).toBe('睡眠')
     expect(summary.dataset.statusCount).toBe('4')
     expect(summary.dataset.statusIds).not.toContain('internal-1')
 
