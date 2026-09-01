@@ -1,0 +1,17 @@
+{
+  "id": "ulquiorra-high-speed-regeneration",
+  "name": "超速再生",
+  "description": "造成或受到伤害后，恢复2点生命。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": ["治疗"],
+  "icon": "💚",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "range": "self",
+  "code": "function executeSkill() { return { success: false, message: '' }; }"
+}

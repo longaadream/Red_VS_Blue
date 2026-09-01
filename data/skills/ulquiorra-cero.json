@@ -1,0 +1,19 @@
+{
+  "id": "ulquiorra-cero",
+  "name": "虚闪",
+  "description": "对6格内1名敌人造成75%攻击力的魔法伤害。",
+  "keywords": [],
+  "targetText": "6格内1名敌人",
+  "effectTags": ["魔法伤害"],
+  "icon": "🟢",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 0.75,
+  "actionPointCost": 1,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "kind": "target", "type": "piece", "filter": "enemy", "range": 6 }] },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 6, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var result = dealDamage(caster, target, Math.floor(caster.attack * 0.75), 'magical', battle, 'ulquiorra-cero'); return { success: true, message: caster.name + '释放虚闪，造成' + (result.damage || 0) + '点魔法伤害' }; }"
+}

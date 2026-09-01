@@ -269,6 +269,7 @@ interface TriggerRule {
     conditions?: any
   }
   effect: EffectFunction
+  targetValidation?: RuntimeTriggerRule['targetValidation']
   limits?: {
     cooldownTurns?: number
     maxUses?: number
@@ -1208,16 +1209,19 @@ function assertRawRuleDefinition(ruleId: string, value: unknown): Record<string,
   if (!isNonEmptyString(ruleId) || rule.id !== ruleId) {
     throw new Error(`Rule definition ${ruleId || '<empty>'} has a mismatched or empty id`)
   }
-  if (!rule.trigger || typeof rule.trigger !== 'object' || !isNonEmptyString(rule.trigger.type)) {
-    throw new Error(`Rule definition ${ruleId} has no trigger type`)
-  }
+  const hasTargetValidation = rule.targetValidation?.type === 'comparePieceNumber'
+  const hasTrigger = rule.trigger && typeof rule.trigger === 'object' && isNonEmptyString(rule.trigger.type)
+  if (!hasTrigger && !hasTargetValidation) throw new Error(`Rule definition ${ruleId} has no execution surface`)
   const hasSkillCode = isNonEmptyString(rule.skillCode)
   const hasTriggerSkill = rule.effect?.type === 'triggerSkill'
     && isNonEmptyString(rule.effect?.skillId)
-  if (Number(hasSkillCode) + Number(hasTriggerSkill) !== 1) {
+  if (hasTrigger && Number(hasSkillCode) + Number(hasTriggerSkill) !== 1) {
     throw new Error(
       `Rule definition ${ruleId} must declare exactly one supported execution surface`,
     )
+  }
+  if (!hasTrigger && (hasSkillCode || hasTriggerSkill)) {
+    throw new Error(`Target validation rule ${ruleId} cannot declare a trigger effect`)
   }
   return rule
 }
@@ -1424,6 +1428,36 @@ export function loadRuleById(
               return true
             };
 
+            const addSkillById = (targetPieceId: string, skillId: string) => {
+              const targetPiece = battle.pieces.find(piece => piece.instanceId === targetPieceId)
+              if (!targetPiece) return false
+              if (!ensureSkillDefinitionForAddition(battle, skillId, targetPieceId)) return false
+              if (!targetPiece.skills) targetPiece.skills = []
+              if (targetPiece.skills.some(skill => skill.skillId === skillId)) return false
+              const newSkill = { skillId, currentCooldown: 0 }
+              targetPiece.skills.push(newSkill)
+              if (targetPiece.displaySkills !== undefined) {
+                const alreadyInDisplay = targetPiece.displaySkills.some(skill => (
+                  (typeof skill === 'string' ? skill : skill.skillId) === skillId
+                ))
+                if (!alreadyInDisplay) targetPiece.displaySkills.push(newSkill)
+              }
+              return true
+            };
+
+            const removeSkillById = (targetPieceId: string, skillId: string) => {
+              const targetPiece = battle.pieces.find(piece => piece.instanceId === targetPieceId)
+              if (!targetPiece?.skills) return false
+              const originalLength = targetPiece.skills.length
+              targetPiece.skills = targetPiece.skills.filter(skill => skill.skillId !== skillId)
+              if (targetPiece.displaySkills !== undefined) {
+                targetPiece.displaySkills = targetPiece.displaySkills.filter(skill => (
+                  (typeof skill === 'string' ? skill : skill.skillId) !== skillId
+                ))
+              }
+              return targetPiece.skills.length < originalLength
+            };
+
             const addPlayerStatusEffectById = (targetPlayerId: string, statusObject: any) => {
               const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
               if (!player) return false
@@ -1467,14 +1501,14 @@ export function loadRuleById(
             };
 
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, fireEvent, Math, Date) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, addSkillById, removeSkillById, selectOption, fireEvent, Math, Date) {
                 ${ruleData.skillCode}
               })
             `;
             const executeRuleCode = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<any>({
               surface: 'ruleSkillCode', contentId: ruleId, code: codeEnvironment, entry: 'rule skillCode body',
             });
-            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate());
+            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, addSkillById, removeSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate());
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
@@ -1866,8 +1900,9 @@ export function loadRuleById(
         id: ruleData.id,
         name: ruleData.name,
         description: ruleData.description,
-        trigger: ruleData.trigger,
+        trigger: ruleData.trigger || { type: 'targetValidation' },
         effect: effectFunction,
+        targetValidation: ruleData.targetValidation,
         limits: ruleData.limits
       };
       
@@ -2039,6 +2074,20 @@ export interface SkillDefinition {
   description: string
   /** 玩家可见的机制关键词。 */
   keywords?: string[]
+  /** Data-authored tags whose rules can add reusable targeting semantics. */
+  statusTag?: {
+    id: string
+    type: string
+    name?: string
+    rule?: string
+    rules?: string[]
+  } | Array<{
+    id: string
+    type: string
+    name?: string
+    rule?: string
+    rules?: string[]
+  }>
   kind: SkillKind
   /** 技能类型：normal=普通技能, super=充能技能 */
   type: SkillType
@@ -2074,6 +2123,8 @@ export interface SkillDefinition {
   summonCapability?: SummonCapabilityDeclaration
   /** When true, cancelling any synthetic post-effect target rolls back the entire skill transaction. */
   rollbackPendingTargetOnCancel?: boolean
+  /** When true, the generic public battle log omits this skill's selected target. */
+  concealTargetInBattleLog?: boolean
 }
 
 /**
@@ -2432,24 +2483,29 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
 
       // 检查是否已经有目标信息（用户已经选择了目标）
       if (defaultOptions.type === 'piece' && context && activeTarget) {
-        // 检查目标是否符合filter要求
-        const isAlly = activeTarget.ownerPlayerId === sourcePiece.ownerPlayerId;
-        const isEnemy = !isAlly;
+        const primaryTargetWasRuleRewritten = callIdx === 0
+          && typeof ctx.ruleRewrittenPrimaryTargetPieceId === 'string'
+          && ctx.ruleRewrittenPrimaryTargetPieceId === activeTarget.instanceId;
+        if (!primaryTargetWasRuleRewritten) {
+          // 检查目标是否符合filter要求
+          const isAlly = activeTarget.ownerPlayerId === sourcePiece.ownerPlayerId;
+          const isEnemy = !isAlly;
 
-        // 根据filter参数检查目标是否符合要求
-        if (defaultOptions.filter === 'ally' && !isAlly) {
-          return needsTargetSelection();
-        } else if (defaultOptions.filter === 'enemy' && !isEnemy) {
-          return needsTargetSelection();
-        }
-
-        // 检查目标是否在范围内
-        if (defaultOptions.range !== undefined && activeTarget.x != null && activeTarget.y != null && sourcePiece.x != null && sourcePiece.y != null) {
-          const distance = declaredTargetStep?.distanceMetric === 'chebyshev'
-            ? Math.max(Math.abs(sourcePiece.x - activeTarget.x), Math.abs(sourcePiece.y - activeTarget.y))
-            : manhattanDistance(sourcePiece, activeTarget);
-          if (distance > defaultOptions.range) {
+          // 根据filter参数检查目标是否符合要求
+          if (defaultOptions.filter === 'ally' && !isAlly) {
             return needsTargetSelection();
+          } else if (defaultOptions.filter === 'enemy' && !isEnemy) {
+            return needsTargetSelection();
+          }
+
+          // 检查目标是否在范围内
+          if (defaultOptions.range !== undefined && activeTarget.x != null && activeTarget.y != null && sourcePiece.x != null && sourcePiece.y != null) {
+            const distance = declaredTargetStep?.distanceMetric === 'chebyshev'
+              ? Math.max(Math.abs(sourcePiece.x - activeTarget.x), Math.abs(sourcePiece.y - activeTarget.y))
+              : manhattanDistance(sourcePiece, activeTarget);
+            if (distance > defaultOptions.range) {
+              return needsTargetSelection();
+            }
           }
         }
 
@@ -3287,7 +3343,7 @@ function resolveDeathBatch(
       ...queues,
     })
     assertFrozenCandidateMembership('afterPieceKilled')
-    checkSynchronousTriggers(battle, {
+    const diedResult = checkSynchronousTriggers(battle, {
       type: 'onPieceDied',
       piece: candidate.piece,
       sourcePiece: candidate.piece,
@@ -3296,6 +3352,15 @@ function resolveDeathBatch(
       ...legacy,
       ...queues,
     })
+    if (diedResult.revival) {
+      const { maxHp, currentHp } = diedResult.revival
+      if (!Number.isSafeInteger(maxHp) || maxHp <= 0 || !Number.isSafeInteger(currentHp) || currentHp <= 0 || currentHp > maxHp) {
+        rejection('DeathBatch revival profile is invalid')
+      }
+      candidate.piece.maxHp = maxHp
+      candidate.piece.currentHp = currentHp
+      candidate.targetMaxHp = maxHp
+    }
     assertFrozenCandidateMembership('onPieceDied')
   }
 
@@ -5381,7 +5446,12 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
 
     // 记录技能执行前的状态
     const beforeState = {
-      enemies: battle.pieces.filter(p => p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0).map(p => ({ instanceId: p.instanceId, currentHp: p.currentHp }))
+      enemies: battle.pieces.filter(p => p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0).map(p => ({ instanceId: p.instanceId, currentHp: p.currentHp })),
+      movementBlocked: battle.pieces.flatMap(piece => (
+        Array.isArray(piece.statusTags) && piece.statusTags.some(tag => tag.blocksForcedMovement === true)
+          ? [{ instanceId: piece.instanceId, x: piece.x, y: piece.y }]
+          : []
+      )),
     };
 
     // 执行技能定义中的代码（所有技能统一走动态代码运行时，不存在硬编码分支）
@@ -5445,6 +5515,13 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           });
           let result = executeSkill(skillEnvironment);
           finishSealedContentExecution(battle, sealedContent)
+
+          for (const snapshot of beforeState.movementBlocked) {
+            const current = battle.pieces.find(piece => piece.instanceId === snapshot.instanceId)
+            if (current && (current.x !== snapshot.x || current.y !== snapshot.y)) {
+              throw new Error(`${current.name || current.templateId} cannot be moved by a skill`)
+            }
+          }
           
           battleDebugLog('Skill execution result:', result);
           battleDebugLog('result.needsOptionSelection:', result && result.needsOptionSelection);

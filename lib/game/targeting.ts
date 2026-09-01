@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RED-59 validates legacy data-authored definitions and action envelopes at runtime. */
 import type { PieceInstance } from './piece'
 import { getSkillById } from './skill-repository'
-import { getEffectiveChargeCost, loadCardById } from './skills'
+import { getEffectiveChargeCost, loadCardById, loadRuleById } from './skills'
 import { manhattanDistance, traceProjectile } from './spatial'
 import type { BattleAction, BattleState } from './turn'
 import type { PendingReactiveCardRef } from './pending-interaction'
@@ -48,7 +48,9 @@ export interface TargetConstraint {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
+  distanceFromSelectedTarget?: { index: number; range: number }
   projectile?: ProjectileTargetingRequirement
+  targetRuleIds?: string[]
 }
 
 export type TargetValidationCode =
@@ -63,6 +65,7 @@ export type TargetValidationCode =
   | 'TARGET_SOURCE_CELL_FORBIDDEN'
   | 'TARGET_NOT_ORTHOGONAL'
   | 'TARGET_SOURCE_CONSTRAINT_FAILED'
+  | 'TARGET_RULE_FAILED'
   | 'TARGET_REFERENCE_MISMATCH'
 
 export interface TargetValidationIssue {
@@ -164,6 +167,7 @@ export interface PendingTargetStep {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
+  distanceFromSelectedTarget?: { index: number; range: number }
   projectile?: ProjectileTargetingRequirement
 }
 
@@ -230,6 +234,7 @@ interface TargetSpec {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
+  distanceFromSelectedTarget?: { index: number; range: number }
 }
 
 interface OptionSpec {
@@ -246,6 +251,18 @@ interface TargetSource {
   ownerPlayerId: string
   sourcePieceId?: string
   steps: SelectionStepSpec[]
+  targetRuleIds?: string[]
+}
+
+function targetRuleIdsFromDefinition(definition: any): string[] {
+  const tags = Array.isArray(definition?.statusTag)
+    ? definition.statusTag
+    : definition?.statusTag ? [definition.statusTag] : []
+  const ids = tags.flatMap((tag: any) => [
+    typeof tag?.rule === 'string' ? tag.rule : undefined,
+    ...(Array.isArray(tag?.rules) ? tag.rules : []),
+  ]).filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+  return [...new Set<string>(ids)]
 }
 
 function issue(code: TargetValidationCode, message: string): TargetValidationIssue {
@@ -349,6 +366,10 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
           : undefined,
         ignoreOccupantSelectedTargetIndex: Number.isInteger(raw.ignoreOccupantSelectedTargetIndex) ? raw.ignoreOccupantSelectedTargetIndex : undefined,
         requireEnemyWithinRange: typeof raw.requireEnemyWithinRange === 'number' ? raw.requireEnemyWithinRange : undefined,
+        distanceFromSelectedTarget: Number.isInteger(raw.distanceFromSelectedTarget?.index)
+          && typeof raw.distanceFromSelectedTarget?.range === 'number'
+          ? { index: raw.distanceFromSelectedTarget.index, range: raw.distanceFromSelectedTarget.range }
+          : undefined,
         projectile: raw.projectile?.requiredCollision === 'piece-before-blocker'
           ? { requiredCollision: 'piece-before-blocker' }
           : undefined,
@@ -504,7 +525,13 @@ function getSource(state: BattleState, action: any): TargetSource | InvalidActio
     if (!steps) {
       return { kind: 'invalid', code: 'TARGET_DECLARATION_MISSING', message: `Skill ${action.skillId} requires a declarative selection contract` }
     }
-    return { actionId: action.skillId, ownerPlayerId: playerId, sourcePieceId: sourcePiece.instanceId, steps }
+    return {
+      actionId: action.skillId,
+      ownerPlayerId: playerId,
+      sourcePieceId: sourcePiece.instanceId,
+      steps,
+      targetRuleIds: targetRuleIdsFromDefinition(definition),
+    }
   }
 
   if (action.type === 'playCard') {
@@ -632,6 +659,7 @@ function constraintFor(
       option => Object.is(option, selectedOption),
     ),
     projectile: spec.projectile,
+    targetRuleIds: selectedTargets.length === 0 ? source.targetRuleIds : undefined,
   }
   return constraint
 }
@@ -695,6 +723,17 @@ function validateSourceSpecificCell(
     }
   }
 
+  if (constraint.distanceFromSelectedTarget) {
+    const selected = constraint.selectedTargets?.[constraint.distanceFromSelectedTarget.index]
+    const selectedPosition = selected?.type === 'piece'
+      ? state.pieces.find(piece => piece.instanceId === selected.pieceId && piece.currentHp > 0)
+      : selected
+    if (!selectedPosition || selectedPosition.x == null || selectedPosition.y == null
+      || manhattanDistance(selectedPosition, ref) > constraint.distanceFromSelectedTarget.range) {
+      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target cell is too far from the selected target')
+    }
+  }
+
   return undefined
 }
 
@@ -730,6 +769,35 @@ function validateSourceSpecificPiece(
   if (constraint.requireOpenCardinalLanding && !hasOpenCardinalLanding(state, target, constraint.sourcePieceId)) {
     return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target has no open cardinal landing cell')
   }
+  return undefined
+}
+
+function validateTargetRules(
+  source: PieceInstance,
+  target: PieceInstance,
+  ruleIds: readonly string[],
+): TargetValidationIssue | undefined {
+  for (const ruleId of ruleIds) {
+    const rule = loadRuleById(ruleId)
+    const validation = rule?.targetValidation
+    if (!validation) return issue('TARGET_RULE_FAILED', `Target rule ${ruleId} is unavailable`)
+    if (validation.type !== 'comparePieceNumber') {
+      return issue('TARGET_RULE_FAILED', `Target rule ${ruleId} is unsupported`)
+    }
+    const sourceValue = Number((source as any)[validation.sourceField])
+    const targetValue = Number((target as any)[validation.targetField])
+    if (!Number.isFinite(sourceValue) || !Number.isFinite(targetValue)) {
+      return issue('TARGET_RULE_FAILED', validation.message || `Target rule ${ruleId} could not compare its fields`)
+    }
+    const passed = validation.operator === 'gt' ? sourceValue > targetValue
+      : validation.operator === 'gte' ? sourceValue >= targetValue
+        : validation.operator === 'lt' ? sourceValue < targetValue
+          : validation.operator === 'lte' ? sourceValue <= targetValue
+            : validation.operator === 'eq' ? sourceValue === targetValue
+              : sourceValue !== targetValue
+    if (!passed) return issue('TARGET_RULE_FAILED', validation.message || `Target rule ${ruleId} failed`)
+  }
+
   return undefined
 }
 
@@ -802,7 +870,12 @@ export function validateTargetRef(
     if (constraint.sameRowOrColumn && sourcePiece && sourcePiece.x !== target.x && sourcePiece.y !== target.y) {
       return issue('TARGET_NOT_ORTHOGONAL', 'Target must be in the same row or column as the source')
     }
-    return validateSourceSpecificPiece(state, constraint, target)
+    const sourceIssue = validateSourceSpecificPiece(state, constraint, target)
+    if (sourceIssue) return sourceIssue
+    if (sourcePiece && constraint.targetRuleIds?.length) {
+      return validateTargetRules(sourcePiece, target, constraint.targetRuleIds)
+    }
+    return undefined
   }
 
   const tile = state.map.tiles.find(candidate => candidate.x === ref.x && candidate.y === ref.y)
@@ -859,6 +932,18 @@ function enumerateCandidates(
   }
 }
 
+/** Authoritative candidate IDs for generic before-skill target replacement rules. */
+export function enumeratePrimaryPieceTargetIds(state: BattleState, draftCommand: BattleAction | any): string[] {
+  const source = getSource(state, draftCommand)
+  if ('kind' in source) return []
+  const primary = source.steps.find(step => step.kind === 'target')
+  if (!primary || primary.kind !== 'target' || primary.type !== 'piece') return []
+  const constraint = constraintFor(source, primary, source.steps.indexOf(primary), [], draftCommand.selectedOption)
+  return enumerateCandidates(state, constraint).candidates.flatMap(candidate => (
+    candidate.type === 'piece' ? [candidate.pieceId] : []
+  ))
+}
+
 function validateCredential(
   state: BattleState,
   action: any,
@@ -873,6 +958,18 @@ function validateCredential(
     return { kind: 'invalid', code: 'TARGET_SELECTION_ID_MISMATCH', message: 'Target selection ID does not match this action and state' }
   }
   return undefined
+}
+
+/**
+ * Reports whether an action definition resolves through exactly one piece-target step.
+ * This deliberately uses the normalized targeting source so legacy selectTarget skill
+ * code and declarative targeting.steps definitions share the same trigger semantics.
+ */
+export function isSinglePieceTargetAction(state: BattleState, draftCommand: BattleAction | any): boolean {
+  const source = getSource(state, draftCommand)
+  if ('kind' in source) return false
+  const targetSteps = source.steps.filter(step => step.kind === 'target') as TargetSpec[]
+  return targetSteps.length === 1 && targetSteps[0].type === 'piece'
 }
 
 export function prepareAction(state: BattleState, draftCommand: BattleAction | any): ActionPreparation {

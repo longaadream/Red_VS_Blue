@@ -3706,13 +3706,15 @@
       const localDefinition = cardsById[cardId] || (G && G.customCards && G.customCards[cardId])
       if (localDefinition) return localDefinition
       if (cardDisplayMetadataById[cardId]) return cardDisplayMetadataById[cardId]
-      if (TRAINING_MODE || battlePageDisposed || cardDisplayMetadataFailures.has(cardId)) return null
+      if (battlePageDisposed || cardDisplayMetadataFailures.has(cardId)) return null
       if (cardDisplayMetadataRequests.has(cardId)) return cardDisplayMetadataRequests.get(cardId)
 
       let request = null
       request = (async function() {
         try {
-          const raw = await fetchServerJson('catalog.card', { cardId }, 3500)
+          const raw = TRAINING_MODE
+            ? await fetchLocalJson('./data/cards/' + cardId + '.json', 3500)
+            : await fetchServerJson('catalog.card', { cardId }, 3500)
           const display = sanitizeCardDisplayMetadata(cardId, raw)
           if (battlePageDisposed) return null
           cardDisplayMetadataById[cardId] = display
@@ -3735,7 +3737,7 @@
     }
 
     function ensureHandCardDisplayMetadata(hand) {
-      if (TRAINING_MODE || battlePageDisposed || !Array.isArray(hand)) {
+      if (battlePageDisposed || !Array.isArray(hand)) {
         return Promise.resolve([])
       }
       const seen = new Set()

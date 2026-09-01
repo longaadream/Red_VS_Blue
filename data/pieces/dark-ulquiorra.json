@@ -1,0 +1,23 @@
+{
+  "id": "dark-ulquiorra",
+  "name": "乌尔奇奥拉·西法",
+  "faction": "evil",
+  "description": "通过伤害积累归刃进度，并以超速再生持续作战。",
+  "rarity": "legendary",
+  "image": "ulquiorra.jpg",
+  "stats": { "maxHp": 12, "attack": 4, "defense": 1, "moveRange": 3 },
+  "skills": [
+    { "skillId": "ulquiorra-cero", "level": 1 },
+    { "skillId": "ulquiorra-high-speed-regeneration", "level": 1 },
+    { "skillId": "ulquiorra-resurreccion", "level": 1 }
+  ],
+  "transformedSkills": [
+    { "skillId": "ulquiorra-black-cero", "triggeredBy": "ulquiorra-resurreccion" }
+  ],
+  "rules": [
+    "rule-ulquiorra-damage-dealt",
+    "rule-ulquiorra-damage-taken",
+    "rule-ulquiorra-resurreccion"
+  ],
+  "isDefault": false
+}

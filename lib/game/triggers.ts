@@ -171,6 +171,14 @@ export interface TriggerRule {
   description: string
   trigger: TriggerCondition
   effect: EffectFunction
+  /** Pure target gate referenced by data-authored skill status tags. */
+  targetValidation?: {
+    type: 'comparePieceNumber'
+    sourceField: string
+    targetField: string
+    operator: 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'ne'
+    message?: string
+  }
   priority?: number
   // 可选的限制条件
   limits?: {
@@ -193,6 +201,10 @@ export interface TriggerContext {
   targetPiece?: PieceInstance
   /** 技能ID，可以被修改以改变即将使用的技能 */
   skillId?: string
+  /** Normalized action shape, shared by declarative and legacy skill targeting. */
+  isSinglePieceTargetAction?: boolean
+  /** Legal primary piece targets stamped before beforeSkillUse rules execute. */
+  legalPrimaryTargetPieceIds?: string[]
   cardId?: string
   cardInstanceId?: string
   pieceTemplateId?: string
@@ -360,6 +372,10 @@ export interface TriggerResult {
   pendingRuleSourceId?: string
   pendingQueue?: Array<{ruleId: string, sourceId?: string}>
   pendingReactiveCards?: PendingReactiveCardRef[]
+  /** Generic before-event rewrite consumed by the authoritative action owner. */
+  targetReplacementPieceId?: string
+  /** Explicit revival profile applied by the death batch after onPieceDied. */
+  revival?: { maxHp: number; currentHp: number }
 }
 
 // 触发系统类
@@ -681,6 +697,8 @@ export class TriggerSystem {
     let pendingRuleId: string | undefined
     let pendingRuleSourceId: string | undefined
     let pendingQueue: Array<{ruleId: string, sourceId?: string}> = []
+    let targetReplacementPieceId: string | undefined
+    let revival: { maxHp: number; currentHp: number } | undefined
 
     if ((battle as any).extensions?.__dryRunSkillPreflight) {
       return { success: false, messages: [], blocked: false } as any
@@ -936,6 +954,18 @@ export class TriggerSystem {
           && Number((context as any).damage) <= 0) {
           blocked = true
         }
+        if (typeof result?.targetReplacementPieceId === 'string') {
+          const replacement = battle.pieces.find(piece => (
+            piece.instanceId === result.targetReplacementPieceId && piece.currentHp > 0
+          ))
+          if (!replacement) throw new Error(`Trigger replacement target ${result.targetReplacementPieceId} is unavailable`)
+          context.targetPiece = replacement
+          targetReplacementPieceId = replacement.instanceId
+        }
+        if (result?.revival) revival = {
+          maxHp: Number(result.revival.maxHp),
+          currentHp: Number(result.revival.currentHp),
+        }
 
         if (result && result.needsOptionSelection) {
           needsOptionSelection = true
@@ -986,7 +1016,7 @@ export class TriggerSystem {
 
     // 只在没有挂起交互时才执行响应卡（避免乱序）
     if (interactionNeeded) {
-      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, selectionMode: pendingSelectionMode, presentation: pendingPresentation, minSelections: pendingMinSelections, maxSelections: pendingMaxSelections, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards } as any, context)
+      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, selectionMode: pendingSelectionMode, presentation: pendingPresentation, minSelections: pendingMinSelections, maxSelections: pendingMaxSelections, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards, targetReplacementPieceId, revival } as any, context)
     }
 
     // 4. 按事件开始时冻结的快照执行 reactive 卡牌，恢复规则队列时不得重复扫描。
@@ -1100,7 +1130,7 @@ export class TriggerSystem {
     }
 
 
-    return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined } as any, context)
+    return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined, targetReplacementPieceId, revival } as any, context)
   }
 
   // 条件评估方法已移除，所有条件判断都在技能代码中通过if语句实现

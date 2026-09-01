@@ -1,0 +1,21 @@
+{
+  "id": "aizen-black-coffin",
+  "name": "黑棺",
+  "description": "灵压。对5格内1名敌人造成150%攻击力的魔法伤害并使其无法移动；目标下回合结束时再次造成等量伤害。",
+  "keywords": ["灵压"],
+  "statusTag": { "id": "spiritual-pressure", "type": "skill-rule", "name": "灵压", "rule": "rule-spiritual-pressure" },
+  "targetText": "5格内1名敌人",
+  "effectTags": ["魔法伤害", "禁锢", "延迟伤害"],
+  "icon": "⬛",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "chargeCost": 2,
+  "powerMultiplier": 1.5,
+  "actionPointCost": 2,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "kind": "target", "type": "piece", "filter": "enemy", "range": 5 }] },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.floor(caster.attack * 1.5); var result = dealDamage(caster, target, damage, 'magical', battle, 'aizen-black-coffin'); var living = battle.pieces.find(function(piece) { return piece.instanceId === target.instanceId && piece.currentHp > 0; }); if (living) { addStatusEffectById(living.instanceId, { id: 'aizen-black-coffin-' + caster.instanceId + '-' + living.instanceId, type: 'aizen-black-coffin', name: '黑棺', visible: true, currentDuration: 1, currentUses: 1, stacks: 1, sourceId: caster.instanceId, delayedDamage: damage, blocksForcedMovement: true }); addRuleById(living.instanceId, 'rule-aizen-black-coffin-move'); addRuleById(living.instanceId, 'rule-aizen-black-coffin-end'); } return { success: true, message: caster.name + '以黑棺造成' + (result.damage || 0) + '点魔法伤害' }; }"
+}

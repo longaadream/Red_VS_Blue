@@ -565,6 +565,12 @@ describe('Demo targeting admission fixture', () => {
     const fixture: any[] = []
     for (const skillId of skillIds) {
       const definition = JSON.parse(readFileSync(resolve(process.cwd(), `data/skills/${skillId}.json`), 'utf8'))
+      source.statusTags = [{ id: 'fixture-divine-shield', type: 'divine-shield' }] as never
+      for (const requirement of definition.targeting?.availability || []) {
+        if (requirement.type === 'sourceStatus' && requirement.present === true) {
+          source.statusTags.push({ id: `fixture-${requirement.statusType}`, type: requirement.statusType } as never)
+        }
+      }
       source.skills = [{ skillId, currentCooldown: 0, usesRemaining: 1 }] as never
       state.skillsById = { [skillId]: definition }
       const actionType = (definition.chargeCost || 0) > 0 ? 'useChargeSkill' : 'useBasicSkill'
@@ -594,7 +600,7 @@ describe('Demo targeting admission fixture', () => {
     }
 
     const fixtureHash = createHash('sha256').update(JSON.stringify(fixture)).digest('hex')
-    expect(fixtureHash).toBe('3fa44e70ad464c6e2141cdf3ab2ca53ad6ceca015c81a503397cec98b0862f12')
+    expect(fixtureHash).toBe('20672f5c4948fd07dc88785ed3e65f67ce063d74b25166a778b42241a25fb61f')
   })
 })
 
