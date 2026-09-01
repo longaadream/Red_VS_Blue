@@ -189,7 +189,20 @@ function createRepository(options: CreateColyseusBattleServerOptions): PostgresA
     idleTimeoutMillis: 30_000,
     application_name: 'red-vs-blue-colyseus',
   })
+  attachPostgresPoolErrorHandler(pool)
   return new PostgresAuthorityRepository(pool)
+}
+
+export function attachPostgresPoolErrorHandler(
+  pool: Pick<Pool, 'on'>,
+  logger: Pick<Console, 'error'> = console,
+): void {
+  pool.on('error', error => {
+    logger.error('[colyseus-postgres] idle pool client error', {
+      code: (error as Error & { code?: string }).code,
+      message: error.message,
+    })
+  })
 }
 
 function numberFromEnv(value: string | undefined, fallback: number): number {

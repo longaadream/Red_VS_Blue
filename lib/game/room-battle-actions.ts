@@ -205,6 +205,8 @@ export interface DispatchRoomBattleActionOptions {
 
 export interface ScheduleBattleTimeoutOptions {
   clock?: DeploymentRuleClock
+  /** Room-owned scheduler (for example Colyseus `this.clock`). */
+  setTimeout?: (handler: () => void | Promise<void>, delayMs: number) => AuthorityTimer
   onCommitted?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
   onTransitionCommitted?: (result: DispatchRoomBattleActionResult) => void | Promise<void>
   onBotTurnReady?: (
@@ -318,7 +320,7 @@ function assertBattleAuthorityPersistenceAvailable(
   }
 }
 
-type AuthorityTimer = ReturnType<typeof setTimeout>
+export type AuthorityTimer = ReturnType<typeof setTimeout> | { clear(): void }
 interface RoomAuthorityClockState {
   excludedMs: number
   pausedAtWall?: number
@@ -1054,7 +1056,8 @@ export async function scheduleRoomBattleTimeout(
   const nextWake = nextAuthorityWake(state)
   if (!nextWake) return
   const delay = Math.max(0, nextWake.at - authorityClock.now())
-  const timer = setTimeout(async () => {
+  const scheduleTimeout = options.setTimeout ?? ((handler, timeoutMs) => setTimeout(handler, timeoutMs))
+  const timer = scheduleTimeout(async () => {
     const firedAt = authorityClock.now()
     if (firedAt < nextWake.at) {
       await scheduleRoomBattleTimeout(store, normalizedRoomId, options)
@@ -1082,7 +1085,6 @@ export async function scheduleRoomBattleTimeout(
           await options.onBotTurnReady?.(result.snapshot, result.actionResult.state)
         }
       }
-      await scheduleRoomBattleTimeout(store, normalizedRoomId, options)
     } catch (error) {
       const code = (error as { code?: unknown })?.code
       if (code !== 'ROOM_NOT_FOUND' && code !== 'BATTLE_NOT_STARTED') {
@@ -1101,9 +1103,19 @@ export async function scheduleRoomBattleTimeout(
           error: error instanceof Error ? error.message : String(error),
         })
       }
+    } finally {
+      try {
+        await scheduleRoomBattleTimeout(store, normalizedRoomId, options)
+      } catch (error) {
+        console.warn('[battle-timeout] failed to re-arm authority timer', {
+          roomId: normalizedRoomId,
+          code: (error as { code?: unknown })?.code,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
   }, delay)
-  ;(timer as AuthorityTimer & { unref?: () => void }).unref?.()
+  ;(timer as ReturnType<typeof setTimeout> & { unref?: () => void }).unref?.()
   authorityTimers.set(normalizedRoomId, timer)
 }
 
@@ -1114,7 +1126,8 @@ export function clearRoomBattleTimeout(roomId: string): void {
   const normalizedRoomId = roomId.trim().toLowerCase()
   const timer = authorityTimers.get(normalizedRoomId)
   if (!timer) return
-  clearTimeout(timer)
+  if (typeof (timer as { clear?: unknown }).clear === 'function') (timer as { clear(): void }).clear()
+  else clearTimeout(timer as ReturnType<typeof setTimeout>)
   authorityTimers.delete(normalizedRoomId)
 }
 
