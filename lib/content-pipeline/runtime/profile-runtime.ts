@@ -299,12 +299,16 @@ export async function getProfileServerReportV1(): Promise<ProfileServerReportV1>
     })
   }
   const lease = await getProfileLeaseReportV1()
+  const webSocketRunning = (globalThis as unknown as { __rvbWss?: unknown }).__rvbWss != null
+  const webSocketExpected = process.env.RVB_PROFILE_EXPECT_WEBSOCKET !== '0'
   const health = {
     profileIntegrity,
     contentParse,
     fixedSeedBattle,
     http: true,
-    webSocket: (globalThis as unknown as { __rvbWss?: unknown }).__rvbWss != null,
+    // This field means that the runtime matches its declared WebSocket mode.
+    // RED-161's Profile-only process must keep legacy player WS disabled.
+    webSocket: webSocketExpected ? webSocketRunning : !webSocketRunning,
     menuResources,
   }
   const report: ProfileServerReportV1 = {

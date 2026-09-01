@@ -90,9 +90,13 @@
     async function useLocalServer() {
       const errEl = document.getElementById('err')
       errEl.style.display = 'none'
-      const result = await api.openLocalGame()
-      if (!result || !result.ok) {
+      try {
+        const result = await api.openLocalGame()
+        if (result && result.ok) return
         errEl.textContent = '本机服务器启动失败：' + (result?.error || '未知错误')
+        errEl.style.display = 'block'
+      } catch {
+        errEl.textContent = '本机服务器启动失败：客户端通信异常，请查看日志。'
         errEl.style.display = 'block'
       }
     }

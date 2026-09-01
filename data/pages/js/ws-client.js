@@ -1,22 +1,22 @@
 ;(function () {
   'use strict'
 
-  var _ws = null
+  var _client = null
+  var _room = null
   var _roomId = null
   var _playerId = null
-  var _mode = 'lan'          // 'lan' | 'relay'
   var _handlers = {}
   var _pending = {}
   var _reqSeq = 1
+  var _generation = 0
   var _reconnectTimer = null
+  var _lobbyPollTimer = null
   var _shouldReconnect = false
   var _subscribed = false
   var _authoritySyncing = false
   var _authoritySyncTimer = null
   var _authoritySyncRequestId = null
   var AUTHORITY_SYNC_TIMEOUT_MS = 8000
-  var BATTLE_AUTHORITY_PROTOCOL_VERSION = 3
-  var BATTLE_AUTHORITY_BUILD_ID = 'rvb-authority-v3-chunked-sha256-1'
 
   function getServerUrl() {
     if (window.RvBUtils && window.RvBUtils.getConnectionConfig) {
@@ -28,161 +28,395 @@
       : (localStorage.getItem('rvb_server_url') || '')
   }
 
-  function buildWsUrl() {
-    var base = String(getServerUrl() || '').trim().replace(/\/+$/, '')
-    if (!base) return null
-    return base.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/ws/rooms/' + _roomId
+  function normalizedBaseUrl(value) {
+    var base = String(value || '').trim().replace(/\/+$/, '')
+    if (base && !/^[a-z]+:\/\//i.test(base)) base = 'http://' + base
+    return base
   }
 
-  async function buildSubscribeMessage() {
-    var roomId = String(_roomId || '').trim().toLowerCase()
-    var playerId = String(_playerId || '').trim().toLowerCase()
-    var message = {
-      type: 'subscribe',
-      roomId: roomId,
-      playerId: playerId,
-      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
-      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
-      profileIdentity: null,
+  function requireSdk() {
+    if (!window.Colyseus || typeof window.Colyseus.Client !== 'function') {
+      throw new Error('Colyseus SDK 未加载，请重新安装或更新客户端')
     }
-    var storedProfile = null
-    var profileIdentity = null
-    if (roomId !== '__lobby') {
-      storedProfile = localStorage.getItem('rvb_game_profile_identity')
-      try {
-        profileIdentity = storedProfile ? JSON.parse(storedProfile) : null
-      } catch (e) {
-        throw new Error('Stored game profile identity is malformed')
-      }
-      if (!profileIdentity || typeof profileIdentity !== 'object' || Array.isArray(profileIdentity)) {
-        throw new Error('Game profile identity is required for battle subscriptions')
-      }
-    }
-    message.profileIdentity = profileIdentity
-    if (roomId === '__lobby') return message
-
-    if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') {
-      throw new Error('Signed identity is required for battle WebSocket subscriptions')
-    }
-    var identity = window.RvBIdentity.getIdentity && window.RvBIdentity.getIdentity()
-    if (!identity || String(identity.id || '').toLowerCase() !== playerId) {
-      throw new Error('Active identity does not match the battle WebSocket player')
-    }
-    var publicKey = window.RvBIdentity.getPublicKey && window.RvBIdentity.getPublicKey()
-    if (!publicKey) throw new Error('Battle WebSocket identity has no public key')
-
-    var payload = {
-      type: 'battle-subscribe',
-      roomId: roomId,
-      playerId: playerId,
-      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
-      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
-      timestamp: Date.now(),
-    }
-    return {
-      type: 'subscribe',
-      roomId: roomId,
-      playerId: playerId,
-      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
-      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
-      profileIdentity: profileIdentity,
-      publicKey: publicKey,
-      payload: payload,
-      signature: await window.RvBIdentity.sign(payload),
-    }
+    return window.Colyseus
   }
 
-  function _doConnect(roomId) {
-    if (_ws && (_ws.readyState === 0 || _ws.readyState === 1)) return
-    var url = buildWsUrl()
-    if (!url) return
+  function createClient(baseUrl) {
+    var Colyseus = requireSdk()
+    var base = normalizedBaseUrl(baseUrl || getServerUrl())
+    if (!base) throw new Error('Server URL is required')
+    return new Colyseus.Client(base)
+  }
 
-    var socket
+  function storedProfileIdentity() {
     try {
-      socket = new WebSocket(url)
-      _ws = socket
-      _subscribed = false
-    } catch (e) {
-      _scheduleReconnect(roomId)
-      return
+      var raw = localStorage.getItem('rvb_game_profile_identity')
+      var value = raw ? JSON.parse(raw) : null
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : null
+    } catch {
+      return null
     }
-
-    socket.onopen = async function () {
-      if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
-      try {
-        var subscribeMessage = await buildSubscribeMessage()
-        if (_ws !== socket || socket.readyState !== 1) return
-        socket.send(JSON.stringify(subscribeMessage))
-      } catch (e) {
-        console.error('[WS] subscribe failed', e)
-        _emit('error', e)
-        _shouldReconnect = false
-        if (_ws === socket) socket.close()
-      }
-    }
-
-    socket.onmessage = function (e) {
-      if (_ws !== socket) return
-      try {
-        var msg = JSON.parse(e.data)
-        if (msg && msg.type === 'battleProtocolUnsupported') {
-          _shouldReconnect = false
-          var protocolError = new Error('客户端与服务端对局协议不兼容，请双方更新到同一验收版本')
-          protocolError.code = msg.code || 'BATTLE_PROTOCOL_UNSUPPORTED'
-          protocolError.context = msg
-          _emit('error', protocolError)
-          socket.close()
-          return
-        }
-        if (msg && msg.type === 'subscribed' && !_subscribed) {
-          _subscribed = true
-          _emit('connect')
-        }
-        if (msg && msg.type === 'rpcResult' && msg.requestId && _pending[msg.requestId]) {
-          var pending = _pending[msg.requestId]
-          delete _pending[msg.requestId]
-          clearTimeout(pending.timer)
-          if (msg.ok) pending.resolve(msg.data)
-          else pending.reject(makeRpcError(msg))
-          return
-        }
-        if (msg && msg.type === 'actionError' && msg.code === 'ROOM_VERSION_CONFLICT') {
-          requestAuthoritySync('room-version-conflict')
-        }
-        var completesAuthoritySync = _authoritySyncing
-          && msg
-          && (msg.type === 'stateUpdate' || msg.type === 'battleSnapshot')
-          && msg.requestId === _authoritySyncRequestId
-        if (completesAuthoritySync) _releaseAuthoritySync()
-        _emit('message', msg)
-        if (completesAuthoritySync) _emit('authoritySyncComplete', msg)
-      } catch {}
-    }
-
-    socket.onclose = function () {
-      if (_ws !== socket) return
-      _ws = null
-      _subscribed = false
-      _releaseAuthoritySync()
-      _emit('disconnect')
-      if (_shouldReconnect) _scheduleReconnect(_roomId)
-    }
-
-    socket.onerror = function () {}
   }
 
-  function _scheduleReconnect(roomId) {
-    if (!_shouldReconnect || _reconnectTimer) return
-    _reconnectTimer = setTimeout(function () {
-      _reconnectTimer = null
-      if (_shouldReconnect) _doConnect(roomId)
-    }, 3000)
+  function pageParams() {
+    try { return new URLSearchParams(window.location.search || '') } catch { return new URLSearchParams() }
+  }
+
+  function currentIdentity() {
+    try {
+      return window.RvBIdentity && typeof window.RvBIdentity.getIdentity === 'function'
+        ? (window.RvBIdentity.getIdentity() || {})
+        : {}
+    } catch {
+      return {}
+    }
+  }
+
+  function joinOptions(playerId) {
+    var params = pageParams()
+    var identity = currentIdentity()
+    var profileIdentity = storedProfileIdentity()
+    if (!profileIdentity) throw new Error('Game profile identity is required for Colyseus admission')
+    return {
+      product: true,
+      playerId: String(playerId || identity.id || '').trim().toLowerCase(),
+      playerName: params.get('playerName') || identity.displayName || '',
+      accountId: identity.accountId || undefined,
+      alignment: params.get('alignment') || undefined,
+      profileIdentity: profileIdentity,
+    }
   }
 
   function _emit(event, data) {
     if (_handlers[event]) {
-      try { _handlers[event](data) } catch (e) { console.error('[WS]', event, e) }
+      try { _handlers[event](data) } catch (error) { console.error('[Colyseus]', event, error) }
     }
+  }
+
+  function emitRoomMessage(type, payload) {
+    var message = payload && typeof payload === 'object'
+      ? Object.assign({}, payload, { type: payload.type || type })
+      : { type: type, data: payload }
+    if (_authoritySyncing && (type === 'stateUpdate' || type === 'battleSnapshot')) {
+      message.requestId = _authoritySyncRequestId
+      _releaseAuthoritySync()
+      _emit('message', message)
+      _emit('authoritySyncComplete', message)
+      return
+    }
+    _emit('message', message)
+  }
+
+  function registerRoomHandlers(room, generation) {
+    room.onMessage('roomUpdate', function (message) {
+      if (generation === _generation) emitRoomMessage('roomUpdate', message)
+    })
+    room.onMessage('battleSnapshot', function (message) {
+      if (generation === _generation) emitRoomMessage('stateUpdate', message)
+    })
+    room.onMessage('battleTransition', function (message) {
+      if (generation === _generation) emitRoomMessage('battleTransition', message)
+    })
+    room.onMessage('battleReceipt', function (message) {
+      if (generation === _generation) {
+        emitRoomMessage(message && message.kind === 'rejected' ? 'actionError' : 'battleReceipt', message)
+      }
+    })
+    room.onMessage('battleDurable', function (message) {
+      if (generation === _generation) emitRoomMessage('battleDurable', message)
+    })
+    room.onMessage('roomRpcResult', function (message) {
+      if (generation !== _generation || !message || !message.requestId) return
+      var pending = _pending[message.requestId]
+      if (!pending) return
+      delete _pending[message.requestId]
+      clearTimeout(pending.timer)
+      if (message.ok) pending.resolve(message.data)
+      else pending.reject(makeRpcError(message))
+    })
+    room.onError(function (code, message) {
+      if (generation !== _generation) return
+      var error = new Error(message || 'Colyseus room error')
+      error.code = code
+      _emit('error', error)
+    })
+    room.onLeave(function () {
+      if (generation !== _generation) return
+      _room = null
+      _subscribed = false
+      _releaseAuthoritySync()
+      rejectPending(new Error('Colyseus room disconnected'))
+      _emit('disconnect')
+      if (_shouldReconnect) scheduleReconnect()
+    })
+  }
+
+  async function connectRoom(generation) {
+    try {
+      _client = createClient()
+      var room = await _client.joinById(_roomId, joinOptions(_playerId))
+      if (generation !== _generation || !_shouldReconnect) {
+        try { await room.leave() } catch {}
+        return
+      }
+      _room = room
+      registerRoomHandlers(room, generation)
+      _subscribed = true
+      if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
+      _emit('connect')
+      var snapshot = await request('rooms.get', { roomId: _roomId }, 5000)
+      var role = snapshot && snapshot.hostId && String(snapshot.hostId).toLowerCase() === _playerId ? 'host' : 'guest'
+      emitRoomMessage('subscribed', { role: role })
+      room.send('battleResync', {})
+    } catch (error) {
+      if (generation !== _generation) return
+      _subscribed = false
+      _emit('error', error)
+      if (_shouldReconnect) scheduleReconnect()
+    }
+  }
+
+  function connectLobby(generation) {
+    _client = createClient()
+    _subscribed = true
+    setTimeout(function () {
+      if (generation !== _generation || !_subscribed) return
+      _emit('connect')
+      pollLobby(generation)
+    }, 0)
+  }
+
+  function pollLobby(generation) {
+    if (generation !== _generation || !_subscribed || _roomId !== '__lobby') return
+    requestAt(getServerUrl(), 'rooms.list', {}, 5000).then(function (data) {
+      if (generation === _generation) emitRoomMessage('lobbyUpdate', data)
+    }).catch(function () {})
+    _lobbyPollTimer = setTimeout(function () { pollLobby(generation) }, 2000)
+  }
+
+  function connect(roomId, playerId) {
+    disconnect()
+    _roomId = String(roomId || '').trim()
+    _playerId = String(playerId || '').trim().toLowerCase() || null
+    _shouldReconnect = true
+    var generation = ++_generation
+    if (_roomId === '__lobby') connectLobby(generation)
+    else void connectRoom(generation)
+  }
+
+  function disconnect() {
+    _shouldReconnect = false
+    _generation += 1
+    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
+    if (_lobbyPollTimer) { clearTimeout(_lobbyPollTimer); _lobbyPollTimer = null }
+    var room = _room
+    _room = null
+    _client = null
+    _subscribed = false
+    _releaseAuthoritySync()
+    rejectPending(new Error('Colyseus connection closed'))
+    if (room) { try { void room.leave() } catch {} }
+  }
+
+  function scheduleReconnect() {
+    if (!_shouldReconnect || _reconnectTimer) return
+    _reconnectTimer = setTimeout(function () {
+      _reconnectTimer = null
+      if (_shouldReconnect) void connectRoom(_generation)
+    }, 1000)
+  }
+
+  function rejectPending(error) {
+    Object.keys(_pending).forEach(function (requestId) {
+      var pending = _pending[requestId]
+      delete _pending[requestId]
+      clearTimeout(pending.timer)
+      pending.reject(error)
+    })
+  }
+
+  function send(message) {
+    if (_authoritySyncing && message && (message.type === 'action' || message.type === 'gameOver')) {
+      _emit('authoritySyncBlocked', message)
+      return false
+    }
+    if (!_subscribed || !_room) return false
+    try {
+      if (message && (message.type === 'action' || message.type === 'gameOver')) {
+        _room.send('battleCommand', message)
+      } else if (message && message.type === 'requestBattleSnapshot') {
+        _room.send('battleResync', {})
+      } else if (message && message.type === 'roomState') {
+        request('rooms.get', { roomId: _roomId }, 5000).catch(function () {})
+      } else if (message && message.type === 'roomAction') {
+        request('rooms.action', Object.assign({}, message, {
+          roomId: _roomId,
+          playerId: message.playerId || _playerId,
+          profileIdentity: message.profileIdentity || storedProfileIdentity(),
+        }), 5000).then(function (data) {
+          emitRoomMessage('roomActionResult', Object.assign({ success: true }, data || {}))
+        }).catch(function (error) {
+          emitRoomMessage('roomActionResult', { success: false, error: error.message, code: error.code })
+        })
+      } else {
+        return false
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  function request(method, data, timeoutMs) {
+    if (_roomId === '__lobby') return requestAt(getServerUrl(), method, data, timeoutMs)
+    timeoutMs = timeoutMs || 5000
+    return new Promise(function (resolve, reject) {
+      if (!_subscribed || !_room) {
+        reject(new Error('Colyseus room not connected'))
+        return
+      }
+      var requestId = 'r' + (_reqSeq++) + '-' + Date.now()
+      var timer = setTimeout(function () {
+        if (!_pending[requestId]) return
+        delete _pending[requestId]
+        reject(new Error('Colyseus request timeout: ' + method))
+      }, timeoutMs)
+      _pending[requestId] = { resolve: resolve, reject: reject, timer: timer }
+      try {
+        var payload = Object.assign({}, data || {})
+        if (method === 'rooms.action') {
+          payload.playerId = payload.playerId || _playerId
+          payload.profileIdentity = payload.profileIdentity || storedProfileIdentity()
+        }
+        _room.send('roomRpc', { requestId: requestId, method: method, data: payload })
+      } catch (error) {
+        clearTimeout(timer)
+        delete _pending[requestId]
+        reject(error)
+      }
+    })
+  }
+
+  async function requestAt(baseUrl, method, data, timeoutMs) {
+    var base = normalizedBaseUrl(baseUrl)
+    var payload = data || {}
+    timeoutMs = timeoutMs || 5000
+    if (!base) throw new Error('Server URL is required')
+    if (method === 'system.health') return fetchJson(base + '/healthz', timeoutMs)
+    if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)
+    if (method === 'catalog.maps') return fetchJson(base + '/catalog/maps', timeoutMs)
+    if (method === 'catalog.pieces') return fetchJson(base + '/catalog/pieces', timeoutMs)
+    if (method === 'catalog.skills') return fetchJson(base + '/catalog/skills', timeoutMs)
+    if (method === 'catalog.card') return fetchJson(base + '/catalog/cards/' + encodeURIComponent(String(payload.cardId || '')), timeoutMs)
+
+    var client = createClient(base)
+    if (method === 'rooms.list') {
+      return fetchJson(base + '/rooms', timeoutMs)
+    }
+    if (method === 'rooms.create') {
+      var hostId = String(payload.hostId || payload.playerId || '').trim().toLowerCase()
+      var room = await withTimeout(client.create('battle', {
+        product: true,
+        name: payload.name,
+        mapId: payload.mapId,
+        visibility: payload.visibility,
+        mode: payload.mode,
+        playerId: hostId,
+        playerName: payload.hostName || payload.playerName,
+        profileIdentity: payload.profileIdentity || storedProfileIdentity(),
+      }), timeoutMs, method)
+      try {
+        return await roomRpc(room, 'rooms.get', { roomId: room.roomId }, timeoutMs)
+      } finally {
+        try { await room.leave() } catch {}
+      }
+    }
+    if (method === 'rooms.action' && (payload.action === 'join' || payload.action === 'rejoin')) {
+      var available = await fetchJson(base + '/rooms', timeoutMs)
+      var listing = (available.rooms || []).find(function (candidate) { return candidate.id === payload.roomId })
+      if (!listing) throw new Error('Room not found or no longer joinable')
+      return { success: true, room: listing }
+    }
+    if (method === 'rooms.delete') {
+      var deleteRoom = await withTimeout(client.joinById(payload.roomId, {
+        product: true,
+        playerId: payload.playerId,
+        playerName: currentIdentity().displayName,
+        profileIdentity: payload.profileIdentity || storedProfileIdentity(),
+      }), timeoutMs, method)
+      try {
+        return await roomRpc(deleteRoom, 'rooms.delete', payload, timeoutMs)
+      } finally {
+        try { await deleteRoom.leave() } catch {}
+      }
+    }
+    throw makeRpcError({ code: 'ROOM_RPC_UNSUPPORTED', error: 'Unsupported Colyseus request: ' + method })
+  }
+
+  function roomRpc(room, method, data, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var requestId = 'probe-' + (_reqSeq++) + '-' + Date.now()
+      var unsubscribe = null
+      var timer = setTimeout(function () {
+        if (unsubscribe) unsubscribe()
+        reject(new Error('Colyseus request timeout: ' + method))
+      }, timeoutMs || 5000)
+      unsubscribe = room.onMessage('roomRpcResult', function (message) {
+        if (!message || message.requestId !== requestId) return
+        clearTimeout(timer)
+        if (unsubscribe) unsubscribe()
+        if (message.ok) resolve(message.data)
+        else reject(makeRpcError(message))
+      })
+      room.send('roomRpc', { requestId: requestId, method: method, data: data || {} })
+    })
+  }
+
+  async function fetchJson(url, timeoutMs) {
+    var controller = new AbortController()
+    var timer = setTimeout(function () { controller.abort() }, timeoutMs || 5000)
+    try {
+      var response = await fetch(url, { signal: controller.signal, cache: 'no-store' })
+      var body = await response.json().catch(function () { return {} })
+      if (!response.ok) throw makeRpcError(body)
+      return body
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  function withTimeout(promise, timeoutMs, label) {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { reject(new Error('Colyseus request timeout: ' + label)) }, timeoutMs || 5000)
+      Promise.resolve(promise).then(function (value) {
+        clearTimeout(timer)
+        resolve(value)
+      }, function (error) {
+        clearTimeout(timer)
+        reject(error)
+      })
+    })
+  }
+
+  function requestAuthoritySync(reason, clientActionId) {
+    if (_authoritySyncing || !_subscribed || !_room) return false
+    _authoritySyncing = true
+    _authoritySyncRequestId = 'authority-sync-' + (_reqSeq++) + '-' + Date.now()
+    _room.send('battleResync', {})
+    _authoritySyncTimer = setTimeout(function () {
+      if (!_releaseAuthoritySync()) return
+      _emit('authoritySyncTimeout', { reason: reason || 'unknown' })
+    }, AUTHORITY_SYNC_TIMEOUT_MS)
+    _emit('authoritySyncStart', Object.assign(
+      { reason: reason || 'unknown' },
+      clientActionId ? { clientActionId: String(clientActionId) } : {}
+    ))
+    return true
+  }
+
+  function requestAuthorityReceiptSync(reason, clientActionId) {
+    if (!clientActionId) return requestAuthoritySync(reason)
+    return requestAuthoritySync(reason, clientActionId)
   }
 
   function _releaseAuthoritySync() {
@@ -194,189 +428,12 @@
     return true
   }
 
-  function requestAuthoritySync(reason) {
-    if (_authoritySyncing) return false
-    if (!_subscribed || !_ws || _ws.readyState !== 1) return false
-    _authoritySyncing = true
-    _authoritySyncRequestId = 'authority-sync-' + (_reqSeq++) + '-' + Date.now()
-    try {
-      _ws.send(JSON.stringify({
-        type: 'requestBattleSnapshot',
-        requestId: _authoritySyncRequestId,
-      }))
-    } catch (error) {
-      _releaseAuthoritySync()
-      return false
-    }
-    _authoritySyncTimer = setTimeout(function () {
-      if (!_releaseAuthoritySync()) return
-      _emit('authoritySyncTimeout', { reason: reason || 'unknown' })
-    }, AUTHORITY_SYNC_TIMEOUT_MS)
-    _emit('authoritySyncStart', { reason: reason || 'unknown' })
-    return true
-  }
-
   function makeRpcError(message) {
-    var error = new Error(message && message.error ? message.error : 'WebSocket RPC failed')
+    var error = new Error(message && (message.error || message.message) ? (message.error || message.message) : 'Colyseus request failed')
     if (message && message.code) error.code = message.code
     if (message && message.context) error.context = message.context
     if (message && message.status) error.status = message.status
     return error
-  }
-
-  function requestAuthorityReceiptSync(reason, clientActionId) {
-    if (_authoritySyncing) return false
-    if (!_subscribed || !_ws || _ws.readyState !== 1) return false
-    if (!clientActionId) return requestAuthoritySync(reason)
-    _authoritySyncing = true
-    _authoritySyncRequestId = 'authority-sync-' + (_reqSeq++) + '-' + Date.now()
-    try {
-      _ws.send(JSON.stringify({
-        type: 'requestBattleSnapshot',
-        requestId: _authoritySyncRequestId,
-        clientActionId: String(clientActionId),
-      }))
-    } catch {
-      _releaseAuthoritySync()
-      return false
-    }
-    _authoritySyncTimer = setTimeout(function () {
-      if (!_releaseAuthoritySync()) return
-      _emit('authoritySyncTimeout', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
-    }, AUTHORITY_SYNC_TIMEOUT_MS)
-    _emit('authoritySyncStart', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
-    return true
-  }
-
-  // Relay subscriptions require signed identity. A local/private URL entered
-  // through the remote connector is still a LAN authority unless relay=1 was
-  // explicitly requested for local Relay development.
-  function resolveTransportMode(mode) {
-    if (mode !== 'relay') return 'lan'
-    try {
-      var params = new URLSearchParams(window.location.search || '')
-      if (params.get('relay') === '1') return 'relay'
-    } catch {}
-    var base = getServerUrl()
-    var withoutScheme = String(base || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
-    var isLocalOrLan = /^(localhost|127\.0\.0\.1)(:\d+)?\b/.test(withoutScheme) ||
-      /^(10\.|26\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(withoutScheme)
-    return isLocalOrLan ? 'lan' : 'relay'
-  }
-
-  function connect(roomId, playerId, mode) {
-    _roomId = roomId
-    _playerId = playerId || null
-    _mode = resolveTransportMode(mode || 'lan')
-    _shouldReconnect = true
-    _doConnect(roomId)
-  }
-
-  function disconnect() {
-    _shouldReconnect = false
-    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
-    var socket = _ws
-    _ws = null
-    _subscribed = false
-    _releaseAuthoritySync()
-    if (socket) { try { socket.close() } catch {} }
-  }
-
-  function send(msg) {
-    if (_authoritySyncing && msg && (msg.type === 'action' || msg.type === 'gameOver')) {
-      _emit('authoritySyncBlocked', msg)
-      return false
-    }
-    if (_subscribed && _ws && _ws.readyState === 1) {
-      try {
-        _ws.send(JSON.stringify(msg))
-        return true
-      } catch {}
-    }
-    return false
-  }
-
-  function request(method, data, timeoutMs) {
-    timeoutMs = timeoutMs || 5000
-    return new Promise(function (resolve, reject) {
-      if (!_subscribed || !_ws || _ws.readyState !== 1) {
-        reject(new Error('WebSocket not connected'))
-        return
-      }
-      var requestId = 'r' + (_reqSeq++) + '-' + Date.now()
-      var timer = setTimeout(function () {
-        if (_pending[requestId]) {
-          delete _pending[requestId]
-          reject(new Error('WebSocket request timeout: ' + method))
-        }
-      }, timeoutMs)
-      _pending[requestId] = { resolve: resolve, reject: reject, timer: timer }
-      try {
-        _ws.send(JSON.stringify({ type: 'rpc', requestId: requestId, method: method, data: data || {} }))
-      } catch (e) {
-        clearTimeout(timer)
-        delete _pending[requestId]
-        reject(e)
-      }
-    })
-  }
-
-  function requestAt(baseUrl, method, data, timeoutMs) {
-    timeoutMs = timeoutMs || 5000
-    return new Promise(function (resolve, reject) {
-      var base = String(baseUrl || '').trim().replace(/\/+$/, '')
-      if (base && !/^[a-z]+:\/\//i.test(base)) base = 'http://' + base
-      var url = base.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:') + '/ws/rooms/__lobby'
-      var requestId = 'probe-' + (_reqSeq++) + '-' + Date.now()
-      var socket = null
-      var settled = false
-      var timer = setTimeout(function () {
-        finish(new Error('WebSocket request timeout: ' + method))
-      }, timeoutMs)
-
-      function finish(error, value) {
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        if (socket) {
-          try { socket.close() } catch {}
-        }
-        if (error) reject(error)
-        else resolve(value)
-      }
-
-      if (!base) {
-        finish(new Error('Server URL is required'))
-        return
-      }
-      try {
-        socket = new WebSocket(url)
-      } catch (error) {
-        finish(error)
-        return
-      }
-      socket.onopen = function () {
-        try {
-          socket.send(JSON.stringify({ type: 'rpc', requestId: requestId, method: method, data: data || {} }))
-        } catch (error) {
-          finish(error)
-        }
-      }
-      socket.onmessage = function (event) {
-        try {
-          var message = JSON.parse(event.data)
-          if (!message || message.type !== 'rpcResult' || message.requestId !== requestId) return
-          if (message.ok) finish(null, message.data)
-          else finish(makeRpcError(message))
-        } catch (error) {
-          finish(error)
-        }
-      }
-      socket.onerror = function () { finish(new Error('WebSocket connection failed')) }
-      socket.onclose = function () {
-        if (!settled) finish(new Error('WebSocket closed before response'))
-      }
-    })
   }
 
   function catalogIdentityErrorMessage(error) {
@@ -384,80 +441,37 @@
   }
 
   function isTransientCatalogIdentityError(error) {
-    var message = catalogIdentityErrorMessage(error)
-    return message === 'WebSocket request timeout: catalog.identity' ||
-      message === 'WebSocket connection failed' ||
-      message === 'WebSocket closed before response'
+    return /(?:timeout|network|fetch|connect|closed)/i.test(catalogIdentityErrorMessage(error))
   }
 
   function serverOriginForDiagnostics(baseUrl) {
-    try {
-      var normalized = String(baseUrl || '').trim()
-      if (normalized && !/^[a-z]+:\/\//i.test(normalized)) normalized = 'http://' + normalized
-      return new URL(normalized).origin
-    } catch {
-      return '[invalid server URL]'
-    }
+    try { return new URL(normalizedBaseUrl(baseUrl)).origin } catch { return '[invalid server URL]' }
   }
 
   async function requestCatalogIdentityAt(baseUrl, scope) {
     var maxAttempts = 2
-    var timeoutMs = 5000
-    var retryDelayMs = 250
     var label = String(scope || 'server')
     var origin = serverOriginForDiagnostics(baseUrl)
-
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await requestAt(baseUrl, 'catalog.identity', {}, timeoutMs)
+        return await requestAt(baseUrl, 'catalog.identity', {}, 5000)
       } catch (error) {
         var transient = isTransientCatalogIdentityError(error)
-        var reason = catalogIdentityErrorMessage(error)
         if (transient && attempt < maxAttempts) {
-          console.warn('[profile] retrying catalog.identity', {
-            scope: label,
-            origin: origin,
-            attempt: attempt,
-            maxAttempts: maxAttempts,
-            reason: reason,
-          })
-          await new Promise(function (resolve) { setTimeout(resolve, retryDelayMs) })
+          await new Promise(function (resolve) { setTimeout(resolve, 250) })
           continue
         }
-
-        var wrapped = new Error(
-          'Profile Identity request failed [' + label + '] ' + origin +
-          ' (attempt ' + attempt + '/' + maxAttempts + '): ' + reason,
-        )
-        wrapped.code = error && error.code
-          ? error.code
-          : (transient ? 'PROFILE_IDENTITY_TRANSPORT_FAILED' : 'PROFILE_IDENTITY_REQUEST_FAILED')
-        wrapped.context = {
-          scope: label,
-          origin: origin,
-          attempt: attempt,
-          maxAttempts: maxAttempts,
-          reason: reason,
-        }
+        var wrapped = new Error('Profile Identity request failed [' + label + '] ' + origin + ' (attempt ' + attempt + '/' + maxAttempts + '): ' + catalogIdentityErrorMessage(error))
+        wrapped.code = error && error.code ? error.code : (transient ? 'PROFILE_IDENTITY_TRANSPORT_FAILED' : 'PROFILE_IDENTITY_REQUEST_FAILED')
+        wrapped.context = { scope: label, origin: origin, attempt: attempt, maxAttempts: maxAttempts, reason: catalogIdentityErrorMessage(error) }
         throw wrapped
       }
     }
-    throw new Error('Profile Identity request failed without an attempt')
   }
 
-  // Event handlers are registered once per page.
-
-  function on(event, handler) {
-    _handlers[event] = handler
-  }
-
-  function isConnected() {
-    return _subscribed && _ws !== null && _ws.readyState === 1
-  }
-
-  function isAuthoritySyncing() {
-    return _authoritySyncing
-  }
+  function on(event, handler) { _handlers[event] = handler }
+  function isConnected() { return _subscribed }
+  function isAuthoritySyncing() { return _authoritySyncing }
 
   window.RvBWs = {
     connect: connect,

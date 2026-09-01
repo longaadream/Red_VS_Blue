@@ -11,6 +11,7 @@
   <script src="js/identity.js"></script>
   <script src="js/game-engine-runtime.js"></script>
   <script src="js/game-engine.js"></script>
+  <script src="js/colyseus-sdk.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
@@ -1747,7 +1748,9 @@
   <script>
     // ── URL params ──
     const params = new URLSearchParams(location.search)
-    const roomId = (params.get('roomId') || '').trim().toLowerCase()
+    // Colyseus room IDs are opaque and case-sensitive. Only player identity is
+    // normalized; changing the room ID makes joinById target another room.
+    const roomId = (params.get('roomId') || '').trim()
     let myPlayerId = (params.get('playerId') || '').trim().toLowerCase()
     const myAccountId = (params.get('accountId') || params.get('account') || '').trim().toLowerCase()
     const myPlayerName = params.get('playerName') || '玩家'
@@ -6165,6 +6168,22 @@
 
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
       closePieceContextMenu()
+      const localTargetProbe = window.BattleLegalActions && typeof GameEngine !== 'undefined'
+        ? BattleLegalActions.probeSkillTarget({
+            snapshot: G,
+            playerId: myPlayerId,
+            pieceId: selectedPieceId,
+            skillId: skId,
+            skillsById: skillsById,
+            engine: GameEngine,
+          })
+        : null
+      // This is presentation-only prediction: the final targeted command is
+      // still validated by the Colyseus authority. The structured rejection
+      // fallback handles any client/server content drift.
+      if (localTargetProbe && localTargetProbe.needsTarget && localTargetProbe.preparation) {
+        if (enterActionTargetMode(draftAction, localTargetProbe.preparation)) return
+      }
       await doAction(draftAction)
     }
 
