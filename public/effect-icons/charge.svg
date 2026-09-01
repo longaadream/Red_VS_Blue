@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="充能">
+  <circle cx="32" cy="32" r="29" fill="#2b1c06" stroke="#f59e0b" stroke-width="4"/>
+  <path d="M36 8 16 36h14l-3 20 21-31H35Z" fill="#fff7cc" stroke="#f59e0b" stroke-width="3" stroke-linejoin="round"/>
+</svg>

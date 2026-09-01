@@ -14,6 +14,7 @@
   <script src="js/colyseus-sdk.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/three.min.js"></script>
+  <script src="js/battle-ui/battle-effect-icons.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
   <script src="js/battle-ui/battle-status-presentation.js"></script>
   <script src="js/battle-ui/battle-context-layout.js"></script>
@@ -2466,6 +2467,7 @@
     let battlePresentation = null
     let battleDomUi = null
     let currentBattleViewModel = null
+    let latestBattlePresentationEvents = []
     function red43QaSnapshot() {
       if (!RED43_QA_MODE) return null
       const pieces = G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
@@ -4202,6 +4204,7 @@
         return
       }
       const actions = msg && Array.isArray(msg.actions) ? msg.actions : []
+      latestBattlePresentationEvents = msg && Array.isArray(msg.presentationEvents) ? msg.presentationEvents : []
       latestAuthorityStateHash = (msg && msg.stateHash) || latestAuthorityStateHash
       latestAuthorityVersion = msg && Number.isSafeInteger(msg.authorityVersion)
         ? msg.authorityVersion
@@ -4305,6 +4308,7 @@
           envelope,
           { authorityVersion: latestAuthorityVersion }
         )
+        latestBattlePresentationEvents = Array.isArray(msg.presentationEvents) ? msg.presentationEvents : []
         var trackedFeedback = msg.receipt
           && pendingActionFeedback
           && pendingActionFeedback.clientActionId === String(msg.receipt.clientActionId)
@@ -4434,6 +4438,7 @@
             addLog('[authority] Ignored an older or unversioned state update', 'info')
             return
           }
+          latestBattlePresentationEvents = Array.isArray(msg.presentationEvents) ? msg.presentationEvents : []
 
           if (_use3d && battlePresentation && G && msg.state) {
             battlePresentation.animateAction(
@@ -4976,6 +4981,7 @@
         : new Set()
       return BattleViewModel.create({
         snapshot: snapshot,
+        presentationEvents: isCurrentSnapshot ? latestBattlePresentationEvents : [],
         viewerId: myPlayerId,
         selectedPieceId: selectedPieceId,
         skillsById: skillsById,

@@ -38,6 +38,7 @@ function fixtureSnapshot(statusTags: Array<Record<string, unknown>>) {
 describe('battle piece health and negative-status summary', () => {
   it('shows the authoritative deployment first-move tag through the generic status UI', () => {
     const window: Record<string, unknown> = {}
+    loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
     const statusPresentation = loadBrowserModule(
       'js/battle-ui/battle-status-presentation.js',
       'BattleStatusPresentation',
@@ -60,20 +61,26 @@ describe('battle piece health and negative-status summary', () => {
       selectedPieceId: 'piece-red',
     })
 
-    expect(model.selection.piece.statusSummary).toEqual([{
+    expect(model.selection.piece.statusSummary).toHaveLength(1)
+    expect(model.selection.piece.statusSummary[0]).toMatchObject({
       id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
       label: '本回合首次移动免费',
+      iconId: 'free-move',
+      iconPath: '/effect-icons/free-move.svg',
+      visibility: 'detail',
       description: '',
       stacks: 0,
       duration: 1,
       uses: 1,
       intensity: 0,
-    }])
+    })
     expect(statusPresentation.detailText(firstMoveTag)).toBe('剩余：1回合 · 剩余：1次')
   })
 
   it('keeps every authoritative status in detail while selecting at most two negative summaries', () => {
     const window: Record<string, unknown> = {}
+    loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
     const statusPresentation = loadBrowserModule(
       'js/battle-ui/battle-status-presentation.js',
       'BattleStatusPresentation',
@@ -81,7 +88,7 @@ describe('battle piece health and negative-status summary', () => {
     )
     const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel', window)
     const rawStatuses = [
-      { id: 'bleeding-1', type: 'bleeding', name: 'Bleeding', remainingDuration: 2, stacks: 3, visible: true },
+      { id: 'amaterasu-1', type: 'amaterasu-burn', name: 'Amaterasu', remainingDuration: 2, stacks: 3, visible: true },
       { id: 'calm-shield-1', type: 'calm-shield', name: 'Calm Shield', currentDuration: 2, stacks: 1, visible: true },
       { id: 'anti-heal-1', type: 'anti-heal', name: 'Anti-heal', duration: 3, stacks: 1, visible: true },
       { id: 'sleep-1', type: 'sleep', name: 'Sleep', currentDuration: 2, stacks: 1, visible: true },
@@ -99,8 +106,8 @@ describe('battle piece health and negative-status summary', () => {
 
     expect(details).toHaveLength(5)
     expect(details[0]).toMatchObject({
-      id: 'bleeding-1',
-      label: 'Bleeding',
+      id: 'amaterasu-1',
+      label: 'Amaterasu',
       stacks: 3,
       duration: 2,
       description: '',
@@ -114,9 +121,12 @@ describe('battle piece health and negative-status summary', () => {
   })
 
   it('renders 0/1/2/3+ negative states without empty markers or horizontal overflow', () => {
+    const window: Record<string, unknown> = {}
+    loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
     const statusPresentation = loadBrowserModule(
       'js/battle-ui/battle-status-presentation.js',
       'BattleStatusPresentation',
+      window,
     )
     const negatives = [
       { id: 'sleep', label: 'Sleep', stacks: 1, duration: 2 },

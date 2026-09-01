@@ -11,6 +11,10 @@ import {
   BATTLE_AUTHORITY_PROTOCOL_VERSION,
   createBattlePublicPatch,
 } from './battle-public-patch'
+import {
+  projectBattlePresentationEvents,
+  type BattlePresentationEvent,
+} from './battle-presentation-events'
 import { hashBattleState, runBattleAction, type BattleActionResult } from './battle-runner'
 import {
   systemDeploymentRuleClock,
@@ -124,6 +128,8 @@ export interface PublicBattleSnapshot {
   persistenceStatus?: 'durable' | 'pending' | 'degraded'
   turnTimer?: TurnTimerProjection
   pendingTimer?: PendingTimerProjection
+  /** Ephemeral player-facing events; never part of state patches or public hashes. */
+  presentationEvents?: BattlePresentationEvent[]
 }
 
 export interface DispatchRoomBattleActionResult {
@@ -142,6 +148,7 @@ export interface DispatchRoomBattleActionResult {
   previousAuthorityState?: BattleState
   nextAuthorityState?: BattleState
   timings?: BattleAuthorityTimings
+  presentationEvents?: BattlePresentationEvent[]
 }
 
 export interface BattleAuthorityTimings {
@@ -171,6 +178,7 @@ export interface PublicBattleTransitionUpdate {
   turnTimer?: TurnTimerProjection
   pendingTimer?: PendingTimerProjection
   timings?: BattleAuthorityTimings
+  presentationEvents: BattlePresentationEvent[]
 }
 
 export interface PreResumeDeliveryContext {
@@ -410,6 +418,7 @@ export function createPublicBattleTransitionUpdate(
       ? undefined
       : projectPendingTimer(result.nextAuthorityState.turnTimer, serverNow),
     timings: result.timings,
+    presentationEvents: result.presentationEvents ?? [],
   }
 }
 
@@ -703,6 +712,14 @@ export async function dispatchRoomBattleAction(
       }
 
       let actionResult = submittedActionResult
+      const presentationEvents = submittedActionResult.trace
+        ? projectBattlePresentationEvents({
+            actionId: submittedActionResult.trace.actionId,
+            command: actionToApply,
+            beforeState: state,
+            afterState: submittedActionResult.state,
+          })
+        : []
       let syncAction: BattleAction | undefined
       if (timerEnabled && shouldSyncTurnTimer(state, submittedActionResult.state, actionToApply)) {
         const resumedAt = getRoomAuthorityNow(normalizedRoomId, clock)
@@ -999,6 +1016,7 @@ export async function dispatchRoomBattleAction(
           persistenceMs: roundTiming(persistenceMs),
           totalMs: roundTiming(monotonicNow() - performanceStartedAt),
         },
+        presentationEvents,
       }
       } finally {
         if (!retainRuntimeTransaction) {

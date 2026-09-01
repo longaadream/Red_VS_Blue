@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="死亡">
+  <circle cx="32" cy="32" r="29" fill="#2b0b16" stroke="#fb7185" stroke-width="4"/>
+  <path d="M15 29c0-10 7-18 17-18s17 8 17 18c0 7-4 12-9 15v8H24v-8c-5-3-9-8-9-15Z" fill="#881337" stroke="#ffe4e6" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="25" cy="30" r="4" fill="#ffe4e6"/><circle cx="39" cy="30" r="4" fill="#ffe4e6"/>
+  <path d="m27 42 5-5 5 5M23 52h18" stroke="#fb7185" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="圣盾">
+  <circle cx="32" cy="32" r="29" fill="#241f08" stroke="#fde68a" stroke-width="4"/>
+  <path d="M32 9 50 17v14c0 12-7 20-18 25-11-5-18-13-18-25V17Z" fill="#92400e" stroke="#fff7cc" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M28 19h8v9h9v8h-9v10h-8V36h-9v-8h9Z" fill="#fef3c7"/>
+</svg>

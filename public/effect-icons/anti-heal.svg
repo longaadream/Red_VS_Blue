@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="禁疗">
+  <circle cx="32" cy="32" r="29" fill="#2b0b16" stroke="#fb7185" stroke-width="4"/>
+  <path d="M27 14h10v12h12v10H37v12H27V36H15V26h12Z" fill="#ffe4e6"/>
+  <path d="m15 15 34 34" stroke="#fb7185" stroke-width="7" stroke-linecap="round"/>
+</svg>

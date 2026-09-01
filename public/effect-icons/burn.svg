@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="持续灼烧">
+  <circle cx="32" cy="32" r="29" fill="#2b1507" stroke="#fb923c" stroke-width="4"/>
+  <path d="M35 9c2 11-7 15-3 24 2-6 7-9 11-14 1 10 8 14 8 24 0 11-8 17-19 17S13 53 13 43c0-9 7-17 15-25 0 7 2 11 7 15-2-8 2-14 0-24Z" fill="#fb923c"/>
+  <path d="M32 36c5 6 3 13 0 17-5-1-8-4-8-9 0-4 3-8 8-13Z" fill="#fff7ed"/>
+</svg>
