@@ -6,87 +6,71 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { getServerGameProfileIdentityV1 } from '../../lib/content-pipeline/runtime/profile-game-identity'
 
-type BrowserHandler = ((event?: any) => void) | null
-
 const TEST_PLAYER_ID = 'player-red'
-const TEST_PUBLIC_KEY = 'test-public-key-player-red'
-const TEST_SUBSCRIBE_TIMESTAMP = 1_750_000_000_000
 
-function deterministicSignature(payload: unknown): string {
-  return `test-signature:${JSON.stringify(payload)}`
+class FakeRoom {
+  static instances: FakeRoom[] = []
+  readonly roomId = 'room-a'
+  readonly sent: Array<{ type: string; payload: Record<string, unknown> }> = []
+  readonly joinOptions: Record<string, unknown>
+  private readonly messageHandlers = new Map<string, Array<(message: unknown) => void>>()
+  private errorHandler: ((code: number, message: string) => void) | null = null
+  private leaveHandler: (() => void) | null = null
+
+  constructor(joinOptions: Record<string, unknown>) {
+    this.joinOptions = joinOptions
+    FakeRoom.instances.push(this)
+  }
+
+  onMessage(type: string, handler: (message: unknown) => void) {
+    const handlers = this.messageHandlers.get(type) ?? []
+    handlers.push(handler)
+    this.messageHandlers.set(type, handlers)
+    return () => this.messageHandlers.set(type, handlers.filter(candidate => candidate !== handler))
+  }
+
+  onError(handler: (code: number, message: string) => void) { this.errorHandler = handler }
+  onLeave(handler: () => void) { this.leaveHandler = handler }
+
+  send(type: string, payload: Record<string, unknown>) {
+    this.sent.push({ type, payload })
+    if (type === 'roomRpc') {
+      queueMicrotask(() => this.emit('roomRpcResult', {
+        requestId: payload.requestId,
+        ok: true,
+        data: { hostId: 'player-blue' },
+      }))
+    }
+  }
+
+  emit(type: string, message: unknown) {
+    for (const handler of this.messageHandlers.get(type) ?? []) handler(message)
+  }
+
+  fail(code: number, message: string) { this.errorHandler?.(code, message) }
+  leaveFromServer() { this.leaveHandler?.() }
+  async leave() {}
 }
 
-function normalizeSource(source: string): string {
-  return source.replace(/\r\n/g, '\n')
-}
+class FakeColyseusClient {
+  static endpoints: string[] = []
 
-function readSection(source: string, startMarker: string, endMarker: string): string {
-  const start = source.indexOf(startMarker)
-  const end = source.indexOf(endMarker, start + startMarker.length)
-  if (start < 0 || end < 0) {
-    throw new Error(`Missing client contract section: ${startMarker} -> ${endMarker}`)
-  }
-  return source.slice(start, end)
-}
+  constructor(endpoint: string) { FakeColyseusClient.endpoints.push(endpoint) }
 
-function readConstant(source: string, name: string): string {
-  const match = source.match(new RegExp(`var ${name} = ([^\\n]+)`))
-  if (!match) throw new Error(`Missing client contract constant: ${name}`)
-  return match[1].trim()
-}
-
-class FakeWebSocket {
-  static instances: FakeWebSocket[] = []
-  readyState = 0
-  sent: string[] = []
-  onopen: BrowserHandler = null
-  onmessage: BrowserHandler = null
-  onclose: BrowserHandler = null
-  onerror: BrowserHandler = null
-
-  constructor(readonly url: string) {
-    FakeWebSocket.instances.push(this)
-  }
-
-  send(payload: string) {
-    this.sent.push(payload)
-  }
-
-  open() {
-    this.readyState = 1
-    this.onopen?.({})
-  }
-
-  receive(message: Record<string, unknown>) {
-    this.onmessage?.({ data: JSON.stringify(message) })
-  }
-
-  beginClosing() {
-    this.readyState = 2
-  }
-
-  closeFromPeer() {
-    this.readyState = 3
-    this.onclose?.({})
-  }
-
-  close() {
-    this.closeFromPeer()
+  async joinById(_roomId: string, options: Record<string, unknown>) {
+    return new FakeRoom(options)
   }
 }
 
 function loadClient() {
-  FakeWebSocket.instances = []
+  FakeRoom.instances = []
+  FakeColyseusClient.endpoints = []
   const profileIdentity = getServerGameProfileIdentityV1()
-  const browserWindow: Record<string, any> = {
+  const browserWindow: Record<string, unknown> = {
     location: { search: '' },
+    Colyseus: { Client: FakeColyseusClient },
     RvBIdentity: {
       getIdentity: () => ({ id: TEST_PLAYER_ID, displayName: 'Test Red' }),
-      getPublicKey: () => TEST_PUBLIC_KEY,
-      sign: async (payload: unknown) => {
-        await Promise.resolve()
-        return deterministicSignature(payload)
-      },
     },
     RvBUtils: {
       getConnectionConfig: () => ({ url: 'http://127.0.0.1:38521' }),
@@ -100,8 +84,10 @@ function loadClient() {
         : null,
     },
     URLSearchParams,
-    WebSocket: FakeWebSocket,
-    Date: { now: () => TEST_SUBSCRIBE_TIMESTAMP },
+    URL,
+    AbortController,
+    fetch,
+    queueMicrotask,
     setTimeout,
     clearTimeout,
     console,
@@ -110,105 +96,41 @@ function loadClient() {
     readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8'),
     { filename: 'ws-client.js' },
   ).runInContext(context)
-  return browserWindow.RvBWs as {
-    connect(roomId: string, playerId: string, mode: string): void
+  return (browserWindow as { RvBWs: {
+    connect(roomId: string, playerId: string, mode?: string): void
     disconnect(): void
     isConnected(): boolean
     isAuthoritySyncing(): boolean
     requestAuthorityReceiptSync(reason: string, clientActionId: string): boolean
     send(message: Record<string, unknown>): boolean
-    on(event: string, handler: (data?: any) => void): void
-  }
+    on(event: string, handler: (data?: unknown) => void): void
+  } }).RvBWs
 }
 
-async function openWithSignedSubscribe(socket: FakeWebSocket) {
-  socket.open()
-  expect(socket.sent).toEqual([])
-  for (let turn = 0; turn < 6 && socket.sent.length === 0; turn += 1) {
-    await Promise.resolve()
-  }
-
-  expect(socket.sent).toHaveLength(1)
-  const message = JSON.parse(socket.sent[0])
-  const payload = {
-    type: 'battle-subscribe',
-    roomId: 'room-a',
-    playerId: TEST_PLAYER_ID,
-    protocolVersion: 3,
-    authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
-    timestamp: TEST_SUBSCRIBE_TIMESTAMP,
-  }
-  expect(message).toEqual({
-    type: 'subscribe',
-    roomId: 'room-a',
-    playerId: TEST_PLAYER_ID,
-    protocolVersion: 3,
-    authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
-    profileIdentity: getServerGameProfileIdentityV1(),
-    publicKey: TEST_PUBLIC_KEY,
-    payload,
-    signature: deterministicSignature(payload),
-  })
-  return message
+async function finishConnect() {
+  for (let turn = 0; turn < 8; turn += 1) await Promise.resolve()
 }
 
 afterEach(() => {
   vi.useRealTimers()
-  FakeWebSocket.instances = []
+  FakeRoom.instances = []
+  FakeColyseusClient.endpoints = []
 })
 
-describe('battle WebSocket reconnect state machine', () => {
-  it('shares protocol and reconnect contracts while keeping desktop signed and Android LAN legacy', () => {
-    const desktopClient = normalizeSource(
-      readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8'),
-    )
-    const androidClient = normalizeSource(
-      readFileSync(resolve(process.cwd(), 'android-client/www/js/ws-client.js'), 'utf8'),
-    )
-    const androidAuthority = normalizeSource(
-      readFileSync(resolve(process.cwd(), 'mobile-server/mobile-server-entry.ts'), 'utf8'),
-    )
+describe('Colyseus reconnect and authority resync state machine', () => {
+  it('uses the Colyseus SDK for desktop while keeping Android on its explicit legacy protocol', () => {
+    const desktop = readFileSync(resolve('data/pages/js/ws-client.js'), 'utf8')
+    const android = readFileSync(resolve('android-client/www/js/ws-client.js'), 'utf8')
 
-    for (const name of ['BATTLE_AUTHORITY_PROTOCOL_VERSION', 'BATTLE_AUTHORITY_BUILD_ID']) {
-      expect(readConstant(androidClient, name)).toBe(readConstant(desktopClient, name))
-    }
-    expect(readConstant(desktopClient, 'BATTLE_AUTHORITY_PROTOCOL_VERSION')).toBe('3')
-    expect(readConstant(desktopClient, 'BATTLE_AUTHORITY_BUILD_ID'))
-      .toBe("'rvb-authority-v3-chunked-sha256-1'")
-
-    for (const [start, end] of [
-      ['function _scheduleReconnect(roomId)', 'function _emit(event, data)'],
-      ['function requestAuthoritySync(reason)', 'function makeRpcError(message)'],
-      ['function connect(roomId, playerId, mode)', 'function disconnect()'],
-    ]) {
-      expect(readSection(androidClient, start, end))
-        .toBe(readSection(desktopClient, start, end))
-    }
-
-    const desktopSubscribe = readSection(
-      desktopClient,
-      'async function buildSubscribeMessage()',
-      'function _doConnect(roomId)',
-    )
-    expect(desktopSubscribe).toContain("if (roomId === '__lobby') return message")
-    expect(desktopSubscribe).toContain('signature: await window.RvBIdentity.sign(payload)')
-    expect(desktopSubscribe).not.toContain("if (_mode !== 'relay') return message")
-
-    const androidSubscribe = readSection(
-      androidClient,
-      'async function buildSubscribeMessage()',
-      'function _doConnect(roomId)',
-    )
-    expect(androidSubscribe).toContain("if (_mode !== 'relay') return message")
-    expect(androidSubscribe).toContain('Signed identity is required for Relay WebSocket subscriptions')
-    expect(androidClient).toContain("msg.type === 'battleProtocolUnsupported'")
-    expect(androidClient).toContain("'BATTLE_PROTOCOL_UNSUPPORTED'")
-    expect(androidAuthority.match(/deploymentMode:\s*'legacy-reroll-v1'/g)).toHaveLength(2)
-    expect(androidAuthority).not.toContain("deploymentMode: 'progressive-reserve-v1'")
-    expect(androidClient).not.toContain('progressive-reserve-v1')
+    expect(desktop).toContain('new Colyseus.Client(base)')
+    expect(desktop).toContain('_client.joinById(_roomId, joinOptions(_playerId))')
+    expect(desktop).not.toContain('new WebSocket(')
+    expect(desktop).not.toContain('BATTLE_AUTHORITY_PROTOCOL_VERSION')
+    expect(android).toContain('BATTLE_AUTHORITY_PROTOCOL_VERSION')
+    expect(android).not.toContain('progressive-reserve-v1')
   })
 
-  it('becomes connected only after subscription and resubscribes after a disconnect', async () => {
+  it('becomes connected after joining and rejoins after a server leave', async () => {
     vi.useFakeTimers()
     const client = loadClient()
     let connects = 0
@@ -216,183 +138,117 @@ describe('battle WebSocket reconnect state machine', () => {
     client.on('connect', () => { connects += 1 })
     client.on('disconnect', () => { disconnects += 1 })
 
-    client.connect('room-a', 'player-red', 'lan')
-    const first = FakeWebSocket.instances[0]
-    await openWithSignedSubscribe(first)
-
+    client.connect('room-a', TEST_PLAYER_ID, 'lan')
     expect(client.isConnected()).toBe(false)
-    expect(connects).toBe(0)
+    await finishConnect()
+    const first = FakeRoom.instances[0]
 
-    first.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
     expect(client.isConnected()).toBe(true)
     expect(connects).toBe(1)
+    expect(FakeColyseusClient.endpoints).toEqual(['http://127.0.0.1:38521'])
+    expect(first.joinOptions).toMatchObject({ product: true, playerId: TEST_PLAYER_ID })
 
-    first.closeFromPeer()
+    first.leaveFromServer()
     expect(client.isConnected()).toBe(false)
     expect(disconnects).toBe(1)
-    await vi.advanceTimersByTimeAsync(3_000)
+    await vi.advanceTimersByTimeAsync(1_000)
+    await finishConnect()
 
-    const second = FakeWebSocket.instances[1]
-    await openWithSignedSubscribe(second)
-    second.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
+    expect(FakeRoom.instances).toHaveLength(2)
     expect(client.isConnected()).toBe(true)
     expect(connects).toBe(2)
-    expect(JSON.parse(second.sent[0])).toMatchObject({ type: 'subscribe', roomId: 'room-a' })
   })
 
-  it('ignores a stale socket close after a replacement connection is subscribed', async () => {
-    vi.useFakeTimers()
+  it('ignores a stale Room leave after a replacement join', async () => {
     const client = loadClient()
     let disconnects = 0
     client.on('disconnect', () => { disconnects += 1 })
 
-    client.connect('room-a', 'player-red', 'lan')
-    const stale = FakeWebSocket.instances[0]
-    await openWithSignedSubscribe(stale)
-    stale.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
-    stale.beginClosing()
+    client.connect('room-a', TEST_PLAYER_ID)
+    await finishConnect()
+    const stale = FakeRoom.instances[0]
+    client.connect('room-a', TEST_PLAYER_ID)
+    await finishConnect()
 
-    client.connect('room-a', 'player-red', 'lan')
-    const replacement = FakeWebSocket.instances[1]
-    await openWithSignedSubscribe(replacement)
-    replacement.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
-    expect(client.isConnected()).toBe(true)
-
-    stale.closeFromPeer()
+    stale.leaveFromServer()
     expect(client.isConnected()).toBe(true)
     expect(disconnects).toBe(0)
-    await vi.advanceTimersByTimeAsync(3_000)
-    expect(FakeWebSocket.instances).toHaveLength(2)
+    expect(FakeRoom.instances).toHaveLength(2)
   })
 
-  it('stops reconnecting when the server rejects the authority protocol build', async () => {
-    vi.useFakeTimers()
+  it('surfaces Colyseus Room errors without silently applying an action', async () => {
     const client = loadClient()
-    const errors: Array<{ code?: string }> = []
-    client.on('error', error => { errors.push(error) })
+    const errors: Array<{ code?: number; message?: string }> = []
+    client.on('error', error => errors.push(error as { code?: number; message?: string }))
 
-    client.connect('room-a', 'player-red', 'lan')
-    const socket = FakeWebSocket.instances[0]
-    await openWithSignedSubscribe(socket)
-    socket.receive({
-      type: 'battleProtocolUnsupported',
-      code: 'BATTLE_PROTOCOL_UNSUPPORTED',
-      expectedProtocolVersion: 3,
-      expectedAuthorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
-    })
+    client.connect('room-a', TEST_PLAYER_ID)
+    await finishConnect()
+    const room = FakeRoom.instances[0]
+    room.fail(4400, 'profile mismatch')
 
     expect(errors).toHaveLength(1)
-    expect(errors[0].code).toBe('BATTLE_PROTOCOL_UNSUPPORTED')
-    expect(client.isConnected()).toBe(false)
-    await vi.advanceTimersByTimeAsync(6_000)
-    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(errors[0]).toMatchObject({ code: 4400, message: 'profile mismatch' })
+    expect(room.sent.filter(message => message.type === 'battleCommand')).toHaveLength(0)
   })
 
-  it('requests one authoritative snapshot on a room version conflict and gates actions until it arrives', async () => {
-    vi.useFakeTimers()
+  it('requests one authoritative snapshot and gates actions until it arrives', async () => {
     const client = loadClient()
-    let syncStarts = 0
-    let syncCompletes = 0
-    client.on('authoritySyncStart', () => { syncStarts += 1 })
-    client.on('authoritySyncComplete', () => { syncCompletes += 1 })
+    let starts = 0
+    let completes = 0
+    client.on('authoritySyncStart', () => { starts += 1 })
+    client.on('authoritySyncComplete', () => { completes += 1 })
 
-    client.connect('room-a', 'player-red', 'lan')
-    const socket = FakeWebSocket.instances[0]
-    await openWithSignedSubscribe(socket)
-    socket.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
+    client.connect('room-a', TEST_PLAYER_ID)
+    await finishConnect()
+    const room = FakeRoom.instances[0]
+    room.sent.length = 0
 
-    socket.receive({
-      type: 'actionError',
-      code: 'ROOM_VERSION_CONFLICT',
-      error: 'room changed concurrently',
-    })
-    socket.receive({
-      type: 'actionError',
-      code: 'ROOM_VERSION_CONFLICT',
-      error: 'same conflict delivered twice',
-    })
-
+    expect(client.requestAuthorityReceiptSync('version-gap', 'action-1')).toBe(true)
+    expect(client.requestAuthorityReceiptSync('duplicate', 'action-2')).toBe(false)
     expect(client.isAuthoritySyncing()).toBe(true)
-    expect(syncStarts).toBe(1)
-    const snapshotRequests = socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'requestBattleSnapshot')
-    expect(snapshotRequests).toHaveLength(1)
-    expect(snapshotRequests[0].requestId).toMatch(/^authority-sync-/)
+    expect(starts).toBe(1)
+    expect(room.sent.filter(message => message.type === 'battleResync')).toHaveLength(1)
     expect(client.send({ type: 'action', command: { type: 'move' } })).toBe(false)
-    expect(socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'action')).toHaveLength(0)
 
-    socket.receive({ type: 'stateUpdate', authorityVersion: 3, state: { turn: { turnNumber: 1 } } })
-    expect(client.isAuthoritySyncing()).toBe(true)
-    expect(syncCompletes).toBe(0)
-
-    socket.receive({
-      type: 'stateUpdate',
-      requestId: snapshotRequests[0].requestId,
-      authorityVersion: 4,
-      state: { turn: { turnNumber: 1 } },
-    })
-
+    room.emit('battleSnapshot', { authorityVersion: 4, state: { turn: { turnNumber: 1 } } })
     expect(client.isAuthoritySyncing()).toBe(false)
-    expect(syncCompletes).toBe(1)
+    expect(completes).toBe(1)
     expect(client.send({ type: 'action', command: { type: 'move' } })).toBe(true)
-    expect(socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'action')).toHaveLength(1)
+    expect(room.sent.filter(message => message.type === 'battleCommand')).toHaveLength(1)
   })
 
-  it('requests one snapshot correlated to the original timed-out action id', async () => {
-    vi.useFakeTimers()
+  it('correlates a resync request with the original timed-out action', async () => {
     const client = loadClient()
-    const syncCompletes: unknown[] = []
-    client.on('authoritySyncComplete', message => { syncCompletes.push(message) })
+    const starts: Array<{ clientActionId?: string }> = []
+    client.on('authoritySyncStart', message => starts.push(message as { clientActionId?: string }))
 
-    client.connect('room-a', 'player-red', 'lan')
-    const socket = FakeWebSocket.instances[0]
-    await openWithSignedSubscribe(socket)
-    socket.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
-
+    client.connect('room-a', TEST_PLAYER_ID)
+    await finishConnect()
     expect(client.requestAuthorityReceiptSync('action-timeout', 'action-original-1')).toBe(true)
-    expect(client.requestAuthorityReceiptSync('action-timeout', 'action-duplicate')).toBe(false)
-    const requests = socket.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'requestBattleSnapshot')
-    expect(requests).toHaveLength(1)
-    expect(requests[0]).toMatchObject({ clientActionId: 'action-original-1' })
 
-    socket.receive({
-      type: 'stateUpdate',
-      requestId: requests[0].requestId,
-      authorityVersion: 3,
-      state: { turn: { turnNumber: 1 } },
-      receipt: { clientActionId: 'action-original-1', status: 'applied', authorityVersion: 3 },
-    })
-    expect(client.isAuthoritySyncing()).toBe(false)
-    expect(syncCompletes).toHaveLength(1)
+    expect(starts).toEqual([expect.objectContaining({
+      reason: 'action-timeout',
+      clientActionId: 'action-original-1',
+    })])
   })
 
-  it('releases the authority sync gate on timeout or disconnect without treating persistence degradation as a conflict', async () => {
+  it('releases the authority sync gate on timeout and disconnect', async () => {
     vi.useFakeTimers()
     const client = loadClient()
-    let syncTimeouts = 0
-    client.on('authoritySyncTimeout', () => { syncTimeouts += 1 })
+    let timeouts = 0
+    client.on('authoritySyncTimeout', () => { timeouts += 1 })
 
-    client.connect('room-a', 'player-red', 'lan')
-    const first = FakeWebSocket.instances[0]
-    await openWithSignedSubscribe(first)
-    first.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
-    first.receive({ type: 'actionError', code: 'ROOM_VERSION_CONFLICT' })
+    client.connect('room-a', TEST_PLAYER_ID)
+    await finishConnect()
+    const room = FakeRoom.instances[0]
+    expect(client.requestAuthorityReceiptSync('action-timeout', 'action-1')).toBe(true)
 
     await vi.advanceTimersByTimeAsync(8_000)
     expect(client.isAuthoritySyncing()).toBe(false)
-    expect(syncTimeouts).toBe(1)
+    expect(timeouts).toBe(1)
 
-    first.receive({ type: 'actionError', code: 'ROOM_VERSION_CONFLICT' })
-    expect(client.isAuthoritySyncing()).toBe(true)
-    first.closeFromPeer()
+    expect(client.requestAuthorityReceiptSync('version-gap', 'action-2')).toBe(true)
+    room.leaveFromServer()
     expect(client.isAuthoritySyncing()).toBe(false)
-
-    await vi.advanceTimersByTimeAsync(3_000)
-    const replacement = FakeWebSocket.instances[1]
-    await openWithSignedSubscribe(replacement)
-    replacement.receive({ type: 'subscribed', roomId: 'room-a', role: 'guest' })
-    replacement.receive({ type: 'actionError', code: 'BATTLE_AUTHORITY_PERSISTENCE_DEGRADED' })
-
-    expect(client.isAuthoritySyncing()).toBe(false)
-    expect(replacement.sent.map(payload => JSON.parse(payload)).filter(message => message.type === 'requestBattleSnapshot')).toHaveLength(0)
   })
 })

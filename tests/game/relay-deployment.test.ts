@@ -417,7 +417,7 @@ describe('relay deployment initialization', () => {
     expect(page).not.toContain('publishRelayAuthorityResult')
   })
 
-  it('submits signed Relay commands and ignores legacy host-authority messages', () => {
+  it('submits Relay commands through Colyseus and ignores legacy host-authority messages', () => {
     const page = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
     const wsClient = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
 
@@ -429,10 +429,11 @@ describe('relay deployment initialization', () => {
     expect(page).not.toContain('postLocalRelayInitialization')
     expect(page).not.toContain('verifyRelayBattleActionAuth')
     expect(page).not.toContain('relayAuthorityState')
-    expect(wsClient).toContain("type: 'battle-subscribe'")
+    expect(wsClient).toContain("_client.joinById(_roomId, joinOptions(_playerId))")
+    expect(wsClient).toContain("_room.send('battleCommand', message)")
     expect(wsClient).toContain("localStorage.getItem('rvb_game_profile_identity')")
     expect(wsClient).toContain('profileIdentity: profileIdentity')
-    expect(wsClient).toContain('signature: await window.RvBIdentity.sign(payload)')
+    expect(wsClient).not.toContain("type: 'battle-subscribe'")
   })
 })
 

@@ -15,21 +15,18 @@ function loadBrowserNetworking(options: {
     setItem(key: string, value: string) { persisted.set(key, String(value)) },
     removeItem(key: string) { persisted.delete(key) },
   }
-  const urls: string[] = []
-  class FakeWebSocket {
-    readyState = 0
-    constructor(url: string) { urls.push(url) }
-    close() {}
-    send() {}
+  const endpoints: string[] = []
+  class FakeColyseusClient {
+    constructor(url: string) { endpoints.push(url) }
   }
   const browserWindow: Record<string, unknown> = {
     location: { search: options.search || '' },
+    Colyseus: { Client: FakeColyseusClient },
   }
   const context = createContext({
     window: browserWindow,
     localStorage,
     URLSearchParams,
-    WebSocket: FakeWebSocket,
     fetch: vi.fn(() => { throw new Error('single-port clients must not probe ws-info') }),
     AbortController,
     setTimeout,
@@ -58,15 +55,15 @@ function loadBrowserNetworking(options: {
     connect(roomId: string, playerId: string, mode: string): void
     disconnect(): void
   }
-  return { persisted, urls, utils, ws }
+  return { persisted, endpoints, utils, ws }
 }
 
 describe('public single-port networking contract', () => {
   it.each([
-    { serverUrl: 'http://127.0.0.1:4200', expected: 'ws://127.0.0.1:4200/ws/rooms/__lobby' },
-    { serverUrl: 'http://192.168.1.20:8080', expected: 'ws://192.168.1.20:8080/ws/rooms/__lobby' },
-    { serverUrl: 'https://relay.example:8443', expected: 'wss://relay.example:8443/ws/rooms/__lobby' },
-  ])('derives the only WebSocket target from $serverUrl', ({ serverUrl, expected }) => {
+    { serverUrl: 'http://127.0.0.1:4200' },
+    { serverUrl: 'http://192.168.1.20:8080' },
+    { serverUrl: 'https://relay.example:8443' },
+  ])('derives the only Colyseus endpoint from $serverUrl', ({ serverUrl }) => {
     const fixture = loadBrowserNetworking({
       serverUrl,
       search: '?wsPort=6554&ws_port=6555',
@@ -79,7 +76,7 @@ describe('public single-port networking contract', () => {
 
     fixture.ws.connect('__lobby', 'alice', serverUrl.includes('relay') ? 'relay' : 'lan')
 
-    expect(fixture.urls).toEqual([expected])
+    expect(fixture.endpoints).toEqual([serverUrl])
     expect(fixture.utils.getConnectionConfig()).not.toHaveProperty('wsPort')
     expect(fixture.utils.appendServerParams(new URLSearchParams()).has('wsPort')).toBe(false)
     expect(fixture.persisted.has('rvb_ws_port')).toBe(false)

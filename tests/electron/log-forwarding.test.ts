@@ -254,7 +254,9 @@ test.each(entries)('%s routes child stdout and stderr through the safe boundary'
 
   expect(source).not.toMatch(/\.stdout\?\.on\('data', \(d\) => process\.stdout\.write\(d\)\)/)
   expect(source).not.toMatch(/process\.stderr\.write\(d\)/)
-  expect(source.match(/attachSafeLogForwarder\(/g)).toHaveLength(3)
+  expect(source.match(/attachSafeLogForwarder\(/g)).toHaveLength(
+    relativePath === 'electron-client/main.ts' ? 5 : 3,
+  )
   expect(source).toContain(".on('error'")
   expect(source).toContain(".on('exit'")
 })
@@ -271,6 +273,6 @@ test('keeps existing non-EPIPE child process failure feedback intact', () => {
   expect(client).toContain('if (serverProcess === spawnedProcess)')
   expect(client).toContain('lastServerExitCode = code')
   expect(client).toContain("console.log(`[client] local server exited: ${code}`)")
-  expect(client).toContain('Local server exited with code ${lastServerExitCode}')
+  expect(client).toContain('Colyseus/PostgreSQL authority exited with code ${lastServerExitCode}')
   expect(client).toContain("return { ok: false, error: exitMsg + detail }")
 })

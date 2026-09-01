@@ -125,7 +125,11 @@ describe('standalone same-origin WebSocket upgrade', () => {
       const electronSource = fs.readFileSync(path.join(root, ...entry.split('/')), 'utf8')
       expect(electronSource).not.toContain("import WebSocket from 'ws'")
       expect(electronSource).toContain("path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')")
-      expect(electronSource).toContain('require(modulePath)')
+      expect(electronSource).toContain(
+        entry === 'electron-client/main.ts'
+          ? 'createRequire(__filename)(modulePath)'
+          : 'require(modulePath)',
+      )
     }
   })
 

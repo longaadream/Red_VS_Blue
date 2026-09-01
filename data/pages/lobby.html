@@ -469,8 +469,8 @@
         && typeof window.electronAPI.getMode === 'function'
       ) {
         const mode = await window.electronAPI.getMode()
-        const localRuntimeUrl = mode && typeof mode.localUrl === 'string'
-          ? mode.localUrl.trim()
+        const localRuntimeUrl = mode && typeof mode.profileRuntimeUrl === 'string'
+          ? mode.profileRuntimeUrl.trim()
           : ''
         if (!localRuntimeUrl) {
           throw new Error('本地 Profile 运行时不可用，请重启客户端后重试')

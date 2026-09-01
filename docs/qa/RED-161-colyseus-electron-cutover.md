@@ -3,8 +3,8 @@
 - 风险：High
 - 分支：`codex/red-161-colyseus-electron-cutover`
 - 合同起始基线：`base_branch: main`，`base_sha: 8902c0da94957fdb52d142363c2c45a2ebda7a7f`
-- 当前验证基线：`origin/main@b0a5c3fb99b68b2a7e174c03b2b0c0a4b30b6926`，RED-138 已重放为
-  `6ab7609`、`9db8cb6`
+- 当前验证基线：`origin/main@aa1d91351d6852909166f9b2e75943105ded1255`，已包含最终 RED-138/139；
+  RED-161 于 `ae7a28f` 合并该基线后重新验证
 - 状态：实现验证中；候选包已构建，真实 PostgreSQL和独立审查仍未完成，不能合并或发布
 
 ## 已切换范围
@@ -52,15 +52,18 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
 
 ## 自动验证
 
-- 目标 continuation、计时器、即时目标展示及受影响 UI/Colyseus 回归：8 files / 50 tests，通过。
-- Colyseus 双客户端阻塞 writer 延迟门：热路径 server/client P95 均强制 `< 100 ms`，通过。
-- RED-138 渐进部署与 SkillCode 相邻回归：7 files / 85 tests，通过。
+- 同步最终 RED-138/139 后，`npm.cmd run test:colyseus`：5 files / 8 tests，通过。
+- RED-138 渐进部署、RED-139 hash 证据、Room 隔离及浏览器规则差异回归：5 files / 23 tests，通过。
+- 迁移 legacy raw WebSocket/单端口合同并保留 Profile、日志、LAN 与 UI 不变量：9 files / 106 tests，通过；
+  由此发现并修复大厅缺失缓存 Identity 时误用 Colyseus `localUrl`、而非独立 `profileRuntimeUrl` 的问题。
+- Colyseus 双客户端阻塞 writer 延迟门包含在上述套件中：热路径 server/client P95 均强制
+  `< 100 ms`，通过。
 - RED-160 原始套件与相邻回归此前合计 42 tests 通过；本次新增 product action 后以以上 12 项为
   当前切换门禁。
 - `npm.cmd run typecheck`：通过。
 - `npx.cmd tsc -p electron-client/tsconfig.json`：通过。
 - `node --check`：Colyseus product/QA/static/build 四个脚本通过。
-- `npm.cmd run build:colyseus`：通过，生成 5.4 MB product authority bundle。
+- `npm.cmd run build:colyseus`：通过，生成 5.9 MB product authority bundle。
 - bundle 使用故意不可达的 PostgreSQL 端口启动时执行到数据库边界并明确 `ECONNREFUSED`；这只证明
   产物可加载和失败关闭，不是数据库集成通过。
 - 在 RED-161 工作树内使用 `npm.cmd ci --legacy-peer-deps` 完成干净依赖安装；Colyseus 0.18 的可选
@@ -70,13 +73,20 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
   设置 `npmRebuild: false`，避免错误地把 Colyseus 可选原生加速模块重编译为 Electron ABI。随后
   Windows `dir` 候选构建通过，`verify-electron-client-package` 检查 48 个页面资源、287 个离线数据
   资源与 43 个图片资源，全部通过。
+- `npm.cmd run check:main-baseline`：通过；HEAD 不落后上述 `origin/main`。
+- `npm.cmd run check:encoding` 与 `git diff --check`：通过。
+- `npm.cmd run test:postgres`：本机未配置 `RVB_TEST_POSTGRES_URL` 且 5432/5433 无监听，1 file / 1 test
+  被明确跳过；不得算作真实 PostgreSQL 通过。
+- 仓库全量 `npm.cmd test`：175 files / 1914 tests 通过、PostgreSQL 1 file / 1 test 跳过；另有 1 个范围外
+  Electron Editor 归档测试在全仓并行时读到临时零字节 JSON 而失败，随后单独复跑 1 file / 9 tests
+  全部通过。该波动不修改 Editor 生产路径，不能替代 RED-161 自身候选门禁。
 
 ## 待完成门禁
 
 - 在真实 PostgreSQL 上运行 `npm.cmd run test:postgres`。
 - 从已构建 Electron 候选包完成双端动作、重连、普通 APPLIED 与终局 DURABLE 验收。
 - 完成 High 风险独立审查。
-- 在本轮修复后重新执行 `check:main-baseline`、diff/编码检查并更新 Draft PR。
+- 更新 Draft PR 并确认最终 head 的 CI。
 
 ## 回退
 

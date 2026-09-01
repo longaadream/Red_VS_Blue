@@ -187,7 +187,8 @@ describe('Windows Electron client runtime', () => {
     const websocket = read('data/pages/js/ws-client.js')
 
     expect(utilities).toMatch(/26\\\./)
-    expect(websocket).toMatch(/26\\\./)
+    expect(websocket).toContain("if (base && !/^[a-z]+:\\/\\//i.test(base)) base = 'http://' + base")
+    expect(websocket).not.toContain("base = 'https://' + base")
   })
 
 })
