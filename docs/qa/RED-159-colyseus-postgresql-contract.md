@@ -88,12 +88,12 @@ RED-159 因此在收尾同步中归档为 ADR-0025；这只是编号冲突消解
 | 命令/检查 | 结果 | 说明 |
 | --- | --- | --- |
 | git fetch origin --prune | 已执行 | 2026-09-01；收尾基线见上 |
-| npm.cmd run check:main-baseline | 待重跑 | 同步 `origin/main` 后重新验证 |
-| npm.cmd run check:encoding | 待重跑 | 不复用旧基线结果 |
-| git diff --check | 待重跑 | 检查当前 PR diff |
-| Markdown 相对链接检查 | 待重跑 | 检查本 PR 改动 Markdown 的相对目标 |
-| allowed_paths 审计 | 待重跑 | PR 自身改动必须只位于三个允许目录 |
-| ADR 引用与脚本存在性检查 | 待重跑 | 对当前 `main` 与 RED-160/161 事实核验 |
+| npm.cmd run check:main-baseline | 通过 | `origin/main@a0d0ead`；Ahead 4，Behind 0 |
+| npm.cmd run check:encoding | 通过 | 880 个文本文件 |
+| git diff --check origin/main...HEAD | 通过 | 无空白错误 |
+| Markdown 相对链接检查 | 通过 | 6 个改动 Markdown 的相对目标全部存在 |
+| allowed_paths 审计 | 通过 | 6 个 PR 文件全部位于三个允许目录 |
+| ADR 引用与脚本存在性检查 | 通过 | 16 个关键文件、2 个 npm script、1 个 RVB 环境变量存在；57 个 Linear 标识符均在 GAME team 中存在 |
 | 独立 AI High Risk contract review | 待复审 | 必须引用当前 diff 与 D1–D5，不复用未留记录的旧结论 |
 
 本任务没有生产行为修改，因此不会把“未运行 runtime 测试”表述为 runtime 测试通过。package scripts
