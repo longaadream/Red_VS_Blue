@@ -653,7 +653,6 @@ function applyCardEffectModifiers(
   return Math.floor(value)
 }
 
-
 /** 为卡牌效果构建执行环境（没有 sourcePiece，用 playerId 判断阵营） */
 function createCardEffectFunctions(
   battle: BattleState,
@@ -994,34 +993,33 @@ export function executeCardFunction(
     restoreSummonQueueContext = bindDeclaredSummonQueueContext(context, sealedContent)
 
     const env = createCardEffectFunctions(battle, playerId, context)
-
     const fullCode = `
-      (function(env) {
-        const context = env.context;
-        const battle = env.battle;
-        const playerId = env.playerId;
-        const selectTarget = env.selectTarget;
-        const selectOption = env.selectOption;
-        const dealDamage = env.dealDamage;
-        const healDamage = env.healDamage;
-        const addCardToHand = env.addCardToHand;
-        const discardCard = env.discardCard;
-        const getHand = env.getHand;
-        const addStatusEffectById = env.addStatusEffectById;
-        const removeStatusEffectById = env.removeStatusEffectById;
-        const addRuleById = env.addRuleById;
-        const removeRuleById = env.removeRuleById;
-        const addPlayerRuleById = env.addPlayerRuleById;
-        const removePlayerRuleById = env.removePlayerRuleById;
-        const Math = env.Math;
-        const Date = env.Date;
-        const console = env.console;
+        (function(env) {
+          const context = env.context;
+          const battle = env.battle;
+          const playerId = env.playerId;
+          const selectTarget = env.selectTarget;
+          const selectOption = env.selectOption;
+          const dealDamage = env.dealDamage;
+          const healDamage = env.healDamage;
+          const addCardToHand = env.addCardToHand;
+          const discardCard = env.discardCard;
+          const getHand = env.getHand;
+          const addStatusEffectById = env.addStatusEffectById;
+          const removeStatusEffectById = env.removeStatusEffectById;
+          const addRuleById = env.addRuleById;
+          const removeRuleById = env.removeRuleById;
+          const addPlayerRuleById = env.addPlayerRuleById;
+          const removePlayerRuleById = env.removePlayerRuleById;
+          const Math = env.Math;
+          const Date = env.Date;
+          const console = env.console;
 
-        ${cardDef.code}
+          ${cardDef.code}
 
-        return executeCard(context);
-      })
-    `
+          return executeCard(context);
+        })
+      `
     const executeCard = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
       surface: 'cardCode', contentId: cardDef.id, code: fullCode, entry: 'executeCard(context)',
     })
@@ -3825,6 +3823,9 @@ type ValidatedDeclaredSummon =
       readonly source: PieceInstance
       readonly capability: StoredOrDeclaredPieceSummonCapabilityDeclaration
       readonly stored?: PieceInstance
+      readonly storageExtensionKey?: string
+      readonly storageEntryKey?: string
+      readonly legacyStorageExtensionKey?: string
     }
 
 interface PreparedDeclaredSummon {
@@ -3835,6 +3836,8 @@ interface PreparedDeclaredSummon {
   readonly sourceId?: string
   readonly insertBeforeSource?: boolean
   readonly storageExtensionKey?: string
+  readonly storageEntryKey?: string
+  readonly legacyStorageExtensionKey?: string
   finalX: number
   finalY: number
 }
@@ -4024,19 +4027,49 @@ function validateStoredPieceSummon(
   capability: StoredOrDeclaredPieceSummonCapabilityDeclaration,
   fatal: (message: string, cause?: unknown) => never,
 ): ValidatedDeclaredSummon {
+  const normalizedOwnerPlayerId = String(source.ownerPlayerId || '').trim().toLowerCase()
+  if (!normalizedOwnerPlayerId) fatal('Stored summon source owner is invalid')
+  const ownerScoped = capability.ownerScopedStorageExtensionKey !== undefined
   const activePiece = battle.pieces.find(piece => (
     piece.currentHp > 0
+    && (!ownerScoped
+      || String(piece.ownerPlayerId || '').trim().toLowerCase() === normalizedOwnerPlayerId)
     && (
       piece.templateId === capability.uniqueTemplateId
       || piece.instanceId === capability.uniqueTemplateId
     )
   ))
   if (activePiece) fatal('The bound unique summon is already active on the board')
-  if (capability.fallback.faction !== source.faction) {
+  let storedValue: unknown
+  let storageExtensionKey: string | undefined
+  let storageEntryKey: string | undefined
+  let legacyStorageExtensionKey: string | undefined
+  const ownerScopedValue = capability.ownerScopedStorageExtensionKey === undefined
+    ? undefined
+    : battle.extensions?.[capability.ownerScopedStorageExtensionKey]
+  if (ownerScopedValue !== undefined) {
+    if (!ownerScopedValue || typeof ownerScopedValue !== 'object' || Array.isArray(ownerScopedValue)) {
+      fatal('Owner-scoped stored summon map must be a plain object')
+    }
+    const ownerScopedPrototype = Object.getPrototypeOf(ownerScopedValue)
+    if (ownerScopedPrototype !== Object.prototype && ownerScopedPrototype !== null) {
+      fatal('Owner-scoped stored summon map must be a plain object')
+    }
+    const ownerScopedRecord = ownerScopedValue as Record<string, unknown>
+    if (!Object.prototype.hasOwnProperty.call(ownerScopedRecord, normalizedOwnerPlayerId)) {
+      fatal('Owner-scoped stored summon map has no piece for its source owner')
+    }
+    storedValue = ownerScopedRecord[normalizedOwnerPlayerId]
+    storageExtensionKey = capability.ownerScopedStorageExtensionKey
+    storageEntryKey = normalizedOwnerPlayerId
+    legacyStorageExtensionKey = capability.storageExtensionKey
+  } else {
+    storedValue = battle.extensions?.[capability.storageExtensionKey]
+    if (storedValue !== undefined) storageExtensionKey = capability.storageExtensionKey
+  }
+  if (!storageEntryKey && capability.fallback.faction !== source.faction) {
     fatal('Stored summon fallback faction does not match its source')
   }
-
-  const storedValue = battle.extensions?.[capability.storageExtensionKey]
   if (storedValue !== undefined) {
     if (!storedValue || typeof storedValue !== 'object' || Array.isArray(storedValue)) {
       fatal('Stored summon piece must be a plain object')
@@ -4049,6 +4082,7 @@ function validateStoredPieceSummon(
       || typeof storedRecord.instanceId !== 'string'
       || storedRecord.instanceId.length === 0
       || typeof storedRecord.name !== 'string'
+      || String(storedRecord.ownerPlayerId || '').trim().toLowerCase() !== normalizedOwnerPlayerId
       || !Number.isFinite(storedRecord.maxHp)
       || Number(storedRecord.maxHp) <= 0
       || !Number.isFinite(storedRecord.attack)
@@ -4071,6 +4105,9 @@ function validateStoredPieceSummon(
     source,
     capability,
     stored: storedValue as PieceInstance | undefined,
+    storageExtensionKey,
+    storageEntryKey,
+    legacyStorageExtensionKey,
   }
 }
 function copyPieceSkills(value: PieceInstance['skills'] | undefined): PieceInstance['skills'] {
@@ -4283,7 +4320,7 @@ function prepareStoredPieceSummon(
     }
   }
   normalizePreparedPieceArrays(piece)
-  piece.isCore = false
+  piece.isCore = stored ? Boolean(stored.isCore) : false
   piece.x = entry.spec.x
   piece.y = entry.spec.y
   piece.ownerPlayerId = entry.source.ownerPlayerId
@@ -4294,9 +4331,11 @@ function prepareStoredPieceSummon(
     recipe: entry.capability.recipe,
     piece,
     ownerPlayerId: entry.source.ownerPlayerId,
-    storageExtensionKey: stored === undefined
+    storageExtensionKey: stored === undefined ? undefined : entry.storageExtensionKey,
+    storageEntryKey: stored === undefined ? undefined : entry.storageEntryKey,
+    legacyStorageExtensionKey: stored === undefined
       ? undefined
-      : entry.capability.storageExtensionKey,
+      : entry.legacyStorageExtensionKey,
     finalX: entry.spec.x,
     finalY: entry.spec.y,
   }
@@ -4473,13 +4512,16 @@ export function resolveDeclaredContentSummonBatch(
 
     // Phase 3: stable before events. Rules may redirect positions, never instances.
     for (const entry of stablePrepared) {
-      const beforeContext = declaredSummonTriggerContext(
-        request,
-        context,
-        chain,
-        entry,
-        'beforePieceSummoned',
-      )
+      const beforeContext: Record<string, unknown> = {
+        ...declaredSummonTriggerContext(
+          request,
+          context,
+          chain,
+          entry,
+          'beforePieceSummoned',
+        ),
+        type: 'beforePieceSummoned' as const,
+      }
       const beforeResult = checkSynchronousTriggers(battle, beforeContext)
       if (beforeResult.blocked) {
         const message = beforeResult.messages?.[0] || 'Summon was blocked'
@@ -4530,26 +4572,46 @@ export function resolveDeclaredContentSummonBatch(
       }
     }
     battle.pieces.splice(0, battle.pieces.length, ...committedPieces)
-    for (const storageExtensionKey of new Set(
-      stablePrepared
-        .map(entry => entry.storageExtensionKey)
-        .filter((key): key is string => typeof key === 'string'),
-    )) {
-      if (battle.extensions) delete battle.extensions[storageExtensionKey]
+    for (const entry of stablePrepared) {
+      if (!battle.extensions || !entry.storageExtensionKey) continue
+      if (!entry.storageEntryKey) {
+        delete battle.extensions[entry.storageExtensionKey]
+        continue
+      }
+      const storedMap = battle.extensions[entry.storageExtensionKey]
+      if (!storedMap || typeof storedMap !== 'object' || Array.isArray(storedMap)) {
+        fatal('Owner-scoped stored summon map changed before commit')
+      }
+      const storedRecord = storedMap as Record<string, unknown>
+      delete storedRecord[entry.storageEntryKey]
+      const remainingKeys = Object.keys(storedRecord).sort(compareDeclaredSummonText)
+      if (remainingKeys.length === 0) delete battle.extensions[entry.storageExtensionKey]
+
+      if (entry.legacyStorageExtensionKey) {
+        const legacyPiece = battle.extensions[entry.legacyStorageExtensionKey] as PieceInstance | undefined
+        if (legacyPiece?.instanceId === entry.piece.instanceId) {
+          if (remainingKeys.length === 0) {
+            delete battle.extensions[entry.legacyStorageExtensionKey]
+          } else {
+            battle.extensions[entry.legacyStorageExtensionKey] = storedRecord[remainingKeys[0]]
+          }
+        }
+      }
     }
 
     // Phase 6: stable after events observe the whole committed batch.
     for (const entry of stablePrepared) {
-      const afterResult = checkSynchronousTriggers(
-        battle,
-        declaredSummonTriggerContext(
+      const afterContext = {
+        ...declaredSummonTriggerContext(
           request,
           context,
           chain,
           entry,
           'afterPieceSummoned',
         ),
-      )
+        type: 'afterPieceSummoned' as const,
+      }
+      const afterResult = checkSynchronousTriggers(battle, afterContext)
       appendDeclaredSummonMessages(
         battle,
         entry.ownerPlayerId,

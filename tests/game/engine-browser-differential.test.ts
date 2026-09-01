@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { TextDecoder, TextEncoder } from 'node:util'
 import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it, vi } from 'vitest'
@@ -27,13 +28,19 @@ vi.mock('@/lib/game/skill-repository', () => ({
 }))
 
 import { mulberry32, setRng } from '@/lib/game/rng'
-import { runBattleAction } from '@/lib/game/battle-runner'
+import {
+  hashBattleState,
+  recordBattleInitialization,
+  runBattleAction,
+} from '@/lib/game/battle-runner'
+import { RuleRuntime } from '@/lib/game/rule-runtime'
 import type { SkillDefinition } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
 import type { TargetRef } from '@/lib/game/targeting'
 import { applyBattleAction } from '@/lib/game/turn'
-import type { BattleAction } from '@/lib/game/turn'
+import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { pinTestBattleState } from './profile-test-identity'
 
 const FIXTURE_NAME = 'normal-move-with-blocker'
 const FIXTURE_SEED = 0x5eed64
@@ -46,6 +53,7 @@ type BrowserEngine = {
     checkTriggers: (state: any, context: any) => { success: boolean }
     clearRules: () => void
   }
+  hashBattleState: typeof hashBattleState
   mulberry32: typeof mulberry32
   setRng: typeof setRng
 }
@@ -86,6 +94,139 @@ function makeFixture() {
     action: { type: 'move' as const, playerId: 'player-red', pieceId: 'mover', toX: 2, toY: 1 },
     state,
   }
+}
+
+const PROGRESSIVE_FIXTURE_SEED = 0x138b0
+const PROGRESSIVE_MODE = 'progressive-reserve-v1'
+const PROGRESSIVE_PLAYERS = ['player-red', 'player-blue'] as const
+
+function makeProgressiveCore(
+  instanceId: string,
+  ownerPlayerId: typeof PROGRESSIVE_PLAYERS[number],
+  x: number | null,
+  y: number | null,
+) {
+  return {
+    ...makePiece({
+      instanceId,
+      ownerPlayerId,
+      faction: ownerPlayerId === 'player-red' ? 'red' : 'blue',
+      x: x ?? 0,
+      y: y ?? 0,
+      currentHp: 12,
+      maxHp: 12,
+      moveRange: 2,
+    }),
+    name: instanceId,
+    isCore: true,
+    x,
+    y,
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+  }
+}
+
+function makeProgressiveRunnerFixture(): BattleState {
+  const redVanguard = makeProgressiveCore('red-vanguard', PROGRESSIVE_PLAYERS[0], 0, 0)
+  const blueVanguard = makeProgressiveCore('blue-vanguard', PROGRESSIVE_PLAYERS[1], 11, 0)
+  const redReserve = makeProgressiveCore('red-reserve', PROGRESSIVE_PLAYERS[0], null, null)
+  const state = makeState({
+    pieces: [redVanguard, blueVanguard] as any,
+    currentPlayerId: PROGRESSIVE_PLAYERS[0],
+    phase: 'start',
+    width: 12,
+    height: 9,
+  }) as any
+  state.gameStartFired = true
+  state.deployment = {
+    mode: PROGRESSIVE_MODE,
+    status: 'awaiting-reserve-deploy',
+    playerIds: [...PROGRESSIVE_PLAYERS],
+    choices: {},
+    locks: {
+      [PROGRESSIVE_PLAYERS[0]]: { locked: false },
+      [PROGRESSIVE_PLAYERS[1]]: { locked: false },
+    },
+    startedAt: 1_750_000_000_000,
+    deadlineAt: 1_750_000_030_000,
+    revision: 7,
+    initialPositions: {
+      [redVanguard.instanceId]: { x: redVanguard.x, y: redVanguard.y },
+      [blueVanguard.instanceId]: { x: blueVanguard.x, y: blueVanguard.y },
+    },
+    openingVanguardsInitialized: true,
+    reserves: {
+      [PROGRESSIVE_PLAYERS[0]]: [redReserve],
+      [PROGRESSIVE_PLAYERS[1]]: [],
+    },
+    reserveCounts: {
+      [PROGRESSIVE_PLAYERS[0]]: 1,
+      [PROGRESSIVE_PLAYERS[1]]: 0,
+    },
+    activePlayerId: PROGRESSIVE_PLAYERS[0],
+    offerTurnNumber: 1,
+    offerPieceIds: [redReserve.instanceId],
+    legalPositions: [{ x: 5, y: 6 }],
+  }
+  pinTestBattleState(state, PROGRESSIVE_FIXTURE_SEED)
+  recordBattleInitialization(
+    state,
+    new RuleRuntime({ rootSeed: PROGRESSIVE_FIXTURE_SEED }),
+    [...PROGRESSIVE_PLAYERS],
+  )
+  return state
+}
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function runtimeCursors(state: BattleState): Record<string, number> {
+  return cloneJson((state.extensions as any)?.debugBattle?.authority?.runtimeCursors ?? {})
+}
+
+function captureRuleError(run: () => unknown): Record<string, unknown> {
+  try {
+    run()
+  } catch (error) {
+    const ruleError = error as any
+    return cloneJson({
+      code: ruleError?.code,
+      name: ruleError?.name,
+      determinism: ruleError?.determinism,
+    })
+  }
+  throw new Error('Expected the progressive deployment command to be rejected')
+}
+
+function progressiveStateContract(state: BattleState) {
+  const deployment = state.deployment
+  return cloneJson({
+    deployment: deployment && {
+      mode: deployment.mode,
+      status: deployment.status,
+      revision: deployment.revision,
+      openingVanguardsInitialized: deployment.openingVanguardsInitialized,
+      activePlayerId: deployment.activePlayerId,
+      offerPieceIds: deployment.offerPieceIds,
+      reserveCounts: deployment.reserveCounts,
+      reservePieceIds: Object.fromEntries(Object.entries(deployment.reserves ?? {})
+        .map(([playerId, pieces]) => [playerId, pieces.map(piece => piece.instanceId)])),
+    },
+    pieces: state.pieces.map(piece => ({
+      instanceId: piece.instanceId,
+      ownerPlayerId: piece.ownerPlayerId,
+      isCore: piece.isCore,
+      currentHp: piece.currentHp,
+      x: piece.x,
+      y: piece.y,
+      statusTags: piece.statusTags,
+    })).sort((left, right) => left.instanceId.localeCompare(right.instanceId)),
+    turn: state.turn,
+    terminalResult: state.terminalResult,
+    runtimeCursors: runtimeCursors(state),
+  })
 }
 
 function makeDemonSummonFixture() {
@@ -250,6 +391,124 @@ describe('game engine Node/browser differential fixture', () => {
       seed: FIXTURE_SEED,
       result: nodeResult,
     })
+  })
+
+  it('rejects stale and missing progressive deployment revisions identically without state or RNG mutation', () => {
+    const browser = loadBrowserEngine()
+    const source = makeProgressiveRunnerFixture()
+    const staleRevision = source.deployment!.revision - 1
+
+    expect(browser.runBattleAction).toBeTypeOf('function')
+    expect(browser.hashBattleState).toBeTypeOf('function')
+
+    for (const expectedDeploymentRevision of [staleRevision, undefined]) {
+      const nodeState = cloneJson(source)
+      const browserState = cloneJson(source)
+      const action = {
+        type: 'deployReservePiece',
+        playerId: PROGRESSIVE_PLAYERS[0],
+        expectedDeploymentRevision,
+        pieceId: 'red-reserve',
+        toX: 5,
+        toY: 6,
+        clientActionId: expectedDeploymentRevision === undefined
+          ? 'browser-progressive-missing-revision'
+          : 'browser-progressive-stale-revision',
+      } as unknown as BattleAction
+      const nodeBefore = {
+        hash: hashBattleState(nodeState),
+        cursors: runtimeCursors(nodeState),
+        contract: progressiveStateContract(nodeState),
+      }
+      const browserBefore = {
+        hash: browser.hashBattleState(browserState),
+        cursors: runtimeCursors(browserState),
+        contract: progressiveStateContract(browserState),
+      }
+
+      const nodeError = captureRuleError(() =>
+        runBattleAction(nodeState, action, { rootSeed: PROGRESSIVE_FIXTURE_SEED }))
+      const browserError = captureRuleError(() =>
+        browser.runBattleAction(browserState, action, { rootSeed: PROGRESSIVE_FIXTURE_SEED }))
+
+      expect(nodeError).toMatchObject({ code: 'PROGRESSIVE_DEPLOYMENT_STALE_REVISION' })
+      expect(browserError).toEqual(nodeError)
+      expect(hashBattleState(nodeState)).toBe(nodeBefore.hash)
+      expect(browser.hashBattleState(browserState)).toBe(browserBefore.hash)
+      expect(runtimeCursors(nodeState)).toEqual(nodeBefore.cursors)
+      expect(runtimeCursors(browserState)).toEqual(browserBefore.cursors)
+      expect(progressiveStateContract(nodeState)).toEqual(nodeBefore.contract)
+      expect(progressiveStateContract(browserState)).toEqual(browserBefore.contract)
+      expect(browserBefore).toEqual(nodeBefore)
+    }
+  })
+
+  it('executes progressive reserve deploy and tagged first move through the tracked bundle with the Node state hash', () => {
+    const browser = loadBrowserEngine()
+    const source = makeProgressiveRunnerFixture()
+    const nodeState = cloneJson(source)
+    const browserState = cloneJson(source)
+    const deployAction: BattleAction = {
+      type: 'deployReservePiece',
+      playerId: PROGRESSIVE_PLAYERS[0],
+      expectedDeploymentRevision: source.deployment!.revision,
+      pieceId: 'red-reserve',
+      toX: 5,
+      toY: 6,
+      clientActionId: 'browser-progressive-deploy',
+    }
+
+    const nodeDeployed = runBattleAction(nodeState, deployAction, {
+      rootSeed: PROGRESSIVE_FIXTURE_SEED,
+    })
+    const browserDeployed = browser.runBattleAction(browserState, deployAction, {
+      rootSeed: PROGRESSIVE_FIXTURE_SEED,
+    })
+
+    expect(browserDeployed.stateHash).toBe(nodeDeployed.stateHash)
+    expect(browser.hashBattleState(browserDeployed.state)).toBe(hashBattleState(nodeDeployed.state))
+    expect(progressiveStateContract(browserDeployed.state))
+      .toEqual(progressiveStateContract(nodeDeployed.state))
+    expect(cloneJson(browserDeployed.trace?.deployment)).toEqual(cloneJson(nodeDeployed.trace?.deployment))
+    expect(browserDeployed.trace?.deployment).toMatchObject({
+      command: 'deploy',
+      mode: PROGRESSIVE_MODE,
+      status: 'complete',
+      openingVanguardsInitialized: true,
+      lastDeployedPieceId: 'red-reserve',
+      deployedPosition: { x: 5, y: 6 },
+    })
+    expect(nodeDeployed.state.turn.phase).toBe('action')
+    expect(nodeDeployed.state.pieces.find(piece => piece.instanceId === 'red-reserve')?.statusTags)
+      .toContainEqual(expect.objectContaining({
+        type: 'deployment-first-move-free',
+        grantedTurnNumber: 1,
+      }))
+
+    const moveAction: BattleAction = {
+      type: 'move',
+      playerId: PROGRESSIVE_PLAYERS[0],
+      pieceId: 'red-reserve',
+      toX: 5,
+      toY: 5,
+    }
+    const nodeMoved = runBattleAction(nodeDeployed.state, moveAction, {
+      rootSeed: PROGRESSIVE_FIXTURE_SEED,
+    })
+    const browserMoved = browser.runBattleAction(browserDeployed.state, moveAction, {
+      rootSeed: PROGRESSIVE_FIXTURE_SEED,
+    })
+
+    expect(browserMoved.stateHash).toBe(nodeMoved.stateHash)
+    expect(browser.hashBattleState(browserMoved.state)).toBe(hashBattleState(nodeMoved.state))
+    expect(progressiveStateContract(browserMoved.state))
+      .toEqual(progressiveStateContract(nodeMoved.state))
+    expect(browserMoved.trace?.deployment).toBeUndefined()
+    expect(nodeMoved.state.turn.phase).toBe('action')
+    expect(nodeMoved.state.players.find(player => player.playerId === PROGRESSIVE_PLAYERS[0])?.actionPoints)
+      .toBe(nodeDeployed.state.players.find(player => player.playerId === PROGRESSIVE_PLAYERS[0])?.actionPoints)
+    expect(nodeMoved.state.pieces.find(piece => piece.instanceId === 'red-reserve')?.statusTags)
+      .not.toContainEqual(expect.objectContaining({ type: 'deployment-first-move-free' }))
   })
 
   it('keeps the real demon-summon-5 damage→summon EffectChain identical in Node and browser', () => {

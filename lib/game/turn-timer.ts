@@ -113,6 +113,10 @@ export function getNormalTurnDurationMs(turnNumber: number): number {
 export function getCurrentInputOwnerPlayerId(state: BattleState): PlayerId {
   return state.pendingOptionSelection?.playerId
     ?? state.pendingTargetSelection?.playerId
+    ?? (state.deployment?.mode === 'progressive-reserve-v1'
+      && state.deployment.status === 'awaiting-reserve-deploy'
+      ? state.deployment.activePlayerId
+      : undefined)
     ?? state.turn.currentPlayerId
 }
 function getEffectiveTurn(state: BattleState): BattleState['turn'] {
@@ -130,7 +134,9 @@ export function createRunningTurnTimer(
   noOpStreaks: Record<PlayerId, number> = state.turnTimer?.noOpStreaks ?? {},
 ): TurnTimerState {
   const hasPendingInput = !!state.pendingOptionSelection || !!state.pendingTargetSelection
-  if (state.turn.phase !== 'action' && !hasPendingInput) {
+  const hasProgressiveDeploymentInput = state.deployment?.mode === 'progressive-reserve-v1'
+    && state.deployment.status === 'awaiting-reserve-deploy'
+  if (state.turn.phase !== 'action' && !hasPendingInput && !hasProgressiveDeploymentInput) {
     throw new Error(
       'A turn timer may only start while the server is waiting in action phase or for pending input')
   }
@@ -199,6 +205,7 @@ export function isAcceptedGameplayAction(action: BattleAction): boolean {
     case 'pendingOptionSelect':
     case 'pendingTargetSelect':
     case 'cancelPendingSelection':
+    case 'deployReservePiece':
       return true
     default:
       return false

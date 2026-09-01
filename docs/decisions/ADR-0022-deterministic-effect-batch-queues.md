@@ -142,7 +142,7 @@ queue push 不返回未来 `healResult`，也不接受结果 callback。Reap 的
 `SummonRequest` 是无 callback、不可携带任意 `PieceInstance` 的封闭联合：
 
 - `template`：只含 templateId、owner/faction、位置和现有 index 参数，由 repository/template pipeline 创建；仅内部 template writer 可创建。
-- `declared-content`：技能或卡牌定义可携带版本化 `summonCapability` 声明；运行时只接受 `source-mirror` 与 `stored-or-declared-piece` 两种封闭 schema。鸣人影分身使用前者声明固定复制字段、三条 clone rule、冷却重置与插入/RNG 策略；恶魔召唤使用后者声明固定 extension key、模板、fallback 棋子和技能。
+- `declared-content`：技能或卡牌定义可携带版本化 `summonCapability` 声明；运行时只接受 `source-mirror` 与 `stored-or-declared-piece` 两种封闭 schema。鸣人影分身使用前者声明固定复制字段、三条 clone rule、冷却重置与插入/RNG 策略；恶魔召唤使用后者声明固定 legacy extension key、可选的按规范化 owner 分桶的 extension map、模板、fallback 棋子和技能。owner map 一旦存在就必须命中当前来源 owner，禁止回退或取用其他玩家的隐藏实例；map 不存在时才允许使用 owner 一致的 legacy 单例或声明式 fallback。
 
 声明必须是普通对象，所有层级只接受列出的键和值域；解析后递归复制、深冻结，并由 `effect-batch` 模块私有 `WeakSet` 品牌认证。writer 同时通过私有 content-binding 映射绑定当前 contentId、已认证声明和允许的 predicate；调用方只能提交 `sourceId`、坐标和可选变体。contentId/声明/品牌/绑定不匹配或出现额外字段时，在修改权威状态前 fatal。不得把任意对象、任意 extension path、任意规则列表、`PieceInstance` 或函数从 writer 请求注入 handler。当前数据中只有两个批准迁移点声明该能力；新增声明属于新的合同审查，而不是内容作者自动获得的 surface。
 
@@ -161,7 +161,7 @@ Prepare 固定执行：
 
 首个稳定失败点之后不再发送剩余 before；失败批次不发送 after，技能/卡牌成本、传送、攻击加成、日志、extension 删除和 RNG 游标不留部分提交。
 
-全部请求通过后，一次 Commit：把带完整 prepared Rules/Status 的所有实例加入 `battle.pieces`，并同时删除 `kiljaedanPiece` extension。Commit 后只允许注册不改变权威 PieceState 的运行时缓存；完成全批缓存注册后，才按稳定顺序发送任何 `afterPieceSummoned`。每个 after 因此能看到全批实例及其完整规则。返回结果对齐输入顺序。
+全部请求通过后，一次 Commit：把带完整 prepared Rules/Status 的所有实例加入 `battle.pieces`，并同时删除已消费的 legacy 单例，或只删除 owner map 中已消费的当前玩家条目；当 legacy 指针恰好指向该条目时，按 owner key 稳定顺序重定向到剩余条目，否则删除。Commit 后只允许注册不改变权威 PieceState 的运行时缓存；完成全批缓存注册后，才按稳定顺序发送任何 `afterPieceSummoned`。每个 after 因此能看到全批实例及其完整规则。返回结果对齐输入顺序。
 
 鸣人 teleport 仍是根 SkillCode 中在 enqueue 前的显式顺序阶段；queued summon 若失败，根事务连同 teleport 回滚。其 clone ID 的逻辑 `Date.now` 调用、一次 `Math.random` 前/后选择、数组相对插入和 RNG 消耗保持现役算法。恶魔召唤保持“伤害 → 攻击 +1 → enqueue summon”，并保留仅在新建实例时的逻辑 `Date.now` 调用；extension 直到 Summon Commit 才删除。
 

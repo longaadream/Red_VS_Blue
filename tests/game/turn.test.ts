@@ -747,6 +747,11 @@ describe('card preflight and interrupted release', () => {
     red.hand = [{ cardId: 'demon-summon-5', instanceId: 'card-5', actionPointCost: 3 }]
     red.discardPile = []
     red.actionPoints = 3
+    state.deployment = {
+      mode: 'progressive-reserve-v1',
+      status: 'turn-ready',
+      activePlayerId: 'player-red',
+    }
     state.extensions.kiljaedanPiece = {
       instanceId: 'kiljaedan-hidden',
       templateId: 'kiljaedan',
@@ -758,6 +763,7 @@ describe('card preflight and interrupted release', () => {
       attack: 4,
       defense: 3,
       moveRange: 4,
+      isCore: true,
       x: 0,
       y: 0,
       skills: [],
@@ -781,6 +787,22 @@ describe('card preflight and interrupted release', () => {
     expect(summoned?.x).toBe(2)
     expect(summoned?.y).toBe(2)
     expect(summoned?.currentHp).toBe(17)
+    expect(summoned?.isCore).toBe(true)
+    expect(next.deployment).toMatchObject({
+      status: 'turn-ready',
+      activePlayerId: 'player-red',
+    })
+    expect(summoned?.statusTags).not.toContainEqual(
+      expect.objectContaining({ type: 'deployment-first-move-free' }),
+    )
+    expect(globalTriggerSystem.checkTriggers).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'afterPieceSummoned',
+        playerId: 'player-red',
+        sourcePiece: expect.objectContaining({ instanceId: 'kiljaedan-hidden' }),
+      }),
+    )
     expect(next.players.find((p: any) => p.playerId === 'player-red').discardPile).toEqual(['demon-summon-5'])
   })
 })

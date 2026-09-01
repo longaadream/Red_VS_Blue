@@ -1,3 +1,5 @@
+import { DEPLOYMENT_FIRST_MOVE_FREE_STATUS } from './piece'
+
 export interface GridPosition {
   x: number
   y: number
@@ -34,6 +36,11 @@ export interface SpatialPiece {
   y?: number | null
   currentHp: number
   moveRange?: number | null
+  statusTags?: ReadonlyArray<{
+    type?: string
+    grantedTurnNumber?: unknown
+    currentUses?: unknown
+  }>
 }
 
 export interface SpatialBattleState {
@@ -65,6 +72,7 @@ export interface NormalMoveActionState extends SpatialBattleState {
   turn: {
     currentPlayerId: string
     phase: string
+    turnNumber: number
   }
 }
 
@@ -334,10 +342,16 @@ export function getLegalNormalMoveTargetsForPlayer(
     return []
   }
   const player = state.players.find(candidate => candidate.playerId.toLowerCase() === normalizedPlayerId)
-  if (!player || player.actionPoints < 1) return []
+  if (!player) return []
 
   const piece = state.pieces.find(candidate => candidate.instanceId === pieceId
     && candidate.ownerPlayerId?.toLowerCase() === normalizedPlayerId
     && candidate.currentHp > 0)
-  return piece ? getLegalNormalMoveTargets(state, piece) : []
+  if (!piece) return []
+  const hasCurrentTurnDeploymentFirstMoveFree = piece.statusTags?.some(statusTag =>
+    statusTag.type === DEPLOYMENT_FIRST_MOVE_FREE_STATUS
+      && statusTag.grantedTurnNumber === state.turn.turnNumber
+      && statusTag.currentUses === 1) === true
+  if (player.actionPoints < 1 && !hasCurrentTurnDeploymentFirstMoveFree) return []
+  return getLegalNormalMoveTargets(state, piece)
 }

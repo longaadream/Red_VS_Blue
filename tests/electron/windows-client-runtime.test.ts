@@ -131,6 +131,32 @@ describe('Windows Electron client runtime', () => {
     expect(singleInstanceLock).toBeGreaterThan(profileConfiguration)
   })
 
+  test('uses a distinct initialized SQLite database for every named development profile', () => {
+    const defaultUserData = path.resolve('C:/Users/test/AppData/Roaming/RED vs BLUE')
+    const first = resolveDevelopmentProfile(
+      ['electron.exe', '--rvb-dev-profile=player-one'],
+      false,
+      defaultUserData,
+    )!
+    const second = resolveDevelopmentProfile(
+      ['electron.exe', '--rvb-dev-profile=player-two'],
+      false,
+      defaultUserData,
+    )!
+    const firstDatabase = path.join(first.userDataPath, 'game.db')
+    const secondDatabase = path.join(second.userDataPath, 'game.db')
+    const source = read('electron-client/main.ts')
+    const startLocalServer = source.slice(
+      source.indexOf('async function startLocalServer('),
+      source.indexOf('type JsonObject ='),
+    )
+
+    expect(firstDatabase).not.toBe(secondDatabase)
+    expect(startLocalServer).toContain("const dbPath = path.join(userData, 'game.db')")
+    expect(startLocalServer).toMatch(/if \(app\.isPackaged \|\| developmentProfile\)[\s\S]*?initDatabase\(dbPath, appRoot\)/)
+    expect(startLocalServer).toMatch(/else \{\s*databaseUrl = `file:\$\{path\.join\(appRoot, 'prisma', 'dev\.db'\)\}`/)
+  })
+
   test('shows identity initialization and save failures instead of swallowing them', () => {
     const page = read('data/pages/index.html')
 

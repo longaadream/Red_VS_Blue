@@ -143,6 +143,7 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
 
 function installRenderHand(context: Context) {
   new Script([
+    readNamedFunction('progressiveDeploymentPending'),
     readNamedFunction('isPendingHandSelection'),
     readNamedFunction('pendingHandCandidateValues'),
     readNamedFunction('syncPendingHandSelection'),

@@ -45,6 +45,19 @@ describe('RED-45 producer/consumer event catalog', () => {
         producers: expect.arrayContaining(['lib/game/turn.ts']),
         consumers: expect.arrayContaining(['data/rules/rule-freeze-prevent-move.json#trigger.type']),
       }),
+      expect.objectContaining({
+        event: 'afterPieceSummoned',
+        declared: true,
+        producers: expect.arrayContaining([
+          'lib/game/battle-setup.ts',
+          'lib/game/skills.ts',
+          'lib/game/turn.ts',
+        ]),
+        consumers: expect.arrayContaining([
+          'data/rules/rule-elune-protection.json#trigger.type',
+          'data/rules/rule-tirion-divine-shield-start.json#trigger.type',
+        ]),
+      }),
     ]))
   })
 
@@ -65,7 +78,6 @@ describe('RED-45 producer/consumer event catalog', () => {
     expect(consumerless).toEqual(expect.arrayContaining([
       'afterCardAdded',
       'afterChargeGained',
-      'afterPieceSummoned',
       'beforePieceSummoned',
       'whenever',
     ]))

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
 import {
+  broadcastBattleSnapshot,
   broadcastBattleTransition,
-  broadcastToRoom,
   queueBotTurnIfReady,
 } from "@/lib/ws-server"
 import {
@@ -16,7 +16,7 @@ import {
   BATTLE_AUTHORITY_PROTOCOL_VERSION,
 } from "@/lib/game/battle-public-patch"
 import { parseBattleAuthorityEnvelope, roomBattleAuthorityVersion } from "@/lib/game/battle-transition"
-import { verifyBattleActionAuth } from "@/lib/game/identity-verify"
+import { verifyBattleActionAuth, verifyBattleSubscribeAuth } from "@/lib/game/identity-verify"
 import { getClientTerminalSubmissionError } from "@/lib/server/battle-terminal"
 import { getGameProfileErrorPayloadV1 } from "@/lib/content-pipeline/runtime/profile-game-identity"
 
@@ -41,9 +41,34 @@ export async function GET(
   const room = await roomStore.getRoom(roomId)
   if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
 
-  const viewerPlayerId = req.headers.get('x-player-id')
-    ?? req.nextUrl.searchParams.get('viewerPlayerId')
-    ?? undefined
+  // Unsigned viewer claims are intentionally ignored. A GET without a signed
+  // subscription identity receives the spectator projection.
+  const authHeader = req.headers.get('x-battle-subscribe-auth')
+  let viewerPlayerId: string | undefined
+  if (authHeader !== null) {
+    let candidate: unknown
+    try {
+      candidate = JSON.parse(authHeader)
+    } catch {
+      return NextResponse.json({
+        error: 'Malformed battle subscription authentication header',
+        code: 'SUBSCRIBE_AUTH_INVALID',
+      }, { status: 401 })
+    }
+    try {
+      viewerPlayerId = (await verifyBattleSubscribeAuth(candidate, {
+        roomId,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      })).playerId
+    } catch (error) {
+      const authError = error as { code?: string; message?: string }
+      return NextResponse.json({
+        error: authError.message ?? 'Battle subscription authentication failed',
+        code: authError.code ?? 'SUBSCRIBE_AUTH_INVALID',
+      }, { status: 401 })
+    }
+  }
   try {
     return NextResponse.json(createPublicBattleSnapshot(room, viewerPlayerId))
   } catch (err) {
@@ -128,12 +153,17 @@ export async function POST(
 
     if (result.transition) broadcastBattleTransition(roomId, result)
     else if (result.kind === 'applied' || result.kind === 'expired') {
-      broadcastToRoom(roomId, { type: 'stateUpdate', ...result.snapshot })
+      await broadcastBattleSnapshot(roomId, {
+        snapshot: result.snapshot,
+        state: result.actionResult.state,
+      })
     }
     await scheduleRoomBattleTimeout(roomStore, roomId, {
-      onCommitted: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
+      onCommitted: () => broadcastBattleSnapshot(roomId),
       onTransitionCommitted: timerResult => broadcastBattleTransition(roomId, timerResult),
-      onBotTurnReady: snapshot => { void queueBotTurnIfReady(roomId, snapshot.state) },
+      onBotTurnReady: (_snapshot, authorityState) => {
+        void queueBotTurnIfReady(roomId, authorityState)
+      },
     })
     queueBotTurnIfReady(roomId, result.actionResult.state)
 

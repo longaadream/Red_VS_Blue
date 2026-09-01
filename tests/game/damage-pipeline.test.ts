@@ -459,6 +459,15 @@ describe('RED-33 deterministic damage pipeline', () => {
     const attacker = makePiece({ instanceId: 'revive-attacker', ownerPlayerId: 'player-red' }) as any
     const defender = makePiece({ instanceId: 'revive-defender', ownerPlayerId: 'player-blue', currentHp: 5, maxHp: 20 }) as any
     const state = makeState({ pieces: [attacker, defender] }) as any
+    defender.statusTags = [{
+      id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
+      name: '本回合首次移动免费',
+      visible: true,
+      grantedTurnNumber: state.turn.turnNumber,
+      currentDuration: 1,
+      currentUses: 1,
+    }]
     state.extensions.lifecycle = []
     globalTriggerSystem.addRules([
       eventRule('observe-revive-kill', 'afterPieceKilled', battle => {
@@ -482,6 +491,11 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(state.pieces.map((piece: any) => piece.instanceId)).toContain(defender.instanceId)
     expect(state.graveyard).toEqual([])
     expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
+    expect(defender.statusTags).toContainEqual(expect.objectContaining({
+      type: 'deployment-first-move-free',
+      grantedTurnNumber: state.turn.turnNumber,
+      currentUses: 1,
+    }))
   })
 
   it('stops a reflected damage cycle with deterministic chain context', () => {

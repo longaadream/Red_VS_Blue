@@ -1,7 +1,7 @@
 {
   "id": "kiljaedan-demonic-pact",
   "name": "恶魔仪式",
-  "description": "战斗开始时，基尔加丹隐匿于虚空，并留下【恶魔召唤(1)】。依次打出5张召唤牌后，基尔加丹会被召唤至指定格子。",
+  "description": "战斗初始化时，基尔加丹进入虚空，并留下【恶魔召唤(1)】。依次打出5张召唤牌后，基尔加丹会被召唤至指定格子。",
   "keywords": ["召唤"],
   "targetText": "被动",
   "effectTags": ["passive", "summon", "card"],
@@ -9,5 +9,5 @@
   "kind": "passive",
   "type": "passive",
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { var kj = context.piece || context.rulePiece; if (!kj) return { success: false, message: '' }; var idx = battle.pieces.findIndex(function(p) { return p.instanceId === kj.instanceId; }); if (idx === -1) return { success: false, message: '' }; battle.pieces.splice(idx, 1); if (!battle.extensions) battle.extensions = {}; var strippedRules = (kj.rules || []).map(function(r) { var rc = {}; for (var k in r) { if (k !== 'effect') rc[k] = r[k]; } return rc; }); var kjCopy = {}; for (var key in kj) { if (key !== 'rules') kjCopy[key] = kj[key]; } kjCopy.rules = strippedRules; try { battle.extensions.kiljaedanPiece = JSON.parse(JSON.stringify(kjCopy)); } catch(e) { battle.extensions.kiljaedanPiece = { instanceId: kj.instanceId, templateId: kj.templateId, ownerPlayerId: kj.ownerPlayerId, name: kj.name, faction: kj.faction }; } addCardToHand('demon-summon-1', kj.ownerPlayerId); return { success: true, message: '基尔加丹隐匿于虚空之中，等待召唤...' }; }"
+  "code": "function executeSkill(context) { var kj = context.piece || context.rulePiece; if (!kj) return { success: false, message: '' }; var idx = battle.pieces.findIndex(function(p) { return p.instanceId === kj.instanceId; }); if (idx === -1) return { success: false, message: '' }; battle.pieces.splice(idx, 1); if (!battle.extensions) battle.extensions = {}; var strippedRules = (kj.rules || []).map(function(r) { var rc = {}; for (var k in r) { if (k !== 'effect') rc[k] = r[k]; } return rc; }); var kjCopy = {}; for (var key in kj) { if (key !== 'rules') kjCopy[key] = kj[key]; } kjCopy.rules = strippedRules; var stored; try { stored = JSON.parse(JSON.stringify(kjCopy)); } catch(e) { stored = { instanceId: kj.instanceId, templateId: kj.templateId, ownerPlayerId: kj.ownerPlayerId, name: kj.name, faction: kj.faction, isCore: kj.isCore }; } var ownerKey = String(kj.ownerPlayerId || '').trim().toLowerCase(); if (!ownerKey) return { success: false, message: '基尔加丹缺少所属玩家' }; if (!battle.extensions.kiljaedanPiecesByPlayerId || Array.isArray(battle.extensions.kiljaedanPiecesByPlayerId)) battle.extensions.kiljaedanPiecesByPlayerId = {}; battle.extensions.kiljaedanPiecesByPlayerId[ownerKey] = stored; if (!battle.extensions.kiljaedanPiece) battle.extensions.kiljaedanPiece = stored; addCardToHand('demon-summon-1', kj.ownerPlayerId); return { success: true, message: '基尔加丹隐匿于虚空之中，等待召唤...' }; }"
 }

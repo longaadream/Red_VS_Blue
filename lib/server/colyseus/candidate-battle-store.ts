@@ -28,6 +28,7 @@ export interface CandidateAuthorityRepository {
 }
 
 export class CandidateBattleStore implements DeploymentRoomStore {
+  readonly terminalAuthorityPersistencePolicy = 'durable-barrier' as const
   private readonly receipts = new Map<string, BattleAuthorityReceipt>()
   private readonly transitions: BattleAuthorityTransitionRecord[]
 

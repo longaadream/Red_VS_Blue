@@ -655,4 +655,91 @@ new Script([
     expect(battlePage).not.toContain("RvBWs.send({ type: 'stateUpdate'")
     expect(browserEngine).toContain('toPublicBattleState')
   })
+
+  it('submits RED-138 deployment only from authoritative projected cells', () => {
+    const battlePage = readPage('battle.html')
+    const submittedActions: unknown[] = []
+    const statusMessages: string[] = []
+    const context = createContext({
+      G: {
+        pieces: [],
+        deployment: {
+          mode: 'progressive-reserve-v1',
+          status: 'awaiting-reserve-deploy',
+          revision: 17,
+          activePlayerId: 'player-red',
+          legalPositions: [{ x: 2, y: 3 }],
+        },
+      },
+      myPlayerId: 'player-red',
+      SPECTATE_MODE: false,
+      targetSubmissionPending: false,
+      pendingActionFeedback: null,
+      localDeploymentChoiceId: 'tyrande-1',
+      pendingOptionSelectionForOther: () => false,
+      doAction: (action: unknown) => submittedActions.push(action),
+      setStatusMsg: (message: string) => statusMessages.push(message),
+    })
+    new Script(readNamedFunction(battlePage, 'onCellClick')).runInContext(context)
+
+    new Script('onCellClick(1, 1)').runInContext(context)
+    expect(submittedActions).toEqual([])
+    expect(statusMessages.at(-1)).toBe('请选择权威高亮的部署格')
+
+    new Script('onCellClick(2, 3)').runInContext(context)
+    expect(JSON.parse(JSON.stringify(submittedActions.at(-1)))).toEqual({
+      type: 'deployReservePiece',
+      playerId: 'player-red',
+      expectedDeploymentRevision: 17,
+      pieceId: 'tyrande-1',
+      toX: 2,
+      toY: 3,
+    })
+
+  })
+
+  it('keeps progressive reserve deployment non-modal and returns directly to normal tagged movement', () => {
+    const battlePage = readPage('battle.html')
+    const reserveSelection = readNamedFunction(battlePage, 'selectReserveDeploymentPiece')
+    const authorityCells = readNamedFunction(battlePage, 'authorityCellSet')
+
+    expect(battlePage).toContain('id="deploymentChoices"')
+    expect(battlePage).toContain('role="radiogroup"')
+    expect(battlePage).not.toContain('id="deploymentSkip"')
+    expect(battlePage).not.toContain("type: 'deploymentSkipFreeMove'")
+    expect(battlePage).not.toContain("type: 'deploymentFreeMove'")
+    expect(battlePage).not.toContain("'awaiting-free-move'")
+    expect(battlePage.match(/expectedDeploymentRevision: deployment\.revision/g)).toHaveLength(2)
+    expect(battlePage).toMatch(
+      /function selectReserveDeploymentPiece\(pieceId\)[\s\S]*?!legalPositions\.length[\s\S]*?type: 'deployReservePiece'[\s\S]*?pieceId: pieceId/,
+    )
+    expect(reserveSelection).not.toContain('Math.random')
+    expect(authorityCells).not.toMatch(/manhattan/i)
+    expect(battlePage).toContain("pieceHasVisibleStatusTag(piece, 'deployment-first-move-free')")
+    expect(battlePage).toContain('本回合首移 0 AP')
+  })
+
+  it('shows authoritative reserve-candidate stats and opens read-only accessible details', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('function showDeploymentPieceInfo(pieceId, trigger, preserveKeyword)')
+    expect(battlePage).toContain('function resolveDeploymentOfferPiece(pieceId)')
+    expect(battlePage).toContain("G.pieceStatsByTemplateId[offer.templateId]")
+    expect(battlePage).toContain('HP / 攻击 / 防御 / 移动')
+    expect(battlePage).toContain('属性与技能')
+    expect(battlePage).toContain('aria-label="查看候选棋子的属性与技能"')
+    expect(battlePage).toContain('aria-labelledby="pieceInfoName"')
+    expect(battlePage).toContain('aria-label="关闭棋子详情"')
+    expect(battlePage).toContain('function handlePieceInfoModalKeydown(event)')
+    expect(battlePage).toMatch(/handlePieceInfoModalKeydown[\s\S]*?event\.key === 'Escape'/)
+    expect(battlePage).toMatch(/handlePieceInfoModalKeydown[\s\S]*?event\.key !== 'Tab'/)
+
+    const inspectSource = readNamedFunction(battlePage, 'showDeploymentPieceInfo')
+    expect(inspectSource).not.toContain('localDeploymentChoiceId =')
+    expect(inspectSource).not.toContain('doAction(')
+    expect(inspectSource).not.toContain('expectedDeploymentRevision')
+    expect(battlePage).toMatch(
+      /function reconcileDeploymentPieceInfo[\s\S]*?deployment\.revision !== currentPieceInfoDeploymentRevision[\s\S]*?closePieceInfo/,
+    )
+  })
 })

@@ -176,6 +176,7 @@ export function runBattleAction(
     const nextMetadata = getOrCreateDebugMetadata(next)
     if (explicitActionId) nextMetadata.appliedActionIds.push(explicitActionId)
 
+    const tracedDeploymentAction = deploymentTraceAction(state, next, action)
     const trace: BattleActionTrace = {
       index: actionIndex,
       rootSeed: runtime?.rootSeed ?? null,
@@ -187,16 +188,24 @@ export function runBattleAction(
       preStateHash,
       postStateHash,
       randomStreams: runtime?.randomTrace(true) ?? [],
-      deployment: isDeploymentAction(action) && next.deployment ? {
-        command: deploymentCommand(action),
+      deployment: tracedDeploymentAction && next.deployment ? {
+        command: deploymentCommand(tracedDeploymentAction),
+        mode: next.deployment.mode,
+        status: next.deployment.status,
         choices: copyDeploymentChoices(next.deployment.choices),
         locks: copyDeploymentLocks(next.deployment.locks),
-        timedOutPlayerIds: action.type === 'deploymentTimeout'
+        timedOutPlayerIds: tracedDeploymentAction.type === 'deploymentTimeout'
           ? next.deployment.playerIds.filter(playerId => next.deployment?.locks[playerId]?.reason === 'timeout')
           : undefined,
         finalPositions: copyDeploymentPositions(next.deployment.finalPositions),
         deadlineAt: next.deployment.deadlineAt,
         revision: next.deployment.revision,
+        openingVanguardsInitialized: next.deployment.openingVanguardsInitialized,
+        activePlayerId: next.deployment.activePlayerId,
+        offerPieceIds: next.deployment.offerPieceIds ? [...next.deployment.offerPieceIds] : undefined,
+        reserveCounts: next.deployment.reserveCounts ? { ...next.deployment.reserveCounts } : undefined,
+        lastDeployedPieceId: next.deployment.lastDeployedPieceId,
+        deployedPosition: committedProgressiveDeploymentPosition(state, next, tracedDeploymentAction),
       } : undefined,
     }
     nextMetadata.actionLog.push(trace)
@@ -415,13 +424,42 @@ function copyDeploymentLocks(
 }
 
 function isDeploymentAction(action: BattleAction): boolean {
-  return action.type === 'deploymentChoice' || action.type === 'deploymentLock' || action.type === 'deploymentTimeout'
+  return action.type === 'deploymentChoice'
+    || action.type === 'deploymentLock'
+    || action.type === 'deploymentTimeout'
+    || action.type === 'deployReservePiece'
 }
 
-function deploymentCommand(action: BattleAction): 'select' | 'lock' | 'timeout' {
-  if (action.type === 'deploymentTimeout') return 'timeout'
+function deploymentCommand(
+  action: BattleAction,
+): 'select' | 'lock' | 'timeout' | 'deploy' {
+  if (action.type === 'deploymentTimeout' || action.type === 'turnTimeout') return 'timeout'
   if (action.type === 'deploymentLock') return 'lock'
+  if (action.type === 'deployReservePiece') return 'deploy'
   return 'select'
+}
+
+function deploymentTraceAction(
+  state: BattleState,
+  next: BattleState,
+  action: BattleAction,
+): BattleAction | undefined {
+  if (isDeploymentAction(action)) return action
+  if (
+    action.type === 'turnTimeout'
+    && (state.deployment?.mode === 'progressive-reserve-v1'
+      || next.deployment?.mode === 'progressive-reserve-v1')
+  ) return action
+  if (
+    action.type !== 'pendingOptionSelect'
+    && action.type !== 'pendingTargetSelect'
+    && action.type !== 'cancelPendingSelection'
+  ) return undefined
+  const pending = state.pendingOptionSelection ?? state.pendingTargetSelection
+  const rootAction = pending?.transaction?.rootAction as BattleAction | undefined
+  if (!rootAction) return undefined
+  if (isDeploymentAction(rootAction)) return rootAction
+  return rootAction.type === 'turnTimeout' ? rootAction : undefined
 }
 
 
@@ -432,6 +470,24 @@ function copyDeploymentPositions(
   return Object.fromEntries(
     Object.entries(positions).map(([pieceId, position]) => [pieceId, { ...position }]),
   )
+}
+
+function committedProgressiveDeploymentPosition(
+  previousState: BattleState,
+  state: BattleState,
+  action: BattleAction,
+): { x: number; y: number } | undefined {
+  if (action.type !== 'deployReservePiece' && action.type !== 'turnTimeout') return undefined
+  const pieceId = action.type === 'deployReservePiece' ? action.pieceId : undefined
+  const previousActionCount = previousState.actions?.length ?? 0
+  const committed = [...(state.actions ?? []).slice(previousActionCount)].reverse().find(entry =>
+    entry.type === 'deployReservePiece'
+    && (pieceId === undefined || entry.payload?.pieceId === pieceId))
+  const x = committed?.payload?.toX
+  const y = committed?.payload?.toY
+  return Number.isSafeInteger(x) && Number.isSafeInteger(y)
+    ? { x: x as number, y: y as number }
+    : undefined
 }
 
 export function replayBattle(input: BattleReplayInput): BattleReplayResult {

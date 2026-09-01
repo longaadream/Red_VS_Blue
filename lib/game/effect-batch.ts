@@ -102,6 +102,7 @@ export interface StoredOrDeclaredPieceSummonCapabilityDeclaration {
   readonly recipe: 'stored-or-declared-piece'
   readonly maxSummons: number
   readonly storageExtensionKey: string
+  readonly ownerScopedStorageExtensionKey?: string
   readonly uniqueTemplateId: string
   readonly fallback: StoredPieceFallbackDeclaration
 }
@@ -1501,6 +1502,7 @@ function parseStoredPieceCapability(
     'recipe',
     'maxSummons',
     'storageExtensionKey',
+    'ownerScopedStorageExtensionKey',
     'uniqueTemplateId',
     'fallback',
   ], 'stored-or-declared-piece capability')
@@ -1515,6 +1517,24 @@ function parseStoredPieceCapability(
     || storageExtensionKey === 'constructor'
   ) {
     capabilityError('stored-or-declared-piece storageExtensionKey is unsafe')
+  }
+  const ownerScopedStorageExtensionKey = value.ownerScopedStorageExtensionKey === undefined
+    ? undefined
+    : readCapabilityString(
+      value.ownerScopedStorageExtensionKey,
+      'stored-or-declared-piece ownerScopedStorageExtensionKey',
+    )
+  if (
+    ownerScopedStorageExtensionKey !== undefined
+    && (
+      !/^[A-Za-z][A-Za-z0-9_]*$/.test(ownerScopedStorageExtensionKey)
+      || ownerScopedStorageExtensionKey === '__proto__'
+      || ownerScopedStorageExtensionKey === 'prototype'
+      || ownerScopedStorageExtensionKey === 'constructor'
+      || ownerScopedStorageExtensionKey === storageExtensionKey
+    )
+  ) {
+    capabilityError('stored-or-declared-piece ownerScopedStorageExtensionKey is unsafe')
   }
   const fallback = parseStoredPieceFallback(value.fallback)
   const uniqueTemplateId = readCapabilityString(
@@ -1537,6 +1557,7 @@ function parseStoredPieceCapability(
     recipe: 'stored-or-declared-piece' as const,
     maxSummons,
     storageExtensionKey,
+    ownerScopedStorageExtensionKey,
     uniqueTemplateId,
     fallback,
   })

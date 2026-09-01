@@ -115,6 +115,7 @@
     ],
     "rules": [
       "rule-blackwidow-toxin-player",
+      "rule-elune-protection",
       "rule-ichigo-black-getsuga-teleport",
       "rule-mangekyo-friendly-death",
       "rule-minato-anchor-end-turn",
@@ -128,6 +129,7 @@
       "rule-shishio-burn-endturn",
       "rule-shishio-burn-move",
       "rule-shishio-infinite-blade-recast",
+      "rule-tirion-divine-shield-start",
       "rule-turalyon-lightforged-march"
     ]
   },

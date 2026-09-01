@@ -26,7 +26,12 @@ function writeLog(message: string) {
 
 // 重新导出类型，保持向后兼容
 import type { BoardMap } from "./map"
-import type { PieceInstance, PieceStats, PieceStatusTag } from "./piece"
+import {
+  DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+  type PieceInstance,
+  type PieceStats,
+  type PieceStatusTag,
+} from "./piece"
 import type { SkillDefinition } from "./skills"
 import { dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, restorePersistedRuleRuntime, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
 import { globalTriggerSystem, type TriggerContext, type TriggerResult, type TriggerRule } from "./triggers"
@@ -70,6 +75,13 @@ import {
 } from './suspendable-action-transaction'
 import { getNormalMoveRejection, manhattanDistance } from "./spatial"
 import {
+  PROGRESSIVE_DEPLOYMENT_MODE,
+  getEmptyWalkableDeploymentPositions,
+  getSafeDeploymentPositions,
+  isProgressiveDeployment,
+  reservePiecesForPlayer,
+} from './deployment'
+import {
   TargetingRuleError,
   advancePendingTargetSession,
   finalizePendingTargetSession,
@@ -101,7 +113,8 @@ const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 
 // ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
 function restorePieceRules(state: BattleState): void {
-  state.pieces.forEach(piece => {
+  const reservePieces = Object.values(state.deployment?.reserves ?? {}).flat()
+  ;[...state.pieces, ...reservePieces].forEach(piece => {
     // 确保 rules 数组存在
     if (!piece.rules) {
       piece.rules = []
@@ -232,6 +245,12 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   const pieceFns   = collectRuleFns(state.pieces)
   const graveFns   = collectRuleFns((state as any).graveyard || [])
   const playerFns  = collectRuleFns(state.players)
+  const reserveFns = Object.fromEntries(
+    Object.entries(state.deployment?.reserves ?? {}).map(([playerId, pieces]) => [
+      playerId,
+      collectRuleFns(pieces),
+    ]),
+  )
 
   // JSON 序列化/反序列化：自动剥离所有函数（编译缓存、effect 等），不需要临时删除
   const cloned = JSON.parse(JSON.stringify(state)) as BattleState
@@ -246,6 +265,9 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   restoreRuleFns(cloned.pieces, pieceFns)
   restoreRuleFns((cloned as any).graveyard || [], graveFns)
   restoreRuleFns(cloned.players, playerFns)
+  for (const [playerId, fnMap] of Object.entries(reserveFns)) {
+    restoreRuleFns(cloned.deployment?.reserves?.[playerId] ?? [], fnMap)
+  }
 
   cloned._v = BATTLE_STATE_VERSION
   return cloned
@@ -346,16 +368,47 @@ export interface DeploymentLock {
   reason?: 'player' | 'timeout'
 }
 
+export type DeploymentMode = 'legacy-reroll-v1' | 'progressive-reserve-v1'
+
+export type DeploymentStatus =
+  | 'awaiting-locks'
+  | 'awaiting-reserve-deploy'
+  | 'turn-ready'
+  | 'complete'
+
+export interface DeploymentOfferPiece {
+  instanceId: string
+  templateId: string
+  name: string
+}
+
 export interface DeploymentState {
-  status: 'awaiting-locks' | 'complete'
+  /** Missing on RED-29 saved states, which are interpreted as legacy-reroll-v1. */
+  mode?: DeploymentMode
+  status: DeploymentStatus
   playerIds: PlayerId[]
   choices: Record<PlayerId, DeploymentChoice>
   locks: Record<PlayerId, DeploymentLock>
   startedAt: number
   deadlineAt: number
   revision: number
+  /** Set only after both seeded opening summons and their trigger queues finish. */
+  openingVanguardsInitialized?: boolean
   initialPositions: Record<string, DeploymentPosition>
   finalPositions?: Record<string, DeploymentPosition>
+  /** Server-only stable core instances that have not entered the board. */
+  reserves?: Record<PlayerId, PieceInstance[]>
+  /** Public count only; reserve identities and order remain server-private. */
+  reserveCounts?: Record<PlayerId, number>
+  activePlayerId?: PlayerId
+  offerTurnNumber?: number
+  /** Server-private IDs. The public projection exposes them only to activePlayerId. */
+  offerPieceIds?: string[]
+  /** Projection-only summaries for the active player. */
+  offerPieces?: DeploymentOfferPiece[]
+  /** Server-authoritative safe cells, exposed only to activePlayerId. */
+  legalPositions?: DeploymentPosition[]
+  lastDeployedPieceId?: string
 }
 
 export interface BattleState {
@@ -416,6 +469,15 @@ export type BattleAction =
   | {
       type: "deploymentTimeout"
       now: number
+      clientActionId?: string
+    }
+  | {
+      type: "deployReservePiece"
+      playerId: PlayerId
+      expectedDeploymentRevision: number
+      pieceId: string
+      toX?: number
+      toY?: number
       clientActionId?: string
     }
   | {
@@ -567,6 +629,265 @@ function resolveDeploymentChoices(state: BattleState, deployment: DeploymentStat
   deployment.finalPositions = Object.fromEntries(state.pieces
     .filter(piece => piece.isCore === true && piece.x !== null && piece.y !== null)
     .map(piece => [piece.instanceId, { x: piece.x as number, y: piece.y as number }]))
+}
+
+function progressiveReserveEntry(
+  deployment: DeploymentState,
+  playerId: string,
+): { playerId: string; pieces: PieceInstance[] } | undefined {
+  const normalized = normalizeStablePlayerId(playerId)
+  const stablePlayerId = Object.keys(deployment.reserves ?? {}).find(
+    candidate => normalizeStablePlayerId(candidate) === normalized,
+  )
+  return stablePlayerId
+    ? { playerId: stablePlayerId, pieces: deployment.reserves?.[stablePlayerId] ?? [] }
+    : undefined
+}
+
+function updateProgressiveReserveCounts(deployment: DeploymentState): void {
+  deployment.reserveCounts = Object.fromEntries(
+    deployment.playerIds.map(playerId => [
+      playerId,
+      progressiveReserveEntry(deployment, playerId)?.pieces.length ?? 0,
+    ]),
+  )
+}
+
+function allProgressiveReservesEmpty(deployment: DeploymentState): boolean {
+  return deployment.playerIds.every(
+    playerId => (progressiveReserveEntry(deployment, playerId)?.pieces.length ?? 0) === 0,
+  )
+}
+
+function clearProgressiveTurnInput(deployment: DeploymentState): void {
+  delete deployment.activePlayerId
+  delete deployment.offerTurnNumber
+  delete deployment.offerPieceIds
+  delete deployment.offerPieces
+  delete deployment.legalPositions
+}
+
+function isCurrentTurnDeploymentFirstMoveFree(
+  statusTag: PieceStatusTag,
+  turnNumber: number,
+): boolean {
+  return statusTag.type === DEPLOYMENT_FIRST_MOVE_FREE_STATUS
+    && statusTag.grantedTurnNumber === turnNumber
+    && statusTag.currentUses === 1
+}
+
+function grantDeploymentFirstMoveFree(piece: PieceInstance, turnNumber: number): void {
+  piece.statusTags = (piece.statusTags ?? []).filter(
+    statusTag => statusTag.type !== DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+  )
+  piece.statusTags.push({
+    id: DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+    type: DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+    name: '本回合首次移动免费',
+    visible: true,
+    grantedTurnNumber: turnNumber,
+    currentDuration: 1,
+    currentUses: 1,
+  })
+}
+
+function consumeDeploymentFirstMoveFree(piece: PieceInstance, turnNumber: number): boolean {
+  const statusIndex = (piece.statusTags ?? []).findIndex(
+    statusTag => isCurrentTurnDeploymentFirstMoveFree(statusTag, turnNumber),
+  )
+  if (statusIndex < 0) return false
+  piece.statusTags.splice(statusIndex, 1)
+  return true
+}
+
+function clearDeploymentFirstMoveFree(state: BattleState): void {
+  const candidates = [
+    ...state.pieces,
+    ...(state.graveyard ?? []),
+    ...Object.values(state.deployment?.reserves ?? {}).flat(),
+  ]
+  const seen = new Set<PieceInstance>()
+  for (const piece of candidates) {
+    if (seen.has(piece)) continue
+    seen.add(piece)
+    piece.statusTags = (piece.statusTags ?? []).filter(
+      statusTag => statusTag.type !== DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+    )
+  }
+}
+
+function assertExpectedProgressiveDeploymentRevision(
+  state: BattleState,
+  expectedDeploymentRevision: number,
+): DeploymentState {
+  const deployment = state.deployment
+  if (!Number.isSafeInteger(expectedDeploymentRevision)
+    || !deployment
+    || !Number.isSafeInteger(deployment.revision)
+    || expectedDeploymentRevision !== deployment.revision) {
+    throw new BattleRuleError(
+      'Progressive deployment command revision is stale or invalid',
+      'PROGRESSIVE_DEPLOYMENT_STALE_REVISION',
+    )
+  }
+  return deployment
+}
+
+function startProgressiveDeploymentTurn(state: BattleState): boolean {
+  const deployment = state.deployment
+  if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE) return false
+
+  updateProgressiveReserveCounts(deployment)
+  const currentPlayerId = state.turn.currentPlayerId
+  const reserve = progressiveReserveEntry(deployment, currentPlayerId)?.pieces ?? []
+  if (reserve.length === 0) {
+    clearProgressiveTurnInput(deployment)
+    deployment.status = allProgressiveReservesEmpty(deployment) ? 'complete' : 'turn-ready'
+    return false
+  }
+
+  const runtime = getActiveRuleRuntime()
+  if (!runtime) {
+    throw new BattleRuleError(
+      'Progressive deployment offer requires a deterministic rule runtime',
+      'PROGRESSIVE_DEPLOYMENT_RUNTIME_REQUIRED',
+    )
+  }
+  const pool = [...reserve].sort((left, right) => compareStableText(left.instanceId, right.instanceId))
+  const offerCount = Math.min(3, pool.length)
+  const streamName = `${RANDOM_STREAM_NAMES.progressiveDeploymentOffer}/${normalizeStablePlayerId(currentPlayerId)}`
+  for (let index = 0; index < offerCount; index += 1) {
+    const selectedIndex = index + runtime.nextInt(streamName, pool.length - index)
+    const selected = pool[selectedIndex]
+    pool[selectedIndex] = pool[index]
+    pool[index] = selected
+  }
+
+  deployment.status = 'awaiting-reserve-deploy'
+  deployment.activePlayerId = currentPlayerId
+  deployment.offerTurnNumber = state.turn.turnNumber
+  deployment.offerPieceIds = pool.slice(0, offerCount).map(piece => piece.instanceId)
+  deployment.legalPositions = getSafeDeploymentPositions(state)
+  deployment.revision += 1
+  return true
+}
+
+function appendTriggerMessages(
+  state: BattleState,
+  playerId: string,
+  result: TriggerResult,
+): void {
+  if (!result.success || result.messages.length === 0) return
+  if (!state.actions) state.actions = []
+  result.messages.forEach(message => {
+    state.actions!.push({
+      type: 'triggerEffect',
+      playerId,
+      turn: state.turn.turnNumber,
+      payload: { message },
+    })
+  })
+}
+
+function assertSynchronousSummonTrigger(result: TriggerResult, eventType: string): void {
+  if (!result.needsOptionSelection && !result.needsTargetSelection) return
+  throw new BattleRuleError(
+    `[${eventType}] interactive trigger is unsupported at this summon boundary`,
+    'INTERACTIVE_TRIGGER_UNSUPPORTED',
+  )
+}
+
+function commitReservePieceSummon(
+  state: BattleState,
+  playerId: string,
+  pieceId: string,
+  position: DeploymentPosition,
+  positionPolicy: 'safe' | 'fallback',
+): PieceInstance {
+  const deployment = state.deployment
+  if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE) {
+    throw new BattleRuleError('Progressive deployment is unavailable')
+  }
+  const reserveEntry = progressiveReserveEntry(deployment, playerId)
+  const reserveIndex = reserveEntry?.pieces.findIndex(piece => piece.instanceId === pieceId) ?? -1
+  const piece = reserveIndex >= 0 ? reserveEntry!.pieces[reserveIndex] : undefined
+  if (!piece || piece.isCore !== true || piece.currentHp <= 0) {
+    throw new BattleRuleError('Reserve core is unavailable')
+  }
+
+  const beforeContext = {
+    type: 'beforePieceSummoned' as const,
+    playerId,
+    targetPosition: { ...position },
+    pieceTemplateId: piece.templateId,
+    faction: piece.faction,
+  }
+  const beforeResult = getActiveTriggerSystem().checkTriggers(state, beforeContext)
+  assertSynchronousSummonTrigger(beforeResult, 'beforePieceSummoned')
+  appendTriggerMessages(state, playerId, beforeResult)
+  if (beforeResult.blocked) {
+    throw new BattleRuleError(
+      beforeResult.messages.join('；') || 'Reserve summon was blocked',
+      'PROGRESSIVE_DEPLOYMENT_SUMMON_BLOCKED',
+    )
+  }
+
+  const finalPosition = beforeContext.targetPosition
+  const legalFinalPositions = positionPolicy === 'safe'
+    ? getSafeDeploymentPositions(state)
+    : getEmptyWalkableDeploymentPositions(state)
+  if (!finalPosition || !legalFinalPositions.some(candidate =>
+    candidate.x === finalPosition.x && candidate.y === finalPosition.y)) {
+    throw new BattleRuleError(
+      positionPolicy === 'safe'
+        ? 'Summon trigger changed the deployment outside the authoritative safe cells'
+        : 'Summon trigger changed the fallback deployment to an invalid position',
+      'PROGRESSIVE_DEPLOYMENT_TRIGGER_POSITION_INVALID',
+    )
+  }
+
+  reserveEntry!.pieces.splice(reserveIndex, 1)
+  piece.x = finalPosition.x
+  piece.y = finalPosition.y
+  const deployedPosition = { x: finalPosition.x, y: finalPosition.y }
+  state.pieces.push(piece)
+  updateProgressiveReserveCounts(deployment)
+
+  const afterResult = getActiveTriggerSystem().checkTriggers(state, {
+    type: 'afterPieceSummoned',
+    playerId,
+    sourcePiece: piece,
+    pieceTemplateId: piece.templateId,
+    faction: piece.faction,
+  })
+  assertSynchronousSummonTrigger(afterResult, 'afterPieceSummoned')
+  appendTriggerMessages(state, playerId, afterResult)
+
+  if (!state.actions) state.actions = []
+  state.actions.push({
+    type: 'deployReservePiece',
+    playerId,
+    turn: state.turn.turnNumber,
+    payload: {
+      message: `${piece.name || piece.templateId} entered the board at (${deployedPosition.x}, ${deployedPosition.y})`,
+      pieceId: piece.instanceId,
+      toX: deployedPosition.x,
+      toY: deployedPosition.y,
+    },
+  })
+  return piece
+}
+
+function finishProgressiveDeploymentTurn(state: BattleState): BattleState {
+  const deployment = state.deployment
+  if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE) return state
+  clearProgressiveTurnInput(deployment)
+  updateProgressiveReserveCounts(deployment)
+  deployment.status = allProgressiveReservesEmpty(deployment) ? 'complete' : 'turn-ready'
+  deployment.revision += 1
+  return applyBattleActionInternal(state, { type: 'beginPhase' }, {
+    skipProgressiveDeployment: true,
+  })
 }
 
 // 辅助函数：大小写不敏感地比较两个玩家ID
@@ -1011,6 +1332,7 @@ function requireActionPhase(state: BattleState) {
 type InternalContinuation = {
   skipTargetingValidation?: boolean
   skipBeginTurn?: boolean
+  skipProgressiveDeployment?: boolean
   skipEndTurnTrigger?: boolean
   skipBeforeSkillUse?: boolean
   skipBeforeCardPlay?: boolean
@@ -1070,6 +1392,7 @@ function applyBattleActionInternal(
   const isDeploymentCommand = action.type === 'deploymentChoice'
     || action.type === 'deploymentLock'
     || action.type === 'deploymentTimeout'
+    || action.type === 'deployReservePiece'
   const isTimerCommand = isTurnTimerSystemAction(action)
   const isPendingInteractionCommand = action.type === 'pendingOptionSelect'
     || action.type === 'pendingTargetSelect'
@@ -1081,6 +1404,19 @@ function applyBattleActionInternal(
     && !isPendingInteractionCommand
   ) {
     throw new BattleRuleError('Battle actions are unavailable until deployment is complete')
+  }
+  if (
+    state.deployment?.mode === PROGRESSIVE_DEPLOYMENT_MODE
+    && state.deployment.status === 'awaiting-reserve-deploy'
+    && !isDeploymentCommand
+    && action.type !== 'surrender'
+    && !isPendingInteractionCommand
+    && !isTimerCommand
+  ) {
+    throw new BattleRuleError(
+      'Resolve the current reserve deployment before taking normal battle actions',
+      'PROGRESSIVE_DEPLOYMENT_REQUIRED',
+    )
   }
 
   // RED-59: all target discovery and final target validation happen before
@@ -1660,6 +1996,35 @@ function applyBattleActionInternal(
       // by a player command. Cancellable sessions cancel; mandatory sessions
       // consume one deterministic candidate. The expired budget is never reset.
       let progressed = resolveTimedOutPendingChain(next)
+      finalizeBattleTerminal(progressed, action)
+      if (progressed.terminalResult) return progressed
+      if (isProgressiveDeployment(progressed)) {
+        const deployment = progressed.deployment!
+        if (deployment.status === 'awaiting-reserve-deploy') {
+          const pieceId = deployment.offerPieceIds?.[0]
+          if (!pieceId) {
+            throw new BattleRuleError(
+              'Progressive deployment timeout has no authoritative offer',
+              'PROGRESSIVE_DEPLOYMENT_OFFER_REQUIRED',
+            )
+          }
+          if (getEmptyWalkableDeploymentPositions(progressed).length === 0) {
+            throw new BattleRuleError(
+              'No empty walkable deployment position exists',
+              'PROGRESSIVE_DEPLOYMENT_NO_EMPTY_CELL',
+            )
+          }
+          const safePosition = deployment.legalPositions?.[0]
+          progressed = applyBattleActionInternal(progressed, {
+            type: 'deployReservePiece',
+            playerId: progressed.turn.currentPlayerId,
+            expectedDeploymentRevision: deployment.revision,
+            pieceId,
+            ...(safePosition ? { toX: safePosition.x, toY: safePosition.y } : {}),
+          })
+          if (progressed.terminalResult) return progressed
+        }
+      }
       const endTurnAlreadySettled = progressed.turn.phase === 'end'
       if (!endTurnAlreadySettled) {
         progressed = applyBattleActionInternal(progressed, {
@@ -1667,8 +2032,88 @@ function applyBattleActionInternal(
           playerId: progressed.turn.currentPlayerId,
         })
         progressed = resolveTimedOutPendingChain(progressed)
+        finalizeBattleTerminal(progressed, action)
+        if (progressed.terminalResult) return progressed
       }
       return applySuspendableChildAction(progressed, { type: 'beginPhase' })
+    }
+
+    case 'deployReservePiece': {
+      assertExpectedProgressiveDeploymentRevision(state, action.expectedDeploymentRevision)
+      const next = safeCloneBattleState(state)
+      const deployment = next.deployment
+      if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE
+        || deployment.status !== 'awaiting-reserve-deploy') {
+        throw new BattleRuleError('Reserve deployment is not awaiting a piece')
+      }
+      if (!isCurrentPlayer(next, action.playerId)
+        || !isSamePlayer(deployment.activePlayerId ?? '', action.playerId)
+        || deployment.offerTurnNumber !== next.turn.turnNumber) {
+        throw new BattleRuleError('Reserve deployment belongs to another player or turn')
+      }
+      if (!(deployment.offerPieceIds ?? []).includes(action.pieceId)) {
+        throw new BattleRuleError('Selected piece is not in the authoritative reserve offer')
+      }
+
+      const safePositions = getSafeDeploymentPositions(next)
+      let position: DeploymentPosition
+      if (safePositions.length > 0) {
+        if (!Number.isSafeInteger(action.toX) || !Number.isSafeInteger(action.toY)) {
+          throw new BattleRuleError('A safe deployment position is required')
+        }
+        const requested = safePositions.find(candidate =>
+          candidate.x === action.toX && candidate.y === action.toY)
+        if (!requested) {
+          throw new BattleRuleError('Deployment position is outside the authoritative safe cells')
+        }
+        position = requested
+      } else {
+        const fallbackPositions = getEmptyWalkableDeploymentPositions(next)
+        if (fallbackPositions.length === 0) {
+          throw new BattleRuleError(
+            'No empty walkable deployment position exists',
+            'PROGRESSIVE_DEPLOYMENT_NO_EMPTY_CELL',
+          )
+        }
+        const runtime = getActiveRuleRuntime()
+        if (!runtime) {
+          throw new BattleRuleError(
+            'Fallback deployment requires a deterministic rule runtime',
+            'PROGRESSIVE_DEPLOYMENT_RUNTIME_REQUIRED',
+          )
+        }
+        const streamName = `${RANDOM_STREAM_NAMES.progressiveDeploymentFallback}/${normalizeStablePlayerId(action.playerId)}`
+        position = fallbackPositions[runtime.nextInt(streamName, fallbackPositions.length)]
+      }
+
+      const deployedPiece = commitReservePieceSummon(
+        next,
+        action.playerId,
+        action.pieceId,
+        position,
+        safePositions.length > 0 ? 'safe' : 'fallback',
+      )
+
+      deployment.lastDeployedPieceId = deployedPiece.instanceId
+      delete deployment.offerPieceIds
+      delete deployment.offerPieces
+      delete deployment.legalPositions
+      if (finalizeBattleTerminal(next, action)) {
+        clearProgressiveTurnInput(deployment)
+        updateProgressiveReserveCounts(deployment)
+        deployment.status = allProgressiveReservesEmpty(deployment) ? 'complete' : 'turn-ready'
+        deployment.revision += 1
+        return next
+      }
+      const livingDeployedPiece = next.pieces.find(piece =>
+        piece.instanceId === deployedPiece.instanceId
+        && piece.currentHp > 0
+        && piece.x !== null
+        && piece.y !== null)
+      if (livingDeployedPiece) {
+        grantDeploymentFirstMoveFree(livingDeployedPiece, next.turn.turnNumber)
+      }
+      return finishProgressiveDeploymentTurn(next)
     }
 
     case "deploymentChoice": {
@@ -1757,16 +2202,19 @@ function applyBattleActionInternal(
         if (!next.gameStartFired && next.turn.turnNumber === 1) {
           writeLog('[beginPhase] Triggering gameStart rules...')
           next.gameStartFired = true
-          // 为初始棋子补发 afterPieceSummoned，确保"进入战场"类规则对初始棋子也能生效
-          for (const piece of next.pieces) {
-            const initialSummonResult = getActiveTriggerSystem().checkTriggers(next, {
-              type: "afterPieceSummoned",
-              playerId: piece.ownerPlayerId,
-              sourcePiece: piece,
-              pieceTemplateId: piece.templateId,
-              faction: piece.faction
-            })
-            assertNoUnhandledInteraction(initialSummonResult, 'afterPieceSummoned')
+          // Legacy/no-deployment battles still treat their initial board as summoned.
+          // Progressive reserve pieces emit this event only when actually entering play.
+          if (!isProgressiveDeployment(next)) {
+            for (const piece of next.pieces) {
+              const initialSummonResult = getActiveTriggerSystem().checkTriggers(next, {
+                type: "afterPieceSummoned",
+                playerId: piece.ownerPlayerId,
+                sourcePiece: piece,
+                pieceTemplateId: piece.templateId,
+                faction: piece.faction
+              })
+              assertNoUnhandledInteraction(initialSummonResult, 'afterPieceSummoned')
+            }
           }
           const gameStartResult = getActiveTriggerSystem().checkTriggers(next, {
             type: "gameStart",
@@ -1781,6 +2229,15 @@ function applyBattleActionInternal(
               next.actions!.push({ type: "triggerEffect", playerId: next.turn.currentPlayerId, turn: 1, payload: { message } })
             })
           }
+        }
+
+        // gameStart may settle the board. Do not generate a private offer or
+        // consume its random stream after either side has lost its last core.
+        if (finalizeBattleTerminal(next, action)) return next
+
+        if (!continuation.skipProgressiveDeployment
+          && startProgressiveDeploymentTurn(next)) {
+          return next
         }
 
         // 触发回合开始效果（只调用一次，checkTriggers会扫描所有棋子和玩家的规则）
@@ -1980,9 +2437,18 @@ function applyBattleActionInternal(
         throw new BattleRuleError("It is not this player's turn")
       }
 
-      // 检查行动点是否足够
+      // Preserve the old side-effect-free AP rejection before cloning or firing
+      // beforeMove. The current-turn deployment tag is the sole exception.
+      const sourcePieceCheck = state.pieces.find(
+        p => p.instanceId === action.pieceId
+          && isSamePlayer(p.ownerPlayerId, action.playerId)
+          && p.currentHp > 0,
+      )
+      const hasDeploymentFirstMoveFree = !!sourcePieceCheck?.statusTags?.some(
+        statusTag => isCurrentTurnDeploymentFirstMoveFree(statusTag, state.turn.turnNumber),
+      )
       const playerMetaCheck = getPlayerMeta(state, action.playerId)
-      if (playerMetaCheck.actionPoints < 1) {
+      if (!hasDeploymentFirstMoveFree && playerMetaCheck.actionPoints < 1) {
         throw new BattleRuleError("Not enough action points to move")
       }
 
@@ -2033,6 +2499,14 @@ function applyBattleActionInternal(
 
       // 检查是否有规则明确阻止了行动（在添加消息之后检查）
       if (beforeMoveResult.blocked) {
+        // A blocked deployment-free move is an authority rejection, so the
+        // runner discards this clone together with trigger effects and RNG reads.
+        if (hasDeploymentFirstMoveFree) {
+          throw new BattleRuleError(
+            beforeMoveResult.messages.join('；') || 'Deployment first move was blocked',
+            'DEPLOYMENT_FIRST_MOVE_BLOCKED',
+          )
+        }
         return next; // 返回包含消息的状态，不执行移动
       }
 
@@ -2041,6 +2515,15 @@ function applyBattleActionInternal(
       const finalToY = moveContext.targetY;
 
       validateMove(next, piece, finalToX, finalToY)
+
+      const deploymentFirstMoveFree = consumeDeploymentFirstMoveFree(
+        piece,
+        next.turn.turnNumber,
+      )
+      const playerMeta = getPlayerMeta(next, action.playerId)
+      if (!deploymentFirstMoveFree && playerMeta.actionPoints < 1) {
+        throw new BattleRuleError("Not enough action points to move")
+      }
 
       // 记录移动前的位置
       const fromX = piece.x
@@ -2051,8 +2534,7 @@ function applyBattleActionInternal(
       piece.y = finalToY
       
       // 消耗行动点
-      const playerMeta = getPlayerMeta(next, action.playerId)
-      playerMeta.actionPoints -= 1
+      if (!deploymentFirstMoveFree) playerMeta.actionPoints -= 1
       
       // 初始化actions数组（如果不存在）
       if (!next.actions) {
@@ -2073,7 +2555,8 @@ function applyBattleActionInternal(
           fromX,
           fromY,
           toX: finalToX,
-          toY: finalToY
+          toY: finalToY,
+          deploymentFirstMoveFree,
         }
       })
 
@@ -2783,6 +3266,10 @@ function applyBattleActionInternal(
           });
         });
       }
+
+      // This tag is scoped to the placement turn even when it was never used.
+      // Clear every storage location before handing authority to the next turn.
+      clearDeploymentFirstMoveFree(next)
 
       // 在回合结束阶段的最后时刻，处理当前玩家棋子的状态效果持续时间扣除和规则移除
       next.pieces.forEach(piece => {
@@ -3506,8 +3993,10 @@ function runSuspendableActionTransaction(
     const pendingError = authoritativeError
     activeEffectChain?.acknowledgePending(pendingError)
     const rootActionType = (transaction.rootAction as { type?: string } | undefined)?.type
+    // A timeout owns the complete forced progression, including deployment,
+    // summon, free-move skipping, end-turn and the next begin-turn chain.
+    // Never return an already-expired interactive session from that root action.
     const shouldAutoResolveTimeout = rootActionType === 'turnTimeout'
-      && pendingError.key.eventType === 'endTurn'
     if (shouldAutoResolveTimeout) {
       if (activeEffectChain && effectChainSnapshot) activeEffectChain.restore(effectChainSnapshot)
       let input: SuspendableInteractionInput
@@ -3523,7 +4012,14 @@ function runSuspendableActionTransaction(
           )
         }
         if (pendingError.prompt.kind === 'option') {
-          const candidates = uniqueSuspendableTimeoutCandidates(pendingError.prompt.options || [])
+          const candidates = uniqueSuspendableTimeoutCandidates(
+            (pendingError.prompt.options || []).map(option => {
+              if (!option || typeof option !== 'object') return option
+              if ('value' in option) return (option as { value: unknown }).value
+              if ('id' in option) return (option as { id: unknown }).id
+              return option
+            }),
+          )
           if (candidates.length === 0) {
             throw new BattleRuleError(
               'Timed-out mandatory transaction option has no legal candidates',

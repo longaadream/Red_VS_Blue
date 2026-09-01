@@ -68,7 +68,11 @@ export interface BattleActionTrace {
 }
 
 export interface DeploymentTraceEvidence {
-  command?: 'initialize' | 'select' | 'lock' | 'timeout'
+  command?: 'initialize' | 'select' | 'lock' | 'timeout' | 'deploy'
+  mode?: 'legacy-reroll-v1' | 'progressive-reserve-v1'
+  status?: BattleState['deployment'] extends infer _Deployment
+    ? NonNullable<BattleState['deployment']>['status']
+    : never
   initialPositions?: Record<string, { x: number; y: number }>
   choices?: Record<string, { pieceId: string | null }>
   locks?: Record<string, { locked: boolean; reason?: 'player' | 'timeout' }>
@@ -76,6 +80,13 @@ export interface DeploymentTraceEvidence {
   finalPositions?: Record<string, { x: number; y: number }>
   deadlineAt?: number
   revision?: number
+  openingVanguardsInitialized?: boolean
+  activePlayerId?: string
+  offerPieceIds?: string[]
+  reserveCounts?: Record<string, number>
+  lastDeployedPieceId?: string
+  /** Actual committed landing cell after before-summon redirection. */
+  deployedPosition?: { x: number; y: number }
   authorityVersion?: number
 }
 
@@ -455,10 +466,17 @@ export function recordBattleInitialization(
     randomStreams: runtime.randomTrace(true),
     deployment: state.deployment ? {
       command: 'initialize',
+      mode: state.deployment.mode,
+      status: state.deployment.status,
       initialPositions: copyPositions(state.deployment.initialPositions),
       locks: copyLocks(state.deployment.locks),
       deadlineAt: state.deployment.deadlineAt,
       revision: state.deployment.revision,
+      openingVanguardsInitialized: state.deployment.openingVanguardsInitialized,
+      activePlayerId: state.deployment.activePlayerId,
+      offerPieceIds: state.deployment.offerPieceIds ? [...state.deployment.offerPieceIds] : undefined,
+      reserveCounts: state.deployment.reserveCounts ? { ...state.deployment.reserveCounts } : undefined,
+      lastDeployedPieceId: state.deployment.lastDeployedPieceId,
     } : undefined,
   }
   metadata.actionLog.push(trace)
@@ -482,6 +500,41 @@ export function recordBattleInitialization(
     frames: [],
   }
   return trace
+}
+
+/**
+ * Internal setup actions (for example the initial turn-timer sync) run before
+ * the room owns an authority checkpoint. They must become part of that
+ * checkpoint rather than appearing as replay frame 0. Rebase only the replay
+ * baseline; initialization/action trace history remains available for audits.
+ */
+export function rebaseBattleReplayForAuthorityCheckpoint(state: BattleState): void {
+  const metadata = getOrCreateDebugMetadata(state)
+  const profilePin = readBattleProfilePinV1(state)
+  if (!profilePin || !metadata.replay || !metadata.authority) {
+    throw pinnedProfileError('Battle authority checkpoint requires initialized replay metadata')
+  }
+  const canonicalState = withoutReplayRuntimeCaches(state)
+  const initialState = createBattleReplayCheckpoint(canonicalState)
+  metadata.replay = {
+    ...metadata.replay,
+    profileIdentity: profilePin.profileIdentity,
+    rootSeed: profilePin.rootSeed,
+    initialStateHash: hashBattleState(canonicalState),
+    initialCheckpointHash: hashStable(initialState),
+    initialState,
+    content: mergeBattleReplayContentSnapshot(
+      metadata.replay.content,
+      createBattleReplayContentSnapshot(state),
+    ),
+    frames: [],
+  }
+  metadata.authority = {
+    ...metadata.authority,
+    profileIdentity: profilePin.profileIdentity,
+    rootSeed: profilePin.rootSeed,
+    replayFrameCount: 0,
+  }
 }
 
 
@@ -664,7 +717,8 @@ export function appendBattleReplayFrame(
 
 function createBattleReplayContentSnapshot(state: BattleState): BattleReplayContentSnapshot {
   const skillIds = new Set<string>()
-  const replayPieces = [...(state.pieces ?? []), ...(state.graveyard ?? [])]
+  const reservePieces = Object.values(state.deployment?.reserves ?? {}).flat()
+  const replayPieces = [...(state.pieces ?? []), ...reservePieces, ...(state.graveyard ?? [])]
   for (const piece of replayPieces) {
     for (const skill of piece.skills ?? []) {
       if (skill?.skillId) skillIds.add(skill.skillId)
@@ -808,9 +862,24 @@ export function materializeBattleTraceForTerminal(
   const traces = history.flatMap(entry => entry.trace ? [entry.trace] : [])
   const commands = history.flatMap(entry => entry.command ? [entry.command] : [])
   const frames = history.flatMap(entry => entry.replayFrame ? [entry.replayFrame] : [])
+  if (metadata.replay) {
+    for (let index = 0; index < frames.length; index += 1) {
+      const frame = frames[index]
+      if (frame.index !== index) {
+        throw new Error(`Trace frame index is not contiguous at ${index}`)
+      }
+      const expectedPreStateHash = index === 0
+        ? metadata.replay.initialStateHash
+        : frames[index - 1].postStateHash
+      if (frame.preStateHash !== expectedPreStateHash) {
+        throw new Error(`Trace frame state hash chain is not contiguous at ${index}`)
+      }
+    }
+  }
   metadata.actionLog = [...initializationTraces, ...traces]
   metadata.commandLog = [...initializationCommands, ...commands]
   if (metadata.replay) metadata.replay = { ...metadata.replay, frames }
+  if (metadata.authority) metadata.authority.replayFrameCount = frames.length
   metadata.appliedActionIds = traces.map(trace => trace.actionId).filter(Boolean)
   return state
 }
