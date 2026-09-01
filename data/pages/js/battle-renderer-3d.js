@@ -1516,6 +1516,7 @@
   let _panStart = null
   let _panMoved = false
   let _pinchDist = 0
+  let _pieceDrag = null
   const _pointers = new Map()
 
   function _listen(target, type, handler, options) {
@@ -1585,6 +1586,61 @@
     return _raycaster.ray.origin.clone().add(_raycaster.ray.direction.clone().multiplyScalar(distance))
   }
 
+  function _pieceDragCandidateAt(pointerId, clientX, clientY) {
+    const selection = _currentModel && _currentModel.selection
+    if (!selection || selection.mode !== 'move' || !selection.pieceId) return null
+    if (!_currentModel.legal || !Array.isArray(_currentModel.legal.moveCells) || !_currentModel.legal.moveCells.length) return null
+    const piece = _findPieceFromPointer(clientX, clientY)
+    if (!piece || piece.id !== selection.pieceId) return null
+    const obj = _pieceObjects.get(piece.id)
+    if (!obj || obj.pending || _anims.has(obj.motionId + ':position')) return null
+    return {
+      pointerId: pointerId,
+      pieceId: piece.id,
+      obj: obj,
+      originX: clientX,
+      originY: clientY,
+      active: false,
+    }
+  }
+
+  function _restorePieceDragVisual() {
+    if (!_pieceDrag || !_pieceDrag.obj) return
+    const obj = _pieceDrag.obj
+    obj.group.position.set(
+      obj.baseX,
+      obj.baseY + (obj.pending && !_reducedMotion ? 0.04 : 0),
+      obj.baseZ,
+    )
+    _updateSelectedRingPosition()
+    _updatePieceSummaryPositions()
+  }
+
+  function _cancelPieceDrag() {
+    _restorePieceDragVisual()
+    _pieceDrag = null
+  }
+
+  function _movePieceDrag(e) {
+    if (!_pieceDrag || _pieceDrag.pointerId !== e.pointerId) return false
+    const distance = Math.hypot(e.clientX - _pieceDrag.originX, e.clientY - _pieceDrag.originY)
+    if (!_pieceDrag.active && distance >= PAN_ACTIVATION_PX) {
+      _pieceDrag.active = true
+      _releasePressedFeedback(e.pointerId)
+    }
+    if (!_pieceDrag.active) return true
+    const point = _groundPointFromClient(e.clientX, e.clientY)
+    if (!point) return true
+    const x = Math.max(0, Math.min(_mapW - 1, point.x))
+    const z = Math.max(0, Math.min(_mapH - 1, point.z))
+    const tileX = Math.max(0, Math.min(_mapW - 1, Math.round(x)))
+    const tileZ = Math.max(0, Math.min(_mapH - 1, Math.round(z)))
+    _pieceDrag.obj.group.position.set(x, _tileSurfaceHeightAt(tileX, tileZ) + 0.08, z)
+    _updateSelectedRingPosition()
+    _updatePieceSummaryPositions()
+    return true
+  }
+
   function _initControls() {
     const canvas = _renderer.domElement
     canvas.style.touchAction = 'none'
@@ -1600,9 +1656,11 @@
       if (_pointers.size === 1) {
         _panStart = { x: e.clientX, y: e.clientY, originX: e.clientX, originY: e.clientY }
         _panMoved = false
+        _pieceDrag = _pieceDragCandidateAt(e.pointerId, e.clientX, e.clientY)
         _pressFeedbackAt(e.pointerId, e.clientX, e.clientY)
         if (typeof canvas.setPointerCapture === 'function') canvas.setPointerCapture(e.pointerId)
       } else if (_pointers.size === 2) {
+        _cancelPieceDrag()
         _pinchDist = _getPinchDist()
         _panStart = null
         _releasePressedFeedback()
@@ -1615,12 +1673,18 @@
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
       if (_pointers.size === 2) {
+        _cancelPieceDrag()
         const d = _getPinchDist()
         if (_pinchDist > 0 && d > 0) {
           _applyZoom(_camera.zoom * (d / _pinchDist))
         }
         _pinchDist = d
         _panMoved = true
+        e.preventDefault()
+        return
+      }
+
+      if (_movePieceDrag(e)) {
         e.preventDefault()
         return
       }
@@ -1642,8 +1706,13 @@
     }, { passive: false })
 
     const endPointer = (e, allowClick) => {
+      const completedPieceDrag = _pieceDrag && _pieceDrag.pointerId === e.pointerId && _pieceDrag.active
+        ? { pieceId: _pieceDrag.pieceId, cell: allowClick ? screenToCell(e.clientX, e.clientY) : null }
+        : null
       const wasClick = !_panMoved && _pointers.size === 1
       _releasePressedFeedback(e.pointerId)
+      if (_pieceDrag && _pieceDrag.pointerId === e.pointerId) _cancelPieceDrag()
+      if (canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId)
       _pointers.delete(e.pointerId)
       if (_pointers.size < 2) _pinchDist = 0
       if (_pointers.size === 1) {
@@ -1652,6 +1721,17 @@
         _panMoved = true
       } else if (!_pointers.size) {
         _panStart = null
+      }
+      if (completedPieceDrag) {
+        if (allowClick && _onIntent) {
+          _onIntent({
+            type: 'drop-piece',
+            pieceId: completedPieceDrag.pieceId,
+            x: completedPieceDrag.cell ? completedPieceDrag.cell.x : null,
+            y: completedPieceDrag.cell ? completedPieceDrag.cell.y : null,
+          })
+        }
+        return
       }
       if (allowClick && wasClick) _handleClick(e)
     }
@@ -1675,10 +1755,12 @@
       }
       if (piece && _onIntent) _onIntent({ type: 'inspect-piece', pieceId: piece.id })
     })
+    _listen(window, 'blur', function () { _resetPointerState(canvas) })
   }
 
   function _resetPointerState(canvas) {
     _releasePressedFeedback()
+    _cancelPieceDrag()
     _pointers.forEach(function (_, pointerId) {
       if (canvas && canvas.hasPointerCapture && canvas.hasPointerCapture(pointerId)) {
         canvas.releasePointerCapture(pointerId)
@@ -1865,6 +1947,7 @@
     _animFrameId = null
     if (_resizeObserver) _resizeObserver.disconnect()
     _resizeObserver = null
+    if (_renderer) _resetPointerState(_renderer.domElement)
     _removeAllListeners()
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
     if (_scene) {
@@ -1908,6 +1991,7 @@
     _playedEventOrder.length = 0
     _pressedPiece = null
     _pressedHighlight = null
+    _pieceDrag = null
     _hlObjects.move.clear()
     _hlObjects.skill.clear()
     _hlObjects.place.clear()

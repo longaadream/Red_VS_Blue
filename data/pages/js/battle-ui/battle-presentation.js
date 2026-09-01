@@ -9,7 +9,7 @@
     'inspect-piece',
     'confirm-target-selection',
     'cancel-target',
-    'toggle-move',
+    'drop-piece',
     'viewport-change',
   ])
 

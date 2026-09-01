@@ -51,8 +51,42 @@
     }
   }
 
+  function placeEdgeDock(anchor, menu, bounds, previousSide) {
+    const anchorLeft = Number(anchor && anchor.left) || 0
+    const anchorTop = Number(anchor && anchor.top) || 0
+    const menuWidth = Math.max(0, Number(menu && menu.width) || 0)
+    const menuHeight = Math.max(0, Number(menu && menu.height) || 0)
+    const boundsWidth = Math.max(0, Number(bounds && bounds.width) || 0)
+    const boundsHeight = Math.max(0, Number(bounds && bounds.height) || 0)
+    const topPadding = Math.max(MENU_PADDING, Number(bounds && bounds.topPadding) || MENU_PADDING)
+    const bottomPadding = Math.max(MENU_PADDING, Number(bounds && bounds.bottomPadding) || MENU_PADDING)
+    const midpoint = boundsWidth / 2
+    const hysteresis = Math.min(64, Math.max(28, boundsWidth * 0.05))
+    let side
+
+    if (previousSide === 'left' && anchorLeft >= midpoint - hysteresis) side = 'left'
+    else if (previousSide === 'right' && anchorLeft <= midpoint + hysteresis) side = 'right'
+    else side = anchorLeft >= midpoint ? 'left' : 'right'
+
+    const left = side === 'left'
+      ? MENU_PADDING
+      : Math.max(MENU_PADDING, boundsWidth - menuWidth - MENU_PADDING)
+    const availableHeight = Math.max(0, boundsHeight - topPadding - bottomPadding)
+    const rawTop = topPadding + (availableHeight - menuHeight) / 2
+    const top = clamp(rawTop, topPadding, boundsHeight - bottomPadding - menuHeight)
+
+    return {
+      left: Number(left.toFixed(3)),
+      top: Number(top.toFixed(3)),
+      side: side,
+      originX: side === 'left' ? 0 : menuWidth,
+      originY: Number(clamp(anchorTop - top, 0, menuHeight).toFixed(3)),
+    }
+  }
+
   root.BattleContextLayout = {
     handArc: handArc,
     placeMenu: placeMenu,
+    placeEdgeDock: placeEdgeDock,
   }
 })(typeof window !== 'undefined' ? window : globalThis)
