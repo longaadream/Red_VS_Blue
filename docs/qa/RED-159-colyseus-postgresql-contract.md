@@ -1,6 +1,6 @@
 # RED-159 Colyseus / PostgreSQL Phase 0 合同验收
 
-- 状态：合同已对齐 RED-160/161，等待本次独立审查与 PR 合并
+- 状态：合同已对齐 RED-160/161，独立 High Risk 审查通过，等待 PR 合并
 - 日期：2026-09-01
 - 任务：[RED-159](https://linear.app/redvsblue/issue/RED-159/phase-0-合同-冻结-colyseuspostgresql-迁移边界耐久语义与双栈验收)
 - 父路线：[RED-158](https://linear.app/redvsblue/issue/RED-158/路线-将权威联机迁移至-colyseus-postgresql并建立-k8swindows-双部署)
@@ -45,7 +45,7 @@ RED-159 因此在收尾同步中归档为 ADR-0025；这只是编号冲突消解
 | SQLite 导出/导入/校验/回退 | ADR 第 7 节；技术合同第 9 节 | 已覆盖 |
 | 30 个有效未完成 Issue 分类 | 技术合同第 11 节 | 已覆盖；不改状态 |
 | B–F 有窄 scope/allowed_paths/tests/rollback/dependencies | 技术合同第 12–13 节 | 已覆盖 |
-| 不复制规则到 Room/UI，不把 Schema/Redis 当真源 | ADR 第 2、5、6 节；独立审查 | 本次收尾待独立复审 |
+| 不复制规则到 Room/UI，不把 Schema/Redis 当真源 | ADR 第 2、5、6 节；独立审查 | 通过；无阻塞项 |
 
 ## 3. RED-160/161 落地对齐
 
@@ -94,10 +94,13 @@ RED-159 因此在收尾同步中归档为 ADR-0025；这只是编号冲突消解
 | Markdown 相对链接检查 | 通过 | 6 个改动 Markdown 的相对目标全部存在 |
 | allowed_paths 审计 | 通过 | 6 个 PR 文件全部位于三个允许目录 |
 | ADR 引用与脚本存在性检查 | 通过 | 16 个关键文件、2 个 npm script、1 个 RVB 环境变量存在；57 个 Linear 标识符均在 GAME team 中存在 |
-| 独立 AI High Risk contract review | 待复审 | 必须引用当前 diff 与 D1–D5，不复用未留记录的旧结论 |
+| 独立 AI High Risk contract review | 通过 | 审查锚点 `origin/main@a0d0ead...9f19865`；无阻塞项，确认 D1–D5、RED-160/161 落地、ADR-0025、范围与后续门禁一致 |
 
 本任务没有生产行为修改，因此不会把“未运行 runtime 测试”表述为 runtime 测试通过。package scripts
 必须在执行前从当前 package.json 核对。
+
+独立审查保留的非阻塞后续项：durable 客户端 outbox、K8s/Redis 精确路由、SQLite exporter/importer、
+完整 fencing/恢复、100 Room 与 Phase F 故障矩阵仍须由后续任务实现和验收；本合同没有把它们误报为完成。
 
 ## 6. 后续候选验收总表
 
