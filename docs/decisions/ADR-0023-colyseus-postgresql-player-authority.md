@@ -24,6 +24,17 @@ SQLite/Prisma 进程中。单 writer 争用和动作回执等待持久化放大�
   覆盖本地展示。该例外不批准通用客户端预测或 Web Worker。
 - SQLite/Prisma 不再参与新 Colyseus 玩家房间或战斗动作路径。现有内容 Profile 管理进程暂时保留，
   其移除属于后续迁移，不得把它误写成玩家动作仍经过 SQLite。
+- Windows LAN 房主随玩家客户端携带 PostgreSQL 16 x64 原生运行时；仅在选择“本机开服”时按需启动，
+  首次运行在用户数据目录初始化独立 cluster 与 `rvb_colyseus` 数据库。运行时只绑定
+  `127.0.0.1` 动态端口，密码随机生成并由 Electron `safeStorage` 加密保存；应用退出时先 drain
+  Colyseus，再以 fast shutdown 停止 PostgreSQL。远程加入者不会启动该数据库。
+- `RVB_POSTGRES_URL`（以及兼容的 PostgreSQL `DATABASE_URL`）仍可显式选择外部 PostgreSQL；官方
+  Server、K8s 与线上部署必须使用外部 PostgreSQL，不能依赖客户端内置实例。内置运行时固定为
+  PostgreSQL `16.15-2` 官方 Windows x64 binary archive，并以固定 SHA-256 和逐文件 manifest 验证；
+  不打包 pgAdmin、StackBuilder、开发头文件或 HTML 文档。
+- Electron 通过 PostgreSQL 官方 `pg_ctl` 启动实例；Windows 下该工具会为数据库子进程移除管理员
+  权限，因此普通启动和提权后的客户端都不需要创建服务或额外本地账户。应用不会降级到 SQLite、
+  PGlite、trust 认证或 volatile 存储。
 - Trace 生成、RED-139 queue 内部实现和玩法数值不在本次切换范围。
 
 ## 备选方案
@@ -35,8 +46,9 @@ SQLite/Prisma 进程中。单 writer 争用和动作回执等待持久化放大�
 ## 影响
 
 玩家动作热路径不再等待 SQL；代价是普通 APPLIED 与 DURABLE 分离，服务器在微批落盘前异常退出时
-允许短暂 RPO。正式本机主机或服务端必须提供 PostgreSQL；无数据库的 volatile QA 入口只能验证 UI
-和 Room 行为，不能作为候选耐久性证据。
+允许短暂 RPO。LAN 玩家不再手工安装、创建或启动数据库，但 Windows 客户端下载体积约增加
+44–60 MiB，安装体积约增加 96–125 MiB，首次 cluster 还会占用约 40–70 MiB。无数据库的 volatile
+QA 入口只能验证 UI 和 Room 行为，不能作为候选耐久性证据。
 
 ## 验证方式
 

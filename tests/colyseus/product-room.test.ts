@@ -9,7 +9,9 @@ import {
   BATTLE_AUTHORITY_PROTOCOL_VERSION,
 } from '@/lib/game/battle-public-patch'
 import { getDemoPieceIds, getPieceById } from '@/lib/game/piece-repository'
+import { createInitialCheckpoint } from '@/lib/server/colyseus/candidate-battle-store'
 import { createColyseusBattleServer } from '@/lib/server/colyseus/create-colyseus-server'
+import { createDevelopmentBattleRoom } from '@/lib/server/colyseus/development-battle-fixture'
 import {
   BATTLE_COMMAND_MESSAGE,
   BATTLE_RECEIPT_MESSAGE,
@@ -23,6 +25,36 @@ import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authori
 import { FakeAuthorityRepository } from './fake-authority-repository'
 
 describe('RED-161 Colyseus product room', () => {
+  it('re-registers a durable PostgreSQL room so players can joinById after authority restart', async () => {
+    const repository = new FakeAuthorityRepository()
+    const profileIdentity = getServerGameProfileIdentityV1()
+    const persistedRoom = createDevelopmentBattleRoom('red161-restored-room')
+    persistedRoom.players.forEach(player => { player.profileIdentity = profileIdentity })
+    await repository.initializeRoom(persistedRoom, createInitialCheckpoint(persistedRoom))
+    const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })
+    const candidate = createColyseusBattleServer({ repository, journal })
+    const port = await availablePort()
+    await candidate.server.listen(port, '127.0.0.1')
+    const client = new ColyseusClient(`ws://127.0.0.1:${port}`)
+    let restoredRoom: ColyseusClientRoom | undefined
+    try {
+      await expect(candidate.restoreProductRooms()).resolves.toEqual(['red161-restored-room'])
+      await expect(fetch(`http://127.0.0.1:${port}/rooms`).then(response => response.json()))
+        .resolves.toEqual({ rooms: expect.arrayContaining([expect.objectContaining({ id: 'red161-restored-room' })]) })
+      restoredRoom = await client.joinById('red161-restored-room', {
+        product: true,
+        playerId: 'player-red',
+        playerName: 'Red',
+        profileIdentity,
+      })
+      await expect(requestRoomRpc(restoredRoom, 'rooms.get', { roomId: restoredRoom.roomId }))
+        .resolves.toMatchObject({ id: 'red161-restored-room', status: 'in-progress' })
+    } finally {
+      if (restoredRoom) await restoredRoom.leave()
+      await candidate.server.gracefullyShutdown(false)
+    }
+  }, 20_000)
+
   it('owns lobby, roster lock, version-zero durability and battle admission without legacy RoomStore', async () => {
     const repository = new FakeAuthorityRepository()
     const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })

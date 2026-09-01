@@ -15,7 +15,8 @@
   ],
   "extraResources": [
     { "from": "_client-stage",       "to": "app/standalone" },
-    { "from": "_client-colyseus",    "to": "app/colyseus" },
+    { "from": "_client-colyseus",    "to": "app/standalone/colyseus" },
+    { "from": "_client-postgres",    "to": "postgres" },
     { "from": "_client-stage/node_modules", "to": "app/standalone/node_modules" },
     { "from": "public",              "to": "app/public" },
     { "from": "data",                "to": "app/data" },

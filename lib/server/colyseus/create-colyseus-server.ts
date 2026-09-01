@@ -1,4 +1,5 @@
 import { defineRoom, defineServer, matchMaker } from 'colyseus'
+import { WebSocketTransport } from '@colyseus/ws-transport'
 import { Pool } from 'pg'
 
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
@@ -26,6 +27,7 @@ export interface BattleServerRepository
   extends CandidateAuthorityRepository, PostgresAuthorityBatchWriter {
   initializeSchema(): Promise<void>
   healthCheck(): Promise<void>
+  listRestorableRoomIds?(): Promise<string[]>
   close?(): Promise<void>
 }
 
@@ -83,6 +85,9 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   let ready = false
   let healthError: string | undefined
   const server = defineServer({
+    // Keep the transport as a static dependency so the packaged authority does
+    // not rely on Colyseus' runtime dynamic import from node_modules.
+    transport: new WebSocketTransport(),
     rooms: {
       [BATTLE_ROOM_TYPE]: defineRoom(BattleRoom),
     },
@@ -159,7 +164,17 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   })
   server.onBeforeShutdown(() => journal.close())
   if (ownsRepository) server.onShutdown(() => repository.close?.())
-  return { server, repository, journal }
+  let roomsRestored = false
+  const restoreProductRooms = async (): Promise<string[]> => {
+    if (roomsRestored) return []
+    roomsRestored = true
+    const roomIds = await repository.listRestorableRoomIds?.() ?? []
+    for (const battleId of roomIds) {
+      await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId })
+    }
+    return roomIds
+  }
+  return { server, repository, journal, restoreProductRooms }
 }
 
 function createRepository(options: CreateColyseusBattleServerOptions): PostgresAuthorityRepository {

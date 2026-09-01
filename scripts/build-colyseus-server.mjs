@@ -23,4 +23,11 @@ await build({
   },
 })
 
+const productBundle = fs.readFileSync(path.join(outputDir, 'colyseus-server.mjs'), 'utf8')
+for (const forbidden of ['@prisma/client', 'new PrismaClient', 'PRAGMA ', 'initRoomStore', 'roomStore =']) {
+  if (productBundle.includes(forbidden)) {
+    throw new Error(`Colyseus product authority bundle contains forbidden legacy dependency: ${forbidden}`)
+  }
+}
+
 console.log('[colyseus-build] Packaged product authority:', path.join(outputDir, 'colyseus-server.mjs'))

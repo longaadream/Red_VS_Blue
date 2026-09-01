@@ -16,12 +16,12 @@ import {
  */
 export class ProductBattleStore {
   readonly terminalAuthorityPersistencePolicy = 'durable-barrier' as const
-  private authorityStore?: CandidateBattleStore
 
   constructor(
     private room: Room,
     private readonly repository: CandidateAuthorityRepository,
     private readonly journal: PostgresAuthorityJournal,
+    private authorityStore?: CandidateBattleStore,
   ) {}
 
   get authority(): CandidateBattleStore | undefined {

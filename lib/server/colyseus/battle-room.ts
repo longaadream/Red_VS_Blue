@@ -55,6 +55,7 @@ import { ProductBattleStore } from './product-battle-store'
 export interface BattleRoomCreateOptions {
   battleId?: string
   product?: boolean
+  restore?: boolean
   name?: string
   mapId?: string
   visibility?: 'public' | 'private'
@@ -97,6 +98,29 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       this.onMessage(BATTLE_COMMAND_MESSAGE, (client, message) => this.handleBattleCommand(client, message))
       this.onMessage(BATTLE_RESYNC_MESSAGE, client => this.sendBattleSnapshot(client))
       this.onMessage(PRODUCT_ROOM_RPC_MESSAGE, (client, message) => this.handleProductRpc(client, message))
+
+      if (options?.restore === true) {
+        this.productMode = true
+        this.roomId = normalizeRequiredId(options.battleId, 'battleId')
+        this.authorityStore = await CandidateBattleStore.open({
+          roomId: this.roomId,
+          repository: dependencies.repository,
+          journal: dependencies.journal,
+          fixtureFactory: dependencies.fixtureFactory,
+        })
+        const room = await this.requireGameRoom()
+        this.productStore = new ProductBattleStore(
+          room,
+          dependencies.repository,
+          dependencies.journal,
+          this.authorityStore,
+        )
+        this.applyRoomProjection(room)
+        this.subscribeDurability()
+        await this.publishProductRoom(room)
+        await this.setPrivate(room.visibility === 'private')
+        return
+      }
 
       if (this.productMode) {
         // PostgreSQL authority IDs are canonical lowercase. Normalize the

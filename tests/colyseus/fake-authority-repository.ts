@@ -19,6 +19,13 @@ export class FakeAuthorityRepository implements BattleServerRepository {
   async healthCheck(): Promise<void> {}
   async close(): Promise<void> {}
 
+  async listRestorableRoomIds(): Promise<string[]> {
+    return [...this.rooms.entries()]
+      .filter(([, value]) => value.room.status !== 'finished')
+      .map(([roomId]) => roomId)
+      .sort()
+  }
+
   async initializeRoom(
     room: Room,
     _checkpoint: BattleAuthorityCheckpointRecord,

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net as electronNet, protocol, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net as electronNet, protocol, safeStorage, session } from 'electron'
 import { spawn, ChildProcess, execFileSync, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
@@ -13,6 +13,7 @@ import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { resolveDevelopmentProfile } from './development-profile'
 import { findFreePort } from './local-port'
 import { resolveClientProtocolFile } from './client-protocol-resource'
+import { EmbeddedPostgresController } from './embedded-postgres'
 import {
   type DesktopProfileReference,
   getActiveResourcePackMeta,
@@ -404,6 +405,7 @@ async function killServer(requireDurable = false): Promise<void> {
     localGameReady = false
     gameServerProcess = null
   }
+  if (embeddedPostgres) await embeddedPostgres.stop()
   if (!serverProcess) return
   const proc = serverProcess
   await stopChildProcessGracefully(proc, requireDurable)
@@ -418,6 +420,9 @@ function forceKillServer(): void {
     gameServerProcess = null
     killProcessTree(gameProc)
   }
+  if (embeddedPostgres) {
+    embeddedPostgres.forceStop()
+  }
   localServerReady = false
   if (!serverProcess) return
   const proc = serverProcess
@@ -431,11 +436,18 @@ function requestApplicationExit(): void {
     return
   }
   if (appExitPromise) return
-  appExitPromise = killServer()
-    .catch(error => console.error('[client] graceful application shutdown failed:', error))
-    .finally(() => {
+  appExitPromise = killServer(true)
+    .then(() => {
       allowAppExit = true
       app.exit(0)
+    })
+    .catch(error => {
+      console.error('[client] durable application shutdown failed; processes remain fail-closed:', error)
+      appExitPromise = null
+      dialog.showErrorBox(
+        '无法安全退出',
+        '战斗记录尚未确认写入数据库，游戏服务仍保持运行。请稍后再次退出；不要强制结束进程。',
+      )
     })
 }
 
@@ -445,6 +457,7 @@ let serverProcess: ChildProcess | null = null
 let localServerReady = false
 let gameServerProcess: ChildProcess | null = null
 let localGameReady = false
+let embeddedPostgres: EmbeddedPostgresController | null = null
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
 type ProfileProcessBinding = {
@@ -541,9 +554,74 @@ function waitForGameAuthorityReady(port: number, timeoutMs = 20000): Promise<boo
 
 function findColyseusEntry(appRoot: string): string | null {
   const candidates = app.isPackaged
-    ? [path.join(appRoot, 'colyseus', 'colyseus-server.mjs')]
+    ? [path.join(appRoot, 'standalone', 'colyseus', 'colyseus-server.mjs')]
     : [path.join(appRoot, '_client-colyseus', 'colyseus-server.mjs')]
   return candidates.find(candidate => fs.existsSync(candidate)) ?? null
+}
+
+function getEmbeddedPostgresRuntimeRoot(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'postgres', 'pgsql')
+    : path.join(getAppRoot(), '_client-postgres', 'pgsql')
+}
+
+function getEmbeddedPostgres(): EmbeddedPostgresController {
+  if (embeddedPostgres) return embeddedPostgres
+  if (process.platform !== 'win32') {
+    throw new Error('The bundled PostgreSQL runtime currently supports Windows x64 only; set RVB_POSTGRES_URL for this platform')
+  }
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('System credential encryption is unavailable; embedded PostgreSQL cannot start safely')
+  }
+  embeddedPostgres = new EmbeddedPostgresController({
+    runtimeRoot: getEmbeddedPostgresRuntimeRoot(),
+    stateRoot: path.join(getUserData(), 'postgres', '16'),
+    findFreePort,
+    protectSecret: plaintext => safeStorage.encryptString(plaintext),
+    unprotectSecret: encrypted => safeStorage.decryptString(encrypted),
+    onUnexpectedExit: (code, signal) => {
+      console.error(`[client] embedded PostgreSQL exited unexpectedly: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
+      localGameReady = false
+      if (gameServerProcess) {
+        const gameProc = gameServerProcess
+        gameServerProcess = null
+        killProcessTree(gameProc)
+      }
+    },
+  })
+  return embeddedPostgres
+}
+
+async function resolveAuthorityDatabaseUrl(): Promise<string> {
+  const external = process.env.RVB_POSTGRES_URL ?? process.env.DATABASE_URL
+  if (external) {
+    let protocol = ''
+    try { protocol = new URL(external).protocol }
+    catch { throw new Error('Configured PostgreSQL authority URL is invalid') }
+    if (protocol !== 'postgresql:' && protocol !== 'postgres:') {
+      throw new Error('Configured battle authority database must use PostgreSQL')
+    }
+    console.info('[client] Using externally configured PostgreSQL authority')
+    return external
+  }
+  console.info('[client] Starting bundled PostgreSQL authority for LAN hosting')
+  const connection = await getEmbeddedPostgres().start()
+  console.info(`[client] Bundled PostgreSQL ready on loopback port ${connection.port}`)
+  return connection.url
+}
+
+function localAuthorityStartupErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (/safeStorage|credential encryption|凭据加密/i.test(message)) {
+    return '系统凭据加密不可用，无法安全启动本机数据库。'
+  }
+  if (/runtime manifest|runtime is missing|SHA-256|inventory/i.test(message)) {
+    return '内置 PostgreSQL 文件校验失败，请重新安装游戏。'
+  }
+  if (/must use PostgreSQL|URL is invalid/i.test(message)) {
+    return 'PostgreSQL 连接配置无效，请检查服务器配置。'
+  }
+  return '本机战斗服务启动失败，请查看客户端日志。'
 }
 
 async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): Promise<void> {
@@ -561,9 +639,7 @@ async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): 
     return
   }
   const binding = profileBinding ?? stableProfileBinding()
-  const databaseUrl = process.env.RVB_POSTGRES_URL
-    ?? process.env.DATABASE_URL
-    ?? 'postgresql://rvb:rvb@127.0.0.1:5433/rvb_colyseus'
+  const databaseUrl = await resolveAuthorityDatabaseUrl()
   console.log(`[client] Colyseus/PostgreSQL game port: ${actualGamePort}`)
   gameServerProcess = spawn(getNodeBin(), [entry], {
     cwd: appRoot,
@@ -720,6 +796,7 @@ async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise
       // This process only serves the installed Profile APIs and presentation
       // assets. Player rooms/actions belong exclusively to Colyseus below.
       DISABLE_WS: '1',
+      RVB_PROFILE_EXPECT_WEBSOCKET: '0',
       RVB_BATTLE_AUTHORITY_V2: '0',
       RVB_BATTLE_ASYNC_JOURNAL: '0',
       RVB_TURN_TIMER_ENABLED: '0',
@@ -1421,9 +1498,13 @@ async function recoverProfileOnStartup(): Promise<void> {
 }
 
 async function startStableLocalServerAndRecover(): Promise<void> {
+  await startStableProfileServerAndRecover()
+  await startLocalGameAuthority(stableProfileBinding())
+}
+
+async function startStableProfileServerAndRecover(): Promise<void> {
   await startLocalServer(stableProfileBinding())
   await recoverProfileOnStartup()
-  await startLocalGameAuthority(stableProfileBinding())
 }
 
 // ─── 资源包管理（Electron IPC，替代 Android 端的 Service Worker 方案）────────
@@ -1704,7 +1785,12 @@ handleTrusted('go-offline', ['connect', 'game'], () => {
 
 handleTrusted('open-local-game', ['connect'], async () => {
   clearOnlineServerUrl()
-  await startStableLocalServerAndRecover()
+  try {
+    await startStableLocalServerAndRecover()
+  } catch (error) {
+    console.error('[client] local authority startup failed:', error)
+    return { ok: false, error: localAuthorityStartupErrorMessage(error) }
+  }
   if (!localGameReady) {
     const exitMsg = lastServerExitCode !== null
       ? `Colyseus/PostgreSQL authority exited with code ${lastServerExitCode}`
@@ -1915,7 +2001,9 @@ app.whenReady().then(async () => {
   }
 
   try {
-    await startStableLocalServerAndRecover()
+    // Remote joiners only need the lightweight Profile service. The bundled
+    // PostgreSQL/Colyseus authority starts lazily when the player chooses LAN host.
+    await startStableProfileServerAndRecover()
   } catch (error) {
     console.error('[profile] startup recovery failed; admission remains closed:', error)
     return
