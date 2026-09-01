@@ -76,7 +76,7 @@
   迁移为渐进部署。
 - 泰兰德与提里奥·弗丁的相关效果在每次该棋子本人结算 `afterPieceSummoned` 时触发，而不是在 `gameStart` 或仅首次上场时触发。需要“首次”语义的内容由 `battle.extensions` 自行记录，本合同不增加通用首次召唤生命周期字段。
 - 基尔加丹的仪式召唤也必须经过 `beforePieceSummoned` 与 `afterPieceSummoned`，但不属于回合预备区部署，因此不获得部署免费首移 statusTag。
-- 旧的初始 16 枚全图部署、公开重投与 45 秒锁定只保留为历史状态和显式 `legacy-reroll-v1` 兼容路径，不再是新建对局默认规则。详细决策见 [ADR-0022](../decisions/ADR-0022-progressive-reserve-deployment.md)。
+- 旧的初始 16 枚全图部署、公开重投与 45 秒锁定只保留为历史状态和显式 `legacy-reroll-v1` 兼容路径，不再是新建对局默认规则。详细决策见 [ADR-0024](../decisions/ADR-0024-progressive-reserve-deployment.md)。
 
 ## 6. 回合、行动点与时限
 

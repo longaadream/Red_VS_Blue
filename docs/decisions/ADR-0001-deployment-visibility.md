@@ -1,6 +1,6 @@
 # ADR-0001：部署阶段公开双方站位
 
-> RED-138 取代说明：本文的公开站位、单枚重投与双方锁定只适用于 `legacy-reroll-v1` 和缺少 mode 的历史状态；新建对局默认的私有三选一渐进式部署见 [ADR-0022](./ADR-0022-progressive-reserve-deployment.md)。
+> RED-138 取代说明：本文的公开站位、单枚重投与双方锁定只适用于 `legacy-reroll-v1` 和缺少 mode 的历史状态；新建对局默认的私有三选一渐进式部署见 [ADR-0024](./ADR-0024-progressive-reserve-deployment.md)。
 
 状态：已接受
 日期：2026-08-13

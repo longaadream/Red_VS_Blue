@@ -1,6 +1,10 @@
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
-import { globalTriggerSystem, type TriggerResult } from "./triggers"
+import {
+  globalTriggerSystem,
+  type TriggerResult,
+  type TriggerRule as RuntimeTriggerRule,
+} from "./triggers"
 import { rng } from "./rng"
 import {
   getActiveRuleExecutionContext,
@@ -14,7 +18,33 @@ const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTrigger
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
 import { DynamicCodeRuntime, dynamicCodeRuntime as globalDynamicCodeRuntime } from './dynamic-code-runtime'
-import { isSuspendableActionPending } from './suspendable-action-transaction'
+import {
+  EffectChain,
+  EffectChainFatalError,
+  createDamageQueueWriter,
+  createDeclaredSummonQueueWriter,
+  createEffectChain,
+  createHealQueueWriter,
+  getActiveEffectChain,
+  isDeclaredSummonCapabilityBoundToContent,
+  installEffectChain,
+  isEffectChainFatalError,
+  isEffectChainPendingSignal,
+  isTrustedDeclaredSummonCapability,
+  rejectEffectBatch,
+  resolveSummonRedirectPosition,
+  type DamageRequest,
+  type DeathRequest,
+  type DeclaredSummonCapability,
+  type DeclaredSummonSpec,
+  type EffectBatchContext,
+  type EffectDispatchMetadata,
+  type EffectExecution,
+  type SourceMirrorSummonCapabilityDeclaration,
+  type StoredOrDeclaredPieceSummonCapabilityDeclaration,
+  type SummonCapabilityDeclaration,
+  type SummonRequest,
+} from './effect-batch'
 
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 function battleDebugLog(...args: unknown[]): void {
@@ -72,6 +102,121 @@ function checkSynchronousTriggers(battle: BattleState, context: any): TriggerRes
     throw error
   }
   return result
+}
+
+export function rethrowAttachedEffectContentError(
+  battle: BattleState,
+  error: unknown,
+  message: string,
+  metadata: EffectDispatchMetadata = {},
+): void {
+  const chain = getActiveEffectChain(battle)
+  if (isEffectChainPendingSignal(error)) {
+    throw chain && !chain.detached ? chain.latchPending(error) : error
+  }
+  if (isEffectChainFatalError(error)) {
+    throw chain && !chain.detached ? chain.latchFatal(error) : error
+  }
+  const context = chain?.currentBatch
+  if (!chain || chain.detached) return
+  if (context) throw rejectEffectBatch(chain, context, message, error, metadata)
+  throw chain.latchFatal(new EffectChainFatalError(
+    'RVB_EFFECT_CHAIN_STATE_INVALID',
+    message,
+    {
+      actionId: chain.actionId,
+      chainId: chain.chainId,
+      kind: metadata.kind ?? null,
+      depth: metadata.depth ?? null,
+      processed: chain.processedBatches,
+      limit: chain.limits.maxBatches,
+      turn: chain.turn,
+      rootSeed: chain.rootSeed,
+      sourceId: metadata.sourceId,
+      skillId: metadata.skillId,
+      targetId: metadata.targetId,
+      targetIds: metadata.targetIds,
+      detached: false,
+      budget: 'state',
+    },
+    error,
+  ))
+}
+
+export function restorePersistedRuleRuntime(
+  state: BattleState,
+  reloadedRule: RuntimeTriggerRule,
+  persistedRule: unknown,
+  sourceId: string,
+): RuntimeTriggerRule {
+  const persistedLimits = (persistedRule as any)?.limits
+  if (persistedLimits === undefined) return reloadedRule
+  if (!persistedLimits || typeof persistedLimits !== 'object' || Array.isArray(persistedLimits)) {
+    rethrowAttachedEffectContentError(
+      state,
+      new Error(`Rule ${reloadedRule.id} has invalid persisted limits`),
+      `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+      { sourceId, skillId: reloadedRule.id },
+    )
+    return reloadedRule
+  }
+
+  const runtimeKeys = ['uses', 'currentCooldown', 'remainingDuration'] as const
+  const values: Partial<Record<(typeof runtimeKeys)[number], number | undefined>> = {}
+  for (const key of runtimeKeys) {
+    if (!Object.prototype.hasOwnProperty.call(persistedLimits, key)) continue
+    const value = (persistedLimits as Record<string, unknown>)[key]
+    const minimum = key === 'remainingDuration' ? -1 : 0
+    if (
+      value !== undefined
+      && (!Number.isSafeInteger(value) || Number(value) < minimum)
+    ) {
+      rethrowAttachedEffectContentError(
+        state,
+        new Error(`Rule ${reloadedRule.id} has invalid persisted ${key}`),
+        `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+        { sourceId, skillId: reloadedRule.id },
+      )
+      return reloadedRule
+    }
+    values[key] = value as number | undefined
+  }
+  if (Object.keys(values).length === 0) return reloadedRule
+  if (!reloadedRule.limits) {
+    rethrowAttachedEffectContentError(
+      state,
+      new Error(`Rule ${reloadedRule.id} persisted runtime has no profile limits`),
+      `Rule ${reloadedRule.id} persisted runtime could not hydrate during an EffectChain`,
+      { sourceId, skillId: reloadedRule.id },
+    )
+    return reloadedRule
+  }
+  return {
+    ...reloadedRule,
+    limits: {
+      ...reloadedRule.limits,
+      ...values,
+    },
+  }
+}
+
+function isThrownInteractionSignal(value: unknown): value is SkillExecutionResult {
+  try {
+    return Boolean(
+      (value as any)?.needsTargetSelection || (value as any)?.needsOptionSelection,
+    )
+  } catch {
+    return false
+  }
+}
+
+function safeThrownValueMessage(value: unknown): string {
+  try {
+    if (value instanceof Error && typeof value.message === 'string') return value.message
+    return String(value)
+  } catch {
+    return 'uninspectable thrown value'
+  }
 }
 
 // 简单的日志写入函数
@@ -187,6 +332,12 @@ export function clearRuleCache(): void {
 function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPlayerId: string, sourcePiece?: PieceInstance): boolean {
   const player = battle.players?.find((p: any) => p.playerId === targetPlayerId)
   if (!player) return false
+  const resolvedCard = loadCardForBattle(battle, cardId, {
+    metadata: {
+      sourceId: sourcePiece?.instanceId || targetPlayerId,
+      skillId: cardId,
+    },
+  })
   if (!player.hand) player.hand = []
   
   // 触发手牌加入手里前规则
@@ -212,13 +363,12 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
   }
   
   if (player.hand.length >= 10) {
-    const def = loadCardById(cardId)
     if (!battle.actions) battle.actions = []
     battle.actions.push({
       type: "cardOverflow",
       playerId: targetPlayerId,
       turn: battle.turn?.turnNumber ?? 0,
-      payload: { message: `手牌已满（10张），${def?.name || cardId}被弃置` }
+      payload: { message: `手牌已满（10张），${resolvedCard?.name || cardId}被弃置` }
     })
     if (!player.discardPile) player.discardPile = []
     player.discardPile.push(cardId)
@@ -229,13 +379,15 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
   const instanceId = runtime
     ? runtime.nextInstanceId('card', `ci-${cardId}`)
     : `ci-${cardId}-${Math.floor(rng() * 1e9)}`
-  const staticCard = loadCardById(cardId)
-  const customCard = (battle as any).customCards?.[cardId]
-  const cardDef = staticCard || customCard
   player.hand.push({
     cardId, instanceId, ownerPlayerId: targetPlayerId,
-    actionPointCost: cardDef?.actionPointCost ?? 0,
-    ...(cardDef ? { name: cardDef.name, description: cardDef.description, icon: cardDef.icon, type: cardDef.type } : {})
+    actionPointCost: resolvedCard?.actionPointCost ?? 0,
+    ...(resolvedCard ? {
+      name: resolvedCard.name,
+      description: resolvedCard.description,
+      icon: resolvedCard.icon,
+      type: resolvedCard.type,
+    } : {})
   })
   
   // 触发手牌加入手里后规则
@@ -351,6 +503,45 @@ export interface CardDefinition {
   icon?: string
   /** Pure, machine-readable source/option/target declaration (RED-59). */
   targeting?: SelectionContractDefinition
+  /** Trusted, closed declaration that binds a sealed summon writer for this content. */
+  summonCapability?: SummonCapabilityDeclaration
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+export function assertCardDefinition(
+  cardId: string,
+  value: unknown,
+  options: { requireReactiveTrigger?: boolean } = {},
+): CardDefinition {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Card definition ${cardId} must be an object`)
+  }
+  const card = value as Record<string, unknown>
+  if (!isNonEmptyString(cardId) || card.id !== cardId) {
+    throw new Error(`Card definition ${cardId || '<empty>'} has a mismatched or empty id`)
+  }
+  if (card.type !== 'active' && card.type !== 'reactive') {
+    throw new Error(`Card definition ${cardId} has an unsupported type`)
+  }
+  if (!isNonEmptyString(card.code)) {
+    throw new Error(`Card definition ${cardId} has no executable code`)
+  }
+  if (
+    options.requireReactiveTrigger
+    && card.type === 'reactive'
+    && (
+      !card.trigger
+      || typeof card.trigger !== 'object'
+      || Array.isArray(card.trigger)
+      || !isNonEmptyString((card.trigger as Record<string, unknown>).type)
+    )
+  ) {
+    throw new Error(`Reactive card definition ${cardId} has no trigger type`)
+  }
+  return value as CardDefinition
 }
 
 /** 清除卡牌缓存（服务器热重载后调用） */
@@ -359,25 +550,91 @@ export function clearCardCache() {
 }
 
 /** 从 data/cards/{cardId}.json 加载卡牌定义（带缓存） */
-export function loadCardById(cardId: string, forceReload = false): CardDefinition | null {
+export function loadCardById(
+  cardId: string,
+  forceReload = false,
+  throwOnFailure = false,
+): CardDefinition | null {
   const cardCache = getSkillExecutionCaches().cardCache
   const cached = cardCache.get(cardId)
-  if (cached && !forceReload) return { ...cached }
   try {
+    if (cached && !forceReload) {
+      try {
+        return { ...assertCardDefinition(cardId, cached) }
+      } catch (error) {
+        cardCache.delete(cardId)
+        throw error
+      }
+    }
     const fs = require('fs')
     const path = require('path')
     const cardPath = path.join(getDataRoot(), 'cards', `${cardId}.json`)
     if (fs.existsSync(cardPath)) {
-      const cardData: CardDefinition = JSON.parse(fs.readFileSync(cardPath, 'utf8'))
+      const cardData = assertCardDefinition(
+        cardId,
+        JSON.parse(fs.readFileSync(cardPath, 'utf8')),
+      )
       cardCache.set(cardId, cardData)
       return { ...cardData }
     }
-    console.error(`[loadCardById] Card file not found: ${cardPath}`)
+    const missing = new Error(`[loadCardById] Card file not found: ${cardPath}`)
+    if (throwOnFailure) throw missing
+    console.error(missing.message)
     return null
   } catch (error) {
+    if (throwOnFailure) throw error
     console.error(`[loadCardById] Error loading card ${cardId}:`, error)
     return null
   }
+}
+
+export function loadCardForBattle(
+  battle: BattleState,
+  cardId: string,
+  options: {
+    forceReload?: boolean
+    requireReactiveTrigger?: boolean
+    metadata?: EffectDispatchMetadata
+  } = {},
+): CardDefinition | null {
+  const chain = getActiveEffectChain(battle)
+  const strict = Boolean(chain && !chain.detached)
+  let staticCard: CardDefinition | null = null
+  let definitionError: unknown
+  try {
+    staticCard = loadCardById(cardId, options.forceReload, strict)
+  } catch (error) {
+    definitionError = error
+  }
+
+  const candidates = [
+    staticCard,
+    (battle as any).customCards?.[cardId] as unknown,
+  ]
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    try {
+      return assertCardDefinition(cardId, candidate, {
+        requireReactiveTrigger: options.requireReactiveTrigger,
+      })
+    } catch (error) {
+      definitionError = error
+    }
+  }
+
+  const error = definitionError === undefined
+    ? new Error(`Card definition ${cardId || '<empty>'} is unavailable`)
+    : definitionError
+  rethrowAttachedEffectContentError(
+    battle,
+    error,
+    `Card definition ${cardId || '<empty>'} could not load during an EffectChain`,
+    {
+      ...options.metadata,
+      skillId: options.metadata?.skillId ?? cardId,
+    },
+  )
+  return null
 }
 function applyCardEffectModifiers(
   cardInstance: any,
@@ -396,82 +653,19 @@ function applyCardEffectModifiers(
   return Math.floor(value)
 }
 
-export function summonExistingPieceWithTriggers(
-  battle: BattleState,
-  piece: PieceInstance,
-  position: { x: number; y: number },
-): SkillExecutionResult {
-  if (!piece?.instanceId || battle.pieces.some(candidate => candidate.instanceId === piece.instanceId)) {
-    return { success: false, message: '召唤实例不存在或已经在场' }
-  }
-  const tile = battle.map?.tiles?.find(candidate =>
-    candidate.x === position.x && candidate.y === position.y)
-  if (!tile?.props?.walkable) return { success: false, message: '召唤位置必须是可行走地格' }
-  if (battle.pieces.some(candidate =>
-    candidate.currentHp > 0 && candidate.x === position.x && candidate.y === position.y)) {
-    return { success: false, message: '召唤位置已被占用' }
-  }
-
-  const beforeContext = {
-    type: 'beforePieceSummoned',
-    playerId: piece.ownerPlayerId,
-    targetPosition: { ...position },
-    pieceTemplateId: piece.templateId,
-    faction: piece.faction,
-  }
-  const beforeResult = checkSynchronousTriggers(battle, beforeContext)
-  if (beforeResult.blocked) {
-    appendDamageMessages(battle, piece.ownerPlayerId, beforeResult.messages)
-    return { success: false, message: beforeResult.messages.join('；') || '召唤被阻止' }
-  }
-  const finalPosition = beforeContext.targetPosition
-  if (!finalPosition
-    || !Number.isSafeInteger(finalPosition.x)
-    || !Number.isSafeInteger(finalPosition.y)) {
-    return { success: false, message: '召唤触发器给出了无效位置' }
-  }
-  const finalTile = battle.map?.tiles?.find(candidate =>
-    candidate.x === finalPosition.x && candidate.y === finalPosition.y)
-  if (!finalTile?.props?.walkable) {
-    return { success: false, message: '召唤触发器将位置改为了不可行走地格' }
-  }
-  if (battle.pieces.some(candidate =>
-    candidate.currentHp > 0
-    && candidate.x === finalPosition.x
-    && candidate.y === finalPosition.y)) {
-    return { success: false, message: '召唤触发器将位置改为了已占用地格' }
-  }
-
-  piece.rules = (piece.rules || []).flatMap((rule: any) => {
-    if (!rule?.id) return [rule]
-    const loaded = loadRuleById(rule.id, FORCE_RULE_RELOAD)
-    return loaded ? [loaded] : [rule]
-  })
-  piece.x = finalPosition.x
-  piece.y = finalPosition.y
-  piece.currentHp = piece.maxHp
-  battle.pieces.push(piece)
-
-  const afterResult = checkSynchronousTriggers(battle, {
-    type: 'afterPieceSummoned',
-    playerId: piece.ownerPlayerId,
-    sourcePiece: piece,
-    pieceTemplateId: piece.templateId,
-    faction: piece.faction,
-  })
-  appendDamageMessages(battle, piece.ownerPlayerId, [
-    ...beforeResult.messages,
-    ...afterResult.messages,
-  ])
-  return {
-    success: true,
-    message: `${piece.name || piece.templateId} 被召唤到(${finalPosition.x},${finalPosition.y})`,
-  }
-}
-
-
 /** 为卡牌效果构建执行环境（没有 sourcePiece，用 playerId 判断阵营） */
-function createCardEffectFunctions(battle: BattleState, playerId: string, context: any) {
+function createCardEffectFunctions(
+  battle: BattleState,
+  playerId: string,
+  context: any,
+) {
+  const authoritativeCardInstance = context?.cardInstance
+  const authoritativeCardInstanceId = typeof authoritativeCardInstance?.instanceId === 'string'
+    ? authoritativeCardInstance.instanceId
+    : undefined
+  const authoritativeCardId = typeof authoritativeCardInstance?.cardId === 'string'
+    ? authoritativeCardInstance.cardId
+    : undefined
   return {
     context,
     battle,
@@ -534,13 +728,55 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     },
 
     dealDamage: (attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = 'true', _battleState?: BattleState, skillId?: string) => {
-      baseDamage = applyCardEffectModifiers(context.cardInstance, 'damage', baseDamage)
-      return dealDamage(attacker, target, baseDamage, damageType, battle, skillId, false, undefined, context.selectedOption)
+      let targetIds: string[] | undefined
+      try {
+        if (context.cardInstance !== authoritativeCardInstance) {
+          throw new Error('CardCode replaced its authoritative card instance')
+        }
+        targetIds = (Array.isArray(target) ? target : [target]).map(entry => entry?.instanceId)
+        baseDamage = applyCardEffectModifiers(authoritativeCardInstance, 'damage', baseDamage)
+        return dealDamage(attacker, target, baseDamage, damageType, battle, skillId, false, undefined, context.selectedOption)
+      } catch (error) {
+        rethrowAttachedEffectContentError(
+          battle,
+          error,
+          'Attached EffectChain CardCode damage facade failed before deterministic enqueue',
+          {
+            kind: 'damage',
+            sourceId: authoritativeCardInstanceId,
+            skillId: skillId || authoritativeCardId,
+            targetId: targetIds?.length === 1 ? targetIds[0] : undefined,
+            targetIds,
+          },
+        )
+        throw error
+      }
     },
 
     healDamage: (healer: PieceInstance, target: PieceInstance | PieceInstance[], baseHeal: number, _battleState?: BattleState, skillId?: string) => {
-      baseHeal = applyCardEffectModifiers(context.cardInstance, 'heal', baseHeal)
-      return healDamage(healer, target, baseHeal, battle, skillId)
+      let targetIds: string[] | undefined
+      try {
+        if (context.cardInstance !== authoritativeCardInstance) {
+          throw new Error('CardCode replaced its authoritative card instance')
+        }
+        targetIds = (Array.isArray(target) ? target : [target]).map(entry => entry?.instanceId)
+        baseHeal = applyCardEffectModifiers(authoritativeCardInstance, 'heal', baseHeal)
+        return healDamage(healer, target, baseHeal, battle, skillId)
+      } catch (error) {
+        rethrowAttachedEffectContentError(
+          battle,
+          error,
+          'Attached EffectChain CardCode heal facade failed before deterministic enqueue',
+          {
+            kind: 'heal',
+            sourceId: authoritativeCardInstanceId,
+            skillId: skillId || authoritativeCardId,
+            targetId: targetIds?.length === 1 ? targetIds[0] : undefined,
+            targetIds,
+          },
+        )
+        throw error
+      }
     },
 
     /** 向某玩家手牌加一张卡（超上限时弃置并写日志） */
@@ -548,9 +784,6 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
       const pid = targetPlayerId || playerId
       return addCardToHandWithTriggers(battle, cardId, pid)
     },
-
-    summonExistingPiece: (piece: PieceInstance, x: number, y: number) =>
-      summonExistingPieceWithTriggers(battle, piece, { x, y }),
 
     /** 按 instanceId 从手牌移除并加入弃牌堆 */
     discardCard: (instanceId: string) => {
@@ -611,7 +844,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     addRuleById: (targetPieceId: string, ruleId: string) => {
       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
       if (targetPiece) {
-        const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
+        const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPieceId })
         if (rule) {
           if (!targetPiece.rules) targetPiece.rules = []
           targetPiece.rules.push(rule)
@@ -634,7 +867,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     addPlayerRuleById: (targetPlayerId: string, ruleId: string) => {
       const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
       if (!player) return false
-      const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
+      const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPlayerId })
       if (!rule) return false
       if (!player.rules) player.rules = []
       if (player.rules.some((r: any) => r.id === ruleId)) return false // 已存在则跳过
@@ -654,6 +887,7 @@ function createCardEffectFunctions(battle: BattleState, playerId: string, contex
     addPlayerSkillById: (targetPlayerId: string, skillId: string) => {
       const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
       if (!player) return false
+      if (!ensureSkillDefinitionForAddition(battle, skillId, targetPlayerId)) return false
       if (!player.skills) player.skills = []
       if (player.skills.some((s: any) => s.skillId === skillId)) return false
       player.skills.push({ skillId, currentCooldown: 0 })
@@ -713,6 +947,24 @@ export function executeCardFunction(
   extraTargets?: Array<{ pieceId?: string; x?: number; y?: number }>,
   cardInstance?: any,
 ): SkillExecutionResult {
+  const expectedCardId = String(cardInstance?.cardId ?? cardDef?.id ?? '')
+  try {
+    cardDef = assertCardDefinition(expectedCardId, cardDef)
+  } catch (error) {
+    rethrowAttachedEffectContentError(
+      battle,
+      error,
+      `CardCode ${expectedCardId || '<empty>'} has an invalid definition during an EffectBatch`,
+      {
+        sourceId: triggerContext?.sourcePiece?.instanceId,
+        skillId: expectedCardId,
+        targetId: targetPiece?.instanceId || triggerContext?.targetPiece?.instanceId,
+      },
+    )
+    return { success: false, message: `卡牌定义无效: ${expectedCardId || '<empty>'}` }
+  }
+  const sealedContent = beginSealedContentExecution(battle, cardDef)
+  let restoreSummonQueueContext: (() => void) | undefined
   try {
     // 卡牌执行上下文：优先使用 triggerContext 作为基础（保持引用），然后添加卡牌相关字段
     // 这样 reactive 卡牌可以修改原始事件的参数（如 damage、heal 等）
@@ -738,16 +990,10 @@ export function executeCardFunction(
     context._selectTargetCallCount = 0
     context.selectedOption = selectedOption
     context.cardInstance = cardInstance || context.cardInstance || null
+    restoreSummonQueueContext = bindDeclaredSummonQueueContext(context, sealedContent)
 
     const env = createCardEffectFunctions(battle, playerId, context)
-    const previousSummonCapability = Object.getOwnPropertyDescriptor(context, 'summonExistingPiece')
-    Object.defineProperty(context, 'summonExistingPiece', {
-      configurable: true,
-      enumerable: false,
-      value: env.summonExistingPiece,
-    })
-    try {
-      const fullCode = `
+    const fullCode = `
         (function(env) {
           const context = env.context;
           const battle = env.battle;
@@ -774,44 +1020,143 @@ export function executeCardFunction(
           return executeCard(context);
         })
       `
-      const executeCard = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
-        surface: 'cardCode', contentId: cardDef.id, code: fullCode, entry: 'executeCard(context)',
-      })
-      const result = executeCard(env)
-      return result || { success: false, message: '卡牌效果无返回值' }
-    } finally {
-      if (previousSummonCapability) {
-        Object.defineProperty(context, 'summonExistingPiece', previousSummonCapability)
-      } else {
-        delete context.summonExistingPiece
-      }
-    }
+    const executeCard = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
+      surface: 'cardCode', contentId: cardDef.id, code: fullCode, entry: 'executeCard(context)',
+    })
+    const result = executeCard(env)
+    finishSealedContentExecution(battle, sealedContent)
+    return result || { success: false, message: '卡牌效果无返回值' }
   } catch (error: any) {
-    if (isSuspendableActionPending(error)) throw error
-    if (error?.needsTargetSelection) return error as SkillExecutionResult
-    if (error?.needsOptionSelection) return error as SkillExecutionResult
-    console.error(`[executeCardFunction] Error executing card ${cardDef.id}:`, error)
-    return { success: false, message: `卡牌执行失败: ${error?.message || error}` }
+    if (isEffectChainPendingSignal(error)) throw error
+    if (isEffectChainFatalError(error)) throw error
+    if (isThrownInteractionSignal(error)) return error
+    rethrowAttachedEffectContentError(
+      battle,
+      error,
+      `CardCode ${cardDef.id} failed during an EffectBatch`,
+      {
+        sourceId: triggerContext?.sourcePiece?.instanceId,
+        skillId: cardDef.id,
+        targetId: triggerContext?.targetPiece?.instanceId,
+      },
+    )
+    const failureMessage = safeThrownValueMessage(error)
+    console.error(`[executeCardFunction] Error executing card ${cardDef.id}: ${failureMessage}`)
+    return { success: false, message: `卡牌执行失败: ${failureMessage}` }
+  } finally {
+    restoreSummonQueueContext?.()
+    sealedContent.cleanup?.()
   }
 }
 
+export function assertSkillDefinition(
+  skillId: string,
+  value: unknown,
+  options: { requireExecutable?: boolean } = {},
+): SkillDefinition {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Skill definition ${skillId} must be an object`)
+  }
+  const skill = value as Record<string, unknown>
+  if (!isNonEmptyString(skillId) || skill.id !== skillId) {
+    throw new Error(`Skill definition ${skillId || '<empty>'} has a mismatched or empty id`)
+  }
+  if ((skill.kind !== 'active' && skill.kind !== 'passive') || !isNonEmptyString(skill.type)) {
+    throw new Error(`Skill definition ${skillId} has incomplete execution metadata`)
+  }
+  if (options.requireExecutable && !isNonEmptyString(skill.code)) {
+    throw new Error(`Skill definition ${skillId} has no executable code`)
+  }
+  return value as SkillDefinition
+}
+
 // 从文件中加载技能定义（用于 addSkillById 同步到 battle.skillsById）
-function loadSkillById(skillId: string): SkillDefinition | null {
+export function loadSkillById(
+  skillId: string,
+  throwOnFailure = false,
+): SkillDefinition | null {
   const skillDefinitionCache = getSkillExecutionCaches().skillDefinitionCache
   const cached = skillDefinitionCache.get(skillId)
-  if (cached && !FORCE_RULE_RELOAD) return cached
   try {
+    if (cached && !FORCE_RULE_RELOAD) {
+      try {
+        return assertSkillDefinition(skillId, cached)
+      } catch (error) {
+        skillDefinitionCache.delete(skillId)
+        throw error
+      }
+    }
     const fs = require('fs')
     const path = require('path')
     const skillPath = path.join(getDataRoot(), 'skills', `${skillId}.json`)
     const content = fs.readFileSync(skillPath, 'utf-8')
-    const loaded = JSON.parse(content) as SkillDefinition
+    const loaded = assertSkillDefinition(skillId, JSON.parse(content))
     skillDefinitionCache.set(skillId, loaded)
     return loaded
   } catch (e) {
+    if (throwOnFailure) throw e
     console.warn(`[loadSkillById] Failed to load skill: ${skillId}`, e)
     return null
   }
+}
+
+export function loadSkillForBattle(
+  battle: BattleState,
+  skillId: string,
+  candidate: unknown = undefined,
+  options: {
+    requireExecutable?: boolean
+    metadata?: EffectDispatchMetadata
+  } = {},
+): SkillDefinition | null {
+  const chain = getActiveEffectChain(battle)
+  const strict = Boolean(chain && !chain.detached)
+  let definition: SkillDefinition | null = null
+  let definitionError: unknown
+  try {
+    definition = candidate === undefined
+      ? loadSkillById(skillId, strict)
+      : assertSkillDefinition(skillId, candidate)
+    if (definition) {
+      return assertSkillDefinition(skillId, definition, {
+        requireExecutable: options.requireExecutable,
+      })
+    }
+  } catch (error) {
+    definitionError = error
+  }
+
+  const error = definitionError === undefined
+    ? new Error(`Skill definition ${skillId || '<empty>'} is unavailable`)
+    : definitionError
+  rethrowAttachedEffectContentError(
+    battle,
+    error,
+    `Skill definition ${skillId || '<empty>'} could not load during an EffectChain`,
+    {
+      ...options.metadata,
+      skillId: options.metadata?.skillId ?? skillId,
+    },
+  )
+  return null
+}
+
+function ensureSkillDefinitionForAddition(
+  battle: BattleState,
+  skillId: string,
+  sourceId: string,
+): SkillDefinition | null {
+  const embedded = (battle as any).skillsById?.[skillId]
+  const definition = loadSkillForBattle(battle, skillId, embedded, {
+    requireExecutable: true,
+    metadata: { sourceId, skillId },
+  })
+  if (!definition) return null
+  if (!(battle as any).skillsById || typeof (battle as any).skillsById !== 'object') {
+    ;(battle as any).skillsById = {}
+  }
+  ;(battle as any).skillsById[skillId] = definition
+  return definition
 }
 
 export function clearSkillDefinitionCache(): void {
@@ -828,7 +1173,9 @@ export function loadAllSkillsById(): Record<string, SkillDefinition> {
     const fs = require('fs')
     const path = require('path')
     const skillsDir = path.join(getDataRoot(), 'skills')
-    const files: string[] = fs.readdirSync(skillsDir).filter((file: string) => file.endsWith('.json'))
+    const files: string[] = fs.readdirSync(skillsDir).filter((file: string) => (
+      file.endsWith('.json') && file !== 'manifest.json'
+    ))
     const result: Record<string, SkillDefinition> = {}
     for (const file of files) {
       const skillId = file.replace('.json', '')
@@ -853,14 +1200,65 @@ function instantiateRuleForBattle(rule: TriggerRule): TriggerRule {
   }
 }
 
-export function loadRuleById(ruleId: string, forceReload: boolean = false): TriggerRule | null {
+function assertRawRuleDefinition(ruleId: string, value: unknown): Record<string, any> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Rule definition ${ruleId} must be an object`)
+  }
+  const rule = value as Record<string, any>
+  if (!isNonEmptyString(ruleId) || rule.id !== ruleId) {
+    throw new Error(`Rule definition ${ruleId || '<empty>'} has a mismatched or empty id`)
+  }
+  if (!rule.trigger || typeof rule.trigger !== 'object' || !isNonEmptyString(rule.trigger.type)) {
+    throw new Error(`Rule definition ${ruleId} has no trigger type`)
+  }
+  const hasSkillCode = isNonEmptyString(rule.skillCode)
+  const hasTriggerSkill = rule.effect?.type === 'triggerSkill'
+    && isNonEmptyString(rule.effect?.skillId)
+  if (Number(hasSkillCode) + Number(hasTriggerSkill) !== 1) {
+    throw new Error(
+      `Rule definition ${ruleId} must declare exactly one supported execution surface`,
+    )
+  }
+  return rule
+}
+
+function assertCompiledRuleDefinition(ruleId: string, value: unknown): TriggerRule {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Compiled rule ${ruleId} must be an object`)
+  }
+  const rule = value as Record<string, any>
+  if (
+    !isNonEmptyString(ruleId)
+    || rule.id !== ruleId
+    || !rule.trigger
+    || typeof rule.trigger !== 'object'
+    || !isNonEmptyString(rule.trigger.type)
+    || typeof rule.effect !== 'function'
+  ) {
+    throw new Error(`Compiled rule ${ruleId || '<empty>'} is invalid`)
+  }
+  return value as TriggerRule
+}
+
+export function loadRuleById(
+  ruleId: string,
+  forceReload: boolean = false,
+  throwOnFailure = false,
+): TriggerRule | null {
   const ruleCache = getSkillExecutionCaches().ruleCache
   battleDebugLog(`[loadRuleById] Called with ruleId: ${ruleId}, forceReload: ${forceReload}`);
   // 命中缓存时返回拷贝（深拷贝 limits，避免跨游戏共享 uses/currentCooldown 计数）
   const cached = ruleCache.get(ruleId)
   if (cached && !forceReload) {
-    battleDebugLog(`[loadRuleById] Cache hit for rule: ${ruleId}`);
-    return instantiateRuleForBattle(cached)
+    try {
+      battleDebugLog(`[loadRuleById] Cache hit for rule: ${ruleId}`);
+      return instantiateRuleForBattle(assertCompiledRuleDefinition(ruleId, cached))
+    } catch (error) {
+      ruleCache.delete(ruleId)
+      if (throwOnFailure) throw error
+      console.error('Error loading cached rule:', error)
+      return null
+    }
   }
   if (forceReload && cached) {
     battleDebugLog(`[loadRuleById] Force reloading rule: ${ruleId}`);
@@ -875,7 +1273,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
     if (fs.existsSync(rulePath)) {
       battleDebugLog(`[loadRuleById] Found rule file: ${rulePath}`);
       const ruleContent = fs.readFileSync(rulePath, 'utf8');
-      const ruleData = JSON.parse(ruleContent);
+      const ruleData = assertRawRuleDefinition(ruleId, JSON.parse(ruleContent));
       
       // 转换effect为函数 - 优先处理 skillCode
       let effectFunction: EffectFunction = () => ({ success: false, message: 'Rule effect not initialized' });
@@ -884,8 +1282,34 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
       if (ruleData.skillCode) {
         effectFunction = (battle: BattleState, context: any) => {
           try {
-            const globalDealDamage = dealDamage;
-            const globalHealDamage = healDamage;
+            const globalDealDamage = (
+              attacker: PieceInstance,
+              target: PieceInstance | PieceInstance[],
+              baseDamage: number,
+              damageType: DamageType = 'true',
+              _battleState?: BattleState,
+              skillId?: string,
+              skipBeforeTrigger = false,
+              killerPlayerId?: string,
+              selectedOption?: any,
+            ) => dealDamage(
+              attacker,
+              target,
+              baseDamage,
+              damageType,
+              battle,
+              skillId,
+              skipBeforeTrigger,
+              killerPlayerId,
+              selectedOption,
+            );
+            const globalHealDamage = (
+              healer: PieceInstance,
+              target: PieceInstance | PieceInstance[],
+              baseHeal: number,
+              _battleState?: BattleState,
+              skillId?: string,
+            ) => healDamage(healer, target, baseHeal, battle, skillId);
 
             // 构建辅助函数
             const addCardToHand = (cardId: string, targetPlayerId?: string) => {
@@ -946,7 +1370,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             const addPlayerRuleById = (targetPlayerId: string, ruleId: string) => {
               const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
               if (!player) return false
-              const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
+              const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPlayerId })
               if (!rule) return false
               if (!player.rules) player.rules = []
               if (player.rules.some((r: any) => r.id === ruleId)) return false
@@ -957,7 +1381,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             const addRuleById = (targetPieceId: string, ruleId: string) => {
               const targetPiece = battle.pieces.find((p: any) => p.instanceId === targetPieceId)
               if (targetPiece) {
-                const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
+                const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPieceId })
                 if (rule) {
                   if (!targetPiece.rules) targetPiece.rules = []
                   targetPiece.rules.push(rule)
@@ -986,6 +1410,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             const addPlayerSkillById = (targetPlayerId: string, skillId: string) => {
               const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
               if (!player) return false
+              if (!ensureSkillDefinitionForAddition(battle, skillId, targetPlayerId)) return false
               if (!player.skills) player.skills = []
               if (player.skills.some((s: any) => s.skillId === skillId)) return false
               player.skills.push({ skillId, currentCooldown: 0 })
@@ -1053,9 +1478,26 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
-            if (isSuspendableActionPending(error)) throw error
-            if (error instanceof DamagePipelineError) throw error;
-            console.error('[Rule] Error executing skillCode:', error);
+            if (isEffectChainPendingSignal(error)) throw error
+            if (isEffectChainFatalError(error)) throw error
+            let isDamagePipelineFailure = false
+            try {
+              isDamagePipelineFailure = error instanceof DamagePipelineError
+            } catch {
+              // Hostile thrown values are ordinary content failures, not pipeline errors.
+            }
+            if (isDamagePipelineFailure) throw error;
+            rethrowAttachedEffectContentError(
+              battle,
+              error,
+              `Rule SkillCode ${ruleId} failed during an EffectBatch`,
+              {
+                sourceId: context?.sourcePiece?.instanceId || context?.piece?.instanceId,
+                skillId: ruleId,
+                targetId: context?.targetPiece?.instanceId,
+              },
+            )
+            console.error('[Rule] Error executing skillCode: ' + safeThrownValueMessage(error));
             return { success: false, message: '规则执行失败' };
           }
         };
@@ -1067,15 +1509,23 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
             writeLog(`[triggerSkill] Triggering skill: ${skillId} for rule: ${ruleId}, context.playerId: ${context.playerId}`);
             if (skillId) {
               battleDebugLog(`Triggering skill: ${skillId} for rule: ${ruleId}`);
-              // 优先从 battle.skillsById 获取（Android 内联数据 / 已缓存），回退到文件系统
-              let skillDef = (battle as any).skillsById?.[skillId];
-              if (!skillDef) {
-                const skillPath = path.join(getDataRoot(), 'skills', `${skillId}.json`);
-                if (fs.existsSync(skillPath)) {
-                  try { skillDef = JSON.parse(fs.readFileSync(skillPath, 'utf8')); } catch {}
-                }
-              }
+              // 优先使用房间内已水合的定义；权威链会校验 ID、元数据和可执行代码。
+              const skillDef = loadSkillForBattle(
+                battle,
+                skillId,
+                (battle as any).skillsById?.[skillId],
+                {
+                  requireExecutable: true,
+                  metadata: {
+                    sourceId: context?.sourcePiece?.instanceId || context?.piece?.instanceId,
+                    skillId,
+                    targetId: context?.targetPiece?.instanceId,
+                  },
+                },
+              )
               if (skillDef) {
+                const sealedContent = beginSealedContentExecution(battle, skillDef)
+                let restoreSummonQueueContext: (() => void) | undefined
                 try {
                   
                   // 保存全局的dealDamage和healDamage函数，避免递归调用
@@ -1097,6 +1547,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                   if (!context.battle) {
                     context.battle = battle;
                   }
+                  restoreSummonQueueContext = bindDeclaredSummonQueueContext(context, sealedContent)
                   // 使用 context 作为 skillContext，确保引用传递
                   const skillContext = context;
                   
@@ -1168,7 +1619,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     addRuleById: (targetPieceId: any, ruleId: any) => {
                       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
                       if (targetPiece) {
-                        const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD);
+                        const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPieceId });
                         if (rule) {
                           if (!targetPiece.rules) {
                             targetPiece.rules = [];
@@ -1190,7 +1641,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     addPlayerRuleById: (targetPlayerId: string, ruleId: string) => {
                       const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
                       if (!player) return false;
-                      const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD);
+                      const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPlayerId });
                       if (!rule) return false;
                       if (!player.rules) player.rules = [];
                       if (player.rules.some((r: any) => r.id === ruleId)) return false;
@@ -1206,6 +1657,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     addPlayerSkillById: (targetPlayerId: string, skillId: string) => {
                       const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
                       if (!player) return false;
+                      if (!ensureSkillDefinitionForAddition(battle, skillId, targetPlayerId)) return false;
                       if (!player.skills) player.skills = [];
                       if (player.skills.some((s: any) => s.skillId === skillId)) return false;
                       player.skills.push({ skillId, currentCooldown: 0 });
@@ -1240,6 +1692,7 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     addSkillById: (targetPieceId: any, skillId: any) => {
                       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
                       if (targetPiece) {
+                        if (!ensureSkillDefinitionForAddition(battle, skillId, targetPieceId)) return false;
                         if (!targetPiece.skills) targetPiece.skills = [];
                         const existingSkill = targetPiece.skills.find(skill => skill.skillId === skillId);
                         if (!existingSkill) {
@@ -1249,10 +1702,6 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                             const alreadyInDisplay = targetPiece.displaySkills.some((s: any) =>
                               (typeof s === 'string' ? s : s.skillId) === skillId);
                             if (!alreadyInDisplay) targetPiece.displaySkills.push(newSkill);
-                          }
-                          if (!battle.skillsById[skillId]) {
-                            const loaded = loadSkillById(skillId);
-                            if (loaded) battle.skillsById[skillId] = loaded;
                           }
                           return true;
                         }
@@ -1351,17 +1800,56 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
                     surface: 'ruleTriggerSkill', contentId: skillId, code: fullSkillCode, entry: 'executeSkill(context)',
                   });
                   const result = executeTriggeredSkill(skillEnvironment);
+                  finishSealedContentExecution(battle, sealedContent)
                   writeLog(`[triggerSkill] Skill execution result for ${skillId}: ${JSON.stringify(result)}`);
                   battleDebugLog(`Skill execution result:`, result);
                   return result;
                 } catch (error) {
-                  if (isSuspendableActionPending(error)) throw error
+                  if (isEffectChainPendingSignal(error)) throw error
+                  if (isEffectChainFatalError(error)) throw error
                   console.error('Error executing skill in rule effect:', error);
+                  rethrowAttachedEffectContentError(
+                    battle,
+                    error,
+                    `Rule triggerSkill ${skillId} failed during an EffectBatch`,
+                    {
+                      sourceId: context?.sourcePiece?.instanceId || context?.piece?.instanceId,
+                      skillId,
+                      targetId: context?.targetPiece?.instanceId,
+                    },
+                  )
                   return { success: false, message: '技能执行失败' };
+                } finally {
+                  restoreSummonQueueContext?.()
+                  sealedContent.cleanup?.()
                 }
               } else {
+                const definitionError = new Error(
+                  `Skill definition ${skillId} is unavailable for triggerSkill rule ${ruleId}`,
+                )
+                rethrowAttachedEffectContentError(
+                  battle,
+                  definitionError,
+                  `Rule triggerSkill ${skillId} could not load its definition during an EffectBatch`,
+                  {
+                    sourceId: context?.sourcePiece?.instanceId || context?.piece?.instanceId,
+                    skillId,
+                    targetId: context?.targetPiece?.instanceId,
+                  },
+                )
                 console.error(`Skill not found: ${skillId}`);
               }
+            } else {
+              rethrowAttachedEffectContentError(
+                battle,
+                new Error(`Rule ${ruleId} declares triggerSkill without a skillId`),
+                `Rule ${ruleId} has an invalid triggerSkill definition during an EffectBatch`,
+                {
+                  sourceId: context?.sourcePiece?.instanceId || context?.piece?.instanceId,
+                  skillId: ruleId,
+                  targetId: context?.targetPiece?.instanceId,
+                },
+              )
             }
             return { success: true, message: `${ruleData.name}触发` };
           };
@@ -1385,18 +1873,53 @@ export function loadRuleById(ruleId: string, forceReload: boolean = false): Trig
       
       battleDebugLog(`Loaded rule successfully: ${ruleId}`);
       // 写入缓存，后续复用时无需再读文件
-      ruleCache.set(ruleId, rule)
-      return instantiateRuleForBattle(rule);
+      const compiledRule = assertCompiledRuleDefinition(ruleId, rule)
+      ruleCache.set(ruleId, compiledRule)
+      return instantiateRuleForBattle(compiledRule);
     } else {
-      console.error(`Rule file not found: ${rulePath}`);
+      const missing = new Error(`Rule file not found: ${rulePath}`)
+      if (throwOnFailure) throw missing
+      console.error(missing.message);
     }
     
     return null;
   } catch (error) {
+    if (throwOnFailure) throw error
     console.error('Error loading rule:', error);
     return null;
   }
 };
+
+export function loadRuleForBattle(
+  battle: BattleState,
+  ruleId: string,
+  metadata: EffectDispatchMetadata = {},
+): TriggerRule | null {
+  const chain = getActiveEffectChain(battle)
+  const strict = Boolean(chain && !chain.detached)
+  let rule: TriggerRule | null = null
+  let definitionError: unknown
+  try {
+    rule = loadRuleById(ruleId, FORCE_RULE_RELOAD, strict)
+  } catch (error) {
+    definitionError = error
+  }
+  if (rule) return rule
+
+  const error = definitionError === undefined
+    ? new Error(`Rule definition ${ruleId || '<empty>'} is unavailable`)
+    : definitionError
+  rethrowAttachedEffectContentError(
+    battle,
+    error,
+    `Rule definition ${ruleId || '<empty>'} could not load during an EffectChain`,
+    {
+      ...metadata,
+      skillId: metadata.skillId ?? ruleId,
+    },
+  )
+  return null
+}
 
 export type SkillId = string
 
@@ -1547,6 +2070,8 @@ export interface SkillDefinition {
   icon?: string
   /** Pure, machine-readable option/target declaration (RED-59). */
   targeting?: SelectionContractDefinition
+  /** Trusted, closed declaration that binds a sealed summon writer for this content. */
+  summonCapability?: SummonCapabilityDeclaration
   /** When true, cancelling any synthetic post-effect target rolls back the entire skill transaction. */
   rollbackPendingTargetOnCancel?: boolean
 }
@@ -2062,6 +2587,9 @@ export interface DamageResult {
   isKilled: boolean
   targetHp: number
   message: string
+  depth?: number
+  enqueueSequence?: number
+  deathBatchId?: string
 }
 
 export interface DamageBatchResult {
@@ -2074,27 +2602,33 @@ export interface DamageBatchResult {
   message: string
 }
 
-interface DamageBatchRequest {
-  attacker: PieceInstance
-  targets: PieceInstance[]
-  baseDamage: number
-  damageType: DamageType
-  skillId?: string
-  skipBeforeTrigger: boolean
-  killerPlayerId?: string
-  selectedOption?: any
+export interface HealResult {
+  success: boolean
+  batchId: string
+  chainId: string
   parentBatchId?: string
+  sourceId: string
+  targetId: string
+  skillId?: string
+  rawHeal: number
+  modifiedHeal: number
+  heal: number
+  blocked: boolean
+  targetHp: number
+  message: string
   depth: number
+  enqueueSequence?: number
 }
 
-interface DamageChain {
+export interface HealBatchResult {
+  success: boolean
+  batchId?: string
   chainId?: string
-  pending: DamageBatchRequest[]
-  processedBatches: number
-  fallbackStart: number
-  sequence: number
-  currentBatchId?: string
-  currentDepth?: number
+  heals: number[]
+  totalHeal: number
+  results: HealResult[]
+  message: string
+  blocked?: boolean
 }
 
 interface PreparedDamage {
@@ -2104,26 +2638,77 @@ interface PreparedDamage {
   emitBlocked: boolean
 }
 
-const MAX_DAMAGE_CHAIN_DEPTH = 20
-const MAX_DAMAGE_CHAIN_BATCHES = 100
+interface PreparedHeal {
+  target: PieceInstance
+  hpBefore: number
+  nextHp: number
+  result: HealResult
+}
+
+interface DeathBatchResolution {
+  batchId: string
+  chainId: string
+  killedIds: readonly string[]
+  revivedIds: readonly string[]
+}
+
 const DAMAGE_TYPES = new Set<DamageType>(['physical', 'magical', 'true', 'toxin'])
-const activeDamageChains = new WeakMap<BattleState, DamageChain>()
 
 export class DamagePipelineError extends Error {
   readonly code: string
   readonly context: Record<string, unknown>
 
   constructor(code: string, message: string, context: Record<string, unknown>) {
-    super(`${message}; context=${JSON.stringify(context)}`)
+    super(message + '; context=' + JSON.stringify(context))
     this.name = 'DamagePipelineError'
     this.code = code
     this.context = context
   }
 }
 
-function compareDamageTarget(left: PieceInstance, right: PieceInstance): number {
+export class HealPipelineError extends Error {
+  readonly code: string
+  readonly context: Record<string, unknown>
+
+  constructor(code: string, message: string, context: Record<string, unknown>) {
+    super(message + '; context=' + JSON.stringify(context))
+    this.name = 'HealPipelineError'
+    this.code = code
+    this.context = context
+  }
+}
+
+function compareEffectTarget(left: PieceInstance, right: PieceInstance): number {
   if (left.instanceId === right.instanceId) return 0
   return left.instanceId < right.instanceId ? -1 : 1
+}
+
+function effectMetadata(context: EffectBatchContext): Record<string, unknown> {
+  return {
+    effectChainId: context.chainId,
+    effectBatchId: context.batchId,
+    parentEffectBatchId: context.parentBatchId,
+    effectBatchKind: context.kind,
+    effectDepth: context.depth,
+    effectEnqueueSequence: context.parentBatchId === undefined ? undefined : context.enqueueSequence,
+    originStage: context.originStage,
+  }
+}
+
+function damageMetadata(context: EffectBatchContext): Record<string, unknown> {
+  return {
+    damageBatchId: context.kind === 'damage' ? context.batchId : context.parentBatchId,
+    damageChainId: context.chainId,
+    parentDamageBatchId: context.kind === 'damage' ? context.parentBatchId : undefined,
+  }
+}
+
+function queueContext(chain: EffectChain, context: EffectBatchContext): Record<string, unknown> {
+  return {
+    ...effectMetadata(context),
+    damageQueue: createDamageQueueWriter(chain),
+    healQueue: createHealQueueWriter(chain),
+  }
 }
 
 function damageContext(
@@ -2143,53 +2728,167 @@ function damageContext(
   }
 }
 
-function validateDamageRequest(
+function healContext(
+  battle: BattleState,
+  healer: PieceInstance,
+  skillId: string | undefined,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const runtime = getActiveRuleRuntime()
+  return {
+    sourceId: healer?.instanceId,
+    playerId: healer?.ownerPlayerId,
+    skillId,
+    turn: battle?.turn?.turnNumber ?? 0,
+    rootSeed: runtime?.rootSeed ?? null,
+    ...extra,
+  }
+}
+
+function validateDamageTargets(
   attacker: PieceInstance,
-  targets: PieceInstance[],
+  targets: readonly PieceInstance[],
   baseDamage: number,
   damageType: DamageType,
   battle: BattleState,
-  skillId?: string,
+  skillId: string | undefined,
+  allowUnavailable: boolean,
 ): PieceInstance[] {
   if (!attacker || typeof attacker.instanceId !== 'string' || !attacker.instanceId) {
-    throw new DamagePipelineError('RVB_DAMAGE_SOURCE_INVALID', 'Damage source must have a stable instanceId', damageContext(battle, attacker, skillId))
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_SOURCE_INVALID',
+      'Damage source must have a stable instanceId',
+      damageContext(battle, attacker, skillId),
+    )
   }
   if (!Number.isFinite(baseDamage) || baseDamage < 0) {
     throw new DamagePipelineError(
       'RVB_DAMAGE_VALUE_INVALID',
-      `Damage must be a finite non-negative number; received ${String(baseDamage)}`,
+      'Damage must be a finite non-negative number; received ' + String(baseDamage),
       damageContext(battle, attacker, skillId, { baseDamage }),
     )
   }
   if (!DAMAGE_TYPES.has(damageType)) {
     throw new DamagePipelineError(
       'RVB_DAMAGE_TYPE_INVALID',
-      `Unsupported damage type ${String(damageType)}`,
+      'Unsupported damage type ' + String(damageType),
       damageContext(battle, attacker, skillId, { damageType }),
     )
   }
-
   const seen = new Set<string>()
   const canonicalTargets: PieceInstance[] = []
   for (const requestedTarget of targets) {
     const targetId = requestedTarget?.instanceId
     if (!targetId) {
-      throw new DamagePipelineError('RVB_DAMAGE_TARGET_INVALID', 'Damage target must have a stable instanceId', damageContext(battle, attacker, skillId))
+      throw new DamagePipelineError(
+        'RVB_DAMAGE_TARGET_INVALID',
+        'Damage target must have a stable instanceId',
+        damageContext(battle, attacker, skillId),
+      )
     }
     if (seen.has(targetId)) {
       throw new DamagePipelineError(
         'RVB_DAMAGE_TARGET_DUPLICATE',
-        `Damage batch contains duplicate target ${targetId}`,
+        'Damage batch contains duplicate target ' + targetId,
         damageContext(battle, attacker, skillId, { targetId }),
       )
     }
     seen.add(targetId)
     const canonical = battle.pieces.find(piece => piece.instanceId === targetId)
-    if (!canonical || canonical.currentHp <= 0) {
+    if (!canonical || !Number.isFinite(canonical.currentHp) || canonical.currentHp <= 0) {
+      const wasInvalidated = (
+        canonical !== undefined
+        && Number.isFinite(canonical.currentHp)
+        && canonical.currentHp <= 0
+      )
+        || (
+          canonical === undefined
+          && Number.isFinite(requestedTarget.currentHp)
+          && requestedTarget.currentHp <= 0
+        )
+        || (battle.graveyard ?? []).some(piece => piece.instanceId === targetId)
+      if (allowUnavailable && wasInvalidated) continue
       throw new DamagePipelineError(
         'RVB_DAMAGE_TARGET_UNAVAILABLE',
-        `Damage target ${targetId} is not an active living piece`,
+        'Damage target ' + targetId + ' is not an active living piece',
         damageContext(battle, attacker, skillId, { targetId }),
+      )
+    }
+    canonicalTargets.push(canonical)
+  }
+  return canonicalTargets
+}
+
+function validateHealTargets(
+  healer: PieceInstance,
+  targets: readonly PieceInstance[],
+  baseHeal: number,
+  battle: BattleState,
+  skillId: string | undefined,
+  allowUnavailable: boolean,
+): PieceInstance[] {
+  if (!healer || typeof healer.instanceId !== 'string' || !healer.instanceId) {
+    throw new HealPipelineError(
+      'RVB_HEAL_SOURCE_INVALID',
+      'Heal source must have a stable instanceId',
+      healContext(battle, healer, skillId),
+    )
+  }
+  if (!Number.isFinite(baseHeal) || baseHeal < 0) {
+    throw new HealPipelineError(
+      'RVB_HEAL_VALUE_INVALID',
+      'Heal must be a finite non-negative number; received ' + String(baseHeal),
+      healContext(battle, healer, skillId, { baseHeal }),
+    )
+  }
+  const seen = new Set<string>()
+  const canonicalTargets: PieceInstance[] = []
+  for (const requestedTarget of targets) {
+    const targetId = requestedTarget?.instanceId
+    if (!targetId) {
+      throw new HealPipelineError(
+        'RVB_HEAL_TARGET_INVALID',
+        'Heal target must have a stable instanceId',
+        healContext(battle, healer, skillId),
+      )
+    }
+    if (seen.has(targetId)) {
+      throw new HealPipelineError(
+        'RVB_HEAL_TARGET_DUPLICATE',
+        'Heal batch contains duplicate target ' + targetId,
+        healContext(battle, healer, skillId, { targetId }),
+      )
+    }
+    seen.add(targetId)
+    const canonical = battle.pieces.find(piece => piece.instanceId === targetId)
+    if (!canonical || !Number.isFinite(canonical.currentHp) || canonical.currentHp <= 0) {
+      const wasInvalidated = (
+        canonical !== undefined
+        && Number.isFinite(canonical.currentHp)
+        && canonical.currentHp <= 0
+      )
+        || (
+          canonical === undefined
+          && Number.isFinite(requestedTarget.currentHp)
+          && requestedTarget.currentHp <= 0
+        )
+        || (battle.graveyard ?? []).some(piece => piece.instanceId === targetId)
+      if (allowUnavailable && wasInvalidated) continue
+      throw new HealPipelineError(
+        'RVB_HEAL_TARGET_UNAVAILABLE',
+        'Heal target ' + targetId + ' is not an active living piece',
+        healContext(battle, healer, skillId, { targetId }),
+      )
+    }
+    if (
+      !Number.isFinite(canonical.maxHp)
+      || canonical.maxHp <= 0
+      || canonical.currentHp > canonical.maxHp
+    ) {
+      throw new HealPipelineError(
+        'RVB_HEAL_TARGET_INVALID',
+        'Heal target ' + targetId + ' must have finite positive maxHp and currentHp within maxHp',
+        healContext(battle, healer, skillId, { targetId }),
       )
     }
     canonicalTargets.push(canonical)
@@ -2210,58 +2909,104 @@ function appendDamageMessages(battle: BattleState, playerId: string, messages: s
   }
 }
 
-function nextDamageBatchId(battle: BattleState, chain: DamageChain): string {
-  const runtime = getActiveRuleRuntime()
-  if (runtime) return runtime.nextInstanceId('damage-batch', 'damage-batch')
-  const id = `damage-batch-${battle.turn?.turnNumber ?? 0}-${chain.fallbackStart + chain.sequence}`
-  chain.sequence += 1
-  return id
+function appendHealBlockedMessage(battle: BattleState, healer: PieceInstance, message: string): void {
+  battle.actions ??= []
+  battle.actions.push({
+    type: 'triggerEffect',
+    playerId: healer.ownerPlayerId,
+    turn: battle.turn?.turnNumber ?? 0,
+    payload: { message },
+  })
 }
 
-function collectFollowUpDamage(
-  queue: NonNullable<import('./triggers').TriggerContext['damageQueue']>,
-  chain: DamageChain,
-  parentBatchId: string,
-  depth: number,
+function finiteNonNegativeDamage(
+  value: unknown,
   battle: BattleState,
-): void {
-  for (const request of queue) {
-    if (depth > MAX_DAMAGE_CHAIN_DEPTH) {
-      throw new DamagePipelineError('RVB_DAMAGE_CHAIN_DEPTH', `Damage chain exceeded depth ${MAX_DAMAGE_CHAIN_DEPTH}`, {
-        chainId: chain.chainId,
-        parentBatchId,
-        depth,
-        turn: battle.turn?.turnNumber ?? 0,
-        rootSeed: getActiveRuleRuntime()?.rootSeed ?? null,
-      })
-    }
-    const targets = Array.isArray(request.target) ? request.target : [request.target]
-    chain.pending.push({
-      attacker: request.attacker,
-      targets,
-      baseDamage: request.damage,
-      damageType: request.damageType,
-      skillId: request.skillId,
-      skipBeforeTrigger: false,
-      killerPlayerId: request.killerPlayerId,
-      parentBatchId,
-      depth,
-    })
+  attacker: PieceInstance,
+  skillId: string | undefined,
+  batchId: string,
+  targetId?: string,
+): number {
+  const number = Number(value)
+  if (!Number.isFinite(number) || number < 0) {
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_MODIFIER_INVALID',
+      'Damage trigger produced invalid value ' + String(value),
+      damageContext(battle, attacker, skillId, { batchId, targetId }),
+    )
   }
+  return number
 }
 
-function prepareTargetDamage(
-  request: DamageBatchRequest,
+function finiteNonNegativeHeal(
+  value: unknown,
+  battle: BattleState,
+  healer: PieceInstance,
+  skillId: string | undefined,
+  batchId: string,
+  targetId?: string,
+): number {
+  const number = Number(value)
+  if (!Number.isFinite(number) || number < 0) {
+    throw new HealPipelineError(
+      'RVB_HEAL_MODIFIER_INVALID',
+      'Heal trigger produced invalid finite non-negative value ' + String(value),
+      healContext(battle, healer, skillId, { batchId, targetId }),
+    )
+  }
+  return number
+}
+
+function rethrowInvalidEffectRequest(
+  error: unknown,
+  request: DamageRequest | import('./effect-batch').HealRequest,
+  context: EffectBatchContext<'damage' | 'heal'>,
+  chain: EffectChain,
+): never {
+  if (isEffectChainFatalError(error) || chain.detached || context.enqueueSequence === undefined) {
+    throw error
+  }
+  const source = request.kind === 'damage' ? request.attacker : request.healer
+  const targetIds = request.targets.map(target => target?.instanceId).filter(Boolean) as string[]
+  throw new EffectChainFatalError(
+    'RVB_EFFECT_CHAIN_STATE_INVALID',
+    'Invalid queued ' + request.kind + ' batch request',
+    {
+      actionId: chain.actionId,
+      chainId: chain.chainId,
+      batchId: context.batchId,
+      parentBatchId: context.parentBatchId,
+      kind: request.kind,
+      depth: context.depth,
+      enqueueSequence: context.enqueueSequence,
+      originStage: context.originStage,
+      processed: chain.processedBatches,
+      limit: chain.limits.maxBatches,
+      turn: chain.turn,
+      rootSeed: chain.rootSeed,
+      sourceId: source?.instanceId,
+      skillId: request.skillId,
+      targetId: targetIds[0],
+      targetIds,
+      detached: false,
+      budget: 'state',
+    },
+    error,
+  )
+}
+
+
+function prepareDamageTarget(
+  request: DamageRequest,
   target: PieceInstance,
   sourceDamage: number,
   sourceBlocked: boolean,
-  batchId: string,
-  chain: DamageChain,
-  queuedDamage: NonNullable<import('./triggers').TriggerContext['damageQueue']>,
+  context: EffectBatchContext<'damage'>,
+  chain: EffectChain,
   battle: BattleState,
 ): PreparedDamage {
-  const beforeTakenQueue: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
-  const beforeTakenContext = {
+  const queues = queueContext(chain, context)
+  const beforeDamageTakenContext = {
     type: 'beforeDamageTaken' as const,
     piece: target,
     sourcePiece: target,
@@ -2271,42 +3016,32 @@ function prepareTargetDamage(
     damageType: request.damageType,
     skillId: request.skillId,
     selectedOption: request.selectedOption,
-    damageBatchId: batchId,
-    damageChainId: chain.chainId,
-    parentDamageBatchId: request.parentBatchId,
     rawDamage: request.baseDamage,
-    damageQueue: beforeTakenQueue,
+    ...damageMetadata(context),
+    ...queues,
   }
   const beforeTaken: TriggerResult = sourceBlocked
     ? { success: false, blocked: true, messages: [] }
-    : getActiveTriggerSystem().checkTriggers(battle, beforeTakenContext)
-  if (beforeTaken.needsOptionSelection) throw beforeTaken
-  if (beforeTaken.needsTargetSelection) throw beforeTaken
+    : checkSynchronousTriggers(battle, beforeDamageTakenContext)
   appendDamageMessages(battle, request.attacker.ownerPlayerId, beforeTaken.messages || [])
-  queuedDamage.push(...beforeTakenQueue)
-
-  const modifiedDamage = Number(beforeTakenContext.damage)
-  if (!Number.isFinite(modifiedDamage) || modifiedDamage < 0) {
-    throw new DamagePipelineError(
-      'RVB_DAMAGE_MODIFIER_INVALID',
-      `Damage trigger produced invalid value ${String(beforeTakenContext.damage)}`,
-      damageContext(battle, request.attacker, request.skillId, { batchId, targetId: target.instanceId }),
-    )
-  }
-
+  const modifiedDamage = finiteNonNegativeDamage(
+    beforeDamageTakenContext.damage,
+    battle,
+    request.attacker,
+    request.skillId,
+    context.batchId,
+    target.instanceId,
+  )
   let blocked = sourceBlocked || Boolean(beforeTaken.blocked)
   const defense = request.damageType === 'physical' || request.damageType === 'magical'
     ? Number(target.defense) || 0
     : 0
   let defendedDamage = 0
-  if (!blocked && modifiedDamage > 0) {
-    defendedDamage = Math.max(1, Math.floor(modifiedDamage - defense))
-  }
+  if (!blocked && modifiedDamage > 0) defendedDamage = Math.max(1, Math.floor(modifiedDamage - defense))
 
   let shieldAbsorbed = 0
   let damageAfterShield = defendedDamage
   if (!blocked && damageAfterShield > 0) {
-    const shieldQueue: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
     const shieldContext = {
       type: 'beforeDamageShield' as const,
       piece: target,
@@ -2317,24 +3052,25 @@ function prepareTargetDamage(
       damageType: request.damageType,
       skillId: request.skillId,
       selectedOption: request.selectedOption,
-      damageBatchId: batchId,
-      damageChainId: chain.chainId,
-      parentDamageBatchId: request.parentBatchId,
       rawDamage: request.baseDamage,
       modifiedDamage,
       defenseApplied: defense,
-      damageQueue: shieldQueue,
+      ...damageMetadata(context),
+      ...queues,
     }
-    const shieldResult = getActiveTriggerSystem().checkTriggers(battle, shieldContext)
-    if (shieldResult.needsOptionSelection) throw shieldResult
-    if (shieldResult.needsTargetSelection) throw shieldResult
-    appendDamageMessages(battle, request.attacker.ownerPlayerId, shieldResult.messages)
-    queuedDamage.push(...shieldQueue)
-    const ruleShieldDamage = Math.max(0, Number(shieldContext.damage) || 0)
+    const shieldResult = checkSynchronousTriggers(battle, shieldContext)
+    appendDamageMessages(battle, request.attacker.ownerPlayerId, shieldResult.messages || [])
+    const ruleShieldDamage = finiteNonNegativeDamage(
+      shieldContext.damage,
+      battle,
+      request.attacker,
+      request.skillId,
+      context.batchId,
+      target.instanceId,
+    )
     shieldAbsorbed += Math.max(0, damageAfterShield - ruleShieldDamage)
     damageAfterShield = ruleShieldDamage
     blocked = Boolean(shieldResult.blocked) || damageAfterShield === 0
-
     if (!blocked && damageAfterShield > 0 && Number(target.shield) > 0) {
       const availableShield = Math.max(0, Number(target.shield) || 0)
       const absorbed = Math.min(availableShield, damageAfterShield)
@@ -2346,7 +3082,6 @@ function prepareTargetDamage(
   }
 
   if (!blocked && damageAfterShield > 0) {
-    const appliedQueue: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
     const appliedContext = {
       type: 'beforeDamageApplied' as const,
       piece: target,
@@ -2357,21 +3092,23 @@ function prepareTargetDamage(
       damageType: request.damageType,
       skillId: request.skillId,
       selectedOption: request.selectedOption,
-      damageBatchId: batchId,
-      damageChainId: chain.chainId,
-      parentDamageBatchId: request.parentBatchId,
       rawDamage: request.baseDamage,
       modifiedDamage,
       defenseApplied: defense,
       shieldAbsorbed,
-      damageQueue: appliedQueue,
+      ...damageMetadata(context),
+      ...queueContext(chain, context),
     }
-    const appliedResult = getActiveTriggerSystem().checkTriggers(battle, appliedContext)
-    if (appliedResult.needsOptionSelection) throw appliedResult
-    if (appliedResult.needsTargetSelection) throw appliedResult
-    appendDamageMessages(battle, request.attacker.ownerPlayerId, appliedResult.messages)
-    queuedDamage.push(...appliedQueue)
-    damageAfterShield = Math.max(0, Number(appliedContext.damage) || 0)
+    const appliedResult = checkSynchronousTriggers(battle, appliedContext)
+    appendDamageMessages(battle, request.attacker.ownerPlayerId, appliedResult.messages || [])
+    damageAfterShield = finiteNonNegativeDamage(
+      appliedContext.damage,
+      battle,
+      request.attacker,
+      request.skillId,
+      context.batchId,
+      target.instanceId,
+    )
     blocked = Boolean(appliedResult.blocked) || damageAfterShield === 0
   }
 
@@ -2379,16 +3116,22 @@ function prepareTargetDamage(
   const hpBefore = target.currentHp
   const targetName = target.name || target.templateId
   const attackerName = request.attacker.name || request.attacker.templateId
-  const typeName = request.damageType === 'physical' ? '物理' : request.damageType === 'magical' ? '魔法' : request.damageType === 'toxin' ? '毒素' : '真实'
+  const typeName = request.damageType === 'physical'
+    ? '物理'
+    : request.damageType === 'magical'
+      ? '魔法'
+      : request.damageType === 'toxin'
+        ? '毒素'
+        : '真实'
   return {
     target,
     hpBefore,
     emitBlocked: blocked && sourceDamage > 0,
     result: {
       success: !blocked,
-      batchId,
-      chainId: chain.chainId || batchId,
-      parentBatchId: request.parentBatchId,
+      batchId: context.batchId,
+      chainId: context.chainId,
+      parentBatchId: context.parentBatchId,
       sourceId: request.attacker.instanceId,
       targetId: target.instanceId,
       skillId: request.skillId,
@@ -2402,44 +3145,307 @@ function prepareTargetDamage(
       isKilled: false,
       targetHp: target.currentHp,
       message: blocked
-        ? `${targetName}受到的伤害被完整抵挡`
-        : `${attackerName}对${targetName}造成${finalDamage}点${typeName}伤害`,
+        ? targetName + '受到的伤害被完整抵挡'
+        : attackerName + '对' + targetName + '造成' + finalDamage + '点' + typeName + '伤害',
+      depth: context.depth,
+      enqueueSequence: context.parentBatchId === undefined ? undefined : context.enqueueSequence,
     },
   }
 }
 
-function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, chain: DamageChain): DamageBatchResult {
-  chain.processedBatches += 1
-  if (chain.processedBatches > MAX_DAMAGE_CHAIN_BATCHES) {
-    throw new DamagePipelineError('RVB_DAMAGE_CHAIN_BUDGET', `Damage chain exceeded ${MAX_DAMAGE_CHAIN_BATCHES} batches`, {
-      chainId: chain.chainId,
-      parentBatchId: request.parentBatchId,
-      depth: request.depth,
-      turn: battle.turn?.turnNumber ?? 0,
-      rootSeed: getActiveRuleRuntime()?.rootSeed ?? null,
+function resolveDeathBatch(
+  request: DeathRequest,
+  context: EffectBatchContext<'death'>,
+  chain: EffectChain,
+  battle: BattleState,
+): DeathBatchResolution {
+  let frozenDiagnostics: {
+    targetIds: string[]
+    sourceId?: string
+    skillId?: string
+  } | undefined
+  const rejection = (message: string, cause?: unknown): never => {
+    const targetIds = frozenDiagnostics?.targetIds ?? (Array.isArray(request.candidates)
+      ? request.candidates.map(candidate => candidate?.piece?.instanceId).filter(Boolean) as string[]
+      : [])
+    const first = Array.isArray(request.candidates) ? request.candidates[0] : undefined
+    throw rejectEffectBatch(chain, context, message, cause, {
+      sourceId: frozenDiagnostics?.sourceId ?? first?.attacker?.instanceId,
+      skillId: frozenDiagnostics?.skillId ?? first?.skillId,
+      targetId: targetIds[0],
+      targetIds,
     })
   }
+  if (!Array.isArray(request.candidates) || request.candidates.length === 0) {
+    rejection('DeathBatch requires at least one candidate')
+  }
+  const seen = new Set<string>()
+  const frozen = request.candidates
+    .map(candidate => {
+      const targetId = candidate.piece?.instanceId
+      if (!targetId) rejection('DeathBatch candidate requires a stable instanceId')
+      if (seen.has(targetId)) rejection('DeathBatch contains a duplicate candidate')
+      seen.add(targetId)
+      const canonicalMatches = battle.pieces.filter(piece => piece.instanceId === targetId)
+      if (canonicalMatches.length !== 1) {
+        rejection('DeathBatch candidate must appear exactly once in battle.pieces')
+      }
+      const canonical = canonicalMatches[0]
+      if (canonical.currentHp !== 0) rejection('DeathBatch candidate HP must equal zero')
+      if (!Number.isFinite(canonical.maxHp) || canonical.maxHp <= 0) {
+        rejection('DeathBatch candidate maxHp must be finite and positive')
+      }
+      if ((battle.graveyard ?? []).some(piece => piece.instanceId === targetId)) {
+        rejection('DeathBatch candidate cannot already exist in graveyard')
+      }
+      const attacker = candidate.attacker
+      const sourceId = attacker?.instanceId
+      if (attacker && (typeof sourceId !== 'string' || sourceId.length === 0)) {
+        rejection('DeathBatch source must have a stable instanceId')
+      }
+      return {
+        piece: canonical,
+        targetId,
+        targetOwnerPlayerId: canonical.ownerPlayerId,
+        targetMaxHp: canonical.maxHp,
+        attacker,
+        sourceId,
+        sourceOwnerPlayerId: attacker?.ownerPlayerId,
+        killerPlayerId: candidate.killerPlayerId,
+        killCreditId: candidate.killerPlayerId ?? attacker?.ownerPlayerId,
+        skillId: candidate.skillId,
+      }
+    })
+    .sort((left, right) => compareEffectTarget(left.piece, right.piece))
+  frozenDiagnostics = {
+    targetIds: frozen.map(candidate => candidate.targetId),
+    sourceId: frozen[0]?.sourceId,
+    skillId: frozen[0]?.skillId,
+  }
+  const assertFrozenSourceMetadata = (stage: string): void => {
+    for (const candidate of frozen) {
+      if (!candidate.attacker) continue
+      if (
+        candidate.attacker.instanceId !== candidate.sourceId
+        || candidate.attacker.ownerPlayerId !== candidate.sourceOwnerPlayerId
+      ) {
+        rejection('DeathBatch source identity changed during ' + stage)
+      }
+    }
+  }
+  const assertFrozenCandidateMembership = (stage: string): void => {
+    assertFrozenSourceMetadata(stage)
+    for (const candidate of frozen) {
+      const activeMatches = battle.pieces.filter(piece => piece.instanceId === candidate.targetId)
+      if (activeMatches.length !== 1 || activeMatches[0] !== candidate.piece) {
+        rejection('DeathBatch frozen candidate membership changed during ' + stage)
+      }
+      if ((battle.graveyard ?? []).some(piece => piece.instanceId === candidate.targetId)) {
+        rejection('DeathBatch frozen candidate entered graveyard before finalization during ' + stage)
+      }
+      if (candidate.piece.ownerPlayerId !== candidate.targetOwnerPlayerId) {
+        rejection('DeathBatch frozen candidate owner changed during ' + stage)
+      }
+      if (
+        !Number.isFinite(candidate.piece.maxHp)
+        || candidate.piece.maxHp <= 0
+        || candidate.piece.maxHp !== candidate.targetMaxHp
+      ) {
+        rejection('DeathBatch frozen candidate maxHp changed during ' + stage)
+      }
+      if (
+        !Number.isFinite(candidate.piece.currentHp)
+        || candidate.piece.currentHp < 0
+        || candidate.piece.currentHp > candidate.targetMaxHp
+      ) {
+        rejection('DeathBatch frozen candidate HP became invalid during ' + stage)
+      }
+    }
+  }
+  const queues = queueContext(chain, context)
+  const legacy = damageMetadata(context)
 
-  const canonicalTargets = validateDamageRequest(
-    request.attacker,
-    request.targets,
-    request.baseDamage,
-    request.damageType,
-    battle,
-    request.skillId,
+  assertFrozenCandidateMembership('freeze')
+  for (const candidate of frozen) {
+    checkSynchronousTriggers(battle, {
+      type: 'beforePieceKilled',
+      piece: candidate.piece,
+      sourcePiece: candidate.piece,
+      targetPiece: candidate.attacker,
+      skillId: candidate.skillId,
+      ...legacy,
+      ...queues,
+    })
+    assertFrozenCandidateMembership('beforePieceKilled')
+    checkSynchronousTriggers(battle, {
+      type: 'afterPieceKilled',
+      piece: candidate.attacker,
+      sourcePiece: candidate.attacker,
+      targetPiece: candidate.piece,
+      skillId: candidate.skillId,
+      ...legacy,
+      ...queues,
+    })
+    assertFrozenCandidateMembership('afterPieceKilled')
+    checkSynchronousTriggers(battle, {
+      type: 'onPieceDied',
+      piece: candidate.piece,
+      sourcePiece: candidate.piece,
+      targetPiece: candidate.attacker,
+      skillId: candidate.skillId,
+      ...legacy,
+      ...queues,
+    })
+    assertFrozenCandidateMembership('onPieceDied')
+  }
+
+  const finalizable = frozen.filter(candidate => candidate.piece.currentHp === 0)
+  const revived = frozen.filter(candidate => candidate.piece.currentHp > 0)
+  const killedIds = finalizable.map(candidate => candidate.targetId)
+  const revivedIds = revived.map(candidate => candidate.targetId)
+  const removedIds = new Set(finalizable.map(candidate => candidate.targetId))
+  battle.pieces.splice(
+    0,
+    battle.pieces.length,
+    ...battle.pieces.filter(piece => !removedIds.has(piece.instanceId)),
   )
-  const stableTargets = [...canonicalTargets].sort(compareDamageTarget)
-  const batchId = nextDamageBatchId(battle, chain)
-  chain.chainId ??= batchId
-  chain.currentBatchId = batchId
-  chain.currentDepth = request.depth
-  const queuedDamage: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
+  battle.graveyard ??= []
+  for (const candidate of finalizable) {
+    battle.graveyard.push(candidate.piece)
+  }
 
+  const assertPostFinalizationIntegrity = (stage: string): void => {
+    assertFrozenSourceMetadata(stage)
+    for (const candidate of finalizable) {
+      if (
+        candidate.piece.instanceId !== candidate.targetId
+        || candidate.piece.ownerPlayerId !== candidate.targetOwnerPlayerId
+      ) {
+        rejection('DeathBatch finalized candidate identity changed during ' + stage)
+      }
+      const activeMatches = battle.pieces.filter(piece => piece.instanceId === candidate.targetId)
+      const graveyardMatches = battle.graveyard.filter(piece => piece.instanceId === candidate.targetId)
+      if (
+        activeMatches.length !== 0
+        || graveyardMatches.length !== 1
+        || graveyardMatches[0] !== candidate.piece
+      ) {
+        rejection('DeathBatch finalized candidate membership changed during ' + stage)
+      }
+      if (
+        !Number.isFinite(candidate.piece.maxHp)
+        || candidate.piece.maxHp <= 0
+        || candidate.piece.maxHp !== candidate.targetMaxHp
+      ) {
+        rejection('DeathBatch finalized candidate maxHp changed during ' + stage)
+      }
+      if (candidate.piece.currentHp !== 0) {
+        rejection('DeathBatch finalized candidate death classification changed during ' + stage)
+      }
+    }
+    for (const candidate of revived) {
+      if (
+        candidate.piece.instanceId !== candidate.targetId
+        || candidate.piece.ownerPlayerId !== candidate.targetOwnerPlayerId
+      ) {
+        rejection('DeathBatch revived candidate identity changed during ' + stage)
+      }
+      const activeMatches = battle.pieces.filter(piece => piece.instanceId === candidate.targetId)
+      const graveyardMatches = battle.graveyard.filter(piece => piece.instanceId === candidate.targetId)
+      if (
+        activeMatches.length !== 1
+        || activeMatches[0] !== candidate.piece
+        || graveyardMatches.length !== 0
+      ) {
+        rejection('DeathBatch revived candidate membership changed during ' + stage)
+      }
+      if (
+        !Number.isFinite(candidate.piece.maxHp)
+        || candidate.piece.maxHp <= 0
+        || candidate.piece.maxHp !== candidate.targetMaxHp
+      ) {
+        rejection('DeathBatch revived candidate maxHp changed during ' + stage)
+      }
+      if (
+        !Number.isFinite(candidate.piece.currentHp)
+        || candidate.piece.currentHp <= 0
+        || candidate.piece.currentHp > candidate.targetMaxHp
+      ) {
+        rejection('DeathBatch revived candidate revival classification changed during ' + stage)
+      }
+    }
+  }
+  assertPostFinalizationIntegrity('finalization')
+
+  const chargeEvents: Array<{ attacker?: PieceInstance; playerId: string }> = []
+  for (const candidate of finalizable) {
+    const killCreditId = candidate.killCreditId
+    if (!killCreditId) continue
+    const grantsKillCharge = !(candidate.piece as PieceInstance & { noKillCharge?: boolean }).noKillCharge
+    if (candidate.piece.ownerPlayerId === killCreditId || !grantsKillCharge) continue
+    const player = battle.players.find(entry => entry.playerId === killCreditId)
+    if (!player) continue
+    player.chargePoints += 1
+    chargeEvents.push({ attacker: candidate.attacker, playerId: killCreditId })
+  }
+  for (const charge of chargeEvents) {
+    checkSynchronousTriggers(battle, {
+      type: 'afterChargeGained',
+      piece: charge.attacker,
+      sourcePiece: charge.attacker,
+      amount: 1,
+      playerId: charge.playerId,
+      ...legacy,
+      ...queues,
+    })
+    assertPostFinalizationIntegrity('afterChargeGained')
+  }
+  return {
+    batchId: context.batchId,
+    chainId: context.chainId,
+    killedIds,
+    revivedIds,
+  }
+}
+
+function resolveDamageBatch(
+  request: DamageRequest,
+  context: EffectBatchContext<'damage'>,
+  chain: EffectChain,
+  battle: BattleState,
+): DamageBatchResult {
+  let canonicalTargets: PieceInstance[]
+  try {
+    canonicalTargets = validateDamageTargets(
+      request.attacker,
+      request.targets,
+      request.baseDamage,
+      request.damageType,
+      battle,
+      request.skillId,
+      context.depth > 0,
+    )
+  } catch (error) {
+    rethrowInvalidEffectRequest(error, request, context, chain)
+  }
+  const stableTargets = [...canonicalTargets].sort(compareEffectTarget)
+  if (stableTargets.length === 0) {
+    return {
+      success: false,
+      batchId: context.batchId,
+      chainId: context.chainId,
+      damages: [],
+      totalDamage: 0,
+      results: [],
+      message: '没有目标',
+    }
+  }
+
+  const queues = queueContext(chain, context)
   let sourceDamage = request.baseDamage
   let sourceBlocked = false
   if (!request.skipBeforeTrigger) {
-    const sourceQueue: NonNullable<import('./triggers').TriggerContext['damageQueue']> = []
-    const sourceContext = {
+    const beforeDamageDealtContext = {
       type: 'beforeDamageDealt' as const,
       piece: request.attacker,
       sourcePiece: request.attacker,
@@ -2449,146 +3455,109 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       damageType: request.damageType,
       skillId: request.skillId,
       selectedOption: request.selectedOption,
-      damageBatchId: batchId,
-      damageChainId: chain.chainId,
-      parentDamageBatchId: request.parentBatchId,
       rawDamage: request.baseDamage,
-      damageQueue: sourceQueue,
+      ...damageMetadata(context),
+      ...queues,
     }
-    const sourceResult = getActiveTriggerSystem().checkTriggers(battle, sourceContext)
-    if (sourceResult.needsOptionSelection) throw sourceResult
-    if (sourceResult.needsTargetSelection) throw sourceResult
-    appendDamageMessages(battle, request.attacker.ownerPlayerId, sourceResult.messages)
-    queuedDamage.push(...sourceQueue)
-    sourceDamage = Number(sourceContext.damage)
+    const sourceResult = checkSynchronousTriggers(battle, beforeDamageDealtContext)
+    appendDamageMessages(battle, request.attacker.ownerPlayerId, sourceResult.messages || [])
+    sourceDamage = finiteNonNegativeDamage(
+      beforeDamageDealtContext.damage,
+      battle,
+      request.attacker,
+      request.skillId,
+      context.batchId,
+    )
     sourceBlocked = Boolean(sourceResult.blocked)
   }
-  if (!Number.isFinite(sourceDamage) || sourceDamage < 0) {
-    throw new DamagePipelineError(
-      'RVB_DAMAGE_MODIFIER_INVALID',
-      `Source damage trigger produced invalid value ${String(sourceDamage)}`,
-      damageContext(battle, request.attacker, request.skillId, { batchId }),
-    )
-  }
 
-  const prepared = stableTargets.map(target => prepareTargetDamage(
+  const prepared = stableTargets.map(target => prepareDamageTarget(
     request,
     target,
     sourceDamage,
     sourceBlocked,
-    batchId,
+    context,
     chain,
-    queuedDamage,
     battle,
   ))
-
-  // Commit every target's HP before any after-damage or lifecycle event can observe the batch.
   for (const entry of prepared) {
-    if (entry.result.damage > 0) {
-      entry.target.currentHp = Math.max(0, entry.hpBefore - entry.result.damage)
-      entry.result.targetHp = entry.target.currentHp
-    }
+    if (entry.result.damage <= 0) continue
+    entry.target.currentHp = Math.max(0, entry.hpBefore - entry.result.damage)
+    entry.result.targetHp = entry.target.currentHp
   }
 
   for (const entry of prepared) {
-    const sharedContext = {
+    const shared = {
+      piece: request.attacker,
       sourcePiece: request.attacker,
       targetPiece: entry.target,
       damage: entry.result.damage,
       damageType: request.damageType,
       skillId: request.skillId,
-      damageBatchId: batchId,
-      damageChainId: chain.chainId,
-      parentDamageBatchId: request.parentBatchId,
       rawDamage: request.baseDamage,
       modifiedDamage: entry.result.modifiedDamage,
       defenseApplied: entry.result.defense,
       shieldAbsorbed: entry.result.shieldAbsorbed,
-      damageQueue: queuedDamage,
+      ...damageMetadata(context),
+      ...queues,
     }
     if (entry.emitBlocked) {
       const blockedResult = checkSynchronousTriggers(battle, {
-        ...sharedContext,
+        ...shared,
         type: 'afterDamageBlocked',
+        piece: entry.target,
         sourcePiece: entry.target,
         targetPiece: request.attacker,
       })
-      appendDamageMessages(battle, request.attacker.ownerPlayerId, blockedResult.messages)
+      appendDamageMessages(battle, request.attacker.ownerPlayerId, blockedResult.messages || [])
       continue
     }
     if (entry.result.damage <= 0) continue
-    const dealtResult = checkSynchronousTriggers(battle, { ...sharedContext, type: 'afterDamageDealt' })
+    const dealtResult = checkSynchronousTriggers(battle, { ...shared, type: 'afterDamageDealt' })
     const takenResult = checkSynchronousTriggers(battle, {
-      ...sharedContext,
+      ...shared,
       type: 'afterDamageTaken',
+      piece: entry.target,
       sourcePiece: entry.target,
       targetPiece: request.attacker,
     })
-    appendDamageMessages(battle, entry.target.ownerPlayerId, [...dealtResult.messages, ...takenResult.messages])
+    appendDamageMessages(
+      battle,
+      entry.target.ownerPlayerId,
+      [...(dealtResult.messages || []), ...(takenResult.messages || [])],
+    )
   }
 
+  const deathCandidates = prepared
+    .filter(entry => (
+      entry.hpBefore > 0
+      && entry.target.currentHp === 0
+      && battle.pieces.some(piece => piece.instanceId === entry.target.instanceId)
+    ))
+    .map(entry => ({
+      piece: entry.target,
+      attacker: request.attacker,
+      killerPlayerId: request.killerPlayerId,
+      skillId: request.skillId,
+    }))
+  let deathResolution: DeathBatchResolution | undefined
+  if (deathCandidates.length > 0) {
+    deathResolution = chain.runEndogenousDeath(
+      { kind: 'death', candidates: deathCandidates },
+      'damage:death',
+      (deathRequest, deathContext, activeChain) => (
+        resolveDeathBatch(deathRequest, deathContext, activeChain, battle)
+      ),
+    )
+  }
+
+  const killedIds = new Set(deathResolution?.killedIds || [])
+  const deathCandidateIds = new Set(deathCandidates.map(candidate => candidate.piece.instanceId))
   for (const entry of prepared) {
-    if (entry.hpBefore <= 0 || entry.target.currentHp !== 0) {
-      entry.result.targetHp = entry.target.currentHp
-      continue
-    }
-    if (!battle.pieces.some(piece => piece.instanceId === entry.target.instanceId)) continue
-
-    checkSynchronousTriggers(battle, {
-      type: 'beforePieceKilled',
-      sourcePiece: entry.target,
-      targetPiece: request.attacker,
-      skillId: request.skillId,
-      damageBatchId: batchId,
-      damageChainId: chain.chainId,
-    })
-    checkSynchronousTriggers(battle, {
-      type: 'afterPieceKilled',
-      sourcePiece: request.attacker,
-      targetPiece: entry.target,
-      skillId: request.skillId,
-      damageBatchId: batchId,
-      damageChainId: chain.chainId,
-    })
-    checkSynchronousTriggers(battle, {
-      type: 'onPieceDied',
-      sourcePiece: entry.target,
-      targetPiece: request.attacker,
-      damage: entry.result.damage,
-      skillId: request.skillId,
-      damageBatchId: batchId,
-      damageChainId: chain.chainId,
-    })
-
-    // A death consumer may revive the target before graveyard/charge finalization.
-    if (entry.target.currentHp > 0) {
-      entry.result.targetHp = entry.target.currentHp
-      continue
-    }
-
-    const killCreditId = request.killerPlayerId || request.attacker.ownerPlayerId
-    const isEnemyKill = entry.target.ownerPlayerId !== killCreditId
-    if (isEnemyKill && !(entry.target as any).noKillCharge) {
-      const playerMeta = battle.players.find(player => player.playerId === killCreditId)
-      if (playerMeta) {
-        playerMeta.chargePoints += 1
-        checkSynchronousTriggers(battle, {
-          type: 'afterChargeGained',
-          sourcePiece: request.attacker,
-          amount: 1,
-          playerId: killCreditId,
-          damageBatchId: batchId,
-          damageChainId: chain.chainId,
-        })
-      }
-    }
-
-    const targetIndex = battle.pieces.findIndex(piece => piece.instanceId === entry.target.instanceId)
-    if (targetIndex !== -1) {
-      battle.graveyard ??= []
-      battle.graveyard.push(battle.pieces.splice(targetIndex, 1)[0])
-      entry.result.isKilled = true
-      entry.result.targetHp = 0
+    entry.result.targetHp = entry.target.currentHp
+    entry.result.isKilled = killedIds.has(entry.target.instanceId)
+    if (deathResolution && deathCandidateIds.has(entry.target.instanceId)) {
+      entry.result.deathBatchId = deathResolution.batchId
     }
   }
 
@@ -2599,9 +3568,9 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
       playerId: request.attacker.ownerPlayerId,
       turn: battle.turn?.turnNumber ?? 0,
       payload: {
-        batchId,
-        chainId: chain.chainId,
-        parentBatchId: request.parentBatchId,
+        batchId: context.batchId,
+        chainId: context.chainId,
+        parentBatchId: context.parentBatchId,
         sourceId: request.attacker.instanceId,
         skillId: request.skillId,
         targetId: entry.target.instanceId,
@@ -2617,21 +3586,1244 @@ function resolveDamageBatch(request: DamageBatchRequest, battle: BattleState, ch
     })
   }
 
-  collectFollowUpDamage(queuedDamage, chain, batchId, request.depth + 1, battle)
-
   const byTargetId = new Map(prepared.map(entry => [entry.target.instanceId, entry.result]))
-  const orderedResults = canonicalTargets.map(target => byTargetId.get(target.instanceId)!)
+  const orderedResults = canonicalTargets
+    .map(target => byTargetId.get(target.instanceId))
+    .filter((result): result is DamageResult => Boolean(result))
   const damages = orderedResults.map(result => result.damage)
   const totalDamage = damages.reduce((sum, damage) => sum + damage, 0)
   return {
     success: orderedResults.some(result => result.success),
-    batchId,
-    chainId: chain.chainId,
+    batchId: context.batchId,
+    chainId: context.chainId,
     damages,
     totalDamage,
     results: orderedResults,
-    message: `对${orderedResults.length}个目标共造成${totalDamage}点伤害`,
+    message: '对' + orderedResults.length + '个目标共造成' + totalDamage + '点伤害',
   }
+}
+
+function resolveHealBatch(
+  request: import('./effect-batch').HealRequest,
+  context: EffectBatchContext<'heal'>,
+  chain: EffectChain,
+  battle: BattleState,
+): HealBatchResult {
+  let canonicalTargets: PieceInstance[]
+  try {
+    canonicalTargets = validateHealTargets(
+      request.healer,
+      request.targets,
+      request.baseHeal,
+      battle,
+      request.skillId,
+      context.depth > 0,
+    )
+  } catch (error) {
+    rethrowInvalidEffectRequest(error, request, context, chain)
+  }
+  const stableTargets = [...canonicalTargets].sort(compareEffectTarget)
+  if (stableTargets.length === 0) {
+    return {
+      success: false,
+      batchId: context.batchId,
+      chainId: context.chainId,
+      heals: [],
+      totalHeal: 0,
+      results: [],
+      message: '没有目标',
+    }
+  }
+  const hpAtBatchStart = new Map(stableTargets.map(target => [target.instanceId, target.currentHp]))
+
+  const queues = queueContext(chain, context)
+  const beforeHealDealtContext = {
+    type: 'beforeHealDealt' as const,
+    piece: request.healer,
+    sourcePiece: request.healer,
+    targetPiece: stableTargets[0],
+    target: stableTargets[0],
+    heal: request.baseHeal,
+    skillId: request.skillId,
+    ...queues,
+  }
+  const sourceResult = checkSynchronousTriggers(battle, beforeHealDealtContext)
+  const sourceHeal = finiteNonNegativeHeal(
+    beforeHealDealtContext.heal,
+    battle,
+    request.healer,
+    request.skillId,
+    context.batchId,
+  )
+
+  if (sourceResult.blocked) {
+    const message = (request.healer.name || request.healer.templateId) + '的治疗被规则阻止'
+    appendHealBlockedMessage(battle, request.healer, message)
+    const stableResults: HealResult[] = stableTargets.map(target => ({
+      success: false,
+      batchId: context.batchId,
+      chainId: context.chainId,
+      parentBatchId: context.parentBatchId,
+      sourceId: request.healer.instanceId,
+      targetId: target.instanceId,
+      skillId: request.skillId,
+      rawHeal: request.baseHeal,
+      modifiedHeal: sourceHeal,
+      heal: 0,
+      blocked: true,
+      targetHp: target.currentHp,
+      message: '治疗被规则阻止',
+      depth: context.depth,
+      enqueueSequence: context.parentBatchId === undefined ? undefined : context.enqueueSequence,
+    }))
+    const byTargetId = new Map(stableResults.map(result => [result.targetId, result]))
+    const results = canonicalTargets.map(target => byTargetId.get(target.instanceId)!)
+    return {
+      success: false,
+      batchId: context.batchId,
+      chainId: context.chainId,
+      heals: results.map(() => 0),
+      totalHeal: 0,
+      results,
+      message: '治疗被规则阻止',
+      blocked: true,
+    }
+  }
+
+  const prepared: PreparedHeal[] = stableTargets.map(target => {
+    const beforeHealTakenContext = {
+      type: 'beforeHealTaken' as const,
+      piece: target,
+      sourcePiece: target,
+      targetPiece: request.healer,
+      target: request.healer,
+      heal: sourceHeal,
+      skillId: request.skillId,
+      ...queues,
+    }
+    const beforeTaken = checkSynchronousTriggers(battle, beforeHealTakenContext)
+    const modifiedHeal = finiteNonNegativeHeal(
+      beforeHealTakenContext.heal,
+      battle,
+      request.healer,
+      request.skillId,
+      context.batchId,
+      target.instanceId,
+    )
+    const blocked = Boolean(beforeTaken.blocked)
+    const hpBefore = blocked
+      ? target.currentHp
+      : hpAtBatchStart.get(target.instanceId)!
+    const requestedHeal = blocked ? 0 : Math.max(0, Math.floor(modifiedHeal))
+    const nextHp = blocked ? hpBefore : Math.min(target.maxHp, hpBefore + requestedHeal)
+    const actualHeal = nextHp - hpBefore
+    const healerName = request.healer.name || request.healer.templateId
+    const targetName = target.name || target.templateId
+    return {
+      target,
+      hpBefore,
+      nextHp,
+      result: {
+        success: !blocked,
+        batchId: context.batchId,
+        chainId: context.chainId,
+        parentBatchId: context.parentBatchId,
+        sourceId: request.healer.instanceId,
+        targetId: target.instanceId,
+        skillId: request.skillId,
+        rawHeal: request.baseHeal,
+        modifiedHeal,
+        heal: actualHeal,
+        blocked,
+        targetHp: nextHp,
+        message: blocked
+          ? '治疗被规则阻止'
+          : healerName + '为' + targetName + '回复' + actualHeal + '点生命值',
+        depth: context.depth,
+        enqueueSequence: context.parentBatchId === undefined ? undefined : context.enqueueSequence,
+      },
+    }
+  })
+
+  for (const entry of prepared) {
+    if (!entry.result.blocked) entry.target.currentHp = entry.nextHp
+    entry.result.targetHp = entry.target.currentHp
+  }
+  for (const entry of prepared) {
+    if (entry.result.blocked) {
+      appendHealBlockedMessage(
+        battle,
+        request.healer,
+        (entry.target.name || entry.target.templateId) + '受到的治疗被规则阻止',
+      )
+      checkSynchronousTriggers(battle, {
+        type: 'afterHealBlocked',
+        piece: entry.target,
+        sourcePiece: entry.target,
+        targetPiece: request.healer,
+        heal: entry.result.modifiedHeal,
+        skillId: request.skillId,
+        ...queues,
+      })
+      continue
+    }
+    checkSynchronousTriggers(battle, {
+      type: 'afterHealDealt',
+      piece: request.healer,
+      sourcePiece: request.healer,
+      targetPiece: entry.target,
+      heal: entry.result.heal,
+      skillId: request.skillId,
+      ...queues,
+    })
+    checkSynchronousTriggers(battle, {
+      type: 'afterHealTaken',
+      piece: entry.target,
+      sourcePiece: entry.target,
+      targetPiece: request.healer,
+      heal: entry.result.heal,
+      skillId: request.skillId,
+      ...queues,
+    })
+  }
+
+  const byTargetId = new Map(prepared.map(entry => [entry.target.instanceId, entry.result]))
+  const results = canonicalTargets.map(target => byTargetId.get(target.instanceId)!)
+  const heals = results.map(result => result.heal)
+  const totalHeal = heals.reduce((sum, heal) => sum + heal, 0)
+  return {
+    success: results.some(result => result.success),
+    batchId: context.batchId,
+    chainId: context.chainId,
+    heals,
+    totalHeal,
+    results,
+    message: '为' + results.length + '个目标共回复' + totalHeal + '点生命值',
+    blocked: results.length > 0 && results.every(result => result.blocked),
+  }
+}
+
+interface IndexedDeclaredSummon {
+  readonly inputIndex: number
+  readonly spec: DeclaredSummonSpec
+}
+
+type ValidatedDeclaredSummon =
+  | {
+      readonly kind: 'source-mirror'
+      readonly inputIndex: number
+      readonly spec: DeclaredSummonSpec
+      readonly source: PieceInstance
+      readonly capability: SourceMirrorSummonCapabilityDeclaration
+    }
+  | {
+      readonly kind: 'stored-piece'
+      readonly inputIndex: number
+      readonly spec: DeclaredSummonSpec
+      readonly source: PieceInstance
+      readonly capability: StoredOrDeclaredPieceSummonCapabilityDeclaration
+      readonly stored?: PieceInstance
+      readonly storageExtensionKey?: string
+      readonly storageEntryKey?: string
+      readonly legacyStorageExtensionKey?: string
+    }
+
+interface PreparedDeclaredSummon {
+  readonly inputIndex: number
+  readonly recipe: DeclaredSummonCapability['recipe']
+  readonly piece: PieceInstance
+  readonly ownerPlayerId: string
+  readonly sourceId?: string
+  readonly insertBeforeSource?: boolean
+  readonly storageExtensionKey?: string
+  readonly storageEntryKey?: string
+  readonly legacyStorageExtensionKey?: string
+  finalX: number
+  finalY: number
+}
+
+interface SummonCapabilityDefinition {
+  readonly id: string
+  readonly summonCapability?: SummonCapabilityDeclaration
+}
+
+interface SealedContentExecution {
+  readonly chain?: EffectChain
+  readonly summonQueue?: ReturnType<typeof createDeclaredSummonQueueWriter>
+  readonly cleanup?: () => void
+}
+
+function cloneEffectTransactionValue<T>(
+  value: T,
+  seen = new WeakMap<object, unknown>(),
+): T {
+  if (value === null || typeof value !== 'object') return value
+  const objectValue = value as object
+  const known = seen.get(objectValue)
+  if (known !== undefined) return known as T
+  if (value instanceof Date) return new Date(value.getTime()) as T
+
+  if (Array.isArray(value)) {
+    const copy: unknown[] = []
+    seen.set(objectValue, copy)
+    for (const entry of value) copy.push(cloneEffectTransactionValue(entry, seen))
+    return copy as T
+  }
+
+  const copy = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>
+  seen.set(objectValue, copy)
+  for (const key of Object.keys(value)) {
+    copy[key] = cloneEffectTransactionValue(
+      (value as Record<string, unknown>)[key],
+      seen,
+    )
+  }
+  return copy as T
+}
+
+function restoreEffectBattleSnapshot(battle: BattleState, snapshot: BattleState): void {
+  const mutableBattle = battle as unknown as Record<string, unknown>
+  for (const key of Object.keys(mutableBattle)) delete mutableBattle[key]
+  Object.assign(mutableBattle, snapshot as unknown as Record<string, unknown>)
+}
+
+function declaredSummonRequestKey(spec: DeclaredSummonSpec): string {
+  return [String(spec.x), String(spec.y), spec.variant ?? ''].join(':')
+}
+
+function compareDeclaredSummonText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
+function compareIndexedDeclaredSummons(
+  left: IndexedDeclaredSummon,
+  right: IndexedDeclaredSummon,
+): number {
+  return compareDeclaredSummonText(
+    declaredSummonRequestKey(left.spec),
+    declaredSummonRequestKey(right.spec),
+  )
+}
+
+function comparePreparedDeclaredSummons(
+  left: PreparedDeclaredSummon,
+  right: PreparedDeclaredSummon,
+): number {
+  return compareDeclaredSummonText(left.piece.instanceId, right.piece.instanceId)
+}
+
+function validateDeclaredSummonPosition(
+  battle: BattleState,
+  x: number,
+  y: number,
+  reservations: Set<string>,
+  fatal: (message: string, cause?: unknown) => never,
+): void {
+  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) {
+    fatal('Summon position must use integer coordinates')
+  }
+  const map = battle.map
+  if (
+    !map
+    || !Number.isSafeInteger(map.width)
+    || !Number.isSafeInteger(map.height)
+    || x < 0
+    || y < 0
+    || x >= map.width
+    || y >= map.height
+  ) {
+    fatal('Summon position is outside the map')
+  }
+  const tile = map.tiles?.find(candidate => candidate.x === x && candidate.y === y)
+  if (!tile) fatal('Summon position is outside the map')
+  if (!tile.props?.walkable) fatal('Summon position must be walkable')
+  if (battle.pieces.some(piece => (
+    piece.currentHp > 0 && piece.x === x && piece.y === y
+  ))) {
+    fatal('Summon position is occupied')
+  }
+  const key = String(x) + ':' + String(y)
+  if (reservations.has(key)) fatal('Summon batch reserves the same cell more than once')
+  reservations.add(key)
+}
+
+function validateDeclaredSummonSpec(
+  capability: DeclaredSummonCapability,
+  value: unknown,
+  fatal: (message: string, cause?: unknown) => never,
+): DeclaredSummonSpec {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fatal('Declared summon spec must be a plain object')
+  }
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null) {
+    fatal('Declared summon spec must use a plain object prototype')
+  }
+  const record = value as Record<string, unknown>
+  if (!Object.keys(record).every(key => ['x', 'y', 'variant'].includes(key))) {
+    fatal('Declared summon spec contains fields outside its sealed call schema')
+  }
+  if (!Number.isSafeInteger(record.x) || !Number.isSafeInteger(record.y)) {
+    fatal('Declared summon spec coordinates must be finite integers')
+  }
+  if (capability.recipe === 'source-mirror') {
+    if (
+      typeof record.variant !== 'string'
+      || !capability.allowedVariants.includes(record.variant)
+    ) {
+      fatal('Declared summon variant is not allowed by its bound capability')
+    }
+  } else if (record.variant !== undefined) {
+    fatal('Stored-piece summon does not accept a variant')
+  }
+  return value as DeclaredSummonSpec
+}
+
+function validateSourceMirrorSummon(
+  entry: IndexedDeclaredSummon,
+  source: PieceInstance,
+  capability: SourceMirrorSummonCapabilityDeclaration,
+): ValidatedDeclaredSummon {
+  return {
+    kind: 'source-mirror',
+    inputIndex: entry.inputIndex,
+    spec: entry.spec,
+    source,
+    capability,
+  }
+}
+
+function resolveDeclaredSummonSource(
+  battle: BattleState,
+  sourceId: string,
+  capability: DeclaredSummonCapability,
+  fatal: (message: string, cause?: unknown) => never,
+): PieceInstance {
+  const boardMatches = battle.pieces.filter(piece => piece.instanceId === sourceId)
+  const graveyardMatches = (battle.graveyard || []).filter(piece => piece.instanceId === sourceId)
+  if (boardMatches.length + graveyardMatches.length !== 1) {
+    fatal('Declared summon source must resolve to one canonical piece')
+  }
+  const source = boardMatches[0] ?? graveyardMatches[0]
+  if (capability.recipe === 'source-mirror') {
+    if (!boardMatches[0] || !Number.isFinite(source.currentHp) || source.currentHp <= 0) {
+      fatal('Source-mirror summon source is not an active living piece')
+    }
+    return source
+  }
+  if (
+    (boardMatches[0] && (!Number.isFinite(source.currentHp) || source.currentHp <= 0))
+    || (graveyardMatches[0] && source.currentHp !== 0)
+  ) {
+    fatal('Stored-piece summon source is neither active living nor finalized in graveyard')
+  }
+  return source
+}
+
+function validateStoredPieceSummon(
+  battle: BattleState,
+  entry: IndexedDeclaredSummon,
+  source: PieceInstance,
+  capability: StoredOrDeclaredPieceSummonCapabilityDeclaration,
+  fatal: (message: string, cause?: unknown) => never,
+): ValidatedDeclaredSummon {
+  const normalizedOwnerPlayerId = String(source.ownerPlayerId || '').trim().toLowerCase()
+  if (!normalizedOwnerPlayerId) fatal('Stored summon source owner is invalid')
+  const ownerScoped = capability.ownerScopedStorageExtensionKey !== undefined
+  const activePiece = battle.pieces.find(piece => (
+    piece.currentHp > 0
+    && (!ownerScoped
+      || String(piece.ownerPlayerId || '').trim().toLowerCase() === normalizedOwnerPlayerId)
+    && (
+      piece.templateId === capability.uniqueTemplateId
+      || piece.instanceId === capability.uniqueTemplateId
+    )
+  ))
+  if (activePiece) fatal('The bound unique summon is already active on the board')
+  let storedValue: unknown
+  let storageExtensionKey: string | undefined
+  let storageEntryKey: string | undefined
+  let legacyStorageExtensionKey: string | undefined
+  const ownerScopedValue = capability.ownerScopedStorageExtensionKey === undefined
+    ? undefined
+    : battle.extensions?.[capability.ownerScopedStorageExtensionKey]
+  if (ownerScopedValue !== undefined) {
+    if (!ownerScopedValue || typeof ownerScopedValue !== 'object' || Array.isArray(ownerScopedValue)) {
+      fatal('Owner-scoped stored summon map must be a plain object')
+    }
+    const ownerScopedPrototype = Object.getPrototypeOf(ownerScopedValue)
+    if (ownerScopedPrototype !== Object.prototype && ownerScopedPrototype !== null) {
+      fatal('Owner-scoped stored summon map must be a plain object')
+    }
+    const ownerScopedRecord = ownerScopedValue as Record<string, unknown>
+    if (!Object.prototype.hasOwnProperty.call(ownerScopedRecord, normalizedOwnerPlayerId)) {
+      fatal('Owner-scoped stored summon map has no piece for its source owner')
+    }
+    storedValue = ownerScopedRecord[normalizedOwnerPlayerId]
+    storageExtensionKey = capability.ownerScopedStorageExtensionKey
+    storageEntryKey = normalizedOwnerPlayerId
+    legacyStorageExtensionKey = capability.storageExtensionKey
+  } else {
+    storedValue = battle.extensions?.[capability.storageExtensionKey]
+    if (storedValue !== undefined) storageExtensionKey = capability.storageExtensionKey
+  }
+  if (!storageEntryKey && capability.fallback.faction !== source.faction) {
+    fatal('Stored summon fallback faction does not match its source')
+  }
+  if (storedValue !== undefined) {
+    if (!storedValue || typeof storedValue !== 'object' || Array.isArray(storedValue)) {
+      fatal('Stored summon piece must be a plain object')
+    }
+    const prototype = Object.getPrototypeOf(storedValue)
+    const storedRecord = storedValue as Record<string, unknown>
+    if (
+      (prototype !== Object.prototype && prototype !== null)
+      || storedRecord.templateId !== capability.uniqueTemplateId
+      || typeof storedRecord.instanceId !== 'string'
+      || storedRecord.instanceId.length === 0
+      || typeof storedRecord.name !== 'string'
+      || String(storedRecord.ownerPlayerId || '').trim().toLowerCase() !== normalizedOwnerPlayerId
+      || !Number.isFinite(storedRecord.maxHp)
+      || Number(storedRecord.maxHp) <= 0
+      || !Number.isFinite(storedRecord.attack)
+      || !Number.isFinite(storedRecord.defense)
+      || !Number.isFinite(storedRecord.moveRange)
+      || (
+        storedRecord.faction !== undefined
+        && storedRecord.faction !== 'red'
+        && storedRecord.faction !== 'blue'
+      )
+      || (storedRecord.faction !== undefined && storedRecord.faction !== source.faction)
+    ) {
+      fatal('Stored summon piece does not match its bound stable Piece schema')
+    }
+  }
+  return {
+    kind: 'stored-piece',
+    inputIndex: entry.inputIndex,
+    spec: entry.spec,
+    source,
+    capability,
+    stored: storedValue as PieceInstance | undefined,
+    storageExtensionKey,
+    storageEntryKey,
+    legacyStorageExtensionKey,
+  }
+}
+function copyPieceSkills(value: PieceInstance['skills'] | undefined): PieceInstance['skills'] {
+  return cloneEffectTransactionValue(Array.isArray(value) ? value : [])
+}
+
+function copyVisibleStatusTags(piece: PieceInstance): PieceInstance['statusTags'] {
+  return cloneEffectTransactionValue(
+    (piece.statusTags || []).filter(status => status.visible !== false),
+  )
+}
+
+function prepareSourceMirrorSummon(
+  entry: Extract<ValidatedDeclaredSummon, { kind: 'source-mirror' }>,
+  contentId: string,
+  fatal: (message: string, cause?: unknown) => never,
+): PreparedDeclaredSummon {
+  // ADR-0022 freezes this exact deterministic consumption order.
+  const createdAt = getRuleDate().now()
+  const insertBeforeSource = getRuleMath().random() < 0.5
+  const instanceId = entry.capability.instanceIdPrefix + String(createdAt)
+  const rules = entry.capability.rules.map(ruleId => {
+    let rule: ReturnType<typeof loadRuleById>
+    try {
+      rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
+    } catch (error) {
+      fatal('Declared source-mirror rule failed to load: ' + ruleId, error)
+    }
+    if (!rule) fatal('Declared source-mirror rule was not found: ' + ruleId)
+    return rule
+  })
+  const status = entry.capability.status
+  const statusTag = {
+    id: status.idPrefix + instanceId,
+    name: status.name,
+    type: status.type,
+    visible: status.visible,
+    remainingDuration: status.remainingDuration,
+    remainingUses: status.remainingUses,
+    intensity: status.intensity,
+    stacks: status.stacks,
+    relatedRules: [...status.relatedRules],
+  }
+  const source = entry.source
+  const displaySkills = copyPieceSkills(source.skills)
+  if (entry.capability.resetBoundSkillCooldown) {
+    const boundSkill = displaySkills.find(skill => skill.skillId === contentId)
+    if (boundSkill) boundSkill.currentCooldown = 0
+  }
+  const piece = {
+    instanceId,
+    isCore: false,
+    templateId: source.templateId,
+    name: source.name,
+    ownerPlayerId: source.ownerPlayerId,
+    faction: source.faction,
+    x: entry.spec.x,
+    y: entry.spec.y,
+    maxHp: entry.capability.maxHp,
+    currentHp: entry.capability.maxHp,
+    displayMaxHp: source.maxHp,
+    displayCurrentHp: source.currentHp,
+    displayAttack: source.attack,
+    displayDefense: source.defense || 0,
+    displayMoveRange: source.moveRange,
+    displaySkills,
+    displayStatusTags: copyVisibleStatusTags(source),
+    attack: entry.capability.attack,
+    defense: entry.capability.defense,
+    moveRange: entry.capability.moveRange,
+    masterPieceId: source.instanceId,
+    noKillCharge: entry.capability.noKillCharge,
+    skills: [],
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+    rules,
+    statusTags: [statusTag],
+  } as unknown as PieceInstance
+  return {
+    inputIndex: entry.inputIndex,
+    recipe: entry.capability.recipe,
+    piece,
+    ownerPlayerId: source.ownerPlayerId,
+    sourceId: source.instanceId,
+    insertBeforeSource,
+    finalX: entry.spec.x,
+    finalY: entry.spec.y,
+  }
+}
+
+function normalizePreparedPieceArrays(piece: PieceInstance): void {
+  piece.skills = Array.isArray(piece.skills) ? piece.skills : []
+  piece.displaySkills = Array.isArray(piece.displaySkills)
+    ? piece.displaySkills
+    : copyPieceSkills(piece.skills)
+  piece.buffs = Array.isArray(piece.buffs) ? piece.buffs : []
+  piece.debuffs = Array.isArray(piece.debuffs) ? piece.debuffs : []
+  piece.ruleTags = Array.isArray(piece.ruleTags) ? piece.ruleTags : []
+  piece.rules = Array.isArray(piece.rules) ? piece.rules : []
+  piece.statusTags = Array.isArray(piece.statusTags) ? piece.statusTags : []
+}
+
+export function hydratePreparedPieceDefinitions(
+  battle: BattleState,
+  piece: PieceInstance,
+  fatal: (message: string, cause?: unknown) => never,
+): void {
+  const rulesById = new Map<string, TriggerRule>()
+  const hydrateRule = (rawRuleId: unknown, persistedRule?: unknown): TriggerRule => {
+    const ruleId = typeof rawRuleId === 'string' ? rawRuleId : ''
+    if (!ruleId) fatal(`Summoned piece ${piece.instanceId} has an invalid rule reference`)
+    let rule: TriggerRule | null = null
+    try {
+      rule = loadRuleForBattle(battle, ruleId, { sourceId: piece.instanceId })
+    } catch (error) {
+      if (isEffectChainFatalError(error)) throw error
+      fatal(`Summoned piece ${piece.instanceId} rule ${ruleId} failed to load`, error)
+    }
+    if (!rule) fatal(`Summoned piece ${piece.instanceId} rule ${ruleId} was not found`)
+    const hydrated = persistedRule === undefined
+      ? rule
+      : restorePersistedRuleRuntime(battle, rule, persistedRule, piece.instanceId)
+    rulesById.set(ruleId, hydrated)
+    return hydrated
+  }
+
+  for (const descriptor of piece.rules || []) {
+    hydrateRule((descriptor as any)?.id, descriptor)
+  }
+  for (const status of piece.statusTags || []) {
+    const relatedRules = (status as any)?.relatedRules
+    if (relatedRules === undefined) continue
+    if (!Array.isArray(relatedRules)) {
+      fatal(`Summoned piece ${piece.instanceId} has invalid status relatedRules`)
+    }
+    for (const ruleId of relatedRules) {
+      if (!rulesById.has(String(ruleId))) hydrateRule(ruleId)
+    }
+  }
+  piece.rules = [...rulesById.values()]
+
+  const skillIds = new Set<string>()
+  for (const descriptor of [
+    ...(piece.skills || []),
+    ...((piece as any).displaySkills || []),
+  ]) {
+    const skillId = typeof descriptor === 'string'
+      ? descriptor
+      : typeof descriptor?.skillId === 'string'
+        ? descriptor.skillId
+        : ''
+    if (!skillId) fatal(`Summoned piece ${piece.instanceId} has an invalid skill reference`)
+    skillIds.add(skillId)
+  }
+  for (const skillId of skillIds) {
+    const definition = loadSkillForBattle(
+      battle,
+      skillId,
+      (battle as any).skillsById?.[skillId],
+      { metadata: { sourceId: piece.instanceId, skillId } },
+    )
+    if (!definition) fatal(`Summoned piece ${piece.instanceId} skill ${skillId} was not found`)
+    if (definition.kind !== 'passive') {
+      try {
+        assertSkillDefinition(skillId, definition, { requireExecutable: true })
+      } catch (error) {
+        fatal(`Summoned piece ${piece.instanceId} active skill ${skillId} is not executable`, error)
+      }
+    }
+  }
+}
+
+function prepareStoredPieceSummon(
+  entry: Extract<ValidatedDeclaredSummon, { kind: 'stored-piece' }>,
+): PreparedDeclaredSummon {
+  const stored = entry.stored
+  const fallback = entry.capability.fallback
+  let piece: PieceInstance
+  if (stored) {
+    piece = cloneEffectTransactionValue(stored)
+  } else {
+    const createdAt = getRuleDate().now()
+    const skills = fallback.skills.map(skill => ({
+      skillId: skill.skillId,
+      level: skill.level,
+      currentCooldown: skill.currentCooldown,
+    }))
+    piece = {
+      instanceId: fallback.instanceIdPrefix + entry.source.ownerPlayerId + '-' + String(createdAt),
+      isCore: false,
+      templateId: fallback.templateId,
+      name: fallback.name,
+      ownerPlayerId: entry.source.ownerPlayerId,
+      faction: entry.source.faction || fallback.faction,
+      maxHp: fallback.maxHp,
+      currentHp: fallback.maxHp,
+      attack: fallback.attack,
+      defense: fallback.defense,
+      moveRange: fallback.moveRange,
+      x: entry.spec.x,
+      y: entry.spec.y,
+      skills,
+      displaySkills: copyPieceSkills(skills),
+      rules: [],
+      statusTags: [],
+      buffs: [],
+      debuffs: [],
+      ruleTags: [],
+    }
+  }
+  normalizePreparedPieceArrays(piece)
+  piece.isCore = stored ? Boolean(stored.isCore) : false
+  piece.x = entry.spec.x
+  piece.y = entry.spec.y
+  piece.ownerPlayerId = entry.source.ownerPlayerId
+  piece.faction = piece.faction || entry.source.faction || fallback.faction
+  piece.currentHp = piece.maxHp || fallback.maxHp
+  return {
+    inputIndex: entry.inputIndex,
+    recipe: entry.capability.recipe,
+    piece,
+    ownerPlayerId: entry.source.ownerPlayerId,
+    storageExtensionKey: stored === undefined ? undefined : entry.storageExtensionKey,
+    storageEntryKey: stored === undefined ? undefined : entry.storageEntryKey,
+    legacyStorageExtensionKey: stored === undefined
+      ? undefined
+      : entry.legacyStorageExtensionKey,
+    finalX: entry.spec.x,
+    finalY: entry.spec.y,
+  }
+}
+
+function declaredSummonTriggerContext(
+  request: SummonRequest,
+  context: EffectBatchContext<'summon'>,
+  chain: EffectChain,
+  entry: PreparedDeclaredSummon,
+  type: 'beforePieceSummoned' | 'afterPieceSummoned',
+): Record<string, unknown> {
+  const triggerPiece = type === 'beforePieceSummoned'
+    ? cloneEffectTransactionValue(entry.piece)
+    : entry.piece
+  return {
+    type,
+    piece: triggerPiece,
+    playerId: entry.ownerPlayerId,
+    sourcePiece: triggerPiece,
+    targetPiece: triggerPiece,
+    target: triggerPiece,
+    skillId: request.skillId,
+    targetPosition: type === 'beforePieceSummoned'
+      ? { x: entry.finalX, y: entry.finalY }
+      : undefined,
+    targetX: type === 'beforePieceSummoned' ? entry.finalX : undefined,
+    targetY: type === 'beforePieceSummoned' ? entry.finalY : undefined,
+    pieceTemplateId: entry.piece.templateId,
+    faction: entry.piece.faction,
+    ...queueContext(chain, context),
+    // Root content summons are still queued and must retain their ledger sequence.
+    effectEnqueueSequence: context.enqueueSequence,
+  }
+}
+
+function appendDeclaredSummonMessages(
+  battle: BattleState,
+  playerId: string,
+  messages: readonly string[],
+): void {
+  if (messages.length === 0) return
+  battle.actions ??= []
+  for (const message of messages) {
+    battle.actions.push({
+      type: 'triggerEffect',
+      playerId,
+      turn: battle.turn?.turnNumber ?? 0,
+      payload: { message },
+    })
+  }
+}
+export function resolveDeclaredContentSummonBatch(
+  request: SummonRequest,
+  context: EffectBatchContext<'summon'>,
+  chain: EffectChain,
+  battle: BattleState,
+): unknown {
+  const battleSnapshot = cloneEffectTransactionValue(battle)
+  const triggerSystem = getActiveTriggerSystem()
+  const triggerSnapshot = triggerSystem.snapshotTransactionState()
+  const runtime = getActiveRuleRuntime()
+  const runtimeSnapshot = runtime?.snapshot()
+  const rejection = (message: string, cause?: unknown) => rejectEffectBatch(
+    chain,
+    context,
+    message,
+    cause,
+    {
+      sourceId: request.sourceId,
+      skillId: request.skillId,
+      targetIds: request.sourceId ? [request.sourceId] : [],
+    },
+  )
+  const fatal = (message: string, cause?: unknown): never => {
+    throw rejection(message, cause)
+  }
+
+  try {
+    const capability = isTrustedDeclaredSummonCapability(request.capability)
+      ? request.capability
+      : fatal('Summon request does not carry a trusted declared capability')
+    if (
+      typeof request.contentId !== 'string'
+      || request.contentId.length === 0
+      || request.skillId !== request.contentId
+    ) {
+      fatal('Summon request is not bound to its declaring content')
+    }
+    if (!isDeclaredSummonCapabilityBoundToContent(capability, request.contentId)) {
+      fatal('Summon capability is not bound to its declaring content')
+    }
+    if (
+      !Array.isArray(request.summons)
+      || request.summons.length === 0
+      || request.summons.length > capability.maxSummons
+    ) {
+      fatal('Declared SummonBatch exceeds its bound batch size')
+    }
+    const sourceId = typeof request.sourceId === 'string' && request.sourceId.length > 0
+      ? request.sourceId
+      : fatal('Declared SummonBatch requires a bound source')
+    const source = resolveDeclaredSummonSource(
+      battle,
+      sourceId,
+      capability,
+      fatal,
+    )
+    const sourceOwner = battle.players.find(player => player.playerId === source.ownerPlayerId)
+      ?? fatal('Declared summon source owner player was not found')
+    if (source.faction !== 'red' && source.faction !== 'blue') {
+      fatal('Declared summon source faction must be red or blue')
+    }
+    const sourceOwnerFaction = (sourceOwner as unknown as { faction?: unknown }).faction
+    if (
+      sourceOwnerFaction !== undefined
+      && sourceOwnerFaction !== 'red'
+      && sourceOwnerFaction !== 'blue'
+    ) {
+      fatal('Declared summon source owner faction must be red or blue when present')
+    }
+    if (typeof sourceOwnerFaction === 'string' && sourceOwnerFaction !== source.faction) {
+      fatal('Declared summon source faction does not match its owner player')
+    }
+
+    const indexed = request.summons
+      .map((unsafeSpec, inputIndex) => ({
+        spec: validateDeclaredSummonSpec(capability, unsafeSpec, fatal),
+        inputIndex,
+      }))
+      .sort(compareIndexedDeclaredSummons)
+    const requestKeys = new Set<string>()
+    for (const entry of indexed) {
+      const key = declaredSummonRequestKey(entry.spec)
+      if (requestKeys.has(key)) fatal('Duplicate declared summon request')
+      requestKeys.add(key)
+    }
+
+    // Phase 1: validate every request and reserve every initial position.
+    const initialReservations = new Set<string>()
+    const validated: ValidatedDeclaredSummon[] = indexed.map(entry => {
+      validateDeclaredSummonPosition(
+        battle,
+        entry.spec.x,
+        entry.spec.y,
+        initialReservations,
+        fatal,
+      )
+      return capability.recipe === 'source-mirror'
+        ? validateSourceMirrorSummon(entry, source, capability)
+        : validateStoredPieceSummon(battle, entry, source, capability, fatal)
+    })
+
+    // Phase 2: build complete instances, including rules/statuses, off-board.
+    const prepared = validated.map(entry => (
+      entry.kind === 'source-mirror'
+        ? prepareSourceMirrorSummon(entry, request.contentId, fatal)
+        : prepareStoredPieceSummon(entry)
+    ))
+    for (const entry of prepared) {
+      hydratePreparedPieceDefinitions(battle, entry.piece, fatal)
+    }
+    const existingIds = new Set([
+      ...battle.pieces.map(piece => piece.instanceId),
+      ...(battle.graveyard || []).map(piece => piece.instanceId),
+    ])
+    for (const entry of prepared) {
+      if (!entry.piece.instanceId || existingIds.has(entry.piece.instanceId)) {
+        fatal('Summon instanceId is not unique: ' + String(entry.piece.instanceId))
+      }
+      existingIds.add(entry.piece.instanceId)
+    }
+    const stablePrepared = prepared.slice().sort(comparePreparedDeclaredSummons)
+
+    // Phase 3: stable before events. Rules may redirect positions, never instances.
+    for (const entry of stablePrepared) {
+      const beforeContext: Record<string, unknown> = {
+        ...declaredSummonTriggerContext(
+          request,
+          context,
+          chain,
+          entry,
+          'beforePieceSummoned',
+        ),
+        type: 'beforePieceSummoned' as const,
+      }
+      const beforeResult = checkSynchronousTriggers(battle, beforeContext)
+      if (beforeResult.blocked) {
+        const message = beforeResult.messages?.[0] || 'Summon was blocked'
+        fatal('Queued declared summon was blocked: ' + message, new Error(message))
+      }
+      appendDeclaredSummonMessages(
+        battle,
+        entry.ownerPlayerId,
+        beforeResult.messages || [],
+      )
+      const finalPosition = resolveSummonRedirectPosition(
+        beforeContext,
+        fatal,
+      )
+      entry.finalX = finalPosition.x
+      entry.finalY = finalPosition.y
+      entry.piece.x = finalPosition.x
+      entry.piece.y = finalPosition.y
+    }
+
+    // Phase 4: revalidate every redirected position as one reservation set.
+    const finalReservations = new Set<string>()
+    for (const entry of stablePrepared) {
+      validateDeclaredSummonPosition(
+        battle,
+        entry.finalX,
+        entry.finalY,
+        finalReservations,
+        fatal,
+      )
+    }
+
+    // Phase 5: one commit window. All complete pieces exist before any after event.
+    const committedPieces = battle.pieces.slice()
+    for (const entry of stablePrepared) {
+      if (entry.recipe === 'source-mirror') {
+        const sourceIndex = committedPieces.findIndex(piece => (
+          piece.instanceId === entry.sourceId && piece.currentHp > 0
+        ))
+        if (sourceIndex < 0) fatal('Source-mirror summon source disappeared before commit')
+        committedPieces.splice(
+          entry.insertBeforeSource ? sourceIndex : sourceIndex + 1,
+          0,
+          entry.piece,
+        )
+      } else {
+        committedPieces.push(entry.piece)
+      }
+    }
+    battle.pieces.splice(0, battle.pieces.length, ...committedPieces)
+    for (const entry of stablePrepared) {
+      if (!battle.extensions || !entry.storageExtensionKey) continue
+      if (!entry.storageEntryKey) {
+        delete battle.extensions[entry.storageExtensionKey]
+        continue
+      }
+      const storedMap = battle.extensions[entry.storageExtensionKey]
+      if (!storedMap || typeof storedMap !== 'object' || Array.isArray(storedMap)) {
+        fatal('Owner-scoped stored summon map changed before commit')
+      }
+      const storedRecord = storedMap as Record<string, unknown>
+      delete storedRecord[entry.storageEntryKey]
+      const remainingKeys = Object.keys(storedRecord).sort(compareDeclaredSummonText)
+      if (remainingKeys.length === 0) delete battle.extensions[entry.storageExtensionKey]
+
+      if (entry.legacyStorageExtensionKey) {
+        const legacyPiece = battle.extensions[entry.legacyStorageExtensionKey] as PieceInstance | undefined
+        if (legacyPiece?.instanceId === entry.piece.instanceId) {
+          if (remainingKeys.length === 0) {
+            delete battle.extensions[entry.legacyStorageExtensionKey]
+          } else {
+            battle.extensions[entry.legacyStorageExtensionKey] = storedRecord[remainingKeys[0]]
+          }
+        }
+      }
+    }
+
+    // Phase 6: stable after events observe the whole committed batch.
+    for (const entry of stablePrepared) {
+      const afterContext = {
+        ...declaredSummonTriggerContext(
+          request,
+          context,
+          chain,
+          entry,
+          'afterPieceSummoned',
+        ),
+        type: 'afterPieceSummoned' as const,
+      }
+      const afterResult = checkSynchronousTriggers(battle, afterContext)
+      appendDeclaredSummonMessages(
+        battle,
+        entry.ownerPlayerId,
+        afterResult.messages || [],
+      )
+    }
+
+    const metadata = {
+      batchId: context.batchId,
+      chainId: context.chainId,
+      parentBatchId: context.parentBatchId,
+      depth: context.depth,
+      enqueueSequence: context.enqueueSequence,
+    }
+    const results = new Array(prepared.length)
+    for (const entry of prepared) {
+      results[entry.inputIndex] = {
+        success: true,
+        inputIndex: entry.inputIndex,
+        piece: entry.piece,
+        message: entry.piece.name + '\u88ab\u53ec\u5524\u5230('
+          + String(entry.finalX) + ',' + String(entry.finalY) + ')',
+        ...metadata,
+      }
+    }
+    return {
+      success: true,
+      pieces: stablePrepared.map(entry => entry.piece),
+      results,
+      message: results.length === 1
+        ? results[0].message
+        : String(results.length) + ' pieces were summoned',
+      ...metadata,
+    }
+  } catch (error) {
+    restoreEffectBattleSnapshot(battle, battleSnapshot)
+    triggerSystem.restoreTransactionState(triggerSnapshot)
+    if (runtime && runtimeSnapshot) runtime.restore(runtimeSnapshot)
+    if (isEffectChainPendingSignal(error)) throw error
+    if (isEffectChainFatalError(error)) throw error
+    throw rejection('Declared content SummonBatch failed', error)
+  }
+}
+function beginSealedContentExecution(
+  battle: BattleState,
+  definition: SummonCapabilityDefinition,
+): SealedContentExecution {
+  if (definition.summonCapability === undefined) return {}
+
+  const active = getActiveEffectChain(battle)
+  const chain = active ?? createDetachedEffectChain(battle, 'summon')
+  const cleanup = active ? undefined : installEffectChain(battle, chain)
+  try {
+    return {
+      chain,
+      summonQueue: createDeclaredSummonQueueWriter(
+        chain,
+        definition.id,
+        definition.summonCapability,
+      ),
+      cleanup,
+    }
+  } catch (error) {
+    cleanup?.()
+    throw error
+  }
+}
+
+function bindDeclaredSummonQueueContext(
+  context: Record<string, unknown>,
+  execution: SealedContentExecution,
+): () => void {
+  const hadOwnValue = Object.prototype.hasOwnProperty.call(context, 'summonQueue')
+  const previousValue = context.summonQueue
+  context.summonQueue = execution.summonQueue
+  return () => {
+    if (hadOwnValue) context.summonQueue = previousValue
+    else delete context.summonQueue
+  }
+}
+
+function finishSealedContentExecution(
+  battle: BattleState,
+  execution: SealedContentExecution,
+): void {
+  const chain = execution.chain
+  if (!chain || chain.state !== 'idle' || chain.pendingCount === 0) return
+  drainBattleEffectChain(battle, chain)
+}
+export type BattleSummonBatchHandler = (
+  request: SummonRequest,
+  context: EffectBatchContext<'summon'>,
+  chain: EffectChain,
+  battle: BattleState,
+) => unknown
+
+function rejectUnsupportedSummonBatch(
+  request: SummonRequest,
+  context: EffectBatchContext<'summon'>,
+  chain: EffectChain,
+): never {
+  throw new EffectChainFatalError(
+    'RVB_EFFECT_CHAIN_SUMMON_CAPABILITY',
+    'No sealed SummonBatch handler was installed for ' + request.contentId,
+    {
+      actionId: chain.actionId,
+      chainId: chain.chainId,
+      batchId: context.batchId,
+      parentBatchId: context.parentBatchId,
+      kind: 'summon',
+      depth: context.depth,
+      enqueueSequence: context.enqueueSequence,
+      originStage: context.originStage,
+      processed: chain.processedBatches,
+      limit: 1,
+      turn: chain.turn,
+      rootSeed: chain.rootSeed,
+      sourceId: request.sourceId,
+      skillId: request.skillId,
+      detached: chain.detached,
+      budget: 'binding',
+    },
+  )
+}
+
+export function drainBattleEffectChain(
+  battle: BattleState,
+  chain: EffectChain,
+  summonHandler?: BattleSummonBatchHandler,
+): readonly EffectExecution[] {
+  return chain.drain({
+    damage: (request, context, activeChain) => resolveDamageBatch(request, context, activeChain, battle),
+    heal: (request, context, activeChain) => resolveHealBatch(request, context, activeChain, battle),
+    summon: (request, context, activeChain) => (
+      request.capability !== undefined
+        ? resolveDeclaredContentSummonBatch(request, context, activeChain, battle)
+        : summonHandler
+          ? summonHandler(request, context, activeChain, battle)
+          : rejectUnsupportedSummonBatch(request, context, activeChain)
+    ),
+    death: (request, context, activeChain) => resolveDeathBatch(request, context, activeChain, battle),
+  })
+}
+
+function createDetachedEffectChain(battle: BattleState, rootKind: 'damage' | 'heal' | 'summon'): EffectChain {
+  const runtime = getActiveRuleRuntime()
+  const turn = battle.turn?.turnNumber ?? 0
+  const fallbackBase = {
+    damage: (battle.actions || []).filter(action => action.type === 'damage').length,
+    heal: 0,
+    summon: 0,
+    death: 0,
+  }
+  const fallbackSequence = { damage: 0, heal: 0, summon: 0, death: 0 }
+  const nextId = (kind: 'damage' | 'heal' | 'summon' | 'death') => {
+    const prefix = kind + '-batch'
+    if (runtime) return runtime.nextInstanceId(prefix, prefix)
+    const sequence = fallbackSequence[kind]
+    fallbackSequence[kind] += 1
+    return prefix + '-' + turn + '-' + (fallbackBase[kind] + sequence)
+  }
+  const chainId = nextId(rootKind)
+  let firstBatch = true
+  return createEffectChain({
+    actionId: chainId + ':action',
+    chainId,
+    turn,
+    rootSeed: runtime?.rootSeed ?? null,
+    detached: true,
+    createBatchId: input => {
+      if (firstBatch) {
+        firstBatch = false
+        return chainId
+      }
+      return nextId(input.kind)
+    },
+  })
+}
+
+function findExecutionResult<TResult>(
+  executions: readonly EffectExecution[],
+  kind: 'damage' | 'heal',
+  enqueueSequence: number,
+): TResult {
+  const execution = executions.find(entry => (
+    entry.kind === kind && entry.context.enqueueSequence === enqueueSequence
+  ))
+  if (!execution) {
+    throw new Error(
+      'EffectChain did not execute root ' + kind + ' request at sequence ' + enqueueSequence,
+    )
+  }
+  return execution.result as TResult
+}
+
+function translateDetachedDamageError(error: unknown, chain: EffectChain): never {
+  if (!chain.detached || !isEffectChainFatalError(error)) throw error
+  if (error.code === 'RVB_EFFECT_CHAIN_DEPTH_LIMIT') {
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_CHAIN_DEPTH',
+      'Damage chain exceeded depth ' + chain.limits.maxDepth,
+      { ...error.context },
+    )
+  }
+  if (error.code === 'RVB_EFFECT_CHAIN_BATCH_LIMIT') {
+    throw new DamagePipelineError(
+      'RVB_DAMAGE_CHAIN_BUDGET',
+      'Damage chain exceeded ' + chain.limits.maxBatches + ' batches',
+      { ...error.context },
+    )
+  }
+  throw error
 }
 
 /**
@@ -2649,232 +4841,161 @@ export function dealDamage(
   killerPlayerId?: string,
   selectedOption?: any,
 ): any {
-  const targets = Array.isArray(target) ? target : [target]
-  if (targets.length === 0) {
-    return { success: false, damages: [], totalDamage: 0, results: [], message: '没有目标' } as DamageBatchResult
-  }
-
-  const activeChain = activeDamageChains.get(battle)
-  if (activeChain) {
-    throw new DamagePipelineError(
-      'RVB_DAMAGE_REENTRANT_CALL',
-      'Nested dealDamage calls must enqueue follow-up damage through context.damageQueue',
-      damageContext(battle, attacker, skillId, {
-        chainId: activeChain.chainId,
-        parentBatchId: activeChain.currentBatchId,
-        depth: (activeChain.currentDepth ?? 0) + 1,
-      }),
-    )
-  }
-
-  const chain: DamageChain = {
-    pending: [],
-    processedBatches: 0,
-    fallbackStart: (battle.actions || []).filter(action => action.type === 'damage').length,
-    sequence: 0,
-  }
-  const rootRequest: DamageBatchRequest = {
-    attacker,
-    targets,
-    baseDamage,
-    damageType,
-    skillId,
-    skipBeforeTrigger,
-    killerPlayerId,
-    selectedOption,
-    depth: 0,
-  }
-  activeDamageChains.set(battle, chain)
+  let chain: EffectChain | undefined
+  let cleanup: (() => void) | undefined
   try {
-    const rootResult = resolveDamageBatch(rootRequest, battle, chain)
-    while (chain.pending.length > 0) {
-      const followUp = chain.pending.shift()!
-      // A prior batch may already have removed a reflected target. That follow-up
-      // has no remaining state to affect and is deterministically skipped.
-      followUp.targets = followUp.targets.filter(candidate => battle.pieces.some(piece => (
-        piece.instanceId === candidate.instanceId && piece.currentHp > 0
-      )))
-      if (followUp.targets.length === 0) continue
-      resolveDamageBatch(followUp, battle, chain)
+    const targets = Array.isArray(target) ? target : [target]
+    const active = getActiveEffectChain(battle)
+    if (active?.state === 'processing' && !active.detached) {
+      active.assertFacadeAllowed('damage', {
+        sourceId: attacker?.instanceId,
+        skillId,
+        targetIds: targets.map(entry => entry?.instanceId),
+      })
+    }
+    if (targets.length === 0) {
+      return {
+        success: false,
+        damages: [],
+        totalDamage: 0,
+        results: [],
+        message: '没有目标',
+      } as DamageBatchResult
     }
 
-    return Array.isArray(target) ? rootResult : rootResult.results[0]
+    if (active?.state === 'processing') {
+      const current = active.currentBatch
+      throw new DamagePipelineError(
+        'RVB_DAMAGE_REENTRANT_CALL',
+        'Nested dealDamage calls must enqueue follow-up damage through context.damageQueue',
+        damageContext(battle, attacker, skillId, {
+          chainId: active.chainId,
+          parentBatchId: current?.batchId,
+          depth: (current?.depth ?? 0) + 1,
+        }),
+      )
+    }
+    chain = active ?? createDetachedEffectChain(battle, 'damage')
+    chain.assertFacadeAllowed('damage', {
+      sourceId: attacker?.instanceId,
+      skillId,
+      targetIds: targets.map(entry => entry?.instanceId),
+    })
+    cleanup = active ? undefined : installEffectChain(battle, chain)
+    const ledgerEntry = chain.enqueue({
+      kind: 'damage',
+      attacker,
+      targets,
+      baseDamage,
+      damageType,
+      skillId,
+      skipBeforeTrigger,
+      killerPlayerId,
+      selectedOption,
+    })
+    const executions = drainBattleEffectChain(battle, chain)
+    const result = findExecutionResult<DamageBatchResult>(
+      executions,
+      'damage',
+      ledgerEntry.enqueueSequence,
+    )
+    return Array.isArray(target) ? result : result.results[0]
+  } catch (error) {
+    if (chain?.detached) translateDetachedDamageError(error, chain)
+    rethrowAttachedEffectContentError(
+      battle,
+      error,
+      'Attached EffectChain damage facade failed before deterministic enqueue',
+      { kind: 'damage' },
+    )
+    if (chain) translateDetachedDamageError(error, chain)
+    throw error
   } finally {
-    activeDamageChains.delete(battle)
+    cleanup?.()
   }
 }
 
-/**
- * 处理治疗计算和应用的函数
- * @param healer 治疗者棋子
- * @param target 目标棋子
- * @param baseHeal 基础治疗值
- * @param battle 战斗状态
- * @param skillId 技能ID（可选）
- * @returns 治疗结果
- */
-export function healDamage(healer: PieceInstance, target: PieceInstance | PieceInstance[], baseHeal: number, battle: BattleState, skillId?: string): any {
-  // 支持传入目标数组：beforeHealDealt 只触发一次，buff 只消耗一次，对所有目标生效
-  if (Array.isArray(target)) {
-    if (target.length === 0) {
-      return { success: false, heals: [], totalHeal: 0, results: [], message: '没有目标' };
+export function healDamage(
+  healer: PieceInstance,
+  target: PieceInstance | PieceInstance[],
+  baseHeal: number,
+  battle: BattleState,
+  skillId?: string,
+): any {
+  let cleanup: (() => void) | undefined
+  try {
+    const targets = Array.isArray(target) ? target : [target]
+    const active = getActiveEffectChain(battle)
+    if (active?.state === 'processing' && !active.detached) {
+      active.assertFacadeAllowed('heal', {
+        sourceId: healer?.instanceId,
+        skillId,
+        targetIds: targets.map(entry => entry?.instanceId),
+      })
     }
-    const healCtx = {
-      type: "beforeHealDealt" as const,
-      piece: healer,
-      sourcePiece: healer,
-      targetPiece: target[0],
-      target: target[0],
-      heal: baseHeal,
-      skillId
-    };
-    const beforeRes = checkSynchronousTriggers(battle, healCtx);
-    if (beforeRes.blocked) {
-      if (!battle.actions) battle.actions = [];
-      battle.actions.push({
-        type: "triggerEffect",
-        playerId: healer.ownerPlayerId,
-        turn: battle.turn.turnNumber,
-        payload: { message: `${healer.name || healer.templateId}的治疗被规则阻止` }
-      });
-      return { success: false, heals: [], totalHeal: 0, results: [], message: '治疗被规则阻止' };
-    }
-    const modifiedHeal = healCtx.heal;
-    const results = target.map(t => healDamage(healer, t, modifiedHeal, battle, skillId));
-    const heals = results.map((r: any) => r.heal || 0);
-    const totalHeal = heals.reduce((sum: number, h: number) => sum + h, 0);
-    return { success: true, heals, totalHeal, results, message: `为${target.length}个目标共回复${totalHeal}点生命值` };
-  }
-
-  // 创建一个可修改的上下文对象，触发器可以直接修改其中的值
-  // piece = 治疗者（事件源），target = 被治疗者（事件目标）
-  const healContext = {
-    type: "beforeHealDealt" as const,
-    piece: healer,
-    sourcePiece: healer,
-    targetPiece: target,
-    target: target,
-    heal: baseHeal,
-    skillId
-  };
-
-  // 触发即将造成治疗前的触发器
-  const beforeHealDealtResult = checkSynchronousTriggers(battle, healContext);
-
-  // 检查是否有规则阻止了治疗
-  if (beforeHealDealtResult.blocked) {
-    // 记录阻止信息到战斗日志
-    const healerName = healer.name || healer.templateId;
-    const targetName = target.name || target.templateId;
-
-    if (!battle.actions) {
-      battle.actions = [];
+    if (targets.length === 0) {
+      return {
+        success: false,
+        heals: [],
+        totalHeal: 0,
+        results: [],
+        message: '没有目标',
+      } as HealBatchResult
     }
 
-    battle.actions.push({
-      type: "triggerEffect",
-      playerId: healer.ownerPlayerId,
-      turn: battle.turn.turnNumber,
-      payload: {
-        message: `${healerName}的治疗被规则阻止`
-      }
-    });
-
-    return {
-      success: false,
-      heal: 0,
-      targetHp: target.currentHp,
-      message: "治疗被规则阻止"
-    };
+    const chain = active ?? createDetachedEffectChain(battle, 'heal')
+    chain.assertFacadeAllowed('heal', {
+      sourceId: healer?.instanceId,
+      skillId,
+      targetIds: targets.map(entry => entry?.instanceId),
+    })
+    cleanup = active ? undefined : installEffectChain(battle, chain)
+    const ledgerEntry = chain.enqueue({
+      kind: 'heal',
+      healer,
+      targets,
+      baseHeal,
+      skillId,
+    })
+    const executions = drainBattleEffectChain(battle, chain)
+    const result = findExecutionResult<HealBatchResult>(
+      executions,
+      'heal',
+      ledgerEntry.enqueueSequence,
+    )
+    return Array.isArray(target) ? result : result.results[0]
+  } catch (error) {
+    rethrowAttachedEffectContentError(
+      battle,
+      error,
+      'Attached EffectChain heal facade failed before deterministic enqueue',
+      { kind: 'heal' },
+    )
+    throw error
+  } finally {
+    cleanup?.()
   }
-
-  // 触发器可能已经修改了 healContext.heal，使用修改后的值
-  const modifiedBaseHeal = healContext.heal;
-
-  // 触发即将受到治疗前的触发器
-  // piece = 被治疗者（事件源），target = 治疗者（事件目标）
-  const beforeHealTakenResult = checkSynchronousTriggers(battle, {
-    type: "beforeHealTaken",
-    piece: target,
-    sourcePiece: target,
-    targetPiece: healer,
-    target: healer,
-    heal: modifiedBaseHeal,
-    skillId
-  });
-
-  // 检查是否有规则阻止了治疗
-  if (beforeHealTakenResult.blocked) {
-    const targetName = target.name || target.templateId;
-
-    if (!battle.actions) battle.actions = [];
-    battle.actions.push({
-      type: "triggerEffect",
-      playerId: healer.ownerPlayerId,
-      turn: battle.turn.turnNumber,
-      payload: { message: `${targetName}受到的治疗被规则阻止` }
-    });
-
-    // 触发治疗格挡后事件
-    checkSynchronousTriggers(battle, {
-      type: "afterHealBlocked",
-      sourcePiece: target,
-      targetPiece: healer,
-      heal: modifiedBaseHeal,
-      skillId
-    });
-
-    return {
-      success: false,
-      heal: 0,
-      targetHp: target.currentHp,
-      message: "治疗被规则阻止"
-    };
-  }
-
-  // 计算最终治疗值（使用触发器可能修改后的值）
-  const finalHeal = Math.max(0, Math.floor(modifiedBaseHeal));
-  
-  // 记录原始生命值
-  const originalHp = target.currentHp;
-  
-  // 应用治疗
-  target.currentHp = Math.min(target.maxHp, target.currentHp + finalHeal);
-  
-  // 计算实际治疗量
-  const actualHeal = target.currentHp - originalHp;
-  
-  // 触发治疗相关的触发器
-  checkSynchronousTriggers(battle, {
-    type: "afterHealDealt",
-    sourcePiece: healer,
-    targetPiece: target,
-    heal: actualHeal,
-    skillId
-  });
-  
-  checkSynchronousTriggers(battle, {
-    type: "afterHealTaken",
-    sourcePiece: target,
-    targetPiece: healer,
-    heal: actualHeal,
-    skillId
-  });
-  
-  // 尝试获取治疗者和目标的名字
-  const healerName = healer.name || healer.templateId;
-  const targetName = target.name || target.templateId;
-  
-  return {
-    success: true,
-    heal: actualHeal,
-    targetHp: target.currentHp,
-    message: `${healerName}为${targetName}回复${actualHeal}点生命值`
-  };
 }
 
 // 执行技能函数
 export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState): SkillExecutionResult {
+  const expectedSkillId = String((context as any)?.skill?.id ?? skillDef?.id ?? '')
+  try {
+    skillDef = assertSkillDefinition(expectedSkillId, skillDef, { requireExecutable: true })
+  } catch (error) {
+    rethrowAttachedEffectContentError(
+      battle,
+      error,
+      `SkillCode ${expectedSkillId || '<empty>'} has an invalid definition during an EffectBatch`,
+      {
+        sourceId: (context as any)?.piece?.instanceId,
+        skillId: expectedSkillId,
+        targetId: (context as any)?.target?.instanceId,
+      },
+    )
+    return { success: false, message: `技能定义无效: ${expectedSkillId || '<empty>'}` }
+  }
+  const sealedContent = beginSealedContentExecution(battle, skillDef)
   try {
     battleDebugLog('=== executeSkillFunction called ===');
     battleDebugLog('Skill ID:', skillDef.id);
@@ -2943,7 +5064,11 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     // 创建技能执行环境，包含辅助函数和效果函数
     const skillEnvironment = {
       // 上下文
-      context: { ...context, forceRemoveEnemyPieceById },
+      context: {
+        ...context,
+        forceRemoveEnemyPieceById,
+        summonQueue: sealedContent.summonQueue,
+      },
       // 源棋子（直接引用，可读写）
       sourcePiece,
       battle,
@@ -3066,7 +5191,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         if (targetPiece) {
           battleDebugLog(`[addRuleById] Found target piece: ${targetPiece.name}`);
           // 从文件中加载规则
-          const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD);
+          const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPieceId });
           if (rule) {
             battleDebugLog(`[addRuleById] Loaded rule: ${rule.id}, effect is function: ${typeof rule.effect === 'function'}`);
             // 创建规则对象的副本并添加关联状态标签数组
@@ -3123,6 +5248,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       addSkillById: (targetPieceId: string, skillId: string) => {
         const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
         if (targetPiece) {
+          if (!ensureSkillDefinitionForAddition(battle, skillId, targetPieceId)) return false;
           if (!targetPiece.skills) targetPiece.skills = [];
           const existingSkill = targetPiece.skills.find(skill => skill.skillId === skillId);
           if (!existingSkill) {
@@ -3132,10 +5258,6 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               const alreadyInDisplay = (targetPiece as any).displaySkills.some((s: any) =>
                 (typeof s === 'string' ? s : s.skillId) === skillId);
               if (!alreadyInDisplay) (targetPiece as any).displaySkills.push(newSkill);
-            }
-            if (!battle.skillsById[skillId]) {
-              const loaded = loadSkillById(skillId);
-              if (loaded) battle.skillsById[skillId] = loaded;
             }
             return true;
           }
@@ -3194,7 +5316,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           return false;
         }
         battleDebugLog(`[addPlayerRuleById] Found player: ${player.playerId}`);
-        const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD);
+        const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPlayerId });
         if (!rule) {
           battleDebugLog(`[addPlayerRuleById] Rule not found: ${ruleId}`);
           return false;
@@ -3218,6 +5340,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       addPlayerSkillById: (targetPlayerId: string, skillId: string) => {
         const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
         if (!player) return false;
+        if (!ensureSkillDefinitionForAddition(battle, skillId, targetPlayerId)) return false;
         if (!player.skills) player.skills = [];
         if (player.skills.some((s: any) => s.skillId === skillId)) return false;
         player.skills.push({ skillId, currentCooldown: 0 });
@@ -3321,6 +5444,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             surface: 'skillCode', contentId: skillDef.id, code: fullSkillCode, entry: 'executeSkill(context)',
           });
           let result = executeSkill(skillEnvironment);
+          finishSealedContentExecution(battle, sealedContent)
           
           battleDebugLog('Skill execution result:', result);
           battleDebugLog('result.needsOptionSelection:', result && result.needsOptionSelection);
@@ -3394,13 +5518,30 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           return result;
         }
       } catch (error) {
-        if (isSuspendableActionPending(error)) throw error
-        if ((error as any)?.needsOptionSelection || (error as any)?.needsTargetSelection) {
+        if (isEffectChainPendingSignal(error)) throw error
+        if (isEffectChainFatalError(error)) throw error
+        let isInteractionSignal = false
+        try {
+          isInteractionSignal = Boolean(
+            (error as any)?.needsOptionSelection || (error as any)?.needsTargetSelection,
+          )
+        } catch {
+          // Hostile thrown values are ordinary content failures, not interactions.
+        }
+        if (isInteractionSignal) {
           return error as SkillExecutionResult
         }
         console.error('Error executing skill code:', error);
         // 执行失败时，直接报错，不使用默认技能
-        throw new Error('技能执行失败: ' + (error instanceof Error ? error.message : '未知错误'));
+        let failureMessage = '未知错误'
+        try {
+          if (error instanceof Error && typeof error.message === 'string') {
+            failureMessage = error.message
+          }
+        } catch {
+          // Keep detached diagnostics total for hostile thrown values.
+        }
+        throw new Error('技能执行失败: ' + failureMessage);
       }
     }
 
@@ -3410,6 +5551,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
   } catch (error) {
     console.error('Error executing skill:', error)
     throw error;
+  } finally {
+    sealedContent.cleanup?.()
   }
 }
 

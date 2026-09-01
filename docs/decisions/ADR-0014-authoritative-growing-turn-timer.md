@@ -1,6 +1,6 @@
 # ADR-0014：服务端权威成长型回合计时
 
-> RED-138 取代说明：本文涉及公开初始/最终站位、个人重投与独立 45 秒部署锁定的条款只适用于 `legacy-reroll-v1` 和缺少 mode 的历史状态。新建对局默认使用 [ADR-0022](./ADR-0022-progressive-reserve-deployment.md) 的渐进部署，候选、落位和免费移动共用当前成长回合时限。
+> RED-138 取代说明：本文涉及公开初始/最终站位、个人重投与独立 45 秒部署锁定的条款只适用于 `legacy-reroll-v1` 和缺少 mode 的历史状态。新建对局默认使用 [ADR-0024](./ADR-0024-progressive-reserve-deployment.md) 的渐进部署，候选、落位和免费移动共用当前成长回合时限。
 
 - 状态：Proposed（等待 RED-36 人工验收）
 - 日期：2026-08-20

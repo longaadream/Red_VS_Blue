@@ -198,7 +198,7 @@ interface BattleReplayResult {
 | `getRuleMath()` / `getRuleDate()` | 给动态技能、规则和附加效果注入确定性的 `Math` / `Date` |
 | `createRootSeed()` | 从安全随机源创建 32 位根种子；不可用时失败关闭 |
 
-稳定命名流至少包括 legacy 的 `deployment`、`deployment-reroll`，渐进部署的 `progressive-deployment/opening-piece/<normalizedPlayerId>`、`opening-cell/<normalizedPlayerId>`、`offer/<normalizedPlayerId>`、`fallback/<normalizedPlayerId>`，以及 `turn-order`、`skill/effect`。实例 ID 使用独立命名空间。算法和兼容要求见 [ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md)，渐进消费合同见 [ADR-0022](../decisions/ADR-0022-progressive-reserve-deployment.md)。
+稳定命名流至少包括 legacy 的 `deployment`、`deployment-reroll`，渐进部署的 `progressive-deployment/opening-piece/<normalizedPlayerId>`、`opening-cell/<normalizedPlayerId>`、`offer/<normalizedPlayerId>`、`fallback/<normalizedPlayerId>`，以及 `turn-order`、`skill/effect`。实例 ID 使用独立命名空间。算法和兼容要求见 [ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md)，渐进消费合同见 [ADR-0024](../decisions/ADR-0024-progressive-reserve-deployment.md)。
 
 运行时是进程级同步作用域：规则执行不能跨异步边界持有它。没有 runtime 的训练/兼容入口仍可落到 `lib/game/rng.ts`，但权威房间入口不得依赖该回退。
 
@@ -380,7 +380,7 @@ flowchart TD
 - 每个自己的回合最多从当前 offer 部署 1 枚；成功前候选实例仍在预备区，成功后只有该实例离开一次。
 - 双方先锋先全部完成再第一次检查核心终局；先锋没有免费首移标签，第一名玩家的第 1 个自己的回合仍能部署 1 枚。
 - `gameStart` 只触发一次；渐进预备棋子只有实际入场时才发 `afterPieceSummoned`。
-- 渐进随机与状态细节由 [ADR-0022](../decisions/ADR-0022-progressive-reserve-deployment.md) 冻结，受控地图选择由 [ADR-0019](../decisions/ADR-0019-selectable-demo-maps.md) 冻结；旧重投由 ADR-0007/0009 仅作 legacy 兼容。
+- 渐进随机与状态细节由 [ADR-0024](../decisions/ADR-0024-progressive-reserve-deployment.md) 冻结，受控地图选择由 [ADR-0019](../decisions/ADR-0019-selectable-demo-maps.md) 冻结；旧重投由 ADR-0007/0009 仅作 legacy 兼容。
 
 ### 5.2 Windows LAN 玩家动作
 
@@ -619,7 +619,7 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 | 确定性运行时决策 | `docs/decisions/ADR-0004-deterministic-rule-runtime.md`（Accepted） |
 | 权威目标选择决策 | `docs/decisions/ADR-0005-authoritative-target-selection.md`（Proposed） |
 | 触发顺序决策 | `docs/decisions/ADR-0006-combat-trigger-ordering.md`（Accepted） |
-| 渐进部署决策 | `docs/decisions/ADR-0022-progressive-reserve-deployment.md`（Accepted） |
+| 渐进部署决策 | `docs/decisions/ADR-0024-progressive-reserve-deployment.md`（Accepted） |
 | Legacy 确定性部署决策 | `docs/decisions/ADR-0007-deterministic-deployment.md`（Accepted，仅兼容） |
 | 触发器原子性合同 | `docs/technical/COMBAT_TRIGGER_ATOMICITY_CONTRACT.md` |
 | 事件生产/消费审计 | `docs/technical/COMBAT_EVENT_PIPELINE_AUDIT.md` |
@@ -641,7 +641,7 @@ RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule 
 
 ## RED-31 2026-08-18 规则修订
 
-> RED-138 取代说明：本节“同步部署”中的 `awaiting-locks`、重投选择和独立 45 秒期限只适用于 `legacy-reroll-v1`；新建对局的双先锋与每回合渐进部署以本文 5.1、6.1 和 ADR-0022 为准。座位与先后手条款继续有效。
+> RED-138 取代说明：本节“同步部署”中的 `awaiting-locks`、重投选择和独立 45 秒期限只适用于 `legacy-reroll-v1`；新建对局的双先锋与每回合渐进部署以本文 5.1、6.1 和 ADR-0024 为准。座位与先后手条款继续有效。
 
 本节取代本文中由 `turn-order` 随机流决定 Demo PVP 先手、以及部署阶段使用 `awaiting-choices` 的旧说明。
 

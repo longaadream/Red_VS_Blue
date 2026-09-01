@@ -1,18 +1,19 @@
-# skillCode 兼容矩阵（RED-45 / RED-75 / RED-80 / RED-129）
+# skillCode 兼容矩阵（RED-45 / RED-75 / RED-80 / RED-129 / RED-139）
 
-状态：RED-80 已按批准方案移除不可达的 AttachedEffect 执行面；当前权威架构为 Rule + statusTag。RED-75 已按同步后的合同将 Node/浏览器差分矩阵由历史六类收敛并固化为五类现役执行面。RED-129 的可中断二阶段伤害使用可暂停 JSON Rule，不扩展 pending `effectCode` 的静态注入面。审计日期：2026-08-29。风险：RED-80 High（跨模块架构清理）；RED-75、RED-129 Medium（测试、规则与文档收口）。
+状态：RED-80 已按批准方案移除不可达的 AttachedEffect 执行面；当前权威架构为 Rule + statusTag。RED-75 将 Node/浏览器差分矩阵收敛为五类现役执行面；RED-129 不扩展 pending `effectCode`；RED-139 只在既有 surface 中加入 typed EffectChain writer，并将 summon 能力封闭绑定到两个获批内容。审计更新：2026-08-31。RED-139 风险：High。
 
-## RED-129 数据与生成 bundle 边界
+## RED-129 / RED-139 数据与生成 bundle 边界
 
 - JSON 中的 `skillCode`、技能 `code` 和 pending `effectCode` 可由运行时动态加载；动态加载只替换数据代码，不会替换静态引擎注入面。
 - pending `effectCode` 的上下文和 `lib/game/targeting.ts` 的动作合法性判断属于静态引擎能力；只导入 JSON 不会改变这些注入面。RED-129 不为 pending 上下文增加伤害 helper。
-- 按 RED-129 合同，本任务不修改或重建浏览器与 Android 的两个 `game-engine.js`。现有生成 bundle 是 RED-129 前快照；它不证明其他新增静态 targeting 能力，但可直接加载当前 JSON，因此用于验证本次两条数据规则的跨端兼容。
+- RED-129 当时没有重建 bundle；RED-139 因新增静态 EffectChain 能力必须运行 `npm.cmd run build:game-engine`，并以真实 `demon-summon-5` 权威动作比较 Node 与生成 bundle 的完整结果。历史冻结 bundle 结论不能替代本次构建证据。
 
 本矩阵区分三类证据：
 
 - **RED-75/80 历史运行时差分**：同一 fixture 分别由 Node 模块和当时生成的 `data/pages/js/game-engine.js` 执行，比较有序轨迹、关键结果和最终权威状态 hash。
 - **全量静态审计**：扫描所有数据代码字段，使用 TypeScript AST 验证语法和词法自由变量，再按生产注入面标记 `supported`、`ambient` 或 `unsupported`。
 - **RED-129 源码与冻结 bundle 回归**：源码测试验证 targeting 与 pending transaction；冻结浏览器 bundle 直接加载当前技能/规则 JSON，验证无限刃二段和黑色月牙落点的选择、取消与权威伤害。
+- **RED-139 动作级差分**：同一 seed/选择凭证执行真实恶魔召唤 `playCard`，比较 Node 与新构建 bundle 的完整 reducer 结果，并锁定 damage → attack +1 → sealed summon 的顺序。
 
 最小 fixture PASS 不等于每一条数据定义都可执行；全量静态审计结论仍单独保留。
 
@@ -32,15 +33,15 @@
 
 | Surface | 生产入口 / 签名 | 证据边界 | 语义差异与限制 |
 | --- | --- | --- | --- |
-| 规则 `skillCode` | `loadRuleById`；语句体获得 `battle`、`context` 和 helper | 真实 `rule-watcher-rage-dealt` 修改同一 context | 内联规则环境；内部异常被规则 wrapper 转为 `success:false` |
+| 规则 `skillCode` | `loadRuleById`；语句体获得 `battle`、`context` 和 helper | 真实 `rule-watcher-rage-dealt` 修改同一 context | 内联规则环境；普通失败可返回 `success:false`，pending 与 EffectChain fatal 必须原样穿透 |
 | 规则 `triggerSkill` | `loadRuleById` → 被引用技能执行环境 | 真实 `rule-divine-blessing` 修改伤害并消费状态 | 不等价于 inline `skillCode`；会适配并修改原触发 context |
-| 棋子技能 `code` | `executeSkillFunction`；`executeSkill(context)` | 最小技能经真实 action reducer 执行 | 支持技能选择与完整技能 helper；失败通常返回 `success:false` |
-| active/reactive 卡牌 `code` | `executeCardFunction`；`executeCard(context)` | active 卡经真实支付/弃牌路径执行 | 卡牌无保证的 `sourcePiece`；reactive 卡复用可修改触发 context |
+| 棋子技能 `code` | `executeSkillFunction`；`executeSkill(context)` | 最小技能经真实 action reducer 执行 | 支持技能选择与完整技能 helper；仅 `naruto-shadow-clone` 获得绑定 summon writer |
+| active/reactive 卡牌 `code` | `executeCardFunction`；`executeCard(context)` | active 卡经真实支付/弃牌路径执行 | 卡牌无保证的 `sourcePiece`；仅 `demon-summon-5` 获得绑定 summon writer |
 | pending target `effectCode` | `pendingTargetSelect`；序列化 `function(ctx)` | RED-75/80 历史差分验证 selection ID/revision | 闭包不可序列化；`ctx` 不提供权威伤害 helper，只注入确定性 `Math`/`Date`；二阶段伤害必须迁入可暂停 Rule |
 
-`pendingTargetSelection.effectCode` 中的 “effect” 只是“完成这次待选交互后执行的续接函数”的历史字段名，不是 AttachedEffect 实例，也不读取 `data/effects`。RED-80 明确保留 pending target/option 会话、选择 revision 和规则剩余队列。
+`pendingTargetSelection.effectCode` 中的 “effect” 只是“完成这次待选交互后执行的续接函数”的历史字段名，不是 AttachedEffect 实例，也不读取 `data/effects`。它不获得 EffectChain writer；pending target/option 会话保存根动作与答案记录，不保存规则剩余队列或半个 Batch ledger。
 
-历史运行时证据：`tests/game/skillcode-browser-differential.test.ts` 的五个表驱动 fixture，以及 `tests/game/skillcode-runtime-matrix.test.ts` 的 Node 最小执行面基线。它们证明 RED-75/80 当时的五类执行面，不证明 RED-129 新增静态能力已经进入 bundle。RED-129 由 `tests/game/red-129-rule-interactions.test.ts` 验证源码规则，并由 `tests/game/red-129-shishio-browser.test.ts` 验证冻结 bundle 动态加载当前 JSON 的两条二阶段规则。
+历史运行时证据：`tests/game/skillcode-browser-differential.test.ts` 的五个表驱动 fixture，以及 `tests/game/skillcode-runtime-matrix.test.ts` 的 Node 最小执行面基线。RED-129 由两组对应回归验证；RED-139 另由 `tests/game/engine-browser-differential.test.ts` 的真实恶魔召唤 fixture 验证新构建 bundle 中的跨类型 EffectChain。
 
 ## RED-75 统一 trace bridge
 
@@ -83,15 +84,17 @@ Remove-Item Env:RED75_TRACE_REPORT
 
 ### 规则 `skillCode`
 
-支持：`battle`、`context`、伤害/治疗、卡牌、Rule、statusTag、player rule/skill/status 增删 helper、`selectOption`、`fireEvent`、`Math`、`Date`。不再注入 `applyEffect`、`removeEffect`、`getPieceEffect`。
+支持：`battle`、`context`、伤害/治疗、卡牌、Rule、statusTag、player rule/skill/status 增删 helper、`selectOption`、`fireEvent`、`Math`、`Date`。Damage/Heal 生命周期的 `context` 可携带 typed `damageQueue` / `healQueue`；没有通用 `effectQueue`、公开 `deathQueue` 或任意 summon writer。不再注入 AttachedEffect helper。
 
 ### 技能 `code`
 
-支持完整技能选择/位移/伤害/治疗/Rule/statusTag/卡牌 helper、`fireEvent`、`Math`、`Date`、`console`。不再注入 AttachedEffect helper。
+支持完整技能选择/位移/伤害/治疗/Rule/statusTag/卡牌 helper、`fireEvent`、`Math`、`Date`、`console`。只有 ID 为 `naruto-shadow-clone` 的生产定义获得 content-bound `summonQueue`，且只接受对应 sealed recipe；其他技能没有该词法绑定。
 
 ### 卡牌 `code`
 
-支持 `context`、`battle`、`playerId`、选择、伤害/治疗、手牌、Rule/statusTag helper、`Math`、`Date`、`console`。
+支持 `context`、`battle`、`playerId`、选择、伤害/治疗、手牌、Rule/statusTag helper、`Math`、`Date`、`console`。只有 ID 为 `demon-summon-5` 的生产定义获得 content-bound `summonQueue`，且只接受基尔加丹恢复 recipe。
+
+不得从其他内容复制这两个绑定名来请求任意 Piece、规则列表、extension path 或 callback；capability/contentId/recipe 不匹配在权威动作中 fatal 并整体回滚。
 
 ### pending `effectCode`
 
@@ -105,7 +108,7 @@ Remove-Item Env:RED75_TRACE_REPORT
 
 ## RNG、克隆与恢复
 
-RED-28 提供命名随机流、规则时钟和确定性实例 ID。规则、技能、卡牌和 pending wrapper 使用注入的 `Math`/`Date`；固定 state/seed/action 的 Node/浏览器最终 hash 由 RED-75/80 历史差分测试验证。RED-129 的新增可暂停数据规则另由当前 JSON 对仓库冻结浏览器 bundle 的回归覆盖。
+RED-28 提供命名随机流、规则时钟和确定性实例 ID。规则、技能、卡牌和 pending wrapper 使用注入的 `Math`/`Date`；固定 state/seed/action 的 Node/浏览器最终 hash 由 RED-75/80 历史差分保留。RED-129 记录其冻结 bundle 边界；RED-139 重新生成 bundle，并以相同 seed、选择凭证和权威动作对完整 reducer 结果做差分。
 
 - `safeCloneBattleState` JSON 克隆状态，并由 loader 恢复规则/技能运行时函数；函数本身不进入权威状态 hash。
 - pending `effectCode` 保存字符串并在恢复时重新编译；闭包不保留是已记录的语义差异。

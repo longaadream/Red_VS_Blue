@@ -112,7 +112,7 @@
 - 创建者由独立 Relay 建房接口直接登记为 host，随后用 `claim-faction` 固化内容阵营；访客 `join` 同步固化内容阵营。`waiting`/`selecting` 页面切换不得写状态或提前开始战斗。
 - 独立 Relay 的 Prisma/PostgreSQL `Room.mapId` 是兼容旧行的可空列；迁移顺序必须是“不含 `mapId` 的既有三表 baseline”后接“只新增可空 `Room.mapId` 的增量迁移”。全新库依次部署两条；旧 `db push` 库先备份、把 baseline 标记为已应用，再部署增量，禁止生产试跑或重建表。代码回退停止读写该列但保留列；删除列仅允许在备份后另行人工批准。
 - 错误：非法、重复、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
-- 决策：[ADR-0022](../decisions/ADR-0022-progressive-reserve-deployment.md)。旧 `deploymentChoice` / `deploymentLock` 协议仅保留给 `legacy-reroll-v1`，见 [ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
+- 决策：[ADR-0024](../decisions/ADR-0024-progressive-reserve-deployment.md)。旧 `deploymentChoice` / `deploymentLock` 协议仅保留给 `legacy-reroll-v1`，见 [ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
 
 ### PVP alignment lock (RED-56)
 

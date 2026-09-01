@@ -240,29 +240,51 @@ if (mode === 'cancel') return { success: false, message: '已取消' };
 4. 防御、最低伤害及伤害类型处理；
 5. `beforeDamageShield`、`beforeDamageApplied`；
 6. 统一提交生命值变化；
-7. 派发后置事件、死亡/复活/墓地/充能等生命周期；
-8. 按 FIFO 处理 `damageQueue` 中的反伤或连锁伤害。
+7. 派发后置事件，并用内生 `DeathBatch` 完成死亡、复活、墓地和充能生命周期；
+8. 按 push sequence FIFO 处理共享 ledger 中的 `damageQueue`、`healQueue` 等获准 follow-up。
 
-嵌套触发器里不要再次直接调用 `dealDamage`。运行时会以 `RVB_DAMAGE_REENTRANT_CALL` 拒绝重入；反伤、溅射和后续伤害应排入 `damageQueue`，从而保留确定顺序并受深度、批次数预算保护。
+根技能/卡牌代码可以按明确的代码顺序多次调用 `dealDamage` 或 `healDamage`；同一权威动作中的这些 facade 共享唯一 `EffectChain` 和累计预算。scheduler 正在处理 Batch 或事件消费者时，不要再次直接调用 facade：Damage 保留 `RVB_DAMAGE_REENTRANT_CALL` ABI，其他重入以 `RVB_EFFECT_CHAIN_REENTRANT` 失败。反伤、溅射和后续伤害必须写入当前 context 提供的 `damageQueue`。
 
 ```js
 const result = dealDamage(sourcePiece, target, 4, 'physical');
 if (result?.pending) return result;
 ```
 
-运行时目前限制事件链深度 20、单链派发预算 100。不要用循环触发器绕过限制。
+每次权威根动作共享最大 Batch depth 20、四类合计 100 个 Batch、effect/trigger 合计 1000 次派发。现有单个 `fireEvent` root 的 depth 20 / 100 次局部防线同时保留；切换效果类型、再次调用 facade 或新建事件 root 都不会重置动作级预算。
 
 ### 6.2 `healDamage(source, targets, amount, options?)`
 
-单目标治疗会依次经过 `beforeHealDealt`、`beforeHealTaken`、实际治疗和后置事件，同样不应直接修改生命值。
+单目标是一个只有一个目标的 `HealBatch`；数组输入是一个真正的多目标 Batch。运行时先验证唯一、仍在场且存活的目标，按 `instanceId` 稳定顺序准备，再执行：
 
-当前实现的多目标治疗存在一个需要作者知道的兼容细节：数组入口会先派发一次批次级 `beforeHealDealt`，随后递归处理每个目标时又分别派发该事件。也就是说，它不是“全批次严格只触发一次”。在运行时统一前，不要编写依赖该事件精确一次的群体治疗规则；使用固定种子回放验证具体触发次数，并把新规则写入独立修复任务。
+1. 每 Batch 恰好一次 `beforeHealDealt`；
+2. 每目标恰好一次 `beforeHealTaken`，读取该目标最终修改后的治疗值；
+3. 所有未 blocked 目标基于同一批开始 HP 计算结果并统一提交；
+4. 提交后按稳定目标顺序派发 blocked 或 `afterHealDealt` / `afterHealTaken`；
+5. 返回的 `results` 和 `heals` 仍与调用方输入顺序对齐。
 
-### 6.3 “同时”语义白名单（未来合同，尚未全部实现）
+治疗消费者中的后续治疗或伤害必须分别写入 `healQueue` / `damageQueue`。queue writer 只登记请求，不同步返回未来结果。例如：
 
-项目已决定：只有 **Damage、Heal、Summon、Death** 四类效果可以定义批次式“同时”语义。这里的“同时”不是多线程并发，而是同一批次先校验并准备所有目标，统一提交该批次的主状态变化，再按稳定顺序串行处理事件与后续效果。Queue 只负责确定性调度和连锁，不能单独提供同时语义。
+```js
+context.healQueue.push({
+  healer: context.source,
+  target: context.source,
+  heal: 2,
+  skillId: 'rule-reap'
+});
+```
 
-当前只有 Damage 已具备正式 `DamageBatch` 与 `damageQueue` 合同。Heal 仍存在上一节所述的递归兼容行为，现役 context **没有** `healQueue`；Summon 和 Death 也没有向 SkillCode 作者公开可直接写入的批次队列。相关运行时设计与迁移由 [RED-139](https://linear.app/redvsblue/issue/RED-139/建立四类确定性-effectbatchqueue-并冻结同时语义白名单) 跟踪，在该任务完成并更新本手册前，不得在内容代码中使用或模拟 `healQueue`、`summonQueue`、`deathQueue` 或无类型 `effectQueue`。
+`beforeHealDealt` 若 source-wide blocked，整批不提交 HP，也不派发每目标 before/after；单个 `beforeHealTaken` blocked 只阻止该目标。不要直接写 `currentHp` 来模拟批次治疗。
+
+### 6.3 “同时”语义白名单（现役合同）
+
+只有 **Damage、Heal、Summon、Death** 四类效果可以定义批次式“同时”语义。这里的“同时”不是多线程并发，而是同一 Batch 先校验并准备全部请求，在该类明确的 checkpoint 统一提交主状态，再按稳定顺序串行处理 after/lifecycle 与 follow-up。Queue 只负责确定性调度和连锁，不能单独提供同时语义。
+
+运行时只接受封闭的 `damage | heal | summon | death` 联合，并把 typed writer 写入同一 FIFO ledger：
+
+- Damage/Heal 生命周期 context 可获得 `damageQueue` 与 `healQueue`；
+- `summonQueue` 只对已绑定的鸣人影分身和恶魔召唤 sealed recipe，以及内部 template handler 开放；新增内容不得假定它自动可用；
+- `deathQueue` 首版仅供内部 handler 使用，内容代码不得主动写入；
+- 不存在 callback、自定义 kind 或无类型 `effectQueue`。需要第五类“同时”效果时必须先建立新的产品合同和 ADR，不能在内容层模拟。
 
 移动、传送、状态、驱散、资源、手牌、技能替换、地格和投射物等其他效果只允许按明确顺序逐项结算。内容作者不得借用上述四类队列包装其他副作用，也不得把数组遍历或 Queue 描述成同时提交。
 
