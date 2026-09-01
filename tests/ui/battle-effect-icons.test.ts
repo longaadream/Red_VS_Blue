@@ -52,11 +52,15 @@ describe('RED-165 battle effect icon registry', () => {
     expect(Object.keys(icons.statusRegistry).sort()).toEqual(expect.arrayContaining(discovered))
     for (const type of discovered) {
       const meta = icons.resolveStatusType(type)
-      expect(['board', 'detail', 'hidden'], type).toContain(meta.visibility)
+      expect(['board', 'hidden'], type).toContain(meta.visibility)
       expect(meta.iconId, type).toBeTruthy()
       expect(meta.assetPath, type).toMatch(/^\/[a-z0-9/_-]+\.svg$/)
       expect(meta.assetPath, type).not.toMatch(/[\u{1F000}-\u{1FAFF}\uFE0F]/u)
     }
+    const registryEntries = Object.values(icons.statusRegistry) as Array<{ visibility: string }>
+    const playerFacing = registryEntries.filter((meta) => meta.visibility !== 'hidden')
+    expect(playerFacing.length).toBeGreaterThan(30)
+    expect(playerFacing.every((meta) => meta.visibility === 'board')).toBe(true)
   })
 
   it('keeps named mechanics distinct, shares semantic fallbacks, and hard-hides bookkeeping', () => {
@@ -70,7 +74,7 @@ describe('RED-165 battle effect icon registry', () => {
     expect(icons.resolveStatusType('divine-shield')).toMatchObject({
       iconId: 'divine-shield',
       category: 'shield',
-      visibility: 'detail',
+      visibility: 'board',
     })
     expect(icons.resolveStatusType('freeze')).toMatchObject({ iconId: 'freeze', visibility: 'board' })
     expect(icons.resolveStatusType('chidori-immobile').iconId)
@@ -88,7 +92,7 @@ describe('RED-165 battle effect icon registry', () => {
     expect(icons.resolveStatus({ type: 'future-visible-effect' })).toMatchObject({
       iconId: 'fallback',
       category: 'unknown',
-      visibility: 'detail',
+      visibility: 'board',
       assetPath: '/effect-icons/fallback.svg',
     })
     expect(icons.badge({ stacks: 3, currentDuration: 2, currentUses: 1, intensity: 8 })).toEqual({
@@ -158,7 +162,7 @@ describe('RED-165 battle effect icon registry', () => {
       type: 'divine-shield',
       iconId: 'divine-shield',
       iconPath: '/effect-icons/divine-shield.svg',
-      visibility: 'detail',
+      visibility: 'board',
     })
     expect(model.selection.piece.statuses[1]).toMatchObject({ iconId: 'fallback' })
     expect(model.presentationEvents).toEqual([expect.objectContaining({

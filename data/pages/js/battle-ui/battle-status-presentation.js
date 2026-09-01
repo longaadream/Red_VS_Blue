@@ -9,6 +9,7 @@
     glyph: '•',
     description: '状态详情由当前权威快照提供。',
     negative: false,
+    visibility: 'board',
   }
 
   function resolve(status) {
@@ -18,7 +19,7 @@
       : DEFAULT_DETAIL
   }
 
-  function boardSummary(statuses) {
+  function boardEntries(statuses) {
     return (statuses || [])
       .map(function (status, index) {
         return { status: status, meta: resolve(status), index: index }
@@ -27,7 +28,19 @@
       .sort(function (left, right) {
         return right.meta.priority - left.meta.priority || left.index - right.index
       })
-      .slice(0, MAX_BOARD_STATUSES)
+  }
+
+  function boardOverview(statuses) {
+    const all = boardEntries(statuses)
+    return {
+      items: all.slice(0, MAX_BOARD_STATUSES),
+      all: all,
+      overflowCount: Math.max(0, all.length - MAX_BOARD_STATUSES),
+    }
+  }
+
+  function boardSummary(statuses) {
+    return boardOverview(statuses).items
   }
 
   function durationValue(status) {
@@ -57,6 +70,8 @@
   root.BattleStatusPresentation = {
     MAX_BOARD_STATUSES: MAX_BOARD_STATUSES,
     resolve: resolve,
+    boardEntries: boardEntries,
+    boardOverview: boardOverview,
     boardSummary: boardSummary,
     durationValue: durationValue,
     detailText: detailText,

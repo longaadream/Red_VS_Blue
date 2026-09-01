@@ -813,6 +813,44 @@
   }
 
   // ── Piece summary overlay ─────────────────────────────────────────────────────
+  function _statusBadgeText(status) {
+    const registry = window.BattleEffectIcons
+    const values = registry && typeof registry.badge === 'function'
+      ? registry.badge(status)
+      : status || {}
+    const stacks = Number(values.stacks)
+    const uses = Number(values.uses)
+    const duration = Number(values.duration)
+    const intensity = Number(values.intensity)
+    if (Number.isFinite(stacks) && stacks > 1) return String(stacks)
+    if (Number.isFinite(uses) && uses > 0) return String(uses)
+    if (Number.isFinite(duration) && duration > 0) return String(duration)
+    if (Number.isFinite(intensity) && intensity > 1) return String(intensity)
+    return ''
+  }
+
+  function _statusIconPath(entry) {
+    return entry.status.iconPath || entry.status.assetPath || entry.meta.assetPath || '/effect-icons/fallback.svg'
+  }
+
+  function _renderStatusIcon(container, entry, compact) {
+    const icon = document.createElement('img')
+    icon.className = compact ? 'piece-board-status-image' : 'piece-board-status-list-image'
+    icon.setAttribute('src', _statusIconPath(entry))
+    icon.setAttribute('alt', '')
+    icon.setAttribute('aria-hidden', 'true')
+    const badgeText = _statusBadgeText(entry.status)
+    const children = [icon]
+    if (badgeText) {
+      const badge = document.createElement('b')
+      badge.className = compact ? 'piece-board-status-badge' : 'piece-board-status-list-badge'
+      badge.textContent = badgeText
+      badge.setAttribute('aria-hidden', 'true')
+      children.push(badge)
+    }
+    container.replaceChildren(...children)
+  }
+
   function _createPieceSummaryEl(piece) {
     const wrap = document.createElement('div')
     wrap.className = 'piece-board-summary'
@@ -823,6 +861,40 @@
     const statuses = document.createElement('span')
     statuses.className = 'piece-board-statuses'
     statuses.hidden = true
+    const overflow = document.createElement('button')
+    overflow.className = 'piece-board-status-overflow'
+    overflow.setAttribute('type', 'button')
+    overflow.setAttribute('aria-expanded', 'false')
+    overflow.hidden = true
+    const popover = document.createElement('span')
+    popover.className = 'piece-board-status-popover'
+    popover.setAttribute('role', 'group')
+    popover.setAttribute('aria-label', '全部状态')
+    popover.setAttribute('aria-hidden', 'true')
+    const popoverId = 'piece-statuses-' + String(piece.id).replace(/[^a-zA-Z0-9_-]/g, '-')
+    popover.id = popoverId
+    overflow.setAttribute('aria-controls', popoverId)
+    const setDisclosureExpanded = function (expanded) {
+      overflow.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+      popover.setAttribute('aria-hidden', expanded ? 'false' : 'true')
+    }
+    overflow.addEventListener('focus', function () { setDisclosureExpanded(true) })
+    overflow.addEventListener('blur', function () {
+      statuses.dataset.open = 'false'
+      setDisclosureExpanded(false)
+    })
+    overflow.addEventListener('mouseenter', function () { setDisclosureExpanded(true) })
+    overflow.addEventListener('mouseleave', function () {
+      setDisclosureExpanded(statuses.dataset.open === 'true')
+    })
+    overflow.addEventListener('click', function (event) {
+      if (event && typeof event.stopPropagation === 'function') event.stopPropagation()
+      const expanded = statuses.dataset.open !== 'true'
+      statuses.dataset.open = expanded ? 'true' : 'false'
+      setDisclosureExpanded(expanded)
+    })
+    statuses.appendChild(overflow)
+    statuses.appendChild(popover)
     wrap.appendChild(health)
     wrap.appendChild(statuses)
     _hpLayer.appendChild(wrap)
@@ -841,13 +913,21 @@
     }
 
     const presentation = window.BattleStatusPresentation
-    const summary = presentation
-      ? presentation.boardSummary(piece.statusSummary || [])
-      : (piece.statusSummary || []).slice(0, 2).map(status => ({ status, meta: { color: '#a78bfa' } }))
+    const overview = presentation && typeof presentation.boardOverview === 'function'
+      ? presentation.boardOverview(piece.statusSummary || [])
+      : (function () {
+          const all = (piece.statusSummary || []).map(status => ({
+            status,
+            meta: { color: '#a78bfa', assetPath: status.iconPath || '/effect-icons/fallback.svg' },
+          }))
+          return { items: all.slice(0, 2), all, overflowCount: Math.max(0, all.length - 2) }
+        })()
+    const summary = overview.items
     const statuses = obj.summaryEl.querySelector('.piece-board-statuses')
     if (statuses) {
       const existing = new Map()
       Array.from(statuses.children || []).forEach(function (dot) {
+        if (!String(dot.className || '').split(/\s+/).includes('piece-board-status-dot')) return
         existing.set(dot.dataset.statusId, dot)
       })
       const desired = new Set()
@@ -864,11 +944,13 @@
         } else {
           dot = document.createElement('span')
           dot.className = 'piece-board-status-dot is-entering'
-          statuses.appendChild(dot)
+          statuses.insertBefore(dot, statuses.querySelector('.piece-board-status-overflow'))
         }
         dot.style.setProperty('--status-color', entry.meta.color)
         dot.dataset.statusId = statusId
         dot.title = entry.status.label || entry.status.id || ''
+        dot.setAttribute('aria-hidden', 'true')
+        _renderStatusIcon(dot, entry, true)
       })
       existing.forEach(function (dot, statusId) {
         if (desired.has(statusId) || obj.statusExitTimers.has(statusId)) return
@@ -876,19 +958,46 @@
         const timer = setTimeout(function () {
           dot.remove()
           obj.statusExitTimers.delete(statusId)
-          if (!statuses.children.length) statuses.hidden = true
+          if (statuses.dataset.totalCount === '0') statuses.hidden = true
         }, MOTION_TOKENS.fast - 20)
         obj.statusExitTimers.set(statusId, timer)
       })
-      statuses.hidden = summary.length === 0 && existing.size === 0
+      const overflow = statuses.querySelector('.piece-board-status-overflow')
+      const popover = statuses.querySelector('.piece-board-status-popover')
+      if (overflow) {
+        overflow.hidden = overview.overflowCount === 0
+        overflow.textContent = '+' + overview.overflowCount
+        overflow.setAttribute('aria-label', '查看全部 ' + overview.all.length + ' 个状态')
+        overflow.setAttribute('aria-expanded', 'false')
+        if (popover) popover.setAttribute('aria-hidden', 'true')
+        statuses.dataset.open = 'false'
+      }
+      if (popover) {
+        const rows = overview.all.map(function (entry) {
+          const row = document.createElement('span')
+          row.className = 'piece-board-status-list-item'
+          const iconSlot = document.createElement('span')
+          iconSlot.className = 'piece-board-status-list-icon'
+          _renderStatusIcon(iconSlot, entry, false)
+          const label = document.createElement('span')
+          label.className = 'piece-board-status-list-label'
+          label.textContent = entry.status.label || entry.status.id || '未知状态'
+          row.appendChild(iconSlot)
+          row.appendChild(label)
+          return row
+        })
+        popover.replaceChildren(...rows)
+      }
+      statuses.dataset.totalCount = String(overview.all.length)
+      statuses.hidden = overview.all.length === 0 && existing.size === 0
     }
 
-    const statusNames = summary.map(function (entry) { return entry.status.label || entry.status.id }).filter(Boolean)
+    const statusNames = overview.all.map(function (entry) { return entry.status.label || entry.status.id }).filter(Boolean)
     const accessible = (piece.name || piece.id) + '\uff0c\u751f\u547d ' + currentHp + ' / ' + maxHp
-      + (statusNames.length ? '\uff0c\u8d1f\u9762\u72b6\u6001 ' + statusNames.join('\u3001') : '')
+      + (statusNames.length ? '\uff0c\u72b6\u6001 ' + statusNames.join('\u3001') : '')
     obj.summaryEl.dataset.health = currentHp + '/' + maxHp
-    obj.summaryEl.dataset.statusCount = String(summary.length)
-    obj.summaryEl.dataset.statusIds = summary.map(function (entry) { return entry.status.id || '' }).join(',')
+    obj.summaryEl.dataset.statusCount = String(overview.all.length)
+    obj.summaryEl.dataset.statusIds = overview.all.map(function (entry) { return entry.status.id || '' }).join(',')
     obj.summaryEl.setAttribute('aria-label', accessible)
     obj.summaryEl.title = accessible
     obj.summaryEl.style.display = piece.visible !== false ? '' : 'none'

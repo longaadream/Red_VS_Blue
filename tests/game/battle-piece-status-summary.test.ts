@@ -68,7 +68,7 @@ describe('battle piece health and negative-status summary', () => {
       label: '本回合首次移动免费',
       iconId: 'free-move',
       iconPath: '/effect-icons/free-move.svg',
-      visibility: 'detail',
+      visibility: 'board',
       description: '',
       stacks: 0,
       duration: 1,
@@ -78,7 +78,7 @@ describe('battle piece health and negative-status summary', () => {
     expect(statusPresentation.detailText(firstMoveTag)).toBe('剩余：1回合 · 剩余：1次')
   })
 
-  it('keeps every authoritative status in detail while selecting at most two negative summaries', () => {
+  it('keeps every player-facing status board-reachable while selecting two compact icon slots', () => {
     const window: Record<string, unknown> = {}
     loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
     const statusPresentation = loadBrowserModule(
@@ -103,6 +103,7 @@ describe('battle piece health and negative-status summary', () => {
     })
     const details = model.selection.piece.statusSummary
     const board = statusPresentation.boardSummary(details)
+    const overview = statusPresentation.boardOverview(details)
 
     expect(details).toHaveLength(5)
     expect(details[0]).toMatchObject({
@@ -117,10 +118,12 @@ describe('battle piece health and negative-status summary', () => {
     expect(details.map((status: { duration: number }) => status.duration)).toEqual([2, 2, 3, 2, 1])
     expect(board.map((entry: { status: { id: string } }) => entry.status.id)).toEqual(['sleep-1', 'freeze-1'])
     expect(board).toHaveLength(statusPresentation.MAX_BOARD_STATUSES)
+    expect(overview.all).toHaveLength(5)
+    expect(overview.overflowCount).toBe(3)
     expect(rawStatuses).toEqual(inputBefore)
   })
 
-  it('renders 0/1/2/3+ negative states without empty markers or horizontal overflow', () => {
+  it('renders 0/1/2 compact slots and reports overflow for 3+ visible states', () => {
     const window: Record<string, unknown> = {}
     loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
     const statusPresentation = loadBrowserModule(
@@ -141,6 +144,7 @@ describe('battle piece health and negative-status summary', () => {
       statusPresentation.boardSummary(negatives.slice(0, 2)).length,
       statusPresentation.boardSummary(negatives).length,
     ]).toEqual([0, 1, 2, 2])
+    expect(statusPresentation.boardOverview(negatives).overflowCount).toBe(2)
     expect(statusPresentation.detailText(negatives[3])).toContain('3层')
     expect(statusPresentation.detailText(negatives[3])).toContain('2回合')
   })

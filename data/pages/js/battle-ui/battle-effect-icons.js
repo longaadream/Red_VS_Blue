@@ -28,7 +28,7 @@
     }, overrides || {}))
   }
 
-  const statusRegistry = Object.freeze({
+  const statusDefinitions = Object.freeze({
     'amaterasu-burn': entry('damage-over-time', VISIBILITY.BOARD, { iconId: 'amaterasu', assetPath: '/tile-effects/amaterasu.svg', label: '天照', priority: 260 }),
     'anti-heal': entry('disable', VISIBILITY.BOARD, { iconId: 'anti-heal', assetPath: '/effect-icons/anti-heal.svg', label: '禁疗', priority: 440 }),
     'arthas-slow': entry('control', VISIBILITY.BOARD, { iconId: 'slow', assetPath: '/effect-icons/slow.svg', label: '减速', priority: 320 }),
@@ -75,6 +75,17 @@
     'venom-corrosion-immobile': entry('control', VISIBILITY.BOARD, { label: '腐蚀定身' }),
   })
 
+  // Every player-meaningful status has a battlefield entry. The renderer
+  // controls density with two icon slots plus an overflow disclosure; only
+  // bookkeeping markers remain hidden.
+  const statusRegistry = Object.freeze(Object.keys(statusDefinitions).reduce(function (registry, type) {
+    const definition = statusDefinitions[type]
+    registry[type] = definition.visibility === VISIBILITY.HIDDEN
+      ? definition
+      : Object.freeze(Object.assign({}, definition, { visibility: VISIBILITY.BOARD }))
+    return registry
+  }, {}))
+
   const actionRegistry = Object.freeze({
     'action-move': entry('mark', VISIBILITY.DETAIL, { iconId: 'action-move', assetPath: '/effect-icons/action-move.svg', label: '移动' }),
     'action-skill': entry('transformation', VISIBILITY.DETAIL, { iconId: 'action-skill', assetPath: '/effect-icons/action-skill.svg', label: '技能' }),
@@ -89,7 +100,8 @@
     shield: entry('shield', VISIBILITY.DETAIL),
   })
 
-  const fallback = entry('unknown', VISIBILITY.DETAIL)
+  const statusFallback = entry('unknown', VISIBILITY.BOARD)
+  const actionFallback = entry('unknown', VISIBILITY.DETAIL)
   const forcedHidden = entry('internal', VISIBILITY.HIDDEN)
 
   function statusType(status) {
@@ -98,7 +110,7 @@
   }
 
   function resolveStatusType(type) {
-    return statusRegistry[String(type || '')] || fallback
+    return statusRegistry[String(type || '')] || statusFallback
   }
 
   function resolveStatus(status) {
@@ -107,7 +119,7 @@
   }
 
   function resolveAction(iconId) {
-    return actionRegistry[String(iconId || '')] || fallback
+    return actionRegistry[String(iconId || '')] || actionFallback
   }
 
   function value(status, keys) {
