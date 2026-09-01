@@ -20,6 +20,7 @@ import { toPublicBattleState } from './game/deployment'
 import {
   getCurrentInputOwnerPlayerId,
   isTurnTimerEnabled,
+  projectPendingTimer,
   projectTurnTimer,
 } from './game/turn-timer'
 import {
@@ -197,13 +198,17 @@ function projectCommittedBattleSnapshot(
   viewerPlayerId?: string,
 ): PublicBattleSnapshot {
   const state = toPublicBattleState(source.state, viewerPlayerId)
+  if (state.turnTimer?.pendingResponse) delete state.turnTimer.pendingResponse
   return {
     ...source.snapshot,
     state,
     stateHash: buildBattleStateHashIndex(state, hashStable).rootHash,
     turnTimer: state.terminalResult || !isTurnTimerEnabled()
       ? undefined
-      : projectTurnTimer(state.turnTimer, source.snapshot.serverNow),
+      : projectTurnTimer(source.state.turnTimer, source.snapshot.serverNow),
+    pendingTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectPendingTimer(source.state.turnTimer, source.snapshot.serverNow),
   }
 }
 
