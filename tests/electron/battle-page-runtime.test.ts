@@ -462,6 +462,87 @@ describe('battle page runtime source', () => {
     }))
   })
 
+  it('submits a legal dropped move once and rejects non-highlighted or invalid drops', () => {
+    const html = readBattlePage()
+    const doAction = vi.fn()
+    const setStatusMsg = vi.fn()
+    const closePieceContextMenu = vi.fn()
+    const context = vm.createContext({ doAction, setStatusMsg, closePieceContextMenu, Set, Number })
+
+    vm.runInContext(`
+      let G = {
+        pieces: [
+          { instanceId: 'piece-1', ownerPlayerId: 'player-red', currentHp: 10, x: 1, y: 1 },
+          { instanceId: 'piece-2', ownerPlayerId: 'player-blue', currentHp: 10, x: 2, y: 2 },
+        ],
+      }
+      let myPlayerId = 'player-red'
+      let selectedPieceId = 'piece-1'
+      let pendingMove = true
+      let validMoves = new Set(['2,1'])
+      let pendingActionFeedback = null
+      let targetSubmissionPending = null
+      let pendingSkill = null
+      let pendingCardAction = null
+      ${runtimeFunction(html, 'moveSelectedPieceToCell')}
+    `, context)
+
+    expect(vm.runInContext("moveSelectedPieceToCell('piece-1', 2, 1)", context)).toBe(true)
+    expect(doAction).toHaveBeenCalledTimes(1)
+    expect(doAction).toHaveBeenCalledWith({ type: 'move', playerId: 'player-red', pieceId: 'piece-1', toX: 2, toY: 1 })
+    expect(vm.runInContext("moveSelectedPieceToCell('piece-1', 2, 1)", context)).toBe(false)
+    expect(doAction).toHaveBeenCalledTimes(1)
+
+    vm.runInContext('pendingMove = true; validMoves = new Set()', context)
+    expect(vm.runInContext("moveSelectedPieceToCell('piece-1', 2, 2)", context)).toBe(false)
+    expect(vm.runInContext("moveSelectedPieceToCell('piece-1', null, null)", context)).toBe(false)
+    expect(doAction).toHaveBeenCalledTimes(1)
+    expect(setStatusMsg).toHaveBeenCalledWith('无法移动到该位置')
+  })
+
+  it('automatically queries move cells for an eligible selection and clears them for target mode', () => {
+    const html = readBattlePage()
+    const queryMoveCells = vi.fn(() => new Set(['2,1']))
+    const context = vm.createContext({
+      window: { BattleLegalActions: { queryMoveCells } },
+      BattleLegalActions: { queryMoveCells },
+      GameEngine: {},
+      Set,
+    })
+
+    vm.runInContext(`
+      let G = {
+        pieces: [{ instanceId: 'piece-1', ownerPlayerId: 'player-red', currentHp: 10, x: 1, y: 1 }],
+        players: [{ playerId: 'player-red' }],
+        turn: { currentPlayerId: 'player-red', phase: 'action' },
+      }
+      let myPlayerId = 'player-red'
+      let selectedPieceId = 'piece-1'
+      let pendingMove = false
+      let validMoves = new Set()
+      let pendingSkill = null
+      let pendingCardAction = null
+      let pendingActionFeedback = null
+      let targetSubmissionPending = null
+      let placingMode = false
+      const SPECTATE_MODE = false
+      const TRAINING_MODE = false
+      function progressiveDeploymentPending() { return false }
+      function _updatePendingSkillTargets() {}
+      ${runtimeFunction(html, 'refreshBattleLegalActions')}
+    `, context)
+
+    vm.runInContext('refreshBattleLegalActions()', context)
+    expect(queryMoveCells).toHaveBeenCalledTimes(1)
+    expect(vm.runInContext('pendingMove', context)).toBe(true)
+    expect(vm.runInContext("validMoves.has('2,1')", context)).toBe(true)
+
+    vm.runInContext("pendingSkill = { skillId: 'skill-1' }; refreshBattleLegalActions()", context)
+    expect(queryMoveCells).toHaveBeenCalledTimes(1)
+    expect(vm.runInContext('pendingMove', context)).toBe(false)
+    expect(vm.runInContext('validMoves.size', context)).toBe(0)
+  })
+
   it('defers and coalesces pending-action presentation until the next animation frame', () => {
     const html = readBattlePage()
     let boardRenders = 0

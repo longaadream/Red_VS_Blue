@@ -19,6 +19,12 @@ function loadContextLayout() {
       menu: { width: number; height: number },
       bounds: { width: number; height: number; topPadding?: number },
     ): { left: number; top: number; side: string; originX: number; originY: number }
+    placeEdgeDock(
+      anchor: { left: number; top: number },
+      menu: { width: number; height: number },
+      bounds: { width: number; height: number; topPadding?: number; bottomPadding?: number },
+      previousSide?: string | null,
+    ): { left: number; top: number; side: string; originX: number; originY: number }
   }
 }
 
@@ -67,6 +73,38 @@ describe('battle contextual layout', () => {
       expect(placed.top + 112).toBeLessThanOrEqual(292)
       expect(placed.originX).toBeGreaterThanOrEqual(0)
       expect(placed.originY).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('docks the piece menu on the opposite edge with safe-area clamping and center hysteresis', () => {
+    const layout = loadContextLayout()
+    const leftDock = layout.placeEdgeDock(
+      { left: 980, top: 360 },
+      { width: 180, height: 220 },
+      { width: 1280, height: 720, topPadding: 64, bottomPadding: 150 },
+    )
+    const rightDock = layout.placeEdgeDock(
+      { left: 220, top: 360 },
+      { width: 180, height: 220 },
+      { width: 1280, height: 720, topPadding: 64, bottomPadding: 150 },
+    )
+    const stableLeft = layout.placeEdgeDock(
+      { left: 615, top: 360 },
+      { width: 180, height: 220 },
+      { width: 1280, height: 720, topPadding: 64, bottomPadding: 150 },
+      'left',
+    )
+
+    expect(leftDock.side).toBe('left')
+    expect(leftDock.left).toBe(8)
+    expect(rightDock.side).toBe('right')
+    expect(rightDock.left).toBe(1092)
+    expect(stableLeft.side).toBe('left')
+    for (const placed of [leftDock, rightDock, stableLeft]) {
+      expect(placed.top).toBeGreaterThanOrEqual(64)
+      expect(placed.top + 220).toBeLessThanOrEqual(570)
+      expect(placed.originY).toBeGreaterThanOrEqual(0)
+      expect(placed.originY).toBeLessThanOrEqual(220)
     }
   })
 })
