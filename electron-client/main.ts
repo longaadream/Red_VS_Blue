@@ -411,6 +411,7 @@ async function stopChildProcessGracefully(
 }
 
 async function killServer(requireDurable = false, invalidateOpening = true): Promise<void> {
+  localAuthorityExitExpected = true
   const finishShutdown = localGameLifecycle.beginShutdown(invalidateOpening)
   try {
     const startup = localGameStartupPromise
@@ -445,6 +446,7 @@ async function killServer(requireDurable = false, invalidateOpening = true): Pro
 }
 
 function forceKillServer(): void {
+  localAuthorityExitExpected = true
   localGameReady = false
   localAuthorityProfileIdentity = null
   if (gameServerProcess) {
@@ -498,6 +500,9 @@ let localProfileIdentity: GameProfileIdentity | null = null
 let localAuthorityProfileIdentity: GameProfileIdentity | null = null
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
+let localAuthorityExitExpected = false
+let localAuthorityAutoRestartUsed = false
+let localAuthorityRecoveryPromise: Promise<void> | null = null
 type ProfileProcessBinding = {
   reference?: DesktopProfileReference
   profileRoot: string
@@ -757,6 +762,7 @@ async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBindin
   const binding = profileBinding ?? stableProfileBinding()
   const databaseUrl = await resolveAuthorityDatabaseUrl()
   console.log(`[client] Colyseus/PostgreSQL game port: ${actualGamePort}`)
+  localAuthorityExitExpected = false
   gameServerProcess = spawn(getNodeBin(), [entry], {
     cwd: appRoot,
     env: {
@@ -803,6 +809,7 @@ async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBindin
   const spawned = gameServerProcess
   spawned.on('error', error => console.error('[client] Colyseus authority error:', error))
   spawned.on('exit', code => {
+    const expectedExit = localAuthorityExitExpected
     lastServerExitCode = code
     if (gameServerProcess === spawned) {
       gameServerProcess = null
@@ -811,6 +818,7 @@ async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBindin
     }
     console.log(`[client] Colyseus authority exited: ${code}`)
     if (lastServerStderr) console.error('[client] last Colyseus stderr:', lastServerStderr.slice(-500))
+    if (!expectedExit) void recoverUnexpectedLocalAuthorityExit(code)
   })
   localGameReady = await waitForGameAuthorityReady(actualGamePort)
   if (!localGameReady) {
@@ -824,6 +832,31 @@ async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBindin
     localAuthorityProfileIdentity = null
     throw error
   }
+}
+
+function recoverUnexpectedLocalAuthorityExit(code: number | null): Promise<void> {
+  if (localAuthorityRecoveryPromise) return localAuthorityRecoveryPromise
+  const recovery = (async () => {
+    abortLocalMatchToConnectScreen(
+      `本局已终止：本机战斗服务意外退出（code ${code ?? 'unknown'}）。正在尝试一次自动重启。`,
+    )
+    if (localAuthorityAutoRestartUsed || localGameLifecycle.shutdownInProgress || allowAppExit) return
+    localAuthorityAutoRestartUsed = true
+    await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      await startLocalGameAuthority(stableProfileBinding())
+      abortLocalMatchToConnectScreen(localGameReady
+        ? '上一局已终止；本机战斗服务已恢复。请点击“使用本机服务器”创建新房间。'
+        : '上一局已终止；本机战斗服务自动重启失败，请保留日志后手动重试。')
+    } catch (error) {
+      console.error('[client] bounded Colyseus authority restart failed:', error)
+      abortLocalMatchToConnectScreen('上一局已终止；本机战斗服务自动重启失败，请保留日志后手动重试。')
+    }
+  })()
+  localAuthorityRecoveryPromise = recovery
+  return recovery.finally(() => {
+    if (localAuthorityRecoveryPromise === recovery) localAuthorityRecoveryPromise = null
+  })
 }
 
 async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): Promise<void> {
@@ -1882,9 +1915,10 @@ function loadOnlineGame(serverUrl: string): void {
 
 let connectWin: BrowserWindow | null = null
 
-function openConnectWindow(): void {
+function openConnectWindow(errorMessage?: string): void {
   if (connectWin && !connectWin.isDestroyed()) {
     connectWin.focus()
+    if (errorMessage) showConnectWindowError(connectWin, errorMessage)
     return
   }
   const win = new BrowserWindow({
@@ -1903,8 +1937,28 @@ function openConnectWindow(): void {
   const connectPath = path.join(getConnectRoot(), 'index.html')
   restrictWindowNavigation(win, (url) => isFileUrlWithinRoot(url, getConnectRoot()))
   win.loadURL(`file:///${connectPath.replace(/\\/g, '/')}?v=${Date.now()}`)
+  if (errorMessage) win.webContents.once('did-finish-load', () => showConnectWindowError(win, errorMessage))
   connectWin = win
   win.on('closed', () => { connectWin = null })
+}
+
+function showConnectWindowError(win: BrowserWindow, message: string): void {
+  void win.webContents.executeJavaScript(`
+    (function () {
+      var error = document.getElementById('err');
+      if (!error) return;
+      error.textContent = ${JSON.stringify(message)};
+      error.style.display = 'block';
+    })();
+  `).catch(error => console.error('[client] failed to show authority abort reason:', error))
+}
+
+function abortLocalMatchToConnectScreen(message: string): void {
+  if (mainWin && !mainWin.isDestroyed()) {
+    mainWin.close()
+    mainWin = null
+  }
+  openConnectWindow(message)
 }
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
@@ -1945,6 +1999,7 @@ handleTrusted('open-local-game', ['connect'], async () => {
   }
   if (localGameOpenPromise) return await localGameOpenPromise
   const openingGeneration = localGameLifecycle.beginOpening()
+  localAuthorityAutoRestartUsed = false
   const opening = (async (): Promise<{ ok: boolean; error?: string }> => {
     clearOnlineServerUrl()
     try {

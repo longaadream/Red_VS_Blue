@@ -71,6 +71,27 @@ describe('RED-161 default player transport', () => {
     expect(builder.extraResources).toContainEqual({ from: '_client-postgres', to: 'postgres' })
   })
 
+  it('keeps legacy raw player WebSocket authority out of default dev/start and candidate startup', async () => {
+    const packageJson = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'))
+    const instrumentation = await readFile(path.join(ROOT, 'instrumentation.ts'), 'utf8')
+    const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
+
+    expect(packageJson.scripts.dev).toBe('next dev')
+    expect(packageJson.scripts.start).toBe('next start')
+    expect(instrumentation).toContain("process.env.ENABLE_LEGACY_PLAYER_WS === '1'")
+    expect(main).toContain("DISABLE_WS: '1'")
+  })
+
+  it('aborts the live match and performs only one bounded authority restart after an unexpected exit', async () => {
+    const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
+    expect(main).toContain('if (!expectedExit) void recoverUnexpectedLocalAuthorityExit(code)')
+    expect(main).toContain('localAuthorityAutoRestartUsed')
+    expect(main).toContain('await new Promise(resolve => setTimeout(resolve, 500))')
+    expect(main).toContain('abortLocalMatchToConnectScreen(')
+    expect(main).toContain('本局已终止')
+    expect(main).not.toContain('setInterval(recoverUnexpectedLocalAuthorityExit')
+  })
+
   it('starts the LAN database lazily while remote joiners only start the Profile service', async () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
     const readyHandler = main.slice(main.indexOf('app.whenReady().then'), main.indexOf("app.on('window-all-closed'"))

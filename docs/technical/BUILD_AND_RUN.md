@@ -775,6 +775,14 @@ npm.cmd run build:electron:client
 随机 SCRAM 密码并通过 `safeStorage` 加密到 `credential.bin`。数据库只监听 `127.0.0.1` 动态端口；
 Colyseus 仍监听 LAN 地址。远程加入者只启动 Profile 进程，不启动 PostgreSQL 或 Colyseus。
 
+RED-170 起，Windows 玩家默认只使用随包 Colyseus authority。根目录 `npm.cmd run dev` 和
+`npm.cmd start` 不再隐式启动旧 `lib/ws-server.ts`；只有遗留诊断明确设置
+`ENABLE_LEGACY_PLAYER_WS=1` 时才注册 raw 玩家 WS。不要在一次候选验收中同时开启两套玩家权威。
+
+本机 authority 意外退出会明确中止当前对局并返回连接页，Electron 至多自动重启一次。这个行为用于
+避免无限崩溃循环，不等同于跨进程 live migration。普通 1–5 秒网络抖动则由 Colyseus SDK 在同一
+session 上恢复，不会重新 `joinById` 创建房间实例。
+
 官方 Server、K8s、CI 或已有数据库的开发环境通过 `RVB_POSTGRES_URL` 指定外部 PostgreSQL；该变量
 存在时内置数据库不会启动。兼容读取 `DATABASE_URL`，但协议必须是 `postgres:` 或 `postgresql:`，
 SQLite URL 会被拒绝。不要把密码写入日志或仓库。

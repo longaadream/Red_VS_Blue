@@ -27,7 +27,8 @@
 | 层          | 当前入口                                                            | 当前职责                                  | 已知边界问题                         |
 | ---------- | --------------------------------------------------------------- | ------------------------------------- | ------------------------------ |
 | 表现层        | `data/pages/battle.html`、`data/pages/js/battle-ui/**`、`battle-renderer-3d.js` | 页面控制器、统一展示模型、DOM HUD、Three.js 战场和用户意图 | 页面仍包含网络与训练预演；联网终局只展示服务端结果 |
-| Next 服务层   | `app/`、`instrumentation.ts`                                     | 静态/Admin HTTP、状态页、训练/PVE、玩家 WebSocket | 玩家大厅/房间/目录/战斗统一 WS；旧玩家 REST 返回 410 |
+| Colyseus 玩家权威层 | `lib/server/colyseus/`、`standalone/colyseus/` | 单 Room actor、玩家 session、命令 FIFO、receipt、接收者投影与 PostgreSQL journal | 默认 Windows 玩家链路；单进程退出会明确中止当前局 |
+| Next 服务层   | `app/`、`instrumentation.ts`                                     | 静态/Admin HTTP、状态页、训练/PVE | raw 玩家 WS 仅可用 `ENABLE_LEGACY_PLAYER_WS=1` 显式兼容开启 |
 | 游戏规则层      | `lib/game/`                                                     | 状态创建、动作执行、技能、触发器、地图和回放                | 类型重复、模块级缓存和全局触发器               |
 | 房间/持久化层    | `lib/game/room-store.ts`、`lib/game/battle-storage.ts`、`prisma/` | 房间状态序列化、SQLite 存取、旧格式兼容               | 外层存档无正式格式版本和迁移链                |
 | PVE Run 持久化层 | `lib/pve/run-store.ts`、`lib/pve/profile-lifecycle.ts` | strict Run aggregate、revision CAS、authority reconciliation evidence/tombstone | 当前 `<userData>/pve-runs` 尚未迁入 RED-140 committed generation |
@@ -53,22 +54,24 @@ Server 的目标架构，但安装器、签名、监督器、备份、更新和�
 [ADR-0021](../decisions/ADR-0021-autonomous-server-operations.md) 和
 [Server Operations v1](./SERVER_OPERATIONS_V1.md)。
 
-### 3.2 Windows/Electron 玩家客户端标准流程
+### 3.2 Windows/Electron 玩家客户端标准流程（RED-170）
 
-1. Electron 客户端从 `electron-client/main.ts::app.whenReady()` 启动并加载打包页面资源。
-2. 客户端进入 `data/pages/battle.html`。
-3. `doAction(action)` 发送 `{ type: "action", action }`。
-4. `lib/ws-server.ts` 接收消息并调用 `runBattleAction()`。
-5. `runBattleAction()` 调用 `applyBattleAction()`，返回新状态及 hash。
-6. `dispatchRoomBattleAction()` 用 `RoomStore.setRoomIfVersion()` CAS 保存房间，成功后才广播 `stateUpdate`；终局状态与房间 `finished` 在同一次写入中提交。
-7. 客户端 `applyServerState()` 替换本地状态并重新渲染。
+1. Electron 客户端从 `electron-client/main.ts::app.whenReady()` 启动 Profile；Host & Play 额外启动内置 PostgreSQL 与随包 Colyseus authority。
+2. `ws-client.js` 使用 Colyseus SDK 创建/加入唯一 `BattleRoom`，大厅 RPC 走原生 request/response。
+3. `battle.html` 发送带 `clientActionId` 和 expected authority version/revision 的明确命令。
+4. `BattleRoom` 把玩家、计时器和系统命令送入同一房间 FIFO；规则提交后直接返回精确 receipt，并按接收者投影状态。
+5. 瞬时断线由 `onDrop/allowReconnection/onReconnect` 恢复同一 session；断线期间输入关闭，恢复后接收完整快照。
+6. 直接 receipt 丢失时，客户端按原 `clientActionId` 请求 `applied | rejected | unknown`，所有结果都在有界时间内解除本地 pending。
+7. PostgreSQL journal 异步推进普通动作 durable 水位；version 0、终局和关闭仍遵守 durable barrier。
 
 RED-127 起不再提供玩家 HTTP 后备入口。大厅、目录、房间、选将、战斗与恢复全部走同源 WebSocket；
 旧玩家 REST 在实际服务边界返回 410，静态资源继续使用 HTTP。RED-127 中
 `/api/admin/**` 只描述历史非自治边界；RED-140 自治发行不得把它或任何 management route 注册到
 玩家 listener，唯一 operator 入口是 trusted IPC，child adapter 仅在独立 loopback `/v1/**`。
 决策见 [ADR-0020](../decisions/ADR-0020-unified-player-websocket-transport.md) 与
-[ADR-0021](../decisions/ADR-0021-autonomous-server-operations.md)。
+[ADR-0021](../decisions/ADR-0021-autonomous-server-operations.md)。RED-170 后默认玩家实现由
+[ADR-0027](../decisions/ADR-0027-colyseus-single-session-match-lifecycle.md) 约束；旧 raw WS 只保留显式兼容开关，
+不允许与 Colyseus 同时作为同一对局的权威。
 
 ### 3.3 Android 开服：当前遗留与迁移目标
 
