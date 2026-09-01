@@ -204,7 +204,7 @@ export class CandidateBattleStore implements DeploymentRoomStore {
   }
 }
 
-function createInitialCheckpoint(room: Room): BattleAuthorityCheckpointRecord {
+export function createInitialCheckpoint(room: Room): BattleAuthorityCheckpointRecord {
   const storage = getBattleStorage(room)
   if (!storage) throw new Error(`Candidate room ${room.id} has no battle state`)
   const state = storage.state as BattleState

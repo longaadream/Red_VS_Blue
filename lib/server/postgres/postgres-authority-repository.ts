@@ -44,6 +44,15 @@ export class PostgresAuthorityRepository implements PostgresAuthorityBatchWriter
     await this.pool.query('SELECT 1')
   }
 
+  async listRestorableRoomIds(): Promise<string[]> {
+    const result = await this.pool.query<{ battle_id: string }>(
+      `SELECT battle_id FROM battle_room_authority
+       WHERE terminal = FALSE
+       ORDER BY updated_at, battle_id`,
+    )
+    return result.rows.map(row => normalizeRoomId(row.battle_id))
+  }
+
   async initializeRoom(
     room: Room,
     checkpoint: BattleAuthorityCheckpointRecord,

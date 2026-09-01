@@ -19,14 +19,28 @@ export class FakeAuthorityRepository implements BattleServerRepository {
   async healthCheck(): Promise<void> {}
   async close(): Promise<void> {}
 
+  async listRestorableRoomIds(): Promise<string[]> {
+    return [...this.rooms.entries()]
+      .filter(([, value]) => value.room.status !== 'finished')
+      .map(([roomId]) => roomId)
+      .sort()
+  }
+
   async initializeRoom(
     room: Room,
     _checkpoint: BattleAuthorityCheckpointRecord,
     epoch = 1,
   ): Promise<void> {
-    if (this.rooms.has(room.id)) return
-    this.rooms.set(room.id, {
-      room: structuredClone(room),
+    const roomId = normalizeRoomId(room.id)
+    if (this.rooms.has(roomId)) return
+    this.rooms.set(roomId, {
+      room: {
+        ...structuredClone(room),
+        id: roomId,
+        battleAuthorityVersion: 0,
+        battleAuthorityDurableVersion: 0,
+        battleAuthorityPersistenceStatus: 'durable',
+      },
       epoch,
       durable: 0,
       receipts: [],
@@ -35,7 +49,7 @@ export class FakeAuthorityRepository implements BattleServerRepository {
   }
 
   async restoreRoom(roomId: string): Promise<RestoredPostgresAuthorityRoom | undefined> {
-    const value = this.rooms.get(roomId)
+    const value = this.rooms.get(normalizeRoomId(roomId))
     if (!value) return undefined
     return {
       room: structuredClone(value.room),
@@ -50,6 +64,7 @@ export class FakeAuthorityRepository implements BattleServerRepository {
     roomId: string,
     jobs: readonly PostgresAuthorityTransitionJob[],
   ): Promise<number> {
+    roomId = normalizeRoomId(roomId)
     await this.beforeCommit?.()
     if (this.failRoomId === roomId) throw new Error(`simulated PostgreSQL failure for ${roomId}`)
     const value = this.rooms.get(roomId)
@@ -74,4 +89,8 @@ export class FakeAuthorityRepository implements BattleServerRepository {
     value.durable = last.transition.toVersion
     return value.durable
   }
+}
+
+function normalizeRoomId(roomId: string): string {
+  return String(roomId ?? '').trim().toLowerCase()
 }

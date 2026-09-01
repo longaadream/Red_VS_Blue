@@ -1,10 +1,11 @@
-import { app, BrowserWindow, ipcMain, net as electronNet, protocol, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net as electronNet, protocol, safeStorage, session } from 'electron'
 import { spawn, ChildProcess, execFileSync, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as dgram from 'dgram'
 import * as http from 'http'
+import { createRequire } from 'module'
 import { randomBytes } from 'crypto'
 import type WebSocket from 'ws'
 import { pathToFileURL } from 'url'
@@ -12,6 +13,11 @@ import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { resolveDevelopmentProfile } from './development-profile'
 import { findFreePort } from './local-port'
 import { resolveClientProtocolFile } from './client-protocol-resource'
+import { EmbeddedPostgresController } from './embedded-postgres'
+import {
+  LOCAL_GAME_OPEN_CANCELLED,
+  LocalGameLifecycleGate,
+} from './local-game-lifecycle'
 import {
   type DesktopProfileReference,
   getActiveResourcePackMeta,
@@ -28,6 +34,8 @@ import {
 
 const LOCAL_PORT_HINT = 38521  // 首选端口，被占用时自动递增（避开 54300-54400 被 QMUpload 占用的范围）
 let actualLocalPort = LOCAL_PORT_HINT  // 实际绑定成功的端口
+const GAME_PORT_HINT = 38621
+let actualGamePort = GAME_PORT_HINT
 const CLIENT_SCHEME = 'rvb-client'
 const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
 const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
@@ -36,6 +44,14 @@ const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
+
+type GameProfileIdentity = Readonly<{
+  schemaVersion: 'rvb-game-profile-identity/v1'
+  engineAbi: string
+  runnerRevision: 'rvb-battle-runner/v1'
+  resolvedProfileHash: string
+  authorityContentHash: string
+}>
 
 type ChildLogStream = 'stdout' | 'stderr'
 type ChildLogErrorSide = 'source' | 'target' | 'write'
@@ -394,16 +410,53 @@ async function stopChildProcessGracefully(
   if (proc.exitCode === null && proc.signalCode === null) killProcessTree(proc)
 }
 
-async function killServer(requireDurable = false): Promise<void> {
-  if (!serverProcess) return
-  const proc = serverProcess
-  await stopChildProcessGracefully(proc, requireDurable)
-  localServerReady = false
-  serverProcess = null
+async function killServer(requireDurable = false, invalidateOpening = true): Promise<void> {
+  const finishShutdown = localGameLifecycle.beginShutdown(invalidateOpening)
+  try {
+    const startup = localGameStartupPromise
+    if (startup) {
+      try {
+        await startup
+      } catch (error) {
+        console.error('[client] local authority startup failed while shutdown was waiting:', error)
+      }
+    }
+    if (gameServerProcess) {
+      const gameProc = gameServerProcess
+      await stopChildProcessGracefully(gameProc, requireDurable)
+      localGameReady = false
+      localAuthorityProfileIdentity = null
+      if (gameServerProcess === gameProc) gameServerProcess = null
+    }
+    if (embeddedPostgres) await embeddedPostgres.stop()
+    if (!serverProcess) return
+    // The Profile/Next process does not own the battle journal and therefore does
+    // not implement the Colyseus durable-drain IPC contract. Waiting for that ACK
+    // here falsely reports a database shutdown failure after the real authority
+    // and PostgreSQL have already stopped.
+    const profileProc = serverProcess
+    localServerReady = false
+    localProfileIdentity = null
+    serverProcess = null
+    killProcessTree(profileProc)
+  } finally {
+    finishShutdown()
+  }
 }
 
 function forceKillServer(): void {
+  localGameReady = false
+  localAuthorityProfileIdentity = null
+  if (gameServerProcess) {
+    const gameProc = gameServerProcess
+    gameServerProcess = null
+    killProcessTree(gameProc)
+  }
+  if (embeddedPostgres) {
+    embeddedPostgres.forceStop()
+  }
   localServerReady = false
+  localProfileIdentity = null
   if (!serverProcess) return
   const proc = serverProcess
   serverProcess = null
@@ -416,11 +469,18 @@ function requestApplicationExit(): void {
     return
   }
   if (appExitPromise) return
-  appExitPromise = killServer()
-    .catch(error => console.error('[client] graceful application shutdown failed:', error))
-    .finally(() => {
+  appExitPromise = killServer(true)
+    .then(() => {
       allowAppExit = true
       app.exit(0)
+    })
+    .catch(error => {
+      console.error('[client] durable application shutdown failed; processes remain fail-closed:', error)
+      appExitPromise = null
+      dialog.showErrorBox(
+        '无法安全退出',
+        '战斗记录尚未确认写入数据库，游戏服务仍保持运行。请稍后再次退出；不要强制结束进程。',
+      )
     })
 }
 
@@ -428,6 +488,14 @@ function requestApplicationExit(): void {
 
 let serverProcess: ChildProcess | null = null
 let localServerReady = false
+let gameServerProcess: ChildProcess | null = null
+let localGameReady = false
+let localGameStartupPromise: Promise<void> | null = null
+let localGameOpenPromise: Promise<{ ok: boolean; error?: string }> | null = null
+const localGameLifecycle = new LocalGameLifecycleGate()
+let embeddedPostgres: EmbeddedPostgresController | null = null
+let localProfileIdentity: GameProfileIdentity | null = null
+let localAuthorityProfileIdentity: GameProfileIdentity | null = null
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
 type ProfileProcessBinding = {
@@ -451,6 +519,70 @@ function stableProfileBinding(): ProfileProcessBinding {
     // Store repairs the pointer and confirms whether a fresh process is needed.
     return { profileRoot: getAppRoot() }
   }
+}
+
+function gameProfileIdentityFromReference(reference: DesktopProfileReference): GameProfileIdentity {
+  return {
+    schemaVersion: 'rvb-game-profile-identity/v1',
+    engineAbi: reference.compatibility.engineAbi,
+    runnerRevision: 'rvb-battle-runner/v1',
+    resolvedProfileHash: reference.resolvedProfileHash,
+    authorityContentHash: reference.authorityContentHash,
+  }
+}
+
+function refreshLocalProfileIdentity(targetProfileHash?: string): void {
+  const reference = readDesktopProfileState(getPackRoot())?.stable
+  if (!reference || (targetProfileHash && reference.resolvedProfileHash !== targetProfileHash)) {
+    localProfileIdentity = null
+    throw new Error('LOCAL_PROFILE_IDENTITY_STATE_MISMATCH')
+  }
+  localProfileIdentity = gameProfileIdentityFromReference(reference)
+}
+
+function parseGameProfileIdentity(value: unknown): GameProfileIdentity {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_INVALID')
+  }
+  const identity = value as Partial<GameProfileIdentity>
+  const keys = Object.keys(identity).sort().join(',')
+  if (
+    keys !== 'authorityContentHash,engineAbi,resolvedProfileHash,runnerRevision,schemaVersion'
+    || identity.schemaVersion !== 'rvb-game-profile-identity/v1'
+    || identity.runnerRevision !== 'rvb-battle-runner/v1'
+    || typeof identity.engineAbi !== 'string'
+    || !/^[a-f0-9]{64}$/.test(identity.resolvedProfileHash ?? '')
+    || !/^[a-f0-9]{64}$/.test(identity.authorityContentHash ?? '')
+  ) throw new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_INVALID')
+  return identity as GameProfileIdentity
+}
+
+function fetchAuthorityProfileIdentity(port: number): Promise<GameProfileIdentity> {
+  return new Promise((resolve, reject) => {
+    const request = http.get(`http://127.0.0.1:${port}/catalog/identity`, response => {
+      const chunks: Buffer[] = []
+      let total = 0
+      response.on('data', (chunk: Buffer) => {
+        total += chunk.byteLength
+        if (total > 64 * 1024) request.destroy(new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_TOO_LARGE'))
+        else chunks.push(chunk)
+      })
+      response.on('end', () => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`LOCAL_AUTHORITY_PROFILE_IDENTITY_HTTP_${response.statusCode ?? 0}`))
+          return
+        }
+        try {
+          const payload = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { profileIdentity?: unknown }
+          resolve(parseGameProfileIdentity(payload.profileIdentity))
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+    request.on('error', reject)
+    request.setTimeout(3_000, () => request.destroy(new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_TIMEOUT')))
+  })
 }
 function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
@@ -498,6 +630,216 @@ function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boole
   })
 }
 
+function waitForGameAuthorityReady(port: number, timeoutMs = 20000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  return new Promise(resolve => {
+    const probe = () => {
+      if (!gameServerProcess) {
+        resolve(false)
+        return
+      }
+      if (Date.now() >= deadline) {
+        resolve(false)
+        return
+      }
+      const request = http.get(`http://127.0.0.1:${port}/healthz`, response => {
+        response.resume()
+        if (response.statusCode === 200) resolve(true)
+        else setTimeout(probe, 250)
+      })
+      request.on('error', () => setTimeout(probe, 250))
+      request.setTimeout(1000, () => request.destroy())
+    }
+    probe()
+  })
+}
+
+function findColyseusEntry(appRoot: string): string | null {
+  const candidates = app.isPackaged
+    ? [path.join(appRoot, 'standalone', 'colyseus', 'colyseus-server.mjs')]
+    : [path.join(appRoot, '_client-colyseus', 'colyseus-server.mjs')]
+  return candidates.find(candidate => fs.existsSync(candidate)) ?? null
+}
+
+function getEmbeddedPostgresRuntimeRoot(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'postgres', 'pgsql')
+    : path.join(getAppRoot(), '_client-postgres', 'pgsql')
+}
+
+function getEmbeddedPostgres(): EmbeddedPostgresController {
+  if (embeddedPostgres) return embeddedPostgres
+  if (process.platform !== 'win32') {
+    throw new Error('The bundled PostgreSQL runtime currently supports Windows x64 only; set RVB_POSTGRES_URL for this platform')
+  }
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('System credential encryption is unavailable; embedded PostgreSQL cannot start safely')
+  }
+  embeddedPostgres = new EmbeddedPostgresController({
+    runtimeRoot: getEmbeddedPostgresRuntimeRoot(),
+    stateRoot: path.join(getUserData(), 'postgres', '16'),
+    findFreePort,
+    protectSecret: plaintext => safeStorage.encryptString(plaintext),
+    unprotectSecret: encrypted => safeStorage.decryptString(encrypted),
+    onUnexpectedExit: (code, signal) => {
+      console.error(`[client] embedded PostgreSQL exited unexpectedly: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
+      localGameReady = false
+      localAuthorityProfileIdentity = null
+      if (gameServerProcess) {
+        const gameProc = gameServerProcess
+        gameServerProcess = null
+        killProcessTree(gameProc)
+      }
+    },
+  })
+  return embeddedPostgres
+}
+
+async function resolveAuthorityDatabaseUrl(): Promise<string> {
+  const external = process.env.RVB_POSTGRES_URL ?? process.env.DATABASE_URL
+  if (external) {
+    let protocol = ''
+    try { protocol = new URL(external).protocol }
+    catch { throw new Error('Configured PostgreSQL authority URL is invalid') }
+    if (protocol !== 'postgresql:' && protocol !== 'postgres:') {
+      throw new Error('Configured battle authority database must use PostgreSQL')
+    }
+    console.info('[client] Using externally configured PostgreSQL authority')
+    return external
+  }
+  console.info('[client] Starting bundled PostgreSQL authority for LAN hosting')
+  const connection = await getEmbeddedPostgres().start()
+  console.info(`[client] Bundled PostgreSQL ready on loopback port ${connection.port}`)
+  return connection.url
+}
+
+function localAuthorityStartupErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message === LOCAL_GAME_OPEN_CANCELLED) {
+    return '本地主机启动已取消，请稍后重试。'
+  }
+  if (/safeStorage|credential encryption|凭据加密/i.test(message)) {
+    return '系统凭据加密不可用，无法安全启动本机数据库。'
+  }
+  if (/runtime manifest|runtime is missing|SHA-256|inventory/i.test(message)) {
+    return '内置 PostgreSQL 文件校验失败，请重新安装游戏。'
+  }
+  if (/must use PostgreSQL|URL is invalid/i.test(message)) {
+    return 'PostgreSQL 连接配置无效，请检查服务器配置。'
+  }
+  return '本机战斗服务启动失败，请查看客户端日志。'
+}
+
+async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBinding): Promise<void> {
+  if (gameServerProcess) {
+    if (!localGameReady) localGameReady = await waitForGameAuthorityReady(actualGamePort, 5000)
+    if (localGameReady) {
+      try {
+        localAuthorityProfileIdentity = await fetchAuthorityProfileIdentity(actualGamePort)
+      } catch (error) {
+        localGameReady = false
+        localAuthorityProfileIdentity = null
+        throw error
+      }
+    }
+    return
+  }
+
+  localGameReady = false
+  localAuthorityProfileIdentity = null
+  actualGamePort = await findFreePort(GAME_PORT_HINT)
+  const appRoot = getAppRoot()
+  const entry = findColyseusEntry(appRoot)
+  if (!entry) {
+    console.error('[client] packaged Colyseus authority is missing; run npm run build:colyseus')
+    return
+  }
+  const binding = profileBinding ?? stableProfileBinding()
+  const databaseUrl = await resolveAuthorityDatabaseUrl()
+  console.log(`[client] Colyseus/PostgreSQL game port: ${actualGamePort}`)
+  gameServerProcess = spawn(getNodeBin(), [entry], {
+    cwd: appRoot,
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      RVB_COLYSEUS_PORT: String(actualGamePort),
+      RVB_COLYSEUS_HOST: '0.0.0.0',
+      RVB_POSTGRES_URL: databaseUrl,
+      RVB_BATTLE_AUTHORITY_V2: '1',
+      RVB_BATTLE_ASYNC_JOURNAL: '1',
+      RVB_TURN_TIMER_ENABLED: '1',
+      APP_ROOT_DIR: appRoot,
+      USER_DATA_DIR: getUserData(),
+      RVB_PROFILE_ROOT: binding.profileRoot,
+      RVB_RESOLVED_PROFILE_HASH: binding.reference?.resolvedProfileHash,
+      RVB_AUTHORITY_CONTENT_HASH: binding.reference?.authorityContentHash,
+      RVB_PROFILE_ENGINE_ABI: binding.reference?.compatibility.engineAbi,
+      RVB_PROFILE_CONTENT_ABI: binding.reference?.compatibility.contentAbi,
+    },
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  })
+
+  lastServerExitCode = null
+  lastServerStderr = ''
+  if (gameServerProcess.stdout) {
+    attachSafeLogForwarder(gameServerProcess.stdout, process.stdout, {
+      runtime: 'electron-client',
+      stream: 'stdout',
+      report: logChildForwardingRecord,
+      reportUnexpectedError: logUnexpectedChildStreamError,
+    })
+  }
+  if (gameServerProcess.stderr) {
+    gameServerProcess.stderr.on('data', data => {
+      lastServerStderr = (lastServerStderr + data.toString()).slice(-3000)
+    })
+    attachSafeLogForwarder(gameServerProcess.stderr, process.stderr, {
+      runtime: 'electron-client',
+      stream: 'stderr',
+      report: logChildForwardingRecord,
+      reportUnexpectedError: logUnexpectedChildStreamError,
+    })
+  }
+  const spawned = gameServerProcess
+  spawned.on('error', error => console.error('[client] Colyseus authority error:', error))
+  spawned.on('exit', code => {
+    lastServerExitCode = code
+    if (gameServerProcess === spawned) {
+      gameServerProcess = null
+      localGameReady = false
+      localAuthorityProfileIdentity = null
+    }
+    console.log(`[client] Colyseus authority exited: ${code}`)
+    if (lastServerStderr) console.error('[client] last Colyseus stderr:', lastServerStderr.slice(-500))
+  })
+  localGameReady = await waitForGameAuthorityReady(actualGamePort)
+  if (!localGameReady) {
+    console.error(`[client] Colyseus/PostgreSQL authority did not become ready on port ${actualGamePort}`)
+    return
+  }
+  try {
+    localAuthorityProfileIdentity = await fetchAuthorityProfileIdentity(actualGamePort)
+  } catch (error) {
+    localGameReady = false
+    localAuthorityProfileIdentity = null
+    throw error
+  }
+}
+
+async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): Promise<void> {
+  if (localGameStartupPromise) {
+    await localGameStartupPromise
+    return
+  }
+  const startup = startLocalGameAuthorityOnce(profileBinding)
+  localGameStartupPromise = startup
+  try {
+    await startup
+  } finally {
+    if (localGameStartupPromise === startup) localGameStartupPromise = null
+  }
+}
+
 function findServerEntry(appRoot: string): string | null {
   const candidates = [
     path.join(appRoot, '.next', 'standalone', 'server.js'),
@@ -543,16 +885,22 @@ function initDatabase(dbPath: string, appRoot: string): void {
   console.log('[client] Database ready.')
 }
 
-async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise<void> {
+async function startLocalServer(
+  profileBinding?: ProfileProcessBinding,
+  expectedGeneration?: number,
+): Promise<void> {
+  if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
   if (serverProcess) {
     if (!localServerReady) {
       localServerReady = await waitForLocalServerReady(actualLocalPort, 5000)
     }
+    if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
     return
   }
 
   localServerReady = false
   actualLocalPort = await findFreePort(LOCAL_PORT_HINT)
+  if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
   console.log(`[client] Public server port: ${actualLocalPort}`)
 
   const appRoot = getAppRoot()
@@ -590,9 +938,13 @@ async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise
       PORT: String(actualLocalPort),
       HOSTNAME: '0.0.0.0',
       NODE_ENV: 'production',
-      RVB_BATTLE_AUTHORITY_V2: '1',
-      RVB_BATTLE_ASYNC_JOURNAL: '1',
-      RVB_TURN_TIMER_ENABLED: '1',
+      // This process only serves the installed Profile APIs and presentation
+      // assets. Player rooms/actions belong exclusively to Colyseus below.
+      DISABLE_WS: '1',
+      RVB_PROFILE_EXPECT_WEBSOCKET: '0',
+      RVB_BATTLE_AUTHORITY_V2: '0',
+      RVB_BATTLE_ASYNC_JOURNAL: '0',
+      RVB_TURN_TIMER_ENABLED: '0',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
       DATABASE_URL: databaseUrl,
@@ -639,6 +991,7 @@ async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise
     if (serverProcess === spawnedProcess) {
       serverProcess = null
       localServerReady = false
+      localProfileIdentity = null
     }
     console.log(`[client] local server exited: ${code}`)
     if (lastServerStderr) console.error('[client] last stderr:', lastServerStderr.slice(-500))
@@ -768,7 +1121,7 @@ function probeProfileWebSocket(timeoutMs = 5_000): Promise<void> {
     const modulePath = app.isPackaged
       ? path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')
       : 'ws'
-    const WebSocketClient = require(modulePath) as new (address: string) => WebSocket
+    const WebSocketClient = createRequire(__filename)(modulePath) as new (address: string) => WebSocket
     const socket = new WebSocketClient(`ws://127.0.0.1:${actualLocalPort}/ws/rooms/__profile-health__`)
     const finish = (error?: Error): void => {
       if (settled) return
@@ -1022,6 +1375,7 @@ async function reconcileMainRendererAfterCommit(
   success: JsonObject,
   allowRendererRollback: boolean,
 ): Promise<JsonObject> {
+  refreshLocalProfileIdentity(targetProfileHash)
   return await reconcileProfileRendererCommit({
     expectedProfileHash: targetProfileHash,
     stage,
@@ -1143,6 +1497,9 @@ async function activateProfileHash(
         keepAdmissionPaused: true,
       },
     })
+    stage = 'colyseus-authority-start'
+    await startLocalGameAuthority(targetBinding)
+    if (!localGameReady) throw new Error('COLYSEUS_POSTGRES_AUTHORITY_START_FAILED')
     stage = 'renderer-commit-reload'
     return await reconcileMainRendererAfterCommit(
       targetProfileHash,
@@ -1265,12 +1622,14 @@ async function selectAndActivateRollback(
   return activateProfileHash(targetHash, allowRendererRollback)
 }
 
-async function recoverProfileOnStartup(): Promise<void> {
+async function recoverProfileOnStartup(expectedGeneration?: number): Promise<void> {
+  localProfileIdentity = null
   if (!localServerReady) throw new Error('PROFILE_SERVER_NOT_READY')
   let recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
   if (recovered.requiresProcessRestart === true) {
-    await killServer()
-    await startLocalServer(stableProfileBinding())
+    await killServer(false, false)
+    if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
+    await startLocalServer(stableProfileBinding(), expectedGeneration)
     if (!localServerReady) throw new Error('PROFILE_STARTUP_RECOVERY_RESTART_FAILED')
     recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
     if (recovered.requiresProcessRestart === true) {
@@ -1285,11 +1644,23 @@ async function recoverProfileOnStartup(): Promise<void> {
     || report.server?.profile?.resolvedProfileHash !== stableProfileHash
     || report.server?.healthy !== true
   ) throw new Error('PROFILE_STARTUP_RECOVERY_HEALTH_MISMATCH')
+  localProfileIdentity = gameProfileIdentityFromReference(report.server.profile as DesktopProfileReference)
 }
 
-async function startStableLocalServerAndRecover(): Promise<void> {
-  await startLocalServer(stableProfileBinding())
-  await recoverProfileOnStartup()
+function assertLocalGameOpeningCurrent(expectedGeneration: number): void {
+  localGameLifecycle.assertOpeningCurrent(expectedGeneration)
+}
+
+async function startStableLocalServerAndRecover(expectedGeneration?: number): Promise<void> {
+  await startStableProfileServerAndRecover(expectedGeneration)
+  if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
+  await startLocalGameAuthority(stableProfileBinding())
+  if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
+}
+
+async function startStableProfileServerAndRecover(expectedGeneration?: number): Promise<void> {
+  await startLocalServer(stableProfileBinding(), expectedGeneration)
+  await recoverProfileOnStartup(expectedGeneration)
 }
 
 // ─── 资源包管理（Electron IPC，替代 Android 端的 Service Worker 方案）────────
@@ -1467,10 +1838,10 @@ function loadLocalGame(): void {
 
   // 仅当本地服务器实际启动后，才注入默认服务器 URL（once：只注入一次，不影响后续页面导航）
   win.webContents.once('did-finish-load', () => {
-    if (!serverProcess || !localServerReady) return
+    if (!gameServerProcess || !localGameReady) return
     win.webContents.executeJavaScript(`
       (function() {
-        var url = 'http://localhost:${actualLocalPort}';
+        var url = 'http://127.0.0.1:${actualGamePort}';
         if (window.RvBUtils && RvBUtils.saveServerConfig) {
           RvBUtils.saveServerConfig({ mode: 'local', url: url });
         } else {
@@ -1569,28 +1940,49 @@ handleTrusted('go-offline', ['connect', 'game'], () => {
 })
 
 handleTrusted('open-local-game', ['connect'], async () => {
-  clearOnlineServerUrl()
-  await startStableLocalServerAndRecover()
-  if (!localServerReady) {
-    const exitMsg = lastServerExitCode !== null
-      ? `Local server exited with code ${lastServerExitCode}`
-      : 'Local server did not become ready'
-    const detail = lastServerStderr ? '\n' + lastServerStderr.slice(-500) : ''
-    return { ok: false, error: exitMsg + detail }
+  if (localGameLifecycle.shutdownInProgress) {
+    return { ok: false, error: '本地主机正在停止，请稍后重试。' }
   }
-  if (connectWin && !connectWin.isDestroyed()) {
-    connectWin.close()
-    connectWin = null
+  if (localGameOpenPromise) return await localGameOpenPromise
+  const openingGeneration = localGameLifecycle.beginOpening()
+  const opening = (async (): Promise<{ ok: boolean; error?: string }> => {
+    clearOnlineServerUrl()
+    try {
+      await startStableLocalServerAndRecover(openingGeneration)
+    } catch (error) {
+      console.error('[client] local authority startup failed:', error)
+      return { ok: false, error: localAuthorityStartupErrorMessage(error) }
+    }
+    if (!localGameReady) {
+      const exitMsg = lastServerExitCode !== null
+        ? `Colyseus/PostgreSQL authority exited with code ${lastServerExitCode}`
+        : 'Colyseus/PostgreSQL authority did not become ready'
+      const detail = lastServerStderr ? '\n' + lastServerStderr.slice(-500) : ''
+      return { ok: false, error: exitMsg + detail }
+    }
+    if (connectWin && !connectWin.isDestroyed()) {
+      connectWin.close()
+      connectWin = null
+    }
+    loadLocalGame()
+    return { ok: true }
+  })()
+  localGameOpenPromise = opening
+  try {
+    return await opening
+  } finally {
+    if (localGameOpenPromise === opening) localGameOpenPromise = null
   }
-  loadLocalGame()
-  return { ok: true }
 })
 
 // 查询当前模式
 handleTrusted('get-mode', ['game'], () => ({
-  isLocal: localServerReady,
-  localUrl: `http://localhost:${actualLocalPort}`,
-  ready: localServerReady,
+  isLocal: localGameReady,
+  localUrl: `http://127.0.0.1:${actualGamePort}`,
+  profileRuntimeUrl: `http://127.0.0.1:${actualLocalPort}`,
+  profileIdentity: localProfileIdentity,
+  localAuthorityProfileIdentity,
+  ready: localGameReady,
 }))
 
 // 重启本地服务器
@@ -1598,7 +1990,7 @@ handleTrusted('restart-server', ['admin'], async () => {
   await killServer()
   await new Promise(resolve => setTimeout(resolve, 1000))
   await startStableLocalServerAndRecover()
-  return { ok: true }
+  return { ok: localGameReady }
 })
 
 // 获取本机局域网 IPv4 地址列表（供 LAN 扫描定位子网）
@@ -1620,7 +2012,7 @@ handleTrusted('get-host-info', ['game'], () => {
       if (iface.family === 'IPv4' && !iface.internal) ips.push(iface.address)
     }
   }
-  return { port: actualLocalPort, ips, running: serverProcess !== null && localServerReady, ready: localServerReady }
+  return { port: actualGamePort, ips, running: gameServerProcess !== null && localGameReady, ready: localGameReady }
 })
 
 // ─── UDP LAN 主机广播与发现 ───────────────────────────────────────────────────
@@ -1647,7 +2039,7 @@ handleTrusted('start-host-broadcast', ['game'], () => {
 
   const myIps = getLanIpList()
   const hostname = os.hostname()
-  const port = actualLocalPort
+  const port = actualGamePort
 
   const send = () => {
     for (const ip of myIps) {
@@ -1780,7 +2172,9 @@ app.whenReady().then(async () => {
   }
 
   try {
-    await startStableLocalServerAndRecover()
+    // Remote joiners only need the lightweight Profile service. The bundled
+    // PostgreSQL/Colyseus authority starts lazily when the player chooses LAN host.
+    await startStableProfileServerAndRecover()
   } catch (error) {
     console.error('[profile] startup recovery failed; admission remains closed:', error)
     return

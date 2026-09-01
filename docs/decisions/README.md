@@ -118,8 +118,9 @@
 - [`ADR-0019-selectable-demo-maps.md`](./ADR-0019-selectable-demo-maps.md)：正式 Demo 使用受控四图目录、房间冻结选择并在所有传输边界失败关闭（RED-119，已接受）。
 - [`ADR-0021-autonomous-server-operations.md`](./ADR-0021-autonomous-server-operations.md)：Windows 自治 Server 的公开发行、受信本地运维、备份更新与回退边界（RED-140，已接受；取代 ADR-0003）。
 - [`ADR-0022-deterministic-effect-batch-queues.md`](./ADR-0022-deterministic-effect-batch-queues.md)：只允许 Damage、Heal、Summon、Death 使用确定性 Batch，并以动作级共享 FIFO 调度后续效果（RED-139，已接受）。
-- [`ADR-0025-colyseus-postgresql-authority.md`](./ADR-0025-colyseus-postgresql-authority.md)：Colyseus 房间权威、PostgreSQL 有界微批耐久、SQLite 离线迁移与 Windows/K8s 双部署边界（RED-159，已接受；已按 RED-160/161 落地校准）。
+- [`ADR-0023-colyseus-postgresql-player-authority.md`](./ADR-0023-colyseus-postgresql-player-authority.md)：默认玩家房间与战斗权威迁移到 Colyseus，PostgreSQL 使用有界微批与关键边界耐久化（RED-160、RED-161，已接受并合入）。
 - [`ADR-0024-progressive-reserve-deployment.md`](./ADR-0024-progressive-reserve-deployment.md)：新建对局默认使用 seeded 三选一预备区部署、安全落位与部署当回合首次普通移动免费（RED-138，已接受，等待实现验收）。
+- [`ADR-0025-colyseus-postgresql-authority.md`](./ADR-0025-colyseus-postgresql-authority.md)：Colyseus 房间权威、PostgreSQL 有界微批耐久、SQLite 离线迁移与 Windows/K8s 双部署边界（RED-159，已接受；已按 RED-160/161 落地校准）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

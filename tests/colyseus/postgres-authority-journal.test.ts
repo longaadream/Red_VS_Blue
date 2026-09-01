@@ -71,6 +71,43 @@ describe('RED-160 PostgreSQL authority journal', () => {
     await expect(journal.drain('healthy')).resolves.toBeUndefined()
     expect(journal.inspect('healthy').durableAuthorityVersion).toBe(1)
   })
+
+  it('closes admission, waits for an in-flight reservation, and only then reports durable shutdown', async () => {
+    const writer = {
+      async commitTransitionBatch(_roomId: string, jobs: readonly PostgresAuthorityTransitionJob[]) {
+        return jobs[jobs.length - 1].transition.toVersion
+      },
+    }
+    const journal = new PostgresAuthorityJournal(writer, { maxDwellMs: 25 })
+    journal.registerRoom('shutdown', 0)
+    const reservation = journal.reserve(jobAt('shutdown', 0))
+    let closed = false
+    const closing = journal.close().then(() => { closed = true })
+
+    await Promise.resolve()
+    expect(closed).toBe(false)
+    expect(() => journal.reserve(jobAt('shutdown', 1))).toThrowError(
+      expect.objectContaining({ code: 'POSTGRES_AUTHORITY_JOURNAL_CLOSED' }),
+    )
+    expect(() => journal.registerRoom('late-room', 0)).toThrowError(
+      expect.objectContaining({ code: 'POSTGRES_AUTHORITY_JOURNAL_CLOSED' }),
+    )
+
+    journal.commit(reservation)
+    await expect(closing).resolves.toBeUndefined()
+    expect(journal.inspect('shutdown')).toMatchObject({ status: 'durable', durableAuthorityVersion: 1 })
+  })
+
+  it('rejects the shutdown barrier when PostgreSQL cannot make a pending transition durable', async () => {
+    const journal = new PostgresAuthorityJournal({
+      async commitTransitionBatch() { throw new Error('simulated PostgreSQL outage') },
+    }, { maxAttempts: 1, maxDwellMs: 25 })
+    journal.registerRoom('shutdown-fault', 0)
+    journal.commit(journal.reserve(jobAt('shutdown-fault', 0)))
+
+    await expect(journal.close()).rejects.toMatchObject({ code: 'POSTGRES_AUTHORITY_DEGRADED' })
+    await expect(journal.close()).rejects.toMatchObject({ code: 'POSTGRES_AUTHORITY_DEGRADED' })
+  })
 })
 
 function jobAt(roomId: string, fromVersion: number): PostgresAuthorityTransitionJob {

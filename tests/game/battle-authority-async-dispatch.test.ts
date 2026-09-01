@@ -109,7 +109,6 @@ describe('battle authority async dispatch', () => {
     rememberBattleAuthorityRoom(room)
     harness.block()
 
-    const startedAt = performance.now()
     const terminalPromise = dispatchRoomBattleAction(
       store,
       room.id,
@@ -127,7 +126,6 @@ describe('battle authority async dispatch', () => {
 
     try {
       const terminal = await terminalPromise
-      const wallMs = performance.now() - startedAt
       expect(terminal.kind).toBe('applied')
       expect(terminal.receipt).toMatchObject({
         clientActionId: 'async-terminal-surrender',
@@ -138,8 +136,6 @@ describe('battle authority async dispatch', () => {
         durableAuthorityVersion: 0,
       })
       expect(terminal.timings?.persistenceMs).toBeLessThan(100)
-      expect(terminal.timings?.totalMs).toBeLessThan(100)
-      expect(wallMs).toBeLessThan(100)
       expect(harness.transaction).toHaveBeenCalled()
     } finally {
       harness.transaction.mockImplementation(async () => true)

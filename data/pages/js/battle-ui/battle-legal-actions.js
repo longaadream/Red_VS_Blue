@@ -159,6 +159,7 @@
         return {
           needsTarget: true,
           baseAction: action,
+          preparation: error.preparation,
           range: error.range,
           targetType: error.targetType || '',
           filter: error.filter || '',
