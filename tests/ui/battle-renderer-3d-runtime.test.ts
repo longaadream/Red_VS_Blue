@@ -522,6 +522,47 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.dispose()
   })
 
+  it('drags the selected movable piece without panning and cancels the gesture without submitting', () => {
+    const harness = createHarness(844, 390, false)
+    const intents: Array<Record<string, unknown>> = []
+    const model: any = runtimeModel()
+    const piece = model.pieces[0]
+    const target = { x: piece.x + 1, y: piece.y }
+    model.selection = { pieceId: piece.id, mode: 'move' }
+    model.legal.moveCells = [target]
+    harness.renderer.init({ container: harness.container, onIntent: (intent: Record<string, unknown>) => intents.push(intent) })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const group = harness.renderers[0].scene!.children.find((child) => child.userData.pieceId === piece.id)!
+    const sourcePoint = harness.renderer.projectCell(piece.x, piece.y, group.position.y + 0.12)
+    const targetPoint = harness.renderer.projectCell(target.x, target.y, 0.12)
+    const cameraReference = harness.renderer.projectCell(10, 8)
+    const canvas = harness.renderers[0].domElement
+
+    canvas.dispatch('pointerdown', { pointerId: 61, pointerType: 'mouse', button: 0, clientX: sourcePoint.clientX, clientY: sourcePoint.clientY })
+    canvas.dispatch('pointermove', { pointerId: 61, pointerType: 'mouse', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
+    expect(group.position.x).not.toBe(piece.x)
+    canvas.dispatch('pointerup', { pointerId: 61, pointerType: 'mouse', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
+
+    expect(intents).toContainEqual({ type: 'drop-piece', pieceId: piece.id, x: target.x, y: target.y })
+    expect(intents).not.toContainEqual({ type: 'activate-cell', x: target.x, y: target.y })
+    expect(distance(cameraReference, harness.renderer.projectCell(10, 8))).toBeLessThan(0.5)
+    expect(group.position.x).toBe(piece.x)
+    expect(group.position.z).toBe(piece.y)
+    expect(canvas.capturedPointers.size).toBe(0)
+
+    const submissionsBeforeCancel = intents.filter((intent) => intent.type === 'drop-piece').length
+    canvas.dispatch('pointerdown', { pointerId: 62, pointerType: 'touch', button: 0, clientX: sourcePoint.clientX, clientY: sourcePoint.clientY })
+    canvas.dispatch('pointermove', { pointerId: 62, pointerType: 'touch', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
+    canvas.dispatch('pointercancel', { pointerId: 62, pointerType: 'touch', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
+    expect(intents.filter((intent) => intent.type === 'drop-piece')).toHaveLength(submissionsBeforeCancel)
+    expect(group.position.x).toBe(piece.x)
+    expect(group.position.z).toBe(piece.y)
+    expect(canvas.capturedPointers.size).toBe(0)
+    harness.renderer.dispose()
+  })
+
   it('shows authoritative waiting feedback and retargets movement from the visible position without replaying an event', () => {
     const harness = createHarness(844, 390, false)
     const model: any = runtimeModel()
