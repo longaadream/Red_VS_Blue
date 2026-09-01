@@ -16,6 +16,16 @@ npm.cmd test -- tests/game/turn-timer.test.ts tests/game/turn-timer-room.test.ts
 npm.cmd exec tsc -- --noEmit
 ```
 
+## 2026-09-01 验证记录
+
+- `npm.cmd run check:main-baseline`：通过；`origin/main` 为 `bf0c7f68568f4fde5a3a04e6046054a0f527c19d`，分支 behind 为 0。
+- 定向规则、投影、AI 与页面合同：6 个文件、101 条测试通过。
+- Electron 战斗页运行时：2 个文件、22 条测试通过。
+- `npm.cmd exec tsc -- --noEmit` 与 `npm.cmd run build:game-engine`：通过。
+- 完整 `npm.cmd test`：176 个文件、1938 条测试通过，2 个文件中的 3 条测试因本机缺少候选版内嵌 PostgreSQL 与 Colyseus 打包产物失败；失败路径均不在 RED-164 修改范围。
+- `npm.cmd run lint`：被仓库 ESLint 配置阻挡；配置启用了 `import/no-anonymous-default-export`，但没有注册 `import` 插件。
+- 正式 `battle.html` 客户端运行时冒烟：桌面与 390 × 844 窄屏均显示“回合冻结 00:34”和独立“响应 00:15”；截图已附加到 Linear RED-164。真实房间入口因本机未配置 `DATABASE_URL` 无法创建房间。
+
 ## 双客户端人工验证
 
 1. 活动玩家先等待普通计时下降，再触发由对手处理的 option 或 target pending。
