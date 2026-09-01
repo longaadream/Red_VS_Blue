@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "agentId": "rvb-ai-zimse-v1",
   "kind": "zero-stage",
   "description": "Aggressive one-step legal-action evaluator that values the position created by spending resources, prioritizes enemy cores, and advances into high-potential positions.",

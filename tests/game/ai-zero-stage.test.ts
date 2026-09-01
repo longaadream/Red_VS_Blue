@@ -249,6 +249,133 @@ describe('zero-stage static evaluator', () => {
       .toBeGreaterThan(clusteredValue.components.enemyProximity.raw)
   })
 
+  it('balances multiple pursuers per surviving core instead of stopping at one-to-one cleanup', () => {
+    const clustered = makeState({
+      width: 21,
+      height: 3,
+      pieces: [
+        makePiece({ instanceId: 'red-near-a', ownerPlayerId: 'player-red', x: 0, y: 1 }),
+        makePiece({ instanceId: 'red-near-b', ownerPlayerId: 'player-red', x: 1, y: 1 }),
+        makePiece({ instanceId: 'red-extra', ownerPlayerId: 'player-red', x: 2, y: 1 }),
+        makePiece({ instanceId: 'red-remote', ownerPlayerId: 'player-red', x: 12, y: 1 }),
+        makePiece({ instanceId: 'blue-near', ownerPlayerId: 'player-blue', x: 0, y: 1 }),
+        makePiece({ instanceId: 'blue-remote', ownerPlayerId: 'player-blue', x: 20, y: 1 }),
+      ],
+    }) as any
+    clustered.pieces.forEach((piece: any) => { piece.isCore = true })
+    const advancingSecondPursuer = structuredClone(clustered) as any
+    advancingSecondPursuer.pieces[2].x = 3
+
+    const clusteredValue = evaluateZeroStageState(aiEnvironmentV1.observe(clustered, 'player-red'))
+    const advancingValue = evaluateZeroStageState(
+      aiEnvironmentV1.observe(advancingSecondPursuer, 'player-red'),
+    )
+
+    expect(advancingValue.components.enemyProximity.raw)
+      .toBeGreaterThan(clusteredValue.components.enemyProximity.raw)
+  })
+
+  it('adds cleanup position value when an assigned pursuer reaches its next-action envelope', () => {
+    const outside = makeState({
+      width: 21,
+      height: 3,
+      pieces: [
+        makePiece({ instanceId: 'red-near-a', ownerPlayerId: 'player-red', x: 0, y: 1 }),
+        makePiece({ instanceId: 'red-near-b', ownerPlayerId: 'player-red', x: 1, y: 1 }),
+        makePiece({ instanceId: 'red-stager', ownerPlayerId: 'player-red', x: 14, y: 1, moveRange: 4 }),
+        makePiece({ instanceId: 'red-remote', ownerPlayerId: 'player-red', x: 19, y: 0 }),
+        makePiece({ instanceId: 'blue-near', ownerPlayerId: 'player-blue', x: 0, y: 1 }),
+        makePiece({ instanceId: 'blue-remote', ownerPlayerId: 'player-blue', x: 20, y: 1 }),
+      ],
+    }) as any
+    outside.pieces.forEach((piece: any) => { piece.isCore = true })
+    const staged = structuredClone(outside) as any
+    staged.pieces[2].x = 15
+
+    const outsideValue = evaluateZeroStageState(aiEnvironmentV1.observe(outside, 'player-red'))
+    const stagedValue = evaluateZeroStageState(aiEnvironmentV1.observe(staged, 'player-red'))
+    const oneStepDistanceGain = 1 / (outside.map.tiles.length - 1)
+
+    expect(stagedValue.components.enemyProximity.raw
+      - outsideValue.components.enemyProximity.raw).toBeGreaterThan(oneStepDistanceGain + 0.04)
+  })
+
+  it('focuses distance value more strongly when only one enemy core survives', () => {
+    const remote = makeState({
+      width: 21,
+      height: 7,
+      pieces: [
+        makePiece({ instanceId: 'red-a', ownerPlayerId: 'player-red', x: 0, y: 1 }),
+        makePiece({ instanceId: 'red-b', ownerPlayerId: 'player-red', x: 0, y: 3 }),
+        makePiece({ instanceId: 'red-c', ownerPlayerId: 'player-red', x: 0, y: 5 }),
+        makePiece({ instanceId: 'blue-last', ownerPlayerId: 'player-blue', x: 20, y: 3 }),
+      ],
+    }) as any
+    remote.pieces.forEach((piece: any) => { piece.isCore = true })
+    const advanced = structuredClone(remote) as any
+    advanced.pieces[1].x = 1
+
+    const remoteValue = evaluateZeroStageState(aiEnvironmentV1.observe(remote, 'player-red'))
+    const advancedValue = evaluateZeroStageState(aiEnvironmentV1.observe(advanced, 'player-red'))
+
+    expect(advancedValue.components.enemyProximity.raw
+      - remoteValue.components.enemyProximity.raw).toBeGreaterThan(0.02)
+  })
+
+  it('rewards entering an action envelope under a slight numerical advantage', () => {
+    const outside = makeState({
+      width: 21,
+      height: 7,
+      pieces: [
+        makePiece({ instanceId: 'red-a', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({ instanceId: 'red-b', ownerPlayerId: 'player-red', x: 1, y: 0 }),
+        makePiece({ instanceId: 'red-c', ownerPlayerId: 'player-red', x: 2, y: 0 }),
+        makePiece({ instanceId: 'red-d', ownerPlayerId: 'player-red', x: 3, y: 0 }),
+        makePiece({ instanceId: 'red-stager', ownerPlayerId: 'player-red', x: 14, y: 3, moveRange: 4 }),
+        makePiece({ instanceId: 'blue-a', ownerPlayerId: 'player-blue', x: 0, y: 6 }),
+        makePiece({ instanceId: 'blue-b', ownerPlayerId: 'player-blue', x: 5, y: 6 }),
+        makePiece({ instanceId: 'blue-c', ownerPlayerId: 'player-blue', x: 10, y: 6 }),
+        makePiece({ instanceId: 'blue-remote', ownerPlayerId: 'player-blue', x: 20, y: 3 }),
+      ],
+    }) as any
+    outside.pieces.forEach((piece: any) => { piece.isCore = true })
+    const staged = structuredClone(outside) as any
+    staged.pieces[4].x = 15
+
+    const outsideValue = evaluateZeroStageState(aiEnvironmentV1.observe(outside, 'player-red'))
+    const stagedValue = evaluateZeroStageState(aiEnvironmentV1.observe(staged, 'player-red'))
+
+    expect(stagedValue.components.enemyProximity.raw
+      - outsideValue.components.enemyProximity.raw).toBeGreaterThan(0.04)
+  })
+
+  it('strengthens each approach step after an advantage side reduces enemies to four cores', () => {
+    const remote = makeState({
+      width: 21,
+      height: 7,
+      pieces: [
+        makePiece({ instanceId: 'red-a', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({ instanceId: 'red-b', ownerPlayerId: 'player-red', x: 1, y: 0 }),
+        makePiece({ instanceId: 'red-c', ownerPlayerId: 'player-red', x: 2, y: 0 }),
+        makePiece({ instanceId: 'red-d', ownerPlayerId: 'player-red', x: 3, y: 0 }),
+        makePiece({ instanceId: 'red-pursuer', ownerPlayerId: 'player-red', x: 14, y: 3, moveRange: 2 }),
+        makePiece({ instanceId: 'blue-a', ownerPlayerId: 'player-blue', x: 0, y: 6 }),
+        makePiece({ instanceId: 'blue-b', ownerPlayerId: 'player-blue', x: 5, y: 6 }),
+        makePiece({ instanceId: 'blue-c', ownerPlayerId: 'player-blue', x: 10, y: 6 }),
+        makePiece({ instanceId: 'blue-remote', ownerPlayerId: 'player-blue', x: 20, y: 3 }),
+      ],
+    }) as any
+    remote.pieces.forEach((piece: any) => { piece.isCore = true })
+    const advanced = structuredClone(remote) as any
+    advanced.pieces[4].x = 15
+
+    const remoteValue = evaluateZeroStageState(aiEnvironmentV1.observe(remote, 'player-red'))
+    const advancedValue = evaluateZeroStageState(aiEnvironmentV1.observe(advanced, 'player-red'))
+
+    expect(advancedValue.components.enemyProximity.raw
+      - remoteValue.components.enemyProximity.raw).toBeGreaterThan(0.01)
+  })
+
   it('penalizes exposed low-health positions and rewards deployment lock readiness', () => {
     const exposed = combatState() as any
     exposed.pieces[0].currentHp = 10
@@ -267,6 +394,25 @@ describe('zero-stage static evaluator', () => {
       deadlineAt: 0, revision: 1, initialPositions: {},
     }
     expect(evaluateZeroStageState(aiEnvironmentV1.observe(safe, 'player-red')).components.deploymentReadiness.raw).toBe(1)
+  })
+
+  it('values public sourced status tags by whether their source is friendly or hostile', () => {
+    const baseline = combatState() as any
+    const cursed = structuredClone(baseline) as any
+    cursed.pieces[1].statusTags = [{
+      id: 'enemy-curse',
+      type: 'curse',
+      sourcePlayerId: 'player-red',
+    }]
+    const neutral = structuredClone(baseline) as any
+    neutral.pieces[1].statusTags = [{ id: 'unknown-polarity', type: 'stance' }]
+
+    const baselineValue = evaluateZeroStageState(aiEnvironmentV1.observe(baseline, 'player-red'))
+    const cursedValue = evaluateZeroStageState(aiEnvironmentV1.observe(cursed, 'player-red'))
+    const neutralValue = evaluateZeroStageState(aiEnvironmentV1.observe(neutral, 'player-red'))
+
+    expect(cursedValue.components.status.raw).toBeGreaterThan(baselineValue.components.status.raw)
+    expect(neutralValue.components.status.raw).toBe(baselineValue.components.status.raw)
   })
 
   it('values damage to a core more than equal normalized damage to a non-core piece', () => {

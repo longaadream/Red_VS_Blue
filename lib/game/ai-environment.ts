@@ -126,7 +126,7 @@ function observedStatusTag(tag: unknown): AIObservedStatusTag | undefined {
     return undefined
   }
   const projected: AIObservedStatusTag = { id: source.id, type: source.type }
-  const stringKeys = ['name'] as const
+  const stringKeys = ['name', 'sourcePlayerId'] as const
   const numberKeys = [
     'currentDuration', 'remainingDuration', 'currentUses', 'intensity', 'stacks',
     'value', 'extraValue', 'centerX', 'centerY', 'damage',

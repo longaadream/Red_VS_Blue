@@ -184,15 +184,79 @@ function enemyProximityPotential(
   const hostileCores = hostile.filter(piece => piece.isCore)
   const objectives = hostileCores.length > 0 ? hostileCores : hostile
   if (sources.length === 0 || objectives.length === 0) return 0
+  const lateCleanup = hostileCores.length > 0
+    && objectives.length <= 4
+    && pursuers.length > objectives.length
+  const pursuitDistanceScale = objectives.length === 1 && pursuers.length > objectives.length
+    ? Math.max(1, Math.sqrt(distanceScale) * 2)
+    : lateCleanup
+      ? Math.max(1, Math.sqrt(distanceScale) * 4)
+      : Math.max(1, distanceScale)
+  const proximity = (source: AIObservedPiece, target: AIObservedPiece) => {
+    const steps = walkableDistance(source, target)
+    if (!Number.isFinite(steps)) return 0
+    return 1 - Math.min(1, steps / pursuitDistanceScale)
+  }
+  const reachesStagingRange = (source: AIObservedPiece, target: AIObservedPiece) => {
+    const steps = walkableDistance(source, target)
+    const stagingRange = Math.max(1, source.moveRange + 1)
+    return Number.isFinite(steps) && steps <= stagingRange
+  }
   const nearestSum = sources.reduce((total, source) => {
-    const steps = Math.min(...objectives.map(target => walkableDistance(source, target)))
-    if (!Number.isFinite(steps)) return total
-    return total + 1 - Math.min(1, steps / Math.max(1, distanceScale))
+    return total + Math.max(0, ...objectives.map(target => proximity(source, target)))
   }, 0)
   const assignmentWeight = hostileCores.length > 0 && pursuers.length > objectives.length
     ? Math.min(0.5, objectives.length / pursuers.length)
     : 0
-  if (assignmentWeight === 0) return nearestSum
+  const stagingCoverage = lateCleanup
+    ? pursuers.reduce((total, source) => (
+        total + Number(objectives.some(target => reachesStagingRange(source, target))) * 0.05
+      ), 0)
+    : 0
+  if (assignmentWeight === 0) return nearestSum + stagingCoverage
+
+  // Once the enemy is deeply outnumbered, assign every surviving core to an
+  // objective with a balanced per-target capacity. The former one-to-one blend
+  // guaranteed only one pursuer per remote survivor; everybody else could keep
+  // following the nearest target and leave a healer or shielded core in an
+  // endless one-on-one. A ceil(N/M) capacity forces N pursuers to distribute as
+  // evenly as possible while still choosing the cheapest assignment globally.
+  if (objectives.length * 2 <= pursuers.length) {
+    const capacity = Math.ceil(pursuers.length / objectives.length)
+    const memo = new Map<string, number>()
+    const bestBalancedAssignment = (sourceIndex: number, targetUses: number[]): number => {
+      if (sourceIndex >= pursuers.length) return 0
+      const memoKey = `${sourceIndex}|${targetUses.join(',')}`
+      const cached = memo.get(memoKey)
+      if (cached !== undefined) return cached
+      let best = Number.NEGATIVE_INFINITY
+      for (let targetIndex = 0; targetIndex < objectives.length; targetIndex += 1) {
+        if (targetUses[targetIndex] >= capacity) continue
+        targetUses[targetIndex] += 1
+        best = Math.max(
+          best,
+          proximity(pursuers[sourceIndex], objectives[targetIndex])
+            + bestBalancedAssignment(sourceIndex + 1, targetUses),
+        )
+        targetUses[targetIndex] -= 1
+      }
+      memo.set(memoKey, best)
+      return best
+    }
+    const pursuerIds = new Set(pursuers.map(piece => piece.instanceId))
+    const supportingNearest = sources.reduce((total, source) => (
+      pursuerIds.has(source.instanceId)
+        ? total
+        : total + Math.max(0, ...objectives.map(target => proximity(source, target)))
+    ), 0)
+    // Assignment prevents abandoned objectives; this target-independent bonus
+    // separately rewards every pursuer that can stage against any survivor.
+    // It avoids a globally optimal assignment label making a nearby actionable
+    // enemy look irrelevant to that pursuer.
+    return supportingNearest
+      + bestBalancedAssignment(0, objectives.map(() => 0))
+      + stagingCoverage
+  }
 
   // Match the smaller side one-to-one against the larger side. A nearest-only
   // sum lets the whole team crowd one nearby core while ignoring survivors on
@@ -200,12 +264,10 @@ function enemyProximityPotential(
   // while assigning distinct pursuers whenever enough core pieces remain.
   const rows = pursuers.length <= objectives.length ? pursuers : objectives
   const columns = pursuers.length <= objectives.length ? objectives : pursuers
-  const proximity = rows.map(row => columns.map(column => {
+  const assignmentProximity = rows.map(row => columns.map(column => {
     const source = pursuers.length <= objectives.length ? row : column
     const target = pursuers.length <= objectives.length ? column : row
-    const steps = walkableDistance(source, target)
-    if (!Number.isFinite(steps)) return 0
-    return 1 - Math.min(1, steps / Math.max(1, distanceScale))
+    return proximity(source, target)
   }))
   const memo = new Map<number, number>()
   const bestAssignment = (rowIndex: number, usedColumns: number): number => {
@@ -219,7 +281,7 @@ function enemyProximityPotential(
       if (Math.floor(usedColumns / bit) % 2 === 1) continue
       best = Math.max(
         best,
-        proximity[rowIndex][columnIndex] + bestAssignment(rowIndex + 1, usedColumns + bit),
+        assignmentProximity[rowIndex][columnIndex] + bestAssignment(rowIndex + 1, usedColumns + bit),
       )
     }
     memo.set(memoKey, best)
@@ -228,7 +290,7 @@ function enemyProximityPotential(
   // Keep the component magnitude comparable to the former per-pursuer sum
   // when there are more pursuers than objectives.
   const assigned = bestAssignment(0, 0) * pursuers.length / rows.length
-  return nearestSum * (1 - assignmentWeight) + assigned * assignmentWeight
+  return nearestSum * (1 - assignmentWeight) + assigned * assignmentWeight + stagingCoverage
 }
 
 function supportPotential(pieces: AIObservedPiece[]) {
@@ -299,7 +361,12 @@ function statusBalance(pieces: AIObservedPiece[]) {
   return pieces.reduce((total, piece) => {
     const buffs = new Set((piece.buffs ?? []).map(item => item.type))
     const debuffs = new Set((piece.debuffs ?? []).map(item => item.type))
-    return total + buffs.size - debuffs.size
+    const explicitTypes = new Set([...buffs, ...debuffs])
+    const sourcedTags = piece.statusTags.reduce((subtotal, tag) => {
+      if (!tag.sourcePlayerId || explicitTypes.has(tag.type)) return subtotal
+      return subtotal + (samePlayer(tag.sourcePlayerId, piece.ownerPlayerId) ? 1 : -1)
+    }, 0)
+    return total + buffs.size - debuffs.size + sourcedTags
   }, 0)
 }
 

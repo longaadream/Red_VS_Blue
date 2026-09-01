@@ -61,6 +61,7 @@ export interface AIObservedStatusTag {
   id: string
   type: string
   name?: string
+  sourcePlayerId?: string
   currentDuration?: number
   remainingDuration?: number
   currentUses?: number
@@ -481,7 +482,7 @@ export interface AiTurnPlan {
   trace: AiPlannerTraceEntry[]
 }
 
-export const ZERO_STAGE_AI_PROFILE_VERSION = 5 as const
+export const ZERO_STAGE_AI_PROFILE_VERSION = 6 as const
 
 export type ZeroStageStaticComponentKey =
   | 'coreSurvival'

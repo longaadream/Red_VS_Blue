@@ -447,11 +447,13 @@ describe('versioned headless AI environment', () => {
       instanceId: 'evaluation-blocked-mover', ownerPlayerId: 'player-red', x: 1, y: 1,
     }) as any
     const blockedState = makeState({ pieces: [blockedMover] }) as any
-    const triggerSpy = vi.spyOn(globalTriggerSystem, 'checkTriggers').mockImplementation((_, context: any) => (
-      context.type === 'beforeMove'
-        ? { success: true, messages: ['blocked'], blocked: true }
-        : { success: true, messages: [], blocked: false }
-    ) as any)
+    globalTriggerSystem.addRule({
+      id: 'evaluation-blocked-move',
+      name: 'evaluation blocked move',
+      description: 'Blocks movement in both full and isolated evaluation runtimes.',
+      trigger: { type: 'beforeMove' },
+      effect: () => ({ success: true, message: 'blocked', blocked: true }),
+    })
     const blockedAction = {
       type: 'move',
       playerId: 'player-red',
@@ -476,7 +478,7 @@ describe('versioned headless AI environment', () => {
     expect(blockedFull.trace.blocked).toBe(true)
     expect(blockedEvaluation.trace.blocked).toBe(true)
     expect(hashBattleState(blockedFull.state)).toBe(hashBattleState(blockedEvaluation.state))
-    triggerSpy.mockRestore()
+    globalTriggerSystem.clearRules()
 
     const rejectedAction = {
       type: 'move', playerId: 'player-red', pieceId: 'evaluation-mover', toX: 99, toY: 99,

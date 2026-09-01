@@ -606,7 +606,10 @@ describe('RED-122 rvb-ai-zimse-v1 mirror self-play evaluation', () => {
     process.stderr.write(`RED122_PVE_3_GAME_RESULT ${JSON.stringify({ summary, results })}\n`)
     expect(results).toHaveLength(pveCases.length)
     if (Number(process.env.RED122_PVE_MAX_TURNS ?? 80) < 80) {
-      expect(results.every(result => result.failure === 'turn-budget')).toBe(true)
+      expect(results.every(result => (
+        result.failure === 'turn-budget'
+        || (result.status === 'finished' && result.failure === null)
+      ))).toBe(true)
     } else {
       expect(summary.failures).toBe(0)
     }
