@@ -306,7 +306,7 @@ const ruleCommands = Object.freeze([
   'card.add-to-hand', 'damage.apply', 'event.fire', 'heal.apply',
   'player-rule.add', 'player-rule.remove', 'player-skill.add', 'player-skill.remove',
   'player-status.add', 'player-status.remove', 'rule.add', 'rule.remove',
-  'status.add', 'status.remove',
+  'skill.add', 'skill.remove', 'status.add', 'status.remove',
 ] as const satisfies readonly SkillCodeAbiV1CommandKind[])
 const triggerCommands = Object.freeze([
   'card.add-to-hand', 'card.discard', 'damage.apply', 'heal.apply',
@@ -391,7 +391,7 @@ export const SKILLCODE_ABI_V1_SURFACES: Readonly<Record<SkillCodeAbiV1Surface, S
       'removeStatusEffectById', 'addPlayerRuleById', 'removePlayerRuleById',
       'addRuleById', 'removeRuleById', 'addPlayerStatusEffectById',
       'removePlayerStatusEffectById', 'addPlayerSkillById', 'removePlayerSkillById',
-      'selectOption', 'fireEvent', 'Math', 'Date',
+      'addSkillById', 'removeSkillById', 'selectOption', 'fireEvent', 'Math', 'Date',
     ]),
     commandKinds: ruleCommands,
     input: SKILLCODE_ABI_V1_INPUT_SCHEMAS.ruleSkillCode,

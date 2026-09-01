@@ -107,6 +107,7 @@ describe('Venom data contract', () => {
 
     expect(piece).toMatchObject({
       id: 'red-venom',
+      image: 'venom.jpg',
       name: '毒液',
       faction: 'evil',
       stats: { maxHp: 14, attack: 3, defense: 1, moveRange: 4 },
@@ -119,6 +120,8 @@ describe('Venom data contract', () => {
     })
 
     expect(getPieceById('red-venom')).toMatchObject({ id: 'red-venom', faction: 'evil' })
+    expect([...readFileSync(join(process.cwd(), 'public', 'venom.jpg')).subarray(0, 3)])
+      .toEqual([0xff, 0xd8, 0xff])
     expect([
       getSkillById('venom-corrosion')?.id,
       getSkillById('venom-host-transfer')?.id,

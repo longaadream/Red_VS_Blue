@@ -419,6 +419,35 @@ describe('battle presentation boundary', () => {
     expect(engine.getLegalNormalMoveTargetsForPlayer).toHaveBeenCalledWith(snapshot, 'player-red', 'piece-red')
   })
 
+  it('highlights a move that is suspended by an out-of-turn pending response', () => {
+    const legalActions = loadBrowserModule('js/battle-ui/battle-legal-actions.js', 'BattleLegalActions')
+    const snapshot = fixtureSnapshot()
+    const engine = {
+      getLegalNormalMoveTargetsForPlayer: vi.fn(() => [{ x: 1, y: 0 }, { x: 2, y: 0 }]),
+      safeCloneBattleState: (state: unknown) => structuredClone(state),
+      applyBattleAction: vi.fn((state, action) => ({
+        ...state,
+        pendingTargetSelection: {
+          playerId: 'player-blue',
+          transaction: {
+            rootAction: action.toX === 1
+              ? { type: 'move', playerId: action.playerId, pieceId: action.pieceId, toX: 1, toY: 0 }
+              : { type: 'move', playerId: action.playerId, pieceId: action.pieceId, toX: 9, toY: 9 },
+          },
+        },
+      })),
+    }
+
+    const moves = legalActions.queryMoveCells({
+      snapshot,
+      playerId: 'player-red',
+      pieceId: 'piece-red',
+      engine,
+    })
+
+    expect(Array.from(moves)).toEqual(['1,0'])
+  })
+
   it('does not treat a repeated same-step target request as a legal skill target', () => {
     const legalActions = loadBrowserModule('js/battle-ui/battle-legal-actions.js', 'BattleLegalActions')
     const snapshot = fixtureSnapshot()

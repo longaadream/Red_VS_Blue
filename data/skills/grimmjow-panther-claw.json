@@ -1,0 +1,20 @@
+{
+  "id": "grimmjow-panther-claw",
+  "name": "豹王之爪",
+  "description": "灵压。对4格内1名敌人连续攻击5次，每次造成75%攻击力的物理伤害。",
+  "keywords": ["灵压"],
+  "statusTag": { "id": "spiritual-pressure", "type": "skill-rule", "name": "灵压", "rule": "rule-spiritual-pressure" },
+  "targetText": "4格内1名敌人",
+  "effectTags": ["物理伤害", "多段攻击"],
+  "icon": "🖐️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 0.75,
+  "actionPointCost": 2,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "kind": "target", "type": "piece", "filter": "enemy", "range": 4 }], "availability": [{ "type": "sourceStatus", "statusType": "grimmjow-resurreccion", "present": true, "message": "尚未归刃" }] },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var hits = 0; var total = 0; for (var index = 0; index < 5; index++) { var activeCaster = battle.pieces.find(function(piece) { return piece.instanceId === caster.instanceId && piece.currentHp > 0; }); var activeTarget = battle.pieces.find(function(piece) { return piece.instanceId === target.instanceId && piece.currentHp > 0; }); if (!activeCaster || !activeTarget) break; var hit = dealDamage(activeCaster, activeTarget, Math.floor(activeCaster.attack * 0.75), 'physical', battle, 'grimmjow-panther-claw'); hits++; total += hit.damage || 0; activeCaster = battle.pieces.find(function(piece) { return piece.instanceId === caster.instanceId && piece.currentHp > 0; }); if (activeCaster) dealDamage(activeCaster, activeCaster, 1, 'true', battle, 'grimmjow-destruction-instinct'); } return { success: true, message: caster.name + '以豹王之爪攻击' + hits + '次，共造成' + total + '点物理伤害' }; }"
+}
