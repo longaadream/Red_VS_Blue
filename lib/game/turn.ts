@@ -505,6 +505,16 @@ export type BattleAction =
       expectedPendingStateRevision?: number | null
     }
   | {
+      type: "pendingTimeout"
+      now: number
+      clientActionId?: string
+      expectedTurnNumber?: number
+      expectedDeadlineAt?: number
+      expectedInputOwnerPlayerId?: PlayerId
+      expectedPendingSelectionId?: string
+      expectedPendingStateRevision?: number
+    }
+  | {
       type: "move"
       playerId: PlayerId
       pieceId: string
@@ -2036,6 +2046,72 @@ function applyBattleActionInternal(
         if (progressed.terminalResult) return progressed
       }
       return applySuspendableChildAction(progressed, { type: 'beginPhase' })
+    }
+
+    case "pendingTimeout": {
+      const next = cloneBattleStateForEffectExecution(state)
+      const response = next.turnTimer?.pendingResponse
+      if (!response) {
+        throw new BattleRuleError('No pending response timer is active', 'PENDING_TIMEOUT_REJECTED')
+      }
+      if (action.now < response.deadlineAt) {
+        throw new BattleRuleError(
+          'Pending timeout cannot run before its authoritative deadline',
+          'PENDING_TIMEOUT_REJECTED',
+        )
+      }
+      const pending = next.pendingOptionSelection ?? next.pendingTargetSelection
+      const pendingOwnerPlayerId = pending && 'ownerPlayerId' in pending && pending.ownerPlayerId
+        ? pending.ownerPlayerId
+        : pending?.playerId
+      if (!pending
+        || pending.selectionId !== response.selectionId
+        || pending.stateRevision !== response.stateRevision
+        || !isSamePlayer(pendingOwnerPlayerId ?? '', response.ownerPlayerId)) {
+        throw new BattleRuleError(
+          'Pending timeout does not match the active response session',
+          'PENDING_TIMEOUT_REJECTED',
+        )
+      }
+      if (!next.actions) next.actions = []
+      next.actions.push({
+        type: 'pendingTimeout',
+        playerId: response.ownerPlayerId,
+        turn: next.turn.turnNumber,
+        payload: {
+          message: 'Pending response timed out',
+          deadlineAt: response.deadlineAt,
+          selectionId: response.selectionId,
+          resolution: response.timeoutResolution.kind,
+        },
+      } as any)
+      const credentials = {
+        playerId: response.ownerPlayerId,
+        selectionId: response.selectionId,
+        stateRevision: response.stateRevision,
+      }
+      if (response.timeoutResolution.kind === 'cancel') {
+        return applyBattleActionInternal(next, {
+          type: 'cancelPendingSelection',
+          ...credentials,
+        })
+      }
+      if (response.timeoutResolution.kind === 'option') {
+        return applyBattleActionInternal(next, {
+          type: 'pendingOptionSelect',
+          ...credentials,
+          selectedOption: response.timeoutResolution.selectedOption,
+        })
+      }
+      const { targetPieceId, targetX, targetY, extraTargets } = response.timeoutResolution
+      return applyBattleActionInternal(next, {
+        type: 'pendingTargetSelect',
+        ...credentials,
+        targetPieceId,
+        targetX,
+        targetY,
+        extraTargets,
+      })
     }
 
     case 'deployReservePiece': {

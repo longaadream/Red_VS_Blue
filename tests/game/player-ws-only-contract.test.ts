@@ -31,12 +31,12 @@ describe('RED-127 player networking boundary', () => {
     expect(room).not.toMatch(/if \(shouldUseRelayMode\(\)\) \{[\s\S]*?btn\.disabled = true/)
   })
 
-  it('uses WebSocket health and content identity for connection checks', () => {
+  it('uses the Colyseus endpoint health and content identity for connection checks', () => {
     const index = readFileSync(resolve('data/pages/index.html'), 'utf8')
     const discovery = readFileSync(resolve('data/pages/js/lan-discover.js'), 'utf8')
     const websocket = readFileSync(resolve('data/pages/js/ws-client.js'), 'utf8')
     expect(index).toContain('RvBWs.requestCatalogIdentityAt')
-    expect(websocket).toContain("requestAt(baseUrl, 'catalog.identity', {}, timeoutMs)")
+    expect(websocket).toContain("if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)")
     expect(discovery).not.toContain('fetch(')
   })
 })
@@ -56,7 +56,7 @@ describe('RED-116 Electron lobby profile bridge', () => {
     expect(body).toContain("console.warn('[profile] remote catalog identity preflight failed', error)")
   })
 
-  it('reads a validated stored Profile Identity before using protected Electron IPC', () => {
+  it('uses the live Electron Profile Identity before any standalone cache fallback', () => {
     const lobby = readFileSync(resolve('data/pages/lobby.html'), 'utf8')
     const readerStart = lobby.indexOf('function readStoredGameProfileIdentity')
     const readerEnd = lobby.indexOf('async function getLocalGameProfileIdentity', readerStart)
@@ -69,13 +69,13 @@ describe('RED-116 Electron lobby profile bridge', () => {
     expect(reader).toContain("localStorage.getItem('rvb_game_profile_identity')")
     expect(reader).toContain('isGameProfileIdentity')
     expect(getter).toContain('readStoredGameProfileIdentity()')
-    expect(getter.indexOf('readStoredGameProfileIdentity()'))
-      .toBeLessThan(getter.indexOf('window.electronAPI'))
+    expect(getter.indexOf('window.electronAPI'))
+      .toBeLessThan(getter.indexOf('readStoredGameProfileIdentity()'))
   })
 
   it('resolves the client local runtime through trusted game IPC', () => {
     const websocket = readFileSync(resolve('data/pages/js/ws-client.js'), 'utf8')
-    expect(websocket).toContain("requestAt(baseUrl, 'catalog.identity', {}, timeoutMs)")
+    expect(websocket).toContain("if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)")
 
     for (const page of ['index.html', 'lobby.html']) {
       const source = readFileSync(resolve('data/pages', page), 'utf8')
@@ -87,12 +87,14 @@ describe('RED-116 Electron lobby profile bridge', () => {
       const getter = source.slice(start, end)
 
       expect(getter).toContain('window.electronAPI.getMode')
-      expect(getter).toContain('mode.localUrl')
-      expect(getter).toContain('RvBWs.requestCatalogIdentityAt')
-      expect(getter).toContain("'local-profile-runtime'")
+      expect(getter).toContain('mode.localAuthorityProfileIdentity')
+      expect(getter).toContain('mode.profileIdentity')
+      expect(getter).not.toContain('mode.profileRuntimeUrl')
       expect(getter).not.toContain('getResourcePackStatus')
-      expect(getter.indexOf('mode.localUrl'))
-        .toBeLessThan(getter.indexOf('RvBWs.requestCatalogIdentityAt'))
+      if (page === 'lobby.html') {
+        expect(getter.indexOf('window.electronAPI.getMode'))
+          .toBeLessThan(getter.indexOf('readStoredGameProfileIdentity()'))
+      }
     }
   })
 })

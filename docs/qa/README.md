@@ -90,6 +90,7 @@
 - 创建新游戏。
 - 完成一次核心回合。
 - [RED-127 Windows 双人 WS 联机候选验收](RED-127-windows-ws-multiplayer.md)
+- [RED-161 Colyseus 默认玩家链路切换验收](RED-161-colyseus-electron-cutover.md)
 - 获取和消耗关键资源。
 - 执行一张牌或一次策略操作。
 - 非法操作被拒绝，且状态没有损坏。
@@ -128,6 +129,7 @@ PR 中根据风险提供以下证据：
 
 - [RED-43 同阵营对局客户端 UI 验收](RED-43-same-alignment-ui.md)
 - [RED-36 权威成长型回合计时验证](RED-36-authoritative-turn-timer.md)
+- [RED-159 Colyseus / PostgreSQL Phase 0 合同验收](RED-159-colyseus-postgresql-contract.md)
 
 ## 不稳定测试
 

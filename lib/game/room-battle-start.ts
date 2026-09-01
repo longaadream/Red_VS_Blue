@@ -20,7 +20,8 @@ import {
 } from './battle-storage'
 import { getPieceById } from './piece-repository'
 import { assertDemoRostersReady, type RosterRoomStore } from './roster-contract'
-import { getPlayerSeat, type Room } from './room-store'
+import { isPlayerSeat, type PlayerSeat } from './match-identity'
+import type { Room } from './room-store'
 import { createRootSeed } from './rule-runtime'
 import {
   systemDeploymentRuleClock,
@@ -39,6 +40,10 @@ import { createRoomRuleRuntime, restoreRoomRuleRuntime } from './room-rule-runti
 export interface StartLockedRosterBattleResult {
   room: Room
   started: boolean
+}
+
+function getPlayerSeat(player: { seat?: PlayerSeat; faction?: PlayerSeat }): PlayerSeat | undefined {
+  return isPlayerSeat(player.seat) ? player.seat : isPlayerSeat(player.faction) ? player.faction : undefined
 }
 
 export interface StartLockedRosterBattleOptions {

@@ -11,6 +11,7 @@
   <script src="js/identity.js"></script>
   <script src="js/game-engine-runtime.js"></script>
   <script src="js/game-engine.js"></script>
+  <script src="js/colyseus-sdk.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
@@ -1419,6 +1420,23 @@
     .turn-clock.fast { color: #fbbf24; }
     .turn-clock.fast.burning { color: #fb7185; }
     .turn-clock[hidden] { display: none !important; }
+    @media (max-width: 600px) {
+      .turn-summary-secondary.pending-timer-active {
+        position: fixed;
+        top: 38px;
+        left: 8px;
+        z-index: 85;
+        display: flex !important;
+        gap: 6px;
+        padding: 4px 7px;
+        border: 1px solid rgba(148,163,184,.18);
+        border-radius: 7px;
+        background: rgba(5,10,20,.72);
+        box-shadow: 0 8px 20px rgba(0,0,0,.24);
+        backdrop-filter: blur(8px);
+      }
+      .turn-summary-secondary.pending-timer-active #phaseLabel { display: none; }
+    }
     @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
       .phase-bar { max-width: calc(100vw - 210px) !important; }
       .player-state-chip { min-width: 102px !important; max-width: 128px; grid-template-columns: minmax(38px, 1fr) auto !important; }
@@ -1603,6 +1621,7 @@
           </div>
           <div class="turn-summary-secondary">
             <span id="phaseLabel">-</span>
+            <span class="turn-clock" id="turnClockFrozen" title="普通回合计时已冻结" hidden>回合冻结 --:--</span>
             <span class="turn-clock" id="turnClock" title="回合计时">--:--</span>
           </div>
         </div>
@@ -1633,7 +1652,10 @@
                   <span id="pieceContextName" class="piece-context-name"></span>
                   <span id="pieceContextHp" class="piece-context-hp"></span>
                 </span>
-                <button type="button" class="piece-context-info" onclick="if(selectedPieceId)dispatchBattleIntent({type:'inspect-piece',pieceId:selectedPieceId})" aria-label="查看棋子完整技能与状态" title="完整技能与状态">i</button>
+                <span class="piece-context-actions">
+                  <button type="button" class="piece-context-info" onclick="if(selectedPieceId)dispatchBattleIntent({type:'inspect-piece',pieceId:selectedPieceId})" aria-label="查看棋子完整技能与状态" title="完整技能与状态">i</button>
+                  <button type="button" class="piece-context-collapse" onclick="dismissPieceContextMenu()" aria-label="收起技能栏" title="收起技能栏">‹</button>
+                </span>
               </div>
               <div id="pieceContextSkills" class="piece-context-skills"></div>
             </div>
@@ -1747,7 +1769,9 @@
   <script>
     // ── URL params ──
     const params = new URLSearchParams(location.search)
-    const roomId = (params.get('roomId') || '').trim().toLowerCase()
+    // Colyseus room IDs are opaque and case-sensitive. Only player identity is
+    // normalized; changing the room ID makes joinById target another room.
+    const roomId = (params.get('roomId') || '').trim()
     let myPlayerId = (params.get('playerId') || '').trim().toLowerCase()
     const myAccountId = (params.get('accountId') || params.get('account') || '').trim().toLowerCase()
     const myPlayerName = params.get('playerName') || '玩家'
@@ -2092,6 +2116,7 @@
     let deploymentStatusTimer = null
     let authorityClockAnchor = null
     let authoritativeTurnTimer = null
+    let authoritativePendingTimer = null
     let myFaction = null       // 'red' | 'blue' (derived from ownerPlayerId)
     let recordSaved = false
     let actionLog = []
@@ -4043,13 +4068,14 @@
       if (!authorityClockAnchor) return Date.now()
       return authorityClockAnchor.serverNow + Math.max(0, Date.now() - authorityClockAnchor.localNow)
     }
-    function syncAuthorityClock(serverNow, turnTimer) {
+    function syncAuthorityClock(serverNow, turnTimer, pendingTimer) {
       if (!Number.isFinite(Number(serverNow))) return
       authorityClockAnchor = {
         serverNow: Number(serverNow),
         localNow: Date.now(),
       }
       authoritativeTurnTimer = turnTimer || null
+      authoritativePendingTimer = pendingTimer || null
     }
     function acceptAuthorityVersion(authorityVersion) {
       if (!Number.isSafeInteger(authorityVersion)) return latestAuthorityVersion === null
@@ -4078,13 +4104,13 @@
       void doBeginPhase()
       return true
     }
-    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer, options) {
+    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer, options, pendingTimer) {
       if (!state) return
       const input = options || {}
       resolveAuthoritySeed(state, seed)
       if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
-      syncAuthorityClock(serverNow, turnTimer)
+      syncAuthorityClock(serverNow, turnTimer, pendingTimer)
 
       const oldG = G
       G = state
@@ -4312,6 +4338,7 @@
               )
             },
           },
+          msg.pendingTimer,
         )
         var patchFinishedAt = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
         if (trackedFeedback) {
@@ -4419,6 +4446,7 @@
           latestAuthorityVersion = Number.isSafeInteger(msg.authorityVersion)
             ? msg.authorityVersion
             : latestAuthorityVersion
+          authoritativePendingTimer = msg.pendingTimer || null
           applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer)
         } else if (msg.type === 'battleTransition') {
           applyBattleTransition(msg)
@@ -4791,17 +4819,6 @@
       if (btn) btn.disabled = disabled
     }
 
-    function canAutoMovePiece(piece) {
-      if (!G || !piece || piece.currentHp <= 0) return false
-      if (!window.BattleLegalActions || typeof GameEngine === 'undefined') return false
-      return BattleLegalActions.queryMoveCells({
-        snapshot: G,
-        playerId: myPlayerId,
-        pieceId: piece.instanceId,
-        engine: GameEngine,
-      }).size > 0
-    }
-
     function restoreSelectedPieceMenu() {
       const sp = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       pendingMove = false
@@ -4884,15 +4901,44 @@
     }
 
     function refreshBattleLegalActions() {
-      if (!G || !window.BattleLegalActions) return
-      if (pendingMove && selectedPieceId) {
+      if (!G || !window.BattleLegalActions) {
+        pendingMove = false
+        validMoves = new Set()
+        return
+      }
+      const selectedPiece = selectedPieceId && G.pieces
+        ? G.pieces.find(function(piece) { return piece.instanceId === selectedPieceId })
+        : null
+      const isOwnPiece = !!(selectedPiece && selectedPiece.ownerPlayerId && selectedPiece.ownerPlayerId.toLowerCase() === myPlayerId)
+      const isMyTurn = !!(G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId)
+      const canSelectMove = !!(
+        selectedPiece
+        && selectedPiece.currentHp > 0
+        && isOwnPiece
+        && isMyTurn
+        && G.turn.phase === 'action'
+        && !SPECTATE_MODE
+        && !pendingSkill
+        && !pendingCardAction
+        && !pendingActionFeedback
+        && !targetSubmissionPending
+        && !G.pendingTargetSelection
+        && !G.pendingOptionSelection
+        && !progressiveDeploymentPending(G)
+        && !(G.deployment && G.deployment.status === 'awaiting-locks')
+        && !(TRAINING_MODE && placingMode)
+        && typeof GameEngine !== 'undefined'
+      )
+      if (canSelectMove) {
         validMoves = BattleLegalActions.queryMoveCells({
           snapshot: G,
           playerId: myPlayerId,
           pieceId: selectedPieceId,
           engine: typeof GameEngine === 'undefined' ? null : GameEngine,
         })
+        pendingMove = validMoves.size > 0
       } else {
+        pendingMove = false
         validMoves = new Set()
       }
       if (pendingSkill) _updatePendingSkillTargets()
@@ -5210,7 +5256,7 @@
         }
       }
 
-      // Keep the board-anchored menu in sync with the current selection.
+      // Keep the opposite-edge skill dock in sync with the current selection.
       const contextPiece = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       renderPieceContextMenu(contextPiece)
     }
@@ -5299,6 +5345,8 @@
     }
 
     let pieceContextPositionFrame = null
+    let dismissedPieceContextId = null
+    let pieceContextDockSide = null
 
     function closePieceContextMenu() {
       const menu = document.getElementById('pieceContextMenu')
@@ -5306,6 +5354,13 @@
       menu.classList.remove('is-open')
       menu.setAttribute('aria-hidden', 'true')
       menu.dataset.pieceId = ''
+    }
+
+    function dismissPieceContextMenu() {
+      const menu = document.getElementById('pieceContextMenu')
+      if (!menu || !menu.classList.contains('is-open')) return
+      dismissedPieceContextId = menu.dataset.pieceId || selectedPieceId || null
+      closePieceContextMenu()
     }
 
     function positionPieceContextMenu() {
@@ -5336,11 +5391,14 @@
 
       const hudOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--battle-hud-offset')) || 0
       const menuTopPadding = hudOffset + 8
-      const placement = layout.placeMenu(anchor, { width: menu.offsetWidth, height: menu.offsetHeight }, {
+      const handHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--battle-hand-height')) || 0
+      const placement = layout.placeEdgeDock(anchor, { width: menu.offsetWidth, height: menu.offsetHeight }, {
         width: stage.clientWidth,
         height: stage.clientHeight,
         topPadding: menuTopPadding,
-      })
+        bottomPadding: handHeight + 8,
+      }, pieceContextDockSide)
+      pieceContextDockSide = placement.side
       menu.style.left = placement.left + 'px'
       menu.style.top = placement.top + 'px'
       menu.style.setProperty('--piece-menu-origin-x', placement.originX + 'px')
@@ -5362,18 +5420,14 @@
       if (!menu || !skillsContainer) return
 
       const trainingOpen = document.getElementById('trainingTools')?.classList.contains('is-open')
-      const isTargeting = !!pendingMove || !!pendingSkill || !!pendingCardAction || !!targetSubmissionPending ||
+      const isTargeting = !!pendingSkill || !!pendingCardAction || !!targetSubmissionPending ||
         pendingTargetSelectionForMe() || pendingOptionSelectionForMe()
-      if (!piece || piece.currentHp <= 0 || isTargeting || trainingOpen) {
+      if (!piece || piece.currentHp <= 0 || isTargeting || trainingOpen || dismissedPieceContextId === piece.instanceId) {
         closePieceContextMenu()
         return
       }
 
       const isOwner = !!piece.ownerPlayerId && piece.ownerPlayerId.toLowerCase() === myPlayerId
-      const isMyTurn = G && G.turn && G.turn.currentPlayerId &&
-        G.turn.currentPlayerId.toLowerCase() === myPlayerId
-      const inAction = G && G.turn && G.turn.phase === 'action'
-      const canMove = isOwner && isMyTurn && inAction && canAutoMovePiece(piece)
       const skills = isOwner ? pieceDispSkills(piece).filter(sk => {
         const skData = skillDefOf(skillIdOf(sk))
         return skData.kind !== 'passive'
@@ -5385,15 +5439,6 @@
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
       menu.dataset.pieceId = piece.instanceId
 
-      const hasFreeFirstMove = pieceHasVisibleStatusTag(piece, 'deployment-first-move-free')
-      const moveCostText = hasFreeFirstMove ? '本回合首移 0 AP' : '选择路线'
-      const moveTitle = hasFreeFirstMove ? '本回合首次普通移动消耗 0 AP' : '选择移动路线'
-      const moveButton = isOwner
-        ? '<button type="button" class="piece-context-skill is-move"' +
-          ' onclick="dispatchBattleIntent({type:\'toggle-move\'})" title="' + escHtml(moveTitle) + '"' + (canMove ? '' : ' disabled') + '>' +
-          '<span class="piece-context-skill-icon">&#8599;</span><span class="piece-context-skill-name">移动</span>' +
-          '<span class="piece-context-skill-cost">' + escHtml(moveCostText) + '</span></button>'
-        : ''
       const skillButtons = skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
         const availability = resolveSkillAvailability(piece, sk)
@@ -5426,7 +5471,7 @@
             (status || ('行动 ' + apCost + (isCharge ? ' · 充能 ' + skillChargeCostLabel(piece, skData) : ''))) +
           '</span></button>'
       }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
-      skillsContainer.innerHTML = moveButton + skillButtons
+      skillsContainer.innerHTML = skillButtons
 
       menu.classList.add('is-open')
       menu.setAttribute('aria-hidden', 'false')
@@ -5581,15 +5626,22 @@
 
     function renderTurnTimerStatus() {
       const clock = document.getElementById('turnClock')
+      const frozenClock = document.getElementById('turnClockFrozen')
       if (!clock || typeof RvBTurnTimerStatus === 'undefined') return
       const view = RvBTurnTimerStatus.create({
         timer: authoritativeTurnTimer,
+        pendingTimer: authoritativePendingTimer,
         now: currentAuthorityNow(),
       })
       clock.hidden = !view.visible
+      if (frozenClock) {
+        frozenClock.hidden = !authoritativePendingTimer
+        frozenClock.textContent = '回合冻结 ' + view.frozenClockText
+      }
+      clock.parentElement?.classList.toggle('pending-timer-active', !!authoritativePendingTimer)
       clock.classList.toggle('burning', view.visible && view.burning)
       clock.classList.toggle('fast', view.visible && view.fast)
-      clock.textContent = view.clockText
+      clock.textContent = authoritativePendingTimer ? '响应 ' + view.clockText : view.clockText
       clock.title = view.label
       clock.setAttribute(
         'aria-label',
@@ -5746,7 +5798,7 @@
 
       const _selPiece = G && G.pieces && G.pieces.find(p => p.instanceId === selectedPieceId)
       const _isOwnSelected = _selPiece && _selPiece.ownerPlayerId && _selPiece.ownerPlayerId.toLowerCase() === myPlayerId
-      const _canMoveSelected = canAutoMovePiece(_selPiece)
+      const _canMoveSelected = !!(pendingMove && validMoves.size > 0)
       setMoveButtonDisabled(!!pendingActionFeedback || !!targetSubmissionPending || _waitingForOwn || _waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
       if (targetSubmissionPending) {
@@ -5780,8 +5832,8 @@
         setStatusMsg(_targetPromptText() || '选择卡牌目标')
       } else if (pendingMove) {
         setStatusMsg(pieceHasVisibleStatusTag(_selPiece, 'deployment-first-move-free')
-          ? '点击高亮格子移动棋子 · 本回合首次移动 0 AP'
-          : '点击高亮格子移动棋子')
+          ? '拖动棋子到高亮格，或点击高亮格移动 · 本回合首移 0 AP'
+          : '拖动棋子到高亮格，或点击高亮格移动')
       } else if (pendingSkill) {
         setStatusMsg(_targetPromptText() || '选择技能目标')
       } else if (selectedPieceId && _isOwnSelected) {
@@ -5809,12 +5861,28 @@
       if (intent.type === 'select-skill') return selectSkillCard(intent.skillId)
       if (intent.type === 'cancel-target') return cancelTargetSelection()
       if (intent.type === 'confirm-target-selection') return confirmPendingBoardTargetSelection()
-      if (intent.type === 'toggle-move') return toggleMove()
+      if (intent.type === 'drop-piece') return moveSelectedPieceToCell(intent.pieceId, intent.x, intent.y)
     }
 
     function dispatchBattleIntent(intent) {
       if (battlePresentation) return battlePresentation.dispatch(intent)
       return handleBattleIntent(intent)
+    }
+
+    function moveSelectedPieceToCell(pieceId, x, y) {
+      if (!G || pieceId !== selectedPieceId || !pendingMove || pendingActionFeedback || targetSubmissionPending || pendingSkill || pendingCardAction) return false
+      const hasCell = Number.isInteger(x) && Number.isInteger(y)
+      const key = hasCell ? x + ',' + y : ''
+      const source = G.pieces.find(function(piece) { return piece.instanceId === pieceId && piece.currentHp > 0 })
+      if (!source || !validMoves.has(key)) {
+        setStatusMsg('无法移动到该位置')
+        return false
+      }
+      pendingMove = false
+      validMoves = new Set()
+      closePieceContextMenu()
+      void doAction({ type: 'move', playerId: myPlayerId, pieceId: pieceId, toX: x, toY: y })
+      return true
     }
 
     function onCellClick(x, y) {
@@ -5968,14 +6036,7 @@
           selectPiece(piece.instanceId)
           return
         }
-        // 合法性拦截：只允许点击高亮格
-        if (!validMoves.has(x + ',' + y)) {
-          setStatusMsg('无法移动到该位置')
-          return
-        }
-        doAction({ type: 'move', playerId: myPlayerId, pieceId: selectedPieceId, toX: x, toY: y })
-        pendingMove = false
-        setMoveButtonClass(false)
+        moveSelectedPieceToCell(selectedPieceId, x, y)
         return
       }
 
@@ -6008,7 +6069,7 @@
         return
       }
 
-      // Left-click selects any piece and opens its board-anchored contextual summary.
+      // Left-click selects any piece and opens its opposite-edge contextual skill dock.
       // Right-click opens the complete skills and status detail.
       if (piece) {
         selectPiece(piece.instanceId)
@@ -6037,6 +6098,8 @@
       }
       clearTargetInteraction('selection-cleared')
       selectedPieceId = null
+      dismissedPieceContextId = null
+      pieceContextDockSide = null
       validMoves = new Set()
       setMoveButtonClass(false)
       const pieceSelect = document.getElementById('pieceSelect')
@@ -6094,16 +6157,14 @@
       }
       clearTargetInteraction('piece-switched')
       selectedPieceId = instanceId
+      dismissedPieceContextId = null
+      pieceContextDockSide = null
       // Sync dropdown
       const pieceSelect = document.getElementById('pieceSelect')
       if (pieceSelect) {
         const hasOption = Array.from(pieceSelect.options || []).some(opt => opt.value === instanceId)
         pieceSelect.value = hasOption ? instanceId : ''
       }
-      // Inspect first; explicit movement closes the menu before route selection.
-      pendingMove = false
-      validMoves = new Set()
-      setMoveButtonClass(false)
       const sp = G && G.pieces.find(p => p.instanceId === selectedPieceId)
       renderPieceContextMenu(sp)
       render()
@@ -6114,20 +6175,7 @@
       if (val) dispatchBattleIntent({ type: 'select-piece', pieceId: val })
     }
 
-    function toggleMove() {
-      if (!selectedPieceId) return
-      if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) {
-        setStatusMsg('请先完成本回合部署步骤')
-        return
-      }
-      pendingMove = !pendingMove
-      pendingSkill = null
-      setMoveButtonClass(pendingMove)
-      const sp = G && G.pieces.find(p => p.instanceId === selectedPieceId)
-      renderBoard(); renderPieceContextMenu(pendingMove ? null : sp); renderActionBar()
-    }
-
-    // selectSkillCard: called from the board-anchored piece menu.
+    // selectSkillCard: called from the opposite-edge piece skill dock.
     async function selectSkillCard(skId) {
       if (!selectedPieceId || !skId || !G) return
       if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) {
@@ -6165,6 +6213,22 @@
 
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
       closePieceContextMenu()
+      const localTargetProbe = window.BattleLegalActions && typeof GameEngine !== 'undefined'
+        ? BattleLegalActions.probeSkillTarget({
+            snapshot: G,
+            playerId: myPlayerId,
+            pieceId: selectedPieceId,
+            skillId: skId,
+            skillsById: skillsById,
+            engine: GameEngine,
+          })
+        : null
+      // This is presentation-only prediction: the final targeted command is
+      // still validated by the Colyseus authority. The structured rejection
+      // fallback handles any client/server content drift.
+      if (localTargetProbe && localTargetProbe.needsTarget && localTargetProbe.preparation) {
+        if (enterActionTargetMode(draftAction, localTargetProbe.preparation)) return
+      }
       await doAction(draftAction)
     }
 
@@ -6835,6 +6899,18 @@
         if (event.target && typeof event.target.closest === 'function' && event.target.closest('#trainingTools')) return
         setTrainingToolsOpen(false)
       }, true)
+
+      document.addEventListener('pointerdown', function (event) {
+        const menu = document.getElementById('pieceContextMenu')
+        if (!menu || !menu.classList.contains('is-open')) return
+        if (event.target && typeof event.target.closest === 'function' && event.target.closest('#pieceContextMenu')) return
+        dismissPieceContextMenu()
+      }, true)
+
+      document.addEventListener('wheel', function (event) {
+        if (!event.target || typeof event.target.closest !== 'function' || !event.target.closest('#boardStage3d')) return
+        dismissPieceContextMenu()
+      }, { capture: true, passive: true })
 
       document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') setTrainingToolsOpen(false)

@@ -127,17 +127,20 @@
   .training-setup-btn { min-height: 44px; }
 
   .piece-context-menu {
+    width: min(148px, calc(100% - 16px));
     max-width: calc(100% - 16px);
-    padding: 6px;
+    padding: 4px;
   }
-  .piece-context-heading { min-height: 44px; }
-  .piece-context-info { width: 44px; height: 44px; }
+  .piece-context-heading { min-height: 36px; }
+  .piece-context-info,
+  .piece-context-collapse { width: 36px; height: 36px; }
   .piece-context-skills {
-    max-width: min(290px, calc(100vw - 36px));
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-block: contain;
   }
-  .piece-context-skill { min-width: 80px; min-height: 44px; padding: 6px 7px; }
+  .piece-context-skill { width: 100%; min-width: 0; min-height: 44px; padding: 5px 7px; }
   .battle-turn-control { right: 12px; bottom: calc(var(--battle-hand-height) + 10px); }
 
   .training-tools { left: 12px; bottom: calc(var(--battle-hand-height) + 10px); }

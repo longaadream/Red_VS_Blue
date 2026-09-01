@@ -750,3 +750,35 @@ ESLint flat config 中因 `import/no-anonymous-default-export` 所属 plugin 未
 
 回退时停止新的内容构建，保留证据和最近已验证版本，把 Client/Server 的 `active.json` 切回
 `previousStable` 后回退 RED-118 提交。不得通过删除版本目录或绕过签名校验完成回退。
+
+## 12. RED-161：Windows LAN 内置 PostgreSQL
+
+玩家客户端的 LAN 房主不需要安装 PostgreSQL、创建数据库或执行 PowerShell 初始化。以下开发入口会
+自动下载并校验固定版本的官方 Windows x64 binary archive，裁剪到 `_client-postgres/`，再启动
+Electron：
+
+```powershell
+npm.cmd run dev:electron:client -- --rvb-dev-profile=player-one
+```
+
+首次下载约 317 MiB，但只把约 96 MiB 的 PostgreSQL runtime、server license 和命令行工具第三方许可证
+写入客户端构建；缓存目录和 staging 不进入
+Git。正式构建执行同一准备步骤并把运行时放入 `resources/postgres/`：
+
+```powershell
+npm.cmd run prepare:embedded-postgres
+node scripts/verify-embedded-postgres-package.mjs _client-postgres
+npm.cmd run build:electron:client
+```
+
+玩家选择本机 LAN 后，Electron 才会在 `<userData>/postgres/16/data` 初始化 PostgreSQL cluster，生成
+随机 SCRAM 密码并通过 `safeStorage` 加密到 `credential.bin`。数据库只监听 `127.0.0.1` 动态端口；
+Colyseus 仍监听 LAN 地址。远程加入者只启动 Profile 进程，不启动 PostgreSQL 或 Colyseus。
+
+官方 Server、K8s、CI 或已有数据库的开发环境通过 `RVB_POSTGRES_URL` 指定外部 PostgreSQL；该变量
+存在时内置数据库不会启动。兼容读取 `DATABASE_URL`，但协议必须是 `postgres:` 或 `postgresql:`，
+SQLite URL 会被拒绝。不要把密码写入日志或仓库。
+
+Electron 使用 PostgreSQL 官方 `pg_ctl` 启动实例；它会在 Windows 上为数据库子进程移除管理员权限，
+因此不要求玩家创建服务或额外本地账户，也支持从提权后的客户端开服。应用不会改用 SQLite、
+PGlite、trust 认证或内存数据库。

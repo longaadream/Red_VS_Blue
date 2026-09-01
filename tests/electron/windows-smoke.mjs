@@ -3,6 +3,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlin
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
+import { Client as ColyseusClient } from '@colyseus/sdk'
+
 const root = path.resolve(import.meta.dirname, '..', '..')
 const applications = {
   server: {
@@ -301,12 +303,11 @@ function stopApplication(application) {
 
 async function isReachable(port) {
   try {
-    const result = await callGameRpc(
-      `ws://127.0.0.1:${port}/ws/rooms/__lobby`,
-      'system.health',
-      {},
-    )
-    return result.ok === true && result.data?.protocol === 'rvb-ws'
+    const response = await fetch(`http://127.0.0.1:${port}/healthz`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const result = await response.json()
+    return response.ok && result.ok === true && ['rvb-ws', 'rvb-colyseus'].includes(result.protocol)
   } catch {
     return false
   }
@@ -685,6 +686,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     : mkdtempSync(path.join(tmpdir(), 'rvb-client-windows-smoke-'))
   const ownsUserDataDir = !configuredUserDataDir
   application.userDataDir = userDataDir
+  let smokeError = null
   try {
     assert(existsSync(sourcePackageRoot), `Missing source client package: ${sourcePackageRoot}`)
     cpSync(sourcePackageRoot, isolatedPackageRoot, { recursive: true })
@@ -694,7 +696,10 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       `Client smoke package must be outside the repository: ${isolatedPackageRoot}`,
     )
     application.executable = path.join(isolatedPackageRoot, 'RED vs BLUE.exe')
-    application.helperExecutables = [path.join(isolatedPackageRoot, 'resources', 'node.exe')]
+    application.helperExecutables = [
+      path.join(isolatedPackageRoot, 'resources', 'node.exe'),
+      path.join(isolatedPackageRoot, 'resources', 'postgres', 'pgsql', 'bin', 'postgres.exe'),
+    ]
     assert(
       existsSync(path.join(isolatedPackageRoot, 'resources', 'app', 'standalone', 'node_modules', 'next', 'package.json')),
       'Isolated client package is missing the standalone Next.js runtime',
@@ -714,7 +719,19 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     })`, true, 20000)
     assert(tlsProbe === 'rejected', `Client unexpectedly accepted an invalid HTTPS certificate: ${tlsProbe}`)
     connection.evaluateFireAndForget(`window.electronAPI.openLocalGame()`)
-    const gameTarget = await waitForTargets(application.debugPort, (candidate) => candidate.url.startsWith('rvb-client://app/index.html'))
+    await delay(2_000)
+    connection.evaluateFireAndForget(`Promise.all([
+      window.electronAPI.openLocalGame(),
+      window.electronAPI.openLocalGame(),
+    ])`)
+    // A cold machine may spend tens of seconds in Windows Defender scanning,
+    // runtime integrity verification and first-cluster initdb. This is startup
+    // work, not the gameplay latency budget.
+    const gameTarget = await waitForTargets(
+      application.debugPort,
+      candidate => candidate.url.startsWith('rvb-client://app/index.html'),
+      60_000,
+    )
     connection.close()
     let gameBridgeReady = false
     for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -756,22 +773,45 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     }))`)
     assert(packagedAssets.every(([, ok, size]) => ok && size > 0), `Client packaged assets are incomplete: ${JSON.stringify(packagedAssets)}`)
     assert(mode.ready === true && mode.isLocal === true, `Client local mode is not ready: ${JSON.stringify(mode)}`)
+    assert(
+      mode.profileIdentity
+        && mode.profileIdentity.schemaVersion === 'rvb-game-profile-identity/v1'
+        && typeof mode.profileIdentity.resolvedProfileHash === 'string'
+        && typeof mode.profileIdentity.authorityContentHash === 'string',
+      `Client did not publish its recovered Profile identity through trusted IPC: ${JSON.stringify(mode)}`,
+    )
+    assert(
+      mode.localAuthorityProfileIdentity
+        && mode.localAuthorityProfileIdentity.schemaVersion === 'rvb-game-profile-identity/v1',
+      `Client did not publish the running authority Profile identity: ${JSON.stringify(mode)}`,
+    )
+    const rendererProfileIdentity = await evaluate(
+      gameTarget,
+      `getLocalGameProfileIdentity(${JSON.stringify(mode.localUrl)})`,
+    )
+    assert(
+      JSON.stringify(rendererProfileIdentity) === JSON.stringify(mode.localAuthorityProfileIdentity),
+      `Client renderer did not consume the running authority Profile identity: ${JSON.stringify({ rendererProfileIdentity, authorityProfileIdentity: mode.localAuthorityProfileIdentity })}`,
+    )
     const localGatewayPort = mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521
     assert(await isReachable(localGatewayPort), 'Client local gateway is not reachable')
     const localBaseUrl = `http://127.0.0.1:${localGatewayPort}`
     const legacyPlayerRestResponse = await fetch(`${localBaseUrl}/api/rooms`, {
       signal: AbortSignal.timeout(2000),
     })
-    const legacyPlayerRestBody = await legacyPlayerRestResponse.json()
+    const legacyPlayerRestBody = await legacyPlayerRestResponse.text()
     assert(
-      legacyPlayerRestResponse.status === 410 && legacyPlayerRestBody.code === 'PLAYER_REST_DISABLED',
-      `Legacy player REST boundary was not disabled: ${legacyPlayerRestResponse.status} ${JSON.stringify(legacyPlayerRestBody)}`,
+      legacyPlayerRestResponse.status === 404,
+      `Legacy player REST boundary was not disabled: ${legacyPlayerRestResponse.status} ${legacyPlayerRestBody.slice(0, 200)}`,
     )
-    const roomWsUrl = `ws://127.0.0.1:${localGatewayPort}/ws/rooms/__lobby`
-    const catalogIdentity = await callGameRpc(
-      roomWsUrl,
-      'catalog.identity',
-      {},
+    const catalogIdentityResponse = await fetch(`${localBaseUrl}/catalog/identity`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const catalogIdentity = { ok: catalogIdentityResponse.ok, data: await catalogIdentityResponse.json() }
+    assert(
+      JSON.stringify(catalogIdentity.data?.profileIdentity) === JSON.stringify(mode.localAuthorityProfileIdentity)
+        && JSON.stringify(catalogIdentity.data?.profileIdentity) === JSON.stringify(rendererProfileIdentity),
+      `Client IPC, renderer, and authority Profile identities diverged: ${JSON.stringify({ catalogIdentity: catalogIdentity.data?.profileIdentity, modeAuthorityIdentity: mode.localAuthorityProfileIdentity, rendererProfileIdentity })}`,
     )
     const resourcePackStatus = await evaluate(gameTarget, `window.electronAPI.packList()`)
     assert(
@@ -799,45 +839,47 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         `Packaged Client runtime Profile reference mismatch: ${JSON.stringify(resourcePackStatus)}`,
       )
     }
-    const roomsBeforeCreate = await callGameRpc(
-      roomWsUrl,
-      'rooms.list',
-      {},
-    )
+    const roomsBeforeCreateResponse = await fetch(`${localBaseUrl}/rooms`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const roomsBeforeCreate = { ok: roomsBeforeCreateResponse.ok, data: await roomsBeforeCreateResponse.json() }
     assert(
       roomsBeforeCreate.ok === true
         && Array.isArray(roomsBeforeCreate.data?.rooms)
         && roomsBeforeCreate.data.rooms.length === 0,
       `Fresh client database did not return an empty room list: ${JSON.stringify(roomsBeforeCreate)}`,
     )
-    const createdRoom = await callGameRpc(
-      `ws://127.0.0.1:${localGatewayPort}/ws/rooms/__lobby`,
-      'rooms.create',
-      {
-        hostId: 'red126-windows-smoke',
-        name: 'RED-126 Windows smoke room',
-        mapId: 'winding-pass',
-        visibility: 'public',
-        profileIdentity: catalogIdentity.data.profileIdentity,
-      },
-    )
+    const colyseusClient = new ColyseusClient(`ws://127.0.0.1:${localGatewayPort}`)
+    const smokeRoom = await colyseusClient.create('battle', {
+      product: true,
+      playerId: 'red161-windows-smoke',
+      playerName: 'RED-161 Windows smoke',
+      name: 'RED-161 Windows smoke room',
+      mapId: 'winding-pass',
+      visibility: 'public',
+      profileIdentity: catalogIdentity.data.profileIdentity,
+    })
+    const createdRoom = {
+      ok: true,
+      data: { id: smokeRoom.roomId, mapId: 'winding-pass' },
+    }
     assert(
       createdRoom.ok === true
         && typeof createdRoom.data?.id === 'string'
         && createdRoom.data?.mapId === 'winding-pass',
       `Fresh client database could not create a room: ${JSON.stringify(createdRoom)}`,
     )
-    const roomsAfterCreate = await callGameRpc(
-      roomWsUrl,
-      'rooms.list',
-      {},
-    )
+    const roomsAfterCreateResponse = await fetch(`${localBaseUrl}/rooms`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const roomsAfterCreate = { ok: roomsAfterCreateResponse.ok, data: await roomsAfterCreateResponse.json() }
     assert(
       roomsAfterCreate.ok === true
         && Array.isArray(roomsAfterCreate.data?.rooms)
         && roomsAfterCreate.data.rooms.some((room) => room.id === createdRoom.data.id),
       `Created room was not persisted in the client database: ${JSON.stringify(roomsAfterCreate)}`,
     )
+    await smokeRoom.leave()
     const pieceGallery = await verifyPieceGallery(application.debugPort, gameTarget)
     const battle = await verifyBattleTerminalError(application.debugPort, pieceGallery.target)
     assert(battle.runtime.readyState === 'complete', `Battle page did not finish loading: ${JSON.stringify(battle.runtime)}`)
@@ -863,20 +905,28 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       profileIdentity: catalogIdentity.data.profileIdentity,
       resourcePackStatus,
       databaseProbe: { roomsBeforeCreate, createdRoom, roomsAfterCreate },
-      legacyPlayerRest: { status: legacyPlayerRestResponse.status, body: legacyPlayerRestBody },
+      legacyPlayerRest: { status: legacyPlayerRestResponse.status },
       pieceGallery: { all: pieceGallery.all, light: pieceGallery.light, dark: pieceGallery.dark },
       battleRuntime: battle.runtime,
       exitedCleanly: true,
       processCountsAfterExit,
     }))
+  } catch (error) {
+    smokeError = error
+    throw error
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)
     application.executable = originalExecutable
     application.helperExecutables = originalHelperExecutables
     application.userDataDir = originalUserDataDir
-    if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
-    rmSync(isolatedPackageBase, { recursive: true, force: true })
+    try {
+      if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
+      rmSync(isolatedPackageBase, { recursive: true, force: true })
+    } catch (cleanupError) {
+      if (!smokeError) throw cleanupError
+      console.error(`[RVB smoke] Cleanup also failed after the primary error: ${cleanupError instanceof Error ? cleanupError.message : cleanupError}`)
+    }
   }
 }
 

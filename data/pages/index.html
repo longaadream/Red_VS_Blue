@@ -6,6 +6,7 @@
   <title>RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/colyseus-sdk.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/lan-discover.js"></script>
   <script src="js/crypto-lib.js"></script>
@@ -800,7 +801,9 @@
       let result
       try {
         const health = await RvBWs.requestAt(cleanUrl, 'system.health', {}, 10000)
-        if (!health || health.protocol !== 'rvb-ws') throw new Error('服务器未返回 RED vs BLUE WS 协议')
+        if (!health || !['rvb-colyseus', 'rvb-ws'].includes(health.protocol)) {
+          throw new Error('服务器未返回 RED vs BLUE 联机协议')
+        }
         RvBUtils.saveServerConfig({ mode: RvBUtils.getServerModeForUrl(cleanUrl), url: cleanUrl })
         result = { success: true, url: cleanUrl }
       } catch (error) {
@@ -812,7 +815,7 @@
         if (btn) { btn.textContent = '校验资源包…'; btn.disabled = true }
         await checkProfileAndGo(result.url, 'remote')
       } else {
-        err.textContent = '\u65e0\u6cd5\u5efa\u7acb WebSocket \u8fde\u63a5\uff1a' + ((result.error && result.error.message) || '\u8fde\u63a5\u5931\u8d25')
+        err.textContent = '\u65e0\u6cd5\u5efa\u7acb\u6e38\u620f\u670d\u52a1\u8fde\u63a5\uff1a' + ((result.error && result.error.message) || '\u8fde\u63a5\u5931\u8d25')
         err.style.display = 'block'
         document.getElementById('forceConnectUrl').value = cleanUrl
         document.getElementById('forceConnectArea').style.display = 'block'
@@ -1156,18 +1159,13 @@
         && typeof window.electronAPI.getMode === 'function'
       ) {
         const mode = await window.electronAPI.getMode()
-        const localRuntimeUrl = mode && typeof mode.localUrl === 'string'
-          ? mode.localUrl.trim()
-          : ''
-        if (!localRuntimeUrl) {
-          throw new Error('本地 Profile 运行时不可用，请重启客户端后重试')
-        }
-        const catalog = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
-        identity = catalog && catalog.profileIdentity
+        const normalizeUrl = value => String(value || '').trim().replace(/\/+$/, '')
+        const isLocalAuthority = normalizeUrl(serverUrl) === normalizeUrl(mode && mode.localUrl)
+        identity = mode && (isLocalAuthority ? mode.localAuthorityProfileIdentity : mode.profileIdentity)
       } else {
-        const localRuntimeUrl = /^https?:$/.test(window.location.protocol)
-          ? window.location.origin
-          : serverUrl
+        // A standalone browser build has no separate installed-profile runtime.
+        // Its playable content is served by the selected Colyseus authority.
+        const localRuntimeUrl = serverUrl
         const catalog = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
         identity = catalog && catalog.profileIdentity
       }

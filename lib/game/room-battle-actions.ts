@@ -51,12 +51,22 @@ import {
   getCurrentInputOwnerPlayerId,
   isAcceptedGameplayAction,
   isTurnTimerEnabled,
+  projectPendingTimer,
   projectTurnTimer,
+  type PendingTimerProjection,
   type TurnTimerProjection,
 } from './turn-timer'
 import type { BattleAction, BattleState } from './turn'
 
 const MAX_ROOM_ACTION_ATTEMPTS = 5
+
+function toTimerSafePublicBattleState(state: BattleState, viewerPlayerId?: string): BattleState {
+  const projected = toPublicBattleState(state, viewerPlayerId)
+  // The response timer has a dedicated projection. Its predeclared default is
+  // server-private and must not ride inside the generic battle-state payload.
+  if (projected.turnTimer?.pendingResponse) delete projected.turnTimer.pendingResponse
+  return projected
+}
 
 interface VersionedBattleStateHashIndex {
   authorityVersion: number
@@ -113,11 +123,12 @@ export interface PublicBattleSnapshot {
   durableAuthorityVersion?: number
   persistenceStatus?: 'durable' | 'pending' | 'degraded'
   turnTimer?: TurnTimerProjection
+  pendingTimer?: PendingTimerProjection
 }
 
 export interface DispatchRoomBattleActionResult {
   kind: 'applied' | 'duplicate' | 'expired' | 'resyncRequired'
-  expiredReason?: 'deployment' | 'turn'
+  expiredReason?: 'deployment' | 'pending' | 'turn'
   snapshot: PublicBattleSnapshot
   /** Final authoritative result, including an internal timer sync when needed. */
   actionResult: BattleActionResult
@@ -158,12 +169,13 @@ export interface PublicBattleTransitionUpdate {
   durableAuthorityVersion?: number
   persistenceStatus?: 'durable' | 'pending' | 'degraded'
   turnTimer?: TurnTimerProjection
+  pendingTimer?: PendingTimerProjection
   timings?: BattleAuthorityTimings
 }
 
 export interface PreResumeDeliveryContext {
   kind: 'applied' | 'expired'
-  expiredReason?: 'deployment' | 'turn'
+  expiredReason?: 'deployment' | 'pending' | 'turn'
   actionHash?: string
 }
 
@@ -195,6 +207,7 @@ export interface ScheduleBattleTimeoutOptions {
 
 export type ScheduleDeploymentTimeoutOptions = ScheduleBattleTimeoutOptions
 type TurnTimeoutAction = Extract<BattleAction, { type: 'turnTimeout' }>
+type PendingTimeoutAction = Extract<BattleAction, { type: 'pendingTimeout' }>
 
 export class RoomBattleActionError extends Error {
   code: string
@@ -318,7 +331,7 @@ export function createPublicBattleSnapshot(
 ): PublicBattleSnapshot {
   const storage = getBattleStorage(room)
   if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started')
-  const state = toPublicBattleState(storage.state as BattleState, viewerPlayerId)
+  const state = toTimerSafePublicBattleState(storage.state as BattleState, viewerPlayerId)
   const serverNow = getRoomAuthorityNow(room.id, clock)
   const authorityVersion = roomBattleAuthorityVersion(room)
   const publicIndex = cachePublicStateHashIndex(
@@ -339,7 +352,12 @@ export function createPublicBattleSnapshot(
     serverNow,
     durableAuthorityVersion: room.battleAuthorityDurableVersion,
     persistenceStatus: room.battleAuthorityPersistenceStatus,
-    turnTimer: state.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(state.turnTimer, serverNow),
+    turnTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectTurnTimer((storage.state as BattleState).turnTimer, serverNow),
+    pendingTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectPendingTimer((storage.state as BattleState).turnTimer, serverNow),
   }
 }
 
@@ -353,8 +371,8 @@ export function createPublicBattleTransitionUpdate(
   if (!transition || !result.previousAuthorityState || !result.nextAuthorityState || !result.receipt) {
     return undefined
   }
-  const previous = toPublicBattleState(result.previousAuthorityState, viewerPlayerId)
-  const next = toPublicBattleState(result.nextAuthorityState, viewerPlayerId)
+  const previous = toTimerSafePublicBattleState(result.previousAuthorityState, viewerPlayerId)
+  const next = toTimerSafePublicBattleState(result.nextAuthorityState, viewerPlayerId)
   const serverNow = getRoomAuthorityNow(roomId, clock)
   const patch = createBattlePublicPatch(previous, next)
   const previousIndex = getPublicStateHashIndex(
@@ -385,7 +403,12 @@ export function createPublicBattleTransitionUpdate(
     serverNow,
     durableAuthorityVersion: result.snapshot.durableAuthorityVersion,
     persistenceStatus: result.snapshot.persistenceStatus,
-    turnTimer: next.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(next.turnTimer, serverNow),
+    turnTimer: next.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectTurnTimer(result.nextAuthorityState.turnTimer, serverNow),
+    pendingTimer: next.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectPendingTimer(result.nextAuthorityState.turnTimer, serverNow),
     timings: result.timings,
   }
 }
@@ -397,7 +420,7 @@ export function createPublicBattleResyncSnapshot(
   clock: DeploymentRuleClock = systemDeploymentRuleClock,
 ): PublicBattleSnapshot | undefined {
   if (!result.transition || !result.nextAuthorityState) return undefined
-  const state = toPublicBattleState(result.nextAuthorityState, viewerPlayerId)
+  const state = toTimerSafePublicBattleState(result.nextAuthorityState, viewerPlayerId)
   const serverNow = getRoomAuthorityNow(roomId, clock)
   const publicIndex = cachePublicStateHashIndex(
     roomId,
@@ -417,7 +440,12 @@ export function createPublicBattleResyncSnapshot(
     serverNow,
     durableAuthorityVersion: result.snapshot.durableAuthorityVersion,
     persistenceStatus: result.snapshot.persistenceStatus,
-    turnTimer: state.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(state.turnTimer, serverNow),
+    turnTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectTurnTimer(result.nextAuthorityState.turnTimer, serverNow),
+    pendingTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectPendingTimer(result.nextAuthorityState.turnTimer, serverNow),
   }
 }
 
@@ -589,10 +617,16 @@ export async function dispatchRoomBattleAction(
         && receivedAt >= state.deployment.deadlineAt
       const turnExpired = timerEnabled
         && !deploymentExpired
+        && !state.turnTimer?.pendingResponse
         && action.type !== 'turnTimeout'
         && state.deployment?.status !== 'awaiting-locks'
         && state.turnTimer?.status === 'running'
         && receivedAt >= state.turnTimer.deadlineAt
+      const pendingExpired = timerEnabled
+        && !deploymentExpired
+        && action.type !== 'pendingTimeout'
+        && state.turnTimer?.pendingResponse?.status === 'running'
+        && receivedAt >= state.turnTimer.pendingResponse.deadlineAt
 
       const actionToApply: BattleAction = deploymentExpired
         ? {
@@ -600,6 +634,12 @@ export async function dispatchRoomBattleAction(
             now: receivedAt,
             clientActionId: `system-deployment-timeout:${normalizedRoomId}:${state.deployment!.deadlineAt}`,
           }
+        : pendingExpired
+        ? createPendingTimeoutAction(
+            state,
+            receivedAt,
+            `system-pending-timeout:${normalizedRoomId}:${state.turnTimer!.pendingResponse!.selectionId}:${state.turnTimer!.pendingResponse!.deadlineAt}`,
+          )
         : turnExpired
         ? createTurnTimeoutAction(
             state,
@@ -736,8 +776,8 @@ export async function dispatchRoomBattleAction(
         nextAuthorityState = canonicalMaterializedState
         actionResult = { ...actionResult, state: canonicalMaterializedState }
       }
-      const previousPublicState = toPublicBattleState(previousAuthorityState)
-      const nextPublicState = toPublicBattleState(nextAuthorityState)
+      const previousPublicState = toTimerSafePublicBattleState(previousAuthorityState)
+      const nextPublicState = toTimerSafePublicBattleState(nextAuthorityState)
       const committedState = authorityV2 && !isTerminal
         ? compactBattleTraceForAuthority(nextAuthorityState)
         : nextAuthorityState
@@ -783,15 +823,17 @@ export async function dispatchRoomBattleAction(
             now: receivedAt,
           })
         : undefined
-      const expired = deploymentExpired || turnExpired
+      const expired = deploymentExpired || pendingExpired || turnExpired
       if (transition && expired) {
         transition.receipt = createBattleAuthorityReceipt({
           roomId: normalizedRoomId,
           clientActionId: requestedClientActionId!,
           status: 'rejected',
           authorityVersion: nextAuthorityVersion,
-          code: turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
-          message: turnExpired
+          code: pendingExpired ? 'PENDING_RESPONSE_EXPIRED' : turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
+          message: pendingExpired
+            ? 'Pending response deadline elapsed; the authoritative timeout was committed instead.'
+            : turnExpired
             ? 'Turn deadline elapsed; the authoritative timeout was committed instead.'
             : 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
         })
@@ -932,6 +974,7 @@ export async function dispatchRoomBattleAction(
         await options.onCommittedBeforeTimerResume(snapshot, {
           kind: expired ? 'expired' : 'applied',
           ...(deploymentExpired ? { expiredReason: 'deployment' as const } : {}),
+          ...(pendingExpired ? { expiredReason: 'pending' as const } : {}),
           ...(turnExpired ? { expiredReason: 'turn' as const } : {}),
           actionHash: submittedActionResult.actionHash,
         })
@@ -940,6 +983,7 @@ export async function dispatchRoomBattleAction(
       return {
         kind: expired ? 'expired' : 'applied',
         ...(deploymentExpired ? { expiredReason: 'deployment' as const } : {}),
+        ...(pendingExpired ? { expiredReason: 'pending' as const } : {}),
         ...(turnExpired ? { expiredReason: 'turn' as const } : {}),
         snapshot,
         actionResult,
@@ -1031,7 +1075,8 @@ export async function scheduleRoomBattleTimeout(
           turn: state.turnTimer?.turnNumber,
           deadlineAt: state.deployment?.status === 'awaiting-locks'
             ? state.deployment.deadlineAt
-            : state.turnTimer?.deadlineAt,
+            : state.turnTimer?.pendingResponse?.deadlineAt ?? state.turnTimer?.deadlineAt,
+          pendingSelectionId: state.turnTimer?.pendingResponse?.selectionId,
           noAcceptedGameplayAction: state.turnTimer ? !state.turnTimer.acceptedGameplayAction : undefined,
           noOpStreak: state.turnTimer?.noOpStreaks[state.turnTimer.ownerPlayerId],
           code,
@@ -1162,6 +1207,31 @@ function createTurnTimeoutAction(
   }
 }
 
+function createPendingTimeoutAction(
+  state: BattleState,
+  now: number,
+  clientActionId: string,
+): PendingTimeoutAction {
+  const timer = state.turnTimer
+  const response = timer?.pendingResponse
+  if (!timer || !response) {
+    throw new RoomBattleActionError(
+      'PENDING_TIMER_MISSING',
+      'Cannot schedule a pending timeout without a running response timer',
+    )
+  }
+  return {
+    type: 'pendingTimeout',
+    now,
+    clientActionId,
+    expectedTurnNumber: timer.turnNumber,
+    expectedDeadlineAt: response.deadlineAt,
+    expectedInputOwnerPlayerId: response.ownerPlayerId,
+    expectedPendingSelectionId: response.selectionId,
+    expectedPendingStateRevision: response.stateRevision,
+  }
+}
+
 function matchesTurnTimeoutExpectation(
   state: BattleState,
   action: TurnTimeoutAction,
@@ -1186,6 +1256,26 @@ function matchesTurnTimeoutExpectation(
     && pending.pendingStateRevision === action.expectedPendingStateRevision
 }
 
+function matchesPendingTimeoutExpectation(
+  state: BattleState,
+  action: PendingTimeoutAction,
+): boolean {
+  if (action.expectedTurnNumber === undefined) return true
+  const timer = state.turnTimer
+  const response = timer?.pendingResponse
+  const pending = state.pendingOptionSelection ?? state.pendingTargetSelection
+  return !!timer
+    && !!response
+    && !!pending
+    && timer.turnNumber === action.expectedTurnNumber
+    && response.deadlineAt === action.expectedDeadlineAt
+    && normalizePlayerId(response.ownerPlayerId) === normalizePlayerId(action.expectedInputOwnerPlayerId)
+    && response.selectionId === action.expectedPendingSelectionId
+    && response.stateRevision === action.expectedPendingStateRevision
+    && pending.selectionId === response.selectionId
+    && pending.stateRevision === response.stateRevision
+}
+
 function nextAuthorityWake(state: BattleState): {
   at: number
   action: (now: number) => BattleAction
@@ -1203,6 +1293,17 @@ function nextAuthorityWake(state: BattleState): {
   }
   const timer = state.turnTimer
   if (!timer || timer.status !== 'running') return undefined
+  if (timer.pendingResponse) {
+    const response = timer.pendingResponse
+    return {
+      at: response.deadlineAt,
+      action: now => createPendingTimeoutAction(
+        state,
+        now,
+        `system-pending-timeout:scheduled:${response.selectionId}:${response.deadlineAt}`,
+      ),
+    }
+  }
   if (timer.burnPhase !== 'burning') {
     return {
       at: timer.burnStartsAt,
@@ -1223,6 +1324,7 @@ function nextAuthorityWake(state: BattleState): {
 function normalizeSystemActionTime(action: BattleAction, now: number): BattleAction {
   if (action.type === 'deploymentTimeout') return { ...action, now }
   if (action.type === 'turnTimerBurn') return { ...action, now }
+  if (action.type === 'pendingTimeout') return { ...action, now }
   if (action.type === 'turnTimeout') return { ...action, now }
   return action
 }
@@ -1247,6 +1349,11 @@ function isAlreadyCommittedSystemAction(state: BattleState, action: BattleAction
       || !state.turnTimer
       || state.turnTimer.status !== 'running'
       || !matchesTurnTimeoutExpectation(state, action)
+  }
+  if (action.type === 'pendingTimeout') {
+    return !!state.terminalResult
+      || !state.turnTimer?.pendingResponse
+      || !matchesPendingTimeoutExpectation(state, action)
   }
   return false
 }
@@ -1284,6 +1391,7 @@ function isSystemTimerAction(action: BattleAction): boolean {
   return action.type === 'deploymentTimeout'
     || action.type === 'turnTimerSync'
     || action.type === 'turnTimerBurn'
+    || action.type === 'pendingTimeout'
     || action.type === 'turnTimeout'
 }
 

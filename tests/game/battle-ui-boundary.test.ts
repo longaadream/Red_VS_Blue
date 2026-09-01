@@ -332,6 +332,7 @@ describe('battle presentation boundary', () => {
     boundary.mount(mount)
     boundary.update(model)
     boundary.dispatch({ type: 'select-piece', pieceId: 'piece-red' })
+    boundary.dispatch({ type: 'drop-piece', pieceId: 'piece-red', x: 1, y: 0 })
     boundary.dispatch({ type: 'viewport-change' })
     boundary.resize()
     boundary.resetView()
@@ -342,6 +343,7 @@ describe('battle presentation boundary', () => {
     expect(renderer.update).toHaveBeenCalledWith(model)
     expect(domUi.update).toHaveBeenCalledWith(model)
     expect(onIntent).toHaveBeenCalledWith({ type: 'select-piece', pieceId: 'piece-red' })
+    expect(onIntent).toHaveBeenCalledWith({ type: 'drop-piece', pieceId: 'piece-red', x: 1, y: 0 })
     expect(onIntent).toHaveBeenCalledWith({ type: 'viewport-change' })
     expect(renderer.resetView).toHaveBeenCalledTimes(1)
     expect(boundary.projectCell(1, 0)).toEqual({ left: 20, top: 30 })
@@ -425,6 +427,41 @@ describe('battle presentation boundary', () => {
     })
 
     expect(Array.from(targets)).toEqual(['1,0'])
+  })
+
+  it('preserves rule-provided target preparation for immediate presentation', () => {
+    const legalActions = loadBrowserModule('js/battle-ui/battle-legal-actions.js', 'BattleLegalActions')
+    const snapshot = fixtureSnapshot()
+    const preparation = {
+      kind: 'needTarget',
+      selectionId: 'selection-1',
+      stateRevision: 4,
+      step: 0,
+      targetType: 'piece',
+      filter: 'enemy',
+      candidates: [{ type: 'piece', pieceId: 'piece-blue' }],
+    }
+    const probe = legalActions.probeSkillTarget({
+      snapshot,
+      playerId: 'player-red',
+      pieceId: 'piece-red',
+      skillId: 'test',
+      skillsById: { test: { id: 'test', type: 'normal' } },
+      engine: {
+        safeCloneBattleState: (state: unknown) => structuredClone(state),
+        validateSkillActionByDryRun: () => {
+          throw Object.assign(new Error('needs target'), {
+            needsTargetSelection: true,
+            preparation,
+            targetType: 'piece',
+            filter: 'enemy',
+            targetIndex: 0,
+          })
+        },
+      },
+    })
+
+    expect(probe).toMatchObject({ needsTarget: true, preparation })
   })
 
   it('uses rule-provided target metadata to avoid probing irrelevant empty cells', () => {

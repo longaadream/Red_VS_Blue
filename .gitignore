@@ -16,7 +16,11 @@ app/tailwind-compiled.css
 # Electron / packaged app output
 dist/
 _client-stage/
+_client-colyseus/
+_client-postgres/
+.cache/embedded-postgres/
 _server-stage/
+.playwright-cli/
 *.exe
 *.msi
 *.dmg

@@ -32,6 +32,7 @@ import {
   stableJson,
 } from '@/lib/game/battle-trace'
 import { finalizePendingOptionSession } from '@/lib/game/pending-interaction'
+import { createRunningTurnTimer, syncTurnTimerAfterAcceptedAction } from '@/lib/game/turn-timer'
 import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { finalizePendingTargetSession, getTargetingStateRevision, prepareAction } from '@/lib/game/targeting'
@@ -193,6 +194,33 @@ beforeEach(() => globalTriggerSystem.clearRules())
 afterEach(() => globalTriggerSystem.clearRules())
 
 describe('versioned headless AI environment', () => {
+  it('projects generic response timing metadata without the server timeout default', () => {
+    const state = makeState({ phase: 'action' })
+    state.turnTimer = createRunningTurnTimer(state, 0)
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: 'player-blue',
+      title: 'Hidden response',
+      options: ['secret-first', 'secret-second'],
+      canCancel: false,
+    }, state.targetingRevision ?? 0)
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 5_000,
+      resumedAt: 5_000,
+      actorPlayerId: 'player-red',
+      acceptedActionType: 'move',
+    })
+
+    const redObservation = observeBattleForAI(state, 'player-red')
+    expect(redObservation.pendingTimer).toMatchObject({
+      ownerPlayerId: 'player-blue',
+      durationMs: 15_000,
+      startedAt: 5_000,
+      deadlineAt: 20_000,
+    })
+    expect(redObservation.pendingOptionSelection).toBeUndefined()
+    expect(stableJson(redObservation)).not.toContain('timeoutResolution')
+    expect(stableJson(redObservation)).not.toContain('secret-first')
+  })
   it('projects player-visible state without opponent hand, hidden status, code, rules, or debug trace', () => {
     const red = makePiece({ instanceId: 'red-piece', ownerPlayerId: 'player-red' }) as any
     const blue = makePiece({ instanceId: 'blue-piece', ownerPlayerId: 'player-blue', x: 4, y: 4 }) as any

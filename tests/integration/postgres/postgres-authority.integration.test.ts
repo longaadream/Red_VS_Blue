@@ -83,7 +83,9 @@ describe.skipIf(!databaseUrl)('RED-160 real PostgreSQL authority integration', (
           { expectedAuthorityVersion: index },
         )
         expect(result.kind).toBe('applied')
-        lastHash = result.snapshot.stateHash
+        // snapshot.stateHash is the viewer-safe public projection hash. Restore
+        // is validated against the authoritative internal transition hash.
+        lastHash = result.transition!.postStateHash
       }
       await firstJournal.drain(battleId)
       await firstJournal.close()

@@ -67,6 +67,8 @@ export class PostgresAuthorityJournal {
   private pendingGlobal = 0
   private reservedGlobal = 0
   private closed = false
+  private closePromise?: Promise<void>
+  private readonly reservationSettledWaiters: Array<() => void> = []
 
   constructor(
     private readonly writer: PostgresAuthorityBatchWriter,
@@ -81,6 +83,7 @@ export class PostgresAuthorityJournal {
   }
 
   registerRoom(roomId: string, durableAuthorityVersion: number): void {
+    if (this.closed) throw journalError('POSTGRES_AUTHORITY_JOURNAL_CLOSED', 'PostgreSQL authority journal is closed')
     const normalized = normalizeRoomId(roomId)
     const version = authorityVersion(durableAuthorityVersion)
     const existing = this.rooms.get(normalized)
@@ -135,6 +138,7 @@ export class PostgresAuthorityJournal {
     const state = this.requireRoom(reservation.roomId)
     state.reserved -= 1
     this.reservedGlobal -= 1
+    this.resolveReservationSettledWaiters()
     state.queue.push({ job: reservation.job, enqueuedAt: performance.now() })
     state.authorityVersion = reservation.job.transition.toVersion
     this.pendingGlobal += 1
@@ -147,6 +151,7 @@ export class PostgresAuthorityJournal {
     const state = this.requireRoom(reservation.roomId)
     state.reserved -= 1
     this.reservedGlobal -= 1
+    this.resolveReservationSettledWaiters()
     reservation.state = 'cancelled'
   }
 
@@ -192,9 +197,20 @@ export class PostgresAuthorityJournal {
   }
 
   async close(): Promise<void> {
-    if (this.closed) return
+    if (this.closePromise) return this.closePromise
     this.closed = true
-    await Promise.all([...this.rooms.keys()].map(roomId => this.drain(roomId)))
+    this.closePromise = (async () => {
+      if (this.reservedGlobal > 0) {
+        await new Promise<void>(resolve => this.reservationSettledWaiters.push(resolve))
+      }
+      await Promise.all([...this.rooms.keys()].map(roomId => this.drain(roomId)))
+    })()
+    return this.closePromise
+  }
+
+  private resolveReservationSettledWaiters(): void {
+    if (this.reservedGlobal !== 0) return
+    for (const resolve of this.reservationSettledWaiters.splice(0)) resolve()
   }
 
   private schedule(roomId: string, state: RoomJournalState): void {
