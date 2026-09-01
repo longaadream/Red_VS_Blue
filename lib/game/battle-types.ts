@@ -242,6 +242,16 @@ export type BattleAction =
       clientActionId?: string
     }
   | {
+      type: "pendingTimeout"
+      now: number
+      clientActionId?: string
+      expectedTurnNumber?: number
+      expectedDeadlineAt?: number
+      expectedInputOwnerPlayerId?: PlayerId
+      expectedPendingSelectionId?: string
+      expectedPendingStateRevision?: number
+    }
+  | {
       type: "move"
       playerId: PlayerId
       pieceId: string

@@ -28,6 +28,7 @@
 12. 旧技能返回的后置 `pendingTargetSelection` 作为合成 target consumer 接入事务：重放恢复到相同选择点，再消费答案并执行一次 `effectCode`。`effectCode` 可以继续产生下一个合成 target consumer；所有阶段完成前不得提交技能成本或核心效果。默认取消语义保持旧合同：跳过后置目标并提交根动作；技能只有显式声明 `rollbackPendingTargetOnCancel` 时，任一合成目标阶段取消才回滚整个根动作。
 13. option 会话可以声明 `selectionMode: 'multi'`、`presentation: 'hand'` 以及权威的 `minSelections` / `maxSelections`。多选提交必须是由不重复候选值组成的数组，凭证、所有者、数量上下限、重复值与失效实例均在重放前校验。`hand` 只决定客户端从既有手牌区收集候选，不创建按组合膨胀的选项列表；普通单选 picker 行为保持不变。
 14. target 会话同样可以声明 `selectionMode: 'multi'` 与权威数量上下限。客户端在棋盘上逐个勾选候选棋子，以主目标加 `extraTargets` 一次提交；不得生成候选组合，也不得生成“棋子组合 × 格子”的笛卡尔积。服务端先校验会话凭证，再校验数量、去重和每个引用是否属于盖章候选。后续地格选择必须建立新的 selection ID、revision 与精确候选集。
+15. 回合外 pending 的计时与超时续接遵循 [ADR-0025](./ADR-0025-off-turn-pending-response-timer.md)：每个新会话获得独立 15 秒，只结算当前会话；不可取消会话的稳定默认答案必须在计时开始前预声明，不能在超时时重新随机或查询候选。
 
 ## 备选方案
 

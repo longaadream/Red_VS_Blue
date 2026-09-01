@@ -105,6 +105,15 @@ export interface AIObservation {
   graveyard: AIObservedPiece[]
   players: AIObservedPlayer[]
   turn: TurnState
+  pendingTimer?: {
+    status: 'running'
+    ownerPlayerId: string
+    selectionId: string
+    stateRevision: number
+    durationMs: number
+    startedAt: number
+    deadlineAt: number
+  }
   terminalResult?: TerminalResult
   deployment?: {
     mode?: NonNullable<BattleState['deployment']>['mode']

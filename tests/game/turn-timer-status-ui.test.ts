@@ -10,14 +10,21 @@ type TurnTimerStatusApi = {
       status: string
       deadlineAt: number
       burnStartsAt: number
+      remainingMs?: number
+      paused?: boolean
       burning?: boolean
       fast?: boolean
+    }
+    pendingTimer?: {
+      status: string
+      deadlineAt: number
     }
     now?: number
   }): {
     visible: boolean
     remainingSeconds: number
     clockText: string
+    frozenClockText: string
     burning: boolean
     fast: boolean
     label: string
@@ -78,6 +85,33 @@ describe('RED-36 turn timer status view', () => {
     expect(api.create({ timer: { ...fast, status: 'stopped' }, now: 1_000 })).toMatchObject({
       visible: false,
       clockText: '--:--',
+    })
+  })
+
+  it('shows the response clock while clearly preserving the frozen turn budget', () => {
+    const api = loadApi()
+
+    expect(api.create({
+      timer: {
+        status: 'running',
+        deadlineAt: 46_000,
+        burnStartsAt: 31_000,
+        remainingMs: 34_000,
+        paused: true,
+      },
+      pendingTimer: {
+        status: 'running',
+        deadlineAt: 20_000,
+      },
+      now: 8_000,
+    })).toMatchObject({
+      visible: true,
+      remainingSeconds: 12,
+      clockText: '00:12',
+      frozenClockText: '00:34',
+      burning: false,
+      fast: false,
+      label: '响应计时（回合计时已冻结 00:34）',
     })
   })
 })

@@ -77,6 +77,20 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('feeds the authoritative response timer into the shared battle clock view', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('let authoritativePendingTimer = null')
+    expect(battlePage).toContain('authoritativePendingTimer = pendingTimer || null')
+    expect(battlePage).toContain('pendingTimer: authoritativePendingTimer')
+    expect(battlePage).toContain('msg.pendingTimer')
+    expect(battlePage).toContain('id="turnClockFrozen"')
+    expect(battlePage).toContain("frozenClock.textContent = '回合冻结 ' + view.frozenClockText")
+    expect(battlePage).toContain("authoritativePendingTimer ? '响应 ' + view.clockText : view.clockText")
+    expect(battlePage).toContain("clock.parentElement?.classList.toggle('pending-timer-active', !!authoritativePendingTimer)")
+    expect(battlePage).toContain('.turn-summary-secondary.pending-timer-active')
+  })
+
   it('renders the authoritative terminal result without judging or submitting gameOver locally', () => {
     const battlePage = readPage('battle.html')
 

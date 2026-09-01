@@ -605,33 +605,50 @@ describe('RED-36 authoritative room timer integration', () => {
     })
   })
 
-  it('charges a pending response timeout to its actual input owner', async () => {
-    const clock = new FakeClock(0)
+  it('freezes the active turn and expires only the independent off-turn response', async () => {
+    const clock = new FakeClock(10_000)
     const room = makeTimedRoom('pending-input-timeout-room')
     const state = (room.battleState as any).state as BattleState
-    state.pendingOptionSelection = {
+    state.pendingOptionSelection = finalizePendingOptionSession({
       playerId: PLAYERS[1],
       title: 'Respond',
       options: ['accept'],
-    }
-    state.turnTimer = createRunningTurnTimer(state, clock.value)
+    }, state.targetingRevision ?? 0)
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 10_000,
+      resumedAt: 10_000,
+      actorPlayerId: PLAYERS[0],
+      acceptedActionType: 'move',
+    })
     const store = new MemoryRoomStore(room)
 
-    clock.value = authoritativeState(store).turnTimer!.deadlineAt
-    const result = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
-      type: 'endTurn',
-      playerId: PLAYERS[0],
+    const publicSnapshot = createPublicBattleSnapshot(store.room, PLAYERS[1], clock)
+    expect(publicSnapshot).toMatchObject({
+      turnTimer: { ownerPlayerId: PLAYERS[0], remainingMs: 35_000, paused: true },
+      pendingTimer: { ownerPlayerId: PLAYERS[1], remainingMs: 15_000 },
+    })
+    expect(publicSnapshot.state.turnTimer?.pendingResponse).toBeUndefined()
+    clock.value = authoritativeState(store).turnTimer!.pendingResponse!.deadlineAt
+    const pending = authoritativeState(store).pendingOptionSelection!
+    const result = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[1], {
+      type: 'pendingOptionSelect',
+      playerId: PLAYERS[1],
+      selectedOption: 'accept',
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
       clientActionId: 'late-while-blue-responds',
     } as any, { clock })
 
-    expect(result.expiredReason).toBe('turn')
+    expect(result.expiredReason).toBe('pending')
     expect(authoritativeState(store).turn).toMatchObject({
-      currentPlayerId: PLAYERS[1],
+      currentPlayerId: PLAYERS[0],
       phase: 'action',
     })
     expect(authoritativeState(store).turnTimer).toMatchObject({
-      ownerPlayerId: PLAYERS[1],
-      turnOwnerPlayerId: PLAYERS[1],
+      ownerPlayerId: PLAYERS[0],
+      turnOwnerPlayerId: PLAYERS[0],
+      remainingMs: 35_000,
+      deadlineAt: 60_000,
       durationMs: 45_000,
       fast: false,
       noOpStreaks: {
@@ -639,6 +656,130 @@ describe('RED-36 authoritative room timer integration', () => {
         [PLAYERS[1]]: 0,
       },
     })
+    expect(authoritativeState(store).pendingOptionSelection).toBeUndefined()
+    expect(authoritativeState(store).actions?.filter(action => action.type === 'pendingTimeout')).toHaveLength(1)
+    expect(authoritativeState(store).actions?.filter(action => action.type === 'turnTimeout')).toHaveLength(0)
+  })
+
+  it('ignores a stale response-timeout callback after a new pending session replaces it', async () => {
+    const clock = new FakeClock(5_000)
+    const room = makeTimedRoom('stale-response-timeout-room')
+    const state = (room.battleState as any).state as BattleState
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: PLAYERS[1],
+      title: 'First response',
+      options: ['first'],
+    }, 0)
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 5_000,
+      resumedAt: 5_000,
+      actorPlayerId: PLAYERS[0],
+      acceptedActionType: 'move',
+    })
+    const firstResponse = state.turnTimer!.pendingResponse!
+    const staleTimeout = {
+      type: 'pendingTimeout',
+      now: firstResponse.deadlineAt,
+      clientActionId: 'stale-first-response-timeout',
+      expectedTurnNumber: state.turnTimer!.turnNumber,
+      expectedDeadlineAt: firstResponse.deadlineAt,
+      expectedInputOwnerPlayerId: firstResponse.ownerPlayerId,
+      expectedPendingSelectionId: firstResponse.selectionId,
+      expectedPendingStateRevision: firstResponse.stateRevision,
+    } as const
+
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: PLAYERS[1],
+      title: 'Second response',
+      options: ['second'],
+    }, 1)
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 6_000,
+      resumedAt: 7_000,
+      actorPlayerId: PLAYERS[1],
+      acceptedActionType: 'pendingOptionSelect',
+    })
+    const store = new MemoryRoomStore(room)
+    const before = clone(store.room)
+
+    clock.value = staleTimeout.now
+    const result = await dispatchRoomBattleAction(
+      store,
+      room.id,
+      undefined,
+      staleTimeout as any,
+      { clock, allowSystem: true },
+    )
+
+    expect(result.kind).toBe('duplicate')
+    expect(store.writes).toBe(0)
+    expect(store.room).toEqual(before)
+  })
+
+  it('uses the predeclared first stable default for a mandatory response timeout', async () => {
+    const clock = new FakeClock(0)
+    const room = makeTimedRoom('mandatory-response-timeout-room')
+    const state = (room.battleState as any).state as BattleState
+    const ruleId = 'mandatory-response-default-probe'
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: PLAYERS[1],
+      title: 'Mandatory response',
+      options: ['first', 'second'],
+      canCancel: false,
+      triggerContext: {
+        type: 'beginTurn',
+        turnNumber: state.turn.turnNumber,
+        playerId: PLAYERS[0],
+        pendingRuleId: ruleId,
+      },
+    }, state.targetingRevision ?? 0)
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 0,
+      resumedAt: 0,
+      actorPlayerId: PLAYERS[0],
+      acceptedActionType: 'move',
+    })
+    const store = new MemoryRoomStore(room)
+    const previousRules = [...globalTriggerSystem.getRules()]
+    globalTriggerSystem.clearRules()
+    globalTriggerSystem.addRules([{
+      id: ruleId,
+      name: 'Mandatory response default probe',
+      description: 'Records the option selected by response timeout',
+      priority: 1,
+      trigger: { type: 'beginTurn' },
+      effect: (battle: BattleState, context: any) => {
+        ;(battle as any).mandatoryResponseDefault = context.selectedOption
+        return { success: true }
+      },
+    }] as any)
+
+    try {
+      expect(authoritativeState(store).turnTimer?.pendingResponse?.timeoutResolution).toEqual({
+        kind: 'option',
+        selectedOption: 'first',
+      })
+      clock.value = authoritativeState(store).turnTimer!.pendingResponse!.deadlineAt
+      const pending = authoritativeState(store).pendingOptionSelection!
+      const result = await dispatchRoomBattleAction(store, room.id, PLAYERS[1], {
+        type: 'pendingOptionSelect',
+        playerId: PLAYERS[1],
+        selectedOption: 'second',
+        selectionId: pending.selectionId,
+        stateRevision: pending.stateRevision,
+        clientActionId: 'late-mandatory-response',
+      } as any, { clock })
+
+      expect(result).toMatchObject({ kind: 'expired', expiredReason: 'pending' })
+      expect((authoritativeState(store) as any).mandatoryResponseDefault).toBe('first')
+      expect(authoritativeState(store).turnTimer?.noOpStreaks).toEqual({
+        [PLAYERS[0]]: 0,
+        [PLAYERS[1]]: 0,
+      })
+    } finally {
+      globalTriggerSystem.clearRules()
+      globalTriggerSystem.addRules(previousRules)
+    }
   })
 
   it('keeps timing an end-of-turn pending input and restores the original turn budget', async () => {
@@ -693,11 +834,11 @@ describe('RED-36 authoritative room timer integration', () => {
     const room = makeTimedRoom('end-turn-pending-timeout-room')
     const state = (room.battleState as any).state as BattleState
     state.turn.phase = 'end'
-    state.pendingOptionSelection = {
+    state.pendingOptionSelection = finalizePendingOptionSession({
       playerId: PLAYERS[1],
       title: 'Resolve end-of-turn effect',
       options: ['resolve'],
-    }
+    }, state.targetingRevision ?? 0)
     state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
       receivedAt: 10_000,
       resumedAt: 10_000,
@@ -720,14 +861,15 @@ describe('RED-36 authoritative room timer integration', () => {
       clientActionId: 'late-end-turn-pending',
     } as any, { clock })
 
-    expect(result).toMatchObject({ kind: 'expired', expiredReason: 'turn' })
+    expect(result).toMatchObject({ kind: 'expired', expiredReason: 'pending' })
     expect(authoritativeState(store).turn).toMatchObject({
-      currentPlayerId: PLAYERS[1],
-      phase: 'action',
+      currentPlayerId: PLAYERS[0],
+      phase: 'end',
     })
     expect(authoritativeState(store).pendingOptionSelection).toBeUndefined()
     expect(authoritativeState(store).pieces.find(piece => piece.instanceId === 'red-piece')?.statusTags)
       .toContainEqual(expect.objectContaining({ id: 'end-turn-duration-proof', remainingDuration: 1 }))
+    expect(authoritativeState(store).actions?.filter(action => action.type === 'turnTimeout')).toHaveLength(0)
   })
 
   it('automatically resolves a non-cancellable pending created after an action-phase timeout', async () => {
@@ -981,6 +1123,47 @@ describe('RED-36 authoritative room timer integration', () => {
     }
   })
 
+  it('schedules an off-turn response timeout without advancing the frozen burn clock', async () => {
+    vi.useFakeTimers()
+    const clock = new FakeClock(0)
+    const room = makeTimedRoom('pending-response-schedule-room')
+    const state = (room.battleState as any).state as BattleState
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: PLAYERS[1],
+      title: 'Scheduled response',
+      options: ['accept'],
+    }, state.targetingRevision ?? 0)
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 0,
+      resumedAt: 0,
+      actorPlayerId: PLAYERS[0],
+      acceptedActionType: 'move',
+    })
+    const store = new MemoryRoomStore(room)
+
+    try {
+      await scheduleRoomBattleTimeout(store, room.id, { clock })
+      clock.value = 14_999
+      await vi.advanceTimersByTimeAsync(14_999)
+      expect(store.writes).toBe(0)
+
+      clock.value = 15_000
+      await vi.advanceTimersByTimeAsync(1)
+      expect(store.writes).toBe(1)
+      expect(authoritativeState(store).pendingOptionSelection).toBeUndefined()
+      expect(authoritativeState(store).turnTimer).toMatchObject({
+        ownerPlayerId: PLAYERS[0],
+        remainingMs: 45_000,
+        deadlineAt: 60_000,
+      })
+      expect(authoritativeState(store).actions?.filter(action => action.type === 'turnTimerBurn')).toHaveLength(0)
+      expect(authoritativeState(store).actions?.filter(action => action.type === 'pendingTimeout')).toHaveLength(1)
+    } finally {
+      clearRoomBattleTimeout(room.id)
+      vi.useRealTimers()
+    }
+  })
+
   it('hands a player timeout directly to the bot turn callback', async () => {
     vi.useFakeTimers()
     const clock = new FakeClock(0)
@@ -1097,6 +1280,11 @@ describe('RED-36 authoritative room timer integration', () => {
       type: 'turnTimerBurn',
       now: 30_000,
       clientActionId: 'forged-turn-burn',
+    } as any, { clock })).rejects.toMatchObject({ code: 'TURN_TIMER_SYSTEM_ACTION_FORBIDDEN' })
+    await expect(dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
+      type: 'pendingTimeout',
+      now: 45_000,
+      clientActionId: 'forged-pending-timeout',
     } as any, { clock })).rejects.toMatchObject({ code: 'TURN_TIMER_SYSTEM_ACTION_FORBIDDEN' })
     expect(store.room).toEqual(before)
     expect(store.writes).toBe(0)

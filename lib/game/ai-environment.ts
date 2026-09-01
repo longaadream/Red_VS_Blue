@@ -191,6 +191,15 @@ export function observeBattleForAI(state: BattleState, playerId: string): AIObse
       skills: cloneSerializable(player.skills || []),
     })),
     turn: cloneSerializable(state.turn),
+    pendingTimer: !state.terminalResult && state.turnTimer?.status === 'running' && state.turnTimer.pendingResponse ? {
+      status: state.turnTimer.pendingResponse.status,
+      ownerPlayerId: state.turnTimer.pendingResponse.ownerPlayerId,
+      selectionId: state.turnTimer.pendingResponse.selectionId,
+      stateRevision: state.turnTimer.pendingResponse.stateRevision,
+      durationMs: state.turnTimer.pendingResponse.durationMs,
+      startedAt: state.turnTimer.pendingResponse.startedAt,
+      deadlineAt: state.turnTimer.pendingResponse.deadlineAt,
+    } : undefined,
     terminalResult: cloneSerializable(state.terminalResult),
     deployment: projectedDeployment ? {
       mode: projectedDeployment.mode,
