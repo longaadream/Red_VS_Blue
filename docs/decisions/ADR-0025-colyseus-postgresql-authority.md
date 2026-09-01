@@ -1,4 +1,4 @@
-# ADR-0023：Colyseus 房间权威与 PostgreSQL 有界异步耐久化
+# ADR-0025：Colyseus 房间权威与 PostgreSQL 有界异步耐久化
 
 - 状态：已接受
 - 日期：2026-08-31
@@ -7,7 +7,7 @@
 - 父路线：RED-158
 - 风险：High
 - 基线：`main@52632636d16dce0a912cab428dc563c59eb4f605`
-- 收尾同步基线：`main@dc9bca46c06e2852621620180e8869a924e29bfa`
+- 收尾同步基线：`main@a0d0ead93009553e32f3088622893443930fab7b`
 - 规范合同：[Colyseus/PostgreSQL 迁移合同](../technical/COLYSEUS_POSTGRESQL_MIGRATION.md)
 - 验收记录：[RED-159 合同验收](../qa/RED-159-colyseus-postgresql-contract.md)
 
@@ -40,6 +40,26 @@ RED-159 只冻结迁移边界、耐久语义、部署拓扑和后续任务拆分
 | D3 状态同步 | 私有普通 BattleState + 小型 Schema/StateView + 即时 receipt/语义 message |
 | D4 K8s 路由 | 稳定 Pod 身份 + per-Pod Service/Gateway 精确路由；experimental Traefik 只作 PoC |
 | D5 SQLite | PostgreSQL 是新运行时唯一真源；SQLite 只作离线只读导出和不可变回退证据 |
+
+### 落地校准（2026-09-01）
+
+后续实现没有推翻 D1–D5，而是把其中两个待实现选择具体化：
+
+- RED-160 已合入 `main`，固定 `colyseus@0.18.5`、`@colyseus/sdk@0.18.2`、
+  `@colyseus/schema@5.0.25` 与 `pg@8.23.0`，交付 BattleRoom、每 Room 25 ms / 8 条 PostgreSQL
+  journal、version 0 和 terminal durable barrier 的最小纵切；
+- RED-139 已合入 `main`，继续保持 Room command FIFO、动作内 EffectChain/Queue 与 PostgreSQL
+  durable queue 三层分离；
+- RED-161 已合入 `main` 并把默认 Electron 玩家链路迁到同一 Colyseus Room；项目负责人同时批准：Windows LAN
+  房主按需使用随候选分发的原生 PostgreSQL 16，远程加入方不启动数据库；官方 Server、K8s 与显式
+  `RVB_POSTGRES_URL` 继续使用外部 PostgreSQL；
+- RED-161 批准的只读目标展示预检只消除选择目标前的准备 RTT，最终命令仍由服务端完整裁决；它不
+  批准客户端权威、乐观状态提交或第二套规则表。
+
+这些是 D1–D3 的实现细化，不改变 PostgreSQL 唯一耐久真源、普通 APPLIED 不等待数据库、终局等待
+DURABLE、SQLite 不进入新运行时、Schema/Redis 不作为审计真源等基础边界。RED-161 的实现和候选
+证据由其自身合同与验收记录负责；K8s/Redis、SQLite 离线导入及大规模故障/容量验证仍属于后续
+Phase E/F，不由 RED-159 文档任务代签。
 
 ### 1. 产品和运行拓扑
 
@@ -250,8 +270,11 @@ Windows 单实例和 Kubernetes worker 必须调用同一个 BattleRoom 与 Post
 启用与生产相同的 Redis Presence/Driver 和精确路由，且每进程使用独立端口和 public address。
 
 Windows 服务停止不能只依赖 POSIX signal；Supervisor/服务管理脚本应先调用受保护 drain 入口，等待
-durable barrier 后再结束进程。PostgreSQL 在 Windows 上采用外部已支持服务还是随产品安装，由后续
-发行任务单独批准；本 ADR 不授权静默安装数据库服务或修改机器级配置。
+durable barrier 后再结束进程。RED-161 已批准 Windows LAN 房主随候选分发原生 PostgreSQL 16：只在
+本机开服时按需初始化并启动用户数据目录中的独立 cluster，只监听 `127.0.0.1` 动态端口，使用随机
+SCRAM 凭据并由 Electron 安全存储保护；远程加入方不启动数据库。显式 `RVB_POSTGRES_URL`、官方
+Server 与 K8s 仍使用外部 PostgreSQL。任何路径都不得回退到 SQLite、PGlite、`trust` 认证或易失性
+持久化，也不得静默安装机器级数据库服务或修改机器级配置。
 
 ### 10. 与既有 ADR 的关系
 
@@ -330,6 +353,8 @@ RED-159 文档阶段执行基线、编码、Markdown link 和 diff 检查，并�
 
 - [RED-158](https://linear.app/redvsblue/issue/RED-158/路线-将权威联机迁移至-colyseus-postgresql并建立-k8swindows-双部署)
 - [RED-159](https://linear.app/redvsblue/issue/RED-159/phase-0-合同-冻结-colyseuspostgresql-迁移边界耐久语义与双栈验收)
+- [RED-160](https://linear.app/redvsblue/issue/RED-160/phase-bd-实现-colyseus-battleroom-postgresql-applieddurable-最小纵切)
+- [RED-161](https://linear.app/redvsblue/issue/RED-161/phase-c-将默认-electron-玩家主链迁移到-colyseuspostgresql)
 - [RED-139](https://linear.app/redvsblue/issue/RED-139/建立四类确定性-effectbatchqueue-并冻结同时语义白名单)
 - [Colyseus Rooms](https://docs.colyseus.io/room)
 - [Colyseus State Synchronization](https://docs.colyseus.io/state)

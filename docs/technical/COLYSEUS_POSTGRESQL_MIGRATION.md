@@ -6,7 +6,8 @@
 - 父路线：RED-158
 - 风险：High
 - 基线：main@52632636d16dce0a912cab428dc563c59eb4f605
-- 决策：[ADR-0023](../decisions/ADR-0023-colyseus-postgresql-authority.md)
+- 收尾同步基线：main@a0d0ead93009553e32f3088622893443930fab7b
+- 决策：[ADR-0025](../decisions/ADR-0025-colyseus-postgresql-authority.md)
 
 ## 1. 合同目的
 
@@ -366,7 +367,11 @@ Room、空队列/同房 burst、普通/周期 checkpoint/terminal、数据库正
 - 默认 LocalPresence/LocalDriver；这只能证明单进程；
 - 复用同一 BattleRoom、PostgreSQL adapter、health、drain 和 recovery；
 - Supervisor 先调用受保护 drain，再停止 child；不只依赖 SIGTERM；
-- PostgreSQL 的安装、升级、备份和支持形态由 Windows 发行任务另行批准；
+- RED-161 已批准 LAN 房主按需使用候选内置的原生 PostgreSQL 16；远程加入方不启动数据库；
+- 内置 cluster 位于用户数据目录，只监听 `127.0.0.1` 动态端口，使用随机 SCRAM 凭据和 Electron
+  安全存储；不得安装机器级服务、使用 `trust`、绑定 LAN 网卡或回落 SQLite/PGlite；
+- 显式 `RVB_POSTGRES_URL`、官方 Server 与 K8s 使用外部 PostgreSQL，不启动内置实例；
+- PostgreSQL major 升级、自动 `pg_upgrade`、公开更新渠道和旧 SQLite 数据导入仍需后续发行合同；
 - 新候选包不得包含 SQLite authority provider/writer。
 
 ### 8.2 Kubernetes
@@ -491,9 +496,24 @@ Room runtime 隔离等验收不变量；只替换它们的 raw ws/SQLite 实现�
 所有子任务均为 High Risk，实施当天重新 fetch origin/main、记录 base SHA、使用独立 RED 分支，并由
 未参与实现的 AI 审查。禁止修改玩法、数值、随机算法、Profile 身份或 Trace 外部语义；禁止活动 Room
 热切。B 与 D 是第一个可分发纵切的最高优先级，允许在冻结的 storage port 两侧并行，但不能同时修改
-同一入口。B–E 完成前 Colyseus 不成为正式默认入口。
+同一入口。Windows LAN 默认入口必须完成 B+C+D 与 E 的 Windows 生命周期子集；E 的 K8s/Redis 子集
+不阻塞 Windows LAN 候选，但在多 Pod 托管入口启用前必须完成。
+
+截至 2026-09-01 的落地状态：
+
+| Phase | 实际状态 | RED-159 收口判断 |
+| --- | --- | --- |
+| B + D | RED-160 已合入 `main`；BattleRoom、PostgreSQL 双水位、25 ms / 8 条微批、version 0 与 terminal barrier 已落地 | 基础合同保持有效 |
+| C | RED-161 已合入 `main`；默认 Electron/浏览器主链、公开投影、receipt、重连与 LAN 内置 PostgreSQL 16 已落地 | 实现证据归 RED-161 验收记录 |
+| E | Windows 单实例部分由 RED-161 提前落地；K8s/Redis、精确 Pod 路由与 room-aware drain 尚未实现 | 合同继续作为后续实现门禁 |
+| F | 尚未完成全量 Windows/K8s、SQLite 导入、100 Room、故障与退役验收 | 合同继续作为后续候选门禁 |
+
+上述状态回填只记录实现进度，不把后续 Issue 的测试结果复制成 RED-159 的运行时验收，也不改变各
+Phase 自己的 High Risk 审查、人工候选、合并和发布权限。
 
 ### Phase B：Colyseus BattleRoom 与规则适配
+
+落地：RED-160 已合入 `main`；以下条目保留为回归与后续扩展门禁。
 
 目标：
 
@@ -540,6 +560,8 @@ Room runtime 隔离等验收不变量；只替换它们的 raw ws/SQLite 实现�
 
 ### Phase C：客户端 SDK、Schema/StateView 与重连
 
+落地：RED-161 已合入 `main`；以下条目继续作为后续回归门禁。
+
 目标：
 
 - 建立小型、版本化的公开 read model；
@@ -579,6 +601,9 @@ Room runtime 隔离等验收不变量；只替换它们的 raw ws/SQLite 实现�
 - 客户端与服务端按同一 build 整体切回 legacy，先停止新 Colyseus Room 并排空。
 
 ### Phase D：PostgreSQL 存储、恢复与 durable terminal
+
+落地：RED-160 已合入最小纵切，RED-161 已用随包 PostgreSQL 16 补充真实集成和 Windows 生命周期；
+SQLite 离线 exporter/importer 与完整生产恢复演练仍未完成。
 
 目标：
 
@@ -627,6 +652,8 @@ Room runtime 隔离等验收不变量；只替换它们的 raw ws/SQLite 实现�
 - 禁止新 runtime 切数据库或活动 Room 降级。
 
 ### Phase E：K8s/Redis 精确路由、drain 与 Windows 单实例
+
+落地：Windows LAN 单实例部分由 RED-161 提前实现；K8s/Redis 与多 Pod 路由/drain 仍待后续任务。
 
 目标：
 
@@ -716,7 +743,7 @@ Room runtime 隔离等验收不变量；只替换它们的 raw ws/SQLite 实现�
 - blocked by B/C/D/E，且 RED-142/143/145/146/149 已按本合同改写；
 - 保留最后 legacy release、前一 Colyseus 候选、原 SQLite 备份和 PG 导出；失败时 drain 后整版回退。
 
-## 13. 执行优先级
+## 13. 执行优先级与当前进度
 
 1. A：RED-159 合同、ADR、schema、故障和 Issue 迁移矩阵；
 2. B + D：最小可运行 BattleRoom + PostgreSQL 垂直切片，先证明普通 APPLIED 不等 DB；
@@ -724,13 +751,17 @@ Room runtime 隔离等验收不变量；只替换它们的 raw ws/SQLite 实现�
 4. E：Windows 单实例、K8s/Redis/精确路由/drain；
 5. F：双栈、故障、延迟、真实客户端验收；人工批准后退役旧路径。
 
-在 B+D 纵切达到可重复本机运行以前，功能扩展优先级低于延迟、幂等、恢复和可分发性。RED-139 可独立
-推进；B 的 adapter 必须等待其已合并公共规则端口，不 import 未合并内部 Effect handler。
+当前已完成 B+C+D 的合入，E 仅完成 Windows LAN 子集，F 尚未开始完整验收。该进度
+不会把未执行的 K8s/Redis、SQLite 导入、100 Room 或双平台候选写成通过。
+
+B+D 纵切已达到可重复本机运行并合入；后续扩展仍不得降低延迟、幂等、恢复和可分发性门禁。
+RED-139 已合入，其公共规则端口继续是 BattleRoom 唯一允许的 EffectChain 适配边界。
 
 ## 14. 相关依据
 
-- [ADR-0023](../decisions/ADR-0023-colyseus-postgresql-authority.md)
+- [ADR-0025](../decisions/ADR-0025-colyseus-postgresql-authority.md)
 - [RED-159 验收](../qa/RED-159-colyseus-postgresql-contract.md)
+- [RED-160 纵切验收](../qa/RED-160-colyseus-postgresql-vertical-slice.md)
 - [RED-109 延迟基线](../qa/RED-109-authority-transition-baseline.md)
 - [ADR-0017 权威 Transition](../decisions/ADR-0017-authority-transition-pipeline.md)
 - [ADR-0020 单一玩家 WebSocket](../decisions/ADR-0020-unified-player-websocket-transport.md)

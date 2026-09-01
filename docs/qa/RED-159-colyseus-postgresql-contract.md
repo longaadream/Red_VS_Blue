@@ -1,14 +1,14 @@
 # RED-159 Colyseus / PostgreSQL Phase 0 合同验收
 
-- 状态：合同实现与收尾同步完成，等待 PR
-- 日期：2026-08-31
+- 状态：合同已对齐 RED-160/161，等待本次独立审查与 PR 合并
+- 日期：2026-09-01
 - 任务：[RED-159](https://linear.app/redvsblue/issue/RED-159/phase-0-合同-冻结-colyseuspostgresql-迁移边界耐久语义与双栈验收)
 - 父路线：[RED-158](https://linear.app/redvsblue/issue/RED-158/路线-将权威联机迁移至-colyseus-postgresql并建立-k8swindows-双部署)
 - 风险：High
 - 分支：codex/red-159-colyseus-postgresql-contract
 - base_branch：main
 - base_sha：52632636d16dce0a912cab428dc563c59eb4f605
-- 收尾同步 base_sha：dc9bca46c06e2852621620180e8869a924e29bfa
+- 收尾同步 base_sha：a0d0ead93009553e32f3088622893443930fab7b
 - 角色：实现者；人工体验验收、合并和发布不在本记录中
 
 ## 1. 范围证据
@@ -24,11 +24,13 @@
 
 预期文档：
 
-- [ADR-0023：Colyseus 房间权威与 PostgreSQL 有界异步耐久化](../decisions/ADR-0023-colyseus-postgresql-authority.md)
+- [ADR-0025：Colyseus 房间权威与 PostgreSQL 有界异步耐久化](../decisions/ADR-0025-colyseus-postgresql-authority.md)
 - [Colyseus / PostgreSQL 权威联机迁移合同](../technical/COLYSEUS_POSTGRESQL_MIGRATION.md)
 - 本验收记录及三个目录索引。
 
-RED-139 已占用 ADR-0022；本任务使用 ADR-0023，避免并发合同编号冲突。
+RED-139 已占用 ADR-0022，RED-161 先合入 `main` 并占用 ADR-0023，RED-138 已占用 ADR-0024。
+RED-159 因此在收尾同步中归档为 ADR-0025；这只是编号冲突消解，不改写已经批准且被 RED-160/161
+采用的 D1–D5。
 
 ## 2. 验收标准映射
 
@@ -43,9 +45,23 @@ RED-139 已占用 ADR-0022；本任务使用 ADR-0023，避免并发合同编号
 | SQLite 导出/导入/校验/回退 | ADR 第 7 节；技术合同第 9 节 | 已覆盖 |
 | 30 个有效未完成 Issue 分类 | 技术合同第 11 节 | 已覆盖；不改状态 |
 | B–F 有窄 scope/allowed_paths/tests/rollback/dependencies | 技术合同第 12–13 节 | 已覆盖 |
-| 不复制规则到 Room/UI，不把 Schema/Redis 当真源 | ADR 第 2、5、6 节；独立审查 | 待独立审查 |
+| 不复制规则到 Room/UI，不把 Schema/Redis 当真源 | ADR 第 2、5、6 节；独立审查 | 本次收尾待独立复审 |
 
-## 3. RED-139 兼容验收
+## 3. RED-160/161 落地对齐
+
+本次收尾只把已经批准和已实现的事实回填到基础合同，不用后续 Issue 代签 RED-159，也不扩大生产范围：
+
+- RED-160 已合入 `main`，实现 Colyseus BattleRoom、私有 BattleState、小型 Schema、每 Room
+  PostgreSQL journal、25 ms / 8 条微批、APPLIED/DURABLE 双水位、version 0 与 terminal barrier；
+- RED-139 已合入 `main`，实际保持 Room FIFO、动作内 EffectChain/Queue 与 durable queue 三层分离；
+- RED-161 已合入 `main` 并完成默认 Electron/浏览器 Colyseus 主链、精确 receipt/重连、目标展示只读预检与
+  LAN 房主内置原生 PostgreSQL 16，并记录真实 PostgreSQL integration、精确 Windows 单机冒烟；
+- RED-161 的候选证据、人工批准和剩余风险归其自身合同与验收记录；RED-159 只确认它没有推翻
+  D1–D5，不重复代签运行时验收；
+- K8s/Redis 精确路由、SQLite exporter/importer、100 Room 和完整 Phase F 故障/容量验收尚未实现，
+  但它们是后续实现任务，不是 RED-159 文档合同完成的前置条件。
+
+## 4. RED-139 兼容验收
 
 以下是后续 BattleRoom 的硬门禁：
 
@@ -65,24 +81,25 @@ RED-139 已占用 ADR-0022；本任务使用 ADR-0023，避免并发合同编号
   hash、journal reserve、stale commit 或 swap 失败必须与 BattleState 一起恢复。
 - runner 非 pending 成功返回前必须证明 EffectChain settled/unloaded；BattleRoom 不补查内部 ledger。
 
-## 4. 文档阶段验证命令
+## 5. 文档阶段验证命令
 
 任务合同要求且必须在提交 PR 前记录真实结果：
 
 | 命令/检查 | 结果 | 说明 |
 | --- | --- | --- |
-| git fetch origin --prune | 已执行 | 2026-08-31；合同基线见上 |
-| npm.cmd run check:main-baseline | 通过 | origin/main dc9bca4；Ahead 1，Behind 0 |
-| npm.cmd run check:encoding | 通过 | 同步后 821 个文本文件 |
-| git diff --check | 通过 | 暂存 diff 无空白错误 |
-| Markdown 相对链接检查 | 通过 | 6 个改动文档的相对目标均存在 |
-| allowed_paths 审计 | 通过 | 6 个文件全部位于 docs/decisions、technical、qa |
-| 独立 AI High Risk contract review | 通过（整改后） | RED-139 兼容审查发现 5 个阻断项并已全部修正；K8s、耐久和 Issue 矩阵分别独立审计 |
+| git fetch origin --prune | 已执行 | 2026-09-01；收尾基线见上 |
+| npm.cmd run check:main-baseline | 待重跑 | 同步 `origin/main` 后重新验证 |
+| npm.cmd run check:encoding | 待重跑 | 不复用旧基线结果 |
+| git diff --check | 待重跑 | 检查当前 PR diff |
+| Markdown 相对链接检查 | 待重跑 | 检查本 PR 改动 Markdown 的相对目标 |
+| allowed_paths 审计 | 待重跑 | PR 自身改动必须只位于三个允许目录 |
+| ADR 引用与脚本存在性检查 | 待重跑 | 对当前 `main` 与 RED-160/161 事实核验 |
+| 独立 AI High Risk contract review | 待复审 | 必须引用当前 diff 与 D1–D5，不复用未留记录的旧结论 |
 
 本任务没有生产行为修改，因此不会把“未运行 runtime 测试”表述为 runtime 测试通过。package scripts
 必须在执行前从当前 package.json 核对。
 
-## 5. 后续候选验收总表
+## 6. 后续候选验收总表
 
 Phase B–F 必须逐项形成自动化或可重复人工证据：
 
@@ -100,7 +117,7 @@ Phase B–F 必须逐项形成自动化或可重复人工证据：
 11. Windows 与 K8s 双客户端候选和不可变 artifact/rollback；
 12. 人工批准后才切默认、删除 legacy runtime、合并或发布。
 
-## 6. 预期独立审查重点
+## 7. 预期独立审查重点
 
 - 是否把 Colyseus 当成自动串行、自动持久化或跨进程 Room 恢复；
 - 是否在 receipt 前遗漏 RED-139 EffectChain 完整收敛；
@@ -113,7 +130,7 @@ Phase B–F 必须逐项形成自动化或可重复人工证据：
 - 故障恢复是否错误声称普通 APPLIED 的 RPO=0；
 - 整版回退是否覆盖了 cutover 后数据损失和外部 settlement。
 
-## 7. 回退
+## 8. 回退
 
 Phase 0 只新增/更新文档，可整体 revert RED-159 提交。不得因为回退文档而删除 SQLite、PostgreSQL、
 Trace、对局或其他开发者文件。后续运行时回退必须停止 admission、排空/记录 durable watermark，
