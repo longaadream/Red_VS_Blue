@@ -42,6 +42,7 @@
 - [`AI_SELF_PLAY.md`](./AI_SELF_PLAY.md)：离线成对自博弈、历史档案、seed 分层、硬门禁、逐局进程隔离、进度与恢复。
 - `ESLINT_BASELINE.md`：零新增 lint 门禁、历史 suppression 基线和清债流程。
 - [`DEVELOPMENT_WORKFLOW.md`](./DEVELOPMENT_WORKFLOW.md)：任务分支 main 基线、本地预检、PR 新鲜度门禁和同步流程。
+- [`COLYSEUS_POSTGRESQL_MIGRATION.md`](./COLYSEUS_POSTGRESQL_MIGRATION.md)：Colyseus BattleRoom、RED-139 Queue 兼容、PostgreSQL 双水位耐久、SQLite 离线迁移及 Windows/K8s 分阶段合同。
 - `MODULE_STATUS.md`：模块现状、负责人、风险和重构进度。
 
 ## 目标架构边界
