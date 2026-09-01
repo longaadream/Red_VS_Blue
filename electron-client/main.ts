@@ -407,6 +407,14 @@ async function stopChildProcessGracefully(
 }
 
 async function killServer(requireDurable = false): Promise<void> {
+  const startup = localGameStartupPromise
+  if (startup) {
+    try {
+      await startup
+    } catch (error) {
+      console.error('[client] local authority startup failed while shutdown was waiting:', error)
+    }
+  }
   if (gameServerProcess) {
     const gameProc = gameServerProcess
     await stopChildProcessGracefully(gameProc, requireDurable)
@@ -473,6 +481,8 @@ let serverProcess: ChildProcess | null = null
 let localServerReady = false
 let gameServerProcess: ChildProcess | null = null
 let localGameReady = false
+let localGameStartupPromise: Promise<void> | null = null
+let localGameOpenPromise: Promise<{ ok: boolean; error?: string }> | null = null
 let embeddedPostgres: EmbeddedPostgresController | null = null
 let localProfileIdentity: GameProfileIdentity | null = null
 let localAuthorityProfileIdentity: GameProfileIdentity | null = null
@@ -707,7 +717,7 @@ function localAuthorityStartupErrorMessage(error: unknown): string {
   return '本机战斗服务启动失败，请查看客户端日志。'
 }
 
-async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): Promise<void> {
+async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBinding): Promise<void> {
   if (gameServerProcess) {
     if (!localGameReady) localGameReady = await waitForGameAuthorityReady(actualGamePort, 5000)
     if (localGameReady) {
@@ -800,6 +810,20 @@ async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): 
     localGameReady = false
     localAuthorityProfileIdentity = null
     throw error
+  }
+}
+
+async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): Promise<void> {
+  if (localGameStartupPromise) {
+    await localGameStartupPromise
+    return
+  }
+  const startup = startLocalGameAuthorityOnce(profileBinding)
+  localGameStartupPromise = startup
+  try {
+    await startup
+  } finally {
+    if (localGameStartupPromise === startup) localGameStartupPromise = null
   }
 }
 
@@ -1890,26 +1914,35 @@ handleTrusted('go-offline', ['connect', 'game'], () => {
 })
 
 handleTrusted('open-local-game', ['connect'], async () => {
-  clearOnlineServerUrl()
+  if (localGameOpenPromise) return await localGameOpenPromise
+  const opening = (async (): Promise<{ ok: boolean; error?: string }> => {
+    clearOnlineServerUrl()
+    try {
+      await startStableLocalServerAndRecover()
+    } catch (error) {
+      console.error('[client] local authority startup failed:', error)
+      return { ok: false, error: localAuthorityStartupErrorMessage(error) }
+    }
+    if (!localGameReady) {
+      const exitMsg = lastServerExitCode !== null
+        ? `Colyseus/PostgreSQL authority exited with code ${lastServerExitCode}`
+        : 'Colyseus/PostgreSQL authority did not become ready'
+      const detail = lastServerStderr ? '\n' + lastServerStderr.slice(-500) : ''
+      return { ok: false, error: exitMsg + detail }
+    }
+    if (connectWin && !connectWin.isDestroyed()) {
+      connectWin.close()
+      connectWin = null
+    }
+    loadLocalGame()
+    return { ok: true }
+  })()
+  localGameOpenPromise = opening
   try {
-    await startStableLocalServerAndRecover()
-  } catch (error) {
-    console.error('[client] local authority startup failed:', error)
-    return { ok: false, error: localAuthorityStartupErrorMessage(error) }
+    return await opening
+  } finally {
+    if (localGameOpenPromise === opening) localGameOpenPromise = null
   }
-  if (!localGameReady) {
-    const exitMsg = lastServerExitCode !== null
-      ? `Colyseus/PostgreSQL authority exited with code ${lastServerExitCode}`
-      : 'Colyseus/PostgreSQL authority did not become ready'
-    const detail = lastServerStderr ? '\n' + lastServerStderr.slice(-500) : ''
-    return { ok: false, error: exitMsg + detail }
-  }
-  if (connectWin && !connectWin.isDestroyed()) {
-    connectWin.close()
-    connectWin = null
-  }
-  loadLocalGame()
-  return { ok: true }
 })
 
 // 查询当前模式

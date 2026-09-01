@@ -113,6 +113,10 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
   必须在退出前回 journal durable ACK，随后 PostgreSQL fast shutdown，Profile-only 进程不再制造虚假的
   “数据库尚未关闭”错误。精确候选冒烟验证 renderer Identity 与 authority Identity 一致，退出后 Electron、
   内置 Node 与 `postgres.exe` 进程计数均为 0。
+- 人工重复点击“我当主机”进一步发现 PostgreSQL 冷启动窗口会并发创建多个 Colyseus 子进程，Electron
+  最终可能持有未监听端口的失败进程，导致耐久退出 ACK 发错对象。Profile/数据库/authority 启动及整个
+  `open-local-game` 处理现已 single-flight；精确候选冒烟在首个请求后延迟 2 秒再并发重复两次，确认只
+  产生一条启动链、可以进入游戏并正常退出，Electron、内置 Node、`postgres.exe` 进程计数仍全部为 0。
 - `npm.cmd run check:main-baseline`：通过；HEAD 不落后上述 `origin/main`。
 - `npm.cmd run check:encoding` 与 `git diff --check`：通过。
 - `npm.cmd run test:postgres`：随包 PostgreSQL wrapper 启动真实实例并驱动原有 integration，通过；原有

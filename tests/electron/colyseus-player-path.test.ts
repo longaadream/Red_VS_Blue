@@ -92,6 +92,25 @@ describe('RED-161 default player transport', () => {
     expect(connect).toContain('客户端通信异常，请查看日志')
   })
 
+  it('single-flights repeated local host startup requests', async () => {
+    const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
+    const wrapperStart = main.indexOf('async function startLocalGameAuthority(')
+    const wrapperEnd = main.indexOf('function findServerEntry(', wrapperStart)
+    const wrapper = main.slice(wrapperStart, wrapperEnd)
+    const openLocalHandler = main.slice(main.indexOf("handleTrusted('open-local-game'"), main.indexOf("handleTrusted('get-mode'"))
+
+    expect(main).toContain('let localGameStartupPromise: Promise<void> | null = null')
+    expect(main).toContain('let localGameOpenPromise: Promise<{ ok: boolean; error?: string }> | null = null')
+    expect(main).toContain('async function startLocalGameAuthorityOnce(')
+    expect(wrapper).toContain('if (localGameStartupPromise)')
+    expect(wrapper).toContain('await localGameStartupPromise')
+    expect(wrapper).toContain('localGameStartupPromise = startup')
+    expect(wrapper).toContain('localGameStartupPromise = null')
+    expect(openLocalHandler).toContain('if (localGameOpenPromise) return await localGameOpenPromise')
+    expect(openLocalHandler).toContain('localGameOpenPromise = opening')
+    expect(openLocalHandler).toContain('localGameOpenPromise = null')
+  })
+
   it('requires a durable authority acknowledgement before normal application exit', async () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
     const exitHandler = main.slice(main.indexOf('function requestApplicationExit()'), main.indexOf('// ─── 本地服务器管理'))
@@ -161,7 +180,7 @@ describe('RED-161 default player transport', () => {
       main.indexOf('type JsonObject ='),
     )
     const gameAuthority = main.slice(
-      main.indexOf('async function startLocalGameAuthority('),
+      main.indexOf('async function startLocalGameAuthorityOnce('),
       main.indexOf('function findServerEntry('),
     )
 

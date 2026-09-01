@@ -719,6 +719,11 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     })`, true, 20000)
     assert(tlsProbe === 'rejected', `Client unexpectedly accepted an invalid HTTPS certificate: ${tlsProbe}`)
     connection.evaluateFireAndForget(`window.electronAPI.openLocalGame()`)
+    await delay(2_000)
+    connection.evaluateFireAndForget(`Promise.all([
+      window.electronAPI.openLocalGame(),
+      window.electronAPI.openLocalGame(),
+    ])`)
     // A cold machine may spend tens of seconds in Windows Defender scanning,
     // runtime integrity verification and first-cluster initdb. This is startup
     // work, not the gameplay latency budget.

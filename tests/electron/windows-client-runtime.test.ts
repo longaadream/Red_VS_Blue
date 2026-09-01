@@ -177,7 +177,7 @@ describe('Windows Electron client runtime', () => {
       clientMain.indexOf('type JsonObject ='),
     )
     const gameAuthority = clientMain.slice(
-      clientMain.indexOf('async function startLocalGameAuthority('),
+      clientMain.indexOf('async function startLocalGameAuthorityOnce('),
       clientMain.indexOf('function findServerEntry('),
     )
 
