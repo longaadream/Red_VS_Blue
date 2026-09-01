@@ -30,7 +30,7 @@ describe('RED-160 Colyseus BattleRoom', () => {
     else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthority
   })
 
-  it('accepts two real clients, acknowledges 20 actions without waiting for PostgreSQL, and deduplicates retries', async () => {
+  it('accepts two real clients, acknowledges 20+ actions without waiting for PostgreSQL, and deduplicates retries', async () => {
     let releaseWriter!: () => void
     const writerBlocked = new Promise<void>(resolve => { releaseWriter = resolve })
     const repository = new FakeAuthorityRepository()
@@ -73,7 +73,10 @@ describe('RED-160 Colyseus BattleRoom', () => {
       const serverQueues: number[] = []
       const serverRules: number[] = []
       const serverPersistence: number[] = []
-      for (let index = 0; index < 20; index += 1) {
+      // Five cold samples plus 100 warm samples make P99 a real percentile
+      // instead of merely aliasing the maximum of a 15-sample window.
+      const actionCount = 105
+      for (let index = 0; index < actionCount; index += 1) {
         const room = Math.floor(index / 2) % 2 === 0 ? redRoom : blueRoom
         const playerId = room === redRoom ? 'player-red' : 'player-blue'
         const clientActionId = `red160-action-${index + 1}`
@@ -102,14 +105,14 @@ describe('RED-160 Colyseus BattleRoom', () => {
         })
       }
 
-      const duplicateId = 'red160-action-20'
+      const duplicateId = `red160-action-${actionCount}`
       const duplicates: BattleReceiptMessage[] = []
       for (let retry = 0; retry < 10; retry += 1) {
         const duplicateReceipt = nextReceipt(blueRoom, duplicateId)
         blueRoom.send(BATTLE_COMMAND_MESSAGE, envelope(
           redRoom.roomId,
           'player-blue',
-          19,
+          actionCount - 1,
           duplicateId,
           { type: 'beginPhase', clientActionId: duplicateId },
         ))
@@ -135,23 +138,27 @@ describe('RED-160 Colyseus BattleRoom', () => {
         )), 0.95),
         clientP50Ms: percentile(warmLatencies, 0.5),
         clientP95Ms: percentile(warmLatencies, 0.95),
+        clientP99Ms: percentile(warmLatencies, 0.99),
+        serverP99Ms: percentile(warmServerTotals, 0.99),
       }
       console.info('[RED-160 applied-latency]', metrics)
       expect(metrics.serverP95Ms).toBeLessThan(100)
       expect(metrics.clientP95Ms).toBeLessThan(100)
+      expect(metrics.serverP99Ms).toBeLessThan(150)
+      expect(metrics.clientP99Ms).toBeLessThan(150)
       expect(repository.batches).toHaveLength(0)
 
       releaseWriter()
       await journal.drain(redRoom.roomId)
-      expect(repository.batches.flat()).toHaveLength(20)
-      expect(journal.inspect(redRoom.roomId).durableAuthorityVersion).toBe(20)
+      expect(repository.batches.flat()).toHaveLength(actionCount)
+      expect(journal.inspect(redRoom.roomId).durableAuthorityVersion).toBe(actionCount)
     } finally {
       releaseWriter()
       await redRoom.leave()
       await blueRoom.leave()
       await candidate.server.gracefullyShutdown(false)
     }
-  }, 20_000)
+  }, 30_000)
 })
 
 function envelope(

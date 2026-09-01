@@ -76,6 +76,30 @@ describe('RED-161 default player transport', () => {
     }
   })
 
+  it('keeps the parallel Profile runtime fenced off from every legacy player authority ingress', async () => {
+    const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
+    const legacyWs = await readFile(path.join(ROOT, 'lib', 'ws-server.ts'), 'utf8')
+    const profileServer = await readFile(path.join(ROOT, 'scripts', 'ws-same-port-server.cjs'), 'utf8')
+    const profileRuntime = main.slice(
+      main.indexOf('async function startLocalServer('),
+      main.indexOf('type JsonObject ='),
+    )
+    const gameAuthority = main.slice(
+      main.indexOf('async function startLocalGameAuthority('),
+      main.indexOf('function findServerEntry('),
+    )
+
+    expect(profileRuntime).toContain("DISABLE_WS: '1'")
+    expect(profileRuntime).toContain("RVB_BATTLE_AUTHORITY_V2: '0'")
+    expect(profileRuntime).toContain("RVB_BATTLE_ASYNC_JOURNAL: '0'")
+    expect(profileRuntime).toContain("RVB_TURN_TIMER_ENABLED: '0'")
+    expect(gameAuthority).toContain("RVB_BATTLE_AUTHORITY_V2: '1'")
+    expect(gameAuthority).toContain("RVB_BATTLE_ASYNC_JOURNAL: '1'")
+    expect(gameAuthority).toContain("RVB_TURN_TIMER_ENABLED: '1'")
+    expect(legacyWs).toMatch(/await quiesceWsServer\(\)\s+if \(process\.env\.DISABLE_WS === '1'\) \{[\s\S]*?return\s+\}/)
+    expect(profileServer).toMatch(/if \(typeof handler !== 'function'\) \{\s+rejectUpgrade\(socket, '503 WebSocket Service Unavailable'\)/)
+  })
+
   it('opens locally predictable skill targeting without a preparatory network round trip', async () => {
     const source = await readFile(path.join(ROOT, 'data', 'pages', 'battle.html'), 'utf8')
     expect(source).toContain('BattleLegalActions.probeSkillTarget({')

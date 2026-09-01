@@ -717,9 +717,12 @@ async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise
       PORT: String(actualLocalPort),
       HOSTNAME: '0.0.0.0',
       NODE_ENV: 'production',
-      RVB_BATTLE_AUTHORITY_V2: '1',
-      RVB_BATTLE_ASYNC_JOURNAL: '1',
-      RVB_TURN_TIMER_ENABLED: '1',
+      // This process only serves the installed Profile APIs and presentation
+      // assets. Player rooms/actions belong exclusively to Colyseus below.
+      DISABLE_WS: '1',
+      RVB_BATTLE_AUTHORITY_V2: '0',
+      RVB_BATTLE_ASYNC_JOURNAL: '0',
+      RVB_TURN_TIMER_ENABLED: '0',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
       DATABASE_URL: databaseUrl,

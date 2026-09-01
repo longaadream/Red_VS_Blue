@@ -5,13 +5,15 @@
 - 合同起始基线：`base_branch: main`，`base_sha: 8902c0da94957fdb52d142363c2c45a2ebda7a7f`
 - 当前验证基线：`origin/main@aa1d91351d6852909166f9b2e75943105ded1255`，已包含最终 RED-138/139；
   RED-161 于 `ae7a28f` 合并该基线后重新验证
-- 状态：实现验证中；候选包已构建，真实 PostgreSQL和独立审查仍未完成，不能合并或发布
+- 状态：实现验证中；候选包已构建，真实 PostgreSQL 和独立复审仍未完成，不能合并或发布
 
 ## 已切换范围
 
 - 五个默认玩家页面加载 Colyseus SDK，并通过 `RvBWs` 兼容层使用真实 Colyseus Room。
 - Product Room 覆盖建房、双人入座、阵营、准备、8 棋阵容锁定、RED-138 渐进部署和战斗动作。
 - Electron 的玩家 `localUrl` 指向 Colyseus 端口；内容 Profile 管理仍使用独立旧运行时端口。
+- Profile 运行时显式设置 `DISABLE_WS=1` 并关闭 legacy battle authority/journal/timer；旧实现只保留为
+  整版回退代码，不能在 Colyseus 候选中接收玩家 Room/action。
 - Colyseus authority 作为 Electron 资源独立打包；新 authority 模块不 import SQLite/Prisma。
 - 普通动作回执不等待数据库；version 0 与终局仍使用 RED-160 的 PostgreSQL durable 边界。
 
@@ -40,15 +42,17 @@ Trace 按合同未验证。既有内容数据仍缺少 `evil-explosion.json`，�
 continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Worker 不在本任务范围。Colyseus
 启动也显式安装 Node 原生 SHA-256 provider。
 
-阻塞 writer 的双 SDK 客户端样本会单独报告前 5 次冷路径，并以之后 15 次作为热路径门禁。本机复测：
+阻塞 writer 的双 SDK 客户端样本会单独报告前 5 次冷路径，并以之后 100 次作为热路径门禁。本机复测：
 
-| 度量 | 冷路径最大值 | 热路径 P50 | 热路径 P95 |
-| --- | ---: | ---: | ---: |
-| 服务端 queue → rules → memory commit → receipt | 75.195 ms | 21.184 ms | 32.203 ms |
-| 本机 SDK send → APPLIED | 85.444 ms | 28.229 ms | 46.399 ms |
+| 度量 | 冷路径最大值 | 热路径 P50 | 热路径 P95 | 热路径 P99 |
+| --- | ---: | ---: | ---: | ---: |
+| 服务端 queue → rules → memory commit → receipt | 63.032 ms | 28.314 ms | 42.695 ms | 56.705 ms |
+| 本机 SDK send → APPLIED | 73.384 ms | 36.429 ms | 52.558 ms | 85.744 ms |
 
-热路径分解 P95：queue 0.046 ms、rules 19.409 ms、memory persistence 2.182 ms、其余投影/哈希
-10.723 ms。数据库 writer 在采样期间保持阻塞，因此这些数字不包含 PostgreSQL 等待。
+热路径分解 P95：queue 0.042 ms、rules 25.940 ms、memory persistence 2.930 ms、其余投影/哈希
+14.653 ms。数据库 writer 在采样期间保持阻塞，因此这些数字不包含 PostgreSQL 等待。测试使用 5 个
+冷样本与 100 个热样本，P99 不再退化成小样本最大值；本机自动门禁为 P95 `< 100 ms`、P99
+`< 150 ms`。这不能替代最终 LAN 候选实测。
 
 ## 自动验证
 
@@ -57,7 +61,7 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
 - 迁移 legacy raw WebSocket/单端口合同并保留 Profile、日志、LAN 与 UI 不变量：9 files / 106 tests，通过；
   由此发现并修复大厅缺失缓存 Identity 时误用 Colyseus `localUrl`、而非独立 `profileRuntimeUrl` 的问题。
 - Colyseus 双客户端阻塞 writer 延迟门包含在上述套件中：热路径 server/client P95 均强制
-  `< 100 ms`，通过。
+  `< 100 ms`，P99 均强制 `< 150 ms`，通过。
 - RED-160 原始套件与相邻回归此前合计 42 tests 通过；本次新增 product action 后以以上 12 项为
   当前切换门禁。
 - `npm.cmd run typecheck`：通过。
@@ -85,7 +89,7 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
 
 - 在真实 PostgreSQL 上运行 `npm.cmd run test:postgres`。
 - 从已构建 Electron 候选包完成双端动作、重连、普通 APPLIED 与终局 DURABLE 验收。
-- 完成 High 风险独立审查。
+- 独立审查首次发现 Profile 进程仍开放 legacy `/ws` 的双权威风险；根因已修复，等待对最终 head 复审。
 - 更新 Draft PR 并确认最终 head 的 CI。
 
 ## 回退
