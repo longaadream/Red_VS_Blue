@@ -93,26 +93,6 @@ function copyFile(src, dst) {
   fs.copyFileSync(src, dst)
 }
 
-function patchServerJsForSamePortUpgrade(filePath) {
-  if (!fs.existsSync(filePath)) return
-  let text = fs.readFileSync(filePath, 'utf-8')
-  if (text.includes('__RVB_WS_SAME_PORT_UPGRADE__')) return
-
-  const marker = "const path = require('path')"
-  const patch = `// __RVB_WS_SAME_PORT_UPGRADE__
-require('./ws-same-port-server.cjs')
-
-const path = require('path')`
-
-  if (!text.startsWith(marker)) {
-    console.warn('[stage-client] server.js patch marker not found; same-port Upgrade preload not injected.')
-    return
-  }
-  text = text.replace(marker, patch)
-  fs.writeFileSync(filePath, text, 'utf-8')
-  console.log('[stage-client] Patched server.js with same-port WebSocket Upgrade preload.')
-}
-
 // 直接落到 _client-stage 根下，不再多套 v0-game-menu-design/ 子目录。
 // electron-builder 把 _client-stage 整体映射到 resources/app/standalone，所以
 // 最终产物路径是 resources/app/standalone/server.js（扁平）。
@@ -122,8 +102,6 @@ fs.mkdirSync(dstRoot, { recursive: true })
 console.log('[stage-client] Copying package.json and server.js...')
 copyFile(path.join(standaloneDir, 'package.json'), path.join(dstRoot, 'package.json'))
 copyFile(path.join(standaloneDir, 'server.js'), path.join(dstRoot, 'server.js'))
-patchServerJsForSamePortUpgrade(path.join(dstRoot, 'server.js'))
-copyFile(path.join(__dirname, 'ws-same-port-server.cjs'), path.join(dstRoot, 'ws-same-port-server.cjs'))
 
 console.log('[stage-client] Copying .next directory...')
 const nextSrc = path.join(standaloneDir, '.next')
@@ -139,22 +117,6 @@ if (fs.existsSync(nmSrc)) {
   copyDir(nmSrc, nmDst, [/\.tmp/])
 }
 
-function copyRuntimeModule(moduleId) {
-  const segments = moduleId.split('/')
-  const source = path.join(__dirname, '..', 'node_modules', ...segments)
-  const target = path.join(nmDst, ...segments)
-  if (!fs.existsSync(source) || !fs.statSync(source).isDirectory()) {
-    console.error('[stage-client] ERROR: required runtime module missing:', moduleId)
-    process.exit(1)
-  }
-  copyDir(source, target, [/\.tmp/])
-}
-
-// Next standalone tracing can omit instrumentation-only dependencies. Stage
-// these explicitly so the packaged server cannot borrow them from the repo.
-copyRuntimeModule('ws')
-copyRuntimeModule('@prisma/client')
-copyRuntimeModule('.prisma/client')
 
 console.log('[stage-client] Copying public/static assets...')
 const publicSrc = path.join(__dirname, '..', 'public')

@@ -9,7 +9,7 @@
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
   <script src="js/colyseus-sdk.js"></script>
-  <script src="js/ws-client.js"></script>
+  <script src="js/colyseus-client.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -325,7 +325,6 @@
         window.location.href = 'room.html?roomId=' + encodeURIComponent(rid)
           + '&playerId=' + encodeURIComponent(pid)
           + '&playerName=' + encodeURIComponent(pname)
-          + (shouldUseRelayMode() ? '&relay=1' : '')
         return
       }
       // Fallback: no room context, return to lobby while preserving server mode.
@@ -342,11 +341,6 @@
     const playerId = params.get('playerId') || ('anon-' + Date.now())
     const accountId = params.get('accountId') || params.get('account') || ''
     const playerName = params.get('playerName') || '玩家'
-    function shouldUseRelayMode() {
-      if (params.get('relay') === '1' || params.get('server') === 'remote') return true
-      return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
-    }
-
     function requireGameProfileIdentity() {
       const stored = localStorage.getItem('rvb_game_profile_identity')
       if (!stored) {
@@ -371,7 +365,7 @@
     let playerFaction = null    // 'red' | 'blue' turn order seat
     let playerAlignment = null  // 'light' | 'dark' content alignment
     playerAlignment = params.get('alignment') || playerAlignment
-    let wsReady = false
+    let colyseusReady = false
     let latestRoom = null
     let factionClaimPromise = null
     let factionClaimed = false
@@ -386,20 +380,20 @@
     const SKILL_CACHE = {}
 
     function connectSelectionWs() {
-      if (typeof RvBWs === 'undefined' || !roomId || !playerId) return
-      RvBWs.on('connect', function() {
-        wsReady = true
+      if (typeof RvBColyseus === 'undefined' || !roomId || !playerId) return
+      RvBColyseus.on('connect', function() {
+        colyseusReady = true
         updateServerRow()
-        RvBWs.send({ type: 'roomState' })
+        RvBColyseus.send({ type: 'roomState' })
         if (initialFactionClaimFinished && !factionClaimed) {
           return ensureFactionClaimed().catch(reportFactionClaimFailure)
         }
       })
-      RvBWs.on('disconnect', function() {
-        wsReady = false
+      RvBColyseus.on('disconnect', function() {
+        colyseusReady = false
         updateServerRow()
       })
-      RvBWs.on('message', function(msg) {
+      RvBColyseus.on('message', function(msg) {
         if (msg.type === 'roomUpdate' && msg.room) {
           latestRoom = msg.room
           const me = (msg.room.players || []).find(p => p.id && p.id.toLowerCase() === playerId.toLowerCase())
@@ -430,36 +424,36 @@
             latestRoom = msg.room
             if (roomLooksBattleReady(msg.room)) navigateBattle()
           }
-        } else if (msg.type === 'stateUpdate' || msg.type === 'battleSnapshot') {
+        } else if (msg.type === 'stateUpdate') {
           navigateBattle()
         }
       })
-      RvBWs.connect(roomId, playerId, shouldUseRelayMode() ? 'relay' : 'lan')
+      RvBColyseus.connect(roomId, playerId)
     }
 
     function waitForSelectionWs(timeoutMs) {
       timeoutMs = timeoutMs || 5000
       return new Promise((resolve, reject) => {
-        if (typeof RvBWs === 'undefined') {
-          reject(new Error('WebSocket client not loaded'))
+        if (typeof RvBColyseus === 'undefined') {
+          reject(new Error('Colyseus client not loaded'))
           return
         }
-        if (RvBWs.isConnected && RvBWs.isConnected()) {
-          wsReady = true
+        if (RvBColyseus.isConnected && RvBColyseus.isConnected()) {
+          colyseusReady = true
           resolve()
           return
         }
         const started = Date.now()
         const timer = setInterval(() => {
-          if (RvBWs.isConnected && RvBWs.isConnected()) {
+          if (RvBColyseus.isConnected && RvBColyseus.isConnected()) {
             clearInterval(timer)
-            wsReady = true
+            colyseusReady = true
             resolve()
             return
           }
           if (Date.now() - started >= timeoutMs) {
             clearInterval(timer)
-            reject(new Error('WebSocket connect timeout'))
+            reject(new Error('Colyseus connect timeout'))
           }
         }, 100)
       })
@@ -467,13 +461,13 @@
 
     function isTransientSelectionWsError(error) {
       const message = error && error.message ? error.message : String(error || '')
-      return /WebSocket (?:connect timeout|not connected|connection failed|closed before response)/i.test(message)
+      return /Colyseus (?:connect timeout|not connected|connection failed|closed before response)/i.test(message)
     }
 
     function reportFactionClaimFailure(error) {
       const message = error && error.message ? error.message : String(error)
       if (isTransientSelectionWsError(error)) {
-        console.warn('[Selection] Waiting to retry faction claim after WebSocket reconnect:', message)
+        console.warn('[Selection] Waiting to retry faction claim after Colyseus reconnect:', message)
         return
       }
       alert('无法认领阵营：' + message)
@@ -514,14 +508,13 @@
       if (accountId) p.set('accountId', accountId)
       if (params.get('debug')) p.set('debug', params.get('debug'))
       if (window.RvBUtils && RvBUtils.appendServerParams) RvBUtils.appendServerParams(p)
-      if (shouldUseRelayMode()) p.set('relay', '1')
       window.location.href = 'battle.html?' + p.toString()
     }
 
     function roomLooksBattleReady(room) {
       if (!room) return false
       if (room.battleState && (room.battleState.state || room.battleState.type)) return true
-      return room.status === 'in-progress' || room.status === 'playing' || room.status === 'battle'
+      return room.status === 'in-progress'
     }
 
     async function fetchJson(path) {
@@ -583,11 +576,11 @@
     }
 
     async function loadServerPieceTemplates() {
-      if (!window.RvBWs || !RvBWs.request) {
+      if (!window.RvBColyseus || !RvBColyseus.request) {
         throw new Error('当前页面没有可用的服务器连接')
       }
       await waitForSelectionWs(SERVER_PIECE_LOAD_TIMEOUT_MS)
-      const data = await RvBWs.request('catalog.pieces', {}, SERVER_PIECE_LOAD_TIMEOUT_MS)
+      const data = await RvBColyseus.request('catalog.pieces', {}, SERVER_PIECE_LOAD_TIMEOUT_MS)
       if (!data || !Array.isArray(data.pieces) || data.pieces.length === 0) {
         throw new Error('响应缺少非空 pieces 数组')
       }
@@ -632,7 +625,7 @@
     async function sendRoomAction(payload) {
       const body = Object.assign({}, payload, { roomId, profileIdentity: requireGameProfileIdentity() })
       await waitForSelectionWs(5000)
-      return RvBWs.request('rooms.action', body, 7000)
+      return RvBColyseus.request('rooms.action', body, 7000)
     }
 
     // Fetch player's faction from room data, then load matching pieces
@@ -710,11 +703,11 @@
             loaded = await withTimeout(
               loadServerPieceTemplates(),
               SERVER_PIECE_LOAD_TIMEOUT_MS,
-              '服务器 WS catalog.pieces'
+              '服务器 Colyseus catalog.pieces'
             )
           } catch (serverError) {
             pieceLoadError = '棋子资源加载失败。本地资源：' + errorReason(localError)
-              + '；服务器 WS catalog.pieces：' + errorReason(serverError)
+              + '；服务器 Colyseus catalog.pieces：' + errorReason(serverError)
             console.error('[piece-selection] piece resources unavailable:', {
               local: errorReason(localError),
               server: errorReason(serverError)
@@ -998,7 +991,7 @@
     }
 
     function startWaitForBattle() {
-      try { if (window.RvBWs && RvBWs.send) RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
+      try { if (window.RvBColyseus && RvBColyseus.send) RvBColyseus.send({ type: 'requestBattleSnapshot' }) } catch {}
       document.getElementById('waitSub').textContent = '房间 ID: ' + roomId
       document.getElementById('waitOverlay').classList.add('show')
       if (pollTimer) clearInterval(pollTimer)
@@ -1010,7 +1003,7 @@
       if (!roomId) return
       try {
         await waitForSelectionWs(2500)
-        const room = await RvBWs.request('rooms.get', { roomId }, 5000)
+        const room = await RvBColyseus.request('rooms.get', { roomId }, 5000)
         latestRoom = room
         if (roomLooksBattleReady(room)) navigateBattle()
       } catch {}
@@ -1029,9 +1022,9 @@
       const btn = document.getElementById('disconnectBtn')
       if (!label) return
       if (url) {
-        const connected = typeof RvBWs !== 'undefined'
-          && RvBWs.isConnected
-          && RvBWs.isConnected()
+        const connected = typeof RvBColyseus !== 'undefined'
+          && RvBColyseus.isConnected
+          && RvBColyseus.isConnected()
         const address = url.replace(/^(?:https?|wss?):\/\//, '').slice(0, 30)
         label.textContent = (connected ? '已连接 ' : '正在连接 ') + address
         label.style.color = connected ? '#22c55e' : '#f59e0b'

@@ -15,7 +15,7 @@ import {
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
 import { toPublicBattleState } from '@/lib/game/deployment'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 import type { BattleState } from '@/lib/game/turn'
 import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authority-journal'
 import type { RestoredPostgresAuthorityRoom } from '@/lib/server/postgres/authority-types'

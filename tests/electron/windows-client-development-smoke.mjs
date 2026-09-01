@@ -317,7 +317,7 @@ async function verifyLanLuckyCoinFallback(port, sourceTarget) {
 
   const runtime = await evaluate(battleTarget, `(async () => {
     const originalServerFetch = RvBUtils.serverFetch
-    const originalSend = RvBWs.send
+    const originalSend = RvBColyseus.send
     const requests = []
     const sentMessages = []
     const useLiveAuthority = ${JSON.stringify(Boolean(red105AuthorityUrl))}
@@ -346,7 +346,7 @@ async function verifyLanLuckyCoinFallback(port, sourceTarget) {
           },
         }
       }
-      RvBWs.send = function (message) { sentMessages.push(message) }
+      RvBColyseus.send = function (message) { sentMessages.push(message) }
       cardsById = {}
       Object.keys(cardDisplayMetadataById).forEach(function (cardId) {
         delete cardDisplayMetadataById[cardId]
@@ -355,7 +355,7 @@ async function verifyLanLuckyCoinFallback(port, sourceTarget) {
       cardDisplayMetadataFailures.clear()
       cardDisplayMetadataLoggedErrors.clear()
       battlePageDisposed = false
-      wsMode = 'lan'
+      colyseusConnected = true
       pendingCardAction = null
       G = {
         players: [{
@@ -414,7 +414,7 @@ async function verifyLanLuckyCoinFallback(port, sourceTarget) {
       }
     } finally {
       RvBUtils.serverFetch = originalServerFetch
-      RvBWs.send = originalSend
+      RvBColyseus.send = originalSend
     }
   })()`)
 

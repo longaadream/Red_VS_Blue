@@ -1,5 +1,5 @@
 import type { BattleState } from '@/lib/game/turn'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 import {
   createServerBattleStateV1,
   type ServerBattleState,

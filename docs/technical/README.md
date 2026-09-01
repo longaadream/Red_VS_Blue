@@ -1,9 +1,9 @@
 # 技术文档
 
-状态：草案  
-负责人：项目负责人  
-适用版本：重构版本  
-最后更新：待填写
+状态：当前索引
+负责人：项目负责人
+适用版本：重构版本
+最后更新：2026-09-01
 
 本目录用于记录 Red VS Blue 的系统架构、模块边界、公共接口、游戏引擎、存档设计、测试入口和调试方法。
 
@@ -42,7 +42,7 @@
 - [`AI_SELF_PLAY.md`](./AI_SELF_PLAY.md)：离线成对自博弈、历史档案、seed 分层、硬门禁、逐局进程隔离、进度与恢复。
 - `ESLINT_BASELINE.md`：零新增 lint 门禁、历史 suppression 基线和清债流程。
 - [`DEVELOPMENT_WORKFLOW.md`](./DEVELOPMENT_WORKFLOW.md)：任务分支 main 基线、本地预检、PR 新鲜度门禁和同步流程。
-- [`COLYSEUS_POSTGRESQL_MIGRATION.md`](./COLYSEUS_POSTGRESQL_MIGRATION.md)：Colyseus BattleRoom、RED-139 Queue 兼容、PostgreSQL 双水位耐久、SQLite 离线迁移及 Windows/K8s 分阶段合同。
+- [`COLYSEUS_POSTGRESQL_MIGRATION.md`](./COLYSEUS_POSTGRESQL_MIGRATION.md)：Windows Colyseus + PostgreSQL 直接切换结果、不变量与验收门禁。
 - `MODULE_STATUS.md`：模块现状、负责人、风险和重构进度。
 
 ## 目标架构边界

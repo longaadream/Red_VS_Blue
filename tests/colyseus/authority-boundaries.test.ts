@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { dispatchRoomBattleAction } from '@/lib/game/room-battle-actions'
 import { restoreRoomRuleRuntime } from '@/lib/game/room-rule-runtime'
@@ -11,18 +11,7 @@ import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authori
 
 import { FakeAuthorityRepository } from './fake-authority-repository'
 
-const originalAuthority = process.env.RVB_BATTLE_AUTHORITY_V2
-
 describe('RED-160 authority commit boundaries', () => {
-  beforeEach(() => {
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
-  })
-
-  afterEach(() => {
-    if (originalAuthority === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-    else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthority
-  })
-
   it('restores TriggerSystem transaction state when journal capacity rejects the outer commit', async () => {
     const roomId = 'red160-runtime-rollback'
     const repository = new FakeAuthorityRepository()

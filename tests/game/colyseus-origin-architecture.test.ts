@@ -48,10 +48,10 @@ function loadBrowserNetworking(options: {
     wsPort: 6553,
   })).toBe(true)
   new Script(
-    readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8'),
-    { filename: 'ws-client.js' },
+    readFileSync(resolve(process.cwd(), 'data/pages/js/colyseus-client.js'), 'utf8'),
+    { filename: 'colyseus-client.js' },
   ).runInContext(context)
-  const ws = browserWindow.RvBWs as {
+  const ws = browserWindow.RvBColyseus as {
     connect(roomId: string, playerId: string, mode: string): void
     disconnect(): void
   }
@@ -67,11 +67,7 @@ describe('public single-port networking contract', () => {
     const fixture = loadBrowserNetworking({
       serverUrl,
       search: '?wsPort=6554&ws_port=6555',
-      stored: {
-        rvb_ws_port: '6556',
-        rvb_ws_port_server_url: serverUrl,
-        rvb_ws_port_source: 'legacy',
-      },
+      stored: {},
     })
 
     fixture.ws.connect('__lobby', 'alice', serverUrl.includes('relay') ? 'relay' : 'lan')
@@ -79,14 +75,11 @@ describe('public single-port networking contract', () => {
     expect(fixture.endpoints).toEqual([serverUrl])
     expect(fixture.utils.getConnectionConfig()).not.toHaveProperty('wsPort')
     expect(fixture.utils.appendServerParams(new URLSearchParams()).has('wsPort')).toBe(false)
-    expect(fixture.persisted.has('rvb_ws_port')).toBe(false)
-    expect(fixture.persisted.has('rvb_ws_port_server_url')).toBe(false)
-    expect(fixture.persisted.has('rvb_ws_port_source')).toBe(false)
     fixture.ws.disconnect()
   })
 
   it('contains no runtime second-port discovery or fallback path', () => {
-    const source = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'data/pages/js/colyseus-client.js'), 'utf8')
     expect(source).not.toContain('/api/ws-info')
     expect(source).not.toContain('basePort + 1')
     expect(source).not.toContain("var _wsPort = 3001")

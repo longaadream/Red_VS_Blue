@@ -21,6 +21,7 @@ import {
   PRODUCT_ROOM_UPDATE_MESSAGE,
 } from '@/lib/server/colyseus/battle-room-protocol'
 import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authority-journal'
+import type { PostgresBattleReportSummaryV1, PostgresBattleReportV1 } from '@/lib/server/postgres/authority-types'
 
 import { FakeAuthorityRepository } from './fake-authority-repository'
 
@@ -79,9 +80,18 @@ describe('RED-161 Colyseus product room', () => {
     expect(redRoom.roomId).toBe(redRoom.roomId.toLowerCase())
     await expect(fetch(`http://127.0.0.1:${port}/catalog/identity`).then(response => response.json()))
       .resolves.toMatchObject({ profileIdentity })
-    await expect(fetch(`http://127.0.0.1:${port}/rooms`).then(response => response.json()))
-      .resolves.toEqual({ rooms: expect.arrayContaining([expect.objectContaining({ id: redRoom.roomId })]) })
-    const blueRoom = await blueClient.joinById(redRoom.roomId, {
+      await expect(fetch(`http://127.0.0.1:${port}/rooms`).then(response => response.json()))
+        .resolves.toEqual({ rooms: expect.arrayContaining([expect.objectContaining({ id: redRoom.roomId })]) })
+      await expect(fetch(`http://127.0.0.1:${port}/rooms/${redRoom.roomId}`).then(response => response.json()))
+        .resolves.toEqual({ room: expect.objectContaining({ id: redRoom.roomId, status: 'waiting' }) })
+      await expect(fetch(`http://127.0.0.1:${port}/rooms/not-a-room`).then(async response => ({
+        status: response.status,
+        body: await response.json(),
+      }))).resolves.toEqual({
+        status: 404,
+        body: { code: 'ROOM_NOT_FOUND', error: 'Room not found' },
+      })
+      const blueRoom = await blueClient.joinById(redRoom.roomId, {
       product: true,
       playerId: 'player-blue',
       playerName: 'Blue',
@@ -185,6 +195,78 @@ describe('RED-161 Colyseus product room', () => {
     } finally {
       await redRoom.leave()
       await blueRoom.leave()
+      await candidate.server.gracefullyShutdown(false)
+    }
+  }, 20_000)
+
+  it('rejects concurrent product room creation with the same creation key', async () => {
+    const repository = new FakeAuthorityRepository()
+    const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })
+    const candidate = createColyseusBattleServer({ repository, journal })
+    const port = await availablePort()
+    await candidate.server.listen(port, '127.0.0.1')
+    const profileIdentity = getServerGameProfileIdentityV1()
+    const firstClient = new ColyseusClient(`ws://127.0.0.1:${port}`)
+    const secondClient = new ColyseusClient(`ws://127.0.0.1:${port}`)
+    const createOptions = {
+      product: true,
+      creationKey: 'player-red:red158-double-create',
+      name: 'RED-158 single room',
+      mapId: 'open-expanse',
+      visibility: 'public',
+      playerId: 'player-red',
+      playerName: 'Red',
+      profileIdentity,
+    }
+    const joinedRooms: ColyseusClientRoom[] = []
+    try {
+      const results = await Promise.allSettled([
+        firstClient.create('battle', createOptions),
+        secondClient.create('battle', createOptions),
+      ])
+      for (const result of results) {
+        if (result.status === 'fulfilled') joinedRooms.push(result.value)
+      }
+      expect(joinedRooms).toHaveLength(1)
+      expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
+      await expect(fetch(`http://127.0.0.1:${port}/rooms`).then(response => response.json()))
+        .resolves.toEqual({ rooms: [expect.objectContaining({ name: 'RED-158 single room' })] })
+    } finally {
+      await Promise.all(joinedRooms.map(room => room.leave()))
+      await candidate.server.gracefullyShutdown(false)
+    }
+  }, 20_000)
+
+  it('serves verified authority reports through Colyseus HTTP only', async () => {
+    const report = {
+      schemaVersion: 'rvb-postgres-battle-report/v1',
+      verified: true,
+      battleId: 'red158-report',
+      authority: { durableAuthorityVersion: 7, transitionHash: 'a'.repeat(64) },
+    } as PostgresBattleReportV1
+    const repository = Object.assign(new FakeAuthorityRepository(), {
+      readBattleReport: async (battleId: string) => battleId === report.battleId ? report : undefined,
+      listBattleReports: async (playerId: string) => playerId === 'player-red'
+        ? [{ battleId: report.battleId, transitionHash: report.authority.transitionHash } as PostgresBattleReportSummaryV1]
+        : [],
+    })
+    const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })
+    const candidate = createColyseusBattleServer({ repository, journal })
+    const port = await availablePort()
+    await candidate.server.listen(port, '127.0.0.1')
+    try {
+      await expect(fetch(`http://127.0.0.1:${port}/battle-reports/${report.battleId}`).then(response => response.json()))
+        .resolves.toEqual({ report })
+      await expect(fetch(`http://127.0.0.1:${port}/battle-reports?playerId=player-red`).then(response => response.json()))
+        .resolves.toEqual({ reports: [{ battleId: report.battleId, transitionHash: report.authority.transitionHash }] })
+      await expect(fetch(`http://127.0.0.1:${port}/battle-reports/missing`).then(async response => ({
+        status: response.status,
+        body: await response.json(),
+      }))).resolves.toEqual({
+        status: 404,
+        body: { code: 'BATTLE_REPORT_NOT_FOUND', error: 'Battle report not found' },
+      })
+    } finally {
       await candidate.server.gracefullyShutdown(false)
     }
   }, 20_000)

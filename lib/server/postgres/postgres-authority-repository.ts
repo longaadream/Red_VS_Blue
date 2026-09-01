@@ -6,10 +6,12 @@ import {
   type BattleAuthorityReceipt,
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 
 import { POSTGRES_AUTHORITY_SCHEMA_STATEMENTS } from './authority-schema'
 import type {
+  PostgresBattleReportV1,
+  PostgresBattleReportReader,
   PostgresAuthorityBatchWriter,
   PostgresAuthorityTransitionJob,
   RestoredPostgresAuthorityRoom,
@@ -18,6 +20,7 @@ import type {
 interface AuthorityRow {
   epoch: string | number
   room_json: Room
+  authority_version: string | number
   durable_version: string | number
   state_hash: string
   public_hash: string
@@ -25,7 +28,7 @@ interface AuthorityRow {
   terminal: boolean
 }
 
-export class PostgresAuthorityRepository implements PostgresAuthorityBatchWriter {
+export class PostgresAuthorityRepository implements PostgresAuthorityBatchWriter, PostgresBattleReportReader {
   constructor(private readonly pool: Pool) {}
 
   async initializeSchema(): Promise<void> {
@@ -216,6 +219,170 @@ export class PostgresAuthorityRepository implements PostgresAuthorityBatchWriter
     }
   }
 
+  async readBattleReport(battleId: string): Promise<PostgresBattleReportV1 | undefined> {
+    const roomId = normalizeRoomId(battleId)
+    const authorityResult = await this.pool.query<AuthorityRow>(
+      'SELECT * FROM battle_room_authority WHERE battle_id = $1',
+      [roomId],
+    )
+    const authority = authorityResult.rows[0]
+    if (!authority) return undefined
+    const authorityVersion = numberValue(authority.durable_version)
+    if (!authority.terminal || numberValue(authority.authority_version) !== authorityVersion) {
+      throw reportError('BATTLE_REPORT_NOT_DURABLE', 'Battle report is not terminal and durable')
+    }
+
+    const initialResult = await this.pool.query<{ checkpoint_json: BattleAuthorityCheckpointRecord }>(
+      `SELECT checkpoint_json FROM battle_checkpoint
+       WHERE battle_id = $1 AND authority_version = 0 AND reason = 'initial'`,
+      [roomId],
+    )
+    const initial = initialResult.rows[0]?.checkpoint_json
+    if (!initial) throw reportError('BATTLE_REPORT_INTEGRITY_FAILED', 'Initial report checkpoint is missing')
+    const transitionResult = await this.pool.query<{ transition_json: BattleAuthorityTransitionRecord }>(
+      'SELECT transition_json FROM battle_transition WHERE battle_id = $1 ORDER BY to_version',
+      [roomId],
+    )
+    const transitions = transitionResult.rows.map(row => row.transition_json)
+    try {
+      replayBattleAuthorityTransitions({
+        roomId,
+        checkpointStorage: initial.storage,
+        checkpointProtocolVersion: initial.protocolVersion,
+        checkpointAuthorityBuildId: initial.authorityBuildId,
+        checkpointVersion: initial.authorityVersion,
+        checkpointStateHash: initial.stateHash,
+        checkpointPublicHash: initial.publicHash,
+        checkpointTransitionHash: initial.transitionHash,
+        targetVersion: authorityVersion,
+        targetTransitionHash: authority.transition_hash,
+        transitions,
+      })
+    } catch (error) {
+      throw reportError(
+        'BATTLE_REPORT_INTEGRITY_FAILED',
+        error instanceof Error ? error.message : String(error),
+      )
+    }
+
+    const terminalResult = await this.pool.query<{
+      authority_version: string | number
+      state_hash: string
+      transition_hash: string
+      checkpoint_json: BattleAuthorityCheckpointRecord
+      committed_at: Date | string
+    }>(
+      'SELECT * FROM battle_terminal_barrier WHERE battle_id = $1',
+      [roomId],
+    )
+    const terminal = terminalResult.rows[0]
+    const terminalVersion = terminal ? numberValue(terminal.authority_version) : -1
+    if (
+      !terminal
+      || terminalVersion !== authorityVersion
+      || terminal.state_hash !== authority.state_hash
+      || terminal.transition_hash !== authority.transition_hash
+      || terminal.checkpoint_json.authorityVersion !== authorityVersion
+      || terminal.checkpoint_json.stateHash !== authority.state_hash
+      || terminal.checkpoint_json.publicHash !== authority.public_hash
+      || terminal.checkpoint_json.transitionHash !== authority.transition_hash
+      || terminal.checkpoint_json.reason !== 'terminal'
+    ) throw reportError('BATTLE_REPORT_INTEGRITY_FAILED', 'Terminal report barrier does not match authority')
+
+    const finalTransition = transitions.at(-1)
+    if (
+      (finalTransition?.postStateHash ?? initial.stateHash) !== authority.state_hash
+      || (finalTransition?.postPublicHash ?? initial.publicHash) !== authority.public_hash
+    ) throw reportError('BATTLE_REPORT_INTEGRITY_FAILED', 'Authority hashes do not match the verified transition chain')
+    try {
+      replayBattleAuthorityTransitions({
+        roomId,
+        checkpointStorage: terminal.checkpoint_json.storage,
+        checkpointProtocolVersion: terminal.checkpoint_json.protocolVersion,
+        checkpointAuthorityBuildId: terminal.checkpoint_json.authorityBuildId,
+        checkpointVersion: terminal.checkpoint_json.authorityVersion,
+        checkpointStateHash: terminal.checkpoint_json.stateHash,
+        checkpointPublicHash: terminal.checkpoint_json.publicHash,
+        checkpointTransitionHash: terminal.checkpoint_json.transitionHash,
+        targetVersion: authorityVersion,
+        targetTransitionHash: authority.transition_hash,
+        transitions: [],
+      })
+    } catch (error) {
+      throw reportError(
+        'BATTLE_REPORT_INTEGRITY_FAILED',
+        `Terminal checkpoint verification failed: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+
+    const receiptResult = await this.pool.query<{ receipt_json: BattleAuthorityReceipt }>(
+      'SELECT receipt_json FROM battle_receipt WHERE battle_id = $1 ORDER BY authority_version, client_action_id',
+      [roomId],
+    )
+    const receipts = receiptResult.rows.map(row => row.receipt_json)
+    if (
+      receipts.length !== transitions.length
+      || receipts.some((receipt, index) => !receiptMatchesTransition(receipt, transitions[index]))
+    ) throw reportError('BATTLE_REPORT_INTEGRITY_FAILED', 'Battle receipts do not match the verified transition chain')
+    const room = authority.room_json
+    return {
+      schemaVersion: 'rvb-postgres-battle-report/v1',
+      verified: true,
+      battleId: roomId,
+      room: {
+        id: roomId,
+        name: room.name,
+        mapId: room.mapId,
+        createdAt: room.createdAt,
+        players: room.players.map(player => ({
+          id: player.id,
+          accountId: player.accountId,
+          name: player.name,
+          seat: player.seat,
+          alignment: player.alignment,
+        })),
+      },
+      authority: {
+        authorityVersion,
+        durableAuthorityVersion: authorityVersion,
+        stateHash: authority.state_hash,
+        publicHash: authority.public_hash,
+        transitionHash: authority.transition_hash,
+      },
+      terminal: {
+        committedAt: new Date(terminal.committed_at).toISOString(),
+        checkpoint: terminal.checkpoint_json,
+      },
+      receipts,
+      transitions,
+    }
+  }
+
+  async listBattleReports(playerId: string, limit = 100) {
+    const normalizedPlayerId = String(playerId ?? '').trim().toLowerCase()
+    if (!normalizedPlayerId) throw reportError('PLAYER_ID_REQUIRED', 'playerId is required')
+    const boundedLimit = Number.isSafeInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 100
+    const result = await this.pool.query<{ battle_id: string }>(
+      `SELECT battle_id FROM battle_room_authority
+       WHERE terminal = TRUE AND room_json->'players' @> $1::jsonb
+       ORDER BY updated_at DESC, battle_id
+       LIMIT $2`,
+      [JSON.stringify([{ id: normalizedPlayerId }]), boundedLimit],
+    )
+    const reports = await Promise.all(result.rows.map(row => this.readBattleReport(row.battle_id)))
+    return reports.filter((report): report is PostgresBattleReportV1 => report !== undefined).map(report => ({
+      battleId: report.battleId,
+      name: report.room.name,
+      mapId: report.room.mapId,
+      createdAt: report.room.createdAt,
+      committedAt: report.terminal.committedAt,
+      authorityVersion: report.authority.authorityVersion,
+      transitionHash: report.authority.transitionHash,
+      players: report.room.players,
+      terminalResult: (report.terminal.checkpoint.storage.state as { terminalResult?: unknown }).terminalResult,
+    }))
+  }
+
   async close(): Promise<void> {
     await this.pool.end()
   }
@@ -367,4 +534,24 @@ function normalizeRoomId(roomId: string): string {
   const normalized = String(roomId ?? '').trim().toLowerCase()
   if (!normalized) throw new Error('roomId is required')
   return normalized
+}
+
+function reportError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { code })
+}
+
+function receiptMatchesTransition(
+  receipt: BattleAuthorityReceipt,
+  transition: BattleAuthorityTransitionRecord | undefined,
+): boolean {
+  if (!transition) return false
+  const expected = transition.receipt
+  return receipt.protocolVersion === expected.protocolVersion
+    && receipt.authorityBuildId === expected.authorityBuildId
+    && receipt.roomId === expected.roomId
+    && receipt.clientActionId === expected.clientActionId
+    && receipt.status === expected.status
+    && receipt.authorityVersion === expected.authorityVersion
+    && receipt.code === expected.code
+    && receipt.message === expected.message
 }

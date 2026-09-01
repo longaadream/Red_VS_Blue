@@ -1,9 +1,8 @@
 ;(function () {
   'use strict'
 
-  // LAN discovery probes public HTTP origins only. The WebSocket endpoint is
-  // always available on the exact same origin through /ws/rooms/{roomId}.
-  const PORTS = [3000, 7878]
+  // Windows LAN discovery probes the Colyseus HTTP catalog/health origin.
+  const PORTS = [38621]
   const TIMEOUT_MS = 900
 
   const QUICK_LAST_OCTETS = [
@@ -13,13 +12,13 @@
   const FULL_LAST_OCTETS = Array.from({ length: 254 }, (_, i) => i + 1)
   const DEFAULT_SUBNETS = ['192.168.1', '192.168.0', '192.168.2', '10.0.0']
 
-  // Discovery probes the same-origin WebSocket RPC directly.
+  // Discovery probes the Colyseus HTTP health endpoint on the public origin.
 
   async function probeOne(ip, port) {
     const url = 'http://' + ip + ':' + port
     try {
-      const health = await RvBWs.requestAt(url, 'system.health', {}, TIMEOUT_MS)
-      if (!health || health.protocol !== 'rvb-ws') return null
+      const health = await RvBColyseus.requestAt(url, 'system.health', {}, TIMEOUT_MS)
+      if (!health || health.ok !== true || health.protocol !== 'rvb-colyseus') return null
       return { url, ip, port }
     } catch {
       return null

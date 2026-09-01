@@ -7,7 +7,7 @@ import { reloadSkills } from "@/lib/game/skill-repository"
 import { loadRuleById } from "@/lib/game/skills"
 import { runBattleAction } from "@/lib/game/battle-runner"
 import { createDebugDuel } from "@/lib/game/debug-battle"
-import { normalizePlayerAlignment } from "@/lib/game/room-store"
+import { normalizePlayerAlignment } from "@/lib/game/room-model"
 import { isPlayerSeat } from "@/lib/game/match-identity"
 
 // 全局棋子 ID 计数器，用于生成唯一的 instanceId

@@ -1,5 +1,16 @@
 # ADR-0025：Colyseus 房间权威与 PostgreSQL 有界异步耐久化
 
+## RED-158 Phase F 修订（2026-09-01）
+
+项目负责人决定不兼容公开测试前的 Windows 旧联机或 SQLite 数据。Phase F 将本 ADR 的分阶段迁移
+收口为直接切换：Windows 根产品只允许 Colyseus + PostgreSQL；Prisma/SQLite、raw WebSocket、旧
+RoomStore、旧玩家 Next API、运行时双写/fallback、迁移开关和独立 Electron Server 全部删除。
+
+本修订同时确认：原 Transition 的命令、Trace、replay frame、state/public/action/transition hash 链
+继续由 PostgreSQL 权威表保存，并可生成经过完整回放校验的战报。Hash 是完整性证明而非加密。
+旧 SQLite exporter/importer 和旧 release 数据恢复不再属于 RED-158 产品合同；Android/独立 Relay
+未被本修订迁移，也不得充当 Windows 回退路径。
+
 - 状态：已接受
 - 日期：2026-08-31
 - 人工批准：2026-08-31

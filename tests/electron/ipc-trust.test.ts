@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import * as clientTrust from '../../electron-client/ipc-trust'
 import * as editorTrust from '../../electron-editor/ipc-trust'
-import * as serverTrust from '../../electron/ipc-trust'
+import * as serverTrust from '../../electron-client/ipc-trust'
 
 type TrustModule = typeof clientTrust
 

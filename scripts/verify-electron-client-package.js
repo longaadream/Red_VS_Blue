@@ -8,13 +8,8 @@ const REQUIRED_FILES = [
   'resources/app/electron-client/dist/main.js',
   'resources/app/standalone/server.js',
   'resources/app/standalone/node_modules/next/package.json',
-  'resources/app/standalone/node_modules/ws/package.json',
-  'resources/app/standalone/ws-same-port-server.cjs',
-  'resources/app/standalone/node_modules/@prisma/client/package.json',
-  'resources/app/standalone/node_modules/.prisma/client/index.js',
   'resources/app/standalone/colyseus/colyseus-server.mjs',
   'resources/app/www/index.html',
-  'resources/app/init-db.js',
   'resources/app/node_modules/adm-zip/package.json',
   'resources/node.exe',
   'resources/postgres/runtime-manifest.json',
@@ -28,10 +23,18 @@ const REQUIRED_FILES = [
 const REQUIRED_DIRECTORIES = [
   'resources/app/public',
   'resources/app/data',
-  'resources/app/prisma',
 ]
 
-const FORBIDDEN_FILES = ['resources/app/www/data/users.json']
+const FORBIDDEN_FILES = [
+  'resources/app/www/data/users.json',
+  'resources/app/init-db.js',
+  'resources/app/prisma/schema.prisma',
+  'resources/app/standalone/ws-same-port-server.cjs',
+  'resources/app/standalone/node_modules/@prisma/client/package.json',
+  'resources/app/standalone/node_modules/.prisma/client/index.js',
+  'resources/app/node_modules/prisma/package.json',
+  'resources/app/node_modules/@prisma/client/package.json',
+]
 
 const OFFLINE_DATA_ENTRIES = [
   'cards',

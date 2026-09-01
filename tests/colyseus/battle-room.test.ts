@@ -1,7 +1,7 @@
 import { createServer } from 'node:net'
 
 import { Client as ColyseusClient, type Room as ColyseusClientRoom } from '@colyseus/sdk'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
   BATTLE_AUTHORITY_BUILD_ID,
@@ -18,18 +18,7 @@ import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authori
 
 import { FakeAuthorityRepository } from './fake-authority-repository'
 
-const originalAuthority = process.env.RVB_BATTLE_AUTHORITY_V2
-
 describe('RED-160 Colyseus BattleRoom', () => {
-  beforeEach(() => {
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
-  })
-
-  afterEach(() => {
-    if (originalAuthority === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-    else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthority
-  })
-
   it('accepts two real clients, acknowledges 20+ actions without waiting for PostgreSQL, and deduplicates retries', async () => {
     let releaseWriter!: () => void
     const writerBlocked = new Promise<void>(resolve => { releaseWriter = resolve })

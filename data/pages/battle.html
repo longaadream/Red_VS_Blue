@@ -12,7 +12,7 @@
   <script src="js/game-engine-runtime.js"></script>
   <script src="js/game-engine.js"></script>
   <script src="js/colyseus-sdk.js"></script>
-  <script src="js/ws-client.js"></script>
+  <script src="js/colyseus-client.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
   <script src="js/battle-ui/battle-status-presentation.js"></script>
@@ -1021,7 +1021,7 @@
       .back-btn, .btn-surrender, .btn-fullmap, #btnSwitchPov, #btnResetCD {
         min-width: 28px; height: 28px; padding: 0 6px; font-size: 12px;
       }
-      #roundLabel, #wsStatus { display: none !important; }
+      #roundLabel, #colyseusStatus { display: none !important; }
       #resApDisplay, #resCpDisplay { min-height: 28px; padding: 3px 6px; font-size: 11px; }
       #playerResCards { max-width: calc(100vw - 84px); }
       .player-state-chip { min-width: 96px; padding: 3px 5px; }
@@ -1592,7 +1592,7 @@
   <div class="topbar" data-battle-ui-region="player-hud">
     <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">离开</button>
     <div class="room-name" id="roomNameLabel">对战</div>
-    <div id="wsStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● WS</div>
+    <div id="colyseusStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● Colyseus</div>
     <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">投降</button>
     <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">切换视角 红方</button>
     <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">冷却</button>
@@ -1779,11 +1779,6 @@
     const SPECTATE_MODE = params.get('mode') === 'spectate'
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
     if (RED43_QA_MODE) document.body.classList.add('red43-qa')
-    function shouldUseRelayMode() {
-      if (params.get('relay') === '1' || params.get('server') === 'remote') return true
-      return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
-    }
-
     // ── Server URL ──
     const getServerUrl = () => RvBUtils.getServerUrl()
 
@@ -2119,7 +2114,6 @@
     let authoritativePendingTimer = null
     let myFaction = null       // 'red' | 'blue' (derived from ownerPlayerId)
     let recordSaved = false
-    let actionLog = []
     let lastActionCount = 0    // how many G.actions entries already displayed
     let lastActionSeq = -1     // last processed action log seq
     let isHost = false         // am I the room host?
@@ -2247,10 +2241,10 @@
 
     function requestAuthorityRecovery(reason) {
       var clientActionId = arguments[1]
-      if (window.RvBWs && typeof RvBWs.requestAuthoritySync === 'function') {
-        var requested = clientActionId && typeof RvBWs.requestAuthorityReceiptSync === 'function'
-          ? RvBWs.requestAuthorityReceiptSync(reason || 'unknown', clientActionId)
-          : RvBWs.requestAuthoritySync(reason || 'unknown')
+      if (window.RvBColyseus && typeof RvBColyseus.requestAuthoritySync === 'function') {
+        var requested = clientActionId && typeof RvBColyseus.requestAuthorityReceiptSync === 'function'
+          ? RvBColyseus.requestAuthorityReceiptSync(reason || 'unknown', clientActionId)
+          : RvBColyseus.requestAuthoritySync(reason || 'unknown')
         return Promise.resolve(requested)
       }
       if (authorityRecoveryPromise) return authorityRecoveryPromise
@@ -2456,12 +2450,9 @@
     let pieceInfoReturnFocus = null
     let currentPieceKeywords = []
     let activePieceKeyword = ''
-    let wsConnected = false     // WebSocket live
-    let wsRole = 'guest'        // 'host' | 'guest' from subscribed message
-    let wsMode = 'lan'          // 'lan' | 'relay'
-    let relaySeq = 0            // outbound action/stateUpdate sequence
+    let colyseusConnected = false     // Colyseus live
+    let colyseusRole = 'guest'        // 'host' | 'guest' from subscribed message
     let localDeploymentChoiceId = null
-    let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
     let battlePresentation = null
     let battleDomUi = null
@@ -3546,11 +3537,11 @@
     }
 
     async function fetchServerJson(method, data, timeoutMs) {
-      if (!window.RvBWs) throw new Error('WebSocket client not loaded')
-      if (RvBWs.isConnected && RvBWs.isConnected()) {
-        return RvBWs.request(method, data || {}, timeoutMs || 3500)
+      if (!window.RvBColyseus) throw new Error('Colyseus client not loaded')
+      if (RvBColyseus.isConnected && RvBColyseus.isConnected()) {
+        return RvBColyseus.request(method, data || {}, timeoutMs || 3500)
       }
-      return RvBWs.requestAt(getServerUrl(), method, data || {}, timeoutMs || 3500)
+      return RvBColyseus.requestAt(getServerUrl(), method, data || {}, timeoutMs || 3500)
 
     }
     function reportCardDisplayMetadataFailure(cardId, error) {
@@ -3834,7 +3825,6 @@
       try {
         localStorage.setItem('rvb_active_battle', JSON.stringify({ roomId, playerId: myPlayerId, accountId: myAccountId, playerName: myPlayerName }))
       } catch {}
-      wsMode = shouldUseRelayMode() ? 'relay' : 'lan'
       await initBattle()
     }
 
@@ -4017,7 +4007,7 @@
       return ''
     }
 
-    // Apply an authoritative state snapshot received from server (WS or GET)
+    // Apply an authoritative state snapshot received from Colyseus.
     var _lastAppliedState = null
     function resolveAuthoritySeed(state, seed) {
       var resolved = typeof seed === 'number' && Number.isInteger(seed) ? (seed >>> 0) : null
@@ -4030,19 +4020,19 @@
       if (typeof gameSeed !== 'number') gameSeed = resolved
       return gameSeed
     }
-    function relayBattleAuthError(code, message) {
+    function battleAuthError(code, message) {
       var error = new Error(message)
       error.code = code
       return error
     }
     async function createBattleActionAuth(action) {
       if (!window.RvBIdentity) {
-        throw relayBattleAuthError('BATTLE_AUTH_REQUIRED', 'Battle action identity is unavailable')
+        throw battleAuthError('BATTLE_AUTH_REQUIRED', 'Battle action identity is unavailable')
       }
       var identity = RvBIdentity.getIdentity()
       var publicKey = RvBIdentity.getPublicKey()
       if (!identity || !publicKey || String(identity.id).toLowerCase() !== myPlayerId) {
-        throw relayBattleAuthError('BATTLE_AUTH_INVALID', 'Active identity does not match this battle player')
+        throw battleAuthError('BATTLE_AUTH_INVALID', 'Active identity does not match this battle player')
       }
       var payload = {
         type: 'battle-action',
@@ -4104,11 +4094,10 @@
       void doBeginPhase()
       return true
     }
-    function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer, options, pendingTimer) {
+    function applyServerState(state, seed, serverNow, turnTimer, options, pendingTimer) {
       if (!state) return
       const input = options || {}
       resolveAuthoritySeed(state, seed)
-      if (!preserveWsSeq) wsActionSeq = -1
       const wasNull = !G
       syncAuthorityClock(serverNow, turnTimer, pendingTimer)
 
@@ -4149,7 +4138,7 @@
       }
 
       if (wasNull) {
-        // First state received from WS; player names arrive via roomUpdate.
+        // First state received from Colyseus; player names arrive via roomUpdate.
         playerNames[myPlayerId] = myPlayerName
         document.getElementById('loadingOverlay').style.display = 'none'
       }
@@ -4166,52 +4155,6 @@
       if (G.terminalResult) { handleGameOver(); return }
 
       maybeAutoBeginPhase()
-    }
-
-    function applyLegacyBattleEntry(entry) {
-      if (!entry || typeof entry.seq !== 'number' || entry.seq <= wsActionSeq) return
-      if (entry.type === 'init') {
-        wsActionSeq = entry.seq
-        applyServerState(entry.payload, entry.seed || gameSeed || null, true)
-        return
-      }
-      if (!G) return
-      if (entry.type === 'gameOver') {
-        wsActionSeq = entry.seq
-        addLog('Ignored a client-authored legacy gameOver entry', 'err')
-        return
-      }
-      if (entry.action && typeof GameEngine !== 'undefined' && GameEngine.applyBattleAction) {
-        try {
-          const oldG = G
-          const nextG = runDeterministicAuthorityAction(G, entry.action).state
-          wsActionSeq = entry.seq
-          applyServerState(nextG, null, true)
-          spawnStateFloaters(oldG, G)
-        } catch (e) {
-          const msg = e && e.message ? e.message : String(e)
-          addLog('[WS] 动作日志回放失败：' + msg, 'err')
-          setStatusMsg('WS 动作日志回放失败：' + msg)
-        }
-      }
-    }
-
-    function applyLegacyBattleSnapshot(msg) {
-      if (!acceptAuthorityVersion(msg && msg.authorityVersion)) {
-        addLog('[authority] Ignored an older or unversioned battle snapshot', 'info')
-        return
-      }
-      const actions = msg && Array.isArray(msg.actions) ? msg.actions : []
-      latestAuthorityStateHash = (msg && msg.stateHash) || latestAuthorityStateHash
-      latestAuthorityVersion = msg && Number.isSafeInteger(msg.authorityVersion)
-        ? msg.authorityVersion
-        : latestAuthorityVersion
-      if (typeof msg.seed === 'number' && !gameSeed && typeof GameEngine !== 'undefined' && GameEngine.setRng) {
-        gameSeed = msg.seed
-        GameEngine.setRng(GameEngine.mulberry32(msg.seed))
-      }
-      actions.forEach(applyLegacyBattleEntry)
-      if (!actions.length && msg && msg.state) applyServerState(msg.state, msg.seed || null)
     }
 
     function authorityPatchBaseState() {
@@ -4321,7 +4264,6 @@
         applyServerState(
           nextState,
           msg.seed || null,
-          false,
           msg.serverNow,
           msg.turnTimer,
           {
@@ -4358,31 +4300,30 @@
       }
     }
 
-    // Connect WebSocket for the given mode ('lan' | 'relay')
-    function connectBattleWs(mode) {
-      if (typeof RvBWs === 'undefined') return
-      wsMode = mode || 'lan'
+    // Connect the Colyseus client for the selected authority origin.
+    function connectBattleColyseus() {
+      if (typeof RvBColyseus === 'undefined') return
 
-      RvBWs.on('connect', function() {
-        wsConnected = true
-        var el = document.getElementById('wsStatus')
-        if (el) { el.style.display = ''; el.textContent = 'WS' }
-        addLog('WebSocket 已连接', 'info')
+      RvBColyseus.on('connect', function() {
+        colyseusConnected = true
+        var el = document.getElementById('colyseusStatus')
+        if (el) { el.style.display = ''; el.textContent = 'Colyseus' }
+        addLog('Colyseus 已连接', 'info')
       })
 
-      RvBWs.on('disconnect', function() {
+      RvBColyseus.on('disconnect', function() {
 
-        wsConnected = false
-        var el = document.getElementById('wsStatus')
+        colyseusConnected = false
+        var el = document.getElementById('colyseusStatus')
         if (el) el.style.display = 'none'
-        addLog('WebSocket 断开，等待重连', 'info')
+        addLog('Colyseus 断开，等待重连', 'info')
         if (pendingActionFeedback) {
           setStatusMsg('连接已断开；原指令仍待确认，重连后将自动同步，请勿重复操作')
           renderActionBar()
         }
       })
 
-      RvBWs.on('authoritySyncStart', function(sync) {
+      RvBColyseus.on('authoritySyncStart', function(sync) {
         if (sync && sync.clientActionId && pendingActionFeedback && sync.clientActionId === pendingActionFeedback.clientActionId) {
           addLog('[authority] 正在按原指令编号查询服务端回执', 'info')
           setStatusMsg('正在同步服务端状态，请勿重复操作')
@@ -4393,7 +4334,7 @@
         addLog('[authority] 检测到版本冲突，正在请求服务端完整快照', 'err')
       })
 
-      RvBWs.on('authoritySyncComplete', function() {
+      RvBColyseus.on('authoritySyncComplete', function() {
         if (pendingActionFeedback && pendingActionFeedback.timedOut) {
           addLog('[authority] 已同步服务端状态，仍在等待原指令的权威结果', 'info')
           renderActionBar()
@@ -4405,7 +4346,7 @@
         setStatusMsg('已同步服务端状态')
       })
 
-      RvBWs.on('authoritySyncTimeout', function() {
+      RvBColyseus.on('authoritySyncTimeout', function() {
         addLog('[authority] 服务端状态同步超时；未确认恢复', 'err')
         renderActionBar()
         setStatusMsg(pendingActionFeedback
@@ -4413,19 +4354,19 @@
           : '服务端状态同步超时，未确认恢复；请重连后再操作')
       })
 
-      RvBWs.on('authoritySyncBlocked', function() {
+      RvBColyseus.on('authoritySyncBlocked', function() {
         setStatusMsg('正在同步服务端状态，请等待完成后重新操作')
       })
 
-      RvBWs.on('message', function(msg) {
+      RvBColyseus.on('message', function(msg) {
         if (msg.to && String(msg.to).toLowerCase() !== myPlayerId) return
         if (msg.type === 'subscribed') {
-          wsRole = msg.role || 'guest'
-          addLog('[WS] 角色：' + wsRole, 'info')
+          colyseusRole = msg.role || 'guest'
+          addLog('[Colyseus] 角色：' + colyseusRole, 'info')
           if (pendingActionFeedback) {
             requestAuthorityRecovery('pending-action-reconnect', pendingActionFeedback.clientActionId)
           } else {
-            try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
+            try { RvBColyseus.send({ type: 'requestBattleSnapshot' }) } catch {}
           }
 
         } else if (msg.type === 'stateUpdate') {
@@ -4437,7 +4378,7 @@
 
           if (_use3d && battlePresentation && G && msg.state) {
             battlePresentation.animateAction(
-              Object.assign({}, msg.lastAction || { type: 'stateUpdate' }, { motionEventKey: 'ws:' + String(msg.stateHash || msg.seq || msg.serverNow || battleStateMotionKey(msg.state)) }),
+              Object.assign({}, msg.lastAction || { type: 'stateUpdate' }, { motionEventKey: 'colyseus:' + String(msg.stateHash || msg.seq || msg.serverNow || battleStateMotionKey(msg.state)) }),
               createBattlePresentationModel(G),
               createBattlePresentationModel(msg.state)
             )
@@ -4447,13 +4388,11 @@
             ? msg.authorityVersion
             : latestAuthorityVersion
           authoritativePendingTimer = msg.pendingTimer || null
-          applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer)
+          applyServerState(msg.state, msg.seed || null, msg.serverNow, msg.turnTimer)
         } else if (msg.type === 'battleTransition') {
           applyBattleTransition(msg)
         } else if (msg.type === 'battleReceipt') {
           applyAuthorityReceipt(msg.receipt)
-        } else if (msg.type === 'battleSnapshot') {
-          applyLegacyBattleSnapshot(msg)
         } else if (msg.type === 'roomUpdate') {
           if (msg.room) {
             isHost = msg.room.hostId && msg.room.hostId.toLowerCase() === myPlayerId
@@ -4469,13 +4408,11 @@
           if (!G) {
             if (reason === 'battle-not-started' && msg.room && msg.room.players) {
               var picked = msg.room.players.filter(function(p) { return p.hasSelectedPieces }).length
-              showMsg('WebSocket 已连接，但战斗尚未开始：已选阵容 ' + picked + '/' + msg.room.players.length, 'err')
+              showMsg('Colyseus 已连接，但战斗尚未开始：已选阵容 ' + picked + '/' + msg.room.players.length, 'err')
             } else {
-              showMsg('WebSocket 已连接，但服务端暂时没有战斗状态：' + reason, 'err')
+              showMsg('Colyseus 已连接，但服务端暂时没有战斗状态：' + reason, 'err')
             }
           }
-        } else if (msg.type === 'actionLog') {
-          applyLegacyBattleEntry(msg.entry)
         } else if (msg.type === 'actionError') {
           var errorActionId = (msg.receipt && msg.receipt.clientActionId) || (msg.action && msg.action.clientActionId)
           if (errorActionId && pendingActionFeedback && pendingActionFeedback.clientActionId !== errorActionId) {
@@ -4532,25 +4469,18 @@
           addLog('服务端处理动作失败：' + (msg.error || 'unknown error'), 'err')
           render()
           setStatusMsg('服务端拒绝：' + rejectionMessage + '；目标选择已清除')
-        } else if (msg.type === 'pendingAction') {
-          // Old relay servers delegated authority to the host client. That path is
-          // intentionally disabled: network clients only consume server stateUpdate.
-          addLog('已忽略旧 Relay 客户端权威动作；等待服务端状态', 'err')
-        } else if (msg.type === 'hostResume') {
-          addLog('已忽略非权威 Relay 恢复状态；等待服务端快照', 'err')
         }
       })
 
-      RvBWs.connect(roomId, myPlayerId, wsMode)
+      RvBColyseus.connect(roomId, myPlayerId)
     }
 
-    // Initialize a real battle: connect WS (server will push initial stateUpdate on subscribe).
-    // State arrives through WS; recovery requests another authoritative WS snapshot.
+    // Initialize a real battle through Colyseus; recovery requests an authority snapshot.
     async function initBattle() {
-      connectBattleWs(wsMode)
+      connectBattleColyseus()
       setTimeout(function() {
         if (!G) {
-          try { if (window.RvBWs && RvBWs.send) RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
+          try { if (window.RvBColyseus && RvBColyseus.send) RvBColyseus.send({ type: 'requestBattleSnapshot' }) } catch {}
           recoverBattleStateViaWs()
         }
       }, 8000)
@@ -4558,19 +4488,17 @@
 
     async function recoverBattleStateViaWs() {
       try {
-        if (!window.RvBWs || !RvBWs.isConnected || !RvBWs.isConnected()) {
-          throw new Error('WebSocket not connected')
+        if (!window.RvBColyseus || !RvBColyseus.isConnected || !RvBColyseus.isConnected()) {
+          throw new Error('Colyseus not connected')
         }
-        RvBWs.send({ type: 'requestBattleSnapshot' })
-        addLog('[WS resync] snapshot requested', 'info')
+        RvBColyseus.send({ type: 'requestBattleSnapshot' })
+        addLog('[Colyseus resync] snapshot requested', 'info')
       } catch (e) {
         showMsg('尚未收到战斗状态：' + ((e && e.message) || e), 'err')
       }
     }
 
     // Kept as a no-op for old call sites.
-    async function pollActions() { /* deprecated: state arrives via WS only */ }
-
     // Exact target candidates are produced by the authoritative rule query.
     // The page controller only converts stable TargetRef values into presentation
     // cells and intent payloads; the presentation layer never reimplements legality.
@@ -6406,9 +6334,9 @@
         return
       }
       if (
-        typeof RvBWs !== 'undefined'
-        && RvBWs.isAuthoritySyncing
-        && RvBWs.isAuthoritySyncing()
+        typeof RvBColyseus !== 'undefined'
+        && RvBColyseus.isAuthoritySyncing
+        && RvBColyseus.isAuthoritySyncing()
       ) {
         setStatusMsg('正在同步服务端状态，请等待完成后重新操作')
         return
@@ -6433,12 +6361,11 @@
         setMoveButtonDisabled(true)
         if (action.type === 'endTurn') addLog('正在结束回合...', 'info')
 
-        // Relay clients submit commands to the server and only consume stateUpdate.
-        if (wsMode === 'relay') {
-          relaySeq++
-          var relayActionAuth = await createBattleActionAuth(action)
-          var relaySubmitted = RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth, { seq: relaySeq, prevStateHash: latestAuthorityStateHash || '' }))
-          if (relaySubmitted === false) {
+        // Submit every authority action through the active Colyseus room.
+        if (colyseusConnected && typeof RvBColyseus !== 'undefined' && RvBColyseus.isConnected()) {
+          var actionAuth = await createBattleActionAuth(action)
+          var submitted = RvBColyseus.send(battleAuthorityCommandMessage(action, actionAuth))
+          if (submitted === false) {
             rejectPendingActionFeedback('authority-syncing', '正在同步服务端状态；本次操作未发送')
             return
           }
@@ -6450,27 +6377,10 @@
           return
         }
 
-
-        // LAN WS: submit action via WS only.
-        if (wsConnected && typeof RvBWs !== 'undefined' && RvBWs.isConnected()) {
-          var lanActionAuth = await createBattleActionAuth(action)
-          var lanSubmitted = RvBWs.send(battleAuthorityCommandMessage(action, lanActionAuth))
-          if (lanSubmitted === false) {
-            rejectPendingActionFeedback('authority-syncing', '正在同步服务端状态；本次操作未发送')
-            return
-          }
-          schedulePendingActionPresentation()
-          if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
-            selectedPieceId = action.pieceId
-          } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
-          return
-        }
-
-        addLog('WebSocket 未连接，无法发送动作；请检查网络和服务端', 'err')
-        rejectPendingActionFeedback('transport-unavailable', 'WebSocket 未连接；目标选择已清除')
+        addLog('Colyseus 未连接，无法发送动作；请检查网络和服务端', 'err')
+        rejectPendingActionFeedback('transport-unavailable', 'Colyseus 未连接；目标选择已清除')
         renderActionBar()
-        setStatusMsg('WebSocket 未连接；目标选择已清除')
+        setStatusMsg('Colyseus 未连接；目标选择已清除')
       } catch (e) {
         rejectPendingActionFeedback('transport-failed', '发送动作失败：' + e.message + '；目标选择已清除')
         addLog('发送动作失败：' + e.message, 'err')
@@ -6560,35 +6470,10 @@
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       try { localStorage.removeItem('rvb_active_battle') } catch {}
       if (!completedMatchTraceRecord) storeCompletedMatchTrace()
-      if (completedMatchTraceRecord && typeof RvBWs !== 'undefined') RvBWs.disconnect()
+      if (completedMatchTraceRecord && typeof RvBColyseus !== 'undefined') RvBColyseus.disconnect()
       if (recordSaved) return
       recordSaved = true
       if (!TRAINING_MODE && !SPECTATE_MODE) {
-      // Save battle record locally
-      try {
-        const identity = (typeof RvBIdentity !== 'undefined') ? RvBIdentity.getIdentity() : null
-        if (identity && G) {
-          const winner = terminalResult.winnerPlayerId
-          const myResult = winner
-            ? (String(winner).toLowerCase() === String(myPlayerId).toLowerCase() ? 'win' : 'loss')
-            : 'draw'
-          const oppPlayer = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() !== myPlayerId)
-          const record = {
-            gameId: roomId + '-' + Date.now(),
-            timestamp: Date.now(),
-            result: myResult,
-            myFaction,
-            myPlayerId,
-            opponentName: (oppPlayer && (playerNames[oppPlayer.playerId] || oppPlayer.name)) || '对手',
-            opponentId: oppPlayer ? oppPlayer.playerId : null,
-          }
-          const records = JSON.parse(localStorage.getItem('rvb_battle_records') || '[]')
-          records.push(record)
-          // Keep last 200 records
-          if (records.length > 200) records.splice(0, records.length - 200)
-          localStorage.setItem('rvb_battle_records', JSON.stringify(records))
-        }
-      } catch {}
       }
       const winner = terminalResult.winnerPlayerId
       const iWon = winner && String(winner).toLowerCase() === String(myPlayerId).toLowerCase()
@@ -6620,7 +6505,7 @@
       }
       document.getElementById('resultOverlay').style.display = 'flex'
       if (!TRAINING_MODE && !SPECTATE_MODE) {
-      // Sign game record asynchronously
+      // Load the verified PostgreSQL authority report asynchronously.
       _signGameRecord()
       }
     }
@@ -6628,36 +6513,24 @@
     var _signedRecord = null
 
     async function _signGameRecord() {
-      if (!window.RvBIdentity) return
-      const identity = RvBIdentity.getIdentity()
-      if (!identity) return
       const statusEl = document.getElementById('recordStatus')
       try {
-        statusEl.textContent = '正在获取战报...'
-        // Wait a moment for server to finalize the game record
-        await new Promise(r => setTimeout(r, 800))
-        if (!window.RvBWs || !RvBWs.isConnected || !RvBWs.isConnected() || !RvBWs.request) {
-          statusEl.textContent = ''
-          return
+        statusEl.textContent = '正在验证 PostgreSQL 权威战报…'
+        await new Promise(r => setTimeout(r, 300))
+        if (!window.RvBColyseus || typeof RvBColyseus.requestAt !== 'function') throw new Error('战报客户端不可用')
+        const serverUrl = window.RvBUtils && RvBUtils.getServerUrl ? RvBUtils.getServerUrl() : ''
+        const record = await RvBColyseus.requestAt(serverUrl, 'battleReports.get', { battleId: roomId }, 8000)
+        if (!record || record.schemaVersion !== 'rvb-postgres-battle-report/v1' || record.verified !== true) {
+          throw new Error('服务器未返回已验证的 DURABLE 战报')
         }
-        const record = await RvBWs.request('gameRecord.get', { roomId }, 5000)
-        if (record.error) { statusEl.textContent = ''; return }
-
-        // Sign the record (without signatures field)
-        const { signatures: _s, ...recordToSign } = record
-        statusEl.textContent = '正在签名战报...'
-        const publicKey = RvBIdentity.getPublicKey()
-        const signature = await RvBIdentity.sign(recordToSign)
-
-        // Submit signature
-        const submitData = await RvBWs.request('gameRecord.sign', { roomId, playerId: identity.id, publicKey, signature }, 5000)
-        const count = submitData?.signaturesCount || 1
-        statusEl.textContent = '已签名 (' + count + '/2)'
-
-        // Store full record for download
-        _signedRecord = { ...record, signatures: { ...(record.signatures || {}), [identity.id]: signature } }
+        _signedRecord = record
+        statusEl.textContent = '权威战报已验证 · DURABLE v' + record.authority.durableAuthorityVersion
         document.getElementById('recordDownloadBtn').style.display = 'inline-block'
-      } catch { statusEl.textContent = '' }
+      } catch (error) {
+        _signedRecord = null
+        statusEl.textContent = '权威战报尚未 DURABLE，暂不可下载'
+        console.warn('[battle-report] authority report unavailable', error)
+      }
     }
 
     function downloadGameRecord() {
@@ -6666,7 +6539,7 @@
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'rvb-record-' + (_signedRecord.gameId || Date.now()) + '.json'
+      a.download = 'rvb-authority-report-' + (_signedRecord.battleId || Date.now()) + '.json'
       a.click()
       URL.revokeObjectURL(url)
     }

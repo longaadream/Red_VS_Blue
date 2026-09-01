@@ -33,7 +33,7 @@ describe('out-of-match developer center', () => {
     expect(combined).toContain("window.location.protocol === 'http:'")
     expect(page).toContain('match-trace.js')
     expect(page).toContain('再次下载 Trace')
-    expect(combined).not.toContain('RvBWs.connect')
+    expect(combined).not.toContain('RvBColyseus.connect')
     expect(combined).not.toContain('requestBattleSnapshot')
     expect(combined).not.toContain("type: 'action'")
     expect(combined).not.toContain('new WebSocket')
@@ -44,9 +44,9 @@ describe('out-of-match developer center', () => {
 
     expect(battle).toContain('js/developer-tools/match-trace.js')
     expect(battle).toContain('storeCompletedMatchTrace')
-    expect(battle.indexOf('latestAuthorityStateHash = msg.stateHash'))
+    expect(battle.indexOf('latestAuthorityStateHash = msg.stateHash || latestAuthorityStateHash'))
       .toBeLessThan(
-        battle.indexOf('applyServerState(msg.state, msg.seed || null, false, msg.serverNow, msg.turnTimer)'),
+        battle.indexOf('applyServerState(\n          nextState,'),
       )
     expect(battle).toMatch(/function handleGameOver\(\)[\s\S]*?storeCompletedMatchTrace\(\)/)
     expect(battle).toContain('下载比赛 Trace')

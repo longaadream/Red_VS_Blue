@@ -10,7 +10,7 @@
 
 ## 已切换范围
 
-- 五个默认玩家页面加载 Colyseus SDK，并通过 `RvBWs` 兼容层使用真实 Colyseus Room。
+- 五个默认玩家页面加载 Colyseus SDK，并通过 `RvBColyseus` 兼容层使用真实 Colyseus Room。
 - Product Room 覆盖建房、双人入座、阵营、准备、8 棋阵容锁定、RED-138 渐进部署和战斗动作。
 - Electron 的玩家 `localUrl` 指向 Colyseus 端口；内容 Profile 管理仍使用独立旧运行时端口。
 - Profile 运行时显式设置 `DISABLE_WS=1` 并关闭 legacy battle authority/journal/timer；旧实现只保留为

@@ -344,7 +344,7 @@ describe('developer tools match trace boundary', () => {
     expect(handler.indexOf('storeCompletedMatchTrace()'))
       .toBeLessThan(handler.indexOf('if (recordSaved) return'))
     expect(handler.indexOf('storeCompletedMatchTrace()'))
-      .toBeLessThan(handler.indexOf('RvBWs.disconnect()'))
+      .toBeLessThan(handler.indexOf('RvBColyseus.disconnect()'))
     expect(battlePage).toContain('id="matchTraceStatus"')
     expect(battlePage).toContain('Trace 生成失败：')
   })

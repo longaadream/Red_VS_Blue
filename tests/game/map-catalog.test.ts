@@ -340,7 +340,6 @@ describe('RED-119 selectable map catalog', () => {
       'data/pve/encounters/prototype-encounter-1.json',
       'app/api/tutorial/route.ts',
       'app/api/developer-tools/scenario/route.ts',
-      'app/api/debug/battle/route.ts',
       'lib/game/debug-battle.ts',
       'data/pages/developer-tools.html',
       'data/pages/index.html',
@@ -359,7 +358,6 @@ describe('RED-119 selectable map catalog', () => {
     expect(sources.get('app/api/tutorial/route.ts')).toContain('getMap(DEFAULT_MAP_ID)')
     expect(sources.get('app/api/developer-tools/scenario/route.ts'))
       .toContain("DEFAULT_MAP_ID = 'large-hole-arena'")
-    expect(sources.get('app/api/debug/battle/route.ts')).toContain("'large-hole-arena'")
     expect(sources.get('lib/game/debug-battle.ts')).toContain("'large-hole-arena'")
     expect(sources.get('data/pages/developer-tools.html')).toContain('value="large-hole-arena"')
     expect(sources.get('data/pages/index.html')).toContain("mapId: 'large-hole-arena'")

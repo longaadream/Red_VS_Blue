@@ -29,7 +29,6 @@ function createFixture() {
     'resources/app/electron-client/dist/main.js',
     'resources/app/standalone/server.js',
     'resources/app/www/index.html',
-    'resources/app/init-db.js',
     'resources/node.exe',
   ]) {
     writeFile(packageRoot, relative)
@@ -37,7 +36,6 @@ function createFixture() {
   for (const relative of [
     'resources/app/public',
     'resources/app/data',
-    'resources/app/prisma',
   ]) {
     fs.mkdirSync(path.join(packageRoot, relative), { recursive: true })
   }
@@ -65,16 +63,13 @@ describe('Electron client package verifier', () => {
       'missing required file: resources/app/standalone/node_modules/next/package.json',
     )
     expect(issues).toContain(
-      'missing required file: resources/app/standalone/node_modules/ws/package.json',
+      'missing required file: resources/app/standalone/colyseus/colyseus-server.mjs',
     )
     expect(issues).toContain(
-      'missing required file: resources/app/standalone/ws-same-port-server.cjs',
+      'missing required file: resources/postgres/pgsql/bin/postgres.exe',
     )
     expect(issues).toContain(
-      'missing required file: resources/app/standalone/node_modules/@prisma/client/package.json',
-    )
-    expect(issues).toContain(
-      'missing required file: resources/app/standalone/node_modules/.prisma/client/index.js',
+      'missing required file: resources/postgres/runtime-manifest.json',
     )
     expect(issues).toContain(
       'missing required file: resources/app/node_modules/adm-zip/package.json',

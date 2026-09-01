@@ -783,6 +783,7 @@ describe('battle page runtime source', () => {
       recordAuthorityPerformance: () => { counts.performance += 1 },
       requestAuthorityRecovery: () => undefined,
       setStatusMsg: () => undefined,
+      addLog: () => undefined,
       clearTimeout: () => undefined,
       battleInteractionMode: () => 'inspect',
     })
@@ -814,7 +815,7 @@ describe('battle page runtime source', () => {
       let battlePresentation = null
       const GameEngine = { applyBattlePublicPatch: () => nextState }
       function authorityPatchBaseState() { return previousState }
-      function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer, options) {
+      function applyServerState(state, seed, serverNow, turnTimer, options) {
         const oldState = G
         G = state
         const policy = options.deriveRenderPolicy ? deriveAuthorityRenderPolicy(oldState, G) : {}
@@ -863,6 +864,7 @@ describe('battle page runtime source', () => {
       updateRed43QaEvidence: () => undefined,
       recordAuthorityPerformance: () => undefined,
       requestAuthorityRecovery: () => undefined,
+      addLog: () => undefined,
       battleInteractionMode: () => 'inspect',
     })
 
@@ -887,7 +889,7 @@ describe('battle page runtime source', () => {
       let battlePresentation = null
       const GameEngine = { applyBattlePublicPatch: () => nextState }
       function authorityPatchBaseState() { return previousState }
-      function applyServerState(state, seed, preserveWsSeq, serverNow, turnTimer, options) {
+      function applyServerState(state, seed, serverNow, turnTimer, options) {
         const oldState = G
         G = state
         const policy = options.deriveRenderPolicy ? deriveAuthorityRenderPolicy(oldState, G) : {}

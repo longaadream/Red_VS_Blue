@@ -1,5 +1,5 @@
 import { Pool } from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { hashBattleState } from '@/lib/game/battle-runner'
 import {
@@ -9,7 +9,7 @@ import {
 import { getBattleStorage } from '@/lib/game/battle-storage'
 import { dispatchRoomBattleAction } from '@/lib/game/room-battle-actions'
 import type { BattleAuthorityTransitionRecord } from '@/lib/game/battle-transition'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { CandidateBattleStore } from '@/lib/server/colyseus/candidate-battle-store'
 import { createDevelopmentBattleRoom } from '@/lib/server/colyseus/development-battle-fixture'
@@ -18,18 +18,7 @@ import { PostgresAuthorityRepository } from '@/lib/server/postgres/postgres-auth
 import type { PostgresAuthorityTransitionJob } from '@/lib/server/postgres/authority-types'
 
 const databaseUrl = process.env.RVB_TEST_POSTGRES_URL
-const originalAuthority = process.env.RVB_BATTLE_AUTHORITY_V2
-
 describe.skipIf(!databaseUrl)('RED-160 real PostgreSQL authority integration', () => {
-  beforeAll(() => {
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
-  })
-
-  afterAll(() => {
-    if (originalAuthority === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-    else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthority
-  })
-
   it('commits a contiguous prefix, restores from checkpoint/replay, deduplicates, and persists terminal barrier', async () => {
     const battleId = `red160-pg-${Date.now()}-${Math.random().toString(16).slice(2)}`
     const pool = new Pool({ connectionString: databaseUrl!, max: 4 })
@@ -153,6 +142,50 @@ describe.skipIf(!databaseUrl)('RED-160 real PostgreSQL authority integration', (
       )
       expect(authority.rows[0]).toMatchObject({ terminal: true })
       expect(Number(authority.rows[0].durable_version)).toBe(21)
+
+      const report = await repository.readBattleReport(battleId)
+      expect(report).toMatchObject({
+        schemaVersion: 'rvb-postgres-battle-report/v1',
+        verified: true,
+        battleId,
+        authority: {
+          authorityVersion: 21,
+          durableAuthorityVersion: 21,
+          transitionHash: barrier.rows[0].transition_hash,
+        },
+        terminal: { checkpoint: { reason: 'terminal', authorityVersion: 21 } },
+      })
+      expect(report?.transitions).toHaveLength(21)
+      expect(report?.receipts).toHaveLength(21)
+      expect(report?.transitions.every(transition => (
+        Array.isArray(transition.commands)
+        && Array.isArray(transition.traces)
+        && Array.isArray(transition.replayFrames)
+        && /^[0-9a-f]{64}$/.test(transition.transitionHash)
+      ))).toBe(true)
+      await expect(repository.listBattleReports('player-red')).resolves.toEqual([
+        expect.objectContaining({
+          battleId,
+          authorityVersion: 21,
+          transitionHash: barrier.rows[0].transition_hash,
+        }),
+      ])
+
+      const finalTransition = report!.transitions.at(-1)!
+      await pool.query(
+        `UPDATE battle_transition
+         SET transition_json = jsonb_set(transition_json, '{actionHash}', '"tampered"'::jsonb)
+         WHERE battle_id = $1 AND to_version = $2`,
+        [battleId, finalTransition.toVersion],
+      )
+      await expect(repository.readBattleReport(battleId)).rejects.toMatchObject({
+        code: 'BATTLE_REPORT_INTEGRITY_FAILED',
+      })
+      await pool.query(
+        'UPDATE battle_transition SET transition_json = $3::jsonb WHERE battle_id = $1 AND to_version = $2',
+        [battleId, finalTransition.toVersion, JSON.stringify(finalTransition)],
+      )
+      await expect(repository.readBattleReport(battleId)).resolves.toMatchObject({ verified: true })
       await restoredJournal.close()
     } finally {
       await pool.query('DELETE FROM battle_room_authority WHERE battle_id = $1', [battleId])

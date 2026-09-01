@@ -5,14 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 const AUTHORITY_INITIALIZATION_FILES = [
   'lib/game/room-battle-start.ts',
-  'app/api/battle/route.ts',
   'app/api/relay-battle-init/route.ts',
 ]
 
 const ROOM_START_DELEGATES = [
-  'lib/ws-server.ts',
-  'app/api/rooms/[roomId]/route.ts',
-  'app/api/rooms/[roomId]/actions/route.ts',
+  'lib/server/colyseus/battle-room.ts',
 ]
 
 const CROSS_PLATFORM_AUTHORITY_FILES = {
@@ -115,17 +112,20 @@ describe('authority determinism audit', () => {
     expect(battlePage).not.toContain('var authorityTrace = null')
     expect(battlePage).not.toContain('trace: authorityTrace')
     expect(battlePage).not.toMatch(/entry\.action\.type\s*===\s*['"]pending(?:Option|Target)Select['"][\s\S]{0,200}wsActionSeq\s*=/)
-    expect(battlePage.match(/runDeterministicAuthorityAction\(/g)?.length, 'legacy replay runner definition and call').toBe(2)
-    expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]stateUpdate['"]/)
-    expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
+    expect(battlePage.match(/runDeterministicAuthorityAction\(/g)?.length, 'training-only deterministic runner definition').toBe(1)
+    expect(battlePage).not.toMatch(/RvBColyseus\.send\(\{\s*type:\s*['"]stateUpdate['"]/)
+    expect(battlePage).not.toContain('已忽略旧 Relay 客户端权威动作')
+    expect(battlePage).not.toContain('runRelayAuthorityAction')
+    expect(battlePage).toContain('RvBColyseus.send(battleAuthorityCommandMessage(action, actionAuth))')
 
     const browserEntry = read(CROSS_PLATFORM_AUTHORITY_FILES.browserEntry)
     expect(browserEntry).toContain('getBattleRootSeed, hashBattleState, hashStable, runBattleAction')
     expect(browserEntry).toContain('applyBattlePublicPatch')
 
     const gameLogicDoc = read('docs/technical/GAME_LOGIC_SYSTEM.md')
-    expect(gameLogicDoc).toContain('不在发送前克隆战局、执行 Runner 或生成客户端 trace')
-    expect(gameLogicDoc).toContain('actionError + preparation')
+    expect(gameLogicDoc).toContain('浏览器只发送意图、显示服务端投影，不执行在线共享规则')
+    expect(gameLogicDoc).toContain('规则失败、')
+    expect(gameLogicDoc).toContain('只产生拒绝，不得写 Transition 或改变房间状态')
     expect(gameLogicDoc).not.toContain('UI->>Browser: 在克隆状态执行动作')
   })
 

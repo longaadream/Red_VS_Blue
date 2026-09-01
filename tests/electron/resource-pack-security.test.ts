@@ -7,14 +7,10 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   listActiveResourcePackFiles,
   readDesktopProfileState,
+  recoverUncertainProfileCommit,
   resolveActiveResourcePackRoot,
   type DesktopProfileReference,
 } from '../../electron-client/resource-pack-store'
-import {
-  recoverUncertainServerCommit,
-  readServerProfileState,
-  resolveServerProfileRoot,
-} from '../../electron/resource-pack-store'
 
 const roots: string[] = []
 
@@ -88,7 +84,7 @@ describe('Electron Profile store security boundary', () => {
       })
     const restart = vi.fn().mockResolvedValue(undefined)
 
-    await expect(recoverUncertainServerCommit(target, observe, restart))
+    await expect(recoverUncertainProfileCommit(target, observe, restart))
       .resolves.toMatchObject({ state: { stable: { resolvedProfileHash: target } } })
     expect(restart).toHaveBeenCalledOnce()
   })
@@ -127,7 +123,6 @@ describe('Electron Profile store security boundary', () => {
     writeState(root, stable)
 
     expect(() => resolveActiveResourcePackRoot(root)).toThrow(/PROFILE_SNAPSHOT_INCOMPLETE/)
-    expect(() => resolveServerProfileRoot(root, stable)).toThrow(/PROFILE_SNAPSHOT_INCOMPLETE/)
   })
 
   test('legacy and malformed pointers are never interpreted as active v1 content', () => {
@@ -135,11 +130,10 @@ describe('Electron Profile store security boundary', () => {
     fs.writeFileSync(path.join(root, 'active.json'), JSON.stringify({ version: 'legacy' }))
 
     expect(readDesktopProfileState(root)).toBeNull()
-    expect(readServerProfileState(root)).toBeNull()
     expect(resolveActiveResourcePackRoot(root)).toBeNull()
   })
 
-  test('client and standalone server resolve the same committed identity', () => {
+  test('client resolves the committed identity from its atomic stable pointer', () => {
     const root = temporaryPackRoot()
     const stable = reference('installed', 'e')
     const profileRoot = materializeProfile(root, stable)
@@ -147,9 +141,6 @@ describe('Electron Profile store security boundary', () => {
 
     expect(readDesktopProfileState(root)?.stable.resolvedProfileHash)
       .toBe(stable.resolvedProfileHash)
-    expect(readServerProfileState(root)?.stable.resolvedProfileHash)
-      .toBe(stable.resolvedProfileHash)
     expect(resolveActiveResourcePackRoot(root)).toBe(profileRoot)
-    expect(resolveServerProfileRoot(root, stable)).toBe(profileRoot)
   })
 })

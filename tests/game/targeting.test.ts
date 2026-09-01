@@ -664,22 +664,18 @@ describe('targeting consumers and performance contract', () => {
     expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
   })
 
-  it('exposes stable selection errors over WS/API and keeps legacy targeting adapters presentation-only', () => {
-    const ws = readFileSync(resolve(process.cwd(), 'lib/ws-server.ts'), 'utf8')
-    const route = readFileSync(resolve(process.cwd(), 'app/api/rooms/[roomId]/battle/route.ts'), 'utf8')
+  it('exposes stable selection errors through Colyseus and keeps targeting adapters presentation-only', () => {
+    const room = readFileSync(resolve(process.cwd(), 'lib/server/colyseus/battle-room.ts'), 'utf8')
     const coordinator = readFileSync(resolve(process.cwd(), 'lib/game/room-battle-actions.ts'), 'utf8')
-    expect(ws).toMatch(
-      /dispatchRoomBattleAction\(\s*roomStore,\s*_roomId,\s*verified\.playerId,\s*envelope\.command/,
+    expect(room).toMatch(
+      /dispatchRoomBattleAction\(\s*this\.authorityStore,\s*this\.roomId,\s*seatedPlayerId,\s*envelope\.command/,
     )
-    expect(ws).toContain('preparation: errAny?.preparation')
-    expect(route).toMatch(
-      /dispatchRoomBattleAction\(\s*roomStore,\s*roomId,\s*verifiedPlayerId,\s*envelope\.command/,
-    )
-    expect(route).toContain('preparation: errAny?.preparation')
+    expect(room).toContain('createColyseusRejectedReceipt({')
     expect(coordinator).toContain('assertActionPlayer(viewerPlayerId, action)')
     const html = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
-    expect(html).toContain('已忽略旧 Relay 客户端权威动作')
+    expect(html).not.toContain('已忽略旧 Relay 客户端权威动作')
     expect(html).not.toContain('runRelayAuthorityAction(action)')
+    expect(html).toContain('RvBColyseus.send(battleAuthorityCommandMessage(action, actionAuth))')
 
     for (const path of [
       'data/pages/js/skill-targeting.js',

@@ -6,7 +6,6 @@ import { getAppRoot, getUserDataDir } from '@/lib/app-paths'
 
 import { getBundledBaseProfileV1 } from './bundled-base'
 import type { ResolvedSnapshotViewV1 } from '../core/resolver'
-import { getProfileWsIngressTrackerV1 } from './profile-ws-ingress'
 import {
   classifyProfileReloadV1,
   ProfileStoreErrorV1,
@@ -44,7 +43,6 @@ export interface ProfileServerReportV1 {
     contentParse: boolean
     fixedSeedBattle: boolean
     http: boolean
-    webSocket: boolean
     menuResources: boolean
   }>
   readonly fixedSeed: Readonly<{ seed: number; stateHash: string | null }>
@@ -240,19 +238,9 @@ function hasMenuResources(
 }
 
 export async function getProfileLeaseReportV1(): Promise<ProfileLeaseReportV1> {
-  const { getRoomStore } = await import('@/lib/game/room-store')
   const { getPveActiveBattleLeaseReportV1 } = await import('@/lib/pve/profile-lifecycle')
-  const [rooms, pve] = await Promise.all([
-    getRoomStore().getAllRooms(),
-    Promise.resolve(getPveActiveBattleLeaseReportV1()),
-  ])
-  const roomIds = rooms
-    .filter(room => (
-      room.status === 'in-progress'
-      || ((room.status === 'waiting' || room.status === 'ready') && (room.players?.length ?? 0) > 0)
-    ))
-    .map(room => room.id)
-    .sort()
+  const pve = getPveActiveBattleLeaseReportV1()
+  const roomIds: string[] = []
   return {
     active: roomIds.length > 0 || pve.active,
     roomIds,
@@ -299,16 +287,11 @@ export async function getProfileServerReportV1(): Promise<ProfileServerReportV1>
     })
   }
   const lease = await getProfileLeaseReportV1()
-  const webSocketRunning = (globalThis as unknown as { __rvbWss?: unknown }).__rvbWss != null
-  const webSocketExpected = process.env.RVB_PROFILE_EXPECT_WEBSOCKET !== '0'
   const health = {
     profileIntegrity,
     contentParse,
     fixedSeedBattle,
     http: true,
-    // This field means that the runtime matches its declared WebSocket mode.
-    // RED-161's Profile-only process must keep legacy player WS disabled.
-    webSocket: webSocketExpected ? webSocketRunning : !webSocketRunning,
     menuResources,
   }
   const report: ProfileServerReportV1 = {
@@ -338,23 +321,6 @@ export async function getProfileServerReportV1(): Promise<ProfileServerReportV1>
   return report
 }
 
-function terminateExistingGameWebSocketsForActivation(): void {
-  const activeServer = (globalThis as unknown as {
-    __rvbWss?: { clients?: Iterable<{ terminate?: () => void; close?: () => void }> }
-  }).__rvbWss
-  if (!activeServer?.clients) return
-  for (const client of activeServer.clients) {
-    try {
-      if (typeof client.terminate === 'function') client.terminate()
-      else client.close?.()
-    } catch (error) {
-      logProfileEventV1('activation-websocket-termination-failure', {
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-}
-
 export async function beginProfileActivationV1(targetProfileHash: string): Promise<{
   activationId: string
   reloadMode: ProfileReloadModeV1
@@ -379,7 +345,6 @@ export async function beginProfileActivationV1(targetProfileHash: string): Promi
       throw new ProfileStoreErrorV1('PROFILE_STORE_BUSY', state.activation.activationId)
     }
     process.env.RVB_PROFILE_ADMISSION_PAUSED = state.activation.activationId
-    terminateExistingGameWebSocketsForActivation()
     const profileRoot = getRuntimeProfileRootV1(context, state.candidate)
     logProfileEventV1('activation-plan-retry', {
       activationId: state.activation.activationId,
@@ -402,12 +367,8 @@ export async function beginProfileActivationV1(targetProfileHash: string): Promi
     planningFence = `activation-plan-${randomUUID()}`
     process.env.RVB_PROFILE_ADMISSION_PAUSED = planningFence
     try {
-      const [httpDrained, webSocketDrained] = await Promise.all([
-        globalThis.__rvbProfileHttpIngressV1?.waitForDrain() ?? true,
-        getProfileWsIngressTrackerV1().waitForDrain(),
-      ])
+      const httpDrained = await (globalThis.__rvbProfileHttpIngressV1?.waitForDrain() ?? true)
       if (!httpDrained) throw new Error('PROFILE_HTTP_DRAIN_FAILED')
-      if (!webSocketDrained) throw new Error('PROFILE_WS_DRAIN_FAILED')
       const lease = await getProfileLeaseReportV1()
       if (process.env.RVB_PROFILE_ADMISSION_PAUSED !== planningFence) {
         throw new ProfileStoreErrorV1('PROFILE_STORE_BUSY', 'activation planning fence lost')
@@ -435,10 +396,6 @@ export async function beginProfileActivationV1(targetProfileHash: string): Promi
     throw error
   }
   process.env.RVB_PROFILE_ADMISSION_PAUSED = transaction.activationId
-  // Existing WebSocket sessions bypass an Upgrade-time gate. Close them in
-  // the same event-loop turn that publishes the activation transaction; new
-  // connections are rejected by the same-port admission fence.
-  terminateExistingGameWebSocketsForActivation()
   const profileRoot = getRuntimeProfileRootV1(context, state.candidate)
   logProfileEventV1('activation-begin', {
     activationId: transaction.activationId,

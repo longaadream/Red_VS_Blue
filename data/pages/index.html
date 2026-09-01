@@ -7,7 +7,7 @@
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
   <script src="js/colyseus-sdk.js"></script>
-  <script src="js/ws-client.js"></script>
+  <script src="js/colyseus-client.js"></script>
   <script src="js/lan-discover.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
@@ -252,7 +252,7 @@
       <div class="item-icon icon-gray">📊</div>
       <div class="item-text">
         <div class="item-title">战绩查询</div>
-        <div class="item-desc" id="recordsSummary">本地对战记录</div>
+        <div class="item-desc" id="recordsSummary">PostgreSQL 权威战报</div>
       </div>
       <span class="item-arrow">›</span>
     </div>
@@ -452,7 +452,7 @@
       </div>
       <!-- Record list -->
       <div id="recordsList" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div id="recordsEmpty" style="text-align:center;color:#475569;font-size:14px;padding:32px 0;display:none">暂无本地战绩记录<br><span style="font-size:12px;color:#334155;margin-top:6px;display:block">完成对局后战绩将自动保存</span></div>
+      <div id="recordsEmpty" style="text-align:center;color:#475569;font-size:14px;padding:32px 0;display:none">暂无权威战绩记录<br><span style="font-size:12px;color:#334155;margin-top:6px;display:block">终局达到 DURABLE 后由 PostgreSQL 保存</span></div>
       <button onclick="closeRecordsSheet()" style="width:100%;padding:12px;background:transparent;border:1px solid #334155;color:#64748b;border-radius:10px;font-size:14px;cursor:pointer;margin-top:12px">关闭</button>
     </div>
   </div>
@@ -707,9 +707,9 @@
       if (window.RvBBridge && (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)) {
         try {
           await (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)(65000)
-          const probe = await RvBWs.requestAt(RvBUtils.getServerUrl(), 'system.health', {}, 5000)
+          const probe = await RvBColyseus.requestAt(RvBUtils.getServerUrl(), 'system.health', {}, 5000)
           if (!probe || !probe.ok) {
-            throw new Error('engine WebSocket probe failed')
+            throw new Error('Colyseus engine probe failed')
           }
         } catch (e) {
           alert('无法启动本地训练营服务：' + ((e && e.message) || e))
@@ -739,7 +739,7 @@
       if (desc) desc.textContent = '创建 PVE 房间中…'
       try {
         const profileIdentity = await getLocalGameProfileIdentity(serverUrl)
-        const room = await RvBWs.requestAt(serverUrl, 'rooms.create', { mode: 'pve', hostId, hostName: playerName, mapId: 'large-hole-arena', profileIdentity }, 7000)
+        const room = await RvBColyseus.requestAt(serverUrl, 'rooms.create', { mode: 'pve', hostId, hostName: playerName, mapId: 'large-hole-arena', profileIdentity }, 7000)
         const params = new URLSearchParams({ roomId: room.id, playerId: hostId, playerName })
         window.location.href = 'piece-selection.html?' + params
       } catch (e) {
@@ -763,7 +763,7 @@
       const candidates = ['http://localhost:3000', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3002', 'http://localhost:7878']
       for (const url of candidates) {
         try {
-          const health = await RvBWs.requestAt(url, 'system.health', {}, 700)
+          const health = await RvBColyseus.requestAt(url, 'system.health', {}, 700)
           if (health && health.ok) return url
         } catch {}
       }
@@ -800,8 +800,8 @@
       if (!/^[a-z]+:\/\//i.test(cleanUrl)) cleanUrl = 'http://' + cleanUrl
       let result
       try {
-        const health = await RvBWs.requestAt(cleanUrl, 'system.health', {}, 10000)
-        if (!health || !['rvb-colyseus', 'rvb-ws'].includes(health.protocol)) {
+        const health = await RvBColyseus.requestAt(cleanUrl, 'system.health', {}, 10000)
+        if (!health || health.protocol !== 'rvb-colyseus') {
           throw new Error('服务器未返回 RED vs BLUE 联机协议')
         }
         RvBUtils.saveServerConfig({ mode: RvBUtils.getServerModeForUrl(cleanUrl), url: cleanUrl })
@@ -880,9 +880,6 @@
           document.getElementById('userName').textContent = identity ? (identity.displayName || '玩家') : '设置账号'
           document.getElementById('userDot').style.background = identity ? '#22c55e' : '#f59e0b'
         }
-        // Show ELO
-        const elo = _calcLocalElo()
-        document.getElementById('userElo').textContent = elo !== null ? ('ELO ' + elo) : ''
       } catch (e) {
         showIdentityError(e, '读取账号')
       }
@@ -1062,20 +1059,29 @@
       }
     }
 
-    // ── Battle Records (localStorage) ─────────────────────────────────────────
-    const RECORDS_KEY = 'rvb_battle_records'
-
-    function _loadRecords() {
-      try {
-        const records = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]')
-        const identity = window.RvBIdentity && RvBIdentity.getIdentity ? RvBIdentity.getIdentity() : null
-        if (!identity || !identity.id) return records
-        return records.filter(r => !r.myPlayerId || r.myPlayerId === identity.id)
-      } catch { return [] }
+    // ── PostgreSQL authority battle reports ───────────────────────────────────
+    async function _loadRecords() {
+      const identity = window.RvBIdentity && RvBIdentity.getIdentity ? RvBIdentity.getIdentity() : null
+      if (!identity || !identity.id || !window.RvBColyseus || typeof RvBColyseus.requestAt !== 'function') return []
+      const serverUrl = window.RvBUtils && RvBUtils.getServerUrl ? RvBUtils.getServerUrl() : ''
+      if (!serverUrl) return []
+      const payload = await RvBColyseus.requestAt(serverUrl, 'battleReports.list', { playerId: identity.id }, 8000)
+      return (payload.reports || []).map(report => {
+        const me = (report.players || []).find(player => player.id === identity.id)
+        const opponent = (report.players || []).find(player => player.id !== identity.id)
+        const winner = report.terminalResult && report.terminalResult.winnerPlayerId
+        return {
+          battleId: report.battleId,
+          timestamp: Date.parse(report.committedAt),
+          result: winner ? (winner === identity.id ? 'win' : 'loss') : 'draw',
+          myFaction: me && me.seat,
+          opponentName: (opponent && opponent.name) || '对手',
+          transitionHash: report.transitionHash,
+        }
+      })
     }
 
-    function _calcLocalElo() {
-      const records = _loadRecords()
+    function _calcAuthorityElo(records) {
       if (!records.length) return null
       let elo = 1200
       const K = 32
@@ -1088,23 +1094,42 @@
       return Math.max(100, elo)
     }
 
-    function _updateRecordsSummary() {
-      const records = _loadRecords()
+    async function _updateRecordsSummary() {
+      const el = document.getElementById('recordsSummary')
+      try {
+      const records = await _loadRecords()
       const wins = records.filter(r => r.result === 'win').length
       const losses = records.filter(r => r.result === 'loss').length
-      const el = document.getElementById('recordsSummary')
+      const elo = _calcAuthorityElo(records)
+      document.getElementById('userElo').textContent = elo !== null ? ('ELO ' + elo) : ''
       if (el) {
         if (records.length === 0) {
-          el.textContent = '暂无本地战绩记录'
+          el.textContent = '暂无权威战绩记录'
         } else {
           el.textContent = `共 ${records.length} 场 · ${wins} 胜 ${losses} 负`
         }
       }
+      } catch (error) {
+        document.getElementById('userElo').textContent = ''
+        if (el) el.textContent = '权威战绩暂不可用'
+        console.warn('[battle-reports] list unavailable', error)
+      }
     }
 
-    function openRecordsSheet() {
-      const records = _loadRecords().slice().sort((a, b) => b.timestamp - a.timestamp)
-      const elo = _calcLocalElo()
+    async function openRecordsSheet() {
+      document.getElementById('recordsOverlay').classList.add('show')
+      const list = document.getElementById('recordsList')
+      const empty = document.getElementById('recordsEmpty')
+      list.innerHTML = '<div style="color:#64748b;text-align:center;padding:20px">正在读取 PostgreSQL 权威战报…</div>'
+      empty.style.display = 'none'
+      let records
+      try {
+        records = (await _loadRecords()).slice().sort((a, b) => b.timestamp - a.timestamp)
+      } catch (error) {
+        list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px">权威战绩读取失败</div>'
+        return
+      }
+      const elo = _calcAuthorityElo(records)
       const wins = records.filter(r => r.result === 'win').length
       const losses = records.filter(r => r.result === 'loss').length
 
@@ -1113,8 +1138,6 @@
       document.getElementById('recordsLosses').textContent = losses
       document.getElementById('recordsTotal').textContent = records.length
 
-      const list = document.getElementById('recordsList')
-      const empty = document.getElementById('recordsEmpty')
       if (records.length === 0) {
         list.innerHTML = ''
         empty.style.display = 'block'
@@ -1134,7 +1157,6 @@
           </div>`
         }).join('')
       }
-      document.getElementById('recordsOverlay').classList.add('show')
     }
 
     function closeRecordsSheet() {
@@ -1166,7 +1188,7 @@
         // A standalone browser build has no separate installed-profile runtime.
         // Its playable content is served by the selected Colyseus authority.
         const localRuntimeUrl = serverUrl
-        const catalog = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
+        const catalog = await RvBColyseus.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
         identity = catalog && catalog.profileIdentity
       }
 
@@ -1196,7 +1218,7 @@
         return false
       }
       try {
-        const data = await RvBWs.requestCatalogIdentityAt(serverUrl, 'remote-server')
+        const data = await RvBColyseus.requestCatalogIdentityAt(serverUrl, 'remote-server')
         if (data && data.profileIdentity) {
           try { localStorage.setItem('rvb_server_profile_identity', JSON.stringify(data.profileIdentity)) } catch {}
         }

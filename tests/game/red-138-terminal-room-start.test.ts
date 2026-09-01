@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { clearRoomDeploymentTimeout } from '@/lib/game/room-battle-actions'
 import { startBattleFromLockedRosters } from '@/lib/game/room-battle-start'
-import type { Room } from '@/lib/game/room-store'
+import { createBattleAuthorityGenesisHash } from '@/lib/game/battle-transition'
+import type { Room } from '@/lib/game/room-model'
 import {
   DEMO_ROSTER_MANIFEST_VERSION,
   getDefaultDemoRosterSelection,
@@ -40,6 +41,24 @@ class MemoryRosterRoomStore implements RosterRoomStore {
     this.room = { ...clone(room), version: expectedVersion + 1 }
     this.writes += 1
     return true
+  }
+
+  async initializeBattleAuthorityCheckpoint(input: {
+    room: Room
+    stateHash: string
+    publicHash: string
+  }): Promise<void> {
+    this.room = {
+      ...this.room,
+      battleAuthorityVersion: 0,
+      battleAuthorityDurableVersion: 0,
+      battleAuthorityPersistenceStatus: 'durable',
+      battleAuthorityTransitionHash: createBattleAuthorityGenesisHash({
+        roomId: input.room.id,
+        stateHash: input.stateHash,
+        publicHash: input.publicHash,
+      }),
+    }
   }
 }
 
@@ -85,7 +104,6 @@ describe('RED-138 opening terminal room settlement', () => {
     const store = new MemoryRosterRoomStore(room)
     const notifications: unknown[] = []
     const originalTimerFlag = process.env.RVB_TURN_TIMER_ENABLED
-    const originalAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
     let openingSummonQueueCount = 0
     const checkTriggers = TriggerSystem.prototype.checkTriggers
     const triggerSpy = vi.spyOn(TriggerSystem.prototype, 'checkTriggers').mockImplementation(function (
@@ -110,7 +128,6 @@ describe('RED-138 opening terminal room settlement', () => {
     })
 
     process.env.RVB_TURN_TIMER_ENABLED = '1'
-    delete process.env.RVB_BATTLE_AUTHORITY_V2
     vi.useFakeTimers()
 
     try {
@@ -156,8 +173,6 @@ describe('RED-138 opening terminal room settlement', () => {
       vi.useRealTimers()
       if (originalTimerFlag === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
       else process.env.RVB_TURN_TIMER_ENABLED = originalTimerFlag
-      if (originalAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-      else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthorityFlag
     }
   })
 })

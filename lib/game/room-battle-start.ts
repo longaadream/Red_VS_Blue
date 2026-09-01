@@ -11,7 +11,6 @@ import {
   rebaseBattleReplayForAuthorityCheckpoint,
   stampPendingDeploymentAuthorityVersion,
 } from './battle-trace'
-import { isBattleAuthorityV2Enabled } from './battle-transition'
 import {
   createServerBattleStateV1,
   getBattleStorage,
@@ -21,7 +20,7 @@ import {
 import { getPieceById } from './piece-repository'
 import { assertDemoRostersReady, type RosterRoomStore } from './roster-contract'
 import { isPlayerSeat, type PlayerSeat } from './match-identity'
-import type { Room } from './room-store'
+import type { Room } from './room-model'
 import { createRootSeed } from './rule-runtime'
 import {
   systemDeploymentRuleClock,
@@ -163,9 +162,7 @@ async function startBattleFromLockedRostersQueued(
         seed,
       )
     }
-    const initialAuthorityVersion = isBattleAuthorityV2Enabled()
-      ? room.battleAuthorityVersion ?? 0
-      : (room.version ?? -1) + 1
+    const initialAuthorityVersion = room.battleAuthorityVersion ?? 0
     if (!Number.isSafeInteger(initialAuthorityVersion) || initialAuthorityVersion < 0) {
       throw new Error(`Invalid initial battle authority version: ${String(initialAuthorityVersion)}`)
     }
@@ -178,7 +175,7 @@ async function startBattleFromLockedRostersQueued(
       mapId,
       status: initialState.terminalResult ? 'finished' : 'in-progress',
       currentTurnIndex: 0,
-      battleAuthorityVersion: isBattleAuthorityV2Enabled() ? initialAuthorityVersion : room.battleAuthorityVersion,
+      battleAuthorityVersion: initialAuthorityVersion,
       battleState: createServerBattleStateV1(
         profileIdentity,
         seed,
@@ -203,30 +200,28 @@ async function startBattleFromLockedRostersQueued(
       }) => Promise<void>
     }
     const committedStorage = getBattleStorage(committedRoom)
-    if (isBattleAuthorityV2Enabled()) {
-      try {
-        if (!committedStorage || !authorityStore.initializeBattleAuthorityCheckpoint) {
-          throw new Error(`Battle authority initial checkpoint is unavailable in ${roomId}`)
-        }
-        await authorityStore.initializeBattleAuthorityCheckpoint({
-          room: committedRoom,
-          storage: committedStorage,
-          stateHash: hashBattleState(committedStorage.state as typeof initialState),
-          publicHash: hashPublicBattleState(initialSnapshot.state),
-        })
-        committedRoom = await store.getRoom(roomId) ?? committedRoom
-        initialSnapshot = createPublicBattleSnapshot(committedRoom, undefined, clock)
-      } catch (checkpointError) {
-        const rolledBack = typeof committedMetadataVersion === 'number'
-          ? await store.setRoomIfVersion(roomId, room, committedMetadataVersion)
-          : (await store.setRoom(roomId, room), true)
-        if (!rolledBack) {
-          throw new Error(
-            `Initial battle checkpoint failed and room rollback conflicted: ${checkpointError instanceof Error ? checkpointError.message : String(checkpointError)}`,
-          )
-        }
-        throw checkpointError
+    try {
+      if (!committedStorage || !authorityStore.initializeBattleAuthorityCheckpoint) {
+        throw new Error(`Battle authority initial checkpoint is unavailable in ${roomId}`)
       }
+      await authorityStore.initializeBattleAuthorityCheckpoint({
+        room: committedRoom,
+        storage: committedStorage,
+        stateHash: hashBattleState(committedStorage.state as typeof initialState),
+        publicHash: hashPublicBattleState(initialSnapshot.state),
+      })
+      committedRoom = await store.getRoom(roomId) ?? committedRoom
+      initialSnapshot = createPublicBattleSnapshot(committedRoom, undefined, clock)
+    } catch (checkpointError) {
+      const rolledBack = typeof committedMetadataVersion === 'number'
+        ? await store.setRoomIfVersion(roomId, room, committedMetadataVersion)
+        : (await store.setRoom(roomId, room), true)
+      if (!rolledBack) {
+        throw new Error(
+          `Initial battle checkpoint failed and room rollback conflicted: ${checkpointError instanceof Error ? checkpointError.message : String(checkpointError)}`,
+        )
+      }
+      throw checkpointError
     }
     await options.onDeploymentUpdate?.(initialSnapshot)
     if (committedRoom.status === 'in-progress') {
@@ -246,7 +241,6 @@ async function ensureInitialAuthorityCheckpoint(
   room: Room,
   clock: DeploymentRuleClock,
 ): Promise<Room> {
-  if (!isBattleAuthorityV2Enabled()) return room
   const authorityVersion = room.battleAuthorityVersion ?? 0
   if (!Number.isSafeInteger(authorityVersion) || authorityVersion < 0) throw new Error('Invalid battle authority version')
   if (authorityVersion > 0) return room

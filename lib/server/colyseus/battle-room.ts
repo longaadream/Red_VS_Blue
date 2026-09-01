@@ -28,7 +28,7 @@ import {
 import { loadCardById } from '@/lib/game/skills'
 import { getAllSkills } from '@/lib/game/skill-repository'
 import { parseBattleAuthorityEnvelope } from '@/lib/game/battle-transition'
-import type { Player, Room as GameRoom } from '@/lib/game/room-store'
+import type { Player, Room as GameRoom } from '@/lib/game/room-model'
 import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authority-journal'
 
 import {
@@ -54,6 +54,7 @@ import { ProductBattleStore } from './product-battle-store'
 
 export interface BattleRoomCreateOptions {
   battleId?: string
+  creationKey?: string
   product?: boolean
   restore?: boolean
   name?: string
@@ -73,6 +74,8 @@ export interface BattleRoomDependencies {
   repository: CandidateAuthorityRepository
   journal: PostgresAuthorityJournal
   fixtureFactory: BattleRoomFixtureFactory
+  claimProductCreation(creationKey: string, roomId: string): string | undefined
+  releaseProductCreation(creationKey: string, roomId: string): void
 }
 
 type RpcCacheRecord = {
@@ -127,26 +130,41 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         // generated Colyseus ID before publishing it so matchmaking, envelopes
         // and version-zero persistence all use one exact identifier.
         this.roomId = normalizeRequiredId(options.battleId ?? this.roomId, 'battleId')
-        const mapId = assertSelectableMapId(options.mapId ?? 'open-expanse')
-        const room: GameRoom = {
-          id: this.roomId,
-          name: normalizeRoomName(options.name, this.roomId),
-          status: 'waiting',
-          createdAt: Date.now(),
-          maxPlayers: 2,
-          players: [],
-          mapId,
-          visibility: options.visibility === 'private' ? 'private' : 'public',
-          spectators: [],
-          currentTurnIndex: 0,
-          actions: [],
-          version: 0,
+        const creationKey = normalizeOptionalId(options.creationKey)
+        const existingRoomId = creationKey
+          ? dependencies.claimProductCreation(creationKey, this.roomId)
+          : undefined
+        if (existingRoomId) {
+          throw Object.assign(new Error('Duplicate product room creation request'), {
+            code: 'ROOM_CREATE_DUPLICATE',
+            context: { creationKey, existingRoomId },
+          })
         }
-        this.productStore = new ProductBattleStore(room, dependencies.repository, dependencies.journal)
-        this.applyWaitingProjection(room)
-        await this.publishProductRoom(room)
-        await this.setPrivate(room.visibility === 'private')
-        return
+        try {
+          const mapId = assertSelectableMapId(options.mapId ?? 'open-expanse')
+          const room: GameRoom = {
+            id: this.roomId,
+            name: normalizeRoomName(options.name, this.roomId),
+            status: 'waiting',
+            createdAt: Date.now(),
+            maxPlayers: 2,
+            players: [],
+            mapId,
+            visibility: options.visibility === 'private' ? 'private' : 'public',
+            spectators: [],
+            currentTurnIndex: 0,
+            actions: [],
+            version: 0,
+          }
+          this.productStore = new ProductBattleStore(room, dependencies.repository, dependencies.journal)
+          this.applyWaitingProjection(room)
+          await this.publishProductRoom(room)
+          await this.setPrivate(room.visibility === 'private')
+          return
+        } catch (error) {
+          if (creationKey) dependencies.releaseProductCreation(creationKey, this.roomId)
+          throw error
+        }
       }
 
       this.maxClients = 2

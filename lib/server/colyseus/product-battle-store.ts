@@ -1,6 +1,6 @@
 import { validateServerBattleStateV1, type ServerBattleState } from '@/lib/game/battle-storage'
 import type { BattleAuthorityCheckpointRecord } from '@/lib/game/battle-transition'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 import type { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authority-journal'
 
 import {
@@ -11,7 +11,7 @@ import {
 
 /**
  * Holds only pre-battle admission state. Once version zero is committed it
- * delegates every RoomStore call to CandidateBattleStore, so setup and battle
+ * delegates every room persistence call to CandidateBattleStore, so setup and battle
  * can never become two live authority sources.
  */
 export class ProductBattleStore {

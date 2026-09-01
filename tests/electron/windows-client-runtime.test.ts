@@ -131,7 +131,7 @@ describe('Windows Electron client runtime', () => {
     expect(singleInstanceLock).toBeGreaterThan(profileConfiguration)
   })
 
-  test('uses a distinct initialized SQLite database for every named development profile', () => {
+  test('uses a distinct embedded PostgreSQL cluster for every named development profile', () => {
     const defaultUserData = path.resolve('C:/Users/test/AppData/Roaming/RED vs BLUE')
     const first = resolveDevelopmentProfile(
       ['electron.exe', '--rvb-dev-profile=player-one'],
@@ -143,18 +143,15 @@ describe('Windows Electron client runtime', () => {
       false,
       defaultUserData,
     )!
-    const firstDatabase = path.join(first.userDataPath, 'game.db')
-    const secondDatabase = path.join(second.userDataPath, 'game.db')
+    const firstDatabase = path.join(first.userDataPath, 'postgres', '16')
+    const secondDatabase = path.join(second.userDataPath, 'postgres', '16')
     const source = read('electron-client/main.ts')
-    const startLocalServer = source.slice(
-      source.indexOf('async function startLocalServer('),
-      source.indexOf('type JsonObject ='),
-    )
 
     expect(firstDatabase).not.toBe(secondDatabase)
-    expect(startLocalServer).toContain("const dbPath = path.join(userData, 'game.db')")
-    expect(startLocalServer).toMatch(/if \(app\.isPackaged \|\| developmentProfile\)[\s\S]*?initDatabase\(dbPath, appRoot\)/)
-    expect(startLocalServer).toMatch(/else \{\s*databaseUrl = `file:\$\{path\.join\(appRoot, 'prisma', 'dev\.db'\)\}`/)
+    expect(source).toContain("stateRoot: path.join(getUserData(), 'postgres', '16')")
+    expect(source).toContain('RVB_POSTGRES_URL: databaseUrl')
+    expect(source).not.toContain("path.join(userData, 'game.db')")
+    expect(source).not.toContain('initDatabase(')
   })
 
   test('shows identity initialization and save failures instead of swallowing them', () => {
@@ -171,7 +168,6 @@ describe('Windows Electron client runtime', () => {
   })
   test('starts the packaged host on every interface with candidate authority features enabled', () => {
     const clientMain = read('electron-client/main.ts')
-    const serverMain = read('electron/main.ts')
     const profileRuntime = clientMain.slice(
       clientMain.indexOf('async function startLocalServer('),
       clientMain.indexOf('type JsonObject ='),
@@ -182,21 +178,17 @@ describe('Windows Electron client runtime', () => {
     )
 
     expect(gameAuthority).toContain("RVB_COLYSEUS_HOST: '0.0.0.0'")
-    expect(serverMain).toContain("HOSTNAME: '0.0.0.0'")
-    for (const source of [gameAuthority, serverMain]) {
-      expect(source).toContain("RVB_BATTLE_AUTHORITY_V2: '1'")
-      expect(source).toContain("RVB_BATTLE_ASYNC_JOURNAL: '1'")
-      expect(source).toContain("RVB_TURN_TIMER_ENABLED: '1'")
-    }
+    expect(gameAuthority).toContain("RVB_TURN_TIMER_ENABLED: '1'")
+    expect(gameAuthority).toContain('RVB_POSTGRES_URL: databaseUrl')
     expect(profileRuntime).toContain("HOSTNAME: '0.0.0.0'")
-    expect(profileRuntime).toContain("DISABLE_WS: '1'")
-    expect(profileRuntime).toContain("RVB_BATTLE_AUTHORITY_V2: '0'")
+    expect(profileRuntime).not.toContain('DISABLE_WS')
+    expect(profileRuntime).not.toContain('RVB_BATTLE_AUTHORITY_V2')
     expect(clientMain).not.toContain("HOSTNAME: '127.0.0.1'")
   })
 
   test('classifies Radmin 26/8 addresses as LAN without HTTPS upgrade', () => {
     const utilities = read('data/pages/js/server-utils.js')
-    const websocket = read('data/pages/js/ws-client.js')
+    const websocket = read('data/pages/js/colyseus-client.js')
 
     expect(utilities).toMatch(/26\\\./)
     expect(websocket).toContain("if (base && !/^[a-z]+:\\/\\//i.test(base)) base = 'http://' + base")

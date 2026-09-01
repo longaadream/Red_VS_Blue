@@ -1,7 +1,7 @@
 import { createServerBattleStateV1 } from '@/lib/game/battle-storage'
 import { pinBattleProfileIdentityV1, recordBattleInitialization } from '@/lib/game/battle-trace'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 import type { BattleState, PlayerId } from '@/lib/game/turn'
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 
