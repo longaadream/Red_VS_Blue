@@ -461,23 +461,29 @@
     }
 
     async function getLocalGameProfileIdentity() {
-      let profileIdentity = readStoredGameProfileIdentity()
+      let profileIdentity
       if (
-        !profileIdentity
-        &&
         window.electronAPI
         && typeof window.electronAPI.getMode === 'function'
       ) {
         const mode = await window.electronAPI.getMode()
-        profileIdentity = mode && mode.profileIdentity
-      } else if (!profileIdentity) {
+        const normalizeUrl = value => String(value || '').trim().replace(/\/+$/, '')
+        const currentServerUrl = window.RvBUtils && RvBUtils.getServerUrl
+          ? RvBUtils.getServerUrl()
+          : ''
+        const isLocalAuthority = normalizeUrl(currentServerUrl) === normalizeUrl(mode && mode.localUrl)
+        profileIdentity = mode && (isLocalAuthority ? mode.localAuthorityProfileIdentity : mode.profileIdentity)
+      } else {
+        profileIdentity = readStoredGameProfileIdentity()
         const localRuntimeUrl = /^https?:$/.test(window.location.protocol)
           ? window.location.origin
           : ''
-        const catalogIdentity = localRuntimeUrl
-          ? await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
-          : await lobbyRequest('catalog.identity')
-        profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
+        if (!profileIdentity) {
+          const catalogIdentity = localRuntimeUrl
+            ? await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
+            : await lobbyRequest('catalog.identity')
+          profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
+        }
       }
 
       if (!isGameProfileIdentity(profileIdentity)) {

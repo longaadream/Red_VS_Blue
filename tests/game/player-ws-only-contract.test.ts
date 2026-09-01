@@ -56,7 +56,7 @@ describe('RED-116 Electron lobby profile bridge', () => {
     expect(body).toContain("console.warn('[profile] remote catalog identity preflight failed', error)")
   })
 
-  it('reads a validated stored Profile Identity before using protected Electron IPC', () => {
+  it('uses the live Electron Profile Identity before any standalone cache fallback', () => {
     const lobby = readFileSync(resolve('data/pages/lobby.html'), 'utf8')
     const readerStart = lobby.indexOf('function readStoredGameProfileIdentity')
     const readerEnd = lobby.indexOf('async function getLocalGameProfileIdentity', readerStart)
@@ -69,8 +69,8 @@ describe('RED-116 Electron lobby profile bridge', () => {
     expect(reader).toContain("localStorage.getItem('rvb_game_profile_identity')")
     expect(reader).toContain('isGameProfileIdentity')
     expect(getter).toContain('readStoredGameProfileIdentity()')
-    expect(getter.indexOf('readStoredGameProfileIdentity()'))
-      .toBeLessThan(getter.indexOf('window.electronAPI'))
+    expect(getter.indexOf('window.electronAPI'))
+      .toBeLessThan(getter.indexOf('readStoredGameProfileIdentity()'))
   })
 
   it('resolves the client local runtime through trusted game IPC', () => {
@@ -87,9 +87,14 @@ describe('RED-116 Electron lobby profile bridge', () => {
       const getter = source.slice(start, end)
 
       expect(getter).toContain('window.electronAPI.getMode')
+      expect(getter).toContain('mode.localAuthorityProfileIdentity')
       expect(getter).toContain('mode.profileIdentity')
       expect(getter).not.toContain('mode.profileRuntimeUrl')
       expect(getter).not.toContain('getResourcePackStatus')
+      if (page === 'lobby.html') {
+        expect(getter.indexOf('window.electronAPI.getMode'))
+          .toBeLessThan(getter.indexOf('readStoredGameProfileIdentity()'))
+      }
     }
   })
 })

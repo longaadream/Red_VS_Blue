@@ -112,7 +112,10 @@ describe('RED-161 default player transport', () => {
     const index = await readFile(path.join(ROOT, 'data', 'pages', 'index.html'), 'utf8')
     const lobby = await readFile(path.join(ROOT, 'data', 'pages', 'lobby.html'), 'utf8')
 
-    expect(main).toContain('profileIdentity: getLocalGameProfileIdentity()')
+    expect(main).toContain('profileIdentity: localProfileIdentity')
+    expect(main).toContain('localAuthorityProfileIdentity,')
+    expect(main).toContain('await fetchAuthorityProfileIdentity(actualGamePort)')
+    expect(main).toContain('refreshLocalProfileIdentity(targetProfileHash)')
     expect(main).toContain("runnerRevision: 'rvb-battle-runner/v1'")
     for (const source of [index, lobby]) {
       const start = source.indexOf('async function getLocalGameProfileIdentity')
@@ -121,9 +124,16 @@ describe('RED-161 default player transport', () => {
         start,
       )
       const getter = source.slice(start, end)
+      expect(getter).toContain('mode.localAuthorityProfileIdentity')
       expect(getter).toContain('mode.profileIdentity')
       expect(getter).not.toContain('mode.profileRuntimeUrl')
     }
+    const lobbyGetter = lobby.slice(
+      lobby.indexOf('async function getLocalGameProfileIdentity'),
+      lobby.indexOf('function summarizeGameProfileIdentity'),
+    )
+    expect(lobbyGetter.indexOf('window.electronAPI.getMode'))
+      .toBeLessThan(lobbyGetter.indexOf('readStoredGameProfileIdentity()'))
   })
 
   it('keeps SQLite and Prisma out of the new Colyseus authority modules', async () => {

@@ -775,13 +775,18 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         && typeof mode.profileIdentity.authorityContentHash === 'string',
       `Client did not publish its recovered Profile identity through trusted IPC: ${JSON.stringify(mode)}`,
     )
+    assert(
+      mode.localAuthorityProfileIdentity
+        && mode.localAuthorityProfileIdentity.schemaVersion === 'rvb-game-profile-identity/v1',
+      `Client did not publish the running authority Profile identity: ${JSON.stringify(mode)}`,
+    )
     const rendererProfileIdentity = await evaluate(
       gameTarget,
       `getLocalGameProfileIdentity(${JSON.stringify(mode.localUrl)})`,
     )
     assert(
-      JSON.stringify(rendererProfileIdentity) === JSON.stringify(mode.profileIdentity),
-      `Client renderer did not consume the trusted local Profile identity: ${JSON.stringify({ rendererProfileIdentity, modeProfileIdentity: mode.profileIdentity })}`,
+      JSON.stringify(rendererProfileIdentity) === JSON.stringify(mode.localAuthorityProfileIdentity),
+      `Client renderer did not consume the running authority Profile identity: ${JSON.stringify({ rendererProfileIdentity, authorityProfileIdentity: mode.localAuthorityProfileIdentity })}`,
     )
     const localGatewayPort = mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521
     assert(await isReachable(localGatewayPort), 'Client local gateway is not reachable')
@@ -798,6 +803,11 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       signal: AbortSignal.timeout(2000),
     })
     const catalogIdentity = { ok: catalogIdentityResponse.ok, data: await catalogIdentityResponse.json() }
+    assert(
+      JSON.stringify(catalogIdentity.data?.profileIdentity) === JSON.stringify(mode.localAuthorityProfileIdentity)
+        && JSON.stringify(catalogIdentity.data?.profileIdentity) === JSON.stringify(rendererProfileIdentity),
+      `Client IPC, renderer, and authority Profile identities diverged: ${JSON.stringify({ catalogIdentity: catalogIdentity.data?.profileIdentity, modeAuthorityIdentity: mode.localAuthorityProfileIdentity, rendererProfileIdentity })}`,
+    )
     const resourcePackStatus = await evaluate(gameTarget, `window.electronAPI.packList()`)
     assert(
       catalogIdentity.ok === true

@@ -107,7 +107,9 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
   避免既关闭旧权威又被旧健康检查误判为不可用。
 - 人工候选发现“我当主机”会向已关闭玩家协议的 Profile-only 进程请求 `/catalog/identity`，以及正常退出
   错把 Profile-only 进程也纳入 battle durable ACK 门禁。修复后，已恢复并校验的本地 Profile Identity
-  通过受信任 Electron IPC 提供给页面，loopback URL 统一使用 `127.0.0.1`；只有 Colyseus authority
+  通过受信任 Electron IPC 提供给页面，且分别保存 Profile runtime 与实际运行中 Colyseus authority
+  的快照；Electron 页面每次优先读取 IPC 并覆盖旧 localStorage，本地主机选择 authority 快照、远程
+  加入选择 Profile 快照。loopback URL 统一使用 `127.0.0.1`；只有 Colyseus authority
   必须在退出前回 journal durable ACK，随后 PostgreSQL fast shutdown，Profile-only 进程不再制造虚假的
   “数据库尚未关闭”错误。精确候选冒烟验证 renderer Identity 与 authority Identity 一致，退出后 Electron、
   内置 Node 与 `postgres.exe` 进程计数均为 0。

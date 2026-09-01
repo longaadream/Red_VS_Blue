@@ -41,6 +41,14 @@ const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
 
+type GameProfileIdentity = Readonly<{
+  schemaVersion: 'rvb-game-profile-identity/v1'
+  engineAbi: string
+  runnerRevision: 'rvb-battle-runner/v1'
+  resolvedProfileHash: string
+  authorityContentHash: string
+}>
+
 type ChildLogStream = 'stdout' | 'stderr'
 type ChildLogErrorSide = 'source' | 'target' | 'write'
 
@@ -403,6 +411,7 @@ async function killServer(requireDurable = false): Promise<void> {
     const gameProc = gameServerProcess
     await stopChildProcessGracefully(gameProc, requireDurable)
     localGameReady = false
+    localAuthorityProfileIdentity = null
     if (gameServerProcess === gameProc) gameServerProcess = null
   }
   if (embeddedPostgres) await embeddedPostgres.stop()
@@ -413,12 +422,14 @@ async function killServer(requireDurable = false): Promise<void> {
   // and PostgreSQL have already stopped.
   const profileProc = serverProcess
   localServerReady = false
+  localProfileIdentity = null
   serverProcess = null
   killProcessTree(profileProc)
 }
 
 function forceKillServer(): void {
   localGameReady = false
+  localAuthorityProfileIdentity = null
   if (gameServerProcess) {
     const gameProc = gameServerProcess
     gameServerProcess = null
@@ -428,6 +439,7 @@ function forceKillServer(): void {
     embeddedPostgres.forceStop()
   }
   localServerReady = false
+  localProfileIdentity = null
   if (!serverProcess) return
   const proc = serverProcess
   serverProcess = null
@@ -462,6 +474,8 @@ let localServerReady = false
 let gameServerProcess: ChildProcess | null = null
 let localGameReady = false
 let embeddedPostgres: EmbeddedPostgresController | null = null
+let localProfileIdentity: GameProfileIdentity | null = null
+let localAuthorityProfileIdentity: GameProfileIdentity | null = null
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
 type ProfileProcessBinding = {
@@ -487,10 +501,7 @@ function stableProfileBinding(): ProfileProcessBinding {
   }
 }
 
-function getLocalGameProfileIdentity(): Record<string, string> | null {
-  if (!localServerReady) return null
-  const reference = readDesktopProfileState(getPackRoot())?.stable
-  if (!reference) return null
+function gameProfileIdentityFromReference(reference: DesktopProfileReference): GameProfileIdentity {
   return {
     schemaVersion: 'rvb-game-profile-identity/v1',
     engineAbi: reference.compatibility.engineAbi,
@@ -498,6 +509,60 @@ function getLocalGameProfileIdentity(): Record<string, string> | null {
     resolvedProfileHash: reference.resolvedProfileHash,
     authorityContentHash: reference.authorityContentHash,
   }
+}
+
+function refreshLocalProfileIdentity(targetProfileHash?: string): void {
+  const reference = readDesktopProfileState(getPackRoot())?.stable
+  if (!reference || (targetProfileHash && reference.resolvedProfileHash !== targetProfileHash)) {
+    localProfileIdentity = null
+    throw new Error('LOCAL_PROFILE_IDENTITY_STATE_MISMATCH')
+  }
+  localProfileIdentity = gameProfileIdentityFromReference(reference)
+}
+
+function parseGameProfileIdentity(value: unknown): GameProfileIdentity {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_INVALID')
+  }
+  const identity = value as Partial<GameProfileIdentity>
+  const keys = Object.keys(identity).sort().join(',')
+  if (
+    keys !== 'authorityContentHash,engineAbi,resolvedProfileHash,runnerRevision,schemaVersion'
+    || identity.schemaVersion !== 'rvb-game-profile-identity/v1'
+    || identity.runnerRevision !== 'rvb-battle-runner/v1'
+    || typeof identity.engineAbi !== 'string'
+    || !/^[a-f0-9]{64}$/.test(identity.resolvedProfileHash ?? '')
+    || !/^[a-f0-9]{64}$/.test(identity.authorityContentHash ?? '')
+  ) throw new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_INVALID')
+  return identity as GameProfileIdentity
+}
+
+function fetchAuthorityProfileIdentity(port: number): Promise<GameProfileIdentity> {
+  return new Promise((resolve, reject) => {
+    const request = http.get(`http://127.0.0.1:${port}/catalog/identity`, response => {
+      const chunks: Buffer[] = []
+      let total = 0
+      response.on('data', (chunk: Buffer) => {
+        total += chunk.byteLength
+        if (total > 64 * 1024) request.destroy(new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_TOO_LARGE'))
+        else chunks.push(chunk)
+      })
+      response.on('end', () => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`LOCAL_AUTHORITY_PROFILE_IDENTITY_HTTP_${response.statusCode ?? 0}`))
+          return
+        }
+        try {
+          const payload = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { profileIdentity?: unknown }
+          resolve(parseGameProfileIdentity(payload.profileIdentity))
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+    request.on('error', reject)
+    request.setTimeout(3_000, () => request.destroy(new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_TIMEOUT')))
+  })
 }
 function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
@@ -599,6 +664,7 @@ function getEmbeddedPostgres(): EmbeddedPostgresController {
     onUnexpectedExit: (code, signal) => {
       console.error(`[client] embedded PostgreSQL exited unexpectedly: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
       localGameReady = false
+      localAuthorityProfileIdentity = null
       if (gameServerProcess) {
         const gameProc = gameServerProcess
         gameServerProcess = null
@@ -644,10 +710,20 @@ function localAuthorityStartupErrorMessage(error: unknown): string {
 async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): Promise<void> {
   if (gameServerProcess) {
     if (!localGameReady) localGameReady = await waitForGameAuthorityReady(actualGamePort, 5000)
+    if (localGameReady) {
+      try {
+        localAuthorityProfileIdentity = await fetchAuthorityProfileIdentity(actualGamePort)
+      } catch (error) {
+        localGameReady = false
+        localAuthorityProfileIdentity = null
+        throw error
+      }
+    }
     return
   }
 
   localGameReady = false
+  localAuthorityProfileIdentity = null
   actualGamePort = await findFreePort(GAME_PORT_HINT)
   const appRoot = getAppRoot()
   const entry = findColyseusEntry(appRoot)
@@ -708,6 +784,7 @@ async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): 
     if (gameServerProcess === spawned) {
       gameServerProcess = null
       localGameReady = false
+      localAuthorityProfileIdentity = null
     }
     console.log(`[client] Colyseus authority exited: ${code}`)
     if (lastServerStderr) console.error('[client] last Colyseus stderr:', lastServerStderr.slice(-500))
@@ -715,6 +792,14 @@ async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): 
   localGameReady = await waitForGameAuthorityReady(actualGamePort)
   if (!localGameReady) {
     console.error(`[client] Colyseus/PostgreSQL authority did not become ready on port ${actualGamePort}`)
+    return
+  }
+  try {
+    localAuthorityProfileIdentity = await fetchAuthorityProfileIdentity(actualGamePort)
+  } catch (error) {
+    localGameReady = false
+    localAuthorityProfileIdentity = null
+    throw error
   }
 }
 
@@ -863,6 +948,7 @@ async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise
     if (serverProcess === spawnedProcess) {
       serverProcess = null
       localServerReady = false
+      localProfileIdentity = null
     }
     console.log(`[client] local server exited: ${code}`)
     if (lastServerStderr) console.error('[client] last stderr:', lastServerStderr.slice(-500))
@@ -1246,6 +1332,7 @@ async function reconcileMainRendererAfterCommit(
   success: JsonObject,
   allowRendererRollback: boolean,
 ): Promise<JsonObject> {
+  refreshLocalProfileIdentity(targetProfileHash)
   return await reconcileProfileRendererCommit({
     expectedProfileHash: targetProfileHash,
     stage,
@@ -1493,6 +1580,7 @@ async function selectAndActivateRollback(
 }
 
 async function recoverProfileOnStartup(): Promise<void> {
+  localProfileIdentity = null
   if (!localServerReady) throw new Error('PROFILE_SERVER_NOT_READY')
   let recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
   if (recovered.requiresProcessRestart === true) {
@@ -1512,6 +1600,7 @@ async function recoverProfileOnStartup(): Promise<void> {
     || report.server?.profile?.resolvedProfileHash !== stableProfileHash
     || report.server?.healthy !== true
   ) throw new Error('PROFILE_STARTUP_RECOVERY_HEALTH_MISMATCH')
+  localProfileIdentity = gameProfileIdentityFromReference(report.server.profile as DesktopProfileReference)
 }
 
 async function startStableLocalServerAndRecover(): Promise<void> {
@@ -1828,7 +1917,8 @@ handleTrusted('get-mode', ['game'], () => ({
   isLocal: localGameReady,
   localUrl: `http://127.0.0.1:${actualGamePort}`,
   profileRuntimeUrl: `http://127.0.0.1:${actualLocalPort}`,
-  profileIdentity: getLocalGameProfileIdentity(),
+  profileIdentity: localProfileIdentity,
+  localAuthorityProfileIdentity,
   ready: localGameReady,
 }))
 
