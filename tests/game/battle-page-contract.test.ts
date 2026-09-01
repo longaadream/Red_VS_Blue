@@ -742,6 +742,15 @@ new Script([
     expect(battlePage).toContain('本回合首移 0 AP')
   })
 
+  it('keeps deployment candidate nodes stable while only the countdown refreshes', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain("let deploymentChoicesRenderKey = ''")
+    expect(battlePage).toContain('if (nextChoicesKey !== deploymentChoicesRenderKey)')
+    expect(battlePage).toContain('deploymentChoicesRenderKey = nextChoicesKey')
+    expect(battlePage).toContain('renderTurnTimerStatus()')
+  })
+
   it('shows authoritative reserve-candidate stats and opens read-only accessible details', () => {
     const battlePage = readPage('battle.html')
 

@@ -6,17 +6,15 @@
   var _roomId = null
   var _playerId = null
   var _handlers = {}
-  var _pending = {}
   var _reqSeq = 1
   var _generation = 0
-  var _reconnectTimer = null
   var _lobbyPollTimer = null
   var _shouldReconnect = false
   var _subscribed = false
   var _authoritySyncing = false
   var _authoritySyncTimer = null
   var _authoritySyncRequestId = null
-  var AUTHORITY_SYNC_TIMEOUT_MS = 8000
+  var AUTHORITY_SYNC_TIMEOUT_MS = 3000
 
   function getServerUrl() {
     if (window.RvBUtils && window.RvBUtils.getConnectionConfig) {
@@ -125,30 +123,53 @@
     room.onMessage('battleDurable', function (message) {
       if (generation === _generation) emitRoomMessage('battleDurable', message)
     })
-    room.onMessage('roomRpcResult', function (message) {
-      if (generation !== _generation || !message || !message.requestId) return
-      var pending = _pending[message.requestId]
-      if (!pending) return
-      delete _pending[message.requestId]
-      clearTimeout(pending.timer)
-      if (message.ok) pending.resolve(message.data)
-      else pending.reject(makeRpcError(message))
-    })
     room.onError(function (code, message) {
       if (generation !== _generation) return
       var error = new Error(message || 'Colyseus room error')
       error.code = code
       _emit('error', error)
     })
+    room.onDrop(function () {
+      if (generation !== _generation) return
+      _subscribed = false
+      _releaseAuthoritySync()
+      _emit('disconnect', { reconnecting: true })
+    })
+    room.onReconnect(function () {
+      if (generation !== _generation || !_shouldReconnect || room !== _room) return
+      _subscribed = true
+      _emit('connect', { reconnected: true })
+      void resyncConnectedRoom(room, generation)
+    })
     room.onLeave(function () {
       if (generation !== _generation) return
       _room = null
       _subscribed = false
       _releaseAuthoritySync()
-      rejectPending(new Error('Colyseus room disconnected'))
-      _emit('disconnect')
-      if (_shouldReconnect) scheduleReconnect()
+      _emit('disconnect', { terminal: true })
     })
+  }
+
+  function configureNativeReconnection(room) {
+    room.reconnection.enabled = true
+    room.reconnection.minUptime = 0
+    room.reconnection.minDelay = 100
+    room.reconnection.maxDelay = 2000
+    room.reconnection.maxRetries = 20
+    // Gameplay clicks are rejected while dropped; never replay newly queued input.
+    room.reconnection.maxEnqueuedMessages = 0
+  }
+
+  async function resyncConnectedRoom(room, generation) {
+    try {
+      var snapshot = await request('rooms.get', { roomId: _roomId }, 5000)
+      if (generation !== _generation || room !== _room || !_subscribed) return
+      var role = snapshot && snapshot.hostId && String(snapshot.hostId).toLowerCase() === _playerId ? 'host' : 'guest'
+      emitRoomMessage('subscribed', { role: role })
+      room.send('battleResync', {})
+    } catch (error) {
+      if (generation === _generation && room === _room) _emit('error', error)
+    }
   }
 
   async function connectRoom(generation) {
@@ -160,19 +181,15 @@
         return
       }
       _room = room
+      configureNativeReconnection(room)
       registerRoomHandlers(room, generation)
       _subscribed = true
-      if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
       _emit('connect')
-      var snapshot = await request('rooms.get', { roomId: _roomId }, 5000)
-      var role = snapshot && snapshot.hostId && String(snapshot.hostId).toLowerCase() === _playerId ? 'host' : 'guest'
-      emitRoomMessage('subscribed', { role: role })
-      room.send('battleResync', {})
+      await resyncConnectedRoom(room, generation)
     } catch (error) {
       if (generation !== _generation) return
       _subscribed = false
       _emit('error', error)
-      if (_shouldReconnect) scheduleReconnect()
     }
   }
 
@@ -207,32 +224,13 @@
   function disconnect() {
     _shouldReconnect = false
     _generation += 1
-    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
     if (_lobbyPollTimer) { clearTimeout(_lobbyPollTimer); _lobbyPollTimer = null }
     var room = _room
     _room = null
     _client = null
     _subscribed = false
     _releaseAuthoritySync()
-    rejectPending(new Error('Colyseus connection closed'))
     if (room) { try { void room.leave() } catch {} }
-  }
-
-  function scheduleReconnect() {
-    if (!_shouldReconnect || _reconnectTimer) return
-    _reconnectTimer = setTimeout(function () {
-      _reconnectTimer = null
-      if (_shouldReconnect) void connectRoom(_generation)
-    }, 1000)
-  }
-
-  function rejectPending(error) {
-    Object.keys(_pending).forEach(function (requestId) {
-      var pending = _pending[requestId]
-      delete _pending[requestId]
-      clearTimeout(pending.timer)
-      pending.reject(error)
-    })
   }
 
   function send(message) {
@@ -270,31 +268,13 @@
   function request(method, data, timeoutMs) {
     if (_roomId === '__lobby') return requestAt(getServerUrl(), method, data, timeoutMs)
     timeoutMs = timeoutMs || 5000
-    return new Promise(function (resolve, reject) {
-      if (!_subscribed || !_room) {
-        reject(new Error('Colyseus room not connected'))
-        return
-      }
-      var requestId = 'r' + (_reqSeq++) + '-' + Date.now()
-      var timer = setTimeout(function () {
-        if (!_pending[requestId]) return
-        delete _pending[requestId]
-        reject(new Error('Colyseus request timeout: ' + method))
-      }, timeoutMs)
-      _pending[requestId] = { resolve: resolve, reject: reject, timer: timer }
-      try {
-        var payload = Object.assign({}, data || {})
-        if (method === 'rooms.action') {
-          payload.playerId = payload.playerId || _playerId
-          payload.profileIdentity = payload.profileIdentity || storedProfileIdentity()
-        }
-        _room.send('roomRpc', { requestId: requestId, method: method, data: payload })
-      } catch (error) {
-        clearTimeout(timer)
-        delete _pending[requestId]
-        reject(error)
-      }
-    })
+    if (!_subscribed || !_room) return Promise.reject(new Error('Colyseus room not connected'))
+    var payload = Object.assign({}, data || {})
+    if (method === 'rooms.action') {
+      payload.playerId = payload.playerId || _playerId
+      payload.profileIdentity = payload.profileIdentity || storedProfileIdentity()
+    }
+    return _room.request('roomRpc', { method: method, data: payload }, { timeout: timeoutMs })
   }
 
   async function requestAt(baseUrl, method, data, timeoutMs) {
@@ -354,22 +334,7 @@
   }
 
   function roomRpc(room, method, data, timeoutMs) {
-    return new Promise(function (resolve, reject) {
-      var requestId = 'probe-' + (_reqSeq++) + '-' + Date.now()
-      var unsubscribe = null
-      var timer = setTimeout(function () {
-        if (unsubscribe) unsubscribe()
-        reject(new Error('Colyseus request timeout: ' + method))
-      }, timeoutMs || 5000)
-      unsubscribe = room.onMessage('roomRpcResult', function (message) {
-        if (!message || message.requestId !== requestId) return
-        clearTimeout(timer)
-        if (unsubscribe) unsubscribe()
-        if (message.ok) resolve(message.data)
-        else reject(makeRpcError(message))
-      })
-      room.send('roomRpc', { requestId: requestId, method: method, data: data || {} })
-    })
+    return room.request('roomRpc', { method: method, data: data || {} }, { timeout: timeoutMs || 5000 })
   }
 
   async function fetchJson(url, timeoutMs) {
@@ -416,7 +381,40 @@
 
   function requestAuthorityReceiptSync(reason, clientActionId) {
     if (!clientActionId) return requestAuthoritySync(reason)
-    return requestAuthoritySync(reason, clientActionId)
+    if (_authoritySyncing || !_subscribed || !_room) return false
+    _authoritySyncing = true
+    _authoritySyncRequestId = 'authority-receipt-' + (_reqSeq++) + '-' + Date.now()
+    _emit('authoritySyncStart', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
+    var room = _room
+    _authoritySyncTimer = setTimeout(function () {
+      if (!_releaseAuthoritySync()) return
+      _emit('authoritySyncTimeout', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
+    }, AUTHORITY_SYNC_TIMEOUT_MS)
+    room.request('battleReceiptRequest', { clientActionId: String(clientActionId) }, { timeout: AUTHORITY_SYNC_TIMEOUT_MS - 250 })
+      .then(function (result) {
+        if (room !== _room || !_releaseAuthoritySync()) return
+        if (result && result.receipt) {
+          emitRoomMessage('battleReceipt', { kind: 'lookup', receipt: result.receipt })
+        } else {
+          emitRoomMessage('actionError', {
+            code: 'BATTLE_RECEIPT_UNKNOWN',
+            error: '服务端未找到该指令，已明确取消本地等待；请根据最新状态重新操作',
+            receipt: {
+              clientActionId: String(clientActionId),
+              status: 'rejected',
+              code: 'BATTLE_RECEIPT_UNKNOWN',
+              message: '服务端未找到该指令',
+            },
+          })
+        }
+        if (result && result.snapshot) emitRoomMessage('stateUpdate', result.snapshot)
+        _emit('authoritySyncComplete', result)
+      })
+      .catch(function () {
+        if (!_releaseAuthoritySync()) return
+        _emit('authoritySyncTimeout', { reason: reason || 'unknown', clientActionId: String(clientActionId) })
+      })
+    return true
   }
 
   function _releaseAuthoritySync() {

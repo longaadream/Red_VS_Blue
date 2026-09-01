@@ -12,10 +12,22 @@ class FakeRoom {
   static instances: FakeRoom[] = []
   readonly roomId = 'room-a'
   readonly sent: Array<{ type: string; payload: Record<string, unknown> }> = []
+  readonly requests: Array<{ type: string; payload: Record<string, unknown> }> = []
+  readonly reconnection = {
+    enabled: false,
+    minUptime: 5_000,
+    minDelay: 1_000,
+    maxDelay: 5_000,
+    maxRetries: 15,
+    maxEnqueuedMessages: 10,
+  }
   readonly joinOptions: Record<string, unknown>
   private readonly messageHandlers = new Map<string, Array<(message: unknown) => void>>()
   private errorHandler: ((code: number, message: string) => void) | null = null
   private leaveHandler: (() => void) | null = null
+  private dropHandler: (() => void) | null = null
+  private reconnectHandler: (() => void) | null = null
+  private receiptResolver: ((value: unknown) => void) | null = null
 
   constructor(joinOptions: Record<string, unknown>) {
     this.joinOptions = joinOptions
@@ -31,16 +43,20 @@ class FakeRoom {
 
   onError(handler: (code: number, message: string) => void) { this.errorHandler = handler }
   onLeave(handler: () => void) { this.leaveHandler = handler }
+  onDrop(handler: () => void) { this.dropHandler = handler }
+  onReconnect(handler: () => void) { this.reconnectHandler = handler }
 
   send(type: string, payload: Record<string, unknown>) {
     this.sent.push({ type, payload })
-    if (type === 'roomRpc') {
-      queueMicrotask(() => this.emit('roomRpcResult', {
-        requestId: payload.requestId,
-        ok: true,
-        data: { hostId: 'player-blue' },
-      }))
+  }
+
+  request(type: string, payload: Record<string, unknown>) {
+    this.requests.push({ type, payload })
+    if (type === 'roomRpc') return Promise.resolve({ hostId: 'player-blue' })
+    if (type === 'battleReceiptRequest') {
+      return new Promise(resolve => { this.receiptResolver = resolve })
     }
+    return Promise.reject(new Error(`unsupported request: ${type}`))
   }
 
   emit(type: string, message: unknown) {
@@ -48,6 +64,9 @@ class FakeRoom {
   }
 
   fail(code: number, message: string) { this.errorHandler?.(code, message) }
+  drop() { this.dropHandler?.() }
+  reconnect() { this.reconnectHandler?.() }
+  resolveReceipt(value: unknown) { this.receiptResolver?.(value); this.receiptResolver = null }
   leaveFromServer() { this.leaveHandler?.() }
   async leave() {}
 }
@@ -130,7 +149,7 @@ describe('Colyseus reconnect and authority resync state machine', () => {
     expect(android).not.toContain('progressive-reserve-v1')
   })
 
-  it('becomes connected after joining and rejoins after a server leave', async () => {
+  it('uses native Room reconnection without creating a replacement join', async () => {
     vi.useFakeTimers()
     const client = loadClient()
     let connects = 0
@@ -148,13 +167,18 @@ describe('Colyseus reconnect and authority resync state machine', () => {
     expect(FakeColyseusClient.endpoints).toEqual(['http://127.0.0.1:38521'])
     expect(first.joinOptions).toMatchObject({ product: true, playerId: TEST_PLAYER_ID })
 
-    first.leaveFromServer()
+    expect(first.reconnection).toMatchObject({
+      enabled: true,
+      minUptime: 0,
+      maxEnqueuedMessages: 0,
+    })
+    first.drop()
     expect(client.isConnected()).toBe(false)
     expect(disconnects).toBe(1)
-    await vi.advanceTimersByTimeAsync(1_000)
+    first.reconnect()
     await finishConnect()
 
-    expect(FakeRoom.instances).toHaveLength(2)
+    expect(FakeRoom.instances).toHaveLength(1)
     expect(client.isConnected()).toBe(true)
     expect(connects).toBe(2)
   })
@@ -191,7 +215,7 @@ describe('Colyseus reconnect and authority resync state machine', () => {
     expect(room.sent.filter(message => message.type === 'battleCommand')).toHaveLength(0)
   })
 
-  it('requests one authoritative snapshot and gates actions until it arrives', async () => {
+  it('requests the exact authoritative receipt and gates actions until it arrives', async () => {
     const client = loadClient()
     let starts = 0
     let completes = 0
@@ -207,10 +231,15 @@ describe('Colyseus reconnect and authority resync state machine', () => {
     expect(client.requestAuthorityReceiptSync('duplicate', 'action-2')).toBe(false)
     expect(client.isAuthoritySyncing()).toBe(true)
     expect(starts).toBe(1)
-    expect(room.sent.filter(message => message.type === 'battleResync')).toHaveLength(1)
+    expect(room.requests.filter(message => message.type === 'battleReceiptRequest')).toHaveLength(1)
     expect(client.send({ type: 'action', command: { type: 'move' } })).toBe(false)
 
-    room.emit('battleSnapshot', { authorityVersion: 4, state: { turn: { turnNumber: 1 } } })
+    room.resolveReceipt({
+      outcome: 'applied',
+      receipt: { clientActionId: 'action-1', status: 'applied', authorityVersion: 4 },
+      snapshot: { authorityVersion: 4, state: { turn: { turnNumber: 1 } } },
+    })
+    await finishConnect()
     expect(client.isAuthoritySyncing()).toBe(false)
     expect(completes).toBe(1)
     expect(client.send({ type: 'action', command: { type: 'move' } })).toBe(true)
@@ -243,7 +272,7 @@ describe('Colyseus reconnect and authority resync state machine', () => {
     const room = FakeRoom.instances[0]
     expect(client.requestAuthorityReceiptSync('action-timeout', 'action-1')).toBe(true)
 
-    await vi.advanceTimersByTimeAsync(8_000)
+    await vi.advanceTimersByTimeAsync(3_000)
     expect(client.isAuthoritySyncing()).toBe(false)
     expect(timeouts).toBe(1)
 

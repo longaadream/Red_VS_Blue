@@ -2467,6 +2467,7 @@
     let wsMode = 'lan'          // 'lan' | 'relay'
     let relaySeq = 0            // outbound action/stateUpdate sequence
     let localDeploymentChoiceId = null
+    let deploymentChoicesRenderKey = ''
     let wsActionSeq = -1         // last applied legacy HTTP action-log seq
     let _use3d = false           // Three.js renderer active
     let battlePresentation = null
@@ -4454,9 +4455,11 @@
 
       RvBWs.on('authoritySyncComplete', function() {
         if (pendingActionFeedback && pendingActionFeedback.timedOut) {
-          addLog('[authority] 已同步服务端状态，仍在等待原指令的权威结果', 'info')
-          renderActionBar()
-          setStatusMsg('已同步服务端状态；原指令仍待确认，请勿重复操作')
+          addLog('[authority] 服务端未返回原指令回执；本地等待已明确结束', 'err')
+          rejectPendingActionFeedback(
+            'authority-outcome-unknown',
+            '服务端未确认原指令；已结束等待，请根据最新状态重新操作',
+          )
           return
         }
         addLog('[authority] 已同步服务端状态', 'info')
@@ -5773,7 +5776,7 @@
       if (state) state.textContent = view.stateText
       if (choices) {
         choices.hidden = !view.showCandidates
-        choices.innerHTML = view.showCandidates
+        const candidateModels = view.showCandidates
           ? view.offerPieces.map(function(piece) {
               const selected = piece.instanceId === localDeploymentChoiceId
               const resolved = resolveDeploymentOfferPiece(piece.instanceId)
@@ -5781,15 +5784,30 @@
               const summary = stats
                 ? 'HP ' + stats.maxHp + ' · 攻击 ' + stats.attack + ' · 防御 ' + stats.defense + ' · 移动 ' + stats.moveRange
                 : '资料同步中'
-              return '<div class="deployment-candidate"><button type="button" class="deployment-choice" role="radio" aria-checked="' + selected
+              return { piece: piece, selected: selected, summary: summary }
+            })
+          : []
+        const nextChoicesKey = JSON.stringify([
+          view.mode,
+          G && G.deployment && G.deployment.revision,
+          localDeploymentChoiceId,
+          candidateModels.map(function(model) { return [model.piece.instanceId, model.piece.name, model.summary] }),
+        ])
+        if (nextChoicesKey !== deploymentChoicesRenderKey) {
+          choices.innerHTML = view.showCandidates
+            ? candidateModels.map(function(model) {
+              const piece = model.piece
+              return '<div class="deployment-candidate"><button type="button" class="deployment-choice" role="radio" aria-checked="' + model.selected
                  + '" data-piece-id="' + escHtml(piece.instanceId)
                  + '" onclick="selectReserveDeploymentPiece(this.dataset.pieceId)">'
                  + '<span class="deployment-choice-name">' + escHtml(piece.name) + '</span>'
-                 + '<span class="deployment-choice-stats" aria-label="HP / 攻击 / 防御 / 移动">' + escHtml(summary) + '</span></button>'
+                 + '<span class="deployment-choice-stats" aria-label="HP / 攻击 / 防御 / 移动">' + escHtml(model.summary) + '</span></button>'
                  + '<button type="button" class="deployment-choice-info" aria-label="查看候选棋子的属性与技能" data-piece-id="' + escHtml(piece.instanceId)
                  + '" onclick="event.stopPropagation();showDeploymentPieceInfo(this.dataset.pieceId,this)">属性与技能</button></div>'
-            }).join('')
-          : ''
+              }).join('')
+            : ''
+          deploymentChoicesRenderKey = nextChoicesKey
+        }
       }
       if (footer) footer.hidden = view.mode !== 'progressive-reserve-v1' || !view.ownsStep
       if (reserveCount) reserveCount.textContent = view.mode === 'progressive-reserve-v1'

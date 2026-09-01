@@ -1,9 +1,9 @@
 import type { BattleAction, BattleState, PlayerId } from './turn'
 
 export const TURN_BURN_WINDOW_MS = 15_000
-export const TURN_FAST_DURATION_MS = 20_000
+export const TURN_FAST_DURATION_MS = 40_000
 export const TURN_TIMEOUT_FORFEIT_STREAK = 3
-export const PENDING_RESPONSE_DURATION_MS = 15_000
+export const PENDING_RESPONSE_DURATION_MS = 30_000
 
 export function isTurnTimerEnabled(): boolean {
   const configured = String(process.env.RVB_TURN_TIMER_ENABLED ?? '').trim().toLowerCase()
@@ -140,11 +140,11 @@ export function getFullRoundNumber(turnNumber: number): number {
 
 export function getNormalTurnDurationMs(turnNumber: number): number {
   const fullRound = getFullRoundNumber(turnNumber)
-  if (fullRound <= 2) return 45_000
-  if (fullRound <= 4) return 60_000
-  if (fullRound <= 6) return 75_000
-  if (fullRound <= 8) return 90_000
-  return 105_000
+  if (fullRound <= 2) return 90_000
+  if (fullRound <= 4) return 120_000
+  if (fullRound <= 6) return 150_000
+  if (fullRound <= 8) return 180_000
+  return 210_000
 }
 
 export function getCurrentInputOwnerPlayerId(state: BattleState): PlayerId {

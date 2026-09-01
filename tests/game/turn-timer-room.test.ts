@@ -74,6 +74,16 @@ class ConflictOnceRoomStore extends MemoryRoomStore {
   }
 }
 
+class TransientReadFailureRoomStore extends MemoryRoomStore {
+  reads = 0
+
+  override async getRoom(roomId: string): Promise<Room | undefined> {
+    this.reads += 1
+    if (this.reads === 2) throw Object.assign(new Error('transient authority read failure'), { code: 'TRANSIENT_READ' })
+    return super.getRoom(roomId)
+  }
+}
+
 class FakeClock {
   constructor(public value: number) {}
   now() { return this.value }
@@ -166,7 +176,7 @@ describe('RED-36 authoritative room timer integration', () => {
 
     const timer = authoritativeState(store).turnTimer!
     expect(timer).toMatchObject({
-      deadlineAt: 55_000,
+      deadlineAt: 100_000,
       lastPausedAt: 10_000,
       lastResumedAt: 20_000,
       acceptedGameplayAction: true,
@@ -197,12 +207,12 @@ describe('RED-36 authoritative room timer integration', () => {
     })
 
     expect(store.writes).toBe(1)
-    expect(authoritativeState(store).turnTimer?.deadlineAt).toBe(45_000)
-    expect(result.snapshot.turnTimer?.remainingMs).toBe(35_000)
-    expect(delivered?.turnTimer?.remainingMs).toBe(35_000)
+    expect(authoritativeState(store).turnTimer?.deadlineAt).toBe(90_000)
+    expect(result.snapshot.turnTimer?.remainingMs).toBe(80_000)
+    expect(delivered?.turnTimer?.remainingMs).toBe(80_000)
     expect(createPublicBattleSnapshot(store.room, PLAYERS[0], clock)).toMatchObject({
       serverNow: 10_000,
-      turnTimer: { remainingMs: 35_000 },
+      turnTimer: { remainingMs: 80_000 },
     })
   })
 
@@ -239,8 +249,8 @@ describe('RED-36 authoritative room timer integration', () => {
       clock.value = 31_000
     } })
 
-    expect(delivered?.turnTimer).toMatchObject({ remainingMs: 15_500, burning: false })
-    expect(result.snapshot.turnTimer).toMatchObject({ remainingMs: 15_500, burning: false })
+    expect(delivered?.turnTimer).toMatchObject({ remainingMs: 60_500, burning: false })
+    expect(result.snapshot.turnTimer).toMatchObject({ remainingMs: 60_500, burning: false })
     expect(result.finalSnapshotAlreadyDelivered).toBe(true)
   })
 
@@ -321,7 +331,7 @@ describe('RED-36 authoritative room timer integration', () => {
       })
       expect(startState.turnTimer).toMatchObject({
         startedAt: 2_000,
-        deadlineAt: 47_000,
+        deadlineAt: 92_000,
       })
       expect(startState.pieces.find(piece => piece.instanceId === 'red-piece')?.statusTags)
         .toContainEqual(expect.objectContaining({ id: 'end-turn-settlement-proof', remainingDuration: 1 }))
@@ -398,9 +408,9 @@ describe('RED-36 authoritative room timer integration', () => {
         inputOwnerPlayerId: PLAYERS[1],
         turnNumber: 2,
         startedAt: 2_000,
-        deadlineAt: 47_000,
-        durationMs: 45_000,
-        remainingMs: 40_000,
+        deadlineAt: 92_000,
+        durationMs: 90_000,
+        remainingMs: 85_000,
         acceptedGameplayAction: true,
       })
       expect(actionState.actions?.filter(action =>
@@ -569,14 +579,14 @@ describe('RED-36 authoritative room timer integration', () => {
     await expireCurrentTurn(store, clock)
     expect(authoritativeState(store).turnTimer).toMatchObject({
       ownerPlayerId: PLAYERS[1],
-      durationMs: 45_000,
+      durationMs: 90_000,
       fast: false,
       noOpStreaks: { [PLAYERS[0]]: 1, [PLAYERS[1]]: 0 },
     })
     await finishCurrentTurnNormally(store, clock)
     expect(authoritativeState(store).turnTimer).toMatchObject({
       ownerPlayerId: PLAYERS[0],
-      durationMs: 20_000,
+      durationMs: 40_000,
       fast: true,
     })
 
@@ -600,7 +610,7 @@ describe('RED-36 authoritative room timer integration', () => {
       ownerPlayerId: PLAYERS[0],
       turnNumber: 5,
       fullRound: 3,
-      durationMs: 60_000,
+      durationMs: 120_000,
       fast: false,
     })
   })
@@ -624,8 +634,8 @@ describe('RED-36 authoritative room timer integration', () => {
 
     const publicSnapshot = createPublicBattleSnapshot(store.room, PLAYERS[1], clock)
     expect(publicSnapshot).toMatchObject({
-      turnTimer: { ownerPlayerId: PLAYERS[0], remainingMs: 35_000, paused: true },
-      pendingTimer: { ownerPlayerId: PLAYERS[1], remainingMs: 15_000 },
+      turnTimer: { ownerPlayerId: PLAYERS[0], remainingMs: 80_000, paused: true },
+      pendingTimer: { ownerPlayerId: PLAYERS[1], remainingMs: 30_000 },
     })
     expect(publicSnapshot.state.turnTimer?.pendingResponse).toBeUndefined()
     clock.value = authoritativeState(store).turnTimer!.pendingResponse!.deadlineAt
@@ -647,9 +657,9 @@ describe('RED-36 authoritative room timer integration', () => {
     expect(authoritativeState(store).turnTimer).toMatchObject({
       ownerPlayerId: PLAYERS[0],
       turnOwnerPlayerId: PLAYERS[0],
-      remainingMs: 35_000,
-      deadlineAt: 60_000,
-      durationMs: 45_000,
+      remainingMs: 80_000,
+      deadlineAt: 120_000,
+      durationMs: 90_000,
       fast: false,
       noOpStreaks: {
         [PLAYERS[0]]: 0,
@@ -823,8 +833,8 @@ describe('RED-36 authoritative room timer integration', () => {
     expect(authoritativeState(store).turnTimer).toMatchObject({
       ownerPlayerId: PLAYERS[0],
       turnOwnerPlayerId: PLAYERS[0],
-      remainingMs: 35_000,
-      deadlineAt: 50_000,
+      remainingMs: 80_000,
+      deadlineAt: 95_000,
       acceptedGameplayAction: true,
     })
   })
@@ -916,7 +926,7 @@ describe('RED-36 authoritative room timer integration', () => {
         ownerPlayerId: PLAYERS[1],
         turnOwnerPlayerId: PLAYERS[1],
         status: 'running',
-        durationMs: 45_000,
+        durationMs: 90_000,
       })
     } finally {
       globalTriggerSystem.clearRules()
@@ -951,7 +961,7 @@ describe('RED-36 authoritative room timer integration', () => {
       ownerPlayerId: PLAYERS[1],
       turnOwnerPlayerId: PLAYERS[1],
       turnNumber: 2,
-      deadlineAt: 90_000,
+      deadlineAt: 180_000,
     })
 
     clock.value = 46_000
@@ -972,7 +982,7 @@ describe('RED-36 authoritative room timer integration', () => {
       ownerPlayerId: PLAYERS[1],
       turnOwnerPlayerId: PLAYERS[1],
       turnNumber: 2,
-      deadlineAt: 90_000,
+      deadlineAt: 136_000,
     })
     expect(completed.players.find(player => player.playerId === PLAYERS[1])?.hand)
       .toContainEqual(expect.objectContaining({ cardId: 'watcher-calm' }))
@@ -1099,8 +1109,8 @@ describe('RED-36 authoritative room timer integration', () => {
         clock,
         onCommitted: snapshot => { committed.push(snapshot) },
       })
-      clock.value = 30_000
-      await vi.advanceTimersByTimeAsync(30_000)
+      clock.value = 75_000
+      await vi.advanceTimersByTimeAsync(75_000)
 
       expect(store.writes).toBe(1)
       expect(authoritativeState(store).turnTimer?.burnPhase).toBe('burning')
@@ -1111,13 +1121,37 @@ describe('RED-36 authoritative room timer integration', () => {
       })
       expect(store.writes).toBe(1)
 
-      clock.value = 45_000
+      clock.value = 90_000
       await vi.advanceTimersByTimeAsync(15_000)
       expect(store.writes).toBe(2)
       expect(authoritativeState(store).turn.turnNumber).toBe(2)
       expect(authoritativeState(store).turnTimer?.ownerPlayerId).toBe(PLAYERS[1])
       expect(committed).toHaveLength(2)
     } finally {
+      clearRoomBattleTimeout(store.room.id)
+      vi.useRealTimers()
+    }
+  })
+
+  it('re-arms the same authority deadline after one transient timer dispatch failure', async () => {
+    vi.useFakeTimers()
+    const clock = new FakeClock(0)
+    const store = new TransientReadFailureRoomStore(makeTimedRoom('timer-transient-read-room'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      await scheduleRoomBattleTimeout(store, store.room.id, { clock })
+      clock.value = 75_000
+      await vi.advanceTimersByTimeAsync(75_000)
+      clock.value = 75_001
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect(store.reads).toBeGreaterThanOrEqual(4)
+      expect(store.writes).toBe(1)
+      expect(authoritativeState(store).actions?.filter(action => action.type === 'turnTimerBurn')).toHaveLength(1)
+      expect(vi.getTimerCount()).toBe(1)
+    } finally {
+      warn.mockRestore()
       clearRoomBattleTimeout(store.room.id)
       vi.useRealTimers()
     }
@@ -1143,18 +1177,18 @@ describe('RED-36 authoritative room timer integration', () => {
 
     try {
       await scheduleRoomBattleTimeout(store, room.id, { clock })
-      clock.value = 14_999
-      await vi.advanceTimersByTimeAsync(14_999)
+      clock.value = 29_999
+      await vi.advanceTimersByTimeAsync(29_999)
       expect(store.writes).toBe(0)
 
-      clock.value = 15_000
+      clock.value = 30_000
       await vi.advanceTimersByTimeAsync(1)
       expect(store.writes).toBe(1)
       expect(authoritativeState(store).pendingOptionSelection).toBeUndefined()
       expect(authoritativeState(store).turnTimer).toMatchObject({
         ownerPlayerId: PLAYERS[0],
-        remainingMs: 45_000,
-        deadlineAt: 60_000,
+        remainingMs: 90_000,
+        deadlineAt: 120_000,
       })
       expect(authoritativeState(store).actions?.filter(action => action.type === 'turnTimerBurn')).toHaveLength(0)
       expect(authoritativeState(store).actions?.filter(action => action.type === 'pendingTimeout')).toHaveLength(1)
@@ -1181,9 +1215,9 @@ describe('RED-36 authoritative room timer integration', () => {
         clock,
         onBotTurnReady: botTurnReady,
       })
-      clock.value = 30_000
-      await vi.advanceTimersByTimeAsync(30_000)
-      clock.value = 45_000
+      clock.value = 75_000
+      await vi.advanceTimersByTimeAsync(75_000)
+      clock.value = 90_000
       await vi.advanceTimersByTimeAsync(15_000)
 
       expect(authoritativeState(store).turn).toMatchObject({
@@ -1241,9 +1275,9 @@ describe('RED-36 authoritative room timer integration', () => {
         clock,
         onBotTurnReady: botTurnReady,
       })
-      clock.value = 30_000
-      await vi.advanceTimersByTimeAsync(30_000)
-      clock.value = 45_000
+      clock.value = 75_000
+      await vi.advanceTimersByTimeAsync(75_000)
+      clock.value = 90_000
       await vi.advanceTimersByTimeAsync(15_000)
 
       expect(authoritativeState(store).turn).toMatchObject({
