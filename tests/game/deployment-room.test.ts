@@ -113,6 +113,138 @@ function makeWatcherDeploymentRoom(id = 'watcher-deployment-room', deadlineAt = 
   return room
 }
 
+function makeProgressiveDeploymentRoom(id = 'progressive-deployment-room'): Room {
+  const reservePiece = (instanceId: string, ownerPlayerId: string, faction: 'red' | 'blue') => ({
+    ...makePiece({ instanceId, ownerPlayerId, faction, x: 0, y: 0, moveRange: 2 }),
+    isCore: true,
+    name: instanceId,
+    x: null,
+    y: null,
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+  })
+  const redReserve = reservePiece('red-reserve', PLAYERS[0], 'red')
+  const blueReserve = reservePiece('blue-reserve', PLAYERS[1], 'blue')
+  const redVanguard = {
+    ...makePiece({
+      instanceId: 'red-vanguard',
+      ownerPlayerId: PLAYERS[0],
+      faction: 'red',
+      x: 5,
+      y: 4,
+    }),
+    isCore: true,
+  }
+  const blueVanguard = {
+    ...makePiece({
+      instanceId: 'blue-vanguard',
+      ownerPlayerId: PLAYERS[1],
+      faction: 'blue',
+      x: 5,
+      y: 3,
+    }),
+    isCore: true,
+  }
+  const state = makeState({
+    pieces: [redVanguard, blueVanguard],
+    currentPlayerId: PLAYERS[0],
+    phase: 'start',
+  }) as any
+  state.gameStartFired = true
+  state.deployment = {
+    mode: 'progressive-reserve-v1',
+    status: 'awaiting-reserve-deploy',
+    playerIds: [...PLAYERS],
+    choices: {},
+    locks: {},
+    startedAt: 1_000,
+    deadlineAt: 46_000,
+    revision: 1,
+    initialPositions: {
+      [redVanguard.instanceId]: { x: redVanguard.x, y: redVanguard.y },
+      [blueVanguard.instanceId]: { x: blueVanguard.x, y: blueVanguard.y },
+    },
+    reserves: {
+      [PLAYERS[0]]: [redReserve],
+      [PLAYERS[1]]: [blueReserve],
+    },
+    reserveCounts: { [PLAYERS[0]]: 1, [PLAYERS[1]]: 1 },
+    activePlayerId: PLAYERS[0],
+    offerTurnNumber: 1,
+    offerPieceIds: [redReserve.instanceId],
+    legalPositions: [{ x: 0, y: 0 }],
+  }
+  pinTestBattleState(state, ROOT_SEED)
+  recordBattleInitialization(state, new RuleRuntime({ rootSeed: ROOT_SEED }), [...PLAYERS])
+
+  return {
+    id,
+    name: id,
+    status: 'in-progress',
+    players: [
+      { id: PLAYERS[0], name: 'Red', seat: 'red', alignment: 'light' },
+      { id: PLAYERS[1], name: 'Blue', seat: 'blue', alignment: 'dark' },
+    ],
+    spectators: [],
+    currentTurnIndex: 0,
+    actions: [],
+    version: 1,
+    battleState: createTestServerBattleState(state, ROOT_SEED) as any,
+  }
+}
+
+describe('RED-138 progressive deployment room authority', () => {
+  it('projects the private offer only to its owner and commits directly into tagged action play', async () => {
+    const store = new MemoryRoomStore(makeProgressiveDeploymentRoom())
+    const clock = { now: () => 2_000 }
+    const ownerBefore = createPublicBattleSnapshot(store.room, PLAYERS[0], clock).state
+    const opponentBefore = createPublicBattleSnapshot(store.room, PLAYERS[1], clock).state
+    const beforeAp = (store.room.battleState as any).state.players
+      .find((player: any) => player.playerId === PLAYERS[0]).actionPoints
+
+    expect(ownerBefore.deployment?.offerPieceIds).toEqual(['red-reserve'])
+    expect(ownerBefore.deployment?.legalPositions).toEqual([{ x: 0, y: 0 }])
+    expect(ownerBefore.deployment?.reserves).toEqual({})
+    expect(opponentBefore.deployment?.offerPieceIds).toEqual([])
+    expect(opponentBefore.deployment?.legalPositions).toEqual([])
+    expect(JSON.stringify(opponentBefore)).not.toContain('red-reserve')
+
+    const deployed = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
+      type: 'deployReservePiece',
+      playerId: PLAYERS[0],
+      expectedDeploymentRevision: ownerBefore.deployment!.revision,
+      pieceId: 'red-reserve',
+      toX: 0,
+      toY: 0,
+      clientActionId: 'progressive-deploy-red',
+    }, { clock })
+
+    expect(deployed.kind).toBe('applied')
+    expect(deployed.snapshot.state.deployment).toMatchObject({
+      status: 'turn-ready',
+    })
+    const authorityState = (store.room.battleState as any).state
+    expect(authorityState.pieces).toContainEqual(expect.objectContaining({
+      instanceId: 'red-reserve',
+      isCore: true,
+      x: 0,
+      y: 0,
+      statusTags: [expect.objectContaining({
+        type: 'deployment-first-move-free',
+        grantedTurnNumber: authorityState.turn.turnNumber,
+      })],
+    }))
+    expect(authorityState.deployment.reserves[PLAYERS[0]]).toEqual([])
+    expect(authorityState.players.find((player: any) => player.playerId === PLAYERS[0]).actionPoints)
+      .toBe(beforeAp)
+
+    expect(authorityState.turn.phase).toBe('action')
+    expect(authorityState.deployment.status).toBe('turn-ready')
+    expect(store.writes).toBe(1)
+  })
+})
+
 describe('RED-31 authoritative deployment room actions', () => {
   it('accepts a late deployment lock without settling timeout when the timer flag is disabled', async () => {
     const savedFlag = process.env.RVB_TURN_TIMER_ENABLED

@@ -4,6 +4,10 @@
 > 适用范围：当前仓库内受信任的技能、卡牌、规则和延迟效果代码
 > 依据：以本仓库运行时代码和兼容审计脚本为准；文档与实现冲突时应停止导入并修正文档或实现
 
+> ABI v1：未来受限 Runtime 的冻结边界见 [`SKILLCODE_ABI_V1.md`](./SKILLCODE_ABI_V1.md) 与
+> [`SKILLCODE_THREAT_MODEL.md`](./SKILLCODE_THREAT_MODEL.md)。现役运行时仍不是安全沙箱；本手册中的
+> 宿主 helper 对象不得直接穿越 ABI v1 边界。
+
 ## 1. 先记住两件事
 
 第一，当前的 SkillCode 是“项目内部脚本”，不是安全沙箱。它最终会由 JavaScript 动态编译执行，因此只能运行随项目审查、测试并发布的受信任代码。来自社区服务器、关卡包或玩家文件的代码，在 RED-135 的沙箱和权限模型落地前不得直接执行。现有 Content Pipeline 会拒绝含可执行代码字段的外部内容，这是有意的安全边界。
@@ -30,7 +34,7 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | 技能 `code` | `data/skills/*.json` | 主动技能和单位能力 | 可以选目标、选项 | 最完整的 Helper 环境 |
 | 卡牌 `code` | `data/cards/*.json` | 手牌效果 | 可以选目标、选项 | 没有保证存在的 `sourcePiece` |
-| 规则 `skillCode` | `data/rules/*.json` | 规则附带的主动能力 | 可以选目标、选项 | 状态 Helper 的细节与技能入口不同 |
+| 规则 `skillCode` | `data/rules/*.json` | 规则附带的主动能力 | 只可选选项 | 现役 wrapper 不注入 `selectTarget`；状态 Helper 的细节与技能入口不同 |
 | 规则 `triggerSkill` | 规则触发器 | 响应事件 | 当前应视为不可交互 | 选择、传送、范围查询能力受限 |
 | `pendingEffectCode` | 延迟目标效果 | 选定目标后执行小段效果 | 不可再次发起选择 | 只有序列化 `ctx`，没有外层 Helper 闭包 |
 | `previewCode` | 技能预览 | UI 展示冷却、伤害等预估 | 不可以 | 不是权威规则，不能改变战局 |
@@ -38,6 +42,12 @@ flowchart LR
 现役入口形式也不同：技能 `code` 定义 `function executeSkill(context)`；卡牌 `code` 定义 `function executeCard(context)`；规则 `skillCode` 是由运行时包装的内联语句；规则 `triggerSkill` 引用一个经触发器适配器执行的技能 ID；pending 的 `effectCode` 定义 `function(ctx)`；预览定义 `function calculatePreview(piece, skillDef, currentCooldown)`。
 
 不要把一段代码从一个入口直接复制到另一个入口。先核对该入口的绑定和事件语义。
+
+ABI v1 不把这些输入当作开放对象：每个入口的字段由 `SKILLCODE_ABI_V1_INPUT_SCHEMAS` 单独冻结，context、
+battle、trigger、pending、piece 与 skill 均使用带 `schemaVersion` 和 `revision` 的只读 JSON snapshot；pending
+payload 也有独立版本包络。snapshot 的 `data` 字段由 `SKILLCODE_ABI_V1_DATA_SCHEMAS` 精确冻结；pending payload
+只允许 `handles`、`numbers`、`enums` 三类 typed record。内容代码不得伪造版本、保存宿主对象或把一个入口的
+snapshot 当作另一个入口使用。
 
 ## 3. 推荐的编写顺序
 
@@ -124,7 +134,9 @@ flowchart LR
 
 ### 4.3 规则 `skillCode`
 
-这是规则提供的主动技能，可使用选择、伤害、治疗、状态、规则、玩家规则、技能和事件 Helper。它的状态添加/移除细节与普通技能并不完全相同，见“状态与规则”一节。
+这是规则提供的主动技能，可使用 `selectOption`、伤害、治疗、状态、规则、玩家规则、技能和事件 Helper；现役
+wrapper 不注入 `selectTarget`，需要目标选择时必须另建运行时扩展，不能假定技能入口的选择能力可复用。它的
+状态添加/移除细节与普通技能并不完全相同，见“状态与规则”一节。
 
 ### 4.4 规则 `triggerSkill`
 
@@ -143,7 +155,9 @@ flowchart LR
 - `ctx.pending`，其中包含已选目标等 pending 数据；
 - `ctx.payload`。
 
-这段代码被单独编译，没有创建 pending 时的局部变量和 Helper 闭包。只把 JSON 可序列化的 ID、坐标、数值和枚举放入 payload；不要把单位对象、函数或 Map 放进去。
+这段代码被单独编译，没有创建 pending 时的局部变量和 Helper 闭包。现役 trusted runtime 只应把 JSON 可序列化
+的 ID、坐标、数值和枚举放入 payload；不要放单位对象、函数或 Map。ABI v1 更严格：adapter 必须把这些值归类到
+`handles`、`numbers`、`enums` typed records，不能原样传递开放对象。
 
 ### 4.6 `previewCode`
 
@@ -226,29 +240,51 @@ if (mode === 'cancel') return { success: false, message: '已取消' };
 4. 防御、最低伤害及伤害类型处理；
 5. `beforeDamageShield`、`beforeDamageApplied`；
 6. 统一提交生命值变化；
-7. 派发后置事件、死亡/复活/墓地/充能等生命周期；
-8. 按 FIFO 处理 `damageQueue` 中的反伤或连锁伤害。
+7. 派发后置事件，并用内生 `DeathBatch` 完成死亡、复活、墓地和充能生命周期；
+8. 按 push sequence FIFO 处理共享 ledger 中的 `damageQueue`、`healQueue` 等获准 follow-up。
 
-嵌套触发器里不要再次直接调用 `dealDamage`。运行时会以 `RVB_DAMAGE_REENTRANT_CALL` 拒绝重入；反伤、溅射和后续伤害应排入 `damageQueue`，从而保留确定顺序并受深度、批次数预算保护。
+根技能/卡牌代码可以按明确的代码顺序多次调用 `dealDamage` 或 `healDamage`；同一权威动作中的这些 facade 共享唯一 `EffectChain` 和累计预算。scheduler 正在处理 Batch 或事件消费者时，不要再次直接调用 facade：Damage 保留 `RVB_DAMAGE_REENTRANT_CALL` ABI，其他重入以 `RVB_EFFECT_CHAIN_REENTRANT` 失败。反伤、溅射和后续伤害必须写入当前 context 提供的 `damageQueue`。
 
 ```js
 const result = dealDamage(sourcePiece, target, 4, 'physical');
 if (result?.pending) return result;
 ```
 
-运行时目前限制事件链深度 20、单链派发预算 100。不要用循环触发器绕过限制。
+每次权威根动作共享最大 Batch depth 20、四类合计 100 个 Batch、effect/trigger 合计 1000 次派发。现有单个 `fireEvent` root 的 depth 20 / 100 次局部防线同时保留；切换效果类型、再次调用 facade 或新建事件 root 都不会重置动作级预算。
 
 ### 6.2 `healDamage(source, targets, amount, options?)`
 
-单目标治疗会依次经过 `beforeHealDealt`、`beforeHealTaken`、实际治疗和后置事件，同样不应直接修改生命值。
+单目标是一个只有一个目标的 `HealBatch`；数组输入是一个真正的多目标 Batch。运行时先验证唯一、仍在场且存活的目标，按 `instanceId` 稳定顺序准备，再执行：
 
-当前实现的多目标治疗存在一个需要作者知道的兼容细节：数组入口会先派发一次批次级 `beforeHealDealt`，随后递归处理每个目标时又分别派发该事件。也就是说，它不是“全批次严格只触发一次”。在运行时统一前，不要编写依赖该事件精确一次的群体治疗规则；使用固定种子回放验证具体触发次数，并把新规则写入独立修复任务。
+1. 每 Batch 恰好一次 `beforeHealDealt`；
+2. 每目标恰好一次 `beforeHealTaken`，读取该目标最终修改后的治疗值；
+3. 所有未 blocked 目标基于同一批开始 HP 计算结果并统一提交；
+4. 提交后按稳定目标顺序派发 blocked 或 `afterHealDealt` / `afterHealTaken`；
+5. 返回的 `results` 和 `heals` 仍与调用方输入顺序对齐。
 
-### 6.3 “同时”语义白名单（未来合同，尚未全部实现）
+治疗消费者中的后续治疗或伤害必须分别写入 `healQueue` / `damageQueue`。queue writer 只登记请求，不同步返回未来结果。例如：
 
-项目已决定：只有 **Damage、Heal、Summon、Death** 四类效果可以定义批次式“同时”语义。这里的“同时”不是多线程并发，而是同一批次先校验并准备所有目标，统一提交该批次的主状态变化，再按稳定顺序串行处理事件与后续效果。Queue 只负责确定性调度和连锁，不能单独提供同时语义。
+```js
+context.healQueue.push({
+  healer: context.source,
+  target: context.source,
+  heal: 2,
+  skillId: 'rule-reap'
+});
+```
 
-当前只有 Damage 已具备正式 `DamageBatch` 与 `damageQueue` 合同。Heal 仍存在上一节所述的递归兼容行为，现役 context **没有** `healQueue`；Summon 和 Death 也没有向 SkillCode 作者公开可直接写入的批次队列。相关运行时设计与迁移由 [RED-139](https://linear.app/redvsblue/issue/RED-139/建立四类确定性-effectbatchqueue-并冻结同时语义白名单) 跟踪，在该任务完成并更新本手册前，不得在内容代码中使用或模拟 `healQueue`、`summonQueue`、`deathQueue` 或无类型 `effectQueue`。
+`beforeHealDealt` 若 source-wide blocked，整批不提交 HP，也不派发每目标 before/after；单个 `beforeHealTaken` blocked 只阻止该目标。不要直接写 `currentHp` 来模拟批次治疗。
+
+### 6.3 “同时”语义白名单（现役合同）
+
+只有 **Damage、Heal、Summon、Death** 四类效果可以定义批次式“同时”语义。这里的“同时”不是多线程并发，而是同一 Batch 先校验并准备全部请求，在该类明确的 checkpoint 统一提交主状态，再按稳定顺序串行处理 after/lifecycle 与 follow-up。Queue 只负责确定性调度和连锁，不能单独提供同时语义。
+
+运行时只接受封闭的 `damage | heal | summon | death` 联合，并把 typed writer 写入同一 FIFO ledger：
+
+- Damage/Heal 生命周期 context 可获得 `damageQueue` 与 `healQueue`；
+- `summonQueue` 只对已绑定的鸣人影分身和恶魔召唤 sealed recipe，以及内部 template handler 开放；新增内容不得假定它自动可用；
+- `deathQueue` 首版仅供内部 handler 使用，内容代码不得主动写入；
+- 不存在 callback、自定义 kind 或无类型 `effectQueue`。需要第五类“同时”效果时必须先建立新的产品合同和 ADR，不能在内容层模拟。
 
 移动、传送、状态、驱散、资源、手牌、技能替换、地格和投射物等其他效果只允许按明确顺序逐项结算。内容作者不得借用上述四类队列包装其他副作用，也不得把数组遍历或 Queue 描述成同时提交。
 
@@ -271,6 +307,11 @@ if (result?.pending) return result;
 ### 8.1 状态 Helper 的入口差异
 
 现役入口还没有完全统一状态语义：
+
+下表也由 ABI v1 的 `statusSemantics` 机器字段冻结；状态对象仅可使用
+`SKILLCODE_ABI_V1_STATUS_FIELDS` 中的 canonical 字段，新增临时字段必须先变更合同。ABI 机器字段将单位与玩家
+状态事件和默认值分开；玩家状态 helper 不派发单位状态的 apply/remove 事件。规则 `skillCode` 仅单位状态缺失
+duration/uses 时按 `-1` 规范化，玩家状态保持现值。
 
 | 入口 | 添加同 ID 状态 | `afterStatusApplied` | 移除后的事件/关联规则清理 |
 | --- | --- | --- | --- |
@@ -479,7 +520,9 @@ function (ctx) {
 }
 ```
 
-这里只展示 `ctx` 的序列化边界和普通扩展数据。由于 `pendingEffectCode` 当前没有完整状态 Helper，若效果要求伤害、治疗或状态生命周期，优先把结算放回主技能的权威重放流程，不要在这里直接修改生命或状态数组。
+这里只展示现役 trusted runtime 的序列化边界和普通扩展数据，不是 ABI v1 payload 形状；ABI adapter 中的同一
+`markerType` 应读取 `payload.enums.markerType`。由于 `pendingEffectCode` 当前没有完整状态 Helper，若效果要求伤害、
+治疗或状态生命周期，优先把结算放回主技能的权威重放流程，不要在这里直接修改生命或状态数组。
 
 ### 11.6 `previewCode`
 
@@ -537,20 +580,24 @@ function calculatePreview(piece, skillDef, currentCooldown) {
 
 ## 15. 实现依据
 
+ABI v1 的机器可读 capability、预算、输入输出与稳定错误码位于
+[`lib/game/skillcode-runtime/abi-v1.ts`](../../lib/game/skillcode-runtime/abi-v1.ts)。它目前未接入生产执行器；作者不得因为 ABI 文件存在，就将外部
+SkillCode 放入 Content Pipeline 或声称现役 `eval` 路径具备沙箱隔离。
+
 本文基于以下现役源码和技术合同整理：
 
-- `lib/game/dynamic-code-runtime.ts`
-- `lib/game/skills.ts`
-- `lib/game/triggers.ts`
-- `lib/game/turn.ts`
-- `lib/game/targeting.ts`
-- `lib/game/spatial.ts`
-- `lib/game/rule-loader.ts`
-- `scripts/audit-skillcode-compat.mjs`
-- `docs/technical/DYNAMIC_CODE_RUNTIME.md`
-- `docs/technical/SKILLCODE_COMPATIBILITY_MATRIX.md`
-- `docs/technical/DAMAGE_PIPELINE.md`
-- `docs/technical/COMBAT_TRIGGER_ATOMICITY_CONTRACT.md`
+- [`lib/game/dynamic-code-runtime.ts`](../../lib/game/dynamic-code-runtime.ts)
+- [`lib/game/skills.ts`](../../lib/game/skills.ts)
+- [`lib/game/triggers.ts`](../../lib/game/triggers.ts)
+- [`lib/game/turn.ts`](../../lib/game/turn.ts)
+- [`lib/game/targeting.ts`](../../lib/game/targeting.ts)
+- [`lib/game/spatial.ts`](../../lib/game/spatial.ts)
+- [`lib/game/rule-loader.ts`](../../lib/game/rule-loader.ts)
+- [`scripts/audit-skillcode-compat.mjs`](../../scripts/audit-skillcode-compat.mjs)
+- [`DYNAMIC_CODE_RUNTIME.md`](./DYNAMIC_CODE_RUNTIME.md)
+- [`SKILLCODE_COMPATIBILITY_MATRIX.md`](./SKILLCODE_COMPATIBILITY_MATRIX.md)
+- [`DAMAGE_PIPELINE.md`](./DAMAGE_PIPELINE.md)
+- [`COMBAT_TRIGGER_ATOMICITY_CONTRACT.md`](./COMBAT_TRIGGER_ATOMICITY_CONTRACT.md)
 - ADR-0004、ADR-0006、ADR-0010、ADR-0015、ADR-0017
 
 每次 Runtime 或 Helper 语义变化，都必须在同一个 PR 中更新本手册和兼容矩阵。

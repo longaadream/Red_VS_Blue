@@ -1335,6 +1335,85 @@
     .deployment-status-state { grid-column: 1 / -1; color: #94a3b8; font-size: 11px; font-weight: 750; }
     .deployment-status.urgent { border-color: rgba(248,113,113,.54); }
     .deployment-status.urgent .deployment-countdown { color: #fca5a5; }
+    .deployment-status.progressive {
+      width: min(480px, calc(100vw - 190px));
+      min-width: 280px;
+      max-width: 100%;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .deployment-status.progressive .deployment-countdown { display: none; }
+    .deployment-choice-strip {
+      grid-column: 1 / -1;
+      display: flex;
+      min-width: 0;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 4px 0 2px;
+      scrollbar-width: thin;
+    }
+    .deployment-choice-strip[hidden] { display: none !important; }
+    .deployment-candidate {
+      min-width: 154px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      flex: 1 0 auto;
+      border: 1px solid rgba(148,163,184,.24);
+      border-radius: 10px;
+      overflow: hidden;
+      background: rgba(15,23,42,.72);
+    }
+    .deployment-choice {
+      min-width: 0;
+      min-height: 54px;
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 0;
+      color: #cbd5e1;
+      background: rgba(30,41,59,.56);
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .deployment-choice:hover { border-color: rgba(125,211,252,.72); color: #f8fafc; }
+    .deployment-choice:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+    .deployment-choice[aria-checked="true"] {
+      border-color: #38bdf8;
+      color: #f0f9ff;
+      background: rgba(3,105,161,.42);
+      box-shadow: inset 0 0 0 1px rgba(125,211,252,.3);
+    }
+    .deployment-choice-name { display: block; color: inherit; }
+    .deployment-choice-stats {
+      display: block;
+      margin-top: 4px;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .deployment-choice-info {
+      min-height: 30px;
+      border: 0;
+      border-top: 1px solid rgba(148,163,184,.2);
+      color: #7dd3fc;
+      background: rgba(2,6,23,.52);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .deployment-choice-info:hover { color: #e0f2fe; background: rgba(3,105,161,.24); }
+    .deployment-choice-info:focus-visible { outline: 2px solid #38bdf8; outline-offset: -2px; }
+    .deployment-status-footer {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 0;
+      gap: 8px;
+      color: #64748b;
+      font-size: 10px;
+    }
+    .deployment-status-footer[hidden] { display: none !important; }
     .turn-clock { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
     .turn-clock.burning { color: #fca5a5; text-shadow: 0 0 12px rgba(239,68,68,.5); }
     .turn-clock.fast { color: #fbbf24; }
@@ -1408,12 +1487,12 @@
   </div>
 
   <!-- Piece Info Modal -->
-  <div id="pieceInfoModal" role="dialog" aria-modal="true" aria-label="棋子详情" onclick="if(event.target===this)closePieceInfo()">
+  <div id="pieceInfoModal" role="dialog" aria-modal="true" aria-labelledby="pieceInfoName" onclick="if(event.target===this)closePieceInfo()">
     <div class="pi-layout">
       <div class="pi-sheet">
       <div class="pi-header">
         <div class="pi-name" id="pieceInfoName"></div>
-        <button class="pi-close" onclick="closePieceInfo()">✕</button>
+        <button class="pi-close" type="button" aria-label="关闭棋子详情" onclick="closePieceInfo()">✕</button>
       </div>
         <div id="pieceInfoContent"></div>
       </div>
@@ -1581,10 +1660,14 @@
           </div>
         </div>
         <div class="turn-control-wrap battle-turn-control">
-          <div class="deployment-status" id="deploymentStatus" role="status" aria-live="polite" hidden>
-            <span class="deployment-status-label">部署确认</span>
+          <div class="deployment-status" id="deploymentStatus" role="region" aria-label="部署状态" hidden>
+            <span class="deployment-status-label" id="deploymentLabel">部署确认</span>
             <strong class="deployment-countdown" id="deploymentCountdown">00:45</strong>
-            <span class="deployment-status-state" id="deploymentState">等待双方确认</span>
+            <span class="deployment-status-state" id="deploymentState" role="status" aria-live="polite">等待双方确认</span>
+            <div class="deployment-choice-strip" id="deploymentChoices" role="radiogroup" aria-label="选择本回合上场棋子" hidden></div>
+            <div class="deployment-status-footer" id="deploymentFooter" hidden>
+              <span id="deploymentReserveCount"></span>
+            </div>
           </div>
           <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
         </div>
@@ -2095,7 +2178,12 @@
         startedAt: typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(),
       }
       pendingActionFeedbackTimer = setTimeout(function () {
-        rejectPendingActionFeedback('action-timeout', '指令确认超时，请检查连接后重试')
+        if (!pendingActionFeedback || pendingActionFeedback.clientActionId !== action.clientActionId) return
+        pendingActionFeedback.timedOut = true
+        pendingActionFeedbackTimer = null
+        renderActionBar()
+        setStatusMsg('指令回执延迟，正在同步服务端状态，请勿重复操作')
+        requestAuthorityRecovery('action-timeout', action.clientActionId)
       }, PENDING_ACTION_TIMEOUT_MS)
       return true
     }
@@ -2133,9 +2221,12 @@
     }
 
     function requestAuthorityRecovery(reason) {
+      var clientActionId = arguments[1]
       if (window.RvBWs && typeof RvBWs.requestAuthoritySync === 'function') {
-        RvBWs.requestAuthoritySync(reason || 'unknown')
-        return Promise.resolve()
+        var requested = clientActionId && typeof RvBWs.requestAuthorityReceiptSync === 'function'
+          ? RvBWs.requestAuthorityReceiptSync(reason || 'unknown', clientActionId)
+          : RvBWs.requestAuthoritySync(reason || 'unknown')
+        return Promise.resolve(requested)
       }
       if (authorityRecoveryPromise) return authorityRecoveryPromise
       addLog('[authority] 请求完整快照：' + (reason || 'unknown'), 'err')
@@ -2335,6 +2426,9 @@
     let currentCardKeywords = []
     let activeCardKeyword = ''
     let currentPieceInfoId = null
+    let currentPieceInfoSource = ''
+    let currentPieceInfoDeploymentRevision = null
+    let pieceInfoReturnFocus = null
     let currentPieceKeywords = []
     let activePieceKeyword = ''
     let wsConnected = false     // WebSocket live
@@ -2548,6 +2642,12 @@
       // Shadow clones keep a summon-time display snapshot only; real rules still read statusTags.
       return p.displayStatusTags !== undefined ? p.displayStatusTags : (p.statusTags || [])
     }
+    function pieceHasVisibleStatusTag(piece, statusId) {
+      if (!piece) return false
+      return pieceDispTags(piece).some(function(tag) {
+        return tag && tag.visible !== false && (tag.id === statusId || tag.type === statusId)
+      })
+    }
     function normalizeKeywordList(items) {
       return [...new Set((items || []).filter(Boolean).map(v => String(v).trim()).filter(Boolean))]
     }
@@ -2591,7 +2691,9 @@
     }
     function selectPieceKeyword(keyword) {
       activePieceKeyword = keyword
-      if (currentPieceInfoId) showPieceInfo(currentPieceInfoId, true)
+      if (!currentPieceInfoId) return
+      if (currentPieceInfoSource === 'deployment') showDeploymentPieceInfo(currentPieceInfoId, null, true)
+      else showPieceInfo(currentPieceInfoId, true)
     }
 
     // State diff -> detailed log entries
@@ -3099,12 +3201,8 @@
     }
 
     // ── Piece info modal ──
-    function showPieceInfo(instanceId, preserveKeyword) {
-      if (!G) return
-      closePieceContextMenu()
-      const piece = G.pieces.find(p => p.instanceId === instanceId)
+    function renderPieceInfoRecord(piece, preserveKeyword) {
       if (!piece) return
-      currentPieceInfoId = instanceId
       const tmpl = PIECES_BY_ID[piece.templateId] || {}
       const stats = piece.stats || {}
       const mhp = pieceMaxHp(piece)
@@ -3226,15 +3324,133 @@
         '这个棋子的技能没有需要额外解释的关键词。'
       )
       bindKeywordBadges('piece')
-      document.getElementById('pieceInfoModal').style.display = 'flex'
+      const modal = document.getElementById('pieceInfoModal')
+      modal.style.display = 'flex'
+      const closeButton = modal.querySelector('.pi-close')
+      if (!preserveKeyword && closeButton) closeButton.focus()
+    }
+    function showPieceInfo(instanceId, preserveKeyword) {
+      if (!G) return
+      closePieceContextMenu()
+      const piece = G.pieces.find(p => p.instanceId === instanceId)
+      if (!piece) return
+      if (!preserveKeyword) pieceInfoReturnFocus = document.activeElement
+      currentPieceInfoId = instanceId
+      currentPieceInfoSource = 'board'
+      currentPieceInfoDeploymentRevision = null
+      renderPieceInfoRecord(piece, preserveKeyword)
+    }
+    function resolveDeploymentOfferPiece(pieceId) {
+      const deployment = G && G.deployment
+      if (
+        !deployment
+        || deployment.mode !== 'progressive-reserve-v1'
+        || deployment.status !== 'awaiting-reserve-deploy'
+        || !progressiveDeploymentOwned(G)
+        || G.terminalResult
+      ) return null
+      const offer = (deployment.offerPieces || []).find(function(piece) { return piece.instanceId === pieceId })
+      if (!offer) return null
+      const template = PIECES_BY_ID[offer.templateId]
+      const authoritativeStats = G.pieceStatsByTemplateId && G.pieceStatsByTemplateId[offer.templateId]
+      const stats = authoritativeStats || (template && template.stats)
+      if (!template || !stats) {
+        return { error: true, instanceId: offer.instanceId, templateId: offer.templateId, name: offer.name || offer.templateId || '未知棋子' }
+      }
+      const maxHp = Number(stats.maxHp)
+      return {
+        instanceId: offer.instanceId,
+        templateId: offer.templateId,
+        name: offer.name || template.name || offer.templateId,
+        stats: {
+          maxHp: Number.isFinite(maxHp) ? maxHp : 1,
+          attack: stats.attack,
+          defense: stats.defense,
+          moveRange: stats.moveRange,
+        },
+        maxHp: Number.isFinite(maxHp) ? maxHp : 1,
+        currentHp: Number.isFinite(maxHp) ? maxHp : 1,
+        skills: (template.skills || []).map(function(skill) {
+          const skillId = skillIdOf(skill)
+          return { skillId: skillId, currentCooldown: 0, currentCharges: 0, unlocked: true }
+        }).filter(function(skill) { return !!skill.skillId }),
+        statusTags: [],
+        buffs: [],
+        debuffs: [],
+      }
+    }
+    function renderDeploymentPieceInfoError(piece) {
+      document.getElementById('pieceInfoName').textContent = piece.name || '候选棋子'
+      document.getElementById('pieceInfoContent').innerHTML = '<div class="pi-status-none">棋子资料暂时不可用。候选仍可正常选择，请等待资料同步后再查看。</div>'
+      document.getElementById('pieceKeywordPanel').innerHTML = ''
+      currentPieceKeywords = []
+      activePieceKeyword = ''
+      const modal = document.getElementById('pieceInfoModal')
+      modal.style.display = 'flex'
+      const closeButton = modal.querySelector('.pi-close')
+      if (closeButton) closeButton.focus()
+    }
+    function showDeploymentPieceInfo(pieceId, trigger, preserveKeyword) {
+      const piece = resolveDeploymentOfferPiece(pieceId)
+      if (!piece) {
+        reconcileDeploymentPieceInfo()
+        return
+      }
+      if (!preserveKeyword) pieceInfoReturnFocus = trigger || document.activeElement
+      currentPieceInfoId = pieceId
+      currentPieceInfoSource = 'deployment'
+      currentPieceInfoDeploymentRevision = G.deployment.revision
+      if (piece.error) renderDeploymentPieceInfoError(piece)
+      else renderPieceInfoRecord(piece, preserveKeyword)
+    }
+    function reconcileDeploymentPieceInfo() {
+      if (currentPieceInfoSource !== 'deployment' || !currentPieceInfoId) return
+      const deployment = G && G.deployment
+      if (
+        !deployment
+        || deployment.mode !== 'progressive-reserve-v1'
+        || deployment.status !== 'awaiting-reserve-deploy'
+        || !progressiveDeploymentOwned(G)
+        || G.terminalResult
+        || deployment.revision !== currentPieceInfoDeploymentRevision
+        || !(deployment.offerPieces || []).some(function(piece) { return piece.instanceId === currentPieceInfoId })
+      ) closePieceInfo({ restoreFocus: false })
+    }
+    function handlePieceInfoModalKeydown(event) {
+      const modal = document.getElementById('pieceInfoModal')
+      if (!modal || modal.style.display === 'none' || modal.style.display === '') return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closePieceInfo()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = Array.from(modal.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'))
+        .filter(function(element) { return element.offsetParent !== null })
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     function closePieceInfo() {
+      const input = arguments[0] || {}
+      const returnFocus = pieceInfoReturnFocus
       currentPieceInfoId = null
+      currentPieceInfoSource = ''
+      currentPieceInfoDeploymentRevision = null
+      pieceInfoReturnFocus = null
       currentPieceKeywords = []
       activePieceKeyword = ''
       document.getElementById('pieceInfoModal').style.display = 'none'
       const selected = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       renderPieceContextMenu(selected || null)
+      if (input.restoreFocus !== false && returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus()
     }
 
     function showTileStatus(x, y) {
@@ -3843,7 +4059,11 @@
     }
     function autoBeginPhaseKey(state, playerId, commandPending) {
       if (!state || state.terminalResult || commandPending) return null
-      if (state.deployment && state.deployment.status !== 'complete') return null
+      if (
+        state.deployment
+        && state.deployment.status !== 'complete'
+        && !(state.deployment.mode === 'progressive-reserve-v1' && state.deployment.status === 'turn-ready')
+      ) return null
       if (state.pendingOptionSelection || state.pendingTargetSelection) return null
       var turn = state.turn
       if (!turn || turn.phase !== 'start' || !turn.currentPlayerId) return null
@@ -3868,7 +4088,18 @@
 
       const oldG = G
       G = state
-      if (!G.deployment || G.deployment.status === 'complete') localDeploymentChoiceId = null
+      reconcileDeploymentPieceInfo()
+      if (!G.deployment || G.deployment.status === 'complete') {
+        localDeploymentChoiceId = null
+      } else if (G.deployment.mode === 'progressive-reserve-v1') {
+        const offeredIds = Array.isArray(G.deployment.offerPieceIds)
+          ? G.deployment.offerPieceIds
+          : (G.deployment.offerPieces || []).map(function(piece) { return piece.instanceId })
+        if (
+          G.deployment.status !== 'awaiting-reserve-deploy'
+          || !offeredIds.includes(localDeploymentChoiceId)
+        ) localDeploymentChoiceId = null
+      }
 
       G.skillsById = Object.assign({}, skillsById || {}, G.skillsById || {})
       if (G.extensions && G.extensions.playerAlignments) {
@@ -4118,24 +4349,41 @@
         var el = document.getElementById('wsStatus')
         if (el) el.style.display = 'none'
         addLog('WebSocket 断开，等待重连', 'info')
-        rejectPendingActionFeedback('disconnect', '连接已断开；待确认指令已取消')
+        if (pendingActionFeedback) {
+          setStatusMsg('连接已断开；原指令仍待确认，重连后将自动同步，请勿重复操作')
+          renderActionBar()
+        }
       })
 
-      RvBWs.on('authoritySyncStart', function() {
+      RvBWs.on('authoritySyncStart', function(sync) {
+        if (sync && sync.clientActionId && pendingActionFeedback && sync.clientActionId === pendingActionFeedback.clientActionId) {
+          addLog('[authority] 正在按原指令编号查询服务端回执', 'info')
+          setStatusMsg('正在同步服务端状态，请勿重复操作')
+          renderActionBar()
+          return
+        }
         clearAuthorityConflictInteraction()
         addLog('[authority] 检测到版本冲突，正在请求服务端完整快照', 'err')
       })
 
       RvBWs.on('authoritySyncComplete', function() {
-        addLog('[authority] 已同步服务端状态；请重新确认操作', 'info')
+        if (pendingActionFeedback && pendingActionFeedback.timedOut) {
+          addLog('[authority] 已同步服务端状态，仍在等待原指令的权威结果', 'info')
+          renderActionBar()
+          setStatusMsg('已同步服务端状态；原指令仍待确认，请勿重复操作')
+          return
+        }
+        addLog('[authority] 已同步服务端状态', 'info')
         renderActionBar()
-        setStatusMsg('已同步服务端状态，请重新确认操作')
+        setStatusMsg('已同步服务端状态')
       })
 
       RvBWs.on('authoritySyncTimeout', function() {
         addLog('[authority] 服务端状态同步超时；未确认恢复', 'err')
         renderActionBar()
-        setStatusMsg('服务端状态同步超时，未确认恢复；请重连后再操作')
+        setStatusMsg(pendingActionFeedback
+          ? '服务端状态同步超时；原指令仍待确认，请勿重复操作'
+          : '服务端状态同步超时，未确认恢复；请重连后再操作')
       })
 
       RvBWs.on('authoritySyncBlocked', function() {
@@ -4147,9 +4395,14 @@
         if (msg.type === 'subscribed') {
           wsRole = msg.role || 'guest'
           addLog('[WS] 角色：' + wsRole, 'info')
-          try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
+          if (pendingActionFeedback) {
+            requestAuthorityRecovery('pending-action-reconnect', pendingActionFeedback.clientActionId)
+          } else {
+            try { RvBWs.send({ type: 'requestBattleSnapshot' }) } catch {}
+          }
 
         } else if (msg.type === 'stateUpdate') {
+          if (msg.receipt) applyAuthorityReceipt(msg.receipt)
           if (!acceptAuthorityVersion(msg.authorityVersion)) {
             addLog('[authority] Ignored an older or unversioned state update', 'info')
             return
@@ -4567,6 +4820,31 @@
       return String(pid).toLowerCase() === String(myPlayerId).toLowerCase()
     }
 
+    function progressiveDeploymentPending(state) {
+      const deployment = state && state.deployment
+      return !!(
+        deployment
+        && deployment.mode === 'progressive-reserve-v1'
+        && deployment.status === 'awaiting-reserve-deploy'
+      )
+    }
+
+    function progressiveDeploymentOwned(state) {
+      const deployment = state && state.deployment
+      return !!(
+        progressiveDeploymentPending(state)
+        && !SPECTATE_MODE
+        && deployment.activePlayerId
+        && clientOwns(deployment.activePlayerId)
+      )
+    }
+
+    function authorityCellSet(cells) {
+      return new Set((Array.isArray(cells) ? cells : []).map(function(cell) {
+        return cell.x + ',' + cell.y
+      }))
+    }
+
     // ── Render ──
     // Render
     function pendingTargetSelectionForMe() {
@@ -4598,6 +4876,7 @@
     }
 
     function battleInteractionMode() {
+      if (progressiveDeploymentOwned(G) && localDeploymentChoiceId) return 'place'
       if (TRAINING_MODE && placingMode) return 'place'
       if (pendingSkill || (pendingCardAction && pendingCardAction.type) || targetSubmissionPending) return 'target'
       if (pendingMove) return 'move'
@@ -4641,6 +4920,14 @@
         : (isCurrentSnapshot && pendingCardAction && pendingCardAction.type
             ? (pendingCardAction.validTargets || new Set())
             : new Set())
+      const progressiveDeployment = isCurrentSnapshot && progressiveDeploymentOwned(snapshot)
+        ? snapshot.deployment
+        : null
+      const progressivePlacementCells = progressiveDeployment
+        && progressiveDeployment.status === 'awaiting-reserve-deploy'
+        && localDeploymentChoiceId
+        ? authorityCellSet(progressiveDeployment.legalPositions)
+        : new Set()
       return BattleViewModel.create({
         snapshot: snapshot,
         viewerId: myPlayerId,
@@ -4656,9 +4943,11 @@
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
           targetCells: targetCells,
-          placementCells: isCurrentSnapshot && TRAINING_MODE && placingMode
-            ? BattleLegalActions.queryTrainingPlacementCells(snapshot)
-            : new Set(),
+          placementCells: progressivePlacementCells.size
+            ? progressivePlacementCells
+            : (isCurrentSnapshot && TRAINING_MODE && placingMode
+                ? BattleLegalActions.queryTrainingPlacementCells(snapshot)
+                : new Set()),
         },
       })
     }
@@ -5096,11 +5385,14 @@
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
       menu.dataset.pieceId = piece.instanceId
 
+      const hasFreeFirstMove = pieceHasVisibleStatusTag(piece, 'deployment-first-move-free')
+      const moveCostText = hasFreeFirstMove ? '本回合首移 0 AP' : '选择路线'
+      const moveTitle = hasFreeFirstMove ? '本回合首次普通移动消耗 0 AP' : '选择移动路线'
       const moveButton = isOwner
         ? '<button type="button" class="piece-context-skill is-move"' +
-          ' onclick="dispatchBattleIntent({type:\'toggle-move\'})"' + (canMove ? '' : ' disabled') + '>' +
+          ' onclick="dispatchBattleIntent({type:\'toggle-move\'})" title="' + escHtml(moveTitle) + '"' + (canMove ? '' : ' disabled') + '>' +
           '<span class="piece-context-skill-icon">&#8599;</span><span class="piece-context-skill-name">移动</span>' +
-          '<span class="piece-context-skill-cost">选择路线</span></button>'
+          '<span class="piece-context-skill-cost">' + escHtml(moveCostText) + '</span></button>'
         : ''
       const skillButtons = skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
@@ -5150,6 +5442,7 @@
       const ap = myMeta ? myMeta.actionPoints : 0
       const pendingHandSelection = G.pendingOptionSelection
       const isHandSelection = isPendingHandSelection(pendingHandSelection)
+      const progressiveBlocked = progressiveDeploymentPending(G) && !isHandSelection
       if (isHandSelection) syncPendingHandSelection(pendingHandSelection)
       const handChoiceCandidates = isHandSelection ? pendingHandCandidateValues(pendingHandSelection) : []
 
@@ -5182,7 +5475,7 @@
         const cardPresentation = card.presentation && typeof card.presentation === 'object' ? card.presentation : {}
         const isContentEnhanced = cardPresentation.variant === 'enhanced'
         const cost = card.actionPointCost ?? def.actionPointCost ?? 0
-        const canNormallyPlay = isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
+        const canNormallyPlay = !progressiveBlocked && isMyTurn && ap >= cost && (def.type === 'active' || def.type === 'reactive' || !def.type)
         const isHandChoiceCandidate = isHandSelection && handChoiceCandidates.some(function(value) { return value === card.instanceId })
         const isHandChoiceSelected = isHandSelection && pendingHandOptionSelection.selectedValues.some(function(value) { return value === card.instanceId })
         const canInteract = isHandSelection ? isHandChoiceCandidate : canNormallyPlay
@@ -5220,7 +5513,7 @@
           : cardName + (cardPresentation.badge ? '，' + cardPresentation.badge : '') + '，行动点 ' + cost
         const arc = window.BattleContextLayout.handArc(index, hand.length)
         return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
-          aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"
+          aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"${progressiveBlocked ? ' disabled' : ''}
           onclick="onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
@@ -5246,6 +5539,10 @@
       if (G.pendingOptionSelection || G.pendingTargetSelection) {
         const pending = G.pendingOptionSelection || G.pendingTargetSelection
         setStatusMsg(clientOwns(pending.playerId) ? '请先完成当前规则选择' : '等待对方完成规则选择')
+        return
+      }
+      if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) {
+        setStatusMsg(progressiveDeploymentOwned(G) ? '请先完成本回合部署步骤' : '等待对方完成部署')
         return
       }
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
@@ -5300,27 +5597,92 @@
       )
     }
 
+    async function selectReserveDeploymentPiece(pieceId) {
+      const deployment = G && G.deployment
+      if (
+        !deployment
+        || deployment.mode !== 'progressive-reserve-v1'
+        || deployment.status !== 'awaiting-reserve-deploy'
+        || !progressiveDeploymentOwned(G)
+        || pendingActionFeedback
+      ) return
+      const offeredIds = Array.isArray(deployment.offerPieceIds)
+        ? deployment.offerPieceIds
+        : (deployment.offerPieces || []).map(function(piece) { return piece.instanceId })
+      if (!offeredIds.includes(pieceId)) {
+        setStatusMsg('该棋子不在当前权威候选中')
+        return
+      }
+      localDeploymentChoiceId = pieceId
+      const legalPositions = Array.isArray(deployment.legalPositions) ? deployment.legalPositions : []
+      if (!legalPositions.length) {
+        renderDeploymentStatus()
+        await doAction({
+          type: 'deployReservePiece',
+          playerId: myPlayerId,
+          expectedDeploymentRevision: deployment.revision,
+          pieceId: pieceId,
+        })
+        return
+      }
+      render()
+      setStatusMsg('请选择高亮格部署棋子')
+    }
+
     function renderDeploymentStatus() {
       const panel = document.getElementById('deploymentStatus')
       if (!panel || typeof RvBDeploymentStatus === 'undefined') return
-      const selected = G && localDeploymentChoiceId
-        ? G.pieces.find(p => p.instanceId === localDeploymentChoiceId)
+      const selected = G && G.deployment && localDeploymentChoiceId
+        ? (G.deployment.offerPieces || []).find(function(piece) { return piece.instanceId === localDeploymentChoiceId })
+          || G.pieces.find(function(piece) { return piece.instanceId === localDeploymentChoiceId })
         : null
       const view = RvBDeploymentStatus.create({
         deployment: G && G.deployment,
         playerId: myPlayerId,
-        selectedPieceName: selected ? pieceName(selected) : '',
+        selectedPieceName: selected ? (selected.name || pieceName(selected)) : '',
         spectating: SPECTATE_MODE,
         now: currentAuthorityNow(),
       })
       panel.hidden = !view.visible
       panel.classList.toggle('urgent', view.visible && view.urgent)
+      panel.classList.toggle('progressive', view.mode === 'progressive-reserve-v1')
       if (!view.visible) return
+      const label = document.getElementById('deploymentLabel')
       const clock = document.getElementById('deploymentCountdown')
       const state = document.getElementById('deploymentState')
+      const choices = document.getElementById('deploymentChoices')
+      const footer = document.getElementById('deploymentFooter')
+      const reserveCount = document.getElementById('deploymentReserveCount')
+      if (label) label.textContent = view.mode === 'progressive-reserve-v1' ? '本回合上场' : '部署确认'
       if (clock) clock.textContent = view.clockText
       if (state) state.textContent = view.stateText
-      panel.setAttribute('aria-label', '部署剩余 ' + view.remainingSeconds + ' 秒，' + view.stateText)
+      if (choices) {
+        choices.hidden = !view.showCandidates
+        choices.innerHTML = view.showCandidates
+          ? view.offerPieces.map(function(piece) {
+              const selected = piece.instanceId === localDeploymentChoiceId
+              const resolved = resolveDeploymentOfferPiece(piece.instanceId)
+              const stats = resolved && !resolved.error ? resolved.stats : null
+              const summary = stats
+                ? 'HP ' + stats.maxHp + ' · 攻击 ' + stats.attack + ' · 防御 ' + stats.defense + ' · 移动 ' + stats.moveRange
+                : '资料同步中'
+              return '<div class="deployment-candidate"><button type="button" class="deployment-choice" role="radio" aria-checked="' + selected
+                 + '" data-piece-id="' + escHtml(piece.instanceId)
+                 + '" onclick="selectReserveDeploymentPiece(this.dataset.pieceId)">'
+                 + '<span class="deployment-choice-name">' + escHtml(piece.name) + '</span>'
+                 + '<span class="deployment-choice-stats" aria-label="HP / 攻击 / 防御 / 移动">' + escHtml(summary) + '</span></button>'
+                 + '<button type="button" class="deployment-choice-info" aria-label="查看候选棋子的属性与技能" data-piece-id="' + escHtml(piece.instanceId)
+                 + '" onclick="event.stopPropagation();showDeploymentPieceInfo(this.dataset.pieceId,this)">属性与技能</button></div>'
+            }).join('')
+          : ''
+      }
+      if (footer) footer.hidden = view.mode !== 'progressive-reserve-v1' || !view.ownsStep
+      if (reserveCount) reserveCount.textContent = view.mode === 'progressive-reserve-v1'
+        ? '预备区剩余 ' + view.reserveCount
+        : ''
+      panel.setAttribute('aria-label', view.mode === 'progressive-reserve-v1'
+        ? view.stateText
+        : '部署剩余 ' + view.remainingSeconds + ' 秒，' + view.stateText)
     }
 
     function renderActionBar() {
@@ -5351,6 +5713,25 @@
         pendingSkill = null
         setMoveButtonClass(false)
         setStatusMsg('')
+        return
+      }
+      if (progressiveDeploymentPending(G)) {
+        const ownsStep = progressiveDeploymentOwned(G)
+        if (btnEnd) {
+          btnEnd.disabled = true
+          btnEnd.textContent = ownsStep ? '请先部署棋子' : '等待对方部署'
+          btnEnd.classList.add('is-start')
+        }
+        setMoveButtonDisabled(true)
+        pendingMove = false
+        if (!G.pendingOptionSelection && !G.pendingTargetSelection) {
+          pendingSkill = null
+          pendingCardAction = null
+        }
+        setMoveButtonClass(false)
+        setStatusMsg(ownsStep
+          ? '从候选中选择棋子并放到高亮格'
+          : '等待对方完成本回合部署')
         return
       }
       if (btnEnd) {
@@ -5398,11 +5779,15 @@
       } else if (pendingCardAction) {
         setStatusMsg(_targetPromptText() || '选择卡牌目标')
       } else if (pendingMove) {
-        setStatusMsg('点击高亮格子移动棋子')
+        setStatusMsg(pieceHasVisibleStatusTag(_selPiece, 'deployment-first-move-free')
+          ? '点击高亮格子移动棋子 · 本回合首次移动 0 AP'
+          : '点击高亮格子移动棋子')
       } else if (pendingSkill) {
         setStatusMsg(_targetPromptText() || '选择技能目标')
       } else if (selectedPieceId && _isOwnSelected) {
-        setStatusMsg('已选中棋子，选择行动')
+        setStatusMsg(pieceHasVisibleStatusTag(_selPiece, 'deployment-first-move-free')
+          ? '已选中棋子 · 本回合首次移动 0 AP'
+          : '已选中棋子，选择行动')
       } else if (selectedPieceId) {
         setStatusMsg('已选中棋子。点击菜单 i 或右键查看详细信息')
       } else {
@@ -5444,6 +5829,44 @@
       // While the other player is choosing, only allow inspecting pieces.
       if (pendingOptionSelectionForOther()) {
         if (piece) selectPiece(piece.instanceId)
+        return
+      }
+
+      const deployment = G.deployment
+      if (
+        deployment
+        && deployment.mode === 'progressive-reserve-v1'
+        && deployment.status === 'awaiting-reserve-deploy'
+      ) {
+        const ownsStep = !SPECTATE_MODE
+          && deployment.activePlayerId
+          && String(deployment.activePlayerId).toLowerCase() === String(myPlayerId).toLowerCase()
+        if (!ownsStep) {
+          if (piece) selectPiece(piece.instanceId)
+          return
+        }
+        if (pendingActionFeedback) {
+          setStatusMsg('部署指令正在等待权威确认')
+          return
+        }
+        if (!localDeploymentChoiceId) {
+          setStatusMsg('请先从候选中选择本回合上场棋子')
+          return
+        }
+        const legalPositions = Array.isArray(deployment.legalPositions) ? deployment.legalPositions : []
+        const legal = legalPositions.some(function(cell) { return cell.x === x && cell.y === y })
+        if (!legal) {
+          setStatusMsg('请选择权威高亮的部署格')
+          return
+        }
+        void doAction({
+          type: 'deployReservePiece',
+          playerId: myPlayerId,
+          expectedDeploymentRevision: deployment.revision,
+          pieceId: localDeploymentChoiceId,
+          toX: x,
+          toY: y,
+        })
         return
       }
 
@@ -5693,6 +6116,10 @@
 
     function toggleMove() {
       if (!selectedPieceId) return
+      if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) {
+        setStatusMsg('请先完成本回合部署步骤')
+        return
+      }
       pendingMove = !pendingMove
       pendingSkill = null
       setMoveButtonClass(pendingMove)
@@ -5703,6 +6130,10 @@
     // selectSkillCard: called from the board-anchored piece menu.
     async function selectSkillCard(skId) {
       if (!selectedPieceId || !skId || !G) return
+      if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) {
+        setStatusMsg('请先完成本回合部署步骤')
+        return
+      }
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return
@@ -5750,6 +6181,10 @@
       if (G.pendingOptionSelection || G.pendingTargetSelection) {
         const pending = G.pendingOptionSelection || G.pendingTargetSelection
         setStatusMsg(clientOwns(pending.playerId) ? '请先完成当前规则选择' : '等待对方完成规则选择')
+        return
+      }
+      if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) {
+        setStatusMsg(progressiveDeploymentOwned(G) ? '请先完成本回合部署步骤' : '等待对方完成部署')
         return
       }
       if (G.deployment && G.deployment.status === 'awaiting-locks') {
@@ -5898,6 +6333,14 @@
     }
 
     async function doAction(action) {
+      if (
+        typeof progressiveDeploymentPending === 'function'
+        && progressiveDeploymentPending(G)
+        && ['move', 'useBasicSkill', 'useChargeSkill', 'playCard', 'endTurn', 'beginPhase'].includes(action && action.type)
+      ) {
+        setStatusMsg(progressiveDeploymentOwned(G) ? '请先完成本回合部署步骤' : '等待对方完成部署')
+        return
+      }
       if (
         typeof RvBWs !== 'undefined'
         && RvBWs.isAuthoritySyncing
@@ -6455,6 +6898,8 @@
     }
     window.addEventListener('pagehide', disposeBattlePage)
     window.addEventListener('unload', disposeBattlePage)
+
+    document.addEventListener('keydown', handlePieceInfoModalKeydown)
 
     // Escape closes the existing tile details panel.
     document.addEventListener('keydown', e => {

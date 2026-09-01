@@ -1,6 +1,6 @@
-# 战斗事件管线审计（RED-45 / RED-77 / RED-80）
+# 战斗事件管线审计（RED-45 / RED-77 / RED-80 / RED-139）
 
-状态：RED-80 已将消费者模型收敛为四个类别；RED-77 已移除无定义的 `beforeAttack` 遗留消费者，并保留 RED-72 原子性与 pending 合同。审计日期：2026-08-18。RED-77 风险：Medium。
+状态：RED-80 已将消费者模型收敛为四个类别；RED-139 在不增加消费者类别的前提下，把 Damage、Heal、Summon、Death 的 trigger dispatch 纳入动作级 EffectChain、共享预算和原子回滚。审计更新：2026-08-31。RED-139 风险：High。
 
 ## 可执行阶段合同
 
@@ -8,12 +8,12 @@
 
 1. 预检输入、目标、资源和版本；失败不得派发事件、付费、推进 RNG 或污染输入状态。
 2. 构造可修改的 `before*` context，并按已批准消费者顺序派发。
-3. `blocked` 停止剩余消费者和核心动作；`pending` 保存当前 context、来源与剩余队列；异常回滚整条命令并抛出带事件上下文的错误。
+3. `blocked` 按所属动作/Batch 合同停止；`pending` 保持权威根动作 pre-state，并保存版本化会话与服务端 replay record；异常回滚整条命令及运行时快照并抛出带事件/EffectChain 上下文的错误。
 4. 使用 `before*` 最终 context 执行核心效果和付费。
 5. 成功核心动作恰好派发一次对应 `after*`；失败、blocked 或仍 pending 时不派发。
 6. 动作入口按现有调用点派发 `whenever`，不能用它替代具体 before/after 阶段。
 
-该合同引用 [ADR-0006](../decisions/ADR-0006-combat-trigger-ordering.md)、[ADR-0008](../decisions/ADR-0008-rule-status-authority.md) 和 [RED-72 原子性合同](./COMBAT_TRIGGER_ATOMICITY_CONTRACT.md)。
+该合同引用 [ADR-0006](../decisions/ADR-0006-combat-trigger-ordering.md)、[ADR-0008](../decisions/ADR-0008-rule-status-authority.md)、[ADR-0022](../decisions/ADR-0022-deterministic-effect-batch-queues.md) 和 [RED-72/121/139 原子性合同](./COMBAT_TRIGGER_ATOMICITY_CONTRACT.md)。
 
 ## 事件目录
 
@@ -27,10 +27,10 @@ RED-77 确认当前产品合同没有独立 attack 动作或 attack 分类，因
 | 移动 | `beforeMove`, `afterMove` | `turn.ts` | blocked 不扣 AP、不移动、不发 after |
 | 技能 | `beforeSkillUse`, `afterSkillUsed` | `turn.ts`, `skills.ts` | pending 不重复 before；成功支付后发 after |
 | 卡牌 | `beforeCardPlay`, `afterCardPlay` | `turn.ts` | blocked 不付费/弃牌 |
-| 伤害/治疗 | 各 `before*` / `after*` / blocked 事件 | `skills.ts` | before 可改数值或阻断 |
-| 死亡/召唤 | kill、died、summoned 事件 | `skills.ts`, `turn.ts`, `battle-setup.ts` | 成功核心变更后继续派发 |
+| 伤害/治疗 | 各 `before*` / `after*` / blocked 事件 | `skills.ts` | 同 Batch Prepare/Commit/Emit；after 观察到全批主状态已提交 |
+| 死亡/召唤 | kill、died、summoned 事件 | `skills.ts`, `turn.ts`, `battle-setup.ts` | Summon 全批 Commit 后发 after；Death 全部 lifecycle 后统一复活判定与 finalization |
 | 状态/充能 | status、charge 事件 | `skills.ts` | 仅在现有成功 helper 路径派发 |
-| 自定义 | `fireEvent(eventName, childContext)` | 五类代码执行面 | 深度 20、每 root 100 次派发预算 |
+| 自定义 | `fireEvent(eventName, childContext)` | 五类代码执行面 | 局部 depth 20 / root 100；活跃 EffectChain 时同时计入动作级 1000 dispatch |
 
 ### 事件目录结果
 
@@ -57,17 +57,19 @@ Rule 类别内按 priority 降序，默认 `0`；同 priority 保留事件开始
 | --- | --- | --- | --- | --- |
 | success | 提交 before、核心效果、成本和批准日志 | 按快照继续 | 核心动作成功后一次 | 提交已使用 cursor |
 | blocked | 提交已完成 before 效果和 limits；不付核心成本 | blocker 后停止 | 无 | 保留已完成 before 随机消耗 |
-| pending | 提交已完成消费者和选择会话；不付核心成本 | 保存来源与剩余队列 | 挂起时无；成功恢复后一次 | 不重放已完成消费者 |
+| pending | 权威 battle 保持根动作 pre-state；只提交会话/私有 replay record | 回答后从根动作重放并注入已验证答案 | 挂起时无；成功恢复后一次 | 恢复 runtime/TriggerSystem/EffectChain 快照；不序列化 queue |
 | invalid | 不提交 | 不派发 | 无 | 不推进 cursor/hash |
-| exception | 整条命令回滚并抛错 | 立即停止 | 无；after 异常也回滚核心 | 不提交 cursor |
+| exception | 整条命令回滚并抛错 | 立即停止 | 无；after/Batch 异常也回滚核心 | 不提交 cursor、event ID、rule limit 或 EffectChain 计数 |
 
 `pendingTargetSelection.effectCode` 是选择会话完成时的序列化续接函数，与 AttachedEffect 无关。连续 pending、取消、错误玩家、陈旧 revision/selection ID 和重复提交继续由权威选择协议处理。
 
+RED-139 的 pending 不保存已处理一半的 EffectBatch 或 ledger。每次 replay attempt 创建新 chain，并从根动作、固定 seed/clock 和答案记录确定性重建 batch ID、enqueue sequence 与累计预算；取消或恢复异常不会留下 scope、日志或运行时游标。
+
 ## 可观察轨迹
 
-`tests/helpers/event-trace.ts` 是纯测试探针，不修改生产派发。记录包含事件链、四类消费者、priority/tie-breaker、context diff、pending/exception、state hash、seed 和随机 cursor。
+`tests/helpers/event-trace.ts` 与 EffectChain 的进程外 `records` 都是纯测试探针，不写入 BattleState、存档、公共 patch 或网络协议。记录可包含事件链、四类消费者、batch/parent/depth、enqueue sequence、priority/tie-breaker、context diff、pending/exception、state hash、seed 和随机 cursor。
 
-`tests/game/event-trace-probe.test.ts` 验证固定 state/context/seed 的记录稳定；`tests/game/skillcode-browser-differential.test.ts` 对五类执行面比较轨迹、结果、action log 和最终 hash。
+`tests/game/event-trace-probe.test.ts` 验证固定 state/context/seed 的记录稳定；SkillCode 与 game-engine browser differential 回归比较 Node/冻结 bundle 的结果、action log 和最终 hash。
 
 ## 八类复杂机制证据
 
@@ -92,6 +94,7 @@ Rule 类别内按 priority 降序，默认 `0`；同 priority 保留事件开始
 | F04 | 异常、原子性和 after 合同不明确 | RED-72 已实现 |
 | F05 | `beforeAttack` 未声明且无生产者 | RED-77 已确认该语义无产品定义并删除遗留消费者；未新增事件 |
 | F07 | AttachedEffect 数据使用未注入 helper | RED-80 通过删除不可达执行面和数据定义解决，不扩展旧 helper |
+| F08 | 四类效果队列、预算和回滚彼此割裂 | RED-139 以封闭联合、单 FIFO ledger、20/100/1000 共享预算及四层事务快照解决；无通用 effectQueue |
 
 ## 验证结果
 

@@ -44,6 +44,7 @@ describe('RED-117 authoritative PVE battle adapter', () => {
     expect(first.reference.stateHash).toBe(repeated.reference.stateHash)
     expect(first.storage.rootSeed).toBe(repeated.storage.rootSeed)
     expect(Object.keys(firstState.deployment?.initialPositions ?? {})).toHaveLength(16)
+    expect(firstState.deployment?.mode).toBe('legacy-reroll-v1')
     expect(firstState.deployment?.status).toBe('complete')
     expect(firstState.extensions?.debugBattle?.actionLog.length).toBeGreaterThanOrEqual(4)
   })

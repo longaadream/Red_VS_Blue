@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
+import { getActiveEffectChain } from '@/lib/game/effect-batch'
 import {
   dispatchRoomBattleAction,
   type DeploymentRoomStore,
@@ -15,7 +16,8 @@ import {
   restoreRoomRuleRuntime,
   type RoomRuleRuntime,
 } from '@/lib/game/room-rule-runtime'
-import { getRuleMath } from '@/lib/game/rule-runtime'
+import { createRuleExecutionContext, getRuleMath } from '@/lib/game/rule-runtime'
+import { dealDamage } from '@/lib/game/skills'
 import type {
   BattleAuthorityCheckpointRecord,
   BattleAuthorityReceipt,
@@ -23,7 +25,7 @@ import type {
 } from '@/lib/game/battle-transition'
 import type { Room } from '@/lib/game/room-store'
 import { getBattleStorage } from '@/lib/game/battle-storage'
-import type { TriggerRule } from '@/lib/game/triggers'
+import { TriggerSystem, type TriggerRule } from '@/lib/game/triggers'
 import type { BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 import { createTestServerBattleState } from './profile-test-identity'
@@ -157,6 +159,23 @@ function markerRule(
       extensions.ruleRolls = rolls
       extensions.ruleRuns = Number(extensions.ruleRuns ?? 0) + 1
       return { success: true, message: roomId }
+    },
+  }
+}
+
+function effectChainFatalRule(roomId: string): TriggerRule {
+  return {
+    id: `room-effect-chain-fatal:${roomId}`,
+    name: `Room EffectChain fatal ${roomId}`,
+    description: 'RED-139 authority adapter rollback fixture',
+    trigger: { type: 'endTurn' },
+    limits: { maxUses: 1, uses: 0, currentCooldown: 0 },
+    effect(battle) {
+      const attacker = battle.pieces.find(piece => piece.ownerPlayerId === 'player-red')
+      const target = battle.pieces.find(piece => piece.ownerPlayerId === 'player-blue')
+      if (!attacker || !target) throw new Error('EffectChain fatal fixture is missing combatants')
+      dealDamage(attacker, target, Number.NaN, 'true', battle, 'room-effect-chain-fatal')
+      return { success: true }
     },
   }
 }
@@ -395,6 +414,119 @@ async function runOnlineSolo(
 }
 
 describe('RED-141 room rule runtime isolation', () => {
+  it('keeps direct, structured-clone, and JSON transports identical across consecutive actions', () => {
+    const initial = rosterState('json-transport')
+    const obito = initial.pieces.find(piece => piece.ownerPlayerId === 'player-red')!
+    obito.attack += 2
+    const serializableEffects = {
+      piece: { type: 'triggerSkill', skillId: 'serializable-piece-skill' },
+      graveyard: { type: 'triggerSkill', skillId: 'serializable-graveyard-skill' },
+      player: { type: 'triggerSkill', skillId: 'serializable-player-skill' },
+    }
+    obito.rules = [
+      { id: 'rule-obito-grudge-reset' },
+      { id: 'rule-anti-heal-block', effect: serializableEffects.piece },
+    ]
+    obito.statusTags = [{
+      id: 'obito-grudge-json-transport',
+      type: 'obito-grudge',
+      name: 'Grudge',
+      stacks: 1,
+      intensity: 2,
+    }]
+    initial.graveyard.push({
+      ...structuredClone(obito),
+      instanceId: 'json-transport:graveyard',
+      currentHp: 0,
+      x: null,
+      y: null,
+      rules: [{ id: 'rule-anti-heal-block', effect: serializableEffects.graveyard }],
+    })
+    initial.players[0].rules = [
+      { id: 'rule-anti-heal-block', effect: serializableEffects.player },
+    ]
+    const inputs = [
+      initial,
+      structuredClone(initial),
+      JSON.parse(JSON.stringify(initial)) as BattleState,
+    ]
+    const contexts = inputs.map(() => createRuleExecutionContext(new TriggerSystem()))
+    const firstAction = {
+      type: 'endTurn',
+      playerId: 'player-red',
+      clientActionId: 'json-transport:end:1',
+    } as const
+    const firstResults = inputs.map((state, index) => runBattleAction(state, firstAction, {
+      rootSeed: 139_160,
+      ruleExecutionContext: contexts[index],
+    }))
+
+    for (const result of firstResults) {
+      expect(() => structuredClone(result.state)).not.toThrow()
+      expect(JSON.parse(JSON.stringify(result.state))).toEqual(result.state)
+      const returnedObito = result.state.pieces.find(piece => piece.instanceId === obito.instanceId)!
+      expect(returnedObito.rules[1]).toMatchObject({ id: 'rule-anti-heal-block' })
+      expect(returnedObito.rules[1]?.effect).toEqual(serializableEffects.piece)
+      expect(result.state.graveyard[0]?.rules[0]?.effect).toEqual(serializableEffects.graveyard)
+      expect(result.state.players[0]?.rules?.[0]).toMatchObject({ id: 'rule-anti-heal-block' })
+      expect(result.state.players[0]?.rules?.[0]?.effect).toEqual(serializableEffects.player)
+      expect([
+        ...result.state.pieces.flatMap(piece => piece.rules),
+        ...result.state.graveyard.flatMap(piece => piece.rules),
+        ...result.state.players.flatMap(player => player.rules ?? []),
+      ].some(rule => typeof rule?.effect === 'function')).toBe(false)
+    }
+    expect(firstResults.map(result => result.stateHash)).toEqual([
+      firstResults[0].stateHash,
+      firstResults[0].stateHash,
+      firstResults[0].stateHash,
+    ])
+    expect(firstResults.map(result => result.trace)).toEqual([
+      firstResults[0].trace,
+      firstResults[0].trace,
+      firstResults[0].trace,
+    ])
+    expect(firstResults.map(result => result.state)).toEqual([
+      firstResults[0].state,
+      firstResults[0].state,
+      firstResults[0].state,
+    ])
+
+    const secondInputs = [
+      firstResults[0].state,
+      structuredClone(firstResults[1].state),
+      JSON.parse(JSON.stringify(firstResults[2].state)) as BattleState,
+    ]
+    const secondAction = {
+      type: 'beginPhase',
+      clientActionId: 'json-transport:begin:2',
+    } as const
+    const secondResults = secondInputs.map((state, index) => runBattleAction(state, secondAction, {
+      rootSeed: 139_160,
+      ruleExecutionContext: contexts[index],
+    }))
+
+    expect(secondResults.map(result => result.stateHash)).toEqual([
+      secondResults[0].stateHash,
+      secondResults[0].stateHash,
+      secondResults[0].stateHash,
+    ])
+    expect(secondResults.map(result => result.trace)).toEqual([
+      secondResults[0].trace,
+      secondResults[0].trace,
+      secondResults[0].trace,
+    ])
+    expect(secondResults.map(result => result.state)).toEqual([
+      secondResults[0].state,
+      secondResults[0].state,
+      secondResults[0].state,
+    ])
+    for (const result of secondResults) {
+      expect(() => structuredClone(result.state)).not.toThrow()
+      expect(JSON.parse(JSON.stringify(result.state))).toEqual(result.state)
+    }
+  })
+
   it('matches two interleaved 100-transition rooms with their solo hashes, RNG cursors, pending state, and limits', () => {
     const soloA = runSolo('room-a', 1401)
     const soloB = runSolo('room-b', 1402)
@@ -514,6 +646,48 @@ describe('RED-141 room rule runtime isolation', () => {
       else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityFlag
     }
   }, 20_000)
+
+  it('rejects an attached EffectChain fatal before the authority adapter can commit a transition', async () => {
+    const previousAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
+    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
+    try {
+      const roomId = 'dispatch-effect-chain-fatal'
+      const store = new MultiRoomAuthorityStore([onlineRoom(roomId, roomId, 1471)])
+      const runtime = restoreRoomRuleRuntime(roomId)
+      const fatalRule = effectChainFatalRule(roomId)
+      runtime.executionContext.triggerSystem.addRule(fatalRule)
+      const before = JSON.parse(JSON.stringify(store.state(roomId))) as BattleState
+      const beforeHash = hashBattleState(before)
+
+      await expect(dispatchRoomBattleAction(
+        store,
+        roomId,
+        'player-red',
+        {
+          type: 'endTurn',
+          playerId: 'player-red',
+          clientActionId: 'dispatch-effect-chain-fatal:action',
+        } as never,
+        { expectedAuthorityVersion: 0, clock: { now: () => 50_000 } },
+      )).rejects.toMatchObject({ code: 'RVB_EFFECT_CHAIN_STATE_INVALID' })
+
+      const persisted = store.state(roomId)
+      expect(hashBattleState(persisted)).toBe(beforeHash)
+      expect(JSON.parse(JSON.stringify(persisted))).toEqual(before)
+      expect(store.rooms.get(roomId)?.battleAuthorityVersion).toBe(0)
+      expect(store.transitions.get(roomId)).toBeUndefined()
+      expect(store.receipts.get(`${roomId}:dispatch-effect-chain-fatal:action`)).toMatchObject({
+        status: 'rejected',
+        authorityVersion: 0,
+        code: 'RVB_EFFECT_CHAIN_STATE_INVALID',
+      })
+      expect(fatalRule.limits).toEqual({ maxUses: 1, uses: 0, currentCooldown: 0 })
+      expect(getActiveEffectChain(persisted)).toBeUndefined()
+    } finally {
+      if (previousAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityFlag
+    }
+  })
 
   it('contains throw, limits, pending, and compiled caches inside the owning room', () => {
     const queue = new RoomAuthorityQueue()
@@ -643,6 +817,9 @@ describe('RED-141 room rule runtime isolation', () => {
     expect(setup).toContain('getRuleExecutionTriggerSystem(globalTriggerSystem)')
     expect(turn).toContain('getRuleExecutionTriggerSystem(globalTriggerSystem)')
     expect(skills).toContain('getRuleExecutionTriggerSystem(globalTriggerSystem)')
+    expect(setup).not.toContain('globalTriggerSystem.checkTriggers')
+    expect(turn).not.toContain('globalTriggerSystem.checkTriggers')
+    expect(skills).not.toContain('globalTriggerSystem.checkTriggers')
     expect(turn).toContain('getRuleDynamicCodeRuntime().compileExpression')
     expect(turn).not.toContain("from './dynamic-code-runtime'")
   })

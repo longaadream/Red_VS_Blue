@@ -85,23 +85,39 @@ function coreEliminationResult(
 ): TerminalResult | null {
   if (state.players.length !== 2) return null
 
-  const removedPieces = Array.isArray(state.extensions?.removedPieces)
-    ? state.extensions.removedPieces
-    : []
-  const coreOwners = new Set(
-    [...state.pieces, ...state.graveyard, ...removedPieces]
-      .filter(piece => piece.isCore === true)
-      .map(piece => normalizePlayerId(piece.ownerPlayerId)),
-  )
+  const progressiveDeployment = state.deployment?.mode === 'progressive-reserve-v1'
+  // Progressive setup temporarily owns every core in the reserve while the two
+  // opening summons and their trigger queues are being resolved. Settlement
+  // starts at the explicit post-opening barrier, before gameStart and the first
+  // offer are allowed to consume effects or randomness.
+  if (progressiveDeployment && state.deployment?.openingVanguardsInitialized !== true) {
+    return null
+  }
+
   const players = state.players.map(player => ({
     playerId: player.playerId,
     normalizedId: normalizePlayerId(player.playerId),
   }))
-  if (!players.every(player => coreOwners.has(player.normalizedId))) return null
+  if (!progressiveDeployment) {
+    const removedPieces = Array.isArray(state.extensions?.removedPieces)
+      ? state.extensions.removedPieces
+      : []
+    const coreOwners = new Set(
+      [...state.pieces, ...state.graveyard, ...removedPieces]
+        .filter(piece => piece.isCore === true)
+        .map(piece => normalizePlayerId(piece.ownerPlayerId)),
+    )
+    if (!players.every(player => coreOwners.has(player.normalizedId))) return null
+  }
 
   const livingCoreOwners = new Set(
     state.pieces
-      .filter(piece => piece.isCore === true && piece.currentHp > 0)
+      .filter(piece => (
+        piece.isCore === true
+        && piece.currentHp > 0
+        && typeof piece.x === 'number'
+        && typeof piece.y === 'number'
+      ))
       .map(piece => normalizePlayerId(piece.ownerPlayerId)),
   )
   const defeated = players.filter(player => !livingCoreOwners.has(player.normalizedId))
