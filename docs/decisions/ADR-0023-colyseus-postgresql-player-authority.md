@@ -18,6 +18,10 @@ SQLite/Prisma 进程中。单 writer 争用和动作回执等待持久化放大�
 - PostgreSQL journal 以 25 ms / 8 条为默认有界微批；版本 0、终局和显式关键边界强制 durable。
 - Electron 打包并启动独立 Colyseus authority bundle；玩家页面通过兼容适配器保留现有 `RvBWs`
   页面接口，但底层不得创建 legacy `/ws/rooms/*` 连接。
+- 目标型技能可以调用与服务端同版本的浏览器规则适配器做只读、非权威的展示预检，以便在第一次
+  网络往返前呈现候选目标。预检不得写回状态、消费随机、读取未投影隐藏信息，或预测伤害、触发链、
+  终局和持久化结果；最终 action 必须由 Colyseus 服务端完整校验，服务端 continuation/rejected 始终
+  覆盖本地展示。该例外不批准通用客户端预测或 Web Worker。
 - SQLite/Prisma 不再参与新 Colyseus 玩家房间或战斗动作路径。现有内容 Profile 管理进程暂时保留，
   其移除属于后续迁移，不得把它误写成玩家动作仍经过 SQLite。
 - Trace 生成、RED-139 queue 内部实现和玩法数值不在本次切换范围。

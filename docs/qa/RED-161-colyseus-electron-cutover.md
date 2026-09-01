@@ -36,7 +36,9 @@ Trace 按合同未验证。既有内容数据仍缺少 `evil-explosion.json`，�
 后续人工验收发现目标准备被 Colyseus `battleReceipt` 压平成普通失败、QA 计时器被脚本关闭，以及
 目标技能需要一次额外的准备往返。修复后：拒绝协议保留 target/option continuation；兼容层转入既有
 `actionError` 交互；QA 与产品均启用计时器；技能目标可由本地规则适配器即时展示，最终带目标命令
-仍由服务端权威校验。Colyseus 启动也显式安装 Node 原生 SHA-256 provider。
+仍由服务端权威校验。该预检只读、非权威，不写回状态、不消费随机、不预测伤害/触发/终局；服务端
+continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Worker 不在本任务范围。Colyseus
+启动也显式安装 Node 原生 SHA-256 provider。
 
 阻塞 writer 的双 SDK 客户端样本会单独报告前 5 次冷路径，并以之后 15 次作为热路径门禁。本机复测：
 
