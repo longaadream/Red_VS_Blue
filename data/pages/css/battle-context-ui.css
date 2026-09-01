@@ -326,6 +326,219 @@
   color: rgba(148, 163, 184, 0.68);
   font-size: 10px;
 }
+
+/* RED-166: compact, icon-first authoritative action history. */
+.action-history-dock {
+  position: absolute;
+  top: calc(var(--battle-hud-offset) + 12px);
+  right: 8px;
+  z-index: 17;
+  width: 52px;
+  max-height: calc(100% - var(--battle-hud-offset) - var(--battle-hand-height) - 24px);
+  pointer-events: none;
+}
+
+.action-history-dock[hidden] { display: none; }
+
+.action-history-list {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+}
+
+.action-history-item,
+.action-history-collapsed-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  min-width: 44px;
+  height: 52px;
+  min-height: 44px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px 0 0 10px;
+  color: #e2e8f0;
+  background: rgba(8, 15, 29, 0.8);
+  box-shadow: inset -2px 0 0 color-mix(in srgb, var(--history-accent, #64748b) 72%, transparent);
+  backdrop-filter: blur(12px) saturate(1.08);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition: width 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms ease, transform 120ms ease;
+}
+
+.action-history-item:hover,
+.action-history-item:focus-visible,
+.action-history-item.is-current {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.action-history-item:active,
+.action-history-collapsed-button:active { transform: scale(0.96); }
+
+.action-history-item:focus-visible,
+.action-history-collapsed-button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.action-history-item.is-selected {
+  box-shadow: inset -3px 0 0 var(--history-accent, #93c5fd), 0 0 0 1px color-mix(in srgb, var(--history-accent, #93c5fd) 48%, transparent);
+}
+
+.action-history-root-icon {
+  position: absolute;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+}
+
+.action-history-root-icon img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7));
+}
+
+.action-history-branch {
+  position: absolute;
+  right: 45px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transform: translateX(5px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.action-history-item.is-current:hover,
+.action-history-item.is-current:focus-visible { width: 96px; }
+
+.action-history-item.is-current:hover .action-history-branch,
+.action-history-item.is-current:focus-visible .action-history-branch {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.action-history-child {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+}
+
+.action-history-child::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--history-accent, #94a3b8);
+}
+
+.action-history-child img { width: 17px; height: 17px; object-fit: contain; }
+.action-history-child b,
+.action-history-overflow {
+  position: absolute;
+  right: -3px;
+  bottom: -4px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  border-radius: 999px;
+  color: #f8fafc;
+  background: #111827;
+  font-size: 7px;
+  font-weight: 900;
+  line-height: 12px;
+  text-align: center;
+}
+
+.action-history-overflow { position: relative; right: auto; bottom: auto; }
+
+.action-history-collapsed-button {
+  display: none;
+  width: 44px;
+  height: 44px;
+}
+
+.action-history-dock.is-collapsed { width: 44px; }
+.action-history-dock.is-collapsed .action-history-list { display: none; }
+.action-history-dock.is-collapsed .action-history-collapsed-button { display: grid; }
+
+.action-history-glyph {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  width: 24px;
+}
+
+.action-history-glyph i {
+  display: block;
+  width: 18px;
+  height: 3px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.action-history-glyph i::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  margin-top: -1px;
+  border-radius: 50%;
+  background: #60a5fa;
+}
+
+.action-history-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.action-history-path {
+  position: absolute;
+  height: 0;
+  border-top: 2px dashed rgba(253, 224, 71, 0.9);
+  transform-origin: 0 50%;
+  filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.7));
+}
+
+.action-history-point {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border: 3px solid #facc15;
+  border-radius: 50%;
+  background: rgba(250, 204, 21, 0.15);
+  box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.12), 0 0 18px rgba(250, 204, 21, 0.72);
+  animation: action-history-pulse 700ms ease-out infinite alternate;
+}
+
+.action-history-point.is-source {
+  border-color: #93c5fd;
+  background: rgba(96, 165, 250, 0.16);
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12), 0 0 18px rgba(96, 165, 250, 0.72);
+}
+
+@keyframes action-history-pulse {
+  from { transform: scale(0.9); opacity: 0.78; }
+  to { transform: scale(1.08); opacity: 1; }
+}
+
 .piece-context-menu {
   --piece-menu-origin-x: left;
   --piece-menu-origin-y: center;
@@ -562,6 +775,7 @@
 
 @media (orientation: landscape) and (max-width: 900px) and (max-height: 500px) {
   .selected-status-overlay { display: none !important; }
+  .action-history-dock { top: calc(var(--battle-hud-offset) + 8px); right: 6px; }
 }
 
 @media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px) {
@@ -703,7 +917,10 @@
   .training-popover,
   .piece-context-menu,
   .piece-context-skill,
-  .card-item { transition-duration: 1ms !important; }
+  .card-item,
+  .action-history-item,
+  .action-history-branch { transition-duration: 1ms !important; }
+  .action-history-point { animation: none !important; }
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -711,8 +928,18 @@
   .topbar,
   .training-tools-toggle,
   .training-popover,
-  .piece-context-menu {
+  .piece-context-menu,
+  .action-history-item,
+  .action-history-collapsed-button {
     background: rgb(8, 15, 29) !important;
     backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .action-history-item,
+  .action-history-collapsed-button {
+    border: 1px solid #cbd5e1;
+    background: #080f1d;
   }
 }
