@@ -20,8 +20,7 @@ import {
 } from './battle-storage'
 import { getPieceById } from './piece-repository'
 import { assertDemoRostersReady, type RosterRoomStore } from './roster-contract'
-import { isPlayerSeat, type PlayerSeat } from './match-identity'
-import type { Room } from './room-store'
+import { getPlayerSeat, type Room } from './room-store'
 import { createRootSeed } from './rule-runtime'
 import {
   systemDeploymentRuleClock,
@@ -45,10 +44,6 @@ export interface StartLockedRosterBattleResult {
 export interface StartLockedRosterBattleOptions {
   clock?: DeploymentRuleClock
   onDeploymentUpdate?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
-}
-
-function getPlayerSeat(player: { seat?: PlayerSeat; faction?: PlayerSeat }): PlayerSeat | undefined {
-  return isPlayerSeat(player.seat) ? player.seat : isPlayerSeat(player.faction) ? player.faction : undefined
 }
 
 export async function startBattleFromLockedRosters(
@@ -143,23 +138,6 @@ async function startBattleFromLockedRostersQueued(
     if (!battle) throw new Error('Failed to initialize battle state')
 
     let initialState = battle
-    for (const bot of roomPlayers
-      .filter(player => player.isBot === true || player.id === 'bot')
-      .sort((left, right) => left.id.localeCompare(right.id))) {
-      initialState = runBattleAction(initialState, {
-        type: 'deploymentLock',
-        playerId: bot.id,
-        clientActionId: `system-deployment-keep:${bot.id}`,
-      }, {
-        rootSeed: seed,
-        ruleExecutionContext: roomRuleRuntime.executionContext,
-      }).state
-      pinBattleProfileIdentityV1(
-        initialState,
-        profileIdentity,
-        seed,
-      )
-    }
     if (
       !initialState.terminalResult
       && initialState.deployment?.mode === 'progressive-reserve-v1'
@@ -174,7 +152,11 @@ async function startBattleFromLockedRostersQueued(
         rootSeed: seed,
         ruleExecutionContext: roomRuleRuntime.executionContext,
       }).state
-      pinBattleProfileIdentityV1(initialState, profileIdentity, seed)
+      pinBattleProfileIdentityV1(
+        initialState,
+        profileIdentity,
+        seed,
+      )
     }
     const initialAuthorityVersion = isBattleAuthorityV2Enabled()
       ? room.battleAuthorityVersion ?? 0

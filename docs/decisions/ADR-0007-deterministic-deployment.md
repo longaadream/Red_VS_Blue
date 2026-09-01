@@ -1,6 +1,6 @@
 # ADR-0007：固定全地图部署与玩家独立重投流
 
-> RED-138 取代说明：本文的初始 16 枚全图出生、`deployment` 流 16 次消费和重投状态机只适用于 `legacy-reroll-v1` 和缺少 mode 的历史状态；新建对局默认规则见 [ADR-0022](./ADR-0022-progressive-reserve-deployment.md)。
+> RED-138 取代说明：本文的初始 16 枚全图出生、`deployment` 流 16 次消费和重投状态机只适用于 `legacy-reroll-v1` 和缺少 mode 的历史状态；新建对局默认规则见 [ADR-0024](./ADR-0024-progressive-reserve-deployment.md)。
 
 - 状态：已接受（固定单图条款由 ADR-0019 部分取代；部署随机与重投合同继续有效）
 - 日期：2026-08-16

@@ -91,19 +91,19 @@
 - 如果方向发生变化，应创建新的 ADR，并将旧 ADR 标记为“已取代”。
 - 相关模块文档应链接到对应 ADR。
 - Linear 高风险任务应引用相关决策记录。
-- [`ADR-0020-unified-player-websocket-transport.md`](./ADR-0020-unified-player-websocket-transport.md)：Windows 玩家业务统一使用 legacy WebSocket（RED-127，已由 ADR-0023 取代）。
+- [`ADR-0020-unified-player-websocket-transport.md`](./ADR-0020-unified-player-websocket-transport.md)：Windows 玩家业务统一使用 WebSocket，旧玩家 REST 运行时返回 410（RED-127，已接受）。
 - 无法确定的事项应保持“提议中”，不得描述为已经确认。
 
 ## 当前已确定的基础决策
 
-- [`ADR-0001-deployment-visibility.md`](./ADR-0001-deployment-visibility.md)：legacy 部署重投阶段公开双方站位（新建对局由 ADR-0022 取代）。
+- [`ADR-0001-deployment-visibility.md`](./ADR-0001-deployment-visibility.md)：legacy 部署重投阶段公开双方站位（新建对局由 ADR-0024 取代）。
 - [`ADR-0002-match-identity-model.md`](./ADR-0002-match-identity-model.md)：分离对局座位、内容阵营、所有权与先后手。
 - [`ADR-0003-electron-server-packaging.md`](./ADR-0003-electron-server-packaging.md)：保留 Electron Server 内部候选打包入口的历史边界（RED-23，已由 ADR-0021 取代）。
 - [`ADR-0004-deterministic-rule-runtime.md`](./ADR-0004-deterministic-rule-runtime.md)：权威规则使用根种子、命名随机流、确定性实例 ID 与逻辑时钟（RED-28，已接受）。
 - [`ADR-0004-battle-presentation-boundary.md`](./ADR-0004-battle-presentation-boundary.md)：定义战场 Three.js、DOM HUD、展示模型与用户意图的单向边界（RED-48，提议中）。
 - [`ADR-0005-authoritative-target-selection.md`](./ADR-0005-authoritative-target-selection.md)：提议以纯查询、精确候选和版本凭证统一 UI、AI 与服务端目标语义（RED-59）。
 - [`ADR-0006-combat-trigger-ordering.md`](./ADR-0006-combat-trigger-ordering.md)：统一战斗触发器的跨类别稳定排序（RED-61，已接受）。
-- [`ADR-0007-deterministic-deployment.md`](./ADR-0007-deterministic-deployment.md)：legacy 固定全地图部署、核心身份与玩家独立重投流（RED-29，已接受；新建对局由 ADR-0022 取代）。
+- [`ADR-0007-deterministic-deployment.md`](./ADR-0007-deterministic-deployment.md)：legacy 固定全地图部署、核心身份与玩家独立重投流（RED-29，已接受；新建对局由 ADR-0024 取代）。
 - [`ADR-0008-rule-status-authority.md`](./ADR-0008-rule-status-authority.md)：Rule + statusTag 是棋子效果唯一权威架构，移除 AttachedEffect（RED-80，已接受）。
 - [`ADR-0009-venom-demo-admission.md`](./ADR-0009-venom-demo-admission.md)：将毒液准入 Demo v0.1 暗方候选池（RED-89，已接受）。
 - [`ADR-0010-deterministic-damage-batches.md`](./ADR-0010-deterministic-damage-batches.md)：单体与多目标伤害统一使用确定性 batch 和动作内连锁（RED-33，已接受）。
@@ -117,8 +117,9 @@
 - [`ADR-0018-content-pipeline-v1.md`](./ADR-0018-content-pipeline-v1.md)：已接受以统一开放包、确定性 Resolved Profile 与声明式 PVE 合同支撑第一方和社区内容管线（RED-111、RED-113）。
 - [`ADR-0019-selectable-demo-maps.md`](./ADR-0019-selectable-demo-maps.md)：正式 Demo 使用受控四图目录、房间冻结选择并在所有传输边界失败关闭（RED-119，已接受）。
 - [`ADR-0021-autonomous-server-operations.md`](./ADR-0021-autonomous-server-operations.md)：Windows 自治 Server 的公开发行、受信本地运维、备份更新与回退边界（RED-140，已接受；取代 ADR-0003）。
-- [`ADR-0022-progressive-reserve-deployment.md`](./ADR-0022-progressive-reserve-deployment.md)：新建对局默认使用 seeded 三选一预备区部署、安全落位与部署当回合首次普通移动免费（RED-138，已接受，等待实现验收）。
+- [`ADR-0022-deterministic-effect-batch-queues.md`](./ADR-0022-deterministic-effect-batch-queues.md)：只允许 Damage、Heal、Summon、Death 使用确定性 Batch，并以动作级共享 FIFO 调度后续效果（RED-139，已接受）。
 - [`ADR-0023-colyseus-postgresql-player-authority.md`](./ADR-0023-colyseus-postgresql-player-authority.md)：默认玩家房间与战斗权威迁移到 Colyseus，PostgreSQL 使用有界微批与关键边界耐久化（RED-160、RED-161，已接受，等待候选门禁）。
+- [`ADR-0024-progressive-reserve-deployment.md`](./ADR-0024-progressive-reserve-deployment.md)：新建对局默认使用 seeded 三选一预备区部署、安全落位与部署当回合首次普通移动免费（RED-138，已接受，等待实现验收）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

@@ -268,7 +268,7 @@ describe('RED-138 mirrored dual-Kiljaedan ritual isolation', () => {
         type: 'beforePieceSummoned',
         playerId: PLAYER_BETA,
         pieceTemplateId: 'kiljaedan',
-        sourcePieceId: undefined,
+        sourcePieceId: betaInstanceId,
         targetPosition: betaResolution.targetPosition,
       },
       {
@@ -282,7 +282,7 @@ describe('RED-138 mirrored dual-Kiljaedan ritual isolation', () => {
         type: 'beforePieceSummoned',
         playerId: PLAYER_ALPHA,
         pieceTemplateId: 'kiljaedan',
-        sourcePieceId: undefined,
+        sourcePieceId: alphaInstanceId,
         targetPosition: alphaResolution.targetPosition,
       },
       {

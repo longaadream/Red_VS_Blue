@@ -83,7 +83,7 @@
 - 候选与合法落点只投影给当前输入玩家；对手和观战者只看预备区数量与公开阶段。棋子实际上场后，`visible=true` 的免费首移 statusTag 按普通棋子状态公开。Windows/Electron 权威房间的完整快照必须按接收者分别投影。
 - 渐进部署使用当前成长回合期限；超时由服务端完成必要部署并直接继续既有回合流程。玩家命令与超时通过房间版本 CAS 串行化。
 - 传输层在调用规则前验证 Ed25519 命令信封；签名覆盖 room/player/完整 action/timestamp，同名 header、body 或 WS subscribe 声明不能替代验证。
-- 当前规则见 [`ADR-0022`](../decisions/ADR-0022-progressive-reserve-deployment.md)；旧 `deploymentChoice` / `deploymentLock` / 45 秒门禁只属于 [`ADR-0007`](../decisions/ADR-0007-deterministic-deployment.md) 与 [`ADR-0009`](../decisions/ADR-0009-authoritative-deployment-lock.md) 的 legacy 模式。
+- 当前规则见 [`ADR-0024`](../decisions/ADR-0024-progressive-reserve-deployment.md)；旧 `deploymentChoice` / `deploymentLock` / 45 秒门禁只属于 [`ADR-0007`](../decisions/ADR-0007-deterministic-deployment.md) 与 [`ADR-0009`](../decisions/ADR-0009-authoritative-deployment-lock.md) 的 legacy 模式。
 
 `TurnState`、`TurnPhase` 和 `PlayerTurnMeta` 位于 `lib/game/turn.ts`。动作包括：
 

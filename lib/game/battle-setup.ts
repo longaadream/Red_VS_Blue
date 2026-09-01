@@ -213,7 +213,7 @@ function initializeProgressiveOpeningVanguards(
       pieceTemplateId: piece.templateId,
       faction: piece.faction,
     }
-    const beforeResult = globalTriggerSystem.checkTriggers(state, beforeContext)
+    const beforeResult = getActiveTriggerSystem().checkTriggers(state, beforeContext)
     assertSetupTriggerIsSynchronous(beforeResult, 'beforePieceSummoned')
     appendSetupTriggerMessages(state, playerId, beforeResult)
     if (beforeResult.blocked) {
@@ -236,7 +236,7 @@ function initializeProgressiveOpeningVanguards(
     piece.y = finalPosition.y
     state.pieces.push(piece)
 
-    const afterResult = globalTriggerSystem.checkTriggers(state, {
+    const afterResult = getActiveTriggerSystem().checkTriggers(state, {
       type: 'afterPieceSummoned',
       playerId,
       sourcePiece: piece,
