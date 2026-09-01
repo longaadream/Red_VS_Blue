@@ -15,7 +15,7 @@
 
 现有权威管线已经证明“规则、版本、hash 和内存状态提交后先回执，数据库随后落盘”可以把本机服务端
 `dispatch → receipt` 从旧管线的 P50 58.922 ms / P95 102.072 ms 降到 P50 12.196 ms /
-P95 15.878 ms。但是当前运行时仍由自建 WebSocket 路由、Prisma 和 SQLite 组成；SQLite 即使启用
+P95 15.878 ms。RED-159 立项时的默认运行时仍由自建 WebSocket 路由、Prisma 和 SQLite 组成；SQLite 即使启用
 WAL 仍只有一个 writer，房间、恢复、部署和客户端路由也缺少一套可横向扩展的明确边界。
 
 问题不是“游戏能否使用 SQL”。大量游戏把账号、库存、对局、赛季、排名和审计数据放在关系型数据库；
@@ -64,7 +64,7 @@ Phase E/F，不由 RED-159 文档任务代签。
 ### 1. 产品和运行拓扑
 
 采用 Colyseus 0.18.x 作为新的玩家联机房间框架，采用 PostgreSQL 作为新运行时唯一耐久数据库。
-具体 patch 版本和 lockfile 在第一个可运行实现任务中固定；生产 Node.js 基线为 22 或更高。
+RED-160 已固定首个实现的 patch 版本和 lockfile；版本值见“落地校准”。生产 Node.js 基线为 22 或更高。
 
 同一套 `BattleRoom`、权威规则适配器、命令信封、Transition、receipt 和恢复协议必须同时支持：
 
@@ -288,10 +288,9 @@ Server 与 K8s 仍使用外部 PostgreSQL。任何路径都不得回退到 SQLit
 | [RED-139 / ADR-0022 Effect Batch/Queue](https://linear.app/redvsblue/issue/RED-139/建立四类确定性-effectbatchqueue-并冻结同时语义白名单) | 动作内四类 Queue、稳定顺序、原子回滚、预算、轨迹与 hash 合同全部保留 | 无；Colyseus 只能包裹其命令边界 |
 | [ADR-0016 Trace v2](./ADR-0016-trace-v2-recorded-state-replay.md) | 全部保留：回放记录事实，不用新规则重跑历史 | 无 |
 
-ADR-0022 由并行 RED-139 交付；本 Phase 0 只依赖其已批准 Linear 合同，不 import 未合并文件或实现。
-后续代码任务必须先同步已合并的 RED-139 公共端口。Colyseus 候选通过完整验收前，旧 release 仍可作为整版
-回退目标单独启动；同一进程、同一战局和同一数据根不得同时运行两套 transport/database，也不得运行中
-热切换。
+ADR-0022 已由 RED-139 合入 `main`；BattleRoom 只依赖其公开规则端口，不 import EffectChain/handler
+内部实现。旧 release 只作为整版回退目标单独启动；同一进程、同一战局和同一数据根不得同时运行两套
+transport/database，也不得运行中热切换。
 
 ## 备选方案
 
