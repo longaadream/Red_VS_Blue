@@ -279,7 +279,15 @@ describe('battle presentation boundary', () => {
         piece: {
           id: 'piece-red',
           name: 'Red Warrior',
-          statuses: [{ id: 'freeze', label: '冰冻', duration: 2, description: '无法行动' }],
+          statuses: [{
+            id: 'freeze',
+            type: 'freeze',
+            label: '冰冻',
+            iconPath: '/tile-effects/blizzard.svg',
+            stacks: 3,
+            duration: 2,
+            description: '无法行动',
+          }],
         },
       },
       turn: {
@@ -301,6 +309,11 @@ describe('battle presentation boundary', () => {
     expect(overlay.innerHTML).toContain('Red Warrior')
     expect(overlay.innerHTML).toContain('冰冻')
     expect(overlay.innerHTML).toContain('2回合')
+    expect(overlay.innerHTML).toContain('class="selected-status-icon"')
+    expect(overlay.innerHTML).toContain('src="/tile-effects/blizzard.svg"')
+    expect(overlay.innerHTML).toContain('class="status-icon-badge"')
+    expect(overlay.innerHTML).toContain('>3</b>')
+    expect(overlay.innerHTML).not.toContain('selected-status-dot')
     expect(overlay.setAttribute).toHaveBeenCalledWith('aria-live', 'polite')
 
     ui.update({

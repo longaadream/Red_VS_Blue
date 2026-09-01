@@ -69,6 +69,45 @@ type ThreeHarness = {
   WebGLRenderer: unknown
 }
 
+type RuntimeStatusFixture = {
+  id: string
+  type?: string
+  label?: string
+  name?: string
+  duration?: number
+  uses?: number
+  iconPath?: string
+}
+
+type RuntimePieceFixture = {
+  id: string
+  name: string
+  faction: string
+  ownerPlayerId: string
+  x: number
+  y: number
+  health: { current: number; max: number }
+  statuses?: RuntimeStatusFixture[]
+  statusSummary: RuntimeStatusFixture[]
+  visible: boolean
+}
+
+type RuntimeModelFixture = {
+  board: {
+    [key: string]: unknown
+    tiles: Array<{ props: { [key: string]: unknown; type: string } }>
+  }
+  pieces: RuntimePieceFixture[]
+  effects: unknown[]
+  legal: {
+    moveCells: Array<{ x: number; y: number }>
+    targetCells: Array<{ x: number; y: number }>
+    placementCells: Array<{ x: number; y: number }>
+  }
+  selection: { pieceId: string | null; mode?: string }
+  interaction: { pendingPieceId: string | null; pendingCommandId: string | null }
+}
+
 class FakeElement {
   readonly tagName: string
   readonly children: FakeElement[] = []
@@ -261,6 +300,8 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
     forceContextLoss() { this.contextLost = true }
   }
 
+  new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-effect-icons.js'), 'utf8'), { filename: 'battle-effect-icons.js' }).runInContext(context)
+  new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-status-presentation.js'), 'utf8'), { filename: 'battle-status-presentation.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-tactical-geometry.js'), 'utf8'), { filename: 'battle-tactical-geometry.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8'), { filename: 'battle-renderer-3d.js' }).runInContext(context)
 
@@ -275,7 +316,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
   return { container, windowObject, renderers, observers, rafCallbacks, cancelledRafs, disposeCounts, frame, renderer: windowObject.BattleRenderer3D! }
 }
 
-function runtimeModel() {
+function runtimeModel(): RuntimeModelFixture {
   const fixture = createRed68BattleFixture()
   return {
     board: fixture.map,
@@ -525,7 +566,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
   it('drags the selected movable piece without panning and cancels the gesture without submitting', () => {
     const harness = createHarness(844, 390, false)
     const intents: Array<Record<string, unknown>> = []
-    const model: any = runtimeModel()
+    const model = runtimeModel()
     const piece = model.pieces[0]
     const target = { x: piece.x + 1, y: piece.y }
     model.selection = { pieceId: piece.id, mode: 'move' }
@@ -565,7 +606,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
 
   it('shows authoritative waiting feedback and retargets movement from the visible position without replaying an event', () => {
     const harness = createHarness(844, 390, false)
-    const model: any = runtimeModel()
+    const model = runtimeModel()
     const pieceId = model.pieces[0].id
     harness.renderer.init({ container: harness.container })
     harness.renderer.update(model)
@@ -638,7 +679,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
   })
   it('enters target cells simultaneously, does not replay stable highlights, and disposes them after exit', () => {
     const harness = createHarness(844, 390, false)
-    const model: any = runtimeModel()
+    const model = runtimeModel()
     model.legal.targetCells = [{ x: 2, y: 2 }, { x: 4, y: 3 }]
     harness.renderer.init({ container: harness.container })
     harness.renderer.update(model)
@@ -667,7 +708,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
 
   it('retargets result outlines from their visible opacity and bounds reduced result durations', () => {
     const harness = createHarness(844, 390, false)
-    const model: any = runtimeModel()
+    const model = runtimeModel()
     const pieceId = model.pieces[0].id
     harness.renderer.init({ container: harness.container })
     harness.renderer.update(model)
@@ -695,21 +736,23 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const hpLayer = harness.container.children.find((child) => child.id === 'hpBarLayer3d')!
     const summary = hpLayer.children.find((child) => child.dataset.pieceId === pieceId)!
     const statuses = summary.querySelector('.piece-board-statuses')!
-    expect(statuses.children).toHaveLength(1)
-    expect(statuses.children[0].className).toContain('is-entering')
+    const enteringDots = statuses.children.filter((child) => child.className.includes('piece-board-status-dot'))
+    expect(enteringDots).toHaveLength(1)
+    expect(enteringDots[0].className).toContain('is-entering')
 
     const statusRemoved = structuredClone(statusAdded)
     statusRemoved.pieces[0].statuses = []
     statusRemoved.pieces[0].statusSummary = []
     harness.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'status-remove' }, statusAdded, statusRemoved)
     harness.renderer.update(statusRemoved)
-    expect(statuses.children).toHaveLength(1)
-    expect(statuses.children[0].className).toContain('is-exiting')
+    const exitingDots = statuses.children.filter((child) => child.className.includes('piece-board-status-dot'))
+    expect(exitingDots).toHaveLength(1)
+    expect(exitingDots[0].className).toContain('is-exiting')
 
     harness.renderer.dispose()
 
     const reduced = createHarness(844, 390, false, true)
-    const reducedModel: any = runtimeModel()
+    const reducedModel = runtimeModel()
     const reducedPieceId = reducedModel.pieces[0].id
     reduced.renderer.init({ container: reduced.container })
     reduced.renderer.update(reducedModel)
@@ -741,6 +784,55 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const deadGroup = reduced.renderers[0].scene!.children.find((child) => child.userData.pieceId === reducedPieceId)!
     expect(deadGroup.visible).toBe(false)
     reduced.renderer.dispose()
+  })
+
+  it('keeps all player-facing statuses reachable through a compact two-icon overflow disclosure', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const pieceId = model.pieces[0].id
+    model.pieces[0].statusSummary = [
+      { id: 'sleep-1', type: 'sleep', label: '睡眠', duration: 2, iconPath: '/effect-icons/sleep.svg' },
+      { id: 'freeze-1', type: 'freeze', label: '冰冻', duration: 1, iconPath: '/tile-effects/blizzard.svg' },
+      { id: 'shield-1', type: 'divine-shield', label: '圣盾', uses: 1, iconPath: '/effect-icons/divine-shield.svg' },
+      { id: 'stance-1', type: 'calm-stance', label: '平静姿态', iconPath: '/effect-icons/stance.svg' },
+      { id: 'internal-1', type: 'shishio-dmg-counter', label: '内部计数' },
+    ]
+
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const hpLayer = harness.container.children.find((child) => child.id === 'hpBarLayer3d')!
+    const summary = hpLayer.children.find((child) => child.dataset.pieceId === pieceId)!
+    const statuses = summary.querySelector('.piece-board-statuses')!
+    const dots = statuses.children.filter((child) => child.className.includes('piece-board-status-dot'))
+    const overflow = statuses.querySelector('.piece-board-status-overflow')!
+    const popover = statuses.querySelector('.piece-board-status-popover')!
+
+    expect(dots).toHaveLength(2)
+    expect(dots.map((dot) => dot.dataset.statusId)).toEqual(['sleep-1', 'freeze-1'])
+    expect(dots[0].querySelector('.piece-board-status-image')?.attributes.src).toBe('/effect-icons/sleep.svg')
+    expect(overflow.hidden).toBe(false)
+    expect(overflow.textContent).toBe('+2')
+    expect(overflow.attributes['aria-label']).toBe('查看全部 4 个状态')
+    expect(popover.children).toHaveLength(4)
+    expect(popover.children[0].attributes['aria-label']).toBe('睡眠')
+    expect(popover.children[0].title).toBe('睡眠')
+    expect(summary.dataset.statusCount).toBe('4')
+    expect(summary.dataset.statusIds).not.toContain('internal-1')
+
+    overflow.dispatch('focus', {})
+    expect(overflow.attributes['aria-expanded']).toBe('true')
+    expect(popover.attributes['aria-hidden']).toBe('false')
+    overflow.dispatch('blur', {})
+    expect(overflow.attributes['aria-expanded']).toBe('false')
+    expect(popover.attributes['aria-hidden']).toBe('true')
+    overflow.dispatch('click', {})
+    expect(statuses.dataset.open).toBe('true')
+    expect(overflow.attributes['aria-expanded']).toBe('true')
+    overflow.dispatch('click', {})
+    expect(statuses.dataset.open).toBe('false')
+    harness.renderer.dispose()
   })
 
 })

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="被动触发">
+  <circle cx="32" cy="32" r="29" fill="#092331" stroke="#38bdf8" stroke-width="4"/>
+  <path d="M11 33c6-10 13-15 21-15s15 5 21 15c-6 9-13 14-21 14S17 42 11 33Z" fill="none" stroke="#e0f2fe" stroke-width="4"/>
+  <circle cx="32" cy="33" r="8" fill="#38bdf8"/>
+  <path d="M32 9v6M9 19l6 4M55 19l-6 4" stroke="#7dd3fc" stroke-width="4" stroke-linecap="round"/>
+</svg>
