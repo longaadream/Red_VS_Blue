@@ -15,6 +15,10 @@ import { findFreePort } from './local-port'
 import { resolveClientProtocolFile } from './client-protocol-resource'
 import { EmbeddedPostgresController } from './embedded-postgres'
 import {
+  LOCAL_GAME_OPEN_CANCELLED,
+  LocalGameLifecycleGate,
+} from './local-game-lifecycle'
+import {
   type DesktopProfileReference,
   getActiveResourcePackMeta,
   isHealthyCommittedProfileObservation,
@@ -406,33 +410,38 @@ async function stopChildProcessGracefully(
   if (proc.exitCode === null && proc.signalCode === null) killProcessTree(proc)
 }
 
-async function killServer(requireDurable = false): Promise<void> {
-  const startup = localGameStartupPromise
-  if (startup) {
-    try {
-      await startup
-    } catch (error) {
-      console.error('[client] local authority startup failed while shutdown was waiting:', error)
+async function killServer(requireDurable = false, invalidateOpening = true): Promise<void> {
+  const finishShutdown = localGameLifecycle.beginShutdown(invalidateOpening)
+  try {
+    const startup = localGameStartupPromise
+    if (startup) {
+      try {
+        await startup
+      } catch (error) {
+        console.error('[client] local authority startup failed while shutdown was waiting:', error)
+      }
     }
+    if (gameServerProcess) {
+      const gameProc = gameServerProcess
+      await stopChildProcessGracefully(gameProc, requireDurable)
+      localGameReady = false
+      localAuthorityProfileIdentity = null
+      if (gameServerProcess === gameProc) gameServerProcess = null
+    }
+    if (embeddedPostgres) await embeddedPostgres.stop()
+    if (!serverProcess) return
+    // The Profile/Next process does not own the battle journal and therefore does
+    // not implement the Colyseus durable-drain IPC contract. Waiting for that ACK
+    // here falsely reports a database shutdown failure after the real authority
+    // and PostgreSQL have already stopped.
+    const profileProc = serverProcess
+    localServerReady = false
+    localProfileIdentity = null
+    serverProcess = null
+    killProcessTree(profileProc)
+  } finally {
+    finishShutdown()
   }
-  if (gameServerProcess) {
-    const gameProc = gameServerProcess
-    await stopChildProcessGracefully(gameProc, requireDurable)
-    localGameReady = false
-    localAuthorityProfileIdentity = null
-    if (gameServerProcess === gameProc) gameServerProcess = null
-  }
-  if (embeddedPostgres) await embeddedPostgres.stop()
-  if (!serverProcess) return
-  // The Profile/Next process does not own the battle journal and therefore does
-  // not implement the Colyseus durable-drain IPC contract. Waiting for that ACK
-  // here falsely reports a database shutdown failure after the real authority
-  // and PostgreSQL have already stopped.
-  const profileProc = serverProcess
-  localServerReady = false
-  localProfileIdentity = null
-  serverProcess = null
-  killProcessTree(profileProc)
 }
 
 function forceKillServer(): void {
@@ -483,6 +492,7 @@ let gameServerProcess: ChildProcess | null = null
 let localGameReady = false
 let localGameStartupPromise: Promise<void> | null = null
 let localGameOpenPromise: Promise<{ ok: boolean; error?: string }> | null = null
+const localGameLifecycle = new LocalGameLifecycleGate()
 let embeddedPostgres: EmbeddedPostgresController | null = null
 let localProfileIdentity: GameProfileIdentity | null = null
 let localAuthorityProfileIdentity: GameProfileIdentity | null = null
@@ -705,6 +715,9 @@ async function resolveAuthorityDatabaseUrl(): Promise<string> {
 
 function localAuthorityStartupErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
+  if (message === LOCAL_GAME_OPEN_CANCELLED) {
+    return '本地主机启动已取消，请稍后重试。'
+  }
   if (/safeStorage|credential encryption|凭据加密/i.test(message)) {
     return '系统凭据加密不可用，无法安全启动本机数据库。'
   }
@@ -872,16 +885,22 @@ function initDatabase(dbPath: string, appRoot: string): void {
   console.log('[client] Database ready.')
 }
 
-async function startLocalServer(profileBinding?: ProfileProcessBinding): Promise<void> {
+async function startLocalServer(
+  profileBinding?: ProfileProcessBinding,
+  expectedGeneration?: number,
+): Promise<void> {
+  if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
   if (serverProcess) {
     if (!localServerReady) {
       localServerReady = await waitForLocalServerReady(actualLocalPort, 5000)
     }
+    if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
     return
   }
 
   localServerReady = false
   actualLocalPort = await findFreePort(LOCAL_PORT_HINT)
+  if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
   console.log(`[client] Public server port: ${actualLocalPort}`)
 
   const appRoot = getAppRoot()
@@ -1603,13 +1622,14 @@ async function selectAndActivateRollback(
   return activateProfileHash(targetHash, allowRendererRollback)
 }
 
-async function recoverProfileOnStartup(): Promise<void> {
+async function recoverProfileOnStartup(expectedGeneration?: number): Promise<void> {
   localProfileIdentity = null
   if (!localServerReady) throw new Error('PROFILE_SERVER_NOT_READY')
   let recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
   if (recovered.requiresProcessRestart === true) {
-    await killServer()
-    await startLocalServer(stableProfileBinding())
+    await killServer(false, false)
+    if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
+    await startLocalServer(stableProfileBinding(), expectedGeneration)
     if (!localServerReady) throw new Error('PROFILE_STARTUP_RECOVERY_RESTART_FAILED')
     recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
     if (recovered.requiresProcessRestart === true) {
@@ -1627,14 +1647,20 @@ async function recoverProfileOnStartup(): Promise<void> {
   localProfileIdentity = gameProfileIdentityFromReference(report.server.profile as DesktopProfileReference)
 }
 
-async function startStableLocalServerAndRecover(): Promise<void> {
-  await startStableProfileServerAndRecover()
-  await startLocalGameAuthority(stableProfileBinding())
+function assertLocalGameOpeningCurrent(expectedGeneration: number): void {
+  localGameLifecycle.assertOpeningCurrent(expectedGeneration)
 }
 
-async function startStableProfileServerAndRecover(): Promise<void> {
-  await startLocalServer(stableProfileBinding())
-  await recoverProfileOnStartup()
+async function startStableLocalServerAndRecover(expectedGeneration?: number): Promise<void> {
+  await startStableProfileServerAndRecover(expectedGeneration)
+  if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
+  await startLocalGameAuthority(stableProfileBinding())
+  if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
+}
+
+async function startStableProfileServerAndRecover(expectedGeneration?: number): Promise<void> {
+  await startLocalServer(stableProfileBinding(), expectedGeneration)
+  await recoverProfileOnStartup(expectedGeneration)
 }
 
 // ─── 资源包管理（Electron IPC，替代 Android 端的 Service Worker 方案）────────
@@ -1914,11 +1940,15 @@ handleTrusted('go-offline', ['connect', 'game'], () => {
 })
 
 handleTrusted('open-local-game', ['connect'], async () => {
+  if (localGameLifecycle.shutdownInProgress) {
+    return { ok: false, error: '本地主机正在停止，请稍后重试。' }
+  }
   if (localGameOpenPromise) return await localGameOpenPromise
+  const openingGeneration = localGameLifecycle.beginOpening()
   const opening = (async (): Promise<{ ok: boolean; error?: string }> => {
     clearOnlineServerUrl()
     try {
-      await startStableLocalServerAndRecover()
+      await startStableLocalServerAndRecover(openingGeneration)
     } catch (error) {
       console.error('[client] local authority startup failed:', error)
       return { ok: false, error: localAuthorityStartupErrorMessage(error) }

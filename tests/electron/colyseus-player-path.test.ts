@@ -78,7 +78,7 @@ describe('RED-161 default player transport', () => {
 
     expect(readyHandler).toContain('await startStableProfileServerAndRecover()')
     expect(readyHandler).not.toContain('await startStableLocalServerAndRecover()')
-    expect(openLocalHandler).toContain('await startStableLocalServerAndRecover()')
+    expect(openLocalHandler).toContain('await startStableLocalServerAndRecover(openingGeneration)')
   })
 
   it('shows a stable fail-closed diagnostic when the bundled authority cannot start', async () => {
@@ -101,7 +101,12 @@ describe('RED-161 default player transport', () => {
 
     expect(main).toContain('let localGameStartupPromise: Promise<void> | null = null')
     expect(main).toContain('let localGameOpenPromise: Promise<{ ok: boolean; error?: string }> | null = null')
+    expect(main).toContain('const localGameLifecycle = new LocalGameLifecycleGate()')
     expect(main).toContain('async function startLocalGameAuthorityOnce(')
+    expect(main).toContain('await killServer(false, false)')
+    expect(main).toContain('assertLocalGameOpeningCurrent(expectedGeneration)')
+    expect(main).toMatch(/actualLocalPort = await findFreePort\(LOCAL_PORT_HINT\)\s+if \(expectedGeneration !== undefined\) assertLocalGameOpeningCurrent\(expectedGeneration\)/)
+    expect(main).toContain('await startLocalServer(stableProfileBinding(), expectedGeneration)')
     expect(wrapper).toContain('if (localGameStartupPromise)')
     expect(wrapper).toContain('await localGameStartupPromise')
     expect(wrapper).toContain('localGameStartupPromise = startup')
@@ -109,6 +114,8 @@ describe('RED-161 default player transport', () => {
     expect(openLocalHandler).toContain('if (localGameOpenPromise) return await localGameOpenPromise')
     expect(openLocalHandler).toContain('localGameOpenPromise = opening')
     expect(openLocalHandler).toContain('localGameOpenPromise = null')
+    expect(openLocalHandler).toContain('const openingGeneration = localGameLifecycle.beginOpening()')
+    expect(openLocalHandler).toContain('startStableLocalServerAndRecover(openingGeneration)')
   })
 
   it('requires a durable authority acknowledgement before normal application exit', async () => {

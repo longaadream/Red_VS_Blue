@@ -117,6 +117,10 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
   最终可能持有未监听端口的失败进程，导致耐久退出 ACK 发错对象。Profile/数据库/authority 启动及整个
   `open-local-game` 处理现已 single-flight；精确候选冒烟在首个请求后延迟 2 秒再并发重复两次，确认只
   产生一条启动链、可以进入游戏并正常退出，Electron、内置 Node、`postgres.exe` 进程计数仍全部为 0。
+  启动链另由 lifecycle generation 约束：外部 teardown 会使旧 opening 失效，Profile 恢复所需的内部
+  restart 不会自我取消；Profile 端口选择后、authority 启动前后均设检查点，防止停止完成后旧链重新
+  spawn。可控 deferred 行为测试覆盖 Profile recovery 中途停止、authority startup 中途停止、内部重启
+  与 teardown 期间拒绝新 opening。
 - `npm.cmd run check:main-baseline`：通过；HEAD 不落后上述 `origin/main`。
 - `npm.cmd run check:encoding` 与 `git diff --check`：通过。
 - `npm.cmd run test:postgres`：随包 PostgreSQL wrapper 启动真实实例并驱动原有 integration，通过；原有
