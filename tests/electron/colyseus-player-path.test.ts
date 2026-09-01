@@ -53,6 +53,11 @@ describe('RED-161 default player transport', () => {
     expect(main).toContain("localUrl: `http://localhost:${actualGamePort}`")
     expect(main).toContain("var url = 'http://localhost:${actualGamePort}';")
     expect(packageJson.scripts['build:electron:client']).toContain('npm run build:colyseus')
+    // Root dependencies are excluded from the Electron app. The Next runtime and
+    // Node-targeted Colyseus authority are staged separately, so rebuilding every
+    // optional root native addon against Electron would be both unnecessary and
+    // would make a clean package require Visual Studio Build Tools.
+    expect(builder.npmRebuild).toBe(false)
     expect(builder.extraResources).toContainEqual({ from: '_client-colyseus', to: 'app/colyseus' })
   })
 

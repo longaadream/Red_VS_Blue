@@ -5,7 +5,7 @@
 - 合同起始基线：`base_branch: main`，`base_sha: 8902c0da94957fdb52d142363c2c45a2ebda7a7f`
 - 当前验证基线：`origin/main@b0a5c3fb99b68b2a7e174c03b2b0c0a4b30b6926`，RED-138 已重放为
   `6ab7609`、`9db8cb6`
-- 状态：实现验证中；真实 PostgreSQL、候选包和独立审查未完成，不能合并或发布
+- 状态：实现验证中；候选包已构建，真实 PostgreSQL和独立审查仍未完成，不能合并或发布
 
 ## 已切换范围
 
@@ -63,11 +63,18 @@ continuation/rejected 始终覆盖本地展示。通用客户端预测与 Web Wo
 - `npm.cmd run build:colyseus`：通过，生成 5.4 MB product authority bundle。
 - bundle 使用故意不可达的 PostgreSQL 端口启动时执行到数据库边界并明确 `ECONNREFUSED`；这只证明
   产物可加载和失败关闭，不是数据库集成通过。
+- 在 RED-161 工作树内使用 `npm.cmd ci --legacy-peer-deps` 完成干净依赖安装；Colyseus 0.18 的可选
+  Zod 4 peer 与项目现有 Zod 3 要求该兼容解析，锁文件本身未发生变化。
+- `npm.cmd run build:electron:client` 的 Next 生产构建与 Colyseus bundle 通过。Electron 客户端的根
+  `node_modules` 已从 `files` 排除，Next standalone 和 Node-targeted authority 作为独立资源打包，因此
+  设置 `npmRebuild: false`，避免错误地把 Colyseus 可选原生加速模块重编译为 Electron ABI。随后
+  Windows `dir` 候选构建通过，`verify-electron-client-package` 检查 48 个页面资源、287 个离线数据
+  资源与 43 个图片资源，全部通过。
 
 ## 待完成门禁
 
 - 在真实 PostgreSQL 上运行 `npm.cmd run test:postgres`。
-- 构建 Electron 候选包，并从候选包完成双端动作、重连、普通 APPLIED 与终局 DURABLE 验收。
+- 从已构建 Electron 候选包完成双端动作、重连、普通 APPLIED 与终局 DURABLE 验收。
 - 完成 High 风险独立审查。
 - 在本轮修复后重新执行 `check:main-baseline`、diff/编码检查并更新 Draft PR。
 

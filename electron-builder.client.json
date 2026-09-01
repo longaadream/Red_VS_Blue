@@ -5,6 +5,7 @@
   "extraMetadata": {
     "main": "electron-client/dist/main.js"
   },
+  "npmRebuild": false,
   "files": [
     "electron-client/dist/**",
     "electron-client/admin/**",
