@@ -17,6 +17,7 @@
     const input = options || {}
     const renderer = input.renderer
     const domUi = input.domUi
+    const historyUi = input.historyUi || null
     const onIntent = typeof input.onIntent === 'function' ? input.onIntent : function () {}
     let mounted = false
     let currentModel = null
@@ -25,6 +26,7 @@
       if (!intent || !INTENT_TYPES.has(intent.type)) {
         throw new Error('Unsupported battle UI intent: ' + String(intent && intent.type))
       }
+      if (intent.type === 'viewport-change' && historyUi && historyUi.resize) historyUi.resize()
       onIntent(intent)
     }
 
@@ -38,6 +40,13 @@
         floatLayer: mountInput.floatLayer || null,
         onIntent: dispatch,
       })
+      if (historyUi && historyUi.mount) {
+        historyUi.mount({
+          element: mountInput.historyDock || null,
+          floatLayer: mountInput.floatLayer || null,
+          projectCell: function (x, y, elevation) { return renderer.projectCell(x, y, elevation) },
+        })
+      }
       mounted = true
     }
 
@@ -46,6 +55,7 @@
       currentModel = model
       renderer.update(model)
       domUi.update(model)
+      if (historyUi && historyUi.update) historyUi.update(model)
     }
 
     function animateAction(action, previousModel, nextModel) {
@@ -56,7 +66,11 @@
       if (mounted && renderer.spawnFloater) renderer.spawnFloater(x, y, text, color, big, options)
     }
 
-    function resize() { if (mounted) renderer.resize() }
+    function resize() {
+      if (!mounted) return
+      renderer.resize()
+      if (historyUi && historyUi.resize) historyUi.resize()
+    }
     function resetView() { if (mounted && renderer.resetView) renderer.resetView() }
     function projectCell(x, y, elevation) { return renderer.projectCell(x, y, elevation) }
     function screenToCell(clientX, clientY) { return renderer.screenToCell(clientX, clientY) }
@@ -65,6 +79,7 @@
       if (!mounted) return
       renderer.dispose()
       domUi.dispose()
+      if (historyUi && historyUi.dispose) historyUi.dispose()
       mounted = false
       currentModel = null
     }

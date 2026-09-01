@@ -646,7 +646,7 @@ new Script([
 
     expect(battlePage).toContain('id="orientationGuard"')
     expect(battlePage).toContain('请旋转设备')
-    expect(battlePage).toContain('@media (orientation: portrait) and (max-width: 760px)')
+    expect(battlePage).toContain('@media (orientation: portrait)')
     expect(battlePage).toContain('@media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px)')
     expect(battlePage).toContain('--mobile-landscape-min: 844px')
     expect(battlePage).toContain('--mobile-landscape-recommended: 932px')

@@ -329,8 +329,6 @@ body {
   pointer-events: auto;
 }
 
-#orientationGuard { display: none !important; }
-
 .battle-log-title {
   font-size: 0 !important;
 }

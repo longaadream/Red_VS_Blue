@@ -16,6 +16,7 @@
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-effect-icons.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
+  <script src="js/battle-ui/battle-action-history.js"></script>
   <script src="js/battle-ui/battle-status-presentation.js"></script>
   <script src="js/battle-ui/battle-context-layout.js"></script>
   <script src="js/battle-ui/battle-legal-actions.js"></script>
@@ -1169,7 +1170,9 @@
     .orientation-guard-card span { color: #94a3b8; font-size: 13px; line-height: 1.6; }
     .orientation-guard-card small { color: #64748b; font-size: 11px; }
 
-    @media (orientation: portrait) and (max-width: 760px) {
+    @media (orientation: portrait) {
+      body { overflow: hidden; }
+      body > :not(#orientationGuard):not(script):not(style) { visibility: hidden !important; }
       #orientationGuard { display: grid; }
     }
 
@@ -1452,10 +1455,10 @@
 </head>
 <body>
 
-  <div id="orientationGuard" role="status" aria-live="polite">
+  <div id="orientationGuard" role="dialog" aria-modal="true" aria-labelledby="orientationGuardTitle">
     <div class="orientation-guard-card">
       <div class="orientation-guard-icon" aria-hidden="true">↻</div>
-      <strong>请旋转设备</strong>
+      <strong id="orientationGuardTitle">请旋转设备</strong>
       <span>战斗需要横屏空间。旋转后会自动恢复棋盘与技能操作。</span>
       <small>最低 844 × 390 · 推荐 932 × 430</small>
     </div>
@@ -1661,6 +1664,7 @@
               <div id="pieceContextSkills" class="piece-context-skills"></div>
             </div>
             <aside id="selectedStatusOverlay" class="selected-status-overlay" data-battle-ui-region="selected-status" aria-label="选中棋子特殊状态" aria-live="polite" hidden></aside>
+            <aside id="actionHistoryDock" class="action-history-dock" data-battle-ui-region="action-history" aria-label="最近动作" hidden></aside>
             <aside id="tileStatusPanel" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="tileStatusTitle">
               <div class="ts-sheet">
                 <div class="ts-header">
@@ -1779,6 +1783,7 @@
     const TRAINING_MODE = params.get('mode') === 'training'
     const SPECTATE_MODE = params.get('mode') === 'spectate'
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
+    const RED166_QA_MODE = params.get('qa') === 'RED-166'
     if (RED43_QA_MODE) document.body.classList.add('red43-qa')
     function shouldUseRelayMode() {
       if (params.get('relay') === '1' || params.get('server') === 'remote') return true
@@ -2466,8 +2471,56 @@
     let _use3d = false           // Three.js renderer active
     let battlePresentation = null
     let battleDomUi = null
+    let battleActionHistory = null
     let currentBattleViewModel = null
     let latestBattlePresentationEvents = []
+    function red166QaPresentationEvents(snapshot) {
+      if (!RED166_QA_MODE || !snapshot || !Array.isArray(snapshot.pieces)) return []
+      const pieces = snapshot.pieces.filter(piece => piece && piece.instanceId && piece.x != null && piece.y != null)
+      if (!pieces.length) return []
+      const players = Array.isArray(snapshot.players) ? snapshot.players : []
+      const events = []
+      for (let index = 0; index < 20; index += 1) {
+        const source = pieces[index % pieces.length]
+        const target = pieces[(index + Math.max(1, Math.floor(pieces.length / 2))) % pieces.length]
+        const actionId = 'red166-qa-' + index
+        const rootEventId = actionId + ':0'
+        const move = index % 2 === 0
+        events.push({
+          eventId: rootEventId,
+          rootEventId,
+          parentEventId: null,
+          actionId,
+          sequence: 0,
+          kind: move ? 'move' : 'skill',
+          iconId: move ? 'action-move' : (index === 17 ? 'future-action' : 'action-skill'),
+          actorPlayerId: source.ownerPlayerId || (players[index % Math.max(1, players.length)] || {}).playerId || null,
+          sourcePieceId: source.instanceId,
+          targetPieceIds: [target.instanceId],
+          targetCell: { x: target.x, y: target.y },
+          result: move
+            ? { fromX: source.x, fromY: source.y, toX: target.x, toY: target.y }
+            : null,
+          priority: 100,
+          skippable: true,
+        })
+        if (index === 19) {
+          events.push({
+            eventId: actionId + ':1', rootEventId, parentEventId: rootEventId, actionId, sequence: 1,
+            kind: 'damage', iconId: 'action-damage', actorPlayerId: source.ownerPlayerId || null,
+            sourcePieceId: source.instanceId, targetPieceIds: [target.instanceId], result: { amount: 3 },
+            priority: 80, skippable: true,
+          })
+          events.push({
+            eventId: actionId + ':2', rootEventId, parentEventId: rootEventId, actionId, sequence: 2,
+            kind: 'statusAdded', iconId: 'status-add', actorPlayerId: source.ownerPlayerId || null,
+            sourcePieceId: source.instanceId, targetPieceIds: [target.instanceId], statusType: 'divine-shield',
+            priority: 70, skippable: true,
+          })
+        }
+      }
+      return events
+    }
     function red43QaSnapshot() {
       if (!RED43_QA_MODE) return null
       const pieces = G && G.pieces ? G.pieces.filter(p => p.currentHp > 0) : []
@@ -4981,7 +5034,9 @@
         : new Set()
       return BattleViewModel.create({
         snapshot: snapshot,
-        presentationEvents: isCurrentSnapshot ? latestBattlePresentationEvents : [],
+        presentationEvents: isCurrentSnapshot
+          ? (latestBattlePresentationEvents.length ? latestBattlePresentationEvents : red166QaPresentationEvents(snapshot))
+          : [],
         viewerId: myPlayerId,
         selectedPieceId: selectedPieceId,
         skillsById: skillsById,
@@ -6885,10 +6940,22 @@
         screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
       battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
-      battlePresentation = BattlePresentation.create({ renderer, domUi: battleDomUi, onIntent: handleBattleIntent })
+      battleActionHistory = BattleActionHistory.create({
+        document,
+        window,
+        icons: BattleEffectIcons,
+        onOpenLog: openLog,
+      })
+      battlePresentation = BattlePresentation.create({
+        renderer,
+        domUi: battleDomUi,
+        historyUi: battleActionHistory,
+        onIntent: handleBattleIntent,
+      })
       battlePresentation.mount({
         boardContainer: document.getElementById('boardStage3d'),
         floatLayer: document.getElementById('floatLayer'),
+        historyDock: document.getElementById('actionHistoryDock'),
       })
       _use3d = hasThreeRenderer
       if (!_use3d) initMapControls()
