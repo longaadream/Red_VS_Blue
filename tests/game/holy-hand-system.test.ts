@@ -992,4 +992,39 @@ describe('Turalyon holy-hand mobility', () => {
     expect(secondStage.pendingTargetSelection.targetType).toBe('grid')
     expectRolledBack(cancel(secondStage))
   })
+
+  it('finishes Grand Crusade without a stuck selector when no complete legal formation exists', () => {
+    const definition = skill('turalyon-grand-crusade')
+    const turalyon = makePiece({ instanceId: 'full-turalyon', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
+    turalyon.isCore = true
+    turalyon.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
+    const ally = makePiece({ instanceId: 'full-ally', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
+    ally.isCore = true
+    const blockers = [
+      [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2],
+    ].map(([x, y], index) => makePiece({
+      instanceId: `formation-blocker-${index}`, ownerPlayerId: 'player-blue', x, y,
+    })) as any[]
+    const state = makeState({ pieces: [turalyon, ally, ...blockers], width: 3, height: 3 }) as any
+    state.skillsById[definition.id] = definition
+    state.players[0].actionPoints = 4
+    state.players[0].chargePoints = 1
+
+    const firstPending = applyBattleAction(state, {
+      type: 'useChargeSkill', playerId: 'player-red', pieceId: turalyon.instanceId, skillId: definition.id,
+    } as any) as any
+    const resolved = applyBattleAction(firstPending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: turalyon.instanceId,
+      extraTargets: [{ pieceId: ally.instanceId }],
+      selectionId: firstPending.pendingTargetSelection.selectionId,
+      stateRevision: firstPending.pendingTargetSelection.stateRevision,
+    } as any) as any
+
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.pendingOptionSelection).toBeUndefined()
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === turalyon.instanceId)).toMatchObject({ x: 0, y: 0 })
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === ally.instanceId)).toMatchObject({ x: 1, y: 0 })
+    expect(resolved.pieces.filter((piece: any) => piece.currentHp > 0).map((piece: any) => `${piece.x},${piece.y}`))
+      .toHaveLength(new Set(resolved.pieces.filter((piece: any) => piece.currentHp > 0).map((piece: any) => `${piece.x},${piece.y}`)).size)
+  })
 })

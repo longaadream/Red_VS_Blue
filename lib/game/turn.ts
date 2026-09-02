@@ -88,6 +88,7 @@ import {
   assertActionTargetingReady,
   assertPendingTargetCancellation,
   enumeratePrimaryPieceTargetIds,
+  getReservedSkillLandingCells,
   isSinglePieceTargetAction,
   stampTargetingRevision,
   validatePendingTargetSubmissions,
@@ -1507,6 +1508,12 @@ function applyBattleActionInternal(
     seed: PendingSeed = {},
   ): boolean => {
     if (!result.needsOptionSelection && !result.needsTargetSelection) return false
+    if (result.needsTargetSelection && Array.isArray(result.targetCandidates)) {
+      const minimum = Number.isSafeInteger(result.minSelections)
+        ? Math.max(0, result.minSelections!)
+        : 1
+      if (result.targetCandidates.length < minimum) return false
+    }
     const currentRuleId = result.pendingRuleId || currentContext.pendingRuleId
     const currentRuleSourceId = result.pendingRuleSourceId || currentContext.pendingRuleSourceId
     const triggerContext = {
@@ -2740,6 +2747,7 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
+        reservedCells: getReservedSkillLandingCells(next, action),
         legalPrimaryTargetPieceIds: enumeratePrimaryPieceTargetIds(next, action),
         isSinglePieceTargetAction: isSinglePieceTargetAction(next, action),
       };
@@ -2860,6 +2868,7 @@ function applyBattleActionInternal(
         targets,
         ruleRewrittenPrimaryTargetPieceId: beforeSkillUseResult.targetReplacementPieceId,
         selectedOption: _actAny.selectedOption,
+        reservedCells: skillUseContext.reservedCells,
         battle: next,
         skill: {
           id: skillDef.id,
@@ -2911,7 +2920,11 @@ function applyBattleActionInternal(
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         const pendingTarget = (result as any).pendingTargetSelection
         battleDebugLog('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
-        if (pendingTarget) {
+        const pendingCandidates = pendingTarget?.targetCandidates || pendingTarget?.candidates
+        const pendingMinimum = Number.isSafeInteger(pendingTarget?.minSelections)
+          ? Math.max(0, pendingTarget.minSelections)
+          : 1
+        if (pendingTarget && (!Array.isArray(pendingCandidates) || pendingCandidates.length >= pendingMinimum)) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
             ownerPlayerId: pendingTarget.playerId || action.playerId,
@@ -2922,8 +2935,8 @@ function applyBattleActionInternal(
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
             source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
-            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
-            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            candidates: pendingCandidates,
+            fixedCandidates: Array.isArray(pendingCandidates),
             selectionMode: pendingTarget.selectionMode,
             minSelections: pendingTarget.minSelections,
             maxSelections: pendingTarget.maxSelections,
@@ -3048,6 +3061,7 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
+        reservedCells: getReservedSkillLandingCells(next, action),
         legalPrimaryTargetPieceIds: enumeratePrimaryPieceTargetIds(next, action),
         isSinglePieceTargetAction: isSinglePieceTargetAction(next, action),
       };
@@ -3179,6 +3193,7 @@ function applyBattleActionInternal(
         targets,
         ruleRewrittenPrimaryTargetPieceId: beforeSkillUseResult.targetReplacementPieceId,
         selectedOption: _actAny.selectedOption,
+        reservedCells: skillUseContext.reservedCells,
         battle: next,
         skill: {
           id: skillDef.id,
@@ -3230,7 +3245,11 @@ function applyBattleActionInternal(
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         const pendingTarget = (result as any).pendingTargetSelection
         battleDebugLog('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
-        if (pendingTarget) {
+        const pendingCandidates = pendingTarget?.targetCandidates || pendingTarget?.candidates
+        const pendingMinimum = Number.isSafeInteger(pendingTarget?.minSelections)
+          ? Math.max(0, pendingTarget.minSelections)
+          : 1
+        if (pendingTarget && (!Array.isArray(pendingCandidates) || pendingCandidates.length >= pendingMinimum)) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
             ownerPlayerId: pendingTarget.playerId || action.playerId,
@@ -3241,8 +3260,8 @@ function applyBattleActionInternal(
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
             source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
-            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
-            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            candidates: pendingCandidates,
+            fixedCandidates: Array.isArray(pendingCandidates),
             selectionMode: pendingTarget.selectionMode,
             minSelections: pendingTarget.minSelections,
             maxSelections: pendingTarget.maxSelections,
