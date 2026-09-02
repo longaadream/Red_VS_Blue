@@ -68,6 +68,14 @@ function parseInlineScript(script: { source: string; htmlLine: number }, index: 
 }
 
 describe('battle page route contract', () => {
+  it('serves canonical battle-page images before legacy public QA assets', () => {
+    const route = readFileSync(resolve(process.cwd(), 'app/qa/client/[...path]/route.ts'), 'utf8')
+
+    expect(route).toContain("[path.resolve(PAGE_ROOT, 'images'), PUBLIC_ROOT]")
+    expect(route).toContain('for (const target of targets)')
+    expect(route).toContain('Local QA serves battle-page images first, then legacy public images.')
+  })
+
   it('parses every inline script in the canonical battle page', () => {
     const scripts = extractInlineScripts(readPage('battle.html'))
 

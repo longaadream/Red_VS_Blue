@@ -120,8 +120,13 @@ describe('RED-165 battle effect icon registry', () => {
   it('resolves every presentation-event action icon without emoji or an empty asset', () => {
     const icons = loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons')
     const actionIconIds = [
-      'action-move', 'action-skill', 'action-charge-skill', 'action-card', 'action-passive',
-      'action-damage', 'action-heal', 'action-death', 'status-add', 'status-remove', 'shield',
+      'action-move', 'action-deploy', 'action-skill', 'action-charge-skill', 'action-card',
+      'action-end-turn', 'action-automatic', 'action-choice', 'action-passive', 'action-block',
+      'action-damage', 'action-heal', 'action-force-move', 'action-spawn', 'action-death',
+      'action-eliminated', 'action-action-points', 'action-charge-points', 'action-card-gain',
+      'action-card-discard', 'action-card-change', 'action-tile-change', 'action-tile-effect-add',
+      'action-tile-effect-remove', 'action-stat-change', 'action-redirect', 'status-add',
+      'status-remove', 'result-hidden',
     ]
     for (const iconId of actionIconIds) {
       expect(icons.resolveAction(iconId)).toMatchObject({ iconId })
@@ -140,7 +145,11 @@ describe('RED-165 battle effect icon registry', () => {
     ] as Array<{ assetPath: string }>
     for (const entry of entries) {
       expect(entry.assetPath, entry.assetPath).toMatch(/^images\//)
-      expect(existsSync(resolve(rootDir, 'public', entry.assetPath.replace(/^images\//, ''))), entry.assetPath).toBe(true)
+      const relative = entry.assetPath.replace(/^images\//, '')
+      expect(
+        existsSync(resolve(rootDir, 'public', relative)) || existsSync(resolve(pagesDir, 'images', relative)),
+        entry.assetPath,
+      ).toBe(true)
     }
   })
 

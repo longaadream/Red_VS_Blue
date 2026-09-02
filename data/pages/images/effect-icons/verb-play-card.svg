@@ -1,0 +1,8 @@
+<!-- Derived from Lucide credit-card + move-up-right; Lucide ISC license applies. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" role="img">
+  <title>打出卡牌</title>
+  <g transform="translate(1 1) scale(0.82)"><rect width="20" height="14" x="2" y="5" rx="2" />
+  <line x1="2" x2="22" y1="10" y2="10" /></g>
+  <g transform="translate(14.25 14.25) scale(0.36)"><path d="M13 5H19V11" />
+  <path d="M19 5L5 19" /></g>
+</svg>

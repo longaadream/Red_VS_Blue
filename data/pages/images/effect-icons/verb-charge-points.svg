@@ -1,0 +1,5 @@
+<!-- Matches the existing Red VS Blue existing-charge-point-glyph. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" role="img">
+  <title>充能点变化</title>
+  <rect x="4.5" y="4.5" width="15" height="15" rx="3" transform="rotate(45 12 12)"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>
+</svg>

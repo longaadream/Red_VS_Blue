@@ -43,8 +43,7 @@
       if (historyUi && historyUi.mount) {
         historyUi.mount({
           element: mountInput.historyDock || null,
-          floatLayer: mountInput.floatLayer || null,
-          projectCell: function (x, y, elevation) { return renderer.projectCell(x, y, elevation) },
+          setHistoryHighlight: function (cells) { return renderer.setHistoryHighlight(cells) },
         })
       }
       mounted = true
