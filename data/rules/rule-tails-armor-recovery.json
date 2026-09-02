@@ -1,0 +1,7 @@
+{
+  "id": "rule-tails-armor-recovery",
+  "name": "恢复模块",
+  "description": "持有恢复模块时，己方回合结束回复3点生命。",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var piece=context.rulePiece;if(!piece||piece.currentHp<=0||context.playerId!==piece.ownerPlayerId)return {success:false,message:''};var count=(piece.statusTags||[]).filter(function(t){return t.type==='periodic-heal';}).length;if(!count){removeRuleById(piece.instanceId,'rule-tails-armor-recovery');return {success:false,message:''};}var amount=count*3;piece.currentHp=Math.min(piece.maxHp,piece.currentHp+amount);return {success:true,message:piece.name+'的恢复模块回复'+amount+'点生命'};"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "sonic", "name": "索尼克", "faction": "good", "rarity": "legendary", "description": "高速突进 / 收割", "image": "sonic.png",
+  "stats": { "maxHp": 12, "attack": 4, "defense": 0, "moveRange": 6, "speed": 6 },
+  "initialStatusTags": [
+    { "id": "sonic-free-normal-move", "type": "free-normal-move-every-turn", "name": "音速", "stacks": 1, "relatedRules": ["rule-sonic-free-move"] },
+    { "id": "sonic-momentum-core", "type": "momentum-core", "name": "动能", "stacks": 0, "visible": true, "skillIds": ["sonic-spin-dash", "sonic-homing-attack"], "relatedRules": ["rule-momentum-gain", "rule-momentum-consume"] }
+  ],
+  "skills": [{ "skillId": "sonic-spin-dash", "level": 1 }, { "skillId": "sonic-homing-attack", "level": 1 }, { "skillId": "sonic-super-form", "level": 1 }], "isDefault": false
+}

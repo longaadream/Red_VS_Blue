@@ -1605,8 +1605,7 @@
     <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">全图</button>
     <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
     <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
-    <div id="opponentHandStack" class="opponent-hand-stack" role="img" aria-label="对方没有手牌" title="对方手牌"><strong class="opponent-hand-count" aria-hidden="true">0</strong></div>
-    <button class="btn-fullmap" id="btnDebugBattleLog" hidden aria-label="打开调试战斗日志" onclick="openLog()" title="调试战斗日志">调试日志</button>
+    <button class="btn-fullmap" aria-label="打开战斗日志" onclick="openLog()" title="战斗日志">日志</button>
   </div>
 
   <!-- Main layout -->
@@ -1658,6 +1657,7 @@
                 <span class="piece-context-identity">
                   <span id="pieceContextName" class="piece-context-name"></span>
                   <span id="pieceContextHp" class="piece-context-hp"></span>
+                  <span id="pieceContextMomentum" class="piece-context-momentum" hidden></span>
                 </span>
                 <span class="piece-context-actions">
                   <button type="button" class="piece-context-info" onclick="if(selectedPieceId)dispatchBattleIntent({type:'inspect-piece',pieceId:selectedPieceId})" aria-label="查看棋子完整技能与状态" title="完整技能与状态">i</button>
@@ -1786,9 +1786,7 @@
     const TRAINING_MODE = params.get('mode') === 'training'
     const SPECTATE_MODE = params.get('mode') === 'spectate'
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
-    const DEBUG_BATTLE_LOG = params.get('debugBattleLog') === '1'
-    const debugBattleLogButton = document.getElementById('btnDebugBattleLog')
-    if (debugBattleLogButton) debugBattleLogButton.hidden = !DEBUG_BATTLE_LOG
+    const RED166_QA_MODE = params.get('qa') === 'RED-166'
     if (RED43_QA_MODE) document.body.classList.add('red43-qa')
     function shouldUseRelayMode() {
       if (params.get('relay') === '1' || params.get('server') === 'remote') return true
@@ -2092,6 +2090,7 @@
       'lethal-toxin': { label: '致命毒素' },
       'blizzard': { label: '暴风雪' },
       'sticky-bomb': { label: '黏弹' },
+      'tails-flight-reservation': { label: '双尾飞行预留' },
     })
     function tileEffectMeta(effect) {
       const tileType = (effect && (effect.tileType || effect.type)) || ''
@@ -2479,29 +2478,52 @@
     let battleActionHistory = null
     let currentBattleViewModel = null
     let latestBattlePresentationEvents = []
-    let trainingBattlePresentationChains = []
-    function refreshTrainingPresentationEvents(Engine) {
-      if (!TRAINING_MODE) return
-      if (!Engine || typeof Engine.projectBattlePresentationEventsForViewer !== 'function') {
-        throw new Error('训练权威动作投影接口未加载')
+    function red166QaPresentationEvents(snapshot) {
+      if (!RED166_QA_MODE || !snapshot || !Array.isArray(snapshot.pieces)) return []
+      const pieces = snapshot.pieces.filter(piece => piece && piece.instanceId && piece.x != null && piece.y != null)
+      if (!pieces.length) return []
+      const players = Array.isArray(snapshot.players) ? snapshot.players : []
+      const events = []
+      for (let index = 0; index < 20; index += 1) {
+        const source = pieces[index % pieces.length]
+        const target = pieces[(index + Math.max(1, Math.floor(pieces.length / 2))) % pieces.length]
+        const actionId = 'red166-qa-' + index
+        const rootEventId = actionId + ':0'
+        const move = index % 2 === 0
+        events.push({
+          eventId: rootEventId,
+          rootEventId,
+          parentEventId: null,
+          actionId,
+          sequence: 0,
+          kind: move ? 'move' : 'skill',
+          iconId: move ? 'action-move' : (index === 17 ? 'future-action' : 'action-skill'),
+          actorPlayerId: source.ownerPlayerId || (players[index % Math.max(1, players.length)] || {}).playerId || null,
+          sourcePieceId: source.instanceId,
+          targetPieceIds: [target.instanceId],
+          targetCell: { x: target.x, y: target.y },
+          result: move
+            ? { fromX: source.x, fromY: source.y, toX: target.x, toY: target.y }
+            : null,
+          priority: 100,
+          skippable: true,
+        })
+        if (index === 19) {
+          events.push({
+            eventId: actionId + ':1', rootEventId, parentEventId: rootEventId, actionId, sequence: 1,
+            kind: 'damage', iconId: 'action-damage', actorPlayerId: source.ownerPlayerId || null,
+            sourcePieceId: source.instanceId, targetPieceIds: [target.instanceId], result: { amount: 3 },
+            priority: 80, skippable: true,
+          })
+          events.push({
+            eventId: actionId + ':2', rootEventId, parentEventId: rootEventId, actionId, sequence: 2,
+            kind: 'statusAdded', iconId: 'status-add', actorPlayerId: source.ownerPlayerId || null,
+            sourcePieceId: source.instanceId, targetPieceIds: [target.instanceId], statusType: 'divine-shield',
+            priority: 70, skippable: true,
+          })
+        }
       }
-      latestBattlePresentationEvents = trainingBattlePresentationChains.flatMap(function (chain) {
-        return Engine.projectBattlePresentationEventsForViewer(chain, myPlayerId)
-      })
-    }
-    function appendTrainingPresentationEvents(Engine, action, beforeState, afterState) {
-      if (!Engine || typeof Engine.projectBattlePresentationEvents !== 'function') {
-        throw new Error('训练权威动作事件接口未加载')
-      }
-      const chain = Engine.projectBattlePresentationEvents({
-        actionId: action.clientActionId,
-        command: action,
-        beforeState: beforeState,
-        afterState: afterState,
-      })
-      if (chain.length) trainingBattlePresentationChains.push(chain)
-      trainingBattlePresentationChains = trainingBattlePresentationChains.slice(-20)
-      refreshTrainingPresentationEvents(Engine)
+      return events
     }
     function red43QaSnapshot() {
       if (!RED43_QA_MODE) return null
@@ -2684,6 +2706,13 @@
         }
       } catch (_) {}
       return {}
+    }
+    function pieceHasMomentumSkillForDisplay(piece) {
+      return pieceDispSkills(piece).some(sk => skillDefOf(skillIdOf(sk)).momentumSkill === true)
+    }
+    function pieceMomentumValue(piece) {
+      const value = Number(piece && piece.momentum)
+      return Number.isFinite(value) ? Math.max(0, value) : 0
     }
     function skillUsesCharge(skillData) {
       return (skillData && (skillData.chargeCost || 0) > 0) || false
@@ -3303,6 +3332,7 @@
         <div class="pi-stat"><div class="pi-stat-val" style="color:#f87171">${pstats.attack ?? '-'}</div><div class="pi-stat-lbl">攻击</div></div>
         <div class="pi-stat"><div class="pi-stat-val" style="color:#60a5fa">${pstats.defense ?? '-'}</div><div class="pi-stat-lbl">防御</div></div>
         <div class="pi-stat"><div class="pi-stat-val" style="color:#fbbf24">${pstats.moveRange ?? '-'}</div><div class="pi-stat-lbl">移动</div></div>
+        ${pieceHasMomentumSkillForDisplay(piece) ? `<div class="pi-stat"><div class="pi-stat-val" style="color:#38bdf8">${pieceMomentumValue(piece)}</div><div class="pi-stat-lbl">动能</div></div>` : ''}
       </div>`
 
       // Skills (display* aware)
@@ -3886,24 +3916,12 @@
       try {
         const config = setupConfig || trainingSetupConfig || getTrainingSetupConfig()
         trainingSetupConfig = config
-        trainingBattlePresentationChains = []
-        latestBattlePresentationEvents = []
         G = await trainingApiFetch('POST', Object.assign({ mapId: mapId || undefined }, config))
-        myPlayerId = G.turn.currentPlayerId
         // Auto-advance past start phase so training enters action phase immediately
         if (G.turn && G.turn.phase === 'start') {
-          try {
-            const Engine = await window.RvBGameEngine.ensure()
-            const beforeBegin = G
-            const beginAction = withClientActionId({ type: 'beginPhase', playerId: G.turn.currentPlayerId })
-            G = await trainingApiFetch('PUT', { action: beginAction, battleState: G })
-            appendTrainingPresentationEvents(Engine, beginAction, beforeBegin, G)
-          } catch (error) {
-            console.error('[training] failed to enter action phase', error)
-          }
+          try { G = await trainingApiFetch('PUT', { action: { type: 'beginPhase' }, battleState: G }) } catch(e) {}
         }
         myPlayerId = G.turn.currentPlayerId
-        refreshTrainingPresentationEvents(window.GameEngine)
         myFaction = getTrainingPlayerFaction(myPlayerId)
         selectedPieceId = null
         clearTargetInteraction('training-started')
@@ -3938,7 +3956,6 @@
       const next = myPlayerId === 'training-red' ? 'training-blue' : 'training-red'
       myPlayerId = next
       myFaction = getTrainingPlayerFaction(myPlayerId)
-      refreshTrainingPresentationEvents(window.GameEngine)
       selectedPieceId = null
       clearTargetInteraction('perspective-switched')
       addLog('控制方 -> ' + trainingPlayerLabel(next), 'turn')
@@ -5032,7 +5049,9 @@
         : new Set()
       return BattleViewModel.create({
         snapshot: snapshot,
-        presentationEvents: isCurrentSnapshot ? latestBattlePresentationEvents : [],
+        presentationEvents: isCurrentSnapshot
+          ? (latestBattlePresentationEvents.length ? latestBattlePresentationEvents : red166QaPresentationEvents(snapshot))
+          : [],
         viewerId: myPlayerId,
         selectedPieceId: selectedPieceId,
         skillsById: skillsById,
@@ -5295,22 +5314,6 @@
       document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, true)).join('')
       document.getElementById('oppPieces').innerHTML = oppPieces.map(p => renderPieceCard(p, false)).join('')
 
-      const opponentHandStack = document.getElementById('opponentHandStack')
-      if (opponentHandStack) {
-        const opponentHandCount = Array.isArray(oppMeta && oppMeta.hand)
-          ? oppMeta.hand.length
-          : Number(oppMeta && oppMeta.handCount) || 0
-        const visibleCardBacks = Math.min(10, Math.max(0, Math.trunc(opponentHandCount)))
-        const cardStep = visibleCardBacks > 1 ? Math.min(3, 19 / (visibleCardBacks - 1)) : 0
-        const cardBacks = Array.from({ length: visibleCardBacks }, function (_, index) {
-          const center = (visibleCardBacks - 1) / 2
-          return '<i style="left:' + (2 + index * cardStep) + 'px;top:' + (4 - Math.min(1.5, index * 0.18)) + 'px;transform:rotate(' + ((index - center) * 0.9) + 'deg)" aria-hidden="true"></i>'
-        }).join('')
-        opponentHandStack.innerHTML = cardBacks + '<strong class="opponent-hand-count" aria-hidden="true">' + visibleCardBacks + '</strong>'
-        opponentHandStack.classList.toggle('is-empty', visibleCardBacks === 0)
-        opponentHandStack.setAttribute('aria-label', opponentHandCount > 0 ? '对方有' + opponentHandCount + '张手牌' : '对方没有手牌')
-      }
-
       // Update piece select dropdown
       const sel = document.getElementById('pieceSelect')
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
@@ -5359,7 +5362,7 @@
         ontouchstart="startPressTimer(event,'${iid}')"
         ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
         oncontextmenu="event.preventDefault();showPieceInfo('${iid}')">
-        <button class="piece-info-btn" onclick="event.stopPropagation();showPieceInfo('${iid}')">鈸?/button>
+        <button type="button" class="piece-info-btn" aria-label="查看${escHtml(displayName)}完整技能与状态" title="完整技能与状态" onclick="event.stopPropagation();showPieceInfo('${iid}')">i</button>
         ${imgSrc ? `<img src="${imgSrc}" onerror="this.style.display='none'" style="width:100%;height:40px;object-fit:cover;border-radius:5px;margin-bottom:3px">` : ''}
         <div class="piece-card-name">${escHtml(displayName)}</div>
         <div class="piece-card-hp">${dispHp}/${mhp} HP</div>
@@ -5510,6 +5513,10 @@
       const displayName = piece.name || (template && template.name) || piece.templateId
       document.getElementById('pieceContextName').textContent = displayName
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
+      const momentumDisplay = document.getElementById('pieceContextMomentum')
+      const showsMomentum = pieceHasMomentumSkillForDisplay(piece)
+      momentumDisplay.hidden = !showsMomentum
+      momentumDisplay.textContent = showsMomentum ? '动能 ' + pieceMomentumValue(piece) : ''
       menu.dataset.pieceId = piece.instanceId
 
       const skillButtons = skills.length ? skills.map(sk => {
@@ -6383,13 +6390,11 @@
     async function trainingDoAction(action) {
       if (!G) return
       try {
-        const Engine = await window.RvBGameEngine.ensure()
         const wasTargetSubmission = !!targetSubmissionPending
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
         const oldG = G
         const newG = await trainingApiFetch('PUT', { action, battleState: G })
-        appendTrainingPresentationEvents(Engine, action, oldG, newG)
         if (_use3d && battlePresentation) {
           battlePresentation.animateAction(
             Object.assign({}, action, { motionEventKey: 'training:' + action.clientActionId }),
@@ -6402,18 +6407,10 @@
         flushActionLog(oldG, G)
         if (action.type === 'endTurn') {
           if (G.turn && G.turn.phase === 'end') {
-            try {
-              const beforeBegin = G
-              const beginAction = withClientActionId({ type: 'beginPhase', playerId: G.turn.currentPlayerId })
-              G = await trainingApiFetch('PUT', { action: beginAction, battleState: G })
-              appendTrainingPresentationEvents(Engine, beginAction, beforeBegin, G)
-            } catch (error) {
-              console.error('[training] failed to advance the next action phase', error)
-            }
+            try { G = await trainingApiFetch('PUT', { action: { type: 'beginPhase' }, battleState: G }) } catch {}
           }
           myPlayerId = G.turn.currentPlayerId
           myFaction = getTrainingPlayerFaction(myPlayerId)
-          refreshTrainingPresentationEvents(Engine)
           const btn = document.getElementById('btnSwitchPov')
           if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(myPlayerId)
         }
@@ -6769,10 +6766,7 @@
       loadingMsg.style.color = type === 'err' ? '#f87171' : '#64748b'
       if (spinner) spinner.style.display = type === 'err' ? 'none' : ''
     }
-    function openLog() {
-      if (!DEBUG_BATTLE_LOG) return
-      document.getElementById('logOverlay').classList.add('show')
-    }
+    function openLog() { document.getElementById('logOverlay').classList.add('show') }
     function closeLog() { document.getElementById('logOverlay').classList.remove('show') }
     function addLog(msg, cls) {
       const body = document.getElementById('logBody')
@@ -6962,13 +6956,14 @@
       const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
       const renderer = hasThreeRenderer ? window.BattleRenderer3D : {
         init() {}, update() {}, resize() {}, resetView() {}, projectCell() { return null },
-        setHistoryHighlight() {}, screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
+        screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
       battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
       battleActionHistory = BattleActionHistory.create({
         document,
         window,
         icons: BattleEffectIcons,
+        onOpenLog: openLog,
       })
       battlePresentation = BattlePresentation.create({
         renderer,

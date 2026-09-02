@@ -1,0 +1,7 @@
+{
+  "id": "rule-tails-flight-inoperable",
+  "name": "双尾飞行不可操作",
+  "description": "预留搬运期间无法移动或使用技能。",
+  "trigger": { "type": "beforeMove" },
+  "skillCode": "var piece=context.rulePiece;if(!piece||!context.sourcePiece||context.sourcePiece.instanceId!==piece.instanceId)return {success:false,message:''};if(!(piece.statusTags||[]).some(function(t){return t.type==='inoperable';})){removeRuleById(piece.instanceId,'rule-tails-flight-inoperable');return {success:false,message:''};}return {success:true,blocked:true,message:piece.name+'不可操作'};"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "rule-momentum-consume",
+  "name": "动能消耗",
+  "description": "使用动能技能后清空动能；超级形态期间保留。",
+  "trigger": { "type": "afterSkillUsed" },
+  "skillCode": "var piece=context.rulePiece;if(!piece||!context.sourcePiece||context.sourcePiece.instanceId!==piece.instanceId)return {success:false,message:''};var tag=(piece.statusTags||[]).find(function(t){return t.type==='momentum-core';});if(!tag||!Array.isArray(tag.skillIds)||tag.skillIds.indexOf(context.skillId)<0)return {success:false,message:''};if((piece.statusTags||[]).some(function(t){return t.type==='preserve-momentum';}))return {success:true,message:piece.name+'保留了动能'};tag.stacks=0;piece.momentum=0;return {success:true,message:piece.name+'的动能已重置'};"
+}

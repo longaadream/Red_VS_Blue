@@ -1,0 +1,7 @@
+{
+  "id": "rule-tails-flight-immune",
+  "name": "双尾飞行免疫",
+  "description": "预留搬运期间免疫伤害。",
+  "trigger": { "type": "beforeDamageTaken" },
+  "skillCode": "var piece=context.rulePiece;if(!piece||!context.piece||context.piece.instanceId!==piece.instanceId)return {success:false,message:''};if(!(piece.statusTags||[]).some(function(t){return t.type==='immune';})){removeRuleById(piece.instanceId,'rule-tails-flight-immune');return {success:false,message:''};}return {success:true,blocked:true,message:piece.name+'处于免疫状态'};"
+}

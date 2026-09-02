@@ -1,0 +1,31 @@
+{
+  "id": "shadow-ride-sweep",
+  "name": "骑射横扫",
+  "description": "仅向上下左右四个正方向冲刺至多7格，路径敌人受到100%攻击力物理伤害；冲刺会被墙体或 trap 阻挡。动能5：选择本次显示冲刺方向的左侧或右侧，冲刺时对该方向4格内的敌人造成5点伤害；射击可穿透角色，但会被掩体或墙体阻挡（不伤害冲刺格敌人）。动能7：路径伤害+2。",
+  "keywords": ["动能"],
+  "effectTags": ["位移", "获得动能"],
+  "momentumSkill": true,
+  "icon": "🏍️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 7,
+        "distanceMetric": "chebyshev",
+        "sameRowOrColumn": true,
+        "excludeSourceCell": true,
+        "requireWalkable": true,
+        "requireUnoccupied": true
+      }
+    ]
+  },
+  "code": "function executeSkill(context){var c=context.piece,b=context.battle,pos=selectTarget({type:'grid',range:7,filter:'all'});if(!pos||pos.needsTargetSelection)return pos;var dx=Math.sign(pos.x-c.x),dy=Math.sign(pos.y-c.y),steps=Math.max(Math.abs(pos.x-c.x),Math.abs(pos.y-c.y));if((dx===0&&dy===0)||(dx!==0&&dy!==0)||steps>7)return {success:false,message:'请选择7格内上下左右方向'};var side=null;if((c.momentum||0)>=5){side=selectOption({title:'选择横扫侧',options:[{label:'左侧',value:'left'},{label:'右侧',value:'right'}]});if(side&&side.needsOptionSelection)return side;}var last=null,pathHit=[],sideHit=[],pathCells=[];for(var i=1;i<=steps;i++){var x=c.x+dx*i,y=c.y+dy*i,tile=b.map.tiles.find(function(q){return q.x===x&&q.y===y;});if(!tile||!tile.props||tile.props.walkable===false||tile.props.type==='wall'||tile.props.type==='trap'||tile.props.type==='hole')return {success:false,message:'冲刺路径被墙体、陷阱或不可通行地形阻挡'};pathCells.push({x:x,y:y});if(!b.pieces.some(function(p){return p.currentHp>0&&p.x===x&&p.y===y&&p.instanceId!==c.instanceId;}))last={x:x,y:y};var pathVictims=b.pieces.filter(function(p){return p.currentHp>0&&p.ownerPlayerId!==c.ownerPlayerId&&p.x===x&&p.y===y;});pathVictims.forEach(function(p){var r=dealDamage(c,p,c.attack+((c.momentum||0)>=7?2:0),'physical',b,context.skill.id);pathHit.push(p.name+'(-'+r.damage+')');});}if(!last)return {success:false,message:'没有可落脚的空格'};if(side){var sx=side==='left'?dy:-dy,sy=side==='left'?-dx:dx;for(var j=0;j<pathCells.length;j++){var origin=pathCells[j];for(var distance=1;distance<=4;distance++){var shotX=origin.x+sx*distance,shotY=origin.y+sy*distance,shotTile=b.map.tiles.find(function(q){return q.x===shotX&&q.y===shotY;});if(!shotTile||shotTile.props&&shotTile.props.bulletPassable===false)break;var onPath=pathCells.some(function(cell){return cell.x===shotX&&cell.y===shotY;});if(onPath)continue;var shotVictims=b.pieces.filter(function(p){return p.currentHp>0&&p.ownerPlayerId!==c.ownerPlayerId&&p.x===shotX&&p.y===shotY;});shotVictims.forEach(function(p){var r=dealDamage(c,p,5,'physical',b,context.skill.id);sideHit.push(p.name+'(-'+r.damage+')');});}}}c.x=last.x;c.y=last.y;return {success:true,message:'骑射横扫至('+last.x+','+last.y+')'+(side?'，按本次冲刺方向垂直射击'+(side==='left'?'左侧':'右侧')+(sideHit.length?'命中'+sideHit.join('、'):'未命中'):'')+(pathHit.length?'，路径命中'+pathHit.join('、'):'')};}"
+}
