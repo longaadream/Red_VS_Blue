@@ -614,6 +614,18 @@ new Script([
     expect(battlePage).toContain('\`<div class="pi-section-label">技能</div>\` + skillsHtml')
   })
 
+  it('renders registered status SVGs in piece detail without undefined optional metadata', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain(
+      "const iconPath = t.iconPath || t.assetPath || meta.assetPath || 'images/effect-icons/fallback.svg'",
+    )
+    expect(battlePage).toContain('class="pi-status-icon-image" src="${escHtml(iconPath)}"')
+    expect(battlePage).toContain("const description = t.description || meta.description || ''")
+    expect(battlePage).toContain("description ? `<span class=\"pi-status-desc\">${escHtml(description)}</span>` : ''")
+    expect(battlePage).not.toContain('escHtml(t.icon || meta.glyph)')
+  })
+
   it('exposes accessible target feedback and a mobile target mode that removes obstructing detail UI', () => {
     const battlePage = readPage('battle.html')
 
