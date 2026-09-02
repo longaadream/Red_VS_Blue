@@ -1,0 +1,12 @@
+{
+  "id": "rule-spiritual-pressure",
+  "name": "灵压",
+  "description": "主要目标的当前攻击力必须低于施法者。",
+  "targetValidation": {
+    "type": "comparePieceNumber",
+    "sourceField": "attack",
+    "targetField": "attack",
+    "operator": "gt",
+    "message": "目标攻击力必须低于施法者"
+  }
+}

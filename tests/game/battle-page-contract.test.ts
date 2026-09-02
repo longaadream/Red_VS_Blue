@@ -68,6 +68,17 @@ function parseInlineScript(script: { source: string; htmlLine: number }, index: 
 }
 
 describe('battle page route contract', () => {
+  it('serves canonical battle-page images before legacy public QA assets', () => {
+    const route = readFileSync(resolve(process.cwd(), 'app/qa/client/[...path]/route.ts'), 'utf8')
+    const staticQaServer = readFileSync(resolve(process.cwd(), 'scripts/run-colyseus-pages-qa.mjs'), 'utf8')
+
+    expect(route).toContain("[path.resolve(PAGE_ROOT, 'images'), PUBLIC_ROOT]")
+    expect(route).toContain('for (const target of targets)')
+    expect(route).toContain('Local QA serves battle-page images first, then legacy public images.')
+    expect(staticQaServer).toContain("[safeResolve(resolve(pagesRoot, 'images'), relativePath), safeResolve(publicRoot, relativePath)]")
+    expect(staticQaServer).toContain('resolveCandidates(pathname).find')
+  })
+
   it('parses every inline script in the canonical battle page', () => {
     const scripts = extractInlineScripts(readPage('battle.html'))
 
@@ -75,6 +86,39 @@ describe('battle page route contract', () => {
     for (const [index, script] of scripts.entries()) {
       expect(() => parseInlineScript(script, index)).not.toThrow()
     }
+  })
+
+  it('mounts the RED-167 vignette inside the shared battle presentation lifecycle', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('<script src="js/game-engine.js"></script>')
+    expect(battlePage).not.toContain('<script src="js/battle-ui/battle-presentation-events.js"></script>')
+    expect(battlePage).toContain('<script src="js/battle-ui/battle-action-identity.js"></script>')
+    expect(battlePage).toContain('<script src="js/battle-ui/battle-action-vignette.js"></script>')
+    expect(battlePage).toContain('battleActionVignette = BattleActionVignette.create({')
+    expect(battlePage).toContain('vignetteUi: battleActionVignette')
+    expect(battlePage).toContain("const RED167_QA_MODE = params.get('qa') === 'RED-167'")
+    expect(battlePage).toContain('window.__RVB_RED167_REPLAY__ = playRed167QaSequence')
+  })
+
+  it('projects real training actions into the shared RED-167 presentation queue', () => {
+    const battlePage = readPage('battle.html')
+    const trainingAction = readNamedAsyncFunction(battlePage, 'trainingDoAction')
+    const appendEvents = readNamedFunction(battlePage, 'appendTrainingPresentationEvents')
+    const refreshEvents = readNamedFunction(battlePage, 'refreshTrainingPresentationEvents')
+    const browserEntry = readFileSync(resolve(process.cwd(), 'lib/game/engine-browser-entry.ts'), 'utf8')
+    const browserEngine = readFileSync(resolve(pagesDir, 'js/game-engine.js'), 'utf8')
+
+    expect(trainingAction).toContain('appendTrainingPresentationEvents(Engine, action, oldG, newG)')
+    expect(appendEvents).toContain('Engine.projectBattlePresentationEvents({')
+    expect(appendEvents).toContain('actionId: action.clientActionId')
+    expect(appendEvents).toContain('beforeState: beforeState')
+    expect(appendEvents).toContain('afterState: afterState')
+    expect(refreshEvents).toContain('Engine.projectBattlePresentationEventsForViewer(chain, myPlayerId)')
+    expect(browserEntry).toContain('projectBattlePresentationEvents')
+    expect(browserEntry).toContain('projectBattlePresentationEventsForViewer')
+    expect(browserEngine).toContain('projectBattlePresentationEvents')
+    expect(browserEngine).toContain('projectBattlePresentationEventsForViewer')
   })
 
   it('feeds the authoritative response timer into the shared battle clock view', () => {
@@ -89,6 +133,9 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain("authoritativePendingTimer ? '响应 ' + view.clockText : view.clockText")
     expect(battlePage).toContain("clock.parentElement?.classList.toggle('pending-timer-active', !!authoritativePendingTimer)")
     expect(battlePage).toContain('.turn-summary-secondary.pending-timer-active')
+    expect(battlePage).not.toContain('deploymentStatusTimer = setInterval')
+    expect(battlePage).toContain('function scheduleDeadlineStatusRefresh()')
+    expect(battlePage).toContain('deadlineStatusTimer = setTimeout')
   })
 
   it('renders the authoritative terminal result without judging or submitting gameOver locally', () => {
@@ -614,6 +661,18 @@ new Script([
     expect(battlePage).toContain('\`<div class="pi-section-label">技能</div>\` + skillsHtml')
   })
 
+  it('renders registered status SVGs in piece detail without undefined optional metadata', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain(
+      "const iconPath = t.iconPath || t.assetPath || meta.assetPath || 'images/effect-icons/fallback.svg'",
+    )
+    expect(battlePage).toContain('class="pi-status-icon-image" src="${escHtml(iconPath)}"')
+    expect(battlePage).toContain("const description = t.description || meta.description || ''")
+    expect(battlePage).toContain("description ? `<span class=\"pi-status-desc\">${escHtml(description)}</span>` : ''")
+    expect(battlePage).not.toContain('escHtml(t.icon || meta.glyph)')
+  })
+
   it('exposes accessible target feedback and a mobile target mode that removes obstructing detail UI', () => {
     const battlePage = readPage('battle.html')
 
@@ -646,7 +705,7 @@ new Script([
 
     expect(battlePage).toContain('id="orientationGuard"')
     expect(battlePage).toContain('请旋转设备')
-    expect(battlePage).toContain('@media (orientation: portrait) and (max-width: 760px)')
+    expect(battlePage).toContain('@media (orientation: portrait)')
     expect(battlePage).toContain('@media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px)')
     expect(battlePage).toContain('--mobile-landscape-min: 844px')
     expect(battlePage).toContain('--mobile-landscape-recommended: 932px')
@@ -740,6 +799,15 @@ new Script([
     expect(authorityCells).not.toMatch(/manhattan/i)
     expect(battlePage).toContain("pieceHasVisibleStatusTag(_selPiece, 'deployment-first-move-free')")
     expect(battlePage).toContain('本回合首移 0 AP')
+  })
+
+  it('keeps deployment candidate nodes stable while only the countdown refreshes', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain("let deploymentChoicesRenderKey = ''")
+    expect(battlePage).toContain('if (nextChoicesKey !== deploymentChoicesRenderKey)')
+    expect(battlePage).toContain('deploymentChoicesRenderKey = nextChoicesKey')
+    expect(battlePage).toContain('renderTurnTimerStatus()')
   })
 
   it('shows authoritative reserve-candidate stats and opens read-only accessible details', () => {

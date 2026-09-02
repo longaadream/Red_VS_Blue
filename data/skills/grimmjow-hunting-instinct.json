@@ -1,0 +1,17 @@
+{
+  "id": "grimmjow-hunting-instinct",
+  "name": "狩猎本能",
+  "description": "4格内的敌人移动或使用技能后，可移动至2格内1个空格；若与其相邻，攻击该敌人2次，每次造成75%攻击力的物理伤害。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": ["回合外移动", "多段攻击"],
+  "icon": "🐆",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "range": "self",
+  "code": "function executeSkill() { return { success: false, message: '' }; }"
+}

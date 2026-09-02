@@ -14,6 +14,7 @@ function createRoots() {
   const activePackRoot = path.join(root, 'pack')
   fs.mkdirSync(path.join(appRoot, 'data', 'pieces'), { recursive: true })
   fs.mkdirSync(path.join(appRoot, 'public'), { recursive: true })
+  fs.mkdirSync(path.join(appRoot, 'public', 'effect-icons'), { recursive: true })
   fs.mkdirSync(path.join(appRoot, 'public', 'tile-effects'), { recursive: true })
   fs.mkdirSync(path.join(htmlRoot, 'data', 'pieces'), { recursive: true })
   fs.mkdirSync(path.join(htmlRoot, 'images', 'terrain'), { recursive: true })
@@ -25,6 +26,7 @@ function createRoots() {
   fs.writeFileSync(path.join(appRoot, 'data', 'pieces', 'manifest.json'), '["development"]')
   fs.writeFileSync(path.join(appRoot, 'public', 'ana.jpg'), 'development portrait')
   fs.writeFileSync(path.join(appRoot, 'public', 'watcher.jpg'), 'application portrait')
+  fs.writeFileSync(path.join(appRoot, 'public', 'effect-icons', 'divine-shield.svg'), '<svg>built in</svg>')
   fs.writeFileSync(path.join(appRoot, 'public', 'tile-effects', 'amaterasu.svg'), '<svg>built in</svg>')
   fs.writeFileSync(path.join(htmlRoot, 'data', 'pieces', 'manifest.json'), '["packaged"]')
   fs.writeFileSync(path.join(htmlRoot, 'images', 'terrain', 'floor.webp'), 'page terrain')
@@ -110,6 +112,11 @@ describe('Electron client protocol resource resolution', () => {
       isPackaged: false,
       relativePath: 'images/tile-effects/amaterasu.svg',
     })).toBe(path.join(roots.appRoot, 'public', 'tile-effects', 'amaterasu.svg'))
+    expect(resolveClientProtocolFile({
+      ...roots,
+      isPackaged: false,
+      relativePath: 'images/effect-icons/divine-shield.svg',
+    })).toBe(path.join(roots.appRoot, 'public', 'effect-icons', 'divine-shield.svg'))
   })
 
   test('keeps active resource-pack images ahead of development fallbacks', () => {
@@ -158,6 +165,23 @@ describe('Electron client protocol resource resolution', () => {
       isPackaged: true,
       relativePath: 'images/ana.jpg',
     })).toBeNull()
+  })
+
+  test('serves trusted built-in status and tile-effect SVGs in packaged builds', () => {
+    const roots = createRoots()
+
+    expect(resolveClientProtocolFile({
+      ...roots,
+      activePackRoot: null,
+      isPackaged: true,
+      relativePath: 'images/effect-icons/divine-shield.svg',
+    })).toBe(path.join(roots.appRoot, 'public', 'effect-icons', 'divine-shield.svg'))
+    expect(resolveClientProtocolFile({
+      ...roots,
+      activePackRoot: null,
+      isPackaged: true,
+      relativePath: 'images/tile-effects/amaterasu.svg',
+    })).toBe(path.join(roots.appRoot, 'public', 'tile-effects', 'amaterasu.svg'))
   })
 
   test.each([

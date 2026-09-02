@@ -22,6 +22,7 @@ const SURFACES = {
       'addStatusEffectById', 'removeStatusEffectById', 'addPlayerRuleById',
       'removePlayerRuleById', 'addRuleById', 'removeRuleById', 'addPlayerStatusEffectById',
       'removePlayerStatusEffectById', 'addPlayerSkillById', 'removePlayerSkillById',
+      'addSkillById', 'removeSkillById',
       'selectOption', 'fireEvent',
       'Math', 'Date',
     ],

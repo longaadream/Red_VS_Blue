@@ -3,6 +3,7 @@ import type { DispatchRoomBattleActionResult } from '@/lib/game/room-battle-acti
 export const BATTLE_ROOM_TYPE = 'battle'
 export const BATTLE_COMMAND_MESSAGE = 'battleCommand'
 export const BATTLE_RECEIPT_MESSAGE = 'battleReceipt'
+export const BATTLE_RECEIPT_REQUEST_MESSAGE = 'battleReceiptRequest'
 export const BATTLE_TRANSITION_MESSAGE = 'battleTransition'
 export const BATTLE_DURABLE_MESSAGE = 'battleDurable'
 export const BATTLE_SNAPSHOT_MESSAGE = 'battleSnapshot'

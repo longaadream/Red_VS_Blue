@@ -371,8 +371,45 @@ describe('Velen delayed holy cards', () => {
 
     const charge = executeCardFunction(loadCardById('holy-charge', true)!, 'player-red', state, undefined, undefined, undefined, undefined, undefined, chargeCard)
     expect(charge.success).toBe(true)
-    expect(source.statusTags.find((tag: any) => tag.type === 'damage-buff')?.intensity).toBe(3)
-    expect(ally.statusTags.find((tag: any) => tag.type === 'damage-buff')?.intensity).toBe(3)
+    expect(source.statusTags.find((tag: any) => tag.type === 'damage-buff')).toMatchObject({ name: '强化', intensity: 3 })
+    expect(ally.statusTags.find((tag: any) => tag.type === 'damage-buff')).toMatchObject({ name: '强化', intensity: 3 })
+  })
+
+  it('merges Holy Charge and Divine Blessing into one additive buff and one rule', () => {
+    const source = makePiece({ instanceId: 'shared-buff-source', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
+    const ally = makePiece({ instanceId: 'shared-buff-ally', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
+    const shielded = makePiece({ instanceId: 'shared-buff-shield', ownerPlayerId: 'player-red', x: 2, y: 0 }) as any
+    shielded.statusTags = [{ id: 'divine-shield', type: 'divine-shield' }]
+    const state = makeState({ pieces: [source, ally, shielded] }) as any
+
+    expect(executeSkill('divine-blessing', state, source.instanceId).success).toBe(true)
+    const enhancedCharge = {
+      cardId: 'holy-charge', instanceId: 'shared-buff-charge', ownerPlayerId: 'player-red',
+      effectModifiers: [{ effect: 'statusIntensity', operation: 'multiply', value: 1.5, statusType: 'damage-buff' }],
+    }
+    expect(executeCardFunction(
+      loadCardById('holy-charge', true)!, 'player-red', state,
+      undefined, undefined, undefined, undefined, undefined, enhancedCharge,
+    ).success).toBe(true)
+
+    for (const piece of [source, ally, shielded]) {
+      expect(piece.statusTags.filter((tag: any) => tag.type === 'damage-buff')).toEqual([
+        expect.objectContaining({
+          id: 'damage-buff', name: '强化', intensity: 6, remainingUses: 1,
+          relatedRules: ['rule-damage-buff'],
+        }),
+      ])
+      expect(piece.rules.filter((rule: any) => rule.id === 'rule-damage-buff')).toHaveLength(1)
+      expect(piece.rules.some((rule: any) => ['rule-holy-charge', 'rule-divine-blessing'].includes(rule.id))).toBe(false)
+    }
+
+    const context: any = {
+      type: 'beforeDamageDealt', playerId: 'player-red', sourcePiece: ally, damage: 3,
+    }
+    expect(new TriggerSystem().checkTriggers(state, context).success).toBe(true)
+    expect(context.damage).toBe(9)
+    expect(ally.statusTags.some((tag: any) => tag.type === 'damage-buff')).toBe(false)
+    expect(ally.rules.some((rule: any) => rule.id === 'rule-damage-buff')).toBe(false)
   })
 
 
@@ -954,5 +991,40 @@ describe('Turalyon holy-hand mobility', () => {
     } as any) as any
     expect(secondStage.pendingTargetSelection.targetType).toBe('grid')
     expectRolledBack(cancel(secondStage))
+  })
+
+  it('finishes Grand Crusade without a stuck selector when no complete legal formation exists', () => {
+    const definition = skill('turalyon-grand-crusade')
+    const turalyon = makePiece({ instanceId: 'full-turalyon', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
+    turalyon.isCore = true
+    turalyon.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
+    const ally = makePiece({ instanceId: 'full-ally', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
+    ally.isCore = true
+    const blockers = [
+      [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2],
+    ].map(([x, y], index) => makePiece({
+      instanceId: `formation-blocker-${index}`, ownerPlayerId: 'player-blue', x, y,
+    })) as any[]
+    const state = makeState({ pieces: [turalyon, ally, ...blockers], width: 3, height: 3 }) as any
+    state.skillsById[definition.id] = definition
+    state.players[0].actionPoints = 4
+    state.players[0].chargePoints = 1
+
+    const firstPending = applyBattleAction(state, {
+      type: 'useChargeSkill', playerId: 'player-red', pieceId: turalyon.instanceId, skillId: definition.id,
+    } as any) as any
+    const resolved = applyBattleAction(firstPending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: turalyon.instanceId,
+      extraTargets: [{ pieceId: ally.instanceId }],
+      selectionId: firstPending.pendingTargetSelection.selectionId,
+      stateRevision: firstPending.pendingTargetSelection.stateRevision,
+    } as any) as any
+
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.pendingOptionSelection).toBeUndefined()
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === turalyon.instanceId)).toMatchObject({ x: 0, y: 0 })
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === ally.instanceId)).toMatchObject({ x: 1, y: 0 })
+    expect(resolved.pieces.filter((piece: any) => piece.currentHp > 0).map((piece: any) => `${piece.x},${piece.y}`))
+      .toHaveLength(new Set(resolved.pieces.filter((piece: any) => piece.currentHp > 0).map((piece: any) => `${piece.x},${piece.y}`)).size)
   })
 })

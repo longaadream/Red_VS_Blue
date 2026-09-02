@@ -95,6 +95,8 @@
   let _floatLayer = null
   let _onIntent = null
   function _notifyViewportChange() {
+    _summaryPositionsDirty = true
+    _invalidate()
     if (_onIntent) _onIntent({ type: 'viewport-change' })
   }
   let _resizeObserver = null
@@ -105,13 +107,20 @@
   let _mapW = 0, _mapH = 0
   let _boardBase = null
   let _boardFront = null
-  const _tileObjects = new Map()       // "x,z" → THREE.Mesh
+  const _tileObjects = new Map()       // "x,z" → { surfaceY, type }
+  const _tileBatches = new Map()       // terrain type → THREE.InstancedMesh
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
   const _hlObjects = { move: new Map(), skill: new Map(), place: new Map(), selected: null, selectedId: null }
+  let _historyHighlightGroup = null
+  let _historyHighlightPointCount = 0
+  let _historyHighlightPathCount = 0
   const _anims = new Map()             // one controller per owner/property
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
+  const _pendingAppearanceCues = new Map()
+  let _presentationAreaFlash = null
+  let _presentationPath = null
   const _texCache = new Map()
   let _textureLoadGeneration = 0
   const _floaters = new Set()
@@ -122,6 +131,9 @@
   let _motionQuery = null
   let _currentModel = null
   let _clock = { prev: 0 }
+  let _summaryPositionsDirty = true
+  let _renderCount = 0
+  let _lastDrawCalls = 0
 
   // ── Geometry / Material cache (shared across all tiles/pieces) ────────────────
   let _tileGeom = null
@@ -234,6 +246,8 @@
       const callbacks = entry.loadCallbacks.splice(0)
       entry.errorCallbacks.length = 0
       callbacks.forEach(callback => callback(resolvedTexture))
+      _summaryPositionsDirty = true
+      _invalidate()
     }, undefined, error => {
       const current = _texCache.get(url)
       if (current === entry) _texCache.delete(url)
@@ -332,9 +346,10 @@
     _resizeObserver = new ResizeObserver(function () { resize() })
     _resizeObserver.observe(_container)
 
-    // Start render loop
+    // Render once, then sleep until state, viewport, texture, or motion changes.
     _clock.prev = 0
-    _animFrameId = requestAnimationFrame(_tick)
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   // ── Resize ───────────────────────────────────────────────────────────────────
@@ -349,7 +364,6 @@
       _camera.zoom = Math.max(_camera.zoom, _minimumUsableZoom(w, h))
       _camera.updateProjectionMatrix()
     }
-    _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
@@ -434,7 +448,7 @@
 
   function _tileSurfaceHeightAt(x, z) {
     const tile = _tileObjects.get(Math.round(x) + ',' + Math.round(z))
-    return tile && Number.isFinite(tile.userData.surfaceY) ? tile.userData.surfaceY : TILE_H
+    return tile && Number.isFinite(tile.surfaceY) ? tile.surfaceY : TILE_H
   }
 
   function _updateCameraProjection(w, h) {
@@ -451,15 +465,30 @@
     _camera.bottom = -halfHeightAtTarget
   }
 
-  // ── Render loop ───────────────────────────────────────────────────────────────
+  // ── Demand-driven render scheduling ───────────────────────────────────────────
+  function _invalidate() {
+    if (!_mounted || !_renderer || _animFrameId != null) return
+    _clock.prev = 0
+    _animFrameId = requestAnimationFrame(_tick)
+  }
+
   function _tick(now) {
     if (!_mounted || !_renderer || !_scene || !_camera) return
-    _animFrameId = requestAnimationFrame(_tick)
-    const dt = Math.min((now - (_clock.prev || now)) / 1000, 0.1)
+    _animFrameId = null
+    const dt = _clock.prev
+      ? Math.min((now - _clock.prev) / 1000, 0.1)
+      : (_anims.size > 0 ? 1 / 60 : 0)
     _clock.prev = now
     _stepAnims(dt)
     _pulseLava(now / 1000)
+    if (_summaryPositionsDirty) {
+      _updatePieceSummaryPositions()
+      _summaryPositionsDirty = false
+    }
     _renderer.render(_scene, _camera)
+    _renderCount += 1
+    _lastDrawCalls = _renderer.info && _renderer.info.render ? _renderer.info.render.calls : 0
+    if (_anims.size > 0 && _animFrameId == null) _animFrameId = requestAnimationFrame(_tick)
   }
 
   function _pulseLava(t) {
@@ -471,7 +500,10 @@
 
   // ── Tile map ─────────────────────────────────────────────────────────────────
   function _buildTiles(map) {
-    _tileObjects.forEach(m => _scene.remove(m))
+    _clearPresentationAreaFlash()
+    _clearPresentationPath()
+    _tileBatches.forEach(batch => _scene.remove(batch))
+    _tileBatches.clear()
     _tileObjects.clear()
     if (_boardFront) {
       _scene.remove(_boardFront)
@@ -501,17 +533,28 @@
 
     _scene.add(_boardBase)
 
+    const tilesByType = new Map()
     map.tiles.forEach(tile => {
       const type = (tile.props && tile.props.type) ? tile.props.type : (tile.type || 'floor')
       const tileHeight = TILE_HEIGHTS[type] || TILE_H
-      const mesh = new THREE.Mesh(_tileGeom, getTileMat(type))
-      mesh.scale.y = tileHeight
-      mesh.position.set(tile.x, tileHeight / 2, tile.y)
-      mesh.userData.tileX = tile.x
-      mesh.userData.tileZ = tile.y
-      mesh.userData.surfaceY = tileHeight
-      _scene.add(mesh)
-      _tileObjects.set(tile.x + ',' + tile.y, mesh)
+      if (!tilesByType.has(type)) tilesByType.set(type, [])
+      tilesByType.get(type).push({ x: tile.x, y: tile.y, surfaceY: tileHeight })
+      _tileObjects.set(tile.x + ',' + tile.y, { surfaceY: tileHeight, type: type })
+    })
+    tilesByType.forEach(function (tiles, type) {
+      const batch = new THREE.InstancedMesh(_tileGeom, getTileMat(type), tiles.length)
+      const transform = new THREE.Object3D()
+      tiles.forEach(function (tile, index) {
+        transform.position.set(tile.x, tile.surfaceY / 2, tile.y)
+        transform.scale.set(1, tile.surfaceY, 1)
+        transform.updateMatrix()
+        batch.setMatrixAt(index, transform.matrix)
+      })
+      if (batch.instanceMatrix && THREE.StaticDrawUsage != null) batch.instanceMatrix.setUsage(THREE.StaticDrawUsage)
+      batch.userData.cells = tiles
+      if (batch.computeBoundingSphere) batch.computeBoundingSphere()
+      _scene.add(batch)
+      _tileBatches.set(type, batch)
     })
 
     const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
@@ -624,11 +667,18 @@
       // Death feedback owns visibility until its authoritative result transition ends.
       if (piece.visible !== false) obj.group.visible = true
       else if (!obj.deathAnimating) obj.group.visible = false
+
+      const appearanceCue = _pendingAppearanceCues.get(piece.id)
+      if (appearanceCue && piece.visible !== false) {
+        _pendingAppearanceCues.delete(piece.id)
+        _animateSummon(obj)
+      }
     })
 
     // Remove departed pieces
     _pieceObjects.forEach((obj, id) => {
       if (!seen.has(id)) {
+        _pendingAppearanceCues.delete(id)
         _scene.remove(obj.group)
         _disposePieceObject(obj)
         _pieceObjects.delete(id)
@@ -813,6 +863,44 @@
   }
 
   // ── Piece summary overlay ─────────────────────────────────────────────────────
+  function _statusBadgeText(status) {
+    const registry = window.BattleEffectIcons
+    const values = registry && typeof registry.badge === 'function'
+      ? registry.badge(status)
+      : status || {}
+    const stacks = Number(values.stacks)
+    const uses = Number(values.uses)
+    const duration = Number(values.duration)
+    const intensity = Number(values.intensity)
+    if (Number.isFinite(stacks) && stacks > 1) return String(stacks)
+    if (Number.isFinite(uses) && uses > 0) return String(uses)
+    if (Number.isFinite(duration) && duration > 0) return String(duration)
+    if (Number.isFinite(intensity) && intensity > 1) return String(intensity)
+    return ''
+  }
+
+  function _statusIconPath(entry) {
+    return entry.status.iconPath || entry.status.assetPath || entry.meta.assetPath || 'images/effect-icons/fallback.svg'
+  }
+
+  function _renderStatusIcon(container, entry, compact) {
+    const icon = document.createElement('img')
+    icon.className = compact ? 'piece-board-status-image' : 'piece-board-status-list-image'
+    icon.setAttribute('src', _statusIconPath(entry))
+    icon.setAttribute('alt', '')
+    icon.setAttribute('aria-hidden', 'true')
+    const badgeText = _statusBadgeText(entry.status)
+    const children = [icon]
+    if (badgeText) {
+      const badge = document.createElement('b')
+      badge.className = compact ? 'piece-board-status-badge' : 'piece-board-status-list-badge'
+      badge.textContent = badgeText
+      badge.setAttribute('aria-hidden', 'true')
+      children.push(badge)
+    }
+    container.replaceChildren(...children)
+  }
+
   function _createPieceSummaryEl(piece) {
     const wrap = document.createElement('div')
     wrap.className = 'piece-board-summary'
@@ -823,6 +911,40 @@
     const statuses = document.createElement('span')
     statuses.className = 'piece-board-statuses'
     statuses.hidden = true
+    const overflow = document.createElement('button')
+    overflow.className = 'piece-board-status-overflow'
+    overflow.setAttribute('type', 'button')
+    overflow.setAttribute('aria-expanded', 'false')
+    overflow.hidden = true
+    const popover = document.createElement('span')
+    popover.className = 'piece-board-status-popover'
+    popover.setAttribute('role', 'group')
+    popover.setAttribute('aria-label', '全部状态')
+    popover.setAttribute('aria-hidden', 'true')
+    const popoverId = 'piece-statuses-' + String(piece.id).replace(/[^a-zA-Z0-9_-]/g, '-')
+    popover.id = popoverId
+    overflow.setAttribute('aria-controls', popoverId)
+    const setDisclosureExpanded = function (expanded) {
+      overflow.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+      popover.setAttribute('aria-hidden', expanded ? 'false' : 'true')
+    }
+    overflow.addEventListener('focus', function () { setDisclosureExpanded(true) })
+    overflow.addEventListener('blur', function () {
+      statuses.dataset.open = 'false'
+      setDisclosureExpanded(false)
+    })
+    overflow.addEventListener('mouseenter', function () { setDisclosureExpanded(true) })
+    overflow.addEventListener('mouseleave', function () {
+      setDisclosureExpanded(statuses.dataset.open === 'true')
+    })
+    overflow.addEventListener('click', function (event) {
+      if (event && typeof event.stopPropagation === 'function') event.stopPropagation()
+      const expanded = statuses.dataset.open !== 'true'
+      statuses.dataset.open = expanded ? 'true' : 'false'
+      setDisclosureExpanded(expanded)
+    })
+    statuses.appendChild(overflow)
+    statuses.appendChild(popover)
     wrap.appendChild(health)
     wrap.appendChild(statuses)
     _hpLayer.appendChild(wrap)
@@ -841,13 +963,21 @@
     }
 
     const presentation = window.BattleStatusPresentation
-    const summary = presentation
-      ? presentation.boardSummary(piece.statusSummary || [])
-      : (piece.statusSummary || []).slice(0, 2).map(status => ({ status, meta: { color: '#a78bfa' } }))
+    const overview = presentation && typeof presentation.boardOverview === 'function'
+      ? presentation.boardOverview(piece.statusSummary || [])
+      : (function () {
+          const all = (piece.statusSummary || []).map(status => ({
+            status,
+            meta: { color: '#a78bfa', assetPath: status.iconPath || 'images/effect-icons/fallback.svg' },
+          }))
+          return { items: all.slice(0, 2), all, overflowCount: Math.max(0, all.length - 2) }
+        })()
+    const summary = overview.items
     const statuses = obj.summaryEl.querySelector('.piece-board-statuses')
     if (statuses) {
       const existing = new Map()
       Array.from(statuses.children || []).forEach(function (dot) {
+        if (!String(dot.className || '').split(/\s+/).includes('piece-board-status-dot')) return
         existing.set(dot.dataset.statusId, dot)
       })
       const desired = new Set()
@@ -864,11 +994,13 @@
         } else {
           dot = document.createElement('span')
           dot.className = 'piece-board-status-dot is-entering'
-          statuses.appendChild(dot)
+          statuses.insertBefore(dot, statuses.querySelector('.piece-board-status-overflow'))
         }
         dot.style.setProperty('--status-color', entry.meta.color)
         dot.dataset.statusId = statusId
         dot.title = entry.status.label || entry.status.id || ''
+        dot.setAttribute('aria-hidden', 'true')
+        _renderStatusIcon(dot, entry, true)
       })
       existing.forEach(function (dot, statusId) {
         if (desired.has(statusId) || obj.statusExitTimers.has(statusId)) return
@@ -876,19 +1008,50 @@
         const timer = setTimeout(function () {
           dot.remove()
           obj.statusExitTimers.delete(statusId)
-          if (!statuses.children.length) statuses.hidden = true
+          if (statuses.dataset.totalCount === '0') statuses.hidden = true
         }, MOTION_TOKENS.fast - 20)
         obj.statusExitTimers.set(statusId, timer)
       })
-      statuses.hidden = summary.length === 0 && existing.size === 0
+      const overflow = statuses.querySelector('.piece-board-status-overflow')
+      const popover = statuses.querySelector('.piece-board-status-popover')
+      if (overflow) {
+        overflow.hidden = overview.overflowCount === 0
+        overflow.textContent = '+' + overview.overflowCount
+        overflow.setAttribute('aria-label', '查看全部 ' + overview.all.length + ' 个状态')
+        overflow.setAttribute('aria-expanded', 'false')
+        if (popover) popover.setAttribute('aria-hidden', 'true')
+        statuses.dataset.open = 'false'
+      }
+      if (popover) {
+        const rows = overview.all.map(function (entry) {
+          const row = document.createElement('span')
+          row.className = 'piece-board-status-list-item'
+          const statusLabel = entry.status.label || entry.status.id || '未知状态'
+          row.setAttribute('role', 'img')
+          row.setAttribute('aria-label', statusLabel)
+          row.title = statusLabel
+          const iconSlot = document.createElement('span')
+          iconSlot.className = 'piece-board-status-list-icon'
+          _renderStatusIcon(iconSlot, entry, false)
+          const label = document.createElement('span')
+          label.className = 'piece-board-status-list-label'
+          label.textContent = statusLabel
+          row.appendChild(iconSlot)
+          row.appendChild(label)
+          return row
+        })
+        popover.replaceChildren(...rows)
+      }
+      statuses.dataset.totalCount = String(overview.all.length)
+      statuses.hidden = overview.all.length === 0 && existing.size === 0
     }
 
-    const statusNames = summary.map(function (entry) { return entry.status.label || entry.status.id }).filter(Boolean)
+    const statusNames = overview.all.map(function (entry) { return entry.status.label || entry.status.id }).filter(Boolean)
     const accessible = (piece.name || piece.id) + '\uff0c\u751f\u547d ' + currentHp + ' / ' + maxHp
-      + (statusNames.length ? '\uff0c\u8d1f\u9762\u72b6\u6001 ' + statusNames.join('\u3001') : '')
+      + (statusNames.length ? '\uff0c\u72b6\u6001 ' + statusNames.join('\u3001') : '')
     obj.summaryEl.dataset.health = currentHp + '/' + maxHp
-    obj.summaryEl.dataset.statusCount = String(summary.length)
-    obj.summaryEl.dataset.statusIds = summary.map(function (entry) { return entry.status.id || '' }).join(',')
+    obj.summaryEl.dataset.statusCount = String(overview.all.length)
+    obj.summaryEl.dataset.statusIds = overview.all.map(function (entry) { return entry.status.id || '' }).join(',')
     obj.summaryEl.setAttribute('aria-label', accessible)
     obj.summaryEl.title = accessible
     obj.summaryEl.style.display = piece.visible !== false ? '' : 'none'
@@ -1045,12 +1208,314 @@
     })
   }
 
+  function _clearPresentationAreaFlash() {
+    _cancelAnimation('presentation:area:intensity')
+    if (!_presentationAreaFlash) return
+    _presentationAreaFlash.entries.forEach(function (entry) {
+      if (_scene && entry.mesh) _scene.remove(entry.mesh)
+      if (entry.flashMaterial && entry.flashMaterial.dispose) entry.flashMaterial.dispose()
+    })
+    _presentationAreaFlash = null
+    _invalidate()
+  }
+
+  function showPresentationAreaFlash(cells) {
+    if (!_mounted || !_scene || !_hlPlaneGeom) return
+    const normalized = []
+    const seen = new Set()
+    ;(cells || []).forEach(function (item) {
+      const cell = _normalizeHighlightItem(item)
+      if (!cell || seen.has(cell.key) || !_tileObjects.has(cell.key)) return
+      seen.add(cell.key)
+      normalized.push(cell)
+    })
+    normalized.sort(function (left, right) { return left.key.localeCompare(right.key) })
+    const signature = normalized.map(function (cell) { return cell.key }).join('|')
+    if (!signature) {
+      _clearPresentationAreaFlash()
+      return
+    }
+    if (_presentationAreaFlash && _presentationAreaFlash.signature === signature) return
+    _clearPresentationAreaFlash()
+
+    const entries = normalized.map(function (cell) {
+      const flashMaterial = new THREE.MeshLambertMaterial({
+        color: 0xf97316,
+        emissive: 0xf97316,
+        transparent: true,
+        opacity: 0.76,
+        depthWrite: false,
+      })
+      flashMaterial.emissiveIntensity = _reducedMotion ? 0.72 : 0
+      const mesh = new THREE.Mesh(_hlPlaneGeom, flashMaterial)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.position.set(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.016, cell.z)
+      mesh.renderOrder = 6
+      mesh.userData.presentationAreaFlash = true
+      mesh.userData.presentationAreaCell = { x: cell.x, y: cell.z }
+      _scene.add(mesh)
+      return {
+        key: cell.key,
+        mesh: mesh,
+        flashMaterial: flashMaterial,
+      }
+    })
+    _presentationAreaFlash = {
+      signature: signature,
+      cellCount: normalized.length,
+      entries: entries,
+    }
+    if (_reducedMotion) return
+    _startAnimation('presentation:area:intensity', {
+      duration: MOTION_SECONDS.result,
+      easing: EASE.out,
+      update: function (progress, raw) {
+        const timeline = Number.isFinite(raw) ? raw : progress
+        const intensity = timeline <= 0.42
+          ? 1.15 * EASE.out(timeline / 0.42)
+          : 1.15 - 0.77 * EASE.in((timeline - 0.42) / 0.58)
+        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = intensity })
+      },
+      complete: function () {
+        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = 0.38 })
+      },
+    })
+  }
+
+  function _disposePresentationObject(object) {
+    if (!object) return
+    object.traverse(function (child) {
+      if (child.geometry && child.geometry.dispose) child.geometry.dispose()
+      if (child.material) {
+        ;(Array.isArray(child.material) ? child.material : [child.material]).forEach(function (material) {
+          if (material && material.dispose) material.dispose()
+        })
+      }
+    })
+  }
+
+  function _clearPresentationPath() {
+    _cancelAnimation('presentation:path:opacity')
+    if (!_presentationPath) return
+    if (_scene && _presentationPath.group) _scene.remove(_presentationPath.group)
+    _disposePresentationObject(_presentationPath.group)
+    _presentationPath = null
+  }
+
+  function _normalizePresentationPoint(point) {
+    const cell = _normalizeHighlightItem(point)
+    if (!cell || !_tileObjects.has(cell.key)) return null
+    return cell
+  }
+
+  function _createPresentationPathRibbon(source, end) {
+    const dx = end.x - source.x
+    const dz = end.z - source.z
+    const distance = Math.hypot(dx, dz)
+    if (distance < 0.001) return null
+    const halfWidth = 0.035
+    const offsetX = -dz / distance * halfWidth
+    const offsetZ = dx / distance * halfWidth
+    // One constant board-plane elevation is intentional: endpoint terrain may
+    // be raised, but the trajectory direction must stay parallel to the grid.
+    // Raised tiles then occlude the line naturally instead of tilting it.
+    const sourceY = TILE_H + 0.028
+    const endY = sourceY
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      source.x + offsetX, sourceY, source.z + offsetZ,
+      source.x - offsetX, sourceY, source.z - offsetZ,
+      end.x - offsetX, endY, end.z - offsetZ,
+      end.x + offsetX, endY, end.z + offsetZ,
+    ], 3))
+    geometry.setIndex([0, 1, 2, 0, 2, 3])
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x93c5fd,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.renderOrder = 4
+    mesh.userData.presentationPathRole = 'trajectory'
+    mesh.userData.sourceCell = { x: source.x, y: source.z }
+    mesh.userData.endCell = { x: end.x, y: end.z }
+    return mesh
+  }
+
+  function _createPresentationAimMarker(selected) {
+    if (!selected) return null
+    const positions = []
+    const segmentCount = 16
+    const radius = 0.22
+    const elevation = _tileSurfaceHeightAt(selected.x, selected.z) + 0.032
+    for (let index = 0; index < segmentCount; index += 2) {
+      const startAngle = index / segmentCount * Math.PI * 2
+      const endAngle = (index + 1) / segmentCount * Math.PI * 2
+      positions.push(
+        selected.x + Math.cos(startAngle) * radius, elevation, selected.z + Math.sin(startAngle) * radius,
+        selected.x + Math.cos(endAngle) * radius, elevation, selected.z + Math.sin(endAngle) * radius,
+      )
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    const material = new THREE.LineBasicMaterial({
+      color: 0xfacc15,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    })
+    const marker = new THREE.LineSegments(geometry, material)
+    marker.renderOrder = 5
+    marker.userData.presentationPathRole = 'selected-aim'
+    marker.userData.selectedCell = { x: selected.x, y: selected.z }
+    return marker
+  }
+
+  function showPresentationPath(input) {
+    if (!_mounted || !_scene) return
+    const source = _normalizePresentationPoint(input && input.source)
+    const end = _normalizePresentationPoint(input && input.end)
+    const selected = _normalizePresentationPoint(input && input.selected)
+    const hasTrajectory = !!(source && end && (source.x !== end.x || source.z !== end.z))
+    if (!hasTrajectory && !selected) {
+      _clearPresentationPath()
+      return
+    }
+    const signature = [source && source.key || '', end && end.key || '', selected && selected.key || ''].join('|')
+    if (_presentationPath && _presentationPath.signature === signature) return
+    _clearPresentationPath()
+    const trajectory = hasTrajectory ? _createPresentationPathRibbon(source, end) : null
+    const aim = _createPresentationAimMarker(selected)
+    if (!trajectory && !aim) return
+    const group = new THREE.Group()
+    group.userData.presentationPath = true
+    if (trajectory) group.add(trajectory)
+    if (aim) group.add(aim)
+    _scene.add(group)
+    const materials = (trajectory ? [trajectory.material] : []).concat(aim ? [aim.material] : [])
+    _presentationPath = {
+      signature: signature,
+      group: group,
+      source: source ? { x: source.x, y: source.z } : null,
+      end: end ? { x: end.x, y: end.z } : null,
+      selected: selected ? { x: selected.x, y: selected.z } : null,
+    }
+    const targetOpacities = (trajectory ? [0.82] : []).concat(aim ? [0.86] : [])
+    if (_reducedMotion) {
+      materials.forEach(function (material, index) { material.opacity = targetOpacities[index] })
+      return
+    }
+    _startAnimation('presentation:path:opacity', {
+      duration: MOTION_SECONDS.fast,
+      easing: EASE.out,
+      update: function (progress) {
+        materials.forEach(function (material, index) { material.opacity = targetOpacities[index] * progress })
+      },
+      complete: function () {
+        materials.forEach(function (material, index) { material.opacity = targetOpacities[index] })
+      },
+    })
+  }
+
   function _updateSelectedRingPosition() {
     if (!_hlObjects.selected || !_hlObjects.selectedId) return
     const obj = _pieceObjects.get(_hlObjects.selectedId)
     if (!obj) return
     _hlObjects.selected.position.copy(obj.group.position)
     _hlObjects.selected.position.y += 0.035
+  }
+
+  function _clearHistoryHighlight() {
+    if (_historyHighlightGroup && _scene) {
+      _scene.remove(_historyHighlightGroup)
+      _historyHighlightGroup.traverse(function (object) {
+        if (object.geometry && object.geometry.dispose) object.geometry.dispose()
+        if (object.material) {
+          ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) {
+            if (material && material.dispose) material.dispose()
+          })
+        }
+      })
+    }
+    _historyHighlightGroup = null
+    _historyHighlightPointCount = 0
+    _historyHighlightPathCount = 0
+  }
+
+  function setHistoryHighlight(items) {
+    _clearHistoryHighlight()
+    if (!_mounted || !_scene) return
+    const cells = []
+    const seen = new Set()
+    ;(Array.isArray(items) ? items : []).forEach(function (item) {
+      const cell = _normalizeHighlightItem(item)
+      if (!cell) return
+      const role = item && item.role === 'source' ? 'source' : 'target'
+      const key = cell.key + ':' + role
+      if (seen.has(key)) return
+      seen.add(key)
+      cells.push({ x: cell.x, z: cell.z, role: role })
+    })
+    if (!cells.length) return
+
+    // This is world-space geometry. The constant Y keeps every connector in an
+    // XZ plane parallel to the board; the active camera supplies perspective.
+    const planeY = TILE_H + 0.09
+    const group = new THREE.Group()
+    group.userData.historyHighlight = true
+    group.userData.planeY = planeY
+    group.renderOrder = 20
+    const source = cells.find(function (cell) { return cell.role === 'source' })
+
+    cells.forEach(function (cell) {
+      const geometry = new THREE.RingGeometry(0.20, 0.29, 32)
+      const color = cell.role === 'source' ? 0x93c5fd : 0xfacc15
+      const material = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.96,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+      })
+      const marker = new THREE.Mesh(geometry, material)
+      marker.rotation.x = -Math.PI / 2
+      marker.position.set(cell.x, planeY, cell.z)
+      marker.renderOrder = 21
+      marker.userData.historyRole = cell.role
+      group.add(marker)
+      _historyHighlightPointCount += 1
+    })
+
+    if (source) {
+      cells.filter(function (cell) { return cell.role === 'target' }).forEach(function (target) {
+        if (target.x === source.x && target.z === source.z) return
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(source.x, planeY, source.z),
+          new THREE.Vector3(target.x, planeY, target.z),
+        ])
+        const material = new THREE.LineDashedMaterial({
+          color: 0xfde047,
+          transparent: true,
+          opacity: 0.92,
+          dashSize: 0.24,
+          gapSize: 0.14,
+          depthTest: false,
+          depthWrite: false,
+        })
+        const path = new THREE.Line(geometry, material)
+        path.computeLineDistances()
+        path.renderOrder = 20
+        path.userData.historyRole = 'path'
+        group.add(path)
+        _historyHighlightPathCount += 1
+      })
+    }
+
+    _historyHighlightGroup = group
+    _scene.add(group)
   }
 
   // ── Animation ─────────────────────────────────────────────────────────────────
@@ -1091,6 +1556,8 @@
     }
     _anims.set(key, controller)
     controller.update(0, 0)
+    _summaryPositionsDirty = true
+    _invalidate()
     return controller
   }
 
@@ -1099,6 +1566,8 @@
     if (!controller) return
     _anims.delete(key)
     if (controller.cancel) controller.cancel()
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   function _cancelAnimationsForPrefix(prefix) {
@@ -1116,6 +1585,8 @@
       controller.update(1, 1)
       if (controller.complete) controller.complete()
     })
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   function _stepAnims(dt) {
@@ -1130,8 +1601,10 @@
       _anims.delete(key)
       if (controller.complete) controller.complete()
     })
-    _updateSelectedRingPosition()
-    _updatePieceSummaryPositions()
+    if (_anims.size > 0) {
+      _updateSelectedRingPosition()
+      _summaryPositionsDirty = true
+    }
   }
 
   function _pieceById(model, pieceId) {
@@ -1189,9 +1662,16 @@
     const damagedTargets = []
     ;(nextModel.pieces || []).forEach(function (nextPiece) {
       const previousPiece = _pieceById(previousModel, nextPiece.id)
-      if (!previousPiece) return
+      if (!previousPiece) {
+        if (nextPiece.visible !== false) _pendingAppearanceCues.set(nextPiece.id, 'summon')
+        return
+      }
       const obj = _pieceObjects.get(nextPiece.id)
       if (!obj) return
+      if (previousPiece.visible === false && nextPiece.visible !== false) {
+        _pendingAppearanceCues.set(nextPiece.id, 'summon')
+        return
+      }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
         _animateMove(obj, nextPiece.x, nextPiece.y)
       }
@@ -1295,10 +1775,12 @@
       obj.targetSelected = targetSelected
       if (pending || targetSelected) {
         obj.feedbackRing.material.color.setHex(pending ? 0xf59e0b : 0x60a5fa)
-        obj.feedbackRing.material.opacity = pending ? 0.38 : 0.58
+        obj.feedbackRing.material.opacity = 0.58
+        obj.body.material.emissiveIntensity = pending ? 0.24 : 0.12
         if (!_reducedMotion && !_anims.has(obj.motionId + ':position')) obj.group.position.y = obj.baseY + 0.04
       } else {
         obj.feedbackRing.material.opacity = 0
+        obj.body.material.emissiveIntensity = 0.08
         if (!_anims.has(obj.motionId + ':position') && !obj.deathAnimating) obj.group.position.y = obj.baseY
       }
     })
@@ -1375,7 +1857,7 @@
     }
     const finalise = function () {
       material.color.setHex(0xf59e0b)
-      material.opacity = obj.pending ? 0.38 : 0
+      material.opacity = obj.pending ? 0.58 : 0
     }
     _startAnimation(obj.motionId + ':outline', {
       duration: resultDuration,
@@ -1384,7 +1866,7 @@
         const timeline = Number.isFinite(raw) ? raw : progress
         const rising = timeline <= 0.45
         const phase = rising ? EASE.out(timeline / 0.45) : EASE.in((timeline - 0.45) / 0.55)
-        const baseOpacity = obj.pending ? 0.38 : 0
+        const baseOpacity = obj.pending ? 0.58 : 0
         material.color.setHex(mixHex(fromColor, color, Math.min(1, progress * 2)))
         material.opacity = rising
           ? fromOpacity + (0.78 - fromOpacity) * phase
@@ -1419,6 +1901,38 @@
     _flashOutline(obj, 0x67e8f9, MOTION_SECONDS.fast)
   }
 
+  function _animateSummon(obj) {
+    obj.group.visible = true
+    _cancelAnimation(obj.motionId + ':visibility')
+    if (_reducedMotion) {
+      _restorePieceVisual(obj)
+      _flashOutline(obj, 0xa78bfa, MOTION_SECONDS.fast)
+      return
+    }
+    const materials = _ownedPieceMaterials(obj)
+    materials.forEach(function (material) {
+      material.transparent = true
+      material.opacity = 0
+    })
+    obj.group.scale.set(0.82, 0.82, 0.82)
+    obj.group.position.y = obj.baseY - 0.04
+    _startAnimation(obj.motionId + ':summon', {
+      duration: MOTION_SECONDS.result,
+      easing: EASE.out,
+      update: function (progress) {
+        const scale = 0.82 + 0.18 * progress
+        obj.group.scale.set(scale, scale, scale)
+        obj.group.position.y = obj.baseY - 0.04 + 0.04 * progress
+        materials.forEach(function (material) { material.opacity = progress })
+      },
+      complete: function () {
+        _restorePieceVisual(obj)
+        _flashOutline(obj, 0xa78bfa, MOTION_SECONDS.fast)
+      },
+      cancel: function () { _restorePieceVisual(obj) },
+    })
+  }
+
   function _ownedPieceMaterials(obj) {
     return [obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial]
       .filter(function (material, index, materials) { return material && materials.indexOf(material) === index })
@@ -1433,11 +1947,22 @@
     })
     if (obj.body.material.color) obj.body.material.color.setHex(0x22272d)
     if (obj.body.material.emissive) obj.body.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
-    obj.body.material.emissiveIntensity = 0.08
+    obj.body.material.emissiveIntensity = obj.pending ? 0.24 : (obj.targetSelected ? 0.12 : 0.08)
     if (obj.ring.material.color) obj.ring.material.color.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     if (obj.ring.material.emissive) obj.ring.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     obj.ring.material.emissiveIntensity = 0.3
     if (obj.markerMaterial.color) obj.markerMaterial.color.setHex(0xf2e8d5)
+    if (obj.feedbackRing && obj.feedbackRing.material) {
+      if (obj.pending) {
+        if (obj.feedbackRing.material.color) obj.feedbackRing.material.color.setHex(0xf59e0b)
+        obj.feedbackRing.material.opacity = 0.58
+      } else if (obj.targetSelected) {
+        if (obj.feedbackRing.material.color) obj.feedbackRing.material.color.setHex(0x67e8f9)
+        obj.feedbackRing.material.opacity = 0.58
+      } else {
+        obj.feedbackRing.material.opacity = 0
+      }
+    }
   }
 
   function _animateDeath(obj) {
@@ -1503,12 +2028,34 @@
       playedEventCount: _playedEventKeys.size,
       floaterCount: _floaters.size,
       pendingPieceIds: Array.from(_pieceObjects.values()).filter(function (obj) { return obj.pending }).map(function (obj) { return obj.id }).sort(),
+      pendingAppearanceCues: Array.from(_pendingAppearanceCues.entries()).map(function (entry) { return entry[0] + ':' + entry[1] }).sort(),
+      presentationAreaCellCount: _presentationAreaFlash ? _presentationAreaFlash.cellCount : 0,
+      presentationPath: _presentationPath ? {
+        source: _presentationPath.source,
+        end: _presentationPath.end,
+        selected: _presentationPath.selected,
+      } : null,
       highlightCounts: {
         move: _hlObjects.move.size,
         skill: _hlObjects.skill.size,
         place: _hlObjects.place.size,
         selected: _hlObjects.selected ? 1 : 0,
+        historyPoints: _historyHighlightPointCount,
+        historyPaths: _historyHighlightPathCount,
       },
+    }
+  }
+
+  function getPerformanceDiagnostics() {
+    return {
+      renderCount: _renderCount,
+      lastDrawCalls: _lastDrawCalls,
+      frameScheduled: _animFrameId != null,
+      activeAnimationCount: _anims.size,
+      terrainBatchCount: _tileBatches.size,
+      terrainInstanceCount: Array.from(_tileBatches.values()).reduce(function (total, batch) {
+        return total + Number(batch.count || 0)
+      }, 0),
     }
   }
 
@@ -1568,7 +2115,6 @@
     })
     _cameraTarget.set(clamped.x, 0, clamped.z)
     _positionCameraFromTarget()
-    _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
@@ -1613,7 +2159,8 @@
       obj.baseZ,
     )
     _updateSelectedRingPosition()
-    _updatePieceSummaryPositions()
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   function _cancelPieceDrag() {
@@ -1637,7 +2184,8 @@
     const tileZ = Math.max(0, Math.min(_mapH - 1, Math.round(z)))
     _pieceDrag.obj.group.position.set(x, _tileSurfaceHeightAt(tileX, tileZ) + 0.08, z)
     _updateSelectedRingPosition()
-    _updatePieceSummaryPositions()
+    _summaryPositionsDirty = true
+    _invalidate()
     return true
   }
 
@@ -1784,7 +2332,6 @@
     const h = _container.clientHeight || 320
     _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(MAX_CAMERA_ZOOM, z))
     _camera.updateProjectionMatrix()
-    _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
@@ -1798,7 +2345,6 @@
     _updateCameraProjection(w, h)
     _camera.zoom = _preferredInitialZoom(w, h)
     _camera.updateProjectionMatrix()
-    _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
@@ -1815,11 +2361,12 @@
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
-    const tileHits = _raycaster.intersectObjects(Array.from(_tileObjects.values()), false)
+    const tileHits = _raycaster.intersectObjects(Array.from(_tileBatches.values()), false)
     if (tileHits.length) {
-      const tile = tileHits[0].object
-      const tileX = Number(tile.userData.tileX)
-      const tileY = Number(tile.userData.tileZ)
+      const hit = tileHits[0]
+      const tile = hit.object.userData.cells && hit.object.userData.cells[hit.instanceId]
+      const tileX = Number(tile && tile.x)
+      const tileY = Number(tile && tile.y)
       if (tileX >= 0 && tileY >= 0 && tileX < _mapW && tileY < _mapH) return { x: tileX, y: tileY }
     }
     const hits = _raycaster.intersectObject(_hitPlane)
@@ -1902,6 +2449,8 @@
     })
     _currentModel = model
     _syncPendingFeedback(model.interaction || {})
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
@@ -1949,6 +2498,7 @@
     _resizeObserver = null
     if (_renderer) _resetPointerState(_renderer.domElement)
     _removeAllListeners()
+    _clearHistoryHighlight()
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
     if (_scene) {
       const geometries = new Set()
@@ -1975,6 +2525,7 @@
       if (_renderer.domElement.parentNode) _renderer.domElement.remove()
     }
     _tileObjects.clear()
+    _tileBatches.clear()
     _pieceObjects.forEach(function (obj) {
       obj.statusExitTimers.forEach(function (timer) { clearTimeout(timer) })
       obj.statusExitTimers.clear()
@@ -1989,6 +2540,9 @@
     _anims.clear()
     _playedEventKeys.clear()
     _playedEventOrder.length = 0
+    _pendingAppearanceCues.clear()
+    _presentationAreaFlash = null
+    _presentationPath = null
     _pressedPiece = null
     _pressedHighlight = null
     _pieceDrag = null
@@ -1997,6 +2551,9 @@
     _hlObjects.place.clear()
     _hlObjects.selected = null
     _hlObjects.selectedId = null
+    _historyHighlightGroup = null
+    _historyHighlightPointCount = 0
+    _historyHighlightPathCount = 0
     _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
@@ -2025,6 +2582,9 @@
     _contactShadowGeom = null
     _contactShadowMat = null
     _clock.prev = 0
+    _summaryPositionsDirty = true
+    _renderCount = 0
+    _lastDrawCalls = 0
     _panStart = null
     _panMoved = false
     _pinchDist = 0
@@ -2042,9 +2602,15 @@
     resize,
     resetView,
     projectCell,
+    setHistoryHighlight,
     screenToCell,
+    showPresentationAreaFlash,
+    clearPresentationAreaFlash: _clearPresentationAreaFlash,
+    showPresentationPath,
+    clearPresentationPath: _clearPresentationPath,
     dispose,
     getMotionDiagnostics,
+    getPerformanceDiagnostics,
     TILE_EFFECT_VISUALS,
     MOTION_TOKENS,
   }

@@ -87,6 +87,9 @@ import {
   finalizePendingTargetSession,
   assertActionTargetingReady,
   assertPendingTargetCancellation,
+  enumeratePrimaryPieceTargetIds,
+  getReservedSkillLandingCells,
+  isSinglePieceTargetAction,
   stampTargetingRevision,
   validatePendingTargetSubmissions,
 } from "./targeting"
@@ -1505,6 +1508,12 @@ function applyBattleActionInternal(
     seed: PendingSeed = {},
   ): boolean => {
     if (!result.needsOptionSelection && !result.needsTargetSelection) return false
+    if (result.needsTargetSelection && Array.isArray(result.targetCandidates)) {
+      const minimum = Number.isSafeInteger(result.minSelections)
+        ? Math.max(0, result.minSelections!)
+        : 1
+      if (result.targetCandidates.length < minimum) return false
+    }
     const currentRuleId = result.pendingRuleId || currentContext.pendingRuleId
     const currentRuleSourceId = result.pendingRuleSourceId || currentContext.pendingRuleSourceId
     const triggerContext = {
@@ -1641,6 +1650,13 @@ function applyBattleActionInternal(
     return applyBattleActionInternal(next, resumeAction, trustedContinuation)
   }
 
+  const applyPendingTargetRewrite = (pending: PendingSession, result: TriggerResult): void => {
+    if (!result.targetReplacementPieceId || !pending.pendingAction) return
+    ;(pending.pendingAction as any).targetPieceId = result.targetReplacementPieceId
+    delete (pending.pendingAction as any).targetX
+    delete (pending.pendingAction as any).targetY
+  }
+
   const resumePendingInteraction = (
     next: BattleState,
     pending: PendingSession,
@@ -1657,6 +1673,7 @@ function applyBattleActionInternal(
         __pendingReactiveCards: pending.pendingReactiveCards,
       }
       const result = getActiveTriggerSystem().checkTriggers(next, currentContext)
+      applyPendingTargetRewrite(pending, result)
       appendTriggerMessages(next, result, actorPlayerId)
       if (result.blocked) return resumeDeferredAction(next, pending, input, true)
       if (setPendingInteraction(next, result, currentContext, {
@@ -1678,6 +1695,7 @@ function applyBattleActionInternal(
         __pendingReactiveCards: pending.pendingReactiveCards,
       }
       const result = getActiveTriggerSystem().checkTriggers(next, currentContext)
+      applyPendingTargetRewrite(pending, result)
       appendTriggerMessages(next, result, actorPlayerId)
       if (result.blocked) return resumeDeferredAction(next, pending, input, true)
       if (setPendingInteraction(next, result, currentContext, {
@@ -2729,11 +2747,19 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
+        reservedCells: getReservedSkillLandingCells(next, action),
+        legalPrimaryTargetPieceIds: enumeratePrimaryPieceTargetIds(next, action),
+        isSinglePieceTargetAction: isSinglePieceTargetAction(next, action),
       };
       const beforeSkillUseResult = continuation.skipBeforeSkillUse
         ? { success: true, messages: [], blocked: false } as any
         : getActiveTriggerSystem().checkTriggers(next, skillUseContext);
-
+      if (beforeSkillUseResult.targetReplacementPieceId) {
+        skillUseContext.targetPiece = next.pieces.find(candidate => (
+          candidate.instanceId === beforeSkillUseResult.targetReplacementPieceId && candidate.currentHp > 0
+        ))
+        if (!skillUseContext.targetPiece) throw new BattleRuleError('Replacement skill target is unavailable')
+      }
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
         // 初始化actions数组
@@ -2826,7 +2852,8 @@ function applyBattleActionInternal(
         }
         return { info: null, pos: null };
       };
-      const _t1 = buildTargetSlot(action.targetPieceId, action.targetX, action.targetY);
+      const finalTargetPieceId = skillUseContext.targetPiece?.instanceId || action.targetPieceId
+      const _t1 = buildTargetSlot(finalTargetPieceId, action.targetX, action.targetY);
       const _actAny = action as any;
       const _extraTargets: Array<{pieceId?: string; x?: number; y?: number}> = _actAny.extraTargets || [];
       const targets = [
@@ -2839,7 +2866,9 @@ function applyBattleActionInternal(
         target: _t1.info,
         targetPosition: _t1.pos,
         targets,
+        ruleRewrittenPrimaryTargetPieceId: beforeSkillUseResult.targetReplacementPieceId,
         selectedOption: _actAny.selectedOption,
+        reservedCells: skillUseContext.reservedCells,
         battle: next,
         skill: {
           id: skillDef.id,
@@ -2891,7 +2920,11 @@ function applyBattleActionInternal(
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         const pendingTarget = (result as any).pendingTargetSelection
         battleDebugLog('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
-        if (pendingTarget) {
+        const pendingCandidates = pendingTarget?.targetCandidates || pendingTarget?.candidates
+        const pendingMinimum = Number.isSafeInteger(pendingTarget?.minSelections)
+          ? Math.max(0, pendingTarget.minSelections)
+          : 1
+        if (pendingTarget && (!Array.isArray(pendingCandidates) || pendingCandidates.length >= pendingMinimum)) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
             ownerPlayerId: pendingTarget.playerId || action.playerId,
@@ -2902,8 +2935,8 @@ function applyBattleActionInternal(
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
             source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
-            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
-            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            candidates: pendingCandidates,
+            fixedCandidates: Array.isArray(pendingCandidates),
             selectionMode: pendingTarget.selectionMode,
             minSelections: pendingTarget.minSelections,
             maxSelections: pendingTarget.maxSelections,
@@ -2929,14 +2962,16 @@ function applyBattleActionInternal(
       let skillMessage = `${pieceName}使用了${skillDef.name || finalSkillId}`;
       
       // 如果有目标，添加目标信息
-      if (action.targetPieceId) {
-        const targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId);
-        if (targetPiece) {
-          const targetName = targetPiece.name || targetPiece.templateId;
-          skillMessage += `，目标是${targetName}`;
+      if (!skillDef.concealTargetInBattleLog) {
+        if (finalTargetPieceId) {
+          const targetPiece = next.pieces.find(p => p.instanceId === finalTargetPieceId);
+          if (targetPiece) {
+            const targetName = targetPiece.name || targetPiece.templateId;
+            skillMessage += `，目标是${targetName}`;
+          }
+        } else if (action.targetX !== undefined && action.targetY !== undefined) {
+          skillMessage += `，目标位置是(${action.targetX}, ${action.targetY})`;
         }
-      } else if (action.targetX !== undefined && action.targetY !== undefined) {
-        skillMessage += `，目标位置是(${action.targetX}, ${action.targetY})`;
       }
       
       // 添加技能执行结果消息
@@ -3026,10 +3061,19 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
+        reservedCells: getReservedSkillLandingCells(next, action),
+        legalPrimaryTargetPieceIds: enumeratePrimaryPieceTargetIds(next, action),
+        isSinglePieceTargetAction: isSinglePieceTargetAction(next, action),
       };
       const beforeSkillUseResult = continuation.skipBeforeSkillUse
         ? { success: true, messages: [], blocked: false } as any
         : getActiveTriggerSystem().checkTriggers(next, skillUseContext);
+      if (beforeSkillUseResult.targetReplacementPieceId) {
+        skillUseContext.targetPiece = next.pieces.find(candidate => (
+          candidate.instanceId === beforeSkillUseResult.targetReplacementPieceId && candidate.currentHp > 0
+        ))
+        if (!skillUseContext.targetPiece) throw new BattleRuleError('Replacement skill target is unavailable')
+      }
 
       // 触发器可能修改了技能ID，使用修改后的值
       const finalSkillId = skillUseContext.skillId;
@@ -3133,7 +3177,8 @@ function applyBattleActionInternal(
         }
         return { info: null, pos: null };
       };
-      const _t1 = buildTargetSlot(action.targetPieceId, action.targetX, action.targetY);
+      const finalTargetPieceId = skillUseContext.targetPiece?.instanceId || action.targetPieceId
+      const _t1 = buildTargetSlot(finalTargetPieceId, action.targetX, action.targetY);
       const _actAny = action as any;
       const _extraTargets: Array<{pieceId?: string; x?: number; y?: number}> = _actAny.extraTargets || [];
       const targets = [
@@ -3146,7 +3191,9 @@ function applyBattleActionInternal(
         target: _t1.info,
         targetPosition: _t1.pos,
         targets,
+        ruleRewrittenPrimaryTargetPieceId: beforeSkillUseResult.targetReplacementPieceId,
         selectedOption: _actAny.selectedOption,
+        reservedCells: skillUseContext.reservedCells,
         battle: next,
         skill: {
           id: skillDef.id,
@@ -3198,7 +3245,11 @@ function applyBattleActionInternal(
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         const pendingTarget = (result as any).pendingTargetSelection
         battleDebugLog('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
-        if (pendingTarget) {
+        const pendingCandidates = pendingTarget?.targetCandidates || pendingTarget?.candidates
+        const pendingMinimum = Number.isSafeInteger(pendingTarget?.minSelections)
+          ? Math.max(0, pendingTarget.minSelections)
+          : 1
+        if (pendingTarget && (!Array.isArray(pendingCandidates) || pendingCandidates.length >= pendingMinimum)) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
             ownerPlayerId: pendingTarget.playerId || action.playerId,
@@ -3209,8 +3260,8 @@ function applyBattleActionInternal(
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
             source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
-            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
-            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            candidates: pendingCandidates,
+            fixedCandidates: Array.isArray(pendingCandidates),
             selectionMode: pendingTarget.selectionMode,
             minSelections: pendingTarget.minSelections,
             maxSelections: pendingTarget.maxSelections,
@@ -3236,14 +3287,16 @@ function applyBattleActionInternal(
       let skillMessage = `${pieceName}使用了${skillDef.name || finalSkillId}（充能技能，消耗${cost}点充能）`;
       
       // 如果有目标，添加目标信息
-      if (action.targetPieceId) {
-        const targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId);
-        if (targetPiece) {
-          const targetName = targetPiece.name || targetPiece.templateId;
-          skillMessage += `，目标是${targetName}`;
+      if (!skillDef.concealTargetInBattleLog) {
+        if (finalTargetPieceId) {
+          const targetPiece = next.pieces.find(p => p.instanceId === finalTargetPieceId);
+          if (targetPiece) {
+            const targetName = targetPiece.name || targetPiece.templateId;
+            skillMessage += `，目标是${targetName}`;
+          }
+        } else if (action.targetX !== undefined && action.targetY !== undefined) {
+          skillMessage += `，目标位置是(${action.targetX}, ${action.targetY})`;
         }
-      } else if (action.targetX !== undefined && action.targetY !== undefined) {
-        skillMessage += `，目标位置是(${action.targetX}, ${action.targetY})`;
       }
       
       // 添加技能执行结果消息

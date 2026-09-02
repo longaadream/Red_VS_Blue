@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="首次移动免费">
+  <circle cx="32" cy="32" r="29" fill="#092419" stroke="#4ade80" stroke-width="4"/>
+  <path d="M11 34h32m-9-10 10 10-10 10" fill="none" stroke="#dcfce7" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M17 18h18M17 50h18" stroke="#4ade80" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="50" cy="17" r="7" fill="#4ade80"/>
+  <path d="M50 13v8m-4-4h8" stroke="#052e16" stroke-width="3" stroke-linecap="round"/>
+</svg>

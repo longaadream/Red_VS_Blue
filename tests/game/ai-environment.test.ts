@@ -213,9 +213,9 @@ describe('versioned headless AI environment', () => {
     const redObservation = observeBattleForAI(state, 'player-red')
     expect(redObservation.pendingTimer).toMatchObject({
       ownerPlayerId: 'player-blue',
-      durationMs: 15_000,
+      durationMs: 30_000,
       startedAt: 5_000,
-      deadlineAt: 20_000,
+      deadlineAt: 35_000,
     })
     expect(redObservation.pendingOptionSelection).toBeUndefined()
     expect(stableJson(redObservation)).not.toContain('timeoutResolution')

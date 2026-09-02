@@ -42,6 +42,26 @@
       : null
     return meta && meta.color ? meta.color : '#a78bfa'
   }
+
+  function statusIcon(status) {
+    return String(status && (status.iconPath || status.assetPath) || 'images/effect-icons/fallback.svg')
+  }
+
+  function statusBadge(status) {
+    const presentation = root.BattleEffectIcons
+    const values = presentation && typeof presentation.badge === 'function'
+      ? presentation.badge(status)
+      : status || {}
+    const stacks = Number(values.stacks)
+    const uses = Number(values.uses)
+    const duration = Number(values.duration)
+    const intensity = Number(values.intensity)
+    if (Number.isFinite(stacks) && stacks > 1) return String(stacks)
+    if (Number.isFinite(uses) && uses > 0) return String(uses)
+    if (Number.isFinite(duration) && duration > 0) return String(duration)
+    if (Number.isFinite(intensity) && intensity > 1) return String(intensity)
+    return ''
+  }
   function formatTimer(seconds) {
     if (seconds == null || seconds === '' || !Number.isFinite(Number(seconds))) return '--:--'
     const total = Math.max(0, Math.floor(Number(seconds)))
@@ -81,8 +101,11 @@
       const statusHtml = statuses.length
         ? statuses.map(function (status) {
             const detail = statusDetailText(status)
+            const badge = statusBadge(status)
             return '<article class="selected-status-item">'
-              + '<span class="selected-status-dot" style="--selected-status-color:' + escapeHtml(statusColor(status)) + '"></span>'
+              + '<span class="selected-status-icon-frame" style="--selected-status-color:' + escapeHtml(statusColor(status)) + '">'
+              + '<img class="selected-status-icon" src="' + escapeHtml(statusIcon(status)) + '" alt="" aria-hidden="true">'
+              + (badge ? '<b class="status-icon-badge" aria-hidden="true">' + escapeHtml(badge) + '</b>' : '') + '</span>'
               + '<span class="selected-status-copy"><strong>' + escapeHtml(statusLabel(status)) + '</strong>'
               + (detail ? '<small>' + escapeHtml(detail) + '</small>' : '')
               + (status.description ? '<span>' + escapeHtml(status.description) + '</span>' : '')
@@ -143,7 +166,11 @@
         const isLocal = !!(model.viewer && String(model.viewer.id).toLowerCase() === String(player.id).toLowerCase())
         const sideName = player.faction === 'blue' ? '蓝方 · 后手' : '红方 · 先手'
         const tags = (player.statusSummary || []).map(function (status) {
-          return '<span class="status-tag" title="' + escapeHtml(status.id) + '">' + escapeHtml(statusLabel(status)) + '</span>'
+          const label = statusLabel(status)
+          const badge = statusBadge(status)
+          return '<span class="status-tag status-tag-icon" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '">'
+            + '<img src="' + escapeHtml(statusIcon(status)) + '" alt="" aria-hidden="true">'
+            + (badge ? '<b class="status-icon-badge" aria-hidden="true">' + escapeHtml(badge) + '</b>' : '') + '</span>'
         }).join('')
         const currentLabel = player.isCurrent ? '，当前行动方' : ''
         const localLabel = isLocal ? '，你' : ''

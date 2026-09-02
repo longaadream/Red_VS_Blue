@@ -28,20 +28,27 @@ function isLoopbackDevelopmentRequest(request: NextRequest): boolean {
   return isRed43LocalDevelopmentHostname(request.nextUrl.hostname)
 }
 
-function resolveQaResource(segments: string[]): string | undefined {
+function resolveQaResources(segments: string[]): string[] {
   if (!segments.length || segments.some(segment =>
     !segment || segment === '.' || segment === '..' || segment.includes('/') || segment.includes('\\') || segment.includes('\0'),
-  )) return undefined
+  )) return []
 
   const servesData = segments[0] === 'data'
   const servesPublicAsset = segments[0] === 'images'
-  const root = servesData ? DATA_ROOT : servesPublicAsset ? PUBLIC_ROOT : PAGE_ROOT
   const relativeSegments = servesData || servesPublicAsset ? segments.slice(1) : segments
-  if (!relativeSegments.length) return undefined
+  if (!relativeSegments.length) return []
 
-  const target = path.resolve(root, ...relativeSegments)
-  if (target !== root && !target.startsWith(`${root}${path.sep}`)) return undefined
-  return target
+  const roots = servesData
+    ? [DATA_ROOT]
+    : servesPublicAsset
+      ? [path.resolve(PAGE_ROOT, 'images'), PUBLIC_ROOT]
+      : [PAGE_ROOT]
+
+  return roots.flatMap(root => {
+    const target = path.resolve(root, ...relativeSegments)
+    if (target !== root && !target.startsWith(`${root}${path.sep}`)) return []
+    return [target]
+  })
 }
 
 export async function GET(
@@ -52,21 +59,24 @@ export async function GET(
     return NextResponse.json({ error: 'RED-43 QA resources are available only from local development.' }, { status: 404 })
   }
 
-  const target = resolveQaResource((await params).path)
-  const contentType = target ? CONTENT_TYPES[path.extname(target).toLowerCase()] : undefined
-  if (!target || !contentType) return NextResponse.json({ error: 'QA resource not found.' }, { status: 404 })
+  const targets = resolveQaResources((await params).path)
+  const contentType = targets[0] ? CONTENT_TYPES[path.extname(targets[0]).toLowerCase()] : undefined
+  if (!targets.length || !contentType) return NextResponse.json({ error: 'QA resource not found.' }, { status: 404 })
 
-  try {
-    const body = await readFile(target)
-    return new NextResponse(new Uint8Array(body), {
-      status: 200,
-      headers: {
-        'Cache-Control': 'no-store',
-        'Content-Type': contentType,
-        'X-Content-Type-Options': 'nosniff',
-      },
-    })
-  } catch {
-    return NextResponse.json({ error: 'QA resource not found.' }, { status: 404 })
+  for (const target of targets) {
+    try {
+      const body = await readFile(target)
+      return new NextResponse(new Uint8Array(body), {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store',
+          'Content-Type': contentType,
+          'X-Content-Type-Options': 'nosniff',
+        },
+      })
+    } catch {
+      // Local QA serves battle-page images first, then legacy public images.
+    }
   }
+  return NextResponse.json({ error: 'QA resource not found.' }, { status: 404 })
 }

@@ -67,6 +67,10 @@ describe('RED-43 same-alignment UI acceptance contract', () => {
       new NextRequest('http://localhost:3000/qa/client/images/tile-effects/amaterasu.svg'),
       { params: Promise.resolve({ path: ['images', 'tile-effects', 'amaterasu.svg'] }) },
     )
+    const effectIconResponse = await getQaClientResource(
+      new NextRequest('http://localhost:3000/qa/client/images/effect-icons/divine-shield.svg'),
+      { params: Promise.resolve({ path: ['images', 'effect-icons', 'divine-shield.svg'] }) },
+    )
     const traversalResponse = await getQaClientResource(
       new NextRequest('http://localhost:3000/qa/client/package.json'),
       { params: Promise.resolve({ path: ['..', 'package.json'] }) },
@@ -87,6 +91,11 @@ describe('RED-43 same-alignment UI acceptance contract', () => {
     expect(tileEffectResponse.headers.get('content-type')).toBe('image/svg+xml')
     expect(await tileEffectResponse.text()).toBe(
       readFileSync(resolve(process.cwd(), 'public/tile-effects/amaterasu.svg'), 'utf8'),
+    )
+    expect(effectIconResponse.status).toBe(200)
+    expect(effectIconResponse.headers.get('content-type')).toBe('image/svg+xml')
+    expect(await effectIconResponse.text()).toBe(
+      readFileSync(resolve(process.cwd(), 'public/effect-icons/divine-shield.svg'), 'utf8'),
     )
     expect(traversalResponse.status).toBe(404)
     expect(nonLoopbackResponse.status).toBe(404)

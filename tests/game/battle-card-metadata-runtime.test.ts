@@ -40,6 +40,7 @@ interface HandContainer {
 interface Runtime {
   context: Context
   container: HandContainer
+  fetchLocalJson: ReturnType<typeof vi.fn>
   fetchServerJson: ReturnType<typeof vi.fn>
   submittedActions: unknown[]
   errors: unknown[][]
@@ -71,6 +72,9 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
   const fetchServerJson = vi.fn(async () => {
     throw new Error('unexpected card metadata request')
   })
+  const fetchLocalJson = vi.fn(async () => {
+    throw new Error('unexpected local card metadata request')
+  })
   const context = createContext({
     G: {
       players: [{
@@ -91,6 +95,7 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
     battlePageDisposed: false,
     pendingCardAction: null,
     pendingHandOptionSelection: { selectionId: null, selectedValues: [], submitting: false },
+    fetchLocalJson,
     fetchServerJson,
     renderHand: undefined,
     doAction: (action: unknown) => submittedActions.push(action),
@@ -138,7 +143,7 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
   new Script(runtimeFunctions.map(([name, isAsync]) => readNamedFunction(name, isAsync)).join('\n'))
     .runInContext(context)
 
-  return { context, container, fetchServerJson, submittedActions, errors }
+  return { context, container, fetchLocalJson, fetchServerJson, submittedActions, errors }
 }
 
 function installRenderHand(context: Context) {
@@ -180,6 +185,31 @@ describe('LAN battle hand card display metadata', () => {
     expect(runtime.container.innerHTML).toContain('images/card-art/the-coin.jpg')
     expect(runtime.fetchServerJson).not.toHaveBeenCalled()
     expect(runtime.submittedActions).toEqual([])
+  })
+
+  it('recovers missing training metadata from the local card file', async () => {
+    const fetchLocalJson = vi.fn(async () => ({
+      id: 'lucky-coin',
+      name: '幸运币',
+      description: '获得1点行动点。',
+      actionPointCost: 0,
+      type: 'active',
+      image: 'the-coin.jpg',
+      code: 'throw new Error("display metadata must not execute")',
+    }))
+    const runtime = createRuntime({ TRAINING_MODE: true, fetchLocalJson })
+    installRenderHand(runtime.context)
+
+    new Script('renderHand()').runInContext(runtime.context)
+    await new Script('ensureHandCardDisplayMetadata(G.players[0].hand)').runInContext(runtime.context)
+
+    expect(fetchLocalJson).toHaveBeenCalledTimes(1)
+    expect(fetchLocalJson).toHaveBeenCalledWith('./data/cards/lucky-coin.json', 3500)
+    expect(runtime.fetchServerJson).not.toHaveBeenCalled()
+    expect(runtime.container.innerHTML).toContain('幸运币')
+    expect(runtime.container.innerHTML).toContain('获得1点行动点。')
+    expect(runtime.container.innerHTML).toContain('images/card-art/the-coin.jpg')
+    expect(runtime.context.cardDisplayMetadataById['lucky-coin']).not.toHaveProperty('code')
   })
 
   it('recovers a minimal LAN hand through one deduplicated display-only request', async () => {

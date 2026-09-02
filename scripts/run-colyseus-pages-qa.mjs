@@ -12,8 +12,8 @@ const host = process.env.RVB_QA_PAGES_HOST?.trim() || '127.0.0.1'
 const server = createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || `${host}:${port}`}`)
   const pathname = decodeURIComponent(url.pathname)
-  const candidate = resolveCandidate(pathname)
-  if (!candidate || !existsSync(candidate) || !statSync(candidate).isFile()) {
+  const candidate = resolveCandidates(pathname).find(filePath => existsSync(filePath) && statSync(filePath).isFile())
+  if (!candidate) {
     response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
     response.end('Not found')
     return
@@ -27,18 +27,21 @@ const server = createServer((request, response) => {
 
 server.listen(port, host, () => {
   console.log(`[colyseus-pages-qa] static client: http://${host}:${port}`)
-  console.log('[colyseus-pages-qa] routes /data/* to game data and /images/* to public piece art')
+  console.log('[colyseus-pages-qa] routes /data/* to game data and /images/* to page assets before public piece art')
 })
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => server.close(() => process.exit(0)))
 }
 
-function resolveCandidate(pathname) {
-  if (pathname === '/' || pathname === '') return resolve(pagesRoot, 'index.html')
-  if (pathname.startsWith('/data/')) return safeResolve(dataRoot, pathname.slice('/data/'.length))
-  if (pathname.startsWith('/images/')) return safeResolve(publicRoot, pathname.slice('/images/'.length))
-  return safeResolve(pagesRoot, pathname.slice(1))
+function resolveCandidates(pathname) {
+  if (pathname === '/' || pathname === '') return [resolve(pagesRoot, 'index.html')]
+  if (pathname.startsWith('/data/')) return [safeResolve(dataRoot, pathname.slice('/data/'.length))].filter(Boolean)
+  if (pathname.startsWith('/images/')) {
+    const relativePath = pathname.slice('/images/'.length)
+    return [safeResolve(resolve(pagesRoot, 'images'), relativePath), safeResolve(publicRoot, relativePath)].filter(Boolean)
+  }
+  return [safeResolve(pagesRoot, pathname.slice(1))].filter(Boolean)
 }
 
 function safeResolve(root, relativePath) {

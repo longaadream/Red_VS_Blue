@@ -37,7 +37,7 @@ describe('tile-effect icon registry', () => {
       const iconPath = join(iconDirectory, `${type}.svg`)
       expect(existsSync(iconPath)).toBe(true)
       const svg = readFileSync(iconPath, 'utf8')
-      expect(svg).toMatch(/<svg[^>]+viewBox="0 0 64 64"/)
+      expect(svg).toMatch(/<svg[^>]+width="64"[^>]+height="64"[^>]+viewBox="0 0 64 64"/)
       expect(svg).not.toMatch(/<script/i)
       expect(svg).not.toMatch(/(?:href|src)\s*=\s*["']https?:\/\//i)
       expect(svg).toMatch(/<(path|circle|polygon|line|rect)\b/)
