@@ -25,7 +25,7 @@
 - 队列、略过、2×、减弱动态和 DOM 清理：`tests/ui/battle-action-vignette.test.ts`；其中固定 16 棋子、160 个根动作并推进 180 秒的压力场景确认队列归零、无残留计时器。
 - renderer 召唤/复活与 pending 高亮：`tests/ui/battle-renderer-3d-runtime.test.ts`
 - 页面/生命周期边界：`tests/game/battle-ui-boundary.test.ts`、`tests/game/battle-page-contract.test.ts`
-- 最新主基线相关回归：8 个相关测试文件共 113 项通过；`npm.cmd run typecheck`、定向 ESLint、3 个浏览器脚本语法检查与 `npm.cmd run check:encoding` 通过。
+- 最新主基线相关回归：8 个相关测试文件共 114 项通过；另含 public projection 的 8 文件组合 97 项通过；`npm.cmd run typecheck`、定向 ESLint、3 个浏览器脚本语法检查与 `npm.cmd run check:encoding` 通过。
 
 ## 浏览器证据（Playwright CLI）
 
