@@ -791,10 +791,10 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const model = runtimeModel()
     const pieceId = model.pieces[0].id
     model.pieces[0].statusSummary = [
-      { id: 'sleep-1', type: 'sleep', label: '睡眠', duration: 2, iconPath: '/effect-icons/sleep.svg' },
-      { id: 'freeze-1', type: 'freeze', label: '冰冻', duration: 1, iconPath: '/tile-effects/blizzard.svg' },
-      { id: 'shield-1', type: 'divine-shield', label: '圣盾', uses: 1, iconPath: '/effect-icons/divine-shield.svg' },
-      { id: 'stance-1', type: 'calm-stance', label: '平静姿态', iconPath: '/effect-icons/stance.svg' },
+      { id: 'sleep-1', type: 'sleep', label: '睡眠', duration: 2, iconPath: 'images/effect-icons/sleep.svg' },
+      { id: 'freeze-1', type: 'freeze', label: '冰冻', duration: 1, iconPath: 'images/tile-effects/blizzard.svg' },
+      { id: 'shield-1', type: 'divine-shield', label: '圣盾', uses: 1, iconPath: 'images/effect-icons/divine-shield.svg' },
+      { id: 'stance-1', type: 'calm-stance', label: '平静姿态', iconPath: 'images/effect-icons/stance.svg' },
       { id: 'internal-1', type: 'shishio-dmg-counter', label: '内部计数' },
     ]
 
@@ -811,7 +811,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
 
     expect(dots).toHaveLength(2)
     expect(dots.map((dot) => dot.dataset.statusId)).toEqual(['sleep-1', 'freeze-1'])
-    expect(dots[0].querySelector('.piece-board-status-image')?.attributes.src).toBe('/effect-icons/sleep.svg')
+    expect(dots[0].querySelector('.piece-board-status-image')?.attributes.src).toBe('images/effect-icons/sleep.svg')
     expect(overflow.hidden).toBe(false)
     expect(overflow.textContent).toBe('+2')
     expect(overflow.attributes['aria-label']).toBe('查看全部 4 个状态')

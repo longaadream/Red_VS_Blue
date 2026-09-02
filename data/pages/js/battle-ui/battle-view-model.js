@@ -77,7 +77,7 @@
         label: String(item.name || item.label || (meta && meta.label) || statusLabel(item)),
         description: String(item.description || item.message || ''),
         iconId: meta ? meta.iconId : 'fallback',
-        iconPath: meta ? meta.assetPath : '/effect-icons/fallback.svg',
+        iconPath: meta ? meta.assetPath : 'images/effect-icons/fallback.svg',
         category: meta ? meta.category : 'unknown',
         tone: meta ? meta.tone : 'neutral',
         color: meta ? meta.color : '#94a3b8',
