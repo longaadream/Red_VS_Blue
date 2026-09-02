@@ -84,7 +84,6 @@ type RuntimePieceFixture = {
   id: string
   templateId?: string
   portraitId?: string
-  visible?: boolean
   name: string
   faction: string
   ownerPlayerId: string

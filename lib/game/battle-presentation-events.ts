@@ -225,7 +225,7 @@ function projectilePresentation(
 ): BattlePresentationMotion | undefined {
   const skillId = text(command.skillId)
   const skill = skillId ? state.skillsById?.[skillId] as unknown as Record<string, unknown> | undefined : undefined
-  if (!skill || skill.form !== 'projectile') return undefined
+  if (!skillId || !skill || skill.form !== 'projectile') return undefined
   const travel = getProjectilePresentationTravel(skillId)
   if (!travel) return undefined
   const selected = selectedCell(command, state)
