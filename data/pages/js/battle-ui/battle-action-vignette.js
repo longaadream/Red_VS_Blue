@@ -59,6 +59,7 @@
     let timers = []
     let speed = 1
     let disposed = false
+    let lastIsViewerTurn = null
     let activeProgressMs = 0
     let activeTimelineStartedAt = 0
     let skipSettling = false
@@ -144,15 +145,18 @@
     function update(model) {
       if (disposed || !model) return
       const groups = groupEvents(model.presentationEvents)
+      const isViewerTurn = !!(model.turn && model.turn.isViewerTurn)
       if (!primed) {
         groups.forEach(function (group) { remember(group.rootEventId) })
         primed = true
+        lastIsViewerTurn = isViewerTurn
         return
       }
       const incoming = groups.filter(function (group) { return remember(group.rootEventId) })
-      if (!forcePlayback && model.turn && model.turn.isViewerTurn) {
+      const controlReturnedToViewer = !forcePlayback && lastIsViewerTurn === false && isViewerTurn
+      lastIsViewerTurn = isViewerTurn
+      if (controlReturnedToViewer) {
         settleAll()
-        return
       }
       pending.push.apply(pending, incoming)
       startNext()

@@ -28,7 +28,7 @@
 - 队列、略过、2×、减弱动态、头像/技能名与 DOM 清理：`tests/ui/battle-action-vignette.test.ts`、`tests/ui/battle-action-identity.test.ts`；其中固定 16 棋子、160 个根动作并推进 180 秒的压力场景确认队列归零、无残留计时器。
 - renderer 召唤/复活与 pending 高亮：`tests/ui/battle-renderer-3d-runtime.test.ts`
 - 页面/生命周期边界：`tests/game/battle-ui-boundary.test.ts`、`tests/game/battle-page-contract.test.ts`
-- 最新主基线相关回归：9 个相关测试文件共 131 项通过；回合计时与部署补充回归 3 个文件共 51 项通过；`npm.cmd run typecheck`、定向 ESLint、浏览器脚本语法检查与 `npm.cmd run check:encoding` 通过。训练运行时测试实际执行投影器并确认事件在 render 时进入展示模型，同时验证提交 action 与前后状态不被投影修改；浏览器直接使用由 `build:game-engine` 生成的规范引擎包，避免独立投影包漂移。页面合同同时覆盖 Next QA 路由和静态 QA 服务对页面 SVG、公共角色头像的寻址。
+- 最新主基线相关回归：9 个相关测试文件共 133 项通过；回合计时与部署补充回归 3 个文件共 51 项通过；`npm.cmd run typecheck`、定向 ESLint、浏览器脚本语法检查与 `npm.cmd run check:encoding` 通过。训练运行时测试实际执行投影器并确认事件在 render 时进入展示模型，同时验证提交 action 与前后状态不被投影修改；浏览器直接使用由 `build:game-engine` 生成的规范引擎包，避免独立投影包漂移。页面合同同时覆盖 Next QA 路由和静态 QA 服务对页面 SVG、公共角色头像的寻址。队列测试额外覆盖普通训练/联网己方回合中新提交技能仍会播放，以及控制权返回时先收束对手旧演出再播放同批新事件。
 - 全量回归曾暴露并已修复“部分运行时状态缺少技能注册表时，表现事件投影导致计时/部署提交失败”的兼容问题。剩余两个非 RED-167 哈希/传输用例在本分支与纯 `origin/main@2c624270` 均失败（`battle-authority-v2` 的 version-zero public hash；`roster-transports` 的 HTTP/WebSocket 部署一致性或超时），记录为主基线现有问题，不在本任务内改写权威哈希或传输规则。
 
 ## 浏览器证据（Playwright CLI）
@@ -40,6 +40,7 @@
 - 844×390、`prefers-reduced-motion: reduce`：`output/playwright/RED-167-reduced-motion-mobile-landscape.png`。截图时演出阶段为可见的 `static`，速度按钮为 44×44px。
 - 略过输入：真实页面派发可取消的 `pointerdown` 后 10.5ms 内同步进入 `settle`；`defaultPrevented=true`、派发返回 `false`、战场父节点收到的穿透事件数为 0。收尾计时目标为 60ms，低于 100ms 验收上限。
 - 资源复查：静态 QA 服务修复后，`images/effect-icons/verb-move.svg` 返回 `200 image/svg+xml`；展开动作历史后遍历页面图片，`complete && naturalWidth === 0` 的破图数量为 0。
+- 普通训练复查：不带 `qa` 参数打开 `battle.html?mode=training`，己方回合真实释放阿尔萨斯“寒冰坚忍”后，状态条出现阿尔萨斯头像与“寒冰坚忍 / 点按战场略过”，行动点 10 → 9、技能进入 3 回合冷却。该链路未使用 `forcePlayback`。
 - 控制台仅出现既有缺失资源 `data/skills/evil-explosion.json` 的 404；未发现 RED-167 运行时异常或展示事件投影错误。
 
 ## Android 人工验证

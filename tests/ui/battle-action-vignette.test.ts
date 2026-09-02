@@ -248,6 +248,37 @@ describe('RED-167 action vignette queue', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it('plays a newly committed skill root during the viewer own turn', () => {
+    const vignetteModule = loadModule()
+    const phases: string[] = []
+    const queue = vignetteModule.createQueue({
+      onPhase: (phase: string, group: { rootEventId: string }) => phases.push(`${group.rootEventId}:${phase}`),
+    })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: true } })
+    queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: true } })
+
+    expect(phases).toEqual(['action-1:0:focus'])
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+  })
+
+  it('settles the opponent action before playing a new root committed as control returns', () => {
+    const vignetteModule = loadModule()
+    const phases: string[] = []
+    const queue = vignetteModule.createQueue({
+      onPhase: (phase: string, group: { rootEventId: string }) => phases.push(`${group.rootEventId}:${phase}`),
+    })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(1), root(2)], turn: { isViewerTurn: true } })
+
+    expect(phases).toEqual([
+      'action-1:0:focus',
+      'action-1:0:settle',
+      'action-2:0:focus',
+    ])
+    expect(queue.getDiagnostics().activeRootId).toBe('action-2:0')
+  })
+
   it('runs a three-minute 16-piece queue without retaining timers or unbounded roots', () => {
     const vignetteModule = loadModule()
     const queue = vignetteModule.createQueue()
