@@ -11,6 +11,16 @@ describe('Sonic roster mechanics', () => {
     piece.rules = [...(piece.rules || []), loadRuleById(ruleId)]
     return piece
   }
+
+  it('does not render momentum as a base stat in the complete piece panel', () => {
+    const battlePage = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
+    const statsTemplate = battlePage.match(/const statsHtml = `([\s\S]*?)`\s*\/\/ Skills/)
+
+    expect(statsTemplate).not.toBeNull()
+    expect(statsTemplate?.[1]).not.toContain('pieceMomentumValue')
+    expect(battlePage).toContain("momentumDisplay.textContent = showsMomentum ? '动能 '")
+  })
+
   it('documents the complete momentum acquisition and consumption contract', () => {
     const glossary = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skill-keywords.json'), 'utf8'))
     const momentum = glossary.find((entry: any) => entry.name === '动能')
