@@ -39,6 +39,7 @@ type RendererApi = {
     playedEventCount: number
     floaterCount: number
     pendingPieceIds: string[]
+    pendingAppearanceCues: string[]
     highlightCounts: { move: number; skill: number; place: number; selected: number }
   }
   dispose(): void
@@ -81,6 +82,9 @@ type RuntimeStatusFixture = {
 
 type RuntimePieceFixture = {
   id: string
+  templateId?: string
+  portraitId?: string
+  visible?: boolean
   name: string
   faction: string
   ownerPlayerId: string
@@ -619,6 +623,10 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.update(pendingModel)
     for (let index = 0; index < 10; index += 1) harness.frame(16)
     expect(harness.renderer.getMotionDiagnostics().pendingPieceIds).toEqual([pieceId])
+    const pendingFeedback = group.children.find((child) => child.userData.motionRole === 'feedback-ring')!
+    const pendingBody = group.children.find((child) => child.material && child.material.emissiveIntensity === 0.24)!
+    expect(pendingFeedback.material!.opacity).toBe(0.58)
+    expect(pendingBody).toBeTruthy()
 
     const firstTarget = structuredClone(model)
     firstTarget.pieces[0].x += 3
@@ -648,6 +656,36 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     for (let index = 0; index < 20; index += 1) harness.frame(16)
     expect(group.position.x).toBeCloseTo(secondTarget.pieces[0].x, 3)
     expect(harness.renderer.getMotionDiagnostics().playedEventCount).toBe(2)
+    harness.renderer.dispose()
+  })
+
+  it('uses a dedicated authoritative summon/revive animation and preserves pending feedback', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    model.pieces[0].templateId = 'base-form'
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const summoned = structuredClone(model)
+    summoned.pieces.push({
+      ...structuredClone(model.pieces[0]),
+      id: 'summoned-piece',
+      templateId: 'summoned-form',
+      x: model.pieces[0].x + 1,
+    })
+    summoned.interaction = { pendingPieceId: 'summoned-piece', pendingCommandId: 'summon-1' }
+    harness.renderer.animateAction({ type: 'battleTransition', motionEventKey: 'summon-1' }, model, summoned)
+    expect(harness.renderer.getMotionDiagnostics().pendingAppearanceCues).toEqual(['summoned-piece:summon'])
+    harness.renderer.update(summoned)
+    expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:summoned-piece:summon')
+    for (let index = 0; index < 20; index += 1) harness.frame(16)
+    const summonedGroup = harness.renderers[0].scene!.children.find((child) => child.userData.pieceId === 'summoned-piece')!
+    const pendingBody = summonedGroup.children.find((child) => child.material && child.material.emissiveIntensity === 0.24)
+    const pendingRing = summonedGroup.children.find((child) => child.userData.motionRole === 'feedback-ring')
+    expect(pendingBody).toBeTruthy()
+    expect(pendingRing).toBeTruthy()
+    expect(pendingRing!.material!.opacity).toBeGreaterThanOrEqual(0.58)
     harness.renderer.dispose()
   })
 

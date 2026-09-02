@@ -175,6 +175,63 @@
     }
   }
 
+  const PRESENTATION_CUES = new Set(['directional', 'projectile', 'area', 'displacement', 'summon'])
+  const PRESENTATION_END_REASONS = new Set(['hit', 'blocked', 'boundary', 'range-expired', 'resolved'])
+  const PRESENTATION_COLLISIONS = new Set(['piece', 'terrain', 'boundary'])
+
+  function normalizePresentationPoint(value) {
+    if (!value || !Number.isFinite(Number(value.x)) || !Number.isFinite(Number(value.y))) return null
+    return { x: Number(value.x), y: Number(value.y) }
+  }
+
+  function normalizePresentationPoints(value) {
+    return (Array.isArray(value) ? value : []).flatMap(function (point) {
+      const normalized = normalizePresentationPoint(point)
+      return normalized ? [normalized] : []
+    })
+  }
+
+  function normalizePresentation(value) {
+    if (!value || typeof value !== 'object' || !PRESENTATION_CUES.has(String(value.cue || ''))) return null
+    const selectedCell = normalizePresentationPoint(value.selectedCell)
+    const endPoint = normalizePresentationPoint(value.endPoint)
+    const endReason = PRESENTATION_END_REASONS.has(String(value.endReason || ''))
+      ? String(value.endReason)
+      : null
+    const collisions = (Array.isArray(value.collisions) ? value.collisions : []).flatMap(function (collision) {
+      const point = normalizePresentationPoint(collision)
+      const kind = String(collision && collision.kind || '')
+      if (!point || !PRESENTATION_COLLISIONS.has(kind)) return []
+      return [{
+        kind: kind,
+        x: point.x,
+        y: point.y,
+        pieceId: collision.pieceId ? String(collision.pieceId) : null,
+        terrainType: collision.terrainType ? String(collision.terrainType) : null,
+        blocking: collision.blocking === true,
+      }]
+    })
+    return {
+      cue: String(value.cue),
+      ...(selectedCell ? { selectedCell: selectedCell } : {}),
+      pathCells: normalizePresentationPoints(value.pathCells),
+      ...(endPoint ? { endPoint: endPoint } : {}),
+      ...(endReason ? { endReason: endReason } : {}),
+      collisions: collisions.map(function (collision) {
+        const normalized = {
+          kind: collision.kind,
+          x: collision.x,
+          y: collision.y,
+          blocking: collision.blocking,
+        }
+        if (collision.pieceId) normalized.pieceId = collision.pieceId
+        if (collision.terrainType) normalized.terrainType = collision.terrainType
+        return normalized
+      }),
+      areaCells: normalizePresentationPoints(value.areaCells),
+    }
+  }
+
   function normalizePresentationEvents(value) {
     if (!Array.isArray(value)) return []
     return value.flatMap(function (event) {
@@ -200,6 +257,7 @@
         statusId: event.statusId ? String(event.statusId) : null,
         statusType: event.statusType ? String(event.statusType) : null,
         result: event.result && typeof event.result === 'object' ? Object.assign({}, event.result) : null,
+        presentation: normalizePresentation(event.presentation),
         priority: numberOr(event.priority, 0),
         skippable: event.skippable !== false,
       }]

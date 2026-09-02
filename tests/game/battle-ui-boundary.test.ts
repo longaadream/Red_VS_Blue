@@ -336,8 +336,9 @@ describe('battle presentation boundary', () => {
       animateAction: vi.fn(),
     }
     const domUi = { update: vi.fn(), dispose: vi.fn() }
+    const vignetteUi = { mount: vi.fn(), update: vi.fn(), resize: vi.fn(), dispose: vi.fn() }
     const onIntent = vi.fn()
-    const boundary = presentation.create({ renderer, domUi, onIntent })
+    const boundary = presentation.create({ renderer, domUi, vignetteUi, onIntent })
     const mount = { boardContainer: {}, floatLayer: {} }
     const model = { board: { width: 3, height: 2 }, pieces: [], legal: {} }
 
@@ -355,6 +356,10 @@ describe('battle presentation boundary', () => {
     expect(domUi.dispose).toHaveBeenCalledTimes(2)
     expect(renderer.update).toHaveBeenCalledWith(model)
     expect(domUi.update).toHaveBeenCalledWith(model)
+    expect(vignetteUi.mount).toHaveBeenCalledTimes(2)
+    expect(vignetteUi.update).toHaveBeenCalledWith(model)
+    expect(vignetteUi.resize).toHaveBeenCalledTimes(2)
+    expect(vignetteUi.dispose).toHaveBeenCalledTimes(2)
     expect(onIntent).toHaveBeenCalledWith({ type: 'select-piece', pieceId: 'piece-red' })
     expect(onIntent).toHaveBeenCalledWith({ type: 'drop-piece', pieceId: 'piece-red', x: 1, y: 0 })
     expect(onIntent).toHaveBeenCalledWith({ type: 'viewport-change' })

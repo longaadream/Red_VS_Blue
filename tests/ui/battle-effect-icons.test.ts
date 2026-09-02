@@ -154,6 +154,12 @@ describe('RED-165 battle effect icon registry', () => {
       presentationEvents: [{
         eventId: 'action-1:0', rootEventId: 'action-1:0', actionId: 'action-1', sequence: 0,
         kind: 'skill', iconId: 'action-skill', actorPlayerId: 'red', sourcePieceId: 'piece-red',
+        presentation: {
+          cue: 'projectile', selectedCell: { x: 0, y: 0 }, pathCells: [{ x: 0, y: 0 }],
+          endPoint: { x: 0, y: 0 }, endReason: 'hit',
+          collisions: [{ kind: 'piece', x: 0, y: 0, pieceId: 'piece-red', blocking: true }],
+          areaCells: [{ x: 0, y: 0 }], ignored: 'not-public',
+        },
         priority: 100, skippable: true, message: '客户端不消费这段日志文字',
       }],
       snapshot: {
@@ -182,6 +188,12 @@ describe('RED-165 battle effect icon registry', () => {
     expect(model.selection.piece.statuses[1]).toMatchObject({ iconId: 'fallback' })
     expect(model.presentationEvents).toEqual([expect.objectContaining({
       eventId: 'action-1:0', kind: 'skill', iconId: 'action-skill', sourcePieceId: 'piece-red',
+      presentation: {
+        cue: 'projectile', selectedCell: { x: 0, y: 0 }, pathCells: [{ x: 0, y: 0 }],
+        endPoint: { x: 0, y: 0 }, endReason: 'hit',
+        collisions: [{ kind: 'piece', x: 0, y: 0, pieceId: 'piece-red', blocking: true }],
+        areaCells: [{ x: 0, y: 0 }],
+      },
     })])
     expect(model.presentationEvents[0]).not.toHaveProperty('message')
   })

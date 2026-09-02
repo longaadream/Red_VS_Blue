@@ -18,6 +18,7 @@
     const renderer = input.renderer
     const domUi = input.domUi
     const historyUi = input.historyUi || null
+    const vignetteUi = input.vignetteUi || null
     const onIntent = typeof input.onIntent === 'function' ? input.onIntent : function () {}
     let mounted = false
     let currentModel = null
@@ -26,6 +27,7 @@
       if (!intent || !INTENT_TYPES.has(intent.type)) {
         throw new Error('Unsupported battle UI intent: ' + String(intent && intent.type))
       }
+      if (intent.type === 'viewport-change' && vignetteUi && vignetteUi.resize) vignetteUi.resize()
       if (intent.type === 'viewport-change' && historyUi && historyUi.resize) historyUi.resize()
       onIntent(intent)
     }
@@ -47,6 +49,13 @@
           projectCell: function (x, y, elevation) { return renderer.projectCell(x, y, elevation) },
         })
       }
+      if (vignetteUi && vignetteUi.mount) {
+        vignetteUi.mount({
+          boardContainer: mountInput.boardContainer,
+          floatLayer: mountInput.floatLayer || null,
+          projectCell: function (x, y, elevation) { return renderer.projectCell(x, y, elevation) },
+        })
+      }
       mounted = true
     }
 
@@ -55,6 +64,7 @@
       currentModel = model
       renderer.update(model)
       domUi.update(model)
+      if (vignetteUi && vignetteUi.update) vignetteUi.update(model)
       if (historyUi && historyUi.update) historyUi.update(model)
     }
 
@@ -69,6 +79,7 @@
     function resize() {
       if (!mounted) return
       renderer.resize()
+      if (vignetteUi && vignetteUi.resize) vignetteUi.resize()
       if (historyUi && historyUi.resize) historyUi.resize()
     }
     function resetView() { if (mounted && renderer.resetView) renderer.resetView() }
@@ -79,6 +90,7 @@
       if (!mounted) return
       renderer.dispose()
       domUi.dispose()
+      if (vignetteUi && vignetteUi.dispose) vignetteUi.dispose()
       if (historyUi && historyUi.dispose) historyUi.dispose()
       mounted = false
       currentModel = null

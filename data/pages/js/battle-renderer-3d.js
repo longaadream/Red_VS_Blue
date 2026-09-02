@@ -112,6 +112,7 @@
   const _anims = new Map()             // one controller per owner/property
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
+  const _pendingAppearanceCues = new Map()
   const _texCache = new Map()
   let _textureLoadGeneration = 0
   const _floaters = new Set()
@@ -624,11 +625,18 @@
       // Death feedback owns visibility until its authoritative result transition ends.
       if (piece.visible !== false) obj.group.visible = true
       else if (!obj.deathAnimating) obj.group.visible = false
+
+      const appearanceCue = _pendingAppearanceCues.get(piece.id)
+      if (appearanceCue && piece.visible !== false) {
+        _pendingAppearanceCues.delete(piece.id)
+        _animateSummon(obj)
+      }
     })
 
     // Remove departed pieces
     _pieceObjects.forEach((obj, id) => {
       if (!seen.has(id)) {
+        _pendingAppearanceCues.delete(id)
         _scene.remove(obj.group)
         _disposePieceObject(obj)
         _pieceObjects.delete(id)
@@ -1302,9 +1310,16 @@
     const damagedTargets = []
     ;(nextModel.pieces || []).forEach(function (nextPiece) {
       const previousPiece = _pieceById(previousModel, nextPiece.id)
-      if (!previousPiece) return
+      if (!previousPiece) {
+        if (nextPiece.visible !== false) _pendingAppearanceCues.set(nextPiece.id, 'summon')
+        return
+      }
       const obj = _pieceObjects.get(nextPiece.id)
       if (!obj) return
+      if (previousPiece.visible === false && nextPiece.visible !== false) {
+        _pendingAppearanceCues.set(nextPiece.id, 'summon')
+        return
+      }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
         _animateMove(obj, nextPiece.x, nextPiece.y)
       }
@@ -1408,10 +1423,12 @@
       obj.targetSelected = targetSelected
       if (pending || targetSelected) {
         obj.feedbackRing.material.color.setHex(pending ? 0xf59e0b : 0x60a5fa)
-        obj.feedbackRing.material.opacity = pending ? 0.38 : 0.58
+        obj.feedbackRing.material.opacity = 0.58
+        obj.body.material.emissiveIntensity = pending ? 0.24 : 0.12
         if (!_reducedMotion && !_anims.has(obj.motionId + ':position')) obj.group.position.y = obj.baseY + 0.04
       } else {
         obj.feedbackRing.material.opacity = 0
+        obj.body.material.emissiveIntensity = 0.08
         if (!_anims.has(obj.motionId + ':position') && !obj.deathAnimating) obj.group.position.y = obj.baseY
       }
     })
@@ -1488,7 +1505,7 @@
     }
     const finalise = function () {
       material.color.setHex(0xf59e0b)
-      material.opacity = obj.pending ? 0.38 : 0
+      material.opacity = obj.pending ? 0.58 : 0
     }
     _startAnimation(obj.motionId + ':outline', {
       duration: resultDuration,
@@ -1497,7 +1514,7 @@
         const timeline = Number.isFinite(raw) ? raw : progress
         const rising = timeline <= 0.45
         const phase = rising ? EASE.out(timeline / 0.45) : EASE.in((timeline - 0.45) / 0.55)
-        const baseOpacity = obj.pending ? 0.38 : 0
+        const baseOpacity = obj.pending ? 0.58 : 0
         material.color.setHex(mixHex(fromColor, color, Math.min(1, progress * 2)))
         material.opacity = rising
           ? fromOpacity + (0.78 - fromOpacity) * phase
@@ -1532,6 +1549,38 @@
     _flashOutline(obj, 0x67e8f9, MOTION_SECONDS.fast)
   }
 
+  function _animateSummon(obj) {
+    obj.group.visible = true
+    _cancelAnimation(obj.motionId + ':visibility')
+    if (_reducedMotion) {
+      _restorePieceVisual(obj)
+      _flashOutline(obj, 0xa78bfa, MOTION_SECONDS.fast)
+      return
+    }
+    const materials = _ownedPieceMaterials(obj)
+    materials.forEach(function (material) {
+      material.transparent = true
+      material.opacity = 0
+    })
+    obj.group.scale.set(0.82, 0.82, 0.82)
+    obj.group.position.y = obj.baseY - 0.04
+    _startAnimation(obj.motionId + ':summon', {
+      duration: MOTION_SECONDS.result,
+      easing: EASE.out,
+      update: function (progress) {
+        const scale = 0.82 + 0.18 * progress
+        obj.group.scale.set(scale, scale, scale)
+        obj.group.position.y = obj.baseY - 0.04 + 0.04 * progress
+        materials.forEach(function (material) { material.opacity = progress })
+      },
+      complete: function () {
+        _restorePieceVisual(obj)
+        _flashOutline(obj, 0xa78bfa, MOTION_SECONDS.fast)
+      },
+      cancel: function () { _restorePieceVisual(obj) },
+    })
+  }
+
   function _ownedPieceMaterials(obj) {
     return [obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial]
       .filter(function (material, index, materials) { return material && materials.indexOf(material) === index })
@@ -1546,11 +1595,22 @@
     })
     if (obj.body.material.color) obj.body.material.color.setHex(0x22272d)
     if (obj.body.material.emissive) obj.body.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
-    obj.body.material.emissiveIntensity = 0.08
+    obj.body.material.emissiveIntensity = obj.pending ? 0.24 : (obj.targetSelected ? 0.12 : 0.08)
     if (obj.ring.material.color) obj.ring.material.color.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     if (obj.ring.material.emissive) obj.ring.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     obj.ring.material.emissiveIntensity = 0.3
     if (obj.markerMaterial.color) obj.markerMaterial.color.setHex(0xf2e8d5)
+    if (obj.feedbackRing && obj.feedbackRing.material) {
+      if (obj.pending) {
+        if (obj.feedbackRing.material.color) obj.feedbackRing.material.color.setHex(0xf59e0b)
+        obj.feedbackRing.material.opacity = 0.58
+      } else if (obj.targetSelected) {
+        if (obj.feedbackRing.material.color) obj.feedbackRing.material.color.setHex(0x67e8f9)
+        obj.feedbackRing.material.opacity = 0.58
+      } else {
+        obj.feedbackRing.material.opacity = 0
+      }
+    }
   }
 
   function _animateDeath(obj) {
@@ -1616,6 +1676,7 @@
       playedEventCount: _playedEventKeys.size,
       floaterCount: _floaters.size,
       pendingPieceIds: Array.from(_pieceObjects.values()).filter(function (obj) { return obj.pending }).map(function (obj) { return obj.id }).sort(),
+      pendingAppearanceCues: Array.from(_pendingAppearanceCues.entries()).map(function (entry) { return entry[0] + ':' + entry[1] }).sort(),
       highlightCounts: {
         move: _hlObjects.move.size,
         skill: _hlObjects.skill.size,
@@ -2102,6 +2163,7 @@
     _anims.clear()
     _playedEventKeys.clear()
     _playedEventOrder.length = 0
+    _pendingAppearanceCues.clear()
     _pressedPiece = null
     _pressedHighlight = null
     _pieceDrag = null

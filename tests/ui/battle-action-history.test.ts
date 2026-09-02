@@ -221,8 +221,10 @@ describe('RED-166 icon action history', () => {
     ui.update(model)
 
     expect(ui.getRoots()).toHaveLength(1)
-    expect(list.innerHTML).toContain('images/effect-icons/fallback.svg')
-    expect(list.innerHTML).toContain('aria-label="技能，点击高亮来源与目标"')
+    expect(list.innerHTML).not.toContain('images/effect-icons/fallback.svg')
+    expect(list.innerHTML).toContain('action-history-root-icon is-text')
+    expect(list.innerHTML).toContain('使用<br>技能')
+    expect(list.innerHTML).toContain('aria-label="使用技能，点击高亮来源与目标"')
     expect(list.innerHTML.match(/data-history-root-id=/g)).toHaveLength(1)
     expect(JSON.stringify(model)).toBe(before)
 

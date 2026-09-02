@@ -1,6 +1,10 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
+  getProjectilePresentationTravel,
   projectBattlePresentationEvents,
   type BattlePresentationEvent,
 } from '@/lib/game/battle-presentation-events'
@@ -13,17 +17,24 @@ import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { makeState } from '../helpers/minimal-state'
 
 function piece(id: string, ownerPlayerId: string, hp: number, statuses: unknown[] = []) {
+  const faction: 'red' | 'blue' = ownerPlayerId === 'player-red' ? 'red' : 'blue'
   return {
     instanceId: id,
     templateId: id,
     name: id,
     ownerPlayerId,
-    faction: ownerPlayerId === 'player-red' ? 'red' : 'blue',
+    faction,
     currentHp: hp,
     maxHp: 10,
     attack: 1,
     defense: 0,
     moveRange: 3,
+    actionPoints: 2,
+    maxActionPoints: 2,
+    chargePoints: 0,
+    maxChargePoints: 0,
+    usedSkills: [],
+    hasMoved: false,
     x: id === 'source' ? 0 : 1,
     y: 0,
     skills: [],
@@ -52,6 +63,28 @@ function project(
 }
 
 describe('RED-165 authoritative battle presentation events', () => {
+  it('declares presentation travel for every projectile skill', () => {
+    const skillDirectory = resolve(process.cwd(), 'data/skills')
+    const projectileSkills = readdirSync(skillDirectory)
+      .filter(file => file.endsWith('.json'))
+      .map(file => JSON.parse(readFileSync(resolve(skillDirectory, file), 'utf8')) as { id: string; form?: string })
+      .filter(skill => skill.form === 'projectile')
+
+    const actual = Object.fromEntries(projectileSkills.map(skill => [
+      skill.id,
+      getProjectilePresentationTravel(skill.id),
+    ]))
+    expect(actual).toEqual({
+      'blackwidow-lethal-strike': 'first-collision',
+      'hellfire-shotgun': 'first-collision',
+      'ichigo-black-getsuga-tensho': 'through-pieces',
+      'ichigo-getsuga-tensho': 'first-collision',
+      'nano-boost': 'selected-target',
+      'sleep-dart': 'first-collision',
+      'venom-symbiote-drag': 'first-collision',
+    })
+  })
+
   it.each([
     [{ type: 'move', playerId: 'player-red', pieceId: 'source', toX: 2, toY: 3 }, 'move', 'action-move'],
     [{ type: 'useBasicSkill', playerId: 'player-red', pieceId: 'source', skillId: 'skill-basic' }, 'skill', 'action-skill'],
@@ -209,5 +242,116 @@ describe('RED-165 authoritative battle presentation events', () => {
     expect(update?.presentationEvents).toEqual(events)
     expect(JSON.stringify(update?.patch)).not.toContain('presentationEvents')
     expect(update?.stateHash).toBe(update?.postPublicHash)
+  })
+
+  it('projects a first-collision projectile past the selected direction cell to its authoritative blocker', () => {
+    const before = makeState({
+      width: 6,
+      height: 1,
+      pieces: [
+        piece('source', 'player-red', 10),
+        { ...piece('ally-blocker', 'player-red', 10), x: 2, y: 0 },
+      ],
+    })
+    before.skillsById['blackwidow-lethal-strike'] = {
+      id: 'blackwidow-lethal-strike',
+      name: 'First collision',
+      description: '',
+      kind: 'active',
+      type: 'normal',
+      form: 'projectile',
+      cooldownTurns: 0,
+      maxCharges: 0,
+      powerMultiplier: 1,
+      code: '',
+      range: 'single',
+      requiresTarget: true,
+      actionPointCost: 1,
+      targeting: { steps: [{ kind: 'target', type: 'grid', filter: 'all', range: 5 }] },
+    }
+    const after = structuredClone(before)
+
+    const events = project({
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'source',
+      skillId: 'blackwidow-lethal-strike',
+      targetX: 1,
+      targetY: 0,
+    }, before, after)
+
+    expect(events[0].presentation).toEqual({
+      cue: 'projectile',
+      selectedCell: { x: 1, y: 0 },
+      pathCells: [{ x: 1, y: 0 }, { x: 2, y: 0 }],
+      endPoint: { x: 2, y: 0 },
+      endReason: 'blocked',
+      collisions: [{ kind: 'piece', x: 2, y: 0, pieceId: 'ally-blocker', blocking: true }],
+    })
+  })
+
+  it('keeps a through-pieces projectile travelling beyond the selected cell and all hit pieces', () => {
+    const before = makeState({
+      width: 6,
+      height: 1,
+      pieces: [
+        piece('source', 'player-red', 10),
+        { ...piece('near-target', 'player-blue', 10), x: 2, y: 0 },
+        { ...piece('far-target', 'player-blue', 10), x: 4, y: 0 },
+      ],
+    })
+    before.skillsById['ichigo-black-getsuga-tensho'] = {
+      id: 'ichigo-black-getsuga-tensho',
+      name: 'Through pieces',
+      description: '',
+      kind: 'active',
+      type: 'normal',
+      form: 'projectile',
+      cooldownTurns: 0,
+      maxCharges: 0,
+      powerMultiplier: 1,
+      code: '',
+      range: 'single',
+      requiresTarget: true,
+      actionPointCost: 1,
+      targeting: { steps: [{ kind: 'target', type: 'grid', filter: 'all', range: 99 }] },
+    }
+    const after = structuredClone(before)
+    after.pieces.find(entry => entry.instanceId === 'near-target')!.currentHp = 8
+    after.pieces.find(entry => entry.instanceId === 'far-target')!.currentHp = 8
+    after.actions = [
+      {
+        type: 'damage', playerId: 'player-red', turn: 1,
+        payload: { sourceId: 'source', targetId: 'near-target', finalDamage: 2, blocked: false, killed: false },
+      },
+      {
+        type: 'damage', playerId: 'player-red', turn: 1,
+        payload: { sourceId: 'source', targetId: 'far-target', finalDamage: 2, blocked: false, killed: false },
+      },
+    ]
+
+    const events = project({
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'source',
+      skillId: 'ichigo-black-getsuga-tensho',
+      targetX: 1,
+      targetY: 0,
+    }, before, after)
+
+    expect(events[0].presentation).toMatchObject({
+      cue: 'projectile',
+      selectedCell: { x: 1, y: 0 },
+      endPoint: { x: 5, y: 0 },
+      endReason: 'boundary',
+    })
+    expect(events[0].presentation?.pathCells).toEqual([
+      { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 }, { x: 5, y: 0 },
+    ])
+    expect(events[0].presentation?.collisions).toEqual([
+      { kind: 'piece', x: 2, y: 0, pieceId: 'near-target', blocking: false },
+      { kind: 'piece', x: 4, y: 0, pieceId: 'far-target', blocking: false },
+      { kind: 'boundary', x: 6, y: 0, blocking: true },
+    ])
   })
 })

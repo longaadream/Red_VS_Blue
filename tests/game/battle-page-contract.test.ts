@@ -77,6 +77,16 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('mounts the RED-167 vignette inside the shared battle presentation lifecycle', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('<script src="js/battle-ui/battle-action-vignette.js"></script>')
+    expect(battlePage).toContain('battleActionVignette = BattleActionVignette.create({')
+    expect(battlePage).toContain('vignetteUi: battleActionVignette')
+    expect(battlePage).toContain("const RED167_QA_MODE = params.get('qa') === 'RED-167'")
+    expect(battlePage).toContain('window.__RVB_RED167_REPLAY__ = playRed167QaSequence')
+  })
+
   it('feeds the authoritative response timer into the shared battle clock view', () => {
     const battlePage = readPage('battle.html')
 

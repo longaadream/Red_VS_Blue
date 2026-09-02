@@ -1,4 +1,5 @@
 import type { BattleAction, BattleActionLog, BattleState } from './turn'
+import { traceProjectile } from './spatial'
 
 export type BattlePresentationEventKind =
   | 'move'
@@ -12,6 +13,46 @@ export type BattlePresentationEventKind =
   | 'statusAdded'
   | 'statusRemoved'
   | 'death'
+
+export type BattlePresentationCue =
+  | 'directional'
+  | 'projectile'
+  | 'area'
+  | 'displacement'
+  | 'summon'
+
+export type BattlePresentationEndReason =
+  | 'hit'
+  | 'blocked'
+  | 'boundary'
+  | 'range-expired'
+  | 'resolved'
+
+export interface BattlePresentationPoint {
+  x: number
+  y: number
+}
+
+export interface BattlePresentationCollision extends BattlePresentationPoint {
+  kind: 'piece' | 'terrain' | 'boundary'
+  pieceId?: string
+  terrainType?: string
+  blocking: boolean
+}
+
+export interface BattlePresentationMotion {
+  cue: BattlePresentationCue
+  /** The player's chosen aim/target cell. It is never the projectile's implied terminal point. */
+  selectedCell?: BattlePresentationPoint
+  /** Ordered, authoritative in-bounds cells traversed by the visual effect. */
+  pathCells?: BattlePresentationPoint[]
+  /** The actual final in-bounds presentation position after collision/range resolution. */
+  endPoint?: BattlePresentationPoint
+  endReason?: BattlePresentationEndReason
+  collisions?: BattlePresentationCollision[]
+  /** Settled target cells for a low-intensity area flash. */
+  areaCells?: BattlePresentationPoint[]
+}
 
 export interface BattlePresentationEvent {
   eventId: string
@@ -32,6 +73,7 @@ export interface BattlePresentationEvent {
   statusId?: string
   statusType?: string
   result?: Record<string, string | number | boolean>
+  presentation?: BattlePresentationMotion
   priority: number
   skippable: boolean
 }
@@ -123,6 +165,195 @@ function commandCell(command: Record<string, unknown>): { x: number; y: number }
   return x === undefined || y === undefined ? undefined : { x, y }
 }
 
+export type ProjectilePresentationTravel = 'first-collision' | 'through-pieces' | 'selected-target'
+
+/** Presentation-only declarations kept outside BattleState, hashes, patches, and persistence. */
+const PROJECTILE_PRESENTATION_TRAVEL: Readonly<Record<string, ProjectilePresentationTravel>> = Object.freeze({
+  'blackwidow-lethal-strike': 'first-collision',
+  'hellfire-shotgun': 'first-collision',
+  'ichigo-black-getsuga-tensho': 'through-pieces',
+  'ichigo-getsuga-tensho': 'first-collision',
+  'nano-boost': 'selected-target',
+  'sleep-dart': 'first-collision',
+  'venom-symbiote-drag': 'first-collision',
+})
+
+export function getProjectilePresentationTravel(skillId: string): ProjectilePresentationTravel | undefined {
+  return PROJECTILE_PRESENTATION_TRAVEL[skillId]
+}
+
+function pieceCell(state: BattleState, pieceId: string | undefined): BattlePresentationPoint | undefined {
+  if (!pieceId) return undefined
+  const piece = state.pieces.find(entry => entry.instanceId === pieceId)
+  const x = finite(piece?.x)
+  const y = finite(piece?.y)
+  return x === undefined || y === undefined ? undefined : { x, y }
+}
+
+function uniquePoints(points: Array<BattlePresentationPoint | undefined>): BattlePresentationPoint[] {
+  const seen = new Set<string>()
+  return points.flatMap(point => {
+    if (!point) return []
+    const key = `${point.x},${point.y}`
+    if (seen.has(key)) return []
+    seen.add(key)
+    return [{ x: point.x, y: point.y }]
+  })
+}
+
+function selectedCell(command: Record<string, unknown>, state: BattleState): BattlePresentationPoint | undefined {
+  const direct = commandCell(command)
+  if (direct) return direct
+  return pieceCell(state, commandTargets(command)[0])
+}
+
+function projectileRange(skill: Record<string, unknown>): number | undefined {
+  const targeting = skill.targeting && typeof skill.targeting === 'object'
+    ? skill.targeting as Record<string, unknown>
+    : null
+  const steps = targeting && Array.isArray(targeting.steps) ? targeting.steps : []
+  const range = steps
+    .flatMap(step => step && typeof step === 'object' ? [finite((step as Record<string, unknown>).range)] : [])
+    .find(value => value !== undefined)
+  return range === undefined ? undefined : Math.max(0, Math.floor(range))
+}
+
+function projectilePresentation(
+  command: Record<string, unknown>,
+  state: BattleState,
+  children: EventDraft[],
+): BattlePresentationMotion | undefined {
+  const skillId = text(command.skillId)
+  const skill = skillId ? state.skillsById?.[skillId] as unknown as Record<string, unknown> | undefined : undefined
+  if (!skill || skill.form !== 'projectile') return undefined
+  const travel = getProjectilePresentationTravel(skillId)
+  if (!travel) return undefined
+  const selected = selectedCell(command, state)
+  if (!selected) return undefined
+
+  if (travel === 'selected-target') {
+    return {
+      cue: 'projectile',
+      selectedCell: selected,
+      pathCells: [selected],
+      endPoint: selected,
+      endReason: 'resolved',
+      collisions: [],
+    }
+  }
+
+  const sourcePieceId = text(command.pieceId)
+  const source = pieceCell(state, sourcePieceId)
+  if (!source) return undefined
+  const dx = selected.x - source.x
+  const dy = selected.y - source.y
+  if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return undefined
+  const direction = { x: dx === 0 ? 0 : Math.sign(dx), y: dy === 0 ? 0 : Math.sign(dy) }
+  const maxDistance = projectileRange(skill)
+  const facts = traceProjectile(state, source, direction, {
+    excludePieceId: sourcePieceId,
+    ...(maxDistance === undefined ? {} : { maxDistance }),
+  })
+  const affectedTargets = new Set(children.flatMap(child => child.targetPieceIds ?? []))
+  const pathCells: BattlePresentationPoint[] = []
+  const collisions: BattlePresentationCollision[] = []
+  let endPoint: BattlePresentationPoint | undefined
+  let endReason: BattlePresentationEndReason | undefined
+
+  for (const fact of facts) {
+    if (fact.type === 'cell') {
+      pathCells.push({ x: fact.x, y: fact.y })
+      endPoint = { x: fact.x, y: fact.y }
+      continue
+    }
+    if (fact.type === 'piece') {
+      const blocking = travel === 'first-collision'
+      collisions.push({
+        kind: 'piece', x: fact.x, y: fact.y, pieceId: fact.piece.instanceId, blocking,
+      })
+      if (blocking) {
+        endPoint = { x: fact.x, y: fact.y }
+        endReason = affectedTargets.has(fact.piece.instanceId) ? 'hit' : 'blocked'
+        break
+      }
+      continue
+    }
+    if (fact.type === 'terrain' && fact.blocksProjectile) {
+      collisions.push({
+        kind: 'terrain', x: fact.x, y: fact.y,
+        terrainType: String(fact.tile.props?.type || 'terrain'), blocking: true,
+      })
+      endPoint = { x: fact.x, y: fact.y }
+      endReason = 'blocked'
+      break
+    }
+    if (fact.type === 'boundary') {
+      collisions.push({ kind: 'boundary', x: fact.x, y: fact.y, blocking: true })
+      endReason = 'boundary'
+      break
+    }
+  }
+
+  if (!endPoint) endPoint = pathCells.at(-1)
+  if (!endReason && endPoint) endReason = 'range-expired'
+  return {
+    cue: 'projectile',
+    selectedCell: selected,
+    pathCells,
+    ...(endPoint ? { endPoint } : {}),
+    ...(endReason ? { endReason } : {}),
+    collisions,
+  }
+}
+
+function nonProjectilePresentation(
+  command: Record<string, unknown>,
+  state: BattleState,
+  children: EventDraft[],
+): BattlePresentationMotion | undefined {
+  const type = String(command.type || '')
+  const selected = selectedCell(command, state)
+  if (type === 'move' || type === 'deployReservePiece') {
+    return selected ? {
+      cue: type === 'deployReservePiece' ? 'summon' : 'displacement',
+      selectedCell: selected,
+      endPoint: selected,
+      endReason: 'resolved',
+    } : undefined
+  }
+  const skillId = text(command.skillId)
+  const skill = skillId ? state.skillsById?.[skillId] as unknown as Record<string, unknown> | undefined : undefined
+  const targetCells = uniquePoints([
+    selected,
+    ...children.flatMap(child => (child.targetPieceIds ?? []).map(pieceId => pieceCell(state, pieceId))),
+  ])
+  const isArea = skill?.form === 'area' || skill?.range === 'area' || targetCells.length > 1
+  if (isArea && targetCells.length) {
+    return {
+      cue: 'area',
+      ...(selected ? { selectedCell: selected } : {}),
+      areaCells: targetCells,
+      endPoint: selected ?? targetCells[0],
+      endReason: 'resolved',
+    }
+  }
+  return selected ? {
+    cue: 'directional',
+    selectedCell: selected,
+    endPoint: selected,
+    endReason: 'resolved',
+  } : undefined
+}
+
+function presentationFor(
+  command: Record<string, unknown>,
+  state: BattleState,
+  children: EventDraft[],
+): BattlePresentationMotion | undefined {
+  return projectilePresentation(command, state, children)
+    ?? nonProjectilePresentation(command, state, children)
+}
+
 function commandCardId(command: Record<string, unknown>, beforeState: BattleState): string | undefined {
   const direct = text(command.cardId)
   if (direct) return direct
@@ -138,7 +369,7 @@ function commandCardId(command: Record<string, unknown>, beforeState: BattleStat
     : undefined
 }
 
-function rootDraft(command: Record<string, unknown>, beforeState: BattleState): EventDraft | undefined {
+function rootDraft(command: Record<string, unknown>, beforeState: BattleState, children: EventDraft[]): EventDraft | undefined {
   const config = ROOT_ACTIONS[String(command.type || '')]
   if (!config) return undefined
   const sourcePieceId = text(command.pieceId)
@@ -156,6 +387,7 @@ function rootDraft(command: Record<string, unknown>, beforeState: BattleState): 
         toY: targetCell.y,
       }
     : undefined
+  const presentation = presentationFor(command, beforeState, children)
   return {
     kind: config.kind,
     iconId: config.iconId,
@@ -166,6 +398,7 @@ function rootDraft(command: Record<string, unknown>, beforeState: BattleState): 
     ...(targetPieceIds.length > 0 ? { targetPieceIds } : {}),
     ...(targetCell ? { targetCell } : {}),
     ...(result ? { result } : {}),
+    ...(presentation ? { presentation } : {}),
     priority: config.priority,
     skippable: true,
   }
@@ -343,7 +576,7 @@ export function projectBattlePresentationEvents(
     ...healDrafts(command, input.beforeState, input.afterState),
     ...statusDrafts(command, input.beforeState, input.afterState),
   ]
-  const root = rootDraft(command, input.beforeState) ?? (children.length > 0 ? {
+  const root = rootDraft(command, input.beforeState, children) ?? (children.length > 0 ? {
     kind: 'passive' as const,
     iconId: 'action-passive',
     actorPlayerId: text(command.playerId) ?? text(input.beforeState.turn?.currentPlayerId),

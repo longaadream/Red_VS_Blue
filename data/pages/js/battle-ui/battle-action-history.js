@@ -230,14 +230,18 @@
         })
         const current = index === 0
         const selected = group.rootEventId === activeRootId
-        const label = String(meta.label || KIND_LABELS[group.root.kind] || '未知动作') + (children.length ? '，包含 ' + children.length + ' 个结果' : '')
+        const usesSkillText = group.root.kind === 'skill' || group.root.kind === 'chargeSkill'
+        const rootLabel = usesSkillText ? '使用技能' : String(meta.label || KIND_LABELS[group.root.kind] || '未知动作')
+        const label = rootLabel + (children.length ? '，包含 ' + children.length + ' 个结果' : '')
         return '<button type="button" class="action-history-item' + (current ? ' is-current' : '') + (selected ? ' is-selected' : '') + '"'
           + ' data-history-root-id="' + escapeHtml(group.rootEventId) + '"'
           + ' data-faction="' + escapeHtml(actor && actor.faction || '') + '"'
           + ' aria-label="' + escapeHtml(label + '，点击高亮来源与目标') + '"'
-          + ' aria-pressed="' + String(selected) + '" title="' + escapeHtml(meta.label || KIND_LABELS[group.root.kind] || '未知动作') + '"'
+          + ' aria-pressed="' + String(selected) + '" title="' + escapeHtml(rootLabel) + '"'
           + ' style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '">'
-          + '<span class="action-history-root-icon"><img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt="" aria-hidden="true"></span>'
+          + '<span class="action-history-root-icon' + (usesSkillText ? ' is-text' : '') + '">'
+          + (usesSkillText ? '<span aria-hidden="true">使用<br>技能</span>'
+            : '<img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt="" aria-hidden="true">') + '</span>'
           + (children.length ? '<span class="action-history-branch" aria-hidden="true">' + visibleChildren.map(renderChild).join('')
             + (overflow ? '<b class="action-history-overflow">+' + overflow + '</b>' : '') + '</span>' : '')
           + '</button>'
