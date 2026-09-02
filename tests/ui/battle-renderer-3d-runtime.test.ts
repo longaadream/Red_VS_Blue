@@ -16,6 +16,8 @@ type ThreeMaterial = {
 }
 type ThreeNode = {
   type: string
+  isInstancedMesh?: boolean
+  count?: number
   children: ThreeNode[]
   visible: boolean
   material?: ThreeMaterial
@@ -41,6 +43,14 @@ type RendererApi = {
     pendingPieceIds: string[]
     highlightCounts: { move: number; skill: number; place: number; selected: number }
   }
+  getPerformanceDiagnostics(): {
+    renderCount: number
+    lastDrawCalls: number
+    frameScheduled: boolean
+    activeAnimationCount: number
+    terrainBatchCount: number
+    terrainInstanceCount: number
+  }
   dispose(): void
 }
 
@@ -60,6 +70,7 @@ type FakeRendererRecord = {
   contextLost: boolean
   scene: ThreeScene | null
   camera: ThreeCamera | null
+  renderCount: number
 }
 
 type DisposablePrototype = { dispose: (this: object) => unknown }
@@ -283,6 +294,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
     contextLost = false
     scene: ThreeScene | null = null
     camera: ThreeCamera | null = null
+    renderCount = 0
     constructor() { renderers.push(this) }
     setPixelRatio(value: number) { this.pixelRatio = value }
     setSize(nextWidth: number, nextHeight: number) {
@@ -291,6 +303,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
       this.domElement.rect = { left: 0, top: 0, width: nextWidth, height: nextHeight }
     }
     render(scene: ThreeScene, camera: ThreeCamera) {
+      this.renderCount += 1
       scene.updateMatrixWorld(true)
       camera.updateMatrixWorld(true)
       this.scene = scene
@@ -343,6 +356,36 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
 }
 
 describe('RED-68 BattleRenderer3D runtime', () => {
+  it('renders static state on demand and batches terrain by material', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+
+    harness.renderer.init({ container: harness.container })
+    expect(harness.rafCallbacks.size).toBe(1)
+    harness.frame(16)
+    expect(harness.rafCallbacks.size).toBe(0)
+
+    harness.renderer.update(model)
+    expect(harness.rafCallbacks.size).toBe(1)
+    harness.frame(16)
+    expect(harness.rafCallbacks.size).toBe(0)
+    expect(harness.renderers[0].renderCount).toBe(2)
+    expect(harness.renderer.getPerformanceDiagnostics()).toMatchObject({
+      renderCount: 2,
+      frameScheduled: false,
+      activeAnimationCount: 0,
+      terrainInstanceCount: model.board.tiles.length,
+    })
+
+    const terrainBatches = harness.renderers[0].scene!.children.filter(child => child.isInstancedMesh)
+    expect(terrainBatches.length).toBeGreaterThan(0)
+    expect(terrainBatches.reduce((total, batch) => total + Number(batch.count || 0), 0)).toBe(model.board.tiles.length)
+    const terrainTypes = new Set(model.board.tiles.map(tile => tile.props.type || 'floor'))
+    expect(terrainBatches.length).toBeLessThanOrEqual(terrainTypes.size)
+
+    harness.renderer.dispose()
+  })
+
   it('executes projection, hit, DPR, touch gestures, reset, flash recovery, and rule-state isolation', () => {
     const harness = createHarness()
     const intents: Array<Record<string, unknown>> = []
@@ -423,6 +466,8 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const firstRenderer = harness.renderers[0]
     const firstCanvas = firstRenderer.domElement as FakeElement
     expect(firstCanvas.listenerCount()).toBeGreaterThan(0)
+    harness.renderer.update(model)
+    expect(harness.rafCallbacks.size).toBe(1)
 
     harness.renderer.init({ container: harness.container })
     expect(firstCanvas.listenerCount()).toBe(0)

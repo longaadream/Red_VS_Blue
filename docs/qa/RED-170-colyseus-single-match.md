@@ -1,7 +1,7 @@
 # RED-170：Colyseus 双人单局闭环验收
 
 - 风险：High
-- 基线：`main@55037468e07dbeff9729d3cff790806cef5c7c35`
+- 基线：`main@03e501c0b5220bbb482eccd939db3eeb11737132`
 - 分支：`codex/red-170-colyseus-single-match`
 - 状态：实现验证中，等待独立审查与人工双机验收
 
@@ -28,6 +28,8 @@
 | 静默服务恢复 | 主菜单不重载，远程对局不受本机 authority 退出影响；本机活动局因无跨进程续局而明确中止 |
 | 旧 Profile durable room | 单局记录错误并跳过；健康 authority 与其他房间继续启动 |
 | 客户端正常启动 | 自动准备本机栈并直接进入主菜单；Host/Training 可显式重试，不显示连接门禁 |
+| PostgreSQL readiness 抖动 | 探针不并发；两次瞬时失败只降级，不终止 authority；连续失败且进程状态确认丢失后只触发一次恢复 |
+| 静态战场 | 设置页和静态棋盘无持续 RAF；20×16 地形按材质批量；resize/state/texture/animation 仍各自唤醒正确帧 |
 
 ## 自动验证
 
@@ -69,6 +71,35 @@ checkout 缺 Android 生成 bundle、打包测试 fixture 未创建 runtime 文�
 完整四入口 Windows smoke 的产品断言运行后，在清理临时 Profile PostgreSQL 目录时以 `EPERM` 失败；
 遗留临时进程已按精确临时路径停止。RED-170 直接相关的 `client` 候选随后独立复跑通过且报告
 Electron、Node、PostgreSQL 进程退出计数均为 0。
+
+### 2026-09-02 PostgreSQL 探针与按需渲染修订
+
+原实现每 2 秒启动一次外部 `pg_isready.exe`，单次 timeout 为 3 秒，因此慢探针可以重叠；仅两次失败就
+把 `connection` 清空并回调权威退出，Electron 随即 `taskkill` 仍存活的 Colyseus。这与实机日志中的
+`code=null expected=false`、随后 PostgreSQL fast shutdown/restart 完全一致。修订后：
+
+- 健康探针上一轮完成后才以 1 秒间隔安排下一轮，单次 readiness 预算 1 秒；任何时刻最多一个探针。
+- 两次连续失败仅记录 `degraded`。第三次失败后才调用独立的 `pg_ctl status`；只有明确非零状态才报告
+  `lost`，timeout/spawn error 视为确认不充分，禁止终止权威。
+- 经确认的数据库进程丢失会记录 initiator/reason/PID，把随后的 Colyseus 退出标记为 expected，并只进入
+  一次既有三次恢复预算。
+- 本机 30 次顺序 `pg_isready` 实测 P50 310.96 ms、P95 519.66 ms、max 885.54 ms。成本主要来自 Windows
+  进程启动/安全扫描而非 SQL；健康目标为 1 秒内返回。崩溃集成测试继续在 8 秒检测预算内通过。
+
+渲染候选实测使用 1266×763 CSS / 1582×953 实际 canvas、训练默认 2 棋子、320 地块：
+
+| 场景 | 实包结果 |
+| --- | --- |
+| 训练设置页静置 2 秒 | `renderDelta=0`、`frameScheduled=false` |
+| 训练棋盘静置 3 秒 | `renderDelta=0`、`frameScheduled=false`、`activeAnimationCount=0` |
+| 地形批处理 | 320 instances 合并为 4 terrain batches |
+| 单次 resize | 恰好唤醒 1 帧，随后再次休眠 |
+| resize 后整帧 draw calls | 19（旧候选同类 2 棋子场景约 338） |
+
+动作延迟口径分开记录：完整 `test:colyseus` 并行组 server P50/P95 为 44.578/79.726 ms，client 为
+58.160/105.425 ms；只运行 `battle-room.test.ts` 的隔离复跑 server P50/P95 为 24.166/33.649 ms，
+client 为 32.460/44.136 ms（client P99 52.333 ms），隔离门槛通过。并行组的 5.425 ms 越线保留为
+同机争用证据，不冒充隔离延迟。
 
 关键测试位于：
 

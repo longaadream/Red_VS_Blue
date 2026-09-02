@@ -89,6 +89,9 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain("authoritativePendingTimer ? '响应 ' + view.clockText : view.clockText")
     expect(battlePage).toContain("clock.parentElement?.classList.toggle('pending-timer-active', !!authoritativePendingTimer)")
     expect(battlePage).toContain('.turn-summary-secondary.pending-timer-active')
+    expect(battlePage).not.toContain('deploymentStatusTimer = setInterval')
+    expect(battlePage).toContain('function scheduleDeadlineStatusRefresh()')
+    expect(battlePage).toContain('deadlineStatusTimer = setTimeout')
   })
 
   it('renders the authoritative terminal result without judging or submitting gameOver locally', () => {

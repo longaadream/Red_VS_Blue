@@ -2119,7 +2119,7 @@
     let pendingCardAction = null  // { type:'playCard', playerId, cardInstanceId } awaiting target
     let validMoves = new Set()   // reachable cells for current move (wall-aware)
     let pollTimer = null
-    let deploymentStatusTimer = null
+    let deadlineStatusTimer = null
     let authorityClockAnchor = null
     let authoritativeTurnTimer = null
     let authoritativePendingTimer = null
@@ -5715,6 +5715,41 @@
       )
     }
 
+    function scheduleDeadlineStatusRefresh() {
+      if (deadlineStatusTimer) clearTimeout(deadlineStatusTimer)
+      deadlineStatusTimer = null
+      if (battlePageDisposed) return
+
+      const now = currentAuthorityNow()
+      const deadlines = []
+      const deployment = G && G.deployment
+      if (deployment && deployment.status === 'awaiting-locks') {
+        deadlines.push(Number(deployment.deadlineAt))
+      }
+      const activeTurnTimer = authoritativePendingTimer && authoritativePendingTimer.status === 'running'
+        ? authoritativePendingTimer
+        : authoritativeTurnTimer
+      if (activeTurnTimer && activeTurnTimer.status === 'running') {
+        deadlines.push(Number(activeTurnTimer.deadlineAt))
+        if (activeTurnTimer === authoritativeTurnTimer) deadlines.push(Number(authoritativeTurnTimer.burnStartsAt))
+      }
+
+      const delays = deadlines.filter(Number.isFinite).map(function(deadlineAt) {
+        const remainingMs = deadlineAt - now
+        if (remainingMs <= 0) return null
+        const untilNextDisplayedSecond = remainingMs % 1000
+        return Math.max(16, untilNextDisplayedSecond || Math.min(1000, remainingMs))
+      }).filter(function(delay) { return delay != null })
+      if (!delays.length) return
+
+      deadlineStatusTimer = setTimeout(function() {
+        deadlineStatusTimer = null
+        renderDeploymentStatus()
+        renderTurnTimerStatus()
+        scheduleDeadlineStatusRefresh()
+      }, Math.min.apply(Math, delays))
+    }
+
     async function selectReserveDeploymentPiece(pieceId) {
       const deployment = G && G.deployment
       if (
@@ -5822,6 +5857,7 @@
       if (!G) return
       renderDeploymentStatus()
       renderTurnTimerStatus()
+      scheduleDeadlineStatusRefresh()
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const phase = G.turn ? G.turn.phase : ''
       const inAction = phase === 'action'
@@ -6979,12 +7015,6 @@
       })
       _use3d = hasThreeRenderer
       if (!_use3d) initMapControls()
-      if (!deploymentStatusTimer) {
-        deploymentStatusTimer = setInterval(function() {
-          renderDeploymentStatus()
-          renderTurnTimerStatus()
-        }, 250)
-      }
       init()
       document.addEventListener('pointerdown', function (event) {
         const root = document.getElementById('trainingTools')
@@ -7060,9 +7090,9 @@
       cardDisplayMetadataRequests.clear()
       if (pollTimer) clearInterval(pollTimer)
       pollTimer = null
-      if (deploymentStatusTimer) clearInterval(deploymentStatusTimer)
+      if (deadlineStatusTimer) clearTimeout(deadlineStatusTimer)
       clearPendingActionFeedback('page-dispose')
-      deploymentStatusTimer = null
+      deadlineStatusTimer = null
       if (battlePresentation) battlePresentation.dispose()
     }
     window.addEventListener('pagehide', disposeBattlePage)

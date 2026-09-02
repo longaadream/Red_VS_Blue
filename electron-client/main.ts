@@ -712,15 +712,28 @@ function getEmbeddedPostgres(): EmbeddedPostgresController {
     findFreePort,
     protectSecret: plaintext => safeStorage.encryptString(plaintext),
     unprotectSecret: encrypted => safeStorage.decryptString(encrypted),
+    onHealthStateChange: state => {
+      const detail = state.detail ? ` detail=${state.detail}` : ''
+      const message = `postgres health state=${state.state} failures=${state.consecutiveFailures}${detail}`
+      if (state.state === 'healthy') console.info(`[client] ${message}`)
+      else console.warn(`[client] ${message}`)
+      appendAuthorityDiagnostic('lifecycle', message)
+    },
     onUnexpectedExit: (code, signal) => {
-      console.error(`[client] embedded PostgreSQL exited unexpectedly: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
+      console.error(`[client] embedded PostgreSQL process loss confirmed: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
       localGameReady = false
       localAuthorityProfileIdentity = null
       if (gameServerProcess) {
         const gameProc = gameServerProcess
+        expectedAuthorityExits.add(gameProc)
         gameServerProcess = null
+        appendAuthorityDiagnostic(
+          'lifecycle',
+          `terminating authority pid=${gameProc.pid ?? 'unknown'} initiator=postgres-health reason=confirmed-postgres-process-loss`,
+        )
         killProcessTree(gameProc)
       }
+      void recoverUnexpectedLocalAuthorityExit(code)
     },
   })
   return embeddedPostgres
@@ -839,7 +852,7 @@ async function startLocalGameAuthorityOnce(
   }
   const spawned = gameServerProcess
   spawned.on('error', error => console.error('[client] Colyseus authority error:', error))
-  spawned.on('exit', code => {
+  spawned.on('exit', (code, signal) => {
     const expectedExit = expectedAuthorityExits.has(spawned)
     expectedAuthorityExits.delete(spawned)
     lastServerExitCode = code
@@ -848,8 +861,11 @@ async function startLocalGameAuthorityOnce(
       localGameReady = false
       localAuthorityProfileIdentity = null
     }
-    console.log(`[client] Colyseus authority exited: ${code}`)
-    appendAuthorityDiagnostic('lifecycle', `authority exited: code=${code ?? 'null'} expected=${expectedExit}`)
+    console.log(`[client] Colyseus authority exited: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
+    appendAuthorityDiagnostic(
+      'lifecycle',
+      `authority exited: pid=${spawned.pid ?? 'unknown'} code=${code ?? 'null'} signal=${signal ?? 'null'} expected=${expectedExit}`,
+    )
     if (lastServerStderr) console.error('[client] last Colyseus stderr:', lastServerStderr.slice(-500))
     if (!expectedExit) void recoverUnexpectedLocalAuthorityExit(code)
   })

@@ -95,6 +95,8 @@
   let _floatLayer = null
   let _onIntent = null
   function _notifyViewportChange() {
+    _summaryPositionsDirty = true
+    _invalidate()
     if (_onIntent) _onIntent({ type: 'viewport-change' })
   }
   let _resizeObserver = null
@@ -105,7 +107,8 @@
   let _mapW = 0, _mapH = 0
   let _boardBase = null
   let _boardFront = null
-  const _tileObjects = new Map()       // "x,z" → THREE.Mesh
+  const _tileObjects = new Map()       // "x,z" → { surfaceY, type }
+  const _tileBatches = new Map()       // terrain type → THREE.InstancedMesh
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
   const _hlObjects = { move: new Map(), skill: new Map(), place: new Map(), selected: null, selectedId: null }
@@ -122,6 +125,9 @@
   let _motionQuery = null
   let _currentModel = null
   let _clock = { prev: 0 }
+  let _summaryPositionsDirty = true
+  let _renderCount = 0
+  let _lastDrawCalls = 0
 
   // ── Geometry / Material cache (shared across all tiles/pieces) ────────────────
   let _tileGeom = null
@@ -234,6 +240,8 @@
       const callbacks = entry.loadCallbacks.splice(0)
       entry.errorCallbacks.length = 0
       callbacks.forEach(callback => callback(resolvedTexture))
+      _summaryPositionsDirty = true
+      _invalidate()
     }, undefined, error => {
       const current = _texCache.get(url)
       if (current === entry) _texCache.delete(url)
@@ -332,9 +340,10 @@
     _resizeObserver = new ResizeObserver(function () { resize() })
     _resizeObserver.observe(_container)
 
-    // Start render loop
+    // Render once, then sleep until state, viewport, texture, or motion changes.
     _clock.prev = 0
-    _animFrameId = requestAnimationFrame(_tick)
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   // ── Resize ───────────────────────────────────────────────────────────────────
@@ -349,7 +358,6 @@
       _camera.zoom = Math.max(_camera.zoom, _minimumUsableZoom(w, h))
       _camera.updateProjectionMatrix()
     }
-    _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
@@ -434,7 +442,7 @@
 
   function _tileSurfaceHeightAt(x, z) {
     const tile = _tileObjects.get(Math.round(x) + ',' + Math.round(z))
-    return tile && Number.isFinite(tile.userData.surfaceY) ? tile.userData.surfaceY : TILE_H
+    return tile && Number.isFinite(tile.surfaceY) ? tile.surfaceY : TILE_H
   }
 
   function _updateCameraProjection(w, h) {
@@ -451,15 +459,30 @@
     _camera.bottom = -halfHeightAtTarget
   }
 
-  // ── Render loop ───────────────────────────────────────────────────────────────
+  // ── Demand-driven render scheduling ───────────────────────────────────────────
+  function _invalidate() {
+    if (!_mounted || !_renderer || _animFrameId != null) return
+    _clock.prev = 0
+    _animFrameId = requestAnimationFrame(_tick)
+  }
+
   function _tick(now) {
     if (!_mounted || !_renderer || !_scene || !_camera) return
-    _animFrameId = requestAnimationFrame(_tick)
-    const dt = Math.min((now - (_clock.prev || now)) / 1000, 0.1)
+    _animFrameId = null
+    const dt = _clock.prev
+      ? Math.min((now - _clock.prev) / 1000, 0.1)
+      : (_anims.size > 0 ? 1 / 60 : 0)
     _clock.prev = now
     _stepAnims(dt)
     _pulseLava(now / 1000)
+    if (_summaryPositionsDirty) {
+      _updatePieceSummaryPositions()
+      _summaryPositionsDirty = false
+    }
     _renderer.render(_scene, _camera)
+    _renderCount += 1
+    _lastDrawCalls = _renderer.info && _renderer.info.render ? _renderer.info.render.calls : 0
+    if (_anims.size > 0 && _animFrameId == null) _animFrameId = requestAnimationFrame(_tick)
   }
 
   function _pulseLava(t) {
@@ -471,7 +494,8 @@
 
   // ── Tile map ─────────────────────────────────────────────────────────────────
   function _buildTiles(map) {
-    _tileObjects.forEach(m => _scene.remove(m))
+    _tileBatches.forEach(batch => _scene.remove(batch))
+    _tileBatches.clear()
     _tileObjects.clear()
     if (_boardFront) {
       _scene.remove(_boardFront)
@@ -501,17 +525,28 @@
 
     _scene.add(_boardBase)
 
+    const tilesByType = new Map()
     map.tiles.forEach(tile => {
       const type = (tile.props && tile.props.type) ? tile.props.type : (tile.type || 'floor')
       const tileHeight = TILE_HEIGHTS[type] || TILE_H
-      const mesh = new THREE.Mesh(_tileGeom, getTileMat(type))
-      mesh.scale.y = tileHeight
-      mesh.position.set(tile.x, tileHeight / 2, tile.y)
-      mesh.userData.tileX = tile.x
-      mesh.userData.tileZ = tile.y
-      mesh.userData.surfaceY = tileHeight
-      _scene.add(mesh)
-      _tileObjects.set(tile.x + ',' + tile.y, mesh)
+      if (!tilesByType.has(type)) tilesByType.set(type, [])
+      tilesByType.get(type).push({ x: tile.x, y: tile.y, surfaceY: tileHeight })
+      _tileObjects.set(tile.x + ',' + tile.y, { surfaceY: tileHeight, type: type })
+    })
+    tilesByType.forEach(function (tiles, type) {
+      const batch = new THREE.InstancedMesh(_tileGeom, getTileMat(type), tiles.length)
+      const transform = new THREE.Object3D()
+      tiles.forEach(function (tile, index) {
+        transform.position.set(tile.x, tile.surfaceY / 2, tile.y)
+        transform.scale.set(1, tile.surfaceY, 1)
+        transform.updateMatrix()
+        batch.setMatrixAt(index, transform.matrix)
+      })
+      if (batch.instanceMatrix && THREE.StaticDrawUsage != null) batch.instanceMatrix.setUsage(THREE.StaticDrawUsage)
+      batch.userData.cells = tiles
+      if (batch.computeBoundingSphere) batch.computeBoundingSphere()
+      _scene.add(batch)
+      _tileBatches.set(type, batch)
     })
 
     const pose = TacticalGeometry.cameraPose({ mapWidth: _mapW, mapHeight: _mapH })
@@ -1204,6 +1239,8 @@
     }
     _anims.set(key, controller)
     controller.update(0, 0)
+    _summaryPositionsDirty = true
+    _invalidate()
     return controller
   }
 
@@ -1212,6 +1249,8 @@
     if (!controller) return
     _anims.delete(key)
     if (controller.cancel) controller.cancel()
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   function _cancelAnimationsForPrefix(prefix) {
@@ -1229,6 +1268,8 @@
       controller.update(1, 1)
       if (controller.complete) controller.complete()
     })
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   function _stepAnims(dt) {
@@ -1243,8 +1284,10 @@
       _anims.delete(key)
       if (controller.complete) controller.complete()
     })
-    _updateSelectedRingPosition()
-    _updatePieceSummaryPositions()
+    if (_anims.size > 0) {
+      _updateSelectedRingPosition()
+      _summaryPositionsDirty = true
+    }
   }
 
   function _pieceById(model, pieceId) {
@@ -1625,6 +1668,19 @@
     }
   }
 
+  function getPerformanceDiagnostics() {
+    return {
+      renderCount: _renderCount,
+      lastDrawCalls: _lastDrawCalls,
+      frameScheduled: _animFrameId != null,
+      activeAnimationCount: _anims.size,
+      terrainBatchCount: _tileBatches.size,
+      terrainInstanceCount: Array.from(_tileBatches.values()).reduce(function (total, batch) {
+        return total + Number(batch.count || 0)
+      }, 0),
+    }
+  }
+
   // ── Camera controls ───────────────────────────────────────────────────────────
   let _panStart = null
   let _panMoved = false
@@ -1681,7 +1737,6 @@
     })
     _cameraTarget.set(clamped.x, 0, clamped.z)
     _positionCameraFromTarget()
-    _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
@@ -1726,7 +1781,8 @@
       obj.baseZ,
     )
     _updateSelectedRingPosition()
-    _updatePieceSummaryPositions()
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   function _cancelPieceDrag() {
@@ -1750,7 +1806,8 @@
     const tileZ = Math.max(0, Math.min(_mapH - 1, Math.round(z)))
     _pieceDrag.obj.group.position.set(x, _tileSurfaceHeightAt(tileX, tileZ) + 0.08, z)
     _updateSelectedRingPosition()
-    _updatePieceSummaryPositions()
+    _summaryPositionsDirty = true
+    _invalidate()
     return true
   }
 
@@ -1897,7 +1954,6 @@
     const h = _container.clientHeight || 320
     _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(MAX_CAMERA_ZOOM, z))
     _camera.updateProjectionMatrix()
-    _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
@@ -1911,7 +1967,6 @@
     _updateCameraProjection(w, h)
     _camera.zoom = _preferredInitialZoom(w, h)
     _camera.updateProjectionMatrix()
-    _updatePieceSummaryPositions()
     _notifyViewportChange()
   }
 
@@ -1928,11 +1983,12 @@
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
-    const tileHits = _raycaster.intersectObjects(Array.from(_tileObjects.values()), false)
+    const tileHits = _raycaster.intersectObjects(Array.from(_tileBatches.values()), false)
     if (tileHits.length) {
-      const tile = tileHits[0].object
-      const tileX = Number(tile.userData.tileX)
-      const tileY = Number(tile.userData.tileZ)
+      const hit = tileHits[0]
+      const tile = hit.object.userData.cells && hit.object.userData.cells[hit.instanceId]
+      const tileX = Number(tile && tile.x)
+      const tileY = Number(tile && tile.y)
       if (tileX >= 0 && tileY >= 0 && tileX < _mapW && tileY < _mapH) return { x: tileX, y: tileY }
     }
     const hits = _raycaster.intersectObject(_hitPlane)
@@ -2015,6 +2071,8 @@
     })
     _currentModel = model
     _syncPendingFeedback(model.interaction || {})
+    _summaryPositionsDirty = true
+    _invalidate()
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
@@ -2088,6 +2146,7 @@
       if (_renderer.domElement.parentNode) _renderer.domElement.remove()
     }
     _tileObjects.clear()
+    _tileBatches.clear()
     _pieceObjects.forEach(function (obj) {
       obj.statusExitTimers.forEach(function (timer) { clearTimeout(timer) })
       obj.statusExitTimers.clear()
@@ -2138,6 +2197,9 @@
     _contactShadowGeom = null
     _contactShadowMat = null
     _clock.prev = 0
+    _summaryPositionsDirty = true
+    _renderCount = 0
+    _lastDrawCalls = 0
     _panStart = null
     _panMoved = false
     _pinchDist = 0
@@ -2158,6 +2220,7 @@
     screenToCell,
     dispose,
     getMotionDiagnostics,
+    getPerformanceDiagnostics,
     TILE_EFFECT_VISUALS,
     MOTION_TOKENS,
   }

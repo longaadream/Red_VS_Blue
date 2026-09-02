@@ -723,7 +723,11 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       existsSync(path.join(isolatedPackageRoot, 'resources', 'app', 'standalone', 'node_modules', 'ws', 'package.json')),
       'Isolated client package is missing the standalone WebSocket runtime',
     )
-    const { target, rendererBoundary } = await launch(application)
+    // A fresh packaged client initializes a brand-new bundled PostgreSQL data
+    // directory before opening the main menu. On Windows, copying the package
+    // into the isolated smoke directory plus security scanning can exceed the
+    // generic 30-second renderer timeout even while startup is progressing.
+    const { target, rendererBoundary } = await launch(application, 90000)
     assert(
       rendererBoundary.url.startsWith('rvb-client://app/index.html'),
       `Client did not open the main menu directly: ${JSON.stringify(rendererBoundary)}`,
