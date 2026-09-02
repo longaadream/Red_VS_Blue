@@ -69,6 +69,14 @@ export function toPublicBattleState(
 ): BattleState {
   const projected = cloneSerializable(state)
   const viewerId = String(viewerPlayerId ?? '').trim().toLowerCase()
+  for (const player of projected.players) {
+    if (viewerId && player.playerId.trim().toLowerCase() === viewerId) continue
+    player.hand = player.hand.map((_card, index) => ({
+      cardId: 'hidden',
+      instanceId: `hidden-card-${index}`,
+      ownerPlayerId: player.playerId,
+    }))
+  }
   const redactPrivatePieceStatus = (piece: BattleState['pieces'][number]) => {
     const owner = String(piece.ownerPlayerId ?? '').trim().toLowerCase() === viewerId
     if (!owner) {

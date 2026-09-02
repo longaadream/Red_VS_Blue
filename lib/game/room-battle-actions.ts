@@ -67,15 +67,6 @@ const MAX_ROOM_ACTION_ATTEMPTS = 5
 
 function toTimerSafePublicBattleState(state: BattleState, viewerPlayerId?: string): BattleState {
   const projected = toPublicBattleState(state, viewerPlayerId)
-  const viewerId = String(viewerPlayerId ?? '').trim().toLowerCase()
-  for (const player of projected.players) {
-    if (viewerId && player.playerId.trim().toLowerCase() === viewerId) continue
-    player.hand = player.hand.map((_card, index) => ({
-      cardId: 'hidden',
-      instanceId: `hidden-card-${index}`,
-      ownerPlayerId: player.playerId,
-    }))
-  }
   // The response timer has a dedicated projection. Its predeclared default is
   // server-private and must not ride inside the generic battle-state payload.
   if (projected.turnTimer?.pendingResponse) delete projected.turnTimer.pendingResponse
