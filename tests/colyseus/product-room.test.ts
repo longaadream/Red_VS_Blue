@@ -1,7 +1,7 @@
 import { createServer } from 'node:net'
 
 import { Client as ColyseusClient, type Room as ColyseusClientRoom } from '@colyseus/sdk'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import {
@@ -24,6 +24,42 @@ import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authori
 import { FakeAuthorityRepository } from './fake-authority-repository'
 
 describe('RED-161 Colyseus product room', () => {
+  it('isolates an incompatible durable room instead of crashing authority startup', async () => {
+    const repository = new FakeAuthorityRepository()
+    const incompatibleRoom = structuredClone(createDevelopmentBattleRoom('incompatible-profile-room'))
+    const incompatibleCheckpoint = createInitialCheckpoint(incompatibleRoom)
+    const storage = incompatibleRoom.battleState as unknown as {
+      profileIdentity: { authorityContentHash: string }
+    }
+    storage.profileIdentity.authorityContentHash = '0'.repeat(64)
+    await repository.initializeRoom(incompatibleRoom, incompatibleCheckpoint)
+
+    const healthyRoom = createDevelopmentBattleRoom('healthy-restored-room')
+    await repository.initializeRoom(healthyRoom, createInitialCheckpoint(healthyRoom))
+    const logger = { error: vi.fn() }
+    const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })
+    const candidate = createColyseusBattleServer({ repository, journal, logger })
+    const port = await availablePort()
+    await candidate.server.listen(port, '127.0.0.1')
+
+    try {
+      await expect(candidate.restoreProductRooms()).resolves.toEqual(['healthy-restored-room'])
+      await expect(fetch(`http://127.0.0.1:${port}/healthz`).then(response => response.json()))
+        .resolves.toMatchObject({ ok: true, protocol: 'rvb-colyseus' })
+      await expect(fetch(`http://127.0.0.1:${port}/rooms`).then(response => response.json()))
+        .resolves.toEqual({ rooms: [expect.objectContaining({ id: 'healthy-restored-room' })] })
+      expect(logger.error).toHaveBeenCalledWith(
+        '[colyseus] durable room restore skipped',
+        expect.objectContaining({
+          battleId: 'incompatible-profile-room',
+          code: 'PINNED_PROFILE_UNAVAILABLE',
+        }),
+      )
+    } finally {
+      await candidate.server.gracefullyShutdown(false)
+    }
+  }, 20_000)
+
   it('re-registers a durable PostgreSQL room so players can joinById after authority restart', async () => {
     const repository = new FakeAuthorityRepository()
     const profileIdentity = getServerGameProfileIdentityV1()

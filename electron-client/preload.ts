@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 返回离线模式（清除地址）
   goOffline: () => ipcRenderer.invoke('go-offline'),
   openLocalGame: () => ipcRenderer.invoke('open-local-game'),
+  ensureLocalAuthority: () => ipcRenderer.invoke('ensure-local-authority'),
   // 查询当前模式
   getMode: () => ipcRenderer.invoke('get-mode'),
   // 重启本地服务器

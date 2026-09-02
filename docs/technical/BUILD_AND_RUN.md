@@ -771,17 +771,25 @@ node scripts/verify-embedded-postgres-package.mjs _client-postgres
 npm.cmd run build:electron:client
 ```
 
-玩家选择本机 LAN 后，Electron 才会在 `<userData>/postgres/16/data` 初始化 PostgreSQL cluster，生成
-随机 SCRAM 密码并通过 `safeStorage` 加密到 `credential.bin`。数据库只监听 `127.0.0.1` 动态端口；
-Colyseus 仍监听 LAN 地址。远程加入者只启动 Profile 进程，不启动 PostgreSQL 或 Colyseus。
+Electron 启动时会在 `<userData>/postgres/16/data` 初始化或复用 PostgreSQL cluster，生成随机 SCRAM
+密码并通过 `safeStorage` 加密到 `credential.bin`，随后自动准备 Colyseus 并直接进入主菜单。数据库只监听
+`127.0.0.1` 动态端口，Colyseus 仍监听 LAN 地址。Host & Play 与 Training/PVE 复用同一进程栈；选择远程
+服务器不再经过独立连接页。代价是远程加入者也会预热本机 authority，以换取所有本地入口的一致可用性。
 
 RED-170 起，Windows 玩家默认只使用随包 Colyseus authority。根目录 `npm.cmd run dev` 和
 `npm.cmd start` 不再隐式启动旧 `lib/ws-server.ts`；只有遗留诊断明确设置
 `ENABLE_LEGACY_PLAYER_WS=1` 时才注册 raw 玩家 WS。不要在一次候选验收中同时开启两套玩家权威。
 
-本机 authority 意外退出会明确中止当前对局并返回连接页，Electron 至多自动重启一次。这个行为用于
-避免无限崩溃循环，不等同于跨进程 live migration。普通 1–5 秒网络抖动则由 Colyseus SDK 在同一
-session 上恢复，不会重新 `joinById` 创建房间实例。
+本机 authority 意外退出后，同一次故障最多自动恢复三次，每次 authority 就绪等待上限为 5 秒；三次
+失败后状态进入 `manual-required`，不会继续后台拉起，玩家必须在 Host & Play 中点击“重试本机服务”
+才能开启新一轮预算。主菜单及远程对局不会因本机服务恢复而重载；本机活动局仍会明确中止，因为本候选
+不承诺跨进程 live migration。普通 1–5 秒网络抖动由 Colyseus SDK 在同一 session 上恢复，不会重新
+`joinById` 创建房间实例。
+
+历史未终结房间如果绑定了当前 runtime 不再提供的 Profile，会以结构化日志记录并跳过；其他房间与
+authority 继续启动。原始 PostgreSQL 记录不会被启动流程删除，后续仍可用匹配的 Profile 做离线诊断。
+客户端同时把经过连接串脱敏的 Colyseus 生命周期、stdout 与 stderr 写入
+`<userData>/logs/authority.log`；文件超过 2 MiB 时保留最近约 1 MiB，避免长期运行无限增长。
 
 官方 Server、K8s、CI 或已有数据库的开发环境通过 `RVB_POSTGRES_URL` 指定外部 PostgreSQL；该变量
 存在时内置数据库不会启动。兼容读取 `DATABASE_URL`，但协议必须是 `postgres:` 或 `postgresql:`，

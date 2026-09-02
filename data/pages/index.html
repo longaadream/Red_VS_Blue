@@ -461,7 +461,18 @@
     // ── 我当主机 ──────────────────────────────────────────────────────────────
     var _hostServerUrl = ''
 
-    async function showHostSheet() {
+    function showHostServiceError(message) {
+      const box = document.getElementById('hostErrBox')
+      box.innerHTML = '<div id="hostServiceErrorText"></div><button type="button" class="btn-cancel" style="margin-top:10px" onclick="retryHostService()">重试本机服务</button>'
+      document.getElementById('hostServiceErrorText').textContent = message || '本机服务尚未就绪'
+      box.style.display = 'block'
+    }
+
+    async function retryHostService() {
+      await showHostSheet(true)
+    }
+
+    async function showHostSheet(forceRetry) {
       document.getElementById('hostOverlay').classList.add('show')
       document.getElementById('hostStatus').innerHTML = '<div class="lan-scanning"><span class="spin">⟳</span><span>正在启动服务器…</span></div>'
       document.getElementById('hostIpBox').style.display = 'none'
@@ -472,7 +483,12 @@
       // Electron: query local server info
       if (window.electronAPI && window.electronAPI.getHostInfo) {
         try {
-          const info = await window.electronAPI.getHostInfo()
+          let info = await window.electronAPI.getHostInfo()
+          let retryResult = null
+          if (!info?.running && forceRetry === true && typeof window.electronAPI.ensureLocalAuthority === 'function') {
+            retryResult = await window.electronAPI.ensureLocalAuthority()
+            info = await window.electronAPI.getHostInfo()
+          }
           if (info && info.running) {
             const port = info.port || 3000
             _hostServerUrl = 'http://localhost:' + port
@@ -485,12 +501,18 @@
             document.getElementById('hostPortHint').textContent = '好友点「连接主机」→ 自动搜索，或手动输入上方地址'
             document.getElementById('hostEnterBtn').style.display = 'block'
           } else {
-            document.getElementById('hostStatus').innerHTML = '<span style="color:#f87171">本地服务器未运行</span>'
-            document.getElementById('hostErrBox').textContent = '请重启应用以启动本地服务器'
-            document.getElementById('hostErrBox').style.display = 'block'
+            const recovery = info && info.recovery
+            if (recovery && recovery.status === 'recovering') {
+              document.getElementById('hostStatus').innerHTML = '<div class="lan-scanning"><span class="spin">⟳</span><span>正在后台恢复本机服务（' + recovery.attempts + '/' + recovery.maxAttempts + '）</span></div>'
+              showHostServiceError(info?.notice || '本机服务正在恢复，请稍后查看')
+            } else {
+              document.getElementById('hostStatus').innerHTML = '<span style="color:#f87171">本地服务器未运行</span>'
+              showHostServiceError(retryResult?.error || info?.notice || '自动恢复已停止，请手动重试本机服务')
+            }
           }
         } catch (e) {
           document.getElementById('hostStatus').innerHTML = '<span style="color:#f87171">获取主机信息失败</span>'
+          showHostServiceError((e && e.message) || '无法读取本机服务状态')
         }
         return
       }
@@ -701,6 +723,13 @@
 
     // ── Training ──────────────────────────────────────────────────────────────
     async function goToTraining() {
+      if (window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
+        const result = await window.electronAPI.ensureLocalAuthority()
+        if (!result?.ok) {
+          alert('本机服务尚未就绪：' + (result?.error || '请稍后重试'))
+          return
+        }
+      }
       // For training, use local embedded server if available
       const localUrl = await _detectLocalServerUrl()
       if (localUrl) RvBUtils.saveServerConfig({ mode: 'local', url: localUrl })
@@ -721,6 +750,13 @@
 
     // ── PVE single-player ─────────────────────────────────────────────────────
     async function startPve() {
+      if (window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
+        const result = await window.electronAPI.ensureLocalAuthority()
+        if (!result?.ok) {
+          alert('本机服务尚未就绪：' + (result?.error || '请稍后重试'))
+          return
+        }
+      }
       const localUrl = await _detectLocalServerUrl()
       if (localUrl) RvBUtils.saveServerConfig({ mode: 'local', url: localUrl })
       if (window.RvBBridge && (RvBUtils.ensureAndroidMobileEngine || RvBUtils.ensureAndroidMobileServer)) {
@@ -756,7 +792,7 @@
       if (window.electronAPI && window.electronAPI.getMode) {
         try {
           const mode = await window.electronAPI.getMode()
-          if (mode && mode.localUrl) return mode.localUrl
+          if (mode && mode.ready && mode.localUrl) return mode.localUrl
         } catch {}
       }
       // Plain browser/file debug mode. Next may move to 3002 when 3000 is busy.

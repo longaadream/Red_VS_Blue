@@ -38,7 +38,7 @@
 | HTTP 动作 API | 已核对/已测试 | `rooms/[roomId]/battle::POST` | 错误 envelope 与 WS 仍有差异 | 统一版本化错误合同 |
 | Prisma RoomStore | 部分核对 | `RoomStore` | 外层无格式版本，字段读取重置 | 定义新格式并做 round-trip |
 | Electron 服务端 | 未运行 | `electron/main.ts` | 最后版本重大故障、启动链复杂 | 第一优先级冒烟基线 |
-| Electron 客户端 | RED-170 自动回归/待双机 | `electron-client/main.ts` | authority 进程退出会中止当前局 | 双机 Host & Play 完整一局与 kill fault |
+| Electron 客户端 | RED-170 自动回归/待双机 | `electron-client/main.ts` | 本机活动局不提供跨进程续局 | 自动本机栈启动、三次恢复熔断/手动重试、双机 Host & Play 完整一局与 kill fault |
 | Android 客户端/服务端 | 正式产物/未验证 | `android-client`、`MobileHttpServer`、`mobile-server-entry.ts` | 生成物漂移；服务端外壳与 Windows 重复 | 双向开服冒烟和共享 Server Core |
 | 浏览器战斗 UI | 已核对/历史遗留 | `data/pages/battle.html` | 超大跨层文件、全局 `G` | 先记录状态边界，再逐步抽离 |
 | Relay | 遗留权威已禁用 | `relay-server` | standalone 服务尚未实现权威状态合同 | 重建服务后再启用在线战斗 |

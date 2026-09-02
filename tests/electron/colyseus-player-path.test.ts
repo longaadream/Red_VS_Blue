@@ -82,24 +82,37 @@ describe('RED-161 default player transport', () => {
     expect(main).toContain("DISABLE_WS: '1'")
   })
 
-  it('aborts the live match and performs only one bounded authority restart after an unexpected exit', async () => {
+  it('bounds authority recovery to three attempts and keeps non-match recovery silent', async () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
     expect(main).toContain('if (!expectedExit) void recoverUnexpectedLocalAuthorityExit(code)')
-    expect(main).toContain('localAuthorityAutoRestartUsed')
-    expect(main).toContain('await new Promise(resolve => setTimeout(resolve, 500))')
-    expect(main).toContain('abortLocalMatchToConnectScreen(')
-    expect(main).toContain('本局已终止')
+    expect(main).toContain('const LOCAL_AUTHORITY_AUTO_RECOVERY_MAX_ATTEMPTS = 3')
+    expect(main).toContain('localAuthorityRecoveryBudget.claimAttempt()')
+    expect(main).toContain('localAuthorityRecoveryBudget.recordFailure()')
+    expect(main).toContain('localAuthorityRecoveryBudget.recordSuccess()')
+    expect(main).toContain('localAuthorityRecoveryBudget.rearm()')
+    expect(main).toContain("'manual-required'")
+    const recovery = main.slice(
+      main.indexOf('function recoverUnexpectedLocalAuthorityExit('),
+      main.indexOf('async function startLocalGameAuthority(', main.indexOf('function recoverUnexpectedLocalAuthorityExit(')),
+    )
+    expect(recovery).not.toContain('loadLocalGame()')
     expect(main).not.toContain('setInterval(recoverUnexpectedLocalAuthorityExit')
   })
 
-  it('starts the LAN database lazily while remote joiners only start the Profile service', async () => {
+  it('prepares the local authority automatically and opens the main menu without the connection gate', async () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
+    const index = await readFile(path.join(ROOT, 'data', 'pages', 'index.html'), 'utf8')
     const readyHandler = main.slice(main.indexOf('app.whenReady().then'), main.indexOf("app.on('window-all-closed'"))
-    const openLocalHandler = main.slice(main.indexOf("handleTrusted('open-local-game'"), main.indexOf("handleTrusted('get-mode'"))
 
-    expect(readyHandler).toContain('await startStableProfileServerAndRecover()')
-    expect(readyHandler).not.toContain('await startStableLocalServerAndRecover()')
-    expect(openLocalHandler).toContain('await startStableLocalServerAndRecover(openingGeneration)')
+    expect(readyHandler).toContain('await startStableLocalServerAndRecover()')
+    expect(readyHandler).toContain('loadLocalGame()')
+    expect(readyHandler).not.toContain('openConnectWindow()')
+    expect(main).toContain("handleTrusted('ensure-local-authority', ['game']")
+    expect(main).toContain("path.join(logDir, 'authority.log')")
+    expect(main).toContain("'postgresql://<redacted>@'")
+    expect(index).toContain('async function retryHostService()')
+    expect(index).toContain('await showHostSheet(true)')
+    expect(index).toContain("forceRetry === true")
   })
 
   it('shows a stable fail-closed diagnostic when the bundled authority cannot start', async () => {

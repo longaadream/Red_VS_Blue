@@ -42,6 +42,7 @@ export interface CreateColyseusBattleServerOptions {
     runtime: string
     database: string
   }
+  logger?: Pick<Console, 'error'>
 }
 
 interface HealthResponse {
@@ -77,6 +78,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     runtime: 'colyseus-postgresql',
     database: 'postgresql',
   }
+  const logger = options.logger ?? console
   const BattleRoom = createBattleRoomClass({
     repository,
     journal,
@@ -169,10 +171,20 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     if (roomsRestored) return []
     roomsRestored = true
     const roomIds = await repository.listRestorableRoomIds?.() ?? []
+    const restoredRoomIds: string[] = []
     for (const battleId of roomIds) {
-      await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId })
+      try {
+        await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId })
+        restoredRoomIds.push(battleId)
+      } catch (error) {
+        logger.error('[colyseus] durable room restore skipped', {
+          battleId,
+          code: (error as Error & { code?: string }).code,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
-    return roomIds
+    return restoredRoomIds
   }
   return { server, repository, journal, restoreProductRooms }
 }

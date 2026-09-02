@@ -34,8 +34,17 @@ BattleRoom 没有接管掉线恢复和权威 deadline，客户端回执超时后
 7. 部署候选 DOM 只在权威 revision/offer/选择变化时重建。倒计时刷新不得销毁按钮或监听器。
 8. PostgreSQL 仍是必要的耐久与恢复层，但不在普通动作 ACK 热路径中同步阻塞。连接池 idle error 必须
    被带上下文记录，不能因未监听 `error` 事件导致 Node 进程退出。
-9. Windows 本机 authority 意外退出时，当前对局明确中止并返回连接页；Electron 只做一次有界自动重启，
-   不伪装为跨进程续局，也不进入无限拉起循环。
+9. Windows 本机 authority 意外退出时，Electron 对同一次故障最多自动恢复三次，每次等待 authority
+   就绪不超过 5 秒，三次失败后打开熔断并停止后台拉起；只有玩家显式点击重试才重新开启预算。主菜单及
+   远程对局中的本机服务恢复不得重载当前窗口；正在进行的本机对局仍因不提供跨进程 live migration 而
+   明确中止。恢复必须等待失败的 single-flight 启动释放所有权，且预期停止按具体子进程隔离，不能让旧
+   进程的迟到 exit 回调误杀或误报新进程。
+10. Windows 客户端启动时自动准备 Profile、内置 PostgreSQL 与 Colyseus，并直接进入主菜单。Host & Play、
+    Training/PVE 复用这套本机服务；远程服务器地址只在主菜单的显式联机入口配置，不再使用独立连接页作为
+    正常启动门禁。启动失败不锁死入口，主菜单的 Host & Play 操作可以显式重试。
+11. 启动恢复历史 durable rooms 时，单个房间因旧 Profile 不可用或自身数据无效而失败，必须记录
+    battleId/code/message 并跳过该房间；不得让一个不可恢复的旧房间终止整个 authority 进程。跳过不等于
+    伪造恢复成功，也不删除原始耐久记录。
 
 ## 备选方案
 
@@ -57,7 +66,7 @@ migration 不在本任务承诺内。
 - 同一 session 连续 100 次瞬时断线恢复，无替代 session 或幽灵席位；
 - 渐进部署中断线后对比 version/hash/deployment/deadline；
 - 丢失直接 receipt 后按原 actionId 查询 applied/rejected/unknown；
-- Room clock、计时增长、前端稳定 DOM、PostgreSQL pool error 和 Electron authority exit 回归测试；
+- Room clock、计时增长、前端稳定 DOM、PostgreSQL pool error、坏历史房间隔离和 Electron 三次恢复熔断/手动重试回归测试；
 - 类型检查和 Colyseus standalone 构建。
 
 ## 回退方式

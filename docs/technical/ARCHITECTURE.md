@@ -56,13 +56,16 @@ Server 的目标架构，但安装器、签名、监督器、备份、更新和�
 
 ### 3.2 Windows/Electron 玩家客户端标准流程（RED-170）
 
-1. Electron 客户端从 `electron-client/main.ts::app.whenReady()` 启动 Profile；Host & Play 额外启动内置 PostgreSQL 与随包 Colyseus authority。
+1. Electron 客户端从 `electron-client/main.ts::app.whenReady()` 自动准备 Profile、内置 PostgreSQL 与随包 Colyseus authority，然后直接进入主菜单；Host & Play 与 Training/PVE 复用该本机栈，远程地址在主菜单内显式选择。
 2. `ws-client.js` 使用 Colyseus SDK 创建/加入唯一 `BattleRoom`，大厅 RPC 走原生 request/response。
 3. `battle.html` 发送带 `clientActionId` 和 expected authority version/revision 的明确命令。
 4. `BattleRoom` 把玩家、计时器和系统命令送入同一房间 FIFO；规则提交后直接返回精确 receipt，并按接收者投影状态。
 5. 瞬时断线由 `onDrop/allowReconnection/onReconnect` 恢复同一 session；断线期间输入关闭，恢复后接收完整快照。
 6. 直接 receipt 丢失时，客户端按原 `clientActionId` 请求 `applied | rejected | unknown`，所有结果都在有界时间内解除本地 pending。
 7. PostgreSQL journal 异步推进普通动作 durable 水位；version 0、终局和关闭仍遵守 durable barrier。
+8. 启动恢复 durable rooms 时逐房间隔离失败；旧 Profile 无法满足的历史房间保留原始记录但不注册到当前 matchmaker，也不能拖垮健康 authority。
+9. 本机 authority 进程故障使用三次自动恢复预算；耗尽后进入 `manual-required`，只接受玩家显式重试。
+   主菜单和远程对局保持原 renderer，不因本机服务恢复而导航；本机活动局不承诺跨进程续局。
 
 RED-127 起不再提供玩家 HTTP 后备入口。大厅、目录、房间、选将、战斗与恢复全部走同源 WebSocket；
 旧玩家 REST 在实际服务边界返回 410，静态资源继续使用 HTTP。RED-127 中

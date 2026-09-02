@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  LocalAuthorityRecoveryBudget,
   LOCAL_GAME_OPEN_CANCELLED,
   LOCAL_GAME_SHUTDOWN_IN_PROGRESS,
   LocalGameLifecycleGate,
@@ -67,5 +68,35 @@ describe('Electron local game lifecycle gate', () => {
     expect(() => lifecycle.beginOpening()).toThrow(LOCAL_GAME_SHUTDOWN_IN_PROGRESS)
     finishShutdown()
     expect(() => lifecycle.beginOpening()).not.toThrow()
+  })
+})
+
+describe('Electron local authority recovery budget', () => {
+  it('opens the circuit after three failed automatic recovery attempts', () => {
+    const recovery = new LocalAuthorityRecoveryBudget(3)
+
+    expect(recovery.claimAttempt()).toEqual({ attempt: 1, maxAttempts: 3 })
+    recovery.recordFailure()
+    expect(recovery.claimAttempt()).toEqual({ attempt: 2, maxAttempts: 3 })
+    recovery.recordFailure()
+    expect(recovery.claimAttempt()).toEqual({ attempt: 3, maxAttempts: 3 })
+    recovery.recordFailure()
+
+    expect(recovery.snapshot()).toEqual({ attempts: 3, maxAttempts: 3, blocked: true })
+    expect(recovery.claimAttempt()).toBeNull()
+  })
+
+  it('requires an explicit rearm after exhaustion and resets after success', () => {
+    const recovery = new LocalAuthorityRecoveryBudget(1)
+    expect(recovery.claimAttempt()).not.toBeNull()
+    recovery.recordFailure()
+    expect(recovery.claimAttempt()).toBeNull()
+
+    recovery.rearm()
+    expect(recovery.claimAttempt()).toEqual({ attempt: 1, maxAttempts: 1 })
+    recovery.recordSuccess()
+
+    expect(recovery.snapshot()).toEqual({ attempts: 0, maxAttempts: 1, blocked: false })
+    expect(recovery.claimAttempt()).toEqual({ attempt: 1, maxAttempts: 1 })
   })
 })

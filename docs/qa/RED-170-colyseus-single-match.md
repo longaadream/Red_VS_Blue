@@ -24,7 +24,10 @@
 | receipt 丢失 | 按同一 clientActionId 得到 applied/rejected/unknown；客户端 pending 有界结束 |
 | 回合超时 | Room clock 只唤醒同一 FIFO；无重复自动部署、重复换回合或重复版本 |
 | PostgreSQL idle error | 记录错误上下文，Node 不因未监听 Pool error 退出 |
-| Colyseus 进程退出 | 当前局明确中止；Electron 至多一次有界重启并返回连接页 |
+| Colyseus 进程退出 | 每次故障最多自动恢复三次；失败后熔断并等待玩家手动重试，不无限拉起 |
+| 静默服务恢复 | 主菜单不重载，远程对局不受本机 authority 退出影响；本机活动局因无跨进程续局而明确中止 |
+| 旧 Profile durable room | 单局记录错误并跳过；健康 authority 与其他房间继续启动 |
+| 客户端正常启动 | 自动准备本机栈并直接进入主菜单；Host/Training 可显式重试，不显示连接门禁 |
 
 ## 自动验证
 
@@ -41,6 +44,21 @@
 | `npm.cmd run build:electron:client` | Windows 客户端候选、Colyseus 与 PostgreSQL 16.15-2 打包校验通过 |
 | `npm.cmd run smoke:electron:windows -- client` | 通过；本机 authority/Profile/PostgreSQL、建房、页面资源及进程退出均通过 |
 | `npm.cmd run test:postgres` | 2 项因未提供外部 `TEST_POSTGRES_URL` 跳过；未描述为通过 |
+
+2026-09-02 恢复策略修订验证：
+
+| 命令/证据 | 结果 |
+| --- | --- |
+| 恢复预算 + Electron/页面/旧房间聚焦集合 | 6 文件、68 项通过 |
+| `npm.cmd run typecheck` | 通过 |
+| `npm.cmd run build:colyseus` | 通过 |
+| `npm.cmd run build:electron:client` | 通过；Windows 客户端、Colyseus、PostgreSQL 包校验通过 |
+| `npm.cmd run smoke:electron:windows -- client` | 通过；临时禁用 authority 后恰好三次进入 `manual-required`，renderer marker 保持，恢复文件并手动重试后预算归零，退出残留进程为 0 |
+| `npm.cmd run test:colyseus` | 7 文件/17 项通过，RED-160 延迟门槛 1 项失败：server P95 91.404 ms，client P95 122.572 ms |
+| RED-160 延迟隔离复跑 | 仍失败：server P95 82.155 ms，client P95 112.696 ms，client P99 164.052 ms；未把该门槛描述为通过 |
+
+恢复策略不在动作 ACK 热路径，但当前机器上的 RED-160 客户端延迟门槛仍未满足，因此候选尚不能仅凭本次
+恢复验证判定为可合并。原始失败值保留用于后续性能定位。
 
 全仓 `npm.cmd test` 首次运行结果为 1984 通过、10 失败、2 跳过。与 RED-170 相关的 AI 计时期望已
 更新并隔离复跑通过；100 局 soak 已改为等价但更轻的真实 Room fixture，隔离及 Colyseus 整组复跑通过；
@@ -63,13 +81,23 @@ Electron、Node、PostgreSQL 进程退出计数均为 0。
 - `tests/game/battle-page-contract.test.ts`
 - `tests/electron/colyseus-player-path.test.ts`
 
+### 真实用户数据启动回归
+
+2026-09-02 在原始 `<userData>/postgres/16/data` 上稳定复现 code 1：两局未终结记录
+`orovtngbd`、`uce1hd1si` 均因 `PINNED_PROFILE_UNAVAILABLE` 使旧 bundle 在
+`restoreProductRooms()` 退出。修复后的 bundle 对两局分别记录 battleId/code/message 并跳过，随后
+`/healthz` 返回 `ok: true`、`/rooms` 返回空列表，进程保持运行。数据库及原始房间记录未删除。
+
 ## 人工候选验证
 
 1. 两台客户端连接同一本机 Host & Play authority，完成建房、选人和至少三个双方回合。
 2. 确认每个自己的回合只要预备区非空就先部署，不是仅开局部署。
 3. 分别在部署选择、普通行动、pending 响应时断网 1–5 秒，恢复后只需继续操作一次。
 4. 在日志中核对 roomId、sessionId、clientActionId、authorityVersion 与 deadline；不得出现永久 pending。
-5. 测试中止 Colyseus 子进程，确认客户端明确结束当前局、返回连接页且只自动重启一次。
+5. 在主菜单中临时移走 authority bundle 并中止 Colyseus 子进程，确认窗口不重载，自动恢复恰好三次后
+   进入 `manual-required`；恢复 bundle 后点击“重试本机服务”，确认预算重置并恢复成功。
+6. 在远程对局中中止本机 Colyseus，确认远程页面与连接不受影响；在本机活动局执行同样操作，确认当前局
+   明确中止且不会被伪装成跨进程续局。
 
 ## 已知边界
 
