@@ -204,14 +204,14 @@
       }
       return icons && typeof icons.resolveAction === 'function'
         ? icons.resolveAction(event && event.iconId)
-        : { iconId: 'fallback', assetPath: '/effect-icons/fallback.svg', label: '未知动作', color: '#94a3b8' }
+        : { iconId: 'fallback', assetPath: 'images/effect-icons/fallback.svg', label: '未知动作', color: '#94a3b8' }
     }
 
     function renderChild(event) {
       const meta = resolveIcon(event)
       const badge = resultBadge(event)
       return '<span class="action-history-child" style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '" aria-hidden="true">'
-        + '<img src="' + escapeHtml(meta.assetPath || '/effect-icons/fallback.svg') + '" alt="">'
+        + '<img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt="">'
         + (badge ? '<b>' + escapeHtml(badge) + '</b>' : '')
         + '</span>'
     }
@@ -237,7 +237,7 @@
           + ' aria-label="' + escapeHtml(label + '，点击高亮来源与目标') + '"'
           + ' aria-pressed="' + String(selected) + '" title="' + escapeHtml(meta.label || KIND_LABELS[group.root.kind] || '未知动作') + '"'
           + ' style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '">'
-          + '<span class="action-history-root-icon"><img src="' + escapeHtml(meta.assetPath || '/effect-icons/fallback.svg') + '" alt="" aria-hidden="true"></span>'
+          + '<span class="action-history-root-icon"><img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt="" aria-hidden="true"></span>'
           + (children.length ? '<span class="action-history-branch" aria-hidden="true">' + visibleChildren.map(renderChild).join('')
             + (overflow ? '<b class="action-history-overflow">+' + overflow + '</b>' : '') + '</span>' : '')
           + '</button>'

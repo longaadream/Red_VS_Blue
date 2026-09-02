@@ -54,7 +54,7 @@ describe('RED-165 battle effect icon registry', () => {
       const meta = icons.resolveStatusType(type)
       expect(['board', 'hidden'], type).toContain(meta.visibility)
       expect(meta.iconId, type).toBeTruthy()
-      expect(meta.assetPath, type).toMatch(/^\/[a-z0-9/_-]+\.svg$/)
+      expect(meta.assetPath, type).toMatch(/^images\/(?:effect-icons|tile-effects)\/[a-z0-9-]+\.svg$/)
       expect(meta.assetPath, type).not.toMatch(/[\u{1F000}-\u{1FAFF}\uFE0F]/u)
     }
     const registryEntries = Object.values(icons.statusRegistry) as Array<{ visibility: string }>
@@ -93,7 +93,7 @@ describe('RED-165 battle effect icon registry', () => {
       iconId: 'fallback',
       category: 'unknown',
       visibility: 'board',
-      assetPath: '/effect-icons/fallback.svg',
+      assetPath: 'images/effect-icons/fallback.svg',
     })
     expect(icons.badge({ stacks: 3, currentDuration: 2, currentUses: 1, intensity: 8 })).toEqual({
       stacks: 3,
@@ -111,7 +111,7 @@ describe('RED-165 battle effect icon registry', () => {
     ]
     for (const iconId of actionIconIds) {
       expect(icons.resolveAction(iconId)).toMatchObject({ iconId })
-      expect(icons.resolveAction(iconId).assetPath).toMatch(/^\/effect-icons\/[a-z0-9-]+\.svg$/)
+      expect(icons.resolveAction(iconId).assetPath).toMatch(/^images\/effect-icons\/[a-z0-9-]+\.svg$/)
       expect(icons.resolveAction(iconId).assetPath).not.toMatch(/[\u{1F000}-\u{1FAFF}\uFE0F]/u)
     }
     expect(icons.resolveAction('future-action').iconId).toBe('fallback')
@@ -125,7 +125,8 @@ describe('RED-165 battle effect icon registry', () => {
       icons.resolveStatusType('future-status'),
     ] as Array<{ assetPath: string }>
     for (const entry of entries) {
-      expect(existsSync(resolve(rootDir, 'public', entry.assetPath.replace(/^\//, ''))), entry.assetPath).toBe(true)
+      expect(entry.assetPath, entry.assetPath).toMatch(/^images\//)
+      expect(existsSync(resolve(rootDir, 'public', entry.assetPath.replace(/^images\//, ''))), entry.assetPath).toBe(true)
     }
   })
 
@@ -161,7 +162,7 @@ describe('RED-165 battle effect icon registry', () => {
     expect(model.selection.piece.statuses[0]).toMatchObject({
       type: 'divine-shield',
       iconId: 'divine-shield',
-      iconPath: '/effect-icons/divine-shield.svg',
+      iconPath: 'images/effect-icons/divine-shield.svg',
       visibility: 'board',
     })
     expect(model.selection.piece.statuses[1]).toMatchObject({ iconId: 'fallback' })
