@@ -11,6 +11,7 @@ const TEST_PLAYER_ID = 'player-red'
 class FakeRoom {
   static instances: FakeRoom[] = []
   readonly roomId = 'room-a'
+  readonly reconnectionToken = 'room-a:session-token'
   readonly sent: Array<{ type: string; payload: Record<string, unknown> }> = []
   readonly requests: Array<{ type: string; payload: Record<string, unknown> }> = []
   readonly reconnection = {
@@ -73,15 +74,23 @@ class FakeRoom {
 
 class FakeColyseusClient {
   static endpoints: string[] = []
+  static joinCalls = 0
+  static reconnectTokens: string[] = []
 
   constructor(endpoint: string) { FakeColyseusClient.endpoints.push(endpoint) }
 
   async joinById(_roomId: string, options: Record<string, unknown>) {
+    FakeColyseusClient.joinCalls += 1
     return new FakeRoom(options)
+  }
+
+  async reconnect(token: string) {
+    FakeColyseusClient.reconnectTokens.push(token)
+    return new FakeRoom({ reconnected: true })
   }
 }
 
-function loadClient() {
+function loadClient(sessionEntries = new Map<string, string>()) {
   FakeRoom.instances = []
   FakeColyseusClient.endpoints = []
   const profileIdentity = getServerGameProfileIdentityV1()
@@ -93,6 +102,11 @@ function loadClient() {
     },
     RvBUtils: {
       getConnectionConfig: () => ({ url: 'http://127.0.0.1:38521' }),
+    },
+    sessionStorage: {
+      getItem: (key: string) => sessionEntries.get(key) ?? null,
+      setItem: (key: string, value: string) => { sessionEntries.set(key, value) },
+      removeItem: (key: string) => { sessionEntries.delete(key) },
     },
   }
   const context = createContext({
@@ -134,6 +148,8 @@ afterEach(() => {
   vi.useRealTimers()
   FakeRoom.instances = []
   FakeColyseusClient.endpoints = []
+  FakeColyseusClient.joinCalls = 0
+  FakeColyseusClient.reconnectTokens = []
 })
 
 describe('Colyseus reconnect and authority resync state machine', () => {
@@ -181,6 +197,21 @@ describe('Colyseus reconnect and authority resync state machine', () => {
     expect(FakeRoom.instances).toHaveLength(1)
     expect(client.isConnected()).toBe(true)
     expect(connects).toBe(2)
+  })
+
+  it('reconnects the existing Colyseus session after page navigation instead of duplicating the player join', async () => {
+    const sessionEntries = new Map<string, string>()
+    const firstPage = loadClient(sessionEntries)
+    firstPage.connect('room-a', TEST_PLAYER_ID)
+    await finishConnect()
+
+    const secondPage = loadClient(sessionEntries)
+    secondPage.connect('room-a', TEST_PLAYER_ID)
+    await finishConnect()
+
+    expect(FakeColyseusClient.joinCalls).toBe(1)
+    expect(FakeColyseusClient.reconnectTokens).toEqual(['room-a:session-token'])
+    expect(secondPage.isConnected()).toBe(true)
   })
 
   it('ignores a stale Room leave after a replacement join', async () => {

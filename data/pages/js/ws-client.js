@@ -14,7 +14,10 @@
   var _authoritySyncing = false
   var _authoritySyncTimer = null
   var _authoritySyncRequestId = null
+  var _connectPromise = null
+  var _lastConnectionError = null
   var AUTHORITY_SYNC_TIMEOUT_MS = 3000
+  var RECONNECT_TOKEN_PREFIX = 'rvb_colyseus_reconnect:'
 
   function getServerUrl() {
     if (window.RvBUtils && window.RvBUtils.getConnectionConfig) {
@@ -44,6 +47,43 @@
     var base = normalizedBaseUrl(baseUrl || getServerUrl())
     if (!base) throw new Error('Server URL is required')
     return new Colyseus.Client(base)
+  }
+
+  function reconnectTokenKey() {
+    return RECONNECT_TOKEN_PREFIX + normalizedBaseUrl(getServerUrl()) + ':' + _roomId + ':' + _playerId
+  }
+
+  function readReconnectToken() {
+    try { return window.sessionStorage.getItem(reconnectTokenKey()) || '' } catch { return '' }
+  }
+
+  function rememberReconnectToken(room) {
+    try {
+      if (room && room.reconnectionToken) window.sessionStorage.setItem(reconnectTokenKey(), room.reconnectionToken)
+    } catch {}
+  }
+
+  function clearReconnectToken() {
+    try { window.sessionStorage.removeItem(reconnectTokenKey()) } catch {}
+  }
+
+  function delay(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms) })
+  }
+
+  async function reconnectStoredRoom(client, token, generation) {
+    var delays = [0, 80, 200, 400, 800]
+    var lastError
+    for (var attempt = 0; attempt < delays.length; attempt++) {
+      if (delays[attempt]) await delay(delays[attempt])
+      if (generation !== _generation || !_shouldReconnect) return null
+      try {
+        return await client.reconnect(token)
+      } catch (error) {
+        lastError = error
+      }
+    }
+    throw lastError || new Error('Colyseus reconnect failed')
   }
 
   function storedProfileIdentity() {
@@ -138,6 +178,7 @@
     room.onReconnect(function () {
       if (generation !== _generation || !_shouldReconnect || room !== _room) return
       _subscribed = true
+      rememberReconnectToken(room)
       _emit('connect', { reconnected: true })
       void resyncConnectedRoom(room, generation)
     })
@@ -145,6 +186,7 @@
       if (generation !== _generation) return
       _room = null
       _subscribed = false
+      clearReconnectToken()
       _releaseAuthoritySync()
       _emit('disconnect', { terminal: true })
     })
@@ -175,21 +217,39 @@
   async function connectRoom(generation) {
     try {
       _client = createClient()
-      var room = await _client.joinById(_roomId, joinOptions(_playerId))
+      var token = readReconnectToken()
+      var room
+      if (token && typeof _client.reconnect === 'function') {
+        try {
+          room = await reconnectStoredRoom(_client, token, generation)
+        } catch (reconnectError) {
+          clearReconnectToken()
+          if (generation !== _generation || !_shouldReconnect) return false
+          room = await _client.joinById(_roomId, joinOptions(_playerId))
+        }
+      } else {
+        room = await _client.joinById(_roomId, joinOptions(_playerId))
+      }
+      if (!room) return false
       if (generation !== _generation || !_shouldReconnect) {
         try { await room.leave() } catch {}
-        return
+        return false
       }
       _room = room
+      _lastConnectionError = null
+      rememberReconnectToken(room)
       configureNativeReconnection(room)
       registerRoomHandlers(room, generation)
       _subscribed = true
       _emit('connect')
       await resyncConnectedRoom(room, generation)
+      return true
     } catch (error) {
       if (generation !== _generation) return
       _subscribed = false
+      _lastConnectionError = error instanceof Error ? error : new Error(String(error))
       _emit('error', error)
+      return false
     }
   }
 
@@ -215,10 +275,17 @@
     disconnect()
     _roomId = String(roomId || '').trim()
     _playerId = String(playerId || '').trim().toLowerCase() || null
+    _lastConnectionError = null
     _shouldReconnect = true
     var generation = ++_generation
     if (_roomId === '__lobby') connectLobby(generation)
-    else void connectRoom(generation)
+    else {
+      var pending = connectRoom(generation)
+      _connectPromise = pending
+      pending.finally(function () {
+        if (_connectPromise === pending) _connectPromise = null
+      })
+    }
   }
 
   function disconnect() {
@@ -229,8 +296,21 @@
     _room = null
     _client = null
     _subscribed = false
+    _connectPromise = null
     _releaseAuthoritySync()
-    if (room) { try { void room.leave() } catch {} }
+    if (room) {
+      clearReconnectToken()
+      try { void room.leave() } catch {}
+    }
+  }
+
+  async function waitForConnection(timeoutMs) {
+    if (_subscribed && _room) return
+    var pending = _connectPromise
+    if (pending) await withTimeout(pending, timeoutMs || 5000, 'room connect')
+    if (_subscribed && _room) return
+    if (_lastConnectionError) throw _lastConnectionError
+    throw new Error('Colyseus room not connected')
   }
 
   function send(message) {
@@ -482,6 +562,7 @@
     requestCatalogIdentityAt: requestCatalogIdentityAt,
     on: on,
     isConnected: isConnected,
+    waitForConnection: waitForConnection,
     isAuthoritySyncing: isAuthoritySyncing,
   }
 })()
