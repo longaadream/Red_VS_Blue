@@ -33,13 +33,14 @@ type RendererApi = {
   resize(): void
   resetView(): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number }
+  setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
   screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
   getMotionDiagnostics(): {
     activeAnimations: string[]
     playedEventCount: number
     floaterCount: number
     pendingPieceIds: string[]
-    highlightCounts: { move: number; skill: number; place: number; selected: number }
+    highlightCounts: { move: number; skill: number; place: number; selected: number; historyPoints: number; historyPaths: number }
   }
   dispose(): void
 }
@@ -343,6 +344,39 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
 }
 
 describe('RED-68 BattleRenderer3D runtime', () => {
+  it('draws action-history points and paths in the Three.js world parallel to the board plane', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.renderer.setHistoryHighlight([
+      { x: 2, y: 3, role: 'source' },
+      { x: 8, y: 3, role: 'target' },
+      { x: 8, y: 7, role: 'target' },
+    ])
+    harness.frame()
+
+    const diagnostics = harness.renderer.getMotionDiagnostics()
+    expect(diagnostics.highlightCounts.historyPoints).toBe(3)
+    expect(diagnostics.highlightCounts.historyPaths).toBe(2)
+    const historyGroup = harness.renderers[0].scene!.children.find((child) => child.userData.historyHighlight === true)
+    expect(historyGroup).toBeTruthy()
+    const paths = historyGroup!.children.filter((child) => child.userData.historyRole === 'path') as Array<ThreeNode & {
+      geometry: { attributes: { position: { array: ArrayLike<number> } } }
+    }>
+    expect(paths).toHaveLength(2)
+    for (const path of paths) {
+      const positions = Array.from(path.geometry.attributes.position.array)
+      expect(positions[1]).toBeCloseTo(positions[4], 6)
+    }
+
+    harness.renderer.setHistoryHighlight([])
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.historyPoints).toBe(0)
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.historyPaths).toBe(0)
+    expect(harness.renderers[0].scene!.children).not.toContain(historyGroup)
+    harness.renderer.dispose()
+  })
+
   it('executes projection, hit, DPR, touch gestures, reset, flash recovery, and rule-state isolation', () => {
     const harness = createHarness()
     const intents: Array<Record<string, unknown>> = []

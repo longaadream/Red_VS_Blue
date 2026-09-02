@@ -109,6 +109,9 @@
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
   const _hlObjects = { move: new Map(), skill: new Map(), place: new Map(), selected: null, selectedId: null }
+  let _historyHighlightGroup = null
+  let _historyHighlightPointCount = 0
+  let _historyHighlightPathCount = 0
   const _anims = new Map()             // one controller per owner/property
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
@@ -1166,6 +1169,97 @@
     _hlObjects.selected.position.y += 0.035
   }
 
+  function _clearHistoryHighlight() {
+    if (_historyHighlightGroup && _scene) {
+      _scene.remove(_historyHighlightGroup)
+      _historyHighlightGroup.traverse(function (object) {
+        if (object.geometry && object.geometry.dispose) object.geometry.dispose()
+        if (object.material) {
+          ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) {
+            if (material && material.dispose) material.dispose()
+          })
+        }
+      })
+    }
+    _historyHighlightGroup = null
+    _historyHighlightPointCount = 0
+    _historyHighlightPathCount = 0
+  }
+
+  function setHistoryHighlight(items) {
+    _clearHistoryHighlight()
+    if (!_mounted || !_scene) return
+    const cells = []
+    const seen = new Set()
+    ;(Array.isArray(items) ? items : []).forEach(function (item) {
+      const cell = _normalizeHighlightItem(item)
+      if (!cell) return
+      const role = item && item.role === 'source' ? 'source' : 'target'
+      const key = cell.key + ':' + role
+      if (seen.has(key)) return
+      seen.add(key)
+      cells.push({ x: cell.x, z: cell.z, role: role })
+    })
+    if (!cells.length) return
+
+    // This is world-space geometry. The constant Y keeps every connector in an
+    // XZ plane parallel to the board; the active camera supplies perspective.
+    const planeY = TILE_H + 0.09
+    const group = new THREE.Group()
+    group.userData.historyHighlight = true
+    group.userData.planeY = planeY
+    group.renderOrder = 20
+    const source = cells.find(function (cell) { return cell.role === 'source' })
+
+    cells.forEach(function (cell) {
+      const geometry = new THREE.RingGeometry(0.20, 0.29, 32)
+      const color = cell.role === 'source' ? 0x93c5fd : 0xfacc15
+      const material = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.96,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+      })
+      const marker = new THREE.Mesh(geometry, material)
+      marker.rotation.x = -Math.PI / 2
+      marker.position.set(cell.x, planeY, cell.z)
+      marker.renderOrder = 21
+      marker.userData.historyRole = cell.role
+      group.add(marker)
+      _historyHighlightPointCount += 1
+    })
+
+    if (source) {
+      cells.filter(function (cell) { return cell.role === 'target' }).forEach(function (target) {
+        if (target.x === source.x && target.z === source.z) return
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(source.x, planeY, source.z),
+          new THREE.Vector3(target.x, planeY, target.z),
+        ])
+        const material = new THREE.LineDashedMaterial({
+          color: 0xfde047,
+          transparent: true,
+          opacity: 0.92,
+          dashSize: 0.24,
+          gapSize: 0.14,
+          depthTest: false,
+          depthWrite: false,
+        })
+        const path = new THREE.Line(geometry, material)
+        path.computeLineDistances()
+        path.renderOrder = 20
+        path.userData.historyRole = 'path'
+        group.add(path)
+        _historyHighlightPathCount += 1
+      })
+    }
+
+    _historyHighlightGroup = group
+    _scene.add(group)
+  }
+
   // ── Animation ─────────────────────────────────────────────────────────────────
 
   function _cubicBezier(values) {
@@ -1621,6 +1715,8 @@
         skill: _hlObjects.skill.size,
         place: _hlObjects.place.size,
         selected: _hlObjects.selected ? 1 : 0,
+        historyPoints: _historyHighlightPointCount,
+        historyPaths: _historyHighlightPathCount,
       },
     }
   }
@@ -2062,6 +2158,7 @@
     _resizeObserver = null
     if (_renderer) _resetPointerState(_renderer.domElement)
     _removeAllListeners()
+    _clearHistoryHighlight()
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
     if (_scene) {
       const geometries = new Set()
@@ -2110,6 +2207,9 @@
     _hlObjects.place.clear()
     _hlObjects.selected = null
     _hlObjects.selectedId = null
+    _historyHighlightGroup = null
+    _historyHighlightPointCount = 0
+    _historyHighlightPathCount = 0
     _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
@@ -2155,6 +2255,7 @@
     resize,
     resetView,
     projectCell,
+    setHistoryHighlight,
     screenToCell,
     dispose,
     getMotionDiagnostics,

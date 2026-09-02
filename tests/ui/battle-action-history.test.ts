@@ -9,7 +9,7 @@ const pagesDir = resolve(process.cwd(), 'data/pages')
 type RootGroup = {
   rootEventId: string
   root: { eventId: string }
-  children: Array<{ eventId: string }>
+  children: Array<{ eventId: string; kind?: string }>
 }
 
 type ActionHistoryUi = {
@@ -34,13 +34,6 @@ type LocalEvent = {
   target?: {
     closest: (selector: string) => { dataset: { historyRootId: string } } | null
   }
-}
-
-type HighlightElement = {
-  className: string
-  innerHTML: string
-  setAttribute: ReturnType<typeof vi.fn>
-  remove: () => void
 }
 
 function loadActionHistory() {
@@ -94,6 +87,26 @@ describe('RED-166 icon action history', () => {
     expect(duplicate).toHaveLength(1)
     expect(duplicate[0].root.eventId).toBe('action-1:0')
     expect(duplicate[0].children.map((event: { eventId: string }) => event.eventId)).toEqual(['action-1:1'])
+  })
+
+  it('replaces a cached actor view when the same root is re-projected for another viewer', () => {
+    const { history } = loadActionHistory()
+    const actorRoot = rootEvent(3, { targetPieceIds: ['secret-target'] })
+    const publicRoot = rootEvent(3, { targetPieceIds: [] })
+    const concealed = {
+      ...publicRoot,
+      eventId: 'action-3:concealed',
+      parentEventId: 'action-3:0',
+      sequence: 1,
+      kind: 'concealed',
+      iconId: 'result-hidden',
+    }
+
+    const actor = history.mergeRoots([], [actorRoot], 20)
+    const opponent = history.mergeRoots(actor, [publicRoot, concealed], 20)
+    expect(opponent[0].root).not.toHaveProperty('targetPieceIds', ['secret-target'])
+    expect(opponent[0].children.map((event: { kind?: string }) => event.kind)).toEqual(['concealed'])
+    expect(JSON.stringify(opponent)).not.toContain('secret-target')
   })
 
   it('keeps bounded data and renders only the latest five roots in stable newest-first order', () => {
@@ -179,19 +192,8 @@ describe('RED-166 icon action history', () => {
       removeEventListener: vi.fn(),
       contains: () => false,
     }
-    let highlight: HighlightElement | null = null
-    const floatLayer = {
-      querySelector: () => highlight,
-      appendChild: (element: HighlightElement) => { highlight = element },
-    }
     const document = {
       getElementById: (id: string) => id === 'actionHistoryDock' ? dock : null,
-      createElement: () => ({
-        className: '',
-        innerHTML: '',
-        setAttribute: vi.fn(),
-        remove: () => { highlight = null },
-      }),
     }
     const window = {
       innerWidth: 1280,
@@ -207,6 +209,7 @@ describe('RED-166 icon action history', () => {
       setTimeout: () => 1,
       clearTimeout: vi.fn(),
     })
+    const setHistoryHighlight = vi.fn()
     const model = {
       pieces: [{ id: 'source', x: 0, y: 0 }, { id: 'target', x: 1, y: 0 }],
       players: [{ id: 'red', faction: 'red' }],
@@ -215,7 +218,7 @@ describe('RED-166 icon action history', () => {
     }
     const before = JSON.stringify(model)
 
-    ui.mount({ element: dock, floatLayer, projectCell: (x: number, y: number) => ({ left: x * 40, top: y * 40 }) })
+    ui.mount({ element: dock, setHistoryHighlight })
     ui.update(model)
     ui.update(model)
 
@@ -255,7 +258,10 @@ describe('RED-166 icon action history', () => {
     expect(clickEvent.preventDefault).toHaveBeenCalledOnce()
     expect(clickEvent.stopPropagation).toHaveBeenCalledOnce()
     expect(ui.getActiveRootId()).toBe('action-1:0')
-    expect((highlight as HighlightElement | null)?.innerHTML).toContain('action-history-path')
+    expect(setHistoryHighlight).toHaveBeenLastCalledWith([
+      expect.objectContaining({ x: 0, y: 0, role: 'source' }),
+      expect.objectContaining({ x: 1, y: 0, role: 'target' }),
+    ])
 
     const expandEvent = {
       preventDefault: vi.fn(),
@@ -285,7 +291,25 @@ describe('RED-166 icon action history', () => {
     expect(ui.getActiveRootId()).toBe('action-1:0')
     listeners.get('click')?.(clickEvent)
     expect(ui.getActiveRootId()).toBeNull()
-    expect(highlight).toBeNull()
+    expect(setHistoryHighlight).toHaveBeenLastCalledWith([])
+  })
+
+  it('renders voluntary movement as subject-predicate only while retaining its board path data', () => {
+    const source = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-history.js'), 'utf8')
+    expect(source).toContain("if (event.kind === 'move') return ''")
+
+    const { history } = loadActionHistory()
+    const group = history.groupEvents([rootEvent(8, {
+      kind: 'move',
+      iconId: 'action-move',
+      targetPieceIds: ['target'],
+      targetCell: { x: 5, y: 4 },
+      result: { fromX: 2, fromY: 4, toX: 5, toY: 4 },
+    })])[0]
+    expect(history.highlightCells(group, { pieces: [] })).toEqual([
+      { x: 2, y: 4, role: 'source' },
+      { x: 5, y: 4, role: 'target' },
+    ])
   })
 
   it('renders the authoritative skill name as text without a skill icon', () => {
@@ -296,7 +320,7 @@ describe('RED-166 icon action history', () => {
     expect(source).toMatch(/isSkillRelease[\s\S]*?rootMark = isSkillRelease[\s\S]*?action-history-skill-name/)
   })
 
-  it('uses the mounted battlefield renderer projection for history highlights', () => {
+  it('delegates history highlights to the mounted battlefield renderer', () => {
     const window: Record<string, unknown> = {}
     const context = createContext({ window, globalThis: window, console })
     new Script(
@@ -305,7 +329,7 @@ describe('RED-166 icon action history', () => {
     ).runInContext(context)
     const renderer = {
       init: vi.fn(),
-      projectCell: vi.fn((x: number, y: number, elevation: number) => ({ left: x * 17, top: y * 13 - elevation })),
+      setHistoryHighlight: vi.fn(),
       dispose: vi.fn(),
     }
     const historyUi = { mount: vi.fn(), dispose: vi.fn() }
@@ -321,13 +345,11 @@ describe('RED-166 icon action history', () => {
     presentation.mount({ boardContainer: {}, floatLayer, historyDock })
     const mounted = historyUi.mount.mock.calls[0]?.[0] as {
       element: unknown
-      floatLayer: unknown
-      projectCell: (x: number, y: number, elevation: number) => unknown
+      setHistoryHighlight: (cells: Array<Record<string, unknown>>) => void
     }
     expect(mounted.element).toBe(historyDock)
-    expect(mounted.floatLayer).toBe(floatLayer)
-    expect(mounted.projectCell(4, 3, 0.86)).toEqual({ left: 68, top: 38.14 })
-    expect(renderer.projectCell).toHaveBeenCalledWith(4, 3, 0.86)
+    mounted.setHistoryHighlight([{ x: 4, y: 3, role: 'source' }])
+    expect(renderer.setHistoryHighlight).toHaveBeenCalledWith([{ x: 4, y: 3, role: 'source' }])
     presentation.dispose()
   })
 
@@ -338,8 +360,13 @@ describe('RED-166 icon action history', () => {
     expect(page).toContain('id="actionHistoryDock"')
     expect(page).toContain('BattleActionHistory.create')
     expect(page).not.toContain('onOpenLog: openLog')
-    expect(page).toContain("params.get('qa') === 'RED-166'")
-    expect(page).toContain('red166QaPresentationEvents(snapshot)')
+    expect(page).not.toContain("params.get('qa') === 'RED-166'")
+    expect(page).not.toContain('red166QaPresentationEvents')
+    expect(page).toContain('Engine.projectBattlePresentationEvents({')
+    expect(page).toContain('Engine.projectBattlePresentationEventsForViewer(')
+    const browserEngine = readFileSync(resolve(pagesDir, 'js/game-engine.js'), 'utf8')
+    expect(browserEngine).toContain('projectBattlePresentationEvents')
+    expect(browserEngine).toContain('projectBattlePresentationEventsForViewer')
     expect(page).toContain('id="btnDebugBattleLog" hidden')
     expect(page).toContain("params.get('debugBattleLog') === '1'")
     expect(page).toContain('if (!DEBUG_BATTLE_LOG) return')
@@ -356,8 +383,7 @@ describe('RED-166 icon action history', () => {
     expect(css).toContain('.action-history-sentence')
     expect(css).toContain('.opponent-hand-stack')
     expect(css).toContain('.opponent-hand-count')
-    expect(css).toMatch(/\.action-history-highlight\s*\{[\s\S]*?pointer-events:\s*none/)
-    expect(css).toMatch(/@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.action-history-point\s*\{\s*animation:\s*none/)
+    expect(css).not.toContain('.action-history-highlight')
   })
 
   it('ships distinct predicate assets for damage, AP/CP and all three hand mutations', () => {

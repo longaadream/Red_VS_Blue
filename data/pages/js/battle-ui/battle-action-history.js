@@ -82,13 +82,11 @@
         return
       }
       const existing = roots[existingIndex]
-      const seen = new Set([existing.root.eventId].concat(existing.children.map(function (event) { return event.eventId })))
-      incoming.children.forEach(function (event) {
-        if (seen.has(event.eventId)) return
-        seen.add(event.eventId)
-        existing.children.push(event)
-      })
-      existing.children.sort(eventOrder)
+      // A repeated root is an authoritative replacement, not an additive patch.
+      // This matters when the same training history is re-projected for another
+      // viewer: actor-only target data must not survive in the local cache.
+      existing.root = incoming.root
+      existing.children = incoming.children.slice().sort(eventOrder)
     })
 
     return roots.slice(-maximum)
@@ -200,8 +198,7 @@
     const cancelTimeout = input.clearTimeout || root.clearTimeout
     let dock = null
     let list = null
-    let floatLayer = null
-    let projectCell = null
+    let setHistoryHighlight = null
     let model = null
     let roots = []
     let activeRootId = null
@@ -249,6 +246,7 @@
     }
 
     function displayObject(event) {
+      if (event.kind === 'move') return ''
       if (event.targetPieceIds && event.targetPieceIds[0]) return displayPiece(event.targetPieceIds[0])
       if (event.kind === 'cardGained' || event.kind === 'cardDiscarded' || event.kind === 'cardChanged') return displayCard(event.cardId || 'hidden')
       if (event.kind === 'actionPoints' || event.kind === 'chargePoints') return ''
@@ -384,42 +382,17 @@
       highlightTimer = null
       activeRootId = null
       pinnedRootId = null
-      if (floatLayer && floatLayer.querySelector) {
-        const overlay = floatLayer.querySelector('.action-history-highlight')
-        if (overlay && overlay.remove) overlay.remove()
-      }
+      if (typeof setHistoryHighlight === 'function') setHistoryHighlight([])
       render()
     }
 
     function highlightOverlay() {
-      if (!activeRootId || !floatLayer || typeof projectCell !== 'function' || !model) return
+      if (!activeRootId || typeof setHistoryHighlight !== 'function' || !model) return
       const group = roots.find(function (entry) { return entry.rootEventId === activeRootId })
       if (!group) return clearHighlight()
-      const projected = highlightCells(group, model).flatMap(function (cell) {
-        const point = projectCell(cell.x, cell.y, 0.86)
-        return point ? [Object.assign({}, cell, { left: point.left, top: point.top })] : []
-      })
-      if (!projected.length) return clearHighlight()
-      let overlay = floatLayer.querySelector && floatLayer.querySelector('.action-history-highlight')
-      if (!overlay && doc && doc.createElement) {
-        overlay = doc.createElement('div')
-        overlay.className = 'action-history-highlight'
-        overlay.setAttribute('aria-hidden', 'true')
-        floatLayer.appendChild(overlay)
-      }
-      if (!overlay) return
-      const source = projected.find(function (point) { return point.role === 'source' })
-      const targets = projected.filter(function (point) { return point.role === 'target' })
-      const lines = source ? targets.map(function (target) {
-        const dx = target.left - source.left
-        const dy = target.top - source.top
-        const distance = Math.sqrt(dx * dx + dy * dy)
-        const angle = Math.atan2(dy, dx) * 180 / Math.PI
-        return '<i class="action-history-path" style="left:' + source.left + 'px;top:' + source.top + 'px;width:' + distance + 'px;transform:rotate(' + angle + 'deg)"></i>'
-      }).join('') : ''
-      overlay.innerHTML = lines + projected.map(function (point) {
-        return '<i class="action-history-point is-' + point.role + '" style="left:' + point.left + 'px;top:' + point.top + 'px"></i>'
-      }).join('')
+      const cells = highlightCells(group, model)
+      if (!cells.length) return clearHighlight()
+      setHistoryHighlight(cells)
     }
 
     function activate(rootId, pin) {
@@ -486,8 +459,7 @@
     function mount(mountOptions) {
       const mountInput = mountOptions || {}
       dock = mountInput.element || (doc && doc.getElementById ? doc.getElementById('actionHistoryDock') : null)
-      floatLayer = mountInput.floatLayer || null
-      projectCell = typeof mountInput.projectCell === 'function' ? mountInput.projectCell : null
+      setHistoryHighlight = typeof mountInput.setHistoryHighlight === 'function' ? mountInput.setHistoryHighlight : null
       if (!dock) return
       dock.innerHTML = '<button type="button" class="action-history-collapsed-button" aria-label="展开动作历史" title="动作历史">'
         + '<span class="action-history-glyph" aria-hidden="true"><i></i><i></i><i></i></span></button>'
@@ -537,8 +509,7 @@
       }
       dock = null
       list = null
-      floatLayer = null
-      projectCell = null
+      setHistoryHighlight = null
       model = null
       roots = []
     }

@@ -1786,7 +1786,6 @@
     const TRAINING_MODE = params.get('mode') === 'training'
     const SPECTATE_MODE = params.get('mode') === 'spectate'
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
-    const RED166_QA_MODE = params.get('qa') === 'RED-166'
     const DEBUG_BATTLE_LOG = params.get('debugBattleLog') === '1'
     const debugBattleLogButton = document.getElementById('btnDebugBattleLog')
     if (debugBattleLogButton) debugBattleLogButton.hidden = !DEBUG_BATTLE_LOG
@@ -2480,59 +2479,29 @@
     let battleActionHistory = null
     let currentBattleViewModel = null
     let latestBattlePresentationEvents = []
-    function red166QaPresentationEvents(snapshot) {
-      if (!RED166_QA_MODE || !snapshot || !Array.isArray(snapshot.pieces)) return []
-      const pieces = snapshot.pieces.filter(piece => piece && piece.instanceId && piece.x != null && piece.y != null)
-      if (!pieces.length) return []
-      const players = Array.isArray(snapshot.players) ? snapshot.players : []
-      const events = []
-      for (let index = 0; index < 20; index += 1) {
-        const source = pieces[index % pieces.length]
-        const target = pieces[(index + Math.max(1, Math.floor(pieces.length / 2))) % pieces.length]
-        const actionId = 'red166-qa-' + index
-        const rootEventId = actionId + ':0'
-        const move = index % 2 === 0
-        const sourceTemplate = PIECES_BY_ID[source.templateId] || {}
-        const sourceSkills = Array.isArray(sourceTemplate.skills) ? sourceTemplate.skills : []
-        const skillReference = sourceSkills.length ? sourceSkills[index % sourceSkills.length] : null
-        const skillId = skillReference && (skillReference.skillId || skillReference.id) || null
-        const skillDefinition = skillId ? skillDefOf(skillId) : null
-        events.push({
-          eventId: rootEventId,
-          rootEventId,
-          parentEventId: null,
-          actionId,
-          sequence: 0,
-          kind: move ? 'move' : 'skill',
-          iconId: move ? 'action-move' : (index === 17 ? 'future-action' : 'action-skill'),
-          label: move ? null : (skillDefinition && skillDefinition.name || skillId || '主动技能'),
-          skillId: move ? null : skillId,
-          actorPlayerId: source.ownerPlayerId || (players[index % Math.max(1, players.length)] || {}).playerId || null,
-          sourcePieceId: source.instanceId,
-          targetPieceIds: [target.instanceId],
-          targetCell: { x: target.x, y: target.y },
-          result: move
-            ? { fromX: source.x, fromY: source.y, toX: target.x, toY: target.y }
-            : null,
-          priority: 100,
-          skippable: true,
-        })
-        if (index === 19) {
-          events.push({
-            eventId: actionId + ':1', rootEventId, parentEventId: rootEventId, actionId, sequence: 1,
-            kind: 'damage', iconId: 'action-damage', actorPlayerId: source.ownerPlayerId || null,
-            sourcePieceId: source.instanceId, targetPieceIds: [target.instanceId], result: { amount: 3 },
-            priority: 80, skippable: true,
-          })
-          events.push({
-            eventId: actionId + ':2', rootEventId, parentEventId: rootEventId, actionId, sequence: 2,
-            kind: 'statusAdded', iconId: 'status-add', actorPlayerId: source.ownerPlayerId || null,
-            sourcePieceId: source.instanceId, targetPieceIds: [target.instanceId], statusType: 'divine-shield',
-            priority: 70, skippable: true,
-          })
-        }
+    let trainingBattlePresentationChains = []
+    function refreshTrainingPresentationEvents(Engine) {
+      if (!TRAINING_MODE) return
+      if (!Engine || typeof Engine.projectBattlePresentationEventsForViewer !== 'function') {
+        throw new Error('训练权威动作投影接口未加载')
       }
-      return events
+      latestBattlePresentationEvents = trainingBattlePresentationChains.flatMap(function (chain) {
+        return Engine.projectBattlePresentationEventsForViewer(chain, myPlayerId)
+      })
+    }
+    function appendTrainingPresentationEvents(Engine, action, beforeState, afterState) {
+      if (!Engine || typeof Engine.projectBattlePresentationEvents !== 'function') {
+        throw new Error('训练权威动作事件接口未加载')
+      }
+      const chain = Engine.projectBattlePresentationEvents({
+        actionId: action.clientActionId,
+        command: action,
+        beforeState: beforeState,
+        afterState: afterState,
+      })
+      if (chain.length) trainingBattlePresentationChains.push(chain)
+      trainingBattlePresentationChains = trainingBattlePresentationChains.slice(-20)
+      refreshTrainingPresentationEvents(Engine)
     }
     function red43QaSnapshot() {
       if (!RED43_QA_MODE) return null
@@ -3917,12 +3886,24 @@
       try {
         const config = setupConfig || trainingSetupConfig || getTrainingSetupConfig()
         trainingSetupConfig = config
+        trainingBattlePresentationChains = []
+        latestBattlePresentationEvents = []
         G = await trainingApiFetch('POST', Object.assign({ mapId: mapId || undefined }, config))
+        myPlayerId = G.turn.currentPlayerId
         // Auto-advance past start phase so training enters action phase immediately
         if (G.turn && G.turn.phase === 'start') {
-          try { G = await trainingApiFetch('PUT', { action: { type: 'beginPhase' }, battleState: G }) } catch(e) {}
+          try {
+            const Engine = await window.RvBGameEngine.ensure()
+            const beforeBegin = G
+            const beginAction = withClientActionId({ type: 'beginPhase', playerId: G.turn.currentPlayerId })
+            G = await trainingApiFetch('PUT', { action: beginAction, battleState: G })
+            appendTrainingPresentationEvents(Engine, beginAction, beforeBegin, G)
+          } catch (error) {
+            console.error('[training] failed to enter action phase', error)
+          }
         }
         myPlayerId = G.turn.currentPlayerId
+        refreshTrainingPresentationEvents(window.GameEngine)
         myFaction = getTrainingPlayerFaction(myPlayerId)
         selectedPieceId = null
         clearTargetInteraction('training-started')
@@ -3957,6 +3938,7 @@
       const next = myPlayerId === 'training-red' ? 'training-blue' : 'training-red'
       myPlayerId = next
       myFaction = getTrainingPlayerFaction(myPlayerId)
+      refreshTrainingPresentationEvents(window.GameEngine)
       selectedPieceId = null
       clearTargetInteraction('perspective-switched')
       addLog('控制方 -> ' + trainingPlayerLabel(next), 'turn')
@@ -5050,9 +5032,7 @@
         : new Set()
       return BattleViewModel.create({
         snapshot: snapshot,
-        presentationEvents: isCurrentSnapshot
-          ? (latestBattlePresentationEvents.length ? latestBattlePresentationEvents : red166QaPresentationEvents(snapshot))
-          : [],
+        presentationEvents: isCurrentSnapshot ? latestBattlePresentationEvents : [],
         viewerId: myPlayerId,
         selectedPieceId: selectedPieceId,
         skillsById: skillsById,
@@ -6403,11 +6383,13 @@
     async function trainingDoAction(action) {
       if (!G) return
       try {
+        const Engine = await window.RvBGameEngine.ensure()
         const wasTargetSubmission = !!targetSubmissionPending
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
         const oldG = G
         const newG = await trainingApiFetch('PUT', { action, battleState: G })
+        appendTrainingPresentationEvents(Engine, action, oldG, newG)
         if (_use3d && battlePresentation) {
           battlePresentation.animateAction(
             Object.assign({}, action, { motionEventKey: 'training:' + action.clientActionId }),
@@ -6420,10 +6402,18 @@
         flushActionLog(oldG, G)
         if (action.type === 'endTurn') {
           if (G.turn && G.turn.phase === 'end') {
-            try { G = await trainingApiFetch('PUT', { action: { type: 'beginPhase' }, battleState: G }) } catch {}
+            try {
+              const beforeBegin = G
+              const beginAction = withClientActionId({ type: 'beginPhase', playerId: G.turn.currentPlayerId })
+              G = await trainingApiFetch('PUT', { action: beginAction, battleState: G })
+              appendTrainingPresentationEvents(Engine, beginAction, beforeBegin, G)
+            } catch (error) {
+              console.error('[training] failed to advance the next action phase', error)
+            }
           }
           myPlayerId = G.turn.currentPlayerId
           myFaction = getTrainingPlayerFaction(myPlayerId)
+          refreshTrainingPresentationEvents(Engine)
           const btn = document.getElementById('btnSwitchPov')
           if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(myPlayerId)
         }
@@ -6972,7 +6962,7 @@
       const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
       const renderer = hasThreeRenderer ? window.BattleRenderer3D : {
         init() {}, update() {}, resize() {}, resetView() {}, projectCell() { return null },
-        screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
+        setHistoryHighlight() {}, screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
       battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
       battleActionHistory = BattleActionHistory.create({

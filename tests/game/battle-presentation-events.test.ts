@@ -353,6 +353,30 @@ describe('RED-165 authoritative battle presentation events', () => {
     expect(JSON.stringify(opponentTarget)).not.toContain('"x":4')
   })
 
+  it('keeps Kyoka Suigetsu targets out of opponent and spectator payloads', () => {
+    const before = stateWithPieces([piece('aizen', 'player-red', 10), piece('secret-ally', 'player-red', 10)])
+    before.skillsById['aizen-kyoka-suiguetsu'] = {
+      id: 'aizen-kyoka-suiguetsu', name: '镜花水月', kind: 'normal', cooldown: 0,
+      powerMultiplier: 0, range: 'single', actionPointCost: 1, code: '',
+      concealTargetInBattleLog: true,
+    } as never
+    const after = structuredClone(before)
+    const authorityEvents = project({
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: 'aizen',
+      skillId: 'aizen-kyoka-suiguetsu', targetPieceId: 'secret-ally',
+    }, before, after)
+
+    expect(projectBattlePresentationEventsForViewer(authorityEvents, 'player-red')[0])
+      .toMatchObject({ kind: 'skill', targetPieceIds: ['secret-ally'] })
+    for (const viewerId of ['player-blue', undefined]) {
+      const projected = projectBattlePresentationEventsForViewer(authorityEvents, viewerId)
+      expect(projected.map(event => event.kind)).toEqual(['skill', 'concealed'])
+      const serialized = JSON.stringify(projected)
+      expect(serialized).not.toContain('secret-ally')
+      expect(serialized).not.toContain('targetPieceIds')
+    }
+  })
+
   it('collapses actor-only results to one payload-free concealed child for opponents and spectators', () => {
     const before = stateWithPieces([piece('source', 'player-red', 10), piece('target', 'player-blue', 10)])
     before.skillsById['naruto-shadow-clone'] = {
