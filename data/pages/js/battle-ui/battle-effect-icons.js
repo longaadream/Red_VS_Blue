@@ -42,6 +42,7 @@
     'chidori-immobile': entry('control', VISIBILITY.BOARD, { label: '千鸟定身' }),
     'curse-ward-used': entry('internal', VISIBILITY.HIDDEN),
     'damage-buff': entry('buff', VISIBILITY.DETAIL, { iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '强化' }),
+    'damage-multiplier': entry('buff', VISIBILITY.DETAIL, { iconId: 'damage-multiplier', assetPath: 'images/effect-icons/damage-multiplier.svg', label: '飞天御剑流' }),
     'deployment-first-move-free': entry('buff', VISIBILITY.DETAIL, { iconId: 'free-move', assetPath: 'images/effect-icons/free-move.svg', label: '首次移动免费' }),
     'demon-strike-charges': entry('charge', VISIBILITY.DETAIL),
     'divine-shield': entry('shield', VISIBILITY.DETAIL, { iconId: 'divine-shield', assetPath: 'images/effect-icons/divine-shield.svg', label: '圣盾' }),

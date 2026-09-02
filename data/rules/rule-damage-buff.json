@@ -1,0 +1,7 @@
+{
+  "id": "rule-damage-buff",
+  "name": "强化",
+  "description": "拥有强化状态的棋子下一次造成正伤害时，增加状态强度并消费强化",
+  "trigger": { "type": "beforeDamageDealt" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || !context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var buff = piece.statusTags && piece.statusTags.find(function(tag) { return tag.id === 'damage-buff' && tag.type === 'damage-buff'; }); if (!buff) { removeRuleById(piece.instanceId, 'rule-damage-buff'); return { success: false, message: '' }; } if (!(context.damage > 0)) return { success: false, message: '' }; var bonus = buff.intensity || 0; context.damage += bonus; removeStatusEffectById(piece.instanceId, buff.id); removeRuleById(piece.instanceId, 'rule-damage-buff'); return { success: true, message: piece.name + '的强化触发，伤害+' + bonus };"
+}

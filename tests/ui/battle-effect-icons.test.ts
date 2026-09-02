@@ -86,6 +86,9 @@ describe('RED-165 battle effect icon registry', () => {
     expect(icons.resolveStatusType('damage-buff')).toMatchObject({
       iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '强化', visibility: 'board',
     })
+    expect(icons.resolveStatusType('damage-multiplier')).toMatchObject({
+      iconId: 'damage-multiplier', assetPath: 'images/effect-icons/damage-multiplier.svg', label: '飞天御剑流', visibility: 'board',
+    })
     expect(icons.resolveStatusType('aizen-kyoka-active').visibility).toBe('hidden')
     expect(icons.resolveStatusType('aizen-kyoka-secret').visibility).toBe('hidden')
     expect(icons.resolveStatusType('chidori-immobile').iconId)
