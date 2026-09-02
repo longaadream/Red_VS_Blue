@@ -20,5 +20,16 @@
   "powerMultiplier": 2,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var targetPiece = battle.pieces.find(function(piece) { return piece.instanceId === target.instanceId && piece.currentHp > 0; }); if (!targetPiece) return { success: false, message: '目标不存在' }; var dirs = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0}]; var landing = null; for (var i = 0; i < dirs.length; i++) { var x = targetPiece.x + dirs[i].x; var y = targetPiece.y + dirs[i].y; var tile = battle.map.tiles.find(function(item) { return item.x === x && item.y === y; }); if (!tile || !tile.props || !tile.props.walkable) continue; var occupied = battle.pieces.some(function(piece) { return piece.currentHp > 0 && piece.instanceId !== caster.instanceId && piece.x === x && piece.y === y; }); if (!occupied) { landing = { x: x, y: y }; break; } } if (!landing) return { success: false, message: '目标身旁没有合法落点' }; caster.x = landing.x; caster.y = landing.y; var result = dealDamage(caster, targetPiece, Math.floor(caster.attack * 2), 'true', battle, context.skill.id); var damage = result.totalDamage !== undefined ? result.totalDamage : (result.damage || 0); var message = caster.name + '以天翔龙闪斩向' + targetPiece.name + '，造成' + damage + '点真实伤害'; if (targetPiece.currentHp <= 0) { var player = battle.players.find(function(item) { return item.playerId === caster.ownerPlayerId; }); if (player) player.actionPoints = (player.actionPoints || 0) + 1; message += '，击杀目标并恢复1点行动点'; } return { success: true, message: message }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.floor(piece.attack * skillDef.powerMultiplier); return { description: '冲向全图任意1名敌人并在其身旁造成' + damage + '点真实伤害；击杀恢复1点行动点。', expectedValues: { damage: damage, actionPointRestore: 1 } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.floor(piece.attack * skillDef.powerMultiplier); return { description: '冲向全图任意1名敌人并在其身旁造成' + damage + '点真实伤害；击杀恢复1点行动点。', expectedValues: { damage: damage, actionPointRestore: 1 } }; }",
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 99,
+        "requireOpenCardinalLanding": true
+      }
+    ]
+  }
 }

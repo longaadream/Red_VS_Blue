@@ -228,6 +228,8 @@ export interface TriggerContext {
   targetY?: number
   targetPosition?: { x: number; y: number } | null
   targetPieceId?: string
+  /** Empty destinations promised to the enclosing authoritative action. */
+  reservedCells?: Array<{ x: number; y: number }>
   /** 伤害类型，可以在 beforeDamageDealt 中被修改 */
   damageType?: 'physical' | 'magical' | 'true' | 'toxin'
   /** RED-33 deterministic damage-chain metadata. */

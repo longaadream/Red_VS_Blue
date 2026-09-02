@@ -2002,6 +2002,8 @@ export interface SkillExecutionContext {
   } | null
   /** 用户通过选项选择器选择的值，未选择时为 undefined */
   selectedOption?: any
+  /** Cells reserved by the enclosing action while reaction rules settle. */
+  reservedCells?: Array<{ x: number; y: number }>
   /**
    * 多步目标选择结果数组（通用 N 目标支持）。
    * targets[0] 与 target/targetPosition 相同（向后兼容）。
@@ -5583,7 +5585,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             const skillUsedResult = checkSynchronousTriggers(battle, {
               type: "afterSkillUsed",
               sourcePiece,
-              skillId: skillDef.id
+              skillId: skillDef.id,
+              reservedCells: context.reservedCells,
             });
 
             // 处理触发效果的消息
