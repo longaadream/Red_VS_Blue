@@ -33,7 +33,7 @@
     const sourceName = String(sourcePiece && sourcePiece.name || '未知棋子')
     return {
       isSkill: skillAction,
-      skillName: skillAction ? String(skill && skill.name || skillId || '技能') : '',
+      skillName: skillAction ? String(event && event.label || skill && skill.name || skillId || '技能') : '',
       sourceName: sourceName,
       portraitSrc: portraitUrl(sourcePiece && sourcePiece.portraitId),
       portraitFallback: initialFor(sourceName),

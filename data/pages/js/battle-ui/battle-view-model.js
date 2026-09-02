@@ -161,6 +161,7 @@
         charge: numberOr(player.chargePoints, 0),
         maxCharge: numberOr(player.maxChargePoints, numberOr(player.maxCharge, 0)),
       },
+      handCount: Array.isArray(player.hand) ? player.hand.length : numberOr(player.handCount, 0),
       statusSummary: normalizeStatuses(player),
     }
   }
@@ -260,6 +261,7 @@
         sequence: numberOr(event.sequence, 0),
         kind: String(event.kind),
         iconId: String(event.iconId || 'fallback'),
+        label: event.label ? String(event.label) : null,
         actorPlayerId: event.actorPlayerId ? String(event.actorPlayerId) : null,
         sourcePieceId: event.sourcePieceId ? String(event.sourcePieceId) : null,
         skillId: event.skillId ? String(event.skillId) : null,
@@ -274,6 +276,8 @@
         statusType: event.statusType ? String(event.statusType) : null,
         result: event.result && typeof event.result === 'object' ? Object.assign({}, event.result) : null,
         presentation: normalizePresentation(event.presentation),
+        complement: event.complement && typeof event.complement === 'object' ? Object.assign({}, event.complement) : null,
+        visibility: event.visibility ? String(event.visibility) : 'public',
         priority: numberOr(event.priority, 0),
         skippable: event.skippable !== false,
       }]

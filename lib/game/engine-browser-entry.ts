@@ -16,6 +16,10 @@
 
 export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } from './turn'
 export { getBattleRootSeed, hashBattleState, hashStable, runBattleAction } from './battle-runner'
+export {
+  projectBattlePresentationEvents,
+  projectBattlePresentationEventsForViewer,
+} from './battle-presentation-events'
 export { getEffectiveChargeCost } from './skills'
 export {
   AI_ENVIRONMENT_CAPABILITIES,

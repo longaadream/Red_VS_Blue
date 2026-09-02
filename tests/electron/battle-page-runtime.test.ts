@@ -692,6 +692,8 @@ describe('battle page runtime source', () => {
       skillId: 'liadrin-divine-shield',
     }]
     const projectBattlePresentationEvents = vi.fn(() => structuredClone(projectedEvents))
+    const projectBattlePresentationEventsForViewer = vi.fn((events: typeof projectedEvents) => structuredClone(events))
+    const Engine = { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer }
     const presentationUpdate = vi.fn()
     const elements: Record<string, { disabled?: boolean; textContent?: string }> = {
       btnEnd: { disabled: false },
@@ -704,7 +706,7 @@ describe('battle page runtime source', () => {
       terminalResult: null,
     }
     const context = vm.createContext({
-      window: { BattlePresentationEvents: { projectBattlePresentationEvents } },
+      window: { RvBGameEngine: { ensure: async () => Engine } },
       __presentationUpdate: presentationUpdate,
       document: { getElementById: (id: string) => elements[id] ?? null },
       clearTimeout: () => { clearedTimers += 1 },
@@ -745,9 +747,11 @@ describe('battle page runtime source', () => {
       let pendingSkill = null
       let pendingCardAction = null
       let latestBattlePresentationEvents = []
+      let trainingBattlePresentationChains = []
       let selectedPieceId = null
       let myPlayerId = 'player-red'
       let myFaction = 'red'
+      const TRAINING_MODE = true
       let _use3d = false
       let battlePresentation = { update: globalThis.__presentationUpdate }
       const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
@@ -769,6 +773,8 @@ describe('battle page runtime source', () => {
       }
       ${runtimeFunction(html, 'clearPendingActionFeedback')}
       ${runtimeFunction(html, 'applyAuthorityReceipt')}
+      ${runtimeFunction(html, 'refreshTrainingPresentationEvents')}
+      ${runtimeFunction(html, 'appendTrainingPresentationEvents')}
       async ${runtimeFunction(html, 'trainingDoAction')}
     `, context)
 
@@ -797,6 +803,7 @@ describe('battle page runtime source', () => {
       }),
       afterState: nextState,
     })
+    expect(projectBattlePresentationEventsForViewer).toHaveBeenCalledWith(projectedEvents, 'player-red')
     expect(context.__submittedAction).toEqual(actionBefore)
     expect(nextState).toEqual(nextStateBefore)
     expect(vm.runInContext('pendingActionFeedback', context)).toBeNull()

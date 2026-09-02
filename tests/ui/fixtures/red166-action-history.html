@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="/data/pages/">
+  <title>RED-166 动作历史视觉验收</title>
+  <link rel="stylesheet" href="css/battle-context-ui.css">
+  <style>
+    :root { --battle-hud-offset: 44px; --battle-hand-height: 112px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #0b1220; color: #e2e8f0; font-family: system-ui, sans-serif; }
+    .stage { position: relative; width: 100vw; height: 100vh; background: radial-gradient(circle at 50% 45%, #243047, #0b1220 68%); }
+    #floatLayer { position: absolute; inset: 0; pointer-events: none; }
+    .caption { position: absolute; left: 18px; top: 18px; color: #94a3b8; font-size: 12px; }
+    .opponent-preview { position: absolute; left: 18px; top: 48px; display: flex; align-items: center; gap: 8px; color: #cbd5e1; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <p class="caption">动作历史视觉夹具不重绘棋盘；实际战斗场景沿用既有地图样式</p>
+    <div class="opponent-preview"><span>对方手牌</span><div id="opponentHandStack" class="opponent-hand-stack" role="img" aria-label="对方有8张手牌"><strong class="opponent-hand-count" aria-hidden="true">8</strong></div></div>
+    <div id="floatLayer"></div>
+    <aside id="actionHistoryDock" class="action-history-dock" aria-label="最近动作"></aside>
+  </main>
+  <script src="js/battle-ui/battle-effect-icons.js"></script>
+  <script src="js/battle-ui/battle-action-history.js"></script>
+  <script>
+    const opponentHandStack = document.getElementById('opponentHandStack')
+    const qaHandCount = 8
+    const qaCardStep = Math.min(3, 19 / (qaHandCount - 1))
+    const qaCardBacks = Array.from({ length: qaHandCount }, function (_, index) {
+      const center = (qaHandCount - 1) / 2
+      return '<i style="left:' + (2 + index * qaCardStep) + 'px;top:' + (4 - Math.min(1.5, index * 0.18)) + 'px;transform:rotate(' + ((index - center) * 0.9) + 'deg)" aria-hidden="true"></i>'
+    }).join('')
+    opponentHandStack.innerHTML = qaCardBacks + '<strong class="opponent-hand-count" aria-hidden="true">' + qaHandCount + '</strong>'
+    const model = {
+      pieces: [
+        { id: 'naruto', name: '鸣人', faction: 'red', x: 1, y: 2 },
+        { id: 'tracer', name: '猎空', faction: 'blue', x: 5, y: 2 },
+      ],
+      players: [
+        { id: 'red', name: '红方', faction: 'red' },
+        { id: 'blue', name: '蓝方', faction: 'blue' },
+      ],
+      selection: { mode: 'inspect' },
+      presentationEvents: [
+        { eventId: 'a:0', rootEventId: 'a:0', actionId: 'a', sequence: 0, kind: 'skill', iconId: 'action-skill', label: '影分身之术', skillId: 'naruto-shadow-clone', actorPlayerId: 'red', sourcePieceId: 'naruto', priority: 100, skippable: true },
+        { eventId: 'a:concealed', rootEventId: 'a:0', parentEventId: 'a:0', actionId: 'a', sequence: 1, kind: 'concealed', iconId: 'result-hidden', complement: { kind: 'concealed' }, priority: 90, skippable: true },
+        { eventId: 'b:0', rootEventId: 'b:0', actionId: 'b', sequence: 0, kind: 'skill', iconId: 'action-skill', label: '脉冲双枪', skillId: 'pulse-pistols', actorPlayerId: 'blue', sourcePieceId: 'tracer', targetPieceIds: ['naruto'], priority: 100, skippable: true },
+        { eventId: 'b:1', rootEventId: 'b:0', parentEventId: 'b:0', actionId: 'b', sequence: 1, kind: 'damage', iconId: 'action-damage', actorPlayerId: 'blue', sourcePieceId: 'tracer', targetPieceIds: ['naruto'], result: { amount: 4 }, complement: { kind: 'amount', amount: 4 }, priority: 70, skippable: true },
+        { eventId: 'b:2', rootEventId: 'b:0', parentEventId: 'b:0', actionId: 'b', sequence: 2, kind: 'chargePoints', iconId: 'action-charge-points', actorPlayerId: 'blue', targetPlayerIds: ['blue'], result: { amount: 1, value: 2 }, complement: { kind: 'amount', amount: 1, value: 2 }, priority: 55, skippable: true },
+        { eventId: 'd:0', rootEventId: 'd:0', actionId: 'd', sequence: 0, kind: 'automatic', iconId: 'action-automatic', actorPlayerId: 'blue', priority: 80, skippable: true },
+        { eventId: 'd:1', rootEventId: 'd:0', parentEventId: 'd:0', actionId: 'd', sequence: 1, kind: 'concealed', iconId: 'result-hidden', complement: { kind: 'concealed' }, priority: 80, skippable: true },
+      ],
+    }
+    const history = BattleActionHistory.create({ document, window, icons: BattleEffectIcons, setTimeout, clearTimeout })
+    history.mount({
+      element: document.getElementById('actionHistoryDock'),
+      floatLayer: document.getElementById('floatLayer'),
+      projectCell(x, y) { return { left: window.innerWidth * 0.45 + (x - y) * 36, top: window.innerHeight * 0.48 + (x + y) * 19 } },
+    })
+    history.update(model)
+    if (new URLSearchParams(location.search).get('expanded') === '1') {
+      document.querySelector('.action-history-collapsed-button').click()
+    }
+  </script>
+</body>
+</html>
