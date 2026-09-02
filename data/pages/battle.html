@@ -16,7 +16,9 @@
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-effect-icons.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
+  <script src="js/battle-ui/battle-action-identity.js"></script>
   <script src="js/battle-ui/battle-action-history.js"></script>
+  <script src="js/battle-ui/battle-action-vignette.js"></script>
   <script src="js/battle-ui/battle-status-presentation.js"></script>
   <script src="js/battle-ui/battle-context-layout.js"></script>
   <script src="js/battle-ui/battle-legal-actions.js"></script>
@@ -1786,6 +1788,7 @@
     const TRAINING_MODE = params.get('mode') === 'training'
     const SPECTATE_MODE = params.get('mode') === 'spectate'
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
+    const RED167_QA_MODE = params.get('qa') === 'RED-167'
     const DEBUG_BATTLE_LOG = params.get('debugBattleLog') === '1'
     const debugBattleLogButton = document.getElementById('btnDebugBattleLog')
     if (debugBattleLogButton) debugBattleLogButton.hidden = !DEBUG_BATTLE_LOG
@@ -2477,8 +2480,11 @@
     let battlePresentation = null
     let battleDomUi = null
     let battleActionHistory = null
+    let battleActionVignette = null
     let currentBattleViewModel = null
     let latestBattlePresentationEvents = []
+    let red167QaReplay = 0
+    let red167QaSequenceTimer = null
     let trainingBattlePresentationChains = []
     function refreshTrainingPresentationEvents(Engine) {
       if (!TRAINING_MODE) return
@@ -2502,6 +2508,111 @@
       if (chain.length) trainingBattlePresentationChains.push(chain)
       trainingBattlePresentationChains = trainingBattlePresentationChains.slice(-20)
       refreshTrainingPresentationEvents(Engine)
+    }
+    function red167QaPresentationSequence(snapshot, replayId) {
+      if (!RED167_QA_MODE || !snapshot || !Array.isArray(snapshot.pieces) || !snapshot.map) return []
+      const pieces = snapshot.pieces.filter(piece => piece && piece.instanceId && piece.x != null && piece.y != null)
+      if (!pieces.length) return []
+      const source = pieces[0]
+      const target = pieces.find(piece => piece.instanceId !== source.instanceId) || source
+      const width = Math.max(1, Number(snapshot.map.width) || 1)
+      const height = Math.max(1, Number(snapshot.map.height) || 1)
+      const stepX = source.x < width - 3 ? 1 : -1
+      const cell = (distance, yOffset) => ({
+        x: Math.max(0, Math.min(width - 1, source.x + stepX * distance)),
+        y: Math.max(0, Math.min(height - 1, source.y + (yOffset || 0))),
+      })
+      const selectedCell = cell(1, 0)
+      const endPoint = cell(3, 0)
+      const areaCells = [cell(1, -1), cell(1, 0), cell(1, 1)]
+      const actionPrefix = 'red167-qa-' + replayId + '-'
+      const root = (index, kind, iconId, presentation, targetCell) => ({
+        eventId: actionPrefix + index + ':0',
+        rootEventId: actionPrefix + index + ':0',
+        parentEventId: null,
+        actionId: actionPrefix + index,
+        sequence: index * 10,
+        kind,
+        iconId,
+        actorPlayerId: source.ownerPlayerId || null,
+        sourcePieceId: source.instanceId,
+        targetPieceIds: target.instanceId === source.instanceId ? [] : [target.instanceId],
+        targetCell: targetCell || selectedCell,
+        result: null,
+        presentation,
+        priority: 100,
+        skippable: true,
+      })
+      const child = (index, kind, iconId, result, statusType) => ({
+        eventId: actionPrefix + index + ':1',
+        rootEventId: actionPrefix + index + ':0',
+        parentEventId: actionPrefix + index + ':0',
+        actionId: actionPrefix + index,
+        sequence: index * 10 + 1,
+        kind,
+        iconId,
+        actorPlayerId: source.ownerPlayerId || null,
+        sourcePieceId: source.instanceId,
+        targetPieceIds: target.instanceId === source.instanceId ? [] : [target.instanceId],
+        result,
+        statusType: statusType || null,
+        priority: 80,
+        skippable: true,
+      })
+      return [
+        [
+          root(1, 'skill', 'action-skill', {
+            cue: 'projectile',
+            selectedCell,
+            pathCells: [selectedCell, cell(2, 0), endPoint],
+            endPoint,
+            endReason: 'blocked',
+            collisions: [{ cell: endPoint, kind: 'piece', blocking: true, pieceId: target.instanceId }],
+            areaCells: [],
+          }),
+          child(1, 'damage', 'action-damage', { amount: 4 }),
+        ],
+        [
+          root(2, 'skill', 'action-skill', {
+            cue: 'directional', selectedCell, pathCells: [selectedCell], endPoint: selectedCell,
+            endReason: 'resolved', collisions: [], areaCells: [],
+          }),
+          child(2, 'statusAdded', 'status-add', { stacks: 1 }, 'stunned'),
+        ],
+        [
+          root(3, 'skill', 'action-skill', {
+            cue: 'area', selectedCell, pathCells: [], endPoint: selectedCell,
+            endReason: 'resolved', collisions: [], areaCells,
+          }),
+          child(3, 'damage', 'action-damage', { amount: 3 }),
+        ],
+        [root(4, 'move', 'action-move', {
+          cue: 'displacement', selectedCell: cell(2, 1), pathCells: [cell(1, 1), cell(2, 1)],
+          endPoint: cell(2, 1), endReason: 'resolved', collisions: [], areaCells: [],
+        }, cell(2, 1))],
+        [root(5, 'deploy', 'action-deploy', {
+          cue: 'summon', selectedCell: cell(1, -1), pathCells: [], endPoint: cell(1, -1),
+          endReason: 'resolved', collisions: [], areaCells: [],
+        }, cell(1, -1))],
+      ]
+    }
+
+    function playRed167QaSequence() {
+      const sequence = red167QaPresentationSequence(G, red167QaReplay + 1)
+      if (!sequence.length) return false
+      red167QaReplay += 1
+      if (red167QaSequenceTimer) clearTimeout(red167QaSequenceTimer)
+      if (battleActionVignette && battleActionVignette.settleAll) battleActionVignette.settleAll()
+      let index = 0
+      const playNext = () => {
+        if (!RED167_QA_MODE || index >= sequence.length) return
+        latestBattlePresentationEvents = sequence[index]
+        index += 1
+        renderBoard()
+        if (index < sequence.length) red167QaSequenceTimer = setTimeout(playNext, 1250)
+      }
+      playNext()
+      return true
     }
     function red43QaSnapshot() {
       if (!RED43_QA_MODE) return null
@@ -6970,10 +7081,17 @@
         window,
         icons: BattleEffectIcons,
       })
+      battleActionVignette = BattleActionVignette.create({
+        document,
+        window,
+        icons: BattleEffectIcons,
+        forcePlayback: RED167_QA_MODE,
+      })
       battlePresentation = BattlePresentation.create({
         renderer,
         domUi: battleDomUi,
         historyUi: battleActionHistory,
+        vignetteUi: battleActionVignette,
         onIntent: handleBattleIntent,
       })
       battlePresentation.mount({
@@ -6990,6 +7108,13 @@
         }, 250)
       }
       init()
+      if (RED167_QA_MODE) {
+        window.__RVB_RED167_REPLAY__ = playRed167QaSequence
+        const waitForRed167Board = () => {
+          if (!playRed167QaSequence()) setTimeout(waitForRed167Board, 250)
+        }
+        setTimeout(waitForRed167Board, 500)
+      }
       document.addEventListener('pointerdown', function (event) {
         const root = document.getElementById('trainingTools')
         if (!root || !root.classList.contains('is-open')) return

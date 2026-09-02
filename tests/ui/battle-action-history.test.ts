@@ -40,8 +40,10 @@ function loadActionHistory() {
   const window: Record<string, unknown> = {}
   const context = createContext({ window, globalThis: window, console, setTimeout, clearTimeout })
   const iconsSource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-effect-icons.js'), 'utf8')
+  const identitySource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-identity.js'), 'utf8')
   const historySource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-history.js'), 'utf8')
   new Script(iconsSource, { filename: 'battle-effect-icons.js' }).runInContext(context)
+  new Script(identitySource, { filename: 'battle-action-identity.js' }).runInContext(context)
   new Script(historySource, { filename: 'battle-action-history.js' }).runInContext(context)
   return {
     history: window.BattleActionHistory as BrowserModule,
@@ -211,7 +213,13 @@ describe('RED-166 icon action history', () => {
     })
     const setHistoryHighlight = vi.fn()
     const model = {
-      pieces: [{ id: 'source', x: 0, y: 0 }, { id: 'target', x: 1, y: 0 }],
+      pieces: [
+        { id: 'source', name: '阿尔萨斯', portraitId: 'arthas.jpg', faction: 'blue', x: 0, y: 0 },
+        { id: 'target', x: 1, y: 0 },
+      ],
+      skillSummariesById: {
+        'arthas-icebound-fortitude': { id: 'arthas-icebound-fortitude', name: '寒冰坚忍' },
+      },
       players: [{ id: 'red', faction: 'red' }],
       selection: { mode: 'inspect' },
       presentationEvents: [rootEvent(1, { kind: 'future', iconId: 'future-action' })],
@@ -226,6 +234,21 @@ describe('RED-166 icon action history', () => {
     expect(list.innerHTML).toContain('images/effect-icons/fallback.svg')
     expect(list.innerHTML).toContain('aria-label="未知动作，点击高亮来源与目标"')
     expect(list.innerHTML.match(/data-history-root-id=/g)).toHaveLength(1)
+    expect(JSON.stringify(model)).toBe(before)
+
+    ui.update({
+      ...model,
+      presentationEvents: [rootEvent(2, {
+        label: '寒冰坚忍',
+        skillId: 'arthas-icebound-fortitude',
+      })],
+    })
+    expect(list.innerHTML).toContain('action-history-root-icon is-portrait')
+    expect(list.innerHTML).toContain('src="images/arthas.jpg"')
+    expect(list.innerHTML).toContain('class="action-history-skill-label"')
+    expect(list.innerHTML).toContain('寒冰坚忍')
+    expect(list.innerHTML).toContain('aria-label="寒冰坚忍，点击高亮来源与目标"')
+    expect(list.innerHTML).not.toContain('使用<br>技能')
     expect(JSON.stringify(model)).toBe(before)
 
     const pointerEvent = { stopPropagation: vi.fn() }
@@ -312,12 +335,12 @@ describe('RED-166 icon action history', () => {
     ])
   })
 
-  it('renders the authoritative skill name as text without a skill icon', () => {
+  it('renders the caster portrait with the authoritative skill name instead of a generic skill icon', () => {
     const source = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-history.js'), 'utf8')
-    expect(source).toContain("event.label || event.skillId || '技能'")
+    expect(source).toContain('resolveIdentity(group.root)')
     expect(source).toContain('action-history-predicate is-skill-release')
-    expect(source).toContain('action-history-skill-name')
-    expect(source).toMatch(/isSkillRelease[\s\S]*?rootMark = isSkillRelease[\s\S]*?action-history-skill-name/)
+    expect(source).toContain('action-history-skill-label')
+    expect(source).toMatch(/rootMark = isSkillRelease[\s\S]*?renderPortrait\(identity\)/)
   })
 
   it('delegates history highlights to the mounted battlefield renderer', () => {

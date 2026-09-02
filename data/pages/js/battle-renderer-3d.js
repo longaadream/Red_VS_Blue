@@ -115,6 +115,9 @@
   const _anims = new Map()             // one controller per owner/property
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
+  const _pendingAppearanceCues = new Map()
+  let _presentationAreaFlash = null
+  let _presentationPath = null
   const _texCache = new Map()
   let _textureLoadGeneration = 0
   const _floaters = new Set()
@@ -474,6 +477,8 @@
 
   // ── Tile map ─────────────────────────────────────────────────────────────────
   function _buildTiles(map) {
+    _clearPresentationAreaFlash()
+    _clearPresentationPath()
     _tileObjects.forEach(m => _scene.remove(m))
     _tileObjects.clear()
     if (_boardFront) {
@@ -627,11 +632,18 @@
       // Death feedback owns visibility until its authoritative result transition ends.
       if (piece.visible !== false) obj.group.visible = true
       else if (!obj.deathAnimating) obj.group.visible = false
+
+      const appearanceCue = _pendingAppearanceCues.get(piece.id)
+      if (appearanceCue && piece.visible !== false) {
+        _pendingAppearanceCues.delete(piece.id)
+        _animateSummon(obj)
+      }
     })
 
     // Remove departed pieces
     _pieceObjects.forEach((obj, id) => {
       if (!seen.has(id)) {
+        _pendingAppearanceCues.delete(id)
         _scene.remove(obj.group)
         _disposePieceObject(obj)
         _pieceObjects.delete(id)
@@ -1161,6 +1173,210 @@
     })
   }
 
+  function _clearPresentationAreaFlash() {
+    _cancelAnimation('presentation:area:intensity')
+    if (!_presentationAreaFlash) return
+    _presentationAreaFlash.entries.forEach(function (entry) {
+      if (entry.mesh && entry.mesh.material === entry.flashMaterial) {
+        entry.mesh.material = entry.originalMaterial
+      }
+      if (entry.flashMaterial && entry.flashMaterial.dispose) entry.flashMaterial.dispose()
+    })
+    _presentationAreaFlash = null
+  }
+
+  function showPresentationAreaFlash(cells) {
+    if (!_mounted || !_scene || !_hlPlaneGeom) return
+    const normalized = []
+    const seen = new Set()
+    ;(cells || []).forEach(function (item) {
+      const cell = _normalizeHighlightItem(item)
+      if (!cell || seen.has(cell.key) || !_tileObjects.has(cell.key)) return
+      seen.add(cell.key)
+      normalized.push(cell)
+    })
+    normalized.sort(function (left, right) { return left.key.localeCompare(right.key) })
+    const signature = normalized.map(function (cell) { return cell.key }).join('|')
+    if (!signature) {
+      _clearPresentationAreaFlash()
+      return
+    }
+    if (_presentationAreaFlash && _presentationAreaFlash.signature === signature) return
+    _clearPresentationAreaFlash()
+
+    const entries = normalized.map(function (cell) {
+      const mesh = _tileObjects.get(cell.key)
+      const originalMaterial = mesh.material
+      const flashMaterial = originalMaterial.clone()
+      if (flashMaterial.emissive) flashMaterial.emissive.setHex(0xf97316)
+      flashMaterial.emissiveIntensity = _reducedMotion ? 0.72 : 0
+      mesh.material = flashMaterial
+      return {
+        key: cell.key,
+        mesh: mesh,
+        originalMaterial: originalMaterial,
+        flashMaterial: flashMaterial,
+      }
+    })
+    _presentationAreaFlash = {
+      signature: signature,
+      cellCount: normalized.length,
+      entries: entries,
+    }
+    if (_reducedMotion) return
+    _startAnimation('presentation:area:intensity', {
+      duration: MOTION_SECONDS.result,
+      easing: EASE.out,
+      update: function (progress, raw) {
+        const timeline = Number.isFinite(raw) ? raw : progress
+        const intensity = timeline <= 0.42
+          ? 1.15 * EASE.out(timeline / 0.42)
+          : 1.15 - 0.77 * EASE.in((timeline - 0.42) / 0.58)
+        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = intensity })
+      },
+      complete: function () {
+        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = 0.38 })
+      },
+    })
+  }
+
+  function _disposePresentationObject(object) {
+    if (!object) return
+    object.traverse(function (child) {
+      if (child.geometry && child.geometry.dispose) child.geometry.dispose()
+      if (child.material) {
+        ;(Array.isArray(child.material) ? child.material : [child.material]).forEach(function (material) {
+          if (material && material.dispose) material.dispose()
+        })
+      }
+    })
+  }
+
+  function _clearPresentationPath() {
+    _cancelAnimation('presentation:path:opacity')
+    if (!_presentationPath) return
+    if (_scene && _presentationPath.group) _scene.remove(_presentationPath.group)
+    _disposePresentationObject(_presentationPath.group)
+    _presentationPath = null
+  }
+
+  function _normalizePresentationPoint(point) {
+    const cell = _normalizeHighlightItem(point)
+    if (!cell || !_tileObjects.has(cell.key)) return null
+    return cell
+  }
+
+  function _createPresentationPathRibbon(source, end) {
+    const dx = end.x - source.x
+    const dz = end.z - source.z
+    const distance = Math.hypot(dx, dz)
+    if (distance < 0.001) return null
+    const halfWidth = 0.035
+    const offsetX = -dz / distance * halfWidth
+    const offsetZ = dx / distance * halfWidth
+    // One constant board-plane elevation is intentional: endpoint terrain may
+    // be raised, but the trajectory direction must stay parallel to the grid.
+    // Raised tiles then occlude the line naturally instead of tilting it.
+    const sourceY = TILE_H + 0.028
+    const endY = sourceY
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      source.x + offsetX, sourceY, source.z + offsetZ,
+      source.x - offsetX, sourceY, source.z - offsetZ,
+      end.x - offsetX, endY, end.z - offsetZ,
+      end.x + offsetX, endY, end.z + offsetZ,
+    ], 3))
+    geometry.setIndex([0, 1, 2, 0, 2, 3])
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x93c5fd,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.renderOrder = 4
+    mesh.userData.presentationPathRole = 'trajectory'
+    mesh.userData.sourceCell = { x: source.x, y: source.z }
+    mesh.userData.endCell = { x: end.x, y: end.z }
+    return mesh
+  }
+
+  function _createPresentationAimMarker(selected) {
+    if (!selected) return null
+    const positions = []
+    const segmentCount = 16
+    const radius = 0.22
+    const elevation = _tileSurfaceHeightAt(selected.x, selected.z) + 0.032
+    for (let index = 0; index < segmentCount; index += 2) {
+      const startAngle = index / segmentCount * Math.PI * 2
+      const endAngle = (index + 1) / segmentCount * Math.PI * 2
+      positions.push(
+        selected.x + Math.cos(startAngle) * radius, elevation, selected.z + Math.sin(startAngle) * radius,
+        selected.x + Math.cos(endAngle) * radius, elevation, selected.z + Math.sin(endAngle) * radius,
+      )
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    const material = new THREE.LineBasicMaterial({
+      color: 0xfacc15,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    })
+    const marker = new THREE.LineSegments(geometry, material)
+    marker.renderOrder = 5
+    marker.userData.presentationPathRole = 'selected-aim'
+    marker.userData.selectedCell = { x: selected.x, y: selected.z }
+    return marker
+  }
+
+  function showPresentationPath(input) {
+    if (!_mounted || !_scene) return
+    const source = _normalizePresentationPoint(input && input.source)
+    const end = _normalizePresentationPoint(input && input.end)
+    const selected = _normalizePresentationPoint(input && input.selected)
+    const hasTrajectory = !!(source && end && (source.x !== end.x || source.z !== end.z))
+    if (!hasTrajectory && !selected) {
+      _clearPresentationPath()
+      return
+    }
+    const signature = [source && source.key || '', end && end.key || '', selected && selected.key || ''].join('|')
+    if (_presentationPath && _presentationPath.signature === signature) return
+    _clearPresentationPath()
+    const trajectory = hasTrajectory ? _createPresentationPathRibbon(source, end) : null
+    const aim = _createPresentationAimMarker(selected)
+    if (!trajectory && !aim) return
+    const group = new THREE.Group()
+    group.userData.presentationPath = true
+    if (trajectory) group.add(trajectory)
+    if (aim) group.add(aim)
+    _scene.add(group)
+    const materials = (trajectory ? [trajectory.material] : []).concat(aim ? [aim.material] : [])
+    _presentationPath = {
+      signature: signature,
+      group: group,
+      source: source ? { x: source.x, y: source.z } : null,
+      end: end ? { x: end.x, y: end.z } : null,
+      selected: selected ? { x: selected.x, y: selected.z } : null,
+    }
+    const targetOpacities = (trajectory ? [0.82] : []).concat(aim ? [0.86] : [])
+    if (_reducedMotion) {
+      materials.forEach(function (material, index) { material.opacity = targetOpacities[index] })
+      return
+    }
+    _startAnimation('presentation:path:opacity', {
+      duration: MOTION_SECONDS.fast,
+      easing: EASE.out,
+      update: function (progress) {
+        materials.forEach(function (material, index) { material.opacity = targetOpacities[index] * progress })
+      },
+      complete: function () {
+        materials.forEach(function (material, index) { material.opacity = targetOpacities[index] })
+      },
+    })
+  }
+
   function _updateSelectedRingPosition() {
     if (!_hlObjects.selected || !_hlObjects.selectedId) return
     const obj = _pieceObjects.get(_hlObjects.selectedId)
@@ -1396,9 +1612,16 @@
     const damagedTargets = []
     ;(nextModel.pieces || []).forEach(function (nextPiece) {
       const previousPiece = _pieceById(previousModel, nextPiece.id)
-      if (!previousPiece) return
+      if (!previousPiece) {
+        if (nextPiece.visible !== false) _pendingAppearanceCues.set(nextPiece.id, 'summon')
+        return
+      }
       const obj = _pieceObjects.get(nextPiece.id)
       if (!obj) return
+      if (previousPiece.visible === false && nextPiece.visible !== false) {
+        _pendingAppearanceCues.set(nextPiece.id, 'summon')
+        return
+      }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
         _animateMove(obj, nextPiece.x, nextPiece.y)
       }
@@ -1502,10 +1725,12 @@
       obj.targetSelected = targetSelected
       if (pending || targetSelected) {
         obj.feedbackRing.material.color.setHex(pending ? 0xf59e0b : 0x60a5fa)
-        obj.feedbackRing.material.opacity = pending ? 0.38 : 0.58
+        obj.feedbackRing.material.opacity = 0.58
+        obj.body.material.emissiveIntensity = pending ? 0.24 : 0.12
         if (!_reducedMotion && !_anims.has(obj.motionId + ':position')) obj.group.position.y = obj.baseY + 0.04
       } else {
         obj.feedbackRing.material.opacity = 0
+        obj.body.material.emissiveIntensity = 0.08
         if (!_anims.has(obj.motionId + ':position') && !obj.deathAnimating) obj.group.position.y = obj.baseY
       }
     })
@@ -1582,7 +1807,7 @@
     }
     const finalise = function () {
       material.color.setHex(0xf59e0b)
-      material.opacity = obj.pending ? 0.38 : 0
+      material.opacity = obj.pending ? 0.58 : 0
     }
     _startAnimation(obj.motionId + ':outline', {
       duration: resultDuration,
@@ -1591,7 +1816,7 @@
         const timeline = Number.isFinite(raw) ? raw : progress
         const rising = timeline <= 0.45
         const phase = rising ? EASE.out(timeline / 0.45) : EASE.in((timeline - 0.45) / 0.55)
-        const baseOpacity = obj.pending ? 0.38 : 0
+        const baseOpacity = obj.pending ? 0.58 : 0
         material.color.setHex(mixHex(fromColor, color, Math.min(1, progress * 2)))
         material.opacity = rising
           ? fromOpacity + (0.78 - fromOpacity) * phase
@@ -1626,6 +1851,38 @@
     _flashOutline(obj, 0x67e8f9, MOTION_SECONDS.fast)
   }
 
+  function _animateSummon(obj) {
+    obj.group.visible = true
+    _cancelAnimation(obj.motionId + ':visibility')
+    if (_reducedMotion) {
+      _restorePieceVisual(obj)
+      _flashOutline(obj, 0xa78bfa, MOTION_SECONDS.fast)
+      return
+    }
+    const materials = _ownedPieceMaterials(obj)
+    materials.forEach(function (material) {
+      material.transparent = true
+      material.opacity = 0
+    })
+    obj.group.scale.set(0.82, 0.82, 0.82)
+    obj.group.position.y = obj.baseY - 0.04
+    _startAnimation(obj.motionId + ':summon', {
+      duration: MOTION_SECONDS.result,
+      easing: EASE.out,
+      update: function (progress) {
+        const scale = 0.82 + 0.18 * progress
+        obj.group.scale.set(scale, scale, scale)
+        obj.group.position.y = obj.baseY - 0.04 + 0.04 * progress
+        materials.forEach(function (material) { material.opacity = progress })
+      },
+      complete: function () {
+        _restorePieceVisual(obj)
+        _flashOutline(obj, 0xa78bfa, MOTION_SECONDS.fast)
+      },
+      cancel: function () { _restorePieceVisual(obj) },
+    })
+  }
+
   function _ownedPieceMaterials(obj) {
     return [obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial]
       .filter(function (material, index, materials) { return material && materials.indexOf(material) === index })
@@ -1640,11 +1897,22 @@
     })
     if (obj.body.material.color) obj.body.material.color.setHex(0x22272d)
     if (obj.body.material.emissive) obj.body.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
-    obj.body.material.emissiveIntensity = 0.08
+    obj.body.material.emissiveIntensity = obj.pending ? 0.24 : (obj.targetSelected ? 0.12 : 0.08)
     if (obj.ring.material.color) obj.ring.material.color.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     if (obj.ring.material.emissive) obj.ring.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     obj.ring.material.emissiveIntensity = 0.3
     if (obj.markerMaterial.color) obj.markerMaterial.color.setHex(0xf2e8d5)
+    if (obj.feedbackRing && obj.feedbackRing.material) {
+      if (obj.pending) {
+        if (obj.feedbackRing.material.color) obj.feedbackRing.material.color.setHex(0xf59e0b)
+        obj.feedbackRing.material.opacity = 0.58
+      } else if (obj.targetSelected) {
+        if (obj.feedbackRing.material.color) obj.feedbackRing.material.color.setHex(0x67e8f9)
+        obj.feedbackRing.material.opacity = 0.58
+      } else {
+        obj.feedbackRing.material.opacity = 0
+      }
+    }
   }
 
   function _animateDeath(obj) {
@@ -1710,6 +1978,13 @@
       playedEventCount: _playedEventKeys.size,
       floaterCount: _floaters.size,
       pendingPieceIds: Array.from(_pieceObjects.values()).filter(function (obj) { return obj.pending }).map(function (obj) { return obj.id }).sort(),
+      pendingAppearanceCues: Array.from(_pendingAppearanceCues.entries()).map(function (entry) { return entry[0] + ':' + entry[1] }).sort(),
+      presentationAreaCellCount: _presentationAreaFlash ? _presentationAreaFlash.cellCount : 0,
+      presentationPath: _presentationPath ? {
+        source: _presentationPath.source,
+        end: _presentationPath.end,
+        selected: _presentationPath.selected,
+      } : null,
       highlightCounts: {
         move: _hlObjects.move.size,
         skill: _hlObjects.skill.size,
@@ -2199,6 +2474,9 @@
     _anims.clear()
     _playedEventKeys.clear()
     _playedEventOrder.length = 0
+    _pendingAppearanceCues.clear()
+    _presentationAreaFlash = null
+    _presentationPath = null
     _pressedPiece = null
     _pressedHighlight = null
     _pieceDrag = null
@@ -2257,6 +2535,10 @@
     projectCell,
     setHistoryHighlight,
     screenToCell,
+    showPresentationAreaFlash,
+    clearPresentationAreaFlash: _clearPresentationAreaFlash,
+    showPresentationPath,
+    clearPresentationPath: _clearPresentationPath,
     dispose,
     getMotionDiagnostics,
     TILE_EFFECT_VISUALS,

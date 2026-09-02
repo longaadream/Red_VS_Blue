@@ -194,6 +194,7 @@
     const doc = input.document || root.document
     const win = input.window || root
     const icons = input.icons || root.BattleEffectIcons
+    const actionIdentity = input.actionIdentity || root.BattleActionIdentity
     const scheduleTimeout = input.setTimeout || root.setTimeout
     const cancelTimeout = input.clearTimeout || root.clearTimeout
     let dock = null
@@ -225,12 +226,35 @@
         + '</span>'
     }
 
+    function resolveIdentity(event) {
+      return actionIdentity && typeof actionIdentity.resolve === 'function'
+        ? actionIdentity.resolve(event, model)
+        : { isSkill: false, skillName: '', sourceName: '', portraitSrc: '', portraitFallback: '?', faction: '' }
+    }
+
+    function renderPortrait(identity) {
+      const portrait = identity || {}
+      return '<span class="action-history-portrait" data-faction="' + escapeHtml(portrait.faction || '')
+        + '" role="img" aria-label="' + escapeHtml(portrait.sourceName || '未知棋子') + '">'
+        + '<span class="action-history-portrait-fallback" aria-hidden="true">'
+        + escapeHtml(portrait.portraitFallback || '?') + '</span>'
+        + (portrait.portraitSrc
+          ? '<img src="' + escapeHtml(portrait.portraitSrc) + '" alt="" aria-hidden="true" onerror="this.style.display=\'none\'">'
+          : '')
+        + '</span>'
+    }
+
     function displayPiece(pieceId) {
       const piece = pieceById(model, pieceId)
       if (!piece) return ''
       const initial = String(piece.name || '?').slice(0, 1)
+      const portraitSrc = actionIdentity && typeof actionIdentity.portraitUrl === 'function'
+        ? actionIdentity.portraitUrl(piece.portraitId)
+        : ''
       return '<span class="action-history-entity is-piece" data-piece-id="' + escapeHtml(piece.id) + '" title="' + escapeHtml(piece.name) + '">'
-        + '<i class="action-history-avatar" data-faction="' + escapeHtml(piece.faction || '') + '">' + escapeHtml(initial) + '</i>'
+        + '<i class="action-history-avatar" data-faction="' + escapeHtml(piece.faction || '') + '"><span aria-hidden="true">' + escapeHtml(initial) + '</span>'
+        + (portraitSrc ? '<img src="' + escapeHtml(portraitSrc) + '" alt="" aria-hidden="true" onerror="this.style.display=\'none\'">' : '')
+        + '</i>'
         + '<span>' + escapeHtml(piece.name) + '</span></span>'
     }
 
@@ -302,6 +326,7 @@
       dock.hidden = entries.length === 0
       list.innerHTML = entries.map(function (group, index) {
         const meta = resolveIcon(group.root)
+        const identity = resolveIdentity(group.root)
         const children = group.children || []
         const visibleChildren = children.slice(0, 2)
         const overflow = Math.max(0, children.length - visibleChildren.length)
@@ -310,21 +335,22 @@
         })
         const current = index === 0
         const selected = group.rootEventId === activeRootId
-        const isSkillRelease = group.root.kind === 'skill' || group.root.kind === 'chargeSkill'
+        const isSkillRelease = identity.isSkill
         const actionLabel = isSkillRelease
-          ? '释放' + String(group.root.label || group.root.skillId || '技能')
+          ? identity.skillName
           : String(meta.label || KIND_LABELS[group.root.kind] || '未知动作')
         const label = actionLabel + (children.length ? '，包含 ' + children.length + ' 个结果' : '')
         const rootMark = isSkillRelease
-          ? '<span class="action-history-skill-name" aria-hidden="true">' + escapeHtml(String(group.root.label || group.root.skillId || '技能').slice(0, 2)) + '</span>'
+          ? renderPortrait(identity)
           : '<img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt="" aria-hidden="true">'
-        return '<button type="button" class="action-history-item' + (current ? ' is-current' : '') + (selected ? ' is-selected' : '') + '"'
+        return '<button type="button" class="action-history-item' + (isSkillRelease ? ' has-skill' : '') + (current ? ' is-current' : '') + (selected ? ' is-selected' : '') + '"'
           + ' data-history-root-id="' + escapeHtml(group.rootEventId) + '"'
           + ' data-faction="' + escapeHtml(actor && actor.faction || '') + '"'
           + ' aria-label="' + escapeHtml(label + '，点击高亮来源与目标') + '"'
           + ' aria-pressed="' + String(selected) + '" title="' + escapeHtml(actionLabel) + '"'
           + ' style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '">'
-          + '<span class="action-history-root-icon">' + rootMark + '</span>'
+          + '<span class="action-history-root-icon' + (isSkillRelease ? ' is-portrait' : '') + '">' + rootMark + '</span>'
+          + (isSkillRelease ? '<span class="action-history-skill-label" aria-hidden="true">' + escapeHtml(actionLabel) + '</span>' : '')
           + (children.length ? '<span class="action-history-branch" aria-hidden="true">' + visibleChildren.map(renderChild).join('')
             + (overflow ? '<b class="action-history-overflow">+' + overflow + '</b>' : '') + '</span>' : '')
           + '<span class="action-history-chain">' + renderSentence(group.root, group.root, true)
