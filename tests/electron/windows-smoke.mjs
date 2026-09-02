@@ -850,7 +850,10 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       'index.html',
       'js/server-utils.js',
       'data/pieces/ana.json',
-      'images/terrain/floor.webp'
+      'images/terrain/floor.webp',
+      'images/effect-icons/empowered.svg',
+      'images/effect-icons/damage-multiplier.svg',
+      'images/tile-effects/blizzard.svg'
     ].map(async (relativePath) => {
       const response = await fetch(new URL(relativePath, location.href))
       return [relativePath, response.ok, (await response.arrayBuffer()).byteLength]
