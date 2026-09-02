@@ -185,6 +185,7 @@
     const doc = input.document || root.document
     const win = input.window || root
     const icons = input.icons || root.BattleEffectIcons
+    const actionIdentity = input.actionIdentity || root.BattleActionIdentity
     const onOpenLog = typeof input.onOpenLog === 'function' ? input.onOpenLog : function () {}
     const scheduleTimeout = input.setTimeout || root.setTimeout
     const cancelTimeout = input.clearTimeout || root.clearTimeout
@@ -216,12 +217,31 @@
         + '</span>'
     }
 
+    function resolveIdentity(event) {
+      return actionIdentity && typeof actionIdentity.resolve === 'function'
+        ? actionIdentity.resolve(event, model)
+        : { isSkill: false, skillName: '', sourceName: '', portraitSrc: '', portraitFallback: '?', faction: '' }
+    }
+
+    function renderPortrait(identity) {
+      const portrait = identity || {}
+      return '<span class="action-history-portrait" data-faction="' + escapeHtml(portrait.faction || '')
+        + '" role="img" aria-label="' + escapeHtml(portrait.sourceName || '未知棋子') + '">'
+        + '<span class="action-history-portrait-fallback" aria-hidden="true">'
+        + escapeHtml(portrait.portraitFallback || '?') + '</span>'
+        + (portrait.portraitSrc
+          ? '<img src="' + escapeHtml(portrait.portraitSrc) + '" alt="" aria-hidden="true" onerror="this.style.display=\'none\'">'
+          : '')
+        + '</span>'
+    }
+
     function render() {
       if (!dock || !list) return
       const entries = visibleRoots(roots, VISIBLE_ROOTS)
       dock.hidden = entries.length === 0
       list.innerHTML = entries.map(function (group, index) {
         const meta = resolveIcon(group.root)
+        const identity = resolveIdentity(group.root)
         const children = group.children || []
         const visibleChildren = children.slice(0, 2)
         const overflow = Math.max(0, children.length - visibleChildren.length)
@@ -230,18 +250,20 @@
         })
         const current = index === 0
         const selected = group.rootEventId === activeRootId
-        const usesSkillText = group.root.kind === 'skill' || group.root.kind === 'chargeSkill'
-        const rootLabel = usesSkillText ? '使用技能' : String(meta.label || KIND_LABELS[group.root.kind] || '未知动作')
+        const rootLabel = identity.isSkill
+          ? identity.skillName
+          : String(meta.label || KIND_LABELS[group.root.kind] || '未知动作')
         const label = rootLabel + (children.length ? '，包含 ' + children.length + ' 个结果' : '')
-        return '<button type="button" class="action-history-item' + (current ? ' is-current' : '') + (selected ? ' is-selected' : '') + '"'
+        return '<button type="button" class="action-history-item' + (identity.isSkill ? ' has-skill' : '') + (current ? ' is-current' : '') + (selected ? ' is-selected' : '') + '"'
           + ' data-history-root-id="' + escapeHtml(group.rootEventId) + '"'
           + ' data-faction="' + escapeHtml(actor && actor.faction || '') + '"'
           + ' aria-label="' + escapeHtml(label + '，点击高亮来源与目标') + '"'
           + ' aria-pressed="' + String(selected) + '" title="' + escapeHtml(rootLabel) + '"'
           + ' style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '">'
-          + '<span class="action-history-root-icon' + (usesSkillText ? ' is-text' : '') + '">'
-          + (usesSkillText ? '<span aria-hidden="true">使用<br>技能</span>'
+          + '<span class="action-history-root-icon' + (identity.isSkill ? ' is-portrait' : '') + '">'
+          + (identity.isSkill ? renderPortrait(identity)
             : '<img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt="" aria-hidden="true">') + '</span>'
+          + (identity.isSkill ? '<span class="action-history-skill-name" aria-hidden="true">' + escapeHtml(rootLabel) + '</span>' : '')
           + (children.length ? '<span class="action-history-branch" aria-hidden="true">' + visibleChildren.map(renderChild).join('')
             + (overflow ? '<b class="action-history-overflow">+' + overflow + '</b>' : '') + '</span>' : '')
           + '</button>'

@@ -81,6 +81,7 @@ describe('battle page route contract', () => {
     const battlePage = readPage('battle.html')
 
     expect(battlePage).toContain('<script src="js/battle-ui/battle-presentation-events.js"></script>')
+    expect(battlePage).toContain('<script src="js/battle-ui/battle-action-identity.js"></script>')
     expect(battlePage).toContain('<script src="js/battle-ui/battle-action-vignette.js"></script>')
     expect(battlePage).toContain('battleActionVignette = BattleActionVignette.create({')
     expect(battlePage).toContain('vignetteUi: battleActionVignette')

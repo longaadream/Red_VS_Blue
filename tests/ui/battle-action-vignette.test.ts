@@ -67,7 +67,9 @@ function loadModule(): VignetteModule {
     clearTimeout,
   }
   const context = createContext({ window: windowObject, globalThis: windowObject, console, setTimeout, clearTimeout })
+  const identitySource = readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-action-identity.js'), 'utf8')
   const source = readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-action-vignette.js'), 'utf8')
+  new Script(identitySource, { filename: 'battle-action-identity.js' }).runInContext(context)
   new Script(source, { filename: 'battle-action-vignette.js' }).runInContext(context)
   return windowObject.BattleActionVignette as VignetteModule
 }
@@ -318,12 +320,16 @@ describe('RED-167 action vignette queue', () => {
     vignette.update({ presentationEvents: [], pieces: [], turn: { isViewerTurn: false } })
     vignette.update({
       pieces: [
-        { id: 'source', x: 0, y: 0 },
+        { id: 'source', name: '阿尔萨斯', portraitId: 'arthas.jpg', faction: 'blue', x: 0, y: 0 },
         { id: 'actual-target', x: 4, y: 0 },
       ],
+      skillSummariesById: {
+        'arthas-icebound-fortitude': { id: 'arthas-icebound-fortitude', name: '寒冰坚忍' },
+      },
       turn: { isViewerTurn: false },
       presentationEvents: [root(1, {
         sourcePieceId: 'source',
+        skillId: 'arthas-icebound-fortitude',
         targetCell: { x: 1, y: 0 },
         presentation: {
           cue: 'projectile',
@@ -351,11 +357,13 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).not.toContain('battle-vignette-path-segment')
     expect(layer.innerHTML).not.toContain('battle-vignette-point')
     expect(layer.innerHTML).not.toContain('battle-vignette-action-icon')
-    expect(layer.innerHTML).not.toContain('<img')
-    expect(layer.innerHTML).toContain('使用技能')
+    expect(layer.innerHTML).toContain('class="battle-vignette-avatar"')
+    expect(layer.innerHTML).toContain('src="images/arthas.jpg"')
+    expect(layer.innerHTML).toContain('寒冰坚忍')
+    expect(layer.innerHTML).not.toContain('使用技能')
+    expect(layer.innerHTML).not.toContain('images/effect-icons/action-skill.svg')
     vi.advanceTimersByTime(300)
     expect(layer.innerHTML).not.toContain('battle-vignette-result')
-    expect(layer.innerHTML).not.toContain('<img')
     expect(layer.innerHTML).not.toContain('>4<')
 
     const speedPointerEvent = {

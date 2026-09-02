@@ -69,6 +69,11 @@ describe('battle presentation boundary', () => {
       viewerId: 'player-red',
       selectedPieceId: 'piece-red',
       interactionMode: 'move',
+      skillsById: {
+        'arthas-icebound-fortitude': {
+          id: 'arthas-icebound-fortitude', name: '寒冰坚忍', code: 'not projected',
+        },
+      },
       legal,
     }
 
@@ -90,9 +95,13 @@ describe('battle presentation boundary', () => {
       ],
       selection: { pieceId: 'piece-red', mode: 'move' },
       players: [{ name: 'A deliberately long tactical player name' }],
+      skillSummariesById: {
+        'arthas-icebound-fortitude': { id: 'arthas-icebound-fortitude', name: '寒冰坚忍' },
+      },
       turn: { remainingSeconds: 89 },
       legal: { moveCells: [{ x: 1, y: 0 }], targetCells: [{ x: 1, y: 0 }], placementCells: [] },
     })
+    expect(trainingModel.skillSummariesById['arthas-icebound-fortitude']).not.toHaveProperty('code')
   })
 
   it('projects the template-declared portrait asset for pieces added after training starts', () => {

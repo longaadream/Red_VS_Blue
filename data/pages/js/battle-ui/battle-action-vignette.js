@@ -264,6 +264,7 @@
     const doc = input.document || root.document
     const win = input.window || root
     const icons = input.icons || root.BattleEffectIcons
+    const actionIdentity = input.actionIdentity || root.BattleActionIdentity
     const reducedMotion = input.reducedMotion === true
       || !!(win && win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches)
     const now = typeof input.now === 'function' ? input.now : Date.now
@@ -309,14 +310,32 @@
         : { assetPath: 'images/effect-icons/fallback.svg', label: '未知动作', color: '#94a3b8' }
     }
 
+    function resolveIdentity(event) {
+      return actionIdentity && typeof actionIdentity.resolve === 'function'
+        ? actionIdentity.resolve(event, model)
+        : { isSkill: false, skillName: '', sourceName: '', portraitSrc: '', portraitFallback: '?', faction: '' }
+    }
+
+    function renderPortrait(identity) {
+      const portrait = identity || {}
+      return '<span class="battle-vignette-avatar" data-faction="' + escapeHtml(portrait.faction || '')
+        + '" role="img" aria-label="' + escapeHtml(portrait.sourceName || '未知棋子') + '">'
+        + '<span class="battle-vignette-avatar-fallback" aria-hidden="true">'
+        + escapeHtml(portrait.portraitFallback || '?') + '</span>'
+        + (portrait.portraitSrc
+          ? '<img src="' + escapeHtml(portrait.portraitSrc) + '" alt="" aria-hidden="true" onerror="this.style.display=\'none\'">'
+          : '')
+        + '</span>'
+    }
+
     function render() {
       if (!layer || !currentGroup || !model) return
       const rootEvent = currentGroup.root
       const meta = resolveIcon(rootEvent)
+      const identity = resolveIdentity(rootEvent)
       const cells = eventCells(currentGroup, model)
       const cue = rootEvent.presentation && rootEvent.presentation.cue || 'directional'
-      const usesSkillText = rootEvent.kind === 'skill' || rootEvent.kind === 'chargeSkill'
-      const actionLabel = usesSkillText ? '使用技能' : (meta.label || '战场动作')
+      const actionLabel = identity.isSkill ? identity.skillName : (meta.label || '战场动作')
       const resultVisible = currentPhase === 'result' || currentPhase === 'settle' || currentPhase === 'static'
       const pathVisible = currentPhase === 'path' || resultVisible
       const travelVisible = pathVisible && cue !== 'area'
@@ -337,8 +356,9 @@
       layer.innerHTML = '<div class="battle-vignette-veil" aria-hidden="true"></div>'
         + '<div class="battle-vignette-status" role="status" aria-live="polite">'
         + '<span class="battle-vignette-label">'
-        + (usesSkillText ? '' : '<img src="' + escapeHtml(meta.assetPath) + '" alt="">')
-        + escapeHtml(actionLabel) + '</span>'
+        + (identity.isSkill ? renderPortrait(identity) : '<img src="' + escapeHtml(meta.assetPath) + '" alt="">')
+        + '<span class="battle-vignette-action-name" title="' + escapeHtml(actionLabel) + '">'
+        + escapeHtml(actionLabel) + '</span></span>'
         + '<span class="battle-vignette-skip-hint">点按战场略过</span>'
         + '<button type="button" class="battle-vignette-speed" data-vignette-control="speed" aria-label="切换演出速度" aria-pressed="'
         + String(speed === 2) + '">' + speed + '×</button></div>'

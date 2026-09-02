@@ -17,6 +17,7 @@
   <script src="js/battle-ui/battle-effect-icons.js"></script>
   <script src="js/battle-ui/battle-presentation-events.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
+  <script src="js/battle-ui/battle-action-identity.js"></script>
   <script src="js/battle-ui/battle-action-history.js"></script>
   <script src="js/battle-ui/battle-action-vignette.js"></script>
   <script src="js/battle-ui/battle-status-presentation.js"></script>
@@ -6492,7 +6493,8 @@
         setMoveButtonDisabled(true)
         const oldG = G
         const newG = await trainingApiFetch('PUT', { action, battleState: G })
-        const projection = window.BattlePresentationEvents
+        const projection = (typeof window !== 'undefined' && window.BattlePresentationEvents)
+          || (typeof globalThis !== 'undefined' && globalThis.BattlePresentationEvents)
         latestBattlePresentationEvents = projection && typeof projection.projectBattlePresentationEvents === 'function'
           ? projection.projectBattlePresentationEvents({
               actionId: action.clientActionId,

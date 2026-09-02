@@ -175,6 +175,22 @@
     }
   }
 
+  function normalizeSkillSummaries(value) {
+    const summaries = {}
+    Object.keys(value || {}).forEach(function (key) {
+      const skill = value[key]
+      if (!skill || typeof skill !== 'object') return
+      const id = String(skill.id || key)
+      const summary = {
+        id: id,
+        name: String(skill.name || id),
+      }
+      summaries[String(key)] = summary
+      summaries[id] = summary
+    })
+    return summaries
+  }
+
   const PRESENTATION_CUES = new Set(['directional', 'projectile', 'area', 'displacement', 'summon'])
   const PRESENTATION_END_REASONS = new Set(['hit', 'blocked', 'boundary', 'range-expired', 'resolved'])
   const PRESENTATION_COLLISIONS = new Set(['piece', 'terrain', 'boundary'])
@@ -302,6 +318,7 @@
       },
       pieces: pieces,
       effects: ((snapshot.extensions && snapshot.extensions.tileEffects) || []).map(normalizeEffect),
+      skillSummariesById: normalizeSkillSummaries(input.skillsById || snapshot.skillsById),
       presentationEvents: normalizePresentationEvents(input.presentationEvents),
       players: players,
       viewer: viewer,
@@ -335,6 +352,7 @@
   root.BattleViewModel = {
     create: create,
     normalizeCells: normalizeCells,
+    normalizeSkillSummaries: normalizeSkillSummaries,
     normalizePresentationEvents: normalizePresentationEvents,
   }
 })(typeof window !== 'undefined' ? window : globalThis)

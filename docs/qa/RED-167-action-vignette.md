@@ -6,7 +6,7 @@
 - 基线：`main` / `400a4169a911ef96aedd966de76cb571e14e8669`
 - 最终同步基线：`origin/main` / `09e3e6c29a2c922bdc591cdb40bc26f6f56954dd`（ahead 1、behind 0 时完成主验证）
 - 分支：`codex/red-167-action-vignette`
-- 范围：权威展示提示、串行小剧场、略过/2×/减弱动态、召唤/复活与 pending 角色反馈；变身专属动画按产品决定延期。
+- 范围：权威展示提示、施法者头像与技能名、串行小剧场、略过/2×/减弱动态、召唤/复活与 pending 角色反馈；变身专属动画按产品决定延期。
 - 不在范围：角色专属终极演出、护盾拦截动画、规则结算、伤害或命中算法。
 
 ## 浏览器复现
@@ -18,20 +18,21 @@
 5. 弹射物阶段确认虚线瞄准格与实际终点可分离，轨迹延伸到实际 `endPoint`；路径被挡或飞越点击格时仍使用结算轨迹。轨迹和虚线必须位于真实棋盘世界平面，不得用平行于屏幕的 DOM 线模拟。
 6. 演出期间点按战场，确认当前动作在 100ms 内收束，并且该次点击不触发棋盘选择、移动或技能。
 6. 切换右上角 1×/2×，确认顺序不变、耗时缩短；将系统设置为“减少动态效果”后刷新，确认只显示 100–140ms 静态结果帧。
-7. 在窄高横屏复查状态条、44px 速度按钮与区域闪烁没有遮挡主要棋盘操作。
+7. 释放任意真实技能，确认顶部状态条显示施法棋子头像与具体技能名；最近动作使用同一头像，悬停/聚焦时显示技能名。头像资源缺失时应显示棋子名首字，不出现破图。
+8. 在窄高横屏复查状态条、44px 速度按钮与区域闪烁没有遮挡主要棋盘操作；过长技能名应单行截断而不挤压速度按钮。
 
 ## 自动验证
 
 - 权威事件与轨迹：`tests/game/battle-presentation-events.test.ts`
-- 队列、略过、2×、减弱动态和 DOM 清理：`tests/ui/battle-action-vignette.test.ts`；其中固定 16 棋子、160 个根动作并推进 180 秒的压力场景确认队列归零、无残留计时器。
+- 队列、略过、2×、减弱动态、头像/技能名与 DOM 清理：`tests/ui/battle-action-vignette.test.ts`、`tests/ui/battle-action-identity.test.ts`；其中固定 16 棋子、160 个根动作并推进 180 秒的压力场景确认队列归零、无残留计时器。
 - renderer 召唤/复活与 pending 高亮：`tests/ui/battle-renderer-3d-runtime.test.ts`
 - 页面/生命周期边界：`tests/game/battle-ui-boundary.test.ts`、`tests/game/battle-page-contract.test.ts`
-- 最新主基线相关回归：8 个相关测试文件共 114 项通过；另含 public projection 的 8 文件组合 97 项通过；`npm.cmd run typecheck`、定向 ESLint、3 个浏览器脚本语法检查与 `npm.cmd run check:encoding` 通过。
+- 最新主基线相关回归：9 个相关测试文件共 117 项通过；`npm.cmd run typecheck`、定向 ESLint、浏览器脚本语法检查与 `npm.cmd run check:encoding` 通过。
 
 ## 浏览器证据（Playwright CLI）
 
-- 1280×720 弹射物：`output/playwright/RED-167-projectile-text-skill.png`。renderer 在固定棋盘平面高度创建 1 条指向权威 `endPoint` 的 3D ribbon 与 1 个 `selectedCell` 世界空间中心虚线；轨迹两端不读取高低地形高度，因此严格平行于棋盘格轴，高地只产生自然遮挡而不会把线段抬歪。DOM 棋盘图层的轨迹、文字和图标数量均为 0。“使用技能”文字只显示在顶部状态条与历史记录。
-- 真实训练动作：训练模式调用共享 `projectBattlePresentationEvents()`，以提交动作及结算前后状态生成与联网链路同结构的 `presentationEvents`。手动释放“寒冰坚忍”后，页面出现“使用技能 / 点按战场略过 / 1×”，施法者获得来源聚焦，且动作沉入最近行动；未解析中文日志，也未改变技能结算。
+- 1280×720 弹射物：`output/playwright/RED-167-projectile-text-skill.png`。renderer 在固定棋盘平面高度创建 1 条指向权威 `endPoint` 的 3D ribbon 与 1 个 `selectedCell` 世界空间中心虚线；轨迹两端不读取高低地形高度，因此严格平行于棋盘格轴，高地只产生自然遮挡而不会把线段抬歪。DOM 棋盘图层的轨迹、文字和图标数量均为 0；施法者头像与技能名只显示在棋盘外的顶部状态条和动作历史。
+- 真实训练动作：训练模式调用共享 `projectBattlePresentationEvents()`，以提交动作及结算前后状态生成与联网链路同结构的 `presentationEvents`。手动释放“寒冰坚忍”后，顶部状态条显示阿尔萨斯头像与“寒冰坚忍 / 点按战场略过 / 1×”，且最近动作的 `aria-label`、标题、头像与展开技能名均来自同一展示身份解析；未解析中文日志，也未改变技能结算。
 - 1280×720 范围闪烁：`output/playwright/RED-167-area-flash.png`。演出层处于 `is-cue-area`，不创建任何 DOM 或额外 3D 覆盖面；renderer 临时克隆并点亮 3 块真实地砖的材质，几何、位置和缩放完全不变，收束时恢复原材质。因此方向、透视、厚度与遮挡直接继承棋盘本身，不存在额外边框角度；棋盘 DOM 的路径、文字和图标数量均为 0。
 - 844×390、`prefers-reduced-motion: reduce`：`output/playwright/RED-167-reduced-motion-mobile-landscape.png`。截图时演出阶段为可见的 `static`，速度按钮为 44×44px。
 - 略过输入：真实页面派发可取消的 `pointerdown` 后 10.5ms 内同步进入 `settle`；`defaultPrevented=true`、派发返回 `false`、战场父节点收到的穿透事件数为 0。收尾计时目标为 60ms，低于 100ms 验收上限。
