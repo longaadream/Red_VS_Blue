@@ -64,19 +64,19 @@ describe('RED-45 runtime skillCode matrix', () => {
   })
 
   it('runs a loaded triggerSkill rule through the skill executor', () => {
-    const piece = makePiece({ instanceId: 'blessing-owner' }) as any
-    piece.statusTags = [{ id: 'divine-blessing-buff', type: 'divine-blessing-buff', intensity: 4 }]
-    const rule = loadRuleById('rule-divine-blessing', true)
+    const piece = makePiece({ instanceId: 'hardy-block-owner' }) as any
+    piece.statusTags = [{ id: 'hardy-block', type: 'hardy-block' }]
+    const rule = loadRuleById('rule-hardy-block', true)
     expect(rule).not.toBeNull()
     piece.rules = [rule]
     const state = makeState({ pieces: [piece] }) as any
-    const context: any = { type: 'beforeDamageDealt', playerId: 'player-red', sourcePiece: piece, piece, damage: 3 }
+    const beforeAttack = piece.attack
+    const context: any = { type: 'afterDamageTaken', playerId: 'player-red', sourcePiece: piece, piece, damage: 4 }
 
     const result = new TriggerSystem().checkTriggers(state, context)
 
     expect(result.success).toBe(true)
-    expect(context.damage).toBe(7)
-    expect(piece.statusTags).toEqual([])
+    expect(piece.attack).toBe(beforeAttack + 2)
   })
 
   it('runs a piece skill code fixture with its battle/context helpers', () => {
@@ -114,14 +114,14 @@ describe('RED-45 runtime skillCode matrix', () => {
     }
     expectRuntimeFixtureCache('ruleSkillCode', 'rule-watcher-rage-dealt', ragePiece)
 
-    const blessingPiece = () => {
-      const piece = makePiece({ instanceId: 'blessing-cache-owner' }) as any
-      piece.statusTags = [{ id: 'divine-blessing-buff', type: 'divine-blessing-buff', intensity: 4 }]
-      piece.rules = [loadRuleById('rule-divine-blessing', true)!]
+    const hardyBlockPiece = () => {
+      const piece = makePiece({ instanceId: 'hardy-block-cache-owner' }) as any
+      piece.statusTags = [{ id: 'hardy-block', type: 'hardy-block' }]
+      piece.rules = [loadRuleById('rule-hardy-block', true)!]
       const state = makeState({ pieces: [piece] }) as any
-      new TriggerSystem().checkTriggers(state, { type: 'beforeDamageDealt', playerId: 'player-red', sourcePiece: piece, piece, damage: 3 })
+      new TriggerSystem().checkTriggers(state, { type: 'afterDamageTaken', playerId: 'player-red', sourcePiece: piece, piece, damage: 4 })
     }
-    expectRuntimeFixtureCache('ruleTriggerSkill', 'divine-blessing-damage', blessingPiece)
+    expectRuntimeFixtureCache('ruleTriggerSkill', 'hardy-block-trigger', hardyBlockPiece)
 
     const skill = {
       id: 'runtime-cache-skill', name: 'runtime cache skill', description: '', kind: 'active', type: 'normal',
