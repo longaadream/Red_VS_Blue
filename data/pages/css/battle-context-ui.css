@@ -664,15 +664,18 @@
   animation: battle-vignette-projectile 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.battle-vignette-area-cell {
+.battle-vignette-area-flash {
   position: absolute;
-  width: 46px;
-  height: 34px;
-  margin: -17px 0 0 -23px;
-  border: 2px solid rgba(251, 146, 60, 0.82);
-  border-radius: 50%;
-  background: rgba(249, 115, 22, 0.28);
-  box-shadow: 0 0 24px rgba(249, 115, 22, 0.58);
+  border: 0;
+  border-radius: 42%;
+  background: radial-gradient(ellipse at center,
+    rgba(251, 191, 36, 0.56) 0%,
+    rgba(249, 115, 22, 0.34) 46%,
+    rgba(249, 115, 22, 0.08) 76%,
+    transparent 100%);
+  box-shadow: 0 0 38px rgba(249, 115, 22, 0.34);
+  transform-origin: center;
+  pointer-events: none;
   animation: battle-vignette-area-flash 280ms ease-out both;
 }
 
@@ -1167,7 +1170,7 @@
   .action-history-point { animation: none !important; }
   .battle-vignette-veil,
   .battle-vignette-point,
-  .battle-vignette-area-cell,
+  .battle-vignette-area-flash,
   .battle-vignette-result { animation: none !important; }
   .battle-vignette-path-segment,
   .battle-vignette-action-icon { display: none !important; }

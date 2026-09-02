@@ -30,7 +30,7 @@
 ## 浏览器证据（Playwright CLI）
 
 - 1280×720 弹射物：`output/playwright/RED-167-projectile-text-skill.png`。实测 `selectedCell` 投影为 `left=968.624px`，权威 `endPoint` 为 `left=1056.26px`，移动标识终点变量为 `1057.04px`，没有回退到点击格；技能根动作的状态条和移动标识均显示“使用技能”，且移动标识不含占位图标。
-- 1280×720 范围闪烁：`output/playwright/RED-167-area-flash.png`。演出层处于 `is-cue-area`，只渲染 3 个权威 `areaCells` 的闪烁轮廓；路径与动作移动标识数量均为 0。
+- 1280×720 范围闪烁：`output/playwright/RED-167-area-flash.png`。演出层处于 `is-cue-area`，以一整片柔和光晕覆盖 3 个权威 `areaCells`；独立格子光圈、来源/瞄准/终点光圈、路径与动作移动标识数量均为 0。
 - 844×390、`prefers-reduced-motion: reduce`：`output/playwright/RED-167-reduced-motion-mobile-landscape.png`。截图时演出阶段为可见的 `static`，速度按钮为 44×44px。
 - 略过输入：真实页面派发可取消的 `pointerdown` 后 10.5ms 内同步进入 `settle`；`defaultPrevented=true`、派发返回 `false`、战场父节点收到的穿透事件数为 0。收尾计时目标为 60ms，低于 100ms 验收上限。
 - 控制台仅出现静态 QA 服务基线缺失资源：`js/game-engine-runtime.js` 与 `data/skills/evil-explosion.json` 的 404；未发现 RED-167 运行时异常。

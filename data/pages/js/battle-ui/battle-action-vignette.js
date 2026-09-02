@@ -346,6 +346,21 @@
       return markup
     }
 
+    function areaFlashMarkup(points) {
+      const screens = uniquePoints(points).map(function (point) { return projected(point) }).filter(Boolean)
+      if (!screens.length) return ''
+      const lefts = screens.map(function (point) { return point.left })
+      const tops = screens.map(function (point) { return point.top })
+      const paddingX = 34
+      const paddingY = 26
+      const left = Math.min.apply(Math, lefts) - paddingX
+      const top = Math.min.apply(Math, tops) - paddingY
+      const width = Math.max.apply(Math, lefts) - Math.min.apply(Math, lefts) + paddingX * 2
+      const height = Math.max.apply(Math, tops) - Math.min.apply(Math, tops) + paddingY * 2
+      return '<i class="battle-vignette-area-flash" style="left:' + left + 'px;top:' + top
+        + 'px;width:' + width + 'px;height:' + height + 'px"></i>'
+    }
+
     function resultBadge(event) {
       const result = event && event.result || {}
       const values = [result.amount, result.absorbed, result.count, result.stacks]
@@ -412,19 +427,19 @@
             : '<img src="' + escapeHtml(meta.assetPath) + '" alt="">') + '</span>'
         : ''
       const areaMarkup = cue === 'area'
-        ? uniquePoints(cells.area.length ? cells.area : cells.targets).map(function (point) {
-          return pointMarkup(point, 'battle-vignette-area-cell')
-        }).join('')
+        ? areaFlashMarkup(cells.area.length ? cells.area : cells.targets)
         : ''
+      const pointMarkers = cue === 'area' ? ''
+        : pointMarkup(cells.source, 'battle-vignette-point is-source')
+          + pointMarkup(cells.selected, 'battle-vignette-point is-selected-aim')
+          + pointMarkup(cells.end || cells.targets[0], 'battle-vignette-point is-end')
       layer.hidden = false
       layer.className = 'battle-vignette-layer is-phase-' + currentPhase + ' is-cue-' + cue
       layer.dataset.phase = currentPhase
       layer.dataset.rootId = currentGroup.rootEventId
       layer.innerHTML = '<div class="battle-vignette-veil" aria-hidden="true"></div>'
         + '<div class="battle-vignette-graphics" aria-hidden="true">'
-        + pointMarkup(cells.source, 'battle-vignette-point is-source')
-        + pointMarkup(cells.selected, 'battle-vignette-point is-selected-aim')
-        + pointMarkup(cells.end || cells.targets[0], 'battle-vignette-point is-end')
+        + pointMarkers
         + (travelVisible ? pathMarkup(cells.source, cells.path, cells.end || cells.targets[0]) : '')
         + (travelVisible ? actionIcon : '')
         + (pathVisible ? areaMarkup : '')
