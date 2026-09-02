@@ -65,7 +65,10 @@ describe('RED-45 runtime skillCode matrix', () => {
 
   it('runs a loaded triggerSkill rule through the skill executor', () => {
     const piece = makePiece({ instanceId: 'blessing-owner' }) as any
-    piece.statusTags = [{ id: 'divine-blessing-buff', type: 'divine-blessing-buff', intensity: 4 }]
+    piece.statusTags = [
+      { id: 'divine-blessing-buff', type: 'damage-buff', name: '强化', intensity: 4 },
+      { id: 'holy-charge-buff', type: 'damage-buff', name: '强化', intensity: 2 },
+    ]
     const rule = loadRuleById('rule-divine-blessing', true)
     expect(rule).not.toBeNull()
     piece.rules = [rule]
@@ -76,7 +79,9 @@ describe('RED-45 runtime skillCode matrix', () => {
 
     expect(result.success).toBe(true)
     expect(context.damage).toBe(7)
-    expect(piece.statusTags).toEqual([])
+    expect(piece.statusTags).toEqual([
+      expect.objectContaining({ id: 'holy-charge-buff', type: 'damage-buff' }),
+    ])
   })
 
   it('runs a piece skill code fixture with its battle/context helpers', () => {
@@ -116,7 +121,7 @@ describe('RED-45 runtime skillCode matrix', () => {
 
     const blessingPiece = () => {
       const piece = makePiece({ instanceId: 'blessing-cache-owner' }) as any
-      piece.statusTags = [{ id: 'divine-blessing-buff', type: 'divine-blessing-buff', intensity: 4 }]
+      piece.statusTags = [{ id: 'divine-blessing-buff', type: 'damage-buff', name: '强化', intensity: 4 }]
       piece.rules = [loadRuleById('rule-divine-blessing', true)!]
       const state = makeState({ pieces: [piece] }) as any
       new TriggerSystem().checkTriggers(state, { type: 'beforeDamageDealt', playerId: 'player-red', sourcePiece: piece, piece, damage: 3 })

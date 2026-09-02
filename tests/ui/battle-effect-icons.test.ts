@@ -77,6 +77,17 @@ describe('RED-165 battle effect icon registry', () => {
       visibility: 'board',
     })
     expect(icons.resolveStatusType('freeze')).toMatchObject({ iconId: 'freeze', visibility: 'board' })
+    expect(icons.resolveStatusType('imprisoned')).toMatchObject({
+      iconId: 'imprisoned', assetPath: 'images/effect-icons/imprisoned.svg', label: '禁锢', visibility: 'board',
+    })
+    expect(icons.resolveStatusType('resurreccion')).toMatchObject({
+      iconId: 'resurreccion', assetPath: 'images/effect-icons/resurreccion.svg', label: '归刃', visibility: 'board',
+    })
+    expect(icons.resolveStatusType('damage-buff')).toMatchObject({
+      iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '强化', visibility: 'board',
+    })
+    expect(icons.resolveStatusType('aizen-kyoka-active').visibility).toBe('hidden')
+    expect(icons.resolveStatusType('aizen-kyoka-secret').visibility).toBe('hidden')
     expect(icons.resolveStatusType('chidori-immobile').iconId)
       .toBe(icons.resolveStatusType('venom-corrosion-immobile').iconId)
     expect(icons.resolveStatusType('shishio-cooldown-fired').visibility).toBe('hidden')

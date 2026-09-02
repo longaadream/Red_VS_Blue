@@ -371,8 +371,8 @@ describe('Velen delayed holy cards', () => {
 
     const charge = executeCardFunction(loadCardById('holy-charge', true)!, 'player-red', state, undefined, undefined, undefined, undefined, undefined, chargeCard)
     expect(charge.success).toBe(true)
-    expect(source.statusTags.find((tag: any) => tag.type === 'damage-buff')?.intensity).toBe(3)
-    expect(ally.statusTags.find((tag: any) => tag.type === 'damage-buff')?.intensity).toBe(3)
+    expect(source.statusTags.find((tag: any) => tag.type === 'damage-buff')).toMatchObject({ name: '强化', intensity: 3 })
+    expect(ally.statusTags.find((tag: any) => tag.type === 'damage-buff')).toMatchObject({ name: '强化', intensity: 3 })
   })
 
 

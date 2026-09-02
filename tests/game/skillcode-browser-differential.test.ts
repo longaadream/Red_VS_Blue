@@ -137,7 +137,7 @@ function executeRuleSkillCode(runtime: Runtime): SkillCodeTraceEvidence {
 function executeRuleTriggerSkill(runtime: Runtime): SkillCodeTraceEvidence {
   seedSkillCodeRuntime(runtime, SURFACE_SEEDS.ruleTriggerSkill)
   const piece = makePiece({ instanceId: 'blessing-owner' }) as any
-  piece.statusTags = [{ id: 'divine-blessing-buff', type: 'divine-blessing-buff', intensity: 4 }]
+  piece.statusTags = [{ id: 'divine-blessing-buff', type: 'damage-buff', name: '强化', intensity: 4 }]
   const rule = runtime.loadRuleById('rule-divine-blessing', true)
   if (!rule) throw new Error('rule-divine-blessing did not load')
   piece.rules = [rule]
