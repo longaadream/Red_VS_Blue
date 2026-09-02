@@ -44,7 +44,7 @@
   }
 
   function statusIcon(status) {
-    return String(status && (status.iconPath || status.assetPath) || '/effect-icons/fallback.svg')
+    return String(status && (status.iconPath || status.assetPath) || 'images/effect-icons/fallback.svg')
   }
 
   function statusBadge(status) {

@@ -830,7 +830,7 @@
   }
 
   function _statusIconPath(entry) {
-    return entry.status.iconPath || entry.status.assetPath || entry.meta.assetPath || '/effect-icons/fallback.svg'
+    return entry.status.iconPath || entry.status.assetPath || entry.meta.assetPath || 'images/effect-icons/fallback.svg'
   }
 
   function _renderStatusIcon(container, entry, compact) {
@@ -918,7 +918,7 @@
       : (function () {
           const all = (piece.statusSummary || []).map(status => ({
             status,
-            meta: { color: '#a78bfa', assetPath: status.iconPath || '/effect-icons/fallback.svg' },
+            meta: { color: '#a78bfa', assetPath: status.iconPath || 'images/effect-icons/fallback.svg' },
           }))
           return { items: all.slice(0, 2), all, overflowCount: Math.max(0, all.length - 2) }
         })()

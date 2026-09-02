@@ -67,7 +67,7 @@ describe('battle piece health and negative-status summary', () => {
       type: 'deployment-first-move-free',
       label: '本回合首次移动免费',
       iconId: 'free-move',
-      iconPath: '/effect-icons/free-move.svg',
+      iconPath: 'images/effect-icons/free-move.svg',
       visibility: 'board',
       description: '',
       stacks: 0,
