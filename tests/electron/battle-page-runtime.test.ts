@@ -681,6 +681,20 @@ describe('battle page runtime source', () => {
   it('applies the successful training authority receipt before rendering', async () => {
     const html = readBattlePage()
     let clearedTimers = 0
+    const projectedEvents = [{
+      eventId: 'training-action-1:0',
+      rootEventId: 'training-action-1:0',
+      actionId: 'training-action-1',
+      sequence: 0,
+      kind: 'skill',
+      iconId: 'action-skill',
+      sourcePieceId: 'liadrin',
+      skillId: 'liadrin-divine-shield',
+    }]
+    const projectBattlePresentationEvents = vi.fn(() => structuredClone(projectedEvents))
+    const projectBattlePresentationEventsForViewer = vi.fn((events: typeof projectedEvents) => structuredClone(events))
+    const Engine = { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer }
+    const presentationUpdate = vi.fn()
     const elements: Record<string, { disabled?: boolean; textContent?: string }> = {
       btnEnd: { disabled: false },
       btnSwitchPov: { textContent: '' },
@@ -692,11 +706,12 @@ describe('battle page runtime source', () => {
       terminalResult: null,
     }
     const context = vm.createContext({
+      window: { RvBGameEngine: { ensure: async () => Engine } },
+      __presentationUpdate: presentationUpdate,
       document: { getElementById: (id: string) => elements[id] ?? null },
       clearTimeout: () => { clearedTimers += 1 },
       setMoveButtonDisabled: () => undefined,
       trainingApiFetch: async () => nextState,
-      createBattlePresentationModel: () => ({}),
       spawnStateFloaters: () => undefined,
       flushActionLog: () => undefined,
       getTrainingPlayerFaction: () => 'red',
@@ -731,11 +746,14 @@ describe('battle page runtime source', () => {
       }
       let pendingSkill = null
       let pendingCardAction = null
+      let latestBattlePresentationEvents = []
+      let trainingBattlePresentationChains = []
       let selectedPieceId = null
       let myPlayerId = 'player-red'
       let myFaction = 'red'
+      const TRAINING_MODE = true
       let _use3d = false
-      let battlePresentation = null
+      let battlePresentation = { update: globalThis.__presentationUpdate }
       const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
       function clearTargetInteraction() {
         pendingSkill = null
@@ -746,21 +764,48 @@ describe('battle page runtime source', () => {
       function render() {
         globalThis.__pendingAtRender = pendingActionFeedback
         globalThis.__targetPendingAtRender = targetSubmissionPending
+        const model = createBattlePresentationModel(G)
+        battlePresentation.update(model)
+        globalThis.__eventsAtRender = model.presentationEvents
+      }
+      function createBattlePresentationModel(snapshot) {
+        return { snapshot, presentationEvents: latestBattlePresentationEvents }
       }
       ${runtimeFunction(html, 'clearPendingActionFeedback')}
       ${runtimeFunction(html, 'applyAuthorityReceipt')}
+      ${runtimeFunction(html, 'refreshTrainingPresentationEvents')}
+      ${runtimeFunction(html, 'appendTrainingPresentationEvents')}
       async ${runtimeFunction(html, 'trainingDoAction')}
     `, context)
 
-    await vm.runInContext(`trainingDoAction({
+    const submittedAction = {
       type: 'playCard',
       playerId: 'player-red',
       clientActionId: 'training-action-1',
       targetPieceId: 'liadrin',
-    })`, context)
+    }
+    context.__submittedAction = structuredClone(submittedAction)
+    const actionBefore = structuredClone(context.__submittedAction)
+    const nextStateBefore = structuredClone(nextState)
+
+    await vm.runInContext('trainingDoAction(__submittedAction)', context)
 
     expect(context.__pendingAtRender).toBeNull()
     expect(context.__targetPendingAtRender).toBeNull()
+    expect(context.__eventsAtRender).toEqual(projectedEvents)
+    expect(presentationUpdate).toHaveBeenCalledWith(expect.objectContaining({ presentationEvents: projectedEvents }))
+    expect(projectBattlePresentationEvents).toHaveBeenCalledOnce()
+    expect(projectBattlePresentationEvents).toHaveBeenCalledWith({
+      actionId: 'training-action-1',
+      command: expect.objectContaining(submittedAction),
+      beforeState: expect.objectContaining({
+        players: [expect.objectContaining({ playerId: 'player-red', actionPoints: 3 })],
+      }),
+      afterState: nextState,
+    })
+    expect(projectBattlePresentationEventsForViewer).toHaveBeenCalledWith(projectedEvents, 'player-red')
+    expect(context.__submittedAction).toEqual(actionBefore)
+    expect(nextState).toEqual(nextStateBefore)
     expect(vm.runInContext('pendingActionFeedback', context)).toBeNull()
     expect(vm.runInContext('targetSubmissionPending', context)).toBeNull()
     expect(vm.runInContext('pendingActionFeedbackTimer', context)).toBeNull()
