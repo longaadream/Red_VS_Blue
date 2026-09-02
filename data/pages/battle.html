@@ -15,6 +15,7 @@
   <script src="js/ws-client.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-effect-icons.js"></script>
+  <script src="js/battle-ui/battle-presentation-events.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
   <script src="js/battle-ui/battle-action-history.js"></script>
   <script src="js/battle-ui/battle-action-vignette.js"></script>
@@ -6491,6 +6492,15 @@
         setMoveButtonDisabled(true)
         const oldG = G
         const newG = await trainingApiFetch('PUT', { action, battleState: G })
+        const projection = window.BattlePresentationEvents
+        latestBattlePresentationEvents = projection && typeof projection.projectBattlePresentationEvents === 'function'
+          ? projection.projectBattlePresentationEvents({
+              actionId: action.clientActionId,
+              command: action,
+              beforeState: oldG,
+              afterState: newG,
+            })
+          : []
         if (_use3d && battlePresentation) {
           battlePresentation.animateAction(
             Object.assign({}, action, { motionEventKey: 'training:' + action.clientActionId }),

@@ -80,11 +80,29 @@ describe('battle page route contract', () => {
   it('mounts the RED-167 vignette inside the shared battle presentation lifecycle', () => {
     const battlePage = readPage('battle.html')
 
+    expect(battlePage).toContain('<script src="js/battle-ui/battle-presentation-events.js"></script>')
     expect(battlePage).toContain('<script src="js/battle-ui/battle-action-vignette.js"></script>')
     expect(battlePage).toContain('battleActionVignette = BattleActionVignette.create({')
     expect(battlePage).toContain('vignetteUi: battleActionVignette')
     expect(battlePage).toContain("const RED167_QA_MODE = params.get('qa') === 'RED-167'")
     expect(battlePage).toContain('window.__RVB_RED167_REPLAY__ = playRed167QaSequence')
+  })
+
+  it('projects real training actions into the shared RED-167 presentation queue', () => {
+    const trainingAction = readNamedAsyncFunction(readPage('battle.html'), 'trainingDoAction')
+    const projectionContext = createContext({})
+    new Script(
+      readFileSync(resolve(pagesDir, 'js/battle-ui/battle-presentation-events.js'), 'utf8'),
+    ).runInContext(projectionContext)
+
+    expect(typeof projectionContext.BattlePresentationEvents?.projectBattlePresentationEvents).toBe('function')
+    expect(trainingAction).toContain('window.BattlePresentationEvents')
+    expect(trainingAction).toContain('projection.projectBattlePresentationEvents({')
+    expect(trainingAction).toContain('actionId: action.clientActionId')
+    expect(trainingAction).toContain('command: action')
+    expect(trainingAction).toContain('beforeState: oldG')
+    expect(trainingAction).toContain('afterState: newG')
+    expect(trainingAction).toContain('latestBattlePresentationEvents =')
   })
 
   it('feeds the authoritative response timer into the shared battle clock view', () => {
