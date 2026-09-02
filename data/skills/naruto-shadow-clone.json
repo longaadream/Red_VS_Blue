@@ -12,6 +12,7 @@
   "maxCharges": 0,
   "powerMultiplier": 1.0,
   "actionPointCost": 1,
+  "concealTargetInBattleLog": true,
   "targeting": {
     "steps": [
       {

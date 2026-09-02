@@ -90,17 +90,35 @@
   }, {}))
 
   const actionRegistry = Object.freeze({
-    'action-move': entry('mark', VISIBILITY.DETAIL, { iconId: 'action-move', assetPath: 'images/effect-icons/action-move.svg', label: '移动' }),
-    'action-skill': entry('transformation', VISIBILITY.DETAIL, { iconId: 'action-skill', assetPath: 'images/effect-icons/action-skill.svg', label: '技能' }),
-    'action-charge-skill': entry('charge', VISIBILITY.DETAIL, { iconId: 'action-charge-skill', assetPath: 'images/effect-icons/action-charge-skill.svg', label: '充能技能' }),
-    'action-card': entry('buff', VISIBILITY.DETAIL, { iconId: 'action-card', assetPath: 'images/effect-icons/action-card.svg', label: '卡牌' }),
-    'action-passive': entry('time', VISIBILITY.DETAIL, { iconId: 'action-passive', assetPath: 'images/effect-icons/action-passive.svg', label: '被动触发' }),
-    'action-damage': entry('damage-over-time', VISIBILITY.DETAIL, { iconId: 'action-damage', assetPath: 'images/effect-icons/action-damage.svg', label: '伤害' }),
-    'action-heal': entry('revive', VISIBILITY.DETAIL, { iconId: 'action-heal', assetPath: 'images/effect-icons/action-heal.svg', label: '治疗' }),
-    'action-death': entry('revive', VISIBILITY.DETAIL, { iconId: 'action-death', assetPath: 'images/effect-icons/action-death.svg', label: '死亡', color: '#fb7185', tone: 'danger' }),
-    'status-add': entry('buff', VISIBILITY.DETAIL, { iconId: 'status-add', assetPath: 'images/effect-icons/status-add.svg', label: '获得状态' }),
-    'status-remove': entry('unknown', VISIBILITY.DETAIL, { iconId: 'status-remove', assetPath: 'images/effect-icons/status-remove.svg', label: '移除状态' }),
-    shield: entry('shield', VISIBILITY.DETAIL),
+    'action-move': entry('mark', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-move.svg', label: '移动' }),
+    'action-deploy': entry('mark', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-deploy.svg', label: '部署' }),
+    'action-skill': entry('transformation', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-skill.svg', label: '使用技能' }),
+    'action-charge-skill': entry('charge', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-charge-skill.svg', label: '使用充能技能' }),
+    'action-card': entry('buff', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-play-card.svg', label: '使用卡牌' }),
+    'action-end-turn': entry('time', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-end-turn.svg', label: '结束回合' }),
+    'action-automatic': entry('time', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-change.svg', label: '自动结算' }),
+    'action-choice': entry('mark', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-choice.svg', label: '选择' }),
+    'action-passive': entry('time', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-change.svg', label: '触发' }),
+    'action-block': entry('shield', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-block.svg', label: '阻止' }),
+    'action-damage': entry('damage-over-time', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-damage.svg', label: '造成伤害' }),
+    'action-heal': entry('revive', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-heal.svg', label: '恢复生命' }),
+    'action-force-move': entry('control', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-force-move.svg', label: '强制位移' }),
+    'action-spawn': entry('revive', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-spawn.svg', label: '生成' }),
+    'action-death': entry('revive', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-death.svg', label: '死亡', color: '#fb7185', tone: 'danger' }),
+    'action-eliminated': entry('revive', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-eliminate.svg', label: '出局', color: '#fb7185', tone: 'danger' }),
+    'action-action-points': entry('mark', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-action-points.svg', label: '行动点变化' }),
+    'action-charge-points': entry('charge', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-charge-points.svg', label: '充能点变化' }),
+    'action-card-gain': entry('buff', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-card-gain.svg', label: '获得手牌' }),
+    'action-card-discard': entry('curse', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-card-discard.svg', label: '弃置手牌' }),
+    'action-card-change': entry('mark', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-card-change.svg', label: '手牌信息变化' }),
+    'action-tile-change': entry('mark', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-change.svg', label: '地格变化' }),
+    'action-tile-effect-add': entry('buff', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-add.svg', label: '添加地格效果' }),
+    'action-tile-effect-remove': entry('unknown', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-remove.svg', label: '移除地格效果' }),
+    'action-stat-change': entry('mark', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-change.svg', label: '属性变化' }),
+    'action-redirect': entry('mark', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-redirect.svg', label: '改换目标' }),
+    'status-add': entry('buff', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-add.svg', label: '添加状态' }),
+    'status-remove': entry('unknown', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/verb-remove.svg', label: '移除状态' }),
+    'result-hidden': entry('unknown', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/complement-hidden.svg', label: '结果保密' }),
   })
 
   const statusFallback = entry('unknown', VISIBILITY.BOARD)
@@ -122,7 +140,9 @@
   }
 
   function resolveAction(iconId) {
-    return actionRegistry[String(iconId || '')] || actionFallback
+    const key = String(iconId || '')
+    const resolved = actionRegistry[key]
+    return resolved ? Object.assign({}, resolved, { iconId: key }) : actionFallback
   }
 
   function value(status, keys) {

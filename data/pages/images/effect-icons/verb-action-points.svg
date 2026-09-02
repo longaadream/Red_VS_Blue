@@ -1,0 +1,5 @@
+<!-- Matches the existing Red VS Blue existing-action-point-glyph. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" role="img">
+  <title>行动点变化</title>
+  <path d="M7 3h10l5 9-5 9H7l-5-9 5-9Z"/><path d="m13.5 5-5 8h4l-2 6 5-8h-4l2-6Z"/>
+</svg>
