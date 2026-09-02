@@ -371,8 +371,45 @@ describe('Velen delayed holy cards', () => {
 
     const charge = executeCardFunction(loadCardById('holy-charge', true)!, 'player-red', state, undefined, undefined, undefined, undefined, undefined, chargeCard)
     expect(charge.success).toBe(true)
-    expect(source.statusTags.find((tag: any) => tag.type === 'damage-buff')?.intensity).toBe(3)
-    expect(ally.statusTags.find((tag: any) => tag.type === 'damage-buff')?.intensity).toBe(3)
+    expect(source.statusTags.find((tag: any) => tag.type === 'damage-buff')).toMatchObject({ name: '强化', intensity: 3 })
+    expect(ally.statusTags.find((tag: any) => tag.type === 'damage-buff')).toMatchObject({ name: '强化', intensity: 3 })
+  })
+
+  it('merges Holy Charge and Divine Blessing into one additive buff and one rule', () => {
+    const source = makePiece({ instanceId: 'shared-buff-source', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
+    const ally = makePiece({ instanceId: 'shared-buff-ally', ownerPlayerId: 'player-red', x: 1, y: 0 }) as any
+    const shielded = makePiece({ instanceId: 'shared-buff-shield', ownerPlayerId: 'player-red', x: 2, y: 0 }) as any
+    shielded.statusTags = [{ id: 'divine-shield', type: 'divine-shield' }]
+    const state = makeState({ pieces: [source, ally, shielded] }) as any
+
+    expect(executeSkill('divine-blessing', state, source.instanceId).success).toBe(true)
+    const enhancedCharge = {
+      cardId: 'holy-charge', instanceId: 'shared-buff-charge', ownerPlayerId: 'player-red',
+      effectModifiers: [{ effect: 'statusIntensity', operation: 'multiply', value: 1.5, statusType: 'damage-buff' }],
+    }
+    expect(executeCardFunction(
+      loadCardById('holy-charge', true)!, 'player-red', state,
+      undefined, undefined, undefined, undefined, undefined, enhancedCharge,
+    ).success).toBe(true)
+
+    for (const piece of [source, ally, shielded]) {
+      expect(piece.statusTags.filter((tag: any) => tag.type === 'damage-buff')).toEqual([
+        expect.objectContaining({
+          id: 'damage-buff', name: '强化', intensity: 6, remainingUses: 1,
+          relatedRules: ['rule-damage-buff'],
+        }),
+      ])
+      expect(piece.rules.filter((rule: any) => rule.id === 'rule-damage-buff')).toHaveLength(1)
+      expect(piece.rules.some((rule: any) => ['rule-holy-charge', 'rule-divine-blessing'].includes(rule.id))).toBe(false)
+    }
+
+    const context: any = {
+      type: 'beforeDamageDealt', playerId: 'player-red', sourcePiece: ally, damage: 3,
+    }
+    expect(new TriggerSystem().checkTriggers(state, context).success).toBe(true)
+    expect(context.damage).toBe(9)
+    expect(ally.statusTags.some((tag: any) => tag.type === 'damage-buff')).toBe(false)
+    expect(ally.rules.some((rule: any) => rule.id === 'rule-damage-buff')).toBe(false)
   })
 
 

@@ -929,8 +929,10 @@
     .pi-status-icon {
       width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
       border-radius: 999px; color: #020617; background: var(--status-color);
+      padding: 3px; overflow: hidden;
       font-size: 12px; font-weight: 950; box-shadow: 0 0 0 1px rgba(255,255,255,.46);
     }
+    .pi-status-icon-image { width: 100%; height: 100%; display: block; object-fit: contain; }
     .pi-status-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
     .pi-status-name { color: #f8fafc; font-size: 12px; font-weight: 800; }
     .pi-status-meta { color: #fbbf24; font-size: 10px; }
@@ -3300,12 +3302,13 @@
               : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
             const detail = statusPresentation ? statusPresentation.detailText(t) : ''
             const label = t.name || t.label || t.type || t.id || '?'
-            const description = t.description || meta.description
+            const iconPath = t.iconPath || t.assetPath || meta.assetPath || 'images/effect-icons/fallback.svg'
+            const description = t.description || meta.description || ''
             return `<div class="pi-status-row" data-status-id="${escHtml(t.id || t.type || '')}">
-              <span class="pi-status-icon" style="--status-color:${escHtml(meta.color)}">${escHtml(t.icon || meta.glyph)}</span>
+              <span class="pi-status-icon" style="--status-color:${escHtml(meta.color)}"><img class="pi-status-icon-image" src="${escHtml(iconPath)}" alt="" aria-hidden="true"></span>
               <span class="pi-status-copy"><span class="pi-status-name">${escHtml(label)}</span>
               ${detail ? `<span class="pi-status-meta">${escHtml(detail)}</span>` : ''}
-              <span class="pi-status-desc">${escHtml(description)}</span></span>
+              ${description ? `<span class="pi-status-desc">${escHtml(description)}</span>` : ''}</span>
             </div>`
           }).join('')}</div>`
         : '<div class="pi-section-label">\u5168\u90e8\u53ef\u89c1\u72b6\u6001</div><div class="pi-status-none">\u5f53\u524d\u65e0\u53ef\u89c1\u72b6\u6001</div>'

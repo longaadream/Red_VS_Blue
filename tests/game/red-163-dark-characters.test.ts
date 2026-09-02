@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- JSON-authored character rules expose dynamic runtime fields. */
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
@@ -177,7 +178,9 @@ describe('RED-163 dark character contract', () => {
     globalTriggerSystem.checkTriggers(state, { type: 'beginTurn', playerId: 'player-red' })
     expect(ulquiorra).toMatchObject({ attack: 5, moveRange: 4, currentHp: 11, maxHp: 12 })
     expect(ulquiorra.skills).toContainEqual(expect.objectContaining({ skillId: 'ulquiorra-black-cero' }))
-    expect(ulquiorra.statusTags).toContainEqual(expect.objectContaining({ type: 'ulquiorra-resurreccion' }))
+    expect(ulquiorra.statusTags).toContainEqual(expect.objectContaining({
+      type: 'resurreccion', name: '归刃',
+    }))
 
     ulquiorra.currentHp = 5
     withRuleRuntime(new RuleRuntime({ rootSeed: 163, tick: 2 }), () => {
@@ -208,6 +211,9 @@ describe('RED-163 dark character contract', () => {
       expect(grimmjow).toMatchObject({ currentHp: 10, maxHp: 10, attack: 5, moveRange: 5 })
       expect(grimmjow.skills).toContainEqual(expect.objectContaining({ skillId: 'grimmjow-panther-claw' }))
       expect(grimmjow.skills).not.toContainEqual(expect.objectContaining({ skillId: 'grimmjow-gran-rey-cero' }))
+      expect(grimmjow.statusTags).toContainEqual(expect.objectContaining({
+        type: 'resurreccion', name: '归刃',
+      }))
       expect(state.players[1].chargePoints).toBe(1)
 
       const second = dealDamage(enemy, grimmjow, 10, 'true', state, 'second-death')
@@ -241,7 +247,7 @@ describe('RED-163 dark character contract', () => {
     state.players[1].actionPoints = 2
     state.skillsById['ulquiorra-cero'] = loadAllSkillsById()['ulquiorra-cero']
     aizen.statusTags = [
-      { id: 'kyoka-public', type: 'aizen-kyoka-active', visible: true },
+      { id: 'kyoka-public', type: 'aizen-kyoka-active', visible: false },
       { id: 'kyoka-secret', type: 'aizen-kyoka-secret', visible: false, targetPieceId: original.instanceId, opponentPlayerId: enemy.ownerPlayerId },
     ]
 
@@ -275,7 +281,7 @@ describe('RED-163 dark character contract', () => {
     }) as any
     aizen.rules = [rule('rule-aizen-kyoka-rewrite'), rule('rule-aizen-kyoka-expire')]
     aizen.statusTags = [
-      { id: 'self-rewrite-public', type: 'aizen-kyoka-active', visible: true },
+      { id: 'self-rewrite-public', type: 'aizen-kyoka-active', visible: false },
       {
         id: 'self-rewrite-secret', type: 'aizen-kyoka-secret', visible: false,
         targetPieceId: 'self-rewrite-ally', opponentPlayerId: 'player-blue',
@@ -410,7 +416,7 @@ describe('RED-163 dark character contract', () => {
     expect(resolved.players[0].actionPoints).toBe(1)
     expect(resolved.pieces.find((piece: any) => piece.instanceId === aizen.instanceId).statusTags)
       .toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: 'aizen-kyoka-active', visible: true }),
+        expect.objectContaining({ type: 'aizen-kyoka-active', visible: false }),
         expect.objectContaining({ type: 'aizen-kyoka-secret', visible: false, targetPieceId: ally.instanceId }),
       ]))
     const publicSkillLog = resolved.actions.find((entry: any) => (
@@ -439,7 +445,7 @@ describe('RED-163 dark character contract', () => {
     state.players[1].actionPoints = 2
     state.skillsById['ulquiorra-cero'] = loadAllSkillsById()['ulquiorra-cero']
     aizen.statusTags = [
-      { id: 'kyoka-public', type: 'aizen-kyoka-active', visible: true },
+      { id: 'kyoka-public', type: 'aizen-kyoka-active', visible: false },
       { id: 'kyoka-secret', type: 'aizen-kyoka-secret', visible: false, targetPieceId: secret.instanceId, opponentPlayerId: enemy.ownerPlayerId },
     ]
 
@@ -480,7 +486,7 @@ describe('RED-163 dark character contract', () => {
     const cast = runBattleAction(state, action, { rootSeed: 168 }).state as any
     expect(cast.pieces.find((piece: any) => piece.instanceId === enemy.instanceId)).toMatchObject({ currentHp: 14, x: 2, y: 0 })
     expect(cast.pieces.find((piece: any) => piece.instanceId === enemy.instanceId).statusTags)
-      .toContainEqual(expect.objectContaining({ type: 'aizen-black-coffin', blocksForcedMovement: true }))
+      .toContainEqual(expect.objectContaining({ type: 'imprisoned', name: '禁锢', blocksForcedMovement: true }))
     expect(cast.players[0]).toMatchObject({ actionPoints: 0, chargePoints: 0 })
 
     cast.turn.currentPlayerId = 'player-blue'
@@ -496,13 +502,13 @@ describe('RED-163 dark character contract', () => {
     })
     expect(blockedMove.pieces.find((piece: any) => piece.instanceId === enemy.instanceId).currentHp).toBe(8)
     expect(blockedMove.pieces.find((piece: any) => piece.instanceId === enemy.instanceId).statusTags)
-      .not.toContainEqual(expect.objectContaining({ type: 'aizen-black-coffin' }))
+      .not.toContainEqual(expect.objectContaining({ id: expect.stringMatching(/^aizen-black-coffin-/) }))
   })
 
   it('rejects skill movement of a piece imprisoned by Black Coffin without changing state', () => {
     const prisoner = makePiece({
       instanceId: 'coffin-prisoner', ownerPlayerId: 'player-red', x: 2, y: 1,
-      statusTags: [{ id: 'coffin-lock', type: 'aizen-black-coffin', blocksForcedMovement: true }],
+      statusTags: [{ id: 'coffin-lock', type: 'imprisoned', name: '禁锢', blocksForcedMovement: true }],
     }) as any
     const mover = makePiece({
       instanceId: 'coffin-forcer', ownerPlayerId: 'player-blue', faction: 'blue', x: 3, y: 1,
@@ -517,6 +523,26 @@ describe('RED-163 dark character contract', () => {
 
     expect(() => runBattleAction(state, action, { rootSeed: 171 })).toThrow(/cannot be moved by a skill/)
     expect(JSON.stringify(state)).toBe(before)
+  })
+
+  it('does not settle an imprisoned status created by another source as Black Coffin damage', () => {
+    const prisoner = makePiece({
+      instanceId: 'other-prisoner', ownerPlayerId: 'player-blue', currentHp: 10, maxHp: 10,
+      statusTags: [{
+        id: 'future-imprisoned-source', type: 'imprisoned', name: '禁锢', sourceId: 'future-caster',
+        delayedDamage: 99, blocksForcedMovement: true,
+      }],
+    })
+    prisoner.rules = [rule('rule-aizen-black-coffin-end'), rule('rule-aizen-black-coffin-move')]
+    const state = makeState({ pieces: [prisoner], currentPlayerId: 'player-blue' })
+
+    withRuleRuntime(new RuleRuntime({ rootSeed: 173, tick: 1 }), () => {
+      globalTriggerSystem.checkTriggers(state, { type: 'endTurn', playerId: 'player-blue' })
+    })
+
+    expect(prisoner.currentHp).toBe(10)
+    expect(prisoner.statusTags).toContainEqual(expect.objectContaining({ id: 'future-imprisoned-source' }))
+    expect(prisoner.rules).not.toContainEqual(expect.objectContaining({ id: 'rule-aizen-black-coffin-end' }))
   })
 
   it('allows Hunting Instinct to trigger repeatedly in the same turn', () => {
@@ -565,7 +591,7 @@ describe('RED-163 dark character contract', () => {
     const grimmjow = makePiece({
       instanceId: 'panther', templateId: 'dark-grimmjow', ownerPlayerId: 'player-red', x: 0, y: 0,
       currentHp: 10, maxHp: 10, attack: 5, moveRange: 5,
-      statusTags: [{ id: 'panther-form', type: 'grimmjow-resurreccion', visible: true }],
+      statusTags: [{ id: 'panther-form', type: 'resurreccion', name: '归刃', visible: true }],
     }) as any
     const enemy = makePiece({
       instanceId: 'panther-target', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 0,
